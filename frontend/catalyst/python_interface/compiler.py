@@ -62,12 +62,10 @@ class Compiler:
             gentxtmod = module
 
         # convert qref to value semantics
-        value_semantics_mlir = (
-            catalyst.python_interface.inspection.xdsl_conversion._quantum_opt_stderr(
-                '--catalyst-pipeline="pipe(canonicalize;convert-to-value-semantics;canonicalize)"',
-                "--mlir-print-op-generic",
-                stdin=str(gentxtmod),
-            )
+        value_semantics_mlir = catalyst.python_interface.inspection.xdsl_conversion._quantum_opt_stderr(
+            '--catalyst-pipeline="pipe(canonicalize;symbol-dce;convert-to-value-semantics;canonicalize)"',
+            "--mlir-print-op-generic",
+            stdin=str(gentxtmod),
         )
 
         # Parse and transform with xDSL

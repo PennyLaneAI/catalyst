@@ -26,147 +26,37 @@ import jax.numpy as jnp
 import pennylane as qp
 from jax._src.lib.mlir import ir
 from jaxlib.mlir.dialects.builtin import ModuleOp
-from pennylane.pytrees import flatten
 
+from catalyst.decomposition.graph_op_id import GraphOpID
 from catalyst.decomposition.type_utils import (
     convert_types_to_mlir_strings,
-    format_dynamic_params_for_id,
     get_dummy_values_for_arg,
-    post_process_concretize_leaves,
-    replace_abstract_wires_with_concrete_wires,
 )
-from catalyst.from_plxpr.uid import generate_uid
 from catalyst.jax_extras.lowering import get_mlir_attribute_from_pyval
 
 # Ops that make a decomposition body non-invertible:
 _NON_INVERTIBLE_MARKERS = ("qref.measure", "quantum.measure")
 
 
-class GraphOpID:
+def wrap_modifier_id(op_id: str, modifier: str) -> str:
+    """Name-wrap an op-level ``modifier`` around a graphOpId's operator name.
+
+    The modifier decorates the operator name only; the ``{param}{wire}{static}`` groups (and an
+    optional ``[uid]``) follow it, matching the compiler's ``defaultGetGraphOpId``. This applies to
+    any modifier (e.g. ``"Adjoint"``, ``"C"``), so nested ids compose as ``C(Adjoint(RX)){...}``.
+    Extend callers here to support future op-level modifiers.
     """
-    A parser object to compute the graph operator id for the operator2 instance `op`.
+    split = len(op_id)
+    for i, char in enumerate(op_id):
+        if char in "{[":
+            split = i
+            break
+    return f"{modifier}({op_id[:split]}){op_id[split:]}"
 
-    The format of the computed graph op ID string is as follows:
-        op_name{param_shaped_type_dictionary}{wire_lens_dictionary}{static_data_dictionary}[UID]
 
-    For example, an Operator2 instance with class name `HybridOpArg`, taking in one float param
-    argument named `angle`, one wire argument named `cwires`, one static data argument
-    `label="hello"`, and UID 10 would be parsed to the following graph op ID:
-        HybridOpArg{angle:[f64]}{cwires:1}{label:hello}[10]
-
-    The defining trait of a graph op ID is that it has unique correspondence to decomposition rules.
-    In other words, different graph op IDs have different sets of decomposition rules.
-
-    For example,
-        PauliRot{angle:[f64]}{wires:1}{pauli_word:X}[]
-    and
-        PauliRot{angle:[f64]}{wires:2}{pauli_word:XX}[]
-    will have different decomposition rules.
-
-    Note that this function should not be updated without updating the corresponding method on the
-    DecomposableGate interface in mlir/lib/quantum/IR/QuantumInterfaces.cpp.
-    """
-
-    def __init__(self, op: qp.core.Operator2):
-        """Create a new GraphOpId."""
-        assert isinstance(
-            op, qp.core.Operator2
-        ), f"Graph-based decomposition expects an Operator2 instance, got {op} of type {type(op)}"
-        self.op = op
-
-        self.operator_name = op.name
-        self.dynamic_shape = self.parse_dynamic_shape()
-        self.wire_lens = self.parse_wire_lens()
-        self.static_data = self.parse_static_data()
-        self.extra_data, self.uid = self.parse_extra_data()
-
-    def parse_dynamic_shape(self) -> dict:
-        """Return the dynamic shape as a dictionary of dtypes from the dynamic arg names."""
-        return {argname: argtype for argname, argtype in sorted(self.op.dynamic_args.items())}
-
-    def parse_wire_lens(self) -> dict:
-        """Return the length of each of the wire args as a dictionary from the wire arg names."""
-        wire_lens = {}
-        for wire_name, wire_arg in sorted(self.op.wire_args.items()):
-            if wire_name not in self.op.hybrid_argnames:
-                wire_lens[wire_name] = len(wire_arg)
-        return wire_lens
-
-    def parse_static_data(self) -> dict:
-        """Return a dictionary of names to static data values."""
-        return {
-            static_argname: getattr(self.op, static_argname)
-            for static_argname in sorted(self.op.compilable_argnames)
-        }
-
-    def parse_extra_data(self) -> dict:
-        """Return the UID computed from this Operator2 instance."""
-        if self.op.static_args or self.op.hybrid_args:
-            hybrid_lens = []
-            hybrid_trees = []
-            hybrid_args = []
-            for _, hybrid_argval in self.op.hybrid_args.items():
-                leaves, tree = flatten(replace_abstract_wires_with_concrete_wires(hybrid_argval))
-                leaves = post_process_concretize_leaves(leaves)
-                hybrid_lens.append(len(leaves))
-                hybrid_trees.append(tree)
-                hybrid_args.extend(leaves)
-            uid = generate_uid(
-                *tuple(self.op.dynamic_args.values()),  # dynamic args
-                *(None,)
-                * sum(
-                    self.wire_lens.values()
-                ),  # non hybrid wires, unused during uid generation, so just give empty values
-                *hybrid_args,
-                op_cls=type(self.op),
-                wire_lens=tuple(self.wire_lens.values()),
-                hybrid_lens=tuple(hybrid_lens),
-                hybrid_trees=tuple(hybrid_trees),
-                adjoint=False,
-                n_ctrls=0,
-                static_args=self.op.static_args,
-            )
-            return self.op.static_args | self.op.hybrid_args, uid
-        else:
-            return {}, -1  # uid is always unsigned, so use -1 for invalid uid
-
-    def get_operator_name(self) -> str:
-        """Return the name of the operator."""
-        return self.operator_name
-
-    def get_dynamic_shape(self) -> dict:
-        """Return a dictionary of names to dynamic shapes."""
-        return self.dynamic_shape
-
-    def get_dynamic_shape_id_format(self) -> str:
-        """Return the dynamic shape formatted for GraphOpId."""
-        return format_dynamic_params_for_id(convert_types_to_mlir_strings(self.dynamic_shape))
-
-    def get_wire_lens_id_format(self) -> str:
-        """Return the wire lengths formatted for GraphOpId."""
-        return "{" + ",".join(f"{name}:{shape}" for name, shape in self.wire_lens.items()) + "}"
-
-    def get_static_data_id_format(self) -> str:
-        """Return the static data formatted for GraphOpId."""
-        return "{" + ",".join(f"{k}:{v}" for k, v in self.static_data.items()) + "}"
-
-    def getID(self) -> str:
-        """
-        Return the GraphOpId as a string.
-
-        NOTE: do not modify this method without also modifying the corresponding DecomposableGate
-        interface in MLIR.
-        """
-        ID_string = (
-            self.get_operator_name()
-            + self.get_dynamic_shape_id_format()
-            + self.get_wire_lens_id_format()
-            + self.get_static_data_id_format()
-        )
-        if self.extra_data:
-            assert self.uid >= 0
-            ID_string += "[" + str(self.uid) + "]"
-        return ID_string
+def name_wrap_adjoint(op_id: str) -> str:
+    """Name-wrap the adjoint modifier around a graphOpId (``RX{...}`` -> ``Adjoint(RX){...}``)."""
+    return wrap_modifier_id(op_id, "Adjoint")
 
 
 def get_rule_strings_from_module(module: ir.Module) -> list[str]:
@@ -254,10 +144,24 @@ def inject_new_rules_into_module(module: ir.Module, decomp_rules: list[str]):
                 decomp_rule_op.clone()
 
 
+def split_call_args(kwargs, is_custom_op):
+    """Split prepared kwargs into (args, kwargs) for calling a rule or resource function.
+
+    Custom-op dynamic params are keyed positionally ("0", "1", ...) but the rule callables expect
+    them by their real argnames, so they are passed positionally with only "wires" kept as keyword.
+    Custom-op params are always scalar f64, so scalar ``0.0`` dummies are used (a shape-(1,) array
+    would instead lower the gate through the general ``qref.operator`` path rather than ``qref.custom``).
+    """
+    if is_custom_op:
+        args = tuple(0.0 for key in kwargs if key != "wires")
+        return args, {"wires": kwargs["wires"]}
+    return (), kwargs
+
+
 def collect_resources_for_op(op_name, kwargs, is_custom_op=False):
     """Return resource data for all decomposition rules associated to op_name."""
     decomp_rules = list(qp.decomposition.list_decomps(op_name))
-    args = ()
+    args, kwargs = split_call_args(kwargs, is_custom_op)
 
     # map rules to resource resources, in a more generic format
     name_to_resource_ids = {}
@@ -266,13 +170,10 @@ def collect_resources_for_op(op_name, kwargs, is_custom_op=False):
         try:
             # The `compute_resources` function's signature is the same as the Operator2 signature
             # for the original op of the rule
-            if is_custom_op:
-                args = tuple(val for key, val in kwargs.items() if key != "wires")
-                kwargs = {"wires": kwargs["wires"]}
             resources = rule.compute_resources(*args, **kwargs)
             name_to_resources[rule.name] = resources.gate_counts
             name_to_resource_ids[rule.name] = {
-                GraphOpID(op).getID(): count for op, count in resources.gate_counts.items()
+                GraphOpID(op).getGraphOpId(): count for op, count in resources.gate_counts.items()
             }
         except Exception as e:
             warnings.warn(f"Failed to get resources for the {rule.name} decomposition rule: {e}")
@@ -319,10 +220,10 @@ def compile_decomposition_rules(
     )
 
     # The distribution pathway targets `Adjoint(op)` and produces adjointed resource gates.
-    target_id = f"Adjoint({op_id})" if wrap_adjoint else op_id
+    target_id = name_wrap_adjoint(op_id) if wrap_adjoint else op_id
     if wrap_adjoint:
         name_to_resource_ids = {
-            rule_name: {f"Adjoint({produced_id})": count for produced_id, count in ids.items()}
+            rule_name: {name_wrap_adjoint(produced_id): count for produced_id, count in ids.items()}
             for rule_name, ids in name_to_resource_ids.items()
         }
 
@@ -344,13 +245,18 @@ def compile_decomposition_rules(
 
         return qp.capture.subroutine(decomp_rule_no_static_args)
 
-    subroutines = [rule_to_subroutine(rule) for rule in decomp_rules]
+    call_args, call_kwargs = split_call_args(kwargs, is_custom_op)
 
-    @qp.qjit(target="mlir", capture=True, skip_decomp_rules=True)
+    subroutines = []
+    for rule in decomp_rules:
+        if rule.is_applicable(*call_args, **call_kwargs):
+            subroutines.append(rule_to_subroutine(rule))
+
+    @qp.qjit(target="mlir", capture=True, collect_decomp_rules=False)
     @qp.qnode(device=device)
     def circuit():
         for subroutine in subroutines:
-            subroutine(**kwargs)
+            subroutine(*call_args, **call_kwargs)
 
     module = circuit.mlir_module
 
@@ -403,15 +309,17 @@ def compile_decomposition_rules_wrapper(
 
 
 def fetch_all_reachable_decomposition_rules_from_op(
-    op_name, op_id, dynamic_shape, wire_lens, static_data, extra_data=None
+    op_name, op_id, dynamic_shape, wire_lens, static_data, extra_data=None, is_custom_op=False
 ):
     extra_data = extra_data or {}
     queue = deque()
-    start = (op_name, dynamic_shape, wire_lens, static_data, extra_data)
+    start = (op_name, dynamic_shape, wire_lens, static_data, extra_data, is_custom_op)
     queue.append(start)
     visited = [start]
 
-    def compile_variants(name, op_id, dynamic_shape, wire_lens, static_data, extra_data):
+    def compile_variants(
+        name, op_id, dynamic_shape, wire_lens, static_data, extra_data, is_custom_op
+    ):
         # CQRs/Adjoint: For an op `name` capture the rules for
         #   1. the base op `name`,
         #   2. the adjoint op `Adjoint(name)` rules, and
@@ -419,7 +327,13 @@ def fetch_all_reachable_decomposition_rules_from_op(
         # Note: a rule whose body or resources can't be captured is skipped with a warning.
         out = get_rule_strings_from_module(
             compile_decomposition_rules(
-                name, op_id, dynamic_shape, wire_lens, static_data, extra_data=extra_data
+                name,
+                op_id,
+                dynamic_shape,
+                wire_lens,
+                static_data,
+                extra_data=extra_data,
+                is_custom_op=is_custom_op,
             )
         )
         if not name.startswith("Adjoint("):
@@ -430,11 +344,12 @@ def fetch_all_reachable_decomposition_rules_from_op(
                     get_rule_strings_from_module(
                         compile_decomposition_rules(
                             adj_name,
-                            f"Adjoint({op_id})",
+                            name_wrap_adjoint(op_id),
                             dynamic_shape,
                             wire_lens,
                             static_data,
                             extra_data=extra_data,
+                            is_custom_op=is_custom_op,
                         )
                     )
                 )
@@ -450,6 +365,7 @@ def fetch_all_reachable_decomposition_rules_from_op(
                         wire_lens,
                         static_data,
                         extra_data=extra_data,
+                        is_custom_op=is_custom_op,
                         wrap_adjoint=True,
                     )
                 )
@@ -464,18 +380,25 @@ def fetch_all_reachable_decomposition_rules_from_op(
                 warnings.warn(f"Failed to synthesize distributed adjoint rules for {adj_name}: {e}")
         return out
 
-    rules = compile_variants(op_name, op_id, dynamic_shape, wire_lens, static_data, extra_data)
+    rules = compile_variants(
+        op_name, op_id, dynamic_shape, wire_lens, static_data, extra_data, is_custom_op
+    )
 
     while len(queue) != 0:
-        this_name, this_dynamic_shape, this_wire_lens, this_static_data, this_extra_data = (
-            queue.popleft()
-        )
+        (
+            this_name,
+            this_dynamic_shape,
+            this_wire_lens,
+            this_static_data,
+            this_extra_data,
+            this_is_custom_op,
+        ) = queue.popleft()
         this_extra_data = this_extra_data or {}
         this_kwargs = prepare_dynamic_op_kwargs(this_dynamic_shape, this_wire_lens)
         # Explore ops reachable through the rules of both this op and its adjoint:
         for explore_name, _ in _op_variants(this_name, ""):
             resources, _, _ = collect_resources_for_op(
-                explore_name, this_kwargs | this_static_data | this_extra_data
+                explore_name, this_kwargs | this_static_data | this_extra_data, this_is_custom_op
             )
             for _rule_name, resource in resources.items():
                 try:
@@ -483,10 +406,11 @@ def fetch_all_reachable_decomposition_rules_from_op(
                         graph_op_id = GraphOpID(op)
                         probe = (
                             graph_op_id.get_operator_name(),
-                            convert_types_to_mlir_strings(graph_op_id.get_dynamic_shape()),
+                            convert_types_to_mlir_strings(graph_op_id.dynamic_shape),
                             graph_op_id.wire_lens,
                             graph_op_id.static_data,
                             graph_op_id.extra_data,
+                            graph_op_id.is_custom_op,
                         )
 
                         if not probe in visited:
@@ -495,11 +419,12 @@ def fetch_all_reachable_decomposition_rules_from_op(
                             rules.extend(
                                 compile_variants(
                                     probe[0],
-                                    graph_op_id.getID(),
+                                    graph_op_id.getGraphOpId(),
                                     probe[1],
                                     probe[2],
                                     probe[3],
                                     probe[4],
+                                    probe[5],
                                 )
                             )
                 except Exception as e:
@@ -517,4 +442,4 @@ def _op_variants(op_name, op_id):
     """
     yield op_name, op_id
     if not op_name.startswith("Adjoint("):
-        yield f"Adjoint({op_name})", f"Adjoint({op_id})"
+        yield f"Adjoint({op_name})", name_wrap_adjoint(op_id)

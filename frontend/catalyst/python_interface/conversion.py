@@ -160,7 +160,7 @@ def xdsl_from_qjit(func: QJIT) -> Callable[..., xbuiltin.ModuleOp]:
         func.jaxpr, *_ = func.capture(args, **kwargs)
         _mlir_module = func.generate_ir()
         value_semantics_mlir = _quantum_opt_stderr(
-            '--catalyst-pipeline="pipe(canonicalize;convert-to-value-semantics;canonicalize)"',
+            '--catalyst-pipeline="pipe(canonicalize;symbol-dce;convert-to-value-semantics;canonicalize)"',
             stdin=str(_mlir_module),
         )
         return parse_generic_to_xdsl_module(value_semantics_mlir)

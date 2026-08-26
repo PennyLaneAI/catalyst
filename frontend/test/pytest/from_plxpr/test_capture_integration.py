@@ -83,6 +83,11 @@ class TestCapture:
     @pytest.mark.parametrize("theta", (jnp.pi, 0.1, 0.0))
     def test_simple_circuit_aot(self, backend, theta):
         """Test the integration for a simple circuit."""
+        if backend == "lightning.qubit":
+            pytest.xfail(
+                reason="Waiting for https://github.com/PennyLaneAI/pennylane-lightning/pull/1420"
+            )
+
         dev = qp.device(backend, wires=2)
 
         @qp.qnode(device=dev)
@@ -310,6 +315,10 @@ class TestCapture:
         """Test the integration for a PCPhase circuit with control."""
         if backend == "lightning.kokkos":
             pytest.xfail(reason="Controlled PCPhase not yet implemented on Kokkos.")
+        if backend == "lightning.qubit":
+            pytest.xfail(
+                reason="Waiting for https://github.com/PennyLaneAI/pennylane-lightning/pull/1420"
+            )
 
         device = qp.device(backend, wires=3)
 
@@ -317,7 +326,7 @@ class TestCapture:
 
         @qp.qnode(device)
         def circuit(theta):
-            qp.ctrl(qp.PCPhase, control=[1], control_values=[False])(theta, 2, wires=[0])
+            qp.ctrl(qp.PCPhase, control=[1], control_values=[False])(theta, dim=2, wires=[0])
             return qp.state()
 
         capture_result = qjit(circuit, capture=True)(theta)
@@ -1135,6 +1144,7 @@ class TestCapture:
             == captured_rotations_inverses_result
         )
 
+    @pytest.mark.xfail(reason="qp.decompose doesn't use graph-decomposition yet.")
     def test_transform_graph_decompose_workflow(self, backend):
         """Test the integration for a circuit with a 'decompose' graph transform."""
 

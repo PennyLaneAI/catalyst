@@ -139,7 +139,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
                                  std::move(altDecomps));
         DecompositionSolver solver(graph);
         auto solution = solver.solve();
-        LLVM_DEBUG(showSolution(solution););
+        LLVM_DEBUG(showSolution(solution));
 
         ///////////////////////////
         // Step 3: Convert python-decompositions from reference to value semantics and run
@@ -187,14 +187,23 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
                 }
             }
 
+            // Distribute a `quantum.ctrl` region lazily.
+            bool hasCtrlRegion = module->walk([&](CtrlOp) { return mlir::WalkResult::interrupt(); })
+                                     .wasInterrupted();
+            if (hasCtrlRegion) {
+                OpPassManager ctrlPm("builtin.module");
+                ctrlPm.addPass(createCtrlLoweringPass());
+                if (failed(runPipeline(ctrlPm, module))) {
+                    return signalPassFailure();
+                }
+            }
+
             // Distribute a `quantum.adjoint` region lazily.
             // It uses a greedy rewriter that would otherwise DCE gates in circuits that
             // never needed adjoint handling.
-            bool hasAdjointRegion = false;
-            module->walk([&](AdjointOp) {
-                hasAdjointRegion = true;
-                return mlir::WalkResult::interrupt();
-            });
+            bool hasAdjointRegion =
+                module->walk([&](AdjointOp) { return mlir::WalkResult::interrupt(); })
+                    .wasInterrupted();
             if (hasAdjointRegion) {
                 OpPassManager adjointPm("builtin.module");
                 adjointPm.addPass(createAdjointLoweringPass());
@@ -293,7 +302,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
 
         // Try to generate resources if they're missing
         if (!resourcesAttr) {
-            ResourceAnalysis analysis(rule);
+            ResourceAnalysis analysis(rule, {}, /*collectDetailedOperations=*/true);
             if (const ResourceResult *flat = analysis.getFlattenedResource(rule.getName())) {
                 rule->setAttr("resources", buildResourceDict(&getContext(), *flat));
             }
@@ -496,65 +505,75 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         });
     }
 
+    // Return the index into `s` of the ')' matching the '(' just consumed from the front of `s`
+    // (the start of `s` is treated as one paren level deep). Depth-aware, so nested modifier
+    // parens like "Adjoint(Op)){...}" resolve to the correct outer ')'. npos if unbalanced.
+    static size_t findMatchingParen(llvm::StringRef s) {
+        int depth = 1;
+        for (size_t i = 0; i < s.size(); ++i) {
+            if (s[i] == '(') {
+                depth++;
+            } else if (s[i] == ')') {
+                depth--;
+                if (depth == 0) {
+                    return i;
+                }
+            }
+        }
+        return llvm::StringRef::npos;
+    }
+
     /**
-     * @brief Helper to parse a gate name into an OperatorNode.
-     * Handles patterns like "Adjoint(GateName)" and "GateName(metadata)".
+     * @brief Parse a graphOpId string into an OperatorNode.
+     *
+     * Handles the name-wrapped modifier forms produced by `defaultGetGraphOpId`:
+     *   - "Adjoint(<inner>)<suffix>"
+     *   - "C(<inner>)<suffix>" / "<n>C(<inner>)<suffix>"
+     * where <inner> is a (possibly further-modified) operator name and <suffix> carries the
+     * "{params}{wires}{static}[uid]" groups. Modifiers nest, e.g. "C(Adjoint(Op)){...}". Falls
+     * back to the legacy "Name(w,p)" resource form. To add a new modifier, mirror the detection
+     * here and the wrapping in `defaultGetGraphOpId`'s `wrapModifiers`.
      */
     OperatorNode parseOperator(llvm::StringRef raw) {
         OperatorNode node;
         llvm::StringRef original = raw;
 
-        // Unwrap control following the implementation for Adjoint(Op)
-        llvm::StringRef afterCount = raw;
-        size_t numDigits = 0;
-        while (numDigits < afterCount.size() && afterCount[numDigits] >= '0' &&
-               afterCount[numDigits] <= '9') {
-            numDigits++;
-        }
-        llvm::StringRef ctrlBody = afterCount.drop_front(numDigits);
-        if (ctrlBody.consume_front("C(") && (ctrlBody.contains('{') || ctrlBody.contains('['))) {
-            size_t numCtrl = 1;
-            if (numDigits > 0) {
-                (void)raw.take_front(numDigits).getAsInteger(10, numCtrl);
+        // Detect a leading name-wrapped op-level modifier: "Adjoint(" or "[<n>]C(".
+        std::string modifier;
+        llvm::StringRef afterModifier;
+        if (raw.starts_with("Adjoint(")) {
+            modifier = "Adjoint";
+            afterModifier = raw.drop_front(llvm::StringRef("Adjoint(").size());
+        } else {
+            size_t numDigits = 0;
+            while (numDigits < raw.size() && raw[numDigits] >= '0' && raw[numDigits] <= '9') {
+                numDigits++;
             }
-            llvm::StringRef inner = ctrlBody.ends_with(")") ? ctrlBody.drop_back(1) : ctrlBody;
-            OperatorNode innerNode = parseOperator(inner);
-            node.numWires = innerNode.numWires;
-            node.numParams = innerNode.numParams;
-            node.id = original.str();
-            node.name = (numCtrl == 1 ? std::string("C(") : std::to_string(numCtrl) + "C(") +
-                        innerNode.name + ")";
-            return node;
+            if (raw.drop_front(numDigits).starts_with("C(")) {
+                modifier = raw.take_front(numDigits).str() + "C";
+                afterModifier = raw.drop_front(numDigits + llvm::StringRef("C(").size());
+            }
         }
 
-        // Unwrap "Adjoint(Op)". The modifier is kept in both the id and the (coarser) name, so the
-        // solver never needs a modifier flag: a modified operator's name won't match a base
-        // gate-set entry.
-        if (raw.consume_front("Adjoint(")) {
-            // New graphOpId form "Adjoint(<base-id>)" (the inner carries '{'/'[' brace groups),
-            // matching defaultGetGraphOpId's wrapping. The whole string is the id; recurse on the
-            // inner base-id to recover name/wires/params.
-            if (raw.contains('{') || raw.contains('[')) {
-                llvm::StringRef inner = raw.ends_with(")") ? raw.drop_back(1) : raw;
-                OperatorNode innerNode = parseOperator(inner);
-                node.name = "Adjoint(" + innerNode.name + ")";
+        if (!modifier.empty()) {
+            size_t closeIdx = findMatchingParen(afterModifier);
+            if (closeIdx != llvm::StringRef::npos) {
+                llvm::StringRef inner = afterModifier.take_front(closeIdx);
+                llvm::StringRef suffix = afterModifier.drop_front(closeIdx + 1);
+                // Recurse on the reconstructed inner id (inner name + suffix) to peel any further
+                // modifiers and recover the base op's wires/params, then re-apply this modifier.
+                OperatorNode innerNode = parseOperator(inner.str() + suffix.str());
+                node.name = modifier + "(" + innerNode.name + ")";
                 node.numWires = innerNode.numWires;
                 node.numParams = innerNode.numParams;
                 node.id = original.str();
                 return node;
             }
-            // FIXME: Currently, the legacy pipeline form "Adjoint(Name)" optionally followed by
-            // a "(w,p)" suffix (e.g. the "Adjoint(T)(1,0)" keys buildResourceDict emits).
-            // To fix this, Add the following find check to find the first ')' closes the base
-            // name and then a trailing "(w,p)" is parsed by the suffix handler below.
-            auto closeIdx = raw.find(')');
-            if (closeIdx == llvm::StringRef::npos) {
-                node.name = "Adjoint(" + raw.trim().str() + ")";
-                return node;
-            }
-            node.name = "Adjoint(" + raw.take_front(closeIdx).trim().str() + ")";
-            raw = raw.drop_front(closeIdx + 1); // leftover: "(w,p)" or ""
-        } else if (raw.contains('[') || raw.contains('{')) {
+            // Unbalanced parens: fall through to base parsing (defensive).
+        }
+
+        // Base op: either the graphOpId "Name{...}..." form or the legacy "Name(w,p)" form.
+        if (raw.contains('[') || raw.contains('{')) {
             node.id = raw.str();
             node.name = raw.take_until([](char c) { return c == '[' || c == '{'; });
         } else {

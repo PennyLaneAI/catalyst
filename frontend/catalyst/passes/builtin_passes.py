@@ -1432,102 +1432,6 @@ ppm_compilation = qp.transform(
 )
 
 
-def ppm_specs(fn, only_disjoint_qubit: bool = False):
-    r"""This function returns following Pauli product rotation (PPR) and Pauli product measurement (PPM)
-    specs in a dictionary:
-
-    - Pi/4 PPR (count the number of clifford PPRs)
-    - Pi/8 PPR (count the number of non-clifford PPRs)
-    - Pi/2 PPR (count the number of classical PPRs)
-    - Max weight for pi/8 PPRs
-    - Max weight for pi/4 PPRs
-    - Max weight for pi/2 PPRs
-    - Number of logical qubits
-    - Number of PPMs
-    - ``depth``: number of PBC layers
-    - ``depth_type``: ``0`` if commuting ops on overlapping qubits may share a layer;
-      ``1`` if only ops with disjoint qubit support may share a layer
-
-    .. note::
-
-        It is recommended to use :func:`pennylane.specs` instead of ``ppm_specs`` to retrieve
-        resource counts of PPR-PPM workflows.
-
-    When there is control flow, this function can count the above statistics inside for loops with
-    a statically known number of iterations. For all other cases, including dynamically sized for
-    loops, and any conditionals and while loops, this pass exits with failure.
-
-    Args:
-        fn (QJIT): qjit-decorated function for which ``ppm_specs`` need to be printed.
-        only_disjoint_qubit (bool): If ``True``, depth is computed using disjoint-qubit layering
-            (``depth_type`` 1). If ``False`` (default), commuting ops on overlapping qubits may
-            share a layer (``depth_type`` 0). Passed to the ``ppm-specs`` MLIR pass as
-            ``disjoint-qubit``.
-
-    Returns:
-        dict: A Python dictionary containing PPM specs of all functions in ``fn``.
-
-    **Example**
-
-    .. code-block:: python
-
-        import pennylane as qp
-        import catalyst
-        from catalyst.passes import ppm_specs, to_ppr
-
-        @qp.qjit(target="mlir")
-        @to_ppr
-        @qp.qnode(qp.device("lightning.qubit", wires=2))
-        def f():
-            qp.H(0)
-            qp.S(1)
-            qp.T(0)
-            qp.CNOT(wires=[0, 1])
-            return qp.expval(qp.Z(0))
-
-        print(ppm_specs(f))
-        print(ppm_specs(f, only_disjoint_qubit=True))
-
-    Example output:
-
-    .. code-block:: pycon
-
-        {'f_0': {'depth': 4, 'depth_type': 0, 'logical_qubits': 2, 'max_weight_pi4': 2,
-                 'max_weight_pi8': 1, 'pi4_ppr': 7, 'pi8_ppr': 1}}
-        {'f_0': {'depth': 7, 'depth_type': 1, 'logical_qubits': 2, 'max_weight_pi4': 2,
-                 'max_weight_pi8': 1, 'pi4_ppr': 7, 'pi8_ppr': 1}}
-    """
-
-    if fn.mlir_module is not None:
-        # aot mode: e.g: setting target="mlir", pipeline="..."
-        new_options = copy.copy(fn.compile_options)
-        if new_options.pipelines is None:
-            new_options.pipelines = [
-                (name, list(passes)) for name, passes in new_options.get_pipelines()
-            ]
-
-        # add ppm-spec pass at the end to existing pipeline
-        _, pass_list = new_options.pipelines[0]  # first pipeline runs the user passes
-        # check if ppm-specs is already in the pass list
-        ppm_specs_pass = "ppm-specs{disjoint-qubit=true}" if only_disjoint_qubit else "ppm-specs"
-        pass_list[:] = [p for p in pass_list if not p.startswith("ppm-specs")] + [ppm_specs_pass]
-
-        new_options = _options_to_cli_flags(new_options)
-        # redirect output to devnull to avoid printing the MLIR
-        raw_result = _quantum_opt(*new_options, "-o", os.devnull, stdin=str(fn.mlir_module))
-
-        try:
-            return json.loads(raw_result)  # validate before returning
-        except (json.JSONDecodeError, ValueError) as e:  # pragma: nocover
-            raise CompileError(
-                "Invalid json format encountered in ppm_specs. "
-                f"Expected valid JSON but got {raw_result}"
-            ) from e
-
-    else:
-        raise NotImplementedError("PPM passes only support AOT (Ahead-Of-Time) compilation mode.")
-
-
 def reduce_t_depth_setup_inputs():
     r"""A quantum compilation pass that reduces the depth and count of non-Clifford Pauli product
     rotation (PPR, :math:`P(\theta) = \exp(-iP\theta)`) operators (e.g., ``T`` gates) by commuting
@@ -1911,20 +1815,26 @@ def graph_decomposition_setup_inputs(
         "libpython_path": str(libpython_path if libpython_path else get_libpython_path()),
     }
 
+    def rule_ref_name(rule):
+        # A rule reference may be a name string, a plain decomposition function, or a PennyLane
+        # ``DecompositionRule`` (returned by ``@register_resources``, which has no ``__name__``).
+        if isinstance(rule, str):
+            return rule
+        if hasattr(rule, "_impl"):
+            return rule._impl.__name__
+        return rule.__name__
+
     if fixed_decomps:
         options |= {
             "fixed_decomps": {
-                to_name(op): (rule if isinstance(rule, str) else rule.__name__)
-                for op, rule in fixed_decomps.items()
+                to_name(op): rule_ref_name(rule) for op, rule in fixed_decomps.items()
             }
         }
 
     if alt_decomps:
         options |= {
             "alt_decomps": {
-                to_name(op): tuple(
-                    (rule if isinstance(rule, str) else rule.__name__) for rule in rules
-                )
+                to_name(op): tuple(rule_ref_name(rule) for rule in rules)
                 for op, rules in alt_decomps.items()
             }
         }

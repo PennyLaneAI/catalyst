@@ -700,7 +700,7 @@ TEST_CASE("Adjoint of an invalid target fails instead of collapsing to the base"
 
 TEST_CASE("Test single-controlled C(1, X)", "[DecompGraph::Solver]") {
     const OperatorNode cnot{"CNOT[][2]{}", "CNOT"};
-    const OperatorNode cx{"C(PauliX{}{wires:1}{})", "C(PauliX)"};
+    const OperatorNode cx{"C(PauliX){}{wires:1}{}", "C(PauliX)"};
 
     const WeightedGateset gateset{{{cnot.name, 1.0}}};
     const std::vector<RuleNode> rules{
@@ -720,7 +720,7 @@ TEST_CASE("Test single-controlled C(1, X)", "[DecompGraph::Solver]") {
 
 TEST_CASE("Test multi-controlled 2C(X)", "[DecompGraph::Solver]") {
     const OperatorNode toffoli{"Toffoli[][3]{}", "Toffoli"};
-    const OperatorNode ccx{"2C(PauliX{}{wires:1}{})", "2C(PauliX)"};
+    const OperatorNode ccx{"2C(PauliX){}{wires:1}{}", "2C(PauliX)"};
 
     const WeightedGateset gateset{{{toffoli.name, 1.0}}};
     const std::vector<RuleNode> rules{
@@ -738,7 +738,7 @@ TEST_CASE("Test multi-controlled 2C(X)", "[DecompGraph::Solver]") {
 TEST_CASE("Test a controlled op that is not accepted as its base gate by name",
           "[DecompGraph::Solver]") {
     // C(PauliX) must reach the gate set through its own rule, even when PauliX is in the gate set.
-    const OperatorNode cx{"C(PauliX{}{wires:1}{})", "C(PauliX)"};
+    const OperatorNode cx{"C(PauliX){}{wires:1}{}", "C(PauliX)"};
 
     const WeightedGateset gateset{{{"PauliX", 1.0}}};
     const std::vector<RuleNode> rules{};
@@ -751,9 +751,9 @@ TEST_CASE("Test a controlled op that is not accepted as its base gate by name",
 TEST_CASE("Test controlled distribution", "[DecompGraph::Solver]") {
     const OperatorNode rz{"RZ[f64][1]{}", "RZ"};
     const OperatorNode ry{"RY[f64][1]{}", "RY"};
-    const OperatorNode crz{"C(RZ{0:[f64]}{wires:1}{})", "C(RZ)"};
-    const OperatorNode cry{"C(RY{0:[f64]}{wires:1}{})", "C(RY)"};
-    const OperatorNode crot{"C(Rot{0:[f64],1:[f64],2:[f64]}{wires:1}{})", "C(Rot)"};
+    const OperatorNode crz{"C(RZ){0:[f64]}{wires:1}{}", "C(RZ)"};
+    const OperatorNode cry{"C(RY){0:[f64]}{wires:1}{}", "C(RY)"};
+    const OperatorNode crot{"C(Rot){0:[f64],1:[f64],2:[f64]}{wires:1}{}", "C(Rot)"};
 
     const WeightedGateset gateset{{{rz.name, 1.0}, {ry.name, 2.0}}};
     const std::vector<RuleNode> rules{
@@ -775,8 +775,8 @@ TEST_CASE("Test controlled distribution", "[DecompGraph::Solver]") {
 }
 
 TEST_CASE("Test mixed C(Adjoint(RX)) pathways to a controlled basis", "[DecompGraph::Solver]") {
-    const OperatorNode cRxAdj{"C(Adjoint(RX{0:[f64]}{wires:1}{}))", "C(Adjoint(RX))"};
-    const OperatorNode cRx{"C(RX{0:[f64]}{wires:1}{})", "C(RX)"};
+    const OperatorNode cRxAdj{"C(Adjoint(RX)){0:[f64]}{wires:1}{}", "C(Adjoint(RX))"};
+    const OperatorNode cRx{"C(RX){0:[f64]}{wires:1}{}", "C(RX)"};
 
     const WeightedGateset gateset{{{cRx.name, 1.0}}};
     const std::vector<RuleNode> rules{
@@ -793,8 +793,8 @@ TEST_CASE("Test mixed C(Adjoint(RX)) pathways to a controlled basis", "[DecompGr
 }
 
 TEST_CASE("Test nested 2C(Adjoint(RX)) pathways opaquely", "[DecompGraph::Solver]") {
-    const OperatorNode ccAdjRx{"2C(Adjoint(RX{0:[f64]}{wires:1}{}))", "2C(Adjoint(RX))"};
-    const OperatorNode ccRx{"2C(RX{0:[f64]}{wires:1}{})", "2C(RX)"};
+    const OperatorNode ccAdjRx{"2C(Adjoint(RX)){0:[f64]}{wires:1}{}", "2C(Adjoint(RX))"};
+    const OperatorNode ccRx{"2C(RX){0:[f64]}{wires:1}{}", "2C(RX)"};
 
     const WeightedGateset gateset{{{ccRx.name, 1.0}}};
     const std::vector<RuleNode> rules{

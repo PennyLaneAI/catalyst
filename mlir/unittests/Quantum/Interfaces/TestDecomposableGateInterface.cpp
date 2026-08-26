@@ -101,7 +101,7 @@ module {
     DecomposableGate op = *module->getOps<CustomOp>().begin();
 
     // Two control wires fold as `2C(...)`
-    ASSERT_EQ(op.getGraphOpId(), "2C(PauliX{}{wires:1}{})");
+    ASSERT_EQ(op.getGraphOpId(), "2C(PauliX){}{wires:1}{}");
 }
 
 TEST(DecomposableGateInterfaceTests, ControlledAdjointCustomOp) {
@@ -124,7 +124,7 @@ module {
     DecomposableGate op = *module->getOps<CustomOp>().begin();
 
     // Modifiers fold control-outermost
-    ASSERT_EQ(op.getGraphOpId(), "C(Adjoint(RX{0:[f64]}{wires:1}{}))");
+    ASSERT_EQ(op.getGraphOpId(), "C(Adjoint(RX)){0:[f64]}{wires:1}{}");
 }
 
 TEST(DecomposableGateInterfaceTests, MultiControlledAdjointCustomOp) {
@@ -148,7 +148,7 @@ module {
     DecomposableGate op = *module->getOps<CustomOp>().begin();
 
     // Controls + Adjoint folding
-    ASSERT_EQ(op.getGraphOpId(), "2C(Adjoint(RX{0:[f64]}{wires:1}{}))");
+    ASSERT_EQ(op.getGraphOpId(), "2C(Adjoint(RX)){0:[f64]}{wires:1}{}");
 }
 
 TEST(DecomposableGateInterfaceTests, MultiRZOp) {
@@ -258,7 +258,7 @@ module {
     ASSERT_EQ(pcphase.getStaticData(), expectedStaticData);
 
     // The op carries one control wire, folded into the id (control-outermost).
-    ASSERT_EQ(pcphase.getGraphOpId(), "C(PCPhase{phi:[f64]}{wires:2}{dim:0})");
+    ASSERT_EQ(pcphase.getGraphOpId(), "C(PCPhase){phi:[f64]}{wires:2}{dim:0}");
 }
 
 TEST(DecomposableGateInterfaceTests, GlobalPhaseOp) {
@@ -324,7 +324,7 @@ module {
 
     // Controlled global phase: the control wire is folded into the id (this is the `C(GlobalPhase)`
     // operator, which a rule maps to `PhaseShift`/`ControlledPhaseShift`).
-    ASSERT_EQ(gphase.getGraphOpId(), "C(GlobalPhase{phi:[f64]}{}{})");
+    ASSERT_EQ(gphase.getGraphOpId(), "C(GlobalPhase){phi:[f64]}{}{}");
 }
 
 TEST(DecomposableGateInterfaceTests, QubitUnitaryOp) {
@@ -362,12 +362,12 @@ module {
     ASSERT_EQ(unitary.getStaticData().size(), 0);
 
     // Controlled unitary: the control wire is folded into the id (control-outermost).
-    ASSERT_EQ(unitary.getGraphOpId(), "C(QubitUnitary{U:["
+    ASSERT_EQ(unitary.getGraphOpId(), "C(QubitUnitary){U:["
                                       "[[complex<f64>,complex<f64>,complex<f64>,complex<f64>],"
                                       "[complex<f64>,complex<f64>,complex<f64>,complex<f64>],"
                                       "[complex<f64>,complex<f64>,complex<f64>,complex<f64>],"
                                       "[complex<f64>,complex<f64>,complex<f64>,complex<f64>]]"
-                                      "]}{wires:2}{})");
+                                      "]}{wires:2}{}");
 }
 
 TEST(DecomposableGateInterfaceTests, OperatorOpQubits) {

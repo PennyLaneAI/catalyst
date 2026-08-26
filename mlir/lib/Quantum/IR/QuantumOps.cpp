@@ -52,6 +52,8 @@
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Support/WalkResult.h"
 
+#include "MBQC/IR/MBQCOps.h"
+#include "PBC/IR/PBCOps.h"
 #include "QRef/IR/QRefOps.h"
 #include "Quantum/IR/QuantumAttrDefs.h"
 #include "Quantum/IR/QuantumDialect.h"
@@ -729,8 +731,9 @@ LogicalResult AdjointOp::verify() {
 
 LogicalResult CtrlOp::verify() {
     auto res = this->getRegion().walk([](Operation *op) {
-        return isa<MeasurementProcess, MeasureOp>(op) ? WalkResult::interrupt()
-                                                      : WalkResult::advance();
+        return isa<MeasurementProcess, MeasureOp, pbc::PPMeasurementOp, mbqc::MeasureInBasisOp>(op)
+                   ? WalkResult::interrupt()
+                   : WalkResult::advance();
     });
 
     if (res.wasInterrupted()) {

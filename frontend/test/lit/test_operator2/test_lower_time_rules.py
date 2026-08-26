@@ -62,18 +62,18 @@ def test_one_rule():
 
             @qp.qjit(capture=True, target="mlir")
             @qp.qnode(qp.device("null.qubit", wires=3))
-            def c():
+            def one_gate():
                 NoParams(reg=[0, 1])
                 return qp.state()
 
-            print(c.mlir)
+            print(one_gate.mlir)
 
-        # CHECK: func.func public @c()
+        # CHECK-LABEL: func.func public @one_gate()
         # CHECK: qref.operator "NoParams"
         # CHECK: func.func private @"__builtin_rule_NoParams{}{reg:2}{}"
         # CHECK-SAME:   resources = {operations = {
-        # CHECK-SAME:   "SingleParam{x:[f64,f64]}{reg:2}{}" = 1 : i64,
-        # CHECK-SAME:   "SingleParam{x:[f64]}{reg:2}{}" = 2 : i64
+        # CHECK-SAME:   "SingleParam{x:{{\[\[f64,f64\]\]}}}{reg:2}{}" = 1 : i64,
+        # CHECK-SAME:   "SingleParam{x:{{\[\[f64\]\]}}}{reg:2}{}" = 2 : i64
         # CHECK-SAME:   target_gate = "NoParams{}{reg:2}{}"
         test_one_gate()
 
@@ -85,20 +85,20 @@ def test_one_rule():
 
             @qp.qjit(capture=True, target="mlir")
             @qp.qnode(qp.device("null.qubit", wires=3))
-            def c():
+            def same_id():
                 NoParams(reg=[0, 1])
                 NoParams(reg=[0, 1])
                 return qp.state()
 
-            print(c.mlir)
+            print(same_id.mlir)
 
-        # CHECK: func.func public @c()
+        # CHECK-LABEL: func.func public @same_id()
         # CHECK: qref.operator "NoParams"
         # CHECK: qref.operator "NoParams"
         # CHECK: func.func private @"__builtin_rule_NoParams{}{reg:2}{}"
         # CHECK-SAME:   resources = {operations = {
-        # CHECK-SAME:   "SingleParam{x:[f64,f64]}{reg:2}{}" = 1 : i64,
-        # CHECK-SAME:   "SingleParam{x:[f64]}{reg:2}{}" = 2 : i64
+        # CHECK-SAME:   "SingleParam{x:{{\[\[f64,f64\]\]}}}{reg:2}{}" = 1 : i64,
+        # CHECK-SAME:   "SingleParam{x:{{\[\[f64\]\]}}}{reg:2}{}" = 2 : i64
         # CHECK-SAME:   target_gate = "NoParams{}{reg:2}{}"
         # CHECK-NOT: func.func private @"__builtin_rule_NoParams{}{reg:2}{}"
         test_multiple_gates_same_id()
@@ -111,25 +111,25 @@ def test_one_rule():
 
             @qp.qjit(capture=True, target="mlir")
             @qp.qnode(qp.device("null.qubit", wires=3))
-            def c():
+            def different_id():
                 NoParams(reg=[0, 1])
                 NoParams(reg=[0, 1, 2])
                 return qp.state()
 
-            print(c.mlir)
+            print(different_id.mlir)
 
-        # CHECK: func.func public @c()
+        # CHECK-LABEL: func.func public @different_id()
         # CHECK: qref.operator "NoParams"
         # CHECK: qref.operator "NoParams"
         # CHECK: func.func private @"__builtin_rule_NoParams{}{reg:2}{}"
         # CHECK-SAME:   resources = {operations = {
-        # CHECK-SAME:   "SingleParam{x:[f64,f64]}{reg:2}{}" = 1 : i64,
-        # CHECK-SAME:   "SingleParam{x:[f64]}{reg:2}{}" = 2 : i64
+        # CHECK-SAME:   "SingleParam{x:{{\[\[f64,f64\]\]}}}{reg:2}{}" = 1 : i64,
+        # CHECK-SAME:   "SingleParam{x:{{\[\[f64\]\]}}}{reg:2}{}" = 2 : i64
         # CHECK-SAME:   target_gate = "NoParams{}{reg:2}{}"
         # CHECK: func.func private @"__builtin_rule_NoParams{}{reg:3}{}"
         # CHECK-SAME:   resources = {operations = {
-        # CHECK-SAME:   "SingleParam{x:[f64,f64]}{reg:2}{}" = 1 : i64,
-        # CHECK-SAME:   "SingleParam{x:[f64]}{reg:2}{}" = 2 : i64
+        # CHECK-SAME:   "SingleParam{x:{{\[\[f64,f64\]\]}}}{reg:2}{}" = 1 : i64,
+        # CHECK-SAME:   "SingleParam{x:{{\[\[f64\]\]}}}{reg:2}{}" = 2 : i64
         # CHECK-SAME:   target_gate = "NoParams{}{reg:3}{}"
         test_multiple_gates_different_ids()
 
@@ -161,37 +161,37 @@ def test_multiple_rules_same_gate():
 
         @qp.qjit(capture=True, target="mlir")
         @qp.qnode(qp.device("null.qubit", wires=3))
-        def c():
+        def multi_rule():
             NoParams(reg=[0, 1])
             NoParams(reg=[0, 1])
             NoParams(reg=[0, 1, 2])
             return qp.state()
 
-        print(c.mlir)
+        print(multi_rule.mlir)
 
 
-# CHECK: func.func public @c()
+# CHECK-LABEL: func.func public @multi_rule()
 # CHECK: qref.operator "NoParams"
 # CHECK: qref.operator "NoParams"
 # CHECK: qref.operator "NoParams"
 # CHECK: func.func private @"__builtin_rule1_NoParams{}{reg:2}{}"
 # CHECK-SAME:   resources = {operations = {
-# CHECK-SAME:   "SingleParam{x:[f64]}{reg:2}{}" = 1 : i64
+# CHECK-SAME:   "SingleParam{x:{{\[\[f64\]\]}}}{reg:2}{}" = 1 : i64
 # CHECK-SAME:   target_gate = "NoParams{}{reg:2}{}"
 # CHECK: func.func private @"__builtin_rule2_NoParams{}{reg:2}{}"
 # CHECK-SAME:   resources = {operations = {
-# CHECK-SAME:   "SingleParam{x:[f64,f64]}{reg:1}{}" = 1 : i64
+# CHECK-SAME:   "SingleParam{x:{{\[\[f64,f64\]\]}}}{reg:1}{}" = 1 : i64
 # CHECK-SAME:   target_gate = "NoParams{}{reg:2}{}"
 #
 # CHECK-NOT: func.func private @"__builtin_rule1_NoParams{}{reg:2}{}"
 #
 # CHECK: func.func private @"__builtin_rule1_NoParams{}{reg:3}{}"
 # CHECK-SAME:   resources = {operations = {
-# CHECK-SAME:   "SingleParam{x:[f64]}{reg:2}{}" = 1 : i64
+# CHECK-SAME:   "SingleParam{x:{{\[\[f64\]\]}}}{reg:2}{}" = 1 : i64
 # CHECK-SAME:   target_gate = "NoParams{}{reg:3}{}"
 # CHECK: func.func private @"__builtin_rule2_NoParams{}{reg:3}{}"
 # CHECK-SAME:   resources = {operations = {
-# CHECK-SAME:   "SingleParam{x:[f64,f64]}{reg:1}{}" = 1 : i64
+# CHECK-SAME:   "SingleParam{x:{{\[\[f64,f64\]\]}}}{reg:1}{}" = 1 : i64
 # CHECK-SAME:   target_gate = "NoParams{}{reg:3}{}"
 test_multiple_rules_same_gate()
 
@@ -218,23 +218,23 @@ def test_multiple_rules_chained():
 
         @qp.qjit(capture=True, target="mlir")
         @qp.qnode(qp.device("null.qubit", wires=3))
-        def c():
+        def chained_rule():
             NoParams(reg=[0, 1])
             return qp.state()
 
-        print(c.mlir)
+        print(chained_rule.mlir)
 
 
-# CHECK: func.func public @c()
+# CHECK-LABEL: func.func public @chained_rule()
 # CHECK: qref.operator "NoParams"
 # CHECK: func.func private @"__builtin_rule1_NoParams{}{reg:2}{}"
 # CHECK-SAME:   resources = {operations = {
-# CHECK-SAME:   "SingleParam{x:[f64]}{reg:1}{}" = 1 : i64
+# CHECK-SAME:   "SingleParam{x:{{\[\[f64\]\]}}}{reg:1}{}" = 1 : i64
 # CHECK-SAME:   target_gate = "NoParams{}{reg:2}{}"
-# CHECK: func.func private @"__builtin_rule2_SingleParam{x:[f64]}{reg:1}{}"
+# CHECK: func.func private @"__builtin_rule2_SingleParam{x:{{\[\[f64\]\]}}}{reg:1}{}"
 # CHECK-SAME:   resources = {operations = {
 # CHECK-SAME:   "CompilableData{}{wires:1}{a:a,b:b,thing:thing}" = 1 : i64
-# CHECK-SAME:   target_gate = "SingleParam{x:[f64]}{reg:1}{}"
+# CHECK-SAME:   target_gate = "SingleParam{x:{{\[\[f64\]\]}}}{reg:1}{}"
 test_multiple_rules_chained()
 
 
@@ -271,27 +271,27 @@ def test_multiple_rules_chained_and_branch():
 
         @qp.qjit(capture=True, target="mlir")
         @qp.qnode(qp.device("null.qubit", wires=3))
-        def c():
+        def chained_branched():
             NoParams(reg=[0, 1])
             return qp.state()
 
-        print(c.mlir)
+        print(chained_branched.mlir)
 
 
-# CHECK: func.func public @c()
+# CHECK-LABEL: func.func public @chained_branched()
 # CHECK: qref.operator "NoParams"
 # CHECK: func.func private @"__builtin_ruleAB_NoParams{}{reg:2}{}"
 # CHECK-SAME:   resources = {operations = {
-# CHECK-SAME:   "SingleParam{x:[f64]}{reg:1}{}" = 1 : i64
+# CHECK-SAME:   "SingleParam{x:{{\[\[f64\]\]}}}{reg:1}{}" = 1 : i64
 # CHECK-SAME:   target_gate = "NoParams{}{reg:2}{}"
-# CHECK: func.func private @"__builtin_ruleBC_SingleParam{x:[f64]}{reg:1}{}"
+# CHECK: func.func private @"__builtin_ruleBC_SingleParam{x:{{\[\[f64\]\]}}}{reg:1}{}"
 # CHECK-SAME:   resources = {operations = {
 # CHECK-SAME:   "CompilableData{}{wires:1}{a:a,b:b,thing:thing}" = 1 : i64
-# CHECK-SAME:   target_gate = "SingleParam{x:[f64]}{reg:1}{}"
-# CHECK: func.func private @"__builtin_ruleBD_SingleParam{x:[f64]}{reg:1}{}"
+# CHECK-SAME:   target_gate = "SingleParam{x:{{\[\[f64\]\]}}}{reg:1}{}"
+# CHECK: func.func private @"__builtin_ruleBD_SingleParam{x:{{\[\[f64\]\]}}}{reg:1}{}"
 # CHECK-SAME:   resources = {operations = {
 # CHECK-SAME:   "CompilableData{}{wires:1}{a:alpha,b:beta,thing:stuff}" = 1 : i64
-# CHECK-SAME:   target_gate = "SingleParam{x:[f64]}{reg:1}{}"
+# CHECK-SAME:   target_gate = "SingleParam{x:{{\[\[f64\]\]}}}{reg:1}{}"
 test_multiple_rules_chained_and_branch()
 
 
@@ -327,31 +327,31 @@ def test_with_cycles():
 
         @qp.qjit(capture=True, target="mlir")
         @qp.qnode(qp.device("null.qubit", wires=3))
-        def c():
+        def cycle():
             NoParams(reg=[0, 1])
             NoParams(reg=[0, 1, 2])
             return qp.state()
 
-        print(c.mlir)
+        print(cycle.mlir)
 
 
-# CHECK: func.func public @c()
+# CHECK-LABEL: func.func public @cycle()
 # CHECK: qref.operator "NoParams"
 # CHECK: func.func private @"__builtin_ruleAB_NoParams{}{reg:2}{}"
 # CHECK-SAME:   resources = {operations = {
-# CHECK-SAME:   "SingleParam{x:[f64]}{reg:1}{}" = 1 : i64
+# CHECK-SAME:   "SingleParam{x:{{\[\[f64\]\]}}}{reg:1}{}" = 1 : i64
 # CHECK-SAME:   target_gate = "NoParams{}{reg:2}{}"
-# CHECK: func.func private @"__builtin_ruleBC_SingleParam{x:[f64]}{reg:1}{}"
+# CHECK: func.func private @"__builtin_ruleBC_SingleParam{x:{{\[\[f64\]\]}}}{reg:1}{}"
 # CHECK-SAME:   resources = {operations = {
 # CHECK-SAME:   "CompilableData{}{wires:1}{a:a,b:b,thing:thing}" = 1 : i64
-# CHECK-SAME:   target_gate = "SingleParam{x:[f64]}{reg:1}{}"
+# CHECK-SAME:   target_gate = "SingleParam{x:{{\[\[f64\]\]}}}{reg:1}{}"
 # CHECK: func.func private @"__builtin_ruleCA_CompilableData{}{wires:1}{a:a,b:b,thing:thing}"
 # CHECK-SAME:   resources = {operations = {
 # CHECK-SAME:   "NoParams{}{reg:2}{}" = 1 : i64
 # CHECK-SAME:   target_gate = "CompilableData{}{wires:1}{a:a,b:b,thing:thing}"
 # CHECK: func.func private @"__builtin_ruleAB_NoParams{}{reg:3}{}"
 # CHECK-SAME:   resources = {operations = {
-# CHECK-SAME:   "SingleParam{x:[f64]}{reg:1}{}" = 1 : i64
+# CHECK-SAME:   "SingleParam{x:{{\[\[f64\]\]}}}{reg:1}{}" = 1 : i64
 # CHECK-SAME:   target_gate = "NoParams{}{reg:3}{}"
 test_with_cycles()
 
@@ -409,18 +409,18 @@ def test_to_multiple_full_args_op():
 
         @qp.qjit(capture=True, target="mlir")
         @qp.qnode(qp.device("null.qubit", wires=3))
-        def c():
+        def to_full_args():
             NoParams(reg=[0, 1, 2])
             return qp.state()
 
-        print(c.mlir)
+        print(to_full_args.mlir)
 
 
-# CHECK: func.func public @c()
+# CHECK-LABEL: func.func public @to_full_args()
 # CHECK: qref.operator "NoParams"
 # CHECK: func.func private @"__builtin_rule_NoParams{}{reg:3}{}"
 # CHECK-SAME:   resources = {operations = {
-# CHECK-SAME:   "MultipleFullArgs{angles1:[f64],angles2:[f64,f64]}{reg1:1,reg2:2}{}[[[uid:[0-9]+]]]" = 2 : i64
+# CHECK-SAME:   "MultipleFullArgs{angles1:{{\[\[f64\]\]}},angles2:{{\[\[f64,f64\]\]}}}{reg1:1,reg2:2}{}[[[uid:[0-9]+]]]" = 2 : i64
 # CHECK-SAME:   target_gate = "NoParams{}{reg:3}{}"
 # CHECK: qref.operator "MultipleFullArgs"
 # CHECK-NEXT:  UID([[uid]]
@@ -449,7 +449,7 @@ def test_from_multiple_full_args_op():
 
         @qp.qjit(capture=True, target="mlir")
         @qp.qnode(qp.device("null.qubit", wires=3))
-        def c():
+        def from_full_args():
             MultipleFullArgs(
                 reg1=1,
                 reg2=2,
@@ -464,20 +464,20 @@ def test_from_multiple_full_args_op():
             )
             return qp.state()
 
-        print(c.mlir)
+        print(from_full_args.mlir)
 
 
-# CHECK: func.func public @c()
+# CHECK-LABEL: func.func public @from_full_args()
 # CHECK: qref.operator "MultipleFullArgs"({{%.+}}: tensor<f64>, {{%.+}}: tensor<f64>)
 # CHECK-SAME:   qubits({{%.}}, {{%.}}, {{%.}}, {{%.}}, {{%.}}, {{%.}}, {{%.}})
 # CHECK:   UID([[uid:[0-9]+]]) forward({{%.+}}: tensor<f64>, {{%.+}}: tensor<i64>)
 # CHECK:   param_map = {angles1 = [0], angles2 = [1]}
 # CHECK-SAME:  qubit_map = {hwires1 = [4, 5], hwires2 = [6], op1 = [2], op2 = [3], reg1 = [0], reg2 = [1]}
 #
-# CHECK: func.func private @"__builtin_rule_MultipleFullArgs{angles1:[[f64]],angles2:[[f64]]}{hwires1:2,hwires2:1,op1:1,op2:1,reg1:1,reg2:1}[[[uid]]]"
+# CHECK: func.func private @"__builtin_rule_MultipleFullArgs{angles1:{{\[\[f64\]\]}},angles2:{{\[\[f64\]\]}}}{hwires1:2,hwires2:1,op1:1,op2:1,reg1:1,reg2:1}{}[[[uid]]]"
 # CHECK-SAME:   resources = {operations = {
 # CHECK-SAME:   "NoParams{}{reg:1}{}" = 2 : i64
-# CHECK-SAME:   target_gate = "MultipleFullArgs{angles1:[[f64]],angles2:[[f64]]}{hwires1:2,hwires2:1,op1:1,op2:1,reg1:1,reg2:1}{}[[[uid]]]"
+# CHECK-SAME:   target_gate = "MultipleFullArgs{angles1:{{\[\[f64\]\]}},angles2:{{\[\[f64\]\]}}}{hwires1:2,hwires2:1,op1:1,op2:1,reg1:1,reg2:1}{}[[[uid]]]"
 test_from_multiple_full_args_op()
 
 
@@ -498,18 +498,18 @@ def test_to_custom_op():
 
         @qp.qjit(capture=True, target="mlir")
         @qp.qnode(qp.device("null.qubit", wires=3))
-        def c():
+        def to_custom():
             NoParams(reg=[0, 1, 2])
             return qp.state()
 
-        print(c.mlir)
+        print(to_custom.mlir)
 
 
-# CHECK: func.func public @c()
+# CHECK-LABEL: func.func public @to_custom()
 # CHECK: qref.operator "NoParams"
 # CHECK: func.func private @"__builtin_rule_NoParams{}{reg:3}{}"
 # CHECK-SAME:   resources = {operations = {
-# CHECK-SAME:   "SingleParamCustomOp{x:[f64]}{wires:1}{}" = 1 : i64
+# CHECK-SAME:   "SingleParamCustomOp{0:[f64]}{wires:1}{}" = 1 : i64
 # CHECK-SAME:   target_gate = "NoParams{}{reg:3}{}"
 # CHECK: qref.custom "SingleParamCustomOp"
 test_to_custom_op()
@@ -532,18 +532,39 @@ def test_from_custom_op():
 
         @qp.qjit(capture=True, target="mlir")
         @qp.qnode(qp.device("null.qubit", wires=3))
-        def c():
+        def from_custom():
             SingleParamCustomOp(x=0.1, wires=[0, 1])
             return qp.state()
 
-        print(c.mlir)
+        print(from_custom.mlir)
 
 
-# CHECK: func.func public @c()
+# CHECK-LABEL: func.func public @from_custom()
 # CHECK: qref.custom "SingleParamCustomOp"
-# CHECK: func.func private @"__builtin_rule_SingleParamCustomOp{x:[f64]}{wires:2}{}"
+# CHECK: func.func private @"__builtin_rule_SingleParamCustomOp{0:[f64]}{wires:2}{}"
 # CHECK-SAME:   resources = {operations = {
 # CHECK-SAME:   "NoParams{}{reg:1}{}" = 1 : i64
-# CHECK-SAME:   target_gate = "SingleParamCustomOp{x:[f64]}{wires:2}{}"
+# CHECK-SAME:   target_gate = "SingleParamCustomOp{0:[f64]}{wires:2}{}"
 # CHECK: qref.operator "NoParams"
 test_from_custom_op()
+
+
+def test_phaseshift_to_rz():
+    """Test that PhaseShift decomposes to a quantum.custom "RZ" & quantum.gphase correctly."""
+
+    @qp.qjit(target="mlir", capture=True)
+    @qp.qnode(qp.device("null.qubit", wires=2))
+    def test_phaseshift():
+        qp.PhaseShift(0.5, 1)
+
+    print(test_phaseshift.mlir)
+
+
+# CHECK-LABEL: test_phaseshift
+# CHECK: func.func private @"__builtin__phaseshift_to_rz_gp
+# CHECK-SAME: resources = {operations = {
+# CHECK-SAME: GlobalPhase{phi:[f64]}{wires:0}{}
+# CHECK-SAME: RZ{0:[f64]}{wires:1}{}
+# CHECK: qref.custom "RZ"
+# CHECK: qref.gphase
+test_phaseshift_to_rz()

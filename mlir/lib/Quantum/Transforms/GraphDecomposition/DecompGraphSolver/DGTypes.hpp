@@ -48,9 +48,6 @@ namespace DecompGraph::Core {
  * When non-empty, static arguments participate in equality
  * comparisons so that rules guarded on a specific value only
  * match operator queries that carry the same value.
- *
- * TODO: Fix the equality with wildcards for numWires and numParams
- * when adding support for operators with dynamic numbers of wires/params.
  */
 struct OperatorNode {
     std::string id;
