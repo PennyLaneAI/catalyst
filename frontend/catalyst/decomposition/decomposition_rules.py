@@ -158,7 +158,7 @@ def split_call_args(kwargs, is_custom_op):
     return (), kwargs
 
 
-def collect_resources_for_op(op_name, kwargs, is_custom_op=False):
+def collect_resources_for_op(op_name, kwargs, is_custom_op=False, adjoint_resources=False):
     """Return resource data for all decomposition rules associated to op_name."""
     decomp_rules = list(qp.decomposition.list_decomps(op_name))
     args, kwargs = split_call_args(kwargs, is_custom_op)
@@ -172,8 +172,12 @@ def collect_resources_for_op(op_name, kwargs, is_custom_op=False):
             # for the original op of the rule
             resources = rule.compute_resources(*args, **kwargs)
             name_to_resources[rule.name] = resources.gate_counts
+            # When adjoint_resources is True, each produced resource's graphOpId is generated in its
+            # adjoint form (Adjoint(<name>){...}) directly from the resource op instance via
+            # GraphOpID.getGraphOpId, rather than string.
             name_to_resource_ids[rule.name] = {
-                GraphOpID(op).getGraphOpId(): count for op, count in resources.gate_counts.items()
+                GraphOpID(op).getGraphOpId(adjoint=adjoint_resources): count
+                for op, count in resources.gate_counts.items()
             }
         except Exception as e:
             warnings.warn(f"Failed to get resources for the {rule.name} decomposition rule: {e}")
@@ -216,16 +220,9 @@ def compile_decomposition_rules(
     device = qp.device("null.qubit", wires=sum(wire_lens.values()))
 
     _, name_to_resource_ids, decomp_rules = collect_resources_for_op(
-        op_name, kwargs | static_data | extra_data, is_custom_op
+        op_name, kwargs | static_data | extra_data, is_custom_op, adjoint_resources=wrap_adjoint
     )
-
-    # The distribution pathway targets `Adjoint(op)` and produces adjointed resource gates.
     target_id = name_wrap_adjoint(op_id) if wrap_adjoint else op_id
-    if wrap_adjoint:
-        name_to_resource_ids = {
-            rule_name: {name_wrap_adjoint(produced_id): count for produced_id, count in ids.items()}
-            for rule_name, ids in name_to_resource_ids.items()
-        }
 
     # The static_data was only needed to instantiate the correct decomp rule
     # Once we have the correct rules, don't send them into qjit
