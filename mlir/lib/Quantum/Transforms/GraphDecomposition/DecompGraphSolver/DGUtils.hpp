@@ -42,9 +42,6 @@ static inline auto print_op(const OperatorNode &op) -> std::string {
     oss << op.name;
     oss << "[w:" << op.numWires << "]";
     oss << "[p:" << op.numParams << "]";
-    if (op.adjoint) {
-        oss << "[adj]";
-    }
     if (!op.staticNamedArgs.empty()) {
         std::vector<std::string> keys;
         keys.reserve(op.staticNamedArgs.size());
