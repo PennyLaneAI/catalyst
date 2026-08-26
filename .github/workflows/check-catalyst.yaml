@@ -69,11 +69,7 @@ jobs:
 
   runtime:
     name: Catalyst-Runtime Build
-    # `llvm` is only needed when ENABLE_EXECUTOR=ON (see the Build step below), but adding it
-    # unconditionally to `needs` costs some parallelism for a much smaller graph. LLVM cache
-    # restore keeps the extra work near-zero on warm cache; transport-touching PRs get
-    # catalyst-executor built for the subprocess-based rdma_loopback pytest.
-    needs: [constants, changes, llvm, determine_runner]
+    needs: [constants, changes, determine_runner]
     runs-on: ${{ needs.determine_runner.outputs.runner_group }}
     strategy:
       matrix:
@@ -91,16 +87,13 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          # lld and libxml2-dev are consumed by HandleLLVMOptions/LLVMConfig when catalyst-
-          # executor's cmake picks up the LLVM package. numpy is required by mlir/Makefile's
-          # llvm target for the Python bindings' NumPy include-dir shell substitution.
           # ccache is picked up automatically by runtime/Makefile's COMPILER_LAUNCHER default.
           # libibverbs-dev is required by find_library(IBVERBS_LIB ibverbs) in
           # runtime/lib/transport/CMakeLists.txt; without it the cpu_verbs (RDMA) backends
           # are silently skipped and the compiled program cannot resolve a controller /
           # coprocessor at run time. The setup-soft-roce composite action later in the job
           # also installs it, but that runs after this build step.
-          sudo apt-get -y -q install ninja-build make cmake ccache clang lld libxml2-dev libibverbs-dev
+          sudo apt-get -y -q install ninja-build make cmake ccache clang libibverbs-dev
           python3 -m pip install "nanobind<2.13" pybind11 numpy PyYAML
 
       - name: Get Cached LLVM Source
@@ -119,55 +112,35 @@ jobs:
           ref: ${{ needs.constants.outputs.llvm_version }}
           path: mlir/llvm-project
 
-      # When ENABLE_EXECUTOR=ON (transport-touching PRs), `make runtime` chains through
-      # `make mlir`, which needs a built LLVM to find via find_package. Restore the cache the
-      # llvm: job populated (guaranteed present by our `needs: [llvm]`).
-      - name: Get Cached LLVM Build
-        if: needs.changes.outputs.transport == 'true'
-        uses: actions/cache/restore@v4
-        with:
-          path: llvm-build
-          key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-ci-build-${{ matrix.compiler }}
-          fail-on-cache-miss: true
-
       # Feature branches restore the most-recent main-populated ccache; they do not save (the
       # save step below is gated on refs/heads/main) so PR runs don't overwrite main's warm cache.
+      # Key is scoped by job (`runtime`) + compiler so it does not collide with the quantum
+      # job's `Linux-ccache-*` prefix, which shares the same repo-wide cache namespace but has
+      # a disjoint TU set (the two would restore each other's caches to ~0% hit rate).
       - name: Restore CCache on feature branches
         id: restore-ccache
         if: ${{ github.ref != 'refs/heads/main' }}
         uses: actions/cache/restore@v4
         with:
           path: .ccache
-          key: ${{ runner.os }}-ccache-${{ github.run_id }}
-          restore-keys: ${{ runner.os }}-ccache-
+          key: ${{ runner.os }}-ccache-runtime-${{ matrix.compiler }}-${{ github.run_id }}
+          restore-keys: ${{ runner.os }}-ccache-runtime-${{ matrix.compiler }}-
 
       - name: Build Catalyst-Runtime
         env:
           # Turn on ENABLE_TRANSPORT only when the PR touches transport paths (see the
-          # `changes` job's filter). Otherwise the runtime skips building the transport backends
-          # and non-transport PRs pay nothing extra. ENABLE_EXECUTOR piggybacks on the same
-          # gate: the RDMA loopback pytest runs its coprocessor in a catalyst-executor
-          # subprocess (via ``executor=Executor()``) to avoid the in-process rxe SIGSEGV.
+          # `changes` job's filter). Otherwise the runtime skips building the transport
+          # backends and non-transport PRs pay nothing extra.
           ENABLE_TRANSPORT: ${{ needs.changes.outputs.transport == 'true' && 'ON' || 'OFF' }}
-          ENABLE_EXECUTOR: ${{ needs.changes.outputs.transport == 'true' && 'ON' || 'OFF' }}
         run: |
-          # LLVM_BUILD_DIR redirects the top-level `runtime: llvm` chain and the runtime's own
-          # find_package(LLVM) at $(LLVM_BUILD_DIR)/lib/cmake/llvm to the cache restored above,
-          # instead of the sub-Makefile default of mlir/llvm-project/build (which is empty).
-          # LLVM_TARGETS overrides mlir/Makefile's default of "check-mlir llvm-symbolizer" so
-          # the chained `make llvm` is a ninja no-op on a warm cache -- check-mlir would re-run
-          # the MLIR test suite each build otherwise.
           CCACHE_DIR="$(pwd)/.ccache" \
           C_COMPILER=$(which ${{ needs.constants.outputs[format('c_compiler.{0}', matrix.compiler)] }}) \
           CXX_COMPILER=$(which ${{ needs.constants.outputs[format('cxx_compiler.{0}', matrix.compiler)] }}) \
           RT_BUILD_DIR="$(pwd)/runtime-build" \
           LLVM_DIR="$(pwd)/mlir/llvm-project" \
-          LLVM_BUILD_DIR="$(pwd)/llvm-build" \
-          LLVM_TARGETS="llvm-symbolizer" \
           ENABLE_ASAN=OFF \
           ENABLE_OQD=ON \
           ENABLE_TRANSPORT="$ENABLE_TRANSPORT" \
-          ENABLE_EXECUTOR="$ENABLE_EXECUTOR" \
           make runtime
 
           CCACHE_DIR="$(pwd)/.ccache" \
@@ -190,17 +163,17 @@ jobs:
       - name: Run transport C++ test suite (Catch2 + soft-RoCE loopback)
         if: needs.changes.outputs.transport == 'true' && matrix.compiler == 'gcc'
         run: |
-          # RT_BUILD_DIR must match the Build Catalyst-Runtime step; otherwise the runtime
-          # sub-Makefile's default (runtime/build/) triggers a second cmake configure and
-          # rebuild in a different tree, doubling the work and leaving runtime-build/tests/
-          # empty (which the assertion below would then trip over).
+          # Pass the same ENABLE_* flags the Build step used so `test_runner: configure`
+          # does not reset the cmake cache to ENABLE_TRANSPORT=OFF/ENABLE_OQD=OFF (which
+          # would drop already-built .sos from the next `cmake --build`). Also match
+          # RT_BUILD_DIR so both steps share the same build tree.
           CCACHE_DIR="$(pwd)/.ccache" \
           C_COMPILER=$(which gcc) \
           CXX_COMPILER=$(which g++) \
           RT_BUILD_DIR="$(pwd)/runtime-build" \
           LLVM_DIR="$(pwd)/mlir/llvm-project" \
-          LLVM_BUILD_DIR="$(pwd)/llvm-build" \
-          LLVM_TARGETS="llvm-symbolizer" \
+          ENABLE_OQD=ON \
+          ENABLE_TRANSPORT=ON \
           make test-runtime-transport
 
       - name: Upload loopback logs on failure
@@ -221,7 +194,6 @@ jobs:
           path: |
             runtime-build/lib/*.so
             runtime-build/lib/backend/*.toml
-            runtime-build/lib/catalyst-executor
           retention-days: 1
 
       - name: Upload OQC-Runtime Artifact
@@ -240,7 +212,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: .ccache
-          key: ${{ runner.os }}-ccache-${{ github.run_id }}
+          key: ${{ runner.os }}-ccache-runtime-${{ matrix.compiler }}-${{ github.run_id }}
 
   llvm:
     name: LLVM Build
@@ -648,15 +620,11 @@ jobs:
         echo "CATALYST_BIN_DIR=$(pwd)/quantum-build/bin" >> $GITHUB_ENV
         echo "CATALYST_LIB_DIR=$(pwd)/quantum-build/lib" >> $GITHUB_ENV
         chmod +x $(pwd)/quantum-build/bin/catalyst  # artifact upload does not preserve permissions
-        # catalyst-executor is only in the runtime artifact when ENABLE_EXECUTOR was on (which
-        # happens on transport-touching PRs); make it executable if it's there.
-        [ -f "$(pwd)/runtime-build/lib/catalyst-executor" ] && chmod +x "$(pwd)/runtime-build/lib/catalyst-executor" || true
 
     - name: Set up Soft-RoCE loopback (transport tests only)
-      # Needed by test_local_cpu_to_local_cpu_rdma_loopback: the coprocessor runs in a
-      # catalyst-executor subprocess and reaches the controller through the rxe0 verbs device
-      # on lo. Runs only for transport-touching PRs; kernel-side and userland pieces are
-      # installed together by the composite action.
+      # Needed by test_local_cpu_to_local_cpu_rdma_loopback: both roles run in this process and
+      # reach each other over rxe0 (soft-RoCE loopback). Runs only for transport-touching PRs;
+      # kernel-side and userland pieces are installed together by the composite action.
       if: needs.changes.outputs.transport == 'true' && matrix.compiler == 'gcc'
       uses: ./.github/actions/setup-soft-roce
 
@@ -681,19 +649,11 @@ jobs:
       # artifact downloaded above already includes the transport backend .so files because
       # the `runtime:` job builds with ENABLE_TRANSPORT=ON in that case.
       #   _memcpy: CPU controller + CPU coproc over local memcpy, both in-process.
-      #   _rdma_loopback: same roles, but the coprocessor runs in a catalyst-executor
-      #   subprocess on 127.0.0.1 (via ``executor=Executor()`` on the Coprocessor node).
+      #   _rdma_loopback: same roles, over rxe0 soft-RoCE loopback, both in-process.
       # GPU-coproc cases execute on check-transport-gpu.yaml.
-      #
-      # LD_LIBRARY_PATH is needed because the test's ``init_args["backend_lib"]`` are bare
-      # filenames (``libcatalyst_transport_cpu_verbs_{controller,coprocessor}.so``), which
-      # ``__catalyst__transport__create`` resolves through ``dlopen`` at runtime -- the loader
-      # searches LD_LIBRARY_PATH, not RUNTIME_LIB_DIR. Propagates into the executor subprocess
-      # via Popen's inherited env, so both sides of the loopback resolve their backends.
       if: needs.changes.outputs.transport == 'true' && matrix.compiler == 'gcc'
       env:
         CATALYST_TRANSPORT_PATH: ${{ github.workspace }}/runtime-build/lib
-        LD_LIBRARY_PATH: ${{ github.workspace }}/runtime-build/lib:${{ github.workspace }}/llvm-build/lib
       run: |
         python3 -m pytest -v \
           "frontend/test/pytest/test_backline.py::TestBacklineDemoIntegration::test_local_cpu_to_local_cpu_memcpy" \
