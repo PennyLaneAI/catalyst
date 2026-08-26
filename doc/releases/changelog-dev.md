@@ -498,12 +498,6 @@
 
 <h3>Internal changes ⚙️</h3>
 
-* The lit test configurations now use lit's internal shell (`execute_external=False`) instead of the
-  external shell. External shell execution is deprecated as of LLVM 23 and will be removed in LLVM 24,
-  where the previous `ShTest(True)` configuration raises an error and prevents the lit suites from
-  running.
-  [(#XXXX)](https://github.com/PennyLaneAI/catalyst/pull/XXXX)
-
 * A GPU CI workflow runs the runtime transport tests on the `single-gpu-x64` runner, gated by
   the `gpu` label.
   [(#3113)](https://github.com/PennyLaneAI/catalyst/pull/3113)
