@@ -1820,8 +1820,8 @@ def graph_decomposition_setup_inputs(
         # ``DecompositionRule`` (returned by ``@register_resources``, which has no ``__name__``).
         if isinstance(rule, str):
             return rule
-        if hasattr(rule, "_impl"):
-            return rule._impl.__name__
+        if isinstance(rule, qp.decomposition.DecompositionRule):
+            return rule.name
         return rule.__name__
 
     if fixed_decomps:

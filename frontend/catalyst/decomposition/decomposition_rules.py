@@ -40,7 +40,10 @@ def name_wrap_adjoint(op_id: str) -> str:
     """Name-wrap the adjoint modifier around a graphOpId."""
     split = len(op_id)
     for i, char in enumerate(op_id):
-        if char in "{[":
+        # assumeing that the first field (dynamic shape) is always
+        # curly brackets, and will always be present even if there
+        # are no params.
+        if char == "{":
             split = i
             break
     return f"Adjoint({op_id[:split]}){op_id[split:]}"
@@ -199,7 +202,7 @@ def compile_decomposition_rules(
 
     When ``wrap_adjoint`` is True, the rules registered on the base op ``op_name`` are instead
     synthesized into rules for ``Adjoint(op_name)`` (aka the "distribution" pathway). Each base
-    rule body is wrapped in a ``qml.adjoint`` region (reduced to op-level modified gates by
+    rule body is wrapped in a ``qp.adjoint`` region (reduced to op-level modified gates by
     ``adjoint-lowering`` within the decomposition pass), the ``target_gate`` updates to the adjoint
     id, and each produced op in the resources is wrapped in ``Adjoint(...)``.
     """

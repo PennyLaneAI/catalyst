@@ -65,9 +65,9 @@ def test_plain_gate_captures_base_and_adjoint():
 
     # CHECK: qref.operator "NoParams"()
     # CHECK-DAG: func.func private @"__builtin_base_rule_NoParams{}{reg:2}{}"
-    # CHECK-DAG:   target_gate = "NoParams{}{reg:2}{}"
+    # CHECK-SAME:   target_gate = "NoParams{}{reg:2}{}"
     # CHECK-DAG: func.func private @"__builtin_adj_rule_Adjoint(NoParams){}{reg:2}{}"
-    # CHECK-DAG:   target_gate = "Adjoint(NoParams){}{reg:2}{}"
+    # CHECK-SAME:   target_gate = "Adjoint(NoParams){}{reg:2}{}"
 
 
 test_plain_gate_captures_base_and_adjoint()
