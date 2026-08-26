@@ -497,24 +497,13 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
             if (DecompUtils::isInDecompRule(op)) {
                 return;
             }
-            OperatorNode node;
+            // Derive the id and modifier-wrapped name from the single parse path, so operator nodes
+            // and rule nodes agree on the spelling of `C(...)`/`Adjoint(...)`.
+            OperatorNode node = parseOperator(op.getGraphOpId());
+
+            // numWires/numParams are debug-only; parseOperator leaves them at defaults for the
+            // graphOpId form, so we need to fill them accurately from the op here.
             node.numWires = op.getNonCtrlQubitOperands().size();
-
-            // The modifiers are carried in the name, as the result
-            // the solver doesn't need a modifier field
-            std::string name = op.getOperatorName();
-            if (op.getAdjointFlag()) {
-                name = "Adjoint(" + name + ")";
-            }
-            size_t numCtrl = op.getCtrlQubitOperands().size();
-            if (numCtrl == 1) {
-                name = "C(" + name + ")";
-            } else if (numCtrl > 1) {
-                name = std::to_string(numCtrl) + "C(" + name + ")";
-            }
-            node.name = name;
-            node.id = op.getGraphOpId();
-
             if (auto paramOp =
                     llvm::dyn_cast<catalyst::quantum::ParametrizedGate>(op.getOperation())) {
                 node.numParams = paramOp.getAllParams().size();
@@ -526,70 +515,15 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         });
     }
 
-    // Return the index into `s` of the ')' matching the '(' just consumed from the front of `s`
-    // (the start of `s` is treated as one paren level deep). Depth-aware, so nested modifier
-    // parens like "Adjoint(Op)){...}" resolve to the correct outer ')'. npos if unbalanced.
-    static size_t findMatchingParen(llvm::StringRef s) {
-        int depth = 1;
-        for (size_t i = 0; i < s.size(); ++i) {
-            if (s[i] == '(') {
-                depth++;
-            } else if (s[i] == ')') {
-                depth--;
-                if (depth == 0) {
-                    return i;
-                }
-            }
-        }
-        return llvm::StringRef::npos;
-    }
-
     /**
      * @brief Parse a graphOpId string into an OperatorNode.
      *
-     * Handles the name-wrapped modifier forms produced by `defaultGetGraphOpId`:
-     *   - "Adjoint(<inner>)<suffix>"
-     *   - "C(<inner>)<suffix>" / "<n>C(<inner>)<suffix>"
-     * where <inner> is a (possibly further-modified) operator name and <suffix> carries the
-     * "{params}{wires}{static}[uid]" groups.
+     * The graphOpId format is "<name>{params}{wires}{static}[uid]", where <name> already carries
+     * any name-wrapped op-level modifiers produced by `defaultGetGraphOpId`, e.g.
+     * "C(Adjoint(RX)){0:[f64]}{wires:1}{}".
      */
     OperatorNode parseOperator(llvm::StringRef raw) {
         OperatorNode node;
-        llvm::StringRef original = raw;
-
-        // Detect a leading name-wrapped op-level modifier: "Adjoint(" or "[<n>]C(".
-        std::string modifier;
-        llvm::StringRef afterModifier;
-        if (raw.starts_with("Adjoint(")) {
-            modifier = "Adjoint";
-            afterModifier = raw.drop_front(llvm::StringRef("Adjoint(").size());
-        } else {
-            size_t numDigits = 0;
-            while (numDigits < raw.size() && raw[numDigits] >= '0' && raw[numDigits] <= '9') {
-                numDigits++;
-            }
-            if (raw.drop_front(numDigits).starts_with("C(")) {
-                modifier = raw.take_front(numDigits).str() + "C";
-                afterModifier = raw.drop_front(numDigits + llvm::StringRef("C(").size());
-            }
-        }
-
-        if (!modifier.empty()) {
-            size_t closeIdx = findMatchingParen(afterModifier);
-            if (closeIdx != llvm::StringRef::npos) {
-                llvm::StringRef inner = afterModifier.take_front(closeIdx);
-                llvm::StringRef suffix = afterModifier.drop_front(closeIdx + 1);
-                // Recurse on the reconstructed inner id (inner name + suffix) to peel any further
-                // modifiers and recover the base op's wires/params, then re-apply this modifier.
-                OperatorNode innerNode = parseOperator(inner.str() + suffix.str());
-                node.name = modifier + "(" + innerNode.name + ")";
-                node.numWires = innerNode.numWires;
-                node.numParams = innerNode.numParams;
-                node.id = original.str();
-                return node;
-            }
-            // Unbalanced parens: fall through to base parsing (defensive).
-        }
 
         // Base op: either the graphOpId "Name{...}..." form or the legacy "Name(w,p)" form.
         if (raw.contains('[') || raw.contains('{')) {
