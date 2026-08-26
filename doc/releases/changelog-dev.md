@@ -196,6 +196,10 @@
   a transport kick/collect round over its buffers.
   [(#3066)](https://github.com/PennyLaneAI/catalyst/pull/3066)
 
+* A `remove-global-phases` pass is added, which removes global phases by deleting `quantum.gphase`  
+  operations without control wires.
+  [(#3143)](https://github.com/PennyLaneAI/catalyst/pull/3143)
+
 * An X/Z syndrome decode can now be routed to its own decoder in a backline coprocessor.
   `qecp.decode_esm_css` carries an optional `check_type` attribute recording which check family a
   syndrome came from, which `lower-decode-to-transport` maps to a `decoder_id` on `transport.kick`.
@@ -722,6 +726,7 @@ Rylan Malarchick,
 Mehrdad Malekmohammadi,
 River McCubbin,
 Shuli Shu,
+Nikhil Sreekumar,
 Paul Haochen Wang,
 Jake Zaia,
 Hongsheng Zheng.

@@ -26,6 +26,7 @@ func.func @distribute_region(%q: !quantum.bit) -> !quantum.bit {
 }
 
 // Adjoint(U) via distribution:
+// CHECK-LABEL: func.func private @adj_u
 func.func private @adj_u(%q: !quantum.bit) -> !quantum.bit attributes {
     target_gate = "Adjoint(U){}{wires:1}{}",
     resources = {operations = {"Adjoint(Hadamard){}{wires:1}{}" = 2 : i64}} } {

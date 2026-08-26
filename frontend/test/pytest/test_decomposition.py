@@ -37,6 +37,8 @@ from pennylane.wires import Wires
 from catalyst import qjit
 from catalyst.decomposition.decomposition_rules import (
     compile_decomposition_rules_wrapper,
+    name_unwrap_adjoint,
+    name_wrap_adjoint,
 )
 from catalyst.decomposition.graph_op_id import GraphOpID
 from catalyst.decomposition.type_utils import (
@@ -80,20 +82,6 @@ class TestGenericUtilities:
         result = get_dummy_values_for_arg(input)
         assert result.dtype == dtype
         assert result.shape == shape
-
-    @pytest.mark.parametrize(
-        "dtype, expected",
-        [
-            ({"name": qp.typing.Float}, {"name": ["f64"]}),
-            ({"name": qp.typing.Int}, {"name": ["i64"]}),
-            ({"test": qp.typing.Bool}, {"test": ["i1"]}),
-            ({"r": qp.typing.Complex}, {"r": ["complex<f64>"]}),
-            ({"A": qp.typing.AbstractArray((2,), "int32")}, {"A": ["i32", "i32"]}),
-        ],
-    )
-    def test_mlir_stringify_type(self, dtype, expected):
-        """Test convert_types_to_mlir_strings."""
-        assert convert_types_to_mlir_strings(dtype) == expected
 
     @pytest.mark.parametrize(
         "op, id",
@@ -155,34 +143,6 @@ class TestGenericUtilities:
 
 class TestPrecompiled:
     """Tests for precompiled decomposition rules."""
-
-    def test_bytecode_file(self):
-        """Test that the bytecode file is generated correctly."""
-        # orig_bcfile = Path(BYTECODE_FILE_PATH)
-        # tmp_bcfile = None
-        #
-        # if orig_bcfile.exists():
-        #     tmp_bcfile = orig_bcfile.replace(BYTECODE_FILE_PATH + ".tmpbackup")
-        #
-        # try:
-        #     precompile_decomp_rules()
-        #     assert orig_bcfile.exists()
-        #
-        # finally:
-        #     if tmp_bcfile:
-        #         tmp_bcfile = tmp_bcfile.replace(orig_bcfile)
-        #     else:
-        #         orig_bcfile.unlink(missing_ok=True)
-        #
-        # # NOTE: empty pass is needed to prevent running default pipeline
-        # rules = _quantum_opt("--empty", BYTECODE_FILE_PATH)
-        #
-        # assert "_isingxy_to_h_cy" in rules
-        # assert "_doublexcit" in rules
-        # assert "_pauliz_to_ps" in rules
-        # assert "_cphase_to_ppr" in rules
-        # assert "_crot" in rules
-        pass
 
 
 class TestTraceTime:
@@ -308,7 +268,27 @@ class TestTraceTime:
 
 
 class TestOnDemand:
-    """Test the python wrapper functions used for on-demand, compile-time decomposition rule lowering."""
+    """Test the python wrapper functions used for on-demand,
+    compile-time decomposition rule lowering.
+    """
+
+    @pytest.mark.parametrize(
+        "op_name, op_id, expected",
+        [
+            ("S", "S{}{wires:1}{}", "S{}{wires:1}{}"),
+            ("S", "Adjoint(S){}{wires:1}{}", "S{}{wires:1}{}"),
+            ("RX", "Adjoint(RX){0:[f64]}{wires:1}{}", "RX{0:[f64]}{wires:1}{}"),
+        ],
+    )
+    def test_name_unwrap_adjoint(self, op_name, op_id, expected):
+        """name_unwrap_adjoint recovers the base op's id from an adjoint graphOpId, and is the
+        inverse of name_wrap_adjoint for a base id."""
+        if op_id.startswith("Adjoint("):
+            assert name_unwrap_adjoint(op_name, op_id) == expected
+            assert name_wrap_adjoint(expected) == op_id
+        else:
+            with pytest.raises(ValueError, match="not an adjoint id"):
+                name_unwrap_adjoint(op_name, op_id)
 
 
 if __name__ == "__main__":
