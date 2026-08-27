@@ -194,8 +194,8 @@ jobs:
           C_COMPILER=$(which ${{ needs.constants.outputs[format('c_compiler.{0}', matrix.compiler)] }}) \
           CXX_COMPILER=$(which ${{ needs.constants.outputs[format('cxx_compiler.{0}', matrix.compiler)] }}) \
           RT_BUILD_DIR="$(pwd)/runtime-build" \
-          LLVM_DIR="$(pwd)/mlir/llvm-project" \
           LLVM_BUILD_DIR="$(pwd)/llvm-build" \
+          LLVM_SRC_DIR="$(pwd)/mlir/llvm-project" \
           ENABLE_ASAN=OFF \
           ENABLE_TRANSPORT="$ENABLE_TRANSPORT" \
           ENABLE_EXECUTOR="$ENABLE_EXECUTOR" \
@@ -206,7 +206,7 @@ jobs:
           CXX_COMPILER=$(which ${{ needs.constants.outputs[format('cxx_compiler.{0}', matrix.compiler)] }}) \
           RT_BUILD_DIR="$(pwd)/runtime-build" \
           OQC_BUILD_DIR="$(pwd)/oqc-build" \
-          LLVM_DIR="$(pwd)/mlir/llvm-project" \
+          LLVM_SRC_DIR="$(pwd)/mlir/llvm-project" \
           make oqc
 
       # Only run the transport C++ tests once (gcc matrix entry). The tests aren't compiler-
@@ -964,7 +964,7 @@ jobs:
           CXX_COMPILER=$(which g++) \
           COMPILER_LAUNCHER="" \
           ENABLE_OQD=ON \
-          LLVM_DIR="$(pwd)/mlir/llvm-project" \
+          LLVM_SRC_DIR="$(pwd)/mlir/llvm-project" \
           make coverage-runtime
           mv runtime/build_cov/coverage.info coverage-${{ github.job }}.info
 
