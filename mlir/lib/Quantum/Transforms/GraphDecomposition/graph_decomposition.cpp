@@ -453,7 +453,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
             }
 
             moduleOp->walk([&](mlir::func::FuncOp func) {
-                if (func.getName().starts_with(opId)) {
+                if (func.getName().ends_with(opId)) {
                     mlir::OwningOpRef<mlir::func::FuncOp> outOp;
                     func->remove();
                     outOp = mlir::OwningOpRef<mlir::func::FuncOp>(func);
