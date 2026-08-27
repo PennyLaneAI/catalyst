@@ -26,10 +26,9 @@ from pennylane import cond
 import catalyst
 from catalyst import api_extensions
 from catalyst import cond as catalyst_cond
+from catalyst import jax_primitives
 from catalyst import measure as catalyst_measure
 from catalyst import qjit
-from catalyst import jax_primitives
-
 from catalyst.api_extensions.control_flow import collect_estimated_probabilities
 from catalyst.utils.exceptions import PlxprCaptureCFCompatibilityError
 
