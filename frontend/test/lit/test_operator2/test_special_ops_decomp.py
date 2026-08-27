@@ -118,14 +118,47 @@ def test_qubit_unitary():
     @qp.qjit(capture=True, target="mlir")
     @qp.qnode(qp.device("null.qubit", wires=3))
     def unitary():
+        qp.QubitUnitary(jnp.eye(2), wires=[0])
         qp.QubitUnitary(jnp.eye(4), wires=[0, 1])
+        qp.QubitUnitary(jnp.eye(8), wires=[0, 1, 2])
         return qp.state()
 
     print(unitary.mlir)
 
 
 # CHECK: func.func public @unitary
+# CHECK: qref.unitary({{%.+}} : tensor<2x2xcomplex<f64>>)
 # CHECK: qref.unitary({{%.+}} : tensor<4x4xcomplex<f64>>)
+# CHECK: qref.unitary({{%.+}} : tensor<8x8xcomplex<f64>>)
+#
+# CHECK: func.func private @"__builtin_zyz_QubitUnitary
+# CHECK-SAME: {U:{{\[\[}}complex<f64>,complex<f64>],
+# CHECK-SAME:     [complex<f64>,complex<f64>{{\]\]}}}{wires:1}{}"
+# CHECK-SAME:   target_gate = "QubitUnitary
+# CHECK-SAME:   {U:{{\[\[}}complex<f64>,complex<f64>],
+# CHECK-SAME:       [complex<f64>,complex<f64>{{\]\]}}}{wires:1}{}"
+#
+# CHECK: func.func private @"__builtin_zxz_QubitUnitary
+# CHECK-SAME: {U:{{\[\[}}complex<f64>,complex<f64>],
+# CHECK-SAME:     [complex<f64>,complex<f64>{{\]\]}}}{wires:1}{}"
+# CHECK-SAME:   target_gate = "QubitUnitary
+# CHECK-SAME:   {U:{{\[\[}}complex<f64>,complex<f64>],
+# CHECK-SAME:       [complex<f64>,complex<f64>{{\]\]}}}{wires:1}{}"
+#
+# CHECK: func.func private @"__builtin_xzx_QubitUnitary
+# CHECK-SAME: {U:{{\[\[}}complex<f64>,complex<f64>],
+# CHECK-SAME:     [complex<f64>,complex<f64>{{\]\]}}}{wires:1}{}"
+# CHECK-SAME:   target_gate = "QubitUnitary
+# CHECK-SAME:   {U:{{\[\[}}complex<f64>,complex<f64>],
+# CHECK-SAME:       [complex<f64>,complex<f64>{{\]\]}}}{wires:1}{}"
+#
+# CHECK: func.func private @"__builtin_xyx_QubitUnitary
+# CHECK-SAME: {U:{{\[\[}}complex<f64>,complex<f64>],
+# CHECK-SAME:     [complex<f64>,complex<f64>{{\]\]}}}{wires:1}{}"
+# CHECK-SAME:   target_gate = "QubitUnitary
+# CHECK-SAME:   {U:{{\[\[}}complex<f64>,complex<f64>],
+# CHECK-SAME:       [complex<f64>,complex<f64>{{\]\]}}}{wires:1}{}"
+#
 # CHECK: func.func private @"__builtin_two_qubit_decomp_rule_QubitUnitary
 # CHECK-SAME: {U:{{\[\[}}complex<f64>,complex<f64>,complex<f64>,complex<f64>],
 # CHECK-SAME:     [complex<f64>,complex<f64>,complex<f64>,complex<f64>],
@@ -136,6 +169,11 @@ def test_qubit_unitary():
 # CHECK-SAME:       [complex<f64>,complex<f64>,complex<f64>,complex<f64>],
 # CHECK-SAME:       [complex<f64>,complex<f64>,complex<f64>,complex<f64>],
 # CHECK-SAME:       [complex<f64>,complex<f64>,complex<f64>,complex<f64>{{\]\]}}}{wires:2}{}"
+#
+# CHECK: func.func private @"__builtin_multi_qubit_decomp_rule_QubitUnitary
+# CHECK-SAME: {wires:3}
+# CHECK-SAME:   target_gate = "QubitUnitary
+# CHECK-SAME:   {wires:3}
 test_qubit_unitary()
 
 

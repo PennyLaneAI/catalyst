@@ -188,7 +188,7 @@ def compile_decomposition_rules(
             decomp_rule_no_static_args = partial(decomp_rule_no_static_args, **extra_data)
 
         # keep the frontend name for readability, append target op_id for symbol uniqueness
-        decomp_rule_no_static_args.__name__ = rule._impl.__name__ + "_" + op_id
+        decomp_rule_no_static_args.__name__ = rule.name + "_" + op_id
 
         return qp.capture.subroutine(decomp_rule_no_static_args)
 
