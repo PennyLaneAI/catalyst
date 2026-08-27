@@ -42,15 +42,14 @@ _NON_INVERTIBLE_MARKERS = (
 
 
 def name_wrap_adjoint(op_id: str) -> str:
-    """Name-wrap the adjoint modifier around a graphOpId."""
-    split = len(op_id)
-    for i, char in enumerate(op_id):
-        # assumeing that the first field (dynamic shape) is always
-        # curly brackets, and will always be present even if there
-        # are no params.
-        if char == "{":
-            split = i
-            break
+    """Name-wrap the adjoint modifier around a graphOpId (``RX{...}`` -> ``Adjoint(RX){...}``).
+
+    Only the operator name is wrapped and the ``{params}{wires}{static}[uid]`` suffix is
+    carried through untouched.
+    """
+    split = op_id.find("{")
+    if split == -1:
+        split = len(op_id)
     return f"Adjoint({op_id[:split]}){op_id[split:]}"
 
 
@@ -105,7 +104,8 @@ def get_rules_from_module(module: ir.Module) -> str:
     Parse and modify decomposition rules from a ModuleOp.
 
     Args:
-        module: an MLIR module object containing a FuncOp named `rule_wrapper` to be extracted
+        module: an MLIR module object; every FuncOp carrying a `target_gate` attribute is
+                extracted as a decomposition rule.
 
     Returns:
         str: The string representation of any decomposition rules from `module`, pre-pending the
@@ -163,7 +163,7 @@ def collect_resources_for_op(op_name, kwargs, is_custom_op=False, adjoint_resour
     decomp_rules = list(qp.decomposition.list_decomps(op_name))
     args, kwargs = split_call_args(kwargs, is_custom_op)
 
-    # map rules to resource resources, in a more generic format
+    # map each rule to its resources, in a more generic format
     name_to_resource_ids = {}
     name_to_resources = {}
     for rule in decomp_rules:
@@ -467,7 +467,7 @@ def fetch_all_reachable_decomposition_rules_from_op(
         this_extra_data = this_extra_data or {}
         this_kwargs = prepare_dynamic_op_kwargs(this_dynamic_shape, this_wire_lens)
         # Explore ops reachable through the rules of both this op and its adjoint:
-        for explore_name, _ in _op_variants(this_name, ""):
+        for explore_name in _op_variant_names(this_name):
             resources, _, _ = collect_resources_for_op(
                 explore_name, this_kwargs | this_static_data | this_extra_data, this_is_custom_op
             )
@@ -506,11 +506,9 @@ def fetch_all_reachable_decomposition_rules_from_op(
     return rules
 
 
-def _op_variants(op_name, op_id):
-    """Yield the (name, id) for an operator, unless it is already adjointed.
-
-    For a gate `Op` we lower the rules registered against both `Op` and `Adjoint(Op)`.
-    """
-    yield op_name, op_id
+def _op_variant_names(op_name):
+    """Yield the operator names to explore for `op_name`: the op itself and, unless it is already
+    adjointed, its adjoint `Adjoint(op_name)`. Rules registered against both are collected."""
+    yield op_name
     if not op_name.startswith("Adjoint("):
-        yield f"Adjoint({op_name})", name_wrap_adjoint(op_id)
+        yield f"Adjoint({op_name})"
