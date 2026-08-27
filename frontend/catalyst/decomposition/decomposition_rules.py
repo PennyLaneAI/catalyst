@@ -43,13 +43,16 @@ _NON_INVERTIBLE_MARKERS = (
 
 # Canonical nesting order for op-level modifiers, listed OUTERMOST first. The compiler's
 # ``wrapModifiers`` (mlir/lib/Quantum/IR/QuantumInterfaces.cpp) folds modifiers into a graphOpId
-# in this exact order: 1) control outermost, 2) adjoint innermost. So a single op that is both
-# controlled and adjointed always spells as ``C(Adjoint(Op))``, never ``Adjoint(C(Op))``. This is
-# a canonicalization. So the two spellings denote the same operator and MUST map to the same graph
-# node, or the solver would treat them as distinct gates to match a rule against the op.
-# The parser (``parseOperator``) is a structural round-trip and does NOT re-order, so canonicity has
-# to be guaranteed here at the producer.
-# We add future modifiers to this tuple at their canonical depth.
+# in this exact order:
+# 1. control outermost
+# 2. adjoint innermost
+# So a single op that is both controlled and adjointed always spells as ``C(Adjoint(Op))``,
+# never ``Adjoint(C(Op))``. This is a canonicalization. So the two spellings denote the same
+# operator and MUST map to the same graph node, or the solver would treat them as distinct gates
+# to match a rule against the op.
+# The parser (``parseOperator``) is a structural round-trip and does NOT re-order, so canonicity
+# has to be guaranteed here at the producer. We add future modifiers to this tuple at their
+# canonical depth.
 _MODIFIER_CANONICAL_ORDER = ("C", "Adjoint")
 
 
@@ -162,7 +165,8 @@ def get_rules_from_module(module: ir.Module) -> str:
     Parse and modify decomposition rules from a ModuleOp.
 
     Args:
-        module: an MLIR module object containing a FuncOp named `rule_wrapper` to be extracted
+        module: an MLIR module object; every FuncOp carrying a `target_gate` attribute is
+                extracted as a decomposition rule.
 
     Returns:
         str: The string representation of any decomposition rules from `module`, pre-pending the
@@ -215,12 +219,12 @@ def split_call_args(kwargs, is_custom_op):
     return (), kwargs
 
 
-def collect_resources_for_op(op_name, kwargs, is_custom_op=False):
+def collect_resources_for_op(op_name, kwargs, is_custom_op=False, adjoint_resources=False):
     """Return resource data for all decomposition rules associated to op_name."""
     decomp_rules = list(qp.decomposition.list_decomps(op_name))
     args, kwargs = split_call_args(kwargs, is_custom_op)
 
-    # map rules to resource resources, in a more generic format
+    # map each rule to its resources, in a more generic format
     name_to_resource_ids = {}
     name_to_resources = {}
     for rule in decomp_rules:
@@ -229,8 +233,12 @@ def collect_resources_for_op(op_name, kwargs, is_custom_op=False):
             # for the original op of the rule
             resources = rule.compute_resources(*args, **kwargs)
             name_to_resources[rule.name] = resources.gate_counts
+            # When adjoint_resources is True, each produced resource's graphOpId is generated in its
+            # adjoint form (Adjoint(<name>){...}) directly from the resource op instance via
+            # GraphOpID.getGraphOpId, rather than string.
             name_to_resource_ids[rule.name] = {
-                GraphOpID(op).getGraphOpId(): count for op, count in resources.gate_counts.items()
+                GraphOpID(op).getGraphOpId(adjoint=adjoint_resources): count
+                for op, count in resources.gate_counts.items()
             }
         except Exception as e:
             warnings.warn(f"Failed to get resources for the {rule.name} decomposition rule: {e}")
@@ -273,16 +281,9 @@ def compile_decomposition_rules(
     device = qp.device("null.qubit", wires=sum(wire_lens.values()))
 
     _, name_to_resource_ids, decomp_rules = collect_resources_for_op(
-        op_name, kwargs | static_data | extra_data, is_custom_op
+        op_name, kwargs | static_data | extra_data, is_custom_op, adjoint_resources=wrap_adjoint
     )
-
-    # The distribution pathway targets `Adjoint(op)` and produces adjointed resource gates.
     target_id = name_wrap_adjoint(op_id) if wrap_adjoint else op_id
-    if wrap_adjoint:
-        name_to_resource_ids = {
-            rule_name: {name_wrap_adjoint(produced_id): count for produced_id, count in ids.items()}
-            for rule_name, ids in name_to_resource_ids.items()
-        }
 
     # The static_data was only needed to instantiate the correct decomp rule
     # Once we have the correct rules, don't send them into qjit
@@ -527,7 +528,7 @@ def fetch_all_reachable_decomposition_rules_from_op(
         this_extra_data = this_extra_data or {}
         this_kwargs = prepare_dynamic_op_kwargs(this_dynamic_shape, this_wire_lens)
         # Explore ops reachable through the rules of both this op and its adjoint:
-        for explore_name, _ in _op_variants(this_name, ""):
+        for explore_name in _op_variant_names(this_name):
             resources, _, _ = collect_resources_for_op(
                 explore_name, this_kwargs | this_static_data | this_extra_data, this_is_custom_op
             )
@@ -566,11 +567,9 @@ def fetch_all_reachable_decomposition_rules_from_op(
     return rules
 
 
-def _op_variants(op_name, op_id):
-    """Yield the (name, id) for an operator, unless it is already adjointed.
-
-    For a gate `Op` we lower the rules registered against both `Op` and `Adjoint(Op)`.
-    """
-    yield op_name, op_id
+def _op_variant_names(op_name):
+    """Yield the operator names to explore for `op_name`: the op itself and, unless it is already
+    adjointed, its adjoint `Adjoint(op_name)`. Rules registered against both are collected."""
+    yield op_name
     if not op_name.startswith("Adjoint("):
-        yield f"Adjoint({op_name})", name_wrap_adjoint(op_id)
+        yield f"Adjoint({op_name})"
