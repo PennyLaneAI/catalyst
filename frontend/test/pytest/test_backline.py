@@ -364,20 +364,46 @@ class TestBacklineDemoIntegration:
         # qp.sample keeps the shots axis explicit: shots=1 with 3 measurements -> (1, 3).
         assert samples.shape == (1, 3), f"expected shape (1, 3), got {samples.shape}"
 
-    def test_local_cpu_to_local_cpu_rdma_loopback(self, use_capture):
-        """Demo 1a: local CPU ↔ local CPU over RDMA loopback, both in-process.
+    @pytest.mark.parametrize(
+        "executor_options, oob_port",
+        [
+            pytest.param(None, 18590, id="in_process"),
+            pytest.param({}, 18591, id="out_of_process"),
+        ],
+    )
+    def test_local_cpu_to_local_cpu_rdma_loopback(
+        self, use_capture, stop_node_executors, executor_options, oob_port
+    ):
+        """Demo 1a: local CPU to local CPU over RDMA loopback, in-process and out-of-process.
 
-        Direct mirror of ``demos/demo_1a_local_cpu_to_local_cpu_rdma.py``. Both roles run in
-        this process and reach each other through the ``rxe0`` soft-RoCE device installed by
-        the ``setup-soft-roce`` composite action: the ibverbs path is real while the fabric
-        underneath it is software.
+        Both roles reach each other through the ``rxe0`` soft-RoCE device installed by the
+        ``setup-soft-roce`` composite action, so the ibverbs path is real while the fabric
+        underneath it is software. The cases differ only in where the coprocessor runs, which
+        ``pennylane.backline.Node.remote`` documents as a property of ``executor_options`` with
+        ``remote`` left at ``False``:
 
-        The config strings follow the demo's ``LOCAL_CFG`` shape - ``dev=<rxe device>;gid=<idx>``,
-        which ``runtime/lib/transport/rdma/common/BackendConfig.hpp`` requires. ``backend_lib``
-        is left off ``init_args`` so the compiler resolves the transport backend via the
-        (``transport``, ``hardware``) mapping in ``backline._resolve_backend_lib`` to an absolute
-        path under ``RUNTIME_LIB_DIR`` - avoiding a runtime ``dlopen`` of a bare filename that
-        the loader would search for on ``LD_LIBRARY_PATH``.
+        * ``in_process`` -- ``executor_options=None``, the default: no executor is built, so both
+          roles stay in this process. A direct mirror of
+          ``demos/demo_1a_local_cpu_to_local_cpu_rdma.py``.
+        * ``out_of_process`` -- ``executor_options={}``, naming neither a ``host`` nor an
+          ``address``: a ``catalyst-executor`` subprocess on this machine, its libraries still
+          resolving from this installation. This is how the roles actually deploy, one queue pair
+          per process -- an earlier in-process version of this test SIGSEGV'd inside ``ghz()`` on
+          GH-hosted ubuntu's ``rdma_rxe`` with two queue pairs in one process. It also covers the
+          executor plugin path: ``_realize_executor`` derives ``_executor_plugins`` only on the
+          ``executor_options`` branch, since a preset ``executor=Executor()`` is taken at the
+          node's word, so the subprocess gets the runtime libraries and the decode library
+          preloaded by absolute path. Needs a runtime built with ``ENABLE_EXECUTOR=ON``, which is
+          what puts ``catalyst-executor`` where ``default_executor_bin`` looks for it.
+
+        A port per case, so both run in one session without meeting each other on the
+        coprocessor's out-of-band port. The config strings follow the demo's ``LOCAL_CFG`` shape -
+        ``dev=<rxe device>;gid=<idx>``, which
+        ``runtime/lib/transport/rdma/common/BackendConfig.hpp`` requires. ``backend_lib`` is left
+        off ``init_args`` so the compiler resolves the transport backend via the (``transport``,
+        ``hardware``) mapping in ``backline._resolve_backend_lib`` to an absolute path under
+        ``RUNTIME_LIB_DIR`` - avoiding a runtime ``dlopen`` of a bare filename that the loader
+        would search for on ``LD_LIBRARY_PATH``.
         """
         steane_lib = str(
             Path(get_lib_path("runtime", "RUNTIME_LIB_DIR")) / "libsteane_coprocessor_cpu.so"
@@ -390,9 +416,14 @@ class TestBacklineDemoIntegration:
         coproc = qp.Coprocessor(
             name="cpu-coproc",
             coprocessor_fn=qp.CoprocessorFunction("steane_coprocessor", lib_path=steane_lib),
-            endpoint=qp.Endpoint("127.0.0.1", 18590),
+            endpoint=qp.Endpoint("127.0.0.1", oob_port),
+            executor_options=executor_options,
             init_args={"config": "dev=rxe0;gid=1"},
         )
+        # Registered before compiling, because ``_realize_executor`` launches the subprocess
+        # during compilation: a failure after that point still has to release the port. A no-op
+        # for the in-process case, whose node never gets an executor.
+        stop_node_executors(coproc)
         dev = qp.Backline(
             controller=ctrl, coprocessors=[coproc], transport="rdma", qec_code="steane"
         )
@@ -416,11 +447,33 @@ class TestBacklineDemoIntegration:
         for pass_name, _ in _qec_pass_specs("steane"):
             assert pass_name in ir, f"{pass_name} missing from the scheduled pipeline"
 
+        # Where the coprocessor ended up, asserted rather than inferred from a passing execution.
+        executor = coproc.executor
+        if executor_options is None:
+            assert executor is None, "the default asks for no executor, so the node stays here"
+        else:
+            assert executor is not None, "executor_options={} did not produce an executor"
+            # ``address`` raises unless the executor is up, and only a local one serves on
+            # loopback, so this pins the mode as well as the liveness.
+            assert executor.address.startswith(
+                "127.0.0.1:"
+            ), f"a local executor serves on loopback, got {executor.address}"
+            plugins = executor._cfg.plugins  # pylint: disable=protected-access
+            plugin_names = [Path(plugin).name for plugin in plugins]
+            for required in (*_EXECUTOR_RUNTIME_PLUGINS, "libsteane_coprocessor_cpu.so"):
+                assert required in plugin_names, f"{required} missing from the executor's plugins"
+            assert all(plugin.startswith("/") for plugin in plugins), (
+                "a node on this machine needs absolute plugin paths: "
+                "the runtime is not on the loader's search path"
+            )
+
         samples = np.asarray(ghz())
         # qp.sample keeps the shots axis explicit: shots=1 with 3 measurements -> (1, 3).
         assert samples.shape == (1, 3), f"expected shape (1, 3), got {samples.shape}"
 
-    def test_cpu_controller_to_gpu_coproc_memcpy_manual_qec(self, use_capture, gpu_triton_platform):
+    def test_cpu_controller_to_gpu_coproc_memcpy_manual_qec(
+        self, use_capture, gpu_triton_platform, gpu_transport_backend
+    ):
         """CPU controller ↔ GPU coprocessor over ``memcpy`` with a manually-scheduled QEC cycle.
 
         Ports demo 2's CSS BP decoder + manual QEC pattern to local memcpy transport, executed
@@ -431,6 +484,7 @@ class TestBacklineDemoIntegration:
         logical-op / iterated-error-injection structure follows demo 2 and is what distinguishes
         this test from the shorter ``*_triton_css_bp`` variant above.
         """
+        del gpu_transport_backend  # gate only: the HIP-built backend library must exist
         pytest.importorskip("triton")
 
         n_data = 13
@@ -544,7 +598,7 @@ class TestBacklineDemoIntegration:
         assert len(result) == 2
 
     def test_cpu_controller_to_gpu_coproc_memcpy_precompiled(
-        self, use_capture, gpu_triton_platform
+        self, use_capture, gpu_triton_platform, gpu_transport_backend
     ):
         """Precompiled GPU decoder (``gpu_steane_launcher``) reached over local memcpy, executed.
 
@@ -559,7 +613,9 @@ class TestBacklineDemoIntegration:
         executes end-to-end once HIP-on-CUDA is installed and the runtime CMake builds the
         transport GPU coproc lib with the launcher symbol.
         """
-        del gpu_triton_platform  # only used to gate on GPU presence; string not consumed here
+        # Both are gates only: one for GPU + Triton driver presence, one for the HIP-built
+        # backend library. Neither value is consumed here.
+        del gpu_triton_platform, gpu_transport_backend
         ctrl = qp.Controller(
             name="cpu-controller",
             device=qp.device("null.qubit", wires=3),
@@ -604,6 +660,20 @@ class TestBacklineDemoIntegration:
         this process on the GPU runner. Compile-only: asserts on ``.mlir`` without executing.
         Execution would need the GPU coproc runtime side of the memcpy backend to load the
         Triton-built ``.so``, which is orthogonal to what the demo pattern is verifying.
+
+        ``backend_lib`` is attached rather than left to the compiler, which is what lets this case
+        run without a HIP toolchain. ``_resolve_backend_lib`` searches the install for the named
+        library and raises ``ValueError`` when it is absent, and
+        ``catalyst_transport_memcpy_gpu_coprocessor`` is built only under ``TRANSPORT_HAS_HIP``
+        (``runtime/lib/transport/memcpy/CMakeLists.txt``) - so on a runner without HIP-on-CUDA the
+        resolver would fail here even though nothing is ever loaded. An attached name takes
+        precedence over the resolver (``backline._node_dict``), and since the QNode is never
+        called there is no ``dlopen`` to satisfy. The two executing GPU cases cannot use this
+        escape hatch: they need the real library.
+
+        So on an NVIDIA runner, with no HIP involved, this covers Triton codegen for the detected
+        ``cuda:<cc>:<warp>`` platform, the [[13,1,3]] hypergraph-product lowering, and the
+        resulting IR. It does not cover the GPU transport backend.
         """
         pytest.importorskip("triton")
         platform = gpu_triton_platform
@@ -646,6 +716,10 @@ class TestBacklineDemoIntegration:
             name="gpu-coproc",
             coprocessor_fn=decoder,
             hardware="gpu",
+            # See the docstring: attached rather than resolved, so a runner without HIP can still
+            # compile this. The name is the one the resolver would have produced, so the IR
+            # assertion below is unchanged.
+            init_args={"backend_lib": "libcatalyst_transport_memcpy_gpu_coprocessor.so"},
         )
         dev = qp.Backline(controller=ctrl, coprocessors=[coproc], transport="memcpy")
 

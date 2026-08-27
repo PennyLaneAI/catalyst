@@ -1,4 +1,4 @@
-name: Check Transport Backends (GPU)
+name: Check Catalyst GPU
 
 # Runs the runtime transport tests on a GPU host. To keep GPU runner time cheap, pull requests
 # only trigger a run once labeled ``gpu``; ``push`` to main runs unconditionally.
@@ -7,14 +7,15 @@ on:
   push:
     branches: [ main ]
     paths:
-      - 'runtime/lib/transport/**'
-      - 'runtime/include/Transport*'
-      - 'runtime/tests/Test_Transport*'
-      - 'mlir/lib/Transport/**'
-      - 'mlir/include/Transport/**'
-      - 'frontend/catalyst/backline.py'
-      - 'frontend/test/pytest/test_backline.py'
-      - '.github/workflows/check-transport-gpu.yaml'
+      - "runtime/lib/transport/**"
+      - "runtime/include/Transport*"
+      - "runtime/tests/Test_Transport*"
+      - "mlir/lib/Transport/**"
+      - "mlir/include/Transport/**"
+      - "frontend/catalyst/backline.py"
+      - "frontend/test/pytest/test_backline.py"
+      - "frontend/test/pytest/conftest.py"
+      - ".github/workflows/check-transport-gpu.yaml"
   pull_request:
     types:
       - opened
@@ -23,14 +24,15 @@ on:
       - ready_for_review
       - labeled
     paths:
-      - 'runtime/lib/transport/**'
-      - 'runtime/include/Transport*'
-      - 'runtime/tests/Test_Transport*'
-      - 'mlir/lib/Transport/**'
-      - 'mlir/include/Transport/**'
-      - 'frontend/catalyst/backline.py'
-      - 'frontend/test/pytest/test_backline.py'
-      - '.github/workflows/check-transport-gpu.yaml'
+      - "runtime/lib/transport/**"
+      - "runtime/include/Transport*"
+      - "runtime/tests/Test_Transport*"
+      - "mlir/lib/Transport/**"
+      - "mlir/include/Transport/**"
+      - "frontend/catalyst/backline.py"
+      - "frontend/test/pytest/test_backline.py"
+      - "frontend/test/pytest/conftest.py"
+      - ".github/workflows/check-transport-gpu.yaml"
   workflow_dispatch:
 
 permissions:
@@ -45,8 +47,8 @@ jobs:
     name: Set build matrix
     uses: ./.github/workflows/constants.yaml
 
-  transport-tests-gpu:
-    name: Transport Backend Tests (GPU)
+  gpu-transport-tests:
+    name: Runtime transport tests (GPU)
     needs: [constants]
     runs-on:
       - single-gpu-x64
@@ -122,12 +124,15 @@ jobs:
       # self-hosted GPU runner. The transport runtime's GPU coprocessor code compiles cleanly
       # against HIP-on-CUDA - runtime/lib/transport/common/coproc/gpu/CMakeLists.txt already
       # has an explicit `if(CMAKE_HIP_COMPILER_ID STREQUAL "NVIDIA")` branch - and the current
-      # runner falls through to `-- transport: no HIP compiler -> GPU backends skipped`,
-      # leaving libcatalyst_transport_memcpy_gpu_coprocessor.so without the gpu_steane_launcher
-      # symbol. Once HIP-on-CUDA is available, we can add an executing counterpart to
-      # test_cpu_controller_to_gpu_coproc_memcpy_precompiled (currently compile-only in
-      # check-catalyst.yaml) that actually launches the persistent GPU decode kernel here.
-      # Related matrix case: I (frontend memcpy CPU->GPU precompiled, execute).
+      # runner falls through to `-- transport: no HIP compiler -> GPU backends skipped`.
+      # That skip is total, not partial: runtime/lib/transport/memcpy/CMakeLists.txt guards the
+      # whole `catalyst_transport_memcpy_gpu_coprocessor` target on TRANSPORT_HAS_HIP, so the .so
+      # is never produced -- and backline._resolve_backend_lib requires it on disk, raising
+      # ValueError rather than resolving. So both *executing* GPU cases
+      # (_memcpy_precompiled, _memcpy_manual_qec) are hard-blocked until HIP-on-CUDA lands.
+      # Also needed then: -DCMAKE_HIP_PLATFORM=nvidia, which runtime/Makefile's `configure`
+      # target currently has no way to pass (its cmake flags are hard-coded).
+      # The compile-only _triton_css_bp case does not need any of this -- see the step below.
 
       # From here down: build LLVM/StableHLO/Enzyme *on this self-hosted GPU runner* rather than
       # consuming check-catalyst.yaml's caches. Cross-runner reuse hit three layered blockers
@@ -236,6 +241,40 @@ jobs:
         run: |
           pip install triton
 
+      - name: Report Triton / GPU driver state
+        # gpu_triton_platform skips the GPU cases when Triton reports no active driver, and that
+        # is what this runner did: an NVIDIA GPU is visible to nvidia-smi while Triton's CUDA
+        # backend lands at "0 active drivers". Which of the pieces below is missing decides
+        # whether the compile-only css_bp case can run at all, and guessing at a triton pin costs
+        # a ~20 min GPU run per attempt -- so print the inputs and read them instead.
+        # Non-fatal: the guard at the end of the job is what decides the outcome.
+        continue-on-error: true
+        run: |
+          nvidia-smi || echo "nvidia-smi unavailable"
+          echo "--- libcuda in loader cache ---"
+          ldconfig -p | grep -i libcuda || echo "no libcuda in ldconfig cache"
+          echo "--- triton probe ---"
+          python3 - <<'EOF'
+          import traceback
+
+          try:
+              import triton
+
+              print("triton version:", triton.__version__)
+          except Exception:  # noqa: BLE001 - reporting, not handling
+              traceback.print_exc()
+              raise SystemExit(0)
+
+          try:
+              from triton.runtime.driver import driver
+
+              # Raises RuntimeError on 0 or >1 active drivers, which is the case
+              # conftest._triton_driver_active() turns into a skip.
+              print("active driver:", driver.active)
+          except Exception:  # noqa: BLE001 - the traceback is the diagnostic
+              traceback.print_exc()
+          EOF
+
       - name: Build Catalyst frontend (reusing the transport-enabled runtime)
         run: |
           # make catalyst -> make frontend runs precompile_decomposition_rules, which imports
@@ -273,12 +312,14 @@ jobs:
         #   - triton_css_bp: minimal Triton codegen path (compile-only for now)
         #   - manual_qec: demo 2's elaborate encoded circuit + Triton-built hgp_bp_osd_decoder,
         #     executes ghz() on the GPU.
-        # All three depend on the runtime CMake having built the memcpy GPU coproc backend .so
-        # with GPU support, which needs HIP-on-CUDA installed on the runner (see the TODO
-        # above about the cloud team). Until that lands, gpu_triton_platform detects the
-        # missing driver and skips the whole set cleanly instead of failing at loader time.
-        # -rs makes those skips visible in the CI log so a green tick with zero coverage is
-        # obvious rather than silent.
+        # Two gates, failing for unrelated reasons:
+        #   gpu_triton_platform     -- a GPU and an active Triton driver. All three need it.
+        #   gpu_transport_backend   -- the HIP-built memcpy GPU coproc .so. Only the two
+        #                              executing cases need it; without the gate they would raise
+        #                              ValueError out of _resolve_backend_lib rather than skip.
+        # So triton_css_bp can run as soon as Triton activates here, with no HIP involved: it is
+        # compile-only and attaches its own backend_lib. The other two stay blocked on
+        # HIP-on-CUDA (see the TODO above). -rs makes every skip visible in the log.
         run: |
           python3 -m pytest -v -rs --junit-xml=gpu-backline-results.xml \
             "frontend/test/pytest/test_backline.py::TestBacklineDemoIntegration::test_cpu_controller_to_gpu_coproc_memcpy_precompiled" \
