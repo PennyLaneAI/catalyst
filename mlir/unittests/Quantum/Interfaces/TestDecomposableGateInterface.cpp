@@ -81,6 +81,76 @@ module {
     ASSERT_EQ(customOp.getGraphOpId(), "RX{0:[f64]}{wires:2}{}");
 }
 
+TEST(DecomposableGateInterfaceTests, MultiControlledCustomOp) {
+    std::string moduleStr = R"mlir(
+module {
+  %true = arith.constant true
+  %q0 = quantum.alloc_qb : !quantum.bit
+  %c0 = quantum.alloc_qb : !quantum.bit
+  %c1 = quantum.alloc_qb : !quantum.bit
+  %oq, %oc:2 = quantum.custom "PauliX"() %q0 ctrls(%c0, %c1) ctrlvals(%true, %true) : !quantum.bit ctrls !quantum.bit, !quantum.bit
+}
+    )mlir";
+
+    DialectRegistry registry;
+    registry.insert<mlir::arith::ArithDialect, QuantumDialect>();
+    MLIRContext context(registry);
+    ParserConfig config(&context, /*verifyAfterParse=*/false);
+    OwningOpRef<ModuleOp> module = parseSourceString<ModuleOp>(moduleStr, config);
+
+    DecomposableGate op = *module->getOps<CustomOp>().begin();
+
+    // Two control wires fold as `2C(...)`
+    ASSERT_EQ(op.getGraphOpId(), "2C(PauliX){}{wires:1}{}");
+}
+
+TEST(DecomposableGateInterfaceTests, ControlledAdjointCustomOp) {
+    std::string moduleStr = R"mlir(
+module {
+  %true = arith.constant true
+  %angle = arith.constant 0.1 : f64
+  %q0 = quantum.alloc_qb : !quantum.bit
+  %c0 = quantum.alloc_qb : !quantum.bit
+  %oq, %oc = quantum.custom "RX"(%angle) %q0 adj ctrls(%c0) ctrlvals(%true) : !quantum.bit ctrls !quantum.bit
+}
+    )mlir";
+
+    DialectRegistry registry;
+    registry.insert<mlir::arith::ArithDialect, QuantumDialect>();
+    MLIRContext context(registry);
+    ParserConfig config(&context, /*verifyAfterParse=*/false);
+    OwningOpRef<ModuleOp> module = parseSourceString<ModuleOp>(moduleStr, config);
+
+    DecomposableGate op = *module->getOps<CustomOp>().begin();
+
+    // Modifiers fold control-outermost
+    ASSERT_EQ(op.getGraphOpId(), "C(Adjoint(RX)){0:[f64]}{wires:1}{}");
+}
+
+TEST(DecomposableGateInterfaceTests, MultiControlledAdjointCustomOp) {
+    std::string moduleStr = R"mlir(
+module {
+  %true = arith.constant true
+  %angle = arith.constant 0.1 : f64
+  %q0 = quantum.alloc_qb : !quantum.bit
+  %c0 = quantum.alloc_qb : !quantum.bit
+  %c1 = quantum.alloc_qb : !quantum.bit
+  %oq, %oc:2 = quantum.custom "RX"(%angle) %q0 adj ctrls(%c0, %c1) ctrlvals(%true, %true) : !quantum.bit ctrls !quantum.bit, !quantum.bit
+}
+    )mlir";
+
+    DialectRegistry registry;
+    registry.insert<mlir::arith::ArithDialect, QuantumDialect>();
+    MLIRContext context(registry);
+    ParserConfig config(&context, /*verifyAfterParse=*/false);
+    OwningOpRef<ModuleOp> module = parseSourceString<ModuleOp>(moduleStr, config);
+
+    DecomposableGate op = *module->getOps<CustomOp>().begin();
+
+    // Controls + Adjoint folding
+    ASSERT_EQ(op.getGraphOpId(), "2C(Adjoint(RX)){0:[f64]}{wires:1}{}");
+}
+
 TEST(DecomposableGateInterfaceTests, MultiRZOp) {
     std::string moduleStr = R"mlir(
 module {
@@ -187,7 +257,8 @@ module {
     mlir::DictionaryAttr expectedStaticData = mlir::DictionaryAttr::get(&context, {entry});
     ASSERT_EQ(pcphase.getStaticData(), expectedStaticData);
 
-    ASSERT_EQ(pcphase.getGraphOpId(), "PCPhase{phi:[f64]}{wires:2}{dim:0}");
+    // The op carries one control wire, folded into the id (control-outermost).
+    ASSERT_EQ(pcphase.getGraphOpId(), "C(PCPhase){phi:[f64]}{wires:2}{dim:0}");
 }
 
 TEST(DecomposableGateInterfaceTests, GlobalPhaseOp) {
@@ -251,7 +322,9 @@ module {
 
     ASSERT_EQ(gphase.getStaticData().size(), 0);
 
-    ASSERT_EQ(gphase.getGraphOpId(), "GlobalPhase{phi:[f64]}{}{}");
+    // Controlled global phase: the control wire is folded into the id (this is the `C(GlobalPhase)`
+    // operator, which a rule maps to `PhaseShift`/`ControlledPhaseShift`).
+    ASSERT_EQ(gphase.getGraphOpId(), "C(GlobalPhase){phi:[f64]}{}{}");
 }
 
 TEST(DecomposableGateInterfaceTests, QubitUnitaryOp) {
@@ -288,7 +361,8 @@ module {
 
     ASSERT_EQ(unitary.getStaticData().size(), 0);
 
-    ASSERT_EQ(unitary.getGraphOpId(), "QubitUnitary{U:["
+    // Controlled unitary: the control wire is folded into the id (control-outermost).
+    ASSERT_EQ(unitary.getGraphOpId(), "C(QubitUnitary){U:["
                                       "[[complex<f64>,complex<f64>,complex<f64>,complex<f64>],"
                                       "[complex<f64>,complex<f64>,complex<f64>,complex<f64>],"
                                       "[complex<f64>,complex<f64>,complex<f64>,complex<f64>],"

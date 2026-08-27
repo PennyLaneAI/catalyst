@@ -15,7 +15,17 @@
   [(#3090)](https://github.com/PennyLaneAI/catalyst/pull/3090)
   [(#3096)](https://github.com/PennyLaneAI/catalyst/pull/3096)
   [(#3116)](https://github.com/PennyLaneAI/catalyst/pull/3116)
+  [(#3127)](https://github.com/PennyLaneAI/catalyst/pull/3127)
   [(#3131)](https://github.com/PennyLaneAI/catalyst/pull/3131)
+
+* The graph-based decomposition system now supports **adjoint operators** for `Operator2`.
+  [(#3120)](https://github.com/PennyLaneAI/catalyst/pull/3120)
+  [(#3115)](https://github.com/PennyLaneAI/catalyst/pull/3115)
+
+  For a target gate set, `Adjoint(Op)` is reached through any of three pathways:
+    1. Rules registered on the base `Op`,
+    2. Rules registered directly for `Adjoint(Op)`, and
+    3. Rules *synthesized by distribution* (`decompose(Adjoint(Op)) = adjoint(decompose(Op))`).
 
 * The `local-random` unitary folding option for :func:`~.mitigate_with_zne` is now implemented,
   reproducing Mitiq's ``fold_gates_at_random``: every gate is folded ``floor((scale_factor-1)/2)``
@@ -26,6 +36,9 @@
   [(#2956)](https://github.com/PennyLaneAI/catalyst/pull/2956)
 
 <h3>Improvements 🛠</h3>
+
+* Add the `XMEM_REPLY_BRAM` memory type and use it to allocate reply buffers in dedicated BRAM.
+  [(#3148)](https://github.com/PennyLaneAI/catalyst/pull/3148)
 
 * a PennyLane `Backline` is serialized to the `catalyst.backline` module attribute and compiled
   through the transport passes.

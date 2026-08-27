@@ -29,17 +29,23 @@ from operator2_dummy_gates import (
     SingleParam,
     StaticData,
 )
-from pennylane.typing import Bool, Complex, Float, Int
+from pennylane import qnode
+from pennylane.decomposition import add_decomps, local_decomps, register_resources
+from pennylane.typing import Bool, Complex, Float, Int, Wire
 from pennylane.wires import Wires
 
+from catalyst import qjit
 from catalyst.decomposition.decomposition_rules import (
+    _MODIFIER_CANONICAL_ORDER,
+    _leading_modifier_kind,
+    _modifier_kind,
     compile_decomposition_rules_wrapper,
+    name_unwrap_adjoint,
+    name_wrap_adjoint,
+    wrap_modifier_id,
 )
 from catalyst.decomposition.graph_op_id import GraphOpID
-from catalyst.decomposition.type_utils import (
-    convert_types_to_mlir_strings,
-    get_dummy_values_for_arg,
-)
+from catalyst.decomposition.type_utils import get_dummy_values_for_arg
 
 
 class TestGenericUtilities:
@@ -77,20 +83,6 @@ class TestGenericUtilities:
         result = get_dummy_values_for_arg(input)
         assert result.dtype == dtype
         assert result.shape == shape
-
-    @pytest.mark.parametrize(
-        "dtype, expected",
-        [
-            ({"name": qp.typing.Float}, {"name": ["f64"]}),
-            ({"name": qp.typing.Int}, {"name": ["i64"]}),
-            ({"test": qp.typing.Bool}, {"test": ["i1"]}),
-            ({"r": qp.typing.Complex}, {"r": ["complex<f64>"]}),
-            ({"A": qp.typing.AbstractArray((2,), "int32")}, {"A": ["i32", "i32"]}),
-        ],
-    )
-    def test_mlir_stringify_type(self, dtype, expected):
-        """Test convert_types_to_mlir_strings."""
-        assert convert_types_to_mlir_strings(dtype) == expected
 
     @pytest.mark.parametrize(
         "op, id",
@@ -155,11 +147,212 @@ class TestPrecompiled:
 
 
 class TestTraceTime:
-    """Placeholder for future tests of trace-time decomposition rule lowering."""
+    """Tests of trace-time decomposition rule lowering."""
+
+    @staticmethod
+    def _base_and_adjoint_rules():
+        from operator2_dummy_gates import SingleParam
+
+        def base_resource_fn(reg):
+            return {SingleParam(x=Float, reg=Wire[2]): 1}
+
+        @register_resources(base_resource_fn)
+        def base_rule(reg):
+            SingleParam(x=0.1, reg=reg[0:2])
+
+        def adj_resource_fn(reg):
+            return {SingleParam(x=Float, reg=Wire[2]): 2}
+
+        @register_resources(adj_resource_fn)
+        def adj_rule(reg):
+            SingleParam(x=0.2, reg=reg[0:2])
+            SingleParam(x=0.3, reg=reg[0:2])
+
+        return base_rule, adj_rule
+
+    def test_plain_gate_captures_base_and_adjoint(self):
+        """Lowering a plain gate captures the rules registered against both the gate
+        and its adjoint."""
+        from operator2_dummy_gates import NoParams
+
+        base_rule, adj_rule = self._base_and_adjoint_rules()
+        with local_decomps():
+            add_decomps(NoParams, base_rule)
+            add_decomps("Adjoint(NoParams)", adj_rule)
+
+            @qjit(capture=True, target="mlir")
+            @qnode(qp.device("null.qubit", wires=3))
+            def circuit():
+                NoParams(reg=[0, 1])
+                return qp.state()
+
+            mlir = circuit.mlir
+
+        assert 'target_gate = "NoParams{}{reg:2}{}"' in mlir
+        assert 'target_gate = "Adjoint(NoParams){}{reg:2}{}"' in mlir
+
+    def test_adjoint_gate_captures_base_and_adjoint(self):
+        """Lowering the Adjoint of a gate captures the rules registered against both the plain gate
+        and its adjoint."""
+        from operator2_dummy_gates import NoParams
+
+        base_rule, adj_rule = self._base_and_adjoint_rules()
+        with local_decomps():
+            add_decomps(NoParams, base_rule)
+            add_decomps("Adjoint(NoParams)", adj_rule)
+
+            @qjit(capture=True, target="mlir")
+            @qnode(qp.device("null.qubit", wires=3))
+            def circuit():
+                qp.adjoint(NoParams(reg=[0, 1]))
+                return qp.state()
+
+            mlir = circuit.mlir
+
+        assert 'qref.operator "NoParams"() adj' in mlir
+        assert 'target_gate = "NoParams{}{reg:2}{}"' in mlir
+        assert 'target_gate = "Adjoint(NoParams){}{reg:2}{}"' in mlir
+
+    def test_distribution_rule_synthesized_from_base_only(self):
+        """With only a base rule registered (no Adjoint(Op) rule), lowering still synthesizes a rule
+        for Adjoint(Op) by distributing the base rule over adjoint (case 3): its resources are the
+        base resources adjointed and its body is an adjoint region."""
+        from operator2_dummy_gates import NoParams
+
+        base_rule, _ = self._base_and_adjoint_rules()
+        with local_decomps():
+            add_decomps(NoParams, base_rule)  # only a base rule, no Adjoint(NoParams) rule
+
+            @qjit(capture=True, target="mlir")
+            @qnode(qp.device("null.qubit", wires=3))
+            def circuit():
+                NoParams(reg=[0, 1])
+                return qp.state()
+
+            mlir = circuit.mlir
+
+        assert 'target_gate = "NoParams{}{reg:2}{}"' in mlir
+        # A distribution rule for Adjoint(NoParams) is synthesized even though none was registered.
+        assert 'target_gate = "Adjoint(NoParams){}{reg:2}{}"' in mlir
+        assert (
+            'resources = {operations = {"Adjoint(SingleParam){x:[[f64]]}{reg:2}{}" = 1 : i64}'
+            in mlir
+        )
+        assert "qref.adjoint" in mlir
+
+    def test_no_distribution_rule_for_non_invertible_body(self):
+        """A distribution rule is NOT synthesized when the base rule body is non-invertible (contains
+        a mid-circuit measurement): the base rule is still lowered, but no Adjoint(Op) rule."""
+        from operator2_dummy_gates import NoParams, SingleParam
+
+        def base_resource_fn(reg):
+            return {SingleParam(x=Float, reg=Wire[2]): 1}
+
+        @register_resources(base_resource_fn)
+        def measuring_rule(reg):
+            SingleParam(x=0.1, reg=reg[0:2])
+            qp.measure(reg[0])
+
+        with local_decomps():
+            add_decomps(NoParams, measuring_rule)
+
+            @qjit(capture=True, target="mlir")
+            @qnode(qp.device("null.qubit", wires=3))
+            def circuit():
+                NoParams(reg=[0, 1])
+                return qp.state()
+
+            mlir = circuit.mlir
+
+        assert 'target_gate = "NoParams{}{reg:2}{}"' in mlir
+        assert 'target_gate = "Adjoint(NoParams){}{reg:2}{}"' not in mlir
 
 
 class TestOnDemand:
-    """Test the python wrapper functions used for on-demand, compile-time decomposition rule lowering."""
+    """Test the python wrapper functions used for on-demand,
+    compile-time decomposition rule lowering.
+    """
+
+    @pytest.mark.parametrize(
+        "op_name, op_id, expected",
+        [
+            ("S", "S{}{wires:1}{}", "S{}{wires:1}{}"),
+            ("S", "Adjoint(S){}{wires:1}{}", "S{}{wires:1}{}"),
+            ("RX", "Adjoint(RX){0:[f64]}{wires:1}{}", "RX{0:[f64]}{wires:1}{}"),
+        ],
+    )
+    def test_name_unwrap_adjoint(self, op_name, op_id, expected):
+        """name_unwrap_adjoint recovers the base op's id from an adjoint graphOpId, and is the
+        inverse of name_wrap_adjoint for a base id."""
+        if op_id.startswith("Adjoint("):
+            assert name_unwrap_adjoint(op_name, op_id) == expected
+            assert name_wrap_adjoint(expected) == op_id
+        else:
+            with pytest.raises(ValueError, match="not an adjoint id"):
+                name_unwrap_adjoint(op_name, op_id)
+
+
+class TestModifierIds:
+    """Unit tests for the op-level modifier name-wrapping helpers (Adjoint / C canonicalization)."""
+
+    @pytest.mark.parametrize(
+        "modifier, expected",
+        [
+            ("Adjoint", "Adjoint"),
+            ("C", "C"),
+            ("2C", "C"),  # multi-control normalises to the "C" kind
+            ("10C", "C"),
+        ],
+    )
+    def test_modifier_kind(self, modifier, expected):
+        """A modifier token normalises to its canonical kind (any ``<n>C`` -> ``C``)."""
+        assert _modifier_kind(modifier) == expected
+
+    @pytest.mark.parametrize(
+        "op_id, expected",
+        [
+            ("Adjoint(RX){0:[f64]}{wires:1}{}", "Adjoint"),
+            ("C(RX){0:[f64]}{wires:1}{}", "C"),
+            ("2C(RX){0:[f64]}{wires:1}{}", "C"),  # exercises the leading-digit scan
+            ("10C(RX){0:[f64]}{wires:1}{}", "C"),  # multi-digit control count
+            ("RX{0:[f64]}{wires:1}{}", None),  # bare id, no modifier
+            ("", None),  # empty edge case
+        ],
+    )
+    def test_leading_modifier_kind(self, op_id, expected):
+        """The outermost modifier of an id is detected (including ``<n>C(...)``), or None if bare."""
+        assert _leading_modifier_kind(op_id) == expected
+
+    @pytest.mark.parametrize(
+        "op_id, modifier, expected",
+        [
+            # Wrapping a bare id with each modifier kind.
+            ("RX{0:[f64]}{wires:1}{}", "C", "C(RX){0:[f64]}{wires:1}{}"),
+            ("RX{0:[f64]}{wires:1}{}", "2C", "2C(RX){0:[f64]}{wires:1}{}"),
+            ("RX{0:[f64]}{wires:1}{}", "Adjoint", "Adjoint(RX){0:[f64]}{wires:1}{}"),
+            # Canonical nesting: control is outermost, so C may wrap an already-adjointed id.
+            (
+                "Adjoint(RX){0:[f64]}{wires:1}{}",
+                "C",
+                "C(Adjoint(RX)){0:[f64]}{wires:1}{}",
+            ),
+            # Only the name is wrapped; the `{...}...[uid]` suffix is carried through untouched.
+            ("HybridOp{a:[[f64]]}{w:1}{}[42]", "C", "C(HybridOp){a:[[f64]]}{w:1}{}[42]"),
+        ],
+    )
+    def test_wrap_modifier_id_canonical(self, op_id, modifier, expected):
+        """A modifier wraps only the operator name, and control may nest outside adjoint."""
+        assert wrap_modifier_id(op_id, modifier) == expected
+
+    @pytest.mark.parametrize(
+        "op_id",
+        ["C(RX){0:[f64]}{wires:1}{}", "2C(RX){0:[f64]}{wires:1}{}"],
+    )
+    def test_wrap_modifier_id_rejects_non_canonical(self, op_id):
+        """Wrapping the canonically-inner ``Adjoint`` around an already-controlled id is rejected."""
+        assert _MODIFIER_CANONICAL_ORDER == ("C", "Adjoint")
+        with pytest.raises(ValueError, match="Non-canonical modifier order"):
+            wrap_modifier_id(op_id, "Adjoint")
 
 
 if __name__ == "__main__":
