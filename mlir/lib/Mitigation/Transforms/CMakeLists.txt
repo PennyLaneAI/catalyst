@@ -18,6 +18,16 @@ set(DEPENDS
     MLIRMitigationPassIncGen
 )
 
+# MitigationMethods/Rem.cpp still uses the legacy `rewriter.create<OpTy>(...)`
+# builder; upstream MLIR has deprecated it in favour of `OpTy::create(rewriter, ...)`.
+# COMPILE_FLAGS rather than target_compile_options so the suppression also
+# applies to the OBJECT library that `add_mlir_library` creates internally.
+# Migration to the new builder is tracked separately.
+set_source_files_properties(
+    MitigationMethods/Rem.cpp
+    PROPERTIES COMPILE_FLAGS "-Wno-deprecated-declarations"
+)
+
 add_mlir_library(${LIBRARY_NAME} STATIC ${SRC} LINK_LIBS PRIVATE ${LIBS} DEPENDS ${DEPENDS})
 target_compile_features(${LIBRARY_NAME} PUBLIC cxx_std_20)
 target_include_directories(${LIBRARY_NAME} PUBLIC

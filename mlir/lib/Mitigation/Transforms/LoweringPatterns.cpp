@@ -15,6 +15,7 @@
 #include "mlir/IR/PatternMatch.h"
 
 #include "Mitigation/Transforms/Patterns.h"
+#include "MitigationMethods/Rem.hpp"
 #include "MitigationMethods/Zne.hpp"
 
 using namespace mlir;
@@ -25,6 +26,7 @@ namespace mitigation {
 
 void populateLoweringPatterns(RewritePatternSet &patterns) {
     patterns.add<ZneLowering>(patterns.getContext());
+    patterns.add<RemLowering>(patterns.getContext());
 }
 
 } // namespace mitigation

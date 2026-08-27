@@ -27,7 +27,15 @@ import jax.numpy as jnp
 import pennylane as qp
 from jax._src.tree_util import tree_flatten
 
-from catalyst.jax_primitives import Folding, func_p, quantum_kernel_p, zne_p
+from catalyst.api_extensions.rem_postprocessing import (
+    rem_apply_to_counts,
+    rem_apply_to_probs,
+    rem_apply_to_samples,
+    rem_calibrate_counts,
+    rem_calibrate_probs,
+    rem_calibrate_samples,
+)
+from catalyst.jax_primitives import Folding, func_p, quantum_kernel_p, rem_p, zne_p
 from catalyst.jax_tracer import Function
 from catalyst.utils.callables import CatalystCallable
 
@@ -196,6 +204,33 @@ def mitigate_with_zne(
     return ZNECallable(fn, scale_factors, extrapolate, folding)
 
 
+def mitigate_with_rem(
+    fn=None, *, calibration_matrices=None, return_calibration_matrices: bool = False
+):
+    """A qjit-compatible frontend that emits a `mitigation.rem` operation.
+
+    When ``calibration_matrices`` is ``None`` the lowering pass emits the
+    all-zeros and all-ones calibration circuits and this callable computes
+    the confusion matrices itself. When a precomputed ``(n_qubits, 2, 2)``
+    matrix stack is supplied, ``rem_calibrate_*`` is skipped and the matrices
+    are passed straight into ``rem_apply_to_*``. Pass
+    ``return_calibration_matrices=True`` to get the matrices back alongside
+    the mitigated result so they can be cached for subsequent calls.
+    """
+
+    kwargs = copy.copy(locals())
+    kwargs.pop("fn")
+
+    if fn is None:
+        return functools.partial(mitigate_with_rem, **kwargs)
+
+    return RemCallable(
+        fn,
+        calibration_matrices=calibration_matrices,
+        return_calibration_matrices=return_calibration_matrices,
+    )
+
+
 ## IMPL ##
 class ZNECallable(CatalystCallable):
     """An object that specifies how a circuit is mitigated with ZNE.
@@ -274,6 +309,130 @@ class ZNECallable(CatalystCallable):
         return zne_results
 
 
+class RemCallable(CatalystCallable):
+    """An object that specifies how a circuit is mitigated with REM.
+
+    Args:
+        fn (Callable): the circuit to be mitigated with REM.
+        calibration_matrices: optional precomputed per-qubit confusion stack
+            of shape ``(n_qubits, 2, 2)``. When ``None`` the lowering pass
+            emits the all-zeros and all-ones calibration circuits and this
+            callable computes the matrices from their outputs via
+            ``rem_calibrate_*``. When provided, ``rem_calibrate_*`` is not
+            traced and the supplied matrices are passed straight into
+            ``rem_apply_to_*``.
+        return_calibration_matrices (bool): when ``True`` the callable
+            returns ``(mitigated_result, calibration_matrices)`` instead of
+            just the mitigated result.
+
+    Raises:
+        TypeError: Non-QNode object was passed as ``fn``.
+    """
+
+    def __init__(
+        self,
+        fn: Callable,
+        calibration_matrices=None,
+        return_calibration_matrices: bool = False,
+    ):
+        functools.update_wrapper(self, fn)
+        self.fn = fn
+        self.__name__ = f"rem.{getattr(fn, '__name__', 'unknown')}"
+        self.calibration_matrices = calibration_matrices
+        self.return_calibration_matrices = bool(return_calibration_matrices)
+        super().__init__("fn")
+
+    def __call__(self, *args, **kwargs):
+        callable_fn = _wrap_callable(self.fn)
+        jaxpr = jax.make_jaxpr(callable_fn)(*args)
+
+        args_data, _ = tree_flatten(args)
+
+        assert jaxpr.eqns, "expected non-empty jaxpr for rem target"
+        assert jaxpr.eqns[0].primitive in {
+            func_p,
+            quantum_kernel_p,
+        }, "expected func_p or quantum_kernel_p as first operation in rem target"
+        callable_fn = jaxpr.eqns[0].params.get("fn", callable_fn)
+        assert callable(
+            callable_fn
+        ), "expected callable set as param on the first operation in rem target"
+
+        mp_kind = _detect_measurement_process(jaxpr)
+        assert mp_kind is not None, (
+            "measurement process must be one of CountsMP, ProbsMP or SampleMP. "
+            "Other measurement processes such as observables are not supported yet."
+        )
+
+        run_calibration = self.calibration_matrices is None
+        rem_results = rem_p.bind(
+            *args_data,
+            run_calibration=run_calibration,
+            jaxpr=jaxpr,
+            fn=callable_fn,
+        )
+
+        qnode_obj = jaxpr.eqns[0].params.get("qnode", None)
+        assert qnode_obj is not None, "REM post-processing requires a QNode target"
+        n_qubits = len(qnode_obj.device.wires)
+        measured_qubits = jnp.array(list(qnode_obj.device.wires))
+
+        handler = {
+            "sample": self._apply_sample,
+            "counts": self._apply_counts,
+            "probs": self._apply_probs,
+        }[mp_kind]
+        mitigated_result, confusion_matrices = handler(
+            rem_results, run_calibration, measured_qubits, n_qubits
+        )
+
+        if self.return_calibration_matrices:
+            return mitigated_result, confusion_matrices
+        return mitigated_result
+
+    def _apply_sample(self, rem_results, run_calibration, measured_qubits, n_qubits):
+        # quantum.sample returns f64 in catalyst; the REM helpers index
+        # confusion matrices by bit value and need an integer dtype.
+        mitigatee_samples = rem_results[0].astype(jnp.int32)
+        if run_calibration:
+            zeros_samples = rem_results[1].astype(jnp.int32)
+            ones_samples = rem_results[2].astype(jnp.int32)
+            confusion_matrices = rem_calibrate_samples(zeros_samples, ones_samples)
+        else:
+            confusion_matrices = jnp.asarray(self.calibration_matrices)
+        unique_bitstrings, mitigated_counts = rem_apply_to_samples(
+            mitigatee_samples, confusion_matrices, measured_qubits, n_qubits
+        )
+        return (unique_bitstrings, mitigated_counts), confusion_matrices
+
+    def _apply_counts(self, rem_results, run_calibration, measured_qubits, n_qubits):
+        mitigatee_eigvals = rem_results[0]
+        mitigatee_counts = rem_results[1]
+        if run_calibration:
+            zeros_counts = rem_results[2]
+            ones_counts = rem_results[3]
+            confusion_matrices = rem_calibrate_counts(zeros_counts, ones_counts)
+        else:
+            confusion_matrices = jnp.asarray(self.calibration_matrices)
+        mitigated_counts = rem_apply_to_counts(
+            mitigatee_counts, confusion_matrices, measured_qubits, n_qubits
+        )
+        return (mitigatee_eigvals, mitigated_counts), confusion_matrices
+
+    def _apply_probs(self, rem_results, run_calibration, measured_qubits, n_qubits):
+        mitigatee_probs = rem_results[0]
+        if run_calibration:
+            zeros_probs = rem_results[1]
+            ones_probs = rem_results[2]
+            confusion_matrices = rem_calibrate_probs(zeros_probs, ones_probs)
+        else:
+            confusion_matrices = jnp.asarray(self.calibration_matrices)
+        mitigated_probs = rem_apply_to_probs(
+            mitigatee_probs, confusion_matrices, measured_qubits, n_qubits
+        )
+        return mitigated_probs, confusion_matrices
+
+
 def polynomial_extrapolation(degree):
     """utility to generate polynomial fitting functions of arbitrary degree"""
     return functools.partial(qp.noise.poly_extrapolate, order=degree)
@@ -286,3 +445,19 @@ def _wrap_callable(fn):
     elif isinstance(fn, Callable):  # Keep at the bottom
         return Function(fn)
     raise TypeError(f"Target must be callable, got: {type(fn)}")
+
+
+def _detect_measurement_process(jaxpr):
+    """Walk the inner jaxpr for a probs/sample/counts primitive; return its name or None.
+
+    Mirrors the detection logic in :func:`_rem_abstract_eval`.
+    """
+    for eqn in jaxpr.eqns:
+        inner = eqn.params.get("call_jaxpr", None)
+        if inner is None:
+            continue
+        for op_eq in inner.eqns:
+            pname = str(op_eq.primitive)
+            if pname in ("probs", "sample", "counts"):
+                return pname
+    return None
