@@ -28,6 +28,8 @@ from catalyst import api_extensions
 from catalyst import cond as catalyst_cond
 from catalyst import measure as catalyst_measure
 from catalyst import qjit
+from catalyst import jax_primitives
+
 from catalyst.api_extensions.control_flow import collect_estimated_probabilities
 from catalyst.utils.exceptions import PlxprCaptureCFCompatibilityError
 
@@ -273,11 +275,10 @@ class TestCaptureCondEstimatedProbabilityLowering:
 
         The probabilities are not yet propagated through the program-capture pipeline, so the
         conditional probabilities that the lowering would receive are injected by patching the
-        conversion helper. This exercises the annotation branch of ``_pl_cond_lowering``.
+        conversion helper, until we can actually pass the estimated probabilities in
+        through the PennyLane frontend.
         """
-        # pylint: disable=import-outside-toplevel
-        import catalyst.jax_primitives as jax_primitives
-
+        # Monkeypatch with some static estimated probabilities
         monkeypatch.setattr(
             jax_primitives,
             "unconditional_to_conditional_if_probs",
@@ -288,7 +289,7 @@ class TestCaptureCondEstimatedProbabilityLowering:
         @qp.qnode(qp.device("lightning.qubit", wires=1))
         def circuit(n: int):
             # if (n <= 5) -> X, elif (n <= 8) -> Y, else -> H : two nested scf.if ops
-            qp.cond(n <= 5, qp.PauliX, qp.Hadamard, ((n <= 8, qp.PauliY),))(wires=0)
+            qp.cond(n <= 5, qp.X, qp.Hadamard, ((n <= 8, qp.Y),))(wires=0)
             return qp.probs()
 
         mlir_module = circuit.mlir
