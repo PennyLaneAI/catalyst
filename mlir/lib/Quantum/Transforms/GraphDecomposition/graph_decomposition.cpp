@@ -497,6 +497,10 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
             if (DecompUtils::isInDecompRule(op)) {
                 return;
             }
+            assert(!op->getParentOfType<AdjointOp>() && !op->getParentOfType<CtrlOp>() &&
+                   "graph-decomposition requires op-level modifiers: ctrl/adjoint regions must be "
+                   "lowered before the decomposition graph is built");
+
             // Derive the id and modifier-wrapped name from the single parse path, so operator nodes
             // and rule nodes agree on the spelling of `C(...)`/`Adjoint(...)`.
             OperatorNode node = parseOperator(op.getGraphOpId());
