@@ -825,7 +825,7 @@ module @test_if {
     %in = quantum.extract %reg[0]  : !quantum.reg -> !quantum.bit
 
     %init_index = arith.constant 1 : index
-    %true = arith.constant 1 : i1 
+    %true = arith.constant 1 : i1
     %limit = arith.constant 10 : index
 
     %out = scf.if %true -> !quantum.bit {
@@ -837,7 +837,11 @@ module @test_if {
       scf.yield %in : !quantum.bit
     }
 
-    return %out : !quantum.bit
+    // CHECK-NOT: "T"
+    // CHECK: "PhaseShift"
+    %post_out = quantum.custom "T"() %out : !quantum.bit
+
+    return %post_out : !quantum.bit
   }
 
   // CHECK-LABEL: func.func private @"__builtin__t_phaseshift_T{}{wires:1}{}"
@@ -875,7 +879,11 @@ module @test_for_loop {
       scf.yield %out : !quantum.bit
     }
 
-    return %rout : !quantum.bit
+    // CHECK-NOT: "T"
+    // CHECK: "PhaseShift"
+    %post_out = quantum.custom "T"() %rout : !quantum.bit
+
+    return %post_out : !quantum.bit
   }
 
   // CHECK-LABEL: func.func private @"__builtin__t_phaseshift_T{}{wires:1}{}"
@@ -900,7 +908,7 @@ module @test_while_loop {
     %in = quantum.extract %reg[0]  : !quantum.reg -> !quantum.bit
 
     %init_index = arith.constant 1 : index
-    %true = arith.constant 1 : i1 
+    %true = arith.constant 1 : i1
     %limit = arith.constant 10 : index
 
     %out_index, %rout = scf.while (%before_index = %init_index, %before_qubit = %in) : (index, !quantum.bit) -> (index, !quantum.bit) {
@@ -909,15 +917,21 @@ module @test_while_loop {
       %out = quantum.custom "T"() %before_qubit: !quantum.bit
       %increment = arith.constant 1 : index
       %updated_index = index.add %before_index, %increment
-      %condition = index.cmp ult (%updated_index, %limit) 
+      %condition = index.cmp ult (%updated_index, %limit)
       scf.condition(%condition) %updated_index, %out: index, !quantum.bit
     } do {
       ^bb0(%after_index: index, %after_qubit : !quantum.bit):
-        %after_out = quantum.custom "S"() %after_qubit : !quantum.bit
+        // CHECK-NOT: "T"
+        // CHECK: "PhaseShift"
+        %after_out = quantum.custom "T"() %after_qubit : !quantum.bit
         scf.yield %after_index, %after_out: index, !quantum.bit
     }
 
-    return %rout : !quantum.bit
+    // CHECK-NOT: "T"
+    // CHECK: "PhaseShift"
+    %post_out = quantum.custom "T"() %rout : !quantum.bit
+
+    return %post_out : !quantum.bit
   }
 
   // CHECK-LABEL: func.func private @"__builtin__t_phaseshift_T{}{wires:1}{}"

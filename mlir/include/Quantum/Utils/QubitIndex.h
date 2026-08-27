@@ -84,6 +84,17 @@ class QubitIndex {
     }
 };
 
+template <typename OperandRangeT, typename ResultRangeT>
+static mlir::Value getMappedQubitOperand(mlir::Value qubit, const OperandRangeT qubitOperands,
+                                         const ResultRangeT qubitResults) {
+    auto it = llvm::find_if(qubitResults, [&](mlir::Value result) { return result == qubit; });
+
+    assert(it != qubitResults.end());
+    size_t resultIndex = std::distance(qubitResults.begin(), it);
+    assert(resultIndex < qubitOperands.size());
+    return qubitOperands[resultIndex];
+}
+
 /// Trace a qubit SSA value back to the quantum.extract that produced it and
 /// return the corresponding QubitIndex (with the originating qreg).
 ///
@@ -107,32 +118,39 @@ inline QubitIndex getExtractIndex(mlir::Value qubit) {
         }
 
         if (auto gate = mlir::dyn_cast_or_null<quantum::QuantumGate>(qubit.getDefiningOp())) {
-            auto qubitOperands = gate.getQubitOperands();
-            auto qubitResults = gate.getQubitResults();
-            auto it =
-                llvm::find_if(qubitResults, [&](mlir::Value result) { return result == qubit; });
-
-            if (it != qubitResults.end()) {
-                size_t resultIndex = std::distance(qubitResults.begin(), it);
-                if (resultIndex < qubitOperands.size()) {
-                    qubit = qubitOperands[resultIndex];
-                    continue;
-                }
-            }
+            qubit = getMappedQubitOperand(qubit, gate.getQubitOperands(), gate.getQubitResults());
+            continue;
         } else if (auto measureOp =
                        mlir::dyn_cast_or_null<quantum::MeasureOp>(qubit.getDefiningOp())) {
             qubit = measureOp.getInQubit();
             continue;
+        } else if (auto ifOp = mlir::dyn_cast_or_null<mlir::scf::IfOp>(qubit.getDefiningOp())) {
+            qubit = getMappedQubitOperand(qubit, ifOp.thenYield().getResults(), ifOp.getResults());
+            continue;
+        } else if (auto forOp = mlir::dyn_cast_or_null<mlir::scf::ForOp>(qubit.getDefiningOp())) {
+            qubit = getMappedQubitOperand(qubit, forOp.getInitArgs(), forOp.getResults());
+            continue;
+        } else if (auto whileOp =
+                       mlir::dyn_cast_or_null<mlir::scf::WhileOp>(qubit.getDefiningOp())) {
+            qubit = getMappedQubitOperand(qubit, whileOp.getConditionOp().getArgs(),
+                                          whileOp.getResults());
+            continue;
         } else if (auto blockArg = mlir::dyn_cast_or_null<mlir::BlockArgument>(qubit)) {
+            unsigned int blockArgIdx = blockArg.getArgNumber();
             if (auto forOp =
                     mlir::dyn_cast_or_null<mlir::scf::ForOp>(blockArg.getOwner()->getParentOp())) {
                 // ForOp Regions (and blocks) have args (iter_arg, *init_args), so the index is
                 // off-by-one
-                qubit = forOp.getInitArgs()[blockArg.getArgNumber() - 1];
+                qubit = forOp.getInitArgs()[blockArgIdx - 1];
                 continue;
             } else if (auto whileOp = mlir::dyn_cast_or_null<mlir::scf::WhileOp>(
                            blockArg.getOwner()->getParentOp())) {
-                qubit = whileOp.getInits()[blockArg.getArgNumber()];
+                mlir::Block *b = blockArg.getOwner();
+                if (b == whileOp.getBeforeBody()) {
+                    qubit = whileOp.getInits()[blockArgIdx];
+                } else if (b == whileOp.getAfterBody()) {
+                    qubit = whileOp.getConditionOp().getArgs()[blockArgIdx];
+                }
                 continue;
             }
         }
