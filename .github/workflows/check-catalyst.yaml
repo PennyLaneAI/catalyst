@@ -718,8 +718,8 @@ jobs:
       # artifact downloaded above already includes the transport backend .so files because
       # the `runtime:` job builds with ENABLE_TRANSPORT=ON in that case.
       #   _memcpy: CPU controller + CPU coproc over local memcpy, both in-process.
-      #   _rdma_loopback: same roles, over rxe0 soft-RoCE loopback, both in-process.
-      #   _rdma_loopback_out_of_process: same fabric, coprocessor in a catalyst-executor
+      #   _rdma_loopback[in_process]: same roles, over rxe0 soft-RoCE loopback, both here.
+      #   _rdma_loopback[out_of_process]: same fabric, coprocessor in a catalyst-executor
       #     subprocess -- how the roles actually deploy, and one queue pair per process.
       # The GPU-coproc cases in the same class are not covered by any CI job yet: they need
       # HIP-on-CUDA on the self-hosted GPU runner to do anything but skip. The workflow that
@@ -728,10 +728,12 @@ jobs:
       env:
         CATALYST_TRANSPORT_PATH: ${{ github.workspace }}/runtime-build/lib
       run: |
-        python3 -m pytest -v \
+        # -rs so a skip shows up in the log: pytest exits 0 when a selected test is skipped, and
+        # these have no skip conditions, so anything reported here is a regression to look at.
+        # The _rdma_loopback id carries no [param] suffix, which selects both of its cases.
+        python3 -m pytest -v -rs \
           "frontend/test/pytest/test_backline.py::TestBacklineDemoIntegration::test_local_cpu_to_local_cpu_memcpy" \
-          "frontend/test/pytest/test_backline.py::TestBacklineDemoIntegration::test_local_cpu_to_local_cpu_rdma_loopback" \
-          "frontend/test/pytest/test_backline.py::TestBacklineDemoIntegration::test_local_cpu_to_local_cpu_rdma_loopback_out_of_process"
+          "frontend/test/pytest/test_backline.py::TestBacklineDemoIntegration::test_local_cpu_to_local_cpu_rdma_loopback"
 
     - name: Run Python Pytest/Lit Tests
       run: |

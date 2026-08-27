@@ -364,90 +364,46 @@ class TestBacklineDemoIntegration:
         # qp.sample keeps the shots axis explicit: shots=1 with 3 measurements -> (1, 3).
         assert samples.shape == (1, 3), f"expected shape (1, 3), got {samples.shape}"
 
-    def test_local_cpu_to_local_cpu_rdma_loopback(self, use_capture):
-        """Demo 1a: local CPU ↔ local CPU over RDMA loopback, both in-process.
-
-        Direct mirror of ``demos/demo_1a_local_cpu_to_local_cpu_rdma.py``. Both roles run in
-        this process and reach each other through the ``rxe0`` soft-RoCE device installed by
-        the ``setup-soft-roce`` composite action: the ibverbs path is real while the fabric
-        underneath it is software.
-
-        The config strings follow the demo's ``LOCAL_CFG`` shape - ``dev=<rxe device>;gid=<idx>``,
-        which ``runtime/lib/transport/rdma/common/BackendConfig.hpp`` requires. ``backend_lib``
-        is left off ``init_args`` so the compiler resolves the transport backend via the
-        (``transport``, ``hardware``) mapping in ``backline._resolve_backend_lib`` to an absolute
-        path under ``RUNTIME_LIB_DIR`` - avoiding a runtime ``dlopen`` of a bare filename that
-        the loader would search for on ``LD_LIBRARY_PATH``.
-        """
-        steane_lib = str(
-            Path(get_lib_path("runtime", "RUNTIME_LIB_DIR")) / "libsteane_coprocessor_cpu.so"
-        )
-        ctrl = qp.Controller(
-            name="cpu-controller",
-            device=qp.device("null.qubit", wires=3),
-            init_args={"config": "dev=rxe0;gid=1"},
-        )
-        coproc = qp.Coprocessor(
-            name="cpu-coproc",
-            coprocessor_fn=qp.CoprocessorFunction("steane_coprocessor", lib_path=steane_lib),
-            endpoint=qp.Endpoint("127.0.0.1", 18590),
-            init_args={"config": "dev=rxe0;gid=1"},
-        )
-        dev = qp.Backline(
-            controller=ctrl, coprocessors=[coproc], transport="rdma", qec_code="steane"
-        )
-
-        @qjit(capture=True)
-        @qp.set_shots(1)
-        @qp.qnode(dev, mcm_method="one-shot")
-        def ghz():
-            qp.Hadamard(0)
-            qp.CNOT([0, 1])
-            qp.CNOT([1, 2])
-            return qp.sample([qp.measure(0), qp.measure(1), qp.measure(2)])
-
-        ir = ghz.mlir
-        assert "catalyst.backline" in ir
-        assert 'transport = "rdma"' in ir
-        assert 'symbol = "steane_coprocessor"' in ir
-        assert 'peer = "127.0.0.1"' in ir
-        assert "libcatalyst_transport_cpu_verbs_controller.so" in ir
-        assert "libcatalyst_transport_cpu_verbs_coprocessor.so" in ir
-        for pass_name, _ in _qec_pass_specs("steane"):
-            assert pass_name in ir, f"{pass_name} missing from the scheduled pipeline"
-
-        samples = np.asarray(ghz())
-        # qp.sample keeps the shots axis explicit: shots=1 with 3 measurements -> (1, 3).
-        assert samples.shape == (1, 3), f"expected shape (1, 3), got {samples.shape}"
-
-    def test_local_cpu_to_local_cpu_rdma_loopback_out_of_process(
-        self, use_capture, stop_node_executors
+    @pytest.mark.parametrize(
+        "executor_options, oob_port",
+        [
+            pytest.param(None, 18590, id="in_process"),
+            pytest.param({}, 18591, id="out_of_process"),
+        ],
+    )
+    def test_local_cpu_to_local_cpu_rdma_loopback(
+        self, use_capture, stop_node_executors, executor_options, oob_port
     ):
-        """Demo 1a, out-of-process: local CPU controller, local CPU coprocessor in a subprocess.
+        """Demo 1a: local CPU to local CPU over RDMA loopback, in-process and out-of-process.
 
-        Same fabric as ``test_local_cpu_to_local_cpu_rdma_loopback`` -- one ``rxe0`` soft-RoCE
-        device on ``lo``, installed by the ``setup-soft-roce`` composite action -- but the
-        coprocessor role runs in its own ``catalyst-executor`` process. ``remote=False`` (the
-        default) with ``executor_options`` naming neither a ``host`` nor an ``address`` is
-        documented on ``pennylane.backline.Node.remote`` as exactly that: out-of-process on this
-        machine, libraries still resolving from this installation.
+        Both roles reach each other through the ``rxe0`` soft-RoCE device installed by the
+        ``setup-soft-roce`` composite action, so the ibverbs path is real while the fabric
+        underneath it is software. The cases differ only in where the coprocessor runs, which
+        ``pennylane.backline.Node.remote`` documents as a property of ``executor_options`` with
+        ``remote`` left at ``False``:
 
-        Two things make this worth testing separately from the in-process case:
+        * ``in_process`` -- ``executor_options=None``, the default: no executor is built, so both
+          roles stay in this process. A direct mirror of
+          ``demos/demo_1a_local_cpu_to_local_cpu_rdma.py``.
+        * ``out_of_process`` -- ``executor_options={}``, naming neither a ``host`` nor an
+          ``address``: a ``catalyst-executor`` subprocess on this machine, its libraries still
+          resolving from this installation. This is how the roles actually deploy, one queue pair
+          per process -- an earlier in-process version of this test SIGSEGV'd inside ``ghz()`` on
+          GH-hosted ubuntu's ``rdma_rxe`` with two queue pairs in one process. It also covers the
+          executor plugin path: ``_realize_executor`` derives ``_executor_plugins`` only on the
+          ``executor_options`` branch, since a preset ``executor=Executor()`` is taken at the
+          node's word, so the subprocess gets the runtime libraries and the decode library
+          preloaded by absolute path. Needs a runtime built with ``ENABLE_EXECUTOR=ON``, which is
+          what puts ``catalyst-executor`` where ``default_executor_bin`` looks for it.
 
-        * It is how the roles actually deploy. Controller and coprocessor are separate processes
-          in every real placement, so each opens its own queue pair. An earlier in-process
-          version of the loopback test SIGSEGV'd inside ``ghz()`` on GH-hosted ubuntu's
-          ``rdma_rxe`` with two queue pairs in one process; splitting the roles removes that
-          shape entirely rather than tuning around it.
-        * It exercises the executor plugin path. ``_realize_executor`` computes
-          ``_executor_plugins`` only for the ``executor_options`` branch -- a preset
-          ``executor=Executor()`` is taken at the node's word and skips it -- so the subprocess
-          gets ``librt_transport.so``, ``librt_capi.so`` and the coprocessor's own decode library
-          preloaded by absolute path. Without them the JIT'd module fails to materialize
-          ``__catalyst__rt__*`` / ``__catalyst__transport__*`` and ``steane_coprocessor``.
-
-        Requires the runtime to have been built with ``ENABLE_EXECUTOR=ON``, which is what puts
-        ``catalyst-executor`` beside the runtime libraries where ``default_executor_bin`` looks.
+        A port per case, so both run in one session without meeting each other on the
+        coprocessor's out-of-band port. The config strings follow the demo's ``LOCAL_CFG`` shape -
+        ``dev=<rxe device>;gid=<idx>``, which
+        ``runtime/lib/transport/rdma/common/BackendConfig.hpp`` requires. ``backend_lib`` is left
+        off ``init_args`` so the compiler resolves the transport backend via the (``transport``,
+        ``hardware``) mapping in ``backline._resolve_backend_lib`` to an absolute path under
+        ``RUNTIME_LIB_DIR`` - avoiding a runtime ``dlopen`` of a bare filename that the loader
+        would search for on ``LD_LIBRARY_PATH``.
         """
         steane_lib = str(
             Path(get_lib_path("runtime", "RUNTIME_LIB_DIR")) / "libsteane_coprocessor_cpu.so"
@@ -460,16 +416,13 @@ class TestBacklineDemoIntegration:
         coproc = qp.Coprocessor(
             name="cpu-coproc",
             coprocessor_fn=qp.CoprocessorFunction("steane_coprocessor", lib_path=steane_lib),
-            # A port of its own: the in-process case above binds 18590, and both tests can run
-            # in the same session.
-            endpoint=qp.Endpoint("127.0.0.1", 18591),
-            # Neither host nor address -> a subprocess on this machine. Empty rather than unset:
-            # ``executor_options=None`` is what asks for no executor at all.
-            executor_options={},
+            endpoint=qp.Endpoint("127.0.0.1", oob_port),
+            executor_options=executor_options,
             init_args={"config": "dev=rxe0;gid=1"},
         )
-        # Registered before compiling: ``_realize_executor`` launches the subprocess during
-        # compilation, so a failure after that point still has to release the port.
+        # Registered before compiling, because ``_realize_executor`` launches the subprocess
+        # during compilation: a failure after that point still has to release the port. A no-op
+        # for the in-process case, whose node never gets an executor.
         stop_node_executors(coproc)
         dev = qp.Backline(
             controller=ctrl, coprocessors=[coproc], transport="rdma", qec_code="steane"
@@ -494,22 +447,25 @@ class TestBacklineDemoIntegration:
         for pass_name, _ in _qec_pass_specs("steane"):
             assert pass_name in ir, f"{pass_name} missing from the scheduled pipeline"
 
-        # The coprocessor is out-of-process, so the compiler had to build it an executor and
-        # bring it up. Assert that rather than inferring it from a passing execution.
+        # Where the coprocessor ended up, asserted rather than inferred from a passing execution.
         executor = coproc.executor
-        assert executor is not None, "executor_options={} did not produce an executor"
-        # ``address`` raises unless the executor is up, and a local one serves on loopback --
-        # so this pins the mode as well as the liveness.
-        assert executor.address.startswith(
-            "127.0.0.1:"
-        ), f"a local executor serves on loopback, got {executor.address}"
-        plugins = executor._cfg.plugins  # pylint: disable=protected-access
-        plugin_names = [Path(plugin).name for plugin in plugins]
-        for required in (*_EXECUTOR_RUNTIME_PLUGINS, "libsteane_coprocessor_cpu.so"):
-            assert required in plugin_names, f"{required} missing from the executor's plugins"
-        assert all(
-            plugin.startswith("/") for plugin in plugins
-        ), "a node on this machine needs absolute plugin paths: the runtime is not on the loader path"
+        if executor_options is None:
+            assert executor is None, "the default asks for no executor, so the node stays here"
+        else:
+            assert executor is not None, "executor_options={} did not produce an executor"
+            # ``address`` raises unless the executor is up, and only a local one serves on
+            # loopback, so this pins the mode as well as the liveness.
+            assert executor.address.startswith(
+                "127.0.0.1:"
+            ), f"a local executor serves on loopback, got {executor.address}"
+            plugins = executor._cfg.plugins  # pylint: disable=protected-access
+            plugin_names = [Path(plugin).name for plugin in plugins]
+            for required in (*_EXECUTOR_RUNTIME_PLUGINS, "libsteane_coprocessor_cpu.so"):
+                assert required in plugin_names, f"{required} missing from the executor's plugins"
+            assert all(plugin.startswith("/") for plugin in plugins), (
+                "a node on this machine needs absolute plugin paths: "
+                "the runtime is not on the loader's search path"
+            )
 
         samples = np.asarray(ghz())
         # qp.sample keeps the shots axis explicit: shots=1 with 3 measurements -> (1, 3).
