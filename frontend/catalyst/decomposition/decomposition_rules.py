@@ -279,7 +279,7 @@ def compile_decomposition_rules(
 
         return ir.WalkResult.ADVANCE
 
-    with module.context:
+    with module.context, ir.Location.unknown():
         module.operation.walk(update_funcop_attributes)
 
     # Inline to avoid helper functions. We want all decomp rule functions to be standalone
@@ -298,7 +298,7 @@ def compile_decomposition_rules(
             return ir.WalkResult.ADVANCE
         return ir.WalkResult.ADVANCE
 
-    with module.context:
+    with module.context, ir.Location.unknown():
         module.operation.walk(remove_qnode_func)
 
     for qnode_func in qnode_func_erasure_worklist:
@@ -319,7 +319,7 @@ def compile_decomposition_rules(
                 op.attributes["sym_visibility"] = ir.StringAttr.get("private")
         return ir.WalkResult.ADVANCE
 
-    with inlined_module.context:
+    with inlined_module.context, ir.Location.unknown():
         inlined_module.operation.walk(re_privatize_rules)
 
     return inlined_module

@@ -47,6 +47,7 @@ _PY_DTYPES_TO_MLIR_DTYPES = {v: k for k, v in _MLIR_DTYPES_TO_PY_DTYPES.items()}
     ir.F16Type: "f16",
     ir.F32Type: "f32",
     ir.F64Type: "f64",
+    (ir.ComplexType, ir.F32Type): "complex<f32>",
     (ir.ComplexType, ir.F64Type): "complex<f64>",
 }
 

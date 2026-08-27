@@ -615,3 +615,27 @@ def test_phaseshift_to_rz():
 # CHECK: qref.custom "RZ"
 # CHECK: qref.gphase
 test_phaseshift_to_rz()
+
+
+def test_basis_rotation():
+    """Test that qp.BasisRotation successfully compiles its decomposition rules."""
+
+    @qp.qjit(target="mlir", capture=True)
+    @qp.qnode(qp.device("null.qubit", wires=2))
+    def test_basis_rotation():
+        U = jnp.array(
+            [
+                [-0.77228482 + 0.0j, -0.02959195 + 0.63458685j],
+                [0.63527644 + 0.0j, -0.03597397 + 0.77144651j],
+            ],
+        )
+        qp.BasisRotation(unitary_matrix=U, wires=[0, 1])
+        return qp.probs()
+
+    print(test_basis_rotation.mlir)
+
+
+# CHECK-LABEL: test_basis_rotation
+# CHECK: func.func private @"__builtin__basis_rotation_decomp_BasisRotation{unitary_matrix:{{\[\[\[}}complex<f64>,complex<f64>],[complex<f64>,complex<f64>{{\]\]\]}}}{wires:2}{check:False}"
+# CHECK-SAME: target_gate = "BasisRotation{unitary_matrix:{{\[\[\[}}complex<f64>,complex<f64>],[complex<f64>,complex<f64>{{\]\]\]}}}{wires:2}{check:False}"
+test_basis_rotation()
