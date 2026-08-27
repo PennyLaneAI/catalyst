@@ -33,6 +33,7 @@
 #include "mlir/IR/TypeRange.h"
 #include "mlir/IR/Types.h"
 #include "mlir/Parser/Parser.h"
+#include <array>
 
 #include "QRef/IR/QRefDialect.h"
 #include "QRef/IR/QRefInterfaces.h"
@@ -350,6 +351,37 @@ module {
     ASSERT_EQ(op.getGraphOpId(),
               "testInterfaceOp{angle:[f64],flag:[i1],index:[i64]}{wire1:1,wire2:1}{"
               "myStaticArray:[1,2,3],myStaticInt:4,myStaticString:Test}");
+}
+
+TEST(DecomposableGateInterfaceTests, OperatorOpGOIDTypeConflict) {
+    std::string moduleStr = R"mlir(
+module {
+  %op0 = "test.op0"() : () -> tensor<f64>
+  %op1 = "test.op1"() : () -> f64
+  %q0 = qref.alloc_qb : !qref.bit
+  %q1 = qref.alloc_qb : !qref.bit
+  qref.operator "testOperator"(%op0: tensor<f64>) qubits(%q0, %q1) param_map = {op=[0]} qubit_map = {wire1=[0], wire2=[1]}
+  qref.operator "testOperator"(%op1: f64) qubits(%q0, %q1) param_map = {op=[0]} qubit_map = {wire1=[0], wire2=[1]}
+}
+    )mlir";
+    // Parsing boilerplate
+    DialectRegistry registry;
+    registry.insert<mlir::arith::ArithDialect, QRefDialect>();
+    test::registerTestDialect(registry);
+    MLIRContext context(registry);
+    ParserConfig config(&context, /*verifyAfterParse=*/false);
+    OwningOpRef<ModuleOp> module = parseSourceString<ModuleOp>(moduleStr, config);
+
+    // Obtain DecomposableGate from the two OperatorOps being compared
+    std::array<DecomposableGate, 2> ops;
+    int i = 0;
+    for(auto op: module->getOps<OperatorOp>()) {
+        ops[i] = op;
+        i++;
+    }
+
+    // Ensure the two ops do not have the same GOID
+    ASSERT_NE(ops[0].getGraphOpId(), ops[1].getGraphOpId());
 }
 
 TEST(DecomposableGateInterfaceTests, OperatorOpQureg) {
