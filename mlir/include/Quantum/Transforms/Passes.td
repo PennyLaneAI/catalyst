@@ -76,6 +76,10 @@ def CtrlLoweringPass : Pass<"ctrl-lowering"> {
     let dependentDialects = ["scf::SCFDialect"];
 }
 
+def RemoveGlobalPhasesPass : Pass<"remove-global-phases"> {
+    let summary = "Remove global phases by deleting phase operations without control wires.";
+}
+
 def SplitMultipleTapesPass : Pass<"split-multiple-tapes"> {
     let summary = "Given a qnode containing multiple tapes, split each tape into its own function.";
 }
