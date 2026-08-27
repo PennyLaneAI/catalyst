@@ -53,6 +53,10 @@ const PipelineList pipelineList{
       // this into something else.
       "inline-nested-module",
       "lower-mitigation",
+      // Decomposition rules are only consumed by graph-decomposition (run inside
+      // apply-transform-sequence). Any that survive here are dead; drop them before
+      // adjoint-lowering so their `quantum.adjoint` regions are not lowered as user adjoints.
+      "symbol-dce",
       // Reduce `quantum.ctrl`/`quantum.adjoint` regions to op-level modifiers.
       // Nested regions (e.g. `ctrl(adjoint(...))`) require alternating the two
       // passes: `ctrl-lowering` defers on a nested adjoint region,
@@ -63,8 +67,7 @@ const PipelineList pipelineList{
       "adjoint-lowering",
       // TODO: we can remove the following 2 passes once PBC has its own pipeline.
       "lower-pbc-init-ops",
-      "disable-assertion",
-      "symbol-dce"}},  // to remove user decomposition rules after all graph-decomposition passes
+      "disable-assertion",}},
     {"hlo-lowering-stage",
      {"canonicalize",
       "func.func(chlo-legalize-to-stablehlo)",

@@ -164,15 +164,18 @@ class GraphOpID:
         """Return the static data formatted for GraphOpId."""
         return "{" + ",".join(f"{k}:{v}" for k, v in self.static_data.items()) + "}"
 
-    def getGraphOpId(self) -> str:
+    def getGraphOpId(self, adjoint: bool = False) -> str:
         """
         Return the GraphOpId as a string.
 
         NOTE: do not modify this method without also modifying the corresponding DecomposableGate
         interface in MLIR.
         """
+        name = self.get_operator_name()
+        if adjoint:
+            name = f"Adjoint({name})"
         ID_string = (
-            self.get_operator_name()
+            name
             + self.get_dynamic_shape_id_format()
             + self.get_wire_lens_id_format()
             + self.get_static_data_id_format()
