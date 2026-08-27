@@ -11,139 +11,94 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Tests that CDF/CGF Hamiltonian tensor data lowers to MLIR as ranked tensor operands.
+"""Tests that ``qp.TrotterCDF`` and ``qp.TrotterCGF`` lower their Hamiltonian tensor data
+to MLIR as ranked tensor operands.
 
-There are two use cases that we want to support:
+Two use cases are covered for each representation:
 
-* **concrete** data hamiltonians, and
-* **abstract** data, where a Hamiltonian built from ``qp.typing.Float[...]``.
-
-And there are two ways of accepting the Hamiltonian:
-
-* A single ``hybrid`` argument, giving ``param_map = {hamiltonian = [1, 2, 3]}``, and
-* as three ``dynamic`` arguments, naming each tensor individually in ``param_map``.
-
-Note that the latter is the design to prefer for now, because Catalyst hands hybrid
-arguments to decomposition-rule compilation as ``AbstractArray`` specifications rather
-than traceable values, so a rule that computes with the tensors cannot be compiled.
+* **concrete** data closed over by the circuit;
+* **abstract** data, where a Hamiltonian built from ``qp.typing.Float[...]`` supplies the
+  ahead-of-time signature, so the tensors lower to function arguments of the declared
+  shape.
 """
 
-# pylint: disable = missing-function-docstring,line-too-long,unused-argument
+# pylint: disable = missing-function-docstring,line-too-long
 
 # RUN: %PYTHON %s | FileCheck %s
 
 import numpy as np
 import pennylane as qp
-from pennylane.numeric_hamiltonians import CDFHamiltonian, CGFHamiltonian, NumericHamiltonian
 from pennylane.typing import Float
 
-L, M, N = 2, 2, 3
-
-
-class TrotterFragmented(qp.core.Operator2):
-    """Takes the Hamiltonian as a single hybrid argument."""
-
-    dynamic_argnames = ("evolution_time",)
-    static_argnames = ("num_trotter_steps",)
-    hybrid_argnames = ("hamiltonian",)
-    wire_argnames = ("wires",)
-
-    def __init__(self, evolution_time, num_trotter_steps, hamiltonian, wires):
-        assert isinstance(hamiltonian, NumericHamiltonian)
-        super().__init__(evolution_time, num_trotter_steps, hamiltonian, wires=wires)
-
-
-class TrotterFragmentedFlat(qp.core.Operator2):
-    """Takes the three tensors as dynamic arguments, so each is named in ``param_map``."""
-
-    dynamic_argnames = ("evolution_time", "core_tensors", "leaf_tensors", "nuc_constant")
-    static_argnames = ("num_trotter_steps",)
-    wire_argnames = ("wires",)
-
-    def __init__(
-        self, evolution_time, core_tensors, leaf_tensors, nuc_constant, num_trotter_steps, wires
-    ):
-        super().__init__(
-            evolution_time, core_tensors, leaf_tensors, nuc_constant, num_trotter_steps, wires=wires
-        )
-
-    @classmethod
-    def from_hamiltonian(cls, evolution_time, num_trotter_steps, hamiltonian, wires):
-        return cls(
-            evolution_time, *hamiltonian.tensors, num_trotter_steps=num_trotter_steps, wires=wires
-        )
-
-
-@qp.register_resources({qp.RZ: 1, qp.GlobalPhase: 1})
-def _flat_decomp(
-    evolution_time, core_tensors, leaf_tensors, nuc_constant, num_trotter_steps, wires
-):
-    qp.RZ(evolution_time * core_tensors[0, ..., 0, 0].sum(), wires[0])
-    qp.GlobalPhase(evolution_time * nuc_constant)
-
-
-qp.add_decomps(TrotterFragmentedFlat, _flat_decomp)
+# CDF: N orbitals -> 2N wires. CGF: M modes x K modals -> M*K wires.
+L, N = 1, 2
+M, K = 2, 2
 
 rng = np.random.default_rng(42)
-CGF = CGFHamiltonian(rng.random((L + 1, M, M, N, N)), rng.random((L + 1, M, N, N)), 0.5)
-CDF = CDFHamiltonian(rng.random((L + 1, N, N)), rng.random((L + 1, N, N)), 0.5)
-
-ABSTRACT_CGF = CGFHamiltonian(Float[L + 1, M, M, N, N], Float[L + 1, M, N, N], Float)
-ABSTRACT_CDF = CDFHamiltonian(Float[L + 1, N, N], Float[L + 1, N, N], Float)
 
 
-@qp.qjit(capture=True, target="mlir")
-@qp.qnode(qp.device("null.qubit", wires=M * N))
-def cgf_concrete(t: float):
-    # CHECK-LABEL: func.func public @cgf_concrete
-    # CHECK: qref.operator "TrotterFragmentedFlat"({{%.+}}: tensor<f64>, {{%.+}}: tensor<3x2x2x3x3xf64>, {{%.+}}: tensor<3x2x3x3xf64>, {{%.+}}: tensor<f64>)
-    # CHECK-SAME: qubits({{.+}})
-    # CHECK: param_map = {core_tensors = [1], evolution_time = [0], leaf_tensors = [2], nuc_constant = [3]}
-    # CHECK: qubit_map = {wires = [0, 1, 2, 3, 4, 5]}
-    TrotterFragmentedFlat.from_hamiltonian(t, 10, CGF, wires=range(M * N))
-    return qp.state()
+def random_orthogonal(dim):
+    """A real orthogonal matrix, as the Trotter leaf tensors require."""
+    q, r = np.linalg.qr(rng.standard_normal((dim, dim)))
+    return q * np.sign(np.diag(r))
 
 
-print(cgf_concrete.mlir)
+CDF = qp.CDFHamiltonian(
+    core_tensors=rng.standard_normal((L + 1, N, N)),
+    leaf_tensors=np.stack([random_orthogonal(N) for _ in range(L + 1)]),
+    nuc_constant=0.5,
+)
+
+CGF = qp.CGFHamiltonian(
+    core_tensors=rng.standard_normal((L + 1, M, M, K, K)),
+    leaf_tensors=np.stack(
+        [np.stack([random_orthogonal(K) for _ in range(M)]) for _ in range(L + 1)]
+    ),
+    nuc_constant=0.5,
+)
+
+ABSTRACT_CDF = qp.CDFHamiltonian(Float[L + 1, N, N], Float[L + 1, N, N], Float)
+ABSTRACT_CGF = qp.CGFHamiltonian(Float[L + 1, M, M, K, K], Float[L + 1, M, K, K], Float)
 
 
-@qp.qjit(capture=True, target="mlir")
+# CDF with concrete data: the two (L+1, N, N) tensors and the scalar constant become
+# ranked tensor operands under a single ``hamiltonian`` entry in ``param_map``.
+@qp.qjit(capture=True, target="mlir", collect_decomp_rules=False)
 @qp.qnode(qp.device("null.qubit", wires=2 * N))
 def cdf_concrete(t: float):
     # CHECK-LABEL: func.func public @cdf_concrete
-    # CHECK: qref.operator "TrotterFragmentedFlat"({{%.+}}: tensor<f64>, {{%.+}}: tensor<3x3x3xf64>, {{%.+}}: tensor<3x3x3xf64>, {{%.+}}: tensor<f64>)
-    # CHECK: param_map = {core_tensors = [1], evolution_time = [0], leaf_tensors = [2], nuc_constant = [3]}
-    # CHECK: qubit_map = {wires = [0, 1, 2, 3, 4, 5]}
-    TrotterFragmentedFlat.from_hamiltonian(t, 10, CDF, wires=range(2 * N))
+    # CHECK: qref.operator "TrotterCDF"({{%.+}}: tensor<f64>, {{%.+}}: tensor<2x2x2xf64>, {{%.+}}: tensor<2x2x2xf64>, {{%.+}}: tensor<f64>)
+    # CHECK-SAME: qubits({{.+}})
+    # CHECK: UID
+    # CHECK: param_map = {evolution_time = [0], hamiltonian = [1, 2, 3]}
+    # CHECK: qubit_map = {wires = [0, 1, 2, 3]}
+    qp.TrotterCDF(evolution_time=t, num_trotter_steps=2, hamiltonian=CDF, wires=range(2 * N))
     return qp.state()
 
 
 print(cdf_concrete.mlir)
 
 
-@qp.qjit(capture=True, target="mlir")
-@qp.qnode(qp.device("null.qubit", wires=M * N))
-def cgf_abstract(
-    t: float,
-    core: ABSTRACT_CGF.core_tensors,
-    leaf: ABSTRACT_CGF.leaf_tensors,
-    nuc: ABSTRACT_CGF.nuc_constant,
-):
-    # CHECK-LABEL: func.func public @cgf_abstract
-    # CHECK-SAME: tensor<3x2x2x3x3xf64>
-    # CHECK-SAME: tensor<3x2x3x3xf64>
-    # CHECK: qref.operator "TrotterFragmentedFlat"({{%.+}}: tensor<f64>, {{%.+}}: tensor<3x2x2x3x3xf64>, {{%.+}}: tensor<3x2x3x3xf64>, {{%.+}}: tensor<f64>)
-    # CHECK: param_map = {core_tensors = [1], evolution_time = [0], leaf_tensors = [2], nuc_constant = [3]}
-    TrotterFragmentedFlat.from_hamiltonian(
-        t, 10, CGFHamiltonian(core, leaf, nuc), wires=range(M * N)
-    )
+# CGF with concrete data: the same operator shape in the IR, but a (L+1, M, M, K, K) core
+# and a (L+1, M, K, K) leaf. No per-representation special-casing in the lowering.
+@qp.qjit(capture=True, target="mlir", collect_decomp_rules=False)
+@qp.qnode(qp.device("null.qubit", wires=M * K))
+def cgf_concrete(t: float):
+    # CHECK-LABEL: func.func public @cgf_concrete
+    # CHECK: qref.operator "TrotterCGF"({{%.+}}: tensor<f64>, {{%.+}}: tensor<2x2x2x2x2xf64>, {{%.+}}: tensor<2x2x2x2xf64>, {{%.+}}: tensor<f64>)
+    # CHECK: UID
+    # CHECK: param_map = {evolution_time = [0], hamiltonian = [1, 2, 3]}
+    # CHECK: qubit_map = {wires = [0, 1, 2, 3]}
+    qp.TrotterCGF(evolution_time=t, num_trotter_steps=2, hamiltonian=CGF, wires=range(M * K))
     return qp.state()
 
 
-print(cgf_abstract.mlir)
+print(cgf_concrete.mlir)
 
 
-@qp.qjit(capture=True, target="mlir")
+# CDF with abstract data: the abstract Hamiltonian *is* the ahead-of-time signature, so the
+# tensors arrive as function arguments of the declared shape rather than as constants.
+@qp.qjit(capture=True, target="mlir", collect_decomp_rules=False)
 @qp.qnode(qp.device("null.qubit", wires=2 * N))
 def cdf_abstract(
     t: float,
@@ -152,11 +107,14 @@ def cdf_abstract(
     nuc: ABSTRACT_CDF.nuc_constant,
 ):
     # CHECK-LABEL: func.func public @cdf_abstract
-    # CHECK-SAME: tensor<3x3x3xf64>
-    # CHECK: qref.operator "TrotterFragmentedFlat"({{%.+}}: tensor<f64>, {{%.+}}: tensor<3x3x3xf64>, {{%.+}}: tensor<3x3x3xf64>, {{%.+}}: tensor<f64>)
-    # CHECK: param_map = {core_tensors = [1], evolution_time = [0], leaf_tensors = [2], nuc_constant = [3]}
-    TrotterFragmentedFlat.from_hamiltonian(
-        t, 10, CDFHamiltonian(core, leaf, nuc), wires=range(2 * N)
+    # CHECK-SAME: tensor<2x2x2xf64>
+    # CHECK: qref.operator "TrotterCDF"({{%.+}}: tensor<f64>, {{%.+}}: tensor<2x2x2xf64>, {{%.+}}: tensor<2x2x2xf64>, {{%.+}}: tensor<f64>)
+    # CHECK: param_map = {evolution_time = [0], hamiltonian = [1, 2, 3]}
+    qp.TrotterCDF(
+        evolution_time=t,
+        num_trotter_steps=2,
+        hamiltonian=qp.CDFHamiltonian(core, leaf, nuc),
+        wires=range(2 * N),
     )
     return qp.state()
 
@@ -164,35 +122,70 @@ def cdf_abstract(
 print(cdf_abstract.mlir)
 
 
-@qp.qjit(capture=True, target="mlir")
-@qp.qnode(qp.device("null.qubit", wires=M * N))
-def cgf_hybrid_arg(t: float):
-    # CHECK-LABEL: func.func public @cgf_hybrid_arg
-    # CHECK: qref.operator "TrotterFragmented"({{%.+}}: tensor<f64>, {{%.+}}: tensor<3x2x2x3x3xf64>, {{%.+}}: tensor<3x2x3x3xf64>, {{%.+}}: tensor<f64>)
-    # CHECK: UID
-    # CHECK: param_map = {evolution_time = [0], hamiltonian = [1, 2, 3]}
-    # CHECK: qubit_map = {wires = [0, 1, 2, 3, 4, 5]}
-    TrotterFragmented(t, 10, CGF, wires=range(M * N))
-    return qp.state()
-
-
-print(cgf_hybrid_arg.mlir)
-
-
-@qp.qjit(capture=True, target="mlir")
-@qp.qnode(qp.device("null.qubit", wires=M * N))
-def cgf_hybrid_arg_abstract(
+# CGF with abstract data.
+@qp.qjit(capture=True, target="mlir", collect_decomp_rules=False)
+@qp.qnode(qp.device("null.qubit", wires=M * K))
+def cgf_abstract(
     t: float,
     core: ABSTRACT_CGF.core_tensors,
     leaf: ABSTRACT_CGF.leaf_tensors,
     nuc: ABSTRACT_CGF.nuc_constant,
 ):
-    # CHECK-LABEL: func.func public @cgf_hybrid_arg_abstract
-    # CHECK-SAME: tensor<3x2x2x3x3xf64>
-    # CHECK: qref.operator "TrotterFragmented"({{%.+}}: tensor<f64>, {{%.+}}: tensor<3x2x2x3x3xf64>, {{%.+}}: tensor<3x2x3x3xf64>, {{%.+}}: tensor<f64>)
+    # CHECK-LABEL: func.func public @cgf_abstract
+    # CHECK-SAME: tensor<2x2x2x2x2xf64>
+    # CHECK: qref.operator "TrotterCGF"({{%.+}}: tensor<f64>, {{%.+}}: tensor<2x2x2x2x2xf64>, {{%.+}}: tensor<2x2x2x2xf64>, {{%.+}}: tensor<f64>)
     # CHECK: param_map = {evolution_time = [0], hamiltonian = [1, 2, 3]}
-    TrotterFragmented(t, 10, CGFHamiltonian(core, leaf, nuc), wires=range(M * N))
+    qp.TrotterCGF(
+        evolution_time=t,
+        num_trotter_steps=2,
+        hamiltonian=qp.CGFHamiltonian(core, leaf, nuc),
+        wires=range(M * K),
+    )
     return qp.state()
 
 
-print(cgf_hybrid_arg_abstract.mlir)
+print(cgf_abstract.mlir)
+
+
+# Controlled evolution. Both variants live in one function so that FileCheck pattern
+# variables can compare their UIDs: variables do not carry across ``CHECK-LABEL`` blocks.
+@qp.qjit(capture=True, target="mlir", collect_decomp_rules=False)
+@qp.qnode(qp.device("null.qubit", wires=2 * N + 1))
+def cdf_controlled(t: float):
+    # CHECK-LABEL: func.func public @cdf_controlled
+
+    # The control qubit rides in ``ctrls``, so it is absent from ``qubit_map``.
+    # CHECK: qref.operator "TrotterCDF"({{%.+}}: tensor<f64>, {{%.+}}: tensor<2x2x2xf64>, {{%.+}}: tensor<2x2x2xf64>, {{%.+}}: tensor<f64>)
+    # CHECK: UID([[SINGLE_PHASE_UID:[0-9]+]])
+    # CHECK: ctrls({{%.+}}) ctrl_vals({{%.+}})
+    # CHECK: param_map = {evolution_time = [0], hamiltonian = [1, 2, 3]}
+    # CHECK: qubit_map = {wires = [0, 1, 2, 3]}
+    qp.ctrl(
+        qp.TrotterCDF(evolution_time=t, num_trotter_steps=2, hamiltonian=CDF, wires=range(2 * N)),
+        control=[2 * N],
+    )
+
+    # ``double_phase`` is static data on an operator that declares hybrid arguments, so it
+    # is folded into the UID rather than emitted as a ``static_data`` attribute. Every
+    # operand matches the operator above, so the UID is the only thing that can differ.
+    # CHECK: qref.operator "TrotterCDF"({{%.+}}: tensor<f64>, {{%.+}}: tensor<2x2x2xf64>, {{%.+}}: tensor<2x2x2xf64>, {{%.+}}: tensor<f64>)
+    # ``CHECK-NOT`` scans up to the next ``CHECK``, so it is anchored on ``ctrls`` rather
+    # than on the UID line itself; anchoring on the UID would leave an empty region and
+    # pass vacuously.
+    # CHECK-NOT: UID([[SINGLE_PHASE_UID]])
+    # CHECK: ctrls({{%.+}}) ctrl_vals({{%.+}})
+    # CHECK: param_map = {evolution_time = [0], hamiltonian = [1, 2, 3]}
+    qp.ctrl(
+        qp.TrotterCDF(
+            evolution_time=t,
+            num_trotter_steps=2,
+            hamiltonian=CDF,
+            wires=range(2 * N),
+            double_phase=True,
+        ),
+        control=[2 * N],
+    )
+    return qp.state()
+
+
+print(cdf_controlled.mlir)
