@@ -70,7 +70,7 @@ def AdjointLoweringPass : Pass<"adjoint-lowering"> {
     ];
 }
 
-def AdjointLoweringCanonicalization : Pass<"adjoint-lowering-canonicalization"> {
+def ResolveGateLevelAdjoint : Pass<"resolve-gate-level-adjoint"> {
     let summary = "Applies canonicalization patterns for adjoint quantum operations.";
 }
 

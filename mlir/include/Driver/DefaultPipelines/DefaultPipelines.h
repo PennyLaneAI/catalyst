@@ -61,8 +61,8 @@ const PipelineList pipelineList{
       "adjoint-lowering",
       "ctrl-lowering",
       "adjoint-lowering",
+      "resolve-gate-level-adjoint",
       // TODO: we can remove the following 2 passes once PBC has its own pipeline.
-      "adjoint-lowering-canonicalization",
       "lower-pbc-init-ops",
       "disable-assertion",
       "symbol-dce"}},  // to remove user decomposition rules after all graph-decomposition passes

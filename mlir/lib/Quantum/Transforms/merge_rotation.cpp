@@ -47,7 +47,7 @@ struct MergeRotationsPass : impl::MergeRotationsPassBase<MergeRotationsPass> {
 
         RewritePatternSet patternsCanonicalization(&getContext());
 
-        populateAdjointLoweringCanonicalizationPatterns(patternsCanonicalization);
+        populateResolveGateLevelAdjointPatterns(patternsCanonicalization);
         catalyst::pbc::PPRotationOp::getCanonicalizationPatterns(patternsCanonicalization,
                                                                  &getContext());
         catalyst::pbc::PPRotationArbitraryOp::getCanonicalizationPatterns(patternsCanonicalization,

@@ -31,7 +31,7 @@ namespace quantum {
 mlir::Value getGlobalString(mlir::Location loc, mlir::OpBuilder &rewriter, mlir::StringRef key,
                             mlir::StringRef value, mlir::ModuleOp mod);
 
-void populateAdjointLoweringCanonicalizationPatterns(mlir::RewritePatternSet &);
+void populateResolveGateLevelAdjointPatterns(mlir::RewritePatternSet &);
 void populateGridsynthPatterns(mlir::RewritePatternSet &patterns, double epsilon, bool pprBasis);
 void populateQIRConversionPatterns(mlir::TypeConverter &, mlir::RewritePatternSet &, bool);
 void populateCancelInversesPatterns(mlir::RewritePatternSet &);
