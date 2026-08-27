@@ -263,6 +263,39 @@ class TestEstimatedProbabilityValidation:
             circuit(5)
 
 
+class TestCaptureCondEstimatedProbabilityLowering:
+    """Lowering of ``estimated_probability`` hints through the program-capture ``cond`` path."""
+
+    @pytest.mark.usefixtures("disable_capture")
+    def test_pl_cond_lowering_attaches_probabilities(self, monkeypatch):
+        """The captured-``cond`` lowering annotates each nested ``scf.if`` with a
+        ``catalyst.estimated_probability`` attribute when conditional probabilities are available.
+
+        The probabilities are not yet propagated through the program-capture pipeline, so the
+        conditional probabilities that the lowering would receive are injected by patching the
+        conversion helper. This exercises the annotation branch of ``_pl_cond_lowering``.
+        """
+        # pylint: disable=import-outside-toplevel
+        import catalyst.jax_primitives as jax_primitives
+
+        monkeypatch.setattr(
+            jax_primitives,
+            "unconditional_to_conditional_if_probs",
+            lambda _: (0.5, 0.25, 0.1),
+        )
+
+        @qjit(capture=True, target="mlir")
+        @qp.qnode(qp.device("lightning.qubit", wires=1))
+        def circuit(n: int):
+            # if (n <= 5) -> X, elif (n <= 8) -> Y, else -> H : two nested scf.if ops
+            qp.cond(n <= 5, qp.PauliX, qp.Hadamard, ((n <= 8, qp.PauliY),))(wires=0)
+            return qp.probs()
+
+        mlir_module = circuit.mlir
+        assert "catalyst.estimated_probability = 5.000000e-01" in mlir_module
+        assert "catalyst.estimated_probability = 2.500000e-01" in mlir_module
+
+
 # pylint: disable=too-many-public-methods,too-many-lines
 class TestCond:
     """Test suite for the Cond functionality in Catalyst."""

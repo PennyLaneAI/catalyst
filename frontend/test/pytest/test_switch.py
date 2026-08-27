@@ -193,6 +193,49 @@ class TestInterpreted:
         with pytest.raises(ValueError, match=SWITCH_DEFAULT_BRANCH_MESSAGE):
             assert SwitchCallable(0, None)
 
+    def test_construct_with_cases_and_branches(self):
+        """Constructing a SwitchCallable directly with ``cases`` and ``branches`` (rather than
+        building it up via ``.branch()``) populates the case/branch and case/probability maps,
+        defaulting every probability to ``None``."""
+
+        def default_branch():
+            return "default"
+
+        def branch_0():
+            return "zero"
+
+        def branch_3():
+            return "three"
+
+        switch_callable = SwitchCallable(
+            0, default_branch, cases=[0, 3], branches=[branch_0, branch_3]
+        )
+
+        assert switch_callable.case_to_branch == {0: branch_0, 3: branch_3}
+        assert switch_callable.case_to_prob == {0: None, 3: None}
+
+    def test_construct_with_estimated_probabilities(self):
+        """The ``estimated_probabilities`` constructor argument is zipped onto the cases."""
+
+        def default_branch():
+            return "default"
+
+        def branch_0():
+            return "zero"
+
+        def branch_3():
+            return "three"
+
+        switch_callable = SwitchCallable(
+            0,
+            default_branch,
+            cases=[0, 3],
+            branches=[branch_0, branch_3],
+            estimated_probabilities=[0.3, 0.5],
+        )
+
+        assert switch_callable.case_to_prob == {0: 0.3, 3: 0.5}
+
     def test_default_branch(self):
         """Test that a single branch is taken as default."""
 

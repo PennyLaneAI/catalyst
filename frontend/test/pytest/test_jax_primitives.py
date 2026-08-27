@@ -31,6 +31,7 @@ from catalyst.jax_primitives import (
     extract_scalar,
     get_call_jaxpr,
     safe_cast_to_f64,
+    set_estimated_iterations_attr,
     unconditional_to_conditional_if_probs,
 )
 
@@ -184,6 +185,13 @@ class TestUnconditionalToConditionalIfProbs:
             remaining -= weight
 
         assert tuple(recovered) == pytest.approx(unconditional)
+
+
+def test_set_estimated_iterations_attr_rejects_negative():
+    """A negative ``estimated_iterations`` is rejected before any MLIR attribute is set, so no
+    operation is required to trigger the guard."""
+    with pytest.raises(ValueError, match="'estimated_iterations' must be non-negative"):
+        set_estimated_iterations_attr(None, -1.0)
 
 
 def test_get_call_jaxpr():
