@@ -913,7 +913,8 @@ module @test_while_loop {
       scf.condition(%condition) %updated_index, %out: index, !quantum.bit
     } do {
       ^bb0(%after_index: index, %after_qubit : !quantum.bit):
-        scf.yield %after_index, %after_qubit : index, !quantum.bit
+        %after_out = quantum.custom "S"() %after_qubit : !quantum.bit
+        scf.yield %after_index, %after_out: index, !quantum.bit
     }
 
     return %rout : !quantum.bit
