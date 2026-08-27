@@ -19,7 +19,7 @@ lower to their own operations:
 - PauliRot
 - GlobalPhase
 - PCPhase
-- QubitUnitary (TODO: cannot yet lower rules that call helper functions)
+- QubitUnitary
 - BasisState
 """
 
@@ -108,6 +108,35 @@ def test_pcphase():
 # CHECK: func.func private @"__builtin__decompose_pcphase_PCPhase{phi:[f64]}{wires:1}{dim:0}"
 # CHECK-SAME:   target_gate = "PCPhase{phi:[f64]}{wires:1}{dim:0}"
 test_pcphase()
+
+
+def test_qubit_unitary():
+    """
+    Test that decomposing qp.QubitUnitary works.
+    """
+
+    @qp.qjit(capture=True, target="mlir")
+    @qp.qnode(qp.device("null.qubit", wires=3))
+    def unitary():
+        qp.QubitUnitary(jnp.eye(4), wires=[0, 1])
+        return qp.state()
+
+    print(unitary.mlir)
+
+
+# CHECK: func.func public @unitary
+# CHECK: qref.unitary({{%.+}} : tensor<4x4xcomplex<f64>>)
+# CHECK: func.func private @"__builtin_two_qubit_decomp_rule_QubitUnitary
+# CHECK-SAME: {U:{{\[\[}}complex<f64>,complex<f64>,complex<f64>,complex<f64>],
+# CHECK-SAME:     [complex<f64>,complex<f64>,complex<f64>,complex<f64>],
+# CHECK-SAME:     [complex<f64>,complex<f64>,complex<f64>,complex<f64>],
+# CHECK-SAME:     [complex<f64>,complex<f64>,complex<f64>,complex<f64>{{\]\]}}}{wires:2}{}"
+# CHECK-SAME:   target_gate = "QubitUnitary
+# CHECK-SAME:   {U:{{\[\[}}complex<f64>,complex<f64>,complex<f64>,complex<f64>],
+# CHECK-SAME:       [complex<f64>,complex<f64>,complex<f64>,complex<f64>],
+# CHECK-SAME:       [complex<f64>,complex<f64>,complex<f64>,complex<f64>],
+# CHECK-SAME:       [complex<f64>,complex<f64>,complex<f64>,complex<f64>{{\]\]}}}{wires:2}{}"
+test_qubit_unitary()
 
 
 def test_gphase():
