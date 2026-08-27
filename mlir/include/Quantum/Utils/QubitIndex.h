@@ -130,6 +130,10 @@ inline QubitIndex getExtractIndex(mlir::Value qubit) {
                 // off-by-one
                 qubit = forOp.getInitArgs()[blockArg.getArgNumber() - 1];
                 continue;
+            } else if (auto whileOp = mlir::dyn_cast_or_null<mlir::scf::WhileOp>(
+                           blockArg.getOwner()->getParentOp())) {
+                qubit = whileOp.getInits()[blockArg.getArgNumber()];
+                continue;
             }
         }
 

@@ -906,7 +906,7 @@ module @test_while_loop {
     %out_index, %rout = scf.while (%before_index = %init_index, %before_qubit = %in) : (index, !quantum.bit) -> (index, !quantum.bit) {
       // CHECK-NOT: "T"
       // CHECK: "PhaseShift"
-      %out = quantum.custom "T"() %in: !quantum.bit
+      %out = quantum.custom "T"() %before_qubit: !quantum.bit
       %increment = arith.constant 1 : index
       %updated_index = index.add %before_index, %increment
       %condition = index.cmp ult (%updated_index, %limit) 
