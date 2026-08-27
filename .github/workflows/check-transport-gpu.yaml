@@ -280,8 +280,31 @@ jobs:
         # -rs makes those skips visible in the CI log so a green tick with zero coverage is
         # obvious rather than silent.
         run: |
-          python3 -m pytest -v -rs \
+          python3 -m pytest -v -rs --junit-xml=gpu-backline-results.xml \
             "frontend/test/pytest/test_backline.py::TestBacklineDemoIntegration::test_cpu_controller_to_gpu_coproc_memcpy_precompiled" \
             "frontend/test/pytest/test_backline.py::TestBacklineDemoIntegration::test_cpu_controller_to_gpu_coproc_triton_css_bp" \
             "frontend/test/pytest/test_backline.py::TestBacklineDemoIntegration::test_cpu_controller_to_gpu_coproc_memcpy_manual_qec"
+
+      - name: Require at least one GPU test to have executed
+        # pytest exits 0 when every selected test is skipped, so without this step the job
+        # reports success while covering nothing -- and it spends ~20 min of self-hosted GPU
+        # time to do it. Until HIP-on-CUDA lands on the runner (see the TODO above), this is
+        # what keeps a fully-skipped run red instead of quietly green.
+        if: always()
+        run: |
+          python3 - <<'EOF'
+          import sys
+          import xml.etree.ElementTree as ET
+
+          root = ET.parse("gpu-backline-results.xml").getroot()
+          suite = root if root.tag == "testsuite" else root.find("testsuite")
+          total = int(suite.get("tests", 0))
+          skipped = int(suite.get("skipped", 0))
+          print(f"{total - skipped}/{total} backline GPU tests executed ({skipped} skipped)")
+          if total == 0 or skipped == total:
+              sys.exit(
+                  "No backline GPU test executed -- all selected tests were skipped. "
+                  "Refusing to report success for a run with zero GPU coverage."
+              )
+          EOF
 
