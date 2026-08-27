@@ -36,6 +36,9 @@
 
 <h3>Improvements 🛠</h3>
 
+* Add the `XMEM_REPLY_BRAM` memory type and use it to allocate reply buffers in dedicated BRAM.
+  [(#3148)](https://github.com/PennyLaneAI/catalyst/pull/3148)
+
 * a PennyLane `Backline` is serialized to the `catalyst.backline` module attribute and compiled
   through the transport passes.
   [(#3068)](https://github.com/PennyLaneAI/catalyst/pull/3068)
