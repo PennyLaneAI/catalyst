@@ -129,7 +129,7 @@ class TestGenericUtilities:
     def test_wrapper_operator(self, mocker):
         """Test that compile_decomposition_rules_wrapper doesn't error on Operator1 instances."""
         mock_decomp = mocker.MagicMock()
-        mock_decomp._impl.__name__ = "FakeRuleName"
+        mock_decomp.name = "FakeRuleName"
         mock_decomp.compute_resources.side_effect = ValueError("Fake Resource Related Error")
 
         mocker.patch("pennylane.decomposition.list_decomps", return_value=[mock_decomp])
