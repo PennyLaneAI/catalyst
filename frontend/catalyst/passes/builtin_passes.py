@@ -1824,20 +1824,26 @@ def graph_decomposition_setup_inputs(
         "libpython_path": str(libpython_path if libpython_path else get_libpython_path()),
     }
 
+    def rule_ref_name(rule):
+        # A rule reference may be a name string, a plain decomposition function, or a PennyLane
+        # ``DecompositionRule`` (returned by ``@register_resources``, which has no ``__name__``).
+        if isinstance(rule, str):
+            return rule
+        if isinstance(rule, qp.decomposition.DecompositionRule):
+            return rule.name
+        return rule.__name__
+
     if fixed_decomps:
         options |= {
             "fixed_decomps": {
-                to_name(op): (rule if isinstance(rule, str) else rule.__name__)
-                for op, rule in fixed_decomps.items()
+                to_name(op): rule_ref_name(rule) for op, rule in fixed_decomps.items()
             }
         }
 
     if alt_decomps:
         options |= {
             "alt_decomps": {
-                to_name(op): tuple(
-                    (rule if isinstance(rule, str) else rule.__name__) for rule in rules
-                )
+                to_name(op): tuple(rule_ref_name(rule) for rule in rules)
                 for op, rules in alt_decomps.items()
             }
         }

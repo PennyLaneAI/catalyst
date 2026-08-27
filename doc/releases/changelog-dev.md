@@ -17,6 +17,15 @@
   [(#3116)](https://github.com/PennyLaneAI/catalyst/pull/3116)
   [(#3131)](https://github.com/PennyLaneAI/catalyst/pull/3131)
 
+* The graph-based decomposition system now supports **adjoint operators** for `Operator2`.
+  [(#3120)](https://github.com/PennyLaneAI/catalyst/pull/3120)
+  [(#3115)](https://github.com/PennyLaneAI/catalyst/pull/3115)
+
+  For a target gate set, `Adjoint(Op)` is reached through any of three pathways:
+    1. Rules registered on the base `Op`,
+    2. Rules registered directly for `Adjoint(Op)`, and
+    3. Rules *synthesized by distribution* (`decompose(Adjoint(Op)) = adjoint(decompose(Op))`).
+
 * The `local-random` unitary folding option for :func:`~.mitigate_with_zne` is now implemented,
   reproducing Mitiq's ``fold_gates_at_random``: every gate is folded ``floor((scale_factor-1)/2)``
   times, then a random subset is folded once more (without replacement) to reach ``scale_factor * n``
@@ -134,6 +143,29 @@
   AOT compilation and as arguments to `pennylane.specs` calculations.
   [(#2953)](https://github.com/PennyLaneAI/catalyst/pull/2953)
 
+* The `ResourceAnalysis` pass can now report concrete resource counts for nested loops in cases
+  where the bounds of an inner loop are directly dependent on the loop variable of a static outer loop.
+  [(#3140)](https://github.com/PennyLaneAI/catalyst/pull/3140)
+
+  For example, this program reports a total of `56` `PauliX` operations, since the number of iterations of the inner loops can be statically determined from the outer loop:
+
+  ```python
+  import pennylane as qp
+
+  @qp.qjit(autograph=True)
+  @qp.qnode(qp.device("null.qubit", wires=1))
+  def circuit():
+      for i in range(8):
+          for j in range(i):
+              for _ in range(j):
+                  qp.PauliX(0)
+
+      return qp.expval(qp.X(0))
+
+  resources = qp.specs(circuit, level=0)().resources
+  print(resources.quantum_operations["PauliX"])  # 56
+  ```
+
 * The `ResourceAnalysis` pass has received a new compiler hint to more accurately estimate quantum
   resources in the presence of conditional operations (`scf.if` and `scf.index_switch`). The
   operations in question can be annotated with either a `catalyst.estimated_probability` or
@@ -186,6 +218,10 @@
 * A `lower-decode-to-transport` pass is added, which replaces each qecp.decode_esm_css with
   a transport kick/collect round over its buffers.
   [(#3066)](https://github.com/PennyLaneAI/catalyst/pull/3066)
+
+* A `remove-global-phases` pass is added, which removes global phases by deleting `quantum.gphase`  
+  operations without control wires.
+  [(#3143)](https://github.com/PennyLaneAI/catalyst/pull/3143)
 
 * An X/Z syndrome decode can now be routed to its own decoder in a backline coprocessor.
   `qecp.decode_esm_css` carries an optional `check_type` attribute recording which check family a
@@ -716,6 +752,7 @@ Rylan Malarchick,
 Mehrdad Malekmohammadi,
 River McCubbin,
 Shuli Shu,
+Nikhil Sreekumar,
 Paul Haochen Wang,
 Jake Zaia,
 Hongsheng Zheng.
