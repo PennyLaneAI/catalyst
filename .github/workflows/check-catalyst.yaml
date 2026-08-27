@@ -528,6 +528,10 @@ jobs:
         sudo apt-get install -y graphviz
         make frontend
 
+    - name: Install PennyLane branch
+      run: |
+        pip install --no-deps --force git+https://github.com/PennyLaneAI/pennylane@chore/remove-wires-arg-from-gp
+
     - name: Verify Graphviz installation
       run: |
         dot -V
@@ -608,6 +612,10 @@ jobs:
         python3 -m pip install -r requirements.txt
         make frontend
 
+    - name: Install PennyLane branch
+      run: |
+        pip install --no-deps --force git+https://github.com/PennyLaneAI/pennylane@chore/remove-wires-arg-from-gp
+
     - name: Run Python Pytest Tests (backend=lightning.kokkos)
       run: |
         # Don't run xDSL tests
@@ -671,6 +679,10 @@ jobs:
         python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
         python3 -m pip install -r requirements.txt
         make frontend
+
+    - name: Install PennyLane branch
+      run: |
+        pip install --no-deps --force git+https://github.com/PennyLaneAI/pennylane@chore/remove-wires-arg-from-gp
 
   runtime-device-tests:
     name: Third-Party Device Tests (C++)
