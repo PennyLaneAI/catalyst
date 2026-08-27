@@ -273,6 +273,24 @@ class TestOnDemand:
     """
 
     @pytest.mark.parametrize(
+        "op_id, expected",
+        [
+            # Normal case: only the name (prefix before the first `{`) is wrapped.
+            ("S{}{wires:1}{}", "Adjoint(S){}{wires:1}{}"),
+            ("RX{0:[f64]}{wires:1}{}", "Adjoint(RX){0:[f64]}{wires:1}{}"),
+            # `[uid]` suffix is carried through untouched.
+            ("HybridOp{a:[[f64]]}{w:1}{}[42]", "Adjoint(HybridOp){a:[[f64]]}{w:1}{}[42]"),
+            # No `{` present (split == -1): the whole id is the name and gets wrapped as-is.
+            ("RX", "Adjoint(RX)"),
+            ("", "Adjoint()"),
+        ],
+    )
+    def test_name_wrap_adjoint(self, op_id, expected):
+        """name_wrap_adjoint wraps only the operator name; when the id has no `{` (split == -1) the
+        whole string is treated as the name and wrapped as-is."""
+        assert name_wrap_adjoint(op_id) == expected
+
+    @pytest.mark.parametrize(
         "op_name, op_id, expected",
         [
             ("S", "S{}{wires:1}{}", "S{}{wires:1}{}"),

@@ -336,7 +336,7 @@ def adjoint_variant_rule_strings(
             if not any(marker in rule for marker in _NON_INVERTIBLE_MARKERS)
         ]
         out.extend(distributed)
-    except Exception as e:  # pylint: disable=broad-except
+    except Exception as e:  # pylint: disable=broad-except # pragma: no cover
         warnings.warn(f"Failed to synthesize distributed adjoint rules for {adj_name}: {e}")
     return out
 
