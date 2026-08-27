@@ -275,11 +275,12 @@ jobs:
         #     executes ghz() on the GPU.
         # All three depend on the runtime CMake having built the memcpy GPU coproc backend .so
         # with GPU support, which needs HIP-on-CUDA installed on the runner (see the TODO
-        # above about the cloud team). Until then they're expected to fail at loader time.
-        # The gpu_triton_platform fixture picks NVIDIA (cuda:*) or AMD (hip:*) based on which
-        # SDK is detected on the runner, so the same test body runs on either target.
+        # above about the cloud team). Until that lands, gpu_triton_platform detects the
+        # missing driver and skips the whole set cleanly instead of failing at loader time.
+        # -rs makes those skips visible in the CI log so a green tick with zero coverage is
+        # obvious rather than silent.
         run: |
-          python3 -m pytest -v \
+          python3 -m pytest -v -rs \
             "frontend/test/pytest/test_backline.py::TestBacklineDemoIntegration::test_cpu_controller_to_gpu_coproc_memcpy_precompiled" \
             "frontend/test/pytest/test_backline.py::TestBacklineDemoIntegration::test_cpu_controller_to_gpu_coproc_triton_css_bp" \
             "frontend/test/pytest/test_backline.py::TestBacklineDemoIntegration::test_cpu_controller_to_gpu_coproc_memcpy_manual_qec"
