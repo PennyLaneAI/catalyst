@@ -89,7 +89,7 @@ class TestGenericUtilities:
         [
             (NoParams(Wires(0)), "NoParams{}{reg:1}{}"),
             (NoParamsCustomOp(Wires([0, 1])), "NoParamsCustomOp{}{wires:2}{}"),
-            (SingleParam(Float, Wires([2, 3])), "SingleParam{x:[[f64]]}{reg:2}{}"),
+            (SingleParam(Float, Wires([2, 3])), "SingleParam{x:[tensor<f64>]}{reg:2}{}"),
             (
                 CompilableData(True, 3.14, "string", Wires([0, 1])),
                 "CompilableData{}{wires:2}{a:True,b:3.14,thing:string}",
@@ -100,7 +100,7 @@ class TestGenericUtilities:
             ),
             (
                 MultiParams(Wires([0, 2, 3]), Complex, Int, Float[2]),
-                "MultiParams{a:[[complex<f64>]],b:[[i64]],c:[[f64,f64]]}{reg:3}",
+                "MultiParams{a:[tensor<complex<f64>>],b:[tensor<i64>],c:[tensor<2xf64>]}{reg:3}",
             ),
             (qp.MultiRZ(Float, Wires([0, 2, 3, 4])), "MultiRZ{theta:[f64]}{wires:4}{}"),
             (
@@ -114,7 +114,7 @@ class TestGenericUtilities:
             ),  # NOTE: open brace to match uid
             (
                 HybridOpArg(Float, StaticData("innerop", Wires(0)), Wires([2, 3]), 12),
-                "HybridOpArg{angle:[[f64]]}{cwires:2}{}[",  # NOTE: open brace to match uid
+                "HybridOpArg{angle:[tensor<f64>]}{cwires:2}{}[",  # NOTE: open brace to match uid
             ),
             (
                 qp.Rot(Bool, Int, Float, Wires(0)),

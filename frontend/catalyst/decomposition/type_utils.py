@@ -23,16 +23,16 @@ from jax._src.lib.mlir import ir
 from jax.core import ShapedArray
 
 _MLIR_DTYPES_TO_PY_DTYPES = {
-    "i1": jnp.bool_,
-    "i8": jnp.int8,
-    "i16": jnp.int16,
-    "i32": jnp.int32,
-    "i64": jnp.int64,
-    "f16": jnp.float16,
-    "f32": jnp.float32,
-    "f64": jnp.float64,
-    "complex<f32>": jnp.complex64,
-    "complex<f64>": jnp.complex128,
+    "tensor<i1>": jnp.bool_,
+    "tensor<i8>": jnp.int8,
+    "tensor<i16>": jnp.int16,
+    "tensor<i32>": jnp.int32,
+    "tensor<i64>": jnp.int64,
+    "tensor<f16>": jnp.float16,
+    "tensor<f32>": jnp.float32,
+    "tensor<f64>": jnp.float64,
+    "tensor<complex<f32>>": jnp.complex64,
+    "tensor<complex<f64>>": jnp.complex128,
 }
 
 _PY_DTYPES_TO_MLIR_DTYPES = {v: k for k, v in _MLIR_DTYPES_TO_PY_DTYPES.items()} | {
