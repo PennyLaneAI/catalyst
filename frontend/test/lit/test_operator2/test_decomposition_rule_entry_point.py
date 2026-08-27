@@ -835,10 +835,10 @@ def test_for_loop():
     """Test when the rule body has a for loop."""
 
     class LayerRX(qp.core.Operator2):
-        dynamic_argnames = ("angle",)
+        dynamic_argnames = ("angles",)
 
-        def __init__(self, angle, wires):
-            super().__init__(angle, wires)
+        def __init__(self, angles, wires):
+            super().__init__(angles, wires)
 
     class TestRX(qp.core.Operator2):
         dynamic_argnames = ("theta",)
@@ -848,11 +848,11 @@ def test_for_loop():
         def __init__(self, theta, wires):
             super().__init__(theta, wires)
 
-    @qp.register_resources(lambda angle, wires: {TestRX(Float, Wire[1]): len(wires)})
-    def test_rule(angle, wires):
+    @qp.register_resources(lambda angles, wires: {TestRX(Float, Wire[1]): len(wires)})
+    def test_rule(angles, wires):
         @qp.for_loop(len(wires))
         def l(i):
-            TestRX(angle, wires[i])
+            TestRX(angles[i], wires[i])
 
         l()  # pylint: disable=no-value-for-parameter
 
@@ -860,7 +860,7 @@ def test_for_loop():
         qp.add_decomps(LayerRX, test_rule)
 
         result = compile_decomposition_rules_wrapper(
-            "LayerRX", "TestID", {"angle": ["f64"]}, {"wires": 3}, {}
+            "LayerRX", "TestID", {"angles": ["f64", "f64", "f64"]}, {"wires": 3}, {}
         )
         print(result)
 
