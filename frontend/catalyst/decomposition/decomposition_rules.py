@@ -314,7 +314,7 @@ def compile_decomposition_rules(
 
     def re_privatize_rules(op):
         if op.name == "func.func":
-            rule_name = ir.StringAttr(op.attributes["sym_name"]).value.removesuffix("_" + op_id)
+            rule_name = ir.StringAttr(op.attributes["sym_name"]).value.removesuffix("_" + target_id)
             if rule_name in name_to_resource_ids:
                 op.attributes["sym_visibility"] = ir.StringAttr.get("private")
         return ir.WalkResult.ADVANCE
