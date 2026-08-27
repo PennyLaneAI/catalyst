@@ -27,6 +27,7 @@ enum {
     XMEM_PL_DDR = 1,
     XMEM_PS_DDR = 2,
     XMEM_BRAM = 5,
+    XMEM_REPLY_BRAM = 6,
 };
 #define XMEM_INVALID_VIRT_ADD 0
 #define XMEM_IS_INVALID_VADDR(va) ((va) == XMEM_INVALID_VIRT_ADD)
