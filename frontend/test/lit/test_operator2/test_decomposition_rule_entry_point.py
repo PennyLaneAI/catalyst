@@ -96,7 +96,7 @@ def test_from_dynamic_argnames():
         qp.add_decomps(SingleParam, rule)
         result = compile_decomposition_rules_wrapper(
             "SingleParam",
-            "SingleParam{x:[[f64,f64]]}{reg:2}{}",
+            "SingleParam{x:[tensor<2xf64>]}{reg:2}{}",
             {"x": ["f64", "f64"]},
             {"reg": 2},
             {},
@@ -106,7 +106,7 @@ def test_from_dynamic_argnames():
 
 # CHECK: func.func private @"rule_SingleParam{x:[tensor<2xf64>]}{reg:2}{}"
 # CHECK-SAME:   resources = {operations = {"NoParams{}{reg:1}{}" = 1 : i64}}
-# CHECK-SAME:   target_gate = "SingleParam{x:[tensor<f64>]}{reg:2}{}"
+# CHECK-SAME:   target_gate = "SingleParam{x:[tensor<2xf64>]}{reg:2}{}"
 test_from_dynamic_argnames()
 
 
@@ -155,7 +155,7 @@ def test_from_multiple_dynamic_argnames():
         qp.add_decomps(MultiParams, rule)
         result = compile_decomposition_rules_wrapper(
             "MultiParams",
-            "MultiParams{a:[[f64]],b:[[i32,f64]],c:[[[i32],[f64]]]}{reg:2}{}",
+            "MultiParams{a:[tensor<f64>],b:[tensor<i32>,tensor<f64>],c:[tensor<i32>,tensor<f64>]}{reg:2}{}",
             {"b": ["i32", "f64"], "c": [["i32"], ["f64"]], "a": ["f64"]},
             {"reg": 2},
             {},
@@ -544,7 +544,7 @@ def test_from_hybrid_op():
         qp.add_decomps(HybridOpArg, rule)
         result = compile_decomposition_rules_wrapper(
             "HybridOpArg",
-            "HybridOpArg{angle:[[f64]]}{cwires:1}{}[5678]",
+            "HybridOpArg{angle:[tensor<f64>]}{cwires:1}{}[5678]",
             {"angle": ["f64"]},
             {"cwires": 1},
             {},
@@ -632,7 +632,7 @@ def test_from_hybrid_op_nested():
         qp.add_decomps(HybridOpArg, rule)
         result = compile_decomposition_rules_wrapper(
             "HybridOpArg",
-            "HybridOpArg{angle:[[f64]]}{cwires:1}{}[7654]",
+            "HybridOpArg{angle:[tensor<f64>]}{cwires:1}{}[7654]",
             {"angle": ["f64"]},
             {"cwires": 1},
             {},
@@ -744,7 +744,7 @@ def test_from_multiple_full_args_op():
         qp.add_decomps(MultipleFullArgs, rule)
         result = compile_decomposition_rules_wrapper(
             "MultipleFullArgs",
-            "MultipleFullArgs{angles1:[[f64]],angles2:[[f64,f64]]}{reg1:1,reg2:2}{}[4444]",
+            "MultipleFullArgs{angles1:[tensor<f64>],angles2:[tensor<2xf64>]}{reg1:1,reg2:2}{}[4444]",
             {"angles1": ["f64"], "angles2": ["f64", "f64"]},
             {"reg1": 1, "reg2": 2},
             {},
@@ -764,7 +764,7 @@ def test_from_multiple_full_args_op():
 # CHECK-SAME:   resources = {operations = {
 # CHECK-SAME:   "NoParams{}{reg:1}{}" = 1 : i64
 # CHECK-SAME:   "SingleParam{x:[tensor<f64>]}{reg:1}{}" = 1 : i64
-# CHECK-SAME:   "SingleParam{x:[tensor<f64>]}{reg:1}{}" = 1 : i64
+# CHECK-SAME:   "SingleParam{x:[tensor<i64>]}{reg:1}{}" = 1 : i64
 # CHECK-SAME:   target_gate = "MultipleFullArgs{angles1:[tensor<f64>],angles2:[tensor<2xf64>]}{reg1:1,reg2:2}{}[4444]"
 # CHECK: "qref.operator"({{%.+}}) {op_name = "SingleParam"
 # CHECK: "qref.operator"({{%.+}}) {op_name = "SingleParam"

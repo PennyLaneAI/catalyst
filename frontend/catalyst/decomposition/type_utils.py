@@ -23,16 +23,16 @@ from jax._src.lib.mlir import ir
 from jax.core import ShapedArray
 
 _MLIR_DTYPES_TO_PY_DTYPES = {
-    "tensor<i1>": jnp.bool_,
-    "tensor<i8>": jnp.int8,
-    "tensor<i16>": jnp.int16,
-    "tensor<i32>": jnp.int32,
-    "tensor<i64>": jnp.int64,
-    "tensor<f16>": jnp.float16,
-    "tensor<f32>": jnp.float32,
-    "tensor<f64>": jnp.float64,
-    "tensor<complex<f32>>": jnp.complex64,
-    "tensor<complex<f64>>": jnp.complex128,
+    "i1": jnp.bool_,
+    "i8": jnp.int8,
+    "i16": jnp.int16,
+    "i32": jnp.int32,
+    "i64": jnp.int64,
+    "f16": jnp.float16,
+    "f32": jnp.float32,
+    "f64": jnp.float64,
+    "complex<f32>": jnp.complex64,
+    "complex<f64>": jnp.complex128,
 }
 
 _PY_DTYPES_TO_MLIR_DTYPES = {v: k for k, v in _MLIR_DTYPES_TO_PY_DTYPES.items()} | {
@@ -48,67 +48,36 @@ _PY_DTYPES_TO_MLIR_DTYPES = {v: k for k, v in _MLIR_DTYPES_TO_PY_DTYPES.items()}
     ir.F32Type: "f32",
     ir.F64Type: "f64",
     (ir.ComplexType, ir.F64Type): "complex<f64>",
+    np.dtype("bool_"): "i1",
+    np.dtype("int8"): "i8",
+    np.dtype("int16"): "i16",
+    np.dtype("int32"): "i32",
+    np.dtype("int64"): "i64",
+    np.dtype("float16"): "f16",
+    np.dtype("float32"): "f32",
+    np.dtype("float64"): "f64",
+    np.dtype("complex64"): "complex<f32>",
+    np.dtype("complex128"): "complex<f64>",
 }
 
 
-def get_mlir_tensor_type_map_key(mlir_type):
-    if isinstance(mlir_type, ir.ComplexType):
-        return (type(mlir_type), type(mlir_type.element_type))
-    if isinstance(mlir_type, ir.IntegerType):
-        return (type(mlir_type), mlir_type.width)
-    return type(mlir_type)
+def convert_item_to_mlir_type(item, is_special_lowering=False):
+    """Convert a string or PennyLane AbstractArray to an mlir type annotation."""
+    if isinstance(item, str):
+        return item
 
+    if item.shape == ():
+        if is_special_lowering:
+            return _PY_DTYPES_TO_MLIR_DTYPES[item.dtype]
+        return "tensor<" + _PY_DTYPES_TO_MLIR_DTYPES[item.dtype] + ">"
 
-def convert_shaped_type_to_mlir_string(shaped_type, current_dim=0):
-    """Convert a shape of arbitrary dimension to a string with MLIR type strings for values."""
-    if isinstance(shaped_type, (ShapedArray, qp.typing.AbstractArray)):
-        if current_dim == shaped_type.ndim:
-            return _PY_DTYPES_TO_MLIR_DTYPES[shaped_type.dtype.type]
-
-        return [
-            convert_shaped_type_to_mlir_string(shaped_type, current_dim + 1)
-        ] * shaped_type.shape[current_dim]
-    elif isinstance(shaped_type, ir.RankedTensorType):
-        if current_dim == shaped_type.rank:
-            return _PY_DTYPES_TO_MLIR_DTYPES[get_mlir_tensor_type_map_key(shaped_type.element_type)]
-
-        return [
-            convert_shaped_type_to_mlir_string(shaped_type, current_dim + 1)
-        ] * shaped_type.shape[current_dim]
-
-
-def convert_types_to_mlir_strings(d: dict) -> dict:
-    """Convert the values of a dictionary to MLIR type strings."""
-
-    def handle_item(item):
-        match item:
-            case str():
-                return item
-            case type():
-                return _PY_DTYPES_TO_MLIR_DTYPES[item]
-            case ir.RankedTensorType():
-                if len(item.shape) == 0:
-                    return [
-                        _PY_DTYPES_TO_MLIR_DTYPES[get_mlir_tensor_type_map_key(item.element_type)]
-                    ]
-                return convert_shaped_type_to_mlir_string(item)
-            case float() | int() | complex():
-                # these need to be wrapped in an additional list to account for the tensor creation in lowering
-                return [_PY_DTYPES_TO_MLIR_DTYPES[type(item)]]
-            case list() | tuple():
-                return [handle_item(i) for i in item]
-            case ShapedArray() | qp.typing.AbstractArray():
-                if item.shape == ():
-                    return [_PY_DTYPES_TO_MLIR_DTYPES[item.dtype.type]]
-                return convert_shaped_type_to_mlir_string(item)
-            case _ if type(item) in _PY_DTYPES_TO_MLIR_DTYPES:
-                return _PY_DTYPES_TO_MLIR_DTYPES[type(item)]
-            case _:
-                raise TypeError(
-                    f"encountered unknown type {type(item)} of item {item} when converting to mlir strings."
-                )
-
-    return {k: handle_item(v) for k, v in d.items()}
+    return (
+        "tensor<"
+        + "x".join(str(dim_size) for dim_size in item.shape)
+        + "x"
+        + _PY_DTYPES_TO_MLIR_DTYPES[item.dtype]
+        + ">"
+    )
 
 
 def format_dynamic_params_for_id(d):
@@ -141,6 +110,11 @@ def get_dummy_values_for_arg(arg):
     """
     match arg:
         case str():
+            if arg.startswith("tensor"):
+                body = arg.removeprefix("tensor<").removesuffix(">")
+                ranks = tuple(map(int, body.split("x")[:-1]))
+                dtype = body.split("x")[-1]
+                return jnp.zeros(ranks, dtype=_MLIR_DTYPES_TO_PY_DTYPES[dtype])
             return jnp.zeros((), dtype=_MLIR_DTYPES_TO_PY_DTYPES[arg])
         case list() | tuple():
             dtype = get_dummy_values_for_arg(arg[0]).dtype

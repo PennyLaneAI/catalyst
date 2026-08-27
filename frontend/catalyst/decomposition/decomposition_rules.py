@@ -26,10 +26,7 @@ from jax._src.lib.mlir import ir
 from jaxlib.mlir.dialects.builtin import ModuleOp
 
 from catalyst.decomposition.graph_op_id import GraphOpID
-from catalyst.decomposition.type_utils import (
-    convert_types_to_mlir_strings,
-    get_dummy_values_for_arg,
-)
+from catalyst.decomposition.type_utils import get_dummy_values_for_arg
 from catalyst.jax_extras.lowering import get_mlir_attribute_from_pyval
 
 # Ops that make a decomposition body non-invertible
@@ -538,7 +535,7 @@ def fetch_all_reachable_decomposition_rules_from_op(
                         graph_op_id = GraphOpID(op)
                         probe = (
                             graph_op_id.get_operator_name(),
-                            convert_types_to_mlir_strings(graph_op_id.dynamic_shape),
+                            graph_op_id.dynamic_shape,
                             graph_op_id.wire_lens,
                             graph_op_id.static_data,
                             graph_op_id.extra_data,

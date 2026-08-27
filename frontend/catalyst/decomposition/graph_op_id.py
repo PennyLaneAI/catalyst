@@ -21,7 +21,7 @@ import pennylane as qp
 from pennylane.pytrees import flatten
 
 from catalyst.decomposition.type_utils import (
-    convert_types_to_mlir_strings,
+    convert_item_to_mlir_type,
     format_dynamic_params_for_id,
     post_process_concretize_leaves,
     replace_abstract_wires_with_concrete_wires,
@@ -79,9 +79,15 @@ class GraphOpID:
         if self.is_custom_op:
             return {str(i): ["f64"] for i in range(len(self.op.dynamic_args))}
         elif issubclass(type(self.op), tuple(_SPECIAL_LOWERINGS.keys())):  # special cases
-            return {argname: argtype for argname, argtype in sorted(self.op.dynamic_args.items())}
+            return {
+                argname: [convert_item_to_mlir_type(argtype, is_special_lowering=True)]
+                for argname, argtype in sorted(self.op.dynamic_args.items())
+            }
         else:
-            return {argname: [argtype] for argname, argtype in sorted(self.op.dynamic_args.items())}
+            return {
+                argname: [convert_item_to_mlir_type(argtype)]
+                for argname, argtype in sorted(self.op.dynamic_args.items())
+            }
 
     def parse_wire_lens(self) -> dict[str, int]:
         """Return a dictionary of wire arg names to lengths."""
@@ -154,7 +160,7 @@ class GraphOpID:
 
     def get_dynamic_shape_id_format(self) -> str:
         """Return the dynamic shape formatted for GraphOpId."""
-        return format_dynamic_params_for_id(convert_types_to_mlir_strings(self.dynamic_shape))
+        return format_dynamic_params_for_id(self.dynamic_shape)
 
     def get_wire_lens_id_format(self) -> str:
         """Return the wire lengths formatted for GraphOpId."""

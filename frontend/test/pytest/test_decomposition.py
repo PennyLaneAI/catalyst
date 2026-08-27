@@ -45,7 +45,10 @@ from catalyst.decomposition.decomposition_rules import (
     wrap_modifier_id,
 )
 from catalyst.decomposition.graph_op_id import GraphOpID
-from catalyst.decomposition.type_utils import get_dummy_values_for_arg
+from catalyst.decomposition.type_utils import (
+    convert_item_to_mlir_type,
+    get_dummy_values_for_arg,
+)
 
 
 class TestGenericUtilities:
@@ -83,6 +86,26 @@ class TestGenericUtilities:
         result = get_dummy_values_for_arg(input)
         assert result.dtype == dtype
         assert result.shape == shape
+
+    @pytest.mark.parametrize(
+        "item, is_custom_op, mlir_type",
+        [
+            (Float, True, "f64"),  # custom op is always float
+            (Float, False, "tensor<f64>"),
+            (Int, False, "tensor<i64>"),
+            (Bool, False, "tensor<i1>"),
+            (Complex, False, "tensor<complex<f64>>"),
+            (Float[1], False, "tensor<1xf64>"),
+            (Float[2], False, "tensor<2xf64>"),
+            (Int[3], False, "tensor<3xi64>"),
+            (Bool[4], False, "tensor<4xi1>"),
+            (Complex[5], False, "tensor<5xcomplex<f64>>"),
+            (Float[2, 2], False, "tensor<2x2xf64>"),
+            (Complex[3, 4, 5], False, "tensor<3x4x5xcomplex<f64>>"),
+        ],
+    )
+    def test_convert_item_to_mlir_type(self, item, is_custom_op, mlir_type):
+        assert convert_item_to_mlir_type(item, is_custom_op) == mlir_type
 
     @pytest.mark.parametrize(
         "op, id",

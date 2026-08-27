@@ -40,7 +40,7 @@ from catalyst.decomposition.decomposition_rules import (
 )
 from catalyst.decomposition.graph_op_id import _SPECIAL_LOWERINGS
 from catalyst.decomposition.type_utils import (
-    convert_types_to_mlir_strings,
+    convert_item_to_mlir_type,
     format_dynamic_params_for_id,
 )
 from catalyst.jax_extras.lowering import get_mlir_attribute_from_pyval
@@ -408,7 +408,7 @@ def compile_decomp_rules(
 
         for dynamic_argname, param in zip(op_cls.dynamic_argnames, non_hybrid_params, strict=True):
             non_hybrid_dynamic_shape[dynamic_argname] = param.type
-        non_hybrid_dynamic_shape = convert_types_to_mlir_strings(non_hybrid_dynamic_shape)
+        non_hybrid_dynamic_shape = {k: [str(v)] for k, v in non_hybrid_dynamic_shape.items()}
 
         non_hybrid_wire_argnames = []
         for wire_argname in op_cls.wire_argnames:
@@ -450,7 +450,9 @@ def compile_decomp_rules(
                 with_hybrid_dynamic_shape[named_attr.name] = [
                     params[idx].type for idx in named_attr.attr
                 ]
-            with_hybrid_dynamic_shape = convert_types_to_mlir_strings(with_hybrid_dynamic_shape)
+            with_hybrid_dynamic_shape = {
+                k: [str(item) for item in v] for k, v in with_hybrid_dynamic_shape.items()
+            }
 
         with_hybrid_wire_lens = {}
         if qubit_map is not None:
