@@ -14,6 +14,8 @@
 
 """Unit tests for the python decompositions module."""
 
+from unittest.mock import MagicMock
+
 import jax.numpy as jnp
 import pennylane as qp
 import pytest
@@ -140,6 +142,26 @@ class TestGenericUtilities:
             )
         assert isinstance(res, str)
 
+    def test_wrapper_passes_compilable_data_to_conditions(self, monkeypatch):
+        """Test that decomposition conditions receive compilable operator data."""
+        mock_decomp = MagicMock()
+        mock_decomp._impl.__name__ = "FakeRuleName"
+        mock_decomp.compute_resources.return_value.gate_counts = {}
+        mock_decomp.is_applicable.side_effect = (
+            lambda *, wires, a, b, thing: a and b == 3.14 and thing == "string"
+        )
+
+        monkeypatch.setattr(qp.decomposition, "list_decomps", lambda _: [mock_decomp])
+
+        res = compile_decomposition_rules_wrapper(
+            "CompilableData",
+            "CompilableData{}{wires:2}{a:True,b:3.14,thing:string}",
+            {},
+            {"wires": 2},
+            {"a": True, "b": 3.14, "thing": "string"},
+        )
+
+        assert isinstance(res, str)
 
 class TestPrecompiled:
     """Tests for precompiled decomposition rules."""
