@@ -60,8 +60,38 @@ jobs:
             BASE="HEAD^"
           fi
 
+          # Everything the transport build and its tests are derived from. Held as git
+          # pathspecs so the same list drives both the existence check and the diff below.
+          PATTERNS=(
+            'runtime/lib/transport/*'
+            'runtime/include/Transport*'
+            'runtime/tests/Test_Transport*'
+            'mlir/lib/Transport/*'
+            'mlir/include/Transport/*'
+            'frontend/catalyst/backline.py'
+            'frontend/test/pytest/test_backline.py'
+            'frontend/test/pytest/conftest.py'
+            'runtime/Makefile'
+            '.github/actions/setup-soft-roce/*'
+            '.github/workflows/check-catalyst.yaml'
+          )
+
+          # A pattern that matches nothing is the failure mode that matters here: the gate
+          # keeps reporting transport=false on real transport changes and nobody notices,
+          # because the absence of a job looks the same as a job that passed. Fail loudly
+          # instead, so a rename has to update this list.
+          missing=()
+          for pattern in "${PATTERNS[@]}"; do
+            git ls-files --error-unmatch -- "$pattern" >/dev/null 2>&1 || missing+=("$pattern")
+          done
+          if [ "${#missing[@]}" -gt 0 ]; then
+            printf 'transport path filter matches no tracked file: %s\n' "${missing[@]}" >&2
+            echo 'Update or remove the pattern in the `changes` job of this workflow.' >&2
+            exit 1
+          fi
+
           transport=false
-          if git diff --name-only "$BASE" HEAD | grep -qE '^(runtime/lib/transport/|runtime/tests/Test_Transport|mlir/(lib|include)/Transport/|frontend/catalyst/backline\.py|frontend/test/pytest/test_backline\.py|\.github/actions/setup-soft-roce/|\.github/workflows/check-transport-cpu\.yaml)'; then
+          if [ -n "$(git diff --name-only "$BASE" HEAD -- "${PATTERNS[@]}")" ]; then
             transport=true
           fi
 
@@ -650,7 +680,9 @@ jobs:
       # the `runtime:` job builds with ENABLE_TRANSPORT=ON in that case.
       #   _memcpy: CPU controller + CPU coproc over local memcpy, both in-process.
       #   _rdma_loopback: same roles, over rxe0 soft-RoCE loopback, both in-process.
-      # GPU-coproc cases execute on check-transport-gpu.yaml.
+      # The GPU-coproc cases in the same class are not covered by any CI job yet: they need
+      # HIP-on-CUDA on the self-hosted GPU runner to do anything but skip. The workflow that
+      # runs them is parked on shuli/transport-gpu-frontend-ci until that lands.
       if: needs.changes.outputs.transport == 'true' && matrix.compiler == 'gcc'
       env:
         CATALYST_TRANSPORT_PATH: ${{ github.workspace }}/runtime-build/lib

@@ -1,4 +1,4 @@
-name: Check Transport Backends (GPU)
+name: Check Catalyst GPU
 
 # Runs the runtime transport tests on a GPU host. To keep GPU runner time cheap, pull requests
 # only trigger a run once labeled ``gpu``; ``push`` to main runs unconditionally.
@@ -7,14 +7,13 @@ on:
   push:
     branches: [ main ]
     paths:
-      - 'runtime/lib/transport/**'
-      - 'runtime/include/Transport*'
-      - 'runtime/tests/Test_Transport*'
-      - 'mlir/lib/Transport/**'
-      - 'mlir/include/Transport/**'
-      - 'frontend/catalyst/backline.py'
-      - 'frontend/test/pytest/test_backline.py'
-      - '.github/workflows/check-transport-gpu.yaml'
+      - "runtime/lib/transport/**"
+      - "runtime/include/Transport*"
+      - "runtime/tests/Test_Transport*"
+      - "mlir/lib/Transport/**"
+      - "mlir/include/Transport/**"
+      - "frontend/catalyst/backline.py"
+      - ".github/workflows/check-transport-gpu.yaml"
   pull_request:
     types:
       - opened
@@ -23,14 +22,13 @@ on:
       - ready_for_review
       - labeled
     paths:
-      - 'runtime/lib/transport/**'
-      - 'runtime/include/Transport*'
-      - 'runtime/tests/Test_Transport*'
-      - 'mlir/lib/Transport/**'
-      - 'mlir/include/Transport/**'
-      - 'frontend/catalyst/backline.py'
-      - 'frontend/test/pytest/test_backline.py'
-      - '.github/workflows/check-transport-gpu.yaml'
+      - "runtime/lib/transport/**"
+      - "runtime/include/Transport*"
+      - "runtime/tests/Test_Transport*"
+      - "mlir/lib/Transport/**"
+      - "mlir/include/Transport/**"
+      - "frontend/catalyst/backline.py"
+      - ".github/workflows/check-transport-gpu.yaml"
   workflow_dispatch:
 
 permissions:
@@ -45,8 +43,8 @@ jobs:
     name: Set build matrix
     uses: ./.github/workflows/constants.yaml
 
-  transport-tests-gpu:
-    name: Transport Backend Tests (GPU)
+  gpu-transport-tests:
+    name: Runtime transport tests (GPU)
     needs: [constants]
     runs-on:
       - single-gpu-x64
@@ -117,171 +115,4 @@ jobs:
       - name: Run memcpy transport tests
         run: |
           "$(pwd)/runtime-build/tests/runner_tests_transport_memcpy"
-
-      # TODO(cloud-team): install HIP-on-CUDA (ROCm's hip-runtime-nvidia + hipcc) on this
-      # self-hosted GPU runner. The transport runtime's GPU coprocessor code compiles cleanly
-      # against HIP-on-CUDA - runtime/lib/transport/common/coproc/gpu/CMakeLists.txt already
-      # has an explicit `if(CMAKE_HIP_COMPILER_ID STREQUAL "NVIDIA")` branch - and the current
-      # runner falls through to `-- transport: no HIP compiler -> GPU backends skipped`,
-      # leaving libcatalyst_transport_memcpy_gpu_coprocessor.so without the gpu_steane_launcher
-      # symbol. Once HIP-on-CUDA is available, we can add an executing counterpart to
-      # test_cpu_controller_to_gpu_coproc_memcpy_precompiled (currently compile-only in
-      # check-catalyst.yaml) that actually launches the persistent GPU decode kernel here.
-      # Related matrix case: I (frontend memcpy CPU->GPU precompiled, execute).
-
-      # From here down: build LLVM/StableHLO/Enzyme *on this self-hosted GPU runner* rather than
-      # consuming check-catalyst.yaml's caches. Cross-runner reuse hit three layered blockers
-      # (MLIRConfig HINTS, LLVMConfig absolute paths, and a GLIBC 2.36/2.38 mismatch in the
-      # cached mlir-tblgen). The first two are fixable in-workflow; the third is a hard binary
-      # portability issue. Building on-runner sidesteps all three. Caches use a "selfhosted-gpu-"
-      # prefix so they never collide with GH-hosted CI caches, and match on runner.os so
-      # different self-hosted runners keep separate stores.
-      - name: Install build dependencies for LLVM/dialects
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y cmake ninja-build clang lld
-          python3 -m pip install numpy "nanobind<2.13" pybind11 PyYAML
-
-      # LLVM source is already restored earlier in the job (for the runtime build) via the
-      # cache-llvm-source step above, so we don't need to re-restore or re-clone here.
-      - name: Cache LLVM Build (GPU-runner scoped)
-        id: cache-llvm-build
-        uses: actions/cache@v4
-        with:
-          path: llvm-build
-          key: selfhosted-gpu-${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-ci-build-gcc
-
-      - name: Build LLVM
-        if: steps.cache-llvm-build.outputs.cache-hit != 'true'
-        run: |
-          C_COMPILER=$(which gcc) \
-          CXX_COMPILER=$(which g++) \
-          LLVM_BUILD_DIR="$(pwd)/llvm-build" \
-          COMPILER_LAUNCHER="" \
-          make llvm
-
-      - name: Cache StableHLO Source
-        id: cache-stablehlo-source
-        uses: actions/cache@v4
-        with:
-          path: mlir/stablehlo
-          key: stablehlo-${{ needs.constants.outputs.stablehlo_version }}-default-source
-          enableCrossOsArchive: true
-
-      - name: Clone StableHLO Submodule
-        if: steps.cache-stablehlo-source.outputs.cache-hit != 'true'
-        uses: actions/checkout@v4
-        with:
-          repository: openxla/stablehlo
-          ref: ${{ needs.constants.outputs.stablehlo_version }}
-          path: mlir/stablehlo
-
-      - name: Cache StableHLO Build (GPU-runner scoped)
-        id: cache-stablehlo-build
-        uses: actions/cache@v4
-        with:
-          path: stablehlo-build
-          key: selfhosted-gpu-${{ runner.os }}-stablehlo-${{ needs.constants.outputs.stablehlo_version }}-ci-build-gcc
-
-      - name: Build StableHLO
-        if: steps.cache-stablehlo-build.outputs.cache-hit != 'true'
-        run: |
-          C_COMPILER=$(which gcc) \
-          CXX_COMPILER=$(which g++) \
-          LLVM_BUILD_DIR="$(pwd)/llvm-build" \
-          STABLEHLO_BUILD_DIR="$(pwd)/stablehlo-build" \
-          COMPILER_LAUNCHER="" \
-          make stablehlo
-
-      - name: Cache Enzyme Source
-        id: cache-enzyme-source
-        uses: actions/cache@v4
-        with:
-          path: mlir/Enzyme
-          key: enzyme-${{ needs.constants.outputs.enzyme_version }}-default-source
-          enableCrossOsArchive: true
-
-      - name: Clone Enzyme Submodule
-        if: steps.cache-enzyme-source.outputs.cache-hit != 'true'
-        uses: actions/checkout@v4
-        with:
-          repository: EnzymeAD/Enzyme
-          ref: ${{ needs.constants.outputs.enzyme_version }}
-          path: mlir/Enzyme
-
-      - name: Cache Enzyme Build (GPU-runner scoped)
-        id: cache-enzyme-build
-        uses: actions/cache@v4
-        with:
-          path: enzyme-build
-          key: selfhosted-gpu-${{ runner.os }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-ci-build-gcc
-
-      - name: Build Enzyme
-        if: steps.cache-enzyme-build.outputs.cache-hit != 'true'
-        run: |
-          C_COMPILER=$(which gcc) \
-          CXX_COMPILER=$(which g++) \
-          LLVM_BUILD_DIR="$(pwd)/llvm-build" \
-          ENZYME_BUILD_DIR="$(pwd)/enzyme-build" \
-          COMPILER_LAUNCHER="" \
-          make enzyme
-
-      - name: Install Python runtime requirements
-        run: |
-          python3 -m pip install -r requirements.txt
-
-      - name: Install Triton for the css_bp_decoder test
-        # The test_cpu_controller_to_gpu_coproc_triton_css_bp case builds a decoder via
-        # pennylane.backline.css_bp_decoder, which requires triton to codegen the .so.
-        run: |
-          pip install triton
-
-      - name: Build Catalyst frontend (reusing the transport-enabled runtime)
-        run: |
-          # make catalyst -> make frontend runs precompile_decomposition_rules, which imports
-          # catalyst -> mlir_quantum. mlir_quantum lives under quantum-build/python_packages/quantum
-          # once the dialects sub-target has run, so PYTHONPATH must include that dir before this
-          # step's shell exits.
-          export PYTHONPATH="${PYTHONPATH:-}:$(pwd)/quantum-build/python_packages/quantum"
-          COMPILER_LAUNCHER="" \
-          C_COMPILER=$(which gcc) \
-          CXX_COMPILER=$(which g++) \
-          ENABLE_LLD=ON \
-          RT_BUILD_DIR="$(pwd)/runtime-build" \
-          LLVM_BUILD_DIR="$(pwd)/llvm-build" \
-          STABLEHLO_BUILD_DIR="$(pwd)/stablehlo-build" \
-          ENZYME_BUILD_DIR="$(pwd)/enzyme-build" \
-          DIALECTS_BUILD_DIR="$(pwd)/quantum-build" \
-          ENABLE_TRANSPORT=ON \
-          make catalyst
-
-      - name: Add Frontend Dependencies to PATH
-        run: |
-          echo "$(pwd)/llvm-build/bin" >> $GITHUB_PATH
-          echo "$(pwd)/quantum-build/bin" >> $GITHUB_PATH
-          echo "PYTHONPATH=${PYTHONPATH:-}:$(pwd)/quantum-build/python_packages/quantum" >> $GITHUB_ENV
-          echo "RUNTIME_LIB_DIR=$(pwd)/runtime-build/lib" >> $GITHUB_ENV
-          echo "MLIR_LIB_DIR=$(pwd)/llvm-build/lib" >> $GITHUB_ENV
-          echo "CATALYST_BIN_DIR=$(pwd)/quantum-build/bin" >> $GITHUB_ENV
-          echo "CATALYST_LIB_DIR=$(pwd)/quantum-build/lib" >> $GITHUB_ENV
-          echo "CATALYST_TRANSPORT_PATH=$(pwd)/runtime-build/lib" >> $GITHUB_ENV
-
-      - name: Run backline GPU integration tests
-        # CPU-CPU memcpy is covered by check-catalyst.yaml on a GH-hosted runner. This workflow
-        # runs cases that need the local GPU:
-        #   - precompiled: demo 4 pattern with the runtime-built gpu_steane_launcher symbol
-        #   - triton_css_bp: minimal Triton codegen path (compile-only for now)
-        #   - manual_qec: demo 2's elaborate encoded circuit + Triton-built hgp_bp_osd_decoder,
-        #     executes ghz() on the GPU.
-        # All three depend on the runtime CMake having built the memcpy GPU coproc backend .so
-        # with GPU support, which needs HIP-on-CUDA installed on the runner (see the TODO
-        # above about the cloud team). Until that lands, gpu_triton_platform detects the
-        # missing driver and skips the whole set cleanly instead of failing at loader time.
-        # -rs makes those skips visible in the CI log so a green tick with zero coverage is
-        # obvious rather than silent.
-        run: |
-          python3 -m pytest -v -rs \
-            "frontend/test/pytest/test_backline.py::TestBacklineDemoIntegration::test_cpu_controller_to_gpu_coproc_memcpy_precompiled" \
-            "frontend/test/pytest/test_backline.py::TestBacklineDemoIntegration::test_cpu_controller_to_gpu_coproc_triton_css_bp" \
-            "frontend/test/pytest/test_backline.py::TestBacklineDemoIntegration::test_cpu_controller_to_gpu_coproc_memcpy_manual_qec"
 
