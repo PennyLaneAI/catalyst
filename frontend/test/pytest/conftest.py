@@ -108,6 +108,30 @@ def gpu_triton_platform():
 
 
 @pytest.fixture(scope="function")
+def stop_node_executors():
+    """Stop the executors the compiler launched for the backline nodes registered here.
+
+    A node carrying ``executor_options`` never hands the test its executor: the compiler builds,
+    launches and caches one on the node itself (``backline._realize_executor``). Catalyst's
+    ``_SessionRegistry`` does clean up, but only at process exit, which is too late inside a
+    pytest session -- the ``catalyst-executor`` subprocess stays up holding the coprocessor's
+    out-of-band TCP port, so a rerun, ``pytest-xdist``, or a second out-of-process case in the
+    same session would meet ``EADDRINUSE``.
+
+    Register each node that asked for an executor; ``Executor.stop()`` is idempotent and runs on
+    teardown whatever the test's outcome, releasing the port and removing the deploy workspace.
+    """
+    nodes = []
+    try:
+        yield nodes.append
+    finally:
+        for node in nodes:
+            executor = getattr(node, "executor", None)
+            if executor is not None:
+                executor.stop()
+
+
+@pytest.fixture(scope="function")
 def create_temporary_toml_file(request) -> str:
     """Create a temporary TOML file with the given content."""
     content = request.param
