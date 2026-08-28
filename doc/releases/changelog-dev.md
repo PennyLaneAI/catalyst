@@ -15,6 +15,7 @@
   [(#3090)](https://github.com/PennyLaneAI/catalyst/pull/3090)
   [(#3096)](https://github.com/PennyLaneAI/catalyst/pull/3096)
   [(#3116)](https://github.com/PennyLaneAI/catalyst/pull/3116)
+  [(#3127)](https://github.com/PennyLaneAI/catalyst/pull/3127)
   [(#3131)](https://github.com/PennyLaneAI/catalyst/pull/3131)
 
 * The graph-based decomposition system now supports **adjoint operators** for `Operator2`.

@@ -36,15 +36,16 @@ from pennylane.wires import Wires
 
 from catalyst import qjit
 from catalyst.decomposition.decomposition_rules import (
+    _MODIFIER_CANONICAL_ORDER,
+    _leading_modifier_kind,
+    _modifier_kind,
     compile_decomposition_rules_wrapper,
     name_unwrap_adjoint,
     name_wrap_adjoint,
+    wrap_modifier_id,
 )
 from catalyst.decomposition.graph_op_id import GraphOpID
-from catalyst.decomposition.type_utils import (
-    convert_types_to_mlir_strings,
-    get_dummy_values_for_arg,
-)
+from catalyst.decomposition.type_utils import get_dummy_values_for_arg
 
 
 class TestGenericUtilities:
@@ -300,24 +301,6 @@ class TestOnDemand:
     """
 
     @pytest.mark.parametrize(
-        "op_id, expected",
-        [
-            # Normal case: only the name (prefix before the first `{`) is wrapped.
-            ("S{}{wires:1}{}", "Adjoint(S){}{wires:1}{}"),
-            ("RX{0:[f64]}{wires:1}{}", "Adjoint(RX){0:[f64]}{wires:1}{}"),
-            # `[uid]` suffix is carried through untouched.
-            ("HybridOp{a:[[f64]]}{w:1}{}[42]", "Adjoint(HybridOp){a:[[f64]]}{w:1}{}[42]"),
-            # No `{` present (split == -1): the whole id is the name and gets wrapped as-is.
-            ("RX", "Adjoint(RX)"),
-            ("", "Adjoint()"),
-        ],
-    )
-    def test_name_wrap_adjoint(self, op_id, expected):
-        """name_wrap_adjoint wraps only the operator name; when the id has no `{` (split == -1) the
-        whole string is treated as the name and wrapped as-is."""
-        assert name_wrap_adjoint(op_id) == expected
-
-    @pytest.mark.parametrize(
         "op_name, op_id, expected",
         [
             ("S", "S{}{wires:1}{}", "S{}{wires:1}{}"),
@@ -334,6 +317,69 @@ class TestOnDemand:
         else:
             with pytest.raises(ValueError, match="not an adjoint id"):
                 name_unwrap_adjoint(op_name, op_id)
+
+
+class TestModifierIds:
+    """Unit tests for the op-level modifier name-wrapping helpers (Adjoint / C canonicalization)."""
+
+    @pytest.mark.parametrize(
+        "modifier, expected",
+        [
+            ("Adjoint", "Adjoint"),
+            ("C", "C"),
+            ("2C", "C"),  # multi-control normalises to the "C" kind
+            ("10C", "C"),
+        ],
+    )
+    def test_modifier_kind(self, modifier, expected):
+        """A modifier token normalises to its canonical kind (any ``<n>C`` -> ``C``)."""
+        assert _modifier_kind(modifier) == expected
+
+    @pytest.mark.parametrize(
+        "op_id, expected",
+        [
+            ("Adjoint(RX){0:[f64]}{wires:1}{}", "Adjoint"),
+            ("C(RX){0:[f64]}{wires:1}{}", "C"),
+            ("2C(RX){0:[f64]}{wires:1}{}", "C"),  # exercises the leading-digit scan
+            ("10C(RX){0:[f64]}{wires:1}{}", "C"),  # multi-digit control count
+            ("RX{0:[f64]}{wires:1}{}", None),  # bare id, no modifier
+            ("", None),  # empty edge case
+        ],
+    )
+    def test_leading_modifier_kind(self, op_id, expected):
+        """The outermost modifier of an id is detected (including ``<n>C(...)``), or None if bare."""
+        assert _leading_modifier_kind(op_id) == expected
+
+    @pytest.mark.parametrize(
+        "op_id, modifier, expected",
+        [
+            # Wrapping a bare id with each modifier kind.
+            ("RX{0:[f64]}{wires:1}{}", "C", "C(RX){0:[f64]}{wires:1}{}"),
+            ("RX{0:[f64]}{wires:1}{}", "2C", "2C(RX){0:[f64]}{wires:1}{}"),
+            ("RX{0:[f64]}{wires:1}{}", "Adjoint", "Adjoint(RX){0:[f64]}{wires:1}{}"),
+            # Canonical nesting: control is outermost, so C may wrap an already-adjointed id.
+            (
+                "Adjoint(RX){0:[f64]}{wires:1}{}",
+                "C",
+                "C(Adjoint(RX)){0:[f64]}{wires:1}{}",
+            ),
+            # Only the name is wrapped; the `{...}...[uid]` suffix is carried through untouched.
+            ("HybridOp{a:[[f64]]}{w:1}{}[42]", "C", "C(HybridOp){a:[[f64]]}{w:1}{}[42]"),
+        ],
+    )
+    def test_wrap_modifier_id_canonical(self, op_id, modifier, expected):
+        """A modifier wraps only the operator name, and control may nest outside adjoint."""
+        assert wrap_modifier_id(op_id, modifier) == expected
+
+    @pytest.mark.parametrize(
+        "op_id",
+        ["C(RX){0:[f64]}{wires:1}{}", "2C(RX){0:[f64]}{wires:1}{}"],
+    )
+    def test_wrap_modifier_id_rejects_non_canonical(self, op_id):
+        """Wrapping the canonically-inner ``Adjoint`` around an already-controlled id is rejected."""
+        assert _MODIFIER_CANONICAL_ORDER == ("C", "Adjoint")
+        with pytest.raises(ValueError, match="Non-canonical modifier order"):
+            wrap_modifier_id(op_id, "Adjoint")
 
 
 if __name__ == "__main__":

@@ -41,16 +41,77 @@ _NON_INVERTIBLE_MARKERS = (
 )
 
 
-def name_wrap_adjoint(op_id: str) -> str:
-    """Name-wrap the adjoint modifier around a graphOpId (``RX{...}`` -> ``Adjoint(RX){...}``).
+# Canonical nesting order for op-level modifiers, listed OUTERMOST first. The compiler's
+# ``wrapModifiers`` (mlir/lib/Quantum/IR/QuantumInterfaces.cpp) folds modifiers into a graphOpId
+# in this exact order:
+# 1. control outermost
+# 2. adjoint innermost
+# So a single op that is both controlled and adjointed always spells as ``C(Adjoint(Op))``,
+# never ``Adjoint(C(Op))``. This is a canonicalization. So the two spellings denote the same
+# operator and MUST map to the same graph node, or the solver would treat them as distinct gates
+# to match a rule against the op.
+# The parser (``parseOperator``) is a structural round-trip and does NOT re-order, so canonicity
+# has to be guaranteed here at the producer. We add future modifiers to this tuple at their
+# canonical depth.
+_MODIFIER_CANONICAL_ORDER = ("C", "Adjoint")
 
-    Only the operator name is wrapped and the ``{params}{wires}{static}[uid]`` suffix is
-    carried through untouched.
+
+def _modifier_kind(modifier: str) -> str:
+    """Normalise a modifier token to its canonical form."""
+    return "C" if modifier.endswith("C") else modifier
+
+
+def _leading_modifier_kind(op_id: str) -> str | None:
+    """Return the canonical kind of ``op_id``'s current outermost modifier, or None if bare."""
+    if op_id.startswith("Adjoint("):
+        return "Adjoint"
+    i = 0
+    while i < len(op_id) and op_id[i].isdigit():
+        i += 1
+    if op_id[i:].startswith("C("):
+        return "C"
+    return None
+
+
+def wrap_modifier_id(op_id: str, modifier: str) -> str:
+    """Name-wrap an op-level ``modifier`` around a graphOpId's operator name.
+
+    The modifier decorates the operator name only; the ``{param}{wire}{static}`` groups (and an
+    optional ``[uid]``) follow it, matching the compiler's ``defaultGetGraphOpId``. This applies to
+    any modifier (e.g. ``"Adjoint"``, ``"C"``), so nested ids compose as ``C(Adjoint(RX)){...}``.
+    Extend callers here to support future op-level modifiers.
     """
-    split = op_id.find("{")
-    if split == -1:
-        split = len(op_id)
-    return f"Adjoint({op_id[:split]}){op_id[split:]}"
+    new_kind = _modifier_kind(modifier)
+    inner_kind = _leading_modifier_kind(op_id)
+    # `modifier is added as the new *outermost* layer. To keep graphOpIds canonical (see
+    # MODIFIER_CANONICAL_ORDER), the new outer modifier must not belong *inside* one that is
+    # already applied (e.g. wrapping Adjoint around an already-controlled C(RX){...} would
+    # produce the non-canonical Adjoint(C(RX)) and is rejected, since the canonical form is
+    # C(Adjoint(RX))).
+    if inner_kind is not None:
+        new_rank = _MODIFIER_CANONICAL_ORDER.index(new_kind)
+        inner_rank = _MODIFIER_CANONICAL_ORDER.index(inner_kind)
+        if new_rank > inner_rank:
+            raise ValueError(
+                f"Non-canonical modifier order: cannot wrap {modifier!r} (canonically inner) "
+                f"around {op_id!r} whose outermost modifier {inner_kind!r} is canonically outer. "
+                f"Apply modifiers outermost-last in the order {_MODIFIER_CANONICAL_ORDER}."
+            )
+
+    split = len(op_id)
+    for i, char in enumerate(op_id):
+        # assumeing that the first field (dynamic shape) is always
+        # curly brackets, and will always be present even if there
+        # are no params.
+        if char == "{":
+            split = i
+            break
+    return f"{modifier}({op_id[:split]}){op_id[split:]}"
+
+
+def name_wrap_adjoint(op_id: str) -> str:
+    """Name-wrap the adjoint modifier around a graphOpId (``RX{...}`` -> ``Adjoint(RX){...}``)."""
+    return wrap_modifier_id(op_id, "Adjoint")
 
 
 def name_unwrap_adjoint(op_name: str, op_id: str) -> str:
@@ -342,7 +403,7 @@ def adjoint_variant_rule_strings(
             if not any(marker in rule for marker in _NON_INVERTIBLE_MARKERS)
         ]
         out.extend(distributed)
-    except Exception as e:  # pylint: disable=broad-except # pragma: no cover
+    except Exception as e:  # pylint: disable=broad-except
         warnings.warn(f"Failed to synthesize distributed adjoint rules for {adj_name}: {e}")
     return out
 

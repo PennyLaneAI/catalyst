@@ -497,24 +497,17 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
             if (DecompUtils::isInDecompRule(op)) {
                 return;
             }
-            OperatorNode node;
+            assert(!op->getParentOfType<AdjointOp>() && !op->getParentOfType<CtrlOp>() &&
+                   "graph-decomposition requires op-level modifiers: ctrl/adjoint regions must be "
+                   "lowered before the decomposition graph is built");
+
+            // Derive the id and modifier-wrapped name from the single parse path, so operator nodes
+            // and rule nodes agree on the spelling of `C(...)`/`Adjoint(...)`.
+            OperatorNode node = parseOperator(op.getGraphOpId());
+
+            // numWires/numParams are debug-only; parseOperator leaves them at defaults for the
+            // graphOpId form, so we need to fill them accurately from the op here.
             node.numWires = op.getNonCtrlQubitOperands().size();
-
-            // The modifiers are carried in the name, as the result
-            // the solver doesn't need a modifier field
-            std::string name = op.getOperatorName();
-            if (op.getAdjointFlag()) {
-                name = "Adjoint(" + name + ")";
-            }
-            size_t numCtrl = op.getCtrlQubitOperands().size();
-            if (numCtrl == 1) {
-                name = "C(" + name + ")";
-            } else if (numCtrl > 1) {
-                name = std::to_string(numCtrl) + "C(" + name + ")";
-            }
-            node.name = name;
-            node.id = op.getGraphOpId();
-
             if (auto paramOp =
                     llvm::dyn_cast<catalyst::quantum::ParametrizedGate>(op.getOperation())) {
                 node.numParams = paramOp.getAllParams().size();
@@ -527,62 +520,17 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
     }
 
     /**
-     * @brief Helper to parse a gate name into an OperatorNode.
-     * Handles patterns like "Adjoint(GateName)" and "GateName(metadata)".
+     * @brief Parse a graphOpId string into an OperatorNode.
+     *
+     * The graphOpId format is "<name>{params}{wires}{static}[uid]", where <name> already carries
+     * any name-wrapped op-level modifiers produced by `defaultGetGraphOpId`, e.g.
+     * "C(Adjoint(RX)){0:[f64]}{wires:1}{}".
      */
     OperatorNode parseOperator(llvm::StringRef raw) {
         OperatorNode node;
-        llvm::StringRef original = raw;
 
-        // Unwrap control following the implementation for Adjoint(Op)
-        llvm::StringRef afterCount = raw;
-        size_t numDigits = 0;
-        while (numDigits < afterCount.size() && afterCount[numDigits] >= '0' &&
-               afterCount[numDigits] <= '9') {
-            numDigits++;
-        }
-        llvm::StringRef ctrlBody = afterCount.drop_front(numDigits);
-        if (ctrlBody.consume_front("C(") && (ctrlBody.contains('{') || ctrlBody.contains('['))) {
-            size_t numCtrl = 1;
-            if (numDigits > 0) {
-                (void)raw.take_front(numDigits).getAsInteger(10, numCtrl);
-            }
-            llvm::StringRef inner = ctrlBody.ends_with(")") ? ctrlBody.drop_back(1) : ctrlBody;
-            OperatorNode innerNode = parseOperator(inner);
-            node.numWires = innerNode.numWires;
-            node.numParams = innerNode.numParams;
-            node.id = original.str();
-            node.name = (numCtrl == 1 ? std::string("C(") : std::to_string(numCtrl) + "C(") +
-                        innerNode.name + ")";
-            return node;
-        }
-
-        // Unwrap "Adjoint(Op)". The modifier is kept in both the id and the (coarser) name, so the
-        // solver never needs a modifier flag: a modified operator's name won't match a base
-        // gate-set entry.
-        if (raw.consume_front("Adjoint(")) {
-            // Name-wrap graphOpId form "Adjoint(<name>)<suffix>": the modifier wraps only the
-            // operator name; the '{'/'[' brace groups (params/wires/static/uid), or a legacy
-            // "(w,p)" suffix, follow the closing ')'. The first ')' closes the base name.
-            auto closeIdx = raw.find(')');
-            if (closeIdx == llvm::StringRef::npos) {
-                node.name = "Adjoint(" + raw.trim().str() + ")";
-                return node;
-            }
-            llvm::StringRef baseName = raw.take_front(closeIdx);
-            llvm::StringRef suffix = raw.drop_front(closeIdx + 1); // "{...}", "(w,p)", or ""
-            if (suffix.contains('{') || suffix.contains('[')) {
-                // Recurse on the reconstructed base-id (name + brace groups) to recover metadata.
-                OperatorNode innerNode = parseOperator(baseName.str() + suffix.str());
-                node.name = "Adjoint(" + innerNode.name + ")";
-                node.numWires = innerNode.numWires;
-                node.numParams = innerNode.numParams;
-                node.id = original.str();
-                return node;
-            }
-            node.name = "Adjoint(" + baseName.trim().str() + ")";
-            raw = suffix; // leftover: "(w,p)" or ""
-        } else if (raw.contains('[') || raw.contains('{')) {
+        // Base op: either the graphOpId "Name{...}..." form or the legacy "Name(w,p)" form.
+        if (raw.contains('[') || raw.contains('{')) {
             node.id = raw.str();
             node.name = raw.take_until([](char c) { return c == '[' || c == '{'; });
         } else {
