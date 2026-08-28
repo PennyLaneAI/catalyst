@@ -96,7 +96,7 @@ def format_dynamic_params_for_id(d):
 def get_dummy_values_for_arg(arg):
     """Given a container of python or MLIR types, replace the types with corresponding dummy values.
 
-    The types are expected to be formatted for GraphOpIDs. Lists/Tuples must contain homogeneous
+    The types are expected to be formatted for ``GraphOpId``s. Lists/Tuples must contain homogeneous
     data types (this is true for any operator).
     """
     match arg:
