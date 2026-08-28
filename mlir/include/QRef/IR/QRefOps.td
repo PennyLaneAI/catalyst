@@ -363,7 +363,6 @@ def CustomOp : UnitaryGate_Op<"custom", [ParametrizedGate, AttrSizedOperandSegme
         }
     }];
 
-    let hasCanonicalizeMethod = 1;
     let hasVerifier = 1;
 }
 
