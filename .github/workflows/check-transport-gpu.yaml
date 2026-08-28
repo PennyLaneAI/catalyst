@@ -13,6 +13,8 @@ on:
       - "mlir/lib/Transport/**"
       - "mlir/include/Transport/**"
       - "frontend/catalyst/backline.py"
+      - "frontend/test/pytest/test_backline.py"
+      - "frontend/test/pytest/conftest.py"
       - ".github/workflows/check-transport-gpu.yaml"
   pull_request:
     types:
@@ -28,6 +30,8 @@ on:
       - "mlir/lib/Transport/**"
       - "mlir/include/Transport/**"
       - "frontend/catalyst/backline.py"
+      - "frontend/test/pytest/test_backline.py"
+      - "frontend/test/pytest/conftest.py"
       - ".github/workflows/check-transport-gpu.yaml"
   workflow_dispatch:
 
@@ -115,4 +119,247 @@ jobs:
       - name: Run memcpy transport tests
         run: |
           "$(pwd)/runtime-build/tests/runner_tests_transport_memcpy"
+
+      # No ROCm install is needed on this runner: lib/transport/CMakeLists.txt fetches the HIP
+      # headers when none are present and drives them with nvcc, so TRANSPORT_HAS_HIP is set and
+      # libcatalyst_transport_memcpy_gpu_coprocessor.so is built here. The step below verifies it.
+
+      # From here down: build LLVM/StableHLO/Enzyme *on this self-hosted GPU runner* rather than
+      # consuming check-catalyst.yaml's caches. Cross-runner reuse hit three layered blockers
+      # (MLIRConfig HINTS, LLVMConfig absolute paths, and a GLIBC 2.36/2.38 mismatch in the
+      # cached mlir-tblgen). The first two are fixable in-workflow; the third is a hard binary
+      # portability issue. Building on-runner sidesteps all three. Caches use a "selfhosted-gpu-"
+      # prefix so they never collide with GH-hosted CI caches, and match on runner.os so
+      # different self-hosted runners keep separate stores.
+      - name: Install build dependencies for LLVM/dialects
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build clang lld
+          python3 -m pip install numpy "nanobind<2.13" pybind11 PyYAML
+
+      # LLVM source is already restored earlier in the job (for the runtime build) via the
+      # cache-llvm-source step above, so we don't need to re-restore or re-clone here.
+      - name: Cache LLVM Build (GPU-runner scoped)
+        id: cache-llvm-build
+        uses: actions/cache@v4
+        with:
+          path: llvm-build
+          key: selfhosted-gpu-${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-ci-build-gcc
+
+      - name: Build LLVM
+        if: steps.cache-llvm-build.outputs.cache-hit != 'true'
+        run: |
+          C_COMPILER=$(which gcc) \
+          CXX_COMPILER=$(which g++) \
+          LLVM_BUILD_DIR="$(pwd)/llvm-build" \
+          COMPILER_LAUNCHER="" \
+          make llvm
+
+      - name: Cache StableHLO Source
+        id: cache-stablehlo-source
+        uses: actions/cache@v4
+        with:
+          path: mlir/stablehlo
+          key: stablehlo-${{ needs.constants.outputs.stablehlo_version }}-default-source
+          enableCrossOsArchive: true
+
+      - name: Clone StableHLO Submodule
+        if: steps.cache-stablehlo-source.outputs.cache-hit != 'true'
+        uses: actions/checkout@v4
+        with:
+          repository: openxla/stablehlo
+          ref: ${{ needs.constants.outputs.stablehlo_version }}
+          path: mlir/stablehlo
+
+      - name: Cache StableHLO Build (GPU-runner scoped)
+        id: cache-stablehlo-build
+        uses: actions/cache@v4
+        with:
+          path: stablehlo-build
+          key: selfhosted-gpu-${{ runner.os }}-stablehlo-${{ needs.constants.outputs.stablehlo_version }}-ci-build-gcc
+
+      - name: Build StableHLO
+        if: steps.cache-stablehlo-build.outputs.cache-hit != 'true'
+        run: |
+          C_COMPILER=$(which gcc) \
+          CXX_COMPILER=$(which g++) \
+          LLVM_BUILD_DIR="$(pwd)/llvm-build" \
+          STABLEHLO_BUILD_DIR="$(pwd)/stablehlo-build" \
+          COMPILER_LAUNCHER="" \
+          make stablehlo
+
+      - name: Cache Enzyme Source
+        id: cache-enzyme-source
+        uses: actions/cache@v4
+        with:
+          path: mlir/Enzyme
+          key: enzyme-${{ needs.constants.outputs.enzyme_version }}-default-source
+          enableCrossOsArchive: true
+
+      - name: Clone Enzyme Submodule
+        if: steps.cache-enzyme-source.outputs.cache-hit != 'true'
+        uses: actions/checkout@v4
+        with:
+          repository: EnzymeAD/Enzyme
+          ref: ${{ needs.constants.outputs.enzyme_version }}
+          path: mlir/Enzyme
+
+      - name: Cache Enzyme Build (GPU-runner scoped)
+        id: cache-enzyme-build
+        uses: actions/cache@v4
+        with:
+          path: enzyme-build
+          key: selfhosted-gpu-${{ runner.os }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-ci-build-gcc
+
+      - name: Build Enzyme
+        if: steps.cache-enzyme-build.outputs.cache-hit != 'true'
+        run: |
+          C_COMPILER=$(which gcc) \
+          CXX_COMPILER=$(which g++) \
+          LLVM_BUILD_DIR="$(pwd)/llvm-build" \
+          ENZYME_BUILD_DIR="$(pwd)/enzyme-build" \
+          COMPILER_LAUNCHER="" \
+          make enzyme
+
+      - name: Install Python runtime requirements
+        run: |
+          python3 -m pip install -r requirements.txt
+
+      - name: Install Triton for the css_bp_decoder test
+        # The test_cpu_controller_to_gpu_coproc_triton_css_bp case builds a decoder via
+        # pennylane.backline.css_bp_decoder, which requires triton to codegen the .so.
+        run: |
+          pip install triton
+
+      - name: Point Triton at the CUDA driver library
+        # Triton activates its CUDA backend by dlopen'ing libcuda.so.1. That library ships with
+        # the *driver*, not the toolkit: /usr/local/cuda/lib64 (already on LD_LIBRARY_PATH above)
+        # holds only a stub under lib64/stubs, which links but cannot initialize a device -- the
+        # "GPU present, 0 active drivers" case that conftest's gpu_triton_platform skips on.
+        # Resolve the real one through the loader cache and hand it to Triton explicitly.
+        # Stubs are excluded deliberately: finding one is worse than finding nothing.
+        run: |
+          set -euo pipefail
+          libcuda=$(ldconfig -p | awk '/libcuda\.so\.1/ {print $NF}' | grep -v /stubs/ | head -1)
+          if [ -z "$libcuda" ]; then
+            # Not in the loader cache on some driver installs; fall back to a bounded search.
+            libcuda=$(find /usr/lib /usr/lib64 -name 'libcuda.so.1' -not -path '*/stubs/*' 2>/dev/null | head -1)
+          fi
+          if [ -z "$libcuda" ]; then
+            echo "No real libcuda.so.1 on this host -- only the toolkit stub, if that."
+            echo "Triton cannot activate a CUDA driver, so the GPU tests will skip."
+            ldconfig -p | grep -i libcuda || echo "(no libcuda in the loader cache at all)"
+            exit 1
+          fi
+          echo "libcuda: $libcuda"
+          echo "TRITON_LIBCUDA_PATH=$(dirname "$libcuda")" >> $GITHUB_ENV
+          echo "LD_LIBRARY_PATH=$(dirname "$libcuda")${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}" >> $GITHUB_ENV
+
+      - name: Report Triton / GPU driver state
+        # gpu_triton_platform skips the GPU cases when Triton reports no active driver, and that
+        # is what this runner did: an NVIDIA GPU is visible to nvidia-smi while Triton's CUDA
+        # backend lands at "0 active drivers". Which of the pieces below is missing decides
+        # whether the compile-only css_bp case can run at all, and guessing at a triton pin costs
+        # a ~20 min GPU run per attempt -- so print the inputs and read them instead.
+        # Non-fatal: the guard at the end of the job is what decides the outcome.
+        continue-on-error: true
+        run: |
+          nvidia-smi || echo "nvidia-smi unavailable"
+          echo "--- libcuda in loader cache ---"
+          ldconfig -p | grep -i libcuda || echo "no libcuda in ldconfig cache"
+          echo "--- triton probe ---"
+          python3 - <<'EOF'
+          import traceback
+
+          try:
+              import triton
+
+              print("triton version:", triton.__version__)
+          except Exception:  # noqa: BLE001 - reporting, not handling
+              traceback.print_exc()
+              raise SystemExit(0)
+
+          try:
+              from triton.runtime.driver import driver
+
+              # Raises RuntimeError on 0 or >1 active drivers, which is the case
+              # conftest._triton_driver_active() turns into a skip.
+              print("active driver:", driver.active)
+          except Exception:  # noqa: BLE001 - the traceback is the diagnostic
+              traceback.print_exc()
+          EOF
+
+      - name: Build Catalyst frontend (reusing the transport-enabled runtime)
+        run: |
+          # make catalyst -> make frontend runs precompile_decomposition_rules, which imports
+          # catalyst -> mlir_quantum. mlir_quantum lives under quantum-build/python_packages/quantum
+          # once the dialects sub-target has run, so PYTHONPATH must include that dir before this
+          # step's shell exits.
+          export PYTHONPATH="${PYTHONPATH:-}:$(pwd)/quantum-build/python_packages/quantum"
+          COMPILER_LAUNCHER="" \
+          C_COMPILER=$(which gcc) \
+          CXX_COMPILER=$(which g++) \
+          ENABLE_LLD=ON \
+          RT_BUILD_DIR="$(pwd)/runtime-build" \
+          LLVM_BUILD_DIR="$(pwd)/llvm-build" \
+          STABLEHLO_BUILD_DIR="$(pwd)/stablehlo-build" \
+          ENZYME_BUILD_DIR="$(pwd)/enzyme-build" \
+          DIALECTS_BUILD_DIR="$(pwd)/quantum-build" \
+          ENABLE_TRANSPORT=ON \
+          make catalyst
+
+      - name: Add Frontend Dependencies to PATH
+        run: |
+          echo "$(pwd)/llvm-build/bin" >> $GITHUB_PATH
+          echo "$(pwd)/quantum-build/bin" >> $GITHUB_PATH
+          echo "PYTHONPATH=${PYTHONPATH:-}:$(pwd)/quantum-build/python_packages/quantum" >> $GITHUB_ENV
+          echo "RUNTIME_LIB_DIR=$(pwd)/runtime-build/lib" >> $GITHUB_ENV
+          echo "MLIR_LIB_DIR=$(pwd)/llvm-build/lib" >> $GITHUB_ENV
+          echo "CATALYST_BIN_DIR=$(pwd)/quantum-build/bin" >> $GITHUB_ENV
+          echo "CATALYST_LIB_DIR=$(pwd)/quantum-build/lib" >> $GITHUB_ENV
+          echo "CATALYST_TRANSPORT_PATH=$(pwd)/runtime-build/lib" >> $GITHUB_ENV
+
+      - name: Run backline GPU integration tests
+        # CPU-CPU memcpy is covered by check-catalyst.yaml on a GH-hosted runner. This workflow
+        # runs cases that need the local GPU:
+        #   - precompiled: demo 4 pattern with the runtime-built gpu_steane_launcher symbol
+        #   - triton_css_bp: minimal Triton codegen path (compile-only for now)
+        #   - manual_qec: demo 2's elaborate encoded circuit + Triton-built hgp_bp_osd_decoder,
+        #     executes ghz() on the GPU.
+        # Two gates, failing for unrelated reasons:
+        #   gpu_transport_backend   -- the memcpy GPU coproc .so, which the runtime build above
+        #                              now produces. Only the two executing cases need it;
+        #                              without the gate they would raise ValueError out of
+        #                              _resolve_backend_lib rather than skip.
+        #   gpu_triton_platform     -- a GPU and an active Triton driver. All three need it, and
+        #                              it is the only gate still capable of skipping everything.
+        # -rs makes every skip visible in the log.
+        run: |
+          python3 -m pytest -v -rs --junit-xml=gpu-backline-results.xml \
+            "frontend/test/pytest/test_backline.py::TestBacklineDemoIntegration::test_cpu_controller_to_gpu_coproc_memcpy_precompiled" \
+            "frontend/test/pytest/test_backline.py::TestBacklineDemoIntegration::test_cpu_controller_to_gpu_coproc_triton_css_bp" \
+            "frontend/test/pytest/test_backline.py::TestBacklineDemoIntegration::test_cpu_controller_to_gpu_coproc_memcpy_manual_qec"
+
+      - name: Require at least one GPU test to have executed
+        # pytest exits 0 when every selected test is skipped, so without this step the job
+        # reports success while covering nothing -- and it spends ~20 min of self-hosted GPU
+        # time to do it. A full skip now means Triton found no active driver, since the backend
+        # library is built above; the step before this one prints the driver state to say why.
+        if: always()
+        run: |
+          python3 - <<'EOF'
+          import sys
+          import xml.etree.ElementTree as ET
+
+          root = ET.parse("gpu-backline-results.xml").getroot()
+          suite = root if root.tag == "testsuite" else root.find("testsuite")
+          total = int(suite.get("tests", 0))
+          skipped = int(suite.get("skipped", 0))
+          print(f"{total - skipped}/{total} backline GPU tests executed ({skipped} skipped)")
+          if total == 0 or skipped == total:
+              sys.exit(
+                  "No backline GPU test executed -- all selected tests were skipped. "
+                  "Refusing to report success for a run with zero GPU coverage."
+              )
+          EOF
 

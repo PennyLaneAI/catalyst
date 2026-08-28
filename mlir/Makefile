@@ -116,7 +116,12 @@ llvm:
 stablehlo:
 	@echo "build stablehlo"
 
+	# Pass LLVM_DIR explicitly. MLIRConfig.cmake's HINTS references an absolute path baked at
+	# LLVM configure time, which is stale when llvm-build/ is restored from a cache built on a
+	# different host -- check-transport-gpu.yaml's selfhosted-gpu-* caches key only on
+	# runner.os, so two self-hosted GPU runners share one store.
 	cmake -G Ninja -S stablehlo -B $(STABLEHLO_BUILD_DIR) \
+		-DLLVM_DIR=$(LLVM_BUILD_DIR)/lib/cmake/llvm \
 		-DSTABLEHLO_ENABLE_LLD=$(ENABLE_LLD) \
 		-DCMAKE_BUILD_TYPE=$(BUILD_TYPE) \
 		-DMLIR_DIR=$(LLVM_BUILD_DIR)/lib/cmake/mlir \
@@ -169,6 +174,7 @@ plugin:
 		-DCMAKE_CXX_COMPILER=$(CXX_COMPILER) \
 		-DCMAKE_C_COMPILER_LAUNCHER=$(COMPILER_LAUNCHER) \
 		-DCMAKE_CXX_COMPILER_LAUNCHER=$(COMPILER_LAUNCHER) \
+		-DLLVM_DIR=$(LLVM_BUILD_DIR)/lib/cmake/llvm \
 		-DMLIR_DIR=$(LLVM_BUILD_DIR)/lib/cmake/mlir \
 		-DLLVM_EXTERNAL_LIT=$(LLVM_EXTERNAL_LIT) \
 		-DCATALYST_TOOLS_DIR=$(DIALECTS_BUILD_DIR)/bin \
@@ -193,6 +199,7 @@ dialects:
 		-DPython3_NumPy_INCLUDE_DIRS=$(shell $(PYTHON) -c "import numpy as np; print(np.get_include())") \
 		-DEnzyme_DIR=$(ENZYME_BUILD_DIR) \
 		-DENZYME_SRC_DIR=$(MK_DIR)/Enzyme \
+		-DLLVM_DIR=$(LLVM_BUILD_DIR)/lib/cmake/llvm \
 		-DMLIR_DIR=$(LLVM_BUILD_DIR)/lib/cmake/mlir \
 		-DSTABLEHLO_DIR=$(MK_DIR)/stablehlo \
 		-DSTABLEHLO_BUILD_DIR=$(STABLEHLO_BUILD_DIR) \
@@ -224,6 +231,7 @@ dialect-docs:
 		-DPython3_NumPy_INCLUDE_DIRS=$(shell $(PYTHON) -c "import numpy as np; print(np.get_include())") \
 		-DEnzyme_DIR=$(ENZYME_BUILD_DIR) \
 		-DENZYME_SRC_DIR=$(MK_DIR)/Enzyme \
+		-DLLVM_DIR=$(LLVM_BUILD_DIR)/lib/cmake/llvm \
 		-DMLIR_DIR=$(LLVM_BUILD_DIR)/lib/cmake/mlir \
 		-DRUNTIME_LIB_DIR=$(RT_BUILD_DIR)/lib \
 		-DMLIR_LIB_DIR=$(LLVM_BUILD_DIR)/lib \

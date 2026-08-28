@@ -1,0 +1,69 @@
+name: Transport path filter
+description: >
+  Report whether this push or pull request touched anything the transport build and its tests
+  are derived from, so jobs can gate on `transport == 'true'` instead of running unconditionally.
+  Requires a checkout with fetch-depth: 0, since it diffs against the base ref.
+
+outputs:
+  transport:
+    description: "true when a tracked transport path changed between the base ref and HEAD"
+    value: ${{ steps.filter.outputs.transport }}
+
+runs:
+  using: composite
+  steps:
+    - id: filter
+      shell: bash
+      run: |
+        # Pick the base ref to diff HEAD against. For PRs use the PR's merge base;
+        # for pushes to main use the previous head. Both are provided by the
+        # GitHub context, no API calls needed.
+        if [ "${{ github.event_name }}" = "pull_request" ]; then
+          BASE="${{ github.event.pull_request.base.sha }}"
+        else
+          BASE="${{ github.event.before }}"
+        fi
+
+        # Fall back to comparing against the parent commit if BASE is unreachable
+        # (shallow clones, first push to a new branch, etc).
+        if ! git cat-file -e "$BASE^{commit}" 2>/dev/null; then
+          BASE="HEAD^"
+        fi
+
+        # Everything the transport build and its tests are derived from. Held as git
+        # pathspecs so the same list drives both the existence check and the diff below.
+        PATTERNS=(
+          'runtime/lib/transport/*'
+          'runtime/include/Transport*'
+          'runtime/tests/Test_Transport*'
+          'mlir/lib/Transport/*'
+          'mlir/include/Transport/*'
+          'frontend/catalyst/backline.py'
+          'frontend/test/pytest/test_backline.py'
+          'frontend/test/pytest/conftest.py'
+          'runtime/Makefile'
+          '.github/actions/setup-soft-roce/*'
+          '.github/actions/transport-path-filter/*'
+          '.github/workflows/check-catalyst.yaml'
+        )
+
+        # A pattern that matches nothing is the failure mode that matters here: the gate
+        # keeps reporting transport=false on real transport changes and nobody notices,
+        # because the absence of a job looks the same as a job that passed. Fail loudly
+        # instead, so a rename has to update this list.
+        missing=()
+        for pattern in "${PATTERNS[@]}"; do
+          git ls-files --error-unmatch -- "$pattern" >/dev/null 2>&1 || missing+=("$pattern")
+        done
+        if [ "${#missing[@]}" -gt 0 ]; then
+          printf 'transport path filter matches no tracked file: %s\n' "${missing[@]}" >&2
+          echo 'Update or remove the pattern in .github/actions/transport-path-filter.' >&2
+          exit 1
+        fi
+
+        transport=false
+        if [ -n "$(git diff --name-only "$BASE" HEAD -- "${PATTERNS[@]}")" ]; then
+          transport=true
+        fi
+
+        echo "transport=$transport" >> "$GITHUB_OUTPUT"

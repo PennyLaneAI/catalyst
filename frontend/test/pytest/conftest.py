@@ -18,12 +18,15 @@ Pytest configuration file for Catalyst test suite.
 import os
 import subprocess
 from importlib.util import find_spec
+from pathlib import Path
 from tempfile import TemporaryDirectory
 from textwrap import dedent
 from warnings import warn
 
 import pennylane as qp
 import pytest
+
+from catalyst.utils.runtime_environment import get_lib_path
 
 
 def _detect_gpu_triton_platform():
@@ -105,6 +108,32 @@ def gpu_triton_platform():
             "(missing CUDA / HIP runtime for the installed triton wheel)"
         )
     return platform
+
+
+@pytest.fixture(scope="module")
+def gpu_transport_backend():
+    """Skip unless the GPU coprocessor transport backend was actually built.
+
+    ``catalyst_transport_memcpy_gpu_coprocessor`` sits inside an ``if(TRANSPORT_HAS_HIP)`` guard
+    in ``runtime/lib/transport/memcpy/CMakeLists.txt``, so a runtime built without a HIP
+    toolchain produces no such library at all. That matters because
+    ``backline._resolve_backend_lib`` requires it on disk and raises ``ValueError`` when it is
+    missing -- a hard failure, not a skip -- so a test that executes a GPU coprocessor has to
+    check for it up front.
+
+    Distinct from :func:`gpu_triton_platform`, which asks whether a GPU and a Triton driver are
+    present. Both gates are needed by the executing cases and they fail for unrelated reasons: a
+    runner can have a working Triton driver and still lack HIP. A compile-only case that attaches
+    its own ``backend_lib`` needs neither this nor the library.
+    """
+    lib_dir = Path(get_lib_path("runtime", "RUNTIME_LIB_DIR"))
+    names = [f"libcatalyst_transport_memcpy_gpu_coprocessor.{ext}" for ext in ("so", "dylib")]
+    if not any((lib_dir / name).exists() for name in names):
+        pytest.skip(
+            f"GPU coprocessor transport backend not built: none of {names} found in {lib_dir}. "
+            "The runtime needs a HIP toolchain (HIP-on-CUDA on an NVIDIA host) for CMake to "
+            "set TRANSPORT_HAS_HIP and build it."
+        )
 
 
 @pytest.fixture(scope="function")

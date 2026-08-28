@@ -471,7 +471,9 @@ class TestBacklineDemoIntegration:
         # qp.sample keeps the shots axis explicit: shots=1 with 3 measurements -> (1, 3).
         assert samples.shape == (1, 3), f"expected shape (1, 3), got {samples.shape}"
 
-    def test_cpu_controller_to_gpu_coproc_memcpy_manual_qec(self, use_capture, gpu_triton_platform):
+    def test_cpu_controller_to_gpu_coproc_memcpy_manual_qec(
+        self, use_capture, gpu_triton_platform, gpu_transport_backend
+    ):
         """CPU controller ↔ GPU coprocessor over ``memcpy`` with a manually-scheduled QEC cycle.
 
         Ports demo 2's CSS BP decoder + manual QEC pattern to local memcpy transport, executed
@@ -482,6 +484,7 @@ class TestBacklineDemoIntegration:
         logical-op / iterated-error-injection structure follows demo 2 and is what distinguishes
         this test from the shorter ``*_triton_css_bp`` variant above.
         """
+        del gpu_transport_backend  # gate only: the HIP-built backend library must exist
         pytest.importorskip("triton")
 
         n_data = 13
@@ -595,7 +598,7 @@ class TestBacklineDemoIntegration:
         assert len(result) == 2
 
     def test_cpu_controller_to_gpu_coproc_memcpy_precompiled(
-        self, use_capture, gpu_triton_platform
+        self, use_capture, gpu_triton_platform, gpu_transport_backend
     ):
         """Precompiled GPU decoder (``gpu_steane_launcher``) reached over local memcpy, executed.
 
@@ -610,7 +613,9 @@ class TestBacklineDemoIntegration:
         executes end-to-end once HIP-on-CUDA is installed and the runtime CMake builds the
         transport GPU coproc lib with the launcher symbol.
         """
-        del gpu_triton_platform  # only used to gate on GPU presence; string not consumed here
+        # Both are gates only: one for GPU + Triton driver presence, one for the HIP-built
+        # backend library. Neither value is consumed here.
+        del gpu_triton_platform, gpu_transport_backend
         ctrl = qp.Controller(
             name="cpu-controller",
             device=qp.device("null.qubit", wires=3),
@@ -645,19 +650,25 @@ class TestBacklineDemoIntegration:
         # qp.sample keeps the shots axis explicit: shots=1 with 3 measurements -> (1, 3).
         assert samples.shape == (1, 3), f"expected shape (1, 3), got {samples.shape}"
 
-    def test_cpu_controller_to_gpu_coproc_triton_css_bp(self, use_capture, gpu_triton_platform):
+    def test_cpu_controller_to_gpu_coproc_triton_css_bp(
+        self, use_capture, gpu_triton_platform, gpu_transport_backend
+    ):
         """CSS BP decoder built via Triton, adapted from demo 2 to a local memcpy placement.
 
         Mirrors ``demos/demo_2_remote_cpu_to_remote_gpu_triton.py``: X- and Z-type parity checks
         of the [[13,1,3]] hypergraph-product code fed to ``qp.backline.css_bp_decoder`` to
         produce a Triton-compiled coprocessor library, wired into the QNode. Remote SSH
         executors from the demo are replaced with a local memcpy backend so both roles run in
-        this process on the GPU runner. Compile-only: asserts on ``.mlir`` without executing.
-        Execution would need the GPU coproc runtime side of the memcpy backend to load the
-        Triton-built ``.so``, which is orthogonal to what the demo pattern is verifying.
+        this process on the GPU runner, and the QNode is executed.
+
+        The decoder is Triton-generated rather than built into the runtime, which is what this
+        case covers that its siblings do not: codegen for the detected ``cuda:<cc>:<warp>``
+        platform, the [[13,1,3]] hypergraph-product lowering, and the GPU transport backend
+        loading the generated ``.so`` to run the decode round.
         """
         pytest.importorskip("triton")
         platform = gpu_triton_platform
+        del gpu_transport_backend  # gate only: the built backend library must exist to execute
 
         n_data = 13
         aux = n_data
@@ -731,6 +742,10 @@ class TestBacklineDemoIntegration:
         assert "libcatalyst_transport_memcpy_gpu_coprocessor.so" in ir
         assert decoder.symbol_name in ir
         assert decoder.lib_path is not None and decoder.lib_path in ir
+
+        samples = np.asarray(circuit())
+        # qp.sample keeps the shots axis explicit: shots=1 with 13 measurements -> (1, 13).
+        assert samples.shape == (1, n_data), f"expected shape (1, {n_data}), got {samples.shape}"
 
 
 def test_placement_behind_a_wrapper_is_found(use_capture):
