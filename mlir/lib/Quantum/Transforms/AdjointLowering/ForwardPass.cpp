@@ -112,6 +112,32 @@ void AugmentedCircuitGenerator::cacheGate(quantum::ParametrizedGate gate, OpBuil
         }
 
         auto aTensor = cast<RankedTensorType>(paramType);
+
+        // Real-valued tensor params (e.g. the `tensor<Nxf64>` angle carried by `quantum.operator`
+        // gates such as RZ) are cached element-by-element as plain f64 values. The complex-matrix
+        // path below is specific to QubitUnitary's `tensor<NxNxcomplex<f64>>`.
+        if (aTensor.getElementType().isF64()) {
+            assert(aTensor.getRank() <= 1 && "only scalar/rank-1 real tensor params are cacheable");
+            if (aTensor.getRank() == 0) {
+                Value element = tensor::ExtractOp::create(builder, loc, clonedParam, ValueRange{});
+                ListPushOp::create(builder, loc, element, cache.paramVector);
+            } else {
+                Value c0i = index::ConstantOp::create(builder, loc, 0);
+                Value c1i = index::ConstantOp::create(builder, loc, 1);
+                Value dim =
+                    ShapedType::kDynamic != aTensor.getShape()[0]
+                        ? (Value)index::ConstantOp::create(builder, loc, aTensor.getShape()[0])
+                        : (Value)tensor::DimOp::create(builder, loc, clonedParam, c0i);
+                scf::ForOp loop = scf::ForOp::create(builder, loc, c0i, dim, c1i);
+                OpBuilder::InsertionGuard guard(builder);
+                builder.setInsertionPointToStart(loop.getBody());
+                Value element =
+                    tensor::ExtractOp::create(builder, loc, clonedParam, loop.getInductionVar());
+                ListPushOp::create(builder, loc, element, cache.paramVector);
+            }
+            continue;
+        }
+
         ArrayRef<int64_t> shape = aTensor.getShape();
         Value c0 = index::ConstantOp::create(builder, loc, 0);
         Value c1 = index::ConstantOp::create(builder, loc, 1);
