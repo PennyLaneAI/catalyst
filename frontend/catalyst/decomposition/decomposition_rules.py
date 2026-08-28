@@ -185,12 +185,21 @@ def collect_resources_for_op(op_name, kwargs, is_custom_op=False, adjoint_resour
     return name_to_resources, name_to_resource_ids, decomp_rules
 
 
+def _unwrap_single_operand(arg_shape):
+    """Drop the per-operand axis from a ``dynamic_shape`` entry."""
+    if isinstance(arg_shape, (list, tuple)) and len(arg_shape) == 1:
+        inner = arg_shape[0]
+        if isinstance(inner, (list, tuple)):
+            return inner
+    return arg_shape
+
+
 def prepare_dynamic_op_kwargs(dynamic_shape, wire_lens) -> dict:
     kwargs = {}
     for wire_name, wire_len in wire_lens.items():
         kwargs[wire_name] = jnp.array(range(wire_len), dtype=int)
     for arg_name, arg_shape in dynamic_shape.items():
-        kwargs[arg_name] = get_dummy_values_for_arg(arg_shape)
+        kwargs[arg_name] = get_dummy_values_for_arg(_unwrap_single_operand(arg_shape))
     return kwargs
 
 
@@ -242,12 +251,23 @@ def compile_decomposition_rules(
 
         return qp.capture.subroutine(decomp_rule_no_static_args)
 
-    call_args, call_kwargs = split_call_args(kwargs, is_custom_op)
+    # condition_args, condition_kwargs = split_call_args(
+    #     kwargs | extra_data, is_custom_op
+    # )
+    condition_args, condition_kwargs = split_call_args(
+        kwargs | static_data | extra_data, is_custom_op
+    )
 
     subroutines = []
     for rule in decomp_rules:
-        if rule.is_applicable(*call_args, **call_kwargs):
+        if rule.name in name_to_resource_ids and rule.is_applicable(
+            *condition_args, **condition_kwargs
+        ):
             subroutines.append(rule_to_subroutine(rule))
+
+    # call_args, _ = split_call_args(kwargs, is_custom_op)
+    # print(call_args)
+    call_args, call_kwargs = split_call_args(kwargs, is_custom_op)
 
     @qp.qjit(target="mlir", capture=True, collect_decomp_rules=False)
     @qp.qnode(device=device)

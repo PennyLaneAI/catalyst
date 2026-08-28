@@ -47,6 +47,7 @@ _PY_DTYPES_TO_MLIR_DTYPES = {v: k for k, v in _MLIR_DTYPES_TO_PY_DTYPES.items()}
     ir.F16Type: "f16",
     ir.F32Type: "f32",
     ir.F64Type: "f64",
+    (ir.ComplexType, ir.F32Type): "complex<f32>",
     (ir.ComplexType, ir.F64Type): "complex<f64>",
 }
 
@@ -147,7 +148,9 @@ def get_dummy_values_for_arg(arg):
             # NOTE: numpy is required since jax won't create an array of strings
             return jnp.zeros(np.array(arg, str).shape, dtype)
         case ShapedArray():
-            return jnp.zeros(arg.shape[0], dtype=arg.dtype)
+            # Use the full shape: ``arg.shape[0]`` raised ``IndexError`` for rank-0 avals
+            # and silently truncated anything of rank > 1 to its leading axis.
+            return jnp.zeros(arg.shape, dtype=arg.dtype)
         case type() | jnp.dtype():
             try:
                 return jnp.zeros((), jnp.dtype(arg))
