@@ -231,6 +231,7 @@ jobs:
           echo "CATALYST_TRANSPORT_PATH=$(pwd)/runtime-build/lib" >> $GITHUB_ENV
 
       - name: Run backline GPU integration tests
+        id: gpu-tests
         # CPU-CPU memcpy is covered by check-catalyst.yaml on a GH-hosted runner. This workflow
         # runs cases that need the local GPU:
         #   - precompiled: demo 4 pattern with the runtime-built gpu_steane_launcher symbol
@@ -256,7 +257,9 @@ jobs:
         # reports success while covering nothing -- and it spends ~20 min of self-hosted GPU
         # time to do it. A full skip now means Triton found no active driver, since the backend
         # library is built above; the step before this one prints the driver state to say why.
-        if: always()
+        # Only meaningful when the tests actually ran: on an earlier failure there is no junit
+        # file, and reporting that as a guard failure buries the real error.
+        if: always() && steps.gpu-tests.outcome != 'skipped'
         run: |
           python3 - <<'EOF'
           import sys

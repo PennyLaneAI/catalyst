@@ -80,11 +80,17 @@ if(NOT _hip_include_dir AND _nvcc)
     endif()
     if(_hip_root)
         list(APPEND CMAKE_PREFIX_PATH "${_hip_root}")
-        # CMakeDetermineHIPCompiler reads both only when unset, asking hipconfig otherwise --
+        # CMakeDetermineHIPCompiler reads these only when unset, asking hipconfig otherwise --
         # which a fetched header tree has no copy of. No architecture flag belongs here: on this
         # platform CMake takes nvcc's own default, and CUDAARCHS overrides it.
         set(CMAKE_HIP_COMPILER_ROCM_ROOT "${_hip_root}")
         set(CMAKE_HIP_PLATFORM "nvidia" CACHE STRING "HIP platform" FORCE)
+        # Naming the compiler matters for the same reason. check_language(HIP) probes in a nested
+        # project that inherits CMAKE_HIP_PLATFORM but not the root above, so it falls through to
+        # hipconfig and aborts with "Failed to find HIP root directory". Setting it here makes
+        # check_language a no-op -- it only probes when undefined -- and leaves enable_language to
+        # run in this scope, where the root is set. nvcc is what CMake picks on this platform.
+        set(CMAKE_HIP_COMPILER "${_nvcc}" CACHE FILEPATH "HIP compiler")
     endif()
 endif()
 
