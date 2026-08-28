@@ -27,6 +27,24 @@
     2. Rules registered directly for `Adjoint(Op)`, and
     3. Rules *synthesized by distribution* (`decompose(Adjoint(Op)) = adjoint(decompose(Op))`).
 
+* The graph-based decomposition system now supports **controlled operators** for `Operator2`,
+  including single control (`C(Op)`), multiple controls (`<n>C(Op)`), and their composition with
+  adjoint.
+  [(#3129)](https://github.com/PennyLaneAI/catalyst/pull/3129)
+  [(#3127)](https://github.com/PennyLaneAI/catalyst/pull/3127)
+
+  Control is folded into the operator identity *control-outermost* (e.g. `C(Adjoint(Op))`), so
+  `ctrl(adjoint(Op))` and `adjoint(ctrl(Op))` collapse to a single node, while a distinct control
+  count is its own node keyed. For a target gate set, `<n>C(Op)` is reached through:
+    1. Rules registered directly for `<n>C(Op)` (e.g. named `CNOT`/`CRX`, `ctrl_decomp_zyz`), and
+    2. Rules *synthesized by distribution* (`decompose(C(Op)) = ctrl(decompose(Op))`), controlling
+       each produced gate with the same control count.
+
+  A rule may re-emit its base decomposition inside a `quantum.ctrl` region; the apply pipeline
+  reduces it to op-level controls with `ctrl-lowering`, iterating
+  `(decompose-lowering -> ctrl-lowering -> adjoint-lowering)` to a fixpoint.
+  Controlled basis gates are only free when their own `<n>C(...)` id is in the target gate set.
+
 * The `local-random` unitary folding option for :func:`~.mitigate_with_zne` is now implemented,
   reproducing Mitiq's ``fold_gates_at_random``: every gate is folded ``floor((scale_factor-1)/2)``
   times, then a random subset is folded once more (without replacement) to reach ``scale_factor * n``
