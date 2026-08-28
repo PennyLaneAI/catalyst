@@ -15,6 +15,7 @@
 """Type handling utilities for decomposition rule lowering."""
 
 import copy
+import re
 
 import jax.numpy as jnp
 import numpy as np
@@ -50,6 +51,25 @@ _PY_DTYPES_TO_MLIR_DTYPES = {v: k for k, v in _MLIR_DTYPES_TO_PY_DTYPES.items()}
     (ir.ComplexType, ir.F32Type): "complex<f32>",
     (ir.ComplexType, ir.F64Type): "complex<f64>",
 }
+
+
+def parse_mlir_tensor_type_string(type_string):
+    """Parse an MLIR tensor type string into ``(shape, element dtype string)``."""
+    match = re.fullmatch(r"tensor<(.*)>", type_string)
+    if match is None:
+        return None
+
+    body = match.group(1)
+    shape = []
+    while (dim := re.match(r"(\d+)x(.*)", body)) is not None:
+        shape.append(int(dim.group(1)))
+        body = dim.group(2)
+
+    if "?" in body.split("x")[0]:
+        raise TypeError(
+            f"Cannot build a dummy value for the dynamically shaped tensor type {type_string!r}."
+        )
+    return tuple(shape), body
 
 
 def get_mlir_tensor_type_map_key(mlir_type):
@@ -142,6 +162,9 @@ def get_dummy_values_for_arg(arg):
     """
     match arg:
         case str():
+            if (parsed := parse_mlir_tensor_type_string(arg)) is not None:
+                shape, element = parsed
+                return jnp.zeros(shape, dtype=_MLIR_DTYPES_TO_PY_DTYPES[element])
             return jnp.zeros((), dtype=_MLIR_DTYPES_TO_PY_DTYPES[arg])
         case list() | tuple():
             dtype = get_dummy_values_for_arg(arg[0]).dtype
