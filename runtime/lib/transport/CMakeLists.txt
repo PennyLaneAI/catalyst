@@ -34,6 +34,9 @@ set_property(TARGET rt_transport PROPERTY POSITION_INDEPENDENT_CODE ON)
 #   common/interface   headers (WireProtocol, ConfigParser)         ::common
 #   common/coproc/cpu  CoprocessorFn plugins (steane, echo)         ::coproc
 #   common/coproc/gpu  HIP plumbing + device decoders               ::coproc
+#
+# "HIP" above is the HIP language: headers plus a compiler. On AMD both come from an installed
+# ROCm; on NVIDIA the compiler is nvcc and the headers are fetched below.
 
 find_package(Threads REQUIRED)
 find_library(IBVERBS_LIB ibverbs)
@@ -78,7 +81,8 @@ if(NOT _hip_include_dir AND _nvcc)
     if(_hip_root)
         list(APPEND CMAKE_PREFIX_PATH "${_hip_root}")
         # CMakeDetermineHIPCompiler reads both only when unset, asking hipconfig otherwise --
-        # which a fetched header tree has no copy of.
+        # which a fetched header tree has no copy of. No architecture flag belongs here: on this
+        # platform CMake takes nvcc's own default, and CUDAARCHS overrides it.
         set(CMAKE_HIP_COMPILER_ROCM_ROOT "${_hip_root}")
         set(CMAKE_HIP_PLATFORM "nvidia" CACHE STRING "HIP platform" FORCE)
     endif()
