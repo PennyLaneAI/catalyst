@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{gate-set=C(RZ)=1.0 alt-decomps=C(Rot){}{wires:1}{}=dedicated,C(Rot){}{wires:1}{}=distribute})' %s | FileCheck %s
+// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{gate-set=C(RZ)=1.0 alt-decomps=C(Rot){}{wires:1}{}=[dedicated,distribute]})' %s | FileCheck %s
 
 // CHECK-LABEL: func.func @competing(
 // CHECK-SAME:  %[[C:.*]]: !quantum.bit, %[[Q:.*]]: !quantum.bit

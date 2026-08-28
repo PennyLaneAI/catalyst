@@ -109,9 +109,8 @@ def wrap_modifier_id(op_id: str, modifier: str) -> str:
 
     # Only the operator name is wrapped; the first '{' begins the {param}{wire}{static}[uid] suffix
     # (the dynamic-shape group is always present), which is carried through untouched.
+    assert "{" in op_id, f"Malformed op id for graph decomposition, got {op_id}"
     split = op_id.find("{")
-    if split == -1:
-        split = len(op_id)
     return f"{modifier}({op_id[:split]}){op_id[split:]}"
 
 
@@ -142,7 +141,7 @@ def name_unwrap_control(op_name: str, op_id: str):
     prefix = f"{digits}C({op_name})"
     if not op_id.startswith(prefix):
         raise ValueError(f"{op_id!r} is not a control id for base op {op_name!r}")
-    return op_name + op_id[len(prefix) :], n_ctrl
+    return op_id.split(prefix)[1], n_ctrl
 
 
 def get_rule_strings_from_module(module: ir.Module) -> list[str]:
