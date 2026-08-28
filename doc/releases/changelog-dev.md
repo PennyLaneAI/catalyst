@@ -134,6 +134,7 @@
 
     With pathways 2 and 3, gates with static data only known at compile time can now be decomposed using the decomposition rule defined in PennyLane.
     For example, this includes `quantum.paulirot`, with Pauli words being the static data.
+    [(#3160)](https://github.com/PennyLaneAI/catalyst/pull/3160)
 
   - The `graph-decomposition` pass eliminated three redundant IR manipulations:
     the cloning, removal, and re-insertion of user rules.
