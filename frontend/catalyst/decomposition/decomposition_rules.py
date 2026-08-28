@@ -243,9 +243,12 @@ def compile_decomposition_rules(
             else:
                 rule._impl(*_args, **_kwargs)
 
+        # Only Python-only static data is baked in. Hybrid arguments are passed at call
+        # time instead so that their tensor leaves become parameters of the rule funcop.
+        # Partial-applying them closed them over as constants, leaving the funcop with
+        # fewer parameters than the operator has operands, which the substitution step
+        # rejects.
         decomp_rule_no_static_args = partial(decomp_rule, **static_data)
-        if extra_data:
-            decomp_rule_no_static_args = partial(decomp_rule_no_static_args, **extra_data)
 
         # Keep the frontend name for readability, append target op_id for symbol uniqueness:
         decomp_rule_no_static_args.__name__ = rule.name + "_" + target_id
@@ -268,7 +271,7 @@ def compile_decomposition_rules(
 
     # call_args, _ = split_call_args(kwargs, is_custom_op)
     # print(call_args)
-    call_args, call_kwargs = split_call_args(kwargs, is_custom_op)
+    call_args, call_kwargs = split_call_args(kwargs | extra_data, is_custom_op)
 
     @qp.qjit(target="mlir", capture=True, collect_decomp_rules=False)
     @qp.qnode(device=device)
