@@ -174,11 +174,16 @@ jobs:
         # silent skip to surface twenty minutes later at the guard.
         run: |
           set -euo pipefail
-          # Pinned below 3.8: 3.8.0 miscompiles the decoder kernels, emitting PTX that ptxas
-          # rejects with "Modifier '.volatile' cannot be combined with modifier '.cv'" -- Triton
-          # reports it as an internal codegen error. Unpinned, this job also breaks whenever
-          # Triton releases, which is exactly how that regression arrived.
-          pip install "triton<3.8"
+          # Pinned below 3.8: 3.8.0 emits PTX that ptxas rejects for the decoder kernels,
+          # "Modifier '.volatile' cannot be combined with modifier '.cv'". Unpinned, this job also
+          # breaks on any Triton release, which is how that arrived.
+          #
+          # torch comes with the pin, not for the tests -- nothing here imports it. Triton 3.7's
+          # CUDA backend decides is_active() by importing torch and asking
+          # torch.cuda.is_available(), so without it the backend reports no active driver and
+          # every GPU test skips. 3.8 replaced that probe with a torch-free one; when the pin is
+          # lifted, this install goes with it.
+          pip install "triton<3.8" torch
 
           # `|| true` on the pipeline: grep exits 1 when nothing matches, which under pipefail
           # would abort the step before the diagnostic below can run.
