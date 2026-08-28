@@ -35,7 +35,7 @@ def test_adder(backend):
     work_wires = [4, 5]
 
     def adder():
-        qp.BasisEmbedding(x, wires=x_wires)
+        qp.BasisEmbedding(qp.math.int_to_binary(x, len(x_wires)), wires=x_wires)
         qp.Adder(k, x_wires, mod, work_wires)
         return qp.sample(wires=x_wires)
 
@@ -81,7 +81,7 @@ def test_basis_embedding(backend):
     """Test basis embedding."""
 
     def basis_embedding(f: jax.core.ShapedArray([3], int)):
-        qp.BasisEmbedding(features=f, wires=[0, 1, 2])
+        qp.BasisEmbedding(f, wires=[0, 1, 2])
         return qp.state()
 
     device = qp.device(backend, wires=3)
@@ -230,9 +230,6 @@ def test_mottonen_state_preparation(backend):
     assert np.allclose(interpreted_fn(state), jitted_fn(state))
 
 
-@pytest.mark.xfail(
-    reason="Waiting for a Lightning nightly release with Operator2 PauliRot fix", strict=True
-)
 def test_arbitrary_state_preparation(backend):
     """Test arbitrary state preparation."""
 
@@ -591,9 +588,6 @@ def test_fermionic_double(backend):
     assert np.allclose(interpreted_fn(weight), jitted_fn(weight))
 
 
-@pytest.mark.xfail(
-    reason="Waiting for a Lightning nightly release with Operator2 PauliRot fix", strict=True
-)
 def test_arbitrary_unitary(backend):
     """Test ArbitraryUnitary."""
 
@@ -703,9 +697,6 @@ def test_local_hilbert_schmidt(backend):
     assert np.allclose(interpreted_fn(v_params), jitted_fn(v_params))
 
 
-@pytest.mark.xfail(
-    reason="Waiting for a Lightning nightly release with Operator2 PauliRot fix", strict=True
-)
 def test_commuting_evolution(backend):
     """Test CommutingEvolution."""
 
@@ -759,9 +750,6 @@ def test_qsvt(backend):
     assert np.allclose(interpreted_fn(), jitted_fn())
 
 
-@pytest.mark.xfail(
-    reason="Waiting for a Lightning nightly release with Operator2 PauliRot fix", strict=True
-)
 def test_approx_time_evoluation(backend):
     """Test ApproxTimeEvolution."""
 
@@ -1115,7 +1103,7 @@ def test_phase_adder(backend):
     work_wire = [4]
 
     def phase_adder():
-        qp.BasisEmbedding(x, wires=x_wires)
+        qp.BasisEmbedding(qp.math.int_to_binary(x, len(x_wires)), wires=x_wires)
         qp.QFT(wires=x_wires)
         qp.PhaseAdder(k, x_wires, mod, work_wire)
         qp.adjoint(qp.QFT)(wires=x_wires)

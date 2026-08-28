@@ -197,11 +197,14 @@ class TestHybridOpVerification:
         with pytest.raises(CompileError, match="RX.*not invertible"):
             qjit(f)(1.2)
 
-        with pytest.raises(CompileError, match="RX.*not invertible"):
+        with pytest.warns(UserWarning, match="AOT.*failed"):
 
             @qjit
             def cir(x: float):
                 return grad(f)(x)
+
+        with pytest.raises(CompileError, match="RX.*not invertible"):
+            cir(1.2)
 
     @pytest.mark.parametrize(
         "op_fn, op_type",
@@ -230,11 +233,14 @@ class TestHybridOpVerification:
         with pytest.raises(CompileError, match="RX.*not invertible"):
             qjit(f)(1.2)
 
-        with pytest.raises(CompileError, match="RX.*not invertible"):
+        with pytest.warns(UserWarning, match="AOT.*failed"):
 
             @qjit
             def cir(x: float):
                 return grad(f)(x)
+
+        with pytest.raises(CompileError, match="RX.*not invertible"):
+            cir(1.2)
 
     @pytest.mark.parametrize(
         "op_fn, op_type",
@@ -257,11 +263,14 @@ class TestHybridOpVerification:
         with pytest.raises(CompileError, match="RX.*not invertible"):
             qjit(f)(1.2)
 
-        with pytest.raises(CompileError, match="RX.*not invertible"):
+        with pytest.warns(UserWarning, match="AOT.*failed"):
 
             @qjit
             def cir(x: float):
                 return grad(f)(x)
+
+        with pytest.raises(CompileError, match="RX.*not invertible"):
+            cir(1.2)
 
     @pytest.mark.parametrize("op_fn", [ctrl_operator, ctrl_op_callable])
     def test_non_controllable_gate_pennylane(self, op_fn):
@@ -278,11 +287,14 @@ class TestHybridOpVerification:
         with pytest.raises(CompileError, match="PauliZ is not controllable"):
             qjit(f)(1.2)
 
-        with pytest.raises(CompileError, match="PauliZ is not controllable"):
+        with pytest.warns(UserWarning, match="AOT.*failed"):
 
             @qjit
             def cir(x: float):
                 return grad(f)(x)
+
+        with pytest.raises(CompileError, match="PauliZ is not controllable"):
+            cir(1.2)
 
     def test_non_controllable_gate_hybridctrl(self):
         """Test that a non-controllable gate applied inside a HybridCtrl raises an error."""
@@ -311,11 +323,14 @@ class TestHybridOpVerification:
             with pytest.raises(CompileError, match="PauliZ is not controllable"):
                 qjit(f)(1.2)
 
-            with pytest.raises(CompileError, match="PauliZ is not controllable"):
+            with pytest.warns(UserWarning, match="AOT.*failed"):
 
                 @qjit
                 def cir(x: float):
                     return grad(f)(x)
+
+            with pytest.raises(CompileError, match="PauliZ is not controllable"):
+                cir(1.2)
 
     def test_hybridctrl_raises_error(self):
         """Test that a HybridCtrl operator is rejected by the verification."""
@@ -332,11 +347,14 @@ class TestHybridOpVerification:
         with pytest.raises(CompileError, match="HybridCtrl is not supported"):
             qjit(f)(1.2)
 
-        with pytest.raises(CompileError, match="HybridCtrl is not supported"):
+        with pytest.warns(UserWarning, match="AOT.*failed"):
 
             @qjit
             def cir(x: float):
                 return grad(f)(x)
+
+        with pytest.raises(CompileError, match="HybridCtrl is not supported"):
+            cir(1.2)
 
     def test_pennylane_ctrl_of_hybridop_raises_error(self):
         """Test that a PennyLane Controlled op with a HybridOp as its base is
@@ -354,11 +372,14 @@ class TestHybridOpVerification:
         with pytest.raises(CompileError, match="Cannot compile PennyLane control of the hybrid op"):
             qjit(f)(1.2)
 
-        with pytest.raises(CompileError, match="Cannot compile PennyLane control of the hybrid op"):
+        with pytest.warns(UserWarning, match="AOT.*failed"):
 
             @qjit
             def cir(x: float):
                 return grad(f)(x)
+
+        with pytest.raises(CompileError, match="Cannot compile PennyLane control of the hybrid op"):
+            cir(1.2)
 
     def test_pennylane_adj_of_hybridop_raises_error(self):
         """Test that a PennyLane Controlled op with a HybridOp as its base is caught
@@ -376,11 +397,14 @@ class TestHybridOpVerification:
         with pytest.raises(CompileError, match="Cannot compile PennyLane inverse of the hybrid op"):
             qjit(f)(1.2)
 
-        with pytest.raises(CompileError, match="Cannot compile PennyLane inverse of the hybrid op"):
+        with pytest.warns(UserWarning, match="AOT.*failed"):
 
             @qjit
             def cir(x: float):
                 return grad(f)(x)
+
+        with pytest.raises(CompileError, match="Cannot compile PennyLane inverse of the hybrid op"):
+            cir(1.2)
 
     @pytest.mark.parametrize("adjoint_type", [Adjoint, HybridAdjoint])
     @pytest.mark.parametrize("unsupported_gate_attribute", ["controllable", "invertible"])
@@ -419,11 +443,14 @@ class TestHybridOpVerification:
             with pytest.raises(CompileError, match=f"PauliZ is not {unsupported_gate_attribute}"):
                 qjit(f)(1.2)
 
-            with pytest.raises(CompileError, match=f"PauliZ is not {unsupported_gate_attribute}"):
+            with pytest.warns(UserWarning, match="AOT.*failed"):
 
                 @qjit
                 def cir(x: float):
                     return grad(f)(x)
+
+            with pytest.raises(CompileError, match=f"PauliZ is not {unsupported_gate_attribute}"):
+                cir(1.2)
 
     @pytest.mark.parametrize("ctrl_type", [Controlled, HybridCtrl])
     @pytest.mark.parametrize("unsupported_gate_attribute", ["controllable", "invertible"])
@@ -462,11 +489,14 @@ class TestHybridOpVerification:
             with pytest.raises(CompileError, match=f"PauliZ is not {unsupported_gate_attribute}"):
                 qjit(f)(1.2)
 
-            with pytest.raises(CompileError, match=f"PauliZ is not {unsupported_gate_attribute}"):
+            with pytest.warns(UserWarning, match="AOT.*failed"):
 
                 @qjit
                 def cir(x: float):
                     return grad(f)(x)
+
+            with pytest.raises(CompileError, match=f"PauliZ is not {unsupported_gate_attribute}"):
+                cir(1.2)
 
     @pytest.mark.parametrize("unsupported_gate_attribute", ["controllable", "invertible"])
     def test_pennylane_ctrl_containing_adjoint(self, unsupported_gate_attribute):
@@ -482,11 +512,14 @@ class TestHybridOpVerification:
         with pytest.raises(CompileError, match=f"PauliZ is not {unsupported_gate_attribute}"):
             qjit(f)(1.2)
 
-        with pytest.raises(CompileError, match=f"PauliZ is not {unsupported_gate_attribute}"):
+        with pytest.warns(UserWarning, match="AOT.*failed"):
 
             @qjit
             def cir(x: float):
                 return grad(f)(x)
+
+        with pytest.raises(CompileError, match=f"PauliZ is not {unsupported_gate_attribute}"):
+            cir(1.2)
 
     @pytest.mark.parametrize("unsupported_gate_attribute", ["controllable", "invertible"])
     def test_pennylane_adjoint_containing_controlled(self, unsupported_gate_attribute):
@@ -502,11 +535,14 @@ class TestHybridOpVerification:
         with pytest.raises(CompileError, match=f"PauliZ is not {unsupported_gate_attribute}"):
             qjit(f)(1.2)
 
-        with pytest.raises(CompileError, match=f"PauliZ is not {unsupported_gate_attribute}"):
+        with pytest.warns(UserWarning, match="AOT.*failed"):
 
             @qjit
             def cir(x: float):
                 return grad(f)(x)
+
+        with pytest.raises(CompileError, match=f"PauliZ is not {unsupported_gate_attribute}"):
+            cir(1.2)
 
 
 class TestObservableValidation:
@@ -747,11 +783,14 @@ class TestAdjointMethodVerification:
             qp.RX(x, wires=0)
             return qp.expval(qp.PauliX(0))
 
-        with pytest.raises(DifferentiableCompileError, match="RX.*non-differentiable"):
+        with pytest.warns(UserWarning, match="AOT.*failed"):
 
             @qjit
             def cir(x: float):
                 return grad(f)(x)
+
+        with pytest.raises(DifferentiableCompileError, match="RX.*non-differentiable"):
+            cir(1.2)
 
     @pytest.mark.parametrize(
         "observable",
@@ -776,11 +815,14 @@ class TestAdjointMethodVerification:
             qp.RX(x, wires=0)
             return qp.expval(observable)
 
-        with pytest.raises(DifferentiableCompileError, match="PauliX.*non-differentiable"):
+        with pytest.warns(UserWarning, match="AOT.*failed"):
 
             @qjit
             def cir(x: float):
                 return grad(f)(x)
+
+        with pytest.raises(DifferentiableCompileError, match="PauliX.*non-differentiable"):
+            cir(1.2)
 
     def test_empty_observable(self):
         """Test that taking the adjoint diff of a circuit with an empyt observable with adjoint
@@ -815,11 +857,14 @@ class TestAdjointMethodVerification:
 
             return qp.expval(qp.PauliX(0))
 
-        with pytest.raises(DifferentiableCompileError, match="RX.*non-differentiable"):
+        with pytest.warns(UserWarning, match="AOT.*failed"):
 
             @qjit
             def cir(x: float):
                 return grad(f)(x)
+
+        with pytest.raises(DifferentiableCompileError, match="RX.*non-differentiable"):
+            cir(1.2)
 
     def test_non_differentiable_gate_nested_adjoint(self):
         """Test that taking the adjoint diff of a tape containing a HybridOp with a
@@ -833,11 +878,14 @@ class TestAdjointMethodVerification:
             adjoint(qp.RX(x, wires=[0]))
             return qp.expval(qp.PauliX(0))
 
-        with pytest.raises(DifferentiableCompileError, match="RX.*non-differentiable"):
+        with pytest.warns(UserWarning, match="AOT.*failed"):
 
             @qjit
             def cir(x: float):
                 return grad(f)(x)
+
+        with pytest.raises(DifferentiableCompileError, match="RX.*non-differentiable"):
+            cir(1.2)
 
 
 @patch("catalyst.device.qjit_device.catalyst_decompose", null_transform)
@@ -866,13 +914,16 @@ class TestParameterShiftMethodVerification:
             qp.RX(x, wires=0)
             return qp.expval(observable)
 
-        with pytest.raises(
-            DifferentiableCompileError, match="PauliX does not support analytic differentiation"
-        ):
+        with pytest.warns(UserWarning, match="AOT.*failed"):
 
             @qjit
             def cir(x: float):
                 return grad(f)(x)
+
+        with pytest.raises(
+            DifferentiableCompileError, match="PauliX does not support analytic differentiation"
+        ):
+            cir(1.2)
 
 
 def test_no_state_returns():
@@ -883,11 +934,14 @@ def test_no_state_returns():
         qp.PauliX(wires=0)
         return qp.state()
 
-    with pytest.raises(DifferentiableCompileError, match="State returns.*forbidden"):
+    with pytest.warns(UserWarning, match="AOT.*failed"):
 
         @qjit
         def cir(x: float):
             return grad(f)(x)
+
+    with pytest.raises(DifferentiableCompileError, match="State returns.*forbidden"):
+        cir(1.2)
 
 
 def test_no_variance_returns():
@@ -898,11 +952,14 @@ def test_no_variance_returns():
         qp.PauliX(wires=0)
         return qp.var(qp.PauliX(0))
 
-    with pytest.raises(DifferentiableCompileError, match="Variance returns.*forbidden"):
+    with pytest.warns(UserWarning, match="AOT.*failed"):
 
         @qjit
         def cir(x: float):
             return grad(f)(x)
+
+    with pytest.raises(DifferentiableCompileError, match="Variance returns.*forbidden"):
+        cir(1.2)
 
 
 if __name__ == "__main__":

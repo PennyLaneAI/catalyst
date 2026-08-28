@@ -36,6 +36,9 @@ _MLIR_DTYPES_TO_PY_DTYPES = {
 }
 
 _PY_DTYPES_TO_MLIR_DTYPES = {v: k for k, v in _MLIR_DTYPES_TO_PY_DTYPES.items()} | {
+    float: "f64",
+    int: "i64",
+    complex: "complex<f64>",
     (ir.IntegerType, 1): "i1",
     (ir.IntegerType, 8): "i8",
     (ir.IntegerType, 16): "i16",
@@ -78,30 +81,32 @@ def convert_types_to_mlir_strings(d: dict) -> dict:
     """Convert the values of a dictionary to MLIR type strings."""
 
     def handle_item(item):
-        if isinstance(item, type):
-            if item in _PY_DTYPES_TO_MLIR_DTYPES:
+        match item:
+            case str():
+                return item
+            case type():
                 return _PY_DTYPES_TO_MLIR_DTYPES[item]
-            raise TypeError(
-                f"encountered unknown type {type(item)} of item {item} when converting to mlir strings."
-            )
-        elif type(item) in _PY_DTYPES_TO_MLIR_DTYPES:
-            return _PY_DTYPES_TO_MLIR_DTYPES[type(item)]
-        elif isinstance(item, str):
-            return item
-        elif isinstance(item, (list, tuple)):
-            return [handle_item(i) for i in item]
-        elif isinstance(item, (ShapedArray, qp.typing.AbstractArray)):
-            if item.shape == ():
-                return [_PY_DTYPES_TO_MLIR_DTYPES[item.dtype.type]]
-            return convert_shaped_type_to_mlir_string(item)
-        elif isinstance(item, ir.RankedTensorType):
-            if len(item.shape) == 0:
-                return [_PY_DTYPES_TO_MLIR_DTYPES[get_mlir_tensor_type_map_key(item.element_type)]]
-            return convert_shaped_type_to_mlir_string(item)
-        else:
-            raise TypeError(
-                f"encountered unknown type {type(item)} of item {item} when converting to mlir strings."
-            )
+            case ir.RankedTensorType():
+                if len(item.shape) == 0:
+                    return [
+                        _PY_DTYPES_TO_MLIR_DTYPES[get_mlir_tensor_type_map_key(item.element_type)]
+                    ]
+                return convert_shaped_type_to_mlir_string(item)
+            case float() | int() | complex():
+                # these need to be wrapped in an additional list to account for the tensor creation in lowering
+                return [_PY_DTYPES_TO_MLIR_DTYPES[type(item)]]
+            case list() | tuple():
+                return [handle_item(i) for i in item]
+            case ShapedArray() | qp.typing.AbstractArray():
+                if item.shape == ():
+                    return [_PY_DTYPES_TO_MLIR_DTYPES[item.dtype.type]]
+                return convert_shaped_type_to_mlir_string(item)
+            case _ if type(item) in _PY_DTYPES_TO_MLIR_DTYPES:
+                return _PY_DTYPES_TO_MLIR_DTYPES[type(item)]
+            case _:
+                raise TypeError(
+                    f"encountered unknown type {type(item)} of item {item} when converting to mlir strings."
+                )
 
     return {k: handle_item(v) for k, v in d.items()}
 
@@ -110,12 +115,19 @@ def format_dynamic_params_for_id(d):
     """Format a structure for ID, after calling convert_types_to_mlir_string on it."""
 
     def handle_item(item):
-        if isinstance(item, str):
-            return item
-        elif isinstance(item, list):
-            return "[" + ",".join(handle_item(i) for i in item) + "]"
+        match item:
+            case str():
+                return item
+            case list() | tuple():
+                return "[" + ",".join(handle_item(i) for i in item) + "]"
 
-    return "{" + ",".join(k + ":" + handle_item(v) for k, v in d.items()) + "}"
+    return (
+        "{"
+        + ",".join(
+            k + ":" + "[" + ",".join(handle_item(item) for item in v) + "]" for k, v in d.items()
+        )
+        + "}"
+    )
 
 
 def get_dummy_values_for_arg(arg):
@@ -127,21 +139,20 @@ def get_dummy_values_for_arg(arg):
     Ex.
     [[float, float], [int, int, int], [int32, int32, int32, int32]]
     """
-    if isinstance(arg, str):
-        return jnp.zeros((), dtype=_MLIR_DTYPES_TO_PY_DTYPES[arg])
-    elif isinstance(arg, (list, tuple)):
-        dtype = get_dummy_values_for_arg(arg[0]).dtype
-        # NOTE: numpy is required since jax won't create an array of strings
-        return jnp.zeros(np.array(arg, str).shape, dtype)
-    elif isinstance(arg, ShapedArray):
-        return jnp.zeros(arg.shape[0], dtype=arg.dtype)
-    elif isinstance(arg, str):
-        return jnp.zeros((), dtype=_MLIR_DTYPES_TO_PY_DTYPES[arg])
-    elif isinstance(arg, (type, jnp.dtype)):
-        try:
-            return jnp.zeros((), jnp.dtype(arg))
-        except TypeError:
-            pass
+    match arg:
+        case str():
+            return jnp.zeros((), dtype=_MLIR_DTYPES_TO_PY_DTYPES[arg])
+        case list() | tuple():
+            dtype = get_dummy_values_for_arg(arg[0]).dtype
+            # NOTE: numpy is required since jax won't create an array of strings
+            return jnp.zeros(np.array(arg, str).shape, dtype)
+        case ShapedArray():
+            return jnp.zeros(arg.shape[0], dtype=arg.dtype)
+        case type() | jnp.dtype():
+            try:
+                return jnp.zeros((), jnp.dtype(arg))
+            except TypeError:
+                pass
 
     raise TypeError(f"Unexpected type in container when creating dummy values: {type(arg)}")
 
@@ -158,7 +169,7 @@ def replace_abstract_wires_with_concrete_wires(node):
         return tuple(replace_abstract_wires_with_concrete_wires(item) for item in node)
     else:
         if isinstance(node, qp.typing.AbstractWires):
-            return qp.wires.Wires(range(node.num_wires))
+            return qp.wires.Wires(range(len(node)))
         else:
             return node
 
@@ -171,7 +182,7 @@ def _replace_op_abstract_wires_with_concrete_wires(op2):
     new_op = copy.deepcopy(op2)
     for wire_arg in new_op.wire_argnames:
         if isinstance(new_op.arguments[wire_arg], qp.typing.AbstractWires):
-            num_wires = new_op.arguments[wire_arg].num_wires
+            num_wires = len(new_op.arguments[wire_arg])
             new_op.arguments[wire_arg] = qp.wires.Wires(range(-1, -num_wires - 1, -1))
     for hybrid_arg in new_op.hybrid_argnames:
         if isinstance(new_op.arguments[hybrid_arg], qp.core.Operator2):

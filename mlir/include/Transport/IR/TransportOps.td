@@ -50,13 +50,19 @@ def Transport_CreateOp : Transport_Op<"create"> {
 
 def Transport_ConnectOp : Transport_Op<"connect"> {
     let summary = "Connect to the peer (blocking).";
-    let arguments = (ins Transport_SessionType:$session, StrAttr:$peer, I16Attr:$oob_port);
+    // peer / oob_port are only needed by transports that run an OOB TCP handshake (RDMA).
+    // In-process transports (memcpy) pair on the session key, so both attrs are optional.
+    let arguments = (ins Transport_SessionType:$session,
+                        OptionalAttr<StrAttr>:$peer,
+                        OptionalAttr<UI16Attr>:$oob_port);
     let assemblyFormat = "$session attr-dict `:` qualified(type($session))";
 }
 
 def Transport_ConnectAsyncOp : Transport_Op<"connect_async"> {
-    let summary = "Non-blocking connect; await the token with transport.barrier.";
-    let arguments = (ins Transport_SessionType:$session, StrAttr:$peer, I16Attr:$oob_port);
+    let summary = "Non-blocking connect; await the token with transport.await.";
+    let arguments = (ins Transport_SessionType:$session,
+                        OptionalAttr<StrAttr>:$peer,
+                        OptionalAttr<UI16Attr>:$oob_port);
     let results = (outs Transport_TokenType:$token);
     let assemblyFormat = "$session attr-dict `:` qualified(type($session)) `->` type($token)";
 }
@@ -68,35 +74,40 @@ def Transport_ExchangeKeysOp : Transport_Op<"exchange_keys"> {
 }
 
 def Transport_ExchangeKeysAsyncOp : Transport_Op<"exchange_keys_async"> {
-    let summary = "Non-blocking exchange_keys; await the token with transport.barrier.";
+    let summary = "Non-blocking exchange_keys; await the token with transport.await.";
     let arguments = (ins Transport_SessionType:$session);
     let results = (outs Transport_TokenType:$token);
     let assemblyFormat = "$session attr-dict `:` qualified(type($session)) `->` type($token)";
 }
 
-def Transport_BarrierOp : Transport_Op<"barrier"> {
+def Transport_AwaitOp : Transport_Op<"await"> {
     let summary = "Await an asynchronous bring-up step.";
     let arguments = (ins Transport_TokenType:$token);
     let assemblyFormat = "$token attr-dict `:` type($token)";
 }
 
 def Transport_EstablishChannelOp : Transport_Op<"establish_channel"> {
-    let summary = "Arm the data channel for the given data path.";
+    let summary = "Arm the channel for the given transport.";
     let description = [{
-        Prepares the data channel selected by `data_path` for the rounds that follow.
-        Runs after `exchange_keys` and before `kick`/`collect`.
+        Prepares the channel selected by `transport` for the rounds that follow.
+        Runs after `exchange_keys` and before `post`/`collect`.
     }];
-    let arguments = (ins Transport_SessionType:$session, StrAttr:$data_path);
-    let assemblyFormat = "$session $data_path attr-dict `:` qualified(type($session))";
+    let arguments = (ins Transport_SessionType:$session, StrAttr:$transport);
+    let assemblyFormat = "$session $transport attr-dict `:` qualified(type($session))";
 }
 
 //===----------------------------------------------------------------------===//
 // Round setup
 //===----------------------------------------------------------------------===//
 
-def Transport_CommitWorkItemOp : Transport_Op<"commit_work_item"> {
-    let summary = "Declare a round's request/reply byte sizes (controller).";
-    let arguments = (ins Transport_ControllerSession:$session, I32Attr:$work_item_idx,
+def Transport_SetMessageSizesOp : Transport_Op<"set_message_sizes"> {
+    let summary = "Declare how big a round's request and reply are (controller).";
+    let description = [{
+        Called once at bring-up. `work_item_idx` selects which of the backend's pre-programmed
+        transfer descriptors this describes
+    }];
+    let arguments = (ins Transport_ControllerSession:$session,
+                         DefaultValuedOptionalAttr<I32Attr, "0">:$work_item_idx,
                          I64Attr:$in_bytes, I64Attr:$out_bytes);
     let assemblyFormat = "$session attr-dict `:` qualified(type($session))";
 }
@@ -127,12 +138,38 @@ def Transport_StartOp : Transport_Op<"start"> {
     let assemblyFormat = "$session attr-dict `:` qualified(type($session))";
 }
 
-def Transport_KickOp : Transport_Op<"kick"> {
-    let summary = "Send a payload as one round's request (controller).";
+def Transport_ReplySlotOp : Transport_Op<"reply_slot"> {
+    let summary = "This round's slot in the transport-owned reply ring (controller).";
+    let description = [{
+        The peer writes its reply here. Handing this to `transport.collect`.
+        The slot is reused every ring wrap, so a consumer has to read it before the next round.
+    }];
+    let arguments = (ins Transport_ControllerSession:$session);
+    let results = (outs Transport_Buffer:$slot);
+    let assemblyFormat = "$session attr-dict `:` qualified(type($session)) `->` type($slot)";
+}
+
+def Transport_StagePayloadOp : Transport_Op<"stage_payload"> {
+    let summary = "Stage a payload into this round's request slot (controller).";
+    let description = [{
+        Writes through the backend, which knows how its slot memory has to be written.
+
+        `decoder_id` addresses the round at one of the peer's decoders. It travels in the frame
+        beside the payload, so it is staged with the payload rather than given to the send.
+    }];
     let arguments = (ins Transport_ControllerSession:$session, Transport_AnyBuffer:$payload,
-                         I32Attr:$work_item_idx,
                          DefaultValuedOptionalAttr<I32Attr, "0">:$decoder_id);
     let assemblyFormat = "$session `,` $payload attr-dict `:` qualified(type($session)) `,` type($payload)";
+}
+
+def Transport_PostOp : Transport_Op<"post"> {
+    let summary = "Post this round's payload (controller).";
+    let description = [{
+        Transmits the payload `transport.stage_payload` put in the request slot.
+    }];
+    let arguments = (ins Transport_ControllerSession:$session,
+                         DefaultValuedOptionalAttr<I32Attr, "0">:$work_item_idx);
+    let assemblyFormat = "$session attr-dict `:` qualified(type($session))";
 }
 
 def Transport_CollectOp : Transport_Op<"collect"> {

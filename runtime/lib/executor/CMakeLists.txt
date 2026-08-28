@@ -9,7 +9,7 @@ find_package(LLVM CONFIG REQUIRED)
 
 llvm_map_components_to_libnames(_executor_llvm_libs
     core support orcjit jitlink object passes
-    ${LLVM_TARGETS_TO_BUILD}
+    AllTargetsCodeGens AllTargetsDescs AllTargetsInfos
 )
 
 #  catalyst_executor_session

@@ -73,8 +73,11 @@ class TestOQDDevice:
         def circuit():
             return qp.sample()
 
+        with pytest.warns(UserWarning, match="AOT"):
+            qjit_c = qjit(circuit)
+
         with pytest.raises(ValueError, match="'one-shot' is not supported in the chosen device"):
-            qjit(circuit)
+            qjit_c()
 
 
 if __name__ == "__main__":

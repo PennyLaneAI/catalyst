@@ -14,29 +14,38 @@
 
 """Unit tests for the python decompositions module."""
 
-from pathlib import Path
-
 import jax.numpy as jnp
 import pennylane as qp
 import pytest
 from jax.core import ShapedArray
-from pennylane import qjit, qnode
+from operator2_dummy_gates import (
+    CompilableData,
+    HybridOpArg,
+    HybridWires,
+    MultiParams,
+    MultipleRegisters,
+    NoParams,
+    NoParamsCustomOp,
+    SingleParam,
+    StaticData,
+)
+from pennylane import qnode
 from pennylane.decomposition import add_decomps, local_decomps, register_resources
-from pennylane.typing import Float, Wire
+from pennylane.typing import Bool, Complex, Float, Int, Wire
+from pennylane.wires import Wires
 
-from catalyst.compiler import _quantum_opt
+from catalyst import qjit
 from catalyst.decomposition.decomposition_rules import (
+    _MODIFIER_CANONICAL_ORDER,
+    _leading_modifier_kind,
+    _modifier_kind,
     compile_decomposition_rules_wrapper,
+    name_unwrap_adjoint,
+    name_wrap_adjoint,
+    wrap_modifier_id,
 )
-from catalyst.decomposition.precompile_decomposition_rules import (
-    get_abstract_args,
-    precompile_decomp_rules,
-)
-from catalyst.decomposition.type_utils import (
-    convert_types_to_mlir_strings,
-    get_dummy_values_for_arg,
-)
-from catalyst.utils.runtime_environment import BYTECODE_FILE_PATH
+from catalyst.decomposition.graph_op_id import GraphOpID
+from catalyst.decomposition.type_utils import get_dummy_values_for_arg
 
 
 class TestGenericUtilities:
@@ -76,59 +85,65 @@ class TestGenericUtilities:
         assert result.shape == shape
 
     @pytest.mark.parametrize(
-        "dtype, expected",
+        "op, id",
         [
-            ({"name": qp.typing.Float}, {"name": ["f64"]}),
-            ({"name": qp.typing.Int}, {"name": ["i64"]}),
-            ({"test": qp.typing.Bool}, {"test": ["i1"]}),
-            ({"r": qp.typing.Complex}, {"r": ["complex<f64>"]}),
-            ({"A": qp.typing.AbstractArray((2,), "int32")}, {"A": ["i32", "i32"]}),
+            (NoParams(Wires(0)), "NoParams{}{reg:1}{}"),
+            (NoParamsCustomOp(Wires([0, 1])), "NoParamsCustomOp{}{wires:2}{}"),
+            (SingleParam(Float, Wires([2, 3])), "SingleParam{x:[[f64]]}{reg:2}{}"),
+            (
+                CompilableData(True, 3.14, "string", Wires([0, 1])),
+                "CompilableData{}{wires:2}{a:True,b:3.14,thing:string}",
+            ),
+            (
+                MultipleRegisters(Wires([0, 1, 2]), Wires([3, 4])),
+                "MultipleRegisters{}{reg1:3,reg2:2}{}",
+            ),
+            (
+                MultiParams(Wires([0, 2, 3]), Complex, Int, Float[2]),
+                "MultiParams{a:[[complex<f64>]],b:[[i64]],c:[[f64,f64]]}{reg:3}",
+            ),
+            (qp.MultiRZ(Float, Wires([0, 2, 3, 4])), "MultiRZ{theta:[f64]}{wires:4}{}"),
+            (
+                qp.PauliRot(Float, "XYZ", Wires([1, 2, 3])),
+                "PauliRot{theta:[f64]}{wires:3}{pauli_word:XYZ}",
+            ),
+            (StaticData("mylabel", Wires([0, 1])), "StaticData{}{reg:2}{}["),
+            (
+                HybridWires(Wires([0, 1, 2])),
+                "HybridWires{}{}{}[",
+            ),  # NOTE: open brace to match uid
+            (
+                HybridOpArg(Float, StaticData("innerop", Wires(0)), Wires([2, 3]), 12),
+                "HybridOpArg{angle:[[f64]]}{cwires:2}{}[",  # NOTE: open brace to match uid
+            ),
+            (
+                qp.Rot(Bool, Int, Float, Wires(0)),
+                "Rot{0:[f64],1:[f64],2:[f64]}{wires:1}{}",
+            ),  # custom ops should be promoted to f64
         ],
     )
-    def test_mlir_stringify_type(self, dtype, expected):
-        """Test mlir_stringify_type."""
-        assert convert_types_to_mlir_strings(dtype) == expected
+    def test_GraphOpId(self, op, id):
+        """Test that GraphOpIds are generated correctly by the frontend."""
+        # NOTE: use startswith to match ops with uids/extra_data
+        assert GraphOpID(op).getGraphOpId().startswith(id)
 
-    def test_wrapper_operator(self):
+    def test_wrapper_operator(self, mocker):
         """Test that compile_decomposition_rules_wrapper doesn't error on Operator1 instances."""
-        # TODO: keep this up to date with an operator that is not migrated, and decomposes to
-        # un-migrated operators.
+        mock_decomp = mocker.MagicMock()
+        mock_decomp._impl.__name__ = "FakeRuleName"
+        mock_decomp.compute_resources.side_effect = ValueError("Fake Resource Related Error")
+
+        mocker.patch("pennylane.decomposition.list_decomps", return_value=[mock_decomp])
+
         with pytest.warns(match="Failed to get resources"):
-            compile_decomposition_rules_wrapper(
-                "PauliX", 'PauliX{}{"wires":1}{}', {}, {"wires": 1}, {}
+            res = compile_decomposition_rules_wrapper(
+                "MockOp", 'MockOp{}{"wires":1}{}', {}, {"wires": 1}, {}
             )
+        assert isinstance(res, str)
 
 
 class TestPrecompiled:
     """Tests for precompiled decomposition rules."""
-
-    def test_bytecode_file(self):
-        """Test that the bytecode file is generated correctly."""
-        # orig_bcfile = Path(BYTECODE_FILE_PATH)
-        # tmp_bcfile = None
-        #
-        # if orig_bcfile.exists():
-        #     tmp_bcfile = orig_bcfile.replace(BYTECODE_FILE_PATH + ".tmpbackup")
-        #
-        # try:
-        #     precompile_decomp_rules()
-        #     assert orig_bcfile.exists()
-        #
-        # finally:
-        #     if tmp_bcfile:
-        #         tmp_bcfile = tmp_bcfile.replace(orig_bcfile)
-        #     else:
-        #         orig_bcfile.unlink(missing_ok=True)
-        #
-        # # NOTE: empty pass is needed to prevent running default pipeline
-        # rules = _quantum_opt("--empty", BYTECODE_FILE_PATH)
-        #
-        # assert "_isingxy_to_h_cy" in rules
-        # assert "_doublexcit" in rules
-        # assert "_pauliz_to_ps" in rules
-        # assert "_cphase_to_ppr" in rules
-        # assert "_crot" in rules
-        pass
 
 
 class TestTraceTime:
@@ -174,7 +189,7 @@ class TestTraceTime:
             mlir = circuit.mlir
 
         assert 'target_gate = "NoParams{}{reg:2}{}"' in mlir
-        assert 'target_gate = "Adjoint(NoParams{}{reg:2}{})"' in mlir
+        assert 'target_gate = "Adjoint(NoParams){}{reg:2}{}"' in mlir
 
     def test_adjoint_gate_captures_base_and_adjoint(self):
         """Lowering the Adjoint of a gate captures the rules registered against both the plain gate
@@ -196,7 +211,7 @@ class TestTraceTime:
 
         assert 'qref.operator "NoParams"() adj' in mlir
         assert 'target_gate = "NoParams{}{reg:2}{}"' in mlir
-        assert 'target_gate = "Adjoint(NoParams{}{reg:2}{})"' in mlir
+        assert 'target_gate = "Adjoint(NoParams){}{reg:2}{}"' in mlir
 
     def test_distribution_rule_synthesized_from_base_only(self):
         """With only a base rule registered (no Adjoint(Op) rule), lowering still synthesizes a rule
@@ -218,9 +233,10 @@ class TestTraceTime:
 
         assert 'target_gate = "NoParams{}{reg:2}{}"' in mlir
         # A distribution rule for Adjoint(NoParams) is synthesized even though none was registered.
-        assert 'target_gate = "Adjoint(NoParams{}{reg:2}{})"' in mlir
+        assert 'target_gate = "Adjoint(NoParams){}{reg:2}{}"' in mlir
         assert (
-            'resources = {operations = {"Adjoint(SingleParam{x:[f64]}{reg:2}{})" = 1 : i64}' in mlir
+            'resources = {operations = {"Adjoint(SingleParam){x:[[f64]]}{reg:2}{}" = 1 : i64}'
+            in mlir
         )
         assert "qref.adjoint" in mlir
 
@@ -249,11 +265,94 @@ class TestTraceTime:
             mlir = circuit.mlir
 
         assert 'target_gate = "NoParams{}{reg:2}{}"' in mlir
-        assert 'target_gate = "Adjoint(NoParams{}{reg:2}{})"' not in mlir
+        assert 'target_gate = "Adjoint(NoParams){}{reg:2}{}"' not in mlir
 
 
 class TestOnDemand:
-    """Test the python wrapper functions used for on-demand, compile-time decomposition rule lowering."""
+    """Test the python wrapper functions used for on-demand,
+    compile-time decomposition rule lowering.
+    """
+
+    @pytest.mark.parametrize(
+        "op_name, op_id, expected",
+        [
+            ("S", "S{}{wires:1}{}", "S{}{wires:1}{}"),
+            ("S", "Adjoint(S){}{wires:1}{}", "S{}{wires:1}{}"),
+            ("RX", "Adjoint(RX){0:[f64]}{wires:1}{}", "RX{0:[f64]}{wires:1}{}"),
+        ],
+    )
+    def test_name_unwrap_adjoint(self, op_name, op_id, expected):
+        """name_unwrap_adjoint recovers the base op's id from an adjoint graphOpId, and is the
+        inverse of name_wrap_adjoint for a base id."""
+        if op_id.startswith("Adjoint("):
+            assert name_unwrap_adjoint(op_name, op_id) == expected
+            assert name_wrap_adjoint(expected) == op_id
+        else:
+            with pytest.raises(ValueError, match="not an adjoint id"):
+                name_unwrap_adjoint(op_name, op_id)
+
+
+class TestModifierIds:
+    """Unit tests for the op-level modifier name-wrapping helpers (Adjoint / C canonicalization)."""
+
+    @pytest.mark.parametrize(
+        "modifier, expected",
+        [
+            ("Adjoint", "Adjoint"),
+            ("C", "C"),
+            ("2C", "C"),  # multi-control normalises to the "C" kind
+            ("10C", "C"),
+        ],
+    )
+    def test_modifier_kind(self, modifier, expected):
+        """A modifier token normalises to its canonical kind (any ``<n>C`` -> ``C``)."""
+        assert _modifier_kind(modifier) == expected
+
+    @pytest.mark.parametrize(
+        "op_id, expected",
+        [
+            ("Adjoint(RX){0:[f64]}{wires:1}{}", "Adjoint"),
+            ("C(RX){0:[f64]}{wires:1}{}", "C"),
+            ("2C(RX){0:[f64]}{wires:1}{}", "C"),  # exercises the leading-digit scan
+            ("10C(RX){0:[f64]}{wires:1}{}", "C"),  # multi-digit control count
+            ("RX{0:[f64]}{wires:1}{}", None),  # bare id, no modifier
+            ("", None),  # empty edge case
+        ],
+    )
+    def test_leading_modifier_kind(self, op_id, expected):
+        """The outermost modifier of an id is detected (including ``<n>C(...)``), or None if bare."""
+        assert _leading_modifier_kind(op_id) == expected
+
+    @pytest.mark.parametrize(
+        "op_id, modifier, expected",
+        [
+            # Wrapping a bare id with each modifier kind.
+            ("RX{0:[f64]}{wires:1}{}", "C", "C(RX){0:[f64]}{wires:1}{}"),
+            ("RX{0:[f64]}{wires:1}{}", "2C", "2C(RX){0:[f64]}{wires:1}{}"),
+            ("RX{0:[f64]}{wires:1}{}", "Adjoint", "Adjoint(RX){0:[f64]}{wires:1}{}"),
+            # Canonical nesting: control is outermost, so C may wrap an already-adjointed id.
+            (
+                "Adjoint(RX){0:[f64]}{wires:1}{}",
+                "C",
+                "C(Adjoint(RX)){0:[f64]}{wires:1}{}",
+            ),
+            # Only the name is wrapped; the `{...}...[uid]` suffix is carried through untouched.
+            ("HybridOp{a:[[f64]]}{w:1}{}[42]", "C", "C(HybridOp){a:[[f64]]}{w:1}{}[42]"),
+        ],
+    )
+    def test_wrap_modifier_id_canonical(self, op_id, modifier, expected):
+        """A modifier wraps only the operator name, and control may nest outside adjoint."""
+        assert wrap_modifier_id(op_id, modifier) == expected
+
+    @pytest.mark.parametrize(
+        "op_id",
+        ["C(RX){0:[f64]}{wires:1}{}", "2C(RX){0:[f64]}{wires:1}{}"],
+    )
+    def test_wrap_modifier_id_rejects_non_canonical(self, op_id):
+        """Wrapping the canonically-inner ``Adjoint`` around an already-controlled id is rejected."""
+        assert _MODIFIER_CANONICAL_ORDER == ("C", "Adjoint")
+        with pytest.raises(ValueError, match="Non-canonical modifier order"):
+            wrap_modifier_id(op_id, "Adjoint")
 
 
 if __name__ == "__main__":

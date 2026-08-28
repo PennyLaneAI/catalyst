@@ -25,6 +25,7 @@ import catalyst
 from catalyst import qjit
 
 # pylint:disable = protected-access,attribute-defined-outside-init,too-many-lines
+# pylint:disable = no-member,no-value-for-parameter
 
 
 @qp.transform
@@ -72,7 +73,7 @@ def check_specs_resources_same(
         assert type(actual_res) is type(expected_res)
         assert actual_res.quantum_operations == expected_res.quantum_operations
         assert actual_res.measurement_processes == expected_res.measurement_processes
-        assert actual_res.num_allocs == expected_res.num_allocs
+        assert actual_res.num_wires == expected_res.num_wires
         assert actual_res.depth == expected_res.depth
         assert actual_res.total_quantum_operations == expected_res.total_quantum_operations
         if isinstance(actual_res, PBCSpecsResources) and isinstance(
@@ -133,6 +134,10 @@ class TestDeviceLevelSpecs:
         assert cat_specs["device_name"] == "lightning.qubit"
         check_specs_same(cat_specs, pl_specs)
 
+    @pytest.mark.xfail(reason="""
+        ControlledQubitUnitary doesn't work with specs in non-jit PL
+        https://app.shortcut.com/xanaduai/story/128500/controlledqubitunitary-doesn-t-work-with-specs-in-non-jit-pl
+    """)
     def test_complex(self):
         """Test a complex case of qp.specs() against PennyLane"""
 
@@ -313,17 +318,17 @@ class TestPassByPassSpecs:
                 "Before MLIR Passes": SpecsResources(
                     counts={"RX": 2, "RZ": 2, "Hadamard": 2, "CNOT": 2},
                     measurement_processes={"probs(all wires)": 1},
-                    num_allocs=2,
+                    num_wires=2,
                 ),
                 "cancel-inverses": SpecsResources(
                     counts={"RX": 2, "RZ": 2},
                     measurement_processes={"probs(all wires)": 1},
-                    num_allocs=2,
+                    num_wires=2,
                 ),
                 "merge-rotations": SpecsResources(
                     counts={"RX": 1, "RZ": 1},
                     measurement_processes={"probs(all wires)": 1},
-                    num_allocs=2,
+                    num_wires=2,
                 ),
             },
         )
@@ -350,7 +355,7 @@ class TestPassByPassSpecs:
         assert specs.resources == SpecsResources(
             counts={"RX": 1, "RZ": 1},
             measurement_processes={"probs(all wires)": 1},
-            num_allocs=2,
+            num_wires=2,
         )
 
     def test_user_level_with_tapes(self, simple_circuit):
@@ -366,7 +371,7 @@ class TestPassByPassSpecs:
         assert specs.resources == SpecsResources(
             counts={"RX": 1, "RZ": 1},
             measurement_processes={"probs(all wires)": 1},
-            num_allocs=2,
+            num_wires=2,
         )
 
     def test_duplicate_level_names(self, simple_circuit):
@@ -384,7 +389,7 @@ class TestPassByPassSpecs:
         canceled_res = SpecsResources(
             counts={"RX": 2, "RZ": 2},
             measurement_processes={"probs(all wires)": 1},
-            num_allocs=2,
+            num_wires=2,
         )
 
         expected = CircuitSpecs(
@@ -407,7 +412,7 @@ class TestPassByPassSpecs:
                 "Before Tape Transforms": SpecsResources(
                     counts={"RX": 2, "RZ": 2, "Hadamard": 2, "CNOT": 2},
                     measurement_processes={"probs(all wires)": 1},
-                    num_allocs=2,
+                    num_wires=2,
                 ),
                 "cancel_inverses": canceled_res,
                 "dummy_transform": canceled_res,
@@ -458,32 +463,32 @@ class TestPassByPassSpecs:
                 "Before Tape Transforms": SpecsResources(
                     counts={"RX": 2, "RZ": 2, "Hadamard": 2, "CNOT": 2},
                     measurement_processes={"probs(all wires)": 1},
-                    num_allocs=2,
+                    num_wires=2,
                 ),
                 "dummy_transform": SpecsResources(
                     counts={"RX": 2, "RZ": 2, "Hadamard": 2, "CNOT": 2},
                     measurement_processes={"probs(all wires)": 1},
-                    num_allocs=2,
+                    num_wires=2,
                 ),
                 "dummy_transform-2": SpecsResources(
                     counts={"RX": 2, "RZ": 2, "Hadamard": 2, "CNOT": 2},
                     measurement_processes={"probs(all wires)": 1},
-                    num_allocs=2,
+                    num_wires=2,
                 ),
                 "Before MLIR Passes": SpecsResources(
                     counts={"RX": 2, "RZ": 2, "Hadamard": 2, "CNOT": 2},
                     measurement_processes={"probs(all wires)": 1},
-                    num_allocs=2,
+                    num_wires=2,
                 ),
                 "cancel-inverses": SpecsResources(
                     counts={"RX": 2, "RZ": 2},
                     measurement_processes={"probs(all wires)": 1},
-                    num_allocs=2,
+                    num_wires=2,
                 ),
                 "merge-rotations": SpecsResources(
                     counts={"RX": 1, "RZ": 1},
                     measurement_processes={"probs(all wires)": 1},
-                    num_allocs=2,
+                    num_wires=2,
                 ),
             },
         )
@@ -531,27 +536,27 @@ class TestPassByPassSpecs:
                 "Before Tape Transforms": SpecsResources(
                     counts={"RX": 2, "RZ": 2, "Hadamard": 2, "CNOT": 2},
                     measurement_processes={"probs(all wires)": 1},
-                    num_allocs=2,
+                    num_wires=2,
                 ),
                 "cancel_inverses": SpecsResources(
                     counts={"RX": 2, "RZ": 2},
                     measurement_processes={"probs(all wires)": 1},
-                    num_allocs=2,
+                    num_wires=2,
                 ),
                 "dummy_transform": SpecsResources(
                     counts={"RX": 2, "RZ": 2},
                     measurement_processes={"probs(all wires)": 1},
-                    num_allocs=2,
+                    num_wires=2,
                 ),
                 "Before MLIR Passes": SpecsResources(
                     counts={"RX": 2, "RZ": 2},
                     measurement_processes={"probs(all wires)": 1},
-                    num_allocs=2,
+                    num_wires=2,
                 ),
                 "merge-rotations": SpecsResources(
                     counts={"RX": 1, "RZ": 1},
                     measurement_processes={"probs(all wires)": 1},
-                    num_allocs=2,
+                    num_wires=2,
                 ),
             },
         )
@@ -601,27 +606,27 @@ class TestPassByPassSpecs:
                 "Before Tape Transforms": SpecsResources(
                     counts={"RX": 2, "RZ": 2, "Hadamard": 2, "CNOT": 2},
                     measurement_processes={"probs(all wires)": 1},
-                    num_allocs=2,
+                    num_wires=2,
                 ),
                 "cancel_inverses": SpecsResources(
                     counts={"RX": 2, "RZ": 2},
                     measurement_processes={"probs(all wires)": 1},
-                    num_allocs=2,
+                    num_wires=2,
                 ),
                 "dummy_transform": SpecsResources(
                     counts={"RX": 2, "RZ": 2},
                     measurement_processes={"probs(all wires)": 1},
-                    num_allocs=2,
+                    num_wires=2,
                 ),
                 "Before MLIR Passes": SpecsResources(
                     counts={"RX": 2, "RZ": 2},
                     measurement_processes={"probs(all wires)": 1},
-                    num_allocs=2,
+                    num_wires=2,
                 ),
                 "merge-rotations": SpecsResources(
                     counts={"RX": 1, "RZ": 1},
                     measurement_processes={"probs(all wires)": 1},
-                    num_allocs=2,
+                    num_wires=2,
                 ),
             },
         )
@@ -652,17 +657,17 @@ class TestPassByPassSpecs:
                 "Before MLIR Passes": SpecsResources(
                     counts={"RX": 2, "RZ": 2, "Hadamard": 2, "CNOT": 2},
                     measurement_processes={"probs(all wires)": 1},
-                    num_allocs=2,
+                    num_wires=2,
                 ),
                 "cancel-inverses": SpecsResources(
                     counts={"RX": 2, "RZ": 2},
                     measurement_processes={"probs(all wires)": 1},
-                    num_allocs=2,
+                    num_wires=2,
                 ),
                 "merge-rotations": SpecsResources(
                     counts={"RX": 1, "RZ": 1},
                     measurement_processes={"probs(all wires)": 1},
-                    num_allocs=2,
+                    num_wires=2,
                 ),
             },
         )
@@ -695,12 +700,12 @@ class TestPassByPassSpecs:
                 "Before MLIR Passes": SpecsResources(
                     counts={"RX": 2, "RZ": 2},
                     measurement_processes={"probs(all wires)": 1},
-                    num_allocs=2,
+                    num_wires=2,
                 ),
                 "merge-rotations": SpecsResources(
                     counts={"RX": 1, "RZ": 1},
                     measurement_processes={"probs(all wires)": 1},
-                    num_allocs=2,
+                    num_wires=2,
                 ),
             },
         )
@@ -767,7 +772,7 @@ class TestPassByPassSpecs:
             resources=SpecsResources(
                 counts={"Hadamard": 1, "PauliX": 2, "PauliZ": 1},
                 measurement_processes={"expval(PauliX)": 1},
-                num_allocs=1,
+                num_wires=1,
             ),
         )
 
@@ -795,7 +800,34 @@ class TestPassByPassSpecs:
             resources=SpecsResources(
                 counts={"Hadamard": 15, "PauliX": 5},
                 measurement_processes={"expval(PauliX)": 1},
-                num_allocs=1,
+                num_wires=1,
+            ),
+        )
+
+        check_specs_same(actual, expected)
+
+    def test_empty_loops(self, capture_mode):
+        """Test that empty static loops are handled correctly."""
+
+        @qp.qjit(capture=capture_mode)
+        @qp.qnode(qp.device("null.qubit", wires=1))
+        def circuit():
+            for _ in range(0):
+                qp.PauliX(0)
+                for _ in range(2, 2):
+                    qp.Hadamard(0)
+            return qp.expval(qp.PauliX(0))
+
+        actual = qp.specs(circuit, level=0)()
+        expected = CircuitSpecs(
+            device_name="null.qubit",
+            num_device_wires=1,
+            shots=Shots(None),
+            level="Before MLIR Passes",
+            resources=SpecsResources(
+                counts={},
+                measurement_processes={"expval(PauliX)": 1},
+                num_wires=1,
             ),
         )
 
@@ -823,17 +855,17 @@ class TestPassByPassSpecs:
                 SpecsResources(
                     counts={"Hadamard": 1, "PauliX": 2},
                     measurement_processes={"expval(PauliX)": 1},
-                    num_allocs=1,
+                    num_wires=1,
                 ),
                 SpecsResources(
                     counts={"Hadamard": 1, "PauliX": 2},
                     measurement_processes={"expval(PauliY)": 1},
-                    num_allocs=1,
+                    num_wires=1,
                 ),
                 SpecsResources(
                     counts={"Hadamard": 1, "PauliX": 2},
                     measurement_processes={"expval(PauliZ)": 1},
-                    num_allocs=1,
+                    num_wires=1,
                 ),
             ],
         )
@@ -863,34 +895,34 @@ class TestPassByPassSpecs:
                     SpecsResources(
                         counts={"Hadamard": 1, "PauliX": 2},
                         measurement_processes={"expval(PauliX)": 1},
-                        num_allocs=3,
+                        num_wires=3,
                     ),
                     SpecsResources(
                         counts={"Hadamard": 1, "PauliX": 2},
                         measurement_processes={"expval(PauliY)": 1},
-                        num_allocs=3,
+                        num_wires=3,
                     ),
                     SpecsResources(
                         counts={"Hadamard": 1, "PauliX": 2},
                         measurement_processes={"expval(PauliZ)": 1},
-                        num_allocs=3,
+                        num_wires=3,
                     ),
                 ],
                 "cancel-inverses": [  # The split should remain throughout subsequent passes
                     SpecsResources(
                         counts={"Hadamard": 1},
                         measurement_processes={"expval(PauliX)": 1},
-                        num_allocs=3,
+                        num_wires=3,
                     ),
                     SpecsResources(
                         counts={"Hadamard": 1},
                         measurement_processes={"expval(PauliY)": 1},
-                        num_allocs=3,
+                        num_wires=3,
                     ),
                     SpecsResources(
                         counts={"Hadamard": 1},
                         measurement_processes={"expval(PauliZ)": 1},
-                        num_allocs=3,
+                        num_wires=3,
                     ),
                 ],
             },
@@ -925,7 +957,7 @@ class TestPassByPassSpecs:
             resources=SpecsResources(
                 counts={"Hadamard": 3, "PauliX": 1},
                 measurement_processes={"probs(all wires)": 1},
-                num_allocs=3,
+                num_wires=3,
             ),
         )
 
@@ -1001,7 +1033,7 @@ class TestSpecsWithPPR:
             resources=PBCSpecsResources(
                 counts={"GlobalPhase": 2, "PPR-pi/4-w1": 3, "PPR-pi/8-w1": 1},
                 measurement_processes={},
-                num_allocs=2,
+                num_wires=2,
                 any_commuting_depth=3,
                 qubit_disjoint_depth=4,
             ),
@@ -1035,7 +1067,7 @@ class TestSpecsWithPPR:
                     "PPR-Phi-w1": 1,
                 },
                 measurement_processes={},
-                num_allocs=4,
+                num_wires=4,
                 any_commuting_depth=4,
                 qubit_disjoint_depth=4,
             ),
@@ -1073,7 +1105,7 @@ class TestSymbolicSpecs:
         expected_res = SpecsResources(
             counts={"Hadamard": 1, "PauliX": 6},
             measurement_processes={"expval(PauliX)": 1},
-            num_allocs=1,
+            num_wires=1,
         )
         check_specs_resources_same(concrete_res, expected_res)
 
@@ -1111,7 +1143,7 @@ class TestSymbolicSpecs:
         expected_res = SpecsResources(
             counts={"Hadamard": 1, "PauliX": 6, "PauliY": 15, "PauliZ": 25},
             measurement_processes={"expval(PauliX)": 1},
-            num_allocs=1,
+            num_wires=1,
         )
         check_specs_resources_same(concrete_res, expected_res)
 
@@ -1147,7 +1179,7 @@ class TestSymbolicSpecs:
         expected_res = SpecsResources(
             counts={"Hadamard": 1, "PauliX": 16, "PauliZ": 3},
             measurement_processes={"expval(PauliX)": 1},
-            num_allocs=1,
+            num_wires=1,
         )
         check_specs_resources_same(concrete_res, expected_res)
 
@@ -1177,7 +1209,7 @@ class TestSymbolicSpecs:
             expected_res = SpecsResources(
                 counts={"Hadamard": 1 + n * n, "PauliX": n},
                 measurement_processes={"expval(PauliX)": 1},
-                num_allocs=1,
+                num_wires=1,
             )
             check_specs_resources_same(concrete_res, expected_res)
 
@@ -1215,7 +1247,7 @@ class TestSymbolicSpecs:
                     SpecsResources(
                         counts={"Hadamard": n * n + n + 1, "PauliX": n},
                         measurement_processes={"expval(PauliX)": 1},
-                        num_allocs=1,
+                        num_wires=1,
                     ),
                 )
 
@@ -1259,6 +1291,268 @@ class TestSymbolicSpecs:
 
         r = qp.specs(c, level=0)(2).resources
         assert r.subs({var: 10 for var in r.vars}).quantum_operations["RX"] == 10
+
+
+class TestSymbolicSpecsLoopConcretization:
+    """
+    Integration tests for the loop concretization feature of the resource analysis pass, which
+    resolves nested loops whose inner bounds are the immediately enclosing loop's induction
+    variable.
+    """
+
+    def test_loop_concretization(self):
+        """Test a straightforward nested loop whose inner bound depends on the outer loop var."""
+        n = 8
+
+        @qp.qjit(autograph=True)
+        @qp.qnode(qp.device("null.qubit", wires=n))
+        def circuit():
+            for i in range(n):
+                for j in range(i):
+                    qp.PauliZ(wires=j % 2)
+            return qp.expval(qp.X(0))
+
+        resources = qp.specs(circuit, level=0)().resources
+
+        assert resources.quantum_operations["PauliZ"] == 28
+
+    def test_triple_nested_loop_concretization(self):
+        """Test 3 nested loops whose bounds depends on the outer loop var."""
+        n = 8
+
+        @qp.qjit(autograph=True)
+        @qp.qnode(qp.device("null.qubit", wires=n))
+        def circuit():
+            for i in range(n):  # Runs 8 times total
+                for j in range(i):  # Runs 28 times total
+                    for k in range(j):  # Runs 56 times total
+                        qp.PauliZ(wires=k % 2)
+                    qp.PauliX(wires=j % 2)
+
+            return qp.expval(qp.X(0))
+
+        resources = qp.specs(circuit, level=0)().resources
+
+        assert resources.quantum_operations["PauliZ"] == 56
+        assert resources.quantum_operations["PauliX"] == 28
+
+    def test_loop_concretization_with_unrelated_middle_loop(self):
+        """Test 3 nested loops where the middle loop is unrelated to the other 2."""
+        a, b = 4, 3
+
+        @qp.qjit(autograph=True)
+        @qp.qnode(qp.device("null.qubit", wires=2))
+        def circuit():
+            for i in range(a):  # Runs 4 times total
+                for j in range(b):  # Runs 12 times total
+                    for k in range(i):  # Runs 18 times total
+                        qp.PauliZ(wires=k % 2)
+                    qp.PauliX(wires=j % 2)
+
+            return qp.expval(qp.X(0))
+
+        resources = qp.specs(circuit, level=0)().resources
+
+        assert resources.quantum_operations["PauliZ"] == 18
+        assert resources.quantum_operations["PauliX"] == 12
+
+    def test_loop_concretization_symbolic(self):
+        """Test nested dynamic loops."""
+
+        @qp.qjit(autograph=True)
+        @qp.qnode(qp.device("null.qubit", wires=8))
+        def circuit(n):
+            for i in range(n):
+                for j in range(i):
+                    qp.PauliZ(wires=j % 2)
+
+            return qp.expval(qp.X(0))
+
+        resources = qp.specs(circuit, level=0)(8).resources
+
+        # Current behaviour is that these loops are *NOT* folded like static loops
+        assert not isinstance(resources.quantum_operations["PauliZ"], (int, float))
+        assert len(resources.quantum_operations["PauliZ"].vars) == 2
+
+    def test_loop_concretization_with_step(self):
+        """Test an outer loop with a step != 1."""
+        n = 8
+
+        @qp.qjit(autograph=True)
+        @qp.qnode(qp.device("null.qubit", wires=n))
+        def circuit():
+            for i in range(0, n, 2):
+                for j in range(i):
+                    qp.PauliZ(wires=j % 2)
+
+            return qp.expval(qp.X(0))
+
+        resources = qp.specs(circuit, level=0)().resources
+
+        assert resources.quantum_operations["PauliZ"] == 12
+
+    def test_loop_concretization_with_inner_step(self):
+        """Test an inner loop with a step != 1."""
+        n = 8
+
+        @qp.qjit(autograph=True)
+        @qp.qnode(qp.device("null.qubit", wires=n))
+        def circuit():
+            for i in range(n):
+                for j in range(0, i, 2):
+                    qp.PauliZ(wires=j % 2)
+
+            return qp.expval(qp.X(0))
+
+        resources = qp.specs(circuit, level=0)().resources
+
+        assert resources.quantum_operations["PauliZ"] == 16
+
+    def test_loop_concretization_with_lower_bound(self):
+        """Test an outer loop with a lower bound."""
+        n = 8
+
+        @qp.qjit(autograph=True)
+        @qp.qnode(qp.device("null.qubit", wires=n))
+        def circuit():
+            for i in range(2, n):
+                for j in range(i):
+                    qp.PauliZ(wires=j % 2)
+
+            return qp.expval(qp.X(0))
+
+        resources = qp.specs(circuit, level=0)().resources
+
+        assert resources.quantum_operations["PauliZ"] == 27
+
+    def test_loop_concretization_with_inner_lower_bound(self):
+        """Test an inner loop with a lower bound."""
+        n = 8
+
+        @qp.qjit(autograph=True)
+        @qp.qnode(qp.device("null.qubit", wires=n))
+        def circuit():
+            for i in range(n):
+                for j in range(1, i):
+                    qp.PauliZ(wires=j % 2)
+
+            return qp.expval(qp.X(0))
+
+        resources = qp.specs(circuit, level=0)().resources
+
+        assert resources.quantum_operations["PauliZ"] == 21
+
+    def test_loop_concretization_reverse(self):
+        """Test concretization on a decrementing loop."""
+        n = 8
+
+        @qp.qjit(autograph=True)
+        @qp.qnode(qp.device("null.qubit", wires=n))
+        def circuit():
+            for i in range(n, 0, -1):
+                for j in range(i):
+                    qp.PauliZ(wires=j % 2)
+
+            return qp.expval(qp.X(0))
+
+        resources = qp.specs(circuit, level=0)().resources
+
+        # Expect a symbolic value: reverse iteration is not supported for concretization
+        assert not isinstance(resources.quantum_operations["PauliZ"], (int, float))
+
+    def test_loop_concretization_static_change(self):
+        """Test concretization where the inner loop depends indirectly on the outer loop var."""
+        n = 8
+
+        @qp.qjit(autograph=True)
+        @qp.qnode(qp.device("null.qubit", wires=n))
+        def circuit():
+            for i in range(n):
+                for j in range(i + 1):  # Note the +1, this is now an expression
+                    qp.PauliZ(wires=j % 2)
+
+            return qp.expval(qp.X(0))
+
+        resources = qp.specs(circuit, level=0)().resources
+
+        # Expect a symbolic value: indirect dependency is not supported for concretization
+        assert not isinstance(resources.quantum_operations["PauliZ"], (int, float))
+
+    def test_loop_concretization_multi_dependency(self):
+        """Test concretization with a loop that has 2 direct dependencies from inner loops."""
+        n = 8
+
+        @qp.qjit(autograph=True)
+        @qp.qnode(qp.device("null.qubit", wires=n))
+        def circuit():
+            for i in range(n):
+                for _ in range(i):
+                    for k in range(i):  # Depends on outer-most loop
+                        qp.PauliZ(wires=k % 2)
+
+            return qp.expval(qp.X(0))
+
+        resources = qp.specs(circuit, level=0)().resources
+
+        assert resources.quantum_operations.get("PauliZ", 0) == 140
+
+    def test_loop_concretization_multi_level_dependency(self):
+        """Test concretization with a loop that jumps back to an outer ancestor,
+        skipping two enclosing loops."""
+        n = 8
+
+        @qp.qjit(autograph=True)
+        @qp.qnode(qp.device("null.qubit", wires=n))
+        def circuit():
+            for i in range(n):
+                for j in range(i):
+                    for k in range(j):
+                        for _ in range(i):  # Jumps back to the outer-most loop
+                            qp.PauliZ(wires=k % 2)
+
+            return qp.expval(qp.X(0))
+
+        resources = qp.specs(circuit, level=0)().resources
+
+        assert resources.quantum_operations.get("PauliZ", 0) == 322
+
+    def test_loop_concretization_combined(self):
+        """Test concretization with all different complexities on loop bounds put together."""
+        n = 8
+
+        @qp.qjit(autograph=True)
+        @qp.qnode(qp.device("null.qubit", wires=n))
+        def circuit():
+            for i in range(1, n, 2):
+                for j in range(1, i):
+                    for k in range(0, j, 2):
+                        qp.PauliZ(wires=k % 2)
+
+            return qp.expval(qp.X(0))
+
+        resources = qp.specs(circuit, level=0)().resources
+
+        assert resources.quantum_operations["PauliZ"] == 20
+
+    def test_loop_concretization_no_iters(self):
+        """Test concretization with a loop that has no iterations."""
+
+        @qp.qjit(autograph=True)
+        @qp.qnode(qp.device("null.qubit", wires=1))
+        def circuit():
+            for i in range(0):
+                for j in range(i):
+                    qp.PauliZ(wires=j % 2)
+            for i in range(2, 2):
+                for j in range(i):
+                    qp.PauliX(wires=j % 2)
+
+            return qp.expval(qp.X(0))
+
+        resources = qp.specs(circuit, level=0)().resources
+
+        assert resources.quantum_operations.get("PauliZ", 0) == 0
+        assert resources.quantum_operations.get("PauliX", 0) == 0
 
 
 class TestMarkerIntegration:
@@ -1307,17 +1601,17 @@ class TestMarkerIntegration:
                 "before-transforms": SpecsResources(
                     counts={"RX": 2, "RZ": 2, "Hadamard": 2, "CNOT": 2},
                     measurement_processes={"probs(all wires)": 1},
-                    num_allocs=2,
+                    num_wires=2,
                 ),
                 "after-tape": SpecsResources(
                     counts={"RX": 2, "RZ": 2, "Hadamard": 2, "CNOT": 2},
                     measurement_processes={"probs(all wires)": 1},
-                    num_allocs=2,
+                    num_wires=2,
                 ),
                 "after-mlir": SpecsResources(
                     counts={"RX": 2, "RZ": 2},
                     measurement_processes={"probs(all wires)": 1},
-                    num_allocs=2,
+                    num_wires=2,
                 ),
             },
         )
@@ -1362,32 +1656,32 @@ class TestMarkerIntegration:
                 "before-transforms": SpecsResources(
                     counts={"RX": 2, "RZ": 2, "Hadamard": 2, "CNOT": 2},
                     measurement_processes={"probs(all wires)": 1},
-                    num_allocs=2,
+                    num_wires=2,
                 ),
                 "dummy_transform": SpecsResources(
                     counts={"RX": 2, "RZ": 2, "Hadamard": 2, "CNOT": 2},
                     measurement_processes={"probs(all wires)": 1},
-                    num_allocs=2,
+                    num_wires=2,
                 ),
                 "after-tape": SpecsResources(
                     counts={"RX": 2, "RZ": 2, "Hadamard": 2, "CNOT": 2},
                     measurement_processes={"probs(all wires)": 1},
-                    num_allocs=2,
+                    num_wires=2,
                 ),
                 "Before MLIR Passes": SpecsResources(
                     counts={"RX": 2, "RZ": 2, "Hadamard": 2, "CNOT": 2},
                     measurement_processes={"probs(all wires)": 1},
-                    num_allocs=2,
+                    num_wires=2,
                 ),
                 "cancel-inverses": SpecsResources(
                     counts={"RX": 2, "RZ": 2},
                     measurement_processes={"probs(all wires)": 1},
-                    num_allocs=2,
+                    num_wires=2,
                 ),
                 "after-mlir": SpecsResources(
                     counts={"RX": 2, "RZ": 2},
                     measurement_processes={"probs(all wires)": 1},
-                    num_allocs=2,
+                    num_wires=2,
                 ),
             },
         )
@@ -1415,12 +1709,12 @@ class TestMarkerIntegration:
                 "m0": SpecsResources(
                     counts={"RX": 2, "RZ": 2, "Hadamard": 2, "CNOT": 2},
                     measurement_processes={"probs(all wires)": 1},
-                    num_allocs=2,
+                    num_wires=2,
                 ),
                 "m1, m1-duplicate": SpecsResources(
                     counts={"RX": 2, "RZ": 2},
                     measurement_processes={"probs(all wires)": 1},
-                    num_allocs=2,
+                    num_wires=2,
                 ),
             },
         )
@@ -1454,17 +1748,17 @@ class TestMarkerIntegration:
                 "m0": SpecsResources(
                     counts={"RX": 2, "RZ": 2, "Hadamard": 2, "CNOT": 2},
                     measurement_processes={"probs(all wires)": 1},
-                    num_allocs=2,
+                    num_wires=2,
                 ),
                 "m1": SpecsResources(
                     counts={"RX": 2, "RZ": 2},
                     measurement_processes={"probs(all wires)": 1},
-                    num_allocs=2,
+                    num_wires=2,
                 ),
                 "m2": SpecsResources(
                     counts={"RX": 1, "RZ": 1},
                     measurement_processes={"probs(all wires)": 1},
-                    num_allocs=2,
+                    num_wires=2,
                 ),
             },
         )
@@ -1472,6 +1766,29 @@ class TestMarkerIntegration:
         actual = qp.specs(simple_circuit, level=["m0", "m1", "m2"])()
 
         check_specs_same(actual, expected)
+
+
+def test_abstract_array_inputs():
+    """Test that AbstractArray and AbstractWires can be used with specs when level!= device."""
+
+    @qp.qjit(capture=True)
+    @qp.qnode(qp.device("lightning.qubit", wires=4))
+    def c(x, wires):
+        @qp.for_loop(x.shape[0])
+        def loop(i):
+            qp.RX(x[i], wires[i])
+
+        @qp.for_loop(wires.shape[0])
+        def loop2(i):
+            qp.X(i)
+
+        loop()
+        loop2()
+        return qp.expval(qp.Z(0))
+
+    s = qp.specs(c, level=0)(qp.typing.AbstractArray((3,), float), qp.typing.Wire[3])
+    assert s.resources.quantum_operations["PauliX"] == 3
+    assert s.resources.quantum_operations["RX"] == 3
 
 
 if __name__ == "__main__":
