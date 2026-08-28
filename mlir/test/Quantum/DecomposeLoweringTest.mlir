@@ -817,7 +817,7 @@ module @different_qreg_values{
 
 // -----
 
-// CHECK-LABEL module @test_if
+// CHECK-LABEL: module @test_if
 
 module @test_if {
   func.func @circuit() -> !quantum.bit {
