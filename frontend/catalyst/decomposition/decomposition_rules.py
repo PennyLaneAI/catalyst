@@ -141,7 +141,7 @@ def name_unwrap_control(op_name: str, op_id: str):
     prefix = f"{digits}C({op_name})"
     if not op_id.startswith(prefix):
         raise ValueError(f"{op_id!r} is not a control id for base op {op_name!r}")
-    return op_id.split(prefix)[1], n_ctrl
+    return op_name + op_id[len(prefix) :], n_ctrl
 
 
 def get_rule_strings_from_module(module: ir.Module) -> list[str]:
