@@ -39,7 +39,11 @@ permissions:
   contents: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  # Keyed on the commit, not github.ref: a pull_request event and a workflow_dispatch of the same
+  # commit carry different refs (refs/pull/N/merge vs refs/heads/<branch>), so a ref-keyed group
+  # let both run at once. On a single-GPU runner they then contend, which surfaces as Triton
+  # reporting "0 active drivers" -- a confusing way to say "another job holds the GPU".
+  group: ${{ github.workflow }}-${{ github.event.pull_request.head.sha || github.sha }}
   cancel-in-progress: true
 
 jobs:
@@ -170,7 +174,11 @@ jobs:
         # silent skip to surface twenty minutes later at the guard.
         run: |
           set -euo pipefail
-          pip install triton
+          # Pinned below 3.8: 3.8.0 miscompiles the decoder kernels, emitting PTX that ptxas
+          # rejects with "Modifier '.volatile' cannot be combined with modifier '.cv'" -- Triton
+          # reports it as an internal codegen error. Unpinned, this job also breaks whenever
+          # Triton releases, which is exactly how that regression arrived.
+          pip install "triton<3.8"
 
           # `|| true` on the pipeline: grep exits 1 when nothing matches, which under pipefail
           # would abort the step before the diagnostic below can run.
