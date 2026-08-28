@@ -26,7 +26,7 @@ func.func @controlled_id_match(%ctrl: !quantum.bit, %q: !quantum.bit) -> (!quant
 }
 
 func.func private @ctrl_u(%q: !quantum.bit, %ctrl: !quantum.bit, %cv: i1) -> (!quantum.bit, !quantum.bit)
-    attributes {target_gate = "C(U{}{wires:1}{})", llvm.linkage = #llvm.linkage<internal>} {
+    attributes {target_gate = "C(U){}{wires:1}{}", llvm.linkage = #llvm.linkage<internal>} {
   %o, %oc = quantum.custom "Hadamard"() %q ctrls(%ctrl) ctrlvals(%cv) : !quantum.bit ctrls !quantum.bit
   return %o, %oc : !quantum.bit, !quantum.bit
 }
@@ -74,7 +74,7 @@ func.func private @base_u(%q: !quantum.bit) -> !quantum.bit
 }
 
 func.func private @ctrl_u2(%q: !quantum.bit, %ctrl: !quantum.bit, %cv: i1) -> (!quantum.bit, !quantum.bit)
-    attributes {target_gate = "C(U{}{wires:1}{})", llvm.linkage = #llvm.linkage<internal>} {
+    attributes {target_gate = "C(U){}{wires:1}{}", llvm.linkage = #llvm.linkage<internal>} {
   %o, %oc = quantum.custom "PauliZ"() %q ctrls(%ctrl) ctrlvals(%cv) : !quantum.bit ctrls !quantum.bit
   return %o, %oc : !quantum.bit, !quantum.bit
 }
