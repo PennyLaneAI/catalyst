@@ -174,16 +174,19 @@ jobs:
         # silent skip to surface twenty minutes later at the guard.
         run: |
           set -euo pipefail
-          # Pinned below 3.8: 3.8.0 emits PTX that ptxas rejects for the decoder kernels,
-          # "Modifier '.volatile' cannot be combined with modifier '.cv'". Unpinned, this job also
-          # breaks on any Triton release, which is how that arrived.
-          #
-          # torch comes with the pin, not for the tests -- nothing here imports it. Triton 3.7's
-          # CUDA backend decides is_active() by importing torch and asking
-          # torch.cuda.is_available(), so without it the backend reports no active driver and
-          # every GPU test skips. 3.8 replaced that probe with a torch-free one; when the pin is
-          # lifted, this install goes with it.
-          pip install "triton<3.8" torch
+          # Installing torch from the cu129 index is what pins everything else here, and each
+          # part of that is load-bearing:
+          #   - cu129 matches this host's driver. PyPI's default torch is built for CUDA 13 and
+          #     refuses to initialise against a 12.9 driver ("driver is too old", found 12090),
+          #     which leaves torch.cuda.is_available() false.
+          #   - torch brings triton 3.5.1 with it, matched to the version it was tested against.
+          #     That is below 3.8, whose codegen emits PTX ptxas rejects for the decoder kernels
+          #     ("Modifier '.volatile' cannot be combined with modifier '.cv'").
+          #   - triton before 3.8 decides is_active() by importing torch and calling
+          #     torch.cuda.is_available(), so it needs torch present regardless. 3.8 replaced that
+          #     with a torch-free probe.
+          # Nothing in the tests imports torch; it is here for that probe and for the pinning.
+          pip install torch --index-url https://download.pytorch.org/whl/cu129
 
           # `|| true` on the pipeline: grep exits 1 when nothing matches, which under pipefail
           # would abort the step before the diagnostic below can run.
