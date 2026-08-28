@@ -64,9 +64,17 @@ GpuRuntime::HbmRing GpuRuntime::alloc_hbm_ring(std::size_t bytes) {
 #error "Unsupported HIP platform"
 #endif
     HIP_CHECK(hipMemset(r.ptr, 0, r.size), "hipMemset(ring)");
+#if defined(__HIP_PLATFORM_AMD__)
     HIP_CHECK(hipMemGetHandleForAddressRange(&r.dmabuf_fd, reinterpret_cast<hipDeviceptr_t>(r.ptr),
                                              r.size, hipMemRangeHandleTypeDmaBufFd, 0),
               "hipMemGetHandleForAddressRange(DmaBufFd)");
+#else
+    // HIP's NVIDIA headers do not wrap this one: there is no CUDA runtime form of it, and even on
+    // AMD hardware HIP dispatches it to the driver symbol below. Call that directly.
+    CU_CHECK(cuMemGetHandleForAddressRange(&r.dmabuf_fd, reinterpret_cast<CUdeviceptr>(r.ptr),
+                                           r.size, CU_MEM_RANGE_HANDLE_TYPE_DMA_BUF_FD, 0),
+             "cuMemGetHandleForAddressRange(DMA_BUF_FD)");
+#endif
     hbm_ptr_ = r.ptr;
     return r;
 }
