@@ -571,7 +571,7 @@ class TestBacklineDemoIntegration:
         @qjit(capture=True)
         @qp.set_shots(1)
         @qp.qnode(dev, mcm_method="one-shot")
-        def encoded_decoded_circuit(error_kind):
+        def encoded_decoded_circuit(error_kind: int):
             encode_logical_zero()
             logical_circuit()
             for error_qubit in range(n_data):
@@ -590,7 +590,11 @@ class TestBacklineDemoIntegration:
         assert "catalyst.backline" in ir
         assert 'transport = "memcpy"' in ir
         assert decoder.symbol_name in ir
-        assert decoder.lib_path is not None and decoder.lib_path in ir
+        # Only the symbol reaches the IR: backline dlopens an in-process coprocessor's library
+        # itself (RTLD_GLOBAL, in _load_coprocessor_fn_libs) and backend_lib names the transport
+        # plugin instead. Assert the Triton build produced a library, not that its path is in the
+        # module.
+        assert decoder.lib_path is not None and Path(decoder.lib_path).exists()
         assert "libcatalyst_transport_memcpy_controller.so" in ir
         assert "libcatalyst_transport_memcpy_gpu_coprocessor.so" in ir
 
