@@ -126,7 +126,7 @@ jobs:
           fi
           echo "$name was not built. Why:"
           echo "--- what CMake resolved ---"
-          grep -E "^(_nvcc|_hip_include_dir|CMAKE_HIP_PLATFORM|CMAKE_HIP_COMPILER|TRANSPORT_HIP_HEADERS_URL)" \
+          grep -E "^(_nvcc|_hip_include_dir|CMAKE_HIP_PLATFORM|CMAKE_HIP_COMPILER|TRANSPORT_HIP_PACKAGES)" \
             "$(pwd)/runtime-build/CMakeCache.txt" || echo "(no HIP entries in the cache at all)"
           echo "--- nvcc on this host ---"
           command -v nvcc || echo "nvcc not on PATH"

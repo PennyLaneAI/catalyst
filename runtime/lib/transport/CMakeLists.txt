@@ -58,24 +58,33 @@ endif()
 find_path(_hip_include_dir hip/hip_runtime.h PATH_SUFFIXES include)
 find_program(_nvcc nvcc HINTS ENV CUDA_PATH ENV CUDA_HOME /usr/local/cuda PATH_SUFFIXES bin)
 if(NOT _hip_include_dir AND _nvcc)
-    # Pinned, so an upstream release cannot change what we compile against. Set the URL to "" to
-    # disable the fetch, e.g. offline builds.
-    set(TRANSPORT_HIP_HEADERS_URL
-        "https://repo.radeon.com/rocm/apt/6.4.4/pool/main/h/hip-dev/hip-dev_6.4.43484.60404-129~24.04_amd64.deb"
-        CACHE STRING "hip-dev package supplying the HIP headers when no ROCm is installed")
-    set(TRANSPORT_HIP_HEADERS_SHA256
-        "bcbc87aae32ad00db72b33e0b67a66bbfe963d8a248e1ac3600d5ae3076916af"
-        CACHE STRING "Expected SHA256 of TRANSPORT_HIP_HEADERS_URL")
+    # url|sha256, pinned so an upstream release cannot change what we compile against. Set the
+    # list to "" to disable the fetch, e.g. offline builds. hip-dev carries the headers and
+    # lib/cmake/hip; hipcc-nvidia carries bin/hipcc and bin/hipconfig, which hip-config.cmake
+    # set_and_check's even though nvcc is what compiles. Both unpack into one opt/rocm-<ver> tree.
+    set(TRANSPORT_HIP_PACKAGES
+        "https://repo.radeon.com/rocm/apt/6.4.4/pool/main/h/hip-dev/hip-dev_6.4.43484.60404-129~24.04_amd64.deb|bcbc87aae32ad00db72b33e0b67a66bbfe963d8a248e1ac3600d5ae3076916af"
+        "https://repo.radeon.com/rocm/apt/6.4.4/pool/main/h/hipcc-nvidia/hipcc-nvidia_1.1.1.60404-129~24.04_amd64.deb|a50ac068a49f7b657beccf3364cc7a2f6e0057f64bccd04b2bb9d6118b2da585"
+        CACHE STRING "url|sha256 of the ROCm packages supplying the HIP headers and driver")
 
     set(_hip_stage "${CMAKE_BINARY_DIR}/hip-headers")
     file(GLOB _hip_root "${_hip_stage}/payload/opt/rocm-*")
-    if(NOT _hip_root AND TRANSPORT_HIP_HEADERS_URL)
+    if(NOT _hip_root AND TRANSPORT_HIP_PACKAGES)
         message(STATUS "transport: no ROCm installed, fetching the HIP headers")
-        # A .deb is an ar archive wrapping data.tar.gz, hence two extractions.
-        file(DOWNLOAD "${TRANSPORT_HIP_HEADERS_URL}" "${_hip_stage}/hip-dev.deb"
-             EXPECTED_HASH "SHA256=${TRANSPORT_HIP_HEADERS_SHA256}" TLS_VERIFY ON)
-        file(ARCHIVE_EXTRACT INPUT "${_hip_stage}/hip-dev.deb" DESTINATION "${_hip_stage}/deb")
-        file(ARCHIVE_EXTRACT INPUT "${_hip_stage}/deb/data.tar.gz" DESTINATION "${_hip_stage}/payload")
+        set(_hip_pkg_n 0)
+        foreach(_hip_pkg IN LISTS TRANSPORT_HIP_PACKAGES)
+            string(REPLACE "|" ";" _hip_pair "${_hip_pkg}")
+            list(GET _hip_pair 0 _hip_url)
+            list(GET _hip_pair 1 _hip_sha)
+            math(EXPR _hip_pkg_n "${_hip_pkg_n} + 1")
+            # A .deb is an ar archive wrapping data.tar.gz, hence two extractions.
+            file(DOWNLOAD "${_hip_url}" "${_hip_stage}/pkg${_hip_pkg_n}.deb"
+                 EXPECTED_HASH "SHA256=${_hip_sha}" TLS_VERIFY ON)
+            file(ARCHIVE_EXTRACT INPUT "${_hip_stage}/pkg${_hip_pkg_n}.deb"
+                 DESTINATION "${_hip_stage}/deb${_hip_pkg_n}")
+            file(ARCHIVE_EXTRACT INPUT "${_hip_stage}/deb${_hip_pkg_n}/data.tar.gz"
+                 DESTINATION "${_hip_stage}/payload")
+        endforeach()
         file(GLOB _hip_root "${_hip_stage}/payload/opt/rocm-*")
     endif()
     if(_hip_root)
