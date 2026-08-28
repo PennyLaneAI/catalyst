@@ -120,19 +120,9 @@ jobs:
         run: |
           "$(pwd)/runtime-build/tests/runner_tests_transport_memcpy"
 
-      # TODO(cloud-team): install HIP-on-CUDA (ROCm's hip-runtime-nvidia + hipcc) on this
-      # self-hosted GPU runner. The transport runtime's GPU coprocessor code compiles cleanly
-      # against HIP-on-CUDA - runtime/lib/transport/common/coproc/gpu/CMakeLists.txt already
-      # has an explicit `if(CMAKE_HIP_COMPILER_ID STREQUAL "NVIDIA")` branch - and the current
-      # runner falls through to `-- transport: no HIP compiler -> GPU backends skipped`.
-      # That skip is total, not partial: runtime/lib/transport/memcpy/CMakeLists.txt guards the
-      # whole `catalyst_transport_memcpy_gpu_coprocessor` target on TRANSPORT_HAS_HIP, so the .so
-      # is never produced -- and backline._resolve_backend_lib requires it on disk, raising
-      # ValueError rather than resolving. So both *executing* GPU cases
-      # (_memcpy_precompiled, _memcpy_manual_qec) are hard-blocked until HIP-on-CUDA lands.
-      # Also needed then: -DCMAKE_HIP_PLATFORM=nvidia, which runtime/Makefile's `configure`
-      # target currently has no way to pass (its cmake flags are hard-coded).
-      # The compile-only _triton_css_bp case does not need any of this -- see the step below.
+      # No ROCm install is needed on this runner: lib/transport/CMakeLists.txt fetches the HIP
+      # headers when none are present and drives them with nvcc, so TRANSPORT_HAS_HIP is set and
+      # libcatalyst_transport_memcpy_gpu_coprocessor.so is built here. The step below verifies it.
 
       # From here down: build LLVM/StableHLO/Enzyme *on this self-hosted GPU runner* rather than
       # consuming check-catalyst.yaml's caches. Cross-runner reuse hit three layered blockers
@@ -241,6 +231,30 @@ jobs:
         run: |
           pip install triton
 
+      - name: Point Triton at the CUDA driver library
+        # Triton activates its CUDA backend by dlopen'ing libcuda.so.1. That library ships with
+        # the *driver*, not the toolkit: /usr/local/cuda/lib64 (already on LD_LIBRARY_PATH above)
+        # holds only a stub under lib64/stubs, which links but cannot initialize a device -- the
+        # "GPU present, 0 active drivers" case that conftest's gpu_triton_platform skips on.
+        # Resolve the real one through the loader cache and hand it to Triton explicitly.
+        # Stubs are excluded deliberately: finding one is worse than finding nothing.
+        run: |
+          set -euo pipefail
+          libcuda=$(ldconfig -p | awk '/libcuda\.so\.1/ {print $NF}' | grep -v /stubs/ | head -1)
+          if [ -z "$libcuda" ]; then
+            # Not in the loader cache on some driver installs; fall back to a bounded search.
+            libcuda=$(find /usr/lib /usr/lib64 -name 'libcuda.so.1' -not -path '*/stubs/*' 2>/dev/null | head -1)
+          fi
+          if [ -z "$libcuda" ]; then
+            echo "No real libcuda.so.1 on this host -- only the toolkit stub, if that."
+            echo "Triton cannot activate a CUDA driver, so the GPU tests will skip."
+            ldconfig -p | grep -i libcuda || echo "(no libcuda in the loader cache at all)"
+            exit 1
+          fi
+          echo "libcuda: $libcuda"
+          echo "TRITON_LIBCUDA_PATH=$(dirname "$libcuda")" >> $GITHUB_ENV
+          echo "LD_LIBRARY_PATH=$(dirname "$libcuda")${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}" >> $GITHUB_ENV
+
       - name: Report Triton / GPU driver state
         # gpu_triton_platform skips the GPU cases when Triton reports no active driver, and that
         # is what this runner did: an NVIDIA GPU is visible to nvidia-smi while Triton's CUDA
@@ -313,13 +327,13 @@ jobs:
         #   - manual_qec: demo 2's elaborate encoded circuit + Triton-built hgp_bp_osd_decoder,
         #     executes ghz() on the GPU.
         # Two gates, failing for unrelated reasons:
-        #   gpu_triton_platform     -- a GPU and an active Triton driver. All three need it.
-        #   gpu_transport_backend   -- the HIP-built memcpy GPU coproc .so. Only the two
-        #                              executing cases need it; without the gate they would raise
-        #                              ValueError out of _resolve_backend_lib rather than skip.
-        # So triton_css_bp can run as soon as Triton activates here, with no HIP involved: it is
-        # compile-only and attaches its own backend_lib. The other two stay blocked on
-        # HIP-on-CUDA (see the TODO above). -rs makes every skip visible in the log.
+        #   gpu_transport_backend   -- the memcpy GPU coproc .so, which the runtime build above
+        #                              now produces. Only the two executing cases need it;
+        #                              without the gate they would raise ValueError out of
+        #                              _resolve_backend_lib rather than skip.
+        #   gpu_triton_platform     -- a GPU and an active Triton driver. All three need it, and
+        #                              it is the only gate still capable of skipping everything.
+        # -rs makes every skip visible in the log.
         run: |
           python3 -m pytest -v -rs --junit-xml=gpu-backline-results.xml \
             "frontend/test/pytest/test_backline.py::TestBacklineDemoIntegration::test_cpu_controller_to_gpu_coproc_memcpy_precompiled" \
@@ -329,8 +343,8 @@ jobs:
       - name: Require at least one GPU test to have executed
         # pytest exits 0 when every selected test is skipped, so without this step the job
         # reports success while covering nothing -- and it spends ~20 min of self-hosted GPU
-        # time to do it. Until HIP-on-CUDA lands on the runner (see the TODO above), this is
-        # what keeps a fully-skipped run red instead of quietly green.
+        # time to do it. A full skip now means Triton found no active driver, since the backend
+        # library is built above; the step before this one prints the driver state to say why.
         if: always()
         run: |
           python3 - <<'EOF'
