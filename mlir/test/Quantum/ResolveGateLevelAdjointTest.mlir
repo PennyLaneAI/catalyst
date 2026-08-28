@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: quantum-opt --resolve-gate-level-adjoint --split-input-file %s | FileCheck %s
+// RUN: quantum-opt --resolve-gate-level-adjoint %s | FileCheck %s
 
 // CHECK-LABEL: test_hermitian_adjoint_canonicalize
 func.func @test_hermitian_adjoint_canonicalize() -> !quantum.bit {
