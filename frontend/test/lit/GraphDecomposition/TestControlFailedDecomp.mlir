@@ -14,7 +14,7 @@
 
 // RUN: not --crash catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{gate-set=Foo=1.0})' %s 2>&1 | FileCheck %s
 
-// CHECK: Decomposition rule not found for operator 'id: C(Bar{}{wires:1}{})'
+// CHECK: Decomposition rule not found for operator 'id: C(Bar){}{wires:1}{}'
 func.func @circuit(%ctrl: !quantum.bit, %q: !quantum.bit) -> (!quantum.bit, !quantum.bit) {
   %true = arith.constant true
   %out, %outc = quantum.custom "Bar"() %q ctrls(%ctrl) ctrlvals(%true) : !quantum.bit ctrls !quantum.bit

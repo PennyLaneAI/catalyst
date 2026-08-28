@@ -12,10 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Unit tests for the ``graph_decomposition`` pass option builder in builtin_passes.py."""
+"""Unit tests for the ``graph_decomposition`` decorator: its pass option builder in
+builtin_passes.py, and its trace-time handling of controlled / controlled-adjoint Operator2 ops."""
 
 from pathlib import Path
 
+import numpy as np
 import pennylane as qp
 import pytest
 from pennylane.decomposition import DecompositionRule, register_resources

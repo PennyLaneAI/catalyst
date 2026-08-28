@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{gate-set=2C(H)=1.0,3C(H)=1.0 alt-decomps=2C(U{}{wires:1}{})=cc_u,3C(U{}{wires:1}{})=ccc_u})' %s | FileCheck %s
+// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{gate-set=2C(H)=1.0,3C(H)=1.0 alt-decomps=2C(U){}{wires:1}{}=cc_u,3C(U){}{wires:1}{}=ccc_u})' %s | FileCheck %s
 
 // CHECK-LABEL: func.func @two_controls(
 func.func @two_controls(%c1: !quantum.bit, %c2: !quantum.bit, %q: !quantum.bit)
@@ -38,8 +38,8 @@ func.func @three_controls(%c1: !quantum.bit, %c2: !quantum.bit, %c3: !quantum.bi
 // 2C(U) -> two 2C(H).
 func.func private @cc_u(%q: !quantum.bit, %c1: !quantum.bit, %c2: !quantum.bit)
     -> (!quantum.bit, !quantum.bit, !quantum.bit) attributes {
-    target_gate = "2C(U{}{wires:1}{})",
-    resources = {operations = {"2C(H{}{wires:1}{})" = 2 : i64}} } {
+    target_gate = "2C(U){}{wires:1}{}",
+    resources = {operations = {"2C(H){}{wires:1}{}" = 2 : i64}} } {
   %true = arith.constant true
   %a, %ac:2 = quantum.custom "H"() %q ctrls(%c1, %c2) ctrlvals(%true, %true) : !quantum.bit ctrls !quantum.bit, !quantum.bit
   %b, %bc:2 = quantum.custom "H"() %a ctrls(%ac#0, %ac#1) ctrlvals(%true, %true) : !quantum.bit ctrls !quantum.bit, !quantum.bit
@@ -49,8 +49,8 @@ func.func private @cc_u(%q: !quantum.bit, %c1: !quantum.bit, %c2: !quantum.bit)
 // 3C(U) -> one 3C(H).
 func.func private @ccc_u(%q: !quantum.bit, %c1: !quantum.bit, %c2: !quantum.bit, %c3: !quantum.bit)
     -> (!quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit) attributes {
-    target_gate = "3C(U{}{wires:1}{})",
-    resources = {operations = {"3C(H{}{wires:1}{})" = 1 : i64}} } {
+    target_gate = "3C(U){}{wires:1}{}",
+    resources = {operations = {"3C(H){}{wires:1}{}" = 1 : i64}} } {
   %true = arith.constant true
   %o, %oc:3 = quantum.custom "H"() %q ctrls(%c1, %c2, %c3) ctrlvals(%true, %true, %true) : !quantum.bit ctrls !quantum.bit, !quantum.bit, !quantum.bit
   return %o, %oc#0, %oc#1, %oc#2 : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit

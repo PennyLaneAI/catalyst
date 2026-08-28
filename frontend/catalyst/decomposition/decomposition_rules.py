@@ -305,9 +305,11 @@ def compile_decomposition_rules(
     base rule body is wrapped in ``qp.ctrl(..., control=<n_ctrl wires>)`` (reduced to op-level
     controlled gates by ``ctrl-lowering`` within the decomposition pass), the ``target_gate`` becomes
     ``<n>C(op_name)`` and each produced resource op is wrapped in the same ``<n>C(...)`` modifier.
-    ``wrap_adjoint`` and ``wrap_control`` are mutually exclusive.
+
+    Note that ``wrap_adjoint`` and ``wrap_control`` may be combined to synthesize the nested modifier
+    ``<n>C(Adjoint(op_name))``: adjoint is applied innermost and control outermost (the canonical
+    order matching the compiler's ``wrapModifiers``).
     """
-    assert not (wrap_adjoint and wrap_control), "adjoint/control synthesis are mutually exclusive"
     kwargs = prepare_dynamic_op_kwargs(dynamic_shape, wire_lens)
     extra_data = extra_data or {}
     n_base_wires = sum(wire_lens.values())
@@ -318,35 +320,28 @@ def compile_decomposition_rules(
         op_name, kwargs | static_data | extra_data, is_custom_op, adjoint_resources=wrap_adjoint
     )
 
-    # A distribution pathway targets the modified op and produces modified resource gates. Both the
-    # target and (for control) the produced-resource ids are name-wrapped via `wrap_modifier_id`, so
-    # they match the compiler's `wrapModifiers` graphOpId spelling. (Adjoint resource ids are already
-    # name-wrapped by `collect_resources_for_op(adjoint_resources=True)`.)
-    if wrap_adjoint:
-        target_id = name_wrap_adjoint(op_id)
-    elif wrap_control:
+    target_id = name_wrap_adjoint(op_id) if wrap_adjoint else op_id
+    if wrap_control:
         ctrl_mod = _control_modifier(n_ctrl)
-        target_id = wrap_modifier_id(op_id, ctrl_mod)
+        target_id = wrap_modifier_id(target_id, ctrl_mod)
         name_to_resource_ids = {
             rule_name: {
                 wrap_modifier_id(produced_id, ctrl_mod): count for produced_id, count in ids.items()
             }
             for rule_name, ids in name_to_resource_ids.items()
         }
-    else:
-        target_id = op_id
 
     # The static_data was only needed to instantiate the correct decomp rule
     # Once we have the correct rules, don't send them into qjit
     def rule_to_subroutine(rule):
         def decomp_rule(*_args, **_kwargs):
-            if wrap_adjoint:
-                qp.adjoint(rule._impl)(*_args, **_kwargs)
-            elif wrap_control:
+            # Apply adjoint innermost, control outermost (canonical `C(Adjoint(Op))`).
+            body = qp.adjoint(rule._impl) if wrap_adjoint else rule._impl
+            if wrap_control:
                 ctrl_wires = _kwargs.pop(ctrl_wire_key)
-                qp.ctrl(rule._impl, control=list(ctrl_wires))(*_args, **_kwargs)
+                qp.ctrl(body, control=list(ctrl_wires))(*_args, **_kwargs)
             else:
-                rule._impl(*_args, **_kwargs)
+                body(*_args, **_kwargs)
 
         decomp_rule_no_static_args = partial(decomp_rule, **static_data)
         if extra_data:
@@ -478,10 +473,14 @@ def control_variant_rule_strings(
     ``ctrl_counts``.
 
     The control analogue of :func:`adjoint_variant_rule_strings`. ``op_id`` is the *base* op's
-    graphOpId (e.g. ``"RX{...}"``). For each control count ``n`` two pathways contribute:
-      1. rules registered directly against ``<n>C(op_name)`` (``list_decomps("C(RX)")``), and
+    graphOpId (e.g. ``"RX{...}"``). For each control count ``n`` three pathways contribute:
+      1. rules registered directly against ``<n>C(op_name)`` (``list_decomps("C(RX)")``),
       2. rules synthesized by distributing each base rule of ``op_name`` over ``n`` controls
-         (the ``wrap_control`` pathway), dropping any whose body is non-controllable.
+         (the ``wrap_control`` pathway), and
+      3. rules for the nested modifier ``<n>C(Adjoint(op_name))`` synthesized by controlling each
+         *adjointed* base rule (``wrap_adjoint`` + ``wrap_control``), so controlled-adjoint ops are
+         reachable too.
+    Distribution rules whose body is non-controllable are dropped.
     """
     out = []
     for n in ctrl_counts:
@@ -504,30 +503,33 @@ def control_variant_rule_strings(
             )
         except Exception as e:  # pylint: disable=broad-except
             warnings.warn(f"Failed to lower the decomposition rules for {ctrl_name}: {e}")
-        # (2) Rules for <n>C(op_name) synthesized by controlling each base rule of op_name:
-        try:
-            controlled = get_rule_strings_from_module(
-                compile_decomposition_rules(
-                    op_name,
-                    op_id,
-                    dynamic_shape,
-                    wire_lens,
-                    static_data,
-                    extra_data=extra_data,
-                    is_custom_op=is_custom_op,
-                    wrap_control=True,
-                    n_ctrl=n,
+        # (2) <n>C(op_name) by controlling each base rule, and
+        # (3) <n>C(Adjoint(op_name)) by controlling each adjointed base rule.
+        for wrap_adjoint, label in ((False, ctrl_name), (True, f"{ctrl_mod}(Adjoint({op_name}))")):
+            try:
+                controlled = get_rule_strings_from_module(
+                    compile_decomposition_rules(
+                        op_name,
+                        op_id,
+                        dynamic_shape,
+                        wire_lens,
+                        static_data,
+                        extra_data=extra_data,
+                        is_custom_op=is_custom_op,
+                        wrap_adjoint=wrap_adjoint,
+                        wrap_control=True,
+                        n_ctrl=n,
+                    )
                 )
-            )
-            # Suppress a distribution rule whose body is non-controllable (e.g. a measurement):
-            controlled = [
-                rule
-                for rule in controlled
-                if not any(marker in rule for marker in _NON_INVERTIBLE_MARKERS)
-            ]
-            out.extend(controlled)
-        except Exception as e:  # pylint: disable=broad-except
-            warnings.warn(f"Failed to synthesize distributed control rules for {ctrl_name}: {e}")
+                # Suppress a distribution rule whose body is non-controllable (e.g. a measurement):
+                controlled = [
+                    rule
+                    for rule in controlled
+                    if not any(marker in rule for marker in _NON_INVERTIBLE_MARKERS)
+                ]
+                out.extend(controlled)
+            except Exception as e:  # pylint: disable=broad-except
+                warnings.warn(f"Failed to synthesize distributed control rules for {label}: {e}")
     return out
 
 
