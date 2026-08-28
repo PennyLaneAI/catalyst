@@ -38,6 +38,7 @@ class GraphOpID:
     The format of the computed graph op ID string is as follows:
         op_name{param_shaped_type_dictionary}{wire_lens_dictionary}{static_data_dictionary}[UID]
 
+    The types in the dynamic shape dictionary should be represented as a list of MLIR-style type annotations.
     The UID is computed from the shapes, dtypes and pytree structures of the `hybrid_args` of
     the Operator2 instance.
 

@@ -81,14 +81,15 @@
     [(#3053)](https://github.com/PennyLaneAI/catalyst/pull/3053)
 
     The format of `graphOpID` is as follows:
-        op_name{param_shaped_type_dictionary}{wire_lens_dictionary}{static_data_dictionary}[UID]
+        op_name{dynamic_shape_dictionary}{wire_lens_dictionary}{static_data_dictionary}[UID]
 
+    The types in the dynamic shape dictionary should be represented as a list of MLIR-style type annotations.
     The UID is a hash computed from the shapes, dtypes and pytree structures of any data on the Python operator that cannot be lowered to MLIR directly.
 
     For example, an operator with class name `HybridOpArg`, taking in one float param
     argument named `angle`, one wire argument named `cwires`, one static data argument
     `label="hello"`, and a computed UID of 10 would be parsed to the following graph op ID:
-        HybridOpArg{angle:[f64]}{cwires:1}{label:hello}[10]
+        HybridOpArg{angle:[tensor<f64>]}{cwires:1}{label:hello}[10]
 
     A node in the decomposition graph is completely identified by its `graphOpId`. For example,
         PauliRot{angle:[f64]}{wires:1}{pauli_word:X}
@@ -126,6 +127,7 @@
     [(#2973)](https://github.com/PennyLaneAI/catalyst/pull/2973)
     [(#2836)](https://github.com/PennyLaneAI/catalyst/pull/2836)
     [(#2855)](https://github.com/PennyLaneAI/catalyst/pull/2855)
+    [(#3158)](https://github.com/PennyLaneAI/catalyst/pull/3158)
 
     1. The pass now supports applying a selection of the available decomposition rules via the `target_rules` parameter.
 
