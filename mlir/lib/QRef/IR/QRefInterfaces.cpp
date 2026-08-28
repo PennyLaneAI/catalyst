@@ -90,7 +90,7 @@ void printSortedMap(const llvm::StringMap<T> &map, llvm::raw_string_ostream &ss,
 }
 
 void printDynamicShape(const llvm::StringMap<llvm::SmallVector<mlir::Type>> &map,
-                        llvm::raw_string_ostream &ss) {
+                       llvm::raw_string_ostream &ss) {
     printSortedMap(map, ss, [](const auto &types, llvm::raw_string_ostream &stream) {
         stream << "[";
         for (auto [j, type] : llvm::enumerate(types)) {
@@ -106,7 +106,7 @@ void printDynamicShape(const llvm::StringMap<llvm::SmallVector<mlir::Type>> &map
 void printWireLens(const llvm::StringMap<size_t> &map, llvm::raw_string_ostream &ss) {
     printSortedMap(map, ss, [](size_t len, llvm::raw_string_ostream &stream) { stream << len; });
 }
-    
+
 } // namespace
 
 //===----------------------------------------------------------------------===//

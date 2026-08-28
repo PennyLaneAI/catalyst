@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <array>
 #include <cstddef>
 #include <string>
 
@@ -33,7 +34,6 @@
 #include "mlir/IR/TypeRange.h"
 #include "mlir/IR/Types.h"
 #include "mlir/Parser/Parser.h"
-#include <array>
 
 #include "QRef/IR/QRefDialect.h"
 #include "QRef/IR/QRefInterfaces.h"
@@ -46,8 +46,8 @@ using namespace catalyst::qref;
 /// We must declare the registration function, and link to the corresponding upstream target
 /// in CMake.
 namespace test {
-    void registerTestDialect(mlir::DialectRegistry &);
-    } // namespace test
+void registerTestDialect(mlir::DialectRegistry &);
+} // namespace test
 
 TEST(DecomposableGateInterfaceTests, CustomOp) {
     std::string moduleStr = R"mlir(
@@ -370,7 +370,7 @@ module {
     // Obtain DecomposableGate from the two OperatorOps being compared
     std::array<DecomposableGate, 2> ops;
     int i = 0;
-    for(auto op: module->getOps<OperatorOp>()) {
+    for (auto op : module->getOps<OperatorOp>()) {
         ops[i] = op;
         i++;
     }
