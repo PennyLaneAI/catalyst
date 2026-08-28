@@ -14,12 +14,6 @@
 
 // RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{gate-set=C(Hadamard)=1.0 alt-decomps=C(U){}{wires:1}{}=ctrl_u})' %s | FileCheck %s
 
-// XFAIL: *
-// Pre-existing decompose-lowering bug (not ctrl-specific): applying a rule to an op-level
-// controlled op crashes on a `replaceOp` result-count assertion, and underneath it a
-// `ComplexType` cast assertion (Casting.h) that also breaks plain non-ctrl E2E. Independent of
-// the graphOpId/rule-synthesis ctrl support; tracked separately.
-
 // CHECK-LABEL: func.func @controlled_basis(
 // CHECK-SAME:  %[[C:.*]]: !quantum.bit, %[[Q:.*]]: !quantum.bit
 func.func @controlled_basis(%ctrl: !quantum.bit, %q: !quantum.bit) -> (!quantum.bit, !quantum.bit) {
