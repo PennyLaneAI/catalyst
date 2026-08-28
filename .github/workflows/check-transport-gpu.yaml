@@ -194,10 +194,20 @@ jobs:
 
           # driver.active raises on 0 or >1 drivers -- the same call conftest turns into a skip.
           python3 - <<'PY'
+          import subprocess
           import triton
+          from triton.backends.nvidia.compiler import get_ptxas
           from triton.runtime.driver import driver
 
           print("triton", triton.__version__, "| active driver:", driver.active)
+          # Triton bundles its own ptxas rather than using the toolkit's, so its version is not
+          # implied by nvcc's and is worth recording next to it. Best-effort: this is context for
+          # a failure, and must not become one.
+          try:
+              ptxas = get_ptxas(driver.active.get_current_target().arch).path
+              print(subprocess.run([ptxas, "--version"], capture_output=True, text=True).stdout)
+          except Exception as exc:  # noqa: BLE001 - diagnostic only
+              print("could not resolve triton's bundled ptxas:", exc)
           PY
 
       - name: Build Catalyst frontend (reusing the transport-enabled runtime)
@@ -232,6 +242,10 @@ jobs:
 
       - name: Run backline GPU integration tests
         id: gpu-tests
+        env:
+          # ptxas writes its diagnostics to a temp file Triton discards unless this is set, which
+          # leaves a codegen failure looking like a bare "exit status 255".
+          TRITON_DUMP_PTXAS_LOG: "1"
         # CPU-CPU memcpy is covered by check-catalyst.yaml on a GH-hosted runner. This workflow
         # runs cases that need the local GPU:
         #   - precompiled: demo 4 pattern with the runtime-built gpu_steane_launcher symbol
