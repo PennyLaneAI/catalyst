@@ -88,7 +88,7 @@ class TestGenericUtilities:
         assert result.shape == shape
 
     @pytest.mark.parametrize(
-        "item, is_custom_op, mlir_type",
+        "item, is_special_lowering, mlir_type",
         [
             (Float, True, "f64"),  # custom op is always float
             (Float, False, "tensor<f64>"),
@@ -104,8 +104,8 @@ class TestGenericUtilities:
             (Complex[3, 4, 5], False, "tensor<3x4x5xcomplex<f64>>"),
         ],
     )
-    def test_convert_item_to_mlir_type(self, item, is_custom_op, mlir_type):
-        assert convert_item_to_mlir_type(item, is_custom_op) == mlir_type
+    def test_convert_item_to_mlir_type(self, item, is_special_lowering, mlir_type):
+        assert convert_item_to_mlir_type(item, is_special_lowering) == mlir_type
 
     @pytest.mark.parametrize(
         "op, id",

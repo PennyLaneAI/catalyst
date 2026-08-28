@@ -489,8 +489,6 @@ func.func @testfunc(%first : tensor<1xi64>, %secondthird : tensor<2xi64>, %arg1 
     // testOperatorUID(angle=float, index=[bool, int])
   %0 = quantum.operator "testOperatorUID"(%arg1: tensor<i1>, %arg2: tensor<f64>, %arg3: tensor<i64>)
     UID(248) quregs(%reg) indices(%first: tensor<1xi64>, %secondthird: tensor<2xi64>) param_map = {angle=[1], index=[0, 2]} qubit_map = {reg=[0, 1]}
-    // old style: testOperatorUID{angle:[[f64]],index:[[i1],[i64]]}{reg:2}{}
-    // new style: testOperatorUID{angle:[tensor<f64>],index:[tensor<i1>,tensor<i64>]}{reg:2}{}
   return
 }
     )mlir";

@@ -44,7 +44,7 @@ class GraphOpID:
     For example, an Operator2 instance with class name `HybridOpArg`, taking in one float param
     argument named `angle`, one wire argument named `cwires`, one static data argument
     `label="hello"`, and a computed UID of 10 would be parsed to the following graph op ID:
-        HybridOpArg{angle:[f64]}{cwires:1}{label:hello}[10]
+        HybridOpArg{angle:[tensor<f64>]}{cwires:1}{label:hello}[10]
 
     The defining trait of a graph op ID is that it has unique correspondence to decomposition rules.
     In other words, different graph op IDs have different sets of decomposition rules.

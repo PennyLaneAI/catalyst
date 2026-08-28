@@ -39,15 +39,9 @@ _PY_DTYPES_TO_MLIR_DTYPES = {v: k for k, v in _MLIR_DTYPES_TO_PY_DTYPES.items()}
     float: "f64",
     int: "i64",
     complex: "complex<f64>",
-    (ir.IntegerType, 1): "i1",
-    (ir.IntegerType, 8): "i8",
-    (ir.IntegerType, 16): "i16",
-    (ir.IntegerType, 32): "i32",
-    (ir.IntegerType, 64): "i64",
     ir.F16Type: "f16",
     ir.F32Type: "f32",
     ir.F64Type: "f64",
-    (ir.ComplexType, ir.F64Type): "complex<f64>",
     np.dtype("bool_"): "i1",
     np.dtype("int8"): "i8",
     np.dtype("int16"): "i16",
@@ -81,7 +75,7 @@ def convert_item_to_mlir_type(item, is_special_lowering=False):
 
 
 def format_dynamic_params_for_id(d):
-    """Format a structure for ID, after calling convert_types_to_mlir_string on it."""
+    """Format a structure for ID."""
 
     def handle_item(item):
         match item:
@@ -100,13 +94,10 @@ def format_dynamic_params_for_id(d):
 
 
 def get_dummy_values_for_arg(arg):
-    """
-    Given a container of python or MLIR types, replace the types with corresponding dummy values.
+    """Given a container of python or MLIR types, replace the types with corresponding dummy values.
 
-    Each item in the container must be representible as an MLIR tensor with at most one layer of
-    nesting, i.e. cannot be nested and all elements must be of the same type.
-    Ex.
-    [[float, float], [int, int, int], [int32, int32, int32, int32]]
+    The types are expected to be formatted for GraphOpIDs. Lists/Tuples must contain homogeneous
+    data types (this is true for any operator).
     """
     match arg:
         case str():
