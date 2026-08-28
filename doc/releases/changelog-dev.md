@@ -144,6 +144,7 @@
     [(#2973)](https://github.com/PennyLaneAI/catalyst/pull/2973)
     [(#2836)](https://github.com/PennyLaneAI/catalyst/pull/2836)
     [(#2855)](https://github.com/PennyLaneAI/catalyst/pull/2855)
+    [(#3156)](https://github.com/PennyLaneAI/catalyst/pull/3156)
 
     1. The pass now supports applying a selection of the available decomposition rules via the `target_rules` parameter.
 
@@ -157,6 +158,8 @@
 
     5. The pass can now handle null decomposition rules, which are rule functions that do not have any quantum values as arguments or results.
     Gates with null decomposition rules are simply removed.
+
+    6. The pass can now handle register-mode rules that target gates in control flow regions whose qubits were extracted outside the region.
 
 * A failure during AOT compilation is now downgraded to a warning and logged.
   [(#3100)](https://github.com/PennyLaneAI/catalyst/pull/3100)
