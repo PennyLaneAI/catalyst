@@ -16,7 +16,7 @@
 
 #include <vector>
 
-#include "llvm/ADT/StringMap.h"   // for DecomposableGate interface
+#include "llvm/ADT/StringMap.h" // for DecomposableGate interface
 #include "mlir/IR/OpDefinition.h"
 
 #include "Catalyst/Analysis/ResourceInterfaces.h"
