@@ -58,13 +58,16 @@ endif()
 find_path(_hip_include_dir hip/hip_runtime.h PATH_SUFFIXES include)
 find_program(_nvcc nvcc HINTS ENV CUDA_PATH ENV CUDA_HOME /usr/local/cuda PATH_SUFFIXES bin)
 if(NOT _hip_include_dir AND _nvcc)
-    # url|sha256, pinned so an upstream release cannot change what we compile against. Set the
+    # url|sha256, pinned so an upstream release cannot change what we compile against. 7.1.x or
+    # newer is required, not merely preferred: hipMemGetHandleForAddressRange and
+    # hipMemRangeHandleTypeDmaBufFd are absent from 6.4.4 on both platforms, and 7.1.1's
+    # nvidia_detail is where they are mapped onto cuMemGetHandleForAddressRange. Set the
     # list to "" to disable the fetch, e.g. offline builds. hip-dev carries the headers and
     # lib/cmake/hip; hipcc-nvidia carries bin/hipcc and bin/hipconfig, which hip-config.cmake
     # set_and_check's even though nvcc is what compiles. Both unpack into one opt/rocm-<ver> tree.
     set(TRANSPORT_HIP_PACKAGES
-        "https://repo.radeon.com/rocm/apt/6.4.4/pool/main/h/hip-dev/hip-dev_6.4.43484.60404-129~24.04_amd64.deb|bcbc87aae32ad00db72b33e0b67a66bbfe963d8a248e1ac3600d5ae3076916af"
-        "https://repo.radeon.com/rocm/apt/6.4.4/pool/main/h/hipcc-nvidia/hipcc-nvidia_1.1.1.60404-129~24.04_amd64.deb|a50ac068a49f7b657beccf3364cc7a2f6e0057f64bccd04b2bb9d6118b2da585"
+        "https://repo.radeon.com/rocm/apt/7.1.1/pool/main/h/hip-dev/hip-dev_7.1.52802.70101-38~24.04_amd64.deb|736acec734396969e11e8813a55742de536c53324fab3a836d75aa3dbf0d9651"
+        "https://repo.radeon.com/rocm/apt/7.1.1/pool/main/h/hipcc-nvidia/hipcc-nvidia_1.1.1.70101-38~24.04_amd64.deb|221a4a0923862cd236d3b9e5b76fd829a87ba171ad08c75b69a6f6984a18ad30"
         CACHE STRING "url|sha256 of the ROCm packages supplying the HIP headers and driver")
 
     set(_hip_stage "${CMAKE_BINARY_DIR}/hip-headers")
