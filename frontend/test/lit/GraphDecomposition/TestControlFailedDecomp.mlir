@@ -20,3 +20,12 @@ func.func @circuit(%ctrl: !quantum.bit, %q: !quantum.bit) -> (!quantum.bit, !qua
   %out, %outc = quantum.custom "Bar"() %q ctrls(%ctrl) ctrlvals(%true) : !quantum.bit ctrls !quantum.bit
   return %out, %outc : !quantum.bit, !quantum.bit
 }
+
+// A decomposition for the base Bar op. It is never applicable to the controlled
+// Bar above, illustrating that Bar and C(Bar) require separate rules.
+func.func private @bar_to_foo(%q: !quantum.bit) -> !quantum.bit attributes {
+    target_gate = "Bar{}{wires:1}{}",
+    resources = {operations = {"Foo{}{wires:1}{}" = 1 : i64}} } {
+  %o = quantum.custom "Foo"() %q : !quantum.bit
+  return %o : !quantum.bit
+}

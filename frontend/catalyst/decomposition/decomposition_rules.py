@@ -313,12 +313,16 @@ def compile_decomposition_rules(
     extra_data = extra_data or {}
     n_base_wires = sum(wire_lens.values())
     device = qp.device("null.qubit", wires=n_base_wires + (n_ctrl if wrap_control else 0))
-    ctrl_wire_key = "zz_ctrl_wires"  # keyword carrying the synthesized control wires to the rule
 
     _, name_to_resource_ids, decomp_rules = collect_resources_for_op(
         op_name, kwargs | static_data | extra_data, is_custom_op, adjoint_resources=wrap_adjoint
     )
 
+    # TODO: The modified target id and the wrapped resource ids are derived here by string-wrapping
+    # the graphOpId (via wrap_modifier_id). Ideally they would be generated via
+    # GraphOpID.getGraphOpId which requires missing steps in the GraphOpID object.
+    # Note it needs changes not just in this function, also in the string id and across
+    # the on-demand C++ loader boundary.
     target_id = name_wrap_adjoint(op_id) if wrap_adjoint else op_id
     if wrap_control:
         ctrl_mod = _control_modifier(n_ctrl)
@@ -333,12 +337,11 @@ def compile_decomposition_rules(
     # The static_data was only needed to instantiate the correct decomp rule
     # Once we have the correct rules, don't send them into qjit
     def rule_to_subroutine(rule):
-        def decomp_rule(*_args, **_kwargs):
+        def decomp_rule(*_args, _ctrl_wires=None, **_kwargs):
             # Apply adjoint innermost, control outermost (canonical `C(Adjoint(Op))`).
             body = qp.adjoint(rule._impl) if wrap_adjoint else rule._impl
             if wrap_control:
-                ctrl_wires = _kwargs.pop(ctrl_wire_key)
-                qp.ctrl(body, control=list(ctrl_wires))(*_args, **_kwargs)
+                qp.ctrl(body, control=list(_ctrl_wires))(*_args, **_kwargs)
             else:
                 body(*_args, **_kwargs)
 
@@ -358,19 +361,20 @@ def compile_decomposition_rules(
         if rule.is_applicable(*call_args, **call_kwargs):
             subroutines.append(rule_to_subroutine(rule))
 
-    # The control wires are passed as an extra keyword (excluded from `is_applicable` above, which
-    # only sees the base op's signature).
-    subroutine_kwargs = dict(call_kwargs)
-    if wrap_control:
-        subroutine_kwargs[ctrl_wire_key] = jnp.array(
-            range(n_base_wires, n_base_wires + n_ctrl), dtype=int
-        )
+    # For control distribution, the extra control wires are
+    # added to each rule body via the `_ctrl_wires` keyword argument.
+    ctrl_wires = (
+        jnp.array(range(n_base_wires, n_base_wires + n_ctrl), dtype=int) if wrap_control else None
+    )
 
     @qp.qjit(target="mlir", capture=True, collect_decomp_rules=False)
     @qp.qnode(device=device)
     def circuit():
         for subroutine in subroutines:
-            subroutine(*call_args, **subroutine_kwargs)
+            if wrap_control:
+                subroutine(*call_args, _ctrl_wires=ctrl_wires, **call_kwargs)
+            else:
+                subroutine(*call_args, **call_kwargs)
 
     module = circuit.mlir_module
 
@@ -623,8 +627,8 @@ def fetch_all_reachable_decomposition_rules_from_op(
     visited = [start]
 
     # Control counts to synthesize `<n>C(...)` rules for. A single control is always captured
-    # proactively; a multi-controlled instance additionally needs its own control count.
-    ctrl_counts = sorted({1} | ({n_ctrls} if n_ctrls > 1 else set()))
+    # proactively; a multi-controlled instance (`n_ctrls > 1`) additionally needs its own count.
+    ctrl_counts = [1] if n_ctrls <= 1 else [1, n_ctrls]
 
     def compile_variants(
         name, op_id, dynamic_shape, wire_lens, static_data, extra_data, is_custom_op
@@ -646,7 +650,10 @@ def fetch_all_reachable_decomposition_rules_from_op(
                 is_custom_op=is_custom_op,
             )
         )
-        if not name.startswith("Adjoint("):
+        # Only synthesize adjoint/control variants of a base op. If `op_id` already carries an
+        # outermost modifier (e.g. `Adjoint(...)` or `C(...)`, reached as another rule's resource),
+        # its own modifier variants are synthesized from its base op instead:
+        if _leading_modifier_kind(op_id) is None:
             out.extend(
                 adjoint_variant_rule_strings(
                     name,
