@@ -131,8 +131,9 @@ def gpu_transport_backend():
     if not any((lib_dir / name).exists() for name in names):
         pytest.skip(
             f"GPU coprocessor transport backend not built: none of {names} found in {lib_dir}. "
-            "The runtime needs a HIP toolchain (HIP-on-CUDA on an NVIDIA host) for CMake to "
-            "set TRANSPORT_HAS_HIP and build it."
+            "CMake sets TRANSPORT_HAS_HIP once it has HIP headers and a compiler for them. On an "
+            "NVIDIA host it fetches the headers itself, so the usual cause is a missing nvcc: "
+            "check that a CUDA toolkit, not just the driver, is installed."
         )
 
 

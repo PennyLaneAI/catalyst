@@ -112,6 +112,30 @@ jobs:
           ENABLE_TRANSPORT=ON \
           make runtime
 
+      - name: Verify the GPU coprocessor backend was built
+        # conftest's gpu_transport_backend fixture looks this name up in RUNTIME_LIB_DIR, and
+        # skips when it is absent -- which reads as "tests passed" unless something fails here
+        # first. The .so exists only when CMake set TRANSPORT_HAS_HIP, so when it is missing the
+        # question is always which half of the HIP toolchain was not found. find_program and
+        # find_path cache their answers, so the CMakeCache says so directly.
+        run: |
+          name=libcatalyst_transport_memcpy_gpu_coprocessor.so
+          if find "$(pwd)/runtime-build/lib" -name "$name" | grep -q .; then
+            find "$(pwd)/runtime-build/lib" -name "$name" -exec ls -l {} +
+            exit 0
+          fi
+          echo "$name was not built. Why:"
+          echo "--- what CMake resolved ---"
+          grep -E "^(_nvcc|_hip_include_dir|CMAKE_HIP_PLATFORM|CMAKE_HIP_COMPILER|TRANSPORT_HIP_HEADERS_URL)" \
+            "$(pwd)/runtime-build/CMakeCache.txt" || echo "(no HIP entries in the cache at all)"
+          echo "--- nvcc on this host ---"
+          command -v nvcc || echo "nvcc not on PATH"
+          ls -l /usr/local/cuda/bin/nvcc 2>/dev/null || echo "no /usr/local/cuda/bin/nvcc"
+          echo "--- fetched headers, if any ---"
+          ls -d "$(pwd)/runtime-build/hip-headers/payload/opt/rocm-"* 2>/dev/null \
+            || echo "(no fetched header tree: the fetch never ran)"
+          exit 1
+
       - name: Build the memcpy test binary
         run: |
           cmake --build "$(pwd)/runtime-build" --target runner_tests_transport_memcpy -j
