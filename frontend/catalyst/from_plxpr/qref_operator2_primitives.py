@@ -496,10 +496,6 @@ def _qref_operator_p_lowering(jax_ctx: mlir.LoweringRuleContext, *args, op_cls, 
     wire_lens = kwargs.pop("wire_lens")
     collect_decomp_rules = kwargs.pop("collect_decomp_rules")
 
-    # Work wires for controlled operators are not used by the MLIR operation yet
-    _ = kwargs.pop("n_ctrl_work_wires", None)
-    _ = kwargs.pop("ctrl_work_wire_type", None)
-
     repack_static_data = {k: unflatten(*v) for k, v in kwargs.items()}
 
     if n_ctrls:
