@@ -741,7 +741,12 @@ class TestBacklineDemoIntegration:
         assert "libcatalyst_transport_memcpy_controller.so" in ir
         assert "libcatalyst_transport_memcpy_gpu_coprocessor.so" in ir
         assert decoder.symbol_name in ir
-        assert decoder.lib_path is not None and decoder.lib_path in ir
+        # Only the symbol: backline loads an in-process coprocessor's library itself, with
+        # ctypes RTLD_GLOBAL in _load_coprocessor_fn_libs, so the transport backend resolves the
+        # decode function out of the global namespace. Writing the path into backend_lib would
+        # displace the transport plugin, which _node_dict says in as many words. So assert the
+        # build produced a library, not that its path reached the IR.
+        assert decoder.lib_path is not None and Path(decoder.lib_path).exists()
 
         samples = np.asarray(circuit())
         # qp.sample keeps the shots axis explicit: shots=1 with 13 measurements -> (1, 13).
