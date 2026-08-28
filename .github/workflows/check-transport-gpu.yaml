@@ -124,170 +124,57 @@ jobs:
       # headers when none are present and drives them with nvcc, so TRANSPORT_HAS_HIP is set and
       # libcatalyst_transport_memcpy_gpu_coprocessor.so is built here. The step below verifies it.
 
-      # From here down: build LLVM/StableHLO/Enzyme *on this self-hosted GPU runner* rather than
-      # consuming check-catalyst.yaml's caches. Cross-runner reuse hit three layered blockers
-      # (MLIRConfig HINTS, LLVMConfig absolute paths, and a GLIBC 2.36/2.38 mismatch in the
-      # cached mlir-tblgen). The first two are fixable in-workflow; the third is a hard binary
-      # portability issue. Building on-runner sidesteps all three. Caches use a "selfhosted-gpu-"
-      # prefix so they never collide with GH-hosted CI caches, and match on runner.os so
-      # different self-hosted runners keep separate stores.
-      - name: Install build dependencies for LLVM/dialects
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y cmake ninja-build clang lld
-          python3 -m pip install numpy "nanobind<2.13" pybind11 PyYAML
-
-      # LLVM source is already restored earlier in the job (for the runtime build) via the
-      # cache-llvm-source step above, so we don't need to re-restore or re-clone here.
-      - name: Cache LLVM Build (GPU-runner scoped)
-        id: cache-llvm-build
-        uses: actions/cache@v4
+      # Built here rather than reused from check-catalyst.yaml: those caches come from GH-hosted
+      # images and the cached mlir-tblgen hits a GLIBC mismatch on this runner.
+      - name: Build LLVM, StableHLO and Enzyme
+        uses: ./.github/actions/build-mlir-stack
         with:
-          path: llvm-build
-          key: selfhosted-gpu-${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-ci-build-gcc
-
-      - name: Build LLVM
-        if: steps.cache-llvm-build.outputs.cache-hit != 'true'
-        run: |
-          C_COMPILER=$(which gcc) \
-          CXX_COMPILER=$(which g++) \
-          LLVM_BUILD_DIR="$(pwd)/llvm-build" \
-          COMPILER_LAUNCHER="" \
-          make llvm
-
-      - name: Cache StableHLO Source
-        id: cache-stablehlo-source
-        uses: actions/cache@v4
-        with:
-          path: mlir/stablehlo
-          key: stablehlo-${{ needs.constants.outputs.stablehlo_version }}-default-source
-          enableCrossOsArchive: true
-
-      - name: Clone StableHLO Submodule
-        if: steps.cache-stablehlo-source.outputs.cache-hit != 'true'
-        uses: actions/checkout@v4
-        with:
-          repository: openxla/stablehlo
-          ref: ${{ needs.constants.outputs.stablehlo_version }}
-          path: mlir/stablehlo
-
-      - name: Cache StableHLO Build (GPU-runner scoped)
-        id: cache-stablehlo-build
-        uses: actions/cache@v4
-        with:
-          path: stablehlo-build
-          key: selfhosted-gpu-${{ runner.os }}-stablehlo-${{ needs.constants.outputs.stablehlo_version }}-ci-build-gcc
-
-      - name: Build StableHLO
-        if: steps.cache-stablehlo-build.outputs.cache-hit != 'true'
-        run: |
-          C_COMPILER=$(which gcc) \
-          CXX_COMPILER=$(which g++) \
-          LLVM_BUILD_DIR="$(pwd)/llvm-build" \
-          STABLEHLO_BUILD_DIR="$(pwd)/stablehlo-build" \
-          COMPILER_LAUNCHER="" \
-          make stablehlo
-
-      - name: Cache Enzyme Source
-        id: cache-enzyme-source
-        uses: actions/cache@v4
-        with:
-          path: mlir/Enzyme
-          key: enzyme-${{ needs.constants.outputs.enzyme_version }}-default-source
-          enableCrossOsArchive: true
-
-      - name: Clone Enzyme Submodule
-        if: steps.cache-enzyme-source.outputs.cache-hit != 'true'
-        uses: actions/checkout@v4
-        with:
-          repository: EnzymeAD/Enzyme
-          ref: ${{ needs.constants.outputs.enzyme_version }}
-          path: mlir/Enzyme
-
-      - name: Cache Enzyme Build (GPU-runner scoped)
-        id: cache-enzyme-build
-        uses: actions/cache@v4
-        with:
-          path: enzyme-build
-          key: selfhosted-gpu-${{ runner.os }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-ci-build-gcc
-
-      - name: Build Enzyme
-        if: steps.cache-enzyme-build.outputs.cache-hit != 'true'
-        run: |
-          C_COMPILER=$(which gcc) \
-          CXX_COMPILER=$(which g++) \
-          LLVM_BUILD_DIR="$(pwd)/llvm-build" \
-          ENZYME_BUILD_DIR="$(pwd)/enzyme-build" \
-          COMPILER_LAUNCHER="" \
-          make enzyme
+          llvm-version: ${{ needs.constants.outputs.llvm_version }}
+          stablehlo-version: ${{ needs.constants.outputs.stablehlo_version }}
+          enzyme-version: ${{ needs.constants.outputs.enzyme_version }}
 
       - name: Install Python runtime requirements
         run: |
           python3 -m pip install -r requirements.txt
 
-      - name: Install Triton for the css_bp_decoder test
-        # The test_cpu_controller_to_gpu_coproc_triton_css_bp case builds a decoder via
-        # pennylane.backline.css_bp_decoder, which requires triton to codegen the .so.
-        run: |
-          pip install triton
-
-      - name: Point Triton at the CUDA driver library
-        # Triton activates its CUDA backend by dlopen'ing libcuda.so.1. That library ships with
-        # the *driver*, not the toolkit: /usr/local/cuda/lib64 (already on LD_LIBRARY_PATH above)
-        # holds only a stub under lib64/stubs, which links but cannot initialize a device -- the
-        # "GPU present, 0 active drivers" case that conftest's gpu_triton_platform skips on.
-        # Resolve the real one through the loader cache and hand it to Triton explicitly.
-        # Stubs are excluded deliberately: finding one is worse than finding nothing.
+      - name: Set up Triton and its CUDA driver
+        # css_bp_decoder codegens through Triton, which activates its CUDA backend by dlopen'ing
+        # libcuda.so.1. That ships with the driver, not the toolkit: /usr/local/cuda/lib64, on
+        # LD_LIBRARY_PATH above, holds only a stub under lib64/stubs -- it links but cannot
+        # initialize a device, which is the "0 active drivers" that gpu_triton_platform skips on.
+        # Resolve the real one, excluding stubs, and prove activation here rather than leaving a
+        # silent skip to surface twenty minutes later at the guard.
         run: |
           set -euo pipefail
-          libcuda=$(ldconfig -p | awk '/libcuda\.so\.1/ {print $NF}' | grep -v /stubs/ | head -1)
+          pip install triton
+
+          # `|| true` on the pipeline: grep exits 1 when nothing matches, which under pipefail
+          # would abort the step before the diagnostic below can run.
+          libcuda=$(ldconfig -p | awk '/libcuda\.so\.1/ {print $NF}' | grep -v /stubs/ | head -1 || true)
           if [ -z "$libcuda" ]; then
-            # Not in the loader cache on some driver installs; fall back to a bounded search.
-            libcuda=$(find /usr/lib /usr/lib64 -name 'libcuda.so.1' -not -path '*/stubs/*' 2>/dev/null | head -1)
+            libcuda=$(find /usr/lib /usr/lib64 -name 'libcuda.so.1' -not -path '*/stubs/*' 2>/dev/null | head -1 || true)
           fi
           if [ -z "$libcuda" ]; then
-            echo "No real libcuda.so.1 on this host -- only the toolkit stub, if that."
-            echo "Triton cannot activate a CUDA driver, so the GPU tests will skip."
+            echo "No real libcuda.so.1 here -- only the toolkit stub, if that."
+            nvidia-smi || echo "nvidia-smi unavailable"
             ldconfig -p | grep -i libcuda || echo "(no libcuda in the loader cache at all)"
             exit 1
           fi
+
+          libcuda_dir=$(dirname "$libcuda")
           echo "libcuda: $libcuda"
-          echo "TRITON_LIBCUDA_PATH=$(dirname "$libcuda")" >> $GITHUB_ENV
-          echo "LD_LIBRARY_PATH=$(dirname "$libcuda")${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}" >> $GITHUB_ENV
+          export TRITON_LIBCUDA_PATH="$libcuda_dir"
+          export LD_LIBRARY_PATH="$libcuda_dir${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
+          echo "TRITON_LIBCUDA_PATH=$libcuda_dir" >> $GITHUB_ENV
+          echo "LD_LIBRARY_PATH=$LD_LIBRARY_PATH" >> $GITHUB_ENV
 
-      - name: Report Triton / GPU driver state
-        # gpu_triton_platform skips the GPU cases when Triton reports no active driver, and that
-        # is what this runner did: an NVIDIA GPU is visible to nvidia-smi while Triton's CUDA
-        # backend lands at "0 active drivers". Which of the pieces below is missing decides
-        # whether the compile-only css_bp case can run at all, and guessing at a triton pin costs
-        # a ~20 min GPU run per attempt -- so print the inputs and read them instead.
-        # Non-fatal: the guard at the end of the job is what decides the outcome.
-        continue-on-error: true
-        run: |
-          nvidia-smi || echo "nvidia-smi unavailable"
-          echo "--- libcuda in loader cache ---"
-          ldconfig -p | grep -i libcuda || echo "no libcuda in ldconfig cache"
-          echo "--- triton probe ---"
-          python3 - <<'EOF'
-          import traceback
+          # driver.active raises on 0 or >1 drivers -- the same call conftest turns into a skip.
+          python3 - <<'PY'
+          import triton
+          from triton.runtime.driver import driver
 
-          try:
-              import triton
-
-              print("triton version:", triton.__version__)
-          except Exception:  # noqa: BLE001 - reporting, not handling
-              traceback.print_exc()
-              raise SystemExit(0)
-
-          try:
-              from triton.runtime.driver import driver
-
-              # Raises RuntimeError on 0 or >1 active drivers, which is the case
-              # conftest._triton_driver_active() turns into a skip.
-              print("active driver:", driver.active)
-          except Exception:  # noqa: BLE001 - the traceback is the diagnostic
-              traceback.print_exc()
-          EOF
+          print("triton", triton.__version__, "| active driver:", driver.active)
+          PY
 
       - name: Build Catalyst frontend (reusing the transport-enabled runtime)
         run: |
