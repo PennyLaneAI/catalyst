@@ -228,11 +228,18 @@ jobs:
 
       - name: Build Catalyst frontend (reusing the transport-enabled runtime)
         run: |
-          # make catalyst -> make frontend runs precompile_decomposition_rules, which imports
-          # catalyst -> mlir_quantum. mlir_quantum lives under quantum-build/python_packages/quantum
-          # once the dialects sub-target has run, so PYTHONPATH must include that dir before this
-          # step's shell exits.
+          # make catalyst -> make frontend runs precompile_decomposition_rules at the end, and it
+          # needs two things this shell must provide, since the step that exports them for the
+          # rest of the job runs after this one:
+          #   PYTHONPATH      catalyst imports mlir_quantum, built under
+          #                   quantum-build/python_packages/quantum by the dialects sub-target.
+          #   CATALYST_LIB_DIR  pipelines.py appends get_lib_path("catalyst", "CATALYST_LIB_DIR")
+          #                   to sys.path and imports default_pipelines from it. Unset, the import
+          #                   fails, precompilation is skipped with only a warning, and the rules
+          #                   are then derived during tracing instead -- where a mismatch between
+          #                   Catalyst's call and PennyLane's rule._impl signature aborts capture.
           export PYTHONPATH="${PYTHONPATH:-}:$(pwd)/quantum-build/python_packages/quantum"
+          export CATALYST_LIB_DIR="$(pwd)/quantum-build/lib"
           COMPILER_LAUNCHER="" \
           C_COMPILER=$(which gcc) \
           CXX_COMPILER=$(which g++) \
