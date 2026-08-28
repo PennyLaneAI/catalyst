@@ -87,12 +87,14 @@ struct DecomposableGatePattern final : public OpInterfaceRewritePattern<Decompos
 
     LogicalResult matchAndRewrite(DecomposableGate op, PatternRewriter &rewriter) const override {
         std::string gateName = op.getOperatorName();
-        bool isAdjoint = op.getOperation()->hasAttr("adjoint");
+        // A modified op (adjoint and/or controlled) is a distinct operator from its base gate.
+        bool isModified =
+            op.getOperation()->hasAttr("adjoint") || !op.getCtrlQubitOperands().empty();
 
-        // Only decompose the op if it is not in the target gate set. An adjoint op is never treated
-        // as a native gate-set member by its base name: Adjoint(Op) is a distinct gate though that
-        // must reach the gate_set through its own custom rule.
-        if (!isAdjoint && targetGateSet.contains(gateName)) {
+        // Only decompose the op if it is not in the target gate set. A modified op is never treated
+        // as a native gate-set member by its base name: `Adjoint(Op)`/`C(Op)` are distinct gates
+        // that must reach the gate_set through their own rules.
+        if (!isModified && targetGateSet.contains(gateName)) {
             return failure();
         }
 
@@ -116,10 +118,10 @@ struct DecomposableGatePattern final : public OpInterfaceRewritePattern<Decompos
         if (it_gateID != decompositionRegistry.end()) {
             // Found a rule with the wanted ID, highest priority rule, just use this one
             rule = it_gateID->second;
-        } else if (!isAdjoint) {
-            // Didn't find ID match, try matching gate name. Non-adjoint only: an adjoint op must
-            // match an Adjoint(...) rule by its id. Note that we never fall back to a plain
-            // base-name rule.
+        } else if (!isModified) {
+            // Didn't find ID match, try matching gate name. Unmodified ops only: a modified op
+            // (`Adjoint(Op)`/`C(Op)`) must match its own rule by id and never fall back to a plain
+            // base-name rule (that would apply the unmodified decomposition to the modified op).
             // TODO: remove multirz's special name editing
             if (isa<quantum::MultiRZOp>(op)) {
                 gateName = gateName + "_" + std::to_string(op.getWireLens()["wires"]);
@@ -132,7 +134,7 @@ struct DecomposableGatePattern final : public OpInterfaceRewritePattern<Decompos
                 return failure();
             }
         } else {
-            // Didn't find ID match, try matching gate name:
+            // Modified op with no id-matched rule: do not fall back to the base-name rule.
             return failure();
         }
 

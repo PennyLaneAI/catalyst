@@ -809,3 +809,69 @@ TEST_CASE("Test nested 2C(Adjoint(RX)) pathways opaquely", "[DecompGraph::Solver
     REQUIRE(result.at(ccAdjRx).ruleName == "ccadj_rx_to_ccrx");
     REQUIRE(result.at(ccRx).isBasis);
 }
+
+TEST_CASE("Test competing controlled pathways are picked by cost", "[DecompGraph::Solver]") {
+    const OperatorNode crz{"C(RZ){0:[f64]}{wires:1}{}", "C(RZ)"};
+    const OperatorNode crot{"C(Rot){0:[f64],1:[f64],2:[f64]}{wires:1}{}", "C(Rot)"};
+
+    const WeightedGateset gateset{{{crz.name, 1.0}}};
+    const RuleNode distribute{"crot_distribute", crot, {{crz, 2}}}; // cost 2
+
+    SECTION("dedicated pathway wins when it is cheaper") {
+        const RuleNode dedicated{"crot_dedicated", crot, {{crz, 1}}}; // cost 1 < 2
+        const DecompositionGraph graph({crot}, gateset, {dedicated, distribute});
+        DecompositionSolver solver(graph);
+        const auto result = solver.solve();
+        REQUIRE(result.at(crot).ruleName == "crot_dedicated");
+        REQUIRE(result.at(crot).totalCost == 1.0);
+    }
+
+    SECTION("distribution pathway wins when the dedicated rule is more expensive") {
+        const RuleNode dedicated{"crot_dedicated", crot, {{crz, 5}}}; // cost 5 > 2
+        const DecompositionGraph graph({crot}, gateset, {dedicated, distribute});
+        DecompositionSolver solver(graph);
+        const auto result = solver.solve();
+        REQUIRE(result.at(crot).ruleName == "crot_distribute");
+        REQUIRE(result.at(crot).totalCost == 2.0);
+    }
+}
+
+TEST_CASE("Test multi-controlled distribution keeps the control count on each produced gate",
+          "[DecompGraph::Solver]") {
+    const OperatorNode ccrz{"2C(RZ){0:[f64]}{wires:1}{}", "2C(RZ)"};
+    const OperatorNode ccry{"2C(RY){0:[f64]}{wires:1}{}", "2C(RY)"};
+    const OperatorNode ccrot{"2C(Rot){0:[f64],1:[f64],2:[f64]}{wires:1}{}", "2C(Rot)"};
+
+    const WeightedGateset gateset{{{ccrz.name, 1.0}, {ccry.name, 2.0}}};
+    const std::vector<RuleNode> rules{
+        {"ccrot_distribute", ccrot, {{ccrz, 2}, {ccry, 1}}},
+    };
+
+    const DecompositionGraph graph({ccrot}, gateset, rules);
+    DecompositionSolver solver(graph);
+    const auto result = solver.solve();
+
+    REQUIRE(result.at(ccrot).ruleName == "ccrot_distribute");
+    REQUIRE(result.at(ccrot).totalCost == 4.0); // 2*1 + 2
+    REQUIRE(result.at(ccrz).isBasis);
+    REQUIRE(result.at(ccry).isBasis);
+}
+
+TEST_CASE("Test a controlled gate in the gate set is basis", "[DecompGraph::Solver]") {
+    const OperatorNode ct{"C(T){}{wires:1}{}", "C(T)"};
+    const OperatorNode cv{"C(V){}{wires:1}{}", "C(V)"};
+
+    const WeightedGateset gateset{{{ct.name, 1.0}}};
+    const std::vector<RuleNode> rules{
+        {"cv_to_ct", cv, {{ct, 1}}},
+    };
+
+    const DecompositionGraph graph({cv, ct}, gateset, rules);
+    DecompositionSolver solver(graph);
+    const auto result = solver.solve();
+
+    REQUIRE(result.at(ct).isBasis);
+    REQUIRE_FALSE(result.at(cv).isBasis);
+    REQUIRE(result.at(cv).ruleName == "cv_to_ct");
+    REQUIRE(result.at(cv).totalCost == 1.0);
+}

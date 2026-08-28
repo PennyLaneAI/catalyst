@@ -37,10 +37,13 @@ from pennylane.wires import Wires
 from catalyst import qjit
 from catalyst.decomposition.decomposition_rules import (
     _MODIFIER_CANONICAL_ORDER,
+    _control_modifier,
     _leading_modifier_kind,
     _modifier_kind,
     compile_decomposition_rules_wrapper,
+    compile_reachable_decomposition_rules_wrapper,
     name_unwrap_adjoint,
+    name_unwrap_control,
     name_wrap_adjoint,
     wrap_modifier_id,
 )
@@ -317,6 +320,62 @@ class TestOnDemand:
         else:
             with pytest.raises(ValueError, match="not an adjoint id"):
                 name_unwrap_adjoint(op_name, op_id)
+
+    @pytest.mark.parametrize(
+        "op_name, op_id, expected_base_id, expected_n_ctrl",
+        [
+            ("RX", "C(RX){0:[f64]}{wires:1}{}", "RX{0:[f64]}{wires:1}{}", 1),
+            ("RX", "2C(RX){0:[f64]}{wires:1}{}", "RX{0:[f64]}{wires:1}{}", 2),
+            ("S", "10C(S){}{wires:1}{}", "S{}{wires:1}{}", 10),  # multi-digit control count
+        ],
+    )
+    def test_name_unwrap_control(self, op_name, op_id, expected_base_id, expected_n_ctrl):
+        """name_unwrap_control recovers the base op's id (with its bare name re-prepended) and the
+        control count from a controlled graphOpId, and round-trips through wrap_modifier_id."""
+
+        assert name_unwrap_control(op_name, op_id) == (expected_base_id, expected_n_ctrl)
+        assert wrap_modifier_id(expected_base_id, _control_modifier(expected_n_ctrl)) == op_id
+
+    def test_name_unwrap_control_rejects_non_control_id(self):
+        """A non-controlled id is rejected for the given base op."""
+
+        with pytest.raises(ValueError, match="not a control id"):
+            name_unwrap_control("RX", "Adjoint(RX){0:[f64]}{wires:1}{}")
+
+    @pytest.mark.parametrize(
+        "op_id, extra_ctrl_target",
+        [
+            ("C(S){}{wires:1}{}", None),
+            # A multi-controlled id recovers n_ctrl=2 and additionally synthesizes the n=1 variant.
+            ("2C(S){}{wires:1}{}", 'target_gate = "C(S){}{wires:1}{}"'),
+        ],
+    )
+    def test_reachable_wrapper_controlled_op(self, op_id, extra_ctrl_target):
+        """compile_reachable_decomposition_rules_wrapper routes a controlled op-id through
+        name_unwrap_controland returns a module that holds both the base op's
+        and the ``<n>C(...)`` rule closure."""
+
+        module_str = compile_reachable_decomposition_rules_wrapper(
+            "S", op_id, {}, {"wires": 1}, {}, is_custom_op=True
+        )
+        assert module_str.lstrip().startswith("module")
+
+        assert f'target_gate = "{op_id}"' in module_str
+        assert 'target_gate = "S{}{wires:1}{}"' in module_str
+        if extra_ctrl_target is not None:
+            assert extra_ctrl_target in module_str
+
+    def test_control_variant_warns_and_skips_on_failure(self, mocker):
+        """control_variant_rule_strings warns and skips a rule when it fails to compile."""
+
+        from catalyst.decomposition import decomposition_rules as dr
+
+        mocker.patch.object(dr, "compile_decomposition_rules", side_effect=ValueError("boom"))
+        with pytest.warns(UserWarning, match="control rules"):
+            out = dr.control_variant_rule_strings(
+                "S", "S{}{wires:1}{}", [1], {}, {"wires": 1}, {}, is_custom_op=True
+            )
+        assert out == []
 
 
 class TestModifierIds:
