@@ -41,6 +41,7 @@ from catalyst.decomposition.decomposition_rules import (
     _leading_modifier_kind,
     _modifier_kind,
     compile_decomposition_rules_wrapper,
+    compile_reachable_decomposition_rules_wrapper,
     name_unwrap_adjoint,
     name_unwrap_control,
     name_wrap_adjoint,
@@ -313,6 +314,41 @@ class TestOnDemand:
 
         with pytest.raises(ValueError, match="not a control id"):
             name_unwrap_control("RX", "Adjoint(RX){0:[f64]}{wires:1}{}")
+
+    @pytest.mark.parametrize(
+        "op_id, extra_ctrl_target",
+        [
+            ("C(S){}{wires:1}{}", None),
+            # A multi-controlled id recovers n_ctrl=2 and additionally synthesizes the n=1 variant.
+            ("2C(S){}{wires:1}{}", 'target_gate = "C(S){}{wires:1}{}"'),
+        ],
+    )
+    def test_reachable_wrapper_controlled_op(self, op_id, extra_ctrl_target):
+        """compile_reachable_decomposition_rules_wrapper routes a controlled op-id through
+        name_unwrap_controland returns a module that holds both the base op's
+        and the ``<n>C(...)`` rule closure."""
+
+        module_str = compile_reachable_decomposition_rules_wrapper(
+            "S", op_id, {}, {"wires": 1}, {}, is_custom_op=True
+        )
+        assert module_str.lstrip().startswith("module")
+
+        assert f'target_gate = "{op_id}"' in module_str
+        assert 'target_gate = "S{}{wires:1}{}"' in module_str
+        if extra_ctrl_target is not None:
+            assert extra_ctrl_target in module_str
+
+    def test_control_variant_warns_and_skips_on_failure(self, mocker):
+        """control_variant_rule_strings warns and skips a rule when it fails to compile."""
+
+        from catalyst.decomposition import decomposition_rules as dr
+
+        mocker.patch.object(dr, "compile_decomposition_rules", side_effect=ValueError("boom"))
+        with pytest.warns(UserWarning, match="control rules"):
+            out = dr.control_variant_rule_strings(
+                "S", "S{}{wires:1}{}", [1], {}, {"wires": 1}, {}, is_custom_op=True
+            )
+        assert out == []
 
 
 class TestModifierIds:
