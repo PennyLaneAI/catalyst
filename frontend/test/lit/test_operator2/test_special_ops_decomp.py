@@ -20,8 +20,6 @@ lower to their own operations:
 - GlobalPhase
 - PCPhase
 - QubitUnitary
-
-On top of the above, we also explicitly test the lowering of some operations in PennyLane:
 - BasisState
 """
 
