@@ -114,7 +114,10 @@ def get_dummy_values_for_arg(arg):
             else:
                 return jnp.zeros((), dtype=_MLIR_DTYPES_TO_PY_DTYPES[arg])
         case list() | tuple():
-            if not any(isinstance(e, list) for e in arg) and arg[0].startswith("tensor"):
+            if all(isinstance(e, str) for e in arg) and arg[0].startswith("tensor"):
+                # if arg is something like [tensor<...>], i.e. a single tensor but carrying the
+                # layer of brackets from StringMap<Vector<Type>>, np str parsing fails to realize
+                # the actual tensor shape, and we need to do it manually
                 assert len(arg) == 1, "cannot create a tensor of tensors"
                 return get_dummy_values_for_arg(arg[0])
             else:
