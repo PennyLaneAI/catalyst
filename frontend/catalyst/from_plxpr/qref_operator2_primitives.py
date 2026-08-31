@@ -337,6 +337,27 @@ def compile_decomp_rules(
             static_data={},
         )
 
+    elif op_cls is qp.BasisState:
+        # qp.BasisState has the same number of booleans as the number of wires
+        num_wires = wire_lens[0]
+        dynamic_shape = {qp.BasisState.dynamic_argnames[0]: [f"tensor<{num_wires}xi1>"]}
+        wire_argname = qp.BasisState.wire_argnames[0]
+        op_id = (
+            "BasisState"
+            + format_dynamic_params_for_id(dynamic_shape)
+            + "{"
+            + f"{wire_argname}:{num_wires}"
+            + "}{}"
+        )
+
+        decomp_rules = fetch_all_reachable_decomposition_rules_from_op(
+            op_name="BasisState",
+            op_id=op_id,
+            dynamic_shape=dynamic_shape,
+            wire_lens={f"{wire_argname}": num_wires},
+            static_data={},
+        )
+
     elif op_cls is qp.QubitUnitary:
         num_wires = wire_lens[0]
         matrix_size = 2**num_wires
@@ -630,6 +651,14 @@ def _special_gphase_lowering(angle, *_, ctrl_qubits, ctrl_values, adjoint):
         ctrl_values=ctrl_values,
         adjoint=adjoint,
     )
+    return ()
+
+
+@_register_special_lowering(qp.BasisState)
+def _special_basis_state_lowering(state, *qubits, ctrl_qubits, ctrl_values, adjoint):
+    assert not ctrl_qubits and not ctrl_values, "ctrl(BasisState) is not supported."
+    assert not adjoint, "adjoint(BasisState) is not supported."
+    SetBasisStateOp(state, qubits)
     return ()
 
 
