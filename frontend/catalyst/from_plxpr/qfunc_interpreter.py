@@ -337,7 +337,7 @@ def _new_hybrid_arg(interp: PLxPRToQuantumJaxprInterpreter, arg) -> list:
     return new_args
 
 
-# pylint: disable=too-many-arguments
+# pylint: disable=too-many-arguments,unused-argument
 def _apply_operator2_gate(
     self,
     *args,
@@ -347,13 +347,20 @@ def _apply_operator2_gate(
     hybrid_trees,
     forward_mask,
     adjoint,
-    n_ctrls,
+    n_ctrls=0,
+    n_ctrl_work_wires=0,
+    ctrl_work_wire_type="borrowed",
     **kwargs,
 ):
     """Apply an Operator2 as a gate instruction using qref_operator_p."""
     n_wires = sum(wire_lens)
     wire_inputs = args[len(op_cls.dynamic_argnames) : len(op_cls.dynamic_argnames) + n_wires]
     if n_ctrls:
+        if n_ctrl_work_wires:
+            # MLIR operations do not currently handle work wires for controlled operators,
+            # so they are ignored.
+            args = args[:-n_ctrl_work_wires]
+
         control_wire_inputs = args[-2 * n_ctrls : -n_ctrls]
         control_values = args[-n_ctrls:]
     else:
