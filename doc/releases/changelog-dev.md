@@ -124,6 +124,7 @@
     2. When lowering a gate operation from JAXPR to MLIR, all rules reachable from that gate are injected into the IR.
     [(#3061)](https://github.com/PennyLaneAI/catalyst/pull/3061)
     [(#3160)](https://github.com/PennyLaneAI/catalyst/pull/3160)
+    [(#3149)](https://github.com/PennyLaneAI/catalyst/pull/3149)
 
     This pathway of rule injection can be opted-out via a new keyword argument on `qp.qjit` named `collect_decomp_rules`.
     This kwarg controls whether or not to compile the decomposition rules during lower-time. Default value is `True`.
