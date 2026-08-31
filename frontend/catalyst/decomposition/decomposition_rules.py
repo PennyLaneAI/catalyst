@@ -25,6 +25,7 @@ import pennylane as qp
 from jax._src.lib.mlir import ir
 from jaxlib.mlir.dialects.builtin import ModuleOp
 
+from catalyst.compiler import _quantum_opt
 from catalyst.decomposition.graph_op_id import GraphOpID
 from catalyst.decomposition.type_utils import get_dummy_values_for_arg
 from catalyst.jax_extras.lowering import get_mlir_attribute_from_pyval
@@ -285,9 +286,10 @@ def compile_decomposition_rules(
     wrap_adjoint=False,
     wrap_control=False,
     n_ctrl=1,
-) -> ModuleOp:
+) -> ir.Operation:
     """
-    Return a ModuleOp containing the decomposition rules for an operator instance.
+    Return the top-level ``builtin.module`` operation containing the decomposition rules for an
+    operator instance.
 
     The decomposition rules will be decorated with appropriate resource and target_gate attributes.
 
@@ -346,8 +348,8 @@ def compile_decomposition_rules(
         if extra_data:
             decomp_rule_no_static_args = partial(decomp_rule_no_static_args, **extra_data)
 
-        # Keep the frontend name for readability, append target op_id for symbol uniqueness:
-        decomp_rule_no_static_args.__name__ = rule._impl.__name__ + "_" + target_id
+        # keep the frontend name for readability, append target op_id for symbol uniqueness
+        decomp_rule_no_static_args.__name__ = rule.name + "_" + target_id
 
         return qp.capture.subroutine(decomp_rule_no_static_args)
 
@@ -389,6 +391,7 @@ def compile_decomposition_rules(
         This function updates the following attributes:
             - Adds the `target_gate` attribute.
             - Adds the `resources` attribute.
+            - Sets the visibility to public (so the inliner does not remove them)
         """
         if op.name == "func.func":
             rule_name = ir.StringAttr(op.attributes["sym_name"]).value.removesuffix("_" + target_id)
@@ -397,13 +400,54 @@ def compile_decomposition_rules(
                     {"operations": name_to_resource_ids[rule_name]}
                 )
                 op.attributes["target_gate"] = ir.StringAttr.get(target_id)
+                op.attributes["sym_visibility"] = ir.StringAttr.get("public")
 
         return ir.WalkResult.ADVANCE
 
-    with module.context:
+    with module.context, ir.Location.unknown():
         module.operation.walk(update_funcop_attributes)
 
-    return module
+    # Inline to avoid helper functions. We want all decomp rule functions to be standalone
+    # Generic printing needed when parsing --quantum-opt string output back to jax IR ModuleOps
+    # since Catalyst's python bindings never export the Catalyst dialects
+    # Before inlining we need to remove the qnode function, since that has a call to the compiled
+    # rule subroutine
+    qnode_func_erasure_worklist = []
+
+    def remove_qnode_func(op):
+        if op.name == "catalyst.launch_kernel":
+            qnode_func_erasure_worklist.append(op.parent)
+            return ir.WalkResult.ADVANCE
+        if op.name == "func.func" and "quantum.node" in op.attributes:
+            qnode_func_erasure_worklist.append(op)
+            return ir.WalkResult.ADVANCE
+        return ir.WalkResult.ADVANCE
+
+    with module.context, ir.Location.unknown():
+        module.operation.walk(remove_qnode_func)
+
+    for qnode_func in qnode_func_erasure_worklist:
+        qnode_func.erase()
+
+    inlined = _quantum_opt(
+        "--inline=inlining-threshold=4294967295",  # Use uint max to indicate always inline
+        "--mlir-print-op-generic",
+        stdin=str(module),
+    )
+
+    inlined_module = ir.Operation.parse(inlined, context=module.context)
+
+    def re_privatize_rules(op):
+        if op.name == "func.func":
+            rule_name = ir.StringAttr(op.attributes["sym_name"]).value.removesuffix("_" + target_id)
+            if rule_name in name_to_resource_ids:
+                op.attributes["sym_visibility"] = ir.StringAttr.get("private")
+        return ir.WalkResult.ADVANCE
+
+    with inlined_module.context, ir.Location.unknown():
+        inlined_module.operation.walk(re_privatize_rules)
+
+    return inlined_module
 
 
 def adjoint_variant_rule_strings(

@@ -25,11 +25,11 @@ import pennylane as qp
 from jax import numpy as jnp
 from operator2_dummy_gates import (
     CompilableData,
+    MultiParams,
     MultipleFullArgs,
     NoParams,
     SingleParam,
     SingleParamCustomOp,
-    StaticData,
 )
 from pennylane.typing import Float, Int, Wire
 
@@ -549,6 +549,53 @@ def test_from_custom_op():
 test_from_custom_op()
 
 
+def test_rule_with_helper_function():
+    """
+    Test that decomposing a rule with a helper function correctly inlines the helper.
+    """
+
+    @qp.capture.subroutine
+    def my_helper():
+        return 4.2
+
+    @qp.register_resources({MultiParams(reg=Wire[1], a=Float, b=Float, c=Float): 1})
+    def rule(reg):
+        MultiParams(reg=reg, a=my_helper(), b=0.2, c=0.3)
+
+    with qp.decomposition.local_decomps():
+        qp.add_decomps(NoParams, rule)
+
+        @qp.qjit(capture=True, target="mlir")
+        @qp.qnode(qp.device("lightning.qubit", wires=2))
+        def with_helper():
+            NoParams(reg=0)
+            NoParams(reg=[0, 1])
+            return qp.probs()
+
+        print(with_helper.mlir)
+
+
+# CHECK-LABEL: func.func public @with_helper()
+# CHECK: qref.operator "NoParams"
+# CHECK: qref.operator "NoParams"
+# CHECK: func.func private @"__builtin_rule_NoParams{}{reg:1}{}"
+# CHECK-SAME:   resources = {operations = {
+# CHECK-SAME:   "MultiParams{a:[tensor<f64>],b:[tensor<f64>],c:[tensor<f64>]}{reg:1}{}" = 1 : i64
+# CHECK-SAME:   target_gate = "NoParams{}{reg:1}{}"
+# CHECK: stablehlo.constant dense<4.200000e+00> : tensor<f64>
+# CHECK-NOT: call
+# CHECK-NOT: my_helper
+#
+# CHECK: func.func private @"__builtin_rule_NoParams{}{reg:2}{}"
+# CHECK-SAME:   resources = {operations = {
+# CHECK-SAME:   "MultiParams{a:[tensor<f64>],b:[tensor<f64>],c:[tensor<f64>]}{reg:1}{}" = 1 : i64
+# CHECK-SAME:   target_gate = "NoParams{}{reg:2}{}"
+# CHECK: stablehlo.constant dense<4.200000e+00> : tensor<f64>
+# CHECK-NOT: call
+# CHECK-NOT: my_helper
+test_rule_with_helper_function()
+
+
 def test_phaseshift_to_rz():
     """Test that PhaseShift decomposes to a quantum.custom "RZ" & quantum.gphase correctly."""
 
@@ -568,3 +615,27 @@ def test_phaseshift_to_rz():
 # CHECK: qref.custom "RZ"
 # CHECK: qref.gphase
 test_phaseshift_to_rz()
+
+
+def test_basis_rotation():
+    """Test that qp.BasisRotation successfully compiles its decomposition rules."""
+
+    @qp.qjit(target="mlir", capture=True)
+    @qp.qnode(qp.device("null.qubit", wires=2))
+    def test_basis_rotation():
+        U = jnp.array(
+            [
+                [-0.77228482 + 0.0j, -0.02959195 + 0.63458685j],
+                [0.63527644 + 0.0j, -0.03597397 + 0.77144651j],
+            ],
+        )
+        qp.BasisRotation(unitary_matrix=U, wires=[0, 1])
+        return qp.probs()
+
+    print(test_basis_rotation.mlir)
+
+
+# CHECK-LABEL: test_basis_rotation
+# CHECK: func.func private @"__builtin__basis_rotation_decomp_BasisRotation{unitary_matrix:[tensor<2x2xcomplex<f64>>]}{wires:2}{check:False}"
+# CHECK-SAME: target_gate = "BasisRotation{unitary_matrix:[tensor<2x2xcomplex<f64>>]}{wires:2}{check:False}"
+test_basis_rotation()
