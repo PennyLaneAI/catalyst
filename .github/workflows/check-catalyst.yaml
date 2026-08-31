@@ -67,8 +67,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          # libibverbs-dev: without it find_library(IBVERBS_LIB ibverbs) in
-          # runtime/lib/transport silently skips the cpu_verbs (RDMA) backends.
+          # libibverbs-dev: without it the RDMA backends are silently skipped at configure time.
           # ccache is picked up by runtime/Makefile's COMPILER_LAUNCHER default.
           sudo apt-get -y -q install ninja-build make cmake ccache clang libibverbs-dev
           python3 -m pip install "nanobind<2.13" pybind11 numpy PyYAML
@@ -89,9 +88,7 @@ jobs:
           ref: ${{ needs.constants.outputs.llvm_version }}
           path: mlir/llvm-project
 
-      # Feature branches restore main's cache but never save (the save step below is gated on
-      # main), so PR runs don't overwrite it. The key is scoped by job + compiler to avoid
-      # colliding with the quantum job, whose disjoint TU set would drop the hit rate to ~0%.
+      # Key is job+compiler scoped: sharing with the quantum job's disjoint TUs means ~0% hits.
       - name: Restore CCache on feature branches
         id: restore-ccache
         if: ${{ github.ref != 'refs/heads/main' }}
@@ -101,9 +98,7 @@ jobs:
           key: ${{ runner.os }}-ccache-runtime-${{ matrix.compiler }}-${{ github.run_id }}
           restore-keys: ${{ runner.os }}-ccache-runtime-${{ matrix.compiler }}-
 
-      # ENABLE_EXECUTOR=ON links LLVM, so a built LLVM has to exist. Restore the one the
-      # `llvm` job built; letting the top-level Makefile's `runtime: llvm` rule fire instead
-      # rebuilds into a different dir and costs ~9 min per PR. Only transport PRs pay for it.
+      # Restore instead of letting Makefile's `runtime: llvm` rebuild into another dir (~9 min).
       - name: Get Cached LLVM Build
         if: needs.transport_changes.outputs.transport == 'true' && matrix.compiler == 'gcc'
         uses: actions/cache/restore@v4
@@ -120,9 +115,7 @@ jobs:
           # the executor links LLVM, and clang would pay that again for a binary nothing uses.
           ENABLE_EXECUTOR: ${{ needs.transport_changes.outputs.transport == 'true' && matrix.compiler == 'gcc' && 'ON' || 'OFF' }}
         run: |
-          # `make -C runtime runtime`, not the top-level target: that one carries an
-          # `ENABLE_EXECUTOR=ON -> runtime: llvm` rule made redundant by the restore above.
-          # Going direct means ENABLE_OQD has to be passed explicitly.
+          # `-C runtime`, not the top-level target: that one would rebuild llvm despite the restore.
           CCACHE_DIR="$(pwd)/.ccache" \
           C_COMPILER=$(which ${{ needs.constants.outputs[format('c_compiler.{0}', matrix.compiler)] }}) \
           CXX_COMPILER=$(which ${{ needs.constants.outputs[format('cxx_compiler.{0}', matrix.compiler)] }}) \
@@ -627,10 +620,7 @@ jobs:
         dot -Tpng -o test.png <<<'digraph { a -> b }' # Verify a png can be rendered
 
     - name: Run backline transport integration tests
-      # The runtime artifact downloaded above already carries the transport backends (the
-      # `runtime` job builds with ENABLE_TRANSPORT=ON for these PRs). Covers CPU->CPU over
-      # memcpy and over rxe0, the latter both in-process and with the coprocessor in a
-      # catalyst-executor subprocess. GPU-coproc cases need the self-hosted GPU runner.
+      # Only the CPU cases; the GPU-coproc ones need the self-hosted runner (check-transport-gpu).
       if: needs.transport_changes.outputs.transport == 'true' && matrix.compiler == 'gcc'
       env:
         CATALYST_TRANSPORT_PATH: ${{ github.workspace }}/runtime-build/lib

@@ -52,26 +52,17 @@ elseif(EXISTS "/opt/rocm")
     list(APPEND CMAKE_PREFIX_PATH "/opt/rocm")
 endif()
 
-# On NVIDIA the HIP language is nvcc with `-x cu`, and ROCm contributes only headers -- hip::host
-# is an empty interface target there. So with no headers found above but a CUDA toolkit present,
-# fetch just hip-dev (2.5 MB) rather than requiring all of ROCm. An install is used unchanged.
+# On NVIDIA nvcc compiles and ROCm supplies only headers -- fetch hip-dev (2.5 MB), not all of ROCm.
 find_path(_hip_include_dir hip/hip_runtime.h PATH_SUFFIXES include)
 find_program(_nvcc nvcc HINTS ENV CUDA_PATH ENV CUDA_HOME /usr/local/cuda PATH_SUFFIXES bin)
 if(NOT _hip_include_dir AND _nvcc)
-    # url|sha256, pinned so an upstream release cannot change what we compile against. 7.1.x or
-    # newer is required, not merely preferred: hipMemGetHandleForAddressRange and
-    # hipMemRangeHandleTypeDmaBufFd are absent from 6.4.4 on both platforms, and 7.1.1's
-    # nvidia_detail is where they are mapped onto cuMemGetHandleForAddressRange. Set the
-    # list to "" to disable the fetch, e.g. offline builds. hip-dev carries the headers and
-    # lib/cmake/hip; hipcc-nvidia carries bin/hipcc and bin/hipconfig, which hip-config.cmake
-    # set_and_check's even though nvcc is what compiles. Both unpack into one opt/rocm-<ver> tree.
-    # Both are MIT (c) Advanced Micro Devices -- hipcc-nvidia ships share/doc/hipcc/LICENSE.txt,
-    # hip-dev carries the grant inline in every header. Fetched at build time and not vendored or
-    # redistributed, so no NOTICE entry is needed; re-check on a ROCm version bump.
+    # 7.1.x or newer required: hipMemGetHandleForAddressRange and hipMemRangeHandleTypeDmaBufFd
+    # are absent from 6.4.4, and 7.1.1 maps them onto cuMemGetHandleForAddressRange.
+    # Both packages are MIT (c) AMD; fetched, not redistributed, so no NOTICE entry is needed.
     set(TRANSPORT_HIP_PACKAGES
         "https://repo.radeon.com/rocm/apt/7.1.1/pool/main/h/hip-dev/hip-dev_7.1.52802.70101-38~24.04_amd64.deb|736acec734396969e11e8813a55742de536c53324fab3a836d75aa3dbf0d9651"
         "https://repo.radeon.com/rocm/apt/7.1.1/pool/main/h/hipcc-nvidia/hipcc-nvidia_1.1.1.70101-38~24.04_amd64.deb|221a4a0923862cd236d3b9e5b76fd829a87ba171ad08c75b69a6f6984a18ad30"
-        CACHE STRING "url|sha256 of the ROCm packages supplying the HIP headers and driver")
+        CACHE STRING "url|sha256 of the ROCm HIP packages; empty disables the fetch")
 
     set(_hip_stage "${CMAKE_BINARY_DIR}/hip-headers")
     file(GLOB _hip_root "${_hip_stage}/payload/opt/rocm-*")

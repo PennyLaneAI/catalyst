@@ -116,10 +116,8 @@ llvm:
 stablehlo:
 	@echo "build stablehlo"
 
-	# Pass LLVM_DIR explicitly. MLIRConfig.cmake's HINTS references an absolute path baked at
-	# LLVM configure time, which is stale when llvm-build/ is restored from a cache built on a
-	# different host -- check-transport-gpu.yaml's selfhosted-gpu-* caches key only on
-	# runner.os, so two self-hosted GPU runners share one store.
+# Explicit LLVM_DIR: MLIRConfig's baked HINTS path is stale when llvm-build/ is restored
+# from a cache saved on another host (the key has no runner.name).
 	cmake -G Ninja -S stablehlo -B $(STABLEHLO_BUILD_DIR) \
 		-DLLVM_DIR=$(LLVM_BUILD_DIR)/lib/cmake/llvm \
 		-DSTABLEHLO_ENABLE_LLD=$(ENABLE_LLD) \

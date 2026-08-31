@@ -149,12 +149,9 @@ builtin-decomp-rules: dialects runtime frontend
 dialect-docs:
 	$(MAKE) -C mlir dialect-docs
 
-# TODO: executor links LLVM and finds it through LLVM_DIR. This creates a dependancy between
-# runtime and LLVM. For now we can run LLVM once in the begining if ENABLE_EXECUTOR is specified.
-# The better solution is perhaps to detactch the executor from runtime into its own target.
-# NB: depends only on `llvm`, not the full `mlir` target. The executor's CMake uses
-# find_package(LLVM CONFIG REQUIRED) - it doesn't need stablehlo, enzyme, or the dialects, so
-# forcing those to build here would just slow down every runtime build.
+# The executor links LLVM via find_package(LLVM CONFIG REQUIRED), coupling runtime to it.
+# `llvm`, not `mlir`: the executor links no stablehlo, enzyme, or dialects.
+# TODO: detach the executor into its own target instead of this dependency.
 ifeq ($(ENABLE_EXECUTOR), ON)
 runtime: llvm
 endif

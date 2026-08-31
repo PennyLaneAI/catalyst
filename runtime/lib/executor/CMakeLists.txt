@@ -12,11 +12,7 @@ llvm_map_components_to_libnames(_executor_llvm_libs
     AllTargetsCodeGens AllTargetsDescs AllTargetsInfos
 )
 
-# gcc 13+ emits a false-positive -Wmaybe-uninitialized against LLVM's ADT/FunctionExtras.h
-# (llvm::unique_function's StorageUnion) whenever an ORC header is transitively included.
-# RUNTIME_ENABLE_WARNINGS promotes it to -Werror, so all three targets in this file
-# (catalyst_executor_session, rt_executor, catalyst-executor) fail to build under gcc.
-# Suppress at directory scope; scoped to gcc so clang isn't affected.
+# False positive in LLVM's unique_function (ADT/FunctionExtras.h), reached via ORC headers.
 if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     add_compile_options(-Wno-error=maybe-uninitialized)
 endif()
