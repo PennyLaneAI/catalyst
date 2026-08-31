@@ -75,6 +75,7 @@
   [(#2981)](https://github.com/PennyLaneAI/catalyst/pull/2981)
   [(#3109)](https://github.com/PennyLaneAI/catalyst/pull/3109)
   [(#3075)](https://github.com/PennyLaneAI/catalyst/pull/3075)
+  [(#3162)](https://github.com/PennyLaneAI/catalyst/pull/3162)
 
 * The graph-based decomposition system has been greatly improved.
 
@@ -99,14 +100,15 @@
     [(#3053)](https://github.com/PennyLaneAI/catalyst/pull/3053)
 
     The format of `graphOpID` is as follows:
-        op_name{param_shaped_type_dictionary}{wire_lens_dictionary}{static_data_dictionary}[UID]
+        op_name{dynamic_shape_dictionary}{wire_lens_dictionary}{static_data_dictionary}[UID]
 
+    The types in the dynamic shape dictionary should be represented as a list of MLIR-style type annotations.
     The UID is a hash computed from the shapes, dtypes and pytree structures of any data on the Python operator that cannot be lowered to MLIR directly.
 
     For example, an operator with class name `HybridOpArg`, taking in one float param
     argument named `angle`, one wire argument named `cwires`, one static data argument
     `label="hello"`, and a computed UID of 10 would be parsed to the following graph op ID:
-        HybridOpArg{angle:[f64]}{cwires:1}{label:hello}[10]
+        HybridOpArg{angle:[tensor<f64>]}{cwires:1}{label:hello}[10]
 
     A node in the decomposition graph is completely identified by its `graphOpId`. For example,
         PauliRot{angle:[f64]}{wires:1}{pauli_word:X}
@@ -121,6 +123,7 @@
 
     2. When lowering a gate operation from JAXPR to MLIR, all rules reachable from that gate are injected into the IR.
     [(#3061)](https://github.com/PennyLaneAI/catalyst/pull/3061)
+    [(#3160)](https://github.com/PennyLaneAI/catalyst/pull/3160)
 
     This pathway of rule injection can be opted-out via a new keyword argument on `qp.qjit` named `collect_decomp_rules`.
     This kwarg controls whether or not to compile the decomposition rules during lower-time. Default value is `True`.
@@ -145,6 +148,7 @@
     [(#2836)](https://github.com/PennyLaneAI/catalyst/pull/2836)
     [(#2855)](https://github.com/PennyLaneAI/catalyst/pull/2855)
     [(#3156)](https://github.com/PennyLaneAI/catalyst/pull/3156)
+    [(#3158)](https://github.com/PennyLaneAI/catalyst/pull/3158)
 
     1. The pass now supports applying a selection of the available decomposition rules via the `target_rules` parameter.
 
@@ -244,7 +248,7 @@
   a transport kick/collect round over its buffers.
   [(#3066)](https://github.com/PennyLaneAI/catalyst/pull/3066)
 
-* A `remove-global-phases` pass is added, which removes global phases by deleting `quantum.gphase`  
+* A `remove-global-phases` pass is added, which removes global phases by deleting `quantum.gphase`
   operations without control wires.
   [(#3143)](https://github.com/PennyLaneAI/catalyst/pull/3143)
 

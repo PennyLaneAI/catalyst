@@ -361,13 +361,7 @@ module {
 
     ASSERT_EQ(unitary.getStaticData().size(), 0);
 
-    // Controlled unitary: the control wire is folded into the id (control-outermost).
-    ASSERT_EQ(unitary.getGraphOpId(), "C(QubitUnitary){U:["
-                                      "[[complex<f64>,complex<f64>,complex<f64>,complex<f64>],"
-                                      "[complex<f64>,complex<f64>,complex<f64>,complex<f64>],"
-                                      "[complex<f64>,complex<f64>,complex<f64>,complex<f64>],"
-                                      "[complex<f64>,complex<f64>,complex<f64>,complex<f64>]]"
-                                      "]}{wires:2}{}");
+    ASSERT_EQ(unitary.getGraphOpId(), "C(QubitUnitary){U:[tensor<4x4xcomplex<f64>>]}{wires:2}{}");
 }
 
 TEST(DecomposableGateInterfaceTests, OperatorOpQubits) {
@@ -487,16 +481,14 @@ func.func @testfunc(%first : tensor<1xi64>, %secondthird : tensor<2xi64>) {
 
 TEST(DecomposableGateInterfaceTests, OperatorOpUID) {
     std::string moduleStr = R"mlir(
-func.func @testfunc(%first : tensor<1xi64>, %secondthird : tensor<2xi64>) {
-  %angle = arith.constant 3.1 : f64
-  %flag = arith.constant 0 : i1
-  %index = arith.constant 5 : i64
+func.func @testfunc(%first : tensor<1xi64>, %secondthird : tensor<2xi64>, %arg1 : tensor<i1>, %arg2: tensor<f64>, %arg3: tensor<i64>) {
 
   %reg = quantum.alloc(4) : !quantum.reg
   %q0 = quantum.extract %reg[0] : !quantum.reg -> !quantum.bit
 
-  %0 = quantum.operator "testOperatorUID"(%flag: i1, %angle: f64, %index: i64)
-    UID(248) quregs(%reg) indices(%first: tensor<1xi64>, %secondthird: tensor<2xi64>) param_map = {flag=[0], angle=[1], index=[2]} qubit_map = {reg=[0, 1]}
+    // testOperatorUID(angle=float, index=[bool, int])
+  %0 = quantum.operator "testOperatorUID"(%arg1: tensor<i1>, %arg2: tensor<f64>, %arg3: tensor<i64>)
+    UID(248) quregs(%reg) indices(%first: tensor<1xi64>, %secondthird: tensor<2xi64>) param_map = {angle=[1], index=[0, 2]} qubit_map = {reg=[0, 1]}
   return
 }
     )mlir";
@@ -513,14 +505,11 @@ func.func @testfunc(%first : tensor<1xi64>, %secondthird : tensor<2xi64>) {
 
     ASSERT_EQ(op.getOperatorName(), "testOperatorUID");
 
-    // This is needed to keep the backing array from being deleted
-    // llvm::SmallVector<llvm::SmallVector<mlir::Type>, 1> backing(
-    //     {mlir::IntegerType::get(&context, 1), mlir::Float64Type::get(&context),
-    //      mlir::IntegerType::get(&context, 64)});
     llvm::StringMap<llvm::SmallVector<mlir::Type>> expectedDynamicShape = {
-        {"flag", {mlir::IntegerType::get(&context, 1)}},
-        {"angle", {mlir::Float64Type::get(&context)}},
-        {"index", {mlir::IntegerType::get(&context, 64)}}};
+        {"angle", {mlir::RankedTensorType::get({}, mlir::Float64Type::get(&context))}},
+        {"index",
+         {mlir::RankedTensorType::get({}, mlir::IntegerType::get(&context, 1)),
+          mlir::RankedTensorType::get({}, mlir::IntegerType::get(&context, 64))}}};
     ASSERT_EQ(op.getDynamicShape(), expectedDynamicShape);
 
     llvm::StringMap<size_t> expectedWires = {{"reg", 3}};
@@ -528,6 +517,7 @@ func.func @testfunc(%first : tensor<1xi64>, %secondthird : tensor<2xi64>) {
 
     ASSERT_EQ(op.getStaticData(), mlir::DictionaryAttr::get(&context, {}));
 
-    ASSERT_EQ(op.getGraphOpId(),
-              "testOperatorUID{angle:[f64],flag:[i1],index:[i64]}{reg:3}{}[248]");
+    ASSERT_EQ(op.getGraphOpId(), "testOperatorUID{angle:[tensor<f64>],index:["
+                                 "tensor<i1>,tensor<i64>]}{reg:3}{}[248]");
+    // TODO: better separate these tests to unittests
 }

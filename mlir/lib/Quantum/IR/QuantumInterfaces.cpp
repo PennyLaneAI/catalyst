@@ -15,7 +15,6 @@
 #include "Quantum/IR/QuantumInterfaces.h"
 
 #include <cstddef>
-#include <cstdint>
 #include <string>
 
 #include "llvm/ADT/STLExtras.h"
@@ -24,7 +23,6 @@
 #include "llvm/Support/raw_ostream.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinAttributes.h"
-#include "mlir/IR/BuiltinTypeInterfaces.h"
 #include "mlir/IR/Types.h"
 #include "mlir/Support/LLVM.h"
 
@@ -69,42 +67,6 @@ void printAttr(mlir::Attribute attr, llvm::raw_string_ostream &ss) {
         .Default([&](mlir::Attribute attr) { attr.print(ss); });
 }
 
-void printShapedType(ArrayRef<int64_t> shape, int64_t dim, Type elementType,
-                     llvm::raw_string_ostream &ss) {
-    // Rank-0 tensors (e.g. tensor<f64>) have an empty shape; print the
-    // element type directly instead of indexing into the empty ArrayRef.
-    if (shape.empty()) {
-        ss << elementType;
-        return;
-    }
-
-    int64_t length = shape[dim];
-    auto printList = [&](auto printItem) {
-        ss << "[";
-        for (int64_t i = 0; i < length; i++) {
-            printItem();
-            if (i != length - 1) {
-                ss << ",";
-            }
-        }
-        ss << "]";
-    };
-
-    if (static_cast<int64_t>(shape.size()) == dim + 1) {
-        printList([&]() { ss << elementType; });
-    } else {
-        printList([&]() { printShapedType(shape, dim + 1, elementType, ss); });
-    }
-}
-
-void printType(mlir::Type type, llvm::raw_string_ostream &ss) {
-    llvm::TypeSwitch<mlir::Type, void>(type)
-        .Case<mlir::ShapedType>([&](mlir::ShapedType shapedType) {
-            printShapedType(shapedType.getShape(), 0, shapedType.getElementType(), ss);
-        })
-        .Default([&](mlir::Type other) { other.print(ss); });
-}
-
 template <typename T, typename PrintFunc>
 void printSortedMap(const llvm::StringMap<T> &map, llvm::raw_string_ostream &ss,
                     PrintFunc printValue) {
@@ -133,7 +95,7 @@ void printDynamicShape(const llvm::StringMap<llvm::SmallVector<mlir::Type>> &map
             if (j > 0) {
                 stream << ",";
             }
-            printType(type, stream);
+            stream << type;
         }
         stream << "]";
     });

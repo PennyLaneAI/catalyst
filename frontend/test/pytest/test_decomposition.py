@@ -48,7 +48,10 @@ from catalyst.decomposition.decomposition_rules import (
     wrap_modifier_id,
 )
 from catalyst.decomposition.graph_op_id import GraphOpID
-from catalyst.decomposition.type_utils import get_dummy_values_for_arg
+from catalyst.decomposition.type_utils import (
+    convert_item_to_mlir_type,
+    get_dummy_values_for_arg,
+)
 
 
 class TestGenericUtilities:
@@ -88,11 +91,31 @@ class TestGenericUtilities:
         assert result.shape == shape
 
     @pytest.mark.parametrize(
+        "item, is_special_lowering, mlir_type",
+        [
+            (Float, True, "f64"),  # custom op is always float
+            (Float, False, "tensor<f64>"),
+            (Int, False, "tensor<i64>"),
+            (Bool, False, "tensor<i1>"),
+            (Complex, False, "tensor<complex<f64>>"),
+            (Float[1], False, "tensor<1xf64>"),
+            (Float[2], False, "tensor<2xf64>"),
+            (Int[3], False, "tensor<3xi64>"),
+            (Bool[4], False, "tensor<4xi1>"),
+            (Complex[5], False, "tensor<5xcomplex<f64>>"),
+            (Float[2, 2], False, "tensor<2x2xf64>"),
+            (Complex[3, 4, 5], False, "tensor<3x4x5xcomplex<f64>>"),
+        ],
+    )
+    def test_convert_item_to_mlir_type(self, item, is_special_lowering, mlir_type):
+        assert convert_item_to_mlir_type(item, is_special_lowering) == mlir_type
+
+    @pytest.mark.parametrize(
         "op, id",
         [
             (NoParams(Wires(0)), "NoParams{}{reg:1}{}"),
             (NoParamsCustomOp(Wires([0, 1])), "NoParamsCustomOp{}{wires:2}{}"),
-            (SingleParam(Float, Wires([2, 3])), "SingleParam{x:[[f64]]}{reg:2}{}"),
+            (SingleParam(Float, Wires([2, 3])), "SingleParam{x:[tensor<f64>]}{reg:2}{}"),
             (
                 CompilableData(True, 3.14, "string", Wires([0, 1])),
                 "CompilableData{}{wires:2}{a:True,b:3.14,thing:string}",
@@ -103,7 +126,7 @@ class TestGenericUtilities:
             ),
             (
                 MultiParams(Wires([0, 2, 3]), Complex, Int, Float[2]),
-                "MultiParams{a:[[complex<f64>]],b:[[i64]],c:[[f64,f64]]}{reg:3}",
+                "MultiParams{a:[tensor<complex<f64>>],b:[tensor<i64>],c:[tensor<2xf64>]}{reg:3}",
             ),
             (qp.MultiRZ(Float, Wires([0, 2, 3, 4])), "MultiRZ{theta:[f64]}{wires:4}{}"),
             (
@@ -117,7 +140,7 @@ class TestGenericUtilities:
             ),  # NOTE: open brace to match uid
             (
                 HybridOpArg(Float, StaticData("innerop", Wires(0)), Wires([2, 3]), 12),
-                "HybridOpArg{angle:[[f64]]}{cwires:2}{}[",  # NOTE: open brace to match uid
+                "HybridOpArg{angle:[tensor<f64>]}{cwires:2}{}[",  # NOTE: open brace to match uid
             ),
             (
                 qp.Rot(Bool, Int, Float, Wires(0)),
@@ -143,6 +166,33 @@ class TestGenericUtilities:
                 "MockOp", 'MockOp{}{"wires":1}{}', {}, {"wires": 1}, {}
             )
         assert isinstance(res, str)
+
+    def test_wrapper_passes_compilable_data_to_conditions(self, mocker):
+        """Test that decomposition conditions receive compilable operator data."""
+        mock_decomp = mocker.MagicMock()
+        mock_decomp._impl.__name__ = "FakeRuleName"
+        mock_decomp.compute_resources.return_value.gate_counts = {}
+        mock_decomp.is_applicable.side_effect = (
+            lambda *, wires, a, b, thing: a and b == 3.14 and thing == "string"
+        )
+
+        mocker.patch("pennylane.decomposition.list_decomps", return_value=[mock_decomp])
+
+        res = compile_decomposition_rules_wrapper(
+            "CompilableData",
+            "CompilableData{}{wires:2}{a:True,b:3.14,thing:string}",
+            {},
+            {"wires": 2},
+            {"a": True, "b": 3.14, "thing": "string"},
+        )
+
+        assert "FakeRuleName" in res
+        mock_decomp.is_applicable.assert_called_once()
+        call_kwargs = mock_decomp.is_applicable.call_args.kwargs
+        assert call_kwargs["a"] is True
+        assert call_kwargs["b"] == 3.14
+        assert call_kwargs["thing"] == "string"
+        assert call_kwargs["wires"].tolist() == [0, 1]
 
 
 class TestPrecompiled:
@@ -238,7 +288,7 @@ class TestTraceTime:
         # A distribution rule for Adjoint(NoParams) is synthesized even though none was registered.
         assert 'target_gate = "Adjoint(NoParams){}{reg:2}{}"' in mlir
         assert (
-            'resources = {operations = {"Adjoint(SingleParam){x:[[f64]]}{reg:2}{}" = 1 : i64}'
+            'resources = {operations = {"Adjoint(SingleParam){x:[tensor<f64>]}{reg:2}{}" = 1 : i64}'
             in mlir
         )
         assert "qref.adjoint" in mlir

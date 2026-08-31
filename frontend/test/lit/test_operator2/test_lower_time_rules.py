@@ -72,8 +72,8 @@ def test_one_rule():
         # CHECK: qref.operator "NoParams"
         # CHECK: func.func private @"__builtin_rule_NoParams{}{reg:2}{}"
         # CHECK-SAME:   resources = {operations = {
-        # CHECK-SAME:   "SingleParam{x:{{\[\[f64,f64\]\]}}}{reg:2}{}" = 1 : i64,
-        # CHECK-SAME:   "SingleParam{x:{{\[\[f64\]\]}}}{reg:2}{}" = 2 : i64
+        # CHECK-SAME:   "SingleParam{x:[tensor<2xf64>]}{reg:2}{}" = 1 : i64,
+        # CHECK-SAME:   "SingleParam{x:[tensor<f64>]}{reg:2}{}" = 2 : i64
         # CHECK-SAME:   target_gate = "NoParams{}{reg:2}{}"
         test_one_gate()
 
@@ -97,8 +97,8 @@ def test_one_rule():
         # CHECK: qref.operator "NoParams"
         # CHECK: func.func private @"__builtin_rule_NoParams{}{reg:2}{}"
         # CHECK-SAME:   resources = {operations = {
-        # CHECK-SAME:   "SingleParam{x:{{\[\[f64,f64\]\]}}}{reg:2}{}" = 1 : i64,
-        # CHECK-SAME:   "SingleParam{x:{{\[\[f64\]\]}}}{reg:2}{}" = 2 : i64
+        # CHECK-SAME:   "SingleParam{x:[tensor<2xf64>]}{reg:2}{}" = 1 : i64,
+        # CHECK-SAME:   "SingleParam{x:[tensor<f64>]}{reg:2}{}" = 2 : i64
         # CHECK-SAME:   target_gate = "NoParams{}{reg:2}{}"
         # CHECK-NOT: func.func private @"__builtin_rule_NoParams{}{reg:2}{}"
         test_multiple_gates_same_id()
@@ -123,13 +123,13 @@ def test_one_rule():
         # CHECK: qref.operator "NoParams"
         # CHECK: func.func private @"__builtin_rule_NoParams{}{reg:2}{}"
         # CHECK-SAME:   resources = {operations = {
-        # CHECK-SAME:   "SingleParam{x:{{\[\[f64,f64\]\]}}}{reg:2}{}" = 1 : i64,
-        # CHECK-SAME:   "SingleParam{x:{{\[\[f64\]\]}}}{reg:2}{}" = 2 : i64
+        # CHECK-SAME:   "SingleParam{x:[tensor<2xf64>]}{reg:2}{}" = 1 : i64,
+        # CHECK-SAME:   "SingleParam{x:[tensor<f64>]}{reg:2}{}" = 2 : i64
         # CHECK-SAME:   target_gate = "NoParams{}{reg:2}{}"
         # CHECK: func.func private @"__builtin_rule_NoParams{}{reg:3}{}"
         # CHECK-SAME:   resources = {operations = {
-        # CHECK-SAME:   "SingleParam{x:{{\[\[f64,f64\]\]}}}{reg:2}{}" = 1 : i64,
-        # CHECK-SAME:   "SingleParam{x:{{\[\[f64\]\]}}}{reg:2}{}" = 2 : i64
+        # CHECK-SAME:   "SingleParam{x:[tensor<2xf64>]}{reg:2}{}" = 1 : i64,
+        # CHECK-SAME:   "SingleParam{x:[tensor<f64>]}{reg:2}{}" = 2 : i64
         # CHECK-SAME:   target_gate = "NoParams{}{reg:3}{}"
         test_multiple_gates_different_ids()
 
@@ -176,22 +176,22 @@ def test_multiple_rules_same_gate():
 # CHECK: qref.operator "NoParams"
 # CHECK: func.func private @"__builtin_rule1_NoParams{}{reg:2}{}"
 # CHECK-SAME:   resources = {operations = {
-# CHECK-SAME:   "SingleParam{x:{{\[\[f64\]\]}}}{reg:2}{}" = 1 : i64
+# CHECK-SAME:   "SingleParam{x:[tensor<f64>]}{reg:2}{}" = 1 : i64
 # CHECK-SAME:   target_gate = "NoParams{}{reg:2}{}"
 # CHECK: func.func private @"__builtin_rule2_NoParams{}{reg:2}{}"
 # CHECK-SAME:   resources = {operations = {
-# CHECK-SAME:   "SingleParam{x:{{\[\[f64,f64\]\]}}}{reg:1}{}" = 1 : i64
+# CHECK-SAME:   "SingleParam{x:[tensor<2xf64>]}{reg:1}{}" = 1 : i64
 # CHECK-SAME:   target_gate = "NoParams{}{reg:2}{}"
 #
 # CHECK-NOT: func.func private @"__builtin_rule1_NoParams{}{reg:2}{}"
 #
 # CHECK: func.func private @"__builtin_rule1_NoParams{}{reg:3}{}"
 # CHECK-SAME:   resources = {operations = {
-# CHECK-SAME:   "SingleParam{x:{{\[\[f64\]\]}}}{reg:2}{}" = 1 : i64
+# CHECK-SAME:   "SingleParam{x:[tensor<f64>]}{reg:2}{}" = 1 : i64
 # CHECK-SAME:   target_gate = "NoParams{}{reg:3}{}"
 # CHECK: func.func private @"__builtin_rule2_NoParams{}{reg:3}{}"
 # CHECK-SAME:   resources = {operations = {
-# CHECK-SAME:   "SingleParam{x:{{\[\[f64,f64\]\]}}}{reg:1}{}" = 1 : i64
+# CHECK-SAME:   "SingleParam{x:[tensor<2xf64>]}{reg:1}{}" = 1 : i64
 # CHECK-SAME:   target_gate = "NoParams{}{reg:3}{}"
 test_multiple_rules_same_gate()
 
@@ -229,12 +229,12 @@ def test_multiple_rules_chained():
 # CHECK: qref.operator "NoParams"
 # CHECK: func.func private @"__builtin_rule1_NoParams{}{reg:2}{}"
 # CHECK-SAME:   resources = {operations = {
-# CHECK-SAME:   "SingleParam{x:{{\[\[f64\]\]}}}{reg:1}{}" = 1 : i64
+# CHECK-SAME:   "SingleParam{x:[tensor<f64>]}{reg:1}{}" = 1 : i64
 # CHECK-SAME:   target_gate = "NoParams{}{reg:2}{}"
-# CHECK: func.func private @"__builtin_rule2_SingleParam{x:{{\[\[f64\]\]}}}{reg:1}{}"
+# CHECK: func.func private @"__builtin_rule2_SingleParam{x:[tensor<f64>]}{reg:1}{}"
 # CHECK-SAME:   resources = {operations = {
 # CHECK-SAME:   "CompilableData{}{wires:1}{a:a,b:b,thing:thing}" = 1 : i64
-# CHECK-SAME:   target_gate = "SingleParam{x:{{\[\[f64\]\]}}}{reg:1}{}"
+# CHECK-SAME:   target_gate = "SingleParam{x:[tensor<f64>]}{reg:1}{}"
 test_multiple_rules_chained()
 
 
@@ -282,16 +282,16 @@ def test_multiple_rules_chained_and_branch():
 # CHECK: qref.operator "NoParams"
 # CHECK: func.func private @"__builtin_ruleAB_NoParams{}{reg:2}{}"
 # CHECK-SAME:   resources = {operations = {
-# CHECK-SAME:   "SingleParam{x:{{\[\[f64\]\]}}}{reg:1}{}" = 1 : i64
+# CHECK-SAME:   "SingleParam{x:[tensor<f64>]}{reg:1}{}" = 1 : i64
 # CHECK-SAME:   target_gate = "NoParams{}{reg:2}{}"
-# CHECK: func.func private @"__builtin_ruleBC_SingleParam{x:{{\[\[f64\]\]}}}{reg:1}{}"
+# CHECK: func.func private @"__builtin_ruleBC_SingleParam{x:[tensor<f64>]}{reg:1}{}"
 # CHECK-SAME:   resources = {operations = {
 # CHECK-SAME:   "CompilableData{}{wires:1}{a:a,b:b,thing:thing}" = 1 : i64
-# CHECK-SAME:   target_gate = "SingleParam{x:{{\[\[f64\]\]}}}{reg:1}{}"
-# CHECK: func.func private @"__builtin_ruleBD_SingleParam{x:{{\[\[f64\]\]}}}{reg:1}{}"
+# CHECK-SAME:   target_gate = "SingleParam{x:[tensor<f64>]}{reg:1}{}"
+# CHECK: func.func private @"__builtin_ruleBD_SingleParam{x:[tensor<f64>]}{reg:1}{}"
 # CHECK-SAME:   resources = {operations = {
 # CHECK-SAME:   "CompilableData{}{wires:1}{a:alpha,b:beta,thing:stuff}" = 1 : i64
-# CHECK-SAME:   target_gate = "SingleParam{x:{{\[\[f64\]\]}}}{reg:1}{}"
+# CHECK-SAME:   target_gate = "SingleParam{x:[tensor<f64>]}{reg:1}{}"
 test_multiple_rules_chained_and_branch()
 
 
@@ -339,19 +339,19 @@ def test_with_cycles():
 # CHECK: qref.operator "NoParams"
 # CHECK: func.func private @"__builtin_ruleAB_NoParams{}{reg:2}{}"
 # CHECK-SAME:   resources = {operations = {
-# CHECK-SAME:   "SingleParam{x:{{\[\[f64\]\]}}}{reg:1}{}" = 1 : i64
+# CHECK-SAME:   "SingleParam{x:[tensor<f64>]}{reg:1}{}" = 1 : i64
 # CHECK-SAME:   target_gate = "NoParams{}{reg:2}{}"
-# CHECK: func.func private @"__builtin_ruleBC_SingleParam{x:{{\[\[f64\]\]}}}{reg:1}{}"
+# CHECK: func.func private @"__builtin_ruleBC_SingleParam{x:[tensor<f64>]}{reg:1}{}"
 # CHECK-SAME:   resources = {operations = {
 # CHECK-SAME:   "CompilableData{}{wires:1}{a:a,b:b,thing:thing}" = 1 : i64
-# CHECK-SAME:   target_gate = "SingleParam{x:{{\[\[f64\]\]}}}{reg:1}{}"
+# CHECK-SAME:   target_gate = "SingleParam{x:[tensor<f64>]}{reg:1}{}"
 # CHECK: func.func private @"__builtin_ruleCA_CompilableData{}{wires:1}{a:a,b:b,thing:thing}"
 # CHECK-SAME:   resources = {operations = {
 # CHECK-SAME:   "NoParams{}{reg:2}{}" = 1 : i64
 # CHECK-SAME:   target_gate = "CompilableData{}{wires:1}{a:a,b:b,thing:thing}"
 # CHECK: func.func private @"__builtin_ruleAB_NoParams{}{reg:3}{}"
 # CHECK-SAME:   resources = {operations = {
-# CHECK-SAME:   "SingleParam{x:{{\[\[f64\]\]}}}{reg:1}{}" = 1 : i64
+# CHECK-SAME:   "SingleParam{x:[tensor<f64>]}{reg:1}{}" = 1 : i64
 # CHECK-SAME:   target_gate = "NoParams{}{reg:3}{}"
 test_with_cycles()
 
@@ -420,7 +420,7 @@ def test_to_multiple_full_args_op():
 # CHECK: qref.operator "NoParams"
 # CHECK: func.func private @"__builtin_rule_NoParams{}{reg:3}{}"
 # CHECK-SAME:   resources = {operations = {
-# CHECK-SAME:   "MultipleFullArgs{angles1:{{\[\[f64\]\]}},angles2:{{\[\[f64,f64\]\]}}}{reg1:1,reg2:2}{}[[[uid:[0-9]+]]]" = 2 : i64
+# CHECK-SAME:   "MultipleFullArgs{angles1:[tensor<f64>],angles2:[tensor<2xf64>]}{reg1:1,reg2:2}{}[[[uid:[0-9]+]]]" = 2 : i64
 # CHECK-SAME:   target_gate = "NoParams{}{reg:3}{}"
 # CHECK: qref.operator "MultipleFullArgs"
 # CHECK-NEXT:  UID([[uid]]
@@ -474,10 +474,10 @@ def test_from_multiple_full_args_op():
 # CHECK:   param_map = {angles1 = [0], angles2 = [1]}
 # CHECK-SAME:  qubit_map = {hwires1 = [4, 5], hwires2 = [6], op1 = [2], op2 = [3], reg1 = [0], reg2 = [1]}
 #
-# CHECK: func.func private @"__builtin_rule_MultipleFullArgs{angles1:{{\[\[f64\]\]}},angles2:{{\[\[f64\]\]}}}{hwires1:2,hwires2:1,op1:1,op2:1,reg1:1,reg2:1}{}[[[uid]]]"
+# CHECK: func.func private @"__builtin_rule_MultipleFullArgs{angles1:[tensor<f64>],angles2:[tensor<f64>]}{hwires1:2,hwires2:1,op1:1,op2:1,reg1:1,reg2:1}{}[[[uid]]]"
 # CHECK-SAME:   resources = {operations = {
 # CHECK-SAME:   "NoParams{}{reg:1}{}" = 2 : i64
-# CHECK-SAME:   target_gate = "MultipleFullArgs{angles1:{{\[\[f64\]\]}},angles2:{{\[\[f64\]\]}}}{hwires1:2,hwires2:1,op1:1,op2:1,reg1:1,reg2:1}{}[[[uid]]]"
+# CHECK-SAME:   target_gate = "MultipleFullArgs{angles1:[tensor<f64>],angles2:[tensor<f64>]}{hwires1:2,hwires2:1,op1:1,op2:1,reg1:1,reg2:1}{}[[[uid]]]"
 test_from_multiple_full_args_op()
 
 
