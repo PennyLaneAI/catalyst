@@ -15,23 +15,19 @@ runs:
     - id: filter
       shell: bash
       run: |
-        # Pick the base ref to diff HEAD against. For PRs use the PR's merge base;
-        # for pushes to main use the previous head. Both are provided by the
-        # GitHub context, no API calls needed.
+        # PRs diff against the merge base, pushes against the previous head; both from context.
         if [ "${{ github.event_name }}" = "pull_request" ]; then
           BASE="${{ github.event.pull_request.base.sha }}"
         else
           BASE="${{ github.event.before }}"
         fi
 
-        # Fall back to comparing against the parent commit if BASE is unreachable
-        # (shallow clones, first push to a new branch, etc).
+        # Fall back to the parent commit when BASE is unreachable (shallow clone, new branch).
         if ! git cat-file -e "$BASE^{commit}" 2>/dev/null; then
           BASE="HEAD^"
         fi
 
-        # Everything the transport build and its tests are derived from. Held as git
-        # pathspecs so the same list drives both the existence check and the diff below.
+        # Git pathspecs, so one list drives both the existence check and the diff below.
         PATTERNS=(
           'runtime/lib/transport/*'
           'runtime/include/Transport*'
@@ -49,10 +45,8 @@ runs:
           '.github/workflows/check-catalyst.yaml'
         )
 
-        # A pattern that matches nothing is the failure mode that matters here: the gate
-        # keeps reporting transport=false on real transport changes and nobody notices,
-        # because the absence of a job looks the same as a job that passed. Fail loudly
-        # instead, so a rename has to update this list.
+        # A pattern matching nothing would report transport=false forever, and a skipped job
+        # looks like a passing one. Fail loudly so a rename has to update this list.
         missing=()
         for pattern in "${PATTERNS[@]}"; do
           git ls-files --error-unmatch -- "$pattern" >/dev/null 2>&1 || missing+=("$pattern")

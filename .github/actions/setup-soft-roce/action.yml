@@ -1,8 +1,7 @@
 name: Set up Soft-RoCE loopback
 description: >
-  Install ibverbs userland, ensure rdma_rxe.ko is available (building it out-of-tree
-  when linux-modules-extra lacks it), and attach an rxe0 link on loopback so ibverbs
-  tests find a device.
+  Install ibverbs userland and attach an rxe0 soft-RoCE link on loopback, building
+  rdma_rxe out-of-tree if the running kernel lacks it.
 
 runs:
   using: composite
@@ -18,8 +17,7 @@ runs:
     - name: Ensure rdma_rxe.ko is available for the running kernel
       shell: bash
       run: |
-        # Try linux-modules-extra first; if the .ko isn't there, build
-        # rdma_rxe out-of-tree from the matching upstream stable branch.
+        # linux-modules-extra first; build rdma_rxe out-of-tree if it lacks the .ko.
         set -euo pipefail
 
         KVER=$(uname -r)
@@ -89,6 +87,5 @@ runs:
         rdma link show
         ibv_devices
         ibv_devinfo -d rxe0
-        # Fail fast if rxe0 didn't come up - otherwise Catch2 tests would
-        # silently SKIP and the loopback would be the only thing exercising it.
+        # Fail fast if rxe0 didn't come up: the Catch2 tests would otherwise silently SKIP.
         ibv_devices | awk '{print $1}' | grep -q '^rxe0$'

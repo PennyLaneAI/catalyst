@@ -1,7 +1,6 @@
 name: Check Catalyst GPU
 
-# Runs the runtime transport tests on a GPU host. To keep GPU runner time cheap, pull requests
-# only trigger a run once labeled ``gpu``; ``push`` to main runs unconditionally.
+# Runs the transport tests on a GPU host. PRs need the ``gpu`` label; pushes to main always run.
 
 on:
   push:
@@ -39,8 +38,8 @@ permissions:
   contents: read
 
 concurrency:
-  # Keyed on the commit, not github.ref: a pull_request and a workflow_dispatch of the same commit
-  # carry different refs, so a ref-keyed group let both run and contend for the single GPU.
+  # Keyed on the commit: a pull_request and a dispatch of the same commit carry different refs,
+  # so a ref-keyed group let both run and contend for the single GPU.
   group: ${{ github.workflow }}-${{ github.event.pull_request.head.sha || github.sha }}
   cancel-in-progress: true
 
@@ -55,7 +54,6 @@ jobs:
     runs-on:
       - single-gpu-x64
 
-    # Push always runs; PRs need a non-draft open state and the ``gpu`` label.
     if: >-
       ${{
         github.event_name == 'push' ||
@@ -101,9 +99,7 @@ jobs:
           ref: ${{ needs.constants.outputs.llvm_version }}
           path: mlir/llvm-project
 
-      # The runtime configure + build only needs LLVM source headers (MLIR_INCLUDE_DIRS
-      # -> mlir/llvm-project/mlir/include, header-only via rt_capi). No built-LLVM
-      # artifacts are consumed as long as ENABLE_EXECUTOR stays OFF, which it does here.
+      # Only LLVM source headers are needed here (header-only via rt_capi), ENABLE_EXECUTOR is OFF.
       - name: Build Catalyst-Runtime with transport enabled
         run: |
           COMPILER_LAUNCHER="" \
@@ -115,9 +111,8 @@ jobs:
           make runtime
 
       - name: Verify the GPU coprocessor backend was built
-        # conftest's gpu_transport_backend fixture skips when this .so is absent, which reads as
-        # "tests passed". It is built only when CMake set TRANSPORT_HAS_HIP, so on a miss dump
-        # what CMake actually resolved -- find_program/find_path cached their answers.
+        # gpu_transport_backend skips when this .so is absent, which reads as "tests passed". It
+        # exists only when CMake set TRANSPORT_HAS_HIP, so on a miss dump what CMake resolved.
         run: |
           name=libcatalyst_transport_memcpy_gpu_coprocessor.so
           if find "$(pwd)/runtime-build/lib" -name "$name" | grep -q .; then
@@ -144,11 +139,9 @@ jobs:
         run: |
           "$(pwd)/runtime-build/tests/runner_tests_transport_memcpy"
 
-      # No ROCm install needed: lib/transport/CMakeLists.txt fetches the HIP headers when none are
-      # present and drives them with nvcc, so TRANSPORT_HAS_HIP is set and the coproc .so is built.
+      # No ROCm install needed: lib/transport/CMakeLists.txt fetches the HIP headers, nvcc drives them.
 
-      # Built here rather than reused from check-catalyst.yaml: those caches come from GH-hosted
-      # images and the cached mlir-tblgen hits a GLIBC mismatch on this runner.
+      # Not reused from check-catalyst.yaml: its GH-hosted mlir-tblgen hits a GLIBC mismatch here.
       - name: Build LLVM, StableHLO and Enzyme
         uses: ./.github/actions/build-mlir-stack
         with:
@@ -161,20 +154,16 @@ jobs:
           python3 -m pip install -r requirements.txt
 
       - name: Set up Triton and its CUDA driver
-        # css_bp_decoder codegens through Triton, which dlopens libcuda.so.1. That ships with the
-        # driver, not the toolkit -- the toolkit's lib64/stubs copy links but cannot initialize a
-        # device, which is the "0 active drivers" gpu_triton_platform skips on. Resolve the real
-        # one and prove activation here, rather than let a silent skip surface at the guard.
+        # Triton dlopens libcuda.so.1, which ships with the driver, not the toolkit -- the stubs
+        # copy links but cannot initialize a device ("0 active drivers"). Resolve the real one.
         run: |
           set -euo pipefail
-          # cu129 matches this host's driver; PyPI's default torch targets CUDA 13 and refuses a
-          # 12.9 driver, leaving torch.cuda.is_available() false. It also pins triton to 3.5.1 --
-          # 3.8+ emits PTX that ptxas rejects for the decoder kernels. Nothing imports torch; it
-          # is here because triton <3.8 probes the driver through torch.cuda.is_available().
+          # cu129 matches this host's driver; the default torch targets CUDA 13 and leaves
+          # torch.cuda.is_available() false. It also pins triton 3.5.1 -- 3.8+ emits PTX that
+          # ptxas rejects. Nothing imports torch; triton <3.8 probes the driver through it.
           pip install torch --index-url https://download.pytorch.org/whl/cu129
 
-          # `|| true`: grep exits 1 on no match, which under pipefail would abort the step
-          # before the diagnostic below can run.
+          # `|| true`: grep exits 1 on no match, which under pipefail aborts before the diagnostic.
           libcuda=$(ldconfig -p | awk '/libcuda\.so\.1/ {print $NF}' | grep -v /stubs/ | head -1 || true)
           if [ -z "$libcuda" ]; then
             libcuda=$(find /usr/lib /usr/lib64 -name 'libcuda.so.1' -not -path '*/stubs/*' 2>/dev/null | head -1 || true)
@@ -201,8 +190,7 @@ jobs:
           from triton.runtime.driver import driver
 
           print("triton", triton.__version__, "| active driver:", driver.active)
-          # Triton bundles its own ptxas, so its version is not implied by nvcc's. Best-effort:
-          # this is context for a failure and must not become one.
+          # Triton bundles its own ptxas, so nvcc's version does not imply it. Best-effort only.
           try:
               ptxas = get_ptxas(driver.active.get_current_target().arch).path
               print(subprocess.run([ptxas, "--version"], capture_output=True, text=True).stdout)
@@ -212,11 +200,9 @@ jobs:
 
       - name: Build Catalyst frontend (reusing the transport-enabled runtime)
         run: |
-          # precompile_decomposition_rules runs at the end of `make frontend` and needs both vars
-          # set here, since the step that exports them for the rest of the job runs after this one.
-          # Without CATALYST_LIB_DIR the default_pipelines import fails, precompilation is skipped
-          # with only a warning, and rules are derived during tracing -- where a signature mismatch
-          # against PennyLane's rule._impl aborts capture.
+          # precompile_decomposition_rules runs at the end of `make frontend`, before the step that
+          # exports these for the rest of the job. Without CATALYST_LIB_DIR it is skipped with only
+          # a warning, and rules are derived during tracing where a signature mismatch aborts.
           export PYTHONPATH="${PYTHONPATH:-}:$(pwd)/quantum-build/python_packages/quantum"
           export CATALYST_LIB_DIR="$(pwd)/quantum-build/lib"
           COMPILER_LAUNCHER="" \
@@ -245,16 +231,11 @@ jobs:
       - name: Run backline GPU integration tests
         id: gpu-tests
         env:
-          # ptxas writes its diagnostics to a temp file Triton discards unless this is set, which
-          # leaves a codegen failure looking like a bare "exit status 255".
+          # Without this Triton discards ptxas diagnostics, leaving codegen failures as "status 255".
           TRITON_DUMP_PTXAS_LOG: "1"
-        # CPU-CPU memcpy is covered by check-catalyst.yaml; these three need the local GPU.
-        # precompiled: gpu_steane_launcher. triton_css_bp: Triton codegen, compile-only.
-        # manual_qec: encoded circuit + Triton-built decoder, executes ghz() on the GPU.
-        # Two gates can skip them -- gpu_transport_backend (the coproc .so built above; without
-        # the gate the executing cases raise out of _resolve_backend_lib) and gpu_triton_platform
-        # (a GPU with an active Triton driver, the only gate able to skip everything).
-        # -rs makes every skip visible in the log.
+        # CPU-CPU memcpy is covered by check-catalyst.yaml; these three need the local GPU. Two
+        # fixtures gate them: gpu_transport_backend (the coproc .so built above) and
+        # gpu_triton_platform (the only one able to skip everything). -rs makes skips visible.
         run: |
           python3 -m pytest -v -rs --junit-xml=gpu-backline-results.xml \
             "frontend/test/pytest/test_backline.py::TestBacklineDemoIntegration::test_cpu_controller_to_gpu_coproc_memcpy_precompiled" \
@@ -262,10 +243,9 @@ jobs:
             "frontend/test/pytest/test_backline.py::TestBacklineDemoIntegration::test_cpu_controller_to_gpu_coproc_memcpy_manual_qec"
 
       - name: Require at least one GPU test to have executed
-        # pytest exits 0 when every selected test is skipped, so without this the job reports
-        # success covering nothing, after ~20 min of GPU time. A full skip means Triton found no
-        # active driver, since the backend .so is built above. Guarded on the tests having run:
-        # on an earlier failure there is no junit file, and failing here buries the real error.
+        # pytest exits 0 when every selected test is skipped, so the job would report success
+        # covering nothing after ~20 min of GPU time. Guarded on the tests having actually run:
+        # an earlier failure leaves no junit file, and failing here would bury the real error.
         if: always() && steps.gpu-tests.outcome != 'skipped'
         run: |
           python3 - <<'EOF'
