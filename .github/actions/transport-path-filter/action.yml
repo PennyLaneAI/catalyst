@@ -41,6 +41,8 @@ runs:
           'frontend/catalyst/backline.py'
           'frontend/test/pytest/test_backline.py'
           'frontend/test/pytest/conftest.py'
+          'runtime/lib/executor/*'
+          'runtime/lib/backend/*'
           'runtime/Makefile'
           '.github/actions/setup-soft-roce/*'
           '.github/actions/transport-path-filter/*'
