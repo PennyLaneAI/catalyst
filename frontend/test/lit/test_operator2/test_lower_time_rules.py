@@ -580,7 +580,7 @@ def test_rule_with_helper_function():
 # CHECK: qref.operator "NoParams"
 # CHECK: func.func private @"__builtin_rule_NoParams{}{reg:1}{}"
 # CHECK-SAME:   resources = {operations = {
-# CHECK-SAME:   "MultiParams{a:{{\[\[f64\]\]}},b:{{\[\[f64\]\]}},c:{{\[\[f64\]\]}}}{reg:1}{}" = 1 : i64
+# CHECK-SAME:   "MultiParams{a:[tensor<f64>],b:[tensor<f64>],c:[tensor<f64>]}{reg:1}{}" = 1 : i64
 # CHECK-SAME:   target_gate = "NoParams{}{reg:1}{}"
 # CHECK: stablehlo.constant dense<4.200000e+00> : tensor<f64>
 # CHECK-NOT: call
@@ -588,7 +588,7 @@ def test_rule_with_helper_function():
 #
 # CHECK: func.func private @"__builtin_rule_NoParams{}{reg:2}{}"
 # CHECK-SAME:   resources = {operations = {
-# CHECK-SAME:   "MultiParams{a:{{\[\[f64\]\]}},b:{{\[\[f64\]\]}},c:{{\[\[f64\]\]}}}{reg:1}{}" = 1 : i64
+# CHECK-SAME:   "MultiParams{a:[tensor<f64>],b:[tensor<f64>],c:[tensor<f64>]}{reg:1}{}" = 1 : i64
 # CHECK-SAME:   target_gate = "NoParams{}{reg:2}{}"
 # CHECK: stablehlo.constant dense<4.200000e+00> : tensor<f64>
 # CHECK-NOT: call
@@ -636,6 +636,6 @@ def test_basis_rotation():
 
 
 # CHECK-LABEL: test_basis_rotation
-# CHECK: func.func private @"__builtin__basis_rotation_decomp_BasisRotation{unitary_matrix:{{\[\[\[}}complex<f64>,complex<f64>],[complex<f64>,complex<f64>{{\]\]\]}}}{wires:2}{check:False}"
-# CHECK-SAME: target_gate = "BasisRotation{unitary_matrix:{{\[\[\[}}complex<f64>,complex<f64>],[complex<f64>,complex<f64>{{\]\]\]}}}{wires:2}{check:False}"
+# CHECK: func.func private @"__builtin__basis_rotation_decomp_BasisRotation{unitary_matrix:[tensor<2x2xcomplex<f64>>]}{wires:2}{check:False}"
+# CHECK-SAME: target_gate = "BasisRotation{unitary_matrix:[tensor<2x2xcomplex<f64>>]}{wires:2}{check:False}"
 test_basis_rotation()

@@ -155,17 +155,17 @@ def test_from_multiple_dynamic_argnames():
         qp.add_decomps(MultiParams, rule)
         result = compile_decomposition_rules_wrapper(
             "MultiParams",
-            "MultiParams{a:[tensor<f64>],b:[tensor<i32>,tensor<f64>],c:[tensor<i32>,tensor<f64>]}{reg:2}{}",
-            {"b": ["i32", "f64"], "c": [["i32"], ["f64"]], "a": ["f64"]},
+            "MultiParams{a:[tensor<f64>],b:[tensor<i32>,tensor<i32>],c:[tensor<f64>,tensor<f64>]}{reg:2}{}",
+            {"b": ["i32", "i32"], "c": ["f64", "f64"], "a": ["f64"]},
             {"reg": 2},
             {},
         )
         print(result)
 
 
-# CHECK: func.func private @"rule_MultiParams{a:[tensor<f64>],b:[tensor<i32>,tensor<f64>],c:[tensor<i32>,tensor<f64>]}{reg:2}{}"
+# CHECK: func.func private @"rule_MultiParams{a:[tensor<f64>],b:[tensor<i32>,tensor<i32>],c:[tensor<f64>,tensor<f64>]}{reg:2}{}"
 # CHECK-SAME:   resources = {operations = {"NoParamsCustomOp{}{wires:2}{}" = 1 : i64}
-# CHECK-SAME:   target_gate = "MultiParams{a:[tensor<f64>],b:[tensor<i32>,tensor<f64>],c:[tensor<i32>,tensor<f64>]}{reg:2}{}"
+# CHECK-SAME:   target_gate = "MultiParams{a:[tensor<f64>],b:[tensor<i32>,tensor<i32>],c:[tensor<f64>,tensor<f64>]}{reg:2}{}"
 test_from_multiple_dynamic_argnames()
 
 
@@ -979,7 +979,7 @@ def test_rule_with_helper_functions():
 
 # CHECK: func.func private @"rule_NoParams{}{reg:1}{}"
 # CHECK-SAME:   resources = {operations = {
-# CHECK-SAME:   "MultiParams{a:{{\[\[f64\]\]}},b:{{\[\[f64\]\]}},c:{{\[\[f64\]\]}}}{reg:1}{}" = 1 : i64
+# CHECK-SAME:   "MultiParams{a:[tensor<f64>],b:[tensor<f64>],c:[tensor<f64>]}{reg:1}{}" = 1 : i64
 # CHECK-SAME:   target_gate = "NoParams{}{reg:1}{}"
 # CHECK: stablehlo.constant dense<4.200000e+00> : tensor<f64>
 # CHECK-NOT: call

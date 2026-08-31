@@ -15,6 +15,7 @@
 """Type handling utilities for decomposition rule lowering."""
 
 import copy
+import re
 
 import jax.numpy as jnp
 import numpy as np
@@ -104,15 +105,22 @@ def get_dummy_values_for_arg(arg):
     match arg:
         case str():
             if arg.startswith("tensor"):
-                body = arg.removeprefix("tensor<").removesuffix(">")
-                ranks = tuple(map(int, body.split("x")[:-1]))
-                dtype = body.split("x")[-1]
+                # Captures the optional dimensions (e.g., '2x2x') in group 1, and the
+                # element type in group 2
+                match = re.match(r"^tensor<((?:\d+x)*)(.*)>$", arg)
+                dim_str, dtype = match.groups()
+                ranks = tuple(int(d) for d in dim_str.split("x") if d)
                 return jnp.zeros(ranks, dtype=_MLIR_DTYPES_TO_PY_DTYPES[dtype])
-            return jnp.zeros((), dtype=_MLIR_DTYPES_TO_PY_DTYPES[arg])
+            else:
+                return jnp.zeros((), dtype=_MLIR_DTYPES_TO_PY_DTYPES[arg])
         case list() | tuple():
-            dtype = get_dummy_values_for_arg(arg[0]).dtype
-            # NOTE: numpy is required since jax won't create an array of strings
-            return jnp.zeros(np.array(arg, str).shape, dtype)
+            if arg[0].startswith("tensor"):
+                assert len(arg) == 1, "cannot create a tensor of tensors"
+                return get_dummy_values_for_arg(arg[0])
+            else:
+                dtype = get_dummy_values_for_arg(arg[0]).dtype
+                # NOTE: numpy is required since jax won't create an array of strings
+                return jnp.zeros(np.array(arg, str).shape, dtype)
         case ShapedArray():
             return jnp.zeros(arg.shape[0], dtype=arg.dtype)
         case type() | jnp.dtype():
