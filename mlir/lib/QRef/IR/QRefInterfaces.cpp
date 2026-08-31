@@ -116,21 +116,41 @@ void printWireLens(const llvm::StringMap<size_t> &map, llvm::raw_string_ostream 
 namespace catalyst {
 namespace qref {
 
+// Wrap an operator's base name with its op-level modifiers (name-wrap), so that `Op`,
+// `Adjoint(Op)`, `C(Op)`, and nested combinations like `C(Adjoint(Op))` are distinct graph
+// identities. Modifiers are applied innermost-first in a canonical order (adjoint innermost,
+// control outermost) so a nested op has a single spelling.
+// An op that is both controlled and adjointed could otherwise be formed as
+// `C(Adjoint(Op))` or `Adjoint(C(Op))` which will produce two ids for one operator,
+// which would split the decomposition graph into two nodes and prevent rules from matching.
+// Always emitting the control-outermost form keeps such ops on a single node. The
+// caller appends the param/wire/static/uid groups. Extend this helper to support future op-level
+// modifiers, preserving the canonical order (mirror the Python side in decomposition_rules.py).
+static std::string wrapModifiers(std::string name, Operation *op) {
+    if (op->hasAttr("adjoint")) {
+        name = "Adjoint(" + name + ")";
+    }
+    if (auto gate = mlir::dyn_cast<QuantumGate>(op)) {
+        size_t numCtrl = gate.getCtrlQubitOperands().size();
+        if (numCtrl == 1) {
+            name = "C(" + name + ")";
+        } else if (numCtrl > 1) {
+            name = std::to_string(numCtrl) + "C(" + name + ")";
+        }
+    }
+    return name;
+}
+
 std::string defaultGetGraphOpId(Operation *op) {
     std::string out;
     llvm::raw_string_ostream ss(out);
 
     DecomposableGate gate = cast<DecomposableGate>(op);
 
-    // Fold the adjoint modifier into the operator name so that `Op` and `Adjoint(Op)` are
-    // distinct in the graphOpId. The modifier wraps only the name; the param/wire/static/uid
-    // groups follow it, i.e. `Adjoint(Rot){...}{wires...}`, not `Adjoint(Rot{...}{wires...})`.
-    std::string name = gate.getOperatorName();
-    if (op->hasAttr("adjoint")) {
-        name = "Adjoint(" + name + ")";
-    }
-
-    ss << name;
+    // Fold op-level modifiers into the operator name so that `Op`, `Adjoint(Op)`, `C(Op)`, and
+    // nested combinations are distinct in the graphOpId. Modifiers wrap only the name; the
+    // param/wire/static/uid groups follow, e.g. `C(Adjoint(Rot)){...}{wires...}`.
+    ss << wrapModifiers(gate.getOperatorName(), op);
     printDynamicShape(gate.getDynamicShape(), ss);
     printWireLens(gate.getWireLens(), ss);
     printAttr(gate.getStaticData(), ss);
