@@ -286,9 +286,10 @@ def compile_decomposition_rules(
     wrap_adjoint=False,
     wrap_control=False,
     n_ctrl=1,
-) -> ModuleOp:
+) -> ir.Operation:
     """
-    Return a ModuleOp containing the decomposition rules for an operator instance.
+    Return the top-level ``builtin.module`` operation containing the decomposition rules for an
+    operator instance.
 
     The decomposition rules will be decorated with appropriate resource and target_gate attributes.
 
