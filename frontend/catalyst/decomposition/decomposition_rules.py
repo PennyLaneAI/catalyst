@@ -376,9 +376,6 @@ def compile_decomposition_rules(
         if rule.name in name_to_resource_ids and rule.is_applicable(
             *condition_args, **condition_kwargs
         ):
-        if rule.name in name_to_resource_ids and rule.is_applicable(
-            *condition_args, **condition_kwargs
-        ):
             subroutines.append(rule_to_subroutine(rule))
 
     # call_args, _ = split_call_args(kwargs, is_custom_op)
