@@ -15,6 +15,7 @@
   [(#3090)](https://github.com/PennyLaneAI/catalyst/pull/3090)
   [(#3096)](https://github.com/PennyLaneAI/catalyst/pull/3096)
   [(#3116)](https://github.com/PennyLaneAI/catalyst/pull/3116)
+  [(#3127)](https://github.com/PennyLaneAI/catalyst/pull/3127)
   [(#3131)](https://github.com/PennyLaneAI/catalyst/pull/3131)
 
 * The graph-based decomposition system now supports **adjoint operators** for `Operator2`.
@@ -25,6 +26,24 @@
     1. Rules registered on the base `Op`,
     2. Rules registered directly for `Adjoint(Op)`, and
     3. Rules *synthesized by distribution* (`decompose(Adjoint(Op)) = adjoint(decompose(Op))`).
+
+* The graph-based decomposition system now supports **controlled operators** for `Operator2`,
+  including single control (`C(Op)`), multiple controls (`<n>C(Op)`), and their composition with
+  adjoint.
+  [(#3129)](https://github.com/PennyLaneAI/catalyst/pull/3129)
+  [(#3127)](https://github.com/PennyLaneAI/catalyst/pull/3127)
+
+  Control is folded into the operator identity *control-outermost* (e.g. `C(Adjoint(Op))`), so
+  `ctrl(adjoint(Op))` and `adjoint(ctrl(Op))` collapse to a single node, while a distinct control
+  count is its own node keyed. For a target gate set, `<n>C(Op)` is reached through:
+    1. Rules registered directly for `<n>C(Op)` (e.g. named `CNOT`/`CRX`, `ctrl_decomp_zyz`), and
+    2. Rules *synthesized by distribution* (`decompose(C(Op)) = ctrl(decompose(Op))`), controlling
+       each produced gate with the same control count.
+
+  A rule may re-emit its base decomposition inside a `quantum.ctrl` region; the apply pipeline
+  reduces it to op-level controls with `ctrl-lowering`, iterating
+  `(decompose-lowering -> ctrl-lowering -> adjoint-lowering)` to a fixpoint.
+  Controlled basis gates are only free when their own `<n>C(...)` id is in the target gate set.
 
 * The `local-random` unitary folding option for :func:`~.mitigate_with_zne` is now implemented,
   reproducing Mitiq's ``fold_gates_at_random``: every gate is folded ``floor((scale_factor-1)/2)``
@@ -80,14 +99,15 @@
     [(#3053)](https://github.com/PennyLaneAI/catalyst/pull/3053)
 
     The format of `graphOpID` is as follows:
-        op_name{param_shaped_type_dictionary}{wire_lens_dictionary}{static_data_dictionary}[UID]
+        op_name{dynamic_shape_dictionary}{wire_lens_dictionary}{static_data_dictionary}[UID]
 
+    The types in the dynamic shape dictionary should be represented as a list of MLIR-style type annotations.
     The UID is a hash computed from the shapes, dtypes and pytree structures of any data on the Python operator that cannot be lowered to MLIR directly.
 
     For example, an operator with class name `HybridOpArg`, taking in one float param
     argument named `angle`, one wire argument named `cwires`, one static data argument
     `label="hello"`, and a computed UID of 10 would be parsed to the following graph op ID:
-        HybridOpArg{angle:[f64]}{cwires:1}{label:hello}[10]
+        HybridOpArg{angle:[tensor<f64>]}{cwires:1}{label:hello}[10]
 
     A node in the decomposition graph is completely identified by its `graphOpId`. For example,
         PauliRot{angle:[f64]}{wires:1}{pauli_word:X}
@@ -102,6 +122,7 @@
 
     2. When lowering a gate operation from JAXPR to MLIR, all rules reachable from that gate are injected into the IR.
     [(#3061)](https://github.com/PennyLaneAI/catalyst/pull/3061)
+    [(#3160)](https://github.com/PennyLaneAI/catalyst/pull/3160)
 
     This pathway of rule injection can be opted-out via a new keyword argument on `qp.qjit` named `collect_decomp_rules`.
     This kwarg controls whether or not to compile the decomposition rules during lower-time. Default value is `True`.
@@ -125,6 +146,8 @@
     [(#2973)](https://github.com/PennyLaneAI/catalyst/pull/2973)
     [(#2836)](https://github.com/PennyLaneAI/catalyst/pull/2836)
     [(#2855)](https://github.com/PennyLaneAI/catalyst/pull/2855)
+    [(#3156)](https://github.com/PennyLaneAI/catalyst/pull/3156)
+    [(#3158)](https://github.com/PennyLaneAI/catalyst/pull/3158)
 
     1. The pass now supports applying a selection of the available decomposition rules via the `target_rules` parameter.
 
@@ -138,6 +161,8 @@
 
     5. The pass can now handle null decomposition rules, which are rule functions that do not have any quantum values as arguments or results.
     Gates with null decomposition rules are simply removed.
+
+    6. The pass can now handle register-mode rules that target gates in control flow regions whose qubits were extracted outside the region.
 
 * A failure during AOT compilation is now downgraded to a warning and logged.
   [(#3100)](https://github.com/PennyLaneAI/catalyst/pull/3100)

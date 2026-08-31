@@ -74,8 +74,8 @@ def test_to_dynamic_argnames():
 
 # CHECK: func.func private @"rule_NoParams{}{reg:2}{}"
 # CHECK-SAME:   resources = {operations = {
-# CHECK-SAME:   "SingleParam{x:{{\[\[f64,f64\]\]}}}{reg:2}{}" = 1 : i64,
-# CHECK-SAME:   "SingleParam{x:{{\[\[f64\]\]}}}{reg:2}{}" = 2 : i64
+# CHECK-SAME:   "SingleParam{x:[tensor<2xf64>]}{reg:2}{}" = 1 : i64,
+# CHECK-SAME:   "SingleParam{x:[tensor<f64>]}{reg:2}{}" = 2 : i64
 # CHECK-SAME:   target_gate = "NoParams{}{reg:2}{}"
 test_to_dynamic_argnames()
 
@@ -96,7 +96,7 @@ def test_from_dynamic_argnames():
         qp.add_decomps(SingleParam, rule)
         result = compile_decomposition_rules_wrapper(
             "SingleParam",
-            "SingleParam{x:[[f64,f64]]}{reg:2}{}",
+            "SingleParam{x:[tensor<2xf64>]}{reg:2}{}",
             {"x": ["f64", "f64"]},
             {"reg": 2},
             {},
@@ -104,9 +104,9 @@ def test_from_dynamic_argnames():
         print(result)
 
 
-# CHECK: func.func private @"rule_SingleParam{x:{{\[\[f64,f64\]\]}}}{reg:2}{}"
+# CHECK: func.func private @"rule_SingleParam{x:[tensor<2xf64>]}{reg:2}{}"
 # CHECK-SAME:   resources = {operations = {"NoParams{}{reg:1}{}" = 1 : i64}}
-# CHECK-SAME:   target_gate = "SingleParam{x:{{\[\[f64,f64\]\]}}}{reg:2}{}"
+# CHECK-SAME:   target_gate = "SingleParam{x:[tensor<2xf64>]}{reg:2}{}"
 test_from_dynamic_argnames()
 
 
@@ -134,7 +134,7 @@ def test_to_multiple_dynamic_argnames():
 
 # CHECK: func.func private @"rule_NoParams{}{reg:1}{}"
 # CHECK-SAME:   resources = {operations =
-# CHECK-SAME:   "MultiParams{a:{{\[\[f64\]\]}},b:{{\[\[\[i64,i64\],\[i64,i64\]\]\]}},c:{{\[\[complex<f64>\]\]}}}{reg:1}{}" = 1 : i64
+# CHECK-SAME:   "MultiParams{a:[tensor<f64>],b:[tensor<2x2xi64>],c:[tensor<complex<f64>>]}{reg:1}{}" = 1 : i64
 # CHECK-SAME:   target_gate = "NoParams{}{reg:1}{}"
 test_to_multiple_dynamic_argnames()
 
@@ -155,7 +155,7 @@ def test_from_multiple_dynamic_argnames():
         qp.add_decomps(MultiParams, rule)
         result = compile_decomposition_rules_wrapper(
             "MultiParams",
-            "MultiParams{a:[[f64]],b:[[i32,f64]],c:[[[i32],[f64]]]}{reg:2}{}",
+            "MultiParams{a:[tensor<f64>],b:[tensor<i32>,tensor<f64>],c:[tensor<i32>,tensor<f64>]}{reg:2}{}",
             {"b": ["i32", "f64"], "c": [["i32"], ["f64"]], "a": ["f64"]},
             {"reg": 2},
             {},
@@ -163,9 +163,9 @@ def test_from_multiple_dynamic_argnames():
         print(result)
 
 
-# CHECK: func.func private @"rule_MultiParams{a:{{\[\[f64\]\]}},b:{{\[\[i32,f64\]\]}},c:{{\[\[\[i32\],\[f64\]\]\]}}}{reg:2}{}"
+# CHECK: func.func private @"rule_MultiParams{a:[tensor<f64>],b:[tensor<i32>,tensor<f64>],c:[tensor<i32>,tensor<f64>]}{reg:2}{}"
 # CHECK-SAME:   resources = {operations = {"NoParamsCustomOp{}{wires:2}{}" = 1 : i64}
-# CHECK-SAME:   target_gate = "MultiParams{a:{{\[\[f64\]\]}},b:{{\[\[i32,f64\]\]}},c:{{\[\[\[i32\],\[f64\]\]\]}}}{reg:2}{}"
+# CHECK-SAME:   target_gate = "MultiParams{a:[tensor<f64>],b:[tensor<i32>,tensor<f64>],c:[tensor<i32>,tensor<f64>]}{reg:2}{}"
 test_from_multiple_dynamic_argnames()
 
 
@@ -301,13 +301,13 @@ def test_from_compilable_data():
 
 
 # CHECK: func.func private @"rule_CompilableData{}{wires:1}{a:1,b:2,thing:3}"
-# CHECK-SAME:   resources = {operations = {"SingleParam{x:{{\[\[f64\]\]}}}{reg:1}{}" = 1 : i64}
+# CHECK-SAME:   resources = {operations = {"SingleParam{x:[tensor<f64>]}{reg:1}{}" = 1 : i64}
 # CHECK-SAME:   target_gate = "CompilableData{}{wires:1}{a:1,b:2,thing:3}"
 # CHECK: stablehlo.constant dense<1.000000e-01> : tensor<f64>
 # CHECK-NOT: stablehlo.constant dense<1.100000e+00> : tensor<f64>
 #
 # CHECK: func.func private @"rule_CompilableData{}{wires:1}{a:10,b:2,thing:3}"
-# CHECK-SAME:   resources = {operations = {"SingleParam{x:{{\[\[f64\]\]}}}{reg:1}{}" = 1 : i64}
+# CHECK-SAME:   resources = {operations = {"SingleParam{x:[tensor<f64>]}{reg:1}{}" = 1 : i64}
 # CHECK-SAME:   target_gate = "CompilableData{}{wires:1}{a:10,b:2,thing:3}"
 # CHECK: stablehlo.constant dense<1.100000e+00> : tensor<f64>
 # CHECK-NOT: stablehlo.constant dense<1.000000e-01> : tensor<f64>
@@ -385,12 +385,12 @@ def test_from_static_data():
 
 
 # CHECK: func.func private @"rule_StaticData{}{reg:1}{}[1234]"
-# CHECK-SAME:   resources = {operations = {"SingleParam{x:{{\[\[f64\]\]}}}{reg:1}{}" = 1 : i64}
+# CHECK-SAME:   resources = {operations = {"SingleParam{x:[tensor<f64>]}{reg:1}{}" = 1 : i64}
 # CHECK-SAME:   target_gate = "StaticData{}{reg:1}{}[1234]"
 # CHECK: stablehlo.constant dense<1.000000e-01> : tensor<f64>
 #
 # CHECK: func.func private @"rule_StaticData{}{reg:1}{}[4321]"
-# CHECK-SAME:   resources = {operations = {"SingleParam{x:{{\[\[f64\]\]}}}{reg:1}{}" = 2 : i64}
+# CHECK-SAME:   resources = {operations = {"SingleParam{x:[tensor<f64>]}{reg:1}{}" = 2 : i64}
 # CHECK-SAME:   target_gate = "StaticData{}{reg:1}{}[4321]"
 # CHECK-DAG: stablehlo.constant dense<1.100000e+00> : tensor<f64>
 # CHECK-DAG: stablehlo.constant dense<2.200000e+00> : tensor<f64>
@@ -524,8 +524,8 @@ def test_to_hybrid_op():
 
 
 # CHECK: func.func private @"rule_NoParams{}{reg:3}{}"
-# CHECK-DAG: "HybridOpArg{angle:{{\[\[f64\]\]}}}{cwires:1}{}[[[uid_1:[0-9]+]]]" = 1
-# CHECK-DAG: "HybridOpArg{angle:{{\[\[f64\]\]}}}{cwires:1}{}[[[uid_2:[0-9]+]]]" = 2
+# CHECK-DAG: "HybridOpArg{angle:[tensor<f64>]}{cwires:1}{}[[[uid_1:[0-9]+]]]" = 1
+# CHECK-DAG: "HybridOpArg{angle:[tensor<f64>]}{cwires:1}{}[[[uid_2:[0-9]+]]]" = 2
 # CHECK-DAG:   target_gate = "NoParams{}{reg:3}{}"
 # CHECK: "qref.operator"
 # CHECK-SAME: UID = [[uid_2]]
@@ -553,7 +553,7 @@ def test_from_hybrid_op():
         qp.add_decomps(HybridOpArg, rule)
         result = compile_decomposition_rules_wrapper(
             "HybridOpArg",
-            "HybridOpArg{angle:[[f64]]}{cwires:1}{}[5678]",
+            "HybridOpArg{angle:[tensor<f64>]}{cwires:1}{}[5678]",
             {"angle": ["f64"]},
             {"cwires": 1},
             {},
@@ -565,13 +565,13 @@ def test_from_hybrid_op():
         print(result)
 
 
-# CHECK: func.func private @"rule_HybridOpArg{angle:{{\[\[f64\]\]}}}{cwires:1}{}[5678]"
+# CHECK: func.func private @"rule_HybridOpArg{angle:[tensor<f64>]}{cwires:1}{}[5678]"
 # CHECK-SAME:   resources = {operations = {
 # CHECK-SAME:   "NoParams{}{reg:1}{}" = 1 : i64,
-# CHECK-SAME:   "StaticDataMultiReg{theta:{{\[\[f64\]\]}}}{reg:1,reg2:2}{}[[[uid:[0-9]+]]]" = 1 : i64
-# CHECK-SAME:   target_gate = "HybridOpArg{angle:{{\[\[f64\]\]}}}{cwires:1}{}[5678]"
+# CHECK-SAME:   "StaticDataMultiReg{theta:[tensor<f64>]}{reg:1,reg2:2}{}[[[uid:[0-9]+]]]" = 1 : i64
+# CHECK-SAME:   target_gate = "HybridOpArg{angle:[tensor<f64>]}{cwires:1}{}[5678]"
 # CHECK: "qref.operator"
-# CHECK-SAME: UID = [[uid]] : i64, op_name = "StaticDataMultiReg"
+# CHECK-SAME:   UID = [[uid]] : i64, op_name = "StaticDataMultiReg"
 test_from_hybrid_op()
 
 
@@ -618,7 +618,7 @@ def test_to_hybrid_op_nested():
 
 
 # CHECK: func.func private @"rule_NoParams{}{reg:3}{}"
-# CHECK-SAME: "HybridOpArg{angle:{{\[\[f64\]\]}}}{cwires:1}{}[[[uid:[0-9]+]]]" = 1
+# CHECK-SAME: "HybridOpArg{angle:[tensor<f64>]}{cwires:1}{}[[[uid:[0-9]+]]]" = 1
 # CHECK-SAME:   target_gate = "NoParams{}{reg:3}{}"
 # CHECK: "qref.operator"
 # CHECK-SAME: UID = [[uid]]
@@ -643,7 +643,7 @@ def test_from_hybrid_op_nested():
         qp.add_decomps(HybridOpArg, rule)
         result = compile_decomposition_rules_wrapper(
             "HybridOpArg",
-            "HybridOpArg{angle:[[f64]]}{cwires:1}{}[7654]",
+            "HybridOpArg{angle:[tensor<f64>]}{cwires:1}{}[7654]",
             {"angle": ["f64"]},
             {"cwires": 1},
             {},
@@ -660,16 +660,16 @@ def test_from_hybrid_op_nested():
         print(result)
 
 
-# CHECK: func.func private @"rule_HybridOpArg{angle:{{\[\[f64\]\]}}}{cwires:1}{}[7654]"
+# CHECK: func.func private @"rule_HybridOpArg{angle:[tensor<f64>]}{cwires:1}{}[7654]"
 # CHECK-SAME:   resources = {operations = {
-# CHECK-SAME:   "HybridOpArg{angle:{{\[\[f64\]\]}}}{cwires:1}{}[[[uid_outer:[0-9]+]]]" = 1 : i64,
+# CHECK-SAME:   "HybridOpArg{angle:[tensor<f64>]}{cwires:1}{}[[[uid_outer:[0-9]+]]]" = 1 : i64,
 # CHECK-SAME:   "NoParams{}{reg:1}{}" = 1 : i64,
-# CHECK-SAME:   "StaticDataMultiReg{theta:{{\[\[f64\]\]}}}{reg:1,reg2:2}{}[[[uid_inner:[0-9]+]]]" = 1 : i64
-# CHECK-SAME:   target_gate = "HybridOpArg{angle:{{\[\[f64\]\]}}}{cwires:1}{}[7654]"
+# CHECK-SAME:   "StaticDataMultiReg{theta:[tensor<f64>]}{reg:1,reg2:2}{}[[[uid_inner:[0-9]+]]]" = 1 : i64
+# CHECK-SAME:   target_gate = "HybridOpArg{angle:[tensor<f64>]}{cwires:1}{}[7654]"
 # CHECK: "qref.operator"
-# CHECK-SAME: UID = [[uid_outer]] : i64, op_name = "HybridOpArg"
+# CHECK-SAME:   UID = [[uid_outer]] : i64, op_name = "HybridOpArg"
 # CHECK: "qref.operator"
-# CHECK-SAME: UID = [[uid_inner]] : i64, op_name = "StaticDataMultiReg"
+# CHECK-SAME:   UID = [[uid_inner]] : i64, op_name = "StaticDataMultiReg"
 test_from_hybrid_op_nested()
 
 
@@ -730,7 +730,7 @@ def test_to_multiple_full_args_op():
 
 
 # CHECK: func.func private @"rule_NoParams{}{reg:3}{}"
-# CHECK-DAG: "MultipleFullArgs{angles1:{{\[\[f64\]\]}},angles2:{{\[\[f64,f64\]\]}}}{reg1:1,reg2:2}{}[[[uid:[0-9]+]]]" = 2
+# CHECK-DAG: "MultipleFullArgs{angles1:[tensor<f64>],angles2:[tensor<2xf64>]}{reg1:1,reg2:2}{}[[[uid:[0-9]+]]]" = 2
 # CHECK-DAG:   target_gate = "NoParams{}{reg:3}{}"
 # CHECK: "qref.operator"
 # CHECK-SAME: UID = [[uid]]
@@ -759,7 +759,7 @@ def test_from_multiple_full_args_op():
         qp.add_decomps(MultipleFullArgs, rule)
         result = compile_decomposition_rules_wrapper(
             "MultipleFullArgs",
-            "MultipleFullArgs{angles1:[[f64]],angles2:[[f64,f64]]}{reg1:1,reg2:2}{}[4444]",
+            "MultipleFullArgs{angles1:[tensor<f64>],angles2:[tensor<2xf64>]}{reg1:1,reg2:2}{}[4444]",
             {"angles1": ["f64"], "angles2": ["f64", "f64"]},
             {"reg1": 1, "reg2": 2},
             {},
@@ -775,18 +775,18 @@ def test_from_multiple_full_args_op():
         print(result)
 
 
-# CHECK: func.func private @"rule_MultipleFullArgs{angles1:{{\[\[f64\]\]}},angles2:{{\[\[f64,f64\]\]}}}{reg1:1,reg2:2}{}[4444]"
+# CHECK: func.func private @"rule_MultipleFullArgs{angles1:[tensor<f64>],angles2:[tensor<2xf64>]}{reg1:1,reg2:2}{}[4444]"
 # CHECK-SAME:   resources = {operations = {
 # CHECK-SAME:   "NoParams{}{reg:1}{}" = 1 : i64
-# CHECK-SAME:   "SingleParam{x:{{\[\[f64\]\]}}}{reg:1}{}" = 1 : i64
-# CHECK-SAME:   "SingleParam{x:{{\[\[i64\]\]}}}{reg:1}{}" = 1 : i64
-# CHECK-SAME:   target_gate = "MultipleFullArgs{angles1:{{\[\[f64\]\]}},angles2:{{\[\[f64,f64\]\]}}}{reg1:1,reg2:2}{}[4444]"
+# CHECK-SAME:   "SingleParam{x:[tensor<f64>]}{reg:1}{}" = 1 : i64
+# CHECK-SAME:   "SingleParam{x:[tensor<i64>]}{reg:1}{}" = 1 : i64
+# CHECK-SAME:   target_gate = "MultipleFullArgs{angles1:[tensor<f64>],angles2:[tensor<2xf64>]}{reg1:1,reg2:2}{}[4444]"
 # CHECK: "qref.operator"
-# CHECK-SAME: op_name = "SingleParam"
+# CHECK-SAME:   op_name = "SingleParam"
 # CHECK: "qref.operator"
-# CHECK-SAME: op_name = "SingleParam"
+# CHECK-SAME:   op_name = "SingleParam"
 # CHECK: "qref.operator"
-# CHECK-SAME: op_name = "NoParams"
+# CHECK-SAME:   op_name = "NoParams"
 test_from_multiple_full_args_op()
 
 
@@ -823,7 +823,7 @@ def test_multiple_rules():
 
 
 # CHECK: func.func private @"rule1_NoParams{}{reg:1}{}"
-# CHECK-SAME:   resources = {operations = {"SingleParam{x:{{\[\[f64\]\]}}}{reg:1}{}" = 1 : i64}}
+# CHECK-SAME:   resources = {operations = {"SingleParam{x:[tensor<f64>]}{reg:1}{}" = 1 : i64}}
 # CHECK-SAME:   target_gate = "NoParams{}{reg:1}{}"
 # CHECK: func.func private @"rule2_NoParams{}{reg:1}{}"
 # CHECK-SAME:   resources = {operations = {"CompilableData{}{wires:3}{a:a,b:b,thing:thing}" = 1 : i64}}
