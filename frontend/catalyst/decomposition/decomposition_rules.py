@@ -351,11 +351,15 @@ def compile_decomposition_rules(
 
         return qp.capture.subroutine(decomp_rule_no_static_args)
 
-    call_args, call_kwargs = split_call_args(kwargs, is_custom_op)
+    condition_args, condition_kwargs = split_call_args(
+        kwargs | static_data | extra_data, is_custom_op
+    )
 
     subroutines = []
     for rule in decomp_rules:
-        if rule.is_applicable(*call_args, **call_kwargs):
+        if rule.name in name_to_resource_ids and rule.is_applicable(
+            *condition_args, **condition_kwargs
+        ):
             subroutines.append(rule_to_subroutine(rule))
 
     # For control distribution, the extra control wires are
@@ -363,6 +367,8 @@ def compile_decomposition_rules(
     ctrl_wires = (
         jnp.array(range(n_base_wires, n_base_wires + n_ctrl), dtype=int) if wrap_control else None
     )
+
+    call_args, call_kwargs = split_call_args(kwargs, is_custom_op)
 
     @qp.qjit(target="mlir", capture=True, collect_decomp_rules=False)
     @qp.qnode(device=device)
