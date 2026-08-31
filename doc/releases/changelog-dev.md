@@ -75,6 +75,7 @@
   [(#2981)](https://github.com/PennyLaneAI/catalyst/pull/2981)
   [(#3109)](https://github.com/PennyLaneAI/catalyst/pull/3109)
   [(#3075)](https://github.com/PennyLaneAI/catalyst/pull/3075)
+  [(#3162)](https://github.com/PennyLaneAI/catalyst/pull/3162)
 
 * The graph-based decomposition system has been greatly improved.
 
@@ -247,7 +248,7 @@
   a transport kick/collect round over its buffers.
   [(#3066)](https://github.com/PennyLaneAI/catalyst/pull/3066)
 
-* A `remove-global-phases` pass is added, which removes global phases by deleting `quantum.gphase`  
+* A `remove-global-phases` pass is added, which removes global phases by deleting `quantum.gphase`
   operations without control wires.
   [(#3143)](https://github.com/PennyLaneAI/catalyst/pull/3143)
 
