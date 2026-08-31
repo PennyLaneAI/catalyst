@@ -18,10 +18,10 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
+#include "QRef/IR/QRefOps.h"
 #include "Quantum/IR/QuantumOps.h"
 
 using namespace mlir;
-using namespace catalyst::quantum;
 
 namespace {
 
@@ -30,13 +30,14 @@ static const mlir::StringSet<> hermitianOps = {"Hadamard", "PauliX", "PauliY", "
 static const mlir::StringSet<> rotationsOps = {"RX",  "RY",  "RZ",  "PhaseShift",
                                                "CRX", "CRY", "CRZ", "ControlledPhaseShift"};
 
-// Canonicalize Adjoint on quantum.custom gates
+// Canonicalize adjoint on quantum.custom and qref.custom gates.
 // For Hermitian gates, the adjoint flag is set to false.
 // For rotations, the parameters are negated.
-struct CustopOpResolveGateLevelAdjointPattern : public OpRewritePattern<CustomOp> {
-    using OpRewritePattern<CustomOp>::OpRewritePattern;
+template <typename CustomOpTy>
+struct CustomOpResolveGateLevelAdjointPattern : public OpRewritePattern<CustomOpTy> {
+    using OpRewritePattern<CustomOpTy>::OpRewritePattern;
 
-    LogicalResult matchAndRewrite(CustomOp op, PatternRewriter &rewriter) const override {
+    LogicalResult matchAndRewrite(CustomOpTy op, PatternRewriter &rewriter) const override {
         if (!op.getAdjoint()) {
             return failure();
         }
@@ -63,9 +64,10 @@ struct CustopOpResolveGateLevelAdjointPattern : public OpRewritePattern<CustomOp
 };
 
 // Creates a new pattern to match MultiRZOp with adjoint flag set to true and canonicalize it.
-struct MultiRZOpResolveGateLevelAdjointPattern : public OpRewritePattern<MultiRZOp> {
-    using OpRewritePattern<MultiRZOp>::OpRewritePattern;
-    LogicalResult matchAndRewrite(MultiRZOp op, PatternRewriter &rewriter) const override {
+template <typename MultiRZOpTy>
+struct MultiRZOpResolveGateLevelAdjointPattern : public OpRewritePattern<MultiRZOpTy> {
+    using OpRewritePattern<MultiRZOpTy>::OpRewritePattern;
+    LogicalResult matchAndRewrite(MultiRZOpTy op, PatternRewriter &rewriter) const override {
         if (!op.getAdjoint()) {
             return failure();
         }
@@ -81,9 +83,10 @@ struct MultiRZOpResolveGateLevelAdjointPattern : public OpRewritePattern<MultiRZ
 };
 
 // Creates a new pattern to match PCPhaseOp with adjoint flag set to true and canonicalize it.
-struct PCPhaseOpResolveGateLevelAdjointPattern : public OpRewritePattern<PCPhaseOp> {
-    using OpRewritePattern<PCPhaseOp>::OpRewritePattern;
-    LogicalResult matchAndRewrite(PCPhaseOp op, PatternRewriter &rewriter) const override {
+template <typename PCPhaseOpTy>
+struct PCPhaseOpResolveGateLevelAdjointPattern : public OpRewritePattern<PCPhaseOpTy> {
+    using OpRewritePattern<PCPhaseOpTy>::OpRewritePattern;
+    LogicalResult matchAndRewrite(PCPhaseOpTy op, PatternRewriter &rewriter) const override {
         if (!op.getAdjoint()) {
             return failure();
         }
@@ -99,9 +102,10 @@ struct PCPhaseOpResolveGateLevelAdjointPattern : public OpRewritePattern<PCPhase
 };
 
 // Creates a new pattern to match PauliRotOp with adjoint flag set to true and canonicalize it.
-struct PauliRotOpResolveGateLevelAdjointPattern : public OpRewritePattern<PauliRotOp> {
-    using OpRewritePattern<PauliRotOp>::OpRewritePattern;
-    LogicalResult matchAndRewrite(PauliRotOp op, PatternRewriter &rewriter) const override {
+template <typename PauliRotOpTy>
+struct PauliRotOpResolveGateLevelAdjointPattern : public OpRewritePattern<PauliRotOpTy> {
+    using OpRewritePattern<PauliRotOpTy>::OpRewritePattern;
+    LogicalResult matchAndRewrite(PauliRotOpTy op, PatternRewriter &rewriter) const override {
         if (!op.getAdjoint()) {
             return failure();
         }
@@ -117,9 +121,10 @@ struct PauliRotOpResolveGateLevelAdjointPattern : public OpRewritePattern<PauliR
 };
 
 // Creates a new pattern to match GlobalPhaseOp with adjoint flag set to true and canonicalize it.
-struct GlobalPhaseOpResolveGateLevelAdjointPattern : public OpRewritePattern<GlobalPhaseOp> {
-    using OpRewritePattern<GlobalPhaseOp>::OpRewritePattern;
-    LogicalResult matchAndRewrite(GlobalPhaseOp op, PatternRewriter &rewriter) const override {
+template <typename GlobalPhaseOpTy>
+struct GlobalPhaseOpResolveGateLevelAdjointPattern : public OpRewritePattern<GlobalPhaseOpTy> {
+    using OpRewritePattern<GlobalPhaseOpTy>::OpRewritePattern;
+    LogicalResult matchAndRewrite(GlobalPhaseOpTy op, PatternRewriter &rewriter) const override {
         if (!op.getAdjoint()) {
             return failure();
         }
@@ -145,9 +150,17 @@ namespace quantum {
 // Populate the patterns for the ResolveGateLevelAdjoint pass.
 // Allows reference in ions_decompositions.cpp and merge_rotation.cpp
 void populateResolveGateLevelAdjointPatterns(RewritePatternSet &patterns) {
-    patterns.add<CustopOpResolveGateLevelAdjointPattern, MultiRZOpResolveGateLevelAdjointPattern,
-                 PCPhaseOpResolveGateLevelAdjointPattern, PauliRotOpResolveGateLevelAdjointPattern,
-                 GlobalPhaseOpResolveGateLevelAdjointPattern>(patterns.getContext());
+    patterns.add<CustomOpResolveGateLevelAdjointPattern<CustomOp>,
+                 CustomOpResolveGateLevelAdjointPattern<catalyst::qref::CustomOp>,
+                 MultiRZOpResolveGateLevelAdjointPattern<MultiRZOp>,
+                 MultiRZOpResolveGateLevelAdjointPattern<catalyst::qref::MultiRZOp>,
+                 PCPhaseOpResolveGateLevelAdjointPattern<PCPhaseOp>,
+                 PCPhaseOpResolveGateLevelAdjointPattern<catalyst::qref::PCPhaseOp>,
+                 PauliRotOpResolveGateLevelAdjointPattern<PauliRotOp>,
+                 PauliRotOpResolveGateLevelAdjointPattern<catalyst::qref::PauliRotOp>,
+                 GlobalPhaseOpResolveGateLevelAdjointPattern<GlobalPhaseOp>,
+                 GlobalPhaseOpResolveGateLevelAdjointPattern<catalyst::qref::GlobalPhaseOp>>(
+        patterns.getContext());
 }
 
 struct ResolveGateLevelAdjoint : impl::ResolveGateLevelAdjointBase<ResolveGateLevelAdjoint> {
