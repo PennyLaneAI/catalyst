@@ -65,6 +65,9 @@ if(NOT _hip_include_dir AND _nvcc)
     # list to "" to disable the fetch, e.g. offline builds. hip-dev carries the headers and
     # lib/cmake/hip; hipcc-nvidia carries bin/hipcc and bin/hipconfig, which hip-config.cmake
     # set_and_check's even though nvcc is what compiles. Both unpack into one opt/rocm-<ver> tree.
+    # Both are MIT (c) Advanced Micro Devices -- hipcc-nvidia ships share/doc/hipcc/LICENSE.txt,
+    # hip-dev carries the grant inline in every header. Fetched at build time and not vendored or
+    # redistributed, so no NOTICE entry is needed; re-check on a ROCm version bump.
     set(TRANSPORT_HIP_PACKAGES
         "https://repo.radeon.com/rocm/apt/7.1.1/pool/main/h/hip-dev/hip-dev_7.1.52802.70101-38~24.04_amd64.deb|736acec734396969e11e8813a55742de536c53324fab3a836d75aa3dbf0d9651"
         "https://repo.radeon.com/rocm/apt/7.1.1/pool/main/h/hipcc-nvidia/hipcc-nvidia_1.1.1.70101-38~24.04_amd64.deb|221a4a0923862cd236d3b9e5b76fd829a87ba171ad08c75b69a6f6984a18ad30"

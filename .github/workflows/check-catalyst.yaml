@@ -162,17 +162,6 @@ jobs:
           ENABLE_TRANSPORT=ON \
           make test-runtime-transport
 
-      - name: Upload loopback logs on failure
-        if: failure() && needs.transport_changes.outputs.transport == 'true' && matrix.compiler == 'gcc'
-        uses: actions/upload-artifact@v4
-        with:
-          name: transport-loopback-logs
-          path: |
-            /tmp/cvl_coproc.log
-            /tmp/cvl_ctrl.log
-          if-no-files-found: ignore
-          retention-days: 7
-
       - name: Upload Catalyst-Runtime Artifact
         uses: actions/upload-artifact@v4
         with:

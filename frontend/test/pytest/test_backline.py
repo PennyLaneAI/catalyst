@@ -377,33 +377,21 @@ class TestBacklineDemoIntegration:
         """Demo 1a: local CPU to local CPU over RDMA loopback, in-process and out-of-process.
 
         Both roles reach each other through the ``rxe0`` soft-RoCE device installed by the
-        ``setup-soft-roce`` composite action, so the ibverbs path is real while the fabric
-        underneath it is software. The cases differ only in where the coprocessor runs, which
-        ``pennylane.backline.Node.remote`` documents as a property of ``executor_options`` with
-        ``remote`` left at ``False``:
+        ``setup-soft-roce`` action, so the ibverbs path is real while the fabric is software.
+        The cases differ only in where the coprocessor runs:
 
-        * ``in_process`` -- ``executor_options=None``, the default: no executor is built, so both
-          roles stay in this process. A direct mirror of
-          ``demos/demo_1a_local_cpu_to_local_cpu_rdma.py``.
-        * ``out_of_process`` -- ``executor_options={}``, naming neither a ``host`` nor an
-          ``address``: a ``catalyst-executor`` subprocess on this machine, its libraries still
-          resolving from this installation. This is how the roles actually deploy, one queue pair
-          per process -- an earlier in-process version of this test SIGSEGV'd inside ``ghz()`` on
-          GH-hosted ubuntu's ``rdma_rxe`` with two queue pairs in one process. It also covers the
-          executor plugin path: ``_realize_executor`` derives ``_executor_plugins`` only on the
-          ``executor_options`` branch, since a preset ``executor=Executor()`` is taken at the
-          node's word, so the subprocess gets the runtime libraries and the decode library
-          preloaded by absolute path. Needs a runtime built with ``ENABLE_EXECUTOR=ON``, which is
-          what puts ``catalyst-executor`` where ``default_executor_bin`` looks for it.
+        * ``in_process`` -- ``executor_options=None``: no executor is built, both roles stay in
+          this process. Mirrors ``demos/demo_1a_local_cpu_to_local_cpu_rdma.py``.
+        * ``out_of_process`` -- ``executor_options={}``: a ``catalyst-executor`` subprocess on
+          this machine. This is how the roles actually deploy, one queue pair per process; an
+          in-process version SIGSEGV'd inside ``ghz()`` on GH-hosted ubuntu's ``rdma_rxe`` with
+          two queue pairs in one process. Needs a runtime built with ``ENABLE_EXECUTOR=ON``.
 
-        A port per case, so both run in one session without meeting each other on the
-        coprocessor's out-of-band port. The config strings follow the demo's ``LOCAL_CFG`` shape -
-        ``dev=<rxe device>;gid=<idx>``, which
-        ``runtime/lib/transport/rdma/common/BackendConfig.hpp`` requires. ``backend_lib`` is left
-        off ``init_args`` so the compiler resolves the transport backend via the (``transport``,
-        ``hardware``) mapping in ``backline._resolve_backend_lib`` to an absolute path under
-        ``RUNTIME_LIB_DIR`` - avoiding a runtime ``dlopen`` of a bare filename that the loader
-        would search for on ``LD_LIBRARY_PATH``.
+        A port per case, so both run in one session without colliding on the coprocessor's
+        out-of-band port. Config strings follow ``dev=<rxe device>;gid=<idx>``, which
+        ``BackendConfig.hpp`` requires. ``backend_lib`` is left off ``init_args`` so the compiler
+        resolves the backend to an absolute path under ``RUNTIME_LIB_DIR``, avoiding a ``dlopen``
+        of a bare filename searched on ``LD_LIBRARY_PATH``.
         """
         steane_lib = str(
             Path(get_lib_path("runtime", "RUNTIME_LIB_DIR")) / "libsteane_coprocessor_cpu.so"
@@ -420,9 +408,8 @@ class TestBacklineDemoIntegration:
             executor_options=executor_options,
             init_args={"config": "dev=rxe0;gid=1"},
         )
-        # Registered before compiling, because ``_realize_executor`` launches the subprocess
-        # during compilation: a failure after that point still has to release the port. A no-op
-        # for the in-process case, whose node never gets an executor.
+        # Registered before compiling: ``_realize_executor`` launches the subprocess during
+        # compilation, and a failure after that still has to release the port.
         stop_node_executors(coproc)
         dev = qp.Backline(
             controller=ctrl, coprocessors=[coproc], transport="rdma", qec_code="steane"
@@ -591,9 +578,7 @@ class TestBacklineDemoIntegration:
         assert 'transport = "memcpy"' in ir
         assert decoder.symbol_name in ir
         # Only the symbol reaches the IR: backline dlopens an in-process coprocessor's library
-        # itself (RTLD_GLOBAL, in _load_coprocessor_fn_libs) and backend_lib names the transport
-        # plugin instead. Assert the Triton build produced a library, not that its path is in the
-        # module.
+        # itself and backend_lib names the transport plugin instead.
         assert decoder.lib_path is not None and Path(decoder.lib_path).exists()
         assert "libcatalyst_transport_memcpy_controller.so" in ir
         assert "libcatalyst_transport_memcpy_gpu_coprocessor.so" in ir
@@ -745,11 +730,8 @@ class TestBacklineDemoIntegration:
         assert "libcatalyst_transport_memcpy_controller.so" in ir
         assert "libcatalyst_transport_memcpy_gpu_coprocessor.so" in ir
         assert decoder.symbol_name in ir
-        # Only the symbol: backline loads an in-process coprocessor's library itself, with
-        # ctypes RTLD_GLOBAL in _load_coprocessor_fn_libs, so the transport backend resolves the
-        # decode function out of the global namespace. Writing the path into backend_lib would
-        # displace the transport plugin, which _node_dict says in as many words. So assert the
-        # build produced a library, not that its path reached the IR.
+        # Only the symbol, as above: writing the path into backend_lib would displace the
+        # transport plugin.
         assert decoder.lib_path is not None and Path(decoder.lib_path).exists()
 
         samples = np.asarray(circuit())
