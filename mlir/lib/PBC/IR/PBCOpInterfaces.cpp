@@ -30,6 +30,8 @@
 
 using namespace mlir;
 using namespace catalyst::pbc;
+
+#include "PBC/IR/PBCOpInterfaces.cpp.inc"
 //===----------------------------------------------------------------------===//
 // Helpers
 //===----------------------------------------------------------------------===//
@@ -170,4 +172,4 @@ std::string defaultGetGraphOpId(Operation *op) {
 
 }
 } // namespace catalyst
-#include "PBC/IR/PBCOpInterfaces.cpp.inc"
+

@@ -136,7 +136,8 @@ def FabricateOp : PBC_Op<"fabricate",
 }
 
 def PPRotationOp : PBC_Op<"ppr", [PBCOpInterface, AttrSizedOperandSegments,
-    DeclareOpInterfaceMethods<ResourceQuantumOpInterface, ["getResourceAdjointFlag", "getResourceDetailedName"]>]> {
+    DeclareOpInterfaceMethods<ResourceQuantumOpInterface, ["getResourceAdjointFlag", "getResourceDetailedName"]>,
+    DeclareOpInterfaceMethods<DecomposableGate>]> {
     let summary = "Pauli Product Rotation on qubits.";
 
     let description = [{
@@ -254,7 +255,8 @@ def PPRotationOp : PBC_Op<"ppr", [PBCOpInterface, AttrSizedOperandSegments,
 }
 
 def PPRotationArbitraryOp : PBC_Op<"ppr.arbitrary", [PBCOpInterface, AttrSizedOperandSegments,
-    DeclareOpInterfaceMethods<ResourceQuantumOpInterface, ["getResourceDetailedName"]>]> {
+    DeclareOpInterfaceMethods<ResourceQuantumOpInterface, ["getResourceDetailedName"]>,
+    DeclareOpInterfaceMethods<DecomposableGate>]> {
     let summary = "Pauli Product Rotation with arbitrary angle.";
     let description = [{
         The PPRotationArbitraryOp represents a Pauli product rotation operation with an arbitrary angle.
