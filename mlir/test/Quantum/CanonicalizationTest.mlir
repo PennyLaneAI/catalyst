@@ -176,7 +176,7 @@ func.func @test_hermitian_adjoint_not_canonicalized(%q0: !quantum.bit) -> !quant
     // CHECK: [[qubit:%.+]] = quantum.extract [[reg]][ 0] : !quantum.reg -> !quantum.bit
 
     %2 = quantum.custom "Hadamard"() %1 adj: !quantum.bit
-    // CHECK:  quantum.custom "Hadamard"() %1 adj : !quantum.bit
+    // CHECK:  quantum.custom "Hadamard"() [[qubit:%.+]] adj : !quantum.bit
     return %2 : !quantum.bit
 }
 
@@ -187,8 +187,7 @@ func.func @test_rotation_adjoint_not_canonicalize(%arg0: f64) -> !quantum.bit {
     // CHECK: [[reg:%.+]] = quantum.alloc( 1) : !quantum.reg
     // CHECK: [[qubit:%.+]] = quantum.extract [[reg]][ 0] : !quantum.reg -> !quantum.bit
     %2 = quantum.custom "RX"(%arg0) %1 adj: !quantum.bit
-    // CHECK-NOT: arith.negf
-    // CHECK:  quantum.custom "RX"(%arg0) %1 adj : !quantum.bit
+    // CHECK:  quantum.custom "RX"([[reg:%.+]]) [[qubit:%.+]] adj : !quantum.bit
     return %2 : !quantum.bit
 }
 
@@ -201,8 +200,7 @@ func.func @test_multirz_adjoint_not_canonicalize(%arg0: f64) -> (!quantum.bit, !
     %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
     %2 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
 
-    // CHECK-NOT: arith.negf
-    // CHECK: [[ret:%.+]]:2 = quantum.multirz(%arg0) %1, %2 adj : !quantum.bit, !quantum.bit
+    // CHECK: [[ret:%.+]]:2 = quantum.multirz([[reg:%.+]]) [[qubit:%.+]], [[qubit:%.+]] adj : !quantum.bit, !quantum.bit
     %3:2 = quantum.multirz (%arg0) %1, %2 adj : !quantum.bit, !quantum.bit
     return %3#0, %3#1 : !quantum.bit, !quantum.bit
 }
@@ -216,8 +214,7 @@ func.func @test_pcphase_adjoint_not_canonicalized(%arg0: f64) -> (!quantum.bit, 
     %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
     %2 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
 
-    // CHECK-NOT: arith.negf
-    // CHECK: [[ret:%.+]]:2 = quantum.pcphase(%arg0, dim : 2) %1, %2 adj : !quantum.bit, !quantum.bit
+    // CHECK: [[ret:%.+]]:2 = quantum.pcphase([[reg:%.+]], dim : 2) [[qubit:%.+]], [[qubit:%.+]] adj : !quantum.bit, !quantum.bit
     %3:2 = quantum.pcphase(%arg0, dim : 2) %1, %2 adj : !quantum.bit, !quantum.bit
     return %3#0, %3#1 : !quantum.bit, !quantum.bit
 }

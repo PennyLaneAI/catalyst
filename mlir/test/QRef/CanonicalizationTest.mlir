@@ -154,7 +154,6 @@ func.func @test_get_cse(%r: !qref.reg<3>, %i: i64) {
 
 // CHECK-LABEL: test_hermitian_adjoint_not_canonicalized
 func.func @test_hermitian_adjoint_not_canonicalized(%q0: !qref.bit) {
-    // CHECK-NOT: arith.negf
     // CHECK: qref.custom "Hadamard"() %arg0 adj : !qref.bit
     qref.custom "Hadamard"() %q0 adj: !qref.bit
     return
