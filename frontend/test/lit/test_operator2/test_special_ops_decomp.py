@@ -131,49 +131,23 @@ def test_qubit_unitary():
 # CHECK: qref.unitary({{%.+}} : tensor<4x4xcomplex<f64>>)
 # CHECK: qref.unitary({{%.+}} : tensor<8x8xcomplex<f64>>)
 #
-# CHECK: func.func private @"__builtin_zyz_QubitUnitary
-# CHECK-SAME: {U:{{\[\[}}complex<f64>,complex<f64>],
-# CHECK-SAME:     [complex<f64>,complex<f64>{{\]\]}}}{wires:1}{}"
-# CHECK-SAME:   target_gate = "QubitUnitary
-# CHECK-SAME:   {U:{{\[\[}}complex<f64>,complex<f64>],
-# CHECK-SAME:       [complex<f64>,complex<f64>{{\]\]}}}{wires:1}{}"
+# CHECK: func.func private @"__builtin_zyz_QubitUnitary{U:[tensor<2x2xcomplex<f64>>]}{wires:1}{}"
+# CHECK-SAME:   target_gate = "QubitUnitary{U:[tensor<2x2xcomplex<f64>>]}{wires:1}{}"
 #
-# CHECK: func.func private @"__builtin_zxz_QubitUnitary
-# CHECK-SAME: {U:{{\[\[}}complex<f64>,complex<f64>],
-# CHECK-SAME:     [complex<f64>,complex<f64>{{\]\]}}}{wires:1}{}"
-# CHECK-SAME:   target_gate = "QubitUnitary
-# CHECK-SAME:   {U:{{\[\[}}complex<f64>,complex<f64>],
-# CHECK-SAME:       [complex<f64>,complex<f64>{{\]\]}}}{wires:1}{}"
+# CHECK: func.func private @"__builtin_zxz_QubitUnitary{U:[tensor<2x2xcomplex<f64>>]}{wires:1}{}"
+# CHECK-SAME:   target_gate = "QubitUnitary{U:[tensor<2x2xcomplex<f64>>]}{wires:1}{}"
 #
-# CHECK: func.func private @"__builtin_xzx_QubitUnitary
-# CHECK-SAME: {U:{{\[\[}}complex<f64>,complex<f64>],
-# CHECK-SAME:     [complex<f64>,complex<f64>{{\]\]}}}{wires:1}{}"
-# CHECK-SAME:   target_gate = "QubitUnitary
-# CHECK-SAME:   {U:{{\[\[}}complex<f64>,complex<f64>],
-# CHECK-SAME:       [complex<f64>,complex<f64>{{\]\]}}}{wires:1}{}"
+# CHECK: func.func private @"__builtin_xzx_QubitUnitary{U:[tensor<2x2xcomplex<f64>>]}{wires:1}{}"
+# CHECK-SAME:   target_gate = "QubitUnitary{U:[tensor<2x2xcomplex<f64>>]}{wires:1}{}"
 #
-# CHECK: func.func private @"__builtin_xyx_QubitUnitary
-# CHECK-SAME: {U:{{\[\[}}complex<f64>,complex<f64>],
-# CHECK-SAME:     [complex<f64>,complex<f64>{{\]\]}}}{wires:1}{}"
-# CHECK-SAME:   target_gate = "QubitUnitary
-# CHECK-SAME:   {U:{{\[\[}}complex<f64>,complex<f64>],
-# CHECK-SAME:       [complex<f64>,complex<f64>{{\]\]}}}{wires:1}{}"
+# CHECK: func.func private @"__builtin_xyx_QubitUnitary{U:[tensor<2x2xcomplex<f64>>]}{wires:1}{}"
+# CHECK-SAME:   target_gate = "QubitUnitary{U:[tensor<2x2xcomplex<f64>>]}{wires:1}{}"
 #
-# CHECK: func.func private @"__builtin_two_qubit_decomp_rule_QubitUnitary
-# CHECK-SAME: {U:{{\[\[}}complex<f64>,complex<f64>,complex<f64>,complex<f64>],
-# CHECK-SAME:     [complex<f64>,complex<f64>,complex<f64>,complex<f64>],
-# CHECK-SAME:     [complex<f64>,complex<f64>,complex<f64>,complex<f64>],
-# CHECK-SAME:     [complex<f64>,complex<f64>,complex<f64>,complex<f64>{{\]\]}}}{wires:2}{}"
-# CHECK-SAME:   target_gate = "QubitUnitary
-# CHECK-SAME:   {U:{{\[\[}}complex<f64>,complex<f64>,complex<f64>,complex<f64>],
-# CHECK-SAME:       [complex<f64>,complex<f64>,complex<f64>,complex<f64>],
-# CHECK-SAME:       [complex<f64>,complex<f64>,complex<f64>,complex<f64>],
-# CHECK-SAME:       [complex<f64>,complex<f64>,complex<f64>,complex<f64>{{\]\]}}}{wires:2}{}"
+# CHECK: func.func private @"__builtin_two_qubit_decomp_rule_QubitUnitary{U:[tensor<4x4xcomplex<f64>>]}{wires:2}{}"
+# CHECK-SAME:   target_gate = "QubitUnitary{U:[tensor<4x4xcomplex<f64>>]}{wires:2}{}"
 #
-# CHECK: func.func private @"__builtin_multi_qubit_decomp_rule_QubitUnitary
-# CHECK-SAME: {wires:3}
-# CHECK-SAME:   target_gate = "QubitUnitary
-# CHECK-SAME:   {wires:3}
+# CHECK: func.func private @"__builtin_multi_qubit_decomp_rule_QubitUnitary{U:[tensor<8x8xcomplex<f64>>]}{wires:3}{}"
+# CHECK-SAME:   target_gate = "QubitUnitary{U:[tensor<8x8xcomplex<f64>>]}{wires:3}{}"
 test_qubit_unitary()
 
 
@@ -215,8 +189,8 @@ def test_basis_state():
 # CHECK: func.func public @basisstate
 # CHECK: qref.set_basis_state({{%.+}}) {{%.+}} : tensor<1xi1>, !qref.bit
 # CHECK: qref.set_basis_state({{%.+}}) {{%.+}}, {{%.+}} : tensor<2xi1>, !qref.bit, !qref.bit
-# CHECK: func.func private @"__builtin__basis_state_decomp_BasisState{state:[i1]}{wires:1}{}"
-# CHECK-SAME:   target_gate = "BasisState{state:[i1]}{wires:1}{}"
-# CHECK: func.func private @"__builtin__basis_state_decomp_BasisState{state:[i1,i1]}{wires:2}{}"
-# CHECK-SAME:   target_gate = "BasisState{state:[i1,i1]}{wires:2}{}"
+# CHECK: func.func private @"__builtin__basis_state_decomp_BasisState{state:[tensor<1xi1>]}{wires:1}{}"
+# CHECK-SAME:   target_gate = "BasisState{state:[tensor<1xi1>]}{wires:1}{}"
+# CHECK: func.func private @"__builtin__basis_state_decomp_BasisState{state:[tensor<2xi1>]}{wires:2}{}"
+# CHECK-SAME:   target_gate = "BasisState{state:[tensor<2xi1>]}{wires:2}{}"
 test_basis_state()

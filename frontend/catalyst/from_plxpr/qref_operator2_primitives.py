@@ -340,7 +340,7 @@ def compile_decomp_rules(
     elif op_cls is qp.BasisState:
         # qp.BasisState has the same number of booleans as the number of wires
         num_wires = wire_lens[0]
-        dynamic_shape = {qp.BasisState.dynamic_argnames[0]: ["i1"] * num_wires}
+        dynamic_shape = {qp.BasisState.dynamic_argnames[0]: [f"tensor<{num_wires}xi1>"]}
         wire_argname = qp.BasisState.wire_argnames[0]
         op_id = (
             "BasisState"
@@ -362,7 +362,9 @@ def compile_decomp_rules(
         num_wires = wire_lens[0]
         matrix_size = 2**num_wires
         dynamic_shape = {
-            qp.QubitUnitary.dynamic_argnames[0]: [["complex<f64>"] * matrix_size] * matrix_size
+            qp.QubitUnitary.dynamic_argnames[0]: [
+                f"tensor<{matrix_size}x{matrix_size}xcomplex<f64>>"
+            ]
         }
         wire_argname = qp.QubitUnitary.wire_argnames[0]
         op_id = (

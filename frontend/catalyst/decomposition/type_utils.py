@@ -114,7 +114,7 @@ def get_dummy_values_for_arg(arg):
             else:
                 return jnp.zeros((), dtype=_MLIR_DTYPES_TO_PY_DTYPES[arg])
         case list() | tuple():
-            if arg[0].startswith("tensor"):
+            if not any(isinstance(e, list) for e in arg) and arg[0].startswith("tensor"):
                 assert len(arg) == 1, "cannot create a tensor of tensors"
                 return get_dummy_values_for_arg(arg[0])
             else:
