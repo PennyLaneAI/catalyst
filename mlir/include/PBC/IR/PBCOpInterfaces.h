@@ -14,10 +14,19 @@
 
 #pragma once
 
+#include "llvm/ADT/StringMap.h"   // for DecomposableGate interface
 #include "mlir/IR/OpDefinition.h"
 
 //===----------------------------------------------------------------------===//
 // PBC interface declarations.
 //===----------------------------------------------------------------------===//
+
+namespace catalyst {
+namespace pbc {
+
+std::string defaultGetGraphOpId(mlir::Operation *op);
+
+}
+} // namespace catalyst
 
 #include "PBC/IR/PBCOpInterfaces.h.inc"

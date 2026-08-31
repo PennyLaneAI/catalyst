@@ -56,4 +56,48 @@ def PBCOpInterface : OpInterface<"PBCOpInterface"> {
 
 }
 
+def DecomposableGate : OpInterface<"DecomposableGate"> {
+    let description = [{
+        This interface provides a generic way to query decomposition data from a quantum operation.
+        An operation must implement this interface in order to compatible with the `graph-decomposition` pass.
+        Note that implementing this interface does not guarantee that an operation will decomposed successfully, only that it will be registered with the graph.
+    }];
+
+    let cppNamespace = "::catalyst::pbc";
+
+    let methods = [
+        InterfaceMethod<
+            "Return the name of the corresponding frontend operator (i.e. the rule supplier).", "std::string", "getOperatorName"
+        >,
+        InterfaceMethod<
+            "Return a map of frontend parameter name to shape and dtype of dynamic data.",
+            "llvm::StringMap<llvm::SmallVector<mlir::Type>>", "getDynamicShape"
+        >,
+        InterfaceMethod<
+            "Return a map of frontend parameter name to number of wires (excluding control wires).",
+            "llvm::StringMap<size_t>", "getWireLens"
+        >,
+        InterfaceMethod<
+            "Return a map of frontend parameter name to static data values.",
+            "mlir::DictionaryAttr", "getStaticData"
+        >,
+        InterfaceMethod<
+            "Return a string representation of any additional data an operator may need to provide"
+            " for uniqueness (ex. UID), or emptystring if not applicable.",
+            "std::string", "getExtraData", (ins), [{}], [{ return ""; }]
+        >,
+        InterfaceMethod<
+            "Return the operation's ID for use with the graph. "
+            "This should be computed by the following convention:\n"
+            "```\n"
+            "name + {map params to list of types} + {map wire args to number of wires} + {static data} + [extra data]\n"
+            "```\n"
+            "Note that extra data is currently specific to `OperatorOp`s, and should only appear when present."
+            "Each of these maps should be sorted lexicographically by key."
+            "In general, this should be computed by the default here and not overridden.",
+            "std::string", "getGraphOpId", (ins), [{}], [{ return ::catalyst::pbc::defaultGetGraphOpId($_op.getOperation()); }]
+        >
+    ];
+}
+
 #endif // PBCOP_INTERFACES

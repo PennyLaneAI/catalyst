@@ -16,9 +16,36 @@
 
 using namespace mlir;
 using namespace catalyst::pbc;
+//===----------------------------------------------------------------------===//
+// Helpers
+//===----------------------------------------------------------------------===//
+
+namespace { 
+
+
+}
 
 //===----------------------------------------------------------------------===//
 // PBC interface definitions.
 //===----------------------------------------------------------------------===//
 
+namespace catalyst {
+namespace pbc {
+    return name;
+}
+
+std::string defaultGetGraphOpId(Operation *op) {
+    std::string out;
+    llvm::raw_string_ostream ss(out);
+
+    DecomposableGate gate = cast<DecomposableGate>(op);
+
+    ss << gate.getOperatorName();
+
+    
+    return op->getName().getStringRef().str();
+}
+
+}
+} // namespace catalyst
 #include "PBC/IR/PBCOpInterfaces.cpp.inc"
