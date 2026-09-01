@@ -505,6 +505,11 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* Fixed an `AttributeError` in the `capture=True` graph-decomposition path when a decomposition
+  rule's resource representation uses abstract wires (`pennylane.typing.Wire[n]`), e.g. for
+  `register_resources` rules that describe cost without concrete wires.
+  [(#3163)](https://github.com/PennyLaneAI/catalyst/issues/3163)
+
 * Fixed a bug where an executor's SSH connection multiplexing was silently disabled on macOS,
   making every remote operation pay a fresh authentication handshake. The control socket went in
   the system temp dir, which macOS puts under a per-user `/var/folders/...` path long enough to
