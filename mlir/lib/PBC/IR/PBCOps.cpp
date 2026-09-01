@@ -232,6 +232,18 @@ void LayerOp::print(OpAsmPrinter &p) {
 }
 
 //===----------------------------------------------------------------------===//
+// PBC op interface methods.
+//===----------------------------------------------------------------------===//
+
+// PPRotationOp
+std::string PPRotationOp::getOperatorName() { return "PPRotation"; }
+llvm::StringMap<llvm::SmallVector<mlir::Type>> PPRotationOp::getDynamicShape() {
+    return {};
+}
+llvm::StringMap<size_t>  PPRotationOp::getWireLens() { return {}; }
+mlir::DictionaryAttr PPRotationOp::getStaticData() { return {}; }
+
+//===----------------------------------------------------------------------===//
 // Implement ResourceQuantumOpInterface methods.
 //===----------------------------------------------------------------------===//
 llvm::StringRef PrepareStateOp::getResourceName() { return "pbc.prepare"; }
