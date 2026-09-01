@@ -258,7 +258,11 @@ def collect_resources_for_op(op_name, kwargs, is_custom_op=False, adjoint_resour
             # adjoint form (Adjoint(<name>){...}) directly from the resource op instance via
             # GraphOpID.getGraphOpId, rather than string.
             name_to_resource_ids[rule.name] = {
-                GraphOpID(op).getGraphOpId(adjoint=adjoint_resources): count
+                (
+                    GraphOpID(op.base).getGraphOpId(adjoint=not adjoint_resources)
+                    if issubclass(op.__class__, qp.ops.op_math.Adjoint)  # TODO: control?
+                    else GraphOpID(op).getGraphOpId(adjoint=adjoint_resources)
+                ): count
                 for op, count in resources.gate_counts.items()
             }
         except Exception as e:

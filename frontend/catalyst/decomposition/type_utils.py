@@ -101,7 +101,6 @@ def get_dummy_values_for_arg(arg):
 
     The types are expected to be formatted for ``GraphOpId``s.
     """
-    breakpoint()
     if arg.startswith("tensor"):
         # Captures the optional dimensions (e.g., '2x2x') in group 1, and the
         # element type in group 2
