@@ -283,3 +283,35 @@ class TestGenerateUID:
             **kwargs,
         )
         assert uid_three_wires != uid_two_wires
+
+    def test_partially_abstract_operator(self):
+        abstract_param = AbstractArray((2,), float)
+        concrete_param = 1.5
+
+        abstract_wire = AbstractQubit()
+        concrete_wire = 0
+
+        kwargs = {
+            "op_cls": DynamicStaticOp,
+            "wire_lens": (2,),
+            "hybrid_lens": (),
+            "hybrid_trees": (),
+            "adjoint": False,
+            "n_ctrls": 0,
+            "static_args": _static_kwargs("partially_abstract_op"),
+        }
+
+        uid_mixed = generate_uid(
+            abstract_param, concrete_param, abstract_wire, concrete_wire, **kwargs
+        )
+        uid_mixed_alt = generate_uid(
+            abstract_param, concrete_param, abstract_wire, concrete_wire, **kwargs
+        )
+
+        assert uid_mixed == uid_mixed_alt
+
+        uid_different_concrete = generate_uid(
+            abstract_param, 2.5, abstract_wire, concrete_wire, **kwargs
+        )
+
+        assert uid_mixed != uid_different_concrete
