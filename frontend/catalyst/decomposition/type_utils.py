@@ -135,36 +135,49 @@ def get_dummy_values_for_arg(arg):
     raise TypeError(f"Unexpected type in container when creating dummy values: {type(arg)}")
 
 
-def replace_abstract_wires_with_concrete_wires(node):
+def replace_wires_with_placeholder_wires(node):
+    """
+    Replace every wire container (abstract or concrete) in ``node`` with placeholder wires.
+
+    Wire labels never affect which decomposition rules apply to an operator: at lowering time
+    wires always show up as (abstract) qubit operands. Hence both `AbstractWires` and concrete
+    `Wires` are replaced with negative placeholder labels, so that operators only differing in
+    their (concrete) wire labels reduce to the same ``GraphOpId``.
+    """
     if isinstance(node, qp.core.Operator2):
-        return _replace_op_abstract_wires_with_concrete_wires(node)
+        return _replace_op_wires_with_placeholder_wires(node)
 
     if isinstance(node, list):
-        return [replace_abstract_wires_with_concrete_wires(item) for item in node]
+        return [replace_wires_with_placeholder_wires(item) for item in node]
     elif isinstance(node, dict):
-        return {k: replace_abstract_wires_with_concrete_wires(v) for k, v in node.items()}
+        return {k: replace_wires_with_placeholder_wires(v) for k, v in node.items()}
     elif isinstance(node, tuple):
-        return tuple(replace_abstract_wires_with_concrete_wires(item) for item in node)
+        return tuple(replace_wires_with_placeholder_wires(item) for item in node)
     else:
-        if isinstance(node, qp.typing.AbstractWires):
-            return qp.wires.Wires(range(len(node)))
+        if isinstance(node, (qp.typing.AbstractWires, qp.wires.Wires)):
+            return _placeholder_wires(len(node))
         else:
             return node
 
 
-def _replace_op_abstract_wires_with_concrete_wires(op2):
+def _placeholder_wires(num_wires):
+    """Return `num_wires` placeholder wires, labelled with negative integers."""
+    return qp.wires.Wires(range(-1, -num_wires - 1, -1))
+
+
+def _replace_op_wires_with_placeholder_wires(op2):
     """
     Given an Operator2 instance, return a copy of the same instance but with all fields whose value
-    is an `AbstractWires` replaced with concrete `Wires`.
+    is an `AbstractWires` or a concrete `Wires` replaced with placeholder `Wires`.
     """
     new_op = copy.deepcopy(op2)
     for wire_arg in new_op.wire_argnames:
-        if isinstance(new_op.arguments[wire_arg], qp.typing.AbstractWires):
-            num_wires = len(new_op.arguments[wire_arg])
-            new_op.arguments[wire_arg] = qp.wires.Wires(range(-1, -num_wires - 1, -1))
+        wire_val = new_op.arguments[wire_arg]
+        if isinstance(wire_val, (qp.typing.AbstractWires, qp.wires.Wires)):
+            new_op.arguments[wire_arg] = _placeholder_wires(len(wire_val))
     for hybrid_arg in new_op.hybrid_argnames:
         if isinstance(new_op.arguments[hybrid_arg], qp.core.Operator2):
-            new_op.arguments[hybrid_arg] = _replace_op_abstract_wires_with_concrete_wires(
+            new_op.arguments[hybrid_arg] = _replace_op_wires_with_placeholder_wires(
                 new_op.arguments[hybrid_arg]
             )
 
