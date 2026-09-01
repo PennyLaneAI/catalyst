@@ -21,7 +21,7 @@ import pennylane as qp
 from pennylane.pytrees import flatten
 
 from catalyst.decomposition.type_utils import (
-    convert_types_to_mlir_strings,
+    convert_item_to_mlir_type,
     format_dynamic_params_for_id,
     post_process_concretize_leaves,
     replace_abstract_wires_with_concrete_wires,
@@ -38,13 +38,14 @@ class GraphOpID:
     The format of the computed graph op ID string is as follows:
         op_name{param_shaped_type_dictionary}{wire_lens_dictionary}{static_data_dictionary}[UID]
 
+    The types in the dynamic shape dictionary should be represented as a list of MLIR-style type annotations.
     The UID is computed from the shapes, dtypes and pytree structures of the `hybrid_args` of
     the Operator2 instance.
 
     For example, an Operator2 instance with class name `HybridOpArg`, taking in one float param
     argument named `angle`, one wire argument named `cwires`, one static data argument
     `label="hello"`, and a computed UID of 10 would be parsed to the following graph op ID:
-        HybridOpArg{angle:[f64]}{cwires:1}{label:hello}[10]
+        HybridOpArg{angle:[tensor<f64>]}{cwires:1}{label:hello}[10]
 
     The defining trait of a graph op ID is that it has unique correspondence to decomposition rules.
     In other words, different graph op IDs have different sets of decomposition rules.
@@ -79,9 +80,15 @@ class GraphOpID:
         if self.is_custom_op:
             return {str(i): ["f64"] for i in range(len(self.op.dynamic_args))}
         elif issubclass(type(self.op), tuple(_SPECIAL_LOWERINGS.keys())):  # special cases
-            return {argname: argtype for argname, argtype in sorted(self.op.dynamic_args.items())}
+            return {
+                argname: [convert_item_to_mlir_type(argtype, is_special_lowering=True)]
+                for argname, argtype in sorted(self.op.dynamic_args.items())
+            }
         else:
-            return {argname: [argtype] for argname, argtype in sorted(self.op.dynamic_args.items())}
+            return {
+                argname: [convert_item_to_mlir_type(argtype)]
+                for argname, argtype in sorted(self.op.dynamic_args.items())
+            }
 
     def parse_wire_lens(self) -> dict[str, int]:
         """Return a dictionary of wire arg names to lengths."""
@@ -154,7 +161,7 @@ class GraphOpID:
 
     def get_dynamic_shape_id_format(self) -> str:
         """Return the dynamic shape formatted for GraphOpId."""
-        return format_dynamic_params_for_id(convert_types_to_mlir_strings(self.dynamic_shape))
+        return format_dynamic_params_for_id(self.dynamic_shape)
 
     def get_wire_lens_id_format(self) -> str:
         """Return the wire lengths formatted for GraphOpId."""
@@ -164,15 +171,18 @@ class GraphOpID:
         """Return the static data formatted for GraphOpId."""
         return "{" + ",".join(f"{k}:{v}" for k, v in self.static_data.items()) + "}"
 
-    def getGraphOpId(self) -> str:
+    def getGraphOpId(self, adjoint: bool = False) -> str:
         """
         Return the GraphOpId as a string.
 
         NOTE: do not modify this method without also modifying the corresponding DecomposableGate
         interface in MLIR.
         """
+        name = self.get_operator_name()
+        if adjoint:
+            name = f"Adjoint({name})"
         ID_string = (
-            self.get_operator_name()
+            name
             + self.get_dynamic_shape_id_format()
             + self.get_wire_lens_id_format()
             + self.get_static_data_id_format()
