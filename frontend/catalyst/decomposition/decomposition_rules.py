@@ -275,7 +275,7 @@ def prepare_dynamic_op_kwargs(dynamic_shape, wire_lens) -> dict:
     for wire_name, wire_len in wire_lens.items():
         kwargs[wire_name] = jnp.array(range(wire_len), dtype=int)
     for arg_name, arg_shape in dynamic_shape.items():
-        kwargs[arg_name] = get_dummy_values_for_arg(arg_shape)
+        kwargs[arg_name] = [get_dummy_values_for_arg(shape) for shape in arg_shape]
     return kwargs
 
 
@@ -290,7 +290,7 @@ def compile_decomposition_rules(
     wrap_adjoint=False,
     wrap_control=False,
     n_ctrl=1,
-) -> ir.Operation:
+) -> ir.Operation | None:
     """
     Return the top-level ``builtin.module`` operation containing the decomposition rules for an
     operator instance.
@@ -386,6 +386,10 @@ def compile_decomposition_rules(
                 subroutine(*call_args, **call_kwargs)
 
     module = circuit.mlir_module
+
+    if not module:
+        with ir.Context() as ctx:
+            return ir.Operation.parse("module {}", context=ctx)
 
     def update_funcop_attributes(op):
         """Update the decomposition rule attributes if op is a decomposition rule.

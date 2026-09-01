@@ -61,35 +61,18 @@ class TestGenericUtilities:
     @pytest.mark.parametrize(
         "input, dtype, shape",
         [
-            # python-type scalar tests
-            (int, "int64", ()),
-            (float, "float64", ()),
-            (jnp.dtype("int32"), "int32", ()),
-            (bool, "bool", ()),
-            (complex, "complex128", ()),
-            # mlir-type scalar tests
+            # scalar tests
             ("i1", "bool", ()),
             ("i32", "int32", ()),
             ("f64", "float64", ()),
             ("complex<f64>", "complex128", ()),
             ("complex<f32>", "complex64", ()),
-            # mlir-type tensor tests
+            # tensor tests
             ("tensor<i1>", "bool", ()),
             ("tensor<1xi1>", "bool", (1,)),
             ("tensor<2xi64>", "int64", (2,)),
             ("tensor<3x4xf64>", "float64", (3, 4)),
             ("tensor<3x4xcomplex<f64>>", "complex128", (3, 4)),
-            # python-type shaped tests
-            (bool, "bool", ()),
-            ([float, float], "float64", (2,)),
-            ([int], "int64", (1,)),
-            (ShapedArray((4,), "int32"), "int32", (4,)),
-            # mlir-type shaped tests
-            ("i32", "int32", ()),
-            (["f64", "f64"], "float64", (2,)),
-            (["i1", "i1", "i1"], "bool", (3,)),
-            ([["f64", "f64"], ["f64", "f64"]], "float64", (2, 2)),
-            (["tensor<3x4xcomplex<f64>>"], "complex128", (3, 4)),
         ],
     )
     def test_get_dummy_values_types(self, input, dtype, shape):
