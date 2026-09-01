@@ -158,10 +158,13 @@ jobs:
         # copy links but cannot initialize a device ("0 active drivers"). Resolve the real one.
         run: |
           set -euo pipefail
-          # cu129 matches this host's driver; the default torch targets CUDA 13 and leaves
-          # torch.cuda.is_available() false. It also pins triton 3.5.1 -- 3.8+ emits PTX that
-          # ptxas rejects. Nothing imports torch; triton <3.8 probes the driver through it.
-          pip install torch --index-url https://download.pytorch.org/whl/cu129
+          # torch is here only so triton <3.8 can probe the driver through it; nothing imports
+          # it. cu129 matches the gpu_runners driver -- the default torch targets CUDA 13 and
+          # leaves torch.cuda.is_available() false. The cap restates what 2.13.0+cu129 already
+          # resolves (triton 3.7.1), so a bump past 3.8 -- whose PTX this ptxas rejects -- fails
+          # while resolving instead of inside triton.jit.
+          pip install 'torch==2.13.0+cu129' 'triton<3.8' \
+            --index-url https://download.pytorch.org/whl/cu129
 
           # `|| true`: grep exits 1 on no match, which under pipefail aborts before the diagnostic.
           libcuda=$(ldconfig -p | awk '/libcuda\.so\.1/ {print $NF}' | grep -v /stubs/ | head -1 || true)
