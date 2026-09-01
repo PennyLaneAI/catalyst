@@ -14,6 +14,7 @@
 
 """Type handling utilities for decomposition rule lowering."""
 
+import copy
 import re
 
 import jax.numpy as jnp
@@ -149,9 +150,11 @@ def replace_wires_with_placeholder_wires(node):
     Wire labels never affect which decomposition rules apply to an operator: at lowering time
     wires always show up as (abstract) qubit operands. Replacing them with placeholders makes
     operators that only differ in their (concrete) wire labels reduce to the same ``GraphOpId``.
+
+    Note that the result is a deep copy.
     """
     # Wires is a pytree itself, so it has to be marked as a leaf to be replaced as a whole.
-    leaves, tree = flatten(node, is_leaf=_is_wires)
+    leaves, tree = flatten(copy.deepcopy(node), is_leaf=_is_wires)
     leaves = [
         qp.wires.Wires(range(-1, -len(leaf) - 1, -1)) if _is_wires(leaf) else leaf
         for leaf in leaves

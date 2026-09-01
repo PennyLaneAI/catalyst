@@ -66,6 +66,10 @@ class TestGenericUtilities:
         op = qp.RX(0.5, original_wires)
         original_op_wires = op.wires
 
+        # NOTE: PennyLane re-wraps wire arguments on construction, so the stored wires are
+        # a different object than original wires.
+        original_wire_arg = op.arguments["wires"]
+
         new_op = replace_wires_with_placeholder_wires(op)
 
         # Check that the new op received the placeholder wires
@@ -75,7 +79,7 @@ class TestGenericUtilities:
         # Check original operator is not mutated
         assert op.wires == original_wires
         assert op.wires is original_op_wires
-        assert op.arguments["wires"] is original_wires
+        assert op.arguments["wires"] is original_wire_arg
 
     @pytest.mark.parametrize(
         "input, dtype, shape",
