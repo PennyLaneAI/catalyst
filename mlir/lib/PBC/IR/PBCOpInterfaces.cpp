@@ -36,7 +36,7 @@ using namespace catalyst::pbc;
 // Helpers
 //===----------------------------------------------------------------------===//
 
-namespace { 
+namespace {
 
 void printAttr(mlir::Attribute attr, llvm::raw_string_ostream &ss) {
     llvm::TypeSwitch<mlir::Attribute, void>(attr)
@@ -124,7 +124,6 @@ void printSortedMap(const llvm::StringMap<T> &map, llvm::raw_string_ostream &ss,
     ss << "}";
 }
 
-
 void printDynamicShape(const llvm::StringMap<llvm::SmallVector<mlir::Type>> &map,
                        llvm::raw_string_ostream &ss) {
     printSortedMap(map, ss, [](const auto &types, llvm::raw_string_ostream &stream) {
@@ -143,7 +142,7 @@ void printWireLens(const llvm::StringMap<size_t> &map, llvm::raw_string_ostream 
     printSortedMap(map, ss, [](size_t len, llvm::raw_string_ostream &stream) { stream << len; });
 }
 
-}
+} // namespace
 
 //===----------------------------------------------------------------------===//
 // PBC interface definitions.
@@ -166,10 +165,9 @@ std::string defaultGetGraphOpId(Operation *op) {
         ss << '[' << gate.getExtraData() << ']';
     }
     ss.flush();
-    
+
     return out;
 }
 
-}
+} // namespace pbc
 } // namespace catalyst
-

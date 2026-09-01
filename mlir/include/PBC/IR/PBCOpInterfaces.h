@@ -14,10 +14,10 @@
 
 #pragma once
 
-#include "llvm/ADT/StringMap.h"     // for DecomposableGate interface
-#include "mlir/IR/OpDefinition.h"
+#include "llvm/ADT/StringMap.h" // for DecomposableGate interface
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypeInterfaces.h"
+#include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/Types.h"
 #include "mlir/Support/LLVM.h"
 

@@ -253,7 +253,9 @@ std::string PPRotationArbitraryOp::getOperatorName() { return "PauliRot"; }
 llvm::StringMap<llvm::SmallVector<mlir::Type>> PPRotationArbitraryOp::getDynamicShape() {
     return {{"theta", {mlir::Float64Type::get(getContext())}}};
 }
-llvm::StringMap<size_t> PPRotationArbitraryOp::getWireLens() { return {{"wires", getInQubits().size()}}; }
+llvm::StringMap<size_t> PPRotationArbitraryOp::getWireLens() {
+    return {{"wires", getInQubits().size()}};
+}
 mlir::DictionaryAttr PPRotationArbitraryOp::getStaticData() {
     mlir::MLIRContext *ctx = getContext();
     mlir::NamedAttribute pauliWordEntry = mlir::NamedAttribute(
