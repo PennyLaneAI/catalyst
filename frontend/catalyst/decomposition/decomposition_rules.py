@@ -266,21 +266,12 @@ def collect_resources_for_op(op_name, kwargs, is_custom_op=False, adjoint_resour
     return name_to_resources, name_to_resource_ids, decomp_rules
 
 
-def _unwrap_single_operand(arg_shape):
-    """Drop the per-operand axis from a ``dynamic_shape`` entry."""
-    if isinstance(arg_shape, (list, tuple)) and len(arg_shape) == 1:
-        inner = arg_shape[0]
-        if isinstance(inner, (list, tuple)):
-            return inner
-    return arg_shape
-
-
 def prepare_dynamic_op_kwargs(dynamic_shape, wire_lens) -> dict:
     kwargs = {}
     for wire_name, wire_len in wire_lens.items():
         kwargs[wire_name] = jnp.array(range(wire_len), dtype=int)
     for arg_name, arg_shape in dynamic_shape.items():
-        kwargs[arg_name] = get_dummy_values_for_arg(_unwrap_single_operand(arg_shape))
+        kwargs[arg_name] = get_dummy_values_for_arg(arg_shape)
     return kwargs
 
 
@@ -295,9 +286,10 @@ def compile_decomposition_rules(
     wrap_adjoint=False,
     wrap_control=False,
     n_ctrl=1,
-) -> ModuleOp:
+) -> ir.Operation:
     """
-    Return a ModuleOp containing the decomposition rules for an operator instance.
+    Return the top-level ``builtin.module`` operation containing the decomposition rules for an
+    operator instance.
 
     The decomposition rules will be decorated with appropriate resource and target_gate attributes.
 
@@ -352,21 +344,15 @@ def compile_decomposition_rules(
             else:
                 body(*_args, **_kwargs)
 
-        # Only Python-only static data is baked in. Hybrid arguments are passed at call
-        # time instead so that their tensor leaves become parameters of the rule funcop.
-        # Partial-applying them closed them over as constants, leaving the funcop with
-        # fewer parameters than the operator has operands, which the substitution step
-        # rejects.
         decomp_rule_no_static_args = partial(decomp_rule, **static_data)
+        if extra_data:
+            decomp_rule_no_static_args = partial(decomp_rule_no_static_args, **extra_data)
 
-        # Keep the frontend name for readability, append target op_id for symbol uniqueness:
+        # keep the frontend name for readability, append target op_id for symbol uniqueness
         decomp_rule_no_static_args.__name__ = rule.name + "_" + target_id
 
         return qp.capture.subroutine(decomp_rule_no_static_args)
 
-    # condition_args, condition_kwargs = split_call_args(
-    #     kwargs | extra_data, is_custom_op
-    # )
     condition_args, condition_kwargs = split_call_args(
         kwargs | static_data | extra_data, is_custom_op
     )
@@ -378,9 +364,13 @@ def compile_decomposition_rules(
         ):
             subroutines.append(rule_to_subroutine(rule))
 
-    # call_args, _ = split_call_args(kwargs, is_custom_op)
-    # print(call_args)
-    call_args, call_kwargs = split_call_args(kwargs | extra_data, is_custom_op)
+    # For control distribution, the extra control wires are
+    # added to each rule body via the `_ctrl_wires` keyword argument.
+    ctrl_wires = (
+        jnp.array(range(n_base_wires, n_base_wires + n_ctrl), dtype=int) if wrap_control else None
+    )
+
+    call_args, call_kwargs = split_call_args(kwargs, is_custom_op)
 
     @qp.qjit(target="mlir", capture=True, collect_decomp_rules=False)
     @qp.qnode(device=device)
@@ -401,7 +391,7 @@ def compile_decomposition_rules(
         This function updates the following attributes:
             - Adds the `target_gate` attribute.
             - Adds the `resources` attribute.
-            - Makes the rule public, so the inliner below does not delete it.
+            - Sets the visibility to public (so the inliner does not remove them)
         """
         if op.name == "func.func":
             rule_name = ir.StringAttr(op.attributes["sym_name"]).value.removesuffix("_" + target_id)
@@ -417,27 +407,34 @@ def compile_decomposition_rules(
     with module.context, ir.Location.unknown():
         module.operation.walk(update_funcop_attributes)
 
+    # Inline to avoid helper functions. We want all decomp rule functions to be standalone
+    # Generic printing needed when parsing --quantum-opt string output back to jax IR ModuleOps
+    # since Catalyst's python bindings never export the Catalyst dialects
+    # Before inlining we need to remove the qnode function, since that has a call to the compiled
+    # rule subroutine
     qnode_func_erasure_worklist = []
 
-    def collect_qnode_funcs(op):
+    def remove_qnode_func(op):
         if op.name == "catalyst.launch_kernel":
             qnode_func_erasure_worklist.append(op.parent)
-        elif op.name == "func.func" and "quantum.node" in op.attributes:
+            return ir.WalkResult.ADVANCE
+        if op.name == "func.func" and "quantum.node" in op.attributes:
             qnode_func_erasure_worklist.append(op)
-        # print("collect_qnode_funcs: ", op.name, op.attributes)
+            return ir.WalkResult.ADVANCE
         return ir.WalkResult.ADVANCE
 
     with module.context, ir.Location.unknown():
-        module.operation.walk(collect_qnode_funcs)
+        module.operation.walk(remove_qnode_func)
 
     for qnode_func in qnode_func_erasure_worklist:
         qnode_func.erase()
 
     inlined = _quantum_opt(
-        "--inline=inlining-threshold=4294967295",  # FIXME: always inline for now
+        "--inline=inlining-threshold=4294967295",  # Use uint max to indicate always inline
         "--mlir-print-op-generic",
         stdin=str(module),
     )
+
     inlined_module = ir.Operation.parse(inlined, context=module.context)
 
     def re_privatize_rules(op):

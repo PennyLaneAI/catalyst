@@ -43,6 +43,8 @@ _PY_DTYPES_TO_MLIR_DTYPES = {v: k for k, v in _MLIR_DTYPES_TO_PY_DTYPES.items()}
     ir.F16Type: "f16",
     ir.F32Type: "f32",
     ir.F64Type: "f64",
+    (ir.ComplexType, ir.F32Type): "complex<f32>",
+    (ir.ComplexType, ir.F64Type): "complex<f64>",
     np.dtype("bool_"): "i1",
     np.dtype("int8"): "i8",
     np.dtype("int16"): "i16",
@@ -103,15 +105,25 @@ def get_dummy_values_for_arg(arg):
     match arg:
         case str():
             if arg.startswith("tensor"):
-                body = arg.removeprefix("tensor<").removesuffix(">")
-                ranks = tuple(map(int, body.split("x")[:-1]))
-                dtype = body.split("x")[-1]
+                # Captures the optional dimensions (e.g., '2x2x') in group 1, and the
+                # element type in group 2
+                match = re.match(r"^tensor<((?:\d+x)*)(.*)>$", arg)
+                dim_str, dtype = match.groups()
+                ranks = tuple(int(d) for d in dim_str.split("x") if d)
                 return jnp.zeros(ranks, dtype=_MLIR_DTYPES_TO_PY_DTYPES[dtype])
-            return jnp.zeros((), dtype=_MLIR_DTYPES_TO_PY_DTYPES[arg])
+            else:
+                return jnp.zeros((), dtype=_MLIR_DTYPES_TO_PY_DTYPES[arg])
         case list() | tuple():
-            dtype = get_dummy_values_for_arg(arg[0]).dtype
-            # NOTE: numpy is required since jax won't create an array of strings
-            return jnp.zeros(np.array(arg, str).shape, dtype)
+            if all(isinstance(e, str) for e in arg) and arg[0].startswith("tensor"):
+                # if arg is something like [tensor<...>], i.e. a single tensor but carrying the
+                # layer of brackets from StringMap<Vector<Type>>, np str parsing fails to realize
+                # the actual tensor shape, and we need to do it manually
+                assert len(arg) == 1, "cannot create a tensor of tensors"
+                return get_dummy_values_for_arg(arg[0])
+            else:
+                dtype = get_dummy_values_for_arg(arg[0]).dtype
+                # NOTE: numpy is required since jax won't create an array of strings
+                return jnp.zeros(np.array(arg, str).shape, dtype)
         case ShapedArray():
             # Use the full shape: ``arg.shape[0]`` raised ``IndexError`` for rank-0 avals
             # and silently truncated anything of rank > 1 to its leading axis.

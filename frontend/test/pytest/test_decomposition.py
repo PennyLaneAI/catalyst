@@ -72,6 +72,12 @@ class TestGenericUtilities:
             ("f64", "float64", ()),
             ("complex<f64>", "complex128", ()),
             ("complex<f32>", "complex64", ()),
+            # mlir-type tensor tests
+            ("tensor<i1>", "bool", ()),
+            ("tensor<1xi1>", "bool", (1,)),
+            ("tensor<2xi64>", "int64", (2,)),
+            ("tensor<3x4xf64>", "float64", (3, 4)),
+            ("tensor<3x4xcomplex<f64>>", "complex128", (3, 4)),
             # python-type shaped tests
             (bool, "bool", ()),
             ([float, float], "float64", (2,)),
@@ -82,6 +88,7 @@ class TestGenericUtilities:
             (["f64", "f64"], "float64", (2,)),
             (["i1", "i1", "i1"], "bool", (3,)),
             ([["f64", "f64"], ["f64", "f64"]], "float64", (2, 2)),
+            (["tensor<3x4xcomplex<f64>>"], "complex128", (3, 4)),
         ],
     )
     def test_get_dummy_values_types(self, input, dtype, shape):
@@ -156,7 +163,7 @@ class TestGenericUtilities:
     def test_wrapper_operator(self, mocker):
         """Test that compile_decomposition_rules_wrapper doesn't error on Operator1 instances."""
         mock_decomp = mocker.MagicMock()
-        mock_decomp._impl.__name__ = "FakeRuleName"
+        mock_decomp.name = "FakeRuleName"
         mock_decomp.compute_resources.side_effect = ValueError("Fake Resource Related Error")
 
         mocker.patch("pennylane.decomposition.list_decomps", return_value=[mock_decomp])
@@ -170,7 +177,7 @@ class TestGenericUtilities:
     def test_wrapper_passes_compilable_data_to_conditions(self, mocker):
         """Test that decomposition conditions receive compilable operator data."""
         mock_decomp = mocker.MagicMock()
-        mock_decomp._impl.__name__ = "FakeRuleName"
+        mock_decomp.name = "FakeRuleName"
         mock_decomp.compute_resources.return_value.gate_counts = {}
         mock_decomp.is_applicable.side_effect = (
             lambda *, wires, a, b, thing: a and b == 3.14 and thing == "string"
