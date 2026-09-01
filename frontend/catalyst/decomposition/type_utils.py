@@ -161,14 +161,14 @@ def replace_wires_with_placeholder_wires(node):
 
 
 def _placeholder_wires(num_wires):
-    """Return `num_wires` placeholder wires, labelled with negative integers."""
+    """Return ``num_wires`` placeholder wires, labelled with negative integers."""
     return qp.wires.Wires(range(-1, -num_wires - 1, -1))
 
 
 def _replace_op_wires_with_placeholder_wires(op2):
     """
     Given an Operator2 instance, return a copy of the same instance but with all fields whose value
-    is an `AbstractWires` or a concrete `Wires` replaced with placeholder `Wires`.
+    is an ``AbstractWires`` or a concrete ``Wires`` replaced with placeholder ``Wires``.
     """
     new_op = copy.deepcopy(op2)
     for wire_arg in new_op.wire_argnames:
