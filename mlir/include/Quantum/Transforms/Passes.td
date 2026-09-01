@@ -209,6 +209,10 @@ def DecomposeLoweringPass : Pass<"decompose-lowering"> {
     ];
 }
 
+def ResolveBasisStateOperatorPass : Pass<"resolve-basis-state-operator"> {
+    let summary = "Replace all quantum.operator ops of BasisState to equivalent quantum.set_basis_state operations ";
+}
+
 def DisentangleCNOTPass : Pass<"disentangle-cnot"> {
     let summary = "Replace a CNOT gate with two single qubit gates whenever possible.";
 
