@@ -431,7 +431,6 @@ def test_adjoint(i: int):
     Test adjoint
     """
     # CHECK-DAG: [[angle:%.+]] = arith.constant 1.000000e-01 : f64
-    # CHECK-DAG: [[angle_adj:%.+]] = arith.constant -1.000000e-01 : f64
 
     # CHECK: [[reg:%.+]] = qref.alloc( 4) : !qref.reg<4>
 
@@ -444,7 +443,7 @@ def test_adjoint(i: int):
     qp.adjoint(qp.CNOT)(wires=[0, i])
 
     # CHECK: [[q0:%.+]] = qref.get [[reg]][ 0] : !qref.reg<4> -> !qref.bit
-    # CHECK: qref.custom "RX"([[angle_adj]]) [[q0]] : !qref.bit
+    # CHECK: qref.custom "RX"([[angle]]) [[q0]] adj : !qref.bit
     qp.adjoint(qp.RX(0.1, wires=0))
 
     # CHECK: [[q0:%.+]] = qref.get [[reg]][ 0] : !qref.reg<4> -> !qref.bit
