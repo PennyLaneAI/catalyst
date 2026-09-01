@@ -27,6 +27,7 @@ from jaxlib.mlir.dialects.builtin import ModuleOp
 
 from catalyst.compiler import _quantum_opt
 from catalyst.decomposition.graph_op_id import GraphOpID
+from catalyst.decomposition.rule_lowering_warning import RuleLoweringWarning
 from catalyst.decomposition.type_utils import get_dummy_values_for_arg
 from catalyst.jax_extras.lowering import get_mlir_attribute_from_pyval
 
@@ -261,7 +262,10 @@ def collect_resources_for_op(op_name, kwargs, is_custom_op=False, adjoint_resour
                 for op, count in resources.gate_counts.items()
             }
         except Exception as e:
-            warnings.warn(f"Failed to get resources for the {rule.name} decomposition rule: {e}")
+            warnings.warn(
+                f"Failed to get resources for the {rule.name} decomposition rule: {e}",
+                category=RuleLoweringWarning,
+            )
 
     return name_to_resources, name_to_resource_ids, decomp_rules
 
@@ -482,7 +486,10 @@ def adjoint_variant_rule_strings(
             )
         )
     except Exception as e:  # pylint: disable=broad-except
-        warnings.warn(f"Failed to lower the decomposition rules for {adj_name}: {e}")
+        warnings.warn(
+            f"Failed to lower the decomposition rules for {adj_name}: {e}",
+            category=RuleLoweringWarning,
+        )
     # (2) Rules for Adjoint(op_name) synthesized by adjointing each base rule of op_name:
     try:
         distributed = get_rule_strings_from_module(
@@ -505,7 +512,10 @@ def adjoint_variant_rule_strings(
         ]
         out.extend(distributed)
     except Exception as e:  # pylint: disable=broad-except
-        warnings.warn(f"Failed to synthesize distributed adjoint rules for {adj_name}: {e}")
+        warnings.warn(
+            f"Failed to synthesize distributed adjoint rules for {adj_name}: {e}",
+            category=RuleLoweringWarning,
+        )
     return out
 
 
@@ -552,7 +562,10 @@ def control_variant_rule_strings(
                 )
             )
         except Exception as e:  # pylint: disable=broad-except
-            warnings.warn(f"Failed to lower the decomposition rules for {ctrl_name}: {e}")
+            warnings.warn(
+                f"Failed to lower the decomposition rules for {ctrl_name}: {e}",
+                category=RuleLoweringWarning,
+            )
         # (2) <n>C(op_name) by controlling each base rule, and
         # (3) <n>C(Adjoint(op_name)) by controlling each adjointed base rule.
         for wrap_adjoint, label in ((False, ctrl_name), (True, f"{ctrl_mod}(Adjoint({op_name}))")):
@@ -579,7 +592,10 @@ def control_variant_rule_strings(
                 ]
                 out.extend(controlled)
             except Exception as e:  # pylint: disable=broad-except
-                warnings.warn(f"Failed to synthesize distributed control rules for {label}: {e}")
+                warnings.warn(
+                    f"Failed to synthesize distributed control rules for {label}: {e}",
+                    category=RuleLoweringWarning,
+                )
     return out
 
 
@@ -775,7 +791,8 @@ def fetch_all_reachable_decomposition_rules_from_op(
                             )
                 except Exception as e:
                     warnings.warn(
-                        f"Failed to lower the {_rule_name} decomposition rule for {this_name}: {e}"
+                        f"Failed to lower the {_rule_name} decomposition rule for {this_name}: {e}",
+                        category=RuleLoweringWarning,
                     )
                 continue
     return rules
