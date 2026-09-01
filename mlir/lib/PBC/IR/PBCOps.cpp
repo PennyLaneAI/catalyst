@@ -236,12 +236,30 @@ void LayerOp::print(OpAsmPrinter &p) {
 //===----------------------------------------------------------------------===//
 
 // PPRotationOp
-std::string PPRotationOp::getOperatorName() { return "PPRotation"; }
+std::string PPRotationOp::getOperatorName() { return "PauliRot"; }
 llvm::StringMap<llvm::SmallVector<mlir::Type>> PPRotationOp::getDynamicShape() {
-    return {};
+    return {{"theta", {mlir::Float64Type::get(getContext())}}};
 }
-llvm::StringMap<size_t>  PPRotationOp::getWireLens() { return {}; }
-mlir::DictionaryAttr PPRotationOp::getStaticData() { return {}; }
+llvm::StringMap<size_t> PPRotationOp::getWireLens() { return {{"wires", getInQubits().size()}}; }
+mlir::DictionaryAttr PPRotationOp::getStaticData() {
+    mlir::MLIRContext *ctx = getContext();
+    mlir::NamedAttribute pauliWordEntry = mlir::NamedAttribute(
+        mlir::StringAttr::get(ctx, "pauli_word"), mlir::StringAttr::get(ctx, getPauliWord()));
+    return mlir::DictionaryAttr::get(ctx, {pauliWordEntry});
+}
+
+// PPRotationArbitraryOp
+std::string PPRotationArbitraryOp::getOperatorName() { return "PauliRot"; }
+llvm::StringMap<llvm::SmallVector<mlir::Type>> PPRotationArbitraryOp::getDynamicShape() {
+    return {{"theta", {mlir::Float64Type::get(getContext())}}};
+}
+llvm::StringMap<size_t> PPRotationArbitraryOp::getWireLens() { return {{"wires", getInQubits().size()}}; }
+mlir::DictionaryAttr PPRotationArbitraryOp::getStaticData() {
+    mlir::MLIRContext *ctx = getContext();
+    mlir::NamedAttribute pauliWordEntry = mlir::NamedAttribute(
+        mlir::StringAttr::get(ctx, "pauli_word"), mlir::StringAttr::get(ctx, getPauliWord()));
+    return mlir::DictionaryAttr::get(ctx, {pauliWordEntry});
+}
 
 //===----------------------------------------------------------------------===//
 // Implement ResourceQuantumOpInterface methods.

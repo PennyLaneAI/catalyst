@@ -250,6 +250,15 @@ def PPRotationOp : PBC_Op<"ppr", [PBCOpInterface, AttrSizedOperandSegments,
         bool isClifford(){
             return hasPiOverTwoRotation() || hasPiOverFourRotation();  // π/2 and π/4 rotations are Clifford
         };
+        std::string getPauliWord()
+        {
+            std::string pauliWord;
+
+            for (mlir::Attribute pauliChar : getPauliProduct()) {
+                pauliWord += cast<mlir::StringAttr>(pauliChar).getValue();
+            }
+            return pauliWord;
+        }
     }];
     let extraClassDeclaration = extraBaseClassDeclaration;
 }
@@ -356,6 +365,19 @@ def PPRotationArbitraryOp : PBC_Op<"ppr.arbitrary", [PBCOpInterface, AttrSizedOp
 
     let hasVerifier = 1;
     let hasCanonicalizeMethod = 1;
+
+    code extraBaseClassDeclaration = [{
+        std::string getPauliWord()
+        {
+            std::string pauliWord;
+
+            for (mlir::Attribute pauliChar : getPauliProduct()) {
+                pauliWord += cast<mlir::StringAttr>(pauliChar).getValue();
+            }
+            return pauliWord;
+        }
+    }];
+    let extraClassDeclaration = extraBaseClassDeclaration;
 }
 
 def PPMeasurementOp : PBC_Op<"ppm", [PBCOpInterface,
