@@ -83,23 +83,21 @@ def main() -> int:
         "cuMemHostAlloc",
         cuda.cuMemHostAlloc(ctypes.byref(hptr), ctypes.c_size_t(SIZE), CU_MEMHOSTALLOC_DEVICEMAP),
     ):
-        hdev = ctypes.c_void_p()
-        if check(
-            "cuMemHostGetDevicePointer",
-            cuda.cuMemHostGetDevicePointer_v2(ctypes.byref(hdev), hptr, 0),
-        ):
-            fd = ctypes.c_int(-1)
-            rc = cuda.cuMemGetHandleForAddressRange(
-                ctypes.byref(fd),
-                hdev,
-                ctypes.c_size_t(SIZE),
-                CU_MEM_RANGE_HANDLE_TYPE_DMA_BUF_FD,
-                ctypes.c_ulonglong(0),
-            )
-            if check("export(host alloc)", rc):
-                print(f"  page-locked host memory exported as dma-buf fd={fd.value}")
-                worked.append("host")
-                os.close(fd.value)
+        # The exportable range for cuMemHostAlloc is the host pointer itself, not the mapped
+        # device pointer from cuMemHostGetDevicePointer -- passing the latter earns
+        # CUDA_ERROR_INVALID_VALUE regardless of whether the device supports the export.
+        fd = ctypes.c_int(-1)
+        rc = cuda.cuMemGetHandleForAddressRange(
+            ctypes.byref(fd),
+            hptr,
+            ctypes.c_size_t(SIZE),
+            CU_MEM_RANGE_HANDLE_TYPE_DMA_BUF_FD,
+            ctypes.c_ulonglong(0),
+        )
+        if check("export(host alloc)", rc):
+            print(f"  page-locked host memory exported as dma-buf fd={fd.value}")
+            worked.append("host")
+            os.close(fd.value)
         cuda.cuMemFreeHost(hptr)
 
     print(f"\nexportable: {', '.join(worked) if worked else 'nothing'}")
