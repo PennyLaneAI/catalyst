@@ -24,6 +24,16 @@ from pennylane.pytrees import PyTreeStructure
 from pennylane.wires import AbstractQubit
 
 
+def _get_aval(val: Any):
+    if isinstance(val, AbstractQubit):
+        return val
+
+    if hasattr(val, "shape") and hasattr(val, "dtype"):
+        return (val.shape, val.dtype.name)
+
+    return _serialize_static(val, None)
+
+
 # pylint: disable=too-many-arguments,too-many-positional-arguments
 def generate_uid(
     *avals_in: tuple[Any, ...],
@@ -40,7 +50,7 @@ def generate_uid(
 
     # Flat dynamic arguments
     dynamic_args = avals_in[: len(op_cls.dynamic_argnames)]
-    dynamic_avals = [(val.shape, val.dtype.name) for val in dynamic_args]
+    dynamic_avals = [_get_aval(val) for val in dynamic_args]
 
     # Hybrid arguments (wire and non-wire)
     args_idx = len(op_cls.dynamic_argnames) + sum(wire_lens)
@@ -52,8 +62,7 @@ def generate_uid(
         else:
             cur_avals = []
             for val in avals_in[args_idx : args_idx + hsize]:
-                aval = val if isinstance(val, AbstractQubit) else (val.shape, val.dtype.name)
-                cur_avals.append(aval)
+                cur_avals.append(_get_aval(val))
             hybrid_avals.append(tuple(cur_avals))
 
         args_idx += hsize
