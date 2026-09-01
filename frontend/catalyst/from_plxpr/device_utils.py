@@ -47,6 +47,7 @@ from catalyst.device.verification import (
     verify_operations,
 )
 from catalyst.utils.exceptions import CompileError
+from catalyst.passes.builtin_passes import graph_decomposition_setup_inputs
 
 _named_obs_dict = {
     "PauliX": qp.X,
@@ -97,6 +98,9 @@ def create_device_preprocessing_pipeline(
         pipeline, unsupported_transforms, device, execution_config, shots, capabilities
     )
     _gradient_preprocessing(
+        pipeline, unsupported_transforms, device, execution_config, shots, capabilities
+    )
+    _gateset_preprocessing(
         pipeline, unsupported_transforms, device, execution_config, shots, capabilities
     )
 
@@ -280,6 +284,35 @@ def _gradient_preprocessing(
             )
         )
 
+
+# pylint: disable=unused-argument
+def _gateset_preprocessing(
+    pipeline: list[BoundTransform],
+    unsupported_transforms: list[str],
+    device: qp.devices.Device,
+    execution_config: ExecutionConfig,
+    shots: int,
+    capabilities: DeviceCapabilities,
+) -> None:
+    """Insert a `graph-decomposition` pass targetting the gateset
+    specified by the specific `device`"""
+    gate_set = []
+
+    # Go through capabilities to populate gate_set
+    for gate, properties in capabilities.operations.items():
+        gate_set.append(gate)
+        
+        if properties.invertible:
+            gate_set.append(f"Adjoint({gate})")
+        if properties.controllable:
+            gate_set.append(f"C({gate})")
+
+    # Get the default args/kwargs with the above gate_set
+    targs, tkwargs = graph_decomposition_setup_inputs(gate_set=gate_set)
+    t = qp.transform(pass_name="graph_decomposition")
+
+    return BoundTransform(t, args=targs, kwargs=tkwargs)
+    
 
 def _safe_create_bound_transform(
     transform: Transform, unsupported_transforms: list[str], warn=True, args=(), kwargs=None
