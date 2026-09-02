@@ -953,7 +953,7 @@ class TestCreateStaticOperatorNodes:
         dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
-        @qp.qjit(autograph=True, target="mlir", capture=True)
+        @qp.qjit(autograph=True, target="mlir", capture=True, collect_decomp_rules=False)
         @qp.qnode(dev)
         def my_circuit():
             qp.pauli_measure("X", wires=[0])
@@ -980,7 +980,7 @@ class TestCreateStaticOperatorNodes:
 
         multiplier = -1 if negative_angle else 1
 
-        @qp.qjit(pipelines=pipe, target="mlir", capture=True)
+        @qp.qjit(pipelines=pipe, target="mlir", capture=True, collect_decomp_rules=False)
         @qp.transform(pass_name="to-ppr")
         @qp.qnode(qp.device("null.qubit", wires=3))
         def cir():
@@ -1010,7 +1010,7 @@ class TestCreateStaticOperatorNodes:
 
         pipe = [("pipe", ["quantum-compilation-stage"])]
 
-        @qp.qjit(pipelines=pipe, target="mlir", capture=True)
+        @qp.qjit(pipelines=pipe, target="mlir", capture=True, collect_decomp_rules=False)
         @qp.transform(pass_name="to-ppr")
         @qp.qnode(qp.device("null.qubit", wires=3))
         def cir():
@@ -1039,7 +1039,7 @@ class TestCreateStaticOperatorNodes:
         dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
-        @qp.qjit(autograph=True, target="mlir", capture=True)
+        @qp.qjit(autograph=True, target="mlir", capture=True, collect_decomp_rules=False)
         @qp.qnode(dev)
         def my_circuit():
             qp.PauliRot(0.5, "X", wires=0)
@@ -1063,7 +1063,7 @@ class TestCreateStaticOperatorNodes:
         dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
-        @qp.qjit(autograph=True, capture=True)
+        @qp.qjit(autograph=True, capture=True, collect_decomp_rules=False)
         @qp.qnode(dev)
         def my_workflow():
             coeffs = [0.2, -0.543]
@@ -1334,7 +1334,7 @@ class TestCreateDynamicOperatorNodes:
         dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
-        @qp.qjit(autograph=True, target="mlir", capture=True)
+        @qp.qjit(autograph=True, target="mlir", capture=True, collect_decomp_rules=False)
         @qp.qnode(dev)
         def my_circuit(x, y):
             qp.pauli_measure("X", wires=[x])

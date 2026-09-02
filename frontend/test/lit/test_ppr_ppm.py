@@ -440,7 +440,7 @@ def test_decompose_arbitrary_ppr():
     pipe = [("pipe", ["quantum-compilation-stage"])]
 
     # CHECK-LABEL: public @test_decompose_arbitrary_ppr_workflow
-    @qjit(pipelines=pipe, target="mlir")
+    @qjit(pipelines=pipe, target="mlir", collect_decomp_rules=False)
     @qp.transform(pass_name="decompose-arbitrary-ppr")
     @qp.transform(pass_name="to-ppr")
     @qp.qnode(qp.device("null.qubit", wires=3))

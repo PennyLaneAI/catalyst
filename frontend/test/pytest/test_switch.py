@@ -394,7 +394,7 @@ class TestClassicalCompiled:
 
         with pytest.raises(PlxprCaptureCFCompatibilityError) as exc_info:
 
-            @qjit(capture=True)
+            @qjit(capture=True, collect_decomp_rules=False)
             @qp.qnode(qp.device(backend, wires=1))
             def circuit(i):
                 @switch(i)
@@ -644,7 +644,7 @@ class TestQuantum:
 
         with pytest.raises(PlxprCaptureCFCompatibilityError) as exc_info:
 
-            @qjit(capture=True)
+            @qjit(capture=True, collect_decomp_rules=False)
             @qp.qnode(qp.device(backend, wires=1))
             def circuit(i):
                 @switch(i)

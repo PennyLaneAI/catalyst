@@ -182,7 +182,7 @@ class TestDeviceLevelSpecs:
 
         dev = qp.device("null.qubit", wires=2)
 
-        @qjit(capture=True)
+        @qjit(capture=True, collect_decomp_rules=False)
         @qp.qnode(dev)
         def circuit():
             qp.PauliRot(0.42, pauli_word="Y", wires=0)  # arbitrary angle
@@ -938,7 +938,7 @@ class TestPassByPassSpecs:
         def subroutine():
             qp.Hadamard(wires=0)
 
-        @qp.qjit(autograph=True, capture=True)
+        @qp.qjit(autograph=True, capture=True, collect_decomp_rules=False)
         @qp.qnode(dev)
         def circuit():
             qp.PauliX(wires=1)
@@ -977,7 +977,7 @@ class TestPassByPassSpecs:
             def __init__(self, phi, reg1, reg2, metadata):
                 super().__init__(phi, reg1, reg2, metadata)
 
-        @qp.qjit(capture=True, target="mlir")
+        @qp.qjit(capture=True, collect_decomp_rules=False, target="mlir")
         @qp.transforms.merge_rotations
         @qp.qnode(qp.device("null.qubit", wires=10))
         def c():
@@ -993,7 +993,7 @@ class TestPassByPassSpecs:
     def test_symbolic_array(self):
         """Test using specs with symbolic_array."""
 
-        @qp.qjit(capture=True, target="mlir")
+        @qp.qjit(capture=True, collect_decomp_rules=False, target="mlir")
         @qp.transforms.merge_rotations
         @qp.qnode(qp.device("null.qubit", wires=1))
         def c():
@@ -1045,7 +1045,7 @@ class TestSpecsWithPPR:
     def test_arbitrary_ppr(self):
         """Test that PPRs are handled correctly."""
 
-        @qp.qjit(target="mlir", capture=True)
+        @qp.qjit(target="mlir", capture=True, collect_decomp_rules=False)
         @qp.transforms.decompose_arbitrary_ppr
         @qp.transforms.to_ppr
         @qp.qnode(qp.device("null.qubit", wires=3))
@@ -1254,7 +1254,7 @@ class TestSymbolicSpecs:
     def test_symbolic_array_inside_loop(self):
         """Test dynamic loop with symbolic_array in a loop."""
 
-        @qp.qjit(capture=True)
+        @qp.qjit(capture=True, collect_decomp_rules=False)
         @qp.qnode(qp.device("null.qubit", wires=1))
         def c(n):
 
@@ -1274,7 +1274,7 @@ class TestSymbolicSpecs:
     def test_symbolic_array_loop_arguemtn(self):
         """Test dynamic loop with a symbolic array as a loop argument."""
 
-        @qp.qjit(capture=True)
+        @qp.qjit(capture=True, collect_decomp_rules=False)
         @qp.qnode(qp.device("null.qubit", wires=1))
         def c(n):
 
@@ -1771,7 +1771,7 @@ class TestMarkerIntegration:
 def test_abstract_array_inputs():
     """Test that AbstractArray and AbstractWires can be used with specs when level!= device."""
 
-    @qp.qjit(capture=True)
+    @qp.qjit(capture=True, collect_decomp_rules=False)
     @qp.qnode(qp.device("lightning.qubit", wires=4))
     def c(x, wires):
         @qp.for_loop(x.shape[0])

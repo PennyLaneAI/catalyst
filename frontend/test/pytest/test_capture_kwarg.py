@@ -38,7 +38,7 @@ class TestCaptureKwarg:
     def test_capture_kwarg_true(self):
         """Test that capture=True is accepted."""
 
-        @qjit(capture=True)
+        @qjit(capture=True, collect_decomp_rules=False)
         def f(x):
             return x * 2
 
@@ -156,7 +156,7 @@ class TestCaptureKwargIntegration:
 
         dev = qp.device(backend, wires=2)
 
-        @qjit(capture=True)
+        @qjit(capture=True, collect_decomp_rules=False)
         @qp.qnode(dev)
         def circuit(theta):
             assert qp.capture.enabled()
@@ -176,7 +176,7 @@ class TestCaptureKwargIntegration:
         try:
             dev = qp.device(backend, wires=2)
 
-            @qjit(capture=False)
+            @qjit(capture=False, collect_decomp_rules=False)
             @qp.qnode(dev)
             def circuit(theta):
                 assert not qp.capture.enabled()
@@ -210,7 +210,7 @@ class TestCaptureKwargIntegration:
         """Test that capture=True works for classical-only functions."""
         qp.capture.disable()
 
-        @qjit(capture=True)
+        @qjit(capture=True, collect_decomp_rules=False)
         def classical_fn(x, y):
             assert qp.capture.enabled()
             return x**2 + y**2
@@ -223,7 +223,7 @@ class TestCaptureKwargIntegration:
         dev = qp.device(backend, wires=1)
         qp.capture.disable()
 
-        @qjit(capture=True)
+        @qjit(capture=True, collect_decomp_rules=False)
         @qp.qnode(dev)
         def circuit_capture(theta):
             assert qp.capture.enabled()
@@ -255,10 +255,10 @@ class TestCaptureCompileOptionsIdentity:
     """
 
     def test_capture_flag_creates_distinct_compile_options(self):
-        """Test that qjit(capture=True) and qjit(capture=False) have distinct CompileOptions."""
+        """Test that qjit(capture=True, collect_decomp_rules=False) and qjit(capture=False) have distinct CompileOptions."""
         qp.capture.disable()  # Ensure global state doesn't affect the test
 
-        @qjit(capture=True)
+        @qjit(capture=True, collect_decomp_rules=False)
         def fn_capture(x):
             return x * 2
 
@@ -286,7 +286,7 @@ class TestCaptureCompileOptionsIdentity:
         """
         qp.capture.disable()  # Global state is disabled
 
-        @qjit(capture=True)
+        @qjit(capture=True, collect_decomp_rules=False)
         def circuit(x: float):  # Type hint enables AOT compilation
             return x * 2
 
@@ -306,7 +306,7 @@ class TestCaptureCompileOptionsIdentity:
         qp.capture.enable()
         try:
 
-            @qjit(capture=False)
+            @qjit(capture=False, collect_decomp_rules=False)
             def circuit(x: float):  # Type hint enables AOT compilation
                 return x * 2
 
@@ -345,7 +345,7 @@ class TestCaptureCompileOptionsIdentity:
         def make_circuit_capture():
             compilation_count["capture"] += 1
 
-            @qjit(capture=True)
+            @qjit(capture=True, collect_decomp_rules=False)
             @qp.qnode(dev)
             def circuit(x):
                 qp.RX(x, wires=0)

@@ -277,7 +277,7 @@ class TestWhileLoops:
         capture mode is enabled."""
         with pytest.raises(PlxprCaptureCFCompatibilityError) as exc_info:
 
-            @qjit(capture=True)
+            @qjit(capture=True, collect_decomp_rules=False)
             @qp.qnode(qp.device("lightning.qubit", wires=3))
             def test(n):
                 def condition(x):
@@ -455,7 +455,7 @@ class TestForLoops:
         capture mode is enabled."""
         with pytest.raises(PlxprCaptureCFCompatibilityError) as exc_info:
 
-            @qjit(capture=True)
+            @qjit(capture=True, collect_decomp_rules=False)
             @qp.qnode(qp.device("lightning.qubit", wires=3))
             def test(n):
                 @for_loop(0, n, 1)
