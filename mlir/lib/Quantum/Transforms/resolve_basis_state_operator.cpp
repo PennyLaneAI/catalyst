@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <llvm/Support/LogicalResult.h>
-#include <mlir/IR/BuiltinTypes.h>
 #define DEBUG_TYPE "resolve-basis-state-operator"
 
+#include "llvm/Support/LogicalResult.h"
 #include "mlir/IR/Builders.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/TypeRange.h"
 #include "mlir/Pass/Pass.h"
