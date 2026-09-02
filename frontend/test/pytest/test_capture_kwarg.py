@@ -255,7 +255,7 @@ class TestCaptureCompileOptionsIdentity:
     """
 
     def test_capture_flag_creates_distinct_compile_options(self):
-        """Test that qjit(capture=True, collect_decomp_rules=False) and qjit(capture=False) have distinct CompileOptions."""
+        """Test that qjit(capture=True) and qjit(capture=False) have distinct CompileOptions."""
         qp.capture.disable()  # Ensure global state doesn't affect the test
 
         @qjit(capture=True, collect_decomp_rules=False)
