@@ -64,7 +64,7 @@ class GpuCoprocessorSession : public CoprocessorSession {
     // Expects `in_len == sizeof(common::Payload)` (16, a wire-shaped frame) and
     // `out_cap >= sizeof(int64_t)`; the reply is always `sizeof(int64_t)` bytes.
     // Anything else throws.
-    std::size_t process_message(const void *in, std::size_t in_len, void *out, std::size_t out_cap);
+    int process_message(const void *in, std::size_t in_len, void *out, std::size_t out_cap);
 
   private:
     void ensure_gpu_state();

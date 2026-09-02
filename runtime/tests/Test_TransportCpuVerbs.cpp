@@ -15,6 +15,7 @@
 #include <algorithm>
 #include <cstdint>
 #include <cstring>
+#include <exception>
 #include <string>
 #include <thread>
 
@@ -46,15 +47,17 @@ static bool have_rxe() {
 
 // A custom coprocessor function (bitwise-invert) to exercise the set_coprocessor_fn
 // path with a non-null, non-echo function.
-static std::size_t invert_fn(const void *in, std::size_t in_len, void *out, std::size_t out_cap,
-                             void * /*ctx*/) {
+static int invert_fn(const void *in, std::size_t in_len, void *out, std::size_t out_cap,
+                     void * /*ctx*/) {
     std::uint64_t v = 0;
     std::memcpy(&v, in, std::min(in_len, sizeof(v)));
     v = ~v;
     const std::size_t n = std::min(out_cap, sizeof(v));
     std::memcpy(out, &v, n);
-    return n;
+    return 0;
 }
+
+static int failing_fn(const void *, std::size_t, void *, std::size_t, void * /*ctx*/) { return 1; }
 
 TEST_CASE("controller and coprocessor connect: both reach INIT and open the "
           "OOB channel",
@@ -234,4 +237,60 @@ TEST_CASE("round-trip with a custom coprocessor function runs on the coprocessor
 
     REQUIRE(got == ~DEMO_SYNDROME); // controller received the coprocessor's result
     REQUIRE(got != DEMO_SYNDROME);  // and it is not a mere echo
+}
+
+TEST_CASE("cpu_verbs treats the coprocessor return value as a status code", "[cpu_libibverbs]") {
+    if (!have_rxe()) {
+        SKIP("no rxe0 RDMA device");
+    }
+    const std::uint16_t port = 18596;
+    const std::size_t SIZE = REGION_BYTES;
+    bool coproc_failed = false;
+    std::string coproc_error;
+
+    std::thread t([&] {
+        try {
+            CpuCoprocessorSession coproc("rxe0", 1);
+            ConnectInfo ci{
+                .peer = "127.0.0.1",
+                .oob_port = port,
+            };
+            coproc.connect(ci);
+            MemRegion m = coproc.alloc_memory(SIZE, MemKind::CpuRam);
+            PeerRef p = coproc.exchange_keys(m);
+            ChannelDesc desc{
+                .transport = "rdma",
+            };
+            coproc.establish_channel(desc, m, p);
+            coproc.set_coprocessor_fn(failing_fn, nullptr);
+            coproc.start();
+            coproc.collect(nullptr, nullptr, 0);
+        } catch (const std::exception &e) {
+            coproc_failed = true;
+            coproc_error = e.what();
+        }
+    });
+
+    CpuControllerSession controller("rxe0", 1);
+    ConnectInfo ci{
+        .peer = "127.0.0.1",
+        .oob_port = port,
+    };
+    controller.connect(ci);
+    MemRegion m = controller.alloc_memory(SIZE, MemKind::CpuRam);
+    PeerRef p = controller.exchange_keys(m);
+    ChannelDesc desc{
+        .transport = "rdma",
+    };
+    controller.establish_channel(desc, m, p);
+    controller.commit_work_item(0, sizeof(std::uint64_t), sizeof(std::uint64_t));
+    controller.start();
+    const std::uint64_t syndrome = DEMO_SYNDROME;
+    controller.write_data_slot(&syndrome, sizeof(syndrome), 0);
+    REQUIRE(controller.kick(0) == 0);
+    controller.stop();
+    t.join();
+
+    REQUIRE(coproc_failed);
+    CHECK(coproc_error.find("status 1") != std::string::npos);
 }
