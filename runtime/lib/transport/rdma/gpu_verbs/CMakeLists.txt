@@ -14,8 +14,11 @@ target_include_directories(catalyst_transport_gpu_verbs_coprocessor
 
 target_link_libraries(catalyst_transport_gpu_verbs_coprocessor
     PUBLIC transport_common catalyst_transport_coproc_gpu
-    PRIVATE ${IBVERBS_LIB} Threads::Threads hip::host)
-if(CMAKE_HIP_COMPILER_ID STREQUAL "NVIDIA")
+    PRIVATE ${IBVERBS_LIB} Threads::Threads)
+if(TRANSPORT_HAS_HIP)
+    target_link_libraries(catalyst_transport_gpu_verbs_coprocessor PRIVATE hip::host)
+endif()
+if(TRANSPORT_HAS_HIP AND CMAKE_HIP_COMPILER_ID STREQUAL "NVIDIA")
     # CUDA runtime is injected automatically by hip however hipMemGetHandleForAddressRange
     # requires the CUDA driver symbol cuMemGetHandleForAddressRange so link it here
     target_link_libraries(catalyst_transport_gpu_verbs_coprocessor PRIVATE CUDA::cuda_driver)

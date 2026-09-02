@@ -73,11 +73,19 @@ int GpuCoprocessorSession::connect(const ConnectInfo &info) {
 MemRegion GpuCoprocessorSession::alloc_memory(std::size_t size, MemKind kind) {
     TP_CHECK(kind == MemKind::GpuHbm, "gpu_verbs: only MemKind::GpuHbm supported");
     hbm_ = gpu_.alloc_hbm_ring(size);
+#ifdef TRANSPORT_GPU_STUB
+    // The host-memory GpuRuntime reports no dma-buf fd, so register the pages directly. Compiled
+    // only in the stub build; on a real GPU the export always yields an fd and a silent fallback
+    // here would hide a failed one.
+    TP_CHECK(hbm_.dmabuf_fd < 0, "gpu stub: unexpected dma-buf fd %d", hbm_.dmabuf_fd);
+    hbm_ring_.emplace(pd_, hbm_.ptr, hbm_.size, MemAccess::REMOTE_WRITE);
+#else
     hbm_ring_.emplace(pd_, /*offset=*/static_cast<std::uint64_t>(0), hbm_.size,
                       /*iova=*/reinterpret_cast<std::uint64_t>(hbm_.ptr), hbm_.dmabuf_fd,
                       MemAccess::REMOTE_WRITE);
     ::close(hbm_.dmabuf_fd); // MR holds its own reference
     hbm_.dmabuf_fd = -1;
+#endif
     return MemRegion{
         .addr = hbm_.ptr,
         .size = hbm_.size,

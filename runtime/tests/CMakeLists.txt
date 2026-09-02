@@ -230,18 +230,32 @@ if(ENABLE_TRANSPORT)
         )
         catch_discover_tests(runner_tests_transport_cpu)
 
+        # GPU-verbs ABI: the cases are STATIC_REQUIRE layout assertions, so they need neither a
+        # GPU nor a HIP toolchain -- only the headers, and GpuRuntime.hpp keeps hipStream_t as an
+        # opaque void* precisely so they stay reachable. Gating the whole target on
+        # TRANSPORT_HAS_HIP confined these checks to GPU hosts; only the library needs the gate.
+        add_executable(runner_tests_transport_gpu)
+        target_sources(runner_tests_transport_gpu PRIVATE
+            Test_TransportGpu.cpp
+        )
+        target_link_libraries(runner_tests_transport_gpu PRIVATE
+            Catch2WithMain
+            catalyst_runtime_testing
+        )
         if(TRANSPORT_HAS_HIP)
-            add_executable(runner_tests_transport_gpu)
-            target_sources(runner_tests_transport_gpu PRIVATE
-                Test_TransportGpu.cpp
-            )
             target_link_libraries(runner_tests_transport_gpu PRIVATE
-                Catch2WithMain
-                catalyst_runtime_testing
                 catalyst_transport_gpu_verbs_coprocessor
             )
-            catch_discover_tests(runner_tests_transport_gpu)
+        else()
+            target_link_libraries(runner_tests_transport_gpu PRIVATE
+                transport_common
+            )
+            target_include_directories(runner_tests_transport_gpu PRIVATE
+                ${CMAKE_CURRENT_SOURCE_DIR}/../lib/transport/rdma/gpu_verbs/coprocessor
+                ${CMAKE_CURRENT_SOURCE_DIR}/../lib/transport/common/coproc/gpu
+            )
         endif()
+        catch_discover_tests(runner_tests_transport_gpu)
     endif()
 
     # Memcpy backend: in-process request/reply copies via memcpy.
@@ -268,11 +282,10 @@ if(ENABLE_TRANSPORT)
     add_dependencies(transport_tests_all runner_tests_transport
                      runner_tests_transport_memcpy)
     if(IBVERBS_LIB)
+        # runner_tests_transport_gpu builds with or without HIP; see its definition above.
         add_dependencies(transport_tests_all runner_tests_transport_common
-                         runner_tests_transport_cpu)
-        if(TRANSPORT_HAS_HIP)
-            add_dependencies(transport_tests_all runner_tests_transport_gpu)
-        endif()
+                         runner_tests_transport_cpu
+                         runner_tests_transport_gpu)
     endif()
 endif()
 

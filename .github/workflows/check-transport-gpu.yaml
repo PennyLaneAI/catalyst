@@ -33,6 +33,11 @@ on:
       - "frontend/test/pytest/conftest.py"
       - ".github/workflows/check-transport-gpu.yaml"
   workflow_dispatch:
+    inputs:
+      probe_only:
+        description: "Run only the dma-buf export probe, skipping the build and test job"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -48,6 +53,34 @@ jobs:
     name: Set build matrix
     uses: ./.github/workflows/constants.yaml
 
+  gpu-dmabuf-probe:
+    name: GPU dma-buf export probe
+    needs: [constants]
+    runs-on:
+      - single-gpu-x64
+    # Dispatch-only: answers whether this GPU exports device memory as a dma-buf fd, which is the
+    # GPU half of gpu_verbs and needs no RDMA device. Also doubles as a driver health check --
+    # cuInit failing here is the "0 active drivers" symptom, reported in seconds rather than after
+    # the build.
+    if: ${{ github.event_name == 'workflow_dispatch' }}
+    steps:
+      - name: Update PATH and LD_LIBRARY_PATH for CUDA
+        run: |
+          echo "/usr/local/cuda/bin" >> $GITHUB_PATH
+          echo "LD_LIBRARY_PATH=/usr/local/cuda/lib64${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}" >> $GITHUB_ENV
+
+      - name: Checkout Catalyst repo
+        uses: actions/checkout@v4
+
+      - name: Report the GPU and driver
+        run: |
+          nvidia-smi || echo "nvidia-smi unavailable"
+          ldconfig -p | grep -i libcuda || echo "(no libcuda in the loader cache)"
+
+      - name: Probe dma-buf export
+        # Informational: a negative answer is a finding, not a broken job.
+        run: python3 runtime/prototypes/dmabuf_probe/cuda_dmabuf_probe.py || true
+
   gpu-transport-tests:
     name: Runtime transport tests (GPU)
     needs: [constants]
@@ -57,7 +90,7 @@ jobs:
     if: >-
       ${{
         github.event_name == 'push' ||
-        github.event_name == 'workflow_dispatch' ||
+        (github.event_name == 'workflow_dispatch' && inputs.probe_only != true) ||
         (
           github.event_name == 'pull_request' &&
           github.event.pull_request.draft == false &&
