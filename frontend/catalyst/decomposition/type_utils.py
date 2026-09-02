@@ -22,6 +22,7 @@ import numpy as np
 import pennylane as qp
 from jax._src.lib.mlir import ir
 from jax.core import ShapedArray
+from pennylane.pytrees import flatten, unflatten
 
 _MLIR_DTYPES_TO_PY_DTYPES = {
     "i1": jnp.bool_,
@@ -137,40 +138,30 @@ def get_dummy_values_for_arg(arg):
     raise TypeError(f"Unexpected type in container when creating dummy values: {type(arg)}")
 
 
-def replace_abstract_wires_with_concrete_wires(node):
-    if isinstance(node, qp.core.Operator2):
-        return _replace_op_abstract_wires_with_concrete_wires(node)
-
-    if isinstance(node, list):
-        return [replace_abstract_wires_with_concrete_wires(item) for item in node]
-    elif isinstance(node, dict):
-        return {k: replace_abstract_wires_with_concrete_wires(v) for k, v in node.items()}
-    elif isinstance(node, tuple):
-        return tuple(replace_abstract_wires_with_concrete_wires(item) for item in node)
-    else:
-        if isinstance(node, qp.typing.AbstractWires):
-            return qp.wires.Wires(range(len(node)))
-        else:
-            return node
+def _is_wires(node):
+    """Return whether ``node`` is a container of wires, abstract or concrete."""
+    return isinstance(node, (qp.typing.AbstractWires, qp.wires.Wires))
 
 
-def _replace_op_abstract_wires_with_concrete_wires(op2):
+def replace_wires_with_placeholder_wires(node):
     """
-    Given an Operator2 instance, return a copy of the same instance but with all fields whose value
-    is an `AbstractWires` replaced with concrete `Wires`.
-    """
-    new_op = copy.deepcopy(op2)
-    for wire_arg in new_op.wire_argnames:
-        if isinstance(new_op.arguments[wire_arg], qp.typing.AbstractWires):
-            num_wires = len(new_op.arguments[wire_arg])
-            new_op.arguments[wire_arg] = qp.wires.Wires(range(-1, -num_wires - 1, -1))
-    for hybrid_arg in new_op.hybrid_argnames:
-        if isinstance(new_op.arguments[hybrid_arg], qp.core.Operator2):
-            new_op.arguments[hybrid_arg] = _replace_op_abstract_wires_with_concrete_wires(
-                new_op.arguments[hybrid_arg]
-            )
+    Return a copy of the pytree ``node`` in which every wire container (abstract or concrete,
+    including the ones nested inside ``Operator2`` instances) is replaced by placeholder wires
+    labelled with negative integers.
 
-    return new_op
+    Wire labels never affect which decomposition rules apply to an operator: at lowering time
+    wires always show up as (abstract) qubit operands. Replacing them with placeholders makes
+    operators that only differ in their (concrete) wire labels reduce to the same ``GraphOpId``.
+
+    Note that the result is a deep copy.
+    """
+    # Wires is a pytree itself, so it has to be marked as a leaf to be replaced as a whole.
+    leaves, tree = flatten(copy.deepcopy(node), is_leaf=_is_wires)
+    leaves = [
+        qp.wires.Wires(range(-1, -len(leaf) - 1, -1)) if _is_wires(leaf) else leaf
+        for leaf in leaves
+    ]
+    return unflatten(leaves, tree)
 
 
 def post_process_concretize_leaves(leaves):
