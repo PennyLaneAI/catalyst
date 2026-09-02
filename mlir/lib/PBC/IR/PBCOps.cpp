@@ -90,6 +90,45 @@ LogicalResult RefPPMeasurementOp::verify() {
     return success();
 }
 
+LogicalResult RefPPRotationOp::verify() {
+    size_t numPauliProduct = getPauliProduct().size();
+
+    if (numPauliProduct == 0) {
+        return emitOpError("Pauli string must be non-empty");
+    }
+
+    if (numPauliProduct != getQubits().size()) {
+        return emitOpError("Number of qubits must match number of pauli operators");
+    }
+    return success();
+}
+
+LogicalResult RefSelectPPMeasurementOp::verify() {
+    if (getQubits().size() != getPauliProduct_0().size() ||
+        getQubits().size() != getPauliProduct_1().size()) {
+        return emitOpError("Number of qubits must match number of pauli operators");
+    }
+    return success();
+}
+
+LogicalResult RefFabricateOp::verify() {
+    auto initState = getInitState();
+    if (initState == LogicalInitKind::zero || initState == LogicalInitKind::one ||
+        initState == LogicalInitKind::plus || initState == LogicalInitKind::minus) {
+        return emitOpError("Logical state should not be fabricated, use `PrepareStateOp` instead.");
+    }
+    return success();
+}
+
+LogicalResult RefPrepareStateOp::verify() {
+    auto initState = getInitState();
+    if (initState == LogicalInitKind::magic || initState == LogicalInitKind::magic_conj) {
+        return emitOpError(
+            "Magic state cannot be prepared by this operation, use `FabricateOp` instead.");
+    }
+    return success();
+}
+
 LogicalResult SelectPPMeasurementOp::verify() {
     if (getInQubits().size() != getPauliProduct_0().size() ||
         getInQubits().size() != getPauliProduct_1().size()) {
@@ -254,9 +293,27 @@ llvm::StringRef PPRotationArbitraryOp::getResourceName() { return "PPR-Phi"; }
 llvm::StringRef PPMeasurementOp::getResourceName() { return "PPM"; }
 llvm::StringRef RefPPMeasurementOp::getResourceName() { return "PPM"; }
 llvm::StringRef SelectPPMeasurementOp::getResourceName() { return "PPM"; }
+llvm::StringRef RefPrepareStateOp::getResourceName() { return "pbc.prepare"; }
+llvm::StringRef RefFabricateOp::getResourceName() { return "pbc.fabricate"; }
+llvm::StringRef RefPPRotationOp::getResourceName() {
+    switch (std::abs(getRotationKind())) {
+    case 1:
+        return "PPR-identity";
+    case 2:
+        return "PPR-pi/2";
+    case 4:
+        return "PPR-pi/4";
+    case 8:
+        return "PPR-pi/8";
+    }
+    assert(false && "RefPPRotationOp::getResourceName: invalid rotation kind");
+    return "PPR-invalid";
+}
+llvm::StringRef RefSelectPPMeasurementOp::getResourceName() { return "PPM"; }
 
 bool PPRotationOp::getResourceAdjointFlag() { return getRotationKind() < 0; }
 bool PPMeasurementOp::getResourceAdjointFlag() { return getNegated(); }
+bool RefPPRotationOp::getResourceAdjointFlag() { return getRotationKind() < 0; }
 
 std::string getDetailedStateName(LogicalInitKind initState) {
     switch (initState) {
@@ -347,6 +404,10 @@ uint64_t PPRotationArbitraryOp::getResourceNumQubits() { return getInQubits().si
 uint64_t PPMeasurementOp::getResourceNumQubits() { return getInQubits().size(); }
 uint64_t RefPPMeasurementOp::getResourceNumQubits() { return getQubits().size(); }
 uint64_t SelectPPMeasurementOp::getResourceNumQubits() { return getInQubits().size(); }
+uint64_t RefPPRotationOp::getResourceNumQubits() { return 0; }
+uint64_t RefSelectPPMeasurementOp::getResourceNumQubits() { return 0; }
+uint64_t RefPrepareStateOp::getResourceNumQubits() { return 0; }
+uint64_t RefFabricateOp::getResourceNumQubits() { return 0; }
 
 uint64_t PrepareStateOp::getResourceNumCtrlQubits() { return 0; }
 uint64_t FabricateOp::getResourceNumCtrlQubits() { return 0; }
@@ -355,6 +416,10 @@ uint64_t PPRotationArbitraryOp::getResourceNumCtrlQubits() { return 0; }
 uint64_t PPMeasurementOp::getResourceNumCtrlQubits() { return 0; }
 uint64_t RefPPMeasurementOp::getResourceNumCtrlQubits() { return 0; }
 uint64_t SelectPPMeasurementOp::getResourceNumCtrlQubits() { return 0; }
+uint64_t RefPPRotationOp::getResourceNumCtrlQubits() { return 0; }
+uint64_t RefSelectPPMeasurementOp::getResourceNumCtrlQubits() { return 0; }
+uint64_t RefPrepareStateOp::getResourceNumCtrlQubits() { return 0; }
+uint64_t RefFabricateOp::getResourceNumCtrlQubits() { return 0; }
 
 uint64_t PrepareStateOp::getResourceNumParams() { return 0; }
 uint64_t FabricateOp::getResourceNumParams() { return 0; }
@@ -363,6 +428,10 @@ uint64_t PPRotationArbitraryOp::getResourceNumParams() { return 0; }
 uint64_t PPMeasurementOp::getResourceNumParams() { return 0; }
 uint64_t RefPPMeasurementOp::getResourceNumParams() { return 0; }
 uint64_t SelectPPMeasurementOp::getResourceNumParams() { return 0; }
+uint64_t RefPPRotationOp::getResourceNumParams() { return 0; }
+uint64_t RefSelectPPMeasurementOp::getResourceNumParams() { return 0; }
+uint64_t RefPrepareStateOp::getResourceNumParams() { return 0; }
+uint64_t RefFabricateOp::getResourceNumParams() { return 0; }
 
 //===----------------------------------------------------------------------===//
 // Implement ResourceAllocQubitOpInterface methods.
@@ -370,3 +439,5 @@ uint64_t SelectPPMeasurementOp::getResourceNumParams() { return 0; }
 
 uint64_t PrepareStateOp::getResourceNumAllocQubits() { return getOutQubits().size(); }
 uint64_t FabricateOp::getResourceNumAllocQubits() { return getOutQubits().size(); }
+uint64_t RefPrepareStateOp::getResourceNumAllocQubits() { return getOutQubits().size(); }
+uint64_t RefFabricateOp::getResourceNumAllocQubits() { return getOutQubits().size(); }

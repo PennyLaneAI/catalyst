@@ -562,6 +562,9 @@
 * Fixed the assembly format for `quantum.adjoint` when it has no quantum operands/results.
   [(#2938)](https://github.com/PennyLaneAI/catalyst/pull/2938)
 
+* Added reference semantics support for PBC operations.
+  [(#3136)](https://github.com/PennyLaneAI/catalyst/pull/3136)
+
 <h3>Internal changes ⚙️</h3>
 
 * A GPU CI workflow runs the runtime transport tests on the `single-gpu-x64` runner, gated by
@@ -771,6 +774,7 @@ Lillian Frederiksen,
 Sengthai Heng,
 David Ittah,
 JiaRung Jian,
+Jeffrey Kam,
 Jacob Kitchen,
 Korbinian Kottmann,
 Christina Lee,
