@@ -9,6 +9,6 @@
 
 add_subdirectory(cpu)
 
-if(TRANSPORT_HAS_HIP)
+if(TRANSPORT_HAS_HIP OR TRANSPORT_GPU_STUB)
     add_subdirectory(gpu)
 endif()
