@@ -55,6 +55,12 @@
 
 <h3>Improvements 🛠</h3>
 
+* Compiled decomposition rules are now memoized per operator variant, so each unique operator and
+  modifier variant is compiled only once. Under program capture, the on-demand rule loader
+  previously rebuilt (and recompiled) the same variants many times over, making rule compilation
+  the dominant cost of decomposition-heavy programs.
+  [(#3174)](https://github.com/PennyLaneAI/catalyst/pull/3174)
+
 * Add the `XMEM_REPLY_BRAM` memory type and use it to allocate reply buffers in dedicated BRAM.
   [(#3148)](https://github.com/PennyLaneAI/catalyst/pull/3148)
 
