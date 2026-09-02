@@ -35,7 +35,7 @@ void populateGridsynthPatterns(mlir::RewritePatternSet &patterns, double epsilon
 void populateQIRConversionPatterns(mlir::TypeConverter &, mlir::RewritePatternSet &, bool);
 void populateCancelInversesPatterns(mlir::RewritePatternSet &);
 void populateMergeRotationsPatterns(mlir::RewritePatternSet &);
-void populateResolveBasisStateOperatorPatterns(mlir::RewritePatternSet &);
+void populateResolveStatePrepOperatorPatterns(mlir::RewritePatternSet &);
 void populateIonsDecompositionPatterns(mlir::RewritePatternSet &);
 void populateDecomposeLoweringPatterns(mlir::RewritePatternSet &,
                                        const llvm::StringMap<mlir::func::FuncOp> &,

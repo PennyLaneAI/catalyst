@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#define DEBUG_TYPE "resolve-basis-state-operator"
+#define DEBUG_TYPE "resolve-state-prep-operator"
 
 #include "llvm/Support/LogicalResult.h"
 #include "mlir/IR/Builders.h"
@@ -29,7 +29,7 @@ using namespace catalyst::quantum;
 
 namespace {
 
-struct ResolveBasisStateOperatorPattern : public OpRewritePattern<OperatorOp> {
+struct ResolveStatePrepOperatorPattern : public OpRewritePattern<OperatorOp> {
     using OpRewritePattern<OperatorOp>::OpRewritePattern;
 
     LogicalResult matchAndRewrite(OperatorOp op, PatternRewriter &rewriter) const override {
@@ -79,21 +79,21 @@ struct ResolveBasisStateOperatorPattern : public OpRewritePattern<OperatorOp> {
 namespace catalyst {
 namespace quantum {
 
-#define GEN_PASS_DEF_RESOLVEBASISSTATEOPERATORPASS
-#define GEN_PASS_DECL_RESOLVEBASISSTATEOPERATORPASS
+#define GEN_PASS_DEF_RESOLVESTATEPREPOPERATORPASS
+#define GEN_PASS_DECL_RESOLVESTATEPREPOPERATORPASS
 #include "Quantum/Transforms/Passes.h.inc"
 
-void populateResolveBasisStateOperatorPatterns(RewritePatternSet &patterns) {
-    patterns.add<ResolveBasisStateOperatorPattern>(patterns.getContext());
+void populateResolveStatePrepOperatorPatterns(RewritePatternSet &patterns) {
+    patterns.add<ResolveStatePrepOperatorPattern>(patterns.getContext());
 }
 
-struct ResolveBasisStateOperatorPass
-    : impl::ResolveBasisStateOperatorPassBase<ResolveBasisStateOperatorPass> {
-    using ResolveBasisStateOperatorPassBase::ResolveBasisStateOperatorPassBase;
+struct ResolveStatePrepOperatorPass
+    : impl::ResolveStatePrepOperatorPassBase<ResolveStatePrepOperatorPass> {
+    using ResolveStatePrepOperatorPassBase::ResolveStatePrepOperatorPassBase;
 
     void runOnOperation() final {
         RewritePatternSet patterns(&getContext());
-        populateResolveBasisStateOperatorPatterns(patterns);
+        populateResolveStatePrepOperatorPatterns(patterns);
 
         if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
             return signalPassFailure();

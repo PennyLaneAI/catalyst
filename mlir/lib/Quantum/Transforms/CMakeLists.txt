@@ -35,7 +35,7 @@ file(GLOB SRC
     merge_rotation.cpp
     quantum_to_llvm.cpp
     reference_semantics_conversion.cpp
-    resolve_basis_state_operator.cpp
+    resolve_state_prep_operator.cpp
     split_non_commuting.cpp
     split_to_single_terms.cpp
 )

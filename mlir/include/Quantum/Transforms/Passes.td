@@ -209,8 +209,8 @@ def DecomposeLoweringPass : Pass<"decompose-lowering"> {
     ];
 }
 
-def ResolveBasisStateOperatorPass : Pass<"resolve-basis-state-operator"> {
-    let summary = "Replace all quantum.operator ops of BasisState to equivalent quantum.set_basis_state operations ";
+def ResolveStatePrepOperatorPass : Pass<"resolve-state-prep-operator"> {
+    let summary = "Replace all quantum.operator ops of StatePrep/BasisState to equivalent quantum.set_state/set_basis_state operations ";
 }
 
 def DisentangleCNOTPass : Pass<"disentangle-cnot"> {

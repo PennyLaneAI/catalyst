@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: quantum-opt --resolve-basis-state-operator --verify-diagnostics %s | FileCheck %s
+// RUN: quantum-opt --resolve-state-prep-operator --verify-diagnostics %s | FileCheck %s
 
 
 // CHECK-LABEL: test_single_qubit_set_state
