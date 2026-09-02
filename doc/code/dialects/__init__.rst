@@ -26,6 +26,10 @@ This document contains the respective Catalyst-defined MLIR dialects, and their 
 :doc:`mbqc`
    Special-purpose dialect for measurement-based quantum computing
 
+:doc:`transport`
+   Special-purpose dialect for Backline, the controller/coprocessor data-movement sessions
+   a placement compiles to
+
 
 .. toctree::
    :hidden:
@@ -37,3 +41,4 @@ This document contains the respective Catalyst-defined MLIR dialects, and their 
    ion
    pbc
    mbqc
+   transport

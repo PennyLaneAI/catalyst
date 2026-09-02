@@ -32,6 +32,16 @@ def Transport_Dialect : Dialect {
         between two endpoints: creating a session, bringing up the connection,
         exchanging memory handles, establishing a data path, and running rounds
         of request/reply traffic until teardown.
+
+        This is what a Backline compiles to. A PennyLane `Placement` is serialized
+        into the `catalyst.backline` module attribute, naming one controller and the
+        coprocessors it drives; `inject-transport-session` reads that attribute and
+        emits the session bring-up and teardown in terms of these ops,
+        `lower-decode-to-transport` turns a decode into a request/reply round over
+        the session, and `convert-transport-to-llvm` lowers the result to
+        `__catalyst__transport__*` runtime calls. A node here is a Backline
+        participant -- a controller or a coprocessor -- and the placement's
+        transport selects which compiled backend carries the traffic.
     }];
 
     let name = "transport";
@@ -97,25 +107,29 @@ class Transport_Attr<string name, string attrMnemonic, list<Trait> traits = []>
 }
 
 // A string field that reads as empty when omitted, so consumers need no null checks.
-def Transport_StrField : DefaultValuedParameter<"mlir::StringAttr",
-                                                "mlir::StringAttr::get($_ctxt, \"\")">;
+class Transport_StrField<string desc = ""> : DefaultValuedParameter<"mlir::StringAttr",
+                                                "mlir::StringAttr::get($_ctxt, \"\")", desc>;
 
 def Transport_NodeAttr : Transport_Attr<"Node", "node"> {
     let summary = "A backline participant: a controller or a coprocessor.";
 
     let parameters = (ins
-        Transport_StrField:$name,
-        Transport_StrField:$peer,
-        OptionalParameter<"mlir::IntegerAttr">:$oob_port,
-        Transport_StrField:$backend_lib,
-        Transport_StrField:$config,
-        Transport_StrField:$triple,
-        Transport_StrField:$address,
-        Transport_StrField:$symbol,
-        OptionalParameter<"mlir::BoolAttr">:$out_of_process,
-        OptionalParameter<"mlir::IntegerAttr">:$in_bytes,
-        OptionalParameter<"mlir::IntegerAttr">:$out_bytes,
-        OptionalParameter<"mlir::IntegerAttr">:$work_item_idx
+        Transport_StrField<"this node's name; the session registry key when non-empty">:$name,
+        Transport_StrField<"the peer's address for the out-of-band handshake">:$peer,
+        OptionalParameter<"mlir::IntegerAttr",
+                          "TCP port for the out-of-band handshake">:$oob_port,
+        Transport_StrField<"backend plugin the runtime dlopens for this node">:$backend_lib,
+        Transport_StrField<"backend configuration string, passed through verbatim">:$config,
+        Transport_StrField<"target triple this node's code is compiled for">:$triple,
+        Transport_StrField<"executor address when this node runs out of process">:$address,
+        Transport_StrField<"coprocessor function symbol the backend binds">:$symbol,
+        OptionalParameter<"mlir::BoolAttr",
+                          "whether this node's code is dispatched to an executor rather than "
+                          "run in the compiling process">:$out_of_process,
+        OptionalParameter<"mlir::IntegerAttr", "request size in bytes for one round">:$in_bytes,
+        OptionalParameter<"mlir::IntegerAttr", "reply size in bytes for one round">:$out_bytes,
+        OptionalParameter<"mlir::IntegerAttr",
+                          "index of this node's work item within the round">:$work_item_idx
     );
 
     let assemblyFormat = "`<` struct(params) `>`";
@@ -140,9 +154,12 @@ def Transport_BacklineAttr : Transport_Attr<"Backline", "backline"> {
     let summary = "A backline placement: one controller and the coprocessors it drives.";
 
     let parameters = (ins
-        "mlir::StringAttr":$transport,
-        "::catalyst::transport::NodeAttr":$controller,
-        OptionalArrayRefParameter<"::catalyst::transport::NodeAttr">:$coprocessors
+        AttrParameter<"mlir::StringAttr",
+                      "transport carrying the traffic, selecting the compiled backend">:$transport,
+        AttrParameter<"::catalyst::transport::NodeAttr",
+                      "the controller node that drives the session">:$controller,
+        OptionalArrayRefParameter<"::catalyst::transport::NodeAttr",
+                                  "the coprocessor nodes the controller drives">:$coprocessors
     );
 
     let assemblyFormat = [{ `<` `transport` `=` $transport `,` `controller` `=` $controller
