@@ -769,7 +769,7 @@
   seven operations, two passes, and the `!executor.session` and `!executor.token` types. The types
   needed their own `-gen-typedef-doc` declaration, since `ExecutorDialect.td` does not include
   `ExecutorTypes.td` and so the dialect page alone omitted them.
-  [(#XXXX)](https://github.com/PennyLaneAI/catalyst/pull/XXXX)
+  [(#3180)](https://github.com/PennyLaneAI/catalyst/pull/3180)
 
 <h3>Contributors ✍️</h3>
 
