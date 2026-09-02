@@ -107,6 +107,27 @@ runtime: configure
 test_runner: configure
 	cmake --build $(RT_BUILD_DIR) --target $(TEST_TARGETS) -j$(NPROC)
 
+# Catch2 exits 4 when a binary ran no tests at all, which is what an all-skipped suite looks like
+# from the outside: the verbs suites skip wholesale on a host with no RDMA device. Left alone that
+# aborts the `set -e` loop below and the suites after it never run, reported as a test failure.
+CATCH_ALLOW_NO_TESTS := --allow-running-no-tests
+
+# One definition for the three places that run the transport suites. catch_discover_tests writes
+# non-executable *_include.cmake / *_tests.cmake next to the binaries and the glob matches those
+# too, so run only real executables.
+define run_transport_suites
+@set -e; ran=0; for t in $(RT_BUILD_DIR)/tests/runner_tests_transport*; do \
+	[ -f "$$t" ] && [ -x "$$t" ] || continue; \
+	echo "Catalyst runtime test suite - $${t##*/}"; \
+	$(ASAN_COMMAND) $$t $(CATCH_ALLOW_NO_TESTS); \
+	ran=$$((ran + 1)); \
+done; \
+if [ "$$ran" -eq 0 ]; then \
+	echo "No transport test binaries found under $(RT_BUILD_DIR)/tests. Was the build configured with ENABLE_TRANSPORT=ON?" >&2; \
+	exit 1; \
+fi
+endef
+
 .PHONY: test
 test: CODE_COVERAGE=OFF
 test: BUILD_TYPE?=RelWithDebInfo
@@ -129,10 +150,7 @@ ifeq ($(ENABLE_OQD), ON)
 endif
 ifeq ($(ENABLE_TRANSPORT), ON)
 	# Transport suites; which binaries exist depends on the toolchain (libibverbs, HIP).
-	@set -e; for t in $(RT_BUILD_DIR)/tests/runner_tests_transport*; do \
-		echo "Catalyst runtime test suite - $${t##*/}"; \
-		$(ASAN_COMMAND) $$t; \
-	done
+	$(call run_transport_suites)
 endif
 ifeq ($(ENABLE_EXECUTOR), ON)
 	# Test the catalyst-executor server over a loopback connection
@@ -147,16 +165,7 @@ test-transport: configure
 	# transport tests will run below.
 	cmake --build $(RT_BUILD_DIR) --target transport_tests_all -j$(NPROC)
 	@echo "Catalyst runtime transport test suites"
-	@set -e; ran=0; for t in $(RT_BUILD_DIR)/tests/runner_tests_transport*; do \
-		[ -x "$$t" ] || continue; \
-		echo "Running $${t##*/}"; \
-		$(ASAN_COMMAND) $$t; \
-		ran=$$((ran + 1)); \
-	done; \
-	if [ "$$ran" -eq 0 ]; then \
-		echo "No transport test binaries found under $(RT_BUILD_DIR)/tests. Was the build configured with ENABLE_TRANSPORT=ON?" >&2; \
-		exit 1; \
-	fi
+	$(call run_transport_suites)
 
 .PHONY: coverage
 coverage: RT_BUILD_DIR := $(RT_BUILD_DIR)_cov
@@ -179,10 +188,7 @@ ifeq ($(ENABLE_OQD), ON)
 endif
 ifeq ($(ENABLE_TRANSPORT), ON)
 	# Transport suites; which binaries exist depends on the toolchain (libibverbs, HIP).
-	@set -e; for t in $(RT_BUILD_DIR)/tests/runner_tests_transport*; do \
-		echo "Catalyst runtime test suite - $${t##*/}"; \
-		$(ASAN_COMMAND) $$t; \
-	done
+	$(call run_transport_suites)
 endif
 ifeq ($(ENABLE_EXECUTOR), ON)
 	$(ASAN_COMMAND) $(RT_BUILD_DIR)/tests/runner_tests_executor
