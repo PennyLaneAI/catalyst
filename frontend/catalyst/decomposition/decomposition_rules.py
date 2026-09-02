@@ -270,6 +270,43 @@ def collect_resources_for_op(op_name, kwargs, is_custom_op=False, adjoint_resour
     return name_to_resources, name_to_resource_ids, decomp_rules
 
 
+# Memoization for `compile_decomposition_rules`. Keyed by the fully-resolved operator instance and
+# modifier variant; values are the (context-owning) result modules, which are only read (walked and
+# cloned) downstream, never mutated, so sharing them across callers is safe.
+_COMPILE_DECOMP_CACHE = {}
+
+
+def _hashable(value):
+    """Return a stable, hashable representation of a (possibly nested dict/list) value."""
+    if isinstance(value, dict):
+        return tuple(sorted((k, _hashable(v)) for k, v in value.items()))
+    if isinstance(value, (list, tuple)):
+        return tuple(_hashable(v) for v in value)
+    try:
+        hash(value)
+        return value
+    except TypeError:
+        return repr(value)
+
+
+def _compile_decomp_cache_key(
+    op_name, op_id, dynamic_shape, wire_lens, static_data, extra_data,
+    is_custom_op, wrap_adjoint, wrap_control, n_ctrl,
+):
+    return (
+        op_name,
+        op_id,
+        _hashable(dynamic_shape),
+        _hashable(wire_lens),
+        _hashable(static_data),
+        _hashable(extra_data),
+        is_custom_op,
+        wrap_adjoint,
+        wrap_control,
+        n_ctrl,
+    )
+
+
 def prepare_dynamic_op_kwargs(dynamic_shape, wire_lens) -> dict:
     kwargs = {}
     for wire_name, wire_len in wire_lens.items():
@@ -312,6 +349,19 @@ def compile_decomposition_rules(
     ``<n>C(Adjoint(op_name))``: adjoint is applied innermost and control outermost (the canonical
     order matching the compiler's ``wrapModifiers``).
     """
+    # The on-demand rule loader rebuilds the full reachable-rule closure for every operator the
+    # compiler asks about, which recompiles the same operator variants many times over. Compiling
+    # a single variant is cheap (~tens of ms), but the closure explosion makes this the dominant
+    # cost of decomposition-heavy programs. Memoize the (context-owning) result module keyed by the
+    # fully-resolved operator instance and modifier variant so each unique variant is compiled once.
+    _cache_key = _compile_decomp_cache_key(
+        op_name, op_id, dynamic_shape, wire_lens, static_data, extra_data,
+        is_custom_op, wrap_adjoint, wrap_control, n_ctrl,
+    )
+    _cached = _COMPILE_DECOMP_CACHE.get(_cache_key)
+    if _cached is not None:
+        return _cached
+
     kwargs = prepare_dynamic_op_kwargs(dynamic_shape, wire_lens)
     extra_data = extra_data or {}
     n_base_wires = sum(wire_lens.values())
@@ -451,6 +501,7 @@ def compile_decomposition_rules(
     with inlined_module.context, ir.Location.unknown():
         inlined_module.operation.walk(re_privatize_rules)
 
+    _COMPILE_DECOMP_CACHE[_cache_key] = inlined_module
     return inlined_module
 
 

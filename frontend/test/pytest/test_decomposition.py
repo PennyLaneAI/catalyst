@@ -37,10 +37,12 @@ from pennylane.wires import Wires
 from catalyst import qjit
 from catalyst.decomposition import GraphOpID, RuleLoweringWarning
 from catalyst.decomposition.decomposition_rules import (
+    _COMPILE_DECOMP_CACHE,
     _MODIFIER_CANONICAL_ORDER,
     _control_modifier,
     _leading_modifier_kind,
     _modifier_kind,
+    compile_decomposition_rules,
     compile_decomposition_rules_wrapper,
     compile_reachable_decomposition_rules_wrapper,
     name_unwrap_adjoint,
@@ -499,6 +501,36 @@ class TestModifierIds:
         assert _MODIFIER_CANONICAL_ORDER == ("C", "Adjoint")
         with pytest.raises(ValueError, match="Non-canonical modifier order"):
             wrap_modifier_id(op_id, "Adjoint")
+
+
+class TestCompileDecompositionRuleCache:
+    """``compile_decomposition_rules`` memoizes its compiled module per operator variant."""
+
+    def test_same_variant_compiled_once(self):
+        """Compiling the same operator variant twice returns the identical cached module."""
+        _COMPILE_DECOMP_CACHE.clear()
+        args = ("RZ", "RZ{0:[f64]}{wires:2}{}", {"0": ["f64"]}, {"wires": 1}, {})
+
+        first = compile_decomposition_rules(*args, is_custom_op=True)
+        assert len(_COMPILE_DECOMP_CACHE) == 1
+        second = compile_decomposition_rules(*args, is_custom_op=True)
+
+        assert first is second
+        assert len(_COMPILE_DECOMP_CACHE) == 1
+
+    def test_distinct_variants_not_shared(self):
+        """Distinct operator variants get independent cache entries and modules."""
+        _COMPILE_DECOMP_CACHE.clear()
+
+        rz = compile_decomposition_rules(
+            "RZ", "RZ{0:[f64]}{wires:2}{}", {"0": ["f64"]}, {"wires": 1}, {}, is_custom_op=True
+        )
+        rx = compile_decomposition_rules(
+            "RX", "RX{0:[f64]}{wires:2}{}", {"0": ["f64"]}, {"wires": 1}, {}, is_custom_op=True
+        )
+
+        assert rz is not rx
+        assert len(_COMPILE_DECOMP_CACHE) == 2
 
 
 if __name__ == "__main__":
