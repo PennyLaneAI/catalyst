@@ -63,7 +63,7 @@ class Compiler:
 
         # convert qref to value semantics
         value_semantics_mlir = catalyst.python_interface.inspection.xdsl_conversion._quantum_opt_stderr(
-            '--catalyst-pipeline="pipe(canonicalize;symbol-dce;convert-to-value-semantics;canonicalize)"',
+            '--catalyst-pipeline="pipe(canonicalize;symbol-dce;convert-to-value-semantics;canonicalize;resolve-basis-state-operator)"',
             "--mlir-print-op-generic",
             stdin=str(gentxtmod),
         )
