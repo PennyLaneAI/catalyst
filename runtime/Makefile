@@ -14,6 +14,8 @@ BUILD_TYPE ?= RelWithDebInfo
 ENABLE_OPENQASM ?= ON
 ENABLE_OQD ?= OFF
 ENABLE_TRANSPORT ?= OFF
+# CDNA4 and CDNA2 by default; `check-hip-amd` passes these to amdclang++ --offload-arch.
+OFFLOAD_ARCHES ?= gfx950 gfx90a
 ENABLE_EXECUTOR ?= OFF
 ENABLE_ASAN ?= OFF
 STRICT_WARNINGS ?= ON
@@ -166,6 +168,14 @@ test-transport: configure
 	cmake --build $(RT_BUILD_DIR) --target transport_tests_all -j$(NPROC)
 	@echo "Catalyst runtime transport test suites"
 	$(call run_transport_suites)
+
+.PHONY: check-hip-amd
+check-hip-amd:
+	# Compile the transport's .hip sources with AMD's compiler, which nothing else does: the
+	# transport GPU backends are built by nvcc against fetched hip-dev headers, so an AMD-only
+	# error would surface first on real AMD hardware. Device-only, so no GPU is involved. Uses
+	# amdclang++ when installed, otherwise a container -- see the script's header.
+	OFFLOAD_ARCHES="$(OFFLOAD_ARCHES)" $(MK_DIR)/prototypes/amd_hip_compile/compile_check.sh
 
 .PHONY: coverage
 coverage: RT_BUILD_DIR := $(RT_BUILD_DIR)_cov
