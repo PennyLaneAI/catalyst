@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <llvm/Support/LogicalResult.h>
+#include <mlir/IR/BuiltinTypes.h>
 #define DEBUG_TYPE "resolve-basis-state-operator"
 
 #include "mlir/IR/Builders.h"
@@ -31,23 +33,44 @@ struct ResolveBasisStateOperatorPattern : public OpRewritePattern<OperatorOp> {
     using OpRewritePattern<OperatorOp>::OpRewritePattern;
 
     LogicalResult matchAndRewrite(OperatorOp op, PatternRewriter &rewriter) const override {
-        if (op.getOpName() != "BasisState") {
+        StringRef name = op.getOpName();
+        bool isBasisState = (name == "BasisState");
+        bool isStatePrep = (name == "StatePrep");
+        if (!isBasisState && !isStatePrep) {
             return failure();
         }
 
-        assert(op.getCtrlQubitOperands().empty() && "Cannot control a SetBasisState op");
-        assert(!op.getAdjointFlag() && "Cannot adjoint a SetBasisState op");
+        assert(op.getCtrlQubitOperands().empty() && "Cannot control a SetState/SetBasisState op");
+        assert(!op.getAdjointFlag() && "Cannot adjoint a SetState/SetBasisState op");
         assert(op.getParams().size() == 1 &&
-               "OperatorOp of BasisState expected the state as the only param");
+               "OperatorOp of BasisState/StatePrep expected the state as the only param");
 
         Value state = op.getParams()[0];
         auto stateType = dyn_cast<RankedTensorType>(state.getType());
-        assert(stateType && stateType.getRank() == 1 && stateType.getElementType().isInteger(1) &&
-               "OperatorOp of BasisState must take in a rank-1 tensor of bools as the state");
 
-        rewriter.replaceOpWithNewOp<SetBasisStateOp>(op, TypeRange(op.getNonCtrlQubitResults()),
-                                                     state, op.getNonCtrlQubitOperands());
-        return success();
+        if (isBasisState) {
+            assert(stateType && stateType.getRank() == 1 &&
+                   stateType.getElementType().isInteger(1) &&
+                   "OperatorOp of BasisState must take in a rank-1 tensor of bools as the state");
+
+            rewriter.replaceOpWithNewOp<SetBasisStateOp>(op, TypeRange(op.getNonCtrlQubitResults()),
+                                                         state, op.getNonCtrlQubitOperands());
+            return success();
+        }
+
+        if (isStatePrep) {
+            auto stateElementType = dyn_cast<ComplexType>(stateType.getElementType());
+            assert(stateType && stateType.getRank() == 1 && stateElementType &&
+                   stateElementType.getElementType().isF64() &&
+                   "OperatorOp of StatePrep must take in a rank-1 tensor of complex<f64> as the "
+                   "state");
+
+            rewriter.replaceOpWithNewOp<SetStateOp>(op, TypeRange(op.getNonCtrlQubitResults()),
+                                                    state, op.getNonCtrlQubitOperands());
+            return success();
+        }
+
+        return failure();
     }
 };
 
