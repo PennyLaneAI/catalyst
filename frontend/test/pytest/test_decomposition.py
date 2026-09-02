@@ -532,6 +532,39 @@ class TestCompileDecompositionRuleCache:
         assert rz is not rx
         assert len(_COMPILE_DECOMP_CACHE) == 2
 
+    def test_same_variant_distinct_rule_sets_not_shared(self):
+        """The same operator variant compiled under two different registered rule sets gets
+        independent cache entries: the compiled module depends on the registered rules, not just the
+        operator variant, so the rule set is part of the cache key."""
+        _COMPILE_DECOMP_CACHE.clear()
+        args = ("NoParams", "NoParams{}{reg:2}{}", {}, {"reg": 2}, {})
+
+        def rule_a_resources(reg):
+            return {SingleParam(x=Float, reg=Wire[2]): 1}
+
+        @register_resources(rule_a_resources)
+        def rule_a(reg):
+            SingleParam(x=0.1, reg=reg[0:2])
+
+        def rule_b_resources(reg):
+            return {SingleParam(x=Float, reg=Wire[2]): 2}
+
+        @register_resources(rule_b_resources)
+        def rule_b(reg):
+            SingleParam(x=0.1, reg=reg[0:2])
+            SingleParam(x=0.2, reg=reg[0:2])
+
+        with local_decomps():
+            add_decomps(NoParams, rule_a)
+            first = compile_decomposition_rules(*args)
+
+        with local_decomps():
+            add_decomps(NoParams, rule_b)
+            second = compile_decomposition_rules(*args)
+
+        assert first is not second
+        assert len(_COMPILE_DECOMP_CACHE) == 2
+
 
 if __name__ == "__main__":
     pytest.main(["-x", __file__])

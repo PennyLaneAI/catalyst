@@ -270,9 +270,11 @@ def collect_resources_for_op(op_name, kwargs, is_custom_op=False, adjoint_resour
     return name_to_resources, name_to_resource_ids, decomp_rules
 
 
-# Memoization for `compile_decomposition_rules`. Keyed by the fully-resolved operator instance and
-# modifier variant; values are the (context-owning) result modules, which are only read (walked and
-# cloned) downstream, never mutated, so sharing them across callers is safe.
+# Memoization for `compile_decomposition_rules`. Keyed by the fully-resolved operator instance,
+# modifier variant, and a fingerprint of the registered rule set. Values are
+# ``(result_module, pinned_rules)`` tuples: the (context-owning) result module is only read (walked
+# and cloned) downstream, never mutated, so sharing it across callers is safe, and the pinned rule
+# objects keep the fingerprinted ids from being recycled while the entry lives.
 _COMPILE_DECOMP_CACHE = {}
 
 
@@ -290,8 +292,17 @@ def _hashable(value):
 
 
 def _compile_decomp_cache_key(
-    op_name, op_id, dynamic_shape, wire_lens, static_data, extra_data,
-    is_custom_op, wrap_adjoint, wrap_control, n_ctrl,
+    op_name,
+    op_id,
+    dynamic_shape,
+    wire_lens,
+    static_data,
+    extra_data,
+    is_custom_op,
+    wrap_adjoint,
+    wrap_control,
+    n_ctrl,
+    rule_ids,
 ):
     return (
         op_name,
@@ -304,6 +315,7 @@ def _compile_decomp_cache_key(
         wrap_adjoint,
         wrap_control,
         n_ctrl,
+        rule_ids,
     )
 
 
@@ -354,13 +366,31 @@ def compile_decomposition_rules(
     # a single variant is cheap (~tens of ms), but the closure explosion makes this the dominant
     # cost of decomposition-heavy programs. Memoize the (context-owning) result module keyed by the
     # fully-resolved operator instance and modifier variant so each unique variant is compiled once.
+    #
+    # The compiled module is fully determined by the operator variant *and* the decomposition rules
+    # currently registered for ``op_name`` (``list_decomps``). That rule set can differ between
+    # programs (e.g. across ``qp.decomposition.local_decomps`` blocks), so it is part of the key: a
+    # variant compiled under one rule set must not be reused under a different one. We fingerprint
+    # the rule set by the identities of its rule objects and pin those objects in the cache value so
+    # their ids cannot be recycled (which could otherwise alias distinct rule sets) while the entry
+    # is alive.
+    registered_rules = tuple(qp.decomposition.list_decomps(op_name))
     _cache_key = _compile_decomp_cache_key(
-        op_name, op_id, dynamic_shape, wire_lens, static_data, extra_data,
-        is_custom_op, wrap_adjoint, wrap_control, n_ctrl,
+        op_name,
+        op_id,
+        dynamic_shape,
+        wire_lens,
+        static_data,
+        extra_data,
+        is_custom_op,
+        wrap_adjoint,
+        wrap_control,
+        n_ctrl,
+        tuple(id(rule) for rule in registered_rules),
     )
     _cached = _COMPILE_DECOMP_CACHE.get(_cache_key)
     if _cached is not None:
-        return _cached
+        return _cached[0]
 
     kwargs = prepare_dynamic_op_kwargs(dynamic_shape, wire_lens)
     extra_data = extra_data or {}
@@ -501,7 +531,8 @@ def compile_decomposition_rules(
     with inlined_module.context, ir.Location.unknown():
         inlined_module.operation.walk(re_privatize_rules)
 
-    _COMPILE_DECOMP_CACHE[_cache_key] = inlined_module
+    # Store the module together with the pinned rule objects (see the fingerprint note above).
+    _COMPILE_DECOMP_CACHE[_cache_key] = (inlined_module, registered_rules)
     return inlined_module
 
 

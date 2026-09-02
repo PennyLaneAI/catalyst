@@ -55,10 +55,12 @@
 
 <h3>Improvements 🛠</h3>
 
-* Compiled decomposition rules are now memoized per operator variant, so each unique operator and
-  modifier variant is compiled only once. Under program capture, the on-demand rule loader
-  previously rebuilt (and recompiled) the same variants many times over, making rule compilation
-  the dominant cost of decomposition-heavy programs.
+* Compiled decomposition rules are now memoized per operator variant and registered rule set, so
+  each unique operator and modifier variant is compiled only once. Under program capture, the
+  on-demand rule loader previously rebuilt (and recompiled) the same variants many times over,
+  making rule compilation the dominant cost of decomposition-heavy programs. The cache is keyed on
+  the registered decomposition rules as well as the operator variant, so changing the registered
+  rules (e.g. across `qml.decomposition.local_decomps` blocks) never returns a stale module.
   [(#3174)](https://github.com/PennyLaneAI/catalyst/pull/3174)
 
 * Add the `XMEM_REPLY_BRAM` memory type and use it to allocate reply buffers in dedicated BRAM.
