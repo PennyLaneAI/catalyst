@@ -505,6 +505,13 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* Fixed a `ValueError` ("Could not capture ... without the number of wires") in the `capture=True`
+  graph-decomposition path when the decomposition-graph solution contains an `Operator2` (such as
+  `SemiAdder`) whose wire and parameter arguments are described by an abstract resource
+  representation. The wire count is now materialized from the abstract rep, and rule-internal
+  optional parameters (e.g. `carry_flip`) fall back to their defaults.
+  [(#3176)](https://github.com/PennyLaneAI/catalyst/pull/3176)
+
 * Fixed an `AttributeError` in the `capture=True` graph-decomposition path when a decomposition
   rule's resource representation uses abstract wires (`pennylane.typing.Wire[n]`), e.g. for
   `register_resources` rules that describe cost without concrete wires.
