@@ -564,6 +564,9 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* Integration tests for :func:`pennylane.specs` have been migrated from the Catalyst frontend to PennyLane.
+  [(#3107)](https://github.com/PennyLaneAI/catalyst/pull/3107)
+
 * A GPU CI workflow runs the runtime transport tests on the `single-gpu-x64` runner, gated by
   the `gpu` label.
   [(#3113)](https://github.com/PennyLaneAI/catalyst/pull/3113)
