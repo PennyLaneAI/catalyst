@@ -30,6 +30,9 @@ This document contains the respective Catalyst-defined MLIR dialects, and their 
    Special-purpose dialect for Backline, the controller/coprocessor data-movement sessions
    a placement compiles to
 
+:doc:`executor`
+   Support dialect for dispatching kernels and calling symbols on a remote executor
+
 
 .. toctree::
    :hidden:
@@ -42,3 +45,4 @@ This document contains the respective Catalyst-defined MLIR dialects, and their 
    pbc
    mbqc
    transport
+   executor

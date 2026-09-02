@@ -765,6 +765,11 @@
   serialized into. The `backline` and `node` attribute parameters gained descriptions, without
   which mlir-tblgen emitted a ragged markdown table that docutils dropped from the rendered page.
   [(#3179)](https://github.com/PennyLaneAI/catalyst/pull/3179)
+* The `executor` dialect is now documented alongside the other Catalyst dialects, covering its
+  seven operations, two passes, and the `!executor.session` and `!executor.token` types. The types
+  needed their own `-gen-typedef-doc` declaration, since `ExecutorDialect.td` does not include
+  `ExecutorTypes.td` and so the dialect page alone omitted them.
+  [(#XXXX)](https://github.com/PennyLaneAI/catalyst/pull/XXXX)
 
 <h3>Contributors ✍️</h3>
 
