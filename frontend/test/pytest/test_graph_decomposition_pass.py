@@ -23,6 +23,7 @@ import pytest
 from pennylane.decomposition import DecompositionRule, register_resources
 from pennylane.typing import Wire
 
+from catalyst import qjit
 from catalyst.from_plxpr.decompose import _resource_num_wires
 from catalyst.passes.builtin_passes import graph_decomposition_setup_inputs
 
@@ -135,6 +136,31 @@ class TestResourceReps:
 
         assert isinstance(op_rep, qp.core.Operator2)
         assert _resource_num_wires(op_rep) == 5
+
+
+class TestOperator2SolutionNodeCapture:
+    """Capturing decomposition solutions that contain an ``Operator2`` (abstract-wire) node."""
+
+    def test_operator2_solution_node_is_captured(self, use_capture_dgraph):
+        """An ``Operator2`` such as ``SemiAdder`` appearing in the decomposition-graph solution
+        is captured rather than aborting: its wire count is materialized from the abstract
+        resource rep and its rule-internal optional parameters (e.g. ``carry_flip``) fall back to
+        their defaults.
+
+        The ``target="jaxpr"`` capture runs the frontend graph-decomposition cleanup (where the
+        ``Operator2`` node is handled) without triggering the downstream C++ decompose-lowering
+        pass. Capture failures are swallowed by ``aot_compile`` and leave ``jaxpr`` as ``None``,
+        so a populated ``jaxpr`` is the signal that the ``Operator2`` node was captured.
+        """
+
+        @qjit(capture=True, target="jaxpr")
+        @qp.transforms.decompose(gate_set={"CNOT", "Toffoli", "X", "Hadamard", "PhaseShift"})
+        @qp.qnode(qp.device("null.qubit", wires=2))
+        def circuit():
+            qp.SemiAdder(x_wires=[0], y_wires=[1])
+            return qp.expval(qp.Z(0))
+
+        assert circuit.jaxpr is not None
 
 
 if __name__ == "__main__":

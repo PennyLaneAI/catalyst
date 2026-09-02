@@ -250,6 +250,21 @@ class DecompRuleInterpreter(qp.capture.PlxprInterpreter):
                 # We use MLIR AdjointOp and ControlledOp primitives
                 # to deal with decomposition of symbolic operations at PLxPR.
                 continue
+            elif isinstance(op.op, qp.core.Operator2):
+                # The operator appears in the decomposition-graph solution with an abstract
+                # resource representation (an ``Operator2`` such as ``SemiAdder``), but it is
+                # not one of the ``COMPILER_OPS_FOR_DECOMPOSITION`` and it is not a skippable
+                # symbolic op. Its wire and parameter arguments are fully described by the
+                # resource rep, so we materialize the wire count from the abstract rep
+                # (``_resource_num_wires``) and build the decomposition rule directly from it.
+                _create_decomposition_rule(
+                    rule,
+                    op_name=op.op.name,
+                    op_rep=op.op,
+                    num_wires=_resource_num_wires(op.op),
+                    num_params=op.op.num_params,
+                    requires_copy=True,
+                )
             else:
                 raise ValueError(f"Could not capture {op.op} without the number of wires.")
 
@@ -296,7 +311,15 @@ def _create_decomposition_rule(
             elif name in op_rep.wire_args:
                 wire_spec = op_rep.wire_args[name]
                 args.append(qp.math.array([0] * len(wire_spec), like="jax"))
-            elif name not in op_rep.compilable_args:
+            elif name in op_rep.compilable_args:
+                # Compilable (static) args are baked into the rule; nothing to pass.
+                pass
+            elif sig_func.parameters[name].default is not inspect.Parameter.empty:
+                # Rule-internal optional parameters that are not part of the operator's
+                # arguments (e.g. ``carry_flip`` in the SemiAdder rule) fall back to their
+                # default value so the captured rule matches the standard decomposition.
+                args.append(sig_func.parameters[name].default)
+            else:
                 raise ValueError(f"Unknown Operator2 argument {name} in decomposition rule {func}.")
             continue
 
