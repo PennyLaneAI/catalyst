@@ -748,14 +748,6 @@
   `-stage` naming convention used when invoking them from the command line (e.g. `quantum-compilation-stage`).
   [#3002](https://github.com/PennyLaneAI/catalyst/pull/3002)
 
-* Frontend tests that do not exercise graph-based decomposition now pass
-  `collect_decomp_rules=False` to `qjit`. Collecting and lowering every decomposition rule
-  reachable from every gate in a circuit costs roughly 0.3 s per operator at trace time, and the
-  rules are dead code unless the `graph-decomposition` pass is applied, so this removes a large
-  amount of redundant work from CI. Tests that specifically cover rule collection and lowering
-  are unchanged.
-  [(#XXXX)](https://github.com/PennyLaneAI/catalyst/pull/XXXX)
-
 <h3>Documentation 📝</h3>
 
 * A broken link was removed in the [Compiler Core](https://docs.pennylane.ai/projects/catalyst/en/stable/modules/mlir.html) documentation page. The link referred to where precompiled decomposition rules were implemented, which has since been refactored.
