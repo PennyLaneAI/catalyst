@@ -24,7 +24,12 @@ from pennylane.decomposition import DecompositionRule, register_resources
 from pennylane.typing import Wire
 
 from catalyst import qjit
-from catalyst.from_plxpr.decompose import _resource_num_wires
+from catalyst.from_plxpr import decompose as decompose_module
+from catalyst.from_plxpr.decompose import (
+    DecompRuleInterpreter,
+    _create_decomposition_rule,
+    _resource_num_wires,
+)
 from catalyst.passes.builtin_passes import graph_decomposition_setup_inputs
 
 # Dummy lib paths so building the options dict never hits the environment / installed libraries.
@@ -161,6 +166,47 @@ class TestOperator2SolutionNodeCapture:
             return qp.expval(qp.Z(0))
 
         assert circuit.jaxpr is not None
+
+    def test_unknown_operator2_argument_raises(self):
+        """A rule parameter that is neither a param/wire/compilable arg of the ``Operator2`` nor an
+        optional rule-internal parameter (no default) cannot be materialized, so building the rule
+        raises. This is the fallback of the ``Operator2`` argument-resolution branch."""
+        op_rep = qp.SemiAdder(Wire[2], Wire[2], Wire[1])
+        assert isinstance(op_rep, qp.core.Operator2)
+
+        def bad_rule(not_an_arg):  # required param not described by the resource rep
+            del not_an_arg
+
+        with pytest.raises(ValueError, match="Unknown Operator2 argument"):
+            _create_decomposition_rule(
+                bad_rule,
+                op_name=op_rep.name,
+                op_rep=op_rep,
+                num_wires=_resource_num_wires(op_rep),
+                num_params=op_rep.num_params,
+            )
+
+    def test_uncapturable_solution_node_raises(self, monkeypatch):
+        """A solution node that is not a compiler op, not a skippable symbolic op, and not an
+        ``Operator2`` has no way to recover its wire count, so ``cleanup`` raises rather than
+        silently emitting a bad rule."""
+
+        class _UncapturableOp:
+            name = "TotallyUnknownOp"
+            params = {}  # `_resource_num_wires` reads `params["num_wires"]` -> None
+
+        class _SolutionNode:
+            op = _UncapturableOp()
+
+        interpreter = DecompRuleInterpreter(gate_set={"CNOT"})
+        monkeypatch.setattr(
+            decompose_module,
+            "_solve_decomposition_graph",
+            lambda *args, **kwargs: {_SolutionNode(): (lambda: None)},
+        )
+
+        with pytest.raises(ValueError, match="Could not capture"):
+            interpreter.cleanup()
 
 
 if __name__ == "__main__":
