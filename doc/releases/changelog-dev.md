@@ -565,6 +565,9 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* Update calls to `GlobalPhase` to no longer use the `wires` argument.
+  [(#3108)](https://github.com/PennyLaneAI/catalyst/pull/3108)
+  
 * A GPU CI workflow runs the runtime transport tests on the `single-gpu-x64` runner, gated by
   the `gpu` label.
   [(#3113)](https://github.com/PennyLaneAI/catalyst/pull/3113)
