@@ -764,7 +764,7 @@
   18 operations, three passes, and the `catalyst.backline` attributes a Backline placement is
   serialized into. The `backline` and `node` attribute parameters gained descriptions, without
   which mlir-tblgen emitted a ragged markdown table that docutils dropped from the rendered page.
-  [(#XXXX)](https://github.com/PennyLaneAI/catalyst/pull/XXXX)
+  [(#3179)](https://github.com/PennyLaneAI/catalyst/pull/3179)
 
 <h3>Contributors ✍️</h3>
 
