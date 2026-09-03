@@ -21,6 +21,7 @@ from typing import Any
 
 from pennylane.core import Operator2
 from pennylane.pytrees import PyTreeStructure
+from pennylane.typing import AbstractWires
 from pennylane.wires import AbstractQubit
 
 
@@ -52,7 +53,11 @@ def generate_uid(
         else:
             cur_avals = []
             for val in avals_in[args_idx : args_idx + hsize]:
-                aval = val if isinstance(val, AbstractQubit) else (val.shape, val.dtype.name)
+                aval = (
+                    val
+                    if isinstance(val, (AbstractQubit, AbstractWires))
+                    else (val.shape, val.dtype.name)
+                )
                 cur_avals.append(aval)
             hybrid_avals.append(tuple(cur_avals))
 

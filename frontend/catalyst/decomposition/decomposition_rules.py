@@ -392,6 +392,9 @@ def compile_decomposition_rules(
 
     call_args, call_kwargs = split_call_args(kwargs, is_custom_op)
 
+    # if op_name == "QROM":
+    #     breakpoint()
+
     @qp.qjit(target="mlir", capture=True, collect_decomp_rules=False)
     @qp.qnode(device=device)
     def circuit():
