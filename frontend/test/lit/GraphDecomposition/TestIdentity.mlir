@@ -45,7 +45,7 @@ module @test_module {
         return %q1 : !quantum.bit
     }
 
-    func.func private @false_decomp(%q : !quantum.bit) -> !quantum.bit attributes {target_gate="testHadamard{}{wires:1}{}"} {
+    func.func private @false_decomp(%q : !quantum.bit) -> !quantum.bit attributes {target_gate="{op = \"testHadamard\", wires = [1]}"} {
         %qout = quantum.custom "testPauliX"() %q : !quantum.bit
         return %qout : !quantum.bit
     }

@@ -45,6 +45,7 @@ from pennylane.typing import Complex, Float, Int, Wire
 from catalyst.decomposition.decomposition_rules import (
     compile_decomposition_rules_wrapper,
 )
+from catalyst.decomposition.graph_op_id import build_graph_op_key
 
 
 def test_to_dynamic_argnames():
@@ -67,16 +68,16 @@ def test_to_dynamic_argnames():
     with qp.decomposition.local_decomps():
         qp.add_decomps(NoParams, rule)
         result = compile_decomposition_rules_wrapper(
-            "NoParams", "NoParams{}{reg:2}{}", {}, {"reg": 2}, {}
+            "NoParams", build_graph_op_key("NoParams", {}, {"reg": 2}, {}), {}, {"reg": 2}, {}
         )
         print(result)
 
 
-# CHECK: func.func private @"rule_NoParams{}{reg:2}{}"
+# CHECK: func.func private @"rule_{op = \22NoParams\22, wires = [2]}"
 # CHECK-SAME:   resources = {operations = {
-# CHECK-SAME:   "SingleParam{x:[tensor<2xf64>]}{reg:2}{}" = 1 : i64,
-# CHECK-SAME:   "SingleParam{x:[tensor<f64>]}{reg:2}{}" = 2 : i64
-# CHECK-SAME:   target_gate = "NoParams{}{reg:2}{}"
+# CHECK-SAME:   "{op = \22SingleParam\22, params = [{{\[}}tensor<2xf64>]], wires = [2]}" = 1 : i64,
+# CHECK-SAME:   "{op = \22SingleParam\22, params = [{{\[}}tensor<f64>]], wires = [2]}" = 2 : i64
+# CHECK-SAME:   target_gate = "{op = \22NoParams\22, wires = [2]}"
 test_to_dynamic_argnames()
 
 
@@ -96,7 +97,9 @@ def test_from_dynamic_argnames():
         qp.add_decomps(SingleParam, rule)
         result = compile_decomposition_rules_wrapper(
             "SingleParam",
-            "SingleParam{x:[tensor<2xf64>]}{reg:2}{}",
+            build_graph_op_key(
+                "SingleParam", {"x": ["tensor<2xf64>"]}, {"reg": 2}, {}
+            ),
             {"x": ["f64", "f64"]},
             {"reg": 2},
             {},
@@ -104,9 +107,9 @@ def test_from_dynamic_argnames():
         print(result)
 
 
-# CHECK: func.func private @"rule_SingleParam{x:[tensor<2xf64>]}{reg:2}{}"
-# CHECK-SAME:   resources = {operations = {"NoParams{}{reg:1}{}" = 1 : i64}}
-# CHECK-SAME:   target_gate = "SingleParam{x:[tensor<2xf64>]}{reg:2}{}"
+# CHECK: func.func private @"rule_{op = \22SingleParam\22, params = [{{\[}}tensor<2xf64>]], wires = [2]}"
+# CHECK-SAME:   resources = {operations = {"{op = \22NoParams\22, wires = [1]}" = 1 : i64}}
+# CHECK-SAME:   target_gate = "{op = \22SingleParam\22, params = [{{\[}}tensor<2xf64>]], wires = [2]}"
 test_from_dynamic_argnames()
 
 
@@ -127,15 +130,15 @@ def test_to_multiple_dynamic_argnames():
     with qp.decomposition.local_decomps():
         qp.add_decomps(NoParams, rule)
         result = compile_decomposition_rules_wrapper(
-            "NoParams", "NoParams{}{reg:1}{}", {}, {"reg": 1}, {}
+            "NoParams", build_graph_op_key("NoParams", {}, {"reg": 1}, {}), {}, {"reg": 1}, {}
         )
         print(result)
 
 
-# CHECK: func.func private @"rule_NoParams{}{reg:1}{}"
+# CHECK: func.func private @"rule_{op = \22NoParams\22, wires = [1]}"
 # CHECK-SAME:   resources = {operations =
-# CHECK-SAME:   "MultiParams{a:[tensor<f64>],b:[tensor<2x2xi64>],c:[tensor<complex<f64>>]}{reg:1}{}" = 1 : i64
-# CHECK-SAME:   target_gate = "NoParams{}{reg:1}{}"
+# CHECK-SAME:   "{op = \22MultiParams\22, params = [{{\[}}tensor<f64>], [tensor<2x2xi64>], [tensor<complex<f64>>]], wires = [1]}" = 1 : i64
+# CHECK-SAME:   target_gate = "{op = \22NoParams\22, wires = [1]}"
 test_to_multiple_dynamic_argnames()
 
 
@@ -155,7 +158,16 @@ def test_from_multiple_dynamic_argnames():
         qp.add_decomps(MultiParams, rule)
         result = compile_decomposition_rules_wrapper(
             "MultiParams",
-            "MultiParams{a:[tensor<f64>],b:[tensor<i32>,tensor<i32>],c:[tensor<f64>,tensor<f64>]}{reg:2}{}",
+            build_graph_op_key(
+                "MultiParams",
+                {
+                    "a": ["tensor<f64>"],
+                    "b": ["tensor<i32>", "tensor<i32>"],
+                    "c": ["tensor<f64>", "tensor<f64>"],
+                },
+                {"reg": 2},
+                {},
+            ),
             {"b": ["i32", "i32"], "c": ["f64", "f64"], "a": ["f64"]},
             {"reg": 2},
             {},
@@ -163,9 +175,9 @@ def test_from_multiple_dynamic_argnames():
         print(result)
 
 
-# CHECK: func.func private @"rule_MultiParams{a:[tensor<f64>],b:[tensor<i32>,tensor<i32>],c:[tensor<f64>,tensor<f64>]}{reg:2}{}"
-# CHECK-SAME:   resources = {operations = {"NoParamsCustomOp{}{wires:2}{}" = 1 : i64}
-# CHECK-SAME:   target_gate = "MultiParams{a:[tensor<f64>],b:[tensor<i32>,tensor<i32>],c:[tensor<f64>,tensor<f64>]}{reg:2}{}"
+# CHECK: func.func private @"rule_{op = \22MultiParams\22, params = [{{\[}}tensor<f64>], [tensor<i32>, tensor<i32>], [tensor<f64>, tensor<f64>]], wires = [2]}"
+# CHECK-SAME:   resources = {operations = {"{op = \22NoParamsCustomOp\22, wires = [2]}" = 1 : i64}
+# CHECK-SAME:   target_gate = "{op = \22MultiParams\22, params = [{{\[}}tensor<f64>], [tensor<i32>, tensor<i32>], [tensor<f64>, tensor<f64>]], wires = [2]}"
 test_from_multiple_dynamic_argnames()
 
 
@@ -186,15 +198,15 @@ def test_to_multiple_wire_argnames():
     with qp.decomposition.local_decomps():
         qp.add_decomps(NoParams, rule)
         result = compile_decomposition_rules_wrapper(
-            "NoParams", "NoParams{}{reg:1}{}", {}, {"reg": 1}, {}
+            "NoParams", build_graph_op_key("NoParams", {}, {"reg": 1}, {}), {}, {"reg": 1}, {}
         )
         print(result)
 
 
-# CHECK: func.func private @"rule_NoParams{}{reg:1}{}"
+# CHECK: func.func private @"rule_{op = \22NoParams\22, wires = [1]}"
 # CHECK-SAME:   resources = {operations =
-# CHECK-SAME:   "MultipleRegisters{}{reg1:1,reg2:2}{}" = 1 : i64
-# CHECK-SAME:   target_gate = "NoParams{}{reg:1}{}"
+# CHECK-SAME:   "{op = \22MultipleRegisters\22, wires = [1, 2]}" = 1 : i64
+# CHECK-SAME:   target_gate = "{op = \22NoParams\22, wires = [1]}"
 test_to_multiple_wire_argnames()
 
 
@@ -215,7 +227,7 @@ def test_from_multiple_wire_argnames():
         qp.add_decomps(MultipleRegisters, rule)
         result = compile_decomposition_rules_wrapper(
             "MultipleRegisters",
-            "MultipleRegisters{}{reg1:2,reg2:3}{}",
+            build_graph_op_key("MultipleRegisters", {}, {"reg1": 2, "reg2": 3}, {}),
             {},
             {"reg1": 2, "reg2": 3},
             {},
@@ -223,11 +235,11 @@ def test_from_multiple_wire_argnames():
         print(result)
 
 
-# CHECK: func.func private @"rule_MultipleRegisters{}{reg1:2,reg2:3}{}"
+# CHECK: func.func private @"rule_{op = \22MultipleRegisters\22, wires = [2, 3]}"
 # CHECK-SAME:   resources = {operations = {
-# CHECK-SAME:   "NoParamsCustomOp{}{wires:2}{}" = 1 : i64
-# CHECK-SAME:   "NoParamsCustomOp{}{wires:3}{}" = 1 : i64
-# CHECK-SAME:   target_gate = "MultipleRegisters{}{reg1:2,reg2:3}{}"
+# CHECK-SAME:   "{op = \22NoParamsCustomOp\22, wires = [2]}" = 1 : i64
+# CHECK-SAME:   "{op = \22NoParamsCustomOp\22, wires = [3]}" = 1 : i64
+# CHECK-SAME:   target_gate = "{op = \22MultipleRegisters\22, wires = [2, 3]}"
 test_from_multiple_wire_argnames()
 
 
@@ -251,16 +263,16 @@ def test_to_compilable_data():
     with qp.decomposition.local_decomps():
         qp.add_decomps(NoParams, rule)
         result = compile_decomposition_rules_wrapper(
-            "NoParams", "NoParams{}{reg:2}{}", {}, {"reg": 2}, {}
+            "NoParams", build_graph_op_key("NoParams", {}, {"reg": 2}, {}), {}, {"reg": 2}, {}
         )
         print(result)
 
 
-# CHECK: func.func private @"rule_NoParams{}{reg:2}{}"
+# CHECK: func.func private @"rule_{op = \22NoParams\22, wires = [2]}"
 # CHECK-SAME:   resources = {operations = {
-# CHECK-SAME:     "CompilableData{}{wires:1}{a:a,b:b,thing:thing}" = 1 : i64,
-# CHECK-SAME:     "CompilableData{}{wires:1}{a:aa,b:bb,thing:stuff}" = 2 : i64
-# CHECK-SAME:   target_gate = "NoParams{}{reg:2}{}"
+# CHECK-SAME:     "{op = \22CompilableData\22, static = {a = \22a\22, b = \22b\22, thing = \22thing\22}, wires = [1]}" = 1 : i64,
+# CHECK-SAME:     "{op = \22CompilableData\22, static = {a = \22aa\22, b = \22bb\22, thing = \22stuff\22}, wires = [1]}" = 2 : i64
+# CHECK-SAME:   target_gate = "{op = \22NoParams\22, wires = [2]}"
 test_to_compilable_data()
 
 
@@ -283,7 +295,12 @@ def test_from_compilable_data():
         qp.add_decomps(CompilableData, rule)
         result_a1 = compile_decomposition_rules_wrapper(
             "CompilableData",
-            "CompilableData{}{wires:1}{a:1,b:2,thing:3}",
+            build_graph_op_key(
+                "CompilableData",
+                {},
+                {"wires": 1},
+                {"a": 1, "b": 2, "thing": 3},
+            ),
             {},
             {"wires": 1},
             {"a": 1, "b": 2, "thing": 3},
@@ -292,7 +309,12 @@ def test_from_compilable_data():
 
         result_a10 = compile_decomposition_rules_wrapper(
             "CompilableData",
-            "CompilableData{}{wires:1}{a:10,b:2,thing:3}",
+            build_graph_op_key(
+                "CompilableData",
+                {},
+                {"wires": 1},
+                {"a": 10, "b": 2, "thing": 3},
+            ),
             {},
             {"wires": 1},
             {"a": 10, "b": 2, "thing": 3},
@@ -300,15 +322,15 @@ def test_from_compilable_data():
         print(result_a10)
 
 
-# CHECK: func.func private @"rule_CompilableData{}{wires:1}{a:1,b:2,thing:3}"
-# CHECK-SAME:   resources = {operations = {"SingleParam{x:[tensor<f64>]}{reg:1}{}" = 1 : i64}
-# CHECK-SAME:   target_gate = "CompilableData{}{wires:1}{a:1,b:2,thing:3}"
+# CHECK: func.func private @"rule_{op = \22CompilableData\22, static = {a = 1 : i64, b = 2 : i64, thing = 3 : i64}, wires = [1]}"
+# CHECK-SAME:   resources = {operations = {"{op = \22SingleParam\22, params = [{{\[}}tensor<f64>]], wires = [1]}" = 1 : i64}
+# CHECK-SAME:   target_gate = "{op = \22CompilableData\22, static = {a = 1 : i64, b = 2 : i64, thing = 3 : i64}, wires = [1]}"
 # CHECK: stablehlo.constant dense<1.000000e-01> : tensor<f64>
 # CHECK-NOT: stablehlo.constant dense<1.100000e+00> : tensor<f64>
 #
-# CHECK: func.func private @"rule_CompilableData{}{wires:1}{a:10,b:2,thing:3}"
-# CHECK-SAME:   resources = {operations = {"SingleParam{x:[tensor<f64>]}{reg:1}{}" = 1 : i64}
-# CHECK-SAME:   target_gate = "CompilableData{}{wires:1}{a:10,b:2,thing:3}"
+# CHECK: func.func private @"rule_{op = \22CompilableData\22, static = {a = 10 : i64, b = 2 : i64, thing = 3 : i64}, wires = [1]}"
+# CHECK-SAME:   resources = {operations = {"{op = \22SingleParam\22, params = [{{\[}}tensor<f64>]], wires = [1]}" = 1 : i64}
+# CHECK-SAME:   target_gate = "{op = \22CompilableData\22, static = {a = 10 : i64, b = 2 : i64, thing = 3 : i64}, wires = [1]}"
 # CHECK: stablehlo.constant dense<1.100000e+00> : tensor<f64>
 # CHECK-NOT: stablehlo.constant dense<1.000000e-01> : tensor<f64>
 test_from_compilable_data()
@@ -334,15 +356,15 @@ def test_to_static_data():
     with qp.decomposition.local_decomps():
         qp.add_decomps(NoParams, rule)
         result = compile_decomposition_rules_wrapper(
-            "NoParams", "NoParams{}{reg:2}{}", {}, {"reg": 2}, {}
+            "NoParams", build_graph_op_key("NoParams", {}, {"reg": 2}, {}), {}, {"reg": 2}, {}
         )
         print(result)
 
 
-# CHECK: func.func private @"rule_NoParams{}{reg:2}{}"
-# CHECK-DAG: "StaticData{}{reg:1}{}[[[uid_1:[0-9]+]]]" = 1
-# CHECK-DAG: "StaticData{}{reg:1}{}[[[uid_2:[0-9]+]]]" = 2
-# CHECK-DAG:   target_gate = "NoParams{}{reg:2}{}"
+# CHECK: func.func private @"rule_{op = \22NoParams\22, wires = [2]}"
+# CHECK-DAG: "{op = \22StaticData\22, uid = [[uid_1:[0-9]+]] : i64, wires = [1]}" = 1
+# CHECK-DAG: "{op = \22StaticData\22, uid = [[uid_2:[0-9]+]] : i64, wires = [1]}" = 2
+# CHECK-DAG:   target_gate = "{op = \22NoParams\22, wires = [2]}"
 # CHECK: "qref.operator"
 # CHECK-SAME: UID = [[uid_1]]
 # CHECK: "qref.operator"
@@ -374,24 +396,34 @@ def test_from_static_data():
     with qp.decomposition.local_decomps():
         qp.add_decomps(StaticData, rule)
         result_1234 = compile_decomposition_rules_wrapper(
-            "StaticData", "StaticData{}{reg:1}{}[1234]", {}, {"reg": 1}, {}, {"label": 1234}
+            "StaticData",
+            build_graph_op_key("StaticData", {}, {"reg": 1}, {}, uid=1234),
+            {},
+            {"reg": 1},
+            {},
+            {"label": 1234},
         )
         print(result_1234)
 
         result_4321 = compile_decomposition_rules_wrapper(
-            "StaticData", "StaticData{}{reg:1}{}[4321]", {}, {"reg": 1}, {}, {"label": 4321}
+            "StaticData",
+            build_graph_op_key("StaticData", {}, {"reg": 1}, {}, uid=4321),
+            {},
+            {"reg": 1},
+            {},
+            {"label": 4321},
         )
         print(result_4321)
 
 
-# CHECK: func.func private @"rule_StaticData{}{reg:1}{}[1234]"
-# CHECK-SAME:   resources = {operations = {"SingleParam{x:[tensor<f64>]}{reg:1}{}" = 1 : i64}
-# CHECK-SAME:   target_gate = "StaticData{}{reg:1}{}[1234]"
+# CHECK: func.func private @"rule_{op = \22StaticData\22, uid = 1234 : i64, wires = [1]}"
+# CHECK-SAME:   resources = {operations = {"{op = \22SingleParam\22, params = [{{\[}}tensor<f64>]], wires = [1]}" = 1 : i64}
+# CHECK-SAME:   target_gate = "{op = \22StaticData\22, uid = 1234 : i64, wires = [1]}"
 # CHECK: stablehlo.constant dense<1.000000e-01> : tensor<f64>
 #
-# CHECK: func.func private @"rule_StaticData{}{reg:1}{}[4321]"
-# CHECK-SAME:   resources = {operations = {"SingleParam{x:[tensor<f64>]}{reg:1}{}" = 2 : i64}
-# CHECK-SAME:   target_gate = "StaticData{}{reg:1}{}[4321]"
+# CHECK: func.func private @"rule_{op = \22StaticData\22, uid = 4321 : i64, wires = [1]}"
+# CHECK-SAME:   resources = {operations = {"{op = \22SingleParam\22, params = [{{\[}}tensor<f64>]], wires = [1]}" = 2 : i64}
+# CHECK-SAME:   target_gate = "{op = \22StaticData\22, uid = 4321 : i64, wires = [1]}"
 # CHECK-DAG: stablehlo.constant dense<1.100000e+00> : tensor<f64>
 # CHECK-DAG: stablehlo.constant dense<2.200000e+00> : tensor<f64>
 test_from_static_data()
@@ -419,15 +451,15 @@ def test_to_hybrid_wires():
     with qp.decomposition.local_decomps():
         qp.add_decomps(NoParams, rule)
         result = compile_decomposition_rules_wrapper(
-            "NoParams", "NoParams{}{reg:3}{}", {}, {"reg": 3}, {}
+            "NoParams", build_graph_op_key("NoParams", {}, {"reg": 3}, {}), {}, {"reg": 3}, {}
         )
         print(result)
 
 
-# CHECK: func.func private @"rule_NoParams{}{reg:3}{}"
-# CHECK-DAG: "HybridWires{}{}{}[[[uid_1:[0-9]+]]]" = 1
-# CHECK-DAG: "HybridWires{}{}{}[[[uid_2:[0-9]+]]]" = 2
-# CHECK-DAG:   target_gate = "NoParams{}{reg:3}{}"
+# CHECK: func.func private @"rule_{op = \22NoParams\22, wires = [3]}"
+# CHECK-DAG: "{op = \22HybridWires\22, uid = [[uid_1:[0-9]+]] : i64}" = 1
+# CHECK-DAG: "{op = \22HybridWires\22, uid = [[uid_2:[0-9]+]] : i64}" = 2
+# CHECK-DAG:   target_gate = "{op = \22NoParams\22, wires = [3]}"
 # CHECK: "qref.operator"
 # CHECK-SAME: UID = [[uid_2]]
 # CHECK: "qref.operator"
@@ -455,7 +487,7 @@ def test_from_hybrid_wires():
         qp.add_decomps(HybridWires, rule)
         result = compile_decomposition_rules_wrapper(
             "HybridWires",
-            "HybridWires{}{}{}[3742]",
+            build_graph_op_key("HybridWires", {}, {}, {}, uid=3742),
             {},
             {},
             {},
@@ -464,9 +496,9 @@ def test_from_hybrid_wires():
         print(result)
 
 
-# CHECK: func.func private @"rule_HybridWires{}{}{}[3742]"
-# CHECK-SAME:   resources = {operations = {"NoParams{}{reg:1}{}" = 3 : i64}}
-# CHECK-SAME:   target_gate = "HybridWires{}{}{}[3742]"
+# CHECK: func.func private @"rule_{op = \22HybridWires\22, uid = 3742 : i64}"
+# CHECK-SAME:   resources = {operations = {"{op = \22NoParams\22, wires = [1]}" = 3 : i64}}
+# CHECK-SAME:   target_gate = "{op = \22HybridWires\22, uid = 3742 : i64}"
 # CHECK: idx_attr = 1
 # CHECK: idx_attr = 2
 # CHECK: idx_attr = 3
@@ -518,15 +550,15 @@ def test_to_hybrid_op():
     with qp.decomposition.local_decomps():
         qp.add_decomps(NoParams, rule)
         result = compile_decomposition_rules_wrapper(
-            "NoParams", "NoParams{}{reg:3}{}", {}, {"reg": 3}, {}
+            "NoParams", build_graph_op_key("NoParams", {}, {"reg": 3}, {}), {}, {"reg": 3}, {}
         )
         print(result)
 
 
-# CHECK: func.func private @"rule_NoParams{}{reg:3}{}"
-# CHECK-DAG: "HybridOpArg{angle:[tensor<f64>]}{cwires:1}{}[[[uid_1:[0-9]+]]]" = 1
-# CHECK-DAG: "HybridOpArg{angle:[tensor<f64>]}{cwires:1}{}[[[uid_2:[0-9]+]]]" = 2
-# CHECK-DAG:   target_gate = "NoParams{}{reg:3}{}"
+# CHECK: func.func private @"rule_{op = \22NoParams\22, wires = [3]}"
+# CHECK-DAG: "{op = \22HybridOpArg\22, params = [{{\[}}tensor<f64>]], uid = [[uid_1:[0-9]+]] : i64, wires = [1]}" = 1
+# CHECK-DAG: "{op = \22HybridOpArg\22, params = [{{\[}}tensor<f64>]], uid = [[uid_2:[0-9]+]] : i64, wires = [1]}" = 2
+# CHECK-DAG:   target_gate = "{op = \22NoParams\22, wires = [3]}"
 # CHECK: "qref.operator"
 # CHECK-SAME: UID = [[uid_2]]
 # CHECK: "qref.operator"
@@ -553,7 +585,13 @@ def test_from_hybrid_op():
         qp.add_decomps(HybridOpArg, rule)
         result = compile_decomposition_rules_wrapper(
             "HybridOpArg",
-            "HybridOpArg{angle:[tensor<f64>]}{cwires:1}{}[5678]",
+            build_graph_op_key(
+                "HybridOpArg",
+                {"angle": ["tensor<f64>"]},
+                {"cwires": 1},
+                {},
+                uid=5678,
+            ),
             {"angle": ["f64"]},
             {"cwires": 1},
             {},
@@ -565,11 +603,11 @@ def test_from_hybrid_op():
         print(result)
 
 
-# CHECK: func.func private @"rule_HybridOpArg{angle:[tensor<f64>]}{cwires:1}{}[5678]"
+# CHECK: func.func private @"rule_{op = \22HybridOpArg\22, params = [{{\[}}tensor<f64>]], uid = 5678 : i64, wires = [1]}"
 # CHECK-SAME:   resources = {operations = {
-# CHECK-SAME:   "NoParams{}{reg:1}{}" = 1 : i64,
-# CHECK-SAME:   "StaticDataMultiReg{theta:[tensor<f64>]}{reg:1,reg2:2}{}[[[uid:[0-9]+]]]" = 1 : i64
-# CHECK-SAME:   target_gate = "HybridOpArg{angle:[tensor<f64>]}{cwires:1}{}[5678]"
+# CHECK-SAME:   "{op = \22NoParams\22, wires = [1]}" = 1 : i64,
+# CHECK-SAME:   "{op = \22StaticDataMultiReg\22, params = [{{\[}}tensor<f64>]], uid = [[uid:[0-9]+]] : i64, wires = [1, 2]}" = 1 : i64
+# CHECK-SAME:   target_gate = "{op = \22HybridOpArg\22, params = [{{\[}}tensor<f64>]], uid = 5678 : i64, wires = [1]}"
 # CHECK: "qref.operator"
 # CHECK-SAME:   UID = [[uid]] : i64, op_name = "StaticDataMultiReg"
 test_from_hybrid_op()
@@ -612,14 +650,14 @@ def test_to_hybrid_op_nested():
     with qp.decomposition.local_decomps():
         qp.add_decomps(NoParams, rule)
         result = compile_decomposition_rules_wrapper(
-            "NoParams", "NoParams{}{reg:3}{}", {}, {"reg": 3}, {}
+            "NoParams", build_graph_op_key("NoParams", {}, {"reg": 3}, {}), {}, {"reg": 3}, {}
         )
         print(result)
 
 
-# CHECK: func.func private @"rule_NoParams{}{reg:3}{}"
-# CHECK-SAME: "HybridOpArg{angle:[tensor<f64>]}{cwires:1}{}[[[uid:[0-9]+]]]" = 1
-# CHECK-SAME:   target_gate = "NoParams{}{reg:3}{}"
+# CHECK: func.func private @"rule_{op = \22NoParams\22, wires = [3]}"
+# CHECK-SAME: "{op = \22HybridOpArg\22, params = [{{\[}}tensor<f64>]], uid = [[uid:[0-9]+]] : i64, wires = [1]}" = 1
+# CHECK-SAME:   target_gate = "{op = \22NoParams\22, wires = [3]}"
 # CHECK: "qref.operator"
 # CHECK-SAME: UID = [[uid]]
 test_to_hybrid_op_nested()
@@ -643,7 +681,13 @@ def test_from_hybrid_op_nested():
         qp.add_decomps(HybridOpArg, rule)
         result = compile_decomposition_rules_wrapper(
             "HybridOpArg",
-            "HybridOpArg{angle:[tensor<f64>]}{cwires:1}{}[7654]",
+            build_graph_op_key(
+                "HybridOpArg",
+                {"angle": ["tensor<f64>"]},
+                {"cwires": 1},
+                {},
+                uid=7654,
+            ),
             {"angle": ["f64"]},
             {"cwires": 1},
             {},
@@ -660,12 +704,12 @@ def test_from_hybrid_op_nested():
         print(result)
 
 
-# CHECK: func.func private @"rule_HybridOpArg{angle:[tensor<f64>]}{cwires:1}{}[7654]"
+# CHECK: func.func private @"rule_{op = \22HybridOpArg\22, params = [{{\[}}tensor<f64>]], uid = 7654 : i64, wires = [1]}"
 # CHECK-SAME:   resources = {operations = {
-# CHECK-SAME:   "HybridOpArg{angle:[tensor<f64>]}{cwires:1}{}[[[uid_outer:[0-9]+]]]" = 1 : i64,
-# CHECK-SAME:   "NoParams{}{reg:1}{}" = 1 : i64,
-# CHECK-SAME:   "StaticDataMultiReg{theta:[tensor<f64>]}{reg:1,reg2:2}{}[[[uid_inner:[0-9]+]]]" = 1 : i64
-# CHECK-SAME:   target_gate = "HybridOpArg{angle:[tensor<f64>]}{cwires:1}{}[7654]"
+# CHECK-SAME:   "{op = \22HybridOpArg\22, params = [{{\[}}tensor<f64>]], uid = [[uid_outer:[0-9]+]] : i64, wires = [1]}" = 1 : i64,
+# CHECK-SAME:   "{op = \22NoParams\22, wires = [1]}" = 1 : i64,
+# CHECK-SAME:   "{op = \22StaticDataMultiReg\22, params = [{{\[}}tensor<f64>]], uid = [[uid_inner:[0-9]+]] : i64, wires = [1, 2]}" = 1 : i64
+# CHECK-SAME:   target_gate = "{op = \22HybridOpArg\22, params = [{{\[}}tensor<f64>]], uid = 7654 : i64, wires = [1]}"
 # CHECK: "qref.operator"
 # CHECK-SAME:   UID = [[uid_outer]] : i64, op_name = "HybridOpArg"
 # CHECK: "qref.operator"
@@ -724,14 +768,14 @@ def test_to_multiple_full_args_op():
     with qp.decomposition.local_decomps():
         qp.add_decomps(NoParams, rule)
         result = compile_decomposition_rules_wrapper(
-            "NoParams", "NoParams{}{reg:3}{}", {}, {"reg": 3}, {}
+            "NoParams", build_graph_op_key("NoParams", {}, {"reg": 3}, {}), {}, {"reg": 3}, {}
         )
         print(result)
 
 
-# CHECK: func.func private @"rule_NoParams{}{reg:3}{}"
-# CHECK-DAG: "MultipleFullArgs{angles1:[tensor<f64>],angles2:[tensor<2xf64>]}{reg1:1,reg2:2}{}[[[uid:[0-9]+]]]" = 2
-# CHECK-DAG:   target_gate = "NoParams{}{reg:3}{}"
+# CHECK: func.func private @"rule_{op = \22NoParams\22, wires = [3]}"
+# CHECK-DAG: "{op = \22MultipleFullArgs\22, params = [{{\[}}tensor<f64>], [tensor<2xf64>]], uid = [[uid:[0-9]+]] : i64, wires = [1, 2]}" = 2
+# CHECK-DAG:   target_gate = "{op = \22NoParams\22, wires = [3]}"
 # CHECK: "qref.operator"
 # CHECK-SAME: UID = [[uid]]
 # CHECK: "qref.operator"
@@ -759,7 +803,16 @@ def test_from_multiple_full_args_op():
         qp.add_decomps(MultipleFullArgs, rule)
         result = compile_decomposition_rules_wrapper(
             "MultipleFullArgs",
-            "MultipleFullArgs{angles1:[tensor<f64>],angles2:[tensor<2xf64>]}{reg1:1,reg2:2}{}[4444]",
+            build_graph_op_key(
+                "MultipleFullArgs",
+                {
+                    "angles1": ["tensor<f64>"],
+                    "angles2": ["tensor<2xf64>"],
+                },
+                {"reg1": 1, "reg2": 2},
+                {},
+                uid=4444,
+            ),
             {"angles1": ["f64"], "angles2": ["f64", "f64"]},
             {"reg1": 1, "reg2": 2},
             {},
@@ -775,12 +828,12 @@ def test_from_multiple_full_args_op():
         print(result)
 
 
-# CHECK: func.func private @"rule_MultipleFullArgs{angles1:[tensor<f64>],angles2:[tensor<2xf64>]}{reg1:1,reg2:2}{}[4444]"
+# CHECK: func.func private @"rule_{op = \22MultipleFullArgs\22, params = [{{\[}}tensor<f64>], [tensor<2xf64>]], uid = 4444 : i64, wires = [1, 2]}"
 # CHECK-SAME:   resources = {operations = {
-# CHECK-SAME:   "NoParams{}{reg:1}{}" = 1 : i64
-# CHECK-SAME:   "SingleParam{x:[tensor<f64>]}{reg:1}{}" = 1 : i64
-# CHECK-SAME:   "SingleParam{x:[tensor<i64>]}{reg:1}{}" = 1 : i64
-# CHECK-SAME:   target_gate = "MultipleFullArgs{angles1:[tensor<f64>],angles2:[tensor<2xf64>]}{reg1:1,reg2:2}{}[4444]"
+# CHECK-SAME:   "{op = \22NoParams\22, wires = [1]}" = 1 : i64
+# CHECK-SAME:   "{op = \22SingleParam\22, params = [{{\[}}tensor<f64>]], wires = [1]}" = 1 : i64
+# CHECK-SAME:   "{op = \22SingleParam\22, params = [{{\[}}tensor<i64>]], wires = [1]}" = 1 : i64
+# CHECK-SAME:   target_gate = "{op = \22MultipleFullArgs\22, params = [{{\[}}tensor<f64>], [tensor<2xf64>]], uid = 4444 : i64, wires = [1, 2]}"
 # CHECK: "qref.operator"
 # CHECK-SAME:   op_name = "SingleParam"
 # CHECK: "qref.operator"
@@ -817,17 +870,17 @@ def test_multiple_rules():
         qp.add_decomps(NoParams, rule1)
         qp.add_decomps(NoParams, rule2)
         result = compile_decomposition_rules_wrapper(
-            "NoParams", "NoParams{}{reg:1}{}", {}, {"reg": 1}, {}
+            "NoParams", build_graph_op_key("NoParams", {}, {"reg": 1}, {}), {}, {"reg": 1}, {}
         )
         print(result)
 
 
-# CHECK: func.func private @"rule1_NoParams{}{reg:1}{}"
-# CHECK-SAME:   resources = {operations = {"SingleParam{x:[tensor<f64>]}{reg:1}{}" = 1 : i64}}
-# CHECK-SAME:   target_gate = "NoParams{}{reg:1}{}"
-# CHECK: func.func private @"rule2_NoParams{}{reg:1}{}"
-# CHECK-SAME:   resources = {operations = {"CompilableData{}{wires:3}{a:a,b:b,thing:thing}" = 1 : i64}}
-# CHECK-SAME:   target_gate = "NoParams{}{reg:1}{}"
+# CHECK: func.func private @"rule1_{op = \22NoParams\22, wires = [1]}"
+# CHECK-SAME:   resources = {operations = {"{op = \22SingleParam\22, params = [{{\[}}tensor<f64>]], wires = [1]}" = 1 : i64}}
+# CHECK-SAME:   target_gate = "{op = \22NoParams\22, wires = [1]}"
+# CHECK: func.func private @"rule2_{op = \22NoParams\22, wires = [1]}"
+# CHECK-SAME:   resources = {operations = {"{op = \22CompilableData\22, static = {a = \22a\22, b = \22b\22, thing = \22thing\22}, wires = [3]}" = 1 : i64}}
+# CHECK-SAME:   target_gate = "{op = \22NoParams\22, wires = [1]}"
 test_multiple_rules()
 
 
@@ -860,14 +913,23 @@ def test_for_loop():
         qp.add_decomps(LayerRX, test_rule)
 
         result = compile_decomposition_rules_wrapper(
-            "LayerRX", "TestID", {"angles": ["f64", "f64", "f64"]}, {"wires": 3}, {}
+            "LayerRX",
+            build_graph_op_key(
+                "LayerRX",
+                {"angles": ["tensor<f64>", "tensor<f64>", "tensor<f64>"]},
+                {"wires": 3},
+                {},
+            ),
+            {"angles": ["f64", "f64", "f64"]},
+            {"wires": 3},
+            {},
         )
         print(result)
 
 
-# CHECK: func.func private @test_rule_TestID
-# CHECK-SAME:   resources = {operations = {"TestRX{0:[f64]}{wires:1}{}" = 3 : i64}}
-# CHECK-SAME:   target_gate = "TestID"
+# CHECK: func.func private @"test_rule_{op = \22LayerRX\22, params = [{{\[}}tensor<f64>, tensor<f64>, tensor<f64>]], wires = [3]}"
+# CHECK-SAME:   resources = {operations = {"{op = \22TestRX\22, params = [{{\[}}f64]], wires = [1]}" = 3 : i64}}
+# CHECK-SAME:   target_gate = "{op = \22LayerRX\22, params = [{{\[}}tensor<f64>, tensor<f64>, tensor<f64>]], wires = [3]}"
 # CHECK-DAG: arith.constant 0 : index
 # CHECK-DAG: arith.constant 3 : index
 # CHECK-DAG: arith.constant 1 : index
@@ -891,7 +953,15 @@ def test_if():
 
     qp.add_decomps(TestOp, if_decomp)
 
-    print(compile_decomposition_rules_wrapper("TestOp", "IfID", {"flag": ["i1"]}, {"wires": 1}, {}))
+    print(
+        compile_decomposition_rules_wrapper(
+            "TestOp",
+            build_graph_op_key("TestOp", {"flag": ["tensor<i1>"]}, {"wires": 1}, {}),
+            {"flag": ["i1"]},
+            {"wires": 1},
+            {},
+        )
+    )
 
 
 # CHECK: if_decomp
@@ -923,7 +993,13 @@ def test_while_loop():
 
     print(
         compile_decomposition_rules_wrapper(
-            "WhileOp", "whileID", {"angle": ["f64"]}, {"wires": 1}, {}
+            "WhileOp",
+            build_graph_op_key(
+                "WhileOp", {"angle": ["tensor<f64>"]}, {"wires": 1}, {}
+            ),
+            {"angle": ["f64"]},
+            {"wires": 1},
+            {},
         )
     )
 
@@ -944,7 +1020,7 @@ def test_custom_op_numbered_args():
     print(
         compile_decomposition_rules_wrapper(
             "RZ",
-            "RZ{0:[f64]}{wires:2}{}",
+            build_graph_op_key("RZ", {"0": ["f64"]}, {"wires": 2}, {}),
             {"0": ["f64"]},
             {"wires": 1},
             {},
@@ -972,15 +1048,15 @@ def test_rule_with_helper_functions():
     with qp.decomposition.local_decomps():
         qp.add_decomps(NoParams, rule)
         result = compile_decomposition_rules_wrapper(
-            "NoParams", "NoParams{}{reg:1}{}", {}, {"reg": 1}, {}
+            "NoParams", build_graph_op_key("NoParams", {}, {"reg": 1}, {}), {}, {"reg": 1}, {}
         )
         print(result)
 
 
-# CHECK: func.func private @"rule_NoParams{}{reg:1}{}"
+# CHECK: func.func private @"rule_{op = \22NoParams\22, wires = [1]}"
 # CHECK-SAME:   resources = {operations = {
-# CHECK-SAME:   "MultiParams{a:[tensor<f64>],b:[tensor<f64>],c:[tensor<f64>]}{reg:1}{}" = 1 : i64
-# CHECK-SAME:   target_gate = "NoParams{}{reg:1}{}"
+# CHECK-SAME:   "{op = \22MultiParams\22, params = [{{\[}}tensor<f64>], [tensor<f64>], [tensor<f64>]], wires = [1]}" = 1 : i64
+# CHECK-SAME:   target_gate = "{op = \22NoParams\22, wires = [1]}"
 # CHECK: stablehlo.constant dense<4.200000e+00> : tensor<f64>
 # CHECK-NOT: call
 # CHECK-NOT: my_helper

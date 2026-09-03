@@ -38,8 +38,8 @@ func.func @distribution(%ctrl: !quantum.bit, %q: !quantum.bit) -> (!quantum.bit,
 
 // C(U) distributed to two controlled Hadamards (value-agnostic: controls on all-ones).
 func.func private @ctrl_u(%q: !quantum.bit, %ctrl: !quantum.bit) -> (!quantum.bit, !quantum.bit) attributes {
-    target_gate = "C(U){}{wires:1}{}",
-    resources = {operations = {"C(Hadamard){}{wires:1}{}" = 2 : i64}} } {
+    target_gate = "{op = \"U\", traits = {controls = 1 : i64}, wires = [1]}",
+    resources = {operations = {"{op = \"Hadamard\", traits = {controls = 1 : i64}, wires = [1]}" = 2 : i64}} } {
   %true = arith.constant true
   %a, %ac = quantum.custom "Hadamard"() %q ctrls(%ctrl) ctrlvals(%true) : !quantum.bit ctrls !quantum.bit
   %b, %bc = quantum.custom "Hadamard"() %a ctrls(%ac) ctrlvals(%true) : !quantum.bit ctrls !quantum.bit

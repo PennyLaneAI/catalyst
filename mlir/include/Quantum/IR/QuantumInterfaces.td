@@ -207,17 +207,14 @@ def DecomposableGate : OpInterface<"DecomposableGate", [QuantumGate]> {
         >,
         InterfaceMethod<
             "Return a string representation of any additional data an operator may need to provide"
-            " for uniqueness (ex. UID), or emptystring if not applicable.",
+            " for uniqueness (ex. UID), or an empty string if not applicable.",
             "std::string", "getExtraData", (ins), [{}], [{ return ""; }]
         >,
         InterfaceMethod<
             "Return the operation's ID for use with the graph. "
-            "This should be computed by the following convention:\n"
-            "```\n"
-            "name + {map params to list of types} + {map wire args to number of wires} + {static data} + [extra data]\n"
-            "```\n"
-            "Note that extra data is currently specific to `OperatorOp`s, and should only appear when present."
-            "Each of these maps should be sorted lexicographically by key."
+            "Dynamic parameter type groups and wire lengths are identified positionally in "
+            "frontend-signature/operand order; frontend argument names are not part of identity. "
+            "Note that extra data is currently specific to `OperatorOp`s, and should only appear when present. "
             "In general, this should be computed by the default here and not overridden.",
             "std::string", "getGraphOpId", (ins), [{}], [{ return ::catalyst::quantum::defaultGetGraphOpId($_op.getOperation()); }]
         >

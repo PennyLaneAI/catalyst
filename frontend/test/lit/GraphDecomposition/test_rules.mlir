@@ -13,7 +13,7 @@
 // limitations under the License.
 
 
-func.func @__builtin_h_to_rz_ry(%q0 : !quantum.bit) -> !quantum.bit attributes {target_gate="testHadamard{}{wires:1}{}"} {
+func.func @__builtin_h_to_rz_ry(%q0 : !quantum.bit) -> !quantum.bit attributes {target_gate="{op = \"testHadamard\", wires = [1]}"} {
     %piby2 = arith.constant 1.57 : f64
     %pi = arith.constant 3.14 : f64
     %negpiby2 = arith.constant -3.14 : f64
@@ -22,7 +22,7 @@ func.func @__builtin_h_to_rz_ry(%q0 : !quantum.bit) -> !quantum.bit attributes {
     return %q2 : !quantum.bit
 }
 
-func.func @__builtin_h_to_rz_rx(%q0 : !quantum.bit) -> !quantum.bit attributes {target_gate="testHadamard{}{wires:1}{}"} {
+func.func @__builtin_h_to_rz_rx(%q0 : !quantum.bit) -> !quantum.bit attributes {target_gate="{op = \"testHadamard\", wires = [1]}"} {
     %piby2 = arith.constant 1.57 : f64
     %negpiby2 = arith.constant -3.14 : f64
     %q1 = quantum.custom "testRZ"(%piby2) %q0 : !quantum.bit
@@ -31,14 +31,14 @@ func.func @__builtin_h_to_rz_rx(%q0 : !quantum.bit) -> !quantum.bit attributes {
     return %q3 : !quantum.bit
 }
 
-func.func @__builtin_x_to_rx(%q0 : !quantum.bit) -> !quantum.bit attributes {target_gate="testPauliX{}{wires:1}{}"} {
+func.func @__builtin_x_to_rx(%q0 : !quantum.bit) -> !quantum.bit attributes {target_gate="{op = \"testPauliX\", wires = [1]}"} {
     %pi = arith.constant 3.14 : f64
     %negpiby2 = arith.constant -3.14 : f64
     %q1 = quantum.custom "testRX"(%pi) %q0 : !quantum.bit
     return %q1 : !quantum.bit
 }
 
-func.func @__builtin_rx_to_rz_ry(%angle : f64, %q0 : !quantum.bit) -> !quantum.bit attributes {target_gate="testRX{0:[f64]}{wires:1}{}"} {
+func.func @__builtin_rx_to_rz_ry(%angle : f64, %q0 : !quantum.bit) -> !quantum.bit attributes {target_gate="{op = \"testRX\", params = [[f64]], wires = [1]}"} {
     %piby2 = arith.constant 1.57 : f64
     %negpiby2 = arith.constant -3.14 : f64
     %q1 = quantum.custom "testRZ"(%piby2) %q0 : !quantum.bit

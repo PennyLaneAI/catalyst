@@ -26,7 +26,7 @@ func.func @controlled_id_match(%ctrl: !quantum.bit, %q: !quantum.bit) -> (!quant
 }
 
 func.func private @ctrl_u(%q: !quantum.bit, %ctrl: !quantum.bit, %cv: i1) -> (!quantum.bit, !quantum.bit)
-    attributes {target_gate = "C(U){}{wires:1}{}", llvm.linkage = #llvm.linkage<internal>} {
+    attributes {target_gate = "{op = \"U\", traits = {controls = 1 : i64}, wires = [1]}", llvm.linkage = #llvm.linkage<internal>} {
   %o, %oc = quantum.custom "Hadamard"() %q ctrls(%ctrl) ctrlvals(%cv) : !quantum.bit ctrls !quantum.bit
   return %o, %oc : !quantum.bit, !quantum.bit
 }
@@ -45,7 +45,7 @@ func.func @no_base_rule_fallback(%ctrl: !quantum.bit, %q: !quantum.bit, %theta: 
 }
 
 func.func private @plain_rx(%theta: f64, %q: !quantum.bit) -> !quantum.bit
-    attributes {target_gate = "RX", llvm.linkage = #llvm.linkage<internal>} {
+    attributes {target_gate = "{op = \"RX\", params = [[f64]], wires = [1]}", llvm.linkage = #llvm.linkage<internal>} {
   %o = quantum.custom "PauliX"() %q : !quantum.bit
   return %o : !quantum.bit
 }
@@ -68,13 +68,13 @@ func.func @distinct_from_base(%ctrl: !quantum.bit, %q0: !quantum.bit, %q1: !quan
 }
 
 func.func private @base_u(%q: !quantum.bit) -> !quantum.bit
-    attributes {target_gate = "U{}{wires:1}{}", llvm.linkage = #llvm.linkage<internal>} {
+    attributes {target_gate = "{op = \"U\", wires = [1]}", llvm.linkage = #llvm.linkage<internal>} {
   %o = quantum.custom "PauliX"() %q : !quantum.bit
   return %o : !quantum.bit
 }
 
 func.func private @ctrl_u2(%q: !quantum.bit, %ctrl: !quantum.bit, %cv: i1) -> (!quantum.bit, !quantum.bit)
-    attributes {target_gate = "C(U){}{wires:1}{}", llvm.linkage = #llvm.linkage<internal>} {
+    attributes {target_gate = "{op = \"U\", traits = {controls = 1 : i64}, wires = [1]}", llvm.linkage = #llvm.linkage<internal>} {
   %o, %oc = quantum.custom "PauliZ"() %q ctrls(%ctrl) ctrlvals(%cv) : !quantum.bit ctrls !quantum.bit
   return %o, %oc : !quantum.bit, !quantum.bit
 }

@@ -18,21 +18,21 @@
 
 module @test_module {
     // CHECK: func.func private @my_X_decomp
-    func.func private @my_X_decomp(%q: !quantum.bit) -> !quantum.bit attributes {target_gate="X"} {
+    func.func private @my_X_decomp(%q: !quantum.bit) -> !quantum.bit attributes {target_gate="{op = \"X\", wires = [1]}"} {
         %angle = arith.constant 1.57 : f64
         %out = quantum.custom "RX"(%angle) %q : !quantum.bit
         return %out : !quantum.bit
     }
 
     // CHECK: func.func private @my_Y_decomp
-    func.func private @my_Y_decomp(%q: !quantum.bit) -> !quantum.bit attributes {target_gate="Y"} {
+    func.func private @my_Y_decomp(%q: !quantum.bit) -> !quantum.bit attributes {target_gate="{op = \"Y\", wires = [1]}"} {
         %angle = arith.constant 1.57 : f64
         %out = quantum.custom "RY"(%angle) %q : !quantum.bit
         return %out : !quantum.bit
     }
 
     // CHECK: func.func private @my_Z_decomp
-    func.func private @my_Z_decomp(%q: !quantum.bit) -> !quantum.bit attributes {target_gate="Z"} {
+    func.func private @my_Z_decomp(%q: !quantum.bit) -> !quantum.bit attributes {target_gate="{op = \"Z\", wires = [1]}"} {
         %angle = arith.constant 1.57 : f64
         %out = quantum.custom "RZ"(%angle) %q : !quantum.bit
         return %out : !quantum.bit

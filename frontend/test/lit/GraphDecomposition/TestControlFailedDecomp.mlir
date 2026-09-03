@@ -14,7 +14,7 @@
 
 // RUN: not --crash catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{gate-set=Foo=1.0})' %s 2>&1 | FileCheck %s
 
-// CHECK: Decomposition rule not found for operator 'id: C(Bar){}{wires:1}{}'
+// CHECK: Decomposition rule not found for operator 'id: {op = "Bar", traits = {controls = 1 : i64}, wires = [1]}'
 func.func @circuit(%ctrl: !quantum.bit, %q: !quantum.bit) -> (!quantum.bit, !quantum.bit) {
   %true = arith.constant true
   %out, %outc = quantum.custom "Bar"() %q ctrls(%ctrl) ctrlvals(%true) : !quantum.bit ctrls !quantum.bit
@@ -24,8 +24,8 @@ func.func @circuit(%ctrl: !quantum.bit, %q: !quantum.bit) -> (!quantum.bit, !qua
 // A decomposition for the base Bar op. It is never applicable to the controlled
 // Bar above, illustrating that Bar and C(Bar) require separate rules.
 func.func private @bar_to_foo(%q: !quantum.bit) -> !quantum.bit attributes {
-    target_gate = "Bar{}{wires:1}{}",
-    resources = {operations = {"Foo{}{wires:1}{}" = 1 : i64}} } {
+    target_gate = "{op = \"Bar\", wires = [1]}",
+    resources = {operations = {"{op = \"Foo\", wires = [1]}" = 1 : i64}} } {
   %o = quantum.custom "Foo"() %q : !quantum.bit
   return %o : !quantum.bit
 }

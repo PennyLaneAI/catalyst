@@ -78,7 +78,7 @@ module {
 
     ASSERT_EQ(customOp.getStaticData().size(), 0);
 
-    ASSERT_EQ(customOp.getGraphOpId(), "RX{0:[f64]}{wires:2}{}");
+    ASSERT_EQ(customOp.getGraphOpId(), "{op = \"RX\", params = [[f64]], wires = [2]}");
 }
 
 TEST(DecomposableGateInterfaceTests, MultiControlledCustomOp) {
@@ -100,8 +100,7 @@ module {
 
     DecomposableGate op = *module->getOps<CustomOp>().begin();
 
-    // Two control wires fold as `2C(...)`
-    ASSERT_EQ(op.getGraphOpId(), "2C(PauliX){}{wires:1}{}");
+    ASSERT_EQ(op.getGraphOpId(), "{op = \"PauliX\", traits = {controls = 2 : i64}, wires = [1]}");
 }
 
 TEST(DecomposableGateInterfaceTests, ControlledAdjointCustomOp) {
@@ -123,8 +122,9 @@ module {
 
     DecomposableGate op = *module->getOps<CustomOp>().begin();
 
-    // Modifiers fold control-outermost
-    ASSERT_EQ(op.getGraphOpId(), "C(Adjoint(RX)){0:[f64]}{wires:1}{}");
+    ASSERT_EQ(op.getGraphOpId(),
+              "{op = \"RX\", params = [[f64]], traits = {adj = true, controls = 1 : "
+              "i64}, wires = [1]}");
 }
 
 TEST(DecomposableGateInterfaceTests, MultiControlledAdjointCustomOp) {
@@ -147,8 +147,9 @@ module {
 
     DecomposableGate op = *module->getOps<CustomOp>().begin();
 
-    // Controls + Adjoint folding
-    ASSERT_EQ(op.getGraphOpId(), "2C(Adjoint(RX)){0:[f64]}{wires:1}{}");
+    ASSERT_EQ(op.getGraphOpId(),
+              "{op = \"RX\", params = [[f64]], traits = {adj = true, controls = 2 : "
+              "i64}, wires = [1]}");
 }
 
 TEST(DecomposableGateInterfaceTests, MultiRZOp) {
@@ -182,7 +183,7 @@ module {
 
     ASSERT_EQ(multiRZ.getStaticData().size(), 0);
 
-    ASSERT_EQ(multiRZ.getGraphOpId(), "MultiRZ{theta:[f64]}{wires:3}{}");
+    ASSERT_EQ(multiRZ.getGraphOpId(), "{op = \"MultiRZ\", params = [[f64]], wires = [3]}");
 }
 
 TEST(DecomposableGateInterfaceTests, PauliRotOp) {
@@ -219,7 +220,9 @@ module {
     mlir::DictionaryAttr expectedStaticData = mlir::DictionaryAttr::get(&context, {entry});
     ASSERT_EQ(paulirot.getStaticData(), expectedStaticData);
 
-    ASSERT_EQ(paulirot.getGraphOpId(), "PauliRot{theta:[f64]}{wires:3}{pauli_word:XYZ}");
+    ASSERT_EQ(paulirot.getGraphOpId(),
+              "{op = \"PauliRot\", params = [[f64]], static = {pauli_word = \"XYZ\"}, "
+              "wires = [3]}");
 }
 
 TEST(DecomposableGateInterfaceTests, PCPhaseOP) {
@@ -257,8 +260,9 @@ module {
     mlir::DictionaryAttr expectedStaticData = mlir::DictionaryAttr::get(&context, {entry});
     ASSERT_EQ(pcphase.getStaticData(), expectedStaticData);
 
-    // The op carries one control wire, folded into the id (control-outermost).
-    ASSERT_EQ(pcphase.getGraphOpId(), "C(PCPhase){phi:[f64]}{wires:2}{dim:0}");
+    ASSERT_EQ(pcphase.getGraphOpId(),
+              "{op = \"PCPhase\", params = [[f64]], static = {dim = 0 : i64}, traits = "
+              "{controls = 1 : i64}, wires = [2]}");
 }
 
 TEST(DecomposableGateInterfaceTests, GlobalPhaseOp) {
@@ -289,7 +293,7 @@ module {
 
     ASSERT_EQ(gphase.getStaticData().size(), 0);
 
-    ASSERT_EQ(gphase.getGraphOpId(), "GlobalPhase{phi:[f64]}{}{}");
+    ASSERT_EQ(gphase.getGraphOpId(), "{op = \"GlobalPhase\", params = [[f64]]}");
 }
 
 TEST(DecomposableGateInterfaceTests, ControlledGlobalPhaseOp) {
@@ -322,9 +326,8 @@ module {
 
     ASSERT_EQ(gphase.getStaticData().size(), 0);
 
-    // Controlled global phase: the control wire is folded into the id (this is the `C(GlobalPhase)`
-    // operator, which a rule maps to `PhaseShift`/`ControlledPhaseShift`).
-    ASSERT_EQ(gphase.getGraphOpId(), "C(GlobalPhase){phi:[f64]}{}{}");
+    ASSERT_EQ(gphase.getGraphOpId(),
+              "{op = \"GlobalPhase\", params = [[f64]], traits = {controls = 1 : i64}}");
 }
 
 TEST(DecomposableGateInterfaceTests, QubitUnitaryOp) {
@@ -361,7 +364,9 @@ module {
 
     ASSERT_EQ(unitary.getStaticData().size(), 0);
 
-    ASSERT_EQ(unitary.getGraphOpId(), "C(QubitUnitary){U:[tensor<4x4xcomplex<f64>>]}{wires:2}{}");
+    ASSERT_EQ(unitary.getGraphOpId(),
+              "{op = \"QubitUnitary\", params = [[tensor<4x4xcomplex<f64>>]], traits = "
+              "{controls = 1 : i64}, wires = [2]}");
 }
 
 TEST(DecomposableGateInterfaceTests, OperatorOpQubits) {
@@ -372,7 +377,7 @@ module {
   %index = arith.constant 5 : i64
   %q0 = quantum.alloc_qb : !quantum.bit
   %q1 = quantum.alloc_qb : !quantum.bit
-  %0:2 = quantum.operator "testInterfaceOp"(%flag: i1, %angle: f64, %index: i64) qubits(%q0, %q1) static_data = {"myStaticArray"=[1,2,3], "myStaticString"="Test", "myStaticInt"=4} param_map = {flag = [0], angle = [1], index = [2]} qubit_map = {wire1 = [0], wire2 = [1]}
+  %0:2 = quantum.operator "testInterfaceOp"(%flag: i1, %angle: f64, %index: i64) qubits(%q0, %q1) static_data = {"myDelimitedString"="a,b{c}", "myStaticArray"=[1,2,3], "myStaticBool"=true, "myStaticFloat"=3.14, "myStaticString"="Test", "myStaticInt"=4} param_map = {flag = [0], angle = [1], index = [2]} qubit_map = {wire1 = [0], wire2 = [1]}
 }
     )mlir";
 
@@ -411,13 +416,24 @@ module {
 
     mlir::NamedAttribute intAttr(mlir::StringAttr::get(&context, "myStaticInt"),
                                  mlir::IntegerAttr::get(i64, 4));
-    mlir::DictionaryAttr expectedStaticData =
-        mlir::DictionaryAttr::get(&context, {arrAttr, stringAttr, intAttr});
+    mlir::NamedAttribute boolAttr(mlir::StringAttr::get(&context, "myStaticBool"),
+                                  mlir::BoolAttr::get(&context, true));
+    mlir::NamedAttribute floatAttr(mlir::StringAttr::get(&context, "myStaticFloat"),
+                                   mlir::FloatAttr::get(Float64Type::get(&context), 3.14));
+    mlir::NamedAttribute delimitedStringAttr(mlir::StringAttr::get(&context, "myDelimitedString"),
+                                             mlir::StringAttr::get(&context, "a,b{c}"));
+    mlir::DictionaryAttr expectedStaticData = mlir::DictionaryAttr::get(
+        &context, {arrAttr, stringAttr, intAttr, boolAttr, floatAttr, delimitedStringAttr});
     ASSERT_EQ(op.getStaticData(), expectedStaticData);
 
-    ASSERT_EQ(op.getGraphOpId(),
-              "testInterfaceOp{angle:[f64],flag:[i1],index:[i64]}{wire1:1,wire2:1}{"
-              "myStaticArray:[1,2,3],myStaticInt:4,myStaticString:Test}");
+    // Kept byte-for-byte in sync with the frontend typed-payload fixture.
+    ASSERT_EQ(
+        op.getGraphOpId(),
+        "{op = \"testInterfaceOp\", params = [[i1], [f64], "
+        "[i64]], static = {myDelimitedString = \"a,b{c}\", myStaticArray = [1, 2, 3], "
+        "myStaticBool = true, "
+        "myStaticFloat = 3.140000e+00 : f64, myStaticInt = 4 : i64, myStaticString = \"Test\"}, "
+        "wires = [1, 1]}");
 }
 
 TEST(DecomposableGateInterfaceTests, OperatorOpQureg) {
@@ -475,8 +491,9 @@ func.func @testfunc(%first : tensor<1xi64>, %secondthird : tensor<2xi64>) {
     ASSERT_EQ(op.getStaticData(), expectedStaticData);
 
     ASSERT_EQ(op.getGraphOpId(),
-              "testOperatorQureg{angle:[f64],flag:[i1],index:[i64]}{reg:3}{"
-              "myStaticArray:[4,2.400000e+00,4],myStaticInt:8,myStaticString:string}");
+              "{op = \"testOperatorQureg\", params = [[i1], [f64], [i64]], static = "
+              "{myStaticArray = [4, 2.400000e+00, 4], myStaticInt = 8 : i64, "
+              "myStaticString = \"string\"}, wires = [3]}");
 }
 
 TEST(DecomposableGateInterfaceTests, OperatorOpUID) {
@@ -517,7 +534,7 @@ func.func @testfunc(%first : tensor<1xi64>, %secondthird : tensor<2xi64>, %arg1 
 
     ASSERT_EQ(op.getStaticData(), mlir::DictionaryAttr::get(&context, {}));
 
-    ASSERT_EQ(op.getGraphOpId(), "testOperatorUID{angle:[tensor<f64>],index:["
-                                 "tensor<i1>,tensor<i64>]}{reg:3}{}[248]");
+    ASSERT_EQ(op.getGraphOpId(), "{op = \"testOperatorUID\", params = [[tensor<i1>, tensor<i64>], "
+                                 "[tensor<f64>]], uid = 248 : i64, wires = [3]}");
     // TODO: better separate these tests to unittests
 }

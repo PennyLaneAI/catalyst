@@ -38,10 +38,13 @@ from catalyst.decomposition.decomposition_rules import (
     fetch_all_reachable_decomposition_rules_from_op,
     inject_new_rules_into_module,
 )
-from catalyst.decomposition.graph_op_id import _SPECIAL_LOWERINGS
+from catalyst.decomposition.graph_op_id import (
+    _SPECIAL_LOWERINGS,
+    build_graph_op_key,
+    is_custom_op,
+)
 from catalyst.decomposition.type_utils import (
     convert_item_to_mlir_type,
-    format_dynamic_params_for_id,
 )
 from catalyst.jax_extras.lowering import get_mlir_attribute_from_pyval
 from catalyst.jax_extras.patches import mock_attributes
@@ -94,17 +97,6 @@ def _qref_operator_p_abstract_eval(*args, **kwargs):
     return []
 
 
-def _is_custom_op(op_cls, avals_in):
-    if op_cls.static_argnames or op_cls.hybrid_argnames or op_cls.compilable_argnames:
-        return False
-    if op_cls.wire_argnames != ("wires",):
-        return False
-    if list(op_cls._sig.parameters.keys())[-1] != "wires":
-        return False
-    # Complex dtypes cannot be safely cast to float64
-    return all(p.shape == () and p.dtype.kind in "ifu" for p in avals_in)
-
-
 def _is_qref_qubit(val) -> bool:
     val_type = val.type
     return (
@@ -112,6 +104,11 @@ def _is_qref_qubit(val) -> bool:
         and ir.OpaqueType(val_type).dialect_namespace == "qref"
         and ir.OpaqueType(val_type).data == "bit"
     )
+
+
+def _group_start_index(named_attr) -> int:
+    """Return the first flattened operand position covered by an argument group."""
+    return min(int(index) for index in named_attr.attr)
 
 
 def _general_validation(*args, op_cls, wire_lens, **kwargs):
@@ -245,12 +242,11 @@ def compile_decomp_rules(
     if is_custom_op:
         dynamic_shape = {str(i): ["f64"] for i in range(len(op_cls.dynamic_argnames))}
 
-        op_id = (
-            op_cls.__name__
-            + format_dynamic_params_for_id(dynamic_shape)
-            + "{"
-            + f"wires:{wire_lens[0]}"
-            + "}{}"
+        op_id = build_graph_op_key(
+            op_cls.__name__,
+            dynamic_shape,
+            {"wires": wire_lens[0]},
+            {},
         )
 
         decomp_rules = fetch_all_reachable_decomposition_rules_from_op(
@@ -265,12 +261,11 @@ def compile_decomp_rules(
     elif op_cls is qp.MultiRZ:
         dynamic_shape = {qp.MultiRZ.dynamic_argnames[0]: ["f64"]}
         wire_argname = qp.MultiRZ.wire_argnames[0]
-        op_id = (
-            "MultiRZ"
-            + format_dynamic_params_for_id(dynamic_shape)
-            + "{"
-            + f"{wire_argname}:{wire_lens[0]}"
-            + "}{}"
+        op_id = build_graph_op_key(
+            "MultiRZ",
+            dynamic_shape,
+            {wire_argname: wire_lens[0]},
+            {},
         )
 
         decomp_rules = fetch_all_reachable_decomposition_rules_from_op(
@@ -285,15 +280,11 @@ def compile_decomp_rules(
         dynamic_shape = {qp.PauliRot.dynamic_argnames[0]: ["f64"]}
         wire_argname = qp.PauliRot.wire_argnames[0]
         pauliword_argname = qp.PauliRot.compilable_argnames[0]
-        op_id = (
-            "PauliRot"
-            + format_dynamic_params_for_id(dynamic_shape)
-            + "{"
-            + f"{wire_argname}:{wire_lens[0]}"
-            + "}"
-            + "{"
-            + f"{pauliword_argname}:{repack_static_data[pauliword_argname]}"
-            + "}"
+        op_id = build_graph_op_key(
+            "PauliRot",
+            dynamic_shape,
+            {wire_argname: wire_lens[0]},
+            repack_static_data,
         )
 
         decomp_rules = fetch_all_reachable_decomposition_rules_from_op(
@@ -307,14 +298,11 @@ def compile_decomp_rules(
     elif op_cls is qp.PCPhase:
         dynamic_shape = {qp.PCPhase.dynamic_argnames[0]: ["f64"]}
         wire_argname = qp.PCPhase.wire_argnames[0]
-        op_id = (
-            "PCPhase"
-            + format_dynamic_params_for_id(dynamic_shape)
-            + "{"
-            + f"{wire_argname}:{wire_lens[0]}"
-            + "}{"
-            + f"dim:{repack_static_data["dim"]}"
-            + "}"
+        op_id = build_graph_op_key(
+            "PCPhase",
+            dynamic_shape,
+            {wire_argname: wire_lens[0]},
+            repack_static_data,
         )
 
         decomp_rules = fetch_all_reachable_decomposition_rules_from_op(
@@ -327,7 +315,7 @@ def compile_decomp_rules(
 
     elif op_cls is qp.GlobalPhase:
         dynamic_shape = {qp.GlobalPhase.dynamic_argnames[0]: ["f64"]}
-        op_id = "GlobalPhase" + format_dynamic_params_for_id(dynamic_shape) + "{}{}"
+        op_id = build_graph_op_key("GlobalPhase", dynamic_shape, {}, {})
 
         decomp_rules = fetch_all_reachable_decomposition_rules_from_op(
             op_name="GlobalPhase",
@@ -346,12 +334,11 @@ def compile_decomp_rules(
             ]
         }
         wire_argname = qp.QubitUnitary.wire_argnames[0]
-        op_id = (
-            "QubitUnitary"
-            + format_dynamic_params_for_id(dynamic_shape)
-            + "{"
-            + f"{wire_argname}:{wire_lens[0]}"
-            + "}{}"
+        op_id = build_graph_op_key(
+            "QubitUnitary",
+            dynamic_shape,
+            {wire_argname: wire_lens[0]},
+            {},
         )
 
         decomp_rules = fetch_all_reachable_decomposition_rules_from_op(
@@ -414,7 +401,10 @@ def compile_decomp_rules(
 
         with_hybrid_dynamic_shape = {}
         if param_map is not None:
-            for named_attr in param_map:
+            # MLIR dictionary attributes print by name; recover frontend/operand order from the
+            # flattened parameter indices before constructing the positional GraphOpID payload.
+            ordered_param_groups = sorted(param_map, key=_group_start_index)
+            for named_attr in ordered_param_groups:
                 with_hybrid_dynamic_shape[named_attr.name] = [
                     params[idx].type for idx in named_attr.attr
                 ]
@@ -424,22 +414,17 @@ def compile_decomp_rules(
 
         with_hybrid_wire_lens = {}
         if qubit_map is not None:
-            for wire_attr in qubit_map:
+            ordered_wire_groups = sorted(qubit_map, key=_group_start_index)
+            for wire_attr in ordered_wire_groups:
                 with_hybrid_wire_lens[wire_attr.name] = len(wire_attr.attr)
 
-        op_id = (
-            op_cls.__name__
-            + format_dynamic_params_for_id(dict(sorted(with_hybrid_dynamic_shape.items())))
-            + "{"
-            + ",".join(f"{name}:{shape}" for name, shape in sorted(with_hybrid_wire_lens.items()))
-            + "}"
+        op_id = build_graph_op_key(
+            op_cls.__name__,
+            with_hybrid_dynamic_shape,
+            with_hybrid_wire_lens,
+            repack_static_data if not (op_cls.hybrid_argnames or op_cls.static_argnames) else {},
+            uid=uid,
         )
-        if not (op_cls.hybrid_argnames or op_cls.static_argnames):
-            op_id += "{" + ",".join(f"{k}:{v}" for k, v in sorted(repack_static_data.items())) + "}"
-        else:
-            op_id += "{}"
-        if uid is not None:
-            op_id += f"[{str(uid)}]"
 
         decomp_rules = fetch_all_reachable_decomposition_rules_from_op(
             op_name=op_cls.__name__,
@@ -503,7 +488,7 @@ def _qref_operator_p_lowering(jax_ctx: mlir.LoweringRuleContext, *args, op_cls, 
 
     # Lowering to qref.custom
     # Custom op only has float dynamic args, followed by a single wire argname "wires" at the end
-    if _is_custom_op(op_cls, jax_ctx.avals_in[: len(op_cls.dynamic_argnames)]):
+    if is_custom_op(op_cls, jax_ctx.avals_in[: len(op_cls.dynamic_argnames)]):
         expected_len = len(op_cls.dynamic_argnames) + sum(wire_lens)
         assert len(args) == expected_len, f"Incorrect number of operands for {op_cls.__name__}."
 

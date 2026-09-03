@@ -25,7 +25,7 @@ func.func @circuit() -> !quantum.bit {
     return %qout : !quantum.bit
 }
 
-func.func @custom_decomp(%q0 : !quantum.bit) -> !quantum.bit attributes {target_gate = "testHadamard{}{wires:1}{}", resources = { operations = { "testRX{0:1}{wires:1}{}"=2, "testRZ{0:1}{wires:1}{}"=1}}} {
+func.func @custom_decomp(%q0 : !quantum.bit) -> !quantum.bit attributes {target_gate = "{op = \"testHadamard\", wires = [1]}", resources = { operations = { "{op = \"testRX\", params = [[f64]], wires = [1]}" = 2, "{op = \"testRZ\", params = [[f64]], wires = [1]}" = 1}}} {
     %cst = arith.constant 1.5707963267948966 : f64
     %q1 = quantum.custom "testRX"(%cst) %q0 : !quantum.bit
     %q2 = quantum.custom "testRZ"(%cst) %q1 : !quantum.bit

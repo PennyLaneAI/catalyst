@@ -27,6 +27,7 @@ from pennylane.typing import Float, Wire
 from catalyst.decomposition.decomposition_rules import (
     compile_reachable_decomposition_rules_wrapper,
 )
+from catalyst.decomposition.graph_op_id import build_graph_op_key
 
 
 def _base_rule():
@@ -61,16 +62,19 @@ def test_on_demand_adjoint_id_routes_to_adjoint_rules():
         qp.add_decomps(NoParams, _base_rule())
         qp.add_decomps("Adjoint(NoParams)", _adj_rule())
 
+        adjoint_id = build_graph_op_key(
+            "NoParams", {}, {"reg": 2}, {}, adjoint=True
+        )
         out = compile_reachable_decomposition_rules_wrapper(
-            "NoParams", "Adjoint(NoParams){}{reg:2}{}", {}, {"reg": 2}, {}, is_custom_op=False
+            "NoParams", adjoint_id, {}, {"reg": 2}, {}, is_custom_op=False
         )
 
         print(out)
 
     # CHECK: module {
-    # CHECK-DAG: func.func private @"__builtin_base_rule_NoParams{}{reg:2}{}"{{.*}}"SingleParam{{.*}}target_gate = "NoParams{}{reg:2}{}"
-    # CHECK-DAG: func.func private @"__builtin_adj_rule_Adjoint(NoParams){}{reg:2}{}"{{.*}}"SingleParam{{.*}} = 2 : i64{{.*}}target_gate = "Adjoint(NoParams){}{reg:2}{}"
-    # CHECK-DAG: func.func private @"__builtin_base_rule_Adjoint(NoParams){}{reg:2}{}"{{.*}}"Adjoint(SingleParam{{.*}}target_gate = "Adjoint(NoParams){}{reg:2}{}"
+    # CHECK-DAG: func.func private @"__builtin_base_rule_{op = \22NoParams\22, wires = [2]}"{{.*}}"{op = \22SingleParam\22{{.*}}target_gate = "{op = \22NoParams\22
+    # CHECK-DAG: func.func private @"__builtin_adj_rule_{op = \22NoParams\22, traits = {adj = true}, wires = [2]}"{{.*}}"{op = \22SingleParam\22{{.*}} = 2 : i64{{.*}}target_gate = "{op = \22NoParams\22, traits = {adj = true}
+    # CHECK-DAG: func.func private @"__builtin_base_rule_{op = \22NoParams\22, traits = {adj = true}, wires = [2]}"{{.*}}"{op = \22SingleParam\22{{.*}}traits = {adj = true}{{.*}}target_gate = "{op = \22NoParams\22, traits = {adj = true}
     # CHECK: qref.adjoint
 
 

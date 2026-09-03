@@ -25,8 +25,8 @@ func.func @parametric(%q: !quantum.bit, %theta: f64) -> !quantum.bit {
 }
 
 func.func private @adj_rz(%theta: f64, %q: !quantum.bit) -> !quantum.bit attributes {
-    target_gate = "Adjoint(testRZ){0:[f64]}{wires:1}{}",
-    resources = {operations = {"testRZ{0:[f64]}{wires:1}{}" = 1 : i64}} } {
+    target_gate = "{op = \"testRZ\", params = [[f64]], traits = {adj = true}, wires = [1]}",
+    resources = {operations = {"{op = \"testRZ\", params = [[f64]], wires = [1]}" = 1 : i64}} } {
   %neg = arith.negf %theta : f64
   %o = quantum.custom "testRZ"(%neg) %q : !quantum.bit
   return %o : !quantum.bit

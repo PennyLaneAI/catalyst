@@ -33,8 +33,8 @@ func.func @decompose_to_adjoint(%q: !quantum.bit) -> !quantum.bit {
 }
 
 func.func private @s_to_adjt(%q: !quantum.bit) -> !quantum.bit attributes {
-    target_gate = "testS{}{wires:1}{}",
-    resources = {operations = {"Adjoint(testT){}{wires:1}{}" = 1 : i64}} } {
+    target_gate = "{op = \"testS\", wires = [1]}",
+    resources = {operations = {"{op = \"testT\", traits = {adj = true}, wires = [1]}" = 1 : i64}} } {
   %o = quantum.custom "testT"() %q adj : !quantum.bit
   return %o : !quantum.bit
 }

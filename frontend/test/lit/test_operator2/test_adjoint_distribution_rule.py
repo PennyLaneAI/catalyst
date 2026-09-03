@@ -47,11 +47,11 @@ def test_distribution_rule_synthesized_from_base():
             return qp.state()
 
         print(c.mlir)
-    # CHECK-DAG: func.func private @"__builtin_base_rule_NoParams{}{reg:2}{}"
-    # CHECK:   target_gate = "NoParams{}{reg:2}{}"
-    # CHECK-DAG: func.func private @"__builtin_base_rule_Adjoint(NoParams){}{reg:2}{}"
-    # CHECK-SAME:   resources = {operations = {"Adjoint(SingleParam){x:[tensor<f64>]}{reg:2}{}" = 2 : i64}
-    # CHECK:   target_gate = "Adjoint(NoParams){}{reg:2}{}"
+    # CHECK-DAG: func.func private @"__builtin_base_rule_{op = \22NoParams\22, wires = [2]}"
+    # CHECK:   target_gate = "{op = \22NoParams\22, wires = [2]}"
+    # CHECK-DAG: func.func private @"__builtin_base_rule_{op = \22NoParams\22, traits = {adj = true}, wires = [2]}"
+    # CHECK-SAME:   resources = {operations = {"{op = \22SingleParam\22, params = [{{\[}}tensor<f64>]], traits = {adj = true}, wires = [2]}" = 2 : i64}
+    # CHECK:   target_gate = "{op = \22NoParams\22, traits = {adj = true}, wires = [2]}"
     # CHECK: qref.adjoint {
 
 

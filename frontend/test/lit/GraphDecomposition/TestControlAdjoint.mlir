@@ -40,8 +40,8 @@ func.func @plain_controlled(%ctrl: !quantum.bit, %q: !quantum.bit) -> (!quantum.
 
 // C(Adjoint(U)) -> two C(Adjoint(H)).
 func.func private @ctrl_adj_u(%q: !quantum.bit, %ctrl: !quantum.bit) -> (!quantum.bit, !quantum.bit) attributes {
-    target_gate = "C(Adjoint(U)){}{wires:1}{}",
-    resources = {operations = {"C(Adjoint(H)){}{wires:1}{}" = 2 : i64}} } {
+    target_gate = "{op = \"U\", traits = {adj = true, controls = 1 : i64}, wires = [1]}",
+    resources = {operations = {"{op = \"H\", traits = {adj = true, controls = 1 : i64}, wires = [1]}" = 2 : i64}} } {
   %true = arith.constant true
   %a, %ac = quantum.custom "H"() %q adj ctrls(%ctrl) ctrlvals(%true) : !quantum.bit ctrls !quantum.bit
   %b, %bc = quantum.custom "H"() %a adj ctrls(%ac) ctrlvals(%true) : !quantum.bit ctrls !quantum.bit
@@ -50,8 +50,8 @@ func.func private @ctrl_adj_u(%q: !quantum.bit, %ctrl: !quantum.bit) -> (!quantu
 
 // C(U) -> a single C(H).
 func.func private @ctrl_u(%q: !quantum.bit, %ctrl: !quantum.bit) -> (!quantum.bit, !quantum.bit) attributes {
-    target_gate = "C(U){}{wires:1}{}",
-    resources = {operations = {"C(H){}{wires:1}{}" = 1 : i64}} } {
+    target_gate = "{op = \"U\", traits = {controls = 1 : i64}, wires = [1]}",
+    resources = {operations = {"{op = \"H\", traits = {controls = 1 : i64}, wires = [1]}" = 1 : i64}} } {
   %true = arith.constant true
   %o, %oc = quantum.custom "H"() %q ctrls(%ctrl) ctrlvals(%true) : !quantum.bit ctrls !quantum.bit
   return %o, %oc : !quantum.bit, !quantum.bit

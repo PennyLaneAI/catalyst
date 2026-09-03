@@ -14,8 +14,8 @@
 
 // RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{gate-set=C(testT)=1.0 alt-decomps=myCZ{}{wires:2}{}=cz_to_ct})' %s | FileCheck %s
 
-// A controlled op that is already in the gate set stays untouched (its id `C(testT){}{wires:1}{}`
-// matches the `C(testT)` gate-set entry -- it is NOT stripped to its base `testT`).
+// A controlled op that is already in the gate set stays untouched: the controlled ID
+// matches the controlled gate-set entry and is not stripped to its base operator.
 // CHECK-LABEL: func.func @ctrl_in_gateset(
 // CHECK-SAME:  [[C:%.+]]: !quantum.bit, [[Q:%.+]]: !quantum.bit
 func.func @ctrl_in_gateset(%c: !quantum.bit, %q: !quantum.bit) -> (!quantum.bit, !quantum.bit) {
@@ -37,8 +37,8 @@ func.func @decompose_to_ctrl(%q0: !quantum.bit, %q1: !quantum.bit) -> (!quantum.
 }
 
 func.func private @cz_to_ct(%q0: !quantum.bit, %q1: !quantum.bit) -> (!quantum.bit, !quantum.bit) attributes {
-    target_gate = "myCZ{}{wires:2}{}",
-    resources = {operations = {"C(testT){}{wires:1}{}" = 1 : i64}} } {
+    target_gate = "{op = \"myCZ\", wires = [2]}",
+    resources = {operations = {"{op = \"testT\", traits = {controls = 1 : i64}, wires = [1]}" = 1 : i64}} } {
   %true = arith.constant true
   %oq, %oc = quantum.custom "testT"() %q1 ctrls(%q0) ctrlvals(%true) : !quantum.bit ctrls !quantum.bit
   return %oc, %oq : !quantum.bit, !quantum.bit

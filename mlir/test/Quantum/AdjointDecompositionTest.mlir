@@ -27,7 +27,7 @@ func.func @self_adjoint(%q: !quantum.bit) -> !quantum.bit {
 }
 
 func.func private @adj_h(%q: !quantum.bit) -> !quantum.bit
-    attributes {target_gate = "Adjoint(Hadamard){}{wires:1}{}", llvm.linkage = #llvm.linkage<internal>} {
+    attributes {target_gate = "{op = \"Hadamard\", traits = {adj = true}, wires = [1]}", llvm.linkage = #llvm.linkage<internal>} {
   %o = quantum.custom "Hadamard"() %q : !quantum.bit
   return %o : !quantum.bit
 }
@@ -47,7 +47,7 @@ func.func @no_base_rule_fallback(%q: !quantum.bit, %theta: f64) -> !quantum.bit 
 }
 
 func.func private @plain_rx(%theta: f64, %q: !quantum.bit) -> !quantum.bit
-    attributes {target_gate = "RX", llvm.linkage = #llvm.linkage<internal>} {
+    attributes {target_gate = "{op = \"RX\", params = [[f64]], wires = [1]}", llvm.linkage = #llvm.linkage<internal>} {
   %o = quantum.custom "PauliX"() %q : !quantum.bit
   return %o : !quantum.bit
 }
@@ -67,7 +67,7 @@ func.func @parametric_negation(%q: !quantum.bit, %theta: f64) -> !quantum.bit {
 }
 
 func.func private @adj_rz(%theta: f64, %q: !quantum.bit) -> !quantum.bit
-    attributes {target_gate = "Adjoint(RZ){0:[f64]}{wires:1}{}", llvm.linkage = #llvm.linkage<internal>} {
+    attributes {target_gate = "{op = \"RZ\", params = [[f64]], traits = {adj = true}, wires = [1]}", llvm.linkage = #llvm.linkage<internal>} {
   %neg = arith.negf %theta : f64
   %o = quantum.custom "RZ"(%neg) %q : !quantum.bit
   return %o : !quantum.bit
@@ -92,13 +92,13 @@ func.func @distinct_from_base(%q0: !quantum.bit, %q1: !quantum.bit) -> (!quantum
 }
 
 func.func private @base_h(%q: !quantum.bit) -> !quantum.bit
-    attributes {target_gate = "Hadamard{}{wires:1}{}", llvm.linkage = #llvm.linkage<internal>} {
+    attributes {target_gate = "{op = \"Hadamard\", wires = [1]}", llvm.linkage = #llvm.linkage<internal>} {
   %o = quantum.custom "PauliX"() %q : !quantum.bit
   return %o : !quantum.bit
 }
 
 func.func private @adj_h2(%q: !quantum.bit) -> !quantum.bit
-    attributes {target_gate = "Adjoint(Hadamard){}{wires:1}{}", llvm.linkage = #llvm.linkage<internal>} {
+    attributes {target_gate = "{op = \"Hadamard\", traits = {adj = true}, wires = [1]}", llvm.linkage = #llvm.linkage<internal>} {
   %o = quantum.custom "PauliZ"() %q : !quantum.bit
   return %o : !quantum.bit
 }
@@ -118,7 +118,7 @@ func.func @non_self_adjoint(%q: !quantum.bit) -> !quantum.bit {
 }
 
 func.func private @adj_s(%q: !quantum.bit) -> !quantum.bit
-    attributes {target_gate = "Adjoint(S){}{wires:1}{}", llvm.linkage = #llvm.linkage<internal>} {
+    attributes {target_gate = "{op = \"S\", traits = {adj = true}, wires = [1]}", llvm.linkage = #llvm.linkage<internal>} {
   %angle = arith.constant -1.5707963267948966 : f64
   %o = quantum.custom "PhaseShift"(%angle) %q : !quantum.bit
   return %o : !quantum.bit
@@ -140,7 +140,7 @@ func.func @distribution(%q: !quantum.bit) -> !quantum.bit {
 }
 
 func.func private @adj_u(%q: !quantum.bit) -> !quantum.bit
-    attributes {target_gate = "Adjoint(U){}{wires:1}{}", llvm.linkage = #llvm.linkage<internal>} {
+    attributes {target_gate = "{op = \"U\", traits = {adj = true}, wires = [1]}", llvm.linkage = #llvm.linkage<internal>} {
   %a = quantum.custom "PauliX"() %q adj : !quantum.bit
   %b = quantum.custom "T"() %a adj : !quantum.bit
   %c = quantum.custom "Hadamard"() %b adj : !quantum.bit
@@ -148,19 +148,19 @@ func.func private @adj_u(%q: !quantum.bit) -> !quantum.bit
 }
 
 func.func private @adj_h3(%q: !quantum.bit) -> !quantum.bit
-    attributes {target_gate = "Adjoint(Hadamard){}{wires:1}{}", llvm.linkage = #llvm.linkage<internal>} {
+    attributes {target_gate = "{op = \"Hadamard\", traits = {adj = true}, wires = [1]}", llvm.linkage = #llvm.linkage<internal>} {
   %o = quantum.custom "Hadamard"() %q : !quantum.bit
   return %o : !quantum.bit
 }
 
 func.func private @adj_x(%q: !quantum.bit) -> !quantum.bit
-    attributes {target_gate = "Adjoint(PauliX){}{wires:1}{}", llvm.linkage = #llvm.linkage<internal>} {
+    attributes {target_gate = "{op = \"PauliX\", traits = {adj = true}, wires = [1]}", llvm.linkage = #llvm.linkage<internal>} {
   %o = quantum.custom "PauliX"() %q : !quantum.bit
   return %o : !quantum.bit
 }
 
 func.func private @adj_t(%q: !quantum.bit) -> !quantum.bit
-    attributes {target_gate = "Adjoint(T){}{wires:1}{}", llvm.linkage = #llvm.linkage<internal>} {
+    attributes {target_gate = "{op = \"T\", traits = {adj = true}, wires = [1]}", llvm.linkage = #llvm.linkage<internal>} {
   %angle = arith.constant -0.78539816339744828 : f64
   %o = quantum.custom "PhaseShift"(%angle) %q : !quantum.bit
   return %o : !quantum.bit
@@ -183,7 +183,7 @@ func.func @decomp_produces_adjoint(%q: !quantum.bit) -> !quantum.bit {
 }
 
 func.func private @mygate(%q: !quantum.bit) -> !quantum.bit
-    attributes {target_gate = "MyGate{}{wires:1}{}", llvm.linkage = #llvm.linkage<internal>} {
+    attributes {target_gate = "{op = \"MyGate\", wires = [1]}", llvm.linkage = #llvm.linkage<internal>} {
   %a = quantum.custom "Hadamard"() %q : !quantum.bit
   %b = quantum.custom "T"() %a adj : !quantum.bit
   %c = quantum.custom "Hadamard"() %b : !quantum.bit
@@ -191,7 +191,7 @@ func.func private @mygate(%q: !quantum.bit) -> !quantum.bit
 }
 
 func.func private @adj_t2(%q: !quantum.bit) -> !quantum.bit
-    attributes {target_gate = "Adjoint(T){}{wires:1}{}", llvm.linkage = #llvm.linkage<internal>} {
+    attributes {target_gate = "{op = \"T\", traits = {adj = true}, wires = [1]}", llvm.linkage = #llvm.linkage<internal>} {
   %angle = arith.constant -0.78539816339744828 : f64
   %o = quantum.custom "PhaseShift"(%angle) %q : !quantum.bit
   return %o : !quantum.bit

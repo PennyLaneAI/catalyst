@@ -26,8 +26,8 @@ func.func @distribute_ctrl_region(%q0: !quantum.bit, %q1: !quantum.bit) -> (!qua
 // myCZ decomposes to a single controlled testT, expressed as a `quantum.ctrl` region over testT.
 // CHECK-LABEL: func.func private @cz_region
 func.func private @cz_region(%q0: !quantum.bit, %q1: !quantum.bit) -> (!quantum.bit, !quantum.bit) attributes {
-    target_gate = "myCZ{}{wires:2}{}",
-    resources = {operations = {"C(testT){}{wires:1}{}" = 1 : i64}} } {
+    target_gate = "{op = \"myCZ\", wires = [2]}",
+    resources = {operations = {"{op = \"testT\", traits = {controls = 1 : i64}, wires = [1]}" = 1 : i64}} } {
   %true = arith.constant true
   %oc, %oq = quantum.ctrl(%q0) ctrlvals(%true) (%q1) : !quantum.bit -> !quantum.bit {
   ^bb0(%arg0: !quantum.bit):

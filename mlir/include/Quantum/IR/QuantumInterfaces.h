@@ -31,7 +31,7 @@ namespace quantum {
 
 std::string defaultGetGraphOpId(mlir::Operation *op);
 
-}
+} // namespace quantum
 } // namespace catalyst
 
 #include "Quantum/IR/QuantumInterfaces.h.inc"
