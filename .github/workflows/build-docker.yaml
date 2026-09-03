@@ -9,8 +9,7 @@ on:
 jobs:
   build:
     name: Build Docker Image
-    runs-on:
-      group: 'PL Additional Runners'
+    runs-on: blacksmith-8vcpu-ubuntu-2404	
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
