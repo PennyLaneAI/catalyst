@@ -189,3 +189,22 @@ def cdf_controlled(t: float):
 
 
 print(cdf_controlled.mlir)
+
+
+@qp.qjit(capture=True, target="mlir", collect_decomp_rules=True)
+@qp.qnode(qp.device("null.qubit", wires=2 * N))
+def cdf_with_rules(t: float):
+    # CHECK-LABEL: func.func public @cdf_with_rules
+
+    # The operator still lowers with its tensor operands...
+    # CHECK: qref.operator "TrotterCDF"({{%.+}}: tensor<f64>, {{%.+}}: tensor<2x2x2xf64>, {{%.+}}: tensor<2x2x2xf64>, {{%.+}}: tensor<f64>)
+    # CHECK: param_map = {evolution_time = [0], hamiltonian = [1, 2, 3]}
+    qp.TrotterCDF(evolution_time=t, num_trotter_steps=2, hamiltonian=CDF, wires=range(2 * N))
+    return qp.state()
+
+
+# CHECK: func.func private @"__builtin__trotter_cdf_decomposition_TrotterCDF{
+# CHECK-SAME: evolution_time:[tensor<f64>]
+# CHECK-SAME: hamiltonian:[tensor<2x2x2xf64>,tensor<2x2x2xf64>,tensor<f64>]
+# CHECK-SAME: {wires:4}
+print(cdf_with_rules.mlir)
