@@ -288,7 +288,7 @@ ENV C_COMPILER=/usr/bin/gcc
 ENV CXX_COMPILER=/usr/bin/g++
 ENV LLVM_BUILD_DIR=/opt/catalyst/llvm-build
 
-RUN git clone --depth 1 --branch ${CATALYST_VERSION} --recurse-submodules --shallow-submodules \
+RUN git clone --depth 1 --branch ${CATALYST_VERSION} \
     https://github.com/PennyLaneAI/catalyst.git /tmp/catalyst-src \
     && cp -a /tmp/catalyst-src/. /opt/catalyst/ \
     && rm -rf /tmp/catalyst-src
