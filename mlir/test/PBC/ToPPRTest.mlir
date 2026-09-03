@@ -293,3 +293,42 @@ func.func private @"some_decomp_rule"(%arg0: tensor<1xf64>, %arg1: tensor<1xi64>
     %3 = quantum.insert %arg2[%extracted], %out_qubits : !quantum.reg, !quantum.bit
     return %3 : !quantum.reg
 }
+
+// -----
+
+func.func @test_ppr_operator_to_ppr(%q0 : !quantum.bit, %q1 : !quantum.bit) {
+    %0:2 = quantum.operator "PPR"() qubits(%q0, %q1)
+        static_data = {angle_denominator = 4 : i64, pauli_word = "XY"}
+    // CHECK: pbc.ppr ["X", "Y"](8)
+    func.return
+}
+
+// -----
+
+func.func @test_negative_and_adjoint_ppr_operator(%q0 : !quantum.bit) {
+    %0 = quantum.operator "PPR"() qubits(%q0)
+        static_data = {angle_denominator = -2 : i64, pauli_word = "Z"}
+    %1 = quantum.operator "PPR"() adj qubits(%0)
+        static_data = {angle_denominator = 1 : i64, pauli_word = "X"}
+    // CHECK: pbc.ppr ["Z"](-4)
+    // CHECK: pbc.ppr ["X"](-2)
+    func.return
+}
+
+// -----
+
+func.func @test_ppr_operator_missing_angle_denominator(%q : !quantum.bit) {
+    // expected-error @+1 {{failed to legalize operation 'quantum.operator' that was explicitly marked illegal}}
+    %0 = quantum.operator "PPR"() qubits(%q) // expected-error @+0 {{PPR operator requires an integer 'angle_denominator' in static_data}}
+        static_data = {pauli_word = "X"}
+    func.return
+}
+
+// -----
+
+func.func @test_ppr_operator_unsupported_angle_denominator(%q : !quantum.bit) {
+    // expected-error @+1 {{failed to legalize operation 'quantum.operator' that was explicitly marked illegal}}
+    %0 = quantum.operator "PPR"() qubits(%q) // expected-error @+0 {{unsupported PPR angle denominator: 3}}
+        static_data = {angle_denominator = 3 : i64, pauli_word = "X"}
+    func.return
+}
