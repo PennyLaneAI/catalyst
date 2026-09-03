@@ -284,8 +284,7 @@ ENV PYTHON=/opt/python/cp313-cp313/bin/python
 ENV PATH="/opt/python/cp313-cp313/bin:${PATH}"
 RUN python -m pip install numpy "nanobind<2.13" pybind11 PyYAML cmake ninja
 
-ENV C_COMPILER=$(which gcc) 
-ENV CXX_COMPILER=$(which g++) 
+
 ENV LLVM_BUILD_DIR=/opt/catalyst/llvm-build
 
 RUN git clone --depth 1 --branch ${CATALYST_VERSION} --recurse-submodules --shallow-submodules \
@@ -296,8 +295,8 @@ RUN git clone --depth 1 --branch ${CATALYST_VERSION} --recurse-submodules --shal
 # ENV LLVM_TARGETS=check-mlir
 
 RUN PYTHON=$PYTHON \
-    C_COMPILER=$C_COMPILER \
-    CXX_COMPILER=$CXX_COMPILER \
+    C_COMPILER=$(which gcc)  \
+    CXX_COMPILER=$(which g++)  \
     LLVM_BUILD_DIR="/opt/catalyst/llvm-build" \
     LLVM_PROJECTS="lld;mlir" \
     LLVM_TARGETS="lld check-mlir" \
