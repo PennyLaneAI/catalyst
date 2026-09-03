@@ -81,7 +81,6 @@ RUNTIME_OPERATIONS = [
     "ISWAP",
     "MultiRZ",
     "PauliRot",
-    "PPR",
     "PauliMeasure",
     "PauliX",
     "PauliY",

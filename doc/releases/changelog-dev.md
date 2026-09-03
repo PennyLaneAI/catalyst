@@ -479,6 +479,10 @@
 * Added ``CZ`` support to ``to-ppr`` pass.
   [(#3009)](https://github.com/PennyLaneAI/catalyst/pull/3009)
 
+* ``to_ppr`` now directly lowers PennyLane's discrete ``PPR`` operator to ``pbc.ppr``, without
+  first decomposing it through ``PauliRot``.
+  [(#10107)](https://github.com/PennyLaneAI/pennylane/pull/10107)
+
 <h3>Breaking changes 💔</h3>
 
 * Removes :func:`~.passes.ppm_specs` and the ``--ppm-specs`` MLIR pass. Use :func:`~.specs` and

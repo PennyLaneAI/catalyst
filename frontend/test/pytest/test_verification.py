@@ -131,16 +131,6 @@ class PauliX2(qp.PauliX):
         return "PauliX2"
 
 
-def test_ppr_is_supported_by_qjit_capabilities():
-    """Test that QJIT preserves a target device's PPR support."""
-    dev = get_custom_device(native_gates={"PPR"}, wires=1)
-    target_capabilities = get_device_capabilities(dev, shots=None)
-
-    qjit_capabilities = get_qjit_device_capabilities(target_capabilities)
-
-    assert "PPR" in qjit_capabilities.operations
-
-
 @patch("catalyst.device.qjit_device.catalyst_decompose", null_transform)
 def test_unsupported_ops_raise_an_error():
     """Test that an unsupported op raises an error"""

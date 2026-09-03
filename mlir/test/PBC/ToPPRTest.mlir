@@ -296,22 +296,50 @@ func.func private @"some_decomp_rule"(%arg0: tensor<1xf64>, %arg1: tensor<1xi64>
 
 // -----
 
+// CHECK-LABEL: func.func @test_ppr_operator_to_ppr
 func.func @test_ppr_operator_to_ppr(%q0 : !quantum.bit, %q1 : !quantum.bit) {
+    // CHECK-NOT: quantum.operator
+    // CHECK: [[out:%.+]]:2 = pbc.ppr ["X", "Y"](8) [[q0:%.+]], [[q1:%.+]]
     %0:2 = quantum.operator "PPR"() qubits(%q0, %q1)
         static_data = {angle_denominator = 4 : i64, pauli_word = "XY"}
-    // CHECK: pbc.ppr ["X", "Y"](8)
+    // CHECK-NOT: quantum.operator
+    // CHECK: return
     func.return
 }
 
 // -----
 
+// CHECK-LABEL: func.func @test_negative_and_adjoint_ppr_operator
 func.func @test_negative_and_adjoint_ppr_operator(%q0 : !quantum.bit) {
+    // CHECK-NOT: quantum.operator
+    // CHECK: [[q0_0:%.+]] = pbc.ppr ["Z"](-4) [[q0:%.+]]
     %0 = quantum.operator "PPR"() qubits(%q0)
         static_data = {angle_denominator = -2 : i64, pauli_word = "Z"}
+    // The second PPR consumes the first PPR's output, not the original input qubit.
+    // CHECK: pbc.ppr ["X"](-2) [[q0_0]]
     %1 = quantum.operator "PPR"() adj qubits(%0)
         static_data = {angle_denominator = 1 : i64, pauli_word = "X"}
-    // CHECK: pbc.ppr ["Z"](-4)
-    // CHECK: pbc.ppr ["X"](-2)
+    // CHECK-NOT: quantum.operator
+    // CHECK: return
+    func.return
+}
+
+// -----
+
+func.func @test_ppr_operator_register_mode_unsupported(%r : !quantum.reg, %idx : tensor<1xi64>) {
+    // expected-error @+1 {{failed to legalize operation 'quantum.operator' that was explicitly marked illegal}}
+    %0 = quantum.operator "PPR"() // expected-error @+0 {{PPR operator requires qubit mode, not register mode}}
+        quregs(%r) indices(%idx : tensor<1xi64>)
+        static_data = {angle_denominator = 4 : i64, pauli_word = "X"}
+    func.return
+}
+
+// -----
+
+func.func @test_ppr_operator_zero_qubits_unsupported() {
+    // expected-error @+1 {{failed to legalize operation 'quantum.operator' that was explicitly marked illegal}}
+    quantum.operator "PPR"() // expected-error @+0 {{PPR operator requires at least one qubit}}
+        static_data = {angle_denominator = 4 : i64, pauli_word = ""}
     func.return
 }
 
@@ -330,5 +358,27 @@ func.func @test_ppr_operator_unsupported_angle_denominator(%q : !quantum.bit) {
     // expected-error @+1 {{failed to legalize operation 'quantum.operator' that was explicitly marked illegal}}
     %0 = quantum.operator "PPR"() qubits(%q) // expected-error @+0 {{unsupported PPR angle denominator: 3}}
         static_data = {angle_denominator = 3 : i64, pauli_word = "X"}
+    func.return
+}
+
+// -----
+
+// A signed integer type (as opposed to signless) must not be accepted: IntegerAttr::getInt()
+// asserts on non-signless types, which would otherwise crash the compiler.
+func.func @test_ppr_operator_signed_angle_denominator(%q : !quantum.bit) {
+    // expected-error @+1 {{failed to legalize operation 'quantum.operator' that was explicitly marked illegal}}
+    %0 = quantum.operator "PPR"() qubits(%q) // expected-error @+0 {{PPR operator requires an integer 'angle_denominator' in static_data}}
+        static_data = {angle_denominator = 4 : si64, pauli_word = "X"}
+    func.return
+}
+
+// -----
+
+// A 1-bit signless integer (e.g. a bare `true`/`false` literal) must be rejected rather than
+// silently sign-extended to -1 by IntegerAttr::getInt().
+func.func @test_ppr_operator_i1_angle_denominator(%q : !quantum.bit) {
+    // expected-error @+1 {{failed to legalize operation 'quantum.operator' that was explicitly marked illegal}}
+    %0 = quantum.operator "PPR"() qubits(%q) // expected-error @+0 {{PPR operator requires an integer 'angle_denominator' in static_data}}
+        static_data = {angle_denominator = true, pauli_word = "X"}
     func.return
 }

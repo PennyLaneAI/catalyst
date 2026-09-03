@@ -412,8 +412,11 @@ LogicalResult convertPauliRotGate(PauliRotOp op, ConversionPatternRewriter &rewr
 }
 
 LogicalResult convertPPROperator(OperatorOp op, ConversionPatternRewriter &rewriter) {
-    if (op.getInQreg() || op.getInQubits().empty()) {
-        return op.emitOpError("PPR operator requires qubit mode");
+    if (op.getInQreg()) {
+        return op.emitOpError("PPR operator requires qubit mode, not register mode");
+    }
+    if (op.getInQubits().empty()) {
+        return op.emitOpError("PPR operator requires at least one qubit");
     }
     if (!op.getAllParams().empty()) {
         return op.emitOpError("PPR operator does not support dynamic parameters");
@@ -421,7 +424,15 @@ LogicalResult convertPPROperator(OperatorOp op, ConversionPatternRewriter &rewri
 
     DictionaryAttr staticData = op.getStaticData();
     auto denominatorAttr = staticData.getAs<IntegerAttr>("angle_denominator");
-    if (!denominatorAttr) {
+    // `getInt()` below asserts that the attribute's type is a signless integer (or index), and
+    // sign-extends the stored bits to produce the result. Reject anything that isn't a signless
+    // integer with enough bits to unambiguously represent the denominators we support (at least
+    // ±1, ±2, ±4): a signed/unsigned type would trip that assertion (crashing the compiler),
+    // while a signless i1 (e.g. a bare `true`/`false` literal) would silently sign-extend to -1.
+    bool isValidDenominatorType = denominatorAttr &&
+                                  denominatorAttr.getType().isSignlessInteger() &&
+                                  denominatorAttr.getType().getIntOrFloatBitWidth() >= 2;
+    if (!isValidDenominatorType) {
         return op.emitOpError(
             "PPR operator requires an integer 'angle_denominator' in static_data");
     }
