@@ -760,15 +760,8 @@
   overall readability.
   [(#3005)](https://github.com/PennyLaneAI/catalyst/pull/3005)
 
-* The `transport` dialect is now documented alongside the other Catalyst dialects, covering its
-  18 operations, three passes, and the `catalyst.backline` attributes a Backline placement is
-  serialized into. The `backline` and `node` attribute parameters gained descriptions, without
-  which mlir-tblgen emitted a ragged markdown table that docutils dropped from the rendered page.
+* The `transport` and `executor` dialects are now documented alongside the other Catalyst dialects.
   [(#3179)](https://github.com/PennyLaneAI/catalyst/pull/3179)
-* The `executor` dialect is now documented alongside the other Catalyst dialects, covering its
-  seven operations, two passes, and the `!executor.session` and `!executor.token` types. The types
-  needed their own `-gen-typedef-doc` declaration, since `ExecutorDialect.td` does not include
-  `ExecutorTypes.td` and so the dialect page alone omitted them.
   [(#3180)](https://github.com/PennyLaneAI/catalyst/pull/3180)
 
 <h3>Contributors ✍️</h3>
