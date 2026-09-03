@@ -1,0 +1,27 @@
+name: Build Pennylane Lightning Catalyst Docker Image
+
+permissions:
+  contents: read
+  
+on:
+    pull_request:
+        
+jobs:
+  build:
+    name: Build Docker Image
+    runs-on:
+      group: 'PL Additional Runners'
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: false
