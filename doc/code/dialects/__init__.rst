@@ -29,6 +29,9 @@ This document contains the respective Catalyst-defined MLIR dialects, and their 
 :doc:`transport`
    Special-purpose dialect for Backline's data-movement
 
+:doc:`executor`
+   Support dialect for dispatching kernels and calling symbols on an executor
+
 
 .. toctree::
    :hidden:
@@ -41,3 +44,4 @@ This document contains the respective Catalyst-defined MLIR dialects, and their 
    pbc
    mbqc
    transport
+   executor
