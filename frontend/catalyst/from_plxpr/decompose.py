@@ -99,7 +99,7 @@ COMPILER_OPS_FOR_DECOMPOSITION: dict[str, tuple[int, int]] = {
 def _resource_num_wires(op_rep):
     """Return the wire count from an Operator or Operator2 resource representation."""
     if isinstance(op_rep, qp.core.Operator2):
-        return op_rep.wires.num_wires
+        return len(op_rep.wires)
 
     params = getattr(op_rep, "params", {}) or {}
     return params.get("num_wires")
@@ -295,7 +295,7 @@ def _create_decomposition_rule(
                 args.append(jax.ShapeDtypeStruct(arg_spec.shape, arg_spec.dtype))
             elif name in op_rep.wire_args:
                 wire_spec = op_rep.wire_args[name]
-                args.append(qp.math.array([0] * wire_spec.num_wires, like="jax"))
+                args.append(qp.math.array([0] * len(wire_spec), like="jax"))
             elif name not in op_rep.compilable_args:
                 raise ValueError(f"Unknown Operator2 argument {name} in decomposition rule {func}.")
             continue
