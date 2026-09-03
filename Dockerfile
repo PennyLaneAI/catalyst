@@ -284,8 +284,8 @@ ENV PYTHON=/opt/python/cp313-cp313/bin/python
 ENV PATH="/opt/python/cp313-cp313/bin:${PATH}"
 RUN python -m pip install numpy "nanobind<2.13" pybind11 PyYAML cmake ninja
 
-ENV C_COMPILER=/usr/bin/gcc
-ENV CXX_COMPILER=/usr/bin/g++
+ENV C_COMPILER=$(which gcc) 
+ENV CXX_COMPILER=$(which g++) 
 ENV LLVM_BUILD_DIR=/opt/catalyst/llvm-build
 
 RUN git clone --depth 1 --branch ${CATALYST_VERSION} --recurse-submodules --shallow-submodules \
