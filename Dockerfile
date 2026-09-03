@@ -280,8 +280,9 @@ RUN cat /etc/dnf.conf | sed "s/\[main\]/\[main\]\ntimeout=5/g" > /etc/dnf.conf
 RUN dnf update -y && dnf install -y libzstd-devel gcc-toolset-13
 
 WORKDIR /opt/catalyst
-RUN pip install numpy "nanobind<2.13" pybind11 PyYAML cmake ninja
 ENV PYTHON=/opt/venv/bin/python3
+RUN pip install numpy "nanobind<2.13" pybind11 PyYAML cmake ninja
+
 ENV C_COMPILER=/usr/bin/gcc
 ENV CXX_COMPILER=/usr/bin/g++
 ENV LLVM_BUILD_DIR=/opt/catalyst/llvm-build
