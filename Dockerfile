@@ -272,30 +272,25 @@ RUN ccache --set-config=cache_dir=/opt/ccache
 
 
 # Download and build Catalyst
-FROM base-build AS wheel-catalyst
+FROM quay.io/pypa/manylinux_2_28_x86_64 AS wheel-catalyst
 ARG PENNYLANE_VERSION
 ARG CATALYST_VERSION
 ARG GCC_VERSION
-RUN apt-get update \
-    && apt-get install --no-install-recommends -y \
-    lld \
-    openmpi-devel \
-    libzstd-devel \
-    gcc-toolset-13 \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
+RUN cat /etc/dnf.conf | sed "s/\[main\]/\[main\]\ntimeout=5/g" > /etc/dnf.conf
+RUN dnf update -y && dnf install -y libzstd-devel gcc-toolset-13
 
 WORKDIR /opt/catalyst
-RUN pip install --no-cache-dir build cmake ninja toml wheel setuptools>=75.8.1 "nanobind<2.13" pybind11 PyYAML "scipy-openblas32<0.3.33" numpy pybind11
+RUN pip install numpy "nanobind<2.13" pybind11 PyYAML cmake ninja
+ENV PYTHON=/opt/venv/bin/python3
+ENV C_COMPILER=/usr/bin/gcc
+ENV CXX_COMPILER=/usr/bin/g++
+ENV LLVM_BUILD_DIR=/opt/catalyst/llvm-build
 
 RUN git clone --depth 1 --branch ${CATALYST_VERSION} --recurse-submodules --shallow-submodules \
     https://github.com/PennyLaneAI/catalyst.git /tmp/catalyst-src \
     && cp -a /tmp/catalyst-src/. /opt/catalyst/ \
     && rm -rf /tmp/catalyst-src
-ENV PYTHON=/opt/venv/bin/python3
-ENV C_COMPILER=/usr/bin/gcc
-ENV CXX_COMPILER=/usr/bin/g++
-ENV LLVM_BUILD_DIR=/opt/catalyst/llvm-build
+
 # ENV LLVM_TARGETS=check-mlir
 
 RUN PYTHON=$PYTHON \
@@ -310,24 +305,32 @@ RUN PYTHON=$PYTHON \
 
 # Build stablehlo dialect
 ENV COMPILER_LAUNCHER=""
-RUN make stablehlo
+RUN C_COMPILER=$(which gcc) \
+    CXX_COMPILER=$(which g++) \
+    LLVM_BUILD_DIR="$(pwd)/llvm-build" \
+    STABLEHLO_BUILD_DIR="/opt/catalyst/stablehlo-build" \
+    COMPILER_LAUNCHER="" \
+    ENABLE_LLD=OFF \
+    make stablehlo
 
 # Build enzyme
 RUN cmake -S mlir/Enzyme/enzyme -B /opt/catalyst/enzyme-build -G Ninja \
--DCMAKE_BUILD_TYPE=Release \
--DLLVM_DIR="/opt/catalyst/lib/cmake/llvm" \
--DENZYME_STATIC_LIB=ON \
--DCMAKE_CXX_VISIBILITY_PRESET=default
+    -DCMAKE_BUILD_TYPE=Release \
+    -DLLVM_DIR="/opt/catalyst/lib/cmake/llvm" \
+    -DENZYME_STATIC_LIB=ON \
+    -DCMAKE_CXX_VISIBILITY_PRESET=default
 
 RUN cmake --build /opt/catalyst/enzyme-build --target EnzymeStatic-22
+# install dependencies
+RUN dnf update -y && dnf install -y openmpi-devel libzstd-devel gcc-toolset-13
 # Build catalyst runtime
 RUN cmake -S runtime -B /opt/catalyst/runtime-build -G Ninja \
--DCMAKE_BUILD_TYPE=Release \
--DCMAKE_LIBRARY_OUTPUT_DIRECTORY="/opt/catalyst/runtime-build/lib" \
--DPython_EXECUTABLE=$PYTHON \
--DENABLE_OPENQASM=ON \
--DENABLE_OQD=OFF \
--DMLIR_INCLUDE_DIRS="/opt/catalyst/mlir/llvm-project/mlir/include"
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_LIBRARY_OUTPUT_DIRECTORY="/opt/catalyst/runtime-build/lib" \
+    -DPython_EXECUTABLE=$PYTHON \
+    -DENABLE_OPENQASM=ON \
+    -DENABLE_OQD=OFF \
+    -DMLIR_INCLUDE_DIRS="/opt/catalyst/mlir/llvm-project/mlir/include"
 
 RUN cmake --build /opt/catalyst/runtime-build --target rt_capi rt_rsdecomp rt_decoder rtd_openqasm rtd_null_qubit
 # Build OQC-Runtime
@@ -355,6 +358,7 @@ RUN cmake --build /opt/catalyst/quantum-build --target check-dialects catalyst-c
 RUN cd /opt/catalyst/quantum-build && cpack
 # Build plugin wheel
 RUN MLIR_DIR="/opt/catalyst/llvm-build/lib/cmake/mlir" \
+    LLVM_BUILD_DIR="/opt/catalyst/llvm-build" \
     make plugin-wheel
 RUN PYTHON=$PYTHON \
     LLVM_BUILD_DIR="/opt/catalyst/llvm-build" \
