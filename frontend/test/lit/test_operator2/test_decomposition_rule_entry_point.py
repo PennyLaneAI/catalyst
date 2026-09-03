@@ -97,9 +97,7 @@ def test_from_dynamic_argnames():
         qp.add_decomps(SingleParam, rule)
         result = compile_decomposition_rules_wrapper(
             "SingleParam",
-            build_graph_op_key(
-                "SingleParam", {"x": ["tensor<2xf64>"]}, {"reg": 2}, {}
-            ),
+            build_graph_op_key("SingleParam", {"x": ["tensor<2xf64>"]}, {"reg": 2}, {}),
             {"x": ["f64", "f64"]},
             {"reg": 2},
             {},
@@ -994,9 +992,7 @@ def test_while_loop():
     print(
         compile_decomposition_rules_wrapper(
             "WhileOp",
-            build_graph_op_key(
-                "WhileOp", {"angle": ["tensor<f64>"]}, {"wires": 1}, {}
-            ),
+            build_graph_op_key("WhileOp", {"angle": ["tensor<f64>"]}, {"wires": 1}, {}),
             {"angle": ["f64"]},
             {"wires": 1},
             {},

@@ -62,9 +62,7 @@ def test_on_demand_adjoint_id_routes_to_adjoint_rules():
         qp.add_decomps(NoParams, _base_rule())
         qp.add_decomps("Adjoint(NoParams)", _adj_rule())
 
-        adjoint_id = build_graph_op_key(
-            "NoParams", {}, {"reg": 2}, {}, adjoint=True
-        )
+        adjoint_id = build_graph_op_key("NoParams", {}, {"reg": 2}, {}, adjoint=True)
         out = compile_reachable_decomposition_rules_wrapper(
             "NoParams", adjoint_id, {}, {"reg": 2}, {}, is_custom_op=False
         )
