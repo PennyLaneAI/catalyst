@@ -293,6 +293,11 @@ RUN git clone --depth 1 --branch ${CATALYST_VERSION} --recurse-submodules --shal
     && rm -rf /tmp/catalyst-src
 
 # ENV LLVM_TARGETS=check-mlir
+RUN cd /opt/catalyst/mlir/llvm-project \
+    && git apply /opt/catalyst/mlir/patches/llvm-bufferization-segfault.patch \
+    && git apply /opt/catalyst/mlir/patches/llvm-python-bindinggen-annotations.patch
+RUN cd /opt/catalyst/mlir/Enzyme \
+    && git apply /opt/catalyst/mlir/patches/enzyme-nvvm-fabs-intrinsics.patch
 
 RUN PYTHON=$PYTHON \
     C_COMPILER=$(which gcc)  \
