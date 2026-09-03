@@ -15,6 +15,7 @@
 #include "PBC/Utils/PBCLayer.h"
 
 #include <algorithm>
+#include <bit>
 #include <cstdint>
 
 #include "llvm/ADT/STLExtras.h"
@@ -31,7 +32,10 @@ using namespace mlir;
 namespace catalyst {
 namespace pbc {
 
-FailureOr<int64_t> PBCLayerContext::ifWorstCaseDepth(scf::IfOp ifOp) {
+static constexpr size_t MinOpsForCommutationBasis = 32;
+
+FailureOr<int64_t> PBCLayerContext::ifWorstCaseDepth(scf::IfOp ifOp)
+{
     FailureOr<int64_t> thenDepth =
         worstCaseDepthOfBlock(&ifOp.getThenRegion().front(), /*liftForLoops=*/false);
     if (failed(thenDepth)) {
@@ -260,13 +264,134 @@ PBCLayerContext::groupLayers(mlir::Operation *root, bool onlyOnDisjointQubit) {
     return groups;
 }
 
-void PBCLayer::insertToLayer(PBCOpInterface op) {
+PBCLayer::PackedPauli PBCLayer::packPauli(PBCOpInterface op,
+                                          llvm::ArrayRef<Value> entryQubits) const
+{
+    assert(entryQubits.size() == op.getPauliProduct().size() &&
+           "Pauli product must have one entry per qubit");
+
+    const size_t numWords = (commutationQubits.size() + 63) / 64;
+    PackedPauli packed{std::vector<uint64_t>(numWords), std::vector<uint64_t>(numWords)};
+
+    for (auto [qubit, pauliAttr] : llvm::zip(entryQubits, op.getPauliProduct())) {
+        auto qubitIt = commutationQubitIndices.find(qubit);
+        if (qubitIt == commutationQubitIndices.end()) {
+            // Existing basis rows act as identity on qubits not in the layer yet.
+            continue;
+        }
+
+        const size_t qubitIndex = qubitIt->second;
+        const uint64_t mask = uint64_t{1} << (qubitIndex % 64);
+        StringRef pauli = cast<StringAttr>(pauliAttr).getValue();
+        if (pauli == "X" || pauli == "Y") {
+            packed.x[qubitIndex / 64] |= mask;
+        }
+        if (pauli == "Z" || pauli == "Y") {
+            packed.z[qubitIndex / 64] |= mask;
+        }
+    }
+    return packed;
+}
+
+bool PBCLayer::commutesWithBasis(const PackedPauli &candidate) const
+{
+    return llvm::all_of(commutationBasis, [&](const PackedPauli &basisRow) {
+        unsigned parity = 0;
+        for (size_t word = 0; word < candidate.x.size(); ++word) {
+            uint64_t localAnticommutations =
+                (candidate.x[word] & basisRow.z[word]) ^
+                (candidate.z[word] & basisRow.x[word]);
+            parity ^= std::popcount(localAnticommutations) & 1U;
+        }
+        return parity == 0;
+    });
+}
+
+void PBCLayer::insertIntoCommutationBasis(PackedPauli candidate)
+{
+    auto xorWithRow = [&](size_t rowIndex) {
+        const PackedPauli &basisRow = commutationBasis[rowIndex];
+        for (size_t word = 0; word < candidate.x.size(); ++word) {
+            candidate.x[word] ^= basisRow.x[word];
+            candidate.z[word] ^= basisRow.z[word];
+        }
+    };
+
+    for (size_t qubit = 0; qubit < commutationQubits.size(); ++qubit) {
+        if (((candidate.x[qubit / 64] >> (qubit % 64)) & 1U) == 0) {
+            continue;
+        }
+        if (xPivotRows[qubit] >= 0) {
+            xorWithRow(static_cast<size_t>(xPivotRows[qubit]));
+            continue;
+        }
+        xPivotRows[qubit] = static_cast<int64_t>(commutationBasis.size());
+        commutationBasis.push_back(std::move(candidate));
+        return;
+    }
+
+    for (size_t qubit = 0; qubit < commutationQubits.size(); ++qubit) {
+        if (((candidate.z[qubit / 64] >> (qubit % 64)) & 1U) == 0) {
+            continue;
+        }
+        if (zPivotRows[qubit] >= 0) {
+            xorWithRow(static_cast<size_t>(zPivotRows[qubit]));
+            continue;
+        }
+        zPivotRows[qubit] = static_cast<int64_t>(commutationBasis.size());
+        commutationBasis.push_back(std::move(candidate));
+        return;
+    }
+}
+
+void PBCLayer::addToCommutationBasis(PBCOpInterface op, llvm::ArrayRef<Value> entryQubits)
+{
+    const size_t oldNumWords = (commutationQubits.size() + 63) / 64;
+    for (Value qubit : entryQubits) {
+        if (commutationQubitIndices.contains(qubit)) {
+            continue;
+        }
+        commutationQubitIndices[qubit] = commutationQubits.size();
+        commutationQubits.push_back(qubit);
+        xPivotRows.push_back(-1);
+        zPivotRows.push_back(-1);
+    }
+
+    const size_t newNumWords = (commutationQubits.size() + 63) / 64;
+    if (newNumWords != oldNumWords) {
+        for (PackedPauli &basisRow : commutationBasis) {
+            basisRow.x.resize(newNumWords);
+            basisRow.z.resize(newNumWords);
+        }
+    }
+    insertIntoCommutationBasis(packPauli(op, entryQubits));
+}
+
+void PBCLayer::buildCommutationBasis()
+{
+    assert(!commutationBasisValid && "commutation basis is already available");
+    commutationQubits.clear();
+    commutationQubitIndices.clear();
+    commutationBasis.clear();
+    xPivotRows.clear();
+    zPivotRows.clear();
+    for (PBCOpInterface op : ops) {
+        addToCommutationBasis(op, getEntryQubitsFrom(op));
+    }
+    commutationBasisValid = true;
+}
+
+void PBCLayer::insertToLayer(PBCOpInterface op)
+{
     ops.emplace_back(op);
     updateResultAndOperand(op);
 
     // Update the cached entry qubit set when inserting
     auto entryQubits = getEntryQubitsFrom(op);
     layerEntryQubits.insert(entryQubits.begin(), entryQubits.end());
+    if (commutationBasisValid) {
+        addToCommutationBasis(op, entryQubits);
+    }
 
     // Track the op's results for dependency lookups
     for (Value r : op->getResults()) {
@@ -278,6 +403,17 @@ void PBCLayer::eraseOp(PBCOpInterface op) {
     llvm::erase(ops, op);
     for (Value r : op->getResults()) {
         layerOpResults.erase(r);
+    }
+
+    // Removing a generator can change the span. Defer reconstruction until
+    // another overlapping candidate actually needs a commutation query.
+    if (commutationBasisValid) {
+        commutationBasisValid = false;
+        commutationQubits.clear();
+        commutationQubitIndices.clear();
+        commutationBasis.clear();
+        xPivotRows.clear();
+        zPivotRows.clear();
     }
 }
 
@@ -372,8 +508,19 @@ bool PBCLayer::commute(PBCOpInterface src, PBCOpInterface dst) {
 }
 
 // Commute an op to all the ops in the layer
-bool PBCLayer::commuteToLayer(PBCOpInterface op) {
-    return llvm::all_of(ops, [&](auto existingOp) { return commute(op, existingOp); });
+bool PBCLayer::commuteToLayer(PBCOpInterface op)
+{
+    // Pairwise checks avoid basis construction overhead for the short layers
+    // that dominate small programs. Larger layers use packed basis rows.
+    if (ops.size() < MinOpsForCommutationBasis) {
+        return llvm::all_of(ops, [&](PBCOpInterface existingOp) { return commute(op, existingOp); });
+    }
+
+    if (!commutationBasisValid) {
+        buildCommutationBasis();
+    }
+    auto entryQubits = getEntryQubitsFrom(op);
+    return commutesWithBasis(packPauli(op, entryQubits));
 }
 
 bool PBCLayer::isSameBlock(PBCOpInterface op) const {

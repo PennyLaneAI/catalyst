@@ -479,6 +479,10 @@
 * Added ``CZ`` support to ``to-ppr`` pass.
   [(#3009)](https://github.com/PennyLaneAI/catalyst/pull/3009)
 
+* PBC layer commutation checks now use packed binary symplectic bases for large overlapping layers,
+  reducing repeated pairwise normalization while preserving the resulting partition.
+  [(#3095)](https://github.com/PennyLaneAI/catalyst/pull/3095)
+
 <h3>Breaking changes 💔</h3>
 
 * Removes :func:`~.passes.ppm_specs` and the ``--ppm-specs`` MLIR pass. Use :func:`~.specs` and
