@@ -31,7 +31,7 @@ This document contains the respective Catalyst-defined MLIR dialects, and their 
    a placement compiles to
 
 :doc:`executor`
-   Support dialect for dispatching kernels and calling symbols on a remote executor
+   Support dialect for dispatching kernels and calling symbols on an executor
 
 
 .. toctree::
