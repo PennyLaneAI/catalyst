@@ -26,5 +26,5 @@ jobs:
           platforms: linux/amd64
           push: false
           build-args: |
-            PENNYLANE_VERSION=${{ github.event.inputs.pennylane_version }}
-            CATALYST_VERSION=${{ github.event.inputs.catalyst_version }}
+            PENNYLANE_VERSION=main
+            CATALYST_VERSION=main
