@@ -22,6 +22,7 @@
 
 #include "QRef/IR/QRefOps.h"
 #include "Quantum/IR/QuantumOps.h"
+#include "Quantum/Transforms/Patterns.h"
 
 using namespace mlir;
 
