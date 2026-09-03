@@ -78,6 +78,46 @@ def test_pauli_rot_to_ppr():
     assert "pbc.ppr" in optimized_ir
 
 
+@pytest.mark.skipif(not hasattr(qp, "PPR"), reason="PennyLane PPR is not installed")
+def test_ppr_operator_capture():
+    """Test that PPR remains a generic operator before applying to_ppr."""
+    pipe = [("pipe", ["quantum-compilation-stage"])]
+
+    @qjit(pipelines=pipe, target="mlir", capture=True)
+    def test_ppr_operator_capture_workflow():
+
+        @qp.qnode(qp.device("null.qubit", wires=2))
+        def f():
+            qp.PPR(4, "XY", wires=[0, 1])
+
+        return f()
+
+    optimized_ir = test_ppr_operator_capture_workflow.mlir_opt
+    assert 'quantum.operator "PPR"' in optimized_ir
+    assert "pbc.ppr" not in optimized_ir
+
+
+@pytest.mark.skipif(not hasattr(qp, "PPR"), reason="PennyLane PPR is not installed")
+def test_ppr_operator_to_ppr():
+    """Test that to_ppr converts a PPR operator to pbc.ppr."""
+    pipe = [("pipe", ["quantum-compilation-stage"])]
+
+    @qjit(pipelines=pipe, target="mlir", capture=True)
+    @to_ppr
+    def test_ppr_operator_to_ppr_workflow():
+
+        @qp.qnode(qp.device("null.qubit", wires=2))
+        def f():
+            qp.PPR(4, "XY", wires=[0, 1])
+
+        return f()
+
+    optimized_ir = test_ppr_operator_to_ppr_workflow.mlir_opt
+    assert 'pbc.ppr ["X", "Y"](8)' in optimized_ir
+    assert 'quantum.operator "PPR"' not in optimized_ir
+    assert "quantum.paulirot" not in optimized_ir
+
+
 def test_pauli_rot_with_arbitrary_angle_to_ppr():
     """Test that Pauli rotation for arbitrary angle."""
     pipe = [("pipe", ["quantum-compilation-stage"])]

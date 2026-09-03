@@ -945,6 +945,7 @@ def to_ppr_setup_inputs():
     ``qp.IsingZZ``,
     ``qp.MultiRZ``,
     ``qp.PauliRot``,
+    ``qp.PPR``,
     and adjoint versions thereof, as well as
     ``qp.measure`` and
     ``qp.pauli_measure``.
