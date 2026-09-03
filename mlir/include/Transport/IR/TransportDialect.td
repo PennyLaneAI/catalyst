@@ -33,15 +33,9 @@ def Transport_Dialect : Dialect {
         exchanging memory handles, establishing a data path, and running rounds
         of request/reply traffic until teardown.
 
-        This is what a Backline compiles to. A PennyLane `Placement` is serialized
-        into the `catalyst.backline` module attribute, naming one controller and the
-        coprocessors it drives; `inject-transport-session` reads that attribute and
-        emits the session bring-up and teardown in terms of these ops,
-        `lower-decode-to-transport` turns a decode into a request/reply round over
-        the session, and `convert-transport-to-llvm` lowers the result to
-        `__catalyst__transport__*` runtime calls. A node here is a Backline
-        participant -- a controller or a coprocessor -- and the placement's
-        transport selects which compiled backend carries the traffic.
+        A session's endpoints are a controller and a coprocessor, described by the
+        `#transport.backline` attribute a module carries as `catalyst.backline`.
+        Every op here lowers to a `__catalyst__transport__*` runtime call.
     }];
 
     let name = "transport";
