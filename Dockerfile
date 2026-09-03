@@ -285,7 +285,9 @@ RUN apt-get update \
     lld \
     ninja-build \
     python3-dev \
-    install -y openmpi-devel libzstd-devel gcc-toolset-13 \
+    openmpi-devel \
+    libzstd-devel \
+    gcc-toolset-13 \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
