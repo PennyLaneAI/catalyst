@@ -168,7 +168,7 @@ func.func @test_num_qubits_no_cse() -> (i64, i64, !quantum.reg) {
 // -----
 
 // CHECK-LABEL: test_hermitian_adjoint_not_canonicalized
-func.func @test_hermitian_adjoint_not_canonicalized(%q0: !quantum.bit) -> !quantum.bit {
+func.func @test_hermitian_adjoint_not_canonicalized() -> !quantum.bit {
     %0 = quantum.alloc( 1) : !quantum.reg
     %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
 

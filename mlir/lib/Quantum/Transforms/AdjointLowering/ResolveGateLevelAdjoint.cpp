@@ -11,8 +11,10 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+#define DEBUG_TYPE "resolve-gate-level-adjoint"
 
 #include "llvm/ADT/StringSet.h"
+#include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
@@ -147,19 +149,17 @@ namespace quantum {
 #define GEN_PASS_DEF_RESOLVEGATELEVELADJOINT
 #include "Quantum/Transforms/Passes.h.inc"
 
-// Populate the patterns for the ResolveGateLevelAdjoint pass.
-// Allows reference in ions_decompositions.cpp and merge_rotation.cpp
 void populateResolveGateLevelAdjointPatterns(RewritePatternSet &patterns) {
-    patterns.add<CustomOpResolveGateLevelAdjointPattern<CustomOp>,
-                 CustomOpResolveGateLevelAdjointPattern<catalyst::qref::CustomOp>,
-                 MultiRZOpResolveGateLevelAdjointPattern<MultiRZOp>,
-                 MultiRZOpResolveGateLevelAdjointPattern<catalyst::qref::MultiRZOp>,
-                 PCPhaseOpResolveGateLevelAdjointPattern<PCPhaseOp>,
-                 PCPhaseOpResolveGateLevelAdjointPattern<catalyst::qref::PCPhaseOp>,
-                 PauliRotOpResolveGateLevelAdjointPattern<PauliRotOp>,
-                 PauliRotOpResolveGateLevelAdjointPattern<catalyst::qref::PauliRotOp>,
-                 GlobalPhaseOpResolveGateLevelAdjointPattern<GlobalPhaseOp>,
-                 GlobalPhaseOpResolveGateLevelAdjointPattern<catalyst::qref::GlobalPhaseOp>>(
+    patterns.add<CustomOpResolveGateLevelAdjointPattern<quantum::CustomOp>,
+                 CustomOpResolveGateLevelAdjointPattern<qref::CustomOp>,
+                 MultiRZOpResolveGateLevelAdjointPattern<quantum::MultiRZOp>,
+                 MultiRZOpResolveGateLevelAdjointPattern<qref::MultiRZOp>,
+                 PCPhaseOpResolveGateLevelAdjointPattern<quantum::PCPhaseOp>,
+                 PCPhaseOpResolveGateLevelAdjointPattern<qref::PCPhaseOp>,
+                 PauliRotOpResolveGateLevelAdjointPattern<quantum::PauliRotOp>,
+                 PauliRotOpResolveGateLevelAdjointPattern<qref::PauliRotOp>,
+                 GlobalPhaseOpResolveGateLevelAdjointPattern<quantum::GlobalPhaseOp>,
+                 GlobalPhaseOpResolveGateLevelAdjointPattern<qref::GlobalPhaseOp>>(
         patterns.getContext());
 }
 
