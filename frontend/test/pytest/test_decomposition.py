@@ -53,11 +53,34 @@ from catalyst.decomposition.graph_op_id import GraphOpID
 from catalyst.decomposition.type_utils import (
     convert_item_to_mlir_type,
     get_dummy_values_for_arg,
+    replace_wires_with_placeholder_wires,
 )
 
 
 class TestGenericUtilities:
     """Tests for common decomposition rule lowering utilities."""
+
+    def test_wires_replacement_doesnt_mutate_operator(self):
+        """Test that the wires replacement helper does not mutate the incoming operator."""
+
+        original_wires = qp.wires.Wires([0])
+        op = qp.RX(0.5, original_wires)
+        original_op_wires = op.wires
+
+        # NOTE: PennyLane re-wraps wire arguments on construction, so the stored wires are
+        # a different object than original wires.
+        original_wire_arg = op.arguments["wires"]
+
+        new_op = replace_wires_with_placeholder_wires(op)
+
+        # Check that the new op received the placeholder wires
+        assert new_op.wires == qp.wires.Wires([-1])
+        assert new_op is not op
+
+        # Check original operator is not mutated
+        assert op.wires == original_wires
+        assert op.wires is original_op_wires
+        assert op.arguments["wires"] is original_wire_arg
 
     @pytest.mark.parametrize(
         "input, dtype, shape",

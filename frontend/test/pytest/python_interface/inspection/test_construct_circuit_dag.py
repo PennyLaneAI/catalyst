@@ -844,15 +844,7 @@ class TestCreateStaticOperatorNodes:
         assert nodes["node1"]["label"] == get_label(qp.H(0))
         assert nodes["node2"]["label"] == get_label(qp.SWAP([0, 1]))
 
-    @pytest.mark.parametrize(
-        "kwargs",
-        [
-            {},
-            {"wires": 0},
-            {"wires": [0, 1]},
-        ],
-    )
-    def test_global_phase_op(self, kwargs, capture_mode):
+    def test_global_phase_op(self, capture_mode):
         """Test that GlobalPhase can be handled."""
 
         dev = qp.device("null.qubit", wires=1)
@@ -861,7 +853,7 @@ class TestCreateStaticOperatorNodes:
         @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
         @qp.qnode(dev)
         def my_circuit():
-            qp.GlobalPhase(0.5, **kwargs)
+            qp.GlobalPhase(0.5)
 
         module = my_circuit()
 

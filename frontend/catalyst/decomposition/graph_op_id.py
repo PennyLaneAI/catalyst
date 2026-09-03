@@ -24,7 +24,7 @@ from catalyst.decomposition.type_utils import (
     convert_item_to_mlir_type,
     format_dynamic_params_for_id,
     post_process_concretize_leaves,
-    replace_abstract_wires_with_concrete_wires,
+    replace_wires_with_placeholder_wires,
 )
 from catalyst.from_plxpr.uid import generate_uid
 
@@ -124,7 +124,7 @@ class GraphOpID:
             hybrid_trees = []
             hybrid_args = []
             for _, hybrid_argval in self.op.hybrid_args.items():
-                leaves, tree = flatten(replace_abstract_wires_with_concrete_wires(hybrid_argval))
+                leaves, tree = flatten(replace_wires_with_placeholder_wires(hybrid_argval))
                 leaves = post_process_concretize_leaves(leaves)
                 hybrid_lens.append(len(leaves))
                 hybrid_trees.append(tree)

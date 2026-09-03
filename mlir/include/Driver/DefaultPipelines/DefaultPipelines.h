@@ -67,13 +67,14 @@ const PipelineList pipelineList{
       "adjoint-lowering",
       // TODO: we can remove the following 2 passes once PBC has its own pipeline.
       "lower-pbc-init-ops",
-      "disable-assertion",}},
+      "disable-assertion",
+      "resolve-state-prep-operator"}},
     {"hlo-lowering-stage",
      {"canonicalize",
       "func.func(chlo-legalize-to-stablehlo)",
       "func.func(stablehlo-legalize-control-flow)",
-      // builtin.module is added to support nested modules 
-      "builtin.module(func.func(stablehlo-legalize-control-flow))", 
+      // builtin.module is added to support nested modules
+      "builtin.module(func.func(stablehlo-legalize-control-flow))",
       "func.func(stablehlo-aggressive-simplification)",
       "stablehlo-legalize-to-linalg",
       "func.func(stablehlo-legalize-to-std)",

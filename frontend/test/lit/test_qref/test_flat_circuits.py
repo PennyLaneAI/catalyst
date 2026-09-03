@@ -406,13 +406,13 @@ def test_set_basis_state():
     # CHECK: [[q0:%.+]] = qref.get [[reg]][ 0] : !qref.reg<4> -> !qref.bit
     # CHECK: [[q2:%.+]] = qref.get [[reg]][ 2] : !qref.reg<4> -> !qref.bit
     # CHECK: [[q3:%.+]] = qref.get [[reg]][ 3] : !qref.reg<4> -> !qref.bit
-    # CHECK: qref.set_basis_state({{%.+}}) [[q0]], [[q2]], [[q3]] : tensor<3xi1>, !qref.bit, !qref.bit, !qref.bit
+    # CHECK: qref.operator "BasisState"({{%.+}}: tensor<3xi1>) qubits([[q0]], [[q2]], [[q3]])
     qp.BasisState(np.array([0, 0, 1]), wires=[0, 2, 3])
 
     # CHECK: [[reg_alloc:%.+]] = qref.alloc( 1) : !qref.reg<1>
     # CHECK: [[q0_alloc:%.+]] = qref.get [[reg_alloc]][ 0] : !qref.reg<1> -> !qref.bit
     # CHECK: [[q2:%.+]] = qref.get [[reg]][ 2] : !qref.reg<4> -> !qref.bit
-    # CHECK: qref.set_basis_state({{%.+}}) [[q0_alloc]], [[q2]] : tensor<2xi1>, !qref.bit, !qref.bit
+    # CHECK: qref.operator "BasisState"({{%.+}}: tensor<2xi1>) qubits([[q0_alloc]], [[q2]])
     # CHECK: qref.dealloc [[reg_alloc]] : !qref.reg<1>
     with qp.allocate(1) as q:
         qp.BasisState(np.array([0, 1]), wires=[q[0], 2])
