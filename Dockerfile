@@ -278,7 +278,7 @@ ARG CATALYST_VERSION
 ARG GCC_VERSION
 RUN cat /etc/dnf.conf | sed "s/\[main\]/\[main\]\ntimeout=5/g" > /etc/dnf.conf
 RUN dnf update -y && dnf install -y libzstd-devel gcc-toolset-13
-
+ENV PATH="/opt/rh/gcc-toolset-13/root/usr/bin:${PATH}"
 WORKDIR /opt/catalyst
 ENV PYTHON=/opt/python/cp313-cp313/bin/python
 ENV PATH="/opt/python/cp313-cp313/bin:${PATH}"
@@ -286,6 +286,7 @@ RUN python -m pip install numpy "nanobind<2.13" pybind11 PyYAML cmake ninja
 
 
 ENV LLVM_BUILD_DIR=/opt/catalyst/llvm-build
+ENV PATH="${LLVM_BUILD_DIR}/bin:${PATH}"
 
 RUN git clone --depth 1 --branch ${CATALYST_VERSION} --recurse-submodules --shallow-submodules \
     https://github.com/PennyLaneAI/catalyst.git /tmp/catalyst-src \
@@ -304,7 +305,7 @@ RUN PYTHON=$PYTHON \
     CXX_COMPILER=$(which g++)  \
     LLVM_BUILD_DIR="/opt/catalyst/llvm-build" \
     LLVM_PROJECTS="lld;mlir" \
-    LLVM_TARGETS="lld" \
+    LLVM_TARGETS="lld check-mlir" \
     ENABLE_ZLIB=FORCE_ON \
     ENABLE_LLD=OFF \
     make llvm
@@ -322,7 +323,7 @@ RUN C_COMPILER=$(which gcc) \
 # Build enzyme
 RUN cmake -S mlir/Enzyme/enzyme -B /opt/catalyst/enzyme-build -G Ninja \
     -DCMAKE_BUILD_TYPE=Release \
-    -DLLVM_DIR="/opt/catalyst/lib/cmake/llvm" \
+    -DLLVM_DIR="/opt/catalyst/llvm-build/lib/cmake/llvm" \
     -DENZYME_STATIC_LIB=ON \
     -DCMAKE_CXX_VISIBILITY_PRESET=default
 
