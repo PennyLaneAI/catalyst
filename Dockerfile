@@ -304,7 +304,7 @@ RUN PYTHON=$PYTHON \
     CXX_COMPILER=$(which g++)  \
     LLVM_BUILD_DIR="/opt/catalyst/llvm-build" \
     LLVM_PROJECTS="lld;mlir" \
-    LLVM_TARGETS="lld check-mlir" \
+    LLVM_TARGETS="lld" \
     ENABLE_ZLIB=FORCE_ON \
     ENABLE_LLD=OFF \
     make llvm
