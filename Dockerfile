@@ -278,13 +278,7 @@ ARG CATALYST_VERSION
 ARG GCC_VERSION
 RUN apt-get update \
     && apt-get install --no-install-recommends -y \
-    build-essential \
-    ccache \
-    cmake \
-    curl \
     lld \
-    ninja-build \
-    python3-dev \
     openmpi-devel \
     libzstd-devel \
     gcc-toolset-13 \
