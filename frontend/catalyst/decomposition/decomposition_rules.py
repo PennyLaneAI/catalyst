@@ -259,9 +259,9 @@ def collect_resources_for_op(op_name, kwargs, is_custom_op=False, adjoint_resour
             # GraphOpID.getGraphOpId, rather than string.
             name_to_resource_ids[rule.name] = {
                 (
-                    GraphOpID(op.base).getGraphOpId(adjoint=not adjoint_resources)
-                    if issubclass(op.__class__, qp.ops.op_math.Adjoint)  # TODO: control?
-                    else GraphOpID(op).getGraphOpId(adjoint=adjoint_resources)
+                    GraphOpID(op.base, adjoint=not adjoint_resources).getGraphOpId()
+                    if issubclass(op.__class__, qp.ops.op_math.Adjoint)
+                    else GraphOpID(op, adjoint=adjoint_resources).getGraphOpId()
                 ): count
                 for op, count in resources.gate_counts.items()
             }
@@ -275,11 +275,23 @@ def collect_resources_for_op(op_name, kwargs, is_custom_op=False, adjoint_resour
 
 
 def prepare_dynamic_op_kwargs(dynamic_shape, wire_lens) -> dict:
+    """Construct representative arguments for tracing a decomposition rule.
+
+    A dynamic name can map to several independent MLIR values, which must remain a Python list.
+    A singleton ranked tensor already represents the complete dynamic argument and is passed
+    without a list wrapper. Scalar entries remain a list because they represent independent values
+    associated with the name, including the singleton case. Wire registers use disjoint labels so
+    operator validation sees the same register relationships as it would in the original circuit.
+    """
     kwargs = {}
+    wire_offset = 0
     for wire_name, wire_len in wire_lens.items():
-        kwargs[wire_name] = jnp.array(range(wire_len), dtype=int)
+        kwargs[wire_name] = jnp.arange(wire_offset, wire_offset + wire_len, dtype=int)
+        wire_offset += wire_len
     for arg_name, arg_shape in dynamic_shape.items():
-        kwargs[arg_name] = [get_dummy_values_for_arg(shape) for shape in arg_shape]
+        values = [get_dummy_values_for_arg(shape) for shape in arg_shape]
+        is_single_tensor = len(arg_shape) == 1 and arg_shape[0].startswith("tensor")
+        kwargs[arg_name] = values[0] if is_single_tensor else values
     return kwargs
 
 

@@ -60,15 +60,27 @@ class GraphOpID:
     DecomposableGate interface in mlir/lib/quantum/IR/QuantumInterfaces.cpp.
     """
 
-    def __init__(self, op: qp.core.Operator2):
+    def __init__(self, op: qp.core.Operator2, adjoint: bool = False, n_ctrls: int = 0):
         """Create a new GraphOpId."""
         assert isinstance(
             op, qp.core.Operator2
         ), f"Graph-based decomposition expects an Operator2 instance, got {op} of type {type(op)}"
         self.op = op
+        self.adjoint = adjoint
+        self.n_ctrls = n_ctrls
+
+        if issubclass(type(op), qp.ops.op_math.Adjoint):
+            self.op = op.base
+            self.adjoint = not adjoint
+        elif isinstance(op, qp.ops.op_math.ControlledOp2):
+            self.op = op.base
+            self.n_ctrls = len(op.control_wires)
+
         self.is_custom_op = self.parse_is_custom_op()
 
-        self.operator_name = op.name
+        # Modifier names are added by getGraphOpId from the normalized modifier state above.
+        # Use the unwrapped operator name here to avoid encoding the same modifier twice.
+        self.operator_name = self.op.name
         self.dynamic_shape = self.parse_dynamic_shape()
         self.wire_lens = self.parse_wire_lens()
         self.static_data = self.parse_static_data()
@@ -171,7 +183,7 @@ class GraphOpID:
         """Return the static data formatted for GraphOpId."""
         return "{" + ",".join(f"{k}:{v}" for k, v in self.static_data.items()) + "}"
 
-    def getGraphOpId(self, adjoint: bool = False) -> str:
+    def getGraphOpId(self) -> str:
         """
         Return the GraphOpId as a string.
 
@@ -179,8 +191,13 @@ class GraphOpID:
         interface in MLIR.
         """
         name = self.get_operator_name()
-        if adjoint:
+        if self.adjoint:
             name = f"Adjoint({name})"
+        if self.n_ctrls == 1:
+            name = f"C({name})"
+        if self.n_ctrls > 1:
+            name = f"{self.n_ctrls}C({name})"
+
         ID_string = (
             name
             + self.get_dynamic_shape_id_format()
