@@ -149,7 +149,7 @@ builtin-decomp-rules: dialects runtime frontend
 dialect-docs:
 	$(MAKE) -C mlir dialect-docs
 
-# TODO: executor links LLVM and finds it through LLVM_DIR. This creates a dependancy between runtime and 
+# TODO: executor links LLVM and finds it through LLVM_DIR. This creates a dependancy between runtime and
 # LLVM. For now we can run LLVM once in the begining if ENABLE_EXECUTOR is specified. The better
 # solution is perhaps to detactch the executor from runtime into its own target.
 ifeq ($(ENABLE_EXECUTOR), ON)
