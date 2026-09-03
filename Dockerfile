@@ -288,7 +288,7 @@ ENV C_COMPILER=/usr/bin/gcc
 ENV CXX_COMPILER=/usr/bin/g++
 ENV LLVM_BUILD_DIR=/opt/catalyst/llvm-build
 
-RUN git clone --depth 1 --branch ${CATALYST_VERSION} \
+RUN git clone --depth 1 --branch ${CATALYST_VERSION} --recurse-submodules --shallow-submodules \
     https://github.com/PennyLaneAI/catalyst.git /tmp/catalyst-src \
     && cp -a /tmp/catalyst-src/. /opt/catalyst/ \
     && rm -rf /tmp/catalyst-src
@@ -298,7 +298,7 @@ RUN git clone --depth 1 --branch ${CATALYST_VERSION} \
 RUN PYTHON=$PYTHON \
     C_COMPILER=$C_COMPILER \
     CXX_COMPILER=$CXX_COMPILER \
-    LLVM_BUILD_DIR="$/opt/catalyst/llvm-build" \
+    LLVM_BUILD_DIR="/opt/catalyst/llvm-build" \
     LLVM_PROJECTS="lld;mlir" \
     LLVM_TARGETS="lld check-mlir" \
     ENABLE_ZLIB=FORCE_ON \
