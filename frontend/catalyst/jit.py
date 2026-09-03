@@ -739,7 +739,7 @@ class QJIT(CatalystCallable):
                 )
             except Exception as e:  # pylint: disable=broad-exception-caught
                 logger.exception(e, exc_info=True)
-                warnings.warn("AOT capture of jaxpr failed. Error logged at exception level")
+                warnings.warn(f"AOT capture of jaxpr failed. Error logged at exception level: {e}")
                 return
 
         if self.compile_options.target in ("mlir", "llvmir", "binary"):
@@ -748,7 +748,9 @@ class QJIT(CatalystCallable):
                 self.mlir_module = self.generate_ir()
             except Exception as e:  # pylint: disable=broad-exception-caught
                 logger.exception(e, exc_info=True)
-                warnings.warn("AOT generation of mlir failed. Error logged at exception level")
+                warnings.warn(
+                    f"AOT generation of mlir failed. Error logged at exception level: {e}"
+                )
                 return
 
         if self.compile_options.target in ("llvmir", "binary"):
