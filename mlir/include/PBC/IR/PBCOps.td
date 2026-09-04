@@ -136,7 +136,8 @@ def FabricateOp : PBC_Op<"fabricate",
 }
 
 def PPRotationOp : PBC_Op<"ppr", [PBCOpInterface, AttrSizedOperandSegments,
-    DeclareOpInterfaceMethods<ResourceQuantumOpInterface, ["getResourceAdjointFlag", "getResourceDetailedName"]>]> {
+    DeclareOpInterfaceMethods<ResourceQuantumOpInterface, ["getResourceAdjointFlag", "getResourceDetailedName"]>,
+    DeclareOpInterfaceMethods<DecomposableGate>]> {
     let summary = "Pauli Product Rotation on qubits.";
 
     let description = [{
@@ -249,12 +250,22 @@ def PPRotationOp : PBC_Op<"ppr", [PBCOpInterface, AttrSizedOperandSegments,
         bool isClifford(){
             return hasPiOverTwoRotation() || hasPiOverFourRotation();  // π/2 and π/4 rotations are Clifford
         };
+        std::string getPauliWord()
+        {
+            std::string pauliWord;
+
+            for (mlir::Attribute pauliChar : getPauliProduct()) {
+                pauliWord += cast<mlir::StringAttr>(pauliChar).getValue();
+            }
+            return pauliWord;
+        }
     }];
     let extraClassDeclaration = extraBaseClassDeclaration;
 }
 
 def PPRotationArbitraryOp : PBC_Op<"ppr.arbitrary", [PBCOpInterface, AttrSizedOperandSegments,
-    DeclareOpInterfaceMethods<ResourceQuantumOpInterface, ["getResourceDetailedName"]>]> {
+    DeclareOpInterfaceMethods<ResourceQuantumOpInterface, ["getResourceDetailedName"]>,
+    DeclareOpInterfaceMethods<DecomposableGate>]> {
     let summary = "Pauli Product Rotation with arbitrary angle.";
     let description = [{
         The PPRotationArbitraryOp represents a Pauli product rotation operation with an arbitrary angle.
@@ -354,6 +365,19 @@ def PPRotationArbitraryOp : PBC_Op<"ppr.arbitrary", [PBCOpInterface, AttrSizedOp
 
     let hasVerifier = 1;
     let hasCanonicalizeMethod = 1;
+
+    code extraBaseClassDeclaration = [{
+        std::string getPauliWord()
+        {
+            std::string pauliWord;
+
+            for (mlir::Attribute pauliChar : getPauliProduct()) {
+                pauliWord += cast<mlir::StringAttr>(pauliChar).getValue();
+            }
+            return pauliWord;
+        }
+    }];
+    let extraClassDeclaration = extraBaseClassDeclaration;
 }
 
 def PPMeasurementOp : PBC_Op<"ppm", [PBCOpInterface,
