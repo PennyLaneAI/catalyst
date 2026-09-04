@@ -412,29 +412,12 @@ LogicalResult convertPauliRotGate(PauliRotOp op, ConversionPatternRewriter &rewr
 }
 
 LogicalResult convertPPROperator(OperatorOp op, ConversionPatternRewriter &rewriter) {
-    if (op.getInQreg()) {
-        return op.emitOpError("PPR operator requires qubit mode, not register mode");
-    }
-    if (op.getInQubits().empty()) {
-        return op.emitOpError("PPR operator requires at least one qubit");
-    }
     if (!op.getAllParams().empty()) {
         return op.emitOpError("PPR operator does not support dynamic parameters");
     }
 
     DictionaryAttr staticData = op.getStaticData();
     auto denominatorAttr = staticData.getAs<IntegerAttr>("angle_denominator");
-    // MLIR's ordinary `i64` is a signless integer type: it can hold negative values, but its type
-    // does not prescribe signed or unsigned arithmetic. `getInt()` supports these ordinary `iN`
-    // attributes, but asserts on the distinct explicitly signed/unsigned `siN`/`uiN` types.
-    // Also reject `i1` (e.g. a bare `true`/`false`), which would sign-extend true to -1.
-    bool isValidDenominatorType = denominatorAttr &&
-                                  denominatorAttr.getType().isSignlessInteger() &&
-                                  denominatorAttr.getType().getIntOrFloatBitWidth() >= 2;
-    if (!isValidDenominatorType) {
-        return op.emitOpError(
-            "PPR operator requires an integer 'angle_denominator' in static_data");
-    }
 
     int64_t denominator = denominatorAttr.getInt();
     if (denominator != 1 && denominator != -1 && denominator != 2 && denominator != -2 &&

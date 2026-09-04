@@ -481,7 +481,7 @@
 
 * ``to_ppr`` now directly lowers PennyLane's discrete ``PPR`` operator to ``pbc.ppr``, without
   first decomposing it through ``PauliRot``.
-  [(#10107)](https://github.com/PennyLaneAI/pennylane/pull/10107)
+  [(#xxxx)](https://github.com/PennyLaneAI/catalyst/pull/xxxx)
 
 <h3>Breaking changes 💔</h3>
 
