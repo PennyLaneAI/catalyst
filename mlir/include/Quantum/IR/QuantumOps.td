@@ -565,7 +565,6 @@ def CustomOp : UnitaryGate_Op<"custom", [DifferentiableGate, NoMemoryEffect,
             return staticValues;
         }
     }];
-    let hasCanonicalizeMethod = 1;
     let hasVerifier = 1;
 }
 
@@ -850,7 +849,6 @@ def MultiRZOp : UnitaryGate_Op<"multirz", [DifferentiableGate, NoMemoryEffect,
         }
     }];
 
-    let hasCanonicalizeMethod = 1;
 }
 
 def PCPhaseOp : UnitaryGate_Op<"pcphase", [DifferentiableGate, NoMemoryEffect,
@@ -899,7 +897,6 @@ def PCPhaseOp : UnitaryGate_Op<"pcphase", [DifferentiableGate, NoMemoryEffect,
         }
     }];
 
-    let hasCanonicalizeMethod = 1;
 }
 
 

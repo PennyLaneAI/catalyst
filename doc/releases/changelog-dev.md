@@ -751,6 +751,9 @@
   `-stage` naming convention used when invoking them from the command line (e.g. `quantum-compilation-stage`).
   [#3002](https://github.com/PennyLaneAI/catalyst/pull/3002)
 
+* A new pass `--resolve-gate-level-adjoint` was added. This pass now handles gate-level adjoint canonicalization, moving it out of the `--canonicalize` pass.
+  [#3155](https://github.com/PennyLaneAI/catalyst/pull/3155)
+
 <h3>Documentation 📝</h3>
 
 * A broken link was removed in the [Compiler Core](https://docs.pennylane.ai/projects/catalyst/en/stable/modules/mlir.html) documentation page. The link referred to where precompiled decomposition rules were implemented, which has since been refactored.
@@ -786,4 +789,5 @@ Shuli Shu,
 Nikhil Sreekumar,
 Paul Haochen Wang,
 Jake Zaia,
+Haider Sajjad,
 Hongsheng Zheng.
