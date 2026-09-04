@@ -411,6 +411,54 @@ LogicalResult convertPauliRotGate(PauliRotOp op, ConversionPatternRewriter &rewr
                                    op.getAdjoint(), rewriter);
 }
 
+LogicalResult convertPPROperator(OperatorOp op, ConversionPatternRewriter &rewriter) {
+    if (!op.getAllParams().empty()) {
+        return op.emitOpError("PPR operator does not support dynamic parameters");
+    }
+
+    DictionaryAttr staticData = op.getStaticData();
+    auto denominatorAttr = staticData.getAs<IntegerAttr>("angle_denominator");
+
+    int64_t denominator = denominatorAttr.getInt();
+    if (denominator != 1 && denominator != -1 && denominator != 2 && denominator != -2 &&
+        denominator != 4 && denominator != -4) {
+        return op.emitOpError("unsupported PPR angle denominator: ") << denominator;
+    }
+
+    auto pauliWordAttr = staticData.getAs<StringAttr>("pauli_word");
+    if (!pauliWordAttr) {
+        return op.emitOpError("PPR operator requires a string 'pauli_word' in static_data");
+    }
+
+    StringRef pauliWord = pauliWordAttr.getValue();
+    if (pauliWord.empty()) {
+        return op.emitOpError("PPR operator requires a non-empty Pauli word");
+    }
+    if (pauliWord.size() != op.getInQubits().size()) {
+        return op.emitOpError("PPR operator requires one Pauli character per input qubit");
+    }
+
+    SmallVector<Attribute> pauliCharacters;
+    pauliCharacters.reserve(pauliWord.size());
+    for (char pauli : pauliWord) {
+        if (pauli != 'X' && pauli != 'Y' && pauli != 'Z') {
+            return op.emitOpError("PPR operator Pauli word may contain only X, Y, or Z");
+        }
+        pauliCharacters.push_back(rewriter.getStringAttr(StringRef(&pauli, 1)));
+    }
+
+    ArrayAttr pauliProduct = rewriter.getArrayAttr(pauliCharacters);
+    int8_t rotationKind = static_cast<int8_t>(2 * denominator);
+    if (op.getAdjoint()) {
+        rotationKind = -rotationKind;
+    }
+
+    auto pprOp =
+        PPRotationOp::create(rewriter, op.getLoc(), pauliProduct, rotationKind, op.getInQubits());
+    rewriter.replaceOp(op, pprOp.getOutQubits());
+    return success();
+}
+
 //===----------------------------------------------------------------------===//
 //                       PBC Lowering Patterns
 //===----------------------------------------------------------------------===//
@@ -420,7 +468,7 @@ struct PBCGateLowering : public OpInterfaceConversionPattern<QuantumOperation> {
 
     LogicalResult matchAndRewrite(QuantumOperation operation, ArrayRef<Value> operands,
                                   ConversionPatternRewriter &rewriter) const final {
-        StringRef supportedGates = "Supported gates: H, S, T, X, Y, Z, S†, T†, I, CNOT, CZ, "
+        StringRef supportedGates = "Supported gates: H, S, T, X, Y, Z, S†, T†, I, CNOT, CZ, PPR,"
                                    "RX, RY, RZ, IsingXX, IsingYY, IsingZZ, MultiRZ, and PauliRot.";
         Operation *op = operation.getOperation();
 
@@ -469,6 +517,10 @@ struct PBCGateLowering : public OpInterfaceConversionPattern<QuantumOperation> {
             return convertMultiRZGate(originOp, rewriter);
         } else if (auto originOp = dyn_cast<PauliRotOp>(op)) {
             return convertPauliRotGate(originOp, rewriter);
+        } else if (auto originOp = dyn_cast<OperatorOp>(op)) {
+            if (originOp.getOpName() == "PPR") {
+                return convertPPROperator(originOp, rewriter);
+            }
         }
 
         return op->emitError("Unsupported operation for PBC conversion. " + supportedGates);
