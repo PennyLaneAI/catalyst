@@ -377,7 +377,7 @@ def compile_decomposition_rules(
         ):
             warnings.warn(
                 f"Skipped the {rule.name} decomposition rule for {target_id}: it contains a "
-                "mid-circuit measurement, which can be used with adjoint or control regions.",
+                "mid-circuit measurement, which is not supported with adjoint or control regions.",
                 category=RuleLoweringWarning,
             )
             continue
