@@ -55,6 +55,11 @@
 
 <h3>Improvements 🛠</h3>
 
+* `RuleLoweringWarning` is now silenced by default. To display these warnings, set
+  `CATALYST_SILENCE_RULE_LOWERING_WARNINGS=0`. This helps debug unexpected decompositions where
+  un-lowerable rules are silently dropped from the graph-decomposition system instead of raising
+  an error.
+
 * Add the `XMEM_REPLY_BRAM` memory type and use it to allocate reply buffers in dedicated BRAM.
   [(#3148)](https://github.com/PennyLaneAI/catalyst/pull/3148)
 
