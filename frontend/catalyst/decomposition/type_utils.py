@@ -20,9 +20,12 @@ import re
 import jax.numpy as jnp
 import numpy as np
 import pennylane as qp
+from jax._src.interpreters.mlir import dtype_to_ir_type
 from jax._src.lib.mlir import ir
 from jax.core import ShapedArray
 from pennylane.pytrees import flatten, unflatten
+
+from catalyst.jax_extras.lowering import mlir_build_context
 
 _MLIR_DTYPES_TO_PY_DTYPES = {
     "i1": jnp.bool_,
@@ -37,45 +40,23 @@ _MLIR_DTYPES_TO_PY_DTYPES = {
     "complex<f64>": jnp.complex128,
 }
 
-_PY_DTYPES_TO_MLIR_DTYPES = {v: k for k, v in _MLIR_DTYPES_TO_PY_DTYPES.items()} | {
-    float: "f64",
-    int: "i64",
-    complex: "complex<f64>",
-    ir.F16Type: "f16",
-    ir.F32Type: "f32",
-    ir.F64Type: "f64",
-    (ir.ComplexType, ir.F32Type): "complex<f32>",
-    (ir.ComplexType, ir.F64Type): "complex<f64>",
-    np.dtype("bool_"): "i1",
-    np.dtype("int8"): "i8",
-    np.dtype("int16"): "i16",
-    np.dtype("int32"): "i32",
-    np.dtype("int64"): "i64",
-    np.dtype("float16"): "f16",
-    np.dtype("float32"): "f32",
-    np.dtype("float64"): "f64",
-    np.dtype("complex64"): "complex<f32>",
-    np.dtype("complex128"): "complex<f64>",
-}
-
 
 def convert_item_to_mlir_type(item, is_special_lowering=False):
-    """Convert a string or PennyLane AbstractArray to an mlir type annotation."""
+    """Convert a string or PennyLane AbstractArray to an mlir type annotation.
+
+    The type is spelled by MLIR's own printer, applied to the type the value lowers to, which is
+    what ``printDynamicShape`` in mlir/lib/Quantum/IR/QuantumInterfaces.cpp does as well. One
+    printer spelling both sides is what keeps a rule compiled here findable by the
+    ``graph-decomposition`` pass.
+    """
     if isinstance(item, str):
         return item
 
-    if item.shape == ():
-        if is_special_lowering:
-            return _PY_DTYPES_TO_MLIR_DTYPES[item.dtype]
-        return "tensor<" + _PY_DTYPES_TO_MLIR_DTYPES[item.dtype] + ">"
-
-    return (
-        "tensor<"
-        + "x".join(str(dim_size) for dim_size in item.shape)
-        + "x"
-        + _PY_DTYPES_TO_MLIR_DTYPES[item.dtype]
-        + ">"
-    )
+    with mlir_build_context():
+        element_type = dtype_to_ir_type(np.dtype(item.dtype))
+        if is_special_lowering and item.shape == ():
+            return str(element_type)
+        return str(ir.RankedTensorType.get(item.shape, element_type))
 
 
 def get_dummy_values_for_arg(arg):

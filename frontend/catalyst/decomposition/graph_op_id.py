@@ -14,7 +14,6 @@
 
 """Python implementation of Graph Operator ID."""
 
-import contextlib
 from collections.abc import Mapping, Sequence
 from typing import Any
 
@@ -29,25 +28,14 @@ from catalyst.decomposition.type_utils import (
     replace_wires_with_placeholder_wires,
 )
 from catalyst.from_plxpr.uid import generate_uid
-from catalyst.jax_extras.lowering import get_mlir_attribute_from_pyval
+from catalyst.jax_extras.lowering import get_mlir_attribute_from_pyval, mlir_build_context
 
 _SPECIAL_LOWERINGS = {}
 
 
-@contextlib.contextmanager
-def _attribute_context():
-    """Provide an MLIR context and location for attribute construction."""
-    if current := ir.Context.current:
-        with ir.Location.unknown(context=current):
-            yield current
-    else:
-        with ir.Context() as context, ir.Location.unknown(context=context):
-            yield context
-
-
 def format_static_data_dict_for_id(static_data):
     """Format the static-data group of a GraphOpID with MLIR's attribute printer."""
-    with _attribute_context():
+    with mlir_build_context():
         attrs = {name: get_mlir_attribute_from_pyval(value) for name, value in static_data.items()}
         return str(ir.DictAttr.get(attrs))
 
