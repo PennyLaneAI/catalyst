@@ -468,9 +468,8 @@ struct PBCGateLowering : public OpInterfaceConversionPattern<QuantumOperation> {
 
     LogicalResult matchAndRewrite(QuantumOperation operation, ArrayRef<Value> operands,
                                   ConversionPatternRewriter &rewriter) const final {
-        StringRef supportedGates = "Supported gates: H, S, T, X, Y, Z, S†, T†, I, CNOT, CZ, "
-                                   "RX, RY, RZ, IsingXX, IsingYY, IsingZZ, MultiRZ, PauliRot, "
-                                   "and PPR.";
+        StringRef supportedGates = "Supported gates: H, S, T, X, Y, Z, S†, T†, I, CNOT, CZ, PPR,"
+                                   "RX, RY, RZ, IsingXX, IsingYY, IsingZZ, MultiRZ, and PauliRot.";
         Operation *op = operation.getOperation();
 
         if (auto gateLikeOp = dyn_cast<QuantumGate>(op)) {
