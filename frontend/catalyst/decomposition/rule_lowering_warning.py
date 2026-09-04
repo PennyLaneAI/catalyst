@@ -30,5 +30,5 @@ def _env_flag(name: str, default: str) -> bool:
 # Default is "1".
 SILENCE_RULE_LOWERING_WARNINGS = _env_flag("CATALYST_SILENCE_RULE_LOWERING_WARNINGS", "1")
 
-if SILENCE_RULE_LOWERING_WARNINGS:
+if SILENCE_RULE_LOWERING_WARNINGS:  # pragma: no-cover
     warnings.filterwarnings("ignore", category=RuleLoweringWarning)
