@@ -78,12 +78,12 @@ def test_paulirot():
 # CHECK: qref.paulirot ["X", "X"]({{%.+}}) {{%.+}}, {{%.+}} : !qref.bit, !qref.bit
 # CHECK: qref.paulirot ["Z"]({{%.+}}) {{%.+}} : !qref.bit
 # CHECK: qref.paulirot ["Y", "Z", "X"]({{%.+}}) {{%.+}}, {{%.+}}, {{%.+}} : !qref.bit, !qref.bit, !qref.bit
-# CHECK: func.func private @"__builtin__pauli_rot_decomposition_PauliRot{theta:[f64]}{wires:2}{pauli_word:XX}"
-# CHECK-SAME:   target_gate = "PauliRot{theta:[f64]}{wires:2}{pauli_word:XX}"
-# CHECK: func.func private @"__builtin__pauli_rot_decomposition_PauliRot{theta:[f64]}{wires:1}{pauli_word:Z}"
-# CHECK-SAME:   target_gate = "PauliRot{theta:[f64]}{wires:1}{pauli_word:Z}"
-# CHECK: func.func private @"__builtin__pauli_rot_decomposition_PauliRot{theta:[f64]}{wires:3}{pauli_word:YZX}"
-# CHECK-SAME:   target_gate = "PauliRot{theta:[f64]}{wires:3}{pauli_word:YZX}"
+# CHECK: func.func private @"__builtin__pauli_rot_decomposition_PauliRot{theta:[f64]}{wires:2}{pauli_word = \22XX\22}"
+# CHECK-SAME:   target_gate = "PauliRot{theta:[f64]}{wires:2}{pauli_word = \22XX\22}"
+# CHECK: func.func private @"__builtin__pauli_rot_decomposition_PauliRot{theta:[f64]}{wires:1}{pauli_word = \22Z\22}"
+# CHECK-SAME:   target_gate = "PauliRot{theta:[f64]}{wires:1}{pauli_word = \22Z\22}"
+# CHECK: func.func private @"__builtin__pauli_rot_decomposition_PauliRot{theta:[f64]}{wires:3}{pauli_word = \22YZX\22}"
+# CHECK-SAME:   target_gate = "PauliRot{theta:[f64]}{wires:3}{pauli_word = \22YZX\22}"
 test_paulirot()
 
 
@@ -105,10 +105,10 @@ def test_pcphase():
 # CHECK: func.func public @pcphase()
 # CHECK: qref.pcphase({{%.+}}, dim : 3) {{%.+}}, {{%.+}}, {{%.+}} : !qref.bit, !qref.bit, !qref.bit
 # CHECK: qref.pcphase({{%.+}}, dim : 0) {{%.+}} : !qref.bit
-# CHECK: func.func private @"__builtin__decompose_pcphase_PCPhase{phi:[f64]}{wires:3}{dim:3}"
-# CHECK-SAME:   target_gate = "PCPhase{phi:[f64]}{wires:3}{dim:3}"
-# CHECK: func.func private @"__builtin__decompose_pcphase_PCPhase{phi:[f64]}{wires:1}{dim:0}"
-# CHECK-SAME:   target_gate = "PCPhase{phi:[f64]}{wires:1}{dim:0}"
+# CHECK: func.func private @"__builtin__decompose_pcphase_PCPhase{phi:[f64]}{wires:3}{dim = 3 : i64}"
+# CHECK-SAME:   target_gate = "PCPhase{phi:[f64]}{wires:3}{dim = 3 : i64}"
+# CHECK: func.func private @"__builtin__decompose_pcphase_PCPhase{phi:[f64]}{wires:1}{dim = 0 : i64}"
+# CHECK-SAME:   target_gate = "PCPhase{phi:[f64]}{wires:1}{dim = 0 : i64}"
 test_pcphase()
 
 
