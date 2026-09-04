@@ -26,6 +26,7 @@ def _env_flag(name: str, default: str) -> bool:
     """Read a boolean environment variable, treating "0"/"false"/"" as false."""
     return os.environ.get(name, default).strip().lower() not in ("", "0", "false")
 
+
 # Default is "1".
 SILENCE_RULE_LOWERING_WARNINGS = _env_flag("CATALYST_SILENCE_RULE_LOWERING_WARNINGS", "1")
 
