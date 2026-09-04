@@ -78,6 +78,7 @@ def test_pauli_rot_to_ppr():
     assert "pbc.ppr" in optimized_ir
 
 
+@pytest.mark.skipif(not hasattr(qp, "PPR"), reason="PennyLane PPR is not installed")
 def test_ppr_operator_capture():
     """Test that PPR remains a generic operator before applying to_ppr."""
     pipe = [("pipe", ["quantum-compilation-stage"])]
@@ -96,6 +97,7 @@ def test_ppr_operator_capture():
     assert "pbc.ppr" not in optimized_ir
 
 
+@pytest.mark.skipif(not hasattr(qp, "PPR"), reason="PennyLane PPR is not installed")
 def test_ppr_operator_to_ppr():
     """Test that to_ppr converts a PPR operator to pbc.ppr."""
     pipe = [("pipe", ["quantum-compilation-stage"])]
