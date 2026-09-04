@@ -19,7 +19,6 @@ gate set, using the decomposition rules collected from its numeric Hamiltonian.
 # pylint: disable = missing-function-docstring
 
 # RUN: %PYTHON %s | FileCheck %s
-# XFAIL: *
 
 import numpy as np
 import pennylane as qp
@@ -63,5 +62,5 @@ def trotter_circuit():
 # CHECK: BasisRotation
 # CHECK: IsingZZ
 # CHECK: RZ
-specs = qp.specs(trotter_circuit)()["resources"].quantum_operations
+specs = qp.specs(trotter_circuit, level=0)()["resources"].quantum_operations
 print(dict(sorted(specs.items())))
