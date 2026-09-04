@@ -122,7 +122,9 @@ if lq_version is not None:
         if lq_version.startswith("git+")
         else f"pennylane-lightning=={lq_version}"
     )
-    kokkos_dep = "" if lq_version.startswith("git+") else f"pennylane-lightning-kokkos=={lq_version}"
+    kokkos_dep = (
+        "" if lq_version.startswith("git+") else f"pennylane-lightning-kokkos=={lq_version}"
+    )
 else:
     lightning_dep = f"pennylane-lightning>={lq_min_release}"
     kokkos_dep = ""
