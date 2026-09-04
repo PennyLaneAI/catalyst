@@ -14,6 +14,7 @@
 
 """Python implementation of Graph Operator ID."""
 
+from collections.abc import Mapping, Sequence
 from typing import Any
 
 import jax.numpy as jnp
@@ -30,6 +31,32 @@ from catalyst.decomposition.type_utils import (
 from catalyst.from_plxpr.uid import generate_uid
 
 _SPECIAL_LOWERINGS = {}
+
+
+def build_graph_op_id(
+    operator_name: str,
+    dynamic_shape: Mapping[str, Sequence[str]],
+    wire_lens: Mapping[str, int],
+    static_data: Mapping[str, Any],
+    *,
+    adjoint: bool = False,
+    num_controls: int = 0,
+    uid: int | None = None,
+) -> str:
+    """Build a canonical frontend GraphOpID from its identity components."""
+    if num_controls < 0:
+        raise ValueError("GraphOpID control count cannot be negative")
+
+    name = f"Adjoint({operator_name})" if adjoint else operator_name
+    if num_controls:
+        prefix = "C" if num_controls == 1 else f"{num_controls}C"
+        name = f"{prefix}({name})"
+
+    dynamic_id = format_dynamic_params_for_id(dict(sorted(dynamic_shape.items())))
+    wire_id = "{" + ",".join(f"{key}:{value}" for key, value in sorted(wire_lens.items())) + "}"
+    static_id = format_static_data_dict_for_id(dict(static_data))
+    uid_id = f"[{uid}]" if uid is not None else ""
+    return name + dynamic_id + wire_id + static_id + uid_id
 
 
 class GraphOpID:
@@ -163,35 +190,23 @@ class GraphOpID:
         """Return the name of the operator."""
         return self.operator_name
 
-    def get_dynamic_shape_id_format(self) -> str:
-        """Return the dynamic shape formatted for GraphOpId."""
-        return format_dynamic_params_for_id(self.dynamic_shape)
-
-    def get_wire_lens_id_format(self) -> str:
-        """Return the wire lengths formatted for GraphOpId."""
-        return "{" + ",".join(f"{name}:{shape}" for name, shape in self.wire_lens.items()) + "}"
-
-    def get_static_data_id_format(self) -> str:
-        """Return the static data formatted for GraphOpId."""
-        return format_static_data_dict_for_id(self.static_data)
-
-    def getGraphOpId(self, adjoint: bool = False) -> str:
+    def getGraphOpId(self, adjoint: bool = False, num_controls: int = 0) -> str:
         """
         Return the GraphOpId as a string.
 
         NOTE: do not modify this method without also modifying the corresponding DecomposableGate
         interface in MLIR.
         """
-        name = self.get_operator_name()
-        if adjoint:
-            name = f"Adjoint({name})"
-        ID_string = (
-            name
-            + self.get_dynamic_shape_id_format()
-            + self.get_wire_lens_id_format()
-            + self.get_static_data_id_format()
-        )
+        uid = None
         if self.extra_data:
             assert self.uid >= 0, f"Failed to compute UID for operator {self.op}"
-            ID_string += "[" + str(self.uid) + "]"
-        return ID_string
+            uid = self.uid
+        return build_graph_op_id(
+            self.get_operator_name(),
+            self.dynamic_shape,
+            self.wire_lens,
+            self.static_data,
+            adjoint=adjoint,
+            num_controls=num_controls,
+            uid=uid,
+        )
