@@ -198,7 +198,6 @@ class TestGenericUtilities:
             )
         assert isinstance(res, str)
 
-    @pytest.mark.filterwarnings("ignore::catalyst.decomposition.RuleLoweringWarning")
     def test_wrapper_passes_compilable_data_to_conditions(self, mocker):
         """Test that decomposition conditions receive compilable operator data."""
         mock_decomp = mocker.MagicMock()
@@ -276,7 +275,6 @@ class TestTraceTime:
         assert 'target_gate = "NoParams{}{reg:2}{}"' in mlir
         assert 'target_gate = "Adjoint(NoParams){}{reg:2}{}"' in mlir
 
-    @pytest.mark.filterwarnings("ignore::catalyst.decomposition.RuleLoweringWarning")
     def test_adjoint_gate_captures_base_and_adjoint(self):
         """Lowering the Adjoint of a gate captures the rules registered against both the plain gate
         and its adjoint."""
@@ -299,7 +297,6 @@ class TestTraceTime:
         assert 'target_gate = "NoParams{}{reg:2}{}"' in mlir
         assert 'target_gate = "Adjoint(NoParams){}{reg:2}{}"' in mlir
 
-    @pytest.mark.filterwarnings("ignore::catalyst.decomposition.RuleLoweringWarning")
     def test_distribution_rule_synthesized_from_base_only(self):
         """With only a base rule registered (no Adjoint(Op) rule), lowering still synthesizes a rule
         for Adjoint(Op) by distributing the base rule over adjoint (case 3): its resources are the
@@ -327,7 +324,6 @@ class TestTraceTime:
         )
         assert "qref.adjoint" in mlir
 
-    @pytest.mark.filterwarnings("ignore::catalyst.decomposition.RuleLoweringWarning")
     def test_no_distribution_rule_for_non_invertible_body(self):
         """A distribution rule is NOT synthesized when the base rule body is non-invertible (contains
         a mid-circuit measurement): the base rule is still lowered, but no Adjoint(Op) rule."""
@@ -400,7 +396,6 @@ class TestOnDemand:
         with pytest.raises(ValueError, match="not a control id"):
             name_unwrap_control("RX", "Adjoint(RX){0:[f64]}{wires:1}{}")
 
-    @pytest.mark.filterwarnings("ignore::catalyst.decomposition.RuleLoweringWarning")
     @pytest.mark.parametrize(
         "op_id, extra_ctrl_target",
         [
@@ -424,7 +419,6 @@ class TestOnDemand:
         if extra_ctrl_target is not None:
             assert extra_ctrl_target in module_str
 
-    @pytest.mark.filterwarnings("ignore::catalyst.decomposition.RuleLoweringWarning")
     def test_control_variant_warns_and_skips_on_failure(self, mocker):
         """control_variant_rule_strings warns and skips a rule when it fails to compile."""
 

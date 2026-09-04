@@ -167,6 +167,12 @@
 
     6. The pass can now handle register-mode rules that target gates in control flow regions whose qubits were extracted outside the region.
 
+  - `RuleLoweringWarning` is silenced by default. To display these warnings, set
+    `CATALYST_SILENCE_RULE_LOWERING_WARNINGS=0`. This helps debug unexpected decompositions where
+    rules cannot be lowered and they are silently dropped from the graph-decomposition system instead
+    of raising an error.
+    [(#3190)](https://github.com/PennyLaneAI/catalyst/pull/3190)
+
 * A failure during AOT compilation is now downgraded to a warning and logged.
   [(#3100)](https://github.com/PennyLaneAI/catalyst/pull/3100)
 
