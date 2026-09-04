@@ -125,6 +125,7 @@
     [(#3061)](https://github.com/PennyLaneAI/catalyst/pull/3061)
     [(#3160)](https://github.com/PennyLaneAI/catalyst/pull/3160)
     [(#3149)](https://github.com/PennyLaneAI/catalyst/pull/3149)
+    [(#3169)](https://github.com/PennyLaneAI/catalyst/pull/3169)
 
     This pathway of rule injection can be opted-out via a new keyword argument on `qp.qjit` named `collect_decomp_rules`.
     This kwarg controls whether or not to compile the decomposition rules during lower-time. Default value is `True`.
@@ -564,6 +565,9 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* Update calls to `GlobalPhase` to no longer use the `wires` argument.
+  [(#3108)](https://github.com/PennyLaneAI/catalyst/pull/3108)
+  
 * A GPU CI workflow runs the runtime transport tests on the `single-gpu-x64` runner, gated by
   the `gpu` label.
   [(#3113)](https://github.com/PennyLaneAI/catalyst/pull/3113)

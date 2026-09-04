@@ -1960,7 +1960,12 @@ class TestAutographInclude:
 
         with pytest.raises(NotImplementedError, match="autograph_include"):
 
-            @qjit(autograph=True, autograph_include=["catalyst.utils.dummy"], capture=True)
+            @qjit(
+                autograph=True,
+                autograph_include=["catalyst.utils.dummy"],
+                capture=True,
+                collect_decomp_rules=False,
+            )
             def included(x: float, n: int):
                 for _ in range(n):
                     x = x + dummy_func(6)

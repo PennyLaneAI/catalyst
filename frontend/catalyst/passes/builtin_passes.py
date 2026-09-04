@@ -25,7 +25,11 @@ from pennylane.decomposition.utils import to_name
 
 from catalyst.compiler import _options_to_cli_flags, _quantum_opt
 from catalyst.utils.exceptions import CompileError
-from catalyst.utils.runtime_environment import BYTECODE_FILE_PATH, get_lib_path, get_libpython_path
+from catalyst.utils.runtime_environment import (
+    BYTECODE_FILE_PATH,
+    get_lib_path,
+    get_libpython_path,
+)
 
 # pylint: disable=line-too-long, too-many-lines
 
@@ -264,7 +268,8 @@ def diagonalize_measurements_setup_inputs(
 
 
 diagonalize_measurements = qp.transform(
-    pass_name="diagonalize-final-measurements", setup_inputs=diagonalize_measurements_setup_inputs
+    pass_name="diagonalize-final-measurements",
+    setup_inputs=diagonalize_measurements_setup_inputs,
 )
 
 
@@ -739,20 +744,20 @@ def combine_global_phases_setup_inputs():
         @combine_global_phases
         @qp.qnode(dev)
         def circuit(n):
-            qp.GlobalPhase(0.1, wires = n-1)
+            qp.GlobalPhase(0.1)
             qp.X(n-1)
-            qp.GlobalPhase(0.1, wires = n-2)
+            qp.GlobalPhase(0.1)
             qp.H(n-2)
 
             @qp.for_loop(0, n)
             def loop(i):
-                qp.GlobalPhase(0.1967, wires=i)
-                qp.GlobalPhase(0.7691, wires=i)
+                qp.GlobalPhase(0.1967)
+                qp.GlobalPhase(0.7691)
 
             loop()
 
-            qp.GlobalPhase(0.1, wires=n-3)
-            qp.GlobalPhase(0.1, wires=0)
+            qp.GlobalPhase(0.1)
+            qp.GlobalPhase(0.1)
 
             return qp.expval(qp.Z(0))
 
@@ -1309,7 +1314,10 @@ def ppr_to_ppm_setup_inputs(decompose_method="pauli-corrected", avoid_y_measure=
     (:math:`P(\tfrac{\pi}{2}) = \exp(-iP\tfrac{\pi}{2}) = P`). Pauli operators can be commuted to
     the end of the circuit and absorbed into terminal measurements.
     """
-    return (), {"decompose_method": decompose_method, "avoid_y_measure": avoid_y_measure}
+    return (), {
+        "decompose_method": decompose_method,
+        "avoid_y_measure": avoid_y_measure,
+    }
 
 
 ppr_to_ppm = qp.transform(pass_name="ppr-to-ppm", setup_inputs=ppr_to_ppm_setup_inputs)
@@ -1698,7 +1706,8 @@ def decompose_arbitrary_ppr_setup_inputs():  # pragma: nocover
 
 
 decompose_arbitrary_ppr = qp.transform(
-    pass_name="decompose-arbitrary-ppr", setup_inputs=decompose_arbitrary_ppr_setup_inputs
+    pass_name="decompose-arbitrary-ppr",
+    setup_inputs=decompose_arbitrary_ppr_setup_inputs,
 )
 
 
