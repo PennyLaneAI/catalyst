@@ -29,8 +29,8 @@ func.func @multi_region(%c1: !quantum.bit, %c2: !quantum.bit, %q: !quantum.bit)
 // 2C(U): base decomposition (H; H) inside a two-control quantum.ctrl region.
 func.func private @cc_u(%q: !quantum.bit, %c1: !quantum.bit, %c2: !quantum.bit)
     -> (!quantum.bit, !quantum.bit, !quantum.bit) attributes {
-    target_gate = "2C(U){}{wires:1}{}",
-    resources = {operations = {"2C(H){}{wires:1}{}" = 2 : i64}} } {
+    target_gate = "{op = \"U\", traits = {controls = 2 : i64}, wires = [1]}",
+    resources = {operations = {"{op = \"H\", traits = {controls = 2 : i64}, wires = [1]}" = 2 : i64}} } {
   %true = arith.constant true
   %oc:2, %oq = quantum.ctrl(%c1, %c2) ctrlvals(%true, %true) (%q) : !quantum.bit, !quantum.bit -> !quantum.bit {
   ^bb0(%arg0: !quantum.bit):

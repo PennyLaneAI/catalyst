@@ -26,7 +26,11 @@ from jax._src.lib.mlir import ir
 from jaxlib.mlir.dialects.builtin import ModuleOp
 
 from catalyst.compiler import _quantum_opt
-from catalyst.decomposition.graph_op_id import GraphOpID
+from catalyst.decomposition.graph_op_id import (
+    GraphOpID,
+    graph_op_id_modifiers,
+    with_graph_op_id_modifiers,
+)
 from catalyst.decomposition.rule_lowering_warning import RuleLoweringWarning
 from catalyst.decomposition.type_utils import get_dummy_values_for_arg
 from catalyst.jax_extras.lowering import get_mlir_attribute_from_pyval
@@ -40,9 +44,8 @@ _NON_INVERTIBLE_MARKERS = (
 )
 
 
-# Canonical nesting order for op-level modifiers, listed OUTERMOST first. The compiler's
-# ``wrapModifiers`` (mlir/lib/Quantum/IR/QuantumInterfaces.cpp) folds modifiers into a graphOpId
-# in this exact order:
+# Canonical nesting order for op-level modifiers, listed OUTERMOST first. GraphOpIDs store
+# modifiers as fields but retain this order when deriving an operator's display name:
 # 1. control outermost
 # 2. adjoint innermost
 # So a single op that is both controlled and adjointed always spells as ``C(Adjoint(Op))``,
@@ -63,8 +66,8 @@ def _modifier_kind(modifier: str) -> str:
 def _control_modifier(n_ctrl: int) -> str:
     """Return the graphOpId control-modifier token for ``n_ctrl`` controls.
 
-    A single control is written ``C`` and ``n > 1`` controls ``<n>C``, mirroring the compiler's
-    ``wrapModifiers``. Used with :func:`wrap_modifier_id`, e.g. ``wrap_modifier_id(op_id, "2C")``.
+    A single control is written ``C`` and ``n > 1`` controls ``<n>C``. Used with
+    :func:`wrap_modifier_id`, e.g. ``wrap_modifier_id(op_id, "2C")``.
     """
     assert n_ctrl >= 1, "control modifier requires at least one control"
     return "C" if n_ctrl == 1 else f"{n_ctrl}C"
@@ -72,24 +75,14 @@ def _control_modifier(n_ctrl: int) -> str:
 
 def _leading_modifier_kind(op_id: str) -> str | None:
     """Return the canonical kind of ``op_id``'s current outermost modifier, or None if bare."""
-    if op_id.startswith("Adjoint("):
-        return "Adjoint"
-    i = 0
-    while i < len(op_id) and op_id[i].isdigit():
-        i += 1
-    if op_id[i:].startswith("C("):
+    _, adjoint, num_controls = graph_op_id_modifiers(op_id)
+    if num_controls:
         return "C"
-    return None
+    return "Adjoint" if adjoint else None
 
 
 def wrap_modifier_id(op_id: str, modifier: str) -> str:
-    """Name-wrap an op-level ``modifier`` around a graphOpId's operator name.
-
-    The modifier decorates the operator name only; the ``{param}{wire}{static}`` groups (and an
-    optional ``[uid]``) follow it, matching the compiler's ``defaultGetGraphOpId``. This applies to
-    any modifier (e.g. ``"Adjoint"``, ``"C"``), so nested ids compose as ``C(Adjoint(RX)){...}``.
-    Extend callers here to support future op-level modifiers.
-    """
+    """Apply an op-level modifier to a structured GraphOpID."""
     new_kind = _modifier_kind(modifier)
     inner_kind = _leading_modifier_kind(op_id)
     # The modifier is added as the new *outermost* layer. To keep graphOpIds canonical (see
@@ -106,41 +99,36 @@ def wrap_modifier_id(op_id: str, modifier: str) -> str:
                 f"Apply modifiers outermost-last in the order {_MODIFIER_CANONICAL_ORDER}."
             )
 
-    # Only the operator name is wrapped; the first '{' begins the {param}{wire}{static}[uid] suffix
-    # (the dynamic-shape group is always present), which is carried through untouched.
-    assert "{" in op_id, f"Malformed op id for graph decomposition, got {op_id}"
-    split = op_id.find("{")
-    return f"{modifier}({op_id[:split]}){op_id[split:]}"
+    if new_kind == "Adjoint":
+        return with_graph_op_id_modifiers(op_id, adjoint=True)
+
+    _, _, existing_controls = graph_op_id_modifiers(op_id)
+    if existing_controls:
+        raise ValueError(f"GraphOpID already has controls: {op_id!r}")
+    control_prefix = modifier.removesuffix("C")
+    num_controls = int(control_prefix) if control_prefix else 1
+    return with_graph_op_id_modifiers(op_id, num_controls=num_controls)
 
 
 def name_wrap_adjoint(op_id: str) -> str:
-    """Name-wrap the adjoint modifier around a graphOpId (``RX{...}`` -> ``Adjoint(RX){...}``)."""
+    """Set the adjoint field on a GraphOpID."""
     return wrap_modifier_id(op_id, "Adjoint")
 
 
 def name_unwrap_adjoint(op_name: str, op_id: str) -> str:
     """Inverse of :func:`name_wrap_adjoint` given the base ``op_name``."""
-    prefix = f"Adjoint({op_name})"
-    if not op_id.startswith(prefix):
+    base_name, adjoint, _ = graph_op_id_modifiers(op_id)
+    if base_name != op_name or not adjoint:
         raise ValueError(f"{op_id!r} is not an adjoint id for base op {op_name!r}")
-    return op_name + op_id[len(prefix) :]
+    return with_graph_op_id_modifiers(op_id, adjoint=False)
 
 
 def name_unwrap_control(op_name: str, op_id: str):
-    """Inverse of control name-wrapping given the base ``op_name``.
-
-    ``("RX", "2C(RX){...}")`` -> ``("RX{...}", 2)`` and ``("RX", "C(RX){...}")`` -> ``("RX{...}", 1)``.
-    Raises if ``op_id`` is not a control id for ``op_name``.
-    """
-    i = 0
-    while i < len(op_id) and op_id[i].isdigit():
-        i += 1
-    digits = op_id[:i]
-    n_ctrl = int(digits) if digits else 1
-    prefix = f"{digits}C({op_name})"
-    if not op_id.startswith(prefix):
+    """Clear the control field and return the previous control count."""
+    base_name, _, num_controls = graph_op_id_modifiers(op_id)
+    if base_name != op_name or num_controls == 0:
         raise ValueError(f"{op_id!r} is not a control id for base op {op_name!r}")
-    return op_name + op_id[len(prefix) :], n_ctrl
+    return with_graph_op_id_modifiers(op_id, num_controls=0), num_controls
 
 
 def get_rule_strings_from_module(module: ir.Module) -> list[str]:
@@ -310,7 +298,7 @@ def compile_decomposition_rules(
 
     Note that ``wrap_adjoint`` and ``wrap_control`` may be combined to synthesize the nested modifier
     ``<n>C(Adjoint(op_name))``: adjoint is applied innermost and control outermost (the canonical
-    order matching the compiler's ``wrapModifiers``).
+    order used when deriving an operator display name from the structured fields).
     """
     kwargs = prepare_dynamic_op_kwargs(dynamic_shape, wire_lens)
     extra_data = extra_data or {}
@@ -321,11 +309,7 @@ def compile_decomposition_rules(
         op_name, kwargs | static_data | extra_data, is_custom_op, adjoint_resources=wrap_adjoint
     )
 
-    # TODO: The modified target id and the wrapped resource ids are derived here by string-wrapping
-    # the graphOpId (via wrap_modifier_id). Ideally they would be generated via
-    # GraphOpID.getGraphOpId which requires missing steps in the GraphOpID object.
-    # Note it needs changes not just in this function, also in the string id and across
-    # the on-demand C++ loader boundary.
+    # Regenerate target and resource IDs by modifying their structured modifier fields.
     target_id = name_wrap_adjoint(op_id) if wrap_adjoint else op_id
     if wrap_control:
         ctrl_mod = _control_modifier(n_ctrl)
@@ -637,10 +621,9 @@ def compile_reachable_decomposition_rules_wrapper(
     ``pythonRuleLowering``), which passes the op's *base* name (``getOperatorName()``) together with
     its full graphOpId (``getGraphOpId()``). Two things matter here:
 
-    * **Modifier ids.** For a plain op the name and id agree (``"S"`` / ``"S{...}"``). For an
-      op-level modifier the graphOpId is name-wrapped (``"Adjoint(S){...}"``) while the name stays
-      the base (``"S"``). We recover the base id so the closure explores the base op *and* its
-      adjoint variants; otherwise ``Adjoint(S)`` would be decomposed as if it were ``S``.
+    * **Modifier ids.** The graphOpId stores adjoint and control state as structured fields while
+      ``op_name`` remains the base name. We clear those fields to recover the base id so the closure
+      can synthesize the requested variants.
     * **The whole closure, not just this op's direct rules.** The loader does not recurse into a
       rule's resource ops, so it needs every rule reachable from this op down to the gate set in one
       shot. For ``Adjoint(S)`` that includes ``Adjoint(S) -> Adjoint(PhaseShift)`` *and*
@@ -649,14 +632,12 @@ def compile_reachable_decomposition_rules_wrapper(
       (base + adjoint-registered + distributed-adjoint rules, transitively) and each returned func
       keeps its own ``target_gate``, which is how the loader registers them.
     """
-    base_id = op_id
-    n_ctrls = 0
-    if op_id.startswith("Adjoint(") and not op_name.startswith("Adjoint("):
-        base_id = name_unwrap_adjoint(op_name, op_id)
-    elif _leading_modifier_kind(op_id) == "C" and not op_name.startswith("Adjoint("):
-        # A controlled op-id (`C(op)` / `<n>C(op)`): recover the base id and control count so the
-        # closure synthesizes the matching `<n>C(...)` rules.
-        base_id, n_ctrls = name_unwrap_control(op_name, op_id)
+    base_name, _, n_ctrls = graph_op_id_modifiers(op_id)
+    if base_name != op_name:
+        raise ValueError(
+            f"GraphOpID base name {base_name!r} does not match operator name {op_name!r}"
+        )
+    base_id = with_graph_op_id_modifiers(op_id, adjoint=False, num_controls=0)
 
     rule_strings = fetch_all_reachable_decomposition_rules_from_op(
         op_name=op_name,

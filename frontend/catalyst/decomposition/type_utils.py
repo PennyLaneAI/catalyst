@@ -78,25 +78,6 @@ def convert_item_to_mlir_type(item, is_special_lowering=False):
     )
 
 
-def format_dynamic_params_for_id(d):
-    """Format a structure for ID."""
-
-    def handle_item(item):
-        match item:
-            case str():
-                return item
-            case list() | tuple():
-                return "[" + ",".join(handle_item(i) for i in item) + "]"
-
-    return (
-        "{"
-        + ",".join(
-            k + ":" + "[" + ",".join(handle_item(item) for item in v) + "]" for k, v in d.items()
-        )
-        + "}"
-    )
-
-
 def get_dummy_values_for_arg(arg):
     """Given a container of python or MLIR types, replace the types with corresponding dummy values.
 

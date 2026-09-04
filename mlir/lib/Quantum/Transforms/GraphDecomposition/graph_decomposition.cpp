@@ -28,6 +28,7 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/DebugLog.h"
 #include "llvm/Support/raw_ostream.h"
+#include "mlir/AsmParser/AsmParser.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
@@ -75,6 +76,84 @@ namespace quantum {
 
 #define GEN_PASS_DEF_GRAPHDECOMPOSITIONPASS
 #include "Quantum/Transforms/Passes.h.inc"
+
+namespace {
+
+struct ParsedGraphOpId {
+    std::string baseName;
+    bool adjoint;
+    size_t numControls;
+
+    std::string getOperatorName() const {
+        std::string name = baseName;
+        if (adjoint) {
+            name = "Adjoint(" + name + ")";
+        }
+        if (numControls == 1) {
+            name = "C(" + name + ")";
+        } else if (numControls > 1) {
+            name = std::to_string(numControls) + "C(" + name + ")";
+        }
+        return name;
+    }
+};
+
+FailureOr<ParsedGraphOpId> parseGraphOpId(llvm::StringRef raw, MLIRContext *context) {
+    auto dictionary = dyn_cast_or_null<DictionaryAttr>(mlir::parseAttribute(raw, context));
+    if (!dictionary) {
+        return failure();
+    }
+
+    auto baseName = dictionary.getAs<StringAttr>("op");
+    auto traits = dictionary.getAs<DictionaryAttr>("traits");
+    auto adjoint = traits ? traits.getAs<BoolAttr>("adj") : BoolAttr();
+    auto numControls = traits ? traits.getAs<IntegerAttr>("controls") : IntegerAttr();
+    auto dynamicTypes = dictionary.getAs<ArrayAttr>("params");
+    auto wireLengths = dictionary.getAs<ArrayAttr>("wires");
+    auto staticData = dictionary.getAs<DictionaryAttr>("static");
+    auto uid = dictionary.getAs<IntegerAttr>("uid");
+    size_t knownFields = 1 + static_cast<size_t>(static_cast<bool>(traits)) +
+                         static_cast<size_t>(static_cast<bool>(dynamicTypes)) +
+                         static_cast<size_t>(static_cast<bool>(wireLengths)) +
+                         static_cast<size_t>(static_cast<bool>(staticData)) +
+                         static_cast<size_t>(static_cast<bool>(uid));
+    size_t knownTraits = static_cast<size_t>(static_cast<bool>(adjoint)) +
+                         static_cast<size_t>(static_cast<bool>(numControls));
+    if (!baseName || dictionary.size() != knownFields ||
+        (traits && (traits.empty() || traits.size() != knownTraits)) ||
+        (adjoint && !adjoint.getValue()) ||
+        (numControls &&
+         (!numControls.getType().isSignlessInteger(64) || numControls.getInt() <= 0)) ||
+        (dynamicTypes && dynamicTypes.empty()) || (wireLengths && wireLengths.empty()) ||
+        (staticData && staticData.empty())) {
+        return failure();
+    }
+
+    if (dynamicTypes) {
+        for (Attribute group : dynamicTypes) {
+            auto types = dyn_cast<ArrayAttr>(group);
+            if (!types || !llvm::all_of(types, llvm::IsaPred<TypeAttr>)) {
+                return failure();
+            }
+        }
+    }
+    if (wireLengths) {
+        for (Attribute value : wireLengths) {
+            auto length = dyn_cast<IntegerAttr>(value);
+            if (!length || !length.getType().isSignlessInteger(64) || length.getInt() < 0) {
+                return failure();
+            }
+        }
+    }
+    if (uid && (!uid.getType().isSignlessInteger(64) || uid.getInt() < 0)) {
+        return failure();
+    }
+
+    return ParsedGraphOpId{baseName.str(), adjoint ? adjoint.getValue() : false,
+                           numControls ? static_cast<size_t>(numControls.getInt()) : 0};
+}
+
+} // namespace
 
 struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDecompositionPass> {
     using GraphDecompositionPassBase::GraphDecompositionPassBase;
@@ -129,7 +208,9 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         if (failed(getRuleNodes(bytecodeRulesFile, setOfRules, userRuleNames))) {
             return signalPassFailure();
         }
-        getOperators(setOfOps);
+        if (failed(getOperators(setOfOps))) {
+            return signalPassFailure();
+        }
 
         ///////////////////////////
         // Step 2: Build and solve the decomposition graph
@@ -329,12 +410,23 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         // 3. Populate RuleNode
         RuleNode ruleNode;
         ruleNode.name = ruleName.str();
-        ruleNode.output = parseOperator(targetGateAttr.getValue());
+        FailureOr<OperatorNode> output = parseOperator(targetGateAttr.getValue());
+        if (failed(output)) {
+            rule.emitError() << "has malformed `target_gate` GraphOpID";
+            return failure();
+        }
+        ruleNode.output = std::move(*output);
 
         for (const auto &namedAttr : operations) {
             if (auto intAttr = mlir::dyn_cast<IntegerAttr>(namedAttr.getValue())) {
-                ruleNode.inputs.push_back({parseOperator(namedAttr.getName().strref()),
-                                           static_cast<uint32_t>(intAttr.getInt())});
+                FailureOr<OperatorNode> input = parseOperator(namedAttr.getName().strref());
+                if (failed(input)) {
+                    rule.emitError()
+                        << "has malformed resource GraphOpID " << namedAttr.getName().strref();
+                    return failure();
+                }
+                ruleNode.inputs.push_back(
+                    {std::move(*input), static_cast<uint32_t>(intAttr.getInt())});
             }
         }
 
@@ -492,18 +584,21 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         return success();
     }
 
-    void getOperators(std::vector<OperatorNode> &operators) {
-        getOperation().walk([&](DecomposableGate op) {
+    LogicalResult getOperators(std::vector<OperatorNode> &operators) {
+        WalkResult result = getOperation().walk([&](DecomposableGate op) {
             if (DecompUtils::isInDecompRule(op)) {
-                return;
+                return WalkResult::advance();
             }
             assert(!op->getParentOfType<AdjointOp>() && !op->getParentOfType<CtrlOp>() &&
                    "graph-decomposition requires op-level modifiers: ctrl/adjoint regions must be "
                    "lowered before the decomposition graph is built");
 
-            // Derive the id and modifier-wrapped name from the single parse path, so operator nodes
-            // and rule nodes agree on the spelling of `C(...)`/`Adjoint(...)`.
-            OperatorNode node = parseOperator(op.getGraphOpId());
+            FailureOr<OperatorNode> parsed = parseOperator(op.getGraphOpId());
+            if (failed(parsed)) {
+                op.emitError("failed to parse generated GraphOpID");
+                return WalkResult::interrupt();
+            }
+            OperatorNode node = std::move(*parsed);
 
             // numWires/numParams are debug-only; parseOperator leaves them at defaults for the
             // graphOpId form, so we need to fill them accurately from the op here.
@@ -516,48 +611,26 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
             }
 
             operators.push_back(node);
+            return WalkResult::advance();
         });
+        return failure(result.wasInterrupted());
     }
 
     /**
      * @brief Parse a graphOpId string into an OperatorNode.
      *
-     * The graphOpId format is "<name>{params}{wires}{static}[uid]", where <name> already carries
-     * any name-wrapped op-level modifiers produced by `defaultGetGraphOpId`, e.g.
-     * "C(Adjoint(RX)){0:[f64]}{wires:1}{}".
+     * The GraphOpID is the canonical text of a dictionary attribute. The complete text remains the
+     * graph identity while the structured modifier fields determine the operator display name used
+     * for gate-set matching.
      */
-    OperatorNode parseOperator(llvm::StringRef raw) {
+    FailureOr<OperatorNode> parseOperator(llvm::StringRef raw) {
         OperatorNode node;
-
-        // Base op: either the graphOpId "Name{...}..." form or the legacy "Name(w,p)" form.
-        if (raw.contains('[') || raw.contains('{')) {
-            node.id = raw.str();
-            node.name = raw.take_until([](char c) { return c == '[' || c == '{'; });
-        } else {
-            auto openIdx = raw.find('(');
-            if (openIdx == llvm::StringRef::npos) {
-                node.name = raw.trim().str();
-                return node;
-            }
-            node.name = raw.take_front(openIdx).trim().str();
-            raw = raw.drop_front(openIdx); // leftover: "(w,p)" or "(w)"
+        FailureOr<ParsedGraphOpId> parsed = parseGraphOpId(raw, &getContext());
+        if (failed(parsed)) {
+            return failure();
         }
-
-        // Parse "(w,p)" (new) or "(w)" (legacy) suffix.
-        if (raw.consume_front("(") && raw.consume_back(")")) {
-            llvm::StringRef wStr, pStr;
-            std::tie(wStr, pStr) = raw.split(',');
-            int w = -1, p = -1;
-            if (!wStr.getAsInteger(10, w)) {
-                node.numWires = w;
-            }
-            if (!pStr.empty() && !pStr.getAsInteger(10, p)) {
-                node.numParams = p;
-            }
-            // If pStr is empty we were given the legacy "(w)" format; leave
-            // numParams at the wildcard default so old bytecode keeps working.
-        }
-
+        node.id = raw.str();
+        node.name = parsed->getOperatorName();
         return node;
     }
 

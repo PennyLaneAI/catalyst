@@ -24,7 +24,7 @@ func.func @circuit(%q: !quantum.bit) -> !quantum.bit {
   return %out: !quantum.bit
 }
 
-func.func private @my_decomp(%q: !quantum.bit) -> !quantum.bit attributes {target_gate="testHadamard{}{wires:1}{}"} {
+func.func private @my_decomp(%q: !quantum.bit) -> !quantum.bit attributes {target_gate="{op = \"testHadamard\", wires = [1]}"} {
   %q0 = quantum.custom "testPauliX"() %q : !quantum.bit
   %q1 = quantum.custom "testPauliX"() %q0 : !quantum.bit
   return %q1 : !quantum.bit

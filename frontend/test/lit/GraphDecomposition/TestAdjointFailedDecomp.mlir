@@ -14,7 +14,7 @@
 
 // RUN: not --crash catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{gate-set=testFoo=1.0})' %s 2>&1 | FileCheck %s
 
-// CHECK: Decomposition rule not found for operator 'id: Adjoint(testFoo){}{wires:1}{}'
+// CHECK: Decomposition rule not found for operator 'id: {op = "testFoo", traits = {adj = true}, wires = [1]}'
 func.func @circuit(%q: !quantum.bit) -> !quantum.bit {
   %out = quantum.custom "testFoo"() %q adj : !quantum.bit
   return %out: !quantum.bit

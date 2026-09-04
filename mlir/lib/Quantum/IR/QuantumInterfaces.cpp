@@ -15,16 +15,20 @@
 #include "Quantum/IR/QuantumInterfaces.h"
 
 #include <cstddef>
+#include <cstdint>
+#include <limits>
 #include <string>
+#include <utility>
 
 #include "llvm/ADT/STLExtras.h"
-#include "llvm/ADT/StringMap.h"
-#include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/raw_ostream.h"
 #include "mlir/IR/Attributes.h"
+#include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/Types.h"
 #include "mlir/Support/LLVM.h"
+
+#include "Quantum/IR/QuantumOps.h"
 
 using namespace mlir;
 using namespace catalyst::quantum;
@@ -37,72 +41,151 @@ using namespace catalyst::quantum;
 
 namespace {
 
-void printAttr(mlir::Attribute attr, llvm::raw_string_ostream &ss) {
-    llvm::TypeSwitch<mlir::Attribute, void>(attr)
-        .Case<mlir::DictionaryAttr>([&](mlir::DictionaryAttr dict) {
-            ss << "{";
-            for (auto [i, entry] : llvm::enumerate(dict)) {
-                if (i > 0) {
-                    ss << ",";
-                }
-
-                ss << entry.getName().str() << ":";
-                printAttr(entry.getValue(), ss);
-            }
-            ss << "}";
-        })
-        .Case<mlir::ArrayAttr>([&](mlir::ArrayAttr arr) {
-            ss << "[";
-            for (auto [i, attr] : llvm::enumerate(arr)) {
-                if (i > 0) {
-                    ss << ",";
-                }
-                printAttr(attr, ss);
-            }
-            ss << "]";
-        })
-        .Case<mlir::StringAttr>([&](mlir::StringAttr attr) { ss << attr.str(); })
-        .Case<mlir::IntegerAttr>([&](mlir::IntegerAttr attr) { ss << attr.getInt(); })
-        .Case<mlir::FloatAttr>([&](mlir::FloatAttr attr) { ss << attr.getValueAsDouble(); })
-        .Default([&](mlir::Attribute attr) { attr.print(ss); });
+int64_t groupStartIndex(NamedAttribute entry) {
+    auto indices = cast<DenseI64ArrayAttr>(entry.getValue()).asArrayRef();
+    return indices.empty() ? std::numeric_limits<int64_t>::max() : *llvm::min_element(indices);
 }
 
-template <typename T, typename PrintFunc>
-void printSortedMap(const llvm::StringMap<T> &map, llvm::raw_string_ostream &ss,
-                    PrintFunc printValue) {
-    llvm::SmallVector<llvm::StringRef> keys;
-    for (const llvm::StringRef key : map.keys()) {
-        keys.push_back(key);
-    }
-    llvm::sort(keys);
+bool groupPrecedes(NamedAttribute lhs, NamedAttribute rhs) {
+    return std::pair(groupStartIndex(lhs), lhs.getName().getValue()) <
+           std::pair(groupStartIndex(rhs), rhs.getName().getValue());
+}
 
-    ss << "{";
-    for (auto [i, key] : llvm::enumerate(keys)) {
-        if (i > 0) {
-            ss << ",";
+SmallVector<NamedAttribute> getOrderedGroups(DictionaryAttr groups) {
+    SmallVector<NamedAttribute> ordered(groups.begin(), groups.end());
+    llvm::sort(ordered, groupPrecedes);
+    return ordered;
+}
+
+SmallVector<SmallVector<Type>> getOrderedDynamicTypes(DecomposableGate gate, Operation *op) {
+    if (auto custom = dyn_cast<CustomOp>(op)) {
+        SmallVector<SmallVector<Type>> result;
+        result.reserve(custom.getParams().size());
+        for (Value param : custom.getParams()) {
+            result.push_back({param.getType()});
         }
-        ss << key << ":";
-        printValue(map.lookup(key), ss);
+        return result;
     }
-    ss << "}";
-}
 
-void printDynamicShape(const llvm::StringMap<llvm::SmallVector<mlir::Type>> &map,
-                       llvm::raw_string_ostream &ss) {
-    printSortedMap(map, ss, [](const auto &types, llvm::raw_string_ostream &stream) {
-        stream << "[";
-        for (auto [j, type] : llvm::enumerate(types)) {
-            if (j > 0) {
-                stream << ",";
+    if (auto generic = dyn_cast<OperatorOp>(op)) {
+        SmallVector<NamedAttribute> groups = getOrderedGroups(generic.getParamMap());
+        SmallVector<SmallVector<Type>> result;
+        result.reserve(groups.size());
+        for (NamedAttribute group : groups) {
+            SmallVector<Type> types;
+            for (int64_t index : cast<DenseI64ArrayAttr>(group.getValue()).asArrayRef()) {
+                types.push_back(generic.getParams()[index].getType());
             }
-            stream << type;
+            result.push_back(std::move(types));
         }
-        stream << "]";
-    });
+        return result;
+    }
+
+    // Built-in decomposable operations currently have at most one parameter group. Sorting the
+    // fallback by name keeps future implementations deterministic until they expose operand order.
+    auto dynamicShape = gate.getDynamicShape();
+    SmallVector<StringRef> names;
+    names.reserve(dynamicShape.size());
+    for (const auto &[name, _] : dynamicShape) {
+        names.push_back(name);
+    }
+    llvm::sort(names);
+
+    SmallVector<SmallVector<Type>> result;
+    result.reserve(names.size());
+    for (StringRef name : names) {
+        result.push_back(dynamicShape.lookup(name));
+    }
+    return result;
 }
 
-void printWireLens(const llvm::StringMap<size_t> &map, llvm::raw_string_ostream &ss) {
-    printSortedMap(map, ss, [](size_t len, llvm::raw_string_ostream &stream) { stream << len; });
+SmallVector<size_t> getOrderedWireLengths(DecomposableGate gate, Operation *op) {
+    if (auto custom = dyn_cast<CustomOp>(op)) {
+        return {custom.getNonCtrlQubitOperands().size()};
+    }
+
+    if (auto generic = dyn_cast<OperatorOp>(op)) {
+        SmallVector<NamedAttribute> groups = getOrderedGroups(generic.getQubitMap());
+        auto wireLengths = gate.getWireLens();
+        SmallVector<size_t> result;
+        result.reserve(groups.size());
+        for (NamedAttribute group : groups) {
+            result.push_back(wireLengths.lookup(group.getName()));
+        }
+        return result;
+    }
+
+    auto wireLengths = gate.getWireLens();
+    SmallVector<StringRef> names;
+    names.reserve(wireLengths.size());
+    for (const auto &[name, _] : wireLengths) {
+        names.push_back(name);
+    }
+    llvm::sort(names);
+
+    SmallVector<size_t> result;
+    result.reserve(names.size());
+    for (StringRef name : names) {
+        result.push_back(wireLengths.lookup(name));
+    }
+    return result;
+}
+
+mlir::DictionaryAttr buildGraphOpKeyAttr(DecomposableGate gate, Operation *op) {
+    MLIRContext *context = op->getContext();
+    Builder builder(context);
+
+    SmallVector<Attribute> dynamicTypes;
+    for (const auto &types : getOrderedDynamicTypes(gate, op)) {
+        SmallVector<Attribute> typeNames;
+        typeNames.reserve(types.size());
+        for (Type type : types) {
+            typeNames.push_back(TypeAttr::get(type));
+        }
+        dynamicTypes.push_back(builder.getArrayAttr(typeNames));
+    }
+
+    SmallVector<Attribute> wireLengths;
+    for (size_t length : getOrderedWireLengths(gate, op)) {
+        wireLengths.push_back(builder.getI64IntegerAttr(length));
+    }
+
+    size_t numControls = 0;
+    if (auto quantumGate = mlir::dyn_cast<QuantumGate>(op)) {
+        numControls = quantumGate.getCtrlQubitOperands().size();
+    }
+
+    NamedAttrList fields;
+    fields.append("op", builder.getStringAttr(gate.getOperatorName()));
+    NamedAttrList traits;
+    if (op->hasAttr("adjoint")) {
+        traits.append("adj", builder.getBoolAttr(true));
+    }
+    if (!dynamicTypes.empty()) {
+        fields.append("params", builder.getArrayAttr(dynamicTypes));
+    }
+    if (numControls) {
+        traits.append("controls", builder.getI64IntegerAttr(numControls));
+    }
+    DictionaryAttr staticData = gate.getStaticData();
+    if (!staticData.empty()) {
+        fields.append("static", staticData);
+    }
+    if (!traits.empty()) {
+        fields.append("traits", traits.getDictionary(context));
+    }
+
+    if (std::string uid = gate.getExtraData(); !uid.empty()) {
+        uint64_t value = 0;
+        bool invalid = llvm::StringRef(uid).getAsInteger(10, value);
+        assert(!invalid && "DecomposableGate extra data must be an integer UID");
+        fields.append("uid", builder.getI64IntegerAttr(value));
+    }
+    if (!wireLengths.empty()) {
+        fields.append("wires", builder.getArrayAttr(wireLengths));
+    }
+
+    return fields.getDictionary(context);
 }
 
 } // namespace
@@ -114,49 +197,11 @@ void printWireLens(const llvm::StringMap<size_t> &map, llvm::raw_string_ostream 
 namespace catalyst {
 namespace quantum {
 
-// Wrap an operator's base name with its op-level modifiers (name-wrap), so that `Op`,
-// `Adjoint(Op)`, `C(Op)`, and nested combinations like `C(Adjoint(Op))` are distinct graph
-// identities. Modifiers are applied innermost-first in a canonical order (adjoint innermost,
-// control outermost) so a nested op has a single spelling.
-// An op that is both controlled and adjointed could otherwise be formed as
-// `C(Adjoint(Op))` or `Adjoint(C(Op))` which will produce two ids for one operator,
-// which would split the decomposition graph into two nodes and prevent rules from matching.
-// Always emitting the control-outermost form keeps such ops on a single node. The
-// caller appends the param/wire/static/uid groups. Extend this helper to support future op-level
-// modifiers, preserving the canonical order (mirror the Python side in decomposition_rules.py).
-static std::string wrapModifiers(std::string name, Operation *op) {
-    if (op->hasAttr("adjoint")) {
-        name = "Adjoint(" + name + ")";
-    }
-    if (auto gate = mlir::dyn_cast<QuantumGate>(op)) {
-        size_t numCtrl = gate.getCtrlQubitOperands().size();
-        if (numCtrl == 1) {
-            name = "C(" + name + ")";
-        } else if (numCtrl > 1) {
-            name = std::to_string(numCtrl) + "C(" + name + ")";
-        }
-    }
-    return name;
-}
-
 std::string defaultGetGraphOpId(Operation *op) {
-    std::string out;
-    llvm::raw_string_ostream ss(out);
-
     DecomposableGate gate = cast<DecomposableGate>(op);
-
-    // Fold op-level modifiers into the operator name so that `Op`, `Adjoint(Op)`, `C(Op)`, and
-    // nested combinations are distinct in the graphOpId. Modifiers wrap only the name; the
-    // param/wire/static/uid groups follow, e.g. `C(Adjoint(Rot)){...}{wires...}`.
-    ss << wrapModifiers(gate.getOperatorName(), op);
-    printDynamicShape(gate.getDynamicShape(), ss);
-    printWireLens(gate.getWireLens(), ss);
-    printAttr(gate.getStaticData(), ss);
-    if (gate.getExtraData() != "") {
-        ss << '[' << gate.getExtraData() << ']';
-    }
-    ss.flush();
-
+    std::string out;
+    llvm::raw_string_ostream stream(out);
+    buildGraphOpKeyAttr(gate, op).print(stream);
     return out;
 }
 

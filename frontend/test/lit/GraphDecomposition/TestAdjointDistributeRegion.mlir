@@ -28,8 +28,8 @@ func.func @distribute_region(%q: !quantum.bit) -> !quantum.bit {
 // Adjoint(U) via distribution:
 // CHECK-LABEL: func.func private @adj_u
 func.func private @adj_u(%q: !quantum.bit) -> !quantum.bit attributes {
-    target_gate = "Adjoint(U){}{wires:1}{}",
-    resources = {operations = {"Adjoint(Hadamard){}{wires:1}{}" = 2 : i64}} } {
+    target_gate = "{op = \"U\", traits = {adj = true}, wires = [1]}",
+    resources = {operations = {"{op = \"Hadamard\", traits = {adj = true}, wires = [1]}" = 2 : i64}} } {
   %out = quantum.adjoint(%q) : !quantum.bit {
   ^bb0(%arg0: !quantum.bit):
     %a = quantum.custom "Hadamard"() %arg0 : !quantum.bit
@@ -41,8 +41,8 @@ func.func private @adj_u(%q: !quantum.bit) -> !quantum.bit attributes {
 
 // Self-adjoint:
 func.func private @adj_h(%q: !quantum.bit) -> !quantum.bit attributes {
-    target_gate = "Adjoint(Hadamard){}{wires:1}{}",
-    resources = {operations = {"Hadamard{}{wires:1}{}" = 1 : i64}} } {
+    target_gate = "{op = \"Hadamard\", traits = {adj = true}, wires = [1]}",
+    resources = {operations = {"{op = \"Hadamard\", wires = [1]}" = 1 : i64}} } {
   %o = quantum.custom "Hadamard"() %q : !quantum.bit
   return %o : !quantum.bit
 }

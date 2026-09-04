@@ -33,7 +33,7 @@ func.func @circuit() -> !quantum.bit {
 }
 
 // CHECK-LABEL: y_to_ry
-func.func @y_to_ry(%q0 : !quantum.bit) -> !quantum.bit attributes {target_gate="testY{}{wires:1}{}", resources = { operations = {"testRY{0:[f64]}{wires:1}{}"=1}}} {
+func.func @y_to_ry(%q0 : !quantum.bit) -> !quantum.bit attributes {target_gate="{op = \"testY\", wires = [1]}", resources = { operations = {"{op = \"testRY\", params = [[f64]], wires = [1]}" = 1}}} {
     %pi = arith.constant 3.14 : f64
     %negpiby2 = arith.constant -1.57 : f64
     %q1 = quantum.custom "testRY"(%pi) %q0 : !quantum.bit
@@ -41,7 +41,7 @@ func.func @y_to_ry(%q0 : !quantum.bit) -> !quantum.bit attributes {target_gate="
 }
 
 // CHECK-LABEL: y_to_x_z
-func.func @y_to_x_z(%q0 : !quantum.bit) -> !quantum.bit attributes {target_gate="testY{}{wires:1}{}", resources = { operations = {"testX{}{wires:1}{}"=1, "testZ{}{wires:1}{}"=1}}} {
+func.func @y_to_x_z(%q0 : !quantum.bit) -> !quantum.bit attributes {target_gate="{op = \"testY\", wires = [1]}", resources = { operations = {"{op = \"testX\", wires = [1]}" = 1, "{op = \"testZ\", wires = [1]}" = 1}}} {
     %q1 = quantum.custom "testX"() %q0 : !quantum.bit
     %q2 = quantum.custom "testZ"() %q1 : !quantum.bit
     return %q2 : !quantum.bit

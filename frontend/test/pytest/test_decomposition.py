@@ -17,6 +17,7 @@
 import jax.numpy as jnp
 import pennylane as qp
 import pytest
+from jax._src.lib.mlir import ir
 from jax.core import ShapedArray
 from operator2_dummy_gates import (
     CompilableData,
@@ -48,12 +49,38 @@ from catalyst.decomposition.decomposition_rules import (
     name_wrap_adjoint,
     wrap_modifier_id,
 )
-from catalyst.decomposition.graph_op_id import GraphOpID
+from catalyst.decomposition.graph_op_id import GraphOpID, build_graph_op_key
 from catalyst.decomposition.type_utils import (
     convert_item_to_mlir_type,
     get_dummy_values_for_arg,
     replace_wires_with_placeholder_wires,
 )
+
+
+def _key(
+    base_name,
+    dynamic_types=None,
+    wire_lengths=None,
+    static_data=None,
+    *,
+    adjoint=False,
+    num_controls=0,
+    uid=None,
+):
+    return build_graph_op_key(
+        base_name,
+        dynamic_types or {},
+        wire_lengths or {},
+        static_data or {},
+        adjoint=adjoint,
+        num_controls=num_controls,
+        uid=uid,
+    )
+
+
+def _mlir_string(value):
+    with ir.Context():
+        return str(ir.StringAttr.get(value))
 
 
 class TestGenericUtilities:
@@ -142,47 +169,126 @@ class TestGenericUtilities:
         assert convert_item_to_mlir_type(item, is_special_lowering) == mlir_type
 
     @pytest.mark.parametrize(
-        "op, id",
+        "op, base_name, dynamic_types, wire_lengths, static_data",
         [
-            (NoParams(Wires(0)), "NoParams{}{reg:1}{}"),
-            (NoParamsCustomOp(Wires([0, 1])), "NoParamsCustomOp{}{wires:2}{}"),
-            (SingleParam(Float, Wires([2, 3])), "SingleParam{x:[tensor<f64>]}{reg:2}{}"),
+            (NoParams(Wires(0)), "NoParams", {}, {"reg": 1}, {}),
+            (NoParamsCustomOp(Wires([0, 1])), "NoParamsCustomOp", {}, {"wires": 2}, {}),
+            (
+                SingleParam(Float, Wires([2, 3])),
+                "SingleParam",
+                {"x": ["tensor<f64>"]},
+                {"reg": 2},
+                {},
+            ),
             (
                 CompilableData(True, 3.14, "string", Wires([0, 1])),
-                "CompilableData{}{wires:2}{a:True,b:3.14,thing:string}",
+                "CompilableData",
+                {},
+                {"wires": 2},
+                {"a": True, "b": 3.14, "thing": "string"},
             ),
             (
                 MultipleRegisters(Wires([0, 1, 2]), Wires([3, 4])),
-                "MultipleRegisters{}{reg1:3,reg2:2}{}",
+                "MultipleRegisters",
+                {},
+                {"reg1": 3, "reg2": 2},
+                {},
             ),
             (
                 MultiParams(Wires([0, 2, 3]), Complex, Int, Float[2]),
-                "MultiParams{a:[tensor<complex<f64>>],b:[tensor<i64>],c:[tensor<2xf64>]}{reg:3}",
+                "MultiParams",
+                {
+                    "a": ["tensor<complex<f64>>"],
+                    "b": ["tensor<i64>"],
+                    "c": ["tensor<2xf64>"],
+                },
+                {"reg": 3},
+                {},
             ),
-            (qp.MultiRZ(Float, Wires([0, 2, 3, 4])), "MultiRZ{theta:[f64]}{wires:4}{}"),
+            (
+                qp.MultiRZ(Float, Wires([0, 2, 3, 4])),
+                "MultiRZ",
+                {"theta": ["f64"]},
+                {"wires": 4},
+                {},
+            ),
             (
                 qp.PauliRot(Float, "XYZ", Wires([1, 2, 3])),
-                "PauliRot{theta:[f64]}{wires:3}{pauli_word:XYZ}",
+                "PauliRot",
+                {"theta": ["f64"]},
+                {"wires": 3},
+                {"pauli_word": "XYZ"},
             ),
-            (StaticData("mylabel", Wires([0, 1])), "StaticData{}{reg:2}{}["),
+            (StaticData("mylabel", Wires([0, 1])), "StaticData", {}, {"reg": 2}, {}),
             (
                 HybridWires(Wires([0, 1, 2])),
-                "HybridWires{}{}{}[",
-            ),  # NOTE: open brace to match uid
+                "HybridWires",
+                {},
+                {},
+                {},
+            ),
             (
                 HybridOpArg(Float, StaticData("innerop", Wires(0)), Wires([2, 3]), 12),
-                "HybridOpArg{angle:[tensor<f64>]}{cwires:2}{}[",  # NOTE: open brace to match uid
+                "HybridOpArg",
+                {"angle": ["tensor<f64>"]},
+                {"cwires": 2},
+                {},
             ),
             (
                 qp.Rot(Bool, Int, Float, Wires(0)),
-                "Rot{0:[f64],1:[f64],2:[f64]}{wires:1}{}",
-            ),  # custom ops should be promoted to f64
+                "Rot",
+                {"0": ["f64"], "1": ["f64"], "2": ["f64"]},
+                {"wires": 1},
+                {},
+            ),
         ],
     )
-    def test_GraphOpId(self, op, id):
+    def test_GraphOpId(self, op, base_name, dynamic_types, wire_lengths, static_data):
         """Test that GraphOpIds are generated correctly by the frontend."""
-        # NOTE: use startswith to match ops with uids/extra_data
-        assert GraphOpID(op).getGraphOpId().startswith(id)
+        graph_op_id = GraphOpID(op)
+        expected = build_graph_op_key(
+            base_name,
+            dynamic_types,
+            wire_lengths,
+            static_data,
+            uid=graph_op_id.uid if graph_op_id.extra_data else None,
+        )
+        assert graph_op_id.getGraphOpId() == expected
+
+    def test_build_graph_op_key_canonical_typed_payload(self):
+        """Match the typed C++ ``OperatorOpQubits`` fixture byte-for-byte."""
+        assert build_graph_op_key(
+            "testInterfaceOp",
+            {"flag": ["i1"], "angle": ["f64"], "index": ["i64"]},
+            {"wire1": 1, "wire2": 1},
+            {
+                "myDelimitedString": "a,b{c}",
+                "myStaticArray": [1, 2, 3],
+                "myStaticBool": True,
+                "myStaticFloat": 3.14,
+                "myStaticInt": 4,
+                "myStaticString": "Test",
+            },
+        ) == (
+            '{op = "testInterfaceOp", params = [[i1], [f64], [i64]], '
+            "static = "
+            '{myDelimitedString = "a,b{c}", myStaticArray = [1, 2, 3], myStaticBool = true, '
+            "myStaticFloat = 3.140000e+00 : f64, myStaticInt = 4 : i64, myStaticString = "
+            '"Test"}, wires = [1, 1]}'
+        )
+
+    def test_build_graph_op_key_uses_position_not_argument_names(self):
+        """Argument renaming does not change identity, while argument reordering does."""
+        original = build_graph_op_key(
+            "Op", {"angle": ["f64"], "index": ["i64"]}, {"left": 1, "right": 2}, {}
+        )
+        renamed = build_graph_op_key("Op", {"x": ["f64"], "y": ["i64"]}, {"a": 1, "b": 2}, {})
+        reordered = build_graph_op_key(
+            "Op", {"index": ["i64"], "angle": ["f64"]}, {"right": 2, "left": 1}, {}
+        )
+
+        assert original == renamed
+        assert original != reordered
 
     def test_wrapper_operator(self, mocker):
         """Test that compile_decomposition_rules_wrapper doesn't error on Operator1 instances."""
@@ -194,7 +300,7 @@ class TestGenericUtilities:
 
         with pytest.warns(RuleLoweringWarning, match="Failed to get resources"):
             res = compile_decomposition_rules_wrapper(
-                "MockOp", 'MockOp{}{"wires":1}{}', {}, {"wires": 1}, {}
+                "MockOp", _key("MockOp", wire_lengths={"wires": 1}), {}, {"wires": 1}, {}
             )
         assert isinstance(res, str)
 
@@ -212,7 +318,11 @@ class TestGenericUtilities:
 
         res = compile_decomposition_rules_wrapper(
             "CompilableData",
-            "CompilableData{}{wires:2}{a:True,b:3.14,thing:string}",
+            _key(
+                "CompilableData",
+                wire_lengths={"wires": 2},
+                static_data={"a": True, "b": 3.14, "thing": "string"},
+            ),
             {},
             {"wires": 2},
             {"a": True, "b": 3.14, "thing": "string"},
@@ -273,8 +383,10 @@ class TestTraceTime:
 
             mlir = circuit.mlir
 
-        assert 'target_gate = "NoParams{}{reg:2}{}"' in mlir
-        assert 'target_gate = "Adjoint(NoParams){}{reg:2}{}"' in mlir
+        base_id = _key("NoParams", wire_lengths={"reg": 2})
+        adjoint_id = _key("NoParams", wire_lengths={"reg": 2}, adjoint=True)
+        assert f"target_gate = {_mlir_string(base_id)}" in mlir
+        assert f"target_gate = {_mlir_string(adjoint_id)}" in mlir
 
     @pytest.mark.filterwarnings("ignore::catalyst.decomposition.RuleLoweringWarning")
     def test_adjoint_gate_captures_base_and_adjoint(self):
@@ -296,8 +408,10 @@ class TestTraceTime:
             mlir = circuit.mlir
 
         assert 'qref.operator "NoParams"() adj' in mlir
-        assert 'target_gate = "NoParams{}{reg:2}{}"' in mlir
-        assert 'target_gate = "Adjoint(NoParams){}{reg:2}{}"' in mlir
+        base_id = _key("NoParams", wire_lengths={"reg": 2})
+        adjoint_id = _key("NoParams", wire_lengths={"reg": 2}, adjoint=True)
+        assert f"target_gate = {_mlir_string(base_id)}" in mlir
+        assert f"target_gate = {_mlir_string(adjoint_id)}" in mlir
 
     @pytest.mark.filterwarnings("ignore::catalyst.decomposition.RuleLoweringWarning")
     def test_distribution_rule_synthesized_from_base_only(self):
@@ -318,13 +432,18 @@ class TestTraceTime:
 
             mlir = circuit.mlir
 
-        assert 'target_gate = "NoParams{}{reg:2}{}"' in mlir
+        base_id = _key("NoParams", wire_lengths={"reg": 2})
+        adjoint_id = _key("NoParams", wire_lengths={"reg": 2}, adjoint=True)
+        assert f"target_gate = {_mlir_string(base_id)}" in mlir
         # A distribution rule for Adjoint(NoParams) is synthesized even though none was registered.
-        assert 'target_gate = "Adjoint(NoParams){}{reg:2}{}"' in mlir
-        assert (
-            'resources = {operations = {"Adjoint(SingleParam){x:[tensor<f64>]}{reg:2}{}" = 1 : i64}'
-            in mlir
+        assert f"target_gate = {_mlir_string(adjoint_id)}" in mlir
+        resource_id = _key(
+            "SingleParam",
+            {"x": ["tensor<f64>"]},
+            {"reg": 2},
+            adjoint=True,
         )
+        assert _mlir_string(resource_id) in mlir
         assert "qref.adjoint" in mlir
 
     @pytest.mark.filterwarnings("ignore::catalyst.decomposition.RuleLoweringWarning")
@@ -352,8 +471,10 @@ class TestTraceTime:
 
             mlir = circuit.mlir
 
-        assert 'target_gate = "NoParams{}{reg:2}{}"' in mlir
-        assert 'target_gate = "Adjoint(NoParams){}{reg:2}{}"' not in mlir
+        base_id = _key("NoParams", wire_lengths={"reg": 2})
+        adjoint_id = _key("NoParams", wire_lengths={"reg": 2}, adjoint=True)
+        assert f"target_gate = {_mlir_string(base_id)}" in mlir
+        assert f"target_gate = {_mlir_string(adjoint_id)}" not in mlir
 
 
 class TestOnDemand:
@@ -362,17 +483,32 @@ class TestOnDemand:
     """
 
     @pytest.mark.parametrize(
-        "op_name, op_id, expected",
+        "op_name, op_id, expected, is_adjoint",
         [
-            ("S", "S{}{wires:1}{}", "S{}{wires:1}{}"),
-            ("S", "Adjoint(S){}{wires:1}{}", "S{}{wires:1}{}"),
-            ("RX", "Adjoint(RX){0:[f64]}{wires:1}{}", "RX{0:[f64]}{wires:1}{}"),
+            (
+                "S",
+                _key("S", wire_lengths={"wires": 1}),
+                _key("S", wire_lengths={"wires": 1}),
+                False,
+            ),
+            (
+                "S",
+                _key("S", wire_lengths={"wires": 1}, adjoint=True),
+                _key("S", wire_lengths={"wires": 1}),
+                True,
+            ),
+            (
+                "RX",
+                _key("RX", {"0": ["f64"]}, {"wires": 1}, adjoint=True),
+                _key("RX", {"0": ["f64"]}, {"wires": 1}),
+                True,
+            ),
         ],
     )
-    def test_name_unwrap_adjoint(self, op_name, op_id, expected):
+    def test_name_unwrap_adjoint(self, op_name, op_id, expected, is_adjoint):
         """name_unwrap_adjoint recovers the base op's id from an adjoint graphOpId, and is the
         inverse of name_wrap_adjoint for a base id."""
-        if op_id.startswith("Adjoint("):
+        if is_adjoint:
             assert name_unwrap_adjoint(op_name, op_id) == expected
             assert name_wrap_adjoint(expected) == op_id
         else:
@@ -382,9 +518,24 @@ class TestOnDemand:
     @pytest.mark.parametrize(
         "op_name, op_id, expected_base_id, expected_n_ctrl",
         [
-            ("RX", "C(RX){0:[f64]}{wires:1}{}", "RX{0:[f64]}{wires:1}{}", 1),
-            ("RX", "2C(RX){0:[f64]}{wires:1}{}", "RX{0:[f64]}{wires:1}{}", 2),
-            ("S", "10C(S){}{wires:1}{}", "S{}{wires:1}{}", 10),  # multi-digit control count
+            (
+                "RX",
+                _key("RX", {"0": ["f64"]}, {"wires": 1}, num_controls=1),
+                _key("RX", {"0": ["f64"]}, {"wires": 1}),
+                1,
+            ),
+            (
+                "RX",
+                _key("RX", {"0": ["f64"]}, {"wires": 1}, num_controls=2),
+                _key("RX", {"0": ["f64"]}, {"wires": 1}),
+                2,
+            ),
+            (
+                "S",
+                _key("S", wire_lengths={"wires": 1}, num_controls=10),
+                _key("S", wire_lengths={"wires": 1}),
+                10,
+            ),
         ],
     )
     def test_name_unwrap_control(self, op_name, op_id, expected_base_id, expected_n_ctrl):
@@ -398,15 +549,18 @@ class TestOnDemand:
         """A non-controlled id is rejected for the given base op."""
 
         with pytest.raises(ValueError, match="not a control id"):
-            name_unwrap_control("RX", "Adjoint(RX){0:[f64]}{wires:1}{}")
+            name_unwrap_control("RX", _key("RX", {"0": ["f64"]}, {"wires": 1}, adjoint=True))
 
     @pytest.mark.filterwarnings("ignore::catalyst.decomposition.RuleLoweringWarning")
     @pytest.mark.parametrize(
         "op_id, extra_ctrl_target",
         [
-            ("C(S){}{wires:1}{}", None),
+            (_key("S", wire_lengths={"wires": 1}, num_controls=1), None),
             # A multi-controlled id recovers n_ctrl=2 and additionally synthesizes the n=1 variant.
-            ("2C(S){}{wires:1}{}", 'target_gate = "C(S){}{wires:1}{}"'),
+            (
+                _key("S", wire_lengths={"wires": 1}, num_controls=2),
+                _key("S", wire_lengths={"wires": 1}, num_controls=1),
+            ),
         ],
     )
     def test_reachable_wrapper_controlled_op(self, op_id, extra_ctrl_target):
@@ -419,10 +573,10 @@ class TestOnDemand:
         )
         assert module_str.lstrip().startswith("module")
 
-        assert f'target_gate = "{op_id}"' in module_str
-        assert 'target_gate = "S{}{wires:1}{}"' in module_str
+        assert f"target_gate = {_mlir_string(op_id)}" in module_str
+        assert f"target_gate = {_mlir_string(_key('S', wire_lengths={'wires': 1}))}" in module_str
         if extra_ctrl_target is not None:
-            assert extra_ctrl_target in module_str
+            assert f"target_gate = {_mlir_string(extra_ctrl_target)}" in module_str
 
     @pytest.mark.filterwarnings("ignore::catalyst.decomposition.RuleLoweringWarning")
     def test_control_variant_warns_and_skips_on_failure(self, mocker):
@@ -433,7 +587,13 @@ class TestOnDemand:
         mocker.patch.object(dr, "compile_decomposition_rules", side_effect=ValueError("boom"))
         with pytest.warns(RuleLoweringWarning, match="control rules"):
             out = dr.control_variant_rule_strings(
-                "S", "S{}{wires:1}{}", [1], {}, {"wires": 1}, {}, is_custom_op=True
+                "S",
+                _key("S", wire_lengths={"wires": 1}),
+                [1],
+                {},
+                {"wires": 1},
+                {},
+                is_custom_op=True,
             )
         assert out == []
 
@@ -457,12 +617,11 @@ class TestModifierIds:
     @pytest.mark.parametrize(
         "op_id, expected",
         [
-            ("Adjoint(RX){0:[f64]}{wires:1}{}", "Adjoint"),
-            ("C(RX){0:[f64]}{wires:1}{}", "C"),
-            ("2C(RX){0:[f64]}{wires:1}{}", "C"),  # exercises the leading-digit scan
-            ("10C(RX){0:[f64]}{wires:1}{}", "C"),  # multi-digit control count
-            ("RX{0:[f64]}{wires:1}{}", None),  # bare id, no modifier
-            ("", None),  # empty edge case
+            (_key("RX", {"0": ["f64"]}, {"wires": 1}, adjoint=True), "Adjoint"),
+            (_key("RX", {"0": ["f64"]}, {"wires": 1}, num_controls=1), "C"),
+            (_key("RX", {"0": ["f64"]}, {"wires": 1}, num_controls=2), "C"),
+            (_key("RX", {"0": ["f64"]}, {"wires": 1}, num_controls=10), "C"),
+            (_key("RX", {"0": ["f64"]}, {"wires": 1}), None),
         ],
     )
     def test_leading_modifier_kind(self, op_id, expected):
@@ -472,18 +631,44 @@ class TestModifierIds:
     @pytest.mark.parametrize(
         "op_id, modifier, expected",
         [
-            # Wrapping a bare id with each modifier kind.
-            ("RX{0:[f64]}{wires:1}{}", "C", "C(RX){0:[f64]}{wires:1}{}"),
-            ("RX{0:[f64]}{wires:1}{}", "2C", "2C(RX){0:[f64]}{wires:1}{}"),
-            ("RX{0:[f64]}{wires:1}{}", "Adjoint", "Adjoint(RX){0:[f64]}{wires:1}{}"),
+            (
+                _key("RX", {"0": ["f64"]}, {"wires": 1}),
+                "C",
+                _key("RX", {"0": ["f64"]}, {"wires": 1}, num_controls=1),
+            ),
+            (
+                _key("RX", {"0": ["f64"]}, {"wires": 1}),
+                "2C",
+                _key("RX", {"0": ["f64"]}, {"wires": 1}, num_controls=2),
+            ),
+            (
+                _key("RX", {"0": ["f64"]}, {"wires": 1}),
+                "Adjoint",
+                _key("RX", {"0": ["f64"]}, {"wires": 1}, adjoint=True),
+            ),
             # Canonical nesting: control is outermost, so C may wrap an already-adjointed id.
             (
-                "Adjoint(RX){0:[f64]}{wires:1}{}",
+                _key("RX", {"0": ["f64"]}, {"wires": 1}, adjoint=True),
                 "C",
-                "C(Adjoint(RX)){0:[f64]}{wires:1}{}",
+                _key(
+                    "RX",
+                    {"0": ["f64"]},
+                    {"wires": 1},
+                    adjoint=True,
+                    num_controls=1,
+                ),
             ),
-            # Only the name is wrapped; the `{...}...[uid]` suffix is carried through untouched.
-            ("HybridOp{a:[[f64]]}{w:1}{}[42]", "C", "C(HybridOp){a:[[f64]]}{w:1}{}[42]"),
+            (
+                _key("HybridOp", {"a": ["tensor<f64>"]}, {"w": 1}, uid=42),
+                "C",
+                _key(
+                    "HybridOp",
+                    {"a": ["tensor<f64>"]},
+                    {"w": 1},
+                    num_controls=1,
+                    uid=42,
+                ),
+            ),
         ],
     )
     def test_wrap_modifier_id_canonical(self, op_id, modifier, expected):
@@ -492,7 +677,10 @@ class TestModifierIds:
 
     @pytest.mark.parametrize(
         "op_id",
-        ["C(RX){0:[f64]}{wires:1}{}", "2C(RX){0:[f64]}{wires:1}{}"],
+        [
+            _key("RX", {"0": ["f64"]}, {"wires": 1}, num_controls=1),
+            _key("RX", {"0": ["f64"]}, {"wires": 1}, num_controls=2),
+        ],
     )
     def test_wrap_modifier_id_rejects_non_canonical(self, op_id):
         """Wrapping the canonically-inner ``Adjoint`` around an already-controlled id is rejected."""

@@ -14,46 +14,178 @@
 
 """Python implementation of Graph Operator ID."""
 
+from contextlib import contextmanager
 from typing import Any
 
-import jax.numpy as jnp
 import pennylane as qp
+from jax._src.lib.mlir import ir
 from pennylane.pytrees import flatten
 
 from catalyst.decomposition.type_utils import (
     convert_item_to_mlir_type,
-    format_dynamic_params_for_id,
     post_process_concretize_leaves,
     replace_wires_with_placeholder_wires,
 )
 from catalyst.from_plxpr.uid import generate_uid
+from catalyst.jax_extras.lowering import get_mlir_attribute_from_pyval
 
 _SPECIAL_LOWERINGS = {}
+
+
+@contextmanager
+def _mlir_context():
+    """Provide an MLIR context and location for attribute construction."""
+    if current := ir.Context.current:
+        with ir.Location.unknown(context=current):
+            yield current
+    else:
+        with ir.Context() as context, ir.Location.unknown(context=context):
+            yield context
+
+
+def build_graph_op_key(
+    base_name: str,
+    dynamic_types: dict[str, list[str]],
+    wire_lengths: dict[str, int],
+    static_data: dict[str, Any],
+    *,
+    adjoint: bool = False,
+    num_controls: int = 0,
+    uid: int | None = None,
+) -> str:
+    """Build the canonical structured GraphOpID string.
+
+    Parameter and wire groups are identified by their position, so both mappings must be in
+    frontend signature order.
+    """
+    if num_controls < 0:
+        raise ValueError("GraphOpID control count cannot be negative")
+
+    with _mlir_context():
+        fields = {"op": ir.StringAttr.get(base_name)}
+        traits = {}
+        if adjoint:
+            traits["adj"] = ir.BoolAttr.get(True)
+        if num_controls:
+            traits["controls"] = get_mlir_attribute_from_pyval(num_controls)
+        if dynamic_types:
+            fields["params"] = ir.ArrayAttr.get(
+                [
+                    ir.ArrayAttr.get(
+                        [ir.TypeAttr.get(ir.Type.parse(type_name)) for type_name in types]
+                    )
+                    for types in dynamic_types.values()
+                ]
+            )
+        if static_data:
+            fields["static"] = get_mlir_attribute_from_pyval(static_data)
+        if traits:
+            fields["traits"] = ir.DictAttr.get(traits)
+        if uid is not None:
+            fields["uid"] = get_mlir_attribute_from_pyval(uid)
+        if wire_lengths:
+            fields["wires"] = get_mlir_attribute_from_pyval(list(wire_lengths.values()))
+        return str(ir.DictAttr.get(fields))
+
+
+def _parse_graph_op_id(op_id: str) -> ir.DictAttr:
+    """Parse and minimally validate a structured GraphOpID."""
+    parsed = ir.Attribute.parse(op_id)
+    if not isinstance(parsed, ir.DictAttr):
+        raise ValueError(f"Malformed GraphOpID, expected a dictionary attribute: {op_id!r}")
+
+    fields = {entry.name for entry in parsed}
+    if "op" not in fields:
+        raise ValueError(f"Malformed GraphOpID, missing field 'op': {op_id!r}")
+    if unknown := fields.difference({"op", "params", "static", "traits", "uid", "wires"}):
+        raise ValueError(f"Malformed GraphOpID, unknown fields {sorted(unknown)}: {op_id!r}")
+    if "traits" in parsed:
+        traits = ir.DictAttr(parsed["traits"])
+        if unknown := {entry.name for entry in traits}.difference({"adj", "controls"}):
+            raise ValueError(
+                f"Malformed GraphOpID, unknown trait fields {sorted(unknown)}: {op_id!r}"
+            )
+    return parsed
+
+
+def graph_op_id_modifiers(op_id: str) -> tuple[str, bool, int]:
+    """Return ``(base_name, adjoint, num_controls)`` from a GraphOpID."""
+    with _mlir_context():
+        parsed = _parse_graph_op_id(op_id)
+        base_name = ir.StringAttr(parsed["op"]).value
+        traits = ir.DictAttr(parsed["traits"]) if "traits" in parsed else None
+        adjoint = ir.BoolAttr(traits["adj"]).value if traits and "adj" in traits else False
+        num_controls = (
+            ir.IntegerAttr(traits["controls"]).value if traits and "controls" in traits else 0
+        )
+        return base_name, adjoint, num_controls
+
+
+def with_graph_op_id_modifiers(
+    op_id: str, *, adjoint: bool | None = None, num_controls: int | None = None
+) -> str:
+    """Return ``op_id`` with selected modifier fields replaced."""
+    if num_controls is not None and num_controls < 0:
+        raise ValueError("GraphOpID control count cannot be negative")
+
+    with _mlir_context():
+        parsed = _parse_graph_op_id(op_id)
+        fields = {entry.name: entry.attr for entry in parsed}
+        traits = (
+            {entry.name: entry.attr for entry in ir.DictAttr(parsed["traits"])}
+            if "traits" in parsed
+            else {}
+        )
+        if adjoint is not None:
+            if adjoint:
+                traits["adj"] = ir.BoolAttr.get(True)
+            else:
+                traits.pop("adj", None)
+        if num_controls is not None:
+            if num_controls:
+                traits["controls"] = get_mlir_attribute_from_pyval(num_controls)
+            else:
+                traits.pop("controls", None)
+        if traits:
+            fields["traits"] = ir.DictAttr.get(traits)
+        else:
+            fields.pop("traits", None)
+        return str(ir.DictAttr.get(fields))
+
+
+def is_custom_op(op_cls: type[qp.core.Operator2], dynamic_args) -> bool:
+    """Return whether an Operator2 lowers to ``qref.custom``."""
+    if op_cls.static_argnames or op_cls.hybrid_argnames or op_cls.compilable_argnames:
+        return False
+    if op_cls.wire_argnames != ("wires",):
+        return False
+    if list(op_cls._sig.parameters.keys())[-1] != "wires":
+        return False
+    return all(
+        arg.shape == () and arg.dtype.kind in "ifu" for arg in dynamic_args
+    ) and not issubclass(op_cls, tuple(_SPECIAL_LOWERINGS.keys()))
 
 
 class GraphOpID:
     """
     A parser object to compute the graph operator id for an abstract operator2 instance `op`.
 
-    The format of the computed graph op ID string is as follows:
-        op_name{param_shaped_type_dictionary}{wire_lens_dictionary}{static_data_dictionary}[UID]
+    The ID is the canonical MLIR text of a dictionary containing the operator's base name and
+    non-default modifiers, dynamic types, wire lengths, static data, and UID.
 
-    The types in the dynamic shape dictionary should be represented as a list of MLIR-style type annotations.
+    The types in the dynamic shape dictionary should be represented as a list of MLIR-style type
+    annotations. Dynamic and wire dictionaries preserve frontend signature order; their names are
+    not part of the ID.
     The UID is computed from the shapes, dtypes and pytree structures of the `hybrid_args` of
     the Operator2 instance.
-
-    For example, an Operator2 instance with class name `HybridOpArg`, taking in one float param
-    argument named `angle`, one wire argument named `cwires`, one static data argument
-    `label="hello"`, and a computed UID of 10 would be parsed to the following graph op ID:
-        HybridOpArg{angle:[tensor<f64>]}{cwires:1}{label:hello}[10]
 
     The defining trait of a graph op ID is that it has unique correspondence to decomposition rules.
     In other words, different graph op IDs have different sets of decomposition rules.
 
     For example,
-        PauliRot{angle:[f64]}{wires:1}{pauli_word:X}
+        {op = "PauliRot", ..., wires = [1]}
     and
-        PauliRot{angle:[f64]}{wires:2}{pauli_word:XX}
+        {op = "PauliRot", ..., wires = [2]}
     will have different decomposition rules.
 
     Note that this function should not be updated without updating the corresponding method on the
@@ -66,7 +198,7 @@ class GraphOpID:
             op, qp.core.Operator2
         ), f"Graph-based decomposition expects an Operator2 instance, got {op} of type {type(op)}"
         self.op = op
-        self.is_custom_op = self.parse_is_custom_op()
+        self.is_custom_op = is_custom_op(type(op), op.dynamic_args.values())
 
         self.operator_name = op.name
         self.dynamic_shape = self.parse_dynamic_shape()
@@ -75,27 +207,31 @@ class GraphOpID:
         self.extra_data, self.uid = self.parse_extra_data()
 
     def parse_dynamic_shape(self) -> dict:
-        """Return a dictionary of dynamic arg names to list of dtypes."""
+        """Return dynamic argument type groups in frontend signature order."""
         # enters as {name: dtype}, we want the format {name: list[dtype]}
         if self.is_custom_op:
             return {str(i): ["f64"] for i in range(len(self.op.dynamic_args))}
         elif issubclass(type(self.op), tuple(_SPECIAL_LOWERINGS.keys())):  # special cases
             return {
-                argname: [convert_item_to_mlir_type(argtype, is_special_lowering=True)]
-                for argname, argtype in sorted(self.op.dynamic_args.items())
+                argname: [
+                    convert_item_to_mlir_type(
+                        self.op.dynamic_args[argname], is_special_lowering=True
+                    )
+                ]
+                for argname in self.op.dynamic_argnames
             }
         else:
             return {
-                argname: [convert_item_to_mlir_type(argtype)]
-                for argname, argtype in sorted(self.op.dynamic_args.items())
+                argname: [convert_item_to_mlir_type(self.op.dynamic_args[argname])]
+                for argname in self.op.dynamic_argnames
             }
 
     def parse_wire_lens(self) -> dict[str, int]:
-        """Return a dictionary of wire arg names to lengths."""
+        """Return wire argument lengths in frontend signature order."""
         wire_lens = {}
-        for wire_name, wire_arg in sorted(self.op.wire_args.items()):
+        for wire_name in self.op.wire_argnames:
             if wire_name not in self.op.hybrid_argnames:
-                wire_lens[wire_name] = len(wire_arg)
+                wire_lens[wire_name] = len(self.op.wire_args[wire_name])
         return wire_lens
 
     def parse_static_data(self) -> dict[str, Any]:
@@ -136,58 +272,27 @@ class GraphOpID:
         else:
             return {}, -1  # uid is unsigned, so use -1 for invalid uid
 
-    def parse_is_custom_op(self) -> bool:
-        """
-        Return whether the Operator2 instance is considered a custom op in MLIR.
-
-        The source of truth for the criteria is in qref_operator2_primitives.py,
-        in the _is_custom_op() helper function. However, that function cannot be directly used here
-        as that is a lowering time util, and only works with JAX-MLIR types.
-        """
-        if self.op.static_argnames or self.op.hybrid_argnames or self.op.compilable_argnames:
-            return False
-        if self.op.wire_argnames != ("wires",):
-            return False
-        if list(self.op._sig.parameters.keys())[-1] != "wires":
-            return False
-        return all(
-            arg.shape == () and arg.dtype.type == jnp.float64
-            for arg in self.op.dynamic_args.values()
-        ) and not issubclass(type(self.op), tuple(_SPECIAL_LOWERINGS.keys()))
-
     def get_operator_name(self) -> str:
         """Return the name of the operator."""
         return self.operator_name
 
-    def get_dynamic_shape_id_format(self) -> str:
-        """Return the dynamic shape formatted for GraphOpId."""
-        return format_dynamic_params_for_id(self.dynamic_shape)
-
-    def get_wire_lens_id_format(self) -> str:
-        """Return the wire lengths formatted for GraphOpId."""
-        return "{" + ",".join(f"{name}:{shape}" for name, shape in self.wire_lens.items()) + "}"
-
-    def get_static_data_id_format(self) -> str:
-        """Return the static data formatted for GraphOpId."""
-        return "{" + ",".join(f"{k}:{v}" for k, v in self.static_data.items()) + "}"
-
-    def getGraphOpId(self, adjoint: bool = False) -> str:
+    def getGraphOpId(self, adjoint: bool = False, num_controls: int = 0) -> str:
         """
         Return the GraphOpId as a string.
 
         NOTE: do not modify this method without also modifying the corresponding DecomposableGate
         interface in MLIR.
         """
-        name = self.get_operator_name()
-        if adjoint:
-            name = f"Adjoint({name})"
-        ID_string = (
-            name
-            + self.get_dynamic_shape_id_format()
-            + self.get_wire_lens_id_format()
-            + self.get_static_data_id_format()
-        )
+        uid = None
         if self.extra_data:
             assert self.uid >= 0, f"Failed to compute UID for operator {self.op}"
-            ID_string += "[" + str(self.uid) + "]"
-        return ID_string
+            uid = self.uid
+        return build_graph_op_key(
+            self.get_operator_name(),
+            self.dynamic_shape,
+            self.wire_lens,
+            self.static_data,
+            adjoint=adjoint,
+            num_controls=num_controls,
+            uid=uid,
+        )

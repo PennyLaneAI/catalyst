@@ -34,15 +34,15 @@ func.func @distribution(%q: !quantum.bit) -> !quantum.bit {
 }
 
 func.func private @adj_h(%q: !quantum.bit) -> !quantum.bit attributes {
-    target_gate = "Adjoint(testHadamard){}{wires:1}{}",
-    resources = {operations = {"testHadamard{}{wires:1}{}" = 1 : i64}} } {
+    target_gate = "{op = \"testHadamard\", traits = {adj = true}, wires = [1]}",
+    resources = {operations = {"{op = \"testHadamard\", wires = [1]}" = 1 : i64}} } {
   %o = quantum.custom "testHadamard"() %q : !quantum.bit
   return %o : !quantum.bit
 }
 
 func.func private @adj_u(%q: !quantum.bit) -> !quantum.bit attributes {
-    target_gate = "Adjoint(testU){}{wires:1}{}",
-    resources = {operations = {"Adjoint(testHadamard){}{wires:1}{}" = 2 : i64}} } {
+    target_gate = "{op = \"testU\", traits = {adj = true}, wires = [1]}",
+    resources = {operations = {"{op = \"testHadamard\", traits = {adj = true}, wires = [1]}" = 2 : i64}} } {
   %a = quantum.custom "testHadamard"() %q adj : !quantum.bit
   %b = quantum.custom "testHadamard"() %a adj : !quantum.bit
   return %b : !quantum.bit

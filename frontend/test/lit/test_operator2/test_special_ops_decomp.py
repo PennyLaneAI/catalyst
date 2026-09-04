@@ -51,10 +51,10 @@ def test_multirz():
 # CHECK: func.func public @multirz()
 # CHECK: qref.multirz({{%.+}}) {{%.+}}, {{%.+}} : !qref.bit, !qref.bit
 # CHECK: qref.multirz({{%.+}}) {{%.+}} : !qref.bit
-# CHECK: func.func private @"__builtin__multi_rz_decomposition_MultiRZ{theta:[f64]}{wires:2}{}"
-# CHECK-SAME:   target_gate = "MultiRZ{theta:[f64]}{wires:2}{}"
-# CHECK: func.func private @"__builtin__multi_rz_decomposition_MultiRZ{theta:[f64]}{wires:1}{}"
-# CHECK-SAME:   target_gate = "MultiRZ{theta:[f64]}{wires:1}{}"
+# CHECK: func.func private @"__builtin__multi_rz_decomposition_{op = \22MultiRZ\22, params = [{{\[}}f64]], wires = [2]}"
+# CHECK-SAME:   target_gate = "{op = \22MultiRZ\22, params = [{{\[}}f64]], wires = [2]}"
+# CHECK: func.func private @"__builtin__multi_rz_decomposition_{op = \22MultiRZ\22, params = [{{\[}}f64]], wires = [1]}"
+# CHECK-SAME:   target_gate = "{op = \22MultiRZ\22, params = [{{\[}}f64]], wires = [1]}"
 test_multirz()
 
 
@@ -78,12 +78,12 @@ def test_paulirot():
 # CHECK: qref.paulirot ["X", "X"]({{%.+}}) {{%.+}}, {{%.+}} : !qref.bit, !qref.bit
 # CHECK: qref.paulirot ["Z"]({{%.+}}) {{%.+}} : !qref.bit
 # CHECK: qref.paulirot ["Y", "Z", "X"]({{%.+}}) {{%.+}}, {{%.+}}, {{%.+}} : !qref.bit, !qref.bit, !qref.bit
-# CHECK: func.func private @"__builtin__pauli_rot_decomposition_PauliRot{theta:[f64]}{wires:2}{pauli_word:XX}"
-# CHECK-SAME:   target_gate = "PauliRot{theta:[f64]}{wires:2}{pauli_word:XX}"
-# CHECK: func.func private @"__builtin__pauli_rot_decomposition_PauliRot{theta:[f64]}{wires:1}{pauli_word:Z}"
-# CHECK-SAME:   target_gate = "PauliRot{theta:[f64]}{wires:1}{pauli_word:Z}"
-# CHECK: func.func private @"__builtin__pauli_rot_decomposition_PauliRot{theta:[f64]}{wires:3}{pauli_word:YZX}"
-# CHECK-SAME:   target_gate = "PauliRot{theta:[f64]}{wires:3}{pauli_word:YZX}"
+# CHECK: func.func private @"__builtin__pauli_rot_decomposition_{op = \22PauliRot\22, params = [{{\[}}f64]], static = {pauli_word = \22XX\22}, wires = [2]}"
+# CHECK-SAME:   target_gate = "{op = \22PauliRot\22, params = [{{\[}}f64]], static = {pauli_word = \22XX\22}, wires = [2]}"
+# CHECK: func.func private @"__builtin__pauli_rot_decomposition_{op = \22PauliRot\22, params = [{{\[}}f64]], static = {pauli_word = \22Z\22}, wires = [1]}"
+# CHECK-SAME:   target_gate = "{op = \22PauliRot\22, params = [{{\[}}f64]], static = {pauli_word = \22Z\22}, wires = [1]}"
+# CHECK: func.func private @"__builtin__pauli_rot_decomposition_{op = \22PauliRot\22, params = [{{\[}}f64]], static = {pauli_word = \22YZX\22}, wires = [3]}"
+# CHECK-SAME:   target_gate = "{op = \22PauliRot\22, params = [{{\[}}f64]], static = {pauli_word = \22YZX\22}, wires = [3]}"
 test_paulirot()
 
 
@@ -105,10 +105,10 @@ def test_pcphase():
 # CHECK: func.func public @pcphase()
 # CHECK: qref.pcphase({{%.+}}, dim : 3) {{%.+}}, {{%.+}}, {{%.+}} : !qref.bit, !qref.bit, !qref.bit
 # CHECK: qref.pcphase({{%.+}}, dim : 0) {{%.+}} : !qref.bit
-# CHECK: func.func private @"__builtin__decompose_pcphase_PCPhase{phi:[f64]}{wires:3}{dim:3}"
-# CHECK-SAME:   target_gate = "PCPhase{phi:[f64]}{wires:3}{dim:3}"
-# CHECK: func.func private @"__builtin__decompose_pcphase_PCPhase{phi:[f64]}{wires:1}{dim:0}"
-# CHECK-SAME:   target_gate = "PCPhase{phi:[f64]}{wires:1}{dim:0}"
+# CHECK: func.func private @"__builtin__decompose_pcphase_{op = \22PCPhase\22, params = [{{\[}}f64]], static = {dim = 3 : i64}, wires = [3]}"
+# CHECK-SAME:   target_gate = "{op = \22PCPhase\22, params = [{{\[}}f64]], static = {dim = 3 : i64}, wires = [3]}"
+# CHECK: func.func private @"__builtin__decompose_pcphase_{op = \22PCPhase\22, params = [{{\[}}f64]], static = {dim = 0 : i64}, wires = [1]}"
+# CHECK-SAME:   target_gate = "{op = \22PCPhase\22, params = [{{\[}}f64]], static = {dim = 0 : i64}, wires = [1]}"
 test_pcphase()
 
 
@@ -133,23 +133,23 @@ def test_qubit_unitary():
 # CHECK: qref.unitary({{%.+}} : tensor<4x4xcomplex<f64>>)
 # CHECK: qref.unitary({{%.+}} : tensor<8x8xcomplex<f64>>)
 #
-# CHECK: func.func private @"__builtin_zyz_QubitUnitary{U:[tensor<2x2xcomplex<f64>>]}{wires:1}{}"
-# CHECK-SAME:   target_gate = "QubitUnitary{U:[tensor<2x2xcomplex<f64>>]}{wires:1}{}"
+# CHECK: func.func private @"__builtin_zyz_{op = \22QubitUnitary\22, params = [{{\[}}tensor<2x2xcomplex<f64>>]], wires = [1]}"
+# CHECK-SAME:   target_gate = "{op = \22QubitUnitary\22, params = [{{\[}}tensor<2x2xcomplex<f64>>]], wires = [1]}"
 #
-# CHECK: func.func private @"__builtin_zxz_QubitUnitary{U:[tensor<2x2xcomplex<f64>>]}{wires:1}{}"
-# CHECK-SAME:   target_gate = "QubitUnitary{U:[tensor<2x2xcomplex<f64>>]}{wires:1}{}"
+# CHECK: func.func private @"__builtin_zxz_{op = \22QubitUnitary\22, params = [{{\[}}tensor<2x2xcomplex<f64>>]], wires = [1]}"
+# CHECK-SAME:   target_gate = "{op = \22QubitUnitary\22, params = [{{\[}}tensor<2x2xcomplex<f64>>]], wires = [1]}"
 #
-# CHECK: func.func private @"__builtin_xzx_QubitUnitary{U:[tensor<2x2xcomplex<f64>>]}{wires:1}{}"
-# CHECK-SAME:   target_gate = "QubitUnitary{U:[tensor<2x2xcomplex<f64>>]}{wires:1}{}"
+# CHECK: func.func private @"__builtin_xzx_{op = \22QubitUnitary\22, params = [{{\[}}tensor<2x2xcomplex<f64>>]], wires = [1]}"
+# CHECK-SAME:   target_gate = "{op = \22QubitUnitary\22, params = [{{\[}}tensor<2x2xcomplex<f64>>]], wires = [1]}"
 #
-# CHECK: func.func private @"__builtin_xyx_QubitUnitary{U:[tensor<2x2xcomplex<f64>>]}{wires:1}{}"
-# CHECK-SAME:   target_gate = "QubitUnitary{U:[tensor<2x2xcomplex<f64>>]}{wires:1}{}"
+# CHECK: func.func private @"__builtin_xyx_{op = \22QubitUnitary\22, params = [{{\[}}tensor<2x2xcomplex<f64>>]], wires = [1]}"
+# CHECK-SAME:   target_gate = "{op = \22QubitUnitary\22, params = [{{\[}}tensor<2x2xcomplex<f64>>]], wires = [1]}"
 #
-# CHECK: func.func private @"__builtin_two_qubit_decomp_rule_QubitUnitary{U:[tensor<4x4xcomplex<f64>>]}{wires:2}{}"
-# CHECK-SAME:   target_gate = "QubitUnitary{U:[tensor<4x4xcomplex<f64>>]}{wires:2}{}"
+# CHECK: func.func private @"__builtin_two_qubit_decomp_rule_{op = \22QubitUnitary\22, params = [{{\[}}tensor<4x4xcomplex<f64>>]], wires = [2]}"
+# CHECK-SAME:   target_gate = "{op = \22QubitUnitary\22, params = [{{\[}}tensor<4x4xcomplex<f64>>]], wires = [2]}"
 #
-# CHECK: func.func private @"__builtin_multi_qubit_decomp_rule_QubitUnitary{U:[tensor<8x8xcomplex<f64>>]}{wires:3}{}"
-# CHECK-SAME:   target_gate = "QubitUnitary{U:[tensor<8x8xcomplex<f64>>]}{wires:3}{}"
+# CHECK: func.func private @"__builtin_multi_qubit_decomp_rule_{op = \22QubitUnitary\22, params = [{{\[}}tensor<8x8xcomplex<f64>>]], wires = [3]}"
+# CHECK-SAME:   target_gate = "{op = \22QubitUnitary\22, params = [{{\[}}tensor<8x8xcomplex<f64>>]], wires = [3]}"
 test_qubit_unitary()
 
 
@@ -196,8 +196,8 @@ def test_basis_state():
 # CHECK:   static_data = {}
 # CHECK:   param_map = {state = [0]} qubit_map = {wires = [0, 1]}
 #
-# CHECK: func.func private @"__builtin__basis_state_decomp_BasisState{state:[tensor<1xi1>]}{wires:1}{}"
-# CHECK-SAME:   target_gate = "BasisState{state:[tensor<1xi1>]}{wires:1}{}"
-# CHECK: func.func private @"__builtin__basis_state_decomp_BasisState{state:[tensor<2xi1>]}{wires:2}{}"
-# CHECK-SAME:   target_gate = "BasisState{state:[tensor<2xi1>]}{wires:2}{}"
+# CHECK: func.func private @"__builtin__basis_state_decomp_{op = \22BasisState\22, params = [{{\[}}tensor<1xi1>]], wires = [1]}"
+# CHECK-SAME:   target_gate = "{op = \22BasisState\22, params = [{{\[}}tensor<1xi1>]], wires = [1]}"
+# CHECK: func.func private @"__builtin__basis_state_decomp_{op = \22BasisState\22, params = [{{\[}}tensor<2xi1>]], wires = [2]}"
+# CHECK-SAME:   target_gate = "{op = \22BasisState\22, params = [{{\[}}tensor<2xi1>]], wires = [2]}"
 test_basis_state()

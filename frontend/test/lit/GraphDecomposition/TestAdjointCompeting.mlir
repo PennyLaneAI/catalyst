@@ -26,24 +26,24 @@ func.func @competing(%q: !quantum.bit) -> !quantum.bit {
 
 // pathway 1: Adjoint(testRot) -> testRZ (cost 1).
 func.func private @dedicated(%q: !quantum.bit) -> !quantum.bit attributes {
-    target_gate = "Adjoint(testRot){}{wires:1}{}",
-    resources = {operations = {"testRZ{}{wires:1}{}" = 1 : i64}} } {
+    target_gate = "{op = \"testRot\", traits = {adj = true}, wires = [1]}",
+    resources = {operations = {"{op = \"testRZ\", wires = [1]}" = 1 : i64}} } {
   %o = quantum.custom "testRZ"() %q : !quantum.bit
   return %o : !quantum.bit
 }
 
 // pathway 2: Adjoint(testRot) -> Adjoint(testRZ) Adjoint(testRZ) -> testRZ testRZ (cost 2).
 func.func private @distribute(%q: !quantum.bit) -> !quantum.bit attributes {
-    target_gate = "Adjoint(testRot){}{wires:1}{}",
-    resources = {operations = {"Adjoint(testRZ){}{wires:1}{}" = 2 : i64}} } {
+    target_gate = "{op = \"testRot\", traits = {adj = true}, wires = [1]}",
+    resources = {operations = {"{op = \"testRZ\", traits = {adj = true}, wires = [1]}" = 2 : i64}} } {
   %a = quantum.custom "testRZ"() %q adj : !quantum.bit
   %b = quantum.custom "testRZ"() %a adj : !quantum.bit
   return %b : !quantum.bit
 }
 
 func.func private @adj_rz(%q: !quantum.bit) -> !quantum.bit attributes {
-    target_gate = "Adjoint(testRZ){}{wires:1}{}",
-    resources = {operations = {"testRZ{}{wires:1}{}" = 1 : i64}} } {
+    target_gate = "{op = \"testRZ\", traits = {adj = true}, wires = [1]}",
+    resources = {operations = {"{op = \"testRZ\", wires = [1]}" = 1 : i64}} } {
   %o = quantum.custom "testRZ"() %q : !quantum.bit
   return %o : !quantum.bit
 }
