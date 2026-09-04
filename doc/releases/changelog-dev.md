@@ -55,12 +55,6 @@
 
 <h3>Improvements 🛠</h3>
 
-* `RuleLoweringWarning` is now silenced by default. To display these warnings, set
-  `CATALYST_SILENCE_RULE_LOWERING_WARNINGS=0`. This helps debug unexpected decompositions where
-  rules cannot be lowered and they are silently dropped from the graph-decomposition system instead
-  of raising an error.
-  [(#3190)](https://github.com/PennyLaneAI/catalyst/pull/3190)
-
 * Add the `XMEM_REPLY_BRAM` memory type and use it to allocate reply buffers in dedicated BRAM.
   [(#3148)](https://github.com/PennyLaneAI/catalyst/pull/3148)
 
@@ -172,6 +166,12 @@
     Gates with null decomposition rules are simply removed.
 
     6. The pass can now handle register-mode rules that target gates in control flow regions whose qubits were extracted outside the region.
+
+  - `RuleLoweringWarning` is silenced by default. To display these warnings, set
+    `CATALYST_SILENCE_RULE_LOWERING_WARNINGS=0`. This helps debug unexpected decompositions where
+    rules cannot be lowered and they are silently dropped from the graph-decomposition system instead
+    of raising an error.
+    [(#3190)](https://github.com/PennyLaneAI/catalyst/pull/3190)
 
 * A failure during AOT compilation is now downgraded to a warning and logged.
   [(#3100)](https://github.com/PennyLaneAI/catalyst/pull/3100)
