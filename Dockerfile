@@ -278,6 +278,8 @@ ARG CATALYST_VERSION
 ARG GCC_VERSION
 RUN cat /etc/dnf.conf | sed "s/\[main\]/\[main\]\ntimeout=5/g" > /etc/dnf.conf
 RUN dnf update -y && dnf install -y libzstd-devel gcc-toolset-13
+ENV C_COMPILER=/opt/rh/gcc-toolset-13/root/usr/bin/gcc
+ENV CXX_COMPILER=/opt/rh/gcc-toolset-13/root/usr/bin/g++
 ENV PATH="/opt/rh/gcc-toolset-13/root/usr/bin:${PATH}"
 WORKDIR /opt/catalyst
 ENV PYTHON=/opt/python/cp313-cp313/bin/python
