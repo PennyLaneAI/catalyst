@@ -681,7 +681,8 @@
   `-stage` naming convention used when invoking them from the command line (e.g. `quantum-compilation-stage`).
   [#3002](https://github.com/PennyLaneAI/catalyst/pull/3002)
 
-* New pass `--resolve-gate-level-adjoint` was added. This pass now handles Gate-level adjoint canonicalization, moving it out of the `--canonicalize` pass.
+* A new pass `--resolve-gate-level-adjoint` was added. This pass now handles gate-level adjoint canonicalization, moving it out of the `--canonicalize` pass.
+  [#3155](https://github.com/PennyLaneAI/catalyst/pull/3155)
 
 <h3>Documentation 📝</h3>
 
