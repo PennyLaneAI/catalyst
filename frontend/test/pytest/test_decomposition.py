@@ -48,7 +48,7 @@ from catalyst.decomposition.decomposition_rules import (
     name_wrap_adjoint,
     wrap_modifier_id,
 )
-from catalyst.decomposition.graph_op_id import GraphOpID
+from catalyst.decomposition.graph_op_id import GraphOpID, build_graph_op_id
 from catalyst.decomposition.type_utils import (
     convert_item_to_mlir_type,
     get_dummy_values_for_arg,
@@ -58,6 +58,20 @@ from catalyst.decomposition.type_utils import (
 
 class TestGenericUtilities:
     """Tests for common decomposition rule lowering utilities."""
+
+    def test_build_graph_op_id(self):
+        """The shared builder canonicalizes every frontend identity component."""
+        op_id = build_graph_op_id(
+            "Example",
+            {"z": ["f64"], "a": ["i1"]},
+            {"right": 2, "left": 1},
+            {"label": "value"},
+            adjoint=True,
+            num_controls=2,
+            uid=7,
+        )
+
+        assert op_id == '2C(Adjoint(Example)){a:[i1],z:[f64]}{left:1,right:2}{label = "value"}[7]'
 
     def test_wires_replacement_doesnt_mutate_operator(self):
         """Test that the wires replacement helper does not mutate the incoming operator."""
@@ -149,7 +163,7 @@ class TestGenericUtilities:
             (SingleParam(Float, Wires([2, 3])), "SingleParam{x:[tensor<f64>]}{reg:2}{}"),
             (
                 CompilableData(True, 3.14, "string", Wires([0, 1])),
-                "CompilableData{}{wires:2}{a:True,b:3.14,thing:string}",
+                'CompilableData{}{wires:2}{a = true, b = 3.140000e+00 : f64, thing = "string"}',
             ),
             (
                 MultipleRegisters(Wires([0, 1, 2]), Wires([3, 4])),
@@ -162,7 +176,7 @@ class TestGenericUtilities:
             (qp.MultiRZ(Float, Wires([0, 2, 3, 4])), "MultiRZ{theta:[f64]}{wires:4}{}"),
             (
                 qp.PauliRot(Float, "XYZ", Wires([1, 2, 3])),
-                "PauliRot{theta:[f64]}{wires:3}{pauli_word:XYZ}",
+                'PauliRot{theta:[f64]}{wires:3}{pauli_word = "XYZ"}',
             ),
             (StaticData("mylabel", Wires([0, 1])), "StaticData{}{reg:2}{}["),
             (
@@ -212,7 +226,7 @@ class TestGenericUtilities:
 
         res = compile_decomposition_rules_wrapper(
             "CompilableData",
-            "CompilableData{}{wires:2}{a:True,b:3.14,thing:string}",
+            'CompilableData{}{wires:2}{a = true, b = 3.140000e+00 : f64, thing = "string"}',
             {},
             {"wires": 2},
             {"a": True, "b": 3.14, "thing": "string"},

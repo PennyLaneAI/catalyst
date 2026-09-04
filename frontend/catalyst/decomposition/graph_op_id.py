@@ -14,21 +14,88 @@
 
 """Python implementation of Graph Operator ID."""
 
+import contextlib
+from collections.abc import Mapping, Sequence
 from typing import Any
 
 import jax.numpy as jnp
 import pennylane as qp
+from jax._src.lib.mlir import ir
 from pennylane.pytrees import flatten
 
 from catalyst.decomposition.type_utils import (
     convert_item_to_mlir_type,
-    format_dynamic_params_for_id,
     post_process_concretize_leaves,
     replace_wires_with_placeholder_wires,
 )
 from catalyst.from_plxpr.uid import generate_uid
+from catalyst.jax_extras.lowering import get_mlir_attribute_from_pyval
 
 _SPECIAL_LOWERINGS = {}
+
+
+@contextlib.contextmanager
+def _attribute_context():
+    """Provide an MLIR context and location for attribute construction."""
+    if current := ir.Context.current:
+        with ir.Location.unknown(context=current):
+            yield current
+    else:
+        with ir.Context() as context, ir.Location.unknown(context=context):
+            yield context
+
+
+def format_static_data_dict_for_id(static_data):
+    """Format the static-data group of a GraphOpID with MLIR's attribute printer."""
+    with _attribute_context():
+        attrs = {name: get_mlir_attribute_from_pyval(value) for name, value in static_data.items()}
+        return str(ir.DictAttr.get(attrs))
+
+
+def format_dynamic_params_for_id(dynamic_shape):
+    """Format the dynamic-parameter group of a GraphOpID."""
+
+    def handle_item(item):
+        match item:
+            case str():
+                return item
+            case list() | tuple():
+                return "[" + ",".join(handle_item(i) for i in item) + "]"
+
+    return (
+        "{"
+        + ",".join(
+            name + ":" + "[" + ",".join(handle_item(item) for item in types) + "]"
+            for name, types in dynamic_shape.items()
+        )
+        + "}"
+    )
+
+
+def build_graph_op_id(
+    operator_name: str,
+    dynamic_shape: Mapping[str, Sequence[str]],
+    wire_lens: Mapping[str, int],
+    static_data: Mapping[str, Any],
+    *,
+    adjoint: bool = False,
+    num_controls: int = 0,
+    uid: int | None = None,
+) -> str:
+    """Build a canonical frontend GraphOpID from its identity components."""
+    if num_controls < 0:
+        raise ValueError("GraphOpID control count cannot be negative")
+
+    name = f"Adjoint({operator_name})" if adjoint else operator_name
+    if num_controls:
+        prefix = "C" if num_controls == 1 else f"{num_controls}C"
+        name = f"{prefix}({name})"
+
+    dynamic_id = format_dynamic_params_for_id(dict(sorted(dynamic_shape.items())))
+    wire_id = "{" + ",".join(f"{key}:{value}" for key, value in sorted(wire_lens.items())) + "}"
+    static_id = format_static_data_dict_for_id(dict(static_data))
+    uid_id = f"[{uid}]" if uid is not None else ""
+    return name + dynamic_id + wire_id + static_id + uid_id
 
 
 class GraphOpID:
@@ -45,15 +112,18 @@ class GraphOpID:
     For example, an Operator2 instance with class name `HybridOpArg`, taking in one float param
     argument named `angle`, one wire argument named `cwires`, one static data argument
     `label="hello"`, and a computed UID of 10 would be parsed to the following graph op ID:
-        HybridOpArg{angle:[tensor<f64>]}{cwires:1}{label:hello}[10]
+        HybridOpArg{angle:[tensor<f64>]}{cwires:1}{label = "hello"}[10]
+
+    The static data group is spelled by MLIR's own attribute printer, applied to the attributes the
+    data lowers to, so each entry reads as it would inside the `static_data` dictionary on the op.
 
     The defining trait of a graph op ID is that it has unique correspondence to decomposition rules.
     In other words, different graph op IDs have different sets of decomposition rules.
 
     For example,
-        PauliRot{angle:[f64]}{wires:1}{pauli_word:X}
+        PauliRot{angle:[f64]}{wires:1}{pauli_word = "X"}
     and
-        PauliRot{angle:[f64]}{wires:2}{pauli_word:XX}
+        PauliRot{angle:[f64]}{wires:2}{pauli_word = "XX"}
     will have different decomposition rules.
 
     Note that this function should not be updated without updating the corresponding method on the
@@ -159,35 +229,23 @@ class GraphOpID:
         """Return the name of the operator."""
         return self.operator_name
 
-    def get_dynamic_shape_id_format(self) -> str:
-        """Return the dynamic shape formatted for GraphOpId."""
-        return format_dynamic_params_for_id(self.dynamic_shape)
-
-    def get_wire_lens_id_format(self) -> str:
-        """Return the wire lengths formatted for GraphOpId."""
-        return "{" + ",".join(f"{name}:{shape}" for name, shape in self.wire_lens.items()) + "}"
-
-    def get_static_data_id_format(self) -> str:
-        """Return the static data formatted for GraphOpId."""
-        return "{" + ",".join(f"{k}:{v}" for k, v in self.static_data.items()) + "}"
-
-    def getGraphOpId(self, adjoint: bool = False) -> str:
+    def getGraphOpId(self, adjoint: bool = False, num_controls: int = 0) -> str:
         """
         Return the GraphOpId as a string.
 
         NOTE: do not modify this method without also modifying the corresponding DecomposableGate
         interface in MLIR.
         """
-        name = self.get_operator_name()
-        if adjoint:
-            name = f"Adjoint({name})"
-        ID_string = (
-            name
-            + self.get_dynamic_shape_id_format()
-            + self.get_wire_lens_id_format()
-            + self.get_static_data_id_format()
-        )
+        uid = None
         if self.extra_data:
             assert self.uid >= 0, f"Failed to compute UID for operator {self.op}"
-            ID_string += "[" + str(self.uid) + "]"
-        return ID_string
+            uid = self.uid
+        return build_graph_op_id(
+            self.get_operator_name(),
+            self.dynamic_shape,
+            self.wire_lens,
+            self.static_data,
+            adjoint=adjoint,
+            num_controls=num_controls,
+            uid=uid,
+        )

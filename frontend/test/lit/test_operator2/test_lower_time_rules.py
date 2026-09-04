@@ -233,7 +233,7 @@ def test_multiple_rules_chained():
 # CHECK-SAME:   target_gate = "NoParams{}{reg:2}{}"
 # CHECK: func.func private @"__builtin_rule2_SingleParam{x:[tensor<f64>]}{reg:1}{}"
 # CHECK-SAME:   resources = {operations = {
-# CHECK-SAME:   "CompilableData{}{wires:1}{a:a,b:b,thing:thing}" = 1 : i64
+# CHECK-SAME:   "CompilableData{}{wires:1}{a = \22a\22, b = \22b\22, thing = \22thing\22}" = 1 : i64
 # CHECK-SAME:   target_gate = "SingleParam{x:[tensor<f64>]}{reg:1}{}"
 test_multiple_rules_chained()
 
@@ -286,11 +286,11 @@ def test_multiple_rules_chained_and_branch():
 # CHECK-SAME:   target_gate = "NoParams{}{reg:2}{}"
 # CHECK: func.func private @"__builtin_ruleBC_SingleParam{x:[tensor<f64>]}{reg:1}{}"
 # CHECK-SAME:   resources = {operations = {
-# CHECK-SAME:   "CompilableData{}{wires:1}{a:a,b:b,thing:thing}" = 1 : i64
+# CHECK-SAME:   "CompilableData{}{wires:1}{a = \22a\22, b = \22b\22, thing = \22thing\22}" = 1 : i64
 # CHECK-SAME:   target_gate = "SingleParam{x:[tensor<f64>]}{reg:1}{}"
 # CHECK: func.func private @"__builtin_ruleBD_SingleParam{x:[tensor<f64>]}{reg:1}{}"
 # CHECK-SAME:   resources = {operations = {
-# CHECK-SAME:   "CompilableData{}{wires:1}{a:alpha,b:beta,thing:stuff}" = 1 : i64
+# CHECK-SAME:   "CompilableData{}{wires:1}{a = \22alpha\22, b = \22beta\22, thing = \22stuff\22}" = 1 : i64
 # CHECK-SAME:   target_gate = "SingleParam{x:[tensor<f64>]}{reg:1}{}"
 test_multiple_rules_chained_and_branch()
 
@@ -343,12 +343,12 @@ def test_with_cycles():
 # CHECK-SAME:   target_gate = "NoParams{}{reg:2}{}"
 # CHECK: func.func private @"__builtin_ruleBC_SingleParam{x:[tensor<f64>]}{reg:1}{}"
 # CHECK-SAME:   resources = {operations = {
-# CHECK-SAME:   "CompilableData{}{wires:1}{a:a,b:b,thing:thing}" = 1 : i64
+# CHECK-SAME:   "CompilableData{}{wires:1}{a = \22a\22, b = \22b\22, thing = \22thing\22}" = 1 : i64
 # CHECK-SAME:   target_gate = "SingleParam{x:[tensor<f64>]}{reg:1}{}"
-# CHECK: func.func private @"__builtin_ruleCA_CompilableData{}{wires:1}{a:a,b:b,thing:thing}"
+# CHECK: func.func private @"__builtin_ruleCA_CompilableData{}{wires:1}{a = \22a\22, b = \22b\22, thing = \22thing\22}"
 # CHECK-SAME:   resources = {operations = {
 # CHECK-SAME:   "NoParams{}{reg:2}{}" = 1 : i64
-# CHECK-SAME:   target_gate = "CompilableData{}{wires:1}{a:a,b:b,thing:thing}"
+# CHECK-SAME:   target_gate = "CompilableData{}{wires:1}{a = \22a\22, b = \22b\22, thing = \22thing\22}"
 # CHECK: func.func private @"__builtin_ruleAB_NoParams{}{reg:3}{}"
 # CHECK-SAME:   resources = {operations = {
 # CHECK-SAME:   "SingleParam{x:[tensor<f64>]}{reg:1}{}" = 1 : i64
@@ -636,6 +636,6 @@ def test_basis_rotation():
 
 
 # CHECK-LABEL: test_basis_rotation
-# CHECK: func.func private @"__builtin__basis_rotation_decomp_BasisRotation{unitary_matrix:[tensor<2x2xcomplex<f64>>]}{wires:2}{check:False}"
-# CHECK-SAME: target_gate = "BasisRotation{unitary_matrix:[tensor<2x2xcomplex<f64>>]}{wires:2}{check:False}"
+# CHECK: func.func private @"__builtin__basis_rotation_decomp_BasisRotation{unitary_matrix:[tensor<2x2xcomplex<f64>>]}{wires:2}{check = false}"
+# CHECK-SAME: target_gate = "BasisRotation{unitary_matrix:[tensor<2x2xcomplex<f64>>]}{wires:2}{check = false}"
 test_basis_rotation()
