@@ -363,8 +363,9 @@ func.func @test_ppr_operator_unsupported_angle_denominator(%q : !quantum.bit) {
 
 // -----
 
-// A signed integer type (as opposed to signless) must not be accepted: IntegerAttr::getInt()
-// asserts on non-signless types, which would otherwise crash the compiler.
+// MLIR's ordinary `i64` type is "signless": it can represent negative values, but signedness is
+// chosen by the operation interpreting it. Explicitly signed `si64` is a different MLIR type and
+// must not be accepted here because IntegerAttr::getInt() only supports signless integer types.
 func.func @test_ppr_operator_signed_angle_denominator(%q : !quantum.bit) {
     // expected-error @+1 {{failed to legalize operation 'quantum.operator' that was explicitly marked illegal}}
     %0 = quantum.operator "PPR"() qubits(%q) // expected-error @+0 {{PPR operator requires an integer 'angle_denominator' in static_data}}
@@ -374,8 +375,8 @@ func.func @test_ppr_operator_signed_angle_denominator(%q : !quantum.bit) {
 
 // -----
 
-// A 1-bit signless integer (e.g. a bare `true`/`false` literal) must be rejected rather than
-// silently sign-extended to -1 by IntegerAttr::getInt().
+// A 1-bit `i1` (e.g. a bare `true`/`false` literal) must be rejected rather than silently
+// sign-extended to -1 by IntegerAttr::getInt().
 func.func @test_ppr_operator_i1_angle_denominator(%q : !quantum.bit) {
     // expected-error @+1 {{failed to legalize operation 'quantum.operator' that was explicitly marked illegal}}
     %0 = quantum.operator "PPR"() qubits(%q) // expected-error @+0 {{PPR operator requires an integer 'angle_denominator' in static_data}}

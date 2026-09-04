@@ -424,11 +424,10 @@ LogicalResult convertPPROperator(OperatorOp op, ConversionPatternRewriter &rewri
 
     DictionaryAttr staticData = op.getStaticData();
     auto denominatorAttr = staticData.getAs<IntegerAttr>("angle_denominator");
-    // `getInt()` below asserts that the attribute's type is a signless integer (or index), and
-    // sign-extends the stored bits to produce the result. Reject anything that isn't a signless
-    // integer with enough bits to unambiguously represent the denominators we support (at least
-    // ±1, ±2, ±4): a signed/unsigned type would trip that assertion (crashing the compiler),
-    // while a signless i1 (e.g. a bare `true`/`false` literal) would silently sign-extend to -1.
+    // MLIR's ordinary `i64` is a signless integer type: it can hold negative values, but its type
+    // does not prescribe signed or unsigned arithmetic. `getInt()` supports these ordinary `iN`
+    // attributes, but asserts on the distinct explicitly signed/unsigned `siN`/`uiN` types.
+    // Also reject `i1` (e.g. a bare `true`/`false`), which would sign-extend true to -1.
     bool isValidDenominatorType = denominatorAttr &&
                                   denominatorAttr.getType().isSignlessInteger() &&
                                   denominatorAttr.getType().getIntOrFloatBitWidth() >= 2;
