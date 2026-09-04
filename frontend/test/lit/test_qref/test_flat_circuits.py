@@ -27,7 +27,7 @@ from catalyst.ftqc import mbqc_pipeline
 
 
 # CHECK: func.func public @test_custom_op(%arg0: tensor<i64>) -> tensor<f64>
-@qp.qjit(capture=True, target="mlir")
+@qp.qjit(capture=True, target="mlir", collect_decomp_rules=False)
 @qp.qnode(qp.device("null.qubit", wires=3))
 def test_custom_op(i: int):
     """
@@ -76,7 +76,7 @@ print(test_custom_op.mlir)
 
 
 # CHECK: func.func public @test_measure() -> tensor<2xf64>
-@qp.qjit(capture=True, target="mlir")
+@qp.qjit(capture=True, target="mlir", collect_decomp_rules=False)
 @qp.qnode(qp.device("null.qubit", wires=3))
 def test_measure():
     """
@@ -100,7 +100,7 @@ def test_measure():
 print(test_measure.mlir)
 
 
-@qp.qjit(capture=True, target="mlir", pipelines=mbqc_pipeline())
+@qp.qjit(capture=True, target="mlir", collect_decomp_rules=False, pipelines=mbqc_pipeline())
 @qp.qnode(qp.device("null.qubit", wires=1))
 def test_mbqc_measurement_in_basis():
     """
@@ -118,7 +118,7 @@ print(test_mbqc_measurement_in_basis.mlir)
 
 
 # CHECK: func.func public @test_dynamic_qubit_allocation(%arg0: tensor<2x2xf64>, %arg1: tensor<i64>) -> tensor<f64>
-@qp.qjit(capture=True, target="mlir")
+@qp.qjit(capture=True, target="mlir", collect_decomp_rules=False)
 @qp.qnode(qp.device("null.qubit", wires=3))
 def test_dynamic_qubit_allocation(i: int):
     """
@@ -185,7 +185,7 @@ print(test_dynamic_qubit_allocation.mlir)
 
 
 # CHECK: func.func public @test_multirz() -> tensor<f64>
-@qp.qjit(capture=True, target="mlir")
+@qp.qjit(capture=True, target="mlir", collect_decomp_rules=False)
 @qp.qnode(qp.device("null.qubit", wires=3))
 def test_multirz():
     """
@@ -215,7 +215,7 @@ print(test_multirz.mlir)
 
 
 # CHECK: func.func public @test_pcphase() -> tensor<f64>
-@qp.qjit(capture=True, target="mlir")
+@qp.qjit(capture=True, target="mlir", collect_decomp_rules=False)
 @qp.qnode(qp.device("null.qubit", wires=3))
 def test_pcphase():
     """
@@ -247,7 +247,7 @@ print(test_pcphase.mlir)
 
 
 # CHECK: func.func public @test_pauli_rot() -> tensor<f64>
-@qp.qjit(capture=True, target="mlir")
+@qp.qjit(capture=True, target="mlir", collect_decomp_rules=False)
 @qp.qnode(qp.device("null.qubit", wires=4))
 def test_pauli_rot():
     """
@@ -284,7 +284,7 @@ print(test_pauli_rot.mlir)
 
 
 # CHECK: func.func public @test_pauli_measure() -> tensor<f64>
-@qp.qjit(capture=True, target="mlir")
+@qp.qjit(capture=True, target="mlir", collect_decomp_rules=False)
 @qp.qnode(qp.device("null.qubit", wires=4))
 def test_pauli_measure():
     """
@@ -308,7 +308,7 @@ print(test_pauli_measure.mlir)
 
 
 # CHECK: func.func public @test_global_phase() -> tensor<f64>
-@qp.qjit(capture=True, target="mlir")
+@qp.qjit(capture=True, target="mlir", collect_decomp_rules=False)
 @qp.qnode(qp.device("null.qubit", wires=4))
 def test_global_phase():
     """
@@ -332,10 +332,6 @@ def test_global_phase():
 print(test_global_phase.mlir)
 
 
-# COM: TODO: ControlledQubitUnitary's decomp rules are buggy and not jittable.
-# COM: https://app.shortcut.com/xanaduai/story/128492/ctrl-decomp-bisect-rule-of-controlledqubitunitary-is-not-jittable,
-# COM: https://app.shortcut.com/xanaduai/story/128494/controlled-two-qubit-unitary-rule-on-controlledqubitunitary-is-not-jittable
-# When fixed, turn collect_decomp_rules back on.
 # CHECK: func.func public @test_unitary(%arg0: tensor<2x2xf64>, %arg1: tensor<4x4xf64>, %arg2: tensor<1xi1>) -> tensor<f64>
 @qp.qjit(capture=True, target="mlir", collect_decomp_rules=False)
 @qp.qnode(qp.device("null.qubit", wires=4))
@@ -365,7 +361,7 @@ print(test_unitary.mlir)
 
 
 # CHECK: func.func public @test_set_state(%arg0: tensor<4xi64>, %arg1: tensor<4xi64>) -> tensor<f64>
-@qp.qjit(capture=True, target="mlir")
+@qp.qjit(capture=True, target="mlir", collect_decomp_rules=False)
 @qp.qnode(qp.device("null.qubit", wires=4))
 def test_set_state():
     """
@@ -395,7 +391,7 @@ print(test_set_state.mlir)
 
 
 # CHECK: func.func public @test_set_basis_state(%arg0: tensor<3xi1>, %arg1: tensor<2xi1>) -> tensor<f64>
-@qp.qjit(capture=True, target="mlir")
+@qp.qjit(capture=True, target="mlir", collect_decomp_rules=False)
 @qp.qnode(qp.device("null.qubit", wires=4))
 def test_set_basis_state():
     """
@@ -424,7 +420,7 @@ print(test_set_basis_state.mlir)
 
 
 # CHECK: func.func public @test_adjoint(%arg0: tensor<i64>) -> tensor<f64>
-@qp.qjit(capture=True, target="mlir")
+@qp.qjit(capture=True, target="mlir", collect_decomp_rules=False)
 @qp.qnode(qp.device("null.qubit", wires=4))
 def test_adjoint(i: int):
     """
@@ -474,7 +470,7 @@ print(test_adjoint.mlir)
 
 
 # CHECK: func.func public @test_adjoint_with_allocation() -> tensor<f64>
-@qp.qjit(capture=True, target="mlir")
+@qp.qjit(capture=True, target="mlir", collect_decomp_rules=False)
 @qp.qnode(qp.device("null.qubit", wires=4))
 def test_adjoint_with_allocation():
     """
@@ -526,7 +522,7 @@ print(test_adjoint_with_allocation.mlir)
 
 
 # CHECK: func.func public @test_adjoint_with_ctrl() -> tensor<f64>
-@qp.qjit(capture=True, target="mlir")
+@qp.qjit(capture=True, target="mlir", collect_decomp_rules=False)
 @qp.qnode(qp.device("null.qubit", wires=4))
 def test_adjoint_with_ctrl():
     """
@@ -570,7 +566,7 @@ print(test_adjoint_with_ctrl.mlir)
 
 
 # CHECK: func.func public @test_ctrl_with_allocation() -> tensor<f64>
-@qp.qjit(capture=True, target="mlir")
+@qp.qjit(capture=True, target="mlir", collect_decomp_rules=False)
 @qp.qnode(qp.device("null.qubit", wires=4))
 def test_ctrl_with_allocation():
     """

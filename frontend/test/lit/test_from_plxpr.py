@@ -41,7 +41,7 @@ def test_conditional_capture():
         qp.cond(m, lambda: (qp.X(0), None)[1])()
         return qp.state()
 
-    @qp.qjit(capture=True)
+    @qp.qjit(capture=True, collect_decomp_rules=False)
     def main():
         return captured_circuit()
 
@@ -73,7 +73,7 @@ def test_loop_capture():
 
         return qp.state()
 
-    @qp.qjit(capture=True)
+    @qp.qjit(capture=True, collect_decomp_rules=False)
     def main():
         return captured_circuit()
 
@@ -115,7 +115,7 @@ def test_while_capture():
         loop((0, 1))
         return qp.state()
 
-    @qp.qjit(capture=True)
+    @qp.qjit(capture=True, collect_decomp_rules=False)
     def main():
         return captured_circuit()
 
@@ -130,7 +130,7 @@ def test_dynamic_wire():
 
     dev = qp.device("null.qubit", wires=3)
 
-    @qp.qjit(capture=True, target="mlir")
+    @qp.qjit(capture=True, collect_decomp_rules=False, target="mlir")
     @qp.qnode(dev)
     def circuit(w1: int):
 
@@ -172,7 +172,7 @@ def test_two_dynamic_CNOTs():
 
     dev = qp.device("null.qubit", wires=3)
 
-    @qp.qjit(capture=True, target="mlir")
+    @qp.qjit(capture=True, collect_decomp_rules=False, target="mlir")
     @qp.qnode(dev)
     def circuit(w1: int, w2: int):
         # CHECK: [[QREG:%.+]] = qref.alloc( 3) : !qref.reg<3>
@@ -203,7 +203,7 @@ def test_pass_application():
 
     dev = qp.device("null.qubit", wires=1)
 
-    @qp.qjit(capture=True, target="mlir")
+    @qp.qjit(capture=True, collect_decomp_rules=False, target="mlir")
     @qp.transforms.cancel_inverses
     @qp.transforms.merge_rotations
     @qp.qnode(dev)
@@ -226,7 +226,7 @@ def test_pass_decomposition():
 
     qp.decomposition.enable_graph()
 
-    @qp.qjit(capture=True, target="mlir")
+    @qp.qjit(capture=True, collect_decomp_rules=False, target="mlir")
     @qp.transforms.cancel_inverses
     @qp.transforms.merge_rotations
     @partial(qp.transforms.decompose, gate_set={"RX", "RZ"})
@@ -240,7 +240,7 @@ def test_pass_decomposition():
 
     print(circuit1.mlir)
 
-    @qp.qjit(capture=True, target="mlir")
+    @qp.qjit(capture=True, collect_decomp_rules=False, target="mlir")
     @qp.transforms.cancel_inverses
     @partial(qp.transforms.decompose, gate_set={"RX", "RZ"})
     @qp.transforms.merge_rotations
@@ -254,7 +254,7 @@ def test_pass_decomposition():
 
     print(circuit2.mlir)
 
-    @qp.qjit(capture=True, target="mlir")
+    @qp.qjit(capture=True, collect_decomp_rules=False, target="mlir")
     @partial(qp.transforms.decompose, gate_set={"RX", "RZ"})
     @qp.transforms.cancel_inverses
     @qp.transforms.merge_rotations
@@ -279,7 +279,7 @@ def test_two_qnodes_with_different_passes_in_one_workflow():
 
     dev = qp.device("null.qubit", wires=1)
 
-    @qp.qjit(capture=True, target="mlir")
+    @qp.qjit(capture=True, collect_decomp_rules=False, target="mlir")
     def workflow():
         @qp.transforms.merge_rotations
         @qp.qnode(dev)

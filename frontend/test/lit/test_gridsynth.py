@@ -202,7 +202,7 @@ def test_capture_workflow_clifford():
     """Test the capture workflow with qp.transforms.gridsynth (Clifford+T)."""
     qp.capture.enable()
 
-    @qjit(target="mlir", pipelines=pipe)
+    @qjit(target="mlir", pipelines=pipe, collect_decomp_rules=False)
     @partial(qp.transforms.gridsynth, epsilon=0.01, ppr_basis=False)
     @qp.qnode(qp.device("lightning.qubit", wires=1))
     def circuit(x: float):
@@ -238,7 +238,7 @@ def test_capture_workflow_ppr():
     """Test the capture workflow with qp.transforms.gridsynth (PPR)."""
     qp.capture.enable()
 
-    @qjit(target="mlir", pipelines=pipe)
+    @qjit(target="mlir", pipelines=pipe, collect_decomp_rules=False)
     @partial(qp.transforms.gridsynth, epsilon=0.01, ppr_basis=True)
     @qp.qnode(qp.device("lightning.qubit", wires=1))
     def circuit(x: float):
