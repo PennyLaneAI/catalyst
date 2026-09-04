@@ -334,7 +334,8 @@ def SetBasisStateOp : Gate_Op<"set_basis_state"> {
 }
 
 
-def CustomOp : UnitaryGate_Op<"custom", [ParametrizedGate, AttrSizedOperandSegments]> {
+def CustomOp : UnitaryGate_Op<"custom", [ParametrizedGate, AttrSizedOperandSegments,
+                                         DeclareOpInterfaceMethods<DecomposableGate>]> {
     let summary = "A generic quantum gate on n qubits with m floating point parameters.";
     let description = [{
         This operation represents a generic quantum gate on an arbitrary number of qubits, with
@@ -367,7 +368,8 @@ def CustomOp : UnitaryGate_Op<"custom", [ParametrizedGate, AttrSizedOperandSegme
     let hasVerifier = 1;
 }
 
-def OperatorOp : UnitaryGate_Op<"operator", [ParametrizedGate, AttrSizedOperandSegments]> {
+def OperatorOp : UnitaryGate_Op<"operator", [ParametrizedGate, AttrSizedOperandSegments,
+                                             DeclareOpInterfaceMethods<DecomposableGate, ["getExtraData"]>]> {
     let summary = "A generalized quantum operation with arbitrary input signature.";
     let description = [{
         The `qref.operator` is a generic representation for arbitrary quantum operations
@@ -514,7 +516,8 @@ def OperatorOp : UnitaryGate_Op<"operator", [ParametrizedGate, AttrSizedOperandS
     ];
 }
 
-def PauliRotOp : UnitaryGate_Op<"paulirot", [ParametrizedGate, AttrSizedOperandSegments]> {
+def PauliRotOp : UnitaryGate_Op<"paulirot", [ParametrizedGate, AttrSizedOperandSegments,
+                                             DeclareOpInterfaceMethods<DecomposableGate>]> {
     let summary = "Apply a Pauli Product Rotation";
     let description = [{
         The `qref.paulirot` operation applies a rotation around a Pauli product
@@ -543,12 +546,22 @@ def PauliRotOp : UnitaryGate_Op<"paulirot", [ParametrizedGate, AttrSizedOperandS
         mlir::ValueRange getAllParams() {
             return getODSOperands(0);  // `angle` is the 0th operand
         }
+
+        std::string getPauliWord() {
+            std::string pauliWord;
+
+            for (mlir::Attribute pauliChar : getPauliProduct()) {
+                pauliWord += cast<mlir::StringAttr>(pauliChar).getValue();
+            }
+            return pauliWord;
+        }
     }];
 
     let hasVerifier = 1;
 }
 
-def GlobalPhaseOp : UnitaryGate_Op<"gphase", [ParametrizedGate, AttrSizedOperandSegments]> {
+def GlobalPhaseOp : UnitaryGate_Op<"gphase", [ParametrizedGate, AttrSizedOperandSegments,
+                                              DeclareOpInterfaceMethods<DecomposableGate>]> {
     let summary = "Global Phase.";
 
     let description = [{
@@ -584,7 +597,8 @@ def GlobalPhaseOp : UnitaryGate_Op<"gphase", [ParametrizedGate, AttrSizedOperand
     }];
 }
 
-def MultiRZOp : UnitaryGate_Op<"multirz", [ParametrizedGate, AttrSizedOperandSegments]> {
+def MultiRZOp : UnitaryGate_Op<"multirz", [ParametrizedGate, AttrSizedOperandSegments,
+                                           DeclareOpInterfaceMethods<DecomposableGate>]> {
     let summary = "Apply an arbitrary multi Z rotation";
     let description = [{
         The `qref.multirz` operation applies an arbitrary multi Z rotation to the state-vector.
@@ -621,7 +635,8 @@ def MultiRZOp : UnitaryGate_Op<"multirz", [ParametrizedGate, AttrSizedOperandSeg
     let hasCanonicalizeMethod = 1;
 }
 
-def PCPhaseOp : UnitaryGate_Op<"pcphase", [ParametrizedGate, AttrSizedOperandSegments]> {
+def PCPhaseOp : UnitaryGate_Op<"pcphase", [ParametrizedGate, AttrSizedOperandSegments,
+                                           DeclareOpInterfaceMethods<DecomposableGate>]> {
     let summary = "Apply a projector-controlled phase gate";
     let description = [{
         This gate is built from simpler gates like `PhaseShift` and `PauliX` and acts on a group
@@ -664,7 +679,8 @@ def PCPhaseOp : UnitaryGate_Op<"pcphase", [ParametrizedGate, AttrSizedOperandSeg
     let hasCanonicalizeMethod = 1;
 }
 
-def QubitUnitaryOp : UnitaryGate_Op<"unitary", [ParametrizedGate, AttrSizedOperandSegments]> {
+def QubitUnitaryOp : UnitaryGate_Op<"unitary", [ParametrizedGate, AttrSizedOperandSegments,
+                                                DeclareOpInterfaceMethods<DecomposableGate>]> {
     let summary = "Apply an arbitrary fixed unitary matrix";
     let description = [{
         The `qref.unitary` operation applies an arbitrary fixed unitary matrix to the
