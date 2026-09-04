@@ -462,7 +462,7 @@ def test_merge_rotation_ppr():
 
     my_pipeline = [("pipe", ["quantum-compilation-stage"])]
 
-    @qp.qjit(pipelines=my_pipeline, target="mlir", capture=True)
+    @qp.qjit(pipelines=my_pipeline, target="mlir", capture=True, collect_decomp_rules=False)
     def test_merge_rotation_ppr_workflow():
         @qp.transforms.merge_rotations  # have to use qp to be capture-compatible
         @qp_to_ppr
@@ -486,7 +486,7 @@ def test_merge_rotation_arbitrary_angle_ppr():
 
     my_pipeline = [("pipe", ["quantum-compilation-stage"])]
 
-    @qp.qjit(pipelines=my_pipeline, target="mlir", capture=True)
+    @qp.qjit(pipelines=my_pipeline, target="mlir", capture=True, collect_decomp_rules=False)
     def test_merge_rotation_ppr_workflow():
         @qp.transforms.merge_rotations
         @qp_to_ppr
@@ -531,9 +531,9 @@ def test_clifford_to_ppm():
 
     pauli_corrected_cir = ppr_to_ppm_transform(decompose_method="pauli-corrected")(to_ppr_cir)
 
-    auto_qjit_cir = qp.qjit(auto_corrected_cir, capture=True)
-    clifford_qjit_cir = qp.qjit(clifford_corrected_cir, capture=True)
-    pauli_qjit_cir = qp.qjit(pauli_corrected_cir, capture=True)
+    auto_qjit_cir = qp.qjit(auto_corrected_cir, capture=True, collect_decomp_rules=False)
+    clifford_qjit_cir = qp.qjit(clifford_corrected_cir, capture=True, collect_decomp_rules=False)
+    pauli_qjit_cir = qp.qjit(pauli_corrected_cir, capture=True, collect_decomp_rules=False)
 
     baseline_cir = cir()
 
@@ -549,7 +549,7 @@ def test_decompose_arbitrary_ppr():
 
     my_pipeline = [("pipe", ["quantum-compilation-stage"])]
 
-    @qp.qjit(pipelines=my_pipeline, target="mlir", capture=True)
+    @qp.qjit(pipelines=my_pipeline, target="mlir", capture=True, collect_decomp_rules=False)
     def test_decompose_arbitrary_ppr_workflow():
         @qp.transform(pass_name="decompose-arbitrary-ppr")
         @qp.transform(pass_name="to-ppr")
@@ -600,9 +600,9 @@ class TestLowerPBCInitOps:
         to_ppr_circuit = qp.transform(pass_name="to-ppr")(baseline_circuit)
         lowered_circuit = qp.transform(pass_name="ppr-to-ppm")(to_ppr_circuit)
 
-        baseline_circuit = qp.qjit(baseline_circuit, capture=True)
-        to_ppr_circuit = qp.qjit(to_ppr_circuit, capture=True)
-        lowered_circuit = qp.qjit(lowered_circuit, capture=True)
+        baseline_circuit = qp.qjit(baseline_circuit, capture=True, collect_decomp_rules=False)
+        to_ppr_circuit = qp.qjit(to_ppr_circuit, capture=True, collect_decomp_rules=False)
+        lowered_circuit = qp.qjit(lowered_circuit, capture=True, collect_decomp_rules=False)
 
         baseline_result = baseline_circuit()
         to_ppr_result = to_ppr_circuit()
