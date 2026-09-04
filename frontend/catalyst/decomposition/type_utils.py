@@ -15,12 +15,14 @@
 """Type handling utilities for decomposition rule lowering."""
 
 import copy
+import re
 
 import jax.numpy as jnp
 import numpy as np
 import pennylane as qp
 from jax._src.lib.mlir import ir
 from jax.core import ShapedArray
+from pennylane.pytrees import flatten, unflatten
 
 _MLIR_DTYPES_TO_PY_DTYPES = {
     "i1": jnp.bool_,
@@ -39,80 +41,45 @@ _PY_DTYPES_TO_MLIR_DTYPES = {v: k for k, v in _MLIR_DTYPES_TO_PY_DTYPES.items()}
     float: "f64",
     int: "i64",
     complex: "complex<f64>",
-    (ir.IntegerType, 1): "i1",
-    (ir.IntegerType, 8): "i8",
-    (ir.IntegerType, 16): "i16",
-    (ir.IntegerType, 32): "i32",
-    (ir.IntegerType, 64): "i64",
     ir.F16Type: "f16",
     ir.F32Type: "f32",
     ir.F64Type: "f64",
+    (ir.ComplexType, ir.F32Type): "complex<f32>",
     (ir.ComplexType, ir.F64Type): "complex<f64>",
+    np.dtype("bool_"): "i1",
+    np.dtype("int8"): "i8",
+    np.dtype("int16"): "i16",
+    np.dtype("int32"): "i32",
+    np.dtype("int64"): "i64",
+    np.dtype("float16"): "f16",
+    np.dtype("float32"): "f32",
+    np.dtype("float64"): "f64",
+    np.dtype("complex64"): "complex<f32>",
+    np.dtype("complex128"): "complex<f64>",
 }
 
 
-def get_mlir_tensor_type_map_key(mlir_type):
-    if isinstance(mlir_type, ir.ComplexType):
-        return (type(mlir_type), type(mlir_type.element_type))
-    if isinstance(mlir_type, ir.IntegerType):
-        return (type(mlir_type), mlir_type.width)
-    return type(mlir_type)
+def convert_item_to_mlir_type(item, is_special_lowering=False):
+    """Convert a string or PennyLane AbstractArray to an mlir type annotation."""
+    if isinstance(item, str):
+        return item
 
+    if item.shape == ():
+        if is_special_lowering:
+            return _PY_DTYPES_TO_MLIR_DTYPES[item.dtype]
+        return "tensor<" + _PY_DTYPES_TO_MLIR_DTYPES[item.dtype] + ">"
 
-def convert_shaped_type_to_mlir_string(shaped_type, current_dim=0):
-    """Convert a shape of arbitrary dimension to a string with MLIR type strings for values."""
-    if isinstance(shaped_type, (ShapedArray, qp.typing.AbstractArray)):
-        if current_dim == shaped_type.ndim:
-            return _PY_DTYPES_TO_MLIR_DTYPES[shaped_type.dtype.type]
-
-        return [
-            convert_shaped_type_to_mlir_string(shaped_type, current_dim + 1)
-        ] * shaped_type.shape[current_dim]
-    elif isinstance(shaped_type, ir.RankedTensorType):
-        if current_dim == shaped_type.rank:
-            return _PY_DTYPES_TO_MLIR_DTYPES[get_mlir_tensor_type_map_key(shaped_type.element_type)]
-
-        return [
-            convert_shaped_type_to_mlir_string(shaped_type, current_dim + 1)
-        ] * shaped_type.shape[current_dim]
-
-
-def convert_types_to_mlir_strings(d: dict) -> dict:
-    """Convert the values of a dictionary to MLIR type strings."""
-
-    def handle_item(item):
-        match item:
-            case str():
-                return item
-            case type():
-                return _PY_DTYPES_TO_MLIR_DTYPES[item]
-            case ir.RankedTensorType():
-                if len(item.shape) == 0:
-                    return [
-                        _PY_DTYPES_TO_MLIR_DTYPES[get_mlir_tensor_type_map_key(item.element_type)]
-                    ]
-                return convert_shaped_type_to_mlir_string(item)
-            case float() | int() | complex():
-                # these need to be wrapped in an additional list to account for the tensor creation in lowering
-                return [_PY_DTYPES_TO_MLIR_DTYPES[type(item)]]
-            case list() | tuple():
-                return [handle_item(i) for i in item]
-            case ShapedArray() | qp.typing.AbstractArray():
-                if item.shape == ():
-                    return [_PY_DTYPES_TO_MLIR_DTYPES[item.dtype.type]]
-                return convert_shaped_type_to_mlir_string(item)
-            case _ if type(item) in _PY_DTYPES_TO_MLIR_DTYPES:
-                return _PY_DTYPES_TO_MLIR_DTYPES[type(item)]
-            case _:
-                raise TypeError(
-                    f"encountered unknown type {type(item)} of item {item} when converting to mlir strings."
-                )
-
-    return {k: handle_item(v) for k, v in d.items()}
+    return (
+        "tensor<"
+        + "x".join(str(dim_size) for dim_size in item.shape)
+        + "x"
+        + _PY_DTYPES_TO_MLIR_DTYPES[item.dtype]
+        + ">"
+    )
 
 
 def format_dynamic_params_for_id(d):
-    """Format a structure for ID, after calling convert_types_to_mlir_string on it."""
+    """Format a structure for ID."""
 
     def handle_item(item):
         match item:
@@ -131,21 +98,33 @@ def format_dynamic_params_for_id(d):
 
 
 def get_dummy_values_for_arg(arg):
-    """
-    Given a container of python or MLIR types, replace the types with corresponding dummy values.
+    """Given a container of python or MLIR types, replace the types with corresponding dummy values.
 
-    Each item in the container must be representible as an MLIR tensor with at most one layer of
-    nesting, i.e. cannot be nested and all elements must be of the same type.
-    Ex.
-    [[float, float], [int, int, int], [int32, int32, int32, int32]]
+    The types are expected to be formatted for ``GraphOpId``s. Lists/Tuples must contain homogeneous
+    data types (this is true for any operator).
     """
     match arg:
         case str():
-            return jnp.zeros((), dtype=_MLIR_DTYPES_TO_PY_DTYPES[arg])
+            if arg.startswith("tensor"):
+                # Captures the optional dimensions (e.g., '2x2x') in group 1, and the
+                # element type in group 2
+                match = re.match(r"^tensor<((?:\d+x)*)(.*)>$", arg)
+                dim_str, dtype = match.groups()
+                ranks = tuple(int(d) for d in dim_str.split("x") if d)
+                return jnp.zeros(ranks, dtype=_MLIR_DTYPES_TO_PY_DTYPES[dtype])
+            else:
+                return jnp.zeros((), dtype=_MLIR_DTYPES_TO_PY_DTYPES[arg])
         case list() | tuple():
-            dtype = get_dummy_values_for_arg(arg[0]).dtype
-            # NOTE: numpy is required since jax won't create an array of strings
-            return jnp.zeros(np.array(arg, str).shape, dtype)
+            if all(isinstance(e, str) for e in arg) and arg[0].startswith("tensor"):
+                # if arg is something like [tensor<...>], i.e. a single tensor but carrying the
+                # layer of brackets from StringMap<Vector<Type>>, np str parsing fails to realize
+                # the actual tensor shape, and we need to do it manually
+                assert len(arg) == 1, "cannot create a tensor of tensors"
+                return get_dummy_values_for_arg(arg[0])
+            else:
+                dtype = get_dummy_values_for_arg(arg[0]).dtype
+                # NOTE: numpy is required since jax won't create an array of strings
+                return jnp.zeros(np.array(arg, str).shape, dtype)
         case ShapedArray():
             return jnp.zeros(arg.shape[0], dtype=arg.dtype)
         case type() | jnp.dtype():
@@ -157,40 +136,30 @@ def get_dummy_values_for_arg(arg):
     raise TypeError(f"Unexpected type in container when creating dummy values: {type(arg)}")
 
 
-def replace_abstract_wires_with_concrete_wires(node):
-    if isinstance(node, qp.core.Operator2):
-        return _replace_op_abstract_wires_with_concrete_wires(node)
-
-    if isinstance(node, list):
-        return [replace_abstract_wires_with_concrete_wires(item) for item in node]
-    elif isinstance(node, dict):
-        return {k: replace_abstract_wires_with_concrete_wires(v) for k, v in node.items()}
-    elif isinstance(node, tuple):
-        return tuple(replace_abstract_wires_with_concrete_wires(item) for item in node)
-    else:
-        if isinstance(node, qp.typing.AbstractWires):
-            return qp.wires.Wires(range(len(node)))
-        else:
-            return node
+def _is_wires(node):
+    """Return whether ``node`` is a container of wires, abstract or concrete."""
+    return isinstance(node, (qp.typing.AbstractWires, qp.wires.Wires))
 
 
-def _replace_op_abstract_wires_with_concrete_wires(op2):
+def replace_wires_with_placeholder_wires(node):
     """
-    Given an Operator2 instance, return a copy of the same instance but with all fields whose value
-    is an `AbstractWires` replaced with concrete `Wires`.
-    """
-    new_op = copy.deepcopy(op2)
-    for wire_arg in new_op.wire_argnames:
-        if isinstance(new_op.arguments[wire_arg], qp.typing.AbstractWires):
-            num_wires = len(new_op.arguments[wire_arg])
-            new_op.arguments[wire_arg] = qp.wires.Wires(range(-1, -num_wires - 1, -1))
-    for hybrid_arg in new_op.hybrid_argnames:
-        if isinstance(new_op.arguments[hybrid_arg], qp.core.Operator2):
-            new_op.arguments[hybrid_arg] = _replace_op_abstract_wires_with_concrete_wires(
-                new_op.arguments[hybrid_arg]
-            )
+    Return a copy of the pytree ``node`` in which every wire container (abstract or concrete,
+    including the ones nested inside ``Operator2`` instances) is replaced by placeholder wires
+    labelled with negative integers.
 
-    return new_op
+    Wire labels never affect which decomposition rules apply to an operator: at lowering time
+    wires always show up as (abstract) qubit operands. Replacing them with placeholders makes
+    operators that only differ in their (concrete) wire labels reduce to the same ``GraphOpId``.
+
+    Note that the result is a deep copy.
+    """
+    # Wires is a pytree itself, so it has to be marked as a leaf to be replaced as a whole.
+    leaves, tree = flatten(copy.deepcopy(node), is_leaf=_is_wires)
+    leaves = [
+        qp.wires.Wires(range(-1, -len(leaf) - 1, -1)) if _is_wires(leaf) else leaf
+        for leaf in leaves
+    ]
+    return unflatten(leaves, tree)
 
 
 def post_process_concretize_leaves(leaves):

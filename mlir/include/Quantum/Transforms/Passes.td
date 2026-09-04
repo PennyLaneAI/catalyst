@@ -80,6 +80,10 @@ def CtrlLoweringPass : Pass<"ctrl-lowering"> {
     let dependentDialects = ["scf::SCFDialect"];
 }
 
+def RemoveGlobalPhasesPass : Pass<"remove-global-phases"> {
+    let summary = "Remove global phases by deleting phase operations without control wires.";
+}
+
 def SplitMultipleTapesPass : Pass<"split-multiple-tapes"> {
     let summary = "Given a qnode containing multiple tapes, split each tape into its own function.";
 }
@@ -207,6 +211,10 @@ def DecomposeLoweringPass : Pass<"decompose-lowering"> {
             /*Type*/"std::string",
             /*Description*/"The set of decomposition rules to apply. If empty, applies all rules.">
     ];
+}
+
+def ResolveStatePrepOperatorPass : Pass<"resolve-state-prep-operator"> {
+    let summary = "Replace all quantum.operator ops of StatePrep/BasisState to equivalent quantum.set_state/set_basis_state operations ";
 }
 
 def DisentangleCNOTPass : Pass<"disentangle-cnot"> {

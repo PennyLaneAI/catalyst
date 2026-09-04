@@ -40,7 +40,7 @@ from catalyst.decomposition.decomposition_rules import (
 )
 from catalyst.decomposition.graph_op_id import _SPECIAL_LOWERINGS
 from catalyst.decomposition.type_utils import (
-    convert_types_to_mlir_strings,
+    convert_item_to_mlir_type,
     format_dynamic_params_for_id,
 )
 from catalyst.jax_extras.lowering import get_mlir_attribute_from_pyval
@@ -337,62 +337,30 @@ def compile_decomp_rules(
             static_data={},
         )
 
-    elif op_cls is qp.BasisState:
-        # TODO: qp.BasisState decomp rule calls allclose, but the current infra cannot support
-        # rules that call other funcops
-        # When the above is implemented, uncomment the BasisState decomp rule collection impl below
-        op_id = ""
-        decomp_rules = []
-
-        # # qp.BasisState has the same number of booleans as the number of wires
-        # num_wires = wire_lens[0]
-        # dynamic_shape = {qp.BasisState.dynamic_argnames[0]: ["i64"] * num_wires}
-        # wire_argname = qp.BasisState.wire_argnames[0]
-        # op_id = (
-        #     "BasisState"
-        #     + format_dynamic_params_for_id(dynamic_shape)
-        #     + "{"
-        #     + f"{wire_argname}:{num_wires}"
-        #     + "}{}"
-        # )
-
-        # decomp_rules = fetch_all_reachable_decomposition_rules_from_op(
-        #     op_name="BasisState",
-        #     op_id=op_id,
-        #     dynamic_shape=dynamic_shape,
-        #     wire_lens={f"{wire_argname}": num_wires},
-        #     static_data={},
-        # )
-
     elif op_cls is qp.QubitUnitary:
-        # TODO: qp.QubitUnitary decomp rule calls det, but the current infra cannot support
-        # rules that call other funcops
-        # When the above is implemented, uncomment the Unitary decomp rule collection impl below
+        num_wires = wire_lens[0]
+        matrix_size = 2**num_wires
+        dynamic_shape = {
+            qp.QubitUnitary.dynamic_argnames[0]: [
+                f"tensor<{matrix_size}x{matrix_size}xcomplex<f64>>"
+            ]
+        }
+        wire_argname = qp.QubitUnitary.wire_argnames[0]
+        op_id = (
+            "QubitUnitary"
+            + format_dynamic_params_for_id(dynamic_shape)
+            + "{"
+            + f"{wire_argname}:{wire_lens[0]}"
+            + "}{}"
+        )
 
-        op_id = ""
-        decomp_rules = []
-
-        # num_wires = wire_lens[0]
-        # matrix_size = 2**num_wires
-        # dynamic_shape = {
-        #     qp.QubitUnitary.dynamic_argnames[0]: [["complex<f64>"] * matrix_size] * matrix_size
-        # }
-        # wire_argname = qp.QubitUnitary.wire_argnames[0]
-        # op_id = (
-        #     "QubitUnitary"
-        #     + "[" + format_dynamic_params_for_id(dynamic_shape) + "]"
-        #     + "{"
-        #     + f"{wire_argname}:{wire_lens[0]}"
-        #     + "}{}"
-        # )
-
-        # decomp_rules = fetch_all_reachable_decomposition_rules_from_op(
-        #     op_name="QubitUnitary",
-        #     op_id=op_id,
-        #     dynamic_shape=dynamic_shape,
-        #     wire_lens={f"{wire_argname}": wire_lens[0]},
-        #     static_data={},
-        # )
+        decomp_rules = fetch_all_reachable_decomposition_rules_from_op(
+            op_name="QubitUnitary",
+            op_id=op_id,
+            dynamic_shape=dynamic_shape,
+            wire_lens={f"{wire_argname}": wire_lens[0]},
+            static_data={},
+        )
 
     else:
         # Operator Op
@@ -408,7 +376,7 @@ def compile_decomp_rules(
 
         for dynamic_argname, param in zip(op_cls.dynamic_argnames, non_hybrid_params, strict=True):
             non_hybrid_dynamic_shape[dynamic_argname] = param.type
-        non_hybrid_dynamic_shape = convert_types_to_mlir_strings(non_hybrid_dynamic_shape)
+        non_hybrid_dynamic_shape = {k: [str(v)] for k, v in non_hybrid_dynamic_shape.items()}
 
         non_hybrid_wire_argnames = []
         for wire_argname in op_cls.wire_argnames:
@@ -450,7 +418,9 @@ def compile_decomp_rules(
                 with_hybrid_dynamic_shape[named_attr.name] = [
                     params[idx].type for idx in named_attr.attr
                 ]
-            with_hybrid_dynamic_shape = convert_types_to_mlir_strings(with_hybrid_dynamic_shape)
+            with_hybrid_dynamic_shape = {
+                k: [str(item) for item in v] for k, v in with_hybrid_dynamic_shape.items()
+            }
 
         with_hybrid_wire_lens = {}
         if qubit_map is not None:
@@ -660,14 +630,6 @@ def _special_gphase_lowering(angle, *_, ctrl_qubits, ctrl_values, adjoint):
         ctrl_values=ctrl_values,
         adjoint=adjoint,
     )
-    return ()
-
-
-@_register_special_lowering(qp.BasisState)
-def _special_basis_state_lowering(state, *qubits, ctrl_qubits, ctrl_values, adjoint):
-    assert not ctrl_qubits and not ctrl_values, "ctrl(BasisState) is not supported."
-    assert not adjoint, "adjoint(BasisState) is not supported."
-    SetBasisStateOp(state, qubits)
     return ()
 
 

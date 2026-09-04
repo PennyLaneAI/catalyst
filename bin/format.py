@@ -23,7 +23,14 @@ from utils import get_cpp_files
 
 CLANG_FMT_BIN = "clang-format"
 
-IGNORE_PATTERNS = ["external", "build", "llvm-project", "Enzyme", "stablehlo"]
+IGNORE_PATTERNS = [
+    "external",
+    "build",
+    "llvm-project",
+    "Enzyme",
+    "stablehlo",
+    "rdma/vendor/infiniband",
+]
 
 DEFAULT_CLANG_FORMAT_VERSION = 20
 
