@@ -567,7 +567,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
     LogicalResult getRuleNodes(llvm::StringRef filename, std::vector<RuleNode> &rules,
                                llvm::StringSet<> &userRuleNames) {
         // Load pre-compiled rules (ignore failure, we can try to solve without)
-        std::ignore = loadBuiltInDecompositionRules(filename, rules);
+        // std::ignore = loadBuiltInDecompositionRules(filename, rules);
 
         // Lower compile-time rules into the module; loadUserDecompositionRules (below) registers
         // the materialized `__builtin`-prefixed funcs as RuleNodes.

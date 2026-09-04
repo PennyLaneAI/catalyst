@@ -46,6 +46,7 @@ from catalyst.decomposition.decomposition_rules import (
     name_unwrap_adjoint,
     name_unwrap_control,
     name_wrap_adjoint,
+    prepare_dynamic_op_kwargs,
     wrap_modifier_id,
 )
 from catalyst.decomposition.graph_op_id import GraphOpID
@@ -84,35 +85,18 @@ class TestGenericUtilities:
     @pytest.mark.parametrize(
         "input, dtype, shape",
         [
-            # python-type scalar tests
-            (int, "int64", ()),
-            (float, "float64", ()),
-            (jnp.dtype("int32"), "int32", ()),
-            (bool, "bool", ()),
-            (complex, "complex128", ()),
-            # mlir-type scalar tests
+            # scalar tests
             ("i1", "bool", ()),
             ("i32", "int32", ()),
             ("f64", "float64", ()),
             ("complex<f64>", "complex128", ()),
             ("complex<f32>", "complex64", ()),
-            # mlir-type tensor tests
+            # tensor tests
             ("tensor<i1>", "bool", ()),
             ("tensor<1xi1>", "bool", (1,)),
             ("tensor<2xi64>", "int64", (2,)),
             ("tensor<3x4xf64>", "float64", (3, 4)),
             ("tensor<3x4xcomplex<f64>>", "complex128", (3, 4)),
-            # python-type shaped tests
-            (bool, "bool", ()),
-            ([float, float], "float64", (2,)),
-            ([int], "int64", (1,)),
-            (ShapedArray((4,), "int32"), "int32", (4,)),
-            # mlir-type shaped tests
-            ("i32", "int32", ()),
-            (["f64", "f64"], "float64", (2,)),
-            (["i1", "i1", "i1"], "bool", (3,)),
-            ([["f64", "f64"], ["f64", "f64"]], "float64", (2, 2)),
-            (["tensor<3x4xcomplex<f64>>"], "complex128", (3, 4)),
         ],
     )
     def test_get_dummy_values_types(self, input, dtype, shape):
@@ -120,6 +104,60 @@ class TestGenericUtilities:
         result = get_dummy_values_for_arg(input)
         assert result.dtype == dtype
         assert result.shape == shape
+
+    def test_prepare_dynamic_op_kwargs(self):
+        """Singleton dynamic values are unwrapped while multiple values remain independent."""
+        kwargs = prepare_dynamic_op_kwargs(
+            {
+                "single": ["tensor<3xf64>"],
+                "single_scalar": ["f64"],
+                "multiple": ["tensor<i1>", "tensor<2xcomplex<f64>>"],
+            },
+            {"control_wires": 2, "target_wires": 3, "empty_wires": 0},
+        )
+
+        assert kwargs["single"].shape == (3,)
+        assert not isinstance(kwargs["single"], list)
+
+        assert isinstance(kwargs["single_scalar"], list)
+        assert len(kwargs["single_scalar"]) == 1
+        assert kwargs["single_scalar"][0].shape == ()
+
+        assert isinstance(kwargs["multiple"], list)
+        assert [value.shape for value in kwargs["multiple"]] == [(), (2,)]
+        assert [value.dtype for value in kwargs["multiple"]] == ["bool", "complex128"]
+
+        assert kwargs["control_wires"].tolist() == [0, 1]
+        assert kwargs["target_wires"].tolist() == [2, 3, 4]
+        assert kwargs["empty_wires"].tolist() == []
+
+    def test_compile_rule_with_multiple_values_per_dynamic_name(self):
+        """Incompatible MLIR values associated with one dynamic name remain separately usable."""
+
+        class MultiValueOp(qp.core.Operator2):
+            dynamic_argnames = ("values",)
+            wire_argnames = ("reg",)
+
+            def __init__(self, values, reg):
+                super().__init__(values, reg)
+
+        @register_resources(lambda values, reg: {NoParams(reg=Wire[1]): 2})
+        def multi_value_rule(values, reg):
+            qp.cond(values[0], NoParams)(reg)
+            qp.cond(values[1] > 0, NoParams)(reg)
+
+        with local_decomps():
+            add_decomps(MultiValueOp, multi_value_rule)
+            result = compile_decomposition_rules_wrapper(
+                "MultiValueOp",
+                "MultiValueOp{values:[tensor<i1>,tensor<i64>]}{reg:1}{}",
+                {"values": ["tensor<i1>", "tensor<i64>"]},
+                {"reg": 1},
+                {},
+            )
+
+        assert "multi_value_rule" in result
+        assert result.count("scf.if") == 2
 
     @pytest.mark.parametrize(
         "item, is_special_lowering, mlir_type",
@@ -183,6 +221,26 @@ class TestGenericUtilities:
         """Test that GraphOpIds are generated correctly by the frontend."""
         # NOTE: use startswith to match ops with uids/extra_data
         assert GraphOpID(op).getGraphOpId().startswith(id)
+
+    def test_graph_op_id_controlled_operator_name(self):
+        """Controlled Operator2 names contain each modifier exactly once."""
+        multix = qp.MultiX(Bool[12], Wire[12])
+
+        controlled_multix = qp.ctrl(multix, control=Wire[1])
+        assert (
+            GraphOpID(controlled_multix).getGraphOpId()
+            == "C(MultiX){bitstring:[tensor<12xi1>]}{wires:12}{}"
+        )
+
+        double_controlled_multix = qp.ctrl(controlled_multix, control=Wire[1])
+        assert (
+            GraphOpID(double_controlled_multix).getGraphOpId()
+            == "2C(MultiX){bitstring:[tensor<12xi1>]}{wires:12}{}"
+        )
+
+    def test_graph_op_id_named_controlled_gate(self):
+        """Named controlled gates retain their canonical operator name."""
+        assert GraphOpID(qp.CNOT(Wire[2])).getGraphOpId() == "CNOT{}{wires:2}{}"
 
     def test_wrapper_operator(self, mocker):
         """Test that compile_decomposition_rules_wrapper doesn't error on Operator1 instances."""

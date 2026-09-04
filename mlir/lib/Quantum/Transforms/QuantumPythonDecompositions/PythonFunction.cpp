@@ -100,6 +100,7 @@ static nb::object getPyvalFromMlirAttribute(mlir::Attribute attr) {
             return outTuple;
         })
         .Case<mlir::StringAttr>([](auto strAttr) { return nb::cast(strAttr.getValue().str()); })
+        .Case<mlir::IntegerAttr>([](auto intAttr) { return nb::cast(intAttr.getInt()); })
         .Default([](auto attr) { return nb::str("placeholder"); });
 }
 

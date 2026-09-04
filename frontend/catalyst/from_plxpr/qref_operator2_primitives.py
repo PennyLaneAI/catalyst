@@ -223,6 +223,14 @@ def _abstractify_jax_array(val):
     return AbstractArray(val.shape, val.dtype)
 
 
+def tuple_to_list_str(t: tuple):
+    out = ""
+    for number in t:
+        out += f"{number},"
+    out = out[:-1]  # strip final ","
+    return "[" + out + "]"
+
+
 # pylint: disable=too-many-arguments,too-many-branches
 def compile_decomp_rules(
     module,
@@ -435,7 +443,13 @@ def compile_decomp_rules(
             + "}"
         )
         if not (op_cls.hybrid_argnames or op_cls.static_argnames):
-            op_id += "{" + ",".join(f"{k}:{v}" for k, v in sorted(repack_static_data.items())) + "}"
+            listified = {}
+            for k, v in sorted(repack_static_data.items()):
+                if isinstance(v, tuple):
+                    listified[k] = tuple_to_list_str(v)
+                else:
+                    listified[k] = v
+            op_id += "{" + ",".join(f"{k}:{v}" for k, v in listified.items()) + "}"
         else:
             op_id += "{}"
         if uid is not None:
