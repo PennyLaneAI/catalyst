@@ -149,7 +149,7 @@ class TestGenericUtilities:
             (SingleParam(Float, Wires([2, 3])), "SingleParam{x:[tensor<f64>]}{reg:2}{}"),
             (
                 CompilableData(True, 3.14, "string", Wires([0, 1])),
-                "CompilableData{}{wires:2}{a:True,b:3.14,thing:string}",
+                'CompilableData{}{wires:2}{a = true, b = 3.140000e+00 : f64, thing = "string"}',
             ),
             (
                 MultipleRegisters(Wires([0, 1, 2]), Wires([3, 4])),
@@ -162,7 +162,7 @@ class TestGenericUtilities:
             (qp.MultiRZ(Float, Wires([0, 2, 3, 4])), "MultiRZ{theta:[f64]}{wires:4}{}"),
             (
                 qp.PauliRot(Float, "XYZ", Wires([1, 2, 3])),
-                "PauliRot{theta:[f64]}{wires:3}{pauli_word:XYZ}",
+                'PauliRot{theta:[f64]}{wires:3}{pauli_word = "XYZ"}',
             ),
             (StaticData("mylabel", Wires([0, 1])), "StaticData{}{reg:2}{}["),
             (
@@ -212,7 +212,7 @@ class TestGenericUtilities:
 
         res = compile_decomposition_rules_wrapper(
             "CompilableData",
-            "CompilableData{}{wires:2}{a:True,b:3.14,thing:string}",
+            'CompilableData{}{wires:2}{a = true, b = 3.140000e+00 : f64, thing = "string"}',
             {},
             {"wires": 2},
             {"a": True, "b": 3.14, "thing": "string"},

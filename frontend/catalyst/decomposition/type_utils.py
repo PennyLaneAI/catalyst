@@ -14,6 +14,7 @@
 
 """Type handling utilities for decomposition rule lowering."""
 
+import contextlib
 import copy
 import re
 
@@ -23,6 +24,8 @@ import pennylane as qp
 from jax._src.lib.mlir import ir
 from jax.core import ShapedArray
 from pennylane.pytrees import flatten, unflatten
+
+from catalyst.jax_extras.lowering import get_mlir_attribute_from_pyval
 
 _MLIR_DTYPES_TO_PY_DTYPES = {
     "i1": jnp.bool_,
@@ -76,6 +79,30 @@ def convert_item_to_mlir_type(item, is_special_lowering=False):
         + _PY_DTYPES_TO_MLIR_DTYPES[item.dtype]
         + ">"
     )
+
+
+@contextlib.contextmanager
+def _attribute_context():
+    """Provide an MLIR context and location for attribute construction."""
+    if current := ir.Context.current:
+        with ir.Location.unknown(context=current):
+            yield current
+    else:
+        with ir.Context() as context, ir.Location.unknown(context=context):
+            yield context
+
+
+def format_static_data_dict_for_id(static_data):
+    """Format the static data group of a ``GraphOpId``, including the surrounding braces.
+
+    The values are converted to the attributes they lower to and handed to MLIR's own printer, which
+    is what ``defaultGetGraphOpId`` in mlir/lib/Quantum/IR/QuantumInterfaces.cpp does as well. One
+    printer spelling both sides is what keeps a rule compiled here findable by the
+    ``graph-decomposition`` pass.
+    """
+    with _attribute_context():
+        attrs = {name: get_mlir_attribute_from_pyval(value) for name, value in static_data.items()}
+        return str(ir.DictAttr.get(attrs))
 
 
 def format_dynamic_params_for_id(d):

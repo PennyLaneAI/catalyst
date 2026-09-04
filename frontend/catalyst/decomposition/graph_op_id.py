@@ -23,6 +23,7 @@ from pennylane.pytrees import flatten
 from catalyst.decomposition.type_utils import (
     convert_item_to_mlir_type,
     format_dynamic_params_for_id,
+    format_static_data_dict_for_id,
     post_process_concretize_leaves,
     replace_wires_with_placeholder_wires,
 )
@@ -45,15 +46,18 @@ class GraphOpID:
     For example, an Operator2 instance with class name `HybridOpArg`, taking in one float param
     argument named `angle`, one wire argument named `cwires`, one static data argument
     `label="hello"`, and a computed UID of 10 would be parsed to the following graph op ID:
-        HybridOpArg{angle:[tensor<f64>]}{cwires:1}{label:hello}[10]
+        HybridOpArg{angle:[tensor<f64>]}{cwires:1}{label = "hello"}[10]
+
+    The static data group is spelled by MLIR's own attribute printer, applied to the attributes the
+    data lowers to, so each entry reads as it would inside the `static_data` dictionary on the op.
 
     The defining trait of a graph op ID is that it has unique correspondence to decomposition rules.
     In other words, different graph op IDs have different sets of decomposition rules.
 
     For example,
-        PauliRot{angle:[f64]}{wires:1}{pauli_word:X}
+        PauliRot{angle:[f64]}{wires:1}{pauli_word = "X"}
     and
-        PauliRot{angle:[f64]}{wires:2}{pauli_word:XX}
+        PauliRot{angle:[f64]}{wires:2}{pauli_word = "XX"}
     will have different decomposition rules.
 
     Note that this function should not be updated without updating the corresponding method on the
@@ -169,7 +173,7 @@ class GraphOpID:
 
     def get_static_data_id_format(self) -> str:
         """Return the static data formatted for GraphOpId."""
-        return "{" + ",".join(f"{k}:{v}" for k, v in self.static_data.items()) + "}"
+        return format_static_data_dict_for_id(self.static_data)
 
     def getGraphOpId(self, adjoint: bool = False) -> str:
         """

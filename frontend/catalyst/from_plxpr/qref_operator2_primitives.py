@@ -40,8 +40,8 @@ from catalyst.decomposition.decomposition_rules import (
 )
 from catalyst.decomposition.graph_op_id import _SPECIAL_LOWERINGS
 from catalyst.decomposition.type_utils import (
-    convert_item_to_mlir_type,
     format_dynamic_params_for_id,
+    format_static_data_dict_for_id,
 )
 from catalyst.jax_extras.lowering import get_mlir_attribute_from_pyval
 from catalyst.jax_extras.patches import mock_attributes
@@ -291,9 +291,9 @@ def compile_decomp_rules(
             + "{"
             + f"{wire_argname}:{wire_lens[0]}"
             + "}"
-            + "{"
-            + f"{pauliword_argname}:{repack_static_data[pauliword_argname]}"
-            + "}"
+            + format_static_data_dict_for_id(
+                {pauliword_argname: repack_static_data[pauliword_argname]}
+            )
         )
 
         decomp_rules = fetch_all_reachable_decomposition_rules_from_op(
@@ -312,9 +312,8 @@ def compile_decomp_rules(
             + format_dynamic_params_for_id(dynamic_shape)
             + "{"
             + f"{wire_argname}:{wire_lens[0]}"
-            + "}{"
-            + f"dim:{repack_static_data["dim"]}"
             + "}"
+            + format_static_data_dict_for_id({"dim": repack_static_data["dim"]})
         )
 
         decomp_rules = fetch_all_reachable_decomposition_rules_from_op(
@@ -435,7 +434,7 @@ def compile_decomp_rules(
             + "}"
         )
         if not (op_cls.hybrid_argnames or op_cls.static_argnames):
-            op_id += "{" + ",".join(f"{k}:{v}" for k, v in sorted(repack_static_data.items())) + "}"
+            op_id += format_static_data_dict_for_id(repack_static_data)
         else:
             op_id += "{}"
         if uid is not None:

@@ -612,7 +612,7 @@ module @circuit_with_operator_op {
 
   // CHECK-LABEL: func.func private @_my_dummy_decomp
   func.func private @_my_dummy_decomp(%arg0: !quantum.reg, %arg1: tensor<1xf64>, %arg2: tensor<1xi64>) -> !quantum.reg attributes
-      {llvm.linkage = #llvm.linkage<internal>, num_wires = 1 : i64, target_gate = "DummyOp{arg:[f64]}{wires:1}{metadata:word}"} {
+      {llvm.linkage = #llvm.linkage<internal>, num_wires = 1 : i64, target_gate = "DummyOp{arg:[f64]}{wires:1}{metadata = \22word\22}"} {
     %0 = stablehlo.slice %arg2 [0:1] : (tensor<1xi64>) -> tensor<1xi64>
     %1 = stablehlo.reshape %0 : (tensor<1xi64>) -> tensor<i64>
     %extracted = tensor.extract %1[] : tensor<i64>
@@ -699,7 +699,7 @@ module @test_paulirot {
     }
 
     // CHECK: my_paulirot_decomp
-    func.func private @my_paulirot_decomp(%inreg : !quantum.reg, %angle_tensor : tensor<f64>, %q_tensor : tensor<3xi64>) -> !quantum.reg attributes {target_gate = "PauliRot{theta:[f64]}{wires:3}{pauli_word:ZXY}"} {
+    func.func private @my_paulirot_decomp(%inreg : !quantum.reg, %angle_tensor : tensor<f64>, %q_tensor : tensor<3xi64>) -> !quantum.reg attributes {target_gate = "PauliRot{theta:[f64]}{wires:3}{pauli_word = \22ZXY\22}"} {
         %pi_by_2 = arith.constant 1.57 : f64
         %m_pi_by_2 = arith.constant -1.57 : f64
         %angle = tensor.extract %angle_tensor[] : tensor<f64>
