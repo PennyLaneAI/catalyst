@@ -14,23 +14,62 @@
 
 """Python implementation of Graph Operator ID."""
 
+import contextlib
 from collections.abc import Mapping, Sequence
 from typing import Any
 
 import jax.numpy as jnp
 import pennylane as qp
+from jax._src.lib.mlir import ir
 from pennylane.pytrees import flatten
 
 from catalyst.decomposition.type_utils import (
     convert_item_to_mlir_type,
-    format_dynamic_params_for_id,
-    format_static_data_dict_for_id,
     post_process_concretize_leaves,
     replace_wires_with_placeholder_wires,
 )
 from catalyst.from_plxpr.uid import generate_uid
+from catalyst.jax_extras.lowering import get_mlir_attribute_from_pyval
 
 _SPECIAL_LOWERINGS = {}
+
+
+@contextlib.contextmanager
+def _attribute_context():
+    """Provide an MLIR context and location for attribute construction."""
+    if current := ir.Context.current:
+        with ir.Location.unknown(context=current):
+            yield current
+    else:
+        with ir.Context() as context, ir.Location.unknown(context=context):
+            yield context
+
+
+def format_static_data_dict_for_id(static_data):
+    """Format the static-data group of a GraphOpID with MLIR's attribute printer."""
+    with _attribute_context():
+        attrs = {name: get_mlir_attribute_from_pyval(value) for name, value in static_data.items()}
+        return str(ir.DictAttr.get(attrs))
+
+
+def format_dynamic_params_for_id(dynamic_shape):
+    """Format the dynamic-parameter group of a GraphOpID."""
+
+    def handle_item(item):
+        match item:
+            case str():
+                return item
+            case list() | tuple():
+                return "[" + ",".join(handle_item(i) for i in item) + "]"
+
+    return (
+        "{"
+        + ",".join(
+            name + ":" + "[" + ",".join(handle_item(item) for item in types) + "]"
+            for name, types in dynamic_shape.items()
+        )
+        + "}"
+    )
 
 
 def build_graph_op_id(
