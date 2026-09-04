@@ -29,64 +29,92 @@ from catalyst.utils.exceptions import PlxprCaptureCFCompatibilityError
 class TestLoopToJaxpr:
     """Collection of tests that examine the generated JAXPR of loops."""
 
-    def test_while_loop(self):
+    @pytest.mark.parametrize("estimated_iterations", [None, 10, 4.3])
+    def test_while_loop(self, estimated_iterations):
         """Check the while loop JAXPR."""
 
-        expected = dedent("""
-            { lambda ; a:f64[]. let
+        expected = dedent(f"""
+            {{ lambda ; a:f64[]. let
                 b:i64[] c:f64[] = while_loop[
-                  body_jaxpr={ lambda ; d:i64[] e:f64[]. let
+                  body_jaxpr={{ lambda ; d:i64[] e:f64[]. let
                       f:i64[] = add d 1:i64[]
-                    in (f, e) }
+                    in (f, e) }}
                   body_nconsts=0
-                  cond_jaxpr={ lambda ; g:i64[] h:f64[]. let
+                  cond_jaxpr={{ lambda ; g:i64[] h:f64[]. let
                       i:bool[] = lt g 10:i64[]
-                    in (i,) }
+                    in (i,) }}
                   cond_nconsts=0
+                  estimated_iterations={estimated_iterations}
                   num_implicit_inputs=0
                   preserve_dimensions=True
                 ] 0:i64[] a
-              in (b, c) }
+              in (b, c) }}
             """)
 
         @qjit
         def circuit(x: float):
-            @while_loop(lambda v: v[0] < 10)
+            @while_loop(lambda v: v[0] < 10, estimated_iterations=estimated_iterations)
             def loop(v):
                 return v[0] + 1, v[1]
 
             return loop((0, x))
 
+        circuit(0.5)
         result = circuit.jaxpr.pretty_print(use_color=False).strip()
         assert expected.strip() == result
 
-    def test_for_loop(self):
+    @pytest.mark.parametrize("estimated_iterations", [None, 10, 4.3])
+    def test_for_loop(self, estimated_iterations):
         """Check the for loop JAXPR."""
 
-        expected = dedent("""
-            { lambda ; a:f64[] b:i64[]. let
+        expected = dedent(f"""
+            {{ lambda ; a:f64[] b:i64[]. let
                 c:i64[] d:f64[] = for_loop[
                   apply_reverse_transform=False
-                  body_jaxpr={ lambda ; e:i64[] f:i64[] g:f64[]. let
+                  body_jaxpr={{ lambda ; e:i64[] f:i64[] g:f64[]. let
                       h:i64[] = add f 1:i64[]
-                    in (h, g) }
+                    in (h, g) }}
                   body_nconsts=0
+                  estimated_iterations={estimated_iterations}
                   num_implicit_inputs=0
                   preserve_dimensions=True
                 ] 0:i64[] b 1:i64[] 0:i64[] 0:i64[] a
-              in (c, d) }
+              in (c, d) }}
         """)
 
         @qjit
         def circuit(x: float, n: int):
-            @for_loop(0, n, 1)
+            @for_loop(0, n, 1, estimated_iterations=estimated_iterations)
             def loop(_, v):
                 return v[0] + 1, v[1]
 
             return loop((0, x))
 
+        circuit(0.5, 3)
         result = circuit.jaxpr.pretty_print(use_color=False).strip()
         assert expected.strip() == result
+
+
+class TestEstimatedIterationsValidation:
+    """Validation of the ``estimated_iterations`` resource hint for loops."""
+
+    @pytest.mark.parametrize("bad", [-1, -0.5])
+    def test_for_loop_negative_raises(self, bad):
+        """A negative ``estimated_iterations`` on a for loop is rejected at construction."""
+        with pytest.raises(ValueError, match="must be a non-negative int or float"):
+
+            @for_loop(0, 10, 1, estimated_iterations=bad)
+            def loop(_, v):  # pylint: disable=unused-variable
+                return v
+
+    @pytest.mark.parametrize("bad", [-1, -0.5])
+    def test_while_loop_negative_raises(self, bad):
+        """A negative ``estimated_iterations`` on a while loop is rejected at construction."""
+        with pytest.raises(ValueError, match="must be a non-negative int or float"):
+
+            @while_loop(lambda v: v < 10, estimated_iterations=bad)
+            def loop(v):  # pylint: disable=unused-variable
+                return v + 1
 
 
 class TestWhileLoops:
@@ -331,7 +359,7 @@ class TestForLoops:
         assert circuit(1)
         assert not circuit(2)
 
-    def test_loop_caried_values(self, backend):
+    def test_loop_carried_values(self, backend):
         """Test for loop with updating loop carried values."""
 
         @qjit

@@ -31,6 +31,8 @@ from catalyst.jax_primitives import (
     extract_scalar,
     get_call_jaxpr,
     safe_cast_to_f64,
+    set_estimated_iterations_attr,
+    unconditional_to_conditional_if_probs,
 )
 
 # Fake some arguments used by functions to be tested.
@@ -133,6 +135,63 @@ class TestHelpers:
             ir_value = ir_constant(test_input)
             with pytest.raises(TypeError, match="Operator TestOp expected a scalar value"):
                 extract_scalar(ir_value, "TestOp", "value")
+
+
+class TestUnconditionalToConditionalIfProbs:
+    """Unit tests for the unconditional->conditional branch-probability conversion used when
+    lowering ``cond``/``switch`` resource hints to nested ``scf.if`` probabilities."""
+
+    def test_none_passthrough(self):
+        """``None`` (no hint provided) is passed through unchanged."""
+        assert unconditional_to_conditional_if_probs(None) is None
+
+    def test_empty(self):
+        """An empty sequence converts to an empty tuple."""
+        assert unconditional_to_conditional_if_probs(()) == ()
+
+    @pytest.mark.parametrize(
+        "unconditional, expected",
+        [
+            ((0.3,), (0.3,)),
+            ((0.2, 0.6, 0.1), (0.2, 0.75, 0.5)),
+            ((0.5, 0.25), (0.5, 0.5)),
+        ],
+    )
+    def test_conversion(self, unconditional, expected):
+        """Unconditional per-branch probabilities convert to the expected conditional ones."""
+        result = unconditional_to_conditional_if_probs(unconditional)
+        assert result == pytest.approx(expected)
+
+    def test_exhausted_mass_yields_zero(self):
+        """Once the probability mass is fully consumed, later branches are unreachable and
+        receive a conditional probability of 0 (rather than dividing by zero)."""
+        result = unconditional_to_conditional_if_probs((0.5, 0.5, 0.3))
+        assert result == pytest.approx((0.5, 1.0, 0.0))
+
+    @pytest.mark.parametrize(
+        "unconditional",
+        [(0.2, 0.6, 0.1), (0.5, 0.25), (0.1, 0.1, 0.1, 0.1), (1.0,)],
+    )
+    def test_roundtrip_recovers_unconditional(self, unconditional):
+        """Applying the conditional probabilities as a cascade (the way the resource analysis
+        weights branches) must recover the original unconditional probabilities."""
+        conditional = unconditional_to_conditional_if_probs(unconditional)
+
+        recovered = []
+        remaining = 1.0
+        for cond_prob in conditional:
+            weight = remaining * cond_prob
+            recovered.append(weight)
+            remaining -= weight
+
+        assert tuple(recovered) == pytest.approx(unconditional)
+
+
+def test_set_estimated_iterations_attr_rejects_negative():
+    """A negative ``estimated_iterations`` is rejected before any MLIR attribute is set, so no
+    operation is required to trigger the guard."""
+    with pytest.raises(ValueError, match="'estimated_iterations' must be non-negative"):
+        set_estimated_iterations_attr(None, -1.0)
 
 
 def test_get_call_jaxpr():
