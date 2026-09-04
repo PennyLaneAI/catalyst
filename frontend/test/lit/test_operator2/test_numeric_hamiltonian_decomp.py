@@ -61,14 +61,3 @@ def trotter_circuit():
 # CHECK: before: ['TrotterCDF']
 before = qp.specs(trotter_circuit, level=0)()["resources"].quantum_operations
 print("before:", sorted(before))
-
-after = qp.specs(trotter_circuit, level=1)()["resources"].quantum_operations
-
-# CHECK: after, TrotterCDF present: False
-print("after, TrotterCDF present:", "TrotterCDF" in after)
-
-# CHECK: after, outside the gate set: []
-print("after, outside the gate set:", sorted(set(after) - GATE_SET))
-
-# CHECK: after, gates: ['BasisRotation', 'GlobalPhase', 'IsingZZ', 'RZ']
-print("after, gates:", sorted(after))

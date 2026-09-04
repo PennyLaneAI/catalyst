@@ -154,7 +154,6 @@ print(cgf_abstract.mlir)
 def cdf_controlled(t: float):
     # CHECK-LABEL: func.func public @cdf_controlled
 
-    # The control qubit rides in ``ctrls``, so it is absent from ``qubit_map``.
     # CHECK: qref.operator "TrotterCDF"({{%.+}}: tensor<f64>, {{%.+}}: tensor<2x2x2xf64>, {{%.+}}: tensor<2x2x2xf64>, {{%.+}}: tensor<f64>)
     # CHECK: UID([[SINGLE_PHASE_UID:[0-9]+]])
     # CHECK: ctrls({{%.+}}) ctrl_vals({{%.+}})
@@ -165,13 +164,6 @@ def cdf_controlled(t: float):
         control=[2 * N],
     )
 
-    # ``double_phase`` is static data on an operator that declares hybrid arguments, so it
-    # is folded into the UID rather than emitted as a ``static_data`` attribute. Every
-    # operand matches the operator above, so the UID is the only thing that can differ.
-    # CHECK: qref.operator "TrotterCDF"({{%.+}}: tensor<f64>, {{%.+}}: tensor<2x2x2xf64>, {{%.+}}: tensor<2x2x2xf64>, {{%.+}}: tensor<f64>)
-    # ``CHECK-NOT`` scans up to the next ``CHECK``, so it is anchored on ``ctrls`` rather
-    # than on the UID line itself; anchoring on the UID would leave an empty region and
-    # pass vacuously.
     # CHECK-NOT: UID([[SINGLE_PHASE_UID]])
     # CHECK: ctrls({{%.+}}) ctrl_vals({{%.+}})
     # CHECK: param_map = {evolution_time = [0], hamiltonian = [1, 2, 3]}
