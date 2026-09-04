@@ -1,0 +1,118 @@
+name: Check Catalyst GPU
+
+# Runs the runtime transport tests on a GPU host. To keep GPU runner time cheap, pull requests
+# only trigger a run once labeled ``gpu``; ``push`` to main runs unconditionally.
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - "runtime/lib/transport/**"
+      - "runtime/include/Transport*"
+      - "runtime/tests/Test_Transport*"
+      - "mlir/lib/Transport/**"
+      - "mlir/include/Transport/**"
+      - "frontend/catalyst/backline.py"
+      - ".github/workflows/check-catalyst-gpu.yaml"
+  pull_request:
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - ready_for_review
+      - labeled
+    paths:
+      - "runtime/lib/transport/**"
+      - "runtime/include/Transport*"
+      - "runtime/tests/Test_Transport*"
+      - "mlir/lib/Transport/**"
+      - "mlir/include/Transport/**"
+      - "frontend/catalyst/backline.py"
+      - ".github/workflows/check-catalyst-gpu.yaml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  constants:
+    name: Set build matrix
+    uses: ./.github/workflows/constants.yaml
+
+  gpu-transport-tests:
+    name: Runtime transport tests (GPU)
+    needs: [constants]
+    runs-on:
+      - single-gpu-x64
+
+    # Push always runs; PRs need a non-draft open state and the ``gpu`` label.
+    if: >-
+      ${{
+        github.event_name == 'push' ||
+        github.event_name == 'workflow_dispatch' ||
+        (
+          github.event_name == 'pull_request' &&
+          github.event.pull_request.draft == false &&
+          contains(github.event.pull_request.labels.*.name, 'gpu')
+        )
+      }}
+
+    steps:
+      - name: Update PATH and LD_LIBRARY_PATH for CUDA
+        run: |
+          echo "/usr/local/cuda/bin" >> $GITHUB_PATH
+          echo "LD_LIBRARY_PATH=/usr/local/cuda/lib64${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}" >> $GITHUB_ENV
+
+      - name: Checkout Catalyst repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ needs.constants.outputs.primary_python_version }}
+
+      - name: Install Python build dependencies
+        run: |
+          python3 -m pip install "cmake>=3.26" ninja "nanobind<2.13" pybind11 numpy PyYAML
+
+      - name: Get Cached LLVM Source
+        id: cache-llvm-source
+        uses: actions/cache/restore@v4
+        with:
+          path: mlir/llvm-project
+          key: llvm-${{ needs.constants.outputs.llvm_version }}-default-source
+          enableCrossOsArchive: true
+
+      - name: Clone LLVM Submodule
+        if: steps.cache-llvm-source.outputs.cache-hit != 'true'
+        uses: actions/checkout@v4
+        with:
+          repository: llvm/llvm-project
+          ref: ${{ needs.constants.outputs.llvm_version }}
+          path: mlir/llvm-project
+
+      # The runtime configure + build only needs LLVM source headers (MLIR_INCLUDE_DIRS
+      # -> mlir/llvm-project/mlir/include, header-only via rt_capi). No built-LLVM
+      # artifacts are consumed as long as ENABLE_EXECUTOR stays OFF, which it does here.
+      - name: Build Catalyst-Runtime with transport enabled
+        run: |
+          COMPILER_LAUNCHER="" \
+          C_COMPILER=$(which gcc) \
+          CXX_COMPILER=$(which g++) \
+          RT_BUILD_DIR="$(pwd)/runtime-build" \
+          LLVM_SRC_DIR="$(pwd)/mlir/llvm-project" \
+          ENABLE_TRANSPORT=ON \
+          make runtime
+
+      - name: Build the memcpy test binary
+        run: |
+          cmake --build "$(pwd)/runtime-build" --target runner_tests_transport_memcpy -j
+
+      - name: Run memcpy transport tests
+        run: |
+          "$(pwd)/runtime-build/tests/runner_tests_transport_memcpy"
+

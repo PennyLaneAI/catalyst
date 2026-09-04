@@ -109,7 +109,7 @@ std::string pythonRuleLowering(catalyst::quantum::DecomposableGate op) {
     QuantumPythonDecompositions::PyInterpreterGuard guard;
     std::string mlirText = guard.withGil([&] -> std::string {
         const char *moduleName = "catalyst.decomposition.decomposition_rules";
-        const char *functionName = "compile_decomposition_rules_wrapper";
+        const char *functionName = "compile_reachable_decomposition_rules_wrapper";
 
         try {
             auto tmp = op.getDynamicShape();

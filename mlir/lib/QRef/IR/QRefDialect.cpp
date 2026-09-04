@@ -19,6 +19,7 @@
 #include "llvm/ADT/TypeSwitch.h" // needed for generated type parser
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/DialectImplementation.h" // needed for generated type parser
+#include "mlir/Transforms/InliningUtils.h"
 
 #include "QRef/IR/QRefOps.h"
 
@@ -30,6 +31,8 @@ using namespace catalyst::qref;
 //===----------------------------------------------------------------------===//
 
 #include "QRef/IR/QRefOpsDialect.cpp.inc"
+
+namespace {
 
 static ParseResult parseQuregTypeBody(AsmParser &parser, IntegerAttr &size) {
     // Parse allocation size: `?` or non-negative integer
@@ -65,6 +68,24 @@ static void printQuregTypeBody(AsmPrinter &printer, IntegerAttr size) {
     }
 }
 
+// This class defines the interface for handling inlining for qref
+// dialect operations.
+// Similar to the scf dialect, we allow all inlining.
+struct QrefInlinerInterface : public DialectInlinerInterface {
+    using DialectInlinerInterface::DialectInlinerInterface;
+
+    // We don't have any special restrictions on what can be inlined into
+    // destination regions (e.g. qref.adjoint/ctrl bodies). Always allow it.
+    bool isLegalToInline(Region *dest, Region *src, bool wouldBeCloned,
+                         IRMapping &valueMapping) const final {
+        return true;
+    }
+
+    // Operations in qref dialect are always legal to inline.
+    bool isLegalToInline(Operation *, Region *, bool, IRMapping &) const final { return true; }
+};
+} // namespace
+
 void QRefDialect::initialize() {
     addTypes<
 #define GET_TYPEDEF_LIST
@@ -75,6 +96,8 @@ void QRefDialect::initialize() {
 #define GET_OP_LIST
 #include "QRef/IR/QRefOps.cpp.inc"
         >();
+
+    addInterfaces<QrefInlinerInterface>();
 }
 
 //===----------------------------------------------------------------------===//
