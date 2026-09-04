@@ -12,6 +12,11 @@ llvm_map_components_to_libnames(_executor_llvm_libs
     AllTargetsCodeGens AllTargetsDescs AllTargetsInfos
 )
 
+# False positive in LLVM's unique_function (ADT/FunctionExtras.h), reached via ORC headers.
+if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    add_compile_options(-Wno-error=maybe-uninitialized)
+endif()
+
 #  catalyst_executor_session
 add_library(catalyst_executor_session SHARED ExecutorSession.cpp)
 

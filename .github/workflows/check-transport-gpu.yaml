@@ -1,7 +1,6 @@
 name: Check Catalyst GPU
 
-# Runs the runtime transport tests on a GPU host. To keep GPU runner time cheap, pull requests
-# only trigger a run once labeled ``gpu``; ``push`` to main runs unconditionally.
+# Runs the transport tests on a GPU host. PRs need the ``gpu`` label; pushes to main always run.
 
 on:
   push:
@@ -13,7 +12,9 @@ on:
       - "mlir/lib/Transport/**"
       - "mlir/include/Transport/**"
       - "frontend/catalyst/backline.py"
-      - ".github/workflows/check-catalyst-gpu.yaml"
+      - "frontend/test/pytest/test_backline.py"
+      - "frontend/test/pytest/conftest.py"
+      - ".github/workflows/check-transport-gpu.yaml"
   pull_request:
     types:
       - opened
@@ -28,14 +29,18 @@ on:
       - "mlir/lib/Transport/**"
       - "mlir/include/Transport/**"
       - "frontend/catalyst/backline.py"
-      - ".github/workflows/check-catalyst-gpu.yaml"
+      - "frontend/test/pytest/test_backline.py"
+      - "frontend/test/pytest/conftest.py"
+      - ".github/workflows/check-transport-gpu.yaml"
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  # Keyed on the commit: a pull_request and a dispatch of the same commit carry different refs,
+  # so a ref-keyed group let both run and contend for the single GPU.
+  group: ${{ github.workflow }}-${{ github.event.pull_request.head.sha || github.sha }}
   cancel-in-progress: true
 
 jobs:
@@ -49,7 +54,6 @@ jobs:
     runs-on:
       - single-gpu-x64
 
-    # Push always runs; PRs need a non-draft open state and the ``gpu`` label.
     if: >-
       ${{
         github.event_name == 'push' ||
@@ -95,9 +99,7 @@ jobs:
           ref: ${{ needs.constants.outputs.llvm_version }}
           path: mlir/llvm-project
 
-      # The runtime configure + build only needs LLVM source headers (MLIR_INCLUDE_DIRS
-      # -> mlir/llvm-project/mlir/include, header-only via rt_capi). No built-LLVM
-      # artifacts are consumed as long as ENABLE_EXECUTOR stays OFF, which it does here.
+      # Only LLVM source headers are needed here (header-only via rt_capi), ENABLE_EXECUTOR is OFF.
       - name: Build Catalyst-Runtime with transport enabled
         run: |
           COMPILER_LAUNCHER="" \
@@ -108,6 +110,27 @@ jobs:
           ENABLE_TRANSPORT=ON \
           make runtime
 
+      - name: Verify the GPU coprocessor backend was built
+        # gpu_transport_backend skips when this .so is absent, which reads as "tests passed". It
+        # exists only when CMake set TRANSPORT_HAS_HIP, so on a miss dump what CMake resolved.
+        run: |
+          name=libcatalyst_transport_memcpy_gpu_coprocessor.so
+          if find "$(pwd)/runtime-build/lib" -name "$name" | grep -q .; then
+            find "$(pwd)/runtime-build/lib" -name "$name" -exec ls -l {} +
+            exit 0
+          fi
+          echo "$name was not built. Why:"
+          echo "--- what CMake resolved ---"
+          grep -E "^(_nvcc|_hip_include_dir|CMAKE_HIP_PLATFORM|CMAKE_HIP_COMPILER|TRANSPORT_HIP_PACKAGES)" \
+            "$(pwd)/runtime-build/CMakeCache.txt" || echo "(no HIP entries in the cache at all)"
+          echo "--- nvcc on this host ---"
+          command -v nvcc || echo "nvcc not on PATH"
+          ls -l /usr/local/cuda/bin/nvcc 2>/dev/null || echo "no /usr/local/cuda/bin/nvcc"
+          echo "--- fetched headers, if any ---"
+          ls -d "$(pwd)/runtime-build/hip-headers/payload/opt/rocm-"* 2>/dev/null \
+            || echo "(no fetched header tree: the fetch never ran)"
+          exit 1
+
       - name: Build the memcpy test binary
         run: |
           cmake --build "$(pwd)/runtime-build" --target runner_tests_transport_memcpy -j
@@ -115,4 +138,132 @@ jobs:
       - name: Run memcpy transport tests
         run: |
           "$(pwd)/runtime-build/tests/runner_tests_transport_memcpy"
+
+      # No ROCm install needed: lib/transport/CMakeLists.txt fetches the HIP headers, nvcc drives them.
+
+      # Not reused from check-catalyst.yaml: its GH-hosted mlir-tblgen hits a GLIBC mismatch here.
+      - name: Build LLVM, StableHLO and Enzyme
+        uses: ./.github/actions/build-mlir-stack
+        with:
+          llvm-version: ${{ needs.constants.outputs.llvm_version }}
+          stablehlo-version: ${{ needs.constants.outputs.stablehlo_version }}
+          enzyme-version: ${{ needs.constants.outputs.enzyme_version }}
+
+      - name: Install Python runtime requirements
+        run: |
+          python3 -m pip install -r requirements.txt
+
+      - name: Set up Triton and its CUDA driver
+        # Triton dlopens libcuda.so.1, which ships with the driver, not the toolkit -- the stubs
+        # copy links but cannot initialize a device ("0 active drivers"). Resolve the real one.
+        run: |
+          set -euo pipefail
+          # torch is here only so triton <3.8 can probe the driver through it; nothing imports
+          # it. cu129 matches the gpu_runners driver -- the default torch targets CUDA 13 and
+          # leaves torch.cuda.is_available() false. The cap restates what 2.13.0+cu129 already
+          # resolves (triton 3.7.1), so a bump past 3.8 -- whose PTX this ptxas rejects -- fails
+          # while resolving instead of inside triton.jit.
+          pip install 'torch==2.13.0+cu129' 'triton<3.8' \
+            --index-url https://download.pytorch.org/whl/cu129
+
+          # `|| true`: grep exits 1 on no match, which under pipefail aborts before the diagnostic.
+          libcuda=$(ldconfig -p | awk '/libcuda\.so\.1/ {print $NF}' | grep -v /stubs/ | head -1 || true)
+          if [ -z "$libcuda" ]; then
+            libcuda=$(find /usr/lib /usr/lib64 -name 'libcuda.so.1' -not -path '*/stubs/*' 2>/dev/null | head -1 || true)
+          fi
+          if [ -z "$libcuda" ]; then
+            echo "No real libcuda.so.1 here -- only the toolkit stub, if that."
+            nvidia-smi || echo "nvidia-smi unavailable"
+            ldconfig -p | grep -i libcuda || echo "(no libcuda in the loader cache at all)"
+            exit 1
+          fi
+
+          libcuda_dir=$(dirname "$libcuda")
+          echo "libcuda: $libcuda"
+          export TRITON_LIBCUDA_PATH="$libcuda_dir"
+          export LD_LIBRARY_PATH="$libcuda_dir${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
+          echo "TRITON_LIBCUDA_PATH=$libcuda_dir" >> $GITHUB_ENV
+          echo "LD_LIBRARY_PATH=$LD_LIBRARY_PATH" >> $GITHUB_ENV
+
+          # driver.active raises on 0 or >1 drivers -- the same call conftest turns into a skip.
+          python3 - <<'PY'
+          import subprocess
+          import triton
+          from triton.backends.nvidia.compiler import get_ptxas
+          from triton.runtime.driver import driver
+
+          print("triton", triton.__version__, "| active driver:", driver.active)
+          # Triton bundles its own ptxas, so nvcc's version does not imply it. Best-effort only.
+          try:
+              ptxas = get_ptxas(driver.active.get_current_target().arch).path
+              print(subprocess.run([ptxas, "--version"], capture_output=True, text=True).stdout)
+          except Exception as exc:  # noqa: BLE001 - diagnostic only
+              print("could not resolve triton's bundled ptxas:", exc)
+          PY
+
+      - name: Build Catalyst frontend (reusing the transport-enabled runtime)
+        run: |
+          # precompile_decomposition_rules runs at the end of `make frontend`, before the step that
+          # exports these for the rest of the job. Without CATALYST_LIB_DIR it is skipped with only
+          # a warning, and rules are derived during tracing where a signature mismatch aborts.
+          export PYTHONPATH="${PYTHONPATH:-}:$(pwd)/quantum-build/python_packages/quantum"
+          export CATALYST_LIB_DIR="$(pwd)/quantum-build/lib"
+          COMPILER_LAUNCHER="" \
+          C_COMPILER=$(which gcc) \
+          CXX_COMPILER=$(which g++) \
+          ENABLE_LLD=ON \
+          RT_BUILD_DIR="$(pwd)/runtime-build" \
+          LLVM_BUILD_DIR="$(pwd)/llvm-build" \
+          STABLEHLO_BUILD_DIR="$(pwd)/stablehlo-build" \
+          ENZYME_BUILD_DIR="$(pwd)/enzyme-build" \
+          DIALECTS_BUILD_DIR="$(pwd)/quantum-build" \
+          ENABLE_TRANSPORT=ON \
+          make catalyst
+
+      - name: Add Frontend Dependencies to PATH
+        run: |
+          echo "$(pwd)/llvm-build/bin" >> $GITHUB_PATH
+          echo "$(pwd)/quantum-build/bin" >> $GITHUB_PATH
+          echo "PYTHONPATH=${PYTHONPATH:-}:$(pwd)/quantum-build/python_packages/quantum" >> $GITHUB_ENV
+          echo "RUNTIME_LIB_DIR=$(pwd)/runtime-build/lib" >> $GITHUB_ENV
+          echo "MLIR_LIB_DIR=$(pwd)/llvm-build/lib" >> $GITHUB_ENV
+          echo "CATALYST_BIN_DIR=$(pwd)/quantum-build/bin" >> $GITHUB_ENV
+          echo "CATALYST_LIB_DIR=$(pwd)/quantum-build/lib" >> $GITHUB_ENV
+          echo "CATALYST_TRANSPORT_PATH=$(pwd)/runtime-build/lib" >> $GITHUB_ENV
+
+      - name: Run backline GPU integration tests
+        id: gpu-tests
+        env:
+          # Without this Triton discards ptxas diagnostics, leaving codegen failures as "status 255".
+          TRITON_DUMP_PTXAS_LOG: "1"
+        # CPU-CPU memcpy is covered by check-catalyst.yaml; these three need the local GPU. Two
+        # fixtures gate them: gpu_transport_backend (the coproc .so built above) and
+        # gpu_triton_platform (the only one able to skip everything). -rs makes skips visible.
+        run: |
+          python3 -m pytest -v -rs --junit-xml=gpu-backline-results.xml \
+            "frontend/test/pytest/test_backline.py::TestBacklineDemoIntegration::test_cpu_controller_to_gpu_coproc_memcpy_precompiled" \
+            "frontend/test/pytest/test_backline.py::TestBacklineDemoIntegration::test_cpu_controller_to_gpu_coproc_triton_css_bp" \
+            "frontend/test/pytest/test_backline.py::TestBacklineDemoIntegration::test_cpu_controller_to_gpu_coproc_memcpy_manual_qec"
+
+      - name: Require at least one GPU test to have executed
+        # pytest exits 0 when every selected test is skipped, so the job would report success
+        # covering nothing after ~20 min of GPU time. Guarded on the tests having actually run:
+        # an earlier failure leaves no junit file, and failing here would bury the real error.
+        if: always() && steps.gpu-tests.outcome != 'skipped'
+        run: |
+          python3 - <<'EOF'
+          import sys
+          import xml.etree.ElementTree as ET
+
+          root = ET.parse("gpu-backline-results.xml").getroot()
+          suite = root if root.tag == "testsuite" else root.find("testsuite")
+          total = int(suite.get("tests", 0))
+          skipped = int(suite.get("skipped", 0))
+          print(f"{total - skipped}/{total} backline GPU tests executed ({skipped} skipped)")
+          if total == 0 or skipped == total:
+              sys.exit(
+                  "No backline GPU test executed -- all selected tests were skipped. "
+                  "Refusing to report success for a run with zero GPU coverage."
+              )
+          EOF
 

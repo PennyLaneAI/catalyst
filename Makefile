@@ -149,11 +149,11 @@ builtin-decomp-rules: dialects runtime frontend
 dialect-docs:
 	$(MAKE) -C mlir dialect-docs
 
-# TODO: executor links LLVM and finds it through LLVM_DIR. This creates a dependancy between runtime and 
-# LLVM. For now we can run LLVM once in the begining if ENABLE_EXECUTOR is specified. The better
-# solution is perhaps to detactch the executor from runtime into its own target.
+# The executor links LLVM via find_package(LLVM CONFIG REQUIRED), coupling runtime to it.
+# `llvm`, not `mlir`: the executor links no stablehlo, enzyme, or dialects.
+# TODO: detach the executor into its own target instead of this dependency.
 ifeq ($(ENABLE_EXECUTOR), ON)
-runtime: mlir
+runtime: llvm
 endif
 
 runtime:
@@ -162,7 +162,7 @@ runtime:
 oqc:
 	$(MAKE) -C frontend/catalyst/third_party/oqc/src oqc
 
-.PHONY: test test-runtime test-frontend lit pytest test-demos test-oqc test-toml-spec
+.PHONY: test test-runtime test-runtime-transport test-frontend lit pytest test-demos test-oqc test-toml-spec
 test: test-runtime test-frontend test-demos
 
 test-toml-spec:
@@ -170,6 +170,9 @@ test-toml-spec:
 
 test-runtime:
 	$(MAKE) -C runtime test
+
+test-runtime-transport:
+	$(MAKE) -C runtime test-transport ENABLE_TRANSPORT=ON
 
 test-mlir:
 	$(MAKE) -C mlir test

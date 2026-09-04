@@ -34,9 +34,22 @@ jobs:
       multiple_compilers: ${{ github.trigger == 'push' && github.ref_name == 'main' }}
       runs_on: ${{ needs.determine_runner.outputs.runner_group }}
 
+  transport_changes:
+    name: "Detect transport changes"
+    runs-on: ubuntu-latest
+    outputs:
+      transport: ${{ steps.filter.outputs.transport }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0        # need history to diff against the base ref
+
+      - id: filter
+        uses: ./.github/actions/transport-path-filter
+
   runtime:
     name: Catalyst-Runtime Build
-    needs: [constants, determine_runner]
+    needs: [constants, transport_changes, determine_runner, llvm]
     runs-on: ${{ needs.determine_runner.outputs.runner_group }}
     strategy:
       matrix:
@@ -54,8 +67,10 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get -y -q install ninja-build make cmake clang
-          python3 -m pip install "nanobind<2.13" pybind11
+          # libibverbs-dev: without it the RDMA backends are silently skipped at configure time.
+          # ccache is picked up by runtime/Makefile's COMPILER_LAUNCHER default.
+          sudo apt-get -y -q install ninja-build make cmake ccache clang libibverbs-dev
+          python3 -m pip install "nanobind<2.13" pybind11 numpy PyYAML
 
       - name: Get Cached LLVM Source
         id: cache-llvm-source
@@ -73,18 +88,46 @@ jobs:
           ref: ${{ needs.constants.outputs.llvm_version }}
           path: mlir/llvm-project
 
+      # Key is job+compiler scoped: sharing with the quantum job's disjoint TUs means ~0% hits.
+      - name: Restore CCache on feature branches
+        id: restore-ccache
+        if: ${{ github.ref != 'refs/heads/main' }}
+        uses: actions/cache/restore@v4
+        with:
+          path: .ccache
+          key: ${{ runner.os }}-ccache-runtime-${{ matrix.compiler }}-${{ github.run_id }}
+          restore-keys: ${{ runner.os }}-ccache-runtime-${{ matrix.compiler }}-
+
+      # Restore instead of letting Makefile's `runtime: llvm` rebuild into another dir (~9 min).
+      - name: Get Cached LLVM Build
+        if: needs.transport_changes.outputs.transport == 'true' && matrix.compiler == 'gcc'
+        uses: actions/cache/restore@v4
+        with:
+          path: llvm-build
+          key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-ci-build-${{ matrix.compiler }}
+          fail-on-cache-miss: true
+
       - name: Build Catalyst-Runtime
+        env:
+          # ON only for transport-touching PRs; the rest skip the transport backends entirely.
+          ENABLE_TRANSPORT: ${{ needs.transport_changes.outputs.transport == 'true' && 'ON' || 'OFF' }}
+          # The out-of-process loopback test launches a catalyst-executor subprocess. gcc only:
+          # the executor links LLVM, and clang would pay that again for a binary nothing uses.
+          ENABLE_EXECUTOR: ${{ needs.transport_changes.outputs.transport == 'true' && matrix.compiler == 'gcc' && 'ON' || 'OFF' }}
         run: |
-          COMPILER_LAUNCHER="" \
+          # `-C runtime`, not the top-level target: that one would rebuild llvm despite the restore.
+          CCACHE_DIR="$(pwd)/.ccache" \
           C_COMPILER=$(which ${{ needs.constants.outputs[format('c_compiler.{0}', matrix.compiler)] }}) \
           CXX_COMPILER=$(which ${{ needs.constants.outputs[format('cxx_compiler.{0}', matrix.compiler)] }}) \
           RT_BUILD_DIR="$(pwd)/runtime-build" \
+          LLVM_BUILD_DIR="$(pwd)/llvm-build" \
           LLVM_SRC_DIR="$(pwd)/mlir/llvm-project" \
           ENABLE_ASAN=OFF \
-          ENABLE_OQD=ON \
-          make runtime
+          ENABLE_TRANSPORT="$ENABLE_TRANSPORT" \
+          ENABLE_EXECUTOR="$ENABLE_EXECUTOR" \
+          make -C runtime runtime ENABLE_OQD=ON
 
-          COMPILER_LAUNCHER="" \
+          CCACHE_DIR="$(pwd)/.ccache" \
           C_COMPILER=$(which ${{ needs.constants.outputs[format('c_compiler.{0}', matrix.compiler)] }}) \
           CXX_COMPILER=$(which ${{ needs.constants.outputs[format('cxx_compiler.{0}', matrix.compiler)] }}) \
           RT_BUILD_DIR="$(pwd)/runtime-build" \
@@ -92,13 +135,35 @@ jobs:
           LLVM_SRC_DIR="$(pwd)/mlir/llvm-project" \
           make oqc
 
+      # gcc only: the tests aren't compiler-sensitive, so running them under both compilers on
+      # push-to-main just burns runner time. Soft-RoCE also mutates the runner's RDMA links.
+      - name: Set up Soft-RoCE loopback (transport tests only)
+        if: needs.transport_changes.outputs.transport == 'true' && matrix.compiler == 'gcc'
+        uses: ./.github/actions/setup-soft-roce
+
+      - name: Run transport C++ test suite (Catch2 + soft-RoCE loopback)
+        if: needs.transport_changes.outputs.transport == 'true' && matrix.compiler == 'gcc'
+        run: |
+          # Same ENABLE_* flags and RT_BUILD_DIR as the Build step, so `test_runner: configure`
+          # does not reset the cmake cache and drop the already-built .sos.
+          CCACHE_DIR="$(pwd)/.ccache" \
+          C_COMPILER=$(which gcc) \
+          CXX_COMPILER=$(which g++) \
+          RT_BUILD_DIR="$(pwd)/runtime-build" \
+          LLVM_DIR="$(pwd)/mlir/llvm-project" \
+          ENABLE_OQD=ON \
+          ENABLE_TRANSPORT=ON \
+          make test-runtime-transport
+
       - name: Upload Catalyst-Runtime Artifact
         uses: actions/upload-artifact@v4
         with:
           name: runtime-build-${{ matrix.compiler }}
+          # catalyst-executor exists only on transport PRs; if-no-files-found stays `warn`.
           path: |
             runtime-build/lib/*.so
             runtime-build/lib/backend/*.toml
+            runtime-build/lib/catalyst-executor
           retention-days: 1
 
       - name: Upload OQC-Runtime Artifact
@@ -109,6 +174,15 @@ jobs:
             oqc-build/*.so
             oqc-build/backend/*.toml
           retention-days: 1
+
+      # Only main pushes save; feature branches read the newest main-populated cache above.
+      - name: Cache CCache on main branch
+        id: save-ccache
+        if: ${{ github.ref == 'refs/heads/main' }}
+        uses: actions/cache/save@v4
+        with:
+          path: .ccache
+          key: ${{ runner.os }}-ccache-runtime-${{ matrix.compiler }}-${{ github.run_id }}
 
   llvm:
     name: LLVM Build
@@ -463,7 +537,7 @@ jobs:
 
   frontend-tests:
     name: Frontend Tests
-    needs: [constants, llvm, runtime, quantum, determine_runner]
+    needs: [constants, transport_changes, llvm, runtime, quantum, determine_runner]
     runs-on: ${{ needs.determine_runner.outputs.runner_group }}
     strategy:
       matrix:
@@ -517,6 +591,18 @@ jobs:
         echo "CATALYST_LIB_DIR=$(pwd)/quantum-build/lib" >> $GITHUB_ENV
         chmod +x $(pwd)/quantum-build/bin/catalyst  # artifact upload does not preserve permissions
 
+    - name: Make catalyst-executor executable (transport tests only)
+      # Same permission loss as the line above, on the binary the out-of-process loopback
+      # test launches. It is found beside the runtime libraries, so it stays where it is.
+      if: needs.transport_changes.outputs.transport == 'true' && matrix.compiler == 'gcc'
+      run: chmod +x $(pwd)/runtime-build/lib/catalyst-executor
+
+    - name: Set up Soft-RoCE loopback (transport tests only)
+      # test_local_cpu_to_local_cpu_rdma_loopback runs both roles in this process and has them
+      # reach each other over rxe0 (soft-RoCE loopback).
+      if: needs.transport_changes.outputs.transport == 'true' && matrix.compiler == 'gcc'
+      uses: ./.github/actions/setup-soft-roce
+
     - name: Install Deps
       run: |
         sudo apt-get update
@@ -532,6 +618,18 @@ jobs:
       run: |
         dot -V
         dot -Tpng -o test.png <<<'digraph { a -> b }' # Verify a png can be rendered
+
+    - name: Run backline transport integration tests
+      # Only the CPU cases; the GPU-coproc ones need the self-hosted runner (check-transport-gpu).
+      if: needs.transport_changes.outputs.transport == 'true' && matrix.compiler == 'gcc'
+      env:
+        CATALYST_TRANSPORT_PATH: ${{ github.workspace }}/runtime-build/lib
+      run: |
+        # -rs so a skip is visible: pytest exits 0 on skip and these have no skip conditions,
+        # so anything reported is a regression. _rdma_loopback selects both of its cases.
+        python3 -m pytest -v -rs \
+          "frontend/test/pytest/test_backline.py::TestBacklineDemoIntegration::test_local_cpu_to_local_cpu_memcpy" \
+          "frontend/test/pytest/test_backline.py::TestBacklineDemoIntegration::test_local_cpu_to_local_cpu_rdma_loopback"
 
     - name: Run Python Pytest/Lit Tests
       run: |

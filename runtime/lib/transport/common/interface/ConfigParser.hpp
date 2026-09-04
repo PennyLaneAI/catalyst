@@ -21,6 +21,8 @@
 #include <string_view>
 #include <system_error>
 
+#include "Error.hpp"
+
 // Backend-agnostic parser for "key=value;..." config strings. No RDMA/HIP dependencies —
 // usable by every transport backend (memcpy included).
 
@@ -59,7 +61,7 @@ inline int parse_index(std::string_view val, const char *key) {
         char buf[192];
         std::snprintf(buf, sizeof(buf), "config: '%s' must be a non-negative integer, got '%.*s'",
                       key, static_cast<int>(val.size()), val.data());
-        throw std::runtime_error(buf);
+        throw TransportError(buf);
     }
     return out;
 }
