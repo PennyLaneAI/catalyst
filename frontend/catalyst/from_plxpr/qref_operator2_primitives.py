@@ -42,6 +42,7 @@ from catalyst.decomposition.graph_op_id import _SPECIAL_LOWERINGS
 from catalyst.decomposition.type_utils import (
     convert_item_to_mlir_type,
     format_dynamic_params_for_id,
+    get_dummy_values_for_arg,
 )
 from catalyst.jax_extras.lowering import get_mlir_attribute_from_pyval
 from catalyst.jax_extras.patches import mock_attributes
@@ -396,19 +397,20 @@ def compile_decomp_rules(
         for hybrid_argname, hybrid_len, hybrid_tree in zip(
             op_cls.hybrid_argnames, hybrid_lens, hybrid_trees
         ):
-            replaced_leaves = []
-            for leaf in avals_in[hybrid_arg_start_idx : hybrid_arg_start_idx + hybrid_len]:
-                if isinstance(leaf, AbstractQubit):
-                    replaced_leaves.append(ShapedArray((), dtype=int))
-                else:
-                    replaced_leaves.append(leaf)
-
+            # Rebuild the hybrid argument around traceable dummy values rather than
+            # AbstractArray specs.
             with Patcher(
                 (AbstractArray, "__hash__", lambda x: id(x)),
             ):
-                replaced_leaves = abstractify(replaced_leaves)
-                unflattened = unflatten(replaced_leaves, hybrid_tree)
-                unflattened = abstractify(unflattened)
+                dummy_leaves = []
+                next_wire_label = 0
+                for leaf in avals_in[hybrid_arg_start_idx : hybrid_arg_start_idx + hybrid_len]:
+                    if isinstance(leaf, AbstractQubit):
+                        dummy_leaves.append(next_wire_label)
+                        next_wire_label += 1
+                    else:
+                        dummy_leaves.append(get_dummy_values_for_arg(leaf))
+                unflattened = unflatten(dummy_leaves, hybrid_tree)
             extra_data[hybrid_argname] = unflattened
             hybrid_arg_start_idx += hybrid_len
 

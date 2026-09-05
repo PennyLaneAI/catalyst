@@ -126,7 +126,9 @@ def get_dummy_values_for_arg(arg):
                 # NOTE: numpy is required since jax won't create an array of strings
                 return jnp.zeros(np.array(arg, str).shape, dtype)
         case ShapedArray():
-            return jnp.zeros(arg.shape[0], dtype=arg.dtype)
+            # Use the full shape as arg.shape[0] raised IndexError for rank-0 avals
+            # and silently truncated anything of rank > 1 to its leading axis.
+            return jnp.zeros(arg.shape, dtype=arg.dtype)
         case type() | jnp.dtype():
             try:
                 return jnp.zeros((), jnp.dtype(arg))
