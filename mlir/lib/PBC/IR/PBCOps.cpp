@@ -272,6 +272,7 @@ mlir::DictionaryAttr PPMeasurementOp::getStaticData() {
     mlir::NamedAttribute pauliWordEntry = mlir::NamedAttribute(
         mlir::StringAttr::get(ctx, "pauli_word"), mlir::StringAttr::get(ctx, getPauliWord()));
 
+    // meas_uid and postselect are not lowered into PPMeasurementOp, so we set them to None
     mlir::StringAttr noneStr = mlir::StringAttr::get(ctx, "None");
     mlir::NamedAttribute measUidEntry =
         mlir::NamedAttribute(mlir::StringAttr::get(ctx, "meas_uid"), noneStr);
