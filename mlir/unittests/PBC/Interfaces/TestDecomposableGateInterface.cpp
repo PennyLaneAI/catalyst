@@ -109,3 +109,43 @@ module {
 
     ASSERT_EQ(ppr.getGraphOpId(), "PauliRot{theta:[f64]}{wires:3}{pauli_word:XYZ}");
 }
+
+TEST(DecomposableGateInterfaceTests, PPMeasurementOp) {
+    std::string moduleStr = R"mlir(
+module {
+  %q1 = quantum.alloc_qb : !quantum.bit
+  %q2 = quantum.alloc_qb : !quantum.bit
+  %mres, %out_qubits:2 = pbc.ppm ["X", "Y"] %q1, %q2 : i1, !quantum.bit, !quantum.bit
+}
+    )mlir";
+
+    DialectRegistry registry;
+    registry.insert<mlir::arith::ArithDialect, catalyst::quantum::QuantumDialect, PBCDialect>();
+    MLIRContext context(registry);
+    ParserConfig config(&context, /*verifyAfterParse=*/false);
+    OwningOpRef<ModuleOp> module = parseSourceString<ModuleOp>(moduleStr, config);
+
+    DecomposableGate ppm = *module->getOps<PPMeasurementOp>().begin();
+
+    ASSERT_EQ(ppm.getOperatorName(), "PauliMeasure");
+
+    llvm::StringMap<llvm::SmallVector<mlir::Type>> expectedDynamicShape = {};
+    ASSERT_EQ(ppm.getDynamicShape(), expectedDynamicShape);
+
+    llvm::StringMap<size_t> expectedWires = {{"wires", 2}};
+    ASSERT_EQ(ppm.getWireLens(), expectedWires);
+
+    mlir::NamedAttribute pauliWordEntry(mlir::StringAttr::get(&context, "pauli_word"),
+                                        mlir::StringAttr::get(&context, "XY"));
+    mlir::NamedAttribute measUidEntry(mlir::StringAttr::get(&context, "meas_uid"),
+                                      mlir::StringAttr::get(&context, "None"));
+    mlir::NamedAttribute postselectEntry(mlir::StringAttr::get(&context, "postselect"),
+                                         mlir::StringAttr::get(&context, "None"));
+
+    mlir::DictionaryAttr expectedStaticData =
+        mlir::DictionaryAttr::get(&context, {measUidEntry, pauliWordEntry, postselectEntry});
+    ASSERT_EQ(ppm.getStaticData(), expectedStaticData);
+
+    ASSERT_EQ(ppm.getGraphOpId(),
+              "PauliMeasure{}{wires:2}{meas_uid:None,pauli_word:XY,postselect:None}");
+}

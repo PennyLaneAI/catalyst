@@ -263,6 +263,25 @@ mlir::DictionaryAttr PPRotationArbitraryOp::getStaticData() {
     return mlir::DictionaryAttr::get(ctx, {pauliWordEntry});
 }
 
+// PPMeasurementOp
+std::string PPMeasurementOp::getOperatorName() { return "PauliMeasure"; }
+llvm::StringMap<llvm::SmallVector<mlir::Type>> PPMeasurementOp::getDynamicShape() { return {}; }
+llvm::StringMap<size_t> PPMeasurementOp::getWireLens() { return {{"wires", getInQubits().size()}}; }
+mlir::DictionaryAttr PPMeasurementOp::getStaticData() {
+    mlir::MLIRContext *ctx = getContext();
+    mlir::NamedAttribute pauliWordEntry = mlir::NamedAttribute(
+        mlir::StringAttr::get(ctx, "pauli_word"), mlir::StringAttr::get(ctx, getPauliWord()));
+
+    mlir::StringAttr noneStr = mlir::StringAttr::get(ctx, "None");
+    mlir::NamedAttribute measUidEntry =
+        mlir::NamedAttribute(mlir::StringAttr::get(ctx, "meas_uid"), noneStr);
+
+    mlir::NamedAttribute postselectEntry =
+        mlir::NamedAttribute(mlir::StringAttr::get(ctx, "postselect"), noneStr);
+
+    return mlir::DictionaryAttr::get(ctx, {measUidEntry, pauliWordEntry, postselectEntry});
+}
+
 //===----------------------------------------------------------------------===//
 // Implement ResourceQuantumOpInterface methods.
 //===----------------------------------------------------------------------===//

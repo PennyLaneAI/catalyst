@@ -381,7 +381,8 @@ def PPRotationArbitraryOp : PBC_Op<"ppr.arbitrary", [PBCOpInterface, AttrSizedOp
 }
 
 def PPMeasurementOp : PBC_Op<"ppm", [PBCOpInterface,
-    DeclareOpInterfaceMethods<ResourceQuantumOpInterface, ["getResourceAdjointFlag", "getResourceDetailedName"]>]> {
+    DeclareOpInterfaceMethods<ResourceQuantumOpInterface, ["getResourceAdjointFlag", "getResourceDetailedName"]>,
+    DeclareOpInterfaceMethods<DecomposableGate>]> {
     let summary = "Pauli Product Measurement on qubits.";
 
     let description = [{
@@ -448,6 +449,18 @@ def PPMeasurementOp : PBC_Op<"ppm", [PBCOpInterface,
     }];
 
     let hasVerifier = 1;
+    code extraBaseClassDeclaration = [{
+        std::string getPauliWord()
+        {
+            std::string pauliWord;
+
+            for (mlir::Attribute pauliChar : getPauliProduct()) {
+                pauliWord += cast<mlir::StringAttr>(pauliChar).getValue();
+            }
+            return pauliWord;
+        }
+    }];
+    let extraClassDeclaration = extraBaseClassDeclaration;
 }
 
 def SelectPPMeasurementOp : PBC_Op<"select.ppm", [DeclareOpInterfaceMethods<ResourceQuantumOpInterface, ["getResourceDetailedName"]>]> {
