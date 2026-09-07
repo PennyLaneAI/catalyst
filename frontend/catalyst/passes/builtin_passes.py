@@ -945,6 +945,7 @@ def to_ppr_setup_inputs():
     ``qp.IsingZZ``,
     ``qp.MultiRZ``,
     ``qp.PauliRot``,
+    ``qp.PPR``,
     and adjoint versions thereof, as well as
     ``qp.measure`` and
     ``qp.pauli_measure``.
@@ -964,6 +965,9 @@ def to_ppr_setup_inputs():
 
         For better compatibility with other PennyLane functionality, ensure that PennyLane program
         capture is enabled with ``@qjit(capture=True)``.
+
+        Note that the angle convention of ``qp.PauliRot`` and ``qp.PPR`` differs from Catalyst's
+        angle convention for PPRs by a factor of two.
 
     **Example**
 
