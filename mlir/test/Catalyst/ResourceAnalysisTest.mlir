@@ -607,6 +607,8 @@ func.func @outer_dyn_loop_calls_nested_helper(%arg0: !quantum.bit, %c4 : index) 
 // If-else branching (take max per op)
 
 // CHECK-LABEL: "if_else_branching"
+// CHECK: metadata
+// CHECK:       "has_unweighted_branches": true
 // CHECK: "quantum_operations"
 // CHECK:   "Hadamard": 3
 // CHECK:   "PauliX": 2
