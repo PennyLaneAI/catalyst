@@ -11,5 +11,3 @@ interacts with an executor service:
 * Shipping a cross-compiled kernel object file (or other assets) to that endpoint
 * Dispatching a previously-shipped qnode kernel
 * Invoking an arbitrary symbol in a shared library
-
-[TOC]

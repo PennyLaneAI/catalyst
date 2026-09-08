@@ -19,7 +19,31 @@ the session, and `convert-transport-to-llvm` lowers the result to
 participant -- a controller or a coprocessor -- and the placement's
 transport selects which compiled backend carries the traffic.
 
-[TOC]
+## Types
+
+### SessionType
+
+_An opaque transport session handle, tagged with its role._
+
+Syntax:
+
+```
+!transport.session<
+  ::catalyst::transport::Role   # role
+>
+```
+
+#### Parameters:
+
+| Parameter | C++ type | Description |
+| :-------: | :-------: | ----------- |
+| role | `::catalyst::transport::Role` | an enum of type Role |
+
+### TokenType
+
+_A handle to an in-flight asynchronous step, awaited with transport.await._
+
+Syntax: `!transport.token`
 
 ## Attributes
 
@@ -84,33 +108,6 @@ Syntax:
 | in_bytes | `mlir::IntegerAttr` | request size in bytes for one round |
 | out_bytes | `mlir::IntegerAttr` | reply size in bytes for one round |
 | work_item_idx | `mlir::IntegerAttr` | index of this node's work item within the round |
-
-## Types
-
-### SessionType
-
-_An opaque transport session handle, tagged with its role._
-
-Syntax:
-
-```
-!transport.session<
-  ::catalyst::transport::Role   # role
->
-```
-
-#### Parameters:
-
-| Parameter | C++ type | Description |
-| :-------: | :-------: | ----------- |
-| role | `::catalyst::transport::Role` | an enum of type Role |
-
-### TokenType
-
-_A handle to an in-flight asynchronous step, awaited with transport.await._
-
-Syntax: `!transport.token`
-
 
 ## Enums
 
