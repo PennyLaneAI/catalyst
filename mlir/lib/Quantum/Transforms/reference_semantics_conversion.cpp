@@ -505,6 +505,40 @@ void handleAdjoint(IRRewriter &builder, quantum::AdjointOp vAdjointOp, QubitValu
     });
 }
 
+void handleCtrl(IRRewriter &builder, quantum::CtrlOp vCtrlOp, QubitValueTracker &tracker,
+                SmallVector<Operation *> &erasureWorklist) {
+    OpBuilder::InsertionGuard guard(builder);
+    builder.setInsertionPoint(vCtrlOp);
+    Location loc = vCtrlOp->getLoc();
+    QubitValueTracker regionTracker = tracker;
+
+    // Add block args to the map
+    for (auto [blockArg, operand] :
+         llvm::zip_equal(vCtrlOp.getRegion().front().getArguments(), vCtrlOp.getArgs())) {
+        if (isa<quantum::QubitType>(blockArg.getType())) {
+            regionTracker.setRQubit(blockArg, tracker.getRQubit(operand));
+        } else if (isa<quantum::QuregType>(blockArg.getType())) {
+            regionTracker.setRQreg(blockArg, tracker.getRQreg(operand));
+        }
+    }
+
+    // Create the rCtrlOp op and handle
+    SmallVector<Value> rCtrlQubits;
+    for (auto vCtrlQubit : vCtrlOp.getInCtrlQubits()) {
+        rCtrlQubits.push_back(tracker.getRQubit(vCtrlQubit));
+    }
+    auto rCtrlOp = qref::CtrlOp::create(builder, loc, rCtrlQubits, vCtrlOp.getInCtrlValues());
+    builder.inlineRegionBefore(vCtrlOp.getRegion(), rCtrlOp.getRegion(), rCtrlOp.getRegion().end());
+    handleRegion(builder, rCtrlOp.getRegion(), regionTracker);
+    cascadeMapAhead(vCtrlOp, tracker);
+    erasureWorklist.push_back(vCtrlOp);
+
+    // Remove the moved over value semantics block args
+    rCtrlOp.getRegion().front().eraseArguments([](BlockArgument arg) {
+        return isa<quantum::QubitType, quantum::QuregType>(arg.getType());
+    });
+}
+
 void handleIf(IRRewriter &builder, scf::IfOp ifOp, QubitValueTracker &tracker,
               SmallVector<Operation *> &erasureWorklist) {
     OpBuilder::InsertionGuard guard(builder);
@@ -814,6 +848,8 @@ std::optional<SmallVector<Operation *>> handleRegion(IRRewriter &builder, Region
             })
             .Case<quantum::AdjointOp>(
                 [&](auto o) { handleAdjoint(builder, o, tracker, erasureWorklist); })
+            .Case<quantum::CtrlOp>(
+                [&](auto o) { handleCtrl(builder, o, tracker, erasureWorklist); })
             .Case<scf::IfOp>([&](auto o) { handleIf(builder, o, tracker, erasureWorklist); })
             .Case<scf::IndexSwitchOp>(
                 [&](auto o) { handleSwitch(builder, o, tracker, erasureWorklist); })

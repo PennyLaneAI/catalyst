@@ -15,6 +15,7 @@
 
 import copy
 import functools
+from collections.abc import Sequence
 
 import pennylane as qp
 from jax._src import core, util
@@ -26,6 +27,7 @@ from mlir_quantum.dialects._transform_ops_gen import ApplyRegisteredPassOp, Name
 from mlir_quantum.dialects.catalyst import LaunchKernelOp
 from pennylane.transforms.core import BoundTransform
 
+from catalyst.backline import module_attributes
 from catalyst.jax_extras.lowering import get_mlir_attribute_from_pyval
 from catalyst.passes import PassPlugin
 
@@ -244,8 +246,11 @@ def lower_qnode_to_funcop(ctx, callable_, call_jaxpr, pipelines):
     assert isinstance(callable_, qp.QNode), "This function expects qnodes"
 
     name = "module_" + callable_.__name__
+    device_attrs = module_attributes(callable_.device)
     # pylint: disable-next=no-member
     with NestedModule(ctx, name) as module, ir.InsertionPoint(module.regions[0].blocks[0]) as ip:
+        for attr_name, value in device_attrs.items():
+            module.operation.attributes[attr_name] = get_mlir_attribute_from_pyval(value)
         transform_module_lowering(ctx, pipelines)
         ctx.module_context.ip = ip
         func_op = get_or_create_funcop(ctx, callable_, call_jaxpr, pipelines)
@@ -418,3 +423,57 @@ def transform_named_sequence_lowering(pipeline, sym_name):
         named_sequence_op.operation.attributes["catalyst.uses_xdsl_passes"] = ir.UnitAttr.get()
 
     return uses_xdsl_passes
+
+
+def set_estimated_iterations_attr(op, value: int | float) -> None:
+    """Attach a trip-count hint to an ``scf.for`` or ``scf.while`` op."""
+    if value is None:
+        return
+    value = float(value)
+    if value < 0:
+        raise ValueError(f"'estimated_iterations' must be non-negative, but got {value}.")
+    ctx = op.context
+    f64_type = ir.F64Type.get(ctx)
+    op.attributes["catalyst.estimated_iterations"] = ir.FloatAttr.get(f64_type, value)
+
+
+def set_estimated_probability_attr(op, value: float) -> None:
+    """Attach a branch probability hint to an ``scf.if`` op."""
+    if value is None:
+        return
+    ctx = op.context
+    f64_type = ir.F64Type.get(ctx)
+    op.attributes["catalyst.estimated_probability"] = ir.FloatAttr.get(f64_type, value)
+
+
+def set_estimated_probabilities_attr(op, values: Sequence[float]) -> None:
+    """Attach branch probability hints to an ``scf.index_switch`` op."""
+    if values is None:
+        return
+    ctx = op.context
+    f64_type = ir.F64Type.get(ctx)
+    attrs = [ir.FloatAttr.get(f64_type, value) for value in values]
+    op.attributes["catalyst.estimated_probabilities"] = ir.ArrayAttr.get(attrs)
+
+
+def unconditional_to_conditional_if_probs(
+    probs: Sequence[float] | None,
+) -> tuple[float, ...] | None:
+    """Convert unconditional branch probabilities to per-``scf.if`` conditional probabilities.
+
+    ``qp.cond`` with ``elif`` branches lowers to nested ``scf.if`` ops.
+    Resource analysis expects each ``scf.if`` to carry the probability that its "then" branch is
+    taken *at that decision point*, so we convert from the user-facing unconditional branch
+    probabilities to those conditional probabilities that need to be passed to the ``scf.if``.
+    """
+    if probs is None:
+        return None
+    conditional = []
+    remaining = 1.0
+    for p in probs:
+        if remaining <= 0.0:
+            conditional.append(0.0)
+        else:
+            conditional.append(p / remaining)
+            remaining -= p
+    return tuple(conditional)

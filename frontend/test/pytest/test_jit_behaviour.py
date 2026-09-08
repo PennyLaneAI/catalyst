@@ -871,7 +871,7 @@ class TestDefaultAvailableIR:
         """Test that AbstractArray and AbstractWires can be used to specify the input
         shapes for AOT compilation."""
 
-        @qp.qjit(capture=True)
+        @qp.qjit(capture=True, collect_decomp_rules=False)
         @qp.qnode(qp.device("lightning.qubit", wires=4))
         def c(x: qp.typing.AbstractArray((3,), float), wires: qp.typing.Wire[4]):
             @qp.for_loop(x.shape[0])
@@ -933,7 +933,7 @@ class TestDefaultAvailableIR:
         # pylint: disable-next=import-outside-toplevel
         from catalyst.python_interface.transforms import iterative_cancel_inverses_pass
 
-        @qjit(capture=True)
+        @qjit(capture=True, collect_decomp_rules=False)
         @iterative_cancel_inverses_pass
         @qp.qnode(qp.device(backend, wires=1))
         def f():
@@ -1128,7 +1128,7 @@ class TestAOTFailures:
 
         with pytest.warns(UserWarning, match="AOT.*failed"):
 
-            @qp.qjit(capture=True)
+            @qp.qjit(capture=True, collect_decomp_rules=False)
             @qp.qnode(qp.device("null.qubit", wires=1))
             def c():
                 raise ValueError
@@ -1147,7 +1147,7 @@ class TestAOTFailures:
 
         with pytest.warns(UserWarning, match="AOT.*failed"):
 
-            @qp.qjit(capture=True)
+            @qp.qjit(capture=True, collect_decomp_rules=False)
             def c():
                 dummy_p.bind()
                 return 2
@@ -1159,7 +1159,7 @@ class TestAOTFailures:
 
         with pytest.warns(UserWarning, match="AOT.*failed"):
 
-            @qp.qjit(capture=True)
+            @qp.qjit(capture=True, collect_decomp_rules=False)
             @qp.qnode(qp.device("null.qubit", wires=1))
             def c():
                 qp.RX(qp.capture.symbolic_array((), float), 0)

@@ -43,10 +43,10 @@ def InjectTransportSessionPass : Pass<"inject-transport-session", "mlir::ModuleO
 }
 
 def LowerDecodeToTransportPass : Pass<"lower-decode-to-transport", "mlir::ModuleOp"> {
-    let summary = "Lower qecp decode ops to a transport kick/collect round over their buffers.";
+    let summary = "Lower qecp decode ops to a transport post/collect round over their buffers.";
     let description = [{
         Replaces each bufferized `qecp.decode_esm_css` op with transport.get_session +
-        transport.kick + transport.collect, offloading the decode to a backline coprocessor.
+        transport.post + transport.collect, offloading the decode to a backline coprocessor.
         The pass is a no-op unless the module carries a `catalyst.backline` attribute declaring at
         least one coprocessor
     }];

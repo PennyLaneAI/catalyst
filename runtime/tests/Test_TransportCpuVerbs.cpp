@@ -142,7 +142,7 @@ TEST_CASE("round-trip: coprocessor gets request, controller gets bounced reply",
         MemRegion m = coproc.alloc_memory(SIZE, MemKind::CpuRam);
         PeerRef p = coproc.exchange_keys(m);
         ChannelDesc desc{
-            .data_path = "cpu_verbs",
+            .transport = "rdma",
         };
         coproc.establish_channel(desc, m, p);
         coproc.set_coprocessor_fn(nullptr, nullptr); // built-in echo
@@ -161,7 +161,7 @@ TEST_CASE("round-trip: coprocessor gets request, controller gets bounced reply",
     MemRegion m = controller.alloc_memory(SIZE, MemKind::CpuRam);
     PeerRef p = controller.exchange_keys(m);
     ChannelDesc desc{
-        .data_path = "cpu_verbs",
+        .transport = "rdma",
     };
     controller.establish_channel(desc, m, p);
     controller.commit_work_item(0, sizeof(std::uint64_t), sizeof(std::uint64_t));
@@ -197,7 +197,7 @@ TEST_CASE("round-trip with a custom coprocessor function runs on the coprocessor
         MemRegion m = coproc.alloc_memory(SIZE, MemKind::CpuRam);
         PeerRef p = coproc.exchange_keys(m);
         ChannelDesc desc{
-            .data_path = "cpu_verbs",
+            .transport = "rdma",
         };
         coproc.establish_channel(desc, m, p);
         coproc.set_coprocessor_fn(invert_fn, nullptr);
@@ -217,7 +217,7 @@ TEST_CASE("round-trip with a custom coprocessor function runs on the coprocessor
     MemRegion m = controller.alloc_memory(SIZE, MemKind::CpuRam);
     PeerRef p = controller.exchange_keys(m);
     ChannelDesc desc{
-        .data_path = "cpu_verbs",
+        .transport = "rdma",
     };
     controller.establish_channel(desc, m, p);
     controller.commit_work_item(0, sizeof(std::uint64_t), sizeof(std::uint64_t));

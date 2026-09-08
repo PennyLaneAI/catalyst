@@ -110,6 +110,9 @@ def _are_param_frequencies_same_as_catalyst(op):
 
     valid = True
     for freqs in op_parameter_frequencies:
+        if len(freqs) == 0:
+            # NOTE: Empty frequencies (i.e. GlobalPhase) yield zero derivatives not affecting results
+            continue
         if len(freqs) != 1:
             return False
         valid &= np.allclose(freqs[0], 1.0)

@@ -26,6 +26,7 @@
 #include "Quantum/IR/QuantumDialect.h"
 
 #include <llvm/ADT/StringRef.h>
+#include <mlir/IR/Attributes.h>
 
 using namespace mlir;
 using namespace catalyst::pbc;
@@ -314,6 +315,86 @@ bool PPRotationOp::getResourceAdjointFlag() { return getRotationKind() < 0; }
 bool PPMeasurementOp::getResourceAdjointFlag() { return getNegated(); }
 bool RefPPRotationOp::getResourceAdjointFlag() { return getRotationKind() < 0; }
 
+std::string getDetailedStateName(LogicalInitKind initState) {
+    switch (initState) {
+    case LogicalInitKind::zero:
+        return "|0)";
+    case LogicalInitKind::one:
+        return "|1)";
+    case LogicalInitKind::plus:
+        return "|+)";
+    case LogicalInitKind::minus:
+        return "|-)";
+    case LogicalInitKind::plus_i:
+        return "|+i)";
+    case LogicalInitKind::minus_i:
+        return "|-i)";
+    case LogicalInitKind::magic:
+        return "|M)";
+    case LogicalInitKind::magic_conj:
+        return "|M†)";
+    }
+    return "";
+}
+
+static std::string getPauliProductString(ArrayAttr pauliProduct) {
+    std::string result;
+    for (Attribute attr : pauliProduct) {
+        if (!result.empty()) {
+            result += ',';
+        }
+        result += cast<StringAttr>(attr).getValue();
+    }
+    return result;
+}
+
+static llvm::StringRef getInitStateResourceDetailedName(MLIRContext *ctx, llvm::StringRef baseName,
+                                                        LogicalInitKind initState) {
+    return StringAttr::get(ctx, std::string(baseName) + "[" + getDetailedStateName(initState) + "]")
+        .getValue();
+}
+
+llvm::StringRef PrepareStateOp::getResourceDetailedName() {
+    return getInitStateResourceDetailedName(getContext(), getResourceName(), getInitState());
+}
+llvm::StringRef FabricateOp::getResourceDetailedName() {
+    return getInitStateResourceDetailedName(getContext(), getResourceName(), getInitState());
+}
+
+static llvm::StringRef getPauliProductResourceDetailedName(MLIRContext *ctx,
+                                                           llvm::StringRef baseName,
+                                                           ArrayAttr pauliProduct) {
+    return StringAttr::get(ctx,
+                           std::string(baseName) + "[" + getPauliProductString(pauliProduct) + "]")
+        .getValue();
+}
+
+static llvm::StringRef getSelectPauliProductResourceDetailedName(MLIRContext *ctx,
+                                                                 llvm::StringRef baseName,
+                                                                 ArrayAttr pauliProduct0,
+                                                                 ArrayAttr pauliProduct1) {
+    return StringAttr::get(ctx, std::string(baseName) + "[" + getPauliProductString(pauliProduct0) +
+                                    ":" + getPauliProductString(pauliProduct1) + "]")
+        .getValue();
+}
+
+llvm::StringRef PPRotationOp::getResourceDetailedName() {
+    return getPauliProductResourceDetailedName(getContext(), getResourceName(), getPauliProduct());
+}
+llvm::StringRef PPRotationArbitraryOp::getResourceDetailedName() {
+    return getPauliProductResourceDetailedName(getContext(), getResourceName(), getPauliProduct());
+}
+llvm::StringRef PPMeasurementOp::getResourceDetailedName() {
+    return getPauliProductResourceDetailedName(getContext(), getResourceName(), getPauliProduct());
+}
+llvm::StringRef RefPPMeasurementOp::getResourceDetailedName() {
+    return getPauliProductResourceDetailedName(getContext(), getResourceName(), getPauliProduct());
+}
+llvm::StringRef SelectPPMeasurementOp::getResourceDetailedName() {
+    return getSelectPauliProductResourceDetailedName(getContext(), getResourceName(),
+                                                     getPauliProduct_0(), getPauliProduct_1());
+}
+
 // TODO: Once PBC's interface is improved, we can remove these implementation
 // and only implement one in the interface definition.
 uint64_t PrepareStateOp::getResourceNumQubits() { return 0; }
@@ -321,7 +402,7 @@ uint64_t FabricateOp::getResourceNumQubits() { return 0; }
 uint64_t PPRotationOp::getResourceNumQubits() { return getInQubits().size(); }
 uint64_t PPRotationArbitraryOp::getResourceNumQubits() { return getInQubits().size(); }
 uint64_t PPMeasurementOp::getResourceNumQubits() { return getInQubits().size(); }
-uint64_t RefPPMeasurementOp::getResourceNumQubits() { return 0; }
+uint64_t RefPPMeasurementOp::getResourceNumQubits() { return getQubits().size(); }
 uint64_t SelectPPMeasurementOp::getResourceNumQubits() { return getInQubits().size(); }
 uint64_t RefPPRotationOp::getResourceNumQubits() { return 0; }
 uint64_t RefSelectPPMeasurementOp::getResourceNumQubits() { return 0; }

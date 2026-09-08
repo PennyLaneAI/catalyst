@@ -23,6 +23,8 @@
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/OpImplementation.h"
 
+#include "MBQC/IR/MBQCOps.h"
+#include "PBC/IR/PBCOps.h"
 #include "QRef/IR/QRefDialect.h"
 #include "Quantum/IR/QuantumInterfaces.h"
 
@@ -52,60 +54,6 @@ static LogicalResult verifyTensorResult(Type ty, int64_t length0, int64_t length
 //===----------------------------------------------------------------------===//
 // QRef op canonicalizers.
 //===----------------------------------------------------------------------===//
-
-static const mlir::StringSet<> hermitianOps = {"Hadamard", "PauliX", "PauliY", "PauliZ", "CNOT",
-                                               "CY",       "CZ",     "SWAP",   "Toffoli"};
-static const mlir::StringSet<> rotationsOps = {"RX",  "RY",  "RZ",  "PhaseShift",
-                                               "CRX", "CRY", "CRZ", "ControlledPhaseShift"};
-
-LogicalResult CustomOp::canonicalize(CustomOp op, mlir::PatternRewriter &rewriter) {
-    if (op.getAdjoint()) {
-        auto name = op.getGateName();
-        if (hermitianOps.contains(name)) {
-            op.setAdjoint(false);
-            return success();
-        } else if (rotationsOps.contains(name)) {
-            auto params = op.getParams();
-            SmallVector<Value> paramsNeg;
-            for (auto param : params) {
-                auto paramNeg = mlir::arith::NegFOp::create(rewriter, op.getLoc(), param);
-                paramsNeg.push_back(paramNeg);
-            }
-
-            rewriter.replaceOpWithNewOp<CustomOp>(op, paramsNeg, op.getQubits(), name, false,
-                                                  op.getCtrlQubits(), op.getCtrlValues());
-
-            return success();
-        }
-        return failure();
-    }
-    return failure();
-}
-
-LogicalResult MultiRZOp::canonicalize(MultiRZOp op, mlir::PatternRewriter &rewriter) {
-    if (op.getAdjoint()) {
-        auto paramNeg = mlir::arith::NegFOp::create(rewriter, op.getLoc(), op.getTheta());
-
-        rewriter.replaceOpWithNewOp<MultiRZOp>(op, paramNeg, op.getQubits(), nullptr,
-                                               op.getCtrlQubits(), op.getCtrlValues());
-
-        return success();
-    };
-    return failure();
-}
-
-LogicalResult PCPhaseOp::canonicalize(PCPhaseOp op, mlir::PatternRewriter &rewriter) {
-    if (op.getAdjoint()) {
-        auto paramNeg = mlir::arith::NegFOp::create(rewriter, op.getLoc(), op.getTheta());
-
-        rewriter.replaceOpWithNewOp<PCPhaseOp>(op, paramNeg, op.getDimAttr(), op.getQubits(),
-                                               nullptr, op.getCtrlQubits(), op.getCtrlValues());
-
-        return success();
-    };
-    return failure();
-}
-
 LogicalResult AllocOp::canonicalize(AllocOp alloc, mlir::PatternRewriter &rewriter) {
     if (alloc->use_empty()) {
         rewriter.eraseOp(alloc);
@@ -341,6 +289,31 @@ LogicalResult AdjointOp::verify() {
     Block &b = this->getRegion().front();
     if (b.getNumArguments() != 0) {
         return emitOpError("qref.adjoint op must have no arguments on its block");
+    }
+
+    return success();
+}
+
+LogicalResult CtrlOp::verify() {
+    auto res = this->getRegion().walk([](Operation *op) {
+        return isa<quantum::MeasurementProcess, MeasureOp, pbc::RefPPMeasurementOp,
+                   mbqc::RefMeasureInBasisOp>(op)
+                   ? WalkResult::interrupt()
+                   : WalkResult::advance();
+    });
+
+    if (res.wasInterrupted()) {
+        return emitOpError("quantum measurements are not allowed in the ctrl regions");
+    }
+
+    Block &b = this->getRegion().front();
+    if (b.getNumArguments() != 0) {
+        return emitOpError("qref.ctrl op must have no arguments on its block");
+    }
+
+    if (this->getCtrlValues().size() != this->getCtrlQubits().size()) {
+        return emitOpError("Ctrl op number of control values must be the same as the number of "
+                           "control qubits");
     }
 
     return success();

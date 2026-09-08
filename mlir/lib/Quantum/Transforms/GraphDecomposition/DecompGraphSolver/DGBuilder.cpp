@@ -18,13 +18,23 @@
 
 #include "DGBuilder.hpp"
 
+#include <cstddef>
 #include <cstdint>
 #include <iostream>
+#include <memory>
+#include <unordered_map>
+#include <unordered_set>
+#include <utility>
 #include <variant>
+#include <vector>
 
+#include "boost/graph/adjacency_list.hpp"
+#include "boost/graph/detail/adjacency_list.hpp"
+#include "boost/graph/graph_selectors.hpp"
+#include "boost/graph/graph_traits.hpp"
+
+#include "DGTypes.hpp"
 #include "DGUtils.hpp"
-
-#include <boost/graph/adjacency_list.hpp>
 
 using namespace DecompGraph::Core;
 
@@ -157,11 +167,6 @@ struct DecompositionGraph::Impl {
             registerOp(op);
         }
 
-        // Register all target gates
-        for (const auto &[op, _] : gateset.ops) {
-            registerOp(op);
-        }
-
         // Register all rules
         for (RuleId ruleId = 0; ruleId < rules.size(); ruleId++) {
             const auto &rule = rules[ruleId];
@@ -291,8 +296,8 @@ void DecompositionGraph::showGraph() const {
 
     // Show target gateset
     std::cerr << "Target Gateset:\n";
-    for (const auto &[op, cost] : impl->gateset.ops) {
-        std::cerr << "  " << print_op(op) << " with cost " << cost << "\n";
+    for (const auto &[name, cost] : impl->gateset.ops) {
+        std::cerr << "  " << name << " with cost " << cost << "\n";
     }
 }
 

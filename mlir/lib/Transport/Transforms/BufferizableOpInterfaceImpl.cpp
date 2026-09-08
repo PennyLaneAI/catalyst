@@ -32,8 +32,9 @@ using namespace catalyst::transport;
 
 namespace {
 
-struct KickOpInterface
-    : public bufferization::BufferizableOpInterface::ExternalModel<KickOpInterface, KickOp> {
+struct StagePayloadOpInterface
+    : public bufferization::BufferizableOpInterface::ExternalModel<StagePayloadOpInterface,
+                                                                   StagePayloadOp> {
     bool bufferizesToMemoryRead(Operation *, OpOperand &,
                                 const bufferization::AnalysisState &) const {
         return true;
@@ -49,13 +50,13 @@ struct KickOpInterface
     LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
                             const bufferization::BufferizationOptions &options,
                             bufferization::BufferizationState &state) const {
-        auto kickOp = cast<KickOp>(op);
-        if (!isa<RankedTensorType>(kickOp.getPayload().getType())) {
+        auto stageOp = cast<StagePayloadOp>(op);
+        if (!isa<RankedTensorType>(stageOp.getPayload().getType())) {
             return success(); // already a memref
         }
         Location loc = op->getLoc();
 
-        FailureOr<Value> payloadBuffer = getBuffer(rewriter, kickOp.getPayload(), options, state);
+        FailureOr<Value> payloadBuffer = getBuffer(rewriter, stageOp.getPayload(), options, state);
         if (failed(payloadBuffer)) {
             return failure();
         }
@@ -73,7 +74,7 @@ struct KickOpInterface
             buffer = alloc.getResult();
         }
 
-        KickOp::create(rewriter, loc, kickOp.getSession(), buffer, kickOp.getWorkItemIdxAttr());
+        StagePayloadOp::create(rewriter, loc, stageOp.getSession(), buffer);
         rewriter.eraseOp(op);
         return success();
     }
@@ -122,7 +123,7 @@ struct CollectOpInterface
 
 void catalyst::transport::registerBufferizableOpInterfaceExternalModels(DialectRegistry &registry) {
     registry.addExtension(+[](MLIRContext *ctx, TransportDialect *dialect) {
-        KickOp::attachInterface<KickOpInterface>(*ctx);
+        StagePayloadOp::attachInterface<StagePayloadOpInterface>(*ctx);
         CollectOp::attachInterface<CollectOpInterface>(*ctx);
     });
 }

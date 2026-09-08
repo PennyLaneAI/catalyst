@@ -363,7 +363,6 @@ def CustomOp : UnitaryGate_Op<"custom", [ParametrizedGate, AttrSizedOperandSegme
         }
     }];
 
-    let hasCanonicalizeMethod = 1;
     let hasVerifier = 1;
 }
 
@@ -618,7 +617,6 @@ def MultiRZOp : UnitaryGate_Op<"multirz", [ParametrizedGate, AttrSizedOperandSeg
         }
     }];
 
-    let hasCanonicalizeMethod = 1;
 }
 
 def PCPhaseOp : UnitaryGate_Op<"pcphase", [ParametrizedGate, AttrSizedOperandSegments]> {
@@ -661,7 +659,6 @@ def PCPhaseOp : UnitaryGate_Op<"pcphase", [ParametrizedGate, AttrSizedOperandSeg
         }
     }];
 
-    let hasCanonicalizeMethod = 1;
 }
 
 def QubitUnitaryOp : UnitaryGate_Op<"unitary", [ParametrizedGate, AttrSizedOperandSegments]> {
@@ -714,6 +711,30 @@ def AdjointOp : Region_Op<"adjoint", [NoTerminator]> {
 
     let assemblyFormat = [{
         attr-dict-with-keyword $region
+    }];
+
+    let hasVerifier = 1;
+}
+
+def CtrlOp : Region_Op<"ctrl", [NoTerminator, AttrSizedOperandSegments]> {
+    let summary = "Apply the enclosed operations controlled on the given control qubits.";
+    let description = [{
+        The `qref.ctrl` operation applies the quantum operations in its single-block region
+        conditioned on a set of control qubits. Each `ctrl_values` entry selects whether the
+        matching control qubit activates on the |1> (true) or |0> (false) state.
+
+        Measurements inside a `qref.ctrl` region are rejected.
+    }];
+
+    let regions = (region SizedRegion<1>:$region);
+
+    let arguments = (ins
+        Variadic<QubitRefType>:$ctrl_qubits,
+        Variadic<I1>:$ctrl_values
+    );
+
+    let assemblyFormat = [{
+        `(` $ctrl_qubits `)` `ctrlvals` `(` $ctrl_values `)` attr-dict-with-keyword $region
     }];
 
     let hasVerifier = 1;

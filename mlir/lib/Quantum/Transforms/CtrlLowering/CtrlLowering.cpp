@@ -65,7 +65,20 @@ static Operation *createControlledGate(PatternRewriter &rewriter, QuantumGate ga
     }
     operands.append(addCtrlValues.begin(), addCtrlValues.end());
 
-    // The added controls grow the (last) out_ctrl_qubits result group.
+    // The control operands/results are NOT necessarily the trailing segments: `quantum.operator`
+    // declares `in_qreg`/`arr_*` operand segments and an `out_qreg` result segment *after* the
+    // control segments. Assembling the operand vector above (leading, non-ctrl qubits, controls)
+    // and appending the new control results at the end is only correct when those trailing
+    // segments are empty (i.e. qubit-mode gates). Bail out cleanly on register-mode gates rather
+    // than silently miscompiling.
+    unsigned numTrailing = op->getNumOperands() - numLeading - nonCtrlQubits.size() -
+                           oldCtrlQubits.size() - oldCtrlValues.size();
+    if (numTrailing != 0) {
+        op->emitError("cannot control a register-mode quantum operation inside a quantum.ctrl "
+                      "region");
+        return nullptr;
+    }
+
     Type qubitType = QubitType::get(rewriter.getContext());
     SmallVector<Type> resultTypes(op->getResultTypes().begin(), op->getResultTypes().end());
     resultTypes.append(addCtrlQubits.size(), qubitType);
@@ -81,14 +94,38 @@ static Operation *createControlledGate(PatternRewriter &rewriter, QuantumGate ga
         state.addAttribute(attr.getName(), attr.getValue());
     }
 
+    // By ODS convention a QuantumGate lays its operands out as [<classical>, (in_qubits,)
+    // in_ctrl_qubits, in_ctrl_values, <trailing>], with in_ctrl_values immediately following
+    // in_ctrl_qubits (some gates, e.g. `quantum.gphase`, have no in_qubits segment at all).
+    // Locate the in_ctrl_qubits segment by its operand start offset -- the classical operands
+    // (`numLeading`) plus the non-ctrl qubits -- rather than assuming it is a trailing segment.
     SmallVector<int32_t> operandSegments = readSegmentSizes(op, "operandSegmentSizes");
-    operandSegments[operandSegments.size() - 2] += static_cast<int32_t>(addCtrlQubits.size());
-    operandSegments[operandSegments.size() - 1] += static_cast<int32_t>(addCtrlValues.size());
+    int32_t ctrlQubitsStart = static_cast<int32_t>(numLeading + nonCtrlQubits.size());
+    unsigned ctrlQubitsSeg = 0;
+    for (int32_t acc = 0; ctrlQubitsSeg < operandSegments.size(); ++ctrlQubitsSeg) {
+        if (acc == ctrlQubitsStart) {
+            break;
+        }
+        acc += operandSegments[ctrlQubitsSeg];
+    }
+    unsigned ctrlValuesSeg = ctrlQubitsSeg + 1;
+    assert(ctrlValuesSeg < operandSegments.size() &&
+           operandSegments[ctrlQubitsSeg] == static_cast<int32_t>(oldCtrlQubits.size()) &&
+           operandSegments[ctrlValuesSeg] == static_cast<int32_t>(oldCtrlValues.size()) &&
+           "unexpected control-operand segment layout");
+    operandSegments[ctrlQubitsSeg] += static_cast<int32_t>(addCtrlQubits.size());
+    operandSegments[ctrlValuesSeg] += static_cast<int32_t>(addCtrlValues.size());
     state.addAttribute("operandSegmentSizes", rewriter.getDenseI32ArrayAttr(operandSegments));
 
     if (op->getAttrOfType<DenseI32ArrayAttr>("resultSegmentSizes")) {
+        // Results follow the pattern out_qubits, out_ctrl_qubits, [out_qreg]; out_ctrl_qubits is
+        // always the second result segment (index 1), which is not necessarily the last one.
         SmallVector<int32_t> resultSegments = readSegmentSizes(op, "resultSegmentSizes");
-        resultSegments[resultSegments.size() - 1] += static_cast<int32_t>(addCtrlQubits.size());
+        constexpr unsigned outCtrlQubitsSeg = 1;
+        assert(outCtrlQubitsSeg < resultSegments.size() &&
+               resultSegments[outCtrlQubitsSeg] == static_cast<int32_t>(oldCtrlQubits.size()) &&
+               "unexpected control-result segment layout");
+        resultSegments[outCtrlQubitsSeg] += static_cast<int32_t>(addCtrlQubits.size());
         state.addAttribute("resultSegmentSizes", rewriter.getDenseI32ArrayAttr(resultSegments));
     }
 
@@ -434,6 +471,9 @@ static LogicalResult distributeControls(PatternRewriter &rewriter, Block &block,
             unsigned numOldControls = gate.getCtrlQubitOperands().size();
             Operation *newOp =
                 createControlledGate(rewriter, gate, map, currentCtrlQubits, ctrlValues);
+            if (!newOp) {
+                return failure();
+            }
             auto newGate = cast<QuantumGate>(newOp);
 
             for (auto [oldResult, newResult] :

@@ -55,10 +55,6 @@ _Convert CliffordT operations to Pauli Product Measurement operations._
 -avoid-y-measure  : Avoid Pauli-Y measurements for Clifford rotations. Rather than performing a Pauli-Y measurement for Clifford rotations (sometimes more costly), a Y state is used instead (requires Y state preparation).
 ```
 
-### `-ppm-specs`
-
-_Count specs in Pauli Product Measurement operations._
-
 ### `-to-ppr`
 
 _Convert quantum dialects to the PBC dialect._

@@ -19,6 +19,7 @@
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#include "mlir/Transforms/Passes.h"
 
 #include "PBC/IR/PBCDialect.h"
 #include "PBC/Transforms/Patterns.h"
@@ -42,6 +43,13 @@ struct PPMCompilationPass : public impl::PPMCompilationPassBase<PPMCompilationPa
     void runOnOperation() final {
         auto ctx = &getContext();
         auto module = getOperation();
+
+        // Remove all decomposition rules, they might involve gates we don't care about
+        OpPassManager pm("builtin.module");
+        pm.addPass(mlir::createSymbolDCEPass());
+        if (failed(runPipeline(pm, getOperation()))) {
+            return signalPassFailure();
+        }
 
         // Phase 1: Convert Clifford+T to PPR representation
         {

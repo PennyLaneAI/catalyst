@@ -35,8 +35,8 @@ struct RegisterDecompRuleResourcePass
     using RegisterDecompRuleResourcePassBase::RegisterDecompRuleResourcePassBase;
 
     void runOnOperation() final {
-        auto &analysis = getAnalysis<ResourceAnalysis, ModuleOp>();
         auto module = llvm::cast<mlir::ModuleOp>(getOperation());
+        ResourceAnalysis analysis(module, {}, /*collectDetailedOperations=*/true);
 
         MLIRContext *ctx = &getContext();
 

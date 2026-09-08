@@ -71,7 +71,7 @@ def Transport_SessionType : Transport_Type<"Session", "session"> {
 }
 
 def Transport_TokenType : Transport_Type<"Token", "token"> {
-    let summary = "A handle to an in-flight asynchronous step, awaited with transport.barrier.";
+    let summary = "A handle to an in-flight asynchronous step, awaited with transport.await.";
 }
 
 // Role-constrained session types used by the role-specific ops.
@@ -109,11 +109,10 @@ def Transport_NodeAttr : Transport_Attr<"Node", "node"> {
         OptionalParameter<"mlir::IntegerAttr">:$oob_port,
         Transport_StrField:$backend_lib,
         Transport_StrField:$config,
-        Transport_StrField:$data_path,
         Transport_StrField:$triple,
         Transport_StrField:$address,
         Transport_StrField:$symbol,
-        OptionalParameter<"mlir::BoolAttr">:$remote,
+        OptionalParameter<"mlir::BoolAttr">:$out_of_process,
         OptionalParameter<"mlir::IntegerAttr">:$in_bytes,
         OptionalParameter<"mlir::IntegerAttr">:$out_bytes,
         OptionalParameter<"mlir::IntegerAttr">:$work_item_idx
@@ -125,13 +124,11 @@ def Transport_NodeAttr : Transport_Attr<"Node", "node"> {
         /// Session registry key: `name` when set and non-empty, else `fallback`.
         mlir::StringAttr keyOr(llvm::StringRef fallback) const;
 
-        /// `data_path` when set, else `dflt`.
-        mlir::StringAttr dataPathOr(llvm::StringRef dflt) const;
+        /// Whether this node's code is dispatched to an executor rather than run in the
+        /// compiling process.
+        bool isOutOfProcess() const;
 
-        /// True only when `remote` is present and set.
-        bool isRemote() const;
-
-        /// Integer fields, with the defaults applied.
+        /// Integer field accessors.
         int64_t oobPort() const;
         int64_t inBytes() const;
         int64_t outBytes() const;

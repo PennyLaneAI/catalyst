@@ -2294,7 +2294,7 @@ class TestParameterShiftVerificationIntegrationTests:
         """Raise exception when there is an op with a grad_recipe that's dynamic"""
         device = qp.device(backend, wires=1)
 
-        class RX(qp.RX):
+        class DummyRX(qp.RX):
             @property
             def grad_recipe(self):
                 x = self.data[0]
@@ -2307,7 +2307,7 @@ class TestParameterShiftVerificationIntegrationTests:
             @grad
             @qp.qnode(device, diff_method="parameter-shift")
             def circuit(x: float):
-                RX(x, wires=[0])
+                DummyRX(x, wires=[0])
                 return qp.expval(qp.PauliZ(wires=0))
 
         with pytest.raises(CompileError, match="not supported with catalyst on this device"):
@@ -2317,7 +2317,7 @@ class TestParameterShiftVerificationIntegrationTests:
         """Raise exception when there is an op with a mismatching grad_recipe"""
         device = qp.device(backend, wires=1)
 
-        class RX(qp.RX):
+        class DummyRX(qp.RX):
             @property
             def grad_recipe(self):
                 return ([[0.0, 0.0, 0.0], [0.0, 0.0, 0.0]],)
@@ -2328,7 +2328,7 @@ class TestParameterShiftVerificationIntegrationTests:
             @grad
             @qp.qnode(device, diff_method="parameter-shift")
             def circuit(x: float):
-                RX(x, wires=[0])
+                DummyRX(x, wires=[0])
                 return qp.expval(qp.PauliZ(wires=0))
 
         with pytest.raises(CompileError, match="not supported with catalyst on this device"):
@@ -2338,7 +2338,7 @@ class TestParameterShiftVerificationIntegrationTests:
         """Raise exception when when there is an lengths are mismatched."""
         device = qp.device(backend, wires=1)
 
-        class RX(qp.RX):
+        class DummyRX(qp.RX):
             @property
             def parameter_frequencies(self):
                 # Only one parameter but two frequencies is an error
@@ -2350,7 +2350,7 @@ class TestParameterShiftVerificationIntegrationTests:
             @grad
             @qp.qnode(device, diff_method="parameter-shift")
             def circuit(x: float):
-                RX(x, wires=[0])
+                DummyRX(x, wires=[0])
                 return qp.expval(qp.PauliZ(wires=0))
 
         with pytest.raises(CompileError, match="not supported with catalyst on this device"):
@@ -2360,7 +2360,7 @@ class TestParameterShiftVerificationIntegrationTests:
         """When there is an op without parameter_frequencies, ps gradient should fail"""
         device = qp.device(backend, wires=1)
 
-        class RX(qp.RX):
+        class DummyRX(qp.RX):
             @property
             def parameter_frequencies(self):
                 # Only one parameter but two frequencies is an error
@@ -2372,7 +2372,7 @@ class TestParameterShiftVerificationIntegrationTests:
             @grad
             @qp.qnode(device, diff_method="parameter-shift")
             def circuit(x: float):
-                RX(x, wires=[0])
+                DummyRX(x, wires=[0])
                 return qp.expval(qp.PauliZ(wires=0))
 
         with pytest.raises(CompileError, match="not supported with catalyst on this device"):

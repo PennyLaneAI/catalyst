@@ -60,6 +60,7 @@
 #include "DGBuilder.hpp"
 #include "DGSolver.hpp"
 #include "DGTypes.hpp"
+#include "DGUtils.hpp"
 #include "DecompUtils.hpp"
 
 #define DEBUG_TYPE "graph-decomposition"
@@ -138,23 +139,84 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
                                  std::move(altDecomps));
         DecompositionSolver solver(graph);
         auto solution = solver.solve();
+        LLVM_DEBUG(showSolution(solution));
 
         ///////////////////////////
         // Step 3: Convert python-decompositions from reference to value semantics and run
-        // decompose-lowering to apply the chosen decomposition rules
+        // decompose-lowering to apply the chosen decomposition rules.
+
+        ///////////////////////////
+        // CQRs:
+        //  - Adjoint: A chosen rule for an adjoint operator may re-emit its base decomposition
+        //             wrapped in a `quantum.adjoint` region. Such a region is only reduced to
+        //             op-level modified gates by `adjoint-lowering`. We therefore iterate
+        //             `(decompose-lowering -> adjoint-lowering)` to a fixpoint.
+        // The solver has already chosen every rule up front; this loop only applies them.
         ModuleOp module = getOperation();
-        OpPassManager pm("builtin.module");
 
         DecomposeLoweringPassOptions dlOptions;
         for (auto &[op, chosenRule] : solution) {
             dlOptions.targetRulesOption.push_back(chosenRule.ruleName);
         }
 
-        pm.addPass(qref::createValueSemanticsConversionPass());
-        pm.addPass(createDecomposeLoweringPass(dlOptions));
+        // Convert reference-semantics python decompositions to value semantics once.
+        {
+            OpPassManager valueSemanticsPm("builtin.module");
+            valueSemanticsPm.addPass(qref::createValueSemanticsConversionPass());
+            if (failed(runPipeline(valueSemanticsPm, module))) {
+                return signalPassFailure();
+            }
+        }
 
-        if (failed(runPipeline(pm, module))) {
-            return signalPassFailure();
+        auto countOps = [](ModuleOp m) {
+            size_t count = 0;
+            m->walk([&](mlir::Operation *) { count++; });
+            return count;
+        };
+
+        // Fixpoint: apply the chosen rules and distribute any `quantum.adjoint` regions they emit,
+        // until the module stops changing.
+        constexpr unsigned maxIterations = 64;
+        size_t previousOpCount = countOps(module);
+        for (unsigned iter = 0; iter < maxIterations; ++iter) {
+            {
+                OpPassManager decomposePm("builtin.module");
+                decomposePm.addPass(createDecomposeLoweringPass(dlOptions));
+                if (failed(runPipeline(decomposePm, module))) {
+                    return signalPassFailure();
+                }
+            }
+
+            // Distribute a `quantum.ctrl` region lazily.
+            bool hasCtrlRegion = module->walk([&](CtrlOp) { return mlir::WalkResult::interrupt(); })
+                                     .wasInterrupted();
+            if (hasCtrlRegion) {
+                OpPassManager ctrlPm("builtin.module");
+                ctrlPm.addPass(createCtrlLoweringPass());
+                if (failed(runPipeline(ctrlPm, module))) {
+                    return signalPassFailure();
+                }
+            }
+
+            // Distribute a `quantum.adjoint` region lazily.
+            // It uses a greedy rewriter that would otherwise DCE gates in circuits that
+            // never needed adjoint handling.
+            bool hasAdjointRegion =
+                module->walk([&](AdjointOp) { return mlir::WalkResult::interrupt(); })
+                    .wasInterrupted();
+            if (hasAdjointRegion) {
+                OpPassManager adjointPm("builtin.module");
+                adjointPm.addPass(createAdjointLoweringPass());
+                if (failed(runPipeline(adjointPm, module))) {
+                    return signalPassFailure();
+                }
+            }
+
+            size_t currentOpCount = countOps(module);
+            if (currentOpCount == previousOpCount) {
+                break;
+            }
+            previousOpCount = currentOpCount;
         }
     }
 
@@ -216,7 +278,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
             cost.consume_back(": f64");
             cost = cost.trim();
 
-            bool success = to_float(cost, targetGateSet.ops[OperatorNode{opName.str()}]);
+            bool success = to_float(cost, targetGateSet.ops[opName.str()]);
 
             if (!success) {
                 return failure();
@@ -240,7 +302,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
 
         // Try to generate resources if they're missing
         if (!resourcesAttr) {
-            ResourceAnalysis analysis(rule);
+            ResourceAnalysis analysis(rule, {}, /*collectDetailedOperations=*/true);
             if (const ResourceResult *flat = analysis.getFlattenedResource(rule.getName())) {
                 rule->setAttr("resources", buildResourceDict(&getContext(), *flat));
             }
@@ -317,13 +379,11 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
     LogicalResult loadUserDecompositionRules(llvm::StringSet<> &userRuleNames,
                                              std::vector<RuleNode> &ruleNodes) {
         mlir::ModuleOp module = getOperation();
-        if (userRuleNames.empty()) {
-            return success();
-        }
 
         WalkResult walkResult = module.walk([&](mlir::func::FuncOp func) {
             if (func->hasAttr(DecompUtils::target_gate_attr_name)) {
-                if (userRuleNames.contains(func.getName())) {
+                if (userRuleNames.contains(func.getName()) ||
+                    func.getName().starts_with("__builtin")) {
                     if (failed(addRuleNode(func, ruleNodes))) {
                         return WalkResult::interrupt();
                     }
@@ -343,8 +403,12 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
      * @brief
      * Use python to lower decomposition rules for all unhandled decomposable operations in the
      * circuit, annotating the lowered decomposition rules with resources and target gates.
+     *
+     * This only *materializes* the lowered rule funcs (as `__builtin`-prefixed funcs) into the
+     * module; `loadUserDecompositionRules`, which runs afterwards, is what registers them as
+     * RuleNodes. It therefore takes no `ruleNodes` output.
      */
-    mlir::LogicalResult loadPythonDecomps(std::vector<RuleNode> &ruleNodes) {
+    mlir::LogicalResult loadPythonDecomps() {
         mlir::ModuleOp module = getOperation();
         MLIRContext *context = &getContext();
 
@@ -360,7 +424,11 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         });
 
         llvm::SmallVector<quantum::DecomposableGate> decomposableOps;
-        module.walk([&](quantum::DecomposableGate op) { decomposableOps.push_back(op); });
+        module.walk([&](quantum::DecomposableGate op) {
+            if (!DecompUtils::isInDecompRule(op)) {
+                decomposableOps.push_back(op);
+            }
+        });
 
         if (!decomposableOps.empty()) {
             if (!loadQPD(libQPDPath, libpythonPath)) {
@@ -375,7 +443,6 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
             if (handledOpIds.contains(opId)) {
                 continue;
             }
-            handledOpIds.insert(opId);
 
             std::string mlirText = pythonRuleLowering(op);
 
@@ -388,53 +455,59 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
                 return failure();
             }
 
+            // The Python wrapper returns the *whole reachable rule closure* for this op, not just
+            // its direct rules: the loader does not recurse into a rule's resource ops, so every
+            // rule on the path down to the gate set (e.g. `Adjoint(S)` -> `Adjoint(PhaseShift)` ->
+            // `PhaseShift`) must arrive together. We only *materialize* each rule func (named
+            // `__builtin_...`) into the module here; `loadUserDecompositionRules` runs next and is
+            // the single place that turns `__builtin`-prefixed funcs into RuleNodes (the same path
+            // the eager frontend relies on for its pre-embedded rules). We must NOT also call
+            // `addRuleNode` here, or every on-demand rule would be registered twice. We still skip
+            // helper funcs (no `target_gate`) and any target already materialized by an earlier
+            // op's closure or embedded in the module, to avoid duplicate symbols.
+            llvm::SmallVector<llvm::StringRef> newlyHandled;
             moduleOp->walk([&](mlir::func::FuncOp func) {
-                if (func.getName().starts_with(opId)) {
-                    mlir::OwningOpRef<mlir::func::FuncOp> outOp;
-                    func->remove();
-                    outOp = mlir::OwningOpRef<mlir::func::FuncOp>(func);
-                    mlir::func::FuncOp funcOp = outOp.get();
-                    funcOp->setAttr("target_gate", mlir::StringAttr::get(context, opId));
-
-                    // if we fail to add one of the decomps, we still want to try for the rest
-                    std::ignore = addRuleNode(funcOp, ruleNodes);
-                    LDBG() << "adding rule " << funcOp.getName();
-                    module.push_back(std::move(outOp.release()));
+                // Note: a single target gate may have several alternative rules, so we only mark a
+                // target handled *after* walking the whole module, otherwise the second alternative
+                // would be dropped.
+                auto targetGate = func->getAttrOfType<StringAttr>("target_gate");
+                if (!targetGate || handledOpIds.contains(targetGate.getValue())) {
+                    return mlir::WalkResult::advance();
                 }
+                mlir::OwningOpRef<mlir::func::FuncOp> outOp;
+                func->remove();
+                outOp = mlir::OwningOpRef<mlir::func::FuncOp>(func);
+                LDBG() << "materializing rule " << outOp.get().getName();
+                newlyHandled.push_back(targetGate.getValue());
+                module.push_back(std::move(outOp.release()));
                 return mlir::WalkResult::advance();
             });
+            for (llvm::StringRef target : newlyHandled) {
+                handledOpIds.insert(target);
+            }
+            // Mark this op handled even if its closure produced no rule (e.g. no decomposition
+            // exists), so repeated instances of the same gate do not re-invoke the Python loader.
+            handledOpIds.insert(opId);
         }
         return success();
     }
 
     void getOperators(std::vector<OperatorNode> &operators) {
-        // TODO: replace this with DecomposableGate interface. We will drop support for any other op
-        // types once the interface has been implemented for the core operations in the quantum
-        // dialect.
-        // The interface will provide one unified way of generating operator nodes from operations,
-        // with consistent getter methods for all relevant data fields.
-        getOperation().walk([&](quantum::QuantumGate op) {
+        getOperation().walk([&](DecomposableGate op) {
             if (DecompUtils::isInDecompRule(op)) {
                 return;
             }
-            OperatorNode node;
+            assert(!op->getParentOfType<AdjointOp>() && !op->getParentOfType<CtrlOp>() &&
+                   "graph-decomposition requires op-level modifiers: ctrl/adjoint regions must be "
+                   "lowered before the decomposition graph is built");
+
+            // Derive the id and modifier-wrapped name from the single parse path, so operator nodes
+            // and rule nodes agree on the spelling of `C(...)`/`Adjoint(...)`.
+            OperatorNode node = parseOperator(op.getGraphOpId());
+
+            // numWires/numParams are debug-only; parseOperator leaves them at defaults for the
+            // graphOpId form, so we need to fill them accurately from the op here.
             node.numWires = op.getNonCtrlQubitOperands().size();
-            node.adjoint = op.getAdjointFlag();
-
-            if (auto customOp = llvm::dyn_cast<quantum::CustomOp>(op.getOperation())) {
-                node.name = customOp.getGateName().str();
-            }
-            // Name handling for non-custom ops
-            else {
-                std::string name = op->getName().stripDialect().str();
-                if (name == "gphase") {
-                    name = "GlobalPhase";
-                } else if (name == "paulirot") {
-                    name = cast<DecomposableGate>(op.getOperation()).getGraphOpId();
-                }
-                node.name = name;
-            }
-
             if (auto paramOp =
                     llvm::dyn_cast<catalyst::quantum::ParametrizedGate>(op.getOperation())) {
                 node.numParams = paramOp.getAllParams().size();
@@ -447,22 +520,19 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
     }
 
     /**
-     * @brief Helper to parse a gate name into an OperatorNode.
-     * Handles patterns like "Adjoint(GateName)" and "GateName(metadata)".
+     * @brief Parse a graphOpId string into an OperatorNode.
+     *
+     * The graphOpId format is "<name>{params}{wires}{static}[uid]", where <name> already carries
+     * any name-wrapped op-level modifiers produced by `defaultGetGraphOpId`, e.g.
+     * "C(Adjoint(RX)){0:[f64]}{wires:1}{}".
      */
     OperatorNode parseOperator(llvm::StringRef raw) {
         OperatorNode node;
 
-        // Unwrap "Adjoint(GateName)"
-        if (raw.consume_front("Adjoint(")) {
-            node.adjoint = true;
-            auto closeIdx = raw.rfind(')');
-            if (closeIdx == llvm::StringRef::npos) {
-                node.name = raw.trim().str();
-                return node;
-            }
-            node.name = raw.take_front(closeIdx).trim().str();
-            raw = raw.drop_front(closeIdx + 1); // leftover: "(w,p)" or ""
+        // Base op: either the graphOpId "Name{...}..." form or the legacy "Name(w,p)" form.
+        if (raw.contains('[') || raw.contains('{')) {
+            node.id = raw.str();
+            node.name = raw.take_until([](char c) { return c == '[' || c == '{'; });
         } else {
             auto openIdx = raw.find('(');
             if (openIdx == llvm::StringRef::npos) {
@@ -499,8 +569,9 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         // Load pre-compiled rules (ignore failure, we can try to solve without)
         std::ignore = loadBuiltInDecompositionRules(filename, rules);
 
-        // Lower and load compile-time rules
-        if (failed(loadPythonDecomps(rules))) {
+        // Lower compile-time rules into the module; loadUserDecompositionRules (below) registers
+        // the materialized `__builtin`-prefixed funcs as RuleNodes.
+        if (failed(loadPythonDecomps())) {
             return failure();
         }
 
