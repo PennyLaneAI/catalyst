@@ -12,4 +12,11 @@ interacts with an executor service:
 * Dispatching a previously-shipped qnode kernel
 * Invoking an arbitrary symbol in a shared library
 
-[TOC]
+`dispatch-executor-targets` is what emits these ops. One caller is the `transport` dialect's
+bring-up: a [PennyLane](https://docs.pennylane.ai/en/stable/) `Placement` node marked as
+running out of process needs its code on the machine that runs it, which is what this dialect
+describes.
+
+> [!IMPORTANT]
+> The executor dialect is experimental and will not maintain API stability between
+> releases. Use at your own risk.
