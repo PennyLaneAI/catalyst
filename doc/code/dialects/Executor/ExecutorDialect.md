@@ -1,4 +1,4 @@
-<!-- Manually added, please edit -->
+<!-- Manually maintained; modified from mlir-tblgen output -->
 
 # 'executor' Dialect
 
