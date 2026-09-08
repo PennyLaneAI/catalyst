@@ -7,6 +7,7 @@ file(GLOB SRC
     AdjointLowering/ForwardPass.cpp
     AdjointLowering/QuantumCache.cpp
     AdjointLowering/ReversePass.cpp
+    AdjointLowering/ResolveGateLevelAdjoint.cpp
     BufferizableOpInterfaceImpl.cpp
     CancelInversesPatterns.cpp
     CtrlLowering/CtrlLowering.cpp
