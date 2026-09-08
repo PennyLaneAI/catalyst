@@ -608,7 +608,7 @@ func.func @outer_dyn_loop_calls_nested_helper(%arg0: !quantum.bit, %c4 : index) 
 
 // CHECK-LABEL: "if_else_branching"
 // CHECK: metadata
-// CHECK:       "has_unweighted_branches": true
+// CHECK:       "has_branches": true
 // CHECK: "quantum_operations"
 // CHECK:   "Hadamard": 3
 // CHECK:   "PauliX": 2
@@ -1175,6 +1175,8 @@ func.func @static_trip_count_large_signed_span(%arg0: !quantum.bit) -> !quantum.
 // A branch between the loops prevents the inner loop from being treated as directly nested.
 
 // CHECK-LABEL: "dyn_for_loop_1": {
+// CHECK: metadata
+// CHECK:       "has_branches": true
 // CHECK: "quantum_operations"
 // CHECK:   "PauliX": 1
 // CHECK-LABEL: "for_loop_1": {
@@ -2061,7 +2063,7 @@ func.func @qref(%arg0: !qref.bit, %arg1: !qref.reg<2>) {
 
 // CHECK-LABEL: "if_estimated_probability"
 // CHECK: metadata
-// CHECK:       "has_unweighted_branches": false
+// CHECK:       "has_branches": false
 // CHECK: quantum_operations
 // CHECK:       "Hadamard": 5
 func.func @if_estimated_probability(%arg0: !quantum.bit, %cond: i1) -> !quantum.bit {
@@ -2166,7 +2168,7 @@ func.func @prob_if_in_loop(%arg0: !quantum.bit, %cond: i1) -> !quantum.bit {
 // 0.2*5 + 0.3*10 + 0.5*2 = 5.
 
 // CHECK-LABEL: "switch_estimated_probabilities"
-// CHECK: "has_unweighted_branches": false
+// CHECK: "has_branches": false
 // CHECK: "quantum_operations"
 // CHECK:       "PauliX": 5
 func.func @switch_estimated_probabilities(%arg0: !quantum.bit, %sel: index) -> !quantum.bit {

@@ -251,7 +251,7 @@ void ResourceAnalysis::analyzeIfOp(scf::IfOp ifOp, ResourceResult &result, bool 
     }
 
     // No hint: fall back to worst-case (max across branches).
-    result.hasUnweightedBranches = true;
+    result.hasBranches = true;
 
     if (!ifOp.getElseRegion().empty()) {
         ResourceResult elseResult = makeEmptyResult();
@@ -296,7 +296,7 @@ void ResourceAnalysis::analyzeIndexSwitchOp(scf::IndexSwitchOp switchOp, Resourc
     }
 
     // No hint: fall back to worst-case (max across all cases).
-    result.hasUnweightedBranches = true;
+    result.hasBranches = true;
 
     ResourceResult maxResult = makeEmptyResult();
     bool first = true;
@@ -521,7 +521,7 @@ static void accumulateScaled(ResourceResult &dest, const ResourceResult &source,
         dest.varFunctionCalls[fc.getKey()] = fc.getValue();
     }
     dest.numAllocQubits += source.numAllocQubits * count;
-    dest.hasUnweightedBranches = dest.hasUnweightedBranches || source.hasUnweightedBranches;
+    dest.hasBranches = dest.hasBranches || source.hasBranches;
     dest.hasDynLoop = dest.hasDynLoop || source.hasDynLoop;
     dest.collectDetailedOperations =
         dest.collectDetailedOperations || source.collectDetailedOperations;
