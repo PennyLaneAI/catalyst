@@ -776,6 +776,7 @@
 * The `transport` and `executor` dialects are now documented alongside the other Catalyst dialects.
   [(#3179)](https://github.com/PennyLaneAI/catalyst/pull/3179)
   [(#3180)](https://github.com/PennyLaneAI/catalyst/pull/3180)
+  [(#3197)](https://github.com/PennyLaneAI/catalyst/pull/3197)
 
 <h3>Contributors ✍️</h3>
 
