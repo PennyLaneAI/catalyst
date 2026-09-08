@@ -4,7 +4,7 @@
 
 _A dialect for dispatching kernels and calling symbols on an executor._
 
-The executor dialect models a small set of operations that describe how a host program
+The executor dialect models the set of operations that describe how a host program
 interacts with an executor service:
 
 * Opening a session with an executor endpoint
