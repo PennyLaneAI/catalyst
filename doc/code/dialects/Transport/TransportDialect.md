@@ -10,15 +10,16 @@ exchanging memory handles, establishing a data path, and running rounds
 of request/reply traffic until teardown.
 
 This is what a Backline compiles to. A PennyLane
-[`Placement`](https://docs.pennylane.ai/en/latest/code/api/pennylane.backline.Placement.html)
+[Placement](https://docs.pennylane.ai/en/latest/code/api/pennylane.backline.Placement.html)
 is serialized into the `catalyst.backline` module attribute, naming one controller and the
-coprocessors it drives; `inject-transport-session` reads that attribute and
-emits the session bring-up and teardown in terms of these ops,
-`lower-decode-to-transport` turns a decode into a request/reply round over
-the session, and `convert-transport-to-llvm` lowers the result to
-`__catalyst__transport__*` runtime calls. A node here is a Backline
-participant -- a controller or a coprocessor -- and the placement's
-transport selects which compiled backend carries the traffic.
+coprocessors it drives; [inject-transport-session](Transport/TransportPasses.html#inject-transport-session)
+reads that attribute and emits the session bring-up and teardown in terms of these ops,
+[lower-decode-to-transport](Transport/TransportPasses.html#lower-decode-to-transport) turns a
+decode into a request/reply round over the session, and
+[convert-transport-to-llvm](Transport/TransportPasses.html#convert-transport-to-llvm) lowers the
+result to `__catalyst__transport__*` runtime calls. A node here is a Backline participant -- a
+controller or a coprocessor -- and the placement's transport selects which compiled backend
+carries the traffic.
 
 ## Types
 
