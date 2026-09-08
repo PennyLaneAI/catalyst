@@ -149,3 +149,50 @@ module {
     ASSERT_EQ(ppm.getGraphOpId(),
               "PauliMeasure{}{wires:2}{meas_uid:None,pauli_word:XY,postselect:None}");
 }
+
+TEST(DecomposableGateInterfaceTests, PPRotationOpAdjoint) {
+    std::string moduleStr = R"mlir(
+module {
+  %q0 = quantum.alloc_qb : !quantum.bit
+  %q1 = quantum.alloc_qb : !quantum.bit
+  %q2 = quantum.alloc_qb : !quantum.bit
+  %0:3 = pbc.ppr ["X", "Y", "Z"](-4) %q0, %q1, %q2 : !quantum.bit, !quantum.bit, !quantum.bit
+}
+    )mlir";
+
+    DialectRegistry registry;
+    registry.insert<mlir::arith::ArithDialect, catalyst::quantum::QuantumDialect, PBCDialect>();
+    MLIRContext context(registry);
+    ParserConfig config(&context, /*verifyAfterParse=*/false);
+    OwningOpRef<ModuleOp> module = parseSourceString<ModuleOp>(moduleStr, config);
+
+    DecomposableGate ppr = *module->getOps<PPRotationOp>().begin();
+
+    // Inverse is encoded as a negative rotation_kind, not an Adjoint(...) wrap.
+    ASSERT_EQ(ppr.getOperatorName(), "PauliRot");
+    ASSERT_EQ(ppr.getGraphOpId(), "PauliRot{theta:[f64]}{wires:3}{pauli_word:XYZ}");
+}
+
+TEST(DecomposableGateInterfaceTests, PPRotationArbitraryOpAdjoint) {
+    std::string moduleStr = R"mlir(
+module {
+  %angle = arith.constant -3.1 : f64
+  %q0 = quantum.alloc_qb : !quantum.bit
+  %q1 = quantum.alloc_qb : !quantum.bit
+  %q2 = quantum.alloc_qb : !quantum.bit
+  %0:3 = pbc.ppr.arbitrary ["X", "Y", "Z"](%angle) %q0, %q1, %q2 : !quantum.bit, !quantum.bit, !quantum.bit
+}
+    )mlir";
+
+    DialectRegistry registry;
+    registry.insert<mlir::arith::ArithDialect, catalyst::quantum::QuantumDialect, PBCDialect>();
+    MLIRContext context(registry);
+    ParserConfig config(&context, /*verifyAfterParse=*/false);
+    OwningOpRef<ModuleOp> module = parseSourceString<ModuleOp>(moduleStr, config);
+
+    DecomposableGate ppr = *module->getOps<PPRotationArbitraryOp>().begin();
+
+    // Inverse is encoded as a negated angle operand, not an Adjoint(...) wrap.
+    ASSERT_EQ(ppr.getOperatorName(), "PauliRot");
+    ASSERT_EQ(ppr.getGraphOpId(), "PauliRot{theta:[f64]}{wires:3}{pauli_word:XYZ}");
+}
