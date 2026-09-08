@@ -2,7 +2,7 @@
 
 # 'transport' Dialect
 
-_A transport dialect for setting up and driving a data-movement session._
+_A dialect for setting up and driving data-movement in a transport session._
 
 The transport dialect models a connection-oriented data-movement session
 between two endpoints: creating a session, bringing up the connection,
