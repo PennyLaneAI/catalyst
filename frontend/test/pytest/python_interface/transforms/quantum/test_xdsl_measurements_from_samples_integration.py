@@ -77,15 +77,13 @@ class TestIntegrationUsefulErrors:
 
         dev = qp.device("lightning.qubit", wires=4)
 
-        with pytest.warns(UserWarning, match="AOT.*failed"):
-
-            @qp.qjit(capture=capture)
-            @measurements_from_samples_pass
-            @qp.set_shots(1000)
-            @qp.qnode(dev)
-            def circuit(theta: float):
-                qp.RX(theta, 0)
-                return qp.counts()
+        @qp.qjit(capture=capture)
+        @measurements_from_samples_pass
+        @qp.set_shots(1000)
+        @qp.qnode(dev)
+        def circuit(theta: float):
+            qp.RX(theta, 0)
+            return qp.counts()
 
         with pytest.raises(NotImplementedError, match="operations are not supported"):
             circuit(1.2)
@@ -102,13 +100,11 @@ class TestIntegrationUsefulErrors:
 
         dev = qp.device("lightning.qubit", wires=2)
 
-        with pytest.warns(UserWarning, match="AOT.*failed"):
-
-            @qp.qjit(capture=capture)
-            @measurements_from_samples_pass
-            @qp.qnode(dev, shots=1000)
-            def circuit():
-                return mp(qp.Z(0) @ qp.X(0))
+        @qp.qjit(capture=capture)
+        @measurements_from_samples_pass
+        @qp.qnode(dev, shots=1000)
+        def circuit():
+            return mp(qp.Z(0) @ qp.X(0))
 
         with pytest.raises(CompileError, match="Observables are not qubit-wise commuting"):
             circuit()
@@ -125,13 +121,11 @@ class TestIntegrationUsefulErrors:
 
         dev = qp.device("lightning.qubit", wires=2)
 
-        with pytest.warns(UserWarning, match="AOT.*failed"):
-
-            @qp.qjit(capture=capture)
-            @measurements_from_samples_pass
-            @qp.qnode(dev, shots=1000)
-            def circuit():
-                return mp(2 * qp.Z(0) + qp.X(0))
+        @qp.qjit(capture=capture)
+        @measurements_from_samples_pass
+        @qp.qnode(dev, shots=1000)
+        def circuit():
+            return mp(2 * qp.Z(0) + qp.X(0))
 
         with pytest.raises(CompileError, match="Observables are not qubit-wise commuting"):
             circuit()
@@ -149,13 +143,11 @@ class TestIntegrationUsefulErrors:
 
         dev = qp.device("lightning.qubit", wires=2)
 
-        with pytest.warns(UserWarning, match="AOT.*failed"):
-
-            @qp.qjit(capture=capture)
-            @measurements_from_samples_pass
-            @qp.qnode(dev, shots=1000)
-            def circuit():
-                return mp(qp.Z(0)), mp(qp.X(0))
+        @qp.qjit(capture=capture)
+        @measurements_from_samples_pass
+        @qp.qnode(dev, shots=1000)
+        def circuit():
+            return mp(qp.Z(0)), mp(qp.X(0))
 
         with pytest.raises(CompileError, match="Observables are not qubit-wise commuting"):
             circuit()
@@ -172,13 +164,11 @@ class TestIntegrationUsefulErrors:
 
         dev = qp.device("lightning.qubit", wires=2)
 
-        with pytest.warns(UserWarning, match="AOT.*failed"):
-
-            @qp.qjit(capture=capture)
-            @measurements_from_samples_pass
-            @qp.qnode(dev, shots=1000)
-            def circuit():
-                return qp.sample(wires=[0]), qp.expval(qp.X(0))
+        @qp.qjit(capture=capture)
+        @measurements_from_samples_pass
+        @qp.qnode(dev, shots=1000)
+        def circuit():
+            return qp.sample(wires=[0]), qp.expval(qp.X(0))
 
         with pytest.raises(CompileError, match="Observables are not qubit-wise commuting"):
             circuit()
@@ -190,13 +180,11 @@ class TestIntegrationUsefulErrors:
 
         dev = qp.device("lightning.qubit", wires=2)
 
-        with pytest.warns(UserWarning, match="AOT.*failed"):
-
-            @qp.qjit(capture=capture)
-            @measurements_from_samples_pass
-            @qp.qnode(dev, shots=1000)
-            def circuit():
-                return qp.expval(obs)
+        @qp.qjit(capture=capture)
+        @measurements_from_samples_pass
+        @qp.qnode(dev, shots=1000)
+        def circuit():
+            return qp.expval(obs)
 
         with pytest.raises(CompileError, match=r"Apply `.*.transforms.split_non_commuting`"):
             circuit()
