@@ -71,7 +71,8 @@ struct ResourceResult {
     bool isQnode = false;
 
     // whether the function contains conditional control flow (scf.if / scf.index_switch)
-    bool hasBranches = false;
+    // without resource hints
+    bool hasUnweightedBranches = false;
 
     // whether any loop has a trip count that could not be statically resolved
     bool hasDynLoop = false;

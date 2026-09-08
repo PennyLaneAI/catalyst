@@ -86,7 +86,7 @@ void ResourceResult::mergeWith(const ResourceResult &other, MergeMethod method) 
 
     numAllocQubits = applyMerge(numAllocQubits, other.numAllocQubits, method);
 
-    hasBranches = hasBranches || other.hasBranches;
+    hasUnweightedBranches = hasUnweightedBranches || other.hasUnweightedBranches;
     hasDynLoop = hasDynLoop || other.hasDynLoop;
     collectDetailedOperations = collectDetailedOperations || other.collectDetailedOperations;
 
@@ -130,7 +130,7 @@ void ResourceResult::multiplyBy(double scalar) {
 // (fractional) count values, but the JSON output always reports the nearest integer.
 //
 // JSON Schema (per function, keyed by name at the root):
-//   metadata: { qnode, auto_qubit_management?, has_branches, device_name? }
+//   metadata: { qnode, auto_qubit_management?, has_unweighted_branches, device_name? }
 //   num_qubits: { alloc, arg, total }
 //   classical_instructions: { "dialect.op": count, ... }
 //   quantum_operations: { "<wires>": { "op_name": count, ... }, ... }  // optional
@@ -149,7 +149,7 @@ llvm::json::Object ResourceResult::toJson() const {
     llvm::json::Object metaDataObject;
     metaDataObject["device_name"] = deviceName;
     metaDataObject["qnode"] = isQnode;
-    metaDataObject["has_branches"] = hasBranches;
+    metaDataObject["has_unweighted_branches"] = hasUnweightedBranches;
     metaDataObject["auto_qubit_management"] = autoQubitManagement;
     funcObj["metadata"] = std::move(metaDataObject);
 
