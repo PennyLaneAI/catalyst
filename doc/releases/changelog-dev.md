@@ -571,6 +571,9 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* Integration tests for :func:`pennylane.specs` have been migrated from the Catalyst frontend to PennyLane.
+  [(#3107)](https://github.com/PennyLaneAI/catalyst/pull/3107)
+
 * Update calls to `GlobalPhase` to no longer use the `wires` argument.
   [(#3108)](https://github.com/PennyLaneAI/catalyst/pull/3108)
   
