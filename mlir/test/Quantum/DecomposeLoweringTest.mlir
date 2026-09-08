@@ -628,6 +628,97 @@ module @circuit_with_operator_op {
 
 // -----
 
+// CHECK-LABEL: module @operator_tensor_params
+module @operator_tensor_params {
+  func.func public @test_tensor_params(
+      %time: tensor<f64>,
+      %core: tensor<2x2xf64>,
+      %leaf: tensor<2x2xf64>,
+      %constant: tensor<f64>) -> !quantum.reg attributes {quantum.node} {
+    %reg = quantum.alloc( 1) : !quantum.reg
+    %qubit = quantum.extract %reg[ 0] : !quantum.reg -> !quantum.bit
+    // CHECK-NOT: tensor.from_elements
+    // CHECK: [[ANGLE:%.+]] = tensor.extract %{{.+}}[] : tensor<f64>
+    // CHECK: [[OUT:%.+]] = quantum.custom "RZ"([[ANGLE]])
+    // CHECK: quantum.operator "TensorSink"(%{{.+}}: tensor<2x2xf64>, %{{.+}}: tensor<2x2xf64>, %{{.+}}: tensor<f64>)
+    // CHECK-NOT: quantum.operator "TensorHybridOp"
+    %out = quantum.operator "TensorHybridOp"(
+        %time: tensor<f64>,
+        %core: tensor<2x2xf64>,
+        %leaf: tensor<2x2xf64>,
+        %constant: tensor<f64>) qubits(%qubit)
+        param_map = {evolution_time = [0], hamiltonian = [1, 2, 3]}
+        qubit_map = {wires = [0]}
+    %updated = quantum.insert %reg[ 0], %out : !quantum.reg, !quantum.bit
+    return %updated : !quantum.reg
+  }
+
+  func.func private @tensor_hybrid_rule(
+      %reg: !quantum.reg,
+      %time: tensor<f64>,
+      %core: tensor<2x2xf64>,
+      %leaf: tensor<2x2xf64>,
+      %constant: tensor<f64>,
+      %wires: tensor<1xi64>) -> !quantum.reg attributes {
+        target_gate = "TensorHybridOp{evolution_time:[tensor<f64>],hamiltonian:[tensor<2x2xf64>,tensor<2x2xf64>,tensor<f64>]}{wires:1}{}"
+      } {
+    %wire_tensor = stablehlo.slice %wires [0:1] : (tensor<1xi64>) -> tensor<1xi64>
+    %wire_scalar = stablehlo.reshape %wire_tensor : (tensor<1xi64>) -> tensor<i64>
+    %wire = tensor.extract %wire_scalar[] : tensor<i64>
+    %qubit = quantum.extract %reg[%wire] : !quantum.reg -> !quantum.bit
+    %angle = tensor.extract %time[] : tensor<f64>
+    %out = quantum.custom "RZ"(%angle) %qubit : !quantum.bit
+    %sink = quantum.operator "TensorSink"(
+        %core: tensor<2x2xf64>,
+        %leaf: tensor<2x2xf64>,
+        %constant: tensor<f64>) qubits(%out)
+        param_map = {data = [0, 1, 2]} qubit_map = {wires = [0]}
+    %updated = quantum.insert %reg[%wire], %sink : !quantum.reg, !quantum.bit
+    return %updated : !quantum.reg
+  }
+}
+
+// -----
+
+// CHECK-LABEL: module @specialized_control_wire
+module @specialized_control_wire {
+  func.func public @test_specialized_control_wire() -> !quantum.reg attributes {quantum.node} {
+    %true = arith.constant true
+    %reg = quantum.alloc( 2) : !quantum.reg
+    %target = quantum.extract %reg[ 0] : !quantum.reg -> !quantum.bit
+    %control = quantum.extract %reg[ 1] : !quantum.reg -> !quantum.bit
+    // CHECK: quantum.custom "PauliX"() %{{.*}} ctrls(%{{.*}}) ctrlvals(%{{.*}})
+    // CHECK-NOT: quantum.operator "OmittedControlWire"
+    %out, %out_ctrl = quantum.operator "OmittedControlWire"() qubits(%target)
+        ctrls(%control) ctrl_vals(%true) qubit_map = {wires = [0]}
+    %updated_target = quantum.insert %reg[ 0], %out : !quantum.reg, !quantum.bit
+    %updated_control = quantum.insert %updated_target[ 1], %out_ctrl : !quantum.reg, !quantum.bit
+    return %updated_control : !quantum.reg
+  }
+
+  // The control index was specialized to its canonical qreg position, so no control-wire tensor
+  // formal remains.
+  func.func private @specialized_control_rule(
+      %reg: !quantum.reg, %wires: tensor<1xi64>) -> !quantum.reg attributes {
+        target_gate = "C(OmittedControlWire){}{wires:1}{}"
+      } {
+    %wire_tensor = stablehlo.slice %wires [0:1] : (tensor<1xi64>) -> tensor<1xi64>
+    %wire_scalar = stablehlo.reshape %wire_tensor : (tensor<1xi64>) -> tensor<i64>
+    %wire = tensor.extract %wire_scalar[] : tensor<i64>
+    %target = quantum.extract %reg[%wire] : !quantum.reg -> !quantum.bit
+    %control = quantum.extract %reg[ 1] : !quantum.reg -> !quantum.bit
+    %true = arith.constant true
+    %out, %out_ctrl = quantum.custom "PauliX"() %target ctrls(%control) ctrlvals(%true)
+        : !quantum.bit ctrls !quantum.bit
+    %updated_target = quantum.insert %reg[%wire], %out : !quantum.reg, !quantum.bit
+    %updated_control = quantum.insert %updated_target[ 1], %out_ctrl
+        : !quantum.reg, !quantum.bit
+    return %updated_control : !quantum.reg
+  }
+}
+
+// -----
+
 // CHECK-LABEL: module @qreg_at_not_first_arg
 module @qreg_at_not_first_arg {
   func.func public @test_qreg_at_not_first_arg() attributes {quantum.node} {

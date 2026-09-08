@@ -460,7 +460,7 @@ def compile_decomp_rules(
         decomp_rules = fetch_all_reachable_decomposition_rules_from_op(
             op_name=op_cls.__name__,
             op_id=op_id,
-            dynamic_shape=non_hybrid_dynamic_shape,
+            dynamic_shape=with_hybrid_dynamic_shape,
             wire_lens=non_hybrid_wire_lens,
             static_data=repack_static_data,
             extra_data=extra_data,
@@ -481,6 +481,14 @@ def _qref_operator_p_lowering(jax_ctx: mlir.LoweringRuleContext, *args, op_cls, 
     n_ctrls = kwargs.pop("n_ctrls")
     wire_lens = kwargs.pop("wire_lens")
     collect_decomp_rules = kwargs.pop("collect_decomp_rules")
+
+    n_ctrl_work_wires = kwargs.pop("n_ctrl_work_wires", 0)
+    kwargs.pop("ctrl_work_wire_type", None)
+    if n_ctrl_work_wires:
+        raise NotImplementedError(
+            "Lowering a controlled Operator2 with control work wires is not supported yet; "
+            f"got {n_ctrl_work_wires} work wire(s)."
+        )
 
     repack_static_data = {k: unflatten(*v) for k, v in kwargs.items()}
 

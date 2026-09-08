@@ -168,7 +168,10 @@ struct DecomposableGatePattern final : public OpInterfaceRewritePattern<Decompos
         assert(analyzer && "Analyzer should be valid");
 
         auto operands = analyzer.prepareOperands(rule, rewriter, op.getLoc());
-        SmallVector<Value> inlinedFunctionResults = inlineRuleBody(rewriter, rule, operands);
+        if (failed(operands)) {
+            return failure();
+        }
+        SmallVector<Value> inlinedFunctionResults = inlineRuleBody(rewriter, rule, *operands);
 
         // Replace the op with the inlined function and adjust the insert ops for the qreg mode
         if (inlinedFunctionResults.size() == 1 &&

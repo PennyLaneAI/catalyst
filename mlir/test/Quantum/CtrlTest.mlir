@@ -193,14 +193,36 @@ func.func @ctrl_measure(%ctrl: !quantum.bit, %q: !quantum.bit) -> !quantum.bit {
 
 // -----
 
-// Region-bearing control flow outside the supported set (scf.if / scf.for / scf.while /
-// scf.index_switch) has no rule for controlling its body, so it is rejected rather than silently
-// left uncontrolled. scf.execute_region stands in for any such op here.
+// Region-bearing classical operations are hoisted out of the control region.
+func.func @ctrl_classical_region(%ctrl: !quantum.bit, %q: !quantum.bit)
+    -> (!quantum.bit, !quantum.bit) {
+  %true = arith.constant true
+  // CHECK-LABEL: @ctrl_classical_region
+  // CHECK: [[ANGLE:%.+]] = scf.execute_region -> f64
+  // CHECK: quantum.custom "RZ"([[ANGLE]]) %{{.*}} ctrls(%{{.*}}) ctrlvals(%{{.*}})
+  // CHECK-NOT: quantum.ctrl
+  %outc, %outq = quantum.ctrl(%ctrl) ctrlvals(%true) (%q) : !quantum.bit -> !quantum.bit {
+  ^bb0(%arg0: !quantum.bit):
+    %angle = scf.execute_region -> f64 {
+      %value = arith.constant 1.0 : f64
+      scf.yield %value : f64
+    }
+    %rz = quantum.custom "RZ"(%angle) %arg0 : !quantum.bit
+    quantum.yield %rz : !quantum.bit
+  }
+  return %outc, %outq : !quantum.bit, !quantum.bit
+}
+
+// -----
+
+// A region-bearing classical operation that contains quantum operations is rejected rather than
+// silently leaving those operations uncontrolled.
+// CHECK-LABEL: @ctrl_unsupported_scf
 func.func @ctrl_unsupported_scf(%ctrl: !quantum.bit, %q: !quantum.bit) -> !quantum.bit {
   %true = arith.constant true
   %outc, %outq = quantum.ctrl(%ctrl) ctrlvals(%true) (%q) : !quantum.bit -> !quantum.bit {
   ^bb0(%arg0: !quantum.bit):
-    // expected-error @+1 {{unsupported scf operation inside a quantum.ctrl region}}
+    // expected-error @+1 {{unsupported region-bearing operation containing quantum operations inside a quantum.ctrl region}}
     %r = scf.execute_region -> !quantum.bit {
       %h = quantum.custom "Hadamard"() %arg0 : !quantum.bit
       scf.yield %h : !quantum.bit

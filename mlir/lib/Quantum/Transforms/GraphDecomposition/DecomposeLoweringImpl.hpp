@@ -190,8 +190,8 @@ class BaseSignatureAnalyzer {
     //    - func(qreg, param*, inWires*, inCtrlWires*?, inCtrlValues*?) -> qreg
     // 2. qubit mode:
     //    - func(param*, inQubits*, inCtrlQubits*?, inCtrlValues*?) -> outQubits*
-    llvm::SmallVector<Value> prepareOperands(func::FuncOp rule, PatternRewriter &rewriter,
-                                             Location loc) {
+    FailureOr<llvm::SmallVector<Value>> prepareOperands(func::FuncOp rule,
+                                                        PatternRewriter &rewriter, Location loc) {
         auto funcType = rule.getFunctionType();
         auto funcInputs = funcType.getInputs();
 
@@ -210,45 +210,125 @@ class BaseSignatureAnalyzer {
         bool hasQreg = (qregIt != rule.getFunctionType().getInputs().end());
 
         int operandIdx = 0;
+        auto appendOperand = [&](Value value) {
+            if (operandIdx >= static_cast<int>(funcInputsNoQreg.size())) {
+                rule.emitError() << "decomposition rule has too few non-register inputs for target "
+                                    "operation operands; attempted operand "
+                                 << operandIdx << " of " << funcInputsNoQreg.size();
+                return failure();
+            }
+            operands[operandIdx++] = value;
+            return success();
+        };
+
         if (!signature.params.empty()) {
-            auto [startIdx, endIdx] =
-                findParamTypeRange(funcInputsNoQreg, signature.params.size(), operandIdx);
-            ArrayRef<Type> paramsTypes =
-                ArrayRef<Type>(funcInputsNoQreg).slice(startIdx, endIdx - startIdx);
-            auto updatedParams = generateParams(signature.params, paramsTypes, rewriter, loc);
-            for (Value param : updatedParams) {
-                operands[operandIdx++] = param;
+            const bool hasMatchingParamPrefix =
+                signature.params.size() <= funcInputsNoQreg.size() &&
+                llvm::all_of(llvm::enumerate(signature.params), [&](auto indexedParam) {
+                    return indexedParam.value().getType() == funcInputsNoQreg[indexedParam.index()];
+                });
+
+            if (hasMatchingParamPrefix) {
+                for (Value param : signature.params) {
+                    if (failed(appendOperand(param))) {
+                        return failure();
+                    }
+                }
+            } else {
+                auto paramRange =
+                    findParamTypeRange(funcInputsNoQreg, signature.params.size(), operandIdx);
+                if (failed(paramRange)) {
+                    auto diag = rule.emitError(
+                        "decomposition rule parameter ABI does not match the target operation; "
+                        "operation parameter types: ");
+                    llvm::interleaveComma(signature.params, diag,
+                                          [&](Value param) { diag << param.getType(); });
+                    diag << "; rule non-register input types: ";
+                    llvm::interleaveComma(funcInputsNoQreg, diag, [&](Type type) { diag << type; });
+                    return failure();
+                }
+
+                auto [startIdx, endIdx] = *paramRange;
+                ArrayRef<Type> paramsTypes =
+                    ArrayRef<Type>(funcInputsNoQreg).slice(startIdx, endIdx - startIdx);
+                auto updatedParams = generateParams(signature.params, paramsTypes, rewriter, loc);
+                for (Value param : updatedParams) {
+                    if (failed(appendOperand(param))) {
+                        return failure();
+                    }
+                }
             }
         }
 
         if (hasQreg) {
-            for (const auto &indices : {signature.inWireIndices, signature.inCtrlWireIndices}) {
-                if (!indices.empty()) {
-                    operands[operandIdx] =
-                        fromTensorOrAsIs(indices, funcInputsNoQreg[operandIdx], rewriter, loc);
-                    operandIdx++;
+            if (!signature.inWireIndices.empty()) {
+                if (operandIdx >= static_cast<int>(funcInputsNoQreg.size())) {
+                    rule.emitError() << "decomposition rule '" << rule.getSymName()
+                                     << "' has no input for a target-operation wire register";
+                    return failure();
+                }
+                Value wireOperand = fromTensorOrAsIs(signature.inWireIndices,
+                                                     funcInputsNoQreg[operandIdx], rewriter, loc);
+                if (failed(appendOperand(wireOperand))) {
+                    return failure();
+                }
+            }
+
+            // A qreg rule may specialize synthesized control-wire indices to constants. The qreg
+            // still carries the live control qubits at those canonical indices.
+            const bool hasControlWireSlot =
+                operandIdx < static_cast<int>(funcInputsNoQreg.size()) &&
+                isa<RankedTensorType>(funcInputsNoQreg[operandIdx]) &&
+                cast<RankedTensorType>(funcInputsNoQreg[operandIdx]).getElementType().isInteger(64);
+            if (!signature.inCtrlWireIndices.empty() && hasControlWireSlot) {
+                Value controlWires = fromTensorOrAsIs(signature.inCtrlWireIndices,
+                                                      funcInputsNoQreg[operandIdx], rewriter, loc);
+                if (failed(appendOperand(controlWires))) {
+                    return failure();
                 }
             }
         } else {
             for (auto inQubit : signature.inQubits) {
-                operands[operandIdx] =
+                if (operandIdx >= static_cast<int>(funcInputsNoQreg.size())) {
+                    rule.emitError("decomposition rule has no input for a target-operation qubit");
+                    return failure();
+                }
+                Value qubitOperand =
                     fromTensorOrAsIs(inQubit, funcInputsNoQreg[operandIdx], rewriter, loc);
-                operandIdx++;
+                if (failed(appendOperand(qubitOperand))) {
+                    return failure();
+                }
             }
 
             for (auto inCtrlQubit : signature.inCtrlQubits) {
-                operands[operandIdx] =
+                if (operandIdx >= static_cast<int>(funcInputsNoQreg.size())) {
+                    rule.emitError(
+                        "decomposition rule has no input for a target-operation control qubit");
+                    return failure();
+                }
+                Value controlOperand =
                     fromTensorOrAsIs(inCtrlQubit, funcInputsNoQreg[operandIdx], rewriter, loc);
-                operandIdx++;
+                if (failed(appendOperand(controlOperand))) {
+                    return failure();
+                }
             }
         }
 
         // Pass the control values only if the rule has a slot for them
         if (!signature.inCtrlValues.empty() &&
             operandIdx < static_cast<int>(funcInputsNoQreg.size())) {
-            operands[operandIdx] = fromTensorOrAsIs(signature.inCtrlValues,
-                                                    funcInputsNoQreg[operandIdx], rewriter, loc);
-            operandIdx++;
+            Value controlValues = fromTensorOrAsIs(signature.inCtrlValues,
+                                                   funcInputsNoQreg[operandIdx], rewriter, loc);
+            if (failed(appendOperand(controlValues))) {
+                return failure();
+            }
+        }
+
+        if (operandIdx != static_cast<int>(funcInputsNoQreg.size())) {
+            rule.emitError() << "decomposition rule has " << funcInputsNoQreg.size()
+                             << " non-register inputs but only " << operandIdx
+                             << " target-operation operands were available";
+            return failure();
         }
 
         if (hasQreg) {
@@ -302,22 +382,24 @@ class BaseSignatureAnalyzer {
     }
 
     // Helper function to find the range of function input types that correspond to params
-    static std::pair<size_t, size_t> findParamTypeRange(ArrayRef<Type> funcInputs,
-                                                        size_t sigParamCount, size_t startIdx = 0) {
+    static FailureOr<std::pair<size_t, size_t>>
+    findParamTypeRange(ArrayRef<Type> funcInputs, size_t sigParamCount, size_t startIdx = 0) {
         size_t paramTypeCount = 0;
         size_t paramTypeEnd = startIdx;
 
         while (paramTypeCount < sigParamCount) {
-            assert(paramTypeEnd < funcInputs.size() &&
-                   "param type end should be less than function input size");
+            if (paramTypeEnd >= funcInputs.size()) {
+                return failure();
+            }
             paramTypeCount += getElementsCount(funcInputs[paramTypeEnd]);
             paramTypeEnd++;
         }
 
-        assert(paramTypeCount == sigParamCount &&
-               "param type count should be equal to signature param count");
+        if (paramTypeCount != sigParamCount) {
+            return failure();
+        }
 
-        return {startIdx, paramTypeEnd};
+        return std::pair{startIdx, paramTypeEnd};
     }
 
     // generate params for the decomposition function based on function type requirements
