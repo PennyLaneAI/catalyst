@@ -19,9 +19,7 @@ include "mlir/IR/OpBase.td"
 include "mlir/IR/BuiltinAttributes.td"
 include "mlir/IR/CommonTypeConstraints.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
-include "Transport/IR/TransportAttrDefs.td"
 include "Transport/IR/TransportDialect.td"
-include "Transport/IR/TransportTypes.td"
 
 // A round's payload or reply buffer: a 1-D memref (buffer form) or tensor (value form).
 def Transport_Buffer : MemRefRankOf<[I1, I8, I16, I32, I64, Index], [1]>;
