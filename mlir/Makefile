@@ -7,9 +7,12 @@ MK_ABSPATH := $(abspath $(lastword $(MAKEFILE_LIST)))
 MK_DIR := $(dir $(MK_ABSPATH))
 DIALECTS_BUILD_DIR ?= $(MK_DIR)/build
 DIALECTS_DOCS_BUILD_DIR ?= $(MK_DIR)/build-docs
-LLVM_BUILD_DIR ?= $(MK_DIR)/llvm-project/build
-STABLEHLO_BUILD_DIR ?= $(MK_DIR)/stablehlo/build
-ENZYME_BUILD_DIR ?= $(MK_DIR)/Enzyme/build
+LLVM_SRC_DIR ?= $(MK_DIR)/llvm-project
+LLVM_BUILD_DIR ?= $(LLVM_SRC_DIR)/build
+STABLEHLO_SRC_DIR ?= $(MK_DIR)/stablehlo
+STABLEHLO_BUILD_DIR ?= $(STABLEHLO_SRC_DIR)/build
+ENZYME_SRC_DIR ?= $(MK_DIR)/Enzyme
+ENZYME_BUILD_DIR ?= $(ENZYME_SRC_DIR)/build
 RT_BUILD_DIR ?= $(MK_DIR)/../runtime/build
 DIST_DIR ?= $(MK_DIR)/dist
 ENABLE_ASAN ?= OFF
@@ -160,7 +163,7 @@ enzyme:
 
 .PHONY: plugin
 plugin:
-	[ -f $(MK_DIR)/standalone ] || cp -r $(MK_DIR)/llvm-project/mlir/examples/standalone .
+	[ -d $(MK_DIR)/standalone ] || cp -r $(LLVM_SRC_DIR)/mlir/examples/standalone $(MK_DIR)
 	@if patch -p0 --dry-run -N < $(MK_DIR)/patches/test-plugin-with-catalyst.patch > /dev/null 2>&1; then \
 		patch -p0 < $(MK_DIR)/patches/test-plugin-with-catalyst.patch; \
 	fi
@@ -192,9 +195,9 @@ dialects:
 		-DPython3_EXECUTABLE=$(PYTHON) \
 		-DPython3_NumPy_INCLUDE_DIRS=$(shell $(PYTHON) -c "import numpy as np; print(np.get_include())") \
 		-DEnzyme_DIR=$(ENZYME_BUILD_DIR) \
-		-DENZYME_SRC_DIR=$(MK_DIR)/Enzyme \
+		-DENZYME_SRC_DIR=$(ENZYME_SRC_DIR) \
 		-DMLIR_DIR=$(LLVM_BUILD_DIR)/lib/cmake/mlir \
-		-DSTABLEHLO_DIR=$(MK_DIR)/stablehlo \
+		-DSTABLEHLO_DIR=$(STABLEHLO_SRC_DIR) \
 		-DSTABLEHLO_BUILD_DIR=$(STABLEHLO_BUILD_DIR) \
 		-DRUNTIME_LIB_DIR=$(RT_BUILD_DIR)/lib \
 		-DMLIR_LIB_DIR=$(LLVM_BUILD_DIR)/lib \
