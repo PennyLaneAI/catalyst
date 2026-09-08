@@ -1,9 +1,4 @@
 .. mdinclude:: Executor/ExecutorDialect.md
-   :end-line: -3
-
-.. important::
-   The executor dialect is experimental and will not maintain API stability between
-   releases. Use at your own risk.
 
 Types
 -----
