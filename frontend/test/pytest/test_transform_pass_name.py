@@ -82,17 +82,31 @@ def test_pass_with_complex_options(options, backend, capture_mode):
         assert 'with options = {"option" = {"1" = 2 : i64, blah = "foo"}}' in captured_circuit.mlir
 
 
-def test_pass_with_unsupported_options(backend):
-    """Tests that unsupported option types raise a clear error."""
+def test_pass_with_none_option(backend):
+    """Tests that None option values are lowered to the MLIR null attribute."""
 
     my_pass = qp.transform(pass_name="my-pass")
 
+    @qp.qjit(target="mlir")
     @partial(my_pass, **{"option": None})
     @qp.qnode(qp.device(backend, wires=1))
     def captured_circuit():
         return qp.expval(qp.PauliZ(0))
 
-    expected_msg = r"Cannot convert Python type <class 'NoneType'> to an MLIR attribute"
+    assert '"option" = none' in captured_circuit.mlir
+
+
+def test_pass_with_unsupported_options(backend):
+    """Tests that unsupported option types raise a clear error."""
+
+    my_pass = qp.transform(pass_name="my-pass")
+
+    @partial(my_pass, **{"option": object()})
+    @qp.qnode(qp.device(backend, wires=1))
+    def captured_circuit():
+        return qp.expval(qp.PauliZ(0))
+
+    expected_msg = r"Cannot convert Python type <class 'object'> to an MLIR attribute"
     with pytest.warns(UserWarning, match="AOT.*failed"):
         qjc = qp.qjit(target="mlir")(captured_circuit)
 
