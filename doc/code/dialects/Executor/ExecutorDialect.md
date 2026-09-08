@@ -2,7 +2,7 @@
 
 # 'executor' Dialect
 
-_A executor dialect for dispatching kernels and calling symbols._
+_A dialect for dispatching kernels and calling symbols on an executor._
 
 The executor dialect models a small set of operations that describe how a host program
 interacts with an executor service:
