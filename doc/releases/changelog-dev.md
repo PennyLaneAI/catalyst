@@ -125,6 +125,7 @@
     [(#3061)](https://github.com/PennyLaneAI/catalyst/pull/3061)
     [(#3160)](https://github.com/PennyLaneAI/catalyst/pull/3160)
     [(#3149)](https://github.com/PennyLaneAI/catalyst/pull/3149)
+    [(#3169)](https://github.com/PennyLaneAI/catalyst/pull/3169)
 
     This pathway of rule injection can be opted-out via a new keyword argument on `qp.qjit` named `collect_decomp_rules`.
     This kwarg controls whether or not to compile the decomposition rules during lower-time. Default value is `True`.
@@ -165,6 +166,12 @@
     Gates with null decomposition rules are simply removed.
 
     6. The pass can now handle register-mode rules that target gates in control flow regions whose qubits were extracted outside the region.
+
+  - `RuleLoweringWarning` is silenced by default. To display these warnings, set
+    `CATALYST_SILENCE_RULE_LOWERING_WARNINGS=0`. This helps debug unexpected decompositions where
+    rules cannot be lowered and they are silently dropped from the graph-decomposition system instead
+    of raising an error.
+    [(#3190)](https://github.com/PennyLaneAI/catalyst/pull/3190)
 
 * A failure during AOT compilation is now downgraded to a warning and logged.
   [(#3100)](https://github.com/PennyLaneAI/catalyst/pull/3100)
@@ -567,6 +574,9 @@
 * Integration tests for :func:`pennylane.specs` have been migrated from the Catalyst frontend to PennyLane.
   [(#3107)](https://github.com/PennyLaneAI/catalyst/pull/3107)
 
+* Update calls to `GlobalPhase` to no longer use the `wires` argument.
+  [(#3108)](https://github.com/PennyLaneAI/catalyst/pull/3108)
+  
 * A GPU CI workflow runs the runtime transport tests on the `single-gpu-x64` runner, gated by
   the `gpu` label.
   [(#3113)](https://github.com/PennyLaneAI/catalyst/pull/3113)
@@ -750,6 +760,9 @@
   `-stage` naming convention used when invoking them from the command line (e.g. `quantum-compilation-stage`).
   [#3002](https://github.com/PennyLaneAI/catalyst/pull/3002)
 
+* A new pass `--resolve-gate-level-adjoint` was added. This pass now handles gate-level adjoint canonicalization, moving it out of the `--canonicalize` pass.
+  [#3155](https://github.com/PennyLaneAI/catalyst/pull/3155)
+
 <h3>Documentation 📝</h3>
 
 * A broken link was removed in the [Compiler Core](https://docs.pennylane.ai/projects/catalyst/en/stable/modules/mlir.html) documentation page. The link referred to where precompiled decomposition rules were implemented, which has since been refactored.
@@ -785,4 +798,5 @@ Shuli Shu,
 Nikhil Sreekumar,
 Paul Haochen Wang,
 Jake Zaia,
+Haider Sajjad,
 Hongsheng Zheng.

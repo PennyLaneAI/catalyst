@@ -363,7 +363,6 @@ def CustomOp : UnitaryGate_Op<"custom", [ParametrizedGate, AttrSizedOperandSegme
         }
     }];
 
-    let hasCanonicalizeMethod = 1;
     let hasVerifier = 1;
 }
 
@@ -618,7 +617,6 @@ def MultiRZOp : UnitaryGate_Op<"multirz", [ParametrizedGate, AttrSizedOperandSeg
         }
     }];
 
-    let hasCanonicalizeMethod = 1;
 }
 
 def PCPhaseOp : UnitaryGate_Op<"pcphase", [ParametrizedGate, AttrSizedOperandSegments]> {
@@ -661,7 +659,6 @@ def PCPhaseOp : UnitaryGate_Op<"pcphase", [ParametrizedGate, AttrSizedOperandSeg
         }
     }];
 
-    let hasCanonicalizeMethod = 1;
 }
 
 def QubitUnitaryOp : UnitaryGate_Op<"unitary", [ParametrizedGate, AttrSizedOperandSegments]> {

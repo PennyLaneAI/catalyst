@@ -34,7 +34,7 @@ def test_basic_dynamic_wire_alloc_plain_API(backend):
     Test basic qp.allocate and qp.deallocate.
     """
 
-    @qjit(capture=True)
+    @qjit(capture=True, collect_decomp_rules=False)
     @qp.qnode(qp.device(backend, wires=3))
     def circuit():
         qp.X(1)  # |010>
@@ -57,7 +57,7 @@ def test_basic_dynamic_wire_alloc_ctx_API(backend):
     Test basic qp.allocate with context manager API.
     """
 
-    @qjit(capture=True)
+    @qjit(capture=True, collect_decomp_rules=False)
     @qp.qnode(qp.device(backend, wires=3))
     def circuit():
         qp.X(1)
@@ -79,7 +79,7 @@ def test_measure(backend):
     Test qp.allocate with qp.Measure ops.
     """
 
-    @qjit(autograph=True, capture=True)
+    @qjit(autograph=True, capture=True, collect_decomp_rules=False)
     @qp.qnode(qp.device(backend, wires=1))
     def circuit():
         with qp.allocate(1) as q:
@@ -102,7 +102,7 @@ def test_measure_with_reset(backend):
     Test qp.allocate with qp.Measure ops with resetting.
     """
 
-    @qjit(autograph=True, capture=True)
+    @qjit(autograph=True, capture=True, collect_decomp_rules=False)
     @qp.qnode(qp.device(backend, wires=1))
     def circuit():
         with qp.allocate(1) as q:
@@ -132,7 +132,7 @@ def test_qp_ctrl(ctrl_val, expected, backend):
     Test qp.allocate with qp.ctrl ops.
     """
 
-    @qjit(capture=True)
+    @qjit(capture=True, collect_decomp_rules=False)
     @qp.qnode(qp.device(backend, wires=1))
     def circuit():
         with qp.allocate(1) as q:
@@ -149,7 +149,7 @@ def test_QubitUnitary(backend):
     Test qp.allocate with qp.QubitUnitary ops.
     """
 
-    @qjit(capture=True)
+    @qjit(capture=True, collect_decomp_rules=False)
     @qp.qnode(qp.device(backend, wires=1))
     def circuit():
         with qp.allocate(2) as qs:
@@ -167,7 +167,7 @@ def test_StatePrep(backend):
     Test qp.allocate with qp.StatePrep ops.
     """
 
-    @qjit(capture=True)
+    @qjit(capture=True, collect_decomp_rules=False)
     @qp.qnode(qp.device(backend, wires=1))
     def circuit():
         with qp.allocate(1) as q:
@@ -185,7 +185,7 @@ def test_BasisState(backend):
     Test qp.allocate with qp.BasisState ops.
     """
 
-    @qjit(capture=True)
+    @qjit(capture=True, collect_decomp_rules=False)
     @qp.qnode(qp.device(backend, wires=1))
     def circuit():
         with qp.allocate(1) as q:
@@ -204,7 +204,7 @@ def test_dynamic_wire_alloc_cond(cond, expected, backend):
     Test qp.allocate and qp.deallocate inside cond.
     """
 
-    @qjit(autograph=True, capture=True)
+    @qjit(autograph=True, capture=True, collect_decomp_rules=False)
     @qp.qnode(qp.device(backend, wires=2))
     def circuit(c):
         if c:
@@ -231,7 +231,7 @@ def test_dynamic_wire_alloc_cond_outside(cond, expected, backend):
     Test passing dynamically allocated wires into a cond.
     """
 
-    @qjit(autograph=True, capture=True)
+    @qjit(autograph=True, capture=True, collect_decomp_rules=False)
     @qp.qnode(qp.device(backend, wires=2))
     def circuit(c):
         with qp.allocate(1) as q1:
@@ -258,7 +258,7 @@ def test_dynamic_wire_alloc_forloop(num_iter, expected, backend):
     Test qp.allocate and qp.deallocate inside for loop.
     """
 
-    @qjit(autograph=True, capture=True)
+    @qjit(autograph=True, capture=True, collect_decomp_rules=False)
     @qp.qnode(qp.device(backend, wires=3))
     def circuit(N):
         for _ in range(N):
@@ -279,7 +279,7 @@ def test_dynamic_wire_alloc_forloop_outside(backend):
     Test passing dynamically allocated wires into a for loop.
     """
 
-    @qjit(autograph=True, capture=True)
+    @qjit(autograph=True, capture=True, collect_decomp_rules=False)
     @qp.qnode(qp.device(backend, wires=1))
     def circuit():
         with qp.allocate(1) as q:
@@ -300,7 +300,7 @@ def test_dynamic_wire_alloc_forloop_outside_multiple_regs(backend):
     Test using multiple dynamically allocated registers from inside for loop.
     """
 
-    @qjit(autograph=True, capture=True)
+    @qjit(autograph=True, capture=True, collect_decomp_rules=False)
     @qp.qnode(qp.device(backend, wires=1))
     def circuit():
         with qp.allocate(1) as q1:
@@ -325,7 +325,7 @@ def test_dynamic_wire_alloc_whileloop(num_iter, expected, backend):
     Test qp.allocate and qp.deallocate inside while loop.
     """
 
-    @qjit(autograph=True, capture=True)
+    @qjit(autograph=True, capture=True, collect_decomp_rules=False)
     @qp.qnode(qp.device(backend, wires=3))
     def circuit(N):
         i = 0
@@ -349,7 +349,7 @@ def test_dynamic_wire_alloc_whileloop_outside(num_iter, expected, backend):
     Test passing dynamically allocated wires into a while loop.
     """
 
-    @qjit(autograph=True, capture=True)
+    @qjit(autograph=True, capture=True, collect_decomp_rules=False)
     @qp.qnode(qp.device(backend, wires=2))
     def circuit(N):
         i = 0
@@ -379,7 +379,7 @@ def test_subroutine(flip_again, expected, backend):
         qp.X(w)
         qp.CNOT(wires=[w, 0])
 
-    @qjit(capture=True)
+    @qjit(capture=True, collect_decomp_rules=False)
     @qp.qnode(qp.device(backend, wires=1))
     def circuit():
         with qp.allocate(1) as q1:
@@ -404,7 +404,7 @@ def test_subroutine_multiple_args(backend):
         qp.X(w2)
         qp.ctrl(qp.RX, (w1, w2))(theta, wires=0)
 
-    @qjit(capture=True)
+    @qjit(capture=True, collect_decomp_rules=False)
     @qp.qnode(qp.device(backend, wires=1))
     def circuit():
         with qp.allocate(1) as q1:
@@ -435,7 +435,7 @@ def test_subroutine_and_loop(backend):
 
         _ = loop(theta)
 
-    @qjit(capture=True)
+    @qjit(capture=True, collect_decomp_rules=False)
     @qp.qnode(qp.device(backend, wires=1))
     def circuit():
         with qp.allocate(1) as q1:
@@ -466,7 +466,7 @@ def test_subroutine_and_loop_multiple_args(backend):
 
         _ = loop(theta)
 
-    @qjit(capture=True)
+    @qjit(capture=True, collect_decomp_rules=False)
     @qp.qnode(qp.device(backend, wires=2))
     def circuit():
         with qp.allocate(2) as q1:
@@ -502,7 +502,7 @@ def test_non_probs_measurement_with_dynamic_wires(backend, measurement_fn, shots
     Test that non-probs measurements with dynamic wire allocations work.
     """
 
-    @qjit(capture=True)
+    @qjit(capture=True, collect_decomp_rules=False)
     @qp.qnode(qp.device(backend, wires=1), shots=shots)
     def circuit():
         with qp.allocate(1) as q:
@@ -518,7 +518,7 @@ def test_adjoint(backend):
     Test adjoints work.
     """
 
-    @qjit(capture=True)
+    @qjit(capture=True, collect_decomp_rules=False)
     @qp.qnode(qp.device(backend, wires=2))
     def circuit():
         with qp.allocate(1) as q:
@@ -559,7 +559,7 @@ def test_use_after_free(backend):
 
     with pytest.warns(UserWarning, match="AOT.*failed"):
 
-        @qjit(capture=True)
+        @qjit(capture=True, collect_decomp_rules=False)
         @qp.qnode(qp.device(backend, wires=1))
         def circuit():
             with qp.allocate(1) as q:
@@ -581,7 +581,7 @@ def test_terminal_MP_all_wires(backend):
 
     with pytest.warns(UserWarning, match="AOT.*failed"):
 
-        @qjit(capture=True)
+        @qjit(capture=True, collect_decomp_rules=False)
         @qp.qnode(qp.device(backend, wires=1))
         def circuit():
             with qp.allocate(1) as _:
@@ -605,7 +605,7 @@ def test_terminal_MP_dynamic_wires(backend):
 
     with pytest.warns(UserWarning, match="AOT.*failed"):
 
-        @qjit(capture=True)
+        @qjit(capture=True, collect_decomp_rules=False)
         @qp.qnode(qp.device(backend, wires=1))
         def circuit():
             q = qp.allocate(1)

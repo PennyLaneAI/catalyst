@@ -20,6 +20,8 @@ lower to their own operations:
 - GlobalPhase
 - PCPhase
 - QubitUnitary
+
+On top of the above, we also explicitly test the lowering of some operations in PennyLane:
 - BasisState
 """
 
@@ -187,8 +189,13 @@ def test_basis_state():
 
 
 # CHECK: func.func public @basisstate
-# CHECK: qref.set_basis_state({{%.+}}) {{%.+}} : tensor<1xi1>, !qref.bit
-# CHECK: qref.set_basis_state({{%.+}}) {{%.+}}, {{%.+}} : tensor<2xi1>, !qref.bit, !qref.bit
+# CHECK: qref.operator "BasisState"({{%.+}}: tensor<1xi1>) qubits({{%.+}})
+# CHECK:   static_data = {}
+# CHECK:   param_map = {state = [0]} qubit_map = {wires = [0]}
+# CHECK: qref.operator "BasisState"({{%.+}}: tensor<2xi1>) qubits({{%.+}}, {{%.+}})
+# CHECK:   static_data = {}
+# CHECK:   param_map = {state = [0]} qubit_map = {wires = [0, 1]}
+#
 # CHECK: func.func private @"__builtin__basis_state_decomp_BasisState{state:[tensor<1xi1>]}{wires:1}{}"
 # CHECK-SAME:   target_gate = "BasisState{state:[tensor<1xi1>]}{wires:1}{}"
 # CHECK: func.func private @"__builtin__basis_state_decomp_BasisState{state:[tensor<2xi1>]}{wires:2}{}"

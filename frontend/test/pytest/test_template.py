@@ -1039,9 +1039,6 @@ def test_multiplier(backend):
     assert np.allclose(interpreted_fn(), jitted_fn())
 
 
-@pytest.mark.xfail(
-    reason="Legacy Catalyst frontend does not support PennyLane's 'borrowed' template argument"
-)
 def test_out_adder(backend):
     """Test OutAdder."""
     mod = 7

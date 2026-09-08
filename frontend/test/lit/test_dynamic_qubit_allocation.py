@@ -23,7 +23,7 @@ import pennylane as qp
 from catalyst import qjit
 
 
-@qjit(target="mlir", capture=True)
+@qjit(target="mlir", capture=True, collect_decomp_rules=False)
 @qp.qnode(qp.device("lightning.qubit", wires=3))
 def test_basic_dynalloc():
     """
@@ -65,7 +65,7 @@ def test_basic_dynalloc():
 print(test_basic_dynalloc.mlir)
 
 
-@qjit(autograph=True, target="mlir", capture=True)
+@qjit(autograph=True, target="mlir", capture=True, collect_decomp_rules=False)
 @qp.qnode(qp.device("lightning.qubit", wires=3))
 def test_measure_with_reset():
     """
@@ -91,7 +91,7 @@ def test_measure_with_reset():
 print(test_measure_with_reset.mlir)
 
 
-@qjit(autograph=True, target="mlir", capture=True)
+@qjit(autograph=True, target="mlir", capture=True, collect_decomp_rules=False)
 @qp.qnode(qp.device("lightning.qubit", wires=2))
 def test_pass_reg_into_forloop():
     """
@@ -122,7 +122,7 @@ def test_pass_reg_into_forloop():
 print(test_pass_reg_into_forloop.mlir)
 
 
-@qjit(autograph=True, target="mlir", capture=True)
+@qjit(autograph=True, target="mlir", capture=True, collect_decomp_rules=False)
 @qp.qnode(qp.device("lightning.qubit", wires=3))
 def test_pass_multiple_regs_into_forloop():
     """
@@ -154,7 +154,7 @@ def test_pass_multiple_regs_into_forloop():
 print(test_pass_multiple_regs_into_forloop.mlir)
 
 
-@qjit(autograph=True, target="mlir", capture=True)
+@qjit(autograph=True, target="mlir", capture=True, collect_decomp_rules=False)
 @qp.qnode(qp.device("lightning.qubit", wires=2))
 def test_pass_multiple_regs_into_whileloop(N: int):
     """
@@ -218,7 +218,7 @@ def test_quantum_subroutine():
     # CHECK:  call @flip([[global_qreg]], [[q1_0]], [[q1_1]], [[q2_2]], [[angle]])
     # CHECK-SAME: (!qref.reg<1>, !qref.bit, !qref.bit, !qref.bit, tensor<f64>) -> ()
 
-    @qjit(target="mlir", capture=True)
+    @qjit(target="mlir", capture=True, collect_decomp_rules=False)
     @qp.qnode(qp.device("lightning.qubit", wires=1))
     def circuit():
         with qp.allocate(2) as q1:
