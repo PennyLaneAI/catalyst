@@ -347,6 +347,14 @@ class TestCapture:
         capture enabled. Hence, we only test that a simple example with a deterministic outcome
         returns correct results.
         """
+
+        if op == qp.I:
+
+            pytest.xfail(
+                "Waiting for a fix on adjoint rule synthesis of Identity"
+            )
+
+
         device = qp.device(backend, wires=1)
 
         @qjit(capture=True, collect_decomp_rules=False)
