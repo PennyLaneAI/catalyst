@@ -48,8 +48,6 @@ from catalyst.decomposition.decomposition_rules import (
     name_unwrap_adjoint,
     name_unwrap_control,
     name_wrap_adjoint,
-    register_op_class,
-    resolve_op_class,
     uses_symbolic_signature,
     wrap_modifier_id,
 )
@@ -528,21 +526,11 @@ class TestSymbolicRules:
             rule = qp.list_decomps(op_name)[rule_name]
             assert uses_symbolic_signature(rule) is symbolic
 
-    def test_resolve_op_class(self):
-        """Test an operator class is resolved from a built-in name or from one seen while tracing, and
-        an unknown name resolves to None."""
-
-        assert resolve_op_class("Hadamard") is qp.Hadamard
-        assert resolve_op_class("NoSuchOperator") is None
-        assert resolve_op_class("NoParams") is None or resolve_op_class("NoParams") is NoParams
-        register_op_class(NoParams)
-        assert resolve_op_class("NoParams") is NoParams
-
     def test_self_adjoint_rule_is_lowered(self):
         """Test ``self_adjoint`` rule on ``Adjoint(Hadamard)``."""
 
         module = compile_registered_adjoint_rules(
-            "Hadamard", "Adjoint(Hadamard){}{wires:1}{}", {}, {"wires": 1}, {}
+            "Hadamard", "Adjoint(Hadamard){}{wires:1}{}", {}, {"wires": 1}, {}, op_cls=qp.Hadamard
         )
         (rule,) = get_rule_strings_from_module(module)
 
@@ -562,6 +550,7 @@ class TestSymbolicRules:
             {"wires": 1},
             {},
             is_custom_op=True,
+            op_cls=qp.RZ,
         )
         (rule,) = get_rule_strings_from_module(module)
 
@@ -586,12 +575,13 @@ class TestSymbolicRules:
                 is None
             )
 
-    def test_unresolvable_op_class_raises(self):
-        """Test lowering cannot proceed without the base operator's class."""
+    def test_missing_op_class_raises(self):
+        """Test lowering cannot proceed without the base operator's class: these rules take a base
+        operator instance, which the operator's name alone cannot produce."""
 
-        with pytest.raises(ValueError, match="Cannot resolve the operator class"):
+        with pytest.raises(ValueError, match="operator class of 'Hadamard' is needed"):
             compile_registered_adjoint_rules(
-                "NoSuchOperator", "Adjoint(NoSuchOperator){}{wires:1}{}", {}, {"wires": 1}, {}
+                "Hadamard", "Adjoint(Hadamard){}{wires:1}{}", {}, {"wires": 1}, {}
             )
 
 
