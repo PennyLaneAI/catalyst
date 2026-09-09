@@ -802,7 +802,7 @@ def control_variant_rule_strings(
         ctrl_mod = _control_modifier(n)
         ctrl_name = f"{ctrl_mod}({op_name})"
         ctrl_id = wrap_modifier_id(op_id, ctrl_mod)
-        # (1) Rules registered directly against <n>C(op_name):
+        # (1.1) Rules registered directly against <n>C(op_name):
         try:
             out.extend(
                 get_rule_strings_from_module(
@@ -822,6 +822,24 @@ def control_variant_rule_strings(
             warnings.warn(
                 f"Failed to lower the decomposition rules for {ctrl_name}: {e}",
                 category=RuleLoweringWarning,
+            )
+        # (1.2) The same, for the rules taking the symbolic operator's arguments.
+        # TODO: the on-demand decomp rules are skipped for now.
+        # TODO: only a single control for now.
+        if n == 1 and op_cls is not None:
+            out.extend(
+                registered_symbolic_rule_strings(
+                    op_name,
+                    ctrl_id,
+                    "control",
+                    n_ctrl=n,
+                    dynamic_shape=dynamic_shape,
+                    wire_lens=wire_lens,
+                    static_data=static_data,
+                    extra_data=extra_data,
+                    is_custom_op=is_custom_op,
+                    op_cls=op_cls,
+                )
             )
         # (2) <n>C(op_name) by controlling each base rule, and
         # (3) <n>C(Adjoint(op_name)) by controlling each adjointed base rule.
