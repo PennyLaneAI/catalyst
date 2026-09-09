@@ -18,9 +18,7 @@ on:
 jobs:
   setup:
     name: Setup the release
-    runs-on:  
-      group: 'PennyLaneAI-Static-IP-Runners'
-      labels: ['pl-2-core-gh-runner']   
+    runs-on: blacksmith-32vcpu-ubuntu-2404  
     steps:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v4
