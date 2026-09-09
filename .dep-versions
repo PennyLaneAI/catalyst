@@ -8,8 +8,8 @@ enzyme=v0.0.238
 
 # For a custom PL version, update the package version here and at
 # 'doc/requirements.txt'
-# pennylane=git+https://github.com/PennyLaneAI/pennylane.git@v0.46.0b1
+pennylane=git+https://github.com/PennyLaneAI/pennylane.git@v0.46.0b1
 
 # For a custom LQ/LK version, update the package version here and at
 # 'doc/requirements.txt'
-# lightning=git+https://github.com/PennyLaneAI/pennylane-lightning.git@v0.46.0b1
+lightning=git+https://github.com/PennyLaneAI/pennylane-lightning.git@v0.46.0b1
