@@ -44,6 +44,11 @@ concurrency:
   cancel-in-progress: true
 
 env:
+  # --- v0.16.0b1 prerelease branch, not merged back to main ------------ #
+  # pip reads this for every install in the job, so `make wheel` can resolve the
+  # pennylane and pennylane-lightning floors that no index carries.
+  PIP_FIND_LINKS: "https://github.com/PennyLaneAI/pennylane/releases/expanded_assets/v0.46.0b1 https://github.com/PennyLaneAI/pennylane-lightning/releases/expanded_assets/v0.46.0b1"
+  # -------------------------------------------------------------------- #
   # If the `inputs.build_standalone_plugin` is set to a value (true/false), then that is used.
   # If the input is empty (meaning this workflow was not triggered by a workflow_call/workflow_dispatch), then check if event_name is schedule.
   # If event_name is NOT schedule, default to false
@@ -494,11 +499,6 @@ jobs:
 
     - name: Install Catalyst
       run: |
-        # --- v0.16.0b1 prerelease branch, not merged back to main ------------ #
-        pip install \
-          --find-links=https://github.com/PennyLaneAI/pennylane/releases/expanded_assets/v0.46.0b1 --find-links=https://github.com/PennyLaneAI/pennylane-lightning/releases/expanded_assets/v0.46.0b1 \
-          PennyLane==0.46.0b1 PennyLane-Lightning==0.46.0b1 PennyLane-Lightning-Kokkos==0.46.0b1
-        # -------------------------------------------------------------------- #
         python${{ matrix.python_version }} -m pip install dist/*.whl --extra-index-url https://test.pypi.org/simple
 
     - name: Install Standalone Plugin

@@ -11,6 +11,13 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
+env:
+  # --- v0.16.0b1 prerelease branch, not merged back to main ------------ #
+  # pip reads this for every install in the workflow, so `make frontend` can resolve
+  # the pennylane and pennylane-lightning floors that no index carries.
+  PIP_FIND_LINKS: "https://github.com/PennyLaneAI/pennylane/releases/expanded_assets/v0.46.0b1 https://github.com/PennyLaneAI/pennylane-lightning/releases/expanded_assets/v0.46.0b1"
+  # -------------------------------------------------------------------- #
+
 permissions:
   contents: read
 
@@ -526,11 +533,6 @@ jobs:
         python3 -m pip install oqc-qcaas-client
         # Install graphviz for testing the mlir-op-graph integration
         sudo apt-get install -y graphviz
-        # --- v0.16.0b1 prerelease branch, not merged back to main ------------ #
-        pip install \
-          --find-links=https://github.com/PennyLaneAI/pennylane/releases/expanded_assets/v0.46.0b1 --find-links=https://github.com/PennyLaneAI/pennylane-lightning/releases/expanded_assets/v0.46.0b1 \
-          PennyLane==0.46.0b1 PennyLane-Lightning==0.46.0b1 PennyLane-Lightning-Kokkos==0.46.0b1
-        # -------------------------------------------------------------------- #
         make frontend
 
     - name: Verify Graphviz installation
@@ -611,11 +613,6 @@ jobs:
         sudo apt-get install -y libasan6 make
         python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
         python3 -m pip install -r requirements.txt
-        # --- v0.16.0b1 prerelease branch, not merged back to main ------------ #
-        pip install \
-          --find-links=https://github.com/PennyLaneAI/pennylane/releases/expanded_assets/v0.46.0b1 --find-links=https://github.com/PennyLaneAI/pennylane-lightning/releases/expanded_assets/v0.46.0b1 \
-          PennyLane==0.46.0b1 PennyLane-Lightning==0.46.0b1 PennyLane-Lightning-Kokkos==0.46.0b1
-        # -------------------------------------------------------------------- #
         make frontend
 
     - name: Run Python Pytest Tests (backend=lightning.kokkos)
@@ -680,11 +677,6 @@ jobs:
         sudo apt-get install -y libasan6 make
         python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
         python3 -m pip install -r requirements.txt
-        # --- v0.16.0b1 prerelease branch, not merged back to main ------------ #
-        pip install \
-          --find-links=https://github.com/PennyLaneAI/pennylane/releases/expanded_assets/v0.46.0b1 --find-links=https://github.com/PennyLaneAI/pennylane-lightning/releases/expanded_assets/v0.46.0b1 \
-          PennyLane==0.46.0b1 PennyLane-Lightning==0.46.0b1 PennyLane-Lightning-Kokkos==0.46.0b1
-        # -------------------------------------------------------------------- #
         make frontend
 
   runtime-device-tests:
