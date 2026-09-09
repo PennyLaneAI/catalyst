@@ -173,8 +173,9 @@
     of raising an error.
     [(#3190)](https://github.com/PennyLaneAI/catalyst/pull/3190)
 
-* A failure during AOT compilation is now downgraded to a warning and logged.
+* A failure during AOT compilation is now logged rather than raised. 
   [(#3100)](https://github.com/PennyLaneAI/catalyst/pull/3100)
+  [(#3194)](https://github.com/PennyLaneAI/catalyst/pull/3194)
 
 * Adds the ability to use `pennylane.typing.AbstractArray` and `pennylane.wires.AbstractWires` as type hints for
   AOT compilation and as arguments to `pennylane.specs` calculations.
