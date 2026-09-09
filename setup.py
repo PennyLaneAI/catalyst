@@ -107,7 +107,11 @@ jax_version = dep_versions.get("jax")
 pl_version = dep_versions.get("pennylane")
 lq_version = dep_versions.get("lightning")
 
-pl_min_release = "0.45.0"
+# --- v0.16.0b1 prerelease branch, not merged back to main ------------------ #
+# A prerelease floor, so that pip is allowed to select 0.46.0b1 for it. Note this
+# rejects 0.46.0.dev* nightlies, which PEP 440 sorts below b1.
+pl_min_release = "0.46.0b1"
+# --------------------------------------------------------------------------- #
 lq_min_release = pl_min_release
 
 if pl_version is not None:
