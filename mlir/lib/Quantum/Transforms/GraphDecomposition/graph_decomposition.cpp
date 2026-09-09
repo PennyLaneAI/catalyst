@@ -51,7 +51,6 @@
 #include "Catalyst/Analysis/ResourceAnalysis.h"
 #include "Catalyst/Analysis/ResourceResult.h"
 #include "Catalyst/Transforms/Passes.h"
-#include "QRef/Transforms/Passes.h"
 #include "Quantum/IR/QuantumDialect.h"
 #include "Quantum/IR/QuantumInterfaces.h"
 #include "Quantum/IR/QuantumOps.h"
@@ -147,8 +146,8 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         LLVM_DEBUG(showSolution(solution));
 
         ///////////////////////////
-        // Step 3: Convert python-decompositions from reference to value semantics and run
-        // decompose-lowering to apply the chosen decomposition rules.
+        // Step 3: Run decompose-lowering to apply the chosen decomposition rules. The lowering
+        // pass normalizes both the circuit and Python decomposition rules to reference semantics.
 
         ///////////////////////////
         // CQRs:
@@ -162,15 +161,6 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         DecomposeLoweringPassOptions dlOptions;
         for (auto &[op, chosenRule] : solution) {
             dlOptions.targetRulesOption.push_back(chosenRule.ruleName);
-        }
-
-        // Convert reference-semantics python decompositions to value semantics once.
-        {
-            OpPassManager valueSemanticsPm("builtin.module");
-            valueSemanticsPm.addPass(qref::createValueSemanticsConversionPass());
-            if (failed(runPipeline(valueSemanticsPm, module))) {
-                return signalPassFailure();
-            }
         }
 
         auto countOps = [](ModuleOp m) {
@@ -607,9 +597,9 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
 
         // Lower compile-time rules into the module; loadUserDecompositionRules (below) registers
         // the materialized `__builtin`-prefixed funcs as RuleNodes.
-        if (failed(loadPythonDecomps())) {
-            return failure();
-        }
+        // if (failed(loadPythonDecomps())) {
+        //     return failure();
+        // }
 
         // Load user-rules
         if (failed(loadUserDecompositionRules(userRuleNames, rules))) {

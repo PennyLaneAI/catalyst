@@ -12,8 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: quantum-opt --decompose-lowering --split-input-file -verify-diagnostics %s | FileCheck %s
+// RUN: quantum-opt --decompose-lowering --split-input-file -verify-diagnostics %s | FileCheck %s --check-prefix=REFERENCE
 
+// REFERENCE-LABEL: module @two_hadamards
+// REFERENCE: [[REG:%.+]] = qref.alloc( 2) : !qref.reg<2>
+// REFERENCE: [[QUBIT:%.+]] = qref.get [[REG]][ 0] : !qref.reg<2> -> !qref.bit
+// REFERENCE: qref.custom "RZ"({{%.+}}) [[QUBIT]] : !qref.bit
+// REFERENCE-NEXT: qref.custom "RY"({{%.+}}) [[QUBIT]] : !qref.bit
+// REFERENCE: qref.custom "RZ"({{%.+}}) [[QUBIT]] : !qref.bit
+// REFERENCE-NEXT: qref.custom "RY"({{%.+}}) [[QUBIT]] : !qref.bit
+// REFERENCE-NOT: qref.custom "Hadamard"
 module @two_hadamards {
   func.func public @test_two_hadamards() -> tensor<4xf64> attributes {quantum.node} {
     %0 = quantum.alloc( 2) : !quantum.reg
@@ -186,6 +194,11 @@ module @recursive {
 
 // Test parametric gates and wires
 
+// REFERENCE-LABEL: module @param_rxry
+// REFERENCE: [[QUBIT:%.+]] = qref.get
+// REFERENCE: qref.custom "RX"({{%.+}}) [[QUBIT]] : !qref.bit
+// REFERENCE-NEXT: qref.custom "RY"({{%.+}}) [[QUBIT]] : !qref.bit
+// REFERENCE-NOT: qref.custom "ParametrizedRXRY"
 // CHECK-LABEL: module @param_rxry
 module @param_rxry {
   func.func public @test_param_rxry(%arg0: tensor<f64>, %arg1: tensor<i64>) -> tensor<2xf64> attributes {quantum.node} {
@@ -232,6 +245,12 @@ module @param_rxry {
 
 // Test recursive and qreg-based gate decomposition
 
+// REFERENCE-LABEL: module @qreg_base_circuit
+// REFERENCE: [[REG:%.+]] = qref.alloc( 1) : !qref.reg<1>
+// REFERENCE: qref.measure
+// REFERENCE: scf.if
+// REFERENCE: qref.custom "RZ"
+// REFERENCE-NOT: qref.custom "Test"
 // CHECK-LABEL: module @qreg_base_circuit
 module @qreg_base_circuit {
   func.func public @test_qreg_base_circuit() -> tensor<2xf64> attributes {quantum.node} {
@@ -347,6 +366,12 @@ module @qreg_base_circuit {
 // -----
 
 // CHECK-LABEL: module @multi_wire_cnot_decomposition
+// REFERENCE-LABEL: module @multi_wire_cnot_decomposition
+// REFERENCE: [[REG:%.+]] = qref.alloc( 2) : !qref.reg<2>
+// REFERENCE: qref.custom "RZ"
+// REFERENCE: qref.custom "RY"
+// REFERENCE: qref.custom "CZ"
+// REFERENCE-NOT: qref.custom "CNOT"
 module @multi_wire_cnot_decomposition {
   func.func public @test_cnot_decomposition() -> tensor<4xf64> attributes {quantum.node} {
     %0 = quantum.alloc( 2) : !quantum.reg
@@ -599,6 +624,9 @@ module @circuit_with_multirz {
 // -----
 
 // CHECK-LABEL: module @circuit_with_operator_op
+// REFERENCE-LABEL: module @circuit_with_operator_op
+// REFERENCE: qref.custom "RZ"
+// REFERENCE-NOT: qref.operator "DummyOp"
 module @circuit_with_operator_op {
   func.func public @test_with_operator(%arg0: f64) -> !quantum.reg attributes {quantum.node} {
     %0 = quantum.alloc( 2) : !quantum.reg
@@ -629,6 +657,11 @@ module @circuit_with_operator_op {
 // -----
 
 // CHECK-LABEL: module @operator_tensor_params
+// REFERENCE-LABEL: module @operator_tensor_params
+// REFERENCE: func.func public @test_tensor_params
+// REFERENCE-NOT: qref.operator "TensorHybridOp"
+// REFERENCE: qref.custom "RZ"
+// REFERENCE: qref.operator "TensorSink"
 module @operator_tensor_params {
   func.func public @test_tensor_params(
       %time: tensor<f64>,
@@ -681,6 +714,9 @@ module @operator_tensor_params {
 // -----
 
 // CHECK-LABEL: module @specialized_control_wire
+// REFERENCE-LABEL: module @specialized_control_wire
+// REFERENCE: qref.custom "PauliX"() {{%.+}} ctrls({{%.+}}) ctrlvals({{%.+}})
+// REFERENCE-NOT: qref.operator "OmittedControlWire"
 module @specialized_control_wire {
   func.func public @test_specialized_control_wire() -> !quantum.reg attributes {quantum.node} {
     %true = arith.constant true
@@ -829,6 +865,9 @@ module @test_paulirot {
 // -----
 
 // CHECK-LABEL: module @null_decomp_rule
+// REFERENCE-LABEL: module @null_decomp_rule
+// REFERENCE: qref.custom "Hadamard"
+// REFERENCE-NOT: qref.custom "PauliX"
 module @null_decomp_rule{
   func.func public @test_null_decomp_rule() attributes {quantum.node} {
     // CHECK: [[reg:%.+]] = quantum.alloc( 1)
@@ -1035,5 +1074,55 @@ module @test_while_loop {
     %out_qubits = quantum.custom "PhaseShift"(%cst) %2 : !quantum.bit
     %3 = quantum.insert %arg1[%extracted], %out_qubits : !quantum.reg, !quantum.bit
     return %3 : !quantum.reg
+  }
+}
+
+// -----
+
+// Exercise reference-semantics conversion through recursively nested structured operations.
+
+// REFERENCE-LABEL: module @nested_control_flow_reference_conversion
+// REFERENCE: scf.if
+// REFERENCE: scf.for
+// REFERENCE: qref.custom "PhaseShift"
+// REFERENCE-NOT: qref.custom "T"
+module @nested_control_flow_reference_conversion {
+  func.func @circuit(%condition: i1) -> !quantum.bit attributes {quantum.node} {
+    %reg = quantum.alloc( 1) : !quantum.reg
+    %qubit = quantum.extract %reg[ 0] : !quantum.reg -> !quantum.bit
+    %start = arith.constant 0 : index
+    %stop = arith.constant 2 : index
+    %step = arith.constant 1 : index
+
+    %result = scf.if %condition -> !quantum.bit {
+      %loop_result = scf.for %i = %start to %stop step %step
+          iter_args(%iter_qubit = %qubit) -> (!quantum.bit) {
+        // An scf.if with no results may omit its else region entirely.
+        scf.if %condition {
+          %side_effect_0 = quantum.custom "T"() %iter_qubit : !quantum.bit
+          %side_effect_1 = quantum.custom "T"() %side_effect_0 : !quantum.bit
+        }
+        %out = quantum.custom "T"() %iter_qubit : !quantum.bit
+        scf.yield %out : !quantum.bit
+      }
+      scf.yield %loop_result : !quantum.bit
+    } else {
+      scf.yield %qubit : !quantum.bit
+    }
+    return %result : !quantum.bit
+  }
+
+  func.func private @"__builtin__t_phaseshift_T{}{wires:1}{}"(
+      %wires: tensor<1xi64>, %qreg: !quantum.reg) -> !quantum.reg
+      attributes {llvm.linkage = #llvm.linkage<internal>,
+                  target_gate = "T{}{wires:1}{}"} {
+    %angle = arith.constant 0.78539816339744828 : f64
+    %slice = stablehlo.slice %wires [0:1] : (tensor<1xi64>) -> tensor<1xi64>
+    %wire_tensor = stablehlo.reshape %slice : (tensor<1xi64>) -> tensor<i64>
+    %wire = tensor.extract %wire_tensor[] : tensor<i64>
+    %qubit = quantum.extract %qreg[%wire] : !quantum.reg -> !quantum.bit
+    %out = quantum.custom "PhaseShift"(%angle) %qubit : !quantum.bit
+    %result = quantum.insert %qreg[%wire], %out : !quantum.reg, !quantum.bit
+    return %result : !quantum.reg
   }
 }
