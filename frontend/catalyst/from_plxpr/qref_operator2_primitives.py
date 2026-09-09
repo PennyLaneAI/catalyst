@@ -17,6 +17,7 @@ of quantum operations to reference semantics JAXPR.
 """
 
 # pylint: disable=unused-argument
+
 import pennylane as qp
 from jax._src.lib.mlir import ir
 from jax.core import ShapedArray
@@ -88,6 +89,8 @@ def _register_special_lowering(op_cls):
 
 qref_operator_p = Primitive("qref_operator")
 qref_operator_p.multiple_results = True
+
+_VISITED_DECOMPOSITION_NODES = set()
 
 
 @qref_operator_p.def_abstract_eval
@@ -243,6 +246,8 @@ def compile_decomp_rules(
     Generate all the decomposition rules registered on the current gate, recursively generating all
     the rules that are registered on the resource gates of these rules as well.
     """
+    visited_nodes = _VISITED_DECOMPOSITION_NODES
+
     if is_custom_op:
         dynamic_shape = {str(i): ["f64"] for i in range(len(op_cls.dynamic_argnames))}
 
@@ -261,6 +266,7 @@ def compile_decomp_rules(
             wire_lens={"wires": wire_lens[0]},
             static_data={},
             is_custom_op=True,
+            visited=visited_nodes,
         )
 
     elif op_cls is qp.MultiRZ:
@@ -280,6 +286,7 @@ def compile_decomp_rules(
             dynamic_shape=dynamic_shape,
             wire_lens={f"{wire_argname}": wire_lens[0]},
             static_data={},
+            visited=visited_nodes,
         )
 
     elif op_cls is qp.PauliRot:
@@ -303,6 +310,7 @@ def compile_decomp_rules(
             dynamic_shape=dynamic_shape,
             wire_lens={f"{wire_argname}": wire_lens[0]},
             static_data=repack_static_data,
+            visited=visited_nodes,
         )
 
     elif op_cls is qp.PCPhase:
@@ -324,6 +332,7 @@ def compile_decomp_rules(
             dynamic_shape=dynamic_shape,
             wire_lens={f"{wire_argname}": wire_lens[0]},
             static_data=repack_static_data,
+            visited=visited_nodes,
         )
 
     elif op_cls is qp.GlobalPhase:
@@ -336,6 +345,7 @@ def compile_decomp_rules(
             dynamic_shape=dynamic_shape,
             wire_lens={},
             static_data={},
+            visited=visited_nodes,
         )
 
     elif op_cls is qp.QubitUnitary:
@@ -361,6 +371,7 @@ def compile_decomp_rules(
             dynamic_shape=dynamic_shape,
             wire_lens={f"{wire_argname}": wire_lens[0]},
             static_data={},
+            visited=visited_nodes,
         )
 
     else:
@@ -450,6 +461,7 @@ def compile_decomp_rules(
             wire_lens=non_hybrid_wire_lens,
             static_data=repack_static_data,
             extra_data=extra_data,
+            visited=visited_nodes,
         )
 
     inject_new_rules_into_module(module, decomp_rules)

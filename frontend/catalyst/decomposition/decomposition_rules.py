@@ -698,12 +698,13 @@ def fetch_all_reachable_decomposition_rules_from_op(
     extra_data=None,
     is_custom_op=False,
     n_ctrls=0,
+    visited: set | None = None,
 ):
     extra_data = extra_data or {}
     queue = deque()
     start = (op_name, dynamic_shape, wire_lens, static_data, extra_data, is_custom_op)
     queue.append(start)
-    visited = [start]
+    visited = visited | {start} if visited else {start}
 
     # Control counts to synthesize `<n>C(...)` rules for. A single control is always captured
     # proactively; a multi-controlled instance (`n_ctrls > 1`) additionally needs its own count.
@@ -792,7 +793,7 @@ def fetch_all_reachable_decomposition_rules_from_op(
                         )
 
                         if not probe in visited:
-                            visited.append(probe)
+                            visited.add(probe)
                             queue.append(probe)
                             rules.extend(
                                 compile_variants(
