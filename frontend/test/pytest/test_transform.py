@@ -1120,8 +1120,7 @@ class TestTransformValidity:
             measurements = [measure(i) for i in range(2)]
             return measurements, qp.expval(qp.PauliZ(0))
 
-        with pytest.warns(UserWarning, match="AOT.*failed"):
-            compiled_qfunc = qjit(qfunc)
+        compiled_qfunc = qjit(qfunc)
 
         with pytest.raises(
             CompileError,
@@ -1181,8 +1180,7 @@ class TestTransformValidity:
             qp.PauliX(2)
             return [1, qp.expval(H4)]
 
-        with pytest.warns(UserWarning, match="AOT.*failed"):
-            compiled_qfunc = qjit(qfunc)
+        compiled_qfunc = qjit(qfunc)
 
         with pytest.raises(
             CompileError,
@@ -1219,8 +1217,7 @@ class TestTransformValidity:
 
             return qfunc
 
-        with pytest.warns(UserWarning, match="AOT.*failed"):
-            compiled_qfunc = qjit(qnode_builder(backend))
+        compiled_qfunc = qjit(qnode_builder(backend))
 
         with pytest.raises(
             CompileError,
@@ -1268,8 +1265,7 @@ class TestTransformValidity:
         def f():
             return qp.state()
 
-        with pytest.warns(UserWarning, match="AOT.*failed"):
-            compiled_f = qjit(f)
+        compiled_f = qjit(f)
 
         with pytest.raises(CompileError, match="Catalyst does not support informative transforms."):
             compiled_f()

@@ -38,7 +38,7 @@ def test_PhaseShift_gridsynth(param, op, eps):
 
     expected = circuit(param)
     gridsynthed_circuit = qp.transforms.gridsynth(circuit, epsilon=eps)
-    qjitted_circuit = qp.qjit(gridsynthed_circuit, capture=True)
+    qjitted_circuit = qp.qjit(gridsynthed_circuit, capture=True, collect_decomp_rules=False)
     result = qjitted_circuit(param)
 
     assert qp.math.allclose(result, expected, atol=eps)
@@ -61,8 +61,10 @@ def test_gridsynth_ppr_basis(param, eps):
 
     gridsynthed_circuit = qp.transforms.gridsynth(circuit, epsilon=eps)
     gridsynthed_circuit_ppr = qp.transforms.gridsynth(circuit, epsilon=eps, ppr_basis=True)
-    qjitted_circuit = qp.qjit(gridsynthed_circuit, capture=True)
-    qjitted_circuit_with_ppr = qp.qjit(gridsynthed_circuit_ppr, capture=True)
+    qjitted_circuit = qp.qjit(gridsynthed_circuit, capture=True, collect_decomp_rules=False)
+    qjitted_circuit_with_ppr = qp.qjit(
+        gridsynthed_circuit_ppr, capture=True, collect_decomp_rules=False
+    )
     result = qjitted_circuit(param)
     result_with_ppr = qjitted_circuit_with_ppr(param)
     assert np.allclose(result, result_with_ppr, atol=eps)
@@ -80,7 +82,9 @@ def test_epsilon_warning_emitted_for_small_epsilon(capfd):
         qp.RZ(x, wires=0)
         return qp.state()
 
-    qp.qjit(qp.transforms.gridsynth(circuit, epsilon=1e-8), capture=True)(0.5)
+    qp.qjit(
+        qp.transforms.gridsynth(circuit, epsilon=1e-8), capture=True, collect_decomp_rules=False
+    )(0.5)
 
     captured = capfd.readouterr()
     assert _EPSILON_WARN_FRAGMENT in captured.err
@@ -95,7 +99,9 @@ def test_epsilon_warning_not_emitted_for_safe_epsilon(capfd):
         qp.RZ(x, wires=0)
         return qp.state()
 
-    qp.qjit(qp.transforms.gridsynth(circuit, epsilon=1e-4), capture=True)(0.5)
+    qp.qjit(
+        qp.transforms.gridsynth(circuit, epsilon=1e-4), capture=True, collect_decomp_rules=False
+    )(0.5)
 
     captured = capfd.readouterr()
     assert _EPSILON_WARN_FRAGMENT not in captured.err
