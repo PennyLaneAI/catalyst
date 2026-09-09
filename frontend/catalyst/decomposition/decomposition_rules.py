@@ -25,6 +25,7 @@ import jax.numpy as jnp
 import pennylane as qp
 from jax._src.lib.mlir import ir
 from pennylane.core.operator import abstractify
+from pennylane.wires import Wires
 
 from catalyst.compiler import _quantum_opt
 from catalyst.decomposition.graph_op_id import GraphOpID
@@ -48,7 +49,13 @@ def _resources_have_measurement(gate_counts) -> bool:
     return any(isinstance(op, _NON_INVERTIBLE_RESOURCE_TYPES) for op in gate_counts)
 
 
-def uses_symbolic_signature(rule) -> bool:
+_SYMBOLIC_ARGNAMES = {
+    "adjoint": ("base",),
+    "control": ("base", "control_wires", "control_values", "work_wires", "work_wire_type"),
+}
+
+
+def uses_symbolic_signature(rule, kind="adjoint") -> bool:
     """Return whether ``rule`` follows the Operator2 symbolic-argument convention.
 
     This is the convention PennyLane uses for its symbolic decomposition rules
@@ -56,7 +63,7 @@ def uses_symbolic_signature(rule) -> bool:
     be used to lower rules registered against ``Adjoint(Op)``.
     """
     try:
-        inspect.signature(rule._impl).bind(base=None)
+        inspect.signature(rule._impl).bind(**{name: None for name in _SYMBOLIC_ARGNAMES[kind]})
     except TypeError:
         return False
     return True
@@ -72,6 +79,21 @@ def build_base_op(op_cls, kwargs, is_custom_op):
     args, kwargs = split_call_args(kwargs, is_custom_op)
     with qp.capture.pause():
         return op_cls(*args, **kwargs)
+
+
+def symbolic_arguments(base_op, kind, ctrl_wires=None) -> dict:
+    """Return the arguments a symbolic ``kind`` rule expects for the given base operator.
+    """
+    if kind == "adjoint":
+        return {"base": base_op}
+    ctrl_wires = Wires(ctrl_wires)
+    return {
+        "base": base_op,
+        "control_wires": ctrl_wires,
+        "control_values": [True] * len(ctrl_wires),
+        "work_wires": Wires([]),
+        "work_wire_type": "borrowed",
+    }
 
 
 # Canonical nesting order for op-level modifiers, listed OUTERMOST first. The compiler's
@@ -522,19 +544,25 @@ def build_rule_module(
     return inlined_module
 
 
-def collect_symbolic_adjoint_resources(op_cls, op_name, kwargs, is_custom_op):
-    """Return resource data for the rules registered against ``Adjoint(op_name)``."""
+# pylint: disable=too-many-arguments
+def collect_symbolic_resources(
+    op_cls, op_name, kwargs, is_custom_op, kind="adjoint", ctrl_wires=()
+):
+    """Return resource data for the rules registered against ``Adjoint(op_name)``/``C(op_name)``.
+    """
+    lookup_name = f"Adjoint({op_name})" if kind == "adjoint" else f"C({op_name})"
     rules = [
         rule
-        for rule in qp.decomposition.list_decomps(f"Adjoint({op_name})")
-        if uses_symbolic_signature(rule)
+        for rule in qp.decomposition.list_decomps(lookup_name)
+        if uses_symbolic_signature(rule, kind)
     ]
     if not rules:
         return [], {}, {}, {}
 
     # The base op is only a carrier of the dummy parameters and wires: the graph reasons about
     # resources in terms of abstract operators, matching `_get_kwargs` in PennyLane's graph.
-    probe_args = {"base": abstractify(build_base_op(op_cls, kwargs, is_custom_op))}
+    base_op = abstractify(build_base_op(op_cls, kwargs, is_custom_op))
+    probe_args = symbolic_arguments(base_op, kind, ctrl_wires)
 
     name_to_resources = {}
     name_to_resource_ids = {}
@@ -559,8 +587,8 @@ def collect_symbolic_adjoint_resources(op_cls, op_name, kwargs, is_custom_op):
     return rules, probe_args, name_to_resources, name_to_resource_ids
 
 
-# pylint: disable=too-many-arguments
-def compile_registered_adjoint_rules(
+# pylint: disable=too-many-arguments,too-many-locals
+def compile_registered_symbolic_rules(
     op_name,
     target_id,
     dynamic_shape,
@@ -569,9 +597,11 @@ def compile_registered_adjoint_rules(
     extra_data=None,
     is_custom_op=False,
     op_cls=None,
+    kind="adjoint",
+    n_ctrl=1,
 ) -> ir.Operation | None:
-    """Return the module of rules registered against ``Adjoint(op_name)`` that follow PennyLane's
-    symbolic-argument convention, or None if there are none.
+    """Return the module of rules registered against ``Adjoint(op_name)``/``C(op_name)`` that follow
+    PennyLane's symbolic-argument convention, or None if there are none.
     """
     if op_cls is None:
         raise ValueError(
@@ -582,19 +612,26 @@ def compile_registered_adjoint_rules(
     extra_data = extra_data or {}
     static_and_extra = static_data | extra_data
     kwargs = prepare_dynamic_op_kwargs(dynamic_shape, wire_lens)
-    device = qp.device("null.qubit", wires=sum(wire_lens.values()))
+    n_base_wires = sum(wire_lens.values())
+    n_ctrl = n_ctrl if kind == "control" else 0
+    device = qp.device("null.qubit", wires=n_base_wires + n_ctrl)
 
-    rules, probe_args, name_to_resources, name_to_resource_ids = collect_symbolic_adjoint_resources(
-        op_cls, op_name, kwargs | static_and_extra, is_custom_op
+    rules, probe_args, name_to_resources, name_to_resource_ids = collect_symbolic_resources(
+        op_cls,
+        op_name,
+        kwargs | static_and_extra,
+        is_custom_op,
+        kind=kind,
+        ctrl_wires=range(n_base_wires, n_base_wires + n_ctrl),
     )
     if not rules:
         return None
 
     def rule_to_subroutine(rule):
-        def decomp_rule(*_args, **_kwargs):
+        def decomp_rule(*_args, _ctrl_wires=None, **_kwargs):
             with qp.capture.pause():
                 base = op_cls(*_args, **_kwargs)
-            rule._impl(base=base)
+            rule._impl(**symbolic_arguments(base, kind, _ctrl_wires))
 
         decomp_rule_no_static_args = partial(decomp_rule, **static_and_extra)
         decomp_rule_no_static_args.__name__ = rule.name + "_" + target_id
@@ -617,20 +654,25 @@ def compile_registered_adjoint_rules(
     if not subroutines:
         return None
 
+    ctrl_wires = (
+        jnp.array(range(n_base_wires, n_base_wires + n_ctrl), dtype=int)
+        if kind == "control"
+        else None
+    )
     call_args, call_kwargs = split_call_args(kwargs, is_custom_op)
 
     return build_rule_module(
-        subroutines, device, call_args, call_kwargs, None, name_to_resource_ids, target_id
+        subroutines, device, call_args, call_kwargs, ctrl_wires, name_to_resource_ids, target_id
     )
 
 
-def registered_adjoint_rule_strings(op_name, target_id, **kwargs) -> list[str]:
-    """Return the rule strings from :func:`compile_registered_adjoint_rules`."""
+def registered_symbolic_rule_strings(op_name, target_id, kind, **kwargs) -> list[str]:
+    """Return the rule strings from :func:`compile_registered_symbolic_rules`."""
     try:
-        module = compile_registered_adjoint_rules(op_name, target_id, **kwargs)
+        module = compile_registered_symbolic_rules(op_name, target_id, kind=kind, **kwargs)
     except Exception as e:  # pylint: disable=broad-except
         warnings.warn(
-            f"Failed to lower the registered adjoint decomposition rules for {target_id}: {e}",
+            f"Failed to lower the registered {kind} decomposition rules for {target_id}: {e}",
             category=RuleLoweringWarning,
         )
         return []
@@ -688,9 +730,10 @@ def adjoint_variant_rule_strings(
     # TODO: the on-demand decomp rules are skipped for now.
     if op_cls is not None:
         out.extend(
-            registered_adjoint_rule_strings(
+            registered_symbolic_rule_strings(
                 op_name,
                 adj_id,
+                "adjoint",
                 dynamic_shape=dynamic_shape,
                 wire_lens=wire_lens,
                 static_data=static_data,
@@ -737,13 +780,16 @@ def control_variant_rule_strings(
     static_data,
     extra_data=None,
     is_custom_op=False,
+    op_cls=None,
 ):
     """Return the rule strings whose ``target_gate`` is ``<n>C(op_name)`` for each ``n`` in
     ``ctrl_counts``.
 
     The control analogue of :func:`adjoint_variant_rule_strings`. ``op_id`` is the *base* op's
-    graphOpId (e.g. ``"RX{...}"``). For each control count ``n`` three pathways contribute:
+    graphOpId (e.g. ``"RX{...}"``). For each control count ``n`` these pathways contribute:
       1. rules registered directly against ``<n>C(op_name)`` (``list_decomps("C(RX)")``),
+      1b. those same registered rules written against the symbolic operator's arguments, which is
+         how PennyLane itself writes them (``flip_zero_ctrl_values(...)``),
       2. rules synthesized by distributing each base rule of ``op_name`` over ``n`` controls
          (the ``wrap_control`` pathway), and
       3. rules for the nested modifier ``<n>C(Adjoint(op_name))`` synthesized by controlling each
@@ -755,18 +801,20 @@ def control_variant_rule_strings(
     for n in ctrl_counts:
         ctrl_mod = _control_modifier(n)
         ctrl_name = f"{ctrl_mod}({op_name})"
+        ctrl_id = wrap_modifier_id(op_id, ctrl_mod)
         # (1) Rules registered directly against <n>C(op_name):
         try:
             out.extend(
                 get_rule_strings_from_module(
                     compile_decomposition_rules(
                         ctrl_name,
-                        wrap_modifier_id(op_id, ctrl_mod),
+                        ctrl_id,
                         dynamic_shape,
                         wire_lens,
                         static_data,
                         extra_data=extra_data,
                         is_custom_op=is_custom_op,
+                        skip_rule=partial(uses_symbolic_signature, kind="control"),
                     )
                 )
             )
@@ -951,6 +999,7 @@ def fetch_all_reachable_decomposition_rules_from_op(
                     static_data,
                     extra_data=extra_data,
                     is_custom_op=is_custom_op,
+                    op_cls=op_classes.get(name),
                 )
             )
         return out
@@ -985,7 +1034,7 @@ def fetch_all_reachable_decomposition_rules_from_op(
                 skip_rule=uses_symbolic_signature if is_adjoint else None,
             )[0]
             if is_adjoint and (this_op_cls := op_classes.get(this_name)) is not None:
-                found |= collect_symbolic_adjoint_resources(
+                found |= collect_symbolic_resources(
                     this_op_cls, this_name, all_kwargs, this_is_custom_op
                 )[2]
             resources |= {(explore_name, name): res for name, res in found.items()}
