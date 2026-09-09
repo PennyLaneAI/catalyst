@@ -532,7 +532,7 @@ class TestJAXMLIRAttributeGetter:
             assert isinstance(attr, ir.TypeAttr)
             assert attr.value == ir.NoneType.get()
 
-    @pytest.mark.parametrize("number", (37, -37))
+    @pytest.mark.parametrize("number", (37, -37, 2**63 - 1, -(2**63)))
     def test_int_attr(self, number):
         """
         Test integer attribute.
@@ -666,7 +666,8 @@ class TestJAXMLIRAttributeGetter:
             with ctx, loc:
                 _ = get_mlir_attribute_from_pyval(Foo())
 
-    def test_int_attr_overflow(self):
+    @pytest.mark.parametrize("value", (2**63, -(2**63) - 1, 2**100))
+    def test_int_attr_overflow(self, value):
         """
         Test int attribute with overflow correctly raises error.
         """
@@ -678,7 +679,7 @@ class TestJAXMLIRAttributeGetter:
             """),
         ):
             with ctx, loc:
-                _ = get_mlir_attribute_from_pyval(2**100)
+                _ = get_mlir_attribute_from_pyval(value)
 
     def test_dataclass_attr(self):
         """

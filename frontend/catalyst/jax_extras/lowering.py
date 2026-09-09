@@ -240,7 +240,7 @@ def get_mlir_attribute_from_pyval(value):
         case int():
             if -9223372036854775808 <= value < 0:  # 2**63
                 attr = ir.IntegerAttr.get(ir.IntegerType.get_signed(64), value)
-            elif 0 <= value < 18446744073709551616:  # = 2**64
+            elif 0 <= value < 9223372036854775808:  # = 2**63
                 attr = ir.IntegerAttr.get(ir.IntegerType.get_signless(64), value)
             else:
                 raise CompileError(textwrap.dedent("""
