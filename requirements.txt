@@ -35,7 +35,12 @@ nbmake
 filecheck
 
 # optional rt/test dependencies
-pennylane-lightning-kokkos
+# --- v0.16.0b1 prerelease branch, not merged back to main ------------------- #
+# Kokkos pins pennylane_lightning to its own exact version, so an unpinned one
+# would pull a released Lightning over the 0.46.0b1 that .dep-versions asks for.
+--find-links https://github.com/PennyLaneAI/pennylane-lightning/releases/expanded_assets/v0.46.0b1
+pennylane-lightning-kokkos==0.46.0b1
+# ---------------------------------------------------------------------------- #
 amazon-braket-pennylane-plugin>1.27.1; python_version < "3.14"
 pydot # Graph visualization backend requirement
 matplotlib # Graph visualization frontend requirement
