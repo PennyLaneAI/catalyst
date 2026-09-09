@@ -15,10 +15,12 @@
 """Unit tests for the python decompositions module."""
 
 import jax.numpy as jnp
+import numpy as np
 import pennylane as qp
 import pytest
 from jax.core import ShapedArray
 from operator2_dummy_gates import (
+    ArrayData,
     CompilableData,
     HybridOpArg,
     HybridWires,
@@ -176,6 +178,15 @@ class TestGenericUtilities:
             (
                 CompilableData(True, 3.14, "string", Wires([0, 1])),
                 'CompilableData{}{wires:2}{a = true, b = 3.140000e+00 : f64, thing = "string"}',
+            ),
+            (
+                ArrayData(np.array([1, 2, 3]), Wires([0, 1])),
+                "ArrayData{}{wires:2}{angles = dense<[1, 2, 3]> : tensor<3xi64>}",
+            ),
+            (
+                # An array of one repeated value takes MLIR's splat shorthand in the id too.
+                ArrayData(np.array([[7, 7], [7, 7]], dtype=np.int8), Wires([0, 1])),
+                "ArrayData{}{wires:2}{angles = dense<7> : tensor<2x2xi8>}",
             ),
             (
                 MultipleRegisters(Wires([0, 1, 2]), Wires([3, 4])),
@@ -350,6 +361,50 @@ class TestTraceTime:
         )
         assert "qref.adjoint" in mlir
 
+    @pytest.mark.filterwarnings("ignore::catalyst.decomposition.RuleLoweringWarning")
+    def test_array_static_data_reaches_the_rules(self):
+        """An operator holding array static data lowers with its array spelled as a dense
+        attribute, and two rules emitting different arrays stay two distinct operators: the search
+        for reachable rules compares arrays by contents rather than asking a whole array whether it
+        is true."""
+
+        def resource_fn_a(angles, wires):
+            return {ArrayData(angles=np.array([1, 2]), wires=Wire[2]): 1}
+
+        @register_resources(resource_fn_a)
+        def rule_a(angles, wires):
+            ArrayData(angles=np.array([1, 2]), wires=wires)
+
+        def resource_fn_b(angles, wires):
+            return {ArrayData(angles=np.array([3, 4]), wires=Wire[2]): 1}
+
+        @register_resources(resource_fn_b)
+        def rule_b(angles, wires):
+            ArrayData(angles=np.array([3, 4]), wires=wires)
+
+        with local_decomps():
+            add_decomps(ArrayData, rule_a, rule_b)
+
+            @qjit(capture=True, target="mlir")
+            @qnode(qp.device("null.qubit", wires=2))
+            def circuit():
+                ArrayData(angles=np.array([5, 5, 5]), wires=[0, 1])
+                return qp.state()
+
+            mlir = circuit.mlir
+
+        # The op carries the array exactly as the id spells it, which is what lets the compiler
+        # print an id for the op that matches the rules compiled here.
+        assert "static_data = {angles = dense<5> : tensor<3xi64>}" in mlir
+        assert 'target_gate = "ArrayData{}{wires:2}{angles = dense<5> : tensor<3xi64>}"' in mlir
+        assert (
+            'target_gate = "ArrayData{}{wires:2}{angles = dense<[1, 2]> : tensor<2xi64>}"' in mlir
+        )
+        assert (
+            'target_gate = "ArrayData{}{wires:2}{angles = dense<[3, 4]> : tensor<2xi64>}"' in mlir
+        )
+
+    @pytest.mark.filterwarnings("ignore::catalyst.decomposition.RuleLoweringWarning")
     def test_no_distribution_rule_for_non_invertible_body(self):
         """A distribution rule is NOT synthesized when the base rule body is non-invertible (contains
         a mid-circuit measurement): the base rule is still lowered, but no Adjoint(Op) rule."""

@@ -85,15 +85,10 @@ static nb::object getPyvalFromTypeRange(mlir::TypeRange typerange) {
     return pyTypes;
 }
 
-// Read an integer attribute the way MLIR's own printer does, so a value that crosses into the
-// frontend and is printed back into a graphOpId keeps the spelling it arrived with: unsigned types
-// zero-extend, while signed and signless ones sign-extend (a signless negative prints as `-5:i64`).
-static nb::object getPyvalFromIntegerAttribute(mlir::IntegerAttr intAttr) {
-    llvm::APInt value = intAttr.getValue();
-    // An `index` attribute is an IntegerAttr with no signedness of its own; reading it as signed is
-    // what IntegerAttr::getInt does.
-    bool isUnsigned = intAttr.getType().isUnsignedInteger();
-
+// Read an integer the way MLIR's own printer does, so a value that crosses into the frontend and is
+// printed back into a graphOpId keeps the spelling it arrived with: unsigned types zero-extend,
+// while signed and signless ones sign-extend (a signless negative prints as `-5:i64`).
+static nb::object getPyvalFromAPInt(const llvm::APInt &value, bool isUnsigned) {
     // APInt only surrenders its value 64 bits at a time, so a wider one goes through its decimal
     // spelling. Python integers have no width of their own to overflow.
     if (isUnsigned ? value.getActiveBits() > 64 : value.getSignificantBits() > 64) {
@@ -110,6 +105,72 @@ static nb::object getPyvalFromIntegerAttribute(mlir::IntegerAttr intAttr) {
         return nb::cast(value.getZExtValue());
     }
     return nb::cast(value.getSExtValue());
+}
+
+static nb::object getPyvalFromIntegerAttribute(mlir::IntegerAttr intAttr) {
+    // An `index` attribute is an IntegerAttr with no signedness of its own; reading it as signed is
+    // what IntegerAttr::getInt does.
+    return getPyvalFromAPInt(intAttr.getValue(), intAttr.getType().isUnsignedInteger());
+}
+
+// Name the NumPy dtype an element type came from, mirroring the dtypes the frontend lowers to dense
+// attributes in `_dense_attribute_from_array`.
+static std::string getNumpyDtypeName(mlir::Type elementType) {
+    unsigned width = 0;
+    llvm::StringRef kind;
+    if (auto intType = llvm::dyn_cast<mlir::IntegerType>(elementType)) {
+        // NumPy has no 1-bit integer; an `i1` array is how a boolean array lowers.
+        if (intType.getWidth() == 1) {
+            return "bool";
+        }
+        width = intType.getWidth();
+        kind = intType.isUnsigned() ? "uint" : "int";
+    } else if (auto floatType = llvm::dyn_cast<mlir::FloatType>(elementType)) {
+        width = floatType.getWidth();
+        kind = "float";
+    }
+
+    if (width != 8 && width != 16 && width != 32 && width != 64) {
+        throw QuantumPythonDecompositions::QPDError(
+            "Cannot convert an array of " + mlir::debugString(elementType) +
+            " to a Python value for graph decomposition, no matching NumPy dtype.");
+    }
+    return (kind + llvm::Twine(width)).str();
+}
+
+// Convert a dense attribute into an equivalent NumPy array. Elements arrive in row-major order,
+// which is the order NumPy fills the requested shape in, and a splat attribute expands back into
+// its full set of elements.
+static nb::object getPyvalFromDenseAttribute(mlir::DenseIntOrFPElementsAttr denseAttr) {
+    mlir::ShapedType shapedType = denseAttr.getType();
+    mlir::Type elementType = shapedType.getElementType();
+    std::string dtypeName = getNumpyDtypeName(elementType);
+
+    nb::list elements;
+    if (llvm::isa<mlir::IntegerType>(elementType)) {
+        bool isUnsigned = elementType.isUnsignedInteger();
+        for (const llvm::APInt &element : denseAttr.getValues<llvm::APInt>()) {
+            elements.append(getPyvalFromAPInt(element, isUnsigned));
+        }
+    } else {
+        for (llvm::APFloat element : denseAttr.getValues<llvm::APFloat>()) {
+            // Widen to double regardless of the element type; NumPy narrows it back when it builds
+            // the array with the dtype the elements came from.
+            bool losesInfo = false;
+            element.convert(llvm::APFloat::IEEEdouble(), llvm::APFloat::rmNearestTiesToEven,
+                            &losesInfo);
+            elements.append(element.convertToDouble());
+        }
+    }
+
+    nb::list shape;
+    for (int64_t dim : shapedType.getShape()) {
+        shape.append(dim);
+    }
+
+    nb::module_ numpy = nb::module_::import_("numpy");
+    nb::object array = numpy.attr("array")(elements, nb::arg("dtype") = dtypeName.c_str());
+    return array.attr("reshape")(shape);
 }
 
 // Convert an MLIR attribute into an equivalent Python value. Generally should represent the
@@ -137,6 +198,8 @@ static nb::object getPyvalFromMlirAttribute(mlir::Attribute attr) {
         .Case<mlir::IntegerAttr>([](auto intAttr) { return getPyvalFromIntegerAttribute(intAttr); })
         .Case<mlir::FloatAttr>(
             [](auto floatAttr) { return nb::cast(floatAttr.getValueAsDouble()); })
+        .Case<mlir::DenseIntOrFPElementsAttr>(
+            [](auto denseAttr) { return getPyvalFromDenseAttribute(denseAttr); })
         .Default([](mlir::Attribute attr) -> nb::object {
             throw QuantumPythonDecompositions::QPDError(
                 "Cannot convert the MLIR attribute " + mlir::debugString(attr) +
