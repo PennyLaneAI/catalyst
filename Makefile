@@ -120,7 +120,10 @@ frontend:
 	@echo "install Catalyst Frontend"
 	# Uninstall pennylane before updating Catalyst, since pip will not replace two development
 	# versions of a package with the same version tag (e.g. 0.38-dev0).
-	$(PYTHON) -m pip uninstall -y pennylane
+	# --- v0.16.0b1 prerelease branch, not merged back to main ---------------- #
+	# Disabled so a pre-installed PennyLane v0.46.0b1 survives this target.
+	# $(PYTHON) -m pip uninstall -y pennylane
+	# ------------------------------------------------------------------------- #
 	$(PYTHON) -m pip install -e . --extra-index-url https://test.pypi.org/simple $(PIP_VERBOSE_FLAG)
 	$(PYTHON) -m catalyst.decomposition.precompile_decomposition_rules
 	rm -r frontend/pennylane_catalyst.egg-info
@@ -239,6 +242,16 @@ wheel:
 	cp $(COPY_FLAGS) $(LLVM_BUILD_DIR)/lib/libmlir_async_runtime.* $(MK_DIR)/frontend/catalyst/lib
 	cp $(COPY_FLAGS) $(DIALECTS_BUILD_DIR)/lib/default_pipelines.* $(MK_DIR)/frontend/catalyst/lib
 	cp $(COPY_FLAGS) $(DIALECTS_BUILD_DIR)/lib/libQuantumPythonDecompositions.* $(MK_DIR)/frontend/catalyst/lib
+
+	# Transport and executor runtime. Built only with -DENABLE_TRANSPORT=ON and
+	# -DENABLE_EXECUTOR=ON, so every copy here is optional.
+	cp $(COPY_FLAGS) $(RT_BUILD_DIR)/lib/librt_transport.* $(MK_DIR)/frontend/catalyst/lib 2>/dev/null || true
+	cp $(COPY_FLAGS) $(RT_BUILD_DIR)/lib/libmemcpy_cpu_impl.* $(MK_DIR)/frontend/catalyst/lib 2>/dev/null || true
+	cp $(COPY_FLAGS) $(RT_BUILD_DIR)/lib/libcatalyst_transport_*.* $(MK_DIR)/frontend/catalyst/lib 2>/dev/null || true
+	cp $(COPY_FLAGS) $(RT_BUILD_DIR)/lib/*_coprocessor_cpu.* $(MK_DIR)/frontend/catalyst/lib 2>/dev/null || true
+	cp $(COPY_FLAGS) $(RT_BUILD_DIR)/lib/librt_executor.* $(MK_DIR)/frontend/catalyst/lib 2>/dev/null || true
+	cp $(COPY_FLAGS) $(RT_BUILD_DIR)/lib/libcatalyst_executor_session.* $(MK_DIR)/frontend/catalyst/lib 2>/dev/null || true
+	cp $(COPY_FLAGS) $(RT_BUILD_DIR)/lib/catalyst-executor $(MK_DIR)/frontend/catalyst/lib 2>/dev/null || true
 
 	# Copy mlir bindings & compiler driver to frontend/mlir_quantum
 	mkdir -p $(MK_DIR)/frontend/mlir_quantum

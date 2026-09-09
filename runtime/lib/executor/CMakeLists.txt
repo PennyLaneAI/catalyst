@@ -83,6 +83,13 @@ target_link_libraries(catalyst-executor PRIVATE
 
 target_compile_options(catalyst-executor PRIVATE -fno-rtti)
 
+# At -O3, GCC reports a maybe-uninitialized false positive inside LLVM's unique_function move,
+# reached by inlining SimpleRemoteEPCServer::Create. The diagnostic is attributed to the inlining
+# context in this target rather than to the header, so including LLVM as SYSTEM does not cover it.
+if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    target_compile_options(catalyst-executor PRIVATE -Wno-maybe-uninitialized)
+endif()
+
 if(APPLE)
     target_link_options(catalyst-executor PRIVATE -Wl,-export_dynamic)
 else()

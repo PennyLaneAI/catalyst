@@ -11,6 +11,13 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
+env:
+  # --- v0.16.0b1 prerelease branch, not merged back to main ------------ #
+  # pip reads this for every install in the workflow, so `make frontend` can resolve
+  # the pennylane and pennylane-lightning floors that no index carries.
+  PIP_FIND_LINKS: "https://github.com/PennyLaneAI/pennylane/releases/expanded_assets/v0.46.0b1 https://github.com/PennyLaneAI/pennylane-lightning/releases/expanded_assets/v0.46.0b1"
+  # -------------------------------------------------------------------- #
+
 permissions:
   contents: read
 

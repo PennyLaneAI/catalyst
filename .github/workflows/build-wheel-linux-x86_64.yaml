@@ -49,6 +49,11 @@ concurrency:
   cancel-in-progress: true
 
 env:
+  # --- v0.16.0b1 prerelease branch, not merged back to main ------------ #
+  # pip reads this for every install in the job, so `make wheel` can resolve the
+  # pennylane and pennylane-lightning floors that no index carries.
+  PIP_FIND_LINKS: "https://github.com/PennyLaneAI/pennylane/releases/expanded_assets/v0.46.0b1 https://github.com/PennyLaneAI/pennylane-lightning/releases/expanded_assets/v0.46.0b1"
+  # -------------------------------------------------------------------- #
   # If the `inputs.build_standalone_plugin` is set to a value (true/false), then that is used.
   # If the input is empty (meaning this workflow was not triggered by a workflow_call/workflow_dispatch), then check if event_name is schedule.
   # If event_name is NOT schedule, default to false
@@ -365,9 +370,13 @@ jobs:
               -DPython_EXECUTABLE=$(which python${{ matrix.python_version }}) \
               -DENABLE_OPENQASM=ON \
               -DENABLE_OQD=OFF \
-              -DMLIR_INCLUDE_DIRS="$GITHUB_WORKSPACE/mlir/llvm-project/mlir/include"
+              -DMLIR_INCLUDE_DIRS="$GITHUB_WORKSPACE/mlir/llvm-project/mlir/include" \
+              -DENABLE_TRANSPORT=ON \
+              -DENABLE_EXECUTOR=ON \
+              -DLLVM_DIR="$GITHUB_WORKSPACE/llvm-build/lib/cmake/llvm"
 
-        cmake --build $GITHUB_WORKSPACE/runtime-build --target rt_capi rt_rsdecomp rt_decoder rtd_openqasm rtd_null_qubit
+        cmake --build $GITHUB_WORKSPACE/runtime-build --target rt_capi rt_rsdecomp rt_decoder rtd_openqasm rtd_null_qubit \
+              transport_all rt_executor catalyst-executor
 
     # Build OQC-Runtime
     - name: Build OQC-Runtime
