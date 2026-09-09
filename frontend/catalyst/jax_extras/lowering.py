@@ -21,6 +21,7 @@ import logging
 import textwrap
 
 import jax
+import numpy as np
 from jax._src import core
 from jax._src.effects import ordered_effects as jax_ordered_effects
 from jax._src.interpreters.mlir import _module_name_regex
@@ -204,6 +205,22 @@ def mlir_build_context():
             yield context
 
 
+def _dense_attribute_from_array(array):
+    """Build a dense elements attribute holding the contents of a NumPy array."""
+    # A dense attribute reads the array's buffer directly, so it has to be C-contiguous. `asarray`
+    # leaves a 0-d array 0-d, which `ascontiguousarray` would promote to rank 1.
+    array = np.asarray(array, order="C")
+
+    # Unsigned data has to say so in its type: read as signless, a `uint8` 250 comes back as -6.
+    signless = not np.issubdtype(array.dtype, np.unsignedinteger)
+    try:
+        return ir.DenseElementsAttr.get(array, signless=signless)
+    except ValueError as exc:
+        raise CompileError(
+            f"Cannot convert a NumPy array of dtype {array.dtype} to an MLIR attribute."
+        ) from exc
+
+
 def get_mlir_attribute_from_pyval(value):
     """
     Given a value of any type, construct an mlir attribute of corresponding type.
@@ -239,6 +256,13 @@ def get_mlir_attribute_from_pyval(value):
 
         case None:
             attr = ir.TypeAttr.get(ir.NoneType.get())
+        # A NumPy scalar is the same static data as the Python number it holds, so it gets the same
+        # attribute rather than a rank-0 dense one. `np.bool_` unwraps to `bool` here.
+        case np.generic():
+            attr = get_mlir_attribute_from_pyval(value.item())
+
+        case np.ndarray():
+            attr = _dense_attribute_from_array(value)
 
         case list() | tuple():
             element_attrs = [get_mlir_attribute_from_pyval(elem) for elem in value]
