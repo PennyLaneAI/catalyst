@@ -210,8 +210,6 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         // until the module stops changing.
         constexpr unsigned maxIterations = 64;
         size_t previousOpCount = countOps(module);
-        // One timer for the whole fixpoint rather than per iteration: the number of iterations is
-        // data-dependent, and per-iteration dumps would drown the useful signal.
         ScopedDiagnosticTimer fixpointTimer("decomp:lowering-fixpoint");
         unsigned iterationsRun = 0;
         for (unsigned iter = 0; iter < maxIterations; ++iter) {
