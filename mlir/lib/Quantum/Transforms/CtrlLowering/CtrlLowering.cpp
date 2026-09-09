@@ -18,14 +18,20 @@
 #include "mlir/IR/IRMapping.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
+#include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
+#include "Quantum/Transforms/Passes.h"
 #include "Quantum/IR/QuantumOps.h"
+#include "QRef/IR/QRefOps.h"
+#include "QRef/IR/QRefDialect.h"
+
+
+
 
 using namespace mlir;
-using namespace catalyst::quantum;
 
-namespace {
+namespace catalyst::quantum {
 
 /// Read a segment-sizes attribute from an operation and return it as a SmallVector<int32_t>. The
 /// attribute is expected to be a DenseI32ArrayAttr, and the returned vector contains the sizes of
@@ -603,7 +609,33 @@ struct CtrlLoweringRewritePattern : public OpRewritePattern<CtrlOp> {
     }
 };
 
-} // namespace
+} // namespace catalyst::quantum
+
+namespace catalyst::quantum {
+
+struct ReferenceSemanticsCtrlLoweringRewritePattern : public OpRewritePattern<CtrlOp> {
+    using OpRewritePattern<CtrlOp>::OpRewritePattern;
+
+    LogicalResult matchAndRewrite(CtrlOp ctrl, PatternRewriter &rewriter) const override {
+        return failure();
+    }
+};
+
+// static SmallVector<int32_t> readSegmentSizes(Operation *op, StringRef name) {
+//     return SmallVector<int32_t>();
+// }
+
+// static Operation* createControlledGate(PatternRewriter &rewriter, QuantumGate gate, IRMapping &map,
+//                                        ValueRange addCtrlQubits, ValueRange addCtrlValues) {
+//     return nullptr;
+// }
+
+// static CtrlOp mergeNestedCtrl(PatternRewriter &rewriter, CtrlOp ctrl, IRMapping &map,
+//                               SmallVector<Value> &currentCtrlQubits, ValueRange ctrlValues) {
+//     return ctrl;
+// }
+
+} // namespace catalyst::quantum
 
 namespace catalyst {
 namespace quantum {
@@ -615,8 +647,21 @@ struct CtrlLoweringPass : impl::CtrlLoweringPassBase<CtrlLoweringPass> {
     using CtrlLoweringPassBase::CtrlLoweringPassBase;
 
     void runOnOperation() final {
+        Operation *op = getOperation();
+        // Convert to reference-semantics 
+        {
+            OpPassManager ReferenceSemanticsPm(op->getName());
+            ReferenceSemanticsPm.addPass(createReferenceSemanticsConversionPass());
+            if (failed(runPipeline(ReferenceSemanticsPm, op))) {
+                return signalPassFailure();
+            }
+        }
+
         RewritePatternSet patterns(&getContext());
-        patterns.add<CtrlLoweringRewritePattern>(patterns.getContext(), 1);
+        patterns.add<quantum::ReferenceSemanticsCtrlLoweringRewritePattern>(patterns.getContext(), 1);
+
+
+        // patterns.add<quantum::CtrlLoweringRewritePattern>(patterns.getContext(), 1);
 
         if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
             return signalPassFailure();
