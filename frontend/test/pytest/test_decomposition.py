@@ -56,6 +56,7 @@ from catalyst.decomposition.type_utils import (
     get_dummy_values_for_arg,
     replace_wires_with_placeholder_wires,
 )
+from catalyst.utils.exceptions import CompileError
 
 
 class TestGenericUtilities:
@@ -511,6 +512,21 @@ class TestOnDemand:
                 "S", "S{}{wires:1}{}", [1], {}, {"wires": 1}, {}, is_custom_op=True
             )
         assert out == []
+
+    def test_compile_rules_reports_missing_mlir_module(self, mocker):
+        """A failed qjit compilation should not cause a secondary NoneType error."""
+
+        from catalyst.decomposition import decomposition_rules as dr
+
+        mocker.patch.object(dr, "collect_resources_for_op", return_value=({}, {}, []))
+        failed_qjit = mocker.MagicMock(mlir_module=None)
+        mocker.patch.object(dr.qp, "qjit", return_value=lambda _circuit: failed_qjit)
+
+        with pytest.raises(
+            CompileError,
+            match="Failed to generate an MLIR module while compiling decomposition rules for S",
+        ):
+            dr.compile_decomposition_rules("S", "S{}{wires:1}{}", {}, {"wires": 1}, {})
 
 
 class TestModifierIds:

@@ -29,6 +29,7 @@ from catalyst.decomposition.graph_op_id import GraphOpID
 from catalyst.decomposition.rule_lowering_warning import RuleLoweringWarning
 from catalyst.decomposition.type_utils import get_dummy_values_for_arg
 from catalyst.jax_extras.lowering import get_mlir_attribute_from_pyval
+from catalyst.utils.exceptions import CompileError
 
 # Ops that make a decomposition body non-invertible
 _NON_INVERTIBLE_MARKERS = (
@@ -401,6 +402,10 @@ def compile_decomposition_rules(
                 subroutine(*call_args, **call_kwargs)
 
     module = circuit.mlir_module
+    if module is None:
+        raise CompileError(
+            f"Failed to generate an MLIR module while compiling decomposition rules for {target_id}"
+        )
 
     def update_funcop_attributes(op):
         """Update the decomposition rule attributes if op is a decomposition rule.
