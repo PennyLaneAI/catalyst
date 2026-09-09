@@ -82,8 +82,7 @@ def build_base_op(op_cls, kwargs, is_custom_op):
 
 
 def symbolic_arguments(base_op, kind, ctrl_wires=None) -> dict:
-    """Return the arguments a symbolic ``kind`` rule expects for the given base operator.
-    """
+    """Return the arguments a symbolic ``kind`` rule expects for the given base operator."""
     if kind == "adjoint":
         return {"base": base_op}
     ctrl_wires = Wires(ctrl_wires)
@@ -548,8 +547,7 @@ def build_rule_module(
 def collect_symbolic_resources(
     op_cls, op_name, kwargs, is_custom_op, kind="adjoint", ctrl_wires=()
 ):
-    """Return resource data for the rules registered against ``Adjoint(op_name)``/``C(op_name)``.
-    """
+    """Return resource data for the rules registered against ``Adjoint(op_name)``/``C(op_name)``."""
     lookup_name = f"Adjoint({op_name})" if kind == "adjoint" else f"C({op_name})"
     rules = [
         rule
