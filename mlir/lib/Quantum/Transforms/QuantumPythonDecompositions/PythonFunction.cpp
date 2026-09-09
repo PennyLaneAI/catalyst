@@ -21,6 +21,7 @@
 #include <string>
 
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringRef.h"
@@ -30,8 +31,10 @@
 #include "llvm/Support/raw_ostream.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinAttributes.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/TypeRange.h"
 #include "mlir/IR/Types.h"
+#include "mlir/Support/DebugStringHelper.h"
 
 #include "Quantum/IR/QuantumInterfaces.h"
 #include "Quantum/IR/QuantumOps.h"
@@ -82,6 +85,35 @@ static nb::object getPyvalFromTypeRange(mlir::TypeRange typerange) {
     return pyTypes;
 }
 
+// Read an integer attribute the way MLIR's own printer does, so a value that crosses into the
+// frontend and is printed back into a graphOpId keeps the spelling it arrived with: unsigned types
+// zero-extend, while signed and signless ones sign-extend (a signless negative prints as `-5:i64`).
+static nb::object getPyvalFromIntegerAttribute(mlir::IntegerAttr intAttr) {
+    llvm::APInt value = intAttr.getValue();
+    // An `index` attribute is an IntegerAttr with no signedness of its own; reading it as signed is
+    // what IntegerAttr::getInt does.
+    bool isUnsigned = intAttr.getType().isUnsignedInteger();
+
+    // APInt only surrenders its value 64 bits at a time, so a wider one goes through its decimal
+    // spelling. Python integers have no width of their own to overflow.
+    if (isUnsigned ? value.getActiveBits() > 64 : value.getSignificantBits() > 64) {
+        llvm::SmallString<40> digits;
+        value.toString(digits, /*Radix=*/10, /*Signed=*/!isUnsigned);
+        PyObject *pyInt = PyLong_FromString(digits.c_str(), /*pend=*/nullptr, /*base=*/10);
+        if (!pyInt) {
+            throw nb::python_error();
+        }
+        return nb::steal(pyInt);
+    }
+
+    if (isUnsigned) {
+        return nb::cast(value.getZExtValue());
+    }
+    return nb::cast(value.getSExtValue());
+}
+
+// Convert an MLIR attribute into an equivalent Python value. Generally should represent the
+// inverse of `get_mlir_attribute_from_pyval` from the frontend direction.
 static nb::object getPyvalFromMlirAttribute(mlir::Attribute attr) {
     return llvm::TypeSwitch<mlir::Attribute, nb::object>(attr)
         .Case<mlir::DictionaryAttr>([](auto dictAttr) {
@@ -93,14 +125,23 @@ static nb::object getPyvalFromMlirAttribute(mlir::Attribute attr) {
             return outDict;
         })
         .Case<mlir::ArrayAttr>([](auto arrAttr) {
-            nb::list outTuple;
+            nb::list outList;
             for (auto val : arrAttr) {
-                outTuple.append(getPyvalFromMlirAttribute(val));
+                outList.append(getPyvalFromMlirAttribute(val));
             }
-            return outTuple;
+            return outList;
         })
         .Case<mlir::StringAttr>([](auto strAttr) { return nb::cast(strAttr.getValue().str()); })
-        .Default([](auto attr) { return nb::str("placeholder"); });
+        // Needs to be before IntegerAttr, since bools are also integers (i1).
+        .Case<mlir::BoolAttr>([](auto boolAttr) { return nb::cast(boolAttr.getValue()); })
+        .Case<mlir::IntegerAttr>([](auto intAttr) { return getPyvalFromIntegerAttribute(intAttr); })
+        .Case<mlir::FloatAttr>(
+            [](auto floatAttr) { return nb::cast(floatAttr.getValueAsDouble()); })
+        .Default([](mlir::Attribute attr) -> nb::object {
+            throw QuantumPythonDecompositions::QPDError(
+                "Cannot convert the MLIR attribute " + mlir::debugString(attr) +
+                " to a Python value for graph decomposition, unknown attribute type.");
+        });
 }
 
 } // namespace
