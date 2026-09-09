@@ -1855,6 +1855,31 @@ graph_decomposition = qp.transform(
     pass_name="graph-decomposition", setup_inputs=graph_decomposition_setup_inputs
 )
 
+
+def adjoint_lowering_setup_inputs():
+    r"""
+    The `adjoint-lowering` pass lowers the adjoint over the region.
+    """
+    return (), {}
+
+adjoint_lowering = qp.transform(
+    pass_name="adjoint-lowering", setup_inputs=adjoint_lowering_setup_inputs
+)
+
+def ctrl_lowering_setup_inputs():
+    r"""
+        The `ctrl-lowering` pass distributes the controls over the region: every gate in the
+        region gains the control qubits/values (appended to any controls it already carries),
+        and the control qubits are threaded through the region. Structural ops (extract, insert,
+        alloc, dealloc) are passed through unchanged, and a nested `quantum.ctrl` region has its
+        controls merged. Measurements inside a `quantum.ctrl` region are rejected.
+    """
+    return (), {}
+
+ctrl_lowering = qp.transform(
+    pass_name="ctrl-lowering", setup_inputs=ctrl_lowering_setup_inputs
+)
+
 __all__ = [
     "cancel_inverses",
     "combine_global_phases",
@@ -1875,4 +1900,6 @@ __all__ = [
     "decompose_arbitrary_ppr",
     "graph_decomposition",
     "diagonalize_measurements",
+    "adjoint_lowering",
+    "ctrl_lowering"
 ]

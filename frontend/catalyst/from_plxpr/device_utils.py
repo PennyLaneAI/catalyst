@@ -28,6 +28,8 @@ from pennylane.transforms import (
 )
 from pennylane.transforms.core import BoundTransform, Transform
 
+from catalyst.passes.builtin_passes import adjoint_lowering, ctrl_lowering
+
 from catalyst.device.decomposition import (
     measurements_from_counts,
     measurements_from_samples,
@@ -295,24 +297,37 @@ def _gateset_preprocessing(
     capabilities: DeviceCapabilities,
 ) -> None:
     """Insert a `graph-decomposition` pass targetting the gateset
-    specified by the specific `device`"""
-    gate_set = []
+    specified by the specific `device`
+    
+    Note that `graph-decomposition` needs `adjoint-lowering` and `ctrl-lowering` to be run before it
+    """
 
-    # Go through capabilities to populate gate_set
-    for gate, properties in capabilities.operations.items():
-        gate_set.append(gate)
-        
-        if properties.invertible:
-            gate_set.append(f"Adjoint({gate})")
-        if properties.controllable:
-            gate_set.append(f"C({gate})")
+    # Insert adjoint-lowering
+    pipeline.append(
+        _safe_create_bound_transform(
+            adjoint_lowering, unsupported_transforms
+        )
+    )
+
+    # Insert ctrl-lowering
+    pipeline.append(
+        _safe_create_bound_transform(
+            ctrl_lowering, unsupported_transforms
+        )
+    )
+
+    gate_set = capabilities.gate_set()
 
     # Get the default args/kwargs with the above gate_set
     targs, tkwargs = graph_decomposition_setup_inputs(gate_set=gate_set)
-    t = qp.transform(pass_name="graph_decomposition")
+    t = qp.transform(pass_name="graph-decomposition")
 
-    return BoundTransform(t, args=targs, kwargs=tkwargs)
-    
+    pipeline.append(
+        _safe_create_bound_transform(
+            t, unsupported_transforms, args=targs, kwargs=tkwargs
+        )
+    )
+
 
 def _safe_create_bound_transform(
     transform: Transform, unsupported_transforms: list[str], warn=True, args=(), kwargs=None
