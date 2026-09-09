@@ -536,10 +536,6 @@ func.func @testfunc(%first : tensor<1xi64>, %secondthird : tensor<2xi64>) {
 
     ASSERT_EQ(op.getOperatorName(), "testOperatorUID");
 
-    // This is needed to keep the backing array from being deleted
-    // llvm::SmallVector<llvm::SmallVector<mlir::Type>, 1> backing(
-    //     {mlir::IntegerType::get(&context, 1), mlir::Float64Type::get(&context),
-    //      mlir::IntegerType::get(&context, 64)});
     llvm::StringMap<llvm::SmallVector<mlir::Type>> expectedDynamicShape = {
         {"flag", {mlir::IntegerType::get(&context, 1)}},
         {"angle", {mlir::Float64Type::get(&context)}},
