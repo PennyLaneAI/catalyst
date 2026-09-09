@@ -21,11 +21,20 @@
 * The graph-based decomposition system now supports **adjoint operators** for `Operator2`.
   [(#3120)](https://github.com/PennyLaneAI/catalyst/pull/3120)
   [(#3115)](https://github.com/PennyLaneAI/catalyst/pull/3115)
+  [(#3204)](https://github.com/PennyLaneAI/catalyst/pull/3204)
 
   For a target gate set, `Adjoint(Op)` is reached through any of three pathways:
     1. Rules registered on the base `Op`,
     2. Rules registered directly for `Adjoint(Op)`, and
     3. Rules *synthesized by distribution* (`decompose(Adjoint(Op)) = adjoint(decompose(Op))`).
+
+  Pathway 2 now also covers the rules PennyLane registers with the *symbolic* operator's arguments,
+  i.e. `rule(base)` rather than the base op's `(*params, wires)`. This is how
+  `self_adjoint`, `adjoint_rotation` and other symbolic rules are written, so `Adjoint(H)`, `Adjoint(X)`,
+  `Adjoint(RZ)`, `Adjoint(Rot)`, ... now decompose straight back to their base operator instead of
+  falling through to the (much longer) distributed rules, or failing to solve at all when the base
+  op is the only member of the target `gate_set`. Rules registered for `Adjoint(Op)` against the base
+  op's parameters keep working: the two conventions are told apart per rule.
 
 * The graph-based decomposition system now supports **controlled operators** for `Operator2`,
   including single control (`C(Op)`), multiple controls (`<n>C(Op)`), and their composition with
