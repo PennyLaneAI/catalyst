@@ -261,6 +261,7 @@ def compile_decomp_rules(
             wire_lens={"wires": wire_lens[0]},
             static_data={},
             is_custom_op=True,
+            op_cls=op_cls,
         )
 
     elif op_cls is qp.MultiRZ:
@@ -280,6 +281,7 @@ def compile_decomp_rules(
             dynamic_shape=dynamic_shape,
             wire_lens={f"{wire_argname}": wire_lens[0]},
             static_data={},
+            op_cls=op_cls,
         )
 
     elif op_cls is qp.PauliRot:
@@ -303,6 +305,7 @@ def compile_decomp_rules(
             dynamic_shape=dynamic_shape,
             wire_lens={f"{wire_argname}": wire_lens[0]},
             static_data=repack_static_data,
+            op_cls=op_cls,
         )
 
     elif op_cls is qp.PCPhase:
@@ -324,6 +327,7 @@ def compile_decomp_rules(
             dynamic_shape=dynamic_shape,
             wire_lens={f"{wire_argname}": wire_lens[0]},
             static_data=repack_static_data,
+            op_cls=op_cls,
         )
 
     elif op_cls is qp.GlobalPhase:
@@ -336,6 +340,7 @@ def compile_decomp_rules(
             dynamic_shape=dynamic_shape,
             wire_lens={},
             static_data={},
+            op_cls=op_cls,
         )
 
     elif op_cls is qp.QubitUnitary:
@@ -361,6 +366,7 @@ def compile_decomp_rules(
             dynamic_shape=dynamic_shape,
             wire_lens={f"{wire_argname}": wire_lens[0]},
             static_data={},
+            op_cls=op_cls,
         )
 
     else:
@@ -450,6 +456,7 @@ def compile_decomp_rules(
             wire_lens=non_hybrid_wire_lens,
             static_data=repack_static_data,
             extra_data=extra_data,
+            op_cls=op_cls,
         )
 
     inject_new_rules_into_module(module, decomp_rules)
