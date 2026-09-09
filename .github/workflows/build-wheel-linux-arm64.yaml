@@ -495,9 +495,9 @@ jobs:
     - name: Install Catalyst
       run: |
         # --- v0.16.0b1 prerelease branch, not merged back to main ------------ #
-        pip install --find-links=https://github.com/PennyLaneAI/pennylane/releases/expanded_assets/v0.46.0b1 PennyLane==0.46.0b1
-        pip install --find-links=https://github.com/PennyLaneAI/pennylane-lightning/releases/expanded_assets/v0.46.0b1 PennyLane-Lightning==0.46.0b1
-        pip install --find-links=https://github.com/PennyLaneAI/pennylane-lightning/releases/expanded_assets/v0.46.0b1 PennyLane-Lightning-Kokkos==0.46.0b1
+        pip install \
+          --find-links=https://github.com/PennyLaneAI/pennylane/releases/expanded_assets/v0.46.0b1 --find-links=https://github.com/PennyLaneAI/pennylane-lightning/releases/expanded_assets/v0.46.0b1 \
+          PennyLane==0.46.0b1 PennyLane-Lightning==0.46.0b1 PennyLane-Lightning-Kokkos==0.46.0b1
         # -------------------------------------------------------------------- #
         python${{ matrix.python_version }} -m pip install dist/*.whl --extra-index-url https://test.pypi.org/simple
 
