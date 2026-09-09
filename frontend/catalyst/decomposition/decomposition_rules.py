@@ -440,8 +440,7 @@ def compile_decomposition_rules(
 def build_rule_module(
     subroutines, device, call_args, call_kwargs, ctrl_wires, name_to_resource_ids, target_id
 ) -> ir.Operation:
-    """Trace ``subroutines`` into a module of standalone decomposition-rule functions.
-    """
+    """Trace ``subroutines`` into a module of standalone decomposition-rule functions."""
 
     @qp.qjit(target="mlir", capture=True, collect_decomp_rules=False)
     @qp.qnode(device=device)
@@ -524,8 +523,7 @@ def build_rule_module(
 
 
 def collect_symbolic_adjoint_resources(op_cls, op_name, kwargs, is_custom_op):
-    """Return resource data for the rules registered against ``Adjoint(op_name)``.
-    """
+    """Return resource data for the rules registered against ``Adjoint(op_name)``."""
     rules = [
         rule
         for rule in qp.decomposition.list_decomps(f"Adjoint({op_name})")
