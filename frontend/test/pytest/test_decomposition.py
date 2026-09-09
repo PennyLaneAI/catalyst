@@ -43,9 +43,14 @@ from catalyst.decomposition.decomposition_rules import (
     _modifier_kind,
     compile_decomposition_rules_wrapper,
     compile_reachable_decomposition_rules_wrapper,
+    compile_registered_adjoint_rules,
+    get_rule_strings_from_module,
     name_unwrap_adjoint,
     name_unwrap_control,
     name_wrap_adjoint,
+    register_op_class,
+    resolve_op_class,
+    uses_symbolic_signature,
     wrap_modifier_id,
 )
 from catalyst.decomposition.graph_op_id import GraphOpID
@@ -493,6 +498,101 @@ class TestModifierIds:
         assert _MODIFIER_CANONICAL_ORDER == ("C", "Adjoint")
         with pytest.raises(ValueError, match="Non-canonical modifier order"):
             wrap_modifier_id(op_id, "Adjoint")
+
+
+class TestSymbolicRules:
+    """Tests for the rules registered against a symbolic operator that take the symbolic
+    op's args; following the convention in PennyLane."""
+
+    @pytest.mark.parametrize(
+        "op_name, rule_name, symbolic",
+        [
+            ("Adjoint(Hadamard)", "decompose_to_base", True),
+            ("Adjoint(Rot)", "_adjoint_rot", True),
+            ("Adjoint(RZ)", "adjoint_rotation", True),
+            ("Adjoint(NoParams)", "adj_rule", False),
+        ],
+    )
+    def test_uses_symbolic_signature(self, op_name, rule_name, symbolic):
+        """Test a rule is recognized as symbolic exactly when its body accepts the symbolic operator's
+        arguments."""
+
+        with local_decomps():
+
+            @register_resources({NoParams: 1})
+            def adj_rule(reg):
+                NoParams(reg=reg)
+
+            add_decomps("Adjoint(NoParams)", adj_rule)
+
+            rule = qp.list_decomps(op_name)[rule_name]
+            assert uses_symbolic_signature(rule) is symbolic
+
+    def test_resolve_op_class(self):
+        """Test an operator class is resolved from a built-in name or from one seen while tracing, and
+        an unknown name resolves to None."""
+
+        assert resolve_op_class("Hadamard") is qp.Hadamard
+        assert resolve_op_class("NoSuchOperator") is None
+        assert resolve_op_class("NoParams") is None or resolve_op_class("NoParams") is NoParams
+        register_op_class(NoParams)
+        assert resolve_op_class("NoParams") is NoParams
+
+    def test_self_adjoint_rule_is_lowered(self):
+        """Test ``self_adjoint`` rule on ``Adjoint(Hadamard)``."""
+
+        module = compile_registered_adjoint_rules(
+            "Hadamard", "Adjoint(Hadamard){}{wires:1}{}", {}, {"wires": 1}, {}
+        )
+        (rule,) = get_rule_strings_from_module(module)
+
+        assert 'target_gate = "Adjoint(Hadamard){}{wires:1}{}"' in rule
+        assert 'resources = {operations = {"Hadamard{}{wires:1}{}" = 1 : i64}}' in rule
+        assert "qref.adjoint" not in rule
+        assert "(%arg0: !qref.reg<1>, %arg1: tensor<1xi64>)" in rule
+        assert rule.count('gate_name = "Hadamard"') == 1
+
+    def test_adjoint_rotation_rule_is_lowered(self):
+        """Test ``adjoint_rotation`` reads the angle off the base operator."""
+
+        module = compile_registered_adjoint_rules(
+            "RZ",
+            "Adjoint(RZ){0:[f64]}{wires:1}{}",
+            {"0": ["f64"]},
+            {"wires": 1},
+            {},
+            is_custom_op=True,
+        )
+        (rule,) = get_rule_strings_from_module(module)
+
+        assert 'target_gate = "Adjoint(RZ){0:[f64]}{wires:1}{}"' in rule
+        assert 'resources = {operations = {"RZ{0:[f64]}{wires:1}{}" = 1 : i64}}' in rule
+        assert "qref.adjoint" not in rule
+        assert "stablehlo.negate" in rule
+
+    def test_no_registered_symbolic_rules(self):
+        """Test an op with no symbolic rules registered against its adjoint yields no module."""
+
+        with local_decomps():
+            assert (
+                compile_registered_adjoint_rules(
+                    "NoParams",
+                    "Adjoint(NoParams){}{reg:2}{}",
+                    {},
+                    {"reg": 2},
+                    {},
+                    op_cls=NoParams,
+                )
+                is None
+            )
+
+    def test_unresolvable_op_class_raises(self):
+        """Test lowering cannot proceed without the base operator's class."""
+
+        with pytest.raises(ValueError, match="Cannot resolve the operator class"):
+            compile_registered_adjoint_rules(
+                "NoSuchOperator", "Adjoint(NoSuchOperator){}{wires:1}{}", {}, {"wires": 1}, {}
+            )
 
 
 if __name__ == "__main__":
