@@ -47,6 +47,41 @@ jobs:
       - id: filter
         uses: ./.github/actions/transport-path-filter
 
+  hip_amd_toolchain:
+    name: "HIP sources build with the AMD toolchain"
+    needs: [transport_changes]
+    if: needs.transport_changes.outputs.transport == 'true'
+    # GH-hosted x86_64: ROCm publishes no arm64 packages, and this needs no GPU -- device-only
+    # compilation touches no driver.
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install the AMD compiler
+        run: |
+          set -euo pipefail
+          # Key to a file rather than piping curl into gpg: a short read leaves a truncated keyring
+          # that only surfaces later as an unresolvable package.
+          curl -fsSL --retry 3 https://repo.radeon.com/rocm/rocm.gpg.key -o /tmp/rocm.gpg.key
+          sudo gpg --dearmor -o /usr/share/keyrings/rocm.gpg < /tmp/rocm.gpg.key
+          echo "deb [signed-by=/usr/share/keyrings/rocm.gpg] https://repo.radeon.com/rocm/apt/7.1.1 noble main" \
+            | sudo tee /etc/apt/sources.list.d/rocm.list > /dev/null
+
+          # Pin above Ubuntu universe: its libamdhip64-dev 5.7.1 headers shadow ROCm's and predate
+          # hipMemRangeHandleTypeDmaBufFd, so the compile fails on an enum that does exist in 7.1.1.
+          printf 'Package: *\nPin: origin repo.radeon.com\nPin-Priority: 1001\n' \
+            | sudo tee /etc/apt/preferences.d/rocm > /dev/null
+
+          sudo apt-get update
+          # rocm-device-libs carries the amdgcn bitcode, without which amdclang++ refuses device
+          # compilation; hip-runtime-amd brings the AMD-side HIP headers.
+          sudo apt-get install -y --no-install-recommends \
+            rocm-llvm hip-runtime-amd hip-dev rocm-device-libs
+          echo "/opt/rocm/bin" >> $GITHUB_PATH
+
+      - name: Compile the .hip sources for CDNA4 and CDNA2
+        run: OFFLOAD_ARCHES="gfx950 gfx90a" runtime/prototypes/amd_hip_compile/compile_check.sh
+
   runtime:
     name: Catalyst-Runtime Build
     needs: [constants, transport_changes, determine_runner, llvm]

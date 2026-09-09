@@ -45,6 +45,11 @@ add_custom_target(transport_all)
 add_custom_target(transport_backends)
 add_dependencies(transport_all rt_transport)
 
+# Build the GPU backends against host memory when no HIP toolchain is present, so the session, the
+# ring/handoff protocol and gpu_verbs_selftest stay runnable off GPU hosts. Never both: HIP wins.
+option(TRANSPORT_GPU_STUB
+       "Build the GPU coprocessor against host memory instead of HIP (testing only)" OFF)
+
 # Detect HIP before add_subdirectory(common) so coproc/gpu can gate on TRANSPORT_HAS_HIP.
 if(DEFINED ENV{ROCM_PATH})
     list(APPEND CMAKE_PREFIX_PATH "$ENV{ROCM_PATH}")
@@ -113,6 +118,8 @@ if(CMAKE_HIP_COMPILER)
         find_package(CUDAToolkit REQUIRED)
     endif()
     set(TRANSPORT_HAS_HIP TRUE CACHE INTERNAL "transport: HIP toolchain available")
+elseif(TRANSPORT_GPU_STUB)
+    message(STATUS "transport: TRANSPORT_GPU_STUB -> GPU backends built against host memory")
 else()
     message(STATUS "transport: no HIP compiler -> GPU backends skipped")
 endif()
@@ -134,7 +141,7 @@ if(IBVERBS_LIB)
         catalyst_transport_cpu_verbs_controller
         catalyst_transport_cpu_verbs_coprocessor)
 
-    if(TRANSPORT_HAS_HIP)
+    if(TRANSPORT_HAS_HIP OR TRANSPORT_GPU_STUB)
         add_subdirectory(rdma/gpu_verbs)
         add_dependencies(transport_all catalyst_transport_gpu_verbs_coprocessor)
         add_dependencies(transport_backends catalyst_transport_gpu_verbs_coprocessor)

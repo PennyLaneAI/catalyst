@@ -1,0 +1,18 @@
+Subject: [PATCH] rocjitsu: reach dup2 through SYS_dup3 where SYS_dup2 is absent
+
+aarch64 Linux carries no dup2 syscall -- glibc implements dup2() on top of
+dup3() -- so SYS_dup2 is undefined there and the KMD interposer fails to
+compile. dup3(oldfd, newfd, 0) is defined to behave as dup2 for distinct
+descriptors, which is the only case this branch reaches.
+
+--- a/lib/rocjitsu/src/rocjitsu/kmd/linux/interposer.cpp
++++ b/lib/rocjitsu/src/rocjitsu/kmd/linux/interposer.cpp
+@@
+-    return static_cast<int>(syscall(SYS_dup2, oldfd, newfd));
++#ifdef SYS_dup2
++    return static_cast<int>(syscall(SYS_dup2, oldfd, newfd));
++#else
++    // aarch64 and other newer ports expose only dup3; flags=0 matches dup2
++    // semantics, and oldfd == newfd is handled by the caller below.
++    return static_cast<int>(syscall(SYS_dup3, oldfd, newfd, 0));
++#endif

@@ -14,6 +14,8 @@ BUILD_TYPE ?= RelWithDebInfo
 ENABLE_OPENQASM ?= ON
 ENABLE_OQD ?= OFF
 ENABLE_TRANSPORT ?= OFF
+# CDNA4 and CDNA2 by default; `check-hip-amd` passes these to amdclang++ --offload-arch.
+OFFLOAD_ARCHES ?= gfx950 gfx90a
 ENABLE_EXECUTOR ?= OFF
 ENABLE_ASAN ?= OFF
 STRICT_WARNINGS ?= ON
@@ -107,6 +109,27 @@ runtime: configure
 test_runner: configure
 	cmake --build $(RT_BUILD_DIR) --target $(TEST_TARGETS) -j$(NPROC)
 
+# Catch2 exits 4 when a binary ran no tests at all, which is what an all-skipped suite looks like
+# from the outside: the verbs suites skip wholesale on a host with no RDMA device. Left alone that
+# aborts the `set -e` loop below and the suites after it never run, reported as a test failure.
+CATCH_ALLOW_NO_TESTS := --allow-running-no-tests
+
+# One definition for the three places that run the transport suites. catch_discover_tests writes
+# non-executable *_include.cmake / *_tests.cmake next to the binaries and the glob matches those
+# too, so run only real executables.
+define run_transport_suites
+@set -e; ran=0; for t in $(RT_BUILD_DIR)/tests/runner_tests_transport*; do \
+	[ -f "$$t" ] && [ -x "$$t" ] || continue; \
+	echo "Catalyst runtime test suite - $${t##*/}"; \
+	$(ASAN_COMMAND) $$t $(CATCH_ALLOW_NO_TESTS); \
+	ran=$$((ran + 1)); \
+done; \
+if [ "$$ran" -eq 0 ]; then \
+	echo "No transport test binaries found under $(RT_BUILD_DIR)/tests. Was the build configured with ENABLE_TRANSPORT=ON?" >&2; \
+	exit 1; \
+fi
+endef
+
 .PHONY: test
 test: CODE_COVERAGE=OFF
 test: BUILD_TYPE?=RelWithDebInfo
@@ -129,10 +152,7 @@ ifeq ($(ENABLE_OQD), ON)
 endif
 ifeq ($(ENABLE_TRANSPORT), ON)
 	# Transport suites; which binaries exist depends on the toolchain (libibverbs, HIP).
-	@set -e; for t in $(RT_BUILD_DIR)/tests/runner_tests_transport*; do \
-		echo "Catalyst runtime test suite - $${t##*/}"; \
-		$(ASAN_COMMAND) $$t; \
-	done
+	$(call run_transport_suites)
 endif
 ifeq ($(ENABLE_EXECUTOR), ON)
 	# Test the catalyst-executor server over a loopback connection
@@ -147,16 +167,15 @@ test-transport: configure
 	# transport tests will run below.
 	cmake --build $(RT_BUILD_DIR) --target transport_tests_all -j$(NPROC)
 	@echo "Catalyst runtime transport test suites"
-	@set -e; ran=0; for t in $(RT_BUILD_DIR)/tests/runner_tests_transport*; do \
-		[ -x "$$t" ] || continue; \
-		echo "Running $${t##*/}"; \
-		$(ASAN_COMMAND) $$t; \
-		ran=$$((ran + 1)); \
-	done; \
-	if [ "$$ran" -eq 0 ]; then \
-		echo "No transport test binaries found under $(RT_BUILD_DIR)/tests. Was the build configured with ENABLE_TRANSPORT=ON?" >&2; \
-		exit 1; \
-	fi
+	$(call run_transport_suites)
+
+.PHONY: check-hip-amd
+check-hip-amd:
+	# Compile the transport's .hip sources with AMD's compiler, which nothing else does: the
+	# transport GPU backends are built by nvcc against fetched hip-dev headers, so an AMD-only
+	# error would surface first on real AMD hardware. Device-only, so no GPU is involved. Uses
+	# amdclang++ when installed, otherwise a container -- see the script's header.
+	OFFLOAD_ARCHES="$(OFFLOAD_ARCHES)" $(MK_DIR)/prototypes/amd_hip_compile/compile_check.sh
 
 .PHONY: coverage
 coverage: RT_BUILD_DIR := $(RT_BUILD_DIR)_cov
@@ -179,10 +198,7 @@ ifeq ($(ENABLE_OQD), ON)
 endif
 ifeq ($(ENABLE_TRANSPORT), ON)
 	# Transport suites; which binaries exist depends on the toolchain (libibverbs, HIP).
-	@set -e; for t in $(RT_BUILD_DIR)/tests/runner_tests_transport*; do \
-		echo "Catalyst runtime test suite - $${t##*/}"; \
-		$(ASAN_COMMAND) $$t; \
-	done
+	$(call run_transport_suites)
 endif
 ifeq ($(ENABLE_EXECUTOR), ON)
 	$(ASAN_COMMAND) $(RT_BUILD_DIR)/tests/runner_tests_executor
