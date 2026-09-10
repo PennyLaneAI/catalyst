@@ -38,7 +38,7 @@ jobs:
         with:
           context: .
           file: Dockerfile
-          platforms: linux/amd64
+          platforms: linux/arm64
           push: false
           build-args: |
             PENNYLANE_VERSION=main
