@@ -614,10 +614,10 @@ struct CtrlLoweringRewritePattern : public OpRewritePattern<CtrlOp> {
 namespace catalyst::qref {
 
 
-// static SmallVector<int32_t> readSegmentSizes(Operation *op, StringRef name) {
-//     auto seg = op->getAttrOfType<DenseI32ArrayAttr>(name);
-//     return SmallVector<int32_t>(seg.asArrayRef().begin(), seg.asArrayRef().end());
-// }
+static SmallVector<int32_t> readSegmentSizes(Operation *op, StringRef name) {
+    auto seg = op->getAttrOfType<DenseI32ArrayAttr>(name);
+    return SmallVector<int32_t>(seg.asArrayRef().begin(), seg.asArrayRef().end());
+}
 
 /// Rebuild a qref.quantum.gate with additional control qubits/values appended to whatever controls it
 /// already carries. The new op is inserted at the rewriter's insertion point.
@@ -635,31 +635,26 @@ static Operation *createControlledGate(PatternRewriter &rewriter, QuantumGate ga
     SmallVector<Value> operands;
     operands.reserve(op->getNumOperands() + addCtrlQubits.size() + addCtrlValues.size());
     for (unsigned i = 0; i < numLeading; ++i) {
-        operands.push_back(map.lookupOrDefault(op->getOperand(i)));
+        operands.push_back(op->getOperand(i));
     }
     for (Value q : nonCtrlQubits) {
-        operands.push_back(map.lookupOrDefault(q));
+        operands.push_back(q);
     }
     for (Value q : oldCtrlQubits) {
-        operands.push_back(map.lookupOrDefault(q));
+        operands.push_back(q);
     }
     operands.append(addCtrlQubits.begin(), addCtrlQubits.end());
     for (Value v : oldCtrlValues) {
-        operands.push_back(map.lookupOrDefault(v));
+        operands.push_back(v);
     }
     operands.append(addCtrlValues.begin(), addCtrlValues.end());
 
-    // The added controls grow the (last) out_ctrl_qubits result group.
-    Type qubitType = QubitType::get(rewriter.getContext());
-    SmallVector<Type> resultTypes(op->getResultTypes().begin(), op->getResultTypes().end());
-    resultTypes.append(addCtrlQubits.size(), qubitType);
-
     OperationState state(op->getLoc(), op->getName());
     state.addOperands(operands);
-    state.addTypes(resultTypes);
+    state.addTypes(op->getResultTypes());
     for (NamedAttribute attr : op->getAttrs()) {
         StringRef attrName = attr.getName().strref();
-        if (attrName == "operandSegmentSizes" || attrName == "resultSegmentSizes") {
+        if (attrName == "operandSegmentSizes") {
             continue;
         }
         state.addAttribute(attr.getName(), attr.getValue());
@@ -670,73 +665,67 @@ static Operation *createControlledGate(PatternRewriter &rewriter, QuantumGate ga
     operandSegments[operandSegments.size() - 1] += static_cast<int32_t>(addCtrlValues.size());
     state.addAttribute("operandSegmentSizes", rewriter.getDenseI32ArrayAttr(operandSegments));
 
-    if (op->getAttrOfType<DenseI32ArrayAttr>("resultSegmentSizes")) {
-        SmallVector<int32_t> resultSegments = readSegmentSizes(op, "resultSegmentSizes");
-        resultSegments[resultSegments.size() - 1] += static_cast<int32_t>(addCtrlQubits.size());
-        state.addAttribute("resultSegmentSizes", rewriter.getDenseI32ArrayAttr(resultSegments));
-    }
-
     return rewriter.create(state);
 }
 
-/// Rebuild a nested `qref.quantum.ctrl` op with the enclosing controls merged in.
-static CtrlOp mergeNestedCtrl(PatternRewriter &rewriter, CtrlOp inner,
-                              ValueRange addCtrlQubits, ValueRange addCtrlValues) {
-    Location loc = inner.getLoc();
-    Type qubitType = QubitType::get(rewriter.getContext());
+// /// Rebuild a nested `qref.quantum.ctrl` op with the enclosing controls merged in.
+// static CtrlOp mergeNestedCtrl(PatternRewriter &rewriter, CtrlOp inner,
+//                               ValueRange addCtrlQubits, ValueRange addCtrlValues) {
+//     Location loc = inner.getLoc();
+//     Type qubitType = QubitType::get(rewriter.getContext());
 
-    SmallVector<Value> mergedCtrlQubits;
-    for (Value q : inner.getInCtrlQubits()) {
-        mergedCtrlQubits.push_back(map.lookupOrDefault(q));
-    }
-    mergedCtrlQubits.append(addCtrlQubits.begin(), addCtrlQubits.end());
+//     SmallVector<Value> mergedCtrlQubits;
+//     for (Value q : inner.getInCtrlQubits()) {
+//         mergedCtrlQubits.push_back(map.lookupOrDefault(q));
+//     }
+//     mergedCtrlQubits.append(addCtrlQubits.begin(), addCtrlQubits.end());
 
-    SmallVector<Value> mergedCtrlValues;
-    for (Value v : inner.getInCtrlValues()) {
-        mergedCtrlValues.push_back(map.lookupOrDefault(v));
-    }
-    mergedCtrlValues.append(addCtrlValues.begin(), addCtrlValues.end());
+//     SmallVector<Value> mergedCtrlValues;
+//     for (Value v : inner.getInCtrlValues()) {
+//         mergedCtrlValues.push_back(map.lookupOrDefault(v));
+//     }
+//     mergedCtrlValues.append(addCtrlValues.begin(), addCtrlValues.end());
 
-    SmallVector<Value> innerArgs;
-    for (Value a : inner.getArgs()) {
-        innerArgs.push_back(map.lookupOrDefault(a));
-    }
+//     SmallVector<Value> innerArgs;
+//     for (Value a : inner.getArgs()) {
+//         innerArgs.push_back(map.lookupOrDefault(a));
+//     }
 
-    SmallVector<Value> operands;
-    operands.append(mergedCtrlQubits.begin(), mergedCtrlQubits.end());
-    operands.append(mergedCtrlValues.begin(), mergedCtrlValues.end());
-    operands.append(innerArgs.begin(), innerArgs.end());
+//     SmallVector<Value> operands;
+//     operands.append(mergedCtrlQubits.begin(), mergedCtrlQubits.end());
+//     operands.append(mergedCtrlValues.begin(), mergedCtrlValues.end());
+//     operands.append(innerArgs.begin(), innerArgs.end());
 
-    // The target-results group is everything after the (leading) out_ctrl_qubits results.
-    ResultRange innerResults = inner->getResults();
-    unsigned numInnerCtrl = inner.getInCtrlQubits().size();
-    unsigned numInnerTargets = innerResults.size() - numInnerCtrl;
+//     // The target-results group is everything after the (leading) out_ctrl_qubits results.
+//     ResultRange innerResults = inner->getResults();
+//     unsigned numInnerCtrl = inner.getInCtrlQubits().size();
+//     unsigned numInnerTargets = innerResults.size() - numInnerCtrl;
 
-    SmallVector<Type> resultTypes(mergedCtrlQubits.size(), qubitType);
-    for (unsigned i = 0; i < numInnerTargets; ++i) {
-        resultTypes.push_back(innerResults[numInnerCtrl + i].getType());
-    }
+//     SmallVector<Type> resultTypes(mergedCtrlQubits.size(), qubitType);
+//     for (unsigned i = 0; i < numInnerTargets; ++i) {
+//         resultTypes.push_back(innerResults[numInnerCtrl + i].getType());
+//     }
 
-    OperationState state(loc, CtrlOp::getOperationName());
-    state.addOperands(operands);
-    state.addTypes(resultTypes);
-    state.addAttribute("operandSegmentSizes",
-                       rewriter.getDenseI32ArrayAttr({static_cast<int32_t>(mergedCtrlQubits.size()),
-                                                      static_cast<int32_t>(mergedCtrlValues.size()),
-                                                      static_cast<int32_t>(innerArgs.size())}));
-    state.addAttribute("resultSegmentSizes",
-                       rewriter.getDenseI32ArrayAttr({static_cast<int32_t>(mergedCtrlQubits.size()),
-                                                      static_cast<int32_t>(numInnerTargets)}));
-    state.addRegion();
+//     OperationState state(loc, CtrlOp::getOperationName());
+//     state.addOperands(operands);
+//     state.addTypes(resultTypes);
+//     state.addAttribute("operandSegmentSizes",
+//                        rewriter.getDenseI32ArrayAttr({static_cast<int32_t>(mergedCtrlQubits.size()),
+//                                                       static_cast<int32_t>(mergedCtrlValues.size()),
+//                                                       static_cast<int32_t>(innerArgs.size())}));
+//     state.addAttribute("resultSegmentSizes",
+//                        rewriter.getDenseI32ArrayAttr({static_cast<int32_t>(mergedCtrlQubits.size()),
+//                                                       static_cast<int32_t>(numInnerTargets)}));
+//     state.addRegion();
 
-    Operation *merged = rewriter.create(state);
+//     Operation *merged = rewriter.create(state);
 
-    // Move the nested region body into the freshly created op (its block arguments, the target
-    // qubits, are unaffected by adding controls).
-    rewriter.inlineRegionBefore(inner.getRegion(), merged->getRegion(0),
-                                merged->getRegion(0).end());
-    return cast<CtrlOp>(merged);
-}
+//     // Move the nested region body into the freshly created op (its block arguments, the target
+//     // qubits, are unaffected by adding controls).
+//     rewriter.inlineRegionBefore(inner.getRegion(), merged->getRegion(0),
+//                                 merged->getRegion(0).end());
+//     return cast<CtrlOp>(merged);
+// }
 
 // match and rewrite a qref.ctrl op with reference semantics
 // this needs to take in a qref.ctrl op and output qref.custum op
@@ -764,7 +753,9 @@ struct ReferenceSemanticsCtrlLoweringRewritePattern : public OpRewritePattern<Ct
                 continue;
             }
             if (auto inner = dyn_cast<CtrlOp>(op)) {
-                mergeNestedCtrl(rewriter, inner, currentCtrlQubits, ctrlValues);
+                // mergeNestedCtrl(rewriter, inner, currentCtrlQubits, ctrlValues);
+                op.emitError("nested quantum.ctrl inside a quantum.ctrl region is not supported "
+                    "by ctrl-lowering; run adjoint-lowering first");
                 continue;
             }
             if (isa<AdjointOp>(op)) {
