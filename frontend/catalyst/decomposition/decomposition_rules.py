@@ -84,8 +84,7 @@ def build_base_op(op_cls, kwargs, is_custom_op):
 
 
 def rule_call_operands(call_args, call_kwargs, ctrl_wires=None) -> list:
-    """Flatten a decomposition rule's call into positional operands.
-    """
+    """Flatten a decomposition rule's call into positional operands."""
     operands = [*call_args, *(call_kwargs[name] for name in sorted(call_kwargs))]
     if ctrl_wires is not None:
         operands.append(ctrl_wires)
