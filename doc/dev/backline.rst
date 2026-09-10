@@ -32,7 +32,8 @@ or an FPGA-based decoder) cooperate over a low-latency transport.
 Installation
 ============
 
-The Backline components are off by default in a Catalyst build. To build them, enable the following build flags:
+The Backline components are off by default in a Catalyst build. To build them, enable the
+following build flags:
 
 ``ENABLE_TRANSPORT``
     Builds ``rt_transport``, the backend-agnostic transport loader, along with the in-tree
@@ -99,8 +100,8 @@ The stack is organized into three interacting layers, mirroring the overall Cata
 
 The end-to-end flow, from a user program to remote execution, proceeds as follows:
 
-#. A workload is declared along with a placement (a controller, its coprocessors, and a transport) and
-   executed under :func:`~.qjit` on a `Backline`_ device.
+#. A workload is declared along with a placement (a controller, its coprocessors, and a
+   transport) and executed under :func:`~.qjit` on a `Backline`_ device.
 #. Before compilation, each node's executor is settled on an address, and the placement is
    serialized onto the root module as ``catalyst.backline``.
 #. ``inject-transport-session`` reads ``catalyst.backline`` and emits the transport session's
@@ -335,7 +336,8 @@ that use it:
     * - ``executor.launch``
       - Invoke a sent kernel. The operands and results mirror the host-side call to the kernel.
     * - ``executor.launch_async``
-      - Start a ``() -> ()`` entry without waiting for it, returning an ``!executor.token``.
+      - Start a kernel that takes no operands and returns no results, without waiting for it to
+        finish. Returns an ``!executor.token`` naming the launch.
     * - ``executor.await``
       - Block until the ``executor.launch_async`` that produced a token has finished. Other
         launches on the same session keep running.
@@ -364,40 +366,22 @@ the string globals, memref descriptors, and per-argument metadata the runtime ex
 Compilation pipeline
 ====================
 
-Two compiler passes drive the target workflow. The compiler driver runs them as their own
-pipeline immediately after the bufferization stage, and only when a compilation workspace is set,
-since cross-compilation writes object files into it.
+Two passes drive the target workflow. The compiler driver runs them as their own pipeline after
+bufferization, and only when a compilation workspace is set, since the object files are written
+into it.
 
 ``cross-compile-targets``
-    For every nested ``builtin.module`` carrying a ``catalyst.target`` attribute, extracts the
-    module body into a standalone root module, runs the default lowering pipeline on it,
-    translates to LLVM IR, and emits an object file. The emitted path is recorded on the module as
-    the ``catalyst.object_file`` attribute, and the module is reduced to external declarations of
-    its entry functions. The target triple comes from the optional ``triple`` key on
-    ``catalyst.target``, falling back to the host triple. Objects destined for local execution are
-    recorded for static linking.
+    Turns each nested module tagged ``catalyst.target`` into a standalone object file, records
+    the path on the module as ``catalyst.object_file``, and reduces the module to external
+    declarations of its entry functions.
 
 ``dispatch-executor-targets``
-    For every nested module carrying both ``catalyst.dispatch`` and ``catalyst.object_file``,
-    injects one ``executor.open`` per unique address and one ``executor.send_binary`` per module
-    into ``setup()``, rewrites every host-side ``catalyst.launch_kernel`` targeting that module
-    into an ``executor.launch``, and erases the nested module from the host. A
-    ``catalyst.custom_call`` carrying a ``dispatch`` entry in its ``backend_config`` becomes an
-    ``executor.call``. No close operation is emitted, since the runtime closes every open session
-    at process exit.
+    Ships each dispatched object to its executor and rewrites the host-side
+    ``catalyst.launch_kernel`` calls into ``executor.launch``.
 
-Two supporting behaviours in the core pipeline make this possible:
-
-- The module-inlining pass skips modules annotated as separate targets, so a kernel destined for a
-  different target is preserved as its own module rather than being flattened into the host
-  program.
-- ``catalyst.launch_kernel`` is bufferizable, so a kernel launched from the host has its tensor
-  operands and results lowered to the memrefs the executor operations accept.
-
-A placement adds three passes on top of this: ``inject-transport-session`` in the quantum
-compilation stage, ``lower-decode-to-transport`` in the bufferization stage, and
-``convert-transport-to-llvm`` before ``convert-catalyst-to-llvm``. A placement naming a
-``qec_code`` also registers the QEC encoding passes and adds ``convert-qecp-to-llvm``.
+A placement adds three further passes: ``inject-transport-session``,
+``lower-decode-to-transport``, and ``convert-transport-to-llvm``. A placement naming a
+``qec_code`` also registers the QEC encoding passes.
 
 Runtime and execution model
 ===========================
@@ -432,32 +416,21 @@ libraries the dispatched code needs, which always include ``librt_transport.so``
 Inspecting a compiled program
 =============================
 
-Compiling with ``keep_intermediate=True`` keeps the workspace the driver writes into, which is
-where the Backline stages leave their output. Cross-compilation needs that workspace regardless,
-since it writes object files into it, and ``cross-compile-targets`` and
-``dispatch-executor-targets`` are skipped entirely when no workspace is set.
+Compilation writes its intermediate files into a workspace directory named after the compiled
+function. By default this is a temporary directory that is discarded afterwards, but
+``keep_intermediate=True`` puts it in the current working directory and keeps it. Each target
+module's own lowering is written to a subdirectory there, which is the only way to see what a
+target module became: it is lowered by its own nested pipeline rather than the one the host
+program runs through.
 
-The driver turns ``keep_intermediate`` into the ``save-ir-after-each`` option on
-``cross-compile-targets``, which controls how much of each target module's own lowering is
-written into its workspace subdirectory. Empty writes nothing, ``pipeline`` writes the extracted
-MLIR and the translated LLVM IR as ``extracted.mlir`` and ``<name>.ll``, and ``changed`` or
-``pass`` add the IR after each pass that altered it or after every pass. This is the way to see
-what a target module became, since it is lowered by its own nested pipeline rather than the one
-the host program runs through.
+``catalyst.Executor`` writes a host-side log per launch, named
+``catalyst-executor[-<name>]-<host>-<timestamp>.log``. This is the only place a failed plugin
+load is reported, so it is the first thing to read when a dispatched kernel cannot resolve a
+symbol.
 
-``cross-compile-targets`` also records the objects of statically linked targets on the root
-module, and the driver writes them to a ``<module>.objects`` manifest in the workspace that the
-frontend hands to the linker.
-
-On the runtime side, ``catalyst.Executor`` writes a host-side log per launch, named
-``catalyst-executor[-<name>]-<host>-<timestamp>.log``. This is the only place a failed plugin load
-is reported, so it is the first thing to read when a dispatched kernel cannot resolve a symbol.
-The ``verbose`` argument controls launcher narration, where ``0`` is quiet, ``1`` is normal, and
-``2`` reports each command.
-
-A transport backend that fails to load will report via the same channel, since the runtime opens
-it with ``dlopen`` on the node it belongs to. Backend errors are logged with a ``[transport]``
-prefix, and a round that never receives a reply surfaces as a collect error.
+Transport backend errors are written to the standard error of whichever process runs the node,
+prefixed with ``[transport]``. For a node running in the compiling process that is the calling
+program's own output, and for a dispatched node it is the executor log above.
 
 Current limitations
 ===================
