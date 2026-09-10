@@ -136,7 +136,7 @@ def FabricateOp : PBC_Op<"fabricate",
 }
 
 def PPRotationOp : PBC_Op<"ppr", [PBCOpInterface, AttrSizedOperandSegments,
-    DeclareOpInterfaceMethods<ResourceQuantumOpInterface, ["getResourceAdjointFlag", "getResourceDetailedName"]>]> {
+    DeclareOpInterfaceMethods<ResourceQuantumOpInterface, ["getResourceDetailedName"]>]> {
     let summary = "Pauli Product Rotation on qubits.";
 
     let description = [{
@@ -357,7 +357,7 @@ def PPRotationArbitraryOp : PBC_Op<"ppr.arbitrary", [PBCOpInterface, AttrSizedOp
 }
 
 def PPMeasurementOp : PBC_Op<"ppm", [PBCOpInterface,
-    DeclareOpInterfaceMethods<ResourceQuantumOpInterface, ["getResourceAdjointFlag", "getResourceDetailedName"]>]> {
+    DeclareOpInterfaceMethods<ResourceQuantumOpInterface, ["getResourceDetailedName"]>]> {
     let summary = "Pauli Product Measurement on qubits.";
 
     let description = [{
