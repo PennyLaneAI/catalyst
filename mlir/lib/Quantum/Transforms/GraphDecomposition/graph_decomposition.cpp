@@ -310,6 +310,8 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
 
             auto [opNameRaw, costRaw] = pairRef.split("=");
             llvm::StringRef opName = opNameRaw.trim();
+            opName.consume_front("\"");
+            opName.consume_back("\"");
             llvm::StringRef cost = costRaw.trim();
 
             cost.consume_back(": f64");
@@ -562,9 +564,17 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
      * The graphOpId format is "<name>{params}{wires}{static}[uid]", where <name> already carries
      * any name-wrapped op-level modifiers produced by `defaultGetGraphOpId`, e.g.
      * "C(Adjoint(RX)){0:[f64]}{wires:1}{}".
+     *
+     * Also remove the numeric prefix from <name>, which is introduced in controllable gates,
+     * for gateset checking.
+     * e.g. "2C(RY){0:[f64]}{wires:1}{}" -> "C(RY)" and not "2C(RY)"
      */
     OperatorNode parseOperator(llvm::StringRef raw) {
         OperatorNode node;
+
+        int index = 0;
+        // Consume the numeric prefix
+        raw.consumeInteger(10, index);
 
         // Base op: either the graphOpId "Name{...}..." form or the legacy "Name(w,p)" form.
         if (raw.contains('[') || raw.contains('{')) {

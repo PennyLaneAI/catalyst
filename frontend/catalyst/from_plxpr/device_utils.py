@@ -28,8 +28,6 @@ from pennylane.transforms import (
 )
 from pennylane.transforms.core import BoundTransform, Transform
 
-from catalyst.passes.builtin_passes import adjoint_lowering, ctrl_lowering
-
 from catalyst.device.decomposition import (
     measurements_from_counts,
     measurements_from_samples,
@@ -48,8 +46,12 @@ from catalyst.device.verification import (
     verify_no_state_variance_returns,
     verify_operations,
 )
+from catalyst.passes.builtin_passes import (
+    adjoint_lowering,
+    ctrl_lowering,
+    graph_decomposition_setup_inputs,
+)
 from catalyst.utils.exceptions import CompileError
-from catalyst.passes.builtin_passes import graph_decomposition_setup_inputs
 
 _named_obs_dict = {
     "PauliX": qp.X,
@@ -298,23 +300,15 @@ def _gateset_preprocessing(
 ) -> None:
     """Insert a `graph-decomposition` pass targetting the gateset
     specified by the specific `device`
-    
+
     Note that `graph-decomposition` needs `adjoint-lowering` and `ctrl-lowering` to be run before it
     """
 
     # Insert adjoint-lowering
-    pipeline.append(
-        _safe_create_bound_transform(
-            adjoint_lowering, unsupported_transforms
-        )
-    )
+    pipeline.append(_safe_create_bound_transform(adjoint_lowering, unsupported_transforms))
 
     # Insert ctrl-lowering
-    pipeline.append(
-        _safe_create_bound_transform(
-            ctrl_lowering, unsupported_transforms
-        )
-    )
+    pipeline.append(_safe_create_bound_transform(ctrl_lowering, unsupported_transforms))
 
     gate_set = capabilities.gate_set()
 
@@ -323,9 +317,7 @@ def _gateset_preprocessing(
     t = qp.transform(pass_name="graph-decomposition")
 
     pipeline.append(
-        _safe_create_bound_transform(
-            t, unsupported_transforms, args=targs, kwargs=tkwargs
-        )
+        _safe_create_bound_transform(t, unsupported_transforms, args=targs, kwargs=tkwargs)
     )
 
 
