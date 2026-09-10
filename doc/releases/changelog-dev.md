@@ -496,7 +496,7 @@
 * The ``ResourceAnalysis`` pass no longer reports PBC Pauli product rotations and measurements
   with an ``Adjoint(...)`` prefix. Resource keys such as ``Adjoint(PPR-pi/4)`` and ``Adjoint(PPM)`` 
   are now counted under ``PPR-pi/4`` and ``PPM`` instead.
-  [(#XXXX)](https://github.com/PennyLaneAI/catalyst/pull/XXXX)
+  [(#3210)](https://github.com/PennyLaneAI/catalyst/pull/3210)
 
 * Removes the non-graph decomposition fallback when `capture=True` is enabled.
   [(#3058)](https://github.com/PennyLaneAI/catalyst/pull/3058/)
