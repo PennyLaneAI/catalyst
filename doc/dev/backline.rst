@@ -99,7 +99,7 @@ The stack is organized into three interacting layers, mirroring the overall Cata
 
 The end-to-end flow, from a user program to remote execution, proceeds as follows:
 
-#. A workload is declared as a placement (a controller, its coprocessors, and a transport) and
+#. A workload is declared along with a placement (a controller, its coprocessors, and a transport) and
    executed under :func:`~.qjit` on a `Backline`_ device.
 #. Before compilation, each node's executor is settled on an address, and the placement is
    serialized onto the root module as ``catalyst.backline``.
