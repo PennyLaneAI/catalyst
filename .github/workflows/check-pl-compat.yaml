@@ -38,8 +38,11 @@ jobs:
       with:
         fetch-depth: 0
     - if: ${{ inputs.catalyst == 'stable' }}
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        git checkout $(git tag -l 'v*' | sort -V | tail -1)
+        git checkout "$(gh release list --repo ${{ github.repository }} \
+            --exclude-pre-releases --limit 1 --json tagName --jq '.[0].tagName')"
     - if: ${{ inputs.catalyst == 'release-candidate' }}
       run: |
         # For rc, we install all packages from TestPyPI.
