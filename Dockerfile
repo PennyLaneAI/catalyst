@@ -315,7 +315,7 @@ RUN  if [ "$LLVM_CACHE" = "false" ]; then \
     LLVM_TARGETS="lld check-mlir" \
     ENABLE_ZLIB=FORCE_ON \
     ENABLE_LLD=OFF \
-    make llvm \
+    make llvm; \
     fi
 
 # Build stablehlo dialect
@@ -327,7 +327,7 @@ RUN if [ "$STABLEHLO_CACHE" = "false" ]; then \
     STABLEHLO_BUILD_DIR="/opt/catalyst/stablehlo-build" \
     COMPILER_LAUNCHER="" \
     ENABLE_LLD=OFF \
-    make stablehlo \
+    make stablehlo; \
     fi
 
 # Build enzyme
