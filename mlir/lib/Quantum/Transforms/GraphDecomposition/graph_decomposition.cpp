@@ -212,6 +212,26 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
             return count;
         };
 
+        // Run a lowering pass over every root that has something for it to lower.
+        auto lowerRoots = [&](llvm::function_ref<bool(mlir::Operation *)> needsLowering,
+                              llvm::function_ref<std::unique_ptr<mlir::Pass>()> makePass) {
+            for (mlir::Operation *root : roots) {
+                if (!needsLowering(root)) {
+                    continue;
+                }
+                OpPassManager pm(root->getName().getStringRef());
+                pm.addPass(makePass());
+                if (failed(runPipeline(pm, root))) {
+                    return failure();
+                }
+            }
+            return success();
+        };
+        auto hasAdjointRegion = [](mlir::Operation *root) {
+            return root->walk([](AdjointOp) { return mlir::WalkResult::interrupt(); })
+                .wasInterrupted();
+        };
+
         // Fixpoint: apply the chosen rules and distribute any `quantum.adjoint` regions they emit,
         // until the circuit stops changing.
         constexpr unsigned maxIterations = 64;
