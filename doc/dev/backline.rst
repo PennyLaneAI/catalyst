@@ -457,8 +457,7 @@ The ``verbose`` argument controls launcher narration, where ``0`` is quiet, ``1`
 
 A transport backend that fails to load reports through the same channel, since the runtime opens
 it with ``dlopen`` on the node it belongs to. Backend errors are logged with a ``[transport]``
-prefix, and a round that never receives a reply surfaces as a collect error naming the cause,
-which is one of memory, timeout, or stuck.
+prefix, and a round that never receives a reply surfaces as a collect error.
 
 Current limitations
 ===================
