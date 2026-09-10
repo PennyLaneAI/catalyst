@@ -455,7 +455,7 @@ is reported, so it is the first thing to read when a dispatched kernel cannot re
 The ``verbose`` argument controls launcher narration, where ``0`` is quiet, ``1`` is normal, and
 ``2`` reports each command.
 
-A transport backend that fails to load reports through the same channel, since the runtime opens
+A transport backend that fails to load will report via the same channel, since the runtime opens
 it with ``dlopen`` on the node it belongs to. Backend errors are logged with a ``[transport]``
 prefix, and a round that never receives a reply surfaces as a collect error.
 
