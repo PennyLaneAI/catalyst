@@ -227,8 +227,7 @@ def test_convert_clifford_to_ppr():
     ppm_specs_output = qp.specs(test_convert_clifford_to_ppr_workflow, level=1)().resources
 
     gate_types = ppm_specs_output.quantum_operations
-    assert gate_types.get("Adjoint(PPR-pi/4)", 0) == 2
-    assert gate_types.get("PPR-pi/4-w1", 0) == 4
+    assert gate_types.get("PPR-pi/4-w1", 0) == 6
     assert gate_types.get("PPR-pi/4-w2", 0) == 1
     assert gate_types.get("PPR-pi/8-w1", 0) == 1
     assert ppm_specs_output.any_commuting_depth == 3
@@ -283,8 +282,7 @@ def test_commute_ppr():
     gate_types = ppm_specs_output.quantum_operations
 
     assert gate_types.get("PPM-w1", 0) == 2
-    assert gate_types.get("Adjoint(PPR-pi/4)", 0) == 2
-    assert gate_types.get("PPR-pi/4-w1", 0) == 4
+    assert gate_types.get("PPR-pi/4-w1", 0) == 6
     assert gate_types.get("PPR-pi/4-w2", 0) == 1
     assert gate_types.get("PPR-pi/8-w1", 0) == 1
     assert ppm_specs_output.any_commuting_depth == 5
@@ -343,8 +341,7 @@ def test_ppr_to_ppm_auto_corrected():
     gate_types = specs_output.resources.quantum_operations
 
     assert gate_types["GlobalPhase"] == 4
-    assert gate_types["PPR-pi/4-w1"] == 4
-    assert gate_types["Adjoint(PPR-pi/4)"] == 2
+    assert gate_types["PPR-pi/4-w1"] == 6
     assert gate_types["PPR-pi/4-w2"] == 1
     assert gate_types["PPR-pi/8-w1"] == 1
 
@@ -370,8 +367,8 @@ def test_ppr_to_ppm_inject_magic_state():
 
     specs_output = qp.specs(test_ppr_to_ppm_workflow, level=1)()
     gate_types = specs_output.resources.quantum_operations
-    assert gate_types["Adjoint(PPR-pi/4)"] == 2
-    assert gate_types["PPR-pi/4-w1"] == 4
+
+    assert gate_types["PPR-pi/4-w1"] == 6
     assert gate_types["PPR-pi/4-w2"] == 1
     assert gate_types["PPR-pi/8-w1"] == 1
     assert gate_types["PPM-w1"] == 2
@@ -398,8 +395,7 @@ def test_ppr_to_ppm_pauli_corrected():
 
     specs_output = qp.specs(test_ppr_to_ppm_workflow, level=1)()
     gate_types = specs_output.resources.quantum_operations
-    assert gate_types["PPR-pi/4-w1"] == 4
-    assert gate_types["Adjoint(PPR-pi/4)"] == 2
+    assert gate_types["PPR-pi/4-w1"] == 6
     assert gate_types["PPR-pi/4-w2"] == 1
     assert gate_types["PPR-pi/8-w1"] == 1
     assert gate_types["PPM-w1"] == 2
@@ -448,9 +444,8 @@ def test_commute_ppr_and_merge_ppr_ppm_with_max_pauli_size():
 
     g_specs = qp.specs(g_workflow, level=3)().resources
     gate_types = g_specs.quantum_operations
-    assert gate_types.get("Adjoint(PPM)", 0) == 1
-    assert gate_types.get("PPM-w1", 0) == 1
-    assert gate_types.get("Adjoint(PPR-pi/4)", 0) == 1
+    assert gate_types.get("PPM-w1", 0) == 2
+    assert gate_types.get("PPR-pi/4-w1", 0) == 1
     assert gate_types.get("PPR-pi/4-w2", 0) == 2
     assert gate_types.get("PPR-pi/8-w1", 0) == 2
     assert g_specs.any_commuting_depth == 3
