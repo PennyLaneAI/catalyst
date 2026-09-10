@@ -39,6 +39,13 @@ _NON_INVERTIBLE_MARKERS = (
     ".ppm",  # pbc.ppm / pbc.ref.ppm / pbc.select.ppm
 )
 
+_NON_INVERTIBLE_RESOURCE_TYPES = (qp.ops.MidMeasure, qp.ops.PauliMeasure)
+
+
+def _resources_have_measurement(gate_counts) -> bool:
+    """Return whether a rule's declared resources contain a mid-circuit measurement."""
+    return any(isinstance(op, _NON_INVERTIBLE_RESOURCE_TYPES) for op in gate_counts)
+
 
 # Canonical nesting order for op-level modifiers, listed OUTERMOST first. The compiler's
 # ``wrapModifiers`` (mlir/lib/Quantum/IR/QuantumInterfaces.cpp) folds modifiers into a graphOpId
@@ -317,7 +324,7 @@ def compile_decomposition_rules(
     n_base_wires = sum(wire_lens.values())
     device = qp.device("null.qubit", wires=n_base_wires + (n_ctrl if wrap_control else 0))
 
-    _, name_to_resource_ids, decomp_rules = collect_resources_for_op(
+    name_to_resources, name_to_resource_ids, decomp_rules = collect_resources_for_op(
         op_name, kwargs | static_data | extra_data, is_custom_op, adjoint_resources=wrap_adjoint
     )
 
@@ -363,9 +370,18 @@ def compile_decomposition_rules(
 
     subroutines = []
     for rule in decomp_rules:
-        if rule.name in name_to_resource_ids and rule.is_applicable(
-            *condition_args, **condition_kwargs
+        if rule.name not in name_to_resource_ids:
+            continue
+        if (wrap_adjoint or wrap_control) and _resources_have_measurement(
+            name_to_resources[rule.name]
         ):
+            warnings.warn(
+                f"Skipped the {rule.name} decomposition rule for {target_id}: it contains a "
+                "mid-circuit measurement, which is not supported with adjoint or control regions.",
+                category=RuleLoweringWarning,
+            )
+            continue
+        if rule.is_applicable(*condition_args, **condition_kwargs):
             subroutines.append(rule_to_subroutine(rule))
 
     # For control distribution, the extra control wires are

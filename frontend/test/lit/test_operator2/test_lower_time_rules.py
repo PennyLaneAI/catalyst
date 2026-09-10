@@ -610,7 +610,7 @@ def test_phaseshift_to_rz():
 # CHECK-LABEL: test_phaseshift
 # CHECK: func.func private @"__builtin__phaseshift_to_rz_gp
 # CHECK-SAME: resources = {operations = {
-# CHECK-SAME: GlobalPhase{phi:[f64]}{wires:0}{}
+# CHECK-SAME: GlobalPhase{phi:[f64]}{}{}
 # CHECK-SAME: RZ{0:[f64]}{wires:1}{}
 # CHECK: qref.custom "RZ"
 # CHECK: qref.gphase

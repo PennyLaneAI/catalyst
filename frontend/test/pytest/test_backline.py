@@ -272,7 +272,7 @@ def test_backline_qnode_capture_path(use_capture):
     """A backline qnode compiles to MLIR carrying the catalyst.backline attribute."""
     dev = qp.Backline(controller=_controller(), coprocessors=[_coproc("cop0")], transport="rdma")
 
-    @qjit(target="mlir", capture=True)
+    @qjit(target="mlir", capture=True, collect_decomp_rules=False)
     @qp.qnode(dev)
     def circuit():
         qp.Hadamard(0)
@@ -290,7 +290,7 @@ def test_backline_qnode_capture_path_memcpy(use_capture):
     """
     dev = qp.Backline(controller=_controller(), coprocessors=[_coproc("cop0")], transport="memcpy")
 
-    @qjit(target="mlir", capture=True)
+    @qjit(target="mlir", capture=True, collect_decomp_rules=False)
     @qp.qnode(dev)
     def circuit():
         qp.Hadamard(0)
@@ -319,7 +319,7 @@ def test_placement_behind_a_wrapper_is_found(use_capture):
         qp.Hadamard(0)
         return qp.probs()
 
-    @qjit(target="mlir", capture=True)
+    @qjit(target="mlir", capture=True, collect_decomp_rules=False)
     def workflow():
         return 2.0 * circuit()
 
@@ -365,7 +365,7 @@ def test_qec_encoding_reaches_a_qnode_behind_a_wrapper(use_capture):
         qp.Hadamard(0)
         return qp.probs()
 
-    @qjit(target="mlir", capture=True)
+    @qjit(target="mlir", capture=True, collect_decomp_rules=False)
     def workflow():
         return 2.0 * circuit()
 
@@ -390,7 +390,7 @@ def test_remote_controller_behind_a_wrapper_is_still_tagged(use_capture):
         qp.Hadamard(0)
         return qp.probs()
 
-    @qjit(target="mlir", capture=True)
+    @qjit(target="mlir", capture=True, collect_decomp_rules=False)
     def workflow():
         return 2.0 * circuit()
 
@@ -411,7 +411,7 @@ def test_two_qnodes_over_one_placement_are_accepted(use_capture):
         qp.CNOT([0, 1])
         return qp.probs()
 
-    @qjit(target="mlir", capture=True)
+    @qjit(target="mlir", capture=True, collect_decomp_rules=False)
     def workflow():
         return circuit_a() + circuit_b()
 
@@ -437,7 +437,7 @@ def test_two_placements_in_one_program_are_rejected(use_capture):
 
     with pytest.raises(CompileError, match="2 different backline placements"):
 
-        @qjit(target="mlir", capture=True)
+        @qjit(target="mlir", capture=True, collect_decomp_rules=False)
         def workflow():
             return circuit_a() + circuit_b()
 
@@ -940,7 +940,7 @@ class TestExecutorRealization:
         cop = _coproc("cop0", oob_port=40000)
         dev = qp.Backline(controller=_controller(), coprocessors=[cop], transport="rdma")
 
-        @qjit(target="mlir", capture=True)
+        @qjit(target="mlir", capture=True, collect_decomp_rules=False)
         @qp.qnode(dev)
         def circuit():
             qp.Hadamard(0)

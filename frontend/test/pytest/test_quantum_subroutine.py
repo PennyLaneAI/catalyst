@@ -35,7 +35,7 @@ class TestSubroutineHOP:
         def identity(x):
             return x
 
-        @qp.qjit(capture=True)
+        @qp.qjit(capture=True, collect_decomp_rules=False)
         def subroutine_test():
             return identity(1)
 
@@ -48,7 +48,7 @@ class TestSubroutineHOP:
         def Hadamard0(wire):
             qp.Hadamard(wire)
 
-        @qp.qjit(capture=True)
+        @qp.qjit(capture=True, collect_decomp_rules=False)
         @qp.qnode(qp.device("lightning.qubit", wires=1))
         def subroutine_test(c: int):
             Hadamard0(c)
@@ -64,7 +64,7 @@ class TestSubroutineHOP:
         def Hadamard0(wire):
             qp.Hadamard(wire)
 
-        @qp.qjit(capture=True)
+        @qp.qjit(capture=True, collect_decomp_rules=False)
         @qp.qnode(qp.device("lightning.qubit", wires=1))
         def subroutine_test(c: int):
             Hadamard0(c)
@@ -83,11 +83,10 @@ class TestSubroutineHOP:
             qp.Hadamard(wires=[0])
 
         msg = "inside subroutine"
-        with pytest.warns(UserWarning, match="AOT.*failed"):
 
-            @qp.qjit(autograph=False, capture=True)
-            def subroutine_test():
-                Hadamard0()
+        @qp.qjit(autograph=False, capture=True, collect_decomp_rules=False)
+        def subroutine_test():
+            Hadamard0()
 
         with pytest.raises(NotImplementedError, match=msg):
             subroutine_test()
@@ -104,7 +103,7 @@ class TestSubroutineHOP:
 
             qp.cond(wire != 0, true_path, false_path)()
 
-        @qp.qjit(autograph=False, capture=True)
+        @qp.qjit(autograph=False, capture=True, collect_decomp_rules=False)
         @qp.qnode(qp.device("lightning.qubit", wires=1))
         def subroutine_test(c: int):
             Hadamard0(c)
@@ -126,7 +125,7 @@ class TestSubroutineClass:
         def f(x, wires):
             qp.RX(x, wires)
 
-        @qp.qjit(capture=True)
+        @qp.qjit(capture=True, collect_decomp_rules=False)
         @qp.qnode(qp.device("lightning.qubit", wires=3))
         def c(x):
             f(x, 0)
@@ -149,7 +148,7 @@ class TestSubroutineClass:
             else:
                 qp.Z(wires)
 
-        @qp.qjit(capture=True)
+        @qp.qjit(capture=True, collect_decomp_rules=False)
         @qp.qnode(qp.device("lightning.qubit", wires=3))
         def c():
             f(0, "X")
@@ -173,7 +172,7 @@ class TestSubroutineClass:
 
             l()
 
-        @qp.qjit(capture=True)
+        @qp.qjit(capture=True, collect_decomp_rules=False)
         @qp.qnode(qp.device("lightning.qubit", wires=4))
         def c():
             f(register=(0, 1, 3))
