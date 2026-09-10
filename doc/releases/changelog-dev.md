@@ -784,6 +784,11 @@
   [(#3180)](https://github.com/PennyLaneAI/catalyst/pull/3180)
   [(#3197)](https://github.com/PennyLaneAI/catalyst/pull/3197)
 
+* A developer guide for Backline describes how heterogeneous compilation and remote execution are
+  built in Catalyst: the `catalyst.backline` module attribute, the transport and executor
+  dialects, the compilation pipeline, and the runtime.
+  [(#3208)](https://github.com/PennyLaneAI/catalyst/pull/3208)
+
 <h3>Contributors ✍️</h3>
 
 This release contains contributions from (in alphabetical order):
