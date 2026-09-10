@@ -225,6 +225,9 @@ def get_mlir_attribute_from_pyval(value):
         case str():
             attr = ir.StringAttr.get(value)
 
+        case None:
+            attr = ir.TypeAttr.get(ir.NoneType.get())
+
         case list() | tuple():
             element_attrs = [get_mlir_attribute_from_pyval(elem) for elem in value]
             attr = ir.ArrayAttr.get(element_attrs)
