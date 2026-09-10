@@ -574,6 +574,9 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* Adds ability to lower `None` attributes to `get_mlir_attribute_from_pyval`.
+  [(#3196)](https://github.com/PennyLaneAI/catalyst/pull/3196)
+
 * Update calls to `GlobalPhase` to no longer use the `wires` argument.
   [(#3108)](https://github.com/PennyLaneAI/catalyst/pull/3108)
   
