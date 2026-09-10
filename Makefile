@@ -360,6 +360,9 @@ lit-coverage:
 	@echo "Running lit tests with coverage"
 	$(DIALECTS_BUILD_DIR)/bin/catalyst --tool=opt --emit-bytecode --register-decomp-rule-resource $(MK_DIR)/frontend/test/lit/GraphDecomposition/test_rules.mlir > $(MK_DIR)/frontend/test/lit/GraphDecomposition/test_rules.mlirbc
 	CATALYST_LIBPYTHON=$$($(PYTHON) -c 'from catalyst.utils.runtime_environment import get_libpython_path; print(get_libpython_path())') ENABLE_LIT_COVERAGE=1 COVERAGE_FILE=$(MK_DIR)/.coverage.lit $(PYTHON) $(LLVM_BUILD_DIR)/bin/llvm-lit -sv frontend/test/lit -j$(shell nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 1)
+	# Each lit worker writes its own .coverage.lit.<host>.<pid>.<random>; merge them into
+	# .coverage.lit, which coverage-frontend then combines with the pytest data.
+	$(PYTHON) -m coverage combine --data-file=$(MK_DIR)/.coverage.lit
 
 coverage-frontend:
 ifeq ($(ENABLE_ASAN),ON)
