@@ -199,7 +199,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
                 return signalPassFailure();
             }
         }
-        
+
         llvm::SmallVector<mlir::Operation *> roots = DecompUtils::getDecompositionRoots(module);
 
         auto countOps = [&roots]() {
