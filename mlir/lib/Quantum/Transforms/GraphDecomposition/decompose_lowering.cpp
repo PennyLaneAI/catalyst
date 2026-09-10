@@ -166,8 +166,8 @@ struct DecomposeLoweringPass : impl::DecomposeLoweringPassBase<DecomposeLowering
         catalyst::quantum::ExtractOp::getCanonicalizationPatterns(decompositionPatterns,
                                                                   &getContext());
         FrozenRewritePatternSet frozenPatterns(std::move(decompositionPatterns));
-        for (func::FuncOp func : DecompUtils::getCircuitFuncs(module)) {
-            if (failed(applyPatternsGreedily(func.getBody(), frozenPatterns))) {
+        for (Operation *root : DecompUtils::getDecompositionRoots(module)) {
+            if (failed(applyPatternsGreedily(root, frozenPatterns))) {
                 return signalPassFailure();
             }
         }
