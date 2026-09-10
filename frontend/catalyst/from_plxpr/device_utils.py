@@ -62,9 +62,10 @@ _named_obs_dict = {
 
 
 def create_device_preprocessing_pipeline(
-    device: qp.devices.Device, execution_config: ExecutionConfig, shots: int, warn: bool = True
+    device: qp.devices.Device, execution_config: ExecutionConfig, shots: int, warn: bool = True, needs_gateset_preprocessing: bool = True
 ) -> list[BoundTransform]:
-    """Create a pipeline of device preprocessing transforms for lowering QNodes."""
+    """Create a pipeline of device preprocessing transforms for lowering QNodes.
+    """
     shots_present = qp.math.is_abstract(shots) or shots != 0
     raw_capabilities: DeviceCapabilities = get_qjit_device_capabilities(
         _load_device_capabilities(device)
@@ -104,9 +105,11 @@ def create_device_preprocessing_pipeline(
     _gradient_preprocessing(
         pipeline, unsupported_transforms, device, execution_config, shots, capabilities
     )
-    _gateset_preprocessing(
-        pipeline, unsupported_transforms, device, execution_config, shots, capabilities
-    )
+
+    if needs_gateset_preprocessing:
+        _gateset_preprocessing(
+            pipeline, unsupported_transforms, device, execution_config, shots, capabilities
+        )
 
     if unsupported_transforms and warn:
         warnings.warn(
@@ -298,23 +301,15 @@ def _gateset_preprocessing(
     shots: int,
     capabilities: DeviceCapabilities,
 ) -> None:
-    """Insert a `graph-decomposition` pass targetting the gateset
+    """Insert a `device-based-decomposition` pass targetting the gateset
     specified by the specific `device`
-
-    Note that `graph-decomposition` needs `adjoint-lowering` and `ctrl-lowering` to be run before it
     """
-
-    # Insert adjoint-lowering
-    pipeline.append(_safe_create_bound_transform(adjoint_lowering, unsupported_transforms))
-
-    # Insert ctrl-lowering
-    pipeline.append(_safe_create_bound_transform(ctrl_lowering, unsupported_transforms))
-
     gate_set = capabilities.gate_set()
 
     # Get the default args/kwargs with the above gate_set
+    # `device-based-decomposition` uses the same arguments as `graph-decomposition`
     targs, tkwargs = graph_decomposition_setup_inputs(gate_set=gate_set)
-    t = qp.transform(pass_name="graph-decomposition")
+    t = qp.transform(pass_name="device-based-decomposition")
 
     pipeline.append(
         _safe_create_bound_transform(t, unsupported_transforms, args=targs, kwargs=tkwargs)

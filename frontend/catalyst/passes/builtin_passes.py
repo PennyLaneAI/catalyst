@@ -1856,30 +1856,20 @@ graph_decomposition = qp.transform(
 )
 
 
-def adjoint_lowering_setup_inputs():
-    r"""
-    The `adjoint-lowering` pass lowers the adjoint over the region.
+def device_based_decomposition_setup_inputs():
+    R"""
+    Specify that the ``-device-based-decomposition`` MLIR compiler pass for applying the graph-based
+    decomposition should be applied to the decorated QNode during :func:`~.qjit` compilation, using
+    the gatseset automatically detected from the backend toml file.
+    
+    Runs `adjoint-lowering` -> `ctrl-lowering` -> `graph-decomposition` with derived gateset
     """
     return (), {}
 
 
-adjoint_lowering = qp.transform(
-    pass_name="adjoint-lowering", setup_inputs=adjoint_lowering_setup_inputs
+device_based_decomposition = qp.transform(
+    pass_name="device-based-decomposition", setup_inputs=device_based_decomposition_setup_inputs
 )
-
-
-def ctrl_lowering_setup_inputs():
-    r"""
-    The `ctrl-lowering` pass distributes the controls over the region: every gate in the
-    region gains the control qubits/values (appended to any controls it already carries),
-    and the control qubits are threaded through the region. Structural ops (extract, insert,
-    alloc, dealloc) are passed through unchanged, and a nested `quantum.ctrl` region has its
-    controls merged. Measurements inside a `quantum.ctrl` region are rejected.
-    """
-    return (), {}
-
-
-ctrl_lowering = qp.transform(pass_name="ctrl-lowering", setup_inputs=ctrl_lowering_setup_inputs)
 
 __all__ = [
     "cancel_inverses",
@@ -1901,6 +1891,5 @@ __all__ = [
     "decompose_arbitrary_ppr",
     "graph_decomposition",
     "diagonalize_measurements",
-    "adjoint_lowering",
-    "ctrl_lowering",
+    "device_based_decomposition",
 ]

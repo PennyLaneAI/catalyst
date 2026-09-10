@@ -245,6 +245,7 @@ class WorkflowInterpreter(PlxprInterpreter):
         new_version.init_qreg = self.init_qreg
         new_version.requires_decompose_lowering = self.requires_decompose_lowering
         new_version.decompose_tkwargs = copy(self.decompose_tkwargs)
+        new_version.needs_gateset_preprocessing = self.needs_gateset_preprocessing
         return new_version
 
     def __init__(self, skip_preprocess=False, _preprocess_warn=True, collect_decomp_rules=True):
@@ -253,6 +254,7 @@ class WorkflowInterpreter(PlxprInterpreter):
         self._skip_preprocess = skip_preprocess
         self._preprocess_warn = _preprocess_warn
         self._collect_decomp_rules = collect_decomp_rules
+        self.needs_gateset_preprocessing = False
 
         # Compiler options for the new decomposition system
         self.requires_decompose_lowering = False
@@ -328,7 +330,7 @@ def handle_qnode(
     pipelines = (("main", tuple(self._pass_pipeline) + device_pass_pipeline(qnode.device)),)
     if not self._skip_preprocess:
         device_preprocessing_pipeline = create_device_preprocessing_pipeline(
-            qnode.device, execution_config, shots, warn=self._preprocess_warn
+            qnode.device, execution_config, shots, warn=self._preprocess_warn, needs_gateset_preprocessing=self.needs_gateset_preprocessing
         )
         pipelines += (("device", device_preprocessing_pipeline),)
 
@@ -406,6 +408,8 @@ def handle_transform(
 ):
     """Handle the conversion from plxpr to Catalyst jaxpr for a
     PL transform."""
+
+    self.check = True
     consts = args[_tuple_to_slice(consts_slice)]
     non_const_args = args[_tuple_to_slice(args_slice)]
     targs = args[_tuple_to_slice(targs_slice)]
@@ -424,9 +428,16 @@ def handle_transform(
 
     # Apply the corresponding Catalyst pass counterpart
     next_eval = copy(self)
-    t = qp.transform(pass_name=transform.pass_name)
-    bound_pass = qp.transforms.core.BoundTransform(t, args=targs, kwargs=pl_tkwargs)
-    next_eval._pass_pipeline.insert(0, bound_pass)
+    
+    if transform.pass_name == "device-based-decomposition":
+        # device-based-decomposition is not applied here, but is delayed to the device preprocessing pipeline
+        # notify that this needs to be done rather than applying the pass here.
+        next_eval.needs_gateset_preprocessing = True
+    else:
+        t = qp.transform(pass_name=transform.pass_name)
+        bound_pass = qp.transforms.core.BoundTransform(t, args=targs, kwargs=pl_tkwargs)
+        next_eval._pass_pipeline.insert(0, bound_pass)
+
     return next_eval.eval(inner_jaxpr, consts, *non_const_args)
 
 
