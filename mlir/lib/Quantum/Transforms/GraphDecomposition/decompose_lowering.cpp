@@ -153,7 +153,6 @@ struct DecomposeLoweringPass : impl::DecomposeLoweringPassBase<DecomposeLowering
         // Step 2: Find the target gate set
         findTargetGateSet(module, targetGateSet);
 
-        // Step 3: Apply the decomposition patterns, canonicalizing the insert/extract pairs
         RewritePatternSet decompositionPatterns(&getContext());
         populateDecomposeLoweringPatterns(decompositionPatterns, decompositionRegistry,
                                           targetGateSet);

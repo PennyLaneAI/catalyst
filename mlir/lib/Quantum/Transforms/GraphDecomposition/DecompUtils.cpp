@@ -18,6 +18,8 @@
 
 #include "mlir/IR/BuiltinAttributes.h"
 
+#include "Quantum/IR/QuantumInterfaces.h"
+
 using namespace mlir;
 
 namespace catalyst {
@@ -50,6 +52,25 @@ bool isInDecompRule(Operation *op) {
         op = parentOp;
     }
     return false;
+}
+
+llvm::SmallVector<Operation *> getDecompositionRoots(ModuleOp module) {
+    llvm::SmallVector<Operation *> roots;
+
+    // Any decomposable gate that does not live in a function
+    // can only be reached by rewriting the module itself.
+    bool gateOutsideFunc = false;
+    module.walk<WalkOrder::PreOrder>([&](Operation *op) {
+        if (auto func = dyn_cast<func::FuncOp>(op)) {
+            if (!isDecompositionFunction(func)) {
+                roots.push_back(func);
+            }
+            // Whatever is inside a function is covered by the function itself.
+            return WalkResult::skip();
+        }
+        return WalkResult::advance();
+    });
+    return roots;
 }
 
 } // namespace DecompUtils

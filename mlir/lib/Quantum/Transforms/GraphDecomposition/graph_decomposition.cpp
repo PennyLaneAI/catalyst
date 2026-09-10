@@ -200,16 +200,22 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
             }
         }
 
-        auto countOps = [](ModuleOp m) {
+
+        // TODO: check if it's needed after testing
+        llvm::SmallVector<mlir::Operation *> roots = DecompUtils::getDecompositionRoots(module);
+
+        auto countOps = [&roots]() {
             size_t count = 0;
-            m->walk([&](mlir::Operation *) { count++; });
+            for (mlir::Operation *root : roots) {
+                root->walk([&](mlir::Operation *) { count++; });
+            }
             return count;
         };
 
         // Fixpoint: apply the chosen rules and distribute any `quantum.adjoint` regions they emit,
-        // until the module stops changing.
+        // until the circuit stops changing.
         constexpr unsigned maxIterations = 64;
-        size_t previousOpCount = countOps(module);
+        size_t previousOpCount = countOps();
         ScopedDiagnosticTimer fixpointTimer("decomp:lowering-fixpoint");
         unsigned iterationsRun = 0;
         for (unsigned iter = 0; iter < maxIterations; ++iter) {
@@ -223,31 +229,18 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
             }
 
             // Distribute a `quantum.ctrl` region lazily.
-            bool hasCtrlRegion = module->walk([&](CtrlOp) { return mlir::WalkResult::interrupt(); })
-                                     .wasInterrupted();
-            if (hasCtrlRegion) {
-                OpPassManager ctrlPm("builtin.module");
-                ctrlPm.addPass(createCtrlLoweringPass());
-                if (failed(runPipeline(ctrlPm, module))) {
-                    return signalPassFailure();
-                }
+            if (failed(lowerRoots(hasCtrlRegion, createCtrlLoweringPass))) {
+                return signalPassFailure();
             }
 
             // Distribute a `quantum.adjoint` region lazily.
             // It uses a greedy rewriter that would otherwise DCE gates in circuits that
             // never needed adjoint handling.
-            bool hasAdjointRegion =
-                module->walk([&](AdjointOp) { return mlir::WalkResult::interrupt(); })
-                    .wasInterrupted();
-            if (hasAdjointRegion) {
-                OpPassManager adjointPm("builtin.module");
-                adjointPm.addPass(createAdjointLoweringPass());
-                if (failed(runPipeline(adjointPm, module))) {
-                    return signalPassFailure();
-                }
+            if (failed(lowerRoots(hasAdjointRegion, createAdjointLoweringPass))) {
+                return signalPassFailure();
             }
 
-            size_t currentOpCount = countOps(module);
+            size_t currentOpCount = countOps();
             if (currentOpCount == previousOpCount) {
                 break;
             }
