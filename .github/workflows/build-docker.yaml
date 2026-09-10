@@ -61,7 +61,7 @@ jobs:
           path: ${{ github.workspace }}/mlir/llvm-project
           key: llvm-${{ needs.constants.outputs.llvm_version }}-container-source
           enableCrossOsArchive: True
-          fail-on-cache-miss: True        
+          fail-on-cache-miss: False        
 
       - name: Get Cached LLVM Build
         id: cache-llvm-build
@@ -69,7 +69,7 @@ jobs:
         with:
           path: ${{ github.workspace }}/llvm-build
           key: manylinux_2_28_x86_64-llvm-${{ needs.constants.outputs.llvm_version }}-${{ matrix.python_version }}-wheel-build
-          fail-on-cache-miss: True
+          fail-on-cache-miss: False
     
       - name: Get Cached Stablehlo Source
         id: cache-stablehlo-source
@@ -78,7 +78,7 @@ jobs:
           path: ${{ github.workspace }}/mlir/stablehlo
           key: stablehlo-${{ needs.constants.outputs.stablehlo_version }}-container-source
           enableCrossOsArchive: True
-          fail-on-cache-miss: True
+          fail-on-cache-miss: False
   
       - name: Get Cached Stablehlo Build
         id: cache-stablehlo-build
@@ -86,7 +86,7 @@ jobs:
         with:
           path: ${{ github.workspace }}/stablehlo-build
           key: manylinux_2_28_x86_64-stablehlo-${{ needs.constants.outputs.stablehlo_version }}-wheel-build
-          fail-on-cache-miss: True
+          fail-on-cache-miss: False
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v6
