@@ -48,8 +48,7 @@ def _attribute_context():
 def format_static_data_dict_for_id(static_data):
     """Format the static-data group of a GraphOpID with MLIR's attribute printer."""
     with _attribute_context():
-        attrs = {name: get_mlir_attribute_from_pyval(value) for name, value in static_data.items()}
-        return str(ir.DictAttr.get(attrs))
+        return str(get_mlir_attribute_from_pyval(static_data))
 
 
 def format_dynamic_params_for_id(dynamic_shape):
