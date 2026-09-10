@@ -274,7 +274,7 @@ RUN ccache --set-config=cache_dir=/opt/ccache
 
 
 # Download and build Catalyst
-FROM quay.io/pypa/manylinux_2_28_x86_64 AS wheel-catalyst
+FROM quay.io/pypa/manylinux_2_28_aarch64 AS wheel-catalyst
 ARG PENNYLANE_VERSION
 ARG CATALYST_VERSION
 ARG GCC_VERSION
@@ -306,8 +306,7 @@ RUN cd /opt/catalyst/mlir/llvm-project \
 RUN cd /opt/catalyst/mlir/Enzyme \
     && git apply /opt/catalyst/mlir/patches/enzyme-nvvm-fabs-intrinsics.patch
 
-RUN  if [ "$LLVM_CACHE" = "false" ]; then \
-    PYTHON=$PYTHON \
+RUN PYTHON=$PYTHON \
     C_COMPILER=$(which gcc)  \
     CXX_COMPILER=$(which g++)  \
     LLVM_BUILD_DIR="/opt/catalyst/llvm-build" \
@@ -315,20 +314,17 @@ RUN  if [ "$LLVM_CACHE" = "false" ]; then \
     LLVM_TARGETS="lld check-mlir" \
     ENABLE_ZLIB=FORCE_ON \
     ENABLE_LLD=OFF \
-    make llvm; \
-    fi
+    make llvm
 
 # Build stablehlo dialect
 ENV COMPILER_LAUNCHER=""
-RUN if [ "$STABLEHLO_CACHE" = "false" ]; then \
-    C_COMPILER=$(which gcc) \
+RUN C_COMPILER=$(which gcc) \
     CXX_COMPILER=$(which g++) \
     LLVM_BUILD_DIR="$(pwd)/llvm-build" \
     STABLEHLO_BUILD_DIR="/opt/catalyst/stablehlo-build" \
     COMPILER_LAUNCHER="" \
     ENABLE_LLD=OFF \
-    make stablehlo; \
-    fi
+    make stablehlo
 
 # Build enzyme
 RUN cmake -S mlir/Enzyme/enzyme -B /opt/catalyst/enzyme-build -G Ninja \
