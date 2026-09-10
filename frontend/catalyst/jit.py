@@ -104,7 +104,7 @@ def qjit(
     dialect_plugins=None,
     capture="global",
     skip_preprocess=False,
-    collect_decomp_rules=True,
+    collect_decomp_rules=False,
 ):  # pylint: disable=too-many-arguments,unused-argument
     """A just-in-time decorator for PennyLane and JAX programs using Catalyst.
 
