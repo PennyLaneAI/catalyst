@@ -153,13 +153,23 @@ struct DecomposeLoweringPass : impl::DecomposeLoweringPassBase<DecomposeLowering
         // Step 2: Find the target gate set
         findTargetGateSet(module, targetGateSet);
 
+        // Step 3: Apply the decomposition patterns, canonicalizing the insert/extract pairs.
+        //
+        // The patterns are applied per circuit function rather than to the whole module. 
+        // Note with the new updates to the graph-decomposition system, the program module
+        // now carries far more decomposition rules than just the QJIT-ed workflow, and rule
+        // bodies are never rewritten in place, so handing them to the greedy driver causes
+        // overhead without doing anything useful.
         RewritePatternSet decompositionPatterns(&getContext());
         populateDecomposeLoweringPatterns(decompositionPatterns, decompositionRegistry,
                                           targetGateSet);
         catalyst::quantum::ExtractOp::getCanonicalizationPatterns(decompositionPatterns,
                                                                   &getContext());
-        if (failed(applyPatternsGreedily(module, std::move(decompositionPatterns)))) {
-            return signalPassFailure();
+        FrozenRewritePatternSet frozenPatterns(std::move(decompositionPatterns));
+        for (func::FuncOp func : DecompUtils::getCircuitFuncs(module)) {
+            if (failed(applyPatternsGreedily(func.getBody(), frozenPatterns))) {
+                return signalPassFailure();
+            }
         }
     }
 };
