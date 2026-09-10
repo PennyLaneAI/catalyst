@@ -570,6 +570,9 @@
 
 * Fixed the assembly format for `quantum.adjoint` when it has no quantum operands/results.
   [(#2938)](https://github.com/PennyLaneAI/catalyst/pull/2938)
+* Fixed a performance degradation issue with `catalyst.runtime_artifacts`. It now visits module 
+  operations only, instead of every operation in the program.
+  [(#3219)](https://github.com/PennyLaneAI/catalyst/pull/3219)
 
 <h3>Internal changes ⚙️</h3>
 
