@@ -277,6 +277,7 @@ RUN ccache --set-config=cache_dir=/opt/ccache
 FROM quay.io/pypa/manylinux_2_28_aarch64 AS wheel-catalyst
 ARG PENNYLANE_VERSION
 ARG CATALYST_VERSION
+ARG LIGHTNING_VERSION
 ARG GCC_VERSION
 ARG LLVM_CACHE
 ARG STABLEHLO_CACHE
@@ -294,8 +295,7 @@ RUN python -m pip install numpy "nanobind<2.13" pybind11 PyYAML cmake ninja
 ENV LLVM_BUILD_DIR=/opt/catalyst/llvm-build
 ENV PATH="${LLVM_BUILD_DIR}/bin:${PATH}"
 
-RUN git clone --depth 1 --branch ${CATALYST_VERSION} --recurse-submodules --shallow-submodules \
-    https://github.com/PennyLaneAI/catalyst.git /tmp/catalyst-src \
+RUN git clone --depth 1 --branch ${CATALYST_VERSION} https://github.com/PennyLaneAI/catalyst.git /tmp/catalyst-src \
     && cp -a /tmp/catalyst-src/. /opt/catalyst/ \
     && rm -rf /tmp/catalyst-src
 

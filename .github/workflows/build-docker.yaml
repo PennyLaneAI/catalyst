@@ -20,7 +20,7 @@ jobs:
     
   build:
     name: Build Docker Image
-    runs-on: blacksmith-16vcpu-ubuntu-2404-arm
+    runs-on: blacksmith-8vcpu-ubuntu-2404-arm
     needs: [check_if_wheel_build_required, constants]    
     strategy:
       fail-fast: false
@@ -43,6 +43,4 @@ jobs:
           build-args: |
             PENNYLANE_VERSION=main
             CATALYST_VERSION=main
-            GITHUB_WORKSPACE=${{ github.workspace }}
-            LLVM_CACHE=false
-            STABLEHLO_CACHE=false
+            LIGHTNING_VERSION=main
