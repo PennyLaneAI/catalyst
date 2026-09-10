@@ -254,11 +254,18 @@ class BaseSignatureAnalyzer {
         if (hasQreg) {
             Value updatedQreg = getUpdatedQreg(rewriter, loc);
 
-            for (auto [i, qubit] : llvm::enumerate(signature.inQubits)) {
-                const QubitIndex &index = signature.inWireIndices[i];
-                updatedQreg =
-                    quantum::InsertOp::create(rewriter, loc, updatedQreg.getType(), updatedQreg,
-                                              index.getValue(), index.getAttr(), qubit);
+            // Every qubit the rule acts on has to be put back into the register it reads from,
+            // control qubits included: the rule addresses them by index, so a control qubit left
+            // out here would be read at its pre-decomposition state.
+            for (const auto &[qubits, indices] :
+                 {std::make_pair(signature.inQubits, signature.inWireIndices),
+                  std::make_pair(signature.inCtrlQubits, signature.inCtrlWireIndices)}) {
+                for (auto [i, qubit] : llvm::enumerate(qubits)) {
+                    const QubitIndex &index = indices[i];
+                    updatedQreg =
+                        quantum::InsertOp::create(rewriter, loc, updatedQreg.getType(), updatedQreg,
+                                                  index.getValue(), index.getAttr(), qubit);
+                }
             }
             std::move_backward(operands.begin() + qregIdx, operands.end() - 1, operands.end());
             operands[qregIdx] = updatedQreg;

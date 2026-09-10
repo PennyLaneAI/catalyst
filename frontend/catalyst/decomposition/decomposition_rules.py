@@ -25,6 +25,8 @@ import jax.numpy as jnp
 import pennylane as qp
 from jax._src.lib.mlir import ir
 from pennylane.core.operator import abstractify
+from pennylane.ops.op_math.adjoint2 import Adjoint2
+from pennylane.ops.op_math.controlled2 import ControlledOp2
 from pennylane.wires import Wires
 
 from catalyst.compiler import _quantum_opt
@@ -79,6 +81,23 @@ def build_base_op(op_cls, kwargs, is_custom_op):
     args, kwargs = split_call_args(kwargs, is_custom_op)
     with qp.capture.pause():
         return op_cls(*args, **kwargs)
+
+
+def rule_call_operands(call_args, call_kwargs, ctrl_wires=None) -> list:
+    """Flatten a decomposition rule's call into positional operands.
+    """
+    operands = [*call_args, *(call_kwargs[name] for name in sorted(call_kwargs))]
+    if ctrl_wires is not None:
+        operands.append(ctrl_wires)
+    return operands
+
+
+def unpack_rule_operands(operands, n_params, kwarg_names, has_ctrl_wires):
+    """Recover ``(params, kwargs, control wires)`` from :func:`rule_call_operands`' flattening."""
+    params = tuple(operands[:n_params])
+    named = dict(zip(kwarg_names, operands[n_params : n_params + len(kwarg_names)], strict=True))
+    ctrl_wires = operands[n_params + len(kwarg_names)] if has_ctrl_wires else None
+    return params, named, ctrl_wires
 
 
 def symbolic_arguments(base_op, kind, ctrl_wires=None) -> dict:
@@ -169,8 +188,19 @@ def wrap_modifier_id(op_id: str, modifier: str) -> str:
 
 
 def name_wrap_adjoint(op_id: str) -> str:
-    """Name-wrap the adjoint modifier around a graphOpId (``RX{...}`` -> ``Adjoint(RX){...}``)."""
+    """Name-wrap the adjoint modifier around a ``graphOpId`` (``RX{...}`` -> ``Adjoint(RX){...}``)."""
     return wrap_modifier_id(op_id, "Adjoint")
+
+
+def resource_graph_op_id(op) -> str:
+    """Return the ``graphOpId`` that a rule's resource operator denotes."""
+    if isinstance(op, Adjoint2):
+        return name_wrap_adjoint(resource_graph_op_id(op.base))
+    if isinstance(op, ControlledOp2):
+        return wrap_modifier_id(
+            resource_graph_op_id(op.base), _control_modifier(len(op.control_wires))
+        )
+    return GraphOpID(op).getGraphOpId()
 
 
 def name_unwrap_adjoint(op_name: str, op_id: str) -> str:
@@ -404,10 +434,17 @@ def compile_decomposition_rules(
             for rule_name, ids in name_to_resource_ids.items()
         }
 
+    call_args, call_kwargs = split_call_args(kwargs, is_custom_op)
+    kwarg_names = sorted(call_kwargs)
+
     # The static_data was only needed to instantiate the correct decomp rule
-    # Once we have the correct rules, don't send them into qjit
+    # Once we have the correct rules, don't send them into qjit: they are closed over instead.
     def rule_to_subroutine(rule):
-        def decomp_rule(*_args, _ctrl_wires=None, **_kwargs):
+        def decomp_rule(*_operands):
+            _args, _kwargs, _ctrl_wires = unpack_rule_operands(
+                _operands, len(call_args), kwarg_names, wrap_control
+            )
+            _kwargs |= static_data | extra_data
             # Apply adjoint innermost, control outermost (canonical `C(Adjoint(Op))`).
             body = qp.adjoint(rule._impl) if wrap_adjoint else rule._impl
             if wrap_control:
@@ -415,14 +452,10 @@ def compile_decomposition_rules(
             else:
                 body(*_args, **_kwargs)
 
-        decomp_rule_no_static_args = partial(decomp_rule, **static_data)
-        if extra_data:
-            decomp_rule_no_static_args = partial(decomp_rule_no_static_args, **extra_data)
-
         # keep the frontend name for readability, append target op_id for symbol uniqueness
-        decomp_rule_no_static_args.__name__ = rule.name + "_" + target_id
+        decomp_rule.__name__ = rule.name + "_" + target_id
 
-        return qp.capture.subroutine(decomp_rule_no_static_args)
+        return qp.capture.subroutine(decomp_rule)
 
     condition_args, condition_kwargs = split_call_args(
         kwargs | static_data | extra_data, is_custom_op
@@ -444,13 +477,10 @@ def compile_decomposition_rules(
         if rule.is_applicable(*condition_args, **condition_kwargs):
             subroutines.append(rule_to_subroutine(rule))
 
-    # For control distribution, the extra control wires are
-    # added to each rule body via the `_ctrl_wires` keyword argument.
+    # For control distribution: the extra control wires trail the base wires in the rule's operands.
     ctrl_wires = (
         jnp.array(range(n_base_wires, n_base_wires + n_ctrl), dtype=int) if wrap_control else None
     )
-
-    call_args, call_kwargs = split_call_args(kwargs, is_custom_op)
 
     return build_rule_module(
         subroutines, device, call_args, call_kwargs, ctrl_wires, name_to_resource_ids, target_id
@@ -462,15 +492,13 @@ def build_rule_module(
     subroutines, device, call_args, call_kwargs, ctrl_wires, name_to_resource_ids, target_id
 ) -> ir.Operation:
     """Trace ``subroutines`` into a module of standalone decomposition-rule functions."""
+    operands = rule_call_operands(call_args, call_kwargs, ctrl_wires)
 
     @qp.qjit(target="mlir", capture=True, collect_decomp_rules=False)
     @qp.qnode(device=device)
     def circuit():
         for subroutine in subroutines:
-            if ctrl_wires is not None:
-                subroutine(*call_args, _ctrl_wires=ctrl_wires, **call_kwargs)
-            else:
-                subroutine(*call_args, **call_kwargs)
+            subroutine(*operands)
 
     module = circuit.mlir_module
     if module is None:
@@ -569,12 +597,10 @@ def collect_symbolic_resources(
             resources = rule.compute_resources(**probe_args)
             name_to_resources[rule.name] = resources.gate_counts
             # The rule body names the ops it produces itself, so unlike the distribution pathway
-            # these ids carry no added modifier.
-            # TODO: a resource op that is itself symbolic (e.g. a generic `Controlled(GlobalPhase)`
-            # rep) does not spell the compiler's canonical `C(GlobalPhase){...}` id here; such a
-            # rule registers an id the solver cannot match.
+            # these ids carry no added modifier; a resource that is itself symbolic is spelled the
+            # way the compiler spells it (see :func:`resource_graph_op_id`).
             name_to_resource_ids[rule.name] = {
-                GraphOpID(op).getGraphOpId(): count for op, count in resources.gate_counts.items()
+                resource_graph_op_id(op): count for op, count in resources.gate_counts.items()
             }
         except Exception as e:  # pylint: disable=broad-except
             warnings.warn(
@@ -625,15 +651,20 @@ def compile_registered_symbolic_rules(
     if not rules:
         return None
 
+    call_args, call_kwargs = split_call_args(kwargs, is_custom_op)
+    kwarg_names = sorted(call_kwargs)
+
     def rule_to_subroutine(rule):
-        def decomp_rule(*_args, _ctrl_wires=None, **_kwargs):
+        def decomp_rule(*_operands):
+            _args, _kwargs, _ctrl_wires = unpack_rule_operands(
+                _operands, len(call_args), kwarg_names, kind == "control"
+            )
             with qp.capture.pause():
-                base = op_cls(*_args, **_kwargs)
+                base = op_cls(*_args, **_kwargs, **static_and_extra)
             rule._impl(**symbolic_arguments(base, kind, _ctrl_wires))
 
-        decomp_rule_no_static_args = partial(decomp_rule, **static_and_extra)
-        decomp_rule_no_static_args.__name__ = rule.name + "_" + target_id
-        return qp.capture.subroutine(decomp_rule_no_static_args)
+        decomp_rule.__name__ = rule.name + "_" + target_id
+        return qp.capture.subroutine(decomp_rule)
 
     subroutines = []
     for rule in rules:
@@ -657,7 +688,6 @@ def compile_registered_symbolic_rules(
         if kind == "control"
         else None
     )
-    call_args, call_kwargs = split_call_args(kwargs, is_custom_op)
 
     return build_rule_module(
         subroutines, device, call_args, call_kwargs, ctrl_wires, name_to_resource_ids, target_id
@@ -823,8 +853,7 @@ def control_variant_rule_strings(
             )
         # (1.2) The same, for the rules taking the symbolic operator's arguments.
         # TODO: the on-demand decomp rules are skipped for now.
-        # TODO: only a single control for now.
-        if n == 1 and op_cls is not None:
+        if op_cls is not None:
             out.extend(
                 registered_symbolic_rule_strings(
                     op_name,
@@ -1055,9 +1084,32 @@ def fetch_all_reachable_decomposition_rules_from_op(
                 )[2]
             resources |= {(explore_name, name): res for name, res in found.items()}
 
+        # And through the rules registered against its controlled form, one entry per control
+        # count since the products of a controlled rule depend on how many controls it has.
+        if (this_op_cls := op_classes.get(this_name)) is not None:
+            n_base_wires = sum(this_wire_lens.values())
+            for n in ctrl_counts:
+                found = collect_symbolic_resources(
+                    this_op_cls,
+                    this_name,
+                    all_kwargs,
+                    this_is_custom_op,
+                    kind="control",
+                    ctrl_wires=range(n_base_wires, n_base_wires + n),
+                )[2]
+                resources |= {
+                    (f"{_control_modifier(n)}({this_name})", name): res
+                    for name, res in found.items()
+                }
+
         for (_, _rule_name), resource in resources.items():
             try:
                 for op, _ in resource.items():
+                    # A generic symbolic resource stands for its base under a modifier, and it is
+                    # the base that owns the decomposition rules; `compile_variants` re-derives the
+                    # modifier variants from there.
+                    while isinstance(op, (Adjoint2, ControlledOp2)):
+                        op = op.base
                     graph_op_id = GraphOpID(op)
                     probe = (
                         graph_op_id.get_operator_name(),
