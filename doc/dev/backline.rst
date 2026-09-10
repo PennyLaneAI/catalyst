@@ -32,7 +32,7 @@ or an FPGA-based decoder) cooperate over a low-latency transport.
 Installation
 ============
 
-The Backline components are off by default in a Catalyst build. Two build flags turn them on:
+The Backline components are off by default in a Catalyst build. To build them, enable the following build flags:
 
 ``ENABLE_TRANSPORT``
     Builds ``rt_transport``, the backend-agnostic transport loader, along with the in-tree
