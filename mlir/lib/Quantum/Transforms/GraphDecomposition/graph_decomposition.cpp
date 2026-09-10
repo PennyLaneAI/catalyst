@@ -199,9 +199,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
                 return signalPassFailure();
             }
         }
-
-
-        // TODO: check if it's needed after testing
+        
         llvm::SmallVector<mlir::Operation *> roots = DecompUtils::getDecompositionRoots(module);
 
         auto countOps = [&roots]() {
@@ -226,6 +224,10 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
                 }
             }
             return success();
+        };
+        auto hasCtrlRegion = [](mlir::Operation *root) {
+            return root->walk([](CtrlOp) { return mlir::WalkResult::interrupt(); })
+                .wasInterrupted();
         };
         auto hasAdjointRegion = [](mlir::Operation *root) {
             return root->walk([](AdjointOp) { return mlir::WalkResult::interrupt(); })
