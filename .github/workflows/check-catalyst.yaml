@@ -530,7 +530,7 @@ jobs:
 
     - name: Install PennyLane branch
       run: |
-        pip install --no-deps --force git+https://github.com/PennyLaneAI/pennylane@chore/remove-wires-arg-from-gp
+        pip install --no-deps --force git+https://github.com/PennyLaneAI/pennylane@feat/port-identity-to-op2
 
     - name: Verify Graphviz installation
       run: |
@@ -614,7 +614,7 @@ jobs:
 
     - name: Install PennyLane branch
       run: |
-        pip install --no-deps --force git+https://github.com/PennyLaneAI/pennylane@chore/remove-wires-arg-from-gp
+        pip install --no-deps --force git+https://github.com/PennyLaneAI/pennylane@feat/port-identity-to-op2
 
     - name: Run Python Pytest Tests (backend=lightning.kokkos)
       run: |
@@ -682,7 +682,7 @@ jobs:
 
     - name: Install PennyLane branch
       run: |
-        pip install --no-deps --force git+https://github.com/PennyLaneAI/pennylane@chore/remove-wires-arg-from-gp
+        pip install --no-deps --force git+https://github.com/PennyLaneAI/pennylane@feat/port-identity-to-op2
 
   runtime-device-tests:
     name: Third-Party Device Tests (C++)
