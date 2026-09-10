@@ -116,8 +116,8 @@ The end-to-end flow, from a user program to remote execution, proceeds as follow
 #. At execution time, the runtime opens a session with each executor, ships each object, and
    invokes the kernels. Results return to the host, meaning the originating Python process.
 
-A node that runs in the originating process carries no dispatch, since its code is called
-directly. A node given an executor is dispatched: its kernel is cross-compiled, shipped to the
+A node that runs in the originating process does not require dispatch, since its code is called
+directly. A node with a given executor is dispatched: its kernel is cross-compiled, shipped to the
 ``catalyst-executor`` process at that node's address, and invoked there. A node is dispatched when
 it carries either an ``executor`` or ``executor_options``, and a node marked ``remote`` has to
 carry one, since there is no other way to reach another machine.
