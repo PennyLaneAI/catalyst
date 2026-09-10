@@ -173,8 +173,9 @@
     of raising an error.
     [(#3190)](https://github.com/PennyLaneAI/catalyst/pull/3190)
 
-* A failure during AOT compilation is now downgraded to a warning and logged.
+* A failure during AOT compilation is now logged rather than raised. 
   [(#3100)](https://github.com/PennyLaneAI/catalyst/pull/3100)
+  [(#3194)](https://github.com/PennyLaneAI/catalyst/pull/3194)
 
 * Adds the ability to use `pennylane.typing.AbstractArray` and `pennylane.wires.AbstractWires` as type hints for
   AOT compilation and as arguments to `pennylane.specs` calculations.
@@ -779,6 +780,7 @@
 * The `transport` and `executor` dialects are now documented alongside the other Catalyst dialects.
   [(#3179)](https://github.com/PennyLaneAI/catalyst/pull/3179)
   [(#3180)](https://github.com/PennyLaneAI/catalyst/pull/3180)
+  [(#3197)](https://github.com/PennyLaneAI/catalyst/pull/3197)
 
 <h3>Contributors ✍️</h3>
 
