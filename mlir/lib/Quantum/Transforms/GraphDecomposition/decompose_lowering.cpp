@@ -155,7 +155,7 @@ struct DecomposeLoweringPass : impl::DecomposeLoweringPassBase<DecomposeLowering
 
         // Step 3: Apply the decomposition patterns, canonicalizing the insert/extract pairs.
         //
-        // The patterns are applied per circuit function rather than to the whole module. 
+        // The patterns are applied per circuit function rather than to the whole module.
         // Note with the new updates to the graph-decomposition system, the program module
         // now carries far more decomposition rules than just the QJIT-ed workflow, and rule
         // bodies are never rewritten in place, so handing them to the greedy driver causes

@@ -68,8 +68,16 @@ llvm::SmallVector<Operation *> getDecompositionRoots(ModuleOp module) {
             // Whatever is inside a function is covered by the function itself.
             return WalkResult::skip();
         }
+        if (isa<DecomposableGate>(op)) {
+            gateOutsideFunc = true;
+            return WalkResult::interrupt();
+        }
         return WalkResult::advance();
     });
+
+    if (gateOutsideFunc) {
+        return {module};
+    }
     return roots;
 }
 
