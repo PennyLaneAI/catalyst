@@ -59,6 +59,18 @@ from catalyst.decomposition.type_utils import (
 class TestGenericUtilities:
     """Tests for common decomposition rule lowering utilities."""
 
+    def test_wires_replacement_doesnt_create_overlapping_wire_labels(self):
+        """Test that the helper does not create overlapping wire labels which create
+        validation failures when the operator is unflattened.
+
+        NOTE: Regression test for the accumulator change made in type_utils.py
+        """
+
+        op = qp.ctrl(qp.S(Wire[1]), Wire[1])
+        new_op = replace_wires_with_placeholder_wires(op)
+
+        assert new_op == qp.ctrl(qp.S(-2), -1)
+
     def test_wires_replacement_doesnt_mutate_operator(self):
         """Test that the wires replacement helper does not mutate the incoming operator."""
 
