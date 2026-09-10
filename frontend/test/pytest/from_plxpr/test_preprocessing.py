@@ -631,15 +631,23 @@ class TestGatesetPreprocessing:
 
         device_pipelines = get_pipelines(f, skip_preprocess=False)[1][1]
         gate_set = next(
-            t.kwargs["gate_set"]
-            for t in device_pipelines
-            if t.pass_name == "graph-decomposition"
+            t.kwargs["gate_set"] for t in device_pipelines if t.pass_name == "graph-decomposition"
         )
 
-        assert "PauliX" in gate_set and "Adjoint(PauliX)" not in gate_set and "C(PauliX)" not in gate_set
-        assert "PauliY" in gate_set and "Adjoint(PauliY)" not in gate_set and "C(PauliY)" in gate_set
-        assert "PauliZ" in gate_set and "Adjoint(PauliZ)" in gate_set and "C(PauliZ)" not in gate_set
-        assert "Hadamard" in gate_set and "Adjoint(Hadamard)" in gate_set and "C(Hadamard)" in gate_set
+        assert (
+            "PauliX" in gate_set
+            and "Adjoint(PauliX)" not in gate_set
+            and "C(PauliX)" not in gate_set
+        )
+        assert (
+            "PauliY" in gate_set and "Adjoint(PauliY)" not in gate_set and "C(PauliY)" in gate_set
+        )
+        assert (
+            "PauliZ" in gate_set and "Adjoint(PauliZ)" in gate_set and "C(PauliZ)" not in gate_set
+        )
+        assert (
+            "Hadamard" in gate_set and "Adjoint(Hadamard)" in gate_set and "C(Hadamard)" in gate_set
+        )
 
 
 class TestIntegration:
