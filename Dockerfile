@@ -21,6 +21,8 @@ ARG CUDA_INSTALLER=https://developer.download.nvidia.com/compute/cuda/12.9.1/loc
 ARG ROCM_INSTALLER=https://repo.radeon.com/amdgpu-install/7.0.3/ubuntu/noble/amdgpu-install_7.0.3.70003-1_all.deb
 ARG AMD_ARCH=AMD_GFX942
 ARG CUDA_ARCH=AMPERE80
+ARG LLVM_CACHE=false
+ARG STABLEHLO_CACHE=false
 
 # Create basic runtime environment base on Ubuntu 24.04 (noble)
 # Create and activate runtime virtual environment
@@ -276,6 +278,8 @@ FROM quay.io/pypa/manylinux_2_28_x86_64 AS wheel-catalyst
 ARG PENNYLANE_VERSION
 ARG CATALYST_VERSION
 ARG GCC_VERSION
+ARG LLVM_CACHE
+ARG STABLEHLO_CACHE
 RUN cat /etc/dnf.conf | sed "s/\[main\]/\[main\]\ntimeout=5/g" > /etc/dnf.conf
 RUN dnf update -y && dnf install -y libzstd-devel gcc-toolset-13
 ENV C_COMPILER=/opt/rh/gcc-toolset-13/root/usr/bin/gcc
@@ -302,7 +306,8 @@ RUN cd /opt/catalyst/mlir/llvm-project \
 RUN cd /opt/catalyst/mlir/Enzyme \
     && git apply /opt/catalyst/mlir/patches/enzyme-nvvm-fabs-intrinsics.patch
 
-RUN PYTHON=$PYTHON \
+RUN  if [ "$LLVM_CACHE" = "false" ]; then \
+    PYTHON=$PYTHON \
     C_COMPILER=$(which gcc)  \
     CXX_COMPILER=$(which g++)  \
     LLVM_BUILD_DIR="/opt/catalyst/llvm-build" \
@@ -314,7 +319,8 @@ RUN PYTHON=$PYTHON \
 
 # Build stablehlo dialect
 ENV COMPILER_LAUNCHER=""
-RUN C_COMPILER=$(which gcc) \
+RUN if [ "$STABLEHLO_CACHE" = "false" ]; then \
+    C_COMPILER=$(which gcc) \
     CXX_COMPILER=$(which g++) \
     LLVM_BUILD_DIR="$(pwd)/llvm-build" \
     STABLEHLO_BUILD_DIR="/opt/catalyst/stablehlo-build" \
