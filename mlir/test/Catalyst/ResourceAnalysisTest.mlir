@@ -715,46 +715,6 @@ func.func @resolvable_nested_for_loop(%arg0: !quantum.bit) -> !quantum.bit {
 
 // -----
 
-// An enclosing induction variable used as the inner loop's lower bound is
-// currently unresolved, so the inner loop remains dynamic.
-
-// CHECK-LABEL: "dyn_for_loop_1": {
-// CHECK: "quantum_operations"
-// CHECK:   "PauliX": 1
-// CHECK-LABEL: "for_loop_1": {
-// CHECK: "function_calls"
-// CHECK:   "dynamic":
-// CHECK:       "dyn_for_loop_1"
-// CHECK: "quantum_operations": {}
-// CHECK-LABEL: "induction_variable_lower_bound_nested_for_loop": {
-// CHECK: "function_calls"
-// CHECK:   "static":
-// CHECK:       "for_loop_1": 8
-// CHECK: "quantum_operations": {}
-func.func @induction_variable_lower_bound_nested_for_loop(
-    %arg0: !quantum.bit) -> !quantum.bit {
-    %c0 = arith.constant 0 : index
-    %c1 = arith.constant 1 : index
-    %c8 = arith.constant 8 : index
-
-    // Python code:
-    // for i in range(8):
-    //     for j in range(i, 8):
-    //         qp.PauliX(0)
-
-    %q = scf.for %i = %c0 to %c8 step %c1 iter_args(%outer_arg = %arg0) -> !quantum.bit {
-        %inner = scf.for %j = %i to %c8 step %c1
-            iter_args(%inner_arg = %outer_arg) -> !quantum.bit {
-            %out = quantum.custom "PauliX"() %inner_arg : !quantum.bit
-            scf.yield %out : !quantum.bit
-        }
-        scf.yield %inner : !quantum.bit
-    }
-    return %q : !quantum.bit
-}
-
-// -----
-
 // The outer, middle, and inner loops execute 8, 28, and 56 times, so their
 // preserved call edges have average multiplicities 8, 3.5, and 2.
 
