@@ -150,6 +150,48 @@ def MergeRotationsPass : Pass<"merge-rotations"> {
     let dependentDialects = ["math::MathDialect"];
 }
 
+def DeviceBasedDecompositionPass: Pass<"device-based-decomposition"> {
+    let summary = "Invoke the graph decomposition pass with the gatseset automatically detected from the backend toml file.";
+
+    let options = [
+        ListOption<
+            /*C++ name*/"targetGateSetOption",
+            /*CLI name*/"gate-set",
+            /*Type*/"std::string",
+            /*Description*/"The accepted gates to decompose to.">,
+        ListOption<
+            /*C++ name*/"fixedDecompsOption",
+            /*CLI name*/"fixed-decomps",
+            /*Type*/"std::string",
+            /*Description*/"Maps an operator to a decomposition rule that will be applied.">,
+        ListOption<
+            /*C++ name*/"altDecompsOption",
+            /*CLI name*/"alt-decomps",
+            /*Type*/"std::string",
+            /*Description*/
+            "Maps an operator to a list of alternative decomposition rules that will be considered"
+            " alongside any built-in rules for the operator.">,
+        Option<
+            /*C++ name*/"bytecodeRulesFile",
+            /*CLI name*/"bytecode-rules",
+            /*Type*/"std::string",
+            /*Default*/[{ "" }],
+            /*Description*/"A path to a bytecode file of compiled decomposition rules.">,
+        Option<
+            /*C++ name*/"libQPDPath",
+            /*CLI name*/"libQPD-path",
+            /*Type*/"std::string",
+            /*Default*/[{ "" }],
+            /*Description*/"A path to the QuantumPythonDecompositions dynamic library.">,
+        Option<
+            /*C++ name*/"libpythonPath",
+            /*CLI name*/"libpython-path",
+            /*Type*/"std::string",
+            /*Default*/[{ "" }],
+            /*Description*/"A path to the python shared library.">
+    ];
+}
+
 def GraphDecompositionPass : Pass<"graph-decomposition", "mlir::ModuleOp"> {
     let summary = "Decompose gates using an MLIR-native graph-based framework.";
 
