@@ -25,6 +25,7 @@ import jax.numpy as jnp
 import pennylane as qp
 from jax._src.lib.mlir import ir
 from pennylane.core.operator import Operator2, abstractify
+from pennylane.decomposition.utils import to_name
 from pennylane.pytrees import flatten, unflatten
 
 from catalyst.compiler import _quantum_opt
@@ -1585,9 +1586,12 @@ def fetch_all_reachable_decomposition_rules_from_op(
                 for op, _ in resource.items():
                     graph_op_id = GraphOpID(op)
                     probe = (
-                        # The name must carry the same modifiers as the id below, since the two
-                        # are paired to look up the rules registered for that id.
-                        graph_op_id.get_modified_operator_name(),
+                        # The name and the id below are paired to look up the rules registered
+                        # for that id, so the name has to carry the op's modifiers too. Spell it
+                        # the way PennyLane's registry does rather than the way the graphOpId
+                        # does: the two agree on `Adjoint(...)`/`C(...)`, but a multi-controlled
+                        # id reads `<n>C(...)`, which PennyLane has no name for.
+                        to_name(op),
                         graph_op_id.dynamic_shape,
                         graph_op_id.wire_lens,
                         graph_op_id.static_data,

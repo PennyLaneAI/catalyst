@@ -253,18 +253,6 @@ class GraphOpID:
         """Return the name of the operator, with any modifiers stripped by ``__init__``."""
         return self.operator_name
 
-    def get_modified_operator_name(self) -> str:
-        """Return the operator's name including the modifiers this instance carries.
-
-        This is the name the graphOpId from :meth:`getGraphOpId` is built on, and so the name
-        PennyLane registers the rules for that id under. Callers pairing a name with an id (for
-        instance to look the id's rules up) must use this rather than :meth:`get_operator_name`,
-        which names the unwrapped base operator.
-        """
-        return build_modified_operator_name(
-            self.operator_name, adjoint=self.adjoint, num_controls=self.n_ctrls
-        )
-
     def getGraphOpId(self, adjoint: bool = False, num_controls: int = 0) -> str:
         """
         Return the GraphOpId as a string.
