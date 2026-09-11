@@ -765,9 +765,8 @@
 * A new pass `--resolve-gate-level-adjoint` was added. This pass now handles gate-level adjoint canonicalization, moving it out of the `--canonicalize` pass.
   [#3155](https://github.com/PennyLaneAI/catalyst/pull/3155)
 
-* Transport CI runs on pull requests that touch the transport paths: the runtime is built with
-  `ENABLE_TRANSPORT=ON`, its Catch2 suites run over a soft-RoCE loopback link, and the backline
-  CPU integration tests run against it. Other pull requests skip the job entirely.
+* Pull requests touching transport now build the runtime with `ENABLE_TRANSPORT=ON` and run its
+  Catch2 suites and the backline CPU tests over a soft-RoCE loopback link.
   [(#3074)](https://github.com/PennyLaneAI/catalyst/pull/3074)
 
 <h3>Documentation 📝</h3>
