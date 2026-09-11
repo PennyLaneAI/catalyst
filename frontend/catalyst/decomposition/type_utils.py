@@ -15,6 +15,7 @@
 """Type handling utilities for decomposition rule lowering."""
 
 import copy
+import itertools
 import re
 
 import jax.numpy as jnp
@@ -78,25 +79,6 @@ def convert_item_to_mlir_type(item, is_special_lowering=False):
     )
 
 
-def format_dynamic_params_for_id(d):
-    """Format a structure for ID."""
-
-    def handle_item(item):
-        match item:
-            case str():
-                return item
-            case list() | tuple():
-                return "[" + ",".join(handle_item(i) for i in item) + "]"
-
-    return (
-        "{"
-        + ",".join(
-            k + ":" + "[" + ",".join(handle_item(item) for item in v) + "]" for k, v in d.items()
-        )
-        + "}"
-    )
-
-
 def get_dummy_values_for_arg(arg):
     """Given a container of python or MLIR types, replace the types with corresponding dummy values.
 
@@ -157,10 +139,21 @@ def replace_wires_with_placeholder_wires(node):
     """
     # Wires is a pytree itself, so it has to be marked as a leaf to be replaced as a whole.
     leaves, tree = flatten(copy.deepcopy(node), is_leaf=_is_wires)
-    leaves = [
-        qp.wires.Wires(range(-1, -len(leaf) - 1, -1)) if _is_wires(leaf) else leaf
-        for leaf in leaves
-    ]
+
+    # NOTE: Run an accumulator to generate unique negative wire labels
+    # as some operators like qp.ctrl(qp.H(Wire[1]), Wire[1]) would
+    # fail to unflatten as without this change they would have duplicate wire labels
+    counter = itertools.count(-1, -1)
+    new_leaves = []
+    for leaf in leaves:
+        if _is_wires(leaf):
+            new_wires = qp.wires.Wires([next(counter) for _ in range(len(leaf))])
+            new_leaves.append(new_wires)
+        else:
+            new_leaves.append(leaf)
+
+    leaves = new_leaves
+
     return unflatten(leaves, tree)
 
 
