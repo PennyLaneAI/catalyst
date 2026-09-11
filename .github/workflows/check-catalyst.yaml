@@ -191,9 +191,12 @@ jobs:
           # rt_decoder into every qjit'd program. OpenQASM defaults ON, so it is turned off
           # explicitly; OQD is left at its OFF default -- compiler.py links librt_OQD_capi only
           # when the .so is present, so not building it is supported rather than merely untested.
+          # clang, matching how backline's INSTALL.md builds the runtime (runtime/Makefile
+          # defaults to it; g++ there is only for the frontend). The LLVM the executor links
+          # is gcc-built, which is fine -- clang uses libstdc++ on Linux too.
           COMPILER_LAUNCHER="" \
-          C_COMPILER=$(which gcc) \
-          CXX_COMPILER=$(which g++) \
+          C_COMPILER=$(which clang) \
+          CXX_COMPILER=$(which clang++) \
           RT_BUILD_DIR="$(pwd)/runtime-build" \
           LLVM_SRC_DIR="$(pwd)/mlir/llvm-project" \
           LLVM_BUILD_DIR="$(pwd)/llvm-build" \
@@ -211,8 +214,8 @@ jobs:
           # Same ENABLE_* flags, RT_BUILD_DIR and LLVM dirs as the build step, so the `configure`
           # prerequisite does not reset the cmake cache and drop the already-built .sos.
           COMPILER_LAUNCHER="" \
-          C_COMPILER=$(which gcc) \
-          CXX_COMPILER=$(which g++) \
+          C_COMPILER=$(which clang) \
+          CXX_COMPILER=$(which clang++) \
           RT_BUILD_DIR="$(pwd)/runtime-build" \
           LLVM_SRC_DIR="$(pwd)/mlir/llvm-project" \
           LLVM_BUILD_DIR="$(pwd)/llvm-build" \
