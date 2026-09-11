@@ -48,7 +48,6 @@ from catalyst.decomposition.decomposition_rules import (
     name_unwrap_adjoint,
     name_unwrap_control,
     name_wrap_adjoint,
-    uses_symbolic_signature,
     wrap_modifier_id,
 )
 from catalyst.decomposition.graph_op_id import GraphOpID
@@ -501,30 +500,6 @@ class TestModifierIds:
 class TestSymbolicRules:
     """Tests for the rules registered against a symbolic operator that take the symbolic
     op's args; following the convention in PennyLane."""
-
-    @pytest.mark.parametrize(
-        "op_name, rule_name, symbolic",
-        [
-            ("Adjoint(Hadamard)", "decompose_to_base", True),
-            ("Adjoint(Rot)", "_adjoint_rot", True),
-            ("Adjoint(RZ)", "adjoint_rotation", True),
-            ("Adjoint(NoParams)", "adj_rule", False),
-        ],
-    )
-    def test_uses_symbolic_signature(self, op_name, rule_name, symbolic):
-        """Test a rule is recognized as symbolic exactly when its body accepts the symbolic operator's
-        arguments."""
-
-        with local_decomps():
-
-            @register_resources({NoParams: 1})
-            def adj_rule(reg):
-                NoParams(reg=reg)
-
-            add_decomps("Adjoint(NoParams)", adj_rule)
-
-            rule = qp.list_decomps(op_name)[rule_name]
-            assert uses_symbolic_signature(rule) is symbolic
 
     def test_self_adjoint_rule_is_lowered(self):
         """Test ``self_adjoint`` rule on ``Adjoint(Hadamard)``."""

@@ -33,8 +33,11 @@
   `self_adjoint`, `adjoint_rotation` and other symbolic rules are written, so `Adjoint(H)`, `Adjoint(X)`,
   `Adjoint(RZ)`, `Adjoint(Rot)`, ... now decompose straight back to their base operator instead of
   falling through to the (much longer) distributed rules, or failing to solve at all when the base
-  op is the only member of the target `gate_set`. Rules registered for `Adjoint(Op)` against the base
-  op's parameters keep working: the two conventions are told apart per rule.
+  op is the only member of the target `gate_set`.
+
+  A rule registered for `Adjoint(Op)` must now take `base`; this is the convention PennyLane's own
+  graph calls such a rule with, and the one every `Operator2` rule in PennyLane already follows. A
+  rule written against the base op's parameters instead is skipped with a `RuleLoweringWarning`.
 
 * The graph-based decomposition system now supports **controlled operators** for `Operator2`,
   including single control (`C(Op)`), multiple controls (`<n>C(Op)`), and their composition with

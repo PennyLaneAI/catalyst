@@ -16,7 +16,6 @@
 
 # pylint: disable=protected-access,bare-except
 
-import inspect
 import warnings
 from collections import deque
 from functools import partial
@@ -24,7 +23,7 @@ from functools import partial
 import jax.numpy as jnp
 import pennylane as qp
 from jax._src.lib.mlir import ir
-from pennylane.core.operator import abstractify
+from pennylane.core.operator import Operator2, abstractify
 
 from catalyst.compiler import _quantum_opt
 from catalyst.decomposition.graph_op_id import GraphOpID
@@ -46,26 +45,6 @@ _NON_INVERTIBLE_RESOURCE_TYPES = (qp.ops.MidMeasure, qp.ops.PauliMeasure)
 def _resources_have_measurement(gate_counts) -> bool:
     """Return whether a rule's declared resources contain a mid-circuit measurement."""
     return any(isinstance(op, _NON_INVERTIBLE_RESOURCE_TYPES) for op in gate_counts)
-
-
-def uses_symbolic_signature(rule) -> bool:
-    """Return whether ``rule`` follows the Operator2 symbolic-argument convention.
-
-    This is the convention PennyLane uses for its symbolic decomposition rules
-    (e.g., ``self_adjoint``, ``adjoint_rotation``) and is the only one that can
-    be used to lower rules registered against ``Adjoint(Op)``.
-
-    Args:
-        rule (DecompositionRule): a rule registered against a symbolic operator name
-
-    Returns:
-        bool: whether the rule body takes the symbolic operator's arguments
-    """
-    try:
-        inspect.signature(rule._impl).bind(base=None)
-    except TypeError:
-        return False
-    return True
 
 
 def build_base_op(op_cls, kwargs, is_custom_op):
@@ -345,9 +324,7 @@ def split_call_args(kwargs, is_custom_op):
     return (), kwargs
 
 
-def collect_resources_for_op(
-    op_name, kwargs, is_custom_op=False, adjoint_resources=False, skip_rule=None
-):
+def collect_resources_for_op(op_name, kwargs, is_custom_op=False, adjoint_resources=False):
     """Return resource data for all decomposition rules associated to op_name.
 
     Args:
@@ -355,7 +332,6 @@ def collect_resources_for_op(
         kwargs (dict): the arguments to compute the resources with
         is_custom_op (bool): whether the operator lowers to ``qref.custom``
         adjoint_resources (bool): whether to spell each produced id in its adjoint form
-        skip_rule (Callable): a predicate that leaves a rule out, for rules another pathway lowers
 
     Returns:
         dict: rule name to the resources it produces
@@ -363,8 +339,6 @@ def collect_resources_for_op(
         list: the rules considered
     """
     decomp_rules = list(qp.decomposition.list_decomps(op_name))
-    if skip_rule is not None:
-        decomp_rules = [rule for rule in decomp_rules if not skip_rule(rule)]
     args, kwargs = split_call_args(kwargs, is_custom_op)
 
     # map each rule to its resources, in a more generic format
@@ -421,7 +395,6 @@ def compile_decomposition_rules(
     wrap_adjoint=False,
     wrap_control=False,
     n_ctrl=1,
-    skip_rule=None,
 ) -> ir.Operation:
     """
     Return the top-level ``builtin.module`` operation containing the decomposition rules for an
@@ -455,9 +428,6 @@ def compile_decomposition_rules(
         wrap_adjoint (bool): whether to distribute the base rules over adjoint
         wrap_control (bool): whether to distribute the base rules over control
         n_ctrl (int): the number of controls to distribute over
-        skip_rule (Callable): a predicate that leaves a rule out. It is how the rules written
-            against the symbolic operator's arguments are handed over to
-            :func:`compile_registered_adjoint_rules`, which knows how to call them.
 
     Returns:
         ir.Operation: the ``builtin.module`` holding the rules
@@ -472,7 +442,6 @@ def compile_decomposition_rules(
         kwargs | static_data | extra_data,
         is_custom_op,
         adjoint_resources=wrap_adjoint,
-        skip_rule=skip_rule,
     )
 
     # TODO: The modified target id and the wrapped resource ids are derived here by string-wrapping
@@ -649,9 +618,6 @@ def build_rule_module(
 def collect_symbolic_adjoint_resources(op_cls, op_name, kwargs, is_custom_op):
     """Return resource data for the rules registered against ``Adjoint(op_name)``.
 
-    Only the rules taking the symbolic operator's arguments are considered; see
-    :func:`uses_symbolic_signature`.
-
     Args:
         op_cls (type): the base operator's class
         op_name (str): the base operator's name
@@ -664,11 +630,7 @@ def collect_symbolic_adjoint_resources(op_cls, op_name, kwargs, is_custom_op):
         dict: rule name to the resources it produces
         dict: rule name to the graphOpId of each resource
     """
-    rules = [
-        rule
-        for rule in qp.decomposition.list_decomps(f"Adjoint({op_name})")
-        if uses_symbolic_signature(rule)
-    ]
+    rules = list(qp.decomposition.list_decomps(f"Adjoint({op_name})"))
     if not rules:
         return [], {}, {}, {}
 
@@ -724,7 +686,7 @@ def compile_registered_adjoint_rules(
         static_data (dict): compiler-static argument names to their values
         extra_data (dict): argument values the graphOpId identifies by UID instead of spelling
         is_custom_op (bool): whether the operator lowers to ``qref.custom``
-        op_cls (type): the base operator's class, required to rebuild it
+        op_cls (type[Operator2]): the base operator's class, required to rebuild it
 
     Returns:
         ir.Operation or None: the module holding the rules, or None if there are none
@@ -737,6 +699,7 @@ def compile_registered_adjoint_rules(
             f"The operator class of {op_name!r} is needed to lower the decomposition rules "
             f"registered against {target_id}"
         )
+    assert issubclass(op_cls, Operator2), f"Expected an Operator2 subclass, got {op_cls}"
 
     extra_data = extra_data or {}
     static_and_extra = static_data | extra_data
@@ -819,11 +782,10 @@ def adjoint_variant_rule_strings(
 ):
     """Return the rule strings whose ``target_gate`` is ``Adjoint(op_name)``.
 
-    ``op_id`` is the *base* op's graphOpId (e.g. ``"S{...}"``). Three pathways contribute:
+    ``op_id`` is the *base* op's graphOpId (e.g. ``"S{...}"``). Two pathways contribute:
       1. rules registered directly against ``Adjoint(op_name)`` (``list_decomps("Adjoint(S)")``),
-         written against the base op's parameters,
-      1b. those same registered rules written against the symbolic operator's arguments, which is
-         how PennyLane itself writes them (``self_adjoint``, ``adjoint_rotation``, ...), and
+         which take the symbolic operator's arguments the way PennyLane writes them
+         (``self_adjoint``, ``adjoint_rotation``, ...), and
       2. rules synthesized by distributing each base rule of ``op_name`` over adjoint
          (the ``wrap_adjoint`` pathway), dropping any whose body is non-invertible.
 
@@ -839,7 +801,7 @@ def adjoint_variant_rule_strings(
         static_data (dict): compiler-static argument names to their values
         extra_data (dict): argument values the graphOpId identifies by UID instead of spelling
         is_custom_op (bool): whether the operator lowers to ``qref.custom``
-        op_cls (type): the base operator's class; pathway 1b is skipped without it
+        op_cls (type): the base operator's class; pathway 1 is skipped without it
 
     Returns:
         list[str]: the rules, as MLIR strings
@@ -847,27 +809,8 @@ def adjoint_variant_rule_strings(
     out = []
     adj_name = f"Adjoint({op_name})"
     adj_id = name_wrap_adjoint(op_id)
-    # (1) Rules registered directly against Adjoint(op_name), taking the base op's arguments:
-    try:
-        out.extend(
-            get_rule_strings_from_module(
-                compile_decomposition_rules(
-                    adj_name,
-                    adj_id,
-                    dynamic_shape,
-                    wire_lens,
-                    static_data,
-                    extra_data=extra_data,
-                    is_custom_op=is_custom_op,
-                    skip_rule=uses_symbolic_signature,
-                )
-            )
-        )
-    except Exception as e:  # pylint: disable=broad-except
-        warnings.warn(
-            f"Failed to lower the decomposition rules for {adj_name}: {e}",
-            category=RuleLoweringWarning,
-        )
+    # (1) Rules registered directly against Adjoint(op_name). They take a base operator instance,
+    # so they need the operator's class.
     # TODO: the on-demand decomp rules are skipped for now.
     if op_cls is not None:
         out.extend(
@@ -1214,23 +1157,24 @@ def fetch_all_reachable_decomposition_rules_from_op(
         this_kwargs = prepare_dynamic_op_kwargs(this_dynamic_shape, this_wire_lens)
         all_kwargs = this_kwargs | this_static_data | this_extra_data
 
-        # Explore ops reachable through the rules of both this op and its adjoint, under both
-        # argument conventions:
-        resources = {}
-
-        for explore_name in _op_variant_names(this_name):
-            is_adjoint = explore_name.startswith("Adjoint(")
-            found = collect_resources_for_op(
-                explore_name,
-                all_kwargs,
-                this_is_custom_op,
-                skip_rule=uses_symbolic_signature if is_adjoint else None,
-            )[0]
-            if is_adjoint and (this_op_cls := op_classes.get(this_name)) is not None:
-                found |= collect_symbolic_adjoint_resources(
+        # Explore the ops reachable through the rules of this op and of its adjoint. Keyed by
+        # (explored op, rule name): the same rule name may be registered against both.
+        resources = {
+            (this_name, name): res
+            for name, res in collect_resources_for_op(this_name, all_kwargs, this_is_custom_op)[
+                0
+            ].items()
+        }
+        if (
+            not this_name.startswith("Adjoint(")
+            and (this_op_cls := op_classes.get(this_name)) is not None
+        ):
+            resources |= {
+                (f"Adjoint({this_name})", name): res
+                for name, res in collect_symbolic_adjoint_resources(
                     this_op_cls, this_name, all_kwargs, this_is_custom_op
-                )[2]
-            resources |= {(explore_name, name): res for name, res in found.items()}
+                )[2].items()
+            }
 
         for (_, _rule_name), resource in resources.items():
             try:
@@ -1267,11 +1211,3 @@ def fetch_all_reachable_decomposition_rules_from_op(
                 )
             continue
     return rules
-
-
-def _op_variant_names(op_name):
-    """Yield the operator names to explore for `op_name`: the op itself and, unless it is already
-    adjointed, its adjoint `Adjoint(op_name)`. Rules registered against both are collected."""
-    yield op_name
-    if not op_name.startswith("Adjoint("):
-        yield f"Adjoint({op_name})"

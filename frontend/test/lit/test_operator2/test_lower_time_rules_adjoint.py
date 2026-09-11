@@ -38,13 +38,15 @@ def _base_rule():
 
 
 def _adj_rule():
-    def adj_resource_fn(reg):
+    """A rule for ``Adjoint(NoParams)``."""
+
+    def adj_resource_fn(base):
         return {SingleParam(x=Float, reg=Wire[2]): 2}
 
     @qp.register_resources(adj_resource_fn)
-    def adj_rule(reg):
-        SingleParam(x=0.2, reg=reg[0:2])
-        SingleParam(x=0.3, reg=reg[0:2])
+    def adj_rule(base):
+        SingleParam(x=0.2, reg=base.wires[0:2])
+        SingleParam(x=0.3, reg=base.wires[0:2])
 
     return adj_rule
 
