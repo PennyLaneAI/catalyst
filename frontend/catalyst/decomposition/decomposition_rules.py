@@ -613,7 +613,11 @@ class _RuleCallABI:
         for name in op_cls.wire_argnames:
             if name in op_cls.hybrid_argnames:
                 continue
-            count = wire_lens[name]
+            # A wire argument holding no qubits contributes no entry to the operator's qubit map,
+            # so the lowering path leaves it out of the graphOpId's wire group entirely. The
+            # on-demand loader rebuilds `wire_lens` from that group, so an absent name here means
+            # an empty register rather than a missing argument.
+            count = wire_lens.get(name, 0)
             start = len(wire_values)
             wire_values.extend(range(start, start + count))
             self._wire_specs.append((name, start, count))

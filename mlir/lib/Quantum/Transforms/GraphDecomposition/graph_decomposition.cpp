@@ -670,11 +670,16 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         // Load pre-compiled rules (ignore failure, we can try to solve without)
         std::ignore = loadBuiltInDecompositionRules(filename, rules);
 
-        // Lower compile-time rules into the module; loadUserDecompositionRules (below) registers
-        // the materialized `__builtin`-prefixed funcs as RuleNodes.
-        if (failed(loadPythonDecomps())) {
-            return failure();
-        }
+        // On-demand rules are disabled for now. This calls back into Python to lower the rules
+        // PennyLane has registered for each operator in the module, and loadUserDecompositionRules
+        // (below) would then register the materialized `__builtin`-prefixed funcs as RuleNodes.
+        // Re-enable once the rule ABI reconstruction on the Python side is settled; until then the
+        // rules a module needs must come from the pre-compiled file above, from the rules the
+        // frontend lowers eagerly at capture time, or be spelled in the module itself.
+        // TODO: re-enable.
+        // if (failed(loadPythonDecomps())) {
+        //     return failure();
+        // }
 
         // Load user-rules
         if (failed(loadUserDecompositionRules(userRuleNames, rules))) {
