@@ -47,8 +47,6 @@ from catalyst.device.verification import (
     verify_operations,
 )
 from catalyst.passes.builtin_passes import (
-    adjoint_lowering,
-    ctrl_lowering,
     graph_decomposition_setup_inputs,
 )
 from catalyst.utils.exceptions import CompileError
