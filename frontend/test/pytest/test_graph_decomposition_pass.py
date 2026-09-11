@@ -21,7 +21,9 @@ import numpy as np
 import pennylane as qp
 import pytest
 from pennylane.decomposition import DecompositionRule, register_resources
+from pennylane.typing import Wire
 
+from catalyst.from_plxpr.decompose import _resource_num_wires
 from catalyst.passes.builtin_passes import graph_decomposition_setup_inputs
 
 # Dummy lib paths so building the options dict never hits the environment / installed libraries.
@@ -121,6 +123,18 @@ class TestAltDecompsOption:
         )
         assert options["alt_decomps"] == {"Hadamard": ("x_to_rx", "h_to_rz", "custom_rule")}
         assert "fixed_decomps" not in options
+
+
+class TestResourceReps:
+    """Tests for resource representations that use abstract wires (``Wire[n]``)."""
+
+    def test_abstract_wire_operator2_resource_rep(self):
+        """``_resource_num_wires`` returns the total wire count of an ``Operator2`` resource
+        representation built from abstract wires (``pennylane.typing.Wire[n]``)."""
+        op_rep = qp.SemiAdder(Wire[2], Wire[2], Wire[1])
+
+        assert isinstance(op_rep, qp.core.Operator2)
+        assert _resource_num_wires(op_rep) == 5
 
 
 if __name__ == "__main__":
