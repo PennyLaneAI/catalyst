@@ -765,9 +765,8 @@
 * A new pass `--resolve-gate-level-adjoint` was added. This pass now handles gate-level adjoint canonicalization, moving it out of the `--canonicalize` pass.
   [#3155](https://github.com/PennyLaneAI/catalyst/pull/3155)
 
-* Pull requests touching transport now build the runtime with `ENABLE_TRANSPORT=ON` and run its
-  Catch2 suites and the backline CPU tests over a soft-RoCE loopback link. On the GPU runner they
-  also cover the CPU-to-GPU coprocessor path over memcpy transport.
+* Pull requests touching transport now run its Catch2 suites and the backline tests: CPU over a
+  soft-RoCE loopback link, and CPU-to-GPU over memcpy on the GPU runner.
   [(#3074)](https://github.com/PennyLaneAI/catalyst/pull/3074)
 
 <h3>Documentation 📝</h3>
