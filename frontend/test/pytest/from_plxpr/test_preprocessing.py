@@ -31,6 +31,7 @@ from catalyst.device.decomposition import measurements_from_counts, measurements
 from catalyst.from_plxpr import from_plxpr
 from catalyst.jax_primitives import quantum_kernel_p
 from catalyst.utils.exceptions import CompileError
+from catalyst.passes.builtin_passes import device_based_decomposition
 
 pytestmark = pytest.mark.usefixtures("use_capture")
 from_plxpr_no_warn = partial(from_plxpr, _preprocess_warn=False)
@@ -586,30 +587,30 @@ class TestGradientPreprocessing:
 
 
 class TestGatesetPreprocessing:
-    """Tests for preprocessing related to invoking `graph-decomposition` pass with target gateset
+    """Tests for preprocessing related to invoking `device-based-decomposition` pass with target gateset
     as described by dveice TOML file."""
 
-    def test_gateset_obs_validation(self):
-        """Tests that the transforms for graph decomposition are added to the pipeline"""
+    @pytest.mark.parametrize("apply_device_based_decomposition", [True, False])
+    def test_device_based_decomposition_added_to_pipeline(self, apply_device_based_decomposition):
+        """Tests that the device-based-decomposition pass is added to the pipeline 
+        when the @device_based_decomposition decorator is applied."""
+
         dev = qp.device("null.qubit", wires=4)
 
-        @qp.qnode(dev)
-        def f():
-            return qp.expval(qp.Z(0))
+        if apply_device_based_decomposition:
+            @device_based_decomposition
+            @qp.qnode(dev)
+            def f():
+                return qp.expval(qp.Z(0))
+        else:
+            @qp.qnode(dev)
+            def f():
+                return qp.expval(qp.Z(0))
 
         device_pipelines = get_pipelines(f, skip_preprocess=False)[1][1]
+        pass_exists = any(t.pass_name == "device-based-decomposition" for t in device_pipelines)
 
-        # AdjointLowering, CtrlLowering and GraphDecomposition must exist in that order, sequentially
-        # in the device pipeline
-        idx = -1
-        for idx, pass_entry in enumerate(device_pipelines):
-            if pass_entry.pass_name == "adjoint-lowering":
-                break
-
-        assert idx != -1
-        assert device_pipelines[idx].pass_name == "adjoint-lowering"
-        assert device_pipelines[idx + 1].pass_name == "ctrl-lowering"
-        assert device_pipelines[idx + 2].pass_name == "graph-decomposition"
+        assert pass_exists == apply_device_based_decomposition
 
     def test_gateset_matches_device_capabilities(self):
         """Test that device operations and their C/Adjoint expansions are in the
@@ -625,13 +626,14 @@ class TestGatesetPreprocessing:
             measurement_processes={"ExpectationMP": [], "SampleMP": [], "CountsMP": []},
         )
 
+        @device_based_decomposition
         @qp.qnode(dev, shots=1)
         def f():
             qp.expval(qp.Z(0))
 
         device_pipelines = get_pipelines(f, skip_preprocess=False)[1][1]
         gate_set = next(
-            t.kwargs["gate_set"] for t in device_pipelines if t.pass_name == "graph-decomposition"
+            t.kwargs["gate_set"] for t in device_pipelines if t.pass_name == "device-based-decomposition"
         )
 
         assert (
