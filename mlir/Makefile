@@ -116,10 +116,7 @@ llvm:
 stablehlo:
 	@echo "build stablehlo"
 
-# Explicit LLVM_DIR: MLIRConfig's baked HINTS path is stale when llvm-build/ is restored
-# from a cache saved on another host (the key has no runner.name).
 	cmake -G Ninja -S stablehlo -B $(STABLEHLO_BUILD_DIR) \
-		-DLLVM_DIR=$(LLVM_BUILD_DIR)/lib/cmake/llvm \
 		-DSTABLEHLO_ENABLE_LLD=$(ENABLE_LLD) \
 		-DCMAKE_BUILD_TYPE=$(BUILD_TYPE) \
 		-DMLIR_DIR=$(LLVM_BUILD_DIR)/lib/cmake/mlir \
@@ -172,7 +169,6 @@ plugin:
 		-DCMAKE_CXX_COMPILER=$(CXX_COMPILER) \
 		-DCMAKE_C_COMPILER_LAUNCHER=$(COMPILER_LAUNCHER) \
 		-DCMAKE_CXX_COMPILER_LAUNCHER=$(COMPILER_LAUNCHER) \
-		-DLLVM_DIR=$(LLVM_BUILD_DIR)/lib/cmake/llvm \
 		-DMLIR_DIR=$(LLVM_BUILD_DIR)/lib/cmake/mlir \
 		-DLLVM_EXTERNAL_LIT=$(LLVM_EXTERNAL_LIT) \
 		-DCATALYST_TOOLS_DIR=$(DIALECTS_BUILD_DIR)/bin \
@@ -197,7 +193,6 @@ dialects:
 		-DPython3_NumPy_INCLUDE_DIRS=$(shell $(PYTHON) -c "import numpy as np; print(np.get_include())") \
 		-DEnzyme_DIR=$(ENZYME_BUILD_DIR) \
 		-DENZYME_SRC_DIR=$(MK_DIR)/Enzyme \
-		-DLLVM_DIR=$(LLVM_BUILD_DIR)/lib/cmake/llvm \
 		-DMLIR_DIR=$(LLVM_BUILD_DIR)/lib/cmake/mlir \
 		-DSTABLEHLO_DIR=$(MK_DIR)/stablehlo \
 		-DSTABLEHLO_BUILD_DIR=$(STABLEHLO_BUILD_DIR) \
@@ -229,7 +224,6 @@ dialect-docs:
 		-DPython3_NumPy_INCLUDE_DIRS=$(shell $(PYTHON) -c "import numpy as np; print(np.get_include())") \
 		-DEnzyme_DIR=$(ENZYME_BUILD_DIR) \
 		-DENZYME_SRC_DIR=$(MK_DIR)/Enzyme \
-		-DLLVM_DIR=$(LLVM_BUILD_DIR)/lib/cmake/llvm \
 		-DMLIR_DIR=$(LLVM_BUILD_DIR)/lib/cmake/mlir \
 		-DRUNTIME_LIB_DIR=$(RT_BUILD_DIR)/lib \
 		-DMLIR_LIB_DIR=$(LLVM_BUILD_DIR)/lib \
