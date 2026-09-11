@@ -12,9 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: quantum-opt --decompose-lowering --split-input-file -verify-diagnostics %s | FileCheck %s
+// RUN: quantum-opt --decompose-lowering --split-input-file -verify-diagnostics %s | FileCheck %s --check-prefix=REFERENCE
 
 
+// REFERENCE-LABEL: func.func @controlled_id_match(
+// REFERENCE-SAME: %[[C:.*]]: !qref.bit, %[[Q:.*]]: !qref.bit
+// REFERENCE: qref.custom "Hadamard"() %[[Q]] ctrls(%[[C]])
+// REFERENCE-NOT: qref.custom "U"
 // CHECK-LABEL: func.func @controlled_id_match(
 // CHECK-SAME:  %[[C:.*]]: !quantum.bit, %[[Q:.*]]: !quantum.bit
 func.func @controlled_id_match(%ctrl: !quantum.bit, %q: !quantum.bit) -> (!quantum.bit, !quantum.bit) {
@@ -33,6 +37,11 @@ func.func private @ctrl_u(%q: !quantum.bit, %ctrl: !quantum.bit, %cv: i1) -> (!q
 
 // -----
 
+// REFERENCE-LABEL: func.func @no_base_rule_fallback(
+// REFERENCE-SAME: %[[C:.*]]: !qref.bit, %[[Q:.*]]: !qref.bit, %[[T:.*]]: f64
+// REFERENCE: qref.custom "RX"(%[[T]]) %[[Q]] ctrls(%[[C]])
+// REFERENCE-NOT: PauliX
+// REFERENCE: return
 // CHECK-LABEL: func.func @no_base_rule_fallback(
 // CHECK-SAME:  %[[C:.*]]: !quantum.bit, %[[Q:.*]]: !quantum.bit, %[[T:.*]]: f64
 func.func @no_base_rule_fallback(%ctrl: !quantum.bit, %q: !quantum.bit, %theta: f64) -> (!quantum.bit, !quantum.bit) {
@@ -52,6 +61,10 @@ func.func private @plain_rx(%theta: f64, %q: !quantum.bit) -> !quantum.bit
 
 // -----
 
+// REFERENCE-LABEL: func.func @distinct_from_base(
+// REFERENCE-SAME: %[[C:.*]]: !qref.bit, %[[Q0:.*]]: !qref.bit, %[[Q1:.*]]: !qref.bit
+// REFERENCE: qref.custom "PauliX"() %[[Q0]]
+// REFERENCE: qref.custom "PauliZ"() %[[Q1]] ctrls(%[[C]])
 // CHECK-LABEL: func.func @distinct_from_base(
 // CHECK-SAME:  %[[C:.*]]: !quantum.bit, %[[Q0:.*]]: !quantum.bit, %[[Q1:.*]]: !quantum.bit
 func.func @distinct_from_base(%ctrl: !quantum.bit, %q0: !quantum.bit, %q1: !quantum.bit)

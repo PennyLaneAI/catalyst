@@ -22,7 +22,7 @@ import numpy as np
 import pennylane as qp
 
 
-@qp.qjit(capture=True, target="mlir")
+@qp.qjit(capture=True, collect_decomp_rules=False, target="mlir")
 @qp.qnode(qp.device("null.qubit", wires=2))
 def c_mat():
     # CHECK-LABEL: func.func public @c_mat
@@ -38,7 +38,7 @@ def c_mat():
 print(c_mat.mlir)
 
 
-@qp.qjit(capture=True, target="mlir")
+@qp.qjit(capture=True, collect_decomp_rules=False, target="mlir")
 @qp.qnode(qp.device("null.qubit", wires=2))
 def c_various_shapes():
     # CHECK-LABEL: func.func public @c_various_shapes
@@ -54,7 +54,7 @@ def c_various_shapes():
 print(c_various_shapes.mlir)
 
 
-@qp.qjit(capture=True, target="mlir")
+@qp.qjit(capture=True, collect_decomp_rules=False, target="mlir")
 @qp.qnode(qp.device("null.qubit", wires=2))
 def c_manipulate_symbolic_array():
     # CHECK-LABEL: func.func public @c_manipulate_symbolic_array
@@ -76,7 +76,7 @@ def c_manipulate_symbolic_array():
 print(c_manipulate_symbolic_array.mlir)
 
 
-@qp.qjit(capture=True, target="mlir")
+@qp.qjit(capture=True, collect_decomp_rules=False, target="mlir")
 @qp.qnode(qp.device("null.qubit", wires=2))
 def c_symbolic_wire():
     # CHECK-LABEL: func.func public @c_symbolic_wire

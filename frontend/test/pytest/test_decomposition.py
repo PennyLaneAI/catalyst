@@ -20,6 +20,7 @@ import pytest
 from jax.core import ShapedArray
 from operator2_dummy_gates import (
     CompilableData,
+    HybridNoOpArg,
     HybridOpArg,
     HybridWires,
     MultiParams,
@@ -31,6 +32,7 @@ from operator2_dummy_gates import (
 )
 from pennylane import qnode
 from pennylane.decomposition import add_decomps, local_decomps, register_resources
+from pennylane.decomposition.utils import to_name
 from pennylane.typing import Bool, Complex, Float, Int, Wire
 from pennylane.wires import Wires
 
@@ -38,11 +40,14 @@ from catalyst import qjit
 from catalyst.decomposition import GraphOpID, RuleLoweringWarning
 from catalyst.decomposition.decomposition_rules import (
     _MODIFIER_CANONICAL_ORDER,
+    _RuleCallABI,
     _control_modifier,
     _leading_modifier_kind,
     _modifier_kind,
+    compile_decomposition_rules,
     compile_decomposition_rules_wrapper,
     compile_reachable_decomposition_rules_wrapper,
+    control_variant_rule_strings,
     name_unwrap_adjoint,
     name_unwrap_control,
     name_wrap_adjoint,
@@ -59,6 +64,14 @@ from catalyst.decomposition.type_utils import (
 
 class TestGenericUtilities:
     """Tests for common decomposition rule lowering utilities."""
+
+    def test_graph_op_id_uses_canonical_decomposition_name(self):
+        """Graph IDs use the name under which decomposition rules are registered."""
+        op = qp.ops.Prod2((NoParams(reg=[0]), NoParams(reg=[1])))
+
+        assert to_name(op) == "Prod2"
+        assert GraphOpID(op).get_operator_name() == to_name(op)
+        assert GraphOpID(NoParams(reg=[0])).get_operator_name() == "NoParams"
 
     def test_wires_replacement_doesnt_mutate_operator(self):
         """Test that the wires replacement helper does not mutate the incoming operator."""
@@ -159,6 +172,37 @@ class TestGenericUtilities:
         assert "multi_value_rule" in result
         assert result.count("scf.if") == 2
 
+    def test_rule_call_abi_reconstructs_hybrid_params(self):
+        """Hybrid pytree leaves remain flat ABI parameters until the rule call."""
+        abi = _RuleCallABI(
+            "HybridNoOpArg",
+            {"angles": ["tensor<f64>", "tensor<f64>"]},
+            {"wires": 1},
+            {},
+            {"angles": [0.0, 0.0]},
+        )
+
+        assert len(abi.call_args) == 3
+        rebuilt = abi.repack(abi.call_args)
+        assert [angle.shape for angle in rebuilt["angles"]] == [(), ()]
+        assert rebuilt["wires"].tolist() == [0]
+
+    def test_rule_call_abi_places_nested_operator_data_in_forward_args(self):
+        """Dynamic leaves of nested operators follow outer parameters in the rule ABI."""
+        abi = _RuleCallABI(
+            "HybridOpArg",
+            {"angle": ["tensor<f64>"]},
+            {"cwires": 1},
+            {},
+            {"op": SingleParam(0.2, reg=[0]), "n_iters": 1},
+        )
+
+        assert len(abi.call_args) == 3
+        rebuilt = abi.repack(abi.call_args)
+        assert rebuilt["angle"] is abi.call_args[0]
+        assert rebuilt["op"].arguments["x"] is abi.call_args[1]
+        assert rebuilt["cwires"].tolist() == [0]
+
     @pytest.mark.parametrize(
         "item, is_special_lowering, mlir_type",
         [
@@ -256,7 +300,6 @@ class TestGenericUtilities:
             )
         assert isinstance(res, str)
 
-    @pytest.mark.filterwarnings("ignore::catalyst.decomposition.RuleLoweringWarning")
     def test_wrapper_passes_compilable_data_to_conditions(self, mocker):
         """Test that decomposition conditions receive compilable operator data."""
         mock_decomp = mocker.MagicMock()
@@ -334,7 +377,6 @@ class TestTraceTime:
         assert 'target_gate = "NoParams{}{reg:2}{}"' in mlir
         assert 'target_gate = "Adjoint(NoParams){}{reg:2}{}"' in mlir
 
-    @pytest.mark.filterwarnings("ignore::catalyst.decomposition.RuleLoweringWarning")
     def test_adjoint_gate_captures_base_and_adjoint(self):
         """Lowering the Adjoint of a gate captures the rules registered against both the plain gate
         and its adjoint."""
@@ -357,7 +399,6 @@ class TestTraceTime:
         assert 'target_gate = "NoParams{}{reg:2}{}"' in mlir
         assert 'target_gate = "Adjoint(NoParams){}{reg:2}{}"' in mlir
 
-    @pytest.mark.filterwarnings("ignore::catalyst.decomposition.RuleLoweringWarning")
     def test_distribution_rule_synthesized_from_base_only(self):
         """With only a base rule registered (no Adjoint(Op) rule), lowering still synthesizes a rule
         for Adjoint(Op) by distributing the base rule over adjoint (case 3): its resources are the
@@ -385,7 +426,6 @@ class TestTraceTime:
         )
         assert "qref.adjoint" in mlir
 
-    @pytest.mark.filterwarnings("ignore::catalyst.decomposition.RuleLoweringWarning")
     def test_no_distribution_rule_for_non_invertible_body(self):
         """A distribution rule is NOT synthesized when the base rule body is non-invertible (contains
         a mid-circuit measurement): the base rule is still lowered, but no Adjoint(Op) rule."""
@@ -418,6 +458,67 @@ class TestOnDemand:
     """Test the python wrapper functions used for on-demand,
     compile-time decomposition rule lowering.
     """
+
+    @pytest.mark.parametrize(
+        "op_name, op_id, n_ctrl, rule_name",
+        [
+            (
+                "Adjoint(RX)",
+                "Adjoint(RX){0:[f64]}{wires:1}{}",
+                1,
+                "adjoint_rotation",
+            ),
+            (
+                "C(RX)",
+                "C(RX){0:[f64]}{wires:1}{}",
+                1,
+                "flip_zero_ctrl_values(_controlled_rx_decomp)",
+            ),
+            (
+                "C(RX)",
+                "2C(RX){0:[f64]}{wires:1}{}",
+                2,
+                "flip_zero_ctrl_values(_controlled_rx_decomp)",
+            ),
+        ],
+    )
+    def test_compile_symbolic_rule_with_base_signature(self, op_name, op_id, n_ctrl, rule_name):
+        """True symbolic rules are invoked with symbolic arguments while the compiled function
+        retains the base operation's parameter and wire signature."""
+
+        module = compile_decomposition_rules(
+            op_name,
+            op_id,
+            {"0": ["f64"]},
+            {"wires": 1},
+            {},
+            is_custom_op=True,
+            n_ctrl=n_ctrl,
+        )
+        module_str = str(module)
+
+        assert rule_name in module_str
+        assert f'target_gate = "{op_id}"' in module_str
+
+    @pytest.mark.filterwarnings("ignore::catalyst.decomposition.RuleLoweringWarning")
+    def test_multi_control_uses_generic_symbolic_rule(self):
+        """A multi-control target uses rules from the generic ``C(Op)`` registry."""
+
+        rules = control_variant_rule_strings(
+            "RX",
+            "RX{0:[f64]}{wires:1}{}",
+            [2],
+            {"0": ["f64"]},
+            {"wires": 1},
+            {},
+            is_custom_op=True,
+        )
+
+        assert any(
+            "flip_zero_ctrl_values(_controlled_rx_decomp)" in rule
+            and 'target_gate = "2C(RX){0:[f64]}{wires:1}{}"' in rule
+            for rule in rules
+        )
 
     @pytest.mark.parametrize(
         "op_name, op_id, expected",
@@ -458,7 +559,6 @@ class TestOnDemand:
         with pytest.raises(ValueError, match="not a control id"):
             name_unwrap_control("RX", "Adjoint(RX){0:[f64]}{wires:1}{}")
 
-    @pytest.mark.filterwarnings("ignore::catalyst.decomposition.RuleLoweringWarning")
     @pytest.mark.parametrize(
         "op_id, extra_ctrl_target",
         [
@@ -482,7 +582,6 @@ class TestOnDemand:
         if extra_ctrl_target is not None:
             assert extra_ctrl_target in module_str
 
-    @pytest.mark.filterwarnings("ignore::catalyst.decomposition.RuleLoweringWarning")
     def test_control_variant_warns_and_skips_on_failure(self, mocker):
         """control_variant_rule_strings warns and skips a rule when it fails to compile."""
 

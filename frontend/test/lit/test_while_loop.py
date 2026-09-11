@@ -110,3 +110,23 @@ def circuit_multiple_args(n: int):
 
 
 print(circuit_multiple_args.mlir)
+
+
+# The `estimated_iterations` hint (here a fractional value) is attached as an f64
+# `catalyst.estimated_iterations` attribute on the emitted `scf.while`.
+# CHECK-NOT: Verification failed
+# CHECK-LABEL: public @jit_circuit_estimated_iterations
+@qjit(target="mlir")
+@qp.qnode(qp.device("lightning.qubit", wires=1))
+def circuit_estimated_iterations(n: int):
+    # CHECK:   scf.while
+    # CHECK:   catalyst.estimated_iterations = 2.500000e+00
+    @while_loop(lambda i: i < n, estimated_iterations=2.5)
+    def loop(i):
+        qp.PauliX(wires=0)
+        return i + 1
+
+    return loop(0)
+
+
+print(circuit_estimated_iterations.mlir)

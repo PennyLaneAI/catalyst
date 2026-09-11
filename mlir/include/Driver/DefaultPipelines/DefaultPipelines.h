@@ -65,6 +65,7 @@ const PipelineList pipelineList{
       "adjoint-lowering",
       "ctrl-lowering",
       "adjoint-lowering",
+      "resolve-gate-level-adjoint",
       // TODO: we can remove the following 2 passes once PBC has its own pipeline.
       "lower-pbc-init-ops",
       "disable-assertion",

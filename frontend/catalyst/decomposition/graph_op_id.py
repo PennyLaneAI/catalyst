@@ -18,6 +18,7 @@ from typing import Any
 
 import jax.numpy as jnp
 import pennylane as qp
+from pennylane.decomposition.utils import to_name
 from pennylane.pytrees import flatten
 
 from catalyst.decomposition.type_utils import (
@@ -80,7 +81,7 @@ class GraphOpID:
 
         # Modifier names are added by getGraphOpId from the normalized modifier state above.
         # Use the unwrapped operator name here to avoid encoding the same modifier twice.
-        self.operator_name = self.op.name
+        self.operator_name = to_name(self.op)
         self.dynamic_shape = self.parse_dynamic_shape()
         self.wire_lens = self.parse_wire_lens()
         self.static_data = self.parse_static_data()

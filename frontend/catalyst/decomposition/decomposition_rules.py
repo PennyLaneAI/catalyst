@@ -16,6 +16,7 @@
 
 # pylint: disable=protected-access,bare-except
 
+import inspect
 import warnings
 from collections import deque
 from functools import partial
@@ -24,6 +25,7 @@ import jax.numpy as jnp
 import pennylane as qp
 from jax._src.lib.mlir import ir
 from jaxlib.mlir.dialects.builtin import ModuleOp
+from pennylane.pytrees import flatten, unflatten
 
 from catalyst.compiler import _quantum_opt
 from catalyst.decomposition.graph_op_id import GraphOpID
@@ -38,6 +40,13 @@ _NON_INVERTIBLE_MARKERS = (
     "measure_in_basis",
     ".ppm",  # pbc.ppm / pbc.ref.ppm / pbc.select.ppm
 )
+
+_NON_INVERTIBLE_RESOURCE_TYPES = (qp.ops.MidMeasure, qp.ops.PauliMeasure)
+
+
+def _resources_have_measurement(gate_counts) -> bool:
+    """Return whether a rule's declared resources contain a mid-circuit measurement."""
+    return any(isinstance(op, _NON_INVERTIBLE_RESOURCE_TYPES) for op in gate_counts)
 
 
 # Canonical nesting order for op-level modifiers, listed OUTERMOST first. The compiler's
@@ -240,9 +249,13 @@ def split_call_args(kwargs, is_custom_op):
     return (), kwargs
 
 
-def collect_resources_for_op(op_name, kwargs, is_custom_op=False, adjoint_resources=False):
+def collect_resources_for_op(
+    op_name, kwargs, is_custom_op=False, adjoint_resources=False, decomp_rules=None
+):
     """Return resource data for all decomposition rules associated to op_name."""
-    decomp_rules = list(qp.decomposition.list_decomps(op_name))
+    decomp_rules = (
+        list(qp.decomposition.list_decomps(op_name)) if decomp_rules is None else list(decomp_rules)
+    )
     args, kwargs = split_call_args(kwargs, is_custom_op)
 
     # map each rule to its resources, in a more generic format
@@ -274,6 +287,126 @@ def collect_resources_for_op(op_name, kwargs, is_custom_op=False, adjoint_resour
     return name_to_resources, name_to_resource_ids, decomp_rules
 
 
+def _parse_symbolic_op_name(op_name):
+    """Return the base name and outer-to-inner modifiers encoded in ``op_name``."""
+    modifiers = []
+    base_name = op_name
+    while base_name.endswith(")"):
+        if base_name.startswith("Adjoint("):
+            modifiers.append(("Adjoint", None))
+            base_name = base_name[len("Adjoint(") : -1]
+            continue
+
+        i = 0
+        while i < len(base_name) and base_name[i].isdigit():
+            i += 1
+        if base_name[i:].startswith("C("):
+            modifiers.append(("C", int(base_name[:i]) if i else None))
+            base_name = base_name[i + len("C(") : -1]
+            continue
+        break
+    return base_name, modifiers
+
+
+def _operator2_subclasses():
+    """Yield all currently loaded Operator2 subclasses."""
+    queue = deque(qp.core.Operator2.__subclasses__())
+    while queue:
+        op_type = queue.popleft()
+        yield op_type
+        queue.extend(op_type.__subclasses__())
+
+
+def _find_base_op_type(op_name):
+    """Find the loaded Operator2 class named by a symbolic operator."""
+    base_name, _ = _parse_symbolic_op_name(op_name)
+    candidate = getattr(qp, base_name, None)
+    if isinstance(candidate, type) and issubclass(candidate, qp.core.Operator2):
+        return candidate
+
+    for op_type in _operator2_subclasses():
+        if op_type.__name__ == base_name:
+            return op_type
+    raise ValueError(f"Could not find the base operation type for symbolic operator {op_name!r}")
+
+
+class _SymbolicDecompositionRule:
+    """Present a symbolic rule through the ABI of its base operation."""
+
+    def __init__(self, rule, op_name, n_ctrl, n_base_wires):
+        self._rule = rule
+        self._base_op_type = _find_base_op_type(op_name)
+        _, self._modifiers = _parse_symbolic_op_name(op_name)
+        self._n_ctrl = n_ctrl
+        self._n_base_wires = n_base_wires
+        self.name = rule.name
+
+    @property
+    def requires_control_wires(self):
+        """Whether the symbolic operation contains a control modifier."""
+        return any(modifier == "C" for modifier, _ in self._modifiers)
+
+    def _symbolic_arguments(self, *args, _ctrl_wires=None, **kwargs):
+        # These objects only carry the symbolic rule's arguments. Pausing capture prevents the
+        # target operation itself from leaking into the traced decomposition body.
+        with qp.capture.pause():
+            symbolic_op = self._base_op_type(*args, **kwargs)
+            for modifier, modifier_ctrl_count in reversed(self._modifiers):
+                if modifier == "Adjoint":
+                    symbolic_op = qp.ops.Adjoint2(symbolic_op)
+                else:
+                    ctrl_count = modifier_ctrl_count or self._n_ctrl
+                    control_wires = (
+                        _ctrl_wires
+                        if _ctrl_wires is not None
+                        else jnp.arange(
+                            self._n_base_wires,
+                            self._n_base_wires + ctrl_count,
+                            dtype=int,
+                        )
+                    )
+                    symbolic_op = qp.ops.ControlledOp2(
+                        symbolic_op,
+                        control_wires=control_wires,
+                        control_values=jnp.ones(ctrl_count, dtype=bool),
+                    )
+        return symbolic_op.arguments
+
+    def _impl(self, *args, _ctrl_wires=None, **kwargs):
+        self._rule._impl(**self._symbolic_arguments(*args, _ctrl_wires=_ctrl_wires, **kwargs))
+
+    def compute_resources(self, *args, **kwargs):
+        """Compute resources using the symbolic rule's actual argument convention."""
+        return self._rule.compute_resources(**self._symbolic_arguments(*args, **kwargs))
+
+    def is_applicable(self, *args, **kwargs):
+        """Check applicability using the symbolic rule's actual argument convention."""
+        return self._rule.is_applicable(**self._symbolic_arguments(*args, **kwargs))
+
+
+def _adapt_symbolic_rules(  # pylint: disable=too-many-arguments,too-many-positional-arguments
+    decomp_rules, op_name, kwargs, is_custom_op, n_ctrl, n_base_wires
+):
+    """Wrap true symbolic rules while preserving legacy base-signature registrations."""
+    _, modifiers = _parse_symbolic_op_name(op_name)
+    if not modifiers:
+        return decomp_rules
+
+    args, call_kwargs = split_call_args(kwargs, is_custom_op)
+    adapted_rules = []
+    for rule in decomp_rules:
+        adapter = _SymbolicDecompositionRule(rule, op_name, n_ctrl, n_base_wires)
+        symbolic_arguments = adapter._symbolic_arguments(*args, **call_kwargs)
+        try:
+            inspect.signature(rule._impl).bind(**symbolic_arguments)
+        except TypeError:
+            # User-registered rules may already expose the base operation's signature.
+            adapted_rules.append(rule)
+        else:
+            adapted_rules.append(adapter)
+    return adapted_rules
+
+
 def prepare_dynamic_op_kwargs(dynamic_shape, wire_lens) -> dict:
     """Construct representative arguments for tracing a decomposition rule.
 
@@ -293,6 +426,189 @@ def prepare_dynamic_op_kwargs(dynamic_shape, wire_lens) -> dict:
         is_single_tensor = len(arg_shape) == 1 and arg_shape[0].startswith("tensor")
         kwargs[arg_name] = values[0] if is_single_tensor else values
     return kwargs
+
+
+def _hybrid_leaf_roles(value, is_wire_arg):
+    """Classify flattened hybrid leaves by their OperatorOp ABI segment."""
+    leaves, tree = flatten(value)
+    if is_wire_arg:
+        return (
+            leaves,
+            tree,
+            [
+                (
+                    "wire_container" if isinstance(leaf, qp.typing.AbstractWires) else "wire",
+                    len(leaf) if isinstance(leaf, qp.typing.AbstractWires) else 1,
+                )
+                for leaf in leaves
+            ],
+        )
+
+    partial_leaves, _ = flatten(value, is_leaf=lambda leaf: isinstance(leaf, qp.core.Operator2))
+    roles = []
+    for partial_leaf in partial_leaves:
+        if isinstance(partial_leaf, qp.core.Operator2):
+            op_leaves, _ = flatten(
+                partial_leaf,
+                is_leaf=lambda leaf: isinstance(leaf, (qp.wires.Wires, qp.typing.AbstractWires)),
+            )
+            for op_leaf in op_leaves:
+                if isinstance(op_leaf, qp.wires.Wires):
+                    roles.extend([("wire", 1)] * len(op_leaf))
+                elif isinstance(op_leaf, qp.typing.AbstractWires):
+                    roles.append(("wire_container", len(op_leaf)))
+                else:
+                    roles.append(("forward", 1))
+        elif isinstance(partial_leaf, qp.wires.Wires):
+            roles.extend([("wire", 1)] * len(partial_leaf))
+        elif isinstance(partial_leaf, qp.typing.AbstractWires):
+            roles.append(("wire_container", len(partial_leaf)))
+        else:
+            roles.append(("param", 1))
+
+    assert len(leaves) == len(roles), "Hybrid leaf roles must match the flattened pytree."
+    return leaves, tree, roles
+
+
+def _concrete_abi_value(value):
+    """Create a traceable representative for an abstract hybrid leaf."""
+    if isinstance(value, qp.typing.AbstractArray):
+        return jnp.zeros(value.shape, dtype=value.dtype)
+    try:
+        return get_dummy_values_for_arg(value)
+    except TypeError:
+        return jnp.asarray(value)
+
+
+def _has_high_rank_real_params(dynamic_shape):
+    """Whether a rule ABI contains real-valued tensor parameters above rank one."""
+    for param_types in dynamic_shape.values():
+        for param_type in param_types:
+            value = _concrete_abi_value(param_type)
+            if value.dtype.kind == "f" and value.ndim > 1:
+                return True
+    return False
+
+
+class _RuleCallABI:
+    """Repack a canonical OperatorOp ABI into the Python arguments of a rule."""
+
+    def __init__(self, op_name, dynamic_shape, wire_lens, static_data, extra_data):
+        op_cls = _find_base_op_type(op_name)
+        self._dynamic_specs = []
+        self._hybrid_specs = []
+        self._wire_specs = []
+        self._static_data = dict(static_data)
+
+        param_values = []
+        forward_values = []
+        wire_values = []
+
+        dynamic_kwargs = prepare_dynamic_op_kwargs(dynamic_shape, {})
+        for name in op_cls.dynamic_argnames:
+            value = dynamic_kwargs[name]
+            count = len(dynamic_shape[name])
+            values = [value] if count == 1 else list(value)
+            start = len(param_values)
+            param_values.extend(values)
+            self._dynamic_specs.append((name, start, count))
+
+        for name in op_cls.wire_argnames:
+            if name in op_cls.hybrid_argnames:
+                continue
+            count = wire_lens[name]
+            start = len(wire_values)
+            wire_values.extend(range(start, start + count))
+            self._wire_specs.append((name, start, count))
+
+        for name in op_cls.hybrid_argnames:
+            template = extra_data[name]
+            leaves, tree, roles = _hybrid_leaf_roles(
+                template, is_wire_arg=name in op_cls.wire_argnames
+            )
+
+            dynamic_values = dynamic_kwargs.get(name, ())
+            if name in dynamic_kwargs and len(dynamic_shape[name]) == 1:
+                dynamic_values = (dynamic_values,)
+            param_iter = iter(dynamic_values)
+
+            leaf_sources = []
+            for leaf, (role, count) in zip(leaves, roles, strict=True):
+                if role == "param":
+                    leaf_sources.append(("param", len(param_values), count))
+                    param_values.append(next(param_iter))
+                elif role == "forward":
+                    leaf_sources.append(("forward", len(forward_values), count))
+                    forward_values.append(_concrete_abi_value(leaf))
+                else:
+                    start = len(wire_values)
+                    leaf_sources.append((role, start, count))
+                    wire_values.extend(range(start, start + count))
+
+            if name in dynamic_kwargs:
+                try:
+                    next(param_iter)
+                except StopIteration:
+                    pass
+                else:
+                    raise AssertionError(f"Too many dynamic values for hybrid argument {name!r}.")
+
+            self._hybrid_specs.append((name, tree, tuple(leaf_sources)))
+
+        self._static_data.update(
+            {
+                name: value
+                for name, value in extra_data.items()
+                if name not in op_cls.hybrid_argnames
+            }
+        )
+        self._num_params = len(param_values)
+        self._num_forward = len(forward_values)
+        self._num_wires = len(wire_values)
+        self.call_args = tuple(param_values + forward_values)
+        if wire_values:
+            self.call_args += (jnp.asarray(wire_values, dtype=int),)
+
+    @property
+    def num_call_args(self):
+        """Number of positional arguments before any synthesized control register."""
+        return self._num_params + self._num_forward + int(bool(self._num_wires))
+
+    @property
+    def num_wires(self):
+        """Number of base-operation wires represented by the ABI."""
+        return self._num_wires
+
+    def repack(self, flat_args):
+        """Reconstruct keyword arguments for the original Operator2 decomposition rule."""
+        params = flat_args[: self._num_params]
+        forwards = flat_args[self._num_params : self._num_params + self._num_forward]
+        wire_arg = flat_args[-1] if self._num_wires else ()
+
+        kwargs = dict(self._static_data)
+        for name, start, count in self._dynamic_specs:
+            values = params[start : start + count]
+            kwargs[name] = values[0] if count == 1 else list(values)
+
+        for name, start, count in self._wire_specs:
+            kwargs[name] = wire_arg[start : start + count]
+
+        for name, tree, leaf_sources in self._hybrid_specs:
+            leaves = []
+            for role, index, count in leaf_sources:
+                if role == "param":
+                    leaves.append(params[index])
+                elif role == "forward":
+                    leaves.append(forwards[index])
+                else:
+                    wire_value = wire_arg[index : index + count]
+                    if role == "wire_container":
+                        leaves.append(qp.wires.Wires(wire_value))
+                    else:
+                        leaves.append(wire_value[0] if count == 1 else wire_value)
+            kwargs[name] = unflatten(leaves, tree)
+
+        return kwargs
 
 
 def compile_decomposition_rules(
@@ -330,11 +646,38 @@ def compile_decomposition_rules(
     """
     kwargs = prepare_dynamic_op_kwargs(dynamic_shape, wire_lens)
     extra_data = extra_data or {}
-    n_base_wires = sum(wire_lens.values())
-    device = qp.device("null.qubit", wires=n_base_wires + (n_ctrl if wrap_control else 0))
+    call_abi = None
+    if not is_custom_op:
+        try:
+            _find_base_op_type(op_name)
+        except ValueError:
+            # Operator1 and external/custom operation names retain their legacy rule ABI.
+            pass
+        else:
+            call_abi = _RuleCallABI(op_name, dynamic_shape, wire_lens, static_data, extra_data)
+    n_base_wires = call_abi.num_wires if call_abi is not None else sum(wire_lens.values())
+    registered_rules = list(qp.decomposition.list_decomps(op_name))
+    decomp_rules = _adapt_symbolic_rules(
+        registered_rules,
+        op_name,
+        kwargs | static_data | extra_data,
+        is_custom_op,
+        n_ctrl,
+        n_base_wires,
+    )
+    has_symbolic_control = any(
+        isinstance(rule, _SymbolicDecompositionRule) and rule.requires_control_wires
+        for rule in decomp_rules
+    )
+    needs_control_wires = wrap_control or has_symbolic_control
+    device = qp.device("null.qubit", wires=n_base_wires + (n_ctrl if needs_control_wires else 0))
 
-    _, name_to_resource_ids, decomp_rules = collect_resources_for_op(
-        op_name, kwargs | static_data | extra_data, is_custom_op, adjoint_resources=wrap_adjoint
+    name_to_resources, name_to_resource_ids, decomp_rules = collect_resources_for_op(
+        op_name,
+        kwargs | static_data | extra_data,
+        is_custom_op,
+        adjoint_resources=wrap_adjoint,
+        decomp_rules=decomp_rules,
     )
 
     # TODO: The modified target id and the wrapped resource ids are derived here by string-wrapping
@@ -359,13 +702,21 @@ def compile_decomposition_rules(
         def decomp_rule(*_args, _ctrl_wires=None, **_kwargs):
             # Apply adjoint innermost, control outermost (canonical `C(Adjoint(Op))`).
             body = qp.adjoint(rule._impl) if wrap_adjoint else rule._impl
+            if call_abi is not None:
+                if needs_control_wires:
+                    _ctrl_wires = _args[call_abi.num_call_args]
+                    _args = _args[: call_abi.num_call_args]
+                _kwargs = call_abi.repack(_args)
+                _args = ()
             if wrap_control:
                 qp.ctrl(body, control=list(_ctrl_wires))(*_args, **_kwargs)
+            elif isinstance(rule, _SymbolicDecompositionRule) and rule.requires_control_wires:
+                body(*_args, _ctrl_wires=_ctrl_wires, **_kwargs)
             else:
                 body(*_args, **_kwargs)
 
         decomp_rule_no_static_args = partial(decomp_rule, **static_data)
-        if extra_data:
+        if extra_data and call_abi is None:
             decomp_rule_no_static_args = partial(decomp_rule_no_static_args, **extra_data)
 
         # keep the frontend name for readability, append target op_id for symbol uniqueness
@@ -379,15 +730,26 @@ def compile_decomposition_rules(
 
     subroutines = []
     for rule in decomp_rules:
-        if rule.name in name_to_resource_ids and rule.is_applicable(
-            *condition_args, **condition_kwargs
+        if rule.name not in name_to_resource_ids:
+            continue
+        if (wrap_adjoint or wrap_control) and _resources_have_measurement(
+            name_to_resources[rule.name]
         ):
+            warnings.warn(
+                f"Skipped the {rule.name} decomposition rule for {target_id}: it contains a "
+                "mid-circuit measurement, which is not supported with adjoint or control regions.",
+                category=RuleLoweringWarning,
+            )
+            continue
+        if rule.is_applicable(*condition_args, **condition_kwargs):
             subroutines.append(rule_to_subroutine(rule))
 
-    # For control distribution, the extra control wires are
+    # For control distribution and true symbolic-control rules, the extra control wires are
     # added to each rule body via the `_ctrl_wires` keyword argument.
     ctrl_wires = (
-        jnp.array(range(n_base_wires, n_base_wires + n_ctrl), dtype=int) if wrap_control else None
+        jnp.array(range(n_base_wires, n_base_wires + n_ctrl), dtype=int)
+        if needs_control_wires
+        else None
     )
 
     call_args, call_kwargs = split_call_args(kwargs, is_custom_op)
@@ -399,7 +761,12 @@ def compile_decomposition_rules(
     @qp.qnode(device=device)
     def circuit():
         for subroutine in subroutines:
-            if wrap_control:
+            if call_abi is not None:
+                if needs_control_wires:
+                    subroutine(*call_abi.call_args, ctrl_wires)
+                else:
+                    subroutine(*call_abi.call_args)
+            elif needs_control_wires:
                 subroutine(*call_args, _ctrl_wires=ctrl_wires, **call_kwargs)
             else:
                 subroutine(*call_args, **call_kwargs)
@@ -514,6 +881,13 @@ def adjoint_variant_rule_strings(
             category=RuleLoweringWarning,
         )
     # (2) Rules for Adjoint(op_name) synthesized by adjointing each base rule of op_name:
+    # Adjoint lowering currently caches real gate parameters only up to rank one. A distributed
+    # rule with higher-rank real inputs can leave those values on Operator2 gates inside the
+    # adjoint region, so omit that optional synthesis path while retaining directly registered
+    # adjoint rules.
+    if _has_high_rank_real_params(dynamic_shape):
+        return out
+
     try:
         distributed = get_rule_strings_from_module(
             compile_decomposition_rules(
@@ -539,7 +913,10 @@ def adjoint_variant_rule_strings(
             f"Failed to synthesize distributed adjoint rules for {adj_name}: {e}",
             category=RuleLoweringWarning,
         )
-    return out
+    # Only target-gate functions are serialized into the rule bytecode. A residual helper call
+    # would therefore become an unresolved symbol after injection, so omit such non-self-contained
+    # modifier rules.
+    return [rule for rule in out if "func.call" not in rule]
 
 
 def control_variant_rule_strings(
@@ -569,18 +946,20 @@ def control_variant_rule_strings(
     for n in ctrl_counts:
         ctrl_mod = _control_modifier(n)
         ctrl_name = f"{ctrl_mod}({op_name})"
+        registered_ctrl_name = f"C({op_name})"
         # (1) Rules registered directly against <n>C(op_name):
         try:
             out.extend(
                 get_rule_strings_from_module(
                     compile_decomposition_rules(
-                        ctrl_name,
+                        registered_ctrl_name,
                         wrap_modifier_id(op_id, ctrl_mod),
                         dynamic_shape,
                         wire_lens,
                         static_data,
                         extra_data=extra_data,
                         is_custom_op=is_custom_op,
+                        n_ctrl=n,
                     )
                 )
             )
@@ -591,7 +970,14 @@ def control_variant_rule_strings(
             )
         # (2) <n>C(op_name) by controlling each base rule, and
         # (3) <n>C(Adjoint(op_name)) by controlling each adjointed base rule.
-        for wrap_adjoint, label in ((False, ctrl_name), (True, f"{ctrl_mod}(Adjoint({op_name}))")):
+        # Higher-rank real parameters can leave region-bearing classical computations inside the
+        # generated control/adjoint regions, which those lowering passes cannot distribute. Keep
+        # directly registered controlled rules above, but omit these optional synthesized paths.
+        variant_kinds = []
+        if not _has_high_rank_real_params(dynamic_shape):
+            variant_kinds.extend([(False, ctrl_name), (True, f"{ctrl_mod}(Adjoint({op_name}))")])
+
+        for wrap_adjoint, label in variant_kinds:
             try:
                 controlled = get_rule_strings_from_module(
                     compile_decomposition_rules(
@@ -619,7 +1005,10 @@ def control_variant_rule_strings(
                     f"Failed to synthesize distributed control rules for {label}: {e}",
                     category=RuleLoweringWarning,
                 )
-    return out
+    # Only target-gate functions are serialized into the rule bytecode. A residual helper call
+    # would therefore become an unresolved symbol after injection, so omit such non-self-contained
+    # modifier rules.
+    return [rule for rule in out if "func.call" not in rule]
 
 
 def compile_decomposition_rules_wrapper(
@@ -782,8 +1171,20 @@ def fetch_all_reachable_decomposition_rules_from_op(
         this_kwargs = prepare_dynamic_op_kwargs(this_dynamic_shape, this_wire_lens)
         # Explore ops reachable through the rules of both this op and its adjoint:
         for explore_name in _op_variant_names(this_name):
+            registered_rules = list(qp.decomposition.list_decomps(explore_name))
+            decomp_rules = _adapt_symbolic_rules(
+                registered_rules,
+                explore_name,
+                this_kwargs | this_static_data | this_extra_data,
+                this_is_custom_op,
+                n_ctrl=1,
+                n_base_wires=sum(this_wire_lens.values()),
+            )
             resources, _, _ = collect_resources_for_op(
-                explore_name, this_kwargs | this_static_data | this_extra_data, this_is_custom_op
+                explore_name,
+                this_kwargs | this_static_data | this_extra_data,
+                this_is_custom_op,
+                decomp_rules=decomp_rules,
             )
             for _rule_name, resource in resources.items():
                 try:

@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include <cstdint>
+#include <fstream>
 #include <numeric>
 #include <string>
 #include <tuple>
@@ -50,7 +51,6 @@
 #include "Catalyst/Analysis/ResourceAnalysis.h"
 #include "Catalyst/Analysis/ResourceResult.h"
 #include "Catalyst/Transforms/Passes.h"
-#include "QRef/Transforms/Passes.h"
 #include "Quantum/IR/QuantumDialect.h"
 #include "Quantum/IR/QuantumInterfaces.h"
 #include "Quantum/IR/QuantumOps.h"
@@ -110,13 +110,6 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         llvm::StringMap<llvm::SmallVector<std::string>> opToAltDecompNames;
         WeightedGateset targetGateSet;
 
-        // Index rules by name for O(1) lookup instead of scanning the vector
-        // for every fixed-decomp entry.
-        llvm::StringMap<const RuleNode *> rulesByName(setOfRules.size());
-        for (const auto &rule : setOfRules) {
-            rulesByName[rule.name] = &rule;
-        }
-
         // get names for fixed and alt decomps
         parseFixedDecomps(opToFixedDecompName, userRuleNames);
         parseAltDecomps(opToAltDecompNames, userRuleNames);
@@ -129,7 +122,18 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         if (failed(getRuleNodes(bytecodeRulesFile, setOfRules, userRuleNames))) {
             return signalPassFailure();
         }
+
+        // Index rules by name after getRuleNodes populates the rule set.
+        llvm::StringMap<const RuleNode *> rulesByName(setOfRules.size());
+        for (const auto &rule : setOfRules) {
+            rulesByName[rule.name] = &rule;
+        }
+
         getOperators(setOfOps);
+
+        std::ofstream outFile("graph_log.txt");
+        outFile << getOperation();
+        outFile.flush();
 
         ///////////////////////////
         // Step 2: Build and solve the decomposition graph
@@ -142,8 +146,8 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         LLVM_DEBUG(showSolution(solution));
 
         ///////////////////////////
-        // Step 3: Convert python-decompositions from reference to value semantics and run
-        // decompose-lowering to apply the chosen decomposition rules.
+        // Step 3: Run decompose-lowering to apply the chosen decomposition rules. The lowering
+        // pass normalizes both the circuit and Python decomposition rules to reference semantics.
 
         ///////////////////////////
         // CQRs:
@@ -159,18 +163,18 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
             dlOptions.targetRulesOption.push_back(chosenRule.ruleName);
         }
 
-        // Convert reference-semantics python decompositions to value semantics once.
-        {
-            OpPassManager valueSemanticsPm("builtin.module");
-            valueSemanticsPm.addPass(qref::createValueSemanticsConversionPass());
-            if (failed(runPipeline(valueSemanticsPm, module))) {
-                return signalPassFailure();
-            }
-        }
-
         auto countOps = [](ModuleOp m) {
             size_t count = 0;
             m->walk([&](mlir::Operation *) { count++; });
+            return count;
+        };
+        auto countModifierRegions = [](ModuleOp m) {
+            size_t count = 0;
+            m->walk([&](mlir::Operation *op) {
+                if (isa<CtrlOp, AdjointOp>(op) && !DecompUtils::isInDecompRule(op)) {
+                    count++;
+                }
+            });
             return count;
         };
 
@@ -178,9 +182,14 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         // until the module stops changing.
         constexpr unsigned maxIterations = 64;
         size_t previousOpCount = countOps(module);
+        size_t previousModifierCount = countModifierRegions(module);
         for (unsigned iter = 0; iter < maxIterations; ++iter) {
             {
                 OpPassManager decomposePm("builtin.module");
+                decomposePm.addPass(createAdjointLoweringPass());
+                decomposePm.addPass(createCtrlLoweringPass());
+                decomposePm.addPass(createAdjointLoweringPass());
+                decomposePm.addPass(createCtrlLoweringPass());
                 decomposePm.addPass(createDecomposeLoweringPass(dlOptions));
                 if (failed(runPipeline(decomposePm, module))) {
                     return signalPassFailure();
@@ -188,7 +197,12 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
             }
 
             // Distribute a `quantum.ctrl` region lazily.
-            bool hasCtrlRegion = module->walk([&](CtrlOp) { return mlir::WalkResult::interrupt(); })
+            bool hasCtrlRegion = module
+                                     ->walk([&](CtrlOp op) {
+                                         return DecompUtils::isInDecompRule(op)
+                                                    ? mlir::WalkResult::advance()
+                                                    : mlir::WalkResult::interrupt();
+                                     })
                                      .wasInterrupted();
             if (hasCtrlRegion) {
                 OpPassManager ctrlPm("builtin.module");
@@ -201,9 +215,13 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
             // Distribute a `quantum.adjoint` region lazily.
             // It uses a greedy rewriter that would otherwise DCE gates in circuits that
             // never needed adjoint handling.
-            bool hasAdjointRegion =
-                module->walk([&](AdjointOp) { return mlir::WalkResult::interrupt(); })
-                    .wasInterrupted();
+            bool hasAdjointRegion = module
+                                        ->walk([&](AdjointOp op) {
+                                            return DecompUtils::isInDecompRule(op)
+                                                       ? mlir::WalkResult::advance()
+                                                       : mlir::WalkResult::interrupt();
+                                        })
+                                        .wasInterrupted();
             if (hasAdjointRegion) {
                 OpPassManager adjointPm("builtin.module");
                 adjointPm.addPass(createAdjointLoweringPass());
@@ -213,10 +231,13 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
             }
 
             size_t currentOpCount = countOps(module);
-            if (currentOpCount == previousOpCount) {
+            size_t currentModifierCount = countModifierRegions(module);
+            if (currentOpCount == previousOpCount &&
+                currentModifierCount == previousModifierCount) {
                 break;
             }
             previousOpCount = currentOpCount;
+            previousModifierCount = currentModifierCount;
         }
     }
 
@@ -275,6 +296,9 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
             llvm::StringRef opName = opNameRaw.trim();
             llvm::StringRef cost = costRaw.trim();
 
+            opName.consume_front("\"");
+            opName.consume_back("\"");
+
             cost.consume_back(": f64");
             cost = cost.trim();
 
@@ -302,6 +326,8 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
 
         // Try to generate resources if they're missing
         if (!resourcesAttr) {
+            llvm::errs() << "needed ResourceAnalysis for resources, bailing instead\n";
+            return success(); // TODO: remove this
             ResourceAnalysis analysis(rule, {}, /*collectDetailedOperations=*/true);
             if (const ResourceResult *flat = analysis.getFlattenedResource(rule.getName())) {
                 rule->setAttr("resources", buildResourceDict(&getContext(), *flat));
@@ -571,9 +597,9 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
 
         // Lower compile-time rules into the module; loadUserDecompositionRules (below) registers
         // the materialized `__builtin`-prefixed funcs as RuleNodes.
-        if (failed(loadPythonDecomps())) {
-            return failure();
-        }
+        // if (failed(loadPythonDecomps())) {
+        //     return failure();
+        // }
 
         // Load user-rules
         if (failed(loadUserDecompositionRules(userRuleNames, rules))) {

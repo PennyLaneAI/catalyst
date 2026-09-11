@@ -42,6 +42,7 @@ from catalyst.decomposition.graph_op_id import _SPECIAL_LOWERINGS
 from catalyst.decomposition.type_utils import (
     convert_item_to_mlir_type,
     format_dynamic_params_for_id,
+    get_dummy_values_for_arg,
 )
 from catalyst.jax_extras.lowering import get_mlir_attribute_from_pyval
 from catalyst.jax_extras.patches import mock_attributes
@@ -404,19 +405,20 @@ def compile_decomp_rules(
         for hybrid_argname, hybrid_len, hybrid_tree in zip(
             op_cls.hybrid_argnames, hybrid_lens, hybrid_trees
         ):
-            replaced_leaves = []
-            for leaf in avals_in[hybrid_arg_start_idx : hybrid_arg_start_idx + hybrid_len]:
-                if isinstance(leaf, AbstractQubit):
-                    replaced_leaves.append(ShapedArray((), dtype=int))
-                else:
-                    replaced_leaves.append(leaf)
-
+            # Rebuild the hybrid argument around traceable dummy values rather than
+            # AbstractArray specs.
             with Patcher(
                 (AbstractArray, "__hash__", lambda x: id(x)),
             ):
-                replaced_leaves = abstractify(replaced_leaves)
-                unflattened = unflatten(replaced_leaves, hybrid_tree)
-                unflattened = abstractify(unflattened)
+                dummy_leaves = []
+                next_wire_label = 0
+                for leaf in avals_in[hybrid_arg_start_idx : hybrid_arg_start_idx + hybrid_len]:
+                    if isinstance(leaf, AbstractQubit):
+                        dummy_leaves.append(next_wire_label)
+                        next_wire_label += 1
+                    else:
+                        dummy_leaves.append(get_dummy_values_for_arg(leaf))
+                unflattened = unflatten(dummy_leaves, hybrid_tree)
             extra_data[hybrid_argname] = unflattened
             hybrid_arg_start_idx += hybrid_len
 
@@ -458,7 +460,7 @@ def compile_decomp_rules(
         decomp_rules = fetch_all_reachable_decomposition_rules_from_op(
             op_name=op_cls.__name__,
             op_id=op_id,
-            dynamic_shape=non_hybrid_dynamic_shape,
+            dynamic_shape=with_hybrid_dynamic_shape,
             wire_lens=non_hybrid_wire_lens,
             static_data=repack_static_data,
             extra_data=extra_data,
@@ -479,6 +481,14 @@ def _qref_operator_p_lowering(jax_ctx: mlir.LoweringRuleContext, *args, op_cls, 
     n_ctrls = kwargs.pop("n_ctrls")
     wire_lens = kwargs.pop("wire_lens")
     collect_decomp_rules = kwargs.pop("collect_decomp_rules")
+
+    n_ctrl_work_wires = kwargs.pop("n_ctrl_work_wires", 0)
+    kwargs.pop("ctrl_work_wire_type", None)
+    if n_ctrl_work_wires:
+        raise NotImplementedError(
+            "Lowering a controlled Operator2 with control work wires is not supported yet; "
+            f"got {n_ctrl_work_wires} work wire(s)."
+        )
 
     repack_static_data = {k: unflatten(*v) for k, v in kwargs.items()}
 
