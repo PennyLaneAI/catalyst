@@ -50,6 +50,7 @@
 #include "Catalyst/Analysis/ResourceAnalysis.h"
 #include "Catalyst/Analysis/ResourceResult.h"
 #include "Catalyst/Transforms/Passes.h"
+#include "Driver/Timer.h"
 #include "QRef/Transforms/Passes.h"
 #include "Quantum/IR/QuantumDialect.h"
 #include "Quantum/IR/QuantumInterfaces.h"
@@ -70,6 +71,30 @@ using namespace catalyst::quantum;
 using namespace DecompGraph::Core;
 using namespace DecompGraph::Solver;
 
+namespace {
+
+/**
+ * @brief RAII wrapper around `catalyst::utils::Timer` that times the enclosing scope and dumps
+ * the result when the scope exits (including on the early returns taken by pass failures).
+ *
+ * Timing is only collected when the driver is run with `ENABLE_DIAGNOSTICS=ON`; otherwise
+ * `start()`/`dump()` are no-ops and the only cost is the `getenv` done by the Timer constructor.
+ */
+class ScopedDiagnosticTimer {
+  public:
+    explicit ScopedDiagnosticTimer(std::string name) : name(std::move(name)) { timer.start(); }
+    ~ScopedDiagnosticTimer() { timer.dump(name); }
+
+    ScopedDiagnosticTimer(const ScopedDiagnosticTimer &) = delete;
+    ScopedDiagnosticTimer &operator=(const ScopedDiagnosticTimer &) = delete;
+
+  private:
+    catalyst::utils::Timer<> timer;
+    std::string name;
+};
+
+} // namespace
+
 namespace catalyst {
 namespace quantum {
 
@@ -79,6 +104,8 @@ namespace quantum {
 struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDecompositionPass> {
     using GraphDecompositionPassBase::GraphDecompositionPassBase;
     void runOnOperation() final {
+        ScopedDiagnosticTimer totalTimer("decomp:total");
+
         // Debugging output for command-line options
         LLVM_DEBUG(llvm::dbgs() << "Running GraphDecompositionPass with options:\n");
         LLVM_DEBUG({
@@ -133,12 +160,16 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
 
         ///////////////////////////
         // Step 2: Build and solve the decomposition graph
-        FixedDecomps fixedDecomps = buildFixedDecomps(opToFixedDecompName, rulesByName);
-        AltDecomps altDecomps = buildAltDecomps(opToAltDecompNames, rulesByName);
-        DecompositionGraph graph(setOfOps, targetGateSet, setOfRules, std::move(fixedDecomps),
-                                 std::move(altDecomps));
-        DecompositionSolver solver(graph);
-        auto solution = solver.solve();
+        GraphResult solution;
+        {
+            ScopedDiagnosticTimer t("decomp:solver");
+            FixedDecomps fixedDecomps = buildFixedDecomps(opToFixedDecompName, rulesByName);
+            AltDecomps altDecomps = buildAltDecomps(opToAltDecompNames, rulesByName);
+            DecompositionGraph graph(setOfOps, targetGateSet, setOfRules, std::move(fixedDecomps),
+                                     std::move(altDecomps));
+            DecompositionSolver solver(graph);
+            solution = solver.solve();
+        }
         LLVM_DEBUG(showSolution(solution));
 
         ///////////////////////////
@@ -161,6 +192,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
 
         // Convert reference-semantics python decompositions to value semantics once.
         {
+            ScopedDiagnosticTimer t("decomp:ref-to-value");
             OpPassManager valueSemanticsPm("builtin.module");
             valueSemanticsPm.addPass(qref::createValueSemanticsConversionPass());
             if (failed(runPipeline(valueSemanticsPm, module))) {
@@ -178,7 +210,10 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         // until the module stops changing.
         constexpr unsigned maxIterations = 64;
         size_t previousOpCount = countOps(module);
+        ScopedDiagnosticTimer fixpointTimer("decomp:lowering-fixpoint");
+        unsigned iterationsRun = 0;
         for (unsigned iter = 0; iter < maxIterations; ++iter) {
+            iterationsRun = iter + 1;
             {
                 OpPassManager decomposePm("builtin.module");
                 decomposePm.addPass(createDecomposeLoweringPass(dlOptions));
@@ -218,6 +253,8 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
             }
             previousOpCount = currentOpCount;
         }
+        LDBG() << "lowering fixpoint reached after " << iterationsRun << " iteration(s), "
+               << previousOpCount << " ops";
     }
 
   private:
@@ -566,6 +603,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
      */
     LogicalResult getRuleNodes(llvm::StringRef filename, std::vector<RuleNode> &rules,
                                llvm::StringSet<> &userRuleNames) {
+        ScopedDiagnosticTimer t("decomp:rules");
         // Load pre-compiled rules (ignore failure, we can try to solve without)
         std::ignore = loadBuiltInDecompositionRules(filename, rules);
 

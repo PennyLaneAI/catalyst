@@ -108,12 +108,12 @@
     For example, an operator with class name `HybridOpArg`, taking in one float param
     argument named `angle`, one wire argument named `cwires`, one static data argument
     `label="hello"`, and a computed UID of 10 would be parsed to the following graph op ID:
-        HybridOpArg{angle:[tensor<f64>]}{cwires:1}{label:hello}[10]
+        HybridOpArg{angle:[tensor<f64>]}{cwires:1}{label = "hello"}[10]
 
     A node in the decomposition graph is completely identified by its `graphOpId`. For example,
-        PauliRot{angle:[f64]}{wires:1}{pauli_word:X}
+        PauliRot{angle:[f64]}{wires:1}{pauli_word = "X"}
     and
-        PauliRot{angle:[f64]}{wires:2}{pauli_word:XX}
+        PauliRot{angle:[f64]}{wires:2}{pauli_word = "XX"}
     will have different decomposition rules.
 
   - A decomposition rule function can arrive in a piece of MLIR in one of three ways:
@@ -151,6 +151,7 @@
     [(#2855)](https://github.com/PennyLaneAI/catalyst/pull/2855)
     [(#3156)](https://github.com/PennyLaneAI/catalyst/pull/3156)
     [(#3158)](https://github.com/PennyLaneAI/catalyst/pull/3158)
+    [(#3206)](https://github.com/PennyLaneAI/catalyst/pull/3206)
 
     1. The pass now supports applying a selection of the available decomposition rules via the `target_rules` parameter.
 
@@ -173,8 +174,9 @@
     of raising an error.
     [(#3190)](https://github.com/PennyLaneAI/catalyst/pull/3190)
 
-* A failure during AOT compilation is now downgraded to a warning and logged.
+* A failure during AOT compilation is now logged rather than raised. 
   [(#3100)](https://github.com/PennyLaneAI/catalyst/pull/3100)
+  [(#3194)](https://github.com/PennyLaneAI/catalyst/pull/3194)
 
 * Adds the ability to use `pennylane.typing.AbstractArray` and `pennylane.wires.AbstractWires` as type hints for
   AOT compilation and as arguments to `pennylane.specs` calculations.
@@ -571,9 +573,12 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* Adds ability to lower `None` attributes to `get_mlir_attribute_from_pyval`.
+  [(#3196)](https://github.com/PennyLaneAI/catalyst/pull/3196)
+
 * Update calls to `GlobalPhase` to no longer use the `wires` argument.
   [(#3108)](https://github.com/PennyLaneAI/catalyst/pull/3108)
-  
+
 * A GPU CI workflow runs the runtime transport tests on the `single-gpu-x64` runner, gated by
   the `gpu` label.
   [(#3113)](https://github.com/PennyLaneAI/catalyst/pull/3113)
@@ -776,6 +781,12 @@
 * The `transport` and `executor` dialects are now documented alongside the other Catalyst dialects.
   [(#3179)](https://github.com/PennyLaneAI/catalyst/pull/3179)
   [(#3180)](https://github.com/PennyLaneAI/catalyst/pull/3180)
+  [(#3197)](https://github.com/PennyLaneAI/catalyst/pull/3197)
+
+* A developer guide for Backline describes how heterogeneous compilation and remote execution are
+  built in Catalyst: the `catalyst.backline` module attribute, the transport and executor
+  dialects, the compilation pipeline, and the runtime.
+  [(#3208)](https://github.com/PennyLaneAI/catalyst/pull/3208)
 
 <h3>Contributors ✍️</h3>
 

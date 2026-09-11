@@ -197,11 +197,9 @@ class TestHybridOpVerification:
         with pytest.raises(CompileError, match="RX.*not invertible"):
             qjit(f)(1.2)
 
-        with pytest.warns(UserWarning, match="AOT.*failed"):
-
-            @qjit
-            def cir(x: float):
-                return grad(f)(x)
+        @qjit
+        def cir(x: float):
+            return grad(f)(x)
 
         with pytest.raises(CompileError, match="RX.*not invertible"):
             cir(1.2)
@@ -233,11 +231,9 @@ class TestHybridOpVerification:
         with pytest.raises(CompileError, match="RX.*not invertible"):
             qjit(f)(1.2)
 
-        with pytest.warns(UserWarning, match="AOT.*failed"):
-
-            @qjit
-            def cir(x: float):
-                return grad(f)(x)
+        @qjit
+        def cir(x: float):
+            return grad(f)(x)
 
         with pytest.raises(CompileError, match="RX.*not invertible"):
             cir(1.2)
@@ -263,11 +259,9 @@ class TestHybridOpVerification:
         with pytest.raises(CompileError, match="RX.*not invertible"):
             qjit(f)(1.2)
 
-        with pytest.warns(UserWarning, match="AOT.*failed"):
-
-            @qjit
-            def cir(x: float):
-                return grad(f)(x)
+        @qjit
+        def cir(x: float):
+            return grad(f)(x)
 
         with pytest.raises(CompileError, match="RX.*not invertible"):
             cir(1.2)
@@ -287,11 +281,9 @@ class TestHybridOpVerification:
         with pytest.raises(CompileError, match="PauliZ is not controllable"):
             qjit(f)(1.2)
 
-        with pytest.warns(UserWarning, match="AOT.*failed"):
-
-            @qjit
-            def cir(x: float):
-                return grad(f)(x)
+        @qjit
+        def cir(x: float):
+            return grad(f)(x)
 
         with pytest.raises(CompileError, match="PauliZ is not controllable"):
             cir(1.2)
@@ -323,11 +315,9 @@ class TestHybridOpVerification:
             with pytest.raises(CompileError, match="PauliZ is not controllable"):
                 qjit(f)(1.2)
 
-            with pytest.warns(UserWarning, match="AOT.*failed"):
-
-                @qjit
-                def cir(x: float):
-                    return grad(f)(x)
+            @qjit
+            def cir(x: float):
+                return grad(f)(x)
 
             with pytest.raises(CompileError, match="PauliZ is not controllable"):
                 cir(1.2)
@@ -347,11 +337,9 @@ class TestHybridOpVerification:
         with pytest.raises(CompileError, match="HybridCtrl is not supported"):
             qjit(f)(1.2)
 
-        with pytest.warns(UserWarning, match="AOT.*failed"):
-
-            @qjit
-            def cir(x: float):
-                return grad(f)(x)
+        @qjit
+        def cir(x: float):
+            return grad(f)(x)
 
         with pytest.raises(CompileError, match="HybridCtrl is not supported"):
             cir(1.2)
@@ -372,11 +360,9 @@ class TestHybridOpVerification:
         with pytest.raises(CompileError, match="Cannot compile PennyLane control of the hybrid op"):
             qjit(f)(1.2)
 
-        with pytest.warns(UserWarning, match="AOT.*failed"):
-
-            @qjit
-            def cir(x: float):
-                return grad(f)(x)
+        @qjit
+        def cir(x: float):
+            return grad(f)(x)
 
         with pytest.raises(CompileError, match="Cannot compile PennyLane control of the hybrid op"):
             cir(1.2)
@@ -397,11 +383,9 @@ class TestHybridOpVerification:
         with pytest.raises(CompileError, match="Cannot compile PennyLane inverse of the hybrid op"):
             qjit(f)(1.2)
 
-        with pytest.warns(UserWarning, match="AOT.*failed"):
-
-            @qjit
-            def cir(x: float):
-                return grad(f)(x)
+        @qjit
+        def cir(x: float):
+            return grad(f)(x)
 
         with pytest.raises(CompileError, match="Cannot compile PennyLane inverse of the hybrid op"):
             cir(1.2)
@@ -443,11 +427,9 @@ class TestHybridOpVerification:
             with pytest.raises(CompileError, match=f"PauliZ is not {unsupported_gate_attribute}"):
                 qjit(f)(1.2)
 
-            with pytest.warns(UserWarning, match="AOT.*failed"):
-
-                @qjit
-                def cir(x: float):
-                    return grad(f)(x)
+            @qjit
+            def cir(x: float):
+                return grad(f)(x)
 
             with pytest.raises(CompileError, match=f"PauliZ is not {unsupported_gate_attribute}"):
                 cir(1.2)
@@ -489,11 +471,9 @@ class TestHybridOpVerification:
             with pytest.raises(CompileError, match=f"PauliZ is not {unsupported_gate_attribute}"):
                 qjit(f)(1.2)
 
-            with pytest.warns(UserWarning, match="AOT.*failed"):
-
-                @qjit
-                def cir(x: float):
-                    return grad(f)(x)
+            @qjit
+            def cir(x: float):
+                return grad(f)(x)
 
             with pytest.raises(CompileError, match=f"PauliZ is not {unsupported_gate_attribute}"):
                 cir(1.2)
@@ -512,11 +492,9 @@ class TestHybridOpVerification:
         with pytest.raises(CompileError, match=f"PauliZ is not {unsupported_gate_attribute}"):
             qjit(f)(1.2)
 
-        with pytest.warns(UserWarning, match="AOT.*failed"):
-
-            @qjit
-            def cir(x: float):
-                return grad(f)(x)
+        @qjit
+        def cir(x: float):
+            return grad(f)(x)
 
         with pytest.raises(CompileError, match=f"PauliZ is not {unsupported_gate_attribute}"):
             cir(1.2)
@@ -535,11 +513,9 @@ class TestHybridOpVerification:
         with pytest.raises(CompileError, match=f"PauliZ is not {unsupported_gate_attribute}"):
             qjit(f)(1.2)
 
-        with pytest.warns(UserWarning, match="AOT.*failed"):
-
-            @qjit
-            def cir(x: float):
-                return grad(f)(x)
+        @qjit
+        def cir(x: float):
+            return grad(f)(x)
 
         with pytest.raises(CompileError, match=f"PauliZ is not {unsupported_gate_attribute}"):
             cir(1.2)
@@ -783,11 +759,9 @@ class TestAdjointMethodVerification:
             qp.RX(x, wires=0)
             return qp.expval(qp.PauliX(0))
 
-        with pytest.warns(UserWarning, match="AOT.*failed"):
-
-            @qjit
-            def cir(x: float):
-                return grad(f)(x)
+        @qjit
+        def cir(x: float):
+            return grad(f)(x)
 
         with pytest.raises(DifferentiableCompileError, match="RX.*non-differentiable"):
             cir(1.2)
@@ -815,11 +789,9 @@ class TestAdjointMethodVerification:
             qp.RX(x, wires=0)
             return qp.expval(observable)
 
-        with pytest.warns(UserWarning, match="AOT.*failed"):
-
-            @qjit
-            def cir(x: float):
-                return grad(f)(x)
+        @qjit
+        def cir(x: float):
+            return grad(f)(x)
 
         with pytest.raises(DifferentiableCompileError, match="PauliX.*non-differentiable"):
             cir(1.2)
@@ -857,11 +829,9 @@ class TestAdjointMethodVerification:
 
             return qp.expval(qp.PauliX(0))
 
-        with pytest.warns(UserWarning, match="AOT.*failed"):
-
-            @qjit
-            def cir(x: float):
-                return grad(f)(x)
+        @qjit
+        def cir(x: float):
+            return grad(f)(x)
 
         with pytest.raises(DifferentiableCompileError, match="RX.*non-differentiable"):
             cir(1.2)
@@ -878,11 +848,9 @@ class TestAdjointMethodVerification:
             adjoint(qp.RX(x, wires=[0]))
             return qp.expval(qp.PauliX(0))
 
-        with pytest.warns(UserWarning, match="AOT.*failed"):
-
-            @qjit
-            def cir(x: float):
-                return grad(f)(x)
+        @qjit
+        def cir(x: float):
+            return grad(f)(x)
 
         with pytest.raises(DifferentiableCompileError, match="RX.*non-differentiable"):
             cir(1.2)
@@ -914,11 +882,9 @@ class TestParameterShiftMethodVerification:
             qp.RX(x, wires=0)
             return qp.expval(observable)
 
-        with pytest.warns(UserWarning, match="AOT.*failed"):
-
-            @qjit
-            def cir(x: float):
-                return grad(f)(x)
+        @qjit
+        def cir(x: float):
+            return grad(f)(x)
 
         with pytest.raises(
             DifferentiableCompileError, match="PauliX does not support analytic differentiation"
@@ -934,11 +900,9 @@ def test_no_state_returns():
         qp.PauliX(wires=0)
         return qp.state()
 
-    with pytest.warns(UserWarning, match="AOT.*failed"):
-
-        @qjit
-        def cir(x: float):
-            return grad(f)(x)
+    @qjit
+    def cir(x: float):
+        return grad(f)(x)
 
     with pytest.raises(DifferentiableCompileError, match="State returns.*forbidden"):
         cir(1.2)
@@ -952,11 +916,9 @@ def test_no_variance_returns():
         qp.PauliX(wires=0)
         return qp.var(qp.PauliX(0))
 
-    with pytest.warns(UserWarning, match="AOT.*failed"):
-
-        @qjit
-        def cir(x: float):
-            return grad(f)(x)
+    @qjit
+    def cir(x: float):
+        return grad(f)(x)
 
     with pytest.raises(DifferentiableCompileError, match="Variance returns.*forbidden"):
         cir(1.2)
