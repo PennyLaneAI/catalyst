@@ -2309,11 +2309,9 @@ func.func public @test_ops_with_ctrl_ref() {
 // CHECK:   "pbc.fabricate": 1
 // CHECK:   "pbc.prepare": 2
 // CHECK: "1"
-// CHECK:   "Adjoint(PPR-identity)": 1
-// CHECK:   "PPR-identity": 1
+// CHECK:   "PPR-identity": 2
 // CHECK: "2"
-// CHECK:   "Adjoint(PPM)": 1
-// CHECK:   "PPM": 1
+// CHECK:   "PPM": 2
 // CHECK:   "PPR-pi/4": 1
 // CHECK: "3"
 // CHECK:   "PPR-pi/8": 1
