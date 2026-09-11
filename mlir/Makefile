@@ -116,8 +116,13 @@ llvm:
 stablehlo:
 	@echo "build stablehlo"
 
-# Explicit LLVM_DIR: MLIRConfig's baked HINTS path is stale when llvm-build/ is restored
-# from a cache saved on another host (the key has no runner.name).
+# Explicit LLVM_DIR, following #3152: `<Package>_DIR` names the directory holding
+# <Package>Config.cmake, so LLVM_DIR is llvm-build/lib/cmake/llvm and never a source path.
+# Pinning it also keeps an LLVM_DIR already in the environment from selecting a different
+# LLVM, the failure #3152 set out to fix. MLIR_DIR alone is not enough: MLIRConfig then
+# resolves LLVM through its own baked HINTS. Dropping these turned check-catalyst red --
+# frontend lit test_function_attributes.py, 'qref.ctrl' op quantum measurements are not
+# allowed in the ctrl regions -- and restoring them turned it green.
 	cmake -G Ninja -S stablehlo -B $(STABLEHLO_BUILD_DIR) \
 		-DLLVM_DIR=$(LLVM_BUILD_DIR)/lib/cmake/llvm \
 		-DSTABLEHLO_ENABLE_LLD=$(ENABLE_LLD) \
