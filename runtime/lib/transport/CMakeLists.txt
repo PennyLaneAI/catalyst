@@ -34,6 +34,9 @@ set_property(TARGET rt_transport PROPERTY POSITION_INDEPENDENT_CODE ON)
 #   common/interface   headers (WireProtocol, ConfigParser)         ::common
 #   common/coproc/cpu  CoprocessorFn plugins (steane, echo)         ::coproc
 #   common/coproc/gpu  HIP plumbing + device decoders               ::coproc
+#
+# "HIP" above is the HIP language: headers plus a compiler. On AMD both come from an installed
+# ROCm; on NVIDIA the compiler is nvcc and the headers are fetched below.
 
 find_package(Threads REQUIRED)
 find_library(IBVERBS_LIB ibverbs)
@@ -47,6 +50,29 @@ if(DEFINED ENV{ROCM_PATH})
     list(APPEND CMAKE_PREFIX_PATH "$ENV{ROCM_PATH}")
 elseif(EXISTS "/opt/rocm")
     list(APPEND CMAKE_PREFIX_PATH "/opt/rocm")
+endif()
+
+# HIP is an installed dependency, not fetched. AMD: ROCm supplies headers and compiler. NVIDIA:
+# nvcc compiles, ROCm supplies headers -- install hip-dev and hipcc-nvidia.
+find_path(_hip_include_dir hip/hip_runtime.h PATH_SUFFIXES include)
+find_program(_nvcc nvcc HINTS ENV CUDA_PATH ENV CUDA_HOME /usr/local/cuda PATH_SUFFIXES bin)
+if(_hip_include_dir AND _nvcc)
+    # The dma-buf export needs hipMemRangeHandleTypeDmaBufFd, added in 7.1 and shipped in
+    # hip-dev's NVIDIA platform header.
+    set(_hip_nv_api "${_hip_include_dir}/hip/nvidia_detail/nvidia_hip_runtime_api.h")
+    if(EXISTS "${_hip_nv_api}")
+        file(STRINGS "${_hip_nv_api}" _hip_dmabuf
+             REGEX "hipMemRangeHandleTypeDmaBufFd" LIMIT_COUNT 1)
+    endif()
+    if(_hip_dmabuf)
+        # Set both: unset, CMakeDetermineHIPCompiler asks hipconfig, and check_language(HIP)
+        # probes in a nested project that would not inherit this scope.
+        set(CMAKE_HIP_PLATFORM "nvidia" CACHE STRING "HIP platform" FORCE)
+        set(CMAKE_HIP_COMPILER "${_nvcc}" CACHE FILEPATH "HIP compiler")
+    else()
+        message(STATUS "transport: HIP at ${_hip_include_dir} has no NVIDIA dma-buf API "
+                       "(hipMemRangeHandleTypeDmaBufFd; needs hip-dev 7.1 or newer)")
+    endif()
 endif()
 
 include(CheckLanguage)
@@ -63,7 +89,9 @@ if(CMAKE_HIP_COMPILER)
     endif()
     set(TRANSPORT_HAS_HIP TRUE CACHE INTERNAL "transport: HIP toolchain available")
 else()
-    message(STATUS "transport: no HIP compiler -> GPU backends skipped")
+    message(STATUS "transport: no HIP compiler -> GPU backends skipped. Install ROCm 7.1 or "
+                   "newer; on an NVIDIA host that is hip-dev and hipcc-nvidia from AMD's "
+                   "repo, alongside CUDA for nvcc.")
 endif()
 
 add_subdirectory(common)

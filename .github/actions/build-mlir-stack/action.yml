@@ -1,0 +1,116 @@
+name: Build the MLIR stack on this runner
+description: >
+  Build LLVM, StableHLO and Enzyme into llvm-build/, stablehlo-build/ and enzyme-build/, caching
+  each. For self-hosted runners, which cannot reuse check-catalyst.yaml's caches: those come from
+  GH-hosted images and the cached mlir-tblgen hits a GLIBC mismatch here. Expects the LLVM source
+  at mlir/llvm-project already.
+
+inputs:
+  llvm-version:
+    description: LLVM ref, used in the build cache key
+    required: true
+  stablehlo-version:
+    description: StableHLO ref, cloned and keyed on
+    required: true
+  enzyme-version:
+    description: Enzyme ref, cloned and keyed on
+    required: true
+  cache-prefix:
+    description: Cache key prefix; keep distinct from the GH-hosted keys so the two never collide
+    required: false
+    default: selfhosted-gpu
+
+runs:
+  using: composite
+  steps:
+    - name: Install build dependencies
+      shell: bash
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y cmake ninja-build clang lld
+        python3 -m pip install numpy "nanobind<2.13" pybind11 PyYAML
+
+    - name: Cache LLVM build
+      id: cache-llvm-build
+      uses: actions/cache@v4
+      with:
+        path: llvm-build
+        key: ${{ inputs.cache-prefix }}-${{ runner.os }}-llvm-${{ inputs.llvm-version }}-ci-build-gcc
+
+    - name: Build LLVM
+      if: steps.cache-llvm-build.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        C_COMPILER=$(which gcc) \
+        CXX_COMPILER=$(which g++) \
+        LLVM_BUILD_DIR="$(pwd)/llvm-build" \
+        COMPILER_LAUNCHER="" \
+        make llvm
+
+    - name: Cache StableHLO source
+      id: cache-stablehlo-source
+      uses: actions/cache@v4
+      with:
+        path: mlir/stablehlo
+        key: stablehlo-${{ inputs.stablehlo-version }}-default-source
+        enableCrossOsArchive: true
+
+    - name: Clone StableHLO
+      if: steps.cache-stablehlo-source.outputs.cache-hit != 'true'
+      uses: actions/checkout@v4
+      with:
+        repository: openxla/stablehlo
+        ref: ${{ inputs.stablehlo-version }}
+        path: mlir/stablehlo
+
+    - name: Cache StableHLO build
+      id: cache-stablehlo-build
+      uses: actions/cache@v4
+      with:
+        path: stablehlo-build
+        key: ${{ inputs.cache-prefix }}-${{ runner.os }}-stablehlo-${{ inputs.stablehlo-version }}-ci-build-gcc
+
+    - name: Build StableHLO
+      if: steps.cache-stablehlo-build.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        C_COMPILER=$(which gcc) \
+        CXX_COMPILER=$(which g++) \
+        LLVM_BUILD_DIR="$(pwd)/llvm-build" \
+        STABLEHLO_BUILD_DIR="$(pwd)/stablehlo-build" \
+        COMPILER_LAUNCHER="" \
+        make stablehlo
+
+    - name: Cache Enzyme source
+      id: cache-enzyme-source
+      uses: actions/cache@v4
+      with:
+        path: mlir/Enzyme
+        key: enzyme-${{ inputs.enzyme-version }}-default-source
+        enableCrossOsArchive: true
+
+    - name: Clone Enzyme
+      if: steps.cache-enzyme-source.outputs.cache-hit != 'true'
+      uses: actions/checkout@v4
+      with:
+        repository: EnzymeAD/Enzyme
+        ref: ${{ inputs.enzyme-version }}
+        path: mlir/Enzyme
+
+    - name: Cache Enzyme build
+      id: cache-enzyme-build
+      uses: actions/cache@v4
+      with:
+        path: enzyme-build
+        key: ${{ inputs.cache-prefix }}-${{ runner.os }}-enzyme-${{ inputs.llvm-version }}-${{ inputs.enzyme-version }}-ci-build-gcc
+
+    - name: Build Enzyme
+      if: steps.cache-enzyme-build.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        C_COMPILER=$(which gcc) \
+        CXX_COMPILER=$(which g++) \
+        LLVM_BUILD_DIR="$(pwd)/llvm-build" \
+        ENZYME_BUILD_DIR="$(pwd)/enzyme-build" \
+        COMPILER_LAUNCHER="" \
+        make enzyme

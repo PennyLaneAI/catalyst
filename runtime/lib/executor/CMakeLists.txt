@@ -12,6 +12,13 @@ llvm_map_components_to_libnames(_executor_llvm_libs
     AllTargetsCodeGens AllTargetsDescs AllTargetsInfos
 )
 
+# GCC false-positives -Wmaybe-uninitialized in LLVM's unique_function (ADT/FunctionExtras.h),
+# reached via ORC headers; -Werror makes it fatal. GCC-only: the executor is built and tested
+# against clang in the backline project, which has no such warning and rejects the flag as unknown.
+if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    add_compile_options(-Wno-error=maybe-uninitialized)
+endif()
+
 #  catalyst_executor_session
 add_library(catalyst_executor_session SHARED ExecutorSession.cpp)
 
