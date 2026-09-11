@@ -125,10 +125,14 @@ jobs:
 
   transport:
     name: Transport Build and Tests
-    needs: [constants, transport_changes, determine_runner, llvm, quantum]
+    needs: [constants, transport_changes, llvm, quantum]
     # Everything below is dead weight on a PR that does not touch transport.
     if: needs.transport_changes.outputs.transport == 'true'
-    runs-on: ${{ needs.determine_runner.outputs.runner_group }}
+    # Pinned rather than following determine_runner. setup-soft-roce loads a kernel module,
+    # building rdma_rxe out-of-tree against linux-headers-$(uname -r) when the running kernel
+    # lacks it -- that is only known to work on the GitHub-hosted Azure image. Revisit once
+    # soft-RoCE has actually been shown to come up on blacksmith-32vcpu-ubuntu-2404.
+    runs-on: ubuntu-24.04
 
     # Deliberately no compiler matrix. The transport sources are not compiler-sensitive, and the
     # executor links LLVM -- a clang leg would pay for that again to produce a binary nothing
