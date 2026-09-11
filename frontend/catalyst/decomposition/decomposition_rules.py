@@ -277,7 +277,10 @@ def split_call_args(kwargs, is_custom_op):
 def collect_resources_for_op(
     op_name, kwargs, is_custom_op=False, adjoint_resources=False, skip_rule=None
 ):
-    """Return resource data for all decomposition rules associated to op_name."""
+    """Return resource data for all decomposition rules associated to op_name.
+
+    ``skip_rule`` is a predicate that leaves a rule out, for the rules another pathway lowers.
+    """
     decomp_rules = list(qp.decomposition.list_decomps(op_name))
     if skip_rule is not None:
         decomp_rules = [rule for rule in decomp_rules if not skip_rule(rule)]
@@ -351,8 +354,9 @@ def compile_decomposition_rules(
     ``<n>C(Adjoint(op_name))``: adjoint is applied innermost and control outermost (the canonical
     order matching the compiler's ``wrapModifiers``).
 
-    ``skip_rule`` leaves out the rules that another pathway is responsible for; see
-    :func:`collect_resources_for_op`.
+    ``skip_rule`` is a predicate that leaves a rule out. It is how the rules written against the
+    symbolic operator's arguments are handed over to :func:`compile_registered_adjoint_rules`,
+    which is the one that knows how to call them.
     """
     kwargs = prepare_dynamic_op_kwargs(dynamic_shape, wire_lens)
     extra_data = extra_data or {}
