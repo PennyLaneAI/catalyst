@@ -71,7 +71,7 @@ if(_hip_include_dir AND _nvcc)
         set(CMAKE_HIP_COMPILER "${_nvcc}" CACHE FILEPATH "HIP compiler")
     else()
         message(STATUS "transport: HIP at ${_hip_include_dir} has no NVIDIA dma-buf API "
-                       "(hipMemRangeHandleTypeDmaBufFd; needs hipcc-nvidia)")
+                       "(hipMemRangeHandleTypeDmaBufFd; needs hip-dev 7.1 or newer)")
     endif()
 endif()
 
