@@ -766,7 +766,8 @@
   [#3155](https://github.com/PennyLaneAI/catalyst/pull/3155)
 
 * Pull requests touching transport now build the runtime with `ENABLE_TRANSPORT=ON` and run its
-  Catch2 suites and the backline CPU tests over a soft-RoCE loopback link.
+  Catch2 suites and the backline CPU tests over a soft-RoCE loopback link. On the GPU runner they
+  also cover the CPU-to-GPU coprocessor path over memcpy transport.
   [(#3074)](https://github.com/PennyLaneAI/catalyst/pull/3074)
 
 <h3>Documentation 📝</h3>
