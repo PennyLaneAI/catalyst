@@ -52,20 +52,27 @@ elseif(EXISTS "/opt/rocm")
     list(APPEND CMAKE_PREFIX_PATH "/opt/rocm")
 endif()
 
-# HIP is an external dependency, not something this build fetches. On AMD an installed ROCm
-# supplies both headers and compiler; on NVIDIA nvcc compiles and ROCm supplies only the headers,
-# so install hip-dev and hipcc-nvidia from AMD's repo. ROCm 7.1 or newer:
-# hipMemGetHandleForAddressRange and hipMemRangeHandleTypeDmaBufFd are absent from 6.4.4, and
-# 7.1.1 maps them onto cuMemGetHandleForAddressRange.
+# HIP is an installed dependency, not fetched. AMD: ROCm supplies headers and compiler. NVIDIA:
+# nvcc compiles, ROCm supplies headers -- install hip-dev and hipcc-nvidia.
 find_path(_hip_include_dir hip/hip_runtime.h PATH_SUFFIXES include)
 find_program(_nvcc nvcc HINTS ENV CUDA_PATH ENV CUDA_HOME /usr/local/cuda PATH_SUFFIXES bin)
 if(_hip_include_dir AND _nvcc)
-    # CMakeDetermineHIPCompiler asks hipconfig when these are unset. Naming the compiler also
-    # makes check_language(HIP) a no-op: it otherwise probes in a nested project that does not
-    # inherit this scope and aborts with "Failed to find HIP root directory". No architecture
-    # flag -- CMake takes nvcc's default, and CUDAARCHS overrides it.
-    set(CMAKE_HIP_PLATFORM "nvidia" CACHE STRING "HIP platform" FORCE)
-    set(CMAKE_HIP_COMPILER "${_nvcc}" CACHE FILEPATH "HIP compiler")
+    # The dma-buf export needs hipMemRangeHandleTypeDmaBufFd, added in 7.1 and shipped in
+    # hip-dev's NVIDIA platform header.
+    set(_hip_nv_api "${_hip_include_dir}/hip/nvidia_detail/nvidia_hip_runtime_api.h")
+    if(EXISTS "${_hip_nv_api}")
+        file(STRINGS "${_hip_nv_api}" _hip_dmabuf
+             REGEX "hipMemRangeHandleTypeDmaBufFd" LIMIT_COUNT 1)
+    endif()
+    if(_hip_dmabuf)
+        # Set both: unset, CMakeDetermineHIPCompiler asks hipconfig, and check_language(HIP)
+        # probes in a nested project that would not inherit this scope.
+        set(CMAKE_HIP_PLATFORM "nvidia" CACHE STRING "HIP platform" FORCE)
+        set(CMAKE_HIP_COMPILER "${_nvcc}" CACHE FILEPATH "HIP compiler")
+    else()
+        message(STATUS "transport: HIP at ${_hip_include_dir} has no NVIDIA dma-buf API "
+                       "(hipMemRangeHandleTypeDmaBufFd; needs hipcc-nvidia)")
+    endif()
 endif()
 
 include(CheckLanguage)
