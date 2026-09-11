@@ -1083,24 +1083,11 @@ def fetch_all_reachable_decomposition_rules_from_op(
                 )[2]
             resources |= {(explore_name, name): res for name, res in found.items()}
 
-        # And through the rules registered against its controlled form, one entry per control
-        # count since the products of a controlled rule depend on how many controls it has.
-        if (this_op_cls := op_classes.get(this_name)) is not None:
-            n_base_wires = sum(this_wire_lens.values())
-            for n in ctrl_counts:
-                found = collect_symbolic_resources(
-                    this_op_cls,
-                    this_name,
-                    all_kwargs,
-                    this_is_custom_op,
-                    kind="control",
-                    ctrl_wires=range(n_base_wires, n_base_wires + n),
-                )[2]
-                resources |= {
-                    (f"{_control_modifier(n)}({this_name})", name): res
-                    for name, res in found.items()
-                }
-
+        # TODO: the rules registered against the *controlled* form are not explored here. Doing so
+        # discovers ops (e.g. `ControlledQubitUnitary`) whose own rules call out to a jitted
+        # classical helper, and such a rule cannot be lifted out of its module: the call is left
+        # dangling and the injected IR fails to verify. So the products of a registered `C(...)`
+        # rule currently have to be in the target gate set.
         for (_, _rule_name), resource in resources.items():
             try:
                 for op, _ in resource.items():

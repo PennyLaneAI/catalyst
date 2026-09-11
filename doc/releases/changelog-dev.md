@@ -54,6 +54,28 @@
   `(decompose-lowering -> ctrl-lowering -> adjoint-lowering)` to a fixpoint.
   Controlled basis gates are only free when their own `<n>C(...)` id is in the target gate set.
 
+  Pathway 1 now also covers the rules PennyLane registers against the *symbolic* operator, i.e.
+  `rule(base, control_wires, control_values, work_wires, work_wire_type)` rather than the base op's
+  `(*params, wires)` — the `flip_zero_ctrl_values(...)` family. These are the rules that terminate a
+  controlled chain in plain gates (`C(Hadamard) -> CH`, `2C(Hadamard) -> H, RY, Toffoli`), so
+  `<n>C(Op)` can now reach a target gate set at all. A resource that is itself a generic symbolic
+  operator is spelled the way the compiler spells a modified operator: the modifier is folded into
+  the base op's id (`2C(S){}{wires:1}{}`), not the wrapper's own arguments. The number of controls
+  an operator instance carries now reaches the rule closure from lowering, so `<n>C(...)` rules are
+  synthesized at trace time rather than only on demand.
+
+  Two defects in applying a register-mode controlled rule are fixed along with it:
+
+  - The rule's operands are now emitted as `func(qreg, param*, inWires*, inCtrlWires*)`, matching
+    what `DecomposeLoweringPass` reads back. They were previously emitted control-wires-first
+    (`qp.capture.subroutine` traces through `jax.jit`, which flattens keyword arguments in sorted
+    order, and `_ctrl_wires` sorts ahead of `wires`), which silently swapped a rule's control and
+    target for a single control and mismatched the tensor shapes for more than one.
+
+  - `DecomposeLoweringPass` now inserts the *control* qubits into the register it hands to a
+    register-mode rule, not just the base qubits. A control qubit left out was read back at its
+    pre-decomposition state, dropping whatever had been applied to it earlier in the circuit.
+
 * The `local-random` unitary folding option for :func:`~.mitigate_with_zne` is now implemented,
   reproducing Mitiq's ``fold_gates_at_random``: every gate is folded ``floor((scale_factor-1)/2)``
   times, then a random subset is folded once more (without replacement) to reach ``scale_factor * n``
