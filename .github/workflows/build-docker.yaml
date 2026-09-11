@@ -1,0 +1,46 @@
+name: Build Pennylane Lightning Catalyst Docker Image
+
+permissions:
+  contents: read
+  
+on:
+    pull_request:
+        
+jobs:
+  check_if_wheel_build_required:
+    if: github.event.pull_request.draft == false
+    uses: ./.github/workflows/check-for-wheel-build.yml
+
+  constants:
+    needs: [check_if_wheel_build_required]
+    name: "Set build matrix"
+    uses: ./.github/workflows/constants.yaml
+    with:
+      runs_on: ubuntu-24.04
+    
+  build:
+    name: Build Docker Image
+    runs-on: blacksmith-8vcpu-ubuntu-2404-arm
+    needs: [check_if_wheel_build_required, constants]    
+    strategy:
+      fail-fast: false
+      matrix:
+        python_version: ${{ fromJson(format('["{0}"]', needs.constants.outputs.primary_python_version)) }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile
+          platforms: linux/arm64
+          push: false
+          build-args: |
+            PENNYLANE_VERSION=main
+            CATALYST_VERSION=main
+            LIGHTNING_VERSION=main
