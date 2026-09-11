@@ -258,8 +258,8 @@ def test_to_compilable_data():
 
 # CHECK: func.func private @"rule_NoParams{}{reg:2}{}"
 # CHECK-SAME:   resources = {operations = {
-# CHECK-SAME:     "CompilableData{}{wires:1}{a:a,b:b,thing:thing}" = 1 : i64,
-# CHECK-SAME:     "CompilableData{}{wires:1}{a:aa,b:bb,thing:stuff}" = 2 : i64
+# CHECK-SAME:     "CompilableData{}{wires:1}{a = \22a\22, b = \22b\22, thing = \22thing\22}" = 1 : i64,
+# CHECK-SAME:     "CompilableData{}{wires:1}{a = \22aa\22, b = \22bb\22, thing = \22stuff\22}" = 2 : i64
 # CHECK-SAME:   target_gate = "NoParams{}{reg:2}{}"
 test_to_compilable_data()
 
@@ -283,7 +283,7 @@ def test_from_compilable_data():
         qp.add_decomps(CompilableData, rule)
         result_a1 = compile_decomposition_rules_wrapper(
             "CompilableData",
-            "CompilableData{}{wires:1}{a:1,b:2,thing:3}",
+            "CompilableData{}{wires:1}{a = 1 : i64, b = 2 : i64, thing = 3 : i64}",
             {},
             {"wires": 1},
             {"a": 1, "b": 2, "thing": 3},
@@ -292,7 +292,7 @@ def test_from_compilable_data():
 
         result_a10 = compile_decomposition_rules_wrapper(
             "CompilableData",
-            "CompilableData{}{wires:1}{a:10,b:2,thing:3}",
+            "CompilableData{}{wires:1}{a = 10 : i64, b = 2 : i64, thing = 3 : i64}",
             {},
             {"wires": 1},
             {"a": 10, "b": 2, "thing": 3},
@@ -300,15 +300,15 @@ def test_from_compilable_data():
         print(result_a10)
 
 
-# CHECK: func.func private @"rule_CompilableData{}{wires:1}{a:1,b:2,thing:3}"
+# CHECK: func.func private @"rule_CompilableData{}{wires:1}{a = 1 : i64, b = 2 : i64, thing = 3 : i64}"
 # CHECK-SAME:   resources = {operations = {"SingleParam{x:[tensor<f64>]}{reg:1}{}" = 1 : i64}
-# CHECK-SAME:   target_gate = "CompilableData{}{wires:1}{a:1,b:2,thing:3}"
+# CHECK-SAME:   target_gate = "CompilableData{}{wires:1}{a = 1 : i64, b = 2 : i64, thing = 3 : i64}"
 # CHECK: stablehlo.constant dense<1.000000e-01> : tensor<f64>
 # CHECK-NOT: stablehlo.constant dense<1.100000e+00> : tensor<f64>
 #
-# CHECK: func.func private @"rule_CompilableData{}{wires:1}{a:10,b:2,thing:3}"
+# CHECK: func.func private @"rule_CompilableData{}{wires:1}{a = 10 : i64, b = 2 : i64, thing = 3 : i64}"
 # CHECK-SAME:   resources = {operations = {"SingleParam{x:[tensor<f64>]}{reg:1}{}" = 1 : i64}
-# CHECK-SAME:   target_gate = "CompilableData{}{wires:1}{a:10,b:2,thing:3}"
+# CHECK-SAME:   target_gate = "CompilableData{}{wires:1}{a = 10 : i64, b = 2 : i64, thing = 3 : i64}"
 # CHECK: stablehlo.constant dense<1.100000e+00> : tensor<f64>
 # CHECK-NOT: stablehlo.constant dense<1.000000e-01> : tensor<f64>
 test_from_compilable_data()
@@ -826,7 +826,7 @@ def test_multiple_rules():
 # CHECK-SAME:   resources = {operations = {"SingleParam{x:[tensor<f64>]}{reg:1}{}" = 1 : i64}}
 # CHECK-SAME:   target_gate = "NoParams{}{reg:1}{}"
 # CHECK: func.func private @"rule2_NoParams{}{reg:1}{}"
-# CHECK-SAME:   resources = {operations = {"CompilableData{}{wires:3}{a:a,b:b,thing:thing}" = 1 : i64}}
+# CHECK-SAME:   resources = {operations = {"CompilableData{}{wires:3}{a = \22a\22, b = \22b\22, thing = \22thing\22}" = 1 : i64}}
 # CHECK-SAME:   target_gate = "NoParams{}{reg:1}{}"
 test_multiple_rules()
 
