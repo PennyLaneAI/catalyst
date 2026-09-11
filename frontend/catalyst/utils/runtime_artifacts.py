@@ -42,22 +42,22 @@ def record_runtime_artifact(module_op, artifact_path):
 def collect_runtime_artifacts(mlir_module, compile_options):
     """Aggregate every ``catalyst.runtime_artifacts`` path into ``compile_options``.
 
-    Walks the module and all nested modules, collecting the artifact paths recorded on each, so the
-    linker receives the full set. The result is stored on ``compile_options.runtime_artifacts``.
+    Collects the paths recorded on ``mlir_module`` and on every module nested within it, in the
+    order first seen, so the linker receives the full set. The result is stored on
+    ``compile_options.runtime_artifacts``.
     """
-    seen = []
+    seen = {}
 
-    def _walk(op):
-        attrs = op.attributes
+    def _walk(module_op):
+        attrs = module_op.attributes
         if RUNTIME_ARTIFACTS_ATTR in attrs:
             for string_attr in attrs[RUNTIME_ARTIFACTS_ATTR]:
-                path = ir.StringAttr(string_attr).value
-                if path not in seen:
-                    seen.append(path)
-        for region in op.regions:
+                seen[ir.StringAttr(string_attr).value] = None
+        for region in module_op.regions:
             for block in region:
                 for child_op in block:
-                    _walk(child_op)
+                    if child_op.operation.name == "builtin.module":
+                        _walk(child_op.operation)
 
     _walk(mlir_module.operation)
     compile_options.runtime_artifacts = tuple(seen)
