@@ -12,14 +12,9 @@ llvm_map_components_to_libnames(_executor_llvm_libs
     AllTargetsCodeGens AllTargetsDescs AllTargetsInfos
 )
 
-# GCC 13.3 (Ubuntu 24.04's default) reports -Wmaybe-uninitialized inside LLVM's unique_function
-# (ADT/FunctionExtras.h), reached via ORC headers and only after inlining at -O2. It is a false
-# positive, but -Werror is on, so it fails the build rather than just being noise.
-#
-# Only GCC needs this. The executor is built and tested against clang/clang++ -- backline's
-# INSTALL.md sets no compiler, so runtime/Makefile's clang default builds it there, and g++ is
-# only for Catalyst's frontend. clang has no such warning; it rejects the flag as an unknown
-# warning option, which is why the guard is needed rather than passing it unconditionally.
+# GCC false-positives -Wmaybe-uninitialized in LLVM's unique_function (ADT/FunctionExtras.h),
+# reached via ORC headers; -Werror makes it fatal. GCC-only: the executor is built and tested
+# against clang, which has no such warning and rejects the flag as unknown.
 if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     add_compile_options(-Wno-error=maybe-uninitialized)
 endif()
