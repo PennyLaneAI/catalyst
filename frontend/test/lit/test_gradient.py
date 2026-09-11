@@ -356,96 +356,86 @@ def test_non_diff_ops_in_cost_and_grad(params: jax.core.ShapedArray([2], float))
 
 print(test_non_diff_ops_in_cost_and_grad.mlir)
 
-
-def test_best_diff_method_single_expval():
-    """Test the diff_method for differentiating a single expval."""
-    num_wires = 1
-    dev = qp.device("lightning.qubit", wires=num_wires)
-
-    @qp.qnode(dev, diff_method="best")
-    def circuit(phi, psi):
-        qp.RY(phi, wires=0)
-        qp.RX(psi, wires=0)
-        return qp.expval(qp.PauliZ(0))
-
-    qjit_grad = qjit(grad(circuit, argnums=[0, 1]), capture=True, collect_decomp_rules=False)
-    _ = qjit_grad(0.1, 0.2)
-
-    # CHECK-NOT: parameter-shift
-    # CHECK: adjoint
-    return qjit_grad.mlir
+# ---
 
 
-test_best_diff_method_single_expval()
+# CHECK-LABEL: public @jit_best_diff_method_single_probs
+@qjit(target="mlir")
+def best_diff_method_single_probs(phi: float, psi: float):
+    """Test that differentiating a single probs selects parameter-shift."""
 
-
-def test_best_diff_method_single_probs():
-    """Test the diff_method for differentiating a single probs."""
-    num_wires = 1
-    dev = qp.device("lightning.qubit", wires=num_wires)
-
-    @qp.qnode(dev, diff_method="best")
+    @qp.qnode(qp.device("lightning.qubit", wires=1), diff_method="best")
     def circuit(phi, psi):
         qp.RY(phi, wires=0)
         qp.RX(psi, wires=0)
         return qp.probs(0)
 
-    qjit_jacobian = qjit(
-        jacobian(circuit, argnums=[0, 1]), capture=True, collect_decomp_rules=False
-    )
-    _ = qjit_jacobian(0.1, 0.2)
-
-    # CHECK-NOT: adjoint
-    # CHECK: parameter-shift
-    print(qjit_jacobian.mlir)
+    # CHECK: diff_method = "parameter-shift"
+    # CHECK-NOT: diff_method = "adjoint"
+    return jacobian(circuit, argnums=[0, 1])(phi, psi)
 
 
-test_best_diff_method_single_probs()
+print(best_diff_method_single_probs.mlir)
+
+# ---
 
 
-def test_best_diff_method_multi_expval():
-    """Test the diff_method for differentiating multiple expval."""
-    num_wires = 1
-    dev = qp.device("lightning.qubit", wires=num_wires)
+# CHECK-LABEL: public @jit_best_diff_method_mixed_return
+@qjit(target="mlir")
+def best_diff_method_mixed_return(phi: float, psi: float):
+    """Test that differentiating a mixed return selects parameter-shift."""
 
-    @qp.qnode(dev, diff_method="best")
-    def circuit(phi, psi):
-        qp.RY(phi, wires=0)
-        qp.RX(psi, wires=0)
-        return [qp.expval(qp.PauliZ(0)), qp.expval(qp.PauliY(0))]
-
-    qjit_jacobian = qjit(
-        jacobian(circuit, argnums=[0, 1]), capture=True, collect_decomp_rules=False
-    )
-    _ = qjit_jacobian(0.1, 0.2)
-
-    # CHECK-NOT: parameter-shift
-    # CHECK: adjoint
-    print(qjit_jacobian.mlir)
-
-
-test_best_diff_method_multi_expval()
-
-
-def test_best_diff_method_mixed_return():
-    """Test the diff_method for differentiating mixed return."""
-    num_wires = 1
-    dev = qp.device("lightning.qubit", wires=num_wires)
-
-    @qp.qnode(dev, diff_method="best")
+    @qp.qnode(qp.device("lightning.qubit", wires=1), diff_method="best")
     def circuit(phi, psi):
         qp.RY(phi, wires=0)
         qp.RX(psi, wires=0)
         return [qp.expval(qp.PauliZ(0)), qp.probs(0)]
 
-    qjit_jacobian = qjit(
-        jacobian(circuit, argnums=[0, 1]), capture=True, collect_decomp_rules=False
-    )
-    _ = qjit_jacobian(0.1, 0.2)
-
-    # CHECK: parameter-shift
-    # CHECK-NOT: adjoint
-    print(qjit_jacobian.mlir)
+    # CHECK: diff_method = "parameter-shift"
+    # CHECK-NOT: diff_method = "adjoint"
+    return jacobian(circuit, argnums=[0, 1])(phi, psi)
 
 
-test_best_diff_method_mixed_return()
+print(best_diff_method_mixed_return.mlir)
+
+# ---
+
+
+# CHECK-LABEL: public @jit_best_diff_method_single_probs_capture
+@qp.qjit(target="mlir", capture=True, collect_decomp_rules=False)
+def best_diff_method_single_probs_capture(phi: float, psi: float):
+    """Test the diff_method for differentiating a single probs with program capture."""
+
+    @qp.qnode(qp.device("lightning.qubit", wires=1), diff_method="best")
+    def circuit(phi, psi):
+        qp.RY(phi, wires=0)
+        qp.RX(psi, wires=0)
+        return qp.probs(0)
+
+    # CHECK: diff_method = "parameter-shift"
+    # CHECK-NOT: diff_method = "adjoint"
+    return qp.jacobian(circuit, argnums=[0, 1])(phi, psi)
+
+
+print(best_diff_method_single_probs_capture.mlir)
+
+# ---
+
+
+# CHECK-LABEL: public @jit_best_diff_method_mixed_return_capture
+@qp.qjit(target="mlir", capture=True, collect_decomp_rules=False)
+def best_diff_method_mixed_return_capture(phi: float, psi: float):
+    """Test the diff_method for differentiating a mixed return with program capture."""
+
+    @qp.qnode(qp.device("lightning.qubit", wires=1), diff_method="best")
+    def circuit(phi, psi):
+        qp.RY(phi, wires=0)
+        qp.RX(psi, wires=0)
+        return [qp.expval(qp.PauliZ(0)), qp.probs(0)]
+
+    # CHECK: diff_method = "parameter-shift"
+    # CHECK-NOT: diff_method = "adjoint"
+    return qp.jacobian(circuit, argnums=[0, 1])(phi, psi)
+
+
+print(best_diff_method_mixed_return_capture.mlir)

@@ -24,7 +24,7 @@ from functools import partial
 import jax.numpy as jnp
 import pennylane as qp
 from jax._src.lib.mlir import ir
-from jaxlib.mlir.dialects.builtin import ModuleOp
+from pennylane.core.operator import Operator2, abstractify
 from pennylane.pytrees import flatten, unflatten
 
 from catalyst.compiler import _quantum_opt
@@ -47,6 +47,26 @@ _NON_INVERTIBLE_RESOURCE_TYPES = (qp.ops.MidMeasure, qp.ops.PauliMeasure)
 def _resources_have_measurement(gate_counts) -> bool:
     """Return whether a rule's declared resources contain a mid-circuit measurement."""
     return any(isinstance(op, _NON_INVERTIBLE_RESOURCE_TYPES) for op in gate_counts)
+
+
+def build_base_op(op_cls, kwargs, is_custom_op):
+    """Instantiate the base operator of a PennyLane's symbolic rule from prepared rule kwargs.
+
+    Note that we have to pause capture here, because the base operator is only a carrier of
+    the traced parameters and wires, and the rule body is what decides whether (and how) it
+    gets applied.
+
+    Args:
+        op_cls (type): the base operator's class
+        kwargs (dict): the prepared rule kwargs
+        is_custom_op (bool): whether the operator lowers to ``qref.custom``
+
+    Returns:
+        Operator2: the base operator, built without binding its primitive
+    """
+    args, kwargs = split_call_args(kwargs, is_custom_op)
+    with qp.capture.pause():
+        return op_cls(*args, **kwargs)
 
 
 # Canonical nesting order for op-level modifiers, listed OUTERMOST first. The compiler's
@@ -98,6 +118,16 @@ def wrap_modifier_id(op_id: str, modifier: str) -> str:
     optional ``[uid]``) follow it, matching the compiler's ``defaultGetGraphOpId``. This applies to
     any modifier (e.g. ``"Adjoint"``, ``"C"``), so nested ids compose as ``C(Adjoint(RX)){...}``.
     Extend callers here to support future op-level modifiers.
+
+    Args:
+        op_id (str): the graphOpId to wrap
+        modifier (str): the modifier token, e.g. ``"Adjoint"``, ``"C"`` or ``"2C"``
+
+    Returns:
+        str: the modified graphOpId
+
+    Raises:
+        ValueError: if the modifier would nest inside one that is canonically outer
     """
     new_kind = _modifier_kind(modifier)
     inner_kind = _leading_modifier_kind(op_id)
@@ -128,7 +158,18 @@ def name_wrap_adjoint(op_id: str) -> str:
 
 
 def name_unwrap_adjoint(op_name: str, op_id: str) -> str:
-    """Inverse of :func:`name_wrap_adjoint` given the base ``op_name``."""
+    """Inverse of :func:`name_wrap_adjoint` given the base ``op_name``.
+
+    Args:
+        op_name (str): the base operator's name
+        op_id (str): the adjoint graphOpId to unwrap
+
+    Returns:
+        str: the base operator's graphOpId
+
+    Raises:
+        ValueError: if ``op_id`` is not an adjoint id for ``op_name``
+    """
     prefix = f"Adjoint({op_name})"
     if not op_id.startswith(prefix):
         raise ValueError(f"{op_id!r} is not an adjoint id for base op {op_name!r}")
@@ -139,7 +180,17 @@ def name_unwrap_control(op_name: str, op_id: str):
     """Inverse of control name-wrapping given the base ``op_name``.
 
     ``("RX", "2C(RX){...}")`` -> ``("RX{...}", 2)`` and ``("RX", "C(RX){...}")`` -> ``("RX{...}", 1)``.
-    Raises if ``op_id`` is not a control id for ``op_name``.
+
+    Args:
+        op_name (str): the base operator's name
+        op_id (str): the controlled graphOpId to unwrap
+
+    Returns:
+        str: the base operator's graphOpId
+        int: the number of controls
+
+    Raises:
+        ValueError: if ``op_id`` is not a control id for ``op_name``
     """
     i = 0
     while i < len(op_id) and op_id[i].isdigit():
@@ -153,6 +204,16 @@ def name_unwrap_control(op_name: str, op_id: str):
 
 
 def get_rule_strings_from_module(module: ir.Module) -> list[str]:
+    """Extract the decomposition rules held by a module as MLIR strings.
+
+    Every FuncOp carrying a ``target_gate`` attribute is a decomposition rule.
+
+    Args:
+        module (ir.Module): the module a rule-compiling qjit produced
+
+    Returns:
+        list[str]: one string per rule, with the ``__builtin_`` prefix added to its name
+    """
     raw_funcOps = []
 
     def find_condition(op):
@@ -195,8 +256,8 @@ def get_rules_from_module(module: ir.Module) -> str:
     Parse and modify decomposition rules from a ModuleOp.
 
     Args:
-        module: an MLIR module object; every FuncOp carrying a `target_gate` attribute is
-                extracted as a decomposition rule.
+        module (ir.Module): an MLIR module object; every FuncOp carrying a `target_gate`
+            attribute is extracted as a decomposition rule.
 
     Returns:
         str: The string representation of any decomposition rules from `module`, pre-pending the
@@ -207,6 +268,14 @@ def get_rules_from_module(module: ir.Module) -> str:
 
 
 def inject_new_rules_into_module(module: ir.Module, decomp_rules: list[str]):
+    """Add decomposition rules to a module, skipping the ones it already holds.
+
+    A rule counts as already held when both its ``target_gate`` and its ``resources`` match.
+
+    Args:
+        module (ir.Module): the module to add the rules to
+        decomp_rules (list[str]): the rules to add, as MLIR strings
+    """
     with ir.InsertionPoint(module.body):
         for decomp_rule in decomp_rules:
             decomp_rule_op = ir.Operation.parse(decomp_rule)
@@ -242,6 +311,14 @@ def split_call_args(kwargs, is_custom_op):
     them by their real argnames, so they are passed positionally with only "wires" kept as keyword.
     Custom-op params are always scalar f64, so scalar ``0.0`` dummies are used (a shape-(1,) array
     would instead lower the gate through the general ``qref.operator`` path rather than ``qref.custom``).
+
+    Args:
+        kwargs (dict): the prepared rule kwargs
+        is_custom_op (bool): whether the operator lowers to ``qref.custom``
+
+    Returns:
+        tuple: the positional arguments to call the rule with
+        dict: the keyword arguments to call the rule with
     """
     if is_custom_op:
         args = tuple(0.0 for key in kwargs if key != "wires")
@@ -252,7 +329,23 @@ def split_call_args(kwargs, is_custom_op):
 def collect_resources_for_op(
     op_name, kwargs, is_custom_op=False, adjoint_resources=False, decomp_rules=None
 ):
-    """Return resource data for all decomposition rules associated to op_name."""
+    """Return resource data for all decomposition rules associated to op_name.
+
+    Args:
+        op_name (str): the operator's name, as PennyLane registers its rules
+        kwargs (dict): the arguments to compute the resources with
+        is_custom_op (bool): whether the operator lowers to ``qref.custom``
+        adjoint_resources (bool): whether to spell each produced id in its adjoint form
+        decomp_rules (list): the rules to consider, or None to use the ones registered against
+            ``op_name``. Callers that have already adapted the registered rules (see
+            :func:`_adapt_symbolic_rules`) pass them here so the resources are computed against
+            the same rule objects that get lowered.
+
+    Returns:
+        dict: rule name to the resources it produces
+        dict: rule name to the graphOpId of each resource
+        list: the rules considered
+    """
     decomp_rules = (
         list(qp.decomposition.list_decomps(op_name)) if decomp_rules is None else list(decomp_rules)
     )
@@ -271,11 +364,7 @@ def collect_resources_for_op(
             # adjoint form (Adjoint(<name>){...}) directly from the resource op instance via
             # GraphOpID.getGraphOpId, rather than string.
             name_to_resource_ids[rule.name] = {
-                (
-                    GraphOpID(op.base, adjoint=not adjoint_resources).getGraphOpId()
-                    if issubclass(op.__class__, qp.ops.op_math.Adjoint)
-                    else GraphOpID(op, adjoint=adjoint_resources).getGraphOpId()
-                ): count
+                GraphOpID(op).getGraphOpId(adjoint=adjoint_resources): count
                 for op, count in resources.gate_counts.items()
             }
         except Exception as e:
@@ -408,13 +497,20 @@ def _adapt_symbolic_rules(  # pylint: disable=too-many-arguments,too-many-positi
 
 
 def prepare_dynamic_op_kwargs(dynamic_shape, wire_lens) -> dict:
-    """Construct representative arguments for tracing a decomposition rule.
+    """Build the dummy arguments an operator's decomposition rules are called with.
 
     A dynamic name can map to several independent MLIR values, which must remain a Python list.
     A singleton ranked tensor already represents the complete dynamic argument and is passed
     without a list wrapper. Scalar entries remain a list because they represent independent values
     associated with the name, including the singleton case. Wire registers use disjoint labels so
     operator validation sees the same register relationships as it would in the original circuit.
+
+    Args:
+        dynamic_shape (dict): dynamic argument names to their MLIR types
+        wire_lens (dict): wire argument names to their lengths
+
+    Returns:
+        dict: argument names to dummy values
     """
     kwargs = {}
     wire_offset = 0
@@ -643,6 +739,21 @@ def compile_decomposition_rules(
     Note that ``wrap_adjoint`` and ``wrap_control`` may be combined to synthesize the nested modifier
     ``<n>C(Adjoint(op_name))``: adjoint is applied innermost and control outermost (the canonical
     order matching the compiler's ``wrapModifiers``).
+
+    Args:
+        op_name (str): the operator's name, as PennyLane registers its rules
+        op_id (str): the operator's graphOpId
+        dynamic_shape (dict): dynamic argument names to their MLIR types
+        wire_lens (dict): wire argument names to their lengths
+        static_data (dict): compiler-static argument names to their values
+        extra_data (dict): argument values the graphOpId identifies by UID instead of spelling
+        is_custom_op (bool): whether the operator lowers to ``qref.custom``
+        wrap_adjoint (bool): whether to distribute the base rules over adjoint
+        wrap_control (bool): whether to distribute the base rules over control
+        n_ctrl (int): the number of controls to distribute over
+
+    Returns:
+        ir.Operation: the ``builtin.module`` holding the rules
     """
     kwargs = prepare_dynamic_op_kwargs(dynamic_shape, wire_lens)
     extra_data = extra_data or {}
@@ -754,24 +865,66 @@ def compile_decomposition_rules(
 
     call_args, call_kwargs = split_call_args(kwargs, is_custom_op)
 
-    # if op_name == "QROM":
-    #     breakpoint()
+    return build_rule_module(
+        subroutines,
+        device,
+        call_args,
+        call_kwargs,
+        ctrl_wires,
+        name_to_resource_ids,
+        target_id,
+        call_abi=call_abi,
+    )
+
+
+# pylint: disable=too-many-arguments
+def build_rule_module(
+    subroutines,
+    device,
+    call_args,
+    call_kwargs,
+    ctrl_wires,
+    name_to_resource_ids,
+    target_id,
+    call_abi=None,
+) -> ir.Operation:
+    """Trace ``subroutines`` into a module of standalone decomposition-rule functions.
+
+    Args:
+        subroutines (list): the rule bodies, as captured subroutines
+        device (Device): the device to trace them on, sized for the operator's wires
+        call_args (tuple): positional arguments to call each subroutine with
+        call_kwargs (dict): keyword arguments to call each subroutine with
+        ctrl_wires: the control wires to pass, or None when the rules are not controlled
+        name_to_resource_ids (dict): rule name to the graphOpId of each resource
+        target_id (str): the graphOpId of the gate the rules decompose
+        call_abi (_RuleCallABI): the canonical OperatorOp ABI the subroutines expose, or None when
+            they keep the legacy rule signature
+
+    Returns:
+        ir.Operation: the module holding the rules
+
+    Raises:
+        RuntimeError: if the rules could not be traced
+    """
 
     @qp.qjit(target="mlir", capture=True, collect_decomp_rules=False)
     @qp.qnode(device=device)
     def circuit():
         for subroutine in subroutines:
             if call_abi is not None:
-                if needs_control_wires:
+                if ctrl_wires is not None:
                     subroutine(*call_abi.call_args, ctrl_wires)
                 else:
                     subroutine(*call_abi.call_args)
-            elif needs_control_wires:
+            elif ctrl_wires is not None:
                 subroutine(*call_args, _ctrl_wires=ctrl_wires, **call_kwargs)
             else:
                 subroutine(*call_args, **call_kwargs)
 
     module = circuit.mlir_module
+    if module is None:
+        raise RuntimeError(f"Failed to trace the decomposition rules for {target_id}")
 
     if not module:
         with ir.Context() as ctx:
@@ -844,41 +997,215 @@ def compile_decomposition_rules(
     return inlined_module
 
 
+def collect_symbolic_adjoint_resources(op_cls, op_name, kwargs, is_custom_op):
+    """Return resource data for the rules registered against ``Adjoint(op_name)``.
+
+    Args:
+        op_cls (type): the base operator's class
+        op_name (str): the base operator's name
+        kwargs (dict): the arguments to build the base operator with
+        is_custom_op (bool): whether the operator lowers to ``qref.custom``
+
+    Returns:
+        list: the rules considered
+        dict: the arguments the rules were probed with
+        dict: rule name to the resources it produces
+        dict: rule name to the graphOpId of each resource
+    """
+    rules = list(qp.decomposition.list_decomps(f"Adjoint({op_name})"))
+    if not rules:
+        return [], {}, {}, {}
+
+    # The base op is only a carrier of the dummy parameters and wires: the graph reasons about
+    # resources in terms of abstract operators, matching `_get_kwargs` in PennyLane's graph.
+    probe_args = {"base": abstractify(build_base_op(op_cls, kwargs, is_custom_op))}
+
+    name_to_resources = {}
+    name_to_resource_ids = {}
+    for rule in rules:
+        try:
+            resources = rule.compute_resources(**probe_args)
+            name_to_resources[rule.name] = resources.gate_counts
+            # The rule body names the ops it produces itself, so unlike the distribution pathway
+            # these ids carry no added modifier.
+            # TODO: a resource op that is itself symbolic (e.g. a generic `Controlled(GlobalPhase)`
+            # rep) does not spell the compiler's canonical `C(GlobalPhase){...}` id here; such a
+            # rule registers an id the solver cannot match.
+            name_to_resource_ids[rule.name] = {
+                GraphOpID(op).getGraphOpId(): count for op, count in resources.gate_counts.items()
+            }
+        except Exception as e:  # pylint: disable=broad-except
+            warnings.warn(
+                f"Failed to get resources for the {rule.name} decomposition rule: {e}",
+                category=RuleLoweringWarning,
+            )
+
+    return rules, probe_args, name_to_resources, name_to_resource_ids
+
+
+# pylint: disable=too-many-arguments
+def compile_registered_adjoint_rules(
+    op_name,
+    target_id,
+    dynamic_shape,
+    wire_lens,
+    static_data,
+    extra_data=None,
+    is_custom_op=False,
+    op_cls=None,
+) -> ir.Operation | None:
+    """Return the module of rules registered against ``Adjoint(op_name)`` that follow PennyLane's
+    symbolic-argument convention, or None if there are none.
+
+    These rules take a base operator instance rather than the base op's parameters, so the rule
+    body rebuilds the operator from its own traced arguments.
+
+    Args:
+        op_name (str): the base operator's name
+        target_id (str): the adjoint graphOpId the rules decompose
+        dynamic_shape (dict): dynamic argument names to their MLIR types
+        wire_lens (dict): wire argument names to their lengths
+        static_data (dict): compiler-static argument names to their values
+        extra_data (dict): argument values the graphOpId identifies by UID instead of spelling
+        is_custom_op (bool): whether the operator lowers to ``qref.custom``
+        op_cls (type[Operator2]): the base operator's class, required to rebuild it
+
+    Returns:
+        ir.Operation or None: the module holding the rules, or None if there are none
+
+    Raises:
+        ValueError: if ``op_cls`` is not given
+    """
+    if op_cls is None:
+        raise ValueError(
+            f"The operator class of {op_name!r} is needed to lower the decomposition rules "
+            f"registered against {target_id}"
+        )
+    assert issubclass(op_cls, Operator2), f"Expected an Operator2 subclass, got {op_cls}"
+
+    extra_data = extra_data or {}
+    static_and_extra = static_data | extra_data
+    kwargs = prepare_dynamic_op_kwargs(dynamic_shape, wire_lens)
+    device = qp.device("null.qubit", wires=sum(wire_lens.values()))
+
+    rules, probe_args, name_to_resources, name_to_resource_ids = collect_symbolic_adjoint_resources(
+        op_cls, op_name, kwargs | static_and_extra, is_custom_op
+    )
+    if not rules:
+        return None
+
+    def rule_to_subroutine(rule):
+        def decomp_rule(*_args, **_kwargs):
+            with qp.capture.pause():
+                base = op_cls(*_args, **_kwargs)
+            rule._impl(base=base)
+
+        decomp_rule_no_static_args = partial(decomp_rule, **static_and_extra)
+        decomp_rule_no_static_args.__name__ = rule.name + "_" + target_id
+        return qp.capture.subroutine(decomp_rule_no_static_args)
+
+    subroutines = []
+    for rule in rules:
+        if rule.name not in name_to_resource_ids:
+            continue
+        if _resources_have_measurement(name_to_resources[rule.name]):
+            warnings.warn(
+                f"Skipped the {rule.name} decomposition rule for {target_id}: it contains a "
+                "mid-circuit measurement, which is not supported with adjoint or control regions.",
+                category=RuleLoweringWarning,
+            )
+            continue
+        if rule.is_applicable(**probe_args):
+            subroutines.append(rule_to_subroutine(rule))
+
+    if not subroutines:
+        return None
+
+    call_args, call_kwargs = split_call_args(kwargs, is_custom_op)
+
+    return build_rule_module(
+        subroutines, device, call_args, call_kwargs, None, name_to_resource_ids, target_id
+    )
+
+
+def registered_adjoint_rule_strings(op_name, target_id, **kwargs) -> list[str]:
+    """Return the rule strings from :func:`compile_registered_adjoint_rules`.
+
+    A failure to lower them is reported as a warning and yields no rules.
+
+    Args:
+        op_name (str): the base operator's name
+        target_id (str): the adjoint graphOpId the rules decompose
+        **kwargs: forwarded to :func:`compile_registered_adjoint_rules`
+
+    Returns:
+        list[str]: the rules, as MLIR strings
+    """
+    try:
+        module = compile_registered_adjoint_rules(op_name, target_id, **kwargs)
+    except Exception as e:  # pylint: disable=broad-except
+        warnings.warn(
+            f"Failed to lower the registered adjoint decomposition rules for {target_id}: {e}",
+            category=RuleLoweringWarning,
+        )
+        return []
+    return get_rule_strings_from_module(module) if module is not None else []
+
+
 def adjoint_variant_rule_strings(
-    op_name, op_id, dynamic_shape, wire_lens, static_data, extra_data=None, is_custom_op=False
+    op_name,
+    op_id,
+    dynamic_shape,
+    wire_lens,
+    static_data,
+    extra_data=None,
+    is_custom_op=False,
+    op_cls=None,
 ):
     """Return the rule strings whose ``target_gate`` is ``Adjoint(op_name)``.
 
     ``op_id`` is the *base* op's graphOpId (e.g. ``"S{...}"``). Two pathways contribute:
-      1. rules registered directly against ``Adjoint(op_name)`` (``list_decomps("Adjoint(S)")``), and
+      1. rules registered directly against ``Adjoint(op_name)`` (``list_decomps("Adjoint(S)")``),
+         which take the symbolic operator's arguments the way PennyLane writes them
+         (``self_adjoint``, ``adjoint_rotation``, ...), and
       2. rules synthesized by distributing each base rule of ``op_name`` over adjoint
          (the ``wrap_adjoint`` pathway), dropping any whose body is non-invertible.
 
     Shared by the eager lowering-time closure (:func:`fetch_all_reachable_decomposition_rules_from_op`)
     and the compiler's on-demand loader (:func:`compile_decomposition_rules_wrapper`) so both build
     adjoint rules identically.
+
+    Args:
+        op_name (str): the base operator's name
+        op_id (str): the base operator's graphOpId
+        dynamic_shape (dict): dynamic argument names to their MLIR types
+        wire_lens (dict): wire argument names to their lengths
+        static_data (dict): compiler-static argument names to their values
+        extra_data (dict): argument values the graphOpId identifies by UID instead of spelling
+        is_custom_op (bool): whether the operator lowers to ``qref.custom``
+        op_cls (type): the base operator's class; pathway 1 is skipped without it
+
+    Returns:
+        list[str]: the rules, as MLIR strings
     """
     out = []
     adj_name = f"Adjoint({op_name})"
-    # (1) Rules registered directly against Adjoint(op_name):
-    try:
+    adj_id = name_wrap_adjoint(op_id)
+    # (1) Rules registered directly against Adjoint(op_name). They take a base operator instance,
+    # so they need the operator's class.
+    # TODO: the on-demand decomp rules are skipped for now.
+    if op_cls is not None:
         out.extend(
-            get_rule_strings_from_module(
-                compile_decomposition_rules(
-                    adj_name,
-                    name_wrap_adjoint(op_id),
-                    dynamic_shape,
-                    wire_lens,
-                    static_data,
-                    extra_data=extra_data,
-                    is_custom_op=is_custom_op,
-                )
+            registered_adjoint_rule_strings(
+                op_name,
+                adj_id,
+                dynamic_shape=dynamic_shape,
+                wire_lens=wire_lens,
+                static_data=static_data,
+                extra_data=extra_data,
+                is_custom_op=is_custom_op,
+                op_cls=op_cls,
             )
-        )
-    except Exception as e:  # pylint: disable=broad-except
-        warnings.warn(
-            f"Failed to lower the decomposition rules for {adj_name}: {e}",
-            category=RuleLoweringWarning,
         )
     # (2) Rules for Adjoint(op_name) synthesized by adjointing each base rule of op_name:
     # Adjoint lowering currently caches real gate parameters only up to rank one. A distributed
@@ -941,6 +1268,19 @@ def control_variant_rule_strings(
          *adjointed* base rule (``wrap_adjoint`` + ``wrap_control``), so controlled-adjoint ops are
          reachable too.
     Distribution rules whose body is non-controllable are dropped.
+
+    Args:
+        op_name (str): the base operator's name
+        op_id (str): the base operator's graphOpId
+        ctrl_counts (list[int]): the control counts to build rules for
+        dynamic_shape (dict): dynamic argument names to their MLIR types
+        wire_lens (dict): wire argument names to their lengths
+        static_data (dict): compiler-static argument names to their values
+        extra_data (dict): argument values the graphOpId identifies by UID instead of spelling
+        is_custom_op (bool): whether the operator lowers to ``qref.custom``
+
+    Returns:
+        list[str]: the rules, as MLIR strings
     """
     out = []
     for n in ctrl_counts:
@@ -1020,7 +1360,20 @@ def compile_decomposition_rules_wrapper(
     extra_data=None,
     is_custom_op=False,
 ) -> str:
-    """Return a string MLIR module containing the decomposition rules for an operator instance."""
+    """Return a string MLIR module containing the decomposition rules for an operator instance.
+
+    Args:
+        op_name (str): the operator's name, as PennyLane registers its rules
+        op_id (str): the operator's graphOpId
+        dynamic_shape (dict): dynamic argument names to their MLIR types
+        wire_lens (dict): wire argument names to their lengths
+        static_data (dict): compiler-static argument names to their values
+        extra_data (dict): argument values the graphOpId identifies by UID instead of spelling
+        is_custom_op (bool): whether the operator lowers to ``qref.custom``
+
+    Returns:
+        str: the module holding the rules
+    """
     return str(
         compile_decomposition_rules(
             op_name,
@@ -1060,6 +1413,18 @@ def compile_reachable_decomposition_rules_wrapper(
       to complete a path. :func:`fetch_all_reachable_decomposition_rules_from_op` builds that closure
       (base + adjoint-registered + distributed-adjoint rules, transitively) and each returned func
       keeps its own ``target_gate``, which is how the loader registers them.
+
+    Args:
+        op_name (str): the operator's *base* name
+        op_id (str): the operator's full graphOpId, modifiers included
+        dynamic_shape (dict): dynamic argument names to their MLIR types
+        wire_lens (dict): wire argument names to their lengths
+        static_data (dict): compiler-static argument names to their values
+        extra_data (dict): argument values the graphOpId identifies by UID instead of spelling
+        is_custom_op (bool): whether the operator lowers to ``qref.custom``
+
+    Returns:
+        str: a module holding the whole reachable rule closure
     """
     base_id = op_id
     n_ctrls = 0
@@ -1094,12 +1459,36 @@ def fetch_all_reachable_decomposition_rules_from_op(
     extra_data=None,
     is_custom_op=False,
     n_ctrls=0,
+    op_cls=None,
 ):
+    """Return every decomposition rule reachable from an operator, as MLIR strings.
+
+    Starting from the given operator, this walks the resources its rules produce and captures the
+    rules of each op it meets, together with their adjoint and controlled variants, until nothing
+    new turns up.
+
+    Args:
+        op_name (str): the operator's name, as PennyLane registers its rules
+        op_id (str): the operator's graphOpId
+        dynamic_shape (dict): dynamic argument names to their MLIR types
+        wire_lens (dict): wire argument names to their lengths
+        static_data (dict): compiler-static argument names to their values
+        extra_data (dict): argument values the graphOpId identifies by UID instead of spelling
+        is_custom_op (bool): whether the operator lowers to ``qref.custom``
+        n_ctrls (int): the number of controls on the operator instance being decomposed
+        op_cls (type): the operator's class; classes of the ops met along the way are taken from
+            the resources themselves
+
+    Returns:
+        list[str]: the rules, as MLIR strings
+    """
     extra_data = extra_data or {}
     queue = deque()
     start = (op_name, dynamic_shape, wire_lens, static_data, extra_data, is_custom_op)
     queue.append(start)
     visited = [start]
+
+    op_classes = {op_name: op_cls} if op_cls is not None else {}
 
     # Control counts to synthesize `<n>C(...)` rules for. A single control is always captured
     # proactively; a multi-controlled instance (`n_ctrls > 1`) additionally needs its own count.
@@ -1138,6 +1527,7 @@ def fetch_all_reachable_decomposition_rules_from_op(
                     static_data,
                     extra_data=extra_data,
                     is_custom_op=is_custom_op,
+                    op_cls=op_classes.get(name),
                 )
             )
             out.extend(
@@ -1169,62 +1559,61 @@ def fetch_all_reachable_decomposition_rules_from_op(
         ) = queue.popleft()
         this_extra_data = this_extra_data or {}
         this_kwargs = prepare_dynamic_op_kwargs(this_dynamic_shape, this_wire_lens)
-        # Explore ops reachable through the rules of both this op and its adjoint:
-        for explore_name in _op_variant_names(this_name):
-            registered_rules = list(qp.decomposition.list_decomps(explore_name))
-            decomp_rules = _adapt_symbolic_rules(
-                registered_rules,
-                explore_name,
-                this_kwargs | this_static_data | this_extra_data,
-                this_is_custom_op,
-                n_ctrl=1,
-                n_base_wires=sum(this_wire_lens.values()),
-            )
-            resources, _, _ = collect_resources_for_op(
-                explore_name,
-                this_kwargs | this_static_data | this_extra_data,
-                this_is_custom_op,
-                decomp_rules=decomp_rules,
-            )
-            for _rule_name, resource in resources.items():
-                try:
-                    for op, _count in resource.items():
-                        graph_op_id = GraphOpID(op)
-                        probe = (
-                            graph_op_id.get_operator_name(),
-                            graph_op_id.dynamic_shape,
-                            graph_op_id.wire_lens,
-                            graph_op_id.static_data,
-                            graph_op_id.extra_data,
-                            graph_op_id.is_custom_op,
-                        )
+        all_kwargs = this_kwargs | this_static_data | this_extra_data
 
-                        if not probe in visited:
-                            visited.append(probe)
-                            queue.append(probe)
-                            rules.extend(
-                                compile_variants(
-                                    probe[0],
-                                    graph_op_id.getGraphOpId(),
-                                    probe[1],
-                                    probe[2],
-                                    probe[3],
-                                    probe[4],
-                                    probe[5],
-                                )
-                            )
-                except Exception as e:
-                    warnings.warn(
-                        f"Failed to lower the {_rule_name} decomposition rule for {this_name}: {e}",
-                        category=RuleLoweringWarning,
+        # Explore the ops reachable through the rules of this op and of its adjoint. Keyed by
+        # (explored op, rule name): the same rule name may be registered against both.
+        resources = {
+            (this_name, name): res
+            for name, res in collect_resources_for_op(this_name, all_kwargs, this_is_custom_op)[
+                0
+            ].items()
+        }
+        if (
+            not this_name.startswith("Adjoint(")
+            and (this_op_cls := op_classes.get(this_name)) is not None
+        ):
+            resources |= {
+                (f"Adjoint({this_name})", name): res
+                for name, res in collect_symbolic_adjoint_resources(
+                    this_op_cls, this_name, all_kwargs, this_is_custom_op
+                )[2].items()
+            }
+
+        for (_, _rule_name), resource in resources.items():
+            try:
+                for op, _ in resource.items():
+                    graph_op_id = GraphOpID(op)
+                    probe = (
+                        # The name must carry the same modifiers as the id below, since the two
+                        # are paired to look up the rules registered for that id.
+                        graph_op_id.get_modified_operator_name(),
+                        graph_op_id.dynamic_shape,
+                        graph_op_id.wire_lens,
+                        graph_op_id.static_data,
+                        graph_op_id.extra_data,
+                        graph_op_id.is_custom_op,
                     )
-                continue
+                    op_classes.setdefault(probe[0], type(op))
+
+                    if not probe in visited:
+                        visited.append(probe)
+                        queue.append(probe)
+                        rules.extend(
+                            compile_variants(
+                                probe[0],
+                                graph_op_id.getGraphOpId(),
+                                probe[1],
+                                probe[2],
+                                probe[3],
+                                probe[4],
+                                probe[5],
+                            )
+                        )
+            except Exception as e:
+                warnings.warn(
+                    f"Failed to lower the {_rule_name} decomposition rule for {this_name}: {e}",
+                    category=RuleLoweringWarning,
+                )
+            continue
     return rules
-
-
-def _op_variant_names(op_name):
-    """Yield the operator names to explore for `op_name`: the op itself and, unless it is already
-    adjointed, its adjoint `Adjoint(op_name)`. Rules registered against both are collected."""
-    yield op_name
-    if not op_name.startswith("Adjoint("):
-        yield f"Adjoint({op_name})"

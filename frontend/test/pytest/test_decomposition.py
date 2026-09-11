@@ -40,21 +40,23 @@ from catalyst import qjit
 from catalyst.decomposition import GraphOpID, RuleLoweringWarning
 from catalyst.decomposition.decomposition_rules import (
     _MODIFIER_CANONICAL_ORDER,
-    _RuleCallABI,
     _control_modifier,
     _leading_modifier_kind,
     _modifier_kind,
+    _RuleCallABI,
     compile_decomposition_rules,
     compile_decomposition_rules_wrapper,
     compile_reachable_decomposition_rules_wrapper,
+    compile_registered_adjoint_rules,
     control_variant_rule_strings,
+    get_rule_strings_from_module,
     name_unwrap_adjoint,
     name_unwrap_control,
     name_wrap_adjoint,
     prepare_dynamic_op_kwargs,
     wrap_modifier_id,
 )
-from catalyst.decomposition.graph_op_id import GraphOpID
+from catalyst.decomposition.graph_op_id import GraphOpID, build_graph_op_id
 from catalyst.decomposition.type_utils import (
     convert_item_to_mlir_type,
     get_dummy_values_for_arg,
@@ -72,6 +74,32 @@ class TestGenericUtilities:
         assert to_name(op) == "Prod2"
         assert GraphOpID(op).get_operator_name() == to_name(op)
         assert GraphOpID(NoParams(reg=[0])).get_operator_name() == "NoParams"
+
+    def test_wires_replacement_doesnt_create_overlapping_wire_labels(self):
+        """Test that the helper does not create overlapping wire labels which create
+        validation failures when the operator is unflattened.
+
+        NOTE: Regression test for the accumulator change made in type_utils.py
+        """
+
+        op = qp.ctrl(qp.S(Wire[1]), Wire[1])
+        new_op = replace_wires_with_placeholder_wires(op)
+
+        assert new_op == qp.ctrl(qp.S(-2), -1)
+
+    def test_build_graph_op_id(self):
+        """The shared builder canonicalizes every frontend identity component."""
+        op_id = build_graph_op_id(
+            "Example",
+            {"z": ["f64"], "a": ["i1"]},
+            {"right": 2, "left": 1},
+            {"label": "value"},
+            adjoint=True,
+            num_controls=2,
+            uid=7,
+        )
+
+        assert op_id == '2C(Adjoint(Example)){a:[i1],z:[f64]}{left:1,right:2}{label = "value"}[7]'
 
     def test_wires_replacement_doesnt_mutate_operator(self):
         """Test that the wires replacement helper does not mutate the incoming operator."""
@@ -231,7 +259,7 @@ class TestGenericUtilities:
             (SingleParam(Float, Wires([2, 3])), "SingleParam{x:[tensor<f64>]}{reg:2}{}"),
             (
                 CompilableData(True, 3.14, "string", Wires([0, 1])),
-                "CompilableData{}{wires:2}{a:True,b:3.14,thing:string}",
+                'CompilableData{}{wires:2}{a = true, b = 3.140000e+00 : f64, thing = "string"}',
             ),
             (
                 MultipleRegisters(Wires([0, 1, 2]), Wires([3, 4])),
@@ -244,7 +272,7 @@ class TestGenericUtilities:
             (qp.MultiRZ(Float, Wires([0, 2, 3, 4])), "MultiRZ{theta:[f64]}{wires:4}{}"),
             (
                 qp.PauliRot(Float, "XYZ", Wires([1, 2, 3])),
-                "PauliRot{theta:[f64]}{wires:3}{pauli_word:XYZ}",
+                'PauliRot{theta:[f64]}{wires:3}{pauli_word = "XYZ"}',
             ),
             (StaticData("mylabel", Wires([0, 1])), "StaticData{}{reg:2}{}["),
             (
@@ -313,7 +341,7 @@ class TestGenericUtilities:
 
         res = compile_decomposition_rules_wrapper(
             "CompilableData",
-            "CompilableData{}{wires:2}{a:True,b:3.14,thing:string}",
+            'CompilableData{}{wires:2}{a = true, b = 3.140000e+00 : f64, thing = "string"}',
             {},
             {"wires": 2},
             {"a": True, "b": 3.14, "thing": "string"},
@@ -656,6 +684,69 @@ class TestModifierIds:
         assert _MODIFIER_CANONICAL_ORDER == ("C", "Adjoint")
         with pytest.raises(ValueError, match="Non-canonical modifier order"):
             wrap_modifier_id(op_id, "Adjoint")
+
+
+class TestSymbolicRules:
+    """Tests for the rules registered against a symbolic operator that take the symbolic
+    op's args; following the convention in PennyLane."""
+
+    def test_self_adjoint_rule_is_lowered(self):
+        """Test ``self_adjoint`` rule on ``Adjoint(Hadamard)``."""
+
+        module = compile_registered_adjoint_rules(
+            "Hadamard", "Adjoint(Hadamard){}{wires:1}{}", {}, {"wires": 1}, {}, op_cls=qp.Hadamard
+        )
+        (rule,) = get_rule_strings_from_module(module)
+
+        assert 'target_gate = "Adjoint(Hadamard){}{wires:1}{}"' in rule
+        assert 'resources = {operations = {"Hadamard{}{wires:1}{}" = 1 : i64}}' in rule
+        assert "qref.adjoint" not in rule
+        assert "(%arg0: !qref.reg<1>, %arg1: tensor<1xi64>)" in rule
+        assert rule.count('gate_name = "Hadamard"') == 1
+
+    def test_adjoint_rotation_rule_is_lowered(self):
+        """Test ``adjoint_rotation`` reads the angle off the base operator."""
+
+        module = compile_registered_adjoint_rules(
+            "RZ",
+            "Adjoint(RZ){0:[f64]}{wires:1}{}",
+            {"0": ["f64"]},
+            {"wires": 1},
+            {},
+            is_custom_op=True,
+            op_cls=qp.RZ,
+        )
+        (rule,) = get_rule_strings_from_module(module)
+
+        assert 'target_gate = "Adjoint(RZ){0:[f64]}{wires:1}{}"' in rule
+        assert 'resources = {operations = {"RZ{0:[f64]}{wires:1}{}" = 1 : i64}}' in rule
+        assert "qref.adjoint" not in rule
+        assert "stablehlo.negate" in rule
+
+    def test_no_registered_symbolic_rules(self):
+        """Test an op with no symbolic rules registered against its adjoint yields no module."""
+
+        with local_decomps():
+            assert (
+                compile_registered_adjoint_rules(
+                    "NoParams",
+                    "Adjoint(NoParams){}{reg:2}{}",
+                    {},
+                    {"reg": 2},
+                    {},
+                    op_cls=NoParams,
+                )
+                is None
+            )
+
+    def test_missing_op_class_raises(self):
+        """Test lowering cannot proceed without the base operator's class: these rules take a base
+        operator instance, which the operator's name alone cannot produce."""
+
+        with pytest.raises(ValueError, match="operator class of 'Hadamard' is needed"):
+            compile_registered_adjoint_rules(
+                "Hadamard", "Adjoint(Hadamard){}{wires:1}{}", {}, {"wires": 1}, {}
+            )
 
 
 if __name__ == "__main__":

@@ -224,8 +224,7 @@ def test_param_shift_on_non_expval(backend):
     def workflow(p: float):
         return qp.jacobian(func, method="auto")(p)
 
-    with pytest.warns(UserWarning, match="AOT.*failed"):
-        workflow = qjit(workflow)
+    workflow = qjit(workflow)
 
     with pytest.raises(
         DifferentiableCompileError, match="The parameter-shift method can only be used"
@@ -247,8 +246,7 @@ def test_adjoint_on_non_expval(backend):
     def workflow(p: float):
         return qp.jacobian(func, method="auto")(p)
 
-    with pytest.warns(UserWarning, match="AOT.*failed"):
-        workflow = qjit(workflow)
+    workflow = qjit(workflow)
 
     with pytest.raises(DifferentiableCompileError, match="The adjoint method can only be used"):
         workflow(1.0)
@@ -1103,15 +1101,13 @@ def test_assert_no_higher_order_without_fd(method, backend):
         qp.RX(x, wires=0)
         return qp.expval(qp.PauliY(0))
 
-    with pytest.warns(UserWarning, match="AOT.*failed"):
-
-        # not sure how to get this working with qp.grad TODO
-        @qjit
-        def workflow(x: float):
-            g = qp.qnode(qp.device(backend, wires=1), diff_method=method)(f)
-            h = catalyst.grad(g, method="auto")
-            i = catalyst.grad(h, method="auto")
-            return i(x)
+    # not sure how to get this working with qp.grad TODO
+    @qjit
+    def workflow(x: float):
+        g = qp.qnode(qp.device(backend, wires=1), diff_method=method)(f)
+        h = catalyst.grad(g, method="auto")
+        i = catalyst.grad(h, method="auto")
+        return i(x)
 
     with pytest.raises(DifferentiableCompileError, match="higher order derivatives"):
         workflow(1.0)
@@ -1124,13 +1120,11 @@ def test_assert_invalid_diff_method():
         qp.RX(x, wires=0)
         return qp.expval(qp.PauliY(0))
 
-    with pytest.warns(UserWarning, match="AOT.*failed"):
-
-        @qjit
-        def workflow(x: float):
-            g = qp.qnode(qp.device("lightning.qubit", wires=1))(f)
-            h = grad(g, method="non-existent method")
-            return h(x)
+    @qjit
+    def workflow(x: float):
+        g = qp.qnode(qp.device("lightning.qubit", wires=1))(f)
+        h = grad(g, method="non-existent method")
+        return h(x)
 
     with pytest.raises(ValueError, match="Invalid differentiation method"):
         workflow(1.0)
@@ -1143,13 +1137,11 @@ def test_assert_invalid_h_type():
         qp.RX(x, wires=0)
         return qp.expval(qp.PauliY(0))
 
-    with pytest.warns(UserWarning, match="AOT.*failed"):
-
-        @qjit
-        def workflow(x: float):
-            g = qp.qnode(qp.device("lightning.qubit", wires=1))(f)
-            h = grad(g, method="fd", h="non-integer")
-            return h(x)
+    @qjit
+    def workflow(x: float):
+        g = qp.qnode(qp.device("lightning.qubit", wires=1))(f)
+        h = grad(g, method="fd", h="non-integer")
+        return h(x)
 
     with pytest.raises(ValueError, match="Invalid h value"):
         workflow(1.0)
@@ -1162,8 +1154,7 @@ def test_assert_non_differentiable():
         h = grad("string!", method="fd")
         return h(x)
 
-    with pytest.warns(UserWarning, match="AOT.*failed"):
-        workflow = qjit(workflow)
+    workflow = qjit(workflow)
 
     with pytest.raises(TypeError, match="'string!' is not a callable object"):
         workflow(1.0)
@@ -1878,11 +1869,9 @@ class TestGradientErrors:
             qp.RX(_bool + 1, wires=0)
             return qp.expval(qp.PauliX(0))
 
-        with pytest.warns(UserWarning, match="AOT.*failed"):
-
-            @qjit
-            def cir(x: float):
-                return grad(f)(x)
+        @qjit
+        def cir(x: float):
+            return grad(f)(x)
 
         with pytest.raises(DifferentiableCompileError, match="MidCircuitMeasure is not allowed"):
             cir(1.0)
@@ -1896,11 +1885,9 @@ class TestGradientErrors:
             qp.RX(y, wires=0)
             return qp.expval(qp.PauliX(0))
 
-        with pytest.warns(UserWarning, match="AOT.*failed"):
-
-            @qjit
-            def cir(x: float):
-                return grad(f)(x)
+        @qjit
+        def cir(x: float):
+            return grad(f)(x)
 
         with pytest.raises(CompileError, match=".*Compilation failed.*"):
             cir(1.0)
@@ -1916,11 +1903,9 @@ class TestGradientErrors:
         def g(x):
             return mitigate_with_zne(f, scale_factors=[1, 3, 5])(x)
 
-        with pytest.warns(UserWarning, match="AOT.*failed"):
-
-            @qjit
-            def cir(x: float):
-                return grad(g)(x)
+        @qjit
+        def cir(x: float):
+            return grad(g)(x)
 
         with pytest.raises(CompileError, match=".*Compilation failed.*"):
             cir(1.0)
@@ -2301,14 +2286,12 @@ class TestParameterShiftVerificationIntegrationTests:
                 c = 0.5 / jnp.sin(x)
                 return ([[c, 0.0, 2 * x], [-c, 0.0, 0.0]],)
 
-        with pytest.warns(UserWarning, match="AOT.*failed"):
-
-            @qjit
-            @grad
-            @qp.qnode(device, diff_method="parameter-shift")
-            def circuit(x: float):
-                DummyRX(x, wires=[0])
-                return qp.expval(qp.PauliZ(wires=0))
+        @qjit
+        @grad
+        @qp.qnode(device, diff_method="parameter-shift")
+        def circuit(x: float):
+            DummyRX(x, wires=[0])
+            return qp.expval(qp.PauliZ(wires=0))
 
         with pytest.raises(CompileError, match="not supported with catalyst on this device"):
             circuit(0.5)
@@ -2322,14 +2305,12 @@ class TestParameterShiftVerificationIntegrationTests:
             def grad_recipe(self):
                 return ([[0.0, 0.0, 0.0], [0.0, 0.0, 0.0]],)
 
-        with pytest.warns(UserWarning, match="AOT.*failed"):
-
-            @qjit
-            @grad
-            @qp.qnode(device, diff_method="parameter-shift")
-            def circuit(x: float):
-                DummyRX(x, wires=[0])
-                return qp.expval(qp.PauliZ(wires=0))
+        @qjit
+        @grad
+        @qp.qnode(device, diff_method="parameter-shift")
+        def circuit(x: float):
+            DummyRX(x, wires=[0])
+            return qp.expval(qp.PauliZ(wires=0))
 
         with pytest.raises(CompileError, match="not supported with catalyst on this device"):
             circuit(0.5)
@@ -2344,14 +2325,12 @@ class TestParameterShiftVerificationIntegrationTests:
                 # Only one parameter but two frequencies is an error
                 return (1.0, 1.0)
 
-        with pytest.warns(UserWarning, match="AOT.*failed"):
-
-            @qjit
-            @grad
-            @qp.qnode(device, diff_method="parameter-shift")
-            def circuit(x: float):
-                DummyRX(x, wires=[0])
-                return qp.expval(qp.PauliZ(wires=0))
+        @qjit
+        @grad
+        @qp.qnode(device, diff_method="parameter-shift")
+        def circuit(x: float):
+            DummyRX(x, wires=[0])
+            return qp.expval(qp.PauliZ(wires=0))
 
         with pytest.raises(CompileError, match="not supported with catalyst on this device"):
             circuit(0.5)
@@ -2366,14 +2345,12 @@ class TestParameterShiftVerificationIntegrationTests:
                 # Only one parameter but two frequencies is an error
                 return [(2.0,)]
 
-        with pytest.warns(UserWarning, match="AOT.*failed"):
-
-            @qjit
-            @grad
-            @qp.qnode(device, diff_method="parameter-shift")
-            def circuit(x: float):
-                DummyRX(x, wires=[0])
-                return qp.expval(qp.PauliZ(wires=0))
+        @qjit
+        @grad
+        @qp.qnode(device, diff_method="parameter-shift")
+        def circuit(x: float):
+            DummyRX(x, wires=[0])
+            return qp.expval(qp.PauliZ(wires=0))
 
         with pytest.raises(CompileError, match="not supported with catalyst on this device"):
             circuit(0.5)
@@ -2507,6 +2484,40 @@ def test_bufferization_inside_tensor_generate(backend):
     assert np.allclose([2.0, 1.0], inp)
 
 
+def test_best_diff_method_single_expval(capture_mode):
+    """Test the diff_method for differentiating a single expval."""
+    num_wires = 1
+    dev = qp.device("lightning.qubit", wires=num_wires)
+
+    @qp.qnode(dev, diff_method="best")
+    def circuit(phi, psi):
+        qp.RY(phi, wires=0)
+        qp.RX(psi, wires=0)
+        return qp.expval(qp.PauliZ(0))
+
+    qjit_grad = qjit(grad(circuit, argnums=[0, 1]), capture=capture_mode)
+    _ = qjit_grad(0.1, 0.2)
+
+    assert "adjoint" in qjit_grad.mlir
+    assert "parameter-shift" not in qjit_grad.mlir
+
+
+def test_best_diff_method_multi_expval(capture_mode):
+    """Test the diff_method for differentiating multiple expval."""
+    num_wires = 1
+    dev = qp.device("lightning.qubit", wires=num_wires)
+
+    @qp.qnode(dev, diff_method="best")
+    def circuit(phi, psi):
+        qp.RY(phi, wires=0)
+        qp.RX(psi, wires=0)
+        return [qp.expval(qp.PauliZ(0)), qp.expval(qp.PauliY(0))]
+
+    qjit_jacobian = qjit(jacobian(circuit, argnums=[0, 1]), capture=capture_mode)
+    _ = qjit_jacobian(0.1, 0.2)
+
+    assert "parameter-shift" not in qjit_jacobian.mlir
+    assert "adjoint" in qjit_jacobian.mlir
 
 
 if __name__ == "__main__":
