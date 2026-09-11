@@ -180,8 +180,10 @@ jobs:
 
       - name: Build Catalyst-Runtime with transport and the executor
         run: |
-          # `-C runtime`, not the top-level target: with ENABLE_EXECUTOR=ON that one declares a
-          # dependency on `llvm` and would rebuild it despite the restore above.
+          # `-C runtime`, not the top-level target: with ENABLE_EXECUTOR=ON that one depends on
+          # `llvm`, whose last step builds LLVM_TARGETS -- `check-mlir llvm-symbolizer` (see
+          # mlir/Makefile). That runs the whole MLIR lit suite on every invocation, restored
+          # cache or not, which is the real cost here rather than any rebuilding.
           #
           # The device backends are trimmed to what the tests reach. These select
           #   rt_capi rtd_null_qubit rt_rsdecomp rt_decoder transport_all rt_executor catalyst-executor
