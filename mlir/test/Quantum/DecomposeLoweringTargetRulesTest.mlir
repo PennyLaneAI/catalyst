@@ -38,14 +38,34 @@ module @test_module {
         return %out : !quantum.bit
     }
 
-    // CHECK: [[q:%.+]] = quantum.alloc_qb
-    // CHECK: [[x_out:%.+]] = quantum.custom "RX"(%{{.+}}) [[q]]
-    // CHECK: [[y_out:%.+]] = quantum.custom "Y"() [[x_out]]
-    // CHECK: [[z_out:%.+]] = quantum.custom "RZ"(%{{.+}}) [[y_out]]
-    // CHECK: quantum.dealloc_qb [[z_out]]
-    %0 = quantum.alloc_qb : !quantum.bit
-    %1 = quantum.custom "X"() %0 : !quantum.bit
-    %2 = quantum.custom "Y"() %1 : !quantum.bit
-    %3 = quantum.custom "Z"() %2 : !quantum.bit
-    quantum.dealloc_qb %3 : !quantum.bit
+    func.func @circuit() attributes {quantum.node} {
+      // CHECK: [[q:%.+]] = qref.alloc_qb
+      // CHECK: qref.custom "RX"(%{{.+}}) [[q]]
+      // CHECK: qref.custom "Y"() [[q]]
+      // CHECK: qref.custom "RZ"(%{{.+}}) [[q]]
+      // CHECK: qref.dealloc_qb [[q]]
+      %0 = quantum.alloc_qb : !quantum.bit
+      %1 = quantum.custom "X"() %0 : !quantum.bit
+      %2 = quantum.custom "Y"() %1 : !quantum.bit
+      %3 = quantum.custom "Z"() %2 : !quantum.bit
+      quantum.dealloc_qb %3 : !quantum.bit
+      return
+    }
+}
+
+// -----
+
+// The pass normalizes to reference semantics even when no decomposition rules are present.
+// CHECK-LABEL: module @no_rules
+// CHECK: func.func @circuit() attributes {quantum.node}
+// CHECK: [[Q:%.+]] = qref.alloc_qb : !qref.bit
+// CHECK: qref.custom "Hadamard"() [[Q]] : !qref.bit
+// CHECK: qref.dealloc_qb [[Q]] : !qref.bit
+module @no_rules {
+  func.func @circuit() attributes {quantum.node} {
+    %q = quantum.alloc_qb : !quantum.bit
+    %out = quantum.custom "Hadamard"() %q : !quantum.bit
+    quantum.dealloc_qb %out : !quantum.bit
+    return
+  }
 }

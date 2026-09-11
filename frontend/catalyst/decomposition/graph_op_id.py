@@ -21,6 +21,7 @@ from typing import Any
 import jax.numpy as jnp
 import pennylane as qp
 from jax._src.lib.mlir import ir
+from pennylane.decomposition.utils import to_name
 from pennylane.pytrees import flatten
 
 from catalyst.decomposition.type_utils import (
@@ -71,6 +72,24 @@ def format_dynamic_params_for_id(dynamic_shape):
     )
 
 
+def build_modified_operator_name(
+    operator_name: str, *, adjoint: bool = False, num_controls: int = 0
+) -> str:
+    """Wrap ``operator_name`` in the modifier names for ``adjoint`` and ``num_controls``.
+
+    Adjoint is applied innermost and control outermost, matching the canonical order the
+    compiler's ``wrapModifiers`` uses (``<n>C(Adjoint(Op))``).
+    """
+    if num_controls < 0:
+        raise ValueError("GraphOpID control count cannot be negative")
+
+    name = f"Adjoint({operator_name})" if adjoint else operator_name
+    if num_controls:
+        prefix = "C" if num_controls == 1 else f"{num_controls}C"
+        name = f"{prefix}({name})"
+    return name
+
+
 def build_graph_op_id(
     operator_name: str,
     dynamic_shape: Mapping[str, Sequence[str]],
@@ -82,13 +101,7 @@ def build_graph_op_id(
     uid: int | None = None,
 ) -> str:
     """Build a canonical frontend GraphOpID from its identity components."""
-    if num_controls < 0:
-        raise ValueError("GraphOpID control count cannot be negative")
-
-    name = f"Adjoint({operator_name})" if adjoint else operator_name
-    if num_controls:
-        prefix = "C" if num_controls == 1 else f"{num_controls}C"
-        name = f"{prefix}({name})"
+    name = build_modified_operator_name(operator_name, adjoint=adjoint, num_controls=num_controls)
 
     dynamic_id = format_dynamic_params_for_id(dict(sorted(dynamic_shape.items())))
     wire_id = "{" + ",".join(f"{key}:{value}" for key, value in sorted(wire_lens.items())) + "}"
@@ -129,15 +142,27 @@ class GraphOpID:
     DecomposableGate interface in mlir/lib/quantum/IR/QuantumInterfaces.cpp.
     """
 
-    def __init__(self, op: qp.core.Operator2):
+    def __init__(self, op: qp.core.Operator2, adjoint: bool = False, n_ctrls: int = 0):
         """Create a new GraphOpId."""
         assert isinstance(
             op, qp.core.Operator2
         ), f"Graph-based decomposition expects an Operator2 instance, got {op} of type {type(op)}"
         self.op = op
+        self.adjoint = adjoint
+        self.n_ctrls = n_ctrls
+
+        if issubclass(type(op), qp.ops.op_math.Adjoint):
+            self.op = op.base
+            self.adjoint = not adjoint
+        elif isinstance(op, qp.ops.op_math.ControlledOp2):
+            self.op = op.base
+            self.n_ctrls = len(op.control_wires)
+
         self.is_custom_op = self.parse_is_custom_op()
 
-        self.operator_name = op.name
+        # Modifier names are added by getGraphOpId from the normalized modifier state above.
+        # Use the unwrapped operator name here to avoid encoding the same modifier twice.
+        self.operator_name = to_name(self.op)
         self.dynamic_shape = self.parse_dynamic_shape()
         self.wire_lens = self.parse_wire_lens()
         self.static_data = self.parse_static_data()
@@ -225,12 +250,16 @@ class GraphOpID:
         ) and not issubclass(type(self.op), tuple(_SPECIAL_LOWERINGS.keys()))
 
     def get_operator_name(self) -> str:
-        """Return the name of the operator."""
+        """Return the name of the operator, with any modifiers stripped by ``__init__``."""
         return self.operator_name
 
     def getGraphOpId(self, adjoint: bool = False, num_controls: int = 0) -> str:
         """
         Return the GraphOpId as a string.
+
+        The ``adjoint`` and ``num_controls`` arguments compose with the modifier state this
+        instance was built with (see ``__init__``), so a caller can ask for the adjoint or a
+        controlled variant of an operator that already carries modifiers of its own.
 
         NOTE: do not modify this method without also modifying the corresponding DecomposableGate
         interface in MLIR.
@@ -244,7 +273,7 @@ class GraphOpID:
             self.dynamic_shape,
             self.wire_lens,
             self.static_data,
-            adjoint=adjoint,
-            num_controls=num_controls,
+            adjoint=self.adjoint ^ adjoint,
+            num_controls=self.n_ctrls + num_controls,
             uid=uid,
         )

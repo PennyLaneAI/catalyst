@@ -80,10 +80,9 @@ def convert_item_to_mlir_type(item, is_special_lowering=False):
 
 
 def get_dummy_values_for_arg(arg):
-    """Given a container of python or MLIR types, replace the types with corresponding dummy values.
+    """Given a container of MLIR types, replace the types with corresponding dummy values.
 
-    The types are expected to be formatted for ``GraphOpId``s. Lists/Tuples must contain homogeneous
-    data types (this is true for any operator).
+    The types are expected to be formatted for ``GraphOpId``s.
     """
     match arg:
         case str():

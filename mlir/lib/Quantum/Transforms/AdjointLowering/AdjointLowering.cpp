@@ -16,6 +16,7 @@
 
 #include "llvm/ADT/STLExtras.h"
 #include "mlir/Dialect/Complex/IR/Complex.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Index/IR/IndexDialect.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
@@ -43,6 +44,11 @@ struct AdjointSingleOpRewritePattern : public OpRewritePattern<AdjointOp> {
     /// the program where quantum control flow is reversed. Most of the time, there is a 1-to-1
     /// correspondence with a notable exception caused by `insert`/`extract` API asymmetry.
     LogicalResult matchAndRewrite(AdjointOp adjoint, PatternRewriter &rewriter) const override {
+        if (auto parentFunc = adjoint->getParentOfType<func::FuncOp>();
+            parentFunc && parentFunc->hasAttr("target_gate")) {
+            return failure();
+        }
+
         // Defer (not an error) if the region still contains a nested quantum.ctrl region.
         // ctrl-lowering must reduce it to op-level controlled gates first; reversing and adjointing
         // those gates is then trivial ((C(g))^dagger = C(g^dagger)). The pipeline runs

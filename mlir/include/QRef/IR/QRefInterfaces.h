@@ -14,11 +14,20 @@
 
 #pragma once
 
+#include <string>
 #include <vector>
 
+#include "llvm/ADT/StringMap.h"
 #include "mlir/IR/OpDefinition.h"
+#include "mlir/IR/Operation.h"
 
 #include "Catalyst/Analysis/ResourceInterfaces.h"
+
+namespace catalyst::qref {
+
+std::string defaultGetGraphOpId(mlir::Operation *op);
+
+} // namespace catalyst::qref
 
 //===----------------------------------------------------------------------===//
 // QRef interface declarations.
