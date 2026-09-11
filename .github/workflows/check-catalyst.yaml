@@ -182,6 +182,13 @@ jobs:
         run: |
           # `-C runtime`, not the top-level target: with ENABLE_EXECUTOR=ON that one declares a
           # dependency on `llvm` and would rebuild it despite the restore above.
+          #
+          # The device backends are trimmed to what the tests reach. These select
+          #   rt_capi rtd_null_qubit rt_rsdecomp rt_decoder transport_all rt_executor catalyst-executor
+          # test_backline only ever asks for null.qubit, and compiler.py links rt_rsdecomp and
+          # rt_decoder into every qjit'd program. OpenQASM defaults ON, so it is turned off
+          # explicitly; OQD is left at its OFF default -- compiler.py links librt_OQD_capi only
+          # when the .so is present, so not building it is supported rather than merely untested.
           COMPILER_LAUNCHER="" \
           C_COMPILER=$(which gcc) \
           CXX_COMPILER=$(which g++) \
@@ -191,7 +198,8 @@ jobs:
           ENABLE_ASAN=OFF \
           ENABLE_TRANSPORT=ON \
           ENABLE_EXECUTOR=ON \
-          make -C runtime runtime ENABLE_OQD=ON
+          ENABLE_OPENQASM=OFF \
+          make -C runtime runtime
 
       - name: Set up Soft-RoCE loopback
         uses: ./.github/actions/setup-soft-roce
@@ -206,9 +214,9 @@ jobs:
           RT_BUILD_DIR="$(pwd)/runtime-build" \
           LLVM_SRC_DIR="$(pwd)/mlir/llvm-project" \
           LLVM_BUILD_DIR="$(pwd)/llvm-build" \
-          ENABLE_OQD=ON \
           ENABLE_TRANSPORT=ON \
           ENABLE_EXECUTOR=ON \
+          ENABLE_OPENQASM=OFF \
           make test-runtime-transport
 
       - name: Download Quantum Build Artifact
