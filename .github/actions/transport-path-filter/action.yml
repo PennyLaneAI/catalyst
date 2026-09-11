@@ -14,52 +14,41 @@ runs:
   steps:
     - id: filter
       shell: bash
+      env:
+        # PRs diff against the merge base, pushes against the previous head. Either can be
+        # unreachable (shallow clone, first push to a branch), so HEAD^ is the fallback.
+        BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
       run: |
-        # PRs diff against the merge base, pushes against the previous head; both from context.
-        if [ "${{ github.event_name }}" = "pull_request" ]; then
-          BASE="${{ github.event.pull_request.base.sha }}"
-        else
-          BASE="${{ github.event.before }}"
-        fi
+        set -euo pipefail
+        git cat-file -e "$BASE^{commit}" 2>/dev/null || BASE="HEAD^"
 
-        # Fall back to the parent commit when BASE is unreachable (shallow clone, new branch).
-        if ! git cat-file -e "$BASE^{commit}" 2>/dev/null; then
-          BASE="HEAD^"
-        fi
-
-        # Git pathspecs, so one list drives both the existence check and the diff below.
+        # Git pathspecs, so one list drives both the staleness check and the diff.
         PATTERNS=(
           'runtime/lib/transport/*'
+          'runtime/lib/executor/*'
+          'runtime/lib/backend/*'
           'runtime/include/Transport*'
           'runtime/tests/Test_Transport*'
+          'runtime/Makefile'
           'mlir/lib/Transport/*'
           'mlir/include/Transport/*'
           'frontend/catalyst/backline.py'
           'frontend/test/pytest/test_backline.py'
           'frontend/test/pytest/conftest.py'
-          'runtime/lib/executor/*'
-          'runtime/lib/backend/*'
-          'runtime/Makefile'
           '.github/actions/setup-soft-roce/*'
           '.github/actions/transport-path-filter/*'
           '.github/workflows/check-catalyst.yaml'
         )
 
-        # A pattern matching nothing would report transport=false forever, and a skipped job
-        # looks like a passing one. Fail loudly so a rename has to update this list.
-        missing=()
+        # A pattern matching nothing reports transport=false forever, and a skipped job reads as
+        # a passing one. Fail loudly so a rename has to update this list.
         for pattern in "${PATTERNS[@]}"; do
-          git ls-files --error-unmatch -- "$pattern" >/dev/null 2>&1 || missing+=("$pattern")
-        done
-        if [ "${#missing[@]}" -gt 0 ]; then
-          printf 'transport path filter matches no tracked file: %s\n' "${missing[@]}" >&2
-          echo 'Update or remove the pattern in .github/actions/transport-path-filter.' >&2
+          git ls-files --error-unmatch -- "$pattern" >/dev/null 2>&1 && continue
+          echo "::error::transport path filter matches no tracked file: $pattern" >&2
+          echo "Update or remove it in .github/actions/transport-path-filter." >&2
           exit 1
-        fi
+        done
 
         transport=false
-        if [ -n "$(git diff --name-only "$BASE" HEAD -- "${PATTERNS[@]}")" ]; then
-          transport=true
-        fi
-
+        [ -z "$(git diff --name-only "$BASE" HEAD -- "${PATTERNS[@]}")" ] || transport=true
         echo "transport=$transport" >> "$GITHUB_OUTPUT"

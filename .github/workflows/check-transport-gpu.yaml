@@ -112,24 +112,15 @@ jobs:
 
       - name: Verify the GPU coprocessor backend was built
         # gpu_transport_backend skips when this .so is absent, which reads as "tests passed". It
-        # exists only when CMake set TRANSPORT_HAS_HIP, so on a miss dump what CMake resolved.
+        # exists only when CMake set TRANSPORT_HAS_HIP, so a miss means HIP was not resolved.
         run: |
           name=libcatalyst_transport_memcpy_gpu_coprocessor.so
-          if find "$(pwd)/runtime-build/lib" -name "$name" | grep -q .; then
-            find "$(pwd)/runtime-build/lib" -name "$name" -exec ls -l {} +
-            exit 0
+          if ! find "$(pwd)/runtime-build/lib" -name "$name" -print -exec ls -l {} + | grep -q .; then
+            echo "::error::$name was not built -- CMake did not resolve HIP."
+            grep -E "^(_nvcc|_hip_include_dir|CMAKE_HIP_|TRANSPORT_HIP_PACKAGES)" \
+              "$(pwd)/runtime-build/CMakeCache.txt" || echo "(no HIP entries in the cache at all)"
+            exit 1
           fi
-          echo "$name was not built. Why:"
-          echo "--- what CMake resolved ---"
-          grep -E "^(_nvcc|_hip_include_dir|CMAKE_HIP_PLATFORM|CMAKE_HIP_COMPILER|TRANSPORT_HIP_PACKAGES)" \
-            "$(pwd)/runtime-build/CMakeCache.txt" || echo "(no HIP entries in the cache at all)"
-          echo "--- nvcc on this host ---"
-          command -v nvcc || echo "nvcc not on PATH"
-          ls -l /usr/local/cuda/bin/nvcc 2>/dev/null || echo "no /usr/local/cuda/bin/nvcc"
-          echo "--- fetched headers, if any ---"
-          ls -d "$(pwd)/runtime-build/hip-headers/payload/opt/rocm-"* 2>/dev/null \
-            || echo "(no fetched header tree: the fetch never ran)"
-          exit 1
 
       - name: Build the memcpy test binary
         run: |
@@ -186,20 +177,11 @@ jobs:
           echo "LD_LIBRARY_PATH=$LD_LIBRARY_PATH" >> $GITHUB_ENV
 
           # driver.active raises on 0 or >1 drivers -- the same call conftest turns into a skip.
-          python3 - <<'PY'
-          import subprocess
+          python3 -c "
           import triton
-          from triton.backends.nvidia.compiler import get_ptxas
           from triton.runtime.driver import driver
-
-          print("triton", triton.__version__, "| active driver:", driver.active)
-          # Triton bundles its own ptxas, so nvcc's version does not imply it. Best-effort only.
-          try:
-              ptxas = get_ptxas(driver.active.get_current_target().arch).path
-              print(subprocess.run([ptxas, "--version"], capture_output=True, text=True).stdout)
-          except Exception as exc:  # noqa: BLE001 - diagnostic only
-              print("could not resolve triton's bundled ptxas:", exc)
-          PY
+          print('triton', triton.__version__, '| active driver:', driver.active)
+          "
 
       - name: Build Catalyst frontend (reusing the transport-enabled runtime)
         run: |
@@ -251,19 +233,19 @@ jobs:
         # an earlier failure leaves no junit file, and failing here would bury the real error.
         if: always() && steps.gpu-tests.outcome != 'skipped'
         run: |
-          python3 - <<'EOF'
-          import sys
-          import xml.etree.ElementTree as ET
-
-          root = ET.parse("gpu-backline-results.xml").getroot()
-          suite = root if root.tag == "testsuite" else root.find("testsuite")
-          total = int(suite.get("tests", 0))
-          skipped = int(suite.get("skipped", 0))
-          print(f"{total - skipped}/{total} backline GPU tests executed ({skipped} skipped)")
-          if total == 0 or skipped == total:
-              sys.exit(
-                  "No backline GPU test executed -- all selected tests were skipped. "
-                  "Refusing to report success for a run with zero GPU coverage."
-              )
-          EOF
-
+          set -euo pipefail
+          # Read the attributes by name: pytest emits them alphabetically, so `skipped` lands
+          # before `tests`, and the <skipped> child elements carry a message, never a count.
+          attr() { grep -o " $1=\"[0-9]*\"" gpu-backline-results.xml | head -1 | tr -dc '0-9'; }
+          total=$(attr tests); skipped=$(attr skipped)
+          if [ -z "$total" ] || [ -z "$skipped" ]; then
+            echo "::error::could not read the test counts out of gpu-backline-results.xml"
+            head -5 gpu-backline-results.xml
+            exit 1
+          fi
+          echo "$((total - skipped))/$total backline GPU tests executed ($skipped skipped)"
+          if [ "$total" -eq 0 ] || [ "$total" -eq "$skipped" ]; then
+            echo "::error::No backline GPU test executed -- all selected tests were skipped." \
+                 "Refusing to report success for a run with zero GPU coverage."
+            exit 1
+          fi
