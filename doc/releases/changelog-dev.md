@@ -765,6 +765,11 @@
 * A new pass `--resolve-gate-level-adjoint` was added. This pass now handles gate-level adjoint canonicalization, moving it out of the `--canonicalize` pass.
   [#3155](https://github.com/PennyLaneAI/catalyst/pull/3155)
 
+* Transport CI runs on pull requests that touch the transport paths: the runtime is built with
+  `ENABLE_TRANSPORT=ON`, its Catch2 suites run over a soft-RoCE loopback link, and the backline
+  CPU integration tests run against it. Other pull requests skip the job entirely.
+  [(#3074)](https://github.com/PennyLaneAI/catalyst/pull/3074)
+
 <h3>Documentation 📝</h3>
 
 * A broken link was removed in the [Compiler Core](https://docs.pennylane.ai/projects/catalyst/en/stable/modules/mlir.html) documentation page. The link referred to where precompiled decomposition rules were implemented, which has since been refactored.
