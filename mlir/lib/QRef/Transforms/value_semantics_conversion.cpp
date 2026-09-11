@@ -25,6 +25,7 @@
 #include "value_semantics_conversion.h"
 
 #include <cstdint>
+#include <limits>
 #include <optional>
 #include <utility>
 #include <variant>
@@ -791,6 +792,32 @@ void collectNecessarySubroutineRValues(func::FuncOp f,
 }
 
 /**
+ * @brief Order a necessary subroutine rValue by the subroutine argument it originates from.
+ *
+ * A necessary rValue is either a qref argument of the subroutine, or a qubit extracted from one of
+ * its register arguments (see SubroutineInfo). The key is that argument's index, paired with the
+ * extract index so several qubits taken from one register keep their register order.
+ */
+std::pair<unsigned, uint64_t> sourceArgumentKey(Value rValue) {
+    if (auto rValueAsArg = dyn_cast<BlockArgument>(rValue)) {
+        return {rValueAsArg.getArgNumber(), 0};
+    }
+    auto getOp = dyn_cast<qref::GetOp>(rValue.getDefiningOp());
+    if (!getOp) {
+        return {std::numeric_limits<unsigned>::max(), 0};
+    }
+    auto rQregAsArg = dyn_cast<BlockArgument>(getOp.getQreg());
+    if (!rQregAsArg) {
+        return {std::numeric_limits<unsigned>::max(), 0};
+    }
+    // A dynamic extract index is rejected by SubroutineInfo below; order those last rather than
+    // reading an absent attribute here.
+    return {rQregAsArg.getArgNumber(),
+            getOp.getIdxAttr().has_value() ? getOp.getIdxAttr().value()
+                                           : std::numeric_limits<uint64_t>::max()};
+}
+
+/**
  * @brief An info object to store what new arguments the converted subroutine needs.
  *
  * The strategy to convert subroutines and calls are as follows:
@@ -846,7 +873,22 @@ void collectNecessarySubroutineRValues(func::FuncOp f,
 struct SubroutineInfo {
   public:
     SubroutineInfo(func::FuncOp f) : subroutine(f) {
-        collectNecessarySubroutineRValues(this->subroutine, this->necessarySubroutineRValues);
+        SetVector<Value> collected;
+        collectNecessarySubroutineRValues(this->subroutine, collected);
+
+        // The collection order is the order the gate operands happen to mention these values in,
+        // which bears no relation to the subroutine's own argument order. Both the converted
+        // signature and the rewritten call sites are built by walking this set, so an arbitrary
+        // order silently permutes the signature: `f(%ctrl, %target)` whose first gate reads
+        // `%target` converts to an `f` whose first argument is the target. Order by the qref
+        // argument each value comes from (and, for a qubit extracted from a register argument, by
+        // its index within that register) so the converted signature keeps the order it had.
+        SmallVector<Value> ordered(collected.begin(), collected.end());
+        llvm::stable_sort(ordered, [](Value lhs, Value rhs) {
+            return sourceArgumentKey(lhs) < sourceArgumentKey(rhs);
+        });
+        this->necessarySubroutineRValues.insert(ordered.begin(), ordered.end());
+
         for (auto rValue : this->necessarySubroutineRValues) {
             if (auto rValueAsArg = dyn_cast<BlockArgument>(rValue)) {
                 newArgsInfo.push_back(rValueAsArg.getArgNumber());

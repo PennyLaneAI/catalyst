@@ -52,6 +52,7 @@
 #include "Catalyst/Analysis/ResourceResult.h"
 #include "Catalyst/Transforms/Passes.h"
 #include "Driver/Timer.h"
+#include "QRef/Transforms/Passes.h"
 #include "Quantum/IR/QuantumDialect.h"
 #include "Quantum/IR/QuantumInterfaces.h"
 #include "Quantum/IR/QuantumOps.h"
@@ -275,6 +276,19 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         }
         LDBG() << "lowering fixpoint reached after " << iterationsRun << " iteration(s), "
                << previousOpCount << " ops";
+
+        // `decompose-lowering` normalizes the circuit and the rules it applies to reference
+        // semantics, but this pass runs inside the transform sequence, i.e. after the pipeline's
+        // own `convert-to-value-semantics`. Nothing downstream would convert the module back, so
+        // restore value semantics here and leave the module in the dialect we received it in.
+        {
+            ScopedDiagnosticTimer t("decomp:ref-to-value");
+            OpPassManager valueSemanticsPm("builtin.module");
+            valueSemanticsPm.addPass(qref::createValueSemanticsConversionPass());
+            if (failed(runPipeline(valueSemanticsPm, module))) {
+                return signalPassFailure();
+            }
+        }
     }
 
   private:
@@ -301,6 +315,14 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
                          llvm::StringSet<> &userRuleNames) {
         for (const std::string &opRulesPair : altDecompsOption) {
             llvm::StringRef pairRef(opRulesPair);
+
+            // The rule list may be bracketed either around the list alone ("op=[r1,r2]") or
+            // around the whole pair ("[op=r1]"); strip the latter before splitting off the key.
+            pairRef = pairRef.trim();
+            if (pairRef.starts_with("[")) {
+                pairRef.consume_front("[");
+                pairRef.consume_back("]");
+            }
 
             auto [opName, rulesRef] = pairRef.split("=");
             opName = opName.trim();
@@ -362,8 +384,6 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
 
         // Try to generate resources if they're missing
         if (!resourcesAttr) {
-            llvm::errs() << "needed ResourceAnalysis for resources, bailing instead\n";
-            return success(); // TODO: remove this
             ResourceAnalysis analysis(rule, {}, /*collectDetailedOperations=*/true);
             if (const ResourceResult *flat = analysis.getFlattenedResource(rule.getName())) {
                 rule->setAttr("resources", buildResourceDict(&getContext(), *flat));
@@ -624,19 +644,37 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
     }
 
     /**
+     * @brief Resolve a `fixed-decomps`/`alt-decomps` override key against the rule it names.
+     *
+     * A key may be spelled either as a full graphOpId ("C(U){}{wires:1}{}") or as a bare operator
+     * name ("testHadamard"). `OperatorNode` identity is its `id`, so a name-only key can never
+     * compare equal to the rule output it is meant to override. The rule already declares the
+     * operator it decomposes through its `target_gate`, so adopt that identity when the names
+     * agree. A key that names a different operator than the rule produces is left as spelled, so
+     * the graph builder reports the mismatch instead of silently retargeting the override.
+     */
+    OperatorNode resolveOverrideKey(llvm::StringRef rawKey, const RuleNode &rule) {
+        OperatorNode key = parseOperator(rawKey);
+        if (key.id.empty() && key.name == rule.output.name) {
+            return rule.output;
+        }
+        return key;
+    }
+
+    /**
      * @brief Create RuleNodes for each rule available to be used in graph decomposition.
      */
     LogicalResult getRuleNodes(llvm::StringRef filename, std::vector<RuleNode> &rules,
                                llvm::StringSet<> &userRuleNames) {
         ScopedDiagnosticTimer t("decomp:rules");
         // Load pre-compiled rules (ignore failure, we can try to solve without)
-        // std::ignore = loadBuiltInDecompositionRules(filename, rules);
+        std::ignore = loadBuiltInDecompositionRules(filename, rules);
 
         // Lower compile-time rules into the module; loadUserDecompositionRules (below) registers
         // the materialized `__builtin`-prefixed funcs as RuleNodes.
-        // if (failed(loadPythonDecomps())) {
-        //     return failure();
-        // }
+        if (failed(loadPythonDecomps())) {
+            return failure();
+        }
 
         // Load user-rules
         if (failed(loadUserDecompositionRules(userRuleNames, rules))) {
@@ -667,8 +705,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
                 continue;
             }
 
-            OperatorNode opNode;
-            opNode.name = opName.str();
+            OperatorNode opNode = resolveOverrideKey(opName, *(it->second));
             fixedDecomps.emplace(std::move(opNode), *(it->second));
         }
         return fixedDecomps;
@@ -694,9 +731,6 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         altDecomps.reserve(opToAltDecompNames.size());
 
         for (const auto &[opName, ruleNames] : opToAltDecompNames) {
-            OperatorNode opNode;
-            opNode.name = opName.str();
-
             std::vector<RuleNode> altRules;
             altRules.reserve(ruleNames.size());
 
@@ -709,6 +743,9 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
             }
 
             if (!altRules.empty()) {
+                // Every alternative listed for a key decomposes the same operator, so resolving
+                // the key against the first is enough.
+                OperatorNode opNode = resolveOverrideKey(opName, altRules.front());
                 altDecomps.emplace(std::move(opNode), std::move(altRules));
             }
         }
