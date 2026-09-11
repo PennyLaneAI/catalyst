@@ -117,7 +117,7 @@ jobs:
           name=libcatalyst_transport_memcpy_gpu_coprocessor.so
           if ! find "$(pwd)/runtime-build/lib" -name "$name" -print -exec ls -l {} + | grep -q .; then
             echo "::error::$name was not built -- CMake did not resolve HIP."
-            grep -E "^(_nvcc|_hip_include_dir|CMAKE_HIP_|TRANSPORT_HIP_PACKAGES)" \
+            grep -E "^(_nvcc|_hip_include_dir|CMAKE_HIP_)" \
               "$(pwd)/runtime-build/CMakeCache.txt" || echo "(no HIP entries in the cache at all)"
             exit 1
           fi
@@ -130,7 +130,8 @@ jobs:
         run: |
           "$(pwd)/runtime-build/tests/runner_tests_transport_memcpy"
 
-      # No ROCm install needed: lib/transport/CMakeLists.txt fetches the HIP headers, nvcc drives them.
+      # Requires ROCm on the runner: hip-dev supplies the headers and hipcc-nvidia the NVIDIA
+      # platform support; nvcc compiles. The build no longer fetches them.
 
       # Not reused from check-catalyst.yaml: its GH-hosted mlir-tblgen hits a GLIBC mismatch here.
       - name: Build LLVM, StableHLO and Enzyme
