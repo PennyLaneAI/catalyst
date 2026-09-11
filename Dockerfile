@@ -274,7 +274,7 @@ RUN pip install --no-cache-dir \
 
 
 # Download and build Catalyst
-FROM quay.io/pypa/manylinux_2_28_aarch64 AS wheel-catalyst
+FROM wheel-lightning-qubit AS wheel-lightning-qubit-catalyst
 ARG PENNYLANE_VERSION
 ARG CATALYST_VERSION
 ARG LIGHTNING_VERSION
