@@ -151,6 +151,7 @@
     [(#2855)](https://github.com/PennyLaneAI/catalyst/pull/2855)
     [(#3156)](https://github.com/PennyLaneAI/catalyst/pull/3156)
     [(#3158)](https://github.com/PennyLaneAI/catalyst/pull/3158)
+    [(#3206)](https://github.com/PennyLaneAI/catalyst/pull/3206)
 
     1. The pass now supports applying a selection of the available decomposition rules via the `target_rules` parameter.
 
@@ -572,6 +573,9 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* Adds ability to lower `None` attributes to `get_mlir_attribute_from_pyval`.
+  [(#3196)](https://github.com/PennyLaneAI/catalyst/pull/3196)
+
 * Update calls to `GlobalPhase` to no longer use the `wires` argument.
   [(#3108)](https://github.com/PennyLaneAI/catalyst/pull/3108)
   
@@ -777,6 +781,12 @@
 * The `transport` and `executor` dialects are now documented alongside the other Catalyst dialects.
   [(#3179)](https://github.com/PennyLaneAI/catalyst/pull/3179)
   [(#3180)](https://github.com/PennyLaneAI/catalyst/pull/3180)
+  [(#3197)](https://github.com/PennyLaneAI/catalyst/pull/3197)
+
+* A developer guide for Backline describes how heterogeneous compilation and remote execution are
+  built in Catalyst: the `catalyst.backline` module attribute, the transport and executor
+  dialects, the compilation pipeline, and the runtime.
+  [(#3208)](https://github.com/PennyLaneAI/catalyst/pull/3208)
 
 <h3>Contributors ✍️</h3>
 

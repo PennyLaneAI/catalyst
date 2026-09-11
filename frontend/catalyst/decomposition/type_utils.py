@@ -15,6 +15,7 @@
 """Type handling utilities for decomposition rule lowering."""
 
 import copy
+import itertools
 import re
 
 import jax.numpy as jnp
@@ -157,10 +158,21 @@ def replace_wires_with_placeholder_wires(node):
     """
     # Wires is a pytree itself, so it has to be marked as a leaf to be replaced as a whole.
     leaves, tree = flatten(copy.deepcopy(node), is_leaf=_is_wires)
-    leaves = [
-        qp.wires.Wires(range(-1, -len(leaf) - 1, -1)) if _is_wires(leaf) else leaf
-        for leaf in leaves
-    ]
+
+    # NOTE: Run an accumulator to generate unique negative wire labels
+    # as some operators like qp.ctrl(qp.H(Wire[1]), Wire[1]) would
+    # fail to unflatten as without this change they would have duplicate wire labels
+    counter = itertools.count(-1, -1)
+    new_leaves = []
+    for leaf in leaves:
+        if _is_wires(leaf):
+            new_wires = qp.wires.Wires([next(counter) for _ in range(len(leaf))])
+            new_leaves.append(new_wires)
+        else:
+            new_leaves.append(leaf)
+
+    leaves = new_leaves
+
     return unflatten(leaves, tree)
 
 
