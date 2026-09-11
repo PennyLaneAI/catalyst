@@ -27,7 +27,7 @@ def test_pauli_rot_lowering():
     """Test that Pauli rotation is lowered to quantum.paulirot."""
     pipe = [("pipe", ["quantum-compilation-stage"])]
 
-    @qjit(pipelines=pipe, target="mlir", capture=True)
+    @qjit(pipelines=pipe, target="mlir", capture=True, collect_decomp_rules=False)
     def test_pauli_rot_lowering_workflow():
 
         @qp.qnode(qp.device("null.qubit", wires=1))
@@ -46,7 +46,7 @@ def test_pauli_rot_lowering_with_ctrl_qubits():
     """
     pipe = [("pipe", ["quantum-compilation-stage"])]
 
-    @qjit(pipelines=pipe, target="mlir", capture=True)
+    @qjit(pipelines=pipe, target="mlir", capture=True, collect_decomp_rules=False)
     def test_pauli_rot_lowering_with_ctrl_qubits_workflow():
 
         @qp.qnode(qp.device("null.qubit", wires=2))
@@ -64,7 +64,7 @@ def test_pauli_rot_to_ppr():
     """Test that Pauli rotation is converted to pbc.ppr."""
     pipe = [("pipe", ["quantum-compilation-stage"])]
 
-    @qjit(pipelines=pipe, target="mlir", capture=True)
+    @qjit(pipelines=pipe, target="mlir", capture=True, collect_decomp_rules=False)
     @to_ppr
     def test_pauli_rot_to_ppr_workflow():
 
@@ -82,7 +82,7 @@ def test_pauli_rot_with_arbitrary_angle_to_ppr():
     """Test that Pauli rotation for arbitrary angle."""
     pipe = [("pipe", ["quantum-compilation-stage"])]
 
-    @qjit(pipelines=pipe, target="mlir", capture=True)
+    @qjit(pipelines=pipe, target="mlir", capture=True, collect_decomp_rules=False)
     @to_ppr
     def test_pauli_rot_with_arbitrary_angle_to_ppr_workflow():
 
@@ -100,7 +100,7 @@ def test_pauli_rot_with_dynamic_angle_to_ppr():
     """Test that Pauli rotation for dynamic angle."""
     pipe = [("pipe", ["quantum-compilation-stage"])]
 
-    @qjit(pipelines=pipe, target="mlir", capture=True)
+    @qjit(pipelines=pipe, target="mlir", capture=True, collect_decomp_rules=False)
     @to_ppr
     def test_pauli_rot_with_dynamic_angle_to_ppr_workflow():
 
@@ -118,7 +118,7 @@ def test_pauli_measure_to_ppm():
     """Test that Pauli measurement is converted to pbc.ppm."""
     pipe = [("pipe", ["quantum-compilation-stage"])]
 
-    @qjit(pipelines=pipe, target="mlir", capture=True)
+    @qjit(pipelines=pipe, target="mlir", capture=True, collect_decomp_rules=False)
     @to_ppr
     def test_pauli_measure_to_ppr_workflow():
 
@@ -136,39 +136,41 @@ def test_pauli_rot_to_ppr_pauli_word_error():
     """Test that unsupported pauli words raises `ValueError`."""
     pipe = [("pipe", ["quantum-compilation-stage"])]
 
+    @qjit(pipelines=pipe, target="mlir", capture=True, collect_decomp_rules=False)
+    def test_pauli_rot_to_ppr_pauli_word_error_workflow():
+
+        @qp.qnode(qp.device("null.qubit", wires=1))
+        def f():
+            qp.PauliRot(np.pi / 4, "A", wires=0)
+
+        return f()
+
     with pytest.raises(
         ValueError,
         match=r"The given Pauli word \"A\" contains characters that are not allowed. "
         r"Allowed characters are I, X, Y and Z",
     ):
-
-        @qjit(pipelines=pipe, target="mlir", capture=True)
-        def test_pauli_rot_to_ppr_pauli_word_error_workflow():
-
-            @qp.qnode(qp.device("null.qubit", wires=1))
-            def f():
-                qp.PauliRot(np.pi / 4, "A", wires=0)
-
-            return f()
+        test_pauli_rot_to_ppr_pauli_word_error_workflow()
 
 
 def test_pauli_measure_to_ppr_pauli_word_error():
     """Test that unsupported pauli words raises `ValueError`."""
     pipe = [("pipe", ["quantum-compilation-stage"])]
 
+    @qjit(pipelines=pipe, target="mlir", capture=True, collect_decomp_rules=False)
+    def test_pauli_measure_to_ppr_pauli_word_error_workflow():
+
+        @qp.qnode(qp.device("null.qubit", wires=1))
+        def f():
+            qp.pauli_measure("A", wires=0)
+
+        return f()
+
     with pytest.raises(
         ValueError,
         match=r"Only Pauli words consisting of 'I', 'X', 'Y', and 'Z' are allowed.",
     ):
-
-        @qjit(pipelines=pipe, target="mlir", capture=True)
-        def test_pauli_measure_to_ppr_pauli_word_error_workflow():
-
-            @qp.qnode(qp.device("null.qubit", wires=1))
-            def f():
-                qp.pauli_measure("A", wires=0)
-
-            return f()
+        test_pauli_measure_to_ppr_pauli_word_error_workflow()
 
 
 def test_controlled_pauli_rot_failure():
@@ -176,7 +178,7 @@ def test_controlled_pauli_rot_failure():
     Test that controlled PauliRot fails at runtime.
     """
 
-    @qjit(capture=True)
+    @qjit(capture=True, collect_decomp_rules=False)
     @qp.qnode(qp.device("lightning.qubit", wires=2))
     def workflow():
         qp.ctrl(qp.PauliRot(np.pi / 4, "X", wires=0), control=1)

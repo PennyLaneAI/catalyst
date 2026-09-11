@@ -268,3 +268,28 @@ func.func @test_parametrized_gate_identity_angle_elision_to_ppr(%q0 : !quantum.b
     // CHECK-NOT: pbc.ppr
     // CHECK: return
 }
+
+// -----
+
+func.func @test_dce_rules(%q1 : !quantum.bit) -> !quantum.bit {
+    // CHECK-NOT: quantum.custom
+    // CHECK: quantum.gphase
+    // CHECK: pbc.ppr ["Z"](4)
+    // CHECK: pbc.ppr ["X"](4)
+    // CHECK: pbc.ppr ["Z"](4)
+    %q1_0 = quantum.custom "H"() %q1 : !quantum.bit
+    func.return %q1_0 : !quantum.bit
+}
+
+// CHECK-NOT: func.func private @"some_decomp_rule"
+func.func private @"some_decomp_rule"(%arg0: tensor<1xf64>, %arg1: tensor<1xi64>, %arg2: !quantum.reg) -> !quantum.reg attributes {resources = {operations = {"some_gate" = 1 : i64}}, target_gate = "Hadamard{}{wires:1}{}"} {
+    %0 = stablehlo.slice %arg1 [0:1] : (tensor<1xi64>) -> tensor<1xi64>
+    %1 = stablehlo.reshape %0 : (tensor<1xi64>) -> tensor<i64>
+    %extracted = tensor.extract %1[] : tensor<i64>
+    %2 = quantum.extract %arg2[%extracted] : !quantum.reg -> !quantum.bit
+    %out_qubits = quantum.operator "some_gate"(%arg0: tensor<1xf64>) qubits(%2)
+      static_data = {}
+      param_map = {phi = [0]} qubit_map = {wires = [0]}
+    %3 = quantum.insert %arg2[%extracted], %out_qubits : !quantum.reg, !quantum.bit
+    return %3 : !quantum.reg
+}

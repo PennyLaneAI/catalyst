@@ -19,11 +19,17 @@ import lit.formats
 from lit.llvm import llvm_config
 
 config.name = "Frontend Tests"
-config.test_format = lit.formats.ShTest(True)
+config.test_format = lit.formats.ShTest()
 
 # Define the file extensions to treat as test files (with the exception of this file).
 config.suffixes = [".py", ".mlir"]
-config.excludes = ["lit.cfg.py", "utils.py", "catalyst.autograph.exclusion.py", "test_rules.mlir"]
+config.excludes = [
+    "lit.cfg.py",
+    "utils.py",
+    "catalyst.autograph.exclusion.py",
+    "operator2_dummy_gates.py",
+    "test_rules.mlir",
+]
 
 # Define the root path of where to look for tests.
 config.test_source_root = os.path.dirname(__file__)

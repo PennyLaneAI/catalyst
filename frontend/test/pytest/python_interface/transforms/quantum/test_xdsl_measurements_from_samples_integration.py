@@ -77,15 +77,16 @@ class TestIntegrationUsefulErrors:
 
         dev = qp.device("lightning.qubit", wires=4)
 
-        with pytest.raises(NotImplementedError, match="operations are not supported"):
+        @qp.qjit(capture=capture)
+        @measurements_from_samples_pass
+        @qp.set_shots(1000)
+        @qp.qnode(dev)
+        def circuit(theta: float):
+            qp.RX(theta, 0)
+            return qp.counts()
 
-            @qp.qjit(capture=capture)
-            @measurements_from_samples_pass
-            @qp.set_shots(1000)
-            @qp.qnode(dev)
-            def circuit(theta: float):
-                qp.RX(theta, 0)
-                return qp.counts()
+        with pytest.raises(NotImplementedError, match="operations are not supported"):
+            circuit(1.2)
 
     @pytest.mark.parametrize("mp", (qp.expval, qp.var))
     def test_overlapping_tensor(self, mp, capture):
@@ -99,13 +100,14 @@ class TestIntegrationUsefulErrors:
 
         dev = qp.device("lightning.qubit", wires=2)
 
-        with pytest.raises(CompileError, match="Observables are not qubit-wise commuting"):
+        @qp.qjit(capture=capture)
+        @measurements_from_samples_pass
+        @qp.qnode(dev, shots=1000)
+        def circuit():
+            return mp(qp.Z(0) @ qp.X(0))
 
-            @qp.qjit(capture=capture)
-            @measurements_from_samples_pass
-            @qp.qnode(dev, shots=1000)
-            def circuit():
-                return mp(qp.Z(0) @ qp.X(0))
+        with pytest.raises(CompileError, match="Observables are not qubit-wise commuting"):
+            circuit()
 
     @pytest.mark.parametrize("mp", (qp.expval, qp.var))
     def test_overlapping_sum(self, mp, capture):
@@ -119,13 +121,14 @@ class TestIntegrationUsefulErrors:
 
         dev = qp.device("lightning.qubit", wires=2)
 
-        with pytest.raises(CompileError, match="Observables are not qubit-wise commuting"):
+        @qp.qjit(capture=capture)
+        @measurements_from_samples_pass
+        @qp.qnode(dev, shots=1000)
+        def circuit():
+            return mp(2 * qp.Z(0) + qp.X(0))
 
-            @qp.qjit(capture=capture)
-            @measurements_from_samples_pass
-            @qp.qnode(dev, shots=1000)
-            def circuit():
-                return mp(2 * qp.Z(0) + qp.X(0))
+        with pytest.raises(CompileError, match="Observables are not qubit-wise commuting"):
+            circuit()
 
     @pytest.mark.parametrize("mp", (qp.expval, qp.var))
     def test_overlapping_mps(self, mp, capture):
@@ -140,13 +143,14 @@ class TestIntegrationUsefulErrors:
 
         dev = qp.device("lightning.qubit", wires=2)
 
-        with pytest.raises(CompileError, match="Observables are not qubit-wise commuting"):
+        @qp.qjit(capture=capture)
+        @measurements_from_samples_pass
+        @qp.qnode(dev, shots=1000)
+        def circuit():
+            return mp(qp.Z(0)), mp(qp.X(0))
 
-            @qp.qjit(capture=capture)
-            @measurements_from_samples_pass
-            @qp.qnode(dev, shots=1000)
-            def circuit():
-                return mp(qp.Z(0)), mp(qp.X(0))
+        with pytest.raises(CompileError, match="Observables are not qubit-wise commuting"):
+            circuit()
 
     def test_overlapping_obs_and_sample(self, capture):
         """Check that an error is raised if the circuit returns an mp with an observable that
@@ -160,13 +164,14 @@ class TestIntegrationUsefulErrors:
 
         dev = qp.device("lightning.qubit", wires=2)
 
-        with pytest.raises(CompileError, match="Observables are not qubit-wise commuting"):
+        @qp.qjit(capture=capture)
+        @measurements_from_samples_pass
+        @qp.qnode(dev, shots=1000)
+        def circuit():
+            return qp.sample(wires=[0]), qp.expval(qp.X(0))
 
-            @qp.qjit(capture=capture)
-            @measurements_from_samples_pass
-            @qp.qnode(dev, shots=1000)
-            def circuit():
-                return qp.sample(wires=[0]), qp.expval(qp.X(0))
+        with pytest.raises(CompileError, match="Observables are not qubit-wise commuting"):
+            circuit()
 
     @pytest.mark.parametrize("obs", (2 * qp.X(0), qp.X(1) + qp.X(2)))
     def test_hamiltonianop_raises_error(self, obs, capture):
@@ -175,13 +180,14 @@ class TestIntegrationUsefulErrors:
 
         dev = qp.device("lightning.qubit", wires=2)
 
-        with pytest.raises(CompileError, match=r"Apply `.*.transforms.split_non_commuting`"):
+        @qp.qjit(capture=capture)
+        @measurements_from_samples_pass
+        @qp.qnode(dev, shots=1000)
+        def circuit():
+            return qp.expval(obs)
 
-            @qp.qjit(capture=capture)
-            @measurements_from_samples_pass
-            @qp.qnode(dev, shots=1000)
-            def circuit():
-                return qp.expval(obs)
+        with pytest.raises(CompileError, match=r"Apply `.*.transforms.split_non_commuting`"):
+            circuit()
 
 
 @pytest.mark.parametrize("capture", [True, False])

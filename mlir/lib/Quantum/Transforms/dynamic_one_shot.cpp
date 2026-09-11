@@ -415,7 +415,8 @@ void editKernelMCMProbs(IRRewriter &builder, func::FuncOp oneShotKernel, quantum
     auto totalIndex =
         arith::ConstantOp::create(builder, loc, i64Type, builder.getIntegerAttr(i64Type, 0));
     Operation *loopUpdater = totalIndex;
-    for (auto [i, mcm] : llvm::enumerate(llvm::reverse(mcmobs.getMcms()))) {
+    SmallVector<Value> mcms(mcmobs.getMcms());
+    for (auto [i, mcm] : llvm::enumerate(llvm::reverse(mcms))) {
         // Power of 2 for this bit position
         auto extuiOp = arith::ExtUIOp::create(builder, loc, builder.getI64Type(), mcm);
         auto shiftSize =

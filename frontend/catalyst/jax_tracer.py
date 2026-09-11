@@ -47,7 +47,7 @@ from pennylane.measurements import (
     VarianceMP,
 )
 from pennylane.operation import Operation, Operator, Wires
-from pennylane.ops import Adjoint, Controlled, ControlledOp
+from pennylane.ops import Adjoint, Controlled, ControlledOp, ControlledOp2
 from pennylane.tape import QuantumTape
 
 import catalyst
@@ -849,12 +849,12 @@ def trace_quantum_operations(
     def bind_native_operation(qrp, op, controlled_wires, controlled_values, adjoint=False):
         # For named-controlled operations (e.g. CNOT, CY, CZ) - bind directly by name. For
         # Controlled(OP) bind OP with native quantum control syntax, and similarly for Adjoint(OP).
-        if type(op) in (Controlled, ControlledOp):
+        if type(op) in (Controlled, ControlledOp, ControlledOp2):
             return bind_native_operation(
                 qrp,
                 op.base,
-                controlled_wires + op.control_wires,
-                controlled_values + op.control_values,
+                tuple(controlled_wires) + tuple(op.control_wires),
+                tuple(controlled_values) + tuple(op.control_values),
                 adjoint,
             )
         elif isinstance(op, Adjoint):
@@ -911,7 +911,7 @@ def trace_quantum_operations(
             # We will revisit this once we have a better solution for
             # supporting general PL operations in Catalyst.
             params = op.parameters
-            pcphase_dim = op.hyperparameters["dimension"][0] if isinstance(op, qp.PCPhase) else None
+            pcphase_dim = op.compilable_args["dim"] if isinstance(op, qp.PCPhase) else None
 
             qubits2 = qinst_p.bind(
                 *[*qubits, *params, *controlled_qubits, *controlled_values],

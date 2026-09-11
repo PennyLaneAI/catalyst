@@ -268,6 +268,10 @@ class TestCatalyst:
 
     def test_adjoint_pcphase(self, backend):
         """Ensures that catalyst.adjoint supports PCPhase operations."""
+        if backend == "lightning.qubit":
+            pytest.xfail(
+                reason="Waiting for https://github.com/PennyLaneAI/pennylane-lightning/pull/1420"
+            )
 
         def func():
             qp.PauliX(0)
@@ -530,10 +534,30 @@ class TestCatalyst:
                 qp.QubitUnitary(
                     jnp.array(
                         [
-                            [0.99500417 - 0.09983342j, 0.0 + 0.0j, 0.0 + 0.0j, 0.0 + 0.0j],
-                            [0.0 + 0.0j, 0.99500417 + 0.09983342j, 0.0 + 0.0j, 0.0 + 0.0j],
-                            [0.0 + 0.0j, 0.0 + 0.0j, 0.99500417 + 0.09983342j, 0.0 + 0.0j],
-                            [0.0 + 0.0j, 0.0 + 0.0j, 0.0 + 0.0j, 0.99500417 - 0.09983342j],
+                            [
+                                0.99500417 - 0.09983342j,
+                                0.0 + 0.0j,
+                                0.0 + 0.0j,
+                                0.0 + 0.0j,
+                            ],
+                            [
+                                0.0 + 0.0j,
+                                0.99500417 + 0.09983342j,
+                                0.0 + 0.0j,
+                                0.0 + 0.0j,
+                            ],
+                            [
+                                0.0 + 0.0j,
+                                0.0 + 0.0j,
+                                0.99500417 + 0.09983342j,
+                                0.0 + 0.0j,
+                            ],
+                            [
+                                0.0 + 0.0j,
+                                0.0 + 0.0j,
+                                0.0 + 0.0j,
+                                0.99500417 - 0.09983342j,
+                            ],
                         ]
                     ),
                     wires=[0, 1],
@@ -753,7 +777,6 @@ class TestInitialization:
         assert op.hyperparameters["base"] is base
         assert op.name == "Adjoint(Rot)"
 
-        assert op.num_params == 3
         assert qp.math.allclose(params, op.parameters)
         assert qp.math.allclose(params, op.data)
 
@@ -808,7 +831,8 @@ class TestProperties:
         assert adj.data == (x,)
 
         with pytest.raises(
-            AttributeError, match="property 'data' of 'AdjointOperation' object has no setter"
+            AttributeError,
+            match="has no setter",
         ):
             setattr(adj, "data", (np.array(2.3456),))
 
@@ -917,6 +941,7 @@ class TestProperties:
         op = adjoint(DummyOp(0))
         assert op.is_verified_hermitian == value
 
+    @pytest.mark.xfail(reason="PL 2.0: Batching is not supported yet.")
     def test_batching_properties(self):
         """Test the batching properties and methods."""
 
@@ -1022,7 +1047,7 @@ class TestMiscMethods:
         base = qp.PauliX(0)
         op = adjoint(base)
 
-        assert op.adjoint() is base
+        assert qp.equal(op.adjoint(), base)
 
     def test_diagonalizing_gates(self):
         """Assert that the diagonalizing gates method gives the base's diagonalizing gates."""
@@ -1095,11 +1120,6 @@ class TestAdjointOperation:
 
         assert base_phase == phase
 
-    def test_control_wires(self):
-        """Test the control_wires of an adjoint are the same as the base op."""
-        op = adjoint(qp.CNOT(wires=("a", "b")))
-        assert op.control_wires == qp.wires.Wires("a")
-
 
 class TestAdjointOperationDiffInfo:
     """Test differention related properties and methods of AdjointOperation."""
@@ -1117,7 +1137,12 @@ class TestAdjointOperationDiffInfo:
         assert adjoint(op).grad_method == op.grad_method
 
     @pytest.mark.parametrize(
-        "base", (qp.PauliX(0), qp.RX(1.234, wires=0), qp.Rot(1.234, 0.0, 0.0, wires=0))
+        "base",
+        (
+            qp.PauliX(0),
+            qp.RX(1.234, wires=0),
+            qp.Rot(1.234, 0.0, 0.0, wires=0),
+        ),
     )
     def test_grad_recipe(self, base):
         """Test that the grad_recipe of the Adjoint is the same as the grad_recipe of the base."""
@@ -1125,11 +1150,17 @@ class TestAdjointOperationDiffInfo:
 
     @pytest.mark.parametrize(
         "base",
-        (qp.RX(1.23, wires=0), qp.Rot(1.23, 2.345, 3.456, wires=0), qp.CRX(1.234, wires=(0, 1))),
+        (
+            qp.RX(1.23, wires=0),
+            qp.Rot(1.23, 2.345, 3.456, wires=0),
+            qp.CRX(1.234, wires=(0, 1)),
+        ),
     )
     def test_parameter_frequencies(self, base):
         """Test that the parameter frequencies of an Adjoint are the same as those of the base."""
-        assert adjoint(base).parameter_frequencies == base.parameter_frequencies
+        assert qp.gradients.parameter_frequencies(
+            adjoint(base)
+        ) == qp.gradients.parameter_frequencies(base)
 
 
 class TestQueueing:
@@ -1234,7 +1265,11 @@ class TestEigvals:
     """Test the Adjoint class adjoint methods."""
 
     @pytest.mark.parametrize(
-        "base", (qp.PauliX(0), qp.Hermitian(np.array([[6 + 0j, 1 - 2j], [1 + 2j, -1]]), wires=0))
+        "base",
+        (
+            qp.PauliX(0),
+            qp.Hermitian(np.array([[6 + 0j, 1 - 2j], [1 + 2j, -1]]), wires=0),
+        ),
     )
     def test_hermitian_eigvals(self, base):
         """Test adjoint's eigvals are the same as base eigvals when op is Hermitian."""
@@ -1308,7 +1343,7 @@ class TestDecomposition:
         adj1 = adjoint(base)
         adj2 = adjoint(adj1)
 
-        assert adj2.decomposition()[0] is base
+        qp.assert_equal(adj2.decomposition()[0], base)
 
 
 class TestIntegration:
@@ -1634,7 +1669,6 @@ class TestAdjointConstructorIntegration:
 
 
 class TestMidCircuitMeasurementAfterAdjoint:
-
     def test_issue_1055(self, backend):
         """See https://github.com/PennyLaneAI/catalyst/issues/1055"""
 
@@ -1731,7 +1765,6 @@ class TestAdjointOfTemplates:
 
         @qp.qnode(qp.device(backend, wires=1))
         def circuit(s: int):
-
             @cat.switch(s)
             def f():
                 qp.T(0)

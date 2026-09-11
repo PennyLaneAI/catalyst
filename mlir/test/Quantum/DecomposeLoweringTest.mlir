@@ -605,15 +605,14 @@ module @circuit_with_operator_op {
     %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
     // CHECK: quantum.custom "RZ"
     // CHECK-NOT: quantum.operator
-    %out_qubits_0 = quantum.operator "DummyOp"(%arg0: f64) qubits(%1)
-      static_data = {metadata = "word"}
-    %2 = quantum.insert %0[ 0], %out_qubits_0 : !quantum.reg, !quantum.bit
+    %out_qubits_0 = quantum.operator "DummyOp"(%arg0: f64) qubits(%1) static_data = {metadata = "word"} param_map = {arg = [0]} qubit_map = {wires = [0]}
+%2 = quantum.insert %0[ 0], %out_qubits_0 : !quantum.reg, !quantum.bit
     return %2 : !quantum.reg
   }
 
   // CHECK-LABEL: func.func private @_my_dummy_decomp
   func.func private @_my_dummy_decomp(%arg0: !quantum.reg, %arg1: tensor<1xf64>, %arg2: tensor<1xi64>) -> !quantum.reg attributes
-      {llvm.linkage = #llvm.linkage<internal>, num_wires = 1 : i64, target_gate = "DummyOp[f64][1]{metadata:word}"} {
+      {llvm.linkage = #llvm.linkage<internal>, num_wires = 1 : i64, target_gate = "DummyOp{arg:[f64]}{wires:1}{metadata = \22word\22}"} {
     %0 = stablehlo.slice %arg2 [0:1] : (tensor<1xi64>) -> tensor<1xi64>
     %1 = stablehlo.reshape %0 : (tensor<1xi64>) -> tensor<i64>
     %extracted = tensor.extract %1[] : tensor<i64>
@@ -700,7 +699,7 @@ module @test_paulirot {
     }
 
     // CHECK: my_paulirot_decomp
-    func.func private @my_paulirot_decomp(%inreg : !quantum.reg, %angle_tensor : tensor<f64>, %q_tensor : tensor<3xi64>) -> !quantum.reg attributes {target_gate = "PauliRot[f64][3]{pauli_word:ZXY}"} {
+    func.func private @my_paulirot_decomp(%inreg : !quantum.reg, %angle_tensor : tensor<f64>, %q_tensor : tensor<3xi64>) -> !quantum.reg attributes {target_gate = "PauliRot{theta:[f64]}{wires:3}{pauli_word = \22ZXY\22}"} {
         %pi_by_2 = arith.constant 1.57 : f64
         %m_pi_by_2 = arith.constant -1.57 : f64
         %angle = tensor.extract %angle_tensor[] : tensor<f64>
@@ -813,5 +812,137 @@ module @different_qreg_values{
     %6 = quantum.insert %arg1[%extracted_0], %out_qubits#0 : !quantum.reg, !quantum.bit
     %7 = quantum.insert %6[%extracted_1], %out_qubits#1 : !quantum.reg, !quantum.bit
     return %7 : !quantum.reg
+  }
+}
+
+// -----
+
+// CHECK-LABEL: module @test_if
+
+module @test_if {
+  func.func @circuit() -> !quantum.bit {
+    %reg = quantum.alloc( 2) : !quantum.reg
+    %in = quantum.extract %reg[0]  : !quantum.reg -> !quantum.bit
+
+    %init_index = arith.constant 1 : index
+    %true = arith.constant 1 : i1
+    %limit = arith.constant 10 : index
+
+    %out = scf.if %true -> !quantum.bit {
+      // CHECK-NOT: "T"
+      // CHECK: "PhaseShift"
+      %if_out = quantum.custom "T"() %in : !quantum.bit
+      scf.yield %if_out : !quantum.bit
+    } else {
+      scf.yield %in : !quantum.bit
+    }
+
+    // CHECK-NOT: "T"
+    // CHECK: "PhaseShift"
+    %post_out = quantum.custom "T"() %out : !quantum.bit
+
+    return %post_out : !quantum.bit
+  }
+
+  // CHECK-LABEL: func.func private @"__builtin__t_phaseshift_T{}{wires:1}{}"
+  func.func private @"__builtin__t_phaseshift_T{}{wires:1}{}"(%arg0: tensor<1xi64>, %arg1: !quantum.reg) -> !quantum.reg attributes {llvm.linkage = #llvm.linkage<internal>, resources = {operations = {"PhaseShift{0:[f64]}{wires:1}{}" = 1 : i64}}, target_gate = "T{}{wires:1}{}"} {
+    %cst = arith.constant 0.78539816339744828 : f64
+    %0 = stablehlo.slice %arg0 [0:1] : (tensor<1xi64>) -> tensor<1xi64>
+    %1 = stablehlo.reshape %0 : (tensor<1xi64>) -> tensor<i64>
+    %extracted = tensor.extract %1[] : tensor<i64>
+    %2 = quantum.extract %arg1[%extracted] : !quantum.reg -> !quantum.bit
+    %out_qubits = quantum.custom "PhaseShift"(%cst) %2 : !quantum.bit
+    %3 = quantum.insert %arg1[%extracted], %out_qubits : !quantum.reg, !quantum.bit
+    return %3 : !quantum.reg
+  }
+}
+
+// -----
+
+// CHECK-LABEL: module @test_for_loop
+
+module @test_for_loop {
+  func.func @circuit() -> !quantum.bit {
+    %reg = quantum.alloc( 2) : !quantum.reg
+    %in = quantum.extract %reg[0]  : !quantum.reg -> !quantum.bit
+
+    %cond = arith.constant 1 : i1
+
+    %start = arith.constant 0 : index
+    %end = arith.constant 10 : index
+    %step = arith.constant 1 : index
+
+    %rout = scf.for %iter = %start to %end step %step iter_args(%for_in = %in) -> (!quantum.bit) {
+      // CHECK-NOT: "T"
+      // CHECK: "PhaseShift"
+      %out = quantum.custom "T"() %for_in : !quantum.bit
+      scf.yield %out : !quantum.bit
+    }
+
+    // CHECK-NOT: "T"
+    // CHECK: "PhaseShift"
+    %post_out = quantum.custom "T"() %rout : !quantum.bit
+
+    return %post_out : !quantum.bit
+  }
+
+  // CHECK-LABEL: func.func private @"__builtin__t_phaseshift_T{}{wires:1}{}"
+  func.func private @"__builtin__t_phaseshift_T{}{wires:1}{}"(%arg0: tensor<1xi64>, %arg1: !quantum.reg) -> !quantum.reg attributes {llvm.linkage = #llvm.linkage<internal>,  target_gate = "T{}{wires:1}{}"} {
+    %cst = arith.constant 0.78539816339744828 : f64
+    %0 = stablehlo.slice %arg0 [0:1] : (tensor<1xi64>) -> tensor<1xi64>
+    %1 = stablehlo.reshape %0 : (tensor<1xi64>) -> tensor<i64>
+    %extracted = tensor.extract %1[] : tensor<i64>
+    %2 = quantum.extract %arg1[%extracted] : !quantum.reg -> !quantum.bit
+    %out_qubits = quantum.custom "PhaseShift"(%cst) %2 : !quantum.bit
+    %3 = quantum.insert %arg1[%extracted], %out_qubits : !quantum.reg, !quantum.bit
+    return %3 : !quantum.reg
+  }
+}
+
+// -----
+
+// CHECK-LABEL: module @test_while_loop
+module @test_while_loop {
+  func.func @circuit() -> !quantum.bit {
+    %reg = quantum.alloc( 2) : !quantum.reg
+    %in = quantum.extract %reg[0]  : !quantum.reg -> !quantum.bit
+
+    %init_index = arith.constant 1 : index
+    %true = arith.constant 1 : i1
+    %limit = arith.constant 10 : index
+
+    %out_index, %rout = scf.while (%before_index = %init_index, %before_qubit = %in) : (index, !quantum.bit) -> (index, !quantum.bit) {
+      // CHECK-NOT: "T"
+      // CHECK: "PhaseShift"
+      %out = quantum.custom "T"() %before_qubit: !quantum.bit
+      %increment = arith.constant 1 : index
+      %updated_index = index.add %before_index, %increment
+      %condition = index.cmp ult (%updated_index, %limit)
+      scf.condition(%condition) %updated_index, %out: index, !quantum.bit
+    } do {
+      ^bb0(%after_index: index, %after_qubit : !quantum.bit):
+        // CHECK-NOT: "T"
+        // CHECK: "PhaseShift"
+        %after_out = quantum.custom "T"() %after_qubit : !quantum.bit
+        scf.yield %after_index, %after_out: index, !quantum.bit
+    }
+
+    // CHECK-NOT: "T"
+    // CHECK: "PhaseShift"
+    %post_out = quantum.custom "T"() %rout : !quantum.bit
+
+    return %post_out : !quantum.bit
+  }
+
+  // CHECK-LABEL: func.func private @"__builtin__t_phaseshift_T{}{wires:1}{}"
+  func.func private @"__builtin__t_phaseshift_T{}{wires:1}{}"(%arg0: tensor<1xi64>, %arg1: !quantum.reg) -> !quantum.reg attributes {llvm.linkage = #llvm.linkage<internal>, resources = {operations = {"PhaseShift{0:[f64]}{wires:1}{}" = 1 : i64}}, target_gate = "T{}{wires:1}{}"} {
+    %cst = arith.constant 0.78539816339744828 : f64
+    %0 = stablehlo.slice %arg0 [0:1] : (tensor<1xi64>) -> tensor<1xi64>
+    %1 = stablehlo.reshape %0 : (tensor<1xi64>) -> tensor<i64>
+    %extracted = tensor.extract %1[] : tensor<i64>
+    %2 = quantum.extract %arg1[%extracted] : !quantum.reg -> !quantum.bit
+    %out_qubits = quantum.custom "PhaseShift"(%cst) %2 : !quantum.bit
+    %3 = quantum.insert %arg1[%extracted], %out_qubits : !quantum.reg, !quantum.bit
+    return %3 : !quantum.reg
   }
 }

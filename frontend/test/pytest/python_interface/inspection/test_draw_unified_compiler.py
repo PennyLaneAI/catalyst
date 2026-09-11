@@ -114,6 +114,7 @@ class TestDraw:
         transforms_circuit = qp.qjit(
             iterative_cancel_inverses_pass(merge_rotations_pass(transforms_circuit)),
             capture=True,
+            collect_decomp_rules=False,
         )
 
         assert draw(transforms_circuit, level=level)() == expected
@@ -145,6 +146,7 @@ class TestDraw:
         transforms_circuit = qp.qjit(
             qp.transforms.cancel_inverses(qp.transforms.merge_rotations(transforms_circuit)),
             capture=True,
+            collect_decomp_rules=False,
         )
 
         assert draw(transforms_circuit, level=level)() == expected
@@ -176,6 +178,7 @@ class TestDraw:
         transforms_circuit = qp.qjit(
             iterative_cancel_inverses_pass(qp.transforms.merge_rotations(transforms_circuit)),
             capture=True,
+            collect_decomp_rules=False,
         )
 
         assert draw(transforms_circuit, level=level)() == expected
@@ -217,7 +220,7 @@ class TestDraw:
     )
     def test_no_passes(self, transforms_circuit, level, expected):
         """Test that if no passes are applied, the circuit is still visualized."""
-        transforms_circuit = qp.qjit(transforms_circuit, capture=True)
+        transforms_circuit = qp.qjit(transforms_circuit, capture=True, collect_decomp_rules=False)
 
         assert draw(transforms_circuit, level=level)() == expected
 
@@ -247,7 +250,7 @@ class TestDraw:
         Test the visualization of control and adjoint variants.
         """
 
-        @qp.qjit(capture=True)
+        @qp.qjit(capture=True, collect_decomp_rules=False)
         @qp.qnode(qp.device("lightning.qubit", wires=3))
         def circuit():
             op()
@@ -255,12 +258,22 @@ class TestDraw:
 
         assert draw(circuit)() == expected
 
+    @pytest.mark.xfail(
+        strict=True,
+        reason=(
+            "MultiControlledX must be canonicalized to X with controls at the PLXPR level. "
+            "The drawer pipeline cannot currently process the resulting qref.operator "
+            "MultiControlledX because it has no executable lowering. Lowering it directly to "
+            "qref.custom PauliX in Catalyst would instead give the frontend and MLIR different "
+            "GraphOpIDs."
+        ),
+    )
     def test_ctrl_before_custom_op(self):
         """
         Test the visualization of control operations before custom ops.
         """
 
-        @qp.qjit(capture=True)
+        @qp.qjit(capture=True, collect_decomp_rules=False)
         @qp.qnode(qp.device("lightning.qubit", wires=3))
         def circuit():
             qp.ctrl(qp.X(3), control=[0, 1, 2], control_values=[1, 0, 1])
@@ -343,7 +356,7 @@ class TestDraw:
             else None
         )
 
-        @qp.qjit(capture=True)
+        @qp.qjit(capture=True, collect_decomp_rules=False)
         @qp.qnode(qp.device("lightning.qubit", wires=3), shots=shots)
         def circuit():
             qp.RX(0.1, 0)
@@ -356,7 +369,7 @@ class TestDraw:
     def test_global_phase(self):
         """Test the visualization of global phase shifts."""
 
-        @qp.qjit(capture=True)
+        @qp.qjit(capture=True, collect_decomp_rules=False)
         @qp.qnode(qp.device("lightning.qubit", wires=3))
         def circuit():
             qp.H(0)
@@ -382,7 +395,7 @@ class TestDraw:
     def test_draw_mid_circuit_measurement_postselect(self, postselect, mid_measure_label):
         """Test that mid-circuit measurements are drawn correctly."""
 
-        @qp.qjit(capture=True)
+        @qp.qjit(capture=True, collect_decomp_rules=False)
         @qp.qnode(qp.device("lightning.qubit", wires=2))
         def circuit():
             qp.Hadamard(0)
@@ -465,7 +478,7 @@ class TestDraw:
         Test the visualization of the quantum operations defined in the unified compiler dialect.
         """
 
-        @qp.qjit(capture=True)
+        @qp.qjit(capture=True, collect_decomp_rules=False)
         @qp.qnode(qp.device("lightning.qubit", wires=3))
         def circuit():
             for op, param, wires in ops:
@@ -480,7 +493,7 @@ class TestDraw:
         two_dim = jax.numpy.array([[0, 1], [1, 0]])
         eight_dim = jax.numpy.zeros((8, 8))
 
-        @qp.qjit(capture=True)
+        @qp.qjit(capture=True, collect_decomp_rules=False)
         @qp.qnode(qp.device("lightning.qubit", wires=2))
         def circuit():
             qp.RX(one_dim[0], wires=0)
@@ -499,7 +512,7 @@ class TestDraw:
         """Test that a warning is raised when dynamic arguments are used."""
 
         # pylint: disable=unused-argument
-        @qp.qjit(capture=True)
+        @qp.qjit(capture=True, collect_decomp_rules=False)
         @qp.qnode(qp.device("lightning.qubit", wires=3))
         def circ(arg):
             qp.RX(0.1, wires=0)
@@ -511,7 +524,7 @@ class TestDraw:
     def adjoint_op_not_implemented(self):
         """Test that NotImplementedError is raised when AdjointOp is used."""
 
-        @qp.qjit(capture=True)
+        @qp.qjit(capture=True, collect_decomp_rules=False)
         @qp.qnode(qp.device("lightning.qubit", wires=1))
         def circuit():
             qp.adjoint(qp.QubitUnitary)(jax.numpy.array([[0, 1], [1, 0]]), wires=[0])
@@ -523,7 +536,7 @@ class TestDraw:
     def test_cond_not_implemented(self):
         """Test that NotImplementedError is raised when cond is used."""
 
-        @qp.qjit(capture=True)
+        @qp.qjit(capture=True, collect_decomp_rules=False)
         @qp.qnode(qp.device("lightning.qubit", wires=2))
         def circuit():
             m0 = qp.measure(0, reset=False, postselect=0)
@@ -536,7 +549,7 @@ class TestDraw:
     def test_for_loop_not_implemented(self):
         """Test that NotImplementedError is raised when for loop is used."""
 
-        @qp.qjit(autograph=True, capture=True)
+        @qp.qjit(autograph=True, capture=True, collect_decomp_rules=False)
         @qp.qnode(qp.device("lightning.qubit", wires=1))
         def circuit():
             for _ in range(3):
@@ -549,7 +562,7 @@ class TestDraw:
     def test_while_loop_not_implemented(self):
         """Test that NotImplementedError is raised when while loop is used."""
 
-        @qp.qjit(autograph=True, capture=True)
+        @qp.qjit(autograph=True, capture=True, collect_decomp_rules=False)
         @qp.qnode(qp.device("lightning.qubit", wires=1))
         def circuit():
             i = 0

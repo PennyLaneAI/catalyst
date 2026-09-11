@@ -876,13 +876,22 @@ def ctrl_distribute(
             )
             new_ops.append(create_adjoint_op(ctrl_op, lazy=True))
         else:
-            ctrl_op = create_controlled_op(
-                copy.copy(op),
-                control=control_wires,
-                control_values=control_values,
-                work_wires=work_wires,
-                work_wire_type=work_wire_type,
-            )
+            if isinstance(op, Operator2):
+                ctrl_op = create_controlled_op2(
+                    copy.copy(op),
+                    control_wires=control_wires,
+                    control_values=control_values,
+                    work_wires=work_wires,
+                    work_wire_type=work_wire_type,
+                )
+            else:
+                ctrl_op = create_controlled_op(
+                    copy.copy(op),
+                    control=control_wires,
+                    control_values=control_values,
+                    work_wires=work_wires,
+                    work_wire_type=work_wire_type,
+                )
             new_ops.append(ctrl_op)
     return new_ops
 

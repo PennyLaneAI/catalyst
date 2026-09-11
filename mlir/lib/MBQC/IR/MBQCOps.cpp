@@ -68,8 +68,8 @@ llvm::StringRef RefMeasureInBasisOp::getResourceName() { return getOperationName
 llvm::StringRef GraphStatePrepOp::getResourceName() { return getOperationName(); }
 llvm::StringRef RefGraphStatePrepOp::getResourceName() { return getOperationName(); }
 
-uint64_t MeasureInBasisOp::getResourceNumQubits() { return 0; }
-uint64_t RefMeasureInBasisOp::getResourceNumQubits() { return 0; }
+uint64_t MeasureInBasisOp::getResourceNumQubits() { return 1; }
+uint64_t RefMeasureInBasisOp::getResourceNumQubits() { return 1; }
 uint64_t GraphStatePrepOp::getResourceNumQubits() { return 0; }
 uint64_t RefGraphStatePrepOp::getResourceNumQubits() { return 0; }
 

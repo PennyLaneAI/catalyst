@@ -20,7 +20,6 @@
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/AllocatorBase.h"
-#include "llvm/Support/LogicalResult.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Block.h"
 #include "mlir/IR/BuiltinAttributes.h"
@@ -88,9 +87,14 @@ struct DecomposableGatePattern final : public OpInterfaceRewritePattern<Decompos
 
     LogicalResult matchAndRewrite(DecomposableGate op, PatternRewriter &rewriter) const override {
         std::string gateName = op.getOperatorName();
+        // A modified op (adjoint and/or controlled) is a distinct operator from its base gate.
+        bool isModified =
+            op.getOperation()->hasAttr("adjoint") || !op.getCtrlQubitOperands().empty();
 
-        // Only decompose the op if it is not in the target gate set
-        if (targetGateSet.contains(gateName)) {
+        // Only decompose the op if it is not in the target gate set. A modified op is never treated
+        // as a native gate-set member by its base name: `Adjoint(Op)`/`C(Op)` are distinct gates
+        // that must reach the gate_set through their own rules.
+        if (!isModified && targetGateSet.contains(gateName)) {
             return failure();
         }
 
@@ -114,11 +118,13 @@ struct DecomposableGatePattern final : public OpInterfaceRewritePattern<Decompos
         if (it_gateID != decompositionRegistry.end()) {
             // Found a rule with the wanted ID, highest priority rule, just use this one
             rule = it_gateID->second;
-        } else {
-            // Didn't find ID match, try matching gate name
+        } else if (!isModified) {
+            // Didn't find ID match, try matching gate name. Unmodified ops only: a modified op
+            // (`Adjoint(Op)`/`C(Op)`) must match its own rule by id and never fall back to a plain
+            // base-name rule (that would apply the unmodified decomposition to the modified op).
             // TODO: remove multirz's special name editing
             if (isa<quantum::MultiRZOp>(op)) {
-                gateName = gateName + "_" + std::to_string(op.getWireLens()[0]);
+                gateName = gateName + "_" + std::to_string(op.getWireLens()["wires"]);
             }
             auto it_gateName = decompositionRegistry.find(gateName);
             if (it_gateName != decompositionRegistry.end()) {
@@ -127,6 +133,9 @@ struct DecomposableGatePattern final : public OpInterfaceRewritePattern<Decompos
                 // Didn't find any rule
                 return failure();
             }
+        } else {
+            // Modified op with no id-matched rule: do not fall back to the base-name rule.
+            return failure();
         }
 
         // For null decomp rules, the signature will not have any quantum values

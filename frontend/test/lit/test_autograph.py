@@ -236,6 +236,8 @@ try:
 
         return y
 
+    if_assign_pytree_shape_mismatch(0.5)
+
 except TypeError as e:
     # CHECK:   Control flow requires a consistent return structure across all branches
     print(e)
@@ -254,6 +256,8 @@ try:
             y = 4
 
         return y  # pylint: disable=possibly-used-before-assignment
+
+    if_assign_partial(0.5)
 
 except AutoGraphError as e:
     # CHECK:   Some branches did not define a value for variable 'y'
@@ -436,6 +440,8 @@ try:
             y = ""
 
         return len(y)
+
+    if_assign_invalid_type(0.5)
 
 except TypeError as e:
     # CHECK:   Argument 'hi' of type <class 'str'> is not a valid JAX type

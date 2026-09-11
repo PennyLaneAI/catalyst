@@ -582,12 +582,14 @@ class TestOtherMeasurements:
             return meas_fun(wires=0, **({"all_outcomes": True} if meas_fun is qp.counts else {}))
 
         if capture_mode:
+            f = qjit(circuit, capture=capture_mode)
             with pytest.raises(ValueError, match="finite shots are required"):
-                qjit(circuit, capture=capture_mode)
+                f()
         else:
 
+            f = qjit(circuit, capture=capture_mode)
             with pytest.raises(CompileError, match="cannot work with shots=None"):
-                qjit(circuit, capture=capture_mode)
+                f()
 
     def test_multiple_return_values(self, backend, tol_stochastic, capture_mode):
         """Test multiple return values."""

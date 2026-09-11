@@ -143,8 +143,10 @@ class TestReturnValues:
         def return_scalar():
             return jnp.array(0, dtype=dtype)
 
+        compiled = qjit(return_scalar)
+
         with pytest.raises(TypeError, match="Requested return type is unavailable."):
-            qjit(return_scalar)
+            compiled()
 
 
 if __name__ == "__main__":

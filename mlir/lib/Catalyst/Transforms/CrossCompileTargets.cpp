@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <algorithm>
+
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/StringExtras.h" // llvm::join
 #include "llvm/IR/LLVMContext.h"
@@ -31,8 +33,10 @@
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinOps.h"
+#include "mlir/IR/OperationSupport.h"
 #include "mlir/InitAllDialects.h"
 #include "mlir/Pass/Pass.h"
+#include "mlir/Pass/PassInstrumentation.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Pass/PassRegistry.h"
 #include "mlir/Target/LLVMIR/Dialect/Builtin/BuiltinToLLVMIRTranslation.h"
@@ -81,6 +85,33 @@ std::vector<std::string> defaultLoweringPassList() {
     auto passes = driver::getBufferizationStage();
     auto llvmPasses = driver::getLLVMDialectLoweringStage();
     passes.insert(passes.end(), llvmPasses.begin(), llvmPasses.end());
+    return passes;
+}
+
+std::vector<std::string> backlineLoweringPassList() {
+    auto buf = driver::getBufferizationStage();
+    auto llvmPasses = driver::getLLVMDialectLoweringStage();
+    std::vector<std::string> passes;
+    passes.reserve(buf.size() + llvmPasses.size() + 3);
+    passes.insert(passes.end(), buf.begin(), buf.end());
+
+    // Promote heap allocations to stack
+    auto dealloc = std::find(passes.begin(), passes.end(), "func.func(buffer-deallocation)");
+    assert(dealloc != passes.end() && "bufferization stage no longer runs buffer-deallocation");
+    passes.insert(dealloc, "func.func(promote-buffers-to-stack{max-alloc-size-in-bytes=64})");
+    passes.push_back("lower-decode-to-transport");
+    for (const auto &passName : llvmPasses) {
+        if (passName == "convert-executor-to-llvm") {
+            continue;
+        }
+        if (passName == "convert-catalyst-to-llvm") {
+            passes.push_back("convert-transport-to-llvm");
+        }
+        if (passName == "convert-quantum-to-llvm") {
+            passes.push_back("convert-qecp-to-llvm");
+        }
+        passes.push_back(passName);
+    }
     return passes;
 }
 
@@ -219,7 +250,36 @@ struct CrossCompileTargetsPass : impl::CrossCompileTargetsPassBase<CrossCompileT
         return std::string(dir.str());
     }
 
-    // Write `op`/`mod` to {dir}/{filename} (used only when dump-intermediate is set).
+    struct SubPipelineDumper : public mlir::PassInstrumentation {
+        SubPipelineDumper(CrossCompileTargetsPass *owner, std::string dir, bool onlyChanged)
+            : owner(owner), dir(std::move(dir)), onlyChanged(onlyChanged) {}
+
+        void runBeforePass(mlir::Pass *pass, mlir::Operation *op) override {
+            // Only `changed` needs the before-image, and fingerprinting a module is not free.
+            if (onlyChanged) {
+                before.insert_or_assign(pass, mlir::OperationFingerPrint(op));
+            }
+        }
+
+        void runAfterPass(mlir::Pass *pass, mlir::Operation *op) override {
+            if (onlyChanged) {
+                auto it = before.find(pass);
+                if (it != before.end() && *it->second == mlir::OperationFingerPrint(op)) {
+                    return;
+                }
+            }
+            owner->dumpMLIR(op, dir,
+                            std::to_string(++index) + "_" + pass->getName().str() + ".mlir");
+        }
+
+        CrossCompileTargetsPass *owner;
+        std::string dir;
+        bool onlyChanged;
+        unsigned index = 0;
+        llvm::DenseMap<mlir::Pass *, std::optional<mlir::OperationFingerPrint>> before;
+    };
+
+    // Write `op`/`mod` to {dir}/{filename} (used only when save-ir-after-each is set).
     void dumpMLIR(mlir::Operation *op, StringRef dir, StringRef filename) {
         llvm::SmallString<128> path(dir);
         llvm::sys::path::append(path, filename);
@@ -348,6 +408,12 @@ struct CrossCompileTargetsPass : impl::CrossCompileTargetsPassBase<CrossCompileT
         moduleOp->setAttr(DLTIDialect::kDataLayoutAttrName,
                           mlir::translateDataLayout(dataLayout, ctx));
 
+        if (auto host = nested->getParentOfType<ModuleOp>()) {
+            if (auto backline = host->getAttr("catalyst.backline")) {
+                moduleOp->setAttr("catalyst.backline", backline);
+            }
+        }
+
         // The entry points are exactly the functions the host calls into this module, named by the
         // surviving launch_kernel call edges. Expose those through the C ABI; privatize the rest so
         // they can be internalized / DCE'd and don't leak as exported symbols.
@@ -368,6 +434,7 @@ struct CrossCompileTargetsPass : impl::CrossCompileTargetsPassBase<CrossCompileT
             }
         }
 
+        const bool dumpIntermediate = !saveIrAfterEach.empty();
         if (dumpIntermediate) {
             dumpMLIR(*standalone, kernelDir, "extracted.mlir");
         }
@@ -380,9 +447,15 @@ struct CrossCompileTargetsPass : impl::CrossCompileTargetsPassBase<CrossCompileT
             pipelineSpec = pipelineAttr.getValue().str();
         }
         if (pipelineSpec.empty()) {
-            pipelineSpec = llvm::join(defaultLoweringPassList(), ",");
+            bool isBackline = moduleOp->hasAttr("catalyst.backline");
+            pipelineSpec = llvm::join(
+                isBackline ? backlineLoweringPassList() : defaultLoweringPassList(), ",");
         }
         PassManager subPM(ctx);
+        if (saveIrAfterEach == "changed" || saveIrAfterEach == "pass") {
+            subPM.addInstrumentation(
+                std::make_unique<SubPipelineDumper>(this, kernelDir, saveIrAfterEach == "changed"));
+        }
         if (failed(parsePassPipeline(pipelineSpec, subPM))) {
             nested.emitError("failed to build the target-lowering pipeline '" + pipelineSpec + "'");
             return failure();

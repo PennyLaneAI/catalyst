@@ -21,12 +21,12 @@
 // CHECK-SAME:      %[[ARG:.*]]: memref<8xi8, strided<[?], offset: ?>>
 // CHECK:         %[[COPY:.*]] = memref.alloc() : memref<8xi8>
 // CHECK:         memref.copy %[[ARG]], %[[COPY]]
-// CHECK:         transport.kick %{{.*}}, %[[COPY]] {work_item_idx = 0 : i32} : !transport.session<controller>, memref<8xi8>
+// CHECK:         transport.stage_payload %{{.*}}, %[[COPY]] : !transport.session<controller>, memref<8xi8>
 // CHECK:         %[[DEST:.*]] = memref.alloc() {{.*}}: memref<8xi8>
 // CHECK:         transport.collect %{{.*}}, %[[DEST]] : !transport.session<controller>, memref<8xi8>
 func.func @round(%payload: tensor<8xi8>) -> tensor<8xi8> {
   %s = transport.get_session : !transport.session<controller>
-  transport.kick %s, %payload {work_item_idx = 0 : i32} : !transport.session<controller>, tensor<8xi8>
+  transport.stage_payload %s, %payload : !transport.session<controller>, tensor<8xi8>
   %corr = transport.collect %s : !transport.session<controller> -> tensor<8xi8>
   return %corr : tensor<8xi8>
 }
@@ -37,12 +37,12 @@ func.func @round(%payload: tensor<8xi8>) -> tensor<8xi8> {
 // CHECK:         %[[P:.*]] = memref.alloc() {{.*}}: memref<8xi8>
 // CHECK:         linalg.fill ins(%{{.*}} : i8) outs(%[[P]] : memref<8xi8>)
 // CHECK-NOT:     memref.copy
-// CHECK:         transport.kick %{{.*}}, %[[P]] {work_item_idx = 0 : i32} : !transport.session<controller>, memref<8xi8>
+// CHECK:         transport.stage_payload %{{.*}}, %[[P]] : !transport.session<controller>, memref<8xi8>
 func.func @round_contiguous(%v: i8) -> tensor<8xi8> {
   %s = transport.get_session : !transport.session<controller>
   %e = tensor.empty() : tensor<8xi8>
   %payload = linalg.fill ins(%v : i8) outs(%e : tensor<8xi8>) -> tensor<8xi8>
-  transport.kick %s, %payload {work_item_idx = 0 : i32} : !transport.session<controller>, tensor<8xi8>
+  transport.stage_payload %s, %payload : !transport.session<controller>, tensor<8xi8>
   %corr = transport.collect %s : !transport.session<controller> -> tensor<8xi8>
   return %corr : tensor<8xi8>
 }
