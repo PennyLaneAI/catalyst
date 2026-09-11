@@ -41,22 +41,24 @@ def _base_rule():
 
 
 def _adj_rule():
-    def adj_resource_fn(reg):
+    """A rule for ``Adjoint(NoParams)``."""
+
+    def adj_resource_fn(base):
         return {SingleParam(x=Float, reg=Wire[2]): 2}
 
     @qp.register_resources(adj_resource_fn)
-    def adj_rule(reg):
-        SingleParam(x=0.2, reg=reg[0:2])
-        SingleParam(x=0.3, reg=reg[0:2])
+    def adj_rule(base):
+        SingleParam(x=0.2, reg=base.wires[0:2])
+        SingleParam(x=0.3, reg=base.wires[0:2])
 
     return adj_rule
 
 
 def test_on_demand_adjoint_id_routes_to_adjoint_rules():
     """Requesting the rules for an ``Adjoint(NoParams)`` id yields the reachable closure with the
-    adjoint rules correctly routed: the base rule of NoParams, the rule registered on
-    Adjoint(NoParams), and the synthesized (adjointed base) rule.
-    Crucially, the adjoint target is never attached to the un-adjointed base body."""
+    adjoint rules correctly routed: the base rule of ``NoParams`` and the synthesized
+    rule. Crucially, the adjoint target is never attached to the un-adjointed base body.
+    """
     with qp.decomposition.local_decomps():
         qp.add_decomps(NoParams, _base_rule())
         qp.add_decomps("Adjoint(NoParams)", _adj_rule())
@@ -69,7 +71,7 @@ def test_on_demand_adjoint_id_routes_to_adjoint_rules():
 
     # CHECK: module {
     # CHECK-DAG: func.func private @"__builtin_base_rule_NoParams{}{reg:2}{}"{{.*}}"SingleParam{{.*}}target_gate = "NoParams{}{reg:2}{}"
-    # CHECK-DAG: func.func private @"__builtin_adj_rule_Adjoint(NoParams){}{reg:2}{}"{{.*}}"SingleParam{{.*}} = 2 : i64{{.*}}target_gate = "Adjoint(NoParams){}{reg:2}{}"
+    # CHECK-NOT: __builtin_adj_rule_Adjoint(NoParams)
     # CHECK-DAG: func.func private @"__builtin_base_rule_Adjoint(NoParams){}{reg:2}{}"{{.*}}"Adjoint(SingleParam{{.*}}target_gate = "Adjoint(NoParams){}{reg:2}{}"
     # CHECK: qref.adjoint
 
