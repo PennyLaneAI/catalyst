@@ -55,6 +55,7 @@ endif()
 add_executable(runner_tests_qir_runtime)
 target_sources(runner_tests_qir_runtime PRIVATE
     Test_DataView.cpp
+    Test_DefaultTensor.cpp
     Test_NullQubit.cpp
     Test_ResourceTracker.cpp
     Test_SharedLibraryManager.cpp
@@ -66,6 +67,7 @@ target_link_libraries(runner_tests_qir_runtime PRIVATE
     pybind11::embed
     catalyst_runtime_testing
     rtd_null_qubit
+    rtd_default_tensor
 )
 
 # Test_SharedLibraryManager dlopens
@@ -79,6 +81,7 @@ endif()
 
 target_compile_definitions(runner_tests_qir_runtime PRIVATE
     RTD_NULL_QUBIT_LIB="$<TARGET_FILE:rtd_null_qubit>"
+    RTD_DEFAULT_TENSOR_LIB="$<TARGET_FILE:rtd_default_tensor>"
 )
 
 catch_discover_tests(runner_tests_qir_runtime)
