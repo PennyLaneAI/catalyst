@@ -30,6 +30,7 @@ from operator2_dummy_gates import (
     StaticData,
 )
 from pennylane import qnode
+from pennylane.core.operator import abstractify
 from pennylane.decomposition import add_decomps, local_decomps, register_resources
 from pennylane.typing import Bool, Complex, Float, Int, Wire
 from pennylane.wires import Wires
@@ -43,11 +44,12 @@ from catalyst.decomposition.decomposition_rules import (
     _modifier_kind,
     compile_decomposition_rules_wrapper,
     compile_reachable_decomposition_rules_wrapper,
-    compile_registered_adjoint_rules,
+    compile_registered_symbolic_rules,
     get_rule_strings_from_module,
     name_unwrap_adjoint,
     name_unwrap_control,
     name_wrap_adjoint,
+    resource_graph_op_id,
     uses_symbolic_signature,
     wrap_modifier_id,
 )
@@ -503,15 +505,16 @@ class TestSymbolicRules:
     op's args; following the convention in PennyLane."""
 
     @pytest.mark.parametrize(
-        "op_name, rule_name, symbolic",
+        "op_name, kind, rule_name, symbolic",
         [
-            ("Adjoint(Hadamard)", "decompose_to_base", True),
-            ("Adjoint(Rot)", "_adjoint_rot", True),
-            ("Adjoint(RZ)", "adjoint_rotation", True),
-            ("Adjoint(NoParams)", "adj_rule", False),
+            ("Adjoint(Hadamard)", "adjoint", "decompose_to_base", True),
+            ("Adjoint(Rot)", "adjoint", "_adjoint_rot", True),
+            ("Adjoint(RZ)", "adjoint", "adjoint_rotation", True),
+            ("C(Hadamard)", "control", "flip_zero_ctrl_values(_controlled_hadamard)", True),
+            ("Adjoint(NoParams)", "adjoint", "adj_rule", False),
         ],
     )
-    def test_uses_symbolic_signature(self, op_name, rule_name, symbolic):
+    def test_uses_symbolic_signature(self, op_name, kind, rule_name, symbolic):
         """Test a rule is recognized as symbolic exactly when its body accepts the symbolic operator's
         arguments."""
 
@@ -524,12 +527,12 @@ class TestSymbolicRules:
             add_decomps("Adjoint(NoParams)", adj_rule)
 
             rule = qp.list_decomps(op_name)[rule_name]
-            assert uses_symbolic_signature(rule) is symbolic
+            assert uses_symbolic_signature(rule, kind) is symbolic
 
     def test_self_adjoint_rule_is_lowered(self):
         """Test ``self_adjoint`` rule on ``Adjoint(Hadamard)``."""
 
-        module = compile_registered_adjoint_rules(
+        module = compile_registered_symbolic_rules(
             "Hadamard", "Adjoint(Hadamard){}{wires:1}{}", {}, {"wires": 1}, {}, op_cls=qp.Hadamard
         )
         (rule,) = get_rule_strings_from_module(module)
@@ -543,7 +546,7 @@ class TestSymbolicRules:
     def test_adjoint_rotation_rule_is_lowered(self):
         """Test ``adjoint_rotation`` reads the angle off the base operator."""
 
-        module = compile_registered_adjoint_rules(
+        module = compile_registered_symbolic_rules(
             "RZ",
             "Adjoint(RZ){0:[f64]}{wires:1}{}",
             {"0": ["f64"]},
@@ -559,12 +562,63 @@ class TestSymbolicRules:
         assert "qref.adjoint" not in rule
         assert "stablehlo.negate" in rule
 
+    @pytest.mark.parametrize(
+        "n_ctrl, target_id, signature, resource",
+        [
+            (
+                1,
+                "C(Hadamard){}{wires:1}{}",
+                "(%arg0: !qref.reg<2>, %arg1: tensor<1xi64>, %arg2: tensor<1xi64>)",
+                '"CH{}{wires:2}{}" = 1 : i64',
+            ),
+            (
+                2,
+                "2C(Hadamard){}{wires:1}{}",
+                "(%arg0: !qref.reg<3>, %arg1: tensor<1xi64>, %arg2: tensor<2xi64>)",
+                '"Toffoli{}{wires:3}{}" = 1 : i64',
+            ),
+        ],
+    )
+    def test_controlled_rule_is_lowered(self, n_ctrl, target_id, signature, resource):
+        """Test a rule registered on ``C(op)`` is lowered for each control count, with the control
+        wires *after* the base wires: the compiler reads a register-mode rule as
+        ``func(qreg, param*, inWires*, inCtrlWires*)``."""
+
+        module = compile_registered_symbolic_rules(
+            "Hadamard",
+            target_id,
+            {},
+            {"wires": 1},
+            {},
+            op_cls=qp.Hadamard,
+            kind="control",
+            n_ctrl=n_ctrl,
+        )
+        (rule,) = get_rule_strings_from_module(module)
+
+        assert f'target_gate = "{target_id}"' in rule
+        assert resource in rule
+        assert signature in rule
+
+    def test_symbolic_resource_id_is_canonical(self):
+        """Test a resource that is itself symbolic is spelled the way the compiler spells a
+        modified operator: the base op's id with the modifier folded into its name."""
+
+        base = abstractify(qp.S(wires=jnp.array([0])))
+        assert resource_graph_op_id(base) == "S{}{wires:1}{}"
+        assert resource_graph_op_id(qp.adjoint(base)) == "Adjoint(S){}{wires:1}{}"
+        assert resource_graph_op_id(qp.ctrl(base, control=[1, 2])) == "2C(S){}{wires:1}{}"
+        # A concrete controlled class is *not* a generic wrapper and keeps its own id.
+        assert (
+            resource_graph_op_id(abstractify(qp.CH(wires=jnp.array([0, 1])))) == "CH{}{wires:2}{}"
+        )
+
     def test_no_registered_symbolic_rules(self):
         """Test an op with no symbolic rules registered against its adjoint yields no module."""
 
         with local_decomps():
             assert (
-                compile_registered_adjoint_rules(
+                compile_registered_symbolic_rules(
                     "NoParams",
                     "Adjoint(NoParams){}{reg:2}{}",
                     {},
@@ -580,7 +634,7 @@ class TestSymbolicRules:
         operator instance, which the operator's name alone cannot produce."""
 
         with pytest.raises(ValueError, match="operator class of 'Hadamard' is needed"):
-            compile_registered_adjoint_rules(
+            compile_registered_symbolic_rules(
                 "Hadamard", "Adjoint(Hadamard){}{wires:1}{}", {}, {"wires": 1}, {}
             )
 
