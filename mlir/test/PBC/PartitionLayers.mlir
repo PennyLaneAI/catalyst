@@ -195,3 +195,53 @@ func.func @test_partition_layers_4(%qr0 : !quantum.bit, %qr1 : !quantum.bit, %qr
 
     func.return
 }
+
+// -----
+
+// The first 32 operators commute but span only a few independent basis rows.
+// This crosses the adaptive basis threshold. The final X anticommutes with
+// ZZZZ and must start a new layer.
+func.func @test_dependent_commuting_basis(%q0 : !quantum.bit, %q1 : !quantum.bit, %q2 : !quantum.bit, %q3 : !quantum.bit) {
+    // CHECK-LABEL: func.func @test_dependent_commuting_basis
+    // CHECK: [[L0:%.+]]:4 = pbc.layer
+    // CHECK-COUNT-32: pbc.ppr
+    // CHECK:   pbc.yield
+    // CHECK: [[L1:%.+]] = pbc.layer
+    // CHECK:   pbc.ppr ["X"]
+    // CHECK:   pbc.yield
+
+    %0:4 = pbc.ppr ["X", "X", "X", "X"] (8) %q0, %q1, %q2, %q3 : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
+    %1:4 = pbc.ppr ["Z", "Z", "Z", "Z"] (8) %0#0, %0#1, %0#2, %0#3 : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
+    %2:4 = pbc.ppr ["Y", "Y", "Y", "Y"] (8) %1#0, %1#1, %1#2, %1#3 : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
+    %3:4 = pbc.ppr ["X", "X", "I", "I"] (8) %2#0, %2#1, %2#2, %2#3 : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
+    %4:4 = pbc.ppr ["X", "X", "X", "X"] (8) %3#0, %3#1, %3#2, %3#3 : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
+    %5:4 = pbc.ppr ["Z", "Z", "Z", "Z"] (8) %4#0, %4#1, %4#2, %4#3 : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
+    %6:4 = pbc.ppr ["Y", "Y", "Y", "Y"] (8) %5#0, %5#1, %5#2, %5#3 : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
+    %7:4 = pbc.ppr ["X", "X", "I", "I"] (8) %6#0, %6#1, %6#2, %6#3 : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
+    %8:4 = pbc.ppr ["X", "X", "X", "X"] (8) %7#0, %7#1, %7#2, %7#3 : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
+    %9:4 = pbc.ppr ["Z", "Z", "Z", "Z"] (8) %8#0, %8#1, %8#2, %8#3 : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
+    %10:4 = pbc.ppr ["Y", "Y", "Y", "Y"] (8) %9#0, %9#1, %9#2, %9#3 : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
+    %11:4 = pbc.ppr ["X", "X", "I", "I"] (8) %10#0, %10#1, %10#2, %10#3 : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
+    %12:4 = pbc.ppr ["X", "X", "X", "X"] (8) %11#0, %11#1, %11#2, %11#3 : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
+    %13:4 = pbc.ppr ["Z", "Z", "Z", "Z"] (8) %12#0, %12#1, %12#2, %12#3 : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
+    %14:4 = pbc.ppr ["Y", "Y", "Y", "Y"] (8) %13#0, %13#1, %13#2, %13#3 : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
+    %15:4 = pbc.ppr ["X", "X", "I", "I"] (8) %14#0, %14#1, %14#2, %14#3 : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
+    %16:4 = pbc.ppr ["X", "X", "X", "X"] (8) %15#0, %15#1, %15#2, %15#3 : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
+    %17:4 = pbc.ppr ["Z", "Z", "Z", "Z"] (8) %16#0, %16#1, %16#2, %16#3 : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
+    %18:4 = pbc.ppr ["Y", "Y", "Y", "Y"] (8) %17#0, %17#1, %17#2, %17#3 : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
+    %19:4 = pbc.ppr ["X", "X", "I", "I"] (8) %18#0, %18#1, %18#2, %18#3 : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
+    %20:4 = pbc.ppr ["X", "X", "X", "X"] (8) %19#0, %19#1, %19#2, %19#3 : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
+    %21:4 = pbc.ppr ["Z", "Z", "Z", "Z"] (8) %20#0, %20#1, %20#2, %20#3 : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
+    %22:4 = pbc.ppr ["Y", "Y", "Y", "Y"] (8) %21#0, %21#1, %21#2, %21#3 : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
+    %23:4 = pbc.ppr ["X", "X", "I", "I"] (8) %22#0, %22#1, %22#2, %22#3 : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
+    %24:4 = pbc.ppr ["X", "X", "X", "X"] (8) %23#0, %23#1, %23#2, %23#3 : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
+    %25:4 = pbc.ppr ["Z", "Z", "Z", "Z"] (8) %24#0, %24#1, %24#2, %24#3 : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
+    %26:4 = pbc.ppr ["Y", "Y", "Y", "Y"] (8) %25#0, %25#1, %25#2, %25#3 : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
+    %27:4 = pbc.ppr ["X", "X", "I", "I"] (8) %26#0, %26#1, %26#2, %26#3 : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
+    %28:4 = pbc.ppr ["X", "X", "X", "X"] (8) %27#0, %27#1, %27#2, %27#3 : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
+    %29:4 = pbc.ppr ["Z", "Z", "Z", "Z"] (8) %28#0, %28#1, %28#2, %28#3 : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
+    %30:4 = pbc.ppr ["Y", "Y", "Y", "Y"] (8) %29#0, %29#1, %29#2, %29#3 : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
+    %31:4 = pbc.ppr ["X", "X", "I", "I"] (8) %30#0, %30#1, %30#2, %30#3 : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
+    %32 = pbc.ppr ["X"] (8) %31#0 : !quantum.bit
+    func.return
+}
