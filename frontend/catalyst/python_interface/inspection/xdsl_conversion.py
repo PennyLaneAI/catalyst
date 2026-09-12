@@ -441,7 +441,7 @@ def resolve_constant_wire(ssa: SSAValue) -> float | int | str:
 
 def ssa_to_qp_params(
     op, control: bool = False, single: bool = False
-) -> list[float | int] | float | int | None:
+) -> list[float | int | str] | float | int | str | None:
     """Get the parameters from the operation."""
     return _extract(op, "in_ctrl_values" if control else "params", resolve_constant_params, single)
 
