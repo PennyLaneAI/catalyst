@@ -47,6 +47,7 @@ from catalyst.passes.builtin_passes import (
     merge_ppr_ppm,
     merge_rotations,
     parity_synth,
+    phase_folding,
     ppm_compilation,
     ppr_to_mbqc,
     ppr_to_ppm,
@@ -78,4 +79,5 @@ __all__ = (
     "apply_pass_plugin",
     "Pass",
     "PassPlugin",
+    "phase_folding",
 )

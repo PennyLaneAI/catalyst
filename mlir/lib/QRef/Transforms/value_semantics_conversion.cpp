@@ -89,19 +89,19 @@ LogicalResult ensureNoReferenceSemanticsOps(Operation *op) {
 
 // A struct to store the register and the index of rQubits from a qref.get operation.
 // This struct is intended to be the keys in `llvm::DenseMap`s.
-struct rQubitGetOpInfo {
-    Value reg;
-    int64_t idxAttr;
-    Value idx;
+// struct rQubitGetOpInfo {
+//     Value reg;
+//     int64_t idxAttr;
+//     Value idx;
 
-    rQubitGetOpInfo(Value _reg, Value _idx) : reg(_reg), idxAttr(-1), idx(_idx) {}
+//     rQubitGetOpInfo(Value _reg, Value _idx) : reg(_reg), idxAttr(-1), idx(_idx) {}
 
-    rQubitGetOpInfo(Value _reg, int64_t _idxAttr) : reg(_reg), idxAttr(_idxAttr), idx(nullptr) {}
+//     rQubitGetOpInfo(Value _reg, int64_t _idxAttr) : reg(_reg), idxAttr(_idxAttr), idx(nullptr) {}
 
-    bool operator==(const rQubitGetOpInfo &other) const {
-        return reg == other.reg && idxAttr == other.idxAttr && idx == other.idx;
-    }
-};
+//     bool operator==(const rQubitGetOpInfo &other) const {
+//         return reg == other.reg && idxAttr == other.idxAttr && idx == other.idx;
+//     }
+// };
 
 std::optional<rQubitGetOpInfo> getGetOpInfo(Value rQubit) {
     bool isGetOp = rQubit.getDefiningOp() && isa<qref::GetOp>(rQubit.getDefiningOp());
@@ -1881,29 +1881,30 @@ void handleRegion(IRRewriter &builder, Region &r, QubitValueTracker &tracker) {
 
 } // anonymous namespace
 
-namespace llvm {
+// namespace llvm {
 
-// Boilerplate to enable using `rQubitGetOpInfo` as DenseMap keys.
-template <> struct DenseMapInfo<rQubitGetOpInfo> {
-    static inline rQubitGetOpInfo getEmptyKey() {
-        return rQubitGetOpInfo(DenseMapInfo<Value>::getEmptyKey(), -1);
-    }
+// // Boilerplate to enable using `rQubitGetOpInfo` as DenseMap keys.
+// template <> struct DenseMapInfo<rQubitGetOpInfo> {
+//     static inline rQubitGetOpInfo getEmptyKey() {
+//         return rQubitGetOpInfo(DenseMapInfo<Value>::getEmptyKey(), -1);
+//     }
 
-    static inline rQubitGetOpInfo getTombstoneKey() {
-        return rQubitGetOpInfo(DenseMapInfo<Value>::getTombstoneKey(), -2);
-    }
+//     static inline rQubitGetOpInfo getTombstoneKey() {
+//         return rQubitGetOpInfo(DenseMapInfo<Value>::getTombstoneKey(), -2);
+//     }
 
-    static unsigned getHashValue(const rQubitGetOpInfo &val) {
-        return hash_combine(hash_value(val.reg.getAsOpaquePointer()), val.idxAttr,
-                            val.idx ? static_cast<size_t>(hash_value(val.idx.getAsOpaquePointer()))
-                                    : 0);
-    }
+//     static unsigned getHashValue(const rQubitGetOpInfo &val) {
+//         return hash_combine(hash_value(val.reg.getAsOpaquePointer()), val.idxAttr,
+//                             val.idx ?
+//                             static_cast<size_t>(hash_value(val.idx.getAsOpaquePointer()))
+//                                     : 0);
+//     }
 
-    static bool isEqual(const rQubitGetOpInfo &lhs, const rQubitGetOpInfo &rhs) {
-        return lhs == rhs;
-    }
-};
-} // namespace llvm
+//     static bool isEqual(const rQubitGetOpInfo &lhs, const rQubitGetOpInfo &rhs) {
+//         return lhs == rhs;
+//     }
+// };
+// } // namespace llvm
 
 namespace catalyst {
 namespace qref {
