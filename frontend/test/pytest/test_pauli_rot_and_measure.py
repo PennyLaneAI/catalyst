@@ -111,7 +111,7 @@ def test_ppr_operator_to_ppr():
         return f()
 
     optimized_ir = test_ppr_operator_to_ppr_workflow.mlir_opt
-    assert 'pbc.ppr ["X", "Y"](8)' in optimized_ir
+    assert 'pbc.ppr ["X", "Y"](4)' in optimized_ir
     assert 'quantum.operator "PPR"' not in optimized_ir
     assert "quantum.paulirot" not in optimized_ir
 

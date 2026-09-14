@@ -966,8 +966,8 @@ def to_ppr_setup_inputs():
         For better compatibility with other PennyLane functionality, ensure that PennyLane program
         capture is enabled with ``@qjit(capture=True)``.
 
-        Note that the angle convention of ``qp.PauliRot`` and ``qp.PPR`` differs from Catalyst's
-        angle convention for PPRs by a factor of two.
+        Note that the angle convention of ``qp.PauliRot`` differs from Catalyst's angle convention
+        for PPRs by a factor of two, whereas ``qp.PPR`` follows Catalyst's convention.
 
     **Example**
 

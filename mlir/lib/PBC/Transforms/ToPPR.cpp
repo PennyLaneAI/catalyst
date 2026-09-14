@@ -420,8 +420,8 @@ LogicalResult convertPPROperator(OperatorOp op, ConversionPatternRewriter &rewri
     auto denominatorAttr = staticData.getAs<IntegerAttr>("angle_denominator");
 
     int64_t denominator = denominatorAttr.getInt();
-    if (denominator != 1 && denominator != -1 && denominator != 2 && denominator != -2 &&
-        denominator != 4 && denominator != -4) {
+    if (denominator != 2 && denominator != -2 && denominator != 4 && denominator != -4 &&
+        denominator != 8 && denominator != -8) {
         return op.emitOpError("unsupported PPR angle denominator: ") << denominator;
     }
 
@@ -441,14 +441,14 @@ LogicalResult convertPPROperator(OperatorOp op, ConversionPatternRewriter &rewri
     SmallVector<Attribute> pauliCharacters;
     pauliCharacters.reserve(pauliWord.size());
     for (char pauli : pauliWord) {
-        if (pauli != 'X' && pauli != 'Y' && pauli != 'Z') {
-            return op.emitOpError("PPR operator Pauli word may contain only X, Y, or Z");
+        if (pauli != 'X' && pauli != 'Y' && pauli != 'Z' && pauli != 'I') {
+            return op.emitOpError("PPR operator Pauli word may contain only X, Y, Z and I");
         }
         pauliCharacters.push_back(rewriter.getStringAttr(StringRef(&pauli, 1)));
     }
 
     ArrayAttr pauliProduct = rewriter.getArrayAttr(pauliCharacters);
-    int8_t rotationKind = static_cast<int8_t>(2 * denominator);
+    int8_t rotationKind = static_cast<int8_t>(denominator);
     if (op.getAdjoint()) {
         rotationKind = -rotationKind;
     }
