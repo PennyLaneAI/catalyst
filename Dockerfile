@@ -280,7 +280,7 @@ ARG GCC_VERSION
 ARG LLVM_CACHE
 ARG STABLEHLO_CACHE
 RUN cat /etc/dnf.conf | sed "s/\[main\]/\[main\]\ntimeout=5/g" > /etc/dnf.conf
-RUN dnf update -y && dnf install -y libzstd-devel gcc-toolset-13
+RUN dnf update -y && dnf install -y libzstd-devel gcc-toolset-13 openmpi-devel
 ENV C_COMPILER=/opt/rh/gcc-toolset-13/root/usr/bin/gcc
 ENV CXX_COMPILER=/opt/rh/gcc-toolset-13/root/usr/bin/g++
 ENV PATH="/opt/rh/gcc-toolset-13/root/usr/bin:${PATH}"
@@ -300,11 +300,11 @@ RUN git clone --depth 1 --branch ${CATALYST_VERSION} \
     && rm -rf /tmp/catalyst-src
 
 # ENV LLVM_TARGETS=check-mlir
-RUN cd /opt/catalyst/mlir/llvm-project \
-    && git apply /opt/catalyst/mlir/patches/llvm-bufferization-segfault.patch \
-    && git apply /opt/catalyst/mlir/patches/llvm-python-bindinggen-annotations.patch
-RUN cd /opt/catalyst/mlir/Enzyme \
-    && git apply /opt/catalyst/mlir/patches/enzyme-nvvm-fabs-intrinsics.patch
+RUN cd /opt/catalyst/mlir/llvm-project 
+    # && git apply /opt/catalyst/mlir/patches/llvm-bufferization-segfault.patch \
+    # && git apply /opt/catalyst/mlir/patches/llvm-python-bindinggen-annotations.patch
+RUN cd /opt/catalyst/mlir/Enzyme 
+    # && git apply /opt/catalyst/mlir/patches/enzyme-nvvm-fabs-intrinsics.patch
 
 RUN PYTHON=$PYTHON \
     C_COMPILER=$(which gcc)  \
