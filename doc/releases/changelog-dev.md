@@ -487,8 +487,7 @@
 * Added ``CZ`` support to ``to-ppr`` pass.
   [(#3009)](https://github.com/PennyLaneAI/catalyst/pull/3009)
 
-* ``to_ppr`` now directly lowers PennyLane's discrete ``PPR`` operator to ``pbc.ppr``, without
-  first decomposing it through ``PauliRot``.
+* ``to_ppr`` now directly lowers PennyLane's discrete ``PPR`` operator to ``pbc.ppr``.
   [(#3185)](https://github.com/PennyLaneAI/catalyst/pull/3185)
 
 <h3>Breaking changes 💔</h3>
