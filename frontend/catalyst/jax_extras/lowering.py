@@ -15,6 +15,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import dataclasses
 import logging
 import textwrap
@@ -190,6 +191,17 @@ def custom_lower_jaxpr_to_module(
                 worklist += [*op.body.operations]
 
     return ctx.module, ctx.context
+
+
+@contextlib.contextmanager
+def mlir_build_context():
+    """Provide an MLIR context and location for attribute and type construction."""
+    if current := ir.Context.current:
+        with ir.Location.unknown(context=current):
+            yield current
+    else:
+        with ir.Context() as context, ir.Location.unknown(context=context):
+            yield context
 
 
 def get_mlir_attribute_from_pyval(value):
