@@ -33,8 +33,11 @@
   `self_adjoint`, `adjoint_rotation` and other symbolic rules are written, so `Adjoint(H)`, `Adjoint(X)`,
   `Adjoint(RZ)`, `Adjoint(Rot)`, ... now decompose straight back to their base operator instead of
   falling through to the (much longer) distributed rules, or failing to solve at all when the base
-  op is the only member of the target `gate_set`. Rules registered for `Adjoint(Op)` against the base
-  op's parameters keep working: the two conventions are told apart per rule.
+  op is the only member of the target `gate_set`.
+
+  A rule registered for `Adjoint(Op)` must now take `base`; this is the convention PennyLane's own
+  graph calls such a rule with, and the one every `Operator2` rule in PennyLane already follows. A
+  rule written against the base op's parameters instead is skipped with a `RuleLoweringWarning`.
 
 * The graph-based decomposition system now supports **controlled operators** for `Operator2`,
   including single control (`C(Op)`), multiple controls (`<n>C(Op)`), and their composition with
@@ -45,7 +48,8 @@
   Control is folded into the operator identity *control-outermost* (e.g. `C(Adjoint(Op))`), so
   `ctrl(adjoint(Op))` and `adjoint(ctrl(Op))` collapse to a single node, while a distinct control
   count is its own node keyed. For a target gate set, `<n>C(Op)` is reached through:
-    1. Rules registered directly for `<n>C(Op)` (e.g. named `CNOT`/`CRX`, `ctrl_decomp_zyz`), and
+    1. Rules registered directly for `C(Op)` (PennyLane names a controlled operator `C(Op)` whatever
+       its control count), and
     2. Rules *synthesized by distribution* (`decompose(C(Op)) = ctrl(decompose(Op))`), controlling
        each produced gate with the same control count.
 
@@ -54,7 +58,7 @@
   `(decompose-lowering -> ctrl-lowering -> adjoint-lowering)` to a fixpoint.
   Controlled basis gates are only free when their own `<n>C(...)` id is in the target gate set.
 
-  Pathway 1 now also covers the rules PennyLane registers against the *symbolic* operator, i.e.
+  Pathway 1 covers the rules PennyLane registers against the *symbolic* operator, i.e.
   `rule(base, control_wires, control_values, work_wires, work_wire_type)` rather than the base op's
   `(*params, wires)` — the `flip_zero_ctrl_values(...)` family. These are the rules that terminate a
   controlled chain in plain gates (`C(Hadamard) -> CH`, `2C(Hadamard) -> H, RY, Toffoli`), so
@@ -139,12 +143,12 @@
     For example, an operator with class name `HybridOpArg`, taking in one float param
     argument named `angle`, one wire argument named `cwires`, one static data argument
     `label="hello"`, and a computed UID of 10 would be parsed to the following graph op ID:
-        HybridOpArg{angle:[tensor<f64>]}{cwires:1}{label:hello}[10]
+        HybridOpArg{angle:[tensor<f64>]}{cwires:1}{label = "hello"}[10]
 
     A node in the decomposition graph is completely identified by its `graphOpId`. For example,
-        PauliRot{angle:[f64]}{wires:1}{pauli_word:X}
+        PauliRot{angle:[f64]}{wires:1}{pauli_word = "X"}
     and
-        PauliRot{angle:[f64]}{wires:2}{pauli_word:XX}
+        PauliRot{angle:[f64]}{wires:2}{pauli_word = "XX"}
     will have different decomposition rules.
 
   - A decomposition rule function can arrive in a piece of MLIR in one of three ways:
@@ -182,6 +186,7 @@
     [(#2855)](https://github.com/PennyLaneAI/catalyst/pull/2855)
     [(#3156)](https://github.com/PennyLaneAI/catalyst/pull/3156)
     [(#3158)](https://github.com/PennyLaneAI/catalyst/pull/3158)
+    [(#3206)](https://github.com/PennyLaneAI/catalyst/pull/3206)
 
     1. The pass now supports applying a selection of the available decomposition rules via the `target_rules` parameter.
 
@@ -603,9 +608,12 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* Adds ability to lower `None` attributes to `get_mlir_attribute_from_pyval`.
+  [(#3196)](https://github.com/PennyLaneAI/catalyst/pull/3196)
+
 * Update calls to `GlobalPhase` to no longer use the `wires` argument.
   [(#3108)](https://github.com/PennyLaneAI/catalyst/pull/3108)
-  
+
 * A GPU CI workflow runs the runtime transport tests on the `single-gpu-x64` runner, gated by
   the `gpu` label.
   [(#3113)](https://github.com/PennyLaneAI/catalyst/pull/3113)
@@ -808,6 +816,12 @@
 * The `transport` and `executor` dialects are now documented alongside the other Catalyst dialects.
   [(#3179)](https://github.com/PennyLaneAI/catalyst/pull/3179)
   [(#3180)](https://github.com/PennyLaneAI/catalyst/pull/3180)
+  [(#3197)](https://github.com/PennyLaneAI/catalyst/pull/3197)
+
+* A developer guide for Backline describes how heterogeneous compilation and remote execution are
+  built in Catalyst: the `catalyst.backline` module attribute, the transport and executor
+  dialects, the compilation pipeline, and the runtime.
+  [(#3208)](https://github.com/PennyLaneAI/catalyst/pull/3208)
 
 <h3>Contributors ✍️</h3>
 
