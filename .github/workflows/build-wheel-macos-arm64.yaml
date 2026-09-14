@@ -521,14 +521,14 @@ jobs:
 
     - name: Run Python Pytest Tests
       run: |
-        python${{ matrix.python_version }} -m pytest frontend/test/pytest -n auto
-        python${{ matrix.python_version }} -m pytest frontend/test/pytest --backend="lightning.kokkos" -n auto -m "not xdsl"
+        python${{ matrix.python_version }} -m pytest frontend/test/pytest -n logical
+        python${{ matrix.python_version }} -m pytest frontend/test/pytest --backend="lightning.kokkos" -n logical -m "not xdsl"
         python${{ matrix.python_version }} -m pytest frontend/test/async_tests
-        python${{ matrix.python_version }} -m pytest frontend/test/pytest --runbraket=LOCAL -n auto -m "not xdsl" || true
-        python${{ matrix.python_version }} -m pytest frontend/test/test_oqc/oqc -n auto
+        python${{ matrix.python_version }} -m pytest frontend/test/pytest --runbraket=LOCAL -n logical -m "not xdsl" || true
+        python${{ matrix.python_version }} -m pytest frontend/test/test_oqc/oqc -n logical
 
     - name: Run Standalone Plugin Tests
       # Run only on Thursday at the given time
       if: env.BUILD_STANDALONE_PLUGIN == 'true'
       run: |
-        python${{ matrix.python_version }} -m pytest standalone_plugin_wheel/standalone_plugin/test -n auto
+        python${{ matrix.python_version }} -m pytest standalone_plugin_wheel/standalone_plugin/test -n logical
