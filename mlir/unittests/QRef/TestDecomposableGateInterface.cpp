@@ -220,7 +220,7 @@ module {
     mlir::DictionaryAttr expectedStaticData = mlir::DictionaryAttr::get(&context, {entry});
     ASSERT_EQ(paulirot.getStaticData(), expectedStaticData);
 
-    ASSERT_EQ(paulirot.getGraphOpId(), "PauliRot{theta:[f64]}{wires:3}{pauli_word:XYZ}");
+    ASSERT_EQ(paulirot.getGraphOpId(), "PauliRot{theta:[f64]}{wires:3}{pauli_word = \"XYZ\"}");
 }
 
 TEST(DecomposableGateInterfaceTests, PCPhaseOP) {
@@ -258,7 +258,7 @@ module {
     mlir::DictionaryAttr expectedStaticData = mlir::DictionaryAttr::get(&context, {entry});
     ASSERT_EQ(pcphase.getStaticData(), expectedStaticData);
 
-    ASSERT_EQ(pcphase.getGraphOpId(), "C(PCPhase){phi:[f64]}{wires:2}{dim:0}");
+    ASSERT_EQ(pcphase.getGraphOpId(), "C(PCPhase){phi:[f64]}{wires:2}{dim = 0 : i64}");
 }
 
 TEST(DecomposableGateInterfaceTests, GlobalPhaseOp) {
@@ -415,8 +415,8 @@ module {
     ASSERT_EQ(op.getStaticData(), expectedStaticData);
 
     ASSERT_EQ(op.getGraphOpId(),
-              "testInterfaceOp{angle:[f64],flag:[i1],index:[i64]}{wire1:1,wire2:1}{"
-              "myStaticArray:[1,2,3],myStaticInt:4,myStaticString:Test}");
+            "testInterfaceOp{angle:[f64],flag:[i1],index:[i64]}{wire1:1,wire2:1}{"
+            "myStaticArray = [1, 2, 3], myStaticInt = 4 : i64, myStaticString = \"Test\"}");
 }
 
 TEST(DecomposableGateInterfaceTests, OperatorOpGOIDTypeConflict) {
@@ -504,9 +504,9 @@ func.func @testfunc(%first : tensor<1xi64>, %secondthird : tensor<2xi64>) {
         mlir::DictionaryAttr::get(&context, {arrAttr, stringAttr, intAttr});
     ASSERT_EQ(op.getStaticData(), expectedStaticData);
 
-    ASSERT_EQ(op.getGraphOpId(),
-              "testOperatorQureg{angle:[f64],flag:[i1],index:[i64]}{reg:3}{"
-              "myStaticArray:[4,2.400000e+00,4],myStaticInt:8,myStaticString:string}");
+    ASSERT_EQ(op.getGraphOpId(), "testOperatorQureg{angle:[f64],flag:[i1],index:[i64]}{reg:3}{"
+                                "myStaticArray = [4, 2.400000e+00, 4], myStaticInt = 8 : i64, "
+                                "myStaticString = \"string\"}");
 }
 
 TEST(DecomposableGateInterfaceTests, OperatorOpUID) {
