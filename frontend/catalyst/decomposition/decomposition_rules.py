@@ -23,13 +23,13 @@ from functools import partial
 import jax.numpy as jnp
 import pennylane as qp
 from jax._src.lib.mlir import ir
-from jaxlib.mlir.dialects.builtin import ModuleOp
 
 from catalyst.compiler import _quantum_opt
 from catalyst.decomposition.graph_op_id import GraphOpID
 from catalyst.decomposition.rule_lowering_warning import RuleLoweringWarning
 from catalyst.decomposition.type_utils import get_dummy_values_for_arg
 from catalyst.jax_extras.lowering import get_mlir_attribute_from_pyval
+from catalyst.utils.exceptions import CompileError
 
 # Ops that make a decomposition body non-invertible
 _NON_INVERTIBLE_MARKERS = (
@@ -402,6 +402,10 @@ def compile_decomposition_rules(
                 subroutine(*call_args, **call_kwargs)
 
     module = circuit.mlir_module
+    if module is None:
+        raise CompileError(
+            f"Failed to generate an MLIR module while compiling decomposition rules for {target_id}"
+        )
 
     def update_funcop_attributes(op):
         """Update the decomposition rule attributes if op is a decomposition rule.
@@ -703,7 +707,7 @@ def fetch_all_reachable_decomposition_rules_from_op(
     queue = deque()
     start = (op_name, dynamic_shape, wire_lens, static_data, extra_data, is_custom_op)
     queue.append(start)
-    visited = [start]
+    visited = {op_id}  # remember ops by their graph id
 
     # Control counts to synthesize `<n>C(...)` rules for. A single control is always captured
     # proactively; a multi-controlled instance (`n_ctrls > 1`) additionally needs its own count.
@@ -782,6 +786,11 @@ def fetch_all_reachable_decomposition_rules_from_op(
                 try:
                     for op, _count in resource.items():
                         graph_op_id = GraphOpID(op)
+                        probe_id = graph_op_id.getGraphOpId()
+                        if probe_id in visited:
+                            continue
+
+                        visited.add(probe_id)
                         probe = (
                             graph_op_id.get_operator_name(),
                             graph_op_id.dynamic_shape,
@@ -790,21 +799,8 @@ def fetch_all_reachable_decomposition_rules_from_op(
                             graph_op_id.extra_data,
                             graph_op_id.is_custom_op,
                         )
-
-                        if not probe in visited:
-                            visited.append(probe)
-                            queue.append(probe)
-                            rules.extend(
-                                compile_variants(
-                                    probe[0],
-                                    graph_op_id.getGraphOpId(),
-                                    probe[1],
-                                    probe[2],
-                                    probe[3],
-                                    probe[4],
-                                    probe[5],
-                                )
-                            )
+                        queue.append(probe)
+                        rules.extend(compile_variants(probe[0], probe_id, *probe[1:]))
                 except Exception as e:
                     warnings.warn(
                         f"Failed to lower the {_rule_name} decomposition rule for {this_name}: {e}",
