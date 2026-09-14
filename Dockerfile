@@ -21,8 +21,6 @@ ARG CUDA_INSTALLER=https://developer.download.nvidia.com/compute/cuda/12.9.1/loc
 ARG ROCM_INSTALLER=https://repo.radeon.com/amdgpu-install/7.0.3/ubuntu/noble/amdgpu-install_7.0.3.70003-1_all.deb
 ARG AMD_ARCH=AMD_GFX942
 ARG CUDA_ARCH=AMPERE80
-ARG LLVM_CACHE=false
-ARG STABLEHLO_CACHE=false
 
 # Create basic runtime environment base on Ubuntu 24.04 (noble)
 # Create and activate runtime virtual environment
@@ -274,7 +272,7 @@ RUN pip install --no-cache-dir \
 
 
 # Download and build Catalyst
-FROM wheel-lightning-qubit AS wheel-lightning-qubit-catalyst
+FROM quay.io/pypa/manylinux_2_28_aarch64 AS wheel-catalyst
 ARG PENNYLANE_VERSION
 ARG CATALYST_VERSION
 ARG LIGHTNING_VERSION
