@@ -591,6 +591,7 @@ class TestDiagonalizeFinalMeasurementsProgramCaptureExecution:
         circuit_compiled = qp.qjit(
             diagonalize_final_measurements_pass(circuit_ref),
             capture=True,
+            collect_decomp_rules=False,
         )
 
         assert np.allclose(expected_res(phi, theta), circuit_compiled(phi, theta))
@@ -808,6 +809,7 @@ class TestDiagonalizeFinalMeasurementsCatalystFrontend:
         circuit_compiled = qp.qjit(
             diagonalize_final_measurements_pass(circuit_ref),
             capture=True,
+            collect_decomp_rules=False,
         )
 
         assert np.allclose(expected_res(phi, theta), circuit_compiled(phi, theta))
@@ -891,8 +893,7 @@ class TestDiagonalizeFinalMeasurementsNonCommuteValidate:
         def circuit():
             return qp.expval(qp.X(0)), qp.var(qp.Z(0))
 
-        with pytest.warns(UserWarning, match="AOT.*failed"):
-            qjitted = qp.qjit(circuit, capture=capture_mode)
+        qjitted = qp.qjit(circuit, capture=capture_mode)
 
         with pytest.raises(CompileError, match=_non_commuting_err_msg):
             qjitted()

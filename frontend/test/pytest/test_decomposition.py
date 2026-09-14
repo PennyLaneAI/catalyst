@@ -48,7 +48,7 @@ from catalyst.decomposition.decomposition_rules import (
     name_wrap_adjoint,
     wrap_modifier_id,
 )
-from catalyst.decomposition.graph_op_id import GraphOpID
+from catalyst.decomposition.graph_op_id import GraphOpID, build_graph_op_id
 from catalyst.decomposition.type_utils import (
     convert_item_to_mlir_type,
     get_dummy_values_for_arg,
@@ -58,6 +58,32 @@ from catalyst.decomposition.type_utils import (
 
 class TestGenericUtilities:
     """Tests for common decomposition rule lowering utilities."""
+
+    def test_wires_replacement_doesnt_create_overlapping_wire_labels(self):
+        """Test that the helper does not create overlapping wire labels which create
+        validation failures when the operator is unflattened.
+
+        NOTE: Regression test for the accumulator change made in type_utils.py
+        """
+
+        op = qp.ctrl(qp.S(Wire[1]), Wire[1])
+        new_op = replace_wires_with_placeholder_wires(op)
+
+        assert new_op == qp.ctrl(qp.S(-2), -1)
+
+    def test_build_graph_op_id(self):
+        """The shared builder canonicalizes every frontend identity component."""
+        op_id = build_graph_op_id(
+            "Example",
+            {"z": ["f64"], "a": ["i1"]},
+            {"right": 2, "left": 1},
+            {"label": "value"},
+            adjoint=True,
+            num_controls=2,
+            uid=7,
+        )
+
+        assert op_id == '2C(Adjoint(Example)){a:[i1],z:[f64]}{left:1,right:2}{label = "value"}[7]'
 
     def test_wires_replacement_doesnt_mutate_operator(self):
         """Test that the wires replacement helper does not mutate the incoming operator."""
@@ -149,7 +175,7 @@ class TestGenericUtilities:
             (SingleParam(Float, Wires([2, 3])), "SingleParam{x:[tensor<f64>]}{reg:2}{}"),
             (
                 CompilableData(True, 3.14, "string", Wires([0, 1])),
-                "CompilableData{}{wires:2}{a:True,b:3.14,thing:string}",
+                'CompilableData{}{wires:2}{a = true, b = 3.140000e+00 : f64, thing = "string"}',
             ),
             (
                 MultipleRegisters(Wires([0, 1, 2]), Wires([3, 4])),
@@ -162,7 +188,7 @@ class TestGenericUtilities:
             (qp.MultiRZ(Float, Wires([0, 2, 3, 4])), "MultiRZ{theta:[f64]}{wires:4}{}"),
             (
                 qp.PauliRot(Float, "XYZ", Wires([1, 2, 3])),
-                "PauliRot{theta:[f64]}{wires:3}{pauli_word:XYZ}",
+                'PauliRot{theta:[f64]}{wires:3}{pauli_word = "XYZ"}',
             ),
             (StaticData("mylabel", Wires([0, 1])), "StaticData{}{reg:2}{}["),
             (
@@ -198,7 +224,6 @@ class TestGenericUtilities:
             )
         assert isinstance(res, str)
 
-    @pytest.mark.filterwarnings("ignore::catalyst.decomposition.RuleLoweringWarning")
     def test_wrapper_passes_compilable_data_to_conditions(self, mocker):
         """Test that decomposition conditions receive compilable operator data."""
         mock_decomp = mocker.MagicMock()
@@ -212,7 +237,7 @@ class TestGenericUtilities:
 
         res = compile_decomposition_rules_wrapper(
             "CompilableData",
-            "CompilableData{}{wires:2}{a:True,b:3.14,thing:string}",
+            'CompilableData{}{wires:2}{a = true, b = 3.140000e+00 : f64, thing = "string"}',
             {},
             {"wires": 2},
             {"a": True, "b": 3.14, "thing": "string"},
@@ -276,7 +301,6 @@ class TestTraceTime:
         assert 'target_gate = "NoParams{}{reg:2}{}"' in mlir
         assert 'target_gate = "Adjoint(NoParams){}{reg:2}{}"' in mlir
 
-    @pytest.mark.filterwarnings("ignore::catalyst.decomposition.RuleLoweringWarning")
     def test_adjoint_gate_captures_base_and_adjoint(self):
         """Lowering the Adjoint of a gate captures the rules registered against both the plain gate
         and its adjoint."""
@@ -299,7 +323,6 @@ class TestTraceTime:
         assert 'target_gate = "NoParams{}{reg:2}{}"' in mlir
         assert 'target_gate = "Adjoint(NoParams){}{reg:2}{}"' in mlir
 
-    @pytest.mark.filterwarnings("ignore::catalyst.decomposition.RuleLoweringWarning")
     def test_distribution_rule_synthesized_from_base_only(self):
         """With only a base rule registered (no Adjoint(Op) rule), lowering still synthesizes a rule
         for Adjoint(Op) by distributing the base rule over adjoint (case 3): its resources are the
@@ -327,7 +350,6 @@ class TestTraceTime:
         )
         assert "qref.adjoint" in mlir
 
-    @pytest.mark.filterwarnings("ignore::catalyst.decomposition.RuleLoweringWarning")
     def test_no_distribution_rule_for_non_invertible_body(self):
         """A distribution rule is NOT synthesized when the base rule body is non-invertible (contains
         a mid-circuit measurement): the base rule is still lowered, but no Adjoint(Op) rule."""
@@ -400,7 +422,6 @@ class TestOnDemand:
         with pytest.raises(ValueError, match="not a control id"):
             name_unwrap_control("RX", "Adjoint(RX){0:[f64]}{wires:1}{}")
 
-    @pytest.mark.filterwarnings("ignore::catalyst.decomposition.RuleLoweringWarning")
     @pytest.mark.parametrize(
         "op_id, extra_ctrl_target",
         [
@@ -424,7 +445,6 @@ class TestOnDemand:
         if extra_ctrl_target is not None:
             assert extra_ctrl_target in module_str
 
-    @pytest.mark.filterwarnings("ignore::catalyst.decomposition.RuleLoweringWarning")
     def test_control_variant_warns_and_skips_on_failure(self, mocker):
         """control_variant_rule_strings warns and skips a rule when it fails to compile."""
 
