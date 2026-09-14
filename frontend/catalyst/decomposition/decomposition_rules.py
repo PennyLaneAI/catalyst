@@ -255,7 +255,12 @@ def collect_resources_for_op(op_name, kwargs, is_custom_op=False, adjoint_resour
     # map each rule to its resources, in a more generic format
     name_to_resource_ids = {}
     name_to_resources = {}
+    applicable_rules = []
     for rule in decomp_rules:
+        if not rule.is_applicable(*args, **kwargs):
+            continue
+
+        applicable_rules.append(rule)
         try:
             # The `compute_resources` function's signature is the same as the Operator2 signature
             # for the original op of the rule
@@ -274,7 +279,7 @@ def collect_resources_for_op(op_name, kwargs, is_custom_op=False, adjoint_resour
                 category=RuleLoweringWarning,
             )
 
-    return name_to_resources, name_to_resource_ids, decomp_rules
+    return name_to_resources, name_to_resource_ids, applicable_rules
 
 
 def prepare_dynamic_op_kwargs(dynamic_shape, wire_lens) -> dict:
@@ -364,10 +369,6 @@ def compile_decomposition_rules(
 
         return qp.capture.subroutine(decomp_rule_no_static_args)
 
-    condition_args, condition_kwargs = split_call_args(
-        kwargs | static_data | extra_data, is_custom_op
-    )
-
     subroutines = []
     for rule in decomp_rules:
         if rule.name not in name_to_resource_ids:
@@ -381,8 +382,7 @@ def compile_decomposition_rules(
                 category=RuleLoweringWarning,
             )
             continue
-        if rule.is_applicable(*condition_args, **condition_kwargs):
-            subroutines.append(rule_to_subroutine(rule))
+        subroutines.append(rule_to_subroutine(rule))
 
     # For control distribution, the extra control wires are
     # added to each rule body via the `_ctrl_wires` keyword argument.
