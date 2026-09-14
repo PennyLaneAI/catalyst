@@ -43,17 +43,17 @@ struct DeviceBasedDecompositionPass : public impl::DeviceBasedDecompositionPassB
         // The options for this pass are handled in the frontend, and match the requirements
         // as per the target device toml file.
 
-        // Run the AdjointLoweringPass
-        OpPassManager adjointPM("builtin.module");
-        adjointPM.addPass(createAdjointLoweringPass());
-        if (failed(runPipeline(adjointPM, getOperation()))) {
-            return signalPassFailure();
-        }
-
         // Run the CtrlLoweringPass
         OpPassManager ctrlPM("builtin.module");
         ctrlPM.addPass(createCtrlLoweringPass());
         if (failed(runPipeline(ctrlPM, getOperation()))) {
+            return signalPassFailure();
+        }
+
+        // Run the AdjointLoweringPass
+        OpPassManager adjointPM("builtin.module");
+        adjointPM.addPass(createAdjointLoweringPass());
+        if (failed(runPipeline(adjointPM, getOperation()))) {
             return signalPassFailure();
         }
 
