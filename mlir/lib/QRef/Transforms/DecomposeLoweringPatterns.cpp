@@ -33,9 +33,9 @@
 #include "mlir/Support/LLVM.h"
 #include "mlir/Support/LogicalResult.h"
 
-#include "Quantum/IR/QuantumInterfaces.h"
-#include "Quantum/IR/QuantumOps.h"
-#include "Quantum/IR/QuantumTypes.h"
+#include "QRef/IR/QRefInterfaces.h"
+#include "QRef/IR/QRefTypes.h"
+#include "QRef/Transforms/Patterns.h"
 
 #include "DecompUtils.hpp"
 #include "DecomposeLoweringImpl.hpp"
@@ -43,10 +43,9 @@
 #define DEBUG_TYPE "decompose-lowering"
 
 using namespace mlir;
-using namespace catalyst::quantum;
 
 namespace catalyst {
-namespace quantum {
+namespace qref {
 
 /**
  * @brief
@@ -54,11 +53,9 @@ namespace quantum {
  * replace the parameters of `rule` and returning the results. `rewriter`'s insertion point will be
  * moved to the end of the inlined function body.
  */
-static SmallVector<Value> inlineRuleBody(PatternRewriter &rewriter, func::FuncOp rule,
-                                         ValueRange operands) {
+void inlineRuleBody(PatternRewriter &rewriter, func::FuncOp rule, ValueRange operands) {
     assert(rule.getBlocks().size() == 1);
     Block &body = rule.front();
-    auto returnOp = cast<func::ReturnOp>(body.getTerminator());
 
     IRMapping mapping;
     mapping.map(body.getArguments(), operands);
@@ -66,12 +63,6 @@ static SmallVector<Value> inlineRuleBody(PatternRewriter &rewriter, func::FuncOp
     for (Operation &op : body.without_terminator()) {
         rewriter.clone(op, mapping);
     }
-
-    SmallVector<Value> results;
-    for (Value operand : returnOp.getOperands()) {
-        results.push_back(mapping.lookupOrDefault(operand));
-    }
-    return results;
 }
 
 struct DecomposableGatePattern final : public OpInterfaceRewritePattern<DecomposableGate> {
@@ -87,6 +78,7 @@ struct DecomposableGatePattern final : public OpInterfaceRewritePattern<Decompos
 
     LogicalResult matchAndRewrite(DecomposableGate op, PatternRewriter &rewriter) const override {
         std::string gateName = op.getOperatorName();
+        llvm::errs() << "visiting " << gateName << "\n";
         // A modified op (adjoint and/or controlled) is a distinct operator from its base gate.
         bool isModified =
             op.getOperation()->hasAttr("adjoint") || !op.getCtrlQubitOperands().empty();
@@ -123,7 +115,7 @@ struct DecomposableGatePattern final : public OpInterfaceRewritePattern<Decompos
             // (`Adjoint(Op)`/`C(Op)`) must match its own rule by id and never fall back to a plain
             // base-name rule (that would apply the unmodified decomposition to the modified op).
             // TODO: remove multirz's special name editing
-            if (isa<quantum::MultiRZOp>(op)) {
+            if (isa<qref::MultiRZOp>(op)) {
                 gateName = gateName + "_" + std::to_string(op.getWireLens()["wires"]);
             }
             auto it_gateName = decompositionRegistry.find(gateName);
@@ -141,45 +133,28 @@ struct DecomposableGatePattern final : public OpInterfaceRewritePattern<Decompos
         // For null decomp rules, the signature will not have any quantum values
         // This is a deviation from the standard decomp func signature, so we deal with it
         // separately
-        if (!llvm::any_of(llvm::concat<const Type>(rule.getFunctionType().getInputs(),
-                                                   rule.getFunctionType().getResults()),
-                          [](const mlir::Type t) {
-                              return isa<quantum::QuregType, quantum::QubitType>(t);
-                          })) {
-            for (auto [inQubit, outQubit] :
-                 llvm::zip_equal(op.getQubitOperands(), op.getQubitResults())) {
-                rewriter.replaceAllUsesWith(outQubit, inQubit);
-            }
+        if (!llvm::any_of(
+                llvm::concat<const Type>(rule.getFunctionType().getInputs(),
+                                         rule.getFunctionType().getResults()),
+                [](const mlir::Type t) { return isa<qref::QuregType, qref::QubitType>(t); })) {
+            rewriter.eraseOp(op);
             return success();
         }
 
-        // Here is the assumption that the decomposition rule must have at least one input and
-        // one result
+        // Here is the assumption that the decomposition rule must have at least one input
         assert(rule.getFunctionType().getNumInputs() > 0 &&
                "Decomposition function must have at least one input");
-        assert(rule.getFunctionType().getNumResults() >= 1 &&
-               "Decomposition function must have at least one result");
 
         rewriter.setInsertionPointAfter(op);
 
         auto enableQreg = llvm::any_of(rule.getFunctionType().getInputs(),
-                                       [](mlir::Type t) { return isa<quantum::QuregType>(t); });
+                                       [](mlir::Type t) { return isa<qref::QuregType>(t); });
         auto analyzer = DecomposableGateSignatureAnalyzer(op, enableQreg);
         assert(analyzer && "Analyzer should be valid");
 
         auto operands = analyzer.prepareOperands(rule, rewriter, op.getLoc());
-        SmallVector<Value> inlinedFunctionResults = inlineRuleBody(rewriter, rule, operands);
-
-        // Replace the op with the inlined function and adjust the insert ops for the qreg mode
-        if (inlinedFunctionResults.size() == 1 &&
-            isa<quantum::QuregType>(inlinedFunctionResults.front().getType())) {
-            auto results = analyzer.prepareResultsForQreg(inlinedFunctionResults.front(),
-                                                          op.getLoc(), rewriter);
-            rewriter.replaceOp(op, results);
-        } else {
-            rewriter.replaceOp(op, inlinedFunctionResults);
-        }
-
+        inlineRuleBody(rewriter, rule, operands);
+        rewriter.eraseOp(op);
         return success();
     }
 };
@@ -191,5 +166,5 @@ void populateDecomposeLoweringPatterns(
                                           targetGateSet);
 }
 
-} // namespace quantum
+} // namespace qref
 } // namespace catalyst

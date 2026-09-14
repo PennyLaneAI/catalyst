@@ -24,11 +24,12 @@
 #include "mlir/IR/Value.h"
 #include "mlir/Support/LLVM.h"
 
+#include "QRef/IR/QRefOps.h"
 #include "Quantum/IR/QuantumInterfaces.h"
 #include "Quantum/IR/QuantumOps.h"
 
 namespace catalyst {
-namespace quantum {
+namespace qref {
 
 /// A struct to represent qubit indices in quantum operations.
 ///
@@ -95,71 +96,19 @@ static mlir::Value getMappedQubitOperand(mlir::Value qubit, const OperandRangeT 
     return qubitOperands[resultIndex];
 }
 
-/// Trace a qubit SSA value back to the quantum.extract that produced it and
-/// return the corresponding QubitIndex (with the originating qreg).
-///
-/// The walk follows the def chain backward through:
-///   - quantum.extract  -> terminate, build QubitIndex from its index operand
-///                         (dynamic Value or static IntegerAttr) and its qreg
-///   - QuantumGate ops  -> step to the qubit operand at the same result position
-///   - quantum.measure  -> step to the input qubit
-///
-/// Returns an invalid (default-constructed) QubitIndex if the chain ends in
-/// some other defining op or a block argument.
-inline QubitIndex getExtractIndex(mlir::Value qubit) {
-    while (qubit) {
-        if (auto extractOp = qubit.getDefiningOp<quantum::ExtractOp>()) {
-            if (mlir::Value idx = extractOp.getIdx()) {
-                return QubitIndex(idx, extractOp.getQreg());
-            }
-            if (mlir::IntegerAttr idxAttr = extractOp.getIdxAttrAttr()) {
-                return QubitIndex(idxAttr, extractOp.getQreg());
-            }
-        }
-
-        if (auto gate = mlir::dyn_cast_or_null<quantum::QuantumGate>(qubit.getDefiningOp())) {
-            qubit = getMappedQubitOperand(qubit, gate.getQubitOperands(), gate.getQubitResults());
-            continue;
-        } else if (auto measureOp =
-                       mlir::dyn_cast_or_null<quantum::MeasureOp>(qubit.getDefiningOp())) {
-            qubit = measureOp.getInQubit();
-            continue;
-        } else if (auto ifOp = mlir::dyn_cast_or_null<mlir::scf::IfOp>(qubit.getDefiningOp())) {
-            qubit = getMappedQubitOperand(qubit, ifOp.thenYield().getResults(), ifOp.getResults());
-            continue;
-        } else if (auto forOp = mlir::dyn_cast_or_null<mlir::scf::ForOp>(qubit.getDefiningOp())) {
-            qubit = getMappedQubitOperand(qubit, forOp.getInitArgs(), forOp.getResults());
-            continue;
-        } else if (auto whileOp =
-                       mlir::dyn_cast_or_null<mlir::scf::WhileOp>(qubit.getDefiningOp())) {
-            qubit = getMappedQubitOperand(qubit, whileOp.getConditionOp().getArgs(),
-                                          whileOp.getResults());
-            continue;
-        } else if (auto blockArg = mlir::dyn_cast_or_null<mlir::BlockArgument>(qubit)) {
-            unsigned int blockArgIdx = blockArg.getArgNumber();
-            if (auto forOp =
-                    mlir::dyn_cast_or_null<mlir::scf::ForOp>(blockArg.getOwner()->getParentOp())) {
-                // ForOp Regions (and blocks) have args (iter_arg, *init_args), so the index is
-                // off-by-one
-                qubit = forOp.getInitArgs()[blockArgIdx - 1];
-                continue;
-            } else if (auto whileOp = mlir::dyn_cast_or_null<mlir::scf::WhileOp>(
-                           blockArg.getOwner()->getParentOp())) {
-                mlir::Block *b = blockArg.getOwner();
-                if (b == whileOp.getBeforeBody()) {
-                    qubit = whileOp.getInits()[blockArgIdx];
-                } else if (b == whileOp.getAfterBody()) {
-                    qubit = whileOp.getConditionOp().getArgs()[blockArgIdx];
-                }
-                continue;
-            }
-        }
-
-        break;
+inline QubitIndex getQubitRefIndex(mlir::Value qubit) {
+    auto getOp = qubit.getDefiningOp<qref::GetOp>();
+    if (!getOp) {
+        return QubitIndex();
     }
-
+    if (mlir::Value idx = getOp.getIdx()) {
+        return QubitIndex(idx, getOp.getQreg());
+    }
+    if (mlir::IntegerAttr idxAttr = getOp.getIdxAttrAttr()) {
+        return QubitIndex(idxAttr, getOp.getQreg());
+    }
     return QubitIndex();
 }
 
-} // namespace quantum
+} // namespace qref
 } // namespace catalyst

@@ -201,18 +201,6 @@ def GraphDecompositionPass : Pass<"graph-decomposition", "mlir::ModuleOp"> {
     ];
 }
 
-def DecomposeLoweringPass : Pass<"decompose-lowering"> {
-    let summary = "Replace quantum operations with compiled decomposition rules.";
-
-    let options = [
-        ListOption<
-            /*C++ name*/"targetRulesOption",
-            /*CLI name*/"target-rules",
-            /*Type*/"std::string",
-            /*Description*/"The set of decomposition rules to apply. If empty, applies all rules.">
-    ];
-}
-
 def ResolveStatePrepOperatorPass : Pass<"resolve-state-prep-operator"> {
     let summary = "Replace all quantum.operator ops of StatePrep/BasisState to equivalent quantum.set_state/set_basis_state operations ";
 }
