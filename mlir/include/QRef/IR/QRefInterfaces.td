@@ -137,5 +137,42 @@ def ParametrizedGate : OpInterface<"ParametrizedGate", [QuantumGate]> {
     ];
 }
 
+def DecomposableGate : OpInterface<"DecomposableGate", [QuantumGate]> {
+    let description = [{
+        Provides the decomposition metadata used to identify a reference-semantics gate in the
+        decomposition graph.
+    }];
+
+    let cppNamespace = "::catalyst::qref";
+
+    let methods = [
+        InterfaceMethod<
+            "Return the name of the corresponding frontend operator.",
+            "std::string", "getOperatorName"
+        >,
+        InterfaceMethod<
+            "Return frontend parameter names mapped to dynamic MLIR types.",
+            "llvm::StringMap<llvm::SmallVector<mlir::Type>>", "getDynamicShape"
+        >,
+        InterfaceMethod<
+            "Return frontend wire arguments mapped to their number of wires.",
+            "llvm::StringMap<size_t>", "getWireLens"
+        >,
+        InterfaceMethod<
+            "Return the operator's static decomposition data.",
+            "mlir::DictionaryAttr", "getStaticData"
+        >,
+        InterfaceMethod<
+            "Return additional data needed to distinguish the operator.",
+            "std::string", "getExtraData", (ins), [{}], [{ return ""; }]
+        >,
+        InterfaceMethod<
+            "Return the operation identifier used by graph decomposition.",
+            "std::string", "getGraphOpId", (ins), [{}],
+            [{ return ::catalyst::qref::defaultGetGraphOpId($_op.getOperation()); }]
+        >
+    ];
+}
+
 
 #endif // QREF_INTERFACES

@@ -41,6 +41,7 @@
 #include "mlir/Transforms/Passes.h"
 #include "stablehlo/dialect/StablehloOps.h" // When we read the decomposition rules module from file, StablehloDialect may not be registered from start.
 
+#include "QRef/IR/QRefDialect.h"
 #include "Quantum/IR/QuantumDialect.h"
 #include "Quantum/IR/QuantumOps.h"
 #include "Quantum/Transforms/Patterns.h"
@@ -57,6 +58,7 @@ namespace quantum {
 
 #define GEN_PASS_DEF_DECOMPOSELOWERINGPASS
 #define GEN_PASS_DECL_DECOMPOSELOWERINGPASS
+#define GEN_PASS_DECL_REFERENCESEMANTICSCONVERSIONPASS
 #include "Quantum/Transforms/Passes.h.inc"
 
 /// A module pass that work through a module, register all decomposition functions, and apply the
@@ -67,6 +69,7 @@ struct DecomposeLoweringPass : impl::DecomposeLoweringPassBase<DecomposeLowering
     void getDependentDialects(DialectRegistry &registry) const override {
         registry.insert<arith::ArithDialect>();
         registry.insert<func::FuncDialect>();
+        registry.insert<qref::QRefDialect>();
         registry.insert<quantum::QuantumDialect>();
         registry.insert<mlir::stablehlo::StablehloDialect>();
         registry.insert<tensor::TensorDialect>();
@@ -140,7 +143,19 @@ struct DecomposeLoweringPass : impl::DecomposeLoweringPassBase<DecomposeLowering
     void runOnOperation() final {
         ModuleOp module = cast<ModuleOp>(getOperation());
 
-        // Step 1: Discover and register all decomposition functions in the module
+        // Step 1: Normalize the circuit and decomposition rules to reference semantics. Qubit
+        // references retain their qreg/index provenance directly, avoiding value-semantics
+        // insert-chain walk-backs during rule inlining.
+        OpPassManager referenceSemanticsPm("builtin.module");
+        referenceSemanticsPm.addPass(createReferenceSemanticsConversionPass());
+        if (failed(runPipeline(referenceSemanticsPm, module))) {
+            return signalPassFailure();
+        }
+
+        decompositionRegistry.clear();
+        targetGateSet.clear();
+
+        // Step 2: Discover and register all decomposition functions in the module
         llvm::StringSet<> targetRules;
         for (auto rule : targetRulesOption) {
             targetRules.insert(rule);
@@ -150,15 +165,13 @@ struct DecomposeLoweringPass : impl::DecomposeLoweringPassBase<DecomposeLowering
             return;
         }
 
-        // Step 2: Find the target gate set
+        // Step 3: Find the target gate set
         findTargetGateSet(module, targetGateSet);
 
-        // Step 3: Apply the decomposition patterns, canonicalizing the insert/extract pairs
+        // Step 4: Apply the decomposition patterns.
         RewritePatternSet decompositionPatterns(&getContext());
         populateDecomposeLoweringPatterns(decompositionPatterns, decompositionRegistry,
                                           targetGateSet);
-        catalyst::quantum::ExtractOp::getCanonicalizationPatterns(decompositionPatterns,
-                                                                  &getContext());
         if (failed(applyPatternsGreedily(module, std::move(decompositionPatterns)))) {
             return signalPassFailure();
         }

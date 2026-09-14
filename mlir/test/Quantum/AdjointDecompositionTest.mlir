@@ -12,11 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: quantum-opt --decompose-lowering --split-input-file -verify-diagnostics %s | FileCheck %s
+// RUN: quantum-opt --decompose-lowering --split-input-file -verify-diagnostics %s | FileCheck %s --check-prefix=REFERENCE
 
 
 /// Self-adjoint basis gate: Adjoint(H) -> H (the modifier is dropped).
 ///
+// REFERENCE-LABEL: func.func @self_adjoint(
+// REFERENCE-SAME: %[[Q:.*]]: !qref.bit)
+// REFERENCE: qref.custom "Hadamard"() %[[Q]] : !qref.bit
+// REFERENCE-NOT: adj
+// REFERENCE: return
 // CHECK-LABEL: func.func @self_adjoint(
 // CHECK-SAME:  %[[Q:.*]]: !quantum.bit
 func.func @self_adjoint(%q: !quantum.bit) -> !quantum.bit {
@@ -36,6 +41,11 @@ func.func private @adj_h(%q: !quantum.bit) -> !quantum.bit
 
 /// An adjoint op must NOT fall back to a plain base-name rule.
 ///
+// REFERENCE-LABEL: func.func @no_base_rule_fallback(
+// REFERENCE-SAME: %[[Q:.*]]: !qref.bit, %[[T:.*]]: f64)
+// REFERENCE: qref.custom "RX"(%[[T]]) %[[Q]] adj : !qref.bit
+// REFERENCE-NOT: PauliX
+// REFERENCE: return
 // CHECK-LABEL: func.func @no_base_rule_fallback(
 // CHECK-SAME:  %[[Q:.*]]: !quantum.bit, %[[T:.*]]: f64
 func.func @no_base_rule_fallback(%q: !quantum.bit, %theta: f64) -> !quantum.bit {
@@ -56,6 +66,10 @@ func.func private @plain_rx(%theta: f64, %q: !quantum.bit) -> !quantum.bit
 
 /// Parametric adjoint of a basis gate: Adjoint(RZ)(theta) -> RZ(-theta).
 ///
+// REFERENCE-LABEL: func.func @parametric_negation(
+// REFERENCE-SAME: %[[Q:.*]]: !qref.bit, %[[T:.*]]: f64)
+// REFERENCE: %[[NEG:.*]] = arith.negf %[[T]] : f64
+// REFERENCE: qref.custom "RZ"(%[[NEG]]) %[[Q]] : !qref.bit
 // CHECK-LABEL: func.func @parametric_negation(
 // CHECK-SAME:  %[[Q:.*]]: !quantum.bit, %[[T:.*]]: f64
 func.func @parametric_negation(%q: !quantum.bit, %theta: f64) -> !quantum.bit {
@@ -78,6 +92,10 @@ func.func private @adj_rz(%theta: f64, %q: !quantum.bit) -> !quantum.bit
 /// Adjoint(Op) is a DISTINCT node from Op: with both a base rule (on the plain id) and an adjoint
 /// rule (on the Adjoint(...) id) present, each op takes its own rule.
 ///
+// REFERENCE-LABEL: func.func @distinct_from_base(
+// REFERENCE-SAME: %[[Q0:.*]]: !qref.bit, %[[Q1:.*]]: !qref.bit)
+// REFERENCE: qref.custom "PauliX"() %[[Q0]] : !qref.bit
+// REFERENCE: qref.custom "PauliZ"() %[[Q1]] : !qref.bit
 // CHECK-LABEL: func.func @distinct_from_base(
 // CHECK-SAME:  %[[Q0:.*]]: !quantum.bit, %[[Q1:.*]]: !quantum.bit
 func.func @distinct_from_base(%q0: !quantum.bit, %q1: !quantum.bit) -> (!quantum.bit, !quantum.bit) {
@@ -107,6 +125,10 @@ func.func private @adj_h2(%q: !quantum.bit) -> !quantum.bit
 
 /// Non-self-adjoint discrete gate: S is not its own inverse, so Adjoint(S) needs an explicit rule.
 ///
+// REFERENCE-LABEL: func.func @non_self_adjoint(
+// REFERENCE-SAME: %[[Q:.*]]: !qref.bit)
+// REFERENCE: %[[ANGLE:.*]] = arith.constant -1.5707963267948966 : f64
+// REFERENCE: qref.custom "PhaseShift"(%[[ANGLE]]) %[[Q]] : !qref.bit
 // CHECK-LABEL: func.func @non_self_adjoint(
 // CHECK-SAME:  %[[Q:.*]]: !quantum.bit
 func.func @non_self_adjoint(%q: !quantum.bit) -> !quantum.bit {
@@ -127,6 +149,11 @@ func.func private @adj_s(%q: !quantum.bit) -> !quantum.bit
 // -----
 /// Distribution: Adjoint of a composite decomposition reverses the sequence and adjoints each gate.
 ///
+// REFERENCE-LABEL: func.func @distribution(
+// REFERENCE-SAME: %[[Q:.*]]: !qref.bit)
+// REFERENCE: qref.custom "PauliX"() %[[Q]] : !qref.bit
+// REFERENCE: qref.custom "PhaseShift"({{%.+}}) %[[Q]] : !qref.bit
+// REFERENCE: qref.custom "Hadamard"() %[[Q]] : !qref.bit
 // CHECK-LABEL: func.func @distribution(
 // CHECK-SAME:  %[[Q:.*]]: !quantum.bit
 func.func @distribution(%q: !quantum.bit) -> !quantum.bit {
@@ -170,6 +197,11 @@ func.func private @adj_t(%q: !quantum.bit) -> !quantum.bit
 
 /// A decomposition of a NON-adjoint gate can itself emit adjoint gates.
 ///
+// REFERENCE-LABEL: func.func @decomp_produces_adjoint(
+// REFERENCE-SAME: %[[Q:.*]]: !qref.bit)
+// REFERENCE: qref.custom "Hadamard"() %[[Q]] : !qref.bit
+// REFERENCE: qref.custom "PhaseShift"({{%.+}}) %[[Q]] : !qref.bit
+// REFERENCE: qref.custom "Hadamard"() %[[Q]] : !qref.bit
 // CHECK-LABEL: func.func @decomp_produces_adjoint(
 // CHECK-SAME:  %[[Q:.*]]: !quantum.bit
 func.func @decomp_produces_adjoint(%q: !quantum.bit) -> !quantum.bit {

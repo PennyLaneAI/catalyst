@@ -465,8 +465,9 @@ void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result,
 
     // Other ops from custom dialects: emit a warning so users are aware
     if (isCustomDialectOp(op)) {
-        op->emitWarning() << "ResourceAnalysis encountered an unknown operation '" << op->getName()
-                          << "' from a tracked dialect. Some resource data may be missing.";
+        // op->emitWarning() << "ResourceAnalysis encountered an unknown operation '" <<
+        // op->getName()
+        //                   << "' from a tracked dialect. Some resource data may be missing.";
         return;
     }
 

@@ -14,6 +14,7 @@
 
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/IRMapping.h"
 #include "mlir/IR/PatternMatch.h"
@@ -542,11 +543,23 @@ static LogicalResult distributeControls(PatternRewriter &rewriter, Block &block,
             op.emitError("unsupported quantum operation inside a quantum.ctrl region");
             return failure();
         }
-        // Any other scf ops would need their body controlled too,
-        // which is not supported:
+        // Region-bearing classical operations compute gate parameters and are independent of
+        // quantum control. Clone them outside the ctrl region as long as they do not contain
+        // quantum operations themselves.
         if (op.getNumRegions() > 0) {
-            op.emitError("unsupported scf operation inside a quantum.ctrl region");
-            return failure();
+            const bool containsQuantumOp = op.walk([](Operation *nestedOp) {
+                                                 return isa<QuantumDialect>(nestedOp->getDialect())
+                                                            ? WalkResult::interrupt()
+                                                            : WalkResult::advance();
+                                             }).wasInterrupted();
+            if (containsQuantumOp) {
+                op.emitError(
+                    "unsupported region-bearing operation containing quantum operations inside a "
+                    "quantum.ctrl region");
+                return failure();
+            }
+            rewriter.clone(op, map);
+            continue;
         }
         // Classical op: clone it:
         rewriter.clone(op, map);
@@ -559,6 +572,11 @@ struct CtrlLoweringRewritePattern : public OpRewritePattern<CtrlOp> {
     using OpRewritePattern<CtrlOp>::OpRewritePattern;
 
     LogicalResult matchAndRewrite(CtrlOp ctrl, PatternRewriter &rewriter) const override {
+        if (auto parentFunc = ctrl->getParentOfType<func::FuncOp>();
+            parentFunc && parentFunc->hasAttr("target_gate")) {
+            return failure();
+        }
+
         // Defer (not an error) if the region still contains a nested quantum.adjoint region.
         // Distributing controls needs an op-level body, so the inner region must be reduced first.
         // The pipeline runs (ctrl-lowering, adjoint-lowering) to a fixpoint: adjoint-lowering

@@ -527,16 +527,19 @@ void handleIf(IRRewriter &builder, scf::IfOp ifOp, QubitValueTracker &tracker,
         return isa<quantum::QubitType, quantum::QuregType>(arg.getType());
     });
 
-    // Handle Else region
-    QubitValueTracker elseRegionTracker = tracker;
-    eraseSCFYieldQuantumOperands(cast<scf::YieldOp>(ifOp.getElseRegion().front().getTerminator()));
-    handleRegion(builder, ifOp.getElseRegion(), elseRegionTracker);
-    ifOp.getElseRegion().front().eraseArguments([](BlockArgument arg) {
-        return isa<quantum::QubitType, quantum::QuregType>(arg.getType());
-    });
+    // Handle the else region when present. An scf.if with no results may omit it entirely.
+    Block *elseBlock = ifOp.elseBlock();
+    if (elseBlock) {
+        QubitValueTracker elseRegionTracker = tracker;
+        eraseSCFYieldQuantumOperands(cast<scf::YieldOp>(elseBlock->getTerminator()));
+        handleRegion(builder, ifOp.getElseRegion(), elseRegionTracker);
+        elseBlock->eraseArguments([](BlockArgument arg) {
+            return isa<quantum::QubitType, quantum::QuregType>(arg.getType());
+        });
+    }
 
     // The else block is empty if the only remaining op is the mandatory scf.yield terminator
-    bool hasElseRegion = &(ifOp.elseBlock()->front()) != ifOp.elseBlock()->getTerminator();
+    bool hasElseRegion = elseBlock && !llvm::hasSingleElement(*elseBlock);
 
     // Collect classical returns of the old if op
     SmallVector<unsigned> classicalReturnIndices;
@@ -770,8 +773,12 @@ std::optional<SmallVector<Operation *>> handleRegion(IRRewriter &builder, Region
     assert(r.front().getTerminator() && "Expected the region body to have a terminator");
 
     SmallVector<Operation *> erasureWorklist;
-    r.walk<WalkOrder::PreOrder>([&](Operation *op) {
-        llvm::TypeSwitch<Operation *, void>(op)
+    // Structured-op handlers recursively convert their regions and may move those regions to new
+    // operations. Only walk this block's immediate operations so an outer recursive walk does not
+    // retain iterators into regions being rewritten. Early increment also permits handlers such as
+    // observable conversion to replace the current operation.
+    for (Operation &op : llvm::make_early_inc_range(r.front())) {
+        llvm::TypeSwitch<Operation *, void>(&op)
             .Case<quantum::AllocOp>(
                 [&](auto o) { handleAlloc(builder, o, tracker, erasureWorklist); })
             .Case<quantum::DeallocOp>(
@@ -808,7 +815,7 @@ std::optional<SmallVector<Operation *>> handleRegion(IRRewriter &builder, Region
             .Case<mbqc::GraphStatePrepOp>(
                 [&](auto o) { handleGraphStatePrep(builder, o, tracker, erasureWorklist); })
             .Default([](Operation *) {});
-    });
+    }
 
     if (erase) {
         if (isa<quantum::YieldOp>(r.front().getTerminator())) {
@@ -883,8 +890,11 @@ void handleSubroutine(IRRewriter &builder, func::FuncOp f,
             newRargIndices.push_back(i + (numNewArgsAdded++));
             oldVargs.push_back(f.getBody().front().getArgument(i));
         } else if (isa<quantum::QuregType>(t)) {
-            typesToInsertArgs.push_back(
-                qref::QuregType::get(ctx, qregSizesAtCallsite[qregSizeIdx++]));
+            IntegerAttr qregSize = qregSizeIdx < static_cast<int>(qregSizesAtCallsite.size())
+                                       ? qregSizesAtCallsite[qregSizeIdx]
+                                       : builder.getI64IntegerAttr(ShapedType::kDynamic);
+            typesToInsertArgs.push_back(qref::QuregType::get(ctx, qregSize));
+            ++qregSizeIdx;
             newRargIndices.push_back(i + (numNewArgsAdded++));
             oldVargs.push_back(f.getBody().front().getArgument(i));
         }
@@ -969,8 +979,16 @@ struct ReferenceSemanticsConversionPass
 
         // Convert the main quantum.mode functions
         for (auto targetFunc : targetFuncs) {
-            QubitValueTracker tracker;
-            handleRegion(builder, targetFunc.getBody(), tracker);
+            bool hasQuantumSignature =
+                llvm::any_of(llvm::concat<const Type>(targetFunc.getArgumentTypes(),
+                                                      targetFunc.getResultTypes()),
+                             llvm::IsaPred<quantum::QubitType, quantum::QuregType>);
+            if (hasQuantumSignature) {
+                handleSubroutine(builder, targetFunc, {});
+            } else {
+                QubitValueTracker tracker;
+                handleRegion(builder, targetFunc.getBody(), tracker);
+            }
             if (failed(ensureNoValueSemanticsOps(targetFunc))) {
                 targetFunc.emitOpError(
                     "Detected remaining value semantics operations after conversion");

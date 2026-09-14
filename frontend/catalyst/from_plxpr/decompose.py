@@ -70,6 +70,7 @@ COMPILER_OPS_FOR_DECOMPOSITION: dict[str, tuple[int, int]] = {
     "IsingXY": (2, 1),
     "IsingYY": (2, 1),
     "IsingZZ": (2, 1),
+    "SemiAdder": (-1, 0),
     "SingleExcitation": (2, 1),
     "DoubleExcitation": (4, 1),
     "ISWAP": (2, 0),
@@ -99,7 +100,7 @@ COMPILER_OPS_FOR_DECOMPOSITION: dict[str, tuple[int, int]] = {
 def _resource_num_wires(op_rep):
     """Return the wire count from an Operator or Operator2 resource representation."""
     if isinstance(op_rep, qp.core.Operator2):
-        return op_rep.wires.num_wires
+        return len(op_rep.wires)
 
     params = getattr(op_rep, "params", {}) or {}
     return params.get("num_wires")

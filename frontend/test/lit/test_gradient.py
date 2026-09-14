@@ -402,7 +402,7 @@ print(best_diff_method_mixed_return.mlir)
 
 
 # CHECK-LABEL: public @jit_best_diff_method_single_probs_capture
-@qp.qjit(target="mlir", capture=True)
+@qp.qjit(target="mlir", capture=True, collect_decomp_rules=False)
 def best_diff_method_single_probs_capture(phi: float, psi: float):
     """Test the diff_method for differentiating a single probs with program capture."""
 
@@ -423,7 +423,7 @@ print(best_diff_method_single_probs_capture.mlir)
 
 
 # CHECK-LABEL: public @jit_best_diff_method_mixed_return_capture
-@qp.qjit(target="mlir", capture=True)
+@qp.qjit(target="mlir", capture=True, collect_decomp_rules=False)
 def best_diff_method_mixed_return_capture(phi: float, psi: float):
     """Test the diff_method for differentiating a mixed return with program capture."""
 

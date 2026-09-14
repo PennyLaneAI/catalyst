@@ -20,6 +20,7 @@ import pytest
 from jax.core import ShapedArray
 from operator2_dummy_gates import (
     CompilableData,
+    HybridNoOpArg,
     HybridOpArg,
     HybridWires,
     MultiParams,
@@ -31,6 +32,7 @@ from operator2_dummy_gates import (
 )
 from pennylane import qnode
 from pennylane.decomposition import add_decomps, local_decomps, register_resources
+from pennylane.decomposition.utils import to_name
 from pennylane.typing import Bool, Complex, Float, Int, Wire
 from pennylane.wires import Wires
 
@@ -41,11 +43,17 @@ from catalyst.decomposition.decomposition_rules import (
     _control_modifier,
     _leading_modifier_kind,
     _modifier_kind,
+    _RuleCallABI,
+    compile_decomposition_rules,
     compile_decomposition_rules_wrapper,
     compile_reachable_decomposition_rules_wrapper,
+    compile_registered_adjoint_rules,
+    control_variant_rule_strings,
+    get_rule_strings_from_module,
     name_unwrap_adjoint,
     name_unwrap_control,
     name_wrap_adjoint,
+    prepare_dynamic_op_kwargs,
     wrap_modifier_id,
 )
 from catalyst.decomposition.graph_op_id import GraphOpID, build_graph_op_id
@@ -58,6 +66,14 @@ from catalyst.decomposition.type_utils import (
 
 class TestGenericUtilities:
     """Tests for common decomposition rule lowering utilities."""
+
+    def test_graph_op_id_uses_canonical_decomposition_name(self):
+        """Graph IDs use the name under which decomposition rules are registered."""
+        op = qp.ops.Prod2((NoParams(reg=[0]), NoParams(reg=[1])))
+
+        assert to_name(op) == "Prod2"
+        assert GraphOpID(op).get_operator_name() == to_name(op)
+        assert GraphOpID(NoParams(reg=[0])).get_operator_name() == "NoParams"
 
     def test_wires_replacement_doesnt_create_overlapping_wire_labels(self):
         """Test that the helper does not create overlapping wire labels which create
@@ -110,35 +126,18 @@ class TestGenericUtilities:
     @pytest.mark.parametrize(
         "input, dtype, shape",
         [
-            # python-type scalar tests
-            (int, "int64", ()),
-            (float, "float64", ()),
-            (jnp.dtype("int32"), "int32", ()),
-            (bool, "bool", ()),
-            (complex, "complex128", ()),
-            # mlir-type scalar tests
+            # scalar tests
             ("i1", "bool", ()),
             ("i32", "int32", ()),
             ("f64", "float64", ()),
             ("complex<f64>", "complex128", ()),
             ("complex<f32>", "complex64", ()),
-            # mlir-type tensor tests
+            # tensor tests
             ("tensor<i1>", "bool", ()),
             ("tensor<1xi1>", "bool", (1,)),
             ("tensor<2xi64>", "int64", (2,)),
             ("tensor<3x4xf64>", "float64", (3, 4)),
             ("tensor<3x4xcomplex<f64>>", "complex128", (3, 4)),
-            # python-type shaped tests
-            (bool, "bool", ()),
-            ([float, float], "float64", (2,)),
-            ([int], "int64", (1,)),
-            (ShapedArray((4,), "int32"), "int32", (4,)),
-            # mlir-type shaped tests
-            ("i32", "int32", ()),
-            (["f64", "f64"], "float64", (2,)),
-            (["i1", "i1", "i1"], "bool", (3,)),
-            ([["f64", "f64"], ["f64", "f64"]], "float64", (2, 2)),
-            (["tensor<3x4xcomplex<f64>>"], "complex128", (3, 4)),
         ],
     )
     def test_get_dummy_values_types(self, input, dtype, shape):
@@ -146,6 +145,91 @@ class TestGenericUtilities:
         result = get_dummy_values_for_arg(input)
         assert result.dtype == dtype
         assert result.shape == shape
+
+    def test_prepare_dynamic_op_kwargs(self):
+        """Singleton dynamic values are unwrapped while multiple values remain independent."""
+        kwargs = prepare_dynamic_op_kwargs(
+            {
+                "single": ["tensor<3xf64>"],
+                "single_scalar": ["f64"],
+                "multiple": ["tensor<i1>", "tensor<2xcomplex<f64>>"],
+            },
+            {"control_wires": 2, "target_wires": 3, "empty_wires": 0},
+        )
+
+        assert kwargs["single"].shape == (3,)
+        assert not isinstance(kwargs["single"], list)
+
+        assert isinstance(kwargs["single_scalar"], list)
+        assert len(kwargs["single_scalar"]) == 1
+        assert kwargs["single_scalar"][0].shape == ()
+
+        assert isinstance(kwargs["multiple"], list)
+        assert [value.shape for value in kwargs["multiple"]] == [(), (2,)]
+        assert [value.dtype for value in kwargs["multiple"]] == ["bool", "complex128"]
+
+        assert kwargs["control_wires"].tolist() == [0, 1]
+        assert kwargs["target_wires"].tolist() == [2, 3, 4]
+        assert kwargs["empty_wires"].tolist() == []
+
+    def test_compile_rule_with_multiple_values_per_dynamic_name(self):
+        """Incompatible MLIR values associated with one dynamic name remain separately usable."""
+
+        class MultiValueOp(qp.core.Operator2):
+            dynamic_argnames = ("values",)
+            wire_argnames = ("reg",)
+
+            def __init__(self, values, reg):
+                super().__init__(values, reg)
+
+        @register_resources(lambda values, reg: {NoParams(reg=Wire[1]): 2})
+        def multi_value_rule(values, reg):
+            qp.cond(values[0], NoParams)(reg)
+            qp.cond(values[1] > 0, NoParams)(reg)
+
+        with local_decomps():
+            add_decomps(MultiValueOp, multi_value_rule)
+            result = compile_decomposition_rules_wrapper(
+                "MultiValueOp",
+                "MultiValueOp{values:[tensor<i1>,tensor<i64>]}{reg:1}{}",
+                {"values": ["tensor<i1>", "tensor<i64>"]},
+                {"reg": 1},
+                {},
+            )
+
+        assert "multi_value_rule" in result
+        assert result.count("scf.if") == 2
+
+    def test_rule_call_abi_reconstructs_hybrid_params(self):
+        """Hybrid pytree leaves remain flat ABI parameters until the rule call."""
+        abi = _RuleCallABI(
+            "HybridNoOpArg",
+            {"angles": ["tensor<f64>", "tensor<f64>"]},
+            {"wires": 1},
+            {},
+            {"angles": [0.0, 0.0]},
+        )
+
+        assert len(abi.call_args) == 3
+        rebuilt = abi.repack(abi.call_args)
+        assert [angle.shape for angle in rebuilt["angles"]] == [(), ()]
+        assert rebuilt["wires"].tolist() == [0]
+
+    def test_rule_call_abi_places_nested_operator_data_in_forward_args(self):
+        """Dynamic leaves of nested operators follow outer parameters in the rule ABI."""
+        abi = _RuleCallABI(
+            "HybridOpArg",
+            {"angle": ["tensor<f64>"]},
+            {"cwires": 1},
+            {},
+            {"op": SingleParam(0.2, reg=[0]), "n_iters": 1},
+        )
+
+        assert len(abi.call_args) == 3
+        rebuilt = abi.repack(abi.call_args)
+        assert rebuilt["angle"] is abi.call_args[0]
+        assert rebuilt["op"].arguments["x"] is abi.call_args[1]
+        assert rebuilt["cwires"].tolist() == [0]
 
     @pytest.mark.parametrize(
         "item, is_special_lowering, mlir_type",
@@ -209,6 +293,26 @@ class TestGenericUtilities:
         """Test that GraphOpIds are generated correctly by the frontend."""
         # NOTE: use startswith to match ops with uids/extra_data
         assert GraphOpID(op).getGraphOpId().startswith(id)
+
+    def test_graph_op_id_controlled_operator_name(self):
+        """Controlled Operator2 names contain each modifier exactly once."""
+        multix = qp.MultiX(Bool[12], Wire[12])
+
+        controlled_multix = qp.ctrl(multix, control=Wire[1])
+        assert (
+            GraphOpID(controlled_multix).getGraphOpId()
+            == "C(MultiX){bitstring:[tensor<12xi1>]}{wires:12}{}"
+        )
+
+        double_controlled_multix = qp.ctrl(controlled_multix, control=Wire[1])
+        assert (
+            GraphOpID(double_controlled_multix).getGraphOpId()
+            == "2C(MultiX){bitstring:[tensor<12xi1>]}{wires:12}{}"
+        )
+
+    def test_graph_op_id_named_controlled_gate(self):
+        """Named controlled gates retain their canonical operator name."""
+        assert GraphOpID(qp.CNOT(Wire[2])).getGraphOpId() == "CNOT{}{wires:2}{}"
 
     def test_wrapper_operator(self, mocker):
         """Test that compile_decomposition_rules_wrapper doesn't error on Operator1 instances."""
@@ -384,6 +488,67 @@ class TestOnDemand:
     """
 
     @pytest.mark.parametrize(
+        "op_name, op_id, n_ctrl, rule_name",
+        [
+            (
+                "Adjoint(RX)",
+                "Adjoint(RX){0:[f64]}{wires:1}{}",
+                1,
+                "adjoint_rotation",
+            ),
+            (
+                "C(RX)",
+                "C(RX){0:[f64]}{wires:1}{}",
+                1,
+                "flip_zero_ctrl_values(_controlled_rx_decomp)",
+            ),
+            (
+                "C(RX)",
+                "2C(RX){0:[f64]}{wires:1}{}",
+                2,
+                "flip_zero_ctrl_values(_controlled_rx_decomp)",
+            ),
+        ],
+    )
+    def test_compile_symbolic_rule_with_base_signature(self, op_name, op_id, n_ctrl, rule_name):
+        """True symbolic rules are invoked with symbolic arguments while the compiled function
+        retains the base operation's parameter and wire signature."""
+
+        module = compile_decomposition_rules(
+            op_name,
+            op_id,
+            {"0": ["f64"]},
+            {"wires": 1},
+            {},
+            is_custom_op=True,
+            n_ctrl=n_ctrl,
+        )
+        module_str = str(module)
+
+        assert rule_name in module_str
+        assert f'target_gate = "{op_id}"' in module_str
+
+    @pytest.mark.filterwarnings("ignore::catalyst.decomposition.RuleLoweringWarning")
+    def test_multi_control_uses_generic_symbolic_rule(self):
+        """A multi-control target uses rules from the generic ``C(Op)`` registry."""
+
+        rules = control_variant_rule_strings(
+            "RX",
+            "RX{0:[f64]}{wires:1}{}",
+            [2],
+            {"0": ["f64"]},
+            {"wires": 1},
+            {},
+            is_custom_op=True,
+        )
+
+        assert any(
+            "flip_zero_ctrl_values(_controlled_rx_decomp)" in rule
+            and 'target_gate = "2C(RX){0:[f64]}{wires:1}{}"' in rule
+            for rule in rules
+        )
+
+    @pytest.mark.parametrize(
         "op_name, op_id, expected",
         [
             ("S", "S{}{wires:1}{}", "S{}{wires:1}{}"),
@@ -519,6 +684,69 @@ class TestModifierIds:
         assert _MODIFIER_CANONICAL_ORDER == ("C", "Adjoint")
         with pytest.raises(ValueError, match="Non-canonical modifier order"):
             wrap_modifier_id(op_id, "Adjoint")
+
+
+class TestSymbolicRules:
+    """Tests for the rules registered against a symbolic operator that take the symbolic
+    op's args; following the convention in PennyLane."""
+
+    def test_self_adjoint_rule_is_lowered(self):
+        """Test ``self_adjoint`` rule on ``Adjoint(Hadamard)``."""
+
+        module = compile_registered_adjoint_rules(
+            "Hadamard", "Adjoint(Hadamard){}{wires:1}{}", {}, {"wires": 1}, {}, op_cls=qp.Hadamard
+        )
+        (rule,) = get_rule_strings_from_module(module)
+
+        assert 'target_gate = "Adjoint(Hadamard){}{wires:1}{}"' in rule
+        assert 'resources = {operations = {"Hadamard{}{wires:1}{}" = 1 : i64}}' in rule
+        assert "qref.adjoint" not in rule
+        assert "(%arg0: !qref.reg<1>, %arg1: tensor<1xi64>)" in rule
+        assert rule.count('gate_name = "Hadamard"') == 1
+
+    def test_adjoint_rotation_rule_is_lowered(self):
+        """Test ``adjoint_rotation`` reads the angle off the base operator."""
+
+        module = compile_registered_adjoint_rules(
+            "RZ",
+            "Adjoint(RZ){0:[f64]}{wires:1}{}",
+            {"0": ["f64"]},
+            {"wires": 1},
+            {},
+            is_custom_op=True,
+            op_cls=qp.RZ,
+        )
+        (rule,) = get_rule_strings_from_module(module)
+
+        assert 'target_gate = "Adjoint(RZ){0:[f64]}{wires:1}{}"' in rule
+        assert 'resources = {operations = {"RZ{0:[f64]}{wires:1}{}" = 1 : i64}}' in rule
+        assert "qref.adjoint" not in rule
+        assert "stablehlo.negate" in rule
+
+    def test_no_registered_symbolic_rules(self):
+        """Test an op with no symbolic rules registered against its adjoint yields no module."""
+
+        with local_decomps():
+            assert (
+                compile_registered_adjoint_rules(
+                    "NoParams",
+                    "Adjoint(NoParams){}{reg:2}{}",
+                    {},
+                    {"reg": 2},
+                    {},
+                    op_cls=NoParams,
+                )
+                is None
+            )
+
+    def test_missing_op_class_raises(self):
+        """Test lowering cannot proceed without the base operator's class: these rules take a base
+        operator instance, which the operator's name alone cannot produce."""
+
+        with pytest.raises(ValueError, match="operator class of 'Hadamard' is needed"):
+            compile_registered_adjoint_rules(
+                "Hadamard", "Adjoint(Hadamard){}{wires:1}{}", {}, {"wires": 1}, {}
+            )
 
 
 if __name__ == "__main__":
