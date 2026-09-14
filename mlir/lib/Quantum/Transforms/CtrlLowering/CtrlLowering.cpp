@@ -742,14 +742,16 @@ struct ReferenceSemanticsCtrlLoweringRewritePattern : public OpRewritePattern<Ct
                                              ctrl.getCtrlQubits().end());
         ValueRange ctrlValues = ctrl.getCtrlValues();
 
-        rewriter.setInsertionPoint(ctrl);
+        SmallVector<Operation *> opsToErase;
 
         for (Operation &op : block.without_terminator()) {
             // Measurements (quantum.measure and MeasurementProcess ops) are already
             // rejected by the CtrlOp verifier, so they never reach here in a verified
             // pipeline.
             if (auto gate = dyn_cast<QuantumGate>(op)) {
+                rewriter.setInsertionPoint(&op);
                 createControlledGate(rewriter, gate, currentCtrlQubits, ctrlValues);
+                opsToErase.push_back(&op);
                 continue;
             }
             if (auto inner = dyn_cast<CtrlOp>(op)) {
@@ -774,6 +776,10 @@ struct ReferenceSemanticsCtrlLoweringRewritePattern : public OpRewritePattern<Ct
             }
         }
 
+        for (Operation *op : opsToErase) {
+            rewriter.eraseOp(op);
+        }
+        rewriter.inlineBlockBefore(&block, ctrl);
         // Assemble the ctrl op results: out_ctrl_qubits followed by the target results.
         rewriter.eraseOp(ctrl);
         return success();
