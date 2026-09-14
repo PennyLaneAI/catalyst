@@ -330,7 +330,11 @@ def handle_qnode(
     pipelines = (("main", tuple(self._pass_pipeline) + device_pass_pipeline(qnode.device)),)
     if not self._skip_preprocess:
         device_preprocessing_pipeline = create_device_preprocessing_pipeline(
-            qnode.device, execution_config, shots, warn=self._preprocess_warn, needs_gateset_preprocessing=self.needs_gateset_preprocessing
+            qnode.device,
+            execution_config,
+            shots,
+            warn=self._preprocess_warn,
+            needs_gateset_preprocessing=self.needs_gateset_preprocessing,
         )
         pipelines += (("device", device_preprocessing_pipeline),)
 
@@ -428,7 +432,7 @@ def handle_transform(
 
     # Apply the corresponding Catalyst pass counterpart
     next_eval = copy(self)
-    
+
     if transform.pass_name == "device-based-decomposition":
         # device-based-decomposition is not applied here, but is delayed to the device preprocessing pipeline
         # notify that this needs to be done rather than applying the pass here.

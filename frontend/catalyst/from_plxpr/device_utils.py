@@ -60,10 +60,13 @@ _named_obs_dict = {
 
 
 def create_device_preprocessing_pipeline(
-    device: qp.devices.Device, execution_config: ExecutionConfig, shots: int, warn: bool = True, needs_gateset_preprocessing: bool = True
+    device: qp.devices.Device,
+    execution_config: ExecutionConfig,
+    shots: int,
+    warn: bool = True,
+    needs_gateset_preprocessing: bool = True,
 ) -> list[BoundTransform]:
-    """Create a pipeline of device preprocessing transforms for lowering QNodes.
-    """
+    """Create a pipeline of device preprocessing transforms for lowering QNodes."""
     shots_present = qp.math.is_abstract(shots) or shots != 0
     raw_capabilities: DeviceCapabilities = get_qjit_device_capabilities(
         _load_device_capabilities(device)

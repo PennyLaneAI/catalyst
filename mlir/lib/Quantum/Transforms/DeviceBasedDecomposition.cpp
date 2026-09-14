@@ -18,11 +18,10 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Operation.h"
 #include "mlir/IR/PatternMatch.h"
-#include "llvm/Support/Debug.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
-#include "Quantum/Transforms/Passes.h"
 
+#include "Quantum/Transforms/Passes.h"
 
 using namespace mlir;
 using namespace llvm;
@@ -32,9 +31,11 @@ namespace quantum {
 
 #define GEN_PASS_DEF_DEVICEBASEDDECOMPOSITIONPASS
 #include "Quantum/Transforms/Passes.h.inc"
-    
-struct DeviceBasedDecompositionPass : public impl::DeviceBasedDecompositionPassBase<DeviceBasedDecompositionPass> {
-    using impl::DeviceBasedDecompositionPassBase<DeviceBasedDecompositionPass>::DeviceBasedDecompositionPassBase;
+
+struct DeviceBasedDecompositionPass
+    : public impl::DeviceBasedDecompositionPassBase<DeviceBasedDecompositionPass> {
+    using impl::DeviceBasedDecompositionPassBase<
+        DeviceBasedDecompositionPass>::DeviceBasedDecompositionPassBase;
 
     void runOnOperation() final {
         LLVM_DEBUG(dbgs() << "DeviceBasedDecompositionPass\n");
@@ -63,15 +64,15 @@ struct DeviceBasedDecompositionPass : public impl::DeviceBasedDecompositionPassB
         // Copy all the options
         GraphDecompositionPassOptions GDOptions;
 
-        for(auto& targetGate : targetGateSetOption) {
+        for (auto &targetGate : targetGateSetOption) {
             GDOptions.targetGateSetOption.push_back(targetGate);
         }
 
-        for(auto& fixedDecomp : fixedDecompsOption) {
+        for (auto &fixedDecomp : fixedDecompsOption) {
             GDOptions.fixedDecompsOption.push_back(fixedDecomp);
         }
 
-        for(auto& altDecomp : altDecompsOption) {
+        for (auto &altDecomp : altDecompsOption) {
             GDOptions.altDecompsOption.push_back(altDecomp);
         }
 
@@ -87,6 +88,6 @@ struct DeviceBasedDecompositionPass : public impl::DeviceBasedDecompositionPassB
         }
     }
 };
-    
+
 } // namespace quantum
 } // namespace catalyst

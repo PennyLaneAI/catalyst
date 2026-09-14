@@ -30,8 +30,8 @@ from pennylane.devices.capabilities import (
 from catalyst.device.decomposition import measurements_from_counts, measurements_from_samples
 from catalyst.from_plxpr import from_plxpr
 from catalyst.jax_primitives import quantum_kernel_p
-from catalyst.utils.exceptions import CompileError
 from catalyst.passes.builtin_passes import device_based_decomposition
+from catalyst.utils.exceptions import CompileError
 
 pytestmark = pytest.mark.usefixtures("use_capture")
 from_plxpr_no_warn = partial(from_plxpr, _preprocess_warn=False)
@@ -592,17 +592,20 @@ class TestGatesetPreprocessing:
 
     @pytest.mark.parametrize("apply_device_based_decomposition", [True, False])
     def test_device_based_decomposition_added_to_pipeline(self, apply_device_based_decomposition):
-        """Tests that the device-based-decomposition pass is added to the pipeline 
+        """Tests that the device-based-decomposition pass is added to the pipeline
         when the @device_based_decomposition decorator is applied."""
 
         dev = qp.device("null.qubit", wires=4)
 
         if apply_device_based_decomposition:
+
             @device_based_decomposition
             @qp.qnode(dev)
             def f():
                 return qp.expval(qp.Z(0))
+
         else:
+
             @qp.qnode(dev)
             def f():
                 return qp.expval(qp.Z(0))
@@ -633,7 +636,9 @@ class TestGatesetPreprocessing:
 
         device_pipelines = get_pipelines(f, skip_preprocess=False)[1][1]
         gate_set = next(
-            t.kwargs["gate_set"] for t in device_pipelines if t.pass_name == "device-based-decomposition"
+            t.kwargs["gate_set"]
+            for t in device_pipelines
+            if t.pass_name == "device-based-decomposition"
         )
 
         assert (

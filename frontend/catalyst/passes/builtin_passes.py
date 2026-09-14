@@ -1861,7 +1861,7 @@ def device_based_decomposition_setup_inputs():
     Specify that the ``-device-based-decomposition`` MLIR compiler pass for applying the graph-based
     decomposition should be applied to the decorated QNode during :func:`~.qjit` compilation, using
     the gatseset automatically detected from the backend toml file.
-    
+
     Runs `adjoint-lowering` -> `ctrl-lowering` -> `graph-decomposition` with derived gateset
     """
     return (), {}
