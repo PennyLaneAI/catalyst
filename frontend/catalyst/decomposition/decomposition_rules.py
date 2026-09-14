@@ -716,6 +716,8 @@ def compile_registered_adjoint_rules(
         def decomp_rule(*_args, **_kwargs):
             with qp.capture.pause():
                 base = op_cls(*_args, **_kwargs)
+            # TODO: Call the rule itself instead of its _impl after merging
+            # https://github.com/PennyLaneAI/pennylane/pull/10144
             rule._impl(base=base)
 
         decomp_rule_no_static_args = partial(decomp_rule, **static_and_extra)
@@ -726,7 +728,7 @@ def compile_registered_adjoint_rules(
     for rule in rules:
         if rule.name not in name_to_resource_ids:
             continue
-        if _resources_have_measurement(name_to_resources[rule.name]):
+        if _resources_have_measurement(name_to_resources[rule.name]):  # pragma: no cover
             warnings.warn(
                 f"Skipped the {rule.name} decomposition rule for {target_id}: it contains a "
                 "mid-circuit measurement, which is not supported with adjoint or control regions.",
@@ -761,7 +763,7 @@ def registered_adjoint_rule_strings(op_name, target_id, **kwargs) -> list[str]:
     """
     try:
         module = compile_registered_adjoint_rules(op_name, target_id, **kwargs)
-    except Exception as e:  # pylint: disable=broad-except
+    except Exception as e:  # pylint: disable=broad-except # pragma: no cover
         warnings.warn(
             f"Failed to lower the registered adjoint decomposition rules for {target_id}: {e}",
             category=RuleLoweringWarning,
