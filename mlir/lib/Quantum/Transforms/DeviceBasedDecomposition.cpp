@@ -40,7 +40,7 @@ struct DeviceBasedDecompositionPass
     void runOnOperation() final {
         LLVM_DEBUG(dbgs() << "DeviceBasedDecompositionPass\n");
 
-        // This pass runs AdjointLowering -> CtrlLowering -> GraphDecomposition
+        // This pass runs CtrlLowering -> AdjointLowering -> GraphDecomposition
         // The options for this pass are handled in the frontend, and match the requirements
         // as per the target device toml file.
 

@@ -413,7 +413,6 @@ def handle_transform(
     """Handle the conversion from plxpr to Catalyst jaxpr for a
     PL transform."""
 
-    self.check = True
     consts = args[_tuple_to_slice(consts_slice)]
     non_const_args = args[_tuple_to_slice(args_slice)]
     targs = args[_tuple_to_slice(targs_slice)]
