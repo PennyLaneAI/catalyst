@@ -22,11 +22,15 @@
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/IRMapping.h"
 #include "mlir/IR/PatternMatch.h"
+#include "mlir/Pass/PassManager.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#include "Catalyst/Transforms/Passes.h"
+#include "QRef/Transforms/Passes.h"
 
 #include "Quantum/IR/QuantumOps.h"
-
+#include "QRef/IR/QRefOps.h"
+#include "QRef/IR/QRefDialect.h"
 #include "QuantumCache.hpp"
 
 using namespace mlir;
@@ -99,6 +103,16 @@ struct AdjointLoweringPass : impl::AdjointLoweringPassBase<AdjointLoweringPass> 
     using AdjointLoweringPassBase::AdjointLoweringPassBase;
 
     void runOnOperation() final {
+        Operation *op = getOperation();
+        // Ensure the IR is in value semantics
+        {
+            OpPassManager ValueSemanticsPm(op->getName());
+            ValueSemanticsPm.addPass(qref::createValueSemanticsConversionPass());
+            if (failed(runPipeline(ValueSemanticsPm, op))) {
+                return signalPassFailure();
+            }
+        }
+
         RewritePatternSet patterns(&getContext());
         patterns.add<AdjointSingleOpRewritePattern>(patterns.getContext(), 1);
 
