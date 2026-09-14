@@ -522,6 +522,15 @@ class TestJAXMLIRAttributeGetter:
             assert isinstance(attr, ir.StringAttr)
             assert attr.value == "hello catalyst!"
 
+    def test_none_attr(self):
+        """
+        Test None is lowered to the MLIR null attribute value.
+        """
+        with ctx, loc:
+            attr = get_mlir_attribute_from_pyval(None)
+            assert isinstance(attr, ir.TypeAttr)
+            assert attr.value == ir.NoneType.get()
+
     @pytest.mark.parametrize("number", (37, -37))
     def test_int_attr(self, number):
         """

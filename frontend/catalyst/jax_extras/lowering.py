@@ -15,6 +15,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import dataclasses
 import logging
 import textwrap
@@ -192,6 +193,17 @@ def custom_lower_jaxpr_to_module(
     return ctx.module, ctx.context
 
 
+@contextlib.contextmanager
+def mlir_build_context():
+    """Provide an MLIR context and location for attribute and type construction."""
+    if current := ir.Context.current:
+        with ir.Location.unknown(context=current):
+            yield current
+    else:
+        with ir.Context() as context, ir.Location.unknown(context=context):
+            yield context
+
+
 def get_mlir_attribute_from_pyval(value):
     """
     Given a value of any type, construct an mlir attribute of corresponding type.
@@ -224,6 +236,9 @@ def get_mlir_attribute_from_pyval(value):
 
         case str():
             attr = ir.StringAttr.get(value)
+
+        case None:
+            attr = ir.TypeAttr.get(ir.NoneType.get())
 
         case list() | tuple():
             element_attrs = [get_mlir_attribute_from_pyval(elem) for elem in value]
