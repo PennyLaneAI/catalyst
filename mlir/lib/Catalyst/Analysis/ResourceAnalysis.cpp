@@ -227,8 +227,6 @@ void ResourceAnalysis::analyzeWhileLoop(scf::WhileOp whileOp, ResourceResult &re
 }
 
 void ResourceAnalysis::analyzeIfOp(scf::IfOp ifOp, ResourceResult &result, bool isAdjoint) {
-    result.hasBranches = true;
-
     ResourceResult thenResult = makeEmptyResult();
     analyzeRegion(ifOp.getThenRegion(), thenResult, isAdjoint);
 
@@ -253,6 +251,8 @@ void ResourceAnalysis::analyzeIfOp(scf::IfOp ifOp, ResourceResult &result, bool 
     }
 
     // No hint: fall back to worst-case (max across branches).
+    result.hasBranches = true;
+
     if (!ifOp.getElseRegion().empty()) {
         ResourceResult elseResult = makeEmptyResult();
         analyzeRegion(ifOp.getElseRegion(), elseResult, isAdjoint);
@@ -263,8 +263,6 @@ void ResourceAnalysis::analyzeIfOp(scf::IfOp ifOp, ResourceResult &result, bool 
 
 void ResourceAnalysis::analyzeIndexSwitchOp(scf::IndexSwitchOp switchOp, ResourceResult &result,
                                             bool isAdjoint) {
-    result.hasBranches = true;
-
     // If branch probabilities are provided, compute the expected (average) resource counts.
     // `catalyst.estimated_probabilities` is an array of floats with one entry per case
     // (excluding the default which is computed automatically).
@@ -298,6 +296,8 @@ void ResourceAnalysis::analyzeIndexSwitchOp(scf::IndexSwitchOp switchOp, Resourc
     }
 
     // No hint: fall back to worst-case (max across all cases).
+    result.hasBranches = true;
+
     ResourceResult maxResult = makeEmptyResult();
     bool first = true;
 
