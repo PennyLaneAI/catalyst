@@ -415,8 +415,8 @@ module {
     ASSERT_EQ(op.getStaticData(), expectedStaticData);
 
     ASSERT_EQ(op.getGraphOpId(),
-            "testInterfaceOp{angle:[f64],flag:[i1],index:[i64]}{wire1:1,wire2:1}{"
-            "myStaticArray = [1, 2, 3], myStaticInt = 4 : i64, myStaticString = \"Test\"}");
+              "testInterfaceOp{angle:[f64],flag:[i1],index:[i64]}{wire1:1,wire2:1}{"
+              "myStaticArray = [1, 2, 3], myStaticInt = 4 : i64, myStaticString = \"Test\"}");
 }
 
 TEST(DecomposableGateInterfaceTests, OperatorOpGOIDTypeConflict) {
@@ -505,8 +505,8 @@ func.func @testfunc(%first : tensor<1xi64>, %secondthird : tensor<2xi64>) {
     ASSERT_EQ(op.getStaticData(), expectedStaticData);
 
     ASSERT_EQ(op.getGraphOpId(), "testOperatorQureg{angle:[f64],flag:[i1],index:[i64]}{reg:3}{"
-                                "myStaticArray = [4, 2.400000e+00, 4], myStaticInt = 8 : i64, "
-                                "myStaticString = \"string\"}");
+                                 "myStaticArray = [4, 2.400000e+00, 4], myStaticInt = 8 : i64, "
+                                 "myStaticString = \"string\"}");
 }
 
 TEST(DecomposableGateInterfaceTests, OperatorOpUID) {
@@ -551,7 +551,6 @@ func.func @testfunc(%first : tensor<1xi64>, %secondthird : tensor<2xi64>) {
               "testOperatorUID{angle:[f64],flag:[i1],index:[i64]}{reg:3}{}[248]");
 }
 
-
 TEST(DecomposableGateInterfaceTests, OperatorOpMultiIndexedParams) {
     std::string moduleStr = R"mlir(
         module {
@@ -577,7 +576,10 @@ TEST(DecomposableGateInterfaceTests, OperatorOpMultiIndexedParams) {
     ASSERT_EQ(op.getOperatorName(), "testInterfaceOp");
 
     llvm::StringMap<llvm::SmallVector<mlir::Type>> expectedDynamicShape = {
-        {"multi_index_param", {mlir::Float64Type::get(&context), mlir::RankedTensorType::get({2}, mlir::IntegerType::get(&context, 64)), mlir::Float64Type::get(&context)}}};
+        {"multi_index_param",
+         {mlir::Float64Type::get(&context),
+          mlir::RankedTensorType::get({2}, mlir::IntegerType::get(&context, 64)),
+          mlir::Float64Type::get(&context)}}};
 
     ASSERT_EQ(op.getDynamicShape(), expectedDynamicShape);
 
