@@ -16,8 +16,10 @@
 
 #include <cstdint>
 
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/Operation.h"
 
 namespace catalyst {
@@ -49,6 +51,10 @@ uint64_t getNumWires(mlir::func::FuncOp func);
 
 /// True if @p op is nested inside a decomposition rule function.
 bool isInDecompRule(mlir::Operation *op);
+
+/// The operations of @p module that decomposition should rewrite: basically every function
+/// that is not itself a decomposition rule.
+llvm::SmallVector<mlir::Operation *> getDecompositionRoots(mlir::ModuleOp module);
 
 } // namespace DecompUtils
 } // namespace quantum
