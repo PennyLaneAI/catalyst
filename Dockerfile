@@ -267,7 +267,7 @@ RUN pip install --no-cache-dir build cmake ninja toml wheel setuptools>=75.8.1
 
 
 # Download and build Catalyst
-FROM quay.io/pypa/manylinux_2_28_aarch64 AS base-catalyst
+FROM quay.io/pypa/manylinux_2_28_x86_64 AS base-catalyst
 ARG PENNYLANE_VERSION
 ARG CATALYST_VERSION
 ARG LIGHTNING_VERSION
