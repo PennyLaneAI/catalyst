@@ -50,6 +50,7 @@ from catalyst.decomposition.decomposition_rules import (
     name_unwrap_adjoint,
     name_unwrap_control,
     name_wrap_adjoint,
+    prepare_dynamic_op_kwargs,
     wrap_modifier_id,
 )
 from catalyst.decomposition.graph_op_id import GraphOpID, build_graph_op_id
@@ -64,16 +65,24 @@ from catalyst.utils.exceptions import CompileError
 class TestGenericUtilities:
     """Tests for common decomposition rule lowering utilities."""
 
+    def test_probe_wires_dont_overlap(self):
+        """Test that the helper for generating probe arguments doesnt create
+        overlapping wires."""
+
+        kwargs = prepare_dynamic_op_kwargs({}, wire_lens={"target": 3, "control": 2})
+        assert np.allclose(kwargs["target"], jnp.array([-1, -2, -3]))
+        assert np.allclose(kwargs["control"], jnp.array([-4, -5]))
+
     def test_wires_replacement_doesnt_create_overlapping_wire_labels(self):
         """Test that the helper does not create overlapping wire labels which create
         validation failures when the operator is unflattened.
 
         NOTE: Regression test for the accumulator change made in type_utils.py
+        NOTE: Regression test for the accumulator change made in decomposition_rules.py
         """
 
         op = qp.ctrl(qp.S(Wire[1]), Wire[1])
         new_op = replace_wires_with_placeholder_wires(op)
-
         assert new_op == qp.ctrl(qp.S(-2), -1)
 
     def test_build_graph_op_id(self):
