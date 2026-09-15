@@ -439,7 +439,7 @@ def split_call_args(kwargs, is_custom_op):
     return (), kwargs
 
 
-def _rule_is_applicable(rule, *args, **kwargs) -> bool:
+def _rule_is_applicable(op_name, rule, *args, **kwargs) -> bool:
     """Return resource data for the decomposition rules that apply to ``op_name``."""
     try:
         return bool(rule.is_applicable(*args, **kwargs))
@@ -476,7 +476,7 @@ def collect_resources_for_op(
     name_to_resources = {}
     applicable_rules = []
     for rule in decomp_rules:
-        if not _rule_is_applicable(rule, *args, **kwargs):
+        if not _rule_is_applicable(op_name, rule, *args, **kwargs):
             continue
 
         applicable_rules.append(rule)
@@ -784,7 +784,7 @@ def collect_symbolic_resources(
     name_to_resource_ids = {}
     applicable_rules = []
     for rule in rules:
-        if not _rule_is_applicable(rule, **probe_args):
+        if not _rule_is_applicable(op_name, rule, **probe_args):
             continue
 
         applicable_rules.append(rule)

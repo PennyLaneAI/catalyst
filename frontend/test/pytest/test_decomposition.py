@@ -858,7 +858,7 @@ class TestApplicabilityFilterOrdering:
         )
 
         assert self._lowering_warnings(recwarn) == [
-            "Failed to check whether the exploding_rule decomposition rule applies: some error"
+            "Excluded the exploding_rule decomposition rule for SingleParam; raised 'some error'"
         ]
         assert "exploding_rule" not in result
         assert "applicable_rule" in result
@@ -916,7 +916,7 @@ class TestApplicabilityFilterOrdering:
             )
 
         assert self._lowering_warnings(recwarn) == [
-            "Failed to check whether the exploding_adj_rule decomposition rule applies: some error"
+            "Excluded the exploding_adj_rule decomposition rule for NoParams; raised 'some error'"
         ]
         assert [r.name for r in rules] == []
         assert name_to_resources == {}
