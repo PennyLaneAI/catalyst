@@ -13,6 +13,7 @@ file(GLOB SRC
     CtrlLowering/CtrlLowering.cpp
     RemoveGlobalPhasesPass.cpp
     ConversionPatterns.cpp
+    DeviceBasedDecomposition.cpp
     GraphDecomposition/DecompUtils.cpp
     GraphDecomposition/DecomposeLoweringPatterns.cpp
     GraphDecomposition/decompose_lowering.cpp

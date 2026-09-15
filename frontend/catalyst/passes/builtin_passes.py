@@ -1855,6 +1855,22 @@ graph_decomposition = qp.transform(
     pass_name="graph-decomposition", setup_inputs=graph_decomposition_setup_inputs
 )
 
+
+def device_based_decomposition_setup_inputs():
+    R"""
+    Specify that the ``-device-based-decomposition`` MLIR compiler pass for applying the graph-based
+    decomposition should be applied to the decorated QNode during :func:`~.qjit` compilation, using
+    the gatseset automatically detected from the backend toml file.
+
+    Runs `adjoint-lowering` -> `ctrl-lowering` -> `graph-decomposition` with derived gateset
+    """
+    return (), {}
+
+
+device_based_decomposition = qp.transform(
+    pass_name="device-based-decomposition", setup_inputs=device_based_decomposition_setup_inputs
+)
+
 __all__ = [
     "cancel_inverses",
     "combine_global_phases",
@@ -1875,4 +1891,5 @@ __all__ = [
     "decompose_arbitrary_ppr",
     "graph_decomposition",
     "diagonalize_measurements",
+    "device_based_decomposition",
 ]
