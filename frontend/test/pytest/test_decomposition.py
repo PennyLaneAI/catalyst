@@ -32,7 +32,12 @@ from operator2_dummy_gates import (
     StaticData,
 )
 from pennylane import qnode
-from pennylane.decomposition import add_decomps, local_decomps, register_resources
+from pennylane.decomposition import (
+    add_decomps,
+    local_decomps,
+    register_condition,
+    register_resources,
+)
 from pennylane.typing import Bool, Complex, Float, Int, Wire
 from pennylane.wires import Wires
 
@@ -655,6 +660,92 @@ class TestSymbolicRules:
             compile_registered_adjoint_rules(
                 "Hadamard", "Adjoint(Hadamard){}{wires:1}{}", {}, {"wires": 1}, {}
             )
+
+
+class TestApplicabilityFilterOrdering:
+    """Regression tests that pin the behaviour that a rule's applicability condition is evaluated
+    before computing its resources.
+
+    This ensures we don't get cases where an inapplicable rule is generating resource-failure warnings
+    as it should never even be considered in the first place.
+
+    """
+
+    OP_ID = "SingleParam{x:[tensor<f64>]}{reg:1}{}"
+    OP_ARGS = ({"x": ["tensor<f64>"]}, {"reg": 1}, {})
+
+    @staticmethod
+    def _lowering_warnings(recorded):
+        return [str(w.message) for w in recorded if issubclass(w.category, RuleLoweringWarning)]
+
+    @staticmethod
+    def _rule(name, applicable=True, resources_explode=False, condition_explodes=False):
+        def condition(x, reg):
+            if condition_explodes:
+                raise RuntimeError("some error")
+
+            return applicable
+
+        def resources(x, reg):
+            if resources_explode:
+                raise ValueError("another error")
+
+            return {NoParams(reg=Wire[1]): 1}
+
+        def impl(x, reg):
+            NoParams(reg=reg)
+
+        impl.__name__ = name
+        return register_condition(condition)(register_resources(resources)(impl))
+
+    def _compile(self, *rules):
+        with local_decomps():
+            add_decomps(SingleParam, *rules)
+            return compile_decomposition_rules_wrapper("SingleParam", self.OP_ID, *self.OP_ARGS)
+
+    # ---- Actual Tests -----
+
+    def test_inapplicable_rule_emits_no_warning(self, recwarn):
+        """Test that an inapplicable rule would be skipped. The condition check is first so we
+        should never see the resource failure happen."""
+
+        result = self._compile(
+            self._rule("inapplicable_rule", applicable=False, resources_explode=True)
+        )
+
+        assert self._lowering_warnings(recwarn) == []
+        assert "inapplicable_rule" not in result
+
+    def test_inapplicable_rule_never_computes_resources(self):
+        """Test that the resource function for an inappliable rule is never called."""
+
+        calls = []
+
+        def resources(x, reg):
+            calls.append("called resources")
+            return {NoParams(reg=Wire[1]): 1}
+
+        def impl(x, reg):
+            NoParams(reg=reg)
+
+        impl.__name__ = "counted_rule"
+        # Make it not applicable
+        rule = register_condition(lambda x, reg: False)(register_resources(resources)(impl))
+
+        self._compile(rule)
+        assert calls == []
+
+    def test_inapplicable_rule_doesnt_hide_applicable_one(self, recwarn):
+        """Test that skipping an inapplicable rule leaves the applicable rules alone."""
+        result = self._compile(
+            self._rule("inapplicable_rule", applicable=False),
+            self._rule("applicable_rule", applicable=True),
+        )
+
+        assert self._lowering_warnings(recwarn) == []
+        assert "applicable_rule" in result
+        assert "inapplicable_rule" not in result
+        assert f'target_gate = "{self.OP_ID}"' in result
 
 
 if __name__ == "__main__":
