@@ -44,6 +44,7 @@
   adjoint.
   [(#3129)](https://github.com/PennyLaneAI/catalyst/pull/3129)
   [(#3127)](https://github.com/PennyLaneAI/catalyst/pull/3127)
+  [(#3213)](https://github.com/PennyLaneAI/catalyst/pull/3213)
 
   Control is folded into the operator identity *control-outermost* (e.g. `C(Adjoint(Op))`), so
   `ctrl(adjoint(Op))` and `adjoint(ctrl(Op))` collapse to a single node, while a distinct control
@@ -67,6 +68,19 @@
   the base op's id (`2C(S){}{wires:1}{}`), not the wrapper's own arguments. The number of controls
   an operator instance carries now reaches the rule closure from lowering, so `<n>C(...)` rules are
   synthesized at trace time rather than only on demand.
+
+  The id a distributed rule declares for each gate it produces is now *generated* with its
+  modifiers, through the same `build_graph_op_id` builder the rest of the frontend uses, instead of
+  being spliced into a finished id string. The modifiers are placed canonically by construction, so
+  a resource that is already symbolic composes (`Adjoint(C(X))` spells `C(Adjoint(X))`) rather than
+  being rejected as out of order.
+
+  A rule may also *produce* a multi-controlled gate. The control count a resource carries is now
+  kept when the closure explores it through its base, so the `<n>C(...)` node that resource names
+  gets rules of its own instead of only `C(...)`; an operator reached again under more controls
+  pays just for the variants it is still missing. The name paired with such an id is spelled the
+  way PennyLane's registry spells it, since a multi-controlled id reads `<n>C(...)` and PennyLane
+  names every controlled operator `C(...)` whatever its control count.
 
   Two defects in applying a register-mode controlled rule are fixed along with it:
 
