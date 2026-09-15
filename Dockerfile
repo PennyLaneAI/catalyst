@@ -290,10 +290,10 @@ ENV LLVM_BUILD_DIR=/opt/catalyst/llvm-build
 ENV PATH="${LLVM_BUILD_DIR}/bin:${PATH}"
 
 # ENV LLVM_TARGETS=check-mlir
-RUN cd /opt/catalyst/mlir/llvm-project 
+RUN cd /opt/catalyst/mlir/llvm-project \
     && git apply /opt/catalyst/mlir/patches/llvm-bufferization-segfault.patch \
     && git apply /opt/catalyst/mlir/patches/llvm-python-bindinggen-annotations.patch
-RUN cd /opt/catalyst/mlir/Enzyme 
+RUN cd /opt/catalyst/mlir/Enzyme \
     && git apply /opt/catalyst/mlir/patches/enzyme-nvvm-fabs-intrinsics.patch
 
 RUN PYTHON=$PYTHON \
