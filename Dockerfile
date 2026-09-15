@@ -93,11 +93,6 @@ ARG PENNYLANE_VERSION
 ARG CATALYST_VERSION
 COPY --from=build-wheel-lightning-qubit /opt/pennylane-lightning/dist/ /
 RUN pip install --force-reinstall --no-cache-dir pennylane_lightning*.whl && rm pennylane_lightning*.whl
-RUN git clone --depth 1 --branch ${CATALYST_VERSION} --no-recurse-submodules \
-    https://github.com/PennyLaneAI/catalyst.git /tmp/catalyst
-RUN pip install --no-cache-dir \
-    git+https://github.com/PennyLaneAI/pennylane.git@${PENNYLANE_VERSION} \
-    && pip install --no-cache-dir --no-deps /tmp/catalyst && rm -rf /tmp/catalyst
 
 # Download Lightning release and build lightning-kokkos backend with Kokkos-OpenMP
 FROM base-build-python AS build-wheel-lightning-kokkos-openmp
@@ -272,7 +267,7 @@ RUN pip install --no-cache-dir \
 
 
 # Download and build Catalyst
-FROM quay.io/pypa/manylinux_2_28_aarch64 AS wheel-catalyst
+FROM quay.io/pypa/manylinux_2_28_aarch64 AS base-catalyst
 ARG PENNYLANE_VERSION
 ARG CATALYST_VERSION
 ARG LIGHTNING_VERSION
@@ -289,22 +284,17 @@ ENV PYTHON=/opt/python/cp313-cp313/bin/python
 ENV PATH="/opt/python/cp313-cp313/bin:${PATH}"
 RUN python -m pip install numpy "nanobind<2.13" pybind11 PyYAML cmake ninja
 
+COPY . /opt/catalyst
 
 ENV LLVM_BUILD_DIR=/opt/catalyst/llvm-build
 ENV PATH="${LLVM_BUILD_DIR}/bin:${PATH}"
 
-RUN git clone --depth 1 --branch ${CATALYST_VERSION} \
-    --recurse-submodules --shallow-submodules \
-    https://github.com/PennyLaneAI/catalyst.git /tmp/catalyst-src \
-    && cp -a /tmp/catalyst-src/. /opt/catalyst/ \
-    && rm -rf /tmp/catalyst-src
-
 # ENV LLVM_TARGETS=check-mlir
 RUN cd /opt/catalyst/mlir/llvm-project 
-    # && git apply /opt/catalyst/mlir/patches/llvm-bufferization-segfault.patch \
-    # && git apply /opt/catalyst/mlir/patches/llvm-python-bindinggen-annotations.patch
+    && git apply /opt/catalyst/mlir/patches/llvm-bufferization-segfault.patch \
+    && git apply /opt/catalyst/mlir/patches/llvm-python-bindinggen-annotations.patch
 RUN cd /opt/catalyst/mlir/Enzyme 
-    # && git apply /opt/catalyst/mlir/patches/enzyme-nvvm-fabs-intrinsics.patch
+    && git apply /opt/catalyst/mlir/patches/enzyme-nvvm-fabs-intrinsics.patch
 
 RUN PYTHON=$PYTHON \
     C_COMPILER=$(which gcc)  \
@@ -318,6 +308,7 @@ RUN PYTHON=$PYTHON \
 
 # Build stablehlo dialect
 ENV COMPILER_LAUNCHER=""
+RUN mkdir /opt/catalyst/stablehlo-build
 RUN C_COMPILER=$(which gcc) \
     CXX_COMPILER=$(which g++) \
     LLVM_BUILD_DIR="$(pwd)/llvm-build" \
@@ -368,6 +359,10 @@ RUN  cmake -S mlir -B /opt/catalyst/quantum-build -G Ninja \
     -DLLVM_ENABLE_ZSTD=OFF \
     -DLLVM_ENABLE_LLD=ON
 RUN cmake --build /opt/catalyst/quantum-build --target check-dialects catalyst-cli
+
+
+FROM base-catalyst AS build-wheel-catalyst
+COPY --from=base-catalyst /opt/catalyst /opt/catalyst
 RUN cd /opt/catalyst/quantum-build && cpack
 # Build plugin wheel
 RUN MLIR_DIR="/opt/catalyst/llvm-build/lib/cmake/mlir" \
