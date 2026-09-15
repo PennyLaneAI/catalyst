@@ -49,7 +49,7 @@ from catalyst.decomposition.decomposition_rules import (
     _control_modifier,
     _leading_modifier_kind,
     _modifier_kind,
-    collect_symbolic_adjoint_resources,
+    collect_symbolic_resources,
     compile_decomposition_rules_wrapper,
     compile_reachable_decomposition_rules_wrapper,
     compile_registered_symbolic_rules,
@@ -863,8 +863,12 @@ class TestApplicabilityFilterOrdering:
 
         with local_decomps():
             add_decomps("Adjoint(NoParams)", rule)
-            rules, _, name_to_resources, name_to_resource_ids = collect_symbolic_adjoint_resources(
-                NoParams, "NoParams", prepare_dynamic_op_kwargs({}, {"reg": 2}), False
+            rules, _, name_to_resources, name_to_resource_ids = collect_symbolic_resources(
+                NoParams,
+                "NoParams",
+                prepare_dynamic_op_kwargs({}, {"reg": 2}),
+                False,
+                kind="adjoint",
             )
 
         assert self._lowering_warnings(recwarn) == []
@@ -903,8 +907,12 @@ class TestApplicabilityFilterOrdering:
 
         with local_decomps():
             add_decomps("Adjoint(NoParams)", rule)
-            rules, _, name_to_resources, name_to_resource_ids = collect_symbolic_adjoint_resources(
-                NoParams, "NoParams", prepare_dynamic_op_kwargs({}, {"reg": 2}), False
+            rules, _, name_to_resources, name_to_resource_ids = collect_symbolic_resources(
+                NoParams,
+                "NoParams",
+                prepare_dynamic_op_kwargs({}, {"reg": 2}),
+                False,
+                kind="adjoint",
             )
 
         assert self._lowering_warnings(recwarn) == [
