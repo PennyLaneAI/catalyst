@@ -229,6 +229,7 @@ def compile_decomp_rules(
     module,
     op_cls,
     is_custom_op=False,
+    n_ctrls=0,
     params=None,
     param_map=None,
     wire_lens=None,
@@ -256,6 +257,7 @@ def compile_decomp_rules(
             static_data={},
             is_custom_op=True,
             op_cls=op_cls,
+            n_ctrls=n_ctrls,
         )
 
     elif op_cls is qp.MultiRZ:
@@ -270,6 +272,7 @@ def compile_decomp_rules(
             wire_lens={f"{wire_argname}": wire_lens[0]},
             static_data={},
             op_cls=op_cls,
+            n_ctrls=n_ctrls,
         )
 
     elif op_cls is qp.PauliRot:
@@ -290,6 +293,7 @@ def compile_decomp_rules(
             wire_lens={f"{wire_argname}": wire_lens[0]},
             static_data=repack_static_data,
             op_cls=op_cls,
+            n_ctrls=n_ctrls,
         )
 
     elif op_cls is qp.PCPhase:
@@ -309,6 +313,7 @@ def compile_decomp_rules(
             wire_lens={f"{wire_argname}": wire_lens[0]},
             static_data=repack_static_data,
             op_cls=op_cls,
+            n_ctrls=n_ctrls,
         )
 
     elif op_cls is qp.GlobalPhase:
@@ -322,6 +327,7 @@ def compile_decomp_rules(
             wire_lens={},
             static_data={},
             op_cls=op_cls,
+            n_ctrls=n_ctrls,
         )
 
     elif op_cls is qp.QubitUnitary:
@@ -341,6 +347,7 @@ def compile_decomp_rules(
             wire_lens={f"{wire_argname}": wire_lens[0]},
             static_data={},
             op_cls=op_cls,
+            n_ctrls=n_ctrls,
         )
 
     else:
@@ -428,6 +435,7 @@ def compile_decomp_rules(
             static_data=repack_static_data,
             extra_data=extra_data,
             op_cls=op_cls,
+            n_ctrls=n_ctrls,
         )
 
     inject_new_rules_into_module(module, decomp_rules)
@@ -467,6 +475,7 @@ def _qref_operator_p_lowering(jax_ctx: mlir.LoweringRuleContext, *args, op_cls, 
             compile_decomp_rules(
                 module=jax_ctx.module_context.module,
                 op_cls=op_cls,
+                n_ctrls=n_ctrls,
                 wire_lens=wire_lens,
                 repack_static_data=repack_static_data,
             )
@@ -508,6 +517,7 @@ def _qref_operator_p_lowering(jax_ctx: mlir.LoweringRuleContext, *args, op_cls, 
                 module=jax_ctx.module_context.module,
                 op_cls=op_cls,
                 is_custom_op=True,
+                n_ctrls=n_ctrls,
                 wire_lens=wire_lens,
             )
 
@@ -562,6 +572,7 @@ def _qref_operator_p_lowering(jax_ctx: mlir.LoweringRuleContext, *args, op_cls, 
             module=jax_ctx.module_context.module,
             op_cls=op_cls,
             is_custom_op=False,
+            n_ctrls=n_ctrls,
             params=params,
             param_map=param_map,
             wire_lens=wire_lens,
