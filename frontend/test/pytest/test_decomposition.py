@@ -48,6 +48,7 @@ from catalyst.decomposition.decomposition_rules import (
     _control_modifier,
     _leading_modifier_kind,
     _modifier_kind,
+    collect_symbolic_adjoint_resources,
     compile_decomposition_rules_wrapper,
     compile_reachable_decomposition_rules_wrapper,
     compile_registered_adjoint_rules,
@@ -768,6 +769,29 @@ class TestApplicabilityFilterOrdering:
         assert "applicable_rule" in result
         assert "inapplicable_rule" not in result
         assert f'target_gate = "{self.OP_ID}"' in result
+
+    def test_symbolic_adjoint_skips_inapplicable_rule(self, recwarn):
+        """Test that an inapplicable Adjoint(Op) rule is skipped."""
+
+        def resources(base):
+            raise ValueError("error")
+
+        def impl(base):
+            NoParams(reg=[0, 1])
+
+        impl.__name__ = "inapplicable_adj_rule"
+        rule = register_condition(lambda base: False)(register_resources(resources)(impl))
+
+        with local_decomps():
+            add_decomps("Adjoint(NoParams)", rule)
+            rules, _, name_to_resources, name_to_resource_ids = collect_symbolic_adjoint_resources(
+                NoParams, "NoParams", prepare_dynamic_op_kwargs({}, {"reg": 2}), False
+            )
+
+        assert self._lowering_warnings(recwarn) == []
+        assert [r.name for r in rules] == []
+        assert name_to_resources == {}
+        assert name_to_resource_ids == {}
 
 
 if __name__ == "__main__":
