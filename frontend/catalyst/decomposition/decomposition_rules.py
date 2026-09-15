@@ -440,8 +440,7 @@ def split_call_args(kwargs, is_custom_op):
 
 
 def _rule_is_applicable(rule, *args, **kwargs) -> bool:
-    """Return whether ``rule`` applies to the probed operator, treating a condition that raises as
-    inapplicable."""
+    """Return resource data for the decomposition rules that apply to ``op_name``."""
     try:
         return bool(rule.is_applicable(*args, **kwargs))
     except Exception as e:  # pylint: disable=broad-except
