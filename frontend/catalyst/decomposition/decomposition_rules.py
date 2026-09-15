@@ -232,28 +232,36 @@ def name_wrap_adjoint(op_id: str) -> str:
     return wrap_modifier_id(op_id, "Adjoint")
 
 
-def resource_graph_op_id(op) -> str:
+def resource_graph_op_id(op, adjoint: bool = False, num_controls: int = 0) -> str:
     """Return the graphOpId that a rule's resource operator denotes.
 
     A *generic* symbolic resource (``Adjoint2``/``ControlledOp2``, as opposed to a concrete class
     such as ``CH``) reports its own wrapper arguments, e.g.
     ``Adjoint(S){}{}{}[1141126509488406748]``. That is not how the compiler spells a modified
     operator: ``wrapModifiers`` folds the modifier into the *base* operator's id. So unwrap to the
-    base and name-wrap the modifiers back on, giving ``Adjoint(S){}{wires:1}{}``.
+    base and build the id with the modifiers back on, giving ``Adjoint(S){}{wires:1}{}``.
+
+    ``adjoint``/``num_controls`` are the modifiers the caller is distributing over the rule; they
+    are folded in together with the operator's own, so a resource that is already symbolic composes
+    canonically (control outermost) instead of being wrapped twice.
 
     Args:
         op (Operator2): a resource operator of a decomposition rule
+        adjoint (bool): whether the rule is being distributed over adjoint
+        num_controls (int): how many controls the rule is being distributed over
 
     Returns:
         str: the graphOpId the compiler gives that operator
     """
-    if isinstance(op, Adjoint2):
-        return name_wrap_adjoint(resource_graph_op_id(op.base))
-    if isinstance(op, ControlledOp2):
-        return wrap_modifier_id(
-            resource_graph_op_id(op.base), _control_modifier(len(op.control_wires))
-        )
-    return GraphOpID(op).getGraphOpId()
+    # Peel the wrappers off and count them instead of wrapping the id:
+    while True:
+        if isinstance(op, Adjoint2):
+            adjoint = not adjoint
+        elif isinstance(op, ControlledOp2):
+            num_controls += len(op.control_wires)
+        else:
+            return GraphOpID(op).getGraphOpId(adjoint=adjoint, num_controls=num_controls)
+        op = op.base
 
 
 def name_unwrap_adjoint(op_name: str, op_id: str) -> str:
@@ -425,7 +433,9 @@ def split_call_args(kwargs, is_custom_op):
     return (), kwargs
 
 
-def collect_resources_for_op(op_name, kwargs, is_custom_op=False, adjoint_resources=False):
+def collect_resources_for_op(
+    op_name, kwargs, is_custom_op=False, adjoint_resources=False, control_resources=0
+):
     """Return resource data for all decomposition rules associated to op_name.
 
     Args:
@@ -433,6 +443,7 @@ def collect_resources_for_op(op_name, kwargs, is_custom_op=False, adjoint_resour
         kwargs (dict): the arguments to compute the resources with
         is_custom_op (bool): whether the operator lowers to ``qref.custom``
         adjoint_resources (bool): whether to spell each produced id in its adjoint form
+        control_resources (int): how many controls to spell on each produced id
 
     Returns:
         dict: rule name to the resources it produces
@@ -451,11 +462,13 @@ def collect_resources_for_op(op_name, kwargs, is_custom_op=False, adjoint_resour
             # for the original op of the rule
             resources = rule.compute_resources(*args, **kwargs)
             name_to_resources[rule.name] = resources.gate_counts
-            # When adjoint_resources is True, each produced resource's graphOpId is generated in its
-            # adjoint form (Adjoint(<name>){...}) directly from the resource op instance via
-            # GraphOpID.getGraphOpId, rather than string.
+            # A distributed rule produces modified gates, so each id is *generated* in its
+            # modified form straight from the resource op instance -- the modifiers are placed
+            # canonically by `build_graph_op_id`, never spliced into a finished id string.
             name_to_resource_ids[rule.name] = {
-                GraphOpID(op).getGraphOpId(adjoint=adjoint_resources): count
+                resource_graph_op_id(
+                    op, adjoint=adjoint_resources, num_controls=control_resources
+                ): count
                 for op, count in resources.gate_counts.items()
             }
         except Exception as e:
@@ -548,23 +561,18 @@ def compile_decomposition_rules(
         kwargs | static_data | extra_data,
         is_custom_op,
         adjoint_resources=wrap_adjoint,
+        control_resources=n_ctrl if wrap_control else 0,
     )
 
-    # TODO: The modified target id and the wrapped resource ids are derived here by string-wrapping
-    # the graphOpId (via wrap_modifier_id). Ideally they would be generated via
-    # GraphOpID.getGraphOpId which requires missing steps in the GraphOpID object.
-    # Note it needs changes not just in this function, also in the string id and across
-    # the on-demand C++ loader boundary.
+    # The *target* id is still derived by string-wrapping, because this is the one identity we are
+    # given rather than holding the operator for: the compiler's on-demand loader hands us a
+    # finished graphOpId string (`getGraphOpId()`), and re-generating it from the components would
+    # only agree as long as both spellings stay in step. Splicing keeps whatever came in verbatim.
+    # TODO: generate it as well, once the loader passes the identity components (or the modifiers)
+    # instead of a pre-wrapped id.
     target_id = name_wrap_adjoint(op_id) if wrap_adjoint else op_id
     if wrap_control:
-        ctrl_mod = _control_modifier(n_ctrl)
-        target_id = wrap_modifier_id(target_id, ctrl_mod)
-        name_to_resource_ids = {
-            rule_name: {
-                wrap_modifier_id(produced_id, ctrl_mod): count for produced_id, count in ids.items()
-            }
-            for rule_name, ids in name_to_resource_ids.items()
-        }
+        target_id = wrap_modifier_id(target_id, _control_modifier(n_ctrl))
 
     call_args, call_kwargs = split_call_args(kwargs, is_custom_op)
     kwarg_names = sorted(call_kwargs)
