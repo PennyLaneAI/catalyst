@@ -51,8 +51,8 @@ from catalyst.decomposition.decomposition_rules import (
     name_unwrap_adjoint,
     name_unwrap_control,
     name_wrap_adjoint,
-    resource_graph_op_id,
     prepare_dynamic_op_kwargs,
+    resource_graph_op_id,
     wrap_modifier_id,
 )
 from catalyst.decomposition.graph_op_id import GraphOpID, build_graph_op_id
