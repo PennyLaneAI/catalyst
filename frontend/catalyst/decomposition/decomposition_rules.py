@@ -16,6 +16,7 @@
 
 # pylint: disable=protected-access,bare-except
 
+import itertools
 import warnings
 from collections import deque
 from functools import partial
@@ -477,8 +478,13 @@ def prepare_dynamic_op_kwargs(dynamic_shape, wire_lens) -> dict:
         dict: argument names to dummy values
     """
     kwargs = {}
+
+    # NOTE: Run an accumulator to generate unique negative wire labels.
+    # Otherwise, operators with control and target wires as their arguments
+    # will receive overlapping wires.
+    wire_counter = itertools.count(-1, -1)
     for wire_name, wire_len in wire_lens.items():
-        kwargs[wire_name] = jnp.array(range(wire_len), dtype=int)
+        kwargs[wire_name] = jnp.array([next(wire_counter) for _ in range(wire_len)], dtype=int)
     for arg_name, arg_shape in dynamic_shape.items():
         kwargs[arg_name] = get_dummy_values_for_arg(arg_shape)
     return kwargs
