@@ -75,7 +75,13 @@ class TestGenericUtilities:
         kwargs = prepare_dynamic_op_kwargs({}, wire_lens={"target": 3, "control": 2})
         assert len(kwargs["target"]) == 3
         assert len(kwargs["control"]) == 2
-        assert not set(kwargs["target"].tolist()).intersection(kwargs["control"].tolist())
+
+        combined_wires = np.concatenate(
+            [np.asarray(kwargs["target"]), np.asarray(kwargs["control"])]
+        )
+        # Assert they are all negative and unique
+        assert np.all(combined_wires < 0)
+        assert len(np.unique(combined_wires)) == 5
 
     def test_wires_replacement_doesnt_create_overlapping_wire_labels(self):
         """Test that the helper does not create overlapping wire labels which create
@@ -275,7 +281,11 @@ class TestGenericUtilities:
         assert call_kwargs["a"] is True
         assert call_kwargs["b"] == 3.14
         assert call_kwargs["thing"] == "string"
-        assert call_kwargs["wires"].tolist() == [0, 1]
+
+        probe_wires = np.asarray(call_kwargs["wires"])
+        assert probe_wires.shape == (2,)
+        assert np.all(probe_wires < 0)
+        assert len(np.unique(probe_wires)) == 2
 
 
 class TestPrecompiled:
