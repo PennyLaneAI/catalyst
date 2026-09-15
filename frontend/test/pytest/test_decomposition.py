@@ -527,6 +527,32 @@ class TestOnDemand:
         if extra_ctrl_target is not None:
             assert extra_ctrl_target in module_str
 
+    def test_multi_controlled_resource_gets_its_rules(self):
+        """A rule whose resource is a multi-controlled op pulls the rules for that ``<n>C(...)``
+        node into the closure.
+
+        The closure explores a symbolic resource through its base, so the control count the
+        resource carries has to be carried over with it; only ``C(...)`` would be synthesized
+        otherwise, leaving the ``2C(...)`` node the resource names without any rule.
+        """
+
+        with local_decomps():
+
+            @register_resources(lambda reg: {qp.ctrl(qp.S(Wire[1]), Wire[2]): 1})
+            def two_controlled_s(reg):
+                qp.ctrl(qp.S(reg[2]), control=[reg[0], reg[1]])
+
+            add_decomps(NoParams, two_controlled_s)
+
+            module_str = compile_reachable_decomposition_rules_wrapper(
+                "NoParams", "NoParams{}{reg:3}{}", {}, {"reg": 3}, {}
+            )
+
+        # the resource the rule declares ...
+        assert '"2C(S){}{wires:1}{}" = 1 : i64' in module_str
+        # ... and the rules that decompose it
+        assert 'target_gate = "2C(S){}{wires:1}{}"' in module_str
+
     def test_control_variant_warns_and_skips_on_failure(self, mocker):
         """control_variant_rule_strings warns and skips a rule when it fails to compile."""
 

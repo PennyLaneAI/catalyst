@@ -25,6 +25,7 @@ import jax.numpy as jnp
 import pennylane as qp
 from jax._src.lib.mlir import ir
 from pennylane.core.operator import Operator2, abstractify
+from pennylane.decomposition.utils import to_name
 from pennylane.ops.op_math.adjoint2 import Adjoint2
 from pennylane.ops.op_math.controlled2 import ControlledOp2
 from pennylane.wires import Wires
@@ -1243,7 +1244,7 @@ def fetch_all_reachable_decomposition_rules_from_op(
     ctrl_counts = [1] if n_ctrls <= 1 else [1, n_ctrls]
 
     def compile_variants(
-        name, op_id, dynamic_shape, wire_lens, static_data, extra_data, is_custom_op
+        name, op_id, dynamic_shape, wire_lens, static_data, extra_data, is_custom_op, counts=None
     ):
         # CQRs (Adjoint/Control): For an op `name` capture the rules for
         #   1. the base op `name`,
@@ -1282,7 +1283,7 @@ def fetch_all_reachable_decomposition_rules_from_op(
                 control_variant_rule_strings(
                     name,
                     op_id,
-                    ctrl_counts,
+                    counts or ctrl_counts,
                     dynamic_shape,
                     wire_lens,
                     static_data,
@@ -1296,6 +1297,9 @@ def fetch_all_reachable_decomposition_rules_from_op(
     rules = compile_variants(
         op_name, op_id, dynamic_shape, wire_lens, static_data, extra_data, is_custom_op
     )
+    # Control counts already synthesized per op, so an op reached again under more controls only
+    # pays for the <n>C(...) variants it is still missing.
+    counts_done = {op_id: set(ctrl_counts)}
 
     while len(queue) != 0:
         (
@@ -1333,14 +1337,26 @@ def fetch_all_reachable_decomposition_rules_from_op(
             try:
                 for op, _count in resource.items():
                     # A generic symbolic resource stands for its base under a modifier, and it is
-                    # the base that owns the rules; `compile_variants` re-derives the modifier
-                    # variants from there.
-                    while isinstance(op, (Adjoint2, ControlledOp2)):
+                    # the base that owns the rules; compile_variants re-derives the modifier
+                    # variants from there. Its control count has to be carried over, or the
+                    # <n>C(...) node the resource names would be left without rules.
+                    res_ctrls = 0
+                    while True:
+                        if isinstance(op, Adjoint2):
+                            pass
+                        elif isinstance(op, ControlledOp2):
+                            res_ctrls += len(op.control_wires)
+                        else:
+                            break
                         op = op.base
                     graph_op_id = GraphOpID(op)
                     probe_id = graph_op_id.getGraphOpId()
                     probe = (
-                        graph_op_id.get_operator_name(),
+                        # The name and the id are paired to look up the rules registered for that
+                        # id, so spell the name the way PennyLane's registry does rather than the
+                        # way the graphOpId does: the two agree on Adjoint(...)/C(...), but
+                        # a multi-controlled id reads <n>C(...), which PennyLane has no name for.
+                        to_name(op),
                         graph_op_id.dynamic_shape,
                         graph_op_id.wire_lens,
                         graph_op_id.static_data,
@@ -1351,12 +1367,29 @@ def fetch_all_reachable_decomposition_rules_from_op(
                     # need its class to rebuild the base of a registered adjoint rule.
                     op_classes.setdefault(probe[0], type(op))
 
-                    if probe_id in visited:
-                        continue
-
-                    visited.add(probe_id)
-                    queue.append(probe)
-                    rules.extend(compile_variants(probe[0], probe_id, *probe[1:]))
+                    counts = {1} | ({res_ctrls} if res_ctrls > 1 else set())
+                    if probe_id not in visited:
+                        visited.add(probe_id)
+                        queue.append(probe)
+                        counts_done[probe_id] = set(counts)
+                        rules.extend(
+                            compile_variants(probe[0], probe_id, *probe[1:], counts=sorted(counts))
+                        )
+                    elif missing := counts - counts_done.setdefault(probe_id, {1}):
+                        # Seen before, but under fewer controls: only the missing <n>C(...)
+                        # variants are still owed, the rest are already in `rules`.
+                        counts_done[probe_id] |= missing
+                        rules.extend(
+                            control_variant_rule_strings(
+                                probe[0],
+                                probe_id,
+                                sorted(missing),
+                                *probe[1:4],
+                                extra_data=probe[4],
+                                is_custom_op=probe[5],
+                                op_cls=op_classes.get(probe[0]),
+                            )
+                        )
             except Exception as e:
                 warnings.warn(
                     f"Failed to lower the {_rule_name} decomposition rule for {this_name}: {e}",
