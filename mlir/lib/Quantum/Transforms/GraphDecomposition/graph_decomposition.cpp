@@ -185,7 +185,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         // The solver has already chosen every rule up front; this loop only applies them.
         ModuleOp module = getOperation();
 
-        DecomposeLoweringPassOptions dlOptions;
+        qref::DecomposeLoweringPassOptions dlOptions;
         for (auto &[op, chosenRule] : solution) {
             dlOptions.targetRulesOption.push_back(chosenRule.ruleName);
         }
