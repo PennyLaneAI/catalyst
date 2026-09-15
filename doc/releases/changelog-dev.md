@@ -44,11 +44,13 @@
   adjoint.
   [(#3129)](https://github.com/PennyLaneAI/catalyst/pull/3129)
   [(#3127)](https://github.com/PennyLaneAI/catalyst/pull/3127)
+  [(#3213)](https://github.com/PennyLaneAI/catalyst/pull/3213)
 
   Control is folded into the operator identity *control-outermost* (e.g. `C(Adjoint(Op))`), so
   `ctrl(adjoint(Op))` and `adjoint(ctrl(Op))` collapse to a single node, while a distinct control
   count is its own node keyed. For a target gate set, `<n>C(Op)` is reached through:
-    1. Rules registered directly for `<n>C(Op)` (e.g. named `CNOT`/`CRX`, `ctrl_decomp_zyz`), and
+    1. Rules registered directly for `C(Op)` (PennyLane names a controlled operator `C(Op)` whatever
+       its control count), and
     2. Rules *synthesized by distribution* (`decompose(C(Op)) = ctrl(decompose(Op))`), controlling
        each produced gate with the same control count.
 
@@ -56,6 +58,41 @@
   reduces it to op-level controls with `ctrl-lowering`, iterating
   `(decompose-lowering -> ctrl-lowering -> adjoint-lowering)` to a fixpoint.
   Controlled basis gates are only free when their own `<n>C(...)` id is in the target gate set.
+
+  Pathway 1 covers the rules PennyLane registers against the *symbolic* operator, i.e.
+  `rule(base, control_wires, control_values, work_wires, work_wire_type)` rather than the base op's
+  `(*params, wires)` — the `flip_zero_ctrl_values(...)` family. These are the rules that terminate a
+  controlled chain in plain gates (`C(Hadamard) -> CH`, `2C(Hadamard) -> H, RY, Toffoli`), so
+  `<n>C(Op)` can now reach a target gate set at all. A resource that is itself a generic symbolic
+  operator is spelled the way the compiler spells a modified operator: the modifier is folded into
+  the base op's id (`2C(S){}{wires:1}{}`), not the wrapper's own arguments. The number of controls
+  an operator instance carries now reaches the rule closure from lowering, so `<n>C(...)` rules are
+  synthesized at trace time rather than only on demand.
+
+  The id a distributed rule declares for each gate it produces is now *generated* with its
+  modifiers, through the same `build_graph_op_id` builder the rest of the frontend uses, instead of
+  being spliced into a finished id string. The modifiers are placed canonically by construction, so
+  a resource that is already symbolic composes (`Adjoint(C(X))` spells `C(Adjoint(X))`) rather than
+  being rejected as out of order.
+
+  A rule may also *produce* a multi-controlled gate. The control count a resource carries is now
+  kept when the closure explores it through its base, so the `<n>C(...)` node that resource names
+  gets rules of its own instead of only `C(...)`; an operator reached again under more controls
+  pays just for the variants it is still missing. The name paired with such an id is spelled the
+  way PennyLane's registry spells it, since a multi-controlled id reads `<n>C(...)` and PennyLane
+  names every controlled operator `C(...)` whatever its control count.
+
+  Two defects in applying a register-mode controlled rule are fixed along with it:
+
+  - The rule's operands are now emitted as `func(qreg, param*, inWires*, inCtrlWires*)`, matching
+    what `DecomposeLoweringPass` reads back. They were previously emitted control-wires-first
+    (`qp.capture.subroutine` traces through `jax.jit`, which flattens keyword arguments in sorted
+    order, and `_ctrl_wires` sorts ahead of `wires`), which silently swapped a rule's control and
+    target for a single control and mismatched the tensor shapes for more than one.
+
+  - `DecomposeLoweringPass` now inserts the *control* qubits into the register it hands to a
+    register-mode rule, not just the base qubits. A control qubit left out was read back at its
+    pre-decomposition state, dropping whatever had been applied to it earlier in the circuit.
 
 * The `local-random` unitary folding option for :func:`~.mitigate_with_zne` is now implemented,
   reproducing Mitiq's ``fold_gates_at_random``: every gate is folded ``floor((scale_factor-1)/2)``
