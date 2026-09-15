@@ -19,7 +19,6 @@
 import itertools
 import warnings
 from collections import deque
-from functools import partial
 
 import jax.numpy as jnp
 import pennylane as qp
@@ -71,6 +70,29 @@ def build_base_op(op_cls, kwargs, is_custom_op):
     args, kwargs = split_call_args(kwargs, is_custom_op)
     with qp.capture.pause():
         return op_cls(*args, **kwargs)
+
+
+def symbolic_op_name(op_name, kind) -> str:
+    """Return the name PennyLane's registry holds ``op_name``'s symbolic rules under.
+
+    A controlled operator is named ``C(Op)`` whatever its control count, so the count never appears
+    here.
+
+    Args:
+        op_name (str): the base operator's name
+        kind (str): ``"adjoint"`` or ``"control"``
+
+    Returns:
+        str: the registry name
+
+    Raises:
+        CompileError: if ``kind`` is not a known symbolic kind
+    """
+    if kind == "adjoint":
+        return f"Adjoint({op_name})"
+    if kind == "control":
+        return f"C({op_name})"
+    raise CompileError(f"Unknown symbolic kind: {kind}")  # pragma: no cover
 
 
 def symbolic_arguments(base_op, kind, ctrl_wires=None) -> dict:
@@ -440,7 +462,7 @@ def split_call_args(kwargs, is_custom_op):
 
 
 def collect_resources_for_op(
-    op_name, kwargs, is_custom_op=False, adjoint_resources=False, control_resources=0
+    op_name, kwargs, is_custom_op=False, adjoint_resources=False, num_controls=0
 ):
     """Return resource data for all decomposition rules associated to op_name.
 
@@ -449,7 +471,7 @@ def collect_resources_for_op(
         kwargs (dict): the arguments to compute the resources with
         is_custom_op (bool): whether the operator lowers to ``qref.custom``
         adjoint_resources (bool): whether to spell each produced id in its adjoint form
-        control_resources (int): how many controls to spell on each produced id
+        num_controls (int): how many controls to spell on each produced id
 
     Returns:
         dict: rule name to the resources it produces
@@ -473,7 +495,7 @@ def collect_resources_for_op(
             # canonically by `build_graph_op_id`, never spliced into a finished id string.
             name_to_resource_ids[rule.name] = {
                 resource_graph_op_id(
-                    op, adjoint=adjoint_resources, num_controls=control_resources
+                    op, adjoint=adjoint_resources, num_controls=num_controls
                 ): count
                 for op, count in resources.gate_counts.items()
             }
@@ -567,7 +589,7 @@ def compile_decomposition_rules(
         kwargs | static_data | extra_data,
         is_custom_op,
         adjoint_resources=wrap_adjoint,
-        control_resources=n_ctrl if wrap_control else 0,
+        num_controls=n_ctrl if wrap_control else 0,
     )
 
     # The *target* id is still derived by string-wrapping, because this is the one identity we are
@@ -758,7 +780,7 @@ def collect_symbolic_resources(
         dict: rule name to the resources it produces
         dict: rule name to the graphOpId of each resource
     """
-    lookup_name = f"Adjoint({op_name})" if kind == "adjoint" else f"C({op_name})"
+    lookup_name = symbolic_op_name(op_name, kind)
     rules = list(qp.decomposition.list_decomps(lookup_name))
     if not rules:
         return [], {}, {}, {}
