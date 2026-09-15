@@ -58,7 +58,6 @@ from catalyst.decomposition.decomposition_rules import (
     name_unwrap_control,
     name_wrap_adjoint,
     prepare_dynamic_op_kwargs,
-    resource_graph_op_id,
     wrap_modifier_id,
 )
 from catalyst.decomposition.graph_op_id import GraphOpID, build_graph_op_id
@@ -658,7 +657,13 @@ class TestSymbolicRules:
         """Test ``self_adjoint`` rule on ``Adjoint(Hadamard)``."""
 
         module = compile_registered_symbolic_rules(
-            "Hadamard", "Adjoint(Hadamard){}{wires:1}{}", {}, {"wires": 1}, {}, op_cls=qp.Hadamard
+            "Hadamard",
+            "Adjoint(Hadamard){}{wires:1}{}",
+            {},
+            {"wires": 1},
+            {},
+            op_cls=qp.Hadamard,
+            kind="adjoint",
         )
         (rule,) = get_rule_strings_from_module(module)
 
@@ -679,6 +684,7 @@ class TestSymbolicRules:
             {},
             is_custom_op=True,
             op_cls=qp.RZ,
+            kind="adjoint",
         )
         (rule,) = get_rule_strings_from_module(module)
 
@@ -730,12 +736,19 @@ class TestSymbolicRules:
         modified operator: the base op's id with the modifier folded into its name."""
 
         base = abstractify(qp.S(wires=jnp.array([0])))
-        assert resource_graph_op_id(base) == "S{}{wires:1}{}"
-        assert resource_graph_op_id(qp.adjoint(base)) == "Adjoint(S){}{wires:1}{}"
-        assert resource_graph_op_id(qp.ctrl(base, control=[1, 2])) == "2C(S){}{wires:1}{}"
+        assert GraphOpID(base).getGraphOpId() == "S{}{wires:1}{}"
+        assert GraphOpID(qp.adjoint(base)).getGraphOpId() == "Adjoint(S){}{wires:1}{}"
+        assert GraphOpID(qp.ctrl(base, control=[1, 2])).getGraphOpId() == "2C(S){}{wires:1}{}"
+        # The modifiers a caller applies compose with the operator's own, control outermost.
+        assert (
+            GraphOpID(qp.adjoint(base)).getGraphOpId(num_controls=1) == "C(Adjoint(S)){}{wires:1}{}"
+        )
+        # The base alone is what owns the rules, so its id leaves the modifiers off.
+        assert GraphOpID(qp.ctrl(base, control=[1, 2])).getBaseGraphOpId() == "S{}{wires:1}{}"
         # A concrete controlled class is *not* a generic wrapper and keeps its own id.
         assert (
-            resource_graph_op_id(abstractify(qp.CH(wires=jnp.array([0, 1])))) == "CH{}{wires:2}{}"
+            GraphOpID(abstractify(qp.CH(wires=jnp.array([0, 1])))).getGraphOpId()
+            == "CH{}{wires:2}{}"
         )
 
     def test_no_registered_symbolic_rules(self):
@@ -750,6 +763,7 @@ class TestSymbolicRules:
                     {"reg": 2},
                     {},
                     op_cls=NoParams,
+                    kind="adjoint",
                 )
                 is None
             )
@@ -760,7 +774,7 @@ class TestSymbolicRules:
 
         with pytest.raises(ValueError, match="operator class of 'Hadamard' is needed"):
             compile_registered_symbolic_rules(
-                "Hadamard", "Adjoint(Hadamard){}{wires:1}{}", {}, {"wires": 1}, {}
+                "Hadamard", "Adjoint(Hadamard){}{wires:1}{}", {}, {"wires": 1}, {}, kind="adjoint"
             )
 
 

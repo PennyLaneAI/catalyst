@@ -19,15 +19,12 @@
 import itertools
 import warnings
 from collections import deque
-from functools import partial
 
 import jax.numpy as jnp
 import pennylane as qp
 from jax._src.lib.mlir import ir
 from pennylane.core.operator import Operator2, abstractify
 from pennylane.decomposition.utils import to_name
-from pennylane.ops.op_math.adjoint2 import Adjoint2
-from pennylane.ops.op_math.controlled2 import ControlledOp2
 from pennylane.wires import Wires
 
 from catalyst.compiler import _quantum_opt
@@ -71,6 +68,29 @@ def build_base_op(op_cls, kwargs, is_custom_op):
     args, kwargs = split_call_args(kwargs, is_custom_op)
     with qp.capture.pause():
         return op_cls(*args, **kwargs)
+
+
+def symbolic_op_name(op_name, kind) -> str:
+    """Return the name PennyLane's registry holds ``op_name``'s symbolic rules under.
+
+    A controlled operator is named ``C(Op)`` whatever its control count, so the count never appears
+    here.
+
+    Args:
+        op_name (str): the base operator's name
+        kind (str): ``"adjoint"`` or ``"control"``
+
+    Returns:
+        str: the registry name
+
+    Raises:
+        CompileError: if ``kind`` is not a known symbolic kind
+    """
+    if kind == "adjoint":
+        return f"Adjoint({op_name})"
+    if kind == "control":
+        return f"C({op_name})"
+    raise CompileError(f"Unknown symbolic kind: {kind}")  # pragma: no cover
 
 
 def symbolic_arguments(base_op, kind, ctrl_wires=None) -> dict:
@@ -236,38 +256,6 @@ def wrap_modifier_id(op_id: str, modifier: str) -> str:
 def name_wrap_adjoint(op_id: str) -> str:
     """Name-wrap the adjoint modifier around a graphOpId (``RX{...}`` -> ``Adjoint(RX){...}``)."""
     return wrap_modifier_id(op_id, "Adjoint")
-
-
-def resource_graph_op_id(op, adjoint: bool = False, num_controls: int = 0) -> str:
-    """Return the graphOpId that a rule's resource operator denotes.
-
-    A *generic* symbolic resource (``Adjoint2``/``ControlledOp2``, as opposed to a concrete class
-    such as ``CH``) reports its own wrapper arguments, e.g.
-    ``Adjoint(S){}{}{}[1141126509488406748]``. That is not how the compiler spells a modified
-    operator: ``wrapModifiers`` folds the modifier into the *base* operator's id. So unwrap to the
-    base and build the id with the modifiers back on, giving ``Adjoint(S){}{wires:1}{}``.
-
-    ``adjoint``/``num_controls`` are the modifiers the caller is distributing over the rule; they
-    are folded in together with the operator's own, so a resource that is already symbolic composes
-    canonically (control outermost) instead of being wrapped twice.
-
-    Args:
-        op (Operator2): a resource operator of a decomposition rule
-        adjoint (bool): whether the rule is being distributed over adjoint
-        num_controls (int): how many controls the rule is being distributed over
-
-    Returns:
-        str: the graphOpId the compiler gives that operator
-    """
-    # Peel the wrappers off and count them instead of wrapping the id:
-    while True:
-        if isinstance(op, Adjoint2):
-            adjoint = not adjoint
-        elif isinstance(op, ControlledOp2):
-            num_controls += len(op.control_wires)
-        else:
-            return GraphOpID(op).getGraphOpId(adjoint=adjoint, num_controls=num_controls)
-        op = op.base
 
 
 def name_unwrap_adjoint(op_name: str, op_id: str) -> str:
@@ -452,7 +440,7 @@ def _rule_is_applicable(op_name, rule, *args, **kwargs) -> bool:
 
 
 def collect_resources_for_op(
-    op_name, kwargs, is_custom_op=False, adjoint_resources=False, control_resources=0
+    op_name, kwargs, is_custom_op=False, adjoint_resources=False, num_controls=0
 ):
     """Return resource data for all decomposition rules associated to op_name.
 
@@ -461,7 +449,7 @@ def collect_resources_for_op(
         kwargs (dict): the arguments to compute the resources with
         is_custom_op (bool): whether the operator lowers to ``qref.custom``
         adjoint_resources (bool): whether to spell each produced id in its adjoint form
-        control_resources (int): how many controls to spell on each produced id
+        num_controls (int): how many controls to spell on each produced id
 
     Returns:
         dict: rule name to the resources it produces
@@ -489,8 +477,8 @@ def collect_resources_for_op(
             # modified form straight from the resource op instance -- the modifiers are placed
             # canonically by `build_graph_op_id`, never spliced into a finished id string.
             name_to_resource_ids[rule.name] = {
-                resource_graph_op_id(
-                    op, adjoint=adjoint_resources, num_controls=control_resources
+                GraphOpID(op).getGraphOpId(
+                    adjoint=adjoint_resources, num_controls=num_controls
                 ): count
                 for op, count in resources.gate_counts.items()
             }
@@ -584,7 +572,7 @@ def compile_decomposition_rules(
         kwargs | static_data | extra_data,
         is_custom_op,
         adjoint_resources=wrap_adjoint,
-        control_resources=n_ctrl if wrap_control else 0,
+        num_controls=n_ctrl if wrap_control else 0,
     )
 
     # The *target* id is still derived by string-wrapping, because this is the one identity we are
@@ -748,9 +736,7 @@ def build_rule_module(
     return inlined_module
 
 
-def collect_symbolic_resources(
-    op_cls, op_name, kwargs, is_custom_op, kind="adjoint", ctrl_wires=()
-):
+def collect_symbolic_resources(op_cls, op_name, kwargs, is_custom_op, *, kind, ctrl_wires=()):
     """Return resource data for the rules registered against ``Adjoint(op_name)``/``C(op_name)``.
 
     PennyLane names a controlled operator ``C(Op)`` whatever its control count, so the registry is
@@ -770,7 +756,7 @@ def collect_symbolic_resources(
         dict: rule name to the resources it produces
         dict: rule name to the graphOpId of each resource
     """
-    lookup_name = f"Adjoint({op_name})" if kind == "adjoint" else f"C({op_name})"
+    lookup_name = symbolic_op_name(op_name, kind)
     rules = list(qp.decomposition.list_decomps(lookup_name))
     if not rules:
         return [], {}, {}, {}
@@ -793,9 +779,9 @@ def collect_symbolic_resources(
             name_to_resources[rule.name] = resources.gate_counts
             # The rule body names the ops it produces itself, so unlike the distribution pathway
             # these ids carry no added modifier; a resource that is itself symbolic is spelled the
-            # way the compiler spells it (see :func:`resource_graph_op_id`).
+            # way the compiler spells it (see :meth:`GraphOpID.peel_modifiers`).
             name_to_resource_ids[rule.name] = {
-                resource_graph_op_id(op): count for op, count in resources.gate_counts.items()
+                GraphOpID(op).getGraphOpId(): count for op, count in resources.gate_counts.items()
             }
         except Exception as e:  # pylint: disable=broad-except
             warnings.warn(
@@ -816,7 +802,8 @@ def compile_registered_symbolic_rules(
     extra_data=None,
     is_custom_op=False,
     op_cls=None,
-    kind="adjoint",
+    *,
+    kind,
     n_ctrl=1,
 ) -> ir.Operation | None:
     """Return the module of rules registered against ``Adjoint(op_name)``/``C(op_name)`` that follow
@@ -1350,7 +1337,7 @@ def fetch_all_reachable_decomposition_rules_from_op(
             resources |= {
                 (f"Adjoint({this_name})", name): res
                 for name, res in collect_symbolic_resources(
-                    this_op_cls, this_name, all_kwargs, this_is_custom_op
+                    this_op_cls, this_name, all_kwargs, this_is_custom_op, kind="adjoint"
                 )[2].items()
             }
 
@@ -1361,17 +1348,10 @@ def fetch_all_reachable_decomposition_rules_from_op(
                     # the base that owns the rules; compile_variants re-derives the modifier
                     # variants from there. Its control count has to be carried over, or the
                     # <n>C(...) node the resource names would be left without rules.
-                    res_ctrls = 0
-                    while True:
-                        if isinstance(op, Adjoint2):
-                            pass
-                        elif isinstance(op, ControlledOp2):
-                            res_ctrls += len(op.control_wires)
-                        else:
-                            break
-                        op = op.base
                     graph_op_id = GraphOpID(op)
-                    probe_id = graph_op_id.getGraphOpId()
+                    op = graph_op_id.op
+                    res_ctrls = graph_op_id.num_controls
+                    probe_id = graph_op_id.getBaseGraphOpId()
                     probe = (
                         # The name and the id are paired to look up the rules registered for that
                         # id, so spell the name the way PennyLane's registry does rather than the
