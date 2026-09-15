@@ -583,6 +583,9 @@
 * Fixed the assembly format for `quantum.adjoint` when it has no quantum operands/results.
   [(#2938)](https://github.com/PennyLaneAI/catalyst/pull/2938)
 
+* Added reference semantics support for PBC operations.
+  [(#3136)](https://github.com/PennyLaneAI/catalyst/pull/3136)
+
 <h3>Internal changes ⚙️</h3>
 
 * Adds ability to lower `None` attributes to `get_mlir_attribute_from_pyval`.
@@ -811,6 +814,7 @@ Lillian Frederiksen,
 Sengthai Heng,
 David Ittah,
 JiaRung Jian,
+Jeffrey Kam,
 Jacob Kitchen,
 Korbinian Kottmann,
 Christina Lee,
