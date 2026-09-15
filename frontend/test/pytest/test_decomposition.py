@@ -73,6 +73,8 @@ class TestGenericUtilities:
         """
 
         kwargs = prepare_dynamic_op_kwargs({}, wire_lens={"target": 3, "control": 2})
+        assert len(kwargs["target"]) == 3
+        assert len(kwargs["control"]) == 2
         assert not set(kwargs["target"].tolist()).intersection(kwargs["control"].tolist())
 
     def test_wires_replacement_doesnt_create_overlapping_wire_labels(self):
