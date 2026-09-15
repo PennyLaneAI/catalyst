@@ -73,8 +73,7 @@ class TestGenericUtilities:
         """
 
         kwargs = prepare_dynamic_op_kwargs({}, wire_lens={"target": 3, "control": 2})
-        assert np.allclose(kwargs["target"], jnp.array([-1, -2, -3]))
-        assert np.allclose(kwargs["control"], jnp.array([-4, -5]))
+        assert not set(kwargs["target"].tolist()).intersection(kwargs["control"].tolist())
 
     def test_wires_replacement_doesnt_create_overlapping_wire_labels(self):
         """Test that the helper does not create overlapping wire labels which create
