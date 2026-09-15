@@ -366,7 +366,7 @@ class TestCatalystOnlyControlled:
 
         with pytest.raises(ValueError, match="Expected a callable"):
 
-            @qjit
+            @qjit(capture=False)
             @qp.qnode(qp.device("lightning.qubit", wires=2))
             def workflow():
                 C_ctrl(0, control=1)(2)
@@ -383,7 +383,7 @@ class TestCatalystOnlyControlled:
             return qp.state()
 
         with pytest.raises(ValueError, match="Length of the control_values"):
-            qjit(circuit)(0.1)
+            qjit(circuit, capture=False)(0.1)
 
     def test_qctrl_no_mid_circuit_measurements(self, backend):
         """Test the no-measurements exception"""
@@ -398,7 +398,7 @@ class TestCatalystOnlyControlled:
             return qp.state()
 
         with pytest.raises(ValueError, match="Mid-circuit measurements cannot be used"):
-            qjit(circuit)(0.1)
+            qjit(circuit, capture=False)(0.1)
 
     def test_qctrl_no_end_circuit_measurements(self, backend):
         """Test the no-measurements exception"""
@@ -413,12 +413,12 @@ class TestCatalystOnlyControlled:
             return qp.state()
 
         with pytest.raises(ValueError, match="Measurement process cannot be used"):
-            qjit(circuit)(0.1)
+            qjit(circuit, capture=False)(0.1)
 
     def test_qctrl_wires(self, backend):
         """Test the wires property of HybridCtrl"""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=3))
         def circuit(theta):
             def func(theta):
@@ -435,7 +435,7 @@ class TestCatalystOnlyControlled:
     def test_qctrl_wires_arg_fun(self, backend):
         """Test the wires property of HybridCtrl with argument wires"""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=4))
         def circuit():
             def func(anc, wires):
@@ -452,7 +452,7 @@ class TestCatalystOnlyControlled:
     def test_qctrl_var_wires(self, backend):
         """Test the wires property of HybridCtrl with variable wires"""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=4))
         def circuit(anc, wires):
             def func(anc, wires):
@@ -469,7 +469,7 @@ class TestCatalystOnlyControlled:
     def test_qctrl_wires_nested(self, backend):
         """Test the wires property of HybridCtrl with nested branches"""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=4))
         def circuit(theta, w1, w2, cw1, cw2):
             def _func1():
@@ -490,7 +490,7 @@ class TestCatalystOnlyControlled:
     def test_qctrl_work_wires(self, backend):
         """Test the wires property of HybridCtrl with work-wires"""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=5))
         def circuit(theta):
             def _func1():
@@ -512,7 +512,7 @@ class TestCatalystOnlyControlled:
     def test_qctrl_wires_controlflow(self, backend):
         """Test the wires property of HybridCtrl with control flow branches"""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=3))
         def circuit(theta, w1, w2, cw):
             def _func():
@@ -556,7 +556,7 @@ class TestCatalystOnlyControlled:
         work_wires_add = [7, 8]
         work_wires_ctrl = [9]
 
-        @qjit
+        @qjit(capture=False)
         def func():
             return PL_ctrl(
                 qp.SemiAdder(
@@ -575,7 +575,7 @@ class TestCatalystOnlyControlled:
         assert op.control_wires == Wires([0])
         assert op.work_wires == Wires([9])
 
-        @qjit
+        @qjit(capture=False)
         def func_native():
             return C_ctrl(
                 qp.SemiAdder(
@@ -645,7 +645,7 @@ class TestCatalystOnlyControlled:
             qp.ControlledSequence(qp.TrotterProduct(H, time=2.4, order=2), control=[1])
             return qp.expval(qp.PauliZ(0))
 
-        assert qp.math.allclose(qjit(circuit)(), circuit())
+        assert qp.math.allclose(qjit(circuit, capture=False)(), circuit())
 
     def test_distribute_controlled_with_adj(self):
         """Test that the distribute_controlled function with a PennyLane Adjoint,

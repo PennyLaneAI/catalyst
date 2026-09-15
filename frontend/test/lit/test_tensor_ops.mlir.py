@@ -32,7 +32,7 @@ from catalyst.debug import get_compilation_stage
 
 
 # CHECK-LABEL: test_ewise_arctan2
-@qjit(keep_intermediate=True)
+@qjit(keep_intermediate=True, capture=False)
 @qp.qnode(qp.device("lightning.qubit", wires=2))
 def test_ewise_arctan2(x, y):
     # CHECK: math.atan2
@@ -64,7 +64,7 @@ print(get_compilation_stage(test_ewise_arctan2, "BufferizationStage"))
 # and we currently support only leaf functions.
 
 
-@qjit(keep_intermediate=True)
+@qjit(keep_intermediate=True, capture=False)
 @qp.qnode(qp.device("lightning.qubit", wires=2))
 # CHECK-LABEL: test_ewise_add
 def test_ewise_add(x, y):
@@ -80,7 +80,7 @@ print(get_compilation_stage(test_ewise_add, "BufferizationStage"))
 
 
 # CHECK-LABEL: test_ewise_mult
-@qjit(keep_intermediate=True)
+@qjit(keep_intermediate=True, capture=False)
 @qp.qnode(qp.device("lightning.qubit", wires=2))
 def test_ewise_mult(x, y):
     # CHECK: arith.mulf
@@ -95,7 +95,7 @@ print(get_compilation_stage(test_ewise_mult, "BufferizationStage"))
 
 
 # CHECK-LABEL: test_ewise_div
-@qjit(keep_intermediate=True)
+@qjit(keep_intermediate=True, capture=False)
 @qp.qnode(qp.device("lightning.qubit", wires=2))
 def test_ewise_div(x, y):
     # CHECK: arith.divf
@@ -110,7 +110,7 @@ print(get_compilation_stage(test_ewise_div, "BufferizationStage"))
 
 
 # CHECK-LABEL: test_ewise_power
-@qjit(keep_intermediate=True)
+@qjit(keep_intermediate=True, capture=False)
 @qp.qnode(qp.device("lightning.qubit", wires=2))
 def test_ewise_power(x, y):
     # CHECK: math.powf
@@ -125,7 +125,7 @@ print(get_compilation_stage(test_ewise_power, "BufferizationStage"))
 
 
 # CHECK-LABEL: test_ewise_sub
-@qjit(keep_intermediate=True)
+@qjit(keep_intermediate=True, capture=False)
 @qp.qnode(qp.device("lightning.qubit", wires=2))
 def test_ewise_sub(x, y):
     # CHECK: arith.subf
@@ -139,7 +139,7 @@ test_ewise_sub(jnp.array(1.0), jnp.array(2.0))
 print(get_compilation_stage(test_ewise_sub, "BufferizationStage"))
 
 
-@qjit(keep_intermediate=True)
+@qjit(keep_intermediate=True, capture=False)
 @qp.qnode(qp.device("lightning.qubit", wires=2))
 # CHECK-LABEL: test_ewise_true_div
 def test_ewise_true_div(x, y):
@@ -159,7 +159,7 @@ print(get_compilation_stage(test_ewise_true_div, "BufferizationStage"))
 
 
 # CHECK-LABEL: test_ewise_float_power
-@qjit(keep_intermediate=True)
+@qjit(keep_intermediate=True, capture=False)
 @qp.qnode(qp.device("lightning.qubit", wires=2))
 def test_ewise_float_power(x, y):
     # CHECK: math.powf
@@ -184,7 +184,7 @@ print(get_compilation_stage(test_ewise_float_power, "BufferizationStage"))
 
 
 # CHECK-LABEL: test_ewise_maximum
-@qjit(keep_intermediate=True)
+@qjit(keep_intermediate=True, capture=False)
 @qp.qnode(qp.device("lightning.qubit", wires=2))
 def test_ewise_maximum(x, y):
     # CHECK: arith.maximumf
@@ -202,7 +202,7 @@ print(get_compilation_stage(test_ewise_maximum, "BufferizationStage"))
 
 
 # CHECK-LABEL: test_ewise_minimum
-@qjit(keep_intermediate=True)
+@qjit(keep_intermediate=True, capture=False)
 @qp.qnode(qp.device("lightning.qubit", wires=2))
 def test_ewise_minimum(x, y):
     # CHECK: arith.minimumf

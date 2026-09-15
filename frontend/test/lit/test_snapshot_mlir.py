@@ -27,7 +27,7 @@ from catalyst import qjit
 
 
 # CHECK-LABEL: public @jit_single_qubit_circuit
-@qjit(target="mlir")
+@qjit(target="mlir", capture=False)
 @qp.qnode(qp.device("lightning.qubit", wires=1))
 def single_qubit_circuit():
     """Test MLIR output of all six single qubit basis states in qp.Snapshot without shots"""
@@ -75,7 +75,7 @@ print(single_qubit_circuit.mlir)
 
 
 # CHECK-LABEL: public @jit_two_qubit_circuit
-@qjit(target="mlir")
+@qjit(target="mlir", capture=False)
 @qp.set_shots(5)
 @qp.qnode(qp.device("lightning.qubit", wires=2), mcm_method="single-branch-statistics")
 def two_qubit_circuit():

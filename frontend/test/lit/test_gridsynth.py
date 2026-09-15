@@ -38,7 +38,7 @@ pipe = [("pipe", ["quantum-compilation-stage"])]
 def test_rz_registration():
     """Test that the gridsynth pass is correctly registered for RZ."""
 
-    @qjit(target="mlir")
+    @qjit(target="mlir", capture=False)
     @gridsynth(epsilon=0.01)
     @qp.qnode(qp.device("lightning.qubit", wires=1))
     def circuit(x: float):
@@ -62,7 +62,7 @@ test_rz_registration()
 def test_rz_lowering():
     """Test that RZ is correctly lowered to the decomposition function."""
 
-    @qjit(target="mlir", pipelines=pipe)
+    @qjit(target="mlir", pipelines=pipe, capture=False)
     @gridsynth(epsilon=0.01)
     @qp.qnode(qp.device("lightning.qubit", wires=1))
     def circuit(x: float):
@@ -95,7 +95,7 @@ test_rz_lowering()
 def test_phaseshift_registration():
     """Test that the gridsynth pass is correctly registered for PhaseShift."""
 
-    @qjit(target="mlir")
+    @qjit(target="mlir", capture=False)
     @gridsynth(epsilon=0.01)
     @qp.qnode(qp.device("lightning.qubit", wires=1))
     def circuit(x: float):
@@ -118,7 +118,7 @@ test_phaseshift_registration()
 def test_phaseshift_lowering():
     """Test that PhaseShift is decomposed into RZ + GlobalPhase."""
 
-    @qjit(target="mlir", pipelines=pipe)
+    @qjit(target="mlir", pipelines=pipe, capture=False)
     @gridsynth(epsilon=0.01)
     @qp.qnode(qp.device("lightning.qubit", wires=1))
     def circuit(x: float):
@@ -147,7 +147,7 @@ test_phaseshift_lowering()
 def test_ppr_registration():
     """Test that ppr_basis=True is passed to the transform."""
 
-    @qjit(target="mlir")
+    @qjit(target="mlir", capture=False)
     @gridsynth(epsilon=0.01, ppr_basis=True)
     @qp.qnode(qp.device("lightning.qubit", wires=1))
     def circuit(x: float):
@@ -168,7 +168,7 @@ test_ppr_registration()
 def test_ppr_lowering():
     """Test that PPR basis generates pbc.ppr operations."""
 
-    @qjit(target="mlir", pipelines=pipe)
+    @qjit(target="mlir", pipelines=pipe, capture=False)
     @gridsynth(epsilon=0.01, ppr_basis=True)
     @qp.qnode(qp.device("lightning.qubit", wires=1))
     def circuit(x: float):

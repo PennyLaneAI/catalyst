@@ -21,7 +21,7 @@ from catalyst import qjit, while_loop
 
 # CHECK-NOT: Verification failed
 # CHECK-LABEL: @jit_circuit
-@qjit(target="mlir")
+@qjit(target="mlir", capture=False)
 @qp.qnode(qp.device("lightning.qubit", wires=1))
 def circuit(n: int):
     # CHECK:   scf.while ([[v0:%.+]] = {{%.+}}, [[array0:%.+]] = {{%.+}})
@@ -49,7 +49,7 @@ print(circuit.mlir)
 
 # CHECK-NOT: Verification failed
 # CHECK-LABEL: func.func public @jit_circuit_outer_scope_reference
-@qjit(target="mlir")
+@qjit(target="mlir", capture=False)
 @qp.qnode(qp.device("lightning.qubit", wires=1))
 def circuit_outer_scope_reference(n: int):
     # CHECK:   [[array0:%.+]] = quantum.alloc
@@ -80,7 +80,7 @@ print(circuit_outer_scope_reference.mlir)
 
 # CHECK-NOT: Verification failed
 # CHECK-LABEL: public @jit_circuit_multiple_args
-@qjit(target="mlir")
+@qjit(target="mlir", capture=False)
 @qp.qnode(qp.device("lightning.qubit", wires=1))
 def circuit_multiple_args(n: int):
     # CHECK-DAG:   [[R0:%.+]] = quantum.alloc({{.+}})
@@ -116,7 +116,7 @@ print(circuit_multiple_args.mlir)
 # `catalyst.estimated_iterations` attribute on the emitted `scf.while`.
 # CHECK-NOT: Verification failed
 # CHECK-LABEL: public @jit_circuit_estimated_iterations
-@qjit(target="mlir")
+@qjit(target="mlir", capture=False)
 @qp.qnode(qp.device("lightning.qubit", wires=1))
 def circuit_estimated_iterations(n: int):
     # CHECK:   scf.while

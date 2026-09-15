@@ -546,6 +546,11 @@
 
 <h3>Breaking changes 💔</h3>
 
+* The default value of ``capture`` on :func:`~.qjit` (and ``CompileOptions``) is now ``True``.
+  ``@qjit`` uses PennyLane program capture unless ``capture=False`` is passed. Pass
+  ``capture="global"`` to keep following ``qp.capture.enabled()``. Because capture is on by
+  default, ``collect_decomp_rules=True`` now applies to undecorated ``@qjit`` programs.
+
 * Removes :func:`~.passes.ppm_specs` and the ``--ppm-specs`` MLIR pass. Use :func:`~.specs` and
   the ``ResourceAnalysis`` pass instead for PPR/PPM resource counts and PBC layer depth
   (``any_commuting_depth`` / ``qubit_disjoint_depth``).

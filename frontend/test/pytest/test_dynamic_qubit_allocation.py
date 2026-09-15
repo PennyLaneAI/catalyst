@@ -537,7 +537,7 @@ def test_no_capture(backend):
     Test error message when used without capture.
     """
 
-    @qjit
+    @qjit(capture=False)
     @qp.qnode(qp.device(backend, wires=1))
     def circuit():
         with qp.allocate(1) as _:

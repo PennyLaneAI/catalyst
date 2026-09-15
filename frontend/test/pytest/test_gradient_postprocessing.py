@@ -37,7 +37,7 @@ def test_scalar_scalar(backend, diff_method):
         w = workflow(x)
         return jnp.cos(w)
 
-    @qjit
+    @qjit(capture=False)
     def jac_postprocess(x):
         return grad(postprocess, method="auto")(x)
 
@@ -59,7 +59,7 @@ def test_one_to_many(backend, diff_method):
         w = workflow(x)
         return jnp.array([jnp.cos(w), w, w * 2])
 
-    @qjit
+    @qjit(capture=False)
     def jac_postprocess(x):
         return jacobian(postprocess, method="auto")(x)
 
@@ -84,7 +84,7 @@ def test_many_to_one(backend, diff_method):
         w = workflow(x)
         return jnp.cos(w)
 
-    @qjit
+    @qjit(capture=False)
     def jac_postprocess(x):
         return grad(postprocess, method="auto")(x)
 
@@ -107,7 +107,7 @@ def test_tensor_measure(backend):
         probs = workflow(x)
         return jnp.sum(probs) / jnp.prod(probs)
 
-    @qjit
+    @qjit(capture=False)
     def jac_postprocess(x):
         return jacobian(postprocess, method="auto")(x)
 
@@ -128,7 +128,7 @@ def test_multi_measure(backend):
         w, probs = workflow(x)
         return jnp.cos(w) + jnp.prod(probs)
 
-    @qjit
+    @qjit(capture=False)
     def jac_postprocess(x):
         return grad(postprocess, method="auto")(x)
 
@@ -143,7 +143,7 @@ def test_purely_classical():
     def postprocess(x):
         return x**2
 
-    @qjit
+    @qjit(capture=False)
     def classical_grad(x):
         return grad(postprocess, method="auto")(x)
 
@@ -166,7 +166,7 @@ def test_jacobian(backend, diff_method):
         w = workflow(x)
         return jnp.array([[jnp.sin(w), jnp.cos(w)], [w, w * 2], [w / 2, w]])
 
-    @qjit
+    @qjit(capture=False)
     def jac_postprocess(x):
         return jacobian(postprocess, method="auto")(x)
 
@@ -187,7 +187,7 @@ def test_multi_result(backend, diff_method):
         w = workflow(x)
         return jnp.cos(w), jnp.array([w, x * 2.454])
 
-    @qjit
+    @qjit(capture=False)
     def jac_postprocess(x):
         return jacobian(postprocess, method="auto")(x)
 
@@ -211,7 +211,7 @@ def test_multi_arg_multi_result(backend, diff_method):
         w = workflow(x, y)
         return jnp.cos(w), jnp.array([w, x[0] * 2.454])
 
-    @qjit
+    @qjit(capture=False)
     def jac_postprocess(x, y):
         return jacobian(postprocess, argnums=[0, 1], method="auto")(x, y)
 
@@ -244,7 +244,7 @@ def test_multi_qnode(backend):
     def postprocess(x):
         return jnp.tanh(second_qnode(x)) * jnp.cos(first_qnode(x))
 
-    @qjit
+    @qjit(capture=False)
     def grad_workflow(x):
         return grad(postprocess, method="auto")(x)
 
@@ -270,7 +270,7 @@ def test_qnode_different_returns(backend):
     def loss(params):
         return jnp.prod(circuit_A(params)) + circuit_B(params)
 
-    @qjit
+    @qjit(capture=False)
     def grad_loss(theta):
         return grad(loss, method="auto")(theta)
 
@@ -291,7 +291,7 @@ def test_no_nested_grad_without_fd():
 
     with pytest.raises(DifferentiableCompileError, match="higher order derivatives"):
 
-        @qjit
+        @qjit(capture=False)
         def outer(x: float):
             return grad(middle, method="auto")(x)
 
