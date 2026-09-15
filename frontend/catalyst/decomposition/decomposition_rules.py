@@ -643,7 +643,12 @@ def collect_symbolic_adjoint_resources(op_cls, op_name, kwargs, is_custom_op):
 
     name_to_resources = {}
     name_to_resource_ids = {}
+    applicable_rules = []
     for rule in rules:
+        if not rule.is_applicable(**probe_args):
+            continue
+
+        applicable_rules.append(rule)
         try:
             resources = rule.compute_resources(**probe_args)
             name_to_resources[rule.name] = resources.gate_counts
@@ -661,7 +666,7 @@ def collect_symbolic_adjoint_resources(op_cls, op_name, kwargs, is_custom_op):
                 category=RuleLoweringWarning,
             )
 
-    return rules, probe_args, name_to_resources, name_to_resource_ids
+    return applicable_rules, probe_args, name_to_resources, name_to_resource_ids
 
 
 # pylint: disable=too-many-arguments
@@ -738,8 +743,7 @@ def compile_registered_adjoint_rules(
                 category=RuleLoweringWarning,
             )
             continue
-        if rule.is_applicable(**probe_args):
-            subroutines.append(rule_to_subroutine(rule))
+        subroutines.append(rule_to_subroutine(rule))
 
     if not subroutines:
         return None
