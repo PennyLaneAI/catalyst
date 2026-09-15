@@ -849,6 +849,20 @@ class TestApplicabilityFilterOrdering:
         assert "inapplicable_rule" not in result
         assert f'target_gate = "{self.OP_ID}"' in result
 
+    def test_raising_condition_drops_only_its_own_rule(self, recwarn):
+        """Tests that a condition that raises on the probe arguments is reported and its rule skipped."""
+
+        result = self._compile(
+            self._rule("exploding_rule", condition_explodes=True),
+            self._rule("applicable_rule"),
+        )
+
+        assert self._lowering_warnings(recwarn) == [
+            "Failed to check whether the exploding_rule decomposition rule applies: some error"
+        ]
+        assert "exploding_rule" not in result
+        assert "applicable_rule" in result
+
     def test_symbolic_adjoint_skips_inapplicable_rule(self, recwarn):
         """Test that an inapplicable Adjoint(Op) rule is skipped."""
 
@@ -875,20 +889,6 @@ class TestApplicabilityFilterOrdering:
         assert [r.name for r in rules] == []
         assert name_to_resources == {}
         assert name_to_resource_ids == {}
-
-    def test_raising_condition_drops_only_its_own_rule(self, recwarn):
-        """Tests that a condition that raises on the probe arguments is reported and its rule skipped."""
-
-        result = self._compile(
-            self._rule("exploding_rule", condition_explodes=True),
-            self._rule("applicable_rule"),
-        )
-
-        assert self._lowering_warnings(recwarn) == [
-            "Failed to check whether the exploding_rule decomposition rule applies: some error"
-        ]
-        assert "exploding_rule" not in result
-        assert "applicable_rule" in result
 
     def test_raising_symbolic_adjoint_condition_is_reported(self, recwarn):
         """A raising condition on an Adjoint(Op) rule is reported and the rule skipped."""
