@@ -142,9 +142,9 @@ struct DecomposeLoweringPass : impl::DecomposeLoweringPassBase<DecomposeLowering
     void runOnOperation() final {
         ModuleOp module = cast<ModuleOp>(getOperation());
 
-        OpPassManager pm("builtin.module");
-        pm.addPass(createReferenceSemanticsConversionPass());
-        if (failed(runPipeline(pm, module))) {
+        OpPassManager pm_to_ref("builtin.module");
+        pm_to_ref.addPass(createReferenceSemanticsConversionPass());
+        if (failed(runPipeline(pm_to_ref, module))) {
             return signalPassFailure();
         }
 
@@ -169,10 +169,10 @@ struct DecomposeLoweringPass : impl::DecomposeLoweringPassBase<DecomposeLowering
             return signalPassFailure();
         }
 
-        OpPassManager pm1("builtin.module");
-        pm1.addPass(createValueSemanticsConversionPass());
-        pm1.addPass(createCanonicalizerPass());
-        if (failed(runPipeline(pm1, module))) {
+        OpPassManager pm_to_val("builtin.module");
+        pm_to_val.addPass(createValueSemanticsConversionPass());
+        pm_to_val.addPass(createCanonicalizerPass());
+        if (failed(runPipeline(pm_to_val, module))) {
             return signalPassFailure();
         }
     }
