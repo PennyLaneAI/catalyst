@@ -55,6 +55,7 @@ from catalyst.decomposition.decomposition_rules import (
     name_unwrap_adjoint,
     name_unwrap_control,
     name_wrap_adjoint,
+    prepare_dynamic_op_kwargs,
     wrap_modifier_id,
 )
 from catalyst.decomposition.graph_op_id import GraphOpID, build_graph_op_id
@@ -69,16 +70,33 @@ from catalyst.utils.exceptions import CompileError
 class TestGenericUtilities:
     """Tests for common decomposition rule lowering utilities."""
 
+    def test_probe_wires_dont_overlap(self):
+        """Test that the helper for generating probe arguments doesnt create
+        overlapping wires.
+
+        NOTE: Regression test for the accumulator change made in #3225.
+        """
+
+        kwargs = prepare_dynamic_op_kwargs({}, wire_lens={"target": 3, "control": 2})
+        assert len(kwargs["target"]) == 3
+        assert len(kwargs["control"]) == 2
+
+        combined_wires = np.concatenate(
+            [np.asarray(kwargs["target"]), np.asarray(kwargs["control"])]
+        )
+        # Assert they are all negative and unique
+        assert np.all(combined_wires < 0)
+        assert len(np.unique(combined_wires)) == 5
+
     def test_wires_replacement_doesnt_create_overlapping_wire_labels(self):
         """Test that the helper does not create overlapping wire labels which create
         validation failures when the operator is unflattened.
 
-        NOTE: Regression test for the accumulator change made in type_utils.py
+        NOTE: Regression test for the accumulator change made in #3214.
         """
 
         op = qp.ctrl(qp.S(Wire[1]), Wire[1])
         new_op = replace_wires_with_placeholder_wires(op)
-
         assert new_op == qp.ctrl(qp.S(-2), -1)
 
     def test_build_graph_op_id(self):
@@ -268,7 +286,11 @@ class TestGenericUtilities:
         assert call_kwargs["a"] is True
         assert call_kwargs["b"] == 3.14
         assert call_kwargs["thing"] == "string"
-        assert call_kwargs["wires"].tolist() == [0, 1]
+
+        probe_wires = np.asarray(call_kwargs["wires"])
+        assert probe_wires.shape == (2,)
+        assert np.all(probe_wires < 0)
+        assert len(np.unique(probe_wires)) == 2
 
 
 class TestPrecompiled:
