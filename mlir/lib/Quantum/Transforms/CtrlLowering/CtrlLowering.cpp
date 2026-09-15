@@ -668,33 +668,27 @@ static Operation *createControlledGate(PatternRewriter &rewriter, QuantumGate ga
     return rewriter.create(state);
 }
 
-// /// Rebuild a nested `qref.quantum.ctrl` op with the enclosing controls merged in.
+/// Rebuild a nested `qref.quantum.ctrl` op with the enclosing controls merged in.
 // static CtrlOp mergeNestedCtrl(PatternRewriter &rewriter, CtrlOp inner,
 //                               ValueRange addCtrlQubits, ValueRange addCtrlValues) {
 //     Location loc = inner.getLoc();
 //     Type qubitType = QubitType::get(rewriter.getContext());
 
 //     SmallVector<Value> mergedCtrlQubits;
-//     for (Value q : inner.getInCtrlQubits()) {
-//         mergedCtrlQubits.push_back(map.lookupOrDefault(q));
+//     for (Value q : inner.getCtrlQubits()) {
+//         mergedCtrlQubits.push_back(q);
 //     }
 //     mergedCtrlQubits.append(addCtrlQubits.begin(), addCtrlQubits.end());
 
 //     SmallVector<Value> mergedCtrlValues;
-//     for (Value v : inner.getInCtrlValues()) {
-//         mergedCtrlValues.push_back(map.lookupOrDefault(v));
+//     for (Value v : inner.getCtrlValues()) {
+//         mergedCtrlValues.push_back(v);
 //     }
 //     mergedCtrlValues.append(addCtrlValues.begin(), addCtrlValues.end());
-
-//     SmallVector<Value> innerArgs;
-//     for (Value a : inner.getArgs()) {
-//         innerArgs.push_back(map.lookupOrDefault(a));
-//     }
 
 //     SmallVector<Value> operands;
 //     operands.append(mergedCtrlQubits.begin(), mergedCtrlQubits.end());
 //     operands.append(mergedCtrlValues.begin(), mergedCtrlValues.end());
-//     operands.append(innerArgs.begin(), innerArgs.end());
 
 //     // The target-results group is everything after the (leading) out_ctrl_qubits results.
 //     ResultRange innerResults = inner->getResults();
@@ -755,9 +749,10 @@ struct ReferenceSemanticsCtrlLoweringRewritePattern : public OpRewritePattern<Ct
                 continue;
             }
             if (auto inner = dyn_cast<CtrlOp>(op)) {
-                // mergeNestedCtrl(rewriter, inner, currentCtrlQubits, ctrlValues);
-                op.emitError("nested quantum.ctrl inside a quantum.ctrl region is not supported "
-                    "by ctrl-lowering; run adjoint-lowering first");
+                rewriter.modifyOpInPlace(inner, [&] {
+                    inner.getCtrlQubitsMutable().append(currentCtrlQubits);
+                    inner.getCtrlValuesMutable().append(ctrlValues);
+                });
                 continue;
             }
             if (isa<AdjointOp>(op)) {
