@@ -740,7 +740,7 @@ class TestApplicabilityFilterOrdering:
         assert "inapplicable_rule" not in result
 
     def test_inapplicable_rule_never_computes_resources(self):
-        """Test that the resource function for an inappliable rule is never called."""
+        """Test that the resource function for an inapplicable rule is never called."""
 
         calls = []
 
