@@ -45,9 +45,8 @@ test_mlir_pass_no_attribute()
 
 def test_xdsl_pass_with_attribute():
     """Test that xDSL passes set uses_xdsl_passes and xdsl_pass attributes"""
-    qp.capture.enable()
 
-    @qp.qjit(target="mlir")
+    @qp.qjit(capture=True, collect_decomp_rules=False, target="mlir")
     @merge_rotations_pass
     @qp.qnode(qp.device("lightning.qubit", wires=1))
     def circuit_with_xdsl_pass():
@@ -58,7 +57,6 @@ def test_xdsl_pass_with_attribute():
     print(circuit_with_xdsl_pass.mlir)
     # CHECK: catalyst.uses_xdsl_passes
     # CHECK: catalyst.xdsl_pass
-    qp.capture.disable()
 
 
 test_xdsl_pass_with_attribute()
@@ -66,9 +64,8 @@ test_xdsl_pass_with_attribute()
 
 def test_mixed_passes_with_attribute():
     """Test that mixing MLIR and xDSL passes sets uses_xdsl_passes and xdsl_pass attributes"""
-    qp.capture.enable()
 
-    @qp.qjit(target="mlir")
+    @qp.qjit(capture=True, collect_decomp_rules=False, target="mlir")
     @qp.transforms.cancel_inverses
     @merge_rotations_pass
     @qp.qnode(qp.device("lightning.qubit", wires=1))
@@ -80,7 +77,6 @@ def test_mixed_passes_with_attribute():
     print(circuit_with_mixed_passes.mlir)
     # CHECK: catalyst.uses_xdsl_passes
     # CHECK: catalyst.xdsl_pass
-    qp.capture.disable()
 
 
 test_mixed_passes_with_attribute()

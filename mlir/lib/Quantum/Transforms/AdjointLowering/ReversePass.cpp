@@ -226,6 +226,48 @@ class AdjointGenerator {
                 Type elementType = aTensorType.getElementType();
                 // Constants
                 auto loc = parametrizedGate.getLoc();
+
+                // Real-valued tensor params (e.g. `quantum.operator` angle tensors) were cached
+                // element-by-element in the forward pass; rebuild the tensor by popping them back.
+                // The complex-matrix path below is specific to QubitUnitary.
+                if (elementType.isF64()) {
+                    assert(aTensorType.getRank() <= 1 &&
+                           "only scalar/rank-1 real tensor params are cacheable");
+                    if (aTensorType.getRank() == 0) {
+                        Value element = ListPopOp::create(builder, loc, cache.paramVector);
+                        cachedParams[numParams - 1 - idx] =
+                            tensor::FromElementsOp::create(builder, loc, paramType, element);
+                    } else {
+                        Value c0i = index::ConstantOp::create(builder, loc, 0);
+                        Value c1i = index::ConstantOp::create(builder, loc, 1);
+                        Value dim = ShapedType::kDynamic != shape[0]
+                                        ? (Value)index::ConstantOp::create(builder, loc, shape[0])
+                                        : (Value)tensor::DimOp::create(
+                                              builder, loc, cachedParams[numParams - 1 - idx], c0i);
+                        Value empty =
+                            tensor::EmptyOp::create(builder, loc, aTensorType, ValueRange{});
+                        // Elements were pushed in ascending index order, so popping yields them in
+                        // descending order: place the i-th popped value at index (dim - 1 - i).
+                        scf::ForOp loop =
+                            scf::ForOp::create(builder, loc, c0i, dim, c1i, ValueRange{empty});
+                        {
+                            OpBuilder::InsertionGuard guard(builder);
+                            builder.setInsertionPointToStart(loop.getBody());
+                            Value acc = loop.getRegionIterArg(0);
+                            Value iPlusOne =
+                                index::AddOp::create(builder, loc, loop.getInductionVar(), c1i);
+                            Value revIdx = index::SubOp::create(builder, loc, dim, iPlusOne);
+                            Value element = ListPopOp::create(builder, loc, cache.paramVector);
+                            Value updated =
+                                tensor::InsertOp::create(builder, loc, element, acc, revIdx);
+                            scf::YieldOp::create(builder, loc, updated);
+                        }
+                        cachedParams[numParams - 1 - idx] = loop.getResult(0);
+                    }
+                    idx++;
+                    continue;
+                }
+
                 Value c0 = index::ConstantOp::create(builder, loc, 0);
                 Value c1 = index::ConstantOp::create(builder, loc, 1);
                 // TODO: Generalize to all possible dimensions

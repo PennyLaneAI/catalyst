@@ -15,7 +15,47 @@
   [(#3090)](https://github.com/PennyLaneAI/catalyst/pull/3090)
   [(#3096)](https://github.com/PennyLaneAI/catalyst/pull/3096)
   [(#3116)](https://github.com/PennyLaneAI/catalyst/pull/3116)
+  [(#3127)](https://github.com/PennyLaneAI/catalyst/pull/3127)
   [(#3131)](https://github.com/PennyLaneAI/catalyst/pull/3131)
+
+* The graph-based decomposition system now supports **adjoint operators** for `Operator2`.
+  [(#3120)](https://github.com/PennyLaneAI/catalyst/pull/3120)
+  [(#3115)](https://github.com/PennyLaneAI/catalyst/pull/3115)
+  [(#3204)](https://github.com/PennyLaneAI/catalyst/pull/3204)
+
+  For a target gate set, `Adjoint(Op)` is reached through any of three pathways:
+    1. Rules registered on the base `Op`,
+    2. Rules registered directly for `Adjoint(Op)`, and
+    3. Rules *synthesized by distribution* (`decompose(Adjoint(Op)) = adjoint(decompose(Op))`).
+
+  Pathway 2 now also covers the rules PennyLane registers with the *symbolic* operator's arguments,
+  i.e. `rule(base)` rather than the base op's `(*params, wires)`. This is how
+  `self_adjoint`, `adjoint_rotation` and other symbolic rules are written, so `Adjoint(H)`, `Adjoint(X)`,
+  `Adjoint(RZ)`, `Adjoint(Rot)`, ... now decompose straight back to their base operator instead of
+  falling through to the (much longer) distributed rules, or failing to solve at all when the base
+  op is the only member of the target `gate_set`.
+
+  A rule registered for `Adjoint(Op)` must now take `base`; this is the convention PennyLane's own
+  graph calls such a rule with, and the one every `Operator2` rule in PennyLane already follows. A
+  rule written against the base op's parameters instead is skipped with a `RuleLoweringWarning`.
+
+* The graph-based decomposition system now supports **controlled operators** for `Operator2`,
+  including single control (`C(Op)`), multiple controls (`<n>C(Op)`), and their composition with
+  adjoint.
+  [(#3129)](https://github.com/PennyLaneAI/catalyst/pull/3129)
+  [(#3127)](https://github.com/PennyLaneAI/catalyst/pull/3127)
+
+  Control is folded into the operator identity *control-outermost* (e.g. `C(Adjoint(Op))`), so
+  `ctrl(adjoint(Op))` and `adjoint(ctrl(Op))` collapse to a single node, while a distinct control
+  count is its own node keyed. For a target gate set, `<n>C(Op)` is reached through:
+    1. Rules registered directly for `<n>C(Op)` (e.g. named `CNOT`/`CRX`, `ctrl_decomp_zyz`), and
+    2. Rules *synthesized by distribution* (`decompose(C(Op)) = ctrl(decompose(Op))`), controlling
+       each produced gate with the same control count.
+
+  A rule may re-emit its base decomposition inside a `quantum.ctrl` region; the apply pipeline
+  reduces it to op-level controls with `ctrl-lowering`, iterating
+  `(decompose-lowering -> ctrl-lowering -> adjoint-lowering)` to a fixpoint.
+  Controlled basis gates are only free when their own `<n>C(...)` id is in the target gate set.
 
 * The `local-random` unitary folding option for :func:`~.mitigate_with_zne` is now implemented,
   reproducing Mitiq's ``fold_gates_at_random``: every gate is folded ``floor((scale_factor-1)/2)``
@@ -26,6 +66,9 @@
   [(#2956)](https://github.com/PennyLaneAI/catalyst/pull/2956)
 
 <h3>Improvements 🛠</h3>
+
+* Add the `XMEM_REPLY_BRAM` memory type and use it to allocate reply buffers in dedicated BRAM.
+  [(#3148)](https://github.com/PennyLaneAI/catalyst/pull/3148)
 
 * a PennyLane `Backline` is serialized to the `catalyst.backline` module attribute and compiled
   through the transport passes.
@@ -44,6 +87,7 @@
   [(#2981)](https://github.com/PennyLaneAI/catalyst/pull/2981)
   [(#3109)](https://github.com/PennyLaneAI/catalyst/pull/3109)
   [(#3075)](https://github.com/PennyLaneAI/catalyst/pull/3075)
+  [(#3162)](https://github.com/PennyLaneAI/catalyst/pull/3162)
 
 * The graph-based decomposition system has been greatly improved.
 
@@ -68,19 +112,20 @@
     [(#3053)](https://github.com/PennyLaneAI/catalyst/pull/3053)
 
     The format of `graphOpID` is as follows:
-        op_name{param_shaped_type_dictionary}{wire_lens_dictionary}{static_data_dictionary}[UID]
+        op_name{dynamic_shape_dictionary}{wire_lens_dictionary}{static_data_dictionary}[UID]
 
+    The types in the dynamic shape dictionary should be represented as a list of MLIR-style type annotations.
     The UID is a hash computed from the shapes, dtypes and pytree structures of any data on the Python operator that cannot be lowered to MLIR directly.
 
     For example, an operator with class name `HybridOpArg`, taking in one float param
     argument named `angle`, one wire argument named `cwires`, one static data argument
     `label="hello"`, and a computed UID of 10 would be parsed to the following graph op ID:
-        HybridOpArg{angle:[f64]}{cwires:1}{label:hello}[10]
+        HybridOpArg{angle:[tensor<f64>]}{cwires:1}{label = "hello"}[10]
 
     A node in the decomposition graph is completely identified by its `graphOpId`. For example,
-        PauliRot{angle:[f64]}{wires:1}{pauli_word:X}
+        PauliRot{angle:[f64]}{wires:1}{pauli_word = "X"}
     and
-        PauliRot{angle:[f64]}{wires:2}{pauli_word:XX}
+        PauliRot{angle:[f64]}{wires:2}{pauli_word = "XX"}
     will have different decomposition rules.
 
   - A decomposition rule function can arrive in a piece of MLIR in one of three ways:
@@ -90,6 +135,9 @@
 
     2. When lowering a gate operation from JAXPR to MLIR, all rules reachable from that gate are injected into the IR.
     [(#3061)](https://github.com/PennyLaneAI/catalyst/pull/3061)
+    [(#3160)](https://github.com/PennyLaneAI/catalyst/pull/3160)
+    [(#3149)](https://github.com/PennyLaneAI/catalyst/pull/3149)
+    [(#3169)](https://github.com/PennyLaneAI/catalyst/pull/3169)
 
     This pathway of rule injection can be opted-out via a new keyword argument on `qp.qjit` named `collect_decomp_rules`.
     This kwarg controls whether or not to compile the decomposition rules during lower-time. Default value is `True`.
@@ -113,6 +161,9 @@
     [(#2973)](https://github.com/PennyLaneAI/catalyst/pull/2973)
     [(#2836)](https://github.com/PennyLaneAI/catalyst/pull/2836)
     [(#2855)](https://github.com/PennyLaneAI/catalyst/pull/2855)
+    [(#3156)](https://github.com/PennyLaneAI/catalyst/pull/3156)
+    [(#3158)](https://github.com/PennyLaneAI/catalyst/pull/3158)
+    [(#3206)](https://github.com/PennyLaneAI/catalyst/pull/3206)
 
     1. The pass now supports applying a selection of the available decomposition rules via the `target_rules` parameter.
 
@@ -127,12 +178,44 @@
     5. The pass can now handle null decomposition rules, which are rule functions that do not have any quantum values as arguments or results.
     Gates with null decomposition rules are simply removed.
 
-* A failure during AOT compilation is now downgraded to a warning and logged.
+    6. The pass can now handle register-mode rules that target gates in control flow regions whose qubits were extracted outside the region.
+
+  - `RuleLoweringWarning` is silenced by default. To display these warnings, set
+    `CATALYST_SILENCE_RULE_LOWERING_WARNINGS=0`. This helps debug unexpected decompositions where
+    rules cannot be lowered and they are silently dropped from the graph-decomposition system instead
+    of raising an error.
+    [(#3190)](https://github.com/PennyLaneAI/catalyst/pull/3190)
+
+* A failure during AOT compilation is now logged rather than raised. 
   [(#3100)](https://github.com/PennyLaneAI/catalyst/pull/3100)
+  [(#3194)](https://github.com/PennyLaneAI/catalyst/pull/3194)
 
 * Adds the ability to use `pennylane.typing.AbstractArray` and `pennylane.wires.AbstractWires` as type hints for
   AOT compilation and as arguments to `pennylane.specs` calculations.
   [(#2953)](https://github.com/PennyLaneAI/catalyst/pull/2953)
+
+* The `ResourceAnalysis` pass can now report concrete resource counts for nested loops in cases
+  where the bounds of an inner loop are directly dependent on the loop variable of a static outer loop.
+  [(#3140)](https://github.com/PennyLaneAI/catalyst/pull/3140)
+
+  For example, this program reports a total of `56` `PauliX` operations, since the number of iterations of the inner loops can be statically determined from the outer loop:
+
+  ```python
+  import pennylane as qp
+
+  @qp.qjit(autograph=True)
+  @qp.qnode(qp.device("null.qubit", wires=1))
+  def circuit():
+      for i in range(8):
+          for j in range(i):
+              for _ in range(j):
+                  qp.PauliX(0)
+
+      return qp.expval(qp.X(0))
+
+  resources = qp.specs(circuit, level=0)().resources
+  print(resources.quantum_operations["PauliX"])  # 56
+  ```
 
 * The `ResourceAnalysis` pass has received a new compiler hint to more accurately estimate quantum
   resources in the presence of conditional operations (`scf.if` and `scf.index_switch`). The
@@ -186,6 +269,10 @@
 * A `lower-decode-to-transport` pass is added, which replaces each qecp.decode_esm_css with
   a transport kick/collect round over its buffers.
   [(#3066)](https://github.com/PennyLaneAI/catalyst/pull/3066)
+
+* A `remove-global-phases` pass is added, which removes global phases by deleting `quantum.gphase`
+  operations without control wires.
+  [(#3143)](https://github.com/PennyLaneAI/catalyst/pull/3143)
 
 * An X/Z syndrome decode can now be routed to its own decoder in a backline coprocessor.
   `qecp.decode_esm_css` carries an optional `check_type` attribute recording which check family a
@@ -498,6 +585,12 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* Adds ability to lower `None` attributes to `get_mlir_attribute_from_pyval`.
+  [(#3196)](https://github.com/PennyLaneAI/catalyst/pull/3196)
+
+* Update calls to `GlobalPhase` to no longer use the `wires` argument.
+  [(#3108)](https://github.com/PennyLaneAI/catalyst/pull/3108)
+
 * A GPU CI workflow runs the runtime transport tests on the `single-gpu-x64` runner, gated by
   the `gpu` label.
   [(#3113)](https://github.com/PennyLaneAI/catalyst/pull/3113)
@@ -681,6 +774,9 @@
   `-stage` naming convention used when invoking them from the command line (e.g. `quantum-compilation-stage`).
   [#3002](https://github.com/PennyLaneAI/catalyst/pull/3002)
 
+* A new pass `--resolve-gate-level-adjoint` was added. This pass now handles gate-level adjoint canonicalization, moving it out of the `--canonicalize` pass.
+  [#3155](https://github.com/PennyLaneAI/catalyst/pull/3155)
+
 <h3>Documentation 📝</h3>
 
 * A broken link was removed in the [Compiler Core](https://docs.pennylane.ai/projects/catalyst/en/stable/modules/mlir.html) documentation page. The link referred to where precompiled decomposition rules were implemented, which has since been refactored.
@@ -693,6 +789,16 @@
   documentation has been updated to fix a number of typos and formatting issues, and to improve
   overall readability.
   [(#3005)](https://github.com/PennyLaneAI/catalyst/pull/3005)
+
+* The `transport` and `executor` dialects are now documented alongside the other Catalyst dialects.
+  [(#3179)](https://github.com/PennyLaneAI/catalyst/pull/3179)
+  [(#3180)](https://github.com/PennyLaneAI/catalyst/pull/3180)
+  [(#3197)](https://github.com/PennyLaneAI/catalyst/pull/3197)
+
+* A developer guide for Backline describes how heterogeneous compilation and remote execution are
+  built in Catalyst: the `catalyst.backline` module attribute, the transport and executor
+  dialects, the compilation pipeline, and the runtime.
+  [(#3208)](https://github.com/PennyLaneAI/catalyst/pull/3208)
 
 <h3>Contributors ✍️</h3>
 
@@ -713,6 +819,8 @@ Rylan Malarchick,
 Mehrdad Malekmohammadi,
 River McCubbin,
 Shuli Shu,
+Nikhil Sreekumar,
 Paul Haochen Wang,
 Jake Zaia,
+Haider Sajjad,
 Hongsheng Zheng.

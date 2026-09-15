@@ -26,7 +26,7 @@ from jax import numpy as jnp
 
 
 # CHECK: func.func public @test_for_loop_basic(%arg0: tensor<i64>, %arg1: tensor<f64>) -> tensor<8xcomplex<f64>>
-@qp.qjit(capture=True, autograph=True, target="mlir")
+@qp.qjit(capture=True, collect_decomp_rules=False, autograph=True, target="mlir")
 @qp.qnode(qp.device("null.qubit", wires=3))
 def test_for_loop_basic(size: int, angle: float):
     """
@@ -60,7 +60,7 @@ print(test_for_loop_basic.mlir)
 
 
 # CHECK: func.func public @test_for_loop_nested(%arg0: tensor<i64>) -> tensor<8xcomplex<f64>>
-@qp.qjit(capture=True, autograph=True, target="mlir")
+@qp.qjit(capture=True, collect_decomp_rules=False, autograph=True, target="mlir")
 @qp.qnode(qp.device("null.qubit", wires=3))
 def test_for_loop_nested(size: int):
     """
@@ -97,7 +97,7 @@ print(test_for_loop_nested.mlir)
 
 
 # CHECK: func.func public @test_for_loop_with_result(%arg0: tensor<i64>) -> tensor<8xcomplex<f64>>
-@qp.qjit(capture=True, autograph=True, target="mlir")
+@qp.qjit(capture=True, collect_decomp_rules=False, autograph=True, target="mlir")
 @qp.qnode(qp.device("null.qubit", wires=3))
 def test_for_loop_with_result(size: int):
     """
@@ -142,7 +142,7 @@ print(test_for_loop_with_result.mlir)
 
 
 # CHECK: func.func public @test_for_loop_with_dynamic_shapes(%arg0: tensor<i64>) -> tensor<8xcomplex<f64>>
-@qp.qjit(capture=True, autograph=True, target="mlir")
+@qp.qjit(capture=True, collect_decomp_rules=False, autograph=True, target="mlir")
 @qp.qnode(qp.device("null.qubit", wires=3))
 def test_for_loop_with_dynamic_shapes(size: int):
     """
@@ -180,7 +180,7 @@ print(test_for_loop_with_dynamic_shapes.mlir)
 
 
 # CHECK: func.func public @test_for_loop_with_dynamic_allocation() -> tensor<f64>
-@qp.qjit(capture=True, autograph=True, target="mlir")
+@qp.qjit(capture=True, collect_decomp_rules=False, autograph=True, target="mlir")
 @qp.qnode(qp.device("null.qubit", wires=3))
 def test_for_loop_with_dynamic_allocation():
     """
@@ -226,7 +226,7 @@ print(test_for_loop_with_dynamic_allocation.mlir)
 
 
 # CHECK: func.func public @test_while_loop_basic(%arg0: tensor<i64>, %arg1: tensor<f64>) -> tensor<8xcomplex<f64>>
-@qp.qjit(capture=True, autograph=True, target="mlir")
+@qp.qjit(capture=True, collect_decomp_rules=False, autograph=True, target="mlir")
 @qp.qnode(qp.device("null.qubit", wires=3))
 def test_while_loop_basic(i: int, angle: float):
     """
@@ -258,7 +258,7 @@ print(test_while_loop_basic.mlir)
 
 
 # CHECK: func.func public @test_while_loop_nested(%arg0: tensor<i64>, %arg1: tensor<f64>) -> tensor<8xcomplex<f64>>
-@qp.qjit(capture=True, autograph=True, target="mlir")
+@qp.qjit(capture=True, collect_decomp_rules=False, autograph=True, target="mlir")
 @qp.qnode(qp.device("null.qubit", wires=3))
 def test_while_loop_nested(i: int, angle: float):
     """
@@ -299,7 +299,7 @@ print(test_while_loop_nested.mlir)
 
 
 # CHECK: func.func public @test_while_loop_with_dynamic_shapes(%arg0: tensor<i64>) -> tensor<8xcomplex<f64>>
-@qp.qjit(capture=True, autograph=True, target="mlir")
+@qp.qjit(capture=True, collect_decomp_rules=False, autograph=True, target="mlir")
 @qp.qnode(qp.device("null.qubit", wires=3))
 def test_while_loop_with_dynamic_shapes(i: int):
     """
@@ -341,7 +341,7 @@ print(test_while_loop_with_dynamic_shapes.mlir)
 
 
 # CHECK: func.func public @test_while_loop_with_dynamic_allocation(%arg0: tensor<i64>) -> tensor<f64>
-@qp.qjit(capture=True, autograph=True, target="mlir")
+@qp.qjit(capture=True, collect_decomp_rules=False, autograph=True, target="mlir")
 @qp.qnode(qp.device("null.qubit", wires=3))
 def test_while_loop_with_dynamic_allocation(i: int):
     """
@@ -390,7 +390,7 @@ print(test_while_loop_with_dynamic_allocation.mlir)
 
 
 # CHECK: func.func public @test_loop_with_adjoint() -> tensor<f64>
-@qp.qjit(capture=True, autograph=True, target="mlir")
+@qp.qjit(capture=True, collect_decomp_rules=False, autograph=True, target="mlir")
 @qp.qnode(qp.device("null.qubit", wires=3))
 def test_loop_with_adjoint():
     """
@@ -430,7 +430,7 @@ print(test_loop_with_adjoint.mlir)
 
 
 # CHECK: func.func public @test_if_basic(%arg0: tensor<i64>, %arg1: tensor<f64>) -> tensor<8xcomplex<f64>>
-@qp.qjit(capture=True, autograph=True, target="mlir")
+@qp.qjit(capture=True, collect_decomp_rules=False, autograph=True, target="mlir")
 @qp.qnode(qp.device("null.qubit", wires=3))
 def test_if_basic(i: int, angle: float):
     """
@@ -475,7 +475,7 @@ print(test_if_basic.mlir)
 
 
 # CHECK: func.func public @test_if_nested(%arg0: tensor<i64>, %arg1: tensor<f64>) -> tensor<8xcomplex<f64>>
-@qp.qjit(capture=True, autograph=True, target="mlir")
+@qp.qjit(capture=True, collect_decomp_rules=False, autograph=True, target="mlir")
 @qp.qnode(qp.device("null.qubit", wires=3))
 def test_if_nested(i: int, angle: float):
     """
@@ -529,7 +529,7 @@ print(test_if_nested.mlir)
 
 
 # CHECK: func.func public @test_if_with_dynamic_shapes(%arg0: tensor<i64>) -> tensor<8xcomplex<f64>>
-@qp.qjit(capture=True, autograph=True, target="mlir")
+@qp.qjit(capture=True, collect_decomp_rules=False, autograph=True, target="mlir")
 @qp.qnode(qp.device("null.qubit", wires=3))
 def test_if_with_dynamic_shapes(i: int):
     """
@@ -588,7 +588,7 @@ print(test_if_with_dynamic_shapes.mlir)
 
 
 # CHECK: func.func public @test_if_with_dynamic_allocation(%arg0: tensor<i64>) -> tensor<8xcomplex<f64>>
-@qp.qjit(capture=True, autograph=True, target="mlir")
+@qp.qjit(capture=True, collect_decomp_rules=False, autograph=True, target="mlir")
 @qp.qnode(qp.device("null.qubit", wires=3))
 def test_if_with_dynamic_allocation(i: int):
     """
@@ -649,7 +649,7 @@ print(test_if_with_dynamic_allocation.mlir)
 
 
 # CHECK: func.func public @test_measurement_result_as_cond() -> tensor<8xcomplex<f64>>
-@qp.qjit(capture=True, autograph=True, target="mlir")
+@qp.qjit(capture=True, collect_decomp_rules=False, autograph=True, target="mlir")
 @qp.qnode(qp.device("null.qubit", wires=3))
 def test_measurement_result_as_cond():
     """
@@ -681,7 +681,7 @@ print(test_measurement_result_as_cond.mlir)
 
 
 # CHECK: func.func public @test_measurement_with_reset() -> tensor<8xcomplex<f64>>
-@qp.qjit(capture=True, autograph=True, target="mlir")
+@qp.qjit(capture=True, collect_decomp_rules=False, autograph=True, target="mlir")
 @qp.qnode(qp.device("null.qubit", wires=3))
 def test_measurement_with_reset():
     """

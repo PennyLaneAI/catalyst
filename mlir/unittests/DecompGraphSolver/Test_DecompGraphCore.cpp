@@ -96,7 +96,7 @@ TEST_CASE("Test WeightedGateset construction and contains", "[DecompGraph::Core]
     const OperatorNode cnot{"CNOT[][2]{}", "CNOT"};
     const OperatorNode rx{"RX[f64][1]{}", "RX"};
 
-    const WeightedGateset gateset{{{"Hadamard", 1.0}, {"CNOT", 2.0}}};
+    const WeightedGateset gateset{{{h.name, 1.0}, {cnot.name, 2.0}}};
 
     REQUIRE(gateset.contains(h));
     REQUIRE(gateset.contains(cnot));

@@ -17,6 +17,7 @@ of quantum operations to reference semantics JAXPR.
 """
 
 # pylint: disable=unused-argument
+import numpy as np
 import pennylane as qp
 from jax._src.lib.mlir import ir
 from jax.core import ShapedArray
@@ -38,10 +39,10 @@ from catalyst.decomposition.decomposition_rules import (
     fetch_all_reachable_decomposition_rules_from_op,
     inject_new_rules_into_module,
 )
-from catalyst.decomposition.graph_op_id import _SPECIAL_LOWERINGS
+from catalyst.decomposition.graph_op_id import _SPECIAL_LOWERINGS, build_graph_op_id
 from catalyst.decomposition.type_utils import (
-    convert_types_to_mlir_strings,
-    format_dynamic_params_for_id,
+    convert_item_to_mlir_type,
+    get_dummy_values_for_arg,
 )
 from catalyst.jax_extras.lowering import get_mlir_attribute_from_pyval
 from catalyst.jax_extras.patches import mock_attributes
@@ -245,13 +246,7 @@ def compile_decomp_rules(
     if is_custom_op:
         dynamic_shape = {str(i): ["f64"] for i in range(len(op_cls.dynamic_argnames))}
 
-        op_id = (
-            op_cls.__name__
-            + format_dynamic_params_for_id(dynamic_shape)
-            + "{"
-            + f"wires:{wire_lens[0]}"
-            + "}{}"
-        )
+        op_id = build_graph_op_id(op_cls.__name__, dynamic_shape, {"wires": wire_lens[0]}, {})
 
         decomp_rules = fetch_all_reachable_decomposition_rules_from_op(
             op_name=op_cls.__name__,
@@ -260,18 +255,13 @@ def compile_decomp_rules(
             wire_lens={"wires": wire_lens[0]},
             static_data={},
             is_custom_op=True,
+            op_cls=op_cls,
         )
 
     elif op_cls is qp.MultiRZ:
         dynamic_shape = {qp.MultiRZ.dynamic_argnames[0]: ["f64"]}
         wire_argname = qp.MultiRZ.wire_argnames[0]
-        op_id = (
-            "MultiRZ"
-            + format_dynamic_params_for_id(dynamic_shape)
-            + "{"
-            + f"{wire_argname}:{wire_lens[0]}"
-            + "}{}"
-        )
+        op_id = build_graph_op_id("MultiRZ", dynamic_shape, {wire_argname: wire_lens[0]}, {})
 
         decomp_rules = fetch_all_reachable_decomposition_rules_from_op(
             op_name="MultiRZ",
@@ -279,21 +269,18 @@ def compile_decomp_rules(
             dynamic_shape=dynamic_shape,
             wire_lens={f"{wire_argname}": wire_lens[0]},
             static_data={},
+            op_cls=op_cls,
         )
 
     elif op_cls is qp.PauliRot:
         dynamic_shape = {qp.PauliRot.dynamic_argnames[0]: ["f64"]}
         wire_argname = qp.PauliRot.wire_argnames[0]
         pauliword_argname = qp.PauliRot.compilable_argnames[0]
-        op_id = (
-            "PauliRot"
-            + format_dynamic_params_for_id(dynamic_shape)
-            + "{"
-            + f"{wire_argname}:{wire_lens[0]}"
-            + "}"
-            + "{"
-            + f"{pauliword_argname}:{repack_static_data[pauliword_argname]}"
-            + "}"
+        op_id = build_graph_op_id(
+            "PauliRot",
+            dynamic_shape,
+            {wire_argname: wire_lens[0]},
+            {pauliword_argname: repack_static_data[pauliword_argname]},
         )
 
         decomp_rules = fetch_all_reachable_decomposition_rules_from_op(
@@ -302,19 +289,17 @@ def compile_decomp_rules(
             dynamic_shape=dynamic_shape,
             wire_lens={f"{wire_argname}": wire_lens[0]},
             static_data=repack_static_data,
+            op_cls=op_cls,
         )
 
     elif op_cls is qp.PCPhase:
         dynamic_shape = {qp.PCPhase.dynamic_argnames[0]: ["f64"]}
         wire_argname = qp.PCPhase.wire_argnames[0]
-        op_id = (
-            "PCPhase"
-            + format_dynamic_params_for_id(dynamic_shape)
-            + "{"
-            + f"{wire_argname}:{wire_lens[0]}"
-            + "}{"
-            + f"dim:{repack_static_data["dim"]}"
-            + "}"
+        op_id = build_graph_op_id(
+            "PCPhase",
+            dynamic_shape,
+            {wire_argname: wire_lens[0]},
+            {"dim": repack_static_data["dim"]},
         )
 
         decomp_rules = fetch_all_reachable_decomposition_rules_from_op(
@@ -323,11 +308,12 @@ def compile_decomp_rules(
             dynamic_shape=dynamic_shape,
             wire_lens={f"{wire_argname}": wire_lens[0]},
             static_data=repack_static_data,
+            op_cls=op_cls,
         )
 
     elif op_cls is qp.GlobalPhase:
         dynamic_shape = {qp.GlobalPhase.dynamic_argnames[0]: ["f64"]}
-        op_id = "GlobalPhase" + format_dynamic_params_for_id(dynamic_shape) + "{}{}"
+        op_id = build_graph_op_id("GlobalPhase", dynamic_shape, {}, {})
 
         decomp_rules = fetch_all_reachable_decomposition_rules_from_op(
             op_name="GlobalPhase",
@@ -335,64 +321,27 @@ def compile_decomp_rules(
             dynamic_shape=dynamic_shape,
             wire_lens={},
             static_data={},
+            op_cls=op_cls,
         )
 
-    elif op_cls is qp.BasisState:
-        # TODO: qp.BasisState decomp rule calls allclose, but the current infra cannot support
-        # rules that call other funcops
-        # When the above is implemented, uncomment the BasisState decomp rule collection impl below
-        op_id = ""
-        decomp_rules = []
-
-        # # qp.BasisState has the same number of booleans as the number of wires
-        # num_wires = wire_lens[0]
-        # dynamic_shape = {qp.BasisState.dynamic_argnames[0]: ["i64"] * num_wires}
-        # wire_argname = qp.BasisState.wire_argnames[0]
-        # op_id = (
-        #     "BasisState"
-        #     + format_dynamic_params_for_id(dynamic_shape)
-        #     + "{"
-        #     + f"{wire_argname}:{num_wires}"
-        #     + "}{}"
-        # )
-
-        # decomp_rules = fetch_all_reachable_decomposition_rules_from_op(
-        #     op_name="BasisState",
-        #     op_id=op_id,
-        #     dynamic_shape=dynamic_shape,
-        #     wire_lens={f"{wire_argname}": num_wires},
-        #     static_data={},
-        # )
-
     elif op_cls is qp.QubitUnitary:
-        # TODO: qp.QubitUnitary decomp rule calls det, but the current infra cannot support
-        # rules that call other funcops
-        # When the above is implemented, uncomment the Unitary decomp rule collection impl below
+        num_wires = wire_lens[0]
+        matrix_size = 2**num_wires
+        matrix_type = convert_item_to_mlir_type(
+            ShapedArray((matrix_size, matrix_size), np.complex128)
+        )
+        dynamic_shape = {qp.QubitUnitary.dynamic_argnames[0]: [matrix_type]}
+        wire_argname = qp.QubitUnitary.wire_argnames[0]
+        op_id = build_graph_op_id("QubitUnitary", dynamic_shape, {wire_argname: wire_lens[0]}, {})
 
-        op_id = ""
-        decomp_rules = []
-
-        # num_wires = wire_lens[0]
-        # matrix_size = 2**num_wires
-        # dynamic_shape = {
-        #     qp.QubitUnitary.dynamic_argnames[0]: [["complex<f64>"] * matrix_size] * matrix_size
-        # }
-        # wire_argname = qp.QubitUnitary.wire_argnames[0]
-        # op_id = (
-        #     "QubitUnitary"
-        #     + "[" + format_dynamic_params_for_id(dynamic_shape) + "]"
-        #     + "{"
-        #     + f"{wire_argname}:{wire_lens[0]}"
-        #     + "}{}"
-        # )
-
-        # decomp_rules = fetch_all_reachable_decomposition_rules_from_op(
-        #     op_name="QubitUnitary",
-        #     op_id=op_id,
-        #     dynamic_shape=dynamic_shape,
-        #     wire_lens={f"{wire_argname}": wire_lens[0]},
-        #     static_data={},
-        # )
+        decomp_rules = fetch_all_reachable_decomposition_rules_from_op(
+            op_name="QubitUnitary",
+            op_id=op_id,
+            dynamic_shape=dynamic_shape,
+            wire_lens={f"{wire_argname}": wire_lens[0]},
+            static_data={},
+            op_cls=op_cls,
+        )
 
     else:
         # Operator Op
@@ -408,7 +357,7 @@ def compile_decomp_rules(
 
         for dynamic_argname, param in zip(op_cls.dynamic_argnames, non_hybrid_params, strict=True):
             non_hybrid_dynamic_shape[dynamic_argname] = param.type
-        non_hybrid_dynamic_shape = convert_types_to_mlir_strings(non_hybrid_dynamic_shape)
+        non_hybrid_dynamic_shape = {k: [str(v)] for k, v in non_hybrid_dynamic_shape.items()}
 
         non_hybrid_wire_argnames = []
         for wire_argname in op_cls.wire_argnames:
@@ -428,19 +377,20 @@ def compile_decomp_rules(
         for hybrid_argname, hybrid_len, hybrid_tree in zip(
             op_cls.hybrid_argnames, hybrid_lens, hybrid_trees
         ):
-            replaced_leaves = []
-            for leaf in avals_in[hybrid_arg_start_idx : hybrid_arg_start_idx + hybrid_len]:
-                if isinstance(leaf, AbstractQubit):
-                    replaced_leaves.append(ShapedArray((), dtype=int))
-                else:
-                    replaced_leaves.append(leaf)
-
+            # Rebuild the hybrid argument around traceable dummy values rather than
+            # AbstractArray specs.
             with Patcher(
                 (AbstractArray, "__hash__", lambda x: id(x)),
             ):
-                replaced_leaves = abstractify(replaced_leaves)
-                unflattened = unflatten(replaced_leaves, hybrid_tree)
-                unflattened = abstractify(unflattened)
+                dummy_leaves = []
+                next_wire_label = 0
+                for leaf in avals_in[hybrid_arg_start_idx : hybrid_arg_start_idx + hybrid_len]:
+                    if isinstance(leaf, AbstractQubit):
+                        dummy_leaves.append(next_wire_label)
+                        next_wire_label += 1
+                    else:
+                        dummy_leaves.append(get_dummy_values_for_arg(leaf))
+                unflattened = unflatten(dummy_leaves, hybrid_tree)
             extra_data[hybrid_argname] = unflattened
             hybrid_arg_start_idx += hybrid_len
 
@@ -450,26 +400,25 @@ def compile_decomp_rules(
                 with_hybrid_dynamic_shape[named_attr.name] = [
                     params[idx].type for idx in named_attr.attr
                 ]
-            with_hybrid_dynamic_shape = convert_types_to_mlir_strings(with_hybrid_dynamic_shape)
+            with_hybrid_dynamic_shape = {
+                k: [str(item) for item in v] for k, v in with_hybrid_dynamic_shape.items()
+            }
 
         with_hybrid_wire_lens = {}
         if qubit_map is not None:
             for wire_attr in qubit_map:
                 with_hybrid_wire_lens[wire_attr.name] = len(wire_attr.attr)
 
-        op_id = (
-            op_cls.__name__
-            + format_dynamic_params_for_id(dict(sorted(with_hybrid_dynamic_shape.items())))
-            + "{"
-            + ",".join(f"{name}:{shape}" for name, shape in sorted(with_hybrid_wire_lens.items()))
-            + "}"
+        identity_static_data = (
+            repack_static_data if not (op_cls.hybrid_argnames or op_cls.static_argnames) else {}
         )
-        if not (op_cls.hybrid_argnames or op_cls.static_argnames):
-            op_id += "{" + ",".join(f"{k}:{v}" for k, v in sorted(repack_static_data.items())) + "}"
-        else:
-            op_id += "{}"
-        if uid is not None:
-            op_id += f"[{str(uid)}]"
+        op_id = build_graph_op_id(
+            op_cls.__name__,
+            with_hybrid_dynamic_shape,
+            with_hybrid_wire_lens,
+            identity_static_data,
+            uid=uid,
+        )
 
         decomp_rules = fetch_all_reachable_decomposition_rules_from_op(
             op_name=op_cls.__name__,
@@ -478,6 +427,7 @@ def compile_decomp_rules(
             wire_lens=non_hybrid_wire_lens,
             static_data=repack_static_data,
             extra_data=extra_data,
+            op_cls=op_cls,
         )
 
     inject_new_rules_into_module(module, decomp_rules)
@@ -660,14 +610,6 @@ def _special_gphase_lowering(angle, *_, ctrl_qubits, ctrl_values, adjoint):
         ctrl_values=ctrl_values,
         adjoint=adjoint,
     )
-    return ()
-
-
-@_register_special_lowering(qp.BasisState)
-def _special_basis_state_lowering(state, *qubits, ctrl_qubits, ctrl_values, adjoint):
-    assert not ctrl_qubits and not ctrl_values, "ctrl(BasisState) is not supported."
-    assert not adjoint, "adjoint(BasisState) is not supported."
-    SetBasisStateOp(state, qubits)
     return ()
 
 

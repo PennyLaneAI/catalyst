@@ -588,11 +588,9 @@ class TestSignatureErrors:
     def test_incompatible_type_reachable_from_user_code(self):
         """Raise error message for incompatible types"""
 
-        with pytest.warns(UserWarning, match="AOT.*failed"):
-
-            @qjit
-            def f(x: str):
-                return
+        @qjit
+        def f(x: str):
+            return
 
         with pytest.raises(TypeError, match="<class 'str'> is not a valid JAX type"):
             f("abc")
@@ -871,7 +869,7 @@ class TestDefaultAvailableIR:
         """Test that AbstractArray and AbstractWires can be used to specify the input
         shapes for AOT compilation."""
 
-        @qp.qjit(capture=True)
+        @qp.qjit(capture=True, collect_decomp_rules=False)
         @qp.qnode(qp.device("lightning.qubit", wires=4))
         def c(x: qp.typing.AbstractArray((3,), float), wires: qp.typing.Wire[4]):
             @qp.for_loop(x.shape[0])
@@ -933,7 +931,7 @@ class TestDefaultAvailableIR:
         # pylint: disable-next=import-outside-toplevel
         from catalyst.python_interface.transforms import iterative_cancel_inverses_pass
 
-        @qjit(capture=True)
+        @qjit(capture=True, collect_decomp_rules=False)
         @iterative_cancel_inverses_pass
         @qp.qnode(qp.device(backend, wires=1))
         def f():
@@ -1109,11 +1107,9 @@ class TestErrorNestedQNode:
             inner()
             return qp.state()
 
-        with pytest.warns(UserWarning, match="AOT.*failed"):
-
-            @qjit
-            def fn():
-                return outer()
+        @qjit
+        def fn():
+            return outer()
 
         with pytest.raises(CompileError):
 
@@ -1126,12 +1122,10 @@ class TestAOTFailures:
     def test_capture_failure(self):
         """Test a failure capturing the jaxpr."""
 
-        with pytest.warns(UserWarning, match="AOT.*failed"):
-
-            @qp.qjit(capture=True)
-            @qp.qnode(qp.device("null.qubit", wires=1))
-            def c():
-                raise ValueError
+        @qp.qjit(capture=True, collect_decomp_rules=False)
+        @qp.qnode(qp.device("null.qubit", wires=1))
+        def c():
+            raise ValueError
 
         assert c.jaxpr is None
 
@@ -1145,25 +1139,21 @@ class TestAOTFailures:
         def f():
             return []
 
-        with pytest.warns(UserWarning, match="AOT.*failed"):
-
-            @qp.qjit(capture=True)
-            def c():
-                dummy_p.bind()
-                return 2
+        @qp.qjit(capture=True, collect_decomp_rules=False)
+        def c():
+            dummy_p.bind()
+            return 2
 
         assert c.jaxpr.eqns[0].primitive == dummy_p
 
     def test_llvm_generation_failure(self):
         """Test a failure lowering to llvmir."""
 
-        with pytest.warns(UserWarning, match="AOT.*failed"):
-
-            @qp.qjit(capture=True)
-            @qp.qnode(qp.device("null.qubit", wires=1))
-            def c():
-                qp.RX(qp.capture.symbolic_array((), float), 0)
-                return qp.probs(wires=0)
+        @qp.qjit(capture=True, collect_decomp_rules=False)
+        @qp.qnode(qp.device("null.qubit", wires=1))
+        def c():
+            qp.RX(qp.capture.symbolic_array((), float), 0)
+            return qp.probs(wires=0)
 
         assert c.mlir
         assert "RX" in c.mlir

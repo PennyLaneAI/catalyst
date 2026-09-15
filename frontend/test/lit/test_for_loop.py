@@ -56,3 +56,22 @@ def loop_circuit(n: int, inc: float):
 
 
 print(loop_circuit.mlir)
+
+
+# The `estimated_iterations` hint is attached as an f64 `catalyst.estimated_iterations`
+# attribute on the emitted `scf.for`.
+# CHECK-LABEL: @jit_loop_estimated_iterations
+@qjit(target="mlir")
+@qp.qnode(qp.device("lightning.qubit", wires=1))
+def loop_estimated_iterations(n: int):
+    # CHECK:       scf.for
+    # CHECK:       catalyst.estimated_iterations = 5.000000e+00
+    @for_loop(0, n, 1, estimated_iterations=5)
+    def loop_fn(i):
+        qp.PauliX(wires=0)
+
+    loop_fn()
+    return qp.state()
+
+
+print(loop_estimated_iterations.mlir)

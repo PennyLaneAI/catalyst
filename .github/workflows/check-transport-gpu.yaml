@@ -104,7 +104,7 @@ jobs:
           C_COMPILER=$(which gcc) \
           CXX_COMPILER=$(which g++) \
           RT_BUILD_DIR="$(pwd)/runtime-build" \
-          LLVM_DIR="$(pwd)/mlir/llvm-project" \
+          LLVM_SRC_DIR="$(pwd)/mlir/llvm-project" \
           ENABLE_TRANSPORT=ON \
           make runtime
 

@@ -30,7 +30,7 @@ pytestmark = pytest.mark.usefixtures("disable_capture")
 def circuit_aot_builder(dev):
     """Test AOT builder."""
 
-    @qjit(capture=True)
+    @qjit(capture=True, collect_decomp_rules=False)
     @qp.qnode(device=dev)
     def catalyst_circuit_aot(x: float):
         qp.Hadamard(wires=0)
@@ -73,7 +73,7 @@ def test_transforms_must_have_pass_name():
         return qp.state()
 
     with pytest.raises(ValueError, match="<transform: some_transform> does not have a pass_name"):
-        qp.qjit(c, capture=True)()
+        qp.qjit(c, capture=True, collect_decomp_rules=False)()
 
 
 # pylint: disable=too-many-public-methods
@@ -155,7 +155,7 @@ class TestCapture:
 
         # Capture enabled
 
-        @qjit(capture=True)
+        @qjit(capture=True, collect_decomp_rules=False)
         @qp.qnode(device=dev)
         def captured_circuit(x):
             qp.Hadamard(wires=0)
@@ -198,7 +198,7 @@ class TestCapture:
 
         # Capture enabled
 
-        @qjit(capture=True)
+        @qjit(capture=True, collect_decomp_rules=False)
         @qp.qnode(dev)
         def captured_circuit(_basis_state):
             qp.BasisState(_basis_state, wires=list(range(n_wires)))
@@ -234,7 +234,7 @@ class TestCapture:
 
         # Capture enabled
 
-        @qjit(capture=True)
+        @qjit(capture=True, collect_decomp_rules=False)
         @qp.qnode(dev)
         def captured_circuit(init_state):
             qp.StatePrep(init_state, wires=list(range(n_wires)))
@@ -264,7 +264,7 @@ class TestCapture:
 
         # Capture enabled
 
-        @qjit(capture=True)
+        @qjit(capture=True, collect_decomp_rules=False)
         @qp.qnode(device)
         def captured_circuit(theta, val):
             qp.adjoint(qp.RY)(jnp.pi, val)
@@ -291,7 +291,7 @@ class TestCapture:
 
         # Capture enabled
 
-        @qjit(capture=True)
+        @qjit(capture=True, collect_decomp_rules=False)
         @qp.qnode(device)
         def captured_circuit(theta):
             qp.ctrl(qp.RX(theta, wires=0), control=[1], control_values=[False])
@@ -329,7 +329,7 @@ class TestCapture:
             qp.ctrl(qp.PCPhase, control=[1], control_values=[False])(theta, dim=2, wires=[0])
             return qp.state()
 
-        capture_result = qjit(circuit, capture=True)(theta)
+        capture_result = qjit(circuit, capture=True, collect_decomp_rules=False)(theta)
 
         # Capture disabled
 
@@ -349,7 +349,7 @@ class TestCapture:
         """
         device = qp.device(backend, wires=1)
 
-        @qjit(capture=True)
+        @qjit(capture=True, collect_decomp_rules=False)
         @qp.qnode(device)
         def captured_circuit():
             op(wires=0)
@@ -367,7 +367,7 @@ class TestCapture:
         """
         device = qp.device(backend, wires=1)
 
-        @qjit(capture=True)
+        @qjit(capture=True, collect_decomp_rules=False)
         @qp.qnode(device)
         def captured_circuit():
             qp.H(wires=0)
@@ -387,7 +387,7 @@ class TestCapture:
         """
         device = qp.device(backend, wires=1)
 
-        @qjit(capture=True, autograph=True)
+        @qjit(capture=True, collect_decomp_rules=False, autograph=True)
         @qp.qnode(device)
         def captured_circuit():
             m = qp.measure(wires=0)
@@ -405,7 +405,7 @@ class TestCapture:
 
         # Capture enabled
 
-        @qjit(capture=True)
+        @qjit(capture=True, collect_decomp_rules=False)
         @qp.qnode(qp.device(backend, wires=4))
         def captured_circuit(x):
 
@@ -438,7 +438,7 @@ class TestCapture:
 
         # Capture enabled
 
-        @qjit(capture=True)
+        @qjit(capture=True, collect_decomp_rules=False)
         @qp.qnode(qp.device(backend, wires=1))
         def captured_circuit(n, x):
 
@@ -477,7 +477,7 @@ class TestCapture:
 
         # Capture enabled
 
-        @qjit(capture=True)
+        @qjit(capture=True, collect_decomp_rules=False)
         @qp.qnode(qp.device(backend, wires=4))
         def captured_circuit(n):
             # Input state: equal superposition
@@ -541,7 +541,7 @@ class TestCapture:
 
         # Capture enabled
 
-        @qjit(capture=True)
+        @qjit(capture=True, collect_decomp_rules=False)
         @qp.qnode(qp.device(backend, wires=1))
         def capturted_circuit(x: float):
 
@@ -593,7 +593,7 @@ class TestCapture:
 
         # Capture enabled
 
-        @qjit(capture=True)
+        @qjit(capture=True, collect_decomp_rules=False)
         @qp.qnode(qp.device(backend, wires=1))
         def captured_circuit(x: float, step: float):
 
@@ -640,7 +640,7 @@ class TestCapture:
 
         # Capture enabled
 
-        @qjit(capture=True)
+        @qjit(capture=True, collect_decomp_rules=False)
         @qp.qnode(qp.device(backend, wires=1))
         def captured_circuit(x: float, y: float):
 
@@ -701,7 +701,7 @@ class TestCapture:
 
         # Capture enabled
 
-        @qjit(capture=True)
+        @qjit(capture=True, collect_decomp_rules=False)
         @qp.qnode(qp.device(backend, wires=1))
         def captured_circuit(x: float):
 
@@ -742,7 +742,7 @@ class TestCapture:
 
         # Capture enabled
 
-        @qjit(capture=True)
+        @qjit(capture=True, collect_decomp_rules=False)
         @qp.qnode(qp.device(backend, wires=1))
         def captured_circuit(x: float):
 
@@ -778,7 +778,7 @@ class TestCapture:
 
         # Capture enabled
 
-        @qjit(capture=True)
+        @qjit(capture=True, collect_decomp_rules=False)
         @qp.qnode(qp.device(backend, wires=1))
         def captured_circuit(x: float):
 
@@ -824,7 +824,7 @@ class TestCapture:
 
         # Capture enabled
 
-        @qjit(capture=True)
+        @qjit(capture=True, collect_decomp_rules=False)
         @qp.qnode(qp.device(backend, wires=1))
         def captured_circuit(x: float):
 
@@ -870,7 +870,7 @@ class TestCapture:
 
         # Capture enabled
 
-        @qjit(capture=True)
+        @qjit(capture=True, collect_decomp_rules=False)
         @qp.qnode(qp.device(backend, wires=1))
         def captured_circuit(x: float):
 
@@ -915,7 +915,7 @@ class TestCapture:
 
         # Capture enabled
 
-        @qjit(capture=True)
+        @qjit(capture=True, collect_decomp_rules=False)
         @qp.qnode(qp.device(backend, wires=1))
         def captured_circuit(x: float, y: float):
 
@@ -971,7 +971,7 @@ class TestCapture:
 
         # Capture enabled
 
-        @qjit(capture=True)
+        @qjit(capture=True, collect_decomp_rules=False)
         @qp.qnode(qp.device(backend, wires=1))
         def captured_circuit(x: float):
 
@@ -1001,7 +1001,7 @@ class TestCapture:
 
         my_pass = qp.transform(pass_name="my-pass", setup_inputs=my_pass_setup_inputs)
 
-        @qjit(target="mlir", capture=True)
+        @qjit(target="mlir", capture=True, collect_decomp_rules=False)
         @partial(my_pass, my_option="my_option_value", my_other_option=False)
         @qp.qnode(qp.device(backend, wires=1))
         def captured_circuit():
@@ -1019,7 +1019,7 @@ class TestCapture:
 
         my_pass = qp.transform(pass_name="my-pass")
 
-        @qjit(target="mlir", capture=True)
+        @qjit(target="mlir", capture=True, collect_decomp_rules=False)
         @partial(my_pass, my_option="my_option_value", my_other_option=False)
         @qp.qnode(qp.device(backend, wires=1))
         def captured_circuit():
@@ -1037,7 +1037,7 @@ class TestCapture:
 
         # Capture enabled
 
-        @qjit(capture=True)
+        @qjit(capture=True, collect_decomp_rules=False)
         @qp.transforms.cancel_inverses
         @qp.qnode(qp.device(backend, wires=1))
         def captured_circuit(x: float):
@@ -1067,7 +1067,7 @@ class TestCapture:
 
         # Capture enabled
 
-        @qjit(capture=True)
+        @qjit(capture=True, collect_decomp_rules=False)
         @qp.transforms.merge_rotations
         @qp.qnode(qp.device(backend, wires=1))
         def captured_circuit(x: float):
@@ -1109,6 +1109,7 @@ class TestCapture:
         captured_inverses_rotations = qjit(
             qp.transforms.cancel_inverses(qp.transforms.merge_rotations(captured_circuit)),
             capture=True,
+            collect_decomp_rules=False,
         )
         captured_inverses_rotations_result = captured_inverses_rotations(0.1)
         assert has_catalyst_transforms(captured_inverses_rotations.mlir)
@@ -1116,6 +1117,7 @@ class TestCapture:
         captured_rotations_inverses = qjit(
             qp.transforms.merge_rotations(qp.transforms.cancel_inverses(captured_circuit)),
             capture=True,
+            collect_decomp_rules=False,
         )
         captured_rotations_inverses_result = captured_rotations_inverses(0.1)
         assert has_catalyst_transforms(captured_rotations_inverses.mlir)
@@ -1148,7 +1150,7 @@ class TestCapture:
     def test_transform_graph_decompose_workflow(self, backend):
         """Test the integration for a circuit with a 'decompose' graph transform."""
 
-        @qjit(capture=True)
+        @qjit(capture=True, collect_decomp_rules=False)
         @partial(qp.transforms.decompose, gate_set=[qp.RX, qp.RY, qp.RZ])
         @qp.qnode(qp.device(backend, wires=2))
         def captured_circuit(x: float, y: float, z: float):
@@ -1188,7 +1190,7 @@ class TestCapture:
 
         # Capture enabled
 
-        @qjit(capture=True)
+        @qjit(capture=True, collect_decomp_rules=False)
         @qp.set_shots(10)
         @qp.qnode(qp.device(backend, wires=2))
         def captured_circuit():
@@ -1223,7 +1225,7 @@ class TestCapture:
         """Test the integration for a circuit with a static variable."""
 
         # Basic test
-        @qjit(capture=True, static_argnums=(0,))
+        @qjit(capture=True, collect_decomp_rules=False, static_argnums=(0,))
         @qp.qnode(qp.device(backend, wires=1))
         def captured_circuit_1(x, y):
             qp.RX(x, wires=0)
@@ -1237,7 +1239,7 @@ class TestCapture:
         assert "%cst = arith.constant 2.0" not in captured_circuit_1_mlir
 
         # Test that qjit static_argnums takes precedence over the one on the qnode
-        @qjit(capture=True, static_argnums=1)
+        @qjit(capture=True, collect_decomp_rules=False, static_argnums=1)
         @qp.qnode(qp.device(backend, wires=1), static_argnums=0)  # should be ignored
         def captured_circuit_2(x, y):
             qp.RX(x, wires=0)
@@ -1253,7 +1255,7 @@ class TestCapture:
         assert jnp.allclose(result_1, result_2)
 
         # Test under a non qnode workflow function
-        @qjit(capture=True, static_argnums=(0,))
+        @qjit(capture=True, collect_decomp_rules=False, static_argnums=(0,))
         def workflow(x, y):
             @qp.qnode(qp.device(backend, wires=1))
             def c():
@@ -1286,7 +1288,7 @@ class TestControlFlow:
             qp.RX(x, 0)
             return qp.expval(qp.Z(0))
 
-        @qjit(capture=True)
+        @qjit(capture=True, collect_decomp_rules=False)
         def f(i0):
             @qp.for_loop(start, stop, step)
             def g(i, x):
@@ -1305,7 +1307,7 @@ class TestControlFlow:
             qp.RX(x, 0)
             return qp.expval(qp.Z(0))
 
-        @qjit(capture=True)
+        @qjit(capture=True, collect_decomp_rules=False)
         def f(x):
 
             const = jnp.array([0, 1, 2])
@@ -1326,7 +1328,7 @@ class TestControlFlow:
         """This tests for kinda a weird edge case bug where the consts where getting
         reordered when translating the inner jaxpr."""
 
-        @qjit(capture=True)
+        @qjit(capture=True, collect_decomp_rules=False)
         @qp.qnode(qp.device("lightning.qubit", wires=3))
         def circuit(x, n):
             @qp.for_loop(3)
@@ -1353,7 +1355,7 @@ class TestControlFlow:
     def test_for_loop_consts_outside_qnode(self):
         """Similar test as above for weird edge case, but not using a qnode."""
 
-        @qjit(capture=True)
+        @qjit(capture=True, collect_decomp_rules=False)
         def f(x, n):
             @qp.for_loop(3)
             def outer(i, a):
@@ -1377,7 +1379,7 @@ def test_adjoint_transform_integration():
         qp.IsingXX(2 * x, wires=(0, 1))
         qp.H(0)
 
-    @qjit(capture=True)
+    @qjit(capture=True, collect_decomp_rules=False)
     @qp.qnode(qp.device("lightning.qubit", wires=3))
     def c(x):
         qp.adjoint(f)(x)
@@ -1397,7 +1399,7 @@ def test_ctrl_transform_integration(separate_funcs):
         qp.RY(3 * y, wires=3)
         qp.RX(2 * x, wires=3)
 
-    @qjit(capture=True)
+    @qjit(capture=True, collect_decomp_rules=False)
     @qp.qnode(qp.device("lightning.qubit", wires=4))
     def c(x, y):
         qp.X(1)
@@ -1427,7 +1429,7 @@ def test_different_static_argnums():
             qp.RZ(x, 0)
         return qp.state()
 
-    @qjit(capture=True)
+    @qjit(capture=True, collect_decomp_rules=False)
     def w(x):
         return c(x, "X"), c(x, "Y"), c(x, "Z")
 

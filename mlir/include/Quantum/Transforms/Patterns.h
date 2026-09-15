@@ -31,10 +31,12 @@ namespace quantum {
 mlir::Value getGlobalString(mlir::Location loc, mlir::OpBuilder &rewriter, mlir::StringRef key,
                             mlir::StringRef value, mlir::ModuleOp mod);
 
+void populateResolveGateLevelAdjointPatterns(mlir::RewritePatternSet &);
 void populateGridsynthPatterns(mlir::RewritePatternSet &patterns, double epsilon, bool pprBasis);
 void populateQIRConversionPatterns(mlir::TypeConverter &, mlir::RewritePatternSet &, bool);
 void populateCancelInversesPatterns(mlir::RewritePatternSet &);
 void populateMergeRotationsPatterns(mlir::RewritePatternSet &);
+void populateResolveStatePrepOperatorPatterns(mlir::RewritePatternSet &);
 void populateIonsDecompositionPatterns(mlir::RewritePatternSet &);
 void populateDecomposeLoweringPatterns(mlir::RewritePatternSet &,
                                        const llvm::StringMap<mlir::func::FuncOp> &,

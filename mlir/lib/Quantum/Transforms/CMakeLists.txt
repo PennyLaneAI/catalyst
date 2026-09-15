@@ -7,9 +7,11 @@ file(GLOB SRC
     AdjointLowering/ForwardPass.cpp
     AdjointLowering/QuantumCache.cpp
     AdjointLowering/ReversePass.cpp
+    AdjointLowering/ResolveGateLevelAdjoint.cpp
     BufferizableOpInterfaceImpl.cpp
     CancelInversesPatterns.cpp
     CtrlLowering/CtrlLowering.cpp
+    RemoveGlobalPhasesPass.cpp
     ConversionPatterns.cpp
     GraphDecomposition/DecompUtils.cpp
     GraphDecomposition/DecomposeLoweringPatterns.cpp
@@ -34,6 +36,7 @@ file(GLOB SRC
     merge_rotation.cpp
     quantum_to_llvm.cpp
     reference_semantics_conversion.cpp
+    resolve_state_prep_operator.cpp
     split_non_commuting.cpp
     split_to_single_terms.cpp
 )

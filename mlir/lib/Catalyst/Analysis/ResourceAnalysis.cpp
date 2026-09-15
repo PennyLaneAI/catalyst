@@ -189,16 +189,18 @@ void ResourceAnalysis::analyzeForLoop(scf::ForOp forOp, ResourceResult &result, 
     analyzeRegion(forOp.getBodyRegion(), bodyResult, isAdjoint);
 
     // Try to resolve a static trip count.
-    std::optional<double> tripCount = resolveForLoopTripCount(forOp);
-
-    if (tripCount.has_value()) {
+    auto tripCount = resolveForLoopTripCount(forOp);
+    if (!tripCount) {
+        tripCount = resolveDirectNestedForLoopAverageTripCount(forOp);
+    }
+    if (tripCount) {
         // Record the loop body under a new name (for_loop_1, …).
         // The parent stores how many times the loop runs.
         // Later, classical ops from that body are added into the parent, multiplied by that count.
         // The name is always new, so we don't overwrite an old entry.
         std::string name = makeUniqueSyntheticName("for_loop_", forLoopCounter);
         funcResults[name] = std::move(bodyResult);
-        result.functionCalls[name] = tripCount.value();
+        result.functionCalls[name] = *tripCount;
         return;
     }
 

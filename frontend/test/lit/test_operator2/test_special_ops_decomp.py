@@ -13,14 +13,16 @@
 """
 Test decomposition rules registered on the special operations are correctly generated.
 
-There are 5 special operators that do not lower to CustomOp or OperatorOp in MLIR, and instead lower
-to their own operations:
+There are a few special operators that do not lower to CustomOp or OperatorOp in MLIR, and instead
+lower to their own operations:
 - MultiRZ
 - PauliRot
 - GlobalPhase
 - PCPhase
-- QubitUnitary (TODO: cannot yet lower rules that call helper functions)
-- BasisState (TODO: cannot yet lower rules that call helper functions)
+- QubitUnitary
+
+On top of the above, we also explicitly test the lowering of some operations in PennyLane:
+- BasisState
 """
 
 # RUN: %PYTHON %s | FileCheck %s
@@ -28,6 +30,7 @@ to their own operations:
 # pylint: disable = line-too-long,unused-argument
 
 import pennylane as qp
+from jax import numpy as jnp
 
 
 def test_multirz():
@@ -75,12 +78,12 @@ def test_paulirot():
 # CHECK: qref.paulirot ["X", "X"]({{%.+}}) {{%.+}}, {{%.+}} : !qref.bit, !qref.bit
 # CHECK: qref.paulirot ["Z"]({{%.+}}) {{%.+}} : !qref.bit
 # CHECK: qref.paulirot ["Y", "Z", "X"]({{%.+}}) {{%.+}}, {{%.+}}, {{%.+}} : !qref.bit, !qref.bit, !qref.bit
-# CHECK: func.func private @"__builtin__pauli_rot_decomposition_PauliRot{theta:[f64]}{wires:2}{pauli_word:XX}"
-# CHECK-SAME:   target_gate = "PauliRot{theta:[f64]}{wires:2}{pauli_word:XX}"
-# CHECK: func.func private @"__builtin__pauli_rot_decomposition_PauliRot{theta:[f64]}{wires:1}{pauli_word:Z}"
-# CHECK-SAME:   target_gate = "PauliRot{theta:[f64]}{wires:1}{pauli_word:Z}"
-# CHECK: func.func private @"__builtin__pauli_rot_decomposition_PauliRot{theta:[f64]}{wires:3}{pauli_word:YZX}"
-# CHECK-SAME:   target_gate = "PauliRot{theta:[f64]}{wires:3}{pauli_word:YZX}"
+# CHECK: func.func private @"__builtin__pauli_rot_decomposition_PauliRot{theta:[f64]}{wires:2}{pauli_word = \22XX\22}"
+# CHECK-SAME:   target_gate = "PauliRot{theta:[f64]}{wires:2}{pauli_word = \22XX\22}"
+# CHECK: func.func private @"__builtin__pauli_rot_decomposition_PauliRot{theta:[f64]}{wires:1}{pauli_word = \22Z\22}"
+# CHECK-SAME:   target_gate = "PauliRot{theta:[f64]}{wires:1}{pauli_word = \22Z\22}"
+# CHECK: func.func private @"__builtin__pauli_rot_decomposition_PauliRot{theta:[f64]}{wires:3}{pauli_word = \22YZX\22}"
+# CHECK-SAME:   target_gate = "PauliRot{theta:[f64]}{wires:3}{pauli_word = \22YZX\22}"
 test_paulirot()
 
 
@@ -102,11 +105,52 @@ def test_pcphase():
 # CHECK: func.func public @pcphase()
 # CHECK: qref.pcphase({{%.+}}, dim : 3) {{%.+}}, {{%.+}}, {{%.+}} : !qref.bit, !qref.bit, !qref.bit
 # CHECK: qref.pcphase({{%.+}}, dim : 0) {{%.+}} : !qref.bit
-# CHECK: func.func private @"__builtin__decompose_pcphase_PCPhase{phi:[f64]}{wires:3}{dim:3}"
-# CHECK-SAME:   target_gate = "PCPhase{phi:[f64]}{wires:3}{dim:3}"
-# CHECK: func.func private @"__builtin__decompose_pcphase_PCPhase{phi:[f64]}{wires:1}{dim:0}"
-# CHECK-SAME:   target_gate = "PCPhase{phi:[f64]}{wires:1}{dim:0}"
+# CHECK: func.func private @"__builtin__decompose_pcphase_PCPhase{phi:[f64]}{wires:3}{dim = 3 : i64}"
+# CHECK-SAME:   target_gate = "PCPhase{phi:[f64]}{wires:3}{dim = 3 : i64}"
+# CHECK: func.func private @"__builtin__decompose_pcphase_PCPhase{phi:[f64]}{wires:1}{dim = 0 : i64}"
+# CHECK-SAME:   target_gate = "PCPhase{phi:[f64]}{wires:1}{dim = 0 : i64}"
 test_pcphase()
+
+
+def test_qubit_unitary():
+    """
+    Test that decomposing qp.QubitUnitary works.
+    """
+
+    @qp.qjit(capture=True, target="mlir")
+    @qp.qnode(qp.device("null.qubit", wires=3))
+    def unitary():
+        qp.QubitUnitary(jnp.eye(2), wires=[0])
+        qp.QubitUnitary(jnp.eye(4), wires=[0, 1])
+        qp.QubitUnitary(jnp.eye(8), wires=[0, 1, 2])
+        return qp.state()
+
+    print(unitary.mlir)
+
+
+# CHECK: func.func public @unitary
+# CHECK: qref.unitary({{%.+}} : tensor<2x2xcomplex<f64>>)
+# CHECK: qref.unitary({{%.+}} : tensor<4x4xcomplex<f64>>)
+# CHECK: qref.unitary({{%.+}} : tensor<8x8xcomplex<f64>>)
+#
+# CHECK: func.func private @"__builtin_zyz_QubitUnitary{U:[tensor<2x2xcomplex<f64>>]}{wires:1}{}"
+# CHECK-SAME:   target_gate = "QubitUnitary{U:[tensor<2x2xcomplex<f64>>]}{wires:1}{}"
+#
+# CHECK: func.func private @"__builtin_zxz_QubitUnitary{U:[tensor<2x2xcomplex<f64>>]}{wires:1}{}"
+# CHECK-SAME:   target_gate = "QubitUnitary{U:[tensor<2x2xcomplex<f64>>]}{wires:1}{}"
+#
+# CHECK: func.func private @"__builtin_xzx_QubitUnitary{U:[tensor<2x2xcomplex<f64>>]}{wires:1}{}"
+# CHECK-SAME:   target_gate = "QubitUnitary{U:[tensor<2x2xcomplex<f64>>]}{wires:1}{}"
+#
+# CHECK: func.func private @"__builtin_xyx_QubitUnitary{U:[tensor<2x2xcomplex<f64>>]}{wires:1}{}"
+# CHECK-SAME:   target_gate = "QubitUnitary{U:[tensor<2x2xcomplex<f64>>]}{wires:1}{}"
+#
+# CHECK: func.func private @"__builtin_two_qubit_decomp_rule_QubitUnitary{U:[tensor<4x4xcomplex<f64>>]}{wires:2}{}"
+# CHECK-SAME:   target_gate = "QubitUnitary{U:[tensor<4x4xcomplex<f64>>]}{wires:2}{}"
+#
+# CHECK: func.func private @"__builtin_multi_qubit_decomp_rule_QubitUnitary{U:[tensor<8x8xcomplex<f64>>]}{wires:3}{}"
+# CHECK-SAME:   target_gate = "QubitUnitary{U:[tensor<8x8xcomplex<f64>>]}{wires:3}{}"
+test_qubit_unitary()
 
 
 def test_gphase():
@@ -127,3 +171,33 @@ def test_gphase():
 # CHECK: func.func public @gphase()
 # CHECK: qref.gphase
 test_gphase()
+
+
+def test_basis_state():
+    """
+    Test that decomposing qp.BasisState works.
+    """
+
+    @qp.qjit(capture=True, target="mlir")
+    @qp.qnode(qp.device("null.qubit", wires=3))
+    def basisstate():
+        qp.BasisState(jnp.array([0]), wires=[2])
+        qp.BasisState(jnp.array([1, 1]), wires=[0, 1])
+        return qp.state()
+
+    print(basisstate.mlir)
+
+
+# CHECK: func.func public @basisstate
+# CHECK: qref.operator "BasisState"({{%.+}}: tensor<1xi1>) qubits({{%.+}})
+# CHECK:   static_data = {}
+# CHECK:   param_map = {state = [0]} qubit_map = {wires = [0]}
+# CHECK: qref.operator "BasisState"({{%.+}}: tensor<2xi1>) qubits({{%.+}}, {{%.+}})
+# CHECK:   static_data = {}
+# CHECK:   param_map = {state = [0]} qubit_map = {wires = [0, 1]}
+#
+# CHECK: func.func private @"__builtin__basis_state_decomp_BasisState{state:[tensor<1xi1>]}{wires:1}{}"
+# CHECK-SAME:   target_gate = "BasisState{state:[tensor<1xi1>]}{wires:1}{}"
+# CHECK: func.func private @"__builtin__basis_state_decomp_BasisState{state:[tensor<2xi1>]}{wires:2}{}"
+# CHECK-SAME:   target_gate = "BasisState{state:[tensor<2xi1>]}{wires:2}{}"
+test_basis_state()
