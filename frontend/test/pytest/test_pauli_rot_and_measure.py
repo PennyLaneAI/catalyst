@@ -21,6 +21,7 @@ from pennylane.transforms import to_ppr
 
 import catalyst
 from catalyst import qjit
+from catalyst.utils.exceptions import CompileError
 
 
 def test_pauli_rot_lowering():
@@ -224,6 +225,63 @@ def test_controlled_pauli_rot_failure():
 
     with pytest.raises(RuntimeError, match="Controlled PauliRot is not supported"):
         workflow()
+
+
+def test_legacy_ppr_lowering():
+    """Test that PPR is lowered directly to pbc.ppr under capture=False."""
+    pipe = [("pipe", ["quantum-compilation-stage"])]
+
+    @qjit(pipelines=pipe, target="mlir", capture=False)
+    def test_legacy_ppr_lowering_workflow():
+
+        @qp.qnode(qp.device("null.qubit", wires=2))
+        def f():
+            qp.PPR(4, "XY", wires=[0, 1])
+            return qp.state()
+
+        return f()
+
+    optimized_ir = test_legacy_ppr_lowering_workflow.mlir_opt
+    assert 'pbc.ppr ["X", "Y"](4)' in optimized_ir
+    assert 'quantum.operator "PPR"' not in optimized_ir
+    assert 'quantum.custom "PPR"' not in optimized_ir
+
+
+def test_legacy_adjoint_ppr_lowering():
+    """Test that Adjoint(PPR) lowers to pbc.ppr with negated rotation_kind."""
+    pipe = [("pipe", ["quantum-compilation-stage"])]
+
+    @qjit(pipelines=pipe, target="mlir", capture=False)
+    def test_legacy_adjoint_ppr_lowering_workflow():
+
+        @qp.qnode(qp.device("null.qubit", wires=1))
+        def f():
+            qp.adjoint(qp.PPR(8, "X", wires=0))
+            return qp.state()
+
+        return f()
+
+    optimized_ir = test_legacy_adjoint_ppr_lowering_workflow.mlir_opt
+    assert 'pbc.ppr ["X"](-8)' in optimized_ir
+
+
+def test_legacy_controlled_ppr_unsupported():
+    """Test that Controlled(PPR) is rejected under capture=False."""
+    pipe = [("pipe", ["quantum-compilation-stage"])]
+
+    with pytest.raises(CompileError, match="(?:Controlled PPR is not supported|not controllable)"):
+
+        @qjit(pipelines=pipe, target="mlir", capture=False)
+        def test_legacy_controlled_ppr_unsupported_workflow():
+
+            @qp.qnode(qp.device("null.qubit", wires=2))
+            def f():
+                qp.ctrl(qp.PPR(4, "X", wires=0), control=1)
+                return qp.state()
+
+            return f()
+
+        test_legacy_controlled_ppr_unsupported_workflow()
 
 
 def test_legacy_pauli_rot_lowering():

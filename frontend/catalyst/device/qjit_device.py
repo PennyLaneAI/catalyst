@@ -284,6 +284,15 @@ def get_qjit_device_capabilities(target_capabilities: DeviceCapabilities) -> Dev
             }
         )
 
+    # Enable compiler-facing PPR ops (lowered directly to pbc.ppr under capture=False)
+    qjit_capabilities.operations.update(
+        {
+            "PPR": OperatorProperties(
+                invertible=True, controllable=False, differentiable=False
+            )
+        }
+    )
+
     # Enable runtime-powered snapshot of quantum state at any particular instance
     qjit_capabilities.operations.update(
         {"Snapshot": OperatorProperties(invertible=False, controllable=False, differentiable=False)}

@@ -99,6 +99,7 @@ from catalyst.jax_primitives import (
     namedobs_p,
     num_qubits_p,
     pauli_rot_p,
+    ppr_p,
     probs_p,
     qalloc_p,
     qdealloc_p,
@@ -850,6 +851,11 @@ def trace_quantum_operations(
         # For named-controlled operations (e.g. CNOT, CY, CZ) - bind directly by name. For
         # Controlled(OP) bind OP with native quantum control syntax, and similarly for Adjoint(OP).
         if type(op) in (Controlled, ControlledOp, ControlledOp2):
+            base = op.base
+            while isinstance(base, Adjoint):
+                base = base.base
+            if isinstance(base, qp.PPR):
+                raise CompileError("Controlled PPR is not supported.")
             return bind_native_operation(
                 qrp,
                 op.base,
@@ -902,6 +908,20 @@ def trace_quantum_operations(
             )
             qrp.insert(op.wires, qubits2[: len(qubits)])
             qrp.insert(controlled_wires, qubits2[len(qubits) :])
+        elif isinstance(op, qp.PPR):
+            if controlled_wires:
+                raise CompileError("Controlled PPR is not supported.")
+            qubits = qrp.extract(op.wires)
+            angle_denominator = op.compilable_args["angle_denominator"]
+            pauli_word = op.compilable_args["pauli_word"]
+            qubits2 = ppr_p.bind(
+                *qubits,
+                angle_denominator=angle_denominator,
+                pauli_word=pauli_word,
+                qubits_len=len(qubits),
+                adjoint=adjoint,
+            )
+            qrp.insert(op.wires, qubits2)
         else:
             qubits = qrp.extract(op.wires)
             controlled_qubits = qrp.extract(controlled_wires)

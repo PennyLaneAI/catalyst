@@ -287,6 +287,11 @@ def catalyst_acceptance(
         match = catalyst_acceptance(op.base, capabilities, grad_method)
         if match and is_controllable(op.base, capabilities):
             return match
+        # If the base is supported but not controllable, keep Controlled(base) intact so
+        # verify_operations can reject it. Otherwise Controlled(base) may be decomposed
+        # to QubitUnitary via its matrix (e.g. Controlled(PPR)).
+        if match:
+            return op.name
 
     elif is_supported(op, capabilities):
         return op.name

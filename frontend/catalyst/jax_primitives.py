@@ -90,7 +90,7 @@ with Patcher(
         VJPOp,
     )
     from mlir_quantum.dialects.mitigation import ZneOp
-    from mlir_quantum.dialects.pbc import PPMeasurementOp
+    from mlir_quantum.dialects.pbc import PPMeasurementOp, PPRotationOp
     from mlir_quantum.dialects.quantum import (
         AdjointOp,
         AllocOp,
@@ -307,6 +307,8 @@ pauli_rot_p = Primitive("pauli_rot")
 pauli_rot_p.multiple_results = True
 pauli_measure_p = Primitive("pauli_measure")
 pauli_measure_p.multiple_results = True
+ppr_p = Primitive("ppr")
+ppr_p.multiple_results = True
 measure_p = Primitive("measure")
 measure_p.multiple_results = True
 compbasis_p = Primitive("compbasis")
@@ -1695,6 +1697,69 @@ def _pauli_measure_lowering(
     from_elements_op = FromElementsOp(result_type, result)
 
     return (from_elements_op.results[0],) + tuple(out_qubits)
+
+
+#
+# PPR (Pauli product rotation) — direct pbc.ppr lowering for capture=False
+#
+@ppr_p.def_abstract_eval
+def _ppr_abstract_eval(*qubits, angle_denominator=None, pauli_word=None, qubits_len=0, adjoint=False):
+    qubits = qubits[:qubits_len]
+    assert all(isinstance(qubit, AbstractQbit) for qubit in qubits)
+    return (AbstractQbit(),) * qubits_len
+
+
+@ppr_p.def_impl
+def _ppr_def_impl(*args, **kwargs):  # pragma: no cover
+    raise NotImplementedError()
+
+
+def _ppr_lowering(
+    jax_ctx: mlir.LoweringRuleContext,
+    *qubits: tuple,
+    angle_denominator=None,
+    pauli_word=None,
+    qubits_len=0,
+    adjoint=False,
+):
+    ctx = jax_ctx.module_context.context
+    ctx.allow_unregistered_dialects = True
+
+    qubits = qubits[:qubits_len]
+    for q in qubits:
+        assert ir.OpaqueType.isinstance(q.type)
+        assert ir.OpaqueType(q.type).dialect_namespace == "quantum"
+        assert ir.OpaqueType(q.type).data == "bit"
+
+    assert angle_denominator is not None
+    assert pauli_word is not None
+
+    if angle_denominator not in (-8, -4, -2, 2, 4, 8):
+        raise ValueError(
+            "PPR angle_denominator must be one of ±2, ±4, ±8, "
+            f"but got {angle_denominator}."
+        )
+
+    if not all(p in ("I", "X", "Y", "Z") for p in pauli_word):
+        raise ValueError("Only Pauli words consisting of 'I', 'X', 'Y', and 'Z' are allowed.")
+
+    if len(pauli_word) != qubits_len:
+        raise ValueError(
+            "The number of wires must be equal to the length of the Pauli word. "
+            f"Got {qubits_len} wires and Pauli word of length {len(pauli_word)}."
+        )
+
+    pauli_product = ir.ArrayAttr.get([ir.StringAttr.get(p) for p in pauli_word])
+    rotation_kind = int(angle_denominator)
+    if adjoint:
+        rotation_kind = -rotation_kind
+
+    return PPRotationOp(
+        out_qubits=[q.type for q in qubits],
+        pauli_product=pauli_product,
+        rotation_kind=rotation_kind,
+        in_qubits=qubits,
+    ).results
 
 
 #
@@ -3145,6 +3210,7 @@ CUSTOM_LOWERING_RULES = (
     (unitary_p, _unitary_lowering),
     (pauli_rot_p, _pauli_rot_lowering),
     (pauli_measure_p, _pauli_measure_lowering),
+    (ppr_p, _ppr_lowering),
     (measure_p, _measure_lowering),
     (compbasis_p, _compbasis_lowering),
     (namedobs_p, _named_obs_lowering),
