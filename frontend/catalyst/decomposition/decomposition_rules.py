@@ -758,9 +758,7 @@ def build_rule_module(
     return inlined_module
 
 
-def collect_symbolic_resources(
-    op_cls, op_name, kwargs, is_custom_op, kind="adjoint", ctrl_wires=()
-):
+def collect_symbolic_resources(op_cls, op_name, kwargs, is_custom_op, *, kind, ctrl_wires=()):
     """Return resource data for the rules registered against ``Adjoint(op_name)``/``C(op_name)``.
 
     PennyLane names a controlled operator ``C(Op)`` whatever its control count, so the registry is
@@ -821,7 +819,8 @@ def compile_registered_symbolic_rules(
     extra_data=None,
     is_custom_op=False,
     op_cls=None,
-    kind="adjoint",
+    *,
+    kind,
     n_ctrl=1,
 ) -> ir.Operation | None:
     """Return the module of rules registered against ``Adjoint(op_name)``/``C(op_name)`` that follow
@@ -1356,7 +1355,7 @@ def fetch_all_reachable_decomposition_rules_from_op(
             resources |= {
                 (f"Adjoint({this_name})", name): res
                 for name, res in collect_symbolic_resources(
-                    this_op_cls, this_name, all_kwargs, this_is_custom_op
+                    this_op_cls, this_name, all_kwargs, this_is_custom_op, kind="adjoint"
                 )[2].items()
             }
 

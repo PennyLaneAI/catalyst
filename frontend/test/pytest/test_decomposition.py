@@ -652,7 +652,13 @@ class TestSymbolicRules:
         """Test ``self_adjoint`` rule on ``Adjoint(Hadamard)``."""
 
         module = compile_registered_symbolic_rules(
-            "Hadamard", "Adjoint(Hadamard){}{wires:1}{}", {}, {"wires": 1}, {}, op_cls=qp.Hadamard
+            "Hadamard",
+            "Adjoint(Hadamard){}{wires:1}{}",
+            {},
+            {"wires": 1},
+            {},
+            op_cls=qp.Hadamard,
+            kind="adjoint",
         )
         (rule,) = get_rule_strings_from_module(module)
 
@@ -673,6 +679,7 @@ class TestSymbolicRules:
             {},
             is_custom_op=True,
             op_cls=qp.RZ,
+            kind="adjoint",
         )
         (rule,) = get_rule_strings_from_module(module)
 
@@ -744,6 +751,7 @@ class TestSymbolicRules:
                     {"reg": 2},
                     {},
                     op_cls=NoParams,
+                    kind="adjoint",
                 )
                 is None
             )
@@ -754,7 +762,7 @@ class TestSymbolicRules:
 
         with pytest.raises(ValueError, match="operator class of 'Hadamard' is needed"):
             compile_registered_symbolic_rules(
-                "Hadamard", "Adjoint(Hadamard){}{wires:1}{}", {}, {"wires": 1}, {}
+                "Hadamard", "Adjoint(Hadamard){}{wires:1}{}", {}, {"wires": 1}, {}, kind="adjoint"
             )
 
 
