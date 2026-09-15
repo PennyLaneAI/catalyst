@@ -528,15 +528,20 @@ void handleIf(IRRewriter &builder, scf::IfOp ifOp, QubitValueTracker &tracker,
     });
 
     // Handle Else region
-    QubitValueTracker elseRegionTracker = tracker;
-    eraseSCFYieldQuantumOperands(cast<scf::YieldOp>(ifOp.getElseRegion().front().getTerminator()));
-    handleRegion(builder, ifOp.getElseRegion(), elseRegionTracker);
-    ifOp.getElseRegion().front().eraseArguments([](BlockArgument arg) {
-        return isa<quantum::QubitType, quantum::QuregType>(arg.getType());
-    });
+    bool hasElseBlock = !ifOp.getElseRegion().empty();
+    if (hasElseBlock) {
+        QubitValueTracker elseRegionTracker = tracker;
+        eraseSCFYieldQuantumOperands(
+            cast<scf::YieldOp>(ifOp.getElseRegion().front().getTerminator()));
+        handleRegion(builder, ifOp.getElseRegion(), elseRegionTracker);
+        ifOp.getElseRegion().front().eraseArguments([](BlockArgument arg) {
+            return isa<quantum::QubitType, quantum::QuregType>(arg.getType());
+        });
+    }
 
     // The else block is empty if the only remaining op is the mandatory scf.yield terminator
-    bool hasElseRegion = &(ifOp.elseBlock()->front()) != ifOp.elseBlock()->getTerminator();
+    bool hasElseRegion =
+        hasElseBlock && (&(ifOp.elseBlock()->front()) != ifOp.elseBlock()->getTerminator());
 
     // Collect classical returns of the old if op
     SmallVector<unsigned> classicalReturnIndices;
