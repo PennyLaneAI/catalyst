@@ -20,6 +20,8 @@ from typing import Any
 import jax.numpy as jnp
 import pennylane as qp
 from jax._src.lib.mlir import ir
+from pennylane.ops.op_math.adjoint2 import Adjoint2
+from pennylane.ops.op_math.controlled2 import ControlledOp2
 from pennylane.pytrees import flatten
 
 from catalyst.decomposition.type_utils import (
@@ -122,6 +124,7 @@ class GraphOpID:
         assert isinstance(
             op, qp.core.Operator2
         ), f"Graph-based decomposition expects an Operator2 instance, got {op} of type {type(op)}"
+        op, self.adjoint, self.num_controls = self.peel_modifiers(op)
         self.op = op
         self.is_custom_op = self.parse_is_custom_op()
 
@@ -130,6 +133,38 @@ class GraphOpID:
         self.wire_lens = self.parse_wire_lens()
         self.static_data = self.parse_static_data()
         self.extra_data, self.uid = self.parse_extra_data()
+
+    @staticmethod
+    def peel_modifiers(op: qp.core.Operator2):
+        """Return the innermost base of ``op`` together with the modifiers wrapping it.
+
+        A *generic* symbolic operator (``Adjoint2``/``ControlledOp2``, as opposed to a concrete
+        class such as ``CH``) reports its wrapper's own arguments, e.g.
+        ``Adjoint(S){}{}{}[1141126509488406748]``. That is not how the compiler spells a modified
+        operator: ``wrapModifiers`` folds the modifier into the *base* operator's id. So the
+        wrappers are peeled off here and counted, and :meth:`getGraphOpId` puts them back in
+        canonical position (control outermost) rather than splicing them into a finished id.
+
+        The walk terminates structurally: each step moves to ``op.base``, one wrapper shallower,
+        and the chain ends at the first non-symbolic operator.
+
+        Args:
+            op (Operator2): the operator to unwrap
+
+        Returns:
+            Operator2: the innermost base operator
+            bool: whether the base is adjointed
+            int: how many controls wrap the base
+        """
+        adjoint, num_controls = False, 0
+        while True:
+            if isinstance(op, Adjoint2):
+                adjoint = not adjoint
+            elif isinstance(op, ControlledOp2):
+                num_controls += len(op.control_wires)
+            else:
+                return op, adjoint, num_controls
+            op = op.base
 
     def parse_dynamic_shape(self) -> dict:
         """Return a dictionary of dynamic arg names to list of dtypes."""
@@ -216,13 +251,8 @@ class GraphOpID:
         """Return the name of the operator."""
         return self.operator_name
 
-    def getGraphOpId(self, adjoint: bool = False, num_controls: int = 0) -> str:
-        """
-        Return the GraphOpId as a string.
-
-        NOTE: do not modify this method without also modifying the corresponding DecomposableGate
-        interface in MLIR.
-        """
+    def _build_id(self, adjoint: bool, num_controls: int) -> str:
+        """Return the GraphOpId of the base operator under the given modifiers."""
         uid = None
         if self.extra_data:
             assert self.uid >= 0, f"Failed to compute UID for operator {self.op}"
@@ -236,3 +266,23 @@ class GraphOpID:
             num_controls=num_controls,
             uid=uid,
         )
+
+    def getGraphOpId(self, adjoint: bool = False, num_controls: int = 0) -> str:
+        """
+        Return the GraphOpId as a string.
+
+        The arguments are the modifiers the *caller* applies on top of the operator, e.g. a rule
+        being distributed over adjoint. They compose with the modifiers the operator carries
+        itself, so an already-symbolic operator spells canonically instead of being wrapped twice.
+
+        NOTE: do not modify this method without also modifying the corresponding DecomposableGate
+        interface in MLIR.
+        """
+        return self._build_id(adjoint != self.adjoint, num_controls + self.num_controls)
+
+    def getBaseGraphOpId(self) -> str:
+        """Return the GraphOpId of the base operator alone, leaving off the modifiers wrapping it.
+
+        The base is what owns the decomposition rules, so this is the id to look them up under.
+        """
+        return self._build_id(False, 0)
