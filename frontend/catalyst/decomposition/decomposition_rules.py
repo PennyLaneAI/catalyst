@@ -445,7 +445,7 @@ def _rule_is_applicable(rule, *args, **kwargs) -> bool:
         return bool(rule.is_applicable(*args, **kwargs))
     except Exception as e:  # pylint: disable=broad-except
         warnings.warn(
-            f"Failed to check whether the {rule.name} decomposition rule applies: {e}",
+            f"Excluded the {rule.name} decomposition rule for {op_name}; raised '{e}'",
             category=RuleLoweringWarning,
         )
         return False
