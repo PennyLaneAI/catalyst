@@ -524,6 +524,8 @@ class TestTraceTime:
         assert 'target_gate = "NoParams{}{reg:2}{}"' in mlir
         assert 'target_gate = "Adjoint(NoParams){}{reg:2}{}"' not in mlir
 
+    # NOTE: This is not a lit test as we need to verify that no warnings
+    # come from the inapplicable rule below.
     def test_work_wire_rule_that_doesnt_apply_lowers_without_warning(self, recwarn):
         """Tests the whole trace-time path: capture, id generation, and rule
         lowering for an operator whose cheaper rule needs two borrowed work wires lowers cleanly
