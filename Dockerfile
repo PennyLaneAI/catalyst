@@ -365,7 +365,6 @@ RUN cmake --build /opt/catalyst/quantum-build --target check-dialects catalyst-c
 
 
 FROM base-catalyst AS build-wheel-catalyst
-COPY --from=base-catalyst /opt/catalyst /opt/catalyst
 RUN cd /opt/catalyst/quantum-build && cpack
 # Build plugin wheel
 RUN MLIR_DIR="/opt/catalyst/llvm-build/lib/cmake/mlir" \
@@ -381,3 +380,15 @@ RUN PYTHON=$PYTHON \
     make wheel
 
 RUN auditwheel repair dist/*.whl -w ./wheel --no-update-tags --exclude libopenblasp-r0-23e5df77.3.21.dev.so
+
+
+FROM wheel-lightning-qubit AS lightning-pennylane-catalyst
+ARG PENNYLANE_VERSION
+COPY --from=build-wheel-catalyst /opt/catalyst/wheel/ /wheels/
+COPY --from=build-wheel-lightning-qubit /opt/pennylane-lightning/dist/ /wheels/
+RUN pip install --no-cache-dir --extra-index-url https://test.pypi.org/simple \
+        /wheels/pennylane_catalyst*.whl \
+    && pip install --no-cache-dir --force-reinstall --no-deps \
+        /wheels/pennylane_lightning*.whl \
+        git+https://github.com/PennyLaneAI/pennylane.git@${PENNYLANE_VERSION} \
+    && rm -rf /wheels
