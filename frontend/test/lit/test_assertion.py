@@ -21,7 +21,7 @@ import pennylane as qp
 from catalyst import debug_assert, measure, qjit
 
 
-@qjit(target="mlir")
+@qjit(target="mlir", capture=False)
 @qp.qnode(qp.device("lightning.qubit", wires=1))
 def circuit(x: float):
     """Test a simple assert example."""

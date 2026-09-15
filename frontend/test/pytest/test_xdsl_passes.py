@@ -76,7 +76,7 @@ class TestCreatePassSaveCallback:
 
     def test_save_callback_workspace_none(self):
         """Test that callback returns None when workspace is None."""
-        options = CompileOptions(keep_intermediate=KeepIntermediateLevel.CHANGED)
+        options = CompileOptions(keep_intermediate=KeepIntermediateLevel.CHANGED, capture=False)
         compiler = Compiler(options=options)
 
         callback = compiler._create_xdsl_pass_save_callback(None)
@@ -84,7 +84,7 @@ class TestCreatePassSaveCallback:
 
     def test_save_callback_keep_intermediate_pipeline(self):
         """Test that callback returns None when keep_intermediate is PIPELINE."""
-        options = CompileOptions(keep_intermediate=KeepIntermediateLevel.PIPELINE)
+        options = CompileOptions(keep_intermediate=KeepIntermediateLevel.PIPELINE, capture=False)
         compiler = Compiler(options=options)
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -94,7 +94,7 @@ class TestCreatePassSaveCallback:
 
     def test_save_callback_returns_callback(self):
         """Test that callback is returned when conditions are met."""
-        options = CompileOptions(keep_intermediate=KeepIntermediateLevel.CHANGED)
+        options = CompileOptions(keep_intermediate=KeepIntermediateLevel.CHANGED, capture=False)
         compiler = Compiler(options=options)
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -105,7 +105,7 @@ class TestCreatePassSaveCallback:
 
     def test_pass_save_callback_skips_when_previous_pass_none(self):
         """Test that callback skips saving when previous_pass is None."""
-        options = CompileOptions(keep_intermediate=KeepIntermediateLevel.CHANGED)
+        options = CompileOptions(keep_intermediate=KeepIntermediateLevel.CHANGED, capture=False)
         compiler = Compiler(options=options)
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -128,7 +128,7 @@ class TestCreatePassSaveCallback:
         except ImportError:
             pytest.skip("xdsl not available")
 
-        options = CompileOptions(keep_intermediate=KeepIntermediateLevel.CHANGED)
+        options = CompileOptions(keep_intermediate=KeepIntermediateLevel.CHANGED, capture=False)
         compiler = Compiler(options=options)
 
         with tempfile.TemporaryDirectory() as tmpdir:

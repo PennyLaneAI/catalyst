@@ -34,7 +34,7 @@ class TestGetMLIRModule:
         """Tests a standard circuit."""
         dev = qp.device("lightning.qubit", wires=1)
 
-        @qp.qjit
+        @qp.qjit(capture=False)
         @qp.qnode(dev)
         def my_workflow():
             qp.X(0)
@@ -47,7 +47,7 @@ class TestGetMLIRModule:
         """Tests a standard circuit with args and kwargs."""
         dev = qp.device("lightning.qubit", wires=1)
 
-        @qp.qjit
+        @qp.qjit(capture=False)
         @qp.qnode(dev)
         def my_workflow(angle, wires=None):
             qp.RX(angle, wires)
@@ -60,7 +60,7 @@ class TestGetMLIRModule:
         """Tests a standard circuit with no return."""
         dev = qp.device("lightning.qubit", wires=1)
 
-        @qp.qjit
+        @qp.qjit(capture=False)
         @qp.qnode(dev)
         def my_workflow(wire):
             qp.X(wire)
@@ -72,7 +72,7 @@ class TestGetMLIRModule:
         """Ensures that the QJIT'd qnode's compile options are not mutable."""
         dev = qp.device("lightning.qubit", wires=1)
 
-        @qp.qjit(autograph=True)
+        @qp.qjit(autograph=True, capture=False)
         @qp.qnode(dev)
         def my_workflow(angle, wires=None):
             qp.RX(angle, wires)

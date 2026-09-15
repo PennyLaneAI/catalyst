@@ -51,7 +51,7 @@ class TestLoopToJaxpr:
               in (b, c) }}
             """)
 
-        @qjit
+        @qjit(capture=False)
         def circuit(x: float):
             @while_loop(lambda v: v[0] < 10, estimated_iterations=estimated_iterations)
             def loop(v):
@@ -82,7 +82,7 @@ class TestLoopToJaxpr:
               in (c, d) }}
         """)
 
-        @qjit
+        @qjit(capture=False)
         def circuit(x: float, n: int):
             @for_loop(0, n, 1, estimated_iterations=estimated_iterations)
             def loop(_, v):
@@ -123,7 +123,7 @@ class TestWhileLoops:
     def test_alternating_loop(self, backend):
         """Test simple while loop."""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=1))
         def circuit(n):
             @while_loop(lambda v: v[0] < v[1])
@@ -143,7 +143,7 @@ class TestWhileLoops:
         """Test error messages issues when the non-bool conditions are provided."""
 
         def workflow(R):
-            @qjit
+            @qjit(capture=False)
             @qp.qnode(qp.device(backend, wires=1))
             def circuit():
                 @while_loop(lambda i: R)
@@ -164,7 +164,7 @@ class TestWhileLoops:
     def test_closure_condition_fn(self, backend):
         """Test while loop with captured values (closures) in the condition function."""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=1))
         def circuit(n):
             @while_loop(lambda i: i < n)
@@ -183,7 +183,7 @@ class TestWhileLoops:
     def test_closure_body_fn(self, backend):
         """Test while loop with captured values (closures) in the body function."""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=1))
         def circuit(n):
             my_const = 1
@@ -204,7 +204,7 @@ class TestWhileLoops:
     def test_assert_joint_closure(self, backend):
         """Test while loop with captured values (closures) in both body and condition functions."""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=1))
         def circuit(n):
             my_const = 1
@@ -225,7 +225,7 @@ class TestWhileLoops:
     def test_assert_reference_outside_measure(self, backend):
         """Test while loop in conjunction with the measure op."""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=1))
         def circuit(n):
             m = measure(wires=0)
@@ -246,7 +246,7 @@ class TestWhileLoops:
     def test_multiple_loop_arguments(self, backend):
         """Test while loop with multiple (loop-carried) arguments."""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=1))
         def circuit(n: int):
             @while_loop(lambda v, _: v[0] < v[1])
@@ -265,7 +265,7 @@ class TestWhileLoops:
     def test_nested_loops(self, backend):
         """Test nested while loops."""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=1))
         def circuit(n, m):
             @while_loop(lambda i, _: i < n)
@@ -330,7 +330,7 @@ class TestForLoops:
     def test_required_index(self, backend):
         """Check for loop error message when the iteration index is missing."""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=1))
         def circuit(n):
             @for_loop(0, n, 1)
@@ -346,7 +346,7 @@ class TestForLoops:
     def test_basic_loop(self, backend):
         """Test simple for loop."""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=1))
         def circuit(n):
             @for_loop(0, n, 1)
@@ -362,7 +362,7 @@ class TestForLoops:
     def test_loop_carried_values(self, backend):
         """Test for loop with updating loop carried values."""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=1))
         def circuit(n):
             @for_loop(0, n, 1)
@@ -381,7 +381,7 @@ class TestForLoops:
     def test_dynamic_wires(self, backend):
         """Test for loops with iteration index-dependant wires."""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=6))
         def circuit(n: int):
             qp.Hadamard(wires=0)
@@ -401,7 +401,7 @@ class TestForLoops:
     def test_closure(self, backend):
         """Test for loop with captured values (closures)."""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=1))
         def circuit(x):
             y = 2 * x
@@ -418,7 +418,7 @@ class TestForLoops:
     def test_nested_loops(self, backend):
         """Test nested for loops."""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=4))
         def circuit(n):
             # Input state: equal superposition
@@ -448,7 +448,7 @@ class TestForLoops:
     def test_negative_step(self, backend):
         """Test loops with a negative step size."""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=1))
         def circuit(n):
             @for_loop(n, 0, -1)
@@ -506,7 +506,7 @@ class TestClassicalCompilation:
     def test_while_loop(self, x, n):
         """Test while loop in classical function."""
 
-        @qjit
+        @qjit(capture=False)
         def mulc(x: int, n: int):
             @while_loop(lambda v, _: v < n)
             def loop(v, i):
@@ -522,7 +522,7 @@ class TestClassicalCompilation:
     def test_while_nested_loop(self, x, n):
         """Test nested while loops in classical function."""
 
-        @qjit
+        @qjit(capture=False)
         def mulc(x: int, n: int):
             @while_loop(lambda i, _: i < x)
             def loop(i, accum):
@@ -541,7 +541,7 @@ class TestClassicalCompilation:
     def test_for_loop(self, x, n):
         """Test for loop in classical function."""
 
-        @qjit
+        @qjit(capture=False)
         def mulc(x: int, n: int):
             @for_loop(0, n, 1)
             def loop(_, agg):
@@ -557,7 +557,7 @@ class TestClassicalCompilation:
     def test_nested_for_loop(self, x, n):
         """Test nested for loops in classical function."""
 
-        @qjit
+        @qjit(capture=False)
         def mulc(x: int, n: int):
             @for_loop(0, x, 1)
             def loop(_, counter):
@@ -577,7 +577,7 @@ class TestClassicalCompilation:
     def test_for_loop_2(self, x, n):
         """Test for loop in classical function with different step size."""
 
-        @qjit
+        @qjit(capture=False)
         def mulc(x: int, n: int):
             @for_loop(0, n, 2)
             def loop(_, agg):
@@ -601,7 +601,7 @@ class TestClassicalCompilation:
         times.
         """
 
-        @qjit
+        @qjit(capture=False)
         def revc():
             @for_loop(5, 10, -1)
             def loop(i, agg):
@@ -618,7 +618,7 @@ class TestClassicalCompilation:
         negative step, but is constant w.r.t. function args.
         """
 
-        @qjit
+        @qjit(capture=False)
         def revc(m: int):
             y = 7
             x = y * 7
@@ -647,7 +647,7 @@ class TestInterpretationControlFlow:
             _, x_times_n = loop(0, 0)
             return x_times_n
 
-        mulc = qjit(muli)
+        mulc = qjit(muli, capture=False)
         assert mulc(1, 2) == muli(1, 2)
 
     def test_for_loop(self):
@@ -661,7 +661,7 @@ class TestInterpretationControlFlow:
             x_times_n = loop(0)
             return x_times_n
 
-        mulc = qjit(muli)
+        mulc = qjit(muli, capture=False)
         assert np.allclose(mulc(1, 2), muli(1, 2))
 
     def test_qnode_with_while_loop(self, backend):
@@ -679,7 +679,7 @@ class TestInterpretationControlFlow:
             loop(0)
             return qp.state()
 
-        compiled_circuit = qjit(interpreted_circuit)
+        compiled_circuit = qjit(interpreted_circuit, capture=False)
         assert np.allclose(compiled_circuit(num_wires), interpreted_circuit(num_wires))
 
     def test_qnode_with_for_loop(self, backend):
@@ -697,7 +697,7 @@ class TestInterpretationControlFlow:
             loop()
             return qp.state()
 
-        compiled_circuit = qjit(interpreted_circuit)
+        compiled_circuit = qjit(interpreted_circuit, capture=False)
         assert np.allclose(compiled_circuit(num_wires), interpreted_circuit(num_wires))
 
 
@@ -816,7 +816,7 @@ class TestForLoopOperatorAccess:
     def test_for_loop_access_quantum(self, backend):
         """Test ForLoop operation access in quantum context."""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=1))
         def circuit():
             @for_loop(0, 4, 1)
@@ -834,7 +834,7 @@ class TestForLoopOperatorAccess:
     def test_for_loop_access_classical(self):
         """Test ForLoop operation access in classical context."""
 
-        @qjit
+        @qjit(capture=False)
         def circuit(x):
             @for_loop(0, 10, 1)
             def body(i, accum):
@@ -886,7 +886,7 @@ class TestWhileLoopOperatorAccess:
     def test_while_loop_access_quantum(self, backend):
         """Test WhileLoop operation access in quantum context."""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=1))
         def circuit():
             @while_loop(lambda i: i < 5)
@@ -904,7 +904,7 @@ class TestWhileLoopOperatorAccess:
     def test_while_loop_access_classical(self):
         """Test WhileLoop operation access in classical context."""
 
-        @qjit
+        @qjit(capture=False)
         def circuit(x):
             @while_loop(lambda i, _: i < 10)
             def body(i, accum):
@@ -968,7 +968,7 @@ class TestStaticLoopFolding:
     def test_static_loop_not_folded_by_default(self):
         """A constant iteration range keeps the for_loop primitive by default."""
 
-        @qjit(target="mlir")
+        @qjit(target="mlir", capture=False)
         def circuit():
             @for_loop(0, 3, 1)
             def loop(i, acc):
@@ -982,7 +982,7 @@ class TestStaticLoopFolding:
         """Enabling the toggle unrolls a constant iteration range at trace time."""
         catalyst.compile_without_static_loops = True
 
-        @qjit(target="mlir")
+        @qjit(target="mlir", capture=False)
         def circuit():
             @for_loop(0, 3, 1)
             def loop(i, acc):
@@ -996,7 +996,7 @@ class TestStaticLoopFolding:
         """A loop with a traced bound is never folded, even when the toggle is enabled."""
         catalyst.compile_without_static_loops = True
 
-        @qjit(target="mlir")
+        @qjit(target="mlir", capture=False)
         def circuit(n: int):
             @for_loop(0, n, 1)
             def loop(i, acc):

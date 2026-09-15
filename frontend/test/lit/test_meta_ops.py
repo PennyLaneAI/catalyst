@@ -20,7 +20,7 @@ from catalyst import qjit
 
 
 # CHECK-LABEL: @adjoint_adjoint
-@qjit(target="mlir")
+@qjit(target="mlir", capture=False)
 @qp.qnode(qp.device("lightning.qubit", wires=1))
 def adjoint_adjoint():
     qp.adjoint(qp.adjoint(qp.S(0)))

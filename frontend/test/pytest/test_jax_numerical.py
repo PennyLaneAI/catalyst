@@ -47,7 +47,7 @@ class TestExpmAndSolve:
             return jsp.linalg.expm(A)
 
         expected = [g(A), f(A, b)]  # [e, 0; 0, e], [0.1; 0.2]
-        observed = [qjit(g)(A), qjit(f)(A, b)]
+        observed = [qjit(g, capture=False)(A), qjit(f, capture=False)(A, b)]
 
         assert np.allclose(expected[0], observed[0])
         assert np.allclose(expected[1], observed[1])
@@ -69,7 +69,7 @@ class TestArgsortNumerical:
     def test_expm_numerical(self, inp):
         """jax.numpy.argsort sort arrays correctly when being qjit compiled"""
 
-        @qjit
+        @qjit(capture=False)
         def f(x):
             return jnp.argsort(x)
 

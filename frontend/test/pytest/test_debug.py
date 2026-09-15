@@ -276,7 +276,7 @@ class TestCProgramGeneration:
         """Test C Program generation"""
         dev = qp.device("lightning.qubit", wires=2)
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(dev)
         def f(x: float):
             """Returns two states."""
@@ -293,7 +293,7 @@ class TestCProgramGeneration:
     def test_program_without_return_nor_arguments(self):
         """Test program without return value nor arguments."""
 
-        @qjit
+        @qjit(capture=False)
         def f():
             """No-op function."""
             return None
@@ -306,7 +306,7 @@ class TestCProgramGeneration:
     def test_generation_with_promotion(self):
         """Test that C program generation works on QJIT objects and args that require promotion."""
 
-        @qjit
+        @qjit(capture=False)
         def f(x: float):
             """Identity function."""
             return x
@@ -319,12 +319,12 @@ class TestCProgramGeneration:
     def test_raises_error_if_tracing(self):
         """Test errors if c program generation requested during tracing."""
 
-        @qjit
+        @qjit(capture=False)
         def f(x: float):
             """Identity function."""
             return x
 
-        @qjit
+        @qjit(capture=False)
         def error_fn(x: float):
             """Should raise an error as we try to generate the C template during tracing."""
             return get_cmain(f, x)
@@ -392,7 +392,7 @@ class TestCProgramGeneration:
             """Square function."""
             return x**2
 
-        jit_f = qjit(f, keep_intermediate=True)
+        jit_f = qjit(f, keep_intermediate=True, capture=False)
         # Create tmp workspaces for intermediates to avoid CI race conditions
         jit_f.use_cwd_for_workspace = False
 
@@ -429,7 +429,7 @@ class TestCProgramGeneration:
             """Square function."""
             return x**2
 
-        jit_grad_f = qjit(value_and_grad(f), keep_intermediate=True)
+        jit_grad_f = qjit(value_and_grad(f), keep_intermediate=True, capture=False)
         # Create tmp workspaces for intermediates to avoid CI race conditions
         jit_grad_f.use_cwd_for_workspace = False
 
@@ -449,7 +449,7 @@ class TestCProgramGeneration:
     def test_get_compilation_stage_without_keep_intermediate(self):
         """Test if error is raised when using get_compilation_stage without keep_intermediate."""
 
-        @qjit
+        @qjit(capture=False)
         def f(x: float):
             """Square function."""
             return x**2
@@ -477,7 +477,7 @@ class TestCProgramGeneration:
     def test_executable_generation(self, arg):
         """Test if generated C Program produces correct results."""
 
-        @qjit
+        @qjit(capture=False)
         def f(x):
             """Square function with debugging print."""
             y = x * x
@@ -503,7 +503,7 @@ class TestCProgramGeneration:
     def test_executable_generation_without_precompiled_function(self):
         """Test if generated C Program produces correct results."""
 
-        @qjit
+        @qjit(capture=False)
         def f(x):
             """identity function with debugging print."""
             debug.print_memref(x)
@@ -529,14 +529,14 @@ class TestOptionsToCliFlags:
         """Test pass plugin option"""
 
         path = pathlib.Path("/path/to/plugin")
-        options = CompileOptions(pass_plugins={path})
+        options = CompileOptions(pass_plugins={path}, capture=False)
         flags = _options_to_cli_flags(options)
         assert ("--load-pass-plugin", path) in flags
 
     def test_options_pass_plugin_list(self):
         """Test pass plugin option when passed in as a list"""
         path = pathlib.Path("/path/to/plugin")
-        options = CompileOptions(pass_plugins=[path, path])
+        options = CompileOptions(pass_plugins=[path, path], capture=False)
         flags = _options_to_cli_flags(options)
         assert ("--load-pass-plugin", path) in flags
         assert isinstance(options.pass_plugins, set)
@@ -544,7 +544,7 @@ class TestOptionsToCliFlags:
     def test_options_pass_plugin_tuple(self):
         """Test pass plugin option when passed in as a tuple"""
         path = pathlib.Path("/path/to/plugin")
-        options = CompileOptions(pass_plugins=(path, path))
+        options = CompileOptions(pass_plugins=(path, path), capture=False)
         flags = _options_to_cli_flags(options)
         assert ("--load-pass-plugin", path) in flags
         assert isinstance(options.pass_plugins, set)
@@ -552,7 +552,7 @@ class TestOptionsToCliFlags:
     def test_option_dialect_plugin(self):
         """Test dialect plugin option"""
         path = pathlib.Path("/path/to/plugin")
-        options = CompileOptions(dialect_plugins={path})
+        options = CompileOptions(dialect_plugins={path}, capture=False)
         flags = _options_to_cli_flags(options)
         assert ("--load-dialect-plugin", path) in flags
         assert isinstance(options.pass_plugins, set)
@@ -560,7 +560,7 @@ class TestOptionsToCliFlags:
     def test_option_dialect_plugin_list(self):
         """Test dialect plugin option"""
         path = pathlib.Path("/path/to/plugin")
-        options = CompileOptions(dialect_plugins=[path, path])
+        options = CompileOptions(dialect_plugins=[path, path], capture=False)
         flags = _options_to_cli_flags(options)
         assert ("--load-dialect-plugin", path) in flags
         assert isinstance(options.dialect_plugins, set)
@@ -568,7 +568,7 @@ class TestOptionsToCliFlags:
     def test_option_dialect_plugin_tuple(self):
         """Test dialect plugin option"""
         path = pathlib.Path("/path/to/plugin")
-        options = CompileOptions(dialect_plugins=(path, path))
+        options = CompileOptions(dialect_plugins=(path, path), capture=False)
         flags = _options_to_cli_flags(options)
         assert ("--load-dialect-plugin", path) in flags
         assert isinstance(options.dialect_plugins, set)
@@ -576,13 +576,13 @@ class TestOptionsToCliFlags:
     def test_option_use_nameloc(self):
         """Test use name location option"""
 
-        options = CompileOptions(use_nameloc=True)
+        options = CompileOptions(use_nameloc=True, capture=False)
         flags = _options_to_cli_flags(options)
         assert "--use-nameloc-as-prefix" in flags
 
     def test_option_not_lower_to_llvm(self):
         """Test not lower to llvm"""
-        options = CompileOptions(lower_to_llvm=False)
+        options = CompileOptions(lower_to_llvm=False, capture=False)
         flags = _options_to_cli_flags(options)
         assert ("--tool", "opt") in flags
 

@@ -25,7 +25,7 @@ from catalyst import measure, qjit
 
 
 # CHECK-LABEL: public @jit_circuit
-@qjit(target="mlir")
+@qjit(target="mlir", capture=False)
 @qp.qnode(qp.device("lightning.qubit", wires=5))
 def circuit(x: float):
     """Test circuit with various multi-qubit gates."""
@@ -49,7 +49,7 @@ print(circuit.mlir)
 
 
 # CHECK-LABEL: public @jit_circuit_unitary
-@qjit(target="mlir")
+@qjit(target="mlir", capture=False)
 @qp.qnode(qp.device("lightning.qubit", wires=3))
 def circuit_unitary():
     """Test circuit with unitary gates."""
@@ -76,7 +76,7 @@ print(circuit_unitary.mlir)
 
 
 # CHECK-LABEL: public @jit_circuit_iswap_pswap
-@qjit(target="mlir")
+@qjit(target="mlir", capture=False)
 @qp.qnode(
     get_custom_qjit_device(2, (), {"ISWAP": OperatorProperties(), "PSWAP": OperatorProperties()})
 )
@@ -93,7 +93,7 @@ print(circuit_iswap_pswap.mlir)
 
 
 # CHECK-LABEL: public @jit_isingZZ_circuit
-@qjit(target="mlir")
+@qjit(target="mlir", capture=False)
 @qp.qnode(qp.device("lightning.qubit", wires=2))
 def isingZZ_circuit(x: float):
     """Circuit that applies an IsingZZ gate to a pair of qubits."""

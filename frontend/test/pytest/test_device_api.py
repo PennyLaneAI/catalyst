@@ -103,7 +103,7 @@ def test_qjit_device_measurements(shots, mocker):
 
     spy = mocker.spy(qjit_device, "filter_device_capabilities_with_shots")
 
-    @qjit
+    @qjit(capture=False)
     @qp.set_shots(shots)
     @qp.qnode(dev)
     def circuit():
@@ -149,7 +149,7 @@ def test_simple_circuit():
     """Test that a circuit with the new device API is compiling to MLIR."""
     dev = NullQubit(wires=2)
 
-    @qjit(target="mlir")
+    @qjit(target="mlir", capture=False)
     @qp.set_shots(shots=2048)
     @qp.qnode(device=dev)
     def circuit():

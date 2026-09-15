@@ -27,7 +27,7 @@ def test_named_controlled():
     """Test that named-controlled operations are passed as-is."""
     dev = get_custom_qjit_device(2, set(), set())
 
-    @qjit(target="mlir")
+    @qjit(target="mlir", capture=False)
     @qp.qnode(dev)
     # CHECK-LABEL: public @jit_named_controlled
     def named_controlled():
@@ -49,7 +49,7 @@ def test_native_controlled_custom():
     """Test native control of a custom operation."""
     dev = get_custom_qjit_device(3, set(), {"Rot": OperatorProperties(True, True, False)})
 
-    @qjit(target="mlir")
+    @qjit(target="mlir", capture=False)
     @qp.qnode(dev)
     # CHECK-LABEL: public @jit_native_controlled
     def native_controlled():
@@ -69,7 +69,7 @@ def test_native_controlled_unitary():
     """Test native control of the unitary operation."""
     dev = get_custom_qjit_device(4, set(), set())
 
-    @qjit(target="mlir")
+    @qjit(target="mlir", capture=False)
     @qp.qnode(dev)
     # CHECK-LABEL: public @jit_native_controlled_unitary
     def native_controlled_unitary():
@@ -99,7 +99,7 @@ def test_native_controlled_multirz():
     """Test native control of the multirz operation."""
     dev = get_custom_qjit_device(3, set(), {"MultiRZ": OperatorProperties(True, True, True)})
 
-    @qjit(target="mlir")
+    @qjit(target="mlir", capture=False)
     @qp.qnode(dev)
     # CHECK-LABEL: public @jit_native_controlled_multirz
     def native_controlled_multirz():
@@ -119,7 +119,7 @@ def test_native_controlled_pcphase():
     """Test native control of the PCPhase operation."""
     dev = get_custom_qjit_device(3, set(), {"PCPhase": OperatorProperties(True, True, False)})
 
-    @qjit(target="mlir")
+    @qjit(target="mlir", capture=False)
     @qp.qnode(dev)
     # CHECK-LABEL: public @jit_native_controlled_pcphase
     def native_controlled_pcphase():

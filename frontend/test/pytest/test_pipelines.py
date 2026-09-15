@@ -39,7 +39,7 @@ class TestDefaultPipeline:
         one from ``CompileOptions.get_stages()``."""
         pipeline = default_pipeline()
 
-        options = CompileOptions()
+        options = CompileOptions(capture=False)
         pipeline_expected = options.get_stages()
         assert pipeline == pipeline_expected
 
@@ -58,8 +58,10 @@ class TestDefaultPipeline:
             qp.RX(angle / 2, wires=0)
             return qp.state()
 
-        circuit_ref = qjit(circuit, target="mlir")
-        circuit_default_pipeline = qjit(circuit, target="mlir", pipelines=default_pipeline())
+        circuit_ref = qjit(circuit, target="mlir", capture=False)
+        circuit_default_pipeline = qjit(
+            circuit, target="mlir", pipelines=default_pipeline(), capture=False
+        )
 
         assert circuit_ref.mlir == circuit_default_pipeline.mlir
         assert circuit_ref.mlir_opt == circuit_default_pipeline.mlir_opt
@@ -78,8 +80,8 @@ class TestDefaultPipeline:
             qp.RX(angle / 2, wires=0)
             return qp.state()
 
-        circuit_ref = qjit(circuit)
-        circuit_default_pipeline = qjit(circuit, pipelines=default_pipeline())
+        circuit_ref = qjit(circuit, capture=False)
+        circuit_default_pipeline = qjit(circuit, pipelines=default_pipeline(), capture=False)
 
         angle = 0.5
         assert np.allclose(circuit_ref(angle), circuit_default_pipeline(angle))

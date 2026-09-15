@@ -54,7 +54,7 @@ weights = np.random.random(size=shape)
 # CHECK-SAME:   walltime: {{[0-9\.]+}} ms{{\s*}} cputime: {{[0-9\.]+}} ms
 
 with instrumentation(circuit.__name__, filename=None, detailed=False):
-    qjit(circuit)(weights)
+    qjit(circuit, capture=False)(weights)
 
 # -----
 
@@ -82,7 +82,7 @@ with instrumentation(circuit.__name__, filename=None, detailed=False):
 # CHECK-SAME:   walltime: {{[0-9\.]+}} ms{{\s*}} cputime: {{[0-9\.]+}} ms{{\s*}} programsize: {{[0-9]+}} lines
 
 with instrumentation(circuit.__name__, filename=None, detailed=True):
-    qjit(circuit)(weights)
+    qjit(circuit, capture=False)(weights)
 
 # Restore original execution platforms
 jax.config.update("jax_platforms", original_jax_platforms)

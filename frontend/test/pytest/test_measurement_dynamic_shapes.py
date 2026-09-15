@@ -111,7 +111,7 @@ def test_dynamic_wires_scalar_readouts(readout, backend, capfd):
 
         return circ()
 
-    cat = catalyst.qjit(ref)
+    cat = catalyst.qjit(ref, capture=False)
 
     assert np.allclose(ref(10), cat(10))
     assert np.allclose(ref(4), cat(4))
@@ -146,7 +146,7 @@ def test_dynamic_wires_statebased_with_wires(readout, backend, capfd):
 
         return circ()
 
-    cat = catalyst.qjit(ref)
+    cat = catalyst.qjit(ref, capture=False)
 
     assert np.allclose(ref(10), cat(10))
     assert np.allclose(ref(4), cat(4))
@@ -177,7 +177,7 @@ def test_dynamic_wires_statebased_without_wires(readout, backend, capfd):
 
         return circ(42)
 
-    cat = catalyst.qjit(ref)
+    cat = catalyst.qjit(ref, capture=False)
 
     assert np.allclose(ref(10), cat(10))
     assert np.allclose(ref(4), cat(4))
@@ -209,7 +209,7 @@ def test_dynamic_wires_sample_with_wires(shots, backend, capfd):
 
         return circ()
 
-    cat = catalyst.qjit(ref)
+    cat = catalyst.qjit(ref, capture=False)
     num_shots = 1 if isinstance(shots, int) else len(shots)
     for test_nqubits in (10, 4):
         expected = ref(test_nqubits)
@@ -244,7 +244,7 @@ def test_dynamic_wires_sample_without_wires(shots, backend, capfd):
 
         return circ()
 
-    cat = catalyst.qjit(ref)
+    cat = catalyst.qjit(ref, capture=False)
     num_shots = 1 if isinstance(shots, int) else len(shots)
     for test_nqubits in (10, 4):
         expected = ref(test_nqubits)
@@ -263,7 +263,7 @@ def test_dynamic_wires_counts_with_wires(backend, capfd):
     Note that Catalyst does not support shot vectors with counts.
     """
 
-    @catalyst.qjit
+    @catalyst.qjit(capture=False)
     def func(num_qubits):
         print("compiling...")
         dev = qp.device(backend, wires=num_qubits)
@@ -293,7 +293,7 @@ def test_dynamic_wires_counts_without_wires(backend, capfd):
     Note that Catalyst does not support shot vectors with counts.
     """
 
-    @catalyst.qjit
+    @catalyst.qjit(capture=False)
     def func(num_qubits):
         print("compiling...")
         dev = qp.device(backend, wires=num_qubits)
@@ -325,7 +325,7 @@ def test_wrong_wires_argument(backend, wires):
     is correctly caught.
     """
 
-    @catalyst.qjit
+    @catalyst.qjit(capture=False)
     def func(num_qubits):
         dev = qp.device(backend, wires=num_qubits)
 
@@ -344,7 +344,7 @@ def test_wrong_wires_argument(backend, wires):
 def test_dynamic_shots_and_wires(capfd):
     """Test that a circuit with both dynamic shots and dynamic wires works correctly with qp.sample."""
 
-    @catalyst.qjit
+    @catalyst.qjit(capture=False)
     def workflow_dynamic_shots_and_wires(num_shots, num_wires):
         print("compiling...")
         device = qp.device("lightning.qubit", wires=num_wires)

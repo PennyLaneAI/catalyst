@@ -946,7 +946,7 @@ def test_vjp_argument_type_checks_incompatible_n_inputs(diff_method):
     and cotangent arguments are incompatible.
     """
 
-    @qjit
+    @qjit(capture=False)
     def C_workflow():
         # If `f` returns two outputs, then `cotangents` must have length 2
         x = (1.0,)

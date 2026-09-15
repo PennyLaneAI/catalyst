@@ -47,7 +47,7 @@ class TestSnapshot:
         ):
             dev = qp.device("lightning.qubit", wires=1)
 
-            @qjit
+            @qjit(capture=False)
             @qp.set_shots(5)
             @qp.qnode(dev)
             def circuit():
@@ -82,7 +82,7 @@ class TestSnapshot:
         expected_snapshot_results = list(qp.snapshots(pl_circuit)().values())
         expected_snapshot_results = expected_snapshot_results[:-1]  # remove 'execution_results' key
 
-        cat_circuit = qjit(qp.qnode(cat_dev)(circuit))
+        cat_circuit = qjit(qp.qnode(cat_dev)(circuit), capture=False)
         jitted_results = cat_circuit()
         jitted_snapshot_results = jitted_results[0]
         jitted_measurement_results = jitted_results[1]
@@ -116,7 +116,7 @@ class TestSnapshot:
         expected_snapshot_results = list(qp.snapshots(pl_circuit)().values())
         expected_snapshot_results = expected_snapshot_results[:-1]  # remove 'execution_results' key
 
-        cat_circuit = qjit(qp.qnode(cat_dev, shots=5)(circuit))
+        cat_circuit = qjit(qp.qnode(cat_dev, shots=5)(circuit), capture=False)
         jitted_results = cat_circuit()
         jitted_snapshot_results = jitted_results[0]
         jitted_measurement_results = jitted_results[1]
@@ -130,7 +130,7 @@ class TestSnapshot:
     def test_snapshots_with_dynamic_wires(self):
         """Test if qp.Snapshot captures dynamic shaped states"""
 
-        @qjit
+        @qjit(capture=False)
         def workflow(num_qubits):
             @qp.qnode(qp.device("lightning.qubit", wires=num_qubits))
             def circuit():
