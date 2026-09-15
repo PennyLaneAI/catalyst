@@ -15,10 +15,12 @@
 """Unit tests for the python decompositions module."""
 
 import jax.numpy as jnp
+import numpy as np
 import pennylane as qp
 import pytest
 from jax.core import ShapedArray
 from operator2_dummy_gates import (
+    ArrayData,
     CompilableData,
     HybridOpArg,
     HybridWires,
@@ -43,6 +45,8 @@ from catalyst.decomposition.decomposition_rules import (
     _modifier_kind,
     compile_decomposition_rules_wrapper,
     compile_reachable_decomposition_rules_wrapper,
+    compile_registered_adjoint_rules,
+    get_rule_strings_from_module,
     name_unwrap_adjoint,
     name_unwrap_control,
     name_wrap_adjoint,
@@ -54,6 +58,7 @@ from catalyst.decomposition.type_utils import (
     get_dummy_values_for_arg,
     replace_wires_with_placeholder_wires,
 )
+from catalyst.utils.exceptions import CompileError
 
 
 class TestGenericUtilities:
@@ -176,6 +181,15 @@ class TestGenericUtilities:
             (
                 CompilableData(True, 3.14, "string", Wires([0, 1])),
                 'CompilableData{}{wires:2}{a = true, b = 3.140000e+00 : f64, thing = "string"}',
+            ),
+            (
+                ArrayData(np.array([1, 2, 3]), Wires([0, 1])),
+                "ArrayData{}{wires:2}{angles = dense<[1, 2, 3]> : tensor<3xi64>}",
+            ),
+            (
+                # An array of one repeated value takes MLIR's splat shorthand in the id too.
+                ArrayData(np.array([[7, 7], [7, 7]], dtype=np.int8), Wires([0, 1])),
+                "ArrayData{}{wires:2}{angles = dense<7> : tensor<2x2xi8>}",
             ),
             (
                 MultipleRegisters(Wires([0, 1, 2]), Wires([3, 4])),
@@ -350,6 +364,50 @@ class TestTraceTime:
         )
         assert "qref.adjoint" in mlir
 
+    @pytest.mark.filterwarnings("ignore::catalyst.decomposition.RuleLoweringWarning")
+    def test_array_static_data_reaches_the_rules(self):
+        """An operator holding array static data lowers with its array spelled as a dense
+        attribute, and two rules emitting different arrays stay two distinct operators: the search
+        for reachable rules compares arrays by contents rather than asking a whole array whether it
+        is true."""
+
+        def resource_fn_a(angles, wires):
+            return {ArrayData(angles=np.array([1, 2]), wires=Wire[2]): 1}
+
+        @register_resources(resource_fn_a)
+        def rule_a(angles, wires):
+            ArrayData(angles=np.array([1, 2]), wires=wires)
+
+        def resource_fn_b(angles, wires):
+            return {ArrayData(angles=np.array([3, 4]), wires=Wire[2]): 1}
+
+        @register_resources(resource_fn_b)
+        def rule_b(angles, wires):
+            ArrayData(angles=np.array([3, 4]), wires=wires)
+
+        with local_decomps():
+            add_decomps(ArrayData, rule_a, rule_b)
+
+            @qjit(capture=True, target="mlir")
+            @qnode(qp.device("null.qubit", wires=2))
+            def circuit():
+                ArrayData(angles=np.array([5, 5, 5]), wires=[0, 1])
+                return qp.state()
+
+            mlir = circuit.mlir
+
+        # The op carries the array exactly as the id spells it, which is what lets the compiler
+        # print an id for the op that matches the rules compiled here.
+        assert "static_data = {angles = dense<5> : tensor<3xi64>}" in mlir
+        assert 'target_gate = "ArrayData{}{wires:2}{angles = dense<5> : tensor<3xi64>}"' in mlir
+        assert (
+            'target_gate = "ArrayData{}{wires:2}{angles = dense<[1, 2]> : tensor<2xi64>}"' in mlir
+        )
+        assert (
+            'target_gate = "ArrayData{}{wires:2}{angles = dense<[3, 4]> : tensor<2xi64>}"' in mlir
+        )
+
+    @pytest.mark.filterwarnings("ignore::catalyst.decomposition.RuleLoweringWarning")
     def test_no_distribution_rule_for_non_invertible_body(self):
         """A distribution rule is NOT synthesized when the base rule body is non-invertible (contains
         a mid-circuit measurement): the base rule is still lowered, but no Adjoint(Op) rule."""
@@ -457,6 +515,21 @@ class TestOnDemand:
             )
         assert out == []
 
+    def test_compile_rules_reports_missing_mlir_module(self, mocker):
+        """A failed qjit compilation should not cause a secondary NoneType error."""
+
+        from catalyst.decomposition import decomposition_rules as dr
+
+        mocker.patch.object(dr, "collect_resources_for_op", return_value=({}, {}, []))
+        failed_qjit = mocker.MagicMock(mlir_module=None)
+        mocker.patch.object(dr.qp, "qjit", return_value=lambda _circuit: failed_qjit)
+
+        with pytest.raises(
+            CompileError,
+            match="Failed to generate an MLIR module while compiling decomposition rules for S",
+        ):
+            dr.compile_decomposition_rules("S", "S{}{wires:1}{}", {}, {"wires": 1}, {})
+
 
 class TestModifierIds:
     """Unit tests for the op-level modifier name-wrapping helpers (Adjoint / C canonicalization)."""
@@ -519,6 +592,69 @@ class TestModifierIds:
         assert _MODIFIER_CANONICAL_ORDER == ("C", "Adjoint")
         with pytest.raises(ValueError, match="Non-canonical modifier order"):
             wrap_modifier_id(op_id, "Adjoint")
+
+
+class TestSymbolicRules:
+    """Tests for the rules registered against a symbolic operator that take the symbolic
+    op's args; following the convention in PennyLane."""
+
+    def test_self_adjoint_rule_is_lowered(self):
+        """Test ``self_adjoint`` rule on ``Adjoint(Hadamard)``."""
+
+        module = compile_registered_adjoint_rules(
+            "Hadamard", "Adjoint(Hadamard){}{wires:1}{}", {}, {"wires": 1}, {}, op_cls=qp.Hadamard
+        )
+        (rule,) = get_rule_strings_from_module(module)
+
+        assert 'target_gate = "Adjoint(Hadamard){}{wires:1}{}"' in rule
+        assert 'resources = {operations = {"Hadamard{}{wires:1}{}" = 1 : i64}}' in rule
+        assert "qref.adjoint" not in rule
+        assert "(%arg0: !qref.reg<1>, %arg1: tensor<1xi64>)" in rule
+        assert rule.count('gate_name = "Hadamard"') == 1
+
+    def test_adjoint_rotation_rule_is_lowered(self):
+        """Test ``adjoint_rotation`` reads the angle off the base operator."""
+
+        module = compile_registered_adjoint_rules(
+            "RZ",
+            "Adjoint(RZ){0:[f64]}{wires:1}{}",
+            {"0": ["f64"]},
+            {"wires": 1},
+            {},
+            is_custom_op=True,
+            op_cls=qp.RZ,
+        )
+        (rule,) = get_rule_strings_from_module(module)
+
+        assert 'target_gate = "Adjoint(RZ){0:[f64]}{wires:1}{}"' in rule
+        assert 'resources = {operations = {"RZ{0:[f64]}{wires:1}{}" = 1 : i64}}' in rule
+        assert "qref.adjoint" not in rule
+        assert "stablehlo.negate" in rule
+
+    def test_no_registered_symbolic_rules(self):
+        """Test an op with no symbolic rules registered against its adjoint yields no module."""
+
+        with local_decomps():
+            assert (
+                compile_registered_adjoint_rules(
+                    "NoParams",
+                    "Adjoint(NoParams){}{reg:2}{}",
+                    {},
+                    {"reg": 2},
+                    {},
+                    op_cls=NoParams,
+                )
+                is None
+            )
+
+    def test_missing_op_class_raises(self):
+        """Test lowering cannot proceed without the base operator's class: these rules take a base
+        operator instance, which the operator's name alone cannot produce."""
+
+        with pytest.raises(ValueError, match="operator class of 'Hadamard' is needed"):
+            compile_registered_adjoint_rules(
+                "Hadamard", "Adjoint(Hadamard){}{wires:1}{}", {}, {"wires": 1}, {}
+            )
 
 
 if __name__ == "__main__":
