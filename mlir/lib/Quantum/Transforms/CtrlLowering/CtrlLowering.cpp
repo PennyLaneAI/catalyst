@@ -728,16 +728,28 @@ struct ReferenceSemanticsCtrlLoweringRewritePattern : public OpRewritePattern<Ct
 
     LogicalResult matchAndRewrite(CtrlOp ctrl, PatternRewriter &rewriter) const override {
         Block &block = ctrl.getRegion().front();
-        // Map the region's block arguments (the target qubits/registers) to the ctrl op operands.
+
+        // 1. PRE-SCAN: Reject unsupported operations before mutating anything.
+        // If we modify the IR and then return failure, MLIR loops infinitely.
+        for (Operation &op : block.without_terminator()) {
+            if (isa<AdjointOp>(op)) {
+                op.emitError("nested quantum.adjoint inside a quantum.ctrl region is not supported by ctrl-lowering; run adjoint-lowering first");
+                return failure();
+            }
+            if (isa<scf::ForOp, scf::IfOp, scf::WhileOp, scf::IndexSwitchOp>(op)) {
+                op.emitError("control flow inside a quantum.ctrl region is not supported by ctrl-lowering");
+                return failure();
+            }
+        }
 
         // The control qubits are threaded through every enclosed gate; the control values are
         // constant for the whole region.
         SmallVector<Value> currentCtrlQubits(ctrl.getCtrlQubits().begin(),
                                              ctrl.getCtrlQubits().end());
         ValueRange ctrlValues = ctrl.getCtrlValues();
-
         SmallVector<Operation *> opsToErase;
 
+        // 2. MUTATION: Now that we know the block is safe, perform the lowering.
         for (Operation &op : block.without_terminator()) {
             // Measurements (quantum.measure and MeasurementProcess ops) are already
             // rejected by the CtrlOp verifier, so they never reach here in a verified
@@ -754,20 +766,6 @@ struct ReferenceSemanticsCtrlLoweringRewritePattern : public OpRewritePattern<Ct
                     inner.getCtrlValuesMutable().append(ctrlValues);
                 });
                 continue;
-            }
-            if (isa<AdjointOp>(op)) {
-                op.emitError("nested quantum.adjoint inside a quantum.ctrl region is not supported "
-                             "by ctrl-lowering; run adjoint-lowering first");
-                return failure();
-            }
-            if (isa<scf::ForOp, scf::IfOp, scf::WhileOp, scf::IndexSwitchOp>(op)) {
-                op.emitError(
-                    "control flow inside a quantum.ctrl region is not supported by ctrl-lowering");
-                return failure();
-            }
-            if (isa<QRefDialect>(op.getDialect())) {
-                op.emitError("unsupported quantum operation inside a quantum.ctrl region");
-                return failure();
             }
         }
 
