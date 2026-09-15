@@ -67,7 +67,10 @@ class TestGenericUtilities:
 
     def test_probe_wires_dont_overlap(self):
         """Test that the helper for generating probe arguments doesnt create
-        overlapping wires."""
+        overlapping wires.
+
+        NOTE: Regression test for the accumulator change made in #3225.
+        """
 
         kwargs = prepare_dynamic_op_kwargs({}, wire_lens={"target": 3, "control": 2})
         assert np.allclose(kwargs["target"], jnp.array([-1, -2, -3]))
@@ -77,8 +80,7 @@ class TestGenericUtilities:
         """Test that the helper does not create overlapping wire labels which create
         validation failures when the operator is unflattened.
 
-        NOTE: Regression test for the accumulator change made in type_utils.py
-        NOTE: Regression test for the accumulator change made in decomposition_rules.py
+        NOTE: Regression test for the accumulator change made in #3214.
         """
 
         op = qp.ctrl(qp.S(Wire[1]), Wire[1])
