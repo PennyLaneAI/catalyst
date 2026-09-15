@@ -526,6 +526,13 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* Fixed a bug where lowering an operator's decomposition rules computed the resources of rules that
+  do not apply to it, so a resource function failing on a configuration it was never meant to
+  handle raised an unnecessary `RuleLoweringWarning`. Each rule's applicability condition is now
+  checked first, and a condition that raises drops its own rule with a warning rather than aborting
+  the whole lowering call.
+  [(#3222)](https://github.com/PennyLaneAI/catalyst/pull/3222)
+
 * Fixed a bug where an executor's SSH connection multiplexing was silently disabled on macOS,
   making every remote operation pay a fresh authentication handshake. The control socket went in
   the system temp dir, which macOS puts under a per-user `/var/folders/...` path long enough to

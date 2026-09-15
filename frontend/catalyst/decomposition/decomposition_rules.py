@@ -326,6 +326,19 @@ def split_call_args(kwargs, is_custom_op):
     return (), kwargs
 
 
+def _rule_is_applicable(rule, *args, **kwargs) -> bool:
+    """Return whether ``rule`` applies to the probed operator, treating a condition that raises as
+    inapplicable."""
+    try:
+        return bool(rule.is_applicable(*args, **kwargs))
+    except Exception as e:  # pylint: disable=broad-except
+        warnings.warn(
+            f"Failed to check whether the {rule.name} decomposition rule applies: {e}",
+            category=RuleLoweringWarning,
+        )
+        return False
+
+
 def collect_resources_for_op(op_name, kwargs, is_custom_op=False, adjoint_resources=False):
     """Return resource data for all decomposition rules associated to op_name.
 
@@ -338,7 +351,7 @@ def collect_resources_for_op(op_name, kwargs, is_custom_op=False, adjoint_resour
     Returns:
         dict: rule name to the resources it produces
         dict: rule name to the graphOpId of each resource
-        list: the rules considered
+        list: the rules that apply to the probed operator
     """
     decomp_rules = list(qp.decomposition.list_decomps(op_name))
     args, kwargs = split_call_args(kwargs, is_custom_op)
@@ -348,7 +361,7 @@ def collect_resources_for_op(op_name, kwargs, is_custom_op=False, adjoint_resour
     name_to_resources = {}
     applicable_rules = []
     for rule in decomp_rules:
-        if not rule.is_applicable(*args, **kwargs):
+        if not _rule_is_applicable(rule, *args, **kwargs):
             continue
 
         applicable_rules.append(rule)
@@ -634,7 +647,7 @@ def collect_symbolic_adjoint_resources(op_cls, op_name, kwargs, is_custom_op):
         is_custom_op (bool): whether the operator lowers to ``qref.custom``
 
     Returns:
-        list: the rules considered
+        list: the rules that apply to the probed operator
         dict: the arguments the rules were probed with
         dict: rule name to the resources it produces
         dict: rule name to the graphOpId of each resource
@@ -651,7 +664,7 @@ def collect_symbolic_adjoint_resources(op_cls, op_name, kwargs, is_custom_op):
     name_to_resource_ids = {}
     applicable_rules = []
     for rule in rules:
-        if not rule.is_applicable(**probe_args):
+        if not _rule_is_applicable(rule, **probe_args):
             continue
 
         applicable_rules.append(rule)
