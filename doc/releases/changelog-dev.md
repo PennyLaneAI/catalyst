@@ -82,6 +82,13 @@
   way PennyLane's registry spells it, since a multi-controlled id reads `<n>C(...)` and PennyLane
   names every controlled operator `C(...)` whatever its control count.
 
+  Right now, a rule registered against `C(Op)` is traced with every control value on, matching
+  the all-ones controls a `<n>C(...)` graphOpId denotes: it records only the control *count*,
+  so an operator with a zero control value maps to the same node and is given the same rule,
+  without the `X` flips that value needs. Zero control values are therefore not yet supported
+  through this pathway; they still decompose correctly through rule distribution, whose
+  `qref.ctrl` region is given the control values at runtime.
+
   Two defects in applying a register-mode controlled rule are fixed along with it:
 
   - The rule's operands are now emitted as `func(qreg, param*, inWires*, inCtrlWires*)`, matching

@@ -54,6 +54,8 @@ from catalyst.decomposition.decomposition_rules import (
     name_unwrap_control,
     name_wrap_adjoint,
     prepare_dynamic_op_kwargs,
+    symbolic_arguments,
+    symbolic_op_name,
     wrap_modifier_id,
 )
 from catalyst.decomposition.graph_op_id import GraphOpID, build_graph_op_id
@@ -819,6 +821,175 @@ class TestSymbolicRules:
             result = circuit()
 
         # The controlled op fires and flips wire 0, so <Z_0> = -1; either defect gives +1.
+        assert np.allclose(result, -1.0)
+
+    @pytest.mark.parametrize("n_ctrl", [1, 2, 5])
+    def test_symbolic_arguments_for_control(self, n_ctrl):
+        """Test the arguments a rule registered against ``C(op)`` is called with: PennyLane passes
+        the controlled operator's own ``arguments`` so all five entries have to be there."""
+
+        base = qp.Hadamard(Wire[1])
+        args = symbolic_arguments(base, "control", ctrl_wires=range(n_ctrl))
+
+        assert set(args) == {
+            "base",
+            "control_wires",
+            "control_values",
+            "work_wires",
+            "work_wire_type",
+        }
+        assert args["base"] is base
+        assert len(args["control_wires"]) == n_ctrl
+        assert args["control_values"] == [True] * n_ctrl
+        assert all(value is True for value in args["control_values"])
+        assert args["work_wires"] == Wires([])
+        assert args["work_wire_type"] == "borrowed"
+
+    def test_symbolic_arguments_for_adjoint(self):
+        """Test an adjoint rule is called with the base operator alone."""
+
+        base = qp.Hadamard(Wire[1])
+        assert symbolic_arguments(base, "adjoint") == {"base": base}
+
+    @pytest.mark.parametrize("kind", ["adjoint", "control"])
+    def test_symbolic_helpers_reject_unknown_kind(self, kind):
+        """Test an unrecognized symbolic kind is refused rather than silently read as a control."""
+
+        assert symbolic_op_name("Hadamard", kind).endswith("(Hadamard)")
+        with pytest.raises(CompileError, match="Unknown symbolic kind: pow"):
+            symbolic_op_name("Hadamard", "pow")
+        with pytest.raises(CompileError, match="Unknown symbolic kind: pow"):
+            symbolic_arguments(qp.Hadamard(Wire[1]), "pow")
+
+    def test_control_values_and_work_wires_reach_the_rule(self):
+        """Test a rule that reads the control values and work wires is lowered against the ones the
+        ``<n>C(...)`` node denotes.
+
+        A rule branching on those values resolves statically at trace time, so the flips it would
+        apply for a zero control value must be absent from the lowered body.
+        """
+
+        recorded = {}
+
+        @register_resources(lambda base, control_wires, **_: {qp.ctrl(qp.X(Wire[1]), Wire[3]): 1})
+        def ctrl_rule(base, control_wires, control_values, work_wires, work_wire_type):
+            recorded["values"] = list(control_values)
+            recorded["work_wires"] = list(work_wires)
+            recorded["work_wire_type"] = work_wire_type
+            # The flips a zero control value would need; all-ones controls emit none of them.
+            for wire, value in zip(control_wires, control_values, strict=True):
+                if not value:
+                    qp.X(wire)
+            qp.ctrl(qp.X(base.wires), control=list(control_wires))
+
+        with local_decomps():
+            add_decomps("C(Hadamard)", ctrl_rule)
+
+            module = compile_registered_symbolic_rules(
+                "Hadamard",
+                "3C(Hadamard){}{wires:1}{}",
+                {},
+                {"wires": 1},
+                {},
+                op_cls=qp.Hadamard,
+                kind="control",
+                n_ctrl=3,
+            )
+
+        assert recorded["values"] == [True, True, True]
+        assert recorded["work_wires"] == []
+        assert recorded["work_wire_type"] == "borrowed"
+
+        (rule,) = [r for r in get_rule_strings_from_module(module) if "ctrl_rule" in r]
+        assert 'target_gate = "3C(Hadamard){}{wires:1}{}"' in rule
+        assert "(%arg0: !qref.reg<4>, %arg1: tensor<1xi64>, %arg2: tensor<3xi64>)" in rule
+        assert "MultiControlledX{control_values:[tensor<3xi1>]}{wires:4,work_wires:0}" in rule
+        assert "PauliX" not in rule
+
+    def test_multi_controlled_rule_is_wired_up_correctly(self):
+        """Test a rule registered on ``C(op)`` and lowered for several controls is given all of
+        them by executing it and the op must fire only when every control is on."""
+
+        class MultiCtrlWired(qp.core.Operator2):
+            """An operator whose controlled form is a Toffoli onto its wire."""
+
+            def __init__(self, wires):
+                super().__init__(wires=wires)
+
+        @register_resources({qp.PauliX: 1})
+        def x_rule(wires):
+            qp.X(wires=wires)
+
+        @register_resources(lambda base, control_wires, **_: {qp.Toffoli: 1})
+        def ctrl_rule(base, control_wires, **_):
+            qp.Toffoli(wires=list(control_wires) + list(base.wires))
+
+        def run(prepared_controls):
+            with local_decomps():
+                add_decomps(MultiCtrlWired, x_rule)
+                add_decomps("C(MultiCtrlWired)", ctrl_rule)
+
+                @qjit(capture=True)
+                @graph_decomposition(gate_set=["Toffoli", "PauliX"])
+                @qnode(qp.device("lightning.qubit", wires=3))
+                def circuit():
+                    for wire in prepared_controls:
+                        qp.X(wire)
+                    qp.ctrl(MultiCtrlWired(0), control=[1, 2])
+                    return qp.expval(qp.Z(0))
+
+                return circuit()
+
+        # Both controls on: the target flips. A rule handed only one control wire, or one whose
+        # controls and target were swapped, would not flip it.
+        assert np.allclose(run([1, 2]), -1.0)
+        # Only one control on: the target must be left alone.
+        assert np.allclose(run([1]), 1.0)
+
+    @pytest.mark.xfail(
+        strict=True,
+        reason="A <n>C(...) graphOpId records only the control count, so an operator with a zero "
+        "control value is handed a rule traced for all-ones controls. Fixed by normalizing zero "
+        "control values into X flips during capture; see the FIXME in symbolic_arguments.",
+    )
+    def test_zero_control_value_is_mislowered(self):
+        """Test an operator with a zero control value decomposes to the right state.
+
+        The registered symbolic rule is traced with every control value on, so the flips a zero
+        value needs are missing from the lowered body and the controlled op fires on the wrong
+        branch. The distribution pathway is unaffected: its ``qref.ctrl`` region is given the
+        control values at runtime.
+        """
+
+        class ZeroCtrl(qp.core.Operator2):
+            """An operator whose controlled form is a CNOT from the control onto its wire."""
+
+            def __init__(self, wires):
+                super().__init__(wires=wires)
+
+        @register_resources({qp.PauliX: 1})
+        def x_rule(wires):
+            qp.X(wires=wires)
+
+        @register_resources(lambda base, control_wires, **_: {qp.CNOT: 1})
+        def ctrl_rule(base, control_wires, **_):
+            qp.CNOT(wires=list(control_wires) + list(base.wires))
+
+        with local_decomps():
+            add_decomps(ZeroCtrl, x_rule)
+            add_decomps("C(ZeroCtrl)", ctrl_rule)
+
+            @qjit(capture=True)
+            @graph_decomposition(gate_set=["CNOT", "PauliX"])
+            @qnode(qp.device("lightning.qubit", wires=2))
+            def circuit():
+                # The control is off, and the control value is zero, so the op fires.
+                qp.ctrl(ZeroCtrl(0), control=[1], control_values=[False])
+                return qp.expval(qp.Z(0))
+
+            result = circuit()
+
+        # The op fires and flips wire 0. Today the flips are missing, so it does not and this is 1.
         assert np.allclose(result, -1.0)
 
     def test_discovered_op_gets_multi_controlled_rules(self):

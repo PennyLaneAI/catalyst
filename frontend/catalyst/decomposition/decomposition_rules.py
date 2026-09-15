@@ -115,6 +115,15 @@ def symbolic_arguments(base_op, kind, ctrl_wires=None) -> dict:
     if kind == "adjoint":
         return {"base": base_op}
     if kind == "control":
+        # FIXME: the all-ones assumption is unsound for an operator that carries a zero control
+        # value. A `<n>C(...)` graphOpId records only the control count, so such an operator maps
+        # to the same node as an all-ones one and the solver hands it this rule, which was traced
+        # without the `X` flips the zero value needs. It's silently giving the wrong state.
+        #
+        # The values cannot be spelled in the id (they may be dynamic), so the fix is to normalize
+        # them away where they are known, by emitting the flips around the operator during capture
+        # so that every controlled operator the decomposition sees really does denote all-ones
+        # controls.
         ctrl_wires = Wires(ctrl_wires)
         return {
             "base": base_op,
@@ -129,7 +138,7 @@ def symbolic_arguments(base_op, kind, ctrl_wires=None) -> dict:
 def rule_call_operands(call_args, call_kwargs, ctrl_wires=None) -> list:
     """Flatten a decomposition rule's call into positional operands.
 
-    The compiler reads a register-mode rule as ``func(qreg, param*, inWires*, inCtrlWires*?)``, so
+    The compiler reads a register-mode rule as ``func(qreg, param*, inWires*, inCtrlWires*)``, so
     the control wires trail the base wires (``prepareOperands`` in
     mlir/lib/Quantum/Transforms/GraphDecomposition/DecomposeLoweringImpl.hpp).
     ``qp.capture.subroutine`` traces through ``jax.jit``, which flattens keyword arguments in
