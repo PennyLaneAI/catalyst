@@ -18,7 +18,7 @@ ARG LIGHTNING_VERSION=main
 ARG CATALYST_VERSION=main
 ARG GCC_VERSION=13
 ARG CUDA_INSTALLER=https://developer.download.nvidia.com/compute/cuda/12.9.1/local_installers/cuda_12.9.1_575.57.08_linux.run
-ARG ROCM_INSTALLER=https://repo.radeon.com/amdgpu-install/7.0.3/ubuntu/noble/amdgpu-install_7.0.3.70003-1_all.deb
+ARG ROCM_INSTALLER=https://repo.radeon.com/amdgpu-install/7.2.4/ubuntu/noble/amdgpu-install_7.2.4.70204-1_all.deb
 ARG AMD_ARCH=AMD_GFX942
 ARG CUDA_ARCH=AMPERE80
 
@@ -109,11 +109,8 @@ ARG CATALYST_VERSION
 COPY --from=build-wheel-lightning-kokkos-openmp /opt/pennylane-lightning/dist/ /
 COPY --from=build-wheel-lightning-qubit /opt/pennylane-lightning/dist/ /
 RUN pip install --force-reinstall --no-cache-dir pennylane_lightning*.whl && rm pennylane_lightning*.whl
-RUN git clone --depth 1 --branch ${CATALYST_VERSION} --no-recurse-submodules \
-    https://github.com/PennyLaneAI/catalyst.git /tmp/catalyst
 RUN pip install --no-cache-dir \
-    git+https://github.com/PennyLaneAI/pennylane.git@${PENNYLANE_VERSION} \
-    && pip install --no-cache-dir --no-deps /tmp/catalyst && rm -rf /tmp/catalyst
+    git+https://github.com/PennyLaneAI/pennylane.git@${PENNYLANE_VERSION}
 
 # Install CUDA-12 in build venv image
 FROM base-build-python AS base-build-cuda
@@ -166,8 +163,7 @@ RUN pip install --force-reinstall --no-cache-dir pennylane_lightning*.whl && rm 
 RUN git clone --depth 1 --branch ${CATALYST_VERSION} --no-recurse-submodules \
     https://github.com/PennyLaneAI/catalyst.git /tmp/catalyst
 RUN pip install --no-cache-dir \
-    git+https://github.com/PennyLaneAI/pennylane.git@${PENNYLANE_VERSION} \
-    && pip install --no-cache-dir --no-deps /tmp/catalyst && rm -rf /tmp/catalyst
+    git+https://github.com/PennyLaneAI/pennylane.git@${PENNYLANE_VERSION} 
 
 # Download and build Lightning-GPU release
 FROM base-build-cuda AS build-wheel-lightning-gpu
@@ -202,11 +198,8 @@ ENV LD_LIBRARY_PATH="$VIRTUAL_ENV/lib/python3.12/site-packages/cuquantum/lib:$LD
 COPY --from=build-wheel-lightning-gpu /opt/pennylane-lightning/dist/ /
 COPY --from=build-wheel-lightning-qubit /opt/pennylane-lightning/dist/ /
 RUN pip install --no-cache-dir --force-reinstall pennylane_lightning*.whl && rm pennylane_lightning*.whl
-RUN git clone --depth 1 --branch ${CATALYST_VERSION} --no-recurse-submodules \
-    https://github.com/PennyLaneAI/catalyst.git /tmp/catalyst
 RUN pip install --no-cache-dir \
-    git+https://github.com/PennyLaneAI/pennylane.git@${PENNYLANE_VERSION} \
-    && pip install --no-cache-dir --no-deps /tmp/catalyst && rm -rf /tmp/catalyst
+    git+https://github.com/PennyLaneAI/pennylane.git@${PENNYLANE_VERSION}
 
 # Install ROCm in build venv image
 FROM base-build-python AS base-build-rocm
@@ -259,11 +252,8 @@ ENV LD_LIBRARY_PATH="/usr/lib/llvm-14/lib:$LD_LIBRARY_PATH"
 COPY --from=build-wheel-lightning-kokkos-rocm /opt/pennylane-lightning/dist/ /
 COPY --from=build-wheel-lightning-qubit /opt/pennylane-lightning/dist/ /
 RUN pip install --force-reinstall --no-cache-dir pennylane_lightning*.whl && rm pennylane_lightning*.whl
-RUN git clone --depth 1 --branch ${CATALYST_VERSION} --no-recurse-submodules \
-    https://github.com/PennyLaneAI/catalyst.git /tmp/catalyst
 RUN pip install --no-cache-dir \
-    git+https://github.com/PennyLaneAI/pennylane.git@${PENNYLANE_VERSION} \
-    && pip install --no-cache-dir --no-deps /tmp/catalyst && rm -rf /tmp/catalyst
+    git+https://github.com/PennyLaneAI/pennylane.git@${PENNYLANE_VERSION}
 
 
 # Download and build Catalyst
