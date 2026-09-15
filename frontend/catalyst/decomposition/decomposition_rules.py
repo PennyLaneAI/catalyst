@@ -88,17 +88,22 @@ def symbolic_arguments(base_op, kind, ctrl_wires=None) -> dict:
 
     Returns:
         dict: the arguments to call the rule with
+
+    Raises:
+        CompileError: if ``kind`` is not a known symbolic kind
     """
     if kind == "adjoint":
         return {"base": base_op}
-    ctrl_wires = Wires(ctrl_wires)
-    return {
-        "base": base_op,
-        "control_wires": ctrl_wires,
-        "control_values": [True] * len(ctrl_wires),
-        "work_wires": Wires([]),
-        "work_wire_type": "borrowed",
-    }
+    if kind == "control":
+        ctrl_wires = Wires(ctrl_wires)
+        return {
+            "base": base_op,
+            "control_wires": ctrl_wires,
+            "control_values": [True] * len(ctrl_wires),
+            "work_wires": Wires([]),
+            "work_wire_type": "borrowed",
+        }
+    raise CompileError(f"Unknown symbolic kind: {kind}")  # pragma: no cover
 
 
 def rule_call_operands(call_args, call_kwargs, ctrl_wires=None) -> list:
@@ -1367,7 +1372,8 @@ def fetch_all_reachable_decomposition_rules_from_op(
                     # need its class to rebuild the base of a registered adjoint rule.
                     op_classes.setdefault(probe[0], type(op))
 
-                    counts = {1} | ({res_ctrls} if res_ctrls > 1 else set())
+                    # The counts every op is captured under, plus the one this resource carries.
+                    counts = set(ctrl_counts) | ({res_ctrls} if res_ctrls > 1 else set())
                     if probe_id not in visited:
                         visited.add(probe_id)
                         queue.append(probe)
@@ -1375,7 +1381,7 @@ def fetch_all_reachable_decomposition_rules_from_op(
                         rules.extend(
                             compile_variants(probe[0], probe_id, *probe[1:], counts=sorted(counts))
                         )
-                    elif missing := counts - counts_done.setdefault(probe_id, {1}):
+                    elif missing := counts - counts_done.setdefault(probe_id, set(ctrl_counts)):
                         # Seen before, but under fewer controls: only the missing <n>C(...)
                         # variants are still owed, the rest are already in `rules`.
                         counts_done[probe_id] |= missing
