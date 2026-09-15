@@ -34,6 +34,8 @@ from operator2_dummy_gates import (
 from pennylane import qnode
 from pennylane.core.operator import abstractify
 from pennylane.decomposition import add_decomps, local_decomps, register_resources
+from pennylane.ops.op_math.adjoint2 import Adjoint2
+from pennylane.ops.op_math.controlled2 import ControlledOp2
 from pennylane.typing import Bool, Complex, Float, Int, Wire
 from pennylane.wires import Wires
 
@@ -60,6 +62,7 @@ from catalyst.decomposition.type_utils import (
     get_dummy_values_for_arg,
     replace_wires_with_placeholder_wires,
 )
+from catalyst.passes import graph_decomposition
 from catalyst.utils.exceptions import CompileError
 
 
@@ -242,6 +245,63 @@ class TestGenericUtilities:
         """Test that GraphOpIds are generated correctly by the frontend."""
         # NOTE: use startswith to match ops with uids/extra_data
         assert GraphOpID(op).getGraphOpId().startswith(id)
+
+    @pytest.mark.parametrize(
+        "op, expected_adjoint, expected_controls",
+        [
+            (qp.S(Wire[1]), False, 0),
+            (qp.adjoint(qp.S(Wire[1])), True, 0),
+            (qp.adjoint(qp.adjoint(qp.S(Wire[1]))), False, 0),  # adjoints cancel
+            (qp.ctrl(qp.S(Wire[1]), Wire[2]), False, 2),
+            (qp.ctrl(qp.adjoint(qp.S(Wire[1])), Wire[1]), True, 1),
+            (qp.adjoint(qp.ctrl(qp.S(Wire[1]), Wire[1])), True, 1),  # the non-canonical nesting
+            # A concrete controlled class is an operator in its own right, not a wrapper.
+            (qp.CH(Wire[2]), False, 0),
+        ],
+    )
+    def test_peel_modifiers(self, op, expected_adjoint, expected_controls):
+        """Test GraphOpID separates a symbolic operator into its base and the modifiers on it."""
+
+        base, adjoint, num_controls = GraphOpID.peel_modifiers(op)
+
+        assert (adjoint, num_controls) == (expected_adjoint, expected_controls)
+        assert not isinstance(base, (Adjoint2, ControlledOp2))
+
+    def test_peeled_identity_describes_the_base(self):
+        """Test the identity components of a symbolic operator are the base operator's, since the
+        base is what the compiler names and what owns the decomposition rules."""
+
+        wrapped = GraphOpID(qp.ctrl(qp.adjoint(qp.RX(Float, Wire[1])), Wire[2]))
+        base = GraphOpID(qp.RX(Float, Wire[1]))
+
+        assert wrapped.operator_name == base.operator_name == "RX"
+        assert wrapped.wire_lens == base.wire_lens == {"wires": 1}
+        assert wrapped.dynamic_shape == base.dynamic_shape
+        assert wrapped.is_custom_op == base.is_custom_op
+        assert wrapped.getBaseGraphOpId() == base.getGraphOpId() == "RX{0:[f64]}{wires:1}{}"
+
+    @pytest.mark.parametrize(
+        "op, caller_adjoint, caller_controls, expected",
+        [
+            # The operator's own modifiers, with the caller applying none.
+            (qp.adjoint(qp.S(Wire[1])), False, 0, "Adjoint(S){}{wires:1}{}"),
+            # The caller's modifiers, on a plain operator.
+            (qp.S(Wire[1]), True, 2, "2C(Adjoint(S)){}{wires:1}{}"),
+            # Both, composed: control outermost, and the two adjoints cancel.
+            (qp.adjoint(qp.S(Wire[1])), True, 1, "C(S){}{wires:1}{}"),
+            (qp.ctrl(qp.S(Wire[1]), Wire[1]), False, 1, "2C(S){}{wires:1}{}"),
+            # Either nesting of the same operator spells the one canonical id.
+            (qp.ctrl(qp.adjoint(qp.S(Wire[1])), Wire[1]), False, 0, "C(Adjoint(S)){}{wires:1}{}"),
+            (qp.adjoint(qp.ctrl(qp.S(Wire[1]), Wire[1])), False, 0, "C(Adjoint(S)){}{wires:1}{}"),
+        ],
+    )
+    def test_graph_op_id_composes_modifiers(self, op, caller_adjoint, caller_controls, expected):
+        """Test the modifiers the caller applies compose with the ones the operator carried rather
+        than wrapping an already-wrapped id a second time."""
+
+        op_id = GraphOpID(op).getGraphOpId(adjoint=caller_adjoint, num_controls=caller_controls)
+
+        assert op_id == expected
 
     def test_wrapper_operator(self, mocker):
         """Test that compile_decomposition_rules_wrapper doesn't error on Operator1 instances."""
@@ -724,6 +784,111 @@ class TestSymbolicRules:
         assert f'target_gate = "{target_id}"' in rule
         assert resource in rule
         assert signature in rule
+
+    def test_controlled_rule_is_wired_up_correctly(self):
+        """Test a rule registered on ``C(op)`` acts on the wires it was given by executing it."""
+
+        class CtrlWired(qp.core.Operator2):
+            """An operator whose controlled form is a CNOT from the control onto its wire."""
+
+            def __init__(self, wires):
+                super().__init__(wires=wires)
+
+        @register_resources({qp.PauliX: 1})
+        def x_rule(wires):
+            qp.X(wires=wires)
+
+        @register_resources(lambda base, control_wires, **_: {qp.CNOT: 1})
+        def ctrl_rule(base, control_wires, **_):
+            qp.CNOT(wires=list(control_wires) + list(base.wires))
+
+        with local_decomps():
+            add_decomps(CtrlWired, x_rule)
+            add_decomps("C(CtrlWired)", ctrl_rule)
+
+            @qjit(capture=True)
+            @graph_decomposition(gate_set=["CNOT", "PauliX"])
+            @qnode(qp.device("lightning.qubit", wires=2))
+            def circuit():
+                # The X both prepares the control in |1> -- so a swapped control/target leaves
+                # wire 0 unflipped -- and is the operation a dropped control qubit would undo.
+                qp.X(1)
+                qp.ctrl(CtrlWired(0), control=[1])
+                return qp.expval(qp.Z(0))
+
+            result = circuit()
+
+        # The controlled op fires and flips wire 0, so <Z_0> = -1; either defect gives +1.
+        assert np.allclose(result, -1.0)
+
+    def test_discovered_op_gets_multi_controlled_rules(self):
+        """Test an op reached through the walk is given rules for *every* control count in play,
+        not just a single control.
+        """
+
+        with local_decomps():
+
+            @register_resources({qp.Hadamard: 1})
+            def h_rule(reg):
+                qp.Hadamard(wires=reg[0])
+
+            add_decomps(NoParams, h_rule)
+
+            module_str = compile_reachable_decomposition_rules_wrapper(
+                "NoParams", "3C(NoParams){}{reg:1}{}", {}, {"reg": 1}, {}
+            )
+
+        assert 'target_gate = "3C(NoParams){}{reg:1}{}"' in module_str
+        # Hadamard is only reached through NoParams' rule, and needs the same control count.
+        assert 'target_gate = "3C(Hadamard){}{wires:1}{}"' in module_str
+
+    def test_symbolic_rule_of_multi_wire_argument_op_is_lowered(self):
+        """Test the base operator of a symbolic rule is built with each wire argument on its own
+        wires.
+        """
+
+        class DisjointRegisters(qp.core.Operator2):
+            """An operator that rejects overlapping registers, as QROM does."""
+
+            wire_argnames = ("control", "target")
+
+            def __init__(self, control, target):
+                if self._labels(control) & self._labels(target):
+                    raise ValueError("control and target wires must not overlap")
+                super().__init__(control=control, target=target)
+
+            @staticmethod
+            def _labels(wires):
+                """The concrete wire labels, skipping abstract ones."""
+                labels = set()
+                for wire in wires:
+                    try:
+                        labels.add(int(wire))
+                    except TypeError:
+                        pass
+                return labels
+
+        @register_resources(lambda base, control_wires, **_: {qp.CNOT: 1})
+        def ctrl_rule(base, control_wires, **_):
+            qp.CNOT(wires=[control_wires[0], base.target[0]])
+
+        with local_decomps():
+            add_decomps("C(DisjointRegisters)", ctrl_rule)
+
+            module = compile_registered_symbolic_rules(
+                "DisjointRegisters",
+                "C(DisjointRegisters){}{control:2,target:1}{}",
+                {},
+                {"control": 2, "target": 1},
+                {},
+                op_cls=DisjointRegisters,
+                kind="control",
+                n_ctrl=1,
+            )
+
+        (rule,) = get_rule_strings_from_module(module)
+        assert 'target_gate = "C(DisjointRegisters){}{control:2,target:1}{}"' in rule
+        assert '"CNOT{}{wires:2}{}" = 1 : i64' in rule
 
     def test_symbolic_resource_id_is_canonical(self):
         """Test a resource that is itself symbolic is spelled the way the compiler spells a

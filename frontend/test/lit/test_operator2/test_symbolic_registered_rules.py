@@ -77,3 +77,43 @@ def test_registered_self_adjoint_rule_targets_the_adjoint_op():
 
 
 test_registered_self_adjoint_rule_targets_the_adjoint_op()
+
+
+def _controlled_rule():
+    """A rule registered against ``C(NoParams)`` and written against the controlled operator's own
+    arguments: the base operator plus its control wires, values and work wires."""
+
+    @qp.register_resources(lambda base, control_wires, **_: {qp.CNOT: 1})
+    def controlled(base, control_wires, **_):
+        qp.CNOT(wires=[control_wires[0], base.reg[0]])
+
+    return controlled
+
+
+def test_registered_control_rule_targets_the_controlled_op():
+    """Test a rule registered against ``C(NoParams)`` is lowered for each control count in play
+    with the control wires trailing the base wires in the rule's operands."""
+    with qp.decomposition.local_decomps():
+        qp.add_decomps(NoParams, _base_rule())
+        qp.add_decomps("C(NoParams)", _controlled_rule())
+
+        print(
+            "\n".join(
+                fetch_all_reachable_decomposition_rules_from_op(
+                    op_name="NoParams",
+                    op_id="NoParams{}{reg:2}{}",
+                    dynamic_shape={},
+                    wire_lens={"reg": 2},
+                    static_data={},
+                    op_cls=NoParams,
+                    n_ctrls=2,
+                )
+            )
+        )
+
+    # CHECK-DAG: func.func private @"__builtin_controlled_C(NoParams){}{reg:2}{}"(%arg0: !qref.reg<3>, %arg1: tensor<2xi64>, %arg2: tensor<1xi64>){{.*}}"CNOT{}{wires:2}{}" = 1 : i64{{.*}}target_gate = "C(NoParams){}{reg:2}{}"
+    # CHECK-DAG: func.func private @"__builtin_controlled_2C(NoParams){}{reg:2}{}"(%arg0: !qref.reg<4>, %arg1: tensor<2xi64>, %arg2: tensor<2xi64>){{.*}}target_gate = "2C(NoParams){}{reg:2}{}"
+    # CHECK-DAG: func.func private @"__builtin_base_rule_2C(NoParams){}{reg:2}{}"{{.*}}"2C(SingleParam){x:[tensor<f64>]}{reg:2}{}" = 1 : i64{{.*}}target_gate = "2C(NoParams){}{reg:2}{}"
+
+
+test_registered_control_rule_targets_the_controlled_op()
