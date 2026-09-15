@@ -57,6 +57,14 @@ class CompilableData(qp.core.Operator2):
         super().__init__(a=a, b=b, thing=thing, wires=wires)
 
 
+class ArrayData(qp.core.Operator2):
+
+    compilable_argnames = ("angles",)
+
+    def __init__(self, angles, wires):
+        super().__init__(angles=angles, wires=wires)
+
+
 class MultipleRegisters(qp.core.Operator2):
 
     wire_argnames = ("reg1", "reg2")

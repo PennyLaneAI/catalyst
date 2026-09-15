@@ -130,8 +130,7 @@ class TestControlledDecomposition:
             ctrl(OpWithNoMatrix(wires=[0, 1]), control=[2, 3])
             return qp.probs()
 
-        with pytest.warns(UserWarning, match="AOT capture of jaxpr failed"):
-            circuit = qjit(f, target="jaxpr")
+        circuit = qjit(f, target="jaxpr")
 
         with pytest.raises(CompileError, match="not supported with catalyst on this device"):
             circuit()
@@ -162,8 +161,7 @@ class TestControlledDecomposition:
             ctrl(UnknownOp(wires=[0, 1]), control=[2, 3])
             return qp.probs()
 
-        with pytest.warns(UserWarning, match="AOT capture of jaxpr failed"):
-            circuit = qjit(f, target="jaxpr")
+        circuit = qjit(f, target="jaxpr")
 
         with pytest.raises(CompileError, match="not supported with catalyst on this device"):
             circuit()
