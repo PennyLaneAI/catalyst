@@ -78,7 +78,7 @@ struct DecomposableGatePattern final : public OpInterfaceRewritePattern<Decompos
 
     LogicalResult matchAndRewrite(DecomposableGate op, PatternRewriter &rewriter) const override {
         std::string gateName = op.getOperatorName();
-        llvm::errs() << "visiting " << gateName << "\n";
+
         // A modified op (adjoint and/or controlled) is a distinct operator from its base gate.
         bool isModified =
             op.getOperation()->hasAttr("adjoint") || !op.getCtrlQubitOperands().empty();

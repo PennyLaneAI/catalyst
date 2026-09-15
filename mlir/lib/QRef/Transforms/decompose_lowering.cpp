@@ -41,8 +41,11 @@
 #include "mlir/Transforms/Passes.h"
 #include "stablehlo/dialect/StablehloOps.h" // When we read the decomposition rules module from file, StablehloDialect may not be registered from start.
 
+#include "QRef/IR/QRefDialect.h"
+#include "QRef/Transforms/Passes.h"
 #include "QRef/Transforms/Patterns.h"
 #include "Quantum/IR/QuantumDialect.h"
+#include "Quantum/Transforms/Passes.h"
 
 #include "DecompUtils.hpp"
 
@@ -55,7 +58,6 @@ namespace catalyst {
 namespace qref {
 
 #define GEN_PASS_DEF_DECOMPOSELOWERINGPASS
-#define GEN_PASS_DECL_DECOMPOSELOWERINGPASS
 #include "QRef/Transforms/Passes.h.inc"
 
 /// A module pass that work through a module, register all decomposition functions, and apply the
@@ -67,6 +69,7 @@ struct DecomposeLoweringPass : impl::DecomposeLoweringPassBase<DecomposeLowering
         registry.insert<arith::ArithDialect>();
         registry.insert<func::FuncDialect>();
         registry.insert<quantum::QuantumDialect>();
+        registry.insert<qref::QRefDialect>();
         registry.insert<mlir::stablehlo::StablehloDialect>();
         registry.insert<tensor::TensorDialect>();
         registry.insert<ub::UBDialect>();
@@ -139,6 +142,12 @@ struct DecomposeLoweringPass : impl::DecomposeLoweringPassBase<DecomposeLowering
     void runOnOperation() final {
         ModuleOp module = cast<ModuleOp>(getOperation());
 
+        OpPassManager pm("builtin.module");
+        pm.addPass(createReferenceSemanticsConversionPass());
+        if (failed(runPipeline(pm, module))) {
+            return signalPassFailure();
+        }
+
         // Step 1: Discover and register all decomposition functions in the module
         llvm::StringSet<> targetRules;
         for (auto rule : targetRulesOption) {
@@ -157,6 +166,13 @@ struct DecomposeLoweringPass : impl::DecomposeLoweringPassBase<DecomposeLowering
         populateDecomposeLoweringPatterns(decompositionPatterns, decompositionRegistry,
                                           targetGateSet);
         if (failed(applyPatternsGreedily(module, std::move(decompositionPatterns)))) {
+            return signalPassFailure();
+        }
+
+        OpPassManager pm1("builtin.module");
+        pm1.addPass(createValueSemanticsConversionPass());
+        pm1.addPass(createCanonicalizerPass());
+        if (failed(runPipeline(pm1, module))) {
             return signalPassFailure();
         }
     }
