@@ -436,6 +436,18 @@ def split_call_args(kwargs, is_custom_op):
     return (), kwargs
 
 
+def _rule_is_applicable(op_name, rule, *args, **kwargs) -> bool:
+    """Return resource data for the decomposition rules that apply to ``op_name``."""
+    try:
+        return bool(rule.is_applicable(*args, **kwargs))
+    except Exception as e:  # pylint: disable=broad-except
+        warnings.warn(
+            f"Excluded the {rule.name} decomposition rule for {op_name}; raised '{e}'",
+            category=RuleLoweringWarning,
+        )
+        return False
+
+
 def collect_resources_for_op(
     op_name, kwargs, is_custom_op=False, adjoint_resources=False, num_controls=0
 ):
@@ -451,7 +463,7 @@ def collect_resources_for_op(
     Returns:
         dict: rule name to the resources it produces
         dict: rule name to the graphOpId of each resource
-        list: the rules considered
+        list: the rules that apply to the probed operator
     """
     decomp_rules = list(qp.decomposition.list_decomps(op_name))
     args, kwargs = split_call_args(kwargs, is_custom_op)
@@ -459,7 +471,12 @@ def collect_resources_for_op(
     # map each rule to its resources, in a more generic format
     name_to_resource_ids = {}
     name_to_resources = {}
+    applicable_rules = []
     for rule in decomp_rules:
+        if not _rule_is_applicable(op_name, rule, *args, **kwargs):
+            continue
+
+        applicable_rules.append(rule)
         try:
             # The `compute_resources` function's signature is the same as the Operator2 signature
             # for the original op of the rule
@@ -480,7 +497,7 @@ def collect_resources_for_op(
                 category=RuleLoweringWarning,
             )
 
-    return name_to_resources, name_to_resource_ids, decomp_rules
+    return name_to_resources, name_to_resource_ids, applicable_rules
 
 
 def prepare_dynamic_op_kwargs(dynamic_shape, wire_lens) -> dict:
@@ -600,10 +617,6 @@ def compile_decomposition_rules(
 
         return qp.capture.subroutine(decomp_rule)
 
-    condition_args, condition_kwargs = split_call_args(
-        kwargs | static_data | extra_data, is_custom_op
-    )
-
     subroutines = []
     for rule in decomp_rules:
         if rule.name not in name_to_resource_ids:
@@ -617,8 +630,7 @@ def compile_decomposition_rules(
                 category=RuleLoweringWarning,
             )
             continue
-        if rule.is_applicable(*condition_args, **condition_kwargs):
-            subroutines.append(rule_to_subroutine(rule))
+        subroutines.append(rule_to_subroutine(rule))
 
     # For control distribution, the extra control wires trail the base wires in the rule's operands.
     ctrl_wires = (
@@ -748,7 +760,7 @@ def collect_symbolic_resources(op_cls, op_name, kwargs, is_custom_op, *, kind, c
         ctrl_wires: the control wires, for ``kind="control"``
 
     Returns:
-        list: the rules considered
+        list: the rules that apply to the probed operator
         dict: the arguments the rules were probed with
         dict: rule name to the resources it produces
         dict: rule name to the graphOpId of each resource
@@ -765,7 +777,12 @@ def collect_symbolic_resources(op_cls, op_name, kwargs, is_custom_op, *, kind, c
 
     name_to_resources = {}
     name_to_resource_ids = {}
+    applicable_rules = []
     for rule in rules:
+        if not _rule_is_applicable(op_name, rule, **probe_args):
+            continue
+
+        applicable_rules.append(rule)
         try:
             resources = rule.compute_resources(**probe_args)
             name_to_resources[rule.name] = resources.gate_counts
@@ -781,7 +798,7 @@ def collect_symbolic_resources(op_cls, op_name, kwargs, is_custom_op, *, kind, c
                 category=RuleLoweringWarning,
             )
 
-    return rules, probe_args, name_to_resources, name_to_resource_ids
+    return applicable_rules, probe_args, name_to_resources, name_to_resource_ids
 
 
 # pylint: disable=too-many-arguments
@@ -877,8 +894,7 @@ def compile_registered_symbolic_rules(
                 category=RuleLoweringWarning,
             )
             continue
-        if rule.is_applicable(**probe_args):
-            subroutines.append(rule_to_subroutine(rule))
+        subroutines.append(rule_to_subroutine(rule))
 
     if not subroutines:
         return None

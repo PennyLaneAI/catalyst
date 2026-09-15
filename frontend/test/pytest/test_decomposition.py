@@ -33,7 +33,12 @@ from operator2_dummy_gates import (
 )
 from pennylane import qnode
 from pennylane.core.operator import abstractify
-from pennylane.decomposition import add_decomps, local_decomps, register_resources
+from pennylane.decomposition import (
+    add_decomps,
+    local_decomps,
+    register_condition,
+    register_resources,
+)
 from pennylane.ops.op_math.adjoint2 import Adjoint2
 from pennylane.ops.op_math.controlled2 import ControlledOp2
 from pennylane.typing import Bool, Complex, Float, Int, Wire
@@ -46,6 +51,7 @@ from catalyst.decomposition.decomposition_rules import (
     _control_modifier,
     _leading_modifier_kind,
     _modifier_kind,
+    collect_symbolic_resources,
     compile_decomposition_rules_wrapper,
     compile_reachable_decomposition_rules_wrapper,
     compile_registered_symbolic_rules,
@@ -519,6 +525,53 @@ class TestTraceTime:
 
         assert 'target_gate = "NoParams{}{reg:2}{}"' in mlir
         assert 'target_gate = "Adjoint(NoParams){}{reg:2}{}"' not in mlir
+
+    # NOTE: This is not a lit test as we need to verify that no warnings
+    # come from the inapplicable rule below.
+    def test_work_wire_rule_that_doesnt_apply_lowers_without_warning(self, recwarn):
+        """Tests the whole trace-time path: capture, id generation, and rule
+        lowering for an operator whose cheaper rule needs two borrowed work wires lowers cleanly
+        when only one is available.
+
+        This is the shape of PennyLane's real work-wire rules (``Select``, ``MultiControlledX``):
+        the rule declares its requirement as a condition, and its resource function derives a
+        work-wire count by subtraction, which is only meaningful once that condition holds.
+        """
+
+        def borrow_resources(reg1, reg2):
+            # Two work wires are consumed, any extras are passed on to the sub-decomposition.
+            return {qp.X(Wire[1]): 2 + len(Wire[len(reg2) - 2])}
+
+        @register_condition(lambda reg1, reg2: len(reg2) >= 2)
+        @register_resources(borrow_resources)
+        def borrow_two_work_wires(reg1, reg2):
+            qp.X(reg2[0:1])
+            qp.X(reg1[0:1])
+
+        @register_resources(lambda reg1, reg2: {qp.X(Wire[1]): 2})
+        def no_work_wires(reg1, reg2):
+            qp.X(reg1[0:1])
+            qp.X(reg1[0:1])
+
+        with local_decomps():
+            add_decomps(MultipleRegisters, borrow_two_work_wires, no_work_wires)
+
+            @qjit(capture=True, target="mlir")
+            @qnode(qp.device("null.qubit", wires=3))
+            def circuit():
+                MultipleRegisters(reg1=[0, 1], reg2=[2])
+                return qp.state()
+
+            mlir = circuit.mlir
+
+        lowering_warnings = [
+            str(w.message) for w in recwarn if issubclass(w.category, RuleLoweringWarning)
+        ]
+
+        assert not any("borrow_two_work_wires" in message for message in lowering_warnings)
+        assert 'target_gate = "MultipleRegisters{}{reg1:2,reg2:1}{}"' in mlir
+        assert "no_work_wires" in mlir
+        assert "borrow_two_work_wires" not in mlir
 
 
 class TestOnDemand:
@@ -1106,6 +1159,215 @@ class TestSymbolicRules:
             compile_registered_symbolic_rules(
                 "Hadamard", "Adjoint(Hadamard){}{wires:1}{}", {}, {"wires": 1}, {}, kind="adjoint"
             )
+
+
+class TestApplicabilityFilterOrdering:
+    """Regression tests that pin the behaviour that a rule's applicability condition is evaluated
+    before computing its resources.
+
+    This ensures we don't get cases where an inapplicable rule is generating resource-failure warnings
+    as it should never even be considered in the first place.
+
+    """
+
+    OP_ID = "SingleParam{x:[tensor<f64>]}{reg:1}{}"
+    OP_ARGS = ({"x": ["tensor<f64>"]}, {"reg": 1}, {})
+
+    # kind, lookup name, ctrl_wires
+    SYMBOLIC_KINDS = [
+        ("adjoint", "Adjoint(NoParams)", ()),
+        ("control", "C(NoParams)", (2,)),
+    ]
+
+    @staticmethod
+    def _lowering_warnings(recorded):
+        return [str(w.message) for w in recorded if issubclass(w.category, RuleLoweringWarning)]
+
+    @staticmethod
+    def _rule(name, applicable=True, resources_explode=False, condition_explodes=False):
+        def condition(x, reg):
+            if condition_explodes:
+                raise RuntimeError("some error")
+
+            return applicable
+
+        def resources(x, reg):
+            if resources_explode:
+                raise ValueError("another error")
+
+            return {NoParams(reg=Wire[1]): 1}
+
+        def impl(x, reg):
+            NoParams(reg=reg)
+
+        impl.__name__ = name
+        return register_condition(condition)(register_resources(resources)(impl))
+
+    def _compile(self, *rules):
+        with local_decomps():
+            add_decomps(SingleParam, *rules)
+            return compile_decomposition_rules_wrapper("SingleParam", self.OP_ID, *self.OP_ARGS)
+
+    @staticmethod
+    def _symbolic_rule(name, applicable=True, condition_explodes=False, resources_explode=False):
+        """A rule registered against ``Adjoint(NoParams)``/``C(NoParams)``.
+
+        PennyLane calls such a rule with the symbolic operator's own arguments: ``base`` alone for an
+        adjoint, and ``base`` plus the control entries for a controlled operator. The catch-all
+        absorbs the latter, so one helper serves both kinds.
+        """
+
+        def condition(base, **_):
+            if condition_explodes:
+                raise RuntimeError("some error")
+
+            return applicable
+
+        def resources(base, **_):
+            if resources_explode:
+                raise ValueError("another error")
+
+            return {NoParams(reg=Wire[2]): 1}
+
+        def impl(base, **_):
+            NoParams(reg=[0, 1])
+
+        impl.__name__ = name
+        return register_condition(condition)(register_resources(resources)(impl))
+
+    @staticmethod
+    def _collect_symbolic(rule, lookup_name, kind, ctrl_wires):
+        with local_decomps():
+            add_decomps(lookup_name, rule)
+            return collect_symbolic_resources(
+                NoParams,
+                "NoParams",
+                prepare_dynamic_op_kwargs({}, {"reg": 2}),
+                False,
+                kind=kind,
+                ctrl_wires=ctrl_wires,
+            )
+
+    # ---- Actual Tests -----
+
+    def test_inapplicable_rule_emits_no_warning(self, recwarn):
+        """Test that an inapplicable rule would be skipped. The condition check is first so we
+        should never see the resource failure happen."""
+
+        result = self._compile(
+            self._rule("inapplicable_rule", applicable=False, resources_explode=True)
+        )
+
+        assert self._lowering_warnings(recwarn) == []
+        assert "inapplicable_rule" not in result
+
+    def test_inapplicable_rule_never_computes_resources(self):
+        """Test that the resource function for an inapplicable rule is never called."""
+
+        calls = []
+
+        def resources(x, reg):
+            calls.append("called resources")
+            return {NoParams(reg=Wire[1]): 1}
+
+        def impl(x, reg):
+            NoParams(reg=reg)
+
+        impl.__name__ = "counted_rule"
+        # Make it not applicable
+        rule = register_condition(lambda x, reg: False)(register_resources(resources)(impl))
+
+        self._compile(rule)
+        assert calls == []
+
+    def test_inapplicable_rule_doesnt_hide_applicable_one(self, recwarn):
+        """Test that skipping an inapplicable rule leaves the applicable rules alone."""
+        result = self._compile(
+            self._rule("inapplicable_rule", applicable=False),
+            self._rule("applicable_rule", applicable=True),
+        )
+
+        assert self._lowering_warnings(recwarn) == []
+        assert "applicable_rule" in result
+        assert "inapplicable_rule" not in result
+        assert f'target_gate = "{self.OP_ID}"' in result
+
+    def test_raising_condition_drops_only_its_own_rule(self, recwarn):
+        """Tests that a condition that raises on the probe arguments is reported and its rule skipped."""
+
+        result = self._compile(
+            self._rule("exploding_rule", condition_explodes=True),
+            self._rule("applicable_rule"),
+        )
+
+        assert self._lowering_warnings(recwarn) == [
+            "Excluded the exploding_rule decomposition rule for SingleParam; raised 'some error'"
+        ]
+        assert "exploding_rule" not in result
+        assert "applicable_rule" in result
+
+    @pytest.mark.parametrize("kind, lookup_name, ctrl_wires", SYMBOLIC_KINDS)
+    def test_symbolic_skips_inapplicable_rule(self, kind, lookup_name, ctrl_wires, recwarn):
+        """Test that an inapplicable rule registered against a symbolic operator is skipped without
+        its resource function being called, for both symbolic kinds."""
+
+        rule = self._symbolic_rule(
+            "inapplicable_sym_rule", applicable=False, resources_explode=True
+        )
+        rules, _, name_to_resources, name_to_resource_ids = self._collect_symbolic(
+            rule, lookup_name, kind, ctrl_wires
+        )
+
+        assert self._lowering_warnings(recwarn) == []
+        assert [r.name for r in rules] == []
+        assert name_to_resources == {}
+        assert name_to_resource_ids == {}
+
+    @pytest.mark.parametrize("kind, lookup_name, ctrl_wires", SYMBOLIC_KINDS)
+    def test_symbolic_raising_condition_is_reported(self, kind, lookup_name, ctrl_wires, recwarn):
+        """Test that a condition that raises on the probe arguments is reported and its rule
+        skipped, for both symbolic kinds."""
+
+        rule = self._symbolic_rule("exploding_sym_rule", condition_explodes=True)
+        rules, _, name_to_resources, _ = self._collect_symbolic(rule, lookup_name, kind, ctrl_wires)
+
+        # NOTE: the message names the base operator, which is what `collect_symbolic_resources`
+        # hands down; the rule itself is registered against `lookup_name`.
+        assert self._lowering_warnings(recwarn) == [
+            "Excluded the exploding_sym_rule decomposition rule for NoParams; raised 'some error'"
+        ]
+        assert [r.name for r in rules] == []
+        assert name_to_resources == {}
+
+    def test_control_rule_needing_work_wires_is_skipped(self, recwarn):
+        """Test that a ``C(Op)`` rule requiring a work wire is filtered out on this path.
+
+        Note this test is intentionally mimicking _select_decomp_multi_control_work_wire's behaviour.
+        """
+
+        def condition(base, work_wires, **_):
+            return len(work_wires) >= 1
+
+        def resources(base, work_wires, **_):
+            # One work wire is consumed, the rest are passed on: only meaningful once the condition
+            # above holds, otherwise this is a register of unknown length.
+            passed_on = Wire[len(work_wires) - 1]
+            return {NoParams(reg=Wire[2]): 1 + len(passed_on)}
+
+        def impl(base, control_wires, control_values, work_wires, work_wire_type):
+            NoParams(reg=[0, 1])
+
+        impl.__name__ = "ctrl_work_wire_rule"
+        rule = register_condition(condition)(register_resources(resources)(impl))
+
+        rules, probe_args, name_to_resources, _ = self._collect_symbolic(
+            rule, "C(NoParams)", "control", (2,)
+        )
+
+        assert probe_args["work_wires"] == Wires([])
+        assert self._lowering_warnings(recwarn) == []
+        assert [r.name for r in rules] == []
+        assert name_to_resources == {}
 
 
 if __name__ == "__main__":
