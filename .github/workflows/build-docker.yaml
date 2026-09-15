@@ -1,0 +1,75 @@
+name: Build Pennylane Lightning Catalyst Docker Image
+
+permissions:
+  contents: read
+  
+on:
+    pull_request:
+        
+jobs:
+  check_if_wheel_build_required:
+    if: github.event.pull_request.draft == false
+    uses: ./.github/workflows/check-for-wheel-build.yml
+
+  constants:
+    needs: [check_if_wheel_build_required]
+    name: "Set build matrix"
+    uses: ./.github/workflows/constants.yaml
+    with:
+      runs_on: ubuntu-24.04
+    
+  build:
+    name: Build Docker Image
+    runs-on: blacksmith-8vcpu-ubuntu-2404
+    needs: [check_if_wheel_build_required, constants]    
+    strategy:
+      fail-fast: false
+      matrix:
+        python_version: ${{ fromJson(format('["{0}"]', needs.constants.outputs.primary_python_version)) }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      # - name: Build and push Docker image
+      #   uses: docker/build-push-action@v6
+      #   with:
+      #     context: .
+      #     file: Dockerfile
+      #     platforms: linux/arm64
+      #     push: false
+      #     build-args: |
+      #       PENNYLANE_VERSION=main
+      #       CATALYST_VERSION=main
+      #       LIGHTNING_VERSION=main
+      # Set up Blacksmith's high-speed NVMe Docker layer caching
+      - name: Set up Docker Builder
+        uses: useblacksmith/setup-docker-builder@v2
+        with:
+          cache-key: docker-image-artifact
+
+      # Build the image and export it to the runner's local Docker daemon
+      - name: Build Docker Image
+        uses: useblacksmith/build-push-action@v2
+        with:
+          context: .
+          file: ./Dockerfile
+          tags: plc:latest
+          # Crucial: load=true saves the image locally instead of pushing it online
+          load: true 
+
+      # Serialize the Docker image into a single transportable archive file
+      - name: Save Docker Image to Archive
+        run: |
+          mkdir -p output
+          docker save plc:latest -o output/plc.tar
+
+      # Upload the archive file so you can download it from the GitHub UI
+      - name: Upload Image as Workflow Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: compiled-docker-image
+          path: output/plc.tar
+          retention-days: 5            
