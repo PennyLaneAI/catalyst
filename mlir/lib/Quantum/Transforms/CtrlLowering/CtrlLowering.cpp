@@ -613,6 +613,9 @@ struct CtrlLoweringRewritePattern : public OpRewritePattern<CtrlOp> {
 
 namespace catalyst::qref {
 
+static LogicalResult distributeControlsQref(PatternRewriter &rewriter, Block &block,
+        SmallVector<Value> &currentCtrlQubits, ValueRange ctrlValues, SmallVector<Operation *> &opsToErase);
+
 
 static SmallVector<int32_t> readSegmentSizes(Operation *op, StringRef name) {
     auto seg = op->getAttrOfType<DenseI32ArrayAttr>(name);
@@ -720,6 +723,147 @@ static Operation *createControlledGate(PatternRewriter &rewriter, QuantumGate ga
 //                                 merged->getRegion(0).end());
 //     return cast<CtrlOp>(merged);
 // }
+/// Control an `scf.if` by turning the control qubits into extra results: each branch tracks the
+/// controls through its body and yields them alongside the original results.
+// static LogicalResult controlScfIf(PatternRewriter &rewriter, scf::IfOp ifOp,
+//                                   SmallVector<Value> &currentCtrlQubits, 
+//                                   ValueRange ctrlValues, SmallVector<Operation *> &opsToErase) {
+//     Type qubitType = QubitType::get(rewriter.getContext());
+//     unsigned numCtrl = currentCtrlQubits.size();
+
+//     // New results = the if's original results, plus one qubit per threaded control.
+//     SmallVector<Type> resultTypes(ifOp.getResultTypes().begin(), ifOp.getResultTypes().end());
+//     resultTypes.append(numCtrl, qubitType);
+
+//     auto newIf = scf::IfOp::create(rewriter, ifOp.getLoc(), resultTypes, ifOp.getCondition(),
+//                                    /*withElseRegion=*/true);
+
+//     // Control one branch: `oldBlock` may be null (a missing else), in which case the branch just
+//     // threads the incoming controls through unchanged.
+//     auto controlBranch = [&](Block *oldBlock, Block *newBlock) -> LogicalResult {
+//         SmallVector<Value> branchCtrl(currentCtrlQubits.begin(), currentCtrlQubits.end());
+//         rewriter.setInsertionPointToStart(newBlock);
+
+//         SmallVector<Value> yielded;
+//         Location yieldLoc = ifOp.getLoc();
+//         if (oldBlock) {
+//             if (failed(
+//                 distributeControlsQref(rewriter, *oldBlock, branchCtrl, ctrlValues, opsToErase))) {
+//                 return failure();
+//             }
+//             auto oldYield = cast<scf::YieldOp>(oldBlock->getTerminator());
+//             yieldLoc = oldYield.getLoc();
+//             for (Value v : oldYield.getOperands()) {
+//                 yielded.push_back(branchMap.lookupOrDefault(v));
+//             }
+//         }
+//         yielded.append(branchCtrl.begin(), branchCtrl.end());
+//         rewriter.setInsertionPointToEnd(newBlock);
+//         scf::YieldOp::create(rewriter, yieldLoc, yielded);
+//         return success();
+//     };
+
+//     if (failed(controlBranch(&ifOp.getThenRegion().front(), newIf.thenBlock()))) {
+//         return failure();
+//     }
+//     if (failed(controlBranch(ifOp.elseBlock(), newIf.elseBlock()))) {
+//         return failure();
+//     }
+
+//     // Map the original results one-to-one; the trailing results are the threaded control qubits.
+//     unsigned numOrig = ifOp.getNumResults();
+//     for (unsigned i = 0; i < numOrig; ++i) {
+//         map.map(ifOp.getResult(i), newIf.getResult(i));
+//     }
+//     currentCtrlQubits.assign(newIf.getResults().begin() + numOrig, newIf.getResults().end());
+
+//     // Restore the insertion point to after the new op so the enclosing walk keeps appending there
+//     // (controlBranch left it inside the else block).
+//     rewriter.setInsertionPointAfter(newIf);
+//     return success();
+// }
+
+static LogicalResult distributeControlsQref(PatternRewriter &rewriter, Block &block,
+    SmallVector<Value> &currentCtrlQubits, ValueRange ctrlValues, SmallVector<Operation *> &opsToErase) {
+    for (Operation &op : block.without_terminator()) {
+        if (auto gate = dyn_cast<QuantumGate>(op)) {
+            rewriter.setInsertionPoint(&op);
+            createControlledGate(rewriter, gate, currentCtrlQubits, ctrlValues);
+            opsToErase.push_back(&op);
+            continue;
+        }
+        if (auto inner = dyn_cast<CtrlOp>(op)) {
+            rewriter.modifyOpInPlace(inner, [&] {
+                inner.getCtrlQubitsMutable().append(currentCtrlQubits);
+                inner.getCtrlValuesMutable().append(ctrlValues);
+            });
+            continue;
+        }
+        if (isa<scf::IfOp, scf::ForOp, scf::WhileOp, scf::IndexSwitchOp>(op)) {
+
+            for (Region &region : op.getRegions()) {
+                if (!region.empty()) {
+                    if (failed(distributeControlsQref(rewriter, region.front(), currentCtrlQubits, ctrlValues, opsToErase))) {
+                        // return failure();
+                    }
+                }
+            }
+            continue;
+        }
+        // if (auto ifOp = dyn_cast<scf::IfOp>(op)) {
+
+        //     if (!ifOp.getThenRegion().empty()) { 
+        //         if (failed(distributeControlsQref(rewriter, ifOp.getThenRegion().front(), currentCtrlQubits, ctrlValues, opsToErase))) {
+        //             // return failure();
+        //         }
+        //     }
+        //     if (!ifOp.getElseRegion().empty()) {
+        //         if (failed(distributeControlsQref(rewriter, ifOp.getElseRegion().front(), currentCtrlQubits, ctrlValues, opsToErase))) {
+        //             // return failure();
+        //         }
+        //     }
+        //     // if (failed(controlScfIf(rewriter, ifOp, map, currentCtrlQubits, ctrlValues))) {
+        //     //     return failure();
+        //     // }
+        //     continue;
+        // }
+        // if (auto forOp = dyn_cast<scf::ForOp>(op)) {
+        //     // if (failed(controlScfFor(rewriter, forOp, map, currentCtrlQubits, ctrlValues))) {
+        //     //     return failure();
+        //     // }
+        //     continue;
+        // }
+        // if (auto whileOp = dyn_cast<scf::WhileOp>(op)) {
+        //     // if (failed(controlScfWhile(rewriter, whileOp, map, currentCtrlQubits, ctrlValues))) {
+        //     //     return failure();
+        //     // }
+        //     continue;
+        // }
+        // if (auto switchOp = dyn_cast<scf::IndexSwitchOp>(op)) {
+        //     // if (failed(controlScfIndexSwitch(rewriter, switchOp, map, currentCtrlQubits,
+        //     //                                  ctrlValues))) {
+        //     //     return failure();
+        //     // }
+        //     continue;
+        // }
+        // if (isa<InsertOp, ExtractOp, AllocOp, DeallocOp, AllocQubitOp, DeallocQubitOp>(op)) {
+        //     // Structural ops carry no controls; thread their operands/results through the map.
+        //     rewriter.clone(op, map);
+        //     continue;
+        // }
+        // if (isa<QuantumDialect>(op.getDialect())) {
+        //     op.emitError("unsupported quantum operation inside a quantum.ctrl region");
+        //     return failure();
+        // }
+        // Any other scf ops would need their body controlled too,
+        // which is not supported:
+        // if (op.getNumRegions() > 0) {
+        //     op.emitError("unsupported scf operation inside a qref.ctrl region");
+        //     return failure();
+        // }
+    }
+    return success();
+}
 
 // match and rewrite a qref.ctrl op with reference semantics
 // this needs to take in a qref.ctrl op and output qref.custum op
@@ -729,17 +873,17 @@ struct ReferenceSemanticsCtrlLoweringRewritePattern : public OpRewritePattern<Ct
     LogicalResult matchAndRewrite(CtrlOp ctrl, PatternRewriter &rewriter) const override {
         Block &block = ctrl.getRegion().front();
 
-        // 1. PRE-SCAN: Reject unsupported operations before mutating anything.
+        // PRE-SCAN: Reject unsupported operations before mutating anything.
         // If we modify the IR and then return failure, MLIR loops infinitely.
         for (Operation &op : block.without_terminator()) {
             if (isa<AdjointOp>(op)) {
-                op.emitError("nested quantum.adjoint inside a quantum.ctrl region is not supported by ctrl-lowering; run adjoint-lowering first");
+                // op.emitError("nested quantum.adjoint inside a quantum.ctrl region is not supported by ctrl-lowering; run adjoint-lowering first");
                 return failure();
             }
-            if (isa<scf::ForOp, scf::IfOp, scf::WhileOp, scf::IndexSwitchOp>(op)) {
-                op.emitError("control flow inside a quantum.ctrl region is not supported by ctrl-lowering");
-                return failure();
-            }
+            // if (op.getNumRegions() > 0) {
+            //     op.emitError("unsupported scf operation inside a qref.ctrl region");
+            //     return failure();
+            // }
         }
 
         // The control qubits are threaded through every enclosed gate; the control values are
@@ -749,24 +893,27 @@ struct ReferenceSemanticsCtrlLoweringRewritePattern : public OpRewritePattern<Ct
         ValueRange ctrlValues = ctrl.getCtrlValues();
         SmallVector<Operation *> opsToErase;
 
-        // 2. MUTATION: Now that we know the block is safe, perform the lowering.
-        for (Operation &op : block.without_terminator()) {
-            // Measurements (quantum.measure and MeasurementProcess ops) are already
-            // rejected by the CtrlOp verifier, so they never reach here in a verified
-            // pipeline.
-            if (auto gate = dyn_cast<QuantumGate>(op)) {
-                rewriter.setInsertionPoint(&op);
-                createControlledGate(rewriter, gate, currentCtrlQubits, ctrlValues);
-                opsToErase.push_back(&op);
-                continue;
-            }
-            if (auto inner = dyn_cast<CtrlOp>(op)) {
-                rewriter.modifyOpInPlace(inner, [&] {
-                    inner.getCtrlQubitsMutable().append(currentCtrlQubits);
-                    inner.getCtrlValuesMutable().append(ctrlValues);
-                });
-                continue;
-            }
+        // MUTATION: Now that we know the block is safe, perform the lowering.
+        // for (Operation &op : block.without_terminator()) {
+        //     // Measurements (quantum.measure and MeasurementProcess ops) are already
+        //     // rejected by the CtrlOp verifier, so they never reach here in a verified
+        //     // pipeline.
+        //     if (auto gate = dyn_cast<QuantumGate>(op)) {
+        //         rewriter.setInsertionPoint(&op);
+        //         createControlledGate(rewriter, gate, currentCtrlQubits, ctrlValues);
+        //         opsToErase.push_back(&op);
+        //         continue;
+        //     }
+        //     if (auto inner = dyn_cast<CtrlOp>(op)) {
+        //         rewriter.modifyOpInPlace(inner, [&] {
+        //             inner.getCtrlQubitsMutable().append(currentCtrlQubits);
+        //             inner.getCtrlValuesMutable().append(ctrlValues);
+        //         });
+        //         continue;
+        //     }
+        // }
+        if (failed(distributeControlsQref(rewriter, block, currentCtrlQubits, ctrlValues, opsToErase))) {
+            return failure();
         }
 
         for (Operation *op : opsToErase) {

@@ -19,7 +19,7 @@ func.func @ctrl_single_gate(%ctrl: !quantum.bit, %q: !quantum.bit) -> (!quantum.
   // CHECK-NOT: qref.ctrl
   // CHECK: %[[TRUE:.*]] = arith.constant true
   %true = arith.constant true
-  // CHECK: qref.custom "RX"() %{{.*}} ctrls(%{{.*}}) ctrlvals(%[[TRUE]]) : !qref.bit ctrls !qref.bit
+  // CHECK: qref.custom "Hadamard"() %{{.*}} ctrls(%{{.*}}) ctrlvals(%[[TRUE]]) : !qref.bit ctrls !qref.bit
   %outc, %outq = quantum.ctrl(%ctrl) ctrlvals(%true) (%q) : !quantum.bit -> !quantum.bit {
   ^bb0(%arg0: !quantum.bit):
     %h = quantum.custom "Hadamard"() %arg0 : !quantum.bit
@@ -34,7 +34,7 @@ func.func @ctrl_single_gate(%ctrl: !quantum.bit, %q: !quantum.bit) -> (!quantum.
 func.func @ctrl_two_gates(%ctrl: !quantum.bit, %q: !quantum.bit) -> (!quantum.bit, !quantum.bit) {
   %true = arith.constant true
   // CHECK: qref.custom "Hadamard"() %{{.*}} ctrls(%{{.*}}) ctrlvals(%{{.*}})
-  // CHECK: qref.custom "PauliX"() %[[O1]] ctrls(%[[C1]]) ctrlvals(%{{.*}})
+  // CHECK: qref.custom "PauliX"() %{{.*}} ctrls(%{{.*}}) ctrlvals(%{{.*}})
   %outc, %outq = quantum.ctrl(%ctrl) ctrlvals(%true) (%q) : !quantum.bit -> !quantum.bit {
   ^bb0(%arg0: !quantum.bit):
     %h = quantum.custom "Hadamard"() %arg0 : !quantum.bit
