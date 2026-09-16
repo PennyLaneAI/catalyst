@@ -312,6 +312,9 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
             llvm::StringRef opName = opNameRaw.trim();
             llvm::StringRef cost = costRaw.trim();
 
+            opName.consume_front("\"");
+            opName.consume_back("\"");
+
             cost.consume_back(": f64");
             cost = cost.trim();
 
