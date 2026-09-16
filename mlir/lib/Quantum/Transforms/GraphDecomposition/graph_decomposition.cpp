@@ -167,7 +167,6 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
             AltDecomps altDecomps = buildAltDecomps(opToAltDecompNames, rulesByName);
             DecompositionGraph graph(setOfOps, targetGateSet, setOfRules, std::move(fixedDecomps),
                                      std::move(altDecomps));
-            graph.showGraph();
             DecompositionSolver solver(graph);
             solution = solver.solve();
         }
@@ -449,7 +448,6 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
                     }
                     llvm::StringRef funcName =
                         func->getAttrOfType<mlir::StringAttr>("frontend_name");
-                    LDBG() << "checking " << funcName << " which targets " << targetGate;
 
                     if (opToFixedDecompName[targetGate] == funcName) {
                         if (failed(addRuleNode(func, ruleNodes))) {
