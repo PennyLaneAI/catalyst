@@ -17,6 +17,7 @@
   [(#3116)](https://github.com/PennyLaneAI/catalyst/pull/3116)
   [(#3127)](https://github.com/PennyLaneAI/catalyst/pull/3127)
   [(#3131)](https://github.com/PennyLaneAI/catalyst/pull/3131)
+  [(#3227)](https://github.com/PennyLaneAI/catalyst/pull/3227)
 
 * The graph-based decomposition system now supports **adjoint operators** for `Operator2`.
   [(#3120)](https://github.com/PennyLaneAI/catalyst/pull/3120)
@@ -145,6 +146,7 @@
   - Added the `DecomposableGate` op interface to allow generic handling of operations in the `graph-decomposition` pass.
     [(#2983)](https://github.com/PennyLaneAI/catalyst/pull/2983)
     [(#3022)](https://github.com/PennyLaneAI/catalyst/pull/3022)
+    [(#3161)](https://github.com/PennyLaneAI/catalyst/pull/3161)
 
     This allows arbitrary operations implementing the interface to be registered to and decomposed by the graph.
     This also allows the use of python-decompositions for any operator pre-registered in the frontend graph.
@@ -154,6 +156,7 @@
     [(#3046)](https://github.com/PennyLaneAI/catalyst/pull/3046)
     [(#3052)](https://github.com/PennyLaneAI/catalyst/pull/3052)
     [(#3053)](https://github.com/PennyLaneAI/catalyst/pull/3053)
+    [(#3229)](https://github.com/PennyLaneAI/catalyst/pull/3229)
 
     The format of `graphOpID` is as follows:
         op_name{dynamic_shape_dictionary}{wire_lens_dictionary}{static_data_dictionary}[UID]
@@ -209,6 +212,7 @@
     [(#3156)](https://github.com/PennyLaneAI/catalyst/pull/3156)
     [(#3158)](https://github.com/PennyLaneAI/catalyst/pull/3158)
     [(#3206)](https://github.com/PennyLaneAI/catalyst/pull/3206)
+    [(#3224)](https://github.com/PennyLaneAI/catalyst/pull/3224)
 
     1. The pass now supports applying a selection of the available decomposition rules via the `target_rules` parameter.
 
@@ -225,13 +229,21 @@
 
     6. The pass can now handle register-mode rules that target gates in control flow regions whose qubits were extracted outside the region.
 
+    7. The pass is now in reference semantics. This eliminates the need to walk back the qubit
+    SSA def-use chain when querying their extract indices, which is very time consuming for
+    big circuits.
+    This also means now the output of `--decompose-lowering` will have a canonical order for
+    the qubit arguments to the decomposition rule functions: the target qubits will always come
+    before the control qubits. This is guaranteed by the conversion back to value semantics upon
+    exiting `--decompose-lowering` pass.
+
   - `RuleLoweringWarning` is silenced by default. To display these warnings, set
     `CATALYST_SILENCE_RULE_LOWERING_WARNINGS=0`. This helps debug unexpected decompositions where
     rules cannot be lowered and they are silently dropped from the graph-decomposition system instead
     of raising an error.
     [(#3190)](https://github.com/PennyLaneAI/catalyst/pull/3190)
 
-* A failure during AOT compilation is now logged rather than raised. 
+* A failure during AOT compilation is now logged rather than raised.
   [(#3100)](https://github.com/PennyLaneAI/catalyst/pull/3100)
   [(#3194)](https://github.com/PennyLaneAI/catalyst/pull/3194)
 
@@ -555,7 +567,7 @@
   [(#3081)](https://github.com/PennyLaneAI/catalyst/pull/3081)
 
 * The ``ResourceAnalysis`` pass no longer reports PBC Pauli product rotations and measurements
-  with an ``Adjoint(...)`` prefix. Resource keys such as ``Adjoint(PPR-pi/4)`` and ``Adjoint(PPM)`` 
+  with an ``Adjoint(...)`` prefix. Resource keys such as ``Adjoint(PPR-pi/4)`` and ``Adjoint(PPM)``
   are now counted under ``PPR-pi/4`` and ``PPM`` instead.
   [(#3210)](https://github.com/PennyLaneAI/catalyst/pull/3210)
 
@@ -698,6 +710,7 @@
   [(#2937)](https://github.com/PennyLaneAI/catalyst/pull/2937)
   [(#2945)](https://github.com/PennyLaneAI/catalyst/pull/2945)
   [(#2948)](https://github.com/PennyLaneAI/catalyst/pull/2948)
+  [(#3224)](https://github.com/PennyLaneAI/catalyst/pull/3224)
 
 * Removed the internal ``mlir_specs`` function which was the old backend for :func:`qp.specs`. The resource analysis pass replaces its use.
   [(#2841)](https://github.com/PennyLaneAI/catalyst/pull/2841)

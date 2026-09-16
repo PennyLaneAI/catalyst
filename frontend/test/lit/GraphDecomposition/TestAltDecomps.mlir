@@ -16,7 +16,7 @@
 
 // RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{gate-set=testRY=3.0,testX=1.0,testZ=1.0 alt-decomps=testY=[y_to_ry,y_to_x_z] bytecode-rules="%BYTECODE_PATH"})' %s | FileCheck %s --check-prefixes XZ
 
-func.func @circuit() -> !quantum.bit {
+func.func @circuit() {
     %0 = quantum.alloc(2) : !quantum.reg
     %q = quantum.extract %0[0] : !quantum.reg -> !quantum.bit
     // RY-NOT: testY
@@ -29,7 +29,9 @@ func.func @circuit() -> !quantum.bit {
 
     // needed to ensure we don't match in the following decomposition rules
     // CHECK: return
-    return %qout : !quantum.bit
+    %1 = quantum.insert %0[ 0], %qout : !quantum.reg, !quantum.bit
+    quantum.dealloc %1 : !quantum.reg
+    return
 }
 
 // CHECK-LABEL: y_to_ry

@@ -470,6 +470,24 @@ func.func @test_while_loop_nested(%arg0: i1) attributes {quantum.node} {
 //
 
 
+// CHECK-LABEL: test_if_classical
+func.func @test_if_classical(%arg0: i1, %arg1: memref<1xf64>) attributes {quantum.node} {
+
+    // CHECK: scf.if %arg0 {
+    // CHECK:     memref.store
+    // CHECK: }
+    scf.if %arg0 {
+        %c0 = arith.constant 0 : index
+        %0 = arith.constant 0.1 : f64
+        memref.store %0, %arg1[%c0] : memref<1xf64>
+    }
+    return
+}
+
+
+// -----
+
+
 // CHECK-LABEL: test_if_non_root_no_else
 func.func @test_if_non_root_no_else(%arg0: i1) attributes {quantum.node} {
 
