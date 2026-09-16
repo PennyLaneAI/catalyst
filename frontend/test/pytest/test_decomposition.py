@@ -1392,8 +1392,8 @@ class TestApplicabilityFilterOrdering:
         assert name_to_resources == {}
 
 
-class TestRegisterModeRuleApplication:
-    """Integration tests for applying register-mode decomposition rules end to end."""
+class TestCustomRuleApplication:
+    """Integration tests for applying custom decomposition rules end-to-end."""
 
     def test_fixed_decomp_rule_ignoring_a_parameter(self):
         """Test a ``fixed_decomps`` rule whose body does not use the operator's parameter decomposes end
