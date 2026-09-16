@@ -139,7 +139,6 @@ def ordered_kwarg_names(call_kwargs, dynamic_shape) -> list:
     """Order a rule's keyword operands params-first, then wires, each group sorted by name."""
     params = sorted(name for name in call_kwargs if name in dynamic_shape)
     wires = sorted(name for name in call_kwargs if name not in dynamic_shape)
-    print(f"ordered_kwarg_names: params={params}, wires={wires}")
     return params + wires
 
 
@@ -686,7 +685,6 @@ def build_rule_module(
     """
 
     operands = rule_call_operands(call_args, call_kwargs, kwarg_names, ctrl_wires)
-    print(f"build_rule_module: operands={operands}, target_id={target_id}")
 
     @qp.qjit(target="mlir", capture=True, collect_decomp_rules=False)
     @qp.qnode(device=device)
