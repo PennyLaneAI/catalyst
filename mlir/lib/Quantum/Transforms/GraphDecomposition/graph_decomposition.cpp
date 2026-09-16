@@ -387,8 +387,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         return success();
     }
 
-    LogicalResult loadBuiltInDecompositionRules(llvm::StringRef filename,
-                                                std::vector<RuleNode> &ruleNodes) {
+    LogicalResult loadBuiltInDecompositionRules(llvm::StringRef filename) {
         mlir::MLIRContext *context = &getContext();
         mlir::ModuleOp module = getOperation();
         mlir::ParserConfig config(context);
@@ -403,11 +402,9 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
             return failure();
         }
 
+        // add to module
         for (auto rule :
              llvm::make_early_inc_range(builtinModule.get().getOps<mlir::func::FuncOp>())) {
-            if (failed(addRuleNode(rule, ruleNodes))) {
-                return failure();
-            }
             // avoid double-insertion
             if (!symbolTable.lookup<mlir::func::FuncOp>(rule.getName())) {
                 rule->remove();
@@ -421,9 +418,9 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
      * @brief Load the listed user rules into the set of RuleNodes for the graph.
      */
     LogicalResult
-    loadUserDecompositionRules(llvm::StringMap<std::string> &opToFixedDecompName,
-                               llvm::StringMap<llvm::SmallVector<std::string>> &opToAltDecompNames,
-                               std::vector<RuleNode> &ruleNodes) {
+    loadDecompositionRules(llvm::StringMap<std::string> &opToFixedDecompName,
+                           llvm::StringMap<llvm::SmallVector<std::string>> &opToAltDecompNames,
+                           std::vector<RuleNode> &ruleNodes) {
         mlir::ModuleOp module = getOperation();
 
         WalkResult walkResult = module.walk([&](mlir::func::FuncOp func) {
@@ -651,17 +648,17 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
                  llvm::StringMap<std::string> &opToFixedDecompName,
                  llvm::StringMap<llvm::SmallVector<std::string>> &opToAltDecompNames) {
         ScopedDiagnosticTimer t("decomp:rules");
-        // Load pre-compiled rules (ignore failure, we can try to solve without)
-        std::ignore = loadBuiltInDecompositionRules(filename, rules);
+        // Load pre-compiled rules (ignore failure, we can try to solve without) into the module
+        std::ignore = loadBuiltInDecompositionRules(filename);
 
-        // Lower compile-time rules into the module; loadUserDecompositionRules (below)
-        // registers the materialized `__builtin`-prefixed funcs as RuleNodes.
+        // Lower compile-time rules into the module
         if (failed(loadPythonDecomps())) {
             return failure();
         }
 
-        // Load user-rules
-        if (failed(loadUserDecompositionRules(opToFixedDecompName, opToAltDecompNames, rules))) {
+        // Load rules from the module into the set of rules used by the graph, filtering by fixed-
+        // and alt-decomps
+        if (failed(loadDecompositionRules(opToFixedDecompName, opToAltDecompNames, rules))) {
             return failure();
         }
         return success();
