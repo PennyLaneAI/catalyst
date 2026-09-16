@@ -44,14 +44,10 @@ LogicalResult verifyTypeIsCacheable(Type ty, Operation *op) {
     ArrayRef<int64_t> shape = aTensorType.getShape();
     Type elementType = aTensorType.getElementType();
 
-    // Real-valued scalar/rank-1 tensors (e.g. `quantum.operator` angle tensors) are cached
-    // element-wise as plain f64 values.
+    // Real-valued tensors of any rank (e.g. `quantum.operator` angle tensors or a BasisRotation
+    // matrix) are cached element-wise as plain f64 values.
     if (elementType.isF64()) {
-        if (shape.size() > 1) {
-            return op->emitOpError()
-                   << "Caching only supports scalar or rank-1 real F64 tensors, got " << ty;
-        }
-        return success();
+        return;
     }
 
     // TODO: Generalize to arbitrary dimensions
