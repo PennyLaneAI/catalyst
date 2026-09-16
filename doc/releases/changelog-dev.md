@@ -212,6 +212,7 @@
     [(#3156)](https://github.com/PennyLaneAI/catalyst/pull/3156)
     [(#3158)](https://github.com/PennyLaneAI/catalyst/pull/3158)
     [(#3206)](https://github.com/PennyLaneAI/catalyst/pull/3206)
+    [(#3224)](https://github.com/PennyLaneAI/catalyst/pull/3224)
 
     1. The pass now supports applying a selection of the available decomposition rules via the `target_rules` parameter.
 
@@ -227,6 +228,14 @@
     Gates with null decomposition rules are simply removed.
 
     6. The pass can now handle register-mode rules that target gates in control flow regions whose qubits were extracted outside the region.
+
+    7. The pass is now in reference semantics. This eliminates the need to walk back the qubit
+    SSA def-use chain when querying their extract indices, which is very time consuming for
+    big circuits.
+    This also means now the output of `--decompose-lowering` will have a canonical order for
+    the qubit arguments to the decomposition rule functions: the target qubits will always come
+    before the control qubits. This is guaranteed by the conversion back to value semantics upon
+    exiting `--decompose-lowering` pass.
 
   - `RuleLoweringWarning` is silenced by default. To display these warnings, set
     `CATALYST_SILENCE_RULE_LOWERING_WARNINGS=0`. This helps debug unexpected decompositions where
