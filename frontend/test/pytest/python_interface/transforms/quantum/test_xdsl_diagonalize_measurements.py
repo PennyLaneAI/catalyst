@@ -534,7 +534,7 @@ class TestDiagonalizeFinalMeasurementsProgramCaptureExecution:
 
         assert np.allclose(expected_res(angle), circuit_compiled(angle))
 
-    @pytest.mark.xfail("Requires fixes from PennyLane #10156", strict=True)
+    @pytest.mark.xfail(reason="Requires fixes from PennyLane #10156", strict=True)
     def test_with_composite_observables(self, capture_mode):
         """Test the transform works for an observable built using operator arithmetic
         (sprod, prod, sum)"""
@@ -677,7 +677,7 @@ class TestDiagonalizeFinalMeasurementsCatalystFrontend:
 
         np.allclose(expected_res(angle), circuit_compiled(angle))
 
-    @pytest.mark.xfail("Requires fixes from PennyLane #10156", strict=True)
+    @pytest.mark.xfail(reason="Requires fixes from PennyLane #10156", strict=True)
     def test_with_composite_observables(self, capture_mode):
         """Test the transform works for an observable built using operator arithmetic
         (sprod, prod, sum)"""
