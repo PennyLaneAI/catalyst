@@ -887,13 +887,6 @@ def compile_registered_symbolic_rules(
     for rule in rules:
         if rule.name not in name_to_resource_ids:
             continue
-        if _resources_have_measurement(name_to_resources[rule.name]):  # pragma: no cover
-            warnings.warn(
-                f"Skipped the {rule.name} decomposition rule for {target_id}: it contains a "
-                "mid-circuit measurement, which is not supported with adjoint or control regions.",
-                category=RuleLoweringWarning,
-            )
-            continue
         subroutines.append(rule_to_subroutine(rule))
 
     if not subroutines:
