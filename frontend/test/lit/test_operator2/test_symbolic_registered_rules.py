@@ -87,7 +87,6 @@ def _adjoint_rule_with_mcm():
         m0 = qp.measure(base.wires)
         qp.cond(m0, NoParams)(base.wires)
 
-
     return rule_with_mcm
 
 
