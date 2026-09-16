@@ -127,15 +127,9 @@ class TestGateSetOption:
     """Cover how gate-set names are carried into the pass options."""
 
     def test_modifier_wrapped_name_is_preserved(self):
-        """A modifier-wrapped gate-set name (e.g. ``Adjoint(TemporaryAND)``, which is not a bare
-        MLIR identifier and therefore gets quoted when the gate-set ``DictionaryAttr`` is printed)
-        is carried into the options with its clean, unquoted name alongside plain names.
-
-        The compiler-side counterpart -- ``parseGateset`` stripping the quotes MLIR adds when
-        printing that ``DictionaryAttr`` -- is covered by the lit test
-        ``GraphDecomposition/TestGatesetQuotedName.mlir``. Together they guard both ends of the
-        quote boundary so a modifier op that is in the gate set is recognized as terminal instead
-        of failing the solver with "rule not found"."""
+        """Test a modifier-wrapped gate-set name (e.g. ``Adjoint(TemporaryAND)`` will be
+        serialized correctly down to the pass options.
+        """
         _, options = graph_decomposition_setup_inputs(
             {"Adjoint(TemporaryAND)", "TemporaryAND"}, **_DUMMY_LIBS
         )
