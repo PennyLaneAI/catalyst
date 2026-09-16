@@ -231,7 +231,6 @@
     7. The pass is now in reference semantics. This eliminates the need to walk back the qubit
     SSA def-use chain when querying their extract indices, which is very time consuming for
     big circuits.
-
     This also means now the output of `--decompose-lowering` will have a canonical order for
     the qubit arguments to the decomposition rule functions: the target qubits will always come
     before the control qubits. This is guaranteed by the conversion back to value semantics upon
