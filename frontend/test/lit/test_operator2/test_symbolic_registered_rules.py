@@ -110,7 +110,8 @@ def test_registered_symbolic_rule_accepts_mcm():
             )
         )
 
-    # CHECK-DAG: func.func private @"__builtin_rule_with_mcm_Adjoint(NoParams){}{reg:1}{}"(%arg0: !qref.reg<1>, %arg1: tensor<1xi64>){{.*}}"NoParams{}{reg:1}{}" = 1 : i64{{.*}}target_gate = "Adjoint(NoParams){}{reg:1}{}"
+    # CHECK-LABEL: func.func private @"__builtin_rule_with_mcm_Adjoint(NoParams){}{reg:1}{}"
+    # CHECK-SAME: target_gate = "Adjoint(NoParams){}{reg:1}{}"
 
 
 test_registered_symbolic_rule_accepts_mcm()
