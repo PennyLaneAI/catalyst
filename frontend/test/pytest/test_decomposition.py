@@ -1392,5 +1392,43 @@ class TestApplicabilityFilterOrdering:
         assert name_to_resources == {}
 
 
+class TestRegisterModeRuleApplication:
+    """Integration tests for applying register-mode decomposition rules end to end."""
+
+    def test_fixed_decomp_rule_ignoring_a_parameter(self):
+        """Test a ``fixed_decomps`` rule whose body does not use the operator's parameter decomposes end
+        to end without crashing."""
+        from operator2_dummy_gates import NoParams, SingleParam
+
+        @register_resources({NoParams(reg=Wire[1]): 2})
+        def expensive_fixed_decomp(x, reg):  # pylint: disable=unused-argument
+            NoParams(reg=reg[0])
+            NoParams(reg=reg[0])
+
+        @register_resources({NoParams(reg=Wire[1]): 1})
+        def cheaper_decomp(x, reg):  # pylint: disable=unused-argument
+            NoParams(reg=reg[0])
+
+        with local_decomps():
+            add_decomps(SingleParam, expensive_fixed_decomp, cheaper_decomp)
+
+            @qjit(capture=True, target="mlir")
+            @graph_decomposition(
+                gate_set={NoParams: 1},
+                fixed_decomps={SingleParam: expensive_fixed_decomp},
+            )
+            @qnode(qp.device("null.qubit", wires=2))
+            def circuit():
+                SingleParam(x=0.5, reg=[0, 1])
+
+            resources = qp.specs(circuit, level="all-mlir")().resources
+
+        # The parameterized SingleParam is decomposed by the graph pass into the target NoParams.
+        assert resources["Before MLIR Passes"].counts == {"SingleParam": 1}
+        after = resources["graph-decomposition"].counts
+        assert "SingleParam" not in after
+        assert after.get("NoParams", 0) >= 1
+
+
 if __name__ == "__main__":
     pytest.main(["-x", __file__])
