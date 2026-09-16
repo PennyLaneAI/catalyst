@@ -136,8 +136,7 @@ def symbolic_arguments(base_op, kind, ctrl_wires=None) -> dict:
 
 
 def ordered_kwarg_names(call_kwargs, dynamic_shape) -> list:
-    """Order a rule's keyword operands params-first, then wires, each group sorted by name.
-    """
+    """Order a rule's keyword operands params-first, then wires, each group sorted by name."""
     params = sorted(name for name in call_kwargs if name in dynamic_shape)
     wires = sorted(name for name in call_kwargs if name not in dynamic_shape)
     print(f"ordered_kwarg_names: params={params}, wires={wires}")

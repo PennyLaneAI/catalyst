@@ -125,7 +125,6 @@ struct DecomposeLoweringPass : impl::DecomposeLoweringPassBase<DecomposeLowering
         });
     }
 
-
   public:
     void runOnOperation() final {
         ModuleOp module = cast<ModuleOp>(getOperation());
