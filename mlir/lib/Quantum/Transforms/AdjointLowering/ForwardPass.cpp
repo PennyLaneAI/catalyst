@@ -52,17 +52,23 @@ void populateArgIdxMapping(TypeRange types, DenseMap<unsigned, unsigned> &argIdx
 /// the cache for the reverse pass to replay.
 class AugmentedCircuitGenerator {
   public:
-    AugmentedCircuitGenerator(IRMapping &oldToCloned, QuantumCache &cache)
-        : oldToCloned(oldToCloned), cache(cache) {}
+    AugmentedCircuitGenerator(IRMapping &oldToCloned, QuantumCache &cache, Region &adjointRegion)
+        : oldToCloned(oldToCloned), cache(cache), adjointRegion(adjointRegion) {}
 
     /// Given a `region` containing classical preprocessing and quantum operations, generate an
     /// augmented version that caches all the parameters required to deterministically re-execute
     /// the circuit (gate params, classical control flow, and dynamic wires).
     void generate(Region &region, OpBuilder &builder);
 
+    bool hasFailed() const { return generationFailed; }
+
   private:
     IRMapping &oldToCloned;
     QuantumCache &cache;
+    /// The top level region of the adjoint operation being lowered. Note that `generate` recurses
+    /// into nested control flow regions, so its `region` argument is not necessarily this one.
+    Region &adjointRegion;
+    bool generationFailed = false;
 
     void visitOperation(scf::ForOp forOp, OpBuilder &builder);
     void visitOperation(scf::WhileOp whileOp, OpBuilder &builder);
@@ -92,10 +98,21 @@ void AugmentedCircuitGenerator::cacheGate(quantum::ParametrizedGate gate, OpBuil
 
     for (Value param : params) {
         Location loc = gate.getLoc();
+
+        // Params that the reverse pass can already see do not need to be recorded. The reverse pass
+        // applies the same predicate to the same values and reuses them in place of a pop, so the
+        // push/pop contract stays consistent between the two passes.
+        if (isAvailableToReversePass(param, adjointRegion)) {
+            continue;
+        }
+
         Value clonedParam = oldToCloned.lookupOrDefault(param);
         Type paramType = clonedParam.getType();
         Operation *op = gate;
-        verifyTypeIsCacheable(paramType, op);
+        if (mlir::failed(verifyTypeIsCacheable(paramType, op))) {
+            generationFailed = true;
+            return;
+        }
 
         if (paramType.isF64()) {
             ListPushOp::create(builder, loc, clonedParam, cache.paramVector);
@@ -109,6 +126,8 @@ void AugmentedCircuitGenerator::cacheGate(quantum::ParametrizedGate gate, OpBuil
         // Hence the sanitization.
         if (!isa<RankedTensorType>(paramType)) {
             gate.emitOpError() << "Unexpected type.";
+            generationFailed = true;
+            return;
         }
 
         auto aTensor = cast<RankedTensorType>(paramType);
@@ -426,10 +445,11 @@ void AugmentedCircuitGenerator::mapResults(Operation *oldOp, Operation *clonedOp
 namespace catalyst {
 namespace quantum {
 
-void generateAdjointForwardPass(Region &region, OpBuilder &builder, IRMapping &oldToCloned,
-                                QuantumCache &cache) {
-    AugmentedCircuitGenerator generator{oldToCloned, cache};
+LogicalResult generateAdjointForwardPass(Region &region, OpBuilder &builder, IRMapping &oldToCloned,
+                                         QuantumCache &cache) {
+    AugmentedCircuitGenerator generator{oldToCloned, cache, region};
     generator.generate(region, builder);
+    return failure(generator.hasFailed());
 }
 
 } // namespace quantum

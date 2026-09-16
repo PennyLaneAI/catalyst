@@ -15,7 +15,9 @@
 #pragma once
 
 #include "mlir/IR/Builders.h"
+#include "mlir/IR/Region.h"
 #include "mlir/IR/Value.h"
+#include "mlir/Support/LogicalResult.h"
 
 #include "Catalyst/IR/CatalystDialect.h"
 
@@ -45,9 +47,25 @@ struct QuantumCache {
     void emitDealloc(mlir::OpBuilder &builder, mlir::Location loc);
 };
 
-/// Verify that `ty` is a type the cache knows how to record (an f64 scalar or a 2D tensor of
-/// complex<f64>), emitting an error on `op` otherwise.
-void verifyTypeIsCacheable(mlir::Type ty, mlir::Operation *op);
+/// Verify that `ty` is a type the cache knows how to record (an f64 scalar, a scalar/rank-1 tensor
+/// of f64, or a 2D tensor of complex<f64>). Emits an error on `op` and returns failure otherwise.
+mlir::LogicalResult verifyTypeIsCacheable(mlir::Type ty, mlir::Operation *op);
+
+/// Returns true if `param`, a gate parameter used inside `adjointRegion`, is already available at
+/// the point where the reverse pass emits its gates, and therefore does not need to be recorded in
+/// the cache at all.
+///
+/// This holds in two cases:
+///   - `param` is defined outside `adjointRegion`. It dominates the adjoint operation, hence it
+///     also dominates everything the forward and reverse passes emit in its place.
+///   - `param` is defined at the immediate top level of `adjointRegion`. The forward pass clones
+///     top-level classical operations to the insertion point that the reverse pass then continues
+///     from, and both passes share a single `IRMapping`, so the reverse pass can look the cloned
+///     value up directly.
+///
+/// It does not hold for values defined inside nested control flow, since the forward pass rebuilds
+/// those regions and their values are neither visible nor loop-invariant: they must be recorded.
+bool isAvailableToReversePass(mlir::Value param, mlir::Region &adjointRegion);
 
 } // namespace quantum
 } // namespace catalyst
