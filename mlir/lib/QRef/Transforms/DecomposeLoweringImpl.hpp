@@ -106,8 +106,11 @@ class BaseSignatureAnalyzer {
         for (const auto &index : signature.inCtrlWireIndices) {
             regs.insert(index.getReg());
         }
-        assert(regs.size() == 1 &&
-               "register-mode decomposition rule cannot span multiple qregs yet");
+        assert(regs.size() == 1 ||
+               (llvm::errs() << "register-mode decomposition rule cannot span multiple qregs yet, "
+                                "got "
+                             << regs.size() << " registers.\n",
+                false));
         return regs.front();
     }
 
@@ -221,14 +224,20 @@ class BaseSignatureAnalyzer {
         size_t paramTypeEnd = startIdx;
 
         while (paramTypeCount < sigParamElements) {
-            assert(paramTypeEnd < funcInputs.size() &&
-                   "param type end should be less than function input size");
+            assert(paramTypeEnd < funcInputs.size() ||
+                   (llvm::errs() << "param type end should be less than function input size, got "
+                                 << paramTypeEnd << " and " << funcInputs.size()
+                                 << " respectively.\n",
+                    false));
             paramTypeCount += getElementsCount(funcInputs[paramTypeEnd]);
             paramTypeEnd++;
         }
 
-        assert(paramTypeCount == sigParamElements &&
-               "param element count should match the function input element count");
+        assert(paramTypeCount == sigParamElements ||
+               (llvm::errs()
+                    << "param element count should match the function input element count, got "
+                    << paramTypeCount << " and " << sigParamElements << " respectively.\n",
+                false));
 
         return {startIdx, paramTypeEnd};
     }
@@ -274,7 +283,10 @@ class BaseSignatureAnalyzer {
             return tensor::FromElementsOp::create(rewriter, loc, type, values);
         }
 
-        assert(values.size() == 1 && "number of values should be 1 for non-tensor type");
+        assert(values.size() == 1 ||
+               (llvm::errs() << "number of values should be 1 for non-tensor type, got "
+                             << values.size() << ".\n",
+                false));
         return values.front();
     }
 
@@ -305,8 +317,11 @@ class BaseSignatureAnalyzer {
             signature.inCtrlWireIndices.emplace_back(index);
         }
 
-        assert((signature.inWireIndices.size() + signature.inCtrlWireIndices.size()) > 0 &&
-               "inWireIndices or inCtrlWireIndices should not be empty");
+        assert((signature.inWireIndices.size() + signature.inCtrlWireIndices.size()) > 0 ||
+               (llvm::errs() << "inWireIndices or inCtrlWireIndices should not be empty, got "
+                             << signature.inWireIndices.size() << " and "
+                             << signature.inCtrlWireIndices.size() << " respectively.\n",
+                false));
     }
 };
 
