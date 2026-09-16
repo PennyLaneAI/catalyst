@@ -716,6 +716,7 @@ def build_rule_module(
                 )
                 op.attributes["target_gate"] = ir.StringAttr.get(target_id)
                 op.attributes["sym_visibility"] = ir.StringAttr.get("public")
+                op.attributes["frontend_name"] = ir.StringAttr.get(rule_name)
 
         return ir.WalkResult.ADVANCE
 
