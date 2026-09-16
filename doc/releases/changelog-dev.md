@@ -17,6 +17,7 @@
   [(#3116)](https://github.com/PennyLaneAI/catalyst/pull/3116)
   [(#3127)](https://github.com/PennyLaneAI/catalyst/pull/3127)
   [(#3131)](https://github.com/PennyLaneAI/catalyst/pull/3131)
+  [(#3227)](https://github.com/PennyLaneAI/catalyst/pull/3227)
 
 * The graph-based decomposition system now supports **adjoint operators** for `Operator2`.
   [(#3120)](https://github.com/PennyLaneAI/catalyst/pull/3120)
@@ -145,6 +146,7 @@
   - Added the `DecomposableGate` op interface to allow generic handling of operations in the `graph-decomposition` pass.
     [(#2983)](https://github.com/PennyLaneAI/catalyst/pull/2983)
     [(#3022)](https://github.com/PennyLaneAI/catalyst/pull/3022)
+    [(#3161)](https://github.com/PennyLaneAI/catalyst/pull/3161)
 
     This allows arbitrary operations implementing the interface to be registered to and decomposed by the graph.
     This also allows the use of python-decompositions for any operator pre-registered in the frontend graph.
@@ -238,7 +240,7 @@ This also allows the use of python-decompositions for any operator pre-registere
     of raising an error.
     [(#3190)](https://github.com/PennyLaneAI/catalyst/pull/3190)
 
-* A failure during AOT compilation is now logged rather than raised. 
+* A failure during AOT compilation is now logged rather than raised.
   [(#3100)](https://github.com/PennyLaneAI/catalyst/pull/3100)
   [(#3194)](https://github.com/PennyLaneAI/catalyst/pull/3194)
 
@@ -559,7 +561,7 @@ This also allows the use of python-decompositions for any operator pre-registere
   [(#3081)](https://github.com/PennyLaneAI/catalyst/pull/3081)
 
 * The ``ResourceAnalysis`` pass no longer reports PBC Pauli product rotations and measurements
-  with an ``Adjoint(...)`` prefix. Resource keys such as ``Adjoint(PPR-pi/4)`` and ``Adjoint(PPM)`` 
+  with an ``Adjoint(...)`` prefix. Resource keys such as ``Adjoint(PPR-pi/4)`` and ``Adjoint(PPM)``
   are now counted under ``PPR-pi/4`` and ``PPM`` instead.
   [(#3210)](https://github.com/PennyLaneAI/catalyst/pull/3210)
 
