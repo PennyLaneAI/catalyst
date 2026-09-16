@@ -59,6 +59,7 @@ from catalyst.decomposition.decomposition_rules import (
     name_unwrap_adjoint,
     name_unwrap_control,
     name_wrap_adjoint,
+    ordered_kwarg_names,
     prepare_dynamic_op_kwargs,
     symbolic_arguments,
     symbolic_op_name,
@@ -76,6 +77,27 @@ from catalyst.utils.exceptions import CompileError
 
 class TestGenericUtilities:
     """Tests for common decomposition rule lowering utilities."""
+
+    @pytest.mark.parametrize(
+        "call_kwargs, dynamic_shape, expected",
+        [
+            # A wire name that sorts before a param name (`reg` < `x`) must still place the param
+            # first, matching the compiler's `func(qreg, param*, inWires*)` contract.
+            ({"reg": 0, "x": 0}, {"x": None}, ["x", "reg"]),
+            # Custom ops carry their params positionally, so only wires remain here (unchanged).
+            ({"wires": 0}, {"0": None}, ["wires"]),
+            # Multiple params and wires each stay sorted within their group, params first.
+            ({"reg": 0, "b": 0, "a": 0}, {"a": None, "b": None}, ["a", "b", "reg"]),
+        ],
+    )
+    def test_ordered_kwarg_names_groups_params_before_wires(
+        self, call_kwargs, dynamic_shape, expected
+    ):
+        """ordered_kwarg_names lays keyword operands out params-first then wires (each sorted),
+        regardless of how the two groups' names sort against each other. Without this, a wire
+        argument whose name sorts before a parameter's places its (multi-element) wire-index operand
+        ahead of the parameter and breaks the compiler's param/wire split."""
+        assert ordered_kwarg_names(call_kwargs, dynamic_shape) == expected
 
     def test_probe_wires_dont_overlap(self):
         """Test that the helper for generating probe arguments doesnt create
