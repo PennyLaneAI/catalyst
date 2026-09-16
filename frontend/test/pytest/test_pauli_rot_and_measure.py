@@ -136,16 +136,14 @@ def test_pauli_rot_to_ppr_pauli_word_error():
     """Test that unsupported pauli words raises `ValueError`."""
     pipe = [("pipe", ["quantum-compilation-stage"])]
 
-    with pytest.warns(UserWarning, match="AOT.*failed"):
+    @qjit(pipelines=pipe, target="mlir", capture=True, collect_decomp_rules=False)
+    def test_pauli_rot_to_ppr_pauli_word_error_workflow():
 
-        @qjit(pipelines=pipe, target="mlir", capture=True, collect_decomp_rules=False)
-        def test_pauli_rot_to_ppr_pauli_word_error_workflow():
+        @qp.qnode(qp.device("null.qubit", wires=1))
+        def f():
+            qp.PauliRot(np.pi / 4, "A", wires=0)
 
-            @qp.qnode(qp.device("null.qubit", wires=1))
-            def f():
-                qp.PauliRot(np.pi / 4, "A", wires=0)
-
-            return f()
+        return f()
 
     with pytest.raises(
         ValueError,
@@ -159,16 +157,14 @@ def test_pauli_measure_to_ppr_pauli_word_error():
     """Test that unsupported pauli words raises `ValueError`."""
     pipe = [("pipe", ["quantum-compilation-stage"])]
 
-    with pytest.warns(UserWarning, match="AOT.*failed"):
+    @qjit(pipelines=pipe, target="mlir", capture=True, collect_decomp_rules=False)
+    def test_pauli_measure_to_ppr_pauli_word_error_workflow():
 
-        @qjit(pipelines=pipe, target="mlir", capture=True, collect_decomp_rules=False)
-        def test_pauli_measure_to_ppr_pauli_word_error_workflow():
+        @qp.qnode(qp.device("null.qubit", wires=1))
+        def f():
+            qp.pauli_measure("A", wires=0)
 
-            @qp.qnode(qp.device("null.qubit", wires=1))
-            def f():
-                qp.pauli_measure("A", wires=0)
-
-            return f()
+        return f()
 
     with pytest.raises(
         ValueError,

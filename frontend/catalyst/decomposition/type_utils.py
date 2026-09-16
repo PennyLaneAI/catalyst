@@ -15,14 +15,18 @@
 """Type handling utilities for decomposition rule lowering."""
 
 import copy
+import itertools
 import re
 
 import jax.numpy as jnp
 import numpy as np
 import pennylane as qp
+from jax._src.interpreters.mlir import dtype_to_ir_type
 from jax._src.lib.mlir import ir
 from jax.core import ShapedArray
 from pennylane.pytrees import flatten, unflatten
+
+from catalyst.jax_extras.lowering import mlir_build_context
 
 _MLIR_DTYPES_TO_PY_DTYPES = {
     "i1": jnp.bool_,
@@ -37,64 +41,23 @@ _MLIR_DTYPES_TO_PY_DTYPES = {
     "complex<f64>": jnp.complex128,
 }
 
-_PY_DTYPES_TO_MLIR_DTYPES = {v: k for k, v in _MLIR_DTYPES_TO_PY_DTYPES.items()} | {
-    float: "f64",
-    int: "i64",
-    complex: "complex<f64>",
-    ir.F16Type: "f16",
-    ir.F32Type: "f32",
-    ir.F64Type: "f64",
-    (ir.ComplexType, ir.F32Type): "complex<f32>",
-    (ir.ComplexType, ir.F64Type): "complex<f64>",
-    np.dtype("bool_"): "i1",
-    np.dtype("int8"): "i8",
-    np.dtype("int16"): "i16",
-    np.dtype("int32"): "i32",
-    np.dtype("int64"): "i64",
-    np.dtype("float16"): "f16",
-    np.dtype("float32"): "f32",
-    np.dtype("float64"): "f64",
-    np.dtype("complex64"): "complex<f32>",
-    np.dtype("complex128"): "complex<f64>",
-}
-
 
 def convert_item_to_mlir_type(item, is_special_lowering=False):
-    """Convert a string or PennyLane AbstractArray to an mlir type annotation."""
+    """Convert a string or PennyLane AbstractArray to an mlir type annotation.
+
+    The type is spelled by MLIR's own printer, applied to the type the value lowers to, which is
+    what ``printDynamicShape`` in mlir/lib/Quantum/IR/QuantumInterfaces.cpp does as well. One
+    printer spelling both sides is what keeps a rule compiled here findable by the
+    ``graph-decomposition`` pass.
+    """
     if isinstance(item, str):
         return item
 
-    if item.shape == ():
-        if is_special_lowering:
-            return _PY_DTYPES_TO_MLIR_DTYPES[item.dtype]
-        return "tensor<" + _PY_DTYPES_TO_MLIR_DTYPES[item.dtype] + ">"
-
-    return (
-        "tensor<"
-        + "x".join(str(dim_size) for dim_size in item.shape)
-        + "x"
-        + _PY_DTYPES_TO_MLIR_DTYPES[item.dtype]
-        + ">"
-    )
-
-
-def format_dynamic_params_for_id(d):
-    """Format a structure for ID."""
-
-    def handle_item(item):
-        match item:
-            case str():
-                return item
-            case list() | tuple():
-                return "[" + ",".join(handle_item(i) for i in item) + "]"
-
-    return (
-        "{"
-        + ",".join(
-            k + ":" + "[" + ",".join(handle_item(item) for item in v) + "]" for k, v in d.items()
-        )
-        + "}"
-    )
+    with mlir_build_context():
+        element_type = dtype_to_ir_type(np.dtype(item.dtype))
+        if is_special_lowering and item.shape == ():
+            return str(element_type)
+        return str(ir.RankedTensorType.get(item.shape, element_type))
 
 
 def get_dummy_values_for_arg(arg):
@@ -126,7 +89,9 @@ def get_dummy_values_for_arg(arg):
                 # NOTE: numpy is required since jax won't create an array of strings
                 return jnp.zeros(np.array(arg, str).shape, dtype)
         case ShapedArray():
-            return jnp.zeros(arg.shape[0], dtype=arg.dtype)
+            # Use the full shape as arg.shape[0] raised IndexError for rank-0 avals
+            # and silently truncated anything of rank > 1 to its leading axis.
+            return jnp.zeros(arg.shape, dtype=arg.dtype)
         case type() | jnp.dtype():
             try:
                 return jnp.zeros((), jnp.dtype(arg))
@@ -155,10 +120,21 @@ def replace_wires_with_placeholder_wires(node):
     """
     # Wires is a pytree itself, so it has to be marked as a leaf to be replaced as a whole.
     leaves, tree = flatten(copy.deepcopy(node), is_leaf=_is_wires)
-    leaves = [
-        qp.wires.Wires(range(-1, -len(leaf) - 1, -1)) if _is_wires(leaf) else leaf
-        for leaf in leaves
-    ]
+
+    # NOTE: Run an accumulator to generate unique negative wire labels
+    # as some operators like qp.ctrl(qp.H(Wire[1]), Wire[1]) would
+    # fail to unflatten as without this change they would have duplicate wire labels
+    counter = itertools.count(-1, -1)
+    new_leaves = []
+    for leaf in leaves:
+        if _is_wires(leaf):
+            new_wires = qp.wires.Wires([next(counter) for _ in range(len(leaf))])
+            new_leaves.append(new_wires)
+        else:
+            new_leaves.append(leaf)
+
+    leaves = new_leaves
+
     return unflatten(leaves, tree)
 
 

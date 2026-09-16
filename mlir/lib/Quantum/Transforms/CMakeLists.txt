@@ -7,14 +7,13 @@ file(GLOB SRC
     AdjointLowering/ForwardPass.cpp
     AdjointLowering/QuantumCache.cpp
     AdjointLowering/ReversePass.cpp
+    AdjointLowering/ResolveGateLevelAdjoint.cpp
     BufferizableOpInterfaceImpl.cpp
     CancelInversesPatterns.cpp
     CtrlLowering/CtrlLowering.cpp
     RemoveGlobalPhasesPass.cpp
     ConversionPatterns.cpp
     GraphDecomposition/DecompUtils.cpp
-    GraphDecomposition/DecomposeLoweringPatterns.cpp
-    GraphDecomposition/decompose_lowering.cpp
     GraphDecomposition/graph_decomposition.cpp
     DisentangleCNOT.cpp
     DisentangleSWAP.cpp
