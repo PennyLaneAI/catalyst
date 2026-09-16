@@ -85,7 +85,7 @@ def _adjoint_rule_with_mcm():
     @qp.register_resources({NoParams(Wire[1]): 1, qp.MidMeasure: 1})
     def rule_with_mcm(base):
         m0 = qp.measure(base.wires)
-        qp.cond(m0, NoParams)(0)
+        qp.cond(m0, NoParams)(base.wires)
 
 
     return rule_with_mcm
