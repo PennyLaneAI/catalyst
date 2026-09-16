@@ -154,7 +154,11 @@
 [(#3161)](https://github.com/PennyLaneAI/catalyst/pull/3161)
 
 This allows arbitrary operations implementing the interface to be registered to and decomposed by the graph.
-This also allows the use of python-decompositions for any operator pre-registered in the frontend graph.
+  - Added the `DecomposableGate` op interface to allow generic handling of operations in the `graph-decomposition` pass.
+    [(#3161)](https://github.com/PennyLaneAI/catalyst/pull/3161)
+
+    This allows arbitrary operations implementing the interface to be registered to and decomposed by the graph.
+    This also allows the use of python-decompositions for any operator pre-registered in the frontend graph.
 
   - The graph solver now matches operators solely by `graphOpId`; the legacy `name`/`numWires` matching pathway has been removed.
     [(#3039)](https://github.com/PennyLaneAI/catalyst/pull/3039)
