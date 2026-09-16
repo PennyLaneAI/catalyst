@@ -248,7 +248,7 @@ class TestCatalystIntegration:
 
         assert not capture_enabled()
 
-        @qjit(pass_plugins=[getXDSLPluginAbsolutePath()])
+        @qjit(pass_plugins=[getXDSLPluginAbsolutePath()], capture=False)
         @qp.qnode(qp.device("lightning.qubit", wires=2))
         def f(x):
             qp.RX(x, 0)
@@ -282,7 +282,7 @@ class TestCatalystIntegration:
 
         assert not capture_enabled()
 
-        @qjit
+        @qjit(capture=False)
         @apply_pass("hello-world")
         @qp.qnode(qp.device("lightning.qubit", wires=2))
         def f(x):
@@ -322,7 +322,7 @@ class TestCatalystIntegration:
 
         assert not capture_enabled()
 
-        @qjit
+        @qjit(capture=False)
         @apply_pass("hello-world")
         @catalyst_cancel_inverses
         @qp.qnode(qp.device("lightning.qubit", wires=2))

@@ -22,7 +22,7 @@ from catalyst import qjit
 from catalyst.tracing.type_signatures import get_arg_names
 
 
-@qjit
+@qjit(capture=False)
 def f_of_empty():
     """Check empty list of arguments"""
     return True
@@ -32,7 +32,7 @@ f_of_empty.jit_compile([])
 assert get_arg_names(f_of_empty.jaxpr.in_avals, f_of_empty.original_function) == []
 
 
-@qjit
+@qjit(capture=False)
 def f_of_a_b(a: float, b: float):
     """Check two float arguments"""
     return a * b
@@ -44,7 +44,7 @@ original_function = f_of_a_b.original_function
 assert get_arg_names(jaxpr_in_avals, original_function) == ["a", "b"]
 
 
-@qjit(abstracted_axes={0: "n"})
+@qjit(abstracted_axes={0: "n"}, capture=False)
 def f_of_dynamic_argument(a):
     """Check dynamic argument"""
     return a
@@ -56,7 +56,7 @@ original_function = f_of_dynamic_argument.original_function
 assert get_arg_names(jaxpr_in_avals, original_function) == ["a", ""]
 
 
-@qjit(abstracted_axes={0: "n"})
+@qjit(abstracted_axes={0: "n"}, capture=False)
 def f_of_qnode_with_dynamic_argument(a):
     """Check QNode argument with dynamic argument"""
 
@@ -73,7 +73,7 @@ original_function = f_of_qnode_with_dynamic_argument.original_function
 assert get_arg_names(jaxpr_in_avals, original_function) == ["a", ""]
 
 
-@qjit
+@qjit(capture=False)
 def f_of_a_with_dynamic_result(a):
     """Check dynamic result"""
     return jnp.ones((a + 1,), dtype=float)
@@ -85,7 +85,7 @@ original_function = f_of_a_with_dynamic_result.original_function
 assert get_arg_names(jaxpr_in_avals, original_function) == ["a"]
 
 
-@qjit(abstracted_axes={0: "n", 2: "m"})
+@qjit(abstracted_axes={0: "n", 2: "m"}, capture=False)
 def f_of_shaped_array(a: ShapedArray([1, 3, 1], dtype=float)):
     """Check ShapedArray argument"""
     return a

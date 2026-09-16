@@ -57,7 +57,7 @@ def test_pipeline_lowering():
         "merge_rotations": {},
     }
 
-    @qjit(keep_intermediate=True)
+    @qjit(keep_intermediate=True, capture=False)
     @pipeline(my_pipeline)
     @qp.qnode(qp.device("lightning.qubit", wires=2))
     def test_pipeline_lowering_workflow(x):
@@ -92,7 +92,7 @@ def test_transform_lowering():
     Basic pipeline lowering on one qnode.
     """
 
-    @qjit(keep_intermediate=True)
+    @qjit(keep_intermediate=True, capture=False)
     @qp.transforms.merge_rotations
     @qp.transforms.cancel_inverses
     @qp.qnode(qp.device("lightning.qubit", wires=2))
@@ -142,7 +142,7 @@ def test_pipeline_lowering_keep_original():
 
     f_pipeline = pipeline(my_pipeline)(f)
 
-    @qjit(keep_intermediate=True)
+    @qjit(keep_intermediate=True, capture=False)
     def test_pipeline_lowering_keep_original_workflow(x):
         return f(x), f_pipeline(x)
 
@@ -191,7 +191,7 @@ def test_pipeline_lowering_global():
         "merge_rotations": {},
     }
 
-    @qjit(keep_intermediate=True, circuit_transform_pipeline=my_pipeline)
+    @qjit(keep_intermediate=True, circuit_transform_pipeline=my_pipeline, capture=False)
     def global_wf():
         @qp.qnode(qp.device("lightning.qubit", wires=2))
         def g(x):
@@ -256,7 +256,7 @@ def test_pipeline_lowering_globloc_override():
         "merge_rotations": {},
     }
 
-    @qjit(keep_intermediate=True, circuit_transform_pipeline=global_pipeline)
+    @qjit(keep_intermediate=True, circuit_transform_pipeline=global_pipeline, capture=False)
     def global_wf():
         @qp.qnode(qp.device("lightning.qubit", wires=2))
         def g(x):
@@ -320,7 +320,7 @@ def test_chained_pipeline_lowering():
         "merge_rotations": {},
     }
 
-    @qjit
+    @qjit(capture=False)
     @pipeline(pipeline1)
     @pipeline(pipeline2)
     @qp.qnode(qp.device("lightning.qubit", wires=2))
@@ -366,7 +366,7 @@ def test_chained_pipeline_lowering_keep_original():
     f_pipeline1 = pipeline(pipeline1)(f)
     f_pipeline2 = pipeline(pipeline2)(f_pipeline1)
 
-    @qjit
+    @qjit(capture=False)
     def test_chained_pipeline_lowering_keep_original_workflow(x: float):
         return f(x), f_pipeline1(x), f_pipeline2(x)
 
@@ -393,7 +393,7 @@ def test_chained_apply_passes():
     Test that chained passes are correctly applied in sequence using apply_pass.
     """
 
-    @qjit
+    @qjit(capture=False)
     @apply_pass("merge-rotations")
     @apply_pass("cancel-inverses")
     @qp.qnode(qp.device("lightning.qubit", wires=2))
@@ -431,7 +431,7 @@ def test_chained_apply_passes_keep_original():
     f_pass1 = apply_pass("cancel-inverses")(f)
     f_pass2 = apply_pass("merge-rotations")(f_pass1)
 
-    @qjit
+    @qjit(capture=False)
     def test_chained_apply_passes_keep_original_workflow(x: float):
         return f(x), f_pass1(x), f_pass2(x)
 
@@ -456,7 +456,7 @@ def test_chained_peephole_passes():
     Test that chained peephole passes are correctly applied in sequence.
     """
 
-    @qjit
+    @qjit(capture=False)
     @merge_rotations
     @cancel_inverses
     @qp.qnode(qp.device("lightning.qubit", wires=2))
@@ -494,7 +494,7 @@ def test_chained_peephole_passes_keep_original():
     f_pass1 = cancel_inverses(f)
     f_pass2 = merge_rotations(f_pass1)
 
-    @qjit
+    @qjit(capture=False)
     def test_chained_peephole_passes_keep_original_workflow(x: float):
         return f(x), f_pass1(x), f_pass2(x)
 
@@ -524,7 +524,7 @@ def test_single_pass_with_autograph():
     Test that peephole optimization works with autograph
     """
 
-    @qjit(autograph=True, target="mlir")
+    @qjit(autograph=True, target="mlir", capture=False)
     @merge_rotations
     @qp.qnode(qp.device("lightning.qubit", wires=1))
     def f(x: float):
@@ -552,7 +552,7 @@ def test_pipeline_with_autograph():
         "merge_rotations": {},
     }
 
-    @qjit(autograph=True, target="mlir")
+    @qjit(autograph=True, target="mlir", capture=False)
     @pipeline(my_pipeline)
     @qp.qnode(qp.device("lightning.qubit", wires=1))
     def f(x: float):
@@ -576,7 +576,7 @@ def test_single_pass_for_loop_autograph():
     Test a peephole optimization where the code is transformed
     """
 
-    @qjit(autograph=True, target="mlir")
+    @qjit(autograph=True, target="mlir", capture=False)
     # CHECK: transform.named_sequence @__transform_main
     # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "merge-rotations" to {{%.+}}
     # CHECK-NEXT: transform.yield
@@ -600,7 +600,7 @@ def test_stacked_pass_for_loop_autograph():
     Test a peephole optimization where the code is transformed
     """
 
-    @qjit(autograph=True, target="mlir")
+    @qjit(autograph=True, target="mlir", capture=False)
     # CHECK: transform.named_sequence @__transform_main
     # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "cancel-inverses" to {{%.+}}
     # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "merge-rotations" to {{%.+}}
@@ -630,7 +630,7 @@ def test_cancel_inverses_tracing_and_lowering():
     Test cancel_inverses during tracing and lowering
     """
 
-    @qjit
+    @qjit(capture=False)
     def test_cancel_inverses_tracing_and_lowering_workflow(xx: float):
 
         @cancel_inverses
@@ -694,7 +694,7 @@ def test_cancel_inverses_tracing_and_lowering_outside_qjit():
         qp.Hadamard(wires=0)
         return qp.expval(qp.PauliZ(0))
 
-    @qjit
+    @qjit(capture=False)
     def test_cancel_inverses_tracing_and_lowering_outside_qjit_workflow(xx: float):
         _f = f(xx)
         return _f
@@ -720,7 +720,7 @@ def test_cancel_inverses_lowering_transform_applied():
     """
 
     # CHECK-LABEL: public @jit_test_cancel_inverses_lowering_transform_applied_workflow
-    @qjit(keep_intermediate=True)
+    @qjit(keep_intermediate=True, capture=False)
     def test_cancel_inverses_lowering_transform_applied_workflow(xx: float):
 
         @cancel_inverses
@@ -796,7 +796,7 @@ def test_cancel_inverses_keep_original():
     # CHECK-NEXT: {{%.+}} = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit
     # CHECK-NEXT: {{%.+}} = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit
     # CHECK-NOT: public @f_0
-    @qjit(keep_intermediate=True)
+    @qjit(keep_intermediate=True, capture=False)
     def test_cancel_inverses_keep_original_workflow0():
         return f(1.0)
 
@@ -811,7 +811,7 @@ def test_cancel_inverses_keep_original():
     # CHECK-NOT: {{%.+}} = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit
     # CHECK-NOT: {{%.+}} = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit
     # CHECK-NOT: public @f_0
-    @qjit(keep_intermediate=True)
+    @qjit(keep_intermediate=True, capture=False)
     def test_cancel_inverses_keep_original_workflow1():
         return g(1.0)
 
@@ -829,7 +829,7 @@ def test_cancel_inverses_keep_original():
     # CHECK: {{%.+}} = quantum.custom "RX"({{%.+}}) {{%.+}} : !quantum.bit
     # CHECK-NOT: {{%.+}} = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit
     # CHECK-NOT: {{%.+}} = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit
-    @qjit(keep_intermediate=True)
+    @qjit(keep_intermediate=True, capture=False)
     def test_cancel_inverses_keep_original_workflow2():
         return f(1.0), g(1.0)
 
@@ -850,7 +850,7 @@ def test_merge_rotations_tracing_and_lowering():
     Test merge_rotations during tracing and lowering
     """
 
-    @qjit
+    @qjit(capture=False)
     def test_merge_rotations_tracing_and_lowering_workflow(xx: float):
 
         @merge_rotations

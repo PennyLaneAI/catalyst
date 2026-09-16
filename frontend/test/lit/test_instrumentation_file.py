@@ -67,7 +67,7 @@ weights = np.random.random(size=shape)
 # CHECK-NEXT:       cputime: {{[0-9\.]+}}
 
 with instrumentation(circuit.__name__, filename=filename, detailed=False):
-    qjit(circuit)(weights)
+    qjit(circuit, capture=False)(weights)
 
 with open(filename, mode="r", encoding="UTF-8") as f:
     print(f.read())
@@ -135,7 +135,7 @@ with open(filename, mode="r", encoding="UTF-8") as f:
 # CHECK-NEXT:             cputime: {{[0-9\.]+}}
 
 with instrumentation(circuit.__name__, filename=filename, detailed=True):
-    qjit(circuit)(weights)
+    qjit(circuit, capture=False)(weights)
 
 with open(filename, mode="r", encoding="UTF-8") as f:
     print(f.read())

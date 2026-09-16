@@ -53,7 +53,7 @@ class TestSwitchToJaxpr:
           in (b,) }
             """)
 
-        @qjit()
+        @qjit(capture=False)
         def circuit(i: int):
             @switch(i)
             def my_switch():
@@ -90,7 +90,7 @@ class TestSwitchToJaxpr:
           in (b,) }
             """)
 
-        @qjit()
+        @qjit(capture=False)
         def circuit(i: int):
             @switch(i)
             def my_switch():
@@ -123,7 +123,7 @@ class TestSwitchEstimatedProbabilityValidation:
         """A hint on some but not all non-default branches is an error."""
         with pytest.raises(ValueError, match="must be provided for every non-default branch"):
 
-            @qjit
+            @qjit(capture=False)
             def circuit(i):
                 @switch(i)
                 def my_switch():
@@ -146,7 +146,7 @@ class TestSwitchEstimatedProbabilityValidation:
         """The non-default branch probabilities must sum to at most 1."""
         with pytest.raises(ValueError, match="must sum to at most 1"):
 
-            @qjit
+            @qjit(capture=False)
             def circuit(i):
                 @switch(i)
                 def my_switch():
@@ -169,7 +169,7 @@ class TestSwitchEstimatedProbabilityValidation:
         """Each probability must lie in [0, 1]."""
         with pytest.raises(ValueError, match=r"must be in \[0, 1\]"):
 
-            @qjit
+            @qjit(capture=False)
             def circuit(i):
                 @switch(i)
                 def my_switch():
@@ -410,7 +410,7 @@ class TestClassicalCompiled:
     def test_default_branch(self):
         """Test that a single branch is taken as default."""
 
-        @qjit
+        @qjit(capture=False)
         def circuit(i):
             @switch(i)
             def my_switch():
@@ -424,7 +424,7 @@ class TestClassicalCompiled:
     def test_1_branch(self):
         """Test that a branch catches only the correct case."""
 
-        @qjit
+        @qjit(capture=False)
         def circuit(i):
             @switch(i)
             def my_switch():
@@ -468,7 +468,7 @@ class TestClassicalCompiled:
     def test_non_sequential_cases(self):
         """Test that cases need not be sequential."""
 
-        @qjit
+        @qjit(capture=False)
         def circuit(i):
             @switch(i)
             def my_switch():
@@ -498,7 +498,7 @@ class TestClassicalCompiled:
     def test_return_type_promotion(self):
         """Test that return types are correctly promoted when applicable."""
 
-        @qjit
+        @qjit(capture=False)
         def circuit(i):
             @switch(i)
             def my_switch():
@@ -529,7 +529,7 @@ class TestClassicalCompiled:
     def test_inconsistent_output_types(self):
         """Test that an exception is raised when incompatible return types are present."""
 
-        @qjit
+        @qjit(capture=False)
         def circuit(i):
             @switch(i)
             def my_switch():
@@ -551,7 +551,7 @@ class TestClassicalCompiled:
     def test_missing_parameter(self):
         """Test that an exception is raised when parameters are missing."""
 
-        @qjit
+        @qjit(capture=False)
         def circuit(i):
             @switch()  # pylint: disable=no-value-for-parameter
             def my_switch():
@@ -566,7 +566,7 @@ class TestClassicalCompiled:
         with pytest.raises(TypeError, match=MISSING_ARGUMENT_MESSAGE):
             circuit(0)
 
-        @qjit
+        @qjit(capture=False)
         def circuit_3(i):
             @switch(i)
             def my_switch():
@@ -605,7 +605,7 @@ class TestClassicalCompiled:
     def test_missing_operation(self):
         """Test that operation access in classical context raises an exception."""
 
-        @qjit
+        @qjit(capture=False)
         def circuit(i):
             @switch(i)
             def my_switch():
@@ -632,7 +632,7 @@ class TestQuantum:
     def test_default_branch(self, backend):
         """Test that a single branch is taken as default."""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=1))
         def circuit(i):
             @switch(i)
@@ -649,7 +649,7 @@ class TestQuantum:
     def test_1_branch(self, backend):
         """Test that the default branch catches all unassigned cases."""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=1))
         def circuit(i):
             @switch(i)
@@ -675,7 +675,7 @@ class TestQuantum:
     def test_branch_args(self, backend):
         """Test that branches can accept arguments."""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=2))
         def circuit(i, angle, wire=None):
             @switch(i)
@@ -701,7 +701,7 @@ class TestQuantum:
     def test_non_sequential_cases(self, backend):
         """Test that cases need not be sequential."""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=1))
         def circuit(i):
             @switch(i)
@@ -732,7 +732,7 @@ class TestQuantum:
     def test_return_type_promotion(self, backend):
         """Test that return types are correctly promoted when applicable."""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=1))
         def circuit(i):
             @switch(i)
@@ -770,7 +770,7 @@ class TestQuantum:
     def test_inconsistent_output_types(self, backend):
         """Test that an exception is raised when incompatible return types are present."""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=1))
         def circuit(i):
             @switch(i)
@@ -796,7 +796,7 @@ class TestQuantum:
     def test_missing_parameter(self, backend):
         """Test that an exception is raised when parameters are missing."""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=1))
         def circuit(i):
             @switch()  # pylint: disable=no-value-for-parameter
@@ -814,7 +814,7 @@ class TestQuantum:
         with pytest.raises(TypeError, match=MISSING_ARGUMENT_MESSAGE):
             circuit(0)
 
-        @qjit
+        @qjit(capture=False)
         def circuit_2(i):
             @switch(i)
             def my_switch():
@@ -855,7 +855,7 @@ class TestQuantum:
     def test_operation_access(self, backend):
         """Test that switch operations can be accessed in a quantum context."""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=1))
         def circuit(i):
             @switch(i)

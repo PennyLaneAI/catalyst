@@ -27,7 +27,7 @@ from catalyst.device.qjit_device import QJITDevice
 def test_variable_capture(_in, _out):
     """Test closures (outer-scope variable capture) for quantum functions."""
 
-    @qjit
+    @qjit(capture=False)
     def workflow(n: int):
         @qp.qnode(qp.device("lightning.qubit", wires=2))
         def f(x: float):
@@ -54,7 +54,7 @@ def test_variable_capture(_in, _out):
 def test_variable_capture_multiple_devices(_in, _out, backend):
     """Test variable capture using multiple backend devices."""
 
-    @qjit
+    @qjit(capture=False)
     def workflow(n: int):
         @qp.qnode(qp.device("lightning.qubit", wires=2))
         def f(x: float):
@@ -79,7 +79,7 @@ def test_unsupported_device():
         return qp.probs()
 
     regex = "Attempting to compile program for incompatible device.*"
-    qjitted = qjit(func)
+    qjitted = qjit(func, capture=False)
 
     with pytest.raises(CompileError, match=regex):
         qjitted()
@@ -94,7 +94,7 @@ def test_qfunc_output_shape_scalar():
         qp.RX(x, wires=0)
         return qp.expval(qp.PauliZ(0))
 
-    @qjit
+    @qjit(capture=False)
     def cost_fn(x: float):
         res = circuit(x)
 
@@ -111,7 +111,7 @@ def test_qfunc_output_shape_list():
         qp.RX(x, wires=0)
         return [qp.expval(qp.PauliZ(0))]
 
-    @qjit
+    @qjit(capture=False)
     def cost_fn(x: float):
         res = circuit(x)
 
@@ -133,7 +133,7 @@ def test_qnode_grad_method_stored_on_execution_config(grad_method, mocker):
         qp.RX(x, wires=0)
         return qp.expval(qp.PauliX(0))
 
-    qjit(circ)(1.2)
+    qjit(circ, capture=False)(1.2)
 
     assert spy.call_count == 1
     _, config = spy.spy_return
@@ -142,7 +142,7 @@ def test_qnode_grad_method_stored_on_execution_config(grad_method, mocker):
     def grad_circ(x: float):
         return grad(circ)(x)
 
-    qjit(grad_circ)(1.2)
+    qjit(grad_circ, capture=False)(1.2)
 
     assert spy.call_count == 2
     _, config = spy.spy_return

@@ -177,7 +177,7 @@ class TestBasicArrayCreation:
                 ),
             )
 
-        @qjit
+        @qjit(capture=False)
         def func(a):
             return circuit(a)
 
@@ -192,16 +192,16 @@ class TestBasicArrayCreation:
         """Test that tensor primitive work in the classical tracing mode"""
 
         assert_array_and_dtype_equal(
-            qjit(lambda: jnp.zeros(shape, dtype))(), jnp.zeros(shape, dtype=dtype)
+            qjit(lambda: jnp.zeros(shape, dtype), capture=False)(), jnp.zeros(shape, dtype=dtype)
         )
         assert_array_and_dtype_equal(
-            qjit(lambda: jnp.ones(shape, dtype))(), jnp.ones(shape, dtype=dtype)
+            qjit(lambda: jnp.ones(shape, dtype), capture=False)(), jnp.ones(shape, dtype=dtype)
         )
         assert_array_and_dtype_equal(
-            qjit(lambda s: jnp.ones(s, dtype))(shape), jnp.ones(shape, dtype=dtype)
+            qjit(lambda s: jnp.ones(s, dtype), capture=False)(shape), jnp.ones(shape, dtype=dtype)
         )
         assert_array_and_dtype_equal(
-            qjit(lambda s: jnp.zeros(s, dtype))(shape), jnp.zeros(shape, dtype=dtype)
+            qjit(lambda s: jnp.zeros(s, dtype), capture=False)(shape), jnp.zeros(shape, dtype=dtype)
         )
 
         @qjit(capture=capture_mode)
@@ -1068,7 +1068,7 @@ class TestWhileLoopDynamicShapes:
 def test_qnode_cond_identity():
     """Test that catalyst tensor primitive is compatible with quantum conditional"""
 
-    @qjit
+    @qjit(capture=False)
     @qp.qnode(qp.device("lightning.qubit", wires=4))
     def f(flag, sz):
         a = jnp.ones([sz], dtype=float)
@@ -1096,7 +1096,7 @@ def test_qnode_cond_abstracted_axes():
     abstracted_axes as the source of dynamism."""
 
     def f(flag, a, b):
-        @qjit(abstracted_axes={0: "n"})
+        @qjit(abstracted_axes={0: "n"}, capture=False)
         @qp.qnode(qp.device("lightning.qubit", wires=4))
         def _f(a, b):
             @cond(flag)
@@ -1123,7 +1123,7 @@ def test_qnode_cond_abstracted_axes():
 def test_qnode_cond_capture():
     """Test that catalyst tensor primitive is compatible with quantum conditional"""
 
-    @qjit
+    @qjit(capture=False)
     @qp.qnode(qp.device("lightning.qubit", wires=4))
     def f(flag, sz):
         a = jnp.ones([sz, 3], dtype=float)
@@ -1148,7 +1148,7 @@ def test_qnode_cond_capture():
 def test_qjit_cond_identity():
     """Test that catalyst tensor primitive is compatible with quantum conditional"""
 
-    @qjit
+    @qjit(capture=False)
     def f(flag, sz):
         a = jnp.ones([sz, 3], dtype=float)
         b = jnp.zeros([sz, 3], dtype=float)
@@ -1173,7 +1173,7 @@ def test_qjit_cond_identity():
 def test_qjit_cond_outdbidx():
     """Test that catalyst tensor primitive is compatible with quantum conditional"""
 
-    @qjit
+    @qjit(capture=False)
     def f(flag, sz):
         @cond(flag)
         def case():
@@ -1192,7 +1192,7 @@ def test_qjit_cond_outdbidx():
 def test_qjit_cond_capture():
     """Test that catalyst tensor primitive is compatible with quantum conditional"""
 
-    @qjit
+    @qjit(capture=False)
     def f(flag, sz):
         a = jnp.ones([sz, 3], dtype=float)
 
@@ -1219,7 +1219,7 @@ def test_trace_to_jaxpr():
     """
     # pylint: disable=protected-access,unused-variable
 
-    @qjit
+    @qjit(capture=False)
     def circuit(sz):
         mode = EvaluationContext.get_evaluation_mode()
 

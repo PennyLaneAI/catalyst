@@ -28,7 +28,7 @@ class TestShotVector:
     def test_return_format_and_shape(self, shots):
         """Test shot-vector as parameter with single sample measurment"""
 
-        @qjit
+        @qjit(capture=False)
         @qp.set_shots(shots)
         @qp.qnode(qp.device("lightning.qubit", wires=1))
         def circuit():
@@ -46,7 +46,7 @@ class TestShotVector:
 
         dev = qp.device("lightning.qubit", wires=1)
 
-        @qjit
+        @qjit(capture=False)
         @qp.set_shots(shots)
         @qp.qnode(dev, mcm_method=mcm_method)
         def circuit_list():
@@ -57,7 +57,7 @@ class TestShotVector:
         assert jnp.array(circuit_list()[0]).shape == (4, 3, 1)
         assert jnp.array(circuit_list()[1]).shape == (4, 3, 1)
 
-        @qjit
+        @qjit(capture=False)
         @qp.set_shots(shots)
         @qp.qnode(dev, mcm_method=mcm_method)
         def circuit_dict():
@@ -75,7 +75,7 @@ class TestShotVector:
 
         dev = qp.device("lightning.qubit", wires=1)
 
-        @qjit
+        @qjit(capture=False)
         @qp.set_shots(((20, 5), 100, (101, 2)))
         @qp.qnode(dev, mcm_method=mcm_method)
         def circuit():
@@ -115,19 +115,19 @@ class TestShotVector:
             with pytest.raises(
                 NotImplementedError, match=r".*\.var\(\) cannot be used on observables"
             ):
-                qjit(circuit)()
+                qjit(circuit, capture=False)()
         else:
             with pytest.raises(
                 NotImplementedError, match="measurement process does not support shot-vectors"
             ):
-                qjit(circuit)()
+                qjit(circuit, capture=False)()
 
     def test_shot_vector_with_complex_container_sample(self):
         """Test shot-vector with complex container sample"""
 
         dev = qp.device("lightning.qubit", wires=1)
 
-        @qjit
+        @qjit(capture=False)
         @qp.set_shots(((3, 4),))
         @qp.qnode(dev, mcm_method="single-branch-statistics")
         def circuit():

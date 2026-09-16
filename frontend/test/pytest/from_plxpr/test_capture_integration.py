@@ -169,7 +169,7 @@ class TestCapture:
 
         # Capture disabled
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(device=dev)
         def circuit(x):
             qp.Hadamard(wires=0)
@@ -208,7 +208,7 @@ class TestCapture:
 
         # Capture disabled
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(dev)
         def circuit(_basis_state):
             qp.BasisState(_basis_state, wires=list(range(n_wires)))
@@ -244,7 +244,7 @@ class TestCapture:
 
         # Capture disabled
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(dev)
         def circuit(init_state):
             qp.StatePrep(init_state, wires=list(range(n_wires)))
@@ -456,7 +456,7 @@ class TestCapture:
 
         # Capture disabled
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=1))
         def circuit(n, x):
 
@@ -506,7 +506,7 @@ class TestCapture:
 
         # Capture disabled
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=4))
         def circuit(n):
             # Input state: equal superposition
@@ -565,7 +565,7 @@ class TestCapture:
 
         # Capture disabled
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=1))
         def circuit(x: float):
 
@@ -615,7 +615,7 @@ class TestCapture:
 
         # Capture disabled
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=1))
         def circuit(x: float, step: float):
 
@@ -669,7 +669,7 @@ class TestCapture:
 
         # Capture disabled
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=1))
         def circuit(x: float, y: float):
 
@@ -720,7 +720,7 @@ class TestCapture:
 
         # Capture disabled
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=1))
         def circuit(x: float):
 
@@ -758,7 +758,7 @@ class TestCapture:
 
         # Capture disabled
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=1))
         def circuit(x: float):
 
@@ -799,7 +799,7 @@ class TestCapture:
 
         # Capture disabled
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=1))
         def circuit(x: float):
 
@@ -845,7 +845,7 @@ class TestCapture:
 
         # Capture disabled
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=1))
         def circuit(x: float):
 
@@ -891,7 +891,7 @@ class TestCapture:
 
         # Capture disabled
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=1))
         def circuit(x: float):
 
@@ -941,7 +941,7 @@ class TestCapture:
 
         # Capture disabled
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=1))
         def circuit(x: float, y: float):
 
@@ -983,7 +983,7 @@ class TestCapture:
 
         # Capture disabled
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=1))
         def circuit(x: float):
 
@@ -1051,7 +1051,7 @@ class TestCapture:
 
         # Capture disabled
 
-        @qjit
+        @qjit(capture=False)
         @qp.transforms.cancel_inverses
         @qp.qnode(qp.device(backend, wires=1))
         def circuit(x: float):
@@ -1081,7 +1081,7 @@ class TestCapture:
 
         # Capture disabled
 
-        @qjit
+        @qjit(capture=False)
         @qp.transforms.merge_rotations
         @qp.qnode(qp.device(backend, wires=1))
         def circuit(x: float):
@@ -1133,10 +1133,12 @@ class TestCapture:
             return qp.expval(qp.PauliZ(0))
 
         inverses_rotations_result = qjit(
-            qp.transforms.cancel_inverses(qp.transforms.merge_rotations(circuit))
+            qp.transforms.cancel_inverses(qp.transforms.merge_rotations(circuit)),
+            capture=False,
         )(0.1)
         rotations_inverses_result = qjit(
-            qp.transforms.merge_rotations(qp.transforms.cancel_inverses(circuit))
+            qp.transforms.merge_rotations(qp.transforms.cancel_inverses(circuit)),
+            capture=False,
         )(0.1)
 
         assert (
@@ -1181,7 +1183,7 @@ class TestCapture:
         # non-capture pathway is not actively developed and raises unnecessary warnings (wontfix)
         with pytest.warns(UserWarning, match="MidCircuitMeasure does not define a decomposition"):
             with pytest.warns(UserWarning, match="Cond does not define a decomposition"):
-                non_capture_result = qjit(circuit)(1.5, 2.5, 3.5)
+                non_capture_result = qjit(circuit, capture=False)(1.5, 2.5, 3.5)
 
         assert jnp.allclose(non_capture_result, capture_result)
 
@@ -1206,7 +1208,7 @@ class TestCapture:
         capture_result = captured_circuit()
         assert "shots(%" in captured_circuit.mlir
 
-        @qjit
+        @qjit(capture=False)
         @qp.set_shots(10)
         @qp.qnode(qp.device(backend, wires=2))
         def circuit():

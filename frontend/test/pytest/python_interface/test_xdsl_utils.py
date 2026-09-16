@@ -365,7 +365,7 @@ class TestConversionUtils:
     def test_xdsl_from_qjit(self):
         """Test that the xdsl_from_qjit function works correctly."""
 
-        @qp.qjit
+        @qp.qjit(capture=False)
         @qp.qnode(qp.device("lightning.qubit", wires=2))
         def circuit():
             return qp.state()

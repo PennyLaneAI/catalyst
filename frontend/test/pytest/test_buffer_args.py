@@ -55,14 +55,14 @@ def test_buffer_args(fn, params):
 
     device = qp.device("lightning.qubit", wires=1)
     interpreted_fn = qp.QNode(fn, device)
-    jitted_fn = qjit(interpreted_fn)
+    jitted_fn = qjit(interpreted_fn, capture=False)
     assert jnp.allclose(interpreted_fn(*params), jitted_fn(*params))
 
 
 def test_qjit_does_not_mutate_numpy_input_buffers():
     """A copied input that is functionally updated must not alias the caller buffer."""
 
-    @qjit
+    @qjit(capture=False)
     def update_with_copy(x):
         y = qp.math.copy(x)
         return y.at[0, 0].set(7.0)
@@ -90,13 +90,13 @@ class TestReturnValues:
             qp.SingleExcitation(params[1], wires=[0, 2])
             return qp.expval(qp.PauliZ(2))
 
-        @qjit
+        @qjit(capture=False)
         def order1(params):
             diff = grad(circuit, argnums=0)
             h = diff(params)
             return h[0], params
 
-        @qjit
+        @qjit(capture=False)
         def order2(params):
             diff = grad(circuit, argnums=0)
             h = diff(params)
@@ -121,7 +121,7 @@ class TestReturnValues:
         compiled function itself.
         """
 
-        @qjit
+        @qjit(capture=False)
         def return_scalar():
             return jnp.array(0, dtype=dtype)
 
@@ -130,7 +130,7 @@ class TestReturnValues:
     def test_returns_jax_array(self):
         """Tests that the return value is a jax array"""
 
-        @qjit
+        @qjit(capture=False)
         def identity(x):
             return x
 
@@ -143,7 +143,7 @@ class TestReturnValues:
         def return_scalar():
             return jnp.array(0, dtype=dtype)
 
-        compiled = qjit(return_scalar)
+        compiled = qjit(return_scalar, capture=False)
 
         with pytest.raises(TypeError, match="Requested return type is unavailable."):
             compiled()
