@@ -21,7 +21,7 @@
 using namespace mlir;
 
 namespace catalyst {
-namespace quantum {
+namespace qref {
 namespace DecompUtils {
 
 StringRef getTargetGateName(func::FuncOp func) {
@@ -51,5 +51,5 @@ bool isInDecompRule(Operation *op) {
 }
 
 } // namespace DecompUtils
-} // namespace quantum
+} // namespace qref
 } // namespace catalyst

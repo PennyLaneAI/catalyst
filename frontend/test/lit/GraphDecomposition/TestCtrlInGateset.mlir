@@ -17,7 +17,7 @@
 // A controlled op that is already in the gate set stays untouched (its id `C(testT){}{wires:1}{}`
 // matches the `C(testT)` gate-set entry -- it is NOT stripped to its base `testT`).
 // CHECK-LABEL: func.func @ctrl_in_gateset(
-// CHECK-SAME:  [[C:%.+]]: !quantum.bit, [[Q:%.+]]: !quantum.bit
+// CHECK-SAME:  [[Q:%.+]]: !quantum.bit, [[C:%.+]]: !quantum.bit
 func.func @ctrl_in_gateset(%c: !quantum.bit, %q: !quantum.bit) -> (!quantum.bit, !quantum.bit) {
   // CHECK: quantum.custom "testT"() [[Q]] ctrls([[C]]) ctrlvals({{%.+}}) : !quantum.bit ctrls !quantum.bit
   %true = arith.constant true
@@ -31,7 +31,7 @@ func.func @ctrl_in_gateset(%c: !quantum.bit, %q: !quantum.bit) -> (!quantum.bit,
 // CHECK-SAME:  [[Q0:%.+]]: !quantum.bit, [[Q1:%.+]]: !quantum.bit
 func.func @decompose_to_ctrl(%q0: !quantum.bit, %q1: !quantum.bit) -> (!quantum.bit, !quantum.bit) {
   // CHECK-NOT: quantum.custom "myCZ"
-  // CHECK: quantum.custom "testT"() [[Q1]] ctrls([[Q0]]) ctrlvals({{%.+}}) : !quantum.bit ctrls !quantum.bit
+  // CHECK: quantum.custom "testT"() [[Q0]] ctrls([[Q1]]) ctrlvals({{%.+}}) : !quantum.bit ctrls !quantum.bit
   %o:2 = quantum.custom "myCZ"() %q0, %q1 : !quantum.bit, !quantum.bit
   return %o#0, %o#1 : !quantum.bit, !quantum.bit
 }

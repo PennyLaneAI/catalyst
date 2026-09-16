@@ -18,7 +18,7 @@
 // CHECK-SAME:  [[Q0:%.+]]: !quantum.bit, [[Q1:%.+]]: !quantum.bit
 func.func @distribute_ctrl_region(%q0: !quantum.bit, %q1: !quantum.bit) -> (!quantum.bit, !quantum.bit) {
   // CHECK-NOT: quantum.ctrl(
-  // CHECK: quantum.custom "testT"() [[Q1]] ctrls([[Q0]]) ctrlvals({{%.+}}) : !quantum.bit ctrls !quantum.bit
+  // CHECK: quantum.custom "testT"() [[Q0]] ctrls([[Q1]]) ctrlvals({{%.+}}) : !quantum.bit ctrls !quantum.bit
   %o:2 = quantum.custom "myCZ"() %q0, %q1 : !quantum.bit, !quantum.bit
   return %o#0, %o#1 : !quantum.bit, !quantum.bit
 }
