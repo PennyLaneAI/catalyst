@@ -142,8 +142,13 @@ class BaseSignatureAnalyzer {
 
         int operandIdx = 0;
         if (!signature.params.empty()) {
+            // Let's match by total scalar-element count instead of number of params:
+            size_t sigParamElements = 0;
+            for (Value param : signature.params) {
+                sigParamElements += getElementsCount(param.getType());
+            }
             auto [startIdx, endIdx] =
-                findParamTypeRange(funcInputsNoQreg, signature.params.size(), operandIdx);
+                findParamTypeRange(funcInputsNoQreg, sigParamElements, operandIdx);
             ArrayRef<Type> paramsTypes =
                 ArrayRef<Type>(funcInputsNoQreg).slice(startIdx, endIdx - startIdx);
             auto updatedParams = generateParams(signature.params, paramsTypes, rewriter, loc);
@@ -193,6 +198,9 @@ class BaseSignatureAnalyzer {
 
   private:
     Value fromTensorOrAsIs(ValueRange values, Type type, PatternRewriter &rewriter, Location loc) {
+        if (values.size() == 1 && values.front().getType() == type) {
+            return values.front();
+        }
         if (isa<RankedTensorType>(type)) {
             return tensor::FromElementsOp::create(rewriter, loc, type, values);
         }
@@ -207,21 +215,20 @@ class BaseSignatureAnalyzer {
         return 1;
     }
 
-    // Helper function to find the range of function input types that correspond to params
-    static std::pair<size_t, size_t> findParamTypeRange(ArrayRef<Type> funcInputs,
-                                                        size_t sigParamCount, size_t startIdx = 0) {
+    static std::pair<size_t, size_t>
+    findParamTypeRange(ArrayRef<Type> funcInputs, size_t sigParamElements, size_t startIdx = 0) {
         size_t paramTypeCount = 0;
         size_t paramTypeEnd = startIdx;
 
-        while (paramTypeCount < sigParamCount) {
+        while (paramTypeCount < sigParamElements) {
             assert(paramTypeEnd < funcInputs.size() &&
                    "param type end should be less than function input size");
             paramTypeCount += getElementsCount(funcInputs[paramTypeEnd]);
             paramTypeEnd++;
         }
 
-        assert(paramTypeCount == sigParamCount &&
-               "param type count should be equal to signature param count");
+        assert(paramTypeCount == sigParamElements &&
+               "param element count should match the function input element count");
 
         return {startIdx, paramTypeEnd};
     }
@@ -233,12 +240,16 @@ class BaseSignatureAnalyzer {
         size_t sigParamIdx = 0;
 
         for (Type funcParamType : funcParamTypes) {
-            const size_t numElements = getElementsCount(funcParamType);
-
-            // collect numElements of signature params
+            // We need to collect signature params until their element counts fill this func input:
+            // Note several scalars packed into one tensor, or a single whole-tensor (e.g. matrix)
+            // params.
+            const size_t neededElements = getElementsCount(funcParamType);
             SmallVector<Value> tensorElements;
-            for (size_t i = 0; i < numElements && sigParamIdx < signatureParams.size(); i++) {
-                tensorElements.push_back(signatureParams[sigParamIdx++]);
+            size_t haveElements = 0;
+            while (haveElements < neededElements && sigParamIdx < signatureParams.size()) {
+                Value param = signatureParams[sigParamIdx++];
+                tensorElements.push_back(param);
+                haveElements += getElementsCount(param.getType());
             }
             operands.push_back(fromTensorOrAsIs(tensorElements, funcParamType, rewriter, loc));
         }

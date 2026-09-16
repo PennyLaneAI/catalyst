@@ -1429,6 +1429,33 @@ class TestCustomRuleApplication:
         assert "SingleParam" not in after
         assert after.get("NoParams", 0) >= 1
 
+    def test_fixed_decomp_rule_with_a_matrix_parameter(self):
+        """Test a rule for an operator whose parameter is a matrix."""
+        from operator2_dummy_gates import NoParams, QubitUnitary
+
+        @register_resources({NoParams(reg=Wire[1]): 1})
+        def qu_to_noparams(matrix, wires):  # pylint: disable=unused-argument
+            NoParams(reg=wires[0:1])
+
+        with local_decomps():
+            add_decomps(QubitUnitary, qu_to_noparams)
+            unitary = 1 / jnp.sqrt(2) * jnp.array([[1, 1], [1, -1]], dtype=jnp.complex128)
+
+            @qjit(capture=True, target="mlir")
+            @graph_decomposition(
+                gate_set={NoParams: 1}, fixed_decomps={QubitUnitary: qu_to_noparams}
+            )
+            @qnode(qp.device("null.qubit", wires=1))
+            def circuit():
+                QubitUnitary(unitary, wires=[0])
+
+            resources = qp.specs(circuit, level="all-mlir")().resources
+
+        assert "QubitUnitary" in resources["Before MLIR Passes"].counts
+        after = resources["graph-decomposition"].counts
+        assert "QubitUnitary" not in after
+        assert after.get("NoParams", 0) >= 1
+
 
 if __name__ == "__main__":
     pytest.main(["-x", __file__])
