@@ -95,7 +95,7 @@ def test_registered_symbolic_rule_accepts_mcm():
 
     with qp.decomposition.local_decomps():
 
-        qp.add_decomps("Adjoint(NoParams)", _self_adjoint_rule())
+        qp.add_decomps("Adjoint(NoParams)", _adjoint_rule_with_mcm())
 
         print(
             "\n".join(
