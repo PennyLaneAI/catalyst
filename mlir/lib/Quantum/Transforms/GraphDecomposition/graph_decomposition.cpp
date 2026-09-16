@@ -138,8 +138,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         llvm::StringMap<llvm::SmallVector<std::string>> opToAltDecompNames;
         WeightedGateset targetGateSet;
 
-        // Index rules by name for O(1) lookup instead of scanning the vector
-        // for every fixed-decomp entry.
+        // NOTE: this is unused
         llvm::StringMap<const RuleNode *> rulesByName(setOfRules.size());
         for (const auto &rule : setOfRules) {
             rulesByName[rule.name] = &rule;
@@ -163,6 +162,8 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         GraphResult solution;
         {
             ScopedDiagnosticTimer t("decomp:solver");
+            // NOTE: fixed and alt-decomps are handled by filtering during rule collection. This is
+            // dead code that should be removed
             FixedDecomps fixedDecomps = buildFixedDecomps(opToFixedDecompName, rulesByName);
             AltDecomps altDecomps = buildAltDecomps(opToAltDecompNames, rulesByName);
             DecompositionGraph graph(setOfOps, targetGateSet, setOfRules, std::move(fixedDecomps),
