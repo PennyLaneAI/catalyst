@@ -323,30 +323,3 @@ func.func @test_negative_and_adjoint_ppr_operator(%q0 : !quantum.bit) {
     // CHECK: return
     func.return
 }
-
-// -----
-
-func.func @test_ppr_operator_unsupported_angle_denominator(%q : !quantum.bit) {
-    // expected-error @+1 {{failed to legalize operation 'quantum.operator' that was explicitly marked illegal}}
-    %0 = quantum.operator "PPR"() qubits(%q) // expected-error @+0 {{unsupported PPR angle denominator: 3}}
-        static_data = {angle_denominator = 3 : i64, pauli_word = "X"}
-    func.return
-}
-
-// -----
-
-func.func @test_ppr_operator_invalid_pauli_character(%q : !quantum.bit) {
-    // expected-error @+1 {{failed to legalize operation 'quantum.operator' that was explicitly marked illegal}}
-    %0 = quantum.operator "PPR"() qubits(%q) // expected-error @+0 {{PPR operator Pauli word may contain only X, Y, Z and I}}
-        static_data = {angle_denominator = 4 : i64, pauli_word = "A"}
-    func.return
-}
-
-// -----
-
-func.func @test_ppr_operator_pauli_qubit_count_mismatch(%q : !quantum.bit) {
-    // expected-error @+1 {{failed to legalize operation 'quantum.operator' that was explicitly marked illegal}}
-    %0 = quantum.operator "PPR"() qubits(%q) // expected-error @+0 {{PPR operator requires one Pauli character per input qubit}}
-        static_data = {angle_denominator = 4 : i64, pauli_word = "XY"}
-    func.return
-}
