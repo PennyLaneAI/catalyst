@@ -538,8 +538,8 @@ class TestDiagonalizeFinalMeasurementsProgramCaptureExecution:
         """Test the transform works for an observable built using operator arithmetic
         (sprod, prod, sum)"""
 
-        if qp.capture.enabled():
-            pytest.xfail("Requires fixes from PennyLane #10156", strict=True)
+        if capture_mode:
+            pytest.xfail("Requires fixes from PennyLane #10156")
 
         dev = qp.device("lightning.qubit", wires=3)
 
@@ -683,8 +683,8 @@ class TestDiagonalizeFinalMeasurementsCatalystFrontend:
         """Test the transform works for an observable built using operator arithmetic
         (sprod, prod, sum)"""
 
-        if qp.capture.enabled():
-            pytest.xfail("Requires fixes from PennyLane #10156", strict=True)
+        if capture_mode:
+            pytest.xfail("Requires fixes from PennyLane #10156")
 
         dev = qp.device("lightning.qubit", wires=3)
 
