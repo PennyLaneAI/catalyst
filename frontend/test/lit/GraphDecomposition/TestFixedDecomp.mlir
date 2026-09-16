@@ -14,15 +14,15 @@
 
 // RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{gate-set=testRX=2.0,testRY=1.0,testRZ=1.0 fixed-decomps=testHadamard=fixed_decomp})' %s | FileCheck %s
 
-func.func @circuit() -> !quantum.bit {
-    %0 = quantum.alloc(1) : !quantum.reg
-    %q = quantum.extract %0[0] : !quantum.reg -> !quantum.bit
+func.func @circuit() {
+    %q = quantum.alloc_qb : !quantum.bit
     // CHECK-NOT: testHadamard"
     // CHECK: testRX
     // CHECK: testRZ
     // CHECK: testRX
     %qout = quantum.custom "testHadamard"() %q : !quantum.bit
-    return %qout : !quantum.bit
+    quantum.dealloc_qb %qout : !quantum.bit
+    return 
 }
 
 // CHECK: @fixed_decomp
