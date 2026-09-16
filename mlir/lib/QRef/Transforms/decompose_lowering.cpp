@@ -88,7 +88,6 @@ struct DecomposeLoweringPass : impl::DecomposeLoweringPassBase<DecomposeLowering
             }
 
             if (StringRef targetOp = DecompUtils::getTargetGateName(func); !targetOp.empty()) {
-                removeUnusedFuncArgs(func);
                 if (targetOp == "MultiRZ") {
                     // Create a new target op name with the number of wires
                     // for MultiRZ, since it has multiple decomposition functions
@@ -126,14 +125,6 @@ struct DecomposeLoweringPass : impl::DecomposeLoweringPassBase<DecomposeLowering
         });
     }
 
-    // Remove unused arguments on a decomposition function
-    // This is because we have some assumptions on the decomp funcs' signature structure
-    void removeUnusedFuncArgs(func::FuncOp f) {
-        f.front().eraseArguments([](BlockArgument arg) { return arg.use_empty(); });
-
-        f.setFunctionType(FunctionType::get(f->getContext(), f.front().getArgumentTypes(),
-                                            f.front().getTerminator()->getOperandTypes()));
-    }
 
   public:
     void runOnOperation() final {
