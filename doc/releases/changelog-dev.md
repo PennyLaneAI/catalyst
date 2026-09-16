@@ -145,16 +145,6 @@
   - Added the `DecomposableGate` op interface to allow generic handling of operations in the `graph-decomposition` pass.
     [(#2983)](https://github.com/PennyLaneAI/catalyst/pull/2983)
     [(#3022)](https://github.com/PennyLaneAI/catalyst/pull/3022)
-
-    This allows arbitrary operations implementing the interface to be registered to and decomposed by the graph.
-    This also allows the use of python-decompositions for any operator pre-registered in the frontend graph.
-- Added the `DecomposableGate` op interface to allow generic handling of operations in the `graph-decomposition` pass.
-[(#2983)](https://github.com/PennyLaneAI/catalyst/pull/2983)
-[(#3022)](https://github.com/PennyLaneAI/catalyst/pull/3022)
-[(#3161)](https://github.com/PennyLaneAI/catalyst/pull/3161)
-
-This allows arbitrary operations implementing the interface to be registered to and decomposed by the graph.
-  - Added the `DecomposableGate` op interface to allow generic handling of operations in the `graph-decomposition` pass.
     [(#3161)](https://github.com/PennyLaneAI/catalyst/pull/3161)
 
     This allows arbitrary operations implementing the interface to be registered to and decomposed by the graph.
