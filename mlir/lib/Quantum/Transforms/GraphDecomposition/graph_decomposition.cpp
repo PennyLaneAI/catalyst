@@ -190,7 +190,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
             dlOptions.targetRulesOption.push_back(chosenRule.ruleName);
         }
 
-        // Convert reference-semantics python decompositions to value semantics once.
+        // Convert reference-semantics python decompositions to value semantics.
         {
             ScopedDiagnosticTimer t("decomp:ref-to-value");
             OpPassManager valueSemanticsPm("builtin.module");

@@ -49,15 +49,15 @@ namespace qref {
 ///     }
 ///   }
 ///
-/// Typical construction site: building a QubitIndex from a quantum.extract op,
+/// Typical construction site: building a QubitIndex from a qref.get op,
 /// where the index may be either a dynamic SSA Value or a static IntegerAttr:
 ///
-///   if (auto extractOp = qubit.getDefiningOp<quantum::ExtractOp>()) {
-///       if (Value idx = extractOp.getIdx()) {
-///           return QubitIndex(idx, extractOp.getQreg());
+///   if (auto getOp = qubit.getDefiningOp<qref::GetOp>()) {
+///       if (Value idx = getOp.getIdx()) {
+///           return QubitIndex(idx, getOp.getQreg());
 ///       }
-///       if (IntegerAttr idxAttr = extractOp.getIdxAttrAttr()) {
-///           return QubitIndex(idxAttr, extractOp.getQreg());
+///       if (IntegerAttr idxAttr = getOp.getIdxAttrAttr()) {
+///           return QubitIndex(idxAttr, getOp.getQreg());
 ///       }
 ///   }
 class QubitIndex {
@@ -80,17 +80,6 @@ class QubitIndex {
         return isAttr() ? std::get<mlir::IntegerAttr>(index) : nullptr;
     }
 };
-
-template <typename OperandRangeT, typename ResultRangeT>
-static mlir::Value getMappedQubitOperand(mlir::Value qubit, const OperandRangeT qubitOperands,
-                                         const ResultRangeT qubitResults) {
-    auto it = llvm::find_if(qubitResults, [&](mlir::Value result) { return result == qubit; });
-
-    assert(it != qubitResults.end());
-    size_t resultIndex = std::distance(qubitResults.begin(), it);
-    assert(resultIndex < qubitOperands.size());
-    return qubitOperands[resultIndex];
-}
 
 inline QubitIndex getQubitRefIndex(mlir::Value qubit) {
     auto getOp = qubit.getDefiningOp<qref::GetOp>();

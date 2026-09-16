@@ -184,9 +184,6 @@ class BaseSignatureAnalyzer {
 
         if (hasQreg) {
             Value reg = getRegister();
-            if (!reg) {
-                return {};
-            }
             std::move_backward(operands.begin() + qregIdx, operands.end() - 1, operands.end());
             operands[qregIdx] = reg;
         }
