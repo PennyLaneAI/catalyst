@@ -19,14 +19,10 @@
 #include <variant>
 
 #include "llvm/ADT/STLExtras.h"
-#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/Value.h"
-#include "mlir/Support/LLVM.h"
 
 #include "QRef/IR/QRefOps.h"
-#include "Quantum/IR/QuantumInterfaces.h"
-#include "Quantum/IR/QuantumOps.h"
 
 namespace catalyst {
 namespace qref {

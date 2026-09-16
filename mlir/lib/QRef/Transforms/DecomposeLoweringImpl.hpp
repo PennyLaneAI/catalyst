@@ -34,10 +34,7 @@
 #include "mlir/IR/ValueRange.h"
 #include "mlir/Support/LLVM.h"
 
-#include "Quantum/IR/QuantumInterfaces.h"
-#include "Quantum/IR/QuantumOps.h"
-#include "Quantum/IR/QuantumTypes.h"
-#include "Quantum/Utils/QubitIndex.h"
+#include "QRef/Utils/QubitIndex.h"
 
 using namespace mlir;
 
