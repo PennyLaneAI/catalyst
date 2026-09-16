@@ -15,7 +15,7 @@
 // RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{gate-set=C(Adjoint(H))=1.0 alt-decomps=C(Adjoint(U)){}{wires:1}{}=ctrl_adj_u})' %s | FileCheck %s
 
 // CHECK-LABEL: func.func @composite_region(
-// CHECK-SAME:  %[[C:.*]]: !quantum.bit, %[[Q:.*]]: !quantum.bit
+// CHECK-SAME:  %[[Q:.*]]: !quantum.bit, %[[C:.*]]: !quantum.bit
 func.func @composite_region(%ctrl: !quantum.bit, %q: !quantum.bit) -> (!quantum.bit, !quantum.bit) {
   %true = arith.constant true
   // CHECK-NOT: quantum.ctrl
