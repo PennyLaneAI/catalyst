@@ -312,6 +312,13 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
             llvm::StringRef opName = opNameRaw.trim();
             llvm::StringRef cost = costRaw.trim();
 
+            // Note gate_set is now a DictionaryAttr which quotes any key that is
+            // not an MLIR op (e.g. "Adjoint(TemporaryAND)").
+            // As the result, we need to strip the surrounding quotes so the stored name
+            // matches the op's graphOpId name following parseFixedDecomps / parseAltDecomps.
+            opName.consume_front("\"");
+            opName.consume_back("\"");
+
             cost.consume_back(": f64");
             cost = cost.trim();
 

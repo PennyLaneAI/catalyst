@@ -123,5 +123,18 @@ class TestAltDecompsOption:
         assert "fixed_decomps" not in options
 
 
+class TestGateSetOption:
+    """Cover how gate-set names are carried into the pass options."""
+
+    def test_modifier_wrapped_name_is_preserved(self):
+        """Test a modifier-wrapped gate-set name (e.g. ``Adjoint(TemporaryAND)`` will be
+        serialized correctly down to the pass options.
+        """
+        _, options = graph_decomposition_setup_inputs(
+            {"Adjoint(TemporaryAND)", "TemporaryAND"}, **_DUMMY_LIBS
+        )
+        assert options["gate_set"] == {"Adjoint(TemporaryAND)": 1.0, "TemporaryAND": 1.0}
+
+
 if __name__ == "__main__":
     pytest.main(["-x", __file__])
