@@ -48,7 +48,7 @@ def _registered_rule():
     """A PennyLane ``DecompositionRule`` (from ``@register_resources``.
 
     Its ``.name`` is the reference; as of PennyLane #10144, it also has a ``.__name__``
-    which shouldn't be interchangable with ``.name``.
+    which isn't always interchangable with ``.name``.
     """
 
     @register_resources(lambda: {})
