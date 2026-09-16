@@ -17,6 +17,7 @@
   [(#3116)](https://github.com/PennyLaneAI/catalyst/pull/3116)
   [(#3127)](https://github.com/PennyLaneAI/catalyst/pull/3127)
   [(#3131)](https://github.com/PennyLaneAI/catalyst/pull/3131)
+  [(#3227)](https://github.com/PennyLaneAI/catalyst/pull/3227)
 
 * The graph-based decomposition system now supports **adjoint operators** for `Operator2`.
   [(#3120)](https://github.com/PennyLaneAI/catalyst/pull/3120)
@@ -231,7 +232,7 @@
     of raising an error.
     [(#3190)](https://github.com/PennyLaneAI/catalyst/pull/3190)
 
-* A failure during AOT compilation is now logged rather than raised. 
+* A failure during AOT compilation is now logged rather than raised.
   [(#3100)](https://github.com/PennyLaneAI/catalyst/pull/3100)
   [(#3194)](https://github.com/PennyLaneAI/catalyst/pull/3194)
 
@@ -552,7 +553,7 @@
   [(#3081)](https://github.com/PennyLaneAI/catalyst/pull/3081)
 
 * The ``ResourceAnalysis`` pass no longer reports PBC Pauli product rotations and measurements
-  with an ``Adjoint(...)`` prefix. Resource keys such as ``Adjoint(PPR-pi/4)`` and ``Adjoint(PPM)`` 
+  with an ``Adjoint(...)`` prefix. Resource keys such as ``Adjoint(PPR-pi/4)`` and ``Adjoint(PPM)``
   are now counted under ``PPR-pi/4`` and ``PPM`` instead.
   [(#3210)](https://github.com/PennyLaneAI/catalyst/pull/3210)
 
