@@ -255,9 +255,6 @@ llvm::StringRef PPMeasurementOp::getResourceName() { return "PPM"; }
 llvm::StringRef RefPPMeasurementOp::getResourceName() { return "PPM"; }
 llvm::StringRef SelectPPMeasurementOp::getResourceName() { return "PPM"; }
 
-bool PPRotationOp::getResourceAdjointFlag() { return getRotationKind() < 0; }
-bool PPMeasurementOp::getResourceAdjointFlag() { return getNegated(); }
-
 std::string getDetailedStateName(LogicalInitKind initState) {
     switch (initState) {
     case LogicalInitKind::zero:

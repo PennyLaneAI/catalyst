@@ -14,13 +14,15 @@
 
 // RUN: catalyst --tool=opt --split-input-file --pass-pipeline='builtin.module( graph-decomposition{gate-set=testHadamard=1.0 fixed-decomps=testPauliX=x_to_h bytecode-rules="%BYTECODE_PATH"}, graph-decomposition{gate-set=testPauliX=1.0 fixed-decomps=testHadamard=h_to_x bytecode-rules="%BYTECODE_PATH"}, graph-decomposition{gate-set=testHadamard=1.0 fixed-decomps=testPauliX=x_to_h bytecode-rules="%BYTECODE_PATH"})' %s | FileCheck %s
 
-func.func @circuit() -> !quantum.bit {
+func.func @circuit() {
     %0 = quantum.alloc(2) : !quantum.reg
     %q = quantum.extract %0[0] : !quantum.reg -> !quantum.bit
     // CHECK-NOT testPauliX
     // CHECK: testHadamard
     %qout = quantum.custom "testPauliX"() %q : !quantum.bit
-    return %qout : !quantum.bit
+    %1 = quantum.insert %0[ 0], %qout : !quantum.reg, !quantum.bit
+    quantum.dealloc %1 : !quantum.reg
+    return
 }
 
 // CHECK-LABEL: h_to_x
