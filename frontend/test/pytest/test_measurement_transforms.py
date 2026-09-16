@@ -599,8 +599,7 @@ class TestMeasurementTransforms:
             qp.RX(theta, 0)
             return qp.sample()
 
-        with pytest.warns(UserWarning, match="AOT.*failed"):
-            compiled_circuit = qjit(circuit)
+        compiled_circuit = qjit(circuit)
 
         with pytest.raises(
             NotImplementedError, match="not implemented with measurements_from_counts"
@@ -620,8 +619,7 @@ class TestMeasurementTransforms:
             qp.RX(theta, 0)
             return qp.counts()
 
-        with pytest.warns(UserWarning, match="AOT.*failed"):
-            compiled_circuit = qjit(circuit)
+        compiled_circuit = qjit(circuit)
 
         with pytest.raises(
             NotImplementedError, match="not implemented with measurements_from_samples"

@@ -13,20 +13,14 @@ on:
         value: ${{ jobs.determine_workflow_runner.outputs.runner_group || inputs.default_runner }}
 
 env:
-  LARGE_RUNNER_GROUP_NAME: blacksmith-4vcpu-ubuntu-2404
+  LARGE_RUNNER_GROUP_NAME: blacksmith-32vcpu-ubuntu-2404
 
 permissions:
   contents: read
 
 jobs:
   determine_workflow_runner:
-    runs-on: >-
-      ${{
-        (
-          github.event_name == 'pull_request'
-          && contains(github.event.pull_request.labels.*.name, 'urgent')
-        ) && 'blacksmith-4vcpu-ubuntu-2404' || 'ubuntu-24.04'
-      }}
+    runs-on: ubuntu-24.04
 
     outputs:
       runner_group: ${{ steps.runner_group.outputs.runner_group }}

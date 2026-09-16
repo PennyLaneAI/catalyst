@@ -536,14 +536,13 @@ def test_no_capture(backend):
     """
     Test error message when used without capture.
     """
-    with pytest.warns(UserWarning, match="AOT.*failed"):
 
-        @qjit
-        @qp.qnode(qp.device(backend, wires=1))
-        def circuit():
-            with qp.allocate(1) as _:
-                pass
-            return qp.probs(wires=[0])
+    @qjit
+    @qp.qnode(qp.device(backend, wires=1))
+    def circuit():
+        with qp.allocate(1) as _:
+            pass
+        return qp.probs(wires=[0])
 
     with pytest.raises(
         CompileError,
@@ -557,15 +556,13 @@ def test_use_after_free(backend):
     Test error message when used after free.
     """
 
-    with pytest.warns(UserWarning, match="AOT.*failed"):
-
-        @qjit(capture=True, collect_decomp_rules=False)
-        @qp.qnode(qp.device(backend, wires=1))
-        def circuit():
-            with qp.allocate(1) as q:
-                qp.X(q[0])
-            qp.Hadamard(q[0])
-            return qp.probs(wires=[0])
+    @qjit(capture=True, collect_decomp_rules=False)
+    @qp.qnode(qp.device(backend, wires=1))
+    def circuit():
+        with qp.allocate(1) as q:
+            qp.X(q[0])
+        qp.Hadamard(q[0])
+        return qp.probs(wires=[0])
 
     with pytest.raises(
         CompileError,
@@ -579,14 +576,12 @@ def test_terminal_MP_all_wires(backend):
     Test error message when used with terminal measurements on all wires.
     """
 
-    with pytest.warns(UserWarning, match="AOT.*failed"):
-
-        @qjit(capture=True, collect_decomp_rules=False)
-        @qp.qnode(qp.device(backend, wires=1))
-        def circuit():
-            with qp.allocate(1) as _:
-                pass
-            return qp.probs()
+    @qjit(capture=True, collect_decomp_rules=False)
+    @qp.qnode(qp.device(backend, wires=1))
+    def circuit():
+        with qp.allocate(1) as _:
+            pass
+        return qp.probs()
 
     with pytest.raises(
         CompileError,
@@ -603,13 +598,11 @@ def test_terminal_MP_dynamic_wires(backend):
     Test error message when used with terminal measurements on dynamic wires.
     """
 
-    with pytest.warns(UserWarning, match="AOT.*failed"):
-
-        @qjit(capture=True, collect_decomp_rules=False)
-        @qp.qnode(qp.device(backend, wires=1))
-        def circuit():
-            q = qp.allocate(1)
-            return qp.probs(q)
+    @qjit(capture=True, collect_decomp_rules=False)
+    @qp.qnode(qp.device(backend, wires=1))
+    def circuit():
+        q = qp.allocate(1)
+        return qp.probs(q)
 
     with pytest.raises(
         CompileError,
