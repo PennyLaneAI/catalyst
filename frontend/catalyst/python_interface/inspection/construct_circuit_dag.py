@@ -34,9 +34,12 @@ from xdsl.ir import Block, Operation, Region
 from catalyst.python_interface.dialects import mbqc, pbc, quantum
 from catalyst.python_interface.inspection.dag_builder import DAGBuilder
 from catalyst.python_interface.inspection.xdsl_conversion import (
+    resolve_constant_params,
+    ssa_to_qp_params,
     ssa_to_qp_wires,
     xdsl_to_qp_measurement,
     xdsl_to_qp_op,
+    xdsl_to_qp_op_name,
 )
 
 # Defines a set of operations from the quantum dialect
@@ -107,6 +110,23 @@ class ClusterEntry:
 
 class VisualizationError(Exception):
     """Custom visualization error."""
+
+
+def _has_symbolic_gate_parameter(op: quantum.GateOp) -> bool:
+    """Whether an xDSL gate contains a parameter represented by a symbolic string."""
+    match op:
+        case quantum.CustomOp():
+            params = ssa_to_qp_params(op)
+        case quantum.GlobalPhaseOp():
+            params = (resolve_constant_params(op.angle),)
+        case quantum.MultiRZOp():
+            params = (resolve_constant_params(op.theta),)
+        case quantum.PauliRotOp():
+            params = (resolve_constant_params(op.angle),)
+        case _:
+            params = ()
+
+    return any(isinstance(param, str) for param in params)
 
 
 class ConstructCircuitDAG:
@@ -199,12 +219,19 @@ class ConstructCircuitDAG:
     @_visualize_operation.register
     def _gate_op(self, op: quantum.GateOp) -> None:
         """Generic handler for unitary gates."""
-        # Create PennyLane instance
-        qp_op: Operator = xdsl_to_qp_op(op)
+        if _has_symbolic_gate_parameter(op):
+            gate_name = xdsl_to_qp_op_name(op, adjoint_mode=False)
+            wires = ssa_to_qp_wires(op, control=True) + ssa_to_qp_wires(op)
+            wires_str = "all" if not wires else f"[{', '.join(map(str, wires))}]"
+            label = f"<name> {gate_name}|<wire> {wires_str}"
+        else:
+            qp_op: Operator = xdsl_to_qp_op(op)
+            wires = qp_op.wires
+            label = get_label(qp_op)
 
         # Add node to current cluster
         node_uid = self.dag_builder.add_node(
-            label=get_label(qp_op),
+            label=label,
             cluster_uid=self._cluster_stack[-1].uid,
             # NOTE: "record" allows us to use ports
             # (https://graphviz.org/doc/info/shapes.html#record)
@@ -216,8 +243,8 @@ class ConstructCircuitDAG:
         # a disjoint or 'floating' node within the current cluster to reflect
         # that it has no strict ordering requirements relative to other
         # quantum operations.
-        if len(qp_op.wires) != 0:
-            self._connect(qp_op.wires, node_uid)
+        if wires:
+            self._connect(wires, node_uid)
 
     @_visualize_operation.register
     def _projective_measure_op(self, op: quantum.MeasureOp) -> None:
