@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{gate-set=testRX=2.0,testRY=1.0,testRZ=1.0 fixed-decomps=testHadamard=custom_decomp bytecode-rules="%BYTECODE_PATH"})' %s | FileCheck %s
+// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{gate-set=testRX=2.0,testRY=1.0,testRZ=1.0 fixed-decomps=testHadamard=fixed_decomp})' %s | FileCheck %s
 
 func.func @circuit() -> !quantum.bit {
     %0 = quantum.alloc(1) : !quantum.reg
@@ -25,10 +25,18 @@ func.func @circuit() -> !quantum.bit {
     return %qout : !quantum.bit
 }
 
-func.func @custom_decomp(%q0 : !quantum.bit) -> !quantum.bit attributes {target_gate = "testHadamard{}{wires:1}{}", resources = { operations = { "testRX{0:1}{wires:1}{}"=2, "testRZ{0:1}{wires:1}{}"=1}}} {
+// CHECK: @fixed_decomp
+func.func @fixed_decomp(%q0 : !quantum.bit) -> !quantum.bit attributes {target_gate = "testHadamard{}{wires:1}{}", frontend_name = "fixed_decomp", resources = { operations = { "testRX{0:[f64]}{wires:1}{}"=2, "testRZ{0:[f64]}{wires:1}{}"=1}}} {
     %cst = arith.constant 1.5707963267948966 : f64
     %q1 = quantum.custom "testRX"(%cst) %q0 : !quantum.bit
     %q2 = quantum.custom "testRZ"(%cst) %q1 : !quantum.bit
     %q3 = quantum.custom "testRX"(%cst) %q2 : !quantum.bit
     return %q3 : !quantum.bit
+}
+
+// CHECK: @cheaper_decomp
+func.func @cheaper_decomp(%q0 : !quantum.bit) -> !quantum.bit attributes {target_gate = "testHadamard{}{wires:1}{}", frontend_name = "cheaper_decomp", resources = { operations = { "testRX{0:[f64]}{wires:1}{}"}} } {
+    %cst = arith.constant 1.5707963267948966 : f64
+    %q1 = quantum.custom "testRX"(%cst) %q0 : !quantum.bit
+    return %q1 : !quantum.bit
 }
