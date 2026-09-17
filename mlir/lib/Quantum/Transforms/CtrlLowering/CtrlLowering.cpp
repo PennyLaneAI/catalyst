@@ -550,7 +550,7 @@ static LogicalResult distributeControls(PatternRewriter &rewriter, Block &block,
         }
         // Any other scf ops would need their body controlled too,
         // which is not supported:
-        if (op.getNumRegions() > 0) {
+        if (isa<scf::SCFDialect>(op.getDialect()) && op.getNumRegions() > 0) {
             op.emitError("unsupported scf operation inside a quantum.ctrl region");
             return failure();
         }

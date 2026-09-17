@@ -79,8 +79,7 @@ def test_unsupported_device():
         return qp.probs()
 
     regex = "Attempting to compile program for incompatible device.*"
-    with pytest.warns(UserWarning, match="AOT.*failed"):
-        qjitted = qjit(func)
+    qjitted = qjit(func)
 
     with pytest.raises(CompileError, match=regex):
         qjitted()

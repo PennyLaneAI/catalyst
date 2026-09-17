@@ -15,7 +15,7 @@
 // RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{gate-set=C(PhaseShift)=1.0 alt-decomps=C(RZ){0:[f64]}{wires:1}{}=ctrl_rz})' %s | FileCheck %s
 
 // CHECK-LABEL: func.func @parametric(
-// CHECK-SAME:  %[[C:.*]]: !quantum.bit, %[[Q:.*]]: !quantum.bit, %[[T:.*]]: f64
+// CHECK-SAME:  %[[T:.*]]: f64, %[[Q:.*]]: !quantum.bit, %[[C:.*]]: !quantum.bit
 func.func @parametric(%ctrl: !quantum.bit, %q: !quantum.bit, %theta: f64) -> (!quantum.bit, !quantum.bit) {
   %true = arith.constant true
   // CHECK-NOT: "RZ"

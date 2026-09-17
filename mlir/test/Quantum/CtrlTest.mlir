@@ -207,3 +207,31 @@ func.func @ctrl_unsupported_scf(%ctrl: !quantum.bit, %q: !quantum.bit) -> !quant
   }
   return %outc : !quantum.bit
 }
+
+// -----
+
+// Region-bearing ops that are not from scf must be accepted
+
+// CHECK-LABEL: @ctrl_with_region_op_non_scf
+func.func @ctrl_with_region_op_non_scf(%ctrl: !quantum.bit, %q: !quantum.bit, %arg2: tensor<f64>, %arg3: tensor<i32>) -> !quantum.bit {
+  %true = arith.constant true
+  %outc, %outq = quantum.ctrl(%ctrl) ctrlvals(%true) (%q) : !quantum.bit -> !quantum.bit {
+  ^bb0(%arg0: !quantum.bit):
+
+    // CHECK: "stablehlo.case"
+    %case = "stablehlo.case"(%arg3) ({
+      %neg = stablehlo.negate %arg2 : tensor<f64>
+      stablehlo.return %neg : tensor<f64>
+    }, {
+      stablehlo.return %arg2 : tensor<f64>
+    }) : (tensor<i32>) -> (tensor<f64>)
+
+    %0 = tensor.extract %case[] : tensor<f64>
+
+    // CHECK: RX
+    // CHECK-SAME: ctrls
+    %rx = quantum.custom "RX"(%0) %arg0 : !quantum.bit
+    quantum.yield %rx : !quantum.bit
+  }
+  return %outc : !quantum.bit
+}
