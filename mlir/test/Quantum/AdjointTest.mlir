@@ -158,13 +158,21 @@ func.func @workflow_unhandled() {
 
 // -----
 
-func.func private @qubit_unitary_test(%arg0: tensor<4x4xcomplex<f64>>) -> tensor<4xcomplex<f64>> {
-    quantum.device ["rtd_lightning.so", "LightningQubit", "{shots: 0}"]
-    %0 = quantum.alloc( 2) : !quantum.reg
-    %1 = quantum.adjoint(%0) : !quantum.reg {
-    ^bb0(%arg1: !quantum.reg):
-      %6 = quantum.extract %arg1[ 0] : !quantum.reg -> !quantum.bit
-      %7 = quantum.extract %arg1[ 1] : !quantum.reg -> !quantum.bit
+func.func private @qubit_unitary_test() -> tensor<4xcomplex<f64>> {
+  quantum.device ["rtd_lightning.so", "LightningQubit", "{shots: 0}"]
+  %0 = quantum.alloc( 2) : !quantum.reg
+
+  %1 = quantum.adjoint(%0) : !quantum.reg {
+  ^bb0(%arg1: !quantum.reg):
+
+    %c0 = arith.constant 0 : index
+    %c4 = arith.constant 4 : index
+    %c1 = arith.constant 1 : index
+    %for_reg = scf.for %i = %c0 to %c4 step %c1 iter_args(%reg = %arg1) -> (!quantum.reg) {
+      %u = "test.op"() : () -> tensor<4x4xcomplex<f64>>
+
+      %6 = quantum.extract %reg[ 0] : !quantum.reg -> !quantum.bit
+      %7 = quantum.extract %reg[ 1] : !quantum.reg -> !quantum.bit
 
       // CHECK-DAG: [[idx0:%.+]] = index.constant 0
       // CHECK-DAG: [[idx1:%.+]] = index.constant 1
@@ -176,9 +184,7 @@ func.func private @qubit_unitary_test(%arg0: tensor<4x4xcomplex<f64>>) -> tensor
       // CHECK:     [[imag:%.+]] = complex.im [[element]]
       // CHECK:     catalyst.list_push [[real]]
       // CHECK:     catalyst.list_push [[imag]]
-
-      %8:2 = quantum.unitary(%arg0 : tensor<4x4xcomplex<f64>>) %6, %7 : !quantum.bit, !quantum.bit
-
+      %8:2 = quantum.unitary(%u : tensor<4x4xcomplex<f64>>) %6, %7 : !quantum.bit, !quantum.bit
       // CHECK-DAG: [[result:%.+]] = tensor.empty
       // CHECK: scf.for [[k:%.+]] = [[idx0]] to [[idxN]] step [[idx1]] iter_args([[curr_k:%.+]] = [[result]])
       // CHECK:   [[kplus1:%.+]] = index.add [[k]], [[idx1]]
@@ -191,21 +197,22 @@ func.func private @qubit_unitary_test(%arg0: tensor<4x4xcomplex<f64>>) -> tensor
       // CHECK:     [[l_idx:%.+]] = index.sub [[idxN]], [[lplus1]]
       // CHECK:     [[new_tensor:%.+]] = tensor.insert [[complex]] into [[curr_l]][[[k_idx]], [[l_idx]]]
       // CHECK:     scf.yield [[new_tensor]]
-
       // CHECK:   scf.yield [[last_tensor]]
 
-
-      %9 = quantum.insert %arg1[ 0], %8#0 : !quantum.reg, !quantum.bit
+      %9 = quantum.insert %reg[ 0], %8#0 : !quantum.reg, !quantum.bit
       %10 = quantum.insert %9[ 1], %8#1 : !quantum.reg, !quantum.bit
-      quantum.yield %10 : !quantum.reg
+      scf.yield %10 : !quantum.reg
     }
-    %2 = quantum.extract %1[ 0] : !quantum.reg -> !quantum.bit
-    %3 = quantum.extract %1[ 1] : !quantum.reg -> !quantum.bit
-    %4 = quantum.compbasis qubits %2, %3 : !quantum.obs
-    %5 = quantum.state %4 : tensor<4xcomplex<f64>>
-    quantum.dealloc %0 : !quantum.reg
-    return %5 : tensor<4xcomplex<f64>>
+    quantum.yield %for_reg : !quantum.reg
   }
+
+  %2 = quantum.extract %1[ 0] : !quantum.reg -> !quantum.bit
+  %3 = quantum.extract %1[ 1] : !quantum.reg -> !quantum.bit
+  %4 = quantum.compbasis qubits %2, %3 : !quantum.obs
+  %5 = quantum.state %4 : tensor<4xcomplex<f64>>
+  quantum.dealloc %0 : !quantum.reg
+  return %5 : tensor<4xcomplex<f64>>
+}
 
 // -----
 
@@ -319,32 +326,48 @@ func.func private @workflow_adjoint(%arg0: f64) -> tensor<4xcomplex<f64>> attrib
 
 // -----
 
-// CHECK-LABEL: @param_ordering
+// CHECK-LABEL: param_ordering
 func.func private @param_ordering(%0: !quantum.reg) -> !quantum.reg {
-  // CHECK-DAG: [[C1:%.+]] = arith.constant 1.000000e-01
-  // CHECK-DAG: [[C2:%.+]] = arith.constant 2.000000e-01
-  // CHECK-DAG: [[C3:%.+]] = arith.constant 3.000000e-01
-  %c1 = arith.constant 0.1 : f64
-  %c2 = arith.constant 0.2 : f64
-  %c3 = arith.constant 0.3 : f64
-
-  // CHECK:     catalyst.list_push [[C1]]
-  // CHECK:     catalyst.list_push [[C2]]
-  // CHECK:     catalyst.list_push [[C3]]
+  // CHECK-DAG: [[F1:%.+]] = arith.constant 1.000000e-01
+  // CHECK-DAG: [[F2:%.+]] = arith.constant 2.000000e-01
+  // CHECK-DAG: [[F3:%.+]] = arith.constant 3.000000e-01
+  %f1 = arith.constant 0.1 : f64
+  %f2 = arith.constant 0.2 : f64
+  %f3 = arith.constant 0.3 : f64
 
   // CHECK-NOT: quantum.adjoint
   %1 = quantum.adjoint(%0) : !quantum.reg {
   ^bb0(%r0: !quantum.reg):
-    %q0 = quantum.extract %r0[ 0] : !quantum.reg -> !quantum.bit
 
-    // CHECK:   [[A3:%.+]] = catalyst.list_pop
-    // CHECK:   [[A2:%.+]] = catalyst.list_pop
-    // CHECK:   [[A1:%.+]] = catalyst.list_pop
-    // CHECK:   quantum.custom "Rot"([[A1]], [[A2]], [[A3]])
-    %q1 = quantum.custom "Rot"(%c1, %c2, %c3) %q0 : !quantum.bit
+    // CHECK: scf.for [[i:%.+]] =
+    %i0 = arith.constant 0 : index
+    %i4 = arith.constant 4 : index
+    %i1 = arith.constant 1 : index
+    %for_reg = scf.for %i = %i0 to %i4 step %i1 iter_args(%reg = %r0) -> (!quantum.reg) {
 
-    %r1 = quantum.insert %r0[ 0], %q1 : !quantum.reg, !quantum.bit
-    quantum.yield %r1 : !quantum.reg
+      // CHECK: [[C1:%.+]] = "test.op"([[F1]], [[i]]) : (f64, index) -> f64
+      // CHECK: [[C2:%.+]] = "test.op"([[F2]], [[i]]) : (f64, index) -> f64
+      // CHECK: [[C3:%.+]] = "test.op"([[F3]], [[i]]) : (f64, index) -> f64
+      %c1 = "test.op" (%f1, %i) : (f64, index) -> (f64)
+      %c2 = "test.op" (%f2, %i) : (f64, index) -> (f64)
+      %c3 = "test.op" (%f3, %i) : (f64, index) -> (f64)
+      // CHECK:     catalyst.list_push [[C1]]
+      // CHECK:     catalyst.list_push [[C2]]
+      // CHECK:     catalyst.list_push [[C3]]
+
+      %q0 = quantum.extract %reg[ 0] : !quantum.reg -> !quantum.bit
+
+      // CHECK:   [[A3:%.+]] = catalyst.list_pop
+      // CHECK:   [[A2:%.+]] = catalyst.list_pop
+      // CHECK:   [[A1:%.+]] = catalyst.list_pop
+      // CHECK:   quantum.custom "Rot"([[A1]], [[A2]], [[A3]])
+      // CHECK-SAME: adj
+      %q1 = quantum.custom "Rot"(%c1, %c2, %c3) %q0 : !quantum.bit
+
+      %r1 = quantum.insert %reg[ 0], %q1 : !quantum.reg, !quantum.bit
+      scf.yield %r1 : !quantum.reg
+    }
+    quantum.yield %for_reg : !quantum.reg
   }
 
   return %1 : !quantum.reg
