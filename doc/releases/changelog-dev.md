@@ -583,6 +583,10 @@
 * Added ``CZ`` support to ``to-ppr`` pass.
   [(#3009)](https://github.com/PennyLaneAI/catalyst/pull/3009)
 
+* The `--adjoint-lowering` pass no longer caches all classical gate parameters.
+  Parameters that are trivially available to the reverse pass is no longer cached.
+  [(#3233)](https://github.com/PennyLaneAI/catalyst/pull/3233)
+
 <h3>Breaking changes 💔</h3>
 
 * Removes :func:`~.passes.ppm_specs` and the ``--ppm-specs`` MLIR pass. Use :func:`~.specs` and
@@ -671,6 +675,9 @@
 
 * Fixed the assembly format for `quantum.adjoint` when it has no quantum operands/results.
   [(#2938)](https://github.com/PennyLaneAI/catalyst/pull/2938)
+* Fixed a performance degradation issue with `catalyst.runtime_artifacts`. It now visits module 
+  operations only, instead of every operation in the program.
+  [(#3219)](https://github.com/PennyLaneAI/catalyst/pull/3219)
 
 <h3>Internal changes ⚙️</h3>
 
