@@ -26,12 +26,12 @@ func.func @circuit() {
 }
 
 // CHECK-LABEL: h_to_x
-func.func @h_to_x(%q : !quantum.bit) -> !quantum.bit attributes {target_gate="testHadamard{}{wires:1}{}"} {
+func.func @h_to_x(%q : !quantum.bit) -> !quantum.bit attributes {target_gate="testHadamard{}{wires:1}{}", frontend_name = "h_to_x"} {
     %q1 = quantum.custom "testPauliX"() %q : !quantum.bit
     return %q1 : !quantum.bit
 }
 
-func.func @x_to_h(%q : !quantum.bit) -> !quantum.bit attributes {target_gate="testPauliX{}{wires:1}{}"} {
+func.func @x_to_h(%q : !quantum.bit) -> !quantum.bit attributes {target_gate="testPauliX{}{wires:1}{}", frontend_name = "x_to_h"} {
     %q1 = quantum.custom "testHadamard"() %q : !quantum.bit
     return %q1 : !quantum.bit
 }

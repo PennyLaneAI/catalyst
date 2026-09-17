@@ -138,9 +138,9 @@ def symbolic_arguments(base_op, kind, ctrl_wires=None) -> dict:
 
 
 def ordered_kwarg_names(call_kwargs, dynamic_shape) -> list:
-    """Order a rule's keyword operands params-first, then wires, each group sorted by name."""
+    """Order a rule's keyword operands params-first, followed by wires in declaration order."""
     params = sorted(name for name in call_kwargs if name in dynamic_shape)
-    wires = sorted(name for name in call_kwargs if name not in dynamic_shape)
+    wires = [name for name in call_kwargs if name not in dynamic_shape]
     return params + wires
 
 
@@ -175,35 +175,44 @@ def flatten_hybrid_args(extra_data) -> tuple:
 
 
 def rule_call_operands(
-    call_args, call_kwargs, kwarg_names, ctrl_wires=None, hybrid_leaves=(), n_param_kwargs=None
+    call_args, call_kwargs, kwarg_names, wire_lens, ctrl_wires=None, hybrid_leaves=()
 ) -> list:
-    """Flatten a rule's call into positional operands.
+    """Flatten a rule call as params, operand-passed hybrid-arg leaves, one grouped base-wire
+    operand, then control wires.
+
+    Everything is passed positionally because ``qp.capture.subroutine`` traces through ``jax.jit``,
+    which would otherwise flatten keyword arguments in sorted-name order.
 
     Args:
         call_args (tuple): the rule's positional arguments
         call_kwargs (dict): the rule's keyword arguments
-        kwarg_names (list[str]): the keyword argument names, in the order to flatten them
+        kwarg_names (list[str]): parameter names first, followed by wire names
+        wire_lens (dict[str, int]): wire names in declaration order and their lengths
         ctrl_wires: the control wires to append, or None when the rule is not controlled
         hybrid_leaves (list): flattened hybrid-argument leaves, inserted after the parameter kwargs
-        n_param_kwargs (int): how many leading ``kwarg_names`` are parameters (the rest are wires);
-            defaults to all of them (no hybrid leaves)
 
     Returns:
         list: the operands to call the traced rule with
     """
-    if n_param_kwargs is None:
-        n_param_kwargs = len(kwarg_names)
-    param_kwargs = [call_kwargs[name] for name in kwarg_names[:n_param_kwargs]]
-    wire_kwargs = [call_kwargs[name] for name in kwarg_names[n_param_kwargs:]]
-    operands = [*call_args, *param_kwargs, *hybrid_leaves, *wire_kwargs]
+    param_names = [name for name in kwarg_names if name not in wire_lens]
+    wire_names = list(wire_lens)
+    grouped_wires = (
+        jnp.concatenate(tuple(call_kwargs[name] for name in wire_names))
+        if wire_names
+        else jnp.array([], dtype=int)
+    )
+    operands = [
+        *call_args,
+        *(call_kwargs[name] for name in param_names),
+        *hybrid_leaves,
+        grouped_wires,
+    ]
     if ctrl_wires is not None:
         operands.append(ctrl_wires)
     return operands
 
 
-def unpack_rule_operands(
-    operands, n_params, kwarg_names, has_ctrl_wires, hybrid_specs=(), n_param_kwargs=None
-):
+def unpack_rule_operands(operands, n_params, kwarg_names, wire_lens, has_ctrl_wires, hybrid_specs=()):
     """Recover ``(params, kwargs, control wires)`` from :func:`rule_call_operands`' flattening.
 
     Reconstructs each hybrid argument from its traced leaves (via its ``treedef``) so the rule body
@@ -212,31 +221,33 @@ def unpack_rule_operands(
     Args:
         operands (tuple): the traced operands the rule body received
         n_params (int): how many of them are positional parameters
-        kwarg_names (list[str]): the keyword argument names, in the order they were flattened
+        kwarg_names (list[str]): parameter names first, followed by wire names
+        wire_lens (dict[str, int]): wire names in declaration order and their lengths
         has_ctrl_wires (bool): whether a trailing control-wire operand is present
         hybrid_specs (list[tuple]): ``(name, treedef, num_leaves)`` per hybrid argument, sitting
-            between the parameter kwargs and the wire kwargs
-        n_param_kwargs (int): how many leading ``kwarg_names`` are parameters; defaults to all
+            between the parameter kwargs and the grouped wire operand
 
     Returns:
         tuple: the rule's positional arguments
         dict: the rule's keyword arguments (including the rebuilt hybrid arguments)
         the control wires, or None
     """
-    if n_param_kwargs is None:
-        n_param_kwargs = len(kwarg_names)
     params = tuple(operands[:n_params])
-    idx = n_params
-    named = {}
-    for name in kwarg_names[:n_param_kwargs]:
-        named[name] = operands[idx]
-        idx += 1
+    param_names = [name for name in kwarg_names if name not in wire_lens]
+    n_kwarg_params = len(param_names)
+    named = dict(zip(param_names, operands[n_params : n_params + n_kwarg_params], strict=True))
+    idx = n_params + n_kwarg_params
     for name, treedef, num_leaves in hybrid_specs:
         named[name] = tree_unflatten(treedef, operands[idx : idx + num_leaves])
         idx += num_leaves
-    for name in kwarg_names[n_param_kwargs:]:
-        named[name] = operands[idx]
-        idx += 1
+
+    grouped_wires = operands[idx]
+    idx += 1
+    offset = 0
+    for name, length in wire_lens.items():
+        named[name] = grouped_wires[offset : offset + length]
+        offset += length
+
     ctrl_wires = operands[idx] if has_ctrl_wires else None
     return params, named, ctrl_wires
 
@@ -658,7 +669,6 @@ def compile_decomposition_rules(
 
     call_args, call_kwargs = split_call_args(kwargs, is_custom_op)
     kwarg_names = ordered_kwarg_names(call_kwargs, dynamic_shape)
-    n_param_kwargs = sum(1 for name in kwarg_names if name in dynamic_shape)
 
     hybrid_specs, hybrid_leaves, closed_hybrid = flatten_hybrid_args(extra_data)
 
@@ -667,7 +677,7 @@ def compile_decomposition_rules(
     def rule_to_subroutine(rule):
         def decomp_rule(*_operands):
             _args, _kwargs, _ctrl_wires = unpack_rule_operands(
-                _operands, len(call_args), kwarg_names, wrap_control, hybrid_specs, n_param_kwargs
+                _operands, len(call_args), kwarg_names, wire_lens, wrap_control, hybrid_specs
             )
             # Operand-passed hybrid args are rebuilt from operands in unpack_rule_operands; static
             # data and closed-over hybrid args are supplied directly.
@@ -704,22 +714,43 @@ def compile_decomposition_rules(
         jnp.array(range(n_base_wires, n_base_wires + n_ctrl), dtype=int) if wrap_control else None
     )
 
-    operands = rule_call_operands(
-        call_args, call_kwargs, kwarg_names, ctrl_wires, hybrid_leaves, n_param_kwargs
+    return build_rule_module(
+        subroutines,
+        device,
+        call_args,
+        call_kwargs,
+        kwarg_names,
+        wire_lens,
+        ctrl_wires,
+        name_to_resource_ids,
+        target_id,
+        hybrid_leaves,
     )
-    return build_rule_module(subroutines, device, operands, name_to_resource_ids, target_id)
 
 
 def build_rule_module(
-    subroutines, device, operands, name_to_resource_ids, target_id
+    subroutines,
+    device,
+    call_args,
+    call_kwargs,
+    kwarg_names,
+    wire_lens,
+    ctrl_wires,
+    name_to_resource_ids,
+    target_id,
+    hybrid_leaves=(),
 ) -> ir.Operation:
     """Trace ``subroutines`` into a module of standalone decomposition-rule functions.
 
     Args:
         subroutines (list): the rule bodies, as captured subroutines
         device (Device): the device to trace them on, sized for the operator's wires
-        operands (list): the positional operands to call each subroutine with (from
-            :func:`rule_call_operands`)
+        call_args (tuple): positional arguments to call each subroutine with
+        call_kwargs (dict): keyword arguments to call each subroutine with
+        kwarg_names (list[str]): the keyword argument names, in the order to flatten them
+        wire_lens (dict[str, int]): wire names in declaration order and their lengths
+        ctrl_wires: the control wires to append, or None when the rules are not controlled
+        hybrid_leaves (list): flattened hybrid-argument leaves passed to :func:`rule_call_operands`
         name_to_resource_ids (dict): rule name to the graphOpId of each resource
         target_id (str): the graphOpId of the gate the rules decompose
 
@@ -729,6 +760,10 @@ def build_rule_module(
     Raises:
         CompileError: if the rules could not be traced
     """
+
+    operands = rule_call_operands(
+        call_args, call_kwargs, kwarg_names, wire_lens, ctrl_wires, hybrid_leaves
+    )
 
     @qp.qjit(target="mlir", capture=True, collect_decomp_rules=False)
     @qp.qnode(device=device)
@@ -760,6 +795,7 @@ def build_rule_module(
                 )
                 op.attributes["target_gate"] = ir.StringAttr.get(target_id)
                 op.attributes["sym_visibility"] = ir.StringAttr.get("public")
+                op.attributes["frontend_name"] = ir.StringAttr.get(rule_name)
 
         return ir.WalkResult.ADVANCE
 
@@ -948,7 +984,6 @@ def compile_registered_symbolic_rules(
 
     call_args, call_kwargs = split_call_args(kwargs, is_custom_op)
     kwarg_names = ordered_kwarg_names(call_kwargs, dynamic_shape)
-    n_param_kwargs = sum(1 for name in kwarg_names if name in dynamic_shape)
 
     # Numeric hybrid args (e.g. a CDFHamiltonian) are passed as operands so their concrete values
     # do not bake into the rule body; the rest are closed over. The modified base op still carries
@@ -959,12 +994,7 @@ def compile_registered_symbolic_rules(
     def rule_to_subroutine(rule):
         def decomp_rule(*_operands):
             _args, _kwargs, _ctrl_wires = unpack_rule_operands(
-                _operands,
-                len(call_args),
-                kwarg_names,
-                has_ctrl,
-                hybrid_specs,
-                n_param_kwargs,
+                _operands, len(call_args), kwarg_names, wire_lens, has_ctrl, hybrid_specs
             )
             # The base is rebuilt from the traced arguments of the rule function, so the wires and
             # parameters the rule body reads off it are this function's own operands. Operand-passed
@@ -990,13 +1020,6 @@ def compile_registered_symbolic_rules(
     for rule in rules:
         if rule.name not in name_to_resource_ids:
             continue
-        if _resources_have_measurement(name_to_resources[rule.name]):  # pragma: no cover
-            warnings.warn(
-                f"Skipped the {rule.name} decomposition rule for {target_id}: it contains a "
-                "mid-circuit measurement, which is not supported with adjoint or control regions.",
-                category=RuleLoweringWarning,
-            )
-            continue
         subroutines.append(rule_to_subroutine(rule))
 
     if not subroutines:
@@ -1006,10 +1029,18 @@ def compile_registered_symbolic_rules(
         jnp.array(range(n_base_wires, n_base_wires + n_ctrl), dtype=int) if has_ctrl else None
     )
 
-    operands = rule_call_operands(
-        call_args, call_kwargs, kwarg_names, ctrl_wires, hybrid_leaves, n_param_kwargs
+    return build_rule_module(
+        subroutines,
+        device,
+        call_args,
+        call_kwargs,
+        kwarg_names,
+        wire_lens,
+        ctrl_wires,
+        name_to_resource_ids,
+        target_id,
+        hybrid_leaves,
     )
-    return build_rule_module(subroutines, device, operands, name_to_resource_ids, target_id)
 
 
 def registered_symbolic_rule_strings(op_name, target_id, kind, **kwargs) -> list[str]:

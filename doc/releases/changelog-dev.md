@@ -186,6 +186,7 @@
     [(#3149)](https://github.com/PennyLaneAI/catalyst/pull/3149)
     [(#3169)](https://github.com/PennyLaneAI/catalyst/pull/3169)
     [(#3222)](https://github.com/PennyLaneAI/catalyst/pull/3222)
+    [(#3237)](https://github.com/PennyLaneAI/catalyst/pull/3237)
 
     This pathway of rule injection can be opted-out via a new keyword argument on `qp.qjit` named `collect_decomp_rules`.
     This kwarg controls whether or not to compile the decomposition rules during lower-time. Default value is `True`.
@@ -242,6 +243,9 @@
     rules cannot be lowered and they are silently dropped from the graph-decomposition system instead
     of raising an error.
     [(#3190)](https://github.com/PennyLaneAI/catalyst/pull/3190)
+
+  - The `graph-decomposition` pass now uses `alt-decomps` to denote the strict set of rules that are considered for an operator, i.e. it no longer considers builtin rules if `alt-decomps` is specified, unless the builtin rules are listed.
+    [(#3230)](https://github.com/PennyLaneAI/catalyst/pull/3230)
 
 * Numeric molecular/vibrational Hamiltonians carried as hybrid arguments by Trotter operators can now
   be decomposed through the graph-based decomposition system, together with MLIR/lowering tests for

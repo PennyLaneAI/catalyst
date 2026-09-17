@@ -88,45 +88,67 @@ class TestGenericUtilities:
             ({"reg": 0, "x": 0}, {"x": None}, ["x", "reg"]),
             # Custom ops carry their params positionally, so only wires remain here (unchanged).
             ({"wires": 0}, {"0": None}, ["wires"]),
-            # Multiple params and wires each stay sorted within their group, params first.
-            ({"reg": 0, "b": 0, "a": 0}, {"a": None, "b": None}, ["a", "b", "reg"]),
+            # Params are sorted, while wire registers retain declaration order for grouping.
+            (
+                {"reg2": 0, "reg1": 0, "b": 0, "a": 0},
+                {"a": None, "b": None},
+                ["a", "b", "reg2", "reg1"],
+            ),
         ],
     )
     def test_ordered_kwarg_names_groups_params_before_wires(
         self, call_kwargs, dynamic_shape, expected
     ):
-        """ordered_kwarg_names lays keyword operands out params-first then wires (each sorted),
-        regardless of how the two groups' names sort against each other. Without this, a wire
-        argument whose name sorts before a parameter's places its (multi-element) wire-index operand
-        ahead of the parameter and breaks the compiler's param/wire split."""
+        """Keyword parameters are sorted before declaration-ordered wire registers."""
         assert ordered_kwarg_names(call_kwargs, dynamic_shape) == expected
 
-    def test_rule_operands_roundtrip_default_n_param_kwargs(self):
-        """Test that when ``n_param_kwargs`` is omitted, both helpers default it to ``len(kwarg_names)``"""
-        call_args = ("a", "b")
-        call_kwargs = {"theta": 0.5, "wires": [0, 1]}
-        kwarg_names = ["theta", "wires"]
+    def test_rule_call_operands_groups_wire_kwargs(self):
+        """Rule calls use one base-wire operand after all sorted parameter operands."""
+        call_args = (jnp.array(10.0),)
+        call_kwargs = {
+            "reg2": jnp.array([3, 4]),
+            "empty_reg": jnp.array([], dtype=int),
+            "reg1": jnp.array([0, 1, 2]),
+            "z": jnp.array(12.0),
+            "a": jnp.array(11.0),
+        }
+        dynamic_shape = {"z": None, "a": None}
+        wire_lens = {"reg2": 2, "empty_reg": 0, "reg1": 3}
+        kwarg_names = ordered_kwarg_names(call_kwargs, dynamic_shape)
+        ctrl_wires = jnp.array([5, 6])
 
-        # rule_call_operands with the default n_param_kwargs
-        operands = rule_call_operands(call_args, call_kwargs, kwarg_names)
-        assert operands == ["a", "b", 0.5, [0, 1]]
+        operands = rule_call_operands(call_args, call_kwargs, kwarg_names, wire_lens, ctrl_wires)
 
-        controlled = rule_call_operands(call_args, call_kwargs, kwarg_names, ctrl_wires=[2])
-        assert controlled == ["a", "b", 0.5, [0, 1], [2]]
+        assert len(operands) == 5
+        np.testing.assert_array_equal(operands[0], 10.0)
+        np.testing.assert_array_equal(operands[1], 11.0)
+        np.testing.assert_array_equal(operands[2], 12.0)
+        np.testing.assert_array_equal(operands[3], [3, 4, 0, 1, 2])
+        np.testing.assert_array_equal(operands[4], [5, 6])
 
-        # unpack_rule_operands with the default n_param_kwargs
-        params, named, ctrl_wires = unpack_rule_operands(
-            controlled, len(call_args), kwarg_names, has_ctrl_wires=True
+    def test_unpack_rule_operands_restores_wire_kwargs(self):
+        """Grouped base wires unpack into distinct registers, including an empty register."""
+        wire_lens = {"reg2": 2, "empty_reg": 0, "reg1": 3}
+        kwarg_names = ["a", "z", *wire_lens]
+        operands = (
+            jnp.array(10.0),
+            jnp.array(11.0),
+            jnp.array(12.0),
+            jnp.array([3, 4, 0, 1, 2]),
+            jnp.array([5, 6]),
         )
-        assert params == ("a", "b")
-        assert named == call_kwargs
-        assert ctrl_wires == [2]
 
-        # Without control wires, the trailing operand is absent and ctrl_wires is None.
-        params, named, ctrl_wires = unpack_rule_operands(
-            operands, len(call_args), kwarg_names, has_ctrl_wires=False
+        args, kwargs, ctrl_wires = unpack_rule_operands(
+            operands, n_params=1, kwarg_names=kwarg_names, wire_lens=wire_lens, has_ctrl_wires=True
         )
-        assert (params, named, ctrl_wires) == (("a", "b"), call_kwargs, None)
+
+        np.testing.assert_array_equal(args[0], 10.0)
+        np.testing.assert_array_equal(kwargs["a"], 11.0)
+        np.testing.assert_array_equal(kwargs["z"], 12.0)
+        np.testing.assert_array_equal(kwargs["reg2"], [3, 4])
+        np.testing.assert_array_equal(kwargs["empty_reg"], [])
+        np.testing.assert_array_equal(kwargs["reg1"], [0, 1, 2])
+        np.testing.assert_array_equal(ctrl_wires, [5, 6])
 
     def test_probe_wires_dont_overlap(self):
         """Test that the helper for generating probe arguments doesnt create
@@ -623,6 +645,33 @@ class TestTraceTime:
         assert 'target_gate = "MultipleRegisters{}{reg1:2,reg2:1}{}"' in mlir
         assert "no_work_wires" in mlir
         assert "borrow_two_work_wires" not in mlir
+
+    def test_fixed_decomps(self):
+        """Test that fixed decomps are adhered to."""
+
+        @register_resources({NoParams(reg=Wire[1]): 2})
+        def expensive_fixed_decomp(wires):
+            NoParams(reg=wires[0])
+            NoParams(reg=wires[0])
+
+        @register_resources({NoParams(reg=Wire[1]): 1})
+        def cheaper_decomp(wires):
+            NoParams(reg=wires[0])
+
+        with local_decomps():
+            add_decomps(NoParamsCustomOp, expensive_fixed_decomp, cheaper_decomp)
+
+            @qjit(capture=True, target="mlir")
+            @graph_decomposition(
+                gate_set={NoParams: 1},
+                fixed_decomps={NoParamsCustomOp: expensive_fixed_decomp},
+            )
+            @qnode(qp.device("null.qubit", wires=2))
+            def circuit():
+                NoParamsCustomOp(wires=[0, 1])
+
+            specs = qp.specs(circuit, level="all-mlir")()
+            assert specs.resources["graph-decomposition"].counts["NoParams"] == 2
 
 
 class TestOnDemand:
@@ -1484,6 +1533,32 @@ class TestCustomRuleApplication:
         after = resources["graph-decomposition"].counts
         assert "QubitUnitary" not in after
         assert after.get("NoParams", 0) >= 1
+
+    def test_special_symbolic_rules_applied(self):
+        """Tests that special symbolic decomposition rules are applied."""
+
+        @qp.register_resources({NoParams(Wire[1]): 1, qp.ops.MidMeasure(Wire[1]): 1})
+        def rule_with_mcm(base):
+            m0 = qp.measure(base.wires[0])
+            qp.cond(m0, NoParams)(base.wires[0])
+
+        with local_decomps():
+
+            add_decomps("Adjoint(NoParams)", rule_with_mcm)
+
+            @qjit(capture=True, target="mlir")
+            @graph_decomposition(gate_set={NoParams: 1, qp.ops.MidMeasure: 1})
+            @qnode(qp.device("null.qubit", wires=1))
+            def circuit():
+                qp.adjoint(NoParams(0))
+
+            resources = qp.specs(circuit, level="all-mlir")().resources
+
+        assert "Adjoint(NoParams)" in resources["Before MLIR Passes"].counts
+        after = resources["graph-decomposition"].counts
+        assert "Adjoint(NoParams)" not in after
+        assert after.get("NoParams", 0) == 1
+        assert after.get("MidCircuitMeasure", 0) == 1
 
 
 class TestNumericHamiltonianDecomposition:
