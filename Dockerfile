@@ -143,7 +143,7 @@ RUN apt-get update \
     g++ \
     gcc \
     git \
-    libgomp1 \
+    libgomp1 
     
 RUN pip install --no-cache-dir --extra-index-url https://test.pypi.org/simple \
         /wheels/pennylane_catalyst*.whl \

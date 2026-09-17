@@ -86,7 +86,7 @@ jobs:
           tags: plc:latest
           load: true 
           build-contexts: |
-            pennylane-lightning=docker-image://pennylane-lightning:latest
+            pennylane-lightning:latest=docker-image://pennylane-lightning:latest
 
       # Serialize the Docker image into a single transportable archive file
       - name: Save Docker Image to Archive
