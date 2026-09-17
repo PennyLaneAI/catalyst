@@ -79,23 +79,17 @@ def test_registered_self_adjoint_rule_targets_the_adjoint_op():
 test_registered_self_adjoint_rule_targets_the_adjoint_op()
 
 
-def _adjoint_rule_with_mcm():
-    """Test the lowering into a rule for ``Adjoint(NoParams)`` that contains MCM."""
+def test_registered_symbolic_rule_accepts_mcm():
+    """Test the lowering into a rule for ``Adjoint(NoParams)`` that contains MCMs."""
 
     @qp.register_resources({NoParams(Wire[1]): 1, qp.ops.MidMeasure: 1})
     def rule_with_mcm(base):
         m0 = qp.measure(base.wires)
         qp.cond(m0, NoParams)(base.wires)
 
-    return rule_with_mcm
-
-
-def test_registered_symbolic_rule_accepts_mcm():
-    """Test the lowering into a rule for ``Adjoint(NoParams)`` that contains MCMs."""
-
     with qp.decomposition.local_decomps():
 
-        qp.add_decomps("Adjoint(NoParams)", _adjoint_rule_with_mcm())
+        qp.add_decomps("Adjoint(NoParams)", rule_with_mcm)
 
         print(
             "\n".join(
