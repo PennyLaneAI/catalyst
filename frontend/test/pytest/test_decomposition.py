@@ -1457,5 +1457,135 @@ class TestCustomRuleApplication:
         assert after.get("NoParams", 0) >= 1
 
 
+class TestNumericHamiltonianDecomposition:
+    """Tests decomposing Trotter operators that carry a numeric Hamiltonian as a
+    hybrid argument, in both their plain and ``qp.adjoint`` forms.
+    """
+
+    @staticmethod
+    def _random_orthogonal(rng, dim):
+        q, r = np.linalg.qr(rng.standard_normal((dim, dim)))
+        return q * np.sign(np.diag(r))
+
+    def _cdf_hamiltonian(self):
+        rng = np.random.default_rng(42)
+        n_orbitals, n_fragments = 2, 1
+        return qp.CDFHamiltonian(
+            core_tensors=rng.standard_normal((n_fragments + 1, n_orbitals, n_orbitals)),
+            leaf_tensors=np.stack(
+                [self._random_orthogonal(rng, n_orbitals) for _ in range(n_fragments + 1)]
+            ),
+            nuc_constant=0.5,
+        )
+
+    def _cgf_hamiltonian(self):
+        rng = np.random.default_rng(42)
+        n_fragments, n_modes, n_modals = 1, 2, 3
+        return qp.CGFHamiltonian(
+            core_tensors=rng.standard_normal(
+                (n_fragments + 1, n_modes, n_modes, n_modals, n_modals)
+            ),
+            leaf_tensors=np.stack(
+                [
+                    np.stack([self._random_orthogonal(rng, n_modals) for _ in range(n_modes)])
+                    for _ in range(n_fragments + 1)
+                ]
+            ),
+            nuc_constant=0.5,
+        )
+
+    def test_trotter_cdf_decomposes(self):
+        """Test that a ``TrotterCDF`` with ``CDFHamiltonian`` decomposes."""
+        hamiltonian = self._cdf_hamiltonian()
+
+        @qjit(capture=True, target="mlir")
+        @graph_decomposition(gate_set={"BasisRotation", "RZ", "IsingZZ", "GlobalPhase"})
+        @qnode(qp.device("null.qubit", wires=4))
+        def circuit():
+            qp.TrotterCDF(
+                evolution_time=1.0, num_trotter_steps=10, hamiltonian=hamiltonian, wires=range(4)
+            )
+
+        resources = qp.specs(circuit, level="all-mlir")().resources
+        assert resources["Before MLIR Passes"].counts == {"TrotterCDF": 1}
+        assert resources["graph-decomposition"].counts == {
+            "BasisRotation": 62,
+            "GlobalPhase": 1,
+            "IsingZZ": 120,
+            "RZ": 40,
+        }
+
+    def test_adjoint_trotter_cdf_decomposes(self):
+        """Test that ``qp.adjoint(TrotterCDF)`` decomposes."""
+        hamiltonian = self._cdf_hamiltonian()
+
+        @qjit(capture=True, target="mlir")
+        @graph_decomposition(gate_set={"BasisRotation", "RZ", "IsingZZ", "GlobalPhase"})
+        @qnode(qp.device("null.qubit", wires=4))
+        def circuit():
+            qp.adjoint(
+                qp.TrotterCDF(
+                    evolution_time=1.0,
+                    num_trotter_steps=10,
+                    hamiltonian=hamiltonian,
+                    wires=range(4),
+                )
+            )
+
+        resources = qp.specs(circuit, level="all-mlir")().resources
+        assert resources["Before MLIR Passes"].counts == {"Adjoint(TrotterCDF)": 1}
+        assert resources["graph-decomposition"].counts == {
+            "Adjoint(BasisRotation)": 62,
+            "IsingZZ": 120,
+            "RZ": 40,
+        }
+
+    def test_trotter_cgf_decomposes(self):
+        """Test that a ``TrotterCGF`` with ``CGFHamiltonian`` decomposes."""
+        hamiltonian = self._cgf_hamiltonian()
+
+        @qjit(capture=True, target="mlir")
+        @graph_decomposition(gate_set={"BasisRotation", "RZ", "IsingZZ", "GlobalPhase"})
+        @qnode(qp.device("null.qubit", wires=6))
+        def circuit():
+            qp.TrotterCGF(
+                evolution_time=1.0, num_trotter_steps=10, hamiltonian=hamiltonian, wires=range(6)
+            )
+
+        resources = qp.specs(circuit, level="all-mlir")().resources
+        assert resources["Before MLIR Passes"].counts == {"TrotterCGF": 1}
+        assert resources["graph-decomposition"].counts == {
+            "BasisRotation": 62,
+            "GlobalPhase": 1,
+            "IsingZZ": 180,
+            "RZ": 60,
+        }
+
+    def test_adjoint_trotter_cgf_decomposes(self):
+        """Test that ``qp.adjoint(TrotterCGF)`` decomposes."""
+        hamiltonian = self._cgf_hamiltonian()
+
+        @qjit(capture=True, target="mlir")
+        @graph_decomposition(gate_set={"BasisRotation", "RZ", "IsingZZ", "GlobalPhase"})
+        @qnode(qp.device("null.qubit", wires=6))
+        def circuit():
+            qp.adjoint(
+                qp.TrotterCGF(
+                    evolution_time=1.0,
+                    num_trotter_steps=10,
+                    hamiltonian=hamiltonian,
+                    wires=range(6),
+                )
+            )
+
+        resources = qp.specs(circuit, level="all-mlir")().resources
+        assert resources["Before MLIR Passes"].counts == {"Adjoint(TrotterCGF)": 1}
+        assert resources["graph-decomposition"].counts == {
+            "Adjoint(BasisRotation)": 62,
+            "IsingZZ": 180,
+            "RZ": 60,
+        }
+
+
 if __name__ == "__main__":
     pytest.main(["-x", __file__])

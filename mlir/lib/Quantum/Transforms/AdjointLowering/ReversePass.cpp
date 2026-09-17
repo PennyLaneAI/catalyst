@@ -290,7 +290,8 @@ class AdjointGenerator {
                         SmallVector<Value> coords =
                             delinearizeIndex(builder, loc, revLinear, dimSizes);
                         Value element = ListPopOp::create(builder, loc, cache.paramVector);
-                        Value updated = tensor::InsertOp::create(builder, loc, element, acc, coords);
+                        Value updated =
+                            tensor::InsertOp::create(builder, loc, element, acc, coords);
                         scf::YieldOp::create(builder, loc, updated);
                     }
                     cachedParams[numParams - 1 - idx] = loop.getResult(0);
