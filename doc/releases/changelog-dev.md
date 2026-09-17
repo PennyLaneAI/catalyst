@@ -560,6 +560,10 @@
 * Added ``CZ`` support to ``to-ppr`` pass.
   [(#3009)](https://github.com/PennyLaneAI/catalyst/pull/3009)
 
+* The `--adjoint-lowering` pass no longer caches all classical gate parameters.
+  Parameters that are trivially available to the reverse pass is no longer cached.
+  [(#3233)](https://github.com/PennyLaneAI/catalyst/pull/3233)
+
 <h3>Breaking changes 💔</h3>
 
 * Removes :func:`~.passes.ppm_specs` and the ``--ppm-specs`` MLIR pass. Use :func:`~.specs` and

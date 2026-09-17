@@ -83,8 +83,8 @@ void cloneAdjointRegion(AdjointOp op, OpBuilder &builder, IRMapping &mapping,
 /// gate parameters and cached control flow.
 class AdjointGenerator {
   public:
-    AdjointGenerator(IRMapping &remappedValues, QuantumCache &cache)
-        : remappedValues(remappedValues), cache(cache) {}
+    AdjointGenerator(IRMapping &remappedValues, QuantumCache &cache, Region &adjointRegion)
+        : remappedValues(remappedValues), cache(cache), adjointRegion(adjointRegion) {}
 
     /// Recursively generate the adjoint version of `region` with reversed control flow and adjoint
     /// quantum gates.
@@ -97,6 +97,10 @@ class AdjointGenerator {
     void generateImpl(Region &region, OpBuilder &builder) {
         assert(region.hasOneBlock() &&
                "Expected only structured control flow (each region should have a single block)");
+
+        if (generationFailed) {
+            return;
+        }
 
         for (Operation &op : llvm::reverse(region.front().without_terminator())) {
             if (auto callOp = dyn_cast<func::CallOp>(op)) {
@@ -212,7 +216,19 @@ class AdjointGenerator {
             // popping gives the parameters in reverse
             for (Value param : llvm::reverse(params)) {
                 Type paramType = param.getType();
-                verifyTypeIsCacheable(paramType, operation);
+
+                // The forward pass does not record params that are already available here; reuse
+                // the value directly instead of popping.
+                if (isAvailableToReversePass(param, adjointRegion)) {
+                    cachedParams[numParams - 1 - idx] = remappedValues.lookupOrDefault(param);
+                    idx++;
+                    continue;
+                }
+
+                if (mlir::failed(verifyTypeIsCacheable(paramType, operation))) {
+                    generationFailed = true;
+                    return;
+                }
                 if (paramType.isF64()) {
                     cachedParams[numParams - 1 - idx] =
                         ListPopOp::create(builder, parametrizedGate.getLoc(), cache.paramVector);
@@ -737,6 +753,8 @@ class AdjointGenerator {
   private:
     IRMapping &remappedValues;
     QuantumCache &cache;
+    // The top level region of the adjoint operation being lowered
+    Region &adjointRegion;
     bool generationFailed = false;
 };
 
@@ -747,7 +765,7 @@ namespace quantum {
 
 LogicalResult generateAdjointReversePass(Region &region, OpBuilder &builder,
                                          IRMapping &remappedValues, QuantumCache &cache) {
-    AdjointGenerator generator{remappedValues, cache};
+    AdjointGenerator generator{remappedValues, cache, region};
     return generator.generate(region, builder);
 }
 
