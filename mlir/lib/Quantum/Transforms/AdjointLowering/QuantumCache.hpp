@@ -58,7 +58,7 @@ mlir::LogicalResult verifyTypeIsCacheable(mlir::Type ty, mlir::Operation *op);
 ///   - `param` is defined outside `adjointRegion`. It dominates the adjoint operation, hence it
 ///     also dominates everything the forward and reverse passes emit in its place.
 ///   - `param` is defined at the immediate top level of `adjointRegion`. These classical ops
-///     are cloned from the forward pass to the reverse pass verbatim. They values also have no
+///     are used from the forward pass to the reverse pass verbatim. They values also have no
 ///     nested control flow dependence.
 ///
 /// It does not hold for values defined inside nested control flow, since the forward pass rebuilds
