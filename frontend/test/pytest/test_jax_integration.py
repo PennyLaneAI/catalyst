@@ -20,6 +20,7 @@ from functools import partial
 
 import jax
 import jax.numpy as jnp
+import numpy as np
 import pennylane as qp
 import pytest
 from jax.interpreters.mlir import ir
@@ -531,7 +532,7 @@ class TestJAXMLIRAttributeGetter:
             assert isinstance(attr, ir.TypeAttr)
             assert attr.value == ir.NoneType.get()
 
-    @pytest.mark.parametrize("number", (37, -37))
+    @pytest.mark.parametrize("number", (37, -37, 2**63 - 1, -(2**63)))
     def test_int_attr(self, number):
         """
         Test integer attribute.
@@ -564,6 +565,67 @@ class TestJAXMLIRAttributeGetter:
             for attr_val, py_val in zip(attr, array):
                 assert isinstance(attr_val, ir.IntegerAttr)
                 assert attr_val.value == py_val
+
+    @pytest.mark.parametrize(
+        "array, spelling",
+        (
+            (np.array([1, 2, 3]), "dense<[1, 2, 3]> : tensor<3xi64>"),
+            # An array whose elements all agree prints in MLIR's splat shorthand.
+            (np.array([5, 5, 5]), "dense<5> : tensor<3xi64>"),
+            (
+                np.array([[1, 2], [3, 4]], dtype=np.int32),
+                "dense<[[1, 2], [3, 4]]> : tensor<2x2xi32>",
+            ),
+            # A rank-0 array stays rank 0 rather than being promoted to a one-element tensor.
+            (np.array(3), "dense<3> : tensor<i64>"),
+            # Unsigned data carries its signedness in the type; read as signless, 250 would be -6.
+            (np.array([1, 250], dtype=np.uint8), "dense<[1, 250]> : tensor<2xui8>"),
+            (np.array([True, False]), "dense<[true, false]> : tensor<2xi1>"),
+            (
+                np.array([1.5, -2.5], dtype=np.float32),
+                "dense<[1.500000e+00, -2.500000e+00]> : tensor<2xf32>",
+            ),
+            # A non-contiguous array, which a dense attribute cannot read as it stands.
+            (np.arange(6)[::2], "dense<[0, 2, 4]> : tensor<3xi64>"),
+            (np.array([], dtype=np.int64), "dense<> : tensor<0xi64>"),
+        ),
+    )
+    def test_numpy_array_attr(self, array, spelling):
+        """
+        Test that a NumPy array becomes a dense attribute, spelled as MLIR prints it.
+
+        The spelling matters as much as the value: it is what a graphOpId carries for array static
+        data, so it has to agree with the compiler's own printer character for character.
+        """
+        with ctx, loc:
+            attr = get_mlir_attribute_from_pyval(array)
+            assert isinstance(attr, ir.DenseElementsAttr)
+            assert str(attr) == spelling
+
+    @pytest.mark.parametrize(
+        "value, attr_type, spelling",
+        (
+            (np.int64(37), ir.IntegerAttr, "37 : i64"),
+            (np.float64(3.7), ir.FloatAttr, "3.700000e+00 : f64"),
+            (np.bool_(True), ir.BoolAttr, "true"),
+        ),
+    )
+    def test_numpy_scalar_attr(self, value, attr_type, spelling):
+        """
+        Test that a NumPy scalar becomes the same attribute as the Python number it holds.
+        """
+        with ctx, loc:
+            attr = get_mlir_attribute_from_pyval(value)
+            assert isinstance(attr, attr_type)
+            assert str(attr) == spelling
+
+    def test_numpy_array_attr_unsupported_dtype(self):
+        """
+        Test that an array MLIR has no dense representation for is reported clearly.
+        """
+        with pytest.raises(CompileError, match="NumPy array of dtype complex128"):
+            with ctx, loc:
+                _ = get_mlir_attribute_from_pyval(np.array([1 + 2j]))
 
     def test_dict_attr(self):
         """
@@ -604,7 +666,8 @@ class TestJAXMLIRAttributeGetter:
             with ctx, loc:
                 _ = get_mlir_attribute_from_pyval(Foo())
 
-    def test_int_attr_overflow(self):
+    @pytest.mark.parametrize("value", (2**63, -(2**63) - 1, 2**100))
+    def test_int_attr_overflow(self, value):
         """
         Test int attribute with overflow correctly raises error.
         """
@@ -616,7 +679,7 @@ class TestJAXMLIRAttributeGetter:
             """),
         ):
             with ctx, loc:
-                _ = get_mlir_attribute_from_pyval(2**100)
+                _ = get_mlir_attribute_from_pyval(value)
 
     def test_dataclass_attr(self):
         """
