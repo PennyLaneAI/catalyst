@@ -243,6 +243,21 @@
     of raising an error.
     [(#3190)](https://github.com/PennyLaneAI/catalyst/pull/3190)
 
+* Numeric molecular/vibrational Hamiltonians carried as hybrid arguments by Trotter operators can now
+  be decomposed through the graph-based decomposition system, together with MLIR/lowering tests for
+  the base `CDFHamiltonian`/`CGFHamiltonian` types.
+  [(#3147)](https://github.com/PennyLaneAI/catalyst/pull/3147)
+  [(#3235)](https://github.com/PennyLaneAI/catalyst/pull/3235)
+
+  The numeric Hamiltonian's array leaves are passed to a decomposition rule as operands rather than
+  being baked into the rule body as constants, so a rule sees the concrete tensors at runtime. This
+  now holds for the hand-written symbolic (`C(Op)` / `Adjoint(Op)`) rules as well as the base rules.
+
+  Real matrix parameters of arbitrary rank are also cached during `--adjoint-lowering`: a real `f64`
+  tensor of any rank (e.g. a `BasisRotation`'s `tensor<NxNxf64>`) is now recorded element-by-element,
+  where before only scalar/rank-1 real tensors and complex matrices were handled. This lets
+  `qp.adjoint(TrotterCDF)`/`qp.adjoint(TrotterCGF)` reach `Adjoint(BasisRotation)` and back.
+
 * A failure during AOT compilation is now logged rather than raised.
   [(#3100)](https://github.com/PennyLaneAI/catalyst/pull/3100)
   [(#3194)](https://github.com/PennyLaneAI/catalyst/pull/3194)
