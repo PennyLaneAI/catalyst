@@ -412,9 +412,7 @@ LogicalResult convertPauliRotGate(PauliRotOp op, ConversionPatternRewriter &rewr
 }
 
 LogicalResult convertPPROperator(OperatorOp op, ConversionPatternRewriter &rewriter) {
-    if (!op.getAllParams().empty()) {
-        return op.emitOpError("PPR operator does not support dynamic parameters");
-    }
+    assert(op.getAllParams().empty() && "PPR operator does not support dynamic parameters");
 
     DictionaryAttr staticData = op.getStaticData();
     auto pauliWordAttr = staticData.getAs<StringAttr>("pauli_word");
