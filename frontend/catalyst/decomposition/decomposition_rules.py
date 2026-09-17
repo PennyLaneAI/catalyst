@@ -21,6 +21,7 @@ import warnings
 from collections import deque
 
 import jax.numpy as jnp
+import numpy as np
 import pennylane as qp
 from jax._src.lib.mlir import ir
 from jax.tree_util import tree_flatten, tree_unflatten
@@ -146,11 +147,9 @@ def ordered_kwarg_names(call_kwargs, dynamic_shape) -> list:
 def flatten_hybrid_args(extra_data) -> tuple:
     """Split hybrid arguments into numeric ones (passed as operands) and the rest (closed over).
 
-    A hybrid argument whose pytree leaves are all plain arrays (e.g. a ``CDFHamiltonian``) is
+    A hybrid argument whose pytree is entirely numeric arrays (e.g. a ``CDFHamiltonian``) is
     flattened so its leaves can be passed into the rule call as operands, keeping the concrete
-    values out of the rule body (where they would otherwise bake in as constants). Hybrid arguments
-    that carry non-array leaves (e.g. a ``ChangeOpBasis2``, whose operands are operators holding
-    ``Wires``) cannot be passed as numeric operands and are instead returned to be closed over.
+    values out of the rule body (where they would otherwise bake in as constants).
 
     Args:
         extra_data (dict): the operator's hybrid arguments, keyed by name
@@ -163,15 +162,15 @@ def flatten_hybrid_args(extra_data) -> tuple:
     specs, leaf_dummies, closed_over = [], [], {}
     for name, value in extra_data.items():
         leaves, treedef = tree_flatten(value)
-        try:
-            dummies = [jnp.zeros(jnp.shape(leaf), dtype=jnp.asarray(leaf).dtype) for leaf in leaves]
-        except (TypeError, ValueError):
-            # A leaf is not a plain array (e.g. an operator's Wires); pass no operands for it and
-            # let the rule body receive the argument as-is, as it did before numeric operands existed.
+        if leaves and all(
+            isinstance(leaf, (np.ndarray, np.generic, jnp.ndarray)) for leaf in leaves
+        ):
+            specs.append((name, treedef, len(leaves)))
+            leaf_dummies.extend(
+                jnp.zeros(jnp.shape(leaf), dtype=jnp.asarray(leaf).dtype) for leaf in leaves
+            )
+        else:
             closed_over[name] = value
-            continue
-        specs.append((name, treedef, len(leaves)))
-        leaf_dummies.extend(dummies)
     return specs, leaf_dummies, closed_over
 
 
