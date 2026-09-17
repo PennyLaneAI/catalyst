@@ -65,8 +65,8 @@ class AugmentedCircuitGenerator {
   private:
     IRMapping &oldToCloned;
     QuantumCache &cache;
-    /// The top level region of the adjoint operation being lowered. Note that `generate` recurses
-    /// into nested control flow regions, so its `region` argument is not necessarily this one.
+
+    /// The top level region of the adjoint operation being lowered.
     Region &adjointRegion;
     bool generationFailed = false;
 
@@ -99,9 +99,7 @@ void AugmentedCircuitGenerator::cacheGate(quantum::ParametrizedGate gate, OpBuil
     for (Value param : params) {
         Location loc = gate.getLoc();
 
-        // Params that the reverse pass can already see do not need to be recorded. The reverse pass
-        // applies the same predicate to the same values and reuses them in place of a pop, so the
-        // push/pop contract stays consistent between the two passes.
+        // Params that the reverse pass can already see do not need to be recorded.
         if (isAvailableToReversePass(param, adjointRegion)) {
             continue;
         }

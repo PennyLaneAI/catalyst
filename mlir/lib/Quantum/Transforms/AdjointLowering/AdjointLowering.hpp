@@ -27,8 +27,7 @@ namespace quantum {
 /// insertion point, and the information needed to deterministically replay the circuit in
 /// reverse (gate parameters, dynamic wires, and control-flow structure) is recorded into the
 /// `QuantumCache`. The reverse pass later consumes this cache.
-/// Returns failure if a gate parameter of a type the cache cannot record was encountered, in which
-/// case a diagnostic has already been emitted.
+/// Returns failure if a gate parameter of a type the cache cannot record was encountered.
 mlir::LogicalResult generateAdjointForwardPass(mlir::Region &region, mlir::OpBuilder &builder,
                                                mlir::IRMapping &oldToCloned, QuantumCache &cache);
 

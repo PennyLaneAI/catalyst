@@ -27,9 +27,9 @@ namespace catalyst {
 namespace quantum {
 
 LogicalResult verifyTypeIsCacheable(Type ty, Operation *op) {
-    // Sanitizing inputs. Every rejection must return failure: `emitOpError` only records a
-    // diagnostic, it does not unwind, so falling through to the casts below would abort the
-    // compiler on an unsupported type instead of reporting it.
+    // Sanitizing inputs.
+    // TODO: although OperatorOp params can be arbitrary types, currently only caching of f64s and
+    // complex (and tensors of them) are implemented.
     if (ty.isF64()) {
         return success();
     }
@@ -55,7 +55,7 @@ LogicalResult verifyTypeIsCacheable(Type ty, Operation *op) {
     }
 
     // TODO: Generalize to arbitrary dimensions
-    if (2 != shape.size()) {
+    if (shape.size() != 2) {
         return op->emitOpError() << "Caching only supports rank-2 tensors of complex F64, got "
                                  << ty;
     }
@@ -73,13 +73,14 @@ LogicalResult verifyTypeIsCacheable(Type ty, Operation *op) {
 
 bool isAvailableToReversePass(Value param, Region &adjointRegion) {
     Region *definingRegion = param.getParentRegion();
-    // Defined outside the adjoint region: dominates the adjoint operation itself.
+
+    // Defined outside the adjoint region: dominates the adjoint operation itself, reverse pass
+    // sees it from above directly.
     if (!definingRegion || !adjointRegion.isAncestor(definingRegion)) {
         return true;
     }
-    // Defined at the immediate top level of the adjoint region: cloned by the forward pass to the
-    // insertion point the reverse pass continues from. Anything deeper lives inside control flow
-    // that the forward pass rebuilds, and must be recorded.
+
+    // Defined at the immediate top level of the adjoint region, not in nested control flow
     return definingRegion == &adjointRegion;
 }
 

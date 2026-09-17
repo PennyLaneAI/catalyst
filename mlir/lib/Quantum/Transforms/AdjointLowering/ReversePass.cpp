@@ -99,8 +99,6 @@ class AdjointGenerator {
                "Expected only structured control flow (each region should have a single block)");
 
         for (Operation &op : llvm::reverse(region.front().without_terminator())) {
-            // Stop as soon as generation has failed: a diagnostic has been emitted and the IR built
-            // so far is incomplete, so continuing would trip an assertion on an unmapped value.
             if (generationFailed) {
                 return;
             }
@@ -219,8 +217,7 @@ class AdjointGenerator {
                 Type paramType = param.getType();
 
                 // The forward pass does not record params that are already available here; reuse
-                // the value directly instead of popping. The predicate must stay identical on both
-                // sides to keep the push/pop contract consistent.
+                // the value directly instead of popping.
                 if (isAvailableToReversePass(param, adjointRegion)) {
                     cachedParams[numParams - 1 - idx] = remappedValues.lookupOrDefault(param);
                     idx++;
@@ -755,8 +752,7 @@ class AdjointGenerator {
   private:
     IRMapping &remappedValues;
     QuantumCache &cache;
-    /// The top level region of the adjoint operation being lowered. Note that `generate` recurses
-    /// into nested control flow regions, so its `region` argument is not necessarily this one.
+    // The top level region of the adjoint operation being lowered
     Region &adjointRegion;
     bool generationFailed = false;
 };
