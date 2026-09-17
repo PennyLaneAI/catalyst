@@ -942,7 +942,11 @@ def compile_registered_symbolic_rules(
     def rule_to_subroutine(rule):
         def decomp_rule(*_operands):
             _args, _kwargs, _ctrl_wires = unpack_rule_operands(
-                _operands, len(call_args), kwarg_names, kind == "control", hybrid_specs,
+                _operands,
+                len(call_args),
+                kwarg_names,
+                kind == "control",
+                hybrid_specs,
                 n_param_kwargs,
             )
             # The base is rebuilt from the traced arguments of the rule function, so the wires and

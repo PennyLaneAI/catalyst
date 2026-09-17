@@ -1592,7 +1592,16 @@ class TestNumericHamiltonianDecomposition:
 
         @qjit(capture=True, target="mlir")
         @graph_decomposition(
-            gate_set={"BasisRotation", "RZ", "IsingZZ", "GlobalPhase", "CRZ", "CNOT", "PhaseShift", "RX"}
+            gate_set={
+                "BasisRotation",
+                "RZ",
+                "IsingZZ",
+                "GlobalPhase",
+                "CRZ",
+                "CNOT",
+                "PhaseShift",
+                "RX",
+            }
         )
         @qnode(qp.device("null.qubit", wires=5))
         def circuit():
@@ -1623,7 +1632,16 @@ class TestNumericHamiltonianDecomposition:
 
         @qjit(capture=True, target="mlir")
         @graph_decomposition(
-            gate_set={"BasisRotation", "RZ", "IsingZZ", "GlobalPhase", "CRZ", "CNOT", "PhaseShift", "RX"}
+            gate_set={
+                "BasisRotation",
+                "RZ",
+                "IsingZZ",
+                "GlobalPhase",
+                "CRZ",
+                "CNOT",
+                "PhaseShift",
+                "RX",
+            }
         )
         @qnode(qp.device("null.qubit", wires=7))
         def circuit():
