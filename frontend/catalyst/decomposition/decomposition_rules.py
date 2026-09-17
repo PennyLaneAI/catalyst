@@ -878,6 +878,7 @@ def compile_registered_symbolic_rules(
     *,
     kind,
     n_ctrl=1,
+    wrap_control=False,
 ) -> ir.Operation | None:
     """Return the module of rules registered against ``Adjoint(op_name)``/``C(op_name)`` that follow
     PennyLane's symbolic-argument convention, or None if there are none.
@@ -895,7 +896,12 @@ def compile_registered_symbolic_rules(
         is_custom_op (bool): whether the operator lowers to ``qref.custom``
         op_cls (type[Operator2]): the base operator's class, required to rebuild it
         kind (str): ``"adjoint"`` or ``"control"``
-        n_ctrl (int): the number of controls, for ``kind="control"``
+        n_ctrl (int): the number of controls, for ``kind="control"`` or ``wrap_control``
+        wrap_control (bool): with ``kind="adjoint"``, control each registered ``Adjoint(op)`` rule
+            body to synthesize the composed modifier ``C(Adjoint(op))``. This reduces the adjoint
+            under control (``C(Adjoint(RZ)) -> C(RZ)``), which the registered ``C(op)`` rules then
+            terminate (``C(RZ) -> CRZ``) -- something plain distribution cannot reach, since a
+            registered ``C(op)`` rule reads op-specific attributes and cannot take an adjoint base.
 
     Returns:
         ir.Operation or None: the module holding the rules, or None if there are none
@@ -914,19 +920,31 @@ def compile_registered_symbolic_rules(
     static_and_extra = static_data | extra_data
     kwargs = prepare_dynamic_op_kwargs(dynamic_shape, wire_lens)
     n_base_wires = sum(wire_lens.values())
-    n_ctrl = n_ctrl if kind == "control" else 0
+    has_ctrl = kind == "control" or wrap_control
+    n_ctrl = n_ctrl if has_ctrl else 0
     device = qp.device("null.qubit", wires=n_base_wires + n_ctrl)
 
+    # A kind="control" rule takes the control wires as its own arguments; a wrap_control adjoint
+    # rule instead has the control applied around its body so it is probed without control wires.
+    collect_ctrl_wires = range(n_base_wires, n_base_wires + n_ctrl) if kind == "control" else ()
     rules, probe_args, name_to_resources, name_to_resource_ids = collect_symbolic_resources(
         op_cls,
         op_name,
         kwargs | static_and_extra,
         is_custom_op,
         kind=kind,
-        ctrl_wires=range(n_base_wires, n_base_wires + n_ctrl),
+        ctrl_wires=collect_ctrl_wires,
     )
     if not rules:
         return None
+
+    # Controlling an adjoint rule's body means every op it produces gains the control modifier.
+    if wrap_control:
+        ctrl_mod = _control_modifier(n_ctrl)
+        name_to_resource_ids = {
+            rule_name: {wrap_modifier_id(rid, ctrl_mod): count for rid, count in ids.items()}
+            for rule_name, ids in name_to_resource_ids.items()
+        }
 
     call_args, call_kwargs = split_call_args(kwargs, is_custom_op)
     kwarg_names = ordered_kwarg_names(call_kwargs, dynamic_shape)
@@ -944,7 +962,7 @@ def compile_registered_symbolic_rules(
                 _operands,
                 len(call_args),
                 kwarg_names,
-                kind == "control",
+                has_ctrl,
                 hybrid_specs,
                 n_param_kwargs,
             )
@@ -956,7 +974,14 @@ def compile_registered_symbolic_rules(
                 base = op_cls(*_args, **_kwargs, **static_data, **closed_hybrid)
             # TODO: Call the rule itself instead of its _impl after merging
             # https://github.com/PennyLaneAI/pennylane/pull/10144
-            rule._impl(**symbolic_arguments(base, kind, _ctrl_wires))
+            if wrap_control:
+                # Reduce the adjoint under control: C(Adjoint(op)) -> C(<adjoint decomposition>).
+                qp.ctrl(
+                    lambda: rule._impl(**symbolic_arguments(base, kind, None)),
+                    control=list(_ctrl_wires),
+                )()
+            else:
+                rule._impl(**symbolic_arguments(base, kind, _ctrl_wires))
 
         decomp_rule.__name__ = rule.name + "_" + target_id
         return qp.capture.subroutine(decomp_rule)
@@ -978,9 +1003,7 @@ def compile_registered_symbolic_rules(
         return None
 
     ctrl_wires = (
-        jnp.array(range(n_base_wires, n_base_wires + n_ctrl), dtype=int)
-        if kind == "control"
-        else None
+        jnp.array(range(n_base_wires, n_base_wires + n_ctrl), dtype=int) if has_ctrl else None
     )
 
     operands = rule_call_operands(
@@ -1155,6 +1178,26 @@ def control_variant_rule_strings(
                     ctrl_id,
                     "control",
                     n_ctrl=n,
+                    dynamic_shape=dynamic_shape,
+                    wire_lens=wire_lens,
+                    static_data=static_data,
+                    extra_data=extra_data,
+                    is_custom_op=is_custom_op,
+                    op_cls=op_cls,
+                )
+            )
+            # (1b) <n>C(Adjoint(op_name)) by controlling each registered Adjoint(op_name) rule.
+            # This reduces the adjoint under control (e.g. C(Adjoint(RZ)) -> C(RZ)), which the
+            # registered C(op_name) rules of pathway 1 then terminate (C(RZ) -> CRZ). The
+            # distribution of pathway 3 cannot reach this: it bottoms out at doubly-modified
+            # primitives such as C(Adjoint(GlobalPhase)) that only registered rules can terminate.
+            out.extend(
+                registered_symbolic_rule_strings(
+                    op_name,
+                    wrap_modifier_id(name_wrap_adjoint(op_id), ctrl_mod),
+                    "adjoint",
+                    n_ctrl=n,
+                    wrap_control=True,
                     dynamic_shape=dynamic_shape,
                     wire_lens=wire_lens,
                     static_data=static_data,

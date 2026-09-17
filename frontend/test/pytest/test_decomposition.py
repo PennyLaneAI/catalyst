@@ -1666,6 +1666,64 @@ class TestNumericHamiltonianDecomposition:
             "RX": 362,
         }
 
+    def test_control_adjoint_trotter_cdf_decomposes(self):
+        """Test that nested ``qp.ctrl`` and ``qp.adjoint`` on a ``TrotterCDF`` decomposes."""
+        hamiltonian = self._cdf_hamiltonian()
+        gate_set = {
+            "BasisRotation",
+            "RZ",
+            "IsingZZ",
+            "GlobalPhase",
+            "CRZ",
+            "CNOT",
+            "PhaseShift",
+            "RX",
+            "PauliX",
+        }
+        expected = {
+            "C(Adjoint(BasisRotation))": 62,
+            "C(CNOT)": 240,
+            "CRZ": 160,
+            "PauliX": 320,
+        }
+
+        @qjit(capture=True, target="mlir")
+        @graph_decomposition(gate_set=gate_set)
+        @qnode(qp.device("null.qubit", wires=5))
+        def ctrl_of_adjoint():
+            qp.ctrl(
+                qp.adjoint(
+                    qp.TrotterCDF(
+                        evolution_time=1.0,
+                        num_trotter_steps=10,
+                        hamiltonian=hamiltonian,
+                        wires=range(4),
+                    )
+                ),
+                control=[4],
+            )
+
+        @qjit(capture=True, target="mlir")
+        @graph_decomposition(gate_set=gate_set)
+        @qnode(qp.device("null.qubit", wires=5))
+        def adjoint_of_ctrl():
+            qp.adjoint(
+                qp.ctrl(
+                    qp.TrotterCDF(
+                        evolution_time=1.0,
+                        num_trotter_steps=10,
+                        hamiltonian=hamiltonian,
+                        wires=range(4),
+                    ),
+                    control=[4],
+                )
+            )
+
+        for circuit in (ctrl_of_adjoint, adjoint_of_ctrl):
+            resources = qp.specs(circuit, level="all-mlir")().resources
+            assert resources["Before MLIR Passes"].counts == {"C(Adjoint(TrotterCDF))": 1}
+            assert resources["graph-decomposition"].counts == expected
+
 
 if __name__ == "__main__":
     pytest.main(["-x", __file__])
