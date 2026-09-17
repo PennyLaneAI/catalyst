@@ -162,6 +162,17 @@ def flatten_hybrid_args(extra_data) -> tuple:
     specs, leaf_dummies, closed_over = [], [], {}
     for name, value in extra_data.items():
         leaves, treedef = tree_flatten(value)
+        # TODO: this "all leaves are numeric arrays" test is a second source of truth for which
+        # hybrid leaves become rule-function inputs, and it must agree with the operator lowering's
+        # own partition (`_process_params` in from_plxpr/qref_operator2_primitives.py), which uses a
+        # per-leaf `forward_mask` to split leaves into `param_map` vs `forward_args` (excluding
+        # qubits).
+        #
+        # Note right now the two agree for all-numeric args (numeric hamiltonians) and for args
+        # with a non-array leaf (an operator carrying Wires), but a mixed hybrid arg would diverge
+        # causing the lowered op's params to outnumber the rule's inputs.
+        # Drive this off `_process_params`/`forward_mask` instead, once the operator's mask is
+        # passed through to rule compilation.
         if leaves and all(
             isinstance(leaf, (np.ndarray, np.generic, jnp.ndarray)) for leaf in leaves
         ):
