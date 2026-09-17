@@ -47,6 +47,25 @@ void populateArgIdxMapping(TypeRange types, DenseMap<unsigned, unsigned> &argIdx
     }
 }
 
+/// Convert a row-major linearized index into per-dimension coordinates given the size of each
+/// dimension, so that an arbitrary-rank tensor can be walked with a single flattened loop.
+SmallVector<Value> delinearizeIndex(OpBuilder &builder, Location loc, Value linear,
+                                    ArrayRef<Value> dimSizes) {
+    int64_t rank = dimSizes.size();
+    SmallVector<Value> strides(rank);
+    Value acc = index::ConstantOp::create(builder, loc, 1);
+    for (int64_t d = rank - 1; d >= 0; --d) {
+        strides[d] = acc;
+        acc = index::MulOp::create(builder, loc, acc, dimSizes[d]);
+    }
+    SmallVector<Value> coords(rank);
+    for (int64_t d = 0; d < rank; ++d) {
+        Value q = index::DivUOp::create(builder, loc, linear, strides[d]);
+        coords[d] = index::RemUOp::create(builder, loc, q, dimSizes[d]);
+    }
+    return coords;
+}
+
 /// Generates the forward "augmented circuit" of the adjoint operation: classical preprocessing is
 /// cloned as-is, while gate parameters, dynamic wires, and control-flow structure are recorded into
 /// the cache for the reverse pass to replay.
@@ -114,27 +133,34 @@ void AugmentedCircuitGenerator::cacheGate(quantum::ParametrizedGate gate, OpBuil
         auto aTensor = cast<RankedTensorType>(paramType);
 
         // Real-valued tensor params (e.g. the `tensor<Nxf64>` angle carried by `quantum.operator`
-        // gates such as RZ) are cached element-by-element as plain f64 values. The complex-matrix
-        // path below is specific to QubitUnitary's `tensor<NxNxcomplex<f64>>`.
+        // gates such as RZ, or the `tensor<NxNxf64>` matrix of a BasisRotation) are cached
+        // element-by-element as plain f64 values in row-major order. The complex-matrix path below
+        // is specific to QubitUnitary's `tensor<NxNxcomplex<f64>>`.
         if (aTensor.getElementType().isF64()) {
-            assert(aTensor.getRank() <= 1 && "only scalar/rank-1 real tensor params are cacheable");
             if (aTensor.getRank() == 0) {
                 Value element = tensor::ExtractOp::create(builder, loc, clonedParam, ValueRange{});
                 ListPushOp::create(builder, loc, element, cache.paramVector);
-            } else {
-                Value c0i = index::ConstantOp::create(builder, loc, 0);
-                Value c1i = index::ConstantOp::create(builder, loc, 1);
-                Value dim =
-                    ShapedType::kDynamic != aTensor.getShape()[0]
-                        ? (Value)index::ConstantOp::create(builder, loc, aTensor.getShape()[0])
-                        : (Value)tensor::DimOp::create(builder, loc, clonedParam, c0i);
-                scf::ForOp loop = scf::ForOp::create(builder, loc, c0i, dim, c1i);
-                OpBuilder::InsertionGuard guard(builder);
-                builder.setInsertionPointToStart(loop.getBody());
-                Value element =
-                    tensor::ExtractOp::create(builder, loc, clonedParam, loop.getInductionVar());
-                ListPushOp::create(builder, loc, element, cache.paramVector);
+                continue;
             }
+            Value c0i = index::ConstantOp::create(builder, loc, 0);
+            Value c1i = index::ConstantOp::create(builder, loc, 1);
+            SmallVector<Value> dimSizes;
+            Value total = c1i;
+            for (int64_t d = 0; d < aTensor.getRank(); ++d) {
+                Value dim =
+                    ShapedType::kDynamic != aTensor.getShape()[d]
+                        ? (Value)index::ConstantOp::create(builder, loc, aTensor.getShape()[d])
+                        : (Value)tensor::DimOp::create(builder, loc, clonedParam, d);
+                dimSizes.push_back(dim);
+                total = index::MulOp::create(builder, loc, total, dim);
+            }
+            scf::ForOp loop = scf::ForOp::create(builder, loc, c0i, total, c1i);
+            OpBuilder::InsertionGuard guard(builder);
+            builder.setInsertionPointToStart(loop.getBody());
+            SmallVector<Value> coords =
+                delinearizeIndex(builder, loc, loop.getInductionVar(), dimSizes);
+            Value element = tensor::ExtractOp::create(builder, loc, clonedParam, coords);
+            ListPushOp::create(builder, loc, element, cache.paramVector);
             continue;
         }
 
