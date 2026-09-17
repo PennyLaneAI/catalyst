@@ -41,6 +41,9 @@ RUN git clone --depth 1 --branch ${CATALYST_VERSION} \
     https://github.com/PennyLaneAI/catalyst.git /tmp/catalyst-src \
     && cp -a /tmp/catalyst-src/. /opt/catalyst/ \
     && rm -rf /tmp/catalyst-src
+
+
+FROM base-catalyst AS build-llvm
 ENV LLVM_BUILD_DIR=/opt/catalyst/llvm-build
 ENV PATH="${LLVM_BUILD_DIR}/bin:${PATH}"
 
@@ -62,6 +65,7 @@ RUN PYTHON=$PYTHON \
     make llvm
 
 # Build stablehlo dialect
+FROM base-catalyst AS build-stablehlo
 ENV COMPILER_LAUNCHER=""
 RUN mkdir /opt/catalyst/stablehlo-build
 RUN C_COMPILER=$(which gcc) \
@@ -73,6 +77,7 @@ RUN C_COMPILER=$(which gcc) \
     make stablehlo
 
 # Build enzyme
+FROM base-catalyst AS build-enzyme
 RUN cmake -S mlir/Enzyme/enzyme -B /opt/catalyst/enzyme-build -G Ninja \
     -DCMAKE_BUILD_TYPE=Release \
     -DLLVM_DIR="/opt/catalyst/llvm-build/lib/cmake/llvm" \
@@ -80,7 +85,9 @@ RUN cmake -S mlir/Enzyme/enzyme -B /opt/catalyst/enzyme-build -G Ninja \
     -DCMAKE_CXX_VISIBILITY_PRESET=default
 
 RUN cmake --build /opt/catalyst/enzyme-build --target EnzymeStatic-22
-# install dependencies
+
+
+FROM base-catalyst AS build-runtime
 RUN dnf update -y && dnf install -y openmpi-devel libzstd-devel gcc-toolset-13
 # Build catalyst runtime
 RUN cmake -S runtime -B /opt/catalyst/runtime-build -G Ninja \
@@ -117,6 +124,11 @@ RUN cmake --build /opt/catalyst/quantum-build --target check-dialects catalyst-c
 
 
 FROM base-catalyst AS build-wheel-catalyst
+COPY --from=build-llvm /opt/catalyst/llvm-build /opt/catalyst/llvm-build
+COPY --from=build-stablehlo /opt/catalyst/stablehlo-build /opt/catalyst/stablehlo-build
+COPY --from=build-enzyme /opt/catalyst/enzyme-build /opt/catalyst/enzyme-build
+COPY --from=build-runtime /opt/catalyst/runtime-build /opt/catalyst/runtime-build
+
 RUN cd /opt/catalyst/quantum-build && cpack
 # Build plugin wheel
 RUN MLIR_DIR="/opt/catalyst/llvm-build/lib/cmake/mlir" \
@@ -145,5 +157,9 @@ RUN apt-get update \
     libgomp1 
 COPY --from=build-wheel-catalyst /opt/catalyst/wheel /wheels    
 RUN pip install --no-cache-dir --extra-index-url https://test.pypi.org/simple \
-        /wheels/pennylane_catalyst*.whl \
+        /wheels/pennylane_catalyst*.whl 
+RUN pip install --no-cache-dir \
+    git+https://github.com/PennyLaneAI/pennylane.git@${PENNYLANE_VERSION}
+RUN pip install --no-cache-dir \
+    git+https://github.com/PennyLaneAI/pennylane-lightning.git@${LIGHTNING_VERSION} \
     && rm -rf /wheels
