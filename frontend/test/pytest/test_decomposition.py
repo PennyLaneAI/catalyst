@@ -1781,20 +1781,24 @@ class TestNumericHamiltonianDecomposition:
         }
 
     def test_control_trotter_cdf_decomposes(self):
-        """Test that ``qp.ctrl(TrotterCDF)`` decomposes."""
+        """Test that ``qp.ctrl(TrotterCDF)`` decomposes.
+
+        This targets a controlled gate set whose terminals are register-mode
+        controlled rules (``C(BasisRotation)``, ``C(RZ)``, ``C(IsingZZ)``). It
+        exercises the register-mode controlled lowering path, in particular the
+        ``C(GlobalPhase) -> PhaseShift`` reduction where the controlled rule has
+        an empty (grouped) base-wire operand slot.
+        """
         hamiltonian = self._cdf_hamiltonian()
 
         @qjit(capture=True, target="mlir")
         @graph_decomposition(
             gate_set={
-                "BasisRotation",
-                "RZ",
-                "IsingZZ",
-                "GlobalPhase",
-                "CRZ",
-                "CNOT",
+                "C(BasisRotation)",
+                "C(RZ)",
+                "C(IsingZZ)",
                 "PhaseShift",
-                "RX",
+                "GlobalPhase",
             }
         )
         @qnode(qp.device("null.qubit", wires=5))
@@ -1812,29 +1816,30 @@ class TestNumericHamiltonianDecomposition:
         resources = qp.specs(circuit, level="all-mlir")().resources
         assert resources["Before MLIR Passes"].counts == {"C(TrotterCDF)": 1}
         assert resources["graph-decomposition"].counts == {
-            "BasisRotation": 62,
-            "C(CNOT)": 240,
-            "CRZ": 160,
-            "GlobalPhase": 242,
+            "C(BasisRotation)": 62,
+            "C(IsingZZ)": 120,
+            "C(RZ)": 40,
+            "GlobalPhase": 1,
             "PhaseShift": 1,
-            "RX": 242,
         }
 
     def test_control_trotter_cgf_decomposes(self):
-        """Test that ``qp.ctrl(TrotterCGF)`` decomposes."""
+        """Test that ``qp.ctrl(TrotterCGF)`` decomposes.
+
+        Like :meth:`test_control_trotter_cdf_decomposes`, this uses a register-mode
+        controlled gate set to exercise the controlled lowering path, including the
+        ``C(GlobalPhase) -> PhaseShift`` reduction with an empty grouped base-wire slot.
+        """
         hamiltonian = self._cgf_hamiltonian()
 
         @qjit(capture=True, target="mlir")
         @graph_decomposition(
             gate_set={
-                "BasisRotation",
-                "RZ",
-                "IsingZZ",
-                "GlobalPhase",
-                "CRZ",
-                "CNOT",
+                "C(BasisRotation)",
+                "C(RZ)",
+                "C(IsingZZ)",
                 "PhaseShift",
-                "RX",
+                "GlobalPhase",
             }
         )
         @qnode(qp.device("null.qubit", wires=7))
@@ -1852,12 +1857,11 @@ class TestNumericHamiltonianDecomposition:
         resources = qp.specs(circuit, level="all-mlir")().resources
         assert resources["Before MLIR Passes"].counts == {"C(TrotterCGF)": 1}
         assert resources["graph-decomposition"].counts == {
-            "BasisRotation": 62,
-            "C(CNOT)": 360,
-            "CRZ": 240,
-            "GlobalPhase": 362,
+            "C(BasisRotation)": 62,
+            "C(IsingZZ)": 180,
+            "C(RZ)": 60,
+            "GlobalPhase": 1,
             "PhaseShift": 1,
-            "RX": 362,
         }
 
     def test_control_adjoint_trotter_cdf_decomposes(self):
