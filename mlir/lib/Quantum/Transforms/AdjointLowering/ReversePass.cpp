@@ -98,10 +98,11 @@ class AdjointGenerator {
         assert(region.hasOneBlock() &&
                "Expected only structured control flow (each region should have a single block)");
 
+        if (generationFailed) {
+            return;
+        }
+
         for (Operation &op : llvm::reverse(region.front().without_terminator())) {
-            if (generationFailed) {
-                return;
-            }
             if (auto callOp = dyn_cast<func::CallOp>(op)) {
                 visitOperation(callOp, builder);
             } else if (auto forOp = dyn_cast<scf::ForOp>(op)) {
