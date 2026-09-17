@@ -1456,6 +1456,32 @@ class TestCustomRuleApplication:
         assert "QubitUnitary" not in after
         assert after.get("NoParams", 0) >= 1
 
+    def test_special_symbolic_rules_applied(self):
+        """Tests that special symbolic decomposition rules are applied."""
+
+        @qp.register_resources({NoParams(Wire[1]): 1, qp.ops.MidMeasure(Wire[1]): 1})
+        def rule_with_mcm(base):
+            m0 = qp.measure(base.wires[0])
+            qp.cond(m0, NoParams)(base.wires[0])
+
+        with local_decomps():
+
+            add_decomps("Adjoint(NoParams)", rule_with_mcm)
+
+            @qjit(capture=True, target="mlir")
+            @graph_decomposition(gate_set={NoParams: 1, qp.ops.MidMeasure: 1})
+            @qnode(qp.device("null.qubit", wires=1))
+            def circuit():
+                qp.adjoint(NoParams(0))
+
+            resources = qp.specs(circuit, level="all-mlir")().resources
+
+        assert "Adjoint(NoParams)" in resources["Before MLIR Passes"].counts
+        after = resources["graph-decomposition"].counts
+        assert "Adjoint(NoParams)" not in after
+        assert after.get("NoParams", 0) == 1
+        assert after.get("MidCircuitMeasure", 0) == 1
+
 
 if __name__ == "__main__":
     pytest.main(["-x", __file__])
