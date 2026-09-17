@@ -96,6 +96,7 @@ COPY --from=build-stablehlo /opt/catalyst/stablehlo-build /opt/catalyst/stablehl
 COPY --from=build-stablehlo /opt/catalyst/mlir/stablehlo /opt/catalyst/mlir/stablehlo
 COPY --from=build-enzyme /opt/catalyst/enzyme-build /opt/catalyst/enzyme-build
 # Build catalyst runtime
+ENV PATH="/opt/catalyst/llvm-build/bin:${PATH}"
 RUN cmake -S runtime -B /opt/catalyst/runtime-build -G Ninja \
     -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_LIBRARY_OUTPUT_DIRECTORY="/opt/catalyst/runtime-build/lib" \
@@ -136,7 +137,7 @@ COPY --from=build-enzyme /opt/catalyst/enzyme-build /opt/catalyst/enzyme-build
 COPY --from=build-runtime /opt/catalyst/runtime-build /opt/catalyst/runtime-build
 COPY --from=build-runtime /opt/catalyst/oqc-build /opt/catalyst/oqc-build
 COPY --from=build-runtime /opt/catalyst/quantum-build /opt/catalyst/quantum-build
-
+ENV PATH="/opt/catalyst/llvm-build/bin:${PATH}"
 RUN cd /opt/catalyst/quantum-build && cpack
 # Build plugin wheel
 RUN MLIR_DIR="/opt/catalyst/llvm-build/lib/cmake/mlir" \
@@ -150,9 +151,9 @@ RUN PYTHON=$PYTHON \
     OQC_BUILD_DIR="/opt/catalyst/oqc-build" \
     ENZYME_BUILD_DIR="/opt/catalyst/enzyme-build" \
     make wheel
-
 RUN auditwheel repair dist/*.whl -w ./wheel --no-update-tags --exclude libopenblasp-r0-23e5df77.3.21.dev.so
 
+# Build Pennylane Lightning Catalyst 
 FROM pennylane-lightning:latest AS lightning-pennylane-catalyst
 RUN apt-get update \
     && apt-get install --no-install-recommends -y \
