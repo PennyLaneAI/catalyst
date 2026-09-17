@@ -61,8 +61,10 @@ from catalyst.decomposition.decomposition_rules import (
     name_wrap_adjoint,
     ordered_kwarg_names,
     prepare_dynamic_op_kwargs,
+    rule_call_operands,
     symbolic_arguments,
     symbolic_op_name,
+    unpack_rule_operands,
     wrap_modifier_id,
 )
 from catalyst.decomposition.graph_op_id import GraphOpID, build_graph_op_id
@@ -86,18 +88,67 @@ class TestGenericUtilities:
             ({"reg": 0, "x": 0}, {"x": None}, ["x", "reg"]),
             # Custom ops carry their params positionally, so only wires remain here (unchanged).
             ({"wires": 0}, {"0": None}, ["wires"]),
-            # Multiple params and wires each stay sorted within their group, params first.
-            ({"reg": 0, "b": 0, "a": 0}, {"a": None, "b": None}, ["a", "b", "reg"]),
+            # Params are sorted, while wire registers retain declaration order for grouping.
+            (
+                {"reg2": 0, "reg1": 0, "b": 0, "a": 0},
+                {"a": None, "b": None},
+                ["a", "b", "reg2", "reg1"],
+            ),
         ],
     )
     def test_ordered_kwarg_names_groups_params_before_wires(
         self, call_kwargs, dynamic_shape, expected
     ):
-        """ordered_kwarg_names lays keyword operands out params-first then wires (each sorted),
-        regardless of how the two groups' names sort against each other. Without this, a wire
-        argument whose name sorts before a parameter's places its (multi-element) wire-index operand
-        ahead of the parameter and breaks the compiler's param/wire split."""
+        """Keyword parameters are sorted before declaration-ordered wire registers."""
         assert ordered_kwarg_names(call_kwargs, dynamic_shape) == expected
+
+    def test_rule_call_operands_groups_wire_kwargs(self):
+        """Rule calls use one base-wire operand after all sorted parameter operands."""
+        call_args = (jnp.array(10.0),)
+        call_kwargs = {
+            "reg2": jnp.array([3, 4]),
+            "empty_reg": jnp.array([], dtype=int),
+            "reg1": jnp.array([0, 1, 2]),
+            "z": jnp.array(12.0),
+            "a": jnp.array(11.0),
+        }
+        dynamic_shape = {"z": None, "a": None}
+        wire_lens = {"reg2": 2, "empty_reg": 0, "reg1": 3}
+        kwarg_names = ordered_kwarg_names(call_kwargs, dynamic_shape)
+        ctrl_wires = jnp.array([5, 6])
+
+        operands = rule_call_operands(call_args, call_kwargs, kwarg_names, wire_lens, ctrl_wires)
+
+        assert len(operands) == 5
+        np.testing.assert_array_equal(operands[0], 10.0)
+        np.testing.assert_array_equal(operands[1], 11.0)
+        np.testing.assert_array_equal(operands[2], 12.0)
+        np.testing.assert_array_equal(operands[3], [3, 4, 0, 1, 2])
+        np.testing.assert_array_equal(operands[4], [5, 6])
+
+    def test_unpack_rule_operands_restores_wire_kwargs(self):
+        """Grouped base wires unpack into distinct registers, including an empty register."""
+        wire_lens = {"reg2": 2, "empty_reg": 0, "reg1": 3}
+        kwarg_names = ["a", "z", *wire_lens]
+        operands = (
+            jnp.array(10.0),
+            jnp.array(11.0),
+            jnp.array(12.0),
+            jnp.array([3, 4, 0, 1, 2]),
+            jnp.array([5, 6]),
+        )
+
+        args, kwargs, ctrl_wires = unpack_rule_operands(
+            operands, n_params=1, kwarg_names=kwarg_names, wire_lens=wire_lens, has_ctrl_wires=True
+        )
+
+        np.testing.assert_array_equal(args[0], 10.0)
+        np.testing.assert_array_equal(kwargs["a"], 11.0)
+        np.testing.assert_array_equal(kwargs["z"], 12.0)
+        np.testing.assert_array_equal(kwargs["reg2"], [3, 4])
+        np.testing.assert_array_equal(kwargs["empty_reg"], [])
+        np.testing.assert_array_equal(kwargs["reg1"], [0, 1, 2])
+        np.testing.assert_array_equal(ctrl_wires, [5, 6])
 
     def test_probe_wires_dont_overlap(self):
         """Test that the helper for generating probe arguments doesnt create

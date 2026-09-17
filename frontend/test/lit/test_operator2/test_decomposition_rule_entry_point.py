@@ -224,10 +224,13 @@ def test_from_multiple_wire_argnames():
 
 
 # CHECK: func.func private @"rule_MultipleRegisters{}{reg1:2,reg2:3}{}"
+# CHECK-SAME: (%[[QREG:arg[0-9]+]]: !qref.reg<5>, %[[WIRES:arg[0-9]+]]: tensor<5xi64>)
 # CHECK-SAME:   resources = {operations = {
 # CHECK-SAME:   "NoParamsCustomOp{}{wires:2}{}" = 1 : i64
 # CHECK-SAME:   "NoParamsCustomOp{}{wires:3}{}" = 1 : i64
 # CHECK-SAME:   target_gate = "MultipleRegisters{}{reg1:2,reg2:3}{}"
+# CHECK: %[[REG1:.+]] = stablehlo.slice %[[WIRES]] [0:2]
+# CHECK-NEXT: %[[REG2:.+]] = stablehlo.slice %[[WIRES]] [2:5]
 test_from_multiple_wire_argnames()
 
 
