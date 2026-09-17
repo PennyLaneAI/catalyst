@@ -680,3 +680,32 @@ func.func private @adjoint_dynamic_register_dynamic_size(%r: !quantum.reg, %n: i
   // CHECK: quantum.dealloc [[reg2]] : !quantum.reg
   return %out : !quantum.reg
 }
+
+// -----
+
+// CHECK-LABEL: @adjoint_real_matrix_param
+func.func @adjoint_real_matrix_param(%arg0: !quantum.reg, %matrix: tensor<2x2xf64>) -> !quantum.reg {
+  // Forward pass: flatten the 2x2 matrix and push every element into the f64 cache.
+  // CHECK: [[cache:%.+]] = catalyst.list_init : <f64>
+  // CHECK: scf.for
+  // CHECK: [[e:%.+]] = tensor.extract {{%.+}}[{{%.+}}, {{%.+}}] : tensor<2x2xf64>
+  // CHECK: catalyst.list_push [[e]], [[cache]] : <f64>
+  // Reverse pass: pop the elements and rebuild the 2x2 matrix for the adjointed op.
+  // CHECK: tensor.empty() : tensor<2x2xf64>
+  // CHECK: scf.for {{.*}} iter_args
+  // CHECK: catalyst.list_pop [[cache]] : <f64>
+  // CHECK: tensor.insert {{%.+}} into {{%.+}}[{{%.+}}, {{%.+}}] : tensor<2x2xf64>
+  // CHECK: quantum.operator "BasisRotation"({{%.+}}: tensor<2x2xf64>) adj
+  %out = quantum.adjoint(%arg0) : !quantum.reg {
+  ^bb0(%r: !quantum.reg):
+    %q0 = quantum.extract %r[ 0] : !quantum.reg -> !quantum.bit
+    %q1 = quantum.extract %r[ 1] : !quantum.reg -> !quantum.bit
+    %op:2 = quantum.operator "BasisRotation"(%matrix: tensor<2x2xf64>) qubits(%q0, %q1)
+      static_data = {}
+      param_map = {unitary_matrix = [0]} qubit_map = {wires = [0, 1]}
+    %r0 = quantum.insert %r[ 0], %op#0 : !quantum.reg, !quantum.bit
+    %r1 = quantum.insert %r0[ 1], %op#1 : !quantum.reg, !quantum.bit
+    quantum.yield %r1 : !quantum.reg
+  }
+  return %out : !quantum.reg
+}
