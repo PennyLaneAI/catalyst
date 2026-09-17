@@ -135,25 +135,30 @@ def symbolic_arguments(base_op, kind, ctrl_wires=None) -> dict:
     raise CompileError(f"Unknown symbolic kind: {kind}")  # pragma: no cover
 
 
-def rule_call_operands(call_args, call_kwargs, ctrl_wires=None) -> list:
-    """Flatten a decomposition rule's call into positional operands.
+def ordered_kwarg_names(call_kwargs, dynamic_shape) -> list:
+    """Order a rule's keyword operands params-first, then wires, each group sorted by name."""
+    params = sorted(name for name in call_kwargs if name in dynamic_shape)
+    wires = sorted(name for name in call_kwargs if name not in dynamic_shape)
+    return params + wires
 
-    The compiler reads a register-mode rule as ``func(qreg, param*, inWires*, inCtrlWires*)``, so
-    the control wires trail the base wires (``prepareOperands`` in
-    mlir/lib/Quantum/Transforms/GraphDecomposition/DecomposeLoweringImpl.hpp).
-    ``qp.capture.subroutine`` traces through ``jax.jit``, which flattens keyword arguments in
-    *sorted* order, so passing the control wires by keyword would place them wherever their name
-    happens to sort. Everything is passed positionally instead, in the order the compiler reads back.
+
+def rule_call_operands(call_args, call_kwargs, kwarg_names, ctrl_wires=None) -> list:
+    """Flatten a rule's call into positional operands: ``call_args``, then ``call_kwargs`` in
+    ``kwarg_names`` order (params-first, from :func:`ordered_kwarg_names`), then the control wires.
+
+    Everything is passed positionally because ``qp.capture.subroutine`` traces through ``jax.jit``,
+    which would otherwise flatten keyword arguments in sorted-name order.
 
     Args:
         call_args (tuple): the rule's positional arguments
         call_kwargs (dict): the rule's keyword arguments
+        kwarg_names (list[str]): the keyword argument names, in the order to flatten them
         ctrl_wires: the control wires to append, or None when the rule is not controlled
 
     Returns:
         list: the operands to call the traced rule with
     """
-    operands = [*call_args, *(call_kwargs[name] for name in sorted(call_kwargs))]
+    operands = [*call_args, *(call_kwargs[name] for name in kwarg_names)]
     if ctrl_wires is not None:
         operands.append(ctrl_wires)
     return operands
@@ -595,7 +600,7 @@ def compile_decomposition_rules(
         target_id = wrap_modifier_id(target_id, _control_modifier(n_ctrl))
 
     call_args, call_kwargs = split_call_args(kwargs, is_custom_op)
-    kwarg_names = sorted(call_kwargs)
+    kwarg_names = ordered_kwarg_names(call_kwargs, dynamic_shape)
 
     # The static_data was only needed to instantiate the correct decomp rule
     # Once we have the correct rules, don't send them into qjit: they are closed over instead.
@@ -638,13 +643,27 @@ def compile_decomposition_rules(
     )
 
     return build_rule_module(
-        subroutines, device, call_args, call_kwargs, ctrl_wires, name_to_resource_ids, target_id
+        subroutines,
+        device,
+        call_args,
+        call_kwargs,
+        kwarg_names,
+        ctrl_wires,
+        name_to_resource_ids,
+        target_id,
     )
 
 
 # pylint: disable=too-many-arguments
 def build_rule_module(
-    subroutines, device, call_args, call_kwargs, ctrl_wires, name_to_resource_ids, target_id
+    subroutines,
+    device,
+    call_args,
+    call_kwargs,
+    kwarg_names,
+    ctrl_wires,
+    name_to_resource_ids,
+    target_id,
 ) -> ir.Operation:
     """Trace ``subroutines`` into a module of standalone decomposition-rule functions.
 
@@ -653,6 +672,7 @@ def build_rule_module(
         device (Device): the device to trace them on, sized for the operator's wires
         call_args (tuple): positional arguments to call each subroutine with
         call_kwargs (dict): keyword arguments to call each subroutine with
+        kwarg_names (list[str]): the keyword argument names, in the order to flatten them
         ctrl_wires: the control wires to append, or None when the rules are not controlled
         name_to_resource_ids (dict): rule name to the graphOpId of each resource
         target_id (str): the graphOpId of the gate the rules decompose
@@ -664,7 +684,7 @@ def build_rule_module(
         CompileError: if the rules could not be traced
     """
 
-    operands = rule_call_operands(call_args, call_kwargs, ctrl_wires)
+    operands = rule_call_operands(call_args, call_kwargs, kwarg_names, ctrl_wires)
 
     @qp.qjit(target="mlir", capture=True, collect_decomp_rules=False)
     @qp.qnode(device=device)
@@ -865,7 +885,7 @@ def compile_registered_symbolic_rules(
         return None
 
     call_args, call_kwargs = split_call_args(kwargs, is_custom_op)
-    kwarg_names = sorted(call_kwargs)
+    kwarg_names = ordered_kwarg_names(call_kwargs, dynamic_shape)
 
     def rule_to_subroutine(rule):
         def decomp_rule(*_operands):
@@ -899,7 +919,14 @@ def compile_registered_symbolic_rules(
     )
 
     return build_rule_module(
-        subroutines, device, call_args, call_kwargs, ctrl_wires, name_to_resource_ids, target_id
+        subroutines,
+        device,
+        call_args,
+        call_kwargs,
+        kwarg_names,
+        ctrl_wires,
+        name_to_resource_ids,
+        target_id,
     )
 
 
