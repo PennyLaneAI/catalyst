@@ -212,7 +212,9 @@ def rule_call_operands(
     return operands
 
 
-def unpack_rule_operands(operands, n_params, kwarg_names, wire_lens, has_ctrl_wires, hybrid_specs=()):
+def unpack_rule_operands(
+    operands, n_params, kwarg_names, wire_lens, has_ctrl_wires, hybrid_specs=()
+):
     """Recover ``(params, kwargs, control wires)`` from :func:`rule_call_operands`' flattening.
 
     Reconstructs each hybrid argument from its traced leaves (via its ``treedef``) so the rule body
