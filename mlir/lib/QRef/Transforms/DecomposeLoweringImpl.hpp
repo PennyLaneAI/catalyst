@@ -106,8 +106,11 @@ class BaseSignatureAnalyzer {
         for (const auto &index : signature.inCtrlWireIndices) {
             regs.insert(index.getReg());
         }
-        assert(regs.size() == 1 &&
-               "register-mode decomposition rule cannot span multiple qregs yet");
+        assert(regs.size() == 1 ||
+               (llvm::errs() << "register-mode decomposition rule cannot span multiple qregs yet, "
+                                "got "
+                             << regs.size() << " registers.\n",
+                false));
         return regs.front();
     }
 
@@ -142,8 +145,13 @@ class BaseSignatureAnalyzer {
 
         int operandIdx = 0;
         if (!signature.params.empty()) {
+            // Let's match by total scalar-element count instead of number of params:
+            size_t sigParamElements = 0;
+            for (Value param : signature.params) {
+                sigParamElements += getElementsCount(param.getType());
+            }
             auto [startIdx, endIdx] =
-                findParamTypeRange(funcInputsNoQreg, signature.params.size(), operandIdx);
+                findParamTypeRange(funcInputsNoQreg, sigParamElements, operandIdx);
             ArrayRef<Type> paramsTypes =
                 ArrayRef<Type>(funcInputsNoQreg).slice(startIdx, endIdx - startIdx);
             auto updatedParams = generateParams(signature.params, paramsTypes, rewriter, loc);
@@ -193,6 +201,9 @@ class BaseSignatureAnalyzer {
 
   private:
     Value fromTensorOrAsIs(ValueRange values, Type type, PatternRewriter &rewriter, Location loc) {
+        if (values.size() == 1 && values.front().getType() == type) {
+            return values.front();
+        }
         if (isa<RankedTensorType>(type)) {
             return tensor::FromElementsOp::create(rewriter, loc, type, values);
         }
@@ -207,21 +218,26 @@ class BaseSignatureAnalyzer {
         return 1;
     }
 
-    // Helper function to find the range of function input types that correspond to params
-    static std::pair<size_t, size_t> findParamTypeRange(ArrayRef<Type> funcInputs,
-                                                        size_t sigParamCount, size_t startIdx = 0) {
+    static std::pair<size_t, size_t>
+    findParamTypeRange(ArrayRef<Type> funcInputs, size_t sigParamElements, size_t startIdx = 0) {
         size_t paramTypeCount = 0;
         size_t paramTypeEnd = startIdx;
 
-        while (paramTypeCount < sigParamCount) {
-            assert(paramTypeEnd < funcInputs.size() &&
-                   "param type end should be less than function input size");
+        while (paramTypeCount < sigParamElements) {
+            assert(paramTypeEnd < funcInputs.size() ||
+                   (llvm::errs() << "param type end should be less than function input size, got "
+                                 << paramTypeEnd << " and " << funcInputs.size()
+                                 << " respectively.\n",
+                    false));
             paramTypeCount += getElementsCount(funcInputs[paramTypeEnd]);
             paramTypeEnd++;
         }
 
-        assert(paramTypeCount == sigParamCount &&
-               "param type count should be equal to signature param count");
+        assert(paramTypeCount == sigParamElements ||
+               (llvm::errs()
+                    << "param element count should match the function input element count, got "
+                    << paramTypeCount << " and " << sigParamElements << " respectively.\n",
+                false));
 
         return {startIdx, paramTypeEnd};
     }
@@ -233,12 +249,16 @@ class BaseSignatureAnalyzer {
         size_t sigParamIdx = 0;
 
         for (Type funcParamType : funcParamTypes) {
-            const size_t numElements = getElementsCount(funcParamType);
-
-            // collect numElements of signature params
+            // We need to collect signature params until their element counts fill this func input:
+            // Note several scalars packed into one tensor, or a single whole-tensor (e.g. matrix)
+            // params.
+            const size_t neededElements = getElementsCount(funcParamType);
             SmallVector<Value> tensorElements;
-            for (size_t i = 0; i < numElements && sigParamIdx < signatureParams.size(); i++) {
-                tensorElements.push_back(signatureParams[sigParamIdx++]);
+            size_t haveElements = 0;
+            while (haveElements < neededElements && sigParamIdx < signatureParams.size()) {
+                Value param = signatureParams[sigParamIdx++];
+                tensorElements.push_back(param);
+                haveElements += getElementsCount(param.getType());
             }
             operands.push_back(fromTensorOrAsIs(tensorElements, funcParamType, rewriter, loc));
         }
@@ -263,7 +283,10 @@ class BaseSignatureAnalyzer {
             return tensor::FromElementsOp::create(rewriter, loc, type, values);
         }
 
-        assert(values.size() == 1 && "number of values should be 1 for non-tensor type");
+        assert(values.size() == 1 ||
+               (llvm::errs() << "number of values should be 1 for non-tensor type, got "
+                             << values.size() << ".\n",
+                false));
         return values.front();
     }
 
@@ -294,8 +317,11 @@ class BaseSignatureAnalyzer {
             signature.inCtrlWireIndices.emplace_back(index);
         }
 
-        assert((signature.inWireIndices.size() + signature.inCtrlWireIndices.size()) > 0 &&
-               "inWireIndices or inCtrlWireIndices should not be empty");
+        assert((signature.inWireIndices.size() + signature.inCtrlWireIndices.size()) > 0 ||
+               (llvm::errs() << "inWireIndices or inCtrlWireIndices should not be empty, got "
+                             << signature.inWireIndices.size() << " and "
+                             << signature.inCtrlWireIndices.size() << " respectively.\n",
+                false));
     }
 };
 
