@@ -5,6 +5,7 @@ permissions:
   
 on:
     pull_request:
+    workflow_dispatch:
         
 jobs:
   check_if_wheel_build_required:
@@ -17,8 +18,19 @@ jobs:
     uses: ./.github/workflows/constants.yaml
     with:
       runs_on: ubuntu-24.04
-    
-  build:
+      
+      # - name: Build and push Docker image
+      #   uses: docker/build-push-action@v6
+      #   with:
+      #     context: .
+      #     file: Dockerfile
+      #     platforms: linux/arm64
+      #     push: false
+      #     build-args: |
+      #       PENNYLANE_VERSION=main
+      #       CATALYST_VERSION=main
+      #       LIGHTNING_VERSION=main
+  build-catalyst:
     name: Build Docker Image
     runs-on: blacksmith-8vcpu-ubuntu-2404
     needs: [check_if_wheel_build_required, constants]    
@@ -50,6 +62,21 @@ jobs:
         with:
           cache-key: docker-image-artifact
 
+      - name: Checkout External Base Repo
+        uses: actions/checkout@v4
+        with:
+          repository: PennyLaneAI/pennylane-lightning
+          ref: main # Branch, tag, or commit SHA
+          path: pennylane-lightning
+
+      - name: Build Lightning docker image
+        uses: useblacksmith/build-push-action@v2
+        with:
+          context: .
+          file: ./pennylane-lightning/docker/Dockerfile
+          tags: pennylane-lightning:latest
+          load: true
+
       # Build the image and export it to the runner's local Docker daemon
       - name: Build Docker Image
         uses: useblacksmith/build-push-action@v2
@@ -57,7 +84,6 @@ jobs:
           context: .
           file: ./Dockerfile
           tags: plc:latest
-          # Crucial: load=true saves the image locally instead of pushing it online
           load: true 
 
       # Serialize the Docker image into a single transportable archive file
