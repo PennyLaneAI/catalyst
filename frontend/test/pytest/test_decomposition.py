@@ -1494,6 +1494,62 @@ class TestNumericHamiltonianDecomposition:
             nuc_constant=0.5,
         )
 
+    @staticmethod
+    def _vibronic_hamiltonian():
+        n_states, n_modes = 2, 1
+        constant = np.zeros((1, n_states, n_states))
+        constant[0, 0, 0], constant[0, 1, 1] = 0.4, -0.4
+        linear = np.zeros((1, n_states, n_states, n_modes))
+        linear[0, 0, 0, 0], linear[0, 1, 1, 0] = 0.2, -0.2
+        return qp.VibronicHamiltonian(
+            constant=constant,
+            linear=linear,
+            quadratic=np.zeros((1, n_states, n_states, n_modes, n_modes)),
+            kinetic=np.einsum("ab,cd->abcd", np.eye(n_states), np.diag(0.3 * np.ones(n_modes))),
+        )
+
+    def test_trotter_vibronic_captures_numeric_hamiltonian(self):
+        """Test a ``TrotterVibronic`` carrying a numeric ``VibronicHamiltonian`` is captured to MLIR with
+        the Hamiltonian passed through its decomposition rules.
+        """
+        hamiltonian = self._vibronic_hamiltonian()
+        n_states, n_modes, k, b = 2, 1, 2, 3
+        n = int(np.ceil(np.log2(n_states)))
+        registers = qp.registers(
+            {
+                "electronic": n,
+                "vib_wires": n_modes * k,
+                "cache": 2 * k,
+                "coefficients": b,
+                "phase_gradient": b,
+                "work": max(n - 1, 2 * k, 2 * b + 2),
+            }
+        )
+        all_wires = qp.wires.Wires.all_wires(list(registers.values()))
+
+        @qjit(capture=True, target="mlir")
+        @graph_decomposition(
+            gate_set={"QROM", "AQFT", "CNOT", "PhaseShift", "RZ", "Hadamard", "GlobalPhase"}
+        )
+        @qnode(qp.device("null.qubit", wires=len(all_wires)))
+        def circuit():
+            qp.TrotterVibronic(
+                evolution_time=1.0,
+                num_trotter_steps=1,
+                hamiltonian=hamiltonian,
+                electronic_wires=registers["electronic"],
+                vib_wires=registers["vib_wires"],
+                cache_wires=registers["cache"],
+                coefficient_wires=registers["coefficients"],
+                phase_gradient_wires=registers["phase_gradient"],
+                work_wires=registers["work"],
+                aqft_order=1,
+            )
+            return qp.probs(wires=registers["electronic"])
+
+        resources = qp.specs(circuit, level=0)().resources
+        assert dict(resources.counts) == {"TrotterVibronic": 1}
+
     def test_trotter_cdf_decomposes(self):
         """Test that a ``TrotterCDF`` with ``CDFHamiltonian`` decomposes."""
         hamiltonian = self._cdf_hamiltonian()
