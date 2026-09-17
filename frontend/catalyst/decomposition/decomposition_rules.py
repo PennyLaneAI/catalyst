@@ -508,7 +508,8 @@ def collect_resources_for_op(
         try:
             # The `compute_resources` function's signature is the same as the Operator2 signature
             # for the original op of the rule
-            resources = rule.compute_resources(*args, **kwargs)
+            with qp.capture.toggle_ctx(True):
+                resources = rule.compute_resources(*args, **kwargs)
             name_to_resources[rule.name] = resources.gate_counts
             # A distributed rule produces modified gates, so each id is *generated* in its
             # modified form straight from the resource op instance -- the modifiers are placed
@@ -831,7 +832,8 @@ def collect_symbolic_resources(op_cls, op_name, kwargs, is_custom_op, *, kind, c
 
         applicable_rules.append(rule)
         try:
-            resources = rule.compute_resources(**probe_args)
+            with qp.capture.toggle_ctx(True):
+                resources = rule.compute_resources(**probe_args)
             name_to_resources[rule.name] = resources.gate_counts
             # The rule body names the ops it produces itself, so unlike the distribution pathway
             # these ids carry no added modifier; a resource that is itself symbolic is spelled the
