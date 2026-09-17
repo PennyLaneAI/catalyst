@@ -47,7 +47,7 @@ LogicalResult verifyTypeIsCacheable(Type ty, Operation *op) {
     // Real-valued tensors of any rank (e.g. `quantum.operator` angle tensors or a BasisRotation
     // matrix) are cached element-wise as plain f64 values.
     if (elementType.isF64()) {
-        return;
+        return success();
     }
 
     // TODO: Generalize to arbitrary dimensions
