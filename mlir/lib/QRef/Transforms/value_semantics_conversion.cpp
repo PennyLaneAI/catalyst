@@ -87,6 +87,22 @@ LogicalResult ensureNoReferenceSemanticsOps(Operation *op) {
     }
 }
 
+// Only scf.if, scf.for, scf.while and scf.index_switch have conversion rules. Any other
+// region-bearing scf op must be rejected before conversion starts: converting the gates nested in
+// its region erases values that the region's own terminator still refers to.
+LogicalResult ensureNoScfExecuteRegionOps(Operation *op) {
+    WalkResult walkResult = op->walk([&](scf::ExecuteRegionOp executeRegionOp) {
+        executeRegionOp.emitError("scf.execute_region is not supported");
+        return WalkResult::interrupt();
+    });
+
+    if (walkResult.wasInterrupted()) {
+        return failure();
+    } else {
+        return success();
+    }
+}
+
 // A struct to store the register and the index of rQubits from a qref.get operation.
 // This struct is intended to be the keys in `llvm::DenseMap`s.
 struct rQubitGetOpInfo {
@@ -1969,6 +1985,10 @@ struct ValueSemanticsConversionPass
                 continue;
             }
 
+            if (failed(ensureNoScfExecuteRegionOps(subroutine))) {
+                return signalPassFailure();
+            }
+
             SubroutineInfo info(subroutine);
             handleSubroutine(builder, subroutine, info.getNecessarySubroutineRValues());
             if (failed(ensureNoReferenceSemanticsOps(subroutine))) {
@@ -1991,6 +2011,10 @@ struct ValueSemanticsConversionPass
 
         // Convert the main quantum.mode functions
         for (auto targetFunc : targetFuncs) {
+            if (failed(ensureNoScfExecuteRegionOps(targetFunc))) {
+                return signalPassFailure();
+            }
+
             QubitValueTracker tracker;
             handleRegion(builder, targetFunc.getBody(), tracker);
             eraseAllRemainingAnchorRValues(targetFunc);
