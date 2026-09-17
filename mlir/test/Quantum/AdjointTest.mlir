@@ -142,6 +142,7 @@ func.func private @workflow_many_args() -> tensor<4xcomplex<f64>> attributes {} 
 
 // -----
 
+// CHECK-LABEL: @workflow_unhandled
 func.func @workflow_unhandled() {
   %0 = quantum.alloc(1) : !quantum.reg
   %1 = quantum.adjoint (%0) : !quantum.reg {
@@ -155,9 +156,39 @@ func.func @workflow_unhandled() {
   return
 }
 
+// -----
+
+// CHECK-LABEL: @workflow_non_float_param
+func.func @workflow_non_float_param(%arg0: !quantum.reg) -> !quantum.reg  {
+
+  // CHECK-NOT: quantum.adjoint
+  %0 = quantum.adjoint(%arg0) : !quantum.reg {
+  ^bb0(%arg1: !quantum.reg):
+
+    // CHECK: [[BOOL_TENSOR:%.+]] = "test.op"() : () -> tensor<2xi1>
+    // CHECK-NOT: catalyst.list_push
+    // CHECK-NOT: catalyst.list_pop
+    %bool_tensor = "test.op" () : () -> (tensor<2xi1>)
+
+    %1 = quantum.extract %arg1[ 0] : !quantum.reg -> !quantum.bit
+    %2 = quantum.extract %arg1[ 1] : !quantum.reg -> !quantum.bit
+
+    // CHECK: quantum.operator "MultiX"([[BOOL_TENSOR]]: tensor<2xi1>) adj
+    %3:2 = quantum.operator "MultiX"(%bool_tensor: tensor<2xi1>) qubits(%1, %2)
+      param_map = {bitstring = [0]} qubit_map = {wires = [0, 1]}
+
+    %r1 = quantum.insert %arg1[ 0], %3#0 : !quantum.reg, !quantum.bit
+    %r2 = quantum.insert %r1[ 1], %3#1 : !quantum.reg, !quantum.bit
+
+    quantum.yield %r2 : !quantum.reg
+  }
+
+  return %0 : !quantum.reg
+}
 
 // -----
 
+// CHECK-LABEL: @qubit_unitary_test
 func.func private @qubit_unitary_test() -> tensor<4xcomplex<f64>> {
   quantum.device ["rtd_lightning.so", "LightningQubit", "{shots: 0}"]
   %0 = quantum.alloc( 2) : !quantum.reg
@@ -326,7 +357,7 @@ func.func private @workflow_adjoint(%arg0: f64) -> tensor<4xcomplex<f64>> attrib
 
 // -----
 
-// CHECK-LABEL: param_ordering
+// CHECK-LABEL: @param_ordering
 func.func private @param_ordering(%0: !quantum.reg) -> !quantum.reg {
   // CHECK-DAG: [[F1:%.+]] = arith.constant 1.000000e-01
   // CHECK-DAG: [[F2:%.+]] = arith.constant 2.000000e-01
@@ -377,6 +408,7 @@ func.func private @param_ordering(%0: !quantum.reg) -> !quantum.reg {
 
 // Test adjoint of scf.for
 
+// CHECK-LABEL: @adjoint_for_loop_static
 func.func public @adjoint_for_loop_static() {
   // CHECK-DAG: [[start:%.+]] = index.constant 0
   // CHECK-DAG: [[stop:%.+]] = index.constant 4
@@ -426,6 +458,8 @@ func.func public @adjoint_for_loop_static() {
 
 // Test adjoint of scf.for with dynamic bounds: only the non-constant bound is cached, while
 // constant bounds (start, step) are still rematerialized.
+
+// CHECK-LABEL: @adjoint_for_loop_mixed_static_dynamic
 func.func public @adjoint_for_loop_mixed_static_dynamic(%stop: index) {
   // CHECK-DAG: [[start:%.+]] = index.constant 0
   // CHECK-DAG: [[step:%.+]] = index.constant 1
@@ -465,6 +499,7 @@ func.func public @adjoint_for_loop_mixed_static_dynamic(%stop: index) {
 
 // Test adjoint of scf.while
 
+  // CHECK-LABEL: @adjoint_while_loop
   func.func public @adjoint_while_loop() {
     %c1 = arith.constant 1 : index
     %c4 = arith.constant 4 : index
@@ -520,6 +555,7 @@ func.func public @adjoint_for_loop_mixed_static_dynamic(%stop: index) {
 
 // Test adjoint of scf.if
 
+  // CHECK-LABEL: @adjoint_if
   func.func public @adjoint_if(%arg0: i1) {
 
     // CHECK: [[reg:%.+]] = quantum.alloc( 2) : !quantum.reg
