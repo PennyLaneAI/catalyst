@@ -1675,6 +1675,40 @@ class TestNumericHamiltonianDecomposition:
             "RZ": 40,
         }
 
+    def test_trotter_cdf_with_fixed_decomp_rule(self):
+        """Test a ``fixed_decomps`` rule pins the ``TrotterCDF`` decomposition, so this test stays stable
+        regardless of PennyLane's built-in rule.
+        """
+        hamiltonian = self._cdf_hamiltonian()
+
+        @register_resources({qp.RZ(Float, wires=Wire[1]): 1, qp.GlobalPhase(Float): 1})
+        def dummy_cdf_decomp(evolution_time, num_trotter_steps, hamiltonian, wires, double_phase):
+            # pylint: disable=redefined-outer-name,unused-argument
+            qp.RZ(hamiltonian.nuc_constant * evolution_time, wires=wires[0])
+            qp.GlobalPhase(hamiltonian.nuc_constant)
+
+        with local_decomps():
+            add_decomps(qp.TrotterCDF, dummy_cdf_decomp)
+
+            @qjit(capture=True, target="mlir")
+            @graph_decomposition(
+                gate_set={"RZ", "GlobalPhase"},
+                fixed_decomps={qp.TrotterCDF: dummy_cdf_decomp},
+            )
+            @qnode(qp.device("null.qubit", wires=4))
+            def circuit():
+                qp.TrotterCDF(
+                    evolution_time=1.0,
+                    num_trotter_steps=10,
+                    hamiltonian=hamiltonian,
+                    wires=range(4),
+                )
+
+            resources = qp.specs(circuit, level="all-mlir")().resources
+
+        assert resources["Before MLIR Passes"].counts == {"TrotterCDF": 1}
+        assert resources["graph-decomposition"].counts == {"RZ": 1, "GlobalPhase": 1}
+
     def test_adjoint_trotter_cdf_decomposes(self):
         """Test that ``qp.adjoint(TrotterCDF)`` decomposes."""
         hamiltonian = self._cdf_hamiltonian()
