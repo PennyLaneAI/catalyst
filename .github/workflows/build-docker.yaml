@@ -79,15 +79,20 @@ jobs:
           outputs: type=docker,dest=pennylane-lightning.tar
 
       # Build the image and export it to the runner's local Docker daemon
+      # - name: Build Docker Image
+      #   uses: useblacksmith/build-push-action@v2
+      #   with:
+      #     context: .
+      #     file: ./Dockerfile
+      #     tags: plc:latest
+      #     load: true 
+      #     build-contexts: |
+      #       pennylane-lightning:latest=docker-archive://pennylane-lightning.tar
       - name: Build Docker Image
-        uses: useblacksmith/build-push-action@v2
-        with:
-          context: .
-          file: ./Dockerfile
-          tags: plc:latest
-          load: true 
-          build-contexts: |
-            pennylane-lightning:latest=docker-archive://pennylane-lightning.tar
+        run: |
+          docker build \
+            -t plc:latest \
+            -f ./Dockerfile .
 
       # Serialize the Docker image into a single transportable archive file
       - name: Save Docker Image to Archive
