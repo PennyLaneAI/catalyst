@@ -804,7 +804,7 @@ static LogicalResult distributeControlsQref(PatternRewriter &rewriter, Block &bl
             for (Region &region : op.getRegions()) {
                 if (!region.empty()) {
                     if (failed(distributeControlsQref(rewriter, region.front(), currentCtrlQubits, ctrlValues, opsToErase))) {
-                        // return failure();
+                        return failure();
                     }
                 }
             }
@@ -846,21 +846,21 @@ static LogicalResult distributeControlsQref(PatternRewriter &rewriter, Block &bl
         //     // }
         //     continue;
         // }
-        // if (isa<InsertOp, ExtractOp, AllocOp, DeallocOp, AllocQubitOp, DeallocQubitOp>(op)) {
-        //     // Structural ops carry no controls; thread their operands/results through the map.
-        //     rewriter.clone(op, map);
-        //     continue;
-        // }
+        if (isa<GetOp, AllocOp, DeallocOp, AllocQubitOp, DeallocQubitOp>(op)) {
+            // Structural ops carry no controls; thread their operands/results through the map.
+            // rewriter.clone(op, map);
+            continue;
+        }
         // if (isa<QuantumDialect>(op.getDialect())) {
         //     op.emitError("unsupported quantum operation inside a quantum.ctrl region");
         //     return failure();
         // }
         // Any other scf ops would need their body controlled too,
         // which is not supported:
-        // if (op.getNumRegions() > 0) {
-        //     op.emitError("unsupported scf operation inside a qref.ctrl region");
-        //     return failure();
-        // }
+        if (isa<scf::SCFDialect>(op.getDialect()) && op.getNumRegions() > 0) {
+            op.emitError("unsupported scf operation inside a qref.ctrl region");
+            return failure();
+        }
     }
     return success();
 }
