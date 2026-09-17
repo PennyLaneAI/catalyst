@@ -931,16 +931,26 @@ def compile_registered_symbolic_rules(
 
     call_args, call_kwargs = split_call_args(kwargs, is_custom_op)
     kwarg_names = ordered_kwarg_names(call_kwargs, dynamic_shape)
+    n_param_kwargs = sum(1 for name in kwarg_names if name in dynamic_shape)
+
+    # Numeric hybrid args (e.g. a CDFHamiltonian) are passed as operands so their concrete values
+    # do not bake into the rule body; the rest are closed over. The modified base op still carries
+    # every hybrid arg, so a baked one would also make the gate op's params outnumber the rule's
+    # inputs (crashing the signature analyzer during decompose-lowering).
+    hybrid_specs, hybrid_leaves, closed_hybrid = flatten_hybrid_args(extra_data)
 
     def rule_to_subroutine(rule):
         def decomp_rule(*_operands):
             _args, _kwargs, _ctrl_wires = unpack_rule_operands(
-                _operands, len(call_args), kwarg_names, kind == "control"
+                _operands, len(call_args), kwarg_names, kind == "control", hybrid_specs,
+                n_param_kwargs,
             )
             # The base is rebuilt from the traced arguments of the rule function, so the wires and
-            # parameters the rule body reads off it are this function's own operands.
+            # parameters the rule body reads off it are this function's own operands. Operand-passed
+            # hybrid args are rebuilt into ``_kwargs``; static data and closed-over hybrid args are
+            # supplied directly.
             with qp.capture.pause():
-                base = op_cls(*_args, **_kwargs, **static_and_extra)
+                base = op_cls(*_args, **_kwargs, **static_data, **closed_hybrid)
             # TODO: Call the rule itself instead of its _impl after merging
             # https://github.com/PennyLaneAI/pennylane/pull/10144
             rule._impl(**symbolic_arguments(base, kind, _ctrl_wires))
@@ -970,7 +980,9 @@ def compile_registered_symbolic_rules(
         else None
     )
 
-    operands = rule_call_operands(call_args, call_kwargs, kwarg_names, ctrl_wires)
+    operands = rule_call_operands(
+        call_args, call_kwargs, kwarg_names, ctrl_wires, hybrid_leaves, n_param_kwargs
+    )
     return build_rule_module(subroutines, device, operands, name_to_resource_ids, target_id)
 
 

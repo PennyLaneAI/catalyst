@@ -1586,6 +1586,68 @@ class TestNumericHamiltonianDecomposition:
             "RZ": 60,
         }
 
+    def test_control_trotter_cdf_decomposes(self):
+        """Test that ``qp.ctrl(TrotterCDF)`` decomposes."""
+        hamiltonian = self._cdf_hamiltonian()
+
+        @qjit(capture=True, target="mlir")
+        @graph_decomposition(
+            gate_set={"BasisRotation", "RZ", "IsingZZ", "GlobalPhase", "CRZ", "CNOT", "PhaseShift", "RX"}
+        )
+        @qnode(qp.device("null.qubit", wires=5))
+        def circuit():
+            qp.ctrl(
+                qp.TrotterCDF(
+                    evolution_time=1.0,
+                    num_trotter_steps=10,
+                    hamiltonian=hamiltonian,
+                    wires=range(4),
+                ),
+                control=[4],
+            )
+
+        resources = qp.specs(circuit, level="all-mlir")().resources
+        assert resources["Before MLIR Passes"].counts == {"C(TrotterCDF)": 1}
+        assert resources["graph-decomposition"].counts == {
+            "BasisRotation": 62,
+            "C(CNOT)": 240,
+            "CRZ": 160,
+            "GlobalPhase": 242,
+            "PhaseShift": 1,
+            "RX": 242,
+        }
+
+    def test_control_trotter_cgf_decomposes(self):
+        """Test that ``qp.ctrl(TrotterCGF)`` decomposes."""
+        hamiltonian = self._cgf_hamiltonian()
+
+        @qjit(capture=True, target="mlir")
+        @graph_decomposition(
+            gate_set={"BasisRotation", "RZ", "IsingZZ", "GlobalPhase", "CRZ", "CNOT", "PhaseShift", "RX"}
+        )
+        @qnode(qp.device("null.qubit", wires=7))
+        def circuit():
+            qp.ctrl(
+                qp.TrotterCGF(
+                    evolution_time=1.0,
+                    num_trotter_steps=10,
+                    hamiltonian=hamiltonian,
+                    wires=range(6),
+                ),
+                control=[6],
+            )
+
+        resources = qp.specs(circuit, level="all-mlir")().resources
+        assert resources["Before MLIR Passes"].counts == {"C(TrotterCGF)": 1}
+        assert resources["graph-decomposition"].counts == {
+            "BasisRotation": 62,
+            "C(CNOT)": 360,
+            "CRZ": 240,
+            "GlobalPhase": 362,
+            "PhaseShift": 1,
+            "RX": 362,
+        }
+
 
 if __name__ == "__main__":
     pytest.main(["-x", __file__])
