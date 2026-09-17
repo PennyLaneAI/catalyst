@@ -461,10 +461,12 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
                     LDBG() << "Decomposition rule " << func.getName()
                            << " was registered to an op with fixed or alt decomps, and wasn't in "
                               "the list - skipping";
-                } else {
-                    if (failed(addRuleNode(func, ruleNodes))) {
-                        return WalkResult::interrupt();
-                    }
+                    return WalkResult::advance();
+                }
+
+                // standard case - targets an op with no restrictions
+                if (failed(addRuleNode(func, ruleNodes))) {
+                    return WalkResult::interrupt();
                 }
             }
             return WalkResult::skip();
