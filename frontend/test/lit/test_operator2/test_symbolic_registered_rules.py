@@ -84,8 +84,8 @@ def test_registered_symbolic_rule_accepts_mcm():
 
     @qp.register_resources({NoParams(Wire[1]): 1, qp.ops.MidMeasure(Wire[1]): 1})
     def rule_with_mcm(base):
-        m0 = qp.measure(base.wires)
-        qp.cond(m0, NoParams)(base.wires)
+        m0 = qp.measure(base.wires[0])
+        qp.cond(m0, NoParams)(base.wires[0])
 
     with qp.decomposition.local_decomps():
 
