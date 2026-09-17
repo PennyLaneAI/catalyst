@@ -61,8 +61,10 @@ from catalyst.decomposition.decomposition_rules import (
     name_wrap_adjoint,
     ordered_kwarg_names,
     prepare_dynamic_op_kwargs,
+    rule_call_operands,
     symbolic_arguments,
     symbolic_op_name,
+    unpack_rule_operands,
     wrap_modifier_id,
 )
 from catalyst.decomposition.graph_op_id import GraphOpID, build_graph_op_id
@@ -86,18 +88,67 @@ class TestGenericUtilities:
             ({"reg": 0, "x": 0}, {"x": None}, ["x", "reg"]),
             # Custom ops carry their params positionally, so only wires remain here (unchanged).
             ({"wires": 0}, {"0": None}, ["wires"]),
-            # Multiple params and wires each stay sorted within their group, params first.
-            ({"reg": 0, "b": 0, "a": 0}, {"a": None, "b": None}, ["a", "b", "reg"]),
+            # Params are sorted, while wire registers retain declaration order for grouping.
+            (
+                {"reg2": 0, "reg1": 0, "b": 0, "a": 0},
+                {"a": None, "b": None},
+                ["a", "b", "reg2", "reg1"],
+            ),
         ],
     )
     def test_ordered_kwarg_names_groups_params_before_wires(
         self, call_kwargs, dynamic_shape, expected
     ):
-        """ordered_kwarg_names lays keyword operands out params-first then wires (each sorted),
-        regardless of how the two groups' names sort against each other. Without this, a wire
-        argument whose name sorts before a parameter's places its (multi-element) wire-index operand
-        ahead of the parameter and breaks the compiler's param/wire split."""
+        """Keyword parameters are sorted before declaration-ordered wire registers."""
         assert ordered_kwarg_names(call_kwargs, dynamic_shape) == expected
+
+    def test_rule_call_operands_groups_wire_kwargs(self):
+        """Rule calls use one base-wire operand after all sorted parameter operands."""
+        call_args = (jnp.array(10.0),)
+        call_kwargs = {
+            "reg2": jnp.array([3, 4]),
+            "empty_reg": jnp.array([], dtype=int),
+            "reg1": jnp.array([0, 1, 2]),
+            "z": jnp.array(12.0),
+            "a": jnp.array(11.0),
+        }
+        dynamic_shape = {"z": None, "a": None}
+        wire_lens = {"reg2": 2, "empty_reg": 0, "reg1": 3}
+        kwarg_names = ordered_kwarg_names(call_kwargs, dynamic_shape)
+        ctrl_wires = jnp.array([5, 6])
+
+        operands = rule_call_operands(call_args, call_kwargs, kwarg_names, wire_lens, ctrl_wires)
+
+        assert len(operands) == 5
+        np.testing.assert_array_equal(operands[0], 10.0)
+        np.testing.assert_array_equal(operands[1], 11.0)
+        np.testing.assert_array_equal(operands[2], 12.0)
+        np.testing.assert_array_equal(operands[3], [3, 4, 0, 1, 2])
+        np.testing.assert_array_equal(operands[4], [5, 6])
+
+    def test_unpack_rule_operands_restores_wire_kwargs(self):
+        """Grouped base wires unpack into distinct registers, including an empty register."""
+        wire_lens = {"reg2": 2, "empty_reg": 0, "reg1": 3}
+        kwarg_names = ["a", "z", *wire_lens]
+        operands = (
+            jnp.array(10.0),
+            jnp.array(11.0),
+            jnp.array(12.0),
+            jnp.array([3, 4, 0, 1, 2]),
+            jnp.array([5, 6]),
+        )
+
+        args, kwargs, ctrl_wires = unpack_rule_operands(
+            operands, n_params=1, kwarg_names=kwarg_names, wire_lens=wire_lens, has_ctrl_wires=True
+        )
+
+        np.testing.assert_array_equal(args[0], 10.0)
+        np.testing.assert_array_equal(kwargs["a"], 11.0)
+        np.testing.assert_array_equal(kwargs["z"], 12.0)
+        np.testing.assert_array_equal(kwargs["reg2"], [3, 4])
+        np.testing.assert_array_equal(kwargs["empty_reg"], [])
+        np.testing.assert_array_equal(kwargs["reg1"], [0, 1, 2])
+        np.testing.assert_array_equal(ctrl_wires, [5, 6])
 
     def test_probe_wires_dont_overlap(self):
         """Test that the helper for generating probe arguments doesnt create
@@ -594,6 +645,33 @@ class TestTraceTime:
         assert 'target_gate = "MultipleRegisters{}{reg1:2,reg2:1}{}"' in mlir
         assert "no_work_wires" in mlir
         assert "borrow_two_work_wires" not in mlir
+
+    def test_fixed_decomps(self):
+        """Test that fixed decomps are adhered to."""
+
+        @register_resources({NoParams(reg=Wire[1]): 2})
+        def expensive_fixed_decomp(wires):
+            NoParams(reg=wires[0])
+            NoParams(reg=wires[0])
+
+        @register_resources({NoParams(reg=Wire[1]): 1})
+        def cheaper_decomp(wires):
+            NoParams(reg=wires[0])
+
+        with local_decomps():
+            add_decomps(NoParamsCustomOp, expensive_fixed_decomp, cheaper_decomp)
+
+            @qjit(capture=True, target="mlir")
+            @graph_decomposition(
+                gate_set={NoParams: 1},
+                fixed_decomps={NoParamsCustomOp: expensive_fixed_decomp},
+            )
+            @qnode(qp.device("null.qubit", wires=2))
+            def circuit():
+                NoParamsCustomOp(wires=[0, 1])
+
+            specs = qp.specs(circuit, level="all-mlir")()
+            assert specs.resources["graph-decomposition"].counts["NoParams"] == 2
 
 
 class TestOnDemand:
@@ -1455,6 +1533,394 @@ class TestCustomRuleApplication:
         after = resources["graph-decomposition"].counts
         assert "QubitUnitary" not in after
         assert after.get("NoParams", 0) >= 1
+
+    def test_special_symbolic_rules_applied(self):
+        """Tests that special symbolic decomposition rules are applied."""
+
+        @qp.register_resources({NoParams(Wire[1]): 1, qp.ops.MidMeasure(Wire[1]): 1})
+        def rule_with_mcm(base):
+            m0 = qp.measure(base.wires[0])
+            qp.cond(m0, NoParams)(base.wires[0])
+
+        with local_decomps():
+
+            add_decomps("Adjoint(NoParams)", rule_with_mcm)
+
+            @qjit(capture=True, target="mlir")
+            @graph_decomposition(gate_set={NoParams: 1, qp.ops.MidMeasure: 1})
+            @qnode(qp.device("null.qubit", wires=1))
+            def circuit():
+                qp.adjoint(NoParams(0))
+
+            resources = qp.specs(circuit, level="all-mlir")().resources
+
+        assert "Adjoint(NoParams)" in resources["Before MLIR Passes"].counts
+        after = resources["graph-decomposition"].counts
+        assert "Adjoint(NoParams)" not in after
+        assert after.get("NoParams", 0) == 1
+        assert after.get("MidCircuitMeasure", 0) == 1
+
+
+class TestNumericHamiltonianDecomposition:
+    """Tests decomposing Trotter operators that carry a numeric Hamiltonian as a
+    hybrid argument, in both their plain and ``qp.adjoint`` forms.
+    """
+
+    @staticmethod
+    def _random_orthogonal(rng, dim):
+        q, r = np.linalg.qr(rng.standard_normal((dim, dim)))
+        return q * np.sign(np.diag(r))
+
+    def _cdf_hamiltonian(self):
+        rng = np.random.default_rng(42)
+        n_orbitals, n_fragments = 2, 1
+        return qp.CDFHamiltonian(
+            core_tensors=rng.standard_normal((n_fragments + 1, n_orbitals, n_orbitals)),
+            leaf_tensors=np.stack(
+                [self._random_orthogonal(rng, n_orbitals) for _ in range(n_fragments + 1)]
+            ),
+            nuc_constant=0.5,
+        )
+
+    def _cgf_hamiltonian(self):
+        rng = np.random.default_rng(42)
+        n_fragments, n_modes, n_modals = 1, 2, 3
+        return qp.CGFHamiltonian(
+            core_tensors=rng.standard_normal(
+                (n_fragments + 1, n_modes, n_modes, n_modals, n_modals)
+            ),
+            leaf_tensors=np.stack(
+                [
+                    np.stack([self._random_orthogonal(rng, n_modals) for _ in range(n_modes)])
+                    for _ in range(n_fragments + 1)
+                ]
+            ),
+            nuc_constant=0.5,
+        )
+
+    @staticmethod
+    def _vibronic_hamiltonian():
+        n_states, n_modes = 2, 1
+        constant = np.zeros((1, n_states, n_states))
+        constant[0, 0, 0], constant[0, 1, 1] = 0.4, -0.4
+        linear = np.zeros((1, n_states, n_states, n_modes))
+        linear[0, 0, 0, 0], linear[0, 1, 1, 0] = 0.2, -0.2
+        return qp.VibronicHamiltonian(
+            constant=constant,
+            linear=linear,
+            quadratic=np.zeros((1, n_states, n_states, n_modes, n_modes)),
+            kinetic=np.einsum("ab,cd->abcd", np.eye(n_states), np.diag(0.3 * np.ones(n_modes))),
+        )
+
+    def test_trotter_vibronic_captures_numeric_hamiltonian(self):
+        """Test a ``TrotterVibronic`` carrying a numeric ``VibronicHamiltonian`` is captured to MLIR with
+        the Hamiltonian passed through its decomposition rules.
+        """
+        hamiltonian = self._vibronic_hamiltonian()
+        n_states, n_modes, k, b = 2, 1, 2, 3
+        n = int(np.ceil(np.log2(n_states)))
+        registers = qp.registers(
+            {
+                "electronic": n,
+                "vib_wires": n_modes * k,
+                "cache": 2 * k,
+                "coefficients": b,
+                "phase_gradient": b,
+                "work": max(n - 1, 2 * k, 2 * b + 2),
+            }
+        )
+        all_wires = qp.wires.Wires.all_wires(list(registers.values()))
+
+        @qjit(capture=True, target="mlir")
+        @graph_decomposition(
+            gate_set={"QROM", "AQFT", "CNOT", "PhaseShift", "RZ", "Hadamard", "GlobalPhase"}
+        )
+        @qnode(qp.device("null.qubit", wires=len(all_wires)))
+        def circuit():
+            qp.TrotterVibronic(
+                evolution_time=1.0,
+                num_trotter_steps=1,
+                hamiltonian=hamiltonian,
+                electronic_wires=registers["electronic"],
+                vib_wires=registers["vib_wires"],
+                cache_wires=registers["cache"],
+                coefficient_wires=registers["coefficients"],
+                phase_gradient_wires=registers["phase_gradient"],
+                work_wires=registers["work"],
+                aqft_order=1,
+            )
+            return qp.probs(wires=registers["electronic"])
+
+        resources = qp.specs(circuit, level=0)().resources
+        assert dict(resources.counts) == {"TrotterVibronic": 1}
+
+    def test_trotter_cdf_decomposes(self):
+        """Test that a ``TrotterCDF`` with ``CDFHamiltonian`` decomposes."""
+        hamiltonian = self._cdf_hamiltonian()
+
+        @qjit(capture=True, target="mlir")
+        @graph_decomposition(gate_set={"BasisRotation", "RZ", "IsingZZ", "GlobalPhase"})
+        @qnode(qp.device("null.qubit", wires=4))
+        def circuit():
+            qp.TrotterCDF(
+                evolution_time=1.0, num_trotter_steps=10, hamiltonian=hamiltonian, wires=range(4)
+            )
+
+        resources = qp.specs(circuit, level="all-mlir")().resources
+        assert resources["Before MLIR Passes"].counts == {"TrotterCDF": 1}
+        assert resources["graph-decomposition"].counts == {
+            "BasisRotation": 62,
+            "GlobalPhase": 1,
+            "IsingZZ": 120,
+            "RZ": 40,
+        }
+
+    def test_trotter_cdf_with_fixed_decomp_rule(self):
+        """Test a ``fixed_decomps`` rule pins the ``TrotterCDF`` decomposition, so this test stays stable
+        regardless of PennyLane's built-in rule.
+        """
+        hamiltonian = self._cdf_hamiltonian()
+
+        @register_resources({qp.RZ(Float, wires=Wire[1]): 1, qp.GlobalPhase(Float): 1})
+        def dummy_cdf_decomp(evolution_time, num_trotter_steps, hamiltonian, wires, double_phase):
+            # pylint: disable=redefined-outer-name,unused-argument
+            qp.RZ(hamiltonian.nuc_constant * evolution_time, wires=wires[0])
+            qp.GlobalPhase(hamiltonian.nuc_constant)
+
+        with local_decomps():
+            add_decomps(qp.TrotterCDF, dummy_cdf_decomp)
+
+            @qjit(capture=True, target="mlir")
+            @graph_decomposition(
+                gate_set={"RZ", "GlobalPhase"},
+                fixed_decomps={qp.TrotterCDF: dummy_cdf_decomp},
+            )
+            @qnode(qp.device("null.qubit", wires=4))
+            def circuit():
+                qp.TrotterCDF(
+                    evolution_time=1.0,
+                    num_trotter_steps=10,
+                    hamiltonian=hamiltonian,
+                    wires=range(4),
+                )
+
+            resources = qp.specs(circuit, level="all-mlir")().resources
+
+        assert resources["Before MLIR Passes"].counts == {"TrotterCDF": 1}
+        assert resources["graph-decomposition"].counts == {"RZ": 1, "GlobalPhase": 1}
+
+    def test_adjoint_trotter_cdf_decomposes(self):
+        """Test that ``qp.adjoint(TrotterCDF)`` decomposes."""
+        hamiltonian = self._cdf_hamiltonian()
+
+        @qjit(capture=True, target="mlir")
+        @graph_decomposition(gate_set={"BasisRotation", "RZ", "IsingZZ", "GlobalPhase"})
+        @qnode(qp.device("null.qubit", wires=4))
+        def circuit():
+            qp.adjoint(
+                qp.TrotterCDF(
+                    evolution_time=1.0,
+                    num_trotter_steps=10,
+                    hamiltonian=hamiltonian,
+                    wires=range(4),
+                )
+            )
+
+        resources = qp.specs(circuit, level="all-mlir")().resources
+        assert resources["Before MLIR Passes"].counts == {"Adjoint(TrotterCDF)": 1}
+        assert resources["graph-decomposition"].counts == {
+            "Adjoint(BasisRotation)": 62,
+            "IsingZZ": 120,
+            "RZ": 40,
+        }
+
+    def test_trotter_cgf_decomposes(self):
+        """Test that a ``TrotterCGF`` with ``CGFHamiltonian`` decomposes."""
+        hamiltonian = self._cgf_hamiltonian()
+
+        @qjit(capture=True, target="mlir")
+        @graph_decomposition(gate_set={"BasisRotation", "RZ", "IsingZZ", "GlobalPhase"})
+        @qnode(qp.device("null.qubit", wires=6))
+        def circuit():
+            qp.TrotterCGF(
+                evolution_time=1.0, num_trotter_steps=10, hamiltonian=hamiltonian, wires=range(6)
+            )
+
+        resources = qp.specs(circuit, level="all-mlir")().resources
+        assert resources["Before MLIR Passes"].counts == {"TrotterCGF": 1}
+        assert resources["graph-decomposition"].counts == {
+            "BasisRotation": 62,
+            "GlobalPhase": 1,
+            "IsingZZ": 180,
+            "RZ": 60,
+        }
+
+    def test_adjoint_trotter_cgf_decomposes(self):
+        """Test that ``qp.adjoint(TrotterCGF)`` decomposes."""
+        hamiltonian = self._cgf_hamiltonian()
+
+        @qjit(capture=True, target="mlir")
+        @graph_decomposition(gate_set={"BasisRotation", "RZ", "IsingZZ", "GlobalPhase"})
+        @qnode(qp.device("null.qubit", wires=6))
+        def circuit():
+            qp.adjoint(
+                qp.TrotterCGF(
+                    evolution_time=1.0,
+                    num_trotter_steps=10,
+                    hamiltonian=hamiltonian,
+                    wires=range(6),
+                )
+            )
+
+        resources = qp.specs(circuit, level="all-mlir")().resources
+        assert resources["Before MLIR Passes"].counts == {"Adjoint(TrotterCGF)": 1}
+        assert resources["graph-decomposition"].counts == {
+            "Adjoint(BasisRotation)": 62,
+            "IsingZZ": 180,
+            "RZ": 60,
+        }
+
+    def test_control_trotter_cdf_decomposes(self):
+        """Test that ``qp.ctrl(TrotterCDF)`` decomposes.
+
+        This targets a controlled gate set whose terminals are register-mode
+        controlled rules (``C(BasisRotation)``, ``C(RZ)``, ``C(IsingZZ)``). It
+        exercises the register-mode controlled lowering path, in particular the
+        ``C(GlobalPhase) -> PhaseShift`` reduction where the controlled rule has
+        an empty (grouped) base-wire operand slot.
+        """
+        hamiltonian = self._cdf_hamiltonian()
+
+        @qjit(capture=True, target="mlir")
+        @graph_decomposition(
+            gate_set={
+                "C(BasisRotation)",
+                "C(RZ)",
+                "C(IsingZZ)",
+                "PhaseShift",
+                "GlobalPhase",
+            }
+        )
+        @qnode(qp.device("null.qubit", wires=5))
+        def circuit():
+            qp.ctrl(
+                qp.TrotterCDF(
+                    evolution_time=1.0,
+                    num_trotter_steps=10,
+                    hamiltonian=hamiltonian,
+                    wires=range(4),
+                ),
+                control=[4],
+            )
+
+        resources = qp.specs(circuit, level="all-mlir")().resources
+        assert resources["Before MLIR Passes"].counts == {"C(TrotterCDF)": 1}
+        assert resources["graph-decomposition"].counts == {
+            "C(BasisRotation)": 62,
+            "C(IsingZZ)": 120,
+            "C(RZ)": 40,
+            "GlobalPhase": 1,
+            "PhaseShift": 1,
+        }
+
+    def test_control_trotter_cgf_decomposes(self):
+        """Test that ``qp.ctrl(TrotterCGF)`` decomposes.
+
+        Like :meth:`test_control_trotter_cdf_decomposes`, this uses a register-mode
+        controlled gate set to exercise the controlled lowering path, including the
+        ``C(GlobalPhase) -> PhaseShift`` reduction with an empty grouped base-wire slot.
+        """
+        hamiltonian = self._cgf_hamiltonian()
+
+        @qjit(capture=True, target="mlir")
+        @graph_decomposition(
+            gate_set={
+                "C(BasisRotation)",
+                "C(RZ)",
+                "C(IsingZZ)",
+                "PhaseShift",
+                "GlobalPhase",
+            }
+        )
+        @qnode(qp.device("null.qubit", wires=7))
+        def circuit():
+            qp.ctrl(
+                qp.TrotterCGF(
+                    evolution_time=1.0,
+                    num_trotter_steps=10,
+                    hamiltonian=hamiltonian,
+                    wires=range(6),
+                ),
+                control=[6],
+            )
+
+        resources = qp.specs(circuit, level="all-mlir")().resources
+        assert resources["Before MLIR Passes"].counts == {"C(TrotterCGF)": 1}
+        assert resources["graph-decomposition"].counts == {
+            "C(BasisRotation)": 62,
+            "C(IsingZZ)": 180,
+            "C(RZ)": 60,
+            "GlobalPhase": 1,
+            "PhaseShift": 1,
+        }
+
+    def test_control_adjoint_trotter_cdf_decomposes(self):
+        """Test that nested ``qp.ctrl`` and ``qp.adjoint`` on a ``TrotterCDF`` decomposes."""
+        hamiltonian = self._cdf_hamiltonian()
+        gate_set = {
+            "BasisRotation",
+            "RZ",
+            "IsingZZ",
+            "GlobalPhase",
+            "CRZ",
+            "CNOT",
+            "PhaseShift",
+            "RX",
+            "PauliX",
+        }
+        expected = {
+            "C(Adjoint(BasisRotation))": 62,
+            "C(CNOT)": 240,
+            "CRZ": 160,
+            "PauliX": 320,
+        }
+
+        @qjit(capture=True, target="mlir")
+        @graph_decomposition(gate_set=gate_set)
+        @qnode(qp.device("null.qubit", wires=5))
+        def ctrl_of_adjoint():
+            qp.ctrl(
+                qp.adjoint(
+                    qp.TrotterCDF(
+                        evolution_time=1.0,
+                        num_trotter_steps=10,
+                        hamiltonian=hamiltonian,
+                        wires=range(4),
+                    )
+                ),
+                control=[4],
+            )
+
+        @qjit(capture=True, target="mlir")
+        @graph_decomposition(gate_set=gate_set)
+        @qnode(qp.device("null.qubit", wires=5))
+        def adjoint_of_ctrl():
+            qp.adjoint(
+                qp.ctrl(
+                    qp.TrotterCDF(
+                        evolution_time=1.0,
+                        num_trotter_steps=10,
+                        hamiltonian=hamiltonian,
+                        wires=range(4),
+                    ),
+                    control=[4],
+                )
+            )
+
+        for circuit in (ctrl_of_adjoint, adjoint_of_ctrl):
+            resources = qp.specs(circuit, level="all-mlir")().resources
+            assert resources["Before MLIR Passes"].counts == {"C(Adjoint(TrotterCDF))": 1}
+            assert resources["graph-decomposition"].counts == expected
 
 
 if __name__ == "__main__":

@@ -186,6 +186,7 @@
     [(#3149)](https://github.com/PennyLaneAI/catalyst/pull/3149)
     [(#3169)](https://github.com/PennyLaneAI/catalyst/pull/3169)
     [(#3222)](https://github.com/PennyLaneAI/catalyst/pull/3222)
+    [(#3237)](https://github.com/PennyLaneAI/catalyst/pull/3237)
 
     This pathway of rule injection can be opted-out via a new keyword argument on `qp.qjit` named `collect_decomp_rules`.
     This kwarg controls whether or not to compile the decomposition rules during lower-time. Default value is `True`.
@@ -242,6 +243,32 @@
     rules cannot be lowered and they are silently dropped from the graph-decomposition system instead
     of raising an error.
     [(#3190)](https://github.com/PennyLaneAI/catalyst/pull/3190)
+
+  - The `graph-decomposition` pass now uses `alt-decomps` to denote the strict set of rules that are considered for an operator, i.e. it no longer considers builtin rules if `alt-decomps` is specified, unless the builtin rules are listed.
+    [(#3230)](https://github.com/PennyLaneAI/catalyst/pull/3230)
+
+* Numeric molecular/vibrational Hamiltonians carried as hybrid arguments by Trotter operators can now
+  be decomposed through the graph-based decomposition system, together with MLIR/lowering tests for
+  the base `CDFHamiltonian`/`CGFHamiltonian` types.
+  [(#3147)](https://github.com/PennyLaneAI/catalyst/pull/3147)
+  [(#3235)](https://github.com/PennyLaneAI/catalyst/pull/3235)
+
+  The numeric Hamiltonian's array leaves are passed to a decomposition rule as operands rather than
+  being baked into the rule body as constants, so a rule sees the concrete tensors at runtime. This
+  now holds for the hand-written symbolic (`C(Op)` / `Adjoint(Op)`) rules as well as the base rules.
+
+  Real matrix parameters of arbitrary rank are also cached during `--adjoint-lowering`: a real `f64`
+  tensor of any rank (e.g. a `BasisRotation`'s `tensor<NxNxf64>`) is now recorded element-by-element,
+  where before only scalar/rank-1 real tensors and complex matrices were handled. This lets
+  `qp.adjoint(TrotterCDF)`/`qp.adjoint(TrotterCGF)` reach `Adjoint(BasisRotation)` and back.
+
+  Composed control-and-adjoint operators (`C(Adjoint(op))`, reached by either `qp.ctrl(qp.adjoint(op))`
+  or `qp.adjoint(qp.ctrl(op))`) can now be decomposed. A new synthesis pathway controls each
+  registered `Adjoint(op)` rule, reducing the adjoint under control (`C(Adjoint(RZ)) -> C(RZ)`) so
+  that the registered `C(op)` rules can terminate it (`C(RZ) -> CRZ`); plain distribution alone
+  cannot reach this, as it bottoms out at doubly-modified primitives such as `C(Adjoint(GlobalPhase))`
+  that only registered rules terminate. Mixed `qp.ctrl`/`qp.adjoint` of `TrotterCDF`/`TrotterCGF` now
+  decompose as a result.
 
 * A failure during AOT compilation is now logged rather than raised.
   [(#3100)](https://github.com/PennyLaneAI/catalyst/pull/3100)
@@ -556,6 +583,10 @@
 * Added ``CZ`` support to ``to-ppr`` pass.
   [(#3009)](https://github.com/PennyLaneAI/catalyst/pull/3009)
 
+* The `--adjoint-lowering` pass no longer caches all classical gate parameters.
+  Parameters that are trivially available to the reverse pass is no longer cached.
+  [(#3233)](https://github.com/PennyLaneAI/catalyst/pull/3233)
+
 <h3>Breaking changes 💔</h3>
 
 * Removes :func:`~.passes.ppm_specs` and the ``--ppm-specs`` MLIR pass. Use :func:`~.specs` and
@@ -644,6 +675,9 @@
 
 * Fixed the assembly format for `quantum.adjoint` when it has no quantum operands/results.
   [(#2938)](https://github.com/PennyLaneAI/catalyst/pull/2938)
+* Fixed a performance degradation issue with `catalyst.runtime_artifacts`. It now visits module 
+  operations only, instead of every operation in the program.
+  [(#3219)](https://github.com/PennyLaneAI/catalyst/pull/3219)
 
 <h3>Internal changes ⚙️</h3>
 
