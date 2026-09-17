@@ -23,6 +23,7 @@ from collections import deque
 import jax.numpy as jnp
 import pennylane as qp
 from jax._src.lib.mlir import ir
+from jax.tree_util import tree_flatten, tree_unflatten
 from pennylane.core.operator import Operator2, abstractify
 from pennylane.decomposition.utils import to_name
 from pennylane.wires import Wires
@@ -142,45 +143,102 @@ def ordered_kwarg_names(call_kwargs, dynamic_shape) -> list:
     return params + wires
 
 
-def rule_call_operands(call_args, call_kwargs, kwarg_names, ctrl_wires=None) -> list:
-    """Flatten a rule's call into positional operands: ``call_args``, then ``call_kwargs`` in
-    ``kwarg_names`` order (params-first, from :func:`ordered_kwarg_names`), then the control wires.
+def flatten_hybrid_args(extra_data) -> tuple:
+    """Split hybrid arguments into numeric ones (passed as operands) and the rest (closed over).
 
-    Everything is passed positionally because ``qp.capture.subroutine`` traces through ``jax.jit``,
-    which would otherwise flatten keyword arguments in sorted-name order.
+    A hybrid argument whose pytree leaves are all plain arrays (e.g. a ``CDFHamiltonian``) is
+    flattened so its leaves can be passed into the rule call as operands, keeping the concrete
+    values out of the rule body (where they would otherwise bake in as constants). Hybrid arguments
+    that carry non-array leaves (e.g. a ``ChangeOpBasis2``, whose operands are operators holding
+    ``Wires``) cannot be passed as numeric operands and are instead returned to be closed over.
+
+    Args:
+        extra_data (dict): the operator's hybrid arguments, keyed by name
+
+    Returns:
+        list[tuple]: ``(name, treedef, num_leaves)`` per operand-passed hybrid argument
+        list: the flat leaf dummies (shape/dtype of the concrete leaves), to pass as operands
+        dict: the hybrid arguments to close over rather than pass as operands, keyed by name
+    """
+    specs, leaf_dummies, closed_over = [], [], {}
+    for name, value in extra_data.items():
+        leaves, treedef = tree_flatten(value)
+        try:
+            dummies = [jnp.zeros(jnp.shape(leaf), dtype=jnp.asarray(leaf).dtype) for leaf in leaves]
+        except (TypeError, ValueError):
+            # A leaf is not a plain array (e.g. an operator's Wires); pass no operands for it and
+            # let the rule body receive the argument as-is, as it did before numeric operands existed.
+            closed_over[name] = value
+            continue
+        specs.append((name, treedef, len(leaves)))
+        leaf_dummies.extend(dummies)
+    return specs, leaf_dummies, closed_over
+
+
+def rule_call_operands(
+    call_args, call_kwargs, kwarg_names, ctrl_wires=None, hybrid_leaves=(), n_param_kwargs=None
+) -> list:
+    """Flatten a rule's call into positional operands.
 
     Args:
         call_args (tuple): the rule's positional arguments
         call_kwargs (dict): the rule's keyword arguments
         kwarg_names (list[str]): the keyword argument names, in the order to flatten them
         ctrl_wires: the control wires to append, or None when the rule is not controlled
+        hybrid_leaves (list): flattened hybrid-argument leaves, inserted after the parameter kwargs
+        n_param_kwargs (int): how many leading ``kwarg_names`` are parameters (the rest are wires);
+            defaults to all of them (no hybrid leaves)
 
     Returns:
         list: the operands to call the traced rule with
     """
-    operands = [*call_args, *(call_kwargs[name] for name in kwarg_names)]
+    if n_param_kwargs is None:
+        n_param_kwargs = len(kwarg_names)
+    param_kwargs = [call_kwargs[name] for name in kwarg_names[:n_param_kwargs]]
+    wire_kwargs = [call_kwargs[name] for name in kwarg_names[n_param_kwargs:]]
+    operands = [*call_args, *param_kwargs, *hybrid_leaves, *wire_kwargs]
     if ctrl_wires is not None:
         operands.append(ctrl_wires)
     return operands
 
 
-def unpack_rule_operands(operands, n_params, kwarg_names, has_ctrl_wires):
+def unpack_rule_operands(
+    operands, n_params, kwarg_names, has_ctrl_wires, hybrid_specs=(), n_param_kwargs=None
+):
     """Recover ``(params, kwargs, control wires)`` from :func:`rule_call_operands`' flattening.
+
+    Reconstructs each hybrid argument from its traced leaves (via its ``treedef``) so the rule body
+    receives the same object the user passed, but built from the traced operands.
 
     Args:
         operands (tuple): the traced operands the rule body received
         n_params (int): how many of them are positional parameters
         kwarg_names (list[str]): the keyword argument names, in the order they were flattened
         has_ctrl_wires (bool): whether a trailing control-wire operand is present
+        hybrid_specs (list[tuple]): ``(name, treedef, num_leaves)`` per hybrid argument, sitting
+            between the parameter kwargs and the wire kwargs
+        n_param_kwargs (int): how many leading ``kwarg_names`` are parameters; defaults to all
 
     Returns:
         tuple: the rule's positional arguments
-        dict: the rule's keyword arguments
+        dict: the rule's keyword arguments (including the rebuilt hybrid arguments)
         the control wires, or None
     """
+    if n_param_kwargs is None:
+        n_param_kwargs = len(kwarg_names)
     params = tuple(operands[:n_params])
-    named = dict(zip(kwarg_names, operands[n_params : n_params + len(kwarg_names)], strict=True))
-    ctrl_wires = operands[n_params + len(kwarg_names)] if has_ctrl_wires else None
+    idx = n_params
+    named = {}
+    for name in kwarg_names[:n_param_kwargs]:
+        named[name] = operands[idx]
+        idx += 1
+    for name, treedef, num_leaves in hybrid_specs:
+        named[name] = tree_unflatten(treedef, operands[idx : idx + num_leaves])
+        idx += num_leaves
+    for name in kwarg_names[n_param_kwargs:]:
+        named[name] = operands[idx]
+        idx += 1
+    ctrl_wires = operands[idx] if has_ctrl_wires else None
     return params, named, ctrl_wires
 
 
@@ -601,16 +659,21 @@ def compile_decomposition_rules(
 
     call_args, call_kwargs = split_call_args(kwargs, is_custom_op)
     kwarg_names = ordered_kwarg_names(call_kwargs, dynamic_shape)
+    n_param_kwargs = sum(1 for name in kwarg_names if name in dynamic_shape)
+
+    hybrid_specs, hybrid_leaves, closed_hybrid = flatten_hybrid_args(extra_data)
 
     # The static_data was only needed to instantiate the correct decomp rule
     # Once we have the correct rules, don't send them into qjit: they are closed over instead.
     def rule_to_subroutine(rule):
         def decomp_rule(*_operands):
             _args, _kwargs, _ctrl_wires = unpack_rule_operands(
-                _operands, len(call_args), kwarg_names, wrap_control
+                _operands, len(call_args), kwarg_names, wrap_control, hybrid_specs, n_param_kwargs
             )
-            _kwargs |= static_data | extra_data
-            # Apply adjoint innermost, control outermost (canonical `C(Adjoint(Op))`).
+            # Operand-passed hybrid args are rebuilt from operands in unpack_rule_operands; static
+            # data and closed-over hybrid args are supplied directly.
+            _kwargs |= static_data | closed_hybrid
+            # Apply adjoint innermost, control outermost (canonical C(Adjoint(Op))).
             body = qp.adjoint(rule._impl) if wrap_adjoint else rule._impl
             if wrap_control:
                 qp.ctrl(body, control=list(_ctrl_wires))(*_args, **_kwargs)
@@ -642,38 +705,22 @@ def compile_decomposition_rules(
         jnp.array(range(n_base_wires, n_base_wires + n_ctrl), dtype=int) if wrap_control else None
     )
 
-    return build_rule_module(
-        subroutines,
-        device,
-        call_args,
-        call_kwargs,
-        kwarg_names,
-        ctrl_wires,
-        name_to_resource_ids,
-        target_id,
+    operands = rule_call_operands(
+        call_args, call_kwargs, kwarg_names, ctrl_wires, hybrid_leaves, n_param_kwargs
     )
+    return build_rule_module(subroutines, device, operands, name_to_resource_ids, target_id)
 
 
-# pylint: disable=too-many-arguments
 def build_rule_module(
-    subroutines,
-    device,
-    call_args,
-    call_kwargs,
-    kwarg_names,
-    ctrl_wires,
-    name_to_resource_ids,
-    target_id,
+    subroutines, device, operands, name_to_resource_ids, target_id
 ) -> ir.Operation:
     """Trace ``subroutines`` into a module of standalone decomposition-rule functions.
 
     Args:
         subroutines (list): the rule bodies, as captured subroutines
         device (Device): the device to trace them on, sized for the operator's wires
-        call_args (tuple): positional arguments to call each subroutine with
-        call_kwargs (dict): keyword arguments to call each subroutine with
-        kwarg_names (list[str]): the keyword argument names, in the order to flatten them
-        ctrl_wires: the control wires to append, or None when the rules are not controlled
+        operands (list): the positional operands to call each subroutine with (from
+            :func:`rule_call_operands`)
         name_to_resource_ids (dict): rule name to the graphOpId of each resource
         target_id (str): the graphOpId of the gate the rules decompose
 
@@ -683,8 +730,6 @@ def build_rule_module(
     Raises:
         CompileError: if the rules could not be traced
     """
-
-    operands = rule_call_operands(call_args, call_kwargs, kwarg_names, ctrl_wires)
 
     @qp.qjit(target="mlir", capture=True, collect_decomp_rules=False)
     @qp.qnode(device=device)
@@ -925,16 +970,8 @@ def compile_registered_symbolic_rules(
         else None
     )
 
-    return build_rule_module(
-        subroutines,
-        device,
-        call_args,
-        call_kwargs,
-        kwarg_names,
-        ctrl_wires,
-        name_to_resource_ids,
-        target_id,
-    )
+    operands = rule_call_operands(call_args, call_kwargs, kwarg_names, ctrl_wires)
+    return build_rule_module(subroutines, device, operands, name_to_resource_ids, target_id)
 
 
 def registered_symbolic_rule_strings(op_name, target_id, kind, **kwargs) -> list[str]:
