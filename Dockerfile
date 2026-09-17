@@ -94,6 +94,7 @@ RUN dnf update -y && dnf install -y openmpi-devel libzstd-devel gcc-toolset-13
 COPY --from=build-llvm /opt/catalyst/llvm-build /opt/catalyst/llvm-build
 COPY --from=build-stablehlo /opt/catalyst/stablehlo-build /opt/catalyst/stablehlo-build
 COPY --from=build-stablehlo /opt/catalyst/mlir/stablehlo /opt/catalyst/mlir/stablehlo
+COPY --from=build-enzyme /opt/catalyst/enzyme-build /opt/catalyst/enzyme-build
 # Build catalyst runtime
 RUN cmake -S runtime -B /opt/catalyst/runtime-build -G Ninja \
     -DCMAKE_BUILD_TYPE=Release \
@@ -151,7 +152,6 @@ RUN PYTHON=$PYTHON \
     make wheel
 
 RUN auditwheel repair dist/*.whl -w ./wheel --no-update-tags --exclude libopenblasp-r0-23e5df77.3.21.dev.so
-
 
 FROM pennylane-lightning:latest AS lightning-pennylane-catalyst
 RUN apt-get update \
