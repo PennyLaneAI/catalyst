@@ -739,3 +739,39 @@ func.func private @adjoint_dynamic_register_dynamic_size(%r: !quantum.reg, %n: i
   // CHECK: quantum.dealloc [[reg2]] : !quantum.reg
   return %out : !quantum.reg
 }
+
+// -----
+
+// CHECK-LABEL: @adjoint_real_matrix_param
+func.func @adjoint_real_matrix_param(%arg0: !quantum.reg) -> !quantum.reg {
+  // Forward pass: flatten the 2x2 matrix and push every element into the f64 cache.
+  // CHECK: [[cache:%.+]] = catalyst.list_init : <f64>
+  // CHECK: scf.for
+  // CHECK: [[e:%.+]] = tensor.extract {{%.+}}[{{%.+}}, {{%.+}}] : tensor<2x2xf64>
+  // CHECK: catalyst.list_push [[e]], [[cache]] : <f64>
+  // Reverse pass: pop the elements and rebuild the 2x2 matrix for the adjointed op.
+  // CHECK: tensor.empty() : tensor<2x2xf64>
+  // CHECK: scf.for {{.*}} iter_args
+  // CHECK: catalyst.list_pop [[cache]] : <f64>
+  // CHECK: tensor.insert {{%.+}} into {{%.+}}[{{%.+}}, {{%.+}}] : tensor<2x2xf64>
+  // CHECK: quantum.operator "BasisRotation"({{%.+}}: tensor<2x2xf64>) adj
+  %out = quantum.adjoint(%arg0) : !quantum.reg {
+  ^bb0(%r: !quantum.reg):
+    %c0 = arith.constant 0 : index
+    %c4 = arith.constant 4 : index
+    %c1 = arith.constant 1 : index
+    %for_reg = scf.for %i = %c0 to %c4 step %c1 iter_args(%reg = %r) -> (!quantum.reg) {
+      %matrix = "test.op"() : () -> tensor<2x2xf64>
+      %q0 = quantum.extract %reg[ 0] : !quantum.reg -> !quantum.bit
+      %q1 = quantum.extract %reg[ 1] : !quantum.reg -> !quantum.bit
+      %op:2 = quantum.operator "BasisRotation"(%matrix: tensor<2x2xf64>) qubits(%q0, %q1)
+        static_data = {}
+        param_map = {unitary_matrix = [0]} qubit_map = {wires = [0, 1]}
+      %r0 = quantum.insert %reg[ 0], %op#0 : !quantum.reg, !quantum.bit
+      %r1 = quantum.insert %r0[ 1], %op#1 : !quantum.reg, !quantum.bit
+      scf.yield %r1 : !quantum.reg
+    }
+    quantum.yield %for_reg : !quantum.reg
+  }
+  return %out : !quantum.reg
+}
