@@ -646,6 +646,33 @@ class TestTraceTime:
         assert "no_work_wires" in mlir
         assert "borrow_two_work_wires" not in mlir
 
+    def test_fixed_decomps(self):
+        """Test that fixed decomps are adhered to."""
+
+        @register_resources({NoParams(reg=Wire[1]): 2})
+        def expensive_fixed_decomp(wires):
+            NoParams(reg=wires[0])
+            NoParams(reg=wires[0])
+
+        @register_resources({NoParams(reg=Wire[1]): 1})
+        def cheaper_decomp(wires):
+            NoParams(reg=wires[0])
+
+        with local_decomps():
+            add_decomps(NoParamsCustomOp, expensive_fixed_decomp, cheaper_decomp)
+
+            @qjit(capture=True, target="mlir")
+            @graph_decomposition(
+                gate_set={NoParams: 1},
+                fixed_decomps={NoParamsCustomOp: expensive_fixed_decomp},
+            )
+            @qnode(qp.device("null.qubit", wires=2))
+            def circuit():
+                NoParamsCustomOp(wires=[0, 1])
+
+            specs = qp.specs(circuit, level="all-mlir")()
+            assert specs.resources["graph-decomposition"].counts["NoParams"] == 2
+
 
 class TestOnDemand:
     """Test the python wrapper functions used for on-demand,

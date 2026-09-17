@@ -988,3 +988,30 @@ def test_rule_with_helper_functions():
 # CHECK-NOT: call
 # CHECK-NOT: my_helper
 test_rule_with_helper_functions()
+
+
+def test_frontend_name_attr():
+    """Test that the frontend rule name is preserved via the `frontend_name` attr for use in fixed
+    and alt decomps."""
+
+    @qp.register_resources(lambda reg: {SingleParam(x=Float, reg=Wire[1]): 1})
+    def frontend_rule(reg):
+        SingleParam(x=0.1, reg=reg[0:1])
+
+    with qp.decomposition.local_decomps():
+        qp.add_decomps(NoParams, frontend_rule)
+        print(
+            compile_decomposition_rules_wrapper(
+                "NoParams",
+                "NoParams{}{reg:2}{}",
+                {},
+                {"reg": 2},
+                {},
+            )
+        )
+
+
+# CHECK-LABEL: func.func private @"frontend_rule_NoParams{}{reg:2}{}"
+# CHECK-SAME: frontend_name = "frontend_rule"
+# CHECK-SAME: target_gate = "NoParams{}{reg:2}{}"
+test_frontend_name_attr()

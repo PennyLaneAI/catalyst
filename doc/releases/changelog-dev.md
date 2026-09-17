@@ -244,6 +244,9 @@
     of raising an error.
     [(#3190)](https://github.com/PennyLaneAI/catalyst/pull/3190)
 
+  - The `graph-decomposition` pass now uses `alt-decomps` to denote the strict set of rules that are considered for an operator, i.e. it no longer considers builtin rules if `alt-decomps` is specified, unless the builtin rules are listed.
+    [(#3230)](https://github.com/PennyLaneAI/catalyst/pull/3230)
+
 * A failure during AOT compilation is now logged rather than raised.
   [(#3100)](https://github.com/PennyLaneAI/catalyst/pull/3100)
   [(#3194)](https://github.com/PennyLaneAI/catalyst/pull/3194)
