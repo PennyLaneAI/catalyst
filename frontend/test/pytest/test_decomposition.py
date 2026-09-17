@@ -61,8 +61,10 @@ from catalyst.decomposition.decomposition_rules import (
     name_wrap_adjoint,
     ordered_kwarg_names,
     prepare_dynamic_op_kwargs,
+    rule_call_operands,
     symbolic_arguments,
     symbolic_op_name,
+    unpack_rule_operands,
     wrap_modifier_id,
 )
 from catalyst.decomposition.graph_op_id import GraphOpID, build_graph_op_id
@@ -98,6 +100,33 @@ class TestGenericUtilities:
         argument whose name sorts before a parameter's places its (multi-element) wire-index operand
         ahead of the parameter and breaks the compiler's param/wire split."""
         assert ordered_kwarg_names(call_kwargs, dynamic_shape) == expected
+
+    def test_rule_operands_roundtrip_default_n_param_kwargs(self):
+        """Test that when ``n_param_kwargs`` is omitted, both helpers default it to ``len(kwarg_names)``"""
+        call_args = ("a", "b")
+        call_kwargs = {"theta": 0.5, "wires": [0, 1]}
+        kwarg_names = ["theta", "wires"]
+
+        # rule_call_operands with the default n_param_kwargs
+        operands = rule_call_operands(call_args, call_kwargs, kwarg_names)
+        assert operands == ["a", "b", 0.5, [0, 1]]
+
+        controlled = rule_call_operands(call_args, call_kwargs, kwarg_names, ctrl_wires=[2])
+        assert controlled == ["a", "b", 0.5, [0, 1], [2]]
+
+        # unpack_rule_operands with the default n_param_kwargs
+        params, named, ctrl_wires = unpack_rule_operands(
+            controlled, len(call_args), kwarg_names, has_ctrl_wires=True
+        )
+        assert params == ("a", "b")
+        assert named == call_kwargs
+        assert ctrl_wires == [2]
+
+        # Without control wires, the trailing operand is absent and ctrl_wires is None.
+        params, named, ctrl_wires = unpack_rule_operands(
+            operands, len(call_args), kwarg_names, has_ctrl_wires=False
+        )
+        assert (params, named, ctrl_wires) == (("a", "b"), call_kwargs, None)
 
     def test_probe_wires_dont_overlap(self):
         """Test that the helper for generating probe arguments doesnt create
