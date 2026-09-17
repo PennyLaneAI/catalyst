@@ -135,7 +135,6 @@ RUN auditwheel repair dist/*.whl -w ./wheel --no-update-tags --exclude libopenbl
 
 
 FROM pennylane-lightning:latest AS lightning-pennylane-catalyst
-ARG PENNYLANE_VERSION
 RUN apt-get update \
     && apt-get install --no-install-recommends -y \
     apt-utils \
@@ -144,7 +143,7 @@ RUN apt-get update \
     gcc \
     git \
     libgomp1 
-    
+COPY --from=build-wheel-catalyst /opt/catalyst/wheel /wheels    
 RUN pip install --no-cache-dir --extra-index-url https://test.pypi.org/simple \
         /wheels/pennylane_catalyst*.whl \
     && rm -rf /wheels
