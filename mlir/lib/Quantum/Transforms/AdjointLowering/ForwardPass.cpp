@@ -117,17 +117,6 @@ void AugmentedCircuitGenerator::cacheGate(quantum::ParametrizedGate gate, OpBuil
             continue;
         }
 
-        // Sanitizing inputs.
-        // Technically we know for a fact that none of this will ever issue an error.
-        // This is because QubitUnitary is guaranteed to have a tensor<NxNxcomplex<f64>>
-        // But this code in the future may be extended to support other types.
-        // Hence the sanitization.
-        if (!isa<RankedTensorType>(paramType)) {
-            gate.emitOpError() << "Unexpected type.";
-            generationFailed = true;
-            return;
-        }
-
         auto aTensor = cast<RankedTensorType>(paramType);
 
         // Real-valued tensor params (e.g. the `tensor<Nxf64>` angle carried by `quantum.operator`
