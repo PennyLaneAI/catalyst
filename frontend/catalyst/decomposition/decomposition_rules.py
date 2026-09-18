@@ -542,7 +542,7 @@ def _rule_is_applicable(op_name, rule, *args, **kwargs) -> bool:
         )
         return False
 
-    # TODO: remove then decompose lowering pass can handle multiple registers
+    # TODO: remove when decompose lowering pass can handle multiple registers
     try:
         allocates_work_wires = _rule_allocates_work_wires(rule, *args, **kwargs)
     except Exception as e:  # pylint: disable=broad-except
