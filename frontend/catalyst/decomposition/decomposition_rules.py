@@ -548,7 +548,7 @@ def _rule_is_applicable(op_name, rule, *args, **kwargs) -> bool:
     except Exception as e:  # pylint: disable=broad-except
         warnings.warn(
             f"Could not read the work-wire spec of the {rule.name} decomposition rule for "
-            f"{op_name}"
+            f"{op_name}",
             category=RuleLoweringWarning,
         )
         allocates_work_wires = True
