@@ -8,4 +8,5 @@ add_mlir_library(MLIRQRef
 
     DEPENDS
     MLIRQRefOpsIncGen
+    MLIRDecompositionInterfacesIncGen
 )

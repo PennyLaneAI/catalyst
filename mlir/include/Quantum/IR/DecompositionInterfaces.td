@@ -60,7 +60,11 @@ def DecomposableGate : OpInterface<"DecomposableGate"> {
             "depends on identical id generation."
             "In general, this should be computed by the default here and not overridden.",
             "std::string", "getGraphOpId", (ins), [{}], [{ return ::catalyst::quantum::defaultGetGraphOpId($_op.getOperation()); }]
-        >
+        >,
+        InterfaceMethod<
+            "Return true if the operator has modifiers (e.g. adjoint, control), false otherwise.",
+            "bool", "hasModifiers", (ins), [{}], [{ return ::catalyst::quantum::hasModifiers($_op.getOperation()); }]
+        >, 
     ];
 }
 

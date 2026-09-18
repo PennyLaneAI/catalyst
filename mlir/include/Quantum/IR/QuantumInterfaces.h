@@ -26,12 +26,4 @@
 // Quantum interface declarations.
 //===----------------------------------------------------------------------===//
 
-namespace catalyst {
-namespace quantum {
-
-std::string defaultGetGraphOpId(mlir::Operation *op);
-
-}
-} // namespace catalyst
-
 #include "Quantum/IR/QuantumInterfaces.h.inc"

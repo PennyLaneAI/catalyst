@@ -37,6 +37,7 @@
 #include "QRef/Utils/QubitIndex.h"
 
 using namespace mlir;
+using namespace catalyst::quantum;
 
 namespace catalyst {
 namespace qref {
@@ -335,11 +336,11 @@ class BaseSignatureAnalyzer {
     }
 };
 
-class DecomposableGateSignatureAnalyzer : public BaseSignatureAnalyzer {
+class QuantumGateSignatureAnalyzer : public BaseSignatureAnalyzer {
   public:
-    DecomposableGateSignatureAnalyzer() = delete;
+    QuantumGateSignatureAnalyzer() = delete;
 
-    DecomposableGateSignatureAnalyzer(DecomposableGate op, bool enableQregMode)
+    QuantumGateSignatureAnalyzer(QuantumGate op, bool enableQregMode)
         : BaseSignatureAnalyzer(op,
                                 isa<ParametrizedGate>(op.getOperation())
                                     ? cast<ParametrizedGate>(op.getOperation()).getAllParams()

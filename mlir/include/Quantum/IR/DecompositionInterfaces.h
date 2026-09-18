@@ -16,4 +16,11 @@
 
 #include "mlir/IR/OpDefinition.h"
 
+namespace catalyst {
+namespace quantum {    
+std::string defaultGetGraphOpId(mlir::Operation *op);
+bool hasModifiers(mlir::Operation *op);
+}
+} // namespace catalyst::quantum
+
 #include "Quantum/IR/DecompositionInterfaces.h.inc"

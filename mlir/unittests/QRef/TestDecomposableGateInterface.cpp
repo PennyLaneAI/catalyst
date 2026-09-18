@@ -41,6 +41,7 @@
 
 using namespace mlir;
 using namespace catalyst::qref;
+using namespace catalyst::quantum;
 
 /// The upstream MLIR Test dialect does not have a header we can include
 /// We must declare the registration function, and link to the corresponding upstream target

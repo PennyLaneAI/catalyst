@@ -15,6 +15,8 @@
 #include "Quantum/IR/QuantumInterfaces.h"
 #include "Quantum/IR/DecompositionInterfaces.h"
 
+#include "QRef/IR/QRefInterfaces.h"
+
 #include <cstddef>
 #include <string>
 
@@ -95,18 +97,37 @@ namespace quantum {
 // caller appends the param/wire/static/uid groups. Extend this helper to support future op-level
 // modifiers, preserving the canonical order (mirror the Python side in decomposition_rules.py).
 static std::string wrapModifiers(std::string name, Operation *op) {
+    size_t numCtrl = 0;
     if (op->hasAttr("adjoint")) {
         name = "Adjoint(" + name + ")";
     }
     if (auto gate = mlir::dyn_cast<QuantumGate>(op)) {
-        size_t numCtrl = gate.getCtrlQubitOperands().size();
-        if (numCtrl == 1) {
-            name = "C(" + name + ")";
-        } else if (numCtrl > 1) {
-            name = std::to_string(numCtrl) + "C(" + name + ")";
-        }
+        numCtrl = gate.getCtrlQubitOperands().size();
+    }
+    else if(auto gate = mlir::dyn_cast<catalyst::qref::QuantumGate>(op)) {
+        numCtrl = gate.getCtrlQubitOperands().size();
+    }
+
+    if (numCtrl == 1) {
+        name = "C(" + name + ")";
+    } else if (numCtrl > 1) {
+        name = std::to_string(numCtrl) + "C(" + name + ")";
     }
     return name;
+}
+
+// Check if the operator has modifiers (e.g. adjoint, control)
+bool hasModifiers(Operation* op){
+    size_t numCtrl = 0;
+
+    if (auto gate = mlir::dyn_cast<QuantumGate>(op)) {
+        numCtrl = gate.getCtrlQubitOperands().size();
+    }
+    else if(auto gate = mlir::dyn_cast<catalyst::qref::QuantumGate>(op)) {
+        numCtrl = gate.getCtrlQubitOperands().size();
+    }
+
+    return op->hasAttr("adjoint") || numCtrl > 0;
 }
 
 std::string defaultGetGraphOpId(Operation *op) {
