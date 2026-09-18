@@ -194,6 +194,7 @@
     [(#3222)](https://github.com/PennyLaneAI/catalyst/pull/3222)
     [(#3237)](https://github.com/PennyLaneAI/catalyst/pull/3237)
     [(#3239)](https://github.com/PennyLaneAI/catalyst/pull/3239)
+    [(#3243)](https://github.com/PennyLaneAI/catalyst/pull/3243)
 
     This pathway of rule injection can be opted-out via a new keyword argument on `qp.qjit` named `collect_decomp_rules`.
     This kwarg controls whether or not to compile the decomposition rules during lower-time. Default value is `True`.
@@ -207,6 +208,8 @@
 
     With pathways 2 and 3, gates with static data only known at compile time can now be decomposed using the decomposition rule defined in PennyLane.
     For example, this includes `quantum.paulirot`, with Pauli words being the static data.
+    Note that decomposition rules that dynamically allocate work wires are not lowered (even when
+    named in `fixed_decomps`), since `decompose-lowering` cannot handle them yet.
 
   - The `graph-decomposition` pass eliminated three redundant IR manipulations:
     the cloning, removal, and re-insertion of user rules.
@@ -253,12 +256,6 @@
 
   - The `graph-decomposition` pass now uses `alt-decomps` to denote the strict set of rules that are considered for an operator, i.e. it no longer considers builtin rules if `alt-decomps` is specified, unless the builtin rules are listed.
     [(#3230)](https://github.com/PennyLaneAI/catalyst/pull/3230)
-
-  - Decomposition rules that dynamically allocate work wires are not offered to the
-    graph-decomposition solver, since `decompose-lowering` cannot lower them yet.
-    Note that such a rule is excluded even when it is named in `fixed_decomps`, in which case the
-    decomposition graph may no longer be solvable.
-    [(#3243)](https://github.com/PennyLaneAI/catalyst/pull/3243)
 
 * Numeric molecular/vibrational Hamiltonians carried as hybrid arguments by Trotter operators can now
   be decomposed through the graph-based decomposition system, together with MLIR/lowering tests for
