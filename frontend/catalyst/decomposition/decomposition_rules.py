@@ -527,8 +527,7 @@ def _rule_allocates_work_wires(rule, *args, **kwargs) -> bool:
 
     TODO: remove when --decompose-lowering can handle multiple registers
     """
-    total = rule.get_work_wire_spec(*args, **kwargs).total
-    return isinstance(total, int) and total > 0
+    return rule.get_work_wire_spec(*args, **kwargs).total > 0
 
 
 def _rule_is_applicable(op_name, rule, *args, **kwargs) -> bool:
