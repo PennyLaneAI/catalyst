@@ -248,6 +248,29 @@
   - The `graph-decomposition` pass now uses `alt-decomps` to denote the strict set of rules that are considered for an operator, i.e. it no longer considers builtin rules if `alt-decomps` is specified, unless the builtin rules are listed.
     [(#3230)](https://github.com/PennyLaneAI/catalyst/pull/3230)
 
+* Numeric molecular/vibrational Hamiltonians carried as hybrid arguments by Trotter operators can now
+  be decomposed through the graph-based decomposition system, together with MLIR/lowering tests for
+  the base `CDFHamiltonian`/`CGFHamiltonian` types.
+  [(#3147)](https://github.com/PennyLaneAI/catalyst/pull/3147)
+  [(#3235)](https://github.com/PennyLaneAI/catalyst/pull/3235)
+
+  The numeric Hamiltonian's array leaves are passed to a decomposition rule as operands rather than
+  being baked into the rule body as constants, so a rule sees the concrete tensors at runtime. This
+  now holds for the hand-written symbolic (`C(Op)` / `Adjoint(Op)`) rules as well as the base rules.
+
+  Real matrix parameters of arbitrary rank are also cached during `--adjoint-lowering`: a real `f64`
+  tensor of any rank (e.g. a `BasisRotation`'s `tensor<NxNxf64>`) is now recorded element-by-element,
+  where before only scalar/rank-1 real tensors and complex matrices were handled. This lets
+  `qp.adjoint(TrotterCDF)`/`qp.adjoint(TrotterCGF)` reach `Adjoint(BasisRotation)` and back.
+
+  Composed control-and-adjoint operators (`C(Adjoint(op))`, reached by either `qp.ctrl(qp.adjoint(op))`
+  or `qp.adjoint(qp.ctrl(op))`) can now be decomposed. A new synthesis pathway controls each
+  registered `Adjoint(op)` rule, reducing the adjoint under control (`C(Adjoint(RZ)) -> C(RZ)`) so
+  that the registered `C(op)` rules can terminate it (`C(RZ) -> CRZ`); plain distribution alone
+  cannot reach this, as it bottoms out at doubly-modified primitives such as `C(Adjoint(GlobalPhase))`
+  that only registered rules terminate. Mixed `qp.ctrl`/`qp.adjoint` of `TrotterCDF`/`TrotterCGF` now
+  decompose as a result.
+
 * A failure during AOT compilation is now logged rather than raised.
   [(#3100)](https://github.com/PennyLaneAI/catalyst/pull/3100)
   [(#3194)](https://github.com/PennyLaneAI/catalyst/pull/3194)
