@@ -775,3 +775,42 @@ func.func @adjoint_real_matrix_param(%arg0: !quantum.reg) -> !quantum.reg {
   }
   return %out : !quantum.reg
 }
+
+// -----
+
+// CHECK-LABEL: @adjoint_integer_tensor_param
+func.func @adjoint_integer_tensor_param(%arg0: !quantum.reg) -> !quantum.reg {
+  // An integer/boolean tensor param (a MultiX bitstring) defined in nested control flow
+  // must be cached.
+  // CHECK: [[cache:%.+]] = catalyst.list_init : <f64>
+  // CHECK: scf.for
+  // CHECK: [[e:%.+]] = tensor.extract {{%.+}}[{{%.+}}] : tensor<2xi1>
+  // CHECK: [[ef:%.+]] = arith.uitofp [[e]] : i1 to f64
+  // CHECK: catalyst.list_push [[ef]], [[cache]] : <f64>
+  // Reverse pass: pop the f64 elements, cast back to i1 and rebuild the bitstring.
+  // CHECK: tensor.empty() : tensor<2xi1>
+  // CHECK: scf.for {{.*}} iter_args
+  // CHECK: [[p:%.+]] = catalyst.list_pop [[cache]] : <f64>
+  // CHECK: [[pi:%.+]] = arith.fptoui [[p]] : f64 to i1
+  // CHECK: tensor.insert [[pi]] into {{%.+}}[{{%.+}}] : tensor<2xi1>
+  // CHECK: quantum.operator "MultiX"({{%.+}}: tensor<2xi1>) adj
+  %out = quantum.adjoint(%arg0) : !quantum.reg {
+  ^bb0(%r: !quantum.reg):
+    %c0 = arith.constant 0 : index
+    %c4 = arith.constant 4 : index
+    %c1 = arith.constant 1 : index
+    %for_reg = scf.for %i = %c0 to %c4 step %c1 iter_args(%reg = %r) -> (!quantum.reg) {
+      %bitstring = "test.op"() : () -> tensor<2xi1>
+      %q0 = quantum.extract %reg[ 0] : !quantum.reg -> !quantum.bit
+      %q1 = quantum.extract %reg[ 1] : !quantum.reg -> !quantum.bit
+      %op:2 = quantum.operator "MultiX"(%bitstring: tensor<2xi1>) qubits(%q0, %q1)
+        static_data = {}
+        param_map = {bitstring = [0]} qubit_map = {wires = [0, 1]}
+      %r0 = quantum.insert %reg[ 0], %op#0 : !quantum.reg, !quantum.bit
+      %r1 = quantum.insert %r0[ 1], %op#1 : !quantum.reg, !quantum.bit
+      scf.yield %r1 : !quantum.reg
+    }
+    quantum.yield %for_reg : !quantum.reg
+  }
+  return %out : !quantum.reg
+}

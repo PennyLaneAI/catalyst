@@ -14,6 +14,7 @@
 
 #include <cstdint>
 
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Complex/IR/Complex.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Index/IR/IndexOps.h"
@@ -136,16 +137,35 @@ void AugmentedCircuitGenerator::cacheGate(quantum::ParametrizedGate gate, OpBuil
             continue;
         }
 
+        // Integer/boolean scalar params are cached through the f64 buffer. `verifyTypeIsCacheable`
+        // has already rejected widths > 53 bits, for which the round-trip would not be exact.
+        if (isa<IntegerType>(paramType)) {
+            Value asF64 = arith::UIToFPOp::create(builder, loc, builder.getF64Type(), clonedParam);
+            ListPushOp::create(builder, loc, asF64, cache.paramVector);
+            continue;
+        }
+
         auto aTensor = cast<RankedTensorType>(paramType);
+        Type elemType = aTensor.getElementType();
 
         // Real-valued tensor params (e.g. the `tensor<Nxf64>` angle carried by `quantum.operator`
         // gates such as RZ, or the `tensor<NxNxf64>` matrix of a BasisRotation) are cached
-        // element-by-element as plain f64 values in row-major order. The complex-matrix path below
-        // is specific to QubitUnitary's `tensor<NxNxcomplex<f64>>`.
-        if (aTensor.getElementType().isF64()) {
+        // element-by-element as plain f64 values in row-major order. Integer/boolean tensors (e.g.
+        // a MultiX `tensor<Nxi1>` bitstring) are cached the same way, casting each element to f64
+        // first; `verifyTypeIsCacheable` has already rejected element widths > 53 bits, for which
+        // that cast would not round-trip exactly. The complex-matrix path below is specific to
+        // QubitUnitary's `tensor<NxNxcomplex<f64>>`.
+        if (elemType.isF64() || elemType.isInteger()) {
+            // Cast an extracted integer/boolean element to f64 before recording it.
+            auto toF64 = [&](Value element) -> Value {
+                if (elemType.isInteger()) {
+                    return arith::UIToFPOp::create(builder, loc, builder.getF64Type(), element);
+                }
+                return element;
+            };
             if (aTensor.getRank() == 0) {
                 Value element = tensor::ExtractOp::create(builder, loc, clonedParam, ValueRange{});
-                ListPushOp::create(builder, loc, element, cache.paramVector);
+                ListPushOp::create(builder, loc, toF64(element), cache.paramVector);
                 continue;
             }
             Value c0i = index::ConstantOp::create(builder, loc, 0);
@@ -166,7 +186,7 @@ void AugmentedCircuitGenerator::cacheGate(quantum::ParametrizedGate gate, OpBuil
             SmallVector<Value> coords =
                 delinearizeIndex(builder, loc, loop.getInductionVar(), dimSizes);
             Value element = tensor::ExtractOp::create(builder, loc, clonedParam, coords);
-            ListPushOp::create(builder, loc, element, cache.paramVector);
+            ListPushOp::create(builder, loc, toF64(element), cache.paramVector);
             continue;
         }
 

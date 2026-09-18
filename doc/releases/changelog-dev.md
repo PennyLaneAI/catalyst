@@ -681,6 +681,17 @@
   operations only, instead of every operation in the program.
   [(#3219)](https://github.com/PennyLaneAI/catalyst/pull/3219)
 
+* Adjoint lowering now supports gates with integer or boolean parameters (e.g. a `MultiX`
+  `tensor<Nxi1>` bitstring) defined inside control flow. Such parameters are cached and rebuilt
+  through the parameter buffer via an exact round-trip, alongside the existing float and complex
+  support.
+  [(#3242)](https://github.com/PennyLaneAI/catalyst/pull/3242)
+
+* Fixed decomposition rules that call jitted classical helpers (e.g. from a `QROM` decomposition)
+  from inside a `quantum.ctrl` or `quantum.adjoint` region. Those helpers are now inlined into the
+  rule body so each rule is self-contained, instead of leaving a dangling call.
+  [(#3242)](https://github.com/PennyLaneAI/catalyst/pull/3242)
+
 <h3>Internal changes ⚙️</h3>
 
 * Adds ability to lower `None` attributes to `get_mlir_attribute_from_pyval`.
