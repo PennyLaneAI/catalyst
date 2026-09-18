@@ -28,14 +28,14 @@ namespace quantum {
 
 LogicalResult verifyTypeIsCacheable(Type ty, Operation *op) {
     // Sanitizing inputs.
-    // TODO: although OperatorOp params can be arbitrary types, currently only caching of f64s and
-    // complex (and tensors of them) are implemented.
-    if (ty.isF64()) {
+    llvm::outs() << "Verifying type is cacheable: " << ty << "\n";
+    if (ty.isF64() || ty.isInteger()) {
         return success();
     }
 
     // TODO: Generalize to unranked tensors
     if (!isa<RankedTensorType>(ty)) {
+        llvm::outs() << "Caching only supports F64 and tensors of complex F64, got " << ty << "\n";
         return op->emitOpError() << "Caching only supports F64 and tensors of complex F64, got "
                                  << ty;
     }
