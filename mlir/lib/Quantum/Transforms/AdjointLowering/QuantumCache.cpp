@@ -28,14 +28,12 @@ namespace quantum {
 
 LogicalResult verifyTypeIsCacheable(Type ty, Operation *op) {
     // Sanitizing inputs.
-    llvm::outs() << "Verifying type is cacheable: " << ty << "\n";
     if (ty.isF64() || ty.isInteger()) {
         return success();
     }
 
     // TODO: Generalize to unranked tensors
     if (!isa<RankedTensorType>(ty)) {
-        llvm::outs() << "Caching only supports F64 and tensors of complex F64, got " << ty << "\n";
         return op->emitOpError() << "Caching only supports F64 and tensors of complex F64, got "
                                  << ty;
     }
@@ -49,7 +47,6 @@ LogicalResult verifyTypeIsCacheable(Type ty, Operation *op) {
     // `tensor<Nxi1>` bitstring of a MultiX gate) are cached the same way via an exact f64
     // round-trip.
     if (elementType.isF64() || elementType.isInteger()) {
-        llvm::outs() << "Type is cacheable: " << ty << "\n";
         return success();
     }
 
