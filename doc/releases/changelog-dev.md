@@ -621,6 +621,26 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* Decomposition rules that dynamically allocate work wires are no longer offered to the
+  graph-decomposition solver, since `decompose-lowering` cannot yet lower them.
+
+  Such a rule calls `qp.allocate`, which lowers to a fresh `qref.alloc`, i.e. a second quantum
+  register. A register-mode rule is bound to exactly one register, so lowering one of these
+  aborted with `register-mode decomposition rule cannot span multiple qregs yet, got 2
+  registers`. The rules are now excluded up front, using the work-wire spec declared by
+  `@register_resources(..., work_wires=...)`, so the solver picks a rule that can actually be
+  lowered instead of failing late.
+
+  For example, `DiagonalQubitUnitary` has both an allocating rule
+  (`_diagonal_mux_on_aux_decomp`, one multiplexed rotation onto an ancilla) and a
+  non-allocating one (`_diagonal_qu_decomp`, a recursive `SelectPauliRot` chain). The former is
+  the cheaper circuit, so the solver always preferred it whenever a work-wire budget existed --
+  and it is precisely the one that could not be lowered.
+
+  Note that a rule excluded here is excluded even when it is named in `fixed_decomps`, in which
+  case the operator may no longer be solvable.
+  [(#3243)](https://github.com/PennyLaneAI/catalyst/pull/3243)
+
 * Fixed a bug where an executor's SSH connection multiplexing was silently disabled on macOS,
   making every remote operation pay a fresh authentication handshake. The control socket went in
   the system temp dir, which macOS puts under a per-user `/var/folders/...` path long enough to

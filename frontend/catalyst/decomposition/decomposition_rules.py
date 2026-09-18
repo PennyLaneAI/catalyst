@@ -522,16 +522,47 @@ def split_call_args(kwargs, is_custom_op):
     return (), kwargs
 
 
+def _rule_allocates_work_wires(rule, *args, **kwargs) -> bool:
+    """Whether a decomposition rule dynamically allocates work wires.
+
+    Such a rule addresses qubits from a register that ``qp.allocate`` creates on the fly, in
+    addition to the operator's own register. ``decompose-lowering`` binds a register-mode rule
+    to exactly one register, so the rule cannot currently be lowered::
+
+        register-mode decomposition rule cannot span multiple qregs yet, got 2 registers.
+
+    The work-wire spec declared by ``@register_resources(..., work_wires=...)`` is the
+    authoritative signal. It may be a callable of the operator's arguments, so fall back to the
+    mere presence of a declaration when it cannot be evaluated here.
+    """
+    try:
+        return rule.get_work_wire_spec(*args, **kwargs).total > 0
+    except Exception:  # pylint: disable=broad-except
+        return bool(getattr(rule, "_work_wire_spec", None))
+
+
 def _rule_is_applicable(op_name, rule, *args, **kwargs) -> bool:
     """Return resource data for the decomposition rules that apply to ``op_name``."""
     try:
-        return bool(rule.is_applicable(*args, **kwargs))
+        if not bool(rule.is_applicable(*args, **kwargs)):
+            return False
     except Exception as e:  # pylint: disable=broad-except
         warnings.warn(
             f"Excluded the {rule.name} decomposition rule for {op_name}; raised '{e}'",
             category=RuleLoweringWarning,
         )
         return False
+
+    if _rule_allocates_work_wires(rule, *args, **kwargs):
+        warnings.warn(
+            f"Excluded the {rule.name} decomposition rule for {op_name}: it dynamically "
+            "allocates work wires, which decompose-lowering cannot yet bind because the rule "
+            "would span more than one qreg.",
+            category=RuleLoweringWarning,
+        )
+        return False
+
+    return True
 
 
 def collect_resources_for_op(
