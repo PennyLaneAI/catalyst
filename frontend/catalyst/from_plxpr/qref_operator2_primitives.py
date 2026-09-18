@@ -193,7 +193,7 @@ def _process_qubits(*args, op_cls, wire_lens, hybrid_lens) -> tuple[list, dict[s
     for wname, wsize in zip(flat_wire_argnames, wire_lens, strict=True):
         # If wsize is 0, then we need to populate the qubit map anyway because the signature must match the operation.
         # This is also needed to ensure that the lowered op generates the same GOID as the frontend.
-        # TODO: see if we can remove this requirement to simplify the IR
+        # TODO: see if we can remove this requirement or upstream it to PL to simplify the IR
         qubits += args[args_idx : args_idx + wsize]
         qubit_map[wname] = ir.DenseI64ArrayAttr.get(list(range(map_idx, map_idx + wsize)))
         map_idx += wsize
