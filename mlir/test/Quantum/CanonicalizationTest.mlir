@@ -242,3 +242,28 @@ func.func @test_interleaved_extract_insert() -> tensor<4xf64> {
   quantum.device_release
   return %6 : tensor<4xf64>
 }
+
+// CHECK-LABEL: test_extract_before_insert
+func.func @test_extract_before_insert() {
+  // CHECK: [[r0:%.+]] = quantum.alloc
+  %r0 = quantum.alloc( 2) : !quantum.reg
+
+  // CHECK: [[q0:%.+]] = quantum.extract [[r0]][ 0]
+  // CHECK: [[q0b:%.+]] = quantum.custom "PauliX"() [[q0]]
+  // CHECK: [[q1:%.+]] = quantum.extract [[r0]][ 1]
+  // CHECK: [[q1b:%.+]] = quantum.custom "PauliY"() [[q1]]
+  // CHECK: [[r1:%.+]] = quantum.insert [[r0]][ 0], %out_qubits
+  // CHECK: [[r2:%.+]] = quantum.insert [[r1]][ 1], %out_qubits_0
+
+  %q0  = quantum.extract %r0[ 0] : !quantum.reg -> !quantum.bit
+  %q0b = quantum.custom "PauliX"() %q0 : !quantum.bit
+  %r1  = quantum.insert %r0[ 0], %q0b : !quantum.reg, !quantum.bit
+
+  %q1  = quantum.extract %r1[ 1] : !quantum.reg -> !quantum.bit
+  %q1b = quantum.custom "PauliY"() %q1 : !quantum.bit
+  %r2  = quantum.insert %r1[ 1], %q1b : !quantum.reg, !quantum.bit
+
+  // CHECK: quantum.dealloc [[r2]]
+  quantum.dealloc %r2 : !quantum.reg
+  return
+}
