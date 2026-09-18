@@ -532,13 +532,16 @@ def _rule_allocates_work_wires(rule, *args, **kwargs) -> bool:
         register-mode decomposition rule cannot span multiple qregs yet, got 2 registers.
 
     The work-wire spec declared by ``@register_resources(..., work_wires=...)`` is the
-    authoritative signal. It may be a callable of the operator's arguments, so fall back to the
-    mere presence of a declaration when it cannot be evaluated here.
+    authoritative signal. It may be a callable of the operator's arguments, so it is evaluated
+    with the same arguments the rule itself is probed with. Only a spec that positively reports
+    work wires excludes a rule: anything we cannot read as a concrete count leaves the rule in
+    place, so a rule we fail to understand behaves exactly as it did before.
     """
     try:
-        return rule.get_work_wire_spec(*args, **kwargs).total > 0
+        total = rule.get_work_wire_spec(*args, **kwargs).total
     except Exception:  # pylint: disable=broad-except
-        return bool(getattr(rule, "_work_wire_spec", None))
+        return False
+    return isinstance(total, int) and total > 0
 
 
 def _rule_is_applicable(op_name, rule, *args, **kwargs) -> bool:
