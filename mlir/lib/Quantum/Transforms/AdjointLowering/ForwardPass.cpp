@@ -139,8 +139,7 @@ void AugmentedCircuitGenerator::cacheGate(quantum::ParametrizedGate gate, OpBuil
 
         // Integer/boolean scalar params are cached through the f64 buffer via an exact round-trip.
         if (isa<IntegerType>(paramType)) {
-            Value asF64 =
-                arith::UIToFPOp::create(builder, loc, builder.getF64Type(), clonedParam);
+            Value asF64 = arith::UIToFPOp::create(builder, loc, builder.getF64Type(), clonedParam);
             ListPushOp::create(builder, loc, asF64, cache.paramVector);
             continue;
         }
@@ -150,8 +149,8 @@ void AugmentedCircuitGenerator::cacheGate(quantum::ParametrizedGate gate, OpBuil
 
         // Real-valued tensor params (e.g. the `tensor<Nxf64>` angle carried by `quantum.operator`
         // gates such as RZ, or the `tensor<NxNxf64>` matrix of a BasisRotation) are cached
-        // element-by-element as plain f64 values in row-major order. Integer/boolean tensors (e.g. a
-        // MultiX `tensor<Nxi1>` bitstring) are cached the same way, casting each element to f64
+        // element-by-element as plain f64 values in row-major order. Integer/boolean tensors (e.g.
+        // a MultiX `tensor<Nxi1>` bitstring) are cached the same way, casting each element to f64
         // first. The complex-matrix path below is specific to QubitUnitary's
         // `tensor<NxNxcomplex<f64>>`.
         if (elemType.isF64() || elemType.isInteger()) {
