@@ -341,57 +341,58 @@ class AdjointGenerator {
                 // with N-1 since MLIR does not allow for loops with negative step sizes.
                 SmallVector<Value> initialValues = {beginningTensor};
 
-                scf::ForOp iForLoop = scf::ForOp::create(builder, loc, lowerBoundDim0,
-                                                         upperBoundDim0, stepDim0, initialValues);
-                {
-                    OpBuilder::InsertionGuard afterIForLoop(builder);
-                    builder.setInsertionPointToStart(iForLoop.getBody());
-                    auto iIterArgs = iForLoop.getRegionIterArgs();
-                    Value currIthTensor = iIterArgs.front();
+                // scf::ForOp iForLoop = scf::ForOp::create(builder, loc, lowerBoundDim0,
+                //                                          upperBoundDim0, stepDim0, initialValues);
+                // {
+                //     OpBuilder::InsertionGuard afterIForLoop(builder);
+                //     builder.setInsertionPointToStart(iForLoop.getBody());
+                //     auto iIterArgs = iForLoop.getRegionIterArgs();
+                //     Value currIthTensor = iIterArgs.front();
 
-                    Value i = iForLoop.getInductionVar();
-                    Value iPlusOne = index::AddOp::create(builder, loc, i, c1);
-                    Value nMinusIMinusOne =
-                        index::SubOp::create(builder, loc, dim0Length, iPlusOne);
-                    // Just for legibility
-                    Value iTensorIndex = nMinusIMinusOne;
+                //     Value i = iForLoop.getInductionVar();
+                //     Value iPlusOne = index::AddOp::create(builder, loc, i, c1);
+                //     Value nMinusIMinusOne =
+                //         index::SubOp::create(builder, loc, dim0Length, iPlusOne);
+                //     // Just for legibility
+                //     Value iTensorIndex = nMinusIMinusOne;
 
-                    scf::ForOp jForLoop = scf::ForOp::create(
-                        builder, loc, lowerBoundDim1, upperBoundDim1, stepDim1, currIthTensor);
-                    {
-                        OpBuilder::InsertionGuard afterJForLoop(builder);
-                        builder.setInsertionPointToStart(jForLoop.getBody());
-                        auto jIterArgs = jForLoop.getRegionIterArgs();
-                        assert(jIterArgs.size() == 1 &&
-                               "jForLoop has more induction variables than necessary.");
-                        Value currIthJthTensor = jIterArgs.front();
+                //     scf::ForOp jForLoop = scf::ForOp::create(
+                //         builder, loc, lowerBoundDim1, upperBoundDim1, stepDim1, currIthTensor);
+                //     {
+                //         OpBuilder::InsertionGuard afterJForLoop(builder);
+                //         builder.setInsertionPointToStart(jForLoop.getBody());
+                //         auto jIterArgs = jForLoop.getRegionIterArgs();
+                //         assert(jIterArgs.size() == 1 &&
+                //                "jForLoop has more induction variables than necessary.");
+                //         Value currIthJthTensor = jIterArgs.front();
 
-                        Value imag = ListPopOp::create(builder, loc, cache.paramVector);
-                        Value real = ListPopOp::create(builder, loc, cache.paramVector);
-                        Value element =
-                            complex::CreateOp::create(builder, loc, elementType, real, imag);
+                //         Value imag = ListPopOp::create(builder, loc, cache.paramVector);
+                //         Value real = ListPopOp::create(builder, loc, cache.paramVector);
+                //         Value element =
+                //             complex::CreateOp::create(builder, loc, elementType, real, imag);
 
-                        // TODO: Generalize to types which are not complex
-                        Value j = jForLoop.getInductionVar();
-                        Value jPlusOne = index::AddOp::create(builder, loc, j, c1);
-                        Value nMinusJMinusOne =
-                            index::SubOp::create(builder, loc, dim1Length, jPlusOne);
-                        // Just for legibility
-                        Value jTensorIndex = nMinusJMinusOne;
-                        SmallVector<Value> indices = {iTensorIndex, jTensorIndex};
+                //         // TODO: Generalize to types which are not complex
+                //         Value j = jForLoop.getInductionVar();
+                //         Value jPlusOne = index::AddOp::create(builder, loc, j, c1);
+                //         Value nMinusJMinusOne =
+                //             index::SubOp::create(builder, loc, dim1Length, jPlusOne);
+                //         // Just for legibility
+                //         Value jTensorIndex = nMinusJMinusOne;
+                //         SmallVector<Value> indices = {iTensorIndex, jTensorIndex};
 
-                        Value updatedIthJthTensor = tensor::InsertOp::create(
-                            builder, loc, element, currIthJthTensor, indices);
-                        scf::YieldOp::create(builder, loc, updatedIthJthTensor);
-                    }
+                //         Value updatedIthJthTensor = tensor::InsertOp::create(
+                //             builder, loc, element, currIthJthTensor, indices);
+                //         scf::YieldOp::create(builder, loc, updatedIthJthTensor);
+                //     }
 
-                    Value ithTensor = jForLoop.getResult(0);
-                    scf::YieldOp::create(builder, loc, ithTensor);
-                }
+                //     Value ithTensor = jForLoop.getResult(0);
+                //     scf::YieldOp::create(builder, loc, ithTensor);
+                // }
 
-                Value recreatedTensor = iForLoop.getResult(0);
-                cachedParams[numParams - 1 - idx] = recreatedTensor;
-                idx++;
+                // Value recreatedTensor = iForLoop.getResult(0);
+                // cachedParams[numParams - 1 - idx] = recreatedTensor;
+                // idx++;
+                continue;
             }
             MutableOperandRange(clone, parametrizedGate.getParamOperandIdx(), params.size())
                 .assign(cachedParams);
