@@ -51,6 +51,8 @@ from catalyst.decomposition.decomposition_rules import (
     _control_modifier,
     _leading_modifier_kind,
     _modifier_kind,
+    _rule_allocates_work_wires,
+    _rule_is_applicable,
     collect_resources_for_op,
     collect_symbolic_resources,
     compile_decomposition_rules_wrapper,
@@ -430,6 +432,22 @@ class TestGenericUtilities:
         assert np.all(probe_wires < 0)
         assert len(np.unique(probe_wires)) == 2
 
+    def test_rule_with_unreadable_work_wire_spec_is_kept(self):
+        """A rule whose work-wire spec cannot be read is left in place.
+
+        The exclusion must be fail-open: only a spec that positively reports work wires removes
+        a rule, so anything we cannot interpret behaves exactly as it did before.
+        """
+
+        @register_resources(lambda wires: {qp.X(Wire[1]): 1})
+        def raises_on_spec(wires):
+            qp.X(wires[0:1])
+
+        raises_on_spec.get_work_wire_spec = lambda *args, **kwargs: 1 / 0
+
+        assert not _rule_allocates_work_wires(raises_on_spec, wires=Wires([0]))
+        assert _rule_is_applicable("MockOp", raises_on_spec, wires=Wires([0]))
+
     def test_collect_resources_unrolls_change_op_basis_for_capture(self):
         """Resources match the rule body that capture produces, even when resource collection
         itself happens outside a capture context."""
@@ -682,6 +700,49 @@ class TestTraceTime:
         assert 'target_gate = "MultipleRegisters{}{reg1:2,reg2:1}{}"' in mlir
         assert "no_work_wires" in mlir
         assert "borrow_two_work_wires" not in mlir
+
+    # NOTE: Not a lit test, as we need to inspect the warning the excluded rule raises.
+    def test_rule_that_allocates_work_wires_is_excluded(self, recwarn):
+        """Tests that a rule declaring work wires is not offered to the solver.
+
+        Such a rule calls ``qp.allocate``, which lowers to a second qreg, and
+        ``decompose-lowering`` binds a register-mode rule to exactly one register. The rule is
+        excluded up front so the solver picks one that can actually be lowered, rather than
+        aborting later with ``cannot span multiple qregs yet``.
+        """
+
+        @register_resources(lambda reg1, reg2: {qp.X(Wire[1]): 2}, work_wires={"zeroed": 1})
+        def allocates_a_work_wire(reg1, reg2):
+            with qp.allocate(1, state="zero", restored=True) as aux:
+                qp.X(aux[0:1])
+                qp.X(reg1[0:1])
+
+        @register_resources(lambda reg1, reg2: {qp.X(Wire[1]): 2})
+        def allocates_nothing(reg1, reg2):
+            qp.X(reg1[0:1])
+            qp.X(reg1[0:1])
+
+        with local_decomps():
+            add_decomps(MultipleRegisters, allocates_a_work_wire, allocates_nothing)
+
+            @qjit(capture=True, target="mlir")
+            @qnode(qp.device("null.qubit", wires=3))
+            def circuit():
+                MultipleRegisters(reg1=[0, 1], reg2=[2])
+                return qp.state()
+
+            mlir = circuit.mlir
+
+        lowering_warnings = [
+            str(w.message) for w in recwarn if issubclass(w.category, RuleLoweringWarning)
+        ]
+
+        assert any(
+            "allocates_a_work_wire" in message and "dynamically allocates work wires" in message
+            for message in lowering_warnings
+        )
+        assert "allocates_nothing" in mlir
+        assert "allocates_a_work_wire" not in mlir
 
     def test_fixed_decomps(self):
         """Test that fixed decomps are adhered to."""
