@@ -112,6 +112,21 @@
 
 <h3>Improvements 🛠</h3>
 
+* The `adjoint-lowering` pass can now cache gate parameters of arbitrary type. Previously only
+  `f64`, `tensor<...xf64>` and rank-2 `tensor<NxNxcomplex<f64>>` parameters could be recorded, so a
+  gate carrying (for example) an integer or index parameter inside classical control flow either
+  failed to compile or crashed the compiler. The cache now holds one array list per parameter
+  element type, and a whole tensor parameter is recorded by a single operation instead of one
+  operation per element, whatever its rank, element type or dynamic dimensions.
+  [(#3236)](https://github.com/PennyLaneAI/catalyst/pull/3236)
+
+* Added `catalyst.list_push_block` and `catalyst.list_pop_block`, which append and remove a whole
+  contiguous run of elements of a `catalyst.arraylist` in one operation, and implemented
+  `BufferizableOpInterface` for both. The push copies the elements into the list's own storage and
+  the pop is written in destination-passing style, so no buffer escapes into the list and no
+  ownership is transferred out of it: buffer hoisting and buffer deallocation keep working unchanged.
+  [(#3236)](https://github.com/PennyLaneAI/catalyst/pull/3236)
+
 * Add the `XMEM_REPLY_BRAM` memory type and use it to allocate reply buffers in dedicated BRAM.
   [(#3148)](https://github.com/PennyLaneAI/catalyst/pull/3148)
 

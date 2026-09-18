@@ -63,6 +63,59 @@ def ListPopOp : Catalyst_Op<"list_pop",
     let assemblyFormat = [{ $list attr-dict `:` type($list) }];
 }
 
+def ListPushBlockOp : Catalyst_Op<"list_push_block"> {
+    let summary = "Append every element of a ranked value to the end of an array list.";
+    let description = [{
+        Appends the elements of `elements` to `list` in row-major order, so that a whole shaped
+        value is recorded by a single operation instead of one operation per element.
+
+        The list *copies* the elements into its own storage: `elements` is only read and the caller
+        keeps ownership of it. This is what makes the operation safe to use on a buffer that is
+        reused or freed afterwards, e.g. one allocated inside a loop.
+
+        Before bufferization `elements` is a ranked tensor of any rank. After bufferization it is a
+        contiguous (identity layout) rank-1 memref, obtained by collapsing the tensor's buffer;
+        that is the only form `--convert-arraylist-to-memref` lowers.
+    }];
+    let arguments = (ins
+        Arg<AnyTypeOf<[AnyRankedTensor, MemRefRankOf<[AnyType], [1]>]>,
+            "the elements to append", [MemRead]>:$elements,
+        Arg<ArrayListType, "the list to append to", [MemRead, MemWrite]>:$list
+    );
+    let assemblyFormat = [{
+        $elements `,` $list attr-dict `:` type($elements) `,` type($list)
+    }];
+    let hasVerifier = 1;
+}
+
+def ListPopBlockOp : Catalyst_Op<"list_pop_block"> {
+    let summary = "Remove the trailing elements of an array list into a destination value.";
+    let description = [{
+        Removes the last N elements of `list` and writes them, in row-major order, into
+        `destination`, where N is the number of elements of `destination`. It is the exact inverse
+        of `catalyst.list_push_block`.
+
+        The operation is written in destination-passing style, so that the destination buffer is
+        allocated by bufferization rather than by this operation: no ownership is transferred and
+        the popped elements are a copy, valid after the list is deallocated.
+
+        Before bufferization `destination` is a ranked tensor and the result is the filled tensor.
+        After bufferization `destination` is a contiguous (identity layout) rank-1 memref which the
+        operation writes in place, and there is no result.
+    }];
+    let arguments = (ins
+        Arg<ArrayListType, "the list to pop from", [MemRead, MemWrite]>:$list,
+        Arg<AnyTypeOf<[AnyRankedTensor, MemRefRankOf<[AnyType], [1]>]>,
+            "the value to write the popped elements into", [MemWrite]>:$destination
+    );
+    let results = (outs Optional<AnyRankedTensor>:$result);
+    let assemblyFormat = [{
+        $list `,` $destination attr-dict `:` type($list) `,` type($destination)
+        (`->` type($result)^)?
+    }];
+    let hasVerifier = 1;
+}
+
 def ListLoadDataOp : Catalyst_Op<"list_load_data"> {
     let summary = "Get the underlying memref storing the data of an array list.";
     let arguments = (ins ArrayListType:$list);

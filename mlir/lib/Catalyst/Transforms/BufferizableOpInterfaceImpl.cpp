@@ -20,6 +20,7 @@
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/Dialect/Utils/ReshapeOpsUtils.h"
 #include "mlir/Transforms/DialectConversion.h"
 
 #include "Catalyst/IR/CatalystOps.h"
@@ -426,6 +427,146 @@ struct LaunchKernelOpInterface
     }
 };
 
+/// Reshape `buffer` into the contiguous rank-1 memref that the array list block operations take,
+/// which is the buffer's elements in row-major order.
+///
+/// `memref.collapse_shape` is a view, not a copy, so writing through the result writes through
+/// `buffer`. A buffer whose layout is not the identity is generally not collapsible; when
+/// `allowCopy` is set it is copied into a fresh contiguous buffer first, which is only valid if the
+/// block is read and not written.
+static FailureOr<Value> collapseToContiguousBlock(Operation *op, RewriterBase &rewriter,
+                                                  Value buffer, bool allowCopy) {
+    Location loc = op->getLoc();
+    auto memrefType = dyn_cast<MemRefType>(buffer.getType());
+    if (!memrefType || memrefType.getRank() == 0) {
+        return op->emitOpError() << "cannot be bufferized: expected a ranked, non-scalar buffer "
+                                    "but got "
+                                 << buffer.getType();
+    }
+
+    if (!memrefType.getLayout().isIdentity()) {
+        if (!allowCopy) {
+            return op->emitOpError()
+                   << "cannot be bufferized: its destination buffer has a non-identity layout ("
+                   << memrefType << "), which the list storage cannot alias";
+        }
+        MemRefType contiguousType =
+            MemRefType::get(memrefType.getShape(), memrefType.getElementType());
+        SmallVector<Value> dynamicSizes;
+        for (int64_t dim = 0; dim < memrefType.getRank(); ++dim) {
+            if (memrefType.isDynamicDim(dim)) {
+                dynamicSizes.push_back(memref::DimOp::create(rewriter, loc, buffer, dim));
+            }
+        }
+        auto alloc = memref::AllocOp::create(rewriter, loc, contiguousType, dynamicSizes);
+        memref::CopyOp::create(rewriter, loc, buffer, alloc.getResult());
+        buffer = alloc.getResult();
+        memrefType = contiguousType;
+    }
+
+    if (memrefType.getRank() == 1) {
+        return buffer;
+    }
+
+    ReassociationIndices allDimensions;
+    for (int64_t dim = 0; dim < memrefType.getRank(); ++dim) {
+        allDimensions.push_back(dim);
+    }
+    SmallVector<ReassociationIndices> reassociation{allDimensions};
+    return memref::CollapseShapeOp::create(rewriter, loc, buffer, reassociation).getResult();
+}
+
+/// Bufferization of catalyst.list_push_block. The list copies the elements into its own storage, so
+/// the operand is only read and nothing escapes into the list.
+struct ListPushBlockOpInterface
+    : public bufferization::BufferizableOpInterface::ExternalModel<ListPushBlockOpInterface,
+                                                                   ListPushBlockOp> {
+    bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
+                                const bufferization::AnalysisState &state) const {
+        return opOperand.get() == cast<ListPushBlockOp>(op).getElements();
+    }
+
+    bool bufferizesToMemoryWrite(Operation *op, OpOperand &opOperand,
+                                 const bufferization::AnalysisState &state) const {
+        return false;
+    }
+
+    bufferization::AliasingValueList
+    getAliasingValues(Operation *op, OpOperand &opOperand,
+                      const bufferization::AnalysisState &state) const {
+        return {};
+    }
+
+    LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
+                            const bufferization::BufferizationOptions &options,
+                            bufferization::BufferizationState &state) const {
+        auto pushOp = cast<ListPushBlockOp>(op);
+        FailureOr<Value> buffer = getBuffer(rewriter, pushOp.getElements(), options, state);
+        if (failed(buffer)) {
+            return failure();
+        }
+        // The elements are read, so a non-collapsible buffer may be copied first.
+        FailureOr<Value> block =
+            collapseToContiguousBlock(op, rewriter, *buffer, /*allowCopy=*/true);
+        if (failed(block)) {
+            return failure();
+        }
+        bufferization::replaceOpWithNewBufferizedOp<ListPushBlockOp>(rewriter, op, *block,
+                                                                     pushOp.getList());
+        return success();
+    }
+};
+
+/// Bufferization of catalyst.list_pop_block. This is a destination-passing operation: the elements
+/// are written into the buffer of the destination tensor, which the result is equivalent to. The
+/// destination buffer is therefore allocated by bufferization and freed by the usual deallocation
+/// pass, and the popped elements outlive the list.
+struct ListPopBlockOpInterface
+    : public bufferization::BufferizableOpInterface::ExternalModel<ListPopBlockOpInterface,
+                                                                   ListPopBlockOp> {
+    // Every element of the destination is overwritten, so its previous contents are not read.
+    bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
+                                const bufferization::AnalysisState &state) const {
+        return false;
+    }
+
+    bool bufferizesToMemoryWrite(Operation *op, OpOperand &opOperand,
+                                 const bufferization::AnalysisState &state) const {
+        return opOperand.get() == cast<ListPopBlockOp>(op).getDestination();
+    }
+
+    bufferization::AliasingValueList
+    getAliasingValues(Operation *op, OpOperand &opOperand,
+                      const bufferization::AnalysisState &state) const {
+        auto popOp = cast<ListPopBlockOp>(op);
+        if (opOperand.get() != popOp.getDestination() || !popOp.getResult()) {
+            return {};
+        }
+        return {{popOp.getResult(), bufferization::BufferRelation::Equivalent}};
+    }
+
+    LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
+                            const bufferization::BufferizationOptions &options,
+                            bufferization::BufferizationState &state) const {
+        auto popOp = cast<ListPopBlockOp>(op);
+        FailureOr<Value> destination = getBuffer(rewriter, popOp.getDestination(), options, state);
+        if (failed(destination)) {
+            return failure();
+        }
+        // The destination is written through the collapsed view, so it must alias the destination
+        // buffer: copying is not an option here.
+        FailureOr<Value> block =
+            collapseToContiguousBlock(op, rewriter, *destination, /*allowCopy=*/false);
+        if (failed(block)) {
+            return failure();
+        }
+        ListPopBlockOp::create(rewriter, op->getLoc(), /*resultTypes=*/TypeRange{},
+                               /*operands=*/ValueRange{popOp.getList(), *block});
+        bufferization::replaceOpWithBufferizedValues(rewriter, op, *destination);
+        return success();
+    }
+};
+
 } // namespace
 
 void catalyst::registerBufferizableOpInterfaceExternalModels(DialectRegistry &registry) {
@@ -436,5 +577,7 @@ void catalyst::registerBufferizableOpInterfaceExternalModels(DialectRegistry &re
         CallbackCallOp::attachInterface<CallbackCallOpInterface>(*ctx);
         SymbolicArrayOp::attachInterface<SymbolicArrayOpInterface>(*ctx);
         LaunchKernelOp::attachInterface<LaunchKernelOpInterface>(*ctx);
+        ListPushBlockOp::attachInterface<ListPushBlockOpInterface>(*ctx);
+        ListPopBlockOp::attachInterface<ListPopBlockOpInterface>(*ctx);
     });
 }
