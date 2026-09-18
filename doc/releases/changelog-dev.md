@@ -138,6 +138,7 @@
   [(#3109)](https://github.com/PennyLaneAI/catalyst/pull/3109)
   [(#3075)](https://github.com/PennyLaneAI/catalyst/pull/3075)
   [(#3162)](https://github.com/PennyLaneAI/catalyst/pull/3162)
+  [(#3245)](https://github.com/PennyLaneAI/catalyst/pull/3245)
 
 * The graph-based decomposition system has been greatly improved.
 
