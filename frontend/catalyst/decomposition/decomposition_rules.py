@@ -525,19 +525,7 @@ def split_call_args(kwargs, is_custom_op):
 def _rule_allocates_work_wires(rule, *args, **kwargs) -> bool:
     """Whether a decomposition rule dynamically allocates work wires.
 
-    Such a rule addresses qubits from a register that ``qp.allocate`` creates on the fly, in
-    addition to the operator's own register. ``decompose-lowering`` binds a register-mode rule
-    to exactly one register, so the rule cannot currently be lowered::
-
-        register-mode decomposition rule cannot span multiple qregs yet, got 2 registers.
-
-    The work-wire spec declared by ``@register_resources(..., work_wires=...)`` is the
-    authoritative signal. It may be a callable of the operator's arguments, so it is evaluated
-    with the same arguments the rule itself is probed with, and it propagates whatever that
-    evaluation raises: the caller decides how to report it.
-
-    A spec that yields no integer count is treated as declaring no work wires. That is only
-    reachable for stand-in rule objects, since ``WorkWireSpec.total`` sums integer fields.
+    TODO: remove when --decompose-lowering can handle multiple registers
     """
     total = rule.get_work_wire_spec(*args, **kwargs).total
     return isinstance(total, int) and total > 0
@@ -558,21 +546,16 @@ def _rule_is_applicable(op_name, rule, *args, **kwargs) -> bool:
     try:
         allocates_work_wires = _rule_allocates_work_wires(rule, *args, **kwargs)
     except Exception as e:  # pylint: disable=broad-except
-        # Keep the rule: it may well be lowerable, and dropping it could leave the operator with
-        # no decomposition at all. Say so, because the guard below is then not protecting it.
         warnings.warn(
             f"Could not read the work-wire spec of the {rule.name} decomposition rule for "
-            f"{op_name}; raised '{e}'. Keeping the rule, but if it does allocate work wires "
-            "lowering it will fail with 'cannot span multiple qregs yet'.",
+            f"{op_name}"
             category=RuleLoweringWarning,
         )
-        allocates_work_wires = False
+        allocates_work_wires = True
 
     if allocates_work_wires:
         warnings.warn(
-            f"Excluded the {rule.name} decomposition rule for {op_name}: it dynamically "
-            "allocates work wires, which decompose-lowering cannot yet bind because the rule "
-            "would span more than one qreg.",
+            f"Excluded the {rule.name} decomposition rule for {op_name} since --decompose-lowering cannot work with multiple registers yet",
             category=RuleLoweringWarning,
         )
         return False
