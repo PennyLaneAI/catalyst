@@ -391,6 +391,7 @@ class TestGenericUtilities:
         """Test that compile_decomposition_rules_wrapper doesn't error on Operator1 instances."""
         mock_decomp = mocker.MagicMock()
         mock_decomp.name = "FakeRuleName"
+        mock_decomp.get_work_wire_spec.return_value.total = 0
         mock_decomp.compute_resources.side_effect = ValueError("Fake Resource Related Error")
 
         mocker.patch("pennylane.decomposition.list_decomps", return_value=[mock_decomp])
@@ -405,6 +406,7 @@ class TestGenericUtilities:
         """Test that decomposition conditions receive compilable operator data."""
         mock_decomp = mocker.MagicMock()
         mock_decomp.name = "FakeRuleName"
+        mock_decomp.get_work_wire_spec.return_value.total = 0
         mock_decomp.compute_resources.return_value.gate_counts = {}
         mock_decomp.is_applicable.side_effect = (
             lambda *, wires, a, b, thing: a and b == 3.14 and thing == "string"
@@ -432,12 +434,11 @@ class TestGenericUtilities:
         assert np.all(probe_wires < 0)
         assert len(np.unique(probe_wires)) == 2
 
-    def test_rule_with_unreadable_work_wire_spec_is_kept(self):
-        """A rule whose work-wire spec cannot be read is kept, with a warning.
+    def test_rule_with_unreadable_work_wire_spec_is_excluded(self):
+        """A rule whose work-wire spec cannot be read is excluded, with a warning.
 
-        Dropping it could leave the operator with no decomposition at all, and raising would
-        fail a compilation that works today, so the rule is kept. The warning matters because
-        the exclusion guard is then not protecting that rule.
+        We cannot tell whether such a rule allocates work wires, so it is conservatively treated
+        as one that does, matching how a rule whose ``is_applicable`` raises is handled.
         """
 
         @register_resources(lambda wires: {qp.X(Wire[1]): 1})
@@ -449,8 +450,8 @@ class TestGenericUtilities:
         with pytest.raises(ZeroDivisionError):
             _rule_allocates_work_wires(raises_on_spec, wires=Wires([0]))
 
-        with pytest.warns(RuleLoweringWarning, match="Could not read the work-wire spec"):
-            assert _rule_is_applicable("MockOp", raises_on_spec, wires=Wires([0]))
+        with pytest.warns(RuleLoweringWarning, match="could not read its work-wire spec"):
+            assert not _rule_is_applicable("MockOp", raises_on_spec, wires=Wires([0]))
 
     def test_collect_resources_unrolls_change_op_basis_for_capture(self):
         """Resources match the rule body that capture produces, even when resource collection
@@ -742,7 +743,7 @@ class TestTraceTime:
         ]
 
         assert any(
-            "allocates_a_work_wire" in message and "dynamically allocates work wires" in message
+            "allocates_a_work_wire" in message and "multiple registers" in message
             for message in lowering_warnings
         )
         assert "allocates_nothing" in mlir

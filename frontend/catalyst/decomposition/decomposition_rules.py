@@ -546,15 +546,16 @@ def _rule_is_applicable(op_name, rule, *args, **kwargs) -> bool:
         allocates_work_wires = _rule_allocates_work_wires(rule, *args, **kwargs)
     except Exception as e:  # pylint: disable=broad-except
         warnings.warn(
-            f"Could not read the work-wire spec of the {rule.name} decomposition rule for "
-            f"{op_name}",
+            f"Excluded the {rule.name} decomposition rule for {op_name}; could not read its "
+            f"work-wire spec, raised '{e}'",
             category=RuleLoweringWarning,
         )
-        allocates_work_wires = True
+        return False
 
     if allocates_work_wires:
         warnings.warn(
-            f"Excluded the {rule.name} decomposition rule for {op_name} since --decompose-lowering cannot work with multiple registers yet",
+            f"Excluded the {rule.name} decomposition rule for {op_name} since "
+            "--decompose-lowering cannot work with multiple registers yet",
             category=RuleLoweringWarning,
         )
         return False
