@@ -409,6 +409,7 @@
   the false data dependency between wires that act on different qubits of the same register
   and leaves extracts grouped above the gates and inserts below them.
   [(#2965)](https://github.com/PennyLaneAI/catalyst/pull/2965)
+  [(#3240)](https://github.com/PennyLaneAI/catalyst/pull/3240)
 
 * Adds a `catalyst::symbolic_array` operation and integrates it with the new `qp.capture.symbolic_array` function.
   [(#2982)](https://github.com/PennyLaneAI/catalyst/pull/2982)
@@ -675,7 +676,8 @@
 
 * Fixed the assembly format for `quantum.adjoint` when it has no quantum operands/results.
   [(#2938)](https://github.com/PennyLaneAI/catalyst/pull/2938)
-* Fixed a performance degradation issue with `catalyst.runtime_artifacts`. It now visits module 
+
+* Fixed a performance degradation issue with `catalyst.runtime_artifacts`. It now visits module
   operations only, instead of every operation in the program.
   [(#3219)](https://github.com/PennyLaneAI/catalyst/pull/3219)
 
