@@ -22,15 +22,16 @@
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/IRMapping.h"
 #include "mlir/IR/PatternMatch.h"
-#include "mlir/Pass/PassManager.h"
 #include "mlir/Pass/Pass.h"
+#include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
-#include "Catalyst/Transforms/Passes.h"
-#include "QRef/Transforms/Passes.h"
 
-#include "Quantum/IR/QuantumOps.h"
-#include "QRef/IR/QRefOps.h"
+#include "Catalyst/Transforms/Passes.h"
 #include "QRef/IR/QRefDialect.h"
+#include "QRef/IR/QRefOps.h"
+#include "QRef/Transforms/Passes.h"
+#include "Quantum/IR/QuantumOps.h"
+
 #include "QuantumCache.hpp"
 
 using namespace mlir;

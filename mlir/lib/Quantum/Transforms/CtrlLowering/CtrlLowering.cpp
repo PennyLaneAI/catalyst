@@ -21,13 +21,10 @@
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-#include "Quantum/Transforms/Passes.h"
-#include "Quantum/IR/QuantumOps.h"
-#include "QRef/IR/QRefOps.h"
 #include "QRef/IR/QRefDialect.h"
-
-
-
+#include "QRef/IR/QRefOps.h"
+#include "Quantum/IR/QuantumOps.h"
+#include "Quantum/Transforms/Passes.h"
 
 using namespace mlir;
 
@@ -614,18 +611,19 @@ struct CtrlLoweringRewritePattern : public OpRewritePattern<CtrlOp> {
 namespace catalyst::qref {
 
 static LogicalResult distributeControlsQref(PatternRewriter &rewriter, Block &block,
-        SmallVector<Value> &currentCtrlQubits, ValueRange ctrlValues, SmallVector<Operation *> &opsToErase);
-
+                                            SmallVector<Value> &currentCtrlQubits,
+                                            ValueRange ctrlValues,
+                                            SmallVector<Operation *> &opsToErase);
 
 static SmallVector<int32_t> readSegmentSizes(Operation *op, StringRef name) {
     auto seg = op->getAttrOfType<DenseI32ArrayAttr>(name);
     return SmallVector<int32_t>(seg.asArrayRef().begin(), seg.asArrayRef().end());
 }
 
-/// Rebuild a qref.quantum.gate with additional control qubits/values appended to whatever controls it
-/// already carries. The new op is inserted at the rewriter's insertion point.
-void createControlledGate(PatternRewriter &rewriter, QuantumGate gate,
-                                       ValueRange addCtrlQubits, ValueRange addCtrlValues) {
+/// Rebuild a qref.quantum.gate with additional control qubits/values appended to whatever controls
+/// it already carries. The new op is inserted at the rewriter's insertion point.
+void createControlledGate(PatternRewriter &rewriter, QuantumGate gate, ValueRange addCtrlQubits,
+                          ValueRange addCtrlValues) {
     Operation *op = gate.getOperation();
     ValueRange nonCtrlQubits = gate.getNonCtrlQubitOperands();
     ValueRange oldCtrlQubits = gate.getCtrlQubitOperands();
@@ -671,7 +669,9 @@ void createControlledGate(PatternRewriter &rewriter, QuantumGate gate,
 }
 
 static LogicalResult distributeControlsQref(PatternRewriter &rewriter, Block &block,
-    SmallVector<Value> &currentCtrlQubits, ValueRange ctrlValues, SmallVector<Operation *> &opsToErase) {
+                                            SmallVector<Value> &currentCtrlQubits,
+                                            ValueRange ctrlValues,
+                                            SmallVector<Operation *> &opsToErase) {
     for (Operation &op : block.without_terminator()) {
         if (auto gate = dyn_cast<QuantumGate>(op)) {
             rewriter.setInsertionPoint(&op);
@@ -689,7 +689,8 @@ static LogicalResult distributeControlsQref(PatternRewriter &rewriter, Block &bl
         if (isa<scf::IfOp, scf::ForOp, scf::WhileOp, scf::IndexSwitchOp>(op)) {
             for (Region &region : op.getRegions()) {
                 if (!region.empty()) {
-                    if (failed(distributeControlsQref(rewriter, region.front(), currentCtrlQubits, ctrlValues, opsToErase))) {
+                    if (failed(distributeControlsQref(rewriter, region.front(), currentCtrlQubits,
+                                                      ctrlValues, opsToErase))) {
                         return failure();
                     }
                 }
@@ -743,7 +744,8 @@ struct ReferenceSemanticsCtrlLoweringRewritePattern : public OpRewritePattern<Ct
         SmallVector<Operation *> opsToErase;
 
         // MUTATION: Now that we know the block is safe, perform the lowering.
-        if (failed(distributeControlsQref(rewriter, block, currentCtrlQubits, ctrlValues, opsToErase))) {
+        if (failed(distributeControlsQref(rewriter, block, currentCtrlQubits, ctrlValues,
+                                          opsToErase))) {
             return failure();
         }
 
@@ -756,7 +758,6 @@ struct ReferenceSemanticsCtrlLoweringRewritePattern : public OpRewritePattern<Ct
         return success();
     }
 };
-
 
 } // namespace catalyst::qref
 
@@ -771,7 +772,7 @@ struct CtrlLoweringPass : impl::CtrlLoweringPassBase<CtrlLoweringPass> {
 
     void runOnOperation() final {
         Operation *op = getOperation();
-        // Convert to reference-semantics 
+        // Convert to reference-semantics
         {
             OpPassManager ReferenceSemanticsPm(op->getName());
             ReferenceSemanticsPm.addPass(createReferenceSemanticsConversionPass());
@@ -782,7 +783,6 @@ struct CtrlLoweringPass : impl::CtrlLoweringPassBase<CtrlLoweringPass> {
 
         RewritePatternSet patterns(&getContext());
         patterns.add<qref::ReferenceSemanticsCtrlLoweringRewritePattern>(patterns.getContext(), 1);
-
 
         // patterns.add<quantum::CtrlLoweringRewritePattern>(patterns.getContext(), 1);
 
