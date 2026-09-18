@@ -116,8 +116,7 @@ class GraphOpID:
     will have different decomposition rules.
 
     Note that this function should not be updated without updating the corresponding methods on the
-    DecomposableGate interface in mlir/lib/quantum/IR/QuantumInterfaces.cpp and the corresponding
-    DecomposableGate interface in mlir/include/QRef/IR/QRefInterfaces.h.
+    DecomposableGate interface in mlir/lib/quantum/IR/DecompositionInterfaces.cpp
     """
 
     def __init__(self, op: qp.core.Operator2):

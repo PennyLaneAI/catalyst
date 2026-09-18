@@ -36,6 +36,7 @@
 #include "QRef/IR/QRefInterfaces.h"
 #include "QRef/IR/QRefTypes.h"
 #include "QRef/Transforms/Patterns.h"
+#include "Quantum/IR/DecompositionInterfaces.h"
 
 #include "DecompUtils.hpp"
 #include "DecomposeLoweringImpl.hpp"
@@ -80,8 +81,7 @@ struct DecomposableGatePattern final : public OpInterfaceRewritePattern<Decompos
         std::string gateName = op.getOperatorName();
 
         // A modified op (adjoint and/or controlled) is a distinct operator from its base gate.
-        bool isModified =
-            op.getOperation()->hasAttr("adjoint") || !op.getCtrlQubitOperands().empty();
+        bool isModified = op.hasModifiers();
 
         // Only decompose the op if it is not in the target gate set. A modified op is never treated
         // as a native gate-set member by its base name: `Adjoint(Op)`/`C(Op)` are distinct gates
@@ -149,7 +149,14 @@ struct DecomposableGatePattern final : public OpInterfaceRewritePattern<Decompos
 
         auto enableQreg = llvm::any_of(rule.getFunctionType().getInputs(),
                                        [](mlir::Type t) { return isa<qref::QuregType>(t); });
-        auto analyzer = DecomposableGateSignatureAnalyzer(op, enableQreg);
+
+        // We now have the operation and the rule.
+        // We need to anaylyze the parameters, input qubits and ctrl qubits, and can therefore
+        // cast to QuantumGate for necessary information
+        assert(isa<QuantumGate>(op.getOperation()) && "Operation must be a QuantumGate");
+        auto qgate = mlir::dyn_cast<QuantumGate>(op.getOperation());
+
+        auto analyzer = QuantumGateSignatureAnalyzer(qgate, enableQreg);
         assert(analyzer && "Analyzer should be valid");
 
         auto operands = analyzer.prepareOperands(rule, rewriter, op.getLoc());

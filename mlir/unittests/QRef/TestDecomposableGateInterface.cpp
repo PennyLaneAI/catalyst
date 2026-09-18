@@ -41,6 +41,7 @@
 
 using namespace mlir;
 using namespace catalyst::qref;
+using namespace catalyst::quantum;
 
 /// The upstream MLIR Test dialect does not have a header we can include
 /// We must declare the registration function, and link to the corresponding upstream target
@@ -80,6 +81,7 @@ module {
     ASSERT_EQ(customOp.getStaticData().size(), 0);
 
     ASSERT_EQ(customOp.getGraphOpId(), "RX{0:[f64]}{wires:2}{}");
+    ASSERT_EQ(customOp.hasModifiers(), false);
 }
 
 TEST(DecomposableGateInterfaceTests, MultiControlledCustomOp) {
@@ -103,6 +105,7 @@ module {
 
     // Two control wires fold as `2C(...)`
     ASSERT_EQ(op.getGraphOpId(), "2C(PauliX){}{wires:1}{}");
+    ASSERT_EQ(op.hasModifiers(), true);
 }
 
 TEST(DecomposableGateInterfaceTests, ControlledAdjointCustomOp) {
@@ -126,6 +129,7 @@ module {
 
     // Modifiers fold control-outermost
     ASSERT_EQ(op.getGraphOpId(), "C(Adjoint(RX)){0:[f64]}{wires:1}{}");
+    ASSERT_EQ(op.hasModifiers(), true);
 }
 
 TEST(DecomposableGateInterfaceTests, MultiControlledAdjointCustomOp) {
@@ -150,6 +154,7 @@ module {
 
     // Controls + Adjoint folding
     ASSERT_EQ(op.getGraphOpId(), "2C(Adjoint(RX)){0:[f64]}{wires:1}{}");
+    ASSERT_EQ(op.hasModifiers(), true);
 }
 
 TEST(DecomposableGateInterfaceTests, MultiRZOp) {
@@ -184,6 +189,7 @@ module {
     ASSERT_EQ(multiRZ.getStaticData().size(), 0);
 
     ASSERT_EQ(multiRZ.getGraphOpId(), "MultiRZ{theta:[f64]}{wires:3}{}");
+    ASSERT_EQ(multiRZ.hasModifiers(), false);
 }
 
 TEST(DecomposableGateInterfaceTests, PauliRotOp) {
@@ -221,6 +227,7 @@ module {
     ASSERT_EQ(paulirot.getStaticData(), expectedStaticData);
 
     ASSERT_EQ(paulirot.getGraphOpId(), "PauliRot{theta:[f64]}{wires:3}{pauli_word = \"XYZ\"}");
+    ASSERT_EQ(paulirot.hasModifiers(), false);
 }
 
 TEST(DecomposableGateInterfaceTests, PCPhaseOP) {
@@ -259,6 +266,7 @@ module {
     ASSERT_EQ(pcphase.getStaticData(), expectedStaticData);
 
     ASSERT_EQ(pcphase.getGraphOpId(), "C(PCPhase){phi:[f64]}{wires:2}{dim = 0 : i64}");
+    ASSERT_EQ(pcphase.hasModifiers(), true);
 }
 
 TEST(DecomposableGateInterfaceTests, GlobalPhaseOp) {
@@ -290,6 +298,7 @@ module {
     ASSERT_EQ(gphase.getStaticData().size(), 0);
 
     ASSERT_EQ(gphase.getGraphOpId(), "GlobalPhase{phi:[f64]}{}{}");
+    ASSERT_EQ(gphase.hasModifiers(), false);
 }
 
 TEST(DecomposableGateInterfaceTests, ControlledGlobalPhaseOp) {
@@ -324,6 +333,7 @@ module {
 
     // Controlled unitary: the control wire is folded into the id (control-outermost).
     ASSERT_EQ(gphase.getGraphOpId(), "C(GlobalPhase){phi:[f64]}{}{}");
+    ASSERT_EQ(gphase.hasModifiers(), true);
 }
 
 TEST(DecomposableGateInterfaceTests, QubitUnitaryOp) {
@@ -361,6 +371,7 @@ module {
     ASSERT_EQ(unitary.getStaticData().size(), 0);
 
     ASSERT_EQ(unitary.getGraphOpId(), "C(QubitUnitary){U:[tensor<4x4xcomplex<f64>>]}{wires:2}{}");
+    ASSERT_EQ(unitary.hasModifiers(), true);
 }
 
 TEST(DecomposableGateInterfaceTests, OperatorOpQubits) {
@@ -417,6 +428,7 @@ module {
     ASSERT_EQ(op.getGraphOpId(),
               "testInterfaceOp{angle:[f64],flag:[i1],index:[i64]}{wire1:1,wire2:1}{"
               "myStaticArray = [1, 2, 3], myStaticInt = 4 : i64, myStaticString = \"Test\"}");
+    ASSERT_EQ(op.hasModifiers(), false);
 }
 
 TEST(DecomposableGateInterfaceTests, OperatorOpGOIDTypeConflict) {
@@ -507,6 +519,7 @@ func.func @testfunc(%first : tensor<1xi64>, %secondthird : tensor<2xi64>) {
     ASSERT_EQ(op.getGraphOpId(), "testOperatorQureg{angle:[f64],flag:[i1],index:[i64]}{reg:3}{"
                                  "myStaticArray = [4, 2.400000e+00, 4], myStaticInt = 8 : i64, "
                                  "myStaticString = \"string\"}");
+    ASSERT_EQ(op.hasModifiers(), false);
 }
 
 TEST(DecomposableGateInterfaceTests, OperatorOpUID) {
@@ -549,6 +562,7 @@ func.func @testfunc(%first : tensor<1xi64>, %secondthird : tensor<2xi64>) {
 
     ASSERT_EQ(op.getGraphOpId(),
               "testOperatorUID{angle:[f64],flag:[i1],index:[i64]}{reg:3}{}[248]");
+    ASSERT_EQ(op.hasModifiers(), false);
 }
 
 TEST(DecomposableGateInterfaceTests, OperatorOpMultiIndexedParams) {
@@ -590,4 +604,5 @@ TEST(DecomposableGateInterfaceTests, OperatorOpMultiIndexedParams) {
 
     ASSERT_EQ(op.getGraphOpId(),
               "testInterfaceOp{multi_index_param:[f64,tensor<2xi64>,f64]}{wire1:1}{}");
+    ASSERT_EQ(op.hasModifiers(), false);
 }

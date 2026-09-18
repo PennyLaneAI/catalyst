@@ -1,6 +1,7 @@
 add_mlir_library(MLIRQuantum
     QuantumDialect.cpp
     QuantumInterfaces.cpp
+    DecompositionInterfaces.cpp
     QuantumOps.cpp
 
     ADDITIONAL_HEADER_DIRS
