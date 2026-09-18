@@ -26,11 +26,30 @@ using namespace catalyst;
 namespace catalyst {
 namespace quantum {
 
+// ============================================================================================
+// Integer/boolean parameters are cached by round-tripping through the *f64* parameter buffer
+// (`arith.uitofp` on the way in, `arith.fptoui` on the way out).
+// f64 represents every integer in [0, 2^53] EXACTLY, and nothing outside that range contiguously.
+// So the round-trip is lossless precisely for widths <= 53 bits.
+// That covers every gate parameter seen in practice (a MultiX bitstring, wire indices,
+// control counts, QROM bitstring rows, ...).
+//
+// Wider integers (e.g. a genuinely large i64) are NOT supported: a value >= 2^53 would round to a
+// nearby f64 and silently fail to round-trip. Rather than cache such a value lossily, let's reject
+// it here so `verifyTypeIsCacheable` fails loudly with a diagnostic.
+// TODO: to support wide integers, cache them in a dedicated integer (e.g. i64) buffer instead of
+// via f64, which would be lossless for all widths.
+// ============================================================================================
+static bool isCacheableInteger(Type ty) {
+    auto intType = dyn_cast<IntegerType>(ty);
+    return intType && intType.getWidth() <= 53;
+}
+
 LogicalResult verifyTypeIsCacheable(Type ty, Operation *op) {
     // Sanitizing inputs.
-    // TODO: although OperatorOp params can be arbitrary types, currently only caching of f64s and
-    // complex (and tensors of them) are implemented.
-    if (ty.isF64() || ty.isInteger()) {
+    // TODO: although OperatorOp params can be arbitrary types, currently only caching of f64s,
+    // narrow (<= 53-bit) integers, and complex (and tensors of them) are implemented.
+    if (ty.isF64() || isCacheableInteger(ty)) {
         return success();
     }
 
@@ -46,9 +65,9 @@ LogicalResult verifyTypeIsCacheable(Type ty, Operation *op) {
 
     // Real-valued tensors of any rank (e.g. `quantum.operator` angle tensors or a BasisRotation
     // matrix) are cached element-wise as plain f64 values. Integer/boolean tensors (e.g. the
-    // `tensor<Nxi1>` bitstring of a MultiX gate) are cached the same way via an exact f64
-    // round-trip.
-    if (elementType.isF64() || elementType.isInteger()) {
+    // `tensor<Nxi1>` bitstring of a MultiX gate) are cached the same way via an f64 round-trip,
+    // exact only for element widths <= 53 bits (see `isCacheableInteger`; wider ones are rejected).
+    if (elementType.isF64() || isCacheableInteger(elementType)) {
         return success();
     }
 

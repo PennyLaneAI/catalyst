@@ -256,7 +256,8 @@ class AdjointGenerator {
                     continue;
                 }
 
-                // Integer/boolean scalar params were cached as f64; pop and cast back.
+                // Integer/boolean scalar params were cached as f64 (widths > 53 bits already
+                // rejected by verifyTypeIsCacheable); pop and cast back.
                 if (auto intType = dyn_cast<IntegerType>(paramType)) {
                     Value popped =
                         ListPopOp::create(builder, parametrizedGate.getLoc(), cache.paramVector);
@@ -277,7 +278,8 @@ class AdjointGenerator {
                 // BasisRotation's `tensor<NxNxf64>` matrix) were cached element-by-element in
                 // row-major order in the forward pass; rebuild the tensor by popping them back.
                 // Integer/boolean tensors (e.g. a MultiX `tensor<Nxi1>` bitstring) were cached the
-                // same way, each element cast to f64; cast back on rebuild.
+                // same way, each element cast to f64 (widths > 53 bits already rejected by
+                // verifyTypeIsCacheable); cast back on rebuild.
                 // Note that the complex-matrix path below is specific to QubitUnitary. We can
                 // revisit this when we have more complex-valued tensor params to handle.
                 if (elementType.isF64() || elementType.isInteger()) {
