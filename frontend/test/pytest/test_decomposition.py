@@ -433,10 +433,11 @@ class TestGenericUtilities:
         assert len(np.unique(probe_wires)) == 2
 
     def test_rule_with_unreadable_work_wire_spec_is_kept(self):
-        """A rule whose work-wire spec cannot be read is left in place.
+        """A rule whose work-wire spec cannot be read is kept, with a warning.
 
-        The exclusion must be fail-open: only a spec that positively reports work wires removes
-        a rule, so anything we cannot interpret behaves exactly as it did before.
+        Dropping it could leave the operator with no decomposition at all, and raising would
+        fail a compilation that works today, so the rule is kept. The warning matters because
+        the exclusion guard is then not protecting that rule.
         """
 
         @register_resources(lambda wires: {qp.X(Wire[1]): 1})
@@ -445,8 +446,11 @@ class TestGenericUtilities:
 
         raises_on_spec.get_work_wire_spec = lambda *args, **kwargs: 1 / 0
 
-        assert not _rule_allocates_work_wires(raises_on_spec, wires=Wires([0]))
-        assert _rule_is_applicable("MockOp", raises_on_spec, wires=Wires([0]))
+        with pytest.raises(ZeroDivisionError):
+            _rule_allocates_work_wires(raises_on_spec, wires=Wires([0]))
+
+        with pytest.warns(RuleLoweringWarning, match="Could not read the work-wire spec"):
+            assert _rule_is_applicable("MockOp", raises_on_spec, wires=Wires([0]))
 
     def test_collect_resources_unrolls_change_op_basis_for_capture(self):
         """Resources match the rule body that capture produces, even when resource collection

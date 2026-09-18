@@ -533,14 +533,13 @@ def _rule_allocates_work_wires(rule, *args, **kwargs) -> bool:
 
     The work-wire spec declared by ``@register_resources(..., work_wires=...)`` is the
     authoritative signal. It may be a callable of the operator's arguments, so it is evaluated
-    with the same arguments the rule itself is probed with. Only a spec that positively reports
-    work wires excludes a rule: anything we cannot read as a concrete count leaves the rule in
-    place, so a rule we fail to understand behaves exactly as it did before.
+    with the same arguments the rule itself is probed with, and it propagates whatever that
+    evaluation raises: the caller decides how to report it.
+
+    A spec that yields no integer count is treated as declaring no work wires. That is only
+    reachable for stand-in rule objects, since ``WorkWireSpec.total`` sums integer fields.
     """
-    try:
-        total = rule.get_work_wire_spec(*args, **kwargs).total
-    except Exception:  # pylint: disable=broad-except
-        return False
+    total = rule.get_work_wire_spec(*args, **kwargs).total
     return isinstance(total, int) and total > 0
 
 
@@ -556,7 +555,20 @@ def _rule_is_applicable(op_name, rule, *args, **kwargs) -> bool:
         )
         return False
 
-    if _rule_allocates_work_wires(rule, *args, **kwargs):
+    try:
+        allocates_work_wires = _rule_allocates_work_wires(rule, *args, **kwargs)
+    except Exception as e:  # pylint: disable=broad-except
+        # Keep the rule: it may well be lowerable, and dropping it could leave the operator with
+        # no decomposition at all. Say so, because the guard below is then not protecting it.
+        warnings.warn(
+            f"Could not read the work-wire spec of the {rule.name} decomposition rule for "
+            f"{op_name}; raised '{e}'. Keeping the rule, but if it does allocate work wires "
+            "lowering it will fail with 'cannot span multiple qregs yet'.",
+            category=RuleLoweringWarning,
+        )
+        allocates_work_wires = False
+
+    if allocates_work_wires:
         warnings.warn(
             f"Excluded the {rule.name} decomposition rule for {op_name}: it dynamically "
             "allocates work wires, which decompose-lowering cannot yet bind because the rule "
