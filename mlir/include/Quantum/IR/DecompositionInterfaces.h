@@ -14,6 +14,7 @@
 
 #pragma once
 
+#include "llvm/ADT/StringMap.h"
 #include "mlir/IR/OpDefinition.h"
 
 namespace catalyst {
