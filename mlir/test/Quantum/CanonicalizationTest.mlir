@@ -252,8 +252,8 @@ func.func @test_extract_before_insert() {
   // CHECK: [[q0b:%.+]] = quantum.custom "PauliX"() [[q0]]
   // CHECK: [[q1:%.+]] = quantum.extract [[r0]][ 1]
   // CHECK: [[q1b:%.+]] = quantum.custom "PauliY"() [[q1]]
-  // CHECK: [[r1:%.+]] = quantum.insert [[r0]][ 0], %out_qubits
-  // CHECK: [[r2:%.+]] = quantum.insert [[r1]][ 1], %out_qubits_0
+  // CHECK: [[r1:%.+]] = quantum.insert [[r0]][ 0], [[q0b]]
+  // CHECK: [[r2:%.+]] = quantum.insert [[r1]][ 1], [[q1b]]
 
   %q0  = quantum.extract %r0[ 0] : !quantum.reg -> !quantum.bit
   %q0b = quantum.custom "PauliX"() %q0 : !quantum.bit
