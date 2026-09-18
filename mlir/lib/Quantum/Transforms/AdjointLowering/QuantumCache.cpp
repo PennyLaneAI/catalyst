@@ -28,6 +28,8 @@ namespace quantum {
 
 LogicalResult verifyTypeIsCacheable(Type ty, Operation *op) {
     // Sanitizing inputs.
+    // TODO: although OperatorOp params can be arbitrary types, currently only caching of f64s and
+    // complex (and tensors of them) are implemented.
     if (ty.isF64() || ty.isInteger()) {
         return success();
     }
