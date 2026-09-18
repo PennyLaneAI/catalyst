@@ -112,6 +112,11 @@
 
 <h3>Improvements 🛠</h3>
 
+* When the graph-based decomposition solver cannot reach the target gate set, the error now lists
+  the actual operators that could not be decomposed (e.g. arbitrary-angle rotations) and the rules
+  it tried, instead of only naming the top-level operator.
+  [(#3246)](https://github.com/PennyLaneAI/catalyst/pull/3246)
+
 * Add the `XMEM_REPLY_BRAM` memory type and use it to allocate reply buffers in dedicated BRAM.
   [(#3148)](https://github.com/PennyLaneAI/catalyst/pull/3148)
 
