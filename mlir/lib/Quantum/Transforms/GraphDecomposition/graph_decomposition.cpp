@@ -168,6 +168,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
             AltDecomps altDecomps = buildAltDecomps(opToAltDecompNames, rulesByName);
             DecompositionGraph graph(setOfOps, targetGateSet, setOfRules, std::move(fixedDecomps),
                                      std::move(altDecomps));
+            graph.showGraph();
             DecompositionSolver solver(graph);
             solution = solver.solve();
         }
