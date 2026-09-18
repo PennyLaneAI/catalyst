@@ -45,8 +45,11 @@ LogicalResult verifyTypeIsCacheable(Type ty, Operation *op) {
     Type elementType = aTensorType.getElementType();
 
     // Real-valued tensors of any rank (e.g. `quantum.operator` angle tensors or a BasisRotation
-    // matrix) are cached element-wise as plain f64 values.
-    if (elementType.isF64()) {
+    // matrix) are cached element-wise as plain f64 values. Integer/boolean tensors (e.g. the
+    // `tensor<Nxi1>` bitstring of a MultiX gate) are cached the same way via an exact f64
+    // round-trip.
+    if (elementType.isF64() || elementType.isInteger()) {
+        llvm::outs() << "Type is cacheable: " << ty << "\n";
         return success();
     }
 

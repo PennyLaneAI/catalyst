@@ -170,48 +170,48 @@ void AugmentedCircuitGenerator::cacheGate(quantum::ParametrizedGate gate, OpBuil
             continue;
         }
 
-        ArrayRef<int64_t> shape = aTensor.getShape();
-        Value c0 = index::ConstantOp::create(builder, loc, 0);
-        Value c1 = index::ConstantOp::create(builder, loc, 1);
-        bool isDim0Static = ShapedType::kDynamic != shape[0];
-        bool isDim1Static = ShapedType::kDynamic != shape[1];
-        Value dim0Length = isDim0Static ? (Value)index::ConstantOp::create(builder, loc, shape[0])
-                                        : (Value)tensor::DimOp::create(builder, loc, param, c0);
-        Value dim1Length = isDim1Static ? (Value)index::ConstantOp::create(builder, loc, shape[1])
-                                        : (Value)tensor::DimOp::create(builder, loc, param, c1);
+        // ArrayRef<int64_t> shape = aTensor.getShape();
+        // Value c0 = index::ConstantOp::create(builder, loc, 0);
+        // Value c1 = index::ConstantOp::create(builder, loc, 1);
+        // bool isDim0Static = ShapedType::kDynamic != shape[0];
+        // bool isDim1Static = ShapedType::kDynamic != shape[1];
+        // Value dim0Length = isDim0Static ? (Value)index::ConstantOp::create(builder, loc, shape[0])
+        //                                 : (Value)tensor::DimOp::create(builder, loc, param, c0);
+        // Value dim1Length = isDim1Static ? (Value)index::ConstantOp::create(builder, loc, shape[1])
+        //                                 : (Value)tensor::DimOp::create(builder, loc, param, c1);
 
-        Value lowerBoundDim0 = c0;
-        Value upperBoundDim0 = dim0Length;
-        Value stepDim0 = c1;
-        Value lowerBoundDim1 = c0;
-        Value upperBoundDim1 = dim1Length;
-        Value stepDim1 = c1;
-        Value matrix = clonedParam;
+        // Value lowerBoundDim0 = c0;
+        // Value upperBoundDim0 = dim0Length;
+        // Value stepDim0 = c1;
+        // Value lowerBoundDim1 = c0;
+        // Value upperBoundDim1 = dim1Length;
+        // Value stepDim1 = c1;
+        // Value matrix = clonedParam;
 
-        scf::ForOp iForLoop =
-            scf::ForOp::create(builder, loc, lowerBoundDim0, upperBoundDim0, stepDim0);
-        {
-            OpBuilder::InsertionGuard afterIForLoop(builder);
-            builder.setInsertionPointToStart(iForLoop.getBody());
-            Value i_index = iForLoop.getInductionVar();
+        // scf::ForOp iForLoop =
+        //     scf::ForOp::create(builder, loc, lowerBoundDim0, upperBoundDim0, stepDim0);
+        // {
+        //     OpBuilder::InsertionGuard afterIForLoop(builder);
+        //     builder.setInsertionPointToStart(iForLoop.getBody());
+        //     Value i_index = iForLoop.getInductionVar();
 
-            scf::ForOp jForLoop =
-                scf::ForOp::create(builder, loc, lowerBoundDim1, upperBoundDim1, stepDim1);
-            {
-                OpBuilder::InsertionGuard afterJForLoop(builder);
-                builder.setInsertionPointToStart(jForLoop.getBody());
-                Value j_index = jForLoop.getInductionVar();
-                SmallVector<Value> indices = {i_index, j_index};
-                Value element = tensor::ExtractOp::create(builder, loc, matrix, indices);
-                // element is complex!
-                // So we need to convert into {f64, f64}
-                Value real = complex::ReOp::create(builder, loc, element);
-                Value imag = complex::ImOp::create(builder, loc, element);
-                // Again, take note of the order.
-                ListPushOp::create(builder, loc, real, cache.paramVector);
-                ListPushOp::create(builder, loc, imag, cache.paramVector);
-            }
-        }
+        //     scf::ForOp jForLoop =
+        //         scf::ForOp::create(builder, loc, lowerBoundDim1, upperBoundDim1, stepDim1);
+        //     {
+        //         OpBuilder::InsertionGuard afterJForLoop(builder);
+        //         builder.setInsertionPointToStart(jForLoop.getBody());
+        //         Value j_index = jForLoop.getInductionVar();
+        //         SmallVector<Value> indices = {i_index, j_index};
+        //         Value element = tensor::ExtractOp::create(builder, loc, matrix, indices);
+        //         // element is complex!
+        //         // So we need to convert into {f64, f64}
+        //         Value real = complex::ReOp::create(builder, loc, element);
+        //         Value imag = complex::ImOp::create(builder, loc, element);
+        //         // Again, take note of the order.
+        //         ListPushOp::create(builder, loc, real, cache.paramVector);
+        //         ListPushOp::create(builder, loc, imag, cache.paramVector);
+        //     }
+        // }
     }
 }
 
