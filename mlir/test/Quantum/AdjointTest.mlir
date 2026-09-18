@@ -205,30 +205,19 @@ func.func private @qubit_unitary_test() -> tensor<4xcomplex<f64>> {
       %6 = quantum.extract %reg[ 0] : !quantum.reg -> !quantum.bit
       %7 = quantum.extract %reg[ 1] : !quantum.reg -> !quantum.bit
 
-      // CHECK-DAG: [[idx0:%.+]] = index.constant 0
-      // CHECK-DAG: [[idx1:%.+]] = index.constant 1
-      // CHECK-DAG: [[idxN:%.+]] = index.constant
-      // CHECK: scf.for [[i:%.+]] = [[idx0]] to [[idxN]] step [[idx1]]
-      // CHECK:     scf.for [[j:%.+]] = [[idx0]] to [[idxN]] step [[idx1]]
-      // CHECK:     [[element:%.+]] = tensor.extract {{.*}}[[[i]], [[j]]
-      // CHECK:     [[real:%.+]] = complex.re [[element]]
-      // CHECK:     [[imag:%.+]] = complex.im [[element]]
-      // CHECK:     catalyst.list_push [[real]]
-      // CHECK:     catalyst.list_push [[imag]]
+      // The matrix is cached in a list of complex elements by a single push, with the elements
+      // kept as they are instead of being split into real and imaginary parts.
+      // CHECK: [[cache:%.+]] = catalyst.list_init : <complex<f64>>
+      // CHECK-NOT: complex.re
+      // CHECK-NOT: complex.im
+      // CHECK-NOT: tensor.extract
+      // CHECK: catalyst.list_push_block {{%.+}}, [[cache]] : tensor<4x4xcomplex<f64>>, <complex<f64>>
       %8:2 = quantum.unitary(%u : tensor<4x4xcomplex<f64>>) %6, %7 : !quantum.bit, !quantum.bit
-      // CHECK-DAG: [[result:%.+]] = tensor.empty
-      // CHECK: scf.for [[k:%.+]] = [[idx0]] to [[idxN]] step [[idx1]] iter_args([[curr_k:%.+]] = [[result]])
-      // CHECK:   [[kplus1:%.+]] = index.add [[k]], [[idx1]]
-      // CHECK:   [[k_idx:%.+]] = index.sub [[idxN]], [[kplus1]]
-      // CHECK:   [[last_tensor:%.+]] = scf.for [[l:%.+]] = [[idx0]] to [[idxN]] step [[idx1]] iter_args([[curr_l:%.+]] = [[curr_k]])
-      // CHECK:     [[imag2:%.+]] = catalyst.list_pop
-      // CHECK:     [[real2:%.+]] = catalyst.list_pop
-      // CHECK:     [[complex:%.+]] = complex.create [[real2]], [[imag2]]
-      // CHECK:     [[lplus1:%.+]] = index.add [[l]], [[idx1]]
-      // CHECK:     [[l_idx:%.+]] = index.sub [[idxN]], [[lplus1]]
-      // CHECK:     [[new_tensor:%.+]] = tensor.insert [[complex]] into [[curr_l]][[[k_idx]], [[l_idx]]]
-      // CHECK:     scf.yield [[new_tensor]]
-      // CHECK:   scf.yield [[last_tensor]]
+      // CHECK-NOT: complex.create
+      // CHECK-NOT: tensor.insert
+      // CHECK: [[dest:%.+]] = tensor.empty() : tensor<4x4xcomplex<f64>>
+      // CHECK: [[restored:%.+]] = catalyst.list_pop_block [[cache]], [[dest]] : <complex<f64>>, tensor<4x4xcomplex<f64>> -> tensor<4x4xcomplex<f64>>
+      // CHECK: quantum.unitary([[restored]] : tensor<4x4xcomplex<f64>>) {{.*}}adj
 
       %9 = quantum.insert %reg[ 0], %8#0 : !quantum.reg, !quantum.bit
       %10 = quantum.insert %9[ 1], %8#1 : !quantum.reg, !quantum.bit
@@ -744,17 +733,17 @@ func.func private @adjoint_dynamic_register_dynamic_size(%r: !quantum.reg, %n: i
 
 // CHECK-LABEL: @adjoint_real_matrix_param
 func.func @adjoint_real_matrix_param(%arg0: !quantum.reg) -> !quantum.reg {
-  // Forward pass: flatten the 2x2 matrix and push every element into the f64 cache.
+  // Forward pass: the whole matrix is appended to the f64 list by a single push, with no loop
+  // over its elements.
   // CHECK: [[cache:%.+]] = catalyst.list_init : <f64>
   // CHECK: scf.for
-  // CHECK: [[e:%.+]] = tensor.extract {{%.+}}[{{%.+}}, {{%.+}}] : tensor<2x2xf64>
-  // CHECK: catalyst.list_push [[e]], [[cache]] : <f64>
-  // Reverse pass: pop the elements and rebuild the 2x2 matrix for the adjointed op.
-  // CHECK: tensor.empty() : tensor<2x2xf64>
-  // CHECK: scf.for {{.*}} iter_args
-  // CHECK: catalyst.list_pop [[cache]] : <f64>
-  // CHECK: tensor.insert {{%.+}} into {{%.+}}[{{%.+}}, {{%.+}}] : tensor<2x2xf64>
-  // CHECK: quantum.operator "BasisRotation"({{%.+}}: tensor<2x2xf64>) adj
+  // CHECK-NOT: tensor.extract
+  // CHECK: catalyst.list_push_block [[matrix:%.+]], [[cache]] : tensor<2x2xf64>, <f64>
+  // Reverse pass: pop the same block back into a fresh tensor of the same shape.
+  // CHECK-NOT: tensor.insert
+  // CHECK: [[dest:%.+]] = tensor.empty() : tensor<2x2xf64>
+  // CHECK: [[restored:%.+]] = catalyst.list_pop_block [[cache]], [[dest]] : <f64>, tensor<2x2xf64> -> tensor<2x2xf64>
+  // CHECK: quantum.operator "BasisRotation"([[restored]]: tensor<2x2xf64>) adj
   %out = quantum.adjoint(%arg0) : !quantum.reg {
   ^bb0(%r: !quantum.reg):
     %c0 = arith.constant 0 : index
@@ -770,6 +759,84 @@ func.func @adjoint_real_matrix_param(%arg0: !quantum.reg) -> !quantum.reg {
       %r0 = quantum.insert %reg[ 0], %op#0 : !quantum.reg, !quantum.bit
       %r1 = quantum.insert %r0[ 1], %op#1 : !quantum.reg, !quantum.bit
       scf.yield %r1 : !quantum.reg
+    }
+    quantum.yield %for_reg : !quantum.reg
+  }
+  return %out : !quantum.reg
+}
+
+// -----
+
+// CHECK-LABEL: @adjoint_integer_params
+func.func @adjoint_integer_params(%arg0: !quantum.reg) -> !quantum.reg {
+  // Parameter lists are keyed by element type, so the i64 scalar and the tensor<2x3xi64> share
+  // one list. The first i64 list is the one holding dynamic wire indices.
+  // CHECK: catalyst.list_init : <i64>
+  // CHECK: [[cache:%.+]] = catalyst.list_init : <i64>
+  %out = quantum.adjoint(%arg0) : !quantum.reg {
+  ^bb0(%r: !quantum.reg):
+    %c0 = arith.constant 0 : index
+    %c4 = arith.constant 4 : index
+    %c1 = arith.constant 1 : index
+    %for_reg = scf.for %i = %c0 to %c4 step %c1 iter_args(%reg = %r) -> (!quantum.reg) {
+      %shots = "test.op"() : () -> i64
+      %table = "test.op"() : () -> tensor<2x3xi64>
+      %q0 = quantum.extract %reg[ 0] : !quantum.reg -> !quantum.bit
+
+      // Forward pass: the scalar is pushed on its own, the tensor as a whole block, both into the
+      // same list.
+      // CHECK: catalyst.list_push [[shots:%.+]], [[cache]] : <i64>
+      // CHECK: catalyst.list_push_block [[table:%.+]], [[cache]] : tensor<2x3xi64>, <i64>
+      %op = quantum.operator "SomeIntegerGate"(%shots: i64, %table: tensor<2x3xi64>) qubits(%q0)
+        param_map = {shots = [0], table = [1]} qubit_map = {wires = [0]}
+
+      // Reverse pass: parameters are popped in reverse order of the pushes.
+      // CHECK: [[dest:%.+]] = tensor.empty() : tensor<2x3xi64>
+      // CHECK: [[restored:%.+]] = catalyst.list_pop_block [[cache]], [[dest]] : <i64>, tensor<2x3xi64> -> tensor<2x3xi64>
+      // CHECK: [[popped_scalar:%.+]] = catalyst.list_pop [[cache]] : <i64>
+      // CHECK: quantum.operator "SomeIntegerGate"([[popped_scalar]]: i64, [[restored]]: tensor<2x3xi64>) adj
+
+      %r0 = quantum.insert %reg[ 0], %op : !quantum.reg, !quantum.bit
+      scf.yield %r0 : !quantum.reg
+    }
+    quantum.yield %for_reg : !quantum.reg
+  }
+  return %out : !quantum.reg
+}
+
+// -----
+
+// CHECK-LABEL: @adjoint_dynamically_shaped_param
+func.func @adjoint_dynamically_shaped_param(%arg0: !quantum.reg) -> !quantum.reg {
+  // A dynamically shaped tensor is cached as a single block just like a static one. Its dynamic
+  // dimensions are recorded in a separate list of index values so that the reverse pass can
+  // rebuild the shape without referring to the region being replaced.
+  // CHECK: [[cache:%.+]] = catalyst.list_init : <f64>
+  // CHECK: [[shapes:%.+]] = catalyst.list_init : <index>
+  %out = quantum.adjoint(%arg0) : !quantum.reg {
+  ^bb0(%r: !quantum.reg):
+    %c0 = arith.constant 0 : index
+    %c4 = arith.constant 4 : index
+    %c1 = arith.constant 1 : index
+    %for_reg = scf.for %i = %c0 to %c4 step %c1 iter_args(%reg = %r) -> (!quantum.reg) {
+      %angles = "test.op"() : () -> tensor<?xf64>
+      %q0 = quantum.extract %reg[ 0] : !quantum.reg -> !quantum.bit
+
+      // CHECK: [[dim:%.+]] = tensor.dim
+      // CHECK: catalyst.list_push [[dim]], [[shapes]] : <index>
+      // CHECK-NOT: tensor.extract
+      // CHECK: catalyst.list_push_block [[angles:%.+]], [[cache]] : tensor<?xf64>, <f64>
+      %op = quantum.operator "SomeDynamicGate"(%angles: tensor<?xf64>) qubits(%q0)
+        param_map = {angles = [0]} qubit_map = {wires = [0]}
+
+      // The shape is restored from the cache, never read off the original parameter.
+      // CHECK: [[popped_dim:%.+]] = catalyst.list_pop [[shapes]] : <index>
+      // CHECK: [[dest:%.+]] = tensor.empty([[popped_dim]]) : tensor<?xf64>
+      // CHECK: [[restored:%.+]] = catalyst.list_pop_block [[cache]], [[dest]] : <f64>, tensor<?xf64> -> tensor<?xf64>
+      // CHECK: quantum.operator "SomeDynamicGate"([[restored]]: tensor<?xf64>) adj
+
+      %r0 = quantum.insert %reg[ 0], %op : !quantum.reg, !quantum.bit
+      scf.yield %r0 : !quantum.reg
     }
     quantum.yield %for_reg : !quantum.reg
   }

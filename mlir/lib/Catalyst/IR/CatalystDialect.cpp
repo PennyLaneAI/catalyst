@@ -46,7 +46,66 @@ void CatalystDialect::initialize() {
         >();
 
     declarePromisedInterfaces<bufferization::BufferizableOpInterface, PrintOp, CustomCallOp,
-                              CallbackCallOp, CallbackOp>();
+                              CallbackCallOp, CallbackOp, ListPushBlockOp, ListPopBlockOp>();
+}
+
+//===----------------------------------------------------------------------===//
+// ListPushBlockOp / ListPopBlockOp
+//===----------------------------------------------------------------------===//
+
+/// Verify the shaped operand of a block push/pop against the list it is stored in. `name` is used
+/// to refer to the operand in diagnostics.
+static LogicalResult verifyBlockOperand(Operation *op, llvm::StringRef name, Type blockType,
+                                        ArrayListType listType) {
+    auto shapedType = cast<ShapedType>(blockType);
+    if (shapedType.getElementType() != listType.getElementType()) {
+        return op->emitOpError() << "expects the element type of '" << name << "' ("
+                                 << shapedType.getElementType()
+                                 << ") to match the element type of the list ("
+                                 << listType.getElementType() << ")";
+    }
+
+    if (isa<RankedTensorType>(blockType)) {
+        // A rank-0 tensor holds a single element and is cached with catalyst.list_push/list_pop:
+        // it has no rank-1 buffer to collapse to, so bufferization could not lower it.
+        if (shapedType.getRank() == 0) {
+            return op->emitOpError() << "expects '" << name << "' to have rank at least 1";
+        }
+        return success();
+    }
+
+    // After bufferization the block is the collapsed, contiguous buffer of the tensor. A
+    // non-identity layout would either be non-collapsible or alias a strided slice, neither of
+    // which the flat list storage can represent.
+    auto memrefType = cast<MemRefType>(blockType);
+    if (!memrefType.getLayout().isIdentity()) {
+        return op->emitOpError() << "expects '" << name << "' to have an identity layout, but got "
+                                 << memrefType;
+    }
+    return success();
+}
+
+LogicalResult ListPushBlockOp::verify() {
+    return verifyBlockOperand(*this, "elements", getElements().getType(), getList().getType());
+}
+
+LogicalResult ListPopBlockOp::verify() {
+    Type destinationType = getDestination().getType();
+    if (failed(verifyBlockOperand(*this, "destination", destinationType, getList().getType()))) {
+        return failure();
+    }
+
+    bool hasTensorDestination = isa<RankedTensorType>(destinationType);
+    if (hasTensorDestination != static_cast<bool>(getResult())) {
+        return emitOpError() << "expects a result if and only if 'destination' is a tensor: a "
+                                "tensor destination is returned filled, a memref destination is "
+                                "written in place";
+    }
+    if (getResult() && getResult().getType() != destinationType) {
+        return emitOpError() << "expects the result type (" << getResult().getType()
+                             << ") to match the type of 'destination' (" << destinationType << ")";
+    }
+    return success();
 }
 
 //===----------------------------------------------------------------------===//

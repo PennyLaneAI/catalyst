@@ -14,12 +14,10 @@
 
 #include <cstdint>
 
-#include "mlir/Dialect/Complex/IR/Complex.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Index/IR/IndexOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
-#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/IR/IRMapping.h"
 #include "mlir/Transforms/DialectConversion.h"
@@ -45,25 +43,6 @@ void populateArgIdxMapping(TypeRange types, DenseMap<unsigned, unsigned> &argIdx
             argIdxMapping.insert({oldIdx, newIdx++});
         }
     }
-}
-
-/// Convert a row-major linearized index into per-dimension coordinates given the size of each
-/// dimension, so that an arbitrary-rank tensor can be walked with a single flattened loop.
-SmallVector<Value> delinearizeIndex(OpBuilder &builder, Location loc, Value linear,
-                                    ArrayRef<Value> dimSizes) {
-    int64_t rank = dimSizes.size();
-    SmallVector<Value> strides(rank);
-    Value acc = index::ConstantOp::create(builder, loc, 1);
-    for (int64_t d = rank - 1; d >= 0; --d) {
-        strides[d] = acc;
-        acc = index::MulOp::create(builder, loc, acc, dimSizes[d]);
-    }
-    SmallVector<Value> coords(rank);
-    for (int64_t d = 0; d < rank; ++d) {
-        Value q = index::DivUOp::create(builder, loc, linear, strides[d]);
-        coords[d] = index::RemUOp::create(builder, loc, q, dimSizes[d]);
-    }
-    return coords;
 }
 
 /// Generates the forward "augmented circuit" of the adjoint operation: classical preprocessing is
@@ -113,9 +92,7 @@ class AugmentedCircuitGenerator {
 };
 
 void AugmentedCircuitGenerator::cacheGate(quantum::ParametrizedGate gate, OpBuilder &builder) {
-    ValueRange params = gate.getAllParams();
-
-    for (Value param : params) {
+    for (Value param : gate.getAllParams()) {
         Location loc = gate.getLoc();
 
         // Params that the reverse pass can already see do not need to be recorded.
@@ -123,95 +100,14 @@ void AugmentedCircuitGenerator::cacheGate(quantum::ParametrizedGate gate, OpBuil
             continue;
         }
 
+        // Record the cloned value, which lives in the augmented circuit being built. The original
+        // `param` belongs to the region that is about to be erased.
         Value clonedParam = oldToCloned.lookupOrDefault(param);
-        Type paramType = clonedParam.getType();
-        Operation *op = gate;
-        if (mlir::failed(verifyTypeIsCacheable(paramType, op))) {
+        if (mlir::failed(verifyTypeIsCacheable(clonedParam.getType(), gate))) {
             generationFailed = true;
             return;
         }
-
-        if (paramType.isF64()) {
-            ListPushOp::create(builder, loc, clonedParam, cache.paramVector);
-            continue;
-        }
-
-        auto aTensor = cast<RankedTensorType>(paramType);
-
-        // Real-valued tensor params (e.g. the `tensor<Nxf64>` angle carried by `quantum.operator`
-        // gates such as RZ, or the `tensor<NxNxf64>` matrix of a BasisRotation) are cached
-        // element-by-element as plain f64 values in row-major order. The complex-matrix path below
-        // is specific to QubitUnitary's `tensor<NxNxcomplex<f64>>`.
-        if (aTensor.getElementType().isF64()) {
-            if (aTensor.getRank() == 0) {
-                Value element = tensor::ExtractOp::create(builder, loc, clonedParam, ValueRange{});
-                ListPushOp::create(builder, loc, element, cache.paramVector);
-                continue;
-            }
-            Value c0i = index::ConstantOp::create(builder, loc, 0);
-            Value c1i = index::ConstantOp::create(builder, loc, 1);
-            SmallVector<Value> dimSizes;
-            Value total = c1i;
-            for (int64_t d = 0; d < aTensor.getRank(); ++d) {
-                Value dim =
-                    ShapedType::kDynamic != aTensor.getShape()[d]
-                        ? (Value)index::ConstantOp::create(builder, loc, aTensor.getShape()[d])
-                        : (Value)tensor::DimOp::create(builder, loc, clonedParam, d);
-                dimSizes.push_back(dim);
-                total = index::MulOp::create(builder, loc, total, dim);
-            }
-            scf::ForOp loop = scf::ForOp::create(builder, loc, c0i, total, c1i);
-            OpBuilder::InsertionGuard guard(builder);
-            builder.setInsertionPointToStart(loop.getBody());
-            SmallVector<Value> coords =
-                delinearizeIndex(builder, loc, loop.getInductionVar(), dimSizes);
-            Value element = tensor::ExtractOp::create(builder, loc, clonedParam, coords);
-            ListPushOp::create(builder, loc, element, cache.paramVector);
-            continue;
-        }
-
-        ArrayRef<int64_t> shape = aTensor.getShape();
-        Value c0 = index::ConstantOp::create(builder, loc, 0);
-        Value c1 = index::ConstantOp::create(builder, loc, 1);
-        bool isDim0Static = ShapedType::kDynamic != shape[0];
-        bool isDim1Static = ShapedType::kDynamic != shape[1];
-        Value dim0Length = isDim0Static ? (Value)index::ConstantOp::create(builder, loc, shape[0])
-                                        : (Value)tensor::DimOp::create(builder, loc, param, c0);
-        Value dim1Length = isDim1Static ? (Value)index::ConstantOp::create(builder, loc, shape[1])
-                                        : (Value)tensor::DimOp::create(builder, loc, param, c1);
-
-        Value lowerBoundDim0 = c0;
-        Value upperBoundDim0 = dim0Length;
-        Value stepDim0 = c1;
-        Value lowerBoundDim1 = c0;
-        Value upperBoundDim1 = dim1Length;
-        Value stepDim1 = c1;
-        Value matrix = clonedParam;
-
-        scf::ForOp iForLoop =
-            scf::ForOp::create(builder, loc, lowerBoundDim0, upperBoundDim0, stepDim0);
-        {
-            OpBuilder::InsertionGuard afterIForLoop(builder);
-            builder.setInsertionPointToStart(iForLoop.getBody());
-            Value i_index = iForLoop.getInductionVar();
-
-            scf::ForOp jForLoop =
-                scf::ForOp::create(builder, loc, lowerBoundDim1, upperBoundDim1, stepDim1);
-            {
-                OpBuilder::InsertionGuard afterJForLoop(builder);
-                builder.setInsertionPointToStart(jForLoop.getBody());
-                Value j_index = jForLoop.getInductionVar();
-                SmallVector<Value> indices = {i_index, j_index};
-                Value element = tensor::ExtractOp::create(builder, loc, matrix, indices);
-                // element is complex!
-                // So we need to convert into {f64, f64}
-                Value real = complex::ReOp::create(builder, loc, element);
-                Value imag = complex::ImOp::create(builder, loc, element);
-                // Again, take note of the order.
-                ListPushOp::create(builder, loc, real, cache.paramVector);
-                ListPushOp::create(builder, loc, imag, cache.paramVector);
-            }
-        }
+        cache.pushParam(clonedParam, builder, loc);
     }
 }
 
