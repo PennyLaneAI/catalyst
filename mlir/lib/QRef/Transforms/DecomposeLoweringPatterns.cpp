@@ -34,9 +34,9 @@
 #include "mlir/Support/LogicalResult.h"
 
 #include "QRef/IR/QRefInterfaces.h"
-#include "Quantum/IR/DecompositionInterfaces.h"
 #include "QRef/IR/QRefTypes.h"
 #include "QRef/Transforms/Patterns.h"
+#include "Quantum/IR/DecompositionInterfaces.h"
 
 #include "DecompUtils.hpp"
 #include "DecomposeLoweringImpl.hpp"

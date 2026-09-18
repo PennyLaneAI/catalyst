@@ -26,9 +26,9 @@
 #include "mlir/Interfaces/ControlFlowInterfaces.h"
 #include "mlir/Support/LogicalResult.h"
 
+#include "Quantum/IR/DecompositionInterfaces.h"
 #include "Quantum/IR/QuantumDialect.h"
 #include "Quantum/IR/QuantumInterfaces.h"
-#include "Quantum/IR/DecompositionInterfaces.h"
 
 //===----------------------------------------------------------------------===//
 // Quantum ops declarations.

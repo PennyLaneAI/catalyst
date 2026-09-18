@@ -12,10 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "Quantum/IR/QuantumInterfaces.h"
 #include "Quantum/IR/DecompositionInterfaces.h"
-
-#include "QRef/IR/QRefInterfaces.h"
 
 #include <cstddef>
 #include <string>
@@ -27,6 +24,9 @@
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/Types.h"
 #include "mlir/Support/LLVM.h"
+
+#include "QRef/IR/QRefInterfaces.h"
+#include "Quantum/IR/QuantumInterfaces.h"
 
 using namespace mlir;
 using namespace catalyst::quantum;
@@ -103,8 +103,7 @@ static std::string wrapModifiers(std::string name, Operation *op) {
     }
     if (auto gate = mlir::dyn_cast<QuantumGate>(op)) {
         numCtrl = gate.getCtrlQubitOperands().size();
-    }
-    else if(auto gate = mlir::dyn_cast<catalyst::qref::QuantumGate>(op)) {
+    } else if (auto gate = mlir::dyn_cast<catalyst::qref::QuantumGate>(op)) {
         numCtrl = gate.getCtrlQubitOperands().size();
     }
 
@@ -117,13 +116,12 @@ static std::string wrapModifiers(std::string name, Operation *op) {
 }
 
 // Check if the operator has modifiers (e.g. adjoint, control)
-bool hasModifiers(Operation* op){
+bool hasModifiers(Operation *op) {
     size_t numCtrl = 0;
 
     if (auto gate = mlir::dyn_cast<QuantumGate>(op)) {
         numCtrl = gate.getCtrlQubitOperands().size();
-    }
-    else if(auto gate = mlir::dyn_cast<catalyst::qref::QuantumGate>(op)) {
+    } else if (auto gate = mlir::dyn_cast<catalyst::qref::QuantumGate>(op)) {
         numCtrl = gate.getCtrlQubitOperands().size();
     }
 

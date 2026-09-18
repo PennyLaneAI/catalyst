@@ -593,7 +593,8 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
             // These debug parameters are not needed for the graph solver, so we fill it in
             // based on if the op has the required information for it or not.
 
-            if(auto quantumOp = llvm::dyn_cast<catalyst::quantum::QuantumGate>(op.getOperation())) {
+            if (auto quantumOp =
+                    llvm::dyn_cast<catalyst::quantum::QuantumGate>(op.getOperation())) {
                 node.numWires = quantumOp.getNonCtrlQubitOperands().size();
             } else {
                 node.numWires = 0;
