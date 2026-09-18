@@ -51,6 +51,8 @@ from catalyst.decomposition.decomposition_rules import (
     _control_modifier,
     _leading_modifier_kind,
     _modifier_kind,
+    _rule_allocates_work_wires,
+    _rule_is_applicable,
     collect_resources_for_op,
     collect_symbolic_resources,
     compile_decomposition_rules_wrapper,
@@ -389,6 +391,7 @@ class TestGenericUtilities:
         """Test that compile_decomposition_rules_wrapper doesn't error on Operator1 instances."""
         mock_decomp = mocker.MagicMock()
         mock_decomp.name = "FakeRuleName"
+        mock_decomp.get_work_wire_spec.return_value.total = 0
         mock_decomp.compute_resources.side_effect = ValueError("Fake Resource Related Error")
 
         mocker.patch("pennylane.decomposition.list_decomps", return_value=[mock_decomp])
@@ -403,6 +406,7 @@ class TestGenericUtilities:
         """Test that decomposition conditions receive compilable operator data."""
         mock_decomp = mocker.MagicMock()
         mock_decomp.name = "FakeRuleName"
+        mock_decomp.get_work_wire_spec.return_value.total = 0
         mock_decomp.compute_resources.return_value.gate_counts = {}
         mock_decomp.is_applicable.side_effect = (
             lambda *, wires, a, b, thing: a and b == 3.14 and thing == "string"
@@ -429,6 +433,25 @@ class TestGenericUtilities:
         assert probe_wires.shape == (2,)
         assert np.all(probe_wires < 0)
         assert len(np.unique(probe_wires)) == 2
+
+    def test_rule_with_unreadable_work_wire_spec_is_excluded(self):
+        """A rule whose work-wire spec cannot be read is excluded, with a warning.
+
+        We cannot tell whether such a rule allocates work wires, so it is conservatively treated
+        as one that does, matching how a rule whose ``is_applicable`` raises is handled.
+        """
+
+        @register_resources(lambda wires: {qp.X(Wire[1]): 1})
+        def raises_on_spec(wires):
+            qp.X(wires[0:1])
+
+        raises_on_spec.get_work_wire_spec = lambda *args, **kwargs: 1 / 0
+
+        with pytest.raises(ZeroDivisionError):
+            _rule_allocates_work_wires(raises_on_spec, wires=Wires([0]))
+
+        with pytest.warns(RuleLoweringWarning, match="could not read its work-wire spec"):
+            assert not _rule_is_applicable("MockOp", raises_on_spec, wires=Wires([0]))
 
     def test_collect_resources_unrolls_change_op_basis_for_capture(self):
         """Resources match the rule body that capture produces, even when resource collection
@@ -682,6 +705,49 @@ class TestTraceTime:
         assert 'target_gate = "MultipleRegisters{}{reg1:2,reg2:1}{}"' in mlir
         assert "no_work_wires" in mlir
         assert "borrow_two_work_wires" not in mlir
+
+    # NOTE: Not a lit test, as we need to inspect the warning the excluded rule raises.
+    def test_rule_that_allocates_work_wires_is_excluded(self, recwarn):
+        """Tests that a rule declaring work wires is not offered to the solver.
+
+        Such a rule calls ``qp.allocate``, which lowers to a second qreg, and
+        ``decompose-lowering`` binds a register-mode rule to exactly one register. The rule is
+        excluded up front so the solver picks one that can actually be lowered, rather than
+        aborting later with ``cannot span multiple qregs yet``.
+        """
+
+        @register_resources(lambda reg1, reg2: {qp.X(Wire[1]): 2}, work_wires={"zeroed": 1})
+        def allocates_a_work_wire(reg1, reg2):
+            with qp.allocate(1, state="zero", restored=True) as aux:
+                qp.X(aux[0:1])
+                qp.X(reg1[0:1])
+
+        @register_resources(lambda reg1, reg2: {qp.X(Wire[1]): 2})
+        def allocates_nothing(reg1, reg2):
+            qp.X(reg1[0:1])
+            qp.X(reg1[0:1])
+
+        with local_decomps():
+            add_decomps(MultipleRegisters, allocates_a_work_wire, allocates_nothing)
+
+            @qjit(capture=True, target="mlir")
+            @qnode(qp.device("null.qubit", wires=3))
+            def circuit():
+                MultipleRegisters(reg1=[0, 1], reg2=[2])
+                return qp.state()
+
+            mlir = circuit.mlir
+
+        lowering_warnings = [
+            str(w.message) for w in recwarn if issubclass(w.category, RuleLoweringWarning)
+        ]
+
+        assert any(
+            "allocates_a_work_wire" in message and "multiple registers" in message
+            for message in lowering_warnings
+        )
+        assert "allocates_nothing" in mlir
+        assert "allocates_a_work_wire" not in mlir
 
     def test_fixed_decomps(self):
         """Test that fixed decomps are adhered to."""
