@@ -249,6 +249,12 @@
   - The `graph-decomposition` pass now uses `alt-decomps` to denote the strict set of rules that are considered for an operator, i.e. it no longer considers builtin rules if `alt-decomps` is specified, unless the builtin rules are listed.
     [(#3230)](https://github.com/PennyLaneAI/catalyst/pull/3230)
 
+  - Decomposition rules that dynamically allocate work wires are not offered to the
+    graph-decomposition solver, since `decompose-lowering` cannot lower them yet.
+    Note that such a rule is excluded even when it is named in `fixed_decomps`, in which case the
+    decomposition graph may no longer be solvable.
+    [(#3243)](https://github.com/PennyLaneAI/catalyst/pull/3243)
+
 * Numeric molecular/vibrational Hamiltonians carried as hybrid arguments by Trotter operators can now
   be decomposed through the graph-based decomposition system, together with MLIR/lowering tests for
   the base `CDFHamiltonian`/`CGFHamiltonian` types.
@@ -621,12 +627,6 @@
 <h3>Deprecations 👋</h3>
 
 <h3>Bug fixes 🐛</h3>
-
-* Decomposition rules that dynamically allocate work wires are no longer offered to the
-  graph-decomposition solver, since `decompose-lowering` cannot yet lower them.
-  Note that a rule excluded here is excluded even when it is named in `fixed_decomps`, in which
-  case the decomposition graph may no longer be solvable.
-  [(#3243)](https://github.com/PennyLaneAI/catalyst/pull/3243)
 
 * Fixed a bug where an executor's SSH connection multiplexing was silently disabled on macOS,
   making every remote operation pay a fresh authentication handshake. The control socket went in
