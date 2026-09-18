@@ -18,6 +18,7 @@
 #include <vector>
 
 #include "Quantum/IR/QuantumInterfaces.h"
+#include "Quantum/IR/DecompositionInterfaces.h"
 
 namespace catalyst::quantum {
 
