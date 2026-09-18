@@ -1914,12 +1914,15 @@ class TestNumericHamiltonianDecomposition:
             "PhaseShift",
             "RX",
             "PauliX",
+            "C(CNOT)",
         }
         expected = {
             "C(Adjoint(BasisRotation))": 62,
             "C(CNOT)": 240,
             "CRZ": 160,
+            "GlobalPhase": 1,
             "PauliX": 320,
+            "PhaseShift": 1,
         }
 
         @qjit(capture=True, target="mlir")
