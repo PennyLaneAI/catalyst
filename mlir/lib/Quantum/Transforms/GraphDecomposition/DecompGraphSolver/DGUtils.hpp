@@ -57,12 +57,26 @@ static inline auto print_op(const OperatorNode &op) -> std::string {
 }
 
 static inline auto graph_failed_message(const OperatorNode &op,
-                                        const std::vector<std::string> &rule_errors)
+                                        const std::vector<std::string> &rule_errors,
+                                        const std::vector<OperatorNode> &unsolvable = {})
     -> std::string {
     std::ostringstream oss;
     oss << "Decomposition rule not found for operator '" << print_op(op) << "'";
+    if (!unsolvable.empty()) {
+        oss << ".\nThe following required operators could not reach the target gateset:";
+        constexpr size_t maxToShow = 25;
+        size_t shown = 0;
+        for (const auto &u : unsolvable) {
+            if (shown++ == maxToShow) {
+                oss << "\n  * ... and " << (unsolvable.size() - maxToShow) << " more";
+                break;
+            }
+            oss << "\n  * " << print_op(u);
+        }
+        oss << "\nAdd one of these (or gates they can decompose into) to the target gateset.";
+    }
     if (!rule_errors.empty()) {
-        oss << ". Tried rules:";
+        oss << "\nTried rules for '" << print_op(op) << "':";
         for (const auto &error : rule_errors) {
             oss << "\n  - " << error;
         }
@@ -91,8 +105,9 @@ class GraphError : public std::runtime_error {
 
 class GraphSolverFailedError : public GraphError {
   public:
-    GraphSolverFailedError(OperatorNode op, std::vector<std::string> rule_errors)
-        : GraphError(graph_failed_message(op, rule_errors)) {}
+    GraphSolverFailedError(OperatorNode op, std::vector<std::string> rule_errors,
+                           std::vector<OperatorNode> unsolvable = {})
+        : GraphError(graph_failed_message(op, rule_errors, unsolvable)) {}
 };
 
 class RuleInvalidOverrideError : public GraphError {
