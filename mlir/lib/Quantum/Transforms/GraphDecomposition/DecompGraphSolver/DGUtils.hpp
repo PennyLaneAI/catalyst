@@ -62,8 +62,16 @@ static inline auto graph_failed_message(const OperatorNode &op,
     -> std::string {
     std::ostringstream oss;
     oss << "Decomposition rule not found for operator '" << print_op(op) << "'";
+    // Keep the tried rules right next to the failed operator, so both stay together (and survive a
+    // truncated snippet of the trace); the longer required-gates list follows.
+    if (!rule_errors.empty()) {
+        oss << ".\nTried rules for '" << print_op(op) << "':";
+        for (const auto &error : rule_errors) {
+            oss << "\n  - " << error;
+        }
+    }
     if (!unsolvable.empty()) {
-        oss << ".\nThe following required operators could not reach the target gateset:";
+        oss << "\nThe following required operators could not reach the target gateset:";
         constexpr size_t maxToShow = 25;
         size_t shown = 0;
         for (const auto &u : unsolvable) {
@@ -74,12 +82,6 @@ static inline auto graph_failed_message(const OperatorNode &op,
             oss << "\n  * " << print_op(u);
         }
         oss << "\nAdd one of these (or gates they can decompose into) to the target gateset.";
-    }
-    if (!rule_errors.empty()) {
-        oss << "\nTried rules for '" << print_op(op) << "':";
-        for (const auto &error : rule_errors) {
-            oss << "\n  - " << error;
-        }
     }
     return oss.str();
 }
