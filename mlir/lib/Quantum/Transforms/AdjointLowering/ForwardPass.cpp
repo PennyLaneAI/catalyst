@@ -14,6 +14,7 @@
 
 #include <cstdint>
 
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Complex/IR/Complex.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Index/IR/IndexOps.h"
@@ -136,16 +137,34 @@ void AugmentedCircuitGenerator::cacheGate(quantum::ParametrizedGate gate, OpBuil
             continue;
         }
 
+        // Integer/boolean scalar params are cached through the f64 buffer via an exact round-trip.
+        if (isa<IntegerType>(paramType)) {
+            Value asF64 =
+                arith::UIToFPOp::create(builder, loc, builder.getF64Type(), clonedParam);
+            ListPushOp::create(builder, loc, asF64, cache.paramVector);
+            continue;
+        }
+
         auto aTensor = cast<RankedTensorType>(paramType);
+        Type elemType = aTensor.getElementType();
 
         // Real-valued tensor params (e.g. the `tensor<Nxf64>` angle carried by `quantum.operator`
         // gates such as RZ, or the `tensor<NxNxf64>` matrix of a BasisRotation) are cached
-        // element-by-element as plain f64 values in row-major order. The complex-matrix path below
-        // is specific to QubitUnitary's `tensor<NxNxcomplex<f64>>`.
-        if (aTensor.getElementType().isF64()) {
+        // element-by-element as plain f64 values in row-major order. Integer/boolean tensors (e.g. a
+        // MultiX `tensor<Nxi1>` bitstring) are cached the same way, casting each element to f64
+        // first. The complex-matrix path below is specific to QubitUnitary's
+        // `tensor<NxNxcomplex<f64>>`.
+        if (elemType.isF64() || elemType.isInteger()) {
+            // Cast an extracted integer/boolean element to f64 before recording it.
+            auto toF64 = [&](Value element) -> Value {
+                if (elemType.isInteger()) {
+                    return arith::UIToFPOp::create(builder, loc, builder.getF64Type(), element);
+                }
+                return element;
+            };
             if (aTensor.getRank() == 0) {
                 Value element = tensor::ExtractOp::create(builder, loc, clonedParam, ValueRange{});
-                ListPushOp::create(builder, loc, element, cache.paramVector);
+                ListPushOp::create(builder, loc, toF64(element), cache.paramVector);
                 continue;
             }
             Value c0i = index::ConstantOp::create(builder, loc, 0);
@@ -166,52 +185,52 @@ void AugmentedCircuitGenerator::cacheGate(quantum::ParametrizedGate gate, OpBuil
             SmallVector<Value> coords =
                 delinearizeIndex(builder, loc, loop.getInductionVar(), dimSizes);
             Value element = tensor::ExtractOp::create(builder, loc, clonedParam, coords);
-            ListPushOp::create(builder, loc, element, cache.paramVector);
+            ListPushOp::create(builder, loc, toF64(element), cache.paramVector);
             continue;
         }
 
-        // ArrayRef<int64_t> shape = aTensor.getShape();
-        // Value c0 = index::ConstantOp::create(builder, loc, 0);
-        // Value c1 = index::ConstantOp::create(builder, loc, 1);
-        // bool isDim0Static = ShapedType::kDynamic != shape[0];
-        // bool isDim1Static = ShapedType::kDynamic != shape[1];
-        // Value dim0Length = isDim0Static ? (Value)index::ConstantOp::create(builder, loc, shape[0])
-        //                                 : (Value)tensor::DimOp::create(builder, loc, param, c0);
-        // Value dim1Length = isDim1Static ? (Value)index::ConstantOp::create(builder, loc, shape[1])
-        //                                 : (Value)tensor::DimOp::create(builder, loc, param, c1);
+        ArrayRef<int64_t> shape = aTensor.getShape();
+        Value c0 = index::ConstantOp::create(builder, loc, 0);
+        Value c1 = index::ConstantOp::create(builder, loc, 1);
+        bool isDim0Static = ShapedType::kDynamic != shape[0];
+        bool isDim1Static = ShapedType::kDynamic != shape[1];
+        Value dim0Length = isDim0Static ? (Value)index::ConstantOp::create(builder, loc, shape[0])
+                                        : (Value)tensor::DimOp::create(builder, loc, param, c0);
+        Value dim1Length = isDim1Static ? (Value)index::ConstantOp::create(builder, loc, shape[1])
+                                        : (Value)tensor::DimOp::create(builder, loc, param, c1);
 
-        // Value lowerBoundDim0 = c0;
-        // Value upperBoundDim0 = dim0Length;
-        // Value stepDim0 = c1;
-        // Value lowerBoundDim1 = c0;
-        // Value upperBoundDim1 = dim1Length;
-        // Value stepDim1 = c1;
-        // Value matrix = clonedParam;
+        Value lowerBoundDim0 = c0;
+        Value upperBoundDim0 = dim0Length;
+        Value stepDim0 = c1;
+        Value lowerBoundDim1 = c0;
+        Value upperBoundDim1 = dim1Length;
+        Value stepDim1 = c1;
+        Value matrix = clonedParam;
 
-        // scf::ForOp iForLoop =
-        //     scf::ForOp::create(builder, loc, lowerBoundDim0, upperBoundDim0, stepDim0);
-        // {
-        //     OpBuilder::InsertionGuard afterIForLoop(builder);
-        //     builder.setInsertionPointToStart(iForLoop.getBody());
-        //     Value i_index = iForLoop.getInductionVar();
+        scf::ForOp iForLoop =
+            scf::ForOp::create(builder, loc, lowerBoundDim0, upperBoundDim0, stepDim0);
+        {
+            OpBuilder::InsertionGuard afterIForLoop(builder);
+            builder.setInsertionPointToStart(iForLoop.getBody());
+            Value i_index = iForLoop.getInductionVar();
 
-        //     scf::ForOp jForLoop =
-        //         scf::ForOp::create(builder, loc, lowerBoundDim1, upperBoundDim1, stepDim1);
-        //     {
-        //         OpBuilder::InsertionGuard afterJForLoop(builder);
-        //         builder.setInsertionPointToStart(jForLoop.getBody());
-        //         Value j_index = jForLoop.getInductionVar();
-        //         SmallVector<Value> indices = {i_index, j_index};
-        //         Value element = tensor::ExtractOp::create(builder, loc, matrix, indices);
-        //         // element is complex!
-        //         // So we need to convert into {f64, f64}
-        //         Value real = complex::ReOp::create(builder, loc, element);
-        //         Value imag = complex::ImOp::create(builder, loc, element);
-        //         // Again, take note of the order.
-        //         ListPushOp::create(builder, loc, real, cache.paramVector);
-        //         ListPushOp::create(builder, loc, imag, cache.paramVector);
-        //     }
-        // }
+            scf::ForOp jForLoop =
+                scf::ForOp::create(builder, loc, lowerBoundDim1, upperBoundDim1, stepDim1);
+            {
+                OpBuilder::InsertionGuard afterJForLoop(builder);
+                builder.setInsertionPointToStart(jForLoop.getBody());
+                Value j_index = jForLoop.getInductionVar();
+                SmallVector<Value> indices = {i_index, j_index};
+                Value element = tensor::ExtractOp::create(builder, loc, matrix, indices);
+                // element is complex!
+                // So we need to convert into {f64, f64}
+                Value real = complex::ReOp::create(builder, loc, element);
+                Value imag = complex::ImOp::create(builder, loc, element);
+                // Again, take note of the order.
+                ListPushOp::create(builder, loc, real, cache.paramVector);
+                ListPushOp::create(builder, loc, imag, cache.paramVector);
+            }
+        }
     }
 }
 
