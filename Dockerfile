@@ -155,6 +155,8 @@ RUN auditwheel repair dist/*.whl -w ./wheel --no-update-tags --exclude libopenbl
 
 # Build Pennylane Lightning Catalyst 
 FROM pennylane-lightning:latest AS lightning-pennylane-catalyst
+ARG PENNYLANE_VERSION
+ARG LIGHTNING_VERSION
 RUN apt-get update \
     && apt-get install --no-install-recommends -y \
     apt-utils \
