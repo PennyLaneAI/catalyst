@@ -17,6 +17,7 @@
 # pylint: disable=protected-access,bare-except
 
 import itertools
+import re
 import warnings
 from collections import deque
 
@@ -929,6 +930,7 @@ def collect_symbolic_resources(op_cls, op_name, kwargs, is_custom_op, *, kind, c
         applicable_rules.append(rule)
         try:
             with qp.capture.toggle_ctx(True):
+                print(rule.name)
                 resources = rule.compute_resources(**probe_args)
             name_to_resources[rule.name] = resources.gate_counts
             # The rule body names the ops it produces itself, so unlike the distribution pathway
@@ -938,11 +940,13 @@ def collect_symbolic_resources(op_cls, op_name, kwargs, is_custom_op, *, kind, c
                 GraphOpID(op).getGraphOpId(): count for op, count in resources.gate_counts.items()
             }
         except Exception as e:  # pylint: disable=broad-except
+            # breakpoint()
             warnings.warn(
                 f"Failed to get resources for the {rule.name} decomposition rule: {e}",
                 category=RuleLoweringWarning,
             )
-
+    # if kind == "control":
+    #     breakpoint()
     return applicable_rules, probe_args, name_to_resources, name_to_resource_ids
 
 
@@ -1446,6 +1450,7 @@ def fetch_all_reachable_decomposition_rules_from_op(
     Returns:
         list[str]: the rules, as MLIR strings
     """
+    print("==================ENTRY====================")
     extra_data = extra_data or {}
     queue = deque()
     start = (op_name, dynamic_shape, wire_lens, static_data, extra_data, is_custom_op)
@@ -1529,14 +1534,15 @@ def fetch_all_reachable_decomposition_rules_from_op(
         this_kwargs = prepare_dynamic_op_kwargs(this_dynamic_shape, this_wire_lens)
         all_kwargs = this_kwargs | this_static_data | this_extra_data
 
-        # Explore the ops reachable through the rules of this op and of its adjoint. Keyed by
-        # (explored op, rule name): the same rule name may be registered against both.
+        # Explore the ops reachable through the rules of this op, its adjoint, and its controls.
+        # Keyed by (explored op, rule name): the same rule name may be registered against all these.
         resources = {
             (this_name, name): res
             for name, res in collect_resources_for_op(this_name, all_kwargs, this_is_custom_op)[
                 0
             ].items()
         }
+
         if (
             not this_name.startswith("Adjoint(")
             and (this_op_cls := op_classes.get(this_name)) is not None
@@ -1548,6 +1554,41 @@ def fetch_all_reachable_decomposition_rules_from_op(
                 )[2].items()
             }
 
+        if (
+            not bool(re.match(r"\d*C\(", this_name))
+            and (this_op_cls := op_classes.get(this_name)) is not None
+            # special: MultiControlledX has a rule _ctrl_mcx_to_mcx that decomposes a
+            # C(MultiControlledX) onto a one-wire bigger MultiControlledX
+            # Do no synthesize controlled rules for C(MultiControlledX), otherwise would
+            # infinitely recurse
+            and this_name != "MultiControlledX"
+        ):
+            num_base_wires = sum(this_wire_lens.values())
+            for n in ctrl_counts:
+                print("MARK!!!!!!!!!!!!!!!", n)
+                print("synthesizing ctrl rules for: ", this_name, all_kwargs)
+                # breakpoint()
+
+                ctrl_resources = collect_symbolic_resources(
+                    this_op_cls,
+                    this_name,
+                    all_kwargs,
+                    this_is_custom_op,
+                    kind="control",
+                    ctrl_wires=range(num_base_wires, num_base_wires + n),
+                )
+                # breakpoint()
+                # resources |= {
+                #     (f"{_control_modifier(n)}({this_name})", name): res
+                #     for name, res in collect_symbolic_resources(
+                #         this_op_cls, this_name, all_kwargs, this_is_custom_op, kind="control"
+                #     )[2].items()
+                # }
+                resources |= {
+                    (f"{_control_modifier(n)}({this_name})", name): res
+                    for name, res in ctrl_resources[2].items()
+                }
+        # breakpoint()
         for (_, _rule_name), resource in resources.items():
             try:
                 for op, _count in resource.items():
