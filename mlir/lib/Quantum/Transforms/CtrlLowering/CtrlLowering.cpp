@@ -29,7 +29,7 @@ using namespace mlir;
 
 namespace catalyst::qref {
 
-static LogicalResult distributeControlsQref(PatternRewriter &rewriter, Block &block,
+static LogicalResult distributeControls(PatternRewriter &rewriter, Block &block,
                                             SmallVector<Value> &currentCtrlQubits,
                                             ValueRange ctrlValues,
                                             SmallVector<Operation *> &opsToErase);
@@ -87,7 +87,7 @@ void createControlledGate(PatternRewriter &rewriter, QuantumGate gate, ValueRang
     rewriter.create(state);
 }
 
-static LogicalResult distributeControlsQref(PatternRewriter &rewriter, Block &block,
+static LogicalResult distributeControls(PatternRewriter &rewriter, Block &block,
                                             SmallVector<Value> &currentCtrlQubits,
                                             ValueRange ctrlValues,
                                             SmallVector<Operation *> &opsToErase) {
@@ -108,7 +108,7 @@ static LogicalResult distributeControlsQref(PatternRewriter &rewriter, Block &bl
         if (isa<scf::IfOp, scf::ForOp, scf::WhileOp, scf::IndexSwitchOp>(op)) {
             for (Region &region : op.getRegions()) {
                 if (!region.empty()) {
-                    if (failed(distributeControlsQref(rewriter, region.front(), currentCtrlQubits,
+                    if (failed(distributeControls(rewriter, region.front(), currentCtrlQubits,
                                                       ctrlValues, opsToErase))) {
                         return failure();
                     }
@@ -137,7 +137,7 @@ static LogicalResult distributeControlsQref(PatternRewriter &rewriter, Block &bl
 
 // match and rewrite a qref.ctrl op with reference semantics
 // this needs to take in a qref.ctrl op and output qref.custum op
-struct ReferenceSemanticsCtrlLoweringRewritePattern : public OpRewritePattern<CtrlOp> {
+struct CtrlLoweringRewritePattern : public OpRewritePattern<CtrlOp> {
     using OpRewritePattern<CtrlOp>::OpRewritePattern;
 
     LogicalResult matchAndRewrite(CtrlOp ctrl, PatternRewriter &rewriter) const override {
@@ -163,7 +163,7 @@ struct ReferenceSemanticsCtrlLoweringRewritePattern : public OpRewritePattern<Ct
         SmallVector<Operation *> opsToErase;
 
         // MUTATION: Now that we know the block is safe, perform the lowering.
-        if (failed(distributeControlsQref(rewriter, block, currentCtrlQubits, ctrlValues,
+        if (failed(distributeControls(rewriter, block, currentCtrlQubits, ctrlValues,
                                           opsToErase))) {
             return failure();
         }
@@ -201,7 +201,7 @@ struct CtrlLoweringPass : impl::CtrlLoweringPassBase<CtrlLoweringPass> {
         }
 
         RewritePatternSet patterns(&getContext());
-        patterns.add<qref::ReferenceSemanticsCtrlLoweringRewritePattern>(patterns.getContext(), 1);
+        patterns.add<qref::CtrlLoweringRewritePattern>(patterns.getContext(), 1);
 
         if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
             return signalPassFailure();
