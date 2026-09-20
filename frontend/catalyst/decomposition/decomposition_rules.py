@@ -522,16 +522,46 @@ def split_call_args(kwargs, is_custom_op):
     return (), kwargs
 
 
+def _rule_allocates_work_wires(rule, *args, **kwargs) -> bool:
+    """Whether a decomposition rule dynamically allocates work wires.
+
+    TODO: remove when --decompose-lowering can handle multiple registers
+    """
+    return rule.get_work_wire_spec(*args, **kwargs).total > 0
+
+
 def _rule_is_applicable(op_name, rule, *args, **kwargs) -> bool:
     """Return resource data for the decomposition rules that apply to ``op_name``."""
     try:
-        return bool(rule.is_applicable(*args, **kwargs))
+        if not bool(rule.is_applicable(*args, **kwargs)):
+            return False
     except Exception as e:  # pylint: disable=broad-except
         warnings.warn(
             f"Excluded the {rule.name} decomposition rule for {op_name}; raised '{e}'",
             category=RuleLoweringWarning,
         )
         return False
+
+    # TODO: remove when decompose lowering pass can handle multiple registers
+    try:
+        allocates_work_wires = _rule_allocates_work_wires(rule, *args, **kwargs)
+    except Exception as e:  # pylint: disable=broad-except
+        warnings.warn(
+            f"Excluded the {rule.name} decomposition rule for {op_name}; could not read its "
+            f"work-wire spec, raised '{e}'",
+            category=RuleLoweringWarning,
+        )
+        return False
+
+    if allocates_work_wires:
+        warnings.warn(
+            f"Excluded the {rule.name} decomposition rule for {op_name} since "
+            "--decompose-lowering cannot work with multiple registers yet",
+            category=RuleLoweringWarning,
+        )
+        return False
+
+    return True
 
 
 def collect_resources_for_op(
@@ -566,7 +596,8 @@ def collect_resources_for_op(
         try:
             # The `compute_resources` function's signature is the same as the Operator2 signature
             # for the original op of the rule
-            resources = rule.compute_resources(*args, **kwargs)
+            with qp.capture.toggle_ctx(True):
+                resources = rule.compute_resources(*args, **kwargs)
             name_to_resources[rule.name] = resources.gate_counts
             # A distributed rule produces modified gates, so each id is *generated* in its
             # modified form straight from the resource op instance -- the modifiers are placed
@@ -897,7 +928,8 @@ def collect_symbolic_resources(op_cls, op_name, kwargs, is_custom_op, *, kind, c
 
         applicable_rules.append(rule)
         try:
-            resources = rule.compute_resources(**probe_args)
+            with qp.capture.toggle_ctx(True):
+                resources = rule.compute_resources(**probe_args)
             name_to_resources[rule.name] = resources.gate_counts
             # The rule body names the ops it produces itself, so unlike the distribution pathway
             # these ids carry no added modifier; a resource that is itself symbolic is spelled the

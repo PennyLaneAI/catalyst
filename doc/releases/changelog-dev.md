@@ -112,6 +112,11 @@
 
 <h3>Improvements 🛠</h3>
 
+* When the graph-based decomposition solver cannot reach the target gate set, the error now lists
+  the actual operators that could not be decomposed (e.g. arbitrary-angle rotations) and the rules
+  it tried, instead of only naming the top-level operator.
+  [(#3246)](https://github.com/PennyLaneAI/catalyst/pull/3246)
+
 * Add the `XMEM_REPLY_BRAM` memory type and use it to allocate reply buffers in dedicated BRAM.
   [(#3148)](https://github.com/PennyLaneAI/catalyst/pull/3148)
 
@@ -133,6 +138,7 @@
   [(#3109)](https://github.com/PennyLaneAI/catalyst/pull/3109)
   [(#3075)](https://github.com/PennyLaneAI/catalyst/pull/3075)
   [(#3162)](https://github.com/PennyLaneAI/catalyst/pull/3162)
+  [(#3245)](https://github.com/PennyLaneAI/catalyst/pull/3245)
 
 * The graph-based decomposition system has been greatly improved.
 
@@ -187,6 +193,8 @@
     [(#3169)](https://github.com/PennyLaneAI/catalyst/pull/3169)
     [(#3222)](https://github.com/PennyLaneAI/catalyst/pull/3222)
     [(#3237)](https://github.com/PennyLaneAI/catalyst/pull/3237)
+    [(#3239)](https://github.com/PennyLaneAI/catalyst/pull/3239)
+    [(#3243)](https://github.com/PennyLaneAI/catalyst/pull/3243)
 
     This pathway of rule injection can be opted-out via a new keyword argument on `qp.qjit` named `collect_decomp_rules`.
     This kwarg controls whether or not to compile the decomposition rules during lower-time. Default value is `True`.
@@ -200,6 +208,8 @@
 
     With pathways 2 and 3, gates with static data only known at compile time can now be decomposed using the decomposition rule defined in PennyLane.
     For example, this includes `quantum.paulirot`, with Pauli words being the static data.
+    Note that decomposition rules that dynamically allocate work wires are not lowered (even when
+    named in `fixed_decomps`), since `decompose-lowering` cannot handle them yet.
 
   - The `graph-decomposition` pass eliminated three redundant IR manipulations:
     the cloning, removal, and re-insertion of user rules.
@@ -409,6 +419,7 @@
   the false data dependency between wires that act on different qubits of the same register
   and leaves extracts grouped above the gates and inserts below them.
   [(#2965)](https://github.com/PennyLaneAI/catalyst/pull/2965)
+  [(#3240)](https://github.com/PennyLaneAI/catalyst/pull/3240)
 
 * Adds a `catalyst::symbolic_array` operation and integrates it with the new `qp.capture.symbolic_array` function.
   [(#2982)](https://github.com/PennyLaneAI/catalyst/pull/2982)
@@ -675,9 +686,21 @@
 
 * Fixed the assembly format for `quantum.adjoint` when it has no quantum operands/results.
   [(#2938)](https://github.com/PennyLaneAI/catalyst/pull/2938)
-* Fixed a performance degradation issue with `catalyst.runtime_artifacts`. It now visits module 
+
+* Fixed a performance degradation issue with `catalyst.runtime_artifacts`. It now visits module
   operations only, instead of every operation in the program.
   [(#3219)](https://github.com/PennyLaneAI/catalyst/pull/3219)
+
+* Adjoint lowering now supports gates with integer or boolean parameters (e.g. a `MultiX`
+  `tensor<Nxi1>` bitstring) defined inside control flow. Such parameters are cached and rebuilt
+  through the parameter buffer via an exact round-trip, alongside the existing float and complex
+  support.
+  [(#3242)](https://github.com/PennyLaneAI/catalyst/pull/3242)
+
+* Fixed decomposition rules that call jitted classical helpers (e.g. from a `QROM` decomposition)
+  from inside a `quantum.ctrl` or `quantum.adjoint` region. Those helpers are now inlined into the
+  rule body so each rule is self-contained, instead of leaving a dangling call.
+  [(#3242)](https://github.com/PennyLaneAI/catalyst/pull/3242)
 
 <h3>Internal changes ⚙️</h3>
 
