@@ -30,9 +30,9 @@ using namespace mlir;
 namespace catalyst::qref {
 
 static LogicalResult distributeControls(PatternRewriter &rewriter, Block &block,
-                                            SmallVector<Value> &currentCtrlQubits,
-                                            ValueRange ctrlValues,
-                                            SmallVector<Operation *> &opsToErase);
+                                        SmallVector<Value> &currentCtrlQubits,
+                                        ValueRange ctrlValues,
+                                        SmallVector<Operation *> &opsToErase);
 
 static SmallVector<int32_t> readSegmentSizes(Operation *op, StringRef name) {
     auto seg = op->getAttrOfType<DenseI32ArrayAttr>(name);
@@ -88,9 +88,9 @@ void createControlledGate(PatternRewriter &rewriter, QuantumGate gate, ValueRang
 }
 
 static LogicalResult distributeControls(PatternRewriter &rewriter, Block &block,
-                                            SmallVector<Value> &currentCtrlQubits,
-                                            ValueRange ctrlValues,
-                                            SmallVector<Operation *> &opsToErase) {
+                                        SmallVector<Value> &currentCtrlQubits,
+                                        ValueRange ctrlValues,
+                                        SmallVector<Operation *> &opsToErase) {
     for (Operation &op : block.without_terminator()) {
         if (auto gate = dyn_cast<QuantumGate>(op)) {
             rewriter.setInsertionPoint(&op);
@@ -109,7 +109,7 @@ static LogicalResult distributeControls(PatternRewriter &rewriter, Block &block,
             for (Region &region : op.getRegions()) {
                 if (!region.empty()) {
                     if (failed(distributeControls(rewriter, region.front(), currentCtrlQubits,
-                                                      ctrlValues, opsToErase))) {
+                                                  ctrlValues, opsToErase))) {
                         return failure();
                     }
                 }
@@ -163,8 +163,8 @@ struct CtrlLoweringRewritePattern : public OpRewritePattern<CtrlOp> {
         SmallVector<Operation *> opsToErase;
 
         // MUTATION: Now that we know the block is safe, perform the lowering.
-        if (failed(distributeControls(rewriter, block, currentCtrlQubits, ctrlValues,
-                                          opsToErase))) {
+        if (failed(
+                distributeControls(rewriter, block, currentCtrlQubits, ctrlValues, opsToErase))) {
             return failure();
         }
 
