@@ -589,7 +589,16 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
 
             // numWires/numParams are debug-only; parseOperator leaves them at defaults for the
             // graphOpId form, so we need to fill them accurately from the op here.
-            node.numWires = op.getNonCtrlQubitOperands().size();
+
+            // These debug parameters are not needed for the graph solver, so we fill it in
+            // based on if the op has the required information for it or not.
+
+            if (auto quantumOp =
+                    llvm::dyn_cast<catalyst::quantum::QuantumGate>(op.getOperation())) {
+                node.numWires = quantumOp.getNonCtrlQubitOperands().size();
+            } else {
+                node.numWires = 0;
+            }
             if (auto paramOp =
                     llvm::dyn_cast<catalyst::quantum::ParametrizedGate>(op.getOperation())) {
                 node.numParams = paramOp.getAllParams().size();

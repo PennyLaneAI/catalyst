@@ -27,6 +27,8 @@ include "QRef/IR/QRefDialect.td"
 include "QRef/IR/QRefInterfaces.td"
 include "QRef/IR/QRefTypes.td"
 
+include "Quantum/IR/DecompositionInterfaces.td"
+
 //===----------------------------------------------------------------------===//
 // QRef dialect operations.
 //===----------------------------------------------------------------------===//

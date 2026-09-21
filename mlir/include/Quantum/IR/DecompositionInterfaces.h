@@ -12,13 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "QRef/IR/QRefInterfaces.h"
+#pragma once
 
-using namespace mlir;
-using namespace catalyst::qref;
+#include "llvm/ADT/StringMap.h"
+#include "mlir/IR/OpDefinition.h"
 
-#include "QRef/IR/QRefInterfaces.cpp.inc"
+namespace catalyst {
+namespace quantum {
+std::string defaultGetGraphOpId(mlir::Operation *op);
+bool hasModifiers(mlir::Operation *op);
+} // namespace quantum
+} // namespace catalyst
 
-//===----------------------------------------------------------------------===//
-// QRef interface definitions.
-//===----------------------------------------------------------------------===//
+#include "Quantum/IR/DecompositionInterfaces.h.inc"
