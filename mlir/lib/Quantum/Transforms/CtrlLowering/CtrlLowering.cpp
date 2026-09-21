@@ -94,9 +94,27 @@ void createControlledGate(PatternRewriter &rewriter, QuantumGate gate, ValueRang
         state.addAttribute(attr.getName(), attr.getValue());
     }
 
+    // By ODS convention a QuantumGate lays its operands out as [<classical>, (in_qubits,)
+    // in_ctrl_qubits, in_ctrl_values, <trailing>], with in_ctrl_values immediately following
+    // in_ctrl_qubits (some gates, e.g. `quantum.gphase`, have no in_qubits segment at all).
+    // Locate the in_ctrl_qubits segment by its operand start offset -- the classical operands
+    // (`numLeading`) plus the non-ctrl qubits -- rather than assuming it is a trailing segment.
     SmallVector<int32_t> operandSegments = readSegmentSizes(op, "operandSegmentSizes");
-    operandSegments[operandSegments.size() - 2] += static_cast<int32_t>(addCtrlQubits.size());
-    operandSegments[operandSegments.size() - 1] += static_cast<int32_t>(addCtrlValues.size());
+    int32_t ctrlQubitsStart = static_cast<int32_t>(numLeading + nonCtrlQubits.size());
+    unsigned ctrlQubitsSeg = 0;
+    for (int32_t acc = 0; ctrlQubitsSeg < operandSegments.size(); ++ctrlQubitsSeg) {
+        if (acc == ctrlQubitsStart) {
+            break;
+        }
+        acc += operandSegments[ctrlQubitsSeg];
+    }
+    unsigned ctrlValuesSeg = ctrlQubitsSeg + 1;
+    assert(ctrlValuesSeg < operandSegments.size() &&
+           operandSegments[ctrlQubitsSeg] == static_cast<int32_t>(oldCtrlQubits.size()) &&
+           operandSegments[ctrlValuesSeg] == static_cast<int32_t>(oldCtrlValues.size()) &&
+           "unexpected control-operand segment layout");
+    operandSegments[ctrlQubitsSeg] += static_cast<int32_t>(addCtrlQubits.size());
+    operandSegments[ctrlValuesSeg] += static_cast<int32_t>(addCtrlValues.size());
     state.addAttribute("operandSegmentSizes", rewriter.getDenseI32ArrayAttr(operandSegments));
     rewriter.create(state);
 }
