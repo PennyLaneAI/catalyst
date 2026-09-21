@@ -21,6 +21,7 @@
 #pragma once
 
 #include <algorithm>
+#include <cstddef>
 #include <iostream>
 #include <sstream>
 #include <stdexcept>
@@ -86,16 +87,37 @@ static inline auto graph_failed_message(const OperatorNode &op,
     return oss.str();
 }
 
+/**
+ * Both `GraphResult` and `ChosenDecompRule::basisCounts` are unordered maps,
+ * so every level is sorted by its printed operator label before being written.
+ * Without that the dump comes out in a different order from run to run,
+ * which makes it hard to check for lit tests.
+ */
 static inline void showSolution(const Core::GraphResult &result) {
-    std::cerr << "Decomposition Solution:\n";
+    std::vector<std::pair<std::string, const Core::ChosenDecompRule *>> entries;
+    entries.reserve(result.size());
     for (const auto &[op, rule] : result) {
-        std::cerr << "  Operator: " << print_op(op) << "\n";
-        std::cerr << "    Chosen Rule: " << rule.ruleName << (rule.isBasis ? " [basis]" : "")
+        entries.emplace_back(print_op(op), &rule);
+    }
+    std::sort(entries.begin(), entries.end(),
+              [](const auto &lhs, const auto &rhs) { return lhs.first < rhs.first; });
+
+    std::cerr << "Decomposition Solution:\n";
+    for (const auto &[opLabel, rule] : entries) {
+        std::cerr << "  Operator: " << opLabel << "\n";
+        std::cerr << "    Chosen Rule: " << rule->ruleName << (rule->isBasis ? " [basis]" : "")
                   << "\n";
-        std::cerr << "    Total Cost: " << rule.totalCost << "\n";
+        std::cerr << "    Total Cost: " << rule->totalCost << "\n";
         std::cerr << "    Basis Counts:\n";
-        for (const auto &[basis_op, count] : rule.basisCounts) {
-            std::cerr << "      - " << print_op(basis_op) << ": " << count << "\n";
+
+        std::vector<std::pair<std::string, size_t>> basisCounts;
+        basisCounts.reserve(rule->basisCounts.size());
+        for (const auto &[basis_op, count] : rule->basisCounts) {
+            basisCounts.emplace_back(print_op(basis_op), count);
+        }
+        std::sort(basisCounts.begin(), basisCounts.end());
+        for (const auto &[basisLabel, count] : basisCounts) {
+            std::cerr << "      - " << basisLabel << ": " << count << "\n";
         }
     }
 }

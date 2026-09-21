@@ -171,7 +171,13 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
             DecompositionSolver solver(graph);
             solution = solver.solve();
         }
-        LLVM_DEBUG(showSolution(solution));
+        // Dump the solver's choices when asked for (`graph_decomposition(..., verbose=True)`), or
+        // whenever the pass runs under `-debug-only=graph-decomposition` on a debug build.
+        if (verboseOption) {
+            showSolution(solution);
+        } else {
+            LLVM_DEBUG(showSolution(solution));
+        }
 
         ///////////////////////////
         // Step 3: Convert python-decompositions from reference to value semantics and run
