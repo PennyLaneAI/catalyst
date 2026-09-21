@@ -602,6 +602,60 @@ func.func public @adjoint_for_loop_mixed_static_dynamic(%stop: index) {
 
 // -----
 
+// Test adjoint of an scf.if whose branch body is itself an scf.if. The captured quantum value is
+// referenced only inside the nested scf.if, not at the outer branch's top level; the reverse pass
+// must recurse into nested regions to find it (otherwise it wrongly reports the branch as touching
+// no quantum state and aborts).
+
+  // CHECK-LABEL: @adjoint_nested_if
+  func.func public @adjoint_nested_if(%arg0: i1, %arg1: i1) {
+
+    // CHECK: [[reg:%.+]] = quantum.alloc( 1) : !quantum.reg
+    // CHECK: [[q0:%.+]] = quantum.extract [[reg]][ 0] : !quantum.reg -> !quantum.bit
+    %0 = quantum.alloc( 1) : !quantum.reg
+    %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+
+    // CHECK-NOT: quantum.adjoint
+    %3 = quantum.adjoint(%1) : !quantum.bit {
+    ^bb0(%q: !quantum.bit):
+
+      // CHECK: [[if_out:%.+]] = scf.if {{%.+}} -> (!quantum.bit) {
+      // CHECK:   [[gate1:%.+]] = quantum.custom "gate1"() [[q0]] adj : !quantum.bit
+      // CHECK:   scf.yield [[gate1]] : !quantum.bit
+      // CHECK: } else {
+      // CHECK:   [[nested:%.+]] = scf.if {{%.+}} -> (!quantum.bit) {
+      // CHECK:     [[gate2:%.+]] = quantum.custom "gate2"() [[q0]] adj : !quantum.bit
+      // CHECK:     scf.yield [[gate2]] : !quantum.bit
+      // CHECK:   } else {
+      // CHECK:     scf.yield [[q0]] : !quantum.bit
+      // CHECK:   }
+      // CHECK:   scf.yield [[nested]] : !quantum.bit
+      // CHECK: }
+      %8 = scf.if %arg0 -> (!quantum.bit) {
+        %g = quantum.custom "gate1"() %q : !quantum.bit
+        scf.yield %g : !quantum.bit
+      } else {
+        %n = scf.if %arg1 -> (!quantum.bit) {
+          %g2 = quantum.custom "gate2"() %q : !quantum.bit
+          scf.yield %g2 : !quantum.bit
+        } else {
+          scf.yield %q : !quantum.bit
+        }
+        scf.yield %n : !quantum.bit
+      }
+
+      quantum.yield %8 : !quantum.bit
+    }
+
+    // CHECK: [[insert0:%.+]] = quantum.insert [[reg]][ 0], [[if_out]] : !quantum.reg, !quantum.bit
+    // CHECK: quantum.dealloc [[insert0]]
+    %4 = quantum.insert %0[ 0], %3 : !quantum.reg, !quantum.bit
+    quantum.dealloc %4 : !quantum.reg
+    return
+  }
+
+// -----
+
 // Test adjoint of scf.index_switch
 
 // CHECK: func.func private @switch_branch_callee.adjoint(%arg0: !quantum.reg) -> !quantum.reg

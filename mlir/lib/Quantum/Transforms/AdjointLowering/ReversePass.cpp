@@ -636,19 +636,23 @@ class AdjointGenerator {
         }
 
         // The quantum values are captured from outside rather than passed in through a
-        // basic block argument. We thus need to traverse the region to look for it.
+        // basic block argument. We thus need to traverse the region to look for it. The traversal
+        // must recurse into nested regions (for example: a branch whose body is another scf.if):
+        // the captured value may only be referenced deep inside, so a shallow scan of the branch
+        // top-level ops would miss it and wrongly conclude the branch touches no quantum state.
         auto findOldestQvaluesInRegion = [&](Region &region) -> SetVector<Value> {
             SetVector<Value> qvalues;
-            for (Operation &innerOp : region.getOps()) {
-                for (Value operand : innerOp.getOperands()) {
+            region.walk([&](Operation *innerOp) {
+                for (Value operand : innerOp->getOperands()) {
+                    Region *operandRegion = operand.getParentRegion();
                     bool isDefinedFromOutsideRegion =
-                        operand.getParentRegion()->isProperAncestor(&region);
+                        operandRegion && operandRegion->isProperAncestor(&region);
                     if (isa<quantum::QuregType, quantum::QubitType>(operand.getType()) &&
                         isDefinedFromOutsideRegion) {
                         qvalues.insert(operand);
                     }
                 }
-            }
+            });
             assert(!qvalues.empty() && "failed to find quantum values in scf.if region");
             return qvalues;
         };
