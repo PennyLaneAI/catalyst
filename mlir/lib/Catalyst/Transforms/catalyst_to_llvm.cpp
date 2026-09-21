@@ -13,8 +13,10 @@
 // limitations under the License.
 
 #include <cstdint>
+#include <string>
 #include <unordered_map>
 
+#include "llvm/Support/xxhash.h"
 #include "mlir/Conversion/LLVMCommon/ConversionTarget.h"
 #include "mlir/Conversion/LLVMCommon/MemRefBuilder.h"
 #include "mlir/Conversion/LLVMCommon/TypeConverter.h"
@@ -26,6 +28,7 @@
 #include "mlir/Transforms/DialectConversion.h"
 
 #include "Catalyst/IR/CatalystOps.h"
+#include "Catalyst/IR/RuntimeCABI.h"
 #include "Catalyst/Transforms/Patterns.h"
 #include "Catalyst/Utils/EnsureFunctionDeclaration.h"
 #include "Catalyst/Utils/StaticAllocas.h"
@@ -309,6 +312,151 @@ Value EncodeDataMemRef(Location loc, PatternRewriter &rewriter, MemRefType memre
     return memref;
 }
 
+// Get the LLVM type for a C ABI type name.
+FailureOr<Type> runtimeCABIType(StringRef name, MLIRContext *ctx) {
+    std::optional<RuntimeCABIType> abi = classifyRuntimeCABIType(name);
+    if (!abi) {
+        return failure();
+    }
+    switch (abi->kind) {
+    case RuntimeCABIKind::Void:
+        return Type(LLVM::LLVMVoidType::get(ctx));
+    case RuntimeCABIKind::Pointer:
+        return Type(LLVM::LLVMPointerType::get(ctx));
+    case RuntimeCABIKind::Float:
+        return abi->width == 32 ? Type(Float32Type::get(ctx)) : Type(Float64Type::get(ctx));
+    case RuntimeCABIKind::Integer:
+        return Type(IntegerType::get(ctx, abi->width));
+    }
+    llvm_unreachable("unhandled runtime C ABI kind");
+}
+
+// Materialize `text` as a NUL-terminated constant and return a pointer to its first byte.
+Value getRuntimeCallString(Location loc, OpBuilder &rewriter, StringRef text, ModuleOp mod) {
+    std::string key = ("runtime_call_cstr_" + Twine(llvm::xxh3_64bits(text))).str();
+    std::string value = text.str();
+    value.push_back('\0');
+    return getGlobalString(loc, rewriter, key, value, mod);
+}
+
+struct RuntimeCallOpPattern : public OpConversionPattern<RuntimeCallOp> {
+    using OpConversionPattern::OpConversionPattern;
+
+    LogicalResult matchAndRewrite(RuntimeCallOp op, RuntimeCallOpAdaptor adaptor,
+                                  ConversionPatternRewriter &rewriter) const override {
+        if (op.isDispatched()) {
+            // Dispatching runtime calls should be handled by `lower-runtime-dispatch`.
+            return failure();
+        }
+        if (!op.getOutTensors().empty()) {
+            return op.emitOpError("out tensors must be bufferized before LLVM conversion");
+        }
+
+        MLIRContext *ctx = op.getContext();
+        Location loc = op.getLoc();
+        ModuleOp mod = op->getParentOfType<ModuleOp>();
+        StringRef resultKind = op.getCResult();
+        bool hasResult = resultKind != "void";
+
+        auto dataPointer = [&](Value original, Value converted) -> FailureOr<Value> {
+            auto memrefType = dyn_cast<MemRefType>(original.getType());
+            if (!memrefType) {
+                return op.emitOpError("expected a memref for buf/out parameter extraction");
+            }
+            MemRefDescriptor descriptor(converted);
+            const auto &converter = static_cast<const LLVMTypeConverter &>(*getTypeConverter());
+            return descriptor.bufferPtr(rewriter, loc, converter, memrefType);
+        };
+
+        // Handle each C parameter in order.
+        SmallVector<Type> paramTypes;
+        SmallVector<Value> callArgs;
+        unsigned inputIndex = 0;
+        unsigned destIndex = 0;
+        unsigned stringIndex = 0;
+        ArrayAttr strings = op.getCStringsAttr();
+
+        for (Attribute attr : op.getCParams()) {
+            StringRef param = cast<StringAttr>(attr).getValue();
+            FailureOr<Type> type = runtimeCABIType(param, ctx);
+            if (failed(type) || param == "void") {
+                return op.emitOpError("unsupported native C ABI parameter type '") << param << "'";
+            }
+            paramTypes.push_back(*type);
+
+            if (param == "str") {
+                assert(strings && stringIndex < strings.size() && "verified compile-time strings");
+                StringRef text = cast<StringAttr>(strings[stringIndex++]).getValue();
+                callArgs.push_back(getRuntimeCallString(loc, rewriter, text, mod));
+                continue;
+            }
+
+            if (param == "out") {
+                assert(destIndex < op.getDestBuffers().size() && "verified destination buffers");
+                FailureOr<Value> ptr = dataPointer(op.getDestBuffers()[destIndex],
+                                                   adaptor.getDestBuffers()[destIndex]);
+                if (failed(ptr)) {
+                    return failure();
+                }
+                callArgs.push_back(*ptr);
+                ++destIndex;
+                continue;
+            }
+
+            assert(inputIndex < op.getInputs().size() && "verified input operands");
+            Value original = op.getInputs()[inputIndex];
+            Value converted = adaptor.getInputs()[inputIndex];
+            ++inputIndex;
+
+            if (param == "buf") {
+                FailureOr<Value> ptr = dataPointer(original, converted);
+                if (failed(ptr)) {
+                    return failure();
+                }
+                callArgs.push_back(*ptr);
+                continue;
+            }
+
+            if (param == "ptr") {
+                callArgs.push_back(LLVM::IntToPtrOp::create(
+                    rewriter, loc, LLVM::LLVMPointerType::get(ctx), converted));
+                continue;
+            }
+
+            callArgs.push_back(converted);
+        }
+
+        FailureOr<Type> resultType = runtimeCABIType(resultKind, ctx);
+        if (failed(resultType)) {
+            return op.emitOpError("unsupported native C ABI result type '") << resultKind << "'";
+        }
+
+        auto point = rewriter.saveInsertionPoint();
+        rewriter.setInsertionPointToStart(mod.getBody());
+        FailureOr<LLVM::LLVMFuncOp> function =
+            LLVM::lookupOrCreateFn(rewriter, mod, op.getCallee(), paramTypes, *resultType);
+        if (failed(function)) {
+            return failure();
+        }
+        function->setPrivate();
+        rewriter.restoreInsertionPoint(point);
+
+        LLVM::CallOp call = LLVM::CallOp::create(rewriter, loc, *function, callArgs);
+        if (!hasResult) {
+            rewriter.eraseOp(op);
+            return success();
+        }
+
+        Value value = call.getResult();
+        if (resultKind == "ptr") {
+            value =
+                LLVM::PtrToIntOp::create(rewriter, loc, rewriter.getI64Type(), value).getResult();
+        }
+        rewriter.replaceOp(op, value);
+        return success();
+    }
+};
+
 struct CustomCallOpPattern : public OpConversionPattern<CustomCallOp> {
     using OpConversionPattern::OpConversionPattern;
 
@@ -571,6 +719,7 @@ struct CatalystConversionPass : impl::CatalystConversionPassBase<CatalystConvers
         LLVMTypeConverter typeConverter(context);
 
         RewritePatternSet patterns(context);
+        patterns.add<RuntimeCallOpPattern>(typeConverter, context);
         patterns.add<CustomCallOpPattern>(typeConverter, context);
         patterns.add<PrintOpPattern>(typeConverter, context);
         patterns.add<AssertionOpPattern>(typeConverter, context);

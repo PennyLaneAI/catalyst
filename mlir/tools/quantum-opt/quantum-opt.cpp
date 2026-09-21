@@ -51,6 +51,7 @@
 #include "RegisterAllPasses.h"
 
 #include "Executor/IR/ExecutorDialect.h"
+#include "Executor/Transforms/BufferizableOpInterfaceImpl.h"
 #include "Transport/IR/TransportDialect.h"
 #include "Transport/Transforms/BufferizableOpInterfaceImpl.h"
 
@@ -91,6 +92,7 @@ int main(int argc, char **argv) {
     catalyst::quantum::registerBufferizableOpInterfaceExternalModels(registry);
     catalyst::qecp::registerBufferizableOpInterfaceExternalModels(registry);
     catalyst::transport::registerBufferizableOpInterfaceExternalModels(registry);
+    catalyst::executor::registerBufferizableOpInterfaceExternalModels(registry);
 
     return mlir::asMainReturnCode(
         mlir::MlirOptMain(argc, argv, "Quantum optimizer driver\n", registry));

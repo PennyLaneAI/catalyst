@@ -30,7 +30,7 @@ from jax._src.core import pytype_aval_mappings
 from jax._src.interpreters import partial_eval as pe
 from jax._src.lax.lax import _merge_dyn_shape, _nary_lower_hlo, cos_p, sin_p
 from jax._src.lib.mlir import ir
-from jax._src.lib.mlir.dialects import hlo
+from jax._src.lib.mlir.dialects import hlo, llvm
 from jax._src.pjit import _pjit_lowering
 from jax.core import AbstractValue
 from jax.extend.core import Primitive
@@ -46,6 +46,7 @@ from jaxlib.mlir.dialects.arith import (
     MulIOp,
     SubIOp,
 )
+from jaxlib.mlir.dialects.builtin import UnrealizedConversionCastOp
 from jaxlib.mlir.dialects.func import FunctionType
 from jaxlib.mlir.dialects.scf import ConditionOp, ForOp, IfOp, IndexSwitchOp, WhileOp, YieldOp
 from jaxlib.mlir.dialects.stablehlo import ConstantOp as StableHLOConstantOp
@@ -76,8 +77,8 @@ with Patcher(
         AssertionOp,
         CallbackCallOp,
         CallbackOp,
-        CustomCallOp,
         PrintOp,
+        RuntimeCallOp,
         SymbolicArrayOp,
     )
     from mlir_quantum.dialects.gradient import (
@@ -140,7 +141,7 @@ with Patcher(
         unconditional_to_conditional_if_probs,
     )
 
-from pennylane.backline.runtime import get_runtime_call_prim
+from pennylane.backline.runtime import CType, get_runtime_call_prim
 from pennylane.capture.primitives import cond_prim as pl_cond_prim
 from pennylane.capture.primitives import for_loop_prim as pl_for_loop_prim
 from pennylane.capture.primitives import jacobian_prim as pl_jac_prim
@@ -556,20 +557,106 @@ def _python_callback_lowering(
 #
 # runtime_call
 #
+_RUNTIME_FLOAT_TYPES = {CType.F32: ir.F32Type, CType.F64: ir.F64Type}
+
+
+def _runtime_scalar_type(ctype, ctx):
+    """Map a runtime scalar/pointer C type to its MLIR SSA type."""
+    if ctype is CType.PTR:
+        return ir.IntegerType.get_signless(64, ctx)
+    if ctype in _RUNTIME_FLOAT_TYPES:
+        return _RUNTIME_FLOAT_TYPES[ctype].get(ctx)
+    return ir.IntegerType.get_signless(ctype.dtype.itemsize * 8, ctx)
+
+
+def _runtime_signless_integer(value, ctx):
+    """Convert MLIR integer to signless integer type."""
+    if not ir.IntegerType.isinstance(value.type):
+        return value
+    integer_type = ir.IntegerType(value.type)
+    if integer_type.is_signless:
+        return value
+    return UnrealizedConversionCastOp(
+        [ir.IntegerType.get_signless(integer_type.width, ctx)], [value]
+    ).results[0]
+
+
+def _runtime_result_tensor(value, tensor_type):
+    """Wrap a scalar runtime result in the tensor JAX expects, widening the integer if needed."""
+    element_type = ir.RankedTensorType(tensor_type).element_type
+    if ir.IntegerType.isinstance(element_type) and value.type != element_type:
+        value = UnrealizedConversionCastOp([element_type], [value]).results[0]
+    return FromElementsOp(tensor_type, value).result
+
+
 def _runtime_call_lowering(
-    jax_ctx: mlir.LoweringRuleContext, *operands, signature, symbol, out_bytes, dispatch, library
+    jax_ctx: mlir.LoweringRuleContext,
+    *operands,
+    signature,
+    symbol,
+    out_bytes,
+    dispatch,
+    library,
+    local_constants,
 ):
-    """Lower a `qp.runtime_call` operation to a `catalyst.custom_call` on the runtime symbol"""
-    # pylint: disable=unused-argument
-    results_ty = list(convert_shaped_arrays_to_tensors(jax_ctx.avals_out))
-    call_op = CustomCallOp(results_ty, list(operands), symbol, number_original_arg=len(operands))
-    if dispatch is not None:
-        call_op.operation.attributes["backend_config"] = ir.DictAttr.get(
-            {"dispatch": ir.StringAttr.get(dispatch)}
+    """Lower a recorded runtime call to ``catalyst.runtime_call`` if dispatch is None,
+    otherwise it would be lowered to a call op in the driver.
+
+    ``out_bytes`` is consumed when the call is traced.
+    """
+    ctx = jax_ctx.module_context.context
+    ctx.allow_unregistered_dialects = True
+
+    dynamic_operands = iter(operands)
+    call_inputs = []
+    for param in signature.params:
+        if param in (CType.STR, CType.OUT):
+            continue
+        value = next(dynamic_operands)
+        if param is CType.BUF:
+            call_inputs.append(value)
+            continue
+        value = extract_scalar(value, f"runtime_call({symbol!r})")
+        call_inputs.append(_runtime_signless_integer(value, ctx))
+
+    # With a scalar result, the first output tensor carries it and the rest are `out` buffers
+    has_result = signature.result is not CType.VOID
+    result_tensors = list(convert_shaped_arrays_to_tensors(jax_ctx.avals_out))
+    scalar_types = [_runtime_scalar_type(signature.result, ctx)] if has_result else []
+    scalar_tensor = result_tensors[0] if has_result else None
+    out_types = result_tensors[1:] if has_result else result_tensors
+
+    c_params = ir.ArrayAttr.get([ir.StringAttr.get(str(param)) for param in signature.params])
+    c_result = ir.StringAttr.get(str(signature.result))
+    c_strings = None
+    if local_constants:
+        # Drop the trailing NUL
+        c_strings = ir.ArrayAttr.get(
+            [
+                ir.StringAttr.get(raw.removesuffix(b"\x00").decode("utf-8"))
+                for raw in local_constants
+            ]
         )
-    elif library:
+
+    call_op = RuntimeCallOp(
+        scalar_types,
+        out_types,
+        call_inputs,
+        [],
+        symbol,
+        c_params,
+        c_result,
+        c_strings=c_strings,
+        dispatch=None if dispatch is None else ir.StringAttr.get(dispatch),
+    )
+    if library and dispatch is None:
         record_runtime_artifact(jax_ctx.module_context.module.operation, library)
-    return call_op.results
+
+    results = []
+    if has_result:
+        results.append(_runtime_result_tensor(call_op.scalar_result[0], scalar_tensor))
+    results.extend(call_op.out_tensors)
+    return tuple(results)
 
 
 #

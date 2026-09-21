@@ -55,13 +55,13 @@ Without `num_input_args` all operands are treated as inputs.
 | Operand | Description |
 | :-----: | ----------- |
 | `session` | A handle to an open executor session. |
-| `inputs` | variadic of memref of any type values |
+| `inputs` | variadic of ranked tensor of any type values or memref of any type values |
 
 #### Results:
 
 | Result | Description |
 | :----: | ----------- |
-| `results` | variadic of memref of any type values |
+| `results` | variadic of ranked tensor of any type values |
 
 
 ### `executor.close` (::catalyst::executor::CloseOp)

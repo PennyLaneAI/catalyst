@@ -13,30 +13,15 @@
 // limitations under the License.
 
 #pragma once
-#ifndef TRANSPORTABI_H
-#define TRANSPORTABI_H
 
-#include <stddef.h>
-#include <stdint.h>
+namespace mlir {
+class DialectRegistry;
+} // namespace mlir
 
-// How many bytes a `str` argument occupies in either layout: a fixed, NUL-padded field.
-#define CATALYST_TRANSPORT_STR_BYTES 256
+namespace catalyst {
+namespace executor {
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+void registerBufferizableOpInterfaceExternalModels(mlir::DialectRegistry &registry);
 
-// LLVM ORC's CWrapperFunctionResult, exported so the adapters need not link LLVM.
-typedef struct {
-    union {
-        char *value_ptr;
-        char value[8];
-    } data;
-    size_t size;
-} CatalystWrapperResult;
-
-#ifdef __cplusplus
-} // extern "C"
-#endif
-
-#endif // TRANSPORTABI_H
+} // namespace executor
+} // namespace catalyst
