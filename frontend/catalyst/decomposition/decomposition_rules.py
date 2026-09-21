@@ -69,7 +69,6 @@ def _adjoint_folds_to_base(resource_ids, op_name) -> bool:
     if len(resource_ids) != 1:
         return False
     ((rid, count),) = resource_ids.items()
-    # print(f"rid: {rid}, count: {count}, op_name: {op_name}")
     return count == 1 and rid.split("{", 1)[0] == op_name
 
 
