@@ -116,7 +116,7 @@ void createControlledGate(PatternRewriter &rewriter, QuantumGate gate, ValueRang
     operandSegments[ctrlQubitsSeg] += static_cast<int32_t>(addCtrlQubits.size());
     operandSegments[ctrlValuesSeg] += static_cast<int32_t>(addCtrlValues.size());
     state.addAttribute("operandSegmentSizes", rewriter.getDenseI32ArrayAttr(operandSegments));
-    
+
     rewriter.create(state);
 }
 
