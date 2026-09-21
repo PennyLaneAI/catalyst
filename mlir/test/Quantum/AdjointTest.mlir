@@ -602,10 +602,7 @@ func.func public @adjoint_for_loop_mixed_static_dynamic(%stop: index) {
 
 // -----
 
-// Test adjoint of an scf.if whose branch body is itself an scf.if. The captured quantum value is
-// referenced only inside the nested scf.if, not at the outer branch's top level; the reverse pass
-// must recurse into nested regions to find it (otherwise it wrongly reports the branch as touching
-// no quantum state and aborts).
+// Test adjoint of an scf.if whose branch body is itself an scf.if.
 
   // CHECK-LABEL: @adjoint_nested_if
   func.func public @adjoint_nested_if(%arg0: i1, %arg1: i1) {
