@@ -26,7 +26,7 @@ func.func @assert_constant(%arg0: i1, %arg1: !llvm.ptr) {
     // CHECK: [[char_ptr:%.+]] = llvm.getelementptr inbounds [[array_ptr]][0, 0] : {{.*}} -> !llvm.ptr, !llvm.array<12 x i8>
     // CHECK: llvm.call @__catalyst__rt__assert_bool(%arg0, [[char_ptr]])
     "catalyst.assert"(%arg0) <{error = "Test Message"}> : (i1) -> ()
-    
+
     return
 }
 
@@ -113,7 +113,53 @@ func.func @custom_call(%arg0: memref<3x3xf64>, %arg1: memref<3x3xf64>) -> () {
 
     // CHECK: llvm.call @lapack_dgesdd([[alloca2]], [[alloca0]])
     catalyst.custom_call fn("lapack_dgesdd") (%arg0, %arg1) {number_original_arg = 1 : i32} : (memref<3x3xf64>, memref<3x3xf64>) -> ()
-    return 
+    return
+}
+
+// -----
+
+// CHECK-LABEL: @runtime_call_scalars
+func.func @runtime_call_scalars(%lhs: i32, %rhs: i32) -> i32 {
+    // CHECK: [[RES:%.+]] = llvm.call @native_add(%arg0, %arg1) : (i32, i32) -> i32
+    // CHECK: return [[RES]]
+    %0 = catalyst.runtime_call fn("native_add") (%lhs, %rhs) {
+        c_params = ["i32", "i32"],
+        c_result = "i32"
+    } : (i32, i32) -> (i32)
+    return %0 : i32
+}
+
+// -----
+
+// CHECK-LABEL: @runtime_call_buffers
+func.func @runtime_call_buffers(
+    %input: memref<4xi8>,
+    %size: i64,
+    %output: memref<4xi8>) -> i32 {
+    // CHECK: %[[STATUS:.+]] = llvm.call @native_buffer_call(%{{.+}}, %{{.+}}, %arg1) : (!llvm.ptr, !llvm.ptr, i64) -> i32
+    // CHECK: return %[[STATUS]]
+    %0 = catalyst.runtime_call fn("native_buffer_call") (%input, %size) in(%output : memref<4xi8>) {
+        c_params = ["buf", "out", "u64"],
+        c_result = "i32"
+    } : (memref<4xi8>, i64) -> (i32)
+    return %0 : i32
+}
+
+// -----
+
+// CHECK: llvm.mlir.global internal constant @[[CSTR:runtime_call_cstr_[0-9]+]]("hello\00")
+// CHECK-LABEL: @runtime_call_string
+func.func @runtime_call_string(%n: i64) -> i32 {
+    // CHECK: %[[ADDR:.+]] = llvm.mlir.addressof @[[CSTR]]
+    // CHECK: %[[PTR:.+]] = llvm.getelementptr inbounds %[[ADDR]][0, 0]
+    // CHECK: %[[STATUS:.+]] = llvm.call @native_log(%[[PTR]], %arg0) : (!llvm.ptr, i64) -> i32
+    // CHECK: return %[[STATUS]]
+    %0 = catalyst.runtime_call fn("native_log") (%n) {
+        c_params = ["str", "u64"],
+        c_result = "i32",
+        c_strings = ["hello"]
+    } : (i64) -> (i32)
+    return %0 : i32
 }
 
 // -----
