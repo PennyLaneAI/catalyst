@@ -116,6 +116,7 @@ void createControlledGate(PatternRewriter &rewriter, QuantumGate gate, ValueRang
     operandSegments[ctrlQubitsSeg] += static_cast<int32_t>(addCtrlQubits.size());
     operandSegments[ctrlValuesSeg] += static_cast<int32_t>(addCtrlValues.size());
     state.addAttribute("operandSegmentSizes", rewriter.getDenseI32ArrayAttr(operandSegments));
+    
     rewriter.create(state);
 }
 
@@ -175,8 +176,12 @@ struct CtrlLoweringRewritePattern : public OpRewritePattern<CtrlOp> {
     LogicalResult matchAndRewrite(CtrlOp ctrl, PatternRewriter &rewriter) const override {
         Block &block = ctrl.getRegion().front();
 
-        // PRE-SCAN: Reject unsupported operations before mutating anything.
-        // If we modify the IR and then return failure, MLIR loops infinitely.
+        // Defer (not an error) if the region still contains a nested quantum.adjoint region.
+        // Distributing controls needs an op-level body, so the inner region must be reduced first.
+        // The pipeline runs (ctrl-lowering, adjoint-lowering) to a fixpoint: adjoint-lowering
+        // reduces the inner region to op-level gates, then this ctrl op lowers on a later
+        // iteration. A pre-scan avoids a partial rewrite (creating ops, then bailing out
+        // mid-region).
         for (Operation &op : block.without_terminator()) {
             if (isa<MeasureOp>(op)) {
                 op.emitError("cannot control a measurement inside a qref.ctrl region");
