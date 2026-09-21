@@ -280,11 +280,11 @@ def c_multiple_registers():
 
     # CHECK: [[q5:%.+]] = qref.get {{%.+}}[ 0]
     # CHECK: qref.operator "MultipleRegisters"() qubits([[q5]])
-    # CHECK: qubit_map = {reg1 = [0]}
+    # CHECK: qubit_map = {reg1 = [0], reg2 = []}
     MultipleRegisters(0, [])
 
     # CHECK: qref.operator "MultipleRegisters"() qubits()
-    # CHECK-NOT: qubit_map
+    # CHECK: qubit_map = {reg1 = [], reg2 = []}
     MultipleRegisters([], [])
     return qp.state()
 

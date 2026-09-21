@@ -198,18 +198,10 @@ def GraphDecompositionPass : Pass<"graph-decomposition", "mlir::ModuleOp"> {
         "LLVM::LLVMDialect",
         "stablehlo::StablehloDialect",
         "tensor::TensorDialect",
-    ];
-}
-
-def DecomposeLoweringPass : Pass<"decompose-lowering"> {
-    let summary = "Replace quantum operations with compiled decomposition rules.";
-
-    let options = [
-        ListOption<
-            /*C++ name*/"targetRulesOption",
-            /*CLI name*/"target-rules",
-            /*Type*/"std::string",
-            /*Description*/"The set of decomposition rules to apply. If empty, applies all rules.">
+        "catalyst::CatalystDialect",
+        "catalyst::qref::QRefDialect",
+        "catalyst::pbc::PBCDialect",
+        "catalyst::mbqc::MBQCDialect",
     ];
 }
 

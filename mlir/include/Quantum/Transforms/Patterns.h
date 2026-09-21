@@ -38,9 +38,6 @@ void populateCancelInversesPatterns(mlir::RewritePatternSet &);
 void populateMergeRotationsPatterns(mlir::RewritePatternSet &);
 void populateResolveStatePrepOperatorPatterns(mlir::RewritePatternSet &);
 void populateIonsDecompositionPatterns(mlir::RewritePatternSet &);
-void populateDecomposeLoweringPatterns(mlir::RewritePatternSet &,
-                                       const llvm::StringMap<mlir::func::FuncOp> &,
-                                       const llvm::StringSet<llvm::MallocAllocator> &);
 void populateLoopBoundaryPatterns(mlir::RewritePatternSet &, unsigned int mode);
 
 } // namespace quantum

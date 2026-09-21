@@ -26,47 +26,79 @@ using namespace catalyst;
 namespace catalyst {
 namespace quantum {
 
-void verifyTypeIsCacheable(Type ty, Operation *op) {
+// ============================================================================================
+// Integer/boolean parameters are cached by round-tripping through the *f64* parameter buffer
+// (`arith.uitofp` on the way in, `arith.fptoui` on the way out).
+// f64 represents every integer in [0, 2^53] EXACTLY, and nothing outside that range contiguously.
+// So the round-trip is lossless precisely for widths <= 53 bits.
+// That covers every gate parameter seen in practice (a MultiX bitstring, wire indices,
+// control counts, QROM bitstring rows, ...).
+//
+// Wider integers (e.g. a genuinely large i64) are NOT supported: a value >= 2^53 would round to a
+// nearby f64 and silently fail to round-trip. Rather than cache such a value lossily, let's reject
+// it here so `verifyTypeIsCacheable` fails loudly with a diagnostic.
+// TODO: to support wide integers, cache them in a dedicated integer (e.g. i64) buffer instead of
+// via f64, which would be lossless for all widths.
+// ============================================================================================
+static bool isCacheableInteger(Type ty) {
+    auto intType = dyn_cast<IntegerType>(ty);
+    return intType && intType.getWidth() <= 53;
+}
+
+LogicalResult verifyTypeIsCacheable(Type ty, Operation *op) {
     // Sanitizing inputs.
-    // Technically we know for a fact that none of this will ever issue an
-    // error. This is because QubitUnitary is guaranteed to have a
-    // tensor<NxNxcomplex<f64>> But this code in the future may be extended to
-    // support other types. Hence the sanitization.
-    if (ty.isF64()) {
-        return;
+    // TODO: although OperatorOp params can be arbitrary types, currently only caching of f64s,
+    // narrow (<= 53-bit) integers, and complex (and tensors of them) are implemented.
+    if (ty.isF64() || isCacheableInteger(ty)) {
+        return success();
     }
 
     // TODO: Generalize to unranked tensors
     if (!isa<RankedTensorType>(ty)) {
-        op->emitOpError() << "Caching only supports tensors complex F64";
+        return op->emitOpError() << "Caching only supports F64 and tensors of complex F64, got "
+                                 << ty;
     }
 
     auto aTensorType = cast<RankedTensorType>(ty);
     ArrayRef<int64_t> shape = aTensorType.getShape();
     Type elementType = aTensorType.getElementType();
 
-    // Real-valued scalar/rank-1 tensors (e.g. `quantum.operator` angle tensors) are cached
-    // element-wise as plain f64 values.
-    if (elementType.isF64()) {
-        if (shape.size() > 1) {
-            op->emitOpError() << "Caching only supports scalar or rank-1 real F64 tensors";
-        }
-        return;
+    // Real-valued tensors of any rank (e.g. `quantum.operator` angle tensors or a BasisRotation
+    // matrix) are cached element-wise as plain f64 values. Integer/boolean tensors (e.g. the
+    // `tensor<Nxi1>` bitstring of a MultiX gate) are cached the same way via an f64 round-trip,
+    // exact only for element widths <= 53 bits (see `isCacheableInteger`; wider ones are rejected).
+    if (elementType.isF64() || isCacheableInteger(elementType)) {
+        return success();
     }
 
     // TODO: Generalize to arbitrary dimensions
-    if (2 != shape.size()) {
-        op->emitOpError() << "Caching only supports tensors complex F64";
+    if (shape.size() != 2) {
+        return op->emitOpError() << "Caching only supports rank-2 tensors of complex F64, got "
+                                 << ty;
     }
     // TODO: Generalize to other types
-    if (!isa<ComplexType>(elementType)) {
-        op->emitOpError() << "Caching only supports tensors complex F64";
+    auto complexType = dyn_cast<ComplexType>(elementType);
+    if (!complexType) {
+        return op->emitOpError() << "Caching only supports tensors of complex F64, got " << ty;
     }
     // TODO: Generalize to other types
-    Type f64 = cast<ComplexType>(elementType).getElementType();
-    if (!f64.isF64()) {
-        op->emitOpError() << "Caching only supports tensors complex F64";
+    if (!complexType.getElementType().isF64()) {
+        return op->emitOpError() << "Caching only supports tensors of complex F64, got " << ty;
     }
+    return success();
+}
+
+bool isAvailableToReversePass(Value param, Region &adjointRegion) {
+    Region *definingRegion = param.getParentRegion();
+
+    // Defined outside the adjoint region: dominates the adjoint operation itself, reverse pass
+    // sees it from above directly.
+    if (!definingRegion || !adjointRegion.isAncestor(definingRegion)) {
+        return true;
+    }
+
+    // Defined at the immediate top level of the adjoint region, not in nested control flow
+    return definingRegion == &adjointRegion;
 }
 
 QuantumCache QuantumCache::initialize(Region &region, OpBuilder &builder, Location loc) {
