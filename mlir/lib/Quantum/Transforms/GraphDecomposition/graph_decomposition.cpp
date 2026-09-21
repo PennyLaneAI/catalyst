@@ -188,7 +188,19 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         ModuleOp module = getOperation();
 
         qref::DecomposeLoweringPassOptions dlOptions;
-        // Collect only the rules on the chosen rule by the solver.
+        // Collect only the rules on the chosen decomp tree, reachable from the circuit
+        // root operators by following each op's chosen rule inputs.
+        //
+        // Note `solution` is the solver's map to target gateset, so it also holds ops explored
+        // while costing rejected candidate rules (their inputs are solved to compute costs).
+        // Feeding every one of those rules to the greedy decompose-lowering rewriter would
+        // let stray rules fire on ops the chosen plan never routes through,
+        // emitting gates beyond the planned resource counts.
+        //
+        // Basis rule names are collected too. `decompose-lowering` treats an empty
+        // target-rules list as "apply every rule", so a circuit already in the target gateset
+        // must still produce a non-empty list, or its terminals would be
+        // decomposed by whatever rules happen to be loaded.
         {
             std::unordered_set<OperatorNode, OperatorNodeHash> visited;
             llvm::StringSet<> seenRules;
@@ -204,7 +216,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
                     continue;
                 }
                 const ChosenDecompRule &chosenRule = it->second;
-                if (!chosenRule.isBasis && seenRules.insert(chosenRule.ruleName).second) {
+                if (seenRules.insert(chosenRule.ruleName).second) {
                     dlOptions.targetRulesOption.push_back(chosenRule.ruleName);
                 }
                 for (const RuleTerm &input : chosenRule.inputs) {
