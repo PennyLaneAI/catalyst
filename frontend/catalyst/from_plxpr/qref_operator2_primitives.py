@@ -441,6 +441,9 @@ def compile_decomp_rules(
     inject_new_rules_into_module(module, decomp_rules)
 
 
+from pennylane.capture.primitives import operator_p
+
+
 def _qref_operator_p_lowering(jax_ctx: mlir.LoweringRuleContext, *args, op_cls, **kwargs):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True

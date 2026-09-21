@@ -23,6 +23,7 @@ import pathlib
 import platform
 import re
 import textwrap
+import urllib.parse
 from copy import deepcopy
 from dataclasses import dataclass, replace
 from typing import Any, Dict, Optional
@@ -147,11 +148,68 @@ class BackendInfo:
     kwargs: Dict[str, Any]
 
 
+RECORD_DEVICE_CALLS_KWARG = "record_device_calls"
+
+
+class RecordDeviceCalls(qp.devices.Device):
+    """Wrap a PennyLane device so Catalyst records runtime resource usage.
+
+    When used with ``@qjit(capture=True)``, the compiled runtime device is paired with
+    NullQubit's resource tracking and writes its resource summary to ``record_path``.
+    """
+
+    def __init__(self, original_device, record_path: str):
+        if not isinstance(record_path, str) or not record_path:
+            raise ValueError("record_path must be a non-empty string")
+
+        kwargs = dict(getattr(original_device, "device_kwargs", {}))
+        kwargs[RECORD_DEVICE_CALLS_KWARG] = record_path
+
+        super().__init__(wires=original_device.wires)
+
+        self.original_device = original_device
+        self.record_path = record_path
+        self.device_kwargs = kwargs
+        self._shots = original_device.shots
+
+    @property
+    def name(self):
+        """The name of the wrapped device."""
+        return self.original_device.name
+
+    def __getattr__(self, name):
+        return getattr(self.original_device, name)
+
+    def get_c_interface(self):
+        """Forward the inner device C interface."""
+        return self.original_device.get_c_interface()
+
+    def preprocess(self, *args, **kwargs):
+        """Forward preprocessing to the inner device."""
+        return self.original_device.preprocess(*args, **kwargs)
+
+    def execute(self, *args, **kwargs):
+        """Forward execution to the inner device."""
+        return self.original_device.execute(*args, **kwargs)
+
+
+def _get_original_device(device):
+    """Return the innermost device, unwrapping :class:`RecordDeviceCalls` wrappers."""
+    while isinstance(device, RecordDeviceCalls):
+        device = device.original_device
+    return device
+
+
 # pylint: disable=too-many-branches
 @debug_logger
 def extract_backend_info(device: qp.devices.QubitDevice) -> BackendInfo:
     """Extract the backend info from a quantum device. The device is expected to carry a reference
     to a valid TOML config file."""
+
+    record_path = None
+    if isinstance(device, RecordDeviceCalls):
+        record_path = device.record_path
+    device = _get_original_device(device)
 
     dname = device.name
     if isinstance(device, qp.devices.LegacyDeviceFacade):
@@ -201,6 +259,11 @@ def extract_backend_info(device: qp.devices.QubitDevice) -> BackendInfo:
     for k, v in getattr(device, "device_kwargs", {}).items():
         if k not in device_kwargs:  # pragma: no branch
             device_kwargs[k] = v
+
+    if record_path is not None:
+        # Runtime kwargs use a comma-delimited representation. Percent-encode the path so
+        # spaces, commas, quotes, and platform-specific separators survive that transport.
+        device_kwargs[RECORD_DEVICE_CALLS_KWARG] = urllib.parse.quote(record_path, safe="/._~-")
 
     return BackendInfo(dname, device_name, device_lpath, device_kwargs)
 
@@ -533,6 +596,8 @@ def filter_out_modifiers(operations):
 
 def _load_device_capabilities(device) -> DeviceCapabilities:
     """Get the contents of the device config toml file."""
+
+    device = _get_original_device(device)
 
     # TODO: This code exists purely for testing. Find another way to customize device Find a
     #       better way for a device to customize its capabilities as seen by Catalyst.
