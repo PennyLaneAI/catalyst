@@ -188,25 +188,28 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         ModuleOp module = getOperation();
 
         qref::DecomposeLoweringPassOptions dlOptions;
-        std::unordered_set<OperatorNode, OperatorNodeHash> visited;
-        llvm::StringSet<> seenRules;
-        std::vector<OperatorNode> worklist = setOfOps;
-        while (!worklist.empty()) {
-            OperatorNode op = worklist.back();
-            worklist.pop_back();
-            if (!visited.insert(op).second) {
-                continue;
-            }
-            auto it = solution.find(op);
-            if (it == solution.end()) {
-                continue;
-            }
-            const ChosenDecompRule &chosenRule = it->second;
-            if (!chosenRule.isBasis && seenRules.insert(chosenRule.ruleName).second) {
-                dlOptions.targetRulesOption.push_back(chosenRule.ruleName);
-            }
-            for (const RuleTerm &input : chosenRule.inputs) {
-                worklist.push_back(input.op);
+        // Collect only the rules on the chosen rule by the solver.
+        {
+            std::unordered_set<OperatorNode, OperatorNodeHash> visited;
+            llvm::StringSet<> seenRules;
+            std::vector<OperatorNode> worklist = setOfOps;
+            while (!worklist.empty()) {
+                OperatorNode op = worklist.back();
+                worklist.pop_back();
+                if (!visited.insert(op).second) {
+                    continue;
+                }
+                auto it = solution.find(op);
+                if (it == solution.end()) {
+                    continue;
+                }
+                const ChosenDecompRule &chosenRule = it->second;
+                if (!chosenRule.isBasis && seenRules.insert(chosenRule.ruleName).second) {
+                    dlOptions.targetRulesOption.push_back(chosenRule.ruleName);
+                }
+                for (const RuleTerm &input : chosenRule.inputs) {
+                    worklist.push_back(input.op);
+                }
             }
         }
 
