@@ -53,7 +53,7 @@ class TestPyTreesReturnValues:
         def circuit2():
             return measure(0)
 
-        jitted_fn = qjit(circuit2)
+        jitted_fn = qjit(circuit2, capture=False)
 
         result = jitted_fn()
         assert not result
@@ -67,7 +67,7 @@ class TestPyTreesReturnValues:
             qp.RX(params[1], wires=1)
             return qp.state()
 
-        jitted_fn = qjit(circuit1)
+        jitted_fn = qjit(circuit1, capture=False)
 
         params = [0.4, 0.8]
         result = jitted_fn(params)
@@ -80,7 +80,7 @@ class TestPyTreesReturnValues:
             qp.RX(params[1], wires=1)
             return [jnp.pi, qp.state()]
 
-        jitted_fn = qjit(circuit2)
+        jitted_fn = qjit(circuit2, capture=False)
 
         params = [0.4, 0.8]
         result = jitted_fn(params)
@@ -99,7 +99,7 @@ class TestPyTreesReturnValues:
             m1 = measure(1)
             return (m0, m1)
 
-        jitted_fn = qjit(circuit1)
+        jitted_fn = qjit(circuit1, capture=False)
 
         result = jitted_fn()
         assert isinstance(result, tuple)
@@ -112,7 +112,7 @@ class TestPyTreesReturnValues:
             m1 = measure(1)
             return (((m0, m1), m0 + m1), m0 * m1)
 
-        jitted_fn = qjit(circuit2)
+        jitted_fn = qjit(circuit2, capture=False)
         result = jitted_fn()
         assert isinstance(result, tuple)
         assert isinstance(result[0], tuple)
@@ -133,7 +133,7 @@ class TestPyTreesReturnValues:
         params = [0.5, 0.6]
         expected_expval = 0.87758256
 
-        jitted_fn = qjit(circuit3)
+        jitted_fn = qjit(circuit3, capture=False)
         result = jitted_fn(params)
         assert isinstance(result, tuple)
         assert isinstance(result[0], tuple)
@@ -152,13 +152,13 @@ class TestPyTreesReturnValues:
         params = [0.5, 0.6]
         expected_expval = 0.87758256
 
-        jitted_fn = qjit(circuit4)
+        jitted_fn = qjit(circuit4, capture=False)
         result = jitted_fn(params)
         assert isinstance(result, tuple)
         assert len(result[0]) == 4
         assert jnp.allclose(result[1], expected_expval)
 
-        @qjit
+        @qjit(capture=False)
         def workflow(x):
             def _f(x):
                 return (2 * x, 3 * x)
@@ -193,7 +193,7 @@ class TestPyTreesReturnValues:
         """Test conditionals."""
 
         # QFunc Path.
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=1))
         def circuit1(n):
             @cond(n > 4)
@@ -215,7 +215,7 @@ class TestPyTreesReturnValues:
         assert res5[1] == (125, 625)
 
         # Classical Path.
-        @qjit
+        @qjit(capture=False)
         def circuit2(n):
             @cond(n > 4)
             def cond_fn():
@@ -255,7 +255,7 @@ class TestPyTreesReturnValues:
                 "w1": qp.expval(qp.PauliZ(1)),
             }
 
-        jitted_fn = qjit(circuit1)
+        jitted_fn = qjit(circuit1, capture=False)
 
         params = [0.2, 0.6]
         expected = {"w0": 0.98006658, "w1": 0.82533561}
@@ -279,7 +279,7 @@ class TestPyTreesReturnValues:
         params = [0.5, 0.6]
         expected_expval = 0.87758256
 
-        jitted_fn = qjit(circuit2)
+        jitted_fn = qjit(circuit2, capture=False)
         result = jitted_fn(params)
         assert isinstance(result, dict)
         assert isinstance(result["counts"], tuple)
@@ -310,7 +310,7 @@ class TestPyTreesReturnValues:
                 dtype=jnp.complex128,
             ),
         ]
-        jitted_fn = qjit(circuit2_snapshot)
+        jitted_fn = qjit(circuit2_snapshot, capture=False)
         result = jitted_fn(params)
         assert isinstance(result, tuple)
         assert isinstance(result[0], list)
@@ -338,13 +338,13 @@ class TestPyTreesReturnValues:
         params = [0.5, 0.6]
         expected_expval = 0.87758256
 
-        jitted_fn = qjit(circuit3)
+        jitted_fn = qjit(circuit3, capture=False)
         result = jitted_fn(params)
         assert isinstance(result, dict)
         assert len(result["state"]) == 4
         assert jnp.allclose(result["expval"]["z0"], expected_expval)
 
-        @qjit
+        @qjit(capture=False)
         def workflow1(param):
             return {"w": jnp.sin(param), "q": jnp.cos(param)}
 
@@ -365,7 +365,7 @@ class TestPyTreesFuncArgs:
             qp.RX(params["b"][0], wires=1)
             return qp.expval(qp.PauliZ(0) @ qp.PauliZ(1)), params["a"][0]
 
-        jitted_fn = qjit(circuit1)
+        jitted_fn = qjit(circuit1, capture=False)
 
         params = {
             "a": [0.4, 0.6],
@@ -383,7 +383,7 @@ class TestPyTreesFuncArgs:
             qp.RX(params["b"][0], wires=1)
             return qp.expval(qp.PauliZ(0) @ qp.PauliZ(1)), params["a"]
 
-        jitted_fn = qjit(circuit2)
+        jitted_fn = qjit(circuit2, capture=False)
 
         params = {
             "a": {"c": (0.4, 0.6)},
@@ -413,7 +413,7 @@ class TestPyTreesFuncArgs:
             qp.RX(params["b"][0], wires=1)
             return qp.expval(qp.PauliZ(0) @ qp.PauliZ(1)), params["a"][0]
 
-        jitted_fn = qjit(circuit1)
+        jitted_fn = qjit(circuit1, capture=False)
 
         params = {
             "a": [0.4, 0.6],
@@ -432,7 +432,7 @@ class TestPyTreesFuncArgs:
             qp.RX(params["b"][0], wires=1)
             return qp.expval(qp.PauliZ(0) @ qp.PauliZ(1)), params["a"][0]
 
-        jitted_fn = qjit(circuit1)
+        jitted_fn = qjit(circuit1, capture=False)
 
         params = {
             "a": [0.4, 0.6],
@@ -494,7 +494,7 @@ class TestPyTreesFuncArgs:
             qp.RX(params["b"][1], wires=1)
             return qp.expval(qp.PauliZ(0) @ qp.PauliZ(1))
 
-        @qjit
+        @qjit(capture=False)
         def workflow1(params):
             g = qp.qnode(qp.device(backend, wires=1))(circuit1)
             h = grad(g)
@@ -517,7 +517,7 @@ class TestPyTreesFuncArgs:
             qp.RX(params["b"][0], wires=1)
             return qp.expval(qp.PauliZ(0) @ qp.PauliZ(1))
 
-        @qjit
+        @qjit(capture=False)
         def workflow2(params):
             g = qp.qnode(qp.device(backend, wires=1))(circuit2)
             h = grad(g)
@@ -554,7 +554,7 @@ class TestPyTreesFuncArgs:
     def test_args_used_in_measure(self, backend):
         """Argument is used directly in measurement"""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=2))
         def circuit(dictionary):
             """q0 = 1; q1 = 0;"""
@@ -569,7 +569,7 @@ class TestPyTreesFuncArgs:
     def test_args_used_indirectly_in_measure(self, backend):
         """Argument is used indirectly in measurement"""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=2))
         def circuit(dictionary):
             """q0 = 1; q1 = 0;"""

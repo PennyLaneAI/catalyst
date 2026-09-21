@@ -29,7 +29,7 @@ class TestStaticArguments:
     def test_function_without_hints(self):
         """Test that a function without type hints works with static argnums (bug fix)."""
 
-        @qjit(static_argnums=1)
+        @qjit(static_argnums=1, capture=False)
         def f(x, y):
             return x + len(y)
 
@@ -38,7 +38,7 @@ class TestStaticArguments:
     def test_function_with_varargs(self):
         """Test that a function without a fixed number of arguments works with static argnums."""
 
-        @qjit(static_argnums=1)
+        @qjit(static_argnums=1, capture=False)
         def f(*args):
             return args[0] + len(args[1]) + args[2]
 
@@ -48,7 +48,7 @@ class TestStaticArguments:
     def test_zero_static_argument(self, argnums):
         """Test QJIT with no static arguments."""
 
-        @qjit(static_argnums=argnums)
+        @qjit(static_argnums=argnums, capture=False)
         def f(x: int):
             return x
 
@@ -58,7 +58,7 @@ class TestStaticArguments:
     def test_out_of_bounds_static_argument(self, argnums):
         """Test QJIT with invalid static argument index with respect to provided arguments."""
 
-        @qjit(static_argnums=argnums)
+        @qjit(static_argnums=argnums, capture=False)
         def f(x):
             return x
 
@@ -69,7 +69,7 @@ class TestStaticArguments:
     def test_unsopported_type_static_argument(self, argnums):
         """Test QJIT with invalid static argument type."""
 
-        @qjit(static_argnums=argnums)
+        @qjit(static_argnums=argnums, capture=False)
         def f(x, y):
             return x + y
 
@@ -88,7 +88,7 @@ class TestStaticArguments:
             def __hash__(self):
                 return hash(str(self))
 
-        @qjit(static_argnums=1)
+        @qjit(static_argnums=1, capture=False)
         def f(x: int, y: MyClass):
             return x + y.val
 
@@ -112,7 +112,7 @@ class TestStaticArguments:
             def __hash__(self):
                 return hash(str(self))
 
-        @qjit(static_argnums=(2, 0))
+        @qjit(static_argnums=(2, 0), capture=False)
         def f(x: MyClass, y: int, z: MyClass):
             return x.val + y + z.val
 
@@ -136,7 +136,7 @@ class TestStaticArguments:
             def __hash__(self):
                 return hash(str(self))
 
-        @qjit(static_argnums=1)
+        @qjit(static_argnums=1, capture=False)
         def f(x: int, y: MyClass):
             return x + y.val_0 + y.val_1
 
@@ -152,7 +152,7 @@ class TestStaticArguments:
         """Test if QJIT static arguments pass through QNode correctly."""
         dev = qp.device("lightning.qubit", wires=1)
 
-        @qjit(static_argnums=(1,))
+        @qjit(static_argnums=(1,), capture=False)
         @qp.qnode(dev)
         def circuit(x, c):
             print("Inside QNode:", c)
@@ -168,7 +168,7 @@ class TestStaticArguments:
         """Test if QJIT static arguments pass through QNode correctly."""
         dev = qp.device("lightning.qubit", wires=1)
 
-        @qjit(static_argnums=(1,))
+        @qjit(static_argnums=(1,), capture=False)
         @qp.qnode(dev)
         def circuit(x, c):
             print("Inside QNode:", c)
@@ -176,7 +176,7 @@ class TestStaticArguments:
             qp.RX(x, 0)
             return qp.expval(qp.PauliZ(0))
 
-        @qjit(static_argnums=(1,))
+        @qjit(static_argnums=(1,), capture=False)
         def wrapper(x, c):
             return circuit(x, c)
 
@@ -188,7 +188,7 @@ class TestStaticArguments:
         """Test if QJIT static arguments pass through QNode correctly when params are switched."""
         dev = qp.device("lightning.qubit", wires=1)
 
-        @qjit(static_argnums=(0,))
+        @qjit(static_argnums=(0,), capture=False)
         @qp.qnode(dev)
         def circuit(c, x):
             print("Inside QNode:", c)
@@ -196,7 +196,7 @@ class TestStaticArguments:
             qp.RX(x, 0)
             return qp.expval(qp.PauliZ(0))
 
-        @qjit(static_argnums=(1,))
+        @qjit(static_argnums=(1,), capture=False)
         def wrapper(x, c):
             return circuit(c, x)
 
@@ -208,12 +208,12 @@ class TestStaticArguments:
         """Test if QJIT static arguments pass through nested Qjit calls with no QNodes."""
         dev = qp.device("lightning.qubit", wires=1)
 
-        @qjit(static_argnums=(0,))
+        @qjit(static_argnums=(0,), capture=False)
         def circuit(c, x):
             print("Inside QNode:", c)
             return x * c
 
-        @qjit(static_argnums=(1,))
+        @qjit(static_argnums=(1,), capture=False)
         def wrapper(x, c):
             return circuit(c, x)
 
@@ -225,7 +225,7 @@ class TestStaticArguments:
         # pylint: disable=unused-argument, function-redefined
         """Test static arguments specified by names"""
 
-        @qjit(static_argnames="y")
+        @qjit(static_argnames="y", capture=False)
         def f(x, y):
             return
 
@@ -233,41 +233,41 @@ class TestStaticArguments:
 
         with pytest.raises(ValueError, match="qjitted function has invalid argname {'yy'}"):
 
-            @qjit(static_argnames="yy")
+            @qjit(static_argnames="yy", capture=False)
             def f_badname(x, y):
                 return
 
         with pytest.raises(ValueError, match="qjitted function has invalid argname {'yy'}"):
 
-            @qjit(static_argnames=["y", "yy"])
+            @qjit(static_argnames=["y", "yy"], capture=False)
             def f_badname_list(x, y):
                 return
 
         with pytest.raises(ValueError, match="qjitted function has invalid argname {'xx', 'yy'}"):
 
-            @qjit(static_argnames=["xx", "yy"])
+            @qjit(static_argnames=["xx", "yy"], capture=False)
             def f_badname_list(x, y):
                 return
 
-        @qjit(static_argnames=("x", "y"))
+        @qjit(static_argnames=("x", "y"), capture=False)
         def f(x, y):
             return
 
         assert set(f.compile_options.static_argnums) == {0, 1}
 
-        @qjit(static_argnames=("x"), static_argnums=[1])
+        @qjit(static_argnames=("x"), static_argnums=[1], capture=False)
         def f(x, y):
             return
 
         assert set(f.compile_options.static_argnums) == {0, 1}
 
-        @qjit(static_argnames=("y"), static_argnums=[0])
+        @qjit(static_argnames=("y"), static_argnums=[0], capture=False)
         def f(x, y):
             return
 
         assert set(f.compile_options.static_argnums) == {0, 1}
 
-        @qjit(static_argnames=("y"), static_argnums=[1])
+        @qjit(static_argnames=("y"), static_argnums=[1], capture=False)
         def f(x, y):
             return
 
@@ -280,7 +280,7 @@ class TestStaticArguments:
 
         dev = qp.device("lightning.qubit", wires=3)
 
-        @qjit(static_argnames="theta")
+        @qjit(static_argnames="theta", capture=False)
         @qp.qnode(dev)
         def f(theta, phi):
             qp.RX(theta, wires=0)
@@ -289,7 +289,7 @@ class TestStaticArguments:
 
         assert set(f.compile_options.static_argnums) == {0}
 
-        @qjit(static_argnames=("x", "y"))
+        @qjit(static_argnames=("x", "y"), capture=False)
         @grad
         def f(x, y):
             return x * y

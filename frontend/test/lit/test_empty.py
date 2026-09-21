@@ -26,7 +26,7 @@ def test_empty():
     """Test a simple example to verify that the empty pass can be used
     with Catalyst."""
 
-    @qp.qjit(target="mlir")
+    @qp.qjit(target="mlir", capture=False)
     @qp.transform(pass_name="empty")
     @qp.qnode(qp.device("lightning.qubit", wires=1))
     def circuit():
@@ -43,7 +43,7 @@ def test_empty_with_options():
     """Test a simple example to verify that the empty pass can be used
     with Catalyst."""
 
-    @qp.qjit(target="mlir")
+    @qp.qjit(target="mlir", capture=False)
     @partial(qp.transform(pass_name="empty"), key="foo")
     @qp.qnode(qp.device("lightning.qubit", wires=1))
     def circuit():

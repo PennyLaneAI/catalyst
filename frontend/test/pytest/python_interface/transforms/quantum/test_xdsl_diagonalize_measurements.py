@@ -873,7 +873,7 @@ class TestDiagonalizeFinalMeasurementsNonCommuteValidate:
         """An CompileError is raised for single measurement non-commuting Hamiltonians."""
 
         # pylint: disable=inconsistent-return-statements
-        @qp.qjit()
+        @qp.qjit(capture=False)
         @diagonalize_final_measurements_pass
         @qp.set_shots(10)
         @qp.qnode(device)
@@ -909,7 +909,7 @@ class TestDiagonalizeFinalMeasurementsNonCommuteValidate:
     def test_non_commuting_multiple_measurements(self, device, obs, m):
         """An CompileError is raised for multiple non-commuting measurements."""
 
-        @qp.qjit()
+        @qp.qjit(capture=False)
         @diagonalize_final_measurements_pass
         @qp.set_shots(10)
         @qp.qnode(device)
@@ -925,7 +925,7 @@ class TestDiagonalizeFinalMeasurementsNonCommuteValidate:
     def test_commuting_single_measurement(self, device, obs, measurements):
         """No error is raised for single measurement commuting Hamiltonians."""
 
-        @qp.qjit()
+        @qp.qjit(capture=False)
         @diagonalize_final_measurements_pass
         @qp.set_shots(10)
         @qp.qnode(device)
@@ -940,7 +940,7 @@ class TestDiagonalizeFinalMeasurementsNonCommuteValidate:
     def test_commuting_multiple_measurements(self, device, obs, m):
         """No error is raised for multiple commuting measurements."""
 
-        @qp.qjit()
+        @qp.qjit(capture=False)
         @diagonalize_final_measurements_pass
         @qp.set_shots(10)
         @qp.qnode(device)

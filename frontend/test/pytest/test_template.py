@@ -41,7 +41,7 @@ def test_adder(backend):
 
     device = qp.device(backend, wires=6)
     interpreted_fn = qp.set_shots(qp.QNode(adder, device), shots=2)
-    jitted_fn = qjit(interpreted_fn)
+    jitted_fn = qjit(interpreted_fn, capture=False)
 
     assert np.allclose(interpreted_fn(), jitted_fn())
 
@@ -56,7 +56,7 @@ def test_amplitude_embedding(backend):
     device = qp.device(backend, wires=2)
     params = jax.numpy.array([1 / 2] * 4)
     interpreted_fn = qp.QNode(amplitude_embedding, device)
-    jitted_fn = qjit(interpreted_fn)
+    jitted_fn = qjit(interpreted_fn, capture=False)
 
     assert np.allclose(interpreted_fn(params), jitted_fn(params))
 
@@ -72,7 +72,7 @@ def test_angle_embedding(backend):
     device = qp.device(backend, wires=3)
     params = jnp.array([1, 2, 3])
     interpreted_fn = qp.QNode(angle_embedding, device)
-    jitted_fn = qjit(interpreted_fn)
+    jitted_fn = qjit(interpreted_fn, capture=False)
 
     assert np.allclose(interpreted_fn(params), jitted_fn(params))
 
@@ -87,7 +87,7 @@ def test_basis_embedding(backend):
     device = qp.device(backend, wires=3)
     params = jax.numpy.array([1, 1, 1])
     interpreted_fn = qp.QNode(basis_embedding, device)
-    jitted_fn = qjit(interpreted_fn)
+    jitted_fn = qjit(interpreted_fn, capture=False)
 
     assert np.allclose(interpreted_fn(params), jitted_fn(params))
 
@@ -101,7 +101,7 @@ def test_cosine_window(backend):
 
     device = qp.device(backend, wires=2)
     interpreted_fn = qp.QNode(cosine_window, device)
-    jitted_fn = qjit(interpreted_fn)
+    jitted_fn = qjit(interpreted_fn, capture=False)
 
     assert np.allclose(interpreted_fn(), jitted_fn())
 
@@ -116,7 +116,7 @@ def test_iqp_embedding(backend):
     device = qp.device(backend, wires=3)
     params = jnp.array([1.0, 2.0, 3.0])
     interpreted_fn = qp.QNode(iqp_embedding, device)
-    jitted_fn = qjit(interpreted_fn)
+    jitted_fn = qjit(interpreted_fn, capture=False)
 
     assert np.allclose(interpreted_fn(params), jitted_fn(params))
 
@@ -133,7 +133,7 @@ def test_qaoa_embedding(backend):
     device = qp.device(backend, wires=2)
     params = [jnp.array([[0.1, -0.3, 1.5], [3.1, 0.2, -2.8]]), jnp.array([1.0, 2.0])]
     interpreted_fn = qp.QNode(qaoa_embedding, device)
-    jitted_fn = qjit(interpreted_fn)
+    jitted_fn = qjit(interpreted_fn, capture=False)
 
     assert np.allclose(interpreted_fn(*params), jitted_fn(*params))
 
@@ -148,7 +148,7 @@ def test_random_layers(backend):
     device = qp.device(backend, wires=3)
     params = jnp.array([[1.0, 2.0, 3.0]])
     interpreted_fn = qp.QNode(randomlayers, device)
-    jitted_fn = qjit(interpreted_fn)
+    jitted_fn = qjit(interpreted_fn, capture=False)
 
     assert np.allclose(interpreted_fn(params), jitted_fn(params))
 
@@ -166,7 +166,7 @@ def test_strongly_entangled_layers(backend):
     size = qp.StronglyEntanglingLayers.shape(n_layers=n_layers, n_wires=n_wires)
     params = jnp.array(np.random.random(size))
     interpreted_fn = qp.QNode(strongly_entangled_layers, device)
-    jitted_fn = qjit(interpreted_fn)
+    jitted_fn = qjit(interpreted_fn, capture=False)
 
     assert np.allclose(interpreted_fn(params), jitted_fn(params))
 
@@ -183,7 +183,7 @@ def test_simplified_two_design(backend):
     weights = jax.numpy.array([[[0.0, jnp.pi], [0.0, jnp.pi]], [[jnp.pi, 0.0], [jnp.pi, 0.0]]])
     params = [init_weights, weights]
     interpreted_fn = qp.QNode(simplified_two_design, device)
-    jitted_fn = qjit(interpreted_fn)
+    jitted_fn = qjit(interpreted_fn, capture=False)
 
     assert np.allclose(interpreted_fn(*params), jitted_fn(*params))
 
@@ -198,7 +198,7 @@ def test_basic_entangler_layers(backend):
     device = qp.device(backend, wires=3)
     params = jnp.array([[jnp.pi, jnp.pi, jnp.pi]])
     interpreted_fn = qp.QNode(basic_entangler_layers, device)
-    jitted_fn = qjit(interpreted_fn)
+    jitted_fn = qjit(interpreted_fn, capture=False)
 
     assert np.allclose(interpreted_fn(params), jitted_fn(params))
 
@@ -225,7 +225,7 @@ def test_mottonen_state_preparation(backend):
     )
     state = params / jnp.linalg.norm(params)
     interpreted_fn = qp.QNode(mottonen_state_prep, device)
-    jitted_fn = qjit(interpreted_fn)
+    jitted_fn = qjit(interpreted_fn, capture=False)
 
     assert np.allclose(interpreted_fn(state), jitted_fn(state))
 
@@ -240,7 +240,7 @@ def test_arbitrary_state_preparation(backend):
     device = qp.device(backend, wires=2)
     params = jnp.array([0.1, 0.1, 0.1, 0.1, 0.1, 0.1])
     interpreted_fn = qp.QNode(vqe, device)
-    jitted_fn = qjit(interpreted_fn)
+    jitted_fn = qjit(interpreted_fn, capture=False)
 
     assert np.allclose(interpreted_fn(params), jitted_fn(params))
 
@@ -262,7 +262,7 @@ def test_all_single_doubles(backend):
     params = jnp.array(np.random.normal(0, np.pi, len(singles) + len(doubles)))
     device = qp.device(backend, wires=4)
     interpreted_fn = qp.QNode(all_single_doubles, device)
-    jitted_fn = qjit(interpreted_fn)
+    jitted_fn = qjit(interpreted_fn, capture=False)
 
     assert np.allclose(interpreted_fn(params), jitted_fn(params))
 
@@ -289,7 +289,7 @@ def test_gate_fabric(backend):
     params = jnp.array(np.random.random(shape))
 
     interpreted_fn = qp.QNode(ansatz, device)
-    jitted_fn = qjit(interpreted_fn)
+    jitted_fn = qjit(interpreted_fn, capture=False)
 
     assert np.allclose(interpreted_fn(qp.numpy.array(params)), jitted_fn(params))
 
@@ -323,7 +323,7 @@ def test_uccsd(backend):
     params = jax.numpy.array(np.zeros(len(singles) + len(doubles)))
 
     interpreted_fn = qp.QNode(circuit, device)
-    jitted_fn = qjit(interpreted_fn)
+    jitted_fn = qjit(interpreted_fn, capture=False)
 
     assert np.allclose(interpreted_fn(params), jitted_fn(params))
 
@@ -338,7 +338,7 @@ def test_kup(backend):
     device = qp.device(backend, wires=4)
     params = jnp.array(np.random.random((1, 6)))
     interpreted_fn = qp.QNode(kup, device)
-    jitted_fn = qjit(interpreted_fn)
+    jitted_fn = qjit(interpreted_fn, capture=False)
 
     assert np.allclose(interpreted_fn(params), jitted_fn(params))
 
@@ -353,7 +353,7 @@ def test_particle_conserving_u1(backend):
     device = qp.device(backend, wires=2)
     weights = jnp.array(np.random.random((1, 1, 2)))
     interpreted_fn = qp.QNode(particle_conserving_u1, device)
-    jitted_fn = qjit(interpreted_fn)
+    jitted_fn = qjit(interpreted_fn, capture=False)
 
     assert np.allclose(interpreted_fn(weights), jitted_fn(weights))
 
@@ -368,7 +368,7 @@ def test_particle_conserving_u2(backend):
     device = qp.device(backend, wires=2)
     weights = jnp.array(np.random.random((1, 3)))
     interpreted_fn = qp.QNode(particle_conserving_u2, device)
-    jitted_fn = qjit(interpreted_fn)
+    jitted_fn = qjit(interpreted_fn, capture=False)
 
     assert np.allclose(interpreted_fn(weights), jitted_fn(weights))
 
@@ -391,7 +391,7 @@ def test_mps(backend):
     device = qp.device(backend, wires=4)
     params = jnp.array([[0.1, -0.3]] * 3)
     interpreted_fn = qp.QNode(mps, device)
-    jitted_fn = qjit(interpreted_fn)
+    jitted_fn = qjit(interpreted_fn, capture=False)
 
     assert np.allclose(interpreted_fn(params), jitted_fn(params))
 
@@ -414,7 +414,7 @@ def test_ttn(backend):
     device = qp.device(backend, wires=4)
     params = jnp.array([[0.1, -0.3]] * 3)
     interpreted_fn = qp.QNode(ttn, device)
-    jitted_fn = qjit(interpreted_fn)
+    jitted_fn = qjit(interpreted_fn, capture=False)
 
     assert np.allclose(interpreted_fn(params), jitted_fn(params))
 
@@ -437,7 +437,7 @@ def test_mera(backend):
     device = qp.device(backend, wires=4)
     params = jnp.array([[0.1, -0.3]] * 5)
     interpreted_fn = qp.QNode(mera, device)
-    jitted_fn = qjit(interpreted_fn)
+    jitted_fn = qjit(interpreted_fn, capture=False)
 
     assert np.allclose(interpreted_fn(params), jitted_fn(params))
 
@@ -458,7 +458,7 @@ def test_two_local_swap_network(backend):
     device = qp.device(backend, wires=4)
     weights = jnp.array(np.random.random(6))
     interpreted_fn = qp.QNode(two_local_swap_network, device)
-    jitted_fn = qjit(interpreted_fn)
+    jitted_fn = qjit(interpreted_fn, capture=False)
 
     assert np.allclose(interpreted_fn(weights), jitted_fn(weights))
 
@@ -501,7 +501,7 @@ def test_grover(backend):
 
     device = qp.device(backend, wires=n_wires)
     interpreted_fn = qp.QNode(grover_interpreted, device)
-    jitted_fn = qjit(qp.QNode(grover_compiled, device))
+    jitted_fn = qjit(qp.QNode(grover_compiled, device), capture=False)
     # Outcome is considered equivalent since
     # -1 = e^i*phi
     positive = np.allclose(interpreted_fn(1), jitted_fn(1))
@@ -530,7 +530,7 @@ def test_reflection(backend):
 
     device = qp.device(backend, wires=3)
     interpreted_fn = qp.QNode(reflection, device)
-    jitted_fn = qjit(qp.QNode(interpreted_fn, device))
+    jitted_fn = qjit(qp.QNode(interpreted_fn, device), capture=False)
 
     assert np.allclose(interpreted_fn(x), jitted_fn(x))
 
@@ -553,7 +553,7 @@ def test_amplitude_amplification(backend):
     params = jnp.array([0.9, 0.1])
     device = qp.device(backend, wires=3)
     interpreted_fn = qp.QNode(amplitude_amplification, device)
-    jitted_fn = qjit(qp.QNode(interpreted_fn, device))
+    jitted_fn = qjit(qp.QNode(interpreted_fn, device), capture=False)
 
     assert np.allclose(interpreted_fn(params), jitted_fn(params))
 
@@ -568,7 +568,7 @@ def test_fermionic(backend):
     device = qp.device(backend, wires=3)
     params = jnp.array(0.56)
     interpreted_fn = qp.QNode(fermionic, device)
-    jitted_fn = qjit(interpreted_fn)
+    jitted_fn = qjit(interpreted_fn, capture=False)
 
     assert np.allclose(interpreted_fn(params), jitted_fn(params))
 
@@ -583,7 +583,7 @@ def test_fermionic_double(backend):
     device = qp.device(backend, wires=5)
     weight = 1.34817
     interpreted_fn = qp.QNode(fermionic, device)
-    jitted_fn = qjit(interpreted_fn)
+    jitted_fn = qjit(interpreted_fn, capture=False)
 
     assert np.allclose(interpreted_fn(weight), jitted_fn(weight))
 
@@ -598,7 +598,7 @@ def test_arbitrary_unitary(backend):
     weights = jnp.array(np.random.random((15,)))
     device = qp.device(backend, wires=2)
     interpreted_fn = qp.QNode(arbitrary_unitary, device)
-    jitted_fn = qjit(interpreted_fn)
+    jitted_fn = qjit(interpreted_fn, capture=False)
 
     assert np.allclose(interpreted_fn(weights), jitted_fn(weights))
 
@@ -612,7 +612,7 @@ def test_permute(backend):
 
     device = qp.device(backend, wires=5)
     interpreted_fn = qp.QNode(permute, device)
-    jitted_fn = qjit(interpreted_fn)
+    jitted_fn = qjit(interpreted_fn, capture=False)
 
     assert np.allclose(interpreted_fn(), jitted_fn())
 
@@ -630,7 +630,7 @@ def test_qft(backend):
     device = qp.device(backend, wires=3)
     params = jnp.array([1, 0, 0])
     interpreted_fn = qp.QNode(qft, device)
-    jitted_fn = qjit(interpreted_fn)
+    jitted_fn = qjit(interpreted_fn, capture=False)
 
     assert np.allclose(interpreted_fn(params), jitted_fn(params))
 
@@ -646,7 +646,7 @@ def test_aqft(backend):
 
     device = qp.device(backend, wires=3)
     interpreted_fn = qp.QNode(aqft, device)
-    jitted_fn = qjit(interpreted_fn, static_argnames="order")
+    jitted_fn = qjit(interpreted_fn, static_argnames="order", capture=False)
 
     assert np.allclose(interpreted_fn(1), jitted_fn(1))
 
@@ -667,7 +667,7 @@ def test_hilbert_schmidt(backend):
     v_params = np.array([0])
     device = qp.device(backend, wires=2)
     interpreted_fn = qp.QNode(hilbert_test, device)
-    jitted_fn = qjit(hilbert_test)
+    jitted_fn = qjit(hilbert_test, capture=False)
 
     assert np.allclose(interpreted_fn(v_params), jitted_fn(v_params))
 
@@ -692,7 +692,7 @@ def test_local_hilbert_schmidt(backend):
     v_params = np.array([3 * np.pi / 2, 3 * np.pi / 2, np.pi / 2])
     device = qp.device(backend, wires=4)
     interpreted_fn = qp.QNode(local_hilbert_test, device)
-    jitted_fn = qjit(local_hilbert_test)
+    jitted_fn = qjit(local_hilbert_test, capture=False)
 
     assert np.allclose(interpreted_fn(v_params), jitted_fn(v_params))
 
@@ -713,7 +713,7 @@ def test_commuting_evolution(backend):
         return qp.expval(qp.PauliZ(0))
 
     interpreted_fn = qp.QNode(circuit, device)
-    jitted_fn = qjit(interpreted_fn)
+    jitted_fn = qjit(interpreted_fn, capture=False)
 
     assert np.allclose(interpreted_fn(1), jitted_fn(1))
 
@@ -729,7 +729,7 @@ def test_flip_sign(backend):
 
     device = qp.device(backend, wires=2)
     interpreted_fn = qp.QNode(flip_sign, device)
-    jitted_fn = qjit(interpreted_fn)
+    jitted_fn = qjit(interpreted_fn, capture=False)
 
     assert np.allclose(interpreted_fn(), jitted_fn())
 
@@ -745,7 +745,7 @@ def test_qsvt(backend):
 
     device = qp.device(backend, wires=1)
     interpreted_fn = qp.QNode(qsvt, device)
-    jitted_fn = qjit(interpreted_fn)
+    jitted_fn = qjit(interpreted_fn, capture=False)
 
     assert np.allclose(interpreted_fn(), jitted_fn())
 
@@ -763,7 +763,7 @@ def test_approx_time_evoluation(backend):
     device = qp.device(backend, wires=3)
     params = jnp.array(1)
     interpreted_fn = qp.QNode(approx_time_evolution, device)
-    jitted_fn = qjit(interpreted_fn)
+    jitted_fn = qjit(interpreted_fn, capture=False)
 
     assert np.allclose(interpreted_fn(params), jitted_fn(params))
 
@@ -782,7 +782,7 @@ def test_qdrift(backend):
 
     device = qp.device(backend, wires=2)
     interpreted_fn = qp.QNode(qdrift, device)
-    jitted_fn = qjit(interpreted_fn)
+    jitted_fn = qjit(interpreted_fn, capture=False)
 
     assert np.allclose(interpreted_fn(time), jitted_fn(time))
 
@@ -805,7 +805,7 @@ def test_trotter_product(backend):
 
     device = qp.device(backend, wires=2)
     interpreted_fn = qp.QNode(trotter_product, device)
-    jitted_fn = qjit(interpreted_fn)
+    jitted_fn = qjit(interpreted_fn, capture=False)
 
     assert np.allclose(interpreted_fn(time, c1, c2), jitted_fn(time, c1, c2))
 
@@ -828,7 +828,7 @@ def test_quantum_phase_estimation(backend):
 
     device = qp.device(backend, wires=6)
     interpreted_fn = qp.QNode(quantum_phase_estimation, device)
-    jitted_fn = qjit(interpreted_fn)
+    jitted_fn = qjit(interpreted_fn, capture=False)
 
     assert np.allclose(interpreted_fn(), jitted_fn())
 
@@ -856,7 +856,7 @@ def test_quantum_montecarlo():
         return qp.probs(estimation_wires)
 
     interpreted_fn = qp.QNode(circuit, device)
-    jitted_fn = qjit(interpreted_fn)
+    jitted_fn = qjit(interpreted_fn, capture=False)
 
     assert np.allclose(interpreted_fn(), jitted_fn())
 
@@ -881,7 +881,7 @@ def test_qnn_ticket(backend):  # pylint: disable-next=line-too-long
     x_train = np.random.rand(n_dset, 2**n_qubits)
     weights = np.random.rand(layers, n_qubits)
     expected = qnn(weights, x_train[0])
-    observed = qjit(qnn)(weights, x_train[0])
+    observed = qjit(qnn, capture=False)(weights, x_train[0])
     assert np.allclose(expected, observed)
 
 
@@ -895,7 +895,7 @@ def test_select(backend):
 
     device = qp.device(backend, wires=4)
     interpreted_fn = qp.QNode(select, device)
-    jitted_fn = qjit(interpreted_fn)
+    jitted_fn = qjit(interpreted_fn, capture=False)
 
     assert np.allclose(interpreted_fn(), jitted_fn())
 
@@ -912,7 +912,7 @@ def test_controlled_sequence(backend):
     x = jnp.array(0.25)
     device = qp.device(backend, wires=4)
     interpreted_fn = qp.QNode(controlled_sequence, device)
-    jitted_fn = qjit(interpreted_fn)
+    jitted_fn = qjit(interpreted_fn, capture=False)
 
     assert np.allclose(interpreted_fn(x), jitted_fn(x))
 
@@ -935,7 +935,7 @@ def test_fable(backend):
 
     device = qp.device(backend, wires=5)
     interpreted_fn = qp.QNode(fable, device)
-    jitted_fn = qjit(interpreted_fn)
+    jitted_fn = qjit(interpreted_fn, capture=False)
 
     assert np.allclose(interpreted_fn(input_matrix), jitted_fn(input_matrix))
 
@@ -952,7 +952,7 @@ def test_qubitization(backend):
     coeffs = [0.1, 0.3, -0.3]
     device = qp.device(backend, wires=5)
     interpreted_fn = qp.QNode(qubitization, device)
-    jitted_fn = qjit(interpreted_fn)
+    jitted_fn = qjit(interpreted_fn, capture=False)
 
     assert np.allclose(interpreted_fn(coeffs), jitted_fn(coeffs))
 
@@ -966,7 +966,7 @@ def test_qrom(backend):
 
     device = qp.device(backend, wires=4)
     interpreted_fn = qp.QNode(qrom, device)
-    jitted_fn = qjit(interpreted_fn)
+    jitted_fn = qjit(interpreted_fn, capture=False)
 
     assert np.allclose(interpreted_fn(), jitted_fn())
 
@@ -985,7 +985,7 @@ def test_prepselprep(backend):
 
     device = qp.device(backend, wires=5)
     interpreted_fn = qp.QNode(prepselprep, device)
-    jitted_fn = qjit(interpreted_fn)
+    jitted_fn = qjit(interpreted_fn, capture=False)
 
     assert np.allclose(interpreted_fn(params), jitted_fn(params))
 
@@ -1010,7 +1010,7 @@ def test_mod_exp(backend):
 
     device = qp.device(backend, wires=10)
     interpreted_fn = qp.QNode(mod_exp, device)
-    jitted_fn = qjit(interpreted_fn)
+    jitted_fn = qjit(interpreted_fn, capture=False)
 
     assert np.allclose(interpreted_fn(), jitted_fn())
 
@@ -1034,7 +1034,7 @@ def test_multiplier(backend):
 
     device = qp.device(backend, wires=8)
     interpreted_fn = qp.set_shots(qp.QNode(multiplier, device), shots=2)
-    jitted_fn = qjit(interpreted_fn)
+    jitted_fn = qjit(interpreted_fn, capture=False)
 
     assert np.allclose(interpreted_fn(), jitted_fn())
 
@@ -1058,7 +1058,7 @@ def test_out_adder(backend):
 
     device = qp.device(backend, wires=11)
     interpreted_fn = qp.set_shots(qp.QNode(out_adder, device), shots=10000)
-    jitted_fn = qjit(interpreted_fn)
+    jitted_fn = qjit(interpreted_fn, capture=False)
 
     assert np.allclose(interpreted_fn(), jitted_fn())
 
@@ -1082,7 +1082,7 @@ def test_out_multiplier(backend):
 
     device = qp.device(backend, wires=11)
     interpreted_fn = qp.set_shots(qp.QNode(out_multiplier, device), shots=2)
-    jitted_fn = qjit(interpreted_fn)
+    jitted_fn = qjit(interpreted_fn, capture=False)
 
     assert np.allclose(interpreted_fn(), jitted_fn())
 
@@ -1105,7 +1105,7 @@ def test_phase_adder(backend):
 
     device = qp.device(backend, wires=range(5))
     interpreted_fn = qp.set_shots(qp.QNode(phase_adder, device), shots=2)
-    jitted_fn = qjit(interpreted_fn)
+    jitted_fn = qjit(interpreted_fn, capture=False)
 
     assert np.allclose(interpreted_fn(), jitted_fn())
 
@@ -1124,7 +1124,7 @@ def test_qutrit_basis_state_preparation(backend):
 
     device = qp.device(backend, wires=2)
     interpreted_fn = qp.QNode(qutrit_basis_state_preparation, device)
-    jitted_fn = qjit(interpreted_fn)
+    jitted_fn = qjit(interpreted_fn, capture=False)
 
     assert np.allclose(interpreted_fn(basis_state, obs), jitted_fn(basis_state, obs))
 
@@ -1151,7 +1151,7 @@ def test_basis_rotation(backend):
 
     device = qp.device(backend, wires=3)
     interpreted_fn = qp.QNode(basis_rotation, device)
-    jitted_fn = qjit(interpreted_fn, static_argnums=1)
+    jitted_fn = qjit(interpreted_fn, static_argnums=1, capture=False)
 
     assert np.allclose(interpreted_fn(unitary_matrix, False), jitted_fn(unitary_matrix, False))
 

@@ -32,7 +32,7 @@ from catalyst import qjit
 def test_polyfit(x, y, deg):
     """Test that polyfit from Jax produces same results qjitted or not."""
 
-    @qjit
+    @qjit(capture=False)
     def polyfit_qjit(x, y):
         return jax.numpy.polyfit(x, y, deg)
 

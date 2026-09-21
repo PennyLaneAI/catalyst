@@ -29,7 +29,7 @@ def qnode(x):
     return qp.state()
 
 
-@qjit(target="mlir")
+@qjit(target="mlir", capture=False)
 # The entry point has no internal linkage.
 # CHECK-DAG: func.func public @jit_workload(%arg0: tensor<f64>) -> tensor<4xcomplex<f64>> attributes {llvm.emit_c_interface} {
 def workload(x: float):

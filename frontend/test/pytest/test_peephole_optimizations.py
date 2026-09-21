@@ -51,8 +51,10 @@ def test_cancel_inverses_functionality(theta, backend, cancel_inverses_version):
     reference_workflow = qp.QNode(circuit, qp.device("default.qubit", wires=1))
 
     customized_device = qp.device(backend, wires=1)
-    qjitted_workflow = qjit(qp.QNode(circuit, customized_device))
-    optimized_workflow = qjit(cancel_inverses_version(qp.QNode(circuit, customized_device)))
+    qjitted_workflow = qjit(qp.QNode(circuit, customized_device), capture=False)
+    optimized_workflow = qjit(
+        cancel_inverses_version(qp.QNode(circuit, customized_device)), capture=False
+    )
 
     assert np.allclose(reference_workflow(theta), qjitted_workflow(theta))
     assert np.allclose(reference_workflow(theta), optimized_workflow(theta))
@@ -80,8 +82,10 @@ def test_merge_rotation_functionality(theta, backend, merge_rotations_version):
     reference_workflow = qp.QNode(circuit, qp.device("default.qubit", wires=1))
 
     customized_device = qp.device(backend, wires=1)
-    qjitted_workflow = qjit(qp.QNode(circuit, customized_device))
-    optimized_workflow = qjit(merge_rotations_version(qp.QNode(circuit, customized_device)))
+    qjitted_workflow = qjit(qp.QNode(circuit, customized_device), capture=False)
+    optimized_workflow = qjit(
+        merge_rotations_version(qp.QNode(circuit, customized_device)), capture=False
+    )
 
     assert np.allclose(reference_workflow(theta), qjitted_workflow(theta))
     assert np.allclose(reference_workflow(theta), optimized_workflow(theta))
@@ -98,7 +102,7 @@ def test_cancel_inverses_functionality_outside_qjit(theta, backend):
         qp.Hadamard(wires=0)
         return qp.probs()
 
-    @qjit
+    @qjit(capture=False)
     def workflow():
         @cancel_inverses
         @qp.qnode(qp.device(backend, wires=1))
@@ -126,7 +130,7 @@ def test_pipeline_functionality(theta, backend):
         "merge_rotations": {},
     }
 
-    @qjit
+    @qjit(capture=False)
     def workflow():
         @qp.qnode(qp.device(backend, wires=2))
         def f(x):
@@ -150,7 +154,7 @@ def test_chained_passes():
     Test that chained passes are present in the transform passes.
     """
 
-    @qjit
+    @qjit(capture=False)
     @merge_rotations
     @cancel_inverses
     @qp.qnode(qp.device("lightning.qubit", wires=2))
@@ -172,7 +176,7 @@ def test_disentangle_passes():
     and are applied correctly.
     """
 
-    @qjit
+    @qjit(capture=False)
     @qp.qnode(qp.device("lightning.qubit", wires=2))
     def circuit_with_no_disentangle_passes():
         # first qubit in |1>
@@ -182,7 +186,7 @@ def test_disentangle_passes():
         qp.SWAP(wires=[0, 1])  # state after SWAP |11>
         return qp.state()
 
-    @qjit
+    @qjit(capture=False)
     @disentangle_cnot
     @disentangle_swap
     @qp.qnode(qp.device("lightning.qubit", wires=2))
@@ -210,7 +214,7 @@ def test_convert_clifford_to_ppr():
 
     pipe = [("pipe", ["quantum-compilation-stage"])]
 
-    @qjit(pipelines=pipe, target="mlir")
+    @qjit(pipelines=pipe, target="mlir", capture=False)
     @to_ppr
     @qp.qnode(qp.device("lightning.qubit", wires=2))
     def test_convert_clifford_to_ppr_workflow():
@@ -238,7 +242,7 @@ def test_convert_cz_to_ppr():
 
     pipe = [("pipe", ["quantum-compilation-stage"])]
 
-    @qjit(pipelines=pipe, target="mlir")
+    @qjit(pipelines=pipe, target="mlir", capture=False)
     def test_convert_cz_to_ppr_workflow():
 
         @to_ppr
@@ -260,7 +264,7 @@ def test_commute_ppr():
 
     pipe = [("pipe", ["quantum-compilation-stage"])]
 
-    @qjit(pipelines=pipe, target="mlir")
+    @qjit(pipelines=pipe, target="mlir", capture=False)
     @commute_ppr
     @to_ppr
     @qp.qnode(qp.device("lightning.qubit", wires=2))
@@ -293,7 +297,7 @@ def test_merge_ppr_ppm():
 
     pipe = [("pipe", ["quantum-compilation-stage"])]
 
-    @qjit(pipelines=pipe, target="mlir")
+    @qjit(pipelines=pipe, target="mlir", capture=False)
     @merge_ppr_ppm
     @to_ppr
     @qp.qnode(qp.device("lightning.qubit", wires=2))
@@ -322,7 +326,7 @@ def test_ppr_to_ppm_auto_corrected():
 
     pipe = [("pipe", ["quantum-compilation-stage"])]
 
-    @qjit(pipelines=pipe, target="mlir")
+    @qjit(pipelines=pipe, target="mlir", capture=False)
     @ppr_to_ppm(decompose_method="auto-corrected")
     @to_ppr
     @qp.qnode(qp.device("lightning.qubit", wires=2))
@@ -350,7 +354,7 @@ def test_ppr_to_ppm_inject_magic_state():
 
     pipe = [("pipe", ["quantum-compilation-stage"])]
 
-    @qjit(pipelines=pipe, target="mlir")
+    @qjit(pipelines=pipe, target="mlir", capture=False)
     @ppr_to_ppm(decompose_method="clifford-corrected", avoid_y_measure=True)
     @to_ppr
     @qp.qnode(qp.device("lightning.qubit", wires=2))
@@ -378,7 +382,7 @@ def test_ppr_to_ppm_pauli_corrected():
 
     pipe = [("pipe", ["quantum-compilation-stage"])]
 
-    @qjit(pipelines=pipe, target="mlir")
+    @qjit(pipelines=pipe, target="mlir", capture=False)
     @ppr_to_ppm(decompose_method="pauli-corrected")
     @to_ppr
     @qp.qnode(qp.device("lightning.qubit", wires=2))
@@ -406,7 +410,7 @@ def test_commute_ppr_and_merge_ppr_ppm_with_max_pauli_size():
     pipe = [("pipe", ["quantum-compilation-stage"])]
     device = qp.device("lightning.qubit", wires=2)
 
-    @qjit(pipelines=pipe, target="mlir")
+    @qjit(pipelines=pipe, target="mlir", capture=False)
     @merge_ppr_ppm
     @commute_ppr(max_pauli_size=2)
     @to_ppr
@@ -416,7 +420,7 @@ def test_commute_ppr_and_merge_ppr_ppm_with_max_pauli_size():
         qp.T(0)
         return measure(0), measure(1)
 
-    @qjit(pipelines=pipe, target="mlir")
+    @qjit(pipelines=pipe, target="mlir", capture=False)
     @merge_ppr_ppm(max_pauli_size=1)
     @commute_ppr
     @to_ppr

@@ -129,7 +129,7 @@ class TestDeviceLevelSpecs:
             return qp.expval(qp.PauliZ(0))
 
         pl_specs = qp.specs(circuit, level="device")()
-        cat_specs = qp.specs(qjit(circuit), level="device")()
+        cat_specs = qp.specs(qjit(circuit, capture=False), level="device")()
 
         assert cat_specs["device_name"] == "lightning.qubit"
         check_specs_same(cat_specs, pl_specs)
@@ -161,7 +161,7 @@ class TestDeviceLevelSpecs:
             return qp.probs()
 
         pl_specs = qp.specs(circuit, level="device")()
-        cat_specs = qp.specs(qjit(circuit), level="device")()
+        cat_specs = qp.specs(qjit(circuit, capture=False), level="device")()
 
         assert cat_specs["device_name"] == "lightning.qubit"
 
@@ -221,7 +221,7 @@ class TestDeviceLevelSpecs:
             )
 
         pl_specs = qp.specs(circuit, level="device")()
-        cat_specs = qp.specs(qjit(circuit), level="device")()
+        cat_specs = qp.specs(qjit(circuit, capture=False), level="device")()
 
         check_specs_same(cat_specs, pl_specs)
 
@@ -237,7 +237,7 @@ class TestDeviceLevelSpecs:
                 qp.var(qp.PauliX(0) @ qp.PauliY(1) @ qp.PauliZ(2)),
             )
 
-        complex_meas_specs = qp.specs(qjit(circuit_complex), level="device")()
+        complex_meas_specs = qp.specs(qjit(circuit_complex, capture=False), level="device")()
         expected_measurements = {
             "expval(Prod(num_terms=2))": 1,
             "expval(Hamiltonian(num_terms=2))": 1,
@@ -364,7 +364,7 @@ class TestPassByPassSpecs:
         simple_circuit = qp.transforms.cancel_inverses(simple_circuit)
         simple_circuit = dummy_transform(simple_circuit)  # Force tape transform
         simple_circuit = qp.transform(pass_name="merge-rotations")(simple_circuit)
-        simple_circuit = qp.qjit(simple_circuit)
+        simple_circuit = qp.qjit(simple_circuit, capture=False)
 
         specs = qp.specs(simple_circuit, level="user")()
         assert specs.level == "merge-rotations"
@@ -384,7 +384,7 @@ class TestPassByPassSpecs:
         simple_circuit = qp.transform(pass_name="cancel-inverses")(simple_circuit)
         simple_circuit = qp.transform(pass_name="cancel-inverses")(simple_circuit)
 
-        simple_circuit = qjit(simple_circuit)
+        simple_circuit = qjit(simple_circuit, capture=False)
 
         canceled_res = SpecsResources(
             counts={"RX": 2, "RZ": 2},
@@ -441,7 +441,7 @@ class TestPassByPassSpecs:
         simple_circuit = qp.transforms.cancel_inverses(simple_circuit)
         simple_circuit = qp.transforms.merge_rotations(simple_circuit)
 
-        simple_circuit = qjit(simple_circuit)
+        simple_circuit = qjit(simple_circuit, capture=False)
 
         expected = CircuitSpecs(
             device_name="lightning.qubit",
@@ -514,7 +514,7 @@ class TestPassByPassSpecs:
             simple_circuit
         )  # Can be applied as an MLIR pass
 
-        simple_circuit = qjit(simple_circuit)
+        simple_circuit = qjit(simple_circuit, capture=False)
 
         actual = qp.specs(simple_circuit, level="all")()
         expected = CircuitSpecs(
@@ -584,7 +584,7 @@ class TestPassByPassSpecs:
         circ = dummy_transform(circ)  # Forces normal tape transform
         circ = qp.transforms.merge_rotations(circ)  # Can be applied as an MLIR pass
 
-        circ = qjit(circ)
+        circ = qjit(circ, capture=False)
 
         actual = qp.specs(circ, level="all")(3)
         expected = CircuitSpecs(
@@ -641,7 +641,7 @@ class TestPassByPassSpecs:
             simple_circuit
         )  # Can be applied as an MLIR pass
 
-        simple_circuit = qjit(simple_circuit)
+        simple_circuit = qjit(simple_circuit, capture=False)
 
         actual = qp.specs(simple_circuit, level="all-mlir")()
         expected = CircuitSpecs(
@@ -685,7 +685,7 @@ class TestPassByPassSpecs:
             simple_circuit
         )  # Can be applied as an MLIR pass
 
-        simple_circuit = qjit(simple_circuit)
+        simple_circuit = qjit(simple_circuit, capture=False)
 
         actual = qp.specs(simple_circuit, level="all-mlir")()
         expected = CircuitSpecs(
@@ -845,7 +845,7 @@ class TestPassByPassSpecs:
             qp.X(0)
             return qp.expval(qp.X(0)), qp.expval(qp.Y(0)), qp.expval(qp.Z(0))
 
-        actual = qp.specs(qjit(circuit), level=1)()
+        actual = qp.specs(qjit(circuit, capture=False), level=1)()
         expected = CircuitSpecs(
             device_name="null.qubit",
             num_device_wires=3,
@@ -884,7 +884,7 @@ class TestPassByPassSpecs:
             qp.X(0)
             return qp.expval(qp.X(0)), qp.expval(qp.Y(0)), qp.expval(qp.Z(0))
 
-        actual = qp.specs(qjit(circuit), level=[1, 2])()
+        actual = qp.specs(qjit(circuit, capture=False), level=[1, 2])()
         expected = CircuitSpecs(
             device_name="null.qubit",
             num_device_wires=3,
@@ -1018,7 +1018,7 @@ class TestSpecsWithPPR:
     def test_ppr(self):
         """Test that PPRs are handled correctly."""
 
-        @qp.qjit(target="mlir")
+        @qp.qjit(target="mlir", capture=False)
         @catalyst.passes.to_ppr
         @qp.qnode(qp.device("null.qubit", wires=2))
         def circ():
@@ -1304,7 +1304,7 @@ class TestSymbolicSpecsLoopConcretization:
         """Test a straightforward nested loop whose inner bound depends on the outer loop var."""
         n = 8
 
-        @qp.qjit(autograph=True)
+        @qp.qjit(autograph=True, capture=False)
         @qp.qnode(qp.device("null.qubit", wires=n))
         def circuit():
             for i in range(n):
@@ -1320,7 +1320,7 @@ class TestSymbolicSpecsLoopConcretization:
         """Test 3 nested loops whose bounds depends on the outer loop var."""
         n = 8
 
-        @qp.qjit(autograph=True)
+        @qp.qjit(autograph=True, capture=False)
         @qp.qnode(qp.device("null.qubit", wires=n))
         def circuit():
             for i in range(n):  # Runs 8 times total
@@ -1340,7 +1340,7 @@ class TestSymbolicSpecsLoopConcretization:
         """Test 3 nested loops where the middle loop is unrelated to the other 2."""
         a, b = 4, 3
 
-        @qp.qjit(autograph=True)
+        @qp.qjit(autograph=True, capture=False)
         @qp.qnode(qp.device("null.qubit", wires=2))
         def circuit():
             for i in range(a):  # Runs 4 times total
@@ -1359,7 +1359,7 @@ class TestSymbolicSpecsLoopConcretization:
     def test_loop_concretization_symbolic(self):
         """Test nested dynamic loops."""
 
-        @qp.qjit(autograph=True)
+        @qp.qjit(autograph=True, capture=False)
         @qp.qnode(qp.device("null.qubit", wires=8))
         def circuit(n):
             for i in range(n):
@@ -1378,7 +1378,7 @@ class TestSymbolicSpecsLoopConcretization:
         """Test an outer loop with a step != 1."""
         n = 8
 
-        @qp.qjit(autograph=True)
+        @qp.qjit(autograph=True, capture=False)
         @qp.qnode(qp.device("null.qubit", wires=n))
         def circuit():
             for i in range(0, n, 2):
@@ -1395,7 +1395,7 @@ class TestSymbolicSpecsLoopConcretization:
         """Test an inner loop with a step != 1."""
         n = 8
 
-        @qp.qjit(autograph=True)
+        @qp.qjit(autograph=True, capture=False)
         @qp.qnode(qp.device("null.qubit", wires=n))
         def circuit():
             for i in range(n):
@@ -1412,7 +1412,7 @@ class TestSymbolicSpecsLoopConcretization:
         """Test an outer loop with a lower bound."""
         n = 8
 
-        @qp.qjit(autograph=True)
+        @qp.qjit(autograph=True, capture=False)
         @qp.qnode(qp.device("null.qubit", wires=n))
         def circuit():
             for i in range(2, n):
@@ -1429,7 +1429,7 @@ class TestSymbolicSpecsLoopConcretization:
         """Test an inner loop with a lower bound."""
         n = 8
 
-        @qp.qjit(autograph=True)
+        @qp.qjit(autograph=True, capture=False)
         @qp.qnode(qp.device("null.qubit", wires=n))
         def circuit():
             for i in range(n):
@@ -1446,7 +1446,7 @@ class TestSymbolicSpecsLoopConcretization:
         """Test concretization on a decrementing loop."""
         n = 8
 
-        @qp.qjit(autograph=True)
+        @qp.qjit(autograph=True, capture=False)
         @qp.qnode(qp.device("null.qubit", wires=n))
         def circuit():
             for i in range(n, 0, -1):
@@ -1464,7 +1464,7 @@ class TestSymbolicSpecsLoopConcretization:
         """Test concretization where the inner loop depends indirectly on the outer loop var."""
         n = 8
 
-        @qp.qjit(autograph=True)
+        @qp.qjit(autograph=True, capture=False)
         @qp.qnode(qp.device("null.qubit", wires=n))
         def circuit():
             for i in range(n):
@@ -1482,7 +1482,7 @@ class TestSymbolicSpecsLoopConcretization:
         """Test concretization with a loop that has 2 direct dependencies from inner loops."""
         n = 8
 
-        @qp.qjit(autograph=True)
+        @qp.qjit(autograph=True, capture=False)
         @qp.qnode(qp.device("null.qubit", wires=n))
         def circuit():
             for i in range(n):
@@ -1501,7 +1501,7 @@ class TestSymbolicSpecsLoopConcretization:
         skipping two enclosing loops."""
         n = 8
 
-        @qp.qjit(autograph=True)
+        @qp.qjit(autograph=True, capture=False)
         @qp.qnode(qp.device("null.qubit", wires=n))
         def circuit():
             for i in range(n):
@@ -1520,7 +1520,7 @@ class TestSymbolicSpecsLoopConcretization:
         """Test concretization with all different complexities on loop bounds put together."""
         n = 8
 
-        @qp.qjit(autograph=True)
+        @qp.qjit(autograph=True, capture=False)
         @qp.qnode(qp.device("null.qubit", wires=n))
         def circuit():
             for i in range(1, n, 2):
@@ -1537,7 +1537,7 @@ class TestSymbolicSpecsLoopConcretization:
     def test_loop_concretization_no_iters(self):
         """Test concretization with a loop that has no iterations."""
 
-        @qp.qjit(autograph=True)
+        @qp.qjit(autograph=True, capture=False)
         @qp.qnode(qp.device("null.qubit", wires=1))
         def circuit():
             for i in range(0):
@@ -1590,7 +1590,7 @@ class TestMarkerIntegration:
 
         assert len(simple_circuit.compile_pipeline.markers) == 3
 
-        qjit_circuit = qp.qjit(simple_circuit)
+        qjit_circuit = qp.qjit(simple_circuit, capture=False)
 
         expected = CircuitSpecs(
             device_name="lightning.qubit",
@@ -1634,7 +1634,7 @@ class TestMarkerIntegration:
 
         assert len(simple_circuit.compile_pipeline.markers) == 3
 
-        qjit_circuit = qp.qjit(simple_circuit)
+        qjit_circuit = qp.qjit(simple_circuit, capture=False)
 
         expected = CircuitSpecs(
             device_name="lightning.qubit",

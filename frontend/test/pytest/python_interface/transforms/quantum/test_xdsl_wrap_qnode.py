@@ -163,7 +163,7 @@ class TestGetCallOp:
         WrapQNodePass has been applied to circuit."""
 
         @xdsl_from_qjit
-        @qp.qjit
+        @qp.qjit(capture=False)
         @qp.qnode(qp.device("null.qubit", wires=1))
         def circ():
             return qp.expval(qp.Z(0))

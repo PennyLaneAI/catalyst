@@ -22,7 +22,7 @@ from catalyst.passes import merge_rotations
 # pylint: disable=line-too-long
 
 
-@qjit(target="mlir")
+@qjit(target="mlir", capture=False)
 @qp.qnode(qp.device("lightning.qubit", wires=1))
 def circuit(x: float):
     qp.RX(x, wires=0)
@@ -34,7 +34,7 @@ def circuit(x: float):
 print(circuit.mlir)
 
 
-@qjit(static_argnums=0)
+@qjit(static_argnums=0, capture=False)
 def test_one_shot_with_static_argnums(N):
     """
     Test static argnums is passed correctly to the one shot qnodes.
@@ -68,7 +68,7 @@ test_one_shot_with_static_argnums(10)
 print(test_one_shot_with_static_argnums.mlir)
 
 
-@qjit(target="mlir")
+@qjit(target="mlir", capture=False)
 def test_one_shot_with_passes():
     """
     Test pass pipeline is passed correctly to the one shot qnodes.

@@ -27,7 +27,7 @@ class TestWireTypes:
     def test_32bit_integer(self, backend, dtype):
         """Test that wires can be a 32-bit integer."""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=1))
         def circuit(w):
             qp.PauliX(0)
@@ -48,7 +48,7 @@ class TestBasicCircuits:
             qp.RX(arg0, wires=[arg2])
             return qp.state()
 
-        result = qjit(qp.qnode(qp.device(backend, wires=3))(circuit))(*args)
+        result = qjit(qp.qnode(qp.device(backend, wires=3))(circuit), capture=False)(*args)
         expected = qp.qnode(qp.device("default.qubit", wires=3))(circuit)(*args)
         assert np.allclose(result, expected)
 
@@ -61,7 +61,7 @@ class TestBasicCircuits:
             qp.RX(arg0, wires=[arg2 + 1])
             return qp.state()
 
-        result = qjit(qp.qnode(qp.device(backend, wires=3))(circuit))(*args)
+        result = qjit(qp.qnode(qp.device(backend, wires=3))(circuit), capture=False)(*args)
         expected = qp.qnode(qp.device("default.qubit", wires=3))(circuit)(*args)
         assert np.allclose(result, expected)
 
@@ -73,7 +73,9 @@ class TestBasicCircuits:
             qp.RX(arg0, wires=w1)
             return qp.sample(wires=w2)
 
-        result = qjit(qp.set_shots(qp.qnode(qp.device(backend, wires=3))(circuit), shots=10))(*args)
+        result = qjit(
+            qp.set_shots(qp.qnode(qp.device(backend, wires=3))(circuit), shots=10), capture=False
+        )(*args)
         expected = qp.set_shots(qp.qnode(qp.device("default.qubit", wires=3))(circuit), shots=10)(
             *args
         )
@@ -87,7 +89,9 @@ class TestBasicCircuits:
             qp.RX(arg0, wires=w1)
             return qp.sample(wires=[w2 + 1])
 
-        result = qjit(qp.set_shots(qp.qnode(qp.device(backend, wires=3))(circuit), shots=10))(*args)
+        result = qjit(
+            qp.set_shots(qp.qnode(qp.device(backend, wires=3))(circuit), shots=10), capture=False
+        )(*args)
         expected = qp.set_shots(qp.qnode(qp.device("default.qubit", wires=3))(circuit), shots=10)(
             *args
         )
@@ -109,7 +113,7 @@ class TestBasicCircuits:
             )
             return qp.expval(qp.Hermitian(A, wires=[w1, w2]))
 
-        result = qjit(qp.qnode(qp.device(backend, wires=2))(circuit))(*args)
+        result = qjit(qp.qnode(qp.device(backend, wires=2))(circuit), capture=False)(*args)
         expected = qp.qnode(qp.device("default.qubit", wires=2))(circuit)(*args)
         assert np.allclose(result, expected)
 
@@ -129,7 +133,7 @@ class TestBasicCircuits:
             )
             return qp.expval(qp.Hermitian(A, wires=[w1 + 1, w2]))
 
-        result = qjit(qp.qnode(qp.device(backend, wires=2))(circuit))(*args)
+        result = qjit(qp.qnode(qp.device(backend, wires=2))(circuit), capture=False)(*args)
         expected = qp.qnode(qp.device("default.qubit", wires=2))(circuit)(*args)
         assert np.allclose(result, expected)
 
@@ -144,7 +148,7 @@ class TestBasicCircuits:
             return qp.state()
 
         dyn_qubit = 1
-        result = qjit(circuit)(jnp.array(dyn_qubit))
+        result = qjit(circuit, capture=False)(jnp.array(dyn_qubit))
         expected = circuit(dyn_qubit)
 
         assert jnp.allclose(result, expected)
@@ -159,7 +163,7 @@ class TestControlFlow:
     def test_conditional(self, args, expected, backend):
         """Test conditional."""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=2))
         def circuit(x: int, y: int):
             @cond(x > 4)
@@ -181,7 +185,7 @@ class TestControlFlow:
     def test_while_loop_with_func_arg_wires(self, args, expected, backend):
         """Test while loop with func arg wires."""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=2))
         def circuit(n: int, m: int):
             @while_loop(lambda v: v[0] < v[1])
@@ -208,7 +212,7 @@ class TestControlFlow:
     def test_while_loop_with_loop_arg_wires(self, args, expected, backend):
         """Test while loop with loop arg wires."""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=5))
         def circuit(n: int, m: int):
             qp.RX(jnp.pi, wires=0)

@@ -78,7 +78,7 @@ def test_pass_compiles_with_qjit(name):
     if args or kwargs:
         bound_transform = transform(*args, **kwargs)
 
-    @qp.qjit(target="mlir")
+    @qp.qjit(target="mlir", capture=False)
     @bound_transform
     @qp.qnode(qp.device("null.qubit", wires=1))
     def circuit():

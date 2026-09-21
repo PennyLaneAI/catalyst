@@ -131,7 +131,7 @@ class TestDecomposition:
             qp.SingleExcitationPlus(theta, wires=[0, 1])
             return qp.state()
 
-        mlir = qjit(circuit, target="mlir").mlir
+        mlir = qjit(circuit, target="mlir", capture=False).mlir
         assert "Hadamard" in mlir
         assert "CNOT" in mlir
         assert "RY" in mlir
@@ -157,7 +157,7 @@ class TestDecomposition:
             qp.BlockEncode(np.array([[1, 1, 1], [0, 1, 0]]), wires=[0, 1, 2])
             return qp.state()
 
-        mlir = qjit(circuit, target="mlir").mlir
+        mlir = qjit(circuit, target="mlir", capture=False).mlir
         assert "quantum.unitary" in mlir
         assert "BlockEncode" not in mlir
 
@@ -289,7 +289,7 @@ class TestPreprocessHybridOp:
             adjoint(lambda: OtherRX(x, 0))()
             return qp.expval(qp.PauliZ(0))
 
-        mlir = qjit(circuit, target="mlir").mlir
+        mlir = qjit(circuit, target="mlir", capture=False).mlir
 
         assert "quantum.adjoint" in mlir
         assert "RX" in mlir
@@ -327,7 +327,7 @@ class TestPreprocessHybridOp:
             return qp.state()
 
         # mlir contains expected gate names, and not the unsupported gate names
-        qjc = qjit(circuit, target="mlir")
+        qjc = qjit(circuit, target="mlir", capture=False)
         # force creation of mlir
         _ = qjc(0.5)
         mlir = qjc.mlir
@@ -362,7 +362,7 @@ class TestPreprocessHybridOp:
 
         dev = qp.device("lightning.qubit", wires=2)
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(dev)
         def circuit(n: int, x: float):
             OtherHadamard(wires=0)
@@ -395,7 +395,7 @@ class TestPreprocessHybridOp:
 
         dev = qp.device("lightning.qubit", wires=1)
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(dev)
         def circuit(x: float):
             @while_loop(lambda x: x < 2.0)
