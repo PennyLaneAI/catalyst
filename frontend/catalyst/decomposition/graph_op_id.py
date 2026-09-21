@@ -14,21 +14,77 @@
 
 """Python implementation of Graph Operator ID."""
 
+from collections.abc import Mapping, Sequence
 from typing import Any
 
 import jax.numpy as jnp
 import pennylane as qp
+from jax._src.lib.mlir import ir
+from pennylane.ops.op_math.adjoint2 import Adjoint2
+from pennylane.ops.op_math.controlled2 import ControlledOp2
 from pennylane.pytrees import flatten
 
 from catalyst.decomposition.type_utils import (
-    convert_types_to_mlir_strings,
-    format_dynamic_params_for_id,
+    convert_item_to_mlir_type,
     post_process_concretize_leaves,
-    replace_abstract_wires_with_concrete_wires,
+    replace_wires_with_placeholder_wires,
 )
 from catalyst.from_plxpr.uid import generate_uid
+from catalyst.jax_extras.lowering import get_mlir_attribute_from_pyval, mlir_build_context
 
 _SPECIAL_LOWERINGS = {}
+
+
+def format_static_data_dict_for_id(static_data):
+    """Format the static-data group of a GraphOpID with MLIR's attribute printer."""
+    with mlir_build_context():
+        return str(get_mlir_attribute_from_pyval(static_data))
+
+
+def format_dynamic_params_for_id(dynamic_shape):
+    """Format the dynamic-parameter group of a GraphOpID."""
+
+    def handle_item(item):
+        match item:
+            case str():
+                return item
+            case list() | tuple():
+                return "[" + ",".join(handle_item(i) for i in item) + "]"
+
+    return (
+        "{"
+        + ",".join(
+            name + ":" + "[" + ",".join(handle_item(item) for item in types) + "]"
+            for name, types in dynamic_shape.items()
+        )
+        + "}"
+    )
+
+
+def build_graph_op_id(
+    operator_name: str,
+    dynamic_shape: Mapping[str, Sequence[str]],
+    wire_lens: Mapping[str, int],
+    static_data: Mapping[str, Any],
+    *,
+    adjoint: bool = False,
+    num_controls: int = 0,
+    uid: int | None = None,
+) -> str:
+    """Build a canonical frontend GraphOpID from its identity components."""
+    if num_controls < 0:
+        raise ValueError("GraphOpID control count cannot be negative")
+
+    name = f"Adjoint({operator_name})" if adjoint else operator_name
+    if num_controls:
+        prefix = "C" if num_controls == 1 else f"{num_controls}C"
+        name = f"{prefix}({name})"
+
+    dynamic_id = format_dynamic_params_for_id(dict(sorted(dynamic_shape.items())))
+    wire_id = "{" + ",".join(f"{key}:{value}" for key, value in sorted(wire_lens.items())) + "}"
+    static_id = format_static_data_dict_for_id(dict(static_data))
+    uid_id = f"[{uid}]" if uid is not None else ""
+    return name + dynamic_id + wire_id + static_id + uid_id
 
 
 class GraphOpID:
@@ -38,25 +94,30 @@ class GraphOpID:
     The format of the computed graph op ID string is as follows:
         op_name{param_shaped_type_dictionary}{wire_lens_dictionary}{static_data_dictionary}[UID]
 
+    The types in the dynamic shape dictionary should be represented as a list of MLIR-style type annotations.
     The UID is computed from the shapes, dtypes and pytree structures of the `hybrid_args` of
     the Operator2 instance.
 
     For example, an Operator2 instance with class name `HybridOpArg`, taking in one float param
     argument named `angle`, one wire argument named `cwires`, one static data argument
     `label="hello"`, and a computed UID of 10 would be parsed to the following graph op ID:
-        HybridOpArg{angle:[f64]}{cwires:1}{label:hello}[10]
+        HybridOpArg{angle:[tensor<f64>]}{cwires:1}{label = "hello"}[10]
+
+    The static data group is spelled by MLIR's own attribute printer, applied to the attributes the
+    data lowers to, so each entry reads as it would inside the `static_data` dictionary on the op.
 
     The defining trait of a graph op ID is that it has unique correspondence to decomposition rules.
     In other words, different graph op IDs have different sets of decomposition rules.
 
     For example,
-        PauliRot{angle:[f64]}{wires:1}{pauli_word:X}
+        PauliRot{angle:[f64]}{wires:1}{pauli_word = "X"}
     and
-        PauliRot{angle:[f64]}{wires:2}{pauli_word:XX}
+        PauliRot{angle:[f64]}{wires:2}{pauli_word = "XX"}
     will have different decomposition rules.
 
-    Note that this function should not be updated without updating the corresponding method on the
-    DecomposableGate interface in mlir/lib/quantum/IR/QuantumInterfaces.cpp.
+    Note that this function should not be updated without updating the corresponding methods on the
+    DecomposableGate interface in mlir/lib/quantum/IR/QuantumInterfaces.cpp and the corresponding
+    DecomposableGate interface in mlir/include/QRef/IR/QRefInterfaces.h.
     """
 
     def __init__(self, op: qp.core.Operator2):
@@ -64,6 +125,7 @@ class GraphOpID:
         assert isinstance(
             op, qp.core.Operator2
         ), f"Graph-based decomposition expects an Operator2 instance, got {op} of type {type(op)}"
+        op, self.adjoint, self.num_controls = self.peel_modifiers(op)
         self.op = op
         self.is_custom_op = self.parse_is_custom_op()
 
@@ -73,15 +135,53 @@ class GraphOpID:
         self.static_data = self.parse_static_data()
         self.extra_data, self.uid = self.parse_extra_data()
 
+    @staticmethod
+    def peel_modifiers(op: qp.core.Operator2):
+        """Return the innermost base of ``op`` together with the modifiers wrapping it.
+
+        A *generic* symbolic operator (``Adjoint2``/``ControlledOp2``, as opposed to a concrete
+        class such as ``CH``) reports its wrapper's own arguments, e.g.
+        ``Adjoint(S){}{}{}[1141126509488406748]``. That is not how the compiler spells a modified
+        operator: ``wrapModifiers`` folds the modifier into the *base* operator's id. So the
+        wrappers are peeled off here and counted, and :meth:`getGraphOpId` puts them back in
+        canonical position (control outermost) rather than splicing them into a finished id.
+
+        The walk terminates structurally: each step moves to ``op.base``, one wrapper shallower,
+        and the chain ends at the first non-symbolic operator.
+
+        Args:
+            op (Operator2): the operator to unwrap
+
+        Returns:
+            Operator2: the innermost base operator
+            bool: whether the base is adjointed
+            int: how many controls wrap the base
+        """
+        adjoint, num_controls = False, 0
+        while True:
+            if isinstance(op, Adjoint2):
+                adjoint = not adjoint
+            elif isinstance(op, ControlledOp2):
+                num_controls += len(op.control_wires)
+            else:
+                return op, adjoint, num_controls
+            op = op.base
+
     def parse_dynamic_shape(self) -> dict:
         """Return a dictionary of dynamic arg names to list of dtypes."""
         # enters as {name: dtype}, we want the format {name: list[dtype]}
         if self.is_custom_op:
             return {str(i): ["f64"] for i in range(len(self.op.dynamic_args))}
         elif issubclass(type(self.op), tuple(_SPECIAL_LOWERINGS.keys())):  # special cases
-            return {argname: argtype for argname, argtype in sorted(self.op.dynamic_args.items())}
+            return {
+                argname: [convert_item_to_mlir_type(argtype, is_special_lowering=True)]
+                for argname, argtype in sorted(self.op.dynamic_args.items())
+            }
         else:
-            return {argname: [argtype] for argname, argtype in sorted(self.op.dynamic_args.items())}
+            return {
+                argname: [convert_item_to_mlir_type(argtype)]
+                for argname, argtype in sorted(self.op.dynamic_args.items())
+            }
 
     def parse_wire_lens(self) -> dict[str, int]:
         """Return a dictionary of wire arg names to lengths."""
@@ -105,7 +205,7 @@ class GraphOpID:
             hybrid_trees = []
             hybrid_args = []
             for _, hybrid_argval in self.op.hybrid_args.items():
-                leaves, tree = flatten(replace_abstract_wires_with_concrete_wires(hybrid_argval))
+                leaves, tree = flatten(replace_wires_with_placeholder_wires(hybrid_argval))
                 leaves = post_process_concretize_leaves(leaves)
                 hybrid_lens.append(len(leaves))
                 hybrid_trees.append(tree)
@@ -152,35 +252,38 @@ class GraphOpID:
         """Return the name of the operator."""
         return self.operator_name
 
-    def get_dynamic_shape_id_format(self) -> str:
-        """Return the dynamic shape formatted for GraphOpId."""
-        return format_dynamic_params_for_id(convert_types_to_mlir_strings(self.dynamic_shape))
+    def _build_id(self, adjoint: bool, num_controls: int) -> str:
+        """Return the GraphOpId of the base operator under the given modifiers."""
+        uid = None
+        if self.extra_data:
+            assert self.uid >= 0, f"Failed to compute UID for operator {self.op}"
+            uid = self.uid
+        return build_graph_op_id(
+            self.get_operator_name(),
+            self.dynamic_shape,
+            self.wire_lens,
+            self.static_data,
+            adjoint=adjoint,
+            num_controls=num_controls,
+            uid=uid,
+        )
 
-    def get_wire_lens_id_format(self) -> str:
-        """Return the wire lengths formatted for GraphOpId."""
-        return "{" + ",".join(f"{name}:{shape}" for name, shape in self.wire_lens.items()) + "}"
-
-    def get_static_data_id_format(self) -> str:
-        """Return the static data formatted for GraphOpId."""
-        return "{" + ",".join(f"{k}:{v}" for k, v in self.static_data.items()) + "}"
-
-    def getGraphOpId(self, adjoint: bool = False) -> str:
+    def getGraphOpId(self, adjoint: bool = False, num_controls: int = 0) -> str:
         """
         Return the GraphOpId as a string.
+
+        The arguments are the modifiers the *caller* applies on top of the operator, e.g. a rule
+        being distributed over adjoint. They compose with the modifiers the operator carries
+        itself, so an already-symbolic operator spells canonically instead of being wrapped twice.
 
         NOTE: do not modify this method without also modifying the corresponding DecomposableGate
         interface in MLIR.
         """
-        name = self.get_operator_name()
-        if adjoint:
-            name = f"Adjoint({name})"
-        ID_string = (
-            name
-            + self.get_dynamic_shape_id_format()
-            + self.get_wire_lens_id_format()
-            + self.get_static_data_id_format()
-        )
-        if self.extra_data:
-            assert self.uid >= 0, f"Failed to compute UID for operator {self.op}"
-            ID_string += "[" + str(self.uid) + "]"
-        return ID_string
+        return self._build_id(adjoint != self.adjoint, num_controls + self.num_controls)
+
+    def getBaseGraphOpId(self) -> str:
+        """Return the GraphOpId of the base operator alone, leaving off the modifiers wrapping it.
+
+        The base is what owns the decomposition rules, so this is the id to look them up under.
+        """
+        return self._build_id(False, 0)

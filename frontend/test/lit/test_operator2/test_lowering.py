@@ -280,11 +280,11 @@ def c_multiple_registers():
 
     # CHECK: [[q5:%.+]] = qref.get {{%.+}}[ 0]
     # CHECK: qref.operator "MultipleRegisters"() qubits([[q5]])
-    # CHECK: qubit_map = {reg1 = [0]}
+    # CHECK: qubit_map = {reg1 = [0], reg2 = []}
     MultipleRegisters(0, [])
 
     # CHECK: qref.operator "MultipleRegisters"() qubits()
-    # CHECK-NOT: qubit_map
+    # CHECK: qubit_map = {reg1 = [], reg2 = []}
     MultipleRegisters([], [])
     return qp.state()
 
@@ -342,9 +342,7 @@ def circuit_multirz(x: float):
     # CHECK: [[q4:%.+]] = qref.get {{%.+}}[ 1]
     # CHECK: [[q5:%.+]] = qref.get {{%.+}}[ 3]
 
-    # MultiRZ gets automatically canonicalized, so it will never have the `adj` attribute
-    # CHECK: [[theta:%.+]] = arith.negf {{%.+}} : f64
-    # CHECK: qref.multirz([[theta]]) [[q3]], [[q4]] ctrls([[q5]]) ctrlvals([[false]]) :
+    # CHECK: qref.multirz({{%.+}}) [[q3]], [[q4]] adj ctrls([[q5]]) ctrlvals([[false]]) :
     # CHECK-SAME: !qref.bit, !qref.bit ctrls !qref.bit
     qp.ctrl(qp.adjoint(qp.MultiRZ(x, wires=(0, 1))), [3], [False])
     return qp.state()
@@ -446,9 +444,7 @@ def c_pcphase(x: float):
     # CHECK: [[q3:%.+]] = qref.get {{%.+}}[ 0]
     # CHECK: [[q4:%.+]] = qref.get {{%.+}}[ 1]
     # CHECK: [[q5:%.+]] = qref.get {{%.+}}[ 2]
-    # PCPhase gets automatically canonicalized, so it will never have the `adj` attribute
-    # CHECK: [[theta:%.+]] = arith.negf {{%.+}} : f64
-    # CHECK: qref.pcphase([[theta]], dim : 3) [[q3]], [[q4]] ctrls([[q5]]) ctrlvals([[false]]) :
+    # CHECK: qref.pcphase({{%.+}}, dim : 3) [[q3]], [[q4]] adj ctrls([[q5]]) ctrlvals([[false]]) :
     # CHECK-SAME: !qref.bit, !qref.bit ctrls !qref.bit
     qp.ctrl(qp.adjoint(qp.PCPhase(x, 3, (0, 1))), [2], [False])
     return qp.state()

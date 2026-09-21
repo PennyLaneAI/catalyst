@@ -70,6 +70,10 @@ def AdjointLoweringPass : Pass<"adjoint-lowering"> {
     ];
 }
 
+def ResolveGateLevelAdjoint : Pass<"resolve-gate-level-adjoint"> {
+    let summary = "Applies canonicalization patterns for adjoint quantum operations.";
+}
+
 def CtrlLoweringPass : Pass<"ctrl-lowering"> {
     let summary = "Lower ctrl regions by distributing the controls over the enclosed operations.";
 
@@ -194,19 +198,15 @@ def GraphDecompositionPass : Pass<"graph-decomposition", "mlir::ModuleOp"> {
         "LLVM::LLVMDialect",
         "stablehlo::StablehloDialect",
         "tensor::TensorDialect",
+        "catalyst::CatalystDialect",
+        "catalyst::qref::QRefDialect",
+        "catalyst::pbc::PBCDialect",
+        "catalyst::mbqc::MBQCDialect",
     ];
 }
 
-def DecomposeLoweringPass : Pass<"decompose-lowering"> {
-    let summary = "Replace quantum operations with compiled decomposition rules.";
-
-    let options = [
-        ListOption<
-            /*C++ name*/"targetRulesOption",
-            /*CLI name*/"target-rules",
-            /*Type*/"std::string",
-            /*Description*/"The set of decomposition rules to apply. If empty, applies all rules.">
-    ];
+def ResolveStatePrepOperatorPass : Pass<"resolve-state-prep-operator"> {
+    let summary = "Replace all quantum.operator ops of StatePrep/BasisState to equivalent quantum.set_state/set_basis_state operations ";
 }
 
 def DisentangleCNOTPass : Pass<"disentangle-cnot"> {
