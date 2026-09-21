@@ -233,6 +233,7 @@ class TestGenericUtilities:
             ("f64", "float64", ()),
             ("complex<f64>", "complex128", ()),
             ("complex<f32>", "complex64", ()),
+            (["f64"], "float64", ()),
             # mlir-type tensor tests
             ("tensor<i1>", "bool", ()),
             ("tensor<1xi1>", "bool", (1,)),
