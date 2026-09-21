@@ -53,6 +53,26 @@ def _resources_have_measurement(gate_counts) -> bool:
     return any(isinstance(op, _NON_INVERTIBLE_RESOURCE_TYPES) for op in gate_counts)
 
 
+def _adjoint_folds_to_base(resource_ids, op_name) -> bool:
+    """Whether an ``Adjoint(op)`` rule's resources are a single unmodified copy of the base op.
+
+    This holds for ``adjoint_rotation`` and ``self_adjoint`` to simplify the rule registry
+    and avoid the solver having to match a rule that produces a modified gate back to the base op.
+
+    Args:
+        resource_ids (dict): the rule's resources as ``{resource graphOpId: count}``
+        op_name (str): the base operator's name
+
+    Returns:
+        bool: whether the rule folds ``Adjoint(op)`` to a single unmodified ``op``
+    """
+    if len(resource_ids) != 1:
+        return False
+    ((rid, count),) = resource_ids.items()
+    # print(f"rid: {rid}, count: {count}, op_name: {op_name}")
+    return count == 1 and rid.split("{", 1)[0] == op_name
+
+
 def build_base_op(op_cls, kwargs, is_custom_op):
     """Instantiate the base operator of a PennyLane's symbolic rule from prepared rule kwargs.
 
@@ -1021,10 +1041,15 @@ def compile_registered_symbolic_rules(
     # Controlling an adjoint rule's body means every op it produces gains the control modifier.
     if wrap_control:
         ctrl_mod = _control_modifier(n_ctrl)
-        name_to_resource_ids = {
-            rule_name: {wrap_modifier_id(rid, ctrl_mod): count for rid, count in ids.items()}
-            for rule_name, ids in name_to_resource_ids.items()
-        }
+        rewritten = {}
+        for rule_name, ids in name_to_resource_ids.items():
+            if _adjoint_folds_to_base(ids, op_name):
+                rewritten[rule_name] = {target_id.replace(f"Adjoint({op_name})", op_name, 1): 1}
+            else:
+                rewritten[rule_name] = {
+                    wrap_modifier_id(rid, ctrl_mod): count for rid, count in ids.items()
+                }
+        name_to_resource_ids = rewritten
 
     call_args, call_kwargs = split_call_args(kwargs, is_custom_op)
     kwarg_names = ordered_kwarg_names(call_kwargs, dynamic_shape)
