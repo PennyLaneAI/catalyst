@@ -69,6 +69,20 @@ void createControlledGate(PatternRewriter &rewriter, QuantumGate gate, ValueRang
     }
     operands.append(addCtrlValues.begin(), addCtrlValues.end());
 
+    // The control operands/results are NOT necessarily the trailing segments: `quantum.operator`
+    // declares `in_qreg`/`arr_*` operand segments and an `out_qreg` result segment *after* the
+    // control segments. Assembling the operand vector above (leading, non-ctrl qubits, controls)
+    // and appending the new control results at the end is only correct when those trailing
+    // segments are empty (i.e. qubit-mode gates). Bail out cleanly on register-mode gates rather
+    // than silently miscompiling.
+    unsigned numTrailing = op->getNumOperands() - numLeading - nonCtrlQubits.size() -
+                           oldCtrlQubits.size() - oldCtrlValues.size();
+    if (numTrailing != 0) {
+        op->emitError("cannot control a register-mode quantum operation inside a qref.ctrl "
+                      "region");
+        return;
+    }
+
     OperationState state(op->getLoc(), op->getName());
     state.addOperands(operands);
     state.addTypes(op->getResultTypes());
