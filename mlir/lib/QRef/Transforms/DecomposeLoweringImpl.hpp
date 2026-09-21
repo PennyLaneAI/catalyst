@@ -161,12 +161,16 @@ class BaseSignatureAnalyzer {
         }
 
         if (hasQreg) {
-            for (const auto &indices : {signature.inWireIndices, signature.inCtrlWireIndices}) {
-                if (!indices.empty()) {
-                    operands[operandIdx] =
-                        fromTensorOrAsIs(indices, funcInputsNoQreg[operandIdx], rewriter, loc);
-                    operandIdx++;
-                }
+            // As the frontend emits a single grouped base-wire operand, we
+            // need to convert it to a tensor of the expected type for the decomposition function.
+            operands[operandIdx] = fromTensorOrAsIs(signature.inWireIndices,
+                                                    funcInputsNoQreg[operandIdx], rewriter, loc);
+            operandIdx++;
+            // The grouped control-wire operand is present only for a controlled rule.
+            if (!signature.inCtrlWireIndices.empty()) {
+                operands[operandIdx] = fromTensorOrAsIs(
+                    signature.inCtrlWireIndices, funcInputsNoQreg[operandIdx], rewriter, loc);
+                operandIdx++;
             }
         } else {
             for (auto inQubit : signature.inQubits) {
@@ -279,7 +283,13 @@ class BaseSignatureAnalyzer {
             }
         }
 
-        if (isa<RankedTensorType>(type)) {
+        if (auto tensorType = dyn_cast<RankedTensorType>(type)) {
+            // A gate with no (control) wires still has a grouped operand slot. we need to build
+            // the empty `tensor<0x...>` as it expects
+            if (values.empty()) {
+                return tensor::EmptyOp::create(rewriter, loc, tensorType.getShape(),
+                                               tensorType.getElementType());
+            }
             return tensor::FromElementsOp::create(rewriter, loc, type, values);
         }
 
