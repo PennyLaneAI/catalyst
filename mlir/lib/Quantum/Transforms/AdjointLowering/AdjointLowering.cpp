@@ -60,7 +60,9 @@ struct AdjointSingleOpRewritePattern : public OpRewritePattern<AdjointOp> {
         // Forward pass: copy the classical computations to the target insertion point and record
         // the values needed to replay the circuit in reverse.
         IRMapping oldToCloned;
-        generateAdjointForwardPass(adjoint.getRegion(), rewriter, oldToCloned, cache);
+        if (failed(generateAdjointForwardPass(adjoint.getRegion(), rewriter, oldToCloned, cache))) {
+            return failure();
+        }
 
         // Seed the reverse pass with the operands of the quantum.yield.
         auto yieldOp = cast<YieldOp>(adjoint.getRegion().front().getTerminator());

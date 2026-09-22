@@ -218,6 +218,8 @@ def DecomposableGate : OpInterface<"DecomposableGate", [QuantumGate]> {
             "```\n"
             "Note that extra data is currently specific to `OperatorOp`s, and should only appear when present."
             "Each of these maps should be sorted lexicographically by key."
+            "The static data map is spelled by MLIR's attribute printer, which the frontend also "
+            "depends on identical id generation."
             "In general, this should be computed by the default here and not overridden.",
             "std::string", "getGraphOpId", (ins), [{}], [{ return ::catalyst::quantum::defaultGetGraphOpId($_op.getOperation()); }]
         >

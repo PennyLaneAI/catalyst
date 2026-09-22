@@ -568,15 +568,20 @@ void handleIf(IRRewriter &builder, scf::IfOp ifOp, QubitValueTracker &tracker,
     });
 
     // Handle Else region
-    QubitValueTracker elseRegionTracker = tracker;
-    eraseSCFYieldQuantumOperands(cast<scf::YieldOp>(ifOp.getElseRegion().front().getTerminator()));
-    handleRegion(builder, ifOp.getElseRegion(), elseRegionTracker);
-    ifOp.getElseRegion().front().eraseArguments([](BlockArgument arg) {
-        return isa<quantum::QubitType, quantum::QuregType>(arg.getType());
-    });
+    bool hasElseBlock = !ifOp.getElseRegion().empty();
+    if (hasElseBlock) {
+        QubitValueTracker elseRegionTracker = tracker;
+        eraseSCFYieldQuantumOperands(
+            cast<scf::YieldOp>(ifOp.getElseRegion().front().getTerminator()));
+        handleRegion(builder, ifOp.getElseRegion(), elseRegionTracker);
+        ifOp.getElseRegion().front().eraseArguments([](BlockArgument arg) {
+            return isa<quantum::QubitType, quantum::QuregType>(arg.getType());
+        });
+    }
 
     // The else block is empty if the only remaining op is the mandatory scf.yield terminator
-    bool hasElseRegion = &(ifOp.elseBlock()->front()) != ifOp.elseBlock()->getTerminator();
+    bool hasElseRegion =
+        hasElseBlock && (&(ifOp.elseBlock()->front()) != ifOp.elseBlock()->getTerminator());
 
     // Collect classical returns of the old if op
     SmallVector<unsigned> classicalReturnIndices;
@@ -922,7 +927,7 @@ void handleSubroutine(IRRewriter &builder, func::FuncOp f,
     SmallVector<unsigned> newRargIndices;
     SmallVector<Value> oldVargs;
     size_t numNewArgsAdded = 0;
-    int qregSizeIdx = 0;
+    size_t qregSizeIdx = 0;
     for (auto [i, t] : llvm::enumerate(f.getFunctionType().getInputs())) {
         if (!isa<quantum::QubitType, quantum::QuregType>(t)) {
             continue;
@@ -933,8 +938,11 @@ void handleSubroutine(IRRewriter &builder, func::FuncOp f,
             newRargIndices.push_back(i + (numNewArgsAdded++));
             oldVargs.push_back(f.getBody().front().getArgument(i));
         } else if (isa<quantum::QuregType>(t)) {
-            typesToInsertArgs.push_back(
-                qref::QuregType::get(ctx, qregSizesAtCallsite[qregSizeIdx++]));
+            // Fallback to dynamic if there's no size deducible
+            IntegerAttr qregSize = qregSizeIdx < qregSizesAtCallsite.size()
+                                       ? qregSizesAtCallsite[qregSizeIdx++]
+                                       : builder.getI64IntegerAttr(ShapedType::kDynamic);
+            typesToInsertArgs.push_back(qref::QuregType::get(ctx, qregSize));
             newRargIndices.push_back(i + (numNewArgsAdded++));
             oldVargs.push_back(f.getBody().front().getArgument(i));
         }

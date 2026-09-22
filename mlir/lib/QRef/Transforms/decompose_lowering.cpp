@@ -12,12 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <cstdint>
 #include <string>
 #include <utility>
 
-#include "llvm/ADT/DenseSet.h"
-#include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/AllocatorBase.h"
@@ -41,9 +38,11 @@
 #include "mlir/Transforms/Passes.h"
 #include "stablehlo/dialect/StablehloOps.h" // When we read the decomposition rules module from file, StablehloDialect may not be registered from start.
 
+#include "QRef/IR/QRefDialect.h"
+#include "QRef/Transforms/Passes.h"
+#include "QRef/Transforms/Patterns.h"
 #include "Quantum/IR/QuantumDialect.h"
-#include "Quantum/IR/QuantumOps.h"
-#include "Quantum/Transforms/Patterns.h"
+#include "Quantum/Transforms/Passes.h"
 
 #include "DecompUtils.hpp"
 
@@ -53,11 +52,10 @@ using namespace mlir;
 using namespace catalyst::quantum;
 
 namespace catalyst {
-namespace quantum {
+namespace qref {
 
 #define GEN_PASS_DEF_DECOMPOSELOWERINGPASS
-#define GEN_PASS_DECL_DECOMPOSELOWERINGPASS
-#include "Quantum/Transforms/Passes.h.inc"
+#include "QRef/Transforms/Passes.h.inc"
 
 /// A module pass that work through a module, register all decomposition functions, and apply the
 /// decomposition patterns
@@ -68,6 +66,7 @@ struct DecomposeLoweringPass : impl::DecomposeLoweringPassBase<DecomposeLowering
         registry.insert<arith::ArithDialect>();
         registry.insert<func::FuncDialect>();
         registry.insert<quantum::QuantumDialect>();
+        registry.insert<qref::QRefDialect>();
         registry.insert<mlir::stablehlo::StablehloDialect>();
         registry.insert<tensor::TensorDialect>();
         registry.insert<ub::UBDialect>();
@@ -89,7 +88,6 @@ struct DecomposeLoweringPass : impl::DecomposeLoweringPassBase<DecomposeLowering
             }
 
             if (StringRef targetOp = DecompUtils::getTargetGateName(func); !targetOp.empty()) {
-                removeUnusedFuncArgs(func);
                 if (targetOp == "MultiRZ") {
                     // Create a new target op name with the number of wires
                     // for MultiRZ, since it has multiple decomposition functions
@@ -127,18 +125,15 @@ struct DecomposeLoweringPass : impl::DecomposeLoweringPassBase<DecomposeLowering
         });
     }
 
-    // Remove unused arguments on a decomposition function
-    // This is because we have some assumptions on the decomp funcs' signature structure
-    void removeUnusedFuncArgs(func::FuncOp f) {
-        f.front().eraseArguments([](BlockArgument arg) { return arg.use_empty(); });
-
-        f.setFunctionType(FunctionType::get(f->getContext(), f.front().getArgumentTypes(),
-                                            f.front().getTerminator()->getOperandTypes()));
-    }
-
   public:
     void runOnOperation() final {
         ModuleOp module = cast<ModuleOp>(getOperation());
+
+        OpPassManager pm_to_ref("builtin.module");
+        pm_to_ref.addPass(createReferenceSemanticsConversionPass());
+        if (failed(runPipeline(pm_to_ref, module))) {
+            return signalPassFailure();
+        }
 
         // Step 1: Discover and register all decomposition functions in the module
         llvm::StringSet<> targetRules;
@@ -153,17 +148,22 @@ struct DecomposeLoweringPass : impl::DecomposeLoweringPassBase<DecomposeLowering
         // Step 2: Find the target gate set
         findTargetGateSet(module, targetGateSet);
 
-        // Step 3: Apply the decomposition patterns, canonicalizing the insert/extract pairs
+        // Step 3: Apply the decomposition patterns
         RewritePatternSet decompositionPatterns(&getContext());
         populateDecomposeLoweringPatterns(decompositionPatterns, decompositionRegistry,
                                           targetGateSet);
-        catalyst::quantum::ExtractOp::getCanonicalizationPatterns(decompositionPatterns,
-                                                                  &getContext());
         if (failed(applyPatternsGreedily(module, std::move(decompositionPatterns)))) {
+            return signalPassFailure();
+        }
+
+        OpPassManager pm_to_val("builtin.module");
+        pm_to_val.addPass(createValueSemanticsConversionPass());
+        pm_to_val.addPass(createCanonicalizerPass());
+        if (failed(runPipeline(pm_to_val, module))) {
             return signalPassFailure();
         }
     }
 };
 
-} // namespace quantum
+} // namespace qref
 } // namespace catalyst

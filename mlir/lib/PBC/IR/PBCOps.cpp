@@ -311,10 +311,6 @@ llvm::StringRef RefPPRotationOp::getResourceName() {
 }
 llvm::StringRef RefSelectPPMeasurementOp::getResourceName() { return "PPM"; }
 
-bool PPRotationOp::getResourceAdjointFlag() { return getRotationKind() < 0; }
-bool PPMeasurementOp::getResourceAdjointFlag() { return getNegated(); }
-bool RefPPRotationOp::getResourceAdjointFlag() { return getRotationKind() < 0; }
-
 std::string getDetailedStateName(LogicalInitKind initState) {
     switch (initState) {
     case LogicalInitKind::zero:
