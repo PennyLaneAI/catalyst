@@ -15,6 +15,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <numeric>
+#include <sstream>
 #include <string>
 #include <tuple>
 #include <unordered_set>
@@ -172,7 +173,19 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
             DecompositionSolver solver(graph);
             solution = solver.solve();
         }
-        LLVM_DEBUG(showSolution(solution));
+        // Dump the solver's choices when asked for (`graph_decomposition(..., verbose=True)`), or
+        // whenever the pass runs under `-debug-only=graph-decomposition` on a debug build. The
+        // debug build routes the dump through `llvm::dbgs()` like the rest of this pass's debug
+        // output, so it honours `-debug-output=...` rather than going straight to stderr.
+        if (verboseOption) {
+            showSolution(solution);
+        } else {
+            LLVM_DEBUG({
+                std::ostringstream dump;
+                showSolution(solution, dump);
+                llvm::dbgs() << dump.str();
+            });
+        }
 
         ///////////////////////////
         // Step 3: Convert python-decompositions from reference to value semantics and run
