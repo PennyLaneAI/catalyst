@@ -42,7 +42,7 @@ from catalyst.decomposition.decomposition_rules import (
 from catalyst.decomposition.graph_op_id import _SPECIAL_LOWERINGS, build_graph_op_id
 from catalyst.decomposition.type_utils import (
     convert_item_to_mlir_type,
-    get_dummy_values_for_arg,
+    get_dummy_values_for_dynamic_shape,
 )
 from catalyst.jax_extras.lowering import get_mlir_attribute_from_pyval
 from catalyst.jax_extras.patches import mock_attributes
@@ -397,7 +397,7 @@ def compile_decomp_rules(
                         dummy_leaves.append(next_wire_label)
                         next_wire_label += 1
                     else:
-                        dummy_leaves.append(get_dummy_values_for_arg(leaf))
+                        dummy_leaves.append(get_dummy_values_for_dynamic_shape(leaf))
                 unflattened = unflatten(dummy_leaves, hybrid_tree)
             extra_data[hybrid_argname] = unflattened
             hybrid_arg_start_idx += hybrid_len
