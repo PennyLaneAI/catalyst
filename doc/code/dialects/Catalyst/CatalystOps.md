@@ -30,7 +30,7 @@ Syntax:
 operation ::= `catalyst.callback_call` $callee `(` $inputs `)` attr-dict `:` functional-type($inputs, results)
 ```
 
-Interfaces: `CallOpInterface`, `MemoryEffectOpInterface`, `SymbolUserOpInterface`
+Interfaces: `ArgAndResultAttrsOpInterface`, `CallOpInterface`, `MemoryEffectOpInterface`, `SymbolUserOpInterface`
 
 #### Attributes:
 
@@ -63,7 +63,7 @@ It corresponds to function bodies that are not yet constructed.
 
 Traits: `IsolatedFromAbove`
 
-Interfaces: `CallableOpInterface`, `FunctionOpInterface`, `Symbol`
+Interfaces: `ArgAndResultAttrsOpInterface`, `CallableOpInterface`, `FunctionOpInterface`, `Symbol`
 
 #### Attributes:
 
@@ -105,7 +105,8 @@ Interfaces: `MemoryEffectOpInterface`
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>call_target_name</code></td><td>::mlir::StringAttr</td><td>string attribute</td></tr>
-<tr><td><code>number_original_arg</code></td><td>::mlir::DenseI32ArrayAttr</td><td>i32 dense array attribute</td></tr>
+<tr><td><code>number_original_arg</code></td><td>::mlir::IntegerAttr</td><td>32-bit signless integer attribute</td></tr>
+<tr><td><code>backend_config</code></td><td>::mlir::DictionaryAttr</td><td>dictionary of named attribute values</td></tr>
 </table>
 
 #### Operands:
@@ -129,7 +130,7 @@ Syntax:
 operation ::= `catalyst.launch_kernel` $callee `(` $inputs `)` attr-dict `:` functional-type($inputs, results)
 ```
 
-Interfaces: `CallOpInterface`, `SymbolUserOpInterface`
+Interfaces: `ArgAndResultAttrsOpInterface`, `CallOpInterface`, `SymbolUserOpInterface`
 
 #### Attributes:
 
@@ -271,3 +272,56 @@ _Prints numeric values or constant strings at runtime._
 | :-----: | ----------- |
 | `val` | any type |
 
+
+### `catalyst.runtime_call` (::catalyst::RuntimeCallOp)
+
+_Invoke a declared runtime symbol through its C signature._
+
+Syntax:
+
+```
+operation ::= `catalyst.runtime_call` `fn` `(` $callee `)` `(` $inputs `)`
+              ( `in` `(` $dest_buffers^ `:` type($dest_buffers) `)` )?
+              attr-dict
+              ( `:` `(` type($inputs)^ `)` )?
+              ( `->` `(` type($scalar_result)^ `)` )?
+              ( `outs` `(` type($out_tensors)^ `)` )?
+```
+
+Call the runtime symbol `callee`, described by the C parameter kinds in
+`c_params` and the C result kind in `c_result`.
+
+* Without `dispatch`, the call is local. `buf`/`out` are bufferized and the op becomes an
+  `llvm.call` using the symbol's native C ABI.
+* With `dispatch`, the call runs on that executor remotely. The `lower-runtime-dispatch` pass
+  marshals the operands into the executor's flat wire layout and rewrites the op into an
+  `executor.call`.
+
+Traits: `AttrSizedOperandSegments`, `AttrSizedResultSegments`
+
+Interfaces: `MemoryEffectOpInterface`
+
+#### Attributes:
+
+<table>
+<tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
+<tr><td><code>callee</code></td><td>::mlir::StringAttr</td><td>string attribute</td></tr>
+<tr><td><code>c_params</code></td><td>::mlir::ArrayAttr</td><td>string array attribute</td></tr>
+<tr><td><code>c_result</code></td><td>::mlir::StringAttr</td><td>string attribute</td></tr>
+<tr><td><code>c_strings</code></td><td>::mlir::ArrayAttr</td><td>string array attribute</td></tr>
+<tr><td><code>dispatch</code></td><td>::mlir::StringAttr</td><td>string attribute</td></tr>
+</table>
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+| `inputs` | variadic of any type |
+| `dest_buffers` | variadic of memref of any type values |
+
+#### Results:
+
+| Result | Description |
+| :----: | ----------- |
+| `scalar_result` | variadic of any type |
+| `out_tensors` | variadic of ranked tensor of any type values |
