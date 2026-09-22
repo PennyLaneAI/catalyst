@@ -150,7 +150,7 @@ RUN PYTHON=$PYTHON \
 RUN auditwheel repair dist/*.whl -w ./wheel --no-update-tags --exclude libopenblasp-r0-23e5df77.3.21.dev.so
 
 # Build Pennylane Lightning Catalyst 
-FROM pennylane-lightning:latest AS lightning-pennylane-catalyst
+FROM pennylane-lightning AS pennylane-catalyst
 ARG PENNYLANE_VERSION
 ARG LIGHTNING_VERSION
 RUN apt-get update \

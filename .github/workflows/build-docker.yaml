@@ -70,10 +70,10 @@ jobs:
         with:
           context: .
           file: ./Dockerfile
-          tags: catalyst:latest
+          tags: pennylane-catalyst:latest
           load: true
           build-contexts: |
-            pennylane-lightning:latest=docker-image://pennylane-lightning:latest
+            pennylane-lightning=docker-image://pennylane-lightning:latest
           build-args: |
             LIGHTNING_VERSION=${{ inputs.lightning-version || 'main' }}
             PENNYLANE_VERSION=${{ inputs.pennylane-version || 'main' }}            
@@ -82,12 +82,12 @@ jobs:
       - name: Save Docker Image to Archive
         run: |
           mkdir -p output
-          docker save catalyst:latest -o output/catalyst.tar
+          docker save pennylane-catalyst:latest -o output/pennylane-catalyst.tar
 
       # Upload the archive file so you can download it from the GitHub UI
       - name: Upload Image as Workflow Artifact
         uses: actions/upload-artifact@v4
         with:
           name: compiled-docker-image
-          path: output/catalyst.tar
+          path: output/pennylane-catalyst.tar
           retention-days: 5            
