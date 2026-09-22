@@ -1089,6 +1089,17 @@ def compile_registered_symbolic_rules(
     for rule in rules:
         if rule.name not in name_to_resource_ids:
             continue
+
+        # A rule whose body is not region-wrapped (plain adjoint/control) may legitimately
+        # contain a measurement and will be kept. Otherwise, the rule is skipped because
+        # the compiler cannot place a mid-circuit measurement in a control or adjoint region.
+        if wrap_control and _resources_have_measurement(name_to_resources[rule.name]):
+            warnings.warn(
+                f"Skipped the {rule.name} decomposition rule for {target_id}: it contains a "
+                "mid-circuit measurement, which cannot be placed in a control region.",
+                category=RuleLoweringWarning,
+            )
+            continue
         subroutines.append(rule_to_subroutine(rule))
 
     if not subroutines:
