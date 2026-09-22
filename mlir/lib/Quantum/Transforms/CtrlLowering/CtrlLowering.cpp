@@ -34,6 +34,9 @@ static LogicalResult distributeControls(PatternRewriter &rewriter, Block &block,
                                         ValueRange ctrlValues,
                                         SmallVector<Operation *> &opsToErase);
 
+/// Read a segment-sizes attribute from an operation and return it as a SmallVector<int32_t>. The
+/// attribute is expected to be a DenseI32ArrayAttr, and the returned vector contains the sizes of
+/// the operand/result segments in order.
 static SmallVector<int32_t> readSegmentSizes(Operation *op, StringRef name) {
     auto seg = op->getAttrOfType<DenseI32ArrayAttr>(name);
     return SmallVector<int32_t>(seg.asArrayRef().begin(), seg.asArrayRef().end());
