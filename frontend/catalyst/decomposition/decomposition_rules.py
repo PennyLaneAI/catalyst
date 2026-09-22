@@ -53,6 +53,25 @@ def _resources_have_measurement(gate_counts) -> bool:
     return any(isinstance(op, _NON_INVERTIBLE_RESOURCE_TYPES) for op in gate_counts)
 
 
+def _adjoint_folds_to_base(resource_ids, op_name) -> bool:
+    """Whether an ``Adjoint(op)`` rule's resources are a single unmodified copy of the base op.
+
+    This holds for ``adjoint_rotation`` and ``self_adjoint`` to simplify the rule registry
+    and avoid the solver having to match a rule that produces a modified gate back to the base op.
+
+    Args:
+        resource_ids (dict): the rule's resources as ``{resource graphOpId: count}``
+        op_name (str): the base operator's name
+
+    Returns:
+        bool: whether the rule folds ``Adjoint(op)`` to a single unmodified ``op``
+    """
+    if len(resource_ids) != 1:
+        return False
+    ((rid, count),) = resource_ids.items()
+    return count == 1 and rid.split("{", 1)[0] == op_name
+
+
 def build_base_op(op_cls, kwargs, is_custom_op):
     """Instantiate the base operator of a PennyLane's symbolic rule from prepared rule kwargs.
 
@@ -1018,13 +1037,25 @@ def compile_registered_symbolic_rules(
     if not rules:
         return None
 
-    # Controlling an adjoint rule's body means every op it produces gains the control modifier.
-    if wrap_control:
-        ctrl_mod = _control_modifier(n_ctrl)
-        name_to_resource_ids = {
-            rule_name: {wrap_modifier_id(rid, ctrl_mod): count for rid, count in ids.items()}
-            for rule_name, ids in name_to_resource_ids.items()
-        }
+    # Rewrite the ids for an adjoint target:
+    #  - adjoint_rotation/self_adjoint folds Adjoint(X) to X, so declare X in its source spelling.
+    #       This matches the op the rule body emits at apply time (f64), not the tensor<1xf64> the
+    #       abstract-probe resource carries, so the solver does not key a rule on an unproduced
+    #       spelling.
+    #  - Under ctrl, every other produced op additionally gains the control modifier.
+    if kind == "adjoint":
+        ctrl_mod = _control_modifier(n_ctrl) if wrap_control else None
+        rewritten = {}
+        for rule_name, ids in name_to_resource_ids.items():
+            if _adjoint_folds_to_base(ids, op_name):
+                rewritten[rule_name] = {target_id.replace(f"Adjoint({op_name})", op_name, 1): 1}
+            elif wrap_control:
+                rewritten[rule_name] = {
+                    wrap_modifier_id(rid, ctrl_mod): count for rid, count in ids.items()
+                }
+            else:
+                rewritten[rule_name] = ids
+        name_to_resource_ids = rewritten
 
     call_args, call_kwargs = split_call_args(kwargs, is_custom_op)
     kwarg_names = ordered_kwarg_names(call_kwargs, dynamic_shape)
@@ -1063,6 +1094,17 @@ def compile_registered_symbolic_rules(
     subroutines = []
     for rule in rules:
         if rule.name not in name_to_resource_ids:
+            continue
+
+        # A rule whose body is not region-wrapped (plain adjoint/control) may legitimately
+        # contain a measurement and will be kept. Otherwise, the rule is skipped because
+        # the compiler cannot place a mid-circuit measurement in a control or adjoint region.
+        if wrap_control and _resources_have_measurement(name_to_resources[rule.name]):
+            warnings.warn(
+                f"Skipped the {rule.name} decomposition rule for {target_id}: it contains a "
+                "mid-circuit measurement, which cannot be placed in a control region.",
+                category=RuleLoweringWarning,
+            )
             continue
         subroutines.append(rule_to_subroutine(rule))
 
