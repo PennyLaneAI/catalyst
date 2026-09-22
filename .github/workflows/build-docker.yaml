@@ -62,8 +62,8 @@ jobs:
           load: true
           push: false
           build-args: |
-            LIGHTNING_VERSION=${{ inputs.lightning-version }}
-            PENNYLANE_VERSION=${{ inputs.pennylane-version }}
+            LIGHTNING_VERSION=${{ inputs.lightning-version || 'main' }}
+            PENNYLANE_VERSION=${{ inputs.pennylane-version || 'main' }}
 
       - name: Build Docker Image
         run: |
