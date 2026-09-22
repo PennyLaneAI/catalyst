@@ -251,6 +251,7 @@ def compile_decomp_rules(
         op_id = build_graph_op_id(op_cls.__name__, dynamic_shape, {"wires": wire_lens[0]}, {})
 
         decomp_rules = fetch_all_reachable_decomposition_rules_from_op(
+            module=module,
             op_name=op_cls.__name__,
             op_id=op_id,
             dynamic_shape=dynamic_shape,
@@ -267,6 +268,7 @@ def compile_decomp_rules(
         op_id = build_graph_op_id("MultiRZ", dynamic_shape, {wire_argname: wire_lens[0]}, {})
 
         decomp_rules = fetch_all_reachable_decomposition_rules_from_op(
+            module=module,
             op_name="MultiRZ",
             op_id=op_id,
             dynamic_shape=dynamic_shape,
@@ -288,6 +290,7 @@ def compile_decomp_rules(
         )
 
         decomp_rules = fetch_all_reachable_decomposition_rules_from_op(
+            module=module,
             op_name="PauliRot",
             op_id=op_id,
             dynamic_shape=dynamic_shape,
@@ -308,6 +311,7 @@ def compile_decomp_rules(
         )
 
         decomp_rules = fetch_all_reachable_decomposition_rules_from_op(
+            module=module,
             op_name="PCPhase",
             op_id=op_id,
             dynamic_shape=dynamic_shape,
@@ -322,6 +326,7 @@ def compile_decomp_rules(
         op_id = build_graph_op_id("GlobalPhase", dynamic_shape, {}, {})
 
         decomp_rules = fetch_all_reachable_decomposition_rules_from_op(
+            module=module,
             op_name="GlobalPhase",
             op_id=op_id,
             dynamic_shape=dynamic_shape,
@@ -342,6 +347,7 @@ def compile_decomp_rules(
         op_id = build_graph_op_id("QubitUnitary", dynamic_shape, {wire_argname: wire_lens[0]}, {})
 
         decomp_rules = fetch_all_reachable_decomposition_rules_from_op(
+            module=module,
             op_name="QubitUnitary",
             op_id=op_id,
             dynamic_shape=dynamic_shape,
@@ -429,6 +435,7 @@ def compile_decomp_rules(
         )
 
         decomp_rules = fetch_all_reachable_decomposition_rules_from_op(
+            module=module,
             op_name=op_cls.__name__,
             op_id=op_id,
             dynamic_shape=non_hybrid_dynamic_shape,
