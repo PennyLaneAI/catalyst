@@ -1038,17 +1038,24 @@ def compile_registered_symbolic_rules(
     if not rules:
         return None
 
-    # Controlling an adjoint rule's body means every op it produces gains the control modifier.
-    if wrap_control:
-        ctrl_mod = _control_modifier(n_ctrl)
+    # Rewrite the ids for an adjoint target:
+    #  - adjoint_rotation/self_adjoint folds Adjoint(X) to X, so declare X in its source spelling.
+    #       This matches the op the rule body emits at apply time (f64), not the tensor<1xf64> the
+    #       abstract-probe resource carries, so the solver does not key a rule on an unproduced
+    #       spelling.
+    #  - Under ctrl, every other produced op additionally gains the control modifier.
+    if kind == "adjoint":
+        ctrl_mod = _control_modifier(n_ctrl) if wrap_control else None
         rewritten = {}
         for rule_name, ids in name_to_resource_ids.items():
             if _adjoint_folds_to_base(ids, op_name):
                 rewritten[rule_name] = {target_id.replace(f"Adjoint({op_name})", op_name, 1): 1}
-            else:
+            elif wrap_control:
                 rewritten[rule_name] = {
                     wrap_modifier_id(rid, ctrl_mod): count for rid, count in ids.items()
                 }
+            else:
+                rewritten[rule_name] = ids
         name_to_resource_ids = rewritten
 
     call_args, call_kwargs = split_call_args(kwargs, is_custom_op)
