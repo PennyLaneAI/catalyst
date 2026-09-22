@@ -1354,6 +1354,46 @@ class TestSymbolicRules:
                 is None
             )
 
+    def test_control_wrapped_symbolic_rule_with_mcm_is_skipped(self):
+        """A registered ``Adjoint(op)`` rule containing a mid-circuit measurement is skipped when it
+        is synthesized *under control* (``C(Adjoint(op))``).
+        """
+
+        @qp.register_resources({NoParams(Wire[1]): 1, qp.ops.MidMeasure(Wire[1]): 1})
+        def adjoint_rule_with_mcm(base):
+            m0 = qp.measure(base.wires[0])
+            qp.cond(m0, NoParams)(base.wires[0])
+
+        with local_decomps():
+            add_decomps("Adjoint(NoParams)", adjoint_rule_with_mcm)
+
+            adjoint_module = compile_registered_symbolic_rules(
+                "NoParams",
+                "Adjoint(NoParams){}{reg:1}{}",
+                {},
+                {"reg": 1},
+                {},
+                op_cls=NoParams,
+                kind="adjoint",
+            )
+            assert adjoint_module is not None
+
+            with pytest.warns(RuleLoweringWarning, match="control region"):
+                control_module = compile_registered_symbolic_rules(
+                    "NoParams",
+                    "C(Adjoint(NoParams)){}{reg:1}{}",
+                    {},
+                    {"reg": 1},
+                    {},
+                    op_cls=NoParams,
+                    kind="adjoint",
+                    n_ctrl=1,
+                    wrap_control=True,
+                )
+
+            # The measurement rule was the only candidate and was skipped, so no module is produced.
+            assert control_module is None
+
     def test_missing_op_class_raises(self):
         """Test lowering cannot proceed without the base operator's class: these rules take a base
         operator instance, which the operator's name alone cannot produce."""
