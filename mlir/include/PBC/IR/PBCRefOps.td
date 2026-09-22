@@ -40,7 +40,7 @@ def RefPPMeasurementOp : PBC_Op<"ref.ppm",
 }
 
 def RefPPRotationOp : PBC_Op<"ref.ppr", [AttrSizedOperandSegments,
-    DeclareOpInterfaceMethods<ResourceQuantumOpInterface, ["getResourceAdjointFlag"]>]> {
+    DeclareOpInterfaceMethods<ResourceQuantumOpInterface, ["getResourceDetailedName"]>]> {
     let summary = "Pauli Product Rotation on qubit references.";
 
     let description = [{

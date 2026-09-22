@@ -386,6 +386,9 @@ llvm::StringRef PPMeasurementOp::getResourceDetailedName() {
 llvm::StringRef RefPPMeasurementOp::getResourceDetailedName() {
     return getPauliProductResourceDetailedName(getContext(), getResourceName(), getPauliProduct());
 }
+llvm::StringRef RefPPRotationOp::getResourceDetailedName() {
+    return getPauliProductResourceDetailedName(getContext(), getResourceName(), getPauliProduct());
+}
 llvm::StringRef SelectPPMeasurementOp::getResourceDetailedName() {
     return getSelectPauliProductResourceDetailedName(getContext(), getResourceName(),
                                                      getPauliProduct_0(), getPauliProduct_1());
