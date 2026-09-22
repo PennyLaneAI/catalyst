@@ -196,6 +196,12 @@ class GraphOpID:
         # enters as {name: dtype}, we want the format {name: list[dtype]}
         if self.is_custom_op:
             return {str(i): ["f64"] for i in range(len(self.op.dynamic_args))}
+        elif isinstance(self.op, qp.QubitUnitary):
+            # `qref.unitary` always takes a complex matrix, so a real one is converted on the way
+            # in and the id must spell the converted type, not the one the user passed.
+            name, matrix = next(iter(self.op.dynamic_args.items()))
+            spec = qp.typing.AbstractArray(qp.math.shape(matrix), complex)
+            return {name: [convert_item_to_mlir_type(spec, is_special_lowering=True)]}
         elif issubclass(type(self.op), tuple(_SPECIAL_LOWERINGS.keys())):  # special cases
             return {
                 argname: [convert_item_to_mlir_type(argtype, is_special_lowering=True)]
@@ -234,6 +240,9 @@ class GraphOpID:
 
     def parse_static_data(self) -> dict[str, Any]:
         """Return a dictionary of (compiler-)static data names to values."""
+        if isinstance(self.op, qp.QubitUnitary):
+            # `unitary_check` is a validation-only flag, the lowering drops it so we must too
+            return {}
         return {
             static_argname: getattr(self.op, static_argname)
             for static_argname in sorted(self.op.compilable_argnames)

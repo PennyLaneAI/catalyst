@@ -325,6 +325,16 @@ class TestGenericUtilities:
             # An integer param is a custom-op param like a float one: the lowering widens it to
             # f64, matching `_is_custom_op` in qref_operator2_primitives.py.
             (SingleParamCustomOp(Int, Wires(0)), "SingleParamCustomOp{0:[f64]}{wires:1}{}"),
+            # `qref.unitary` takes a complex matrix and carries no static data, so a real matrix
+            # still spells complex and `unitary_check` is left out.
+            (
+                qp.QubitUnitary(np.eye(2), Wires(0)),
+                "QubitUnitary{U:[tensor<2x2xcomplex<f64>>]}{wires:1}{}",
+            ),
+            (
+                qp.QubitUnitary(np.eye(4, dtype=complex), Wires([0, 1])),
+                "QubitUnitary{U:[tensor<4x4xcomplex<f64>>]}{wires:2}{}",
+            ),
         ],
     )
     def test_GraphOpId(self, op, id):
