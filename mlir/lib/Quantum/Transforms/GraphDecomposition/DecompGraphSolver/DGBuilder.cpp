@@ -265,7 +265,12 @@ bool DecompositionGraph::hasOperator(const OperatorNode &op) const {
     return impl->opToId.find(op) != impl->opToId.end();
 }
 
-void DecompositionGraph::showGraph(std::ostream &os) const {
+} // namespace DecompGraph::Solver
+
+namespace DecompGraph::Core {
+
+void showGraph(const Solver::DecompositionGraph &graph, std::ostream &os) {
+    const auto *impl = graph.impl.get();
     os << "Decomposition Graph:\n";
     // Show all operators by their names
     os << "Operators:\n";
@@ -301,4 +306,4 @@ void DecompositionGraph::showGraph(std::ostream &os) const {
     }
 }
 
-} // namespace DecompGraph::Solver
+} // namespace DecompGraph::Core

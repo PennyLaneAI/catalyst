@@ -30,6 +30,7 @@
 #include <vector>
 
 #include "DGTypes.hpp"
+#include "DGUtils.hpp"
 
 namespace DecompGraph::Solver {
 
@@ -37,6 +38,10 @@ class DecompositionGraph {
   private:
     struct Impl;
     std::unique_ptr<Impl> impl;
+
+    // Debug printer, declared in DGUtils.hpp beside `showSolution`; a friend because it reports
+    // the graph's internals.
+    friend void Core::showGraph(const DecompositionGraph &graph, std::ostream &os);
 
   public:
     using RuleId = std::size_t;
@@ -145,19 +150,6 @@ class DecompositionGraph {
      * either as a root operator or as an operator appearing in the decomposition rules.
      */
     bool hasOperator(const Core::OperatorNode &op) const;
-
-    /**
-     * @brief Prints the graph structure for debugging purposes.
-     *
-     * This method can be used to visualize the graph structure, including the operators, rules,
-     * and their relationships. It can help in understanding how the graph is constructed and how
-     * the decomposition rules are connected to the operators. The exact format of the output can
-     * be designed to be human-readable and informative for debugging.
-     *
-     * @param os where to write the dump. Defaults to stderr; pass e.g. an `std::ostringstream` to
-     *           capture it instead and route it somewhere else.
-     */
-    void showGraph(std::ostream &os = std::cerr) const;
 };
 
 } // namespace DecompGraph::Solver

@@ -31,6 +31,11 @@
 
 #include "DGTypes.hpp"
 
+namespace DecompGraph::Solver {
+// Only `showGraph` below needs it, and only by reference.
+class DecompositionGraph;
+} // namespace DecompGraph::Solver
+
 namespace DecompGraph::Core {
 
 static inline auto print_op(const OperatorNode &op) -> std::string {
@@ -123,6 +128,23 @@ static inline void showSolution(const Core::GraphResult &result, std::ostream &o
         }
     }
 }
+
+/**
+ * @brief Prints the graph structure for debugging purposes.
+ *
+ * This reports the operators, the rules, and their relationships, which helps in understanding how
+ * the graph was constructed and how the decomposition rules connect to the operators.
+ *
+ * Paired with `showSolution` above (see `DecompositionSolver::solve`, which prints both on a
+ * failure) and a free function for the same reason: a `GraphResult` is a plain map, so it has no
+ * class of its own to be a method of. Defined in DGBuilder.cpp, where the graph's internals live,
+ * and a friend of `DecompositionGraph` because it reports them.
+ *
+ * @param graph the graph to print
+ * @param os    where to write the dump. Defaults to stderr; pass e.g. an `std::ostringstream` to
+ *              capture it instead and route it somewhere else.
+ */
+void showGraph(const Solver::DecompositionGraph &graph, std::ostream &os = std::cerr);
 
 class GraphError : public std::runtime_error {
   public:
