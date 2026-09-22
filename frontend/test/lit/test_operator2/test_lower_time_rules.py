@@ -708,17 +708,12 @@ def test_real_op_that_decomposes_to_basis_rotation():
     print(_compile_parent(lambda: jnp.array([[0.76484219, 0.64421769], [0.64421769, -0.76484219]])))
 
 
-# The parent's rule declares a real-valued child ...
 # CHECK: func.func private @"__builtin_rule_MatrixParent{matrix:[tensor<2x2xf64>]}{wires:2}{}"
 # CHECK-SAME: resources = {operations = {
 # CHECK-SAME: "BasisRotation{unitary_matrix:[tensor<2x2xf64>]}{wires:2}{check = false}" = 1 : i64
 # CHECK-SAME: target_gate = "MatrixParent{matrix:[tensor<2x2xf64>]}{wires:2}{}"
-#
-# ... it emits a real-valued child ...
 # CHECK: qref.operator "BasisRotation"(
 # CHECK-SAME: tensor<2x2xf64>
-#
-# ... and the rule lowered for that child is the real-valued one, reporting one PhaseShift.
 # CHECK: func.func private @"__builtin__real_basis_rotation_decomp_BasisRotation{unitary_matrix:[tensor<2x2xf64>]}{wires:2}{check = false}"
 # CHECK-SAME: "PhaseShift{0:[f64]}{wires:1}{}" = 1 : i64
 # CHECK-SAME: "SingleExcitation{0:[f64]}{wires:2}{}" = 1 : i64
