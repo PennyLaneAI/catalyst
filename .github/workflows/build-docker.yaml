@@ -5,11 +5,12 @@ permissions:
   
 on:
     pull_request:
+      types:
+        - labeled
     workflow_dispatch:
         
 jobs:
   check_if_wheel_build_required:
-    if: github.event.pull_request.draft == false
     uses: ./.github/workflows/check-for-wheel-build.yml
 
   constants:
@@ -44,29 +45,12 @@ jobs:
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-      
-      # - name: Build and push Docker image
-      #   uses: docker/build-push-action@v6
-      #   with:
-      #     context: .
-      #     file: Dockerfile
-      #     platforms: linux/arm64
-      #     push: false
-      #     build-args: |
-      #       PENNYLANE_VERSION=main
-      #       CATALYST_VERSION=main
-      #       LIGHTNING_VERSION=main
-      # Set up Blacksmith's high-speed NVMe Docker layer caching
-      - name: Set up Docker Builder
-        uses: useblacksmith/setup-docker-builder@v2
-        with:
-          cache-key: docker-image-artifact
 
       - name: Checkout External Base Repo
         uses: actions/checkout@v4
         with:
           repository: PennyLaneAI/pennylane-lightning
-          ref: main # Branch, tag, or commit SHA
+          ref: main 
           path: pennylane-lightning
 
       - name: Build Lightning docker image
@@ -78,16 +62,6 @@ jobs:
           load: true
           outputs: type=docker,dest=pennylane-lightning.tar
 
-      # Build the image and export it to the runner's local Docker daemon
-      # - name: Build Docker Image
-      #   uses: useblacksmith/build-push-action@v2
-      #   with:
-      #     context: .
-      #     file: ./Dockerfile
-      #     tags: plc:latest
-      #     load: true 
-      #     build-contexts: |
-      #       pennylane-lightning:latest=docker-archive://pennylane-lightning.tar
       - name: Build Docker Image
         run: |
           docker build \

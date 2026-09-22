@@ -59,14 +59,12 @@ RUN PYTHON=$PYTHON \
     CXX_COMPILER=$(which g++)  \
     LLVM_BUILD_DIR="/opt/catalyst/llvm-build" \
     LLVM_PROJECTS="lld;mlir" \
-    LLVM_TARGETS="lld check-mlir" \
+    LLVM_TARGETS="lld" \
     ENABLE_ZLIB=FORCE_ON \
     ENABLE_LLD=OFF \
     make llvm
 
 # Build stablehlo dialect
-FROM base-catalyst AS build-stablehlo
-COPY --from=build-llvm /opt/catalyst/llvm-build /opt/catalyst/llvm-build
 ENV COMPILER_LAUNCHER=""
 RUN mkdir /opt/catalyst/stablehlo-build
 RUN C_COMPILER=$(which gcc) \
@@ -78,8 +76,6 @@ RUN C_COMPILER=$(which gcc) \
     make stablehlo
 
 # Build enzyme
-FROM base-catalyst AS build-enzyme
-COPY --from=build-llvm /opt/catalyst/llvm-build /opt/catalyst/llvm-build
 RUN cmake -S mlir/Enzyme/enzyme -B /opt/catalyst/enzyme-build -G Ninja \
     -DCMAKE_BUILD_TYPE=Release \
     -DLLVM_DIR="/opt/catalyst/llvm-build/lib/cmake/llvm" \
@@ -92,9 +88,9 @@ RUN cmake --build /opt/catalyst/enzyme-build --target EnzymeStatic-22
 FROM base-catalyst AS build-runtime
 RUN dnf update -y && dnf install -y openmpi-devel libzstd-devel gcc-toolset-13
 COPY --from=build-llvm /opt/catalyst/llvm-build /opt/catalyst/llvm-build
-COPY --from=build-stablehlo /opt/catalyst/stablehlo-build /opt/catalyst/stablehlo-build
-COPY --from=build-stablehlo /opt/catalyst/mlir/stablehlo /opt/catalyst/mlir/stablehlo
-COPY --from=build-enzyme /opt/catalyst/enzyme-build /opt/catalyst/enzyme-build
+COPY --from=build-llvm /opt/catalyst/stablehlo-build /opt/catalyst/stablehlo-build
+COPY --from=build-llvm /opt/catalyst/mlir/stablehlo /opt/catalyst/mlir/stablehlo
+COPY --from=build-llvm /opt/catalyst/enzyme-build /opt/catalyst/enzyme-build
 # Build catalyst runtime
 ENV PATH="/opt/catalyst/llvm-build/bin:${PATH}"
 RUN cmake -S runtime -B /opt/catalyst/runtime-build -G Ninja \
