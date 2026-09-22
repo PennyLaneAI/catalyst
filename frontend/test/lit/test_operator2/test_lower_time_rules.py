@@ -31,7 +31,7 @@ from operator2_dummy_gates import (
     SingleParam,
     SingleParamCustomOp,
 )
-from pennylane.typing import Float, Int, Wire
+from pennylane.typing import Complex, Float, Int, Wire
 
 
 def test_one_rule():
@@ -617,12 +617,12 @@ def test_phaseshift_to_rz():
 test_phaseshift_to_rz()
 
 
-def test_basis_rotation():
-    """Test that qp.BasisRotation successfully compiles its decomposition rules."""
+def test_basis_rotation_complex_valued():
+    """Test that a complex-valued qp.BasisRotation compiles its complex decomposition rule."""
 
     @qp.qjit(target="mlir", capture=True)
     @qp.qnode(qp.device("null.qubit", wires=2))
-    def test_basis_rotation():
+    def test_basis_rotation_complex_valued():
         U = jnp.array(
             [
                 [-0.77228482 + 0.0j, -0.02959195 + 0.63458685j],
@@ -632,10 +632,38 @@ def test_basis_rotation():
         qp.BasisRotation(unitary_matrix=U, wires=[0, 1])
         return qp.probs()
 
-    print(test_basis_rotation.mlir)
+    print(test_basis_rotation_complex_valued.mlir)
 
 
-# CHECK-LABEL: test_basis_rotation
-# CHECK: func.func private @"__builtin__basis_rotation_decomp_BasisRotation{unitary_matrix:[tensor<2x2xcomplex<f64>>]}{wires:2}{check = false}"
+# CHECK-LABEL: test_basis_rotation_complex_valued
+# CHECK: func.func private @"__builtin__complex_basis_rotation_decomp_BasisRotation{unitary_matrix:[tensor<2x2xcomplex<f64>>]}{wires:2}{check = false}"
+# CHECK-SAME: resources = {operations = {
+# CHECK-SAME: "PhaseShift{0:[f64]}{wires:1}{}" = 3 : i64
+# CHECK-SAME: "SingleExcitation{0:[f64]}{wires:2}{}" = 1 : i64
 # CHECK-SAME: target_gate = "BasisRotation{unitary_matrix:[tensor<2x2xcomplex<f64>>]}{wires:2}{check = false}"
-test_basis_rotation()
+test_basis_rotation_complex_valued()
+
+
+def test_basis_rotation_real_valued():
+    """Test that a real-valued qp.BasisRotation compiles the real decomposition rule instead, keyed
+    on a real ``unitary_matrix``. A real and a complex matrix are separate operators with separate
+    rules and separate resource counts, so neither may be named with the other's data type."""
+
+    @qp.qjit(target="mlir", capture=True)
+    @qp.qnode(qp.device("null.qubit", wires=2))
+    def test_basis_rotation_real_valued():
+        # A real orthogonal matrix with determinant -1, so the determinant-fixing PhaseShift runs.
+        U = jnp.array([[0.76484219, 0.64421769], [0.64421769, -0.76484219]])
+        qp.BasisRotation(unitary_matrix=U, wires=[0, 1])
+        return qp.probs()
+
+    print(test_basis_rotation_real_valued.mlir)
+
+
+# CHECK-LABEL: test_basis_rotation_real_valued
+# CHECK: func.func private @"__builtin__real_basis_rotation_decomp_BasisRotation{unitary_matrix:[tensor<2x2xf64>]}{wires:2}{check = false}"
+# CHECK-SAME: resources = {operations = {
+# CHECK-SAME: "PhaseShift{0:[f64]}{wires:1}{}" = 1 : i64
+# CHECK-SAME: "SingleExcitation{0:[f64]}{wires:2}{}" = 1 : i64
+# CHECK-SAME: target_gate = "BasisRotation{unitary_matrix:[tensor<2x2xf64>]}{wires:2}{check = false}"
+test_basis_rotation_real_valued()
