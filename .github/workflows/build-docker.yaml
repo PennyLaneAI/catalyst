@@ -59,28 +59,35 @@ jobs:
           context: ./pennylane-lightning
           file: ./pennylane-lightning/docker/Dockerfile
           tags: pennylane-lightning:latest
-          load: true
+          outputs: type=docker,dest=pennylane-lightning.tar
           push: false
           build-args: |
             LIGHTNING_VERSION=${{ inputs.lightning-version || 'main' }}
             PENNYLANE_VERSION=${{ inputs.pennylane-version || 'main' }}
 
       - name: Build Docker Image
-        run: |
-          docker build \
-            -t plc:latest \
-            -f ./Dockerfile .
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          tags: catalyst:latest
+          load: true
+          build-contexts: |
+            pennylane-lightning:latest=docker-archive://pennylane-lightning.tar
+          build-args: |
+            LIGHTNING_VERSION=${{ inputs.lightning-version || 'main' }}
+            PENNYLANE_VERSION=${{ inputs.pennylane-version || 'main' }}            
 
       # Serialize the Docker image into a single transportable archive file
       - name: Save Docker Image to Archive
         run: |
           mkdir -p output
-          docker save plc:latest -o output/plc.tar
+          docker save catalyst:latest -o output/catalyst.tar
 
       # Upload the archive file so you can download it from the GitHub UI
       - name: Upload Image as Workflow Artifact
         uses: actions/upload-artifact@v4
         with:
           name: compiled-docker-image
-          path: output/plc.tar
+          path: output/catalyst.tar
           retention-days: 5            
