@@ -617,133 +617,131 @@ def test_phaseshift_to_rz():
 test_phaseshift_to_rz()
 
 
-def test_basis_rotation_complex_valued():
-    """Test that a complex-valued qp.BasisRotation compiles its complex decomposition rule."""
+def test_basis_rotation_decomposition():
+    """Test that qp.BasisRotation decompositions show up properly in MLIR."""
 
-    @qp.qjit(target="mlir", capture=True)
-    @qp.qnode(qp.device("null.qubit", wires=2))
     def test_basis_rotation_complex_valued():
-        U = jnp.array(
-            [
-                [-0.77228482 + 0.0j, -0.02959195 + 0.63458685j],
-                [0.63527644 + 0.0j, -0.03597397 + 0.77144651j],
-            ],
-        )
-        qp.BasisRotation(unitary_matrix=U, wires=[0, 1])
-        return qp.probs()
-
-    print(test_basis_rotation_complex_valued.mlir)
-
-
-# CHECK-LABEL: test_basis_rotation_complex_valued
-# CHECK: func.func private @"__builtin__complex_basis_rotation_decomp_BasisRotation{unitary_matrix:[tensor<2x2xcomplex<f64>>]}{wires:2}{check = false}"
-# CHECK-SAME: resources = {operations = {
-# CHECK-SAME: "PhaseShift{0:[f64]}{wires:1}{}" = 3 : i64
-# CHECK-SAME: "SingleExcitation{0:[f64]}{wires:2}{}" = 1 : i64
-# CHECK-SAME: target_gate = "BasisRotation{unitary_matrix:[tensor<2x2xcomplex<f64>>]}{wires:2}{check = false}"
-test_basis_rotation_complex_valued()
-
-
-def test_basis_rotation_real_valued():
-    """Test that a real-valued qp.BasisRotation compiles the real decomposition rule instead, keyed
-    on a real ``unitary_matrix``. A real and a complex matrix are separate operators with separate
-    rules and separate resource counts, so neither may be named with the other's data type."""
-
-    @qp.qjit(target="mlir", capture=True)
-    @qp.qnode(qp.device("null.qubit", wires=2))
-    def test_basis_rotation_real_valued():
-        # A real orthogonal matrix with determinant -1, so the determinant-fixing PhaseShift runs.
-        U = jnp.array([[0.76484219, 0.64421769], [0.64421769, -0.76484219]])
-        qp.BasisRotation(unitary_matrix=U, wires=[0, 1])
-        return qp.probs()
-
-    print(test_basis_rotation_real_valued.mlir)
-
-
-# CHECK-LABEL: test_basis_rotation_real_valued
-# CHECK: func.func private @"__builtin__real_basis_rotation_decomp_BasisRotation{unitary_matrix:[tensor<2x2xf64>]}{wires:2}{check = false}"
-# CHECK-SAME: resources = {operations = {
-# CHECK-SAME: "PhaseShift{0:[f64]}{wires:1}{}" = 1 : i64
-# CHECK-SAME: "SingleExcitation{0:[f64]}{wires:2}{}" = 1 : i64
-# CHECK-SAME: target_gate = "BasisRotation{unitary_matrix:[tensor<2x2xf64>]}{wires:2}{check = false}"
-test_basis_rotation_real_valued()
-
-
-def _compile_parent(U):
-    """Lower a parent operator whose decomposition rule emits a ``BasisRotation`` carrying the
-    parent's own matrix, and return the MLIR.
-    """
-
-    class MatrixParent(qp.core.operator.Operator2):
-        dynamic_argnames = ("matrix",)
-        wire_argnames = ("wires",)
-
-        def __init__(self, matrix, wires):
-            super().__init__(matrix, wires)
-
-    def rule_resource_fn(matrix, wires):
-        spec = Complex if qp.math.get_dtype_name(matrix).startswith("complex") else Float
-        return {qp.BasisRotation(spec[2, 2], Wire[2]): 1}
-
-    @qp.register_resources(rule_resource_fn)
-    def rule(matrix, wires):
-        qp.BasisRotation(matrix, wires)
-
-    with qp.decomposition.local_decomps():
-        qp.add_decomps(MatrixParent, rule)
+        """Test that a complex-valued qp.BasisRotation compiles its complex decomposition rule."""
 
         @qp.qjit(target="mlir", capture=True)
         @qp.qnode(qp.device("null.qubit", wires=2))
-        def parent_circuit():
-            MatrixParent(U, [0, 1])
-            return qp.probs()
-
-        return parent_circuit.mlir
-
-
-def test_real_op_that_decomposes_to_basis_rotation():
-    """A parent holding a real matrix must declare, emit and find a real ``BasisRotation``."""
-
-    # A real orthogonal matrix with determinant -1, so the determinant-fixing PhaseShift runs.
-    print(_compile_parent(jnp.array([[0.76484219, 0.64421769], [0.64421769, -0.76484219]])))
-
-
-# CHECK: func.func private @"__builtin_rule_MatrixParent{matrix:[tensor<2x2xf64>]}{wires:2}{}"
-# CHECK-SAME: resources = {operations = {
-# CHECK-SAME: "BasisRotation{unitary_matrix:[tensor<2x2xf64>]}{wires:2}{check = false}" = 1 : i64
-# CHECK-SAME: target_gate = "MatrixParent{matrix:[tensor<2x2xf64>]}{wires:2}{}"
-# CHECK: qref.operator "BasisRotation"(
-# CHECK-SAME: tensor<2x2xf64>
-# CHECK: func.func private @"__builtin__real_basis_rotation_decomp_BasisRotation{unitary_matrix:[tensor<2x2xf64>]}{wires:2}{check = false}"
-# CHECK-SAME: "PhaseShift{0:[f64]}{wires:1}{}" = 1 : i64
-# CHECK-SAME: "SingleExcitation{0:[f64]}{wires:2}{}" = 1 : i64
-# CHECK-SAME: target_gate = "BasisRotation{unitary_matrix:[tensor<2x2xf64>]}{wires:2}{check = false}"
-test_real_op_that_decomposes_to_basis_rotation()
-
-
-def test_complex_op_that_decomposes_to_basis_rotation():
-    """The same parent holding a complex matrix must route to the complex rule instead."""
-
-    print(
-        _compile_parent(
-            jnp.array(
+        def test_basis_rotation_complex_valued():
+            U = jnp.array(
                 [
                     [-0.77228482 + 0.0j, -0.02959195 + 0.63458685j],
                     [0.63527644 + 0.0j, -0.03597397 + 0.77144651j],
                 ],
             )
+            qp.BasisRotation(unitary_matrix=U, wires=[0, 1])
+            return qp.probs()
+
+        print(test_basis_rotation_complex_valued.mlir)
+
+    # CHECK-LABEL: test_basis_rotation_complex_valued
+    # CHECK: func.func private @"__builtin__complex_basis_rotation_decomp_BasisRotation{unitary_matrix:[tensor<2x2xcomplex<f64>>]}{wires:2}{check = false}"
+    # CHECK-SAME: resources = {operations = {
+    # CHECK-SAME: "PhaseShift{0:[f64]}{wires:1}{}" = 3 : i64
+    # CHECK-SAME: "SingleExcitation{0:[f64]}{wires:2}{}" = 1 : i64
+    # CHECK-SAME: target_gate = "BasisRotation{unitary_matrix:[tensor<2x2xcomplex<f64>>]}{wires:2}{check = false}"
+    test_basis_rotation_complex_valued()
+
+    def test_basis_rotation_real_valued():
+        """Test that a real-valued qp.BasisRotation compiles the real decomposition rule instead, keyed
+        on a real ``unitary_matrix``. A real and a complex matrix are separate operators with separate
+        rules and separate resource counts, so neither may be named with the other's data type."""
+
+        @qp.qjit(target="mlir", capture=True)
+        @qp.qnode(qp.device("null.qubit", wires=2))
+        def test_basis_rotation_real_valued():
+            # A real orthogonal matrix with determinant -1, so the determinant-fixing PhaseShift runs.
+            U = jnp.array([[0.76484219, 0.64421769], [0.64421769, -0.76484219]])
+            qp.BasisRotation(unitary_matrix=U, wires=[0, 1])
+            return qp.probs()
+
+        print(test_basis_rotation_real_valued.mlir)
+
+    # CHECK-LABEL: test_basis_rotation_real_valued
+    # CHECK: func.func private @"__builtin__real_basis_rotation_decomp_BasisRotation{unitary_matrix:[tensor<2x2xf64>]}{wires:2}{check = false}"
+    # CHECK-SAME: resources = {operations = {
+    # CHECK-SAME: "PhaseShift{0:[f64]}{wires:1}{}" = 1 : i64
+    # CHECK-SAME: "SingleExcitation{0:[f64]}{wires:2}{}" = 1 : i64
+    # CHECK-SAME: target_gate = "BasisRotation{unitary_matrix:[tensor<2x2xf64>]}{wires:2}{check = false}"
+    test_basis_rotation_real_valued()
+
+    def _compile_parent(U):
+        """Lower a parent operator whose decomposition rule emits a ``BasisRotation`` carrying the
+        parent's own matrix, and return the MLIR.
+        """
+
+        class MatrixParent(qp.core.operator.Operator2):
+            dynamic_argnames = ("matrix",)
+            wire_argnames = ("wires",)
+
+            def __init__(self, matrix, wires):
+                super().__init__(matrix, wires)
+
+        def rule_resource_fn(matrix, wires):
+            spec = Complex if qp.math.get_dtype_name(matrix).startswith("complex") else Float
+            return {qp.BasisRotation(spec[2, 2], Wire[2]): 1}
+
+        @qp.register_resources(rule_resource_fn)
+        def rule(matrix, wires):
+            qp.BasisRotation(matrix, wires)
+
+        with qp.decomposition.local_decomps():
+            qp.add_decomps(MatrixParent, rule)
+
+            @qp.qjit(target="mlir", capture=True)
+            @qp.qnode(qp.device("null.qubit", wires=2))
+            def parent_circuit():
+                MatrixParent(U, [0, 1])
+                return qp.probs()
+
+            return parent_circuit.mlir
+
+    def test_real_op_that_decomposes_to_basis_rotation():
+        """A parent holding a real matrix must declare, emit and find a real ``BasisRotation``."""
+
+        # A real orthogonal matrix with determinant -1, so the determinant-fixing PhaseShift runs.
+        print(_compile_parent(jnp.array([[0.76484219, 0.64421769], [0.64421769, -0.76484219]])))
+
+    # CHECK: func.func private @"__builtin_rule_MatrixParent{matrix:[tensor<2x2xf64>]}{wires:2}{}"
+    # CHECK-SAME: resources = {operations = {
+    # CHECK-SAME: "BasisRotation{unitary_matrix:[tensor<2x2xf64>]}{wires:2}{check = false}" = 1 : i64
+    # CHECK-SAME: target_gate = "MatrixParent{matrix:[tensor<2x2xf64>]}{wires:2}{}"
+    # CHECK: qref.operator "BasisRotation"(
+    # CHECK-SAME: tensor<2x2xf64>
+    # CHECK: func.func private @"__builtin__real_basis_rotation_decomp_BasisRotation{unitary_matrix:[tensor<2x2xf64>]}{wires:2}{check = false}"
+    # CHECK-SAME: "PhaseShift{0:[f64]}{wires:1}{}" = 1 : i64
+    # CHECK-SAME: "SingleExcitation{0:[f64]}{wires:2}{}" = 1 : i64
+    # CHECK-SAME: target_gate = "BasisRotation{unitary_matrix:[tensor<2x2xf64>]}{wires:2}{check = false}"
+    test_real_op_that_decomposes_to_basis_rotation()
+
+    def test_complex_op_that_decomposes_to_basis_rotation():
+        """The same parent holding a complex matrix must route to the complex rule instead."""
+
+        print(
+            _compile_parent(
+                jnp.array(
+                    [
+                        [-0.77228482 + 0.0j, -0.02959195 + 0.63458685j],
+                        [0.63527644 + 0.0j, -0.03597397 + 0.77144651j],
+                    ],
+                )
+            )
         )
-    )
+
+    # CHECK: func.func private @"__builtin_rule_MatrixParent{matrix:[tensor<2x2xcomplex<f64>>]}{wires:2}{}"
+    # CHECK-SAME: resources = {operations = {
+    # CHECK-SAME: "BasisRotation{unitary_matrix:[tensor<2x2xcomplex<f64>>]}{wires:2}{check = false}" = 1 : i64
+    #
+    # CHECK: func.func private @"__builtin__complex_basis_rotation_decomp_BasisRotation{unitary_matrix:[tensor<2x2xcomplex<f64>>]}{wires:2}{check = false}"
+    # CHECK-SAME: "PhaseShift{0:[f64]}{wires:1}{}" = 3 : i64
+    # CHECK-SAME: "SingleExcitation{0:[f64]}{wires:2}{}" = 1 : i64
+    test_complex_op_that_decomposes_to_basis_rotation()
 
 
-# CHECK: func.func private @"__builtin_rule_MatrixParent{matrix:[tensor<2x2xcomplex<f64>>]}{wires:2}{}"
-# CHECK-SAME: resources = {operations = {
-# CHECK-SAME: "BasisRotation{unitary_matrix:[tensor<2x2xcomplex<f64>>]}{wires:2}{check = false}" = 1 : i64
-#
-# CHECK: func.func private @"__builtin__complex_basis_rotation_decomp_BasisRotation{unitary_matrix:[tensor<2x2xcomplex<f64>>]}{wires:2}{check = false}"
-# CHECK-SAME: "PhaseShift{0:[f64]}{wires:1}{}" = 3 : i64
-# CHECK-SAME: "SingleExcitation{0:[f64]}{wires:2}{}" = 1 : i64
-test_complex_op_that_decomposes_to_basis_rotation()
+test_basis_rotation_decomposition()
 
 
 def test_ctrl_rule_is_traversed():
