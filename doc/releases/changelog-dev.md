@@ -599,8 +599,11 @@
 * Added ``CZ`` support to ``to-ppr`` pass.
   [(#3009)](https://github.com/PennyLaneAI/catalyst/pull/3009)
 
+* ``to_ppr`` now directly lowers PennyLane's discrete ``PPR`` operator to ``pbc.ppr``.
+  [(#3185)](https://github.com/PennyLaneAI/catalyst/pull/3185)
+
 * The `--adjoint-lowering` pass no longer caches all classical gate parameters.
-  Parameters that are trivially available to the reverse pass is no longer cached.
+  Parameters that are trivially available to the reverse pass are no longer cached.
   [(#3233)](https://github.com/PennyLaneAI/catalyst/pull/3233)
 
 <h3>Breaking changes 💔</h3>
