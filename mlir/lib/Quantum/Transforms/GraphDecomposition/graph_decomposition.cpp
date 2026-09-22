@@ -129,6 +129,45 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
             llvm::dbgs() << "\n";
         });
 
+        ModuleOp module = getOperation();
+
+        ///////////////////////////
+        // Step 0: Reduce control/adjoint regions in the given circuit to op-level modifiers.
+        // Currently, functional modifiers such as qp.adjoint(op)(...) and qp.ctrl(op, ...)
+        // are captured as quantum.adjoint/quantum.ctrl regions while qp.adjoint(op(...)) is already
+        // op-level! The decomposition graph is built from op-level gates, so we need to lower any
+        // input regions here first. Rules are not loaded yet, so this only affects the circuit.
+        // Note we iterate to a fixpoint to also handle nested modifiers.
+        {
+            ScopedDiagnosticTimer t("decomp:region-lowering");
+            constexpr unsigned maxRegionLoweringIters = 64;
+            for (unsigned iter = 0; iter < maxRegionLoweringIters; ++iter) {
+                bool hasCtrlRegion =
+                    module->walk([&](CtrlOp) { return mlir::WalkResult::interrupt(); })
+                        .wasInterrupted();
+                bool hasAdjointRegion =
+                    module->walk([&](AdjointOp) { return mlir::WalkResult::interrupt(); })
+                        .wasInterrupted();
+                if (!hasCtrlRegion && !hasAdjointRegion) {
+                    break;
+                }
+                if (hasCtrlRegion) {
+                    OpPassManager ctrlPm("builtin.module");
+                    ctrlPm.addPass(createCtrlLoweringPass());
+                    if (failed(runPipeline(ctrlPm, module))) {
+                        return signalPassFailure();
+                    }
+                }
+                if (hasAdjointRegion) {
+                    OpPassManager adjointPm("builtin.module");
+                    adjointPm.addPass(createAdjointLoweringPass());
+                    if (failed(runPipeline(adjointPm, module))) {
+                        return signalPassFailure();
+                    }
+                }
+            }
+        }
+
         ///////////////////////////
         // Step 1: Gather inputs for graph
         std::vector<OperatorNode> setOfOps;
@@ -184,8 +223,6 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         //             op-level modified gates by `adjoint-lowering`. We therefore iterate
         //             `(decompose-lowering -> adjoint-lowering)` to a fixpoint.
         // The solver has already chosen every rule up front; this loop only applies them.
-        ModuleOp module = getOperation();
-
         qref::DecomposeLoweringPassOptions dlOptions;
         for (auto &[op, chosenRule] : solution) {
             dlOptions.targetRulesOption.push_back(chosenRule.ruleName);
