@@ -695,7 +695,7 @@ def _compile_parent(U):
         @qp.qjit(target="mlir", capture=True)
         @qp.qnode(qp.device("null.qubit", wires=2))
         def parent_circuit():
-            MatrixParent(U(), [0, 1])
+            MatrixParent(U, [0, 1])
             return qp.probs()
 
         return parent_circuit.mlir
@@ -705,7 +705,7 @@ def test_real_op_that_decomposes_to_basis_rotation():
     """A parent holding a real matrix must declare, emit and find a real ``BasisRotation``."""
 
     # A real orthogonal matrix with determinant -1, so the determinant-fixing PhaseShift runs.
-    print(_compile_parent(lambda: jnp.array([[0.76484219, 0.64421769], [0.64421769, -0.76484219]])))
+    print(_compile_parent(jnp.array([[0.76484219, 0.64421769], [0.64421769, -0.76484219]])))
 
 
 # CHECK: func.func private @"__builtin_rule_MatrixParent{matrix:[tensor<2x2xf64>]}{wires:2}{}"
@@ -726,7 +726,7 @@ def test_complex_op_that_decomposes_to_basis_rotation():
 
     print(
         _compile_parent(
-            lambda: jnp.array(
+            jnp.array(
                 [
                     [-0.77228482 + 0.0j, -0.02959195 + 0.63458685j],
                     [0.63527644 + 0.0j, -0.03597397 + 0.77144651j],
