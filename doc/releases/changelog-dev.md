@@ -113,6 +113,11 @@
 
 <h3>Improvements 🛠</h3>
 
+* :func:`~.passes.graph_decomposition` accepts a `verbose` keyword argument. When `True`, the pass
+  prints the decomposition rule the solver chose for each operator, along with its cost and the
+  resulting gate counts, to `stderr`.
+  [(#3250)](https://github.com/PennyLaneAI/catalyst/pull/3250)
+
 * When the graph-based decomposition solver cannot reach the target gate set, the error now lists
   the actual operators that could not be decomposed (e.g. arbitrary-angle rotations) and the rules
   it tried, instead of only naming the top-level operator.
