@@ -45,8 +45,11 @@ def _plain_rule():
 
 
 def _registered_rule():
-    """A PennyLane ``DecompositionRule`` (from ``@register_resources``; has ``.name``, no
-    ``__name__``)."""
+    """A PennyLane ``DecompositionRule`` (from ``@register_resources``.
+
+    Its ``.name`` is the reference; as of PennyLane #10144, it also has a ``.__name__``
+    which isn't always interchangable with ``.name``.
+    """
 
     @register_resources(lambda: {})
     def h_to_rz(wire):  # pylint: disable=unused-argument
@@ -67,10 +70,20 @@ class TestRuleRefName:
         """A ``DecompositionRule`` resolves via ``.name``."""
         rule = _registered_rule()
         assert isinstance(rule, DecompositionRule)
-        assert not hasattr(rule, "__name__")
 
         options = _setup(fixed_decomps={qp.Hadamard: rule})
         assert options["fixed_decomps"] == {"Hadamard": "h_to_rz"}
+
+    def test_decomposition_rule_name_wins_over_dunder_name(self):
+        """Test that .name is preferred over .__name__."""
+
+        rule = _registered_rule()
+        rule.name = "h_to_rz_renamed"
+        assert rule.__name__ == "h_to_rz"
+
+        options = _setup(fixed_decomps={qp.Hadamard: rule})
+        # Renamed .name is used
+        assert options["fixed_decomps"] == {"Hadamard": "h_to_rz_renamed"}
 
     def test_plain_function_reference(self):
         """A bare decomposition function resolves via its ``__name__`` (the final fallback
