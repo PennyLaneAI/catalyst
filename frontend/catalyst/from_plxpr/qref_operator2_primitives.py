@@ -541,8 +541,6 @@ def _qref_operator_p_lowering(jax_ctx: mlir.LoweringRuleContext, *args, op_cls, 
             wire_lens=wire_lens,
             hybrid_lens=hybrid_lens,
             hybrid_trees=hybrid_trees,
-            adjoint=adjoint,
-            n_ctrls=n_ctrls,
             static_args=repack_static_data,
         )
         static_data = None

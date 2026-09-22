@@ -221,8 +221,6 @@ class GraphOpID:
                 wire_lens=tuple(self.wire_lens.values()),
                 hybrid_lens=tuple(hybrid_lens),
                 hybrid_trees=tuple(hybrid_trees),
-                adjoint=False,
-                n_ctrls=0,
                 static_args=self.op.static_args,
             )
             return self.op.static_args | self.op.hybrid_args, uid
