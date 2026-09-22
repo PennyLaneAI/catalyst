@@ -211,7 +211,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         // until the module stops changing.
         constexpr unsigned maxIterations = 64;
         size_t previousOpCount = countOps(module);
-        ScopedDiagnosticTimer fixpointTimer("decomp:lowering-fixpoint");
+        ScopedDiagnosticTimer fixpointTimer("decomp:greedy-lowering");
         unsigned iterationsRun = 0;
         for (unsigned iter = 0; iter < maxIterations; ++iter) {
             iterationsRun = iter + 1;
@@ -223,27 +223,20 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
                 }
             }
 
-            // Distribute a `quantum.ctrl` region lazily.
-            bool hasCtrlRegion = module->walk([&](CtrlOp) { return mlir::WalkResult::interrupt(); })
-                                     .wasInterrupted();
-            if (hasCtrlRegion) {
-                OpPassManager ctrlPm("builtin.module");
-                ctrlPm.addPass(createCtrlLoweringPass());
-                if (failed(runPipeline(ctrlPm, module))) {
-                    return signalPassFailure();
-                }
-            }
-
-            // Distribute a `quantum.adjoint` region lazily.
-            // It uses a greedy rewriter that would otherwise DCE gates in circuits that
-            // never needed adjoint handling.
-            bool hasAdjointRegion =
-                module->walk([&](AdjointOp) { return mlir::WalkResult::interrupt(); })
-                    .wasInterrupted();
-            if (hasAdjointRegion) {
-                OpPassManager adjointPm("builtin.module");
-                adjointPm.addPass(createAdjointLoweringPass());
-                if (failed(runPipeline(adjointPm, module))) {
+            // Distribute any `quantum.ctrl`/`quantum.adjoint` regions the rules emitted, lazily.
+            // `lower-modifiers` reduces both (including nested `ctrl(adjoint(...))`) to a fixpoint
+            // in one greedy pass.
+            bool hasModifierRegion = module
+                                         ->walk([&](mlir::Operation *op) {
+                                             return (isa<CtrlOp, AdjointOp>(op))
+                                                        ? mlir::WalkResult::interrupt()
+                                                        : mlir::WalkResult::advance();
+                                         })
+                                         .wasInterrupted();
+            if (hasModifierRegion) {
+                OpPassManager modifierPm("builtin.module");
+                modifierPm.addPass(createLowerModifiersPass());
+                if (failed(runPipeline(modifierPm, module))) {
                     return signalPassFailure();
                 }
             }

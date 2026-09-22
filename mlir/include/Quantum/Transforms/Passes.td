@@ -80,6 +80,23 @@ def CtrlLoweringPass : Pass<"ctrl-lowering"> {
     let dependentDialects = ["scf::SCFDialect"];
 }
 
+def LowerModifiersPass : Pass<"lower-modifiers"> {
+    let summary = "Lower quantum.ctrl and quantum.adjoint regions to op-level modifiers.";
+
+    let description = [{
+        Runs the ctrl-lowering and adjoint-lowering rewrite patterns together under a single greedy
+        driver.
+    }];
+
+    let dependentDialects = [
+        "catalyst::CatalystDialect",
+        "index::IndexDialect",
+        "tensor::TensorDialect",
+        "complex::ComplexDialect",
+        "scf::SCFDialect"
+    ];
+}
+
 def RemoveGlobalPhasesPass : Pass<"remove-global-phases"> {
     let summary = "Remove global phases by deleting phase operations without control wires.";
 }

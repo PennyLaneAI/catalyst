@@ -41,10 +41,11 @@ const PipelineList pipelineList{
       // tapes will generate multiple qnodes. One for each tape.
       // Split multiple tapes enforces that invariant.
       "split-multiple-tapes",
-      // Reduce quantum.ctrl/quantum.adjoint regions in the input to
-      // op-level modifiers before the transform sequence runs.
-      "ctrl-lowering",
-      "adjoint-lowering",
+      // lower-modifiers reduces arbitrarily nested ctrl/adjoint regions to a fixpoint in
+      // one greedy pass. No rule funcs exist yet, so unlike the post-transform lowering
+      // below there is no rule body whose adjoint/ctrl region could be mistaken for a
+      // user adjoint/ctrl.
+      "lower-modifiers",
       // Run the transform sequence defined in the MLIR module
       "builtin.module(apply-transform-sequence)",
       // Nested modules are something that will be used in the future
@@ -59,16 +60,13 @@ const PipelineList pipelineList{
       "lower-mitigation",
       // Decomposition rules are only consumed by graph-decomposition (run inside
       // apply-transform-sequence). Any that survive here are dead; drop them before
-      // adjoint-lowering so their `quantum.adjoint` regions are not lowered as user adjoints.
+      // lower-modifiers so their quantum.adjoint/ctrl regions are not lowered as
+      // user adjoints/ctrls.
       "symbol-dce",
-      // Reduce `quantum.ctrl`/`quantum.adjoint` regions to op-level modifiers.
-      // Nested regions (e.g. `ctrl(adjoint(...))`) require alternating the two
-      // passes: `ctrl-lowering` defers on a nested adjoint region,
-      // `adjoint-lowering` reduces it, then `ctrl-lowering` runs again.
-      "ctrl-lowering",
-      "adjoint-lowering",
-      "ctrl-lowering",
-      "adjoint-lowering",
+      // Reduce any remaining quantum.ctrl/quantum.adjoint regions to op-level modifiers,
+      // including nested regions (e.g. ctrl(adjoint(...))) and the quantum.adjoint/ctrl
+      // regions that lower-mitigation (ZNE) emits.
+      "lower-modifiers",
       "resolve-gate-level-adjoint",
       // TODO: we can remove the following 2 passes once PBC has its own pipeline.
       "lower-pbc-init-ops",

@@ -1691,8 +1691,9 @@ class TestCustomRuleApplication:
         assert after.get("MidCircuitMeasure", 0) == 1
 
     def test_functional_control_region_is_lowered(self):
-        """Test a functional modifier ``qp.ctrl(op, control=...)(...)`` is captured as a
-        ``quantum.ctrl`` region.
+        """Test ``qp.ctrl(op, control=...)(...)`` is captured as a ``quantum.ctrl`` region
+        in a quantum program and then it is lowered to an op-level modifier before
+        graph-decomposition.
         """
 
         class CtrlOnly(qp.core.Operator2):
