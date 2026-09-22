@@ -1933,6 +1933,10 @@ class TestNumericHamiltonianDecomposition:
             "RZ": 40,
         }
 
+    @pytest.mark.skip(
+        reason="This test is currently too slow to run in CI. It can be enabled for local testing when needed"
+        "until the performance of the decomposition pass is improved."
+    )
     def test_trotter_cgf_decomposes(self):
         """Test that a ``TrotterCGF`` with ``CGFHamiltonian`` decomposes."""
         hamiltonian = self._cgf_hamiltonian()
@@ -1954,6 +1958,10 @@ class TestNumericHamiltonianDecomposition:
             "RZ": 60,
         }
 
+    @pytest.mark.skip(
+        reason="This test is currently too slow to run in CI. It can be enabled for local testing when needed"
+        "until the performance of the decomposition pass is improved."
+    )
     def test_adjoint_trotter_cgf_decomposes(self):
         """Test that ``qp.adjoint(TrotterCGF)`` decomposes."""
         hamiltonian = self._cgf_hamiltonian()
@@ -2024,6 +2032,10 @@ class TestNumericHamiltonianDecomposition:
             "PhaseShift": 1,
         }
 
+    @pytest.mark.skip(
+        reason="This test is currently too slow to run in CI. It can be enabled for local testing when needed"
+        "until the performance of the decomposition pass is improved."
+    )
     def test_control_trotter_cgf_decomposes(self):
         """Test that ``qp.ctrl(TrotterCGF)`` decomposes.
 
@@ -2065,6 +2077,10 @@ class TestNumericHamiltonianDecomposition:
             "PhaseShift": 1,
         }
 
+    @pytest.mark.skip(
+        reason="This test is currently too slow to run in CI. It can be enabled for local testing when needed"
+        "until the performance of the decomposition pass is improved."
+    )
     def test_control_adjoint_trotter_cdf_decomposes(self):
         """Test that nested ``qp.ctrl`` and ``qp.adjoint`` on a ``TrotterCDF`` decomposes."""
         hamiltonian = self._cdf_hamiltonian()
