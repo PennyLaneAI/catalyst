@@ -25,6 +25,7 @@
 #pragma once
 
 #include <cstddef>
+#include <iostream>
 #include <memory>
 #include <vector>
 
@@ -152,8 +153,11 @@ class DecompositionGraph {
      * and their relationships. It can help in understanding how the graph is constructed and how
      * the decomposition rules are connected to the operators. The exact format of the output can
      * be designed to be human-readable and informative for debugging.
+     *
+     * @param os where to write the dump. Defaults to stderr; pass e.g. an `std::ostringstream` to
+     *           capture it instead and route it somewhere else.
      */
-    void showGraph() const;
+    void showGraph(std::ostream &os = std::cerr) const;
 };
 
 } // namespace DecompGraph::Solver

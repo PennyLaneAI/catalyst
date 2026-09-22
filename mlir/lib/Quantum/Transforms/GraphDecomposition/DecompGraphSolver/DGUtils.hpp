@@ -92,8 +92,11 @@ static inline auto graph_failed_message(const OperatorNode &op,
  * so every level is sorted by its printed operator label before being written.
  * Without that the dump comes out in a different order from run to run,
  * which makes it hard to check for lit tests.
+ *
+ * @param result the rule the solver chose for each operator.
+ * @param os where to write the dump. Defaults to stderr.
  */
-static inline void showSolution(const Core::GraphResult &result) {
+static inline void showSolution(const Core::GraphResult &result, std::ostream &os = std::cerr) {
     std::vector<std::pair<std::string, const Core::ChosenDecompRule *>> entries;
     entries.reserve(result.size());
     for (const auto &[op, rule] : result) {
@@ -102,13 +105,12 @@ static inline void showSolution(const Core::GraphResult &result) {
     std::sort(entries.begin(), entries.end(),
               [](const auto &lhs, const auto &rhs) { return lhs.first < rhs.first; });
 
-    std::cerr << "Decomposition Solution:\n";
+    os << "Decomposition Solution:\n";
     for (const auto &[opLabel, rule] : entries) {
-        std::cerr << "  Operator: " << opLabel << "\n";
-        std::cerr << "    Chosen Rule: " << rule->ruleName << (rule->isBasis ? " [basis]" : "")
-                  << "\n";
-        std::cerr << "    Total Cost: " << rule->totalCost << "\n";
-        std::cerr << "    Basis Counts:\n";
+        os << "  Operator: " << opLabel << "\n";
+        os << "    Chosen Rule: " << rule->ruleName << (rule->isBasis ? " [basis]" : "") << "\n";
+        os << "    Total Cost: " << rule->totalCost << "\n";
+        os << "    Basis Counts:\n";
 
         std::vector<std::pair<std::string, size_t>> basisCounts;
         basisCounts.reserve(rule->basisCounts.size());
@@ -117,7 +119,7 @@ static inline void showSolution(const Core::GraphResult &result) {
         }
         std::sort(basisCounts.begin(), basisCounts.end());
         for (const auto &[basisLabel, count] : basisCounts) {
-            std::cerr << "      - " << basisLabel << ": " << count << "\n";
+            os << "      - " << basisLabel << ": " << count << "\n";
         }
     }
 }
