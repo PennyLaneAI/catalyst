@@ -185,14 +185,18 @@ struct CtrlLoweringRewritePattern : public OpRewritePattern<CtrlOp> {
         // reduces the inner region to op-level gates, then this ctrl op lowers on a later
         // iteration. A pre-scan avoids a partial rewrite (creating ops, then bailing out
         // mid-region).
-        for (Operation &op : block.without_terminator()) {
-            if (isa<MeasureOp>(op)) {
-                op.emitError("cannot control a measurement inside a qref.ctrl region");
-                return failure();
-            }
-            if (isa<AdjointOp>(op)) {
-                return failure();
-            }
+        if (ctrl.getRegion()
+                .walk([](Operation *op) {
+                    if (isa<AdjointOp>(op)) {
+                        return WalkResult::interrupt();
+                    }
+                    if (isa<MeasureOp>(op)) {
+                        return WalkResult::interrupt();
+                    }
+                    return WalkResult::advance();
+                })
+                .wasInterrupted()) {
+            return failure();
         }
 
         // The control qubits are threaded through every enclosed gate; the control values are
