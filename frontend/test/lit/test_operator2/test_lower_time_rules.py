@@ -30,6 +30,7 @@ from operator2_dummy_gates import (
     NoParams,
     SingleParam,
     SingleParamCustomOp,
+    TestQubitUnitary,
 )
 from pennylane.typing import Complex, Float, Int, Wire
 
@@ -673,13 +674,6 @@ def test_basis_rotation_decomposition():
         parent's own matrix, and return the MLIR.
         """
 
-        class MatrixParent(qp.core.operator.Operator2):
-            dynamic_argnames = ("matrix",)
-            wire_argnames = ("wires",)
-
-            def __init__(self, matrix, wires):
-                super().__init__(matrix, wires)
-
         def rule_resource_fn(matrix, wires):
             spec = Complex if qp.math.get_dtype_name(matrix).startswith("complex") else Float
             return {qp.BasisRotation(spec[2, 2], Wire[2]): 1}
@@ -689,12 +683,12 @@ def test_basis_rotation_decomposition():
             qp.BasisRotation(matrix, wires)
 
         with qp.decomposition.local_decomps():
-            qp.add_decomps(MatrixParent, rule)
+            qp.add_decomps(TestQubitUnitary, rule)
 
             @qp.qjit(target="mlir", capture=True)
             @qp.qnode(qp.device("null.qubit", wires=2))
             def parent_circuit():
-                MatrixParent(U, [0, 1])
+                TestQubitUnitary(U, [0, 1])
                 return qp.probs()
 
             return parent_circuit.mlir
@@ -705,10 +699,10 @@ def test_basis_rotation_decomposition():
         # A real orthogonal matrix with determinant -1, so the determinant-fixing PhaseShift runs.
         print(_compile_parent(jnp.array([[0.76484219, 0.64421769], [0.64421769, -0.76484219]])))
 
-    # CHECK: func.func private @"__builtin_rule_MatrixParent{matrix:[tensor<2x2xf64>]}{wires:2}{}"
+    # CHECK: func.func private @"__builtin_rule_TestQubitUnitary{matrix:[tensor<2x2xf64>]}{wires:2}{}"
     # CHECK-SAME: resources = {operations = {
     # CHECK-SAME: "BasisRotation{unitary_matrix:[tensor<2x2xf64>]}{wires:2}{check = false}" = 1 : i64
-    # CHECK-SAME: target_gate = "MatrixParent{matrix:[tensor<2x2xf64>]}{wires:2}{}"
+    # CHECK-SAME: target_gate = "TestQubitUnitary{matrix:[tensor<2x2xf64>]}{wires:2}{}"
     # CHECK: qref.operator "BasisRotation"(
     # CHECK-SAME: tensor<2x2xf64>
     # CHECK: func.func private @"__builtin__real_basis_rotation_decomp_BasisRotation{unitary_matrix:[tensor<2x2xf64>]}{wires:2}{check = false}"
@@ -731,7 +725,7 @@ def test_basis_rotation_decomposition():
             )
         )
 
-    # CHECK: func.func private @"__builtin_rule_MatrixParent{matrix:[tensor<2x2xcomplex<f64>>]}{wires:2}{}"
+    # CHECK: func.func private @"__builtin_rule_TestQubitUnitary{matrix:[tensor<2x2xcomplex<f64>>]}{wires:2}{}"
     # CHECK-SAME: resources = {operations = {
     # CHECK-SAME: "BasisRotation{unitary_matrix:[tensor<2x2xcomplex<f64>>]}{wires:2}{check = false}" = 1 : i64
     #
