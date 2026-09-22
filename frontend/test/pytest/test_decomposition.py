@@ -1354,6 +1354,46 @@ class TestSymbolicRules:
                 is None
             )
 
+    def test_control_wrapped_symbolic_rule_with_mcm_is_skipped(self):
+        """A registered ``Adjoint(op)`` rule containing a mid-circuit measurement is skipped when it
+        is synthesized *under control* (``C(Adjoint(op))``).
+        """
+
+        @qp.register_resources({NoParams(Wire[1]): 1, qp.ops.MidMeasure(Wire[1]): 1})
+        def adjoint_rule_with_mcm(base):
+            m0 = qp.measure(base.wires[0])
+            qp.cond(m0, NoParams)(base.wires[0])
+
+        with local_decomps():
+            add_decomps("Adjoint(NoParams)", adjoint_rule_with_mcm)
+
+            adjoint_module = compile_registered_symbolic_rules(
+                "NoParams",
+                "Adjoint(NoParams){}{reg:1}{}",
+                {},
+                {"reg": 1},
+                {},
+                op_cls=NoParams,
+                kind="adjoint",
+            )
+            assert adjoint_module is not None
+
+            with pytest.warns(RuleLoweringWarning, match="control region"):
+                control_module = compile_registered_symbolic_rules(
+                    "NoParams",
+                    "C(Adjoint(NoParams)){}{reg:1}{}",
+                    {},
+                    {"reg": 1},
+                    {},
+                    op_cls=NoParams,
+                    kind="adjoint",
+                    n_ctrl=1,
+                    wrap_control=True,
+                )
+
+            # The measurement rule was the only candidate and was skipped, so no module is produced.
+            assert control_module is None
+
     def test_missing_op_class_raises(self):
         """Test lowering cannot proceed without the base operator's class: these rules take a base
         operator instance, which the operator's name alone cannot produce."""
@@ -1612,29 +1652,29 @@ class TestCustomRuleApplication:
 
     def test_fixed_decomp_rule_with_a_matrix_parameter(self):
         """Test a rule for an operator whose parameter is a matrix."""
-        from operator2_dummy_gates import NoParams, QubitUnitary
+        from operator2_dummy_gates import NoParams, TestQubitUnitary
 
         @register_resources({NoParams(reg=Wire[1]): 1})
         def qu_to_noparams(matrix, wires):  # pylint: disable=unused-argument
             NoParams(reg=wires[0:1])
 
         with local_decomps():
-            add_decomps(QubitUnitary, qu_to_noparams)
+            add_decomps(TestQubitUnitary, qu_to_noparams)
             unitary = 1 / jnp.sqrt(2) * jnp.array([[1, 1], [1, -1]], dtype=jnp.complex128)
 
             @qjit(capture=True, target="mlir")
             @graph_decomposition(
-                gate_set={NoParams: 1}, fixed_decomps={QubitUnitary: qu_to_noparams}
+                gate_set={NoParams: 1}, fixed_decomps={TestQubitUnitary: qu_to_noparams}
             )
             @qnode(qp.device("null.qubit", wires=1))
             def circuit():
-                QubitUnitary(unitary, wires=[0])
+                TestQubitUnitary(unitary, wires=[0])
 
             resources = qp.specs(circuit, level="all-mlir")().resources
 
-        assert "QubitUnitary" in resources["Before MLIR Passes"].counts
+        assert "TestQubitUnitary" in resources["Before MLIR Passes"].counts
         after = resources["graph-decomposition"].counts
-        assert "QubitUnitary" not in after
+        assert "TestQubitUnitary" not in after
         assert after.get("NoParams", 0) >= 1
 
     def test_special_symbolic_rules_applied(self):
@@ -1813,11 +1853,18 @@ class TestNumericHamiltonianDecomposition:
         assert resources["graph-decomposition"].counts == {"RZ": 1, "GlobalPhase": 1}
 
     def test_adjoint_trotter_cdf_decomposes(self):
-        """Test that ``qp.adjoint(TrotterCDF)`` decomposes."""
+        """Test that ``qp.adjoint(TrotterCDF)`` decomposes.
+
+        ``Adjoint(BasisRotation)`` needs to be listed in the target gate set explicitly
+        As PennyLane registers no adjoint decomposition rule for ``BasisRotation``,
+        so its adjoint must be a target terminal to be reachable.
+        """
         hamiltonian = self._cdf_hamiltonian()
 
         @qjit(capture=True, target="mlir")
-        @graph_decomposition(gate_set={"BasisRotation", "RZ", "IsingZZ", "GlobalPhase"})
+        @graph_decomposition(
+            gate_set={"BasisRotation", "Adjoint(BasisRotation)", "RZ", "IsingZZ", "GlobalPhase"}
+        )
         @qnode(qp.device("null.qubit", wires=4))
         def circuit():
             qp.adjoint(
@@ -1863,7 +1910,9 @@ class TestNumericHamiltonianDecomposition:
         hamiltonian = self._cgf_hamiltonian()
 
         @qjit(capture=True, target="mlir")
-        @graph_decomposition(gate_set={"BasisRotation", "RZ", "IsingZZ", "GlobalPhase"})
+        @graph_decomposition(
+            gate_set={"BasisRotation", "Adjoint(BasisRotation)", "RZ", "IsingZZ", "GlobalPhase"}
+        )
         @qnode(qp.device("null.qubit", wires=6))
         def circuit():
             qp.adjoint(

@@ -754,3 +754,50 @@ def test_complex_op_that_decomposes_to_basis_rotation():
 # CHECK-SAME: "PhaseShift{0:[f64]}{wires:1}{}" = 3 : i64
 # CHECK-SAME: "SingleExcitation{0:[f64]}{wires:2}{}" = 1 : i64
 test_complex_op_that_decomposes_to_basis_rotation()
+
+
+def test_ctrl_rule_is_traversed():
+    """
+    Test that rules from a controlled version of a base gate are compiled and traversed from when
+    the circuit just has the base gate.
+
+    In this test, a C(NoParams) decomposes to a CompilableData, and a CompilableData decomposes to
+    a SingleParam. We test that just from the base NoParams, both rules are present.
+    """
+
+    @qp.register_resources({CompilableData(a="a", b="b", thing="thing", wires=Wire[1]): 1})
+    def ctrl_rule(base, control_wires, control_values, work_wires, work_wire_type):
+        CompilableData(a="a", b="b", thing="thing", wires=base.wires)
+
+    @qp.register_resources({SingleParam(x=Float, reg=Wire[1]): 1})
+    def rule(a, b, thing, wires):
+        SingleParam(x=0.1, reg=wires[0])
+
+    with qp.decomposition.local_decomps():
+        qp.add_decomps("C(NoParams)", ctrl_rule)
+        qp.add_decomps(CompilableData, rule)
+
+        @qp.qjit(capture=True, target="mlir")
+        @qp.qnode(qp.device("null.qubit", wires=3))
+        def ctrl_is_traversed():
+            NoParams(reg=0)
+            return qp.probs()
+
+        print(ctrl_is_traversed.mlir)
+
+
+# CHECK-LABEL: func.func public @ctrl_is_traversed()
+# CHECK: qref.operator "NoParams"
+#
+# CHECK: func.func private @"__builtin_ctrl_rule_C(NoParams){}{reg:1}{}"
+# CHECK-SAME:   resources = {operations = {
+# CHECK-SAME:   "CompilableData{}{wires:1}{a = \22a\22, b = \22b\22, thing = \22thing\22}" = 1 : i64
+# CHECK-SAME:   target_gate = "C(NoParams){}{reg:1}{}"
+# CHECK: qref.operator "CompilableData"
+#
+# CHECK: func.func private @"__builtin_rule_CompilableData{}{wires:1}{a = \22a\22, b = \22b\22, thing = \22thing\22}"
+# CHECK-SAME:   resources = {operations = {
+# CHECK-SAME:   "SingleParam{x:[tensor<f64>]}{reg:1}{}" = 1 : i64
+# CHECK-SAME:   target_gate = "CompilableData{}{wires:1}{a = \22a\22, b = \22b\22, thing = \22thing\22}"
+# CHECK: qref.operator "SingleParam"
+test_ctrl_rule_is_traversed()

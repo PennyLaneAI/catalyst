@@ -46,6 +46,7 @@
   [(#3129)](https://github.com/PennyLaneAI/catalyst/pull/3129)
   [(#3127)](https://github.com/PennyLaneAI/catalyst/pull/3127)
   [(#3213)](https://github.com/PennyLaneAI/catalyst/pull/3213)
+  [(#3248)](https://github.com/PennyLaneAI/catalyst/pull/3248)
 
   Control is folded into the operator identity *control-outermost* (e.g. `C(Adjoint(Op))`), so
   `ctrl(adjoint(Op))` and `adjoint(ctrl(Op))` collapse to a single node, while a distinct control
@@ -163,6 +164,7 @@
     [(#3052)](https://github.com/PennyLaneAI/catalyst/pull/3052)
     [(#3053)](https://github.com/PennyLaneAI/catalyst/pull/3053)
     [(#3229)](https://github.com/PennyLaneAI/catalyst/pull/3229)
+    [(#3251)](https://github.com/PennyLaneAI/catalyst/pull/3251)
 
     The format of `graphOpID` is as follows:
         op_name{dynamic_shape_dictionary}{wire_lens_dictionary}{static_data_dictionary}[UID]
