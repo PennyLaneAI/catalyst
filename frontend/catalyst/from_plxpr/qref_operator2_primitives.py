@@ -191,12 +191,13 @@ def _process_qubits(*args, op_cls, wire_lens, hybrid_lens) -> tuple[list, dict[s
     args_idx = len(op_cls.dynamic_argnames)
     map_idx = 0
     for wname, wsize in zip(flat_wire_argnames, wire_lens, strict=True):
-        if wsize:
-            # If wsize is 0, then we don't need to populate the qubit map. It will be empty anyway
-            qubits += args[args_idx : args_idx + wsize]
-            qubit_map[wname] = ir.DenseI64ArrayAttr.get(list(range(map_idx, map_idx + wsize)))
-            map_idx += wsize
-            args_idx += wsize
+        # If wsize is 0, then we need to populate the qubit map anyway because the signature must match the operation.
+        # This is also needed to ensure that the lowered op generates the same GOID as the frontend.
+        # TODO: see if we can remove this requirement or upstream it to PL to simplify the IR
+        qubits += args[args_idx : args_idx + wsize]
+        qubit_map[wname] = ir.DenseI64ArrayAttr.get(list(range(map_idx, map_idx + wsize)))
+        map_idx += wsize
+        args_idx += wsize
 
     # Hybrid wire arguments and nested-operator wires from non-wire hybrid arguments
     for hname, hsize in zip(op_cls.hybrid_argnames, hybrid_lens, strict=True):
