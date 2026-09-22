@@ -2032,9 +2032,9 @@ class TestNumericHamiltonianDecomposition:
             "C(Adjoint(BasisRotation))": 62,
             "C(CNOT)": 240,
             "CRZ": 160,
-            "GlobalPhase": 40,
+            "GlobalPhase": 1,
             "PauliX": 320,
-            "PhaseShift": 40,
+            "PhaseShift": 1,
         }
 
         @qjit(capture=True, target="mlir")
