@@ -1813,11 +1813,18 @@ class TestNumericHamiltonianDecomposition:
         assert resources["graph-decomposition"].counts == {"RZ": 1, "GlobalPhase": 1}
 
     def test_adjoint_trotter_cdf_decomposes(self):
-        """Test that ``qp.adjoint(TrotterCDF)`` decomposes."""
+        """Test that ``qp.adjoint(TrotterCDF)`` decomposes.
+
+        ``Adjoint(BasisRotation)`` needs to be listed in the target gate set explicitly
+        As PennyLane registers no adjoint decomposition rule for ``BasisRotation``,
+        so its adjoint must be a target terminal to be reachable.
+        """
         hamiltonian = self._cdf_hamiltonian()
 
         @qjit(capture=True, target="mlir")
-        @graph_decomposition(gate_set={"BasisRotation", "RZ", "IsingZZ", "GlobalPhase"})
+        @graph_decomposition(
+            gate_set={"BasisRotation", "Adjoint(BasisRotation)", "RZ", "IsingZZ", "GlobalPhase"}
+        )
         @qnode(qp.device("null.qubit", wires=4))
         def circuit():
             qp.adjoint(
@@ -1859,11 +1866,17 @@ class TestNumericHamiltonianDecomposition:
         }
 
     def test_adjoint_trotter_cgf_decomposes(self):
-        """Test that ``qp.adjoint(TrotterCGF)`` decomposes."""
+        """Test that ``qp.adjoint(TrotterCGF)`` decomposes.
+
+        See :meth:`test_adjoint_trotter_cdf_decomposes`: ``Adjoint(BasisRotation)`` is a target
+        terminal because PennyLane registers no adjoint decomposition rule for ``BasisRotation``.
+        """
         hamiltonian = self._cgf_hamiltonian()
 
         @qjit(capture=True, target="mlir")
-        @graph_decomposition(gate_set={"BasisRotation", "RZ", "IsingZZ", "GlobalPhase"})
+        @graph_decomposition(
+            gate_set={"BasisRotation", "Adjoint(BasisRotation)", "RZ", "IsingZZ", "GlobalPhase"}
+        )
         @qnode(qp.device("null.qubit", wires=6))
         def circuit():
             qp.adjoint(
