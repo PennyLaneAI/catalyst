@@ -8,6 +8,16 @@ on:
       types:
         - labeled
     workflow_dispatch:
+      inputs:
+        lightning-version:
+          type: string
+          required: true
+          description: The version of Lightning to use. This should be a valid git tag, e.g. v0.36.0.
+        pennylane-version:
+          type: string
+          required: false
+          default: main
+          description: The version of PennyLane to use. This should be a valid git tag, e.g. v0.36.0.
         
 jobs:
   check_if_wheel_build_required:
@@ -19,18 +29,7 @@ jobs:
     uses: ./.github/workflows/constants.yaml
     with:
       runs_on: ubuntu-24.04
-      
-      # - name: Build and push Docker image
-      #   uses: docker/build-push-action@v6
-      #   with:
-      #     context: .
-      #     file: Dockerfile
-      #     platforms: linux/arm64
-      #     push: false
-      #     build-args: |
-      #       PENNYLANE_VERSION=main
-      #       CATALYST_VERSION=main
-      #       LIGHTNING_VERSION=main
+
   build-catalyst:
     name: Build Docker Image
     runs-on: blacksmith-8vcpu-ubuntu-2404
@@ -54,13 +53,16 @@ jobs:
           path: pennylane-lightning
 
       - name: Build Lightning docker image
-        uses: useblacksmith/build-push-action@v2
+        uses: docker/build-push-action@v6
         with:
-          context: .
+          context: ./pennylane-lightning
           file: ./pennylane-lightning/docker/Dockerfile
           tags: pennylane-lightning:latest
           load: true
-          outputs: type=docker,dest=pennylane-lightning.tar
+          push: false
+          build-args: |
+            LIGHTNING_VERSION=${{ inputs.lightning-version }}
+            PENNYLANE_VERSION=${{ inputs.pennylane-version }}
 
       - name: Build Docker Image
         run: |
