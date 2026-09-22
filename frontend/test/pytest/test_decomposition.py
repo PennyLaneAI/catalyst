@@ -73,7 +73,7 @@ from catalyst.decomposition.decomposition_rules import (
 from catalyst.decomposition.graph_op_id import GraphOpID, build_graph_op_id
 from catalyst.decomposition.type_utils import (
     convert_item_to_mlir_type,
-    get_dummy_values_for_arg,
+    get_dummy_values_for_dynamic_shape,
     replace_wires_with_placeholder_wires,
 )
 from catalyst.passes import graph_decomposition
@@ -233,6 +233,7 @@ class TestGenericUtilities:
             ("f64", "float64", ()),
             ("complex<f64>", "complex128", ()),
             ("complex<f32>", "complex64", ()),
+            (["f64"], "float64", ()),
             # mlir-type tensor tests
             ("tensor<i1>", "bool", ()),
             ("tensor<1xi1>", "bool", (1,)),
@@ -254,7 +255,7 @@ class TestGenericUtilities:
     )
     def test_get_dummy_values_types(self, input, dtype, shape):
         """Test that get_dummy_values_for_container handles MLIR and Python types correctly."""
-        result = get_dummy_values_for_arg(input)
+        result = get_dummy_values_for_dynamic_shape(input)
         assert result.dtype == dtype
         assert result.shape == shape
 
