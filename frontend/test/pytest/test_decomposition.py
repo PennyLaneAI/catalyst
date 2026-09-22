@@ -1866,11 +1866,7 @@ class TestNumericHamiltonianDecomposition:
         }
 
     def test_adjoint_trotter_cgf_decomposes(self):
-        """Test that ``qp.adjoint(TrotterCGF)`` decomposes.
-
-        See :meth:`test_adjoint_trotter_cdf_decomposes`: ``Adjoint(BasisRotation)`` is a target
-        terminal because PennyLane registers no adjoint decomposition rule for ``BasisRotation``.
-        """
+        """Test that ``qp.adjoint(TrotterCGF)`` decomposes."""
         hamiltonian = self._cgf_hamiltonian()
 
         @qjit(capture=True, target="mlir")
