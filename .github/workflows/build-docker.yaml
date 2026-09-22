@@ -59,7 +59,7 @@ jobs:
           context: ./pennylane-lightning
           file: ./pennylane-lightning/docker/Dockerfile
           tags: pennylane-lightning:latest
-          outputs: type=docker,dest=pennylane-lightning.tar
+          load: true
           push: false
           build-args: |
             LIGHTNING_VERSION=${{ inputs.lightning-version || 'main' }}
@@ -73,7 +73,7 @@ jobs:
           tags: catalyst:latest
           load: true
           build-contexts: |
-            pennylane-lightning:latest=docker-archive://pennylane-lightning.tar
+            pennylane-lightning:latest=docker-image://pennylane-lightning:latest
           build-args: |
             LIGHTNING_VERSION=${{ inputs.lightning-version || 'main' }}
             PENNYLANE_VERSION=${{ inputs.pennylane-version || 'main' }}            
