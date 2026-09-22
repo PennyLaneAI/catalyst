@@ -205,7 +205,13 @@ def GraphDecompositionPass : Pass<"graph-decomposition", "mlir::ModuleOp"> {
             /*CLI name*/"libpython-path",
             /*Type*/"std::string",
             /*Default*/[{ "" }],
-            /*Description*/"A path to the python shared library.">
+            /*Description*/"A path to the python shared library.">,
+        Option<
+            /*C++ name*/"verboseOption",
+            /*CLI name*/"verbose",
+            /*Type*/"bool",
+            /*Default*/[{ false }],
+            /*Description*/"Print the decomposition rule chosen for each operator to stderr.">
     ];
 
     let dependentDialects = [

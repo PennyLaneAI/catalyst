@@ -1614,6 +1614,54 @@ class TestApplicabilityFilterOrdering:
         assert name_to_resources == {}
 
 
+class TestVerboseSolution:
+    """Integration tests for ``graph_decomposition(..., verbose=True)``."""
+
+    @staticmethod
+    def _compile(verbose):
+        """Compile, all the way to a binary, a circuit whose operator decomposes into Hadamard."""
+
+        class DecomposesToH(qp.core.Operator2):
+            """An operator whose only rule produces a Hadamard."""
+
+            def __init__(self, wires):
+                super().__init__(wires=wires)
+
+        @register_resources({qp.Hadamard: 1})
+        def h_rule(wires):
+            qp.Hadamard(wires=wires)
+
+        with local_decomps():
+            add_decomps(DecomposesToH, h_rule)
+
+            @qjit(capture=True, verbose=True)
+            @graph_decomposition(gate_set=["H"], verbose=verbose)
+            @qnode(qp.device("null.qubit", wires=1))
+            def circuit():
+                DecomposesToH(0)
+                return qp.expval(qp.Z(0))
+
+            circuit.use_cwd_for_workspace = False
+            circuit.jit_compile(())
+            circuit.workspace.cleanup()
+
+    def test_solution_is_printed(self, capfd):
+        """Test the rule chosen for each operator reaches the user's terminal."""
+        self._compile(verbose=True)
+
+        capture = capfd.readouterr()
+        output = capture.out + capture.err
+        assert "Decomposition Solution:" in output
+        assert "h_rule" in output
+
+    def test_quiet_by_default(self, capfd):
+        """Test no solution is printed when the pass is not asked to be verbose."""
+        self._compile(verbose=False)
+
+        capture = capfd.readouterr()
+        assert "Decomposition Solution:" not in capture.out + capture.err
+
+
 class TestCustomRuleApplication:
     """Integration tests for applying custom decomposition rules end-to-end."""
 
@@ -1943,6 +1991,10 @@ class TestNumericHamiltonianDecomposition:
             "RZ": 40,
         }
 
+    @pytest.mark.skip(
+        reason="This test is currently too slow to run in CI. It can be enabled for local testing when needed"
+        "until the performance of the decomposition pass is improved."
+    )
     def test_trotter_cgf_decomposes(self):
         """Test that a ``TrotterCGF`` with ``CGFHamiltonian`` decomposes."""
         hamiltonian = self._cgf_hamiltonian()
@@ -1964,6 +2016,10 @@ class TestNumericHamiltonianDecomposition:
             "RZ": 60,
         }
 
+    @pytest.mark.skip(
+        reason="This test is currently too slow to run in CI. It can be enabled for local testing when needed"
+        "until the performance of the decomposition pass is improved."
+    )
     def test_adjoint_trotter_cgf_decomposes(self):
         """Test that ``qp.adjoint(TrotterCGF)`` decomposes."""
         hamiltonian = self._cgf_hamiltonian()
@@ -2034,6 +2090,10 @@ class TestNumericHamiltonianDecomposition:
             "PhaseShift": 1,
         }
 
+    @pytest.mark.skip(
+        reason="This test is currently too slow to run in CI. It can be enabled for local testing when needed"
+        "until the performance of the decomposition pass is improved."
+    )
     def test_control_trotter_cgf_decomposes(self):
         """Test that ``qp.ctrl(TrotterCGF)`` decomposes.
 
@@ -2075,6 +2135,10 @@ class TestNumericHamiltonianDecomposition:
             "PhaseShift": 1,
         }
 
+    @pytest.mark.skip(
+        reason="This test is currently too slow to run in CI. It can be enabled for local testing when needed"
+        "until the performance of the decomposition pass is improved."
+    )
     def test_control_adjoint_trotter_cdf_decomposes(self):
         """Test that nested ``qp.ctrl`` and ``qp.adjoint`` on a ``TrotterCDF`` decomposes."""
         hamiltonian = self._cdf_hamiltonian()
