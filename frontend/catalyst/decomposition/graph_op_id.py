@@ -17,9 +17,7 @@
 from collections.abc import Mapping, Sequence
 from typing import Any
 
-import jax.numpy as jnp
 import pennylane as qp
-from jax._src.lib.mlir import ir
 from pennylane.ops.op_math.adjoint2 import Adjoint2
 from pennylane.ops.op_math.controlled2 import ControlledOp2
 from pennylane.pytrees import flatten
@@ -33,6 +31,22 @@ from catalyst.from_plxpr.uid import generate_uid
 from catalyst.jax_extras.lowering import get_mlir_attribute_from_pyval, mlir_build_context
 
 _SPECIAL_LOWERINGS = {}
+
+
+def _is_custom_op(op_cls, avals_in):
+    """Return whether an operator lowers to ``qref.custom`` rather than ``qref.operator``.
+
+    Callers reached through a special lowering are handled before this is consulted, so it does
+    not exclude ``_SPECIAL_LOWERINGS``; :meth:`GraphOpID.parse_is_custom_op` adds that itself.
+    """
+    if op_cls.static_argnames or op_cls.hybrid_argnames or op_cls.compilable_argnames:
+        return False
+    if op_cls.wire_argnames != ("wires",):
+        return False
+    if list(op_cls._sig.parameters.keys())[-1] != "wires":
+        return False
+    # Params are widened to f64 by `safe_cast_to_f64`; complex cannot be cast safely.
+    return all(p.shape == () and p.dtype.kind in "ifu" for p in avals_in)
 
 
 def _is_wires(item) -> bool:
@@ -261,19 +275,12 @@ class GraphOpID:
         """
         Return whether the Operator2 instance is considered a custom op in MLIR.
 
-        The source of truth for the criteria is in qref_operator2_primitives.py,
-        in the _is_custom_op() helper function. However, that function cannot be directly used here
-        as that is a lowering time util, and only works with JAX-MLIR types.
+        Defers to the same :func:`_is_custom_op` the lowering uses, so the two cannot drift. The
+        lowering dispatches a special-lowered operator before reaching that check, so the extra
+        ``_SPECIAL_LOWERINGS`` exclusion is applied here instead.
         """
-        if self.op.static_argnames or self.op.hybrid_argnames or self.op.compilable_argnames:
-            return False
-        if self.op.wire_argnames != ("wires",):
-            return False
-        if list(self.op._sig.parameters.keys())[-1] != "wires":
-            return False
-        return all(
-            arg.shape == () and arg.dtype.type == jnp.float64
-            for arg in self.op.dynamic_args.values()
+        return _is_custom_op(
+            type(self.op), tuple(self.op.dynamic_args.values())
         ) and not issubclass(type(self.op), tuple(_SPECIAL_LOWERINGS.keys()))
 
     def get_operator_name(self) -> str:

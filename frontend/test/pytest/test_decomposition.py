@@ -29,6 +29,7 @@ from operator2_dummy_gates import (
     NoParams,
     NoParamsCustomOp,
     SingleParam,
+    SingleParamCustomOp,
     StaticData,
 )
 from pennylane import qnode
@@ -321,6 +322,9 @@ class TestGenericUtilities:
                 qp.Rot(Bool, Int, Float, Wires(0)),
                 "Rot{0:[f64],1:[f64],2:[f64]}{wires:1}{}",
             ),  # custom ops should be promoted to f64
+            # An integer param is a custom-op param like a float one: the lowering widens it to
+            # f64, matching `_is_custom_op` in qref_operator2_primitives.py.
+            (SingleParamCustomOp(Int, Wires(0)), "SingleParamCustomOp{0:[f64]}{wires:1}{}"),
         ],
     )
     def test_GraphOpId(self, op, id):

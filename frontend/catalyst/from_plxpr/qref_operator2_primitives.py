@@ -39,7 +39,11 @@ from catalyst.decomposition.decomposition_rules import (
     fetch_all_reachable_decomposition_rules_from_op,
     inject_new_rules_into_module,
 )
-from catalyst.decomposition.graph_op_id import _SPECIAL_LOWERINGS, build_graph_op_id
+from catalyst.decomposition.graph_op_id import (
+    _SPECIAL_LOWERINGS,
+    _is_custom_op,
+    build_graph_op_id,
+)
 from catalyst.decomposition.type_utils import (
     convert_item_to_mlir_type,
     get_dummy_values_for_arg,
@@ -93,17 +97,6 @@ qref_operator_p.multiple_results = True
 @qref_operator_p.def_abstract_eval
 def _qref_operator_p_abstract_eval(*args, **kwargs):
     return []
-
-
-def _is_custom_op(op_cls, avals_in):
-    if op_cls.static_argnames or op_cls.hybrid_argnames or op_cls.compilable_argnames:
-        return False
-    if op_cls.wire_argnames != ("wires",):
-        return False
-    if list(op_cls._sig.parameters.keys())[-1] != "wires":
-        return False
-    # Complex dtypes cannot be safely cast to float64
-    return all(p.shape == () and p.dtype.kind in "ifu" for p in avals_in)
 
 
 def _is_qref_qubit(val) -> bool:
