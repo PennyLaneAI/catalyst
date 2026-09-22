@@ -45,6 +45,8 @@ jobs:
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
+        with:
+          driver: docker        
 
       - name: Checkout External Base Repo
         uses: actions/checkout@v4
