@@ -1,4 +1,4 @@
-name: Build Pennylane Lightning Catalyst Docker Image
+name: Build Catalyst Docker Image
 
 permissions:
   contents: read
