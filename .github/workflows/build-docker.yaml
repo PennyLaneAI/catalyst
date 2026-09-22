@@ -65,6 +65,10 @@ jobs:
             LIGHTNING_VERSION=${{ inputs.lightning-version || 'main' }}
             PENNYLANE_VERSION=${{ inputs.pennylane-version || 'main' }}
 
+      - name: Check docker image
+        run: |
+          docker images
+
       - name: Build Docker Image
         uses: docker/build-push-action@v6
         with:
