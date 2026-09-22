@@ -155,7 +155,7 @@ def _out_of_process(node: Node) -> bool:
     return node.executor_options is not None or node.executor is not None
 
 
-def _node_dict(node: Node, role: str, transport: str) -> dict:
+def _node_dict(node: Node, role: str, transport: str, needs_backend: bool = True) -> dict:
     """Map a backline node to a ``catalyst.backline`` node dict. Reads ``node.executor`` as-is.
 
     Coprocessor connection information is carried by ``endpoint`` in current PennyLane Backline;
@@ -166,6 +166,8 @@ def _node_dict(node: Node, role: str, transport: str) -> dict:
         role: The node's role, used when resolving the backend library.
         transport: The placement's transport name. Together with ``node.hardware``, this selects
             the concrete backend. An explicit ``init_args["backend_lib"]`` path takes precedence.
+        needs_backend: Whether this node opens a transport session. In the case of a controller with
+            no coprocessors, this is ``False``.
     """
     d: dict = {"out_of_process": bool(_out_of_process(node))}
     if node.name is not None:
@@ -183,7 +185,7 @@ def _node_dict(node: Node, role: str, transport: str) -> dict:
             f"backline node has unrecognized init_args {unknown}; recognized: {list(_INIT_KEYS)}."
         )
     hardware = getattr(node, "hardware", None)
-    if hardware is not None and not init.get("backend_lib"):
+    if needs_backend and hardware is not None and not init.get("backend_lib"):
         d["backend_lib"] = _resolve_backend_lib(transport, hardware, role, bool(node.remote))
     # A node may be handed any object as its executor, so its fields are read rather than assumed.
     executor = node.executor
@@ -355,10 +357,13 @@ def _coprocessor_fn_config(fn, placement: Placement) -> str:
 def serialize_backline(placement: Placement) -> dict:
     """Serialize a ``Placement`` into the ``catalyst.backline`` attribute dict."""
     transport = placement.transport.name
+    has_coprocessors = bool(placement.coprocessors)
     result = {
         "transport": transport,
         "controller": {
-            **_node_dict(placement.controller, "controller", transport),
+            **_node_dict(
+                placement.controller, "controller", transport, needs_backend=has_coprocessors
+            ),
             "in_bytes": _message_size(placement, "in_bytes"),
             "out_bytes": _message_size(placement, "out_bytes"),
         },
@@ -662,7 +667,7 @@ def module_attributes(device: Device) -> dict[str, str]:
     # A controller running in this process needs no module of its own either,
     # so only a dispatched one is tagged.
     controller = getattr(getattr(device, "placement", None), "controller", None)
-    if controller is not None and controller.remote:
+    if controller is not None and _out_of_process(controller):
         return {"catalyst.backline_role": "controller"}
     return {}
 
