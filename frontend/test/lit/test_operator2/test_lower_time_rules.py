@@ -672,11 +672,6 @@ test_basis_rotation_real_valued()
 def _compile_parent(U):
     """Lower a parent operator whose decomposition rule emits a ``BasisRotation`` carrying the
     parent's own matrix, and return the MLIR.
-
-    The rule's ``resources`` attribute is the child as *declared*; the ``qref.operator`` in its body
-    is the child as *emitted*. Catalyst's graph solver matches those graphOpIds verbatim, so if
-    ``BasisRotation`` does not honour the data type it is handed, the two disagree and the child is
-    never decomposed.
     """
 
     class MatrixParent(qp.core.operator.Operator2):
