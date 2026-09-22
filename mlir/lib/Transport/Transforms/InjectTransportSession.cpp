@@ -68,6 +68,28 @@ struct PendingLocalCoproc {
     Value token;
 };
 
+// Fill a node's nested module with the triple it is cross-compiled/dispatched to.
+void setTargetFromNode(ModuleOp nested, NodeAttr node) {
+    OpBuilder b(nested.getContext());
+    nested->setAttr(
+        "catalyst.target",
+        b.getDictionaryAttr({NamedAttribute(b.getStringAttr("triple"), node.getTriple())}));
+    if (auto addr = node.getAddress(); !addr.getValue().empty()) {
+        nested->setAttr("catalyst.dispatch",
+                        b.getDictionaryAttr({NamedAttribute(b.getStringAttr("address"), addr)}));
+    }
+}
+
+// Find a module tagged with a role, or null if none is present.
+ModuleOp findRoleModule(ModuleOp mod, llvm::StringRef role) {
+    for (auto m : mod.getOps<ModuleOp>()) {
+        if (m->getAttrOfType<StringAttr>(kRoleAttr) == role) {
+            return m;
+        }
+    }
+    return {};
+}
+
 // Emits the transport session lifecycle for one backline placement.
 //
 // A node is either
@@ -212,7 +234,7 @@ class SessionEmitter {
 
     // In-process transports (memcpy) pair on the session key and never dial peer:oob_port, so
     // emitted transport.connect / connect_async ops carry no peer / oob_port.
-    bool needsOob() const { return transport != "memcpy"; }
+    bool needsOob() const { return transport != "memcpy" && transport != "none"; }
     StringAttr peerFor(NodeAttr node) { return needsOob() ? node.getPeer() : StringAttr{}; }
     IntegerAttr portFor(NodeAttr node) {
         return needsOob() ? portAttr(node.oobPort()) : IntegerAttr{};
@@ -242,20 +264,6 @@ class SessionEmitter {
         commit(ctr);
         StartOp::create(b, loc, ctr);
         keyed.push_back({ctrlTy, key, teardownFn});
-    }
-
-    // Fill a node's nested module in with the triple it is cross-compiled to and the address it is
-    // dispatched to, both taken from its entry in the placement.
-    void setTargetFromNode(ModuleOp nested, NodeAttr node) {
-        OpBuilder b(ctx);
-        nested->setAttr(
-            "catalyst.target",
-            b.getDictionaryAttr({NamedAttribute(b.getStringAttr("triple"), node.getTriple())}));
-        if (auto addr = node.getAddress(); !addr.getValue().empty()) {
-            nested->setAttr(
-                "catalyst.dispatch",
-                b.getDictionaryAttr({NamedAttribute(b.getStringAttr("address"), addr)}));
-        }
     }
 
     // A remote coprocessor's target module, cross-compiled to its triple and dispatched by the
@@ -409,29 +417,26 @@ struct InjectTransportSessionPass
         NodeAttr ctrl = backline.getController();
         ArrayRef<NodeAttr> coprocs = backline.getCoprocessors();
 
-        // A lone controller with no peer has nothing to dial, so no transport session is emitted.
-        // A peer still brings one up, supporting self-dial tests.
-        StringAttr ctrlPeer = ctrl.getPeer();
-        if (coprocs.empty() && (!ctrlPeer || ctrlPeer.getValue().empty())) {
-            return;
-        }
-
         // Remoteness comes from the attribute, not from whether a target module is present.
         bool dispatchedController = ctrl.isOutOfProcess();
 
         ModuleOp ctrlMod;
         if (dispatchedController) {
-            for (auto m : mod.getOps<ModuleOp>()) {
-                if (m->getAttrOfType<StringAttr>(kRoleAttr) == kControllerRole) {
-                    ctrlMod = m;
-                    break;
-                }
-            }
+            ctrlMod = findRoleModule(mod, kControllerRole);
             if (!ctrlMod) {
                 mod.emitError() << "remote controller has no module tagged " << kRoleAttr << " = \""
                                 << kControllerRole << "\"";
                 return signalPassFailure();
             }
+        }
+
+        // Skip session emission for a controller with no coprocessors.
+        StringAttr ctrlPeer = ctrl.getPeer();
+        if (coprocs.empty() && (!ctrlPeer || ctrlPeer.getValue().empty())) {
+            if (dispatchedController) {
+                setTargetFromNode(ctrlMod, ctrl);
+            }
+            return;
         }
 
         SessionEmitter(mod, backline.getTransport(), ctrl, dispatchedController, ctrlMod)

@@ -678,10 +678,36 @@ class TestBackendResolution:
 
     def test_default_cpu_hardware_selects_backend(self, fake_lib_dir):
         """Omitting hardware selects the CPU backend."""
-        fake_lib_dir("rdma/cpu_verbs/libcatalyst_transport_cpu_verbs_controller.so")
+        fake_lib_dir(
+            "rdma/cpu_verbs/libcatalyst_transport_cpu_verbs_controller.so",
+            "rdma/cpu_verbs/libcatalyst_transport_cpu_verbs_coprocessor.so",
+        )
         ctrl = qp.Controller(device=qp.device("null.qubit", wires=2), name="ctrl")
-        d = serialize_backline(qp.Backline(controller=ctrl, transport="rdma").placement)
+        cop = qp.Coprocessor(
+            name="cop0", endpoint=qp.Endpoint("127.0.0.1", 18590), coprocessor_fn="coproc_fn"
+        )
+        d = serialize_backline(
+            qp.Backline(controller=ctrl, coprocessors=[cop], transport="rdma").placement
+        )
         assert d["controller"]["backend_lib"].endswith("_cpu_verbs_controller.so")
+
+    def test_a_placement_without_coprocessors(self, fake_lib_dir):
+        """A lone controller opens no transport session, so it needs no transport backend."""
+        fake_lib_dir()  # nothing built
+        ctrl = qp.Controller(device=qp.device("null.qubit", wires=2), name="ctrl", hardware="cpu")
+        d = serialize_backline(qp.Backline(controller=ctrl, transport="rdma").placement)
+        assert "backend_lib" not in d["controller"]
+
+    def test_an_explicit_backend_lib_without_coprocessors(self):
+        """An explicit backend library survives even when nothing would load it."""
+        ctrl = qp.Controller(
+            device=qp.device("null.qubit", wires=2),
+            name="ctrl",
+            hardware="cpu",
+            init_args={"backend_lib": "chosen.so"},
+        )
+        d = serialize_backline(qp.Backline(controller=ctrl, transport="rdma").placement)
+        assert d["controller"]["backend_lib"] == "chosen.so"
 
 
 @pytest.fixture
