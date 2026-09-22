@@ -18,6 +18,7 @@
 #include <sstream>
 #include <string>
 #include <tuple>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -200,8 +201,41 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         ModuleOp module = getOperation();
 
         qref::DecomposeLoweringPassOptions dlOptions;
-        for (auto &[op, chosenRule] : solution) {
-            dlOptions.targetRulesOption.push_back(chosenRule.ruleName);
+        // Collect only the rules on the chosen decomp tree, reachable from the circuit
+        // root operators by following each op's chosen rule inputs.
+        //
+        // Note `solution` is the solver's map to target gateset, so it also holds ops explored
+        // while costing rejected candidate rules (their inputs are solved to compute costs).
+        // Feeding every one of those rules to the greedy decompose-lowering rewriter would
+        // let stray rules fire on ops the chosen plan never routes through,
+        // emitting gates beyond the planned resource counts.
+        //
+        // Basis rule names are collected too. `decompose-lowering` treats an empty
+        // target-rules list as "apply every rule", so a circuit already in the target gateset
+        // must still produce a non-empty list, or its terminals would be
+        // decomposed by whatever rules happen to be loaded.
+        {
+            std::unordered_set<OperatorNode, OperatorNodeHash> visited;
+            llvm::StringSet<> seenRules;
+            std::vector<OperatorNode> worklist = setOfOps;
+            while (!worklist.empty()) {
+                OperatorNode op = worklist.back();
+                worklist.pop_back();
+                if (!visited.insert(op).second) {
+                    continue;
+                }
+                auto it = solution.find(op);
+                if (it == solution.end()) {
+                    continue;
+                }
+                const ChosenDecompRule &chosenRule = it->second;
+                if (seenRules.insert(chosenRule.ruleName).second) {
+                    dlOptions.targetRulesOption.push_back(chosenRule.ruleName);
+                }
+                for (const RuleTerm &input : chosenRule.inputs) {
+                    worklist.push_back(input.op);
+                }
+            }
         }
 
         // Convert reference-semantics python decompositions to value semantics.
