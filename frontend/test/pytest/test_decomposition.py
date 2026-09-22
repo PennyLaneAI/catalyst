@@ -2021,24 +2021,20 @@ class TestNumericHamiltonianDecomposition:
         """Test that nested ``qp.ctrl`` and ``qp.adjoint`` on a ``TrotterCDF`` decomposes."""
         hamiltonian = self._cdf_hamiltonian()
         gate_set = {
-            "BasisRotation",
-            "RZ",
-            "IsingZZ",
-            "GlobalPhase",
-            "CRZ",
-            "CNOT",
-            "PhaseShift",
-            "RX",
-            "PauliX",
+            "C(Adjoint(BasisRotation))",
             "C(CNOT)",
+            "CRZ",
+            "GlobalPhase",
+            "PauliX",
+            "PhaseShift",
         }
         expected = {
             "C(Adjoint(BasisRotation))": 62,
             "C(CNOT)": 240,
             "CRZ": 160,
-            "GlobalPhase": 1,
+            "GlobalPhase": 40,
             "PauliX": 320,
-            "PhaseShift": 1,
+            "PhaseShift": 40,
         }
 
         @qjit(capture=True, target="mlir")
