@@ -17,6 +17,7 @@
 # pylint: disable=protected-access,bare-except
 
 import itertools
+import re
 import warnings
 from collections import deque
 
@@ -32,7 +33,7 @@ from pennylane.wires import Wires
 from catalyst.compiler import _quantum_opt
 from catalyst.decomposition.graph_op_id import GraphOpID
 from catalyst.decomposition.rule_lowering_warning import RuleLoweringWarning
-from catalyst.decomposition.type_utils import get_dummy_values_for_arg
+from catalyst.decomposition.type_utils import get_dummy_values_for_dynamic_shape
 from catalyst.jax_extras.lowering import get_mlir_attribute_from_pyval
 from catalyst.utils.exceptions import CompileError
 
@@ -50,6 +51,25 @@ _NON_INVERTIBLE_RESOURCE_TYPES = (qp.ops.MidMeasure, qp.ops.PauliMeasure)
 def _resources_have_measurement(gate_counts) -> bool:
     """Return whether a rule's declared resources contain a mid-circuit measurement."""
     return any(isinstance(op, _NON_INVERTIBLE_RESOURCE_TYPES) for op in gate_counts)
+
+
+def _adjoint_folds_to_base(resource_ids, op_name) -> bool:
+    """Whether an ``Adjoint(op)`` rule's resources are a single unmodified copy of the base op.
+
+    This holds for ``adjoint_rotation`` and ``self_adjoint`` to simplify the rule registry
+    and avoid the solver having to match a rule that produces a modified gate back to the base op.
+
+    Args:
+        resource_ids (dict): the rule's resources as ``{resource graphOpId: count}``
+        op_name (str): the base operator's name
+
+    Returns:
+        bool: whether the rule folds ``Adjoint(op)`` to a single unmodified ``op``
+    """
+    if len(resource_ids) != 1:
+        return False
+    ((rid, count),) = resource_ids.items()
+    return count == 1 and rid.split("{", 1)[0] == op_name
 
 
 def build_base_op(op_cls, kwargs, is_custom_op):
@@ -299,11 +319,10 @@ def _leading_modifier_kind(op_id: str) -> str | None:
     """Return the canonical kind of ``op_id``'s current outermost modifier, or None if bare."""
     if op_id.startswith("Adjoint("):
         return "Adjoint"
-    i = 0
-    while i < len(op_id) and op_id[i].isdigit():
-        i += 1
-    if op_id[i:].startswith("C("):
+
+    if re.match(r"\d*C\(", op_id):
         return "C"
+
     return None
 
 
@@ -636,7 +655,7 @@ def prepare_dynamic_op_kwargs(dynamic_shape, wire_lens) -> dict:
     for wire_name, wire_len in wire_lens.items():
         kwargs[wire_name] = jnp.array([next(wire_counter) for _ in range(wire_len)], dtype=int)
     for arg_name, arg_shape in dynamic_shape.items():
-        kwargs[arg_name] = get_dummy_values_for_arg(arg_shape)
+        kwargs[arg_name] = get_dummy_values_for_dynamic_shape(arg_shape)
     return kwargs
 
 
@@ -942,7 +961,6 @@ def collect_symbolic_resources(op_cls, op_name, kwargs, is_custom_op, *, kind, c
                 f"Failed to get resources for the {rule.name} decomposition rule: {e}",
                 category=RuleLoweringWarning,
             )
-
     return applicable_rules, probe_args, name_to_resources, name_to_resource_ids
 
 
@@ -1019,13 +1037,25 @@ def compile_registered_symbolic_rules(
     if not rules:
         return None
 
-    # Controlling an adjoint rule's body means every op it produces gains the control modifier.
-    if wrap_control:
-        ctrl_mod = _control_modifier(n_ctrl)
-        name_to_resource_ids = {
-            rule_name: {wrap_modifier_id(rid, ctrl_mod): count for rid, count in ids.items()}
-            for rule_name, ids in name_to_resource_ids.items()
-        }
+    # Rewrite the ids for an adjoint target:
+    #  - adjoint_rotation/self_adjoint folds Adjoint(X) to X, so declare X in its source spelling.
+    #       This matches the op the rule body emits at apply time (f64), not the tensor<1xf64> the
+    #       abstract-probe resource carries, so the solver does not key a rule on an unproduced
+    #       spelling.
+    #  - Under ctrl, every other produced op additionally gains the control modifier.
+    if kind == "adjoint":
+        ctrl_mod = _control_modifier(n_ctrl) if wrap_control else None
+        rewritten = {}
+        for rule_name, ids in name_to_resource_ids.items():
+            if _adjoint_folds_to_base(ids, op_name):
+                rewritten[rule_name] = {target_id.replace(f"Adjoint({op_name})", op_name, 1): 1}
+            elif wrap_control:
+                rewritten[rule_name] = {
+                    wrap_modifier_id(rid, ctrl_mod): count for rid, count in ids.items()
+                }
+            else:
+                rewritten[rule_name] = ids
+        name_to_resource_ids = rewritten
 
     call_args, call_kwargs = split_call_args(kwargs, is_custom_op)
     kwarg_names = ordered_kwarg_names(call_kwargs, dynamic_shape)
@@ -1064,6 +1094,17 @@ def compile_registered_symbolic_rules(
     subroutines = []
     for rule in rules:
         if rule.name not in name_to_resource_ids:
+            continue
+
+        # A rule whose body is not region-wrapped (plain adjoint/control) may legitimately
+        # contain a measurement and will be kept. Otherwise, the rule is skipped because
+        # the compiler cannot place a mid-circuit measurement in a control or adjoint region.
+        if wrap_control and _resources_have_measurement(name_to_resources[rule.name]):
+            warnings.warn(
+                f"Skipped the {rule.name} decomposition rule for {target_id}: it contains a "
+                "mid-circuit measurement, which cannot be placed in a control region.",
+                category=RuleLoweringWarning,
+            )
             continue
         subroutines.append(rule_to_subroutine(rule))
 
@@ -1529,14 +1570,15 @@ def fetch_all_reachable_decomposition_rules_from_op(
         this_kwargs = prepare_dynamic_op_kwargs(this_dynamic_shape, this_wire_lens)
         all_kwargs = this_kwargs | this_static_data | this_extra_data
 
-        # Explore the ops reachable through the rules of this op and of its adjoint. Keyed by
-        # (explored op, rule name): the same rule name may be registered against both.
+        # Explore the ops reachable through the rules of this op, its adjoint, and its controls.
+        # Keyed by (explored op, rule name): the same rule name may be registered against all these.
         resources = {
             (this_name, name): res
             for name, res in collect_resources_for_op(this_name, all_kwargs, this_is_custom_op)[
                 0
             ].items()
         }
+
         if (
             not this_name.startswith("Adjoint(")
             and (this_op_cls := op_classes.get(this_name)) is not None
@@ -1548,6 +1590,29 @@ def fetch_all_reachable_decomposition_rules_from_op(
                 )[2].items()
             }
 
+        if (
+            not bool(re.match(r"\d*C\(", this_name))
+            and (this_op_cls := op_classes.get(this_name)) is not None
+            # special: MultiControlledX has a rule _ctrl_mcx_to_mcx that decomposes a
+            # C(MultiControlledX) onto a one-wire bigger MultiControlledX
+            # Do no synthesize controlled rules for C(MultiControlledX), otherwise would
+            # infinitely recurse
+            and this_name != "MultiControlledX"
+        ):
+            num_base_wires = sum(this_wire_lens.values())
+            for n in ctrl_counts:
+                ctrl_resources = collect_symbolic_resources(
+                    this_op_cls,
+                    this_name,
+                    all_kwargs,
+                    this_is_custom_op,
+                    kind="control",
+                    ctrl_wires=range(num_base_wires, num_base_wires + n),
+                )
+                resources |= {
+                    (f"{_control_modifier(n)}({this_name})", name): res
+                    for name, res in ctrl_resources[2].items()
+                }
         for (_, _rule_name), resource in resources.items():
             try:
                 for op, _count in resource.items():
