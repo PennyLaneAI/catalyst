@@ -35,6 +35,16 @@ from catalyst.jax_extras.lowering import get_mlir_attribute_from_pyval, mlir_bui
 _SPECIAL_LOWERINGS = {}
 
 
+def _is_wires(item) -> bool:
+    """Return whether a pytree leaf is a group of wires."""
+    return isinstance(item, (qp.typing.AbstractWires, qp.wires.Wires))
+
+
+def _is_op_or_wires(item) -> bool:
+    """Return whether a pytree leaf is a nested operator or a group of wires."""
+    return isinstance(item, qp.core.Operator2) or _is_wires(item)
+
+
 def format_static_data_dict_for_id(static_data):
     """Format the static-data group of a GraphOpID with MLIR's attribute printer."""
     with mlir_build_context():
@@ -178,10 +188,20 @@ class GraphOpID:
                 for argname, argtype in sorted(self.op.dynamic_args.items())
             }
         else:
-            return {
+            dynamic_shape = {
                 argname: [convert_item_to_mlir_type(argtype)]
                 for argname, argtype in sorted(self.op.dynamic_args.items())
             }
+            # Collect additional dynamic params from hybrid args (have to match _process_params).
+            for argname, value in sorted(self.op.hybrid_args.items()):
+                if argname in self.op.wire_argnames:  # do not include wires
+                    continue
+                # skip operators
+                leaves, _ = flatten(value, is_leaf=_is_op_or_wires)
+                params = [leaf for leaf in leaves if not _is_op_or_wires(leaf)]
+                if params:
+                    dynamic_shape[argname] = [convert_item_to_mlir_type(param) for param in params]
+            return dynamic_shape
 
     def parse_wire_lens(self) -> dict[str, int]:
         """Return a dictionary of wire arg names to lengths."""
@@ -189,6 +209,13 @@ class GraphOpID:
         for wire_name, wire_arg in sorted(self.op.wire_args.items()):
             if wire_name not in self.op.hybrid_argnames:
                 wire_lens[wire_name] = len(wire_arg)
+        # match hybrid arg wires collection from _process_qubits (have to match generated IR op)
+        for argname, value in sorted(self.op.hybrid_args.items()):
+            # Descend through nested operators: their wires are qubit operands of this operator.
+            leaves, _ = flatten(value, is_leaf=_is_wires)
+            count = sum(len(leaf) for leaf in leaves if _is_wires(leaf))
+            if count:
+                wire_lens[argname] = count
         return wire_lens
 
     def parse_static_data(self) -> dict[str, Any]:
@@ -204,6 +231,11 @@ class GraphOpID:
             hybrid_lens = []
             hybrid_trees = []
             hybrid_args = []
+            filtered_wire_lens = tuple(
+                length
+                for name, length in self.wire_lens.items()
+                if name not in self.op.hybrid_argnames
+            )
             for _, hybrid_argval in self.op.hybrid_args.items():
                 leaves, tree = flatten(replace_wires_with_placeholder_wires(hybrid_argval))
                 leaves = post_process_concretize_leaves(leaves)
@@ -212,13 +244,11 @@ class GraphOpID:
                 hybrid_args.extend(leaves)
             uid = generate_uid(
                 *tuple(self.op.dynamic_args.values()),  # dynamic args
-                *(None,)
-                * sum(
-                    self.wire_lens.values()
-                ),  # non hybrid wires, unused during uid generation, so just give empty values
+                *(None,) * sum(filtered_wire_lens),
+                # non hybrid wires, unused during uid generation, so just give empty values
                 *hybrid_args,
                 op_cls=type(self.op),
-                wire_lens=tuple(self.wire_lens.values()),
+                wire_lens=filtered_wire_lens,
                 hybrid_lens=tuple(hybrid_lens),
                 hybrid_trees=tuple(hybrid_trees),
                 static_args=self.op.static_args,

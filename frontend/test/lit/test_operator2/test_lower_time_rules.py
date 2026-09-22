@@ -420,7 +420,7 @@ def test_to_multiple_full_args_op():
 # CHECK: qref.operator "NoParams"
 # CHECK: func.func private @"__builtin_rule_NoParams{}{reg:3}{}"
 # CHECK-SAME:   resources = {operations = {
-# CHECK-SAME:   "MultipleFullArgs{angles1:[tensor<f64>],angles2:[tensor<2xf64>]}{reg1:1,reg2:2}{}[[[uid:[0-9]+]]]" = 2 : i64
+# CHECK-SAME:   "MultipleFullArgs{angles1:[tensor<f64>],angles2:[tensor<2xf64>]}{hwires1:2,hwires2:1,op1:1,op2:1,reg1:1,reg2:2}{}[[[uid:[0-9]+]]]" = 2 : i64
 # CHECK-SAME:   target_gate = "NoParams{}{reg:3}{}"
 # CHECK: qref.operator "MultipleFullArgs"
 # CHECK-NEXT:  UID([[uid]]

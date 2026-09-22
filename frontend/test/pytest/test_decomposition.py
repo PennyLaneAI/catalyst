@@ -310,11 +310,12 @@ class TestGenericUtilities:
             (StaticData("mylabel", Wires([0, 1])), "StaticData{}{reg:2}{}["),
             (
                 HybridWires(Wires([0, 1, 2])),
-                "HybridWires{}{}{}[",
+                "HybridWires{}{cwires:3}{}[",
             ),  # NOTE: open brace to match uid
             (
                 HybridOpArg(Float, StaticData("innerop", Wires(0)), Wires([2, 3]), 12),
-                "HybridOpArg{angle:[tensor<f64>]}{cwires:2}{}[",  # NOTE: open brace to match uid
+                "HybridOpArg{angle:[tensor<f64>]}{cwires:2,op:1}{}[",
+                # NOTE: open brace to match uid
             ),
             (
                 qp.Rot(Bool, Int, Float, Wires(0)),
