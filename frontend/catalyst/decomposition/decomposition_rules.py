@@ -482,6 +482,26 @@ def get_rules_from_module(module: ir.Module) -> str:
     return "\n".join(str(funcOp) for funcOp in funcOps) if funcOps else ""
 
 
+def _op_explored(module: ir.Module, op_id: str) -> bool:
+    """Return whether the operator is already explored."""
+    with ir.InsertionPoint(module.body):
+        op_explored = False
+
+        def find_condition(op):
+            nonlocal op_explored
+            if op.name == "func.func":
+                if "target_gate" in op.attributes:
+                    target_gate = op.attributes["target_gate"]
+                    if target_gate == op_id:
+                        op_explored = True
+                        return ir.WalkResult.INTERRUPT
+                    return ir.WalkResult.SKIP
+            return ir.WalkResult.ADVANCE
+
+        module.operation.walk(find_condition)
+        return op_explored
+
+
 def inject_new_rules_into_module(module: ir.Module, decomp_rules: list[str]):
     """Add decomposition rules to a module, skipping the ones it already holds.
 
@@ -494,29 +514,7 @@ def inject_new_rules_into_module(module: ir.Module, decomp_rules: list[str]):
     with ir.InsertionPoint(module.body):
         for decomp_rule in decomp_rules:
             decomp_rule_op = ir.Operation.parse(decomp_rule)
-            rule_already_exists = False
-
-            def find_condition(op):
-                nonlocal rule_already_exists
-                if op.name == "func.func":
-                    if "target_gate" in op.attributes:
-                        target_gate = op.attributes["target_gate"]
-                        resources = op.attributes["resources"]
-
-                        current_rule_target_gate = decomp_rule_op.attributes["target_gate"]
-                        current_rule_resources = decomp_rule_op.attributes["resources"]
-                        if (
-                            target_gate == current_rule_target_gate
-                            and resources == current_rule_resources
-                        ):
-                            rule_already_exists = True
-                            return ir.WalkResult.INTERRUPT
-                        return ir.WalkResult.SKIP
-                return ir.WalkResult.ADVANCE
-
-            module.operation.walk(find_condition)
-            if not rule_already_exists:
-                decomp_rule_op.clone()
+            decomp_rule_op.clone()
 
 
 def split_call_args(kwargs, is_custom_op):
@@ -1465,6 +1463,7 @@ def fetch_all_reachable_decomposition_rules_from_op(
     is_custom_op=False,
     n_ctrls=0,
     op_cls=None,
+    module=None,
 ):
     """Return every decomposition rule reachable from an operator, as MLIR strings.
 
@@ -1487,6 +1486,9 @@ def fetch_all_reachable_decomposition_rules_from_op(
     Returns:
         list[str]: the rules, as MLIR strings
     """
+    if module is not None and _op_explored(module, op_id):
+        return []
+
     extra_data = extra_data or {}
     queue = deque()
     start = (op_name, dynamic_shape, wire_lens, static_data, extra_data, is_custom_op)
