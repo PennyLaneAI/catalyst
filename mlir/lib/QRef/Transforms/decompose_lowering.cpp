@@ -129,9 +129,13 @@ struct DecomposeLoweringPass : impl::DecomposeLoweringPassBase<DecomposeLowering
     void runOnOperation() final {
         ModuleOp module = cast<ModuleOp>(getOperation());
 
-        OpPassManager pm_to_ref("builtin.module");
-        pm_to_ref.addPass(createReferenceSemanticsConversionPass());
-        if (failed(runPipeline(pm_to_ref, module))) {
+        // 1. The core DL pattern is on qref
+        // 2. DL expects no adj and ctrl regions
+        // Hence the preprocessing passes
+        OpPassManager pm_preprocess("builtin.module");
+        pm_preprocess.addPass(createModifiersLoweringPass());
+        pm_preprocess.addPass(createReferenceSemanticsConversionPass());
+        if (failed(runPipeline(pm_preprocess, module))) {
             return signalPassFailure();
         }
 

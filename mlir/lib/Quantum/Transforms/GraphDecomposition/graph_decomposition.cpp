@@ -154,6 +154,13 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
             llvm::dbgs() << "\n";
         });
 
+        // Strip away adjoint and control regions to match the graph, where modifiers are on
+        // the individual ops
+        // Note that both adj lowering and ctrl lowering are still in value semantics now
+        if (failed(runModifiersLowering(getOperation()))) {
+            return signalPassFailure();
+        }
+
         ///////////////////////////
         // Step 1: Gather inputs for graph
         std::vector<OperatorNode> setOfOps;
@@ -271,13 +278,6 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
             }
         }
 
-        // Strip away adjoint and control regions to match the graph, where modifiers are on
-        // the individual ops
-        // Note that both adj lowering and ctrl lowering are still in value semantics now
-        if (failed(runModifiersLowering(module))) {
-            return signalPassFailure();
-        }
-
         auto countOps = [](ModuleOp m) {
             size_t count = 0;
             m->walk([&](mlir::Operation *) { count++; });
@@ -298,10 +298,6 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
                 if (failed(runPipeline(decomposePm, module))) {
                     return signalPassFailure();
                 }
-            }
-
-            if (failed(runModifiersLowering(module))) {
-                return signalPassFailure();
             }
 
             size_t currentOpCount = countOps(module);
