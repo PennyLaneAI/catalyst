@@ -30,6 +30,7 @@
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/DebugLog.h"
+#include "llvm/Support/LogicalResult.h"
 #include "llvm/Support/raw_ostream.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
@@ -106,6 +107,28 @@ namespace quantum {
 
 struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDecompositionPass> {
     using GraphDecompositionPassBase::GraphDecompositionPassBase;
+
+    LogicalResult runModifiersLowering(Operation *module) {
+        // Distribute any `quantum.ctrl`/`quantum.adjoint` regions the rules emitted, lazily.
+        // `modifiers-lowering` reduces both (including nested `ctrl(adjoint(...))`) to a
+        // fixpoint in one greedy pass.
+        bool hasModifierRegion = module
+                                     ->walk([&](mlir::Operation *op) {
+                                         return (isa<CtrlOp, AdjointOp>(op))
+                                                    ? mlir::WalkResult::interrupt()
+                                                    : mlir::WalkResult::advance();
+                                     })
+                                     .wasInterrupted();
+        if (hasModifierRegion) {
+            OpPassManager modifierPm("builtin.module");
+            modifierPm.addPass(createModifiersLoweringPass());
+            if (failed(runPipeline(modifierPm, module))) {
+                return failure();
+            }
+        }
+        return success();
+    }
+
     void runOnOperation() final {
         ScopedDiagnosticTimer totalTimer("decomp:total");
 
@@ -248,6 +271,13 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
             }
         }
 
+        // Strip away adjoint and control regions to match the graph, where modifiers are on
+        // the individual ops
+        // Note that both adj lowering and ctrl lowering are still in value semantics now
+        if (failed(runModifiersLowering(module))) {
+            return signalPassFailure();
+        }
+
         auto countOps = [](ModuleOp m) {
             size_t count = 0;
             m->walk([&](mlir::Operation *) { count++; });
@@ -270,22 +300,8 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
                 }
             }
 
-            // Distribute any `quantum.ctrl`/`quantum.adjoint` regions the rules emitted, lazily.
-            // `modifiers-lowering` reduces both (including nested `ctrl(adjoint(...))`) to a
-            // fixpoint in one greedy pass.
-            bool hasModifierRegion = module
-                                         ->walk([&](mlir::Operation *op) {
-                                             return (isa<CtrlOp, AdjointOp>(op))
-                                                        ? mlir::WalkResult::interrupt()
-                                                        : mlir::WalkResult::advance();
-                                         })
-                                         .wasInterrupted();
-            if (hasModifierRegion) {
-                OpPassManager modifierPm("builtin.module");
-                modifierPm.addPass(createModifiersLoweringPass());
-                if (failed(runPipeline(modifierPm, module))) {
-                    return signalPassFailure();
-                }
+            if (failed(runModifiersLowering(module))) {
+                return signalPassFailure();
             }
 
             size_t currentOpCount = countOps(module);

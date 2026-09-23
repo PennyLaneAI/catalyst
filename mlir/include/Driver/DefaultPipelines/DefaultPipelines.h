@@ -41,13 +41,6 @@ const PipelineList pipelineList{
       // tapes will generate multiple qnodes. One for each tape.
       // Split multiple tapes enforces that invariant.
       "split-multiple-tapes",
-      // Reduce quantum.ctrl/quantum.adjoint regions to op-level modifiers before the
-      // transform sequence runs. modifiers in the user program are captured as regions
-      // and graph-decomposition (run inside apply-transform-sequence) builds its graph
-      // from op-level modifiers only, so these regions must be reduced first.
-      // modifiers-lowering resolves arbitrarily nested ctrl/adjoint regions to a fixpoint
-      // in one greedy pass.
-      "modifiers-lowering",
       // Run the transform sequence defined in the MLIR module
       "builtin.module(apply-transform-sequence)",
       // Nested modules are something that will be used in the future
