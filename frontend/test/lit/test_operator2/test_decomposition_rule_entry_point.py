@@ -433,10 +433,13 @@ def test_to_hybrid_wires():
 # CHECK-DAG:   target_gate = "NoParams{}{reg:3}{}"
 # CHECK: "qref.operator"
 # CHECK-SAME: UID = [[uid_2]]
+# CHECK-SAME: qubit_map = {cwires = array<i64: 0>}
 # CHECK: "qref.operator"
 # CHECK-SAME: UID = [[uid_2]]
+# CHECK-SAME: qubit_map = {cwires = array<i64: 0>}
 # CHECK: "qref.operator"
 # CHECK-SAME: UID = [[uid_1]]
+# CHECK-SAME: qubit_map = {cwires = array<i64: 0, 1, 2>}
 test_to_hybrid_wires()
 
 
@@ -532,10 +535,13 @@ def test_to_hybrid_op():
 # CHECK-DAG:   target_gate = "NoParams{}{reg:3}{}"
 # CHECK: "qref.operator"
 # CHECK-SAME: UID = [[uid_2]]
+# CHECK-SAME: qubit_map = {cwires = array<i64: 0>, op = array<i64: 1, 2, 3>}
 # CHECK: "qref.operator"
 # CHECK-SAME: UID = [[uid_2]]
+# CHECK-SAME: qubit_map = {cwires = array<i64: 0>, op = array<i64: 1, 2, 3>}
 # CHECK: "qref.operator"
 # CHECK-SAME: UID = [[uid_1]]
+# CHECK-SAME: qubit_map = {cwires = array<i64: 0>, op = array<i64: 1, 2, 3>}
 test_to_hybrid_op()
 
 
@@ -625,6 +631,7 @@ def test_to_hybrid_op_nested():
 # CHECK-SAME:   target_gate = "NoParams{}{reg:3}{}"
 # CHECK: "qref.operator"
 # CHECK-SAME: UID = [[uid]]
+# CHECK-SAME: qubit_map = {cwires = array<i64: 0>, op = array<i64: 1, 2, 3, 4, 5, 6>}
 test_to_hybrid_op_nested()
 
 
@@ -671,6 +678,7 @@ def test_from_hybrid_op_nested():
 # CHECK-SAME:   target_gate = "HybridOpArg{angle:[tensor<f64>]}{cwires:1}{}[7654]"
 # CHECK: "qref.operator"
 # CHECK-SAME:   UID = [[uid_outer]] : i64, op_name = "HybridOpArg"
+# CHECK-SAME:   qubit_map = {cwires = array<i64: 0>, op = array<i64: 1, 2, 3>}
 # CHECK: "qref.operator"
 # CHECK-SAME:   UID = [[uid_inner]] : i64, op_name = "StaticDataMultiReg"
 test_from_hybrid_op_nested()
@@ -737,8 +745,10 @@ def test_to_multiple_full_args_op():
 # CHECK-DAG:   target_gate = "NoParams{}{reg:3}{}"
 # CHECK: "qref.operator"
 # CHECK-SAME: UID = [[uid]]
+# CHECK-SAME: qubit_map = {hwires1 = array<i64: 5, 6>, hwires2 = array<i64: 7>, op1 = array<i64: 3>, op2 = array<i64: 4>, reg1 = array<i64: 0>, reg2 = array<i64: 1, 2>}
 # CHECK: "qref.operator"
 # CHECK-SAME: UID = [[uid]]
+# CHECK-SAME: qubit_map = {hwires1 = array<i64: 5, 6>, hwires2 = array<i64: 7>, op1 = array<i64: 3>, op2 = array<i64: 4>, reg1 = array<i64: 0>, reg2 = array<i64: 1, 2>}
 test_to_multiple_full_args_op()
 
 

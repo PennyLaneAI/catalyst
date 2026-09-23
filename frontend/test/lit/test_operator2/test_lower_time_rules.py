@@ -424,8 +424,10 @@ def test_to_multiple_full_args_op():
 # CHECK-SAME:   target_gate = "NoParams{}{reg:3}{}"
 # CHECK: qref.operator "MultipleFullArgs"
 # CHECK-NEXT:  UID([[uid]]
+# CHECK-NEXT:  param_map = {angles1 = [0], angles2 = [1]} qubit_map = {hwires1 = [5, 6], hwires2 = [7], op1 = [3], op2 = [4], reg1 = [0], reg2 = [1, 2]}
 # CHECK: qref.operator "MultipleFullArgs"
 # CHECK-NEXT:  UID([[uid]]
+# CHECK-NEXT:  param_map = {angles1 = [0], angles2 = [1]} qubit_map = {hwires1 = [5, 6], hwires2 = [7], op1 = [3], op2 = [4], reg1 = [0], reg2 = [1, 2]}
 test_to_multiple_full_args_op()
 
 
