@@ -783,3 +783,31 @@ def test_ctrl_rule_is_traversed():
 # CHECK-SAME:   target_gate = "CompilableData{}{wires:1}{a = \22a\22, b = \22b\22, thing = \22thing\22}"
 # CHECK: qref.operator "SingleParam"
 test_ctrl_rule_is_traversed()
+
+
+def test_rule_uniqueness():
+    """Test that unique rules with equivalent resources are still both lowered."""
+
+    @qp.register_resources({SingleParam(Float, Wire[1]): 1})
+    def one_rule(reg):
+        SingleParam(0.5, reg[0])
+
+    @qp.register_resources({SingleParam(Float, Wire[1]): 1})
+    def two_rule(reg):
+        SingleParam(0.5, reg[0])
+
+    with qp.decomposition.local_decomps():
+        qp.add_decomps(NoParams, one_rule, two_rule)
+
+        @qp.qjit(target="mlir", capture=True)
+        @qp.qnode(qp.device("null.qubit", wires=1))
+        def circuit():
+            NoParams(0)
+            return qp.probs()
+
+        print(circuit.mlir)
+
+
+# CHECK-LABEL: func.func private @"__builtin_one_rule
+# CHECK-LABEL: func.func private @"__builtin_two_rule
+test_rule_uniqueness()

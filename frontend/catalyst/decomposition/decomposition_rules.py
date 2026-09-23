@@ -508,6 +508,7 @@ def inject_new_rules_into_module(module: ir.Module, decomp_rules: list[str]):
                         if (
                             target_gate == current_rule_target_gate
                             and resources == current_rule_resources
+                            and op.attributes["sym_name"] == decomp_rule_op.attributes["sym_name"]
                         ):
                             rule_already_exists = True
                             return ir.WalkResult.INTERRUPT
