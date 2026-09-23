@@ -80,6 +80,28 @@ def CtrlLoweringPass : Pass<"ctrl-lowering"> {
     let dependentDialects = ["scf::SCFDialect"];
 }
 
+def ModifiersLoweringPass : Pass<"modifiers-lowering"> {
+    let summary = "Lower quantum.ctrl and quantum.adjoint regions to op-level modifiers.";
+
+    let description = [{
+        Runs the ctrl-lowering and adjoint-lowering rewrite patterns together under a single greedy
+        driver until a fixed point. This allows arbitrarily nested control and adjoint regions to be
+        resolved. Each pattern defers (returns a match failure) while its region still contains the
+        other modifier, so the greedy worklist naturally interleaves them: an inner adjoint region is
+        reduced, then the enclosing control lowers on a re-try, and vice versa. This reaches the same
+        fixed point as manually alternating the standalone ctrl-lowering and adjoint-lowering passes,
+        in a single pass and regardless of nesting depth or order.
+    }];
+
+    let dependentDialects = [
+        "catalyst::CatalystDialect",
+        "index::IndexDialect",
+        "tensor::TensorDialect",
+        "complex::ComplexDialect",
+        "scf::SCFDialect"
+    ];
+}
+
 def RemoveGlobalPhasesPass : Pass<"remove-global-phases"> {
     let summary = "Remove global phases by deleting phase operations without control wires.";
 }

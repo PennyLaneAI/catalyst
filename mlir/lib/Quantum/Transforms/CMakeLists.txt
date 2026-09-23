@@ -20,6 +20,7 @@ file(GLOB SRC
     GridsynthPatterns.cpp
     IonsDecompositionPatterns.cpp
     LoopBoundaryOptimizationPatterns.cpp
+    ModifiersLowering.cpp
     MergeRotationsPatterns.cpp
     QPDLoader.cpp
     SplitMultipleTapes.cpp

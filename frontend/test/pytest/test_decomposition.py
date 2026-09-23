@@ -1753,6 +1753,59 @@ class TestCustomRuleApplication:
         assert after.get("NoParams", 0) == 1
         assert after.get("MidCircuitMeasure", 0) == 1
 
+    def test_functional_adjoint_region_is_lowered(self):
+        """Test that a functional modifier ``qp.adjoint(op)(...)`` is captured as a ``quantum.adjoint``
+        region and lowered to an op-level modifier before graph-decomposition (which builds its graph
+        from op-level modifiers only). Uses dummy gates to keep the compile fast.
+        """
+
+        @register_resources({NoParams(Wire[1]): 1})
+        def adj_rule(base):
+            NoParams(base.wires[0])
+
+        with local_decomps():
+
+            add_decomps("Adjoint(NoParams)", adj_rule)
+
+            @qjit(capture=True, target="mlir")
+            @graph_decomposition(gate_set={NoParams: 1})
+            @qnode(qp.device("null.qubit", wires=1))
+            def circuit():
+                qp.adjoint(NoParams)(0)
+
+            resources = qp.specs(circuit, level="all-mlir")().resources
+
+        after = resources["graph-decomposition"].counts
+        assert "Adjoint(NoParams)" not in after
+        assert after.get("NoParams", 0) == 1
+
+    def test_functional_control_region_is_lowered(self):
+        """Test ``qp.ctrl(op, control=...)(...)`` is captured as a ``quantum.ctrl`` region
+        in a quantum program and then it is lowered to an op-level modifier before
+        graph-decomposition.
+        """
+
+        @register_resources(lambda base, **_: {NoParams(Wire[1]): 1})
+        def ctrl_rule(base, **_):
+            NoParams(base.wires[0])
+
+        with local_decomps():
+
+            add_decomps("C(NoParams)", ctrl_rule)
+
+            @qjit(capture=True, target="mlir")
+            @graph_decomposition(gate_set={NoParams: 1})
+            @qnode(qp.device("null.qubit", wires=2))
+            def circuit():
+                # Functional form: captured as a `quantum.ctrl` region, not an op-level modifier.
+                qp.ctrl(NoParams, control=[1])(0)
+
+            resources = qp.specs(circuit, level="all-mlir")().resources
+
+        after = resources["graph-decomposition"].counts
+        assert "C(NoParams)" not in after
+        assert after.get("NoParams", 0) == 1
+
 
 class TestNumericHamiltonianDecomposition:
     """Tests decomposing Trotter operators that carry a numeric Hamiltonian as a

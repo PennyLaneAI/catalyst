@@ -643,6 +643,12 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* `adjoint-lowering` no longer fails on gates whose parameter is a wide-integer tensor. Integer and
+  boolean gate parameters (e.g. a `QROM` `tensor<Nxi64>` bitstring) are now recorded in a dedicated
+  i64 cache buffer during adjoint reversal, zero-extended in and truncated out, instead of being
+  round-tripped through the f64 buffer.
+  [(#3265)](https://github.com/PennyLaneAI/catalyst/pull/3265)
+
 * Fixed a bug where an executor's SSH connection multiplexing was silently disabled on macOS,
   making every remote operation pay a fresh authentication handshake. The control socket went in
   the system temp dir, which macOS puts under a per-user `/var/folders/...` path long enough to
@@ -716,6 +722,16 @@
   [(#3242)](https://github.com/PennyLaneAI/catalyst/pull/3242)
 
 <h3>Internal changes ⚙️</h3>
+
+* A new `modifiers-lowering` pass reduces `quantum.ctrl` and `quantum.adjoint` regions to op-level
+  modifiers by running the `ctrl-lowering` and `adjoint-lowering` rewrite patterns together under a
+  single greedy driver. Each pattern defers (a match failure) while its region still holds the other
+  modifier, so the greedy worklist interleaves them and resolves arbitrarily nested modifiers (e.g.
+  `ctrl(adjoint(ctrl(...)))`) to a fixpoint in one pass. This replaces the manual alternation of the
+  two passes in the default pipeline (functional modifiers such as `qp.adjoint(op)(...)` and
+  `qp.ctrl(op, ...)` are now lowered before the transform sequence) and in the graph-decomposition
+  apply fixpoint.
+  [(#3257)](https://github.com/PennyLaneAI/catalyst/pull/3257)
 
 * Adds ability to lower `None` attributes to `get_mlir_attribute_from_pyval`.
   [(#3196)](https://github.com/PennyLaneAI/catalyst/pull/3196)

@@ -831,18 +831,17 @@ func.func @adjoint_real_matrix_param(%arg0: !quantum.reg) -> !quantum.reg {
 
 // CHECK-LABEL: @adjoint_integer_tensor_param
 func.func @adjoint_integer_tensor_param(%arg0: !quantum.reg) -> !quantum.reg {
-  // An integer/boolean tensor param (a MultiX bitstring) defined in nested control flow
-  // must be cached.
-  // CHECK: [[cache:%.+]] = catalyst.list_init : <f64>
+  // CHECK: catalyst.list_init : <f64>
+  // CHECK: [[cache:%.+]] = catalyst.list_init : <i64>
   // CHECK: scf.for
   // CHECK: [[e:%.+]] = tensor.extract {{%.+}}[{{%.+}}] : tensor<2xi1>
-  // CHECK: [[ef:%.+]] = arith.uitofp [[e]] : i1 to f64
-  // CHECK: catalyst.list_push [[ef]], [[cache]] : <f64>
-  // Reverse pass: pop the f64 elements, cast back to i1 and rebuild the bitstring.
+  // CHECK: [[ei:%.+]] = arith.extui [[e]] : i1 to i64
+  // CHECK: catalyst.list_push [[ei]], [[cache]] : <i64>
+  // Reverse pass: pop the i64 elements, truncate back to i1 and rebuild the bitstring.
   // CHECK: tensor.empty() : tensor<2xi1>
   // CHECK: scf.for {{.*}} iter_args
-  // CHECK: [[p:%.+]] = catalyst.list_pop [[cache]] : <f64>
-  // CHECK: [[pi:%.+]] = arith.fptoui [[p]] : f64 to i1
+  // CHECK: [[p:%.+]] = catalyst.list_pop [[cache]] : <i64>
+  // CHECK: [[pi:%.+]] = arith.trunci [[p]] : i64 to i1
   // CHECK: tensor.insert [[pi]] into {{%.+}}[{{%.+}}] : tensor<2xi1>
   // CHECK: quantum.operator "MultiX"({{%.+}}: tensor<2xi1>) adj
   %out = quantum.adjoint(%arg0) : !quantum.reg {
