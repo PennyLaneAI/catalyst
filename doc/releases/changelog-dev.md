@@ -233,6 +233,7 @@
     [(#3158)](https://github.com/PennyLaneAI/catalyst/pull/3158)
     [(#3206)](https://github.com/PennyLaneAI/catalyst/pull/3206)
     [(#3224)](https://github.com/PennyLaneAI/catalyst/pull/3224)
+    [(#3264)](https://github.com/PennyLaneAI/catalyst/pull/3264)
 
     1. The pass now supports applying a selection of the available decomposition rules via the `target_rules` parameter.
 
