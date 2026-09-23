@@ -901,18 +901,6 @@ class TestOnDemand:
         # ... and the rules that decompose it
         assert 'target_gate = "2C(S){}{wires:1}{}"' in module_str
 
-    def test_control_variant_warns_and_skips_on_failure(self, mocker):
-        """control_variant_rule_strings warns and skips a rule when it fails to compile."""
-
-        from catalyst.decomposition import decomposition_rules as dr
-
-        mocker.patch.object(dr, "compile_decomposition_rules", side_effect=ValueError("boom"))
-        with pytest.warns(RuleLoweringWarning, match="control rules"):
-            out = dr.control_variant_rule_strings(
-                "S", "S{}{wires:1}{}", [1], {}, {"wires": 1}, {}, is_custom_op=True
-            )
-        assert out == []
-
     def test_compile_rules_reports_missing_mlir_module(self, mocker):
         """A failed qjit compilation should not cause a secondary NoneType error."""
 

@@ -26,7 +26,7 @@ from operator2_dummy_gates import NoParams, SingleParam
 from pennylane.typing import Float, Wire
 
 from catalyst.decomposition.decomposition_rules import (
-    fetch_all_reachable_decomposition_rules_from_op,
+    materialize_reachable_rule_strings,
 )
 
 
@@ -61,7 +61,7 @@ def test_registered_self_adjoint_rule_targets_the_adjoint_op():
 
         print(
             "\n".join(
-                fetch_all_reachable_decomposition_rules_from_op(
+                materialize_reachable_rule_strings(
                     op_name="NoParams",
                     op_id="NoParams{}{reg:2}{}",
                     dynamic_shape={},
@@ -93,7 +93,7 @@ def test_registered_symbolic_rule_accepts_mcm():
 
         print(
             "\n".join(
-                fetch_all_reachable_decomposition_rules_from_op(
+                materialize_reachable_rule_strings(
                     op_name="NoParams",
                     op_id="NoParams{}{reg:1}{}",
                     dynamic_shape={},
@@ -131,7 +131,7 @@ def test_registered_control_rule_targets_the_controlled_op():
 
         print(
             "\n".join(
-                fetch_all_reachable_decomposition_rules_from_op(
+                materialize_reachable_rule_strings(
                     op_name="NoParams",
                     op_id="NoParams{}{reg:2}{}",
                     dynamic_shape={},
