@@ -1,0 +1,15 @@
+# BuildKit picks this up automatically as the ignore file for docker/Dockerfile.
+# Local build trees would bloat the context and, worse, overwrite the image's own.
+llvm-build
+stablehlo-build
+enzyme-build
+runtime-build
+quantum-build
+oqc-build
+**/build
+**/dist
+**/*.egg-info
+**/__pycache__
+# Includes the submodules' .git files, which point at ../../.git/modules and would make
+# the Makefiles' `git apply --check` fail, silently skipping the patches.
+**/.git
