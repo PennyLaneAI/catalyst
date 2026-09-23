@@ -30,6 +30,7 @@ from operator2_dummy_gates import (
     NoParamsCustomOp,
     SingleParam,
     StaticData,
+    TestQubitUnitary,
 )
 from pennylane import qnode
 from pennylane.core.operator import abstractify
@@ -2085,16 +2086,12 @@ class TestNumericHamiltonianDecomposition:
         """Test that nested ``qp.ctrl`` and ``qp.adjoint`` on a ``TrotterCDF`` decomposes."""
         hamiltonian = self._cdf_hamiltonian()
         gate_set = {
-            "BasisRotation",
-            "RZ",
-            "IsingZZ",
-            "GlobalPhase",
-            "CRZ",
-            "CNOT",
-            "PhaseShift",
-            "RX",
-            "PauliX",
+            "C(Adjoint(BasisRotation))",
             "C(CNOT)",
+            "CRZ",
+            "GlobalPhase",
+            "PauliX",
+            "PhaseShift",
         }
         expected = {
             "C(Adjoint(BasisRotation))": 62,
@@ -2141,6 +2138,58 @@ class TestNumericHamiltonianDecomposition:
             resources = qp.specs(circuit, level="all-mlir")().resources
             assert resources["Before MLIR Passes"].counts == {"C(Adjoint(TrotterCDF))": 1}
             assert resources["graph-decomposition"].counts == expected
+
+
+def test_custom_op_that_decomposes_to_basis_rotation():
+    """Test that the correct BasisRotation decomposition rules are both available and being used."""
+
+    def rule_resource_fn(matrix, wires):
+        spec = Complex if qp.math.get_dtype_name(matrix).startswith("complex") else Float
+        return {qp.BasisRotation(spec[2, 2], Wire[2]): 1}
+
+    @qp.register_resources(rule_resource_fn)
+    def rule(matrix, wires):
+        qp.BasisRotation(matrix, wires)
+
+    with qp.decomposition.local_decomps():
+        qp.add_decomps(TestQubitUnitary, rule)
+
+        gate_set = {"SingleExcitation", "PhaseShift"}
+
+        @qp.qjit(target="mlir", capture=True)
+        @graph_decomposition(gate_set=gate_set)
+        @qp.qnode(qp.device("null.qubit", wires=2))
+        def parent_circuit_complex():
+            complex_mat = jnp.array(
+                [
+                    [-0.77228482 + 0.0j, -0.02959195 + 0.63458685j],
+                    [0.63527644 + 0.0j, -0.03597397 + 0.77144651j],
+                ]
+            )
+            TestQubitUnitary(complex_mat, [0, 1])
+            return qp.probs()
+
+        resources = qp.specs(parent_circuit_complex, level="all-mlir")().resources
+        assert resources["Before MLIR Passes"].counts == {"TestQubitUnitary": 1}
+        assert resources["graph-decomposition"].counts == {
+            "PhaseShift": 3,
+            "SingleExcitation": 1,
+        }
+
+        @qp.qjit(target="mlir", capture=True)
+        @graph_decomposition(gate_set=gate_set)
+        @qp.qnode(qp.device("null.qubit", wires=2))
+        def parent_circuit_real():
+            real_mat = jnp.array([[0.76484219, 0.64421769], [0.64421769, -0.76484219]])
+            TestQubitUnitary(real_mat, [0, 1])
+            return qp.probs()
+
+        resources = qp.specs(parent_circuit_real, level="all-mlir")().resources
+        assert resources["Before MLIR Passes"].counts == {"TestQubitUnitary": 1}
+        assert resources["graph-decomposition"].counts == {
+            "PhaseShift": 1,
+            "SingleExcitation": 1,
+        }
 
 
 if __name__ == "__main__":
