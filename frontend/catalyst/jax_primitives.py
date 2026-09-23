@@ -356,6 +356,8 @@ quantum_kernel_p = core.CallPrimitive("quantum_kernel")
 quantum_kernel_p.multiple_results = True
 decomprule_p = core.Primitive("decomposition_rule")
 decomprule_p.multiple_results = True
+decomp_definition_p = core.Primitive("decomposition_rule_definition")
+decomp_definition_p.multiple_results = True
 
 
 def decomposition_rule(func=None, *, is_qreg=True, num_params=0, pauli_word=None, op_type=None):
@@ -643,17 +645,19 @@ def _func_lowering(ctx, *args, call_jaxpr, fn):
 #
 # Decomp rule
 #
-@decomprule_p.def_abstract_eval
-def _decomposition_rule_abstract(*, pyfun, func_jaxpr, is_qreg=False, num_params=None, **params):
+@decomprule_p.def_abstract_eval  # TODO: remove this primitive once DecompRuleInterpreter is gone
+def _decomposition_rule_abstract(*, pyfun, func_jaxpr, is_qreg, num_params):
     return ()
 
 
-def _decomposition_rule_lowering(ctx, *, pyfun, func_jaxpr, **params):
-    """Lower a quantum decomposition rule into MLIR in a single step process.
-    The step is the compilation of the definition of the function fn.
-    """
+@decomp_definition_p.def_abstract_eval
+def _decomposition_definition_abstract(*, pyfun, func_jaxpr):
+    return ()
 
-    lower_callable(ctx, pyfun, func_jaxpr, **params)
+
+def _decomposition_definition_lowering(ctx, *, pyfun, func_jaxpr):
+    """Lower a finalized Catalyst decomposition-rule as a function definition."""
+    lower_callable(ctx, pyfun, func_jaxpr)
     return ()
 
 
@@ -3185,7 +3189,7 @@ CUSTOM_LOWERING_RULES = (
     (cos_p, _cos_lowering2),
     (quantum_kernel_p, _quantum_kernel_lowering),
     (quantum_subroutine_prim, subroutine_lowering),
-    (decomprule_p, _decomposition_rule_lowering),
+    (decomp_definition_p, _decomposition_definition_lowering),
 )
 
 

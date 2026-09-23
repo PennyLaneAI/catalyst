@@ -14,9 +14,11 @@
 
 """Managed state for the decomposition rule discovery and capture mechanism."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from typing import Any
 
 import pennylane as qp
+from jax.extend.core import ClosedJaxpr
 from pennylane.core.operator import abstractify
 
 from catalyst.decomposition.graph_op_id import GraphOpID
@@ -90,3 +92,62 @@ class RuleRequest:
             is_custom_op=graph_op_id.is_custom_op,
             control_count=graph_op_id.num_controls + ambient_control_count,
         )
+
+
+@dataclass
+class RuleDef:
+    """Wrapper for traced decomposition rules and associated metadata.
+
+    Each rule is associated with an identifier to avoid compiling the same named alternative
+    more than once while preserving distinct alternatives with identical resource counts.
+
+    Attributes:
+        pyfun: Python callable retained for naming and lowering the function.
+        closed_jaxpr: Converted Catalyst JAXPR containing the rule body.
+        target_gate: Full GraphOpID of the operation decomposed by the rule.
+        resources: GraphOpID-to-multiplicity mapping produced by the rule.
+        frontend_name: PennyLane rule name used for fixed and alternative rule selection.
+    """
+
+    pyfun: Any
+    closed_jaxpr: ClosedJaxpr
+    target_gate: str
+    resources: dict[str, int]
+    frontend_name: str
+
+    @property
+    def identifier(self) -> tuple:
+        """Rule identifier for deduplication."""
+
+        return (
+            self.target_gate,
+            self.frontend_name,
+            tuple(sorted(self.resources.items())),
+        )
+
+
+@dataclass
+class DecompositionScope:
+    """A context to collect decomposition requests and the resulting traced definitions.
+
+    Attributes:
+        roots: Map of (base) GraphOpID to a request object, as well as observed control counts.
+        definitions: Map of rule identifiers to traced definitions, in first-seen order.
+    """
+
+    roots: dict[str, tuple[RuleRequest, set[int]]] = field(default_factory=dict)
+    definitions: dict[tuple, RuleDef] = field(default_factory=dict)
+
+    def record_root(self, request: RuleRequest) -> None:
+        """Record root nodes for later decomp rule capture, which are explored recursively."""
+
+        previous = self.roots.get(request.base_id)
+        if previous is None:
+            self.roots[request.base_id] = (request, {request.control_count})
+        else:
+            previous[1].add(request.control_count)
+
+    def record_definition(self, rule_def: RuleDef) -> None:
+        """Record a definition once, preserving first-seen order."""
+
+        self.definitions.setdefault(rule_def.identifier, rule_def)
