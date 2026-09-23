@@ -41,10 +41,12 @@ const PipelineList pipelineList{
       // tapes will generate multiple qnodes. One for each tape.
       // Split multiple tapes enforces that invariant.
       "split-multiple-tapes",
-      // lower-modifiers reduces arbitrarily nested ctrl/adjoint regions to a fixpoint in
-      // one greedy pass. No rule funcs exist yet, so unlike the post-transform lowering
-      // below there is no rule body whose adjoint/ctrl region could be mistaken for a
-      // user adjoint/ctrl.
+      // Reduce quantum.ctrl/quantum.adjoint regions to op-level modifiers before the
+      // transform sequence runs. modifiers in the user program are captured as regions
+      // and graph-decomposition (run inside apply-transform-sequence) builds its graph
+      // from op-level modifiers only, so these regions must be reduced first.
+      // lower-modifiers resolves arbitrarily nested ctrl/adjoint regions to a fixpoint
+      // in one greedy pass.
       "lower-modifiers",
       // Run the transform sequence defined in the MLIR module
       "builtin.module(apply-transform-sequence)",
@@ -60,8 +62,7 @@ const PipelineList pipelineList{
       "lower-mitigation",
       // Decomposition rules are only consumed by graph-decomposition (run inside
       // apply-transform-sequence). Any that survive here are dead; drop them before
-      // lower-modifiers so their quantum.adjoint/ctrl regions are not lowered as
-      // user adjoints/ctrls.
+      // lower-modifiers so we don't needlessly lower the ctrl/adjoint regions in their bodies.
       "symbol-dce",
       // Reduce any remaining quantum.ctrl/quantum.adjoint regions to op-level modifiers,
       // including nested regions (e.g. ctrl(adjoint(...))) and the quantum.adjoint/ctrl

@@ -1755,20 +1755,20 @@ class TestCustomRuleApplication:
 
     def test_functional_adjoint_region_is_lowered(self):
         """Test that a functional modifier ``qp.adjoint(op)(...)`` is captured as a ``quantum.adjoint``
-        region.
+        region and lowered to an op-level modifier before graph-decomposition (which builds its graph
+        from op-level modifiers only). Uses dummy gates to keep the compile fast.
         """
 
-        @qp.register_resources({NoParams(Wire[1]): 1, qp.ops.MidMeasure(Wire[1]): 1})
-        def rule_with_mcm(base):
-            m0 = qp.measure(base.wires[0])
-            qp.cond(m0, NoParams)(base.wires[0])
+        @register_resources({NoParams(Wire[1]): 1})
+        def adj_rule(base):
+            NoParams(base.wires[0])
 
         with local_decomps():
 
-            add_decomps("Adjoint(NoParams)", rule_with_mcm)
+            add_decomps("Adjoint(NoParams)", adj_rule)
 
             @qjit(capture=True, target="mlir")
-            @graph_decomposition(gate_set={NoParams: 1, qp.ops.MidMeasure: 1})
+            @graph_decomposition(gate_set={NoParams: 1})
             @qnode(qp.device("null.qubit", wires=1))
             def circuit():
                 qp.adjoint(NoParams)(0)
@@ -1778,7 +1778,6 @@ class TestCustomRuleApplication:
         after = resources["graph-decomposition"].counts
         assert "Adjoint(NoParams)" not in after
         assert after.get("NoParams", 0) == 1
-        assert after.get("MidCircuitMeasure", 0) == 1
 
     def test_functional_control_region_is_lowered(self):
         """Test ``qp.ctrl(op, control=...)(...)`` is captured as a ``quantum.ctrl`` region
@@ -1786,30 +1785,26 @@ class TestCustomRuleApplication:
         graph-decomposition.
         """
 
-        class CtrlOnly(qp.core.Operator2):
-            def __init__(self, wires):
-                super().__init__(wires=wires)
-
-        @register_resources(lambda base, control_wires, **_: {qp.PauliX: 1})
-        def ctrl_rule(base, control_wires, **_):
-            qp.PauliX(base.wires[0])
+        @register_resources(lambda base, **_: {NoParams(Wire[1]): 1})
+        def ctrl_rule(base, **_):
+            NoParams(base.wires[0])
 
         with local_decomps():
 
-            add_decomps("C(CtrlOnly)", ctrl_rule)
+            add_decomps("C(NoParams)", ctrl_rule)
 
             @qjit(capture=True, target="mlir")
-            @graph_decomposition(gate_set={qp.PauliX: 1})
+            @graph_decomposition(gate_set={NoParams: 1})
             @qnode(qp.device("null.qubit", wires=2))
             def circuit():
                 # Functional form: captured as a `quantum.ctrl` region, not an op-level modifier.
-                qp.ctrl(CtrlOnly, control=[1])(0)
+                qp.ctrl(NoParams, control=[1])(0)
 
             resources = qp.specs(circuit, level="all-mlir")().resources
 
         after = resources["graph-decomposition"].counts
-        assert "C(CtrlOnly)" not in after
-        assert after.get("PauliX", 0) == 1
+        assert "C(NoParams)" not in after
+        assert after.get("NoParams", 0) == 1
 
 
 class TestNumericHamiltonianDecomposition:
