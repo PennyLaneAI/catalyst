@@ -808,6 +808,6 @@ def test_rule_uniqueness():
         print(circuit.mlir)
 
 
-# CHECK-LABEL: func.func public @__builtin_one_rule
-# CHECK-LABEL: func.func public @__builtin_two_rule
+# CHECK-LABEL: func.func private @"__builtin_one_rule
+# CHECK-LABEL: func.func private @"__builtin_two_rule
 test_rule_uniqueness()
