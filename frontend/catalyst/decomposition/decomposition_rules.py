@@ -28,6 +28,7 @@ import pennylane as qp
 from jax._src.lib.mlir import ir
 from jax.tree_util import tree_flatten, tree_unflatten
 from pennylane.core.operator import Operator2, abstractify
+from pennylane.decomposition.utils import to_name
 from pennylane.wires import Wires
 
 from catalyst.compiler import _quantum_opt
@@ -115,7 +116,7 @@ def _adjoint_folds_to_base(resource_ids, op_name) -> bool:
 
     Args:
         resource_ids (dict): the rule's resources as ``{resource graphOpId: count}``
-        op_name (str): the base operator's name
+        op_name (str): the base operator's GraphOpID name
 
     Returns:
         bool: whether the rule folds ``Adjoint(op)`` to a single unmodified ``op``
@@ -601,7 +602,12 @@ def _rule_is_applicable(op_name, rule, *args, **kwargs) -> bool:
 
 
 def collect_resources_for_op(
-    op_name, kwargs, is_custom_op=False, adjoint_resources=False, num_controls=0
+    op_name,
+    kwargs,
+    is_custom_op=False,
+    adjoint_resources=False,
+    num_controls=0,
+    op_cls=None,
 ):
     """Return resource data for all decomposition rules associated to op_name.
 
@@ -611,13 +617,14 @@ def collect_resources_for_op(
         is_custom_op (bool): whether the operator lowers to ``qref.custom``
         adjoint_resources (bool): whether to spell each produced id in its adjoint form
         num_controls (int): how many controls to spell on each produced id
+        op_cls (type): operator class used for registry lookup, when available
 
     Returns:
         dict: rule name to the resources it produces
         dict: rule name to the graphOpId of each resource
         list: the rules that apply to the probed operator
     """
-    decomp_rules = list(qp.decomposition.list_decomps(op_name))
+    decomp_rules = list(qp.decomposition.list_decomps(op_cls or op_name))
     args, kwargs = split_call_args(kwargs, is_custom_op)
 
     # map each rule to its resources, in a more generic format
@@ -684,6 +691,7 @@ def build_decomp_target_spec(
     static_data,
     extra_data=None,
     is_custom_op=False,
+    op_cls=None,
     wrap_adjoint=False,
     wrap_control=False,
     n_ctrl=1,
@@ -706,13 +714,14 @@ def build_decomp_target_spec(
     order matching the compiler's ``wrapModifiers``).
 
     Args:
-        op_name (str): the operator's name, as PennyLane registers its rules
+        op_name (str): the operator's GraphOpID name and fallback registry name
         op_id (str): the operator's graphOpId
         dynamic_shape (dict): dynamic argument names to their MLIR types
         wire_lens (dict): wire argument names to their lengths
         static_data (dict): compiler-static argument names to their values
         extra_data (dict): argument values the graphOpId identifies by UID instead of spelling
         is_custom_op (bool): whether the operator lowers to ``qref.custom``
+        op_cls (type): operator class used for registry lookup, when available
         wrap_adjoint (bool): whether to distribute the base rules over adjoint
         wrap_control (bool): whether to distribute the base rules over control
         n_ctrl (int): the number of controls to distribute over
@@ -731,6 +740,7 @@ def build_decomp_target_spec(
         is_custom_op,
         adjoint_resources=wrap_adjoint,
         num_controls=n_ctrl if wrap_control else 0,
+        op_cls=op_cls,
     )
 
     # The *target* id is still derived by string-wrapping, because this is the one identity we are
@@ -982,7 +992,7 @@ def collect_symbolic_resources(op_cls, op_name, kwargs, is_custom_op, *, kind, c
 
     Args:
         op_cls (type): the base operator's class
-        op_name (str): the base operator's name
+        op_name (str): the base operator's GraphOpID name
         kwargs (dict): the arguments to build the base operator with
         is_custom_op (bool): whether the operator lowers to ``qref.custom``
         kind (str): ``"adjoint"`` or ``"control"``
@@ -994,7 +1004,7 @@ def collect_symbolic_resources(op_cls, op_name, kwargs, is_custom_op, *, kind, c
         dict: rule name to the resources it produces
         dict: rule name to the graphOpId of each resource
     """
-    lookup_name = symbolic_op_name(op_name, kind)
+    lookup_name = symbolic_op_name(to_name(op_cls), kind)
     rules = list(qp.decomposition.list_decomps(lookup_name))
     if not rules:
         return [], {}, {}, {}
@@ -1265,6 +1275,7 @@ def build_decomp_rule_variants(
         "static_data": request.static_data,
         "extra_data": request.extra_data,
         "is_custom_op": request.is_custom_op,
+        "op_cls": request.op_cls,
     }
     base_sets = []
     if include_base:

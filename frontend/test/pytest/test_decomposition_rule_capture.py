@@ -57,6 +57,21 @@ def test_repeated_gate_captures_one_variant_set(mocker):
     assert all(eqn.primitive is not decomprule_p for eqn in kernel_jaxpr.eqns)
 
 
+def test_registry_lookup_uses_operator_class():
+    """An Operator2 whose graph name is shared with an Operator1 uses its own registry rules."""
+
+    @qjit(capture=True, target="mlir")
+    @qp.qnode(qp.device("null.qubit", wires=2))
+    def circuit():
+        qp.prod(qp.X(0), qp.Y(1))
+        return qp.state()
+
+    mlir = str(circuit.mlir)
+
+    assert 'frontend_name = "_prod2_decomp"' in mlir
+    assert 'frontend_name = "_prod_decomp"' not in mlir
+
+
 def test_shared_descendant_resources_are_collected_once(mocker):
     """Preparation drives traversal without a second resource-discovery probe."""
 
