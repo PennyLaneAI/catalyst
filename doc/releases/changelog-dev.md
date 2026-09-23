@@ -669,7 +669,6 @@
 * Fixed support of region-based adjoint (`qp.adjoint(qfunc)()`) when used in conjunction with
   dynamic qubit allocation.
   [(#2933)](https://github.com/PennyLaneAI/catalyst/pull/2933)
-  [(#3257)](https://github.com/PennyLaneAI/catalyst/pull/3257)
 
   For instance, the following would previously fail:
   ```py
