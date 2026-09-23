@@ -34,6 +34,7 @@
 #include "mlir/Support/LogicalResult.h"
 
 #include "QRef/IR/QRefInterfaces.h"
+#include "QRef/IR/QRefOps.h"
 #include "QRef/IR/QRefTypes.h"
 #include "QRef/Transforms/Patterns.h"
 
@@ -78,6 +79,15 @@ struct DecomposableGatePattern final : public OpInterfaceRewritePattern<Decompos
 
     LogicalResult matchAndRewrite(DecomposableGate op, PatternRewriter &rewriter) const override {
         std::string gateName = op.getOperatorName();
+
+        // Check if the gate is inside a modifier (control/adjoint) region.
+        // If so, inlining the rule for this op may not be allowed! i.e. it may contain a
+        // measurement. Instead, let the next round of control/adjoint lowering be applied and
+        // return to this op after the modifiers have been wrapped.
+        if (op.getOperation()->getParentOfType<qref::CtrlOp>() ||
+            op.getOperation()->getParentOfType<qref::AdjointOp>()) {
+            return failure();
+        }
 
         // A modified op (adjoint and/or controlled) is a distinct operator from its base gate.
         bool isModified =
