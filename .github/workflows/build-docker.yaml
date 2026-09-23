@@ -4,6 +4,8 @@ permissions:
   contents: read
 
 on:
+  push:
+    branches: [josephleekl/container]  # TEMP: remove before merge
   workflow_dispatch:
     inputs:
       catalyst-version:
@@ -69,7 +71,7 @@ jobs:
           context: .
           file: docker/Dockerfile
           target: catalyst
-          tags: test:${{ inputs.catalyst-version }}-catalyst
+          tags: test:${{ inputs.catalyst-version || 'ci' }}-catalyst
           cache-from: type=registry,ref=${{ env.DEPS_CACHE }}
           build-args: |
             LIGHTNING_VERSION=${{ inputs.lightning-version }}
@@ -77,7 +79,7 @@ jobs:
 
       - name: Test
         run: |
-          docker run --rm test:${{ inputs.catalyst-version }}-catalyst
+          docker run --rm test:${{ inputs.catalyst-version || 'ci' }}-catalyst
 
       - name: Build and push version
         uses: docker/build-push-action@v6
