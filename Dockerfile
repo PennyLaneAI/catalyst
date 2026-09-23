@@ -59,7 +59,7 @@ RUN PYTHON=$PYTHON \
     CXX_COMPILER=$(which g++)  \
     LLVM_BUILD_DIR="/opt/catalyst/llvm-build" \
     LLVM_PROJECTS="lld;mlir" \
-    LLVM_TARGETS="lld mlir-tblgen" \
+    LLVM_TARGETS="lld check-mlir" \
     ENABLE_ZLIB=FORCE_ON \
     ENABLE_LLD=OFF \
     make llvm
@@ -127,12 +127,12 @@ RUN cmake --build /opt/catalyst/quantum-build --target check-dialects catalyst-c
 
 
 FROM base-catalyst AS build-wheel-catalyst
-COPY --from=build-llvm /opt/catalyst/llvm-build /opt/catalyst/llvm-build
-COPY --from=build-llvm /opt/catalyst/stablehlo-build /opt/catalyst/stablehlo-build
-COPY --from=build-llvm /opt/catalyst/enzyme-build /opt/catalyst/enzyme-build
-COPY --from=build-llvm /opt/catalyst/runtime-build /opt/catalyst/runtime-build
-COPY --from=build-llvm /opt/catalyst/oqc-build /opt/catalyst/oqc-build
-COPY --from=build-llvm /opt/catalyst/quantum-build /opt/catalyst/quantum-build
+COPY --from=build-runtime /opt/catalyst/llvm-build /opt/catalyst/llvm-build
+COPY --from=build-runtime /opt/catalyst/stablehlo-build /opt/catalyst/stablehlo-build
+COPY --from=build-runtime /opt/catalyst/enzyme-build /opt/catalyst/enzyme-build
+COPY --from=build-runtime /opt/catalyst/runtime-build /opt/catalyst/runtime-build
+COPY --from=build-runtime /opt/catalyst/oqc-build /opt/catalyst/oqc-build
+COPY --from=build-runtime /opt/catalyst/quantum-build /opt/catalyst/quantum-build
 ENV PATH="/opt/catalyst/llvm-build/bin:${PATH}"
 RUN cd /opt/catalyst/quantum-build && cpack
 # Build plugin wheel
