@@ -31,6 +31,8 @@ from operator2_dummy_gates import (
     SingleParam,
     SingleParamCustomOp,
 )
+from pennylane import add_decomps, qjit, qnode, register_resources
+from pennylane.decomposition import local_decomps
 from pennylane.typing import Float, Int, Wire
 
 
@@ -686,3 +688,31 @@ def test_ctrl_rule_is_traversed():
 # CHECK-SAME:   target_gate = "CompilableData{}{wires:1}{a = \22a\22, b = \22b\22, thing = \22thing\22}"
 # CHECK: qref.operator "SingleParam"
 test_ctrl_rule_is_traversed()
+
+
+def test_rule_uniqueness():
+    """Test that unique rules with equivalent resources are still both lowered."""
+
+    @register_resources({SingleParam(Float, Wire[1]): 1})
+    def one_rule(reg):
+        SingleParam(0.5, reg[0])
+
+    @register_resources({SingleParam(Float, Wire[1]): 1})
+    def two_rule(reg):
+        SingleParam(0.5, reg[0])
+
+    with local_decomps():
+        add_decomps(NoParams, one_rule, two_rule)
+
+        @qjit(target="mlir", capture=True)
+        @qnode(qp.device("null.qubit", wires=1))
+        def circuit():
+            NoParams(0)
+            return qp.probs()
+
+        print(circuit.mlir)
+
+
+# CHECK-LABEL: func.func public @__builtin_one_rule
+# CHECK-LABEL: func.func public @__builtin_two_rule
+test_rule_uniqueness()
