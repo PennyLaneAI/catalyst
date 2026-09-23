@@ -80,7 +80,7 @@ def CtrlLoweringPass : Pass<"ctrl-lowering"> {
     let dependentDialects = ["scf::SCFDialect"];
 }
 
-def LowerModifiersPass : Pass<"lower-modifiers"> {
+def ModifiersLoweringPass : Pass<"modifiers-lowering"> {
     let summary = "Lower quantum.ctrl and quantum.adjoint regions to op-level modifiers.";
 
     let description = [{

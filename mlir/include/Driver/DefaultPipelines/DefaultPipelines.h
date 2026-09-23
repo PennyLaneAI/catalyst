@@ -45,9 +45,9 @@ const PipelineList pipelineList{
       // transform sequence runs. modifiers in the user program are captured as regions
       // and graph-decomposition (run inside apply-transform-sequence) builds its graph
       // from op-level modifiers only, so these regions must be reduced first.
-      // lower-modifiers resolves arbitrarily nested ctrl/adjoint regions to a fixpoint
+      // modifiers-lowering resolves arbitrarily nested ctrl/adjoint regions to a fixpoint
       // in one greedy pass.
-      "lower-modifiers",
+      "modifiers-lowering",
       // Run the transform sequence defined in the MLIR module
       "builtin.module(apply-transform-sequence)",
       // Nested modules are something that will be used in the future
@@ -62,12 +62,12 @@ const PipelineList pipelineList{
       "lower-mitigation",
       // Decomposition rules are only consumed by graph-decomposition (run inside
       // apply-transform-sequence). Any that survive here are dead; drop them before
-      // lower-modifiers so we don't needlessly lower the ctrl/adjoint regions in their bodies.
+      // modifiers-lowering so we don't needlessly lower the ctrl/adjoint regions in their bodies.
       "symbol-dce",
       // Reduce any remaining quantum.ctrl/quantum.adjoint regions to op-level modifiers,
       // including nested regions (e.g. ctrl(adjoint(...))) and the quantum.adjoint/ctrl
       // regions that lower-mitigation (ZNE) emits.
-      "lower-modifiers",
+      "modifiers-lowering",
       "resolve-gate-level-adjoint",
       // TODO: we can remove the following 2 passes once PBC has its own pipeline.
       "lower-pbc-init-ops",

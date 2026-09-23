@@ -723,7 +723,7 @@
 
 <h3>Internal changes ⚙️</h3>
 
-* A new `lower-modifiers` pass reduces `quantum.ctrl` and `quantum.adjoint` regions to op-level
+* A new `modifiers-lowering` pass reduces `quantum.ctrl` and `quantum.adjoint` regions to op-level
   modifiers by running the `ctrl-lowering` and `adjoint-lowering` rewrite patterns together under a
   single greedy driver. Each pattern defers (a match failure) while its region still holds the other
   modifier, so the greedy worklist interleaves them and resolves arbitrarily nested modifiers (e.g.

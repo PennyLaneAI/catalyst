@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Nested quantum.ctrl / quantum.adjoint regions are reduced innermost-out by the `lower-modifiers`
+// Nested quantum.ctrl / quantum.adjoint regions are reduced innermost-out by the `modifiers-lowering`
 // pass, which runs both lowering patterns under one greedy driver. Each pattern defers (fails to
 // match) while its region still holds the other modifier, so the greedy worklist interleaves them
 // to a fixpoint in a single pass, regardless of nesting depth or order.
-// RUN: quantum-opt --lower-modifiers --split-input-file %s | FileCheck %s
+// RUN: quantum-opt --modifiers-lowering --split-input-file %s | FileCheck %s
 
 // CHECK-LABEL: @nested_ctrl_of_ctrl
 func.func @nested_ctrl_of_ctrl(%c1: !quantum.bit, %c2: !quantum.bit, %q: !quantum.bit)

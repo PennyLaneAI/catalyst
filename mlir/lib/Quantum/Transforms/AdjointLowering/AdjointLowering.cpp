@@ -49,7 +49,7 @@ struct AdjointSingleOpRewritePattern : public OpRewritePattern<AdjointOp> {
         // those gates is then trivial ((C(g))^dagger = C(g^dagger)). Returning failure() drives the
         // greedy fixpoint: ctrl-lowering reduces the inner region, then the greedy driver re-tries
         // this adjoint op and it lowers. This works whether the two patterns run in separate
-        // alternating passes or together in the combined lower-modifiers pass. Pre-scanning here
+        // alternating passes or together in the combined modifiers-lowering pass. Pre-scanning here
         // avoids the ReversePass "Unhandled operation" error path.
         if (adjoint.getRegion()
                 .walk([](CtrlOp) { return WalkResult::interrupt(); })

@@ -28,7 +28,7 @@ using namespace mlir;
 namespace catalyst {
 namespace quantum {
 
-#define GEN_PASS_DEF_LOWERMODIFIERSPASS
+#define GEN_PASS_DEF_MODIFIERSLOWERINGPASS
 #include "Quantum/Transforms/Passes.h.inc"
 
 // Lower `quantum.ctrl` and `quantum.adjoint` regions to op-level modifiers in a single greedy
@@ -36,8 +36,8 @@ namespace quantum {
 // modifier, so the greedy worklist interleaves them: an inner adjoint is reduced, then its
 // enclosing control lowers on a re-try, and vice versa. This resolves arbitrarily nested modifiers
 // without manually alternating the two standalone passes.
-struct LowerModifiersPass : impl::LowerModifiersPassBase<LowerModifiersPass> {
-    using LowerModifiersPassBase::LowerModifiersPassBase;
+struct ModifiersLoweringPass : impl::ModifiersLoweringPassBase<ModifiersLoweringPass> {
+    using ModifiersLoweringPassBase::ModifiersLoweringPassBase;
 
     void runOnOperation() final {
         RewritePatternSet patterns(&getContext());

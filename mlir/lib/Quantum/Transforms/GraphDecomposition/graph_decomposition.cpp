@@ -271,8 +271,8 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
             }
 
             // Distribute any `quantum.ctrl`/`quantum.adjoint` regions the rules emitted, lazily.
-            // `lower-modifiers` reduces both (including nested `ctrl(adjoint(...))`) to a fixpoint
-            // in one greedy pass.
+            // `modifiers-lowering` reduces both (including nested `ctrl(adjoint(...))`) to a
+            // fixpoint in one greedy pass.
             bool hasModifierRegion = module
                                          ->walk([&](mlir::Operation *op) {
                                              return (isa<CtrlOp, AdjointOp>(op))
@@ -282,7 +282,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
                                          .wasInterrupted();
             if (hasModifierRegion) {
                 OpPassManager modifierPm("builtin.module");
-                modifierPm.addPass(createLowerModifiersPass());
+                modifierPm.addPass(createModifiersLoweringPass());
                 if (failed(runPipeline(modifierPm, module))) {
                     return signalPassFailure();
                 }

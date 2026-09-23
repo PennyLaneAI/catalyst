@@ -565,7 +565,7 @@ struct CtrlLoweringRewritePattern : public OpRewritePattern<CtrlOp> {
         // Returning failure() drives the greedy fixpoint: adjoint-lowering reduces the inner region
         // to op-level gates, then the greedy driver re-tries this ctrl op and it lowers. This works
         // whether the two patterns run in separate alternating passes or together in the combined
-        // lower-modifiers pass. A pre-scan avoids a partial rewrite (creating ops, then bailing
+        // modifiers-lowering pass. A pre-scan avoids a partial rewrite (creating ops, then bailing
         // out mid-region).
         if (ctrl.getRegion()
                 .walk([](AdjointOp) { return WalkResult::interrupt(); })
