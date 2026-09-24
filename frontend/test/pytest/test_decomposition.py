@@ -22,13 +22,16 @@ from jax.core import ShapedArray
 from operator2_dummy_gates import (
     ArrayData,
     CompilableData,
+    HybridNoOpArg,
     HybridOpArg,
     HybridWires,
     MultiParams,
+    MultiParamsCustom,
     MultipleRegisters,
     NoParams,
     NoParamsCustomOp,
     SingleParam,
+    SingleParamCustomOp,
     StaticData,
     TestQubitUnitary,
 )
@@ -315,16 +318,42 @@ class TestGenericUtilities:
             (StaticData("mylabel", Wires([0, 1])), "StaticData{}{reg:2}{}["),
             (
                 HybridWires(Wires([0, 1, 2])),
-                "HybridWires{}{}{}[",
+                "HybridWires{}{cwires:3}{}[",
             ),  # NOTE: open brace to match uid
             (
                 HybridOpArg(Float, StaticData("innerop", Wires(0)), Wires([2, 3]), 12),
-                "HybridOpArg{angle:[tensor<f64>]}{cwires:2}{}[",  # NOTE: open brace to match uid
+                "HybridOpArg{angle:[tensor<f64>]}{cwires:2,op:1}{}[",
+                # NOTE: open brace to match uid
+            ),
+            # Numeric hybrid leaves land in the param group (matching lowering param_map), and
+            # contribute no qubits so they are absent from wire_lens.
+            (
+                HybridNoOpArg(Float[2], Wires(0)),
+                "HybridNoOpArg{angles:[tensor<2xf64>]}{wires:1}{}[",
             ),
             (
                 qp.Rot(Bool, Int, Float, Wires(0)),
                 "Rot{0:[f64],1:[f64],2:[f64]}{wires:1}{}",
             ),  # custom ops should be promoted to f64
+            # An integer param is a custom-op param like a float one: the lowering widens it to
+            # f64, matching `_is_custom_op` in qref_operator2_primitives.py.
+            (SingleParamCustomOp(Int, Wires(0)), "SingleParamCustomOp{0:[f64]}{wires:1}{}"),
+            # wires is not the last signature parameter, so this is not a custom op even though
+            # the dynamic args are scalar int/float (same criterion as the lowering).
+            (
+                MultiParamsCustom(Wires(0), Float, Int, Float),
+                "MultiParamsCustom{a:[tensor<f64>],b:[tensor<i64>],c:[tensor<f64>]}{wires:1}{}",
+            ),
+            # `qref.unitary` takes a complex matrix and carries no static data, so a real matrix
+            # still spells complex and `unitary_check` is left out.
+            (
+                qp.QubitUnitary(np.eye(2), Wires(0)),
+                "QubitUnitary{U:[tensor<2x2xcomplex<f64>>]}{wires:1}{}",
+            ),
+            (
+                qp.QubitUnitary(np.eye(4, dtype=complex), Wires([0, 1])),
+                "QubitUnitary{U:[tensor<4x4xcomplex<f64>>]}{wires:2}{}",
+            ),
         ],
     )
     def test_GraphOpId(self, op, id):
