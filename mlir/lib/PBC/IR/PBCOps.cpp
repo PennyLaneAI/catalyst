@@ -123,7 +123,8 @@ LogicalResult RefFabricateOp::verify() {
     auto initState = getInitState();
     if (initState == LogicalInitKind::zero || initState == LogicalInitKind::one ||
         initState == LogicalInitKind::plus || initState == LogicalInitKind::minus) {
-        return emitOpError("Logical state should not be fabricated, use `PrepareStateOp` instead.");
+        return emitOpError(
+            "Logical state should not be fabricated, use `RefPrepareStateOp` instead.");
     }
     return success();
 }
@@ -132,7 +133,7 @@ LogicalResult RefPrepareStateOp::verify() {
     auto initState = getInitState();
     if (initState == LogicalInitKind::magic || initState == LogicalInitKind::magic_conj) {
         return emitOpError(
-            "Magic state cannot be prepared by this operation, use `FabricateOp` instead.");
+            "Magic state cannot be prepared by this operation, use `RefFabricateOp` instead.");
     }
     return success();
 }
