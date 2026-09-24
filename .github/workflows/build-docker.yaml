@@ -1,4 +1,4 @@
-name: Docker::Linux::x86_64::Catalyst
+name: Docker::Linux::Catalyst
 
 permissions:
   contents: read
@@ -27,15 +27,20 @@ on:
         required: true
         description: Push to Docker Hub when done.
 
-env:
-  # Layer cache for the deps stage (LLVM, StableHLO, Enzyme). Not a runnable image.
-  DEPS_CACHE: pennylaneai/pennylane:buildcache-catalyst-deps
-
 jobs:
   docker:
-    name: docker::ubuntu-24.04::catalyst::${{ inputs.catalyst-version }}
-    timeout-minutes: 180
-    runs-on: blacksmith-8vcpu-ubuntu-2404
+    name: docker::ubuntu-24.04::${{ matrix.arch }}::catalyst::${{ inputs.catalyst-version }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { arch: x86_64, runner: blacksmith-8vcpu-ubuntu-2404 }
+          - { arch: aarch64, runner: blacksmith-8vcpu-ubuntu-2404-arm }
+    runs-on: ${{ matrix.runner }}
+    env:
+      # Layer cache for the deps stage (LLVM, StableHLO, Enzyme). Not a runnable image.
+      DEPS_CACHE: pennylaneai/pennylane:buildcache-catalyst-deps-${{ matrix.arch }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -44,7 +49,16 @@ jobs:
 
       - name: Read dependency versions
         id: pins
-        run: grep -E '^(llvm|stablehlo|enzyme)=' .dep-versions >> "$GITHUB_OUTPUT"
+        run: grep -E '^(llvm|stablehlo|enzyme|pennylane|lightning)=' .dep-versions >> "$GITHUB_OUTPUT"
+
+      - name: Validate image tag
+        id: tag
+        if: ${{ inputs.push-to-dockerhub }}
+        env:
+          TAG: ${{ inputs.catalyst-version }}-catalyst-pl-${{ inputs.pennylane-version || steps.pins.outputs.pennylane }}-lightning-${{ inputs.lightning-version || steps.pins.outputs.lightning }}-${{ matrix.arch }}
+        run: |
+          [[ "$TAG" =~ ^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$ ]] || { echo "::error::Invalid Docker tag: $TAG"; exit 1; }
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
 
       # Source caches saved by check-catalyst.yaml; much faster than cloning the submodules.
       - uses: actions/cache/restore@v4
@@ -80,8 +94,6 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      # Built on its own so only the deps layers go to the registry cache: mode=max on the
-      # full build would also upload the Catalyst build trees, which change every run.
       - name: Build dependencies (LLVM, StableHLO, Enzyme)
         uses: docker/build-push-action@v6
         with:
@@ -109,6 +121,17 @@ jobs:
         run: |
           docker run --rm test:${{ inputs.catalyst-version || 'ci' }}-catalyst
 
+      - name: Save image
+        run: docker save test:${{ inputs.catalyst-version || 'ci' }}-catalyst | gzip > pennylane-catalyst.tar.gz
+
+      - name: Upload image as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pennylane-catalyst-${{ matrix.arch }}
+          path: pennylane-catalyst.tar.gz
+          retention-days: 1
+          compression-level: 0
+
       - name: Build and push version
         uses: docker/build-push-action@v6
         if: ${{ inputs.push-to-dockerhub }}
@@ -117,7 +140,7 @@ jobs:
           context: .
           file: docker/Dockerfile
           target: catalyst
-          tags: pennylaneai/pennylane:${{ inputs.catalyst-version }}-catalyst,pennylaneai/pennylane:latest-catalyst
+          tags: pennylaneai/pennylane:${{ steps.tag.outputs.tag }},pennylaneai/pennylane:latest-catalyst-${{ matrix.arch }}
           cache-from: type=registry,ref=${{ env.DEPS_CACHE }}
           build-args: |
             LIGHTNING_VERSION=${{ inputs.lightning-version }}
