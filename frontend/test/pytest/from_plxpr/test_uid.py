@@ -19,7 +19,7 @@ from pennylane.pytrees import flatten
 from pennylane.typing import AbstractArray
 from pennylane.wires import AbstractQubit
 
-from catalyst.from_plxpr.uid import _serialize_static, generate_uid
+from catalyst.from_plxpr.uid import _serialize, generate_uid
 
 
 class StaticOp(qp.core.Operator2):
@@ -92,20 +92,14 @@ class TestGenerateUID:
         """Test that operators with the same static arguments have the same UID."""
         uid_a = generate_uid(
             op_cls=StaticOp,
-            wire_lens=(1,),
             hybrid_lens=(),
             hybrid_trees=(),
-            adjoint=False,
-            n_ctrls=0,
             static_args=_static_kwargs("hello"),
         )
         uid_b = generate_uid(
             op_cls=StaticOp,
-            wire_lens=(1,),
             hybrid_lens=(),
             hybrid_trees=(),
-            adjoint=False,
-            n_ctrls=0,
             static_args=_static_kwargs("hello"),
         )
         assert uid_a == uid_b
@@ -114,20 +108,14 @@ class TestGenerateUID:
         """Test that operators with different static arguments have different UIDs."""
         uid_a = generate_uid(
             op_cls=StaticOp,
-            wire_lens=(1,),
             hybrid_lens=(),
             hybrid_trees=(),
-            adjoint=False,
-            n_ctrls=0,
             static_args=_static_kwargs("hello"),
         )
         uid_b = generate_uid(
             op_cls=StaticOp,
-            wire_lens=(1,),
             hybrid_lens=(),
             hybrid_trees=(),
-            adjoint=False,
-            n_ctrls=0,
             static_args=_static_kwargs("world"),
         )
         assert uid_a != uid_b
@@ -140,20 +128,14 @@ class TestGenerateUID:
 
         uid_a = generate_uid(
             op_cls=HybridWiresOp,
-            wire_lens=(),
             hybrid_lens=(2,),
             hybrid_trees=hybrid_trees,
-            adjoint=False,
-            n_ctrls=0,
             static_args={},
         )
         uid_b = generate_uid(
             op_cls=HybridWiresOp,
-            wire_lens=(),
             hybrid_lens=(2,),
             hybrid_trees=hybrid_trees,
-            adjoint=False,
-            n_ctrls=0,
             static_args={},
         )
         assert uid_a == uid_b
@@ -166,72 +148,30 @@ class TestGenerateUID:
 
         uid_two = generate_uid(
             op_cls=HybridWiresOp,
-            wire_lens=(),
             hybrid_lens=(2,),
             hybrid_trees=(hybrid_tree1,),
-            adjoint=False,
-            n_ctrls=0,
             static_args={},
         )
         uid_three = generate_uid(
             op_cls=HybridWiresOp,
-            wire_lens=(),
             hybrid_lens=(2,),
             hybrid_trees=(hybrid_tree2,),
-            adjoint=False,
-            n_ctrls=0,
             static_args={},
         )
         assert uid_two != uid_three
 
-    def test_same_dynamic_avals_same_uid(self):
-        """Test that operators with the same dynamic aval signatures have the same UID."""
-        aval = AbstractArray((), int)
+    def test_dynamic_avals_do_not_affect_uid(self):
+        """Test that dynamic argument avals do not contribute to the UID."""
         kwargs = {
             "op_cls": DynamicStaticOp,
-            "wire_lens": (1,),
             "hybrid_lens": (),
             "hybrid_trees": (),
-            "adjoint": False,
-            "n_ctrls": 0,
-            "static_args": _static_kwargs("hello"),
-        }
-
-        uid_a = generate_uid(aval, **kwargs)
-        uid_b = generate_uid(aval, **kwargs)
-        assert uid_a == uid_b
-
-    def test_different_dynamic_shape_different_uid(self):
-        """Test that different dynamic argument shapes produce different UIDs."""
-        kwargs = {
-            "op_cls": DynamicStaticOp,
-            "wire_lens": (1,),
-            "hybrid_lens": (),
-            "hybrid_trees": (),
-            "adjoint": False,
-            "n_ctrls": 0,
             "static_args": _static_kwargs("hello"),
         }
 
         uid_scalar = generate_uid(AbstractArray((), int), **kwargs)
         uid_matrix = generate_uid(AbstractArray((4, 4), int), **kwargs)
-        assert uid_scalar != uid_matrix
-
-    def test_different_dynamic_dtype_different_uid(self):
-        """Test that different dynamic argument dtypes produce different UIDs."""
-        kwargs = {
-            "op_cls": DynamicStaticOp,
-            "wire_lens": (1,),
-            "hybrid_lens": (),
-            "hybrid_trees": (),
-            "adjoint": False,
-            "n_ctrls": 0,
-            "static_args": _static_kwargs("hello"),
-        }
-
-        uid_f64 = generate_uid(AbstractArray((), float), **kwargs)
-        uid_i64 = generate_uid(AbstractArray((), int), **kwargs)
-        assert uid_f64 != uid_i64
+        assert uid_scalar == uid_matrix
 
     @pytest.mark.parametrize(
         "value",
@@ -252,8 +192,8 @@ class TestGenerateUID:
     )
     def test_supported_types(self, value):
         """Test that common static Python types are serialized for UID hashing."""
-        ser = _serialize_static(value, "name")
-        assert hash(ser)
+        ser = _serialize(value)
+        assert isinstance(hash(ser), int)
 
     def test_hybrid_operator_avals_in_uid(self):
         """Test that non-wire hybrid operator aval signatures affect UID generation."""
@@ -261,9 +201,6 @@ class TestGenerateUID:
         _, hybrid_tree2 = flatten(InnerOp(0.5, [0, 1]))
         kwargs = {
             "op_cls": HybridOp,
-            "wire_lens": (),
-            "adjoint": False,
-            "n_ctrls": 0,
             "static_args": _static_kwargs("hello"),
         }
 
@@ -278,8 +215,8 @@ class TestGenerateUID:
         uid_two_wires = generate_uid(
             AbstractArray((), float),
             AbstractQubit(),
-            hybrid_lens=(2,),
             hybrid_trees=(hybrid_tree2,),
+            hybrid_lens=(2,),
             **kwargs,
         )
         assert uid_three_wires != uid_two_wires

@@ -211,18 +211,10 @@ class GraphOpID:
                 hybrid_trees.append(tree)
                 hybrid_args.extend(leaves)
             uid = generate_uid(
-                *tuple(self.op.dynamic_args.values()),  # dynamic args
-                *(None,)
-                * sum(
-                    self.wire_lens.values()
-                ),  # non hybrid wires, unused during uid generation, so just give empty values
                 *hybrid_args,
                 op_cls=type(self.op),
-                wire_lens=tuple(self.wire_lens.values()),
                 hybrid_lens=tuple(hybrid_lens),
                 hybrid_trees=tuple(hybrid_trees),
-                adjoint=False,
-                n_ctrls=0,
                 static_args=self.op.static_args,
             )
             return self.op.static_args | self.op.hybrid_args, uid

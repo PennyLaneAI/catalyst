@@ -33,6 +33,7 @@ from operator2_dummy_gates import (
     SingleParamCustomOp,
     SingleParamNoCustomOpBadOrder,
     StaticData,
+    StaticDataMultiReg,
 )
 
 
@@ -468,6 +469,27 @@ def c_static_data():
 
 
 print(c_static_data.mlir)
+
+
+@qp.qjit(capture=True, target="mlir")
+@qp.qnode(qp.device("null.qubit", wires=3))
+def c_uid_ignores_dynamic_shape_and_wires(x: float):
+    # CHECK-LABEL: func.func public @c_uid_ignores_dynamic_shape_and_wires
+
+    # CHECK: qref.operator "StaticDataMultiReg"({{%.+}}: tensor<f64>) qubits({{%.+}}, {{%.+}})
+    # CHECK-NEXT: UID([[UID_A:[0-9]+]])
+    # CHECK-NEXT: param_map = {theta = [0]} qubit_map = {reg = [0], reg2 = [1]}
+    StaticDataMultiReg("hello", reg=0, reg2=1, theta=x)
+
+    # UID must be the same since static data is equal, even though dynamic data differs
+    # CHECK: qref.operator "StaticDataMultiReg"({{%.+}}: tensor<3xf64>) qubits({{%.+}}, {{%.+}}, {{%.+}})
+    # CHECK-NEXT: UID([[UID_A]])
+    # CHECK-NEXT: param_map = {theta = [0]} qubit_map = {reg = [0, 1], reg2 = [2]}
+    StaticDataMultiReg("hello", reg=(0, 1), reg2=2, theta=np.array([1.0, 2.0, 3.0]))
+    return qp.state()
+
+
+print(c_uid_ignores_dynamic_shape_and_wires.mlir)
 
 
 @qp.qjit(capture=True, target="mlir")
