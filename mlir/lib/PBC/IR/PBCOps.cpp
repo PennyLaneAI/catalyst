@@ -62,7 +62,22 @@ template <typename OpType> LogicalResult verifyPPROp(OpType op) {
         return op.emitOpError("Pauli string must be non-empty");
     }
 
-    if (numPauliProduct != op.getInQubits().size()) {
+    if (numPauliProduct != op.getQubitOperands().size()) {
+        return op.emitOpError("Number of qubits must match number of pauli operators");
+    }
+    return mlir::success();
+}
+
+template <typename OpType> LogicalResult verifyPPMOp(OpType op) {
+    if (op.getQubitOperands().size() != op.getPauliProduct().size()) {
+        return op.emitOpError("Number of qubits must match number of pauli operators");
+    }
+    return mlir::success();
+}
+
+template <typename OpType> LogicalResult verifySelectPPMOp(OpType op) {
+    if (op.getQubitOperands().size() != op.getPauliProduct_0().size() ||
+        op.getQubitOperands().size() != op.getPauliProduct_1().size()) {
         return op.emitOpError("Number of qubits must match number of pauli operators");
     }
     return mlir::success();
@@ -76,66 +91,9 @@ LogicalResult PPRotationOp::verify() { return verifyPPROp(*this); }
 
 LogicalResult PPRotationArbitraryOp::verify() { return verifyPPROp(*this); }
 
-LogicalResult PPMeasurementOp::verify() {
-    if (getInQubits().size() != getPauliProduct().size()) {
-        return emitOpError("Number of qubits must match number of pauli operators");
-    }
-    return mlir::success();
-}
+LogicalResult PPMeasurementOp::verify() { return verifyPPMOp(*this); }
 
-LogicalResult RefPPMeasurementOp::verify() {
-    if (getQubits().size() != getPauliProduct().size()) {
-        return emitOpError("Number of qubits must match number of pauli operators");
-    }
-    return success();
-}
-
-LogicalResult RefPPRotationOp::verify() {
-    size_t numPauliProduct = getPauliProduct().size();
-
-    if (numPauliProduct == 0) {
-        return emitOpError("Pauli string must be non-empty");
-    }
-
-    if (numPauliProduct != getQubits().size()) {
-        return emitOpError("Number of qubits must match number of pauli operators");
-    }
-    return success();
-}
-
-LogicalResult RefSelectPPMeasurementOp::verify() {
-    if (getQubits().size() != getPauliProduct_0().size() ||
-        getQubits().size() != getPauliProduct_1().size()) {
-        return emitOpError("Number of qubits must match number of pauli operators");
-    }
-    return success();
-}
-
-LogicalResult RefFabricateOp::verify() {
-    auto initState = getInitState();
-    if (initState == LogicalInitKind::zero || initState == LogicalInitKind::one ||
-        initState == LogicalInitKind::plus || initState == LogicalInitKind::minus) {
-        return emitOpError("Logical state should not be fabricated, use `PrepareStateOp` instead.");
-    }
-    return success();
-}
-
-LogicalResult RefPrepareStateOp::verify() {
-    auto initState = getInitState();
-    if (initState == LogicalInitKind::magic || initState == LogicalInitKind::magic_conj) {
-        return emitOpError(
-            "Magic state cannot be prepared by this operation, use `FabricateOp` instead.");
-    }
-    return success();
-}
-
-LogicalResult SelectPPMeasurementOp::verify() {
-    if (getInQubits().size() != getPauliProduct_0().size() ||
-        getInQubits().size() != getPauliProduct_1().size()) {
-        return emitOpError("Number of qubits must match number of pauli operators");
-    }
-    return mlir::success();
-}
+LogicalResult SelectPPMeasurementOp::verify() { return verifySelectPPMOp(*this); }
 
 LogicalResult PrepareStateOp::verify() {
     auto initState = getInitState();
@@ -155,6 +113,30 @@ LogicalResult FabricateOp::verify() {
     return mlir::success();
 }
 
+LogicalResult RefPPRotationOp::verify() { return verifyPPROp(*this); }
+
+LogicalResult RefPPMeasurementOp::verify() { return verifyPPMOp(*this); }
+
+LogicalResult RefSelectPPMeasurementOp::verify() { return verifySelectPPMOp(*this); }
+
+LogicalResult RefFabricateOp::verify() {
+    auto initState = getInitState();
+    if (initState == LogicalInitKind::zero || initState == LogicalInitKind::one ||
+        initState == LogicalInitKind::plus || initState == LogicalInitKind::minus) {
+        return emitOpError("Logical state should not be fabricated, use `PrepareStateOp` instead.");
+    }
+    return success();
+}
+
+LogicalResult RefPrepareStateOp::verify() {
+    auto initState = getInitState();
+    if (initState == LogicalInitKind::magic || initState == LogicalInitKind::magic_conj) {
+        return emitOpError(
+            "Magic state cannot be prepared by this operation, use `FabricateOp` instead.");
+    }
+    return success();
+}
+
 LogicalResult PPRotationOp::canonicalize(PPRotationOp op, PatternRewriter &rewriter) {
     return canonicalizePPROp(op, rewriter);
 }
@@ -162,6 +144,19 @@ LogicalResult PPRotationOp::canonicalize(PPRotationOp op, PatternRewriter &rewri
 LogicalResult PPRotationArbitraryOp::canonicalize(PPRotationArbitraryOp op,
                                                   PatternRewriter &rewriter) {
     return canonicalizePPROp(op, rewriter);
+}
+
+LogicalResult RefPPRotationOp::canonicalize(RefPPRotationOp op, PatternRewriter &rewriter) {
+    bool allIdentity = llvm::all_of(op.getPauliProduct(), [](mlir::Attribute attr) {
+        auto pauliStr = llvm::cast<mlir::StringAttr>(attr);
+        return pauliStr.getValue() == "I";
+    });
+
+    if (allIdentity) {
+        rewriter.eraseOp(op);
+        return mlir::success();
+    }
+    return mlir::failure();
 }
 
 void LayerOp::build(OpBuilder &builder, OperationState &result, ValueRange inValues,
@@ -291,7 +286,6 @@ llvm::StringRef PPRotationOp::getResourceName() {
 }
 llvm::StringRef PPRotationArbitraryOp::getResourceName() { return "PPR-Phi"; }
 llvm::StringRef PPMeasurementOp::getResourceName() { return "PPM"; }
-llvm::StringRef RefPPMeasurementOp::getResourceName() { return "PPM"; }
 llvm::StringRef SelectPPMeasurementOp::getResourceName() { return "PPM"; }
 llvm::StringRef RefPrepareStateOp::getResourceName() { return "pbc.prepare"; }
 llvm::StringRef RefFabricateOp::getResourceName() { return "pbc.fabricate"; }
@@ -309,6 +303,7 @@ llvm::StringRef RefPPRotationOp::getResourceName() {
     assert(false && "RefPPRotationOp::getResourceName: invalid rotation kind");
     return "PPR-invalid";
 }
+llvm::StringRef RefPPMeasurementOp::getResourceName() { return "PPM"; }
 llvm::StringRef RefSelectPPMeasurementOp::getResourceName() { return "PPM"; }
 
 std::string getDetailedStateName(LogicalInitKind initState) {
@@ -350,13 +345,6 @@ static llvm::StringRef getInitStateResourceDetailedName(MLIRContext *ctx, llvm::
         .getValue();
 }
 
-llvm::StringRef PrepareStateOp::getResourceDetailedName() {
-    return getInitStateResourceDetailedName(getContext(), getResourceName(), getInitState());
-}
-llvm::StringRef FabricateOp::getResourceDetailedName() {
-    return getInitStateResourceDetailedName(getContext(), getResourceName(), getInitState());
-}
-
 static llvm::StringRef getPauliProductResourceDetailedName(MLIRContext *ctx,
                                                            llvm::StringRef baseName,
                                                            ArrayAttr pauliProduct) {
@@ -374,6 +362,12 @@ static llvm::StringRef getSelectPauliProductResourceDetailedName(MLIRContext *ct
         .getValue();
 }
 
+llvm::StringRef PrepareStateOp::getResourceDetailedName() {
+    return getInitStateResourceDetailedName(getContext(), getResourceName(), getInitState());
+}
+llvm::StringRef FabricateOp::getResourceDetailedName() {
+    return getInitStateResourceDetailedName(getContext(), getResourceName(), getInitState());
+}
 llvm::StringRef PPRotationOp::getResourceDetailedName() {
     return getPauliProductResourceDetailedName(getContext(), getResourceName(), getPauliProduct());
 }
@@ -383,13 +377,24 @@ llvm::StringRef PPRotationArbitraryOp::getResourceDetailedName() {
 llvm::StringRef PPMeasurementOp::getResourceDetailedName() {
     return getPauliProductResourceDetailedName(getContext(), getResourceName(), getPauliProduct());
 }
-llvm::StringRef RefPPMeasurementOp::getResourceDetailedName() {
-    return getPauliProductResourceDetailedName(getContext(), getResourceName(), getPauliProduct());
+llvm::StringRef SelectPPMeasurementOp::getResourceDetailedName() {
+    return getSelectPauliProductResourceDetailedName(getContext(), getResourceName(),
+                                                     getPauliProduct_0(), getPauliProduct_1());
+}
+
+llvm::StringRef RefPrepareStateOp::getResourceDetailedName() {
+    return getInitStateResourceDetailedName(getContext(), getResourceName(), getInitState());
+}
+llvm::StringRef RefFabricateOp::getResourceDetailedName() {
+    return getInitStateResourceDetailedName(getContext(), getResourceName(), getInitState());
 }
 llvm::StringRef RefPPRotationOp::getResourceDetailedName() {
     return getPauliProductResourceDetailedName(getContext(), getResourceName(), getPauliProduct());
 }
-llvm::StringRef SelectPPMeasurementOp::getResourceDetailedName() {
+llvm::StringRef RefPPMeasurementOp::getResourceDetailedName() {
+    return getPauliProductResourceDetailedName(getContext(), getResourceName(), getPauliProduct());
+}
+llvm::StringRef RefSelectPPMeasurementOp::getResourceDetailedName() {
     return getSelectPauliProductResourceDetailedName(getContext(), getResourceName(),
                                                      getPauliProduct_0(), getPauliProduct_1());
 }
