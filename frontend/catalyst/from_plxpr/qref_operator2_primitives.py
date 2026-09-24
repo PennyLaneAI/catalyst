@@ -536,14 +536,15 @@ def _qref_operator_p_lowering(jax_ctx: mlir.LoweringRuleContext, *args, op_cls, 
     )
 
     if op_cls.hybrid_argnames or op_cls.static_argnames:
+        # Only pass in the avals of hybrid arguments
+        start = len(op_cls.dynamic_argnames) + sum(wire_lens)
+        stop = start + sum(hybrid_lens)
+
         uid = generate_uid(
-            *jax_ctx.avals_in,
+            *jax_ctx.avals_in[start:stop],
             op_cls=op_cls,
-            wire_lens=wire_lens,
             hybrid_lens=hybrid_lens,
             hybrid_trees=hybrid_trees,
-            adjoint=adjoint,
-            n_ctrls=n_ctrls,
             static_args=repack_static_data,
         )
         static_data = None

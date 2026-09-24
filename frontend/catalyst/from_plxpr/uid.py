@@ -28,120 +28,62 @@ from pennylane.wires import AbstractQubit
 def generate_uid(
     *avals_in: tuple[Any, ...],
     op_cls: type[Operator2],
-    wire_lens: tuple[int, ...],
     hybrid_lens: tuple[int, ...],
     hybrid_trees: tuple[PyTreeStructure, ...],
-    adjoint: bool,
-    n_ctrls: int,
     static_args: dict[str, Any],
 ):
     """Generate a unique identifier that allows us to distinguish between
     operators with unique non-compilable arguments."""
 
-    # Flat dynamic arguments
-    dynamic_args = avals_in[: len(op_cls.dynamic_argnames)]
-    dynamic_avals = [(val.shape, val.dtype.name) for val in dynamic_args]
-
     # Hybrid arguments (wire and non-wire)
-    args_idx = len(op_cls.dynamic_argnames) + sum(wire_lens)
+    arg_idx = 0
     hybrid_avals = []
     for hname, hsize in zip(op_cls.hybrid_argnames, hybrid_lens):
         if hname in op_cls.wire_argnames:
             hybrid_avals.append(hsize)
 
         else:
-            cur_avals = []
-            for val in avals_in[args_idx : args_idx + hsize]:
-                aval = val if isinstance(val, AbstractQubit) else (val.shape, val.dtype.name)
-                cur_avals.append(aval)
-            hybrid_avals.append(tuple(cur_avals))
+            cur_avals = tuple(
+                val if isinstance(val, AbstractQubit) else (val.shape, val.dtype.name)
+                for val in avals_in[arg_idx : arg_idx + hsize]
+            )
+            hybrid_avals.append(cur_avals)
 
-        args_idx += hsize
+        arg_idx += hsize
 
-    # Static arguments
-    reduced_static_args = tuple(_serialize_static(val, name) for name, val in static_args.items())
+    serialized_hybrid = (hybrid_trees, tuple(hybrid_avals))
+    serialized_static = tuple(
+        (name, type(val), _serialize(val)) for name, val in static_args.items()
+    )
 
-    reduced = [op_cls]
-    reduced.append(("dynamic", tuple(dynamic_avals)))
-    reduced.append(("wires", wire_lens))
-    reduced.append(("hybrid", hybrid_trees, tuple(hybrid_avals)))
-    reduced.append(("static", reduced_static_args))
-    reduced.append(("adjoint", adjoint))
-    reduced.append(("n_ctrls", n_ctrls))
-
-    encoded_bytes = str(reduced).encode("utf-8")
+    encoded_bytes = str((serialized_hybrid, serialized_static)).encode("utf-8")
     sha_hash = hashlib.sha256(encoded_bytes).hexdigest()
 
     # hexdigest() returns the hexadecimal hash in string format
-    # Take 16 hexadecimals, since UID on Operator op is I64Attr, which is a 64-bit unsigned
-    return int("0" + sha_hash[:15], 16)
+    # Take 16 hexadecimals, since UID on Operator op is I64Attr. Right-shift
+    # to stay in the safe range of positive signed 64-bit integers
+    return int(sha_hash[:16], 16) >> 1
 
 
 @singledispatch
-def _serialize_static(val: Any, name: str | None):
-    """Create a reduced representation of a value that can be used to easily
+def _serialize(val: Any):
+    """Create a serialized representation of a value that can be used to easily
     create a UID for it.
-
-    The reduced representation will be a tuple with the following format:
-
-    .. code-block:: python
-
-        (name, type, hashable_reduction)
     """
-    # For arbitrary opaque data that may be unhashable, just use the id
-    return (name, type(val), id(val))
+    return str(val)
 
 
-# pylint: disable=unused-argument
-@_serialize_static.register(type(None))
-def _serialize_none(val, name):
-    return (name, type(None), None)
+@_serialize.register(list | tuple)
+def _serialize_sequence(val):
+    return tuple(_serialize(item) for item in val)
 
 
-@_serialize_static.register(bool)
-def _serialize_bool(val, name):
-    return (name, bool, val)
+@_serialize.register(dict)
+def _serialize_dict(val):
+    serialized = ((str(_serialize(k)), _serialize(v)) for k, v in val.items())
+    return tuple(sorted(serialized, key=lambda item: item[0]))
 
 
-@_serialize_static.register(int)
-def _serialize_int(val, name):
-    return (name, int, val)
-
-
-@_serialize_static.register(float)
-def _serialize_float(val, name):
-    return (name, float, repr(val))
-
-
-@_serialize_static.register(complex)
-def _serialize_complex(val, name):
-    return (name, complex, (repr(val.real), repr(val.imag)))
-
-
-@_serialize_static.register(str)
-def _serialize_str(val, name):
-    return (name, str, val)
-
-
-@_serialize_static.register(list)
-def _serialize_list(val, name):
-    return (name, list, tuple(_serialize_static(item, None) for item in val))
-
-
-@_serialize_static.register(tuple)
-def _serialize_tuple(val, name):
-    return (name, tuple, tuple(_serialize_static(item, None) for item in val))
-
-
-@_serialize_static.register(dict)
-def _serialize_dict(val, name):
-    return (
-        name,
-        dict,
-        frozenset((_serialize_static(k, None), _serialize_static(v, None)) for k, v in val.items()),
-    )
-
-
-@_serialize_static.register(set | frozenset)
-def _serialize_set(val, name):
-    return (name, type(val), frozenset(_serialize_static(item, None) for item in val))
+@_serialize.register(set | frozenset)
+def _serialize_set(val):
+    return tuple(sorted(str(_serialize(v)) for v in val))
