@@ -1915,9 +1915,9 @@ class TestNumericHamiltonianDecomposition:
         resources = qp.specs(circuit, level="all-mlir")().resources
         assert resources["Before MLIR Passes"].counts == {"TrotterCDF": 1}
         assert resources["graph-decomposition"].counts == {
-            "BasisRotation": 62,
+            "BasisRotation": 44,
             "GlobalPhase": 1,
-            "IsingZZ": 120,
+            "IsingZZ": 66,
             "RZ": 40,
         }
 
@@ -1982,15 +1982,15 @@ class TestNumericHamiltonianDecomposition:
         resources = qp.specs(circuit, level="all-mlir")().resources
         assert resources["Before MLIR Passes"].counts == {"Adjoint(TrotterCDF)": 1}
         assert resources["graph-decomposition"].counts == {
-            "Adjoint(BasisRotation)": 62,
-            "IsingZZ": 120,
+            "Adjoint(BasisRotation)": 44,
+            "IsingZZ": 66,
             "RZ": 40,
         }
 
-    @pytest.mark.skip(
-        reason="This test is currently too slow to run in CI. It can be enabled for local testing when needed"
-        "until the performance of the decomposition pass is improved."
-    )
+    # @pytest.mark.skip(
+    #     reason="This test is currently too slow to run in CI. It can be enabled for local testing when needed"
+    #     "until the performance of the decomposition pass is improved."
+    # )
     def test_trotter_cgf_decomposes(self):
         """Test that a ``TrotterCGF`` with ``CGFHamiltonian`` decomposes."""
         hamiltonian = self._cgf_hamiltonian()
@@ -2006,16 +2006,16 @@ class TestNumericHamiltonianDecomposition:
         resources = qp.specs(circuit, level="all-mlir")().resources
         assert resources["Before MLIR Passes"].counts == {"TrotterCGF": 1}
         assert resources["graph-decomposition"].counts == {
-            "BasisRotation": 62,
+            "BasisRotation": 44,
             "GlobalPhase": 1,
-            "IsingZZ": 180,
+            "IsingZZ": 99,
             "RZ": 60,
         }
 
-    @pytest.mark.skip(
-        reason="This test is currently too slow to run in CI. It can be enabled for local testing when needed"
-        "until the performance of the decomposition pass is improved."
-    )
+    # @pytest.mark.skip(
+    #     reason="This test is currently too slow to run in CI. It can be enabled for local testing when needed"
+    #     "until the performance of the decomposition pass is improved."
+    # )
     def test_adjoint_trotter_cgf_decomposes(self):
         """Test that ``qp.adjoint(TrotterCGF)`` decomposes."""
         hamiltonian = self._cgf_hamiltonian()
@@ -2038,8 +2038,8 @@ class TestNumericHamiltonianDecomposition:
         resources = qp.specs(circuit, level="all-mlir")().resources
         assert resources["Before MLIR Passes"].counts == {"Adjoint(TrotterCGF)": 1}
         assert resources["graph-decomposition"].counts == {
-            "Adjoint(BasisRotation)": 62,
-            "IsingZZ": 180,
+            "Adjoint(BasisRotation)": 44,
+            "IsingZZ": 99,
             "RZ": 60,
         }
 
@@ -2079,17 +2079,17 @@ class TestNumericHamiltonianDecomposition:
         resources = qp.specs(circuit, level="all-mlir")().resources
         assert resources["Before MLIR Passes"].counts == {"C(TrotterCDF)": 1}
         assert resources["graph-decomposition"].counts == {
-            "C(BasisRotation)": 62,
-            "C(IsingZZ)": 120,
+            "C(BasisRotation)": 44,
+            "C(IsingZZ)": 66,
             "C(RZ)": 40,
             "GlobalPhase": 1,
             "PhaseShift": 1,
         }
 
-    @pytest.mark.skip(
-        reason="This test is currently too slow to run in CI. It can be enabled for local testing when needed"
-        "until the performance of the decomposition pass is improved."
-    )
+    # @pytest.mark.skip(
+    #     reason="This test is currently too slow to run in CI. It can be enabled for local testing when needed"
+    #     "until the performance of the decomposition pass is improved."
+    # )
     def test_control_trotter_cgf_decomposes(self):
         """Test that ``qp.ctrl(TrotterCGF)`` decomposes.
 
@@ -2124,17 +2124,17 @@ class TestNumericHamiltonianDecomposition:
         resources = qp.specs(circuit, level="all-mlir")().resources
         assert resources["Before MLIR Passes"].counts == {"C(TrotterCGF)": 1}
         assert resources["graph-decomposition"].counts == {
-            "C(BasisRotation)": 62,
-            "C(IsingZZ)": 180,
+            "C(BasisRotation)": 44,
+            "C(IsingZZ)": 99,
             "C(RZ)": 60,
             "GlobalPhase": 1,
             "PhaseShift": 1,
         }
 
-    @pytest.mark.skip(
-        reason="This test is currently too slow to run in CI. It can be enabled for local testing when needed"
-        "until the performance of the decomposition pass is improved."
-    )
+    # @pytest.mark.skip(
+    #     reason="This test is currently too slow to run in CI. It can be enabled for local testing when needed"
+    #     "until the performance of the decomposition pass is improved."
+    # )
     def test_control_adjoint_trotter_cdf_decomposes(self):
         """Test that nested ``qp.ctrl`` and ``qp.adjoint`` on a ``TrotterCDF`` decomposes."""
         hamiltonian = self._cdf_hamiltonian()
@@ -2147,11 +2147,11 @@ class TestNumericHamiltonianDecomposition:
             "PhaseShift",
         }
         expected = {
-            "C(Adjoint(BasisRotation))": 62,
-            "C(CNOT)": 240,
-            "CRZ": 160,
+            "C(Adjoint(BasisRotation))": 44,
+            "C(CNOT)": 132,
+            "CRZ": 106,
             "GlobalPhase": 1,
-            "PauliX": 320,
+            "PauliX": 212,
             "PhaseShift": 1,
         }
 
