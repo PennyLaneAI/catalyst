@@ -32,7 +32,7 @@ from pennylane.decomposition.utils import to_name
 from pennylane.wires import Wires
 
 from catalyst.compiler import _quantum_opt
-from catalyst.decomposition.capture_session import RuleRequest
+from catalyst.decomposition.capture_session import ModifierState, RuleRequest
 from catalyst.decomposition.graph_op_id import GraphOpID
 from catalyst.decomposition.rule_lowering_warning import RuleLoweringWarning
 from catalyst.decomposition.type_utils import get_dummy_values_for_dynamic_shape
@@ -86,8 +86,9 @@ class DecompTargetSpec:
         hybrid_leaves: Numeric hybrid leaves passed as rule operands instead of being closed over.
         target_id: Full GraphOpID that every rule in the set decomposes.
         num_qreg_qubits: Register size required by the legacy standalone materializer.
+        modifier_context: Modifiers to distribute over each raw resource while descending into the
+            graph.
         reject_noninvertible: Whether modifier distribution requires filtering noninvertible bodies.
-        contributes_to_discovery: Whether raw resources from this set extend the reachable graph.
     """
 
     rules: list[DecompRuleSpec]
@@ -99,8 +100,8 @@ class DecompTargetSpec:
     hybrid_leaves: tuple
     target_id: str
     num_qreg_qubits: int
+    modifier_context: ModifierState
     reject_noninvertible: bool = False
-    contributes_to_discovery: bool = False
 
 
 def _resources_have_measurement(gate_counts) -> bool:
@@ -817,6 +818,7 @@ def build_decomp_target_spec(
         hybrid_leaves=tuple(hybrid_leaves),
         target_id=target_id,
         num_qreg_qubits=n_base_wires + (n_ctrl if wrap_control else 0),
+        modifier_context=(wrap_adjoint, n_ctrl if wrap_control else 0),
         reject_noninvertible=wrap_adjoint or wrap_control,
     )
 
@@ -1209,6 +1211,7 @@ def build_registered_decomp_target_spec(
         hybrid_leaves=tuple(hybrid_leaves),
         target_id=target_id,
         num_qreg_qubits=n_base_wires + n_ctrl,
+        modifier_context=(False, n_ctrl if wrap_control else 0),
         reject_noninvertible=wrap_control,
     )
 
@@ -1247,13 +1250,12 @@ def compile_registered_symbolic_rules(
     return materialize_decomp_target_spec(target_spec)
 
 
-def _append_decomp_target_spec(out, description, factory, *, contributes_to_discovery=False):
+def _append_decomp_target_spec(out, description, factory):
     """Append one optional target specification, reporting exclusions consistently."""
 
     try:
         target_spec = factory()
         if target_spec is not None:
-            target_spec.contributes_to_discovery = contributes_to_discovery
             out.append(target_spec)
     except Exception as exc:  # pylint: disable=broad-except
         warnings.warn(
@@ -1263,9 +1265,14 @@ def _append_decomp_target_spec(out, description, factory, *, contributes_to_disc
 
 
 def build_decomp_rule_variants(
-    request: RuleRequest, control_counts: set[int], *, include_base: bool
-) -> tuple[list[DecompTargetSpec], dict[int, list[DecompTargetSpec]]]:
-    """Build target specifications for one base request without materializing MLIR."""
+    request: RuleRequest, modifier_states: set[ModifierState]
+) -> list[DecompTargetSpec]:
+    """Build only the requested modifier variants for one base identity.
+
+    Registered symbolic rules describe their produced modifiers directly on their resource
+    operators. Distributed rules instead inherit the target's modifier context, recorded on the
+    resulting target specification for use by the reachability walk.
+    """
 
     common = {
         "op_name": request.op_name,
@@ -1277,18 +1284,22 @@ def build_decomp_rule_variants(
         "is_custom_op": request.is_custom_op,
         "op_cls": request.op_cls,
     }
-    base_sets = []
-    if include_base:
+    target_specs = []
+    plain = (False, 0)
+    adjoint = (True, 0)
+
+    if plain in modifier_states:
         _append_decomp_target_spec(
-            base_sets,
+            target_specs,
             f"build the decomposition rule specification for {request.base_id}",
             lambda: build_decomp_target_spec(**common),
-            contributes_to_discovery=True,
         )
+
+    if adjoint in modifier_states:
         adj_id = name_wrap_adjoint(request.base_id)
         if request.op_cls is not None:
             _append_decomp_target_spec(
-                base_sets,
+                target_specs,
                 f"lower the registered adjoint decomposition rules for {adj_id}",
                 lambda: build_registered_decomp_target_spec(
                     request.op_name,
@@ -1301,22 +1312,25 @@ def build_decomp_rule_variants(
                     op_cls=request.op_cls,
                     kind="adjoint",
                 ),
-                contributes_to_discovery=True,
             )
         _append_decomp_target_spec(
-            base_sets,
+            target_specs,
             f"synthesize distributed adjoint rules for Adjoint({request.op_name})",
             lambda: build_decomp_target_spec(**common, wrap_adjoint=True),
         )
 
-    control_sets: dict[int, list[DecompTargetSpec]] = {}
-    for count in sorted(control_counts):
-        sets = []
+    control_counts = sorted(
+        {control_count for _, control_count in modifier_states if control_count}
+    )
+    for count in control_counts:
         ctrl_mod = _control_modifier(count)
         ctrl_id = wrap_modifier_id(request.base_id, ctrl_mod)
-        if request.op_cls is not None:
+        controlled = (False, count)
+        controlled_adjoint = (True, count)
+
+        if controlled in modifier_states and request.op_cls is not None:
             _append_decomp_target_spec(
-                sets,
+                target_specs,
                 f"lower the registered control decomposition rules for {ctrl_id}",
                 lambda: build_registered_decomp_target_spec(
                     request.op_name,
@@ -1330,10 +1344,11 @@ def build_decomp_rule_variants(
                     kind="control",
                     n_ctrl=count,
                 ),
-                contributes_to_discovery=request.op_name != "MultiControlledX",
             )
+
+        if controlled_adjoint in modifier_states and request.op_cls is not None:
             _append_decomp_target_spec(
-                sets,
+                target_specs,
                 f"lower controlled registered adjoint rules for {ctrl_id}",
                 lambda: build_registered_decomp_target_spec(
                     request.op_name,
@@ -1349,84 +1364,86 @@ def build_decomp_rule_variants(
                     wrap_control=True,
                 ),
             )
-        for wrap_adjoint in (False, True):
-            label = (
-                f"{ctrl_mod}(Adjoint({request.op_name}))"
-                if wrap_adjoint
-                else f"{ctrl_mod}({request.op_name})"
-            )
+
+        if controlled in modifier_states:
             _append_decomp_target_spec(
-                sets,
-                f"synthesize distributed control rules for {label}",
-                lambda wrap_adjoint=wrap_adjoint: build_decomp_target_spec(
+                target_specs,
+                f"synthesize distributed control rules for {ctrl_mod}({request.op_name})",
+                lambda: build_decomp_target_spec(
                     **common,
-                    wrap_adjoint=wrap_adjoint,
                     wrap_control=True,
                     n_ctrl=count,
                 ),
             )
-        control_sets[count] = sets
 
-    return base_sets, control_sets
+        if controlled_adjoint in modifier_states:
+            _append_decomp_target_spec(
+                target_specs,
+                f"synthesize distributed control rules for "
+                f"{ctrl_mod}(Adjoint({request.op_name}))",
+                lambda: build_decomp_target_spec(
+                    **common,
+                    wrap_adjoint=True,
+                    wrap_control=True,
+                    n_ctrl=count,
+                ),
+            )
+
+    return target_specs
 
 
 def walk_reachable_decomp_rule_sets(
-    initial_requests: list[tuple[RuleRequest, set[int]]],
+    initial_requests: list[tuple[RuleRequest, set[ModifierState]]],
 ) -> list[DecompTargetSpec]:
-    """Build every reachable decomposition rule set in one worklist traversal."""
+    """Build every reachable decomposition rule set in one contextual worklist traversal.
 
-    queue = deque()
-    for request, observed_counts in initial_requests:
-        counts = {1, *(count for count in observed_counts if count > 1)}
-        if request.control_count > 1:
-            counts.add(request.control_count)
-        queue.append((request, counts))
+    Every modifier state is demand-driven and propagated through resource edges. Revisiting an
+    identity processes only states not handled by an earlier queue entry.
+    """
 
-    processed_counts: dict[str, set[int]] = {}
+    queue = deque(
+        (request, required_states, frozenset({request.base_id}))
+        for request, required_states in initial_requests
+    )
+
+    processed_states: dict[str, set[ModifierState]] = {}
     target_specs = []
 
     def child_requests(rule_sets):
         children = []
         for target_spec in rule_sets:
-            if not target_spec.contributes_to_discovery:
-                continue
+            context = target_spec.modifier_context
             for rule in target_spec.rules:
                 for op in rule.resource_ops:
                     if isinstance(op, Operator2):
-                        children.append(RuleRequest.from_operation(op))
+                        children.append(RuleRequest.from_operation(op, context))
         return children
 
     while queue:
-        request, required_counts = queue.popleft()
-        previous_counts = processed_counts.get(request.base_id)
-        first_visit = previous_counts is None
-        missing_counts = required_counts if first_visit else required_counts - previous_counts
-        if not first_visit and not missing_counts:
+        request, demanded_states, ancestors = queue.popleft()
+        demanded_states = set(demanded_states)
+        previous_states = processed_states.setdefault(request.base_id, set())
+        missing_states = demanded_states - previous_states
+        if not missing_states:
             continue
 
-        processed_counts.setdefault(request.base_id, set()).update(required_counts)
-        base_sets, control_sets = build_decomp_rule_variants(
-            request,
-            missing_counts,
-            include_base=first_visit,
-        )
-        target_specs.extend(base_sets)
-        for count in sorted(control_sets):
-            target_specs.extend(control_sets[count])
+        previous_states.update(missing_states)
+        new_specs = build_decomp_rule_variants(request, missing_states)
+        target_specs.extend(new_specs)
 
-        # Preserve the legacy traversal contract: a late control count tops up this node's
-        # definitions but does not reopen its descendants. Contextual modifier propagation is a
-        # separate follow-up.
-        if first_visit:
-            children = child_requests(base_sets)
-            for count in sorted(control_sets):
-                children.extend(child_requests(control_sets[count]))
-
-            for child in children:
-                child_counts = set(required_counts)
-                if child.control_count > 1:
-                    child_counts.add(child.control_count)
-                queue.append((child, child_counts))
+        for child in child_requests(new_specs):
+            # A controlled self-cycle can otherwise manufacture an unbounded sequence of control
+            # counts. Allow the first transition from an uncontrolled ancestor, as well as
+            # adjoint changes and non-increasing control counts, but stop a controlled path when
+            # returning to an ancestor with still more controls.
+            increases_control_cycle = (
+                child.base_id in ancestors
+                and request.control_count > 0
+                and child.control_count > request.control_count
+            )
+            if increases_control_cycle:
+                continue
+            queue.append((child, {child.modifier_state}, ancestors | frozenset({child.base_id})))
 
     return target_specs
 
@@ -1479,13 +1496,13 @@ def compile_reachable_decomposition_rules_wrapper(
     """Return an MLIR module with the full reachable decomposition-rule closure for an operator.
 
     This is the entry point for the compiler's *on-demand* rule loader (``loadPythonDecomps`` ->
-    ``pythonRuleLowering``), which passes the op's *base* name (``getOperatorName()``) together with
-    its full graphOpId (``getGraphOpId()``). Two things matter here:
+    ``pythonRuleLowering``). The callback currently receives the op's *base* name
+    (``getOperatorName()``) together with its full graphOpId (``getGraphOpId()``). Two things matter
+    here:
 
     * **Modifier ids.** For a plain op the name and id agree (``"S"`` / ``"S{...}"``). For an
-      op-level modifier the graphOpId is name-wrapped (``"Adjoint(S){...}"``) while the name stays
-      the base (``"S"``). We recover the base id so the closure explores the base op *and* its
-      adjoint variants; otherwise ``Adjoint(S)`` would be decomposed as if it were ``S``.
+      op-level modifier the graphOpId is name-wrapped while the name stays the base (``"S"``). We
+      recover the base id and modifier state so discovery starts from that variant.
     * **The whole closure, not just this op's direct rules.** The loader does not recurse into a
       rule's resource ops, so it needs every rule reachable from this op down to the gate set in one
       shot. For ``Adjoint(S)`` that includes ``Adjoint(S) -> Adjoint(PhaseShift)`` *and*
@@ -1507,9 +1524,10 @@ def compile_reachable_decomposition_rules_wrapper(
         str: a module holding the whole reachable rule closure
     """
     base_id = op_id
-    n_ctrls = 0
+    adjoint, n_ctrls = False, 0
     if op_id.startswith("Adjoint(") and not op_name.startswith("Adjoint("):
         base_id = name_unwrap_adjoint(op_name, op_id)
+        adjoint = True
     elif _leading_modifier_kind(op_id) == "C" and not op_name.startswith("Adjoint("):
         # A controlled op-id (`C(op)` / `<n>C(op)`): recover the base id and control count so the
         # closure synthesizes the matching `<n>C(...)` rules.
@@ -1523,6 +1541,7 @@ def compile_reachable_decomposition_rules_wrapper(
         static_data=static_data,
         extra_data=extra_data,
         is_custom_op=is_custom_op,
+        adjoint=adjoint,
         n_ctrls=n_ctrls,
     )
     # Wrap the rule funcs in a module: the compiler parses this string with
@@ -1538,6 +1557,7 @@ def materialize_reachable_rule_strings(
     static_data,
     extra_data=None,
     is_custom_op=False,
+    adjoint=False,
     n_ctrls=0,
     op_cls=None,
 ):
@@ -1554,6 +1574,7 @@ def materialize_reachable_rule_strings(
         static_data (dict): compiler-static argument names to their values
         extra_data (dict): argument values the graphOpId identifies by UID instead of spelling
         is_custom_op (bool): whether the operator lowers to ``qref.custom``
+        adjoint (bool): whether the requested operator instance is adjointed
         n_ctrls (int): the number of controls on the operator instance being decomposed
         op_cls (type): the operator's class; classes of the ops met along the way are taken from
             the resources themselves
@@ -1570,9 +1591,10 @@ def materialize_reachable_rule_strings(
         static_data=static_data,
         extra_data=extra_data or {},
         is_custom_op=is_custom_op,
+        adjoint=adjoint,
         control_count=n_ctrls,
     )
-    target_specs = walk_reachable_decomp_rule_sets([(request, {n_ctrls})])
+    target_specs = walk_reachable_decomp_rule_sets([(request, {request.modifier_state})])
 
     rules = []
     for target_spec in target_specs:

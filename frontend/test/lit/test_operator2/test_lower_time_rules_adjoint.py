@@ -12,10 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""
-Test that lowering an Operator2 gate `Op` to MLIR lowers the decomposition rules
-registered for both `Op` and `Adjoint(Op)`.
-"""
+"""Test contextual decomposition-rule capture for plain and adjoint Operator2 gates."""
 
 # RUN: %PYTHON %s | FileCheck %s
 
@@ -51,8 +48,8 @@ def _adj_rule():
     return adj_rule
 
 
-def test_plain_gate_captures_base_and_adjoint():
-    """Lowering a plain gate captures the rules registered against both the gate and its adjoint."""
+def test_plain_gate_captures_only_base():
+    """Lowering a plain gate captures only the rules registered against the plain gate."""
     with qp.decomposition.local_decomps():
         qp.add_decomps(NoParams, _base_rule())
         qp.add_decomps("Adjoint(NoParams)", _adj_rule())
@@ -65,17 +62,11 @@ def test_plain_gate_captures_base_and_adjoint():
 
         print(c.mlir)
 
-    # Three rules are captured, each tied to the correct target and resources:
-    #   1. base rule of NoParams          -> target NoParams,          one SingleParam
-    #   2. rule registered on Adjoint(..) -> target Adjoint(NoParams), two SingleParam
-    #   3. synthesized (adjointed base)   -> target Adjoint(NoParams), one Adjoint(SingleParam)
     # CHECK: qref.operator "NoParams"()
     # CHECK-DAG: func.func private @"__builtin_base_rule_NoParams{}{reg:2}{}"{{.*}}"SingleParam{{.*}}target_gate = "NoParams{}{reg:2}{}"
-    # CHECK-DAG: func.func private @"__builtin_adj_rule_Adjoint(NoParams){}{reg:2}{}"{{.*}}"SingleParam{{.*}} = 2 : i64{{.*}}target_gate = "Adjoint(NoParams){}{reg:2}{}"
-    # CHECK-DAG: func.func private @"__builtin_base_rule_Adjoint(NoParams){}{reg:2}{}"{{.*}}"Adjoint(SingleParam{{.*}}target_gate = "Adjoint(NoParams){}{reg:2}{}"
 
 
-test_plain_gate_captures_base_and_adjoint()
+test_plain_gate_captures_only_base()
 
 
 def test_adjoint_gate_captures_adjoint_rule():
@@ -92,11 +83,9 @@ def test_adjoint_gate_captures_adjoint_rule():
 
         print(c.mlir)
 
-    # Lowering `adjoint(NoParams)` collects the SAME three rules as the plain case: the collector
-    # keys off the base name `NoParams` regardless of the op-level adjoint modifier, so it always
-    # explores NoParams + Adjoint(NoParams). Only the circuit body differs (the op carries `adj`).
+    # Both alternatives for the requested adjoint target are retained: the directly registered
+    # symbolic rule and the rule synthesized by distributing adjoint over the base rule.
     # CHECK: qref.operator "NoParams"() adj
-    # CHECK-DAG: func.func private @"__builtin_base_rule_NoParams{}{reg:2}{}"{{.*}}"SingleParam{{.*}}target_gate = "NoParams{}{reg:2}{}"
     # CHECK-DAG: func.func private @"__builtin_adj_rule_Adjoint(NoParams){}{reg:2}{}"{{.*}}"SingleParam{{.*}} = 2 : i64{{.*}}target_gate = "Adjoint(NoParams){}{reg:2}{}"
     # CHECK-DAG: func.func private @"__builtin_base_rule_Adjoint(NoParams){}{reg:2}{}"{{.*}}"Adjoint(SingleParam{{.*}}target_gate = "Adjoint(NoParams){}{reg:2}{}"
 

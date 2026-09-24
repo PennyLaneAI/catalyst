@@ -28,6 +28,7 @@ from jax._src.sharding_impls import UNSPECIFIED
 from jax.core import take_current_trace
 from pennylane.capture import PlxprInterpreter, pause
 from pennylane.capture.base_interpreter import jaxpr_to_jaxpr
+from pennylane.capture.primitives import adjoint_transform_prim as plxpr_adjoint_transform_prim
 from pennylane.capture.primitives import cond_prim as pl_cond_prim
 from pennylane.capture.primitives import ctrl_transform_prim as plxpr_ctrl_transform_prim
 from pennylane.capture.primitives import measure_prim as plxpr_measure_prim
@@ -44,7 +45,7 @@ from pennylane.measurements import CountsMP
 from pennylane.pytrees import flatten, unflatten
 from pennylane.wires import AbstractQubit, Wires, is_abstract_qubit
 
-from catalyst.decomposition.capture_session import RuleDef, RuleRequest
+from catalyst.decomposition.capture_session import ModifierState, RuleDef, RuleRequest
 from catalyst.decomposition.decomposition_rules import (
     rule_call_operands,
     walk_reachable_decomp_rule_sets,
@@ -132,6 +133,8 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
         """Any control wires used for a subroutine."""
         self.control_values = control_values
         """Any control values for executing a subroutine."""
+        self.modifier_context: ModifierState = (False, 0)
+        """Modifier context surrounding decomposition requests."""
         self.has_dynamic_allocation = False
         self.decomposition_scope = decomposition_scope
 
@@ -153,7 +156,7 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
             if isinstance(eqn.outvars[0], jax.core.DropVar):
                 if self.decomposition_scope is not None:
                     self.decomposition_scope.record_root(
-                        RuleRequest.from_operation(op, len(self.control_wires))
+                        RuleRequest.from_operation(op, self.modifier_context)
                     )
                 _apply_operator2_gate(self, *invals, **eqn.params)
                 return ()
@@ -848,6 +851,26 @@ def handle_measure_in_basis(self, angle, wire, plane, reset, postselect):
 
 
 # pylint: disable=unused-argument
+@PLxPRToQuantumJaxprInterpreter.register_primitive(plxpr_adjoint_transform_prim)
+def handle_adjoint_transform(self, *invals, jaxpr, lazy, n_consts):
+    """Interpret an adjoint region while retaining its context for rule discovery."""
+    consts = invals[:n_consts]
+    args = invals[n_consts:]
+    body_interpreter = copy(self)
+    adjoint, control_count = self.modifier_context
+    body_interpreter.modifier_context = (not adjoint, control_count)
+    body = jaxpr_to_jaxpr(body_interpreter, jaxpr, consts, *args)
+
+    return plxpr_adjoint_transform_prim.bind(
+        *body.consts,
+        *args,
+        jaxpr=body.jaxpr,
+        lazy=lazy,
+        n_consts=len(body.consts),
+    )
+
+
+# pylint: disable=unused-argument
 @PLxPRToQuantumJaxprInterpreter.register_primitive(plxpr_ctrl_transform_prim)
 def handle_ctrl_transform(self, *invals, jaxpr, n_control, control_values, work_wires, n_consts):
     """Interpret a control transform, then re-bind it for lowering to a `qref.ctrl` region op."""
@@ -858,7 +881,10 @@ def handle_ctrl_transform(self, *invals, jaxpr, n_control, control_values, work_
     control_qubits = [
         w if is_abstract_qubit(w) else qref_get_p.bind(self.init_qreg, w) for w in control_wires
     ]
-    body = jaxpr_to_jaxpr(copy(self), jaxpr, consts, *args)
+    body_interpreter = copy(self)
+    adjoint, control_count = self.modifier_context
+    body_interpreter.modifier_context = (adjoint, control_count + n_control)
+    body = jaxpr_to_jaxpr(body_interpreter, jaxpr, consts, *args)
 
     return plxpr_ctrl_transform_prim.bind(
         *body.consts,
