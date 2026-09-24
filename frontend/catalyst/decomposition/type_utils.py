@@ -53,9 +53,6 @@ def convert_item_to_mlir_type(item, is_special_lowering=False):
     if isinstance(item, str):
         return item
 
-    if not hasattr(item, "dtype"):
-        item = np.asarray(item)
-
     with mlir_build_context():
         element_type = dtype_to_ir_type(np.dtype(item.dtype))
         if is_special_lowering and item.shape == ():
