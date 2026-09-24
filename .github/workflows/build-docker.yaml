@@ -30,7 +30,7 @@ on:
 jobs:
   docker:
     name: docker::ubuntu-24.04::${{ matrix.arch }}::catalyst::${{ inputs.catalyst-version }}
-    timeout-minutes: 60
+    timeout-minutes: 90
     strategy:
       fail-fast: false
       matrix:
