@@ -130,7 +130,7 @@ ResourceAnalysis::ResourceAnalysis(ModuleOp moduleOp,
     for (auto funcOp : definedFuncOps) {
         ResourceResult result = makeEmptyResult();
         for (auto &region : funcOp->getRegions()) {
-            analyzeRegion(region, result, /*isAdjoint=*/false);
+            analyzeRegion(region, result, /*isAdjoint=*/false, /*numControlQubits=*/0);
         }
 
         if (funcOp.getName() == entryFunc) {
@@ -163,7 +163,7 @@ ResourceAnalysis::ResourceAnalysis(func::FuncOp funcOp,
     ResourceResult result = makeEmptyResult();
 
     for (auto &region : funcOp->getRegions()) {
-        analyzeRegion(region, result, /*isAdjoint*/ false);
+        analyzeRegion(region, result, /*isAdjoint=*/false, /*numControlQubits=*/0);
     }
 
     // TODO: Additional handling for entrypoint functions
@@ -184,9 +184,10 @@ std::string ResourceAnalysis::makeUniqueSyntheticName(StringRef prefix, int64_t 
     return candidate;
 }
 
-void ResourceAnalysis::analyzeForLoop(scf::ForOp forOp, ResourceResult &result, bool isAdjoint) {
+void ResourceAnalysis::analyzeForLoop(scf::ForOp forOp, ResourceResult &result, bool isAdjoint,
+                                      unsigned numControlQubits) {
     ResourceResult bodyResult = makeEmptyResult();
-    analyzeRegion(forOp.getBodyRegion(), bodyResult, isAdjoint);
+    analyzeRegion(forOp.getBodyRegion(), bodyResult, isAdjoint, numControlQubits);
 
     // Try to resolve a static trip count.
     auto tripCount = resolveForLoopTripCount(forOp);
@@ -213,9 +214,9 @@ void ResourceAnalysis::analyzeForLoop(scf::ForOp forOp, ResourceResult &result, 
 }
 
 void ResourceAnalysis::analyzeWhileLoop(scf::WhileOp whileOp, ResourceResult &result,
-                                        bool isAdjoint) {
+                                        bool isAdjoint, unsigned numControlQubits) {
     ResourceResult bodyResult = makeEmptyResult();
-    analyzeRegion(whileOp.getAfter(), bodyResult, isAdjoint);
+    analyzeRegion(whileOp.getAfter(), bodyResult, isAdjoint, numControlQubits);
 
     if (auto iters = getEstimatedIterationsHint(whileOp)) {
         bodyResult.multiplyBy(*iters);
@@ -226,11 +227,12 @@ void ResourceAnalysis::analyzeWhileLoop(scf::WhileOp whileOp, ResourceResult &re
     result.mergeWith(bodyResult);
 }
 
-void ResourceAnalysis::analyzeIfOp(scf::IfOp ifOp, ResourceResult &result, bool isAdjoint) {
+void ResourceAnalysis::analyzeIfOp(scf::IfOp ifOp, ResourceResult &result, bool isAdjoint,
+                                   unsigned numControlQubits) {
     result.hasBranches = true;
 
     ResourceResult thenResult = makeEmptyResult();
-    analyzeRegion(ifOp.getThenRegion(), thenResult, isAdjoint);
+    analyzeRegion(ifOp.getThenRegion(), thenResult, isAdjoint, numControlQubits);
 
     // If a branch probability hint is present, compute the expected (average) resource counts
     // weighted by the probability, rather than the worst case.
@@ -241,7 +243,7 @@ void ResourceAnalysis::analyzeIfOp(scf::IfOp ifOp, ResourceResult &result, bool 
 
         ResourceResult elseResult = makeEmptyResult();
         if (!ifOp.getElseRegion().empty()) {
-            analyzeRegion(ifOp.getElseRegion(), elseResult, isAdjoint);
+            analyzeRegion(ifOp.getElseRegion(), elseResult, isAdjoint, numControlQubits);
         }
 
         thenResult.multiplyBy(pThen);
@@ -255,14 +257,14 @@ void ResourceAnalysis::analyzeIfOp(scf::IfOp ifOp, ResourceResult &result, bool 
     // No hint: fall back to worst-case (max across branches).
     if (!ifOp.getElseRegion().empty()) {
         ResourceResult elseResult = makeEmptyResult();
-        analyzeRegion(ifOp.getElseRegion(), elseResult, isAdjoint);
+        analyzeRegion(ifOp.getElseRegion(), elseResult, isAdjoint, numControlQubits);
         thenResult.mergeWith(elseResult, ResourceResult::MergeMethod::Max);
     }
     result.mergeWith(thenResult);
 }
 
 void ResourceAnalysis::analyzeIndexSwitchOp(scf::IndexSwitchOp switchOp, ResourceResult &result,
-                                            bool isAdjoint) {
+                                            bool isAdjoint, unsigned numControlQubits) {
     result.hasBranches = true;
 
     // If branch probabilities are provided, compute the expected (average) resource counts.
@@ -275,7 +277,7 @@ void ResourceAnalysis::analyzeIndexSwitchOp(scf::IndexSwitchOp switchOp, Resourc
 
         for (auto &&[idx, caseRegion] : llvm::enumerate(caseRegions)) {
             ResourceResult caseResult = makeEmptyResult();
-            analyzeRegion(caseRegion, caseResult, isAdjoint);
+            analyzeRegion(caseRegion, caseResult, isAdjoint, numControlQubits);
 
             double p = cast<FloatAttr>(probsAttr[idx]).getValueAsDouble();
             sumProb += p;
@@ -289,7 +291,7 @@ void ResourceAnalysis::analyzeIndexSwitchOp(scf::IndexSwitchOp switchOp, Resourc
         double pDefault = std::min(std::max(0.0, 1.0 - sumProb), 1.0);
 
         ResourceResult defaultResult = makeEmptyResult();
-        analyzeRegion(switchOp.getDefaultRegion(), defaultResult, isAdjoint);
+        analyzeRegion(switchOp.getDefaultRegion(), defaultResult, isAdjoint, numControlQubits);
         defaultResult.multiplyBy(pDefault);
         expected.mergeWith(defaultResult, ResourceResult::MergeMethod::Sum);
 
@@ -303,7 +305,7 @@ void ResourceAnalysis::analyzeIndexSwitchOp(scf::IndexSwitchOp switchOp, Resourc
 
     for (auto &caseRegion : caseRegions) {
         ResourceResult caseResult = makeEmptyResult();
-        analyzeRegion(caseRegion, caseResult, isAdjoint);
+        analyzeRegion(caseRegion, caseResult, isAdjoint, numControlQubits);
         if (first) {
             maxResult = std::move(caseResult);
             first = false;
@@ -314,16 +316,16 @@ void ResourceAnalysis::analyzeIndexSwitchOp(scf::IndexSwitchOp switchOp, Resourc
 
     // default region
     ResourceResult defaultResult = makeEmptyResult();
-    analyzeRegion(switchOp.getDefaultRegion(), defaultResult, isAdjoint);
+    analyzeRegion(switchOp.getDefaultRegion(), defaultResult, isAdjoint, numControlQubits);
     maxResult.mergeWith(defaultResult, ResourceResult::MergeMethod::Max);
 
     result.mergeWith(maxResult);
 }
 
-void ResourceAnalysis::analyzePBCLayer(pbc::LayerOp layerOp, ResourceResult &result,
-                                       bool isAdjoint) {
+void ResourceAnalysis::analyzePBCLayer(pbc::LayerOp layerOp, ResourceResult &result, bool isAdjoint,
+                                       unsigned numControlQubits) {
     for (auto &layerRegion : layerOp->getRegions()) {
-        analyzeRegion(layerRegion, result, isAdjoint);
+        analyzeRegion(layerRegion, result, isAdjoint, numControlQubits);
     }
 }
 
@@ -335,38 +337,50 @@ void ResourceAnalysis::analyzePBCLayer(pbc::LayerOp layerOp, ResourceResult &res
  * @param region The MLIR region to analyze.
  * @param result The ResourceResult to accumulate counts into.
  * @param isAdjoint Whether the current region is under an adjoint (quantum.adjoint) operation.
+ * @param numControlQubits The number of control qubits added by the current region.
  */
-void ResourceAnalysis::analyzeRegion(Region &region, ResourceResult &result, bool isAdjoint) {
+void ResourceAnalysis::analyzeRegion(Region &region, ResourceResult &result, bool isAdjoint,
+                                     unsigned numControlQubits) {
     for (Block &block : region) {
         for (Operation &op : block) {
             bool needsCollection = true;
 
             llvm::TypeSwitch<Operation &, void>(op)
                 .Case<quantum::AdjointOp, qref::AdjointOp>([&](auto adjOp) {
-                    analyzeRegion(adjOp.getRegion(), result, !isAdjoint);
+                    analyzeRegion(adjOp.getRegion(), result, !isAdjoint, numControlQubits);
+                    needsCollection = false;
+                })
+                .Case<quantum::CtrlOp>([&](auto ctrlOp) {
+                    analyzeRegion(ctrlOp.getRegion(), result, isAdjoint,
+                                  numControlQubits + ctrlOp.getInCtrlQubits().size());
+                    needsCollection = false;
+                })
+                .Case<qref::CtrlOp>([&](auto ctrlOp) {
+                    analyzeRegion(ctrlOp.getRegion(), result, isAdjoint,
+                                  numControlQubits + ctrlOp.getCtrlQubits().size());
                     needsCollection = false;
                 })
                 .Case([&](mlir::scf::ForOp forLoopOp) {
-                    analyzeForLoop(forLoopOp, result, isAdjoint);
+                    analyzeForLoop(forLoopOp, result, isAdjoint, numControlQubits);
                 })
                 .Case([&](mlir::scf::WhileOp whileOp) {
-                    analyzeWhileLoop(whileOp, result, isAdjoint);
+                    analyzeWhileLoop(whileOp, result, isAdjoint, numControlQubits);
                 })
                 .Case([&](mlir::scf::IfOp ifConditionalOp) {
-                    analyzeIfOp(ifConditionalOp, result, isAdjoint);
+                    analyzeIfOp(ifConditionalOp, result, isAdjoint, numControlQubits);
                 })
                 .Case([&](mlir::scf::IndexSwitchOp switchOp) {
-                    analyzeIndexSwitchOp(switchOp, result, isAdjoint);
+                    analyzeIndexSwitchOp(switchOp, result, isAdjoint, numControlQubits);
                 })
                 .Case([&](pbc::LayerOp regionLayerOp) {
-                    analyzePBCLayer(regionLayerOp, result, isAdjoint);
+                    analyzePBCLayer(regionLayerOp, result, isAdjoint, numControlQubits);
                 })
                 .Default([&](Operation &op) {
                     // other operations - do nothing
                 });
 
             if (needsCollection) {
-                collectOperation(&op, result, isAdjoint);
+                collectOperation(&op, result, isAdjoint, numControlQubits);
                 if (collectDetailedOperations) {
                     result.collectDetailedOperations = true;
                     collectDetailedOperation(&op, result, isAdjoint);
@@ -391,9 +405,10 @@ void ResourceAnalysis::analyzeRegion(Region &region, ResourceResult &result, boo
  * @param op The operation to collect.
  * @param result The ResourceResult to update with the operation's resource usage.
  * @param isAdjoint Whether the current region is under an adjoint (quantum.adjoint) operation.
+ * @param numControlQubits The number of control qubits added by the current region.
  */
-void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result,
-                                        bool isAdjoint) const {
+void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result, bool isAdjoint,
+                                        unsigned numControlQubits) const {
     // Collect extensions for the operation
     assert(result.extensions.size() == extensionAnalyses.size() &&
            "extension data/collector size mismatch");
@@ -419,7 +434,7 @@ void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result,
         if (isAdjoint ^ inst.getResourceAdjointFlag()) {
             name = "Adjoint(" + name + ")";
         }
-        uint64_t nCtrlQubits = inst.getResourceNumCtrlQubits();
+        uint64_t nCtrlQubits = inst.getResourceNumCtrlQubits() + numControlQubits;
 
         if (nCtrlQubits == 1) {
             name = "C(" + name + ")";
