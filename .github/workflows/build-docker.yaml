@@ -41,7 +41,35 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ inputs.catalyst-version }}
-          submodules: true
+
+      - name: Read dependency versions
+        id: pins
+        run: grep -E '^(llvm|stablehlo|enzyme)=' .dep-versions >> "$GITHUB_OUTPUT"
+
+      # Source caches saved by check-catalyst.yaml; much faster than cloning the submodules.
+      - uses: actions/cache/restore@v4
+        with:
+          path: mlir/llvm-project
+          key: llvm-${{ steps.pins.outputs.llvm }}-default-source
+          enableCrossOsArchive: true
+
+      - uses: actions/cache/restore@v4
+        with:
+          path: mlir/stablehlo
+          key: stablehlo-${{ steps.pins.outputs.stablehlo }}-default-source
+          enableCrossOsArchive: true
+
+      - uses: actions/cache/restore@v4
+        with:
+          path: mlir/Enzyme
+          key: enzyme-${{ steps.pins.outputs.enzyme }}-default-source
+          enableCrossOsArchive: true
+
+      - name: Fetch uncached submodules
+        run: |
+          for d in llvm-project stablehlo Enzyme; do
+            [ -n "$(ls -A mlir/$d)" ] || git submodule update --init --depth 1 mlir/$d
+          done
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
