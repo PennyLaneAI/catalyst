@@ -35,9 +35,11 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { arch: x86_64, runner: blacksmith-8vcpu-ubuntu-2404 }
-          - { arch: aarch64, runner: blacksmith-8vcpu-ubuntu-2404-arm }
+          - { arch: amd64, runner: blacksmith-8vcpu-ubuntu-2404 }
+          - { arch: arm64, runner: blacksmith-8vcpu-ubuntu-2404-arm }
     runs-on: ${{ matrix.runner }}
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
     env:
       # Layer cache for the deps stage (LLVM, StableHLO, Enzyme). Not a runnable image.
       DEPS_CACHE: pennylaneai/pennylane:buildcache-catalyst-deps-${{ matrix.arch }}
@@ -55,7 +57,7 @@ jobs:
         id: tag
         if: ${{ inputs.push-to-dockerhub }}
         env:
-          TAG: ${{ inputs.catalyst-version }}-catalyst-pl-${{ inputs.pennylane-version || steps.pins.outputs.pennylane }}-lightning-${{ inputs.lightning-version || steps.pins.outputs.lightning }}-${{ matrix.arch }}
+          TAG: ${{ inputs.pennylane-version || steps.pins.outputs.pennylane }}-catalyst-${{ inputs.catalyst-version }}-lightning-${{ inputs.lightning-version || steps.pins.outputs.lightning }}
         run: |
           [[ "$TAG" =~ ^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$ ]] || { echo "::error::Invalid Docker tag: $TAG"; exit 1; }
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
@@ -132,16 +134,53 @@ jobs:
           retention-days: 1
           compression-level: 0
 
-      - name: Build and push version
+      # Untagged; the manifest job puts both archs under the one real tag.
+      - name: Push by digest
+        id: push
         uses: docker/build-push-action@v6
         if: ${{ inputs.push-to-dockerhub }}
         with:
-          push: ${{ inputs.push-to-dockerhub }}
           context: .
           file: docker/Dockerfile
           target: catalyst
-          tags: pennylaneai/pennylane:${{ steps.tag.outputs.tag }},pennylaneai/pennylane:latest-catalyst-${{ matrix.arch }}
+          outputs: type=image,name=pennylaneai/pennylane,push-by-digest=true,name-canonical=true,push=true
           cache-from: type=registry,ref=${{ env.DEPS_CACHE }}
           build-args: |
             LIGHTNING_VERSION=${{ inputs.lightning-version }}
             PENNYLANE_VERSION=${{ inputs.pennylane-version }}
+
+      - name: Save digest
+        if: ${{ inputs.push-to-dockerhub }}
+        run: echo "${{ steps.push.outputs.digest }}" > "${{ runner.temp }}/digest"
+
+      - name: Upload digest
+        if: ${{ inputs.push-to-dockerhub }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: digest-${{ matrix.arch }}
+          path: ${{ runner.temp }}/digest
+          retention-days: 1
+
+  # Combines the per-arch images under one tag
+  manifest:
+    needs: docker
+    if: ${{ inputs.push-to-dockerhub }}
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Download digests
+        uses: actions/download-artifact@v4
+        with:
+          pattern: digest-*
+          path: digests
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Create multi-arch tag
+        env:
+          TAG: ${{ needs.docker.outputs.tag }}
+        run: |
+          docker buildx imagetools create -t "pennylaneai/pennylane:$TAG" \
+            $(sed 's|^|pennylaneai/pennylane@|' digests/*/digest)
