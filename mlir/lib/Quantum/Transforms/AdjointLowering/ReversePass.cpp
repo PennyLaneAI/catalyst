@@ -31,6 +31,7 @@
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/IR/IRMapping.h"
 #include "mlir/IR/Value.h"
+#include "mlir/IR/ValueRange.h"
 #include "mlir/IR/Verifier.h"
 #include "mlir/Transforms/DialectConversion.h"
 
@@ -226,6 +227,7 @@ class AdjointGenerator {
 
         // Read cached parameters from the recorded parameter vector.
         Operation *operation = gate;
+        Location loc = operation->getLoc();
         if (auto parametrizedGate = dyn_cast<quantum::ParametrizedGate>(operation)) {
             OpBuilder::InsertionGuard insertionGuard(builder);
             builder.setInsertionPoint(clone);
@@ -249,6 +251,76 @@ class AdjointGenerator {
                     generationFailed = true;
                     return;
                 }
+
+                DataLayout dataLayout = DataLayout::closest(operation);
+                auto zero = arith::ConstantIndexOp::create(builder, loc, 0);
+
+                if (isa<RankedTensorType>(paramType)) {
+                    // Param is a tensor, need to convert to tensors via bufferization ops
+                    continue;
+                } else {
+                    // Param not a tensor, just use a raw memref without buffers
+                    // Cache holds the bytes in reverse
+                    // e.g. if the two params were 0x01234567, 0x89abcedf, the cache looks like
+                    // [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, a, b, c, d, e, f] <---
+                    // where stack i/o happens at the right of the above illustration
+
+                    // 1. Create a scratch memory to hold the popped bytes
+                    int64_t paramNumBytes = dataLayout.getTypeSize(paramType).getFixedValue();
+                    uint64_t alignment = dataLayout.getTypeABIAlignment(paramType);
+                    auto sizedMemrefType = MemRefType::get({paramNumBytes}, builder.getI8Type());
+                    Value scratchMemory =
+                        memref::AllocOp::create(builder, loc, sizedMemrefType,
+                                                builder.getI64IntegerAttr(alignment))
+                            .getMemref();
+
+                    // 2. Pop bytes and store them into the scratch memory
+                    // The popped bytes need to be stored at the back, e.g.
+                    // iteration 0, popped 0xf, store at index 7
+                    // iteration 1, popped 0xe, store at index 6
+                    // ....
+                    // iteration 7, popped 0x8, store at index 0
+                    // Storing index is num_bytes - 1 - iter
+                    Value c0i = index::ConstantOp::create(builder, loc, 0);
+                    Value c1i = index::ConstantOp::create(builder, loc, 1);
+                    Value total = index::ConstantOp::create(builder, loc, paramNumBytes);
+                    scf::ForOp popLoop = scf::ForOp::create(builder, loc, c0i, total, c1i);
+                    {
+                        OpBuilder::InsertionGuard guard(builder);
+                        builder.setInsertionPointToStart(popLoop.getBody());
+
+                        Value poppedByte =
+                            ListPopOp::create(builder, loc, cache.paramVector).getResult();
+
+                        Value minusOne =
+                            arith::SubIOp::create(builder, loc, total, c1i).getResult();
+                        Value storeIndex =
+                            arith::SubIOp::create(builder, loc, minusOne, popLoop.getInductionVar())
+                                .getResult();
+
+                        memref::StoreOp::create(builder, loc, poppedByte, scratchMemory,
+                                                ValueRange{storeIndex});
+                    }
+
+                    // 3. The scratch memory now stores the same bytes as the intended param
+                    // View it as a singular entry of the raw type and load
+                    auto targetViewType = MemRefType::get({1}, paramType);
+                    Value view = memref::ViewOp::create(builder, loc, targetViewType, scratchMemory,
+                                                        zero, ValueRange{} // Empty dynamic sizes
+                                                        )
+                                     ->getResult(0);
+                    Value load =
+                        memref::LoadOp::create(builder, loc, view, ValueRange{zero}).getResult();
+
+                    // 4. Release scratch memory
+                    memref::DeallocOp::create(builder, loc, scratchMemory);
+
+                    cachedParams[numParams - 1 - idx] = load;
+
+                    idx++;
+                    continue;
+                }
+
                 if (paramType.isF64()) {
                     cachedParams[numParams - 1 - idx] =
                         ListPopOp::create(builder, parametrizedGate.getLoc(), cache.paramVector);

@@ -22,7 +22,9 @@
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
+#include "mlir/IR/Attributes.h"
 #include "mlir/IR/IRMapping.h"
+#include "mlir/Interfaces/DataLayoutInterfaces.h"
 #include "mlir/Transforms/DialectConversion.h"
 
 #include "Catalyst/IR/CatalystOps.h"
@@ -130,6 +132,57 @@ void AugmentedCircuitGenerator::cacheGate(quantum::ParametrizedGate gate, OpBuil
         if (mlir::failed(verifyTypeIsCacheable(paramType, op))) {
             generationFailed = true;
             return;
+        }
+
+        DataLayout dataLayout = DataLayout::closest(op);
+        auto zero = arith::ConstantIndexOp::create(builder, loc, 0);
+
+        if (isa<RankedTensorType>(paramType)) {
+            // Param is a tensor, need to convert to memrefs via bufferization ops
+            // TODO
+            continue;
+        } else {
+            // Param not a tensor, just use a raw memref without buffers
+
+            // 1. Create a block of scratch memory the same size as the param type
+            // e.g. for f64, create memref<8xi8>
+            int64_t paramNumBytes = dataLayout.getTypeSize(paramType).getFixedValue();
+            uint64_t alignment = dataLayout.getTypeABIAlignment(paramType);
+            auto sizedMemrefType = MemRefType::get({paramNumBytes}, builder.getI8Type());
+            Value scratchMemory = memref::AllocOp::create(builder, loc, sizedMemrefType,
+                                                          builder.getI64IntegerAttr(alignment))
+                                      .getMemref();
+
+            // 2. Create a view into the memref with a singular entry of the raw type
+            // e.g. memref<8xi8> to memref<1xf64>
+            // and store the param into the scratch memory with the view
+            auto targetViewType = MemRefType::get({1}, paramType);
+            Value view = memref::ViewOp::create(builder, loc, targetViewType, scratchMemory, zero,
+                                                ValueRange{} // Empty dynamic sizes
+                                                )
+                             ->getResult(0);
+            memref::StoreOp::create(builder, loc, clonedParam, view, ValueRange{zero});
+
+            // 3. The scratch memory now holds the same bytes as the as param value
+            // Push the numerical byte values onto the (i8) cache
+            // e.g. if param were 0x1234abcd, then push 0x1, then 0x2, then ...,
+            // then 0xd, onto the cache
+            Value c0i = index::ConstantOp::create(builder, loc, 0);
+            Value c1i = index::ConstantOp::create(builder, loc, 1);
+            Value total = index::ConstantOp::create(builder, loc, paramNumBytes);
+            scf::ForOp pushLoop = scf::ForOp::create(builder, loc, c0i, total, c1i);
+            {
+                OpBuilder::InsertionGuard guard(builder);
+                builder.setInsertionPointToStart(pushLoop.getBody());
+                Value byte =
+                    memref::LoadOp::create(builder, loc, scratchMemory, pushLoop.getInductionVar())
+                        .getResult();
+                ListPushOp::create(builder, loc, byte, cache.paramVector);
+            }
+
+            // 4. Release scratch memory
+            memref::DeallocOp::create(builder, loc, scratchMemory);
+            continue;
         }
 
         if (paramType.isF64()) {

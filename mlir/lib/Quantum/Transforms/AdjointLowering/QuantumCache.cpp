@@ -16,6 +16,7 @@
 
 #include <cstdint>
 
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 
 #include "Catalyst/IR/CatalystOps.h"
@@ -94,12 +95,14 @@ bool isAvailableToReversePass(Value param, Region &adjointRegion) {
 
 QuantumCache QuantumCache::initialize(Region &region, OpBuilder &builder, Location loc) {
     MLIRContext *ctx = builder.getContext();
-    auto paramVectorType = ArrayListType::get(ctx, builder.getF64Type());
+    Type byteSizeType = builder.getI8Type();
+    auto paramVectorType = ArrayListType::get(ctx, byteSizeType);
+
     auto intVectorType = ArrayListType::get(ctx, builder.getI64Type());
     auto wireVectorType = ArrayListType::get(ctx, builder.getI64Type());
     auto controlFlowTapeType = ArrayListType::get(ctx, builder.getIndexType());
     auto paramVector = ListInitOp::create(builder, loc, paramVectorType);
-    auto intVector = ListInitOp::create(builder, loc, intVectorType);
+    auto intVector = ListInitOp::create(builder, loc, intVectorType); // TODO: REMOVE
     auto wireVector = ListInitOp::create(builder, loc, wireVectorType);
 
     // Initialize the tapes that store the structure of control flow.
