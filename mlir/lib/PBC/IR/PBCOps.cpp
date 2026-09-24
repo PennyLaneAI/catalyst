@@ -401,10 +401,10 @@ uint64_t FabricateOp::getResourceNumQubits() { return 0; }
 uint64_t PPRotationOp::getResourceNumQubits() { return getInQubits().size(); }
 uint64_t PPRotationArbitraryOp::getResourceNumQubits() { return getInQubits().size(); }
 uint64_t PPMeasurementOp::getResourceNumQubits() { return getInQubits().size(); }
-uint64_t RefPPMeasurementOp::getResourceNumQubits() { return getQubits().size(); }
 uint64_t SelectPPMeasurementOp::getResourceNumQubits() { return getInQubits().size(); }
-uint64_t RefPPRotationOp::getResourceNumQubits() { return 0; }
-uint64_t RefSelectPPMeasurementOp::getResourceNumQubits() { return 0; }
+uint64_t RefPPRotationOp::getResourceNumQubits() { return getQubits().size(); }
+uint64_t RefPPMeasurementOp::getResourceNumQubits() { return getQubits().size(); }
+uint64_t RefSelectPPMeasurementOp::getResourceNumQubits() { return getQubits().size(); }
 uint64_t RefPrepareStateOp::getResourceNumQubits() { return 0; }
 uint64_t RefFabricateOp::getResourceNumQubits() { return 0; }
 
@@ -413,9 +413,9 @@ uint64_t FabricateOp::getResourceNumCtrlQubits() { return 0; }
 uint64_t PPRotationOp::getResourceNumCtrlQubits() { return 0; }
 uint64_t PPRotationArbitraryOp::getResourceNumCtrlQubits() { return 0; }
 uint64_t PPMeasurementOp::getResourceNumCtrlQubits() { return 0; }
-uint64_t RefPPMeasurementOp::getResourceNumCtrlQubits() { return 0; }
 uint64_t SelectPPMeasurementOp::getResourceNumCtrlQubits() { return 0; }
 uint64_t RefPPRotationOp::getResourceNumCtrlQubits() { return 0; }
+uint64_t RefPPMeasurementOp::getResourceNumCtrlQubits() { return 0; }
 uint64_t RefSelectPPMeasurementOp::getResourceNumCtrlQubits() { return 0; }
 uint64_t RefPrepareStateOp::getResourceNumCtrlQubits() { return 0; }
 uint64_t RefFabricateOp::getResourceNumCtrlQubits() { return 0; }
@@ -425,9 +425,9 @@ uint64_t FabricateOp::getResourceNumParams() { return 0; }
 uint64_t PPRotationOp::getResourceNumParams() { return 0; }
 uint64_t PPRotationArbitraryOp::getResourceNumParams() { return 0; }
 uint64_t PPMeasurementOp::getResourceNumParams() { return 0; }
-uint64_t RefPPMeasurementOp::getResourceNumParams() { return 0; }
 uint64_t SelectPPMeasurementOp::getResourceNumParams() { return 0; }
 uint64_t RefPPRotationOp::getResourceNumParams() { return 0; }
+uint64_t RefPPMeasurementOp::getResourceNumParams() { return 0; }
 uint64_t RefSelectPPMeasurementOp::getResourceNumParams() { return 0; }
 uint64_t RefPrepareStateOp::getResourceNumParams() { return 0; }
 uint64_t RefFabricateOp::getResourceNumParams() { return 0; }
