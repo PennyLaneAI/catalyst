@@ -63,6 +63,7 @@ from catalyst.decomposition.decomposition_rules import (
     compile_reachable_decomposition_rules_wrapper,
     compile_registered_symbolic_rules,
     get_rule_strings_from_module,
+    materialize_reachable_rule_strings,
     name_unwrap_adjoint,
     name_unwrap_control,
     name_wrap_adjoint,
@@ -836,12 +837,11 @@ class TestOnDemand:
         [
             ("RX", "C(RX){0:[f64]}{wires:1}{}", "RX{0:[f64]}{wires:1}{}", 1),
             ("RX", "2C(RX){0:[f64]}{wires:1}{}", "RX{0:[f64]}{wires:1}{}", 2),
-            ("S", "10C(S){}{wires:1}{}", "S{}{wires:1}{}", 10),  # multi-digit control count
+            ("S", "10C(S){}{wires:1}{}", "S{}{wires:1}{}", 10),
         ],
     )
     def test_name_unwrap_control(self, op_name, op_id, expected_base_id, expected_n_ctrl):
-        """name_unwrap_control recovers the base op's id (with its bare name re-prepended) and the
-        control count from a controlled graphOpId, and round-trips through wrap_modifier_id."""
+        """name_unwrap_control recovers the base ID and control count."""
 
         assert name_unwrap_control(op_name, op_id) == (expected_base_id, expected_n_ctrl)
         assert wrap_modifier_id(expected_base_id, _control_modifier(expected_n_ctrl)) == op_id
@@ -852,28 +852,28 @@ class TestOnDemand:
         with pytest.raises(ValueError, match="not a control id"):
             name_unwrap_control("RX", "Adjoint(RX){0:[f64]}{wires:1}{}")
 
-    @pytest.mark.parametrize(
-        "op_id, extra_ctrl_target",
-        [
-            ("C(S){}{wires:1}{}", None),
-            # A multi-controlled id recovers n_ctrl=2 and additionally synthesizes the n=1 variant.
-            ("2C(S){}{wires:1}{}", 'target_gate = "C(S){}{wires:1}{}"'),
-        ],
-    )
-    def test_reachable_wrapper_controlled_op(self, op_id, extra_ctrl_target):
-        """compile_reachable_decomposition_rules_wrapper routes a controlled op-id through
-        name_unwrap_controland returns a module that holds both the base op's
-        and the ``<n>C(...)`` rule closure."""
+    def test_reachable_wrapper_plain_op(self):
+        """The on-demand wrapper captures the closure reachable from a plain operator."""
 
+        op_id = "S{}{wires:1}{}"
         module_str = compile_reachable_decomposition_rules_wrapper(
             "S", op_id, {}, {"wires": 1}, {}, is_custom_op=True
         )
         assert module_str.lstrip().startswith("module")
 
         assert f'target_gate = "{op_id}"' in module_str
-        assert 'target_gate = "S{}{wires:1}{}"' in module_str
-        if extra_ctrl_target is not None:
-            assert extra_ctrl_target in module_str
+
+    @pytest.mark.parametrize("op_id", ["C(S){}{wires:1}{}", "2C(S){}{wires:1}{}"])
+    def test_reachable_wrapper_controlled_op(self, op_id):
+        """The on-demand wrapper preserves the requested control count."""
+
+        module_str = compile_reachable_decomposition_rules_wrapper(
+            "S", op_id, {}, {"wires": 1}, {}, is_custom_op=True
+        )
+
+        assert f'target_gate = "{op_id}"' in module_str
+        if op_id.startswith("2C("):
+            assert 'target_gate = "C(S){}{wires:1}{}"' not in module_str
 
     def test_multi_controlled_resource_gets_its_rules(self):
         """A rule whose resource is a multi-controlled op pulls the rules for that ``<n>C(...)``
@@ -1280,8 +1280,15 @@ class TestSymbolicRules:
 
             add_decomps(NoParams, h_rule)
 
-            module_str = compile_reachable_decomposition_rules_wrapper(
-                "NoParams", "3C(NoParams){}{reg:1}{}", {}, {"reg": 1}, {}
+            module_str = "\n".join(
+                materialize_reachable_rule_strings(
+                    "NoParams",
+                    "NoParams{}{reg:1}{}",
+                    {},
+                    {"reg": 1},
+                    {},
+                    n_ctrls=3,
+                )
             )
 
         assert 'target_gate = "3C(NoParams){}{reg:1}{}"' in module_str
