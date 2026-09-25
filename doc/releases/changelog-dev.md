@@ -723,6 +723,12 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* A manually triggered workflow is added to build a Catalyst Docker image with PennyLane and
+  Lightning for `linux/amd64` and `linux/arm64`, and can publish it to Docker Hub as a single
+  multi-arch tag. The LLVM, StableHLO and Enzyme build is cached in the registry, so rebuilds only
+  recompile Catalyst.
+  [(#3182)](https://github.com/PennyLaneAI/catalyst/pull/3182)
+
 * A new `modifiers-lowering` pass reduces `quantum.ctrl` and `quantum.adjoint` regions to op-level
   modifiers by running the `ctrl-lowering` and `adjoint-lowering` rewrite patterns together under a
   single greedy driver. Each pattern defers (a match failure) while its region still holds the other
@@ -954,6 +960,7 @@
 
 This release contains contributions from (in alphabetical order):
 
+Runor Agbaire,
 Ali Asadi,
 Joey Carter,
 Yushao Chen,
