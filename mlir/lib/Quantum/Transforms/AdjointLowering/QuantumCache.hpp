@@ -32,7 +32,10 @@ namespace quantum {
 /// are pushed in program order during the forward pass and popped in reverse during the backward
 /// pass.
 struct QuantumCache {
-    mlir::TypedValue<ArrayListType> paramVector;
+    // mlir::TypedValue<ArrayListType> paramVector;
+    mlir::Value paramVector;
+    mlir::Value currentOffset;
+    mlir::TypedValue<ArrayListType> offsetVector;
     mlir::TypedValue<ArrayListType> intVector;
     mlir::TypedValue<ArrayListType> wireVector;
     /// For every structured control flow op, store the values required for it to execute.

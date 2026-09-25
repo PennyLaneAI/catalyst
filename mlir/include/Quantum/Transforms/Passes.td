@@ -65,6 +65,7 @@ def AdjointLoweringPass : Pass<"adjoint-lowering"> {
         "catalyst::CatalystDialect",
         "index::IndexDialect",
         "tensor::TensorDialect",
+        "bufferization::BufferizationDialect",
         "complex::ComplexDialect",
         "scf::SCFDialect"
     ];
