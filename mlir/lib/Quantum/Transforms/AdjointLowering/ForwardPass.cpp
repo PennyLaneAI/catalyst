@@ -111,9 +111,7 @@ void AugmentedCircuitGenerator::cacheGate(quantum::ParametrizedGate gate, OpBuil
         Value clonedParam = oldToCloned.lookupOrDefault(param);
         Type paramType = clonedParam.getType();
         Operation *op = gate;
-
         DataLayout dataLayout = DataLayout::closest(op);
-        auto zero = arith::ConstantIndexOp::create(builder, loc, 0);
 
         // 1. Load the current offset index from the currentOffset memref
         Value currentOffsetIndex =
@@ -146,6 +144,8 @@ void AugmentedCircuitGenerator::cacheGate(quantum::ParametrizedGate gate, OpBuil
                                        currentOffsetIndex, ValueRange{} // Empty dynamic sizes
                                        )
                     ->getResult(0);
+
+            auto zero = index::ConstantOp::create(builder, loc, 0);
             memref::StoreOp::create(builder, loc, clonedParam, view, ValueRange{zero});
         }
 

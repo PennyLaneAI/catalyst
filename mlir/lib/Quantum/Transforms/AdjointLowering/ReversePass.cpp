@@ -229,9 +229,6 @@ class AdjointGenerator {
                     continue;
                 }
 
-                DataLayout dataLayout = DataLayout::closest(operation);
-                auto zero = arith::ConstantIndexOp::create(builder, loc, 0);
-
                 // 1. Pop the current offset
                 Value currentOffsetIndex =
                     ListPopOp::create(builder, loc, cache.offsetVector).getResult();
@@ -254,11 +251,6 @@ class AdjointGenerator {
                                                         )
                                      ->getResult(0);
 
-                    SmallVector<Value> zeros;
-                    for (auto _ : memrefType.getShape()) {
-                        zeros.push_back(zero);
-                    }
-
                     // One-shot-bufferization rejects to_tensor ops without `restrict` attribute
                     // The `restrict` attribute means there must be no other to_tensor op with
                     // the same or with an aliasing memref operand. This is true in our case, since
@@ -277,6 +269,8 @@ class AdjointGenerator {
                                                         ValueRange{} // Empty dynamic sizes
                                                         )
                                      ->getResult(0);
+
+                    auto zero = index::ConstantOp::create(builder, loc, 0);
                     loadedParam =
                         memref::LoadOp::create(builder, loc, view, ValueRange{zero}).getResult();
                 }
