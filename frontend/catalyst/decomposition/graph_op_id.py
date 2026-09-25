@@ -17,9 +17,7 @@
 from collections.abc import Mapping, Sequence
 from typing import Any
 
-import jax.numpy as jnp
 import pennylane as qp
-from jax._src.lib.mlir import ir
 from pennylane.ops.op_math.adjoint2 import Adjoint2
 from pennylane.ops.op_math.controlled2 import ControlledOp2
 from pennylane.pytrees import flatten
@@ -33,6 +31,32 @@ from catalyst.from_plxpr.uid import generate_uid
 from catalyst.jax_extras.lowering import get_mlir_attribute_from_pyval, mlir_build_context
 
 _SPECIAL_LOWERINGS = {}
+
+
+def _is_custom_op(op_cls, avals_in):
+    """Return whether an operator lowers to ``qref.custom`` rather than ``qref.operator``.
+
+    Callers reached through a special lowering are handled before this is consulted, so it does
+    not exclude ``_SPECIAL_LOWERINGS``; :meth:`GraphOpID.parse_is_custom_op` adds that itself.
+    """
+    if op_cls.static_argnames or op_cls.hybrid_argnames or op_cls.compilable_argnames:
+        return False
+    if op_cls.wire_argnames != ("wires",):
+        return False
+    if list(op_cls._sig.parameters.keys())[-1] != "wires":
+        return False
+    # Params are widened to f64 by `safe_cast_to_f64`; complex cannot be cast safely.
+    return all(p.shape == () and p.dtype.kind in "ifu" for p in avals_in)
+
+
+def _is_wires(item) -> bool:
+    """Return whether a pytree leaf is a group of wires."""
+    return isinstance(item, (qp.typing.AbstractWires, qp.wires.Wires))
+
+
+def _is_op_or_wires(item) -> bool:
+    """Return whether a pytree leaf is a nested operator or a group of wires."""
+    return isinstance(item, qp.core.Operator2) or _is_wires(item)
 
 
 def format_static_data_dict_for_id(static_data):
@@ -172,16 +196,32 @@ class GraphOpID:
         # enters as {name: dtype}, we want the format {name: list[dtype]}
         if self.is_custom_op:
             return {str(i): ["f64"] for i in range(len(self.op.dynamic_args))}
+        elif isinstance(self.op, qp.QubitUnitary):
+            # `qref.unitary` always takes a complex matrix, so a real one is converted on the way
+            # in and the id must spell the converted type, not the one the user passed.
+            name, matrix = next(iter(self.op.dynamic_args.items()))
+            spec = qp.typing.AbstractArray(qp.math.shape(matrix), complex)
+            return {name: [convert_item_to_mlir_type(spec, is_special_lowering=True)]}
         elif issubclass(type(self.op), tuple(_SPECIAL_LOWERINGS.keys())):  # special cases
             return {
                 argname: [convert_item_to_mlir_type(argtype, is_special_lowering=True)]
                 for argname, argtype in sorted(self.op.dynamic_args.items())
             }
         else:
-            return {
+            dynamic_shape = {
                 argname: [convert_item_to_mlir_type(argtype)]
                 for argname, argtype in sorted(self.op.dynamic_args.items())
             }
+            # Collect additional dynamic params from hybrid args (have to match _process_params).
+            for argname, value in sorted(self.op.hybrid_args.items()):
+                if argname in self.op.wire_argnames:  # do not include wires
+                    continue
+                # skip operators
+                leaves, _ = flatten(value, is_leaf=_is_op_or_wires)
+                params = [leaf for leaf in leaves if not _is_op_or_wires(leaf)]
+                if params:
+                    dynamic_shape[argname] = [convert_item_to_mlir_type(param) for param in params]
+            return dynamic_shape
 
     def parse_wire_lens(self) -> dict[str, int]:
         """Return a dictionary of wire arg names to lengths."""
@@ -189,10 +229,20 @@ class GraphOpID:
         for wire_name, wire_arg in sorted(self.op.wire_args.items()):
             if wire_name not in self.op.hybrid_argnames:
                 wire_lens[wire_name] = len(wire_arg)
+        # match hybrid arg wires collection from _process_qubits (have to match generated IR op)
+        for argname, value in sorted(self.op.hybrid_args.items()):
+            # Descend through nested operators: their wires are qubit operands of this operator.
+            leaves, _ = flatten(value, is_leaf=_is_wires)
+            count = sum(len(leaf) for leaf in leaves if _is_wires(leaf))
+            if count:
+                wire_lens[argname] = count
         return wire_lens
 
     def parse_static_data(self) -> dict[str, Any]:
         """Return a dictionary of (compiler-)static data names to values."""
+        if isinstance(self.op, qp.QubitUnitary):
+            # `unitary_check` is a validation-only flag, the lowering drops it so we must too
+            return {}
         return {
             static_argname: getattr(self.op, static_argname)
             for static_argname in sorted(self.op.compilable_argnames)
@@ -204,6 +254,11 @@ class GraphOpID:
             hybrid_lens = []
             hybrid_trees = []
             hybrid_args = []
+            filtered_wire_lens = tuple(
+                length
+                for name, length in self.wire_lens.items()
+                if name not in self.op.hybrid_argnames
+            )
             for _, hybrid_argval in self.op.hybrid_args.items():
                 leaves, tree = flatten(replace_wires_with_placeholder_wires(hybrid_argval))
                 leaves = post_process_concretize_leaves(leaves)
@@ -212,17 +267,13 @@ class GraphOpID:
                 hybrid_args.extend(leaves)
             uid = generate_uid(
                 *tuple(self.op.dynamic_args.values()),  # dynamic args
-                *(None,)
-                * sum(
-                    self.wire_lens.values()
-                ),  # non hybrid wires, unused during uid generation, so just give empty values
+                *(None,) * sum(filtered_wire_lens),
+                # non hybrid wires, unused during uid generation, so just give empty values
                 *hybrid_args,
                 op_cls=type(self.op),
-                wire_lens=tuple(self.wire_lens.values()),
+                wire_lens=filtered_wire_lens,
                 hybrid_lens=tuple(hybrid_lens),
                 hybrid_trees=tuple(hybrid_trees),
-                adjoint=False,
-                n_ctrls=0,
                 static_args=self.op.static_args,
             )
             return self.op.static_args | self.op.hybrid_args, uid
@@ -233,19 +284,12 @@ class GraphOpID:
         """
         Return whether the Operator2 instance is considered a custom op in MLIR.
 
-        The source of truth for the criteria is in qref_operator2_primitives.py,
-        in the _is_custom_op() helper function. However, that function cannot be directly used here
-        as that is a lowering time util, and only works with JAX-MLIR types.
+        Defers to the same :func:`_is_custom_op` the lowering uses, so the two cannot drift. The
+        lowering dispatches a special-lowered operator before reaching that check, so the extra
+        ``_SPECIAL_LOWERINGS`` exclusion is applied here instead.
         """
-        if self.op.static_argnames or self.op.hybrid_argnames or self.op.compilable_argnames:
-            return False
-        if self.op.wire_argnames != ("wires",):
-            return False
-        if list(self.op._sig.parameters.keys())[-1] != "wires":
-            return False
-        return all(
-            arg.shape == () and arg.dtype.type == jnp.float64
-            for arg in self.op.dynamic_args.values()
+        return _is_custom_op(
+            type(self.op), tuple(self.op.dynamic_args.values())
         ) and not issubclass(type(self.op), tuple(_SPECIAL_LOWERINGS.keys()))
 
     def get_operator_name(self) -> str:
