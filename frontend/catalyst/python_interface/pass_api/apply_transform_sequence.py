@@ -25,7 +25,7 @@ from xdsl.dialects import builtin, transform
 from xdsl.ir import Attribute
 from xdsl.parser import Parser
 from xdsl.passes import ModulePass, PassPipeline
-from xdsl.pattern_rewriter import PatternRewriter, RewritePattern, op_type_rewrite_pattern
+from xdsl.pattern_rewriter import PatternRewriter, RewritePattern, op_type_rewrite_pattern, InsertPoint
 from xdsl.printer import Printer
 
 from catalyst.compiler import _quantum_opt
@@ -217,10 +217,9 @@ class ApplyTransformSequenceNoCallbackPattern(RewritePattern):
     def match_and_rewrite(self, transformer: builtin.ModuleOp, rewriter: PatternRewriter):
         """Rewrite modules containing transform.named_sequences."""
         payload: builtin.ModuleOp = transformer.parent_op()
-        # Erase the transformer from the payload module. Note that PatternRewriter.erase_op
-        # erases the operation from its parent block without destroying the object. Hence,
-        # we can keep interacting with the transformer after the erasure.
-        rewriter.erase_op(transformer)
+        # Detach (do not erase) so we can clone the transformer for MLIR groups.
+        insertion_point = InsertPoint.before(transformer.next_op)
+        transformer.detach()
 
         pass_ops = []
         for ns in transformer.ops:
@@ -239,13 +238,36 @@ class ApplyTransformSequenceNoCallbackPattern(RewritePattern):
             if is_xdsl_group:
                 self._apply_xdsl_pipeline(payload, group)
             else:
-                payload = self._apply_mlir_pipeline(payload, group, rewriter)
+                clone = self._clone_transformer_for_mlir_group(transformer, group)
+                rewriter.insert_op(clone, insertion_point)
+                payload = self._apply_mlir_pipeline(payload, rewriter)
+
+                insertion_point = InsertPoint.at_start(payload.body.block)
 
     def _is_xdsl_pass(self, op: transform.ApplyRegisteredPassOp) -> bool:
         """Check whether a registered pass op corresponds to an xDSL or MLIR pass."""
         # self.passes maps pass names to xDSL passes. If the pass name is in self.passes, we know
         # that it is an xDSL pass. Otherwise, we assume that the name corresponds to an MLIR pass.
         return op.pass_name.data in self.passes
+
+    @staticmethod
+    def _clone_transformer_for_mlir_group(
+        transformer: builtin.ModuleOp,
+        group: Sequence[transform.ApplyRegisteredPassOp],
+    ) -> builtin.ModuleOp:
+        """Clone ``transformer``, rewriting passes outside ``group`` to no-ops.
+        """
+        group_set = set(group)
+        clone = transformer.clone()
+
+        for orig_ns, clone_ns in zip(transformer.ops, clone.ops, strict=True):
+
+            for orig_op, clone_op in zip(orig_ns.body.ops, clone_ns.body.ops, strict=True):
+                if orig_op not in group_set and isinstance(orig_op, transform.ApplyRegisteredPassOp):
+                    clone_op.pass_name = builtin.StringAttr("empty")
+                    clone_op.options = builtin.DictionaryAttr({})
+
+        return clone
 
     def _apply_xdsl_pipeline(
         self, payload: builtin.ModuleOp, pass_ops: list[transform.ApplyRegisteredPassOp]
@@ -265,15 +287,15 @@ class ApplyTransformSequenceNoCallbackPattern(RewritePattern):
     def _apply_mlir_pipeline(
         self,
         payload: builtin.ModuleOp,
-        pass_ops: list[transform.ApplyRegisteredPassOp],
         rewriter: PatternRewriter,
     ) -> builtin.ModuleOp:
-        r"""Interpret a sequence of ``ApplyRegisteredPassOp``\ s corresponding to MLIR passes."""
+        r"""Apply MLIR passes embedded in ``transformer_clone`` via apply-transform-sequence."""
         buffer = StringIO()
         Printer(stream=buffer, print_generic_format=True).print_op(payload)
 
-        pipeline = _create_mlir_cli_schedule(pass_ops)
-        modified = _quantum_opt(*pipeline, "-mlir-print-op-generic", stdin=buffer.getvalue())
+        modified = _quantum_opt(
+            "--apply-transform-sequence", "-mlir-print-op-generic", stdin=buffer.getvalue()
+        )
 
         data = Parser(self.ctx, modified).parse_module()
         rewriter.replace_op(payload, data)
