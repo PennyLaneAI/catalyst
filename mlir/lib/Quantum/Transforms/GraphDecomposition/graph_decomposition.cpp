@@ -363,6 +363,8 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
 
             auto [opNameRaw, costRaw] = pairRef.split("=");
             llvm::StringRef opName = opNameRaw.trim();
+            opName.consume_front("\"");
+            opName.consume_back("\"");
             llvm::StringRef cost = costRaw.trim();
 
             // Note gate_set is now a DictionaryAttr which quotes any key that is
@@ -374,6 +376,10 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
 
             cost.consume_back(": f64");
             cost = cost.trim();
+
+            // remove the numeric prefix from <opName> in the case of controllable gates
+            int index = 0;
+            opName.consumeInteger(10, index);
 
             bool success = to_float(cost, targetGateSet.ops[opName.str()]);
 
@@ -671,10 +677,10 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
             auto openIdx = raw.find('(');
             if (openIdx == llvm::StringRef::npos) {
                 node.name = raw.trim().str();
-                return node;
+            } else {
+                node.name = raw.take_front(openIdx).trim().str();
+                raw = raw.drop_front(openIdx); // leftover: "(w,p)" or "(w)"
             }
-            node.name = raw.take_front(openIdx).trim().str();
-            raw = raw.drop_front(openIdx); // leftover: "(w,p)" or "(w)"
         }
 
         // Parse "(w,p)" (new) or "(w)" (legacy) suffix.
@@ -691,6 +697,12 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
             // If pStr is empty we were given the legacy "(w)" format; leave
             // numParams at the wildcard default so old bytecode keeps working.
         }
+
+        // remove the numeric prefix from <name> in the case of controllable gates
+        StringRef name = node.name;
+        int index = 0;
+        name.consumeInteger(10, index);
+        node.name = name.str();
 
         return node;
     }

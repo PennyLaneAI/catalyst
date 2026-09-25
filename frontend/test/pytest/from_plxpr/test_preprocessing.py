@@ -30,6 +30,7 @@ from pennylane.devices.capabilities import (
 from catalyst.device.decomposition import measurements_from_counts, measurements_from_samples
 from catalyst.from_plxpr import from_plxpr
 from catalyst.jax_primitives import quantum_kernel_p
+from catalyst.passes.builtin_passes import device_based_decomposition
 from catalyst.utils.exceptions import CompileError
 
 pytestmark = pytest.mark.usefixtures("use_capture")
@@ -583,6 +584,77 @@ class TestGradientPreprocessing:
                 t.pass_name == "empty" and t.kwargs["key"] == "validate_observables_parameter_shift"
                 for t in device_pipeline
             )
+
+
+class TestGatesetPreprocessing:
+    """Tests for preprocessing related to invoking `device-based-decomposition` pass with target gateset
+    as described by dveice TOML file."""
+
+    @pytest.mark.parametrize("apply_device_based_decomposition", [True, False])
+    def test_device_based_decomposition_added_to_pipeline(self, apply_device_based_decomposition):
+        """Tests that the device-based-decomposition pass is added to the pipeline
+        when the @device_based_decomposition decorator is applied."""
+
+        dev = qp.device("null.qubit", wires=4)
+
+        if apply_device_based_decomposition:
+
+            @device_based_decomposition
+            @qp.qnode(dev)
+            def f():
+                return qp.expval(qp.Z(0))
+
+        else:
+
+            @qp.qnode(dev)
+            def f():
+                return qp.expval(qp.Z(0))
+
+        device_pipelines = get_pipelines(f, skip_preprocess=False)[1][1]
+        pass_exists = any(t.pass_name == "device-based-decomposition" for t in device_pipelines)
+
+        assert pass_exists == apply_device_based_decomposition
+
+    def test_gateset_matches_device_capabilities(self):
+        """Test that device operations and their C/Adjoint expansions are in the
+        graph-decomposition gate_set."""
+        dev = CapabilitiesDevice(wires=4)
+        dev.capabilities = DeviceCapabilities(
+            operations={
+                "PauliX": OperatorProperties(invertible=False, controllable=False),
+                "PauliY": OperatorProperties(invertible=False, controllable=True),
+                "PauliZ": OperatorProperties(invertible=True, controllable=False),
+                "Hadamard": OperatorProperties(invertible=True, controllable=True),
+            },
+            measurement_processes={"ExpectationMP": [], "SampleMP": [], "CountsMP": []},
+        )
+
+        @device_based_decomposition
+        @qp.qnode(dev, shots=1)
+        def f():
+            qp.expval(qp.Z(0))
+
+        device_pipelines = get_pipelines(f, skip_preprocess=False)[1][1]
+        gate_set = next(
+            t.kwargs["gate_set"]
+            for t in device_pipelines
+            if t.pass_name == "device-based-decomposition"
+        )
+
+        assert (
+            "PauliX" in gate_set
+            and "Adjoint(PauliX)" not in gate_set
+            and "C(PauliX)" not in gate_set
+        )
+        assert (
+            "PauliY" in gate_set and "Adjoint(PauliY)" not in gate_set and "C(PauliY)" in gate_set
+        )
+        assert (
+            "PauliZ" in gate_set and "Adjoint(PauliZ)" in gate_set and "C(PauliZ)" not in gate_set
+        )
+        assert (
+            "Hadamard" in gate_set and "Adjoint(Hadamard)" in gate_set and "C(Hadamard)" in gate_set
+        )
 
 
 class TestIntegration:
