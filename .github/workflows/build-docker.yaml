@@ -4,14 +4,12 @@ permissions:
   contents: read
 
 on:
-  push:
-    branches: [josephleekl/container]  # TEMP: remove before merge
   workflow_dispatch:
     inputs:
       catalyst-version:
         type: string
         required: true
-        description: The version of Catalyst to use. This should be a valid git ref, e.g. v0.14.0.
+        description: The version of Catalyst to use. This should be a valid git ref.
       lightning-version:
         type: string
         required: false
@@ -62,7 +60,6 @@ jobs:
           [[ "$TAG" =~ ^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$ ]] || { echo "::error::Invalid Docker tag: $TAG"; exit 1; }
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
 
-      # Source caches saved by check-catalyst.yaml; much faster than cloning the submodules.
       - uses: actions/cache/restore@v4
         with:
           path: mlir/llvm-project
@@ -103,6 +100,9 @@ jobs:
           file: docker/Dockerfile
           target: deps
           cache-from: type=registry,ref=${{ env.DEPS_CACHE }}
+          # mode=max: cache every layer of the deps build.
+          # image-manifest/oci-mediatypes: store the cache in the standard image format
+          # so Docker Hub accepts it.
           cache-to: type=registry,ref=${{ env.DEPS_CACHE }},mode=max,image-manifest=true,oci-mediatypes=true
 
       - name: Build and export to Docker
@@ -113,7 +113,7 @@ jobs:
           context: .
           file: docker/Dockerfile
           target: catalyst
-          tags: test:${{ inputs.catalyst-version || 'ci' }}-catalyst
+          tags: catalyst:test
           cache-from: type=registry,ref=${{ env.DEPS_CACHE }}
           build-args: |
             LIGHTNING_VERSION=${{ inputs.lightning-version }}
@@ -121,10 +121,10 @@ jobs:
 
       - name: Test
         run: |
-          docker run --rm test:${{ inputs.catalyst-version || 'ci' }}-catalyst
+          docker run --rm catalyst:test python -c "import pennylane as qp; qp.about(); qp.device('lightning.qubit', wires=1); qp.device('lightning.kokkos', wires=1)"
 
       - name: Save image
-        run: docker save test:${{ inputs.catalyst-version || 'ci' }}-catalyst | gzip > pennylane-catalyst.tar.gz
+        run: docker save catalyst:test | gzip > pennylane-catalyst.tar.gz
 
       - name: Upload image as artifact
         uses: actions/upload-artifact@v4
@@ -134,7 +134,7 @@ jobs:
           retention-days: 1
           compression-level: 0
 
-      # Untagged; the manifest job puts both archs under the one real tag.
+      # Untagged; publish-multiarch-tag puts both archs under the one real tag.
       - name: Push by digest
         id: push
         uses: docker/build-push-action@v6
@@ -162,7 +162,7 @@ jobs:
           retention-days: 1
 
   # Combines the per-arch images under one tag
-  manifest:
+  publish-multiarch-tag:
     needs: docker
     if: ${{ inputs.push-to-dockerhub }}
     runs-on: ubuntu-24.04
