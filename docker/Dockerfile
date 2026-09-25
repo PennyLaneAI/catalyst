@@ -45,24 +45,7 @@ ENV DIALECTS_BUILD_DIR=/opt/catalyst/quantum-build
 
 RUN BUILD_TYPE=Release make runtime
 RUN make oqc
-
-RUN cmake -S mlir -B ${DIALECTS_BUILD_DIR} -G Ninja \
-        -DCMAKE_BUILD_TYPE=Release \
-        -DLLVM_ENABLE_ASSERTIONS=ON \
-        -DCMAKE_PREFIX_PATH=/opt/catalyst \
-        -DQUANTUM_ENABLE_BINDINGS_PYTHON=ON \
-        -DPython_EXECUTABLE=$PYTHON \
-        -DPython3_EXECUTABLE=$PYTHON \
-        -DPython3_NumPy_INCLUDE_DIRS=$($PYTHON -c "import numpy as np; print(np.get_include())") \
-        -DMLIR_DIR="${LLVM_BUILD_DIR}/lib/cmake/mlir" \
-        -DSTABLEHLO_DIR=/opt/catalyst/mlir/stablehlo \
-        -DSTABLEHLO_BUILD_DIR="${STABLEHLO_BUILD_DIR}" \
-        -DEnzyme_DIR="${ENZYME_BUILD_DIR}" \
-        -DENZYME_SRC_DIR=/opt/catalyst/mlir/Enzyme \
-        -DLLVM_ENABLE_ZLIB=FORCE_ON \
-        -DLLVM_ENABLE_ZSTD=OFF \
-        -DLLVM_ENABLE_LLD=ON \
-    && cmake --build ${DIALECTS_BUILD_DIR} --target catalyst-cli QuantumPythonModules
+RUN make dialects
 
 RUN make wheel \
     && auditwheel repair dist/*.whl -w /opt/wheel --no-update-tags \
