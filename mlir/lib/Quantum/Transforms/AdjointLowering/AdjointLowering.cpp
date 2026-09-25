@@ -15,6 +15,7 @@
 #include "AdjointLowering.hpp"
 
 #include "llvm/ADT/STLExtras.h"
+#include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Complex/IR/Complex.h"
 #include "mlir/Dialect/Index/IR/IndexDialect.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"

@@ -19,7 +19,6 @@ func.func private @workflow_plain() -> tensor<4xcomplex<f64>> attributes {} {
   %val = "test.op" () : () -> (i64)
   %cst = arith.constant 4.000000e-01 : f64
   %c0_i64 = arith.constant 0 : i64
-  quantum.device ["rtd_lightning.so", "LightningQubit", "{shots: 0}"]
   %0 = quantum.alloc( 2) : !quantum.reg
   %1 = quantum.extract %0[%c0_i64] : !quantum.reg -> !quantum.bit
   // CHECK:        RX
@@ -67,7 +66,6 @@ func.func private @workflow_plain() -> tensor<4xcomplex<f64>> attributes {} {
 func.func private @workflow_nested() -> tensor<4xcomplex<f64>> attributes {} {
   %c1_i64 = arith.constant 1 : i64
   %c0_i64 = arith.constant 0 : i64
-  quantum.device ["rtd_lightning.so", "LightningQubit", "{shots: 0}"]
   %0 = quantum.alloc( 2) : !quantum.reg
   %1 = quantum.adjoint(%0) : !quantum.reg {
   ^bb0(%arg0: !quantum.reg):
@@ -107,7 +105,6 @@ func.func private @workflow_many_args() -> tensor<4xcomplex<f64>> attributes {} 
   %cst = arith.constant 4.000000e-01 : f64
   %c0_i64 = arith.constant 0 : i64
   %c1_i64 = arith.constant 1 : i64
-  quantum.device ["rtd_lightning.so", "LightningQubit", "{shots: 0}"]
   %0 = quantum.alloc( 2) : !quantum.reg
 
   // CHECK: [[q0:%.+]] = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
@@ -142,7 +139,6 @@ func.func private @workflow_many_args() -> tensor<4xcomplex<f64>> attributes {} 
 
 // -----
 
-// CHECK-LABEL: @workflow_unhandled
 func.func @workflow_unhandled() {
   %0 = quantum.alloc(1) : !quantum.reg
   %1 = quantum.adjoint (%0) : !quantum.reg {
@@ -188,65 +184,6 @@ func.func @workflow_non_float_param(%arg0: !quantum.reg) -> !quantum.reg  {
 
 // -----
 
-// CHECK-LABEL: @qubit_unitary_test
-func.func private @qubit_unitary_test() -> tensor<4xcomplex<f64>> {
-  quantum.device ["rtd_lightning.so", "LightningQubit", "{shots: 0}"]
-  %0 = quantum.alloc( 2) : !quantum.reg
-
-  %1 = quantum.adjoint(%0) : !quantum.reg {
-  ^bb0(%arg1: !quantum.reg):
-
-    %c0 = arith.constant 0 : index
-    %c4 = arith.constant 4 : index
-    %c1 = arith.constant 1 : index
-    %for_reg = scf.for %i = %c0 to %c4 step %c1 iter_args(%reg = %arg1) -> (!quantum.reg) {
-      %u = "test.op"() : () -> tensor<4x4xcomplex<f64>>
-
-      %6 = quantum.extract %reg[ 0] : !quantum.reg -> !quantum.bit
-      %7 = quantum.extract %reg[ 1] : !quantum.reg -> !quantum.bit
-
-      // CHECK-DAG: [[idx0:%.+]] = index.constant 0
-      // CHECK-DAG: [[idx1:%.+]] = index.constant 1
-      // CHECK-DAG: [[idxN:%.+]] = index.constant
-      // CHECK: scf.for [[i:%.+]] = [[idx0]] to [[idxN]] step [[idx1]]
-      // CHECK:     scf.for [[j:%.+]] = [[idx0]] to [[idxN]] step [[idx1]]
-      // CHECK:     [[element:%.+]] = tensor.extract {{.*}}[[[i]], [[j]]
-      // CHECK:     [[real:%.+]] = complex.re [[element]]
-      // CHECK:     [[imag:%.+]] = complex.im [[element]]
-      // CHECK:     catalyst.list_push [[real]]
-      // CHECK:     catalyst.list_push [[imag]]
-      %8:2 = quantum.unitary(%u : tensor<4x4xcomplex<f64>>) %6, %7 : !quantum.bit, !quantum.bit
-      // CHECK-DAG: [[result:%.+]] = tensor.empty
-      // CHECK: scf.for [[k:%.+]] = [[idx0]] to [[idxN]] step [[idx1]] iter_args([[curr_k:%.+]] = [[result]])
-      // CHECK:   [[kplus1:%.+]] = index.add [[k]], [[idx1]]
-      // CHECK:   [[k_idx:%.+]] = index.sub [[idxN]], [[kplus1]]
-      // CHECK:   [[last_tensor:%.+]] = scf.for [[l:%.+]] = [[idx0]] to [[idxN]] step [[idx1]] iter_args([[curr_l:%.+]] = [[curr_k]])
-      // CHECK:     [[imag2:%.+]] = catalyst.list_pop
-      // CHECK:     [[real2:%.+]] = catalyst.list_pop
-      // CHECK:     [[complex:%.+]] = complex.create [[real2]], [[imag2]]
-      // CHECK:     [[lplus1:%.+]] = index.add [[l]], [[idx1]]
-      // CHECK:     [[l_idx:%.+]] = index.sub [[idxN]], [[lplus1]]
-      // CHECK:     [[new_tensor:%.+]] = tensor.insert [[complex]] into [[curr_l]][[[k_idx]], [[l_idx]]]
-      // CHECK:     scf.yield [[new_tensor]]
-      // CHECK:   scf.yield [[last_tensor]]
-
-      %9 = quantum.insert %reg[ 0], %8#0 : !quantum.reg, !quantum.bit
-      %10 = quantum.insert %9[ 1], %8#1 : !quantum.reg, !quantum.bit
-      scf.yield %10 : !quantum.reg
-    }
-    quantum.yield %for_reg : !quantum.reg
-  }
-
-  %2 = quantum.extract %1[ 0] : !quantum.reg -> !quantum.bit
-  %3 = quantum.extract %1[ 1] : !quantum.reg -> !quantum.bit
-  %4 = quantum.compbasis qubits %2, %3 : !quantum.obs
-  %5 = quantum.state %4 : tensor<4xcomplex<f64>>
-  quantum.dealloc %0 : !quantum.reg
-  return %5 : tensor<4xcomplex<f64>>
-}
-
-// -----
-
 func.func private @circuit(%arg0: f64, %arg1: !quantum.reg) -> !quantum.reg {
     %c0_i64 = arith.constant 0 : i64
     %c1_i64 = arith.constant 1 : i64
@@ -276,7 +213,6 @@ func.func private @workflow_adjoint(%arg0: f64) -> tensor<4xcomplex<f64>> attrib
   %c1_i64 = arith.constant 1 : i64
   %cst = arith.constant 4.000000e-01 : f64
   %c0_i64 = arith.constant 0 : i64
-  quantum.device ["rtd_lightning.so", "LightningQubit", "{shots: 0}"]
   %0 = quantum.alloc( 2) : !quantum.reg
   %1 = quantum.extract %0[%c0_i64] : !quantum.reg -> !quantum.bit
   %2 = quantum.custom "RX"(%cst) %1 : !quantum.bit
@@ -353,55 +289,6 @@ func.func private @workflow_adjoint(%arg0: f64) -> tensor<4xcomplex<f64>> attrib
   %12 = quantum.insert %11[ 1], %3#1 : !quantum.reg, !quantum.bit
   quantum.dealloc %12 : !quantum.reg
   return %10 : tensor<4xcomplex<f64>>
-}
-
-// -----
-
-// CHECK-LABEL: @param_ordering
-func.func private @param_ordering(%0: !quantum.reg) -> !quantum.reg {
-  // CHECK-DAG: [[F1:%.+]] = arith.constant 1.000000e-01
-  // CHECK-DAG: [[F2:%.+]] = arith.constant 2.000000e-01
-  // CHECK-DAG: [[F3:%.+]] = arith.constant 3.000000e-01
-  %f1 = arith.constant 0.1 : f64
-  %f2 = arith.constant 0.2 : f64
-  %f3 = arith.constant 0.3 : f64
-
-  // CHECK-NOT: quantum.adjoint
-  %1 = quantum.adjoint(%0) : !quantum.reg {
-  ^bb0(%r0: !quantum.reg):
-
-    // CHECK: scf.for [[i:%.+]] =
-    %i0 = arith.constant 0 : index
-    %i4 = arith.constant 4 : index
-    %i1 = arith.constant 1 : index
-    %for_reg = scf.for %i = %i0 to %i4 step %i1 iter_args(%reg = %r0) -> (!quantum.reg) {
-
-      // CHECK: [[C1:%.+]] = "test.op"([[F1]], [[i]]) : (f64, index) -> f64
-      // CHECK: [[C2:%.+]] = "test.op"([[F2]], [[i]]) : (f64, index) -> f64
-      // CHECK: [[C3:%.+]] = "test.op"([[F3]], [[i]]) : (f64, index) -> f64
-      %c1 = "test.op" (%f1, %i) : (f64, index) -> (f64)
-      %c2 = "test.op" (%f2, %i) : (f64, index) -> (f64)
-      %c3 = "test.op" (%f3, %i) : (f64, index) -> (f64)
-      // CHECK:     catalyst.list_push [[C1]]
-      // CHECK:     catalyst.list_push [[C2]]
-      // CHECK:     catalyst.list_push [[C3]]
-
-      %q0 = quantum.extract %reg[ 0] : !quantum.reg -> !quantum.bit
-
-      // CHECK:   [[A3:%.+]] = catalyst.list_pop
-      // CHECK:   [[A2:%.+]] = catalyst.list_pop
-      // CHECK:   [[A1:%.+]] = catalyst.list_pop
-      // CHECK:   quantum.custom "Rot"([[A1]], [[A2]], [[A3]])
-      // CHECK-SAME: adj
-      %q1 = quantum.custom "Rot"(%c1, %c2, %c3) %q0 : !quantum.bit
-
-      %r1 = quantum.insert %reg[ 0], %q1 : !quantum.reg, !quantum.bit
-      scf.yield %r1 : !quantum.reg
-    }
-    quantum.yield %for_reg : !quantum.reg
-  }
-
-  return %1 : !quantum.reg
 }
 
 // -----
@@ -788,79 +675,5 @@ func.func private @adjoint_dynamic_register_dynamic_size(%r: !quantum.reg, %n: i
   // CHECK: [[cnot:%.+]]:2 = quantum.custom "CNOT"() {{%.+}}, [[aux]] adj : !quantum.bit, !quantum.bit
   // CHECK: [[reg2:%.+]] = quantum.insert [[reg]][ 0], [[cnot]]#1 : !quantum.reg, !quantum.bit
   // CHECK: quantum.dealloc [[reg2]] : !quantum.reg
-  return %out : !quantum.reg
-}
-
-// -----
-
-// CHECK-LABEL: @adjoint_real_matrix_param
-func.func @adjoint_real_matrix_param(%arg0: !quantum.reg) -> !quantum.reg {
-  // Forward pass: flatten the 2x2 matrix and push every element into the f64 cache.
-  // CHECK: [[cache:%.+]] = catalyst.list_init : <f64>
-  // CHECK: scf.for
-  // CHECK: [[e:%.+]] = tensor.extract {{%.+}}[{{%.+}}, {{%.+}}] : tensor<2x2xf64>
-  // CHECK: catalyst.list_push [[e]], [[cache]] : <f64>
-  // Reverse pass: pop the elements and rebuild the 2x2 matrix for the adjointed op.
-  // CHECK: tensor.empty() : tensor<2x2xf64>
-  // CHECK: scf.for {{.*}} iter_args
-  // CHECK: catalyst.list_pop [[cache]] : <f64>
-  // CHECK: tensor.insert {{%.+}} into {{%.+}}[{{%.+}}, {{%.+}}] : tensor<2x2xf64>
-  // CHECK: quantum.operator "BasisRotation"({{%.+}}: tensor<2x2xf64>) adj
-  %out = quantum.adjoint(%arg0) : !quantum.reg {
-  ^bb0(%r: !quantum.reg):
-    %c0 = arith.constant 0 : index
-    %c4 = arith.constant 4 : index
-    %c1 = arith.constant 1 : index
-    %for_reg = scf.for %i = %c0 to %c4 step %c1 iter_args(%reg = %r) -> (!quantum.reg) {
-      %matrix = "test.op"() : () -> tensor<2x2xf64>
-      %q0 = quantum.extract %reg[ 0] : !quantum.reg -> !quantum.bit
-      %q1 = quantum.extract %reg[ 1] : !quantum.reg -> !quantum.bit
-      %op:2 = quantum.operator "BasisRotation"(%matrix: tensor<2x2xf64>) qubits(%q0, %q1)
-        static_data = {}
-        param_map = {unitary_matrix = [0]} qubit_map = {wires = [0, 1]}
-      %r0 = quantum.insert %reg[ 0], %op#0 : !quantum.reg, !quantum.bit
-      %r1 = quantum.insert %r0[ 1], %op#1 : !quantum.reg, !quantum.bit
-      scf.yield %r1 : !quantum.reg
-    }
-    quantum.yield %for_reg : !quantum.reg
-  }
-  return %out : !quantum.reg
-}
-
-// -----
-
-// CHECK-LABEL: @adjoint_integer_tensor_param
-func.func @adjoint_integer_tensor_param(%arg0: !quantum.reg) -> !quantum.reg {
-  // CHECK: catalyst.list_init : <f64>
-  // CHECK: [[cache:%.+]] = catalyst.list_init : <i64>
-  // CHECK: scf.for
-  // CHECK: [[e:%.+]] = tensor.extract {{%.+}}[{{%.+}}] : tensor<2xi1>
-  // CHECK: [[ei:%.+]] = arith.extui [[e]] : i1 to i64
-  // CHECK: catalyst.list_push [[ei]], [[cache]] : <i64>
-  // Reverse pass: pop the i64 elements, truncate back to i1 and rebuild the bitstring.
-  // CHECK: tensor.empty() : tensor<2xi1>
-  // CHECK: scf.for {{.*}} iter_args
-  // CHECK: [[p:%.+]] = catalyst.list_pop [[cache]] : <i64>
-  // CHECK: [[pi:%.+]] = arith.trunci [[p]] : i64 to i1
-  // CHECK: tensor.insert [[pi]] into {{%.+}}[{{%.+}}] : tensor<2xi1>
-  // CHECK: quantum.operator "MultiX"({{%.+}}: tensor<2xi1>) adj
-  %out = quantum.adjoint(%arg0) : !quantum.reg {
-  ^bb0(%r: !quantum.reg):
-    %c0 = arith.constant 0 : index
-    %c4 = arith.constant 4 : index
-    %c1 = arith.constant 1 : index
-    %for_reg = scf.for %i = %c0 to %c4 step %c1 iter_args(%reg = %r) -> (!quantum.reg) {
-      %bitstring = "test.op"() : () -> tensor<2xi1>
-      %q0 = quantum.extract %reg[ 0] : !quantum.reg -> !quantum.bit
-      %q1 = quantum.extract %reg[ 1] : !quantum.reg -> !quantum.bit
-      %op:2 = quantum.operator "MultiX"(%bitstring: tensor<2xi1>) qubits(%q0, %q1)
-        static_data = {}
-        param_map = {bitstring = [0]} qubit_map = {wires = [0, 1]}
-      %r0 = quantum.insert %reg[ 0], %op#0 : !quantum.reg, !quantum.bit
-      %r1 = quantum.insert %r0[ 1], %op#1 : !quantum.reg, !quantum.bit
-      scf.yield %r1 : !quantum.reg
-    }
-    quantum.yield %for_reg : !quantum.reg
-  }
   return %out : !quantum.reg
 }

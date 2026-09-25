@@ -15,6 +15,7 @@
 #include <cstdint>
 
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Complex/IR/Complex.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Index/IR/IndexOps.h"
@@ -22,7 +23,9 @@
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
+#include "mlir/IR/Attributes.h"
 #include "mlir/IR/IRMapping.h"
+#include "mlir/Interfaces/DataLayoutInterfaces.h"
 #include "mlir/Transforms/DialectConversion.h"
 
 #include "Catalyst/IR/CatalystOps.h"
@@ -46,25 +49,6 @@ void populateArgIdxMapping(TypeRange types, DenseMap<unsigned, unsigned> &argIdx
             argIdxMapping.insert({oldIdx, newIdx++});
         }
     }
-}
-
-/// Convert a row-major linearized index into per-dimension coordinates given the size of each
-/// dimension, so that an arbitrary-rank tensor can be walked with a single flattened loop.
-SmallVector<Value> delinearizeIndex(OpBuilder &builder, Location loc, Value linear,
-                                    ArrayRef<Value> dimSizes) {
-    int64_t rank = dimSizes.size();
-    SmallVector<Value> strides(rank);
-    Value acc = index::ConstantOp::create(builder, loc, 1);
-    for (int64_t d = rank - 1; d >= 0; --d) {
-        strides[d] = acc;
-        acc = index::MulOp::create(builder, loc, acc, dimSizes[d]);
-    }
-    SmallVector<Value> coords(rank);
-    for (int64_t d = 0; d < rank; ++d) {
-        Value q = index::DivUOp::create(builder, loc, linear, strides[d]);
-        coords[d] = index::RemUOp::create(builder, loc, q, dimSizes[d]);
-    }
-    return coords;
 }
 
 /// Generates the forward "augmented circuit" of the adjoint operation: classical preprocessing is
@@ -127,118 +111,67 @@ void AugmentedCircuitGenerator::cacheGate(quantum::ParametrizedGate gate, OpBuil
         Value clonedParam = oldToCloned.lookupOrDefault(param);
         Type paramType = clonedParam.getType();
         Operation *op = gate;
-        if (mlir::failed(verifyTypeIsCacheable(paramType, op))) {
-            generationFailed = true;
-            return;
+        DataLayout dataLayout = DataLayout::closest(op);
+
+        // 1. Load the current offset index from the currentOffset memref
+        Value currentOffsetIndex =
+            memref::LoadOp::create(builder, loc, cache.currentOffset, ValueRange{}).getResult();
+
+        // 2. Store the param value into the cache at the current offset
+        // The cache is a raw <some_size x i8> byte memref, so need to view it with the
+        // param type size
+        if (isa<RankedTensorType>(paramType)) {
+            // Param is a tensor, need to convert to memrefs via bufferization ops
+            auto tensorType = cast<RankedTensorType>(paramType);
+            assert(tensorType.hasStaticShape() &&
+                   "Dynamically sized tensor params not supported yet");
+
+            MemRefType memrefType =
+                MemRefType::get(tensorType.getShape(), tensorType.getElementType());
+            auto buffer = bufferization::ToBufferOp::create(builder, loc, memrefType, clonedParam)
+                              .getBuffer();
+            Value view =
+                memref::ViewOp::create(builder, loc, memrefType, cache.paramVector,
+                                       currentOffsetIndex, ValueRange{} // Empty dynamic sizes
+                                       )
+                    ->getResult(0);
+            memref::CopyOp::create(builder, loc, buffer, view);
+        } else {
+            // Param not a tensor, just use a raw memref without buffers
+            auto targetViewType = MemRefType::get({}, paramType);
+            Value view =
+                memref::ViewOp::create(builder, loc, targetViewType, cache.paramVector,
+                                       currentOffsetIndex, ValueRange{} // Empty dynamic sizes
+                                       )
+                    ->getResult(0);
+
+            memref::StoreOp::create(builder, loc, clonedParam, view, ValueRange{});
         }
 
-        if (paramType.isF64()) {
-            ListPushOp::create(builder, loc, clonedParam, cache.paramVector);
-            continue;
-        }
+        // 3. Push the current offset onto the offset stack
+        ListPushOp::create(builder, loc, currentOffsetIndex, cache.offsetVector);
 
-        // This is a temporary trick to make it lossless for widths <= 64 bits.
-        Type i64Ty = builder.getI64Type();
-        auto zextToI64 = [&](Value v) -> Value {
-            if (v.getType() == i64Ty) {
-                return v;
+        // 4. Increment the current offset with the byte size of this param
+        int64_t paramNumBytes = 0;
+        if (isa<RankedTensorType>(paramType)) {
+            auto tensorType = cast<RankedTensorType>(paramType);
+            int64_t elementTypeNumBytes =
+                dataLayout.getTypeSize(tensorType.getElementType()).getFixedValue();
+
+            int64_t numElements = 1;
+            for (int64_t dim : tensorType.getShape()) {
+                numElements *= dim;
             }
-            return arith::ExtUIOp::create(builder, loc, i64Ty, v);
-        };
-
-        // Integer/boolean scalar params are recorded in the i64 buffer.
-        if (isa<IntegerType>(paramType)) {
-            ListPushOp::create(builder, loc, zextToI64(clonedParam), cache.intVector);
-            continue;
+            paramNumBytes = numElements * elementTypeNumBytes;
+        } else {
+            paramNumBytes = dataLayout.getTypeSize(paramType).getFixedValue();
         }
 
-        auto aTensor = cast<RankedTensorType>(paramType);
-        Type elemType = aTensor.getElementType();
-
-        // Real-valued tensor params (e.g. the `tensor<Nxf64>` angle carried by `quantum.operator`
-        // gates such as RZ, or the `tensor<NxNxf64>` matrix of a BasisRotation) are cached
-        // element-by-element as plain f64 values in row-major order in `paramVector`.
-        // Integer/boolean tensors (e.g. a MultiX `tensor<Nxi1>` bitstring or a QROM `tensor<Nxi64>`
-        // bitstring) are cached the same way but in the i64 buffer `intVector`, zero-extending each
-        // element. `verifyTypeIsCacheable` has already rejected integer widths > 64 bits. The
-        // complex-matrix path below is specific to QubitUnitary's `tensor<NxNxcomplex<f64>>`.
-        if (elemType.isF64() || elemType.isInteger()) {
-            auto recordElement = [&](Value element) {
-                if (elemType.isInteger()) {
-                    ListPushOp::create(builder, loc, zextToI64(element), cache.intVector);
-                } else {
-                    ListPushOp::create(builder, loc, element, cache.paramVector);
-                }
-            };
-            if (aTensor.getRank() == 0) {
-                Value element = tensor::ExtractOp::create(builder, loc, clonedParam, ValueRange{});
-                recordElement(element);
-                continue;
-            }
-            Value c0i = index::ConstantOp::create(builder, loc, 0);
-            Value c1i = index::ConstantOp::create(builder, loc, 1);
-            SmallVector<Value> dimSizes;
-            Value total = c1i;
-            for (int64_t d = 0; d < aTensor.getRank(); ++d) {
-                Value dim =
-                    ShapedType::kDynamic != aTensor.getShape()[d]
-                        ? (Value)index::ConstantOp::create(builder, loc, aTensor.getShape()[d])
-                        : (Value)tensor::DimOp::create(builder, loc, clonedParam, d);
-                dimSizes.push_back(dim);
-                total = index::MulOp::create(builder, loc, total, dim);
-            }
-            scf::ForOp loop = scf::ForOp::create(builder, loc, c0i, total, c1i);
-            OpBuilder::InsertionGuard guard(builder);
-            builder.setInsertionPointToStart(loop.getBody());
-            SmallVector<Value> coords =
-                delinearizeIndex(builder, loc, loop.getInductionVar(), dimSizes);
-            Value element = tensor::ExtractOp::create(builder, loc, clonedParam, coords);
-            recordElement(element);
-            continue;
-        }
-
-        ArrayRef<int64_t> shape = aTensor.getShape();
-        Value c0 = index::ConstantOp::create(builder, loc, 0);
-        Value c1 = index::ConstantOp::create(builder, loc, 1);
-        bool isDim0Static = ShapedType::kDynamic != shape[0];
-        bool isDim1Static = ShapedType::kDynamic != shape[1];
-        Value dim0Length = isDim0Static ? (Value)index::ConstantOp::create(builder, loc, shape[0])
-                                        : (Value)tensor::DimOp::create(builder, loc, param, c0);
-        Value dim1Length = isDim1Static ? (Value)index::ConstantOp::create(builder, loc, shape[1])
-                                        : (Value)tensor::DimOp::create(builder, loc, param, c1);
-
-        Value lowerBoundDim0 = c0;
-        Value upperBoundDim0 = dim0Length;
-        Value stepDim0 = c1;
-        Value lowerBoundDim1 = c0;
-        Value upperBoundDim1 = dim1Length;
-        Value stepDim1 = c1;
-        Value matrix = clonedParam;
-
-        scf::ForOp iForLoop =
-            scf::ForOp::create(builder, loc, lowerBoundDim0, upperBoundDim0, stepDim0);
-        {
-            OpBuilder::InsertionGuard afterIForLoop(builder);
-            builder.setInsertionPointToStart(iForLoop.getBody());
-            Value i_index = iForLoop.getInductionVar();
-
-            scf::ForOp jForLoop =
-                scf::ForOp::create(builder, loc, lowerBoundDim1, upperBoundDim1, stepDim1);
-            {
-                OpBuilder::InsertionGuard afterJForLoop(builder);
-                builder.setInsertionPointToStart(jForLoop.getBody());
-                Value j_index = jForLoop.getInductionVar();
-                SmallVector<Value> indices = {i_index, j_index};
-                Value element = tensor::ExtractOp::create(builder, loc, matrix, indices);
-                // element is complex!
-                // So we need to convert into {f64, f64}
-                Value real = complex::ReOp::create(builder, loc, element);
-                Value imag = complex::ImOp::create(builder, loc, element);
-                // Again, take note of the order.
-                ListPushOp::create(builder, loc, real, cache.paramVector);
-                ListPushOp::create(builder, loc, imag, cache.paramVector);
-            }
-        }
+        Value paramNumBytesValue =
+            index::ConstantOp::create(builder, loc, paramNumBytes).getResult();
+        Value newOffset =
+            index::AddOp::create(builder, loc, currentOffsetIndex, paramNumBytesValue).getResult();
+        memref::StoreOp::create(builder, loc, newOffset, cache.currentOffset, ValueRange{});
     }
 }
 

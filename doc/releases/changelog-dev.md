@@ -276,11 +276,6 @@
   being baked into the rule body as constants, so a rule sees the concrete tensors at runtime. This
   now holds for the hand-written symbolic (`C(Op)` / `Adjoint(Op)`) rules as well as the base rules.
 
-  Real matrix parameters of arbitrary rank are also cached during `--adjoint-lowering`: a real `f64`
-  tensor of any rank (e.g. a `BasisRotation`'s `tensor<NxNxf64>`) is now recorded element-by-element,
-  where before only scalar/rank-1 real tensors and complex matrices were handled. This lets
-  `qp.adjoint(TrotterCDF)`/`qp.adjoint(TrotterCGF)` reach `Adjoint(BasisRotation)` and back.
-
   Composed control-and-adjoint operators (`C(Adjoint(op))`, reached by either `qp.ctrl(qp.adjoint(op))`
   or `qp.adjoint(qp.ctrl(op))`) can now be decomposed. A new synthesis pathway controls each
   registered `Adjoint(op)` rule, reducing the adjoint under control (`C(Adjoint(RZ)) -> C(RZ)`) so
@@ -288,6 +283,28 @@
   cannot reach this, as it bottoms out at doubly-modified primitives such as `C(Adjoint(GlobalPhase))`
   that only registered rules terminate. Mixed `qp.ctrl`/`qp.adjoint` of `TrotterCDF`/`TrotterCGF` now
   decompose as a result.
+
+* The `--adjoint-lowering` pass has been improved in the following ways:
+
+  - It no longer caches all classical gate parameters.
+    Parameters that are trivially available to the reverse pass are no longer cached.
+    [(#3233)](https://github.com/PennyLaneAI/catalyst/pull/3233)
+
+  - It can now cache parameters of arbitrary types.
+    [(#3265)](https://github.com/PennyLaneAI/catalyst/pull/3265)
+    [(#3270)](https://github.com/PennyLaneAI/catalyst/pull/3270)
+
+    The above two improvements make `Operator2` classes, which might have arbitrary parameter types
+    (for example `qp.adjoint(TrotterCDF)`/`qp.adjoint(TrotterCGF)`), processable by `--adjoint-lowering`.
+    This also allows the synthesis of their adjoint decomposition rules.
+
+  - It can now handle adjoint operations containing control flow operations
+    that have multiple quantum operands, of either quantum register or qubit type.
+    [(#2868)](https://github.com/PennyLaneAI/catalyst/pull/2868)
+
+  - It no longer turns statically bounded for loops into
+    dynamically bounded ones. In this way they remain analyzable by functionality like `qp.specs`.
+    [(#2959)](https://github.com/PennyLaneAI/catalyst/issues/2959)
 
 * A failure during AOT compilation is now logged rather than raised.
   [(#3100)](https://github.com/PennyLaneAI/catalyst/pull/3100)
@@ -510,10 +527,6 @@
   `measurement_processes`, and pluggable metrics under `extended_fields`.
   [(#3076)](https://github.com/PennyLaneAI/catalyst/pull/3076)
 
-* The `--adjoint-lowering` pass no longer turns statically bounded for loops into
-  dynamically bounded ones. In this way they remain analyzable by functionality like `qp.specs`.
-  [(#2959)](https://github.com/PennyLaneAI/catalyst/issues/2959)
-
 * PPRs and PPMs can now be lowered properly into MLIR directly in the non-capture workflow.
   [(#2816)](https://github.com/PennyLaneAI/catalyst/pull/2816)
 
@@ -577,10 +590,6 @@
   trace back to the same allocation.
   [(#2861)](https://github.com/PennyLaneAI/catalyst/pull/2861)
 
-* The `--adjoint-lowering` pass can now handle adjoint operations containing control flow operations
-  that have multiple quantum operands, of either quantum register or qubit type.
-  [(#2868)](https://github.com/PennyLaneAI/catalyst/pull/2868)
-
 * The `--decompose-lowering` pass now uses the `DecomposableGate` interface, allowing it to support
   many new gate operations, including `quantum.paulirot`.
   [(#2893)](https://github.com/PennyLaneAI/catalyst/pull/2893)
@@ -606,10 +615,6 @@
 * ``to_ppr`` now directly lowers PennyLane's discrete ``PPR`` operator to ``pbc.ppr``.
   [(#3185)](https://github.com/PennyLaneAI/catalyst/pull/3185)
   [(#3262)](https://github.com/PennyLaneAI/catalyst/pull/3262)
-
-* The `--adjoint-lowering` pass no longer caches all classical gate parameters.
-  Parameters that are trivially available to the reverse pass are no longer cached.
-  [(#3233)](https://github.com/PennyLaneAI/catalyst/pull/3233)
 
 <h3>Breaking changes 💔</h3>
 
@@ -642,12 +647,6 @@
 <h3>Deprecations 👋</h3>
 
 <h3>Bug fixes 🐛</h3>
-
-* `adjoint-lowering` no longer fails on gates whose parameter is a wide-integer tensor. Integer and
-  boolean gate parameters (e.g. a `QROM` `tensor<Nxi64>` bitstring) are now recorded in a dedicated
-  i64 cache buffer during adjoint reversal, zero-extended in and truncated out, instead of being
-  round-tripped through the f64 buffer.
-  [(#3265)](https://github.com/PennyLaneAI/catalyst/pull/3265)
 
 * Fixed a bug where an executor's SSH connection multiplexing was silently disabled on macOS,
   making every remote operation pay a fresh authentication handshake. The control socket went in

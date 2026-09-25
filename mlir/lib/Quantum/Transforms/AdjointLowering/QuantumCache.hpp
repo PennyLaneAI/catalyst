@@ -32,8 +32,10 @@ namespace quantum {
 /// are pushed in program order during the forward pass and popped in reverse during the backward
 /// pass.
 struct QuantumCache {
-    mlir::TypedValue<ArrayListType> paramVector;
-    mlir::TypedValue<ArrayListType> intVector;
+    // mlir::TypedValue<ArrayListType> paramVector;
+    mlir::Value paramVector;
+    mlir::Value currentOffset;
+    mlir::TypedValue<ArrayListType> offsetVector;
     mlir::TypedValue<ArrayListType> wireVector;
     /// For every structured control flow op, store the values required for it to execute.
     /// Specifically: store the conditions for scf.if ops, the start/stop/step of scf.for ops, and
@@ -47,11 +49,6 @@ struct QuantumCache {
 
     void emitDealloc(mlir::OpBuilder &builder, mlir::Location loc);
 };
-
-/// Verify that `ty` is a type the cache knows how to record: an f64 or integer (<= 64-bit) scalar,
-/// a tensor of f64 or integer (<= 64-bit) elements, or a 2D tensor of complex<f64>. Emits an error
-/// on `op` and returns failure otherwise.
-mlir::LogicalResult verifyTypeIsCacheable(mlir::Type ty, mlir::Operation *op);
 
 /// Returns true if `param`, a gate parameter used inside `adjointRegion`, is already available
 /// when the reverse pass emits its gates, and therefore does not need to be recorded in the cache.
