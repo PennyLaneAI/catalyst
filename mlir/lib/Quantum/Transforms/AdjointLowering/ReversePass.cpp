@@ -263,10 +263,16 @@ class AdjointGenerator {
                     for (auto _ : memrefType.getShape()) {
                         zeros.push_back(zero);
                     }
-                    Value memrefLoad =
-                        memref::LoadOp::create(builder, loc, view, zeros).getResult();
+
+                    // One-shot-bufferization rejects to_tensor ops without `restrict` attribute
+                    // The `restrict` attribute means there must be no other to_tensor op with
+                    // the same or with an aliasing memref operand. This is true in our case, since
+                    // each tensor param gets its own segment in the byte cache.
+                    // See
+                    // https://mlir.llvm.org/docs/Dialects/BufferizationOps/#bufferizationto_tensor-bufferizationtotensorop
+                    bool _restrict = true;
                     loadedParam =
-                        bufferization::ToTensorOp::create(builder, loc, tensorType, memrefLoad)
+                        bufferization::ToTensorOp::create(builder, loc, tensorType, view, _restrict)
                             .getResult();
                 } else {
                     // Param not a tensor, just use a raw memref without buffers

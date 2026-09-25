@@ -134,8 +134,8 @@ void AugmentedCircuitGenerator::cacheGate(quantum::ParametrizedGate gate, OpBuil
 
             MemRefType memrefType =
                 MemRefType::get(tensorType.getShape(), tensorType.getElementType());
-            auto buffer =
-                bufferization::ToBufferOp::create(builder, loc, memrefType, param).getBuffer();
+            auto buffer = bufferization::ToBufferOp::create(builder, loc, memrefType, clonedParam)
+                              .getBuffer();
             Value view =
                 memref::ViewOp::create(builder, loc, memrefType, cache.paramVector,
                                        currentOffsetIndex, ValueRange{} // Empty dynamic sizes
