@@ -41,6 +41,7 @@ from pennylane.transforms import (
     split_to_single_terms,
 )
 
+from catalyst.device import python_device
 from catalyst.device.decomposition import (
     catalyst_decompose,
     measurements_from_counts,
@@ -176,6 +177,9 @@ def extract_backend_info(device: qp.devices.QubitDevice) -> BackendInfo:
     elif hasattr(device, "get_c_interface"):
         # Support third party devices with `get_c_interface`
         device_name, device_lpath = device.get_c_interface()
+    elif python_device.is_python_device(device):
+        # Devices implemented in Python are executed through the PennyLane Python device bridge
+        device_name, device_lpath, device_kwargs = python_device.backend_info(device)
     else:
         raise CompileError(f"The {dname} device does not provide C interface for compilation.")
 
@@ -343,6 +347,8 @@ class QJITDevice(qp.devices.Device):
         self.backend_name = backend.c_interface_name
         self.backend_lib = backend.lpath
         self.backend_kwargs = backend.kwargs
+        if python_device.is_python_device(original_device):
+            self.backend_kwargs.update(python_device.register_qnode(original_device))
 
     @debug_logger
     def preprocess(
@@ -416,6 +422,9 @@ class QJITDevice(qp.devices.Device):
         measurement_transforms = self._measurement_transform_program(capabilities)
         config = replace(config, device_options=deepcopy(config.device_options))
         pipeline += measurement_transforms
+
+        if python_device.is_python_device(self.original_device):
+            pipeline.add_transform(python_device.verify_no_mid_circuit_measurements)
 
         # decomposition to supported ops/measurements
         pipeline.add_transform(
@@ -538,6 +547,9 @@ def _load_device_capabilities(device) -> DeviceCapabilities:
     #       better way for a device to customize its capabilities as seen by Catalyst.
     if hasattr(device, "qjit_capabilities"):
         return device.qjit_capabilities
+
+    if python_device.is_python_device(device):
+        return python_device.python_device_capabilities(device)
 
     if getattr(device, "config_filepath") is not None:
         toml_file = device.config_filepath

@@ -15,11 +15,12 @@
 """Test cases relating to quantum functions represented via :class:`qp.QNode.`"""
 
 import jax.numpy as jnp
+import numpy as np
 import pennylane as qp
 import pytest
 
 import catalyst
-from catalyst import CompileError, grad, measure, qjit
+from catalyst import grad, measure, qjit
 from catalyst.device.qjit_device import QJITDevice
 
 
@@ -71,18 +72,16 @@ def test_variable_capture_multiple_devices(_in, _out, backend):
     assert workflow(_in) == _out
 
 
-def test_unsupported_device():
-    """Test unsupported device."""
+def test_python_device():
+    """Test that devices implemented in Python (without a C interface) are executed through the
+    PennyLane Python device bridge (see test_python_device.py)."""
 
     @qp.qnode(qp.device("default.qubit", wires=2))
     def func():
+        qp.X(1)
         return qp.probs()
 
-    regex = "Attempting to compile program for incompatible device.*"
-    qjitted = qjit(func)
-
-    with pytest.raises(CompileError, match=regex):
-        qjitted()
+    assert np.allclose(qjit(func)(), [0, 1, 0, 0])
 
 
 def test_qfunc_output_shape_scalar():
