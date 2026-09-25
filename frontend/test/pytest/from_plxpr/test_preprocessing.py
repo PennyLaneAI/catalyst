@@ -585,6 +585,62 @@ class TestGradientPreprocessing:
             )
 
 
+class TestGatesetPreprocessing:
+    """Tests for preprocessing related to invoking `graph-decomposition` pass with target gateset
+    as described by dveice TOML file."""
+
+    def test_gateset_obs_validation(self):
+        """Tests that the transforms for graph decomposition are added to the pipeline"""
+        dev = qp.device("null.qubit", wires=4)
+
+        @qp.qnode(dev)
+        def f():
+            return qp.expval(qp.Z(0))
+
+        device_pipelines = get_pipelines(f, skip_preprocess=False)[1][1]
+
+        # `graph-decomposition` must exist in the device pipeline
+        assert any(t.pass_name == "graph-decomposition" for t in device_pipelines)
+
+    def test_gateset_matches_device_capabilities(self):
+        """Test that device operations and their C/Adjoint expansions are in the
+        graph-decomposition gate_set."""
+        dev = CapabilitiesDevice(wires=4)
+        dev.capabilities = DeviceCapabilities(
+            operations={
+                "PauliX": OperatorProperties(invertible=False, controllable=False),
+                "PauliY": OperatorProperties(invertible=False, controllable=True),
+                "PauliZ": OperatorProperties(invertible=True, controllable=False),
+                "Hadamard": OperatorProperties(invertible=True, controllable=True),
+            },
+            measurement_processes={"ExpectationMP": [], "SampleMP": [], "CountsMP": []},
+        )
+
+        @qp.qnode(dev, shots=1)
+        def f():
+            qp.expval(qp.Z(0))
+
+        device_pipelines = get_pipelines(f, skip_preprocess=False)[1][1]
+        gate_set = next(
+            t.kwargs["gate_set"] for t in device_pipelines if t.pass_name == "graph-decomposition"
+        )
+
+        assert (
+            "PauliX" in gate_set
+            and "Adjoint(PauliX)" not in gate_set
+            and "C(PauliX)" not in gate_set
+        )
+        assert (
+            "PauliY" in gate_set and "Adjoint(PauliY)" not in gate_set and "C(PauliY)" in gate_set
+        )
+        assert (
+            "PauliZ" in gate_set and "Adjoint(PauliZ)" in gate_set and "C(PauliZ)" not in gate_set
+        )
+        assert (
+            "Hadamard" in gate_set and "Adjoint(Hadamard)" in gate_set and "C(Hadamard)" in gate_set
+        )
+
+
 class TestIntegration:
     """Integration tests for device preprocessing with program capture."""
 
