@@ -69,6 +69,22 @@ LogicalResult ensureNoValueSemanticsOps(Operation *op) {
     }
 }
 
+// Only scf.if, scf.for, scf.while and scf.index_switch have conversion rules. Any other
+// region-bearing scf op must be rejected before conversion starts: converting the gates nested in
+// its region erases values that the region's own terminator still refers to.
+LogicalResult ensureNoScfExecuteRegionOps(Operation *op) {
+    WalkResult walkResult = op->walk([&](scf::ExecuteRegionOp executeRegionOp) {
+        executeRegionOp.emitError("scf.execute_region is not supported");
+        return WalkResult::interrupt();
+    });
+
+    if (walkResult.wasInterrupted()) {
+        return failure();
+    } else {
+        return success();
+    }
+}
+
 void eraseSCFYieldQuantumOperands(scf::YieldOp yieldOp) {
     // scf.yield can yield both classical and quantum values
     // We need to only keep the classical yields from scf regions
@@ -978,6 +994,9 @@ struct ReferenceSemanticsConversionPass
         // Convert the main quantum.mode functions
         for (auto targetFunc : targetFuncs) {
             QubitValueTracker tracker;
+            if (failed(ensureNoScfExecuteRegionOps(targetFunc))) {
+                return signalPassFailure();
+            }
             handleRegion(builder, targetFunc.getBody(), tracker);
             if (failed(ensureNoValueSemanticsOps(targetFunc))) {
                 targetFunc.emitOpError(
@@ -1016,6 +1035,9 @@ struct ReferenceSemanticsConversionPass
         // By default, scc iterates call graph in post order (callee before caller), so we reverse
         // the visit order.
         for (func::FuncOp subroutine : llvm::reverse(subroutinesPostOrder)) {
+            if (failed(ensureNoScfExecuteRegionOps(subroutine))) {
+                return signalPassFailure();
+            }
             QubitValueTracker tracker;
             handleSubroutine(builder, subroutine, collectQregSizesAtCallsite(subroutine, mod));
             if (failed(ensureNoValueSemanticsOps(subroutine))) {
