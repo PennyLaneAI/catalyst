@@ -13,6 +13,7 @@
 # limitations under the License.
 """This file contains the pass that applies all passes present in the program representation."""
 
+import re
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from functools import partial
@@ -30,6 +31,9 @@ from xdsl.printer import Printer
 
 from catalyst.compiler import _quantum_opt
 from catalyst.python_interface.utils import get_pyval_from_xdsl_attr
+
+# MLIR bare-id: (letter | [_]) (letter | digit | [_$.])*
+_MLIR_BARE_ID = re.compile(r"[A-Za-z_][A-Za-z0-9_$.]*")
 
 available_passes: dict[str, Callable[[], type[ModulePass]]] = {}
 
@@ -318,9 +322,29 @@ def _create_mlir_cli_schedule(pass_ops: Sequence[transform.ApplyRegisteredPassOp
     return schedule
 
 
-def _get_cli_option_from_attr(attr: Attribute) -> Any:
+def _format_mlir_dict_key(key: str) -> str:
+    """Format a dictionary key the way MLIR prints DictionaryAttr keys.
+
+    Bare identifiers are printed unquoted; all other keys use a double-quoted
+    string literal (e.g. ``Adjoint(CNOT)`` becomes ``"Adjoint(CNOT)"``).
+    """
+    if _MLIR_BARE_ID.fullmatch(key):
+        return key
+    # Escape embedded quotes/backslashes the same way MLIR string literals do.
+    escaped = key.replace("\\", "\\\\").replace('"', '\\"')
+    return f'"{escaped}"'
+
+
+def _get_cli_option_from_attr(attr: Attribute, *, nested: bool = False) -> Any:
     """Convert an xDSL attribute corresponding to a pass option value into a valid
-    CLI option value."""
+    CLI option value.
+
+    Serialization mirrors MLIR's ``ApplyRegisteredPassOp`` option stringification:
+    top-level ``ArrayAttr`` values are comma-separated (``ListOption`` form), while
+    ``DictionaryAttr`` values follow MLIR's DictionaryAttr printer
+    (``{key = value, ...}`` with quoted non-bare keys). Nested ``ArrayAttr`` values
+    inside a dictionary are bracketed so commas do not break list/dict parsing.
+    """
     cli_val = None
 
     match attr:
@@ -339,13 +363,23 @@ def _get_cli_option_from_attr(attr: Attribute) -> Any:
             cli_val = f"'{attr.data}'"
 
         case builtin.ArrayAttr():
-            cli_val = ",".join([str(_get_cli_option_from_attr(attr)) for attr in attr.data])
+            elements = [_get_cli_option_from_attr(elt, nested=True) for elt in attr.data]
+            if nested:
+                # Match MLIR ArrayAttr printing when nested inside a DictionaryAttr.
+                cli_val = f"[{', '.join(str(elt) for elt in elements)}]"
+            else:
+                # Top-level ListOption: comma-separated elements, no brackets.
+                cli_val = ",".join(str(elt) for elt in elements)
 
         case builtin.DictionaryAttr():
+            # Match MLIR DictionaryAttr printing (elideType): comma-separated
+            # entries, spaces around '=', and quoted keys when needed.
             mapping = []
             for k, v in attr.data.items():
-                mapping.append(f"{k}={_get_cli_option_from_attr(v)}")
-            cli_val = f"{{{' '.join(mapping)}}}"
+                mapping.append(
+                    f"{_format_mlir_dict_key(k)} = {_get_cli_option_from_attr(v, nested=True)}"
+                )
+            cli_val = f"{{{', '.join(mapping)}}}"
 
         case _:  # pragma: no cover
             raise ValueError(f"Unsupported option type {attr}.")
