@@ -43,6 +43,17 @@ def PBCOpInterface : OpInterface<"PBCOpInterface"> {
             /*methodName=*/"getOutQubits"
         >,
         InterfaceMethod<
+            /*desc=*/[{
+                Get the qubit operands for this operation, under the name shared with the
+                reference semantics PBC ops.
+            }],
+            /*retTy=*/"mlir::ValueRange",
+            /*methodName=*/"getQubitOperands",
+            /*args=*/(ins),
+            /*methodBody=*/[{}],
+            /*defaultImpl=*/[{ return $_op.getInQubits(); }]
+        >,
+        InterfaceMethod<
             /*desc=*/"Get the Pauli product for this operation.",
             /*retTy=*/"::mlir::ArrayAttr",
             /*methodName=*/"getPauliProduct"
