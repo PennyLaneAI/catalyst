@@ -2267,6 +2267,55 @@ func.func public @test_ops_with_ctrl() -> tensor<8xf64> {
 
 // -----
 
+// Test operations with ctrl region.
+
+// CHECK-LABEL: "test_ops_with_ctrl_region"
+// CHECK: "1"
+// CHECK:   "Adjoint(T)": 1
+// CHECK:   "PauliX": 1
+// CHECK: "2"
+// CHECK:   "C(Adjoint(S))": 1
+// CHECK:   "C(PauliY)": 1
+// CHECK: "3"
+// CHECK:   "2C(S)": 1
+
+func.func public @test_ops_with_ctrl_region() -> tensor<8xf64> {
+    %false = arith.constant false
+    %true = arith.constant true
+    %c0_i64 = arith.constant 0 : i64
+    %0 = quantum.alloc( 3) : !quantum.reg
+    %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+    %out_qubits = quantum.custom "PauliX"() %1 : !quantum.bit
+    %out_qubits_0 = quantum.custom "T"() %out_qubits adj : !quantum.bit
+    %2 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
+    %out_ctrl_qubits, %out_qubits_1 = quantum.ctrl(%2) ctrlvals(%true) (%out_qubits_0) : !quantum.bit -> !quantum.bit {
+    ^bb0(%arg0: !quantum.bit):
+        %s_1 = quantum.custom "S"() %arg0 adj : !quantum.bit
+        quantum.yield %s_1 : !quantum.bit
+    }
+    %3 = quantum.extract %0[ 2] : !quantum.reg -> !quantum.bit
+    %out_ctrl_qubits_3:2, %out_qubits_2 = quantum.ctrl(%out_ctrl_qubits, %3) ctrlvals(%true, %false) (%out_qubits_1) : !quantum.bit, !quantum.bit -> !quantum.bit {
+    ^bb0(%arg0: !quantum.bit):
+        %s_2 = quantum.custom "S"() %arg0 : !quantum.bit
+        quantum.yield %s_2 : !quantum.bit
+    }
+    %out_qubits_4_0, %out_qubits_4_1 = quantum.ctrl(%out_ctrl_qubits_3#1) ctrlvals(%true) (%out_qubits_2) : !quantum.bit -> !quantum.bit {
+    ^bb0(%arg0: !quantum.bit):
+        %y = quantum.custom "PauliY"() %arg0 : !quantum.bit
+        quantum.yield %y : !quantum.bit
+    }
+    %4 = quantum.insert %0[ 0], %out_qubits_4_1 : !quantum.reg, !quantum.bit
+    %5 = quantum.insert %4[ 1], %out_ctrl_qubits_3#0 : !quantum.reg, !quantum.bit
+    %6 = quantum.insert %5[ 2], %out_qubits_4_0 : !quantum.reg, !quantum.bit
+    %7 = quantum.compbasis qreg %6 : !quantum.obs
+    %8 = quantum.probs %7 : tensor<8xf64>
+    quantum.dealloc %6 : !quantum.reg
+    quantum.device_release
+    return %8 : tensor<8xf64>
+}
+
+// -----
+
 // Test operations with control qubits in reference semantics.
 
 // CHECK-LABEL: "test_ops_with_ctrl_ref"
@@ -2294,6 +2343,33 @@ func.func public @test_ops_with_ctrl_ref() {
     qref.dealloc %0 : !qref.reg<3>
     return
 }
+
+// -----
+
+// Test nested Ctrl
+
+// CHECK-LABEL: "test_nested_ctrl"
+// CHECK: "4"
+// CHECK:   "3C(S)": 1
+
+func.func public @test_nested_ctrl(){
+    %false = arith.constant false
+    %true = arith.constant true
+    %ctrls = qref.alloc( 3) : !qref.reg<3>
+    %ctrl_0 = qref.get %ctrls[ 0] : !qref.reg<3> -> !qref.bit
+    %ctrl_1 = qref.get %ctrls[ 1] : !qref.reg<3> -> !qref.bit
+    %ctrl_2 = qref.get %ctrls[ 2] : !qref.reg<3> -> !qref.bit
+    %input = qref.alloc_qb : !qref.bit
+
+    qref.ctrl (%ctrl_0) ctrlvals (%true){
+        qref.ctrl (%ctrl_1) ctrlvals (%false){
+            qref.custom "S"() %input ctrls(%ctrl_2) ctrlvals(%true) : !qref.bit ctrls !qref.bit
+        }
+    }
+
+    return
+}
+
 
 // -----
 
