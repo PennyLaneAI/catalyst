@@ -435,6 +435,9 @@ class CustomOpConversion(RewritePattern):
                     )
                     new_results = (ctrl_conv_cast_op.results[0], trgt_conv_cast_op.results[0])
 
+            case "GadgetCall":
+                ops_to_insert = self._get_qecl_ops_for_gadget_call(op)
+
             case _:
                 raise CompileError(
                     f"Conversion of op '{op.name}' only supports gates 'Identity', 'PauliX', "
@@ -488,6 +491,42 @@ class CustomOpConversion(RewritePattern):
             qec_cycle_op := qecl.QecCycleOp(in_codeblock=qecl_gate_op.out_codeblock),
             _cast_to_qubit(qec_cycle_op.out_codeblock),
         )
+
+    @classmethod
+    def _get_qecl_ops_for_gadget_call(cls, op: quantum.CustomOp) -> tuple[Operation, ...]:
+        """Helper function that returns the qecl operations of a PennyLane gadget call.
+
+        The call is a ``quantum.custom "GadgetCall"`` op produced by ``pennylane.ftqc.gadget.apply``,
+        whose ``gadget.payload`` attribute holds the gadget's emitted IR. The gadget is lowered
+        to qecl by PennyLane and its operations are inserted on the codeblock of the op's
+        qubit.
+        """
+        # The gadget lowering lives in PennyLane and depends on this package's dialects.
+        from pennylane.ftqc.gadget import GadgetError
+        from pennylane.ftqc.gadget.lowering import LoweringGap, inline_gadget_call
+
+        name = op.attributes["gadget.name"].data
+        if len(op.in_qubits) != 1:
+            raise CompileError(
+                f"Gadget '{name}' acts on {len(op.in_qubits)} logical qubits, but the "
+                "quantum-to-qecl conversion supports one logical qubit per codeblock (k = 1)"
+            )
+
+        qubit_owner_op = op.in_qubits[0].owner
+        if not _is_type_convertible(qubit_owner_op, qecl.LogicalCodeblockType):  # pragma: no cover
+            _raise_failed_to_convert_op_compile_error(op)
+
+        conv_cast_op = builtin.UnrealizedConversionCastOp.get(
+            (qubit_owner_op.results[0],), (qubit_owner_op.operands[0].type,)
+        )
+        try:
+            gadget_ops, codeblock = inline_gadget_call(
+                op.attributes["gadget.payload"].data, conv_cast_op.results[0]
+            )
+        except (LoweringGap, GadgetError) as exc:
+            raise CompileError(f"Cannot convert gadget '{name}' to qecl: {exc}") from exc
+
+        return (conv_cast_op, *gadget_ops, _cast_to_qubit(codeblock))
 
 
 # MARK: Measure Op Pattern

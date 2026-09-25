@@ -1825,3 +1825,78 @@ class TestQuantumToQecLogicalPassIntegration:
             return qp.sample(wires=[0, 1, 2])
 
         run_filecheck_qjit(circuit)
+
+
+# MARK: TestGadgetCallPattern
+
+
+class TestGadgetCallPattern:
+    """Tests for the conversion of PennyLane gadget calls (``pennylane.ftqc.gadget.apply``)."""
+
+    def test_memory_gadget_integration(self, run_filecheck_qjit):
+        """Test that a memory gadget call is replaced by its QEC cycles on the qubit's codeblock,
+        tagged with the gadget and its code."""
+        from pennylane.ftqc import gadget
+        from pennylane.ftqc.gadget.library import steane_memory
+
+        _, _, memory = steane_memory(rounds=2)
+        dev = qp.device("null.qubit", wires=1)
+
+        @qp.qjit(capture=True, collect_decomp_rules=False, target="mlir")
+        @convert_quantum_to_qecl_pass(k=1)
+        @qp.qnode(dev, shots=10, mcm_method="one-shot")
+        def circuit():
+            # CHECK-LABEL: func.func public @circuit{{.+}} quantum.node
+            # CHECK-NOT: GadgetCall
+            # CHECK: [[x:%.+]] = qecl.x
+            # CHECK: [[cycle:%.+]] = qecl.qec [[x]]
+            # CHECK: [[gadget0:%.+]] = qecl.qec [[cycle]] {{{.*}}gadget.name = "steane_memory"}
+            # CHECK: [[gadget1:%.+]] = qecl.qec [[gadget0]] {{{.*}}gadget.name = "steane_memory"}
+            # CHECK: qecl.measure [[gadget1]]
+            qp.X(0)
+            gadget.apply(memory, wires=0)
+            return qp.sample(wires=[0])
+
+        run_filecheck_qjit(circuit)
+
+    def test_unlowerable_gadget_raises(self, run_filecheck_qjit):
+        """Test that a gadget that qecl cannot express raises a CompileError with the reason."""
+        from pennylane.ftqc import gadget
+        from pennylane.ftqc.gadget.library import steane_code
+
+        code = steane_code()
+        a, b = gadget.Phase.from_code("a", code), gadget.Phase.from_code("b", code)
+
+        @gadget.define(action=gadget.Action.idle(), code=code, phases=(a, b))
+        def hop(handle):
+            handle, _ = gadget.rounds(handle, 1, record="r0")
+            handle = gadget.deform(handle, to="b")
+            handle, _ = gadget.rounds(handle, 1, record="r1")
+            return handle
+
+        @qp.qjit(capture=True, collect_decomp_rules=False, target="mlir")
+        @convert_quantum_to_qecl_pass(k=1)
+        @qp.qnode(qp.device("null.qubit", wires=1), shots=10, mcm_method="one-shot")
+        def circuit():
+            gadget.apply(hop, wires=0)
+            return qp.sample(wires=[0])
+
+        with pytest.raises(CompileError, match="changes the measured stabilizer group"):
+            run_filecheck_qjit(circuit)
+
+    def test_gadget_on_several_qubits_raises(self, run_filecheck_qjit):
+        """Test that a gadget on more than one logical qubit raises a CompileError for k = 1."""
+        from pennylane.ftqc import gadget
+        from pennylane.ftqc.gadget.library import rep_code_zz_merge
+
+        _, _, measure_zz = rep_code_zz_merge(d=3)
+
+        @qp.qjit(capture=True, collect_decomp_rules=False, target="mlir")
+        @convert_quantum_to_qecl_pass(k=1)
+        @qp.qnode(qp.device("null.qubit", wires=2), shots=10, mcm_method="one-shot")
+        def circuit():
+            gadget.apply(measure_zz, wires=[0, 1])
+            return qp.sample(wires=[0])
+
+        with pytest.raises(CompileError, match="acts on 2 logical qubits"):
+            run_filecheck_qjit(circuit)

@@ -486,6 +486,22 @@ class ConvertQecLogicalToQecPhysicalPass(ModulePass):
                 f"per codeblock, k, is 1, but got k = {self.qec_code.k}"
             )
 
+        # Gadgets inserted by `pennylane.ftqc.gadget.apply` record the code they were written for;
+        # check it against the code this pass lowers to before the code is fixed.
+        if any(
+            isinstance(inner_op, qecl.QecCycleOp) and "gadget.code_hx" in inner_op.attributes
+            for inner_op in op.walk()
+        ):
+            from pennylane.ftqc.gadget import GadgetError
+            from pennylane.ftqc.gadget.lowering import check_pipeline_code
+
+            try:
+                check_pipeline_code(
+                    op, self.qec_code.x_tanner, self.qec_code.z_tanner, str(self.qec_code)
+                )
+            except GadgetError as exc:
+                raise CompileError(str(exc)) from exc
+
         # n is the number of physical data qubits from the QEC code.
         ConvertQECLNoiseOpToQECPNoisePass(
             n=self.qec_code.n, number_errors=self.number_errors

@@ -37,6 +37,7 @@ from pennylane.capture.primitives import (
     quantum_subroutine_prim,
     transform_prim,
 )
+from pennylane.ftqc.gadget.calls import get_gadget_call_prim
 from pennylane.ftqc.primitives import measure_in_basis_prim as plxpr_measure_in_basis_prim
 from pennylane.measurements import CountsMP
 from pennylane.pytrees import flatten, unflatten
@@ -47,6 +48,7 @@ from catalyst.from_plxpr.qref_jax_primitives import (
     qref_alloc_p,
     qref_compbasis_p,
     qref_dealloc_p,
+    qref_gadget_call_p,
     qref_get_p,
     qref_gphase_p,
     qref_hermitian_p,
@@ -633,6 +635,16 @@ def handle_pauli_measure(self, *wires_inval, pauli_word, **params):
     result = qref_pauli_measure_p.bind(*in_qubits, pauli_word=pauli_word, qubits_len=len(in_qubits))
     result = jnp.astype(result, int)
     return result
+
+
+@PLxPRToQuantumJaxprInterpreter.register_primitive(get_gadget_call_prim())
+def handle_gadget_call(self, *wires_inval, name, payload):
+    """Handle the conversion from plxpr to Catalyst jaxpr for a PennyLane gadget call"""
+    in_qubits = [
+        w if is_abstract_qubit(w) else qref_get_p.bind(self.init_qreg, w) for w in wires_inval
+    ]
+    qref_gadget_call_p.bind(*in_qubits, name=name, payload=payload)
+    return []
 
 
 # pylint: disable=unused-argument

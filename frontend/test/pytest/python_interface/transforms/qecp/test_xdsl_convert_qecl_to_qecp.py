@@ -1975,3 +1975,56 @@ class TestGenerality:
 
         pipeline = (ConvertQecLogicalToQecPhysicalPass(qec_code=QecCode.get("Shor913")),)
         run_filecheck(program, pipeline)
+
+
+class TestGadgetCodeCheck:
+    """Tests that gadgets are only lowered with the QEC code they were written for."""
+
+    def test_matching_code(self, run_filecheck_qjit):
+        """Test that a gadget on the Steane code lowers with the Steane code."""
+        from pennylane.ftqc import gadget
+        from pennylane.ftqc.gadget.library import steane_memory
+
+        _, _, memory = steane_memory(rounds=2)
+
+        @qp.qjit(capture=True, collect_decomp_rules=False, target="mlir")
+        @convert_qecl_to_qecp_pass(qec_code="Steane")
+        @convert_quantum_to_qecl_pass(k=1)
+        @qp.qnode(qp.device("null.qubit", wires=1), shots=10, mcm_method="one-shot")
+        def circuit():
+            # CHECK-LABEL: func.func public @circuit{{.+}} quantum.node
+            # CHECK-NOT: qecl.qec
+            qp.X(0)
+            gadget.apply(memory, wires=0)
+            return qp.sample(wires=[0])
+
+        run_filecheck_qjit(circuit)
+
+    def test_mismatched_code_raises(self, run_filecheck_qjit):
+        """Test that a gadget whose code has different checks than the pipeline code raises a
+        CompileError instead of being lowered with the pipeline code's cycles."""
+        from pennylane.ftqc import gadget
+
+        h = np.array(
+            [[0, 0, 0, 1, 1, 1, 1], [0, 1, 1, 0, 0, 1, 1], [1, 0, 1, 0, 1, 0, 1]], dtype=np.uint8
+        )
+        ones = np.ones((1, 7), dtype=np.uint8)
+        other = gadget.CSSCode("reordered", h, h, ones, ones)
+
+        @gadget.define(
+            action=gadget.Action.idle(), code=other, phases=(gadget.Phase.from_code("s", other),)
+        )
+        def reordered_memory(handle):
+            handle, _ = gadget.rounds(handle, 2, record="m")
+            return handle
+
+        @qp.qjit(capture=True, collect_decomp_rules=False, target="mlir")
+        @convert_qecl_to_qecp_pass(qec_code="Steane")
+        @convert_quantum_to_qecl_pass(k=1)
+        @qp.qnode(qp.device("null.qubit", wires=1), shots=10, mcm_method="one-shot")
+        def circuit():
+            gadget.apply(reordered_memory, wires=0)
+            return qp.sample(wires=[0])
+
+        with pytest.raises(CompileError, match="written for code reordered, whose checks differ"):
+            run_filecheck_qjit(circuit)

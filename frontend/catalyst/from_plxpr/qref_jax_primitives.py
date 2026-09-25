@@ -169,6 +169,8 @@ qref_measure_in_basis_p = Primitive("qref_measure_in_basis")
 qref_compbasis_p = Primitive("qref_compbasis")
 qref_namedobs_p = Primitive("qref_namedobs")
 qref_hermitian_p = Primitive("qref_hermitian")
+qref_gadget_call_p = Primitive("qref_gadget_call")
+qref_gadget_call_p.multiple_results = True
 
 
 #
@@ -561,6 +563,43 @@ def _qref_pauli_measure_lowering(
 
 
 #
+# gadget call
+#
+@qref_gadget_call_p.def_abstract_eval
+def _qref_gadget_call_abstract_eval(*qubits, name=None, payload=None):
+    assert all(isinstance(qubit, AbstractQubit) for qubit in qubits)
+    return ()
+
+
+def _qref_gadget_call_lowering(jax_ctx: mlir.LoweringRuleContext, *qubits, name=None, payload=None):
+    """Lower a call to a PennyLane gadget (``pennylane.ftqc.gadget.apply``).
+
+    The call becomes a ``quantum.custom "GadgetCall"`` gate whose ``gadget.payload`` attribute
+    holds the gadget's emitted IR. The ``convert-quantum-to-qecl`` pass replaces it with the
+    gadget's ``qecl`` operations; no other pass or runtime can execute it.
+    """
+    ctx = jax_ctx.module_context.context
+    ctx.allow_unregistered_dialects = True
+
+    for q in qubits:
+        assert ir.OpaqueType.isinstance(q.type)
+        assert ir.OpaqueType(q.type).dialect_namespace == "qref"
+        assert ir.OpaqueType(q.type).data == "bit"
+
+    op = CustomOp(
+        params=[],
+        qubits=qubits,
+        gate_name=ir.StringAttr.get("GadgetCall"),
+        ctrl_qubits=[],
+        ctrl_values=[],
+        adjoint=False,
+    )
+    op.operation.attributes["gadget.name"] = ir.StringAttr.get(name)
+    op.operation.attributes["gadget.payload"] = ir.StringAttr.get(payload)
+    return ()
+
+
+#
 # qubit unitary operation
 #
 @qref_unitary_p.def_abstract_eval
@@ -898,6 +937,7 @@ CUSTOM_LOWERING_RULES = (
     (qref_compbasis_p, _qref_compbasis_lowering),
     (qref_namedobs_p, _qref_named_obs_lowering),
     (qref_hermitian_p, _qref_hermitian_lowering),
+    (qref_gadget_call_p, _qref_gadget_call_lowering),
     (plxpr_adjoint_transform_prim, _pl_adjoint_lowering),
     (plxpr_ctrl_transform_prim, _pl_ctrl_lowering),
 )
