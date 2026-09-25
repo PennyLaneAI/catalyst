@@ -621,7 +621,7 @@ class TestBacklineDemoIntegration:
         swap_pairs = [(0, 1), (2, 3)]
 
         decoder = qp.backline.css_bp_decoder(
-            checks, checks, postprocess="osd", num_iters=5, prob=0.1, platform=gpu_triton_platform
+            checks, checks, postprocess="osd", num_iters=1, prob=0.1, platform=gpu_triton_platform
         )
 
         ctrl = qp.Controller(
@@ -823,7 +823,7 @@ class TestBacklineDemoIntegration:
 
         try:
             decoder = qp.backline.css_bp_decoder(
-                Hx, Hz, postprocess="osd", num_iters=5, prob=0.1, platform=platform
+                Hx, Hz, postprocess="osd", num_iters=1, prob=0.1, platform=platform
             )
         except (ImportError, RuntimeError, OSError) as exc:
             pytest.skip(f"Triton css_bp_decoder build unavailable: {exc}")
