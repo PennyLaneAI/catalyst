@@ -263,16 +263,15 @@ class AdjointGenerator {
                             .getResult();
                 } else {
                     // Param not a tensor, just use a raw memref without buffers
-                    auto targetViewType = MemRefType::get({1}, paramType);
+                    auto targetViewType = MemRefType::get({}, paramType);
                     Value view = memref::ViewOp::create(builder, loc, targetViewType,
                                                         cache.paramVector, currentOffsetIndex,
                                                         ValueRange{} // Empty dynamic sizes
                                                         )
                                      ->getResult(0);
 
-                    auto zero = index::ConstantOp::create(builder, loc, 0);
                     loadedParam =
-                        memref::LoadOp::create(builder, loc, view, ValueRange{zero}).getResult();
+                        memref::LoadOp::create(builder, loc, view, ValueRange{}).getResult();
                 }
                 cachedParams[numParams - 1 - idx] = loadedParam;
                 idx++;

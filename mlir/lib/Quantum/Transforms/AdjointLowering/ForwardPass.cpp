@@ -138,15 +138,14 @@ void AugmentedCircuitGenerator::cacheGate(quantum::ParametrizedGate gate, OpBuil
             memref::CopyOp::create(builder, loc, buffer, view);
         } else {
             // Param not a tensor, just use a raw memref without buffers
-            auto targetViewType = MemRefType::get({1}, paramType);
+            auto targetViewType = MemRefType::get({}, paramType);
             Value view =
                 memref::ViewOp::create(builder, loc, targetViewType, cache.paramVector,
                                        currentOffsetIndex, ValueRange{} // Empty dynamic sizes
                                        )
                     ->getResult(0);
 
-            auto zero = index::ConstantOp::create(builder, loc, 0);
-            memref::StoreOp::create(builder, loc, clonedParam, view, ValueRange{zero});
+            memref::StoreOp::create(builder, loc, clonedParam, view, ValueRange{});
         }
 
         // 3. Push the current offset onto the offset stack

@@ -175,22 +175,22 @@ func.func @mixed_param_types(%0: !quantum.reg) -> !quantum.reg {
     // CHECK:   [[c4:%.+]] = "test.op"([[i]]) : (index) -> tensor<6xi1>
     //
     // CHECK: [[offset:%.+]] = memref.load [[cur_offset]][] : memref<index>
-    // CHECK: [[view:%.+]] = memref.view [[data_vector]][[[offset]]][] : memref<2048xi8> to memref<1xf64>
-    // CHECK: memref.store [[c1]], [[view]][[[zero]]] : memref<1xf64>
+    // CHECK: [[view:%.+]] = memref.view [[data_vector]][[[offset]]][] : memref<2048xi8> to memref<f64>
+    // CHECK: memref.store [[c1]], [[view]][] : memref<f64>
     // CHECK: catalyst.list_push [[offset]], [[offset_vector]] : <index>
     // CHECK: [[new_offset:%.+]] = index.add [[offset]], [[_8]]
     // CHECK: memref.store [[new_offset]], [[cur_offset]][] : memref<index>
     //
     // CHECK: [[offset:%.+]] = memref.load [[cur_offset]][] : memref<index>
-    // CHECK: [[view:%.+]] = memref.view [[data_vector]][[[offset]]][] : memref<2048xi8> to memref<1xi1>
-    // CHECK: memref.store [[c2]], [[view]][[[zero]]] : memref<1xi1>
+    // CHECK: [[view:%.+]] = memref.view [[data_vector]][[[offset]]][] : memref<2048xi8> to memref<i1>
+    // CHECK: memref.store [[c2]], [[view]][] : memref<i1>
     // CHECK: catalyst.list_push [[offset]], [[offset_vector]] : <index>
     // CHECK: [[new_offset:%.+]] = index.add [[offset]], [[_1]]
     // CHECK: memref.store [[new_offset]], [[cur_offset]][] : memref<index>
     //
     // CHECK: [[offset:%.+]] = memref.load [[cur_offset]][] : memref<index>
-    // CHECK: [[view:%.+]] = memref.view [[data_vector]][[[offset]]][] : memref<2048xi8> to memref<1xcomplex<i32>>
-    // CHECK: memref.store [[c3]], [[view]][[[zero]]] : memref<1xcomplex<i32>>
+    // CHECK: [[view:%.+]] = memref.view [[data_vector]][[[offset]]][] : memref<2048xi8> to memref<complex<i32>>
+    // CHECK: memref.store [[c3]], [[view]][] : memref<complex<i32>>
     // CHECK: catalyst.list_push [[offset]], [[offset_vector]] : <index>
     // CHECK: [[new_offset:%.+]] = index.add [[offset]], [[_8]]
     // CHECK: memref.store [[new_offset]], [[cur_offset]][] : memref<index>
@@ -217,16 +217,16 @@ func.func @mixed_param_types(%0: !quantum.reg) -> !quantum.reg {
       // CHECK: [[c4:%.+]] = bufferization.to_tensor [[view]] restrict : memref<6xi1> to tensor<6xi1>
       //
       // CHECK: [[offset:%.+]] = catalyst.list_pop [[offset_vector]] : <index>
-      // CHECK: [[view:%.+]] = memref.view [[data_vector]][[[offset]]][] : memref<2048xi8> to memref<1xcomplex<i32>>
-      // CHECK: [[c3:%.+]] = memref.load [[view]][[[zero]]] : memref<1xcomplex<i32>>
+      // CHECK: [[view:%.+]] = memref.view [[data_vector]][[[offset]]][] : memref<2048xi8> to memref<complex<i32>>
+      // CHECK: [[c3:%.+]] = memref.load [[view]][] : memref<complex<i32>>
       //
       // CHECK: [[offset:%.+]] = catalyst.list_pop [[offset_vector]] : <index>
-      // CHECK: [[view:%.+]] = memref.view [[data_vector]][[[offset]]][] : memref<2048xi8> to memref<1xi1>
-      // CHECK: [[c2:%.+]] = memref.load [[view]][[[zero]]] : memref<1xi1>
+      // CHECK: [[view:%.+]] = memref.view [[data_vector]][[[offset]]][] : memref<2048xi8> to memref<i1>
+      // CHECK: [[c2:%.+]] = memref.load [[view]][] : memref<i1>
       //
       // CHECK: [[offset:%.+]] = catalyst.list_pop [[offset_vector]] : <index>
-      // CHECK: [[view:%.+]] = memref.view [[data_vector]][[[offset]]][] : memref<2048xi8> to memref<1xf64>
-      // CHECK: [[c1:%.+]] = memref.load [[view]][[[zero]]] : memref<1xf64>
+      // CHECK: [[view:%.+]] = memref.view [[data_vector]][[[offset]]][] : memref<2048xi8> to memref<f64>
+      // CHECK: [[c1:%.+]] = memref.load [[view]][] : memref<f64>
       //
       // CHECK: quantum.operator "gate"([[c1]]: f64, [[c2]]: i1, [[c3]]: complex<i32>, [[c4]]: tensor<6xi1>) adj
       %q1 = quantum.operator "gate"(%c1: f64, %c2: i1, %c3: complex<i32>, %c4: tensor<6xi1>) qubits(%q0)
