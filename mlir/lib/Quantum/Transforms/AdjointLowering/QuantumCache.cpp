@@ -16,12 +16,11 @@
 
 #include <cstdint>
 
+#include "mlir/Dialect/Index/IR/IndexOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 
 #include "Catalyst/IR/CatalystOps.h"
-
-#include <mlir/Dialect/Index/IR/IndexOps.h>
 
 using namespace mlir;
 using namespace catalyst;
@@ -97,13 +96,8 @@ bool isAvailableToReversePass(Value param, Region &adjointRegion) {
 
 QuantumCache QuantumCache::initialize(Region &region, OpBuilder &builder, Location loc) {
     MLIRContext *ctx = builder.getContext();
-    Type byteSizeType = builder.getI8Type();
-    // auto paramVectorType = ArrayListType::get(ctx, byteSizeType);
 
-    auto intVectorType = ArrayListType::get(ctx, builder.getI64Type());
-    auto wireVectorType = ArrayListType::get(ctx, builder.getI64Type());
-    auto controlFlowTapeType = ArrayListType::get(ctx, builder.getIndexType());
-    // auto paramVector = ListInitOp::create(builder, loc, paramVectorType);
+    Type byteSizeType = builder.getI8Type();
     uint32_t defaultSize = 2048; // just some default size for now
     auto paramVector =
         memref::AllocOp::create(builder, loc, MemRefType::get({defaultSize}, byteSizeType))
@@ -114,14 +108,14 @@ QuantumCache QuantumCache::initialize(Region &region, OpBuilder &builder, Locati
             .getMemref();
     auto zero = index::ConstantOp::create(builder, loc, 0);
     memref::StoreOp::create(builder, loc, zero, currentOffset, ValueRange{});
-
     auto offsetVectorType = ArrayListType::get(ctx, builder.getIndexType());
     auto offsetVector = ListInitOp::create(builder, loc, offsetVectorType);
 
-    auto intVector = ListInitOp::create(builder, loc, intVectorType); // TODO: REMOVE
+    auto wireVectorType = ArrayListType::get(ctx, builder.getI64Type());
     auto wireVector = ListInitOp::create(builder, loc, wireVectorType);
 
     // Initialize the tapes that store the structure of control flow.
+    auto controlFlowTapeType = ArrayListType::get(ctx, builder.getIndexType());
     DenseMap<Operation *, TypedValue<ArrayListType>> controlFlowTapes;
     region.walk([&](Operation *op) {
         if (isa<scf::ForOp, scf::IfOp, scf::WhileOp, scf::IndexSwitchOp>(op)) {
@@ -132,7 +126,6 @@ QuantumCache QuantumCache::initialize(Region &region, OpBuilder &builder, Locati
     return quantum::QuantumCache{.paramVector = paramVector,
                                  .currentOffset = currentOffset,
                                  .offsetVector = offsetVector,
-                                 .intVector = intVector,
                                  .wireVector = wireVector,
                                  .controlFlowTapes = controlFlowTapes};
 }
@@ -141,7 +134,6 @@ void QuantumCache::emitDealloc(OpBuilder &builder, Location loc) {
     memref::DeallocOp::create(builder, loc, paramVector);
     memref::DeallocOp::create(builder, loc, currentOffset);
     ListDeallocOp::create(builder, loc, offsetVector);
-    ListDeallocOp::create(builder, loc, intVector);
     ListDeallocOp::create(builder, loc, wireVector);
     for (const auto &[_key, controlFlowTape] : controlFlowTapes) {
         ListDeallocOp::create(builder, loc, controlFlowTape);

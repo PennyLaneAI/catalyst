@@ -36,7 +36,6 @@ struct QuantumCache {
     mlir::Value paramVector;
     mlir::Value currentOffset;
     mlir::TypedValue<ArrayListType> offsetVector;
-    mlir::TypedValue<ArrayListType> intVector;
     mlir::TypedValue<ArrayListType> wireVector;
     /// For every structured control flow op, store the values required for it to execute.
     /// Specifically: store the conditions for scf.if ops, the start/stop/step of scf.for ops, and
