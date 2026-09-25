@@ -26,12 +26,7 @@ from xdsl.dialects import builtin, transform
 from xdsl.ir import Attribute
 from xdsl.parser import Parser
 from xdsl.passes import ModulePass, PassPipeline
-from xdsl.pattern_rewriter import (
-    InsertPoint,
-    PatternRewriter,
-    RewritePattern,
-    op_type_rewrite_pattern,
-)
+from xdsl.pattern_rewriter import PatternRewriter, RewritePattern, op_type_rewrite_pattern, InsertPoint
 from xdsl.printer import Printer
 
 from catalyst.compiler import _quantum_opt
@@ -227,11 +222,7 @@ class ApplyTransformSequenceNoCallbackPattern(RewritePattern):
         """Rewrite modules containing transform.named_sequences."""
         payload: builtin.ModuleOp = transformer.parent_op()
         # Detach (do not erase) so we can clone the transformer for MLIR groups.
-        if transformer.next_op is not None:
-            insertion_point = InsertPoint.before(transformer.next_op)
-        else:
-            insertion_point = InsertPoint.at_end(payload.body.block)
-
+        insertion_point = InsertPoint.before(transformer.next_op)
         transformer.detach()
 
         pass_ops = []
@@ -268,16 +259,15 @@ class ApplyTransformSequenceNoCallbackPattern(RewritePattern):
         transformer: builtin.ModuleOp,
         group: Sequence[transform.ApplyRegisteredPassOp],
     ) -> builtin.ModuleOp:
-        """Clone ``transformer``, rewriting passes outside ``group`` to no-ops."""
+        """Clone ``transformer``, rewriting passes outside ``group`` to no-ops.
+        """
         group_set = set(group)
         clone = transformer.clone()
 
         for orig_ns, clone_ns in zip(transformer.ops, clone.ops, strict=True):
 
             for orig_op, clone_op in zip(orig_ns.body.ops, clone_ns.body.ops, strict=True):
-                if orig_op not in group_set and isinstance(
-                    orig_op, transform.ApplyRegisteredPassOp
-                ):
+                if orig_op not in group_set and isinstance(orig_op, transform.ApplyRegisteredPassOp):
                     clone_op.pass_name = builtin.StringAttr("empty")
                     clone_op.options = builtin.DictionaryAttr({})
 
