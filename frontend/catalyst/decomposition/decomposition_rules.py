@@ -16,19 +16,24 @@
 
 # pylint: disable=protected-access,bare-except
 
+import itertools
+import re
 import warnings
 from collections import deque
-from functools import partial
 
 import jax.numpy as jnp
+import numpy as np
 import pennylane as qp
 from jax._src.lib.mlir import ir
+from jax.tree_util import tree_flatten, tree_unflatten
 from pennylane.core.operator import Operator2, abstractify
+from pennylane.decomposition.utils import to_name
+from pennylane.wires import Wires
 
 from catalyst.compiler import _quantum_opt
 from catalyst.decomposition.graph_op_id import GraphOpID
 from catalyst.decomposition.rule_lowering_warning import RuleLoweringWarning
-from catalyst.decomposition.type_utils import get_dummy_values_for_arg
+from catalyst.decomposition.type_utils import get_dummy_values_for_dynamic_shape
 from catalyst.jax_extras.lowering import get_mlir_attribute_from_pyval
 from catalyst.utils.exceptions import CompileError
 
@@ -46,6 +51,25 @@ _NON_INVERTIBLE_RESOURCE_TYPES = (qp.ops.MidMeasure, qp.ops.PauliMeasure)
 def _resources_have_measurement(gate_counts) -> bool:
     """Return whether a rule's declared resources contain a mid-circuit measurement."""
     return any(isinstance(op, _NON_INVERTIBLE_RESOURCE_TYPES) for op in gate_counts)
+
+
+def _adjoint_folds_to_base(resource_ids, op_name) -> bool:
+    """Whether an ``Adjoint(op)`` rule's resources are a single unmodified copy of the base op.
+
+    This holds for ``adjoint_rotation`` and ``self_adjoint`` to simplify the rule registry
+    and avoid the solver having to match a rule that produces a modified gate back to the base op.
+
+    Args:
+        resource_ids (dict): the rule's resources as ``{resource graphOpId: count}``
+        op_name (str): the base operator's name
+
+    Returns:
+        bool: whether the rule folds ``Adjoint(op)`` to a single unmodified ``op``
+    """
+    if len(resource_ids) != 1:
+        return False
+    ((rid, count),) = resource_ids.items()
+    return count == 1 and rid.split("{", 1)[0] == op_name
 
 
 def build_base_op(op_cls, kwargs, is_custom_op):
@@ -66,6 +90,199 @@ def build_base_op(op_cls, kwargs, is_custom_op):
     args, kwargs = split_call_args(kwargs, is_custom_op)
     with qp.capture.pause():
         return op_cls(*args, **kwargs)
+
+
+def symbolic_op_name(op_name, kind) -> str:
+    """Return the name PennyLane's registry holds ``op_name``'s symbolic rules under.
+
+    A controlled operator is named ``C(Op)`` whatever its control count, so the count never appears
+    here.
+
+    Args:
+        op_name (str): the base operator's name
+        kind (str): ``"adjoint"`` or ``"control"``
+
+    Returns:
+        str: the registry name
+
+    Raises:
+        CompileError: if ``kind`` is not a known symbolic kind
+    """
+    if kind == "adjoint":
+        return f"Adjoint({op_name})"
+    if kind == "control":
+        return f"C({op_name})"
+    raise CompileError(f"Unknown symbolic kind: {kind}")  # pragma: no cover
+
+
+def symbolic_arguments(base_op, kind, ctrl_wires=None) -> dict:
+    """Return the arguments a rule registered against a symbolic operator expects.
+
+    PennyLane calls such a rule with the symbolic operator's own ``arguments``: ``base`` alone for
+    an adjoint, and the five entries below for a controlled operator. Control values are plain
+    Python booleans so that a rule wrapped in ``flip_zero_control`` statically resolves to no ``X``
+    flips, matching the all-ones ``ctrlvals`` a ``<n>C(...)`` graphOpId denotes.
+
+    Args:
+        base_op (Operator2): the base operator the rule acts on
+        kind (str): ``"adjoint"`` or ``"control"``
+        ctrl_wires: the control wires, for ``kind="control"``
+
+    Returns:
+        dict: the arguments to call the rule with
+
+    Raises:
+        CompileError: if ``kind`` is not a known symbolic kind
+    """
+    if kind == "adjoint":
+        return {"base": base_op}
+    if kind == "control":
+        # FIXME: the all-ones assumption is unsound for an operator that carries a zero control
+        # value. A `<n>C(...)` graphOpId records only the control count, so such an operator maps
+        # to the same node as an all-ones one and the solver hands it this rule, which was traced
+        # without the `X` flips the zero value needs. It's silently giving the wrong state.
+        #
+        # The values cannot be spelled in the id (they may be dynamic), so the fix is to normalize
+        # them away where they are known, by emitting the flips around the operator during capture
+        # so that every controlled operator the decomposition sees really does denote all-ones
+        # controls.
+        ctrl_wires = Wires(ctrl_wires)
+        return {
+            "base": base_op,
+            "control_wires": ctrl_wires,
+            "control_values": [True] * len(ctrl_wires),
+            "work_wires": Wires([]),
+            "work_wire_type": "borrowed",
+        }
+    raise CompileError(f"Unknown symbolic kind: {kind}")  # pragma: no cover
+
+
+def ordered_kwarg_names(call_kwargs, dynamic_shape) -> list:
+    """Order a rule's keyword operands params-first, followed by wires in declaration order."""
+    params = sorted(name for name in call_kwargs if name in dynamic_shape)
+    wires = [name for name in call_kwargs if name not in dynamic_shape]
+    return params + wires
+
+
+def flatten_hybrid_args(extra_data) -> tuple:
+    """Split hybrid arguments into numeric ones (passed as operands) and the rest (closed over).
+
+    A hybrid argument whose pytree is entirely numeric arrays (e.g. a ``CDFHamiltonian``) is
+    flattened so its leaves can be passed into the rule call as operands, keeping the concrete
+    values out of the rule body (where they would otherwise bake in as constants).
+
+    Args:
+        extra_data (dict): the operator's hybrid arguments, keyed by name
+
+    Returns:
+        list[tuple]: ``(name, treedef, num_leaves)`` per operand-passed hybrid argument
+        list: the flat leaf dummies (shape/dtype of the concrete leaves), to pass as operands
+        dict: the hybrid arguments to close over rather than pass as operands, keyed by name
+    """
+    specs, leaf_dummies, closed_over = [], [], {}
+    for name, value in extra_data.items():
+        leaves, treedef = tree_flatten(value)
+        # TODO: this "all leaves are numeric arrays" test is a second source of truth for which
+        # hybrid leaves become rule-function inputs, and it must agree with the operator lowering's
+        # own partition (`_process_params` in from_plxpr/qref_operator2_primitives.py), which uses a
+        # per-leaf `forward_mask` to split leaves into `param_map` vs `forward_args` (excluding
+        # qubits).
+        #
+        # Note right now the two agree for all-numeric args (numeric hamiltonians) and for args
+        # with a non-array leaf (an operator carrying Wires), but a mixed hybrid arg would diverge
+        # causing the lowered op's params to outnumber the rule's inputs.
+        # Drive this off `_process_params`/`forward_mask` instead, once the operator's mask is
+        # passed through to rule compilation.
+        if leaves and all(
+            isinstance(leaf, (np.ndarray, np.generic, jnp.ndarray)) for leaf in leaves
+        ):
+            specs.append((name, treedef, len(leaves)))
+            leaf_dummies.extend(
+                jnp.zeros(jnp.shape(leaf), dtype=jnp.asarray(leaf).dtype) for leaf in leaves
+            )
+        else:
+            closed_over[name] = value
+    return specs, leaf_dummies, closed_over
+
+
+def rule_call_operands(
+    call_args, call_kwargs, kwarg_names, wire_lens, ctrl_wires=None, hybrid_leaves=()
+) -> list:
+    """Flatten a rule call as params, operand-passed hybrid-arg leaves, one grouped base-wire
+    operand, then control wires.
+
+    Everything is passed positionally because ``qp.capture.subroutine`` traces through ``jax.jit``,
+    which would otherwise flatten keyword arguments in sorted-name order.
+
+    Args:
+        call_args (tuple): the rule's positional arguments
+        call_kwargs (dict): the rule's keyword arguments
+        kwarg_names (list[str]): parameter names first, followed by wire names
+        wire_lens (dict[str, int]): wire names in declaration order and their lengths
+        ctrl_wires: the control wires to append, or None when the rule is not controlled
+        hybrid_leaves (list): flattened hybrid-argument leaves, inserted after the parameter kwargs
+
+    Returns:
+        list: the operands to call the traced rule with
+    """
+    param_names = [name for name in kwarg_names if name not in wire_lens]
+    wire_names = list(wire_lens)
+    grouped_wires = (
+        jnp.concatenate(tuple(call_kwargs[name] for name in wire_names))
+        if wire_names
+        else jnp.array([], dtype=int)
+    )
+    operands = [
+        *call_args,
+        *(call_kwargs[name] for name in param_names),
+        *hybrid_leaves,
+        grouped_wires,
+    ]
+    if ctrl_wires is not None:
+        operands.append(ctrl_wires)
+    return operands
+
+
+def unpack_rule_operands(
+    operands, n_params, kwarg_names, wire_lens, has_ctrl_wires, hybrid_specs=()
+):
+    """Recover ``(params, kwargs, control wires)`` from :func:`rule_call_operands`' flattening.
+
+    Reconstructs each hybrid argument from its traced leaves (via its ``treedef``) so the rule body
+    receives the same object the user passed, but built from the traced operands.
+
+    Args:
+        operands (tuple): the traced operands the rule body received
+        n_params (int): how many of them are positional parameters
+        kwarg_names (list[str]): parameter names first, followed by wire names
+        wire_lens (dict[str, int]): wire names in declaration order and their lengths
+        has_ctrl_wires (bool): whether a trailing control-wire operand is present
+        hybrid_specs (list[tuple]): ``(name, treedef, num_leaves)`` per hybrid argument, sitting
+            between the parameter kwargs and the grouped wire operand
+
+    Returns:
+        tuple: the rule's positional arguments
+        dict: the rule's keyword arguments (including the rebuilt hybrid arguments)
+        the control wires, or None
+    """
+    params = tuple(operands[:n_params])
+    param_names = [name for name in kwarg_names if name not in wire_lens]
+    n_kwarg_params = len(param_names)
+    named = dict(zip(param_names, operands[n_params : n_params + n_kwarg_params], strict=True))
+    idx = n_params + n_kwarg_params
+    for name, treedef, num_leaves in hybrid_specs:
+        named[name] = tree_unflatten(treedef, operands[idx : idx + num_leaves])
+        idx += num_leaves
+
+    grouped_wires = operands[idx]
+    idx += 1
+    offset = 0
+    for name, length in wire_lens.items():
+        named[name] = grouped_wires[offset : offset + length]
+        offset += length
+
+    ctrl_wires = operands[idx] if has_ctrl_wires else None
+    return params, named, ctrl_wires
 
 
 # Canonical nesting order for op-level modifiers, listed OUTERMOST first. The compiler's
@@ -102,11 +319,10 @@ def _leading_modifier_kind(op_id: str) -> str | None:
     """Return the canonical kind of ``op_id``'s current outermost modifier, or None if bare."""
     if op_id.startswith("Adjoint("):
         return "Adjoint"
-    i = 0
-    while i < len(op_id) and op_id[i].isdigit():
-        i += 1
-    if op_id[i:].startswith("C("):
+
+    if re.match(r"\d*C\(", op_id):
         return "C"
+
     return None
 
 
@@ -292,6 +508,7 @@ def inject_new_rules_into_module(module: ir.Module, decomp_rules: list[str]):
                         if (
                             target_gate == current_rule_target_gate
                             and resources == current_rule_resources
+                            and op.attributes["sym_name"] == decomp_rule_op.attributes["sym_name"]
                         ):
                             rule_already_exists = True
                             return ir.WalkResult.INTERRUPT
@@ -325,7 +542,51 @@ def split_call_args(kwargs, is_custom_op):
     return (), kwargs
 
 
-def collect_resources_for_op(op_name, kwargs, is_custom_op=False, adjoint_resources=False):
+def _rule_allocates_work_wires(rule, *args, **kwargs) -> bool:
+    """Whether a decomposition rule dynamically allocates work wires.
+
+    TODO: remove when --decompose-lowering can handle multiple registers
+    """
+    return rule.get_work_wire_spec(*args, **kwargs).total > 0
+
+
+def _rule_is_applicable(op_name, rule, *args, **kwargs) -> bool:
+    """Return resource data for the decomposition rules that apply to ``op_name``."""
+    try:
+        if not bool(rule.is_applicable(*args, **kwargs)):
+            return False
+    except Exception as e:  # pylint: disable=broad-except
+        warnings.warn(
+            f"Excluded the {rule.name} decomposition rule for {op_name}; raised '{e}'",
+            category=RuleLoweringWarning,
+        )
+        return False
+
+    # TODO: remove when decompose lowering pass can handle multiple registers
+    try:
+        allocates_work_wires = _rule_allocates_work_wires(rule, *args, **kwargs)
+    except Exception as e:  # pylint: disable=broad-except
+        warnings.warn(
+            f"Excluded the {rule.name} decomposition rule for {op_name}; could not read its "
+            f"work-wire spec, raised '{e}'",
+            category=RuleLoweringWarning,
+        )
+        return False
+
+    if allocates_work_wires:
+        warnings.warn(
+            f"Excluded the {rule.name} decomposition rule for {op_name} since "
+            "--decompose-lowering cannot work with multiple registers yet",
+            category=RuleLoweringWarning,
+        )
+        return False
+
+    return True
+
+
+def collect_resources_for_op(
+    op_name, kwargs, is_custom_op=False, adjoint_resources=False, num_controls=0
+):
     """Return resource data for all decomposition rules associated to op_name.
 
     Args:
@@ -333,11 +594,12 @@ def collect_resources_for_op(op_name, kwargs, is_custom_op=False, adjoint_resour
         kwargs (dict): the arguments to compute the resources with
         is_custom_op (bool): whether the operator lowers to ``qref.custom``
         adjoint_resources (bool): whether to spell each produced id in its adjoint form
+        num_controls (int): how many controls to spell on each produced id
 
     Returns:
         dict: rule name to the resources it produces
         dict: rule name to the graphOpId of each resource
-        list: the rules considered
+        list: the rules that apply to the probed operator
     """
     decomp_rules = list(qp.decomposition.list_decomps(op_name))
     args, kwargs = split_call_args(kwargs, is_custom_op)
@@ -345,17 +607,25 @@ def collect_resources_for_op(op_name, kwargs, is_custom_op=False, adjoint_resour
     # map each rule to its resources, in a more generic format
     name_to_resource_ids = {}
     name_to_resources = {}
+    applicable_rules = []
     for rule in decomp_rules:
+        if not _rule_is_applicable(op_name, rule, *args, **kwargs):
+            continue
+
+        applicable_rules.append(rule)
         try:
             # The `compute_resources` function's signature is the same as the Operator2 signature
             # for the original op of the rule
-            resources = rule.compute_resources(*args, **kwargs)
+            with qp.capture.toggle_ctx(True):
+                resources = rule.compute_resources(*args, **kwargs)
             name_to_resources[rule.name] = resources.gate_counts
-            # When adjoint_resources is True, each produced resource's graphOpId is generated in its
-            # adjoint form (Adjoint(<name>){...}) directly from the resource op instance via
-            # GraphOpID.getGraphOpId, rather than string.
+            # A distributed rule produces modified gates, so each id is *generated* in its
+            # modified form straight from the resource op instance -- the modifiers are placed
+            # canonically by `build_graph_op_id`, never spliced into a finished id string.
             name_to_resource_ids[rule.name] = {
-                GraphOpID(op).getGraphOpId(adjoint=adjoint_resources): count
+                GraphOpID(op).getGraphOpId(
+                    adjoint=adjoint_resources, num_controls=num_controls
+                ): count
                 for op, count in resources.gate_counts.items()
             }
         except Exception as e:
@@ -364,7 +634,7 @@ def collect_resources_for_op(op_name, kwargs, is_custom_op=False, adjoint_resour
                 category=RuleLoweringWarning,
             )
 
-    return name_to_resources, name_to_resource_ids, decomp_rules
+    return name_to_resources, name_to_resource_ids, applicable_rules
 
 
 def prepare_dynamic_op_kwargs(dynamic_shape, wire_lens) -> dict:
@@ -378,10 +648,15 @@ def prepare_dynamic_op_kwargs(dynamic_shape, wire_lens) -> dict:
         dict: argument names to dummy values
     """
     kwargs = {}
+
+    # NOTE: Run an accumulator to generate unique negative wire labels.
+    # Otherwise, operators with control and target wires as their arguments
+    # will receive overlapping wires.
+    wire_counter = itertools.count(-1, -1)
     for wire_name, wire_len in wire_lens.items():
-        kwargs[wire_name] = jnp.array(range(wire_len), dtype=int)
+        kwargs[wire_name] = jnp.array([next(wire_counter) for _ in range(wire_len)], dtype=int)
     for arg_name, arg_shape in dynamic_shape.items():
-        kwargs[arg_name] = get_dummy_values_for_arg(arg_shape)
+        kwargs[arg_name] = get_dummy_values_for_dynamic_shape(arg_shape)
     return kwargs
 
 
@@ -443,47 +718,45 @@ def compile_decomposition_rules(
         kwargs | static_data | extra_data,
         is_custom_op,
         adjoint_resources=wrap_adjoint,
+        num_controls=n_ctrl if wrap_control else 0,
     )
 
-    # TODO: The modified target id and the wrapped resource ids are derived here by string-wrapping
-    # the graphOpId (via wrap_modifier_id). Ideally they would be generated via
-    # GraphOpID.getGraphOpId which requires missing steps in the GraphOpID object.
-    # Note it needs changes not just in this function, also in the string id and across
-    # the on-demand C++ loader boundary.
+    # The *target* id is still derived by string-wrapping, because this is the one identity we are
+    # given rather than holding the operator for: the compiler's on-demand loader hands us a
+    # finished graphOpId string (`getGraphOpId()`), and re-generating it from the components would
+    # only agree as long as both spellings stay in step. Splicing keeps whatever came in verbatim.
+    # TODO: generate it as well, once the loader passes the identity components (or the modifiers)
+    # instead of a pre-wrapped id.
     target_id = name_wrap_adjoint(op_id) if wrap_adjoint else op_id
     if wrap_control:
-        ctrl_mod = _control_modifier(n_ctrl)
-        target_id = wrap_modifier_id(target_id, ctrl_mod)
-        name_to_resource_ids = {
-            rule_name: {
-                wrap_modifier_id(produced_id, ctrl_mod): count for produced_id, count in ids.items()
-            }
-            for rule_name, ids in name_to_resource_ids.items()
-        }
+        target_id = wrap_modifier_id(target_id, _control_modifier(n_ctrl))
+
+    call_args, call_kwargs = split_call_args(kwargs, is_custom_op)
+    kwarg_names = ordered_kwarg_names(call_kwargs, dynamic_shape)
+
+    hybrid_specs, hybrid_leaves, closed_hybrid = flatten_hybrid_args(extra_data)
 
     # The static_data was only needed to instantiate the correct decomp rule
-    # Once we have the correct rules, don't send them into qjit
+    # Once we have the correct rules, don't send them into qjit: they are closed over instead.
     def rule_to_subroutine(rule):
-        def decomp_rule(*_args, _ctrl_wires=None, **_kwargs):
-            # Apply adjoint innermost, control outermost (canonical `C(Adjoint(Op))`).
+        def decomp_rule(*_operands):
+            _args, _kwargs, _ctrl_wires = unpack_rule_operands(
+                _operands, len(call_args), kwarg_names, wire_lens, wrap_control, hybrid_specs
+            )
+            # Operand-passed hybrid args are rebuilt from operands in unpack_rule_operands; static
+            # data and closed-over hybrid args are supplied directly.
+            _kwargs |= static_data | closed_hybrid
+            # Apply adjoint innermost, control outermost (canonical C(Adjoint(Op))).
             body = qp.adjoint(rule._impl) if wrap_adjoint else rule._impl
             if wrap_control:
                 qp.ctrl(body, control=list(_ctrl_wires))(*_args, **_kwargs)
             else:
                 body(*_args, **_kwargs)
 
-        decomp_rule_no_static_args = partial(decomp_rule, **static_data)
-        if extra_data:
-            decomp_rule_no_static_args = partial(decomp_rule_no_static_args, **extra_data)
-
         # keep the frontend name for readability, append target op_id for symbol uniqueness
-        decomp_rule_no_static_args.__name__ = rule.name + "_" + target_id
+        decomp_rule.__name__ = rule.name + "_" + target_id
 
-        return qp.capture.subroutine(decomp_rule_no_static_args)
-
-    condition_args, condition_kwargs = split_call_args(
-        kwargs | static_data | extra_data, is_custom_op
-    )
+        return qp.capture.subroutine(decomp_rule)
 
     subroutines = []
     for rule in decomp_rules:
@@ -498,25 +771,38 @@ def compile_decomposition_rules(
                 category=RuleLoweringWarning,
             )
             continue
-        if rule.is_applicable(*condition_args, **condition_kwargs):
-            subroutines.append(rule_to_subroutine(rule))
+        subroutines.append(rule_to_subroutine(rule))
 
-    # For control distribution, the extra control wires are
-    # added to each rule body via the `_ctrl_wires` keyword argument.
+    # For control distribution, the extra control wires trail the base wires in the rule's operands.
     ctrl_wires = (
         jnp.array(range(n_base_wires, n_base_wires + n_ctrl), dtype=int) if wrap_control else None
     )
 
-    call_args, call_kwargs = split_call_args(kwargs, is_custom_op)
-
     return build_rule_module(
-        subroutines, device, call_args, call_kwargs, ctrl_wires, name_to_resource_ids, target_id
+        subroutines,
+        device,
+        call_args,
+        call_kwargs,
+        kwarg_names,
+        wire_lens,
+        ctrl_wires,
+        name_to_resource_ids,
+        target_id,
+        hybrid_leaves,
     )
 
 
-# pylint: disable=too-many-arguments
 def build_rule_module(
-    subroutines, device, call_args, call_kwargs, ctrl_wires, name_to_resource_ids, target_id
+    subroutines,
+    device,
+    call_args,
+    call_kwargs,
+    kwarg_names,
+    wire_lens,
+    ctrl_wires,
+    name_to_resource_ids,
+    target_id,
+    hybrid_leaves=(),
 ) -> ir.Operation:
     """Trace ``subroutines`` into a module of standalone decomposition-rule functions.
 
@@ -525,7 +811,10 @@ def build_rule_module(
         device (Device): the device to trace them on, sized for the operator's wires
         call_args (tuple): positional arguments to call each subroutine with
         call_kwargs (dict): keyword arguments to call each subroutine with
-        ctrl_wires: the control wires to pass, or None when the rules are not controlled
+        kwarg_names (list[str]): the keyword argument names, in the order to flatten them
+        wire_lens (dict[str, int]): wire names in declaration order and their lengths
+        ctrl_wires: the control wires to append, or None when the rules are not controlled
+        hybrid_leaves (list): flattened hybrid-argument leaves passed to :func:`rule_call_operands`
         name_to_resource_ids (dict): rule name to the graphOpId of each resource
         target_id (str): the graphOpId of the gate the rules decompose
 
@@ -536,14 +825,15 @@ def build_rule_module(
         CompileError: if the rules could not be traced
     """
 
+    operands = rule_call_operands(
+        call_args, call_kwargs, kwarg_names, wire_lens, ctrl_wires, hybrid_leaves
+    )
+
     @qp.qjit(target="mlir", capture=True, collect_decomp_rules=False)
     @qp.qnode(device=device)
     def circuit():
         for subroutine in subroutines:
-            if ctrl_wires is not None:
-                subroutine(*call_args, _ctrl_wires=ctrl_wires, **call_kwargs)
-            else:
-                subroutine(*call_args, **call_kwargs)
+            subroutine(*operands)
 
     module = circuit.mlir_module
     if module is None:
@@ -569,6 +859,7 @@ def build_rule_module(
                 )
                 op.attributes["target_gate"] = ir.StringAttr.get(target_id)
                 op.attributes["sym_visibility"] = ir.StringAttr.get("public")
+                op.attributes["frontend_name"] = ir.StringAttr.get(rule_name)
 
         return ir.WalkResult.ADVANCE
 
@@ -618,40 +909,51 @@ def build_rule_module(
     return inlined_module
 
 
-def collect_symbolic_adjoint_resources(op_cls, op_name, kwargs, is_custom_op):
-    """Return resource data for the rules registered against ``Adjoint(op_name)``.
+def collect_symbolic_resources(op_cls, op_name, kwargs, is_custom_op, *, kind, ctrl_wires=()):
+    """Return resource data for the rules registered against ``Adjoint(op_name)``/``C(op_name)``.
+
+    PennyLane names a controlled operator ``C(Op)`` whatever its control count, so the registry is
+    always queried under that single name; ``ctrl_wires`` carries the count.
 
     Args:
         op_cls (type): the base operator's class
         op_name (str): the base operator's name
         kwargs (dict): the arguments to build the base operator with
         is_custom_op (bool): whether the operator lowers to ``qref.custom``
+        kind (str): ``"adjoint"`` or ``"control"``
+        ctrl_wires: the control wires, for ``kind="control"``
 
     Returns:
-        list: the rules considered
+        list: the rules that apply to the probed operator
         dict: the arguments the rules were probed with
         dict: rule name to the resources it produces
         dict: rule name to the graphOpId of each resource
     """
-    rules = list(qp.decomposition.list_decomps(f"Adjoint({op_name})"))
+    lookup_name = symbolic_op_name(op_name, kind)
+    rules = list(qp.decomposition.list_decomps(lookup_name))
     if not rules:
         return [], {}, {}, {}
 
     # The base op is only a carrier of the dummy parameters and wires: the graph reasons about
     # resources in terms of abstract operators, matching `_get_kwargs` in PennyLane's graph.
-    probe_args = {"base": abstractify(build_base_op(op_cls, kwargs, is_custom_op))}
+    base_op = abstractify(build_base_op(op_cls, kwargs, is_custom_op))
+    probe_args = symbolic_arguments(base_op, kind, ctrl_wires)
 
     name_to_resources = {}
     name_to_resource_ids = {}
+    applicable_rules = []
     for rule in rules:
+        if not _rule_is_applicable(op_name, rule, **probe_args):
+            continue
+
+        applicable_rules.append(rule)
         try:
-            resources = rule.compute_resources(**probe_args)
+            with qp.capture.toggle_ctx(True):
+                resources = rule.compute_resources(**probe_args)
             name_to_resources[rule.name] = resources.gate_counts
             # The rule body names the ops it produces itself, so unlike the distribution pathway
-            # these ids carry no added modifier.
-            # TODO: a resource op that is itself symbolic (e.g. a generic `Controlled(GlobalPhase)`
-            # rep) does not spell the compiler's canonical `C(GlobalPhase){...}` id here; such a
-            # rule registers an id the solver cannot match.
+            # these ids carry no added modifier; a resource that is itself symbolic is spelled the
+            # way the compiler spells it (see :meth:`GraphOpID.peel_modifiers`).
             name_to_resource_ids[rule.name] = {
                 GraphOpID(op).getGraphOpId(): count for op, count in resources.gate_counts.items()
             }
@@ -660,12 +962,11 @@ def collect_symbolic_adjoint_resources(op_cls, op_name, kwargs, is_custom_op):
                 f"Failed to get resources for the {rule.name} decomposition rule: {e}",
                 category=RuleLoweringWarning,
             )
-
-    return rules, probe_args, name_to_resources, name_to_resource_ids
+    return applicable_rules, probe_args, name_to_resources, name_to_resource_ids
 
 
 # pylint: disable=too-many-arguments
-def compile_registered_adjoint_rules(
+def compile_registered_symbolic_rules(
     op_name,
     target_id,
     dynamic_shape,
@@ -674,22 +975,33 @@ def compile_registered_adjoint_rules(
     extra_data=None,
     is_custom_op=False,
     op_cls=None,
+    *,
+    kind,
+    n_ctrl=1,
+    wrap_control=False,
 ) -> ir.Operation | None:
-    """Return the module of rules registered against ``Adjoint(op_name)`` that follow PennyLane's
-    symbolic-argument convention, or None if there are none.
+    """Return the module of rules registered against ``Adjoint(op_name)``/``C(op_name)`` that follow
+    PennyLane's symbolic-argument convention, or None if there are none.
 
     These rules take a base operator instance rather than the base op's parameters, so the rule
     body rebuilds the operator from its own traced arguments.
 
     Args:
         op_name (str): the base operator's name
-        target_id (str): the adjoint graphOpId the rules decompose
+        target_id (str): the modified graphOpId the rules decompose
         dynamic_shape (dict): dynamic argument names to their MLIR types
         wire_lens (dict): wire argument names to their lengths
         static_data (dict): compiler-static argument names to their values
         extra_data (dict): argument values the graphOpId identifies by UID instead of spelling
         is_custom_op (bool): whether the operator lowers to ``qref.custom``
         op_cls (type[Operator2]): the base operator's class, required to rebuild it
+        kind (str): ``"adjoint"`` or ``"control"``
+        n_ctrl (int): the number of controls, for ``kind="control"`` or ``wrap_control``
+        wrap_control (bool): with ``kind="adjoint"``, control each registered ``Adjoint(op)`` rule
+            body to synthesize the composed modifier ``C(Adjoint(op))``. This reduces the adjoint
+            under control (``C(Adjoint(RZ)) -> C(RZ)``), which the registered ``C(op)`` rules then
+            terminate (``C(RZ) -> CRZ``) -- something plain distribution cannot reach, since a
+            registered ``C(op)`` rule reads op-specific attributes and cannot take an adjoint base.
 
     Returns:
         ir.Operation or None: the module holding the rules, or None if there are none
@@ -707,68 +1019,136 @@ def compile_registered_adjoint_rules(
     extra_data = extra_data or {}
     static_and_extra = static_data | extra_data
     kwargs = prepare_dynamic_op_kwargs(dynamic_shape, wire_lens)
-    device = qp.device("null.qubit", wires=sum(wire_lens.values()))
+    n_base_wires = sum(wire_lens.values())
+    has_ctrl = kind == "control" or wrap_control
+    n_ctrl = n_ctrl if has_ctrl else 0
+    device = qp.device("null.qubit", wires=n_base_wires + n_ctrl)
 
-    rules, probe_args, name_to_resources, name_to_resource_ids = collect_symbolic_adjoint_resources(
-        op_cls, op_name, kwargs | static_and_extra, is_custom_op
+    # A kind="control" rule takes the control wires as its own arguments; a wrap_control adjoint
+    # rule instead has the control applied around its body so it is probed without control wires.
+    collect_ctrl_wires = range(n_base_wires, n_base_wires + n_ctrl) if kind == "control" else ()
+    rules, probe_args, name_to_resources, name_to_resource_ids = collect_symbolic_resources(
+        op_cls,
+        op_name,
+        kwargs | static_and_extra,
+        is_custom_op,
+        kind=kind,
+        ctrl_wires=collect_ctrl_wires,
     )
     if not rules:
         return None
 
+    # Rewrite the ids for an adjoint target:
+    #  - adjoint_rotation/self_adjoint folds Adjoint(X) to X, so declare X in its source spelling.
+    #       This matches the op the rule body emits at apply time (f64), not the tensor<1xf64> the
+    #       abstract-probe resource carries, so the solver does not key a rule on an unproduced
+    #       spelling.
+    #  - Under ctrl, every other produced op additionally gains the control modifier.
+    if kind == "adjoint":
+        ctrl_mod = _control_modifier(n_ctrl) if wrap_control else None
+        rewritten = {}
+        for rule_name, ids in name_to_resource_ids.items():
+            if _adjoint_folds_to_base(ids, op_name):
+                rewritten[rule_name] = {target_id.replace(f"Adjoint({op_name})", op_name, 1): 1}
+            elif wrap_control:
+                rewritten[rule_name] = {
+                    wrap_modifier_id(rid, ctrl_mod): count for rid, count in ids.items()
+                }
+            else:
+                rewritten[rule_name] = ids
+        name_to_resource_ids = rewritten
+
+    call_args, call_kwargs = split_call_args(kwargs, is_custom_op)
+    kwarg_names = ordered_kwarg_names(call_kwargs, dynamic_shape)
+
+    # Numeric hybrid args (e.g. a CDFHamiltonian) are passed as operands so their concrete values
+    # do not bake into the rule body; the rest are closed over. The modified base op still carries
+    # every hybrid arg, so a baked one would also make the gate op's params outnumber the rule's
+    # inputs (crashing the signature analyzer during decompose-lowering).
+    hybrid_specs, hybrid_leaves, closed_hybrid = flatten_hybrid_args(extra_data)
+
     def rule_to_subroutine(rule):
-        def decomp_rule(*_args, **_kwargs):
+        def decomp_rule(*_operands):
+            _args, _kwargs, _ctrl_wires = unpack_rule_operands(
+                _operands, len(call_args), kwarg_names, wire_lens, has_ctrl, hybrid_specs
+            )
+            # The base is rebuilt from the traced arguments of the rule function, so the wires and
+            # parameters the rule body reads off it are this function's own operands. Operand-passed
+            # hybrid args are rebuilt into ``_kwargs``; static data and closed-over hybrid args are
+            # supplied directly.
             with qp.capture.pause():
-                base = op_cls(*_args, **_kwargs)
+                base = op_cls(*_args, **_kwargs, **static_data, **closed_hybrid)
             # TODO: Call the rule itself instead of its _impl after merging
             # https://github.com/PennyLaneAI/pennylane/pull/10144
-            rule._impl(base=base)
+            if wrap_control:
+                # Reduce the adjoint under control: C(Adjoint(op)) -> C(<adjoint decomposition>).
+                qp.ctrl(
+                    lambda: rule._impl(**symbolic_arguments(base, kind, None)),
+                    control=list(_ctrl_wires),
+                )()
+            else:
+                rule._impl(**symbolic_arguments(base, kind, _ctrl_wires))
 
-        decomp_rule_no_static_args = partial(decomp_rule, **static_and_extra)
-        decomp_rule_no_static_args.__name__ = rule.name + "_" + target_id
-        return qp.capture.subroutine(decomp_rule_no_static_args)
+        decomp_rule.__name__ = rule.name + "_" + target_id
+        return qp.capture.subroutine(decomp_rule)
 
     subroutines = []
     for rule in rules:
         if rule.name not in name_to_resource_ids:
             continue
-        if _resources_have_measurement(name_to_resources[rule.name]):  # pragma: no cover
+
+        # A rule whose body is not region-wrapped (plain adjoint/control) may legitimately
+        # contain a measurement and will be kept. Otherwise, the rule is skipped because
+        # the compiler cannot place a mid-circuit measurement in a control or adjoint region.
+        if wrap_control and _resources_have_measurement(name_to_resources[rule.name]):
             warnings.warn(
                 f"Skipped the {rule.name} decomposition rule for {target_id}: it contains a "
-                "mid-circuit measurement, which is not supported with adjoint or control regions.",
+                "mid-circuit measurement, which cannot be placed in a control region.",
                 category=RuleLoweringWarning,
             )
             continue
-        if rule.is_applicable(**probe_args):
-            subroutines.append(rule_to_subroutine(rule))
+        subroutines.append(rule_to_subroutine(rule))
 
     if not subroutines:
         return None
 
-    call_args, call_kwargs = split_call_args(kwargs, is_custom_op)
+    ctrl_wires = (
+        jnp.array(range(n_base_wires, n_base_wires + n_ctrl), dtype=int) if has_ctrl else None
+    )
 
     return build_rule_module(
-        subroutines, device, call_args, call_kwargs, None, name_to_resource_ids, target_id
+        subroutines,
+        device,
+        call_args,
+        call_kwargs,
+        kwarg_names,
+        wire_lens,
+        ctrl_wires,
+        name_to_resource_ids,
+        target_id,
+        hybrid_leaves,
     )
 
 
-def registered_adjoint_rule_strings(op_name, target_id, **kwargs) -> list[str]:
-    """Return the rule strings from :func:`compile_registered_adjoint_rules`.
+def registered_symbolic_rule_strings(op_name, target_id, kind, **kwargs) -> list[str]:
+    """Return the rule strings from :func:`compile_registered_symbolic_rules`.
 
     A failure to lower them is reported as a warning and yields no rules.
 
     Args:
         op_name (str): the base operator's name
-        target_id (str): the adjoint graphOpId the rules decompose
-        **kwargs: forwarded to :func:`compile_registered_adjoint_rules`
+        target_id (str): the modified graphOpId the rules decompose
+        kind (str): ``"adjoint"`` or ``"control"``
+        **kwargs: forwarded to :func:`compile_registered_symbolic_rules`
 
     Returns:
         list[str]: the rules, as MLIR strings
     """
     try:
-        module = compile_registered_adjoint_rules(op_name, target_id, **kwargs)
-    except Exception as e:  # pylint: disable=broad-except # pragma: no cover
+        module = compile_registered_symbolic_rules(op_name, target_id, kind=kind, **kwargs)
+    except Exception as e:  # pylint: disable=broad-except
         warnings.warn(
-            f"Failed to lower the registered adjoint decomposition rules for {target_id}: {e}",
+            f"Failed to lower the registered {kind} decomposition rules for {target_id}: {e}",
             category=RuleLoweringWarning,
         )
         return []
@@ -819,9 +1199,10 @@ def adjoint_variant_rule_strings(
     # TODO: the on-demand decomp rules are skipped for now.
     if op_cls is not None:
         out.extend(
-            registered_adjoint_rule_strings(
+            registered_symbolic_rule_strings(
                 op_name,
                 adj_id,
+                "adjoint",
                 dynamic_shape=dynamic_shape,
                 wire_lens=wire_lens,
                 static_data=static_data,
@@ -868,13 +1249,17 @@ def control_variant_rule_strings(
     static_data,
     extra_data=None,
     is_custom_op=False,
+    op_cls=None,
 ):
     """Return the rule strings whose ``target_gate`` is ``<n>C(op_name)`` for each ``n`` in
     ``ctrl_counts``.
 
     The control analogue of :func:`adjoint_variant_rule_strings`. ``op_id`` is the *base* op's
-    graphOpId (e.g. ``"RX{...}"``). For each control count ``n`` three pathways contribute:
-      1. rules registered directly against ``<n>C(op_name)`` (``list_decomps("C(RX)")``),
+    graphOpId (e.g. ``"RX{...}"``). For each control count ``n`` these pathways contribute:
+      1. rules registered directly against ``C(op_name)``, which take the symbolic operator's
+         arguments the way PennyLane writes them (``flip_zero_ctrl_values(...)``). PennyLane names
+         a controlled operator ``C(Op)`` whatever its control count, so the registry is queried
+         under that one name for every ``n``,
       2. rules synthesized by distributing each base rule of ``op_name`` over ``n`` controls
          (the ``wrap_control`` pathway), and
       3. rules for the nested modifier ``<n>C(Adjoint(op_name))`` synthesized by controlling each
@@ -891,6 +1276,7 @@ def control_variant_rule_strings(
         static_data (dict): compiler-static argument names to their values
         extra_data (dict): argument values the graphOpId identifies by UID instead of spelling
         is_custom_op (bool): whether the operator lowers to ``qref.custom``
+        op_cls (type): the base operator's class; pathway 1 is skipped without it
 
     Returns:
         list[str]: the rules, as MLIR strings
@@ -899,25 +1285,44 @@ def control_variant_rule_strings(
     for n in ctrl_counts:
         ctrl_mod = _control_modifier(n)
         ctrl_name = f"{ctrl_mod}({op_name})"
-        # (1) Rules registered directly against <n>C(op_name):
-        try:
+        ctrl_id = wrap_modifier_id(op_id, ctrl_mod)
+        # (1) Rules registered directly against C(op_name). They take a base operator instance,
+        # so they need the operator's class.
+        # TODO: the on-demand decomp rules are skipped for now.
+        if op_cls is not None:
             out.extend(
-                get_rule_strings_from_module(
-                    compile_decomposition_rules(
-                        ctrl_name,
-                        wrap_modifier_id(op_id, ctrl_mod),
-                        dynamic_shape,
-                        wire_lens,
-                        static_data,
-                        extra_data=extra_data,
-                        is_custom_op=is_custom_op,
-                    )
+                registered_symbolic_rule_strings(
+                    op_name,
+                    ctrl_id,
+                    "control",
+                    n_ctrl=n,
+                    dynamic_shape=dynamic_shape,
+                    wire_lens=wire_lens,
+                    static_data=static_data,
+                    extra_data=extra_data,
+                    is_custom_op=is_custom_op,
+                    op_cls=op_cls,
                 )
             )
-        except Exception as e:  # pylint: disable=broad-except
-            warnings.warn(
-                f"Failed to lower the decomposition rules for {ctrl_name}: {e}",
-                category=RuleLoweringWarning,
+            # (1b) <n>C(Adjoint(op_name)) by controlling each registered Adjoint(op_name) rule.
+            # This reduces the adjoint under control (e.g. C(Adjoint(RZ)) -> C(RZ)), which the
+            # registered C(op_name) rules of pathway 1 then terminate (C(RZ) -> CRZ). The
+            # distribution of pathway 3 cannot reach this: it bottoms out at doubly-modified
+            # primitives such as C(Adjoint(GlobalPhase)) that only registered rules can terminate.
+            out.extend(
+                registered_symbolic_rule_strings(
+                    op_name,
+                    wrap_modifier_id(name_wrap_adjoint(op_id), ctrl_mod),
+                    "adjoint",
+                    n_ctrl=n,
+                    wrap_control=True,
+                    dynamic_shape=dynamic_shape,
+                    wire_lens=wire_lens,
+                    static_data=static_data,
+                    extra_data=extra_data,
+                    is_custom_op=is_custom_op,
+                    op_cls=op_cls,
+                )
             )
         # (2) <n>C(op_name) by controlling each base rule, and
         # (3) <n>C(Adjoint(op_name)) by controlling each adjointed base rule.
@@ -1096,7 +1501,7 @@ def fetch_all_reachable_decomposition_rules_from_op(
     ctrl_counts = [1] if n_ctrls <= 1 else [1, n_ctrls]
 
     def compile_variants(
-        name, op_id, dynamic_shape, wire_lens, static_data, extra_data, is_custom_op
+        name, op_id, dynamic_shape, wire_lens, static_data, extra_data, is_custom_op, counts=None
     ):
         # CQRs (Adjoint/Control): For an op `name` capture the rules for
         #   1. the base op `name`,
@@ -1135,12 +1540,13 @@ def fetch_all_reachable_decomposition_rules_from_op(
                 control_variant_rule_strings(
                     name,
                     op_id,
-                    ctrl_counts,
+                    counts or ctrl_counts,
                     dynamic_shape,
                     wire_lens,
                     static_data,
                     extra_data=extra_data,
                     is_custom_op=is_custom_op,
+                    op_cls=op_classes.get(name),
                 )
             )
         return out
@@ -1148,6 +1554,9 @@ def fetch_all_reachable_decomposition_rules_from_op(
     rules = compile_variants(
         op_name, op_id, dynamic_shape, wire_lens, static_data, extra_data, is_custom_op
     )
+    # Control counts already synthesized per op, so an op reached again under more controls only
+    # pays for the <n>C(...) variants it is still missing.
+    counts_done = {op_id: set(ctrl_counts)}
 
     while len(queue) != 0:
         (
@@ -1162,32 +1571,66 @@ def fetch_all_reachable_decomposition_rules_from_op(
         this_kwargs = prepare_dynamic_op_kwargs(this_dynamic_shape, this_wire_lens)
         all_kwargs = this_kwargs | this_static_data | this_extra_data
 
-        # Explore the ops reachable through the rules of this op and of its adjoint. Keyed by
-        # (explored op, rule name): the same rule name may be registered against both.
+        # Explore the ops reachable through the rules of this op, its adjoint, and its controls.
+        # Keyed by (explored op, rule name): the same rule name may be registered against all these.
         resources = {
             (this_name, name): res
             for name, res in collect_resources_for_op(this_name, all_kwargs, this_is_custom_op)[
                 0
             ].items()
         }
+
         if (
             not this_name.startswith("Adjoint(")
             and (this_op_cls := op_classes.get(this_name)) is not None
         ):
             resources |= {
                 (f"Adjoint({this_name})", name): res
-                for name, res in collect_symbolic_adjoint_resources(
-                    this_op_cls, this_name, all_kwargs, this_is_custom_op
+                for name, res in collect_symbolic_resources(
+                    this_op_cls, this_name, all_kwargs, this_is_custom_op, kind="adjoint"
                 )[2].items()
             }
 
+        if (
+            not bool(re.match(r"\d*C\(", this_name))
+            and (this_op_cls := op_classes.get(this_name)) is not None
+            # special: MultiControlledX has a rule _ctrl_mcx_to_mcx that decomposes a
+            # C(MultiControlledX) onto a one-wire bigger MultiControlledX
+            # Do no synthesize controlled rules for C(MultiControlledX), otherwise would
+            # infinitely recurse
+            and this_name != "MultiControlledX"
+        ):
+            num_base_wires = sum(this_wire_lens.values())
+            for n in ctrl_counts:
+                ctrl_resources = collect_symbolic_resources(
+                    this_op_cls,
+                    this_name,
+                    all_kwargs,
+                    this_is_custom_op,
+                    kind="control",
+                    ctrl_wires=range(num_base_wires, num_base_wires + n),
+                )
+                resources |= {
+                    (f"{_control_modifier(n)}({this_name})", name): res
+                    for name, res in ctrl_resources[2].items()
+                }
         for (_, _rule_name), resource in resources.items():
             try:
                 for op, _count in resource.items():
+                    # A generic symbolic resource stands for its base under a modifier, and it is
+                    # the base that owns the rules; compile_variants re-derives the modifier
+                    # variants from there. Its control count has to be carried over, or the
+                    # <n>C(...) node the resource names would be left without rules.
                     graph_op_id = GraphOpID(op)
-                    probe_id = graph_op_id.getGraphOpId()
+                    op = graph_op_id.op
+                    res_ctrls = graph_op_id.num_controls
+                    probe_id = graph_op_id.getBaseGraphOpId()
                     probe = (
-                        graph_op_id.get_operator_name(),
+                        # The name and the id are paired to look up the rules registered for that
+                        # id, so spell the name the way PennyLane's registry does rather than the
+                        # way the graphOpId does: the two agree on Adjoint(...)/C(...), but
+                        # a multi-controlled id reads <n>C(...), which PennyLane has no name for.
+                        to_name(op),
                         graph_op_id.dynamic_shape,
                         graph_op_id.wire_lens,
                         graph_op_id.static_data,
@@ -1198,12 +1641,30 @@ def fetch_all_reachable_decomposition_rules_from_op(
                     # need its class to rebuild the base of a registered adjoint rule.
                     op_classes.setdefault(probe[0], type(op))
 
-                    if probe_id in visited:
-                        continue
-
-                    visited.add(probe_id)
-                    queue.append(probe)
-                    rules.extend(compile_variants(probe[0], probe_id, *probe[1:]))
+                    # The counts every op is captured under, plus the one this resource carries.
+                    counts = set(ctrl_counts) | ({res_ctrls} if res_ctrls > 1 else set())
+                    if probe_id not in visited:
+                        visited.add(probe_id)
+                        queue.append(probe)
+                        counts_done[probe_id] = set(counts)
+                        rules.extend(
+                            compile_variants(probe[0], probe_id, *probe[1:], counts=sorted(counts))
+                        )
+                    elif missing := counts - counts_done.setdefault(probe_id, set(ctrl_counts)):
+                        # Seen before, but under fewer controls: only the missing <n>C(...)
+                        # variants are still owed, the rest are already in `rules`.
+                        counts_done[probe_id] |= missing
+                        rules.extend(
+                            control_variant_rule_strings(
+                                probe[0],
+                                probe_id,
+                                sorted(missing),
+                                *probe[1:4],
+                                extra_data=probe[4],
+                                is_custom_op=probe[5],
+                                op_cls=op_classes.get(probe[0]),
+                            )
+                        )
             except Exception as e:
                 warnings.warn(
                     f"Failed to lower the {_rule_name} decomposition rule for {this_name}: {e}",

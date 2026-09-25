@@ -39,10 +39,14 @@ from catalyst.decomposition.decomposition_rules import (
     fetch_all_reachable_decomposition_rules_from_op,
     inject_new_rules_into_module,
 )
-from catalyst.decomposition.graph_op_id import _SPECIAL_LOWERINGS, build_graph_op_id
+from catalyst.decomposition.graph_op_id import (
+    _SPECIAL_LOWERINGS,
+    _is_custom_op,
+    build_graph_op_id,
+)
 from catalyst.decomposition.type_utils import (
     convert_item_to_mlir_type,
-    get_dummy_values_for_arg,
+    get_dummy_values_for_dynamic_shape,
 )
 from catalyst.jax_extras.lowering import get_mlir_attribute_from_pyval
 from catalyst.jax_extras.patches import mock_attributes
@@ -93,17 +97,6 @@ qref_operator_p.multiple_results = True
 @qref_operator_p.def_abstract_eval
 def _qref_operator_p_abstract_eval(*args, **kwargs):
     return []
-
-
-def _is_custom_op(op_cls, avals_in):
-    if op_cls.static_argnames or op_cls.hybrid_argnames or op_cls.compilable_argnames:
-        return False
-    if op_cls.wire_argnames != ("wires",):
-        return False
-    if list(op_cls._sig.parameters.keys())[-1] != "wires":
-        return False
-    # Complex dtypes cannot be safely cast to float64
-    return all(p.shape == () and p.dtype.kind in "ifu" for p in avals_in)
 
 
 def _is_qref_qubit(val) -> bool:
@@ -191,12 +184,13 @@ def _process_qubits(*args, op_cls, wire_lens, hybrid_lens) -> tuple[list, dict[s
     args_idx = len(op_cls.dynamic_argnames)
     map_idx = 0
     for wname, wsize in zip(flat_wire_argnames, wire_lens, strict=True):
-        if wsize:
-            # If wsize is 0, then we don't need to populate the qubit map. It will be empty anyway
-            qubits += args[args_idx : args_idx + wsize]
-            qubit_map[wname] = ir.DenseI64ArrayAttr.get(list(range(map_idx, map_idx + wsize)))
-            map_idx += wsize
-            args_idx += wsize
+        # If wsize is 0, then we need to populate the qubit map anyway because the signature must match the operation.
+        # This is also needed to ensure that the lowered op generates the same GOID as the frontend.
+        # TODO: see if we can remove this requirement or upstream it to PL to simplify the IR
+        qubits += args[args_idx : args_idx + wsize]
+        qubit_map[wname] = ir.DenseI64ArrayAttr.get(list(range(map_idx, map_idx + wsize)))
+        map_idx += wsize
+        args_idx += wsize
 
     # Hybrid wire arguments and nested-operator wires from non-wire hybrid arguments
     for hname, hsize in zip(op_cls.hybrid_argnames, hybrid_lens, strict=True):
@@ -229,6 +223,7 @@ def compile_decomp_rules(
     module,
     op_cls,
     is_custom_op=False,
+    n_ctrls=0,
     params=None,
     param_map=None,
     wire_lens=None,
@@ -256,6 +251,7 @@ def compile_decomp_rules(
             static_data={},
             is_custom_op=True,
             op_cls=op_cls,
+            n_ctrls=n_ctrls,
         )
 
     elif op_cls is qp.MultiRZ:
@@ -270,6 +266,7 @@ def compile_decomp_rules(
             wire_lens={f"{wire_argname}": wire_lens[0]},
             static_data={},
             op_cls=op_cls,
+            n_ctrls=n_ctrls,
         )
 
     elif op_cls is qp.PauliRot:
@@ -290,6 +287,7 @@ def compile_decomp_rules(
             wire_lens={f"{wire_argname}": wire_lens[0]},
             static_data=repack_static_data,
             op_cls=op_cls,
+            n_ctrls=n_ctrls,
         )
 
     elif op_cls is qp.PCPhase:
@@ -309,6 +307,7 @@ def compile_decomp_rules(
             wire_lens={f"{wire_argname}": wire_lens[0]},
             static_data=repack_static_data,
             op_cls=op_cls,
+            n_ctrls=n_ctrls,
         )
 
     elif op_cls is qp.GlobalPhase:
@@ -322,6 +321,7 @@ def compile_decomp_rules(
             wire_lens={},
             static_data={},
             op_cls=op_cls,
+            n_ctrls=n_ctrls,
         )
 
     elif op_cls is qp.QubitUnitary:
@@ -341,6 +341,7 @@ def compile_decomp_rules(
             wire_lens={f"{wire_argname}": wire_lens[0]},
             static_data={},
             op_cls=op_cls,
+            n_ctrls=n_ctrls,
         )
 
     else:
@@ -389,7 +390,7 @@ def compile_decomp_rules(
                         dummy_leaves.append(next_wire_label)
                         next_wire_label += 1
                     else:
-                        dummy_leaves.append(get_dummy_values_for_arg(leaf))
+                        dummy_leaves.append(get_dummy_values_for_dynamic_shape(leaf))
                 unflattened = unflatten(dummy_leaves, hybrid_tree)
             extra_data[hybrid_argname] = unflattened
             hybrid_arg_start_idx += hybrid_len
@@ -428,6 +429,7 @@ def compile_decomp_rules(
             static_data=repack_static_data,
             extra_data=extra_data,
             op_cls=op_cls,
+            n_ctrls=n_ctrls,
         )
 
     inject_new_rules_into_module(module, decomp_rules)
@@ -467,6 +469,7 @@ def _qref_operator_p_lowering(jax_ctx: mlir.LoweringRuleContext, *args, op_cls, 
             compile_decomp_rules(
                 module=jax_ctx.module_context.module,
                 op_cls=op_cls,
+                n_ctrls=n_ctrls,
                 wire_lens=wire_lens,
                 repack_static_data=repack_static_data,
             )
@@ -508,6 +511,7 @@ def _qref_operator_p_lowering(jax_ctx: mlir.LoweringRuleContext, *args, op_cls, 
                 module=jax_ctx.module_context.module,
                 op_cls=op_cls,
                 is_custom_op=True,
+                n_ctrls=n_ctrls,
                 wire_lens=wire_lens,
             )
 
@@ -531,8 +535,6 @@ def _qref_operator_p_lowering(jax_ctx: mlir.LoweringRuleContext, *args, op_cls, 
             wire_lens=wire_lens,
             hybrid_lens=hybrid_lens,
             hybrid_trees=hybrid_trees,
-            adjoint=adjoint,
-            n_ctrls=n_ctrls,
             static_args=repack_static_data,
         )
         static_data = None
@@ -562,6 +564,7 @@ def _qref_operator_p_lowering(jax_ctx: mlir.LoweringRuleContext, *args, op_cls, 
             module=jax_ctx.module_context.module,
             op_cls=op_cls,
             is_custom_op=False,
+            n_ctrls=n_ctrls,
             params=params,
             param_map=param_map,
             wire_lens=wire_lens,

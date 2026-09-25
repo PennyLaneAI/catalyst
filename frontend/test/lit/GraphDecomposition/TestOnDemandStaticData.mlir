@@ -21,16 +21,17 @@
 
 // CHECK-LABEL: func.func @circuit
 // CHECK-NOT: quantum.pcphase
-// CHECK: quantum.operator "PhaseShift"
+// CHECK: quantum.custom "PhaseShift"
 // CHECK: quantum.gphase
-func.func @circuit(%theta: f64) -> !quantum.reg {
+func.func @circuit(%theta: f64) attributes {quantum.node} {
     %r = quantum.alloc(2) : !quantum.reg
     %q0 = quantum.extract %r[0] : !quantum.reg -> !quantum.bit
     %q1 = quantum.extract %r[1] : !quantum.reg -> !quantum.bit
     %out:2 = quantum.pcphase(%theta, dim : 2) %q0, %q1 : !quantum.bit, !quantum.bit
     %r0 = quantum.insert %r[0], %out#0 : !quantum.reg, !quantum.bit
     %r1 = quantum.insert %r0[1], %out#1 : !quantum.reg, !quantum.bit
-    return %r1 : !quantum.reg
+    quantum.dealloc %r1 : !quantum.reg
+    return
 }
 
 // The rule came back keyed on the id the compiler prints for the op, `dim` included.
