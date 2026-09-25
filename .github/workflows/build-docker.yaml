@@ -1,99 +1,186 @@
-name: Build Catalyst Docker Image
+name: Docker::Linux::Catalyst
 
 permissions:
   contents: read
-  
+
 on:
-    pull_request:
-      types:
-        - labeled
-    push:
-    workflow_dispatch:
-      inputs:
-        lightning-version:
-          type: string
-          required: true
-          description: The version of Lightning to use. This should be a valid git tag, e.g. v0.36.0.
-        pennylane-version:
-          type: string
-          required: false
-          default: main
-          description: The version of PennyLane to use. This should be a valid git tag, e.g. v0.36.0.
-        
+  workflow_dispatch:
+    inputs:
+      catalyst-version:
+        type: string
+        required: true
+        description: The version of Catalyst to use. This should be a valid git ref.
+      lightning-version:
+        type: string
+        required: false
+        default: ''
+        description: Lightning git ref to build from source. Empty uses the version pinned in .dep-versions.
+      pennylane-version:
+        type: string
+        required: false
+        default: ''
+        description: PennyLane git ref to install from source. Empty uses the version pinned in .dep-versions.
+      push-to-dockerhub:
+        type: boolean
+        required: true
+        description: Push to Docker Hub when done.
+
 jobs:
-  check_if_wheel_build_required:
-    uses: ./.github/workflows/check-for-wheel-build.yml
-
-  constants:
-    needs: [check_if_wheel_build_required]
-    name: "Set build matrix"
-    uses: ./.github/workflows/constants.yaml
-    with:
-      runs_on: ubuntu-24.04
-
-  build-catalyst:
-    name: Build Docker Image
-    runs-on: blacksmith-8vcpu-ubuntu-2404
-    needs: [check_if_wheel_build_required, constants]    
+  docker:
+    name: docker::ubuntu-24.04::${{ matrix.arch }}::catalyst::${{ inputs.catalyst-version }}
+    timeout-minutes: 120
     strategy:
       fail-fast: false
       matrix:
-        python_version: ${{ fromJson(format('["{0}"]', needs.constants.outputs.primary_python_version)) }}
+        include:
+          - { arch: amd64, runner: blacksmith-8vcpu-ubuntu-2404 }
+          - { arch: arm64, runner: blacksmith-8vcpu-ubuntu-2404-arm }
+    runs-on: ${{ matrix.runner }}
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+    env:
+      # Layer cache for the deps stage (LLVM, StableHLO, Enzyme). Not a runnable image.
+      DEPS_CACHE: pennylaneai/pennylane:buildcache-catalyst-deps-${{ matrix.arch }}
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.catalyst-version }}
+
+      - name: Read dependency versions
+        id: pins
+        run: grep -E '^(llvm|stablehlo|enzyme|pennylane|lightning)=' .dep-versions >> "$GITHUB_OUTPUT"
+
+      - name: Validate image tag
+        id: tag
+        if: ${{ inputs.push-to-dockerhub }}
+        env:
+          TAG: ${{ inputs.pennylane-version || steps.pins.outputs.pennylane }}-catalyst-${{ inputs.catalyst-version }}-lightning-${{ inputs.lightning-version || steps.pins.outputs.lightning }}
+        run: |
+          [[ "$TAG" =~ ^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$ ]] || { echo "::error::Invalid Docker tag: $TAG"; exit 1; }
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/cache/restore@v4
+        with:
+          path: mlir/llvm-project
+          key: llvm-${{ steps.pins.outputs.llvm }}-default-source
+          enableCrossOsArchive: true
+
+      - uses: actions/cache/restore@v4
+        with:
+          path: mlir/stablehlo
+          key: stablehlo-${{ steps.pins.outputs.stablehlo }}-default-source
+          enableCrossOsArchive: true
+
+      - uses: actions/cache/restore@v4
+        with:
+          path: mlir/Enzyme
+          key: enzyme-${{ steps.pins.outputs.enzyme }}-default-source
+          enableCrossOsArchive: true
+
+      - name: Fetch uncached submodules
+        run: |
+          for d in llvm-project stablehlo Enzyme; do
+            [ -n "$(ls -A mlir/$d)" ] || git submodule update --init --depth 1 mlir/$d
+          done
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
         with:
-          driver: docker        
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Checkout External Base Repo
-        uses: actions/checkout@v4
-        with:
-          repository: PennyLaneAI/pennylane-lightning
-          ref: main 
-          path: pennylane-lightning
-
-      - name: Build Lightning docker image
-        uses: docker/build-push-action@v6
-        with:
-          context: ./pennylane-lightning
-          file: ./pennylane-lightning/docker/Dockerfile
-          tags: pennylane-lightning:latest
-          load: true
-          push: false
-          build-args: |
-            LIGHTNING_VERSION=${{ inputs.lightning-version || 'main' }}
-            PENNYLANE_VERSION=${{ inputs.pennylane-version || 'main' }}
-
-      - name: Check docker image
-        run: |
-          docker images
-
-      - name: Build Docker Image
+      - name: Build dependencies (LLVM, StableHLO, Enzyme)
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: ./Dockerfile
-          tags: pennylane-catalyst:latest
+          file: docker/Dockerfile
+          target: deps
+          cache-from: type=registry,ref=${{ env.DEPS_CACHE }}
+          # mode=max: cache every layer of the deps build.
+          # image-manifest/oci-mediatypes: store the cache in the standard image format
+          # so Docker Hub accepts it.
+          cache-to: type=registry,ref=${{ env.DEPS_CACHE }},mode=max,image-manifest=true,oci-mediatypes=true
+
+      - name: Build and export to Docker
+        uses: docker/build-push-action@v6
+        with:
           load: true
-          build-contexts: |
-            pennylane-lightning=docker-image://pennylane-lightning:latest
+          push: false
+          context: .
+          file: docker/Dockerfile
+          target: catalyst
+          tags: catalyst:test
+          cache-from: type=registry,ref=${{ env.DEPS_CACHE }}
           build-args: |
-            LIGHTNING_VERSION=${{ inputs.lightning-version || 'main' }}
-            PENNYLANE_VERSION=${{ inputs.pennylane-version || 'main' }}            
+            LIGHTNING_VERSION=${{ inputs.lightning-version }}
+            PENNYLANE_VERSION=${{ inputs.pennylane-version }}
 
-      # Serialize the Docker image into a single transportable archive file
-      - name: Save Docker Image to Archive
+      - name: Test
         run: |
-          mkdir -p output
-          docker save pennylane-catalyst:latest -o output/pennylane-catalyst.tar
+          docker run --rm catalyst:test python -c "import pennylane as qp; qp.about(); qp.device('lightning.qubit', wires=1); qp.device('lightning.kokkos', wires=1)"
 
-      # Upload the archive file so you can download it from the GitHub UI
-      - name: Upload Image as Workflow Artifact
+      - name: Save image
+        run: docker save catalyst:test | gzip > pennylane-catalyst.tar.gz
+
+      - name: Upload image as artifact
         uses: actions/upload-artifact@v4
         with:
-          name: compiled-docker-image
-          path: output/pennylane-catalyst.tar
-          retention-days: 5            
+          name: pennylane-catalyst-${{ matrix.arch }}
+          path: pennylane-catalyst.tar.gz
+          retention-days: 1
+          compression-level: 0
+
+      # Untagged; publish-multiarch-tag puts both archs under the one real tag.
+      - name: Push by digest
+        id: push
+        uses: docker/build-push-action@v6
+        if: ${{ inputs.push-to-dockerhub }}
+        with:
+          context: .
+          file: docker/Dockerfile
+          target: catalyst
+          outputs: type=image,name=pennylaneai/pennylane,push-by-digest=true,name-canonical=true,push=true
+          cache-from: type=registry,ref=${{ env.DEPS_CACHE }}
+          build-args: |
+            LIGHTNING_VERSION=${{ inputs.lightning-version }}
+            PENNYLANE_VERSION=${{ inputs.pennylane-version }}
+
+      - name: Save digest
+        if: ${{ inputs.push-to-dockerhub }}
+        run: echo "${{ steps.push.outputs.digest }}" > "${{ runner.temp }}/digest"
+
+      - name: Upload digest
+        if: ${{ inputs.push-to-dockerhub }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: digest-${{ matrix.arch }}
+          path: ${{ runner.temp }}/digest
+          retention-days: 1
+
+  # Combines the per-arch images under one tag
+  publish-multiarch-tag:
+    needs: docker
+    if: ${{ inputs.push-to-dockerhub }}
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Download digests
+        uses: actions/download-artifact@v4
+        with:
+          pattern: digest-*
+          path: digests
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Create multi-arch tag
+        env:
+          TAG: ${{ needs.docker.outputs.tag }}
+        run: |
+          docker buildx imagetools create -t "pennylaneai/pennylane:$TAG" \
+            $(sed 's|^|pennylaneai/pennylane@|' digests/*/digest)
