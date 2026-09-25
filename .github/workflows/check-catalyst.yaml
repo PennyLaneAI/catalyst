@@ -34,6 +34,19 @@ jobs:
       multiple_compilers: ${{ github.trigger == 'push' && github.ref_name == 'main' }}
       runs_on: ${{ needs.determine_runner.outputs.runner_group }}
 
+  transport_changes:
+    name: "Detect transport changes"
+    runs-on: ubuntu-latest
+    outputs:
+      transport: ${{ steps.filter.outputs.transport }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0        # need history to diff against the base ref
+
+      - id: filter
+        uses: ./.github/actions/transport-path-filter
+
   runtime:
     name: Catalyst-Runtime Build
     needs: [constants, determine_runner]
@@ -109,6 +122,141 @@ jobs:
             oqc-build/*.so
             oqc-build/backend/*.toml
           retention-days: 1
+
+  transport:
+    name: Transport Build and Tests
+    needs: [constants, transport_changes, llvm, quantum]
+    # Everything below is dead weight on a PR that does not touch transport.
+    if: needs.transport_changes.outputs.transport == 'true'
+    # Pinned rather than following determine_runner. setup-soft-roce loads a kernel module,
+    # building rdma_rxe out-of-tree against linux-headers-$(uname -r) when the running kernel
+    # lacks it -- that is only known to work on the GitHub-hosted Azure image. Revisit once
+    # soft-RoCE has actually been shown to come up on blacksmith-32vcpu-ubuntu-2404.
+    runs-on: ubuntu-24.04
+
+    # Deliberately no compiler matrix. The transport sources are not compiler-sensitive, and the
+    # executor links LLVM -- a clang leg would pay for that again to produce a binary nothing
+    # else consumes. Soft-RoCE also mutates the runner's RDMA links, which is worth doing once.
+    steps:
+      - name: Checkout Catalyst repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python # Ensure the "primary" python version is used
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ needs.constants.outputs.primary_python_version }}
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          # libibverbs-dev: without it the RDMA backends are silently skipped at configure time.
+          sudo apt-get -y -q install ninja-build make cmake clang libibverbs-dev
+          python3 -m pip install "nanobind<2.13" pybind11 numpy PyYAML
+
+      - name: Get Cached LLVM Source
+        id: cache-llvm-source
+        uses: actions/cache/restore@v4
+        with:
+          path: mlir/llvm-project
+          key: llvm-${{ needs.constants.outputs.llvm_version }}-default-source
+          enableCrossOsArchive: true
+
+      - name: Clone LLVM Submodule
+        if: steps.cache-llvm-source.outputs.cache-hit != 'true'
+        uses: actions/checkout@v4
+        with:
+          repository: llvm/llvm-project
+          ref: ${{ needs.constants.outputs.llvm_version }}
+          path: mlir/llvm-project
+
+      # The executor links LLVM via find_package(LLVM CONFIG REQUIRED), so unlike the runtime
+      # job this one needs a built LLVM, not just its headers. Restored from what `llvm` cached.
+      - name: Get Cached LLVM Build
+        uses: actions/cache/restore@v4
+        with:
+          path: llvm-build
+          key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-ci-build-gcc
+          fail-on-cache-miss: true
+
+      - name: Build Catalyst-Runtime with transport and the executor
+        run: |
+          # `-C runtime`, not the top-level target: with ENABLE_EXECUTOR=ON that one depends on
+          # `llvm`, whose last step builds LLVM_TARGETS -- `check-mlir llvm-symbolizer` (see
+          # mlir/Makefile). That runs the whole MLIR lit suite on every invocation, restored
+          # cache or not, which is the real cost here rather than any rebuilding.
+          #
+          # The device backends are trimmed to what the tests reach. These select
+          #   rt_capi rtd_null_qubit rt_rsdecomp rt_decoder transport_all rt_executor catalyst-executor
+          # test_backline only ever asks for null.qubit, and compiler.py links rt_rsdecomp and
+          # rt_decoder into every qjit'd program. OpenQASM defaults ON, so it is turned off
+          # explicitly; OQD is left at its OFF default -- compiler.py links librt_OQD_capi only
+          # when the .so is present, so not building it is supported rather than merely untested.
+          # clang, matching how backline's INSTALL.md builds the runtime (runtime/Makefile
+          # defaults to it; g++ there is only for the frontend). The LLVM the executor links
+          # is gcc-built, which is fine -- clang uses libstdc++ on Linux too.
+          COMPILER_LAUNCHER="" \
+          C_COMPILER=$(which clang) \
+          CXX_COMPILER=$(which clang++) \
+          RT_BUILD_DIR="$(pwd)/runtime-build" \
+          LLVM_SRC_DIR="$(pwd)/mlir/llvm-project" \
+          LLVM_BUILD_DIR="$(pwd)/llvm-build" \
+          ENABLE_ASAN=OFF \
+          ENABLE_TRANSPORT=ON \
+          ENABLE_EXECUTOR=ON \
+          ENABLE_OPENQASM=OFF \
+          make -C runtime runtime
+
+      - name: Set up Soft-RoCE loopback
+        uses: ./.github/actions/setup-soft-roce
+
+      - name: Run transport C++ test suite (Catch2 + soft-RoCE loopback)
+        run: |
+          # Same ENABLE_* flags, RT_BUILD_DIR and LLVM dirs as the build step, so the `configure`
+          # prerequisite does not reset the cmake cache and drop the already-built .sos.
+          COMPILER_LAUNCHER="" \
+          C_COMPILER=$(which clang) \
+          CXX_COMPILER=$(which clang++) \
+          RT_BUILD_DIR="$(pwd)/runtime-build" \
+          LLVM_SRC_DIR="$(pwd)/mlir/llvm-project" \
+          LLVM_BUILD_DIR="$(pwd)/llvm-build" \
+          ENABLE_TRANSPORT=ON \
+          ENABLE_EXECUTOR=ON \
+          ENABLE_OPENQASM=OFF \
+          make test-runtime-transport
+
+      - name: Download Quantum Build Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: quantum-build-gcc
+          path: quantum-build
+
+      - name: Add Frontend Dependencies to PATH
+        run: |
+          echo "$(pwd)/llvm-build/bin" >> $GITHUB_PATH
+          echo "$(pwd)/quantum-build/bin" >> $GITHUB_PATH
+          echo "PYTHONPATH=$PYTHONPATH:$(pwd)/quantum-build/python_packages/quantum" >> $GITHUB_ENV
+          echo "RUNTIME_LIB_DIR=$(pwd)/runtime-build/lib" >> $GITHUB_ENV
+          echo "MLIR_LIB_DIR=$(pwd)/llvm-build/lib" >> $GITHUB_ENV
+          echo "CATALYST_BIN_DIR=$(pwd)/quantum-build/bin" >> $GITHUB_ENV
+          echo "CATALYST_LIB_DIR=$(pwd)/quantum-build/lib" >> $GITHUB_ENV
+          # catalyst-executor is built in this job rather than downloaded, so it keeps its mode.
+          echo "CATALYST_TRANSPORT_PATH=$(pwd)/runtime-build/lib" >> $GITHUB_ENV
+          chmod +x $(pwd)/quantum-build/bin/catalyst  # artifact upload does not preserve permissions
+
+      - name: Build the Catalyst frontend
+        run: |
+          sudo apt-get install -y make
+          python3 -m pip install -r requirements.txt
+          make frontend
+
+      - name: Run backline transport integration tests
+        run: |
+          # Only the CPU cases; the GPU-coproc ones need the self-hosted runner (check-transport-gpu).
+          # -rs so a skip is visible: pytest exits 0 on skip and these have no skip conditions,
+          # so anything reported is a regression. _rdma_loopback selects both of its cases.
+          python3 -m pytest -v -rs \
+            "frontend/test/pytest/test_backline.py::TestBacklineDemoIntegration::test_local_cpu_to_local_cpu_memcpy" \
+            "frontend/test/pytest/test_backline.py::TestBacklineDemoIntegration::test_local_cpu_to_local_cpu_rdma_loopback"
 
   llvm:
     name: LLVM Build

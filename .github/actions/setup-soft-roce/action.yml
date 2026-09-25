@@ -1,0 +1,91 @@
+name: Set up Soft-RoCE loopback
+description: >
+  Install ibverbs userland and attach an rxe0 soft-RoCE link on loopback, building
+  rdma_rxe out-of-tree if the running kernel lacks it.
+
+runs:
+  using: composite
+  steps:
+    - name: Install RDMA userland dependencies
+      shell: bash
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          libibverbs-dev libibverbs1 ibverbs-providers ibverbs-utils \
+          rdma-core iproute2
+
+    - name: Ensure rdma_rxe.ko is available for the running kernel
+      shell: bash
+      run: |
+        # linux-modules-extra first; build rdma_rxe out-of-tree if it lacks the .ko.
+        set -euo pipefail
+
+        KVER=$(uname -r)
+        echo "Running kernel: $KVER"
+
+        have_rxe() {
+          find /lib/modules/"$KVER" -name 'rdma_rxe*' -print -quit | grep -q .
+        }
+
+        # --- Path 1: standard Ubuntu extras package ----------------------
+        sudo apt-get install -y "linux-modules-extra-$KVER" 2>/dev/null || true
+        sudo depmod -a
+        if have_rxe; then
+          echo "rdma_rxe.ko provided by linux-modules-extra-$KVER"
+          find /lib/modules/"$KVER" -name 'rdma_rxe*' -print
+          exit 0
+        fi
+
+        echo "linux-modules-extra unavailable or missing rdma_rxe;" \
+             "falling back to out-of-tree build."
+
+        # --- Path 2: build rdma_rxe out-of-tree --------------------------
+        sudo apt-get install -y \
+          build-essential bc bison flex libssl-dev libelf-dev git \
+          "linux-headers-$KVER"
+
+        # Upstream stable branch matching the running kernel's major.minor.
+        KVER_MAJMIN=$(echo "$KVER" | cut -d- -f1 | cut -d. -f1-2)
+        SRC=/tmp/linux-src
+        echo "Cloning linux-${KVER_MAJMIN}.y stable branch..."
+        git clone --depth 1 \
+          --branch "linux-${KVER_MAJMIN}.y" \
+          https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git \
+          "$SRC"
+
+        # Force obj-m; Azure kernel has CONFIG_RDMA_RXE unset.
+        sed -i 's|obj-\$(CONFIG_RDMA_RXE)|obj-m|' \
+          "$SRC/drivers/infiniband/sw/rxe/Makefile"
+
+        make -C "/lib/modules/$KVER/build" \
+          M="$SRC/drivers/infiniband/sw/rxe" modules
+
+        KO="$SRC/drivers/infiniband/sw/rxe/rdma_rxe.ko"
+        if [ ! -f "$KO" ]; then
+          echo "::error::rdma_rxe.ko not produced by build"
+          ls -la "$SRC/drivers/infiniband/sw/rxe/"
+          exit 1
+        fi
+
+        sudo install -D -m 644 "$KO" \
+          "/lib/modules/$KVER/kernel/drivers/infiniband/sw/rxe/rdma_rxe.ko"
+        sudo depmod -a
+
+        if ! have_rxe; then
+          echo "::error::rdma_rxe.ko not resolvable after install"
+          exit 1
+        fi
+        echo "Built and installed rdma_rxe.ko from linux-${KVER_MAJMIN}.y"
+        modinfo rdma_rxe | head -20
+
+    - name: Configure Soft-RoCE (rxe0 on loopback)
+      shell: bash
+      run: |
+        # Attach rdma_rxe to `lo` so the tests find an ibverbs device named rxe0.
+        sudo modprobe rdma_rxe
+        sudo rdma link add rxe0 type rxe netdev lo
+        rdma link show
+        ibv_devices
+        ibv_devinfo -d rxe0
+        # Fail fast if rxe0 didn't come up: the Catch2 tests would otherwise silently SKIP.
+        ibv_devices | awk '{print $1}' | grep -q '^rxe0$'

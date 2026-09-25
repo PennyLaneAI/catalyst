@@ -12,6 +12,15 @@ llvm_map_components_to_libnames(_executor_llvm_libs
     AllTargetsCodeGens AllTargetsDescs AllTargetsInfos
 )
 
+# GCC false-positives -Wmaybe-uninitialized in LLVM's unique_function (ADT/FunctionExtras.h),
+# reached via ORC headers; -Werror makes it fatal. GCC-only: the executor is built and tested
+# against clang in the backline project, which has no such warning and rejects the flag as unknown.
+# Applied per target rather than to the directory: only the two that include ORC headers need it,
+# and rt_executor keeps the warning fatal (ExecutorSession.hpp pulls in no LLVM).
+if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    set(_executor_orc_warning_flags -Wno-error=maybe-uninitialized)
+endif()
+
 #  catalyst_executor_session
 add_library(catalyst_executor_session SHARED ExecutorSession.cpp)
 
@@ -30,7 +39,10 @@ target_link_libraries(catalyst_executor_session PRIVATE
     ${CMAKE_DL_LIBS}
 )
 
-target_compile_options(catalyst_executor_session PRIVATE -fno-rtti)
+target_compile_options(catalyst_executor_session PRIVATE
+    -fno-rtti
+    ${_executor_orc_warning_flags}
+)
 
 set_property(TARGET catalyst_executor_session PROPERTY POSITION_INDEPENDENT_CODE ON)
 
@@ -81,7 +93,10 @@ target_link_libraries(catalyst-executor PRIVATE
     ${CMAKE_DL_LIBS}
 )
 
-target_compile_options(catalyst-executor PRIVATE -fno-rtti)
+target_compile_options(catalyst-executor PRIVATE
+    -fno-rtti
+    ${_executor_orc_warning_flags}
+)
 
 if(APPLE)
     target_link_options(catalyst-executor PRIVATE -Wl,-export_dynamic)

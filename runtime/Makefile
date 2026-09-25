@@ -43,6 +43,23 @@ ifeq ($(ENABLE_ASAN), ON)
 ASAN_COMMAND = $(ASAN_FLAGS)
 endif
 
+# Transport suites; which binaries exist depends on the toolchain (libibverbs, HIP), so the set
+# is discovered rather than listed. Zero binaries is a failure: with ENABLE_TRANSPORT=ON the
+# caller asked for these to run, and an empty glob would otherwise report success for no tests.
+# Deferred expansion, so RT_BUILD_DIR picks up any target-specific override (see `coverage`).
+define run_transport_tests
+@set -e; ran=0; for t in $(RT_BUILD_DIR)/tests/runner_tests_transport*; do \
+	[ -x "$$t" ] || continue; \
+	echo "Catalyst runtime test suite - $${t##*/}"; \
+	$(ASAN_COMMAND) $$t; \
+	ran=$$((ran + 1)); \
+done; \
+if [ "$$ran" -eq 0 ]; then \
+	echo "No transport test binaries found in $(RT_BUILD_DIR)/tests. Was this build configured with ENABLE_TRANSPORT=ON?" >&2; \
+	exit 1; \
+fi
+endef
+
 BUILD_TARGETS := rt_capi rtd_null_qubit rt_rsdecomp rt_decoder
 TEST_TARGETS := runner_tests_qir_runtime runner_tests_mbqc_runtime runner_tests_rsdecomp_runtime runner_tests_decoder_runtime
 
@@ -128,16 +145,22 @@ ifeq ($(ENABLE_OQD), ON)
 	$(ASAN_COMMAND) $(RT_BUILD_DIR)/tests/runner_tests_oqd
 endif
 ifeq ($(ENABLE_TRANSPORT), ON)
-	# Transport suites; which binaries exist depends on the toolchain (libibverbs, HIP).
-	@set -e; for t in $(RT_BUILD_DIR)/tests/runner_tests_transport*; do \
-		echo "Catalyst runtime test suite - $${t##*/}"; \
-		$(ASAN_COMMAND) $$t; \
-	done
+	$(run_transport_tests)
 endif
 ifeq ($(ENABLE_EXECUTOR), ON)
 	# Test the catalyst-executor server over a loopback connection
 	$(ASAN_COMMAND) $(RT_BUILD_DIR)/tests/runner_tests_executor
 endif
+
+.PHONY: test-transport
+test-transport: BUILD_TYPE?=RelWithDebInfo
+test-transport: configure
+	# Only build the transport suite; going through `test_runner` would rebuild the QIR,
+	# MBQC, RSDecomp, Decoder, OpenQASM, OQD binaries too -- pure waste when only the
+	# transport tests will run below.
+	cmake --build $(RT_BUILD_DIR) --target transport_tests_all -j$(NPROC)
+	@echo "Catalyst runtime transport test suites"
+	$(run_transport_tests)
 
 .PHONY: coverage
 coverage: RT_BUILD_DIR := $(RT_BUILD_DIR)_cov
@@ -159,11 +182,7 @@ ifeq ($(ENABLE_OQD), ON)
 	$(ASAN_COMMAND) $(RT_BUILD_DIR)/tests/runner_tests_oqd
 endif
 ifeq ($(ENABLE_TRANSPORT), ON)
-	# Transport suites; which binaries exist depends on the toolchain (libibverbs, HIP).
-	@set -e; for t in $(RT_BUILD_DIR)/tests/runner_tests_transport*; do \
-		echo "Catalyst runtime test suite - $${t##*/}"; \
-		$(ASAN_COMMAND) $$t; \
-	done
+	$(run_transport_tests)
 endif
 ifeq ($(ENABLE_EXECUTOR), ON)
 	$(ASAN_COMMAND) $(RT_BUILD_DIR)/tests/runner_tests_executor
