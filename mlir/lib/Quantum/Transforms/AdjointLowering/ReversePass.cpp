@@ -229,11 +229,6 @@ class AdjointGenerator {
                     continue;
                 }
 
-                if (mlir::failed(verifyTypeIsCacheable(paramType, operation))) {
-                    generationFailed = true;
-                    return;
-                }
-
                 DataLayout dataLayout = DataLayout::closest(operation);
                 auto zero = arith::ConstantIndexOp::create(builder, loc, 0);
 
