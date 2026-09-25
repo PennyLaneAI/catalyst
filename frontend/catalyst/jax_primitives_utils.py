@@ -191,6 +191,13 @@ def lower_callable_to_funcop(ctx, callable_, call_jaxpr):
 
         func_op.attributes["diff_method"] = ir.StringAttr.get(diff_method)
 
+        # QNodes on Python devices are executed through the Python device bridge at runtime
+        # pylint: disable-next=import-outside-toplevel
+        from catalyst.device.python_device import is_python_device
+
+        if is_python_device(getattr(callable_, "device", None)):
+            func_op.attributes["catalyst.python_device"] = ir.UnitAttr.get()
+
         # Register the decomposition gatesets to the QNode FuncOp
         # This will set a queue of gatesets that enables support for multiple
         # levels of decomposition in the MLIR decomposition pass

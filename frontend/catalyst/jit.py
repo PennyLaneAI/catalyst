@@ -45,6 +45,7 @@ from catalyst.backline import (
 from catalyst.compiled_functions import CompilationCache, CompiledFunction
 from catalyst.compiler import CompileOptions, Compiler, canonicalize, to_llvmir, to_mlir_opt
 from catalyst.debug.instruments import instrument
+from catalyst.device import python_device
 from catalyst.from_plxpr import trace_from_pennylane
 from catalyst.jax_tracer import lower_jaxpr_to_mlir, trace_to_jaxpr
 from catalyst.logging import debug_logger, debug_logger_init
@@ -1002,7 +1003,12 @@ class QJIT(CatalystCallable):
         """
         # Deploy the executors the program dispatches to specified by the placement.
         launch_executors(self._placement)
-        results = self.compiled_function(*args, **kwargs)
+        try:
+            results = self.compiled_function(*args, **kwargs)
+        except RuntimeError as e:
+            # Errors raised by Python devices during execution are re-raised as such
+            python_device.reraise_pending(e)
+            raise
 
         # TODO: Move this to the compiled function object.
         return tree_unflatten(self.out_treedef, results)
