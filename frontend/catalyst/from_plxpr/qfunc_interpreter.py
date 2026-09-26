@@ -17,6 +17,7 @@ Sets up the PLxPRToQuantumJaxprInterpreter for converting plxpr to catalyst jaxp
 
 # pylint: disable=protected-access
 import textwrap
+import warnings
 from copy import copy
 from functools import partial
 
@@ -24,6 +25,7 @@ import jax
 import jax.numpy as jnp
 import pennylane as qp
 from jax._src.sharding_impls import UNSPECIFIED
+from jax.core import take_current_trace
 from pennylane.capture import PlxprInterpreter, pause
 from pennylane.capture.base_interpreter import jaxpr_to_jaxpr
 from pennylane.capture.primitives import cond_prim as pl_cond_prim
@@ -42,8 +44,15 @@ from pennylane.measurements import CountsMP
 from pennylane.pytrees import flatten, unflatten
 from pennylane.wires import AbstractQubit, Wires, is_abstract_qubit
 
+from catalyst.decomposition.capture_session import RuleDef, RuleRequest
+from catalyst.decomposition.decomposition_rules import (
+    rule_call_operands,
+    walk_reachable_decomp_rule_sets,
+)
+from catalyst.decomposition.rule_lowering_warning import RuleLoweringWarning
 from catalyst.from_plxpr.qref_jax_primitives import (
     MeasurementPlane,
+    QrefQreg,
     qref_alloc_p,
     qref_compbasis_p,
     qref_dealloc_p,
@@ -63,6 +72,7 @@ from catalyst.from_plxpr.qref_jax_primitives import (
 )
 from catalyst.jax_primitives import (
     counts_p,
+    decomp_definition_p,
     decomprule_p,
     expval_p,
     hamiltonian_p,
@@ -112,7 +122,7 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
         *,
         control_wires=(),
         control_values=(),
-        collect_decomp_rules=True,
+        decomposition_scope=None,
     ):
         self.device = device
         self.shots = shots
@@ -123,7 +133,7 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
         self.control_values = control_values
         """Any control values for executing a subroutine."""
         self.has_dynamic_allocation = False
-        self.collect_decomp_rules = collect_decomp_rules
+        self.decomposition_scope = decomposition_scope
 
         super().__init__()
 
@@ -141,6 +151,10 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
             with qp.QueuingManager.stop_recording():
                 op = eqn.primitive.impl(*invals, **eqn.params)
             if isinstance(eqn.outvars[0], jax.core.DropVar):
+                if self.decomposition_scope is not None:
+                    self.decomposition_scope.record_root(
+                        RuleRequest.from_operation(op, len(self.control_wires))
+                    )
                 _apply_operator2_gate(self, *invals, **eqn.params)
                 return ()
             return op
@@ -401,9 +415,98 @@ def _apply_operator2_gate(
         forward_mask=forward_mask,
         adjoint=adjoint,
         n_ctrls=n_ctrls,
-        collect_decomp_rules=self.collect_decomp_rules,
         **kwargs,
     )
+
+
+def _convert_decomp_target_spec(interpreter, target_spec):
+    """Convert one target specification into Catalyst rule JAXPRs."""
+
+    with take_current_trace():
+        operands = rule_call_operands(
+            target_spec.call_args,
+            target_spec.call_kwargs,
+            target_spec.kwarg_names,
+            target_spec.wire_lens,
+            target_spec.ctrl_wires,
+            target_spec.hybrid_leaves,
+        )
+        operands = [jax.ShapeDtypeStruct(operand.shape, operand.dtype) for operand in operands]
+    out = []
+    for rule in target_spec.rules:
+        pyfun = rule.pyfun
+        if not pyfun.__name__.startswith("__builtin_"):
+            pyfun.__name__ = "__builtin_" + pyfun.__name__
+        setattr(pyfun, "target_gate", target_spec.target_id)
+        setattr(pyfun, "resources", {"operations": rule.resources})
+        setattr(pyfun, "frontend_name", rule.frontend_name)
+
+        with take_current_trace():
+            try:
+                plxpr = jax.make_jaxpr(pyfun)(*operands)
+            except Exception as exc:  # pylint: disable=broad-except
+                warnings.warn(
+                    f"Failed to capture the {rule.frontend_name} decomposition rule for "
+                    f"{target_spec.target_id}: {exc}",
+                    category=RuleLoweringWarning,
+                )
+                continue
+            if target_spec.reject_noninvertible and _contains_noninvertible_equation(plxpr):
+                continue
+
+            def wrapper(global_qreg, *args):
+                converter = copy(interpreter)
+                converter.init_qreg = global_qreg
+                converter.decomposition_scope = None
+                converter.subroutine_cache = {}
+                converter(plxpr, *args)
+
+            try:
+                converted = jax.make_jaxpr(wrapper)(QrefQreg(), *plxpr.in_avals)
+            except Exception as exc:  # pylint: disable=broad-except
+                if isinstance(exc, CompileError):
+                    raise
+                warnings.warn(
+                    f"Failed to convert the {rule.frontend_name} decomposition rule for "
+                    f"{target_spec.target_id}: {exc}",
+                    category=RuleLoweringWarning,
+                )
+                continue
+        out.append(
+            RuleDef(
+                pyfun=pyfun,
+                closed_jaxpr=converted,
+                target_gate=target_spec.target_id,
+                resources=rule.resources,
+                frontend_name=rule.frontend_name,
+            )
+        )
+    return out
+
+
+def _capture_scope_rules(interpreter, scope):
+    """Populate one decomposition scope outside the active program trace."""
+
+    for target_spec in walk_reachable_decomp_rule_sets(list(scope.roots.values())):
+        for rule_def in _convert_decomp_target_spec(interpreter, target_spec):
+            scope.record_definition(rule_def)
+
+
+def capture_and_bind_kernel_rules(interpreter):
+    """Capture this kernel's reachable rules and append definition equations."""
+
+    scope = interpreter.decomposition_scope
+    if scope is None:
+        return
+
+    with take_current_trace():
+        _capture_scope_rules(interpreter, scope)
+
+    for rule_def in scope.definitions.values():
+        decomp_definition_p.bind(
+            pyfun=rule_def.pyfun,
+            func_jaxpr=rule_def.closed_jaxpr,
+        )
 
 
 # pylint: disable=unused-argument, too-many-arguments
@@ -547,6 +650,31 @@ def _subroutine_kernel(interpreter, jaxpr, global_qreg, *args):
     return retvals
 
 
+def _any_equation(jaxpr, predicate):
+    """Return whether any equation in a PLxPR or its nested regions satisfies ``predicate``."""
+
+    def is_region(value):
+        return hasattr(value, "jaxpr") or hasattr(value, "eqns")
+
+    for eqn in getattr(jaxpr, "jaxpr", jaxpr).eqns:
+        if predicate(eqn):
+            return True
+        for value in eqn.params.values():
+            nested = value if isinstance(value, (tuple, list)) else (value,)
+            if any(is_region(item) and _any_equation(item, predicate) for item in nested):
+                return True
+    return False
+
+
+def _contains_noninvertible_equation(jaxpr):
+    """Return whether a PLxPR contains a measurement-like primitive."""
+
+    return _any_equation(
+        jaxpr,
+        lambda eqn: "measure" in eqn.primitive.name or eqn.primitive.name.endswith("ppm"),
+    )
+
+
 @PLxPRToQuantumJaxprInterpreter.register_primitive(quantum_subroutine_prim)
 def handle_subroutine(self, *args, **kwargs):
     """
@@ -554,7 +682,8 @@ def handle_subroutine(self, *args, **kwargs):
     """
     plxpr = kwargs["jaxpr"]
 
-    transformed = self.subroutine_cache.get(hash(str(plxpr)))
+    cache_key = hash(str(plxpr))
+    transformed = self.subroutine_cache.get(cache_key)
 
     if not transformed:
         f = partial(
@@ -563,7 +692,7 @@ def handle_subroutine(self, *args, **kwargs):
             plxpr,
         )
         converted_closed_jaxpr_branch = jax.make_jaxpr(f)(self.init_qreg, *args)
-        self.subroutine_cache[hash(str(plxpr))] = converted_closed_jaxpr_branch
+        self.subroutine_cache[cache_key] = converted_closed_jaxpr_branch
     else:
         converted_closed_jaxpr_branch = transformed
 
@@ -591,9 +720,7 @@ def handle_subroutine(self, *args, **kwargs):
 
 @PLxPRToQuantumJaxprInterpreter.register_primitive(decomprule_p)
 def handle_decomposition_rule(self, *, pyfun, func_jaxpr, is_qreg, num_params):
-    """
-    Transform a quantum decomposition rule from PLxPR into JAXPR with quantum primitives.
-    """
+    """Transform a source-level decomposition rule into a Catalyst rule definition."""
     if is_qreg:
 
         def wrapper(global_qreg, *args):
@@ -616,7 +743,7 @@ def handle_decomposition_rule(self, *, pyfun, func_jaxpr, is_qreg, num_params):
         ]
         converted_closed_jaxpr_branch = jax.make_jaxpr(wrapper)(*new_in_avals)
 
-    decomprule_p.bind(pyfun=pyfun, func_jaxpr=converted_closed_jaxpr_branch)
+    decomp_definition_p.bind(pyfun=pyfun, func_jaxpr=converted_closed_jaxpr_branch)
 
     return ()
 
