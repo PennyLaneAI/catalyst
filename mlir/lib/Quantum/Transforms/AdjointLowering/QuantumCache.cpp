@@ -16,9 +16,12 @@
 
 #include <cstdint>
 
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Index/IR/IndexOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/IR/BuiltinAttributes.h"
+#include "mlir/IR/BuiltinOps.h"
 
 #include "Catalyst/IR/CatalystOps.h"
 
@@ -47,7 +50,8 @@ QuantumCache QuantumCache::initialize(Region &region, OpBuilder &builder, Locati
     Type byteSizeType = builder.getI8Type();
     uint32_t defaultSize = 2048; // just some default size for now
     auto paramVector =
-        memref::AllocOp::create(builder, loc, MemRefType::get({defaultSize}, byteSizeType))
+        memref::AllocOp::create(builder, loc, MemRefType::get({defaultSize}, byteSizeType),
+                                /*alignment =*/builder.getI64IntegerAttr(64))
             .getMemref();
 
     auto currentOffset =
@@ -57,6 +61,42 @@ QuantumCache QuantumCache::initialize(Region &region, OpBuilder &builder, Locati
     memref::StoreOp::create(builder, loc, zero, currentOffset, ValueRange{});
     auto offsetVectorType = ArrayListType::get(ctx, builder.getIndexType());
     auto offsetVector = ListInitOp::create(builder, loc, offsetVectorType);
+
+    std::string funcName = "__adjoing_lowering_roundup_offset_to_alignment";
+    auto moduleOp = region.getParentOfType<ModuleOp>();
+    auto offsetRoundupFunc = moduleOp.lookupSymbol(funcName);
+    // Check if the helper already exists in the module
+    if (!offsetRoundupFunc) {
+        OpBuilder::InsertionGuard guard(builder);
+        builder.setInsertionPointToStart(moduleOp.getBody());
+
+        Type indexType = builder.getIndexType();
+        auto offsetRoundupFuncType = FunctionType::get(ctx, /*inputs=*/{indexType, indexType},
+                                                       /*outputs=*/{indexType});
+
+        offsetRoundupFunc = func::FuncOp::create(builder, loc, funcName, offsetRoundupFuncType);
+        func::FuncOp offsetRoundupFuncOp = cast<func::FuncOp>(offsetRoundupFunc);
+        offsetRoundupFuncOp.setPrivate();
+
+        // The formula to round up current offset (O) to intended alignment (A) is
+        // O_aligned = (O + A - 1) & ~(A - 1)
+        // given that A is a power of 2
+        Block *entryBlock = offsetRoundupFuncOp.addEntryBlock();
+        builder.setInsertionPointToStart(entryBlock);
+        BlockArgument rawOffset = offsetRoundupFuncOp.getArgument(0);
+        BlockArgument alignment = offsetRoundupFuncOp.getArgument(1);
+
+        Value one = index::ConstantOp::create(builder, loc, 1);
+        Value a_minus_one = index::SubOp::create(builder, loc, alignment, one);
+        Value o_plus_a_minus_one = index::AddOp::create(builder, loc, rawOffset, a_minus_one);
+        // mlir doesn't have an instruction for bitwise NOT
+        // need to XOR with a mask of all 1
+        Value all_bit_ones = index::ConstantOp::create(builder, loc, -1);
+        Value not_a_minus_one = index::XOrOp::create(builder, loc, a_minus_one, all_bit_ones);
+        Value offsetAligned =
+            index::AndOp::create(builder, loc, o_plus_a_minus_one, not_a_minus_one);
+        func::ReturnOp::create(builder, loc, offsetAligned);
+    }
 
     auto wireVectorType = ArrayListType::get(ctx, builder.getI64Type());
     auto wireVector = ListInitOp::create(builder, loc, wireVectorType);
@@ -73,6 +113,7 @@ QuantumCache QuantumCache::initialize(Region &region, OpBuilder &builder, Locati
     return quantum::QuantumCache{.paramVector = paramVector,
                                  .currentOffset = currentOffset,
                                  .offsetVector = offsetVector,
+                                 .offsetRoundupFunc = cast<func::FuncOp>(offsetRoundupFunc),
                                  .wireVector = wireVector,
                                  .controlFlowTapes = controlFlowTapes};
 }

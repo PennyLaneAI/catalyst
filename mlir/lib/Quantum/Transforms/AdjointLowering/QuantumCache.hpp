@@ -14,6 +14,7 @@
 
 #pragma once
 
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/Region.h"
 #include "mlir/IR/Value.h"
@@ -36,6 +37,7 @@ struct QuantumCache {
     mlir::Value paramVector;
     mlir::Value currentOffset;
     mlir::TypedValue<ArrayListType> offsetVector;
+    mlir::func::FuncOp offsetRoundupFunc;
     mlir::TypedValue<ArrayListType> wireVector;
     /// For every structured control flow op, store the values required for it to execute.
     /// Specifically: store the conditions for scf.if ops, the start/stop/step of scf.for ops, and

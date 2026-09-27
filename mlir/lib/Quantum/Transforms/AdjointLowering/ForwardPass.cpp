@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <bit> // std::has_single_bit
 #include <cstdint>
 
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -114,8 +115,20 @@ void AugmentedCircuitGenerator::cacheGate(quantum::ParametrizedGate gate, OpBuil
         DataLayout dataLayout = DataLayout::closest(op);
 
         // 1. Load the current offset index from the currentOffset memref
+        // Need to round it up to the required alignment
         Value currentOffsetIndex =
             memref::LoadOp::create(builder, loc, cache.currentOffset, ValueRange{}).getResult();
+        uint64_t alignment = 0;
+        if (isa<RankedTensorType>(paramType)) {
+            alignment = 64;
+        } else {
+            alignment = dataLayout.getTypeSize(paramType).getFixedValue();
+            assert(std::has_single_bit(alignment) && "alignment must be a power of 2");
+        }
+        Value alignmentIndex = index::ConstantOp::create(builder, loc, alignment);
+        Value alignedOffset = func::CallOp::create(builder, loc, cache.offsetRoundupFunc,
+                                                   {currentOffsetIndex, alignmentIndex})
+                                  ->getResult(0);
 
         // 2. Store the param value into the cache at the current offset
         // The cache is a raw <some_size x i8> byte memref, so need to view it with the
@@ -130,26 +143,24 @@ void AugmentedCircuitGenerator::cacheGate(quantum::ParametrizedGate gate, OpBuil
                 MemRefType::get(tensorType.getShape(), tensorType.getElementType());
             auto buffer = bufferization::ToBufferOp::create(builder, loc, memrefType, clonedParam)
                               .getBuffer();
-            Value view =
-                memref::ViewOp::create(builder, loc, memrefType, cache.paramVector,
-                                       currentOffsetIndex, ValueRange{} // Empty dynamic sizes
-                                       )
-                    ->getResult(0);
+            Value view = memref::ViewOp::create(builder, loc, memrefType, cache.paramVector,
+                                                alignedOffset, ValueRange{} // Empty dynamic sizes
+                                                )
+                             ->getResult(0);
             memref::CopyOp::create(builder, loc, buffer, view);
         } else {
             // Param not a tensor, just use a raw memref without buffers
             auto targetViewType = MemRefType::get({}, paramType);
-            Value view =
-                memref::ViewOp::create(builder, loc, targetViewType, cache.paramVector,
-                                       currentOffsetIndex, ValueRange{} // Empty dynamic sizes
-                                       )
-                    ->getResult(0);
+            Value view = memref::ViewOp::create(builder, loc, targetViewType, cache.paramVector,
+                                                alignedOffset, ValueRange{} // Empty dynamic sizes
+                                                )
+                             ->getResult(0);
 
             memref::StoreOp::create(builder, loc, clonedParam, view, ValueRange{});
         }
 
         // 3. Push the current offset onto the offset stack
-        ListPushOp::create(builder, loc, currentOffsetIndex, cache.offsetVector);
+        ListPushOp::create(builder, loc, alignedOffset, cache.offsetVector);
 
         // 4. Increment the current offset with the byte size of this param
         int64_t paramNumBytes = 0;
@@ -170,7 +181,7 @@ void AugmentedCircuitGenerator::cacheGate(quantum::ParametrizedGate gate, OpBuil
         Value paramNumBytesValue =
             index::ConstantOp::create(builder, loc, paramNumBytes).getResult();
         Value newOffset =
-            index::AddOp::create(builder, loc, currentOffsetIndex, paramNumBytesValue).getResult();
+            index::AddOp::create(builder, loc, alignedOffset, paramNumBytesValue).getResult();
         memref::StoreOp::create(builder, loc, newOffset, cache.currentOffset, ValueRange{});
     }
 }
