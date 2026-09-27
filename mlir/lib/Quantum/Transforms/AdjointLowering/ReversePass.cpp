@@ -229,6 +229,11 @@ class AdjointGenerator {
                     continue;
                 }
 
+                if (mlir::failed(verifyTypeIsCacheable(paramType, operation))) {
+                    generationFailed = true;
+                    return;
+                }
+
                 // 1. Pop the current offset
                 Value currentOffsetIndex =
                     ListPopOp::create(builder, loc, cache.offsetVector).getResult();

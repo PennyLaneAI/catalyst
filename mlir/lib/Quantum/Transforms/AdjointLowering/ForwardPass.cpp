@@ -112,6 +112,12 @@ void AugmentedCircuitGenerator::cacheGate(quantum::ParametrizedGate gate, OpBuil
         Value clonedParam = oldToCloned.lookupOrDefault(param);
         Type paramType = clonedParam.getType();
         Operation *op = gate;
+
+        if (mlir::failed(verifyTypeIsCacheable(paramType, op))) {
+            generationFailed = true;
+            return;
+        }
+
         DataLayout dataLayout = DataLayout::closest(op);
 
         // 1. Load the current offset index from the currentOffset memref

@@ -16,12 +16,15 @@
 
 #include <cstdint>
 
+#include "llvm/Support/Casting.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Index/IR/IndexOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinOps.h"
+#include "mlir/IR/BuiltinTypes.h"
 
 #include "Catalyst/IR/CatalystOps.h"
 
@@ -42,6 +45,29 @@ bool isAvailableToReversePass(Value param, Region &adjointRegion) {
 
     // Defined at the immediate top level of the adjoint region, not in nested control flow
     return definingRegion == &adjointRegion;
+}
+
+LogicalResult verifyTypeIsCacheable(Type ty, Operation *op) {
+    auto isIntOrFloatOrComplex = [](Type ty) -> bool {
+        if (ty.isIntOrFloat()) {
+            return true;
+        }
+        if (auto complexTy = dyn_cast<mlir::ComplexType>(ty)) {
+            return complexTy.getElementType().isIntOrFloat();
+        }
+        return false;
+    };
+
+    if (isIntOrFloatOrComplex(ty)) {
+        return success();
+    }
+
+    if (isa<RankedTensorType>(ty) &&
+        isIntOrFloatOrComplex(cast<RankedTensorType>(ty).getElementType())) {
+        return success();
+    }
+
+    return op->emitOpError() << "Caching only supports scalar and tensor types, got " << ty;
 }
 
 QuantumCache QuantumCache::initialize(Region &region, OpBuilder &builder, Location loc) {

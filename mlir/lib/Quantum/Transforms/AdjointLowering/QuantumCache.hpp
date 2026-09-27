@@ -68,5 +68,9 @@ struct QuantumCache {
 /// those regions and their values are neither visible nor loop-invariant: they must be recorded.
 bool isAvailableToReversePass(mlir::Value param, mlir::Region &adjointRegion);
 
+/// Verify that `ty` is a type the cache knows how to record
+/// Scalar and tensor types are allowed
+mlir::LogicalResult verifyTypeIsCacheable(mlir::Type ty, mlir::Operation *op);
+
 } // namespace quantum
 } // namespace catalyst
