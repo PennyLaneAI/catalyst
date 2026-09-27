@@ -18,7 +18,7 @@
 // COM: O_aligned = (O + A - 1) & ~(A - 1)
 // COM: given that A is a power of 2
 
-// CHECK:  func.func private @__adjoing_lowering_roundup_offset_to_alignment(%arg0: index, %arg1: index) -> index {
+// CHECK:  func.func private @__adjoint_lowering_roundup_offset_to_alignment(%arg0: index, %arg1: index) -> index {
 // CHECK:    [[minus_one:%.+]] = index.constant -1
 // CHECK:    [[one:%.+]] = index.constant 1
 // CHECK:    [[A_minus_one:%.+]] = index.sub %arg1, [[one]]
@@ -53,7 +53,7 @@ func.func @qubit_unitary_test() -> tensor<4xcomplex<f64>> {
     // CHECK: scf.for
     // CHECK:   [[param:%.+]] = "test.op"() : () -> tensor<4x4xcomplex<f64>>
     // CHECK:   [[raw_offset:%.+]] = memref.load [[cur_offset]][] : memref<index>
-    // CHECK:   [[offset:%.+]] = func.call @__adjoing_lowering_roundup_offset_to_alignment
+    // CHECK:   [[offset:%.+]] = func.call @__adjoint_lowering_roundup_offset_to_alignment
     // CHECK-SAME:   ([[raw_offset]], [[_64]]) : (index, index) -> index
     // CHECK:   [[param_memref:%.+]] = bufferization.to_buffer [[param]]
     // CHECK-SAME:    tensor<4x4xcomplex<f64>> to memref<4x4xcomplex<f64>>
@@ -123,7 +123,7 @@ func.func @adjoint_real_matrix_param(%arg0: !quantum.reg) -> !quantum.reg {
     // CHECK: scf.for
     // CHECK:   [[param:%.+]] = "test.op"() : () -> tensor<2x2xf64>
     // CHECK:   [[raw_offset:%.+]] = memref.load [[cur_offset]][] : memref<index>
-    // CHECK:   [[offset:%.+]] = func.call @__adjoing_lowering_roundup_offset_to_alignment
+    // CHECK:   [[offset:%.+]] = func.call @__adjoint_lowering_roundup_offset_to_alignment
     // CHECK-SAME:  ([[raw_offset]], [[_64]]) : (index, index) -> index
     // CHECK:   [[param_memref:%.+]] = bufferization.to_buffer [[param]] : tensor<2x2xf64> to memref<2x2xf64>
     // CHECK:   [[view:%.+]] = memref.view [[data_vector]][[[offset]]][] : memref<2048xi8> to memref<2x2xf64>
@@ -196,7 +196,7 @@ func.func @mixed_param_types(%0: !quantum.reg) -> !quantum.reg {
     // CHECK:   [[c4:%.+]] = "test.op"([[i]]) : (index) -> tensor<6xi1>
     //
     // CHECK: [[raw_offset:%.+]] = memref.load [[cur_offset]][] : memref<index>
-    // CHECK: [[offset:%.+]] = func.call @__adjoing_lowering_roundup_offset_to_alignment
+    // CHECK: [[offset:%.+]] = func.call @__adjoint_lowering_roundup_offset_to_alignment
     // CHECK-SAME:  ([[raw_offset]], [[_8]]) : (index, index) -> index
     // CHECK: [[view:%.+]] = memref.view [[data_vector]][[[offset]]][] : memref<2048xi8> to memref<f64>
     // CHECK: memref.store [[c1]], [[view]][] : memref<f64>
@@ -205,7 +205,7 @@ func.func @mixed_param_types(%0: !quantum.reg) -> !quantum.reg {
     // CHECK: memref.store [[new_offset]], [[cur_offset]][] : memref<index>
     //
     // CHECK: [[raw_offset:%.+]] = memref.load [[cur_offset]][] : memref<index>
-    // CHECK: [[offset:%.+]] = func.call @__adjoing_lowering_roundup_offset_to_alignment
+    // CHECK: [[offset:%.+]] = func.call @__adjoint_lowering_roundup_offset_to_alignment
     // CHECK-SAME:  ([[raw_offset]], [[_1]]) : (index, index) -> index
     // CHECK: [[view:%.+]] = memref.view [[data_vector]][[[offset]]][] : memref<2048xi8> to memref<i1>
     // CHECK: memref.store [[c2]], [[view]][] : memref<i1>
@@ -214,7 +214,7 @@ func.func @mixed_param_types(%0: !quantum.reg) -> !quantum.reg {
     // CHECK: memref.store [[new_offset]], [[cur_offset]][] : memref<index>
     //
     // CHECK: [[raw_offset:%.+]] = memref.load [[cur_offset]][] : memref<index>
-    // CHECK: [[offset:%.+]] = func.call @__adjoing_lowering_roundup_offset_to_alignment
+    // CHECK: [[offset:%.+]] = func.call @__adjoint_lowering_roundup_offset_to_alignment
     // CHECK-SAME:  ([[raw_offset]], [[_8]]) : (index, index) -> index
     // CHECK: [[view:%.+]] = memref.view [[data_vector]][[[offset]]][] : memref<2048xi8> to memref<complex<i32>>
     // CHECK: memref.store [[c3]], [[view]][] : memref<complex<i32>>
@@ -223,7 +223,7 @@ func.func @mixed_param_types(%0: !quantum.reg) -> !quantum.reg {
     // CHECK: memref.store [[new_offset]], [[cur_offset]][] : memref<index>
     //
     // CHECK:   [[raw_offset:%.+]] = memref.load [[cur_offset]][] : memref<index>
-    // CHECK:   [[offset:%.+]] = func.call @__adjoing_lowering_roundup_offset_to_alignment
+    // CHECK:   [[offset:%.+]] = func.call @__adjoint_lowering_roundup_offset_to_alignment
     // CHECK-SAME:  ([[raw_offset]], [[_64]]) : (index, index) -> index
     // CHECK:   [[c4_memref:%.+]] = bufferization.to_buffer [[c4]] : tensor<6xi1> to memref<6xi1>
     // CHECK:   [[view:%.+]] = memref.view [[data_vector]][[[offset]]][] : memref<2048xi8> to memref<6xi1>

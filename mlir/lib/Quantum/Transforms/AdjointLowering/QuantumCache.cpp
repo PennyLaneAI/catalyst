@@ -62,9 +62,14 @@ LogicalResult verifyTypeIsCacheable(Type ty, Operation *op) {
         return success();
     }
 
-    if (isa<RankedTensorType>(ty) &&
-        isIntOrFloatOrComplex(cast<RankedTensorType>(ty).getElementType())) {
-        return success();
+    if (auto tensorTy = dyn_cast<RankedTensorType>(ty)) {
+        if (!tensorTy.hasStaticShape()) {
+            return op->emitError()
+                   << "Caching does not support dynamic shape tensors yet, got " << ty;
+        }
+        if (isIntOrFloatOrComplex(tensorTy.getElementType())) {
+            return success();
+        }
     }
 
     return op->emitOpError() << "Caching only supports scalar and tensor types, got " << ty;
@@ -88,7 +93,7 @@ QuantumCache QuantumCache::initialize(Region &region, OpBuilder &builder, Locati
     auto offsetVectorType = ArrayListType::get(ctx, builder.getIndexType());
     auto offsetVector = ListInitOp::create(builder, loc, offsetVectorType);
 
-    std::string funcName = "__adjoing_lowering_roundup_offset_to_alignment";
+    std::string funcName = "__adjoint_lowering_roundup_offset_to_alignment";
     auto moduleOp = region.getParentOfType<ModuleOp>();
     auto offsetRoundupFunc = moduleOp.lookupSymbol(funcName);
     // Check if the helper already exists in the module

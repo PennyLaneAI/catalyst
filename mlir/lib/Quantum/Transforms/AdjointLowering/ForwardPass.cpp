@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <bit> // std::has_single_bit
 #include <cstdint>
 
+#include "llvm/Support/MathExtras.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Complex/IR/Complex.h"
@@ -128,8 +128,7 @@ void AugmentedCircuitGenerator::cacheGate(quantum::ParametrizedGate gate, OpBuil
         if (isa<RankedTensorType>(paramType)) {
             alignment = 64;
         } else {
-            alignment = dataLayout.getTypeSize(paramType).getFixedValue();
-            assert(std::has_single_bit(alignment) && "alignment must be a power of 2");
+            alignment = llvm::PowerOf2Ceil(dataLayout.getTypeSize(paramType).getFixedValue());
         }
         Value alignmentIndex = index::ConstantOp::create(builder, loc, alignment);
         Value alignedOffset = func::CallOp::create(builder, loc, cache.offsetRoundupFunc,
@@ -142,9 +141,6 @@ void AugmentedCircuitGenerator::cacheGate(quantum::ParametrizedGate gate, OpBuil
         if (isa<RankedTensorType>(paramType)) {
             // Param is a tensor, need to convert to memrefs via bufferization ops
             auto tensorType = cast<RankedTensorType>(paramType);
-            assert(tensorType.hasStaticShape() &&
-                   "Dynamically sized tensor params not supported yet");
-
             MemRefType memrefType =
                 MemRefType::get(tensorType.getShape(), tensorType.getElementType());
             auto buffer = bufferization::ToBufferOp::create(builder, loc, memrefType, clonedParam)

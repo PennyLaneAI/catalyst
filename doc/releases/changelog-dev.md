@@ -290,7 +290,7 @@
     Parameters that are trivially available to the reverse pass are no longer cached.
     [(#3233)](https://github.com/PennyLaneAI/catalyst/pull/3233)
 
-  - It can now cache parameters of arbitrary types.
+  - It can now cache parameters of arbitrary scalar and tensor types.
     [(#3265)](https://github.com/PennyLaneAI/catalyst/pull/3265)
     [(#3270)](https://github.com/PennyLaneAI/catalyst/pull/3270)
 
