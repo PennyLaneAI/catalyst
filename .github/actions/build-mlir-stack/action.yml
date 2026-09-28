@@ -120,13 +120,23 @@ runs:
             exit 0
           fi
         fi
+        # $LLVM_BUILD_OPTIONS is unquoted on purpose: the overrides are several words, and
+        # as make command-line variables they propagate into the `-C mlir` sub-make and beat
+        # its `?=` defaults. It must stay above the assignments -- a comment between a `\`
+        # continuation and `make` silently detaches every assignment from the command.
         C_COMPILER=$(which gcc) \
         CXX_COMPILER=$(which g++) \
         LLVM_BUILD_DIR="$(pwd)/llvm-build" \
         COMPILER_LAUNCHER="" \
-        # Unquoted on purpose: the overrides are several words, and as make command-line
-        # variables they propagate into the `-C mlir` sub-make and beat its `?=` defaults.
         make llvm $LLVM_BUILD_OPTIONS
+        # Verify the tree actually landed in llvm-build. `make` exits 0 after building
+        # into its own default directory if the env prefix above ever stops reaching it --
+        # which already happened once, and only surfaced two hours later as a confusing
+        # find_package failure in the next component.
+        if [ ! -e "$(pwd)/llvm-build/lib/cmake/mlir/MLIRConfig.cmake" ]; then
+          echo "::error::llvm-build/lib/cmake/mlir/MLIRConfig.cmake is missing after 'make llvm' reported success."
+          exit 1
+        fi
         if [ -n "${PERSIST_BASE:-}" ]; then
           touch "$PERSIST_BASE/llvm-build/.catalyst-complete"
         fi
@@ -183,6 +193,14 @@ runs:
         STABLEHLO_BUILD_DIR="$(pwd)/stablehlo-build" \
         COMPILER_LAUNCHER="" \
         make stablehlo
+        # Verify the tree actually landed in stablehlo-build. `make` exits 0 after building
+        # into its own default directory if the env prefix above ever stops reaching it --
+        # which already happened once, and only surfaced two hours later as a confusing
+        # find_package failure in the next component.
+        if [ ! -e "$(pwd)/stablehlo-build/CMakeCache.txt" ]; then
+          echo "::error::stablehlo-build/CMakeCache.txt is missing after 'make stablehlo' reported success."
+          exit 1
+        fi
         if [ -n "${PERSIST_BASE:-}" ]; then
           touch "$PERSIST_BASE/stablehlo-build/.catalyst-complete"
         fi
@@ -239,6 +257,14 @@ runs:
         ENZYME_BUILD_DIR="$(pwd)/enzyme-build" \
         COMPILER_LAUNCHER="" \
         make enzyme
+        # Verify the tree actually landed in enzyme-build. `make` exits 0 after building
+        # into its own default directory if the env prefix above ever stops reaching it --
+        # which already happened once, and only surfaced two hours later as a confusing
+        # find_package failure in the next component.
+        if [ ! -e "$(pwd)/enzyme-build/CMakeCache.txt" ]; then
+          echo "::error::enzyme-build/CMakeCache.txt is missing after 'make enzyme' reported success."
+          exit 1
+        fi
         if [ -n "${PERSIST_BASE:-}" ]; then
           touch "$PERSIST_BASE/enzyme-build/.catalyst-complete"
         fi
