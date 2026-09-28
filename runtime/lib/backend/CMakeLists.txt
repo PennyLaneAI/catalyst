@@ -1,6 +1,9 @@
 add_subdirectory(null_qubit)
 configure_file(null_qubit/null_qubit.toml null_qubit.toml)
 
+add_subdirectory(default_tensor)
+configure_file(default_tensor/default_tensor.toml default_tensor.toml)
+
 if(ENABLE_OQD)
 add_subdirectory(oqd)
 configure_file(oqd/oqd.toml oqd.toml)

@@ -1,0 +1,46 @@
+schema = 3
+
+[operators.gates]
+
+Identity = { properties = [                 "invertible"                  ] }
+PauliX   = { properties = [ "controllable", "invertible"                  ] }
+PauliY   = { properties = [ "controllable", "invertible"                  ] }
+PauliZ   = { properties = [ "controllable", "invertible"                  ] }
+Hadamard = { properties = [ "controllable", "invertible"                  ] }
+RX       = { properties = [ "controllable", "invertible"                  ] }
+RY       = { properties = [ "controllable", "invertible"                  ] }
+RZ       = { properties = [ "controllable", "invertible"                  ] }
+CNOT     = { properties = [                 "invertible"                  ] }
+CZ       = { properties = [                 "invertible"                  ] }
+
+[operators.observables]
+
+Identity          = { }
+PauliX            = { }
+PauliY            = { }
+PauliZ            = { }
+Hadamard          = { }
+Hermitian         = { }
+Prod              = { }
+SProd             = { }
+Sum               = { }
+LinearCombination = { }
+
+[measurement_processes]
+
+ExpectationMP = { }
+VarianceMP    = { }
+ProbabilityMP = { }
+StateMP       = { conditions = [ "analytic"    ] }
+SampleMP      = { conditions = [ "finiteshots" ] }
+CountsMP      = { conditions = [ "finiteshots" ] }
+
+[compilation]
+
+qjit_compatible = true
+runtime_code_generation = false
+dynamic_qubit_management = true
+non_commuting_observables = true
+overlapping_observables = true
+initial_state_prep = false
+supported_mcm_methods = [ "device", "one-shot" ]
