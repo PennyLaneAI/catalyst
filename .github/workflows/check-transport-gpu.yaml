@@ -142,6 +142,12 @@ jobs:
           llvm-version: ${{ needs.constants.outputs.llvm_version }}
           stablehlo-version: ${{ needs.constants.outputs.stablehlo_version }}
           enzyme-version: ${{ needs.constants.outputs.enzyme_version }}
+          # Kept on the runner rather than in the GitHub cache. This box is dedicated, so the
+          # built stack can simply stay on disk: nothing is uploaded, nothing counts against the
+          # 10 GB repo quota, and it is not scoped to a PR ref. That scoping is why the cache
+          # was always cold -- entries written by a PR run are invisible to every other PR and
+          # are deleted with the branch, and this workflow has only ever run on pull_request.
+          persist-root: ~/.cache/catalyst-ci/mlir-stack
 
       - name: Install Python runtime requirements
         run: |

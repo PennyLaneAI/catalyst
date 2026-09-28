@@ -1,9 +1,19 @@
 name: Build the MLIR stack on this runner
 description: >
-  Build LLVM, StableHLO and Enzyme into llvm-build/, stablehlo-build/ and enzyme-build/, caching
-  each. For self-hosted runners, which cannot reuse check-catalyst.yaml's caches: those come from
-  GH-hosted images and the cached mlir-tblgen hits a GLIBC mismatch here. Expects the LLVM source
-  at mlir/llvm-project already.
+  Build LLVM, StableHLO and Enzyme into llvm-build/, stablehlo-build/ and enzyme-build/. For
+  self-hosted runners, which cannot reuse check-catalyst.yaml's caches: those come from GH-hosted
+  images and the cached mlir-tblgen hits a GLIBC mismatch here. Expects the LLVM source at
+  mlir/llvm-project already.
+
+  Two ways to avoid rebuilding, picked by `persist-root`:
+
+  * unset -- the GitHub cache. Restore and save are separate steps rather than the combined
+    `actions/cache`, which only saves in a post-job step: the caller spends another hour on
+    Triton and GPU tests after this action returns, and a cancel there (the GPU workflow sets
+    cancel-in-progress) would discard a finished multi-hour LLVM build.
+  * set -- a directory on the runner itself, which is what a dedicated self-hosted box wants.
+    Nothing is uploaded or downloaded, and the result is not scoped to a PR ref, so it is still
+    there for the next run on any branch.
 
 inputs:
   llvm-version:
@@ -22,17 +32,25 @@ inputs:
   llvm-variant:
     description: >
       Names this LLVM configuration. Variants configured with different cmake options get their
-      own cache entry instead of overwriting each other, so a second LLVM can be cached next to
-      the default one rather than replacing it. `default` is a plain `make llvm`; its key is
-      spelled exactly as before so existing caches keep hitting.
+      own cache entry, or their own on-disk slot, instead of overwriting each other. `default` is
+      a plain `make llvm`; its cache key is spelled exactly as before so existing caches keep
+      hitting.
     required: false
     default: default
   llvm-build-options:
     description: >
       `make llvm` variable overrides defining a non-default variant, space separated, e.g.
       "LLVM_TARGETS_TO_BUILD=host;AArch64". Ignored for the default variant. Whatever is set
-      here has to be reflected in `llvm-variant`, which is what the cache is keyed on -- the
+      here has to be reflected in `llvm-variant`, which is what the slot is named after -- the
       options themselves are not part of the key.
+    required: false
+    default: ""
+  persist-root:
+    description: >
+      Directory on the runner to build into, outside the workspace so `actions/checkout`'s
+      `git clean -ffdx` cannot delete it. A leading `~` is expanded. Set this on a dedicated
+      self-hosted runner to reuse the built stack directly; leave it empty on ephemeral runners,
+      where the GitHub cache is the only thing that survives.
     required: false
     default: ""
 
@@ -46,9 +64,38 @@ runs:
         sudo apt-get install -y cmake ninja-build clang lld
         python3 -m pip install numpy "nanobind<2.13" pybind11 PyYAML
 
-    - name: Cache LLVM build
+    - name: Prepare the persistent build directories
+      id: persist
+      if: inputs.persist-root != ''
+      shell: bash
+      env:
+        PERSIST_ROOT: ${{ inputs.persist-root }}
+        SLOT: llvm-${{ inputs.llvm-version }}-${{ inputs.llvm-variant }}-${{ inputs.stablehlo-version }}-${{ inputs.enzyme-version }}-gcc
+      run: |
+        set -euo pipefail
+        # One slot per set of refs, so bumping any of them starts from an empty tree rather than
+        # reconfiguring an incompatible one. Old slots are left behind deliberately -- reclaiming
+        # that disk is a judgement call for whoever owns the runner, not something to do silently
+        # from a workflow.
+        base="${PERSIST_ROOT/#\~/$HOME}/$SLOT"
+        for d in llvm-build stablehlo-build enzyme-build; do
+          mkdir -p "$base/$d"
+          # Symlinked into the workspace so every `$(pwd)/<d>` in the caller keeps resolving.
+          ln -sfn "$base/$d" "$GITHUB_WORKSPACE/$d"
+          # Written only after the matching build succeeds, so a tree left half-built by a
+          # cancel or a failure is rebuilt (incrementally) rather than trusted.
+          if [ -e "$base/$d/.catalyst-complete" ]; then
+            echo "${d%%-*}_ready=true" >> "$GITHUB_OUTPUT"
+            echo "reusing $d from $base"
+          fi
+        done
+        echo "PERSIST_BASE=$base" >> "$GITHUB_ENV"
+        du -sh "$base" 2>/dev/null || true
+
+    - name: Restore LLVM build
       id: cache-llvm-build
-      uses: actions/cache@v4
+      if: inputs.persist-root == ''
+      uses: actions/cache/restore@v4
       with:
         path: llvm-build
         # The variant is appended only when it is not `default`, so the default key stays
@@ -57,7 +104,7 @@ runs:
         key: ${{ inputs.cache-prefix }}-${{ runner.os }}-llvm-${{ inputs.llvm-version }}-ci-build-gcc${{ inputs.llvm-variant != 'default' && format('-{0}', inputs.llvm-variant) || '' }}
 
     - name: Build LLVM
-      if: steps.cache-llvm-build.outputs.cache-hit != 'true'
+      if: steps.cache-llvm-build.outputs.cache-hit != 'true' && steps.persist.outputs.llvm_ready != 'true'
       shell: bash
       env:
         LLVM_BUILD_OPTIONS: ${{ inputs.llvm-build-options }}
@@ -69,6 +116,16 @@ runs:
         LLVM_BUILD_DIR="$(pwd)/llvm-build" \
         COMPILER_LAUNCHER="" \
         make llvm $LLVM_BUILD_OPTIONS
+        if [ -n "${PERSIST_BASE:-}" ]; then
+          touch "$PERSIST_BASE/llvm-build/.catalyst-complete"
+        fi
+
+    - name: Save llvm-build
+      if: inputs.persist-root == '' && steps.cache-llvm-build.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v4
+      with:
+        path: llvm-build
+        key: ${{ steps.cache-llvm-build.outputs.cache-primary-key }}
 
     - name: Cache StableHLO source
       id: cache-stablehlo-source
@@ -86,15 +143,16 @@ runs:
         ref: ${{ inputs.stablehlo-version }}
         path: mlir/stablehlo
 
-    - name: Cache StableHLO build
+    - name: Restore StableHLO build
       id: cache-stablehlo-build
-      uses: actions/cache@v4
+      if: inputs.persist-root == ''
+      uses: actions/cache/restore@v4
       with:
         path: stablehlo-build
         key: ${{ inputs.cache-prefix }}-${{ runner.os }}-stablehlo-${{ inputs.stablehlo-version }}-ci-build-gcc
 
     - name: Build StableHLO
-      if: steps.cache-stablehlo-build.outputs.cache-hit != 'true'
+      if: steps.cache-stablehlo-build.outputs.cache-hit != 'true' && steps.persist.outputs.stablehlo_ready != 'true'
       shell: bash
       run: |
         C_COMPILER=$(which gcc) \
@@ -103,6 +161,16 @@ runs:
         STABLEHLO_BUILD_DIR="$(pwd)/stablehlo-build" \
         COMPILER_LAUNCHER="" \
         make stablehlo
+        if [ -n "${PERSIST_BASE:-}" ]; then
+          touch "$PERSIST_BASE/stablehlo-build/.catalyst-complete"
+        fi
+
+    - name: Save stablehlo-build
+      if: inputs.persist-root == '' && steps.cache-stablehlo-build.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v4
+      with:
+        path: stablehlo-build
+        key: ${{ steps.cache-stablehlo-build.outputs.cache-primary-key }}
 
     - name: Cache Enzyme source
       id: cache-enzyme-source
@@ -120,15 +188,16 @@ runs:
         ref: ${{ inputs.enzyme-version }}
         path: mlir/Enzyme
 
-    - name: Cache Enzyme build
+    - name: Restore Enzyme build
       id: cache-enzyme-build
-      uses: actions/cache@v4
+      if: inputs.persist-root == ''
+      uses: actions/cache/restore@v4
       with:
         path: enzyme-build
         key: ${{ inputs.cache-prefix }}-${{ runner.os }}-enzyme-${{ inputs.llvm-version }}-${{ inputs.enzyme-version }}-ci-build-gcc
 
     - name: Build Enzyme
-      if: steps.cache-enzyme-build.outputs.cache-hit != 'true'
+      if: steps.cache-enzyme-build.outputs.cache-hit != 'true' && steps.persist.outputs.enzyme_ready != 'true'
       shell: bash
       run: |
         C_COMPILER=$(which gcc) \
@@ -137,3 +206,13 @@ runs:
         ENZYME_BUILD_DIR="$(pwd)/enzyme-build" \
         COMPILER_LAUNCHER="" \
         make enzyme
+        if [ -n "${PERSIST_BASE:-}" ]; then
+          touch "$PERSIST_BASE/enzyme-build/.catalyst-complete"
+        fi
+
+    - name: Save enzyme-build
+      if: inputs.persist-root == '' && steps.cache-enzyme-build.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v4
+      with:
+        path: enzyme-build
+        key: ${{ steps.cache-enzyme-build.outputs.cache-primary-key }}
