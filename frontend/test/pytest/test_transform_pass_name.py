@@ -44,7 +44,7 @@ def test_pass_with_options(options, expected_strings, backend):
 
     my_pass = qp.transform(pass_name="my-pass")
 
-    @qp.qjit(target="mlir")
+    @qp.qjit(target="mlir", capture=False)
     @partial(my_pass, **options)
     @qp.qnode(qp.device(backend, wires=1))
     def captured_circuit():
@@ -87,7 +87,7 @@ def test_pass_with_none_option(backend):
 
     my_pass = qp.transform(pass_name="my-pass")
 
-    @qp.qjit(target="mlir")
+    @qp.qjit(target="mlir", capture=False)
     @partial(my_pass, **{"option": None})
     @qp.qnode(qp.device(backend, wires=1))
     def captured_circuit():
@@ -107,7 +107,7 @@ def test_pass_with_unsupported_options(backend):
         return qp.expval(qp.PauliZ(0))
 
     expected_msg = r"Cannot convert Python type <class 'object'> to an MLIR attribute"
-    qjc = qp.qjit(target="mlir")(captured_circuit)
+    qjc = qp.qjit(target="mlir", capture=False)(captured_circuit)
 
     with pytest.raises(CompileError, match=expected_msg):
         qjc()
@@ -122,7 +122,7 @@ def test_pass_before_tape_transform(backend):
     def tape_transform(tape):
         return (tape,), lambda x: x[0]
 
-    @qp.qjit
+    @qp.qjit(capture=False)
     @tape_transform
     @my_pass
     @qp.qnode(qp.device(backend, wires=1))
@@ -142,7 +142,7 @@ def test_pass_after_tape_transform(backend):
 
     my_pass = qp.transform(pass_name="my-pass")
 
-    @qp.qjit(target="mlir")
+    @qp.qjit(target="mlir", capture=False)
     @my_pass
     @tape_only_cancel_inverses
     @qp.qnode(qp.device(backend, wires=1))

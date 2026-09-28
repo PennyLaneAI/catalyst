@@ -26,14 +26,14 @@ from catalyst.jit import _ensure_capture_mode as ensure_capture_mode
 class TestCaptureKwarg:
     """Test suite for the capture kwarg functionality."""
 
-    def test_capture_kwarg_default_is_global(self):
-        """Test that the default value of capture is 'global'."""
+    def test_capture_kwarg_default_is_true(self):
+        """Test that the default value of capture is True."""
 
         @qjit
         def f(x):
             return x * 2
 
-        assert f.compile_options.capture == "global"
+        assert f.compile_options.capture is True
 
     def test_capture_kwarg_true(self):
         """Test that capture=True is accepted."""
@@ -328,7 +328,7 @@ class TestCaptureCompileOptionsIdentity:
         assert opts_true.capture is True
         assert opts_false.capture is False
         assert opts_global.capture == "global"
-        assert opts_default.capture == "global"  # Default should be "global"
+        assert opts_default.capture is True  # Default should be True
 
     def test_different_capture_produces_different_qjit_objects(self, backend):
         """Test that different capture settings produce independent QJIT objects.

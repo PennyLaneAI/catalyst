@@ -83,7 +83,7 @@ def test_add_noise(backend):
     qnode_backend = qnode_builder(backend)
 
     expected = jax.jit(qnode_control)(0.9, 0.4, 0.5, 0.6)
-    observed = qjit(qnode_backend)(0.9, 0.4, 0.5, 0.6)
+    observed = qjit(qnode_backend, capture=False)(0.9, 0.4, 0.5, 0.6)
     assert np.allclose(expected, observed)
 
     _, expected_shape = jax.tree_util.tree_flatten(expected)
@@ -117,7 +117,7 @@ def test_batch_input(backend):
     weights = pnp.random.uniform(-pnp.pi, pnp.pi, (2,))
 
     expected = jax.jit(qnode_control)(inputs, weights)
-    observed = qjit(qnode_backend)(inputs, weights)
+    observed = qjit(qnode_backend, capture=False)(inputs, weights)
     _, expected_shape = jax.tree_util.tree_flatten(expected)
     _, observed_shape = jax.tree_util.tree_flatten(observed)
     assert np.allclose(expected, observed)
@@ -153,7 +153,7 @@ def test_batch_params(backend):
     qnode_backend = qnode_builder(backend)
 
     jax_jit = jax.jit(qnode_control)
-    compiled = qjit(qnode_backend)
+    compiled = qjit(qnode_backend, capture=False)
     expected = jax_jit(data, x, weights)
     observed = compiled(data, x, weights)
     assert np.allclose(expected, observed)
@@ -185,7 +185,7 @@ def test_batch_partial(backend):
     qnode_backend = qp.batch_partial(qnode_builder(backend), all_operations=True, y=y)
 
     jax_jit = jax.jit(qnode_control)
-    compiled = qjit(qnode_backend)
+    compiled = qjit(qnode_backend, capture=False)
     expected = jax_jit(x)
     observed = compiled(x)
     assert np.allclose(expected, observed)
@@ -222,7 +222,7 @@ def test_cancel_inverses(backend):
     qnode_backend = qnode_builder(backend)
 
     jax_jit = jax.jit(qnode_control)
-    compiled = qjit(qnode_backend)
+    compiled = qjit(qnode_backend, capture=False)
 
     x, y, z = 0.1, 0.2, 0.3
     expected = jax_jit(x, y, z)
@@ -261,7 +261,7 @@ def test_commute_controlled(backend):
     qnode_backend = qnode_builder(backend)
 
     jax_jit = jax.jit(qnode_control)
-    compiled = qjit(qnode_backend)
+    compiled = qjit(qnode_backend, capture=False)
 
     expected = jax_jit(0.5)
     observed = compiled(0.5)
@@ -291,7 +291,7 @@ def test_convert_to_numpy_parameters(backend):
     qnode_backend = qnode_builder(backend)
 
     jax_jit = jax.jit(qnode_control)
-    compiled = qjit(qnode_backend)
+    compiled = qjit(qnode_backend, capture=False)
 
     expected = jax_jit()
     observed = compiled()
@@ -321,7 +321,7 @@ def test_decompose(backend):
     qnode_backend = qnode_builder(backend)
 
     jax_jit = jax.jit(qnode_control)
-    compiled = qjit(qnode_backend)
+    compiled = qjit(qnode_backend, capture=False)
 
     expected = jax_jit()
     observed = compiled()
@@ -351,7 +351,7 @@ def test_diagonalize_measurements(backend):
     qnode_backend = qnode_builder(backend)
 
     jax_jit = jax.jit(qnode_control)
-    compiled = qjit(qnode_backend)
+    compiled = qjit(qnode_backend, capture=False)
 
     x = [np.pi / 4, np.pi / 4]
     expected = jax_jit(x)
@@ -385,7 +385,7 @@ def test_insert(backend):
     qnode_backend = qnode_builder(backend)
 
     jax_jit = jax.jit(qnode_control)
-    compiled = qjit(qnode_backend)
+    compiled = qjit(qnode_backend, capture=False)
 
     expected = jax_jit(0.9, 0.4, 0.5, 0.6)
     observed = compiled(0.9, 0.4, 0.5, 0.6)
@@ -416,7 +416,7 @@ def test_merge_amplitude_embedding(backend):
     qnode_backend = qnode_builder(backend)
 
     jax_jit = jax.jit(qnode_control)
-    compiled = qjit(qnode_backend)
+    compiled = qjit(qnode_backend, capture=False)
 
     expected = jax_jit()
     observed = compiled()
@@ -448,7 +448,7 @@ def test_remove_barrier(backend):
     qnode_backend = qnode_builder(backend)
 
     jax_jit = jax.jit(qnode_control)
-    compiled = qjit(qnode_backend)
+    compiled = qjit(qnode_backend, capture=False)
 
     expected = jax_jit()
     observed = compiled()
@@ -484,7 +484,7 @@ def test_single_qubit_fusion(backend):
     qnode_backend = qnode_builder(backend)
 
     jax_jit = jax.jit(qnode_control)
-    compiled = qjit(qnode_backend)
+    compiled = qjit(qnode_backend, capture=False)
 
     expected = jax_jit(r1, r2)
     observed = compiled(r1, r2)
@@ -525,7 +525,7 @@ def test_split_non_commuting(backend):
     qnode_control = qnode_builder("default.qubit")
     qnode_backend = qnode_builder(backend)
     expected = jax.jit(qnode_control)()
-    observed = qjit(qnode_backend)()
+    observed = qjit(qnode_backend, capture=False)()
     assert np.allclose(expected, observed)
 
     _, expected_shape = jax.tree_util.tree_flatten(expected)
@@ -556,7 +556,7 @@ def test_transpile(backend):
     qnode_backend = qnode_builder(backend)
 
     jax_jit = jax.jit(qnode_control)
-    compiled = qjit(qnode_backend)
+    compiled = qjit(qnode_backend, capture=False)
 
     expected = jax_jit()
     observed = compiled()
@@ -589,7 +589,7 @@ def test_undo_swaps(backend):
     qnode_backend = qnode_builder(backend)
 
     jax_jit = jax.jit(qnode_control)
-    compiled = qjit(qnode_backend)
+    compiled = qjit(qnode_backend, capture=False)
 
     expected = jax_jit()
     observed = compiled()
@@ -628,7 +628,7 @@ class TestMitigate:
         qnode_backend = qnode_builder(backend)
         x = np.arange(6)
 
-        compiled = qjit(qnode_backend)
+        compiled = qjit(qnode_backend, capture=False)
         observed = compiled(x)
         expected = qnode_control(x)
         assert np.allclose(expected, observed)
@@ -670,7 +670,7 @@ class TestMitigate:
         qnode_control = qnode_builder("default.qubit")
         qnode_backend = qnode_builder(backend)
 
-        compiled = qjit(qnode_backend)
+        compiled = qjit(qnode_backend, capture=False)
         observed = compiled(w1, w2)
         expected = qnode_control(w1, w2)
         assert np.allclose(expected, observed)
@@ -717,7 +717,7 @@ class TestQuantumMonteCarlo:
         qnode_backend = qnode_builder(backend)
 
         jax_jit = jax.jit(qnode_control)
-        compiled = qjit(qnode_backend)
+        compiled = qjit(qnode_backend, capture=False)
 
         expected = jax_jit()
         observed = compiled()
@@ -756,7 +756,7 @@ class TestQuantumMonteCarlo:
         qnode_backend = qnode_builder(backend)
 
         jax_jit = jax.jit(qnode_control)
-        compiled = qjit(qnode_backend)
+        compiled = qjit(qnode_backend, capture=False)
 
         expected = jax_jit()
         observed = compiled()
@@ -838,7 +838,7 @@ class TestBroadcastExpand:
         qnode_backend = qnode_builder(backend)
 
         expected = jax.jit(qnode_control)(*params, obs)
-        observed = qjit(qnode_backend)(*params, obs)
+        observed = qjit(qnode_backend, capture=False)(*params, obs)
 
         assert np.allclose(expected, observed)
         _, expected_shape = jax.tree_util.tree_flatten(expected)
@@ -887,7 +887,7 @@ class TestBroadcastExpand:
         qnode_backend = qnode_builder(backend)
 
         expected = jax.jit(qnode_control)(*params, obs)
-        observed = qjit(qnode_backend)(*params, obs)
+        observed = qjit(qnode_backend, capture=False)(*params, obs)
 
         assert np.allclose(expected, observed)
         _, expected_shape = jax.tree_util.tree_flatten(expected)
@@ -927,7 +927,9 @@ class TestCutCircuitMCTransform:
 
         x = jnp.array(0.531)
         cut_circuit_jit = jax.jit(qcut.cut_circuit(qnode_default, use_opt_einsum=False))
-        cut_circuit_qjit = qjit(qcut.cut_circuit(qnode_backend, use_opt_einsum=False))
+        cut_circuit_qjit = qjit(
+            qcut.cut_circuit(qnode_backend, use_opt_einsum=False), capture=False
+        )
 
         expected = cut_circuit_jit(x)
         observed = cut_circuit_qjit(x)
@@ -972,7 +974,7 @@ class TestSplitNonCommuting:
         qnode_backend = qnode_builder(backend)
         qnode_control = qnode_builder("default.qubit")
         expected = jax.jit(qnode_control)()
-        observed = qjit(qnode_backend)()
+        observed = qjit(qnode_backend, capture=False)()
 
         assert np.allclose(expected, observed)
         _, expected_shape = jax.tree_util.tree_flatten(expected)
@@ -999,7 +1001,7 @@ class TestSplitNonCommuting:
         qnode_backend = qnode_builder(backend)
         qnode_control = qnode_builder("default.qubit")
         expected = jax.jit(qnode_control)()
-        observed = qjit(qnode_backend)()
+        observed = qjit(qnode_backend, capture=False)()
         assert np.allclose(expected, observed)
         _, expected_shape = jax.tree_util.tree_flatten(expected)
         _, observed_shape = jax.tree_util.tree_flatten(observed)
@@ -1030,7 +1032,7 @@ class TestQFuncTransforms:
         qnode_backend = qnode_builder(backend)
         qnode_control = qnode_builder("default.qubit")
         expected = jax.jit(qnode_control)(theta_1, theta_2)
-        compiled_function = qjit(qnode_backend)
+        compiled_function = qjit(qnode_backend, capture=False)
         observed = compiled_function(theta_1, theta_2)
         assert np.allclose(expected, observed)
         _, expected_shape = jax.tree_util.tree_flatten(expected)
@@ -1082,7 +1084,7 @@ class TestQFuncTransforms:
         qnode_backend = qnode_builder(backend)
         qnode_control = qnode_builder("default.qubit")
         expected = jax.jit(qnode_control)()
-        compiled = qjit(qnode_backend)
+        compiled = qjit(qnode_backend, capture=False)
         observed = compiled()
         assert np.allclose(expected, observed)
         _, expected_shape = jax.tree_util.tree_flatten(expected)
@@ -1120,7 +1122,7 @@ class TestTransformValidity:
             measurements = [measure(i) for i in range(2)]
             return measurements, qp.expval(qp.PauliZ(0))
 
-        compiled_qfunc = qjit(qfunc)
+        compiled_qfunc = qjit(qfunc, capture=False)
 
         with pytest.raises(
             CompileError,
@@ -1147,7 +1149,7 @@ class TestTransformValidity:
 
         dev = qp.device(backend, wires=2)
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(dev)
         def qfunc():
             qp.X(0)
@@ -1180,7 +1182,7 @@ class TestTransformValidity:
             qp.PauliX(2)
             return [1, qp.expval(H4)]
 
-        compiled_qfunc = qjit(qfunc)
+        compiled_qfunc = qjit(qfunc, capture=False)
 
         with pytest.raises(
             CompileError,
@@ -1217,7 +1219,7 @@ class TestTransformValidity:
 
             return qfunc
 
-        compiled_qfunc = qjit(qnode_builder(backend))
+        compiled_qfunc = qjit(qnode_builder(backend), capture=False)
 
         with pytest.raises(
             CompileError,
@@ -1246,7 +1248,7 @@ class TestTransformValidity:
             return qfunc
 
         qnode_backend = qnode_builder(backend)
-        compiled_function = qjit(qnode_backend)
+        compiled_function = qjit(qnode_backend, capture=False)
         compiled_function(theta_1, theta_2)
 
         # Here we are asserting that there is only one RZ operation
@@ -1265,7 +1267,7 @@ class TestTransformValidity:
         def f():
             return qp.state()
 
-        compiled_f = qjit(f)
+        compiled_f = qjit(f, capture=False)
 
         with pytest.raises(CompileError, match="Catalyst does not support informative transforms."):
             compiled_f()
@@ -1294,7 +1296,7 @@ def test_clifford_t_decomposition(backend):
     qnode_backend = qnode_builder(backend)
 
     jax_jit = jax.jit(qnode_control)
-    compiled = qjit(qnode_backend)
+    compiled = qjit(qnode_backend, capture=False)
 
     expected = jax_jit(x, y)
     observed = compiled(x, y)
@@ -1330,7 +1332,7 @@ def test_commutation_dag(backend):
     qnode_backend = qnode_builder(backend)
 
     jax_jit = jax.jit(qnode_control)
-    compiled = qjit(qnode_backend)
+    compiled = qjit(qnode_backend, capture=False)
 
     expected = jax_jit(np.pi / 4, np.pi / 3, np.pi / 2)
     observed = compiled(np.pi / 4, np.pi / 3, np.pi / 2)
@@ -1364,7 +1366,7 @@ def test_defer_measurements(backend):
     qnode_backend = qnode_builder(backend)
 
     jax_jit = jax.jit(qnode_control)
-    compiled = qjit(qnode_backend)
+    compiled = qjit(qnode_backend, capture=False)
 
     expected = jax_jit()
     observed = compiled()
@@ -1398,7 +1400,7 @@ def test_dynamic_one_shot(backend):
     qnode_backend = qnode_builder(backend)
 
     jax_jit = jax.jit(qnode_control)
-    compiled = qjit(qnode_backend)
+    compiled = qjit(qnode_backend, capture=False)
 
     x = np.pi / 4
     y = np.pi / 4
@@ -1439,7 +1441,7 @@ def test_pattern_matching_optimization(backend):
     qnode_backend = qnode_builder(backend)
 
     jax_jit = jax.jit(qnode_control)
-    compiled = qjit(qnode_backend)
+    compiled = qjit(qnode_backend, capture=False)
 
     expected = jax_jit()
     observed = compiled()
@@ -1475,7 +1477,7 @@ def test_sign_expand(backend):
     qnode_backend = qnode_builder(backend)
 
     jax_jit = jax.jit(qnode_control)
-    compiled = qjit(qnode_backend)
+    compiled = qjit(qnode_backend, capture=False)
 
     expected = jax_jit()
     observed = compiled()
@@ -1508,7 +1510,7 @@ def test_split_to_single_terms(backend):
     qnode_backend = qnode_builder(backend)
 
     jax_jit = jax.jit(qnode_control)
-    compiled = qjit(qnode_backend)
+    compiled = qjit(qnode_backend, capture=False)
 
     x = [np.pi / 4, np.pi / 4]
     expected = jax_jit(x)
@@ -1546,7 +1548,7 @@ def test_to_zx(backend):
     qnode_backend = qnode_builder(backend)
 
     jax_jit = jax.jit(qnode_control)
-    compiled = qjit(qnode_backend)
+    compiled = qjit(qnode_backend, capture=False)
 
     params = [5 / 4 * np.pi, 3 / 4 * np.pi, 0.1, 0.3]
     expected = jax_jit(params)
@@ -1582,7 +1584,7 @@ def test_unitary_to_rot(backend):
 
     params = [0.2, 0.3]
 
-    compiled = qjit(qnode_backend)
+    compiled = qjit(qnode_backend, capture=False)
     observed = compiled(params)
     expected = qnode_control(params)
     assert np.allclose(expected, observed)

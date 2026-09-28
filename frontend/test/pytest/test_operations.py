@@ -92,7 +92,7 @@ def test_no_parameters(backend):
 
         return qp.state()
 
-    qjit_fn = qjit(qp.qnode(qp.device(backend, wires=4))(circuit))
+    qjit_fn = qjit(qp.qnode(qp.device(backend, wires=4))(circuit), capture=False)
     qp_fn = qp.qnode(qp.device("default.qubit", wires=4))(circuit)
 
     assert np.allclose(qjit_fn(), qp_fn())
@@ -155,7 +155,7 @@ def test_param(backend):
 
         return qp.state()
 
-    qjit_fn = qjit(qp.qnode(qp.device(backend, wires=4))(circuit))
+    qjit_fn = qjit(qp.qnode(qp.device(backend, wires=4))(circuit), capture=False)
     qp_fn = qp.qnode(qp.device("default.qubit", wires=4))(circuit)
 
     assert np.allclose(qjit_fn(3.14, 0.6), qp_fn(3.14, 0.6))
@@ -208,7 +208,7 @@ def test_hybrid_op_repr(backend):
                 assert not has_nested_tapes(op)
         return qp.state()
 
-    qjit(qp.qnode(qp.device(backend, wires=4))(circuit))(1)
+    qjit(qp.qnode(qp.device(backend, wires=4))(circuit), capture=False)(1)
 
 
 @pytest.mark.parametrize("inp", [(1.0), (2.0), (3.0), (4.0)])
@@ -221,7 +221,7 @@ def test_qubitunitary_complex(inp, backend):
         qp.QubitUnitary(U1, wires=0)
         return qp.expval(qp.PauliY(0))
 
-    @qjit
+    @qjit(capture=False)
     def compiled(x: float):
         g = qp.qnode(qp.device(backend, wires=1))(f)
         return g(x)
@@ -239,7 +239,7 @@ def test_multicontrolledx_via_paulix():
 
     dev = qp.device("lightning.qubit", wires=4)
 
-    @qjit
+    @qjit(capture=False)
     @qp.qnode(dev)
     def circuit():
         qp.Hadamard(0)
@@ -267,7 +267,7 @@ def test_to_matrix_ops():
         qp.Rot(x, y, z, wires=[0])
         return qp.state()
 
-    circuit = qjit(qp.qnode(dev)(qfunc))
+    circuit = qjit(qp.qnode(dev)(qfunc), capture=False)
 
     with pytest.raises(
         CompileError, match="The device that specifies to_matrix_ops must support QubitUnitary"
@@ -282,7 +282,7 @@ def test_to_matrix_ops():
         num_wires=1, discards=("QubitUnitary", "Rot"), additions=set(), to_matrix_ops=None
     )
 
-    circuit = qjit(qp.qnode(dev)(qfunc))
+    circuit = qjit(qp.qnode(dev)(qfunc), capture=False)
     circuit(0.3, 0.4, 0.5)  # should compile successfully
 
 

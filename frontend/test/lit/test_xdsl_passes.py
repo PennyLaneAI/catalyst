@@ -27,7 +27,7 @@ from catalyst.python_interface.transforms import merge_rotations_pass
 def test_mlir_pass_no_attribute():
     """Test that MLIR-only passes do NOT set uses_xdsl_passes and xdsl_pass attributes"""
 
-    @qp.qjit(target="mlir")
+    @qp.qjit(target="mlir", capture=False)
     @qp.transforms.cancel_inverses
     @qp.qnode(qp.device("lightning.qubit", wires=1))
     def circuit_with_mlir_pass():

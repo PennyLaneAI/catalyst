@@ -25,7 +25,7 @@ from catalyst import grad, qjit
 def test_add_multiply():
     """Test to index a jax array and have operations on it."""
 
-    @qjit
+    @qjit(capture=False)
     def add_multiply(l: jax.core.ShapedArray((3,), dtype=float), idx: int):
         res = l.at[idx].multiply(3)
         res2 = l.at[idx].add(2)
@@ -38,7 +38,7 @@ def test_add_multiply():
 def test_multiple_index():
     """Test to index a jax array and have operations on it."""
 
-    @qjit
+    @qjit(capture=False)
     def multiple_index_multiply(l: jax.core.ShapedArray((3,), dtype=float)):
         res = l.at[1:3].multiply(3)
         return res
@@ -50,7 +50,7 @@ def test_multiple_index():
 def test_matrix():
     """Test to index a jax array and have operations on it."""
 
-    @qjit
+    @qjit(capture=False)
     def multiple_index_multiply(l: jax.core.ShapedArray((3, 3), dtype=float)):
         res = l.at[1:3].multiply(jnp.array(3))
         return res
@@ -68,7 +68,7 @@ def test_matrix_list_index_right():
         A = A.at[[0, 1], :].set(jnp.ones([2, 3]), indices_are_sorted=True, unique_indices=True)
         return A
 
-    res = qjit(matrix_list_index)(A)
+    res = qjit(matrix_list_index, capture=False)(A)
     assert np.allclose(res, jnp.array([[1, 1, 1], [1, 1, 1], [2, 2, 2]]))
 
 
@@ -81,7 +81,7 @@ def test_matrix_list_index_left():
         A = A.at[:, [0, 1]].set(jnp.ones([3, 2]), indices_are_sorted=True, unique_indices=True)
         return A
 
-    res = qjit(matrix_list_index)(A)
+    res = qjit(matrix_list_index, capture=False)(A)
     assert np.allclose(res, jnp.array([[1, 1, 2], [1, 1, 2], [1, 1, 2]]))
 
 
@@ -94,7 +94,7 @@ def test_gather_derivative():
     x = jax.numpy.array([0.1, 0.2, 0.3, 0.4])
 
     expected = jax.grad(f)(x)
-    results = qjit(grad(f))(x)
+    results = qjit(grad(f), capture=False)(x)
     assert np.allclose(expected, results)
 
 

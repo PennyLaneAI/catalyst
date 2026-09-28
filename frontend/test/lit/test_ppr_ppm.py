@@ -41,7 +41,7 @@ def test_convert_clifford_to_ppr():
 
     pipe = [("pipe", ["quantum-compilation-stage"])]
 
-    @qjit(pipelines=pipe, target="mlir")
+    @qjit(pipelines=pipe, target="mlir", capture=False)
     @to_ppr
     @qp.qnode(qp.device("null.qubit", wires=2))
     def circuit():
@@ -69,7 +69,7 @@ def test_commute_ppr():
     pipe = [("pipe", ["quantum-compilation-stage"])]
 
     # CHECK-LABEL: public @cir_commute_ppr
-    @qjit(pipelines=pipe, target="mlir")
+    @qjit(pipelines=pipe, target="mlir", capture=False)
     @commute_ppr
     @to_ppr
     @qp.qnode(qp.device("null.qubit", wires=2))
@@ -104,7 +104,7 @@ def test_commute_ppr_max_pauli_size():
 
     pipe = [("pipe", ["quantum-compilation-stage"])]
 
-    @qjit(pipelines=pipe, target="mlir")
+    @qjit(pipelines=pipe, target="mlir", capture=False)
     @commute_ppr(max_pauli_size=2)
     @to_ppr
     @qp.qnode(qp.device("null.qubit", wires=2))
@@ -135,7 +135,7 @@ def test_merge_ppr_ppm():
 
     pipe = [("pipe", ["quantum-compilation-stage"])]
 
-    @qjit(pipelines=pipe, target="mlir")
+    @qjit(pipelines=pipe, target="mlir", capture=False)
     @merge_ppr_ppm
     @to_ppr
     @qp.qnode(qp.device("null.qubit", wires=2))
@@ -163,7 +163,7 @@ def test_merge_ppr_ppm_max_pauli_size():
 
     pipe = [("pipe", ["quantum-compilation-stage"])]
 
-    @qjit(pipelines=pipe, target="mlir")
+    @qjit(pipelines=pipe, target="mlir", capture=False)
     @merge_ppr_ppm(max_pauli_size=1)
     @to_ppr
     @qp.qnode(qp.device("null.qubit", wires=2))
@@ -193,7 +193,7 @@ def test_ppr_to_ppm():
 
     device = qp.device("null.qubit", wires=2)
 
-    @qjit(pipelines=pipe, target="mlir")
+    @qjit(pipelines=pipe, target="mlir", capture=False)
     def circuit_ppr_to_ppm():
 
         # CHECK-LABEL: public @cir_default_0
@@ -310,7 +310,7 @@ def test_clifford_to_ppm():
 
     pipe = [("pipe", ["quantum-compilation-stage"])]
 
-    @qjit(pipelines=pipe, target="mlir")
+    @qjit(pipelines=pipe, target="mlir", capture=False)
     def test_clifford_to_ppm_workflow():
 
         # CHECK-LABEL: public @cir_clifford_to_ppm
@@ -364,7 +364,7 @@ def test_reduce_t_depth():
     pipe = [("pipe", ["quantum-compilation-stage"])]
 
     # CHECK-LABEL: public @test_reduce_t_depth_workflow
-    @qjit(pipelines=pipe, target="mlir")
+    @qjit(pipelines=pipe, target="mlir", capture=False)
     @reduce_t_depth
     @merge_ppr_ppm
     @commute_ppr
@@ -402,7 +402,7 @@ def test_ppr_to_mbqc():
     pipe = [("pipe", ["quantum-compilation-stage"])]
 
     # CHECK-LABEL: public @test_ppr_to_mbqc_workflow
-    @qjit(pipelines=pipe, target="mlir")
+    @qjit(pipelines=pipe, target="mlir", capture=False)
     @ppr_to_mbqc
     @to_ppr
     @qp.qnode(qp.device("null.qubit", wires=2))

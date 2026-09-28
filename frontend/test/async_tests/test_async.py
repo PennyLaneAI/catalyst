@@ -57,9 +57,9 @@ def test_qnode_execution(backend):
         return circuit3(new_params)
 
     params = jnp.array([1.0, 2.0])
-    compiled = qjit(async_qnodes=True)(multiple_qnodes)
+    compiled = qjit(async_qnodes=True, capture=False)(multiple_qnodes)
     observed = compiled(params)
-    expected = qjit(multiple_qnodes)(params)
+    expected = qjit(multiple_qnodes, capture=False)(params)
     assert "async_execute_fn" in compiled.llvmir
     assert np.allclose(expected, observed)
 
@@ -75,7 +75,7 @@ def test_gradient(inp, diff_methods, backend):
         qp.RX(x * 2, wires=0)
         return qp.expval(qp.PauliY(0))
 
-    @qjit(async_qnodes=True)
+    @qjit(async_qnodes=True, capture=False)
     def compiled(x: float):
         g = qp.qnode(qp.device(backend, wires=1), diff_method=diff_methods[0])(f)
         h = grad(g, method=diff_methods[1])
@@ -99,7 +99,7 @@ def test_exception(backend):
         qp.CNOT(wires=[x, 0])
         return qp.probs()
 
-    @qjit(async_qnodes=True)
+    @qjit(async_qnodes=True, capture=False)
     def wrapper():
         return circuit(0)
 
@@ -117,7 +117,7 @@ def test_exception2(backend):
         qp.CNOT(wires=[x, 0])
         return qp.probs()
 
-    @qjit(async_qnodes=True)
+    @qjit(async_qnodes=True, capture=False)
     def wrapper():
         return circuit(0) + circuit(0)
 
@@ -135,7 +135,7 @@ def test_exception3(backend):
         qp.CNOT(wires=[x, 0])
         return qp.probs()
 
-    @qjit(async_qnodes=True)
+    @qjit(async_qnodes=True, capture=False)
     def wrapper():
         circuit(0) + circuit(0)
         return None
@@ -160,7 +160,7 @@ def test_exception4(backend):
         qp.CNOT(wires=[x, 0])
         return qp.probs()
 
-    @qjit(async_qnodes=True)
+    @qjit(async_qnodes=True, capture=False)
     def wrapper():
         circuit(0) + circuit2(0)
         return None
@@ -188,7 +188,7 @@ def test_exception_adjoint(backend):
         adjoint(bad_cnot)(x)
         return qp.probs()
 
-    @qjit(async_qnodes=True)
+    @qjit(async_qnodes=True, capture=False)
     def wrapper():
         circuit(0) + circuit2(0)
         return None
@@ -205,7 +205,7 @@ def test_exception_conditional(backend):
         qp.CNOT(wires=[x, 0])
         return qp.probs()
 
-    @qjit(async_qnodes=True)
+    @qjit(async_qnodes=True, capture=False)
     def wrapper(x: int):
         @cond(x == 1)
         def cond_fn():
@@ -231,7 +231,7 @@ def test_exception_conditional_1(backend):
         qp.CNOT(wires=[x, 0])
         return qp.probs()
 
-    @qjit(async_qnodes=True)
+    @qjit(async_qnodes=True, capture=False)
     def wrapper(x: int):
         y = circuit(1)
 
@@ -259,7 +259,7 @@ def test_exception_conditional_2(backend):
         qp.CNOT(wires=[x, 0])
         return qp.probs()
 
-    @qjit(async_qnodes=True)
+    @qjit(async_qnodes=True, capture=False)
     def wrapper(x: int):
         y = circuit(0)
 
@@ -317,7 +317,7 @@ def test_qnode_exception_dependency(order, backend):
     params = jnp.array([1.0, 2.0])
     msg = "Unrecoverable error"
     with pytest.raises(RuntimeError, match=msg):
-        qjit(async_qnodes=True)(multiple_qnodes)(params)
+        qjit(async_qnodes=True, capture=False)(multiple_qnodes)(params)
 
 
 # TODO: add the following diff_methods once issue #419 is fixed:
@@ -332,7 +332,7 @@ def test_gradient_exception(inp, diff_methods, backend):
         qp.CNOT(wires=[0, y])
         return qp.expval(qp.PauliY(0))
 
-    @qjit(async_qnodes=True)
+    @qjit(async_qnodes=True, capture=False)
     def compiled(x: float):
         g = qp.qnode(qp.device(backend, wires=1), diff_method=diff_methods[0])(f)
         h = grad(g, method=diff_methods[1], argnums=[0])
@@ -346,7 +346,7 @@ def test_gradient_exception(inp, diff_methods, backend):
 def test_exception_in_loop(backend):
     "Test exception happening in a loop."
 
-    @qjit(async_qnodes=True)
+    @qjit(async_qnodes=True, capture=False)
     @qp.qnode(qp.device(backend, wires=3))
     def circuit(n):
         @while_loop(lambda v: v[0] < v[1])
@@ -372,7 +372,7 @@ def test_exception_in_loop(backend):
 def test_exception_in_for_loop(backend):
     "Test exception happening in a loop."
 
-    @qjit(async_qnodes=True)
+    @qjit(async_qnodes=True, capture=False)
     @qp.qnode(qp.device(backend, wires=1))
     def circuit(n):
         @for_loop(0, 1, n)
@@ -404,7 +404,7 @@ def test_exception_in_loop2(backend):
     def good():
         return qp.state()
 
-    @qjit(async_qnodes=True)
+    @qjit(async_qnodes=True, capture=False)
     def wrapper(n):
         x = good()
         y = bad(n)

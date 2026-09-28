@@ -88,7 +88,7 @@ def test_split_to_single_terms_with_tensor_product():
     """
     dev = qp.device("lightning.qubit", wires=3)
 
-    @qjit
+    @qjit(capture=False)
     @qp.transform(pass_name="split-to-single-terms")
     @qp.qnode(dev)
     def circ1():
@@ -97,7 +97,7 @@ def test_split_to_single_terms_with_tensor_product():
         qp.Rot(0.8, 0.7, 0.6, wires=2)
         return qp.expval(2 * (qp.Z(0) @ qp.X(1)) + 3 * qp.Y(2)), qp.expval(qp.Z(1))
 
-    @qjit
+    @qjit(capture=False)
     @qp.qnode(dev)
     def circ2():
         qp.Rot(0.4, 0.3, 0.2, wires=0)

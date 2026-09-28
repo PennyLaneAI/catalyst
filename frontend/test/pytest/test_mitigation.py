@@ -55,7 +55,7 @@ def test_single_measurement(params, extrapolation, folding, scale_factors):
         qp.Hadamard(wires=1)
         return qp.expval(qp.PauliY(wires=0))
 
-    @catalyst.qjit
+    @catalyst.qjit(capture=False)
     def mitigated_qnode(args):
         return catalyst.mitigate_with_zne(
             circuit,
@@ -85,7 +85,7 @@ def test_multiple_measurements(params, extrapolation, folding):
         qp.Hadamard(wires=1)
         return qp.expval(qp.PauliY(wires=0)), qp.expval(qp.PauliY(wires=1))
 
-    @catalyst.qjit
+    @catalyst.qjit(capture=False)
     def mitigated_qnode(args):
         return catalyst.mitigate_with_zne(
             circuit,
@@ -125,13 +125,13 @@ def test_single_measurement_control_flow(params, folding):
         loop_1()
         return qp.expval(qp.PauliY(wires=0))
 
-    @catalyst.qjit
+    @catalyst.qjit(capture=False)
     def mitigated_qnode(args, n):
         return catalyst.mitigate_with_zne(circuit, scale_factors=[1, 3, 5, 7], folding=folding)(
             args, n
         )
 
-    assert np.allclose(mitigated_qnode(params, 3), catalyst.qjit(circuit)(params, 3))
+    assert np.allclose(mitigated_qnode(params, 3), catalyst.qjit(circuit, capture=False)(params, 3))
 
 
 @pytest.mark.parametrize("scale_factors", [[-1, 3, 5, 7], [1, 2, 5, 7]])
@@ -141,7 +141,7 @@ def test_scale_factors_value_error(scale_factors):
     def circuit(x):
         return jax.numpy.sin(x)
 
-    @catalyst.qjit
+    @catalyst.qjit(capture=False)
     def mitigated_function(args):
         return catalyst.mitigate_with_zne(circuit, scale_factors=scale_factors)(args)
 
@@ -183,7 +183,7 @@ def test_dtype_error(extrapolation):
         qp.Hadamard(wires=1)
         return qp.expval(qp.PauliY(wires=0)), 1
 
-    @catalyst.qjit
+    @catalyst.qjit(capture=False)
     def mitigated_qnode(args):
         return catalyst.mitigate_with_zne(
             circuit, scale_factors=[1, 3, 5, 7], extrapolate=extrapolation
@@ -209,7 +209,7 @@ def test_dtype_not_float_error(extrapolation):
         qp.Hadamard(wires=1)
         return 1
 
-    @catalyst.qjit
+    @catalyst.qjit(capture=False)
     def mitigated_qnode(args):
         return catalyst.mitigate_with_zne(
             circuit, scale_factors=[1, 3, 5, 7], extrapolate=extrapolation
@@ -235,7 +235,7 @@ def test_shape_error(extrapolation):
         qp.Hadamard(wires=1)
         return qp.probs(wires=0)
 
-    @catalyst.qjit
+    @catalyst.qjit(capture=False)
     def mitigated_qnode(args):
         return catalyst.mitigate_with_zne(
             circuit, scale_factors=[1, 3, 5, 7], extrapolate=extrapolation
@@ -260,7 +260,7 @@ def test_folding_type_not_supported():
             circuit, scale_factors=[], folding="bad-folding-type-value"
         )()
 
-    qjitted = catalyst.qjit(mitigated_qnode)
+    qjitted = catalyst.qjit(mitigated_qnode, capture=False)
 
     with pytest.raises(ValueError, match="Folding type must be"):
         qjitted()
@@ -283,7 +283,7 @@ def test_local_random_folding_runs():
         qp.Hadamard(wires=1)
         return qp.expval(qp.PauliY(wires=0))
 
-    @catalyst.qjit(seed=42)
+    @catalyst.qjit(seed=42, capture=False)
     def mitigated_qnode():
         return catalyst.mitigate_with_zne(
             circuit, scale_factors=[1, 3, 5], folding="local-random"
@@ -311,7 +311,7 @@ def test_local_random_fractional_scale_factors_run(scale_factors):
         qp.Hadamard(wires=1)
         return qp.expval(qp.PauliY(wires=0))
 
-    @catalyst.qjit(seed=42)
+    @catalyst.qjit(seed=42, capture=False)
     def mitigated_qnode():
         return catalyst.mitigate_with_zne(
             circuit, scale_factors=scale_factors, folding="local-random"
@@ -380,13 +380,13 @@ def test_zne_usage_patterns(params, extrapolation, folding):
         qp.Hadamard(wires=1)
         return qp.expval(qp.PauliY(wires=0))
 
-    @catalyst.qjit
+    @catalyst.qjit(capture=False)
     def mitigated_qnode_fn_as_argument(args):
         return catalyst.mitigate_with_zne(
             fn, scale_factors=[1, 3, 5, 7], extrapolate=extrapolation, folding=folding
         )(args)
 
-    @catalyst.qjit
+    @catalyst.qjit(capture=False)
     def mitigated_qnode_partial(args):
         return catalyst.mitigate_with_zne(
             scale_factors=[1, 3, 5, 7], extrapolate=extrapolation, folding=folding
@@ -412,7 +412,7 @@ def test_zne_with_jax_polyfit():
     def jax_extrapolation(scale_factors, results):
         return jax.numpy.polyfit(scale_factors, results, 2)[-1]
 
-    @catalyst.qjit
+    @catalyst.qjit(capture=False)
     def mitigated_qnode():
         return catalyst.mitigate_with_zne(
             circuit, scale_factors=[1, 3, 5, 7], extrapolate=jax_extrapolation
@@ -434,7 +434,7 @@ def test_zne_with_extrap_kwargs():
         qp.Hadamard(wires=1)
         return qp.expval(qp.PauliY(wires=0))
 
-    @catalyst.qjit
+    @catalyst.qjit(capture=False)
     def mitigated_qnode():
         return catalyst.mitigate_with_zne(
             circuit,
@@ -459,7 +459,7 @@ def test_exponential_extrapolation_with_kwargs():
         qp.Hadamard(wires=1)
         return qp.expval(qp.PauliY(wires=0))
 
-    @catalyst.qjit
+    @catalyst.qjit(capture=False)
     def mitigated_qnode():
         return catalyst.mitigate_with_zne(
             circuit,
@@ -486,7 +486,7 @@ def test_jaxpr_with_const():
         qp.Hadamard(wires=1)
         return qp.expval(qp.PauliY(wires=0))
 
-    @catalyst.qjit
+    @catalyst.qjit(capture=False)
     def mitigated_qnode():
         return catalyst.mitigate_with_zne(
             circuit,
@@ -506,13 +506,13 @@ def test_mcm_method_with_zne(backend):
 
     s = [1, 3]
 
-    @catalyst.qjit
+    @catalyst.qjit(capture=False)
     def mitigated_circuit_1():
         s = [1, 3]
         g = qp.set_shots(qp.QNode(circuit, dev, mcm_method="one-shot"), shots=5)
         return catalyst.mitigate_with_zne(g, scale_factors=s)()
 
-    @catalyst.qjit
+    @catalyst.qjit(capture=False)
     def mitigated_circuit_2():
         g = qp.set_shots(qp.QNode(circuit, dev), shots=5)
         return catalyst.mitigate_with_zne(g, scale_factors=s)()
@@ -551,7 +551,7 @@ def test_on_classical_function_with_qnodes(params, extrapolation, folding, scale
         qp.Hadamard(wires=1)
         return qp.expval(qp.PauliY(wires=0))
 
-    @catalyst.qjit
+    @catalyst.qjit(capture=False)
     @partial(
         catalyst.mitigate_with_zne,
         scale_factors=scale_factors,
@@ -595,7 +595,7 @@ def test_multiple_qnodes_sinked(params, extrapolation, folding, scale_factors):
         qp.Hadamard(wires=1)
         return qp.expval(qp.PauliY(wires=0))
 
-    @catalyst.qjit
+    @catalyst.qjit(capture=False)
     @partial(
         catalyst.mitigate_with_zne,
         scale_factors=scale_factors,

@@ -112,7 +112,7 @@ class Test2QubitStatePrep:
 
     dev = qp.device("lightning.qubit", wires=2)
 
-    @qjit
+    @qjit(capture=False)
     @qp.qnode(dev)
     @staticmethod
     def circuit_01(input_state):
@@ -128,7 +128,7 @@ class Test2QubitStatePrep:
 
         return qp.state()
 
-    @qjit
+    @qjit(capture=False)
     @qp.qnode(dev)
     @staticmethod
     def circuit_10(input_state):
@@ -187,7 +187,7 @@ class TestTrotterProduct:
             )
             return qp.probs(wires=[2])
 
-        assert np.allclose(circ(), qjit(circ)())
+        assert np.allclose(circ(), qjit(circ, capture=False)())
 
     def test_basis_state_trotter(self, backend):
         """
@@ -205,7 +205,7 @@ class TestTrotterProduct:
             )
             return qp.probs(wires=[2])
 
-        assert np.allclose(circ(), qjit(circ)())
+        assert np.allclose(circ(), qjit(circ, capture=False)())
 
 
 if __name__ == "__main__":

@@ -33,8 +33,8 @@ def circuit_np():
 def test_variable_wires(backend):
     """Test variable wires."""
 
-    jitted_fn_jnp = qjit(qp.qnode(qp.device(backend, wires=1))(circuit_jnp))
-    jitted_fn_np = qjit(qp.qnode(qp.device(backend, wires=1))(circuit_np))
+    jitted_fn_jnp = qjit(qp.qnode(qp.device(backend, wires=1))(circuit_jnp), capture=False)
+    jitted_fn_np = qjit(qp.qnode(qp.device(backend, wires=1))(circuit_np), capture=False)
     assert np.isclose(jitted_fn_jnp(), jitted_fn_np())
 
 

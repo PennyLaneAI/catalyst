@@ -25,7 +25,7 @@ def i(x):
 
 
 # CHECK-LABEL: module @one_callback_cached
-@qjit
+@qjit(capture=False)
 # CHECK-NOT: catalyst.callback @callback
 # CHECK-LABEL: func.func public @jit_one_callback_cached
 def one_callback_cached(x: float):
@@ -49,7 +49,7 @@ def always_return_float(x) -> float:
 
 
 # CHECK-LABEL: module @test2
-@qjit
+@qjit(capture=False)
 # CHECK-NOT: catalyst.callback @callback
 # CHECK-LABEL: func.func public @jit_test2
 def test2():
@@ -71,7 +71,7 @@ def custom_name(x) -> float:
     return x
 
 
-@qjit
+@qjit(capture=False)
 def test3(x: float) -> float:
     """Tests that custom_name will be in the IR"""
     return custom_name(x)

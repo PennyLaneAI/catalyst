@@ -78,7 +78,7 @@ def test_decomposition_lowering():
     Basic pipeline lowering on one qnode.
     """
 
-    @qjit(keep_intermediate=True)
+    @qjit(keep_intermediate=True, capture=False)
     @catalyst.passes.ions_decomposition
     @qp.qnode(CustomDevice(2))
     def test_decomposition_lowering_workflow(x):

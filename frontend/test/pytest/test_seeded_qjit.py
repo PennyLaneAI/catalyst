@@ -24,7 +24,7 @@ def test_seeded_async():
     """Test that seeding and async cannot be simultaneously used"""
     with pytest.raises(CompileError, match="Seeding has no effect on asynchronous QNodes"):
 
-        @qjit(async_qnodes=True, seed=37)
+        @qjit(async_qnodes=True, seed=37, capture=False)
         def _():
             return
 
@@ -36,7 +36,7 @@ def test_seed_out_of_range(seed):
     """Test that a seed that is not a unsigned 32-bit int raises an error"""
     with pytest.raises(ValueError, match="Seed must be an unsigned 32-bit integer!"):
 
-        @qjit(seed=seed)
+        @qjit(seed=seed, capture=False)
         def _():
             return
 
@@ -56,7 +56,7 @@ def test_seeded_measurement(seed, backend):
 
     dev = qp.device(backend, wires=1)
 
-    @qjit(seed=seed)
+    @qjit(seed=seed, capture=False)
     def workflow():
         @qp.qnode(dev)
         def circuit():
@@ -72,7 +72,7 @@ def test_seeded_measurement(seed, backend):
 
         return circuit(), circuit(), circuit(), circuit()
 
-    @qjit(seed=seed)
+    @qjit(seed=seed, capture=False)
     def workflow1():
         @qp.qnode(dev)
         def circuit():
@@ -117,7 +117,7 @@ def test_seeded_sample(seed, shots, readout, backend):
 
     dev = qp.device(backend, wires=2)
 
-    @qjit(seed=seed)
+    @qjit(seed=seed, capture=False)
     def workflow():
         @qp.set_shots(shots)
         @qp.qnode(dev)
@@ -128,7 +128,7 @@ def test_seeded_sample(seed, shots, readout, backend):
 
         return circuit(), circuit(), circuit(), circuit()
 
-    @qjit(seed=seed)
+    @qjit(seed=seed, capture=False)
     def workflow1():
         @qp.set_shots(shots)
         @qp.qnode(dev)
@@ -167,7 +167,7 @@ def test_seeded_probs(seed, shots, backend):
 
     dev = qp.device(backend, wires=2)
 
-    @qjit(seed=seed)
+    @qjit(seed=seed, capture=False)
     def workflow():
         @qp.set_shots(shots)
         @qp.qnode(dev)
@@ -178,7 +178,7 @@ def test_seeded_probs(seed, shots, backend):
 
         return circuit(), circuit(), circuit(), circuit()
 
-    @qjit(seed=seed)
+    @qjit(seed=seed, capture=False)
     def workflow1():
         @qp.set_shots(shots)
         @qp.qnode(dev)
@@ -218,7 +218,7 @@ def test_seeded_expval(seed, shots, backend):
 
     dev = qp.device(backend, wires=2)
 
-    @qjit(seed=seed)
+    @qjit(seed=seed, capture=False)
     def workflow():
         @qp.set_shots(shots)
         @qp.qnode(dev)
@@ -228,7 +228,7 @@ def test_seeded_expval(seed, shots, backend):
 
         return circuit(), circuit(), circuit(), circuit()
 
-    @qjit(seed=seed)
+    @qjit(seed=seed, capture=False)
     def workflow1():
         @qp.set_shots(shots)
         @qp.qnode(dev)
@@ -267,7 +267,7 @@ def test_seeded_var(seed, shots, backend):
 
     dev = qp.device(backend, wires=2)
 
-    @qjit(seed=seed)
+    @qjit(seed=seed, capture=False)
     def workflow():
         @qp.set_shots(shots)
         @qp.qnode(dev)
@@ -277,7 +277,7 @@ def test_seeded_var(seed, shots, backend):
 
         return circuit(), circuit(), circuit(), circuit()
 
-    @qjit(seed=seed)
+    @qjit(seed=seed, capture=False)
     def workflow1():
         @qp.set_shots(shots)
         @qp.qnode(dev)

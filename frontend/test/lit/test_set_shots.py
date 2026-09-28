@@ -29,7 +29,7 @@ def test_simple_circuit_set_shots():
     """Test that a circuit with qp.set_shots is compiling to MLIR."""
     dev = qp.device("lightning.qubit", wires=2)
 
-    @qjit(target="mlir")
+    @qjit(target="mlir", capture=False)
     @partial(qp.set_shots, shots=2048)
     @qp.qnode(device=dev, mcm_method="single-branch-statistics")
     def circuit():

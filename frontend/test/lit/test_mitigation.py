@@ -23,7 +23,7 @@ from catalyst import mitigate_with_zne, qjit
 # pylint: disable=line-too-long
 
 
-@qjit(target="mlir")
+@qjit(target="mlir", capture=False)
 def mcm_method_with_zne():
     """Test that the dynamic_one_shot works with ZNE."""
     dev = qp.device("lightning.qubit", wires=1)

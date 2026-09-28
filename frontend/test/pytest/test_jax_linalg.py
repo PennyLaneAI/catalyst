@@ -344,7 +344,7 @@ class TestCholesky:
         matrices of various data types and sizes.
         """
 
-        @qjit
+        @qjit(capture=False)
         def f(X):
             return jsp.linalg.cholesky(X, lower=True)
 
@@ -380,7 +380,7 @@ class TestCholesky:
         matrices of various data types and sizes.
         """
 
-        @qjit
+        @qjit(capture=False)
         def f(X):
             return jsp.linalg.cholesky(X, lower=False)
 
@@ -430,7 +430,7 @@ class TestExpm:
         various data types and sizes.
         """
 
-        @qjit
+        @qjit(capture=False)
         def f(X):
             return jsp.linalg.expm(X)
 
@@ -461,7 +461,7 @@ class TestExpm:
         various data types and sizes when using the `upper_triangular=True` option.
         """
 
-        @qjit
+        @qjit(capture=False)
         def f(X):
             return jsp.linalg.expm(X, upper_triangular=True)
 
@@ -501,7 +501,7 @@ class TestFunmNumerical:
         matrices of various data types and sizes.
         """
 
-        @qjit
+        @qjit(capture=False)
         def f(X):
             def func(X):
                 return jnp.sin(X) + 2 * jnp.cos(X)
@@ -549,7 +549,7 @@ class TestHessenberg:
         Note that jax does not support integer matrices for this function.
         """
 
-        @qjit
+        @qjit(capture=False)
         def f(X):
             return jsp.linalg.hessenberg(X, calc_q=True)
 
@@ -607,7 +607,7 @@ class TestLU:
         various data types and sizes.
         """
 
-        @qjit
+        @qjit(capture=False)
         def f(X):
             return jsp.linalg.lu(X)
 
@@ -658,7 +658,7 @@ class TestLUSolve:
         Note that jax does not support integer matrices for this function.
         """
 
-        @qjit
+        @qjit(capture=False)
         def f(A, b):
             lu_and_piv = jsp.linalg.lu_factor(A)
             return jsp.linalg.lu_solve(lu_and_piv, b)
@@ -712,7 +712,7 @@ class TestPolar:
         Note that jax does not support integer matrices for this function.
         """
 
-        @qjit
+        @qjit(capture=False)
         def f(X):
             return jsp.linalg.polar(X, method="svd")
 
@@ -746,7 +746,7 @@ class TestPolar:
         """
         print("Start")
 
-        @qjit
+        @qjit(capture=False)
         def f(X):
             return jsp.linalg.polar(X, method="qdwh")
 
@@ -801,7 +801,7 @@ class TestQR:
         Note that jax does not support integer matrices for this function.
         """
 
-        @qjit
+        @qjit(capture=False)
         def f(X):
             return jsp.linalg.qr(X)
 
@@ -849,7 +849,7 @@ class TestSchur:
         Note that jax does not support integer matrices for this function.
         """
 
-        @qjit
+        @qjit(capture=False)
         def f(X):
             return jsp.linalg.schur(X, output="real")
 
@@ -883,7 +883,7 @@ class TestSchur:
         Note that jax does not support integer matrices for this function.
         """
 
-        @qjit
+        @qjit(capture=False)
         def f(X):
             return jsp.linalg.schur(X, output="complex")
 
@@ -937,7 +937,7 @@ class TestSolve:
         vectors of various data types and sizes.
         """
 
-        @qjit
+        @qjit(capture=False)
         def f(A, b):
             return jsp.linalg.solve(A, b)
 
@@ -963,7 +963,7 @@ class TestSolve:
         option.
         """
 
-        @qjit
+        @qjit(capture=False)
         def f(A, b):
             return jsp.linalg.solve(A, b, assume_a="her")
 
@@ -1011,7 +1011,7 @@ class TestSqrtm:
         various data types and sizes.
         """
 
-        @qjit
+        @qjit(capture=False)
         def f(X):
             return jsp.linalg.sqrtm(X)
 
@@ -1062,7 +1062,7 @@ class TestSVD:
         of various data types and sizes.
         """
 
-        @qjit
+        @qjit(capture=False)
         def f(X):
             return jsp.linalg.svd(X)
 
@@ -1100,7 +1100,7 @@ class TestTridiagonal:
         of various data types and sizes.
         """
 
-        @qjit
+        @qjit(capture=False)
         def f(X):
             return lax.linalg.tridiagonal(X)
 

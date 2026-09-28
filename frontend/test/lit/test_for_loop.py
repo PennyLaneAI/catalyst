@@ -21,7 +21,7 @@ from catalyst import for_loop, qjit
 
 # CHECK-NOT: Verification failed
 # CHECK-LABEL: @jit_loop_circuit
-@qjit(target="mlir")
+@qjit(target="mlir", capture=False)
 @qp.qnode(qp.device("lightning.qubit", wires=3))
 def loop_circuit(n: int, inc: float):
     # CHECK-DAG:   [[qreg:%.+]] = quantum.alloc
@@ -61,7 +61,7 @@ print(loop_circuit.mlir)
 # The `estimated_iterations` hint is attached as an f64 `catalyst.estimated_iterations`
 # attribute on the emitted `scf.for`.
 # CHECK-LABEL: @jit_loop_estimated_iterations
-@qjit(target="mlir")
+@qjit(target="mlir", capture=False)
 @qp.qnode(qp.device("lightning.qubit", wires=1))
 def loop_estimated_iterations(n: int):
     # CHECK:       scf.for

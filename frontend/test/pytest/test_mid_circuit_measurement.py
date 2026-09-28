@@ -57,7 +57,7 @@ class TestMidCircuitMeasurement:
             return measure(0)
 
         with pytest.raises(CompileError, match=r"can only be used from within a .*\.qnode"):
-            qjit(circuit)()
+            qjit(circuit, capture=False)()
 
     def test_invalid_arguments(self, backend):
         """Test too many arguments to the wires parameter."""
@@ -71,7 +71,7 @@ class TestMidCircuitMeasurement:
         with pytest.raises(
             TypeError, match="Only one element is supported for the 'wires' parameter"
         ):
-            qjit(circuit)()
+            qjit(circuit, capture=False)()
 
     def test_invalid_arguments2(self, backend):
         """Test too large array for the wires parameter."""
@@ -83,12 +83,12 @@ class TestMidCircuitMeasurement:
             return m
 
         with pytest.raises(TypeError, match="Measure is only supported on 1 qubit"):
-            qjit(circuit)()
+            qjit(circuit, capture=False)()
 
     def test_basic(self, backend):
         """Test measure (basic)."""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=1))
         def circuit(x: float):
             qp.RX(x, wires=0)
@@ -100,7 +100,7 @@ class TestMidCircuitMeasurement:
     def test_scalar_array_wire(self, backend):
         """Test a scalar array wire."""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=2))
         def circuit(w):
             qp.PauliX(0)
@@ -112,7 +112,7 @@ class TestMidCircuitMeasurement:
     def test_1element_array_wire(self, backend):
         """Test a 1D single-element array wire."""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=2))
         def circuit(w):
             qp.PauliX(0)
@@ -124,7 +124,7 @@ class TestMidCircuitMeasurement:
     def test_more_complex(self, backend):
         """Test measure (more complex)."""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=2))
         def circuit(x: float):
             qp.RX(x, wires=0)
@@ -140,7 +140,7 @@ class TestMidCircuitMeasurement:
     def test_with_postselect_zero(self, backend):
         """Test measure (postselect = 0)."""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=1))
         def circuit(x: float):
             qp.RX(x, wires=0)
@@ -152,7 +152,7 @@ class TestMidCircuitMeasurement:
     def test_with_postselect_one(self, backend):
         """Test measure (postselect = 1)."""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=1))
         def circuit(x: float):
             qp.RX(x, wires=0)
@@ -164,7 +164,7 @@ class TestMidCircuitMeasurement:
     def test_with_reset_false(self, backend):
         """Test measure (reset = False)."""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=1))
         def circuit():
             qp.Hadamard(wires=0)
@@ -177,7 +177,7 @@ class TestMidCircuitMeasurement:
     def test_with_reset_true(self, backend):
         """Test measure (reset = True)."""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=1))
         def circuit():
             qp.Hadamard(wires=0)
@@ -192,7 +192,7 @@ class TestMidCircuitMeasurement:
 
         dev = qp.device(backend, wires=1)
 
-        @qjit
+        @qjit(capture=False)
         @qp.set_shots(1)
         @qp.qnode(dev)
         def circuit(x):
@@ -209,7 +209,7 @@ class TestMidCircuitMeasurement:
 
         dev = qp.device(backend, wires=1)
 
-        @qjit
+        @qjit(capture=False)
         @qp.set_shots(10)
         @qp.qnode(dev)
         def circuit(x):
@@ -225,7 +225,7 @@ class TestMidCircuitMeasurement:
         """Test that an error is raised if trying to execute with mcm_method="deferred"."""
         dev = qp.device(backend, wires=1)
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(dev, mcm_method="deferred")
         def circuit(x):
             qp.RX(x, 0)
@@ -241,7 +241,7 @@ class TestMidCircuitMeasurement:
         """Test that an error is raised if using mcm_method="one-shot" without shots."""
         dev = qp.device(backend, wires=1)
 
-        @qjit
+        @qjit(capture=False)
         @qp.set_shots(None)
         @qp.qnode(dev, mcm_method="one-shot")
         def circuit(x):
@@ -259,7 +259,7 @@ class TestMidCircuitMeasurement:
         `postselect_mode="hw-like"`"""
         dev = qp.device(backend, wires=1)
 
-        @qjit
+        @qjit(capture=False)
         @qp.set_shots(10)
         @qp.qnode(dev, mcm_method="single-branch-statistics", postselect_mode="hw-like")
         def circuit(x):
@@ -287,7 +287,7 @@ class TestMidCircuitMeasurement:
             postselect_mode=postselect_mode, mcm_method=mcm_method
         )
 
-        @qjit
+        @qjit(capture=False)
         @qp.set_shots(10)
         @qp.qnode(dev, **asdict(original_config))
         def circuit(x):
@@ -304,7 +304,7 @@ class TestMidCircuitMeasurement:
         """Test that the correct default mcm_method is chosen based on postselect_mode"""
         dev = qp.device(backend, wires=1)
 
-        @qjit
+        @qjit(capture=False)
         @qp.set_shots(10)
         @qp.qnode(dev, mcm_method=None, postselect_mode=postselect_mode)
         def circuit(x):
@@ -326,7 +326,7 @@ class TestMidCircuitMeasurement:
         """Test that the correct default mcm_method is chosen based on postselect_mode"""
         dev = qp.device(backend, wires=1)
 
-        @qjit
+        @qjit(capture=False)
         @qp.set_shots(20)
         @qp.qnode(dev, mcm_method=mcm_method, postselect_mode=postselect_mode)
         def circuit(x):
@@ -344,7 +344,7 @@ class TestMidCircuitMeasurement:
         """Test that the correct default mcm_method is chosen based on postselect_mode"""
         dev = qp.device(backend, wires=1)
 
-        @qjit
+        @qjit(capture=False)
         @qp.set_shots(20)
         @qp.qnode(dev, mcm_method=mcm_method, postselect_mode=postselect_mode)
         def circuit(x):
@@ -370,7 +370,7 @@ class TestMidCircuitMeasurement:
         """Test that the correct default mcm_method is chosen based on postselect_mode"""
         dev = qp.device(backend, wires=1)
 
-        @qjit
+        @qjit(capture=False)
         @qp.set_shots(5)
         @qp.qnode(dev, mcm_method=mcm_method, postselect_mode=postselect_mode)
         def circuit(x):
@@ -403,7 +403,7 @@ class TestMidCircuitMeasurement:
         """Test that an error is raised if postselecting on an invalid value"""
         dev = qp.device(backend, wires=1)
 
-        @qjit
+        @qjit(capture=False)
         @qp.set_shots(10)
         @qp.qnode(dev, mcm_method=mcm_method)
         def circuit(x):
@@ -424,7 +424,7 @@ class TestMidCircuitMeasurement:
         err = "single-branch-statistics does not support measurement processes"
         with pytest.raises(NotImplementedError, match=err):
 
-            @qjit
+            @qjit(capture=False)
             @qp.set_shots(5)
             @qp.qnode(qp.device(backend, wires=2), mcm_method="single-branch-statistics")
             def measurement():
@@ -438,7 +438,7 @@ class TestMidCircuitMeasurement:
     def test_mcm_config_propagation_cond(self, postselect_method):
         """Test that the mcm_config is propagated when tracing nested ops."""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(
             qp.device("lightning.qubit", wires=1),
             shots=10,
@@ -460,7 +460,7 @@ class TestMidCircuitMeasurement:
     def test_mcm_config_propagation_for_loop(self, postselect_method):
         """Test that the mcm_config is propagated when tracing nested ops."""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(
             qp.device("lightning.qubit", wires=1),
             shots=10,
@@ -487,7 +487,7 @@ class TestDynamicOneShotIntegration:
         Test static argnums is passed correctly to the one shot qnodes.
         """
 
-        @qjit(static_argnums=0)
+        @qjit(static_argnums=0, capture=False)
         def workflow(N):
             dev = qp.device(backend, wires=N)
 
@@ -534,7 +534,7 @@ class TestDynamicOneShotIntegration:
 
         dev = qp.device(backend, wires=1)
 
-        @qjit
+        @qjit(capture=False)
         @qp.set_shots(1)
         @qp.qnode(dev, mcm_method="one-shot", postselect_mode=postselect_mode)
         def circuit(x):
@@ -557,7 +557,7 @@ class TestDynamicOneShotIntegration:
         dev = qp.device(backend, wires=1)
         spy = mocker.spy(catalyst.qfunc, "dynamic_one_shot")
 
-        @qjit
+        @qjit(capture=False)
         @qp.set_shots(shots)
         @qp.qnode(dev, mcm_method="one-shot")
         def circuit(x):
@@ -576,7 +576,7 @@ class TestDynamicOneShotIntegration:
         dev = qp.device(backend, wires=1)
         param = np.pi / 4
 
-        @qjit
+        @qjit(capture=False)
         @qp.set_shots(shots)
         @qp.qnode(dev, mcm_method="one-shot")
         def func(x):
@@ -599,7 +599,7 @@ class TestDynamicOneShotIntegration:
             match="dynamic_one_shot is only supported with finite shots.",
         ):
 
-            @qjit
+            @qjit(capture=False)
             @catalyst.qfunc.dynamic_one_shot
             @qp.set_shots(None)
             @qp.qnode(dev)
@@ -615,7 +615,7 @@ class TestDynamicOneShotIntegration:
         dev = qp.device(backend, wires=1)
         param = np.pi / 4 * jnp.ones(2)
 
-        @qjit
+        @qjit(capture=False)
         @qp.set_shots(shots)
         @qp.qnode(dev, mcm_method="one-shot")
         def func(x, y):
@@ -636,7 +636,7 @@ class TestDynamicOneShotIntegration:
         shots = 10
         dev = qp.device(backend, wires=1)
 
-        @qjit
+        @qjit(capture=False)
         @qp.set_shots(shots)
         @qp.qnode(dev, mcm_method="one-shot")
         def circuit(x):
@@ -691,7 +691,7 @@ class TestDynamicOneShotIntegration:
 
         dev = qp.device(backend, wires=2)
 
-        @qjit(seed=123456)
+        @qjit(seed=123456, capture=False)
         @partial(qp.set_shots, shots=shots)
         @qp.qnode(dev, postselect_mode=postselect_mode, mcm_method="one-shot")
         def func(x, y):
@@ -780,7 +780,7 @@ class TestDynamicOneShotIntegration:
 
         dev = qp.device(backend, wires=2)
 
-        @qjit(seed=37)
+        @qjit(seed=37, capture=False)
         @qp.set_shots(shots)
         @qp.qnode(dev, mcm_method="one-shot", postselect_mode=postselect_mode)
         def func(x, y):
@@ -845,7 +845,7 @@ class TestDynamicOneShotIntegration:
         shots = 10
         dev = qp.device(backend, wires=qubits)
 
-        @qjit
+        @qjit(capture=False)
         @qp.set_shots(shots)
         @qp.qnode(dev, mcm_method="one-shot")
         def cost():
@@ -860,7 +860,7 @@ class TestDynamicOneShotIntegration:
         """Test mcm result with one-shot"""
         dev = qp.device("lightning.qubit", wires=1)
 
-        @qjit
+        @qjit(capture=False)
         @qp.set_shots(10)
         @qp.qnode(dev, mcm_method="one-shot")
         def circuit():
@@ -873,7 +873,7 @@ class TestDynamicOneShotIntegration:
     def test_dynamic_one_shot_classical_return_values_with_mcm(self):
         """Test classical return value with one-shot"""
 
-        @qjit(autograph=True)
+        @qjit(autograph=True, capture=False)
         @qp.set_shots(10)
         @qp.qnode(qp.device("lightning.qubit", wires=1), mcm_method="one-shot")
         def circuit():
@@ -890,7 +890,7 @@ class TestDynamicOneShotIntegration:
         """Test classical return values with one-shot"""
         dev = qp.device("lightning.qubit", wires=1)
 
-        @qjit
+        @qjit(capture=False)
         @qp.set_shots(12)
         @qp.qnode(dev, mcm_method="one-shot")
         def circuit():
@@ -929,11 +929,11 @@ class TestDynamicOneShotIntegration:
             qp.RX(x, wires=0)
             return qp.expval(qp.PauliZ(wires=0))
 
-        @qjit
+        @qjit(capture=False)
         def grad_f(x):
             return grad(f, method="auto")(x)
 
-        @qjit
+        @qjit(capture=False)
         def grad_g(x):
             return grad(g, method="auto")(x)
 
@@ -949,7 +949,7 @@ class TestDynamicOneShotIntegration:
     def test_mcm_method_with_value_and_grad(self):
         """Test that the dynamic_one_shot works with value_and_grad."""
 
-        @qjit
+        @qjit(capture=False)
         def workflow1(x: float):
             @qp.set_shots(10)
             @qp.qnode(qp.device("lightning.qubit", wires=3), mcm_method="one-shot")
@@ -960,7 +960,7 @@ class TestDynamicOneShotIntegration:
 
             return x * (circuit1()[0])
 
-        @qjit
+        @qjit(capture=False)
         def workflow2(x: float):
             @qp.set_shots(10)
             @qp.qnode(qp.device("lightning.qubit", wires=3))
@@ -971,8 +971,8 @@ class TestDynamicOneShotIntegration:
 
             return x * (circuit2()[0])
 
-        result1 = qjit(value_and_grad(workflow1))(3.0)
-        result2 = qjit(value_and_grad(workflow2))(3.0)
+        result1 = qjit(value_and_grad(workflow1), capture=False)(3.0)
+        result2 = qjit(value_and_grad(workflow2), capture=False)(3.0)
         assert np.allclose(result1, result2)
 
     @pytest.mark.parametrize("diff_method", ["auto", "fd"])
@@ -994,12 +994,12 @@ class TestDynamicOneShotIntegration:
             qp.RX(x2, wires=0)
             return qp.expval(qp.PauliY(0))
 
-        @qjit
+        @qjit(capture=False)
         def C_workflow():
             f = qp.set_shots(qp.QNode(circuit_rx, device=dev, mcm_method="one-shot"), shots=5)
             return C_jvp(f, x, t, method=diff_method, argnums=list(range(len(x))))
 
-        @qjit
+        @qjit(capture=False)
         def J_workflow():
             f = qp.set_shots(qp.QNode(circuit_rx, device=dev), shots=5)
             return C_jvp(f, x, t, method=diff_method, argnums=list(range(len(x))))
@@ -1031,12 +1031,12 @@ class TestDynamicOneShotIntegration:
             [0.111],
         )
 
-        @qjit
+        @qjit(capture=False)
         def C_workflow():
             f = qp.set_shots(qp.QNode(circuit_rx, device=dev, mcm_method="one-shot"), shots=5)
             return C_vjp(f, x, ct, method=diff_method, argnums=list(range(len(x))))
 
-        @qjit
+        @qjit(capture=False)
         def J_workflow():
             f = qp.set_shots(qp.QNode(circuit_rx, device=dev), shots=5)
             return C_vjp(f, x, ct, method=diff_method, argnums=list(range(len(x))))

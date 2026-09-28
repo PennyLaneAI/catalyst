@@ -22,7 +22,7 @@ import pennylane as qp
 from catalyst import qjit
 
 
-@qjit
+@qjit(capture=False)
 @qp.set_shots(1000)
 @qp.qnode(
     qp.device(

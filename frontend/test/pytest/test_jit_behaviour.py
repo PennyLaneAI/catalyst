@@ -41,7 +41,7 @@ from catalyst.utils.exceptions import CompileError
 def f_aot_builder(backend, wires=1, shots=1000):
     """Test AOT builder."""
 
-    @qjit
+    @qjit(capture=False)
     @qp.set_shots(shots)
     @qp.qnode(qp.device(backend, wires=wires))
     def f(x: float) -> bool:
@@ -54,7 +54,7 @@ def f_aot_builder(backend, wires=1, shots=1000):
 def f_jit_builder(backend, wires=1, shots=1000):
     """Test JIT builder."""
 
-    @qjit
+    @qjit(capture=False)
     @qp.set_shots(shots)
     @qp.qnode(qp.device(backend, wires=wires))
     def f(x):
@@ -67,7 +67,7 @@ def f_jit_builder(backend, wires=1, shots=1000):
 def fsample_aot_builder(backend, wires=1, shots=1000):
     """Test AOT builder with the sample measurement process."""
 
-    @qjit
+    @qjit(capture=False)
     @qp.set_shots(shots)
     @qp.qnode(qp.device(backend, wires=wires))
     def f(x: float):
@@ -82,7 +82,7 @@ class TestDifferentPrecisions:
         """Test different precisions."""
 
         def builder(_in):
-            @qjit
+            @qjit(capture=False)
             @qp.qnode(qp.device(backend, wires=1))
             def f(x):
                 qp.RX(x, wires=0)
@@ -116,7 +116,7 @@ class TestJittedWithOneTypeRunWithAnother:
     def test_recompile_when_unsupported_argument(self, from_type, to_type, backend):
         """Test recompile when unsupported argument."""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=1))
         def f(x):
             if x.dtype == jnp.dtype(jnp.complex64):
@@ -147,7 +147,7 @@ class TestJittedWithOneTypeRunWithAnother:
             # Treat warnings as an error.
             warnings.simplefilter("error")
 
-            @qjit
+            @qjit(capture=False)
             @qp.qnode(qp.device(backend, wires=1))
             def f(x):
                 qp.RX(jnp.real(x), wires=0)
@@ -173,7 +173,7 @@ class TestJittedWithOneTypeRunWithAnother:
     def test_recompile_warning(self, to_type, backend):
         """Test recompile warning."""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=1))
         def f(x: jax.core.ShapedArray([], jnp.int8)):
             if x.dtype == jnp.dtype(jnp.complex64):
@@ -203,7 +203,7 @@ class TestJittedWithOneTypeRunWithAnother:
     def test_recompile_python_types(self, from_type, to_type, backend):
         """Test recompile python types."""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=1))
         def f(x):
             if x.dtype == jnp.dtype(jnp.complex128):
@@ -235,7 +235,7 @@ class TestJittedWithOneTypeRunWithAnother:
     def test_recompile_no_warning(self, to_type, backend):
         """Test recompile no warning."""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=1))
         def f(x):
             qp.RX(x.astype(float), wires=0)
@@ -271,7 +271,7 @@ class TestTypePromotion:
     def test_promote_to_double(self, promote_from, val, backend):
         """Test promote to double."""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=1))
         def f(x):
             qp.RX(x, wires=0)
@@ -298,7 +298,7 @@ class TestTypePromotion:
     def test_promotion_python_types(self, from_type, to_type, backend):
         """Test promotion python types."""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=1))
         def f(x):
             if x.dtype == jnp.dtype(jnp.complex128):
@@ -327,7 +327,7 @@ class TestTypePromotion:
     def test_promote_to_int(self, promote_from, backend):
         """Test promote to int."""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=1))
         def f(x):
             qp.RX(x.astype(float), wires=0)
@@ -351,7 +351,7 @@ class TestTypePromotion:
     def test_promote_unsigned(self, promote_from, backend):
         """Test promote to unsigned."""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=1))
         def f(x):
             qp.RX(x.astype(float), wires=0)
@@ -383,7 +383,7 @@ class TestTypePromotion:
     def test_promote_complex(self, promote_from, backend):
         """Test promote complex."""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=1))
         def f(x):
             qp.RX(x.real, wires=0)
@@ -411,13 +411,13 @@ class TestDecorator:
     def test_function_is_cached(self, backend):
         """Test function is cached with decorator."""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=1))
         def f_no_parenthesis(x):
             qp.RY(x, wires=0)
             return measure(wires=0)
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=1))
         def f_parenthesis(x):
             qp.RY(x, wires=0)
@@ -430,7 +430,7 @@ class TestCaching:
     def test_function_is_cached(self, backend):
         """Test function is cached."""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=1))
         def f_jit(x):
             qp.RY(x, wires=0)
@@ -457,7 +457,7 @@ class TestCaching:
             qp.RX(x, wires=0)
             return qp.expval(qp.PauliZ(wires=0))
 
-        @qjit
+        @qjit(capture=False)
         def g(x: float):
             return f(x) + f(x)
 
@@ -588,7 +588,7 @@ class TestSignatureErrors:
     def test_incompatible_type_reachable_from_user_code(self):
         """Raise error message for incompatible types"""
 
-        @qjit
+        @qjit(capture=False)
         def f(x: str):
             return
 
@@ -614,7 +614,7 @@ class TestClassicalCompilation:
         def addi(x: int, y: int):
             return x + y
 
-        addc = qjit(addi)
+        addc = qjit(addi, capture=False)
         assert addc.mlir
         assert addi(a, b) == addc(a, b)
 
@@ -632,7 +632,7 @@ class TestArraysInHamiltonian:
     def test_array_repr_from_context1(self, coeffs, backend):
         """Test array representation from context in Hamiltonian."""
 
-        @qjit(target="mlir")
+        @qjit(target="mlir", capture=False)
         @qp.qnode(qp.device(backend, wires=6))
         def f():
             qp.Hadamard(wires=0)
@@ -652,7 +652,7 @@ class TestArraysInHamiltonian:
     def test_array_repr_as_parameter(self, coeffs, backend):
         """Test array representation as parameter in Hamiltonian."""
 
-        @qjit(target="mlir")
+        @qjit(target="mlir", capture=False)
         @qp.qnode(qp.device(backend, wires=6))
         def f(coeffs):
             qp.Hadamard(wires=0)
@@ -672,7 +672,7 @@ class TestArraysInHamiltonian:
     def test_array_repr_built_in(self, array, backend):
         """Test array representation built-in in Hamiltonian."""
 
-        @qjit(target="mlir")
+        @qjit(target="mlir", capture=False)
         @qp.qnode(qp.device(backend, wires=6))
         def f():
             qp.Hadamard(wires=0)
@@ -704,7 +704,7 @@ class TestArraysInHermitian:
     def test_array_repr_from_context2(self, matrix, array, backend):
         """Test array representation from context in Hermitian."""
 
-        @qjit(target="mlir")
+        @qjit(target="mlir", capture=False)
         @qp.qnode(qp.device(backend, wires=6))
         def f(x: float):
             qp.RX(x, wires=0)
@@ -723,7 +723,7 @@ class TestArraysInHermitian:
     def test_array_repr_as_parameter(self, matrix, array, backend):
         """Test array representation as parameter in Hermitian."""
 
-        @qjit(target="mlir")
+        @qjit(target="mlir", capture=False)
         @qp.qnode(qp.device(backend, wires=2))
         def f(matrix):
             qp.RX(jnp.pi, wires=0)
@@ -742,7 +742,7 @@ class TestArraysInHermitian:
     def test_array_repr_built_in(self, array, backend):
         """Test array representation built-in in Hermitian."""
 
-        @qjit(target="mlir")
+        @qjit(target="mlir", capture=False)
         @qp.qnode(qp.device(backend, wires=2))
         def f(x: float):
             qp.RX(x, wires=0)
@@ -764,13 +764,13 @@ class TestTracingQJITAnnotatedFunctions:
     def test_purely_classical_context(self):
         """Test purely classical context."""
 
-        @qjit
+        @qjit(capture=False)
         def f():
             return 1
 
         assert f.mlir
 
-        @qjit
+        @qjit(capture=False)
         def g():
             return f() + 1
 
@@ -785,13 +785,13 @@ class TestTracingQJITAnnotatedFunctions:
             qp.RX(x, wires=0)
             return qp.state()
 
-        @qjit
+        @qjit(capture=False)
         def g1(x: float):
             return f(x)
 
         assert g1.mlir
 
-        @qjit
+        @qjit(capture=False)
         def g2(x: float):
             return g1(x)
 
@@ -802,20 +802,23 @@ class TestTracingQJITAnnotatedFunctions:
         """Test gradient of qjit equivalence."""
 
         # Issue 376
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(device=qp.device(backend, wires=1))
         def circuit(phi):
             qp.RX(phi, wires=0)
             return qp.expval(qp.PauliZ(0))
 
-        @qjit
+        @qjit(capture=False)
         def workflow(phi):
             g = grad(circuit)
             return g(phi)
 
-        assert np.allclose(qjit(grad(qjit(circuit)))(phi), qjit(grad(circuit))(phi))
-        assert np.allclose(qjit(grad(circuit))(phi), workflow(phi))
-        assert np.allclose(workflow(phi), qjit(grad(circuit))(phi))
+        assert np.allclose(
+            qjit(grad(qjit(circuit, capture=False)), capture=False)(phi),
+            qjit(grad(circuit), capture=False)(phi),
+        )
+        assert np.allclose(qjit(grad(circuit), capture=False)(phi), workflow(phi))
+        assert np.allclose(workflow(phi), qjit(grad(circuit), capture=False)(phi))
 
     @pytest.mark.parametrize("phi", [(0.0), (1.0), (2.0)])
     def test_gradient_of_qjit_correctness(self, phi, backend):
@@ -826,14 +829,14 @@ class TestTracingQJITAnnotatedFunctions:
             qp.RX(phi, wires=0)
             return qp.expval(qp.PauliZ(0))
 
-        @qjit
+        @qjit(capture=False)
         def workflow1(phi):
             g = grad(circuit)
             return g(phi)
 
-        @qjit
+        @qjit(capture=False)
         def workflow2(phi):
-            g = grad(qjit(circuit))
+            g = grad(qjit(circuit, capture=False))
             return g(phi)
 
         assert np.allclose(workflow1(phi), workflow2(phi))
@@ -846,16 +849,16 @@ class TestTracingQJITAnnotatedFunctions:
             qp.RX(phi, wires=0)
             return qp.expval(qp.PauliZ(0))
 
-        @qjit
+        @qjit(capture=False)
         def workflow(phi: float):
             g = grad(circuit)
             return g(phi)
 
         mlir_v1 = workflow.mlir
 
-        @qjit
+        @qjit(capture=False)
         def workflow(phi: float):  # pylint: disable=function-redefined
-            g = grad(qjit(circuit))
+            g = grad(qjit(circuit, capture=False))
             return g(phi)
 
         mlir_v2 = workflow.mlir
@@ -889,7 +892,7 @@ class TestDefaultAvailableIR:
     def test_mlir(self):
         """Test mlir."""
 
-        @qjit  # Note that we are using the default qjit
+        @qjit(capture=False)  # Note that we are using the default qjit
         def f():
             return 1
 
@@ -903,7 +906,7 @@ class TestDefaultAvailableIR:
             qp.RX(x, wires=0)
             return qp.state()
 
-        @qjit  # Note that we are using the default qjit
+        @qjit(capture=False)  # Note that we are using the default qjit
         def g(x: float):
             return f(x)
 
@@ -918,7 +921,7 @@ class TestDefaultAvailableIR:
             qp.RX(x, wires=0)
             return qp.state()
 
-        @qjit  # Note that we are using the default qjit
+        @qjit(capture=False)  # Note that we are using the default qjit
         def g(x: float):
             return f(x)
 
@@ -947,7 +950,7 @@ class TestDefaultAvailableIR:
         """Test that keep_intermediate with target='mlir' writes the initial IR and
         pipeline output files into the workspace when mlir_opt is accessed."""
 
-        @qjit(target="mlir", keep_intermediate=True)
+        @qjit(target="mlir", keep_intermediate=True, capture=False)
         @qp.qnode(qp.device(backend, wires=1))
         def circuit():
             qp.H(0)
@@ -966,7 +969,7 @@ class TestDefaultAvailableIR:
     def test_jaxpr_target(self, backend):
         """Test no mlir is generated for jaxpr target."""
 
-        @qjit(target="jaxpr")
+        @qjit(target="jaxpr", capture=False)
         @qp.qnode(qp.device(backend, wires=1))
         def f(x: float):
             qp.RX(x, wires=0)
@@ -994,7 +997,7 @@ class TestAvoidVerification:
             loop()
             return
 
-        jitted_function = qjit(test)
+        jitted_function = qjit(test, capture=False)
         capture_string = capfd.readouterr()
         assert "does not reference a valid function" not in capture_string.err
 
@@ -1012,13 +1015,13 @@ class TestTwoQJITsOneName:
             """Returns 1"""
             return 1
 
-        foo_1 = qjit(foo)
+        foo_1 = qjit(foo, capture=False)
 
         def foo():
             """Returns 2"""
             return 2
 
-        foo_2 = qjit(foo)
+        foo_2 = qjit(foo, capture=False)
 
         assert foo_1() == 1
         assert foo_2() == 2
@@ -1030,13 +1033,13 @@ class TestTwoQJITsOneName:
             """Returns 1"""
             return 1
 
-        foo_1 = qjit(keep_intermediate=True)(foo)
+        foo_1 = qjit(keep_intermediate=True, capture=False)(foo)
 
         def foo():
             """Returns 2"""
             return 2
 
-        foo_2 = qjit(keep_intermediate=True)(foo)
+        foo_2 = qjit(keep_intermediate=True, capture=False)(foo)
 
         assert foo_1() == 1
         assert foo_2() == 2
@@ -1053,8 +1056,8 @@ class TestQJITUsagePatterns:
         def fn(x, y):
             return x * y
 
-        res_pattern_fn_as_argument = qjit(fn, autograph=False)(5, 6)
-        res_pattern_partial = qjit(autograph=False)(fn)(5, 6)
+        res_pattern_fn_as_argument = qjit(fn, autograph=False, capture=False)(5, 6)
+        res_pattern_partial = qjit(autograph=False, capture=False)(fn)(5, 6)
 
         expected = 30
         assert res_pattern_fn_as_argument == expected
@@ -1072,7 +1075,7 @@ class TestGradPartial:
 
         partial_fn = partial(fn, y=1)
 
-        @qjit
+        @qjit(capture=False)
         def grad_partial_fn(x):
             return grad(partial_fn)(x)
 
@@ -1107,7 +1110,7 @@ class TestErrorNestedQNode:
             inner()
             return qp.state()
 
-        @qjit
+        @qjit(capture=False)
         def fn():
             return outer()
 

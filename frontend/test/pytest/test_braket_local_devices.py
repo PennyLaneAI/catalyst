@@ -99,7 +99,7 @@ class TestBraketGates:
 
             return qp.expval(qp.PauliZ(0) @ qp.PauliZ(1))
 
-        qjit_fn = qjit(qp.qnode(device)(circuit))
+        qjit_fn = qjit(qp.qnode(device)(circuit), capture=False)
         qp_fn = qp.qnode(qp.device("default.qubit", wires=3))(circuit)
 
         assert np.allclose(qjit_fn(), qp_fn())
@@ -135,7 +135,7 @@ class TestBraketGates:
 
             return qp.var(qp.PauliZ(0) @ qp.PauliZ(1) @ qp.PauliZ(2))
 
-        qjit_fn = qjit(qp.qnode(device)(circuit))
+        qjit_fn = qjit(qp.qnode(device)(circuit), capture=False)
         qp_fn = qp.qnode(qp.device("default.qubit", wires=3))(circuit)
 
         assert np.allclose(qjit_fn(3.14, 0.6), qp_fn(3.14, 0.6))
@@ -154,7 +154,7 @@ class TestBraketSample:
     def test_sample_on_1qbit_braket(self, device):
         """Test sample on 1 qubit on braket devices."""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(device, shots=1000)
         def sample_1qbit(x: float):
             qp.RX(x, wires=0)
@@ -177,7 +177,7 @@ class TestBraketSample:
     def test_sample_on_2qbits_braket(self, device):
         """Test sample on 2 qubits on braket devices."""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(device, shots=1000)
         def sample_2qbits(x: float):
             qp.RX(x, wires=0)
@@ -205,7 +205,7 @@ class TestBraketProbs:
     def test_probs_on_1qbit_braket(self, device):
         """Test probs on 1 qubit on braket devices."""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(device, shots=1000)
         def probs_1qbit(x: float):
             qp.RX(x, wires=0)
@@ -223,7 +223,7 @@ class TestBraketProbs:
     def test_probs_on_2qbits_braket(self, device):
         """Test probs on 2 qubits on braket devices."""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(device, shots=1000)
         def probs_2qbits(x: float):
             qp.RX(x, wires=0)
@@ -247,7 +247,7 @@ class TestBraketCounts:
     def test_count_on_1qbit_braket(self, device):
         """Test counts on 1 qubits on braket devices."""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(device, shots=1000)
         def counts_1qbit(x: float):
             qp.RX(x, wires=0)
@@ -270,7 +270,7 @@ class TestBraketCounts:
     def test_count_on_2qbits_braket(self, device):
         """Test counts on 2 qubits on braket devices."""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(device, shots=1000)
         def counts_2qbit(x: float):
             qp.RX(x, wires=0)
@@ -303,7 +303,7 @@ class TestBraketExpval:
     def test_named(self, device):
         """Test expval for named observables on braket devices."""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(device)
         def expval(x: float):
             qp.RX(x, wires=0)
@@ -330,7 +330,7 @@ class TestBraketExpval:
     def test_hermitian_1(self, device):
         """Test expval for Hermitian observable on braket devices."""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(device)
         def expval(x: float):
             qp.RY(x, wires=0)
@@ -360,7 +360,7 @@ class TestBraketExpval:
     def test_hermitian_2(self, device):
         """Test expval for Hermitian observable on braket devices."""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(device)
         def expval(x: float):
             qp.RX(x, wires=0)
@@ -395,7 +395,7 @@ class TestBraketExpval:
     def test_tensor_1(self, device):
         """Test expval for Tensor observable on braket devices."""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(device)
         def expval(x: float, y: float):
             qp.RX(x, wires=0)
@@ -424,7 +424,7 @@ class TestBraketExpval:
     def test_tensor_2(self, device):
         """Test expval for Tensor observable including hermitian observable on braket devices."""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(device)
         def expval(x: float, y: float):
             qp.RX(x, wires=0)
@@ -462,7 +462,7 @@ class TestBraketVar:
     def test_rx(self, device):
         """Test var with RX on braket devices."""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(device)
         def var(x: float):
             qp.RX(x, wires=0)
@@ -487,7 +487,7 @@ class TestBraketVar:
     def test_hadamard(self, device):
         """Test var with Hadamard on braket devices."""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(device)
         def var(x: float):
             qp.Hadamard(wires=0)
@@ -513,7 +513,7 @@ class TestBraketVar:
     def test_tensor_1(self, device):
         """Test variance for Tensor observable on braket devices."""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(device)
         def circuit(x: float, y: float):
             qp.RX(x, wires=0)
@@ -542,7 +542,7 @@ class TestBraketVar:
     def test_tensor_2(self, device):
         """Test variance for Tensor observable including hermitian observable on braket devices."""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(device)
         def circuit(x: float, y: float):
             qp.RX(x, wires=0)
@@ -579,7 +579,7 @@ class TestBraketMeasurementsProcess:
     def test_multiple_return_values_braket1(self, device):
         """Test multiple return values."""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(device)
         def all_measurements(x):
             qp.RY(x, wires=0)
@@ -611,7 +611,7 @@ class TestBraketMeasurementsProcess:
     def test_multiple_return_values_braket2(self, device):
         """Test multiple return values with shots > 0."""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(device, shots=100)
         def all_measurements(x):
             qp.RY(x, wires=0)
@@ -655,7 +655,7 @@ class TestBraketMeasurementsProcess:
     def test_unsupported_measurement_braket(self, device):
         """Test unsupported measurement on braket devices."""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(device)
         def circuit(x: float, y: float):
             qp.RX(x, wires=0)
@@ -689,7 +689,7 @@ class TestBraketGradient:
             qp.RX(x * 2, wires=0)
             return qp.expval(qp.PauliY(0))
 
-        @qjit
+        @qjit(capture=False)
         def compiled(x: float):
             g = qp.qnode(device)(f)
             h = grad(g, method="fd", h=1e-4)
@@ -722,7 +722,7 @@ class TestBraketGradient:
             qp.RX(x * 2, wires=1)
             return qp.expval(qp.PauliY(0) @ qp.PauliZ(1))
 
-        @qjit
+        @qjit(capture=False)
         def compiled(x: float, y: float):
             g = qp.qnode(device)(f)
             h = grad(g, method="fd", h=1e-4)
@@ -754,7 +754,7 @@ class TestBraketGradient:
             qp.RX(x, wires=0)
             return qp.expval(qp.PauliY(0))
 
-        @qjit
+        @qjit(capture=False)
         def compiled_grad_default(x: float):
             g = qp.qnode(device)(f)
             h = grad(g, method="fd", h=1e-4)

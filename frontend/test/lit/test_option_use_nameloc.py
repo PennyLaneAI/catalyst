@@ -22,7 +22,7 @@ from catalyst import qjit
 
 
 # CHECK-LABEL: @jit_f
-@qjit(use_nameloc=True)
+@qjit(use_nameloc=True, capture=False)
 def f(x: float, y: float):
     """Check that MLIR module contains name location information, and MLIR code uses that name
     location information.
@@ -38,7 +38,7 @@ print_mlir(f, 0.3, 0.4)
 
 
 # CHECK-LABEL: @jit_f_opt
-@qjit(use_nameloc=True)
+@qjit(use_nameloc=True, capture=False)
 def f_opt(x: float, y: float):
     """Check that MLIR module contains name location information, and MLIR code uses that name
     location information.

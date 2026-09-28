@@ -68,7 +68,7 @@ def test_custom_device_load():
     assert backend_info.kwargs["option1"] == 42
     assert backend_info.kwargs["option2"] == 38
 
-    @qjit
+    @qjit(capture=False)
     @qp.qnode(device)
     def f():
         """Measurements on a NullQubit device always return false (i.e. 0)"""
@@ -104,7 +104,7 @@ def test_custom_device_bad_directory():
             """Execution."""
             raise NotImplementedError
 
-    @qjit
+    @qjit(capture=False)
     @qp.qnode(CustomDevice(wires=1))
     def f():
         return measure(0)
@@ -135,7 +135,7 @@ def test_custom_device_no_c_interface():
             """Execution."""
             raise NotImplementedError
 
-    @qjit
+    @qjit(capture=False)
     @qp.qnode(CustomDevice(wires=1))
     def f():
         return measure(0)

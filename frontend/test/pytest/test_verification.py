@@ -153,7 +153,7 @@ def test_unsupported_ops_raise_an_error():
         return qp.expval(qp.PauliX(0))
 
     with pytest.raises(CompileError, match="UnsupportedOp is not supported"):
-        qjit(f)(1.2)
+        qjit(f, capture=False)(1.2)
 
 
 def queue_ops(x, wires):
@@ -195,9 +195,9 @@ class TestHybridOpVerification:
             return qp.expval(qp.PauliX(0))
 
         with pytest.raises(CompileError, match="RX.*not invertible"):
-            qjit(f)(1.2)
+            qjit(f, capture=False)(1.2)
 
-        @qjit
+        @qjit(capture=False)
         def cir(x: float):
             return grad(f)(x)
 
@@ -229,9 +229,9 @@ class TestHybridOpVerification:
             return qp.expval(qp.PauliX(0))
 
         with pytest.raises(CompileError, match="RX.*not invertible"):
-            qjit(f)(1.2)
+            qjit(f, capture=False)(1.2)
 
-        @qjit
+        @qjit(capture=False)
         def cir(x: float):
             return grad(f)(x)
 
@@ -257,9 +257,9 @@ class TestHybridOpVerification:
             return qp.expval(qp.PauliX(0))
 
         with pytest.raises(CompileError, match="RX.*not invertible"):
-            qjit(f)(1.2)
+            qjit(f, capture=False)(1.2)
 
-        @qjit
+        @qjit(capture=False)
         def cir(x: float):
             return grad(f)(x)
 
@@ -279,9 +279,9 @@ class TestHybridOpVerification:
             return qp.expval(qp.PauliX(0))
 
         with pytest.raises(CompileError, match="PauliZ is not controllable"):
-            qjit(f)(1.2)
+            qjit(f, capture=False)(1.2)
 
-        @qjit
+        @qjit(capture=False)
         def cir(x: float):
             return grad(f)(x)
 
@@ -313,9 +313,9 @@ class TestHybridOpVerification:
 
         with patch("catalyst.device.qjit_device.RUNTIME_OPERATIONS", runtime_ops_with_qctrl):
             with pytest.raises(CompileError, match="PauliZ is not controllable"):
-                qjit(f)(1.2)
+                qjit(f, capture=False)(1.2)
 
-            @qjit
+            @qjit(capture=False)
             def cir(x: float):
                 return grad(f)(x)
 
@@ -335,9 +335,9 @@ class TestHybridOpVerification:
             return qp.expval(qp.PauliX(0))
 
         with pytest.raises(CompileError, match="HybridCtrl is not supported"):
-            qjit(f)(1.2)
+            qjit(f, capture=False)(1.2)
 
-        @qjit
+        @qjit(capture=False)
         def cir(x: float):
             return grad(f)(x)
 
@@ -358,9 +358,9 @@ class TestHybridOpVerification:
             return qp.expval(qp.PauliX(0))
 
         with pytest.raises(CompileError, match="Cannot compile PennyLane control of the hybrid op"):
-            qjit(f)(1.2)
+            qjit(f, capture=False)(1.2)
 
-        @qjit
+        @qjit(capture=False)
         def cir(x: float):
             return grad(f)(x)
 
@@ -381,9 +381,9 @@ class TestHybridOpVerification:
             return qp.expval(qp.PauliX(0))
 
         with pytest.raises(CompileError, match="Cannot compile PennyLane inverse of the hybrid op"):
-            qjit(f)(1.2)
+            qjit(f, capture=False)(1.2)
 
-        @qjit
+        @qjit(capture=False)
         def cir(x: float):
             return grad(f)(x)
 
@@ -425,9 +425,9 @@ class TestHybridOpVerification:
 
         with patch("catalyst.device.qjit_device.RUNTIME_OPERATIONS", runtime_ops_with_qctrl):
             with pytest.raises(CompileError, match=f"PauliZ is not {unsupported_gate_attribute}"):
-                qjit(f)(1.2)
+                qjit(f, capture=False)(1.2)
 
-            @qjit
+            @qjit(capture=False)
             def cir(x: float):
                 return grad(f)(x)
 
@@ -469,9 +469,9 @@ class TestHybridOpVerification:
 
         with patch("catalyst.device.qjit_device.RUNTIME_OPERATIONS", runtime_ops_with_qctrl):
             with pytest.raises(CompileError, match=f"PauliZ is not {unsupported_gate_attribute}"):
-                qjit(f)(1.2)
+                qjit(f, capture=False)(1.2)
 
-            @qjit
+            @qjit(capture=False)
             def cir(x: float):
                 return grad(f)(x)
 
@@ -490,9 +490,9 @@ class TestHybridOpVerification:
             return qp.expval(qp.PauliX(0))
 
         with pytest.raises(CompileError, match=f"PauliZ is not {unsupported_gate_attribute}"):
-            qjit(f)(1.2)
+            qjit(f, capture=False)(1.2)
 
-        @qjit
+        @qjit(capture=False)
         def cir(x: float):
             return grad(f)(x)
 
@@ -511,9 +511,9 @@ class TestHybridOpVerification:
             return qp.expval(qp.PauliX(0))
 
         with pytest.raises(CompileError, match=f"PauliZ is not {unsupported_gate_attribute}"):
-            qjit(f)(1.2)
+            qjit(f, capture=False)(1.2)
 
-        @qjit
+        @qjit(capture=False)
         def cir(x: float):
             return grad(f)(x)
 
@@ -536,7 +536,7 @@ class TestObservableValidation:
             return qp.expval(qp.RX(1.2, 0))
 
         with pytest.raises(CompileError, match="RX.*not supported as an observable"):
-            qjit(f)()
+            qjit(f, capture=False)()
 
     @pytest.mark.parametrize(
         "measurements, invalid_op",
@@ -695,7 +695,7 @@ class TestMeasurementTypeValidation:
             return qp.state()
 
         with pytest.raises(CompileError, match="Please specify shots=None."):
-            qjit(f)()
+            qjit(f, capture=False)()
 
     @pytest.mark.parametrize("measurement", [qp.sample, qp.counts])
     def test_sample_measurements_rejected_without_shots(self, measurement):
@@ -712,7 +712,7 @@ class TestMeasurementTypeValidation:
             return measurement()
 
         with pytest.raises(CompileError, match="Please specify a finite number of shots."):
-            qjit(f)()
+            qjit(f, capture=False)()
 
     def test_unsupported_measurement_types_rejected(self):
         """Test that trying to use a measurement type that is generally unsupported by
@@ -741,7 +741,7 @@ class TestMeasurementTypeValidation:
             return MyMeasurement()
 
         with pytest.raises(CompileError, match="is not a supported measurement process"):
-            qjit(f)()
+            qjit(f, capture=False)()
 
 
 @patch("catalyst.device.qjit_device.catalyst_decompose", null_transform)
@@ -759,7 +759,7 @@ class TestAdjointMethodVerification:
             qp.RX(x, wires=0)
             return qp.expval(qp.PauliX(0))
 
-        @qjit
+        @qjit(capture=False)
         def cir(x: float):
             return grad(f)(x)
 
@@ -789,7 +789,7 @@ class TestAdjointMethodVerification:
             qp.RX(x, wires=0)
             return qp.expval(observable)
 
-        @qjit
+        @qjit(capture=False)
         def cir(x: float):
             return grad(f)(x)
 
@@ -807,7 +807,7 @@ class TestAdjointMethodVerification:
             qp.RX(x, wires=0)
             return qp.probs()
 
-        qjit(f)(1.2)
+        qjit(f, capture=False)(1.2)
 
     def test_non_differentiable_gate_nested_cond(self):
         """Test that taking the adjoint diff of a tape containing a parameterized operation
@@ -829,7 +829,7 @@ class TestAdjointMethodVerification:
 
             return qp.expval(qp.PauliX(0))
 
-        @qjit
+        @qjit(capture=False)
         def cir(x: float):
             return grad(f)(x)
 
@@ -848,7 +848,7 @@ class TestAdjointMethodVerification:
             adjoint(qp.RX(x, wires=[0]))
             return qp.expval(qp.PauliX(0))
 
-        @qjit
+        @qjit(capture=False)
         def cir(x: float):
             return grad(f)(x)
 
@@ -882,7 +882,7 @@ class TestParameterShiftMethodVerification:
             qp.RX(x, wires=0)
             return qp.expval(observable)
 
-        @qjit
+        @qjit(capture=False)
         def cir(x: float):
             return grad(f)(x)
 
@@ -900,7 +900,7 @@ def test_no_state_returns():
         qp.PauliX(wires=0)
         return qp.state()
 
-    @qjit
+    @qjit(capture=False)
     def cir(x: float):
         return grad(f)(x)
 
@@ -916,7 +916,7 @@ def test_no_variance_returns():
         qp.PauliX(wires=0)
         return qp.var(qp.PauliX(0))
 
-    @qjit
+    @qjit(capture=False)
     def cir(x: float):
         return grad(f)(x)
 

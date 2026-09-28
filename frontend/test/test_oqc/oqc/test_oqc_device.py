@@ -107,7 +107,7 @@ class TestOQCCircuit:
         os.environ["OQC_EMAIL"] = "email"
         os.environ["OQC_URL"] = "url"
 
-        @qp.qjit
+        @qp.qjit(capture=False)
         @qp.qnode(qp.device("oqc.cloud", backend="lucy", wires=8))
         def circuit():
             return qp.probs()

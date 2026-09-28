@@ -20,7 +20,7 @@ import pennylane as qp
 from catalyst import measure, qjit
 
 
-@qjit(target="mlir")
+@qjit(target="mlir", capture=False)
 def workflow(n: int):
     @qp.qnode(qp.device("lightning.qubit", wires=1))
     # CHECK-LABEL: public @f

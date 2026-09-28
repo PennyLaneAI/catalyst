@@ -20,7 +20,7 @@ import pennylane as qp
 from catalyst import measure, qjit
 
 
-@qjit(target="mlir")
+@qjit(target="mlir", capture=False)
 @qp.qnode(qp.device("lightning.qubit", wires=2))
 # CHECK-LABEL @f.jit
 def f(arg0: float, arg1: int, arg2: int):
@@ -47,7 +47,7 @@ print(f.mlir)
 # -----
 
 
-@qjit(target="mlir")
+@qjit(target="mlir", capture=False)
 @qp.qnode(qp.device("null.qubit", wires=2))
 # CHECK-LABEL: public @g()
 def g():

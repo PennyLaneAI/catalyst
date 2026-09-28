@@ -115,7 +115,7 @@ class TestCondToJaxpr:
             in (c,) }
             """)
 
-        @qjit()
+        @qjit(capture=False)
         def circuit(n: int):
             @catalyst_cond(n == 5, estimated_probability=0.2)
             def cond_fn():
@@ -158,7 +158,7 @@ class TestCondToJaxpr:
             in (e,) }
             """)
 
-        @qjit()
+        @qjit(capture=False)
         def circuit(n: int):
             @catalyst_cond(n == 5, estimated_probability=0.2)
             def cond_fn():
@@ -221,7 +221,7 @@ class TestEstimatedProbabilityValidation:
         """The partial-probability error propagates through the ``cond`` API when only some
         branches specify ``estimated_probability``."""
 
-        @qjit
+        @qjit(capture=False)
         def circuit(n):
             @catalyst_cond(n == 5, estimated_probability=0.2)
             def cond_fn():
@@ -244,7 +244,7 @@ class TestEstimatedProbabilityValidation:
     def test_probabilities_summing_above_one_raise_through_cond(self):
         """The sum-to-one error propagates through the ``cond`` API."""
 
-        @qjit
+        @qjit(capture=False)
         def circuit(n):
             @catalyst_cond(n == 5, estimated_probability=0.7)
             def cond_fn():
@@ -1376,7 +1376,7 @@ class TestStaticConditionalFolding:
     def test_static_conditional_folded_by_default(self, predicate):
         """A constant predicate is resolved at trace time, leaving no cond primitive."""
 
-        @qjit(target="mlir")
+        @qjit(target="mlir", capture=False)
         def circuit():
             @catalyst_cond(predicate)
             def branch():
@@ -1394,7 +1394,7 @@ class TestStaticConditionalFolding:
         """Disabling the toggle keeps the cond primitive even for a constant predicate."""
         catalyst.compile_without_static_conditionals = False
 
-        @qjit(target="mlir")
+        @qjit(target="mlir", capture=False)
         def circuit():
             @catalyst_cond(True)
             def branch():
@@ -1411,7 +1411,7 @@ class TestStaticConditionalFolding:
     def test_dynamic_conditional_not_folded(self):
         """A predicate depending on a traced argument is never folded."""
 
-        @qjit(target="mlir")
+        @qjit(target="mlir", capture=False)
         def circuit(n: int):
             @catalyst_cond(n == 5)
             def branch():

@@ -161,13 +161,15 @@ class TestMeasurementTransforms:
 
         transformed_circuit = measurements_from_counts(basic_circuit, dev.wires)
 
-        mlir = qjit(transformed_circuit, target="mlir").mlir
+        mlir = qjit(transformed_circuit, target="mlir", capture=False).mlir
         assert "expval" not in mlir
         assert "quantum.var" not in mlir
         assert "counts" in mlir
 
         theta = 1.9
-        expval_res, var_res, counts_res, probs_res = qjit(transformed_circuit, seed=37)(theta)
+        expval_res, var_res, counts_res, probs_res = qjit(
+            transformed_circuit, seed=37, capture=False
+        )(theta)
 
         expval_expected = np.sin(theta) * np.sin(theta / 2)
         var_expected = 1 - np.sin(2 * theta) ** 2
@@ -215,14 +217,16 @@ class TestMeasurementTransforms:
 
         transformed_circuit = measurements_from_samples(basic_circuit, dev.wires)
 
-        mlir = qjit(transformed_circuit, target="mlir").mlir
+        mlir = qjit(transformed_circuit, target="mlir", capture=False).mlir
         assert "expval" not in mlir
         assert "quantum.var" not in mlir
         assert "sample" in mlir
 
         theta = 1.9
 
-        expval_res, var_res, sample_res, probs_res = qjit(transformed_circuit, seed=37)(theta)
+        expval_res, var_res, sample_res, probs_res = qjit(
+            transformed_circuit, seed=37, capture=False
+        )(theta)
 
         expval_expected = np.sin(theta) * np.sin(theta / 2)
         var_expected = 1 - np.sin(2 * theta) ** 2
@@ -275,7 +279,7 @@ class TestMeasurementTransforms:
             assert measurement_transform in transform_program
 
             # MLIR only contains target measurement
-            @qjit
+            @qjit(capture=False)
             @qp.set_shots(100)
             @qp.qnode(dev)
             def circuit(theta: float):
@@ -289,7 +293,7 @@ class TestMeasurementTransforms:
                     qp.probs(wires=[3, 4]),
                 )
 
-            mlir = qjit(circuit, target="mlir").mlir
+            mlir = qjit(circuit, target="mlir", capture=False).mlir
 
         assert "expval" not in mlir
         assert "quantum.var" not in mlir
@@ -328,7 +332,7 @@ class TestMeasurementTransforms:
             assert measurement_transform in transform_program
 
             # MLIR only contains target measurement
-            @qjit
+            @qjit(capture=False)
             @qp.set_shots(1000)
             @qp.qnode(dev)
             def circuit(theta: float):
@@ -342,7 +346,7 @@ class TestMeasurementTransforms:
                     qp.probs(wires=[3, 4]),
                 )
 
-            mlir = qjit(circuit, target="mlir").mlir
+            mlir = qjit(circuit, target="mlir", capture=False).mlir
 
         assert "expval" not in mlir
         assert "quantum.var" not in mlir
@@ -371,7 +375,7 @@ class TestMeasurementTransforms:
             with pytest.raises(
                 RuntimeError, match="The device does not support observables or sample/counts"
             ):
-                qjit(circuit)()
+                qjit(circuit, capture=False)()
 
     # pylint: disable=unnecessary-lambda
     @pytest.mark.parametrize(
@@ -399,7 +403,7 @@ class TestMeasurementTransforms:
 
         theta = 2.5
         counts_expected = circuit(theta)
-        res = qjit(measurements_from_counts(circuit, dev.wires), seed=37)(theta)
+        res = qjit(measurements_from_counts(circuit, dev.wires), seed=37, capture=False)(theta)
 
         # counts comparison by converting catalyst format to PL style eigvals dict
         basis_states, counts = res
@@ -455,7 +459,7 @@ class TestMeasurementTransforms:
             return measurement()
 
         theta = 2.5
-        res = qjit(measurements_from_samples(circuit, dev.wires), seed=37)(theta)
+        res = qjit(measurements_from_samples(circuit, dev.wires), seed=37, capture=False)(theta)
         # PL flattens N-by-1 2D result arrays into size-N 1D arrays, but Catalyst does not
         if len(measurement().wires) == 1:
             res = res.flatten()
@@ -507,7 +511,7 @@ class TestMeasurementTransforms:
 
         dev = qp.device("lightning.qubit", wires=4)
 
-        @qjit(seed=37)
+        @qjit(seed=37, capture=False)
         @partial(measurements_from_samples, device_wires=dev.wires)
         @qp.set_shots(shots)
         @qp.qnode(dev)
@@ -516,7 +520,7 @@ class TestMeasurementTransforms:
             qp.RX(theta / 2, 1)
             return input_measurement()
 
-        mlir = qjit(circuit, target="mlir").mlir
+        mlir = qjit(circuit, target="mlir", capture=False).mlir
         assert "expval" not in mlir
         assert "sample" in mlir
 
@@ -563,7 +567,7 @@ class TestMeasurementTransforms:
 
         dev = qp.device("lightning.qubit", wires=4)
 
-        @qjit(seed=37)
+        @qjit(seed=37, capture=False)
         @partial(measurements_from_counts, device_wires=dev.wires)
         @qp.set_shots(3000)
         @qp.qnode(dev)
@@ -572,7 +576,7 @@ class TestMeasurementTransforms:
             qp.RX(theta / 2, 1)
             return input_measurement()
 
-        mlir = qjit(circuit, target="mlir").mlir
+        mlir = qjit(circuit, target="mlir", capture=False).mlir
         assert "expval" not in mlir
         assert "counts" in mlir
 
@@ -599,7 +603,7 @@ class TestMeasurementTransforms:
             qp.RX(theta, 0)
             return qp.sample()
 
-        compiled_circuit = qjit(circuit)
+        compiled_circuit = qjit(circuit, capture=False)
 
         with pytest.raises(
             NotImplementedError, match="not implemented with measurements_from_counts"
@@ -619,7 +623,7 @@ class TestMeasurementTransforms:
             qp.RX(theta, 0)
             return qp.counts()
 
-        compiled_circuit = qjit(circuit)
+        compiled_circuit = qjit(circuit, capture=False)
 
         with pytest.raises(
             NotImplementedError, match="not implemented with measurements_from_samples"
@@ -664,7 +668,7 @@ class TestMeasurementTransforms:
             "catalyst.device.qjit_device.filter_device_capabilities_with_shots",
             Mock(return_value=config),
         ):
-            jitted_circuit = qjit(circuit)
+            jitted_circuit = qjit(circuit, capture=False)
 
             transform_program, _ = spy.spy_return
             assert split_non_commuting in transform_program
@@ -696,7 +700,7 @@ class TestMeasurementTransforms:
         def circuit():
             return qp.expval(qp.X(0)), qp.var(qp.Y(1)), qp.expval(qp.Hadamard(2))
 
-        mlir = qjit(circuit, target="mlir").mlir
+        mlir = qjit(circuit, target="mlir", capture=False).mlir
         for obs in unsupported_obs:
             assert f"{obs}] : !quantum.obs" in mlir
 
@@ -709,7 +713,7 @@ class TestMeasurementTransforms:
             "catalyst.device.qjit_device.filter_device_capabilities_with_shots",
             Mock(return_value=config),
         ):
-            mlir = qjit(circuit, target="mlir").mlir
+            mlir = qjit(circuit, target="mlir", capture=False).mlir
 
             for obs in unsupported_obs:
                 assert f"{obs}] : !quantum.obs" not in mlir
@@ -842,7 +846,7 @@ class TestMeasurementTransforms:
             "catalyst.device.qjit_device.filter_device_capabilities_with_shots",
             Mock(return_value=config),
         ):
-            jitted_circuit = qjit(unjitted_circuit)
+            jitted_circuit = qjit(unjitted_circuit, capture=False)
             assert len(jitted_circuit(1.2)) == len(expected_result) == 2
             assert np.allclose(jitted_circuit(1.2), expected_result)
 
@@ -855,7 +859,7 @@ class TestMeasurementTransforms:
             "catalyst.device.qjit_device.filter_device_capabilities_with_shots",
             Mock(return_value=config),
         ):
-            jitted_circuit = qjit(unjitted_circuit)
+            jitted_circuit = qjit(unjitted_circuit, capture=False)
             assert len(jitted_circuit(1.2)) == len(expected_result) == 2
             assert np.allclose(jitted_circuit(1.2), unjitted_circuit(1.2))
 
@@ -887,7 +891,7 @@ class TestMeasurementTransforms:
         assert "Sum" in config.observables
 
         # test case where transform should not be applied
-        jitted_circuit = qjit(unjitted_circuit)
+        jitted_circuit = qjit(unjitted_circuit, capture=False)
         assert len(jitted_circuit(1.2)) == len(expected_result) == 2
         assert np.allclose(jitted_circuit(1.2), expected_result)
 
@@ -900,7 +904,7 @@ class TestMeasurementTransforms:
             "catalyst.device.qjit_device.filter_device_capabilities_with_shots",
             Mock(return_value=config),
         ):
-            jitted_circuit = qjit(unjitted_circuit)
+            jitted_circuit = qjit(unjitted_circuit, capture=False)
             assert len(jitted_circuit(1.2)) == len(expected_result) == 2
             assert np.allclose(jitted_circuit(1.2), unjitted_circuit(1.2))
 
@@ -915,7 +919,7 @@ class TestTransform:
         """Test the transfom measurements_from_counts."""
         device = qp.device("lightning.qubit", wires=4)
 
-        @qjit
+        @qjit(capture=False)
         @partial(measurements_from_counts, device_wires=device.wires)
         @qp.set_shots(1000)
         @qp.qnode(device=device)
@@ -971,6 +975,6 @@ class TestTransform:
                 CompileError,
                 match=f"'{transform_measurement.__name__}' transform is not supported",
             ):
-                qjit(circuit)()
+                qjit(circuit, capture=False)()
         else:
-            qjit(circuit)()
+            qjit(circuit, capture=False)()

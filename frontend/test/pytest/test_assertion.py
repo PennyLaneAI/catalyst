@@ -25,7 +25,7 @@ class TestAssertion:
     def test_static_assertion_true(self):
         """Test that the static true assertion always passes."""
 
-        @qjit
+        @qjit(capture=False)
         def circuit(x):
             debug_assert(True, "Always pass")
             return x * 8
@@ -35,7 +35,7 @@ class TestAssertion:
     def test_static_assertion_false(self):
         """Test that the static false assertion always fails."""
 
-        @qjit
+        @qjit(capture=False)
         def circuit(x):
             debug_assert(False, "Always fail")
             return x * 8
@@ -46,7 +46,7 @@ class TestAssertion:
     def test_dynamic_assertion(self):
         """Test that the dynamic assertions work."""
 
-        @qjit
+        @qjit(capture=False)
         def circuit(x):
             debug_assert(x < 6, "x greater than 6")
             return x * 8
@@ -58,7 +58,7 @@ class TestAssertion:
     def test_disabling_assertions_static(self):
         """Test that disabling static assertion works."""
 
-        @qjit(disable_assertions=True)
+        @qjit(disable_assertions=True, capture=False)
         def circuit(x):
             debug_assert(False, "x greater than 6")
             return x * 8
@@ -68,7 +68,7 @@ class TestAssertion:
     def test_disabling_assertions_dynamic(self):
         """Test that disabling static assertion works."""
 
-        @qjit(disable_assertions=True)
+        @qjit(disable_assertions=True, capture=False)
         def circuit(x):
             debug_assert(x < 6, "x greater than 6")
             return x * 8
@@ -84,14 +84,14 @@ class TestAssertion:
             return True
 
         with pytest.raises(RuntimeError, match="Always raise"):
-            qjit(circuit)()
+            qjit(circuit, capture=False)()
 
-        assert qjit(disable_assertions=True)(circuit)() == True
+        assert qjit(disable_assertions=True, capture=False)(circuit)() == True
 
         with pytest.raises(RuntimeError, match="Always raise"):
-            qjit(circuit)()
+            qjit(circuit, capture=False)()
 
-        assert qjit(disable_assertions=True)(circuit)() == True
+        assert qjit(disable_assertions=True, capture=False)(circuit)() == True
 
 
 if __name__ == "__main__":

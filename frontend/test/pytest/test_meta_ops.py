@@ -76,7 +76,7 @@ def test_adjoint(g):
         qp.adjoint(g)
         return qp.state()
 
-    result = qjit(qp.qnode(qp.device("lightning.qubit", wires=4))(circuit))()
+    result = qjit(qp.qnode(qp.device("lightning.qubit", wires=4))(circuit), capture=False)()
     expected = qp.qnode(qp.device("default.qubit", 4), interface="jax")(circuit)()
 
     assert jnp.allclose(result, expected)
@@ -90,7 +90,7 @@ def test_control(g, ctrls):
         qp.ctrl(g, control=ctrls)
         return qp.state()
 
-    result = qjit(qp.qnode(qp.device("lightning.qubit", wires=7))(circuit))()
+    result = qjit(qp.qnode(qp.device("lightning.qubit", wires=7))(circuit), capture=False)()
     expected = qp.qnode(qp.device("default.qubit", 7), interface="jax")(circuit)()
 
     assert jnp.allclose(result, expected)
@@ -104,7 +104,9 @@ def test_control_variable_wires(g, ctrls):
         qp.ctrl(g, control=ctrls)
         return qp.state()
 
-    result = qjit(qp.qnode(qp.device("lightning.qubit", wires=7))(circuit))(jnp.array(ctrls))
+    result = qjit(qp.qnode(qp.device("lightning.qubit", wires=7))(circuit), capture=False)(
+        jnp.array(ctrls)
+    )
     expected = qp.qnode(qp.device("default.qubit", 7), interface="jax")(circuit)(ctrls)
 
     assert jnp.allclose(result, expected)

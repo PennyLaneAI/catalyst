@@ -75,7 +75,7 @@ def test_circuit():
     # CHECK:   quantum.device shots([[shots]]) ["[[PATH:.*]]librtd_null_qubit.{{so|dylib}}", "Custom", "{}"]
     dev = CustomDevice(wires=2)
 
-    @qjit(target="mlir")
+    @qjit(target="mlir", capture=False)
     @qp.set_shots(2048)
     @qp.qnode(device=dev)
     def circuit():
@@ -102,7 +102,7 @@ def test_preprocess():
     # CHECK:   quantum.device shots([[shots]]) ["[[PATH:.*]]librtd_null_qubit.{{so|dylib}}", "Custom", "{}"]
     dev = CustomDevice(wires=2)
 
-    @qjit(target="mlir")
+    @qjit(target="mlir", capture=False)
     @qp.set_shots(2048)
     @qp.qnode(device=dev)
     def circuit_split():

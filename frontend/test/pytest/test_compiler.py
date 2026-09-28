@@ -72,7 +72,7 @@ class TestCompilerOptions:
 
         verbose = logfile is not None
 
-        @qjit(verbose=verbose, logfile=logfile, keep_intermediate=keep_intermediate)
+        @qjit(verbose=verbose, logfile=logfile, keep_intermediate=keep_intermediate, capture=False)
         @qp.qnode(qp.device(backend, wires=1))
         def workflow(x):
             qp.RX(x, wires=0)
@@ -97,7 +97,7 @@ class TestCompilerOptions:
             return qp.state()
 
         with instrumentation(circuit.__name__, filename=None, detailed=True):
-            qjit(circuit)()
+            qjit(circuit, capture=False)()
 
         capture_result = capsys.readouterr()
         capture = capture_result.out + capture_result.err
@@ -121,32 +121,32 @@ class TestCompilerOptions:
     )
     def test_keep_intermediate_levels_conversion(self, input_value, expected_level):
         """Test that various inputs for keep_intermediate are correctly converted to Enum."""
-        options = CompileOptions(keep_intermediate=input_value)
+        options = CompileOptions(keep_intermediate=input_value, capture=False)
         assert options.keep_intermediate == expected_level
 
     @pytest.mark.parametrize("invalid_input", [4, -1, "invalid_string", 4.0, []])
     def test_keep_intermediate_invalid_inputs(self, invalid_input):
         """Test that invalid inputs for keep_intermediate raise appropriate errors."""
         with pytest.raises(ValueError, match="Invalid value for keep_intermediate:"):
-            CompileOptions(keep_intermediate=invalid_input)
+            CompileOptions(keep_intermediate=invalid_input, capture=False)
 
     def test_options_to_cli_flags_keep_intermediate_none(self):
         """Test _options_to_cli_flags with KeepIntermediateLevel.NONE."""
-        options = CompileOptions(keep_intermediate=KeepIntermediateLevel.NONE)
+        options = CompileOptions(keep_intermediate=KeepIntermediateLevel.NONE, capture=False)
         flags = _options_to_cli_flags(options)
         assert "--keep-intermediate" not in flags
         assert "--save-ir-after-each=pass" not in flags
 
     def test_options_to_cli_flags_keep_intermediate_basic(self):
         """Test _options_to_cli_flags with KeepIntermediateLevel.PIPELINE."""
-        options = CompileOptions(keep_intermediate=KeepIntermediateLevel.PIPELINE)
+        options = CompileOptions(keep_intermediate=KeepIntermediateLevel.PIPELINE, capture=False)
         flags = _options_to_cli_flags(options)
         assert "--keep-intermediate" in flags
         assert "--save-ir-after-each=pass" not in flags
 
     def test_options_to_cli_flags_keep_intermediate_changed(self):
         """Test _options_to_cli_flags with KeepIntermediateLevel.CHANGED."""
-        options = CompileOptions(keep_intermediate=KeepIntermediateLevel.CHANGED)
+        options = CompileOptions(keep_intermediate=KeepIntermediateLevel.CHANGED, capture=False)
         flags = _options_to_cli_flags(options)
         assert "--keep-intermediate" in flags
         assert "--save-ir-after-each=changed" in flags
@@ -154,7 +154,7 @@ class TestCompilerOptions:
 
     def test_options_to_cli_flags_keep_intermediate_pass(self):
         """Test _options_to_cli_flags with KeepIntermediateLevel.PASS."""
-        options = CompileOptions(keep_intermediate=KeepIntermediateLevel.PASS)
+        options = CompileOptions(keep_intermediate=KeepIntermediateLevel.PASS, capture=False)
         flags = _options_to_cli_flags(options)
         assert "--keep-intermediate" in flags
         assert "--save-ir-after-each=pass" in flags
@@ -232,13 +232,13 @@ class TestDefaultFlags:
     def test_rt_executor_linked_when_present(self, monkeypatch):
         """-lrt_executor is added when librt_executor exists in the runtime lib dir."""
         self._patch_isfile(monkeypatch, overrides={self._lib_name("librt_executor"): True})
-        flags = LinkerDriver.get_default_flags(CompileOptions())
+        flags = LinkerDriver.get_default_flags(CompileOptions(capture=False))
         assert "-lrt_executor" in flags
 
     def test_rt_executor_not_linked_when_absent(self, monkeypatch):
         """-lrt_executor is omitted when librt_executor is missing."""
         self._patch_isfile(monkeypatch, overrides={self._lib_name("librt_executor"): False})
-        flags = LinkerDriver.get_default_flags(CompileOptions())
+        flags = LinkerDriver.get_default_flags(CompileOptions(capture=False))
         assert "-lrt_executor" not in flags
 
 
@@ -256,7 +256,9 @@ class TestCompilerWarnings:
         """Test that a warning is emitted when a compiler failed."""
         with pytest.warns(UserWarning, match="Compiler .* failed .*"):
             # pylint: disable=protected-access
-            LinkerDriver._attempt_link("cc", [""], "in.o", "out.so", CompileOptions(verbose=True))
+            LinkerDriver._attempt_link(
+                "cc", [""], "in.o", "out.so", CompileOptions(verbose=True, capture=False)
+            )
 
 
 class TestCompilerErrors:
@@ -327,7 +329,7 @@ void _catalyst_pyface_jit_cpp_exception_test(void*, void*) {
                         "<FAKE_IR>",
                     )
 
-        @qjit(target="mlir")
+        @qjit(target="mlir", capture=False)
         @qp.qnode(qp.device(backend, wires=1))
         def cpp_exception_test():
             return None
@@ -350,7 +352,7 @@ class TestCompilerState:
     def test_invalid_target(self):
         """Test that nothing happens in AOT compilation when an invalid target is provided."""
 
-        @qjit(target="hello")
+        @qjit(target="hello", capture=False)
         def f():
             return 0
 
@@ -369,7 +371,12 @@ class TestCompilerState:
 
         log = io.StringIO()  # for inspection
         options = CompileOptions(
-            lower_to_llvm=False, link=False, pipelines=test_pipes, verbose=True, logfile=log
+            lower_to_llvm=False,
+            link=False,
+            pipelines=test_pipes,
+            verbose=True,
+            logfile=log,
+            capture=False,
         )
 
         compiled = QJIT(f, options)
@@ -400,7 +407,7 @@ class TestCompilerState:
             def __call__(self, x):
                 return x
 
-        f = qjit(NoNameClass())
+        f = qjit(NoNameClass(), capture=False)
 
         assert f(3) == 3
         assert f.__name__ == "unknown"
@@ -408,12 +415,13 @@ class TestCompilerState:
     def test_print_stages(self, backend):
         """Test that after compiling the intermediate files exist."""
 
-        options = CompileOptions()
+        options = CompileOptions(capture=False)
         pipelines = options.get_stages()
 
         @qjit(
             keep_intermediate=True,
             pipelines=[("EmptyPipeline1", [])] + pipelines + [("EmptyPipeline2", [])],
+            capture=False,
         )
         @qp.qnode(qp.device(backend, wires=1))
         def workflow(x):
@@ -440,7 +448,7 @@ class TestCompilerState:
     def test_print_nonexistent_stages(self, backend):
         """What happens if we attempt to print something that doesn't exist?"""
 
-        @qjit(keep_intermediate=True)
+        @qjit(keep_intermediate=True, capture=False)
         @qp.qnode(qp.device(backend, wires=1))
         def workflow(x):
             qp.RX(x, wires=0)
@@ -493,7 +501,11 @@ class TestCompilerState:
         test_pipelines = [("PipelineA", ["canonicalize"]), ("PipelineB", ["test"])]
         with pytest.raises(CompileError) as e:
             compiled = qjit(
-                circuit, pipelines=test_pipelines, target="mlir", keep_intermediate=True
+                circuit,
+                pipelines=test_pipelines,
+                target="mlir",
+                keep_intermediate=True,
+                capture=False,
             )
             compiled.compile()
 
@@ -506,7 +518,7 @@ class TestCompilerState:
         compiled.workspace.cleanup()
 
         with pytest.raises(CompileError) as e:
-            qjit(circuit, pipelines=test_pipelines, verbose=True)()
+            qjit(circuit, pipelines=test_pipelines, verbose=True, capture=False)()
 
         assert stack_trace_pattern in e.value.args[0]
 
@@ -523,7 +535,7 @@ class TestCustomCall:
             B = qp.math.sqrt_matrix(A)
             return B @ A
 
-        qjit_result = qjit(workflow)(A)
+        qjit_result = qjit(workflow, capture=False)(A)
         pl_result = workflow(A)
         assert np.allclose(qjit_result, pl_result)
 
@@ -536,7 +548,7 @@ class TestCustomCall:
             B = qp.math.sqrt_matrix(A) @ qp.math.sqrt_matrix(A)
             return B @ A
 
-        qjit_result = qjit(workflow)(A)
+        qjit_result = qjit(workflow, capture=False)(A)
         pl_result = workflow(A)
         assert np.allclose(qjit_result, pl_result)
 

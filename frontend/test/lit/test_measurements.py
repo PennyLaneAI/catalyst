@@ -34,7 +34,7 @@ from catalyst.jax_primitives import compbasis_p, counts_p, sample_p
 
 try:
     # COM: CHECK-LABEL: public @sample1(
-    @qjit(target="mlir")
+    @qjit(target="mlir", capture=False)
     @qp.set_shots(1000)
     @qp.qnode(qp.device("lightning.qubit", wires=2))
     def sample1(x: float, y: float):
@@ -50,7 +50,7 @@ try:
     print(sample1.mlir)
 
     # COM: CHECK-LABEL: public @sample2(
-    @qjit(target="mlir")
+    @qjit(target="mlir", capture=False)
     @qp.set_shots(1000)
     @qp.qnode(qp.device("lightning.qubit", wires=2))
     def sample2(x: float, y: float):
@@ -72,7 +72,7 @@ except CompileError:
 
 
 # CHECK-LABEL: public @sample3(
-@qjit(target="mlir")
+@qjit(target="mlir", capture=False)
 @qp.set_shots(1000)
 @qp.qnode(qp.device("lightning.qubit", wires=2))
 # CHECK: [[shots:%.+]] = arith.constant 1000 : i64
@@ -98,7 +98,7 @@ print(sample3.mlir)
 
 
 # CHECK-LABEL: public @test_sample_static(
-@qjit
+@qjit(capture=False)
 @qp.qnode(
     qp.device("null.qubit", wires=1)
 )  # SampleOp is only legal if there is a device in the same scope
@@ -114,7 +114,7 @@ def test_sample_static():
 print(test_sample_static.mlir)
 
 
-@qjit
+@qjit(capture=False)
 def test_sample_dynamic(shots: int):
     """Test that the sample primitive with dynamic shape can be correctly compiled to mlir."""
 
@@ -141,7 +141,7 @@ print(test_sample_dynamic.mlir)
 
 
 # CHECK-LABEL: @sample_dynamic_qubits
-@qjit(target="mlir")
+@qjit(target="mlir", capture=False)
 def sample_dynamic_qubits(num_qubits):
     @qp.set_shots(37)
     @qp.qnode(qp.device("lightning.qubit", wires=num_qubits))
@@ -169,7 +169,7 @@ print(sample_dynamic_qubits.mlir)
 try:
 
     # COM: CHECK-LABEL: public @counts1(
-    @qjit(target="mlir")
+    @qjit(target="mlir", capture=False)
     @qp.set_shots(1000)
     @qp.qnode(qp.device("lightning.qubit", wires=2))
     def counts1(x: float, y: float):
@@ -184,7 +184,7 @@ try:
 
     print(counts1.mlir)
 
-    @qjit(target="mlir")
+    @qjit(target="mlir", capture=False)
     @qp.set_shots(1000)
     @qp.qnode(qp.device("lightning.qubit", wires=2))
     def counts2(x: float, y: float):
@@ -206,7 +206,7 @@ except:
 
 
 # CHECK-LABEL: public @counts3(
-@qjit(target="mlir")
+@qjit(target="mlir", capture=False)
 @qp.set_shots(1000)
 @qp.qnode(qp.device("lightning.qubit", wires=2))
 # CHECK: [[shots:%.+]] = arith.constant 1000 : i64
@@ -232,7 +232,7 @@ print(counts3.mlir)
 
 
 # CHECK-LABEL: public @jit_test_counts_static(
-@qjit(target="mlir")
+@qjit(target="mlir", capture=False)
 @qp.qnode(qp.device("null.qubit", wires=0))
 def test_counts_static():
     """Test that the counts primitive can be correctly compiled to mlir."""
@@ -247,7 +247,7 @@ print(test_counts_static.mlir)
 
 
 # CHECK-LABEL: @counts_dynamic_qubits
-@qjit(target="mlir")
+@qjit(target="mlir", capture=False)
 def counts_dynamic_qubits(num_qubits):
     @qp.set_shots(37)
     @qp.qnode(qp.device("lightning.qubit", wires=num_qubits))
@@ -268,7 +268,7 @@ print(counts_dynamic_qubits.mlir)
 
 
 # CHECK-LABEL: public @expval1(
-@qjit(target="mlir")
+@qjit(target="mlir", capture=False)
 @qp.qnode(qp.device("lightning.qubit", wires=2))
 def expval1(x: float, y: float):
     qp.RX(x, wires=0)
@@ -285,7 +285,7 @@ print(expval1.mlir)
 
 
 # CHECK-LABEL: public @expval2(
-@qjit(target="mlir")
+@qjit(target="mlir", capture=False)
 @qp.qnode(qp.device("lightning.qubit", wires=3))
 def expval2(x: float, y: float):
     # CHECK: [[q0:%.+]] = quantum.custom "RX"
@@ -307,7 +307,7 @@ print(expval2.mlir)
 
 
 # CHECK-LABEL: public @expval3(
-@qjit(target="mlir")
+@qjit(target="mlir", capture=False)
 @qp.qnode(qp.device("lightning.qubit", wires=2))
 def expval3():
     A = np.array([[complex(1.0, 0.0), complex(2.0, 0.0)], [complex(2.0, 0.0), complex(1.0, 0.0)]])
@@ -321,7 +321,7 @@ print(expval3.mlir)
 
 
 # CHECK-LABEL: public @expval4(
-@qjit(target="mlir")
+@qjit(target="mlir", capture=False)
 @qp.qnode(qp.device("lightning.qubit", wires=2))
 def expval4():
     B = np.array(
@@ -342,7 +342,7 @@ print(expval4.mlir)
 
 
 # CHECK-LABEL: public @expval5(
-@qjit(target="mlir")
+@qjit(target="mlir", capture=False)
 @qp.qnode(qp.device("lightning.qubit", wires=3))
 def expval5(x: float, y: float):
     # CHECK: [[q0:%.+]] = quantum.custom "RX"
@@ -372,7 +372,7 @@ print(expval5.mlir)
 
 
 # CHECK-LABEL: public @expval6(
-@qjit(target="mlir")
+@qjit(target="mlir", capture=False)
 @qp.qnode(qp.device("lightning.qubit", wires=3))
 def expval6(x: float, y: float):
     # CHECK: [[q0:%.+]] = quantum.custom "RX"
@@ -400,7 +400,7 @@ print(expval6.mlir)
 
 
 # CHECK-LABEL: public @expval7(
-@qjit(target="mlir")
+@qjit(target="mlir", capture=False)
 @qp.qnode(qp.device("lightning.qubit", wires=2))
 def expval7(x: float):
     # CHECK: [[q0:%.+]] = quantum.custom "RX"
@@ -429,7 +429,7 @@ print(expval7.mlir)
 
 
 # CHECK-LABEL: public @expval8(
-@qjit(target="mlir")
+@qjit(target="mlir", capture=False)
 @qp.qnode(qp.device("lightning.qubit", wires=2))
 def expval8():
     A = np.array([[complex(1.0, 0.0), complex(2.0, 0.0)], [complex(2.0, 0.0), complex(1.0, 0.0)]])
@@ -443,7 +443,7 @@ print(expval8.mlir)
 
 
 # CHECK-LABEL: public @expval9(
-@qjit(target="mlir")
+@qjit(target="mlir", capture=False)
 @qp.qnode(qp.device("lightning.qubit", wires=2))
 def expval9():
     B = np.array(
@@ -464,7 +464,7 @@ print(expval9.mlir)
 
 
 # CHECK-LABEL: public @expval10(
-@qjit(target="mlir")
+@qjit(target="mlir", capture=False)
 @qp.qnode(qp.device("lightning.qubit", wires=3))
 def expval10(x: float, y: float):
     # CHECK: [[q0:%.+]] = quantum.custom "RX"
@@ -486,7 +486,7 @@ print(expval10.mlir)
 
 
 # CHECK-LABEL: public @expval11(
-@qjit(target="mlir")
+@qjit(target="mlir", capture=False)
 @qp.qnode(qp.device("lightning.qubit", wires=3))
 def expval11(x: float, y: float):
     # CHECK: [[q0:%.+]] = quantum.custom "RX"
@@ -516,7 +516,7 @@ print(expval11.mlir)
 
 
 # CHECK-LABEL: @expval12
-@qjit(target="mlir")
+@qjit(target="mlir", capture=False)
 def expval12(num_qubits):
     # CHECK: func.func public @circ(%arg0: tensor<i64>) -> tensor<f64>
     @qp.qnode(qp.device("lightning.qubit", wires=num_qubits))
@@ -548,7 +548,7 @@ print(expval12.mlir)
 
 
 # CHECK-LABEL: @expval13
-@qjit(target="mlir")
+@qjit(target="mlir", capture=False)
 def expval13():
     # CHECK: func.func public @circ() -> (tensor<f64>, tensor<f64>)
     @qp.qnode(qp.device("null.qubit", wires=1))
@@ -566,7 +566,7 @@ print(expval13.mlir)
 
 
 # CHECK-LABEL: @expval14
-@qjit(target="mlir")
+@qjit(target="mlir", capture=False)
 def expval14():
     A = np.zeros((4, 4), dtype=complex)
     B = np.zeros((2, 2), dtype=complex)
@@ -596,7 +596,7 @@ print(expval14.mlir)
 
 
 # CHECK-LABEL: public @var1(
-@qjit(target="mlir")
+@qjit(target="mlir", capture=False)
 @qp.qnode(qp.device("lightning.qubit", wires=2))
 def var1(x: float, y: float):
     qp.RX(x, wires=0)
@@ -613,7 +613,7 @@ print(var1.mlir)
 
 
 # CHECK-LABEL: public @var2(
-@qjit(target="mlir")
+@qjit(target="mlir", capture=False)
 @qp.qnode(qp.device("lightning.qubit", wires=3))
 def var2(x: float, y: float):
     qp.RX(x, wires=0)
@@ -638,7 +638,7 @@ print(var2.mlir)
 
 
 # CHECK-LABEL: public @probs1(
-@qjit(target="mlir")
+@qjit(target="mlir", capture=False)
 @qp.qnode(qp.device("lightning.qubit", wires=2))
 def probs1(x: float, y: float):
     qp.RX(x, wires=0)
@@ -659,7 +659,7 @@ print(probs1.mlir)
 
 
 # CHECK-LABEL: @probs_dynamic_with_wires
-@qjit(target="mlir")
+@qjit(target="mlir", capture=False)
 def probs_dynamic_with_wires(num_qubits):
     @qp.qnode(qp.device("lightning.qubit", wires=num_qubits))
     def circ():
@@ -674,7 +674,7 @@ print(probs_dynamic_with_wires.mlir)
 
 
 # CHECK-LABEL: @probs_dynamic_without_wires
-@qjit(target="mlir")
+@qjit(target="mlir", capture=False)
 def probs_dynamic_without_wires(num_qubits):
     @qp.qnode(qp.device("lightning.qubit", wires=num_qubits))
     def circ():
@@ -694,7 +694,7 @@ print(probs_dynamic_without_wires.mlir)
 
 
 # CHECK-LABEL: public @state1(
-@qjit(target="mlir")
+@qjit(target="mlir", capture=False)
 @qp.qnode(qp.device("lightning.qubit", wires=2))
 def state1(x: float, y: float):
     # CHECK: [[reg:%.+]] = quantum.alloc( 2) : !quantum.reg
@@ -719,7 +719,7 @@ print(state1.mlir)
 
 
 # CHECK-LABEL: @state_dynamic
-@qjit(target="mlir")
+@qjit(target="mlir", capture=False)
 def state_dynamic(num_qubits):
     @qp.qnode(qp.device("lightning.qubit", wires=num_qubits))
     def circ():
@@ -739,7 +739,7 @@ print(state_dynamic.mlir)
 
 
 # CHECK-LABEL: @automatic_qubit_management
-@qjit(target="mlir")
+@qjit(target="mlir", capture=False)
 def automatic_qubit_management():
     @qp.qnode(qp.device("lightning.qubit"))
     def circ():
@@ -762,7 +762,7 @@ print(automatic_qubit_management.mlir)
 
 
 # CHECK-LABEL: @test_multiple_terminal_measurements
-@qjit(target="mlir")
+@qjit(target="mlir", capture=False)
 @qp.qnode(qp.device("null.qubit", wires=2), shots=1000)
 def test_multiple_terminal_measurements():
     # CHECK: [[q0:%.+]] = quantum.extract {{%.+}}[ 0] : !quantum.reg -> !quantum.bit

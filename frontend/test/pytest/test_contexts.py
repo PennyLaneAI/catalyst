@@ -33,7 +33,7 @@ class TestAccelerateContext:
     def test_in_accelerate_context(self):
         """Test that AccelerateContext returns True when in an accelerate context."""
 
-        @qjit
+        @qjit(capture=False)
         @accelerate
         def identity(x: float):
             assert AccelerateContext.am_inside_accelerate()
@@ -44,7 +44,7 @@ class TestAccelerateContext:
     def test_not_in_accelerate_context(self):
         """Test that AccelerateContext returns False when not in an accelerate context."""
 
-        @qjit
+        @qjit(capture=False)
         def identity(x: float):
             assert not AccelerateContext.am_inside_accelerate()
             return x
@@ -112,7 +112,7 @@ class TestGradContextIntegration:
     def test_assert_inside_grad(self):
         """Test assertion of grad context with grad"""
 
-        @qjit
+        @qjit(capture=False)
         @grad
         def identity(x: float):
             assert GradContext.am_inside_grad()
@@ -125,7 +125,7 @@ class TestGradContextIntegration:
 
         arg = jnp.array([[1.0, 1.0], [1.0, 1.0]])
 
-        @qjit
+        @qjit(capture=False)
         @jacobian
         def identity(x):
             assert GradContext.am_inside_grad()
@@ -143,7 +143,7 @@ class TestGradContextIntegration:
             assert not GradContext.am_inside_grad(), msg
             return x
 
-        identity = qjit(identity)
+        identity = qjit(identity, capture=False)
 
         with pytest.raises(AssertionError, match=msg):
             identity(1.2)
@@ -178,15 +178,18 @@ class TestEvaluationModes:
         wrapper(EvaluationMode.INTERPRETATION)()
         with EvaluationContext(EvaluationMode.INTERPRETATION):
             wrapper(EvaluationMode.INTERPRETATION)()
-        qjit(wrapper(EvaluationMode.CLASSICAL_COMPILATION))()
-        qjit(qp.qnode(qp.device(backend, wires=1))(wrapper(EvaluationMode.QUANTUM_COMPILATION)))()
+        qjit(wrapper(EvaluationMode.CLASSICAL_COMPILATION), capture=False)()
+        qjit(
+            qp.qnode(qp.device(backend, wires=1))(wrapper(EvaluationMode.QUANTUM_COMPILATION)),
+            capture=False,
+        )()
 
 
 class TestTracing:
     def test_fixed_tracing(self, backend):
         """Test fixed tracing."""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=1))
         def circuit():
             m = measure(wires=0)
@@ -213,7 +216,7 @@ class TestTracing:
 
             return m
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=3))
         def circuit(n):
             @while_loop(lambda i: i < n)
@@ -235,7 +238,7 @@ class TestTracing:
     def test_discarded_measurements(self, backend):
         """Test discarded measurements."""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=2))
         def circuit():
             qp.state()
@@ -246,7 +249,7 @@ class TestTracing:
     def test_mixed_result_types(self, backend):
         """Test mixed result types."""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=1))
         def circuit():
             @while_loop(lambda _, repeat: repeat)
@@ -269,7 +272,7 @@ def test_complex_dialect(backend):
     def circuit():
         return qp.state()
 
-    @qjit
+    @qjit(capture=False)
     def workflow():
         x = circuit()[0]  # pylint: disable=unsubscriptable-object
         return jnp.sum(x).real

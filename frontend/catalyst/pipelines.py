@@ -137,9 +137,9 @@ class CompileOptions:
         dialect_plugins (Optional[Iterable[Path]]): List of paths to dialect plugins.
         capture (Optional[Union[str, bool]]): Controls whether to use PennyLane program capture.
 
-            - ``"global"`` (default): Defer to ``qp.capture.enabled()``
-            - ``True``: Force program capture on, regardless of global setting
+            - ``True`` (default): Force program capture on, regardless of global setting
             - ``False``: Force program capture off (use old frontend)
+            - ``"global"``: Defer to ``qp.capture.enabled()``
         skip_preprocess (bool): Controls whether or not to skip quantum device preprocessing.
             If ``True``, transforms used to preprocess and validate the user program before
             executing on a quantum backend will not be used, and the user is expected to ensure
@@ -173,7 +173,7 @@ class CompileOptions:
     circuit_transform_pipeline: Optional[dict[str, dict[str, str]]] = None
     pass_plugins: Optional[Set[Path]] = None
     dialect_plugins: Optional[Set[Path]] = None
-    capture: bool | Literal["global"] = "global"
+    capture: bool | Literal["global"] = True
     skip_preprocess: bool = False
     runtime_artifacts: tuple[str, ...] = ()
     collect_decomp_rules: bool = True

@@ -50,7 +50,7 @@ def test_multiple_tape_transforms():
 
     dispatched_transform = qp.transform(my_quantum_transform)
 
-    @qjit
+    @qjit(capture=False)
     @dispatched_transform
     @qp.qnode(qp.device("lightning.qubit", wires=2))
     def circuit_twotapes(x):

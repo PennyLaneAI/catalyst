@@ -24,7 +24,7 @@ from catalyst import qjit, switch
 
 
 # CHECK-LABEL: public @jit_no_branches
-@qjit(target="mlir")
+@qjit(target="mlir", capture=False)
 def no_branches(i: int):
 
     # cast index and use as arg for switch
@@ -46,7 +46,7 @@ print(no_branches.mlir)
 
 
 # CHECK-LABEL: public @jit_classical_circuit
-@qjit(target="mlir")
+@qjit(target="mlir", capture=False)
 def classical_circuit(i: int):
 
     # cast index and use as arg for switch
@@ -89,7 +89,7 @@ print(classical_circuit.mlir)
 
 
 # CHECK-LABEL: public @quantum_circuit
-@qjit(target="mlir")
+@qjit(target="mlir", capture=False)
 
 # CHECK: quantum.device
 @qp.qnode(qp.device("lightning.qubit", wires=1))
@@ -129,7 +129,7 @@ print(quantum_circuit.mlir)
 # The per-case `estimated_probability` hints are attached as a `catalyst.estimated_probabilities`
 # array (one entry per non-default case, in case order) on the emitted `scf.index_switch`.
 # CHECK-LABEL: public @jit_estimated_probabilities
-@qjit(target="mlir")
+@qjit(target="mlir", capture=False)
 def estimated_probabilities(i: int):
 
     # CHECK:    scf.index_switch {{.*}} {catalyst.estimated_probabilities = [3.000000e-01, 5.000000e-01]}

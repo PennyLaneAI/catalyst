@@ -47,7 +47,9 @@ def test_partial_sample(backend):
 
     wires = [4, None]
     devices = [qp.device(backend, wires=wire) for wire in wires]
-    ref, observed = (qjit(qp.set_shots(qp.qnode(dev)(circuit), shots=10))() for dev in devices)
+    ref, observed = (
+        qjit(qp.set_shots(qp.qnode(dev)(circuit), shots=10), capture=False)() for dev in devices
+    )
     assert ref.shape == observed.shape
     assert np.allclose(ref, observed)
 
@@ -64,7 +66,9 @@ def test_partial_counts(backend):
 
     wires = [4, None]
     devices = [qp.device(backend, wires=wire) for wire in wires]
-    ref, observed = (qjit(qp.set_shots(qp.qnode(dev)(circuit), shots=10))() for dev in devices)
+    ref, observed = (
+        qjit(qp.set_shots(qp.qnode(dev)(circuit), shots=10), capture=False)() for dev in devices
+    )
     assert (ref[i].shape == observed[i].shape for i in (0, 1))
     assert np.allclose(ref, observed)
 
@@ -81,7 +85,9 @@ def test_partial_probs(backend):
 
     wires = [4, None]
     devices = [qp.device(backend, wires=wire) for wire in wires]
-    ref, observed = (qjit(qp.set_shots(qp.qnode(dev)(circuit), shots=10))() for dev in devices)
+    ref, observed = (
+        qjit(qp.set_shots(qp.qnode(dev)(circuit), shots=10), capture=False)() for dev in devices
+    )
     assert ref.shape == observed.shape
     assert np.allclose(ref, observed)
 
@@ -98,7 +104,9 @@ def test_sample(backend):
 
     wires = [4, None]
     devices = [qp.device(backend, wires=wire) for wire in wires]
-    ref, observed = (qjit(qp.set_shots(qp.qnode(dev)(circuit), shots=10))() for dev in devices)
+    ref, observed = (
+        qjit(qp.set_shots(qp.qnode(dev)(circuit), shots=10), capture=False)() for dev in devices
+    )
     assert ref.shape == observed.shape
     assert np.allclose(ref, observed)
 
@@ -115,7 +123,9 @@ def test_counts(backend):
 
     wires = [4, None]
     devices = [qp.device(backend, wires=wire) for wire in wires]
-    ref, observed = (qjit(qp.set_shots(qp.qnode(dev)(circuit), shots=10))() for dev in devices)
+    ref, observed = (
+        qjit(qp.set_shots(qp.qnode(dev)(circuit), shots=10), capture=False)() for dev in devices
+    )
     assert (ref[i].shape == observed[i].shape for i in (0, 1))
     assert np.allclose(ref, observed)
 
@@ -132,7 +142,7 @@ def test_probs(backend):
 
     wires = [4, None]
     devices = [qp.device(backend, wires=wire) for wire in wires]
-    ref, observed = (qjit(qp.qnode(dev)(circuit))() for dev in devices)
+    ref, observed = (qjit(qp.qnode(dev)(circuit), capture=False)() for dev in devices)
     assert ref.shape == observed.shape
     assert np.allclose(ref, observed)
 
@@ -149,7 +159,7 @@ def test_state(backend):
 
     wires = [4, None]
     devices = [qp.device(backend, wires=wire) for wire in wires]
-    ref, observed = (qjit(qp.qnode(dev)(circuit))() for dev in devices)
+    ref, observed = (qjit(qp.qnode(dev)(circuit), capture=False)() for dev in devices)
     assert ref.shape == observed.shape
     assert np.allclose(ref, observed)
 
@@ -160,7 +170,7 @@ def test_gradient(backend):
     """
     dev = qp.device(backend)
 
-    @qjit
+    @qjit(capture=False)
     @qp.qnode(dev)
     def circuit(params):
         qp.RX(params[0], wires=1)

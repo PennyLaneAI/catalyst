@@ -25,7 +25,7 @@ from catalyst import grad, jacobian, qjit
 
 
 # CHECK-LABEL: public @jit_grad_default
-@qjit(target="mlir")
+@qjit(target="mlir", capture=False)
 def grad_default(x: float):
     @qp.qnode(qp.device("lightning.qubit", wires=1))
     def f(x: float):
@@ -41,7 +41,7 @@ print(grad_default.mlir)
 
 
 # CHECK-LABEL: public @jit_override_method
-@qjit(target="mlir")
+@qjit(target="mlir", capture=False)
 def override_method(x: float):
     @qp.qnode(qp.device("lightning.qubit", wires=1))
     def f(x: float):
@@ -57,7 +57,7 @@ print(override_method.mlir)
 
 
 # CHECK-LABEL: public @jit_override_h
-@qjit(target="mlir")
+@qjit(target="mlir", capture=False)
 def override_h(x: float):
     @qp.qnode(qp.device("lightning.qubit", wires=1))
     def f(x: float):
@@ -73,7 +73,7 @@ print(override_h.mlir)
 
 
 # CHECK-LABEL: public @jit_override_diff_arg
-@qjit(target="mlir")
+@qjit(target="mlir", capture=False)
 def override_diff_arg(x: float):
     @qp.qnode(qp.device("lightning.qubit", wires=1))
     def f(x: float, y: float):
@@ -89,7 +89,7 @@ print(override_diff_arg.mlir)
 
 
 # CHECK-LABEL: public @jit_second_grad
-@qjit(target="mlir")
+@qjit(target="mlir", capture=False)
 def second_grad(x: float):
     @qp.qnode(qp.device("lightning.qubit", wires=1))
     def f(x: float):
@@ -107,7 +107,7 @@ print(second_grad.mlir)
 
 
 # CHECK-LABEL: public @jit_grad_range_change
-@qjit(target="mlir")
+@qjit(target="mlir", capture=False)
 def grad_range_change():
     @qp.qnode(qp.device("lightning.qubit", wires=1))
     def f(x: float, y: float):
@@ -124,7 +124,7 @@ print(grad_range_change.mlir)
 
 
 # CHECK-LABEL: public @jit_grad_hoist_constant(%arg0
-@qjit(target="mlir")
+@qjit(target="mlir", capture=False)
 def grad_hoist_constant(params: jax.core.ShapedArray([2], float)):
     @qp.qnode(qp.device("lightning.qubit", wires=3))
     def circuit(params):
@@ -144,7 +144,7 @@ print(grad_hoist_constant.mlir)
 
 
 # CHECK-LABEL: @test_gradient_used_twice
-@qjit(target="mlir")
+@qjit(target="mlir", capture=False)
 def test_gradient_used_twice(x: float):
     """This tests that calling the return of grad
     more than once does not define multiple functions.
@@ -164,7 +164,7 @@ print(test_gradient_used_twice.mlir)
 
 
 # CHECK-LABEL: @test_gradient_taken_twice
-@qjit(target="mlir")
+@qjit(target="mlir", capture=False)
 def test_gradient_taken_twice(x: float):
     """This tests that calling grad
     more than once does not define multiple functions.
@@ -185,7 +185,7 @@ print(test_gradient_taken_twice.mlir)
 
 
 # CHECK-LABEL: @test_higher_order_used_twice
-@qjit(target="mlir")
+@qjit(target="mlir", capture=False)
 def test_higher_order_used_twice(x: float):
     """Test that a single function is generated when using higher order derivatives"""
 
@@ -206,7 +206,7 @@ print(test_higher_order_used_twice.mlir)
 
 
 # CHECK-LABEL: @test_non_diff
-@qjit(target="mlir")
+@qjit(target="mlir", capture=False)
 def test_non_diff(params: jax.core.ShapedArray([2], float)):
     """Test non-differentiable operations are not decomposed when grad is not used."""
 
@@ -231,7 +231,7 @@ print(test_non_diff.mlir)
 
 
 # CHECK-LABEL: @test_diff_const_paramshift
-@qjit(target="mlir")
+@qjit(target="mlir", capture=False)
 def test_diff_const_paramshift(params: jax.core.ShapedArray([2], float)):
     """Test non-differentiable operations are not decomposed when constant with param-shift."""
 
@@ -255,7 +255,7 @@ print(test_diff_const_paramshift.mlir)
 
 
 # CHECK-LABEL: @test_diff_const_adjoint
-@qjit(target="mlir")
+@qjit(target="mlir", capture=False)
 def test_diff_const_adjoint(params: jax.core.ShapedArray([2], float)):
     """Test non-differentiable operations *are* decomposed even when constant with adjoint.
     State preparations & unitaries are exempted from this and can be skipped if constant.
@@ -281,7 +281,7 @@ print(test_diff_const_adjoint.mlir)
 
 
 # CHECK-LABEL: @test_diff_dynamic_paramshift
-@qjit(target="mlir")
+@qjit(target="mlir", capture=False)
 def test_diff_dynamic_paramshift(params: jax.core.ShapedArray([2], float)):
     """Test non-differentiable operations are decomposed when active with param-shift."""
 
@@ -306,7 +306,7 @@ print(test_diff_dynamic_paramshift.mlir)
 
 
 # CHECK-LABEL: @test_diff_dynamic_adjoint
-@qjit(target="mlir")
+@qjit(target="mlir", capture=False)
 def test_diff_dynamic_adjoint(params: jax.core.ShapedArray([2], float)):
     """Test non-differentiable operations are decomposed when active with adjoint."""
 
@@ -330,7 +330,7 @@ print(test_diff_dynamic_adjoint.mlir)
 
 
 # CHECK-LABEL: @test_non_diff_ops_in_cost_and_grad
-@qjit(target="mlir")
+@qjit(target="mlir", capture=False)
 def test_non_diff_ops_in_cost_and_grad(params: jax.core.ShapedArray([2], float)):
     """Test decomposition when invoking both the function and its derivative."""
 
@@ -360,7 +360,7 @@ print(test_non_diff_ops_in_cost_and_grad.mlir)
 
 
 # CHECK-LABEL: public @jit_best_diff_method_single_probs
-@qjit(target="mlir")
+@qjit(target="mlir", capture=False)
 def best_diff_method_single_probs(phi: float, psi: float):
     """Test that differentiating a single probs selects parameter-shift."""
 
@@ -381,7 +381,7 @@ print(best_diff_method_single_probs.mlir)
 
 
 # CHECK-LABEL: public @jit_best_diff_method_mixed_return
-@qjit(target="mlir")
+@qjit(target="mlir", capture=False)
 def best_diff_method_mixed_return(phi: float, psi: float):
     """Test that differentiating a mixed return selects parameter-shift."""
 

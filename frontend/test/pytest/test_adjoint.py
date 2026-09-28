@@ -288,7 +288,7 @@ class TestCatalyst:
 
         with pytest.raises(ValueError, match="Measurement process cannot be used"):
 
-            @qjit
+            @qjit(capture=False)
             @qp.qnode(qp.device("lightning.qubit", wires=2))
             def C_workflow():
                 adjoint(func)()
@@ -300,7 +300,7 @@ class TestCatalyst:
         """Checks that catalyst.adjoint rejects non-quantum program arguments."""
         with pytest.raises(ValueError, match="Expected a callable"):
 
-            @qjit
+            @qjit(capture=False)
             @qp.qnode(qp.device("lightning.qubit", wires=2))
             def C_workflow():
                 adjoint(33)()
@@ -510,7 +510,7 @@ class TestCatalyst:
     def test_adjoint_wires(self, backend):
         """Test the wires property of Adjoint"""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=3))
         def circuit(theta):
             def func(theta):
@@ -527,7 +527,7 @@ class TestCatalyst:
     def test_adjoint_wires_qubitunitary(self, backend):
         """Test the wires property of nested Adjoint with QubitUnitary"""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=3))
         def circuit():
             def func():
@@ -580,7 +580,7 @@ class TestCatalyst:
             qp.RY(theta / 2, wires=w1)
             qp.RZ(theta, wires=2)
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(device)
         def C_workflow(w0, w1, theta):
             qp.PauliX(wires=0)
@@ -599,7 +599,7 @@ class TestCatalyst:
     def test_adjoint_wires_controlflow(self, backend):
         """Test the wires property of Adjoint  in a conditional branch"""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=3))
         def circuit():
             def func(pred, theta):
@@ -660,7 +660,7 @@ class TestCatalyst:
 
         adj_op = adjoint(qp.RY(np.pi / 2, wires=0))
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=1))
         def circuit():
             qp.Hadamard(0)
@@ -1675,7 +1675,7 @@ class TestMidCircuitMeasurementAfterAdjoint:
         def subroutine():
             qp.Hadamard(wires=1)
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device("lightning.qubit", wires=2))
         def circuit():
             # Comment/uncomment to toggle bug
@@ -1697,7 +1697,7 @@ class TestAdjointOfTemplates:
     def test_adjoint_for_loop(self, backend):
         """Test operator adjoint works around templates that decompose into for loops."""
 
-        @qp.qjit
+        @qp.qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=1))
         def circuit(n: int):
             qp.H(0)
@@ -1719,7 +1719,7 @@ class TestAdjointOfTemplates:
     def test_adjoint_while_loop(self, backend):
         """Test operator adjoint works around templates that decompose into for loops."""
 
-        @qp.qjit
+        @qp.qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=1))
         def circuit(n: int):
             qp.H(0)
@@ -1742,7 +1742,7 @@ class TestAdjointOfTemplates:
     def test_adjoint_cond(self, backend):
         """Test operator adjoint works around templates that decompose into if conditionals."""
 
-        @qp.qjit
+        @qp.qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=1))
         def circuit(b: bool):
             qp.H(0)
@@ -1774,7 +1774,7 @@ class TestAdjointOfTemplates:
 
             return qp.expval(qp.Z(0))
 
-        result = qjit(circuit)(0)
+        result = qjit(circuit, capture=False)(0)
         assert np.isclose(result, 1.0)
 
 

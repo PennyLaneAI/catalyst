@@ -21,7 +21,7 @@ from catalyst.debug import get_compilation_stage
 
 
 # CHECK-LABEL: public @jit_a_plus_b_times_2
-@qjit(keep_intermediate=True)
+@qjit(keep_intermediate=True, capture=False)
 def a_plus_b_times_2(a, b):
     # CHECK: %extracted
     # CHECK: tensor.extract
@@ -37,7 +37,7 @@ a_plus_b_times_2.workspace.cleanup()
 
 
 # CHECK-LABEL: public @jit_f_with_cond
-@qjit(autograph=True, keep_intermediate=True)
+@qjit(autograph=True, keep_intermediate=True, capture=False)
 def f_with_cond(a, b):
     # CHECK: %extracted
     # CHECK: tensor.extract
@@ -65,7 +65,7 @@ f_with_cond.workspace.cleanup()
 
 
 # CHECK-LABEL: public @jit_f_with_for_loop
-@qjit(autograph=True, keep_intermediate=True)
+@qjit(autograph=True, keep_intermediate=True, capture=False)
 def f_with_for_loop(a, b):
     # CHECK: %extracted
     # CHECK: tensor.extract
@@ -88,7 +88,7 @@ f_with_for_loop.workspace.cleanup()
 
 
 # CHECK-LABEL: public @jit_f_with_loop_over_list
-@qjit(autograph=True, keep_intermediate=True)
+@qjit(autograph=True, keep_intermediate=True, capture=False)
 def f_with_loop_over_list(a, b):
     # CHECK: %extracted
     # CHECK: tensor.extract
@@ -111,7 +111,7 @@ f_with_loop_over_list.workspace.cleanup()
 
 
 # CHECK-LABEL: public @jit_f_with_enumerate
-@qjit(autograph=True, keep_intermediate=True)
+@qjit(autograph=True, keep_intermediate=True, capture=False)
 def f_with_enumerate(a, b):
     # CHECK: %extracted
     # CHECK: tensor.extract

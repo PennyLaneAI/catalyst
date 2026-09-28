@@ -36,7 +36,7 @@ for capture in [True, False]:
 
 
 # CHECK-LABEL: test_qnode_dynamic_arg
-@qjit(abstracted_axes={0: "n"})
+@qjit(abstracted_axes={0: "n"}, capture=False)
 def test_qnode_dynamic_arg(a):
     """Test passing a dynamic argument to qnode"""
 
@@ -70,7 +70,7 @@ for capture in [True, False]:
 
 
 # CHECK-LABEL: test_qnode_dynamic_result
-@qjit
+@qjit(capture=False)
 def test_qnode_dynamic_result(a):
     """Test getting a dynamic result from qnode"""
 

@@ -134,7 +134,7 @@ def test_apply_pass():
         qp.X(0)
         return qp.state()
 
-    @qp.qjit(target="mlir")
+    @qp.qjit(target="mlir", capture=False)
     def module():
         return qnode()
 
@@ -149,7 +149,7 @@ def test_apply_pass_unsupported_inputs():
     """Test if the pipeline would break for an unsupported input for the
     diagonalize-final-measurements pass"""
 
-    @qp.qjit(target="mlir")
+    @qp.qjit(target="mlir", capture=False)
     @apply_pass("diagonalize-final-measurements", to_eigvals=True)
     @qp.qnode(qp.device("lightning.qubit", wires=1))
     def qnode():
@@ -176,7 +176,7 @@ def test_apply_pass_raise_error():
         "`split-non-commuting` pass first.",
     ):
 
-        @qp.qjit(target="mlir")
+        @qp.qjit(target="mlir", capture=False)
         def module():
             return qnode()
 
@@ -191,7 +191,7 @@ def test_apply_pass_plugin(tmp_path):
     fake_plugin = tmp_path / "fake_plugin.so"
     fake_plugin.touch()
 
-    @qp.qjit(target="mlir")
+    @qp.qjit(target="mlir", capture=False)
     @apply_pass_plugin(str(fake_plugin), "my-custom-pass")
     @qp.qnode(qp.device("lightning.qubit", wires=1))
     def circuit():

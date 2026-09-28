@@ -58,7 +58,7 @@ print_code(while_simple)
 
 
 # CHECK-LABEL: def while_default_jax
-@qjit(autograph=True)
+@qjit(autograph=True, capture=False)
 def while_default_jax(a: int):
     """Checks that failure during the while-loop tracing is detected and the fallback unrolling is
     executed."""
@@ -96,7 +96,7 @@ class Failing:
 
 
 # CHECK-LABEL: def while_fallback_jax
-@qjit(autograph=True)
+@qjit(autograph=True, capture=False)
 def while_fallback_jax(a: int):
     """Checks that failure during the while-loop tracing is detected and the fallback unrolling is
     executed."""
@@ -197,7 +197,7 @@ print_code(if_assign)
 
 
 # CHECK-LABEL: def ag__if_assign_no_type_mismatch
-@qjit  # needed to trigger Catalyst type checks during tracing
+@qjit(capture=False)  # needed to trigger Catalyst type checks during tracing
 @run_autograph
 def if_assign_no_type_mismatch(x: float):
     """Verify the absense of error from a conditional that doesn't produce the same type across
@@ -224,7 +224,7 @@ print_code(if_assign_no_type_mismatch)
 
 try:
 
-    @qjit  # needed to trigger the execution of ag__.if_stmt which performs the check
+    @qjit(capture=False)  # needed to trigger the execution of ag__.if_stmt which performs the check
     @run_autograph
     def if_assign_pytree_shape_mismatch(x: float):
         """Verify error from a conditional that doesn't produce a value in all branches."""
@@ -247,7 +247,7 @@ except TypeError as e:
 
 try:
 
-    @qjit  # needed to trigger the execution of ag__.if_stmt which performs the check
+    @qjit(capture=False)  # needed to trigger the execution of ag__.if_stmt which performs the check
     @run_autograph
     def if_assign_partial(x: float):
         """Verify error from a conditional that doesn't produce a value in all branches."""
@@ -365,7 +365,7 @@ print_code(if_assign_existing_partial)
 
 
 # CHECK-LABEL: def ag__if_assign_existing_partial_no_type_mismatch
-@qjit
+@qjit(capture=False)
 @run_autograph
 def if_assign_existing_partial_no_type_mismatch(x: float):
     """Verify error from a conditional that assigns to an existing value with different type,
@@ -429,7 +429,7 @@ print_code(if_assign_multiple)
 
 try:
 
-    @qjit
+    @qjit(capture=False)
     @run_autograph
     def if_assign_invalid_type(x: float):
         """Verify error from a conditional that produces a type invalid for tracing."""
@@ -589,7 +589,7 @@ def f():
 
 
 # CHECK-LABEL: def disable_autograph_decorator_jax
-@qjit(autograph=True)
+@qjit(autograph=True, capture=False)
 def disable_autograph_decorator_jax(x: float, n: int):
     """Checks that Autograph is disabled for a given function."""
     # CHECK: body_jaxpr={ lambda ; d:i64[] e:f64[]. let
@@ -619,7 +619,7 @@ def g():
 
 
 # CHECK-LABEL: def enable_autograph_decorator_jax
-@qjit(autograph=True)
+@qjit(autograph=True, capture=False)
 def enable_autograph_decorator_jax(x: float, n: int):
     """Checks that Autograph is enabled for a given function."""
     # CHECK: branch_jaxprs=[{ lambda ; . let  in (36:i64[],) }, { lambda ; . let  in (216:i64[],) }]
@@ -647,7 +647,7 @@ def h():
 
 
 # CHECK-LABEL: def disable_autograph_context_manager_jax
-@qjit(autograph=True)
+@qjit(autograph=True, capture=False)
 def disable_autograph_context_manager_jax():
     """Checks that Autograph is disabled for a given context."""
     # CHECK: { lambda ; . let in (36.4:f64[],) }
@@ -676,7 +676,7 @@ def func():
 
 
 # CHECK-LABEL: def enable_autograph_context_manager_jax
-@qjit(autograph=True)
+@qjit(autograph=True, capture=False)
 def enable_autograph_context_manager_jax():
     """Checks that Autograph is enabled with no context."""
     # CHECK: branch_jaxprs=[{ lambda ; . let  in (36:i64[],) }, { lambda ; . let  in (216:i64[],) }]
@@ -693,7 +693,7 @@ print(enable_autograph_context_manager_jax.jaxpr)
 
 
 # CHECK-LABEL: def include_module_to_autograph
-@qjit(autograph=True, autograph_include=["catalyst.autograph.__exclusion"])
+@qjit(autograph=True, autograph_include=["catalyst.autograph.__exclusion"], capture=False)
 def include_module_to_autograph(x: float, n: int):
     """Checks that a module is included to Autograph conversion."""
     # CHECK: branch_jaxprs=[{ lambda ; . let  in (36:i64[],) }, { lambda ; . let  in (216:i64[],) }]
@@ -710,7 +710,7 @@ print(include_module_to_autograph.jaxpr)
 
 
 # CHECK-LABEL: def excluded_module_from_autograph
-@qjit(autograph=True)
+@qjit(autograph=True, capture=False)
 def excluded_module_from_autograph(x: float, n: int):
     """Checks that a module is excluded from Autograph conversion."""
     # CHECK: body_jaxpr={ lambda ; d:i64[] e:f64[]. let

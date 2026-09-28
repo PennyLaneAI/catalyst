@@ -23,7 +23,7 @@ from catalyst import cond, measure, qjit
 
 # CHECK-NOT: Verification failed
 # CHECK-LABEL: public @jit_circuit
-@qjit(target="mlir")
+@qjit(target="mlir", capture=False)
 @qp.qnode(qp.device("lightning.qubit", wires=1))
 def circuit(n: int):
     # CHECK-DAG:   [[c5:%[a-zA-Z0-9_]+]] = stablehlo.constant dense<5> : tensor<i64>
@@ -61,7 +61,7 @@ print(circuit.mlir)
 
 
 # CHECK-LABEL: public @jit_circuit_single_gate
-@qjit(target="mlir")
+@qjit(target="mlir", capture=False)
 @qp.qnode(qp.device("lightning.qubit", wires=1))
 def circuit_single_gate(n: int):
     # pylint: disable=line-too-long
@@ -153,7 +153,7 @@ print(circuit_single_gate.mlir)
 
 
 # CHECK-LABEL: test_convert_element_type
-@qjit
+@qjit(capture=False)
 def test_convert_element_type(i: int, f: float):
     """Test the presence of convert_element_type JAX primitive when the type conversion is
     required."""
@@ -182,7 +182,7 @@ print(test_convert_element_type.jaxpr)
 
 
 # CHECK-LABEL: test_no_convert_element_type
-@qjit
+@qjit(capture=False)
 def test_no_convert_element_type(i: int):
     """Test the absense of convert_element_type JAX primitive when no type conversion is required"""
 
@@ -211,7 +211,7 @@ print(test_no_convert_element_type.jaxpr)
 
 # A single `estimated_probability` hint is attached to the emitted `scf.if`.
 # CHECK-LABEL: public @jit_cond_estimated_probability
-@qjit(target="mlir")
+@qjit(target="mlir", capture=False)
 def cond_estimated_probability(n: int):
     # CHECK:       scf.if
     # CHECK:       catalyst.estimated_probability = 5.000000e-01
@@ -236,7 +236,7 @@ print(cond_estimated_probability.mlir)
 # that its branch is taken given no earlier branch was. The user-facing unconditional hints
 # (0.5, 0.125) therefore become (0.5, 0.125 / (1 - 0.5) = 0.25) on the two `scf.if`s.
 # CHECK-LABEL: public @jit_cond_estimated_probability_chain
-@qjit(target="mlir")
+@qjit(target="mlir", capture=False)
 def cond_estimated_probability_chain(n: int):
     # CHECK-DAG:   catalyst.estimated_probability = 5.000000e-01
     # CHECK-DAG:   catalyst.estimated_probability = 2.500000e-01

@@ -49,7 +49,7 @@ def test_setup_failure_surfaces_as_runtime_error(
 ):  # pylint: disable=redefined-outer-name,unused-argument
     """Test that a RuntimeError thrown from the JIT'd setup function be caught by the wrapper."""
 
-    @qjit
+    @qjit(capture=False)
     def circuit():
         return 0
 

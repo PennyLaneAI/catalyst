@@ -22,7 +22,7 @@ import pennylane as qp
 from catalyst import qjit
 
 
-@qjit(target="mlir")
+@qjit(target="mlir", capture=False)
 @qp.qnode(qp.device("lightning.qubit", wires=2))
 def state_prep_example():
     """Test example from
@@ -40,7 +40,7 @@ def state_prep_example():
 print(state_prep_example.mlir)
 
 
-@qjit(target="mlir")
+@qjit(target="mlir", capture=False)
 @qp.qnode(qp.device("lightning.qubit", wires=2))
 def basis_state_example():
     """Test example from
@@ -58,7 +58,7 @@ def basis_state_example():
 print(basis_state_example.mlir)
 
 
-@qjit(target="mlir")
+@qjit(target="mlir", capture=False)
 @qp.qnode(qp.device("lightning.qubit", wires=2))
 def state_prep_example_double():
     """What happens if we have two? It shouldn't be repeated because
@@ -75,7 +75,7 @@ def state_prep_example_double():
 print(state_prep_example_double.mlir)
 
 
-@qjit(target="mlir")
+@qjit(target="mlir", capture=False)
 @qp.qnode(qp.device("lightning.qubit", wires=2))
 def state_prep_trotter():
     """
@@ -98,7 +98,7 @@ def state_prep_trotter():
 print(state_prep_trotter.mlir)
 
 
-@qjit(target="mlir")
+@qjit(target="mlir", capture=False)
 @qp.qnode(qp.device("lightning.qubit", wires=2))
 def basis_state_trotter():
     """

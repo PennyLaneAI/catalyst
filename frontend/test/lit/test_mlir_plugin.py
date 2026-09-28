@@ -104,7 +104,7 @@ print(mlir_string)
 def test_pass_options():
     """Is the option in the generated MLIR?"""
 
-    @qjit(target="mlir")
+    @qjit(target="mlir", capture=False)
     # CHECK: options = {"an-option" = true, "maxValue" = 1 : i64, "multi-word-option" = 1 : i64}
     @catalyst.passes.apply_pass("some-pass", "an-option", maxValue=1, multi_word_option=1)
     @qp.qnode(qp.device("null.qubit", wires=1))

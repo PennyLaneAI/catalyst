@@ -29,8 +29,8 @@ from catalyst import jacobian, mitigate_with_zne, qjit, vmap
 # Test autograph on nested QJIT object.
 
 
-@qjit(autograph=True, target="mlir")
-@qjit(target="")
+@qjit(autograph=True, target="mlir", capture=False)
+@qjit(target="", capture=False)
 @qp.qnode(qp.device("lightning.qubit", wires=1))
 def test_qjit(c: bool, data: float):
     if c:
@@ -63,7 +63,7 @@ annotated_params = [
 ]
 test_vmap.__signature__ = inspect.Signature(annotated_params)
 
-test_vmap = qjit(test_vmap, autograph=True, target="mlir")
+test_vmap = qjit(test_vmap, autograph=True, target="mlir", capture=False)
 
 # CHECK-LABEL: @test_vmap
 # CHECK:         scf.if
@@ -74,7 +74,7 @@ print(test_vmap.mlir)
 # Test autograph on nested Grad object.
 
 
-@qjit(autograph=True, target="mlir")
+@qjit(autograph=True, target="mlir", capture=False)
 @jacobian(argnums=1)
 @qp.qnode(qp.device("lightning.qubit", wires=1))
 def test_grad(c: bool, data: float):
@@ -92,7 +92,7 @@ print(test_grad.mlir)
 # Test autograph on nested ZNE object.
 
 
-@qjit(autograph=True, target="mlir")
+@qjit(autograph=True, target="mlir", capture=False)
 @mitigate_with_zne(scale_factors=[1, 3, 5])
 @qp.qnode(qp.device("lightning.qubit", wires=1))
 def test_zne(c: bool, data: float):

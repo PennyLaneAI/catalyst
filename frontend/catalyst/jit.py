@@ -102,7 +102,7 @@ def qjit(
     circuit_transform_pipeline=None,
     pass_plugins=None,
     dialect_plugins=None,
-    capture="global",
+    capture=True,
     skip_preprocess=False,
     collect_decomp_rules=True,
 ):  # pylint: disable=too-many-arguments,unused-argument
@@ -182,16 +182,15 @@ def qjit(
         pass_plugins (Optional[List[Path]]): List of paths to pass plugins.
         dialect_plugins (Optional[List[Path]]): List of paths to dialect plugins.
         capture (str or bool): Controls whether to use PennyLane program capture for tracing.
-            This allows enabling capture locally for this QJIT without affecting the global
-            ``qp.capture.enabled()`` state.
+            This allows enabling or disabling capture locally for this QJIT without affecting
+            the global ``qp.capture.enabled()`` state.
 
-            - ``"global"`` (default): Defer to ``qp.capture.enabled()`` to decide whether
-              to use program capture.
-            - ``True``: Force program capture on for this QJIT, regardless of the global setting.
-              This allows using the new capture-based frontend without calling
-              ``qp.capture.enable()`` globally.
+            - ``True`` (default): Force program capture on for this QJIT, regardless of the
+              global setting.
             - ``False``: Force program capture off for this QJIT, using the old frontend,
               regardless of the global setting.
+            - ``"global"``: Defer to ``qp.capture.enabled()`` to decide whether to use
+              program capture.
         skip_preprocess (bool): Controls whether or not to skip quantum device preprocessing.
             If ``True``, transforms used to preprocess and validate the user program before
             executing on a quantum backend will not be used, and the user is expected to ensure
