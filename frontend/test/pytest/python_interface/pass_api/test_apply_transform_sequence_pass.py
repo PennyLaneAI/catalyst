@@ -133,7 +133,19 @@ class TestCreateMLIRSchedule:
         )
         schedule = _create_mlir_cli_schedule(pass_ops=[pass_op])
         assert len(schedule) == 1
-        assert schedule[0] == "--test-pass=dict-opt={a=1 b=2 c=3 d=4}"
+        assert schedule[0] == "--test-pass=dict-opt={a = 1, b = 2, c = 3, d = 4}"
+
+    def test_pass_dict_options_quotes_non_bare_keys(self):
+        """Non-bare DictionaryAttr keys are quoted like MLIR's DictAttr printer."""
+        pass_op = create_apply_registered_pass_op(
+            "test-pass",
+            options={"gate-set": {"CNOT": 1.0, "Adjoint(CNOT)": 1.0, "C(T)": 1.0}},
+        )
+        schedule = _create_mlir_cli_schedule(pass_ops=[pass_op])
+        assert len(schedule) == 1
+        assert schedule[0] == (
+            '--test-pass=gate-set={CNOT = 1.0, "Adjoint(CNOT)" = 1.0, "C(T)" = 1.0}'
+        )
 
     def test_pass_nested_container_options(self):
         """Test that passes with options that are nested containers are parsed correctly."""
@@ -147,8 +159,8 @@ class TestCreateMLIRSchedule:
         schedule = _create_mlir_cli_schedule(pass_ops=[pass_op])
         assert len(schedule) == 1
         assert (
-            schedule[0]
-            == "--test-pass=list-opt={a=1 b=2},{c=1.5},{d=false e=true} dict-opt={f=1,2 g=1}"
+            schedule[0] == "--test-pass=list-opt={a = 1, b = 2},{c = 1.5},{d = false, e = true} "
+            "dict-opt={f = [1, 2], g = 1}"
         )
 
     def test_multiple_passes(self):
