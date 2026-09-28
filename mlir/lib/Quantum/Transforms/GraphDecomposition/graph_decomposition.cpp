@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <cassert>
 #include <cstddef>
 #include <cstdint>
 #include <numeric>
@@ -170,12 +171,6 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         llvm::StringMap<llvm::SmallVector<std::string>> opToAltDecompNames;
         WeightedGateset targetGateSet;
 
-        // NOTE: this is unused
-        llvm::StringMap<const RuleNode *> rulesByName(setOfRules.size());
-        for (const auto &rule : setOfRules) {
-            rulesByName[rule.name] = &rule;
-        }
-
         // get names for fixed and alt decomps
         parseFixedDecomps(opToFixedDecompName, userRuleNames);
         parseAltDecomps(opToAltDecompNames, userRuleNames);
@@ -196,10 +191,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
             ScopedDiagnosticTimer t("decomp:solver");
             // NOTE: fixed and alt-decomps are handled by filtering during rule collection. This is
             // dead code that should be removed
-            FixedDecomps fixedDecomps = buildFixedDecomps(opToFixedDecompName, rulesByName);
-            AltDecomps altDecomps = buildAltDecomps(opToAltDecompNames, rulesByName);
-            DecompositionGraph graph(setOfOps, targetGateSet, setOfRules, std::move(fixedDecomps),
-                                     std::move(altDecomps));
+            DecompositionGraph graph(setOfOps, targetGateSet, setOfRules);
             DecompositionSolver solver(graph);
             solution = solver.solve();
         }
@@ -717,76 +709,6 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
             return failure();
         }
         return success();
-    }
-
-    /**
-     * @brief Convert the parsed fixed-decomposition mapping (op name → rule name)
-     * into the Core::FixedDecomps type expected by the DecompositionGraph.
-     *
-     * For each entry, looks up the corresponding RuleNode in setOfRules by name.
-     * Rules not found in setOfRules are skipped with a diagnostic.
-     *
-     * @param opToFixedDecompName  Parsed mapping from operator name to fixed-rule name.
-     * @param setOfRules           The full list of available decomposition rules.
-     * @return Core::FixedDecomps  Mapping from OperatorNode to its fixed RuleNode.
-     */
-    FixedDecomps buildFixedDecomps(const llvm::StringMap<std::string> &opToFixedDecompName,
-                                   const llvm::StringMap<const RuleNode *> &rulesByName) {
-        FixedDecomps fixedDecomps;
-        fixedDecomps.reserve(opToFixedDecompName.size());
-
-        for (const auto &[opName, ruleName] : opToFixedDecompName) {
-            auto it = rulesByName.find(ruleName);
-            if (it == rulesByName.end()) {
-                continue;
-            }
-
-            OperatorNode opNode;
-            opNode.name = opName.str();
-            fixedDecomps.emplace(std::move(opNode), *(it->second));
-        }
-        return fixedDecomps;
-    }
-
-    /**
-     * @brief Convert the parsed alternative-decomposition mapping
-     * (op name → list of rule names) into the Core::AltDecomps type
-     * expected by the DecompositionGraph.
-     *
-     * For each entry, looks up the corresponding RuleNodes in setOfRules by name.
-     * Individual rules not found are skipped with a diagnostic.
-     *
-     * @param opToAltDecompNames  Parsed mapping from operator name to alternative-rule
-     * names.
-     * @param setOfRules          The full list of available decomposition rules.
-     * @return Core::AltDecomps   Mapping from OperatorNode to its alternative RuleNodes.
-     */
-    AltDecomps
-    buildAltDecomps(const llvm::StringMap<llvm::SmallVector<std::string>> &opToAltDecompNames,
-                    const llvm::StringMap<const RuleNode *> &rulesByName) {
-        AltDecomps altDecomps;
-        altDecomps.reserve(opToAltDecompNames.size());
-
-        for (const auto &[opName, ruleNames] : opToAltDecompNames) {
-            OperatorNode opNode;
-            opNode.name = opName.str();
-
-            std::vector<RuleNode> altRules;
-            altRules.reserve(ruleNames.size());
-
-            for (const auto &ruleName : ruleNames) {
-                auto it = rulesByName.find(ruleName);
-                if (it == rulesByName.end()) {
-                    continue;
-                }
-                altRules.push_back(*(it->second));
-            }
-
-            if (!altRules.empty()) {
-                altDecomps.emplace(std::move(opNode), std::move(altRules));
-            }
-        }
-        return altDecomps;
     }
 };
 
