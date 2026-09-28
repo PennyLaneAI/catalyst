@@ -9,8 +9,8 @@ description: >
 
   * unset -- the GitHub cache. Restore and save are separate steps rather than the combined
     `actions/cache`, which only saves in a post-job step: the caller spends another hour on
-    Triton and GPU tests after this action returns, and a cancel there (the GPU workflow sets
-    cancel-in-progress) would discard a finished multi-hour LLVM build.
+    Triton and GPU tests after this action returns, and anything that ends the job in there --
+    a failure, a timeout, a cancel -- would otherwise discard a finished multi-hour LLVM build.
   * set -- a directory on the runner itself, which is what a dedicated self-hosted box wants.
     Nothing is uploaded or downloaded, and the result is not scoped to a PR ref, so it is still
     there for the next run on any branch.
