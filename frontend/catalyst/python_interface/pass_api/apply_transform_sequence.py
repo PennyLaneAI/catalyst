@@ -218,7 +218,11 @@ class ApplyTransformSequenceNoCallbackPattern(RewritePattern):
         """Rewrite modules containing transform.named_sequences."""
         payload: builtin.ModuleOp = transformer.parent_op()
         # Detach (do not erase) so we can clone the transformer for MLIR groups.
-        insertion_point = InsertPoint.before(transformer.next_op)
+        if transformer.next_op is not None:
+            insertion_point = InsertPoint.before(transformer.next_op)
+        else:
+            insertion_point = InsertPoint.at_start(payload.body.block)
+
         transformer.detach()
 
         pass_ops = []
