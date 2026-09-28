@@ -109,12 +109,23 @@ runs:
       env:
         LLVM_BUILD_OPTIONS: ${{ inputs.llvm-build-options }}
       run: |
-        # Unquoted on purpose: the overrides are several words, and as make command-line
-        # variables they propagate into the `-C mlir` sub-make and beat its `?=` defaults.
+        # Jobs from different PRs share this runner and this slot -- three were seen
+        # building at once. Serialize on the slot, then re-check the stamp, so a job
+        # that waited here reuses the finished tree instead of clobbering it.
+        if [ -n "${PERSIST_BASE:-}" ]; then
+          exec 9>"$PERSIST_BASE/llvm-build.lock"
+          flock 9
+          if [ -e "$PERSIST_BASE/llvm-build/.catalyst-complete" ]; then
+            echo "llvm-build was completed by a concurrent job; reusing it"
+            exit 0
+          fi
+        fi
         C_COMPILER=$(which gcc) \
         CXX_COMPILER=$(which g++) \
         LLVM_BUILD_DIR="$(pwd)/llvm-build" \
         COMPILER_LAUNCHER="" \
+        # Unquoted on purpose: the overrides are several words, and as make command-line
+        # variables they propagate into the `-C mlir` sub-make and beat its `?=` defaults.
         make llvm $LLVM_BUILD_OPTIONS
         if [ -n "${PERSIST_BASE:-}" ]; then
           touch "$PERSIST_BASE/llvm-build/.catalyst-complete"
@@ -155,6 +166,17 @@ runs:
       if: steps.cache-stablehlo-build.outputs.cache-hit != 'true' && steps.persist.outputs.stablehlo_ready != 'true'
       shell: bash
       run: |
+        # Jobs from different PRs share this runner and this slot -- three were seen
+        # building at once. Serialize on the slot, then re-check the stamp, so a job
+        # that waited here reuses the finished tree instead of clobbering it.
+        if [ -n "${PERSIST_BASE:-}" ]; then
+          exec 9>"$PERSIST_BASE/stablehlo-build.lock"
+          flock 9
+          if [ -e "$PERSIST_BASE/stablehlo-build/.catalyst-complete" ]; then
+            echo "stablehlo-build was completed by a concurrent job; reusing it"
+            exit 0
+          fi
+        fi
         C_COMPILER=$(which gcc) \
         CXX_COMPILER=$(which g++) \
         LLVM_BUILD_DIR="$(pwd)/llvm-build" \
@@ -200,6 +222,17 @@ runs:
       if: steps.cache-enzyme-build.outputs.cache-hit != 'true' && steps.persist.outputs.enzyme_ready != 'true'
       shell: bash
       run: |
+        # Jobs from different PRs share this runner and this slot -- three were seen
+        # building at once. Serialize on the slot, then re-check the stamp, so a job
+        # that waited here reuses the finished tree instead of clobbering it.
+        if [ -n "${PERSIST_BASE:-}" ]; then
+          exec 9>"$PERSIST_BASE/enzyme-build.lock"
+          flock 9
+          if [ -e "$PERSIST_BASE/enzyme-build/.catalyst-complete" ]; then
+            echo "enzyme-build was completed by a concurrent job; reusing it"
+            exit 0
+          fi
+        fi
         C_COMPILER=$(which gcc) \
         CXX_COMPILER=$(which g++) \
         LLVM_BUILD_DIR="$(pwd)/llvm-build" \

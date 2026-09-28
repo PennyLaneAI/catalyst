@@ -38,9 +38,11 @@ permissions:
   contents: read
 
 concurrency:
-  # Keyed on the commit: a pull_request and a dispatch of the same commit carry different refs,
-  # so a ref-keyed group let both run and contend for the single GPU.
-  group: ${{ github.workflow }}-${{ github.event.pull_request.head.sha || github.sha }}
+  # Keyed on the PR (or ref) and the event, not the commit. Keying on the commit meant a new push
+  # started a new group instead of superseding the old one: three runs of this branch were seen
+  # building LLVM at once on the same GPU host, with the newest queued behind them. The event is
+  # in the key so a workflow_dispatch still does not cancel the pull_request run of the same code.
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
