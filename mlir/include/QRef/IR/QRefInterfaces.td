@@ -73,6 +73,11 @@ def QuantumGate : OpInterface<"QuantumGate", [QuantumOperation]> {
             "void", "setCtrlValueOperands", (ins "mlir::ValueRange":$replacements)
         >,
         InterfaceMethod<
+            "Append additional control qubits and their associated control values to the gate.",
+            "void", "addControls",
+            (ins "mlir::ValueRange":$ctrlQubits, "mlir::ValueRange":$ctrlValues)
+        >,
+        InterfaceMethod<
             "Return adjoint flag.",
             "bool", "getAdjointFlag"
         >,

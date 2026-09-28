@@ -129,9 +129,39 @@ static LogicalResult distributeControls(PatternRewriter &rewriter, Block &block,
                                         SmallVector<Operation *> &opsToErase) {
     for (Operation &op : block.without_terminator()) {
         if (auto gate = dyn_cast<QuantumGate>(op)) {
-            rewriter.setInsertionPoint(&op);
-            createControlledGate(rewriter, gate, currentCtrlQubits, ctrlValues);
-            opsToErase.push_back(&op);
+            // rewriter.setInsertionPoint(&op);
+            // createControlledGate(rewriter, gate, currentCtrlQubits, ctrlValues);
+            // opsToErase.push_back(&op);
+            
+            // instead of making a new gate just copy modifyOpInPlacend append currentCtrlQubits and ctrlValues to getCtrlQubitsMutable
+            // rewriter.modifyOpInPlace((gate), [&] {
+            //     gate->insertOperands(gate->getNumOperands(), currentCtrlQubits);
+            //     gate->insertOperands(gate->getNumOperands(), ctrlValues);
+            
+            //     SmallVector<int32_t> operandSegments = readSegmentSizes(gate, "operandSegmentSizes");
+            //     unsigned numLeading = gate->getNumOperands();
+            //     int32_t ctrlQubitsStart = static_cast<int32_t>(numLeading + gate.getNonCtrlQubitOperands().size());
+                
+            //     unsigned ctrlQubitsSeg = 0;
+            //     for (int32_t acc = 0; ctrlQubitsSeg < operandSegments.size(); ++ctrlQubitsSeg) {
+            //         if (acc == ctrlQubitsStart) {
+            //             break;
+            //         }
+            //         acc += operandSegments[ctrlQubitsSeg];
+            //     }
+            //     unsigned ctrlValuesSeg = ctrlQubitsSeg + 1;
+
+            //     operandSegments[ctrlQubitsSeg] += currentCtrlQubits.size();
+            //     operandSegments[ctrlValuesSeg] += ctrlValues.size();
+            // });
+
+
+            // then for the operandSegmentSizes (AttrSizedOperandSegments) array, 
+            // just increment it inplace (ctrlQubits should be index 1, ctrlValues index 2??)
+            
+            rewriter.modifyOpInPlace(gate,
+                                     [&] { 
+                                        gate.addControls(currentCtrlQubits, ctrlValues); });
             continue;
         }
         if (auto inner = dyn_cast<CtrlOp>(op)) {
@@ -212,9 +242,9 @@ struct CtrlLoweringRewritePattern : public OpRewritePattern<CtrlOp> {
             return failure();
         }
 
-        for (Operation *op : opsToErase) {
-            rewriter.eraseOp(op);
-        }
+        // for (Operation *op : opsToErase) {
+            // rewriter.eraseOp(op);
+        // }
         rewriter.inlineBlockBefore(&block, ctrl);
         // Assemble the ctrl op results: out_ctrl_qubits followed by the target results.
         rewriter.eraseOp(ctrl);
