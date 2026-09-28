@@ -14,7 +14,7 @@ on:
         type: string
         required: false
         default: ''
-        description: Lightning git ref to build from source. Empty uses the version pinned in .dep-versions.
+        description: Lightning git ref (branch, tag or commit SHA) to build from source. Empty uses the version pinned in .dep-versions.
       pennylane-version:
         type: string
         required: false
@@ -121,7 +121,18 @@ jobs:
 
       - name: Test
         run: |
-          docker run --rm catalyst:test python -c "import pennylane as qp; qp.about(); qp.device('lightning.qubit', wires=1); qp.device('lightning.kokkos', wires=1)"
+          docker run --rm -i catalyst:test python - <<'EOF'
+          import pennylane as qp
+          qp.about()
+          for dev in ["lightning.qubit", "lightning.kokkos"]:
+              @qp.qjit
+              @qp.qnode(qp.device(dev, wires=1))
+              def f():
+                  qp.Hadamard(0)
+                  return qp.probs()
+              assert qp.math.allclose(f(), [0.5, 0.5]), (dev, f())
+              print(dev, "qjit ok")
+          EOF
 
       - name: Save image
         run: docker save catalyst:test | gzip > pennylane-catalyst.tar.gz

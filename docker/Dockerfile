@@ -68,9 +68,9 @@ RUN if [ -n "${PENNYLANE_VERSION}" ]; then \
 
 
 RUN if [ -n "${LIGHTNING_VERSION}" ]; then \
-        git clone -q --depth 1 --branch "${LIGHTNING_VERSION}" \
-            https://github.com/PennyLaneAI/pennylane-lightning.git /tmp/lightning \
-        && cd /tmp/lightning && python scripts/configure_pyproject_toml.py \
+        git clone -q https://github.com/PennyLaneAI/pennylane-lightning.git /tmp/lightning \
+        && cd /tmp/lightning && git checkout -q "${LIGHTNING_VERSION}" \
+        && python scripts/configure_pyproject_toml.py \
         && pip install --no-cache-dir --no-deps --force-reinstall . \
         && git clean -fdxq \
         && PL_BACKEND=lightning_kokkos python scripts/configure_pyproject_toml.py \
