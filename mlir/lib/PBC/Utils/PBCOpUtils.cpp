@@ -24,8 +24,7 @@
 namespace catalyst {
 namespace pbc {
 
-mlir::Value getReachingValueAt(mlir::Value qubit, PBCOpInterface op)
-{
+mlir::Value getReachingValueAt(mlir::Value qubit, PBCOpInterface op) {
     // We want to find the qubit that is used by op.
     // e.g., op is first PPR, while qubit can be the operands from the third PPR.
     // %0_q0, %0_q1 = pbc.ppr ["X", "X"](8) %arg0, %arg1 // <- op
@@ -63,8 +62,7 @@ mlir::Value getReachingValueAt(mlir::Value qubit, PBCOpInterface op)
     return getReachingValueAt(inQubit, op);
 }
 
-std::vector<mlir::Value> getInQubitReachingValuesAt(PBCOpInterface srcOp, PBCOpInterface dstOp)
-{
+std::vector<mlir::Value> getInQubitReachingValuesAt(PBCOpInterface srcOp, PBCOpInterface dstOp) {
     std::vector<mlir::Value> dominanceQubits;
     dominanceQubits.reserve(srcOp.getInQubits().size());
     for (auto inQubit : srcOp.getInQubits()) {
@@ -74,8 +72,7 @@ std::vector<mlir::Value> getInQubitReachingValuesAt(PBCOpInterface srcOp, PBCOpI
     return dominanceQubits;
 }
 
-bool commutes(PBCOpInterface rhsOp, PBCOpInterface lhsOp)
-{
+bool commutes(PBCOpInterface rhsOp, PBCOpInterface lhsOp) {
     if (lhsOp->getBlock() != rhsOp->getBlock()) {
         return false;
     }

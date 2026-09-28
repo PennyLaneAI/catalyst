@@ -57,8 +57,7 @@ struct RTIOEmitARTIQRuntimePass
     : public impl::RTIOEmitARTIQRuntimePassBase<RTIOEmitARTIQRuntimePass> {
     using RTIOEmitARTIQRuntimePassBase::RTIOEmitARTIQRuntimePassBase;
 
-    void runOnOperation() override
-    {
+    void runOnOperation() override {
         ModuleOp moduleOp = getOperation();
         MLIRContext *ctx = &getContext();
         OpBuilder builder(ctx);
@@ -86,8 +85,7 @@ struct RTIOEmitARTIQRuntimePass
   private:
     /// Emit ARTIQ runtime wrapper for LLVM dialect kernel function
     LogicalResult emitARTIQRuntimeForLLVMFunc(ModuleOp moduleOp, OpBuilder &builder,
-                                              LLVM::LLVMFuncOp kernelFunc)
-    {
+                                              LLVM::LLVMFuncOp kernelFunc) {
         MLIRContext *ctx = builder.getContext();
         Location loc = moduleOp.getLoc();
 
@@ -123,16 +121,13 @@ struct RTIOEmitARTIQRuntimePass
             // Create zero/null values for each argument type
             if (isa<LLVM::LLVMPointerType>(argTy)) {
                 callArgs.push_back(LLVM::ZeroOp::create(builder, loc, ptrTy));
-            }
-            else if (argTy.isInteger(64)) {
+            } else if (argTy.isInteger(64)) {
                 callArgs.push_back(
                     LLVM::ConstantOp::create(builder, loc, i64Ty, builder.getI64IntegerAttr(0)));
-            }
-            else if (argTy.isInteger(32)) {
+            } else if (argTy.isInteger(32)) {
                 callArgs.push_back(
                     LLVM::ConstantOp::create(builder, loc, i32Ty, builder.getI32IntegerAttr(0)));
-            }
-            else {
+            } else {
                 // For other types, use null pointer as fallback
                 callArgs.push_back(LLVM::ZeroOp::create(builder, loc, ptrTy));
             }
@@ -147,8 +142,7 @@ struct RTIOEmitARTIQRuntimePass
     }
 
     /// Declare __artiq_personality function
-    void declareARTIQPersonality(ModuleOp moduleOp, OpBuilder &builder, Location loc)
-    {
+    void declareARTIQPersonality(ModuleOp moduleOp, OpBuilder &builder, Location loc) {
         if (moduleOp.lookupSymbol<LLVM::LLVMFuncOp>(ARTIQRuntime::artiqPersonality)) {
             return;
         }

@@ -77,8 +77,7 @@ namespace {
 
 // A helper to generate a memref.alloc() with an identical type as the
 // (possibly dynamically-shaped) reference Value.
-Value generateAllocation(OpBuilder &builder, Location loc, Value reference)
-{
+Value generateAllocation(OpBuilder &builder, Location loc, Value reference) {
     auto origMemrefType = cast<MemRefType>(reference.getType());
     auto memrefType = MemRefType::get(origMemrefType.getShape(), origMemrefType.getElementType());
 
@@ -97,8 +96,7 @@ Value generateAllocation(OpBuilder &builder, Location loc, Value reference)
 
 // Helper function to generate a list of memref allocations.
 void generateAllocations(RewriterBase &rewriter, Location loc, SmallVectorImpl<Value> &allocations,
-                         ValueRange referenceValues)
-{
+                         ValueRange referenceValues) {
     for (Value memref : referenceValues) {
         allocations.push_back(
             generateAllocation(rewriter, loc, cast<TypedValue<MemRefType>>(memref)));
@@ -113,14 +111,12 @@ void generateAllocations(RewriterBase &rewriter, Location loc, SmallVectorImpl<V
 // See https://github.com/llvm/llvm-project/pull/114155/files
 //
 // Note that as stated in the overall TODO, we force identity layout at the moment.
-void TensorType2MemrefType(const TypeRange &inTypes, SmallVector<Type> &convertedResults)
-{
+void TensorType2MemrefType(const TypeRange &inTypes, SmallVector<Type> &convertedResults) {
     for (Type inType : inTypes) {
         if (isa<TensorType>(inType)) {
             convertedResults.push_back(
                 bufferization::getMemRefTypeWithStaticIdentityLayout(cast<TensorType>(inType)));
-        }
-        else {
+        } else {
             convertedResults.push_back(inType);
         }
     }
@@ -128,8 +124,7 @@ void TensorType2MemrefType(const TypeRange &inTypes, SmallVector<Type> &converte
 
 static bufferization::BufferLikeType
 getBufferizedFunctionArgType(FunctionOpInterface funcOp, int64_t index,
-                             const bufferization::BufferizationOptions &options)
-{
+                             const bufferization::BufferizationOptions &options) {
     auto tensorType = dyn_cast<TensorType>(funcOp.getArgumentTypes()[index]);
     assert(tensorType && "expected TensorType");
 
@@ -140,8 +135,7 @@ getBufferizedFunctionArgType(FunctionOpInterface funcOp, int64_t index,
     return memrefType;
 }
 
-static ReturnOp getAssumedUniqueReturnOp(FunctionOpInterface funcOp)
-{
+static ReturnOp getAssumedUniqueReturnOp(FunctionOpInterface funcOp) {
     ReturnOp returnOp;
     for (Block &b : funcOp.getFunctionBody()) {
         if (auto candidateOp = dyn_cast<ReturnOp>(b.getTerminator())) {
@@ -161,28 +155,24 @@ static ReturnOp getAssumedUniqueReturnOp(FunctionOpInterface funcOp)
 struct AdjointOpInterface
     : public bufferization::BufferizableOpInterface::ExternalModel<AdjointOpInterface, AdjointOp> {
     bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
-                                const bufferization::AnalysisState &state) const
-    {
+                                const bufferization::AnalysisState &state) const {
         return true;
     }
 
     bool bufferizesToMemoryWrite(Operation *op, OpOperand &opOperand,
-                                 const bufferization::AnalysisState &state) const
-    {
+                                 const bufferization::AnalysisState &state) const {
         return false;
     }
 
     bufferization::AliasingValueList
     getAliasingValues(Operation *op, OpOperand &opOperand,
-                      const bufferization::AnalysisState &state) const
-    {
+                      const bufferization::AnalysisState &state) const {
         return {};
     }
 
     LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
                             const bufferization::BufferizationOptions &options,
-                            bufferization::BufferizationState &state) const
-    {
+                            bufferization::BufferizationState &state) const {
         auto adjointOp = cast<AdjointOp>(op);
         Location loc = adjointOp.getLoc();
         Value gradSize = adjointOp.getGradSize();
@@ -200,8 +190,7 @@ struct AdjointOpInterface
                 MemRefType memrefType = cast<MemRefType>(resType);
                 Value memrefValue = memref::AllocOp::create(rewriter, loc, memrefType, gradSize);
                 memrefValues.push_back(memrefValue);
-            }
-            else {
+            } else {
                 nonTensorResultTypes.push_back(adjointOp->getResultTypes()[i]);
                 nonTensorResultIndices.push_back(i);
             }
@@ -216,8 +205,7 @@ struct AdjointOpInterface
                     return failure();
                 }
                 bufferArgs.push_back(*opBuffer);
-            }
-            else {
+            } else {
                 bufferArgs.push_back(operand);
             }
         }
@@ -234,8 +222,7 @@ struct AdjointOpInterface
                 // a non tensor result, just use the Value
                 bufferdNewValues.push_back(newAdjointOp->getResult(nonTensorResultCounter));
                 nonTensorResultCounter++;
-            }
-            else {
+            } else {
                 // a tensor result, use the buffer
                 bufferdNewValues.push_back(memrefValues[tensorResultCounter]);
                 tensorResultCounter++;
@@ -255,14 +242,12 @@ struct BackpropOpInterface
     : public bufferization::BufferizableOpInterface::ExternalModel<BackpropOpInterface,
                                                                    BackpropOp> {
     bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
-                                const bufferization::AnalysisState &state) const
-    {
+                                const bufferization::AnalysisState &state) const {
         return true;
     }
 
     bool bufferizesToMemoryWrite(Operation *op, OpOperand &opOperand,
-                                 const bufferization::AnalysisState &state) const
-    {
+                                 const bufferization::AnalysisState &state) const {
         // Enzyme mutates the result shadows. This means the cotangents will be written into.
         // The other visible operand before bufferization is $args, the arguments to the
         // differentiated callee. It will not be written into.
@@ -274,15 +259,13 @@ struct BackpropOpInterface
 
     bufferization::AliasingValueList
     getAliasingValues(Operation *op, OpOperand &opOperand,
-                      const bufferization::AnalysisState &state) const
-    {
+                      const bufferization::AnalysisState &state) const {
         return {};
     }
 
     LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
                             const bufferization::BufferizationOptions &options,
-                            bufferization::BufferizationState &state) const
-    {
+                            bufferization::BufferizationState &state) const {
         auto backpropOp = cast<BackpropOp>(op);
         Location loc = backpropOp.getLoc();
 
@@ -303,8 +286,7 @@ struct BackpropOpInterface
                     return failure();
                 }
                 bufferArgs.push_back(*opBuffer);
-            }
-            else {
+            } else {
                 bufferArgs.push_back(operand);
             }
         }
@@ -320,8 +302,7 @@ struct BackpropOpInterface
                 Value shadow = generateAllocation(rewriter, loc, diffArg);
                 gradients.push_back(shadow);
                 argShadows.push_back(shadow);
-            }
-            else if (isa<FloatType>(diffArg.getType())) {
+            } else if (isa<FloatType>(diffArg.getType())) {
                 scalarReturnTypes.push_back(diffArg.getType());
                 scalarIndices.push_back(idx);
                 // Put a null placeholder value that will be filled in with the result of the
@@ -381,8 +362,7 @@ struct BackpropOpInterface
 struct ForwardOpInterface
     : public bufferization::OpWithUnstructuredControlFlowBufferizableOpInterfaceExternalModel<
           ForwardOpInterface, ForwardOp> {
-    bool hasTensorSemantics(Operation *op) const
-    {
+    bool hasTensorSemantics(Operation *op) const {
         auto isaTensor = llvm::IsaPred<TensorType>;
 
         // A function has tensor semantics if it has tensor arguments/results.
@@ -400,16 +380,14 @@ struct ForwardOpInterface
 
     bufferization::AliasingOpOperandList
     getAliasingOpOperands(Operation *op, Value value,
-                          const bufferization::AnalysisState &state) const
-    {
+                          const bufferization::AnalysisState &state) const {
         return {};
     }
 
     FailureOr<bufferization::BufferLikeType>
     getBufferType(Operation *op, Value value, const bufferization::BufferizationOptions &options,
                   const bufferization::BufferizationState &state,
-                  SmallVector<Value> &invocationStack) const
-    {
+                  SmallVector<Value> &invocationStack) const {
         // The getBufferType() method is called on either BlockArguments or OpResults.
         // https://github.com/llvm/llvm-project/blob/main/mlir/include/mlir/Dialect/Bufferization/IR/BufferizableOpInterface.td#L506
         // Since forward and reverse ops are funcop-like, they do not have result Values,
@@ -437,8 +415,7 @@ struct ForwardOpInterface
 
     LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
                             const bufferization::BufferizationOptions &options,
-                            bufferization::BufferizationState &state) const
-    {
+                            bufferization::BufferizationState &state) const {
         auto forwardOp = cast<ForwardOp>(op);
         FunctionType funcType = forwardOp.getFunctionType();
 
@@ -506,8 +483,7 @@ struct ForwardOpInterface
 struct ReverseOpInterface
     : public bufferization::OpWithUnstructuredControlFlowBufferizableOpInterfaceExternalModel<
           ReverseOpInterface, ReverseOp> {
-    bool hasTensorSemantics(Operation *op) const
-    {
+    bool hasTensorSemantics(Operation *op) const {
         auto isaTensor = llvm::IsaPred<TensorType>;
 
         // A function has tensor semantics if it has tensor arguments/results.
@@ -516,24 +492,23 @@ struct ReverseOpInterface
         bool hasTensorResult = any_of(reverseOp.getResultTypes(), isaTensor);
         bool hasTensorFuncInType = any_of(reverseOp.getFunctionType().getInputs(), isaTensor);
         bool hasTensorFuncOutType = any_of(reverseOp.getFunctionType().getResults(), isaTensor);
-        if (hasTensorArg || hasTensorResult || hasTensorFuncInType || hasTensorFuncOutType)
+        if (hasTensorArg || hasTensorResult || hasTensorFuncInType || hasTensorFuncOutType) {
             return true;
+        }
 
         return false;
     }
 
     bufferization::AliasingOpOperandList
     getAliasingOpOperands(Operation *op, Value value,
-                          const bufferization::AnalysisState &state) const
-    {
+                          const bufferization::AnalysisState &state) const {
         return {};
     }
 
     FailureOr<bufferization::BufferLikeType>
     getBufferType(Operation *op, Value value, const bufferization::BufferizationOptions &options,
                   const bufferization::BufferizationState &state,
-                  SmallVector<Value> &invocationStack) const
-    {
+                  SmallVector<Value> &invocationStack) const {
         // See comment on the getBufferType() method on forward op.
         auto reverseOp = cast<ReverseOp>(op);
         auto bbArg = cast<BlockArgument>(value);
@@ -548,8 +523,7 @@ struct ReverseOpInterface
 
     LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
                             const bufferization::BufferizationOptions &options,
-                            bufferization::BufferizationState &state) const
-    {
+                            bufferization::BufferizationState &state) const {
         auto reverseOp = cast<ReverseOp>(op);
         FunctionType funcType = reverseOp.getFunctionType();
 
@@ -568,9 +542,11 @@ struct ReverseOpInterface
         Location loc = returnOp.getLoc();
 
         // 1. Bufferize every block.
-        for (Block &block : reverseOp.getBody())
-            if (failed(bufferization::bufferizeBlockSignature(&block, rewriter, options, state)))
+        for (Block &block : reverseOp.getBody()) {
+            if (failed(bufferization::bufferizeBlockSignature(&block, rewriter, options, state))) {
                 return failure();
+            }
+        }
 
         // 2. For each result, keep track of which inplace argument it reuses.
         SmallVector<Value> returnValues;
@@ -613,8 +589,7 @@ struct ReverseOpInterface
 
 } // namespace
 
-void catalyst::gradient::registerBufferizableOpInterfaceExternalModels(DialectRegistry &registry)
-{
+void catalyst::gradient::registerBufferizableOpInterfaceExternalModels(DialectRegistry &registry) {
     registry.addExtension(+[](MLIRContext *ctx, GradientDialect *dialect) {
         AdjointOp::attachInterface<AdjointOpInterface>(*ctx);
         BackpropOp::attachInterface<BackpropOpInterface>(*ctx);

@@ -70,8 +70,7 @@ struct PauliStringWrapper {
     PauliStringWrapper &operator=(const PauliStringWrapper &data) = delete;
     PauliStringWrapper &operator=(PauliStringWrapper &&data) = delete;
 
-    bool operator==(const PauliStringWrapper &rhs) const
-    {
+    bool operator==(const PauliStringWrapper &rhs) const {
         return (this->get_pauli_word() == rhs.get_pauli_word()) &&
                (this->isNegative() == rhs.isNegative());
     }

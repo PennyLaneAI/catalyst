@@ -31,8 +31,7 @@ using namespace mlir;
 namespace catalyst {
 namespace pbc {
 
-FailureOr<int64_t> PBCLayerContext::ifWorstCaseDepth(scf::IfOp ifOp)
-{
+FailureOr<int64_t> PBCLayerContext::ifWorstCaseDepth(scf::IfOp ifOp) {
     FailureOr<int64_t> thenDepth =
         worstCaseDepthOfBlock(&ifOp.getThenRegion().front(), /*liftForLoops=*/false);
     if (failed(thenDepth)) {
@@ -51,8 +50,7 @@ FailureOr<int64_t> PBCLayerContext::ifWorstCaseDepth(scf::IfOp ifOp)
     return std::max(*thenDepth, elseDepth);
 }
 
-FailureOr<int64_t> PBCLayerContext::switchWorstCaseDepth(scf::IndexSwitchOp switchOp)
-{
+FailureOr<int64_t> PBCLayerContext::switchWorstCaseDepth(scf::IndexSwitchOp switchOp) {
     FailureOr<int64_t> defaultDepth =
         worstCaseDepthOfBlock(&switchOp.getDefaultBlock(), /*liftForLoops=*/false);
     if (failed(defaultDepth)) {
@@ -72,10 +70,9 @@ FailureOr<int64_t> PBCLayerContext::switchWorstCaseDepth(scf::IndexSwitchOp swit
     return maxDepth;
 }
 
-FailureOr<int64_t> PBCLayerContext::forWorstCaseDepth(scf::ForOp forOp)
-{
-    // Same trip-count rules as resource counting (`estimated_iterations`, static bounds, …).
-    std::optional<int64_t> tripCount = resolveForLoopTripCount(forOp);
+FailureOr<int64_t> PBCLayerContext::forWorstCaseDepth(scf::ForOp forOp) {
+    // Same trip-count rules as resource counting (`catalyst.estimated_iterations`, static bounds…).
+    std::optional<double> tripCount = resolveForLoopTripCount(forOp);
 
     if (!tripCount) {
         if (skipDynamic_) {
@@ -94,8 +91,8 @@ FailureOr<int64_t> PBCLayerContext::forWorstCaseDepth(scf::ForOp forOp)
 
 FailureOr<int64_t> PBCLayerContext::computeBlockWorstCaseDepth(Block *block,
                                                                bool onlyOnDisjointQubit,
-                                                               bool skipDynamic, bool liftForLoops)
-{
+                                                               bool skipDynamic,
+                                                               bool liftForLoops) {
     // These flags are invariant across the whole traversal, so stash them once instead of
     // threading them through every recursion level; the worker reads them from member state.
     onlyOnDisjointQubit_ = onlyOnDisjointQubit;
@@ -103,8 +100,7 @@ FailureOr<int64_t> PBCLayerContext::computeBlockWorstCaseDepth(Block *block,
     return worstCaseDepthOfBlock(block, liftForLoops);
 }
 
-FailureOr<int64_t> PBCLayerContext::worstCaseDepthOfBlock(Block *block, bool liftForLoops)
-{
+FailureOr<int64_t> PBCLayerContext::worstCaseDepthOfBlock(Block *block, bool liftForLoops) {
     int64_t depth = 0;
     PBCLayer layer(this);
 
@@ -203,8 +199,7 @@ FailureOr<int64_t> PBCLayerContext::worstCaseDepthOfBlock(Block *block, bool lif
     return depth;
 }
 
-PBCDepths PBCLayerContext::computePBCDepth(Block *block)
-{
+PBCDepths PBCLayerContext::computePBCDepth(Block *block) {
     // Try to calculate the depth with static first, then fallback to skip-dynamic.
     auto d0 = computeBlockWorstCaseDepth(block, /*onlyOnDisjointQubit=*/false,
                                          /*skipDynamic=*/false, /*liftForLoops=*/true);
@@ -236,8 +231,7 @@ PBCDepths PBCLayerContext::computePBCDepth(Block *block)
 // Only op membership is recorded; operand/result bookkeeping is deferred until
 // construction so that SSA values reflect any layers already materialized in IR.
 llvm::SmallVector<std::vector<PBCOpInterface>>
-PBCLayerContext::groupLayers(mlir::Operation *root, bool onlyOnDisjointQubit)
-{
+PBCLayerContext::groupLayers(mlir::Operation *root, bool onlyOnDisjointQubit) {
     bool hasExistingLayers = false;
     root->walk([&](LayerOp) {
         hasExistingLayers = true;
@@ -266,8 +260,7 @@ PBCLayerContext::groupLayers(mlir::Operation *root, bool onlyOnDisjointQubit)
     return groups;
 }
 
-void PBCLayer::insertToLayer(PBCOpInterface op)
-{
+void PBCLayer::insertToLayer(PBCOpInterface op) {
     ops.emplace_back(op);
     updateResultAndOperand(op);
 
@@ -281,16 +274,14 @@ void PBCLayer::insertToLayer(PBCOpInterface op)
     }
 }
 
-void PBCLayer::eraseOp(PBCOpInterface op)
-{
+void PBCLayer::eraseOp(PBCOpInterface op) {
     llvm::erase(ops, op);
     for (Value r : op->getResults()) {
         layerOpResults.erase(r);
     }
 }
 
-void PBCLayer::updateResultAndOperand(PBCOpInterface op)
-{
+void PBCLayer::updateResultAndOperand(PBCOpInterface op) {
     // Ensure layer operand set contains canonical origins for any input qubits
     ValueRange inQubits = op.getInQubits();
     ValueRange outQubits = op.getOutQubits();
@@ -326,8 +317,7 @@ void PBCLayer::updateResultAndOperand(PBCOpInterface op)
     }
 }
 
-std::vector<Value> PBCLayer::getEntryQubitsFrom(PBCOpInterface op)
-{
+std::vector<Value> PBCLayer::getEntryQubitsFrom(PBCOpInterface op) {
     std::vector<Value> entryQubits;
     entryQubits.reserve(op.getInQubits().size());
 
@@ -347,8 +337,7 @@ std::vector<Value> PBCLayer::getEntryQubitsFrom(PBCOpInterface op)
     return entryQubits;
 }
 
-std::vector<Value> PBCLayer::getEntryQubitsFrom(YieldOp yieldOp)
-{
+std::vector<Value> PBCLayer::getEntryQubitsFrom(YieldOp yieldOp) {
     std::vector<Value> entries;
     entries.reserve(yieldOp->getNumOperands());
     for (Value yOperand : yieldOp->getOperands()) {
@@ -358,8 +347,7 @@ std::vector<Value> PBCLayer::getEntryQubitsFrom(YieldOp yieldOp)
         Value entry = yOperand;
         if (localQubitToEntry.contains(yOperand)) {
             entry = localQubitToEntry[yOperand];
-        }
-        else if (resultToOperand.contains(yOperand)) {
+        } else if (resultToOperand.contains(yOperand)) {
             entry = resultToOperand[yOperand];
         }
         entries.push_back(entry);
@@ -367,16 +355,14 @@ std::vector<Value> PBCLayer::getEntryQubitsFrom(YieldOp yieldOp)
     return entries;
 }
 
-bool PBCLayer::actOnDisjointQubits(PBCOpInterface op)
-{
+bool PBCLayer::actOnDisjointQubits(PBCOpInterface op) {
     // Check for overlap with cached index set
     return llvm::none_of(getEntryQubitsFrom(op),
                          [&](const auto &q) { return layerEntryQubits.contains(q); });
 }
 
 // Commute two ops if they act on the same qubits based on qubit indexes on that layer
-bool PBCLayer::commute(PBCOpInterface src, PBCOpInterface dst)
-{
+bool PBCLayer::commute(PBCOpInterface src, PBCOpInterface dst) {
     auto srcEntryQubits = getEntryQubitsFrom(src);
     auto dstEntryQubits = getEntryQubitsFrom(dst);
 
@@ -386,21 +372,18 @@ bool PBCLayer::commute(PBCOpInterface src, PBCOpInterface dst)
 }
 
 // Commute an op to all the ops in the layer
-bool PBCLayer::commuteToLayer(PBCOpInterface op)
-{
+bool PBCLayer::commuteToLayer(PBCOpInterface op) {
     return llvm::all_of(ops, [&](auto existingOp) { return commute(op, existingOp); });
 }
 
-bool PBCLayer::isSameBlock(PBCOpInterface op) const
-{
+bool PBCLayer::isSameBlock(PBCOpInterface op) const {
     if (ops.empty()) {
         return true;
     }
     return op->getBlock() == ops.back()->getBlock();
 }
 
-bool PBCLayer::dependsOnLayerOps(mlir::Value value) const
-{
+bool PBCLayer::dependsOnLayerOps(mlir::Value value) const {
     if (layerOpResults.empty()) {
         return false;
     }
@@ -427,8 +410,7 @@ bool PBCLayer::dependsOnLayerOps(mlir::Value value) const
     return false;
 }
 
-bool PBCLayer::extractOperandsDependOnLayerOps(PBCOpInterface op) const
-{
+bool PBCLayer::extractOperandsDependOnLayerOps(PBCOpInterface op) const {
     for (mlir::Value operand : op->getOperands()) {
         mlir::Operation *defOp = operand.getDefiningOp();
         if (llvm::isa_and_nonnull<quantum::ExtractOp>(defOp)) {
@@ -442,8 +424,7 @@ bool PBCLayer::extractOperandsDependOnLayerOps(PBCOpInterface op) const
     return false;
 }
 
-bool PBCLayer::insert(PBCOpInterface op, bool onlyDisjointQubit)
-{
+bool PBCLayer::insert(PBCOpInterface op, bool onlyDisjointQubit) {
     if (empty()) {
         insertToLayer(op);
         return true;
@@ -471,8 +452,7 @@ bool PBCLayer::insert(PBCOpInterface op, bool onlyDisjointQubit)
     return false;
 }
 
-llvm::SmallVector<mlir::Value> PBCLayer::getResultsOrderedByTypeThenOperand() const
-{
+llvm::SmallVector<mlir::Value> PBCLayer::getResultsOrderedByTypeThenOperand() const {
     llvm::SmallVector<mlir::Value> ordered;
 
     // 1. Collect classical first in program order

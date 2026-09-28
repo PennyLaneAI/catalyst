@@ -26,50 +26,56 @@ using namespace catalyst::pbc;
 
 namespace {
 
-bool verifyPrevNonClifford(PPRotationOp op, Operation *prevOp)
-{
-    if (prevOp == nullptr)
+bool verifyPrevNonClifford(PPRotationOp op, Operation *prevOp) {
+    if (prevOp == nullptr) {
         return true;
+    }
 
-    if (prevOp == op)
+    if (prevOp == op) {
         return false;
+    }
 
-    if (prevOp->isBeforeInBlock(op))
+    if (prevOp->isBeforeInBlock(op)) {
         return true;
+    }
 
     for (auto operandValue : prevOp->getOperands()) {
-        if (!verifyPrevNonClifford(op, operandValue.getDefiningOp()))
+        if (!verifyPrevNonClifford(op, operandValue.getDefiningOp())) {
             return false;
+        }
     }
     return true;
 }
 
-bool verifyNextNonClifford(PPRotationOp op, PPRotationOp nextOp)
-{
-    if (!nextOp.isNonClifford())
+bool verifyNextNonClifford(PPRotationOp op, PPRotationOp nextOp) {
+    if (!nextOp.isNonClifford()) {
         return false;
+    }
 
-    if (nextOp == nullptr)
+    if (nextOp == nullptr) {
         return false;
+    }
 
     for (auto operandValue : nextOp.getOperands()) {
         auto defOp = operandValue.getDefiningOp();
 
-        if (defOp == op)
+        if (defOp == op) {
             continue;
+        }
 
-        if (!verifyPrevNonClifford(op, defOp))
+        if (!verifyPrevNonClifford(op, defOp)) {
             return false;
+        }
     }
 
     return true;
 }
 
 LogicalResult visitValidNonCliffordPPR(PPRotationOp op,
-                                       std::function<LogicalResult(PPRotationOp)> callback)
-{
-    if (op.isNonClifford())
+                                       std::function<LogicalResult(PPRotationOp)> callback) {
+    if (op.isNonClifford()) {
         return failure();
+    }
 
     for (auto userOp : op->getUsers()) {
         if (auto pprOp = llvm::dyn_cast<PPRotationOp>(userOp)) {
@@ -84,8 +90,7 @@ LogicalResult visitValidNonCliffordPPR(PPRotationOp op,
 
 void moveCliffordPastNonClifford(const PauliStringWrapper &lhsPauli,
                                  const PauliStringWrapper &rhsPauli, PauliStringWrapper *result,
-                                 PatternRewriter &rewriter)
-{
+                                 PatternRewriter &rewriter) {
     assert(lhsPauli.op != nullptr && "LHS Operation is not found");
     assert(rhsPauli.op != nullptr && "RHS Operation is not found");
     assert(llvm::isa<PPRotationOp>(lhsPauli.op) && "LHS Operation is not PPRotationOp");
@@ -105,8 +110,7 @@ void moveCliffordPastNonClifford(const PauliStringWrapper &lhsPauli,
     if (result != nullptr) {
         updatePauliWord(rhs, result->get_pauli_word(), rewriter);
         updatePauliWordSign(rhs, result->isNegative(), rewriter);
-    }
-    else {
+    } else {
         updatePauliWord(rhs, rhsPauli.get_pauli_word(), rewriter);
         updatePauliWordSign(rhs, rhsPauli.isNegative(), rewriter);
     }
@@ -147,12 +151,9 @@ struct CommutePPR : public OpRewritePattern<PPRotationOp> {
     size_t MAX_PAULI_SIZE;
 
     CommutePPR(mlir::MLIRContext *context, size_t maxPauliSize, PatternBenefit benefit)
-        : OpRewritePattern(context), MAX_PAULI_SIZE(maxPauliSize)
-    {
-    }
+        : OpRewritePattern(context), MAX_PAULI_SIZE(maxPauliSize) {}
 
-    LogicalResult matchAndRewrite(PPRotationOp op, PatternRewriter &rewriter) const override
-    {
+    LogicalResult matchAndRewrite(PPRotationOp op, PatternRewriter &rewriter) const override {
         return visitValidNonCliffordPPR(op, [&](PPRotationOp nonCliffordPPR) {
             auto [normCliffordPPR, normNonCliffordPPR] = normalizePPROps(op, nonCliffordPPR);
 
@@ -182,8 +183,7 @@ struct CommutePPR : public OpRewritePattern<PPRotationOp> {
 namespace catalyst {
 namespace pbc {
 
-void populateCommutePPRPatterns(mlir::RewritePatternSet &patterns, unsigned int maxPauliSize)
-{
+void populateCommutePPRPatterns(mlir::RewritePatternSet &patterns, unsigned int maxPauliSize) {
     patterns.add<CommutePPR>(patterns.getContext(), maxPauliSize, 1);
 }
 } // namespace pbc

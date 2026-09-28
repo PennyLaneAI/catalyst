@@ -29,8 +29,7 @@ using namespace catalyst::qecl;
 
 #include "QecLogical/IR/QecLogicalOpsDialect.cpp.inc"
 
-void QecLogicalDialect::initialize()
-{
+void QecLogicalDialect::initialize() {
     addTypes<
 #define GET_TYPEDEF_LIST
 #include "QecLogical/IR/QecLogicalOpsTypes.cpp.inc"

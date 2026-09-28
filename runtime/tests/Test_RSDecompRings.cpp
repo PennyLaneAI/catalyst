@@ -21,8 +21,7 @@
 using namespace Catch::Matchers;
 using namespace RSDecomp::Rings;
 
-TEST_CASE("Test ZSqrtTwo class", "[RSDecomp][Rings]")
-{
+TEST_CASE("Test ZSqrtTwo class", "[RSDecomp][Rings]") {
     ZSqrtTwo z1(1, 2);
     ZSqrtTwo z2(3, 4);
 
@@ -69,8 +68,7 @@ TEST_CASE("Test ZSqrtTwo class", "[RSDecomp][Rings]")
     CHECK(z2.to_omega() == ZOmega(-4, 0, 4, 3));
 }
 
-TEST_CASE("Test ZOmega class", "[RSDecomp][Rings]")
-{
+TEST_CASE("Test ZOmega class", "[RSDecomp][Rings]") {
     const double tol = 1e-10;
     ZOmega z1(1, 2, 3, 4);
     ZOmega z2(5, 6, 7, 8);
@@ -115,8 +113,7 @@ TEST_CASE("Test ZOmega class", "[RSDecomp][Rings]")
     CHECK((z1 - ZOmega(2, 2, 2, 0)).to_sqrt_two() == ZSqrtTwo(4, 1));
 }
 
-TEST_CASE("Test DyadicMatrix class", "[RSDecomp][Rings]")
-{
+TEST_CASE("Test DyadicMatrix class", "[RSDecomp][Rings]") {
     ZOmega z1 = ZOmega(1, 2, 3, 4);
     ZOmega z2 = ZOmega(5, 6, 7, 8);
     DyadicMatrix m1{z1, z2, z1, z2};
@@ -139,8 +136,7 @@ TEST_CASE("Test DyadicMatrix class", "[RSDecomp][Rings]")
     CHECK(dyadic_matrix_mul(m2, m3) == DyadicMatrix{exp_z1, exp_z2, exp_z1, exp_z2, 3});
 }
 
-TEST_CASE("Test SO3Matrix class", "[RSDecomp][Rings]")
-{
+TEST_CASE("Test SO3Matrix class", "[RSDecomp][Rings]") {
     ZOmega z1 = ZOmega(1, 2, 3, 4);
     ZOmega z2 = ZOmega(5, 6, 7, 8);
     DyadicMatrix m1{z1, z2, z1, z2};

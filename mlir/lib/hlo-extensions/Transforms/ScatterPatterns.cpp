@@ -33,8 +33,7 @@ namespace hlo_extensions {
 struct ScatterOpRewritePattern : public mlir::OpRewritePattern<stablehlo::ScatterOp> {
     using mlir::OpRewritePattern<stablehlo::ScatterOp>::OpRewritePattern;
 
-    void emitIndicesError(stablehlo::ScatterOp op) const
-    {
+    void emitIndicesError(stablehlo::ScatterOp op) const {
         op.emitError()
             << "Indices are not unique and/or not sorted. Note that when using multiple indices "
             << "with ``jax.numpy.ndarray.at``, the indices must be sorted and unique. "
@@ -45,8 +44,7 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<stablehlo::Scatte
             << ", sorted: " << op.getIndicesAreSorted();
     }
 
-    mlir::LogicalResult onlyOneInputUpdateAndResult(stablehlo::ScatterOp op) const
-    {
+    mlir::LogicalResult onlyOneInputUpdateAndResult(stablehlo::ScatterOp op) const {
         // Semantics of scatter:
         // https://github.com/openxla/stablehlo/blob/main/docs/spec.md#scatter
         // Assumption 1: only one input, one update, and one result
@@ -65,8 +63,7 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<stablehlo::Scatte
         return op.getResults().size() == 1 ? success() : failure();
     }
 
-    mlir::LogicalResult isAssignment(stablehlo::ScatterOp op) const
-    {
+    mlir::LogicalResult isAssignment(stablehlo::ScatterOp op) const {
         // From:
         // C23: update_computation has type
         //      (tensor<E0>, ..., tensor<EN-1>, tensor<E0>, ..., tensor<EN-1>) -> (tensor<E0>, ...,
@@ -99,8 +96,7 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<stablehlo::Scatte
         return returnOp.getResults().front() == block.getArgument(1) ? success() : failure();
     }
 
-    mlir::LogicalResult noBatching(stablehlo::ScatterOp op) const
-    {
+    mlir::LogicalResult noBatching(stablehlo::ScatterOp op) const {
         // Ok, now that we know it is an assignment, we need to worry about
         // where exactly are we assigning and what are we assigning.
         // First let's worry about the what we are assigning.
@@ -124,8 +120,7 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<stablehlo::Scatte
         //   return scatterDimNumbers.getInputBatchingDims().empty() ? success() : failure();
     }
 
-    mlir::LogicalResult singleFullSlices(stablehlo::ScatterOp op) const
-    {
+    mlir::LogicalResult singleFullSlices(stablehlo::ScatterOp op) const {
         // From:
         //   More formally, for all update_index in index_space(updates[0]):
         //     * update_scatter_dims = [d for d in axes(updates[0]) and d not in update_window_dims]
@@ -145,15 +140,13 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<stablehlo::Scatte
         return rank == scatterDimNumbers.getUpdateWindowDims().size() ? success() : failure();
     }
 
-    mlir::LogicalResult canBeDoneWithSingleTensorInsertSlice(stablehlo::ScatterOp op) const
-    {
+    mlir::LogicalResult canBeDoneWithSingleTensorInsertSlice(stablehlo::ScatterOp op) const {
         return cast<RankedTensorType>(op.getScatterIndices().getType()).getRank() == 1 ? success()
                                                                                        : failure();
     }
 
     mlir::LogicalResult lowerToTensorInsertSlice(stablehlo::ScatterOp op,
-                                                 mlir::PatternRewriter &rewriter) const
-    {
+                                                 mlir::PatternRewriter &rewriter) const {
         // mhlo::ScatterOp is exactly the same as stablehlo::ScatterOp
         // See https://www.tensorflow.org/mlir/hlo_ops#mhloscatter_mhloscatterop
         // and https://github.com/openxla/stablehlo/blob/main/docs/spec.md#scatter
@@ -254,8 +247,7 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<stablehlo::Scatte
                 dynOffsets.push_back(indexCastOp);
                 staticOffsets.push_back(ShapedType::kDynamic);
                 staticSizes.push_back(1);
-            }
-            else if (updateDim == inputDim) {
+            } else if (updateDim == inputDim) {
                 int scatterDimIndex = scatterDimsToOperandDims[inputDim];
                 Value scatterDimVal = index::ConstantOp::create(rewriter, loc, scatterDimIndex);
                 auto extractOp =
@@ -268,8 +260,7 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<stablehlo::Scatte
                 staticOffsets.push_back(ShapedType::kDynamic);
                 staticSizes.push_back(updateShape[updateDim]);
                 updateDim++;
-            }
-            else {
+            } else {
                 staticOffsets.push_back(0);
                 staticSizes.push_back(updateShape[updateDim]);
                 updateDim++;
@@ -286,8 +277,7 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<stablehlo::Scatte
     }
 
     mlir::LogicalResult matchAndRewrite(stablehlo::ScatterOp op,
-                                        mlir::PatternRewriter &rewriter) const override
-    {
+                                        mlir::PatternRewriter &rewriter) const override {
         // FastPath
         if (!failed(this->lowerToTensorInsertSlice(op, rewriter))) {
             return success();
@@ -315,8 +305,9 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<stablehlo::Scatte
         // Extract the block responsible for update
         Region &region = op.getUpdateComputation();
 
-        if (!region.hasOneBlock())
+        if (!region.hasOneBlock()) {
             return failure();
+        }
 
         ModuleOp moduleOp = op->getParentOfType<ModuleOp>();
 
@@ -424,8 +415,7 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<stablehlo::Scatte
                     Value updatedExtracted;
                     if (isa<RankedTensorType>(updated.getType())) {
                         updatedExtracted = tensor::ExtractOp::create(builder, loc, updated);
-                    }
-                    else {
+                    } else {
                         updatedExtracted = updated;
                     }
                     // Insert the computed update in the results and replace the previous value
@@ -457,8 +447,7 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<stablehlo::Scatte
 
     // Store all the necessary variables for the SCF for op in above defined struct
     UpdateData getUpdateData(stablehlo::ScatterOp &op, mlir::PatternRewriter &rewriter,
-                             mlir::Location loc) const
-    {
+                             mlir::Location loc) const {
         UpdateData data;
         // Get the inputs and updates values
         data.resultsValue = op.getInputs().front();
@@ -494,8 +483,7 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<stablehlo::Scatte
             std::set_difference(dimensions.begin(), dimensions.end(),
                                 data.updatedWindowsDims.begin(), data.updatedWindowsDims.end(),
                                 std::back_inserter(data.updatedScatterDims));
-        }
-        else {
+        } else {
             data.updatedScatterDims = dimensions;
         }
 
@@ -527,8 +515,7 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<stablehlo::Scatte
     // Take the update block from scatter (bb0) and insert an equivalent function if it does not
     // exist
     FlatSymbolRefAttr getOrInsertUpdateFunction(Location loc, ModuleOp moduleOp, OpBuilder &builder,
-                                                Region &updateRegion, std::string funcName) const
-    {
+                                                Region &updateRegion, std::string funcName) const {
         MLIRContext *ctx = builder.getContext();
 
         if (moduleOp.lookupSymbol<func::FuncOp>(funcName)) {
@@ -573,8 +560,7 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<stablehlo::Scatte
     void generateIndicesRecursive(const std::vector<int64_t> &shape,
                                   std::vector<int64_t> &currentIndex, size_t dimension,
                                   SmallVector<Value> &configurations,
-                                  mlir::PatternRewriter &rewriter, Location loc) const
-    {
+                                  mlir::PatternRewriter &rewriter, Location loc) const {
         if (dimension == shape.size()) {
             for (auto elem : currentIndex) {
                 // integer to Value
@@ -582,8 +568,7 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<stablehlo::Scatte
                 // Add to configuration
                 configurations.push_back(valueCurrentIndex);
             }
-        }
-        else {
+        } else {
             for (int i = 0; i < shape[dimension]; i++) {
                 currentIndex.push_back(i);
                 generateIndicesRecursive(shape, currentIndex, dimension + 1, configurations,
@@ -602,8 +587,7 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<stablehlo::Scatte
                                          ArrayRef<int64_t> insertedWindowsDims,
                                          Value scatterIndices, int64_t indexVectorDim,
                                          ArrayRef<int64_t> scatterDimsToOperandDims,
-                                         OpBuilder &builder, Location loc) const
-    {
+                                         OpBuilder &builder, Location loc) const {
         // Get the scatter indices from the update scatter indices
         if (!updateScatterIndices.empty()) {
             scatterIndices = extractScatterIndices(updateScatterIndices, scatterIndices,
@@ -631,14 +615,12 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<stablehlo::Scatte
                     Value addValueCasted =
                         arith::IndexCastOp::create(builder, loc, builder.getIndexType(), addValue);
                     results.push_back(addValueCasted);
-                }
-                else {
+                } else {
                     results.push_back(indexUpdate);
                 }
             }
             return results;
-        }
-        else {
+        } else {
             SmallVector<Value> fullStartIndex;
             for (size_t i = 0; i < inputsShape.size(); ++i) {
                 // Full start indices (use scatter dims op)
@@ -650,8 +632,7 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<stablehlo::Scatte
                     auto indexScatter =
                         tensor::ExtractOp::create(builder, loc, scatterIndices, indexConstantOp);
                     fullStartIndex.push_back(indexScatter);
-                }
-                else {
+                } else {
                     TypedAttr indexAttr = builder.getI32IntegerAttr(0);
                     Value index = arith::ConstantOp::create(builder, loc, indexAttr);
                     fullStartIndex.push_back(index);
@@ -682,8 +663,7 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<stablehlo::Scatte
     // Given a vector of index value (update scatter), it extracts the value from scatterIndices,
     // The index vector dim indicates the dimension to be extracted.
     Value extractScatterIndices(SmallVector<Value> updateScatterIndices, Value scatterIndices,
-                                int64_t indexVectorDim, Location loc, OpBuilder builder) const
-    {
+                                int64_t indexVectorDim, Location loc, OpBuilder builder) const {
         auto scatterIndicesTensorType = cast<RankedTensorType>(scatterIndices.getType());
         // Get the rank and shape of scatter indices
         int64_t rank = scatterIndicesTensorType.getRank();
@@ -698,8 +678,7 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<stablehlo::Scatte
                 offsets[i] = ShapedType::kDynamic;
                 if (i > indexVectorDim) {
                     dynOffsets.push_back(updateScatterIndices[i - 1]);
-                }
-                else {
+                } else {
                     dynOffsets.push_back(updateScatterIndices[i]);
                 }
             }
@@ -723,8 +702,7 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<stablehlo::Scatte
     }
     // From a index value i it extracts the update indices from the tensor of values.
     Value extractUpdateIndices(Value allUpdatesIndicesTensor, Value i, Location loc,
-                               OpBuilder builder) const
-    {
+                               OpBuilder builder) const {
         RankedTensorType updateType = cast<RankedTensorType>(allUpdatesIndicesTensor.getType());
 
         auto rank = updateType.getRank();
@@ -753,8 +731,7 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<stablehlo::Scatte
     }
 };
 
-void populateScatterPatterns(RewritePatternSet &patterns)
-{
+void populateScatterPatterns(RewritePatternSet &patterns) {
     patterns.add<ScatterOpRewritePattern>(patterns.getContext(), 1);
 }
 

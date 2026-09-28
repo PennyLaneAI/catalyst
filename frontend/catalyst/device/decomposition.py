@@ -54,19 +54,40 @@ logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
 
 
-def check_alternative_support(op, capabilities: DeviceCapabilities):
+def check_alternative_support(
+    op, capabilities: DeviceCapabilities, grad_method: Union[str, None] = None
+):
     """Verify that aliased operations aren't supported via alternative definitions."""
 
     if isinstance(op, qp.ops.Controlled) and type(op) is not qp.ops.ControlledOp:
-        # "Cast" away the specialized class for gates like Toffoli, ControlledQubitUnitary, etc.
         supported = capabilities.operations.get(op.base.name)
         if supported and supported.controllable:
+            if isinstance(op, qp.ops.Controlled2):
+                # ``Controlled`` treats ``Controlled2`` as a virtual subclass for compatibility.
+                # Preserve a named Operator2 gate when differentiation requires its decomposition.
+                if not is_differentiable(op, capabilities, grad_method):
+                    return None
+
+                # Normalize the specialized gate to a generic control without crossing back into
+                # the legacy operator hierarchy. ``qp.ctrl`` is the public construction API, but
+                # it deliberately dispatches this back to the specialized gate we are replacing.
+                return [
+                    qp.ops.ControlledOp2(
+                        op.base,
+                        op.control_wires,
+                        op.control_values,
+                        op.work_wires,
+                        op.work_wire_type,
+                    )
+                ]
+
+            # "Cast" away legacy specialized classes such as CRX and ControlledQubitUnitary.
             return [qp.ops.Controlled(op.base, op.control_wires, op.control_values, op.work_wires)]
 
     return None
 
 
-def catalyst_decomposer(op, capabilities: DeviceCapabilities):
+def catalyst_decomposer(op, capabilities: DeviceCapabilities, grad_method: Union[str, None] = None):
     """A decomposer for catalyst, to be passed to the decompose transform. Takes an operator and
     returns the default decomposition, unless the operator should decompose to a QubitUnitary.
     Raises a CompileError for MidMeasureMP"""
@@ -74,7 +95,7 @@ def catalyst_decomposer(op, capabilities: DeviceCapabilities):
     if isinstance(op, MidMeasureMP):
         raise CompileError("Must use 'measure' from Catalyst instead of PennyLane.")
 
-    alternative_decomp = check_alternative_support(op, capabilities)
+    alternative_decomp = check_alternative_support(op, capabilities, grad_method)
     if alternative_decomp is not None:
         return alternative_decomp
 
@@ -141,7 +162,9 @@ def catalyst_decompose(
         def stopping_condition(op):
             return catalyst_acceptance(op, capabilities, grad_method)
 
-        decomposer = partial(catalyst_decomposer, capabilities=capabilities)
+        decomposer = partial(
+            catalyst_decomposer, capabilities=capabilities, grad_method=grad_method
+        )
 
     decompose_kwargs = {
         "num_work_wires": num_work_wires,
@@ -260,7 +283,7 @@ def catalyst_acceptance(
     # There are cases where a custom controlled gate, e.g., CH, is supported, but its
     # base, i.e., H, is not labeled controllable. In this case, we don't want to use
     # this branch to check the support for this operation.
-    elif type(op) is qp.ops.ControlledOp:
+    elif type(op) in (qp.ops.ControlledOp, qp.ops.ControlledOp2):
         match = catalyst_acceptance(op.base, capabilities, grad_method)
         if match and is_controllable(op.base, capabilities):
             return match

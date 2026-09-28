@@ -31,8 +31,7 @@ namespace mbqc {
 
 class MBQCTypeConverter : public LLVMTypeConverter {
   public:
-    MBQCTypeConverter(MLIRContext *ctx) : LLVMTypeConverter(ctx)
-    {
+    MBQCTypeConverter(MLIRContext *ctx) : LLVMTypeConverter(ctx) {
         addConversion([&](quantum::QubitType type) { return convertQubitType(type); });
         addConversion([&](quantum::ResultType type) { return convertResultType(type); });
     }
@@ -45,8 +44,7 @@ class MBQCTypeConverter : public LLVMTypeConverter {
 struct MBQCConversionPass : impl::MBQCConversionPassBase<MBQCConversionPass> {
     using MBQCConversionPassBase::MBQCConversionPassBase;
 
-    void runOnOperation() final
-    {
+    void runOnOperation() final {
         MLIRContext *context = &getContext();
         MBQCTypeConverter typeConverter(context);
 

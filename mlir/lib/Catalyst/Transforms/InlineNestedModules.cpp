@@ -107,8 +107,7 @@ namespace {
  * output = { @bar, @baz }
  */
 void computeFullyQualifiedName(SymbolOpInterface symbol, const Operation *op,
-                               std::deque<FlatSymbolRefAttr> &hierarchy)
-{
+                               std::deque<FlatSymbolRefAttr> &hierarchy) {
     auto stringRef = symbol.getNameAttr();
     auto flatSymbolRef = SymbolRefAttr::get(stringRef);
     hierarchy.push_front(flatSymbolRef);
@@ -117,8 +116,9 @@ void computeFullyQualifiedName(SymbolOpInterface symbol, const Operation *op,
     auto parentSymbol = dyn_cast<SymbolOpInterface>(parent);
     auto parentIsLimit = parent == op;
     auto isValidParent = parent && parentSymbol && !parentIsLimit;
-    if (!isValidParent)
+    if (!isValidParent) {
         return;
+    }
 
     computeFullyQualifiedName(parentSymbol, op, hierarchy);
 }
@@ -136,8 +136,7 @@ void computeFullyQualifiedName(SymbolOpInterface symbol, const Operation *op,
  * ```
  * getFullyQualifiedNameUntil(@baz, @foo) = @bar::@baz
  */
-SymbolRefAttr getFullyQualifiedNameUntil(SymbolOpInterface symbol, const Operation *op)
-{
+SymbolRefAttr getFullyQualifiedNameUntil(SymbolOpInterface symbol, const Operation *op) {
     auto symbolTable = symbol->getParentOp();
     assert(symbolTable->hasTrait<OpTrait::SymbolTable>() &&
            "symbolTable must have OpTrait::SymbolTable");
@@ -161,6 +160,11 @@ static constexpr llvm::StringRef fullyQualifiedNameAttr = "catalyst.fully_qualif
 static constexpr llvm::StringRef quantumNodeAttr = "quantum.node";
 static constexpr llvm::StringRef legacyQNodeAttr = "qnode";
 static constexpr llvm::StringRef targetAttr = "catalyst.target";
+static constexpr llvm::StringRef backlineRoleAttr = "catalyst.backline_role";
+
+static bool isSeparateCompilationUnit(Operation *op) {
+    return op->hasAttr(targetAttr) || op->hasAttr(backlineRoleAttr);
+}
 
 struct AnnotateWithFullyQualifiedName : public OpInterfaceRewritePattern<SymbolOpInterface> {
     using OpInterfaceRewritePattern<SymbolOpInterface>::OpInterfaceRewritePattern;
@@ -168,13 +172,10 @@ struct AnnotateWithFullyQualifiedName : public OpInterfaceRewritePattern<SymbolO
     /// This overload constructs a pattern that matches any operation type.
     AnnotateWithFullyQualifiedName(MLIRContext *context, Operation *root)
         : OpInterfaceRewritePattern<SymbolOpInterface>::OpInterfaceRewritePattern(context),
-          _root(root)
-    {
-    }
+          _root(root) {}
 
     LogicalResult matchAndRewrite(SymbolOpInterface symbol,
-                                  PatternRewriter &rewriter) const override
-    {
+                                  PatternRewriter &rewriter) const override {
         auto hasQualifiedName = symbol->hasAttr(fullyQualifiedNameAttr);
         if (hasQualifiedName) {
             return failure();
@@ -194,9 +195,7 @@ struct RenameFunctionsPattern : public RewritePattern {
     RenameFunctionsPattern(MLIRContext *context, SmallVector<Operation *> *symbolTables,
                            llvm::SmallSet<StringRef, 8> *externalFuncDeclNames)
         : RewritePattern(MatchAnyOpTypeTag(), 1, context), _symbolTables(symbolTables),
-          _externalFuncDeclNames(externalFuncDeclNames)
-    {
-    }
+          _externalFuncDeclNames(externalFuncDeclNames) {}
 
     LogicalResult matchAndRewrite(Operation *op, PatternRewriter &rewriter) const override;
 
@@ -207,11 +206,10 @@ struct RenameFunctionsPattern : public RewritePattern {
 static constexpr llvm::StringRef hasBeenRenamedAttrName = "catalyst.unique_names";
 
 LogicalResult RenameFunctionsPattern::matchAndRewrite(Operation *child,
-                                                      PatternRewriter &rewriter) const
-{
+                                                      PatternRewriter &rewriter) const {
     bool isSymbolTable = child->hasTrait<OpTrait::SymbolTable>();
     bool hasBeenRenamed = child->hasAttr(hasBeenRenamedAttrName);
-    bool mustRename = isSymbolTable && !hasBeenRenamed && !child->hasAttr(targetAttr);
+    bool mustRename = isSymbolTable && !hasBeenRenamed && !isSeparateCompilationUnit(child);
     if (!mustRename) {
         return failure();
     }
@@ -275,9 +273,7 @@ struct InlineNestedModule : public RewritePattern {
     InlineNestedModule(MLIRContext *context,
                        const llvm::SmallSet<StringRef, 8> &externalFuncDeclNames)
         : RewritePattern(MatchAnyOpTypeTag(), 1, context),
-          _externalFuncDeclNames(externalFuncDeclNames)
-    {
-    }
+          _externalFuncDeclNames(externalFuncDeclNames) {}
 
     const llvm::SmallSet<StringRef, 8> &_externalFuncDeclNames;
 
@@ -290,10 +286,9 @@ struct InlineNestedModule : public RewritePattern {
     // `runOnOperation()`
     mutable llvm::SmallSet<StringRef, 8> alreadyInlinedFuncDeclNames;
 
-    LogicalResult matchAndRewrite(Operation *op, PatternRewriter &rewriter) const override
-    {
+    LogicalResult matchAndRewrite(Operation *op, PatternRewriter &rewriter) const override {
         bool isSymbolTable = op->hasTrait<OpTrait::SymbolTable>();
-        bool mustInline = isSymbolTable && !op->hasAttr(targetAttr);
+        bool mustInline = isSymbolTable && !isSeparateCompilationUnit(op);
         if (!mustInline) {
             return failure();
         }
@@ -312,8 +307,7 @@ struct InlineNestedModule : public RewritePattern {
                 if (f.isExternal() && _externalFuncDeclNames.contains(funcName)) {
                     if (alreadyInlinedFuncDeclNames.contains(funcName)) {
                         _erasureWorklist.push_back(f);
-                    }
-                    else {
+                    } else {
                         alreadyInlinedFuncDeclNames.insert(funcName);
                     }
                 }
@@ -345,13 +339,10 @@ struct SymbolReplacerPattern
     SymbolReplacerPattern(MLIRContext *context, const DenseMap<SymbolRefAttr, SymbolRefAttr> *map)
         : OpInterfaceRewritePattern<
               catalyst::gradient::GradientOpInterface>::OpInterfaceRewritePattern(context),
-          _map(map)
-    {
-    }
+          _map(map) {}
 
     LogicalResult matchAndRewrite(catalyst::gradient::GradientOpInterface user,
-                                  PatternRewriter &rewriter) const override
-    {
+                                  PatternRewriter &rewriter) const override {
         auto found = _map->find(user.getCallee()) != _map->end();
         if (!found) {
             return failure();
@@ -368,13 +359,10 @@ struct ZNEReplacerPattern : public OpRewritePattern<catalyst::mitigation::ZneOp>
     using OpRewritePattern<catalyst::mitigation::ZneOp>::OpRewritePattern;
 
     ZNEReplacerPattern(MLIRContext *context, const DenseMap<SymbolRefAttr, SymbolRefAttr> *map)
-        : OpRewritePattern<catalyst::mitigation::ZneOp>::OpRewritePattern(context), _map(map)
-    {
-    }
+        : OpRewritePattern<catalyst::mitigation::ZneOp>::OpRewritePattern(context), _map(map) {}
 
     LogicalResult matchAndRewrite(catalyst::mitigation::ZneOp op,
-                                  PatternRewriter &rewriter) const override
-    {
+                                  PatternRewriter &rewriter) const override {
         auto found = _map->find(op.getCallee()) != _map->end();
         if (!found) {
             return failure();
@@ -391,13 +379,10 @@ struct NestedToFlatCallPattern : public OpRewritePattern<catalyst::LaunchKernelO
     using OpRewritePattern<catalyst::LaunchKernelOp>::OpRewritePattern;
     /// This overload constructs a pattern that matches any operation type.
     NestedToFlatCallPattern(MLIRContext *context, const DenseMap<SymbolRefAttr, SymbolRefAttr> *map)
-        : OpRewritePattern<catalyst::LaunchKernelOp>::OpRewritePattern(context), _map(map)
-    {
-    }
+        : OpRewritePattern<catalyst::LaunchKernelOp>::OpRewritePattern(context), _map(map) {}
 
     LogicalResult matchAndRewrite(catalyst::LaunchKernelOp op,
-                                  PatternRewriter &rewriter) const override
-    {
+                                  PatternRewriter &rewriter) const override {
         auto it = _map->find(op.getCallee());
         if (it == _map->end()) {
             return failure();
@@ -415,8 +400,7 @@ struct CleanupPattern : public RewritePattern {
     /// This overload constructs a pattern that matches any operation type.
     CleanupPattern(MLIRContext *context) : RewritePattern(MatchAnyOpTypeTag(), 1, context) {}
 
-    LogicalResult matchAndRewrite(Operation *op, PatternRewriter &rewriter) const override
-    {
+    LogicalResult matchAndRewrite(Operation *op, PatternRewriter &rewriter) const override {
         bool hasQualifiedName = op->hasAttr(fullyQualifiedNameAttr);
         bool hasQNodeAttr = op->hasAttr(quantumNodeAttr);
         bool hasBeenRenamed = op->hasAttr(hasBeenRenamedAttrName);
@@ -448,13 +432,11 @@ namespace catalyst {
 struct AnnotateWithFullyQualifiedNamePass
     : PassWrapper<AnnotateWithFullyQualifiedNamePass, OperationPass<>> {
 
-    bool canScheduleOn(RegisteredOperationName opInfo) const override
-    {
+    bool canScheduleOn(RegisteredOperationName opInfo) const override {
         return opInfo.hasTrait<OpTrait::SymbolTable>();
     }
 
-    void runOnOperation() override
-    {
+    void runOnOperation() override {
         MLIRContext *context = &getContext();
         GreedyRewriteConfig config;
         config.setStrictness(GreedyRewriteStrictness::ExistingOps);
@@ -475,8 +457,7 @@ struct InlineNestedSymbolTablePass : PassWrapper<InlineNestedSymbolTablePass, Op
     int _stopAfterStep;
     InlineNestedSymbolTablePass(int stopAfter) : _stopAfterStep(stopAfter) {}
 
-    void runOnOperation() override
-    {
+    void runOnOperation() override {
         // Here we are in a root module/symbol table
         // that contains other nested modules/symbol tables.
 
@@ -558,8 +539,7 @@ struct InlineNestedSymbolTablePass : PassWrapper<InlineNestedSymbolTablePass, Op
 struct InlineNestedModulePass : impl::InlineNestedModulePassBase<InlineNestedModulePass> {
     using InlineNestedModulePassBase::InlineNestedModulePassBase;
 
-    void runOnOperation() final
-    {
+    void runOnOperation() final {
         MLIRContext *ctx = &getContext();
         auto op = getOperation();
         auto pm = PassManager::on<ModuleOp>(ctx);

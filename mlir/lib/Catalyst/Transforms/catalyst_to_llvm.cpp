@@ -39,8 +39,7 @@ using namespace catalyst;
 namespace {
 
 Value getGlobalString(Location loc, OpBuilder &rewriter, StringRef key, StringRef value,
-                      ModuleOp mod)
-{
+                      ModuleOp mod) {
     auto type = LLVM::LLVMArrayType::get(IntegerType::get(rewriter.getContext(), 8), value.size());
     LLVM::GlobalOp glb = mod.lookupSymbol<LLVM::GlobalOp>(key);
     if (!glb) {
@@ -67,13 +66,11 @@ enum NumericType : int8_t {
     c128,
 };
 
-std::optional<int8_t> encodeNumericType(Type elemType)
-{
+std::optional<int8_t> encodeNumericType(Type elemType) {
     int8_t typeEncoding;
     if (isa<IndexType>(elemType)) {
         typeEncoding = NumericType::index;
-    }
-    else if (auto intType = dyn_cast<IntegerType>(elemType)) {
+    } else if (auto intType = dyn_cast<IntegerType>(elemType)) {
         switch (intType.getWidth()) {
         case 1:
             typeEncoding = NumericType::i1;
@@ -93,8 +90,7 @@ std::optional<int8_t> encodeNumericType(Type elemType)
         default:
             return std::nullopt;
         }
-    }
-    else if (auto floatType = dyn_cast<FloatType>(elemType)) {
+    } else if (auto floatType = dyn_cast<FloatType>(elemType)) {
         switch (floatType.getWidth()) {
         case 32:
             typeEncoding = NumericType::f32;
@@ -105,11 +101,11 @@ std::optional<int8_t> encodeNumericType(Type elemType)
         default:
             return std::nullopt;
         }
-    }
-    else if (auto cmplxType = dyn_cast<ComplexType>(elemType)) {
+    } else if (auto cmplxType = dyn_cast<ComplexType>(elemType)) {
         auto floatType = dyn_cast<FloatType>(cmplxType.getElementType());
-        if (!floatType)
+        if (!floatType) {
             return std::nullopt;
+        }
 
         switch (floatType.getWidth()) {
         case 32:
@@ -121,8 +117,7 @@ std::optional<int8_t> encodeNumericType(Type elemType)
         default:
             return std::nullopt;
         }
-    }
-    else {
+    } else {
         return std::nullopt;
     }
     return typeEncoding;
@@ -136,8 +131,7 @@ std::optional<int8_t> encodeNumericType(Type elemType)
 //    i8 type_encoding
 // }
 Value EncodeOpaqueMemRef(Location loc, PatternRewriter &rewriter, MemRefType memrefType,
-                         Type llvmMemrefType, Value memrefLlvm)
-{
+                         Type llvmMemrefType, Value memrefLlvm) {
     auto ctx = rewriter.getContext();
 
     // Encoded memref type: !llvm.struct<(i64, ptr<i8>, i8)>.
@@ -174,8 +168,7 @@ struct PrintOpPattern : public OpConversionPattern<PrintOp> {
     using OpConversionPattern::OpConversionPattern;
 
     LogicalResult matchAndRewrite(PrintOp op, PrintOpAdaptor adaptor,
-                                  ConversionPatternRewriter &rewriter) const override
-    {
+                                  ConversionPatternRewriter &rewriter) const override {
 
         Location loc = op.getLoc();
         MLIRContext *ctx = this->getContext();
@@ -198,8 +191,7 @@ struct PrintOpPattern : public OpConversionPattern<PrintOp> {
             Value global = getGlobalString(loc, rewriter, symbolName, stringValue, mod);
             LLVM::CallOp::create(rewriter, loc, fnDecl, global);
             rewriter.eraseOp(op);
-        }
-        else {
+        } else {
             StringRef qirName = "__catalyst__rt__print_tensor";
 
             // C interface for the print function is an unranked & opaque memref descriptor:
@@ -242,8 +234,7 @@ struct AssertionOpPattern : public OpConversionPattern<AssertionOp> {
     using OpConversionPattern::OpConversionPattern;
 
     LogicalResult matchAndRewrite(AssertionOp op, AssertionOpAdaptor adaptor,
-                                  ConversionPatternRewriter &rewriter) const override
-    {
+                                  ConversionPatternRewriter &rewriter) const override {
         Location loc = op.getLoc();
         MLIRContext *ctx = this->getContext();
         StringRef qirName = "__catalyst__rt__assert_bool";
@@ -282,8 +273,7 @@ struct AssertionOpPattern : public OpConversionPattern<AssertionOp> {
 //    i8 type_encoding
 // }
 Value EncodeDataMemRef(Location loc, PatternRewriter &rewriter, MemRefType memrefType,
-                       Type llvmMemrefType, Value memrefLlvm)
-{
+                       Type llvmMemrefType, Value memrefLlvm) {
     auto ctx = rewriter.getContext();
 
     // Encoded memref type: !llvm.struct<(i64, ptr<i8>, i8)>.
@@ -323,8 +313,7 @@ struct CustomCallOpPattern : public OpConversionPattern<CustomCallOp> {
     using OpConversionPattern::OpConversionPattern;
 
     LogicalResult matchAndRewrite(CustomCallOp op, CustomCallOpAdaptor adaptor,
-                                  ConversionPatternRewriter &rewriter) const override
-    {
+                                  ConversionPatternRewriter &rewriter) const override {
         MLIRContext *ctx = op.getContext();
         Location loc = op.getLoc();
         // Create function
@@ -440,8 +429,7 @@ struct DefineCallbackOpPattern : public OpConversionPattern<CallbackOp> {
     using OpConversionPattern::OpConversionPattern;
 
     LogicalResult matchAndRewrite(CallbackOp op, CallbackOpAdaptor adaptor,
-                                  ConversionPatternRewriter &rewriter) const override
-    {
+                                  ConversionPatternRewriter &rewriter) const override {
         // Only match with ops without an entry block
         if (!op.empty()) {
             return failure();
@@ -496,8 +484,7 @@ struct ReplaceCallbackOpWithFuncOp : public OpConversionPattern<CallbackOp> {
     using OpConversionPattern::OpConversionPattern;
 
     LogicalResult matchAndRewrite(CallbackOp op, CallbackOpAdaptor adaptor,
-                                  ConversionPatternRewriter &rewriter) const override
-    {
+                                  ConversionPatternRewriter &rewriter) const override {
         // Only match with ops with an entry block
         if (op.empty()) {
             return failure();
@@ -525,8 +512,7 @@ struct CallbackCallOpPattern : public OpConversionPattern<CallbackCallOp> {
     using OpConversionPattern::OpConversionPattern;
 
     LogicalResult matchAndRewrite(CallbackCallOp op, CallbackCallOpAdaptor adaptor,
-                                  ConversionPatternRewriter &rewriter) const override
-    {
+                                  ConversionPatternRewriter &rewriter) const override {
         // Just change the calling convention from scalar replacement of aggregates
         // to pointer to struct.
         auto loc = op.getLoc();
@@ -549,8 +535,7 @@ struct CustomGradOpPattern : public OpConversionPattern<gradient::CustomGradOp> 
     using OpConversionPattern::OpConversionPattern;
 
     LogicalResult matchAndRewrite(gradient::CustomGradOp op, gradient::CustomGradOpAdaptor adaptor,
-                                  ConversionPatternRewriter &rewriter) const override
-    {
+                                  ConversionPatternRewriter &rewriter) const override {
         // only match after all three are func.func
         auto callee = op.getCalleeAttr();
         auto forward = op.getForwardAttr();
@@ -581,8 +566,7 @@ namespace catalyst {
 struct CatalystConversionPass : impl::CatalystConversionPassBase<CatalystConversionPass> {
     using CatalystConversionPassBase::CatalystConversionPassBase;
 
-    void runOnOperation() final
-    {
+    void runOnOperation() final {
         MLIRContext *context = &getContext();
         LLVMTypeConverter typeConverter(context);
 

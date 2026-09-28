@@ -30,8 +30,7 @@
 #define ROSS_CACHE_SIZE 10000
 
 namespace {
-bool is_odd_multiple_of_pi_4(double angle)
-{
+bool is_odd_multiple_of_pi_4(double angle) {
     const double pi_over_4 = M_PI / 4.0;
     double multiple = angle / pi_over_4;
     int rounded_multiple = static_cast<int>(std::round(multiple));
@@ -54,8 +53,7 @@ using namespace RSDecomp::NormalForms;
  * phase.
  */
 std::pair<std::vector<GateType>, double> compute_clifford_T_decomposition(double angle,
-                                                                          double epsilon)
-{
+                                                                          double epsilon) {
     ZOmega scale(0, 0, 0, 1);
     double phase = 0.0;
 
@@ -86,8 +84,7 @@ std::pair<std::vector<GateType>, double> compute_clifford_T_decomposition(double
         }
 
         phase = static_cast<double>(units) * (M_PI / 8.0);
-    }
-    else {
+    } else {
         double modified_angle = -angle / 2.0;
         long k = std::lround(modified_angle / M_PI_2);
         double shift = -static_cast<double>(k) * M_PI_2;
@@ -135,8 +132,7 @@ using StdCacheKey = std::tuple<double, double>;
 using StdCacheValue = std::pair<std::vector<GateType>, double>;
 static lru_cache<StdCacheKey, StdCacheValue, ROSS_CACHE_SIZE> ross_cache_std;
 
-std::pair<std::vector<GateType>, double> eval_ross_algorithm(double angle, double epsilon)
-{
+std::pair<std::vector<GateType>, double> eval_ross_algorithm(double angle, double epsilon) {
     StdCacheKey key = {angle, epsilon};
 
     if (auto val_opt = ross_cache_std.get(key); val_opt) {
@@ -153,8 +149,7 @@ using PPRCacheKey = std::tuple<double, double>;
 using PPRCacheValue = std::pair<std::vector<PPRGateType>, double>;
 static lru_cache<PPRCacheKey, PPRCacheValue, ROSS_CACHE_SIZE> ross_cache_ppr;
 
-std::pair<std::vector<PPRGateType>, double> eval_ross_algorithm_ppr(double angle, double epsilon)
-{
+std::pair<std::vector<PPRGateType>, double> eval_ross_algorithm_ppr(double angle, double epsilon) {
     PPRCacheKey key = {angle, epsilon};
 
     if (auto val_opt = ross_cache_ppr.get(key); val_opt) {
@@ -177,8 +172,7 @@ std::pair<std::vector<PPRGateType>, double> eval_ross_algorithm_ppr(double angle
  * and the global phase update.
  */
 std::pair<bool, double> try_append_pair_expansion(std::vector<PPRGateType> &out, GateType current,
-                                                  GateType next)
-{
+                                                  GateType next) {
     // We only care if the first gate is HT or SHT
     if (current != GateType::HT && current != GateType::SHT) {
         return {false, 0.0};
@@ -214,8 +208,7 @@ std::pair<bool, double> try_append_pair_expansion(std::vector<PPRGateType> &out,
 /**
  * @brief Convert single gate for HST_to_PPR and return the global phase update.
  */
-double append_single_gate_expansion(std::vector<PPRGateType> &out, GateType gate)
-{
+double append_single_gate_expansion(std::vector<PPRGateType> &out, GateType gate) {
     switch (gate) {
     case GateType::T:
         out.emplace_back(PPRGateType::Z8);
@@ -262,8 +255,7 @@ double append_single_gate_expansion(std::vector<PPRGateType> &out, GateType gate
  * @return std::pair<std::vector<PPRGateType>, double> The converted vector of PPRGateType and
  * the global phase update.
  */
-std::pair<std::vector<PPRGateType>, double> HST_to_PPR(const std::vector<GateType> &input_gates)
-{
+std::pair<std::vector<PPRGateType>, double> HST_to_PPR(const std::vector<GateType> &input_gates) {
     std::vector<PPRGateType> output_gates;
     output_gates.reserve(input_gates.size() * 2);
     double phase_update = 0;
@@ -292,8 +284,7 @@ std::pair<std::vector<PPRGateType>, double> HST_to_PPR(const std::vector<GateTyp
 // Extern C implementation
 extern "C" {
 
-size_t rs_decomposition_get_size(double theta, double epsilon, bool ppr_basis)
-{
+size_t rs_decomposition_get_size(double theta, double epsilon, bool ppr_basis) {
     if (epsilon < 1e-6) {
         std::ostringstream oss;
         oss << std::scientific << epsilon;
@@ -305,8 +296,7 @@ size_t rs_decomposition_get_size(double theta, double epsilon, bool ppr_basis)
     if (ppr_basis) {
         auto result = eval_ross_algorithm_ppr(theta, epsilon);
         return result.first.size();
-    }
-    else {
+    } else {
         auto result = eval_ross_algorithm(theta, epsilon);
         return result.first.size();
     }
@@ -332,8 +322,7 @@ size_t rs_decomposition_get_size(double theta, double epsilon, bool ppr_basis)
  */
 void rs_decomposition_get_gates([[maybe_unused]] size_t *data_allocated, size_t *data_aligned,
                                 size_t offset, size_t size0, size_t stride0, double theta,
-                                double epsilon, bool ppr_basis)
-{
+                                double epsilon, bool ppr_basis) {
     (void)data_allocated;
 
     const size_t sizes[1] = {size0};
@@ -350,8 +339,7 @@ void rs_decomposition_get_gates([[maybe_unused]] size_t *data_allocated, size_t 
         for (size_t i = 0; i < s; ++i) {
             gates_view(i) = static_cast<size_t>(gates[i]);
         }
-    }
-    else {
+    } else {
         const auto &[gates, phase] = eval_ross_algorithm(theta, epsilon);
 
         size_t s = gates.size();
@@ -371,12 +359,10 @@ void rs_decomposition_get_gates([[maybe_unused]] size_t *data_allocated, size_t 
  * @param ppr_basis Whether to use PPR basis
  * @return double The global phase
  */
-double rs_decomposition_get_phase(double theta, double epsilon, bool ppr_basis)
-{
+double rs_decomposition_get_phase(double theta, double epsilon, bool ppr_basis) {
     if (ppr_basis) {
         return eval_ross_algorithm_ppr(theta, epsilon).second;
-    }
-    else {
+    } else {
         return eval_ross_algorithm(theta, epsilon).second;
     }
 }

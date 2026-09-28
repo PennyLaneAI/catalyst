@@ -9,4 +9,5 @@ add_mlir_library(MLIRCatalyst
     MLIRCatalystOpsIncGen
 
     LINK_LIBS PRIVATE
+    MLIRSCFDialect
 )

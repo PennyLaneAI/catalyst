@@ -217,7 +217,7 @@ class TestPossibleErrors:
         In PennyLane the error raised is a ValueError.
         """
 
-        with pytest.raises(ValueError, match="State must be of length 2; got length 1"):
+        with pytest.raises(ValueError, match="State and wires must have the same length"):
 
             @qjit
             @qp.qnode(qp.device("lightning.qubit", wires=2))

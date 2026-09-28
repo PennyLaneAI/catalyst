@@ -55,8 +55,7 @@ std::optional<ZOmega> solve_diophantine(const ZSqrtTwo &xi, int max_trials = MAX
  * @param n The number to test for primality.
  * @return true if n is likely prime, false otherwise.
  */
-inline bool primality_test(INT_TYPE n)
-{
+inline bool primality_test(INT_TYPE n) {
     static lru_cache<INT_TYPE, bool, FACTORING_CACHE_SIZE> cache;
     if (auto val_opt = cache.get(n); val_opt) {
         return *val_opt;
@@ -66,8 +65,7 @@ inline bool primality_test(INT_TYPE n)
     if (boost::multiprecision::miller_rabin_test(n, 25)) {
         cache.put(n, true);
         return true;
-    }
-    else {
+    } else {
         cache.put(n, false);
         return false;
     }
@@ -83,8 +81,7 @@ inline bool primality_test(INT_TYPE n)
  * @param p The prime number.
  * @return The Legendre symbol of a modulo p.
  */
-inline INT_TYPE legendre_symbol(INT_TYPE a, INT_TYPE p)
-{
+inline INT_TYPE legendre_symbol(INT_TYPE a, INT_TYPE p) {
     static lru_cache<std::pair<INT_TYPE, INT_TYPE>, INT_TYPE, FACTORING_CACHE_SIZE> cache;
     auto key = std::make_pair(a, p);
 
@@ -110,18 +107,21 @@ inline INT_TYPE legendre_symbol(INT_TYPE a, INT_TYPE p)
  * @param p The odd prime modulus.
  * @return The square root of n under modulo p, or std::nullopt if it does not exist.
  */
-inline std::optional<INT_TYPE> sqrt_modulo_p(INT_TYPE n, INT_TYPE p)
-{
+inline std::optional<INT_TYPE> sqrt_modulo_p(INT_TYPE n, INT_TYPE p) {
     // Trivial cases
     INT_TYPE a = n % p;
-    if (a < 0)
+    if (a < 0) {
         a += p; // Handle C++ negative modulo behavior
-    if (a == 0)
+    }
+    if (a == 0) {
         return INT_TYPE(0);
-    if (p == 2)
+    }
+    if (p == 2) {
         return a;
-    if (legendre_symbol(a, p) != 1 || p % 2 == 0)
+    }
+    if (legendre_symbol(a, p) != 1 || p % 2 == 0) {
         return std::nullopt;
+    }
 
     // Factor p-1 as q*2^s with q odd
     INT_TYPE q = p - 1;
@@ -139,8 +139,9 @@ inline std::optional<INT_TYPE> sqrt_modulo_p(INT_TYPE n, INT_TYPE p)
 
     // Find a quadratic non-residue z, such that z^((p-1)/2) = -1 mod p
     INT_TYPE z = 2;
-    while (legendre_symbol(z, p) != p - 1)
+    while (legendre_symbol(z, p) != p - 1) {
         z++;
+    }
 
     INT_TYPE m = s;
     INT_TYPE c = boost::multiprecision::powm(z, q, p);
@@ -155,8 +156,9 @@ inline std::optional<INT_TYPE> sqrt_modulo_p(INT_TYPE n, INT_TYPE p)
         while (t2i != 1) {
             t2i = (t2i * t2i) % p;
             i++;
-            if (i == m)
+            if (i == m) {
                 return std::nullopt;
+            }
         }
 
         // Compute b = c^(2^(m-i-1)) mod p
@@ -186,8 +188,7 @@ inline std::optional<INT_TYPE> sqrt_modulo_p(INT_TYPE n, INT_TYPE p)
  * @param max_trials The maximum number of attempts to find a factor.
  * @return An integer factor of n, or std::nullopt if no factors are found.
  */
-inline std::optional<INT_TYPE> integer_factorize(INT_TYPE n, int max_trials)
-{
+inline std::optional<INT_TYPE> integer_factorize(INT_TYPE n, int max_trials) {
     static lru_cache<std::pair<INT_TYPE, int>, std::optional<INT_TYPE>, FACTORING_CACHE_SIZE> cache;
     auto cache_key = std::make_pair(n, max_trials);
 
@@ -220,8 +221,9 @@ inline std::optional<INT_TYPE> integer_factorize(INT_TYPE n, int max_trials)
         while (g == 1) {
             x = y;
             // Process next `r` steps
-            for (INT_TYPE i = 0; i < r; ++i)
+            for (INT_TYPE i = 0; i < r; ++i) {
                 y = ((y * y) % n + c) % n;
+            }
 
             INT_TYPE k = 0;
             while (k < r && g == 1) {
@@ -277,8 +279,7 @@ inline std::optional<INT_TYPE> integer_factorize(INT_TYPE n, int max_trials)
  * @return A vector of sorted prime factors, or std::nullopt.
  */
 inline std::optional<std::vector<INT_TYPE>> prime_factorize(INT_TYPE n, int max_trials,
-                                                            bool z_sqrt_two)
-{
+                                                            bool z_sqrt_two) {
     static lru_cache<std::tuple<INT_TYPE, int, bool>, std::optional<std::vector<INT_TYPE>>,
                      FACTORING_CACHE_SIZE>
         cache;
@@ -297,8 +298,9 @@ inline std::optional<std::vector<INT_TYPE>> prime_factorize(INT_TYPE n, int max_
         stack.pop_back();
 
         // Trivial case
-        if (p <= 1)
+        if (p <= 1) {
             continue;
+        }
 
         // Check if p is prime
         if (primality_test(p)) {
@@ -348,8 +350,7 @@ inline std::optional<std::vector<INT_TYPE>> prime_factorize(INT_TYPE n, int max_
  * @param p A prime integer.
  * @return A vector of factors in Z[sqrt(2)], or std::nullopt if factorization fails.
  */
-inline std::optional<std::vector<ZSqrtTwo>> factorize_prime_zsqrt_two(INT_TYPE p)
-{
+inline std::optional<std::vector<ZSqrtTwo>> factorize_prime_zsqrt_two(INT_TYPE p) {
     // Lemma C.8: ±2 = (0 + 1√2)(0 ± 1√2)
     if (abs_val(p) == INT_TYPE(2)) {
         return std::vector<ZSqrtTwo>{ZSqrtTwo(0, 1), ZSqrtTwo(0, (p < 0) ? -1 : 1)};
@@ -363,8 +364,9 @@ inline std::optional<std::vector<ZSqrtTwo>> factorize_prime_zsqrt_two(INT_TYPE p
     // Default case (Lemma C.11): p = ±1 mod 8
     // Solve t^2 = 2 (mod p)
     auto t_opt = sqrt_modulo_p(2, p);
-    if (!t_opt)
+    if (!t_opt) {
         return std::nullopt;
+    }
     INT_TYPE t = *t_opt;
 
     // Perform ring GCD to get (a + b√2)(a - b√2)
@@ -384,30 +386,33 @@ inline std::optional<std::vector<ZSqrtTwo>> factorize_prime_zsqrt_two(INT_TYPE p
  * @param p A prime integer.
  * @return A factor in Z[omega], or std::nullopt if factorization fails
  */
-inline std::optional<ZOmega> factorize_prime_zomega(const ZSqrtTwo &x, INT_TYPE p)
-{
+inline std::optional<ZOmega> factorize_prime_zomega(const ZSqrtTwo &x, INT_TYPE p) {
     // Basic cases
-    if (p == 2)
+    if (p == 2) {
         return ZOmega(0, 0, 1, 1);
+    }
 
     INT_TYPE a = p % 8;
     // p = 2k or p = 7 mod 8, no factorization in Z[omega]
-    if (a % 2 == 0 || a == 7)
+    if (a % 2 == 0 || a == 7) {
         return std::nullopt;
+    }
 
     // p = 1, 5 mod 8, use h = sqrt(-1) mod p
     if (a == 1 || a == 5) {
         auto h_opt = sqrt_modulo_p(-1, p);
-        if (!h_opt)
+        if (!h_opt) {
             return std::nullopt;
+        }
         return gcd(ZOmega(0, 1, 0, *h_opt), ZOmega(-x.b, 0, x.b, x.a));
     }
 
     // Default case: a == 3
     // p = 3 mod 8, use h = sqrt(-2) mod p
     auto h_opt = sqrt_modulo_p(-2, p);
-    if (!h_opt)
+    if (!h_opt) {
         return std::nullopt;
+    }
     return gcd(ZOmega(1, 0, 1, *h_opt), ZOmega(-x.b, 0, x.b, x.a));
 }
 
@@ -422,26 +427,29 @@ inline std::optional<ZOmega> factorize_prime_zomega(const ZSqrtTwo &x, INT_TYPE 
  * @param max_trials Maximum attempts for factorization.
  * @return An element of Z[omega] satisfying the equation, or std::nullopt.
  */
-inline std::optional<ZOmega> solve_diophantine(const ZSqrtTwo &xi, int max_trials)
-{
-    if (xi.a == 0 && xi.b == 0)
+inline std::optional<ZOmega> solve_diophantine(const ZSqrtTwo &xi, int max_trials) {
+    if (xi.a == 0 && xi.b == 0) {
         return ZOmega(0, 0, 0, 0);
+    }
 
     INT_TYPE p = xi.norm();
-    if (p < 2)
+    if (p < 2) {
         return std::nullopt;
+    }
 
     auto factors_opt = prime_factorize(p, max_trials);
-    if (!factors_opt)
+    if (!factors_opt) {
         return std::nullopt;
+    }
 
     ZOmega scale(0, 0, 0, 1); // Represents 1 in Z[omega]
     ZSqrtTwo next_xi = xi;
 
     for (INT_TYPE factor : *factors_opt) {
         auto primes_zsqrt_two_opt = factorize_prime_zsqrt_two(factor);
-        if (!primes_zsqrt_two_opt)
+        if (!primes_zsqrt_two_opt) {
             return std::nullopt;
+        }
 
         for (const auto &eta : *primes_zsqrt_two_opt) {
             // Scale the next_xi by the factor in Z[sqrt(2)]
@@ -452,8 +460,9 @@ inline std::optional<ZOmega> solve_diophantine(const ZSqrtTwo &xi, int max_trial
             if ((next_xi.a % next_ab == 0) && (next_xi.b % next_ab == 0)) {
                 next_xi = ZSqrtTwo(next_xi.a / next_ab, next_xi.b / next_ab);
                 auto t = factorize_prime_zomega(eta, factor);
-                if (!t)
+                if (!t) {
                     return std::nullopt;
+                }
                 scale = scale * (*t);
             }
         }
@@ -464,18 +473,21 @@ inline std::optional<ZOmega> solve_diophantine(const ZSqrtTwo &xi, int max_trial
     INT_TYPE s_abs = s_val.norm();
     ZSqrtTwo s_new = xi * s_val.adj2();
 
-    if (s_new.a % s_abs != 0 || s_new.b % s_abs != 0)
+    if (s_new.a % s_abs != 0 || s_new.b % s_abs != 0) {
         return std::nullopt;
+    }
 
     // The remaining quotient should be a unit in Z[sqrt(2)]
     auto t2 = xi / s_val;
     INT_TYPE t2_abs = t2.norm();
-    if (t2_abs * t2_abs != 1)
+    if (t2_abs * t2_abs != 1) {
         return std::nullopt;
+    }
 
     auto t2_sqrt = t2.sqrt();
-    if (!t2_sqrt)
+    if (!t2_sqrt) {
         return std::nullopt;
+    }
     return scale * (*t2_sqrt).to_omega();
 }
 

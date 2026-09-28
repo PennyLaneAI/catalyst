@@ -39,8 +39,7 @@ namespace quantum {
 struct MergeRotationsPass : impl::MergeRotationsPassBase<MergeRotationsPass> {
     using MergeRotationsPassBase::MergeRotationsPassBase;
 
-    void runOnOperation() final
-    {
+    void runOnOperation() final {
         LLVM_DEBUG(dbgs() << "merge rotation pass"
                           << "\n");
 
@@ -48,10 +47,7 @@ struct MergeRotationsPass : impl::MergeRotationsPassBase<MergeRotationsPass> {
 
         RewritePatternSet patternsCanonicalization(&getContext());
 
-        catalyst::quantum::CustomOp::getCanonicalizationPatterns(patternsCanonicalization,
-                                                                 &getContext());
-        catalyst::quantum::MultiRZOp::getCanonicalizationPatterns(patternsCanonicalization,
-                                                                  &getContext());
+        populateResolveGateLevelAdjointPatterns(patternsCanonicalization);
         catalyst::pbc::PPRotationOp::getCanonicalizationPatterns(patternsCanonicalization,
                                                                  &getContext());
         catalyst::pbc::PPRotationArbitraryOp::getCanonicalizationPatterns(patternsCanonicalization,

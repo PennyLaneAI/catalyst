@@ -14,6 +14,7 @@
 
 #include <cstdint>
 
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Complex/IR/Complex.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Index/IR/IndexOps.h"
@@ -38,8 +39,7 @@ using namespace catalyst::quantum;
 namespace {
 bool isQuantumType(Type type) { return isa<quantum::QuantumDialect>(type.getDialect()); }
 
-void populateArgIdxMapping(TypeRange types, DenseMap<unsigned, unsigned> &argIdxMapping)
-{
+void populateArgIdxMapping(TypeRange types, DenseMap<unsigned, unsigned> &argIdxMapping) {
     unsigned newIdx = 0;
     for (const auto &[oldIdx, type] : llvm::enumerate(types)) {
         if (!isQuantumType(type)) {
@@ -48,24 +48,47 @@ void populateArgIdxMapping(TypeRange types, DenseMap<unsigned, unsigned> &argIdx
     }
 }
 
+/// Convert a row-major linearized index into per-dimension coordinates given the size of each
+/// dimension, so that an arbitrary-rank tensor can be walked with a single flattened loop.
+SmallVector<Value> delinearizeIndex(OpBuilder &builder, Location loc, Value linear,
+                                    ArrayRef<Value> dimSizes) {
+    int64_t rank = dimSizes.size();
+    SmallVector<Value> strides(rank);
+    Value acc = index::ConstantOp::create(builder, loc, 1);
+    for (int64_t d = rank - 1; d >= 0; --d) {
+        strides[d] = acc;
+        acc = index::MulOp::create(builder, loc, acc, dimSizes[d]);
+    }
+    SmallVector<Value> coords(rank);
+    for (int64_t d = 0; d < rank; ++d) {
+        Value q = index::DivUOp::create(builder, loc, linear, strides[d]);
+        coords[d] = index::RemUOp::create(builder, loc, q, dimSizes[d]);
+    }
+    return coords;
+}
+
 /// Generates the forward "augmented circuit" of the adjoint operation: classical preprocessing is
 /// cloned as-is, while gate parameters, dynamic wires, and control-flow structure are recorded into
 /// the cache for the reverse pass to replay.
 class AugmentedCircuitGenerator {
   public:
-    AugmentedCircuitGenerator(IRMapping &oldToCloned, QuantumCache &cache)
-        : oldToCloned(oldToCloned), cache(cache)
-    {
-    }
+    AugmentedCircuitGenerator(IRMapping &oldToCloned, QuantumCache &cache, Region &adjointRegion)
+        : oldToCloned(oldToCloned), cache(cache), adjointRegion(adjointRegion) {}
 
     /// Given a `region` containing classical preprocessing and quantum operations, generate an
     /// augmented version that caches all the parameters required to deterministically re-execute
     /// the circuit (gate params, classical control flow, and dynamic wires).
     void generate(Region &region, OpBuilder &builder);
 
+    bool hasFailed() const { return generationFailed; }
+
   private:
     IRMapping &oldToCloned;
     QuantumCache &cache;
+
+    /// The top level region of the adjoint operation being lowered.
+    Region &adjointRegion;
+    bool generationFailed = false;
 
     void visitOperation(scf::ForOp forOp, OpBuilder &builder);
     void visitOperation(scf::WhileOp whileOp, OpBuilder &builder);
@@ -80,8 +103,7 @@ class AugmentedCircuitGenerator {
                     const DenseMap<unsigned, unsigned> &argIdxMapping);
 
     // Emit an operation to cache a dynamic wire for quantum.insert/extract ops.
-    template <typename IndexingOp> void cacheDynamicWire(IndexingOp op, OpBuilder &builder)
-    {
+    template <typename IndexingOp> void cacheDynamicWire(IndexingOp op, OpBuilder &builder) {
         if (!op.getIdxAttr().has_value()) {
             ListPushOp::create(builder, op.getLoc(), oldToCloned.lookupOrDefault(op.getIdx()),
                                cache.wireVector);
@@ -91,32 +113,90 @@ class AugmentedCircuitGenerator {
     void cacheGate(quantum::ParametrizedGate gate, OpBuilder &builder);
 };
 
-void AugmentedCircuitGenerator::cacheGate(quantum::ParametrizedGate gate, OpBuilder &builder)
-{
+void AugmentedCircuitGenerator::cacheGate(quantum::ParametrizedGate gate, OpBuilder &builder) {
     ValueRange params = gate.getAllParams();
 
     for (Value param : params) {
         Location loc = gate.getLoc();
+
+        // Params that the reverse pass can already see do not need to be recorded.
+        if (isAvailableToReversePass(param, adjointRegion)) {
+            continue;
+        }
+
         Value clonedParam = oldToCloned.lookupOrDefault(param);
         Type paramType = clonedParam.getType();
         Operation *op = gate;
-        verifyTypeIsCacheable(paramType, op);
+        if (mlir::failed(verifyTypeIsCacheable(paramType, op))) {
+            generationFailed = true;
+            return;
+        }
 
         if (paramType.isF64()) {
             ListPushOp::create(builder, loc, clonedParam, cache.paramVector);
             continue;
         }
 
-        // Sanitizing inputs.
-        // Technically we know for a fact that none of this will ever issue an error.
-        // This is because QubitUnitary is guaranteed to have a tensor<NxNxcomplex<f64>>
-        // But this code in the future may be extended to support other types.
-        // Hence the sanitization.
-        if (!isa<RankedTensorType>(paramType)) {
-            gate.emitOpError() << "Unexpected type.";
+        // This is a temporary trick to make it lossless for widths <= 64 bits.
+        Type i64Ty = builder.getI64Type();
+        auto zextToI64 = [&](Value v) -> Value {
+            if (v.getType() == i64Ty) {
+                return v;
+            }
+            return arith::ExtUIOp::create(builder, loc, i64Ty, v);
+        };
+
+        // Integer/boolean scalar params are recorded in the i64 buffer.
+        if (isa<IntegerType>(paramType)) {
+            ListPushOp::create(builder, loc, zextToI64(clonedParam), cache.intVector);
+            continue;
         }
 
         auto aTensor = cast<RankedTensorType>(paramType);
+        Type elemType = aTensor.getElementType();
+
+        // Real-valued tensor params (e.g. the `tensor<Nxf64>` angle carried by `quantum.operator`
+        // gates such as RZ, or the `tensor<NxNxf64>` matrix of a BasisRotation) are cached
+        // element-by-element as plain f64 values in row-major order in `paramVector`.
+        // Integer/boolean tensors (e.g. a MultiX `tensor<Nxi1>` bitstring or a QROM `tensor<Nxi64>`
+        // bitstring) are cached the same way but in the i64 buffer `intVector`, zero-extending each
+        // element. `verifyTypeIsCacheable` has already rejected integer widths > 64 bits. The
+        // complex-matrix path below is specific to QubitUnitary's `tensor<NxNxcomplex<f64>>`.
+        if (elemType.isF64() || elemType.isInteger()) {
+            auto recordElement = [&](Value element) {
+                if (elemType.isInteger()) {
+                    ListPushOp::create(builder, loc, zextToI64(element), cache.intVector);
+                } else {
+                    ListPushOp::create(builder, loc, element, cache.paramVector);
+                }
+            };
+            if (aTensor.getRank() == 0) {
+                Value element = tensor::ExtractOp::create(builder, loc, clonedParam, ValueRange{});
+                recordElement(element);
+                continue;
+            }
+            Value c0i = index::ConstantOp::create(builder, loc, 0);
+            Value c1i = index::ConstantOp::create(builder, loc, 1);
+            SmallVector<Value> dimSizes;
+            Value total = c1i;
+            for (int64_t d = 0; d < aTensor.getRank(); ++d) {
+                Value dim =
+                    ShapedType::kDynamic != aTensor.getShape()[d]
+                        ? (Value)index::ConstantOp::create(builder, loc, aTensor.getShape()[d])
+                        : (Value)tensor::DimOp::create(builder, loc, clonedParam, d);
+                dimSizes.push_back(dim);
+                total = index::MulOp::create(builder, loc, total, dim);
+            }
+            scf::ForOp loop = scf::ForOp::create(builder, loc, c0i, total, c1i);
+            OpBuilder::InsertionGuard guard(builder);
+            builder.setInsertionPointToStart(loop.getBody());
+            SmallVector<Value> coords =
+                delinearizeIndex(builder, loc, loop.getInductionVar(), dimSizes);
+            Value element = tensor::ExtractOp::create(builder, loc, clonedParam, coords);
+            recordElement(element);
+            continue;
+        }
+
         ArrayRef<int64_t> shape = aTensor.getShape();
         Value c0 = index::ConstantOp::create(builder, loc, 0);
         Value c1 = index::ConstantOp::create(builder, loc, 1);
@@ -162,8 +242,7 @@ void AugmentedCircuitGenerator::cacheGate(quantum::ParametrizedGate gate, OpBuil
     }
 }
 
-void AugmentedCircuitGenerator::generate(Region &region, OpBuilder &builder)
-{
+void AugmentedCircuitGenerator::generate(Region &region, OpBuilder &builder) {
     assert(region.hasOneBlock() &&
            "Expected only structured control flow (each region should have a single block)");
     auto isClassicalSCFOp = [](Operation &op) {
@@ -174,37 +253,27 @@ void AugmentedCircuitGenerator::generate(Region &region, OpBuilder &builder)
     for (Operation &op : region.front().without_terminator()) {
         if (auto insertOp = dyn_cast<quantum::InsertOp>(op)) {
             cacheDynamicWire(insertOp, builder);
-        }
-        else if (auto extractOp = dyn_cast<quantum::ExtractOp>(op)) {
+        } else if (auto extractOp = dyn_cast<quantum::ExtractOp>(op)) {
             cacheDynamicWire(extractOp, builder);
-        }
-        else if (auto gate = dyn_cast<quantum::ParametrizedGate>(op)) {
+        } else if (auto gate = dyn_cast<quantum::ParametrizedGate>(op)) {
             cacheGate(gate, builder);
-        }
-        else if (isa<QuantumDialect>(op.getDialect())) {
+        } else if (isa<QuantumDialect>(op.getDialect())) {
             // Any quantum op other than a parametrized gate/insert/extract is ignored.
-        }
-        else if (isa<pbc::PPRotationOp>(op)) {
+        } else if (isa<pbc::PPRotationOp>(op)) {
             // PPRs are ignored
-        }
-        else if (isClassicalSCFOp(op)) {
+        } else if (isClassicalSCFOp(op)) {
             // Purely classical SCF ops should be treated as any other purely classical op, but
             // quantum SCF ops need to be recursively visited.
             builder.clone(op, oldToCloned);
-        }
-        else if (auto forOp = dyn_cast<scf::ForOp>(op)) {
+        } else if (auto forOp = dyn_cast<scf::ForOp>(op)) {
             visitOperation(forOp, builder);
-        }
-        else if (auto ifOp = dyn_cast<scf::IfOp>(op)) {
+        } else if (auto ifOp = dyn_cast<scf::IfOp>(op)) {
             visitOperation(ifOp, builder);
-        }
-        else if (auto whileOp = dyn_cast<scf::WhileOp>(&op)) {
+        } else if (auto whileOp = dyn_cast<scf::WhileOp>(&op)) {
             visitOperation(whileOp, builder);
-        }
-        else if (auto switchOp = dyn_cast<scf::IndexSwitchOp>(op)) {
+        } else if (auto switchOp = dyn_cast<scf::IndexSwitchOp>(op)) {
             visitOperation(switchOp, builder);
-        }
-        else if (auto callOp = dyn_cast<func::CallOp>(op)) {
+        } else if (auto callOp = dyn_cast<func::CallOp>(op)) {
             auto results = callOp.getResultTypes();
             bool quantum = std::any_of(results.begin(), results.end(), [](const auto &value) {
                 return isa<QuregType, QubitType>(value);
@@ -214,16 +283,14 @@ void AugmentedCircuitGenerator::generate(Region &region, OpBuilder &builder)
             if (!quantum) {
                 builder.clone(op, oldToCloned);
             }
-        }
-        else {
+        } else {
             // Purely classical ops are deeply cloned as-is.
             builder.clone(op, oldToCloned);
         }
     }
 }
 
-void AugmentedCircuitGenerator::visitOperation(scf::ForOp forOp, OpBuilder &builder)
-{
+void AugmentedCircuitGenerator::visitOperation(scf::ForOp forOp, OpBuilder &builder) {
     DenseMap<unsigned, unsigned> argIdxMapping;
     SmallVector<Value> classicalInits;
     populateArgIdxMapping(forOp.getResultTypes(), argIdxMapping);
@@ -263,8 +330,7 @@ void AugmentedCircuitGenerator::visitOperation(scf::ForOp forOp, OpBuilder &buil
     mapResults(forOp, newForOp, argIdxMapping);
 }
 
-void AugmentedCircuitGenerator::visitOperation(scf::WhileOp whileOp, OpBuilder &builder)
-{
+void AugmentedCircuitGenerator::visitOperation(scf::WhileOp whileOp, OpBuilder &builder) {
     SmallVector<Type> classicalResultTypes;
     SmallVector<Value> classicalInits;
     DenseMap<unsigned, unsigned> argIdxMapping;
@@ -319,8 +385,7 @@ void AugmentedCircuitGenerator::visitOperation(scf::WhileOp whileOp, OpBuilder &
     ListPushOp::create(builder, whileOp.getLoc(), numIters, tape);
 }
 
-void AugmentedCircuitGenerator::visitOperation(scf::IndexSwitchOp switchOp, OpBuilder &builder)
-{
+void AugmentedCircuitGenerator::visitOperation(scf::IndexSwitchOp switchOp, OpBuilder &builder) {
     auto getRegionBuilder = [&](Region &oldRegion) {
         return [&](OpBuilder &builder, Location loc) {
             generate(oldRegion, builder);
@@ -369,8 +434,7 @@ void AugmentedCircuitGenerator::visitOperation(scf::IndexSwitchOp switchOp, OpBu
     mapResults(switchOp, newSwitchOp, argIdxMapping);
 }
 
-void AugmentedCircuitGenerator::visitOperation(scf::IfOp ifOp, OpBuilder &builder)
-{
+void AugmentedCircuitGenerator::visitOperation(scf::IfOp ifOp, OpBuilder &builder) {
     auto getRegionBuilder = [&](Region &oldRegion) {
         return [&](OpBuilder &builder, Location loc) {
             generate(oldRegion, builder);
@@ -395,8 +459,7 @@ void AugmentedCircuitGenerator::visitOperation(scf::IfOp ifOp, OpBuilder &builde
 }
 
 void AugmentedCircuitGenerator::cloneTerminatorClassicalOperands(Operation *terminator,
-                                                                 OpBuilder &builder)
-{
+                                                                 OpBuilder &builder) {
     SmallVector<Value> newYieldOperands;
     for (Value operand : terminator->getOperands()) {
         if (!isQuantumType(operand.getType())) {
@@ -408,8 +471,7 @@ void AugmentedCircuitGenerator::cloneTerminatorClassicalOperands(Operation *term
 }
 
 void AugmentedCircuitGenerator::mapResults(Operation *oldOp, Operation *clonedOp,
-                                           const DenseMap<unsigned, unsigned> &argIdxMapping)
-{
+                                           const DenseMap<unsigned, unsigned> &argIdxMapping) {
     for (const auto &[oldIdx, oldResult] : llvm::enumerate(oldOp->getResults())) {
         if (argIdxMapping.contains(oldIdx)) {
             unsigned newIdx = argIdxMapping.at(oldIdx);
@@ -423,11 +485,11 @@ void AugmentedCircuitGenerator::mapResults(Operation *oldOp, Operation *clonedOp
 namespace catalyst {
 namespace quantum {
 
-void generateAdjointForwardPass(Region &region, OpBuilder &builder, IRMapping &oldToCloned,
-                                QuantumCache &cache)
-{
-    AugmentedCircuitGenerator generator{oldToCloned, cache};
+LogicalResult generateAdjointForwardPass(Region &region, OpBuilder &builder, IRMapping &oldToCloned,
+                                         QuantumCache &cache) {
+    AugmentedCircuitGenerator generator{oldToCloned, cache, region};
     generator.generate(region, builder);
+    return failure(generator.hasFailed());
 }
 
 } // namespace quantum

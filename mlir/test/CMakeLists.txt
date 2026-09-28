@@ -29,9 +29,11 @@ set(TEST_SUITES
     PauliFrame
     cli
     PBC
+    Executor
     RTIO
     QecLogical
     QecPhysical
+    Transport
 )
 
 

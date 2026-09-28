@@ -21,8 +21,7 @@
 
 using namespace Catch::Matchers;
 
-TEST_CASE("Test DataView Pre-Increment Iterator - double, 1", "[DataView]")
-{
+TEST_CASE("Test DataView Pre-Increment Iterator - double, 1", "[DataView]") {
     double data_aligned[3] = {1.0, 1.1, 1.2};
     size_t offset = 0U;
     size_t sizes[1] = {3};
@@ -37,8 +36,7 @@ TEST_CASE("Test DataView Pre-Increment Iterator - double, 1", "[DataView]")
     CHECK_THAT(*++view_iter, WithinRel(1.2, 1e-5));
 }
 
-TEST_CASE("Test DataView Pre-Increment Iterator - int, 2", "[DataView]")
-{
+TEST_CASE("Test DataView Pre-Increment Iterator - int, 2", "[DataView]") {
     int data_aligned[3][3] = {{0, 1, 2}, {3, 4, 5}};
     size_t offset = 0U;
     size_t sizes[2] = {3, 3};
@@ -54,8 +52,7 @@ TEST_CASE("Test DataView Pre-Increment Iterator - int, 2", "[DataView]")
     }
 }
 
-TEST_CASE("Test DataView Pre-Increment Iterator - int, 3", "[DataView]")
-{
+TEST_CASE("Test DataView Pre-Increment Iterator - int, 3", "[DataView]") {
     int data_aligned[18] = {0};
     for (int i = 0; i < 18; i++) {
         data_aligned[i] = i;
@@ -75,8 +72,7 @@ TEST_CASE("Test DataView Pre-Increment Iterator - int, 3", "[DataView]")
     }
 }
 
-TEST_CASE("Test DataView Post-Increment Iterator - double, 1", "[DataView]")
-{
+TEST_CASE("Test DataView Post-Increment Iterator - double, 1", "[DataView]") {
     double data_aligned[3] = {3.2, 4.1, 1.6};
     size_t offset = 0;
     size_t sizes[1] = {3};
@@ -91,8 +87,7 @@ TEST_CASE("Test DataView Post-Increment Iterator - double, 1", "[DataView]")
     CHECK_THAT(*view_iter, WithinRel(1.6, 1e-5));
 }
 
-TEST_CASE("Test DataView Post-Increment Iterator - int, 2", "[DataView]")
-{
+TEST_CASE("Test DataView Post-Increment Iterator - int, 2", "[DataView]") {
     int data_aligned[3][3] = {{0, 1, 2}, {3, 4, 5}};
     size_t offset = 0U;
     size_t sizes[2] = {3, 3};
@@ -107,8 +102,7 @@ TEST_CASE("Test DataView Post-Increment Iterator - int, 2", "[DataView]")
     }
 }
 
-TEST_CASE("Test DataView Post-Increment Iterator - int, 3", "[DataView]")
-{
+TEST_CASE("Test DataView Post-Increment Iterator - int, 3", "[DataView]") {
     int data_aligned[18] = {0};
     for (int i = 0; i < 18; i++) {
         data_aligned[i] = i;
@@ -127,8 +121,7 @@ TEST_CASE("Test DataView Post-Increment Iterator - int, 3", "[DataView]")
     }
 }
 
-TEST_CASE("DataView Iterator Distance 0 - 0 first axis", "[DataView]")
-{
+TEST_CASE("DataView Iterator Distance 0 - 0 first axis", "[DataView]") {
     int *data_aligned = nullptr;
     size_t offset = 0;
     size_t sizes[2] = {0, 10};
@@ -139,8 +132,7 @@ TEST_CASE("DataView Iterator Distance 0 - 0 first axis", "[DataView]")
     CHECK(std::distance(view.begin(), view.end()) == 0);
 }
 
-TEST_CASE("DataView Iterator Distance 0 - 0 second axis", "[DataView]")
-{
+TEST_CASE("DataView Iterator Distance 0 - 0 second axis", "[DataView]") {
     int *data_aligned = nullptr;
     size_t offset = 0;
     size_t sizes[2] = {10, 0};
@@ -151,8 +143,7 @@ TEST_CASE("DataView Iterator Distance 0 - 0 second axis", "[DataView]")
     CHECK(std::distance(view.begin(), view.end()) == 0);
 }
 
-TEST_CASE("DataView Iterator Distance 4 - int, 2", "[DataView]")
-{
+TEST_CASE("DataView Iterator Distance 4 - int, 2", "[DataView]") {
     int data_aligned[2][2] = {{1, 2}, {3, 4}};
     size_t offset = 0;
     size_t sizes[2] = {2, 2};
@@ -163,8 +154,7 @@ TEST_CASE("DataView Iterator Distance 4 - int, 2", "[DataView]")
     CHECK(std::distance(view.begin(), view.end()) == 4);
 }
 
-TEST_CASE("DataView Iterator Distance 12 - double, 3", "[DataView]")
-{
+TEST_CASE("DataView Iterator Distance 12 - double, 3", "[DataView]") {
     double data_aligned[2][2][3] = {{{3.1, 2.6, 9.5}, {5.4, 2.3, 8.1}},
                                     {{9.8, 8.2, 7.2}, {0.7, 9.6, 6.6}}};
     size_t offset = 0;
@@ -176,8 +166,7 @@ TEST_CASE("DataView Iterator Distance 12 - double, 3", "[DataView]")
     CHECK(std::distance(view.begin(), view.end()) == 12);
 }
 
-TEST_CASE("DataView Size - 0 first axis", "[DataView]")
-{
+TEST_CASE("DataView Size - 0 first axis", "[DataView]") {
     int *data_aligned = nullptr;
     size_t offset = 0;
     size_t sizes[2] = {0, 10};

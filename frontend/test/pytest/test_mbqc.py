@@ -49,7 +49,7 @@ def test_measure_x(mbqc_pipeline):
     """
     dev = qp.device("null.qubit", wires=1)
 
-    @qjit(capture=True, pipelines=mbqc_pipeline)
+    @qjit(capture=True, collect_decomp_rules=False, pipelines=mbqc_pipeline)
     @qp.qnode(dev)
     def workload():
         _ = plft.measure_x(0)
@@ -72,7 +72,7 @@ def test_measure_y(mbqc_pipeline):
     """
     dev = qp.device("null.qubit", wires=1)
 
-    @qjit(capture=True, pipelines=mbqc_pipeline)
+    @qjit(capture=True, collect_decomp_rules=False, pipelines=mbqc_pipeline)
     @qp.qnode(dev)
     def workload():
         _ = plft.measure_y(0)
@@ -96,7 +96,7 @@ def test_measure_z(mbqc_pipeline):
     """
     dev = qp.device("null.qubit", wires=1)
 
-    @qjit(capture=True, pipelines=mbqc_pipeline)
+    @qjit(capture=True, collect_decomp_rules=False, pipelines=mbqc_pipeline)
     @qp.qnode(dev)
     def workload():
         _ = plft.measure_z(0)
@@ -122,7 +122,7 @@ def test_measure_measure_arbitrary_basis(angle, plane, mbqc_pipeline):
     """
     dev = qp.device("null.qubit", wires=1)
 
-    @qjit(capture=True, pipelines=mbqc_pipeline)
+    @qjit(capture=True, collect_decomp_rules=False, pipelines=mbqc_pipeline)
     @qp.qnode(dev)
     def workload():
         _ = plft.measure_arbitrary_basis(wires=0, angle=angle, plane=plane)
@@ -143,7 +143,7 @@ def test_measure_measure_arbitrary_basis_postselect(postselect, mbqc_pipeline):
     """
     dev = qp.device("null.qubit", wires=1)
 
-    @qjit(capture=True, pipelines=mbqc_pipeline)
+    @qjit(capture=True, collect_decomp_rules=False, pipelines=mbqc_pipeline)
     @qp.qnode(dev)
     def workload():
         _ = plft.measure_arbitrary_basis(wires=0, angle=0.1, plane="XY", postselect=postselect)
@@ -162,7 +162,7 @@ def test_measure_measure_arbitrary_basis_invalid_plane(mbqc_pipeline):
 
     with pytest.raises(ValueError, match=r"Measurement plane must be one of \['XY', 'YZ', 'ZX'\]"):
 
-        @qjit(capture=True, pipelines=mbqc_pipeline)
+        @qjit(capture=True, collect_decomp_rules=False, pipelines=mbqc_pipeline)
         @qp.qnode(dev)
         def workload():
             _ = plft.measure_arbitrary_basis(wires=0, angle=0.1, plane="YX")
@@ -182,7 +182,7 @@ def test_measure_measure_arbitrary_basis_invalid_postselect(postselect, mbqc_pip
         CompileError, match="op attribute 'postselect' failed to satisfy constraint"
     ):
 
-        @qjit(capture=True, pipelines=mbqc_pipeline)
+        @qjit(capture=True, collect_decomp_rules=False, pipelines=mbqc_pipeline)
         @qp.qnode(dev)
         def workload():
             _ = plft.measure_arbitrary_basis(wires=0, angle=0.1, plane="XY", postselect=postselect)
@@ -216,7 +216,7 @@ def test_explicit_rz_in_mbqc(rz_angle, mbqc_pipeline):
     lattice = plft.generate_lattice([4], "chain")
 
     # RZ circuit in the MBQC representation
-    @qjit(capture=True, pipelines=mbqc_pipeline)
+    @qjit(capture=True, collect_decomp_rules=False, pipelines=mbqc_pipeline)
     @qp.qnode(dev)
     def circuit_mbqc(start_state, angle):
         # prep input node
@@ -307,7 +307,7 @@ def test_cnot_in_mbqc_representation(mbqc_pipeline):
         return reduce(lambda a, b: a ^ b, args)
 
     # Equivalent CNOT circuit in the MBQC representation
-    @qjit(capture=True, pipelines=mbqc_pipeline)
+    @qjit(capture=True, collect_decomp_rules=False, pipelines=mbqc_pipeline)
     @qp.qnode(dev)
     def circuit_mbqc(start_state):
         # prep input nodes

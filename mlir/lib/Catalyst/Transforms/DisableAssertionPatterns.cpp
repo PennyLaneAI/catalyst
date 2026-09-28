@@ -26,8 +26,7 @@ struct DisableAssertionRewritePattern : public mlir::OpRewritePattern<AssertionO
     using mlir::OpRewritePattern<AssertionOp>::OpRewritePattern;
 
     mlir::LogicalResult matchAndRewrite(AssertionOp op,
-                                        mlir::PatternRewriter &rewriter) const override
-    {
+                                        mlir::PatternRewriter &rewriter) const override {
         rewriter.eraseOp(op);
         return success();
     }
@@ -37,8 +36,7 @@ struct DisableAssertionRewritePattern : public mlir::OpRewritePattern<AssertionO
 
 namespace catalyst {
 
-void populateDisableAssertionPatterns(RewritePatternSet &patterns)
-{
+void populateDisableAssertionPatterns(RewritePatternSet &patterns) {
     patterns.add<DisableAssertionRewritePattern>(patterns.getContext());
 }
 

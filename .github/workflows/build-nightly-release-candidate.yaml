@@ -9,7 +9,9 @@ permissions:
 jobs:
   setup:
     name: Setup the release
-    runs-on: ubuntu-24.04-arm
+    runs-on:  
+      group: 'PennyLaneAI-Static-IP-Runners'
+      labels: ['pl-2-core-gh-runner']   
     outputs:
       rc_branch: ${{ steps.check_rc.outputs.rc_branch }}
       branch_exists: ${{ steps.check_rc.outputs.branch_exists }}
@@ -109,7 +111,9 @@ jobs:
     name: Trigger PennyLane RC release workflow
     if: ${{ always() && !cancelled() }}
     needs: [upload]
-    runs-on: ubuntu-24.04
+    runs-on:  
+      group: 'PennyLaneAI-Static-IP-Runners'
+      labels: ['pl-2-core-gh-runner']   
 
     steps:
     - name: Trigger PennyLane release workflow

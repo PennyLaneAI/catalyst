@@ -20,17 +20,19 @@
 
 #include <algorithm>
 #include <optional>
+#include <string>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 
 #include "DGTypes.hpp"
+#include "DGUtils.hpp"
 
 using namespace DecompGraph::Core;
 
 namespace DecompGraph::Solver {
 
-ChosenDecompRule DecompositionSolver::basisRule(const OperatorNode &op)
-{
+ChosenDecompRule DecompositionSolver::basisRule(const OperatorNode &op) {
     if (!graph.isTargetGate(op)) {
         return invalidRule(op); // not a target gate, so no valid basis rule
     }
@@ -44,8 +46,7 @@ ChosenDecompRule DecompositionSolver::basisRule(const OperatorNode &op)
     return solution;
 }
 
-ChosenDecompRule DecompositionSolver::evalRule(const RuleNode &rule)
-{
+ChosenDecompRule DecompositionSolver::evalRule(const RuleNode &rule) {
     ChosenDecompRule solution;
     solution.ruleName = rule.name;
     solution.isBasis = false;
@@ -71,10 +72,10 @@ ChosenDecompRule DecompositionSolver::evalRule(const RuleNode &rule)
     return solution;
 }
 
-ChosenDecompRule DecompositionSolver::bestRule(const OperatorNode &op)
-{
+ChosenDecompRule DecompositionSolver::bestRule(const OperatorNode &op) {
     const auto &all_rules = graph.getAllRulesFor(op);
     if (all_rules.empty()) {
+        unsolvableOps.insert(op);
         return invalidRule(op); // no valid rules
     }
 
@@ -98,14 +99,14 @@ ChosenDecompRule DecompositionSolver::bestRule(const OperatorNode &op)
     }
 
     if (!best_rule.has_value()) {
+        unsolvableOps.insert(op);
         return invalidRule(op); // no valid rules
     }
 
     return best_rule.value();
 }
 
-ChosenDecompRule DecompositionSolver::solveOperator(const OperatorNode &op)
-{
+ChosenDecompRule DecompositionSolver::solveOperator(const OperatorNode &op) {
     // Check if the operator has already been solved
     if (const auto it = solvedMap.find(op); it != solvedMap.end()) {
         return it->second;
@@ -123,13 +124,11 @@ ChosenDecompRule DecompositionSolver::solveOperator(const OperatorNode &op)
 
         explicit VisitGuard(std::unordered_set<OperatorNode, OperatorNodeHash> &visited,
                             std::vector<OperatorNode> &solvingStack, const OperatorNode &node)
-            : visited_(visited), solvingStack_(solvingStack), currentNode_(node)
-        {
+            : visited_(visited), solvingStack_(solvingStack), currentNode_(node) {
             visited_.insert(currentNode_);         // add to visited in case of exceptions
             solvingStack_.push_back(currentNode_); // push to stack in case of exceptions
         }
-        ~VisitGuard()
-        {
+        ~VisitGuard() {
             visited_.erase(currentNode_);
             if (!solvingStack_.empty()) {
                 solvingStack_.pop_back();
@@ -148,8 +147,7 @@ ChosenDecompRule DecompositionSolver::solveOperator(const OperatorNode &op)
     return chosen;
 }
 
-GraphResult DecompositionSolver::solve()
-{
+GraphResult DecompositionSolver::solve() {
     // Return cached solution if already solved
     if (!solvedMap.empty()) {
         return solvedMap;
@@ -159,7 +157,7 @@ GraphResult DecompositionSolver::solve()
         const auto chosen_rule = solveOperator(root);
         if (isInvalidRule(chosen_rule)) {
             // Debugging output:
-            graph.showGraph();
+            showGraph(graph);
             showSolution(solvedMap);
 
             // Prepare error msg:
@@ -168,8 +166,20 @@ GraphResult DecompositionSolver::solve()
                 rules_error.push_back(rule.name);
             }
 
-            throw GraphSolverFailedError(root,
-                                         rules_error); // all rules failed for this root operator
+            // List of ops where the chain could not reach the gateset:
+            std::vector<OperatorNode> unsolvable;
+            for (const auto &u : unsolvableOps) {
+                if (u != root) {
+                    unsolvable.push_back(u);
+                }
+            }
+            std::sort(unsolvable.begin(), unsolvable.end(),
+                      [](const OperatorNode &a, const OperatorNode &b) {
+                          return print_op(a) < print_op(b);
+                      });
+
+            throw GraphSolverFailedError(root, rules_error,
+                                         unsolvable); // all rules failed for this root operator
         }
     }
 

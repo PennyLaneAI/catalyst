@@ -16,7 +16,7 @@ from fnmatch import fnmatch
 from pathlib import Path
 from re import compile as re_compile
 
-SRCFILE_EXT = ["c", "cc", "cpp", "cxx", "cu"]
+SRCFILE_EXT = ["c", "cc", "cpp", "cxx", "cu", "hip"]
 HEADERFILE_EXT = ["h", "hh", "hpp", "hxx", "cuh"]
 
 rgx_gitignore_comment = re_compile("#.*$")

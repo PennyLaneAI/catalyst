@@ -35,8 +35,7 @@ using namespace catalyst::quantum;
 namespace {
 
 // Return the magic state or complex conjugate of the magic state
-LogicalInitKind getMagicState(PPRotationOp op)
-{
+LogicalInitKind getMagicState(PPRotationOp op) {
     if (op.getRotationKind() > 0) {
         return LogicalInitKind::magic;
     }
@@ -72,8 +71,7 @@ LogicalInitKind getMagicState(PPRotationOp op)
 ///   * Measuring -1 corresponds to storing `true = 1` and 1 corresponds to storing `false = 0`.
 ///   - If the X or Y measurement yields -1, apply P(π/2) on the input qubits
 void decomposePauliCorrectedPiOverEight(bool avoidPauliYMeasure, PPRotationOp op,
-                                        PatternRewriter &rewriter)
-{
+                                        PatternRewriter &rewriter) {
     auto loc = op.getLoc();
     // We always initialize the magic state here, not the conjugate.
     auto magic = FabricateOp::create(rewriter, loc, LogicalInitKind::magic);
@@ -105,8 +103,9 @@ void decomposePauliCorrectedPiOverEight(bool avoidPauliYMeasure, PPRotationOp op
             outPZQubits.pop_back();                                // [input qubits]
             auto pprPI2 =
                 PPRotationOp::create(rewriter, loc, pauliP, 2, outPZQubits, ppmXX.getMres());
-            for (auto q : axillaryQubits)
+            for (auto q : axillaryQubits) {
                 DeallocQubitOp::create(rewriter, loc, q);
+            }
             scf::YieldOp::create(rewriter, loc, pprPI2.getOutQubits());
         };
 
@@ -126,13 +125,11 @@ void decomposePauliCorrectedPiOverEight(bool avoidPauliYMeasure, PPRotationOp op
         scf::IfOp ifOp;
         if (rotationKind > 0) {
             ifOp = scf::IfOp::create(rewriter, loc, ppmPZRes, YBuilder, XBuilder);
-        }
-        else {
+        } else {
             ifOp = scf::IfOp::create(rewriter, loc, ppmPZRes, XBuilder, YBuilder);
         }
         rewriter.replaceOp(op, ifOp);
-    }
-    else {
+    } else {
         SmallVector<StringRef> pauliX = {"X"};
         SmallVector<StringRef> pauliY = {"Y"};
         auto ppmXY = SelectPPMeasurementOp::create(rewriter, loc, ppmPZRes, pauliY, pauliX,
@@ -192,8 +189,7 @@ void decomposePauliCorrectedPiOverEight(bool avoidPauliYMeasure, PPRotationOp op
 /// |0⟩─────────| Y |─| Z(π/2)|───╚══╣X/Z╠═╝
 ///             └───┘ └───────┘      └───┘
 void decomposeAutoCorrectedPiOverEight(bool avoidPauliYMeasure, PPRotationOp op,
-                                       PatternRewriter &rewriter)
-{
+                                       PatternRewriter &rewriter) {
     auto loc = op.getLoc();
 
     // Initialize |0⟩ (zero) or Fabricate |Y⟩ (plus_i)
@@ -267,8 +263,7 @@ void decomposeAutoCorrectedPiOverEight(bool avoidPauliYMeasure, PPRotationOp op,
 ///   * Measuring -1 corresponds to storing `true = 1` and 1 corresponds to storing `false = 0`.
 /// - If X measurement yields -1 then apply P(π/2)
 /// FIXME: The expected value output is non-deterministic -- presumably caused by global phase.
-void decomposeInjectMagicStatePiOverEight(PPRotationOp op, PatternRewriter &rewriter)
-{
+void decomposeInjectMagicStatePiOverEight(PPRotationOp op, PatternRewriter &rewriter) {
     auto loc = op.getLoc();
 
     // Fabricate the magic state |m⟩
@@ -312,12 +307,10 @@ struct DecomposeNonCliffordPPR : public OpRewritePattern<PPRotationOp> {
 
     DecomposeNonCliffordPPR(MLIRContext *context, DecomposeMethod method, bool avoidPauliYMeasure,
                             PatternBenefit benefit = 1)
-        : OpRewritePattern(context, benefit), method(method), avoidPauliYMeasure(avoidPauliYMeasure)
-    {
-    }
+        : OpRewritePattern(context, benefit), method(method),
+          avoidPauliYMeasure(avoidPauliYMeasure) {}
 
-    LogicalResult matchAndRewrite(PPRotationOp op, PatternRewriter &rewriter) const override
-    {
+    LogicalResult matchAndRewrite(PPRotationOp op, PatternRewriter &rewriter) const override {
         if (op.isNonClifford() && !op.getCondition()) {
             switch (method) {
             case DecomposeMethod::AutoCorrected:
@@ -342,8 +335,7 @@ namespace pbc {
 
 void populateDecomposeNonCliffordPPRPatterns(RewritePatternSet &patterns,
                                              DecomposeMethod decomposeMethod,
-                                             bool avoidPauliYMeasure)
-{
+                                             bool avoidPauliYMeasure) {
     patterns.add<DecomposeNonCliffordPPR>(patterns.getContext(), decomposeMethod,
                                           avoidPauliYMeasure, 1);
 }

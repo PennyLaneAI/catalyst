@@ -25,14 +25,12 @@
 
 #pragma once
 
-#include <optional>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
 #include "DGBuilder.hpp"
 #include "DGTypes.hpp"
-#include "DGUtils.hpp"
 
 namespace DecompGraph::Solver {
 
@@ -68,6 +66,7 @@ class DecompositionSolver {
         solvedMap{};
     std::unordered_set<Core::OperatorNode, Core::OperatorNodeHash> visited{};
     std::vector<Core::OperatorNode> solvingStack{};
+    std::unordered_set<Core::OperatorNode, Core::OperatorNodeHash> unsolvableOps{};
 
     /**
      * @brief basisRule constructs a ChosenDecompRule for a target gate operator,
@@ -134,8 +133,7 @@ class DecompositionSolver {
      * @param op The operator node for which to return an invalid ChosenDecompRule.
      * @return Core::ChosenDecompRule An invalid ChosenDecompRule.
      */
-    [[nodiscard]] inline Core::ChosenDecompRule invalidRule(const Core::OperatorNode &op)
-    {
+    [[nodiscard]] inline Core::ChosenDecompRule invalidRule(const Core::OperatorNode &op) {
         return {op, false, "", {}, 0.0, {}};
     }
 
@@ -144,8 +142,7 @@ class DecompositionSolver {
      * rule name is empty. An invalid ChosenDecompRule indicates that no valid decomposition rule
      * could be found for the operator during the solving process.
      */
-    [[nodiscard]] inline bool isInvalidRule(const Core::ChosenDecompRule &rule) const
-    {
+    [[nodiscard]] inline bool isInvalidRule(const Core::ChosenDecompRule &rule) const {
         return rule.ruleName.empty();
     }
 };

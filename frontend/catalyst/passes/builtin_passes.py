@@ -25,7 +25,11 @@ from pennylane.decomposition.utils import to_name
 
 from catalyst.compiler import _options_to_cli_flags, _quantum_opt
 from catalyst.utils.exceptions import CompileError
-from catalyst.utils.runtime_environment import BYTECODE_FILE_PATH, get_lib_path, get_libpython_path
+from catalyst.utils.runtime_environment import (
+    BYTECODE_FILE_PATH,
+    get_lib_path,
+    get_libpython_path,
+)
 
 # pylint: disable=line-too-long, too-many-lines
 
@@ -264,7 +268,8 @@ def diagonalize_measurements_setup_inputs(
 
 
 diagonalize_measurements = qp.transform(
-    pass_name="diagonalize-final-measurements", setup_inputs=diagonalize_measurements_setup_inputs
+    pass_name="diagonalize-final-measurements",
+    setup_inputs=diagonalize_measurements_setup_inputs,
 )
 
 
@@ -739,20 +744,20 @@ def combine_global_phases_setup_inputs():
         @combine_global_phases
         @qp.qnode(dev)
         def circuit(n):
-            qp.GlobalPhase(0.1, wires = n-1)
+            qp.GlobalPhase(0.1)
             qp.X(n-1)
-            qp.GlobalPhase(0.1, wires = n-2)
+            qp.GlobalPhase(0.1)
             qp.H(n-2)
 
             @qp.for_loop(0, n)
             def loop(i):
-                qp.GlobalPhase(0.1967, wires=i)
-                qp.GlobalPhase(0.7691, wires=i)
+                qp.GlobalPhase(0.1967)
+                qp.GlobalPhase(0.7691)
 
             loop()
 
-            qp.GlobalPhase(0.1, wires=n-3)
-            qp.GlobalPhase(0.1, wires=0)
+            qp.GlobalPhase(0.1)
+            qp.GlobalPhase(0.1)
 
             return qp.expval(qp.Z(0))
 
@@ -940,6 +945,7 @@ def to_ppr_setup_inputs():
     ``qp.IsingZZ``,
     ``qp.MultiRZ``,
     ``qp.PauliRot``,
+    ``qp.PPR``,
     and adjoint versions thereof, as well as
     ``qp.measure`` and
     ``qp.pauli_measure``.
@@ -959,6 +965,9 @@ def to_ppr_setup_inputs():
 
         For better compatibility with other PennyLane functionality, ensure that PennyLane program
         capture is enabled with ``@qjit(capture=True)``.
+
+        Note that the angle convention of ``qp.PauliRot`` differs from Catalyst's angle convention
+        for PPRs by a factor of two, whereas ``qp.PPR`` follows Catalyst's convention.
 
     **Example**
 
@@ -1055,7 +1064,6 @@ def commute_ppr_setup_inputs(max_pauli_size=0):
     .. code-block:: python
 
         import pennylane as qp
-        import jax.numpy as jnp
 
         @qp.qjit(capture=True)
         @qp.transforms.commute_ppr(max_pauli_size=2)
@@ -1064,17 +1072,17 @@ def commute_ppr_setup_inputs(max_pauli_size=0):
         def circuit():
 
             # equivalent to a Hadamard gate
-            qp.PauliRot(jnp.pi / 2, pauli_word="Z", wires=0)
-            qp.PauliRot(jnp.pi / 2, pauli_word="X", wires=0)
-            qp.PauliRot(jnp.pi / 2, pauli_word="Z", wires=0)
+            qp.PPR(4, pauli_word="Z", wires=0)
+            qp.PPR(4, pauli_word="X", wires=0)
+            qp.PPR(4, pauli_word="Z", wires=0)
 
             # equivalent to a CNOT gate
-            qp.PauliRot(jnp.pi / 2, pauli_word="ZX", wires=[0, 1])
-            qp.PauliRot(-jnp.pi / 2, pauli_word="Z", wires=0)
-            qp.PauliRot(-jnp.pi / 2, pauli_word="X", wires=1)
+            qp.PPR(4, pauli_word="ZX", wires=[0, 1])
+            qp.PPR(-4, pauli_word="Z", wires=0)
+            qp.PPR(-4, pauli_word="X", wires=1)
 
             # equivalent to a T gate
-            qp.PauliRot(jnp.pi / 4, pauli_word="Z", wires=0)
+            qp.PPR(8, pauli_word="Z", wires=0)
 
             return qp.expval(qp.Z(0))
 
@@ -1096,9 +1104,9 @@ def commute_ppr_setup_inputs(max_pauli_size=0):
     - expval(PauliZ): 1
     Depth: Not computed
 
-    In the example above, the Clifford PPRs (:class:`~.PauliRot` instances with an angle of rotation
-    of :math:`\tfrac{\pi}{2}`) will be commuted past the non-Clifford PPR (:class:`~.PauliRot`
-    instances with an angle of rotation of :math:`\tfrac{\pi}{4}`). In the above output,
+    In the example above, the Clifford PPRs (:class:`~.PPR` instances with an angle denominator
+    of :math:`\pm 4`) will be commuted past the non-Clifford PPR (:class:`~.PPR`
+    instances with an angle denominator :math:`\pm 8`). In the above output,
     ``PPR-theta-w<int>`` denotes the type of PPR present in the circuit, where ``theta`` is the PPR
     angle (:math:`\theta`) and ``w<int>`` denotes the PPR weight (the number of qubits it acts on,
     or the length of the Pauli word).
@@ -1160,15 +1168,14 @@ def merge_ppr_ppm_setup_inputs(max_pauli_size=0):
     .. code-block:: python
 
         import pennylane as qp
-        import jax.numpy as jnp
 
         @qp.qjit(capture=True)
         @qp.transforms.merge_ppr_ppm(max_pauli_size=2)
         @qp.transforms.to_ppr
         @qp.qnode(qp.device("lightning.qubit", wires=2))
         def circuit():
-            qp.PauliRot(jnp.pi / 2, pauli_word="Z", wires=0)
-            qp.PauliRot(jnp.pi / 2, pauli_word="X", wires=1)
+            qp.PPR(4, pauli_word="Z", wires=0)
+            qp.PPR(4, pauli_word="X", wires=1)
 
             ppm = qp.pauli_measure(pauli_word="ZX", wires=[0, 1])
 
@@ -1260,7 +1267,6 @@ def ppr_to_ppm_setup_inputs(decompose_method="pauli-corrected", avoid_y_measure=
 
         import pennylane as qp
         from functools import partial
-        import jax.numpy as jnp
 
         @qp.qjit(capture=True)
         @qp.transforms.ppr_to_ppm
@@ -1268,17 +1274,17 @@ def ppr_to_ppm_setup_inputs(decompose_method="pauli-corrected", avoid_y_measure=
         @qp.qnode(qp.device("null.qubit", wires=2))
         def circuit():
             # equivalent to a Hadamard gate
-            qp.PauliRot(jnp.pi / 2, pauli_word="Z", wires=0)
-            qp.PauliRot(jnp.pi / 2, pauli_word="X", wires=0)
-            qp.PauliRot(jnp.pi / 2, pauli_word="Z", wires=0)
+            qp.PPR(4, pauli_word="Z", wires=0)
+            qp.PPR(4, pauli_word="X", wires=0)
+            qp.PPR(4, pauli_word="Z", wires=0)
 
             # equivalent to a CNOT gate
-            qp.PauliRot(jnp.pi / 2, pauli_word="ZX", wires=[0, 1])
-            qp.PauliRot(-jnp.pi / 2, pauli_word="Z", wires=[0])
-            qp.PauliRot(-jnp.pi / 2, pauli_word="X", wires=[1])
+            qp.PPR(4, pauli_word="ZX", wires=[0, 1])
+            qp.PPR(-4, pauli_word="Z", wires=[0])
+            qp.PPR(-4, pauli_word="X", wires=[1])
 
             # equivalent to a T gate
-            qp.PauliRot(jnp.pi / 4, pauli_word="Z", wires=0)
+            qp.PPR(8, pauli_word="Z", wires=0)
 
             return qp.expval(qp.Z(0))
 
@@ -1309,7 +1315,10 @@ def ppr_to_ppm_setup_inputs(decompose_method="pauli-corrected", avoid_y_measure=
     (:math:`P(\tfrac{\pi}{2}) = \exp(-iP\tfrac{\pi}{2}) = P`). Pauli operators can be commuted to
     the end of the circuit and absorbed into terminal measurements.
     """
-    return (), {"decompose_method": decompose_method, "avoid_y_measure": avoid_y_measure}
+    return (), {
+        "decompose_method": decompose_method,
+        "avoid_y_measure": avoid_y_measure,
+    }
 
 
 ppr_to_ppm = qp.transform(pass_name="ppr-to-ppm", setup_inputs=ppr_to_ppm_setup_inputs)
@@ -1432,102 +1441,6 @@ ppm_compilation = qp.transform(
 )
 
 
-def ppm_specs(fn, only_disjoint_qubit: bool = False):
-    r"""This function returns following Pauli product rotation (PPR) and Pauli product measurement (PPM)
-    specs in a dictionary:
-
-    - Pi/4 PPR (count the number of clifford PPRs)
-    - Pi/8 PPR (count the number of non-clifford PPRs)
-    - Pi/2 PPR (count the number of classical PPRs)
-    - Max weight for pi/8 PPRs
-    - Max weight for pi/4 PPRs
-    - Max weight for pi/2 PPRs
-    - Number of logical qubits
-    - Number of PPMs
-    - ``depth``: number of PBC layers
-    - ``depth_type``: ``0`` if commuting ops on overlapping qubits may share a layer;
-      ``1`` if only ops with disjoint qubit support may share a layer
-
-    .. note::
-
-        It is recommended to use :func:`pennylane.specs` instead of ``ppm_specs`` to retrieve
-        resource counts of PPR-PPM workflows.
-
-    When there is control flow, this function can count the above statistics inside for loops with
-    a statically known number of iterations. For all other cases, including dynamically sized for
-    loops, and any conditionals and while loops, this pass exits with failure.
-
-    Args:
-        fn (QJIT): qjit-decorated function for which ``ppm_specs`` need to be printed.
-        only_disjoint_qubit (bool): If ``True``, depth is computed using disjoint-qubit layering
-            (``depth_type`` 1). If ``False`` (default), commuting ops on overlapping qubits may
-            share a layer (``depth_type`` 0). Passed to the ``ppm-specs`` MLIR pass as
-            ``disjoint-qubit``.
-
-    Returns:
-        dict: A Python dictionary containing PPM specs of all functions in ``fn``.
-
-    **Example**
-
-    .. code-block:: python
-
-        import pennylane as qp
-        import catalyst
-        from catalyst.passes import ppm_specs, to_ppr
-
-        @qp.qjit(target="mlir")
-        @to_ppr
-        @qp.qnode(qp.device("lightning.qubit", wires=2))
-        def f():
-            qp.H(0)
-            qp.S(1)
-            qp.T(0)
-            qp.CNOT(wires=[0, 1])
-            return qp.expval(qp.Z(0))
-
-        print(ppm_specs(f))
-        print(ppm_specs(f, only_disjoint_qubit=True))
-
-    Example output:
-
-    .. code-block:: pycon
-
-        {'f_0': {'depth': 4, 'depth_type': 0, 'logical_qubits': 2, 'max_weight_pi4': 2,
-                 'max_weight_pi8': 1, 'pi4_ppr': 7, 'pi8_ppr': 1}}
-        {'f_0': {'depth': 7, 'depth_type': 1, 'logical_qubits': 2, 'max_weight_pi4': 2,
-                 'max_weight_pi8': 1, 'pi4_ppr': 7, 'pi8_ppr': 1}}
-    """
-
-    if fn.mlir_module is not None:
-        # aot mode: e.g: setting target="mlir", pipeline="..."
-        new_options = copy.copy(fn.compile_options)
-        if new_options.pipelines is None:
-            new_options.pipelines = [
-                (name, list(passes)) for name, passes in new_options.get_pipelines()
-            ]
-
-        # add ppm-spec pass at the end to existing pipeline
-        _, pass_list = new_options.pipelines[0]  # first pipeline runs the user passes
-        # check if ppm-specs is already in the pass list
-        ppm_specs_pass = "ppm-specs{disjoint-qubit=true}" if only_disjoint_qubit else "ppm-specs"
-        pass_list[:] = [p for p in pass_list if not p.startswith("ppm-specs")] + [ppm_specs_pass]
-
-        new_options = _options_to_cli_flags(new_options)
-        # redirect output to devnull to avoid printing the MLIR
-        raw_result = _quantum_opt(*new_options, "-o", os.devnull, stdin=str(fn.mlir_module))
-
-        try:
-            return json.loads(raw_result)  # validate before returning
-        except (json.JSONDecodeError, ValueError) as e:  # pragma: nocover
-            raise CompileError(
-                "Invalid json format encountered in ppm_specs. "
-                f"Expected valid JSON but got {raw_result}"
-            ) from e
-
-    else:
-        raise NotImplementedError("PPM passes only support AOT (Ahead-Of-Time) compilation mode.")
-
-
 def reduce_t_depth_setup_inputs():
     r"""A quantum compilation pass that reduces the depth and count of non-Clifford Pauli product
     rotation (PPR, :math:`P(\theta) = \exp(-iP\theta)`) operators (e.g., ``T`` gates) by commuting
@@ -1575,18 +1488,17 @@ def reduce_t_depth_setup_inputs():
     .. code-block:: python
 
         import pennylane as qp
-        import jax.numpy as jnp
 
         @qp.qjit(capture=True)
         @qp.transforms.reduce_t_depth
         @qp.transforms.to_ppr
         @qp.qnode(qp.device("null.qubit", wires=4))
         def circuit():
-            qp.PauliRot(jnp.pi / 4, pauli_word="Z", wires=1)
-            qp.PauliRot(-jnp.pi / 4, pauli_word="XYZ", wires=[0, 2, 3])
-            qp.PauliRot(-jnp.pi / 2, pauli_word="XYZY", wires=[0, 1, 2, 3])
-            qp.PauliRot(jnp.pi / 4, pauli_word="XZX", wires=[0, 1, 3])
-            qp.PauliRot(-jnp.pi / 4, pauli_word="XZY", wires=[0, 1, 2])
+            qp.PPR(8, pauli_word="Z", wires=1)
+            qp.PPR(-8, pauli_word="XYZ", wires=[0, 2, 3])
+            qp.PPR(-4, pauli_word="XYZY", wires=[0, 1, 2, 3])
+            qp.PPR(8, pauli_word="XZX", wires=[0, 1, 3])
+            qp.PPR(-8, pauli_word="XZY", wires=[0, 1, 2])
 
             return qp.expval(qp.Z(0))
 
@@ -1794,7 +1706,8 @@ def decompose_arbitrary_ppr_setup_inputs():  # pragma: nocover
 
 
 decompose_arbitrary_ppr = qp.transform(
-    pass_name="decompose-arbitrary-ppr", setup_inputs=decompose_arbitrary_ppr_setup_inputs
+    pass_name="decompose-arbitrary-ppr",
+    setup_inputs=decompose_arbitrary_ppr_setup_inputs,
 )
 
 
@@ -1806,6 +1719,7 @@ def graph_decomposition_setup_inputs(
     _builtin_rule_path: str = BYTECODE_FILE_PATH,
     libQPD_path: Path | None = None,
     libpython_path: Path | None = None,
+    verbose: bool = False,
 ):  # pylint: disable=unused-argument, too-many-arguments, too-many-positional-arguments
     R"""
     Specify that the ``-graph-decomposition`` MLIR compiler pass for applying the graph-based
@@ -1836,6 +1750,8 @@ def graph_decomposition_setup_inputs(
                                      operators need to be decomposed (i.e. when they're not
                                      in the target gate set).
        alt_decomps (dict | None): map operators to lists of decomposition rules that the graph system will consider as alternative rules for operators.
+        verbose (bool): if ``True``, the pass prints the decomposition rule the solver chose for
+            each operator, along with its cost and the resulting gate counts, to stderr. ``False`` by default.
 
     Returns:
         ~.QNode:
@@ -1911,23 +1827,32 @@ def graph_decomposition_setup_inputs(
         "libpython_path": str(libpython_path if libpython_path else get_libpython_path()),
     }
 
+    def rule_ref_name(rule):
+        # A rule reference may be a name string, a plain decomposition function, or a PennyLane
+        # ``DecompositionRule`` (returned by ``@register_resources``, which has no ``__name__``).
+        if isinstance(rule, str):
+            return rule
+        if isinstance(rule, qp.decomposition.DecompositionRule):
+            return rule.name
+        return rule.__name__
+
     if fixed_decomps:
         options |= {
             "fixed_decomps": {
-                to_name(op): (rule if isinstance(rule, str) else rule.__name__)
-                for op, rule in fixed_decomps.items()
+                to_name(op): rule_ref_name(rule) for op, rule in fixed_decomps.items()
             }
         }
 
     if alt_decomps:
         options |= {
             "alt_decomps": {
-                to_name(op): tuple(
-                    (rule if isinstance(rule, str) else rule.__name__) for rule in rules
-                )
+                to_name(op): tuple(rule_ref_name(rule) for rule in rules)
                 for op, rules in alt_decomps.items()
             }
         }
+
+    if verbose:
+        options |= {"verbose": True}
 
     return (), options
 

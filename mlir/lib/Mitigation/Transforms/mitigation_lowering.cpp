@@ -37,8 +37,7 @@ namespace mitigation {
 struct MitigationLoweringPass : impl::MitigationLoweringPassBase<MitigationLoweringPass> {
     using MitigationLoweringPassBase::MitigationLoweringPassBase;
 
-    void runOnOperation() final
-    {
+    void runOnOperation() final {
         RewritePatternSet mitigationPatterns(&getContext());
         populateLoweringPatterns(mitigationPatterns);
 

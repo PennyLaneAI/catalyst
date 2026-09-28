@@ -34,8 +34,7 @@ struct memref_beginning_t {
     size_t offset;
 };
 
-size_t memref_size_based_on_rank(size_t rank)
-{
+size_t memref_size_based_on_rank(size_t rank) {
     size_t allocated = sizeof(void *);
     size_t aligned = sizeof(void *);
     size_t offset = sizeof(size_t);
@@ -44,8 +43,7 @@ size_t memref_size_based_on_rank(size_t rank)
     return allocated + aligned + offset + sizes + strides;
 }
 
-size_t *to_sizes(char *base, size_t rank)
-{
+size_t *to_sizes(char *base, size_t rank) {
     if (rank == 0) {
         return NULL;
     }
@@ -57,8 +55,7 @@ size_t *to_sizes(char *base, size_t rank)
     return reinterpret_cast<size_t *>(base + bytes_offset);
 }
 
-size_t *to_strides(char *base, size_t rank)
-{
+size_t *to_strides(char *base, size_t rank) {
     if (rank == 0) {
         return NULL;
     }
@@ -71,21 +68,18 @@ size_t *to_strides(char *base, size_t rank)
     return reinterpret_cast<size_t *>(base + bytes_offset);
 }
 
-void free_wrap(PyObject *capsule)
-{
+void free_wrap(PyObject *capsule) {
     void *obj = PyCapsule_GetPointer(capsule, NULL);
     free(obj);
 }
 
-const npy_intp *npy_get_dimensions(char *memref, size_t rank)
-{
+const npy_intp *npy_get_dimensions(char *memref, size_t rank) {
     size_t *sizes = to_sizes(memref, rank);
     const npy_intp *dims = reinterpret_cast<npy_intp *>(sizes);
     return dims;
 }
 
-const npy_intp *npy_get_strides(char *memref, size_t element_size, size_t rank)
-{
+const npy_intp *npy_get_strides(char *memref, size_t element_size, size_t rank) {
     size_t *strides = to_strides(memref, rank);
     for (unsigned int idx = 0; idx < rank; idx++) {
         // memref strides are in terms of elements.
@@ -99,8 +93,7 @@ const npy_intp *npy_get_strides(char *memref, size_t element_size, size_t rank)
 }
 
 nb::list move_returns(void *memref_array_ptr, nb::object result_desc, nb::object transfer,
-                      nb::dict numpy_arrays)
-{
+                      nb::dict numpy_arrays) {
     nb::list returns;
     if (result_desc.is_none()) {
         return returns;
@@ -202,8 +195,7 @@ nb::list move_returns(void *memref_array_ptr, nb::object result_desc, nb::object
 }
 
 nb::list wrap(nb::object func, nb::tuple py_args, nb::object result_desc, nb::object transfer,
-              nb::dict numpy_arrays)
-{
+              nb::dict numpy_arrays) {
     // Install signal handler to catch user interrupts (e.g. CTRL-C).
     signal(SIGINT, [](int code) { throw std::runtime_error("KeyboardInterrupt (SIGINT)"); });
 
@@ -234,14 +226,12 @@ nb::list wrap(nb::object func, nb::tuple py_args, nb::object result_desc, nb::ob
     return returns;
 }
 
-template <typename FnPtr> static FnPtr extract_fn_ptr(nb::object fn_obj)
-{
+template <typename FnPtr> static FnPtr extract_fn_ptr(nb::object fn_obj) {
     auto ctypes = nb::module_::import_("ctypes");
     return *reinterpret_cast<FnPtr *>(nb::cast<size_t>(ctypes.attr("addressof")(fn_obj)));
 }
 
-void invoke_setup(nb::object setup_fn, std::vector<std::string> argv)
-{
+void invoke_setup(nb::object setup_fn, std::vector<std::string> argv) {
     using setup_fn_t = void (*)(int, char **);
     setup_fn_t fn = extract_fn_ptr<setup_fn_t>(setup_fn);
 
@@ -257,8 +247,7 @@ void invoke_setup(nb::object setup_fn, std::vector<std::string> argv)
     }
 }
 
-void invoke_teardown(nb::object teardown_fn)
-{
+void invoke_teardown(nb::object teardown_fn) {
     using teardown_fn_t = void (*)();
     teardown_fn_t fn = extract_fn_ptr<teardown_fn_t>(teardown_fn);
 
@@ -268,8 +257,7 @@ void invoke_teardown(nb::object teardown_fn)
     }
 }
 
-NB_MODULE(wrapper, m)
-{
+NB_MODULE(wrapper, m) {
     m.doc() = "wrapper module";
     // We have to annotate all the arguments to `wrap` to allow `result_desc` to be None
     // See https://nanobind.readthedocs.io/en/latest/functions.html#none-arguments

@@ -14,26 +14,22 @@ using namespace mlir;
 using namespace catalyst;
 
 namespace {
-bool isScalarTensor(Type type)
-{
+bool isScalarTensor(Type type) {
     if (auto rankedType = dyn_cast<RankedTensorType>(type)) {
         return rankedType.getRank() == 0;
     }
     return false;
 }
 
-Type getScalarOrOriginalType(Type type)
-{
+Type getScalarOrOriginalType(Type type) {
     if (isScalarTensor(type)) {
         return dyn_cast<RankedTensorType>(type).getElementType();
-    }
-    else {
+    } else {
         return type;
     }
 }
 
-bool hasScalarTensorSignature(func::FuncOp funcOp)
-{
+bool hasScalarTensorSignature(func::FuncOp funcOp) {
     for (Type type : funcOp.getFunctionType().getInputs()) {
         if (isScalarTensor(type)) {
             return true;
@@ -50,8 +46,7 @@ bool hasScalarTensorSignature(func::FuncOp funcOp)
 struct DetensorizeCallSitePattern : public OpRewritePattern<func::CallOp> {
     using OpRewritePattern<func::CallOp>::OpRewritePattern;
 
-    LogicalResult matchAndRewrite(func::CallOp callOp, PatternRewriter &rewriter) const override
-    {
+    LogicalResult matchAndRewrite(func::CallOp callOp, PatternRewriter &rewriter) const override {
         auto funcOp =
             SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(callOp, callOp.getCalleeAttr());
 
@@ -105,8 +100,7 @@ struct DetensorizeCallSitePattern : public OpRewritePattern<func::CallOp> {
     void extractDetensorizedOpSignature(FunctionType &funcType, func::FuncOp &funcOp,
                                         SmallVector<Type> &newArgTypes,
                                         SmallVector<Type> &newResultTypes,
-                                        SmallVector<NamedAttribute> &newAttrs) const
-    {
+                                        SmallVector<NamedAttribute> &newAttrs) const {
         for (Type type : funcType.getInputs()) {
             newArgTypes.push_back(getScalarOrOriginalType(type));
         }
@@ -125,8 +119,7 @@ struct DetensorizeCallSitePattern : public OpRewritePattern<func::CallOp> {
     }
 
     void mapFuncOpBodyAndReturnOp(PatternRewriter &rewriter, Block *newEntryBlock,
-                                  func::FuncOp &funcOp, IRMapping &mapper) const
-    {
+                                  func::FuncOp &funcOp, IRMapping &mapper) const {
         rewriter.setInsertionPointToStart(newEntryBlock);
         for (const auto &it : llvm::enumerate(funcOp.getArguments())) {
             Value oldArg = it.value();
@@ -137,8 +130,7 @@ struct DetensorizeCallSitePattern : public OpRewritePattern<func::CallOp> {
                 auto fromElementsOp = tensor::FromElementsOp::create(rewriter, newArg.getLoc(),
                                                                      oldArg.getType(), newArg);
                 mapper.map(oldArg, fromElementsOp.getResult());
-            }
-            else {
+            } else {
                 mapper.map(oldArg, newArg);
             }
         }
@@ -160,8 +152,7 @@ struct DetensorizeCallSitePattern : public OpRewritePattern<func::CallOp> {
                 auto extractOp = tensor::ExtractOp::create(rewriter, oldReturnOp.getLoc(),
                                                            newOperand, ValueRange{});
                 newReturnOperands.push_back(extractOp.getResult());
-            }
-            else {
+            } else {
                 newReturnOperands.push_back(newOperand);
             }
         }
@@ -169,8 +160,7 @@ struct DetensorizeCallSitePattern : public OpRewritePattern<func::CallOp> {
     }
 
     void replaceCallOp(PatternRewriter &rewriter, func::CallOp &callOp,
-                       func::FuncOp &newFuncOp) const
-    {
+                       func::FuncOp &newFuncOp) const {
         rewriter.setInsertionPoint(callOp);
         SmallVector<Value> newOperands;
         for (Value operand : callOp.getOperands()) {
@@ -180,8 +170,7 @@ struct DetensorizeCallSitePattern : public OpRewritePattern<func::CallOp> {
                 auto extractOp =
                     tensor::ExtractOp::create(rewriter, callOp.getLoc(), operand, ValueRange{});
                 newOperands.push_back(extractOp.getResult());
-            }
-            else {
+            } else {
                 newOperands.push_back(operand);
             }
         }
@@ -198,8 +187,7 @@ struct DetensorizeCallSitePattern : public OpRewritePattern<func::CallOp> {
                 auto fromElementsOp = tensor::FromElementsOp::create(
                     rewriter, callOp.getLoc(), oldResult.getType(), newResult);
                 newResults.push_back(fromElementsOp.getResult());
-            }
-            else {
+            } else {
                 newResults.push_back(newResult);
             }
         }
@@ -218,8 +206,7 @@ struct DetensorizeFunctionBoundaryPass
     : public impl::DetensorizeFunctionBoundaryPassBase<DetensorizeFunctionBoundaryPass> {
     using impl::DetensorizeFunctionBoundaryPassBase<
         DetensorizeFunctionBoundaryPass>::DetensorizeFunctionBoundaryPassBase;
-    void runOnOperation() override
-    {
+    void runOnOperation() override {
         MLIRContext *context = &getContext();
         RewritePatternSet patterns(context);
 

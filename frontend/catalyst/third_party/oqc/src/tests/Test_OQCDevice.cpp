@@ -25,8 +25,7 @@ namespace py = pybind11;
 
 using namespace Catalyst::Runtime::Device;
 
-TEST_CASE("Test the OQCDevice constructor", "[openqasm]")
-{
+TEST_CASE("Test the OQCDevice constructor", "[openqasm]") {
     auto device = OQCDevice("{shots : 100}");
     CHECK(device.GetNumQubits() == 0);
 
@@ -34,8 +33,7 @@ TEST_CASE("Test the OQCDevice constructor", "[openqasm]")
                         Catch::Matchers::ContainsSubstring("unsupported by device"));
 }
 
-TEST_CASE("Test qubits allocation OpenQasmDevice", "[openqasm]")
-{
+TEST_CASE("Test qubits allocation OpenQasmDevice", "[openqasm]") {
     std::unique_ptr<OQCDevice> device = std::make_unique<OQCDevice>("{shots : 100}");
 
     device->AllocateQubits(3);
@@ -43,8 +41,7 @@ TEST_CASE("Test qubits allocation OpenQasmDevice", "[openqasm]")
     CHECK(device->GetDeviceShots() == 100);
 }
 
-TEST_CASE("Test the bell pair circuit", "[openqasm]")
-{
+TEST_CASE("Test the bell pair circuit", "[openqasm]") {
     std::unique_ptr<OQCDevice> device = std::make_unique<OQCDevice>("{shots : 100}");
 
     constexpr size_t n = 2;
@@ -76,8 +73,7 @@ TEST_CASE("Test the bell pair circuit", "[openqasm]")
     CHECK(device->Circuit() == toqasmempty);
 }
 
-TEST_CASE("Test counts", "[openqasm][counts]")
-{
+TEST_CASE("Test counts", "[openqasm][counts]") {
     // This test needs a python interpreter to execute the OQC python script
     // inside the `OQCDevice`'s `PartialCounts' method.
     if (!Py_IsInitialized()) {

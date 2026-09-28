@@ -1,8 +1,0 @@
-dataclasses-json
-py-cpuinfo
-altair
-vl-convert-python
-pandas
-zstd
-dill
-psutil

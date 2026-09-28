@@ -17,6 +17,11 @@
 
 #include "mlir/Pass/Pass.h"
 
+#include "Catalyst/IR/CatalystDialect.h"
+#include "MBQC/IR/MBQCDialect.h"
+#include "PBC/IR/PBCDialect.h"
+#include "QRef/IR/QRefDialect.h"
+
 namespace catalyst {
 namespace quantum {
 

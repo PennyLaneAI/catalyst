@@ -30,21 +30,24 @@ using namespace catalyst::pbc;
 namespace {
 
 /// recursively check if the next users of the NextOp are not PPMeasurementOp
-bool verifyNextNonClifford(PPMeasurementOp op, Operation *nextOp)
-{
+bool verifyNextNonClifford(PPMeasurementOp op, Operation *nextOp) {
     // Avoid segmentation fault (should not happen)
-    if (nextOp == nullptr)
+    if (nextOp == nullptr) {
         return true;
+    }
 
     for (auto userOp : nextOp->getUsers()) {
-        if (userOp == op)
+        if (userOp == op) {
             return false;
+        }
 
-        if (!userOp->isBeforeInBlock(op))
+        if (!userOp->isBeforeInBlock(op)) {
             continue;
+        }
 
-        if (!verifyNextNonClifford(op, userOp))
+        if (!verifyNextNonClifford(op, userOp)) {
             return false;
+        }
     }
 
     return true;
@@ -62,32 +65,35 @@ bool verifyNextNonClifford(PPMeasurementOp op, Operation *nextOp)
 ///
 /// Users of prevOp can be PPMeasurementOp,
 /// but the users of Y (a user of prevOp) should not be PPMeasurementOp.
-bool verifyPrevNonClifford(PPMeasurementOp op, PPRotationOp prevOp)
-{
+bool verifyPrevNonClifford(PPMeasurementOp op, PPRotationOp prevOp) {
     // Avoid segmentation fault (should not happen)
-    if (prevOp == nullptr)
+    if (prevOp == nullptr) {
         return false;
+    }
 
-    if (prevOp.isNonClifford())
+    if (prevOp.isNonClifford()) {
         return false;
+    }
 
     for (auto opUser : prevOp->getUsers()) {
-        if (opUser == op)
+        if (opUser == op) {
             continue;
+        }
 
-        if (!verifyNextNonClifford(op, opUser))
+        if (!verifyNextNonClifford(op, opUser)) {
             return false;
+        }
     }
 
     return true;
 }
 
 LogicalResult visitValidCliffordPPR(PPMeasurementOp op,
-                                    std::function<LogicalResult(PPRotationOp)> callback)
-{
+                                    std::function<LogicalResult(PPRotationOp)> callback) {
     for (auto qubit : op->getOperands()) {
-        if (qubit.getDefiningOp() == nullptr)
+        if (qubit.getDefiningOp() == nullptr) {
             continue;
+        }
 
         if (auto pprOp = llvm::dyn_cast<PPRotationOp>(qubit.getDefiningOp())) {
             if (verifyPrevNonClifford(op, pprOp)) {
@@ -100,8 +106,7 @@ LogicalResult visitValidCliffordPPR(PPMeasurementOp op,
 }
 
 void moveCliffordPastPPM(const PauliStringWrapper &lhsPauli, const PauliStringWrapper &rhsPauli,
-                         PauliStringWrapper *result, PatternRewriter &rewriter)
-{
+                         PauliStringWrapper *result, PatternRewriter &rewriter) {
     assert(lhsPauli.op != nullptr && "LHS Operation is not found");
     assert(rhsPauli.op != nullptr && "RHS Operation is not found");
     assert(llvm::isa<PPRotationOp>(lhsPauli.op) && "LHS Operation is not PPRotationOp");
@@ -114,8 +119,7 @@ void moveCliffordPastPPM(const PauliStringWrapper &lhsPauli, const PauliStringWr
     if (result != nullptr) {
         updatePauliWord(rhs, result->get_pauli_word(), rewriter);
         updatePauliWordSign(rhs, result->isNegative(), rewriter);
-    }
-    else {
+    } else {
         updatePauliWord(rhs, rhsPauli.get_pauli_word(), rewriter);
     }
 
@@ -146,18 +150,19 @@ void moveCliffordPastPPM(const PauliStringWrapper &lhsPauli, const PauliStringWr
     sortTopologically(lhs->getBlock(), itr);
 }
 
-bool shouldRemovePPR(PPRotationOp op)
-{
-    if (op->getUsers().empty())
+bool shouldRemovePPR(PPRotationOp op) {
+    if (op->getUsers().empty()) {
         return true;
+    }
 
     SetVector<Operation *> slice;
     getForwardSlice(op, &slice);
 
     for (Operation *forwardOp : slice) {
         if (!isa<catalyst::quantum::InsertOp>(forwardOp) &&
-            !isa<catalyst::quantum::DeallocOp>(forwardOp))
+            !isa<catalyst::quantum::DeallocOp>(forwardOp)) {
             return false;
+        }
     }
 
     return true;
@@ -169,12 +174,9 @@ struct MergePPRIntoPPM : public OpRewritePattern<PPMeasurementOp> {
     size_t MAX_PAULI_SIZE;
 
     MergePPRIntoPPM(mlir::MLIRContext *context, size_t maxPauliSize, PatternBenefit benefit)
-        : OpRewritePattern(context, benefit), MAX_PAULI_SIZE(maxPauliSize)
-    {
-    }
+        : OpRewritePattern(context, benefit), MAX_PAULI_SIZE(maxPauliSize) {}
 
-    LogicalResult matchAndRewrite(PPMeasurementOp PPMOp, PatternRewriter &rewriter) const override
-    {
+    LogicalResult matchAndRewrite(PPMeasurementOp PPMOp, PatternRewriter &rewriter) const override {
         return visitValidCliffordPPR(PPMOp, [&](PPRotationOp cliffordPPROp) {
             auto [normPPROp, normPPMOp] = normalizePPROps(cliffordPPROp, PPMOp);
 
@@ -202,8 +204,7 @@ struct MergePPRIntoPPM : public OpRewritePattern<PPMeasurementOp> {
 struct RemoveDeadPPR : public OpRewritePattern<PPRotationOp> {
     using OpRewritePattern::OpRewritePattern;
 
-    LogicalResult matchAndRewrite(PPRotationOp op, PatternRewriter &rewriter) const override
-    {
+    LogicalResult matchAndRewrite(PPRotationOp op, PatternRewriter &rewriter) const override {
         if (shouldRemovePPR(op)) {
             rewriter.replaceOp(op, op.getInQubits());
             return success();
@@ -217,8 +218,7 @@ struct RemoveDeadPPR : public OpRewritePattern<PPRotationOp> {
 namespace catalyst {
 namespace pbc {
 
-void populateMergePPRIntoPPMPatterns(RewritePatternSet &patterns, unsigned int maxPauliSize)
-{
+void populateMergePPRIntoPPMPatterns(RewritePatternSet &patterns, unsigned int maxPauliSize) {
     patterns.add<MergePPRIntoPPM>(patterns.getContext(), maxPauliSize, 1);
     patterns.add<RemoveDeadPPR>(patterns.getContext(), 1);
 }

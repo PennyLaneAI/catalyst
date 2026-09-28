@@ -396,6 +396,10 @@ def DecodeEsmCssOp : QecPhysical_Op<"decode_esm_css"> {
         and Z checks. It is therefore up to the user of this operation to determine what type(s) of
         correction(s) to apply given the Tanner graph that was supplied.
 
+        The optional `check_type` attribute records which check family this syndrome came from
+        ("x" or "z"), so a consumer picking a decoder per parity-check matrix need not recover it by
+        tracing the Tanner graph operand.
+
         If no correctable error was detected, this operation returns an index value of -1.
 
         #### Example
@@ -422,7 +426,8 @@ def DecodeEsmCssOp : QecPhysical_Op<"decode_esm_css"> {
     let arguments = (ins
         AnyTypeOf<[1DTensorOf<[I1]>, MemRefRankOf<[I1], [1]>]>:$esm,
         TannerGraphType:$tanner_graph,
-        Optional<MemRefRankOf<[Index], [1]>>:$err_idx_in
+        Optional<MemRefRankOf<[Index], [1]>>:$err_idx_in,
+        OptionalAttr<StrAttr>:$check_type
     );
 
     let results = (outs

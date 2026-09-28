@@ -10,7 +10,6 @@ file(GLOB SRC
     commute_ppr.cpp
     MergePPRIntoPPM.cpp
     merge_ppr_into_ppm.cpp
-    CountPPMSpecs.cpp
     decompose_non_clifford_ppr.cpp
     DecomposeNonCliffordPPR.cpp
     decompose_clifford_ppr.cpp
@@ -37,6 +36,7 @@ set(LIBS
     ${conversion_libs}
     MLIRPBC
     PBCUtils
+    PBCAnalysis
 )
 
 set(DEPENDS
@@ -46,19 +46,9 @@ set(DEPENDS
 add_mlir_library(${LIBRARY_NAME} STATIC ${SRC} LINK_LIBS PRIVATE ${LIBS} DEPENDS ${DEPENDS})
 target_compile_features(${LIBRARY_NAME} PUBLIC cxx_std_20)
 
-target_link_libraries(${LIBRARY_NAME} 
-    PRIVATE nlohmann_json::nlohmann_json
-)
-
-# Disable warning from json library
-if(CMAKE_CXX_COMPILER_ID MATCHES ".*Clang")
-set_source_files_properties(
-    CountPPMSpecs.cpp
-    COMPILE_FLAGS "-Wno-covered-switch-default"
-)
-endif()
-
 target_include_directories(${LIBRARY_NAME} PUBLIC
-                           .
-                           ${PROJECT_SOURCE_DIR}/include
-                           ${CMAKE_BINARY_DIR}/include)
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
+    $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
+    $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/include>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+)

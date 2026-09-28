@@ -27,8 +27,8 @@ using namespace catalyst;
 #include "Catalyst/IR/CatalystOps.cpp.inc"
 
 void CustomCallOp::getEffects(
-    llvm::SmallVectorImpl<mlir::SideEffects::EffectInstance<mlir::MemoryEffects::Effect>> &effects)
-{
+    llvm::SmallVectorImpl<mlir::SideEffects::EffectInstance<mlir::MemoryEffects::Effect>>
+        &effects) {
     // Assume all effects
     effects.emplace_back(mlir::MemoryEffects::Allocate::get());
     effects.emplace_back(mlir::MemoryEffects::Free::get());
@@ -37,8 +37,8 @@ void CustomCallOp::getEffects(
 }
 
 void CallbackCallOp::getEffects(
-    llvm::SmallVectorImpl<mlir::SideEffects::EffectInstance<mlir::MemoryEffects::Effect>> &effects)
-{
+    llvm::SmallVectorImpl<mlir::SideEffects::EffectInstance<mlir::MemoryEffects::Effect>>
+        &effects) {
     // Assume all effects
     effects.emplace_back(mlir::MemoryEffects::Allocate::get());
     effects.emplace_back(mlir::MemoryEffects::Free::get());
@@ -46,8 +46,7 @@ void CallbackCallOp::getEffects(
     effects.emplace_back(mlir::MemoryEffects::Read::get());
 }
 
-LogicalResult CallbackCallOp::verifySymbolUses(SymbolTableCollection &symbolTable)
-{
+LogicalResult CallbackCallOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
     auto callee = this->getCalleeAttr();
     auto sym = symbolTable.lookupNearestSymbolFrom(this->getOperation(), callee);
     if (!sym) {
@@ -58,8 +57,7 @@ LogicalResult CallbackCallOp::verifySymbolUses(SymbolTableCollection &symbolTabl
     return success();
 }
 
-LogicalResult LaunchKernelOp::verifySymbolUses(SymbolTableCollection &symbolTable)
-{
+LogicalResult LaunchKernelOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
     auto callee = this->getCalleeAttr();
     SymbolOpInterface sym =
         symbolTable.lookupNearestSymbolFrom<SymbolOpInterface>(this->getOperation(), callee);

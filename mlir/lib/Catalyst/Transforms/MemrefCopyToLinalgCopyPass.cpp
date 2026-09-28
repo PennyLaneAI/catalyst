@@ -36,8 +36,7 @@ struct MemrefCopyToLinalgCopyPass
     : impl::MemrefCopyToLinalgCopyPassBase<MemrefCopyToLinalgCopyPass> {
     using MemrefCopyToLinalgCopyPassBase::MemrefCopyToLinalgCopyPassBase;
 
-    void runOnOperation() final
-    {
+    void runOnOperation() final {
         LLVM_DEBUG(dbgs() << "memref.copy  to linalg.copy pass"
                           << "\n");
 

@@ -31,7 +31,13 @@ import pennylane as qp
 import pytest
 
 from catalyst import QJIT, qjit
-from catalyst.compiler import CompileOptions, Compiler, LinkerDriver, _options_to_cli_flags
+from catalyst.compiler import (
+    CompileOptions,
+    Compiler,
+    LinkerDriver,
+    _catalyst,
+    _options_to_cli_flags,
+)
 from catalyst.debug import instrumentation
 from catalyst.pipelines import KeepIntermediateLevel
 from catalyst.utils.exceptions import CompileError
@@ -152,6 +158,88 @@ class TestCompilerOptions:
         flags = _options_to_cli_flags(options)
         assert "--keep-intermediate" in flags
         assert "--save-ir-after-each=pass" in flags
+
+
+class TestCompilerDiagnostics:
+    """Unit tests for diagnostics emitted by the Catalyst subprocess."""
+
+    @pytest.mark.parametrize(
+        "text,stdout,stderr",
+        [
+            (True, "output", "compiler warning\n"),
+            (False, b"output", b"compiler warning\n"),
+        ],
+    )
+    def test_forward_stderr(self, monkeypatch, text, stdout, stderr):
+        stderr_stream = io.StringIO()
+        result = subprocess.CompletedProcess([], 0, stdout=stdout, stderr=stderr)
+        monkeypatch.setattr(sys, "stderr", stderr_stream)
+        monkeypatch.setattr(subprocess, "run", lambda *args, **kwargs: result)
+
+        assert _catalyst(text=text, stderr_return=True) == stdout
+        assert stderr_stream.getvalue() == "compiler warning\n"
+
+    def test_stderr_not_forwarded_by_default(self, monkeypatch):
+        stderr_stream = io.StringIO()
+        result = subprocess.CompletedProcess([], 0, stdout="output", stderr="compiler warning\n")
+        monkeypatch.setattr(sys, "stderr", stderr_stream)
+        monkeypatch.setattr(subprocess, "run", lambda *args, **kwargs: result)
+
+        assert _catalyst() == "output"
+        assert stderr_stream.getvalue() == ""
+
+    def test_color_diagnostics_in_terminal(self, monkeypatch):
+        class Terminal(io.StringIO):
+            def isatty(self):
+                return True
+
+        command = []
+
+        def run(cmd, **_kwargs):
+            command.extend(cmd)
+            return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
+
+        monkeypatch.setattr(sys, "stderr", Terminal())
+        monkeypatch.setattr(subprocess, "run", run)
+
+        _catalyst()
+
+        assert command[1] == "--color"
+
+
+class TestDefaultFlags:
+    """Unit tests for optional libraries discovered in LinkerDriver.get_default_flags."""
+
+    @staticmethod
+    def _lib_name(stem):
+        """Build the platform-specific shared library file name for a library stem."""
+        ext = ".so" if platform.system() == "Linux" else ".dylib"
+        return stem + ext
+
+    def _patch_isfile(self, monkeypatch, overrides):
+        """Patch isfile to force given library file names present/absent."""
+        real_isfile = os.path.isfile
+        overrides = {os.path.basename(name): value for name, value in overrides.items()}
+
+        def fake_isfile(p):
+            name = os.path.basename(p)
+            if name in overrides:
+                return overrides[name]
+            return real_isfile(p)
+
+        monkeypatch.setattr("catalyst.compiler.os.path.isfile", fake_isfile)
+
+    def test_rt_executor_linked_when_present(self, monkeypatch):
+        """-lrt_executor is added when librt_executor exists in the runtime lib dir."""
+        self._patch_isfile(monkeypatch, overrides={self._lib_name("librt_executor"): True})
+        flags = LinkerDriver.get_default_flags(CompileOptions())
+        assert "-lrt_executor" in flags
+
+    def test_rt_executor_not_linked_when_absent(self, monkeypatch):
+        """-lrt_executor is omitted when librt_executor is missing."""
+        self._patch_isfile(monkeypatch, overrides={self._lib_name("librt_executor"): False})
+        flags = LinkerDriver.get_default_flags(CompileOptions())
+        assert "-lrt_executor" not in flags
 
 
 class TestCompilerWarnings:

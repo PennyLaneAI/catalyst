@@ -27,16 +27,14 @@ struct OneDimProblemParams {
     std::string test_name;
 };
 
-TEST_CASE("Test one dimensional grid problem", "[RSDecomp][GridProblems]")
-{
+TEST_CASE("Test one dimensional grid problem", "[RSDecomp][GridProblems]") {
     std::vector<OneDimProblemParams> params = {
         {8.9, 9.5, -21, -18, 2, "Case 1"},
         {246.023423, 248.5823575862261, 778, 779.0106829464769, 3, "Case 2"},
         {13734300, 13734500, -13874089.232, -13874089.181, 6, "Case 3"}};
 
     for (const auto &p : params) {
-        SECTION(p.test_name)
-        {
+        SECTION(p.test_name) {
             double x0 = p.x0;
             double x1 = p.x1;
             double y0 = p.y0;
@@ -71,8 +69,7 @@ struct UprightProblemParams {
     std::string test_name;
 };
 
-TEST_CASE("Test upright problem", "[RSDecomp][GridProblems]")
-{
+TEST_CASE("Test upright problem", "[RSDecomp][GridProblems]") {
     std::vector<UprightProblemParams> params = {
         {{5, 6, 4, 5}, {2, 3, -1, 0}, ZOmega(1, 2, 3, 4), "Case 1"},
         {{-4, -3.8, 2.2, 2.4}, {-9, -8, 2.5, 4.2}, ZOmega(-2, 3, 1, -6), "Case 2"}};
@@ -86,8 +83,7 @@ TEST_CASE("Test upright problem", "[RSDecomp][GridProblems]")
 
     EllipseState state{Ellipse(D), Ellipse(D)};
     for (const auto &p : params) {
-        SECTION(p.test_name)
-        {
+        SECTION(p.test_name) {
             bbox bbox3 = p.bbox1;
             for (double &val : bbox3) {
                 val -= M_SQRT1_2;
@@ -125,8 +121,7 @@ struct TwoDimProblemParams {
     std::string test_name;
 };
 
-TEST_CASE("Test two dimensional grid problem", "[RSDecomp][GridProblems]")
-{
+TEST_CASE("Test two dimensional grid problem", "[RSDecomp][GridProblems]") {
     std::vector<TwoDimProblemParams> params = {
         {Ellipse({3.0, 0.5, 1.0}, {-1.7, 13.95}), Ellipse({3.0, 0.3, 0.3}, {-12.3, -7.9}),
          ZOmega(4, 3, 12, -7), "Case 1"},
@@ -134,8 +129,7 @@ TEST_CASE("Test two dimensional grid problem", "[RSDecomp][GridProblems]")
          ZOmega(4, 4, 11, -6), "Case 2"}};
 
     for (const auto &p : params) {
-        SECTION(p.test_name)
-        {
+        SECTION(p.test_name) {
             EllipseState state(p.e1, p.e2);
 
             two_dim_problem_solution_iterator sols(state);
@@ -156,8 +150,7 @@ struct GridIteratorParams {
     double epsilon;
 };
 
-TEST_CASE("Test GridIterator", "[RSDecomp][GridProblems]")
-{
+TEST_CASE("Test GridIterator", "[RSDecomp][GridProblems]") {
     // Data from @pytest.mark.parametrize
     std::vector<GridIteratorParams> params = {
         {0.0, 1e-3},
@@ -178,8 +171,7 @@ TEST_CASE("Test GridIterator", "[RSDecomp][GridProblems]")
         std::string test_name =
             "theta=" + std::to_string(p.theta) + ", epsilon=" + std::to_string(p.epsilon);
 
-        SECTION(test_name)
-        {
+        SECTION(test_name) {
             double theta = p.theta;
             double epsilon = p.epsilon;
             GridIterator grid_sols(theta, epsilon);

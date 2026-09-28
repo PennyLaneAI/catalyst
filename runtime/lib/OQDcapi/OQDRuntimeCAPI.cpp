@@ -28,16 +28,14 @@ static std::unique_ptr<json> JSON = nullptr;
 static std::unique_ptr<std::vector<Pulse *>> PulseGarbageCan = nullptr;
 static std::unique_ptr<std::unordered_map<Pulse *, bool>> PulseIsMeasurePulse = nullptr;
 
-template <typename T> json &numerical_json_factory(T value)
-{
+template <typename T> json &numerical_json_factory(T value) {
     static json j;
     j["class_"] = "MathNum";
     j["value"] = value;
     return j;
 }
 
-void to_json(json &j, const Pulse &p, bool is_measure_pulse = false)
-{
+void to_json(json &j, const Pulse &p, bool is_measure_pulse = false) {
     RT_FAIL_IF(p.target >= (*JSON)["system"]["ions"].size(), "ion index out of range");
 
     const auto &transitions = (*JSON)["system"]["ions"][p.target]["transitions"];
@@ -62,8 +60,7 @@ void to_json(json &j, const Pulse &p, bool is_measure_pulse = false)
 
 extern "C" {
 
-void __catalyst__oqd__rt__initialize()
-{
+void __catalyst__oqd__rt__initialize() {
     PulseGarbageCan = std::make_unique<std::vector<Pulse *>>();
     PulseIsMeasurePulse = std::make_unique<std::unordered_map<Pulse *, bool>>();
 
@@ -86,8 +83,7 @@ void __catalyst__oqd__rt__initialize()
     (*JSON)["protocol"] = protocol;
 }
 
-void __catalyst__oqd__rt__finalize(const std::string &openapl_file_name)
-{
+void __catalyst__oqd__rt__finalize(const std::string &openapl_file_name) {
     for (auto pulse : *PulseGarbageCan) {
         delete pulse;
     }
@@ -98,20 +94,17 @@ void __catalyst__oqd__rt__finalize(const std::string &openapl_file_name)
     JSON = nullptr;
 }
 
-void __catalyst__oqd__ion(const std::string &ion_specs)
-{
+void __catalyst__oqd__ion(const std::string &ion_specs) {
     (*JSON)["system"]["ions"].push_back(json::parse(ion_specs));
 }
 
-void __catalyst__oqd__modes(const std::vector<std::string> &phonon_specs)
-{
+void __catalyst__oqd__modes(const std::vector<std::string> &phonon_specs) {
     for (auto phonon_spec : phonon_specs) {
         (*JSON)["system"]["modes"].push_back(json::parse(phonon_spec));
     }
 }
 
-Pulse *__catalyst__oqd__pulse(QUBIT *qubit, double duration, double phase, Beam *beam)
-{
+Pulse *__catalyst__oqd__pulse(QUBIT *qubit, double duration, double phase, Beam *beam) {
     size_t wire = reinterpret_cast<QubitIdType>(qubit);
 
     // Since this is CAPI, we cannot return smart pointer.
@@ -122,8 +115,7 @@ Pulse *__catalyst__oqd__pulse(QUBIT *qubit, double duration, double phase, Beam 
     return pulse;
 }
 
-Pulse *__catalyst__oqd__measure_pulse(QUBIT *qubit, double duration, double phase, Beam *beam)
-{
+Pulse *__catalyst__oqd__measure_pulse(QUBIT *qubit, double duration, double phase, Beam *beam) {
     size_t wire = reinterpret_cast<QubitIdType>(qubit);
 
     Pulse *pulse = new Pulse({beam, wire, duration, phase});
@@ -132,8 +124,7 @@ Pulse *__catalyst__oqd__measure_pulse(QUBIT *qubit, double duration, double phas
     return pulse;
 }
 
-void __catalyst__oqd__ParallelProtocol(Pulse **pulses, size_t num_of_pulses)
-{
+void __catalyst__oqd__ParallelProtocol(Pulse **pulses, size_t num_of_pulses) {
     json j;
     j["class_"] = "ParallelProtocol";
 
@@ -150,8 +141,7 @@ void __catalyst__oqd__ParallelProtocol(Pulse **pulses, size_t num_of_pulses)
     (*JSON)["protocol"]["sequence"].push_back(j);
 }
 
-bool __catalyst__oqd__readout_bit(QUBIT *qubit)
-{
+bool __catalyst__oqd__readout_bit(QUBIT *qubit) {
     // The actual classical bit value is determined at runtime by the hardware.
     // Return a placeholder here.
     return false;

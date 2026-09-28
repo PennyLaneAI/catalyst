@@ -39,8 +39,7 @@ using namespace catalyst::qecp;
 // QecPhysical op verifiers.
 //===----------------------------------------------------------------------===//
 
-LogicalResult AllocAuxQubitOp::verify()
-{
+LogicalResult AllocAuxQubitOp::verify() {
     const auto qubitRole = getQubit().getType().getRole();
     if (qubitRole != QecPhysicalQubitRole::Auxiliary) {
         return emitOpError() << "expected a QEC physical qubit with role '"
@@ -50,8 +49,7 @@ LogicalResult AllocAuxQubitOp::verify()
     return success();
 }
 
-LogicalResult DeallocAuxQubitOp::verify()
-{
+LogicalResult DeallocAuxQubitOp::verify() {
     const auto qubitRole = getQubit().getType().getRole();
     if (qubitRole != QecPhysicalQubitRole::Auxiliary) {
         return emitOpError() << "expected a QEC physical qubit with role '"
@@ -61,8 +59,7 @@ LogicalResult DeallocAuxQubitOp::verify()
     return success();
 }
 
-LogicalResult ExtractCodeblockOp::verify()
-{
+LogicalResult ExtractCodeblockOp::verify() {
     if (!(getIdx() || getIdxAttr().has_value())) {
         return emitOpError() << "expected to have a non-null index";
     }
@@ -96,8 +93,7 @@ LogicalResult ExtractCodeblockOp::verify()
     return success();
 }
 
-LogicalResult InsertCodeblockOp::verify()
-{
+LogicalResult InsertCodeblockOp::verify() {
     if (!(getIdx() || getIdxAttr().has_value())) {
         return emitOpError() << "expected to have a non-null index";
     }
@@ -131,8 +127,7 @@ LogicalResult InsertCodeblockOp::verify()
     return success();
 }
 
-LogicalResult ExtractQubitOp::verify()
-{
+LogicalResult ExtractQubitOp::verify() {
     if (!(getIdx() || getIdxAttr().has_value())) {
         return emitOpError() << "expected to have a non-null index";
     }
@@ -159,8 +154,7 @@ LogicalResult ExtractQubitOp::verify()
     return success();
 }
 
-LogicalResult InsertQubitOp::verify()
-{
+LogicalResult InsertQubitOp::verify() {
     if (!(getIdx() || getIdxAttr().has_value())) {
         return emitOpError() << "expected to have a non-null index";
     }
@@ -188,8 +182,7 @@ LogicalResult InsertQubitOp::verify()
     return success();
 }
 
-LogicalResult AssembleTannerGraphOp::verify()
-{
+LogicalResult AssembleTannerGraphOp::verify() {
     const auto rowIdxType = dyn_cast<ShapedType>(getRowIdx().getType());
     const auto colPtrType = dyn_cast<ShapedType>(getColPtr().getType());
     const auto tannerGraphType = getTannerGraph().getType();
@@ -237,8 +230,7 @@ LogicalResult AssembleTannerGraphOp::verify()
  *
  * Erase alloc op if it has no uses.
  */
-LogicalResult AllocOp::canonicalize(AllocOp alloc, mlir::PatternRewriter &rewriter)
-{
+LogicalResult AllocOp::canonicalize(AllocOp alloc, mlir::PatternRewriter &rewriter) {
     if (alloc->use_empty()) {
         rewriter.eraseOp(alloc);
         return success();
@@ -252,8 +244,7 @@ LogicalResult AllocOp::canonicalize(AllocOp alloc, mlir::PatternRewriter &rewrit
  *
  * Erase alloc/dealloc op pairs if allocated hyper-register is immediately deallocated.
  */
-LogicalResult DeallocOp::canonicalize(DeallocOp dealloc, mlir::PatternRewriter &rewriter)
-{
+LogicalResult DeallocOp::canonicalize(DeallocOp dealloc, mlir::PatternRewriter &rewriter) {
     const auto hyperReg = dealloc.getHyperReg();
     if (auto alloc = dyn_cast_if_present<AllocOp>(hyperReg.getDefiningOp())) {
         if (hyperReg.hasOneUse()) {
@@ -271,8 +262,8 @@ LogicalResult DeallocOp::canonicalize(DeallocOp dealloc, mlir::PatternRewriter &
  *
  * Erase alloc_aux op if it has no uses.
  */
-LogicalResult AllocAuxQubitOp::canonicalize(AllocAuxQubitOp alloc, mlir::PatternRewriter &rewriter)
-{
+LogicalResult AllocAuxQubitOp::canonicalize(AllocAuxQubitOp alloc,
+                                            mlir::PatternRewriter &rewriter) {
     if (alloc->use_empty()) {
         rewriter.eraseOp(alloc);
         return success();
@@ -287,8 +278,7 @@ LogicalResult AllocAuxQubitOp::canonicalize(AllocAuxQubitOp alloc, mlir::Pattern
  * Erase alloc/dealloc op pairs if allocated aux qubit is immediately deallocated.
  */
 LogicalResult DeallocAuxQubitOp::canonicalize(DeallocAuxQubitOp dealloc,
-                                              mlir::PatternRewriter &rewriter)
-{
+                                              mlir::PatternRewriter &rewriter) {
     const auto qubit = dealloc.getQubit();
     if (auto alloc = dyn_cast_if_present<AllocAuxQubitOp>(qubit.getDefiningOp())) {
         if (qubit.hasOneUse()) {
@@ -307,8 +297,7 @@ LogicalResult DeallocAuxQubitOp::canonicalize(DeallocAuxQubitOp dealloc,
  * Erase alloc_cb op if it has no uses.
  */
 LogicalResult AllocCodeblockOp::canonicalize(AllocCodeblockOp alloc_cb,
-                                             mlir::PatternRewriter &rewriter)
-{
+                                             mlir::PatternRewriter &rewriter) {
     if (alloc_cb->use_empty()) {
         rewriter.eraseOp(alloc_cb);
         return success();
@@ -323,8 +312,7 @@ LogicalResult AllocCodeblockOp::canonicalize(AllocCodeblockOp alloc_cb,
  * Erase alloc_cb/dealloc_cb op pairs if allocated codeblock is immediately deallocated.
  */
 LogicalResult DeallocCodeblockOp::canonicalize(DeallocCodeblockOp dealloc_cb,
-                                               mlir::PatternRewriter &rewriter)
-{
+                                               mlir::PatternRewriter &rewriter) {
     const auto qubit = dealloc_cb.getCodeblock();
     if (auto alloc_cb = dyn_cast_if_present<AllocCodeblockOp>(qubit.getDefiningOp())) {
         if (qubit.hasOneUse()) {
@@ -357,8 +345,7 @@ LogicalResult DeallocCodeblockOp::canonicalize(DeallocCodeblockOp dealloc_cb,
  *   %b2 = test.op %b0
  */
 LogicalResult ExtractCodeblockOp::canonicalize(ExtractCodeblockOp extract,
-                                               mlir::PatternRewriter &rewriter)
-{
+                                               mlir::PatternRewriter &rewriter) {
     if (auto insert =
             dyn_cast_if_present<InsertCodeblockOp>(extract.getHyperReg().getDefiningOp())) {
         bool bothStatic = extract.getIdxAttr().has_value() && insert.getIdxAttr().has_value();
@@ -394,8 +381,7 @@ LogicalResult ExtractCodeblockOp::canonicalize(ExtractCodeblockOp extract,
  *   %r2 = test.op %r0
  */
 LogicalResult InsertCodeblockOp::canonicalize(InsertCodeblockOp insert,
-                                              mlir::PatternRewriter &rewriter)
-{
+                                              mlir::PatternRewriter &rewriter) {
     if (auto extract =
             dyn_cast_if_present<ExtractCodeblockOp>(insert.getCodeblock().getDefiningOp())) {
         bool bothStatic = extract.getIdxAttr().has_value() && insert.getIdxAttr().has_value();
@@ -422,8 +408,8 @@ LogicalResult InsertCodeblockOp::canonicalize(InsertCodeblockOp insert,
  *
  * Analogous to ExtractCodeblockOp::canonicalize() above.
  */
-LogicalResult ExtractQubitOp::canonicalize(ExtractQubitOp extract, mlir::PatternRewriter &rewriter)
-{
+LogicalResult ExtractQubitOp::canonicalize(ExtractQubitOp extract,
+                                           mlir::PatternRewriter &rewriter) {
     if (auto insert = dyn_cast_if_present<InsertQubitOp>(extract.getCodeblock().getDefiningOp())) {
         bool bothStatic = extract.getIdxAttr().has_value() && insert.getIdxAttr().has_value();
         bool bothDynamic = !extract.getIdxAttr().has_value() && !insert.getIdxAttr().has_value();
@@ -447,8 +433,7 @@ LogicalResult ExtractQubitOp::canonicalize(ExtractQubitOp extract, mlir::Pattern
  *
  * Analogous to InsertCodeblockOp::canonicalize() above
  */
-LogicalResult InsertQubitOp::canonicalize(InsertQubitOp insert, mlir::PatternRewriter &rewriter)
-{
+LogicalResult InsertQubitOp::canonicalize(InsertQubitOp insert, mlir::PatternRewriter &rewriter) {
     if (auto extract = dyn_cast_if_present<ExtractQubitOp>(insert.getQubit().getDefiningOp())) {
         bool bothStatic = extract.getIdxAttr().has_value() && insert.getIdxAttr().has_value();
         bool bothDynamic = !extract.getIdxAttr().has_value() && !insert.getIdxAttr().has_value();
@@ -476,8 +461,7 @@ LogicalResult InsertQubitOp::canonicalize(InsertQubitOp insert, mlir::PatternRew
 /**
  * @brief Prefer using an attribute when the index is constant.
  */
-template <typename IndexingOp> LogicalResult foldConstantIndexingOp(IndexingOp op, Attribute idx)
-{
+template <typename IndexingOp> LogicalResult foldConstantIndexingOp(IndexingOp op, Attribute idx) {
     bool hasNoIdxAttr = !op.getIdxAttr().has_value();
     bool isConstantIdx = isa_and_nonnull<IntegerAttr>(idx);
     if (hasNoIdxAttr && isConstantIdx) {
@@ -494,8 +478,7 @@ template <typename IndexingOp> LogicalResult foldConstantIndexingOp(IndexingOp o
 /**
  * @brief Fold method for extract-codeblock op.
  */
-OpFoldResult ExtractCodeblockOp::fold(FoldAdaptor adaptor)
-{
+OpFoldResult ExtractCodeblockOp::fold(FoldAdaptor adaptor) {
     if (succeeded(foldConstantIndexingOp(*this, adaptor.getIdx()))) {
         return getResult();
     }
@@ -506,8 +489,7 @@ OpFoldResult ExtractCodeblockOp::fold(FoldAdaptor adaptor)
 /**
  * @brief Fold method for insert-codeblock op.
  */
-OpFoldResult InsertCodeblockOp::fold(FoldAdaptor adaptor)
-{
+OpFoldResult InsertCodeblockOp::fold(FoldAdaptor adaptor) {
     if (succeeded(foldConstantIndexingOp(*this, adaptor.getIdx()))) {
         return getResult();
     }
@@ -518,8 +500,7 @@ OpFoldResult InsertCodeblockOp::fold(FoldAdaptor adaptor)
 /**
  * @brief Fold method for extract-qubit op.
  */
-OpFoldResult ExtractQubitOp::fold(FoldAdaptor adaptor)
-{
+OpFoldResult ExtractQubitOp::fold(FoldAdaptor adaptor) {
     if (succeeded(foldConstantIndexingOp(*this, adaptor.getIdx()))) {
         return getResult();
     }
@@ -530,8 +511,7 @@ OpFoldResult ExtractQubitOp::fold(FoldAdaptor adaptor)
 /**
  * @brief Fold method for insert-qubit op.
  */
-OpFoldResult InsertQubitOp::fold(FoldAdaptor adaptor)
-{
+OpFoldResult InsertQubitOp::fold(FoldAdaptor adaptor) {
     if (succeeded(foldConstantIndexingOp(*this, adaptor.getIdx()))) {
         return getResult();
     }

@@ -10,4 +10,5 @@ add_mlir_library(MLIRMBQC
     MLIRMBQCInterfacesIncGen
     MLIRMBQCOpsIncGen
     MLIRMBQCEnumsIncGen
+    MLIRResourceInterfacesIncGen
 )

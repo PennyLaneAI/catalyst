@@ -14,7 +14,8 @@
 
 include "QRef/IR/QRefTypes.td"
 
-def RefMeasureInBasisOp : MBQC_Op<"ref.measure_in_basis"> {
+def RefMeasureInBasisOp : MBQC_Op<"ref.measure_in_basis",
+    [DeclareOpInterfaceMethods<ResourceQuantumOpInterface>]> {
     let summary = "A parametric single-qubit projective measurement in an arbitrary basis.";
     let description = [{
         Identical to the `mbqc.measure_in_basis` operation, except in reference semantics.
@@ -36,7 +37,9 @@ def RefMeasureInBasisOp : MBQC_Op<"ref.measure_in_basis"> {
     }];
 }
 
-def RefGraphStatePrepOp : MBQC_Op<"ref.graph_state_prep"> {
+def RefGraphStatePrepOp : MBQC_Op<"ref.graph_state_prep",
+    [DeclareOpInterfaceMethods<ResourceQuantumOpInterface>,
+     DeclareOpInterfaceMethods<ResourceAllocQubitOpInterface>]> {
     let summary = "Allocate resources for a new graph state.";
     let description = [{
         Identical to the `mbqc.graph_state_prep` operation, except in reference semantics.

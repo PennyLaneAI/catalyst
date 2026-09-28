@@ -31,8 +31,7 @@ using namespace mlir;
 using namespace catalyst;
 
 namespace {
-void disentangleCNOTs(FunctionOpInterface &func, bool verbose)
-{
+void disentangleCNOTs(FunctionOpInterface &func, bool verbose) {
     mlir::IRRewriter builder(func->getContext());
     Location loc = func->getLoc();
 
@@ -78,8 +77,7 @@ void disentangleCNOTs(FunctionOpInterface &func, bool verbose)
                 builder.replaceAllUsesWith(targetOut, targetIn);
                 builder.eraseOp(op);
                 return;
-            }
-            else {
+            } else {
                 builder.setInsertionPoint(op);
                 quantum::CustomOp xgate =
                     quantum::CustomOp::create(builder, loc, /*gate_name=*/"PauliX",
@@ -107,8 +105,7 @@ void disentangleCNOTs(FunctionOpInterface &func, bool verbose)
                 builder.replaceAllUsesWith(controlOut, controlIn);
                 builder.eraseOp(op);
                 return;
-            }
-            else {
+            } else {
                 builder.setInsertionPoint(op);
                 quantum::CustomOp zgate =
                     quantum::CustomOp::create(builder, loc, /*gate_name=*/"PauliZ",
@@ -132,8 +129,7 @@ namespace quantum {
 struct DisentangleCNOTPass : public impl::DisentangleCNOTPassBase<DisentangleCNOTPass> {
     using impl::DisentangleCNOTPassBase<DisentangleCNOTPass>::DisentangleCNOTPassBase;
 
-    void runOnOperation() override
-    {
+    void runOnOperation() override {
         auto op = getOperation();
         for (Operation &nestedOp : op->getRegion(0).front().getOperations()) {
             if (auto func = dyn_cast<FunctionOpInterface>(nestedOp)) {

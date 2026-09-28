@@ -16,10 +16,21 @@
 
 #include <vector>
 
+#include "llvm/ADT/StringMap.h" // for DecomposableGate interface
 #include "mlir/IR/OpDefinition.h"
+
+#include "Catalyst/Analysis/ResourceInterfaces.h"
 
 //===----------------------------------------------------------------------===//
 // QRef interface declarations.
 //===----------------------------------------------------------------------===//
+
+namespace catalyst {
+namespace qref {
+
+std::string defaultGetGraphOpId(mlir::Operation *op);
+
+}
+} // namespace catalyst
 
 #include "QRef/IR/QRefInterfaces.h.inc"

@@ -35,8 +35,7 @@ namespace ion {
 #include "Ion/Transforms/Passes.h.inc"
 
 struct IonTypeConverter : public LLVMTypeConverter {
-    IonTypeConverter(MLIRContext *ctx) : LLVMTypeConverter(ctx)
-    {
+    IonTypeConverter(MLIRContext *ctx) : LLVMTypeConverter(ctx) {
         addConversion([&](IonType type) { return convertIonType(type); });
         addConversion([&](PulseType type) { return convertPulseType(type); });
         addConversion([&](QubitType type) { return convertIonQubitType(type); });
@@ -51,8 +50,7 @@ struct IonTypeConverter : public LLVMTypeConverter {
 struct IonConversionPass : impl::IonConversionPassBase<IonConversionPass> {
     using IonConversionPassBase::IonConversionPassBase;
 
-    void runOnOperation() final
-    {
+    void runOnOperation() final {
         MLIRContext *context = &getContext();
         IonTypeConverter typeConverter(context);
 

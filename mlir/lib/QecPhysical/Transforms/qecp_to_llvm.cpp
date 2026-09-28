@@ -38,14 +38,12 @@ namespace qecp {
 #include "QecPhysical/Transforms/Passes.h.inc"
 
 struct QecPhysicalTypeConverter : public LLVMTypeConverter {
-    QecPhysicalTypeConverter(MLIRContext *ctx) : LLVMTypeConverter(ctx)
-    {
+    QecPhysicalTypeConverter(MLIRContext *ctx) : LLVMTypeConverter(ctx) {
         addConversion([&](TannerGraphType type) { return convertTannerGraphType(type); });
     }
 
   private:
-    std::optional<Type> convertTannerGraphType(TannerGraphType mlirType)
-    {
+    std::optional<Type> convertTannerGraphType(TannerGraphType mlirType) {
         auto *ctx = &getContext();
 
         auto llvmStruct = LLVM::LLVMStructType::getIdentified(ctx, "TannerGraph");
@@ -74,8 +72,7 @@ struct QecPhysicalTypeConverter : public LLVMTypeConverter {
 struct QecPhysicalConversionPass : impl::QecPhysicalConversionPassBase<QecPhysicalConversionPass> {
     using QecPhysicalConversionPassBase::QecPhysicalConversionPassBase;
 
-    void runOnOperation() final
-    {
+    void runOnOperation() final {
         MLIRContext *context = &getContext();
         QecPhysicalTypeConverter typeConverter(context);
 

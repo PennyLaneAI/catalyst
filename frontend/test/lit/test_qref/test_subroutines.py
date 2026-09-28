@@ -30,7 +30,7 @@ def basic_subroutine(x, y, wires):  # pylint: disable=missing-function-docstring
 
 
 # CHECK: func.func public @test_basic_subroutine() -> tensor<f64>
-@qp.qjit(capture=True, target="mlir")
+@qp.qjit(capture=True, collect_decomp_rules=False, target="mlir")
 @qp.qnode(qp.device("lightning.qubit", wires=3))
 def test_basic_subroutine():
     """
@@ -76,7 +76,7 @@ def subroutine_with_return(x, y, wires):  # pylint: disable=missing-function-doc
 
 
 # CHECK: func.func public @test_subroutine_with_return() -> tensor<f64>
-@qp.qjit(capture=True, target="mlir")
+@qp.qjit(capture=True, collect_decomp_rules=False, target="mlir")
 @qp.qnode(qp.device("lightning.qubit", wires=3))
 def test_subroutine_with_return():
     """
@@ -123,7 +123,7 @@ def subroutine_with_allocation(wires):  # pylint: disable=missing-function-docst
 
 
 # CHECK: func.func public @test_subroutine_with_allocation() -> tensor<f64>
-@qp.qjit(capture=True, target="mlir")
+@qp.qjit(capture=True, collect_decomp_rules=False, target="mlir")
 @qp.qnode(qp.device("lightning.qubit", wires=3))
 def test_subroutine_with_allocation():
     """

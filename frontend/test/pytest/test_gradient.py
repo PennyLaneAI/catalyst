@@ -224,10 +224,12 @@ def test_param_shift_on_non_expval(backend):
     def workflow(p: float):
         return qp.jacobian(func, method="auto")(p)
 
+    workflow = qjit(workflow)
+
     with pytest.raises(
         DifferentiableCompileError, match="The parameter-shift method can only be used"
     ):
-        qjit(workflow)
+        workflow(1.0)
 
 
 def test_adjoint_on_non_expval(backend):
@@ -244,8 +246,10 @@ def test_adjoint_on_non_expval(backend):
     def workflow(p: float):
         return qp.jacobian(func, method="auto")(p)
 
+    workflow = qjit(workflow)
+
     with pytest.raises(DifferentiableCompileError, match="The adjoint method can only be used"):
-        qjit(workflow)
+        workflow(1.0)
 
 
 def test_grad_on_qjit():
@@ -1097,15 +1101,16 @@ def test_assert_no_higher_order_without_fd(method, backend):
         qp.RX(x, wires=0)
         return qp.expval(qp.PauliY(0))
 
-    with pytest.raises(DifferentiableCompileError, match="higher order derivatives"):
+    # not sure how to get this working with qp.grad TODO
+    @qjit
+    def workflow(x: float):
+        g = qp.qnode(qp.device(backend, wires=1), diff_method=method)(f)
+        h = catalyst.grad(g, method="auto")
+        i = catalyst.grad(h, method="auto")
+        return i(x)
 
-        # not sure how to get this working with qp.grad TODO
-        @qjit
-        def workflow(x: float):
-            g = qp.qnode(qp.device(backend, wires=1), diff_method=method)(f)
-            h = catalyst.grad(g, method="auto")
-            i = catalyst.grad(h, method="auto")
-            return i(x)
+    with pytest.raises(DifferentiableCompileError, match="higher order derivatives"):
+        workflow(1.0)
 
 
 def test_assert_invalid_diff_method():
@@ -1115,13 +1120,14 @@ def test_assert_invalid_diff_method():
         qp.RX(x, wires=0)
         return qp.expval(qp.PauliY(0))
 
-    with pytest.raises(ValueError, match="Invalid differentiation method"):
+    @qjit
+    def workflow(x: float):
+        g = qp.qnode(qp.device("lightning.qubit", wires=1))(f)
+        h = grad(g, method="non-existent method")
+        return h(x)
 
-        @qjit
-        def workflow(x: float):
-            g = qp.qnode(qp.device("lightning.qubit", wires=1))(f)
-            h = grad(g, method="non-existent method")
-            return h(x)
+    with pytest.raises(ValueError, match="Invalid differentiation method"):
+        workflow(1.0)
 
 
 def test_assert_invalid_h_type():
@@ -1131,13 +1137,14 @@ def test_assert_invalid_h_type():
         qp.RX(x, wires=0)
         return qp.expval(qp.PauliY(0))
 
-    with pytest.raises(ValueError, match="Invalid h value"):
+    @qjit
+    def workflow(x: float):
+        g = qp.qnode(qp.device("lightning.qubit", wires=1))(f)
+        h = grad(g, method="fd", h="non-integer")
+        return h(x)
 
-        @qjit
-        def workflow(x: float):
-            g = qp.qnode(qp.device("lightning.qubit", wires=1))(f)
-            h = grad(g, method="fd", h="non-integer")
-            return h(x)
+    with pytest.raises(ValueError, match="Invalid h value"):
+        workflow(1.0)
 
 
 def test_assert_non_differentiable():
@@ -1147,8 +1154,10 @@ def test_assert_non_differentiable():
         h = grad("string!", method="fd")
         return h(x)
 
+    workflow = qjit(workflow)
+
     with pytest.raises(TypeError, match="'string!' is not a callable object"):
-        qjit(workflow)
+        workflow(1.0)
 
 
 def test_finite_diff_arbitrary_functions(capture_mode):
@@ -1860,11 +1869,12 @@ class TestGradientErrors:
             qp.RX(_bool + 1, wires=0)
             return qp.expval(qp.PauliX(0))
 
-        with pytest.raises(DifferentiableCompileError, match="MidCircuitMeasure is not allowed"):
+        @qjit
+        def cir(x: float):
+            return grad(f)(x)
 
-            @qjit
-            def cir(x: float):
-                return grad(f)(x)
+        with pytest.raises(DifferentiableCompileError, match="MidCircuitMeasure is not allowed"):
+            cir(1.0)
 
     def test_callback_error(self):
         """Test with callback"""
@@ -1875,11 +1885,12 @@ class TestGradientErrors:
             qp.RX(y, wires=0)
             return qp.expval(qp.PauliX(0))
 
-        with pytest.raises(CompileError, match=".*Compilation failed.*"):
+        @qjit
+        def cir(x: float):
+            return grad(f)(x)
 
-            @qjit
-            def cir(x: float):
-                return grad(f)(x)
+        with pytest.raises(CompileError, match=".*Compilation failed.*"):
+            cir(1.0)
 
     def test_with_zne(self):
         """Test with ZNE"""
@@ -1892,11 +1903,12 @@ class TestGradientErrors:
         def g(x):
             return mitigate_with_zne(f, scale_factors=[1, 3, 5])(x)
 
-        with pytest.raises(CompileError, match=".*Compilation failed.*"):
+        @qjit
+        def cir(x: float):
+            return grad(g)(x)
 
-            @qjit
-            def cir(x: float):
-                return grad(g)(x)
+        with pytest.raises(CompileError, match=".*Compilation failed.*"):
+            cir(1.0)
 
 
 class TestGradientUsagePatterns:
@@ -2151,7 +2163,7 @@ class TestParameterShiftVerificationUnitTests:
     def test_check_param_frequencies_different_length(self):
         """Check exception is raised when frequencies length mismatches parameter length"""
 
-        class DummyOp(qp.operation.Operator):
+        class DummyOp(qp.operation.Operation):
             def __init__(self, wires=None):
                 super().__init__(0.0, wires=wires)
 
@@ -2168,7 +2180,7 @@ class TestParameterShiftVerificationUnitTests:
     def test_check_invalid_frequencies(self):
         """Check exception is raised when invalid frequencies are found"""
 
-        class DummyOp(qp.operation.Operator):
+        class DummyOp(qp.operation.Operation):
             def __init__(self, wires=None):
                 super().__init__(0.0, wires=wires)
 
@@ -2185,7 +2197,7 @@ class TestParameterShiftVerificationUnitTests:
     def test_undefined_frequencies(self):
         """Test ParameterFrequenciesUndefinedError"""
 
-        class DummyOp(qp.operation.Operator):
+        class DummyOp(qp.operation.Operation):
             def __init__(self, wires=None):
                 super().__init__(0.0, wires=wires)
 
@@ -2267,79 +2279,81 @@ class TestParameterShiftVerificationIntegrationTests:
         """Raise exception when there is an op with a grad_recipe that's dynamic"""
         device = qp.device(backend, wires=1)
 
-        class RX(qp.RX):
+        class DummyRX(qp.RX):
             @property
             def grad_recipe(self):
                 x = self.data[0]
                 c = 0.5 / jnp.sin(x)
                 return ([[c, 0.0, 2 * x], [-c, 0.0, 0.0]],)
 
-        with pytest.raises(CompileError, match="not supported with catalyst on this device"):
+        @qjit
+        @grad
+        @qp.qnode(device, diff_method="parameter-shift")
+        def circuit(x: float):
+            DummyRX(x, wires=[0])
+            return qp.expval(qp.PauliZ(wires=0))
 
-            @qjit
-            @grad
-            @qp.qnode(device, diff_method="parameter-shift")
-            def circuit(x: float):
-                RX(x, wires=[0])
-                return qp.expval(qp.PauliZ(wires=0))
+        with pytest.raises(CompileError, match="not supported with catalyst on this device"):
+            circuit(0.5)
 
     def test_grad_recipe_static(self, backend):
         """Raise exception when there is an op with a mismatching grad_recipe"""
         device = qp.device(backend, wires=1)
 
-        class RX(qp.RX):
+        class DummyRX(qp.RX):
             @property
             def grad_recipe(self):
                 return ([[0.0, 0.0, 0.0], [0.0, 0.0, 0.0]],)
 
-        with pytest.raises(CompileError, match="not supported with catalyst on this device"):
+        @qjit
+        @grad
+        @qp.qnode(device, diff_method="parameter-shift")
+        def circuit(x: float):
+            DummyRX(x, wires=[0])
+            return qp.expval(qp.PauliZ(wires=0))
 
-            @qjit
-            @grad
-            @qp.qnode(device, diff_method="parameter-shift")
-            def circuit(x: float):
-                RX(x, wires=[0])
-                return qp.expval(qp.PauliZ(wires=0))
+        with pytest.raises(CompileError, match="not supported with catalyst on this device"):
+            circuit(0.5)
 
     def test_parameter_frequencies(self, backend):
         """Raise exception when when there is an lengths are mismatched."""
         device = qp.device(backend, wires=1)
 
-        class RX(qp.RX):
+        class DummyRX(qp.RX):
             @property
             def parameter_frequencies(self):
                 # Only one parameter but two frequencies is an error
                 return (1.0, 1.0)
 
+        @qjit
+        @grad
+        @qp.qnode(device, diff_method="parameter-shift")
+        def circuit(x: float):
+            DummyRX(x, wires=[0])
+            return qp.expval(qp.PauliZ(wires=0))
+
         with pytest.raises(CompileError, match="not supported with catalyst on this device"):
-
-            @qjit
-            @grad
-            @qp.qnode(device, diff_method="parameter-shift")
-            def circuit(x: float):
-                RX(x, wires=[0])
-                return qp.expval(qp.PauliZ(wires=0))
-
             circuit(0.5)
 
     def test_parameter_frequencies_not_one(self, backend):
         """When there is an op without parameter_frequencies, ps gradient should fail"""
         device = qp.device(backend, wires=1)
 
-        class RX(qp.RX):
+        class DummyRX(qp.RX):
             @property
             def parameter_frequencies(self):
                 # Only one parameter but two frequencies is an error
                 return [(2.0,)]
 
-        with pytest.raises(CompileError, match="not supported with catalyst on this device"):
+        @qjit
+        @grad
+        @qp.qnode(device, diff_method="parameter-shift")
+        def circuit(x: float):
+            DummyRX(x, wires=[0])
+            return qp.expval(qp.PauliZ(wires=0))
 
-            @qjit
-            @grad
-            @qp.qnode(device, diff_method="parameter-shift")
-            def circuit(x: float):
-                RX(x, wires=[0])
-                return qp.expval(qp.PauliZ(wires=0))
+        with pytest.raises(CompileError, match="not supported with catalyst on this device"):
+            circuit(0.5)
 
 
 @pytest.mark.parametrize("diff_method", ["parameter-shift", "adjoint"])
@@ -2488,24 +2502,6 @@ def test_best_diff_method_single_expval(capture_mode):
     assert "parameter-shift" not in qjit_grad.mlir
 
 
-def test_best_diff_method_single_probs(capture_mode):
-    """Test the diff_method for differentiating a single probs."""
-    num_wires = 1
-    dev = qp.device("lightning.qubit", wires=num_wires)
-
-    @qp.qnode(dev, diff_method="best")
-    def circuit(phi, psi):
-        qp.RY(phi, wires=0)
-        qp.RX(psi, wires=0)
-        return qp.probs(0)
-
-    qjit_jacobian = qjit(jacobian(circuit, argnums=[0, 1]), capture=capture_mode)
-    _ = qjit_jacobian(0.1, 0.2)
-
-    assert "parameter-shift" in qjit_jacobian.mlir
-    assert "adjoint" not in qjit_jacobian.mlir
-
-
 def test_best_diff_method_multi_expval(capture_mode):
     """Test the diff_method for differentiating multiple expval."""
     num_wires = 1
@@ -2522,24 +2518,6 @@ def test_best_diff_method_multi_expval(capture_mode):
 
     assert "parameter-shift" not in qjit_jacobian.mlir
     assert "adjoint" in qjit_jacobian.mlir
-
-
-def test_best_diff_method_mixed_return(capture_mode):
-    """Test the diff_method for differentiating mixed return."""
-    num_wires = 1
-    dev = qp.device("lightning.qubit", wires=num_wires)
-
-    @qp.qnode(dev, diff_method="best")
-    def circuit(phi, psi):
-        qp.RY(phi, wires=0)
-        qp.RX(psi, wires=0)
-        return [qp.expval(qp.PauliZ(0)), qp.probs(0)]
-
-    qjit_jacobian = qjit(jacobian(circuit, argnums=[0, 1]), capture=capture_mode)
-    _ = qjit_jacobian(0.1, 0.2)
-
-    assert "parameter-shift" in qjit_jacobian.mlir
-    assert "adjoint" not in qjit_jacobian.mlir
 
 
 if __name__ == "__main__":

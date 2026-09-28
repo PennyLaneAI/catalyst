@@ -35,7 +35,7 @@ include "QRef/IR/QRefTypes.td"
 
 class Memory_Op<string mnemonic, list<Trait> traits = []> : QRef_Op<mnemonic, traits>;
 
-def AllocOp : Memory_Op<"alloc"> {
+def AllocOp : Memory_Op<"alloc", [DeclareOpInterfaceMethods<ResourceAllocQubitOpInterface>]> {
     let summary = "Allocate n qubits.";
     let description = [{
         This operation represents the allocation of some number of qubits.
@@ -58,7 +58,7 @@ def AllocOp : Memory_Op<"alloc"> {
     let hasVerifier = 1;
 }
 
-def AllocQubitOp : Memory_Op<"alloc_qb"> {
+def AllocQubitOp : Memory_Op<"alloc_qb", [DeclareOpInterfaceMethods<ResourceAllocQubitOpInterface>]> {
     let summary = "Allocate a single qubit.";
     let description = [{
         This operation represents the allocation of a single qubit.
@@ -174,6 +174,17 @@ class Gate_Op<string mnemonic, list<Trait> traits = []> :
             assert(qubits.size() == replacements.size() && "must provide values for all qubits");
             qubits.assign(replacements);
         }
+
+        // Override: ResourceQuantumOpInterface
+        llvm::StringRef getResourceName();
+
+        uint64_t getResourceNumQubits() {
+            return getQubitOperands().size();
+        }
+
+        uint64_t getResourceNumCtrlQubits() { return 0; }
+
+        uint64_t getResourceNumParams() { return 0; }
     }];
 
     let extraClassDeclaration = extraBaseClassDeclaration;
@@ -244,6 +255,28 @@ class UnitaryGate_Op<string mnemonic, list<Trait> traits = []> :
                (*this)->removeAttr("adjoint");
             }
         }
+
+        // Override: ResourceQuantumOpInterface
+        llvm::StringRef getResourceName();
+
+        uint64_t getResourceNumQubits() {
+            return getQubits().size();
+        }
+
+        uint64_t getResourceNumCtrlQubits() {
+            return getCtrlQubits().size();
+        }
+
+        uint64_t getResourceNumParams() {
+            if (auto gate = mlir::dyn_cast<qref::ParametrizedGate>(getOperation())){
+                return gate.getAllParams().size();
+            }
+            return 0;
+        }
+
+        bool getResourceAdjointFlag() {
+            return getAdjointFlag();
+        }
     }];
 
     let extraClassDeclaration = extraBaseClassDeclaration;
@@ -301,7 +334,8 @@ def SetBasisStateOp : Gate_Op<"set_basis_state"> {
 }
 
 
-def CustomOp : UnitaryGate_Op<"custom", [ParametrizedGate, AttrSizedOperandSegments]> {
+def CustomOp : UnitaryGate_Op<"custom", [ParametrizedGate, AttrSizedOperandSegments,
+                                         DeclareOpInterfaceMethods<DecomposableGate>]> {
     let summary = "A generic quantum gate on n qubits with m floating point parameters.";
     let description = [{
         This operation represents a generic quantum gate on an arbitrary number of qubits, with
@@ -330,11 +364,11 @@ def CustomOp : UnitaryGate_Op<"custom", [ParametrizedGate, AttrSizedOperandSegme
         }
     }];
 
-    let hasCanonicalizeMethod = 1;
     let hasVerifier = 1;
 }
 
-def OperatorOp : UnitaryGate_Op<"operator", [ParametrizedGate, AttrSizedOperandSegments]> {
+def OperatorOp : UnitaryGate_Op<"operator", [ParametrizedGate, AttrSizedOperandSegments,
+                                             DeclareOpInterfaceMethods<DecomposableGate, ["getExtraData"]>]> {
     let summary = "A generalized quantum operation with arbitrary input signature.";
     let description = [{
         The `qref.operator` is a generic representation for arbitrary quantum operations
@@ -481,7 +515,8 @@ def OperatorOp : UnitaryGate_Op<"operator", [ParametrizedGate, AttrSizedOperandS
     ];
 }
 
-def PauliRotOp : UnitaryGate_Op<"paulirot", [ParametrizedGate, AttrSizedOperandSegments]> {
+def PauliRotOp : UnitaryGate_Op<"paulirot", [ParametrizedGate, AttrSizedOperandSegments,
+                                             DeclareOpInterfaceMethods<DecomposableGate>]> {
     let summary = "Apply a Pauli Product Rotation";
     let description = [{
         The `qref.paulirot` operation applies a rotation around a Pauli product
@@ -510,12 +545,22 @@ def PauliRotOp : UnitaryGate_Op<"paulirot", [ParametrizedGate, AttrSizedOperandS
         mlir::ValueRange getAllParams() {
             return getODSOperands(0);  // `angle` is the 0th operand
         }
+
+        std::string getPauliWord() {
+            std::string pauliWord;
+
+            for (mlir::Attribute pauliChar : getPauliProduct()) {
+                pauliWord += cast<mlir::StringAttr>(pauliChar).getValue();
+            }
+            return pauliWord;
+        }
     }];
 
     let hasVerifier = 1;
 }
 
-def GlobalPhaseOp : UnitaryGate_Op<"gphase", [ParametrizedGate, AttrSizedOperandSegments]> {
+def GlobalPhaseOp : UnitaryGate_Op<"gphase", [ParametrizedGate, AttrSizedOperandSegments,
+                                              DeclareOpInterfaceMethods<DecomposableGate>]> {
     let summary = "Global Phase.";
 
     let description = [{
@@ -551,7 +596,8 @@ def GlobalPhaseOp : UnitaryGate_Op<"gphase", [ParametrizedGate, AttrSizedOperand
     }];
 }
 
-def MultiRZOp : UnitaryGate_Op<"multirz", [ParametrizedGate, AttrSizedOperandSegments]> {
+def MultiRZOp : UnitaryGate_Op<"multirz", [ParametrizedGate, AttrSizedOperandSegments,
+                                           DeclareOpInterfaceMethods<DecomposableGate>]> {
     let summary = "Apply an arbitrary multi Z rotation";
     let description = [{
         The `qref.multirz` operation applies an arbitrary multi Z rotation to the state-vector.
@@ -585,10 +631,10 @@ def MultiRZOp : UnitaryGate_Op<"multirz", [ParametrizedGate, AttrSizedOperandSeg
         }
     }];
 
-    let hasCanonicalizeMethod = 1;
 }
 
-def PCPhaseOp : UnitaryGate_Op<"pcphase", [ParametrizedGate, AttrSizedOperandSegments]> {
+def PCPhaseOp : UnitaryGate_Op<"pcphase", [ParametrizedGate, AttrSizedOperandSegments,
+                                           DeclareOpInterfaceMethods<DecomposableGate>]> {
     let summary = "Apply a projector-controlled phase gate";
     let description = [{
         This gate is built from simpler gates like `PhaseShift` and `PauliX` and acts on a group
@@ -628,10 +674,10 @@ def PCPhaseOp : UnitaryGate_Op<"pcphase", [ParametrizedGate, AttrSizedOperandSeg
         }
     }];
 
-    let hasCanonicalizeMethod = 1;
 }
 
-def QubitUnitaryOp : UnitaryGate_Op<"unitary", [ParametrizedGate, AttrSizedOperandSegments]> {
+def QubitUnitaryOp : UnitaryGate_Op<"unitary", [ParametrizedGate, AttrSizedOperandSegments,
+                                                DeclareOpInterfaceMethods<DecomposableGate>]> {
     let summary = "Apply an arbitrary fixed unitary matrix";
     let description = [{
         The `qref.unitary` operation applies an arbitrary fixed unitary matrix to the
@@ -681,6 +727,30 @@ def AdjointOp : Region_Op<"adjoint", [NoTerminator]> {
 
     let assemblyFormat = [{
         attr-dict-with-keyword $region
+    }];
+
+    let hasVerifier = 1;
+}
+
+def CtrlOp : Region_Op<"ctrl", [NoTerminator, AttrSizedOperandSegments]> {
+    let summary = "Apply the enclosed operations controlled on the given control qubits.";
+    let description = [{
+        The `qref.ctrl` operation applies the quantum operations in its single-block region
+        conditioned on a set of control qubits. Each `ctrl_values` entry selects whether the
+        matching control qubit activates on the |1> (true) or |0> (false) state.
+
+        Measurements inside a `qref.ctrl` region are rejected.
+    }];
+
+    let regions = (region SizedRegion<1>:$region);
+
+    let arguments = (ins
+        Variadic<QubitRefType>:$ctrl_qubits,
+        Variadic<I1>:$ctrl_values
+    );
+
+    let assemblyFormat = [{
+        `(` $ctrl_qubits `)` `ctrlvals` `(` $ctrl_values `)` attr-dict-with-keyword $region
     }];
 
     let hasVerifier = 1;
@@ -787,7 +857,7 @@ def HermitianOp : Observable_Op<"hermitian"> {
 
 // -----
 
-def MeasureOp : QRef_Op<"measure"> {
+def MeasureOp : QRef_Op<"measure", [DeclareOpInterfaceMethods<ResourceQuantumOpInterface>]> {
     let summary = "A single-qubit projective measurement in the computational basis.";
     let description = [{
         This operation represents a single-qubit computational basis measurement.
