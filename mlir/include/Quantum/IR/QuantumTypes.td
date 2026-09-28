@@ -37,6 +37,16 @@ def QuregType : Quantum_Type<"Qureg", "reg"> {
 def ObservableType : Quantum_Type<"Observable", "obs"> {
     let summary = "A quantum observable for use in measurements.";
 }
+def AbstractHamiltonianType : Quantum_Type<"AbstractHamiltonian", "abs_hamiltonian"> {
+    let summary = "A representation-agnostic handle to a Hamiltonian.";
+    let description = [{
+        An opaque, compile-time handle to a Hamiltonian, independent of its underlying
+        representation (Pauli-word, linear-combination-of-unitaries, compressed
+        double-factorized, ...). It carries no payload itself: the numeric data flows alongside
+        as ordinary tensor/memref values, and the structure rides as attributes on the producing
+        operation. This mirrors how `!quantum.obs` is used as an opaque observable token.
+    }];
+}
 def ResultType : Quantum_Type<"Result", "res"> {
     let summary = "A quantum measurement result.";
 }
