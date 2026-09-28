@@ -99,7 +99,9 @@ jobs:
           ref: ${{ needs.constants.outputs.llvm_version }}
           path: mlir/llvm-project
 
-      # Only LLVM source headers are needed here (header-only via rt_capi), ENABLE_EXECUTOR is OFF.
+      # ENABLE_EXECUTOR is left OFF: the out-of-process executor cases reach the coprocessor
+      # over RDMA, and this host has no RDMA-capable NIC, so only the memcpy tests run here.
+      # That also keeps the build to LLVM source headers alone (header-only via rt_capi).
       - name: Build Catalyst-Runtime with transport enabled
         run: |
           COMPILER_LAUNCHER="" \

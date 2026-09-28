@@ -19,6 +19,22 @@ inputs:
     description: Cache key prefix; keep distinct from the GH-hosted keys so the two never collide
     required: false
     default: selfhosted-gpu
+  llvm-variant:
+    description: >
+      Names this LLVM configuration. Variants configured with different cmake options get their
+      own cache entry instead of overwriting each other, so a second LLVM can be cached next to
+      the default one rather than replacing it. `default` is a plain `make llvm`; its key is
+      spelled exactly as before so existing caches keep hitting.
+    required: false
+    default: default
+  llvm-build-options:
+    description: >
+      `make llvm` variable overrides defining a non-default variant, space separated, e.g.
+      "LLVM_TARGETS_TO_BUILD=host;AArch64". Ignored for the default variant. Whatever is set
+      here has to be reflected in `llvm-variant`, which is what the cache is keyed on -- the
+      options themselves are not part of the key.
+    required: false
+    default: ""
 
 runs:
   using: composite
@@ -35,17 +51,24 @@ runs:
       uses: actions/cache@v4
       with:
         path: llvm-build
-        key: ${{ inputs.cache-prefix }}-${{ runner.os }}-llvm-${{ inputs.llvm-version }}-ci-build-gcc
+        # The variant is appended only when it is not `default`, so the default key stays
+        # byte-identical to the one already in the cache -- adding a variant must not cost
+        # everyone else a fresh LLVM build.
+        key: ${{ inputs.cache-prefix }}-${{ runner.os }}-llvm-${{ inputs.llvm-version }}-ci-build-gcc${{ inputs.llvm-variant != 'default' && format('-{0}', inputs.llvm-variant) || '' }}
 
     - name: Build LLVM
       if: steps.cache-llvm-build.outputs.cache-hit != 'true'
       shell: bash
+      env:
+        LLVM_BUILD_OPTIONS: ${{ inputs.llvm-build-options }}
       run: |
+        # Unquoted on purpose: the overrides are several words, and as make command-line
+        # variables they propagate into the `-C mlir` sub-make and beat its `?=` defaults.
         C_COMPILER=$(which gcc) \
         CXX_COMPILER=$(which g++) \
         LLVM_BUILD_DIR="$(pwd)/llvm-build" \
         COMPILER_LAUNCHER="" \
-        make llvm
+        make llvm $LLVM_BUILD_OPTIONS
 
     - name: Cache StableHLO source
       id: cache-stablehlo-source
