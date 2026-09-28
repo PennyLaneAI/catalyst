@@ -164,6 +164,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
 
         ///////////////////////////
         // Step 1: Gather inputs for graph
+        ModuleOp module = getOperation();
         std::vector<OperatorNode> setOfOps;
         std::vector<RuleNode> setOfRules;
         llvm::StringSet<> userRuleNames;
@@ -210,33 +211,34 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         }
 
         ///////////////////////////
-        // Step 3: Convert python-decompositions from reference to value semantics and run
-        // decompose-lowering to apply the chosen decomposition rules.
-
-        ///////////////////////////
-        // CQRs:
-        //  - Adjoint: A chosen rule for an adjoint operator may re-emit its base decomposition
-        //             wrapped in a `quantum.adjoint` region. Such a region is only reduced to
-        //             op-level modified gates by `adjoint-lowering`. We therefore iterate
-        //             `(decompose-lowering -> adjoint-lowering)` to a fixpoint.
-        // The solver has already chosen every rule up front; this loop only applies them.
-        ModuleOp module = getOperation();
-
-        qref::DecomposeLoweringPassOptions dlOptions;
-        // Collect only the rules on the chosen decomp tree, reachable from the circuit
-        // root operators by following each op's chosen rule inputs.
-        //
-        // Note `solution` is the solver's map to target gateset, so it also holds ops explored
-        // while costing rejected candidate rules (their inputs are solved to compute costs).
-        // Feeding every one of those rules to the greedy decompose-lowering rewriter would
-        // let stray rules fire on ops the chosen plan never routes through,
-        // emitting gates beyond the planned resource counts.
-        //
-        // Basis rule names are collected too. `decompose-lowering` treats an empty
-        // target-rules list as "apply every rule", so a circuit already in the target gateset
-        // must still produce a non-empty list, or its terminals would be
-        // decomposed by whatever rules happen to be loaded.
+        // Step 3: use decompose-lowering to apply the chosen decomposition rules.
+        // Note that on-demand rules may have introduced mixed semantics at this point, but
+        // decompose-lowering runs conversion and will ensure consistency
         {
+            ScopedDiagnosticTimer fixpointTimer("decomp:decompose-lowering");
+
+            ///////////////////////////
+            // CQRs:
+            //  - Adjoint: A chosen rule for an adjoint operator may re-emit its base decomposition
+            //             wrapped in a `quantum.adjoint` region. Such a region is only reduced to
+            //             op-level modified gates by `adjoint-lowering`. We therefore iterate
+            //             `(decompose-lowering -> adjoint-lowering)` to a fixpoint.
+            // The solver has already chosen every rule up front; this loop only applies them.
+
+            // Collect only the rules on the chosen decomp tree, reachable from the circuit
+            // root operators by following each op's chosen rule inputs.
+            //
+            // Note `solution` is the solver's map to target gateset, so it also holds ops explored
+            // while costing rejected candidate rules (their inputs are solved to compute costs).
+            // Feeding every one of those rules to the greedy decompose-lowering rewriter would
+            // let stray rules fire on ops the chosen plan never routes through,
+            // emitting gates beyond the planned resource counts.
+            //
+            // Basis rule names are collected too. `decompose-lowering` treats an empty
+            // target-rules list as "apply every rule", so a circuit already in the target gateset
+            // must still produce a non-empty list, or its terminals would be
+            // decomposed by whatever rules happen to be loaded.
+            qref::DecomposeLoweringPassOptions dlOptions;
             std::unordered_set<OperatorNode, OperatorNodeHash> visited;
             llvm::StringSet<> seenRules;
             std::vector<OperatorNode> worklist = setOfOps;
@@ -258,48 +260,12 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
                     worklist.push_back(input.op);
                 }
             }
-        }
-
-        // Convert reference-semantics python decompositions to value semantics.
-        {
-            ScopedDiagnosticTimer t("decomp:ref-to-value");
-            OpPassManager valueSemanticsPm("builtin.module");
-            valueSemanticsPm.addPass(qref::createValueSemanticsConversionPass());
-            if (failed(runPipeline(valueSemanticsPm, module))) {
+            OpPassManager decomposePm("builtin.module");
+            decomposePm.addPass(createDecomposeLoweringPass(dlOptions));
+            if (failed(runPipeline(decomposePm, module))) {
                 return signalPassFailure();
             }
         }
-
-        auto countOps = [](ModuleOp m) {
-            size_t count = 0;
-            m->walk([&](mlir::Operation *) { count++; });
-            return count;
-        };
-
-        // Fixpoint: apply the chosen rules and distribute any `quantum.adjoint` regions they emit,
-        // until the module stops changing.
-        constexpr unsigned maxIterations = 64;
-        size_t previousOpCount = countOps(module);
-        ScopedDiagnosticTimer fixpointTimer("decomp:greedy-lowering");
-        unsigned iterationsRun = 0;
-        for (unsigned iter = 0; iter < maxIterations; ++iter) {
-            iterationsRun = iter + 1;
-            {
-                OpPassManager decomposePm("builtin.module");
-                decomposePm.addPass(createDecomposeLoweringPass(dlOptions));
-                if (failed(runPipeline(decomposePm, module))) {
-                    return signalPassFailure();
-                }
-            }
-
-            size_t currentOpCount = countOps(module);
-            if (currentOpCount == previousOpCount) {
-                break;
-            }
-            previousOpCount = currentOpCount;
-        }
-        LDBG() << "lowering fixpoint reached after " << iterationsRun << " iteration(s), "
-               << previousOpCount << " ops";
     }
 
   private:
@@ -476,7 +442,8 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
                         .take_until([](char c) { return c == '{'; }) // remove GOID data
                         .drop_while(llvm::isDigit);                  // remove <n>C numeric prefix
 
-                // if this op has alt or fixed decomps then we are we only take the specified rules
+                // if this op has alt or fixed decomps then we are we only take the specified
+                // rules
                 if (opToFixedDecompName.contains(targetGate) ||
                     opToAltDecompNames.contains(targetGate)) {
 
@@ -647,8 +614,8 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
     /**
      * @brief Parse a graphOpId string into an OperatorNode.
      *
-     * The graphOpId format is "<name>{params}{wires}{static}[uid]", where <name> already carries
-     * any name-wrapped op-level modifiers produced by `defaultGetGraphOpId`, e.g.
+     * The graphOpId format is "<name>{params}{wires}{static}[uid]", where <name> already
+     * carries any name-wrapped op-level modifiers produced by `defaultGetGraphOpId`, e.g.
      * "C(Adjoint(RX)){0:[f64]}{wires:1}{}".
      */
     OperatorNode parseOperator(llvm::StringRef raw) {
@@ -703,8 +670,8 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
             return failure();
         }
 
-        // Load rules from the module into the set of rules used by the graph, filtering by fixed-
-        // and alt-decomps
+        // Load rules from the module into the set of rules used by the graph, filtering by
+        // fixed- and alt-decomps
         if (failed(loadDecompositionRules(opToFixedDecompName, opToAltDecompNames, rules))) {
             return failure();
         }
