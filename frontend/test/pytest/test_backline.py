@@ -479,7 +479,11 @@ class TestBacklineDemoIntegration:
             controller=ctrl, coprocessors=[coproc], transport="memcpy", qec_code="steane"
         )
 
-        @qjit(capture=True)
+        # Backline circuits are Clifford-only for now, so no decomposition is needed and
+        # collecting the reachable rules just dominates compile time (tens of minutes for the
+        # QEC circuits below).
+        # TODO: revisit once Backline supports non-Clifford gates and decomposition is required.
+        @qjit(capture=True, collect_decomp_rules=False)
         @qp.set_shots(1)
         @qp.qnode(dev, mcm_method="one-shot")
         def ghz():
@@ -695,7 +699,7 @@ class TestBacklineDemoIntegration:
                 [qp.prod(*(pauli(wires=int(q)) for q in np.flatnonzero(row))) for row in rows],
             )
 
-        @qjit(capture=True)
+        @qjit(capture=True, collect_decomp_rules=False)
         @qp.set_shots(1)
         @qp.qnode(dev, mcm_method="one-shot")
         def encoded_decoded_circuit(error_kind: int):
@@ -758,7 +762,7 @@ class TestBacklineDemoIntegration:
             controller=ctrl, coprocessors=[coproc], transport="memcpy", qec_code="steane"
         )
 
-        @qjit(capture=True)
+        @qjit(capture=True, collect_decomp_rules=False)
         @qp.set_shots(1)
         @qp.qnode(dev, mcm_method="one-shot")
         def ghz():
@@ -839,7 +843,7 @@ class TestBacklineDemoIntegration:
         )
         dev = qp.Backline(controller=ctrl, coprocessors=[coproc], transport="memcpy")
 
-        @qjit(capture=True)
+        @qjit(capture=True, collect_decomp_rules=False)
         @qp.set_shots(1)
         @qp.qnode(dev, mcm_method="one-shot")
         def circuit():
