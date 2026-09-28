@@ -61,16 +61,21 @@ jobs:
         fail-on-cache-miss: True
 
     - name: Build and pack catalyst-mlir-dev
+      env:
+        LLVM_BUILD_DIR: "${{ github.workspace }}/llvm-build"
+        LLVM_INSTALL_STAGING_DIR: "${{ github.workspace }}/llvm-build/install"
       run: |
-        LLVM_BUILD_DIR="${GITHUB_WORKSPACE}/llvm-build" \
-        LLVM_INSTALL_STAGING_DIR="${LLVM_BUILD_DIR}/install" \
-        DESTDIR=${LLVM_INSTALL_STAGING_DIR} cmake --build ${LLVM_BUILD_DIR} --target install-distribution
+        # Build and install
+        DESTDIR="${LLVM_INSTALL_STAGING_DIR}" cmake --build "${LLVM_BUILD_DIR}" --target install-distribution
 
-        LLVM_VERSION=$(${LLVM_INSTALL_STAGING_DIR}/bin/llvm-config --version) \
-        LLVM_COMMIT=$(grep llvm ${GITHUB_WORKSPACE}/.dep-versions | awk -F '=' '{ print $$2 }' | cut -c1-8) \
+        # Get version details
+        LLVM_VERSION=$("${LLVM_INSTALL_STAGING_DIR}/bin/llvm-config" --version)
+        LLVM_COMMIT=$(grep llvm "${GITHUB_WORKSPACE}/.dep-versions" | awk -F '=' '{ print $2 }' | cut -c1-8)
         LLVM_VERSION_FULL="${LLVM_VERSION}-${LLVM_COMMIT}"
-        tar -czf catalyst-mlir-dev_$(uname -s)_$(uname -m)_${LLVM_VERSION_FULL}.tar.gz
-            -C ${LLVM_INSTALL_STAGING_DIR} bin lib include
+
+        # Package archive
+        tar -czf "catalyst-mlir-dev_$(uname -s)_$(uname -m)_${LLVM_VERSION_FULL}.tar.gz" \
+          -C "${LLVM_INSTALL_STAGING_DIR}" bin lib include
 
     - name: Locate the archive
       id: archive
@@ -144,16 +149,21 @@ jobs:
         path: mlir/llvm-project
 
     - name: Build and pack catalyst-mlir-dev
+      env:
+        LLVM_BUILD_DIR: "${{ github.workspace }}/llvm-build"
+        LLVM_INSTALL_STAGING_DIR: "${{ github.workspace }}/llvm-build/install"
       run: |
-        LLVM_BUILD_DIR="${GITHUB_WORKSPACE}/llvm-build" \
-        LLVM_INSTALL_STAGING_DIR="${LLVM_BUILD_DIR}/install" \
-        DESTDIR=${LLVM_INSTALL_STAGING_DIR} cmake --build ${LLVM_BUILD_DIR} --target install-distribution
+        # Build and install
+        DESTDIR="${LLVM_INSTALL_STAGING_DIR}" cmake --build "${LLVM_BUILD_DIR}" --target install-distribution
 
-        LLVM_VERSION=$(${LLVM_INSTALL_STAGING_DIR}/bin/llvm-config --version) \
-        LLVM_COMMIT=$(grep llvm ${GITHUB_WORKSPACE}/.dep-versions | awk -F '=' '{ print $$2 }' | cut -c1-8) \
+        # Get version details
+        LLVM_VERSION=$("${LLVM_INSTALL_STAGING_DIR}/bin/llvm-config" --version)
+        LLVM_COMMIT=$(grep llvm "${GITHUB_WORKSPACE}/.dep-versions" | awk -F '=' '{ print $2 }' | cut -c1-8)
         LLVM_VERSION_FULL="${LLVM_VERSION}-${LLVM_COMMIT}"
-        tar -czf catalyst-mlir-dev_$(uname -s)_$(uname -m)_${LLVM_VERSION_FULL}.tar.gz
-            -C ${LLVM_INSTALL_STAGING_DIR} bin lib include
+
+        # Package archive
+        tar -czf "catalyst-mlir-dev_$(uname -s)_$(uname -m)_${LLVM_VERSION_FULL}.tar.gz" \
+          -C "${LLVM_INSTALL_STAGING_DIR}" bin lib include
 
     - name: Locate the archive
       id: archive
