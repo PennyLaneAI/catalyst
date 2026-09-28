@@ -512,14 +512,9 @@ class TestParitySynthIntegration:
             qp.CNOT((1, 0))
             return qp.state()
 
-        raw_circuit = qp.qjit(
-            circuit, capture=True, collect_decomp_rules=False, skip_preprocess=True
-        )
+        raw_circuit = qp.qjit(circuit, capture=True, collect_decomp_rules=False, skip_preprocess=True)
         compiled_circuit = qp.qjit(
-            parity_synth_pass(circuit),
-            capture=True,
-            collect_decomp_rules=False,
-            skip_preprocess=True,
+            parity_synth_pass(circuit), capture=True, collect_decomp_rules=False, skip_preprocess=True
         )
 
         run_filecheck_qjit(compiled_circuit)
@@ -606,6 +601,7 @@ class TestParitySynthIntegration:
 
             return qp.state()
 
+<<<<<<< HEAD
         raw_circuit = qp.qjit(
             circuit, capture=True, collect_decomp_rules=False, skip_preprocess=True
         )
@@ -614,6 +610,11 @@ class TestParitySynthIntegration:
             capture=True,
             collect_decomp_rules=False,
             skip_preprocess=True,
+=======
+        raw_circuit = qp.qjit(circuit, capture=True, collect_decomp_rules=False, skip_preprocess=True)
+        compiled_circuit = qp.qjit(
+            parity_synth_pass(circuit), capture=True, collect_decomp_rules=False, skip_preprocess=True
+>>>>>>> 55b501f5a (parity_synth filechecks shouldn't be affected by grph_decomp)
         )
 
         run_filecheck_qjit(compiled_circuit)
@@ -684,6 +685,7 @@ class TestParitySynthIntegration:
 
             return qp.state()
 
+<<<<<<< HEAD
         raw_circuit = qp.qjit(
             circuit, capture=True, collect_decomp_rules=False, skip_preprocess=True
         )
@@ -692,6 +694,11 @@ class TestParitySynthIntegration:
             capture=True,
             collect_decomp_rules=False,
             skip_preprocess=True,
+=======
+        raw_circuit = qp.qjit(circuit, capture=True, collect_decomp_rules=False, skip_preprocess=True)
+        compiled_circuit = qp.qjit(
+            parity_synth_pass(circuit), capture=True, collect_decomp_rules=False, skip_preprocess=True
+>>>>>>> 55b501f5a (parity_synth filechecks shouldn't be affected by grph_decomp)
         )
 
         run_filecheck_qjit(compiled_circuit)
