@@ -660,13 +660,13 @@ def ions_decomposition_setup_inputs():  # pragma: nocover
         %out_qubits_5 = quantum.custom "RY"(%cst_0) %out_qubits_4 : !quantum.bit
         %out_qubits_6:2 = quantum.custom "MS"(%cst_0) %out_qubits_5, %2 : !quantum.bit, !quantum.bit
         %out_qubits_7 = quantum.custom "RX"(%cst_2) %out_qubits_6#0 : !quantum.bit
-        %out_qubits_8 = quantum.custom "RY"(%cst_2) %out_qubits_6#1 : !quantum.bit
+        %out_qubits_8 = quantum.custom "RX"(%cst_2) %out_qubits_6#1 : !quantum.bit
         %out_qubits_9 = quantum.custom "RY"(%cst_2) %out_qubits_7 : !quantum.bit
-        %3 = quantum.namedobs %out_qubits_8[ PauliY] : !quantum.obs
+        %3 = quantum.namedobs %out_qubits_9[ PauliY] : !quantum.obs
         %4 = quantum.expval %3 : f64
         %from_elements = tensor.from_elements %4 : tensor<f64>
-        %5 = quantum.insert %0[ 0], %out_qubits_8 : !quantum.reg, !quantum.bit
-        %6 = quantum.insert %5[ 1], %out_qubits_9 : !quantum.reg, !quantum.bit
+        %5 = quantum.insert %0[ 0], %out_qubits_9 : !quantum.reg, !quantum.bit
+        %6 = quantum.insert %5[ 1], %out_qubits_8 : !quantum.reg, !quantum.bit
         quantum.dealloc %6 : !quantum.reg
         quantum.device_release
         return %from_elements : tensor<f64>
@@ -704,7 +704,7 @@ def ions_decomposition_setup_inputs():  # pragma: nocover
         %out_qubits_5 = quantum.custom "RY"(%cst_0) %out_qubits_4 : !quantum.bit
         %out_qubits_6:2 = quantum.custom "MS"(%cst_0) %out_qubits_5, %2 : !quantum.bit, !quantum.bit
         %out_qubits_7 = quantum.custom "RX"(%cst_2) %out_qubits_6#0 : !quantum.bit
-        %out_qubits_8 = quantum.custom "RY"(%cst_2) %out_qubits_6#1 : !quantum.bit
+        %out_qubits_8 = quantum.custom "RX"(%cst_2) %out_qubits_6#1 : !quantum.bit
         %out_qubits_9 = quantum.custom "RY"(%cst_2) %out_qubits_7 : !quantum.bit
     """
     return (), {}
