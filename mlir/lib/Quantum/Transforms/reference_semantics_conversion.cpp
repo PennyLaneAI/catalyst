@@ -375,8 +375,7 @@ void handlePPM(IRRewriter &builder, pbc::PPMeasurementOp vPPMOp, QubitValueTrack
 }
 
 void handleFabricate(IRRewriter &builder, pbc::FabricateOp vFabricateOp, QubitValueTracker &tracker,
-                     SmallVector<Operation *> &erasureWorklist)
-{
+                     SmallVector<Operation *> &erasureWorklist) {
     OpBuilder::InsertionGuard guard(builder);
     builder.setInsertionPoint(vFabricateOp);
     Location loc = vFabricateOp.getLoc();
