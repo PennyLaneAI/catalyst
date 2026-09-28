@@ -643,6 +643,11 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* Fixed the CNOT decomposition of the `ions-decomposition` pass, which did not implement a CNOT:
+  it rotated the target with `RY(-π/2)` instead of `RX(-π/2)` and returned the two qubits in
+  swapped order.
+  [(#3277)](https://github.com/PennyLaneAI/catalyst/pull/3277)
+
 * `adjoint-lowering` no longer fails on gates whose parameter is a wide-integer tensor. Integer and
   boolean gate parameters (e.g. a `QROM` `tensor<Nxi64>` bitstring) are now recorded in a dedicated
   i64 cache buffer during adjoint reversal, zero-extended in and truncated out, instead of being
@@ -957,6 +962,7 @@ This release contains contributions from (in alphabetical order):
 Ali Asadi,
 Joey Carter,
 Yushao Chen,
+Filip Dobrosavljevic,
 Lillian Frederiksen,
 Sengthai Heng,
 David Ittah,
