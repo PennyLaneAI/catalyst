@@ -78,15 +78,23 @@ runs:
         # that disk is a judgement call for whoever owns the runner, not something to do silently
         # from a workflow.
         base="${PERSIST_ROOT/#\~/$HOME}/$SLOT"
+        # The stamp alone is not enough to trust a tree: a build that reported success while
+        # writing somewhere else stamped a directory that is actually empty, and every later run
+        # then skipped the build and failed seconds later in the next component. Require the
+        # artifact the next component consumes, and drop a stamp that is not backed by one.
         for d in llvm-build stablehlo-build enzyme-build; do
+          case "$d" in
+            llvm-build) marker=lib/cmake/mlir/MLIRConfig.cmake ;;
+            *)          marker=CMakeCache.txt ;;
+          esac
           mkdir -p "$base/$d"
           # Symlinked into the workspace so every `$(pwd)/<d>` in the caller keeps resolving.
           ln -sfn "$base/$d" "$GITHUB_WORKSPACE/$d"
-          # Written only after the matching build succeeds, so a tree left half-built by a
-          # cancel or a failure is rebuilt (incrementally) rather than trusted.
-          if [ -e "$base/$d/.catalyst-complete" ]; then
+          if [ -e "$base/$d/.catalyst-complete" ] && [ -e "$base/$d/$marker" ]; then
             echo "${d%%-*}_ready=true" >> "$GITHUB_OUTPUT"
             echo "reusing $d from $base"
+          else
+            rm -f "$base/$d/.catalyst-complete"
           fi
         done
         echo "PERSIST_BASE=$base" >> "$GITHUB_ENV"
@@ -115,7 +123,8 @@ runs:
         if [ -n "${PERSIST_BASE:-}" ]; then
           exec 9>"$PERSIST_BASE/llvm-build.lock"
           flock 9
-          if [ -e "$PERSIST_BASE/llvm-build/.catalyst-complete" ]; then
+          if [ -e "$PERSIST_BASE/llvm-build/.catalyst-complete" ] \
+             && [ -e "$PERSIST_BASE/llvm-build/lib/cmake/mlir/MLIRConfig.cmake" ]; then
             echo "llvm-build was completed by a concurrent job; reusing it"
             exit 0
           fi
@@ -182,7 +191,8 @@ runs:
         if [ -n "${PERSIST_BASE:-}" ]; then
           exec 9>"$PERSIST_BASE/stablehlo-build.lock"
           flock 9
-          if [ -e "$PERSIST_BASE/stablehlo-build/.catalyst-complete" ]; then
+          if [ -e "$PERSIST_BASE/stablehlo-build/.catalyst-complete" ] \
+             && [ -e "$PERSIST_BASE/stablehlo-build/CMakeCache.txt" ]; then
             echo "stablehlo-build was completed by a concurrent job; reusing it"
             exit 0
           fi
@@ -246,7 +256,8 @@ runs:
         if [ -n "${PERSIST_BASE:-}" ]; then
           exec 9>"$PERSIST_BASE/enzyme-build.lock"
           flock 9
-          if [ -e "$PERSIST_BASE/enzyme-build/.catalyst-complete" ]; then
+          if [ -e "$PERSIST_BASE/enzyme-build/.catalyst-complete" ] \
+             && [ -e "$PERSIST_BASE/enzyme-build/CMakeCache.txt" ]; then
             echo "enzyme-build was completed by a concurrent job; reusing it"
             exit 0
           fi
