@@ -1,5 +1,4 @@
-
-// Copyright 2022-2023 Xanadu Quantum Technologies Inc.
+// Copyright 2026 Xanadu Quantum Technologies Inc.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -13,21 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#pragma once
+// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{gate-set="Adjoint(V)"=1.0})' %s | FileCheck %s
 
-#include "mlir/Pass/Pass.h"
-
-#include "Catalyst/IR/CatalystDialect.h"
-#include "MBQC/IR/MBQCDialect.h"
-#include "PBC/IR/PBCDialect.h"
-#include "QRef/IR/QRefDialect.h"
-
-namespace catalyst {
-namespace quantum {
-
-#define GEN_PASS_DECL
-#define GEN_PASS_REGISTRATION
-#include "Quantum/Transforms/Passes.h.inc"
-
-} // namespace quantum
-} // namespace catalyst
+// CHECK-LABEL: func.func @circuit
+// CHECK: custom "V"() %{{.*}} adj
+func.func @circuit(%q: !quantum.bit) -> !quantum.bit {
+  %out = quantum.custom "V"() %q adj : !quantum.bit
+  return %out : !quantum.bit
+}

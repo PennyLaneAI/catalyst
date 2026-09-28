@@ -53,8 +53,10 @@ def test_multirz():
 # CHECK: qref.multirz({{%.+}}) {{%.+}} : !qref.bit
 # CHECK: func.func private @"__builtin__multi_rz_decomposition_MultiRZ{theta:[f64]}{wires:2}{}"
 # CHECK-SAME:   target_gate = "MultiRZ{theta:[f64]}{wires:2}{}"
+# CHECK: qref.custom "RZ"
 # CHECK: func.func private @"__builtin__multi_rz_decomposition_MultiRZ{theta:[f64]}{wires:1}{}"
 # CHECK-SAME:   target_gate = "MultiRZ{theta:[f64]}{wires:1}{}"
+# CHECK: qref.custom "RZ"
 test_multirz()
 
 

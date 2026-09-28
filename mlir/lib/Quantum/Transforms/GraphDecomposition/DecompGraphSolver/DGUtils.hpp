@@ -21,6 +21,7 @@
 #pragma once
 
 #include <algorithm>
+#include <cstddef>
 #include <iostream>
 #include <sstream>
 #include <stdexcept>
@@ -29,6 +30,11 @@
 #include <vector>
 
 #include "DGTypes.hpp"
+
+namespace DecompGraph::Solver {
+// Only `showGraph` below needs it, and only by reference.
+class DecompositionGraph;
+} // namespace DecompGraph::Solver
 
 namespace DecompGraph::Core {
 
@@ -57,32 +63,88 @@ static inline auto print_op(const OperatorNode &op) -> std::string {
 }
 
 static inline auto graph_failed_message(const OperatorNode &op,
-                                        const std::vector<std::string> &rule_errors)
+                                        const std::vector<std::string> &rule_errors,
+                                        const std::vector<OperatorNode> &unsolvable = {})
     -> std::string {
     std::ostringstream oss;
     oss << "Decomposition rule not found for operator '" << print_op(op) << "'";
+    // Keep the tried rules right next to the failed operator, so both stay together (and survive a
+    // truncated snippet of the trace); the longer required-gates list follows.
     if (!rule_errors.empty()) {
-        oss << ". Tried rules:";
+        oss << ".\nTried rules for '" << print_op(op) << "':";
         for (const auto &error : rule_errors) {
             oss << "\n  - " << error;
         }
     }
+    if (!unsolvable.empty()) {
+        oss << "\nThe following required operators could not reach the target gateset:";
+        constexpr size_t maxToShow = 25;
+        size_t shown = 0;
+        for (const auto &u : unsolvable) {
+            if (shown++ == maxToShow) {
+                oss << "\n  * ... and " << (unsolvable.size() - maxToShow) << " more";
+                break;
+            }
+            oss << "\n  * " << print_op(u);
+        }
+        oss << "\nAdd one of these (or gates they can decompose into) to the target gateset.";
+    }
     return oss.str();
 }
 
-static inline void showSolution(const Core::GraphResult &result) {
-    std::cerr << "Decomposition Solution:\n";
+/**
+ * Both `GraphResult` and `ChosenDecompRule::basisCounts` are unordered maps,
+ * so every level is sorted by its printed operator label before being written.
+ * Without that the dump comes out in a different order from run to run,
+ * which makes it hard to check for lit tests.
+ *
+ * @param result the rule the solver chose for each operator.
+ * @param os where to write the dump. Defaults to stderr.
+ */
+static inline void showSolution(const Core::GraphResult &result, std::ostream &os = std::cerr) {
+    std::vector<std::pair<std::string, const Core::ChosenDecompRule *>> entries;
+    entries.reserve(result.size());
     for (const auto &[op, rule] : result) {
-        std::cerr << "  Operator: " << print_op(op) << "\n";
-        std::cerr << "    Chosen Rule: " << rule.ruleName << (rule.isBasis ? " [basis]" : "")
-                  << "\n";
-        std::cerr << "    Total Cost: " << rule.totalCost << "\n";
-        std::cerr << "    Basis Counts:\n";
-        for (const auto &[basis_op, count] : rule.basisCounts) {
-            std::cerr << "      - " << print_op(basis_op) << ": " << count << "\n";
+        entries.emplace_back(print_op(op), &rule);
+    }
+    std::sort(entries.begin(), entries.end(),
+              [](const auto &lhs, const auto &rhs) { return lhs.first < rhs.first; });
+
+    os << "Decomposition Solution:\n";
+    for (const auto &[opLabel, rule] : entries) {
+        os << "  Operator: " << opLabel << "\n";
+        os << "    Chosen Rule: " << rule->ruleName << (rule->isBasis ? " [basis]" : "") << "\n";
+        os << "    Total Cost: " << rule->totalCost << "\n";
+        os << "    Basis Counts:\n";
+
+        std::vector<std::pair<std::string, size_t>> basisCounts;
+        basisCounts.reserve(rule->basisCounts.size());
+        for (const auto &[basis_op, count] : rule->basisCounts) {
+            basisCounts.emplace_back(print_op(basis_op), count);
+        }
+        std::sort(basisCounts.begin(), basisCounts.end());
+        for (const auto &[basisLabel, count] : basisCounts) {
+            os << "      - " << basisLabel << ": " << count << "\n";
         }
     }
 }
+
+/**
+ * @brief Prints the graph structure for debugging purposes.
+ *
+ * This reports the operators, the rules, and their relationships, which helps in understanding how
+ * the graph was constructed and how the decomposition rules connect to the operators.
+ *
+ * Paired with `showSolution` above (see `DecompositionSolver::solve`, which prints both on a
+ * failure) and a free function for the same reason: a `GraphResult` is a plain map, so it has no
+ * class of its own to be a method of. Defined in DGBuilder.cpp, where the graph's internals live,
+ * and a friend of `DecompositionGraph` because it reports them.
+ *
+ * @param graph the graph to print
+ * @param os    where to write the dump. Defaults to stderr; pass e.g. an `std::ostringstream` to
+ *              capture it instead and route it somewhere else.
+ */
+void showGraph(const Solver::DecompositionGraph &graph, std::ostream &os = std::cerr);
 
 class GraphError : public std::runtime_error {
   public:
@@ -91,8 +153,9 @@ class GraphError : public std::runtime_error {
 
 class GraphSolverFailedError : public GraphError {
   public:
-    GraphSolverFailedError(OperatorNode op, std::vector<std::string> rule_errors)
-        : GraphError(graph_failed_message(op, rule_errors)) {}
+    GraphSolverFailedError(OperatorNode op, std::vector<std::string> rule_errors,
+                           std::vector<OperatorNode> unsolvable = {})
+        : GraphError(graph_failed_message(op, rule_errors, unsolvable)) {}
 };
 
 class RuleInvalidOverrideError : public GraphError {

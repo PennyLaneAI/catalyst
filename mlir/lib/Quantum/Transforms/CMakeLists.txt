@@ -14,14 +14,13 @@ file(GLOB SRC
     RemoveGlobalPhasesPass.cpp
     ConversionPatterns.cpp
     GraphDecomposition/DecompUtils.cpp
-    GraphDecomposition/DecomposeLoweringPatterns.cpp
-    GraphDecomposition/decompose_lowering.cpp
     GraphDecomposition/graph_decomposition.cpp
     DisentangleCNOT.cpp
     DisentangleSWAP.cpp
     GridsynthPatterns.cpp
     IonsDecompositionPatterns.cpp
     LoopBoundaryOptimizationPatterns.cpp
+    ModifiersLowering.cpp
     MergeRotationsPatterns.cpp
     QPDLoader.cpp
     SplitMultipleTapes.cpp

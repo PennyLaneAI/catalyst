@@ -15,7 +15,7 @@
 // RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{gate-set=C(T)=1.0 alt-decomps=C(V){}{wires:1}{}=v_to_ctrl_t})' %s | FileCheck %s
 
 // CHECK-LABEL: func.func @controlled_in_gateset(
-// CHECK-SAME:  %[[C:.*]]: !quantum.bit, %[[Q:.*]]: !quantum.bit
+// CHECK-SAME:  %[[Q:.*]]: !quantum.bit, %[[C:.*]]: !quantum.bit
 func.func @controlled_in_gateset(%ctrl: !quantum.bit, %q: !quantum.bit) -> (!quantum.bit, !quantum.bit) {
   %true = arith.constant true
   // CHECK: %[[O:.*]], %[[OC:.*]] = quantum.custom "T"() %[[Q]] ctrls(%[[C]]) ctrlvals(%{{.*}}) : !quantum.bit ctrls !quantum.bit
@@ -25,7 +25,7 @@ func.func @controlled_in_gateset(%ctrl: !quantum.bit, %q: !quantum.bit) -> (!qua
 }
 
 // CHECK-LABEL: func.func @decompose_to_controlled(
-// CHECK-SAME:  %[[C:.*]]: !quantum.bit, %[[Q:.*]]: !quantum.bit
+// CHECK-SAME:  %[[Q:.*]]: !quantum.bit, %[[C:.*]]: !quantum.bit
 func.func @decompose_to_controlled(%ctrl: !quantum.bit, %q: !quantum.bit) -> (!quantum.bit, !quantum.bit) {
   %true = arith.constant true
   // CHECK-NOT: "V"

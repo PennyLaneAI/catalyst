@@ -16,7 +16,7 @@
 
 // RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{gate-set=testRY=3.0,testX=1.0,testZ=1.0 alt-decomps=testY=[y_to_ry,y_to_x_z] bytecode-rules="%BYTECODE_PATH"})' %s | FileCheck %s --check-prefixes XZ
 
-func.func @circuit() -> !quantum.bit {
+func.func @circuit() {
     %0 = quantum.alloc(2) : !quantum.reg
     %q = quantum.extract %0[0] : !quantum.reg -> !quantum.bit
     // RY-NOT: testY
@@ -29,11 +29,13 @@ func.func @circuit() -> !quantum.bit {
 
     // needed to ensure we don't match in the following decomposition rules
     // CHECK: return
-    return %qout : !quantum.bit
+    %1 = quantum.insert %0[ 0], %qout : !quantum.reg, !quantum.bit
+    quantum.dealloc %1 : !quantum.reg
+    return
 }
 
 // CHECK-LABEL: y_to_ry
-func.func @y_to_ry(%q0 : !quantum.bit) -> !quantum.bit attributes {target_gate="testY{}{wires:1}{}", resources = { operations = {"testRY{0:[f64]}{wires:1}{}"=1}}} {
+func.func @y_to_ry(%q0 : !quantum.bit) -> !quantum.bit attributes {target_gate="testY{}{wires:1}{}", resources = { operations = {"testRY{0:[f64]}{wires:1}{}"=1}}, frontend_name = "y_to_ry"} {
     %pi = arith.constant 3.14 : f64
     %negpiby2 = arith.constant -1.57 : f64
     %q1 = quantum.custom "testRY"(%pi) %q0 : !quantum.bit
@@ -41,7 +43,7 @@ func.func @y_to_ry(%q0 : !quantum.bit) -> !quantum.bit attributes {target_gate="
 }
 
 // CHECK-LABEL: y_to_x_z
-func.func @y_to_x_z(%q0 : !quantum.bit) -> !quantum.bit attributes {target_gate="testY{}{wires:1}{}", resources = { operations = {"testX{}{wires:1}{}"=1, "testZ{}{wires:1}{}"=1}}} {
+func.func @y_to_x_z(%q0 : !quantum.bit) -> !quantum.bit attributes {target_gate="testY{}{wires:1}{}", resources = { operations = {"testX{}{wires:1}{}"=1, "testZ{}{wires:1}{}"=1}}, frontend_name = "y_to_x_z"} {
     %q1 = quantum.custom "testX"() %q0 : !quantum.bit
     %q2 = quantum.custom "testZ"() %q1 : !quantum.bit
     return %q2 : !quantum.bit

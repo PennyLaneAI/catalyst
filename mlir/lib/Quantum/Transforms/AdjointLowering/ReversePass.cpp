@@ -21,6 +21,7 @@
 #include <vector>
 
 #include "llvm/ADT/SmallVector.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Complex/IR/Complex.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Index/IR/IndexOps.h"
@@ -79,12 +80,31 @@ void cloneAdjointRegion(AdjointOp op, OpBuilder &builder, IRMapping &mapping,
     }
 }
 
+/// Convert a row-major linearized index into per-dimension coordinates given the size of each
+/// dimension, so that an arbitrary-rank tensor can be rebuilt with a single flattened loop.
+SmallVector<Value> delinearizeIndex(OpBuilder &builder, Location loc, Value linear,
+                                    ArrayRef<Value> dimSizes) {
+    int64_t rank = dimSizes.size();
+    SmallVector<Value> strides(rank);
+    Value acc = index::ConstantOp::create(builder, loc, 1);
+    for (int64_t d = rank - 1; d >= 0; --d) {
+        strides[d] = acc;
+        acc = index::MulOp::create(builder, loc, acc, dimSizes[d]);
+    }
+    SmallVector<Value> coords(rank);
+    for (int64_t d = 0; d < rank; ++d) {
+        Value q = index::DivUOp::create(builder, loc, linear, strides[d]);
+        coords[d] = index::RemUOp::create(builder, loc, q, dimSizes[d]);
+    }
+    return coords;
+}
+
 /// A class that generates the quantum "backwards pass" of the adjoint operation using the stored
 /// gate parameters and cached control flow.
 class AdjointGenerator {
   public:
-    AdjointGenerator(IRMapping &remappedValues, QuantumCache &cache)
-        : remappedValues(remappedValues), cache(cache) {}
+    AdjointGenerator(IRMapping &remappedValues, QuantumCache &cache, Region &adjointRegion)
+        : remappedValues(remappedValues), cache(cache), adjointRegion(adjointRegion) {}
 
     /// Recursively generate the adjoint version of `region` with reversed control flow and adjoint
     /// quantum gates.
@@ -97,6 +117,10 @@ class AdjointGenerator {
     void generateImpl(Region &region, OpBuilder &builder) {
         assert(region.hasOneBlock() &&
                "Expected only structured control flow (each region should have a single block)");
+
+        if (generationFailed) {
+            return;
+        }
 
         for (Operation &op : llvm::reverse(region.front().without_terminator())) {
             if (auto callOp = dyn_cast<func::CallOp>(op)) {
@@ -212,10 +236,38 @@ class AdjointGenerator {
             // popping gives the parameters in reverse
             for (Value param : llvm::reverse(params)) {
                 Type paramType = param.getType();
-                verifyTypeIsCacheable(paramType, operation);
+
+                // The forward pass does not record params that are already available here; reuse
+                // the value directly instead of popping.
+                if (isAvailableToReversePass(param, adjointRegion)) {
+                    cachedParams[numParams - 1 - idx] = remappedValues.lookupOrDefault(param);
+                    idx++;
+                    continue;
+                }
+
+                if (mlir::failed(verifyTypeIsCacheable(paramType, operation))) {
+                    generationFailed = true;
+                    return;
+                }
                 if (paramType.isF64()) {
                     cachedParams[numParams - 1 - idx] =
                         ListPopOp::create(builder, parametrizedGate.getLoc(), cache.paramVector);
+                    idx++;
+                    continue;
+                }
+
+                // This is a temporary trick to make it lossless for widths <= 64 bits.
+                Type i64Ty = builder.getI64Type();
+                auto truncFromI64 = [&](Value v, Type target, Location l) -> Value {
+                    if (target == i64Ty) {
+                        return v;
+                    }
+                    return arith::TruncIOp::create(builder, l, target, v);
+                };
+                if (auto intType = dyn_cast<IntegerType>(paramType)) {
+                    Location l = parametrizedGate.getLoc();
+                    Value popped = ListPopOp::create(builder, l, cache.intVector);
+                    cachedParams[numParams - 1 - idx] = truncFromI64(popped, intType, l);
                     idx++;
                     continue;
                 }
@@ -227,43 +279,68 @@ class AdjointGenerator {
                 // Constants
                 auto loc = parametrizedGate.getLoc();
 
-                // Real-valued tensor params (e.g. `quantum.operator` angle tensors) were cached
-                // element-by-element in the forward pass; rebuild the tensor by popping them back.
-                // The complex-matrix path below is specific to QubitUnitary.
-                if (elementType.isF64()) {
-                    assert(aTensorType.getRank() <= 1 &&
-                           "only scalar/rank-1 real tensor params are cacheable");
+                // Real-valued tensor params (e.g. `quantum.operator` angle tensors, or a
+                // BasisRotation's `tensor<NxNxf64>` matrix) were cached element-by-element in
+                // row-major order in `paramVector`; rebuild the tensor by popping them back.
+                // Integer/boolean tensors (e.g. a MultiX `tensor<Nxi1>` bitstring or a QROM
+                // `tensor<Nxi64>` bitstring) were recorded the same way in the i64 buffer
+                // `intVector` (widths > 64 bits already rejected by verifyTypeIsCacheable);
+                // truncate each popped element back on rebuild.
+                // Note that the complex-matrix path below is specific to QubitUnitary. We can
+                // revisit this when we have more complex-valued tensor params to handle.
+                if (elementType.isF64() || elementType.isInteger()) {
+                    // Pop one element from the buffer matching the tensor's element type.
+                    auto readElement = [&]() -> Value {
+                        if (elementType.isInteger()) {
+                            Value popped = ListPopOp::create(builder, loc, cache.intVector);
+                            return truncFromI64(popped, elementType, loc);
+                        }
+                        return ListPopOp::create(builder, loc, cache.paramVector);
+                    };
                     if (aTensorType.getRank() == 0) {
-                        Value element = ListPopOp::create(builder, loc, cache.paramVector);
+                        Value element = readElement();
                         cachedParams[numParams - 1 - idx] =
                             tensor::FromElementsOp::create(builder, loc, paramType, element);
-                    } else {
-                        Value c0i = index::ConstantOp::create(builder, loc, 0);
-                        Value c1i = index::ConstantOp::create(builder, loc, 1);
-                        Value dim = ShapedType::kDynamic != shape[0]
-                                        ? (Value)index::ConstantOp::create(builder, loc, shape[0])
-                                        : (Value)tensor::DimOp::create(
-                                              builder, loc, cachedParams[numParams - 1 - idx], c0i);
-                        Value empty =
-                            tensor::EmptyOp::create(builder, loc, aTensorType, ValueRange{});
-                        // Elements were pushed in ascending index order, so popping yields them in
-                        // descending order: place the i-th popped value at index (dim - 1 - i).
-                        scf::ForOp loop =
-                            scf::ForOp::create(builder, loc, c0i, dim, c1i, ValueRange{empty});
-                        {
-                            OpBuilder::InsertionGuard guard(builder);
-                            builder.setInsertionPointToStart(loop.getBody());
-                            Value acc = loop.getRegionIterArg(0);
-                            Value iPlusOne =
-                                index::AddOp::create(builder, loc, loop.getInductionVar(), c1i);
-                            Value revIdx = index::SubOp::create(builder, loc, dim, iPlusOne);
-                            Value element = ListPopOp::create(builder, loc, cache.paramVector);
-                            Value updated =
-                                tensor::InsertOp::create(builder, loc, element, acc, revIdx);
-                            scf::YieldOp::create(builder, loc, updated);
-                        }
-                        cachedParams[numParams - 1 - idx] = loop.getResult(0);
+                        idx++;
+                        continue;
                     }
+                    Value c0i = index::ConstantOp::create(builder, loc, 0);
+                    Value c1i = index::ConstantOp::create(builder, loc, 1);
+                    SmallVector<Value> dimSizes;
+                    SmallVector<Value> dynSizes;
+                    Value total = c1i;
+                    for (int64_t d = 0; d < aTensorType.getRank(); ++d) {
+                        Value dim;
+                        if (ShapedType::kDynamic != shape[d]) {
+                            dim = index::ConstantOp::create(builder, loc, shape[d]);
+                        } else {
+                            dim = tensor::DimOp::create(builder, loc, param, d);
+                            dynSizes.push_back(dim);
+                        }
+                        dimSizes.push_back(dim);
+                        total = index::MulOp::create(builder, loc, total, dim);
+                    }
+                    Value empty = tensor::EmptyOp::create(builder, loc, aTensorType, dynSizes);
+                    // Elements were pushed in ascending linearized order, so popping yields them in
+                    // descending order: place the i-th popped value at linearized index
+                    // (total - 1 - i), delinearized back into per-dimension coordinates.
+                    scf::ForOp loop =
+                        scf::ForOp::create(builder, loc, c0i, total, c1i, ValueRange{empty});
+                    {
+                        OpBuilder::InsertionGuard guard(builder);
+                        builder.setInsertionPointToStart(loop.getBody());
+                        Value acc = loop.getRegionIterArg(0);
+                        Value iPlusOne =
+                            index::AddOp::create(builder, loc, loop.getInductionVar(), c1i);
+                        Value revLinear = index::SubOp::create(builder, loc, total, iPlusOne);
+                        SmallVector<Value> coords =
+                            delinearizeIndex(builder, loc, revLinear, dimSizes);
+                        Value element = readElement();
+                        Value updated =
+                            tensor::InsertOp::create(builder, loc, element, acc, coords);
+                        scf::YieldOp::create(builder, loc, updated);
+                    }
+                    cachedParams[numParams - 1 - idx] = loop.getResult(0);
                     idx++;
                     continue;
                 }
@@ -566,19 +643,23 @@ class AdjointGenerator {
         }
 
         // The quantum values are captured from outside rather than passed in through a
-        // basic block argument. We thus need to traverse the region to look for it.
+        // basic block argument. We thus need to traverse the region to look for it. The traversal
+        // must recurse into nested regions (for example: a branch whose body is another scf.if):
+        // the captured value may only be referenced deep inside, so a shallow scan of the branch
+        // top-level ops would miss it and wrongly conclude the branch touches no quantum state.
         auto findOldestQvaluesInRegion = [&](Region &region) -> SetVector<Value> {
             SetVector<Value> qvalues;
-            for (Operation &innerOp : region.getOps()) {
-                for (Value operand : innerOp.getOperands()) {
+            region.walk([&](Operation *innerOp) {
+                for (Value operand : innerOp->getOperands()) {
+                    Region *operandRegion = operand.getParentRegion();
                     bool isDefinedFromOutsideRegion =
-                        operand.getParentRegion()->isProperAncestor(&region);
+                        operandRegion && operandRegion->isProperAncestor(&region);
                     if (isa<quantum::QuregType, quantum::QubitType>(operand.getType()) &&
                         isDefinedFromOutsideRegion) {
                         qvalues.insert(operand);
                     }
                 }
-            }
+            });
             assert(!qvalues.empty() && "failed to find quantum values in scf.if region");
             return qvalues;
         };
@@ -737,6 +818,8 @@ class AdjointGenerator {
   private:
     IRMapping &remappedValues;
     QuantumCache &cache;
+    // The top level region of the adjoint operation being lowered
+    Region &adjointRegion;
     bool generationFailed = false;
 };
 
@@ -747,7 +830,7 @@ namespace quantum {
 
 LogicalResult generateAdjointReversePass(Region &region, OpBuilder &builder,
                                          IRMapping &remappedValues, QuantumCache &cache) {
-    AdjointGenerator generator{remappedValues, cache};
+    AdjointGenerator generator{remappedValues, cache, region};
     return generator.generate(region, builder);
 }
 

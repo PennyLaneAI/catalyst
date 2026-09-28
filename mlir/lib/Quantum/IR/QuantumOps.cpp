@@ -190,8 +190,10 @@ struct RedirectExtractThroughDistinctInsert : public mlir::OpRewritePattern<Extr
             return failure();
         }
         // Read the pre-insert register.
-        rewriter.modifyOpInPlace(extract,
-                                 [&] { extract.getQregMutable().assign(insert.getInQreg()); });
+        rewriter.modifyOpInPlace(extract, [&] {
+            extract.getQregMutable().assign(insert.getInQreg());
+            extract->moveBefore(insert);
+        });
 
         // Sink the bypassed insert to just above the earliest remaining user of its result.
         Operation *earliestUser = nullptr;
@@ -1162,7 +1164,7 @@ ParseResult OperatorOp::parse(OpAsmParser &parser, OperationState &result) {
 }
 
 //===----------------------------------------------------------------------===//
-// Quantum op interface methods.
+// DecomposableGate interface methods.
 //===----------------------------------------------------------------------===//
 
 // CustomOp
@@ -1317,6 +1319,8 @@ llvm::StringMap<size_t> OperatorOp::getWireLens() {
 std::string OperatorOp::getExtraData() {
     return getUID().has_value() ? std::to_string(getUID().value()) : "";
 }
+
+//===----------------------------------------------------------------------===//
 // Implement ResourceQuantumOpInterface interface methods.
 //===----------------------------------------------------------------------===//
 
