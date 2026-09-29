@@ -38,10 +38,8 @@ permissions:
   contents: read
 
 concurrency:
-  # Keyed on the PR (or ref) and the event, not the commit. Keying on the commit meant a new push
-  # started a new group instead of superseding the old one: three runs of this branch were seen
-  # building LLVM at once on the same GPU host, with the newest queued behind them. The event is
-  # in the key so a workflow_dispatch still does not cancel the pull_request run of the same code.
+  # Not keyed on the commit -- that started a new group per push instead of superseding it. The
+  # event is in the key so workflow_dispatch and pull_request do not cancel each other.
   group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
@@ -97,14 +95,8 @@ jobs:
           } >> "$GITHUB_ENV"
 
       - name: Install the HIP headers
-        # nvcc is the HIP compiler on this host; ROCm supplies only the headers. `apt-get
-        # download` rather than `install`: hip-dev Depends on rocm-llvm and comgr, 611 MB of
-        # AMD-GPU toolchain nothing here uses. 7.1+ for the dma-buf API, absent from 6.4.
-        # Both packages are MIT (c) AMD, fetched and not redistributed.
-        #
-        # Suite and versions are pinned together -- if the pool image stops being jammy the
-        # pinned versions will not resolve and this fails, rather than silently skipping the
-        # GPU tests later.
+        # nvcc compiles the HIP; ROCm supplies the headers. The repo URL pins 7.1.1, needed for
+        # the dma-buf API that 6.4 lacks. Both packages are MIT (c) AMD.
         run: |
           set -euo pipefail
           curl -fsSL https://repo.radeon.com/rocm/rocm.gpg.key \
@@ -113,17 +105,10 @@ jobs:
                "https://repo.radeon.com/rocm/apt/7.1.1 jammy main" \
             | sudo tee /etc/apt/sources.list.d/rocm.list
           sudo apt-get update
-          tmp=$(mktemp -d)
-          ( cd "$tmp" && apt-get download \
-              hip-dev=7.1.52802.70101-38~22.04 \
-              hipcc-nvidia=1.1.1.70101-38~22.04 )
-          for deb in "$tmp"/*.deb; do sudo dpkg-deb -x "$deb" /; done
-          rm -rf "$tmp"
-          # An unmatched glob stays literal, so check rather than exporting a path that does
-          # not exist -- CMake would just not find HIP and the GPU tests would skip.
-          rocm=$(echo /opt/rocm-*)
-          [ -d "$rocm" ] || { echo "::error::hip-dev did not unpack to /opt/rocm-*"; exit 1; }
-          echo "ROCM_PATH=$rocm" >> $GITHUB_ENV
+          # --no-install-recommends: hip-dev and rocm-llvm recommend libdrm-amdgpu and a
+          # multilib gcc, neither of which an NVIDIA host compiling with nvcc needs.
+          sudo apt-get install -y --no-install-recommends hip-dev hipcc-nvidia
+          echo "ROCM_PATH=$(echo /opt/rocm-*)" >> $GITHUB_ENV
 
       - name: Get Cached LLVM Source
         id: cache-llvm-source
@@ -155,34 +140,16 @@ jobs:
           cmake --build "$RT_BUILD_DIR" --target runner_tests_transport_memcpy -j
           "$RT_BUILD_DIR/tests/runner_tests_transport_memcpy"
 
-      - name: Install Python runtime requirements
+      - name: Install Python runtime requirements and Triton
         run: |
           python3 -m pip install -r requirements.txt
-
-      - name: Set up Triton and its CUDA driver
-        # Triton dlopens libcuda.so.1, which ships with the driver rather than the toolkit.
-        run: |
-          set -euo pipefail
-          # torch exists only so triton <3.8 can probe the driver through it. cu129 matches the
-          # gpu_runners driver; default torch targets CUDA 13 and leaves cuda.is_available()
-          # false. The cap fails a bump past triton 3.8, whose PTX this ptxas rejects.
+          # torch exists only so triton <3.8 can probe the driver through it; cu129 matches
+          # the gpu_runners driver. Installed after requirements.txt so it resolves against
+          # the pinned set.
           pip install 'torch==2.13.0+cu129' 'triton<3.8' \
             --index-url https://download.pytorch.org/whl/cu129
-
-          # Every run on this pool has the driver at the multiarch path; the toolkit's stub
-          # is elsewhere and cannot initialize a device. Fail loudly if it ever moves.
-          libcuda_dir=/lib/x86_64-linux-gnu
-          [ -e "$libcuda_dir/libcuda.so.1" ] || { echo "::error::no libcuda.so.1 in $libcuda_dir"; exit 1; }
-          export TRITON_LIBCUDA_PATH="$libcuda_dir"
-          echo "TRITON_LIBCUDA_PATH=$libcuda_dir" >> $GITHUB_ENV
-
-          # Triton's own activation, which the fixture turns into a skip -- fails here in
-          # three minutes rather than inside triton.jit after the frontend build.
-          python3 -c "
-          import triton
-          from triton.runtime.driver import driver
-          print('triton', triton.__version__, '| active driver:', driver.active)
-          "
+          # Triton dlopens libcuda.so.1 from the driver, not the toolkit stub.
+          echo "TRITON_LIBCUDA_PATH=/lib/x86_64-linux-gnu" >> $GITHUB_ENV
 
       # After the pip steps: requirements.txt pins numpy/nanobind/pybind11, which the MLIR
       # bindings compile against. Late, because a cache miss here costs two hours.
