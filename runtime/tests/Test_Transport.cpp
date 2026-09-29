@@ -258,6 +258,27 @@ TEST_CASE("set_coprocessor_fn fails when <symbol>_init fails", "[transport]") {
     __catalyst__transport__destroy(co);
 }
 
+extern "C" void *catalyst_onnx_coprocessor_init(const char *config);
+
+TEST_CASE("the ONNX coprocessor function rejects a bad config", "[transport]") {
+    CHECK(catalyst_onnx_coprocessor_init("") == nullptr); // no model
+    CHECK(catalyst_onnx_coprocessor_init("model=m.onnx;colour=blue") == nullptr);
+    CHECK(catalyst_onnx_coprocessor_init("model=m.onnx;provider=tpu") == nullptr);
+    CHECK(catalyst_onnx_coprocessor_init("model=m.onnx;ort_lib=/no/such/libort.so") == nullptr);
+}
+
+TEST_CASE("set_coprocessor_fn configures the ONNX coprocessor function through its _init",
+          "[transport]") {
+    auto *co = __catalyst__transport__create(MEMCPY_COPROCESSOR_BACKEND_PATH,
+                                             "fn.model=/no/such/model.onnx",
+                                             CATALYST_TRANSPORT_ROLE_COPROCESSOR, "onnx_fn");
+    REQUIRE(co != nullptr);
+    // The function and its _init resolve, and it is _init that fails, on the missing model.
+    CHECK(__catalyst__transport__set_coprocessor_fn(co, "catalyst_onnx_coprocessor") ==
+          CATALYST_TRANSPORT_ERR);
+    __catalyst__transport__destroy(co);
+}
+
 TEST_CASE("memcpy backend plugins round-trip through the transport CAPI", "[transport]") {
     auto *ct = make_memcpy_controller("memcpy_roundtrip");
     auto *co = make_memcpy_coprocessor("memcpy_roundtrip");

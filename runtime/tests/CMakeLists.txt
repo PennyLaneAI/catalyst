@@ -193,6 +193,7 @@ if(ENABLE_TRANSPORT)
     target_link_libraries(runner_tests_transport PRIVATE
         Catch2WithMain
         rt_transport
+        catalyst_onnx_coprocessor
     )
     target_compile_definitions(runner_tests_transport PRIVATE
         STUB_BACKEND_PATH="$<TARGET_FILE:stub_transport_backend>"
