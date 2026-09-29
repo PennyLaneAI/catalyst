@@ -2,6 +2,21 @@
 
 <h3>New features since last release</h3>
 
+* You can now dynamically prepare magic T states inside captured Catalyst workflows using
+  ``qp.allocate(state="magic-T")`` and ``qp.allocate(state="magic-T-adj")``, which makes it
+  easier to compile FTQC-style routines that need T-state ancillas on the fly (for example
+  TemporaryAND) with ``qjit(capture=True)``.
+  [(#3029)](https://github.com/PennyLaneAI/catalyst/pull/3029)
+
+  ```python
+  @qjit(capture=True)
+  @qnode(dev)
+  def circuit():
+      qb = qp.allocate(state="magic-T")
+      # ... use qb in your circuit ...
+      qp.deallocate(qb)
+  ```
+
 * A new `quantum.ctrl` region op and a `ctrl-lowering` pass are added to the Quantum Dialect
   for controlled subcircuits in Catalyst.
 

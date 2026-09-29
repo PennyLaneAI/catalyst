@@ -60,6 +60,8 @@ void handleMeasureInBasis(IRRewriter &builder, mbqc::MeasureInBasisOp vMeasureIn
                           QubitValueTracker &tracker, SmallVector<Operation *> &erasureWorklist);
 void handlePPM(IRRewriter &builder, pbc::PPMeasurementOp vPPMOp, QubitValueTracker &tracker,
                SmallVector<Operation *> &erasureWorklist);
+void handleFabricate(IRRewriter &builder, pbc::FabricateOp vFabricateOp, QubitValueTracker &tracker,
+                     SmallVector<Operation *> &erasureWorklist);
 void handleCall(IRRewriter &builder, func::CallOp callOp, QubitValueTracker &tracker,
                 SmallVector<Operation *> &erasureWorklist);
 void handleCompbasis(IRRewriter &builder, quantum::ComputationalBasisOp vCompbasisOp,

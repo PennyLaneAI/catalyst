@@ -90,6 +90,15 @@ LogicalResult RefPPMeasurementOp::verify() {
     return success();
 }
 
+LogicalResult RefFabricateOp::verify() {
+    auto initState = getInitState();
+    if (initState == LogicalInitKind::zero || initState == LogicalInitKind::one ||
+        initState == LogicalInitKind::plus || initState == LogicalInitKind::minus) {
+        return emitOpError("Logical state should not be fabricated, use `PrepareStateOp` instead.");
+    }
+    return success();
+}
+
 LogicalResult SelectPPMeasurementOp::verify() {
     if (getInQubits().size() != getPauliProduct_0().size() ||
         getInQubits().size() != getPauliProduct_1().size()) {

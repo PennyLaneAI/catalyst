@@ -213,6 +213,16 @@ void eraseAllRemainingAnchorRValues(func::FuncOp f) {
                "qref.reg Values must have no uses after the semantic conversion");
         graphStatePrepOp->erase();
     });
+    f.walk([&](qref::AllocQubitOp allocQbOp) {
+        assert(allocQbOp.use_empty() &&
+               "qref.bit Values must have no uses after the semantic conversion");
+        allocQbOp->erase();
+    });
+    f.walk([&](pbc::RefFabricateOp fabricateOp) {
+        assert(fabricateOp.use_empty() &&
+               "qref.bit Values must have no uses after the semantic conversion");
+        fabricateOp->erase();
+    });
 }
 
 /**
@@ -1145,6 +1155,16 @@ void handlePPM(IRRewriter &builder, pbc::RefPPMeasurementOp rPPMOp, QubitValueTr
     builder.eraseOp(rPPMOp);
 }
 
+void handleRefFabricate(IRRewriter &builder, pbc::RefFabricateOp rFabricateOp,
+                        QubitValueTracker &tracker) {
+    OpBuilder::InsertionGuard guard(builder);
+    builder.setInsertionPoint(rFabricateOp);
+    Location loc = rFabricateOp.getLoc();
+
+    auto fabricateOp = pbc::FabricateOp::create(builder, loc, rFabricateOp.getInitState());
+    tracker.setCurrentVQubit(rFabricateOp.getQubit(), fabricateOp.getOutQubits().front());
+}
+
 void handleCall(IRRewriter &builder, func::CallOp callOp, QubitValueTracker &tracker) {
     OpBuilder::InsertionGuard guard(builder);
     MLIRContext *ctx = callOp.getContext();
@@ -1867,6 +1887,7 @@ void handleRegion(IRRewriter &builder, Region &r, QubitValueTracker &tracker) {
             .Case<mbqc::RefMeasureInBasisOp>(
                 [&](auto o) { handleMeasureInBasis(builder, o, tracker); })
             .Case<pbc::RefPPMeasurementOp>([&](auto o) { handlePPM(builder, o, tracker); })
+            .Case<pbc::RefFabricateOp>([&](auto o) { handleRefFabricate(builder, o, tracker); })
             .Case<qref::AdjointOp>([&](auto o) { handleAdjoint(builder, o, tracker); })
             .Case<qref::CtrlOp>([&](auto o) { handleCtrl(builder, o, tracker); })
             .Case<scf::IfOp>([&](auto o) { handleIf(builder, o, tracker); })
