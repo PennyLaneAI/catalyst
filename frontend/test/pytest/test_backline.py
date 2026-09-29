@@ -127,6 +127,84 @@ def test_single_coprocessor():
     assert d["coprocessors"][0]["symbol"] == "coproc_fn"
 
 
+def test_coprocessor_fn_config_is_appended_with_the_fn_prefix():
+    """A coprocessor function's config joins the node config, each key prefixed ``fn.``."""
+    fn = qp.CoprocessorFunction("coproc_fn", config="model=/m.onnx;provider=migraphx")
+    dev = qp.Backline(
+        controller=_controller(), coprocessors=[_coproc("cop0", fn=fn)], transport="rdma"
+    )
+    node = serialize_backline(dev.placement)["coprocessors"][0]
+    assert node["config"] == "cfg;fn.model=/m.onnx;fn.provider=migraphx"
+
+
+def test_coprocessor_fn_config_without_a_node_config():
+    """A coprocessor with no config of its own carries the function's alone."""
+    fn = qp.CoprocessorFunction("coproc_fn", config="model=/m.onnx")
+    coproc = _coproc("cop0", fn=fn, init_args={"backend_lib": "backend.so"})
+    dev = qp.Backline(controller=_controller(), coprocessors=[coproc], transport="rdma")
+    node = serialize_backline(dev.placement)
+    assert node["coprocessors"][0]["config"] == "fn.model=/m.onnx"
+
+
+def test_coprocessor_fn_config_entry_without_a_value_is_rejected():
+    """An entry that is not key=value is rejected at compile time."""
+    fn = qp.CoprocessorFunction("coproc_fn", config="model")
+    dev = qp.Backline(
+        controller=_controller(), coprocessors=[_coproc("cop0", fn=fn)], transport="rdma"
+    )
+    with pytest.raises(CompileError, match="not of the form key=value"):
+        serialize_backline(dev.placement)
+
+
+def _gpu_coproc(fn, config=None):
+    init = {"backend_lib": "backend.so"}
+    if config is not None:
+        init["config"] = config
+    return qp.Coprocessor(name="gpu0", hardware="gpu", coprocessor_fn=fn, init_args=init)
+
+
+def test_a_per_message_function_selects_the_per_message_gpu_mode():
+    """A GPU coprocessor running a per-message function is configured for it automatically."""
+    fn = qp.CoprocessorFunction("coproc_fn", per_message=True)
+    dev = qp.Backline(
+        controller=_controller(), coprocessors=[_gpu_coproc(fn, "gpu=1")], transport="memcpy"
+    )
+    assert serialize_backline(dev.placement)["coprocessors"][0]["config"] == (
+        "gpu=1;coproc_fn=per_message"
+    )
+
+
+def test_an_explicit_gpu_mode_is_kept():
+    """A config that already chooses the mode is not overridden."""
+    fn = qp.CoprocessorFunction("coproc_fn", per_message=True)
+    coproc = _gpu_coproc(fn, "coproc_fn=launch_once")
+    dev = qp.Backline(controller=_controller(), coprocessors=[coproc], transport="memcpy")
+    assert serialize_backline(dev.placement)["coprocessors"][0]["config"] == "coproc_fn=launch_once"
+
+
+def test_a_launcher_on_a_gpu_keeps_the_default_mode():
+    """A function not marked per_message leaves a GPU coprocessor's config alone."""
+    dev = qp.Backline(
+        controller=_controller(), coprocessors=[_gpu_coproc("coproc_fn")], transport="memcpy"
+    )
+    assert "config" not in serialize_backline(dev.placement)["coprocessors"][0]
+
+
+def test_a_per_message_function_on_an_rdma_gpu_is_rejected():
+    """Only the memcpy GPU backend runs per-message functions."""
+    fn = qp.CoprocessorFunction("coproc_fn", per_message=True)
+    coproc = qp.Coprocessor(
+        name="gpu0",
+        hardware="gpu",
+        coprocessor_fn=fn,
+        endpoint=qp.Endpoint("127.0.0.1", 18590),
+        init_args={"backend_lib": "backend.so"},
+    )
+    dev = qp.Backline(controller=_controller(), coprocessors=[coproc], transport="rdma")
+    with pytest.raises(CompileError, match="only over the memcpy transport"):
+        serialize_backline(dev.placement)
+
+
 def test_in_process_coprocessor_fn_lib_is_loaded(monkeypatch):
     """An in-process coprocessor's CoprocessorFn library is loaded, so its symbol can resolve.
 
@@ -166,6 +244,21 @@ def test_coprocessor_fn_without_lib_path_loads_nothing(monkeypatch):
     dev = qp.Backline(controller=_controller(), coprocessors=[_coproc("cop0")], transport="rdma")
     launch_executors(dev.placement)
     assert loaded == []
+
+
+def test_a_builtin_coprocessor_fn_loads_catalysts_own_library(monkeypatch):
+    """A coprocessor function Catalyst ships needs no lib_path: its runtime library is loaded."""
+    loaded = []
+    monkeypatch.setattr("ctypes.CDLL", lambda path, mode=None: loaded.append(path) or object())
+    monkeypatch.setattr(
+        "catalyst.backline.get_lib_path", lambda project, env: "/opt/catalyst/runtime/lib"
+    )
+    fn = qp.CoprocessorFunction("catalyst_onnx_coprocessor")
+    dev = qp.Backline(
+        controller=_controller(), coprocessors=[_coproc("cop0", fn=fn)], transport="rdma"
+    )
+    launch_executors(dev.placement)
+    assert loaded == ["/opt/catalyst/runtime/lib/libcatalyst_onnx_coprocessor.so"]
 
 
 def test_unlaunched_executor_names_the_node_it_came_from():
