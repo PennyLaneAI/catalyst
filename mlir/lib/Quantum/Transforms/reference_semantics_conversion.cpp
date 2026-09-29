@@ -73,9 +73,35 @@ LogicalResult ensureNoValueSemanticsOps(Operation *op) {
 // region-bearing scf op must be rejected before conversion starts: converting the gates nested in
 // its region erases values that the region's own terminator still refers to.
 LogicalResult ensureNoScfExecuteRegionOps(Operation *op) {
+    auto hasQrefType = [](TypeRange types) {
+        return llvm::any_of(types, llvm::IsaPred<qref::QubitType, qref::QuregType>);
+    };
+
+    auto isClassicalOp = [&](Operation *op) {
+        // Yielding/using qref values is not classical, even for scf.yield / func.call.
+        if (hasQrefType(op->getOperandTypes()) || hasQrefType(op->getResultTypes())) {
+            return false;
+        }
+        // Ops from quantum-related dialects are not classical.
+        return !isa<qref::QRefDialect>(op->getDialect()) &&
+               !isa<VALUE_SEMANTICS_GATE_OPS, VALUE_SEMANTICS_OBSERVABLE_OPS,
+                    mbqc::RefGraphStatePrepOp>(op);
+    };
+
     WalkResult walkResult = op->walk([&](scf::ExecuteRegionOp executeRegionOp) {
-        executeRegionOp.emitError("scf.execute_region is not supported");
-        return WalkResult::interrupt();
+        WalkResult walkResultER = executeRegionOp->walk([&](Operation *innerOp) {
+            if (!isClassicalOp(innerOp)) {
+                executeRegionOp.emitError("scf.execute_region is not supported");
+                return WalkResult::interrupt();
+            }
+            return WalkResult::advance();
+        });
+
+        if (walkResultER.wasInterrupted()) {
+            return WalkResult::interrupt();
+        }
+
+        return WalkResult::advance();
     });
 
     if (walkResult.wasInterrupted()) {

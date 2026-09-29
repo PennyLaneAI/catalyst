@@ -94,35 +94,34 @@ LogicalResult ensureNoReferenceSemanticsOps(Operation *op) {
 LogicalResult ensureNoScfExecuteRegionOps(Operation *op) {
     auto hasQrefType = [](TypeRange types) {
         return llvm::any_of(types, llvm::IsaPred<qref::QubitType, qref::QuregType>);
-      };
+    };
 
     auto isClassicalOp = [&](Operation *op) {
-        
         // Yielding/using qref values is not classical, even for scf.yield / func.call.
-        if (hasQrefType(op->getOperandTypes()) || hasQrefType(op->getResultTypes()))
-          return false;
+        if (hasQrefType(op->getOperandTypes()) || hasQrefType(op->getResultTypes())) {
+            return false;
+        }
         // Ops from quantum-related dialects are not classical.
         return !isa<qref::QRefDialect>(op->getDialect()) &&
                !isa<REFERENCE_SEMANTICS_GATE_OPS, REFERENCE_SEMANTICS_OBSERVABLE_OPS,
                     mbqc::RefGraphStatePrepOp>(op);
-      };
-      
-      WalkResult walkResult = op->walk([&](Operation *nestedOp) {
-        if (auto erOp = dyn_cast<scf::ExecuteRegionOp>(nestedOp)) {
-          if (hasQrefType(erOp.getResultTypes())) {
-            erOp.emitError("scf.execute_region is not supported");
+    };
+
+    WalkResult walkResult = op->walk([&](scf::ExecuteRegionOp executeRegionOp) {
+        WalkResult walkResultER = executeRegionOp->walk([&](Operation *innerOp) {
+            if (!isClassicalOp(innerOp)) {
+                executeRegionOp.emitError("scf.execute_region is not supported");
+                return WalkResult::interrupt();
+            }
+            return WalkResult::advance();
+        });
+
+        if (walkResultER.wasInterrupted()) {
             return WalkResult::interrupt();
-          }
-          return WalkResult::advance();
         }
-      
-        auto erOp = nestedOp->getParentOfType<scf::ExecuteRegionOp>();
-        if (!erOp || isClassicalOp(nestedOp))
-          return WalkResult::advance();
-      
-        erOp.emitError("scf.execute_region is not supported");
-        return WalkResult::interrupt();
-      });
+
+        return WalkResult::advance();
+    });
 
     if (walkResult.wasInterrupted()) {
         return failure();
