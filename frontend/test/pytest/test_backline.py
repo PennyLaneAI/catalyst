@@ -390,17 +390,10 @@ def gpu_triton_platform():
 def gpu_transport_backend():
     """Skip unless the GPU coprocessor transport backend was actually built.
 
-    ``catalyst_transport_memcpy_gpu_coprocessor`` sits inside an ``if(TRANSPORT_HAS_HIP)`` guard
-    in ``runtime/lib/transport/memcpy/CMakeLists.txt``, so a runtime built without a HIP
-    toolchain produces no such library at all. That matters because
-    ``backline._resolve_backend_lib`` requires it on disk and raises ``ValueError`` when it is
-    missing -- a hard failure, not a skip -- so a test that executes a GPU coprocessor has to
-    check for it up front.
-
-    Distinct from :func:`gpu_triton_platform`, which asks whether a GPU and a Triton driver are
-    present. Both gates are needed by the executing cases and they fail for unrelated reasons: a
-    runner can have a working Triton driver and still lack HIP. A compile-only case that attaches
-    its own ``backend_lib`` needs neither this nor the library.
+    The library sits behind ``if(TRANSPORT_HAS_HIP)``, so a runtime built without a HIP
+    toolchain has none, and ``backline._resolve_backend_lib`` then raises ``ValueError``
+    rather than skipping. A runner can pass :func:`gpu_triton_platform` and still fail this
+    one: a working Triton driver does not imply HIP.
     """
     lib_dir = Path(get_lib_path("runtime", "RUNTIME_LIB_DIR"))
     names = [f"libcatalyst_transport_memcpy_gpu_coprocessor.{ext}" for ext in ("so", "dylib")]
@@ -417,15 +410,10 @@ def gpu_transport_backend():
 def stop_node_executors():
     """Stop the executors the compiler launched for the backline nodes registered here.
 
-    A node carrying ``executor_options`` never hands the test its executor: the compiler builds,
-    launches and caches one on the node itself (``backline._realize_executor``). Catalyst's
-    ``_SessionRegistry`` does clean up, but only at process exit, which is too late inside a
-    pytest session -- the ``catalyst-executor`` subprocess stays up holding the coprocessor's
-    out-of-band TCP port, so a rerun, ``pytest-xdist``, or a second out-of-process case in the
-    same session would meet ``EADDRINUSE``.
-
-    Register each node that asked for an executor; ``Executor.stop()`` is idempotent and runs on
-    teardown whatever the test's outcome, releasing the port and removing the deploy workspace.
+    ``_SessionRegistry`` only cleans up at process exit, too late inside a pytest session: the
+    ``catalyst-executor`` subprocess keeps the coprocessor's out-of-band TCP port, so a rerun,
+    ``pytest-xdist``, or a second out-of-process case would meet ``EADDRINUSE``. Register each
+    node that asked for an executor; ``stop()`` is idempotent and runs on teardown either way.
     """
     nodes = []
     try:
@@ -742,9 +730,8 @@ class TestBacklineDemoIntegration:
         ``catalyst_transport_coproc_gpu`` lib), so ``CoprocessorFunction`` carries no
         ``lib_path``; the runtime resolves the symbol after dlopen of the backend .so.
 
-        Skipped by ``gpu_triton_platform`` on runners without a GPU. On the GPU workflow this
-        executes end-to-end once HIP-on-CUDA is installed and the runtime CMake builds the
-        transport GPU coproc lib with the launcher symbol.
+        Skipped by ``gpu_triton_platform`` on runners without a GPU; executes end-to-end on
+        the check-transport-gpu workflow.
         """
         # Both are gates only: one for GPU + Triton driver presence, one for the HIP-built
         # backend library. Neither value is consumed here.
