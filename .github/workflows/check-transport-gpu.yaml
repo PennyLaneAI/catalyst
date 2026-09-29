@@ -147,12 +147,21 @@ jobs:
           llvm-version: ${{ needs.constants.outputs.llvm_version }}
           stablehlo-version: ${{ needs.constants.outputs.stablehlo_version }}
           enzyme-version: ${{ needs.constants.outputs.enzyme_version }}
-          # Kept on the runner rather than in the GitHub cache. This box is dedicated, so the
-          # built stack can simply stay on disk: nothing is uploaded, nothing counts against the
-          # 10 GB repo quota, and it is not scoped to a PR ref. That scoping is why the cache
-          # was always cold -- entries written by a PR run are invisible to every other PR and
-          # are deleted with the branch, and this workflow has only ever run on pull_request.
-          persist-root: ~/.cache/catalyst-ci/mlir-stack
+          # No persist-root, so the action caches instead of building into a directory on the
+          # runner. `single-gpu-x64` is an autoscaled pool that hands out a fresh EC2 instance
+          # per run -- the runner name carries the instance id and it differs every time -- so
+          # nothing under $HOME survives and an on-disk slot came up empty on every run. The
+          # cache does persist, and it restores from in-region storage at ~200 MB/s; llvm-build
+          # packs to about 1 GB, which is seconds against the two hours it takes to build.
+          #
+          # Entries are scoped to the ref that wrote them: one written by a PR run serves later
+          # runs of that same PR and no other branch. A run on main writes one every branch can
+          # read, so the first push to main after an LLVM bump is what seeds this for everyone.
+          #
+          # These get their own keys rather than reusing the ones check-catalyst.yaml writes:
+          # that LLVM job builds on ubuntu-24.04 and this host is jammy, so its mlir-tblgen
+          # hits a GLIBC mismatch here. `cache-prefix` defaults to selfhosted-gpu to keep the
+          # two sets apart.
 
       - name: Install Python runtime requirements
         run: |
