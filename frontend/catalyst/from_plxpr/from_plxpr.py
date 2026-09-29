@@ -315,7 +315,9 @@ def handle_qnode(
     if graph_decomp_pass:
         is_gate_set = bool(graph_decomp_pass.kwargs.get("gate_set"))
 
-    decomposition_scope = DecompositionScope() if (self._collect_decomp_rules or is_gate_set) else None
+    decomposition_scope = (
+        DecompositionScope() if (self._collect_decomp_rules or is_gate_set) else None
+    )
 
     def calling_convention(*args):
         device_init_p.bind(
