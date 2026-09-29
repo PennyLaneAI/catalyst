@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: quantum-opt --convert-to-value-semantics --split-input-file -verify-diagnostics %s
+// RUN: quantum-opt --convert-to-value-semantics --split-input-file -verify-diagnostics %s | FileCheck %s
 
 // Region-bearing control flow outside the supported set (scf.if / scf.for / scf.while /
 // scf.index_switch) has no conversion rule, so it is rejected rather than silently left
@@ -29,4 +29,18 @@ func.func @execute_region_in_body() attributes {quantum.node} {
 
   qref.dealloc %a : !qref.reg<1>
   return
+}
+
+// -----
+
+// Purely classical scf.execute_region ops do not need a conversion rule and must be allowed.
+// CHECK-LABEL: func.func @classical_execute_region
+func.func @classical_execute_region() -> i32 attributes {quantum.node} {
+  %c = arith.constant 1 : i32
+  // CHECK: scf.execute_region
+  %y = scf.execute_region -> i32 {
+    %x = arith.addi %c, %c : i32
+    scf.yield %x : i32
+  }
+  return %y : i32
 }

@@ -87,14 +87,42 @@ LogicalResult ensureNoReferenceSemanticsOps(Operation *op) {
     }
 }
 
-// Only scf.if, scf.for, scf.while and scf.index_switch have conversion rules. Any other
-// region-bearing scf op must be rejected before conversion starts: converting the gates nested in
-// its region erases values that the region's own terminator still refers to.
+// Only scf.if, scf.for, scf.while and scf.index_switch have conversion rules. A quantum-bearing
+// scf.execute_region must be rejected before conversion starts: converting the gates nested in its
+// region erases values that the region's own terminator still refers to. Purely classical
+// scf.execute_region ops are left alone.
 LogicalResult ensureNoScfExecuteRegionOps(Operation *op) {
-    WalkResult walkResult = op->walk([&](scf::ExecuteRegionOp executeRegionOp) {
-        executeRegionOp.emitError("scf.execute_region is not supported");
+    auto hasQrefType = [](TypeRange types) {
+        return llvm::any_of(types, llvm::IsaPred<qref::QubitType, qref::QuregType>);
+      };
+
+    auto isClassicalOp = [&](Operation *op) {
+        
+        // Yielding/using qref values is not classical, even for scf.yield / func.call.
+        if (hasQrefType(op->getOperandTypes()) || hasQrefType(op->getResultTypes()))
+          return false;
+        // Ops from quantum-related dialects are not classical.
+        return !isa<qref::QRefDialect>(op->getDialect()) &&
+               !isa<REFERENCE_SEMANTICS_GATE_OPS, REFERENCE_SEMANTICS_OBSERVABLE_OPS,
+                    mbqc::RefGraphStatePrepOp>(op);
+      };
+      
+      WalkResult walkResult = op->walk([&](Operation *nestedOp) {
+        if (auto erOp = dyn_cast<scf::ExecuteRegionOp>(nestedOp)) {
+          if (hasQrefType(erOp.getResultTypes())) {
+            erOp.emitError("scf.execute_region is not supported");
+            return WalkResult::interrupt();
+          }
+          return WalkResult::advance();
+        }
+      
+        auto erOp = nestedOp->getParentOfType<scf::ExecuteRegionOp>();
+        if (!erOp || isClassicalOp(nestedOp))
+          return WalkResult::advance();
+      
+        erOp.emitError("scf.execute_region is not supported");
         return WalkResult::interrupt();
-    });
+      });
 
     if (walkResult.wasInterrupted()) {
         return failure();
