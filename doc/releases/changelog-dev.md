@@ -117,7 +117,7 @@
   committed by `__catalyst__transport__set_message_sizes`. A frame of up to 8 bytes keeps the
   16 B `Payload` layout, so existing coprocessor functions and launchers are unaffected. The RDMA
   backends still carry 8 bytes and reject a larger size.
-  [(#XXXX)](https://github.com/PennyLaneAI/catalyst/pull/XXXX)
+  [(#3281)](https://github.com/PennyLaneAI/catalyst/pull/3281)
 
 * :func:`~.passes.graph_decomposition` accepts a `verbose` keyword argument. When `True`, the pass
   prints the decomposition rule the solver chose for each operator, along with its cost and the
