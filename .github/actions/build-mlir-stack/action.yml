@@ -61,8 +61,16 @@ runs:
       shell: bash
       run: |
         sudo apt-get update
-        sudo apt-get install -y cmake ninja-build clang lld
+        sudo apt-get install -y cmake ninja-build clang lld ccache
         python3 -m pip install numpy "nanobind<2.13" pybind11 PyYAML
+
+        # ccache earns its keep only where its directory survives between jobs, which is the
+        # case on a dedicated self-hosted runner ($HOME persists) and not on an ephemeral one.
+        # It covers what the build slot cannot: a fresh tree after an LLVM bump, a new variant,
+        # or an invalidated slot still recompiles all ~4900 targets, and on this 4-core host
+        # that is two hours. Most of those translation units are unchanged, so they hit.
+        ccache --max-size=20G
+        ccache --zero-stats
 
     - name: Prepare the persistent build directories
       id: persist
@@ -136,7 +144,7 @@ runs:
         C_COMPILER=$(which gcc) \
         CXX_COMPILER=$(which g++) \
         LLVM_BUILD_DIR="$(pwd)/llvm-build" \
-        COMPILER_LAUNCHER="" \
+        COMPILER_LAUNCHER="$(which ccache)" \
         make llvm $LLVM_BUILD_OPTIONS
         # Verify the tree actually landed in llvm-build. `make` exits 0 after building
         # into its own default directory if the env prefix above ever stops reaching it --
@@ -201,7 +209,7 @@ runs:
         CXX_COMPILER=$(which g++) \
         LLVM_BUILD_DIR="$(pwd)/llvm-build" \
         STABLEHLO_BUILD_DIR="$(pwd)/stablehlo-build" \
-        COMPILER_LAUNCHER="" \
+        COMPILER_LAUNCHER="$(which ccache)" \
         make stablehlo
         # Verify the tree actually landed in stablehlo-build. `make` exits 0 after building
         # into its own default directory if the env prefix above ever stops reaching it --
@@ -266,7 +274,7 @@ runs:
         CXX_COMPILER=$(which g++) \
         LLVM_BUILD_DIR="$(pwd)/llvm-build" \
         ENZYME_BUILD_DIR="$(pwd)/enzyme-build" \
-        COMPILER_LAUNCHER="" \
+        COMPILER_LAUNCHER="$(which ccache)" \
         make enzyme
         # Verify the tree actually landed in enzyme-build. `make` exits 0 after building
         # into its own default directory if the env prefix above ever stops reaching it --

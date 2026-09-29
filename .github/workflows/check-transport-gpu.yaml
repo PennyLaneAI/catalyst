@@ -84,6 +84,9 @@ jobs:
       - name: Install Python build dependencies
         run: |
           python3 -m pip install "cmake>=3.26" ninja "nanobind<2.13" pybind11 numpy PyYAML
+          # Installed here, not only in build-mlir-stack: the runtime build below runs first,
+          # and COMPILER_LAUNCHER resolves to whatever `which ccache` finds at that point.
+          sudo apt-get update && sudo apt-get install -y ccache
 
       - name: Get Cached LLVM Source
         id: cache-llvm-source
@@ -106,7 +109,7 @@ jobs:
       # That also keeps the build to LLVM source headers alone (header-only via rt_capi).
       - name: Build Catalyst-Runtime with transport enabled
         run: |
-          COMPILER_LAUNCHER="" \
+          COMPILER_LAUNCHER="$(which ccache)" \
           C_COMPILER=$(which gcc) \
           CXX_COMPILER=$(which g++) \
           RT_BUILD_DIR="$(pwd)/runtime-build" \
@@ -201,7 +204,7 @@ jobs:
           # a warning, and rules are derived during tracing where a signature mismatch aborts.
           export PYTHONPATH="${PYTHONPATH:-}:$(pwd)/quantum-build/python_packages/quantum"
           export CATALYST_LIB_DIR="$(pwd)/quantum-build/lib"
-          COMPILER_LAUNCHER="" \
+          COMPILER_LAUNCHER="$(which ccache)" \
           C_COMPILER=$(which gcc) \
           CXX_COMPILER=$(which g++) \
           ENABLE_LLD=ON \
