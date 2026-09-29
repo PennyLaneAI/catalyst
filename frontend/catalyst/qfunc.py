@@ -29,6 +29,7 @@ import pennylane as qp
 from jax.core import eval_jaxpr
 from jax.tree_util import tree_flatten, tree_unflatten
 from pennylane import exceptions
+from pennylane.logging import debug_logger
 from pennylane.measurements import CountsMP, ExpectationMP, ProbabilityMP, SampleMP, VarianceMP
 from pennylane.transforms.dynamic_one_shot import (
     gather_non_mcm,
@@ -44,7 +45,6 @@ from catalyst.jax_extras import deduce_avals, get_implicit_and_explicit_flat_arg
 from catalyst.jax_extras.tracing import uses_transform
 from catalyst.jax_primitives import quantum_kernel_p
 from catalyst.jax_tracer import Function, trace_quantum_function
-from pennylane.logging import debug_logger
 from catalyst.passes.pass_api import dict_to_compile_pipeline
 from catalyst.tracing.contexts import EvaluationContext
 from catalyst.tracing.type_signatures import filter_static_args

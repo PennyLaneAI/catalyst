@@ -38,9 +38,9 @@ from jax.interpreters.mlir import (
 )
 from jaxlib.mlir.dialects.builtin import ModuleOp
 from jaxlib.mlir.dialects.func import FuncOp
+from pennylane.logging import debug_logger
 
 import catalyst
-from pennylane.logging import debug_logger
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.patching import Patcher
 
