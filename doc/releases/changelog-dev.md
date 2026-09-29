@@ -117,7 +117,7 @@
   committed by `__catalyst__transport__set_message_sizes`. A frame of up to 8 bytes keeps the
   16 B `Payload` layout, so existing coprocessor functions and launchers are unaffected. The RDMA
   backends still carry 8 bytes and reject a larger size.
-  [(#XXXX)](https://github.com/PennyLaneAI/catalyst/pull/XXXX)
+  [(#3281)](https://github.com/PennyLaneAI/catalyst/pull/3281)
 
 * The memcpy GPU coprocessor also runs in a per-message mode, selected with
   `coproc_fn=per_message` in its config. It then runs a host `CoprocessorFn` once per message on
