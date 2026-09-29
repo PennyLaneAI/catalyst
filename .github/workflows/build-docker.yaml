@@ -26,7 +26,39 @@ on:
         description: Push to Docker Hub when done.
 
 jobs:
+  # Resolves every ref to a commit once, so both arch jobs build the same commits and the
+  # tag matches them. Fails immediately on a ref that doesn't exist.
+  resolve:
+    runs-on: ubuntu-24.04
+    outputs:
+      catalyst: ${{ steps.resolve.outputs.catalyst }}
+      pennylane: ${{ steps.resolve.outputs.pennylane }}
+      lightning: ${{ steps.resolve.outputs.lightning }}
+      tag: ${{ steps.resolve.outputs.tag }}
+    steps:
+      - name: Resolve refs and compute image tag
+        id: resolve
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CATALYST_VERSION: ${{ inputs.catalyst-version }}
+          PENNYLANE_VERSION: ${{ inputs.pennylane-version }}
+          LIGHTNING_VERSION: ${{ inputs.lightning-version }}
+        run: |
+          set -o pipefail
+          sha() { gh api "repos/PennyLaneAI/$1/commits/$2" --jq .sha; }
+          pin() { gh api "repos/PennyLaneAI/catalyst/contents/.dep-versions?ref=$catalyst" --jq .content | base64 -d | sed -n "s/^$1=//p"; }
+          catalyst=$(sha catalyst "$CATALYST_VERSION")
+          pennylane=${PENNYLANE_VERSION:+$(sha pennylane "$PENNYLANE_VERSION")}
+          lightning=${LIGHTNING_VERSION:+$(sha pennylane-lightning "$LIGHTNING_VERSION")}
+          # Short SHA for refs built from source, the pinned version otherwise.
+          pl=${pennylane:0:7}; pl=${pl:-$(pin pennylane)}
+          lq=${lightning:0:7}; lq=${lq:-$(pin lightning)}
+          TAG="pennylane-$pl-lightning-$lq-catalyst-${catalyst:0:7}"
+          [[ "$TAG" =~ ^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$ ]] || { echo "::error::Invalid Docker tag: $TAG"; exit 1; }
+          { echo "catalyst=$catalyst"; echo "pennylane=$pennylane"; echo "lightning=$lightning"; echo "tag=$TAG"; } >> "$GITHUB_OUTPUT"
+
   docker:
+    needs: resolve
     name: docker::ubuntu-24.04::${{ matrix.arch }}::catalyst::${{ inputs.catalyst-version }}
     timeout-minutes: 180
     strategy:
@@ -36,8 +68,6 @@ jobs:
           - { arch: amd64, runner: blacksmith-8vcpu-ubuntu-2404 }
           - { arch: arm64, runner: blacksmith-8vcpu-ubuntu-2404-arm }
     runs-on: ${{ matrix.runner }}
-    outputs:
-      tag: ${{ steps.tag.outputs.tag }}
     env:
       # Layer cache for the deps stage (LLVM, StableHLO, Enzyme). Not a runnable image.
       DEPS_CACHE: pennylaneai/pennylane:buildcache-catalyst-deps-${{ matrix.arch }}
@@ -45,31 +75,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.catalyst-version }}
+          ref: ${{ needs.resolve.outputs.catalyst }}
+          persist-credentials: false
 
       - name: Read dependency versions
         id: pins
-        run: grep -E '^(llvm|stablehlo|enzyme|pennylane|lightning)=' .dep-versions >> "$GITHUB_OUTPUT"
-
-      - name: Compute image tag
-        id: tag
-        env:
-          PENNYLANE_VERSION: ${{ inputs.pennylane-version }}
-          LIGHTNING_VERSION: ${{ inputs.lightning-version }}
-          PENNYLANE_PIN: ${{ steps.pins.outputs.pennylane }}
-          LIGHTNING_PIN: ${{ steps.pins.outputs.lightning }}
-        run: |
-          # Short commit SHA of a branch/tag (^{} is an annotated tag's commit); an input
-          # that is already a SHA is used as is.
-          sha() {
-            s=$(git ls-remote "https://github.com/PennyLaneAI/$1.git" "refs/heads/$2" "refs/tags/$2" "refs/tags/$2^{}" | tail -1)
-            s=${s:-$2}; echo "${s:0:7}"
-          }
-          pennylane=${PENNYLANE_VERSION:+$(sha pennylane "$PENNYLANE_VERSION")}; pennylane=${pennylane:-$PENNYLANE_PIN}
-          lightning=${LIGHTNING_VERSION:+$(sha pennylane-lightning "$LIGHTNING_VERSION")}; lightning=${lightning:-$LIGHTNING_PIN}
-          TAG="pennylane-$pennylane-lightning-$lightning-catalyst-$(git rev-parse --short=7 HEAD)"
-          [[ "$TAG" =~ ^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$ ]] || { echo "::error::Invalid Docker tag: $TAG"; exit 1; }
-          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+        run: grep -E '^(llvm|stablehlo|enzyme)=' .dep-versions >> "$GITHUB_OUTPUT"
 
       - uses: actions/cache/restore@v4
         with:
@@ -124,15 +135,15 @@ jobs:
           context: .
           file: docker/Dockerfile
           target: catalyst
-          tags: pennylaneai/pennylane:${{ steps.tag.outputs.tag }}
+          tags: pennylaneai/pennylane:${{ needs.resolve.outputs.tag }}
           cache-from: type=registry,ref=${{ env.DEPS_CACHE }}
           build-args: |
-            LIGHTNING_VERSION=${{ inputs.lightning-version }}
-            PENNYLANE_VERSION=${{ inputs.pennylane-version }}
+            LIGHTNING_VERSION=${{ needs.resolve.outputs.lightning }}
+            PENNYLANE_VERSION=${{ needs.resolve.outputs.pennylane }}
 
       - name: Test
         run: |
-          docker run --rm -i pennylaneai/pennylane:${{ steps.tag.outputs.tag }} python - <<'EOF'
+          docker run --rm -i pennylaneai/pennylane:${{ needs.resolve.outputs.tag }} python - <<'EOF'
           import pennylane as qp
           qp.about()
           for dev in ["lightning.qubit", "lightning.kokkos"]:
@@ -146,7 +157,7 @@ jobs:
           EOF
 
       - name: Save image
-        run: docker save pennylaneai/pennylane:${{ steps.tag.outputs.tag }} | gzip > pennylane-catalyst.tar.gz
+        run: docker save pennylaneai/pennylane:${{ needs.resolve.outputs.tag }} | gzip > pennylane-catalyst.tar.gz
 
       - name: Upload image as artifact
         uses: actions/upload-artifact@v4
@@ -168,8 +179,8 @@ jobs:
           outputs: type=image,name=pennylaneai/pennylane,push-by-digest=true,name-canonical=true,push=true
           cache-from: type=registry,ref=${{ env.DEPS_CACHE }}
           build-args: |
-            LIGHTNING_VERSION=${{ inputs.lightning-version }}
-            PENNYLANE_VERSION=${{ inputs.pennylane-version }}
+            LIGHTNING_VERSION=${{ needs.resolve.outputs.lightning }}
+            PENNYLANE_VERSION=${{ needs.resolve.outputs.pennylane }}
 
       - name: Save digest
         if: ${{ inputs.push-to-dockerhub }}
@@ -185,7 +196,7 @@ jobs:
 
   # Combines the per-arch images under one tag
   publish-multiarch-tag:
-    needs: docker
+    needs: [resolve, docker]
     if: ${{ inputs.push-to-dockerhub }}
     runs-on: ubuntu-24.04
     steps:
@@ -202,7 +213,7 @@ jobs:
 
       - name: Create multi-arch tag
         env:
-          TAG: ${{ needs.docker.outputs.tag }}
+          TAG: ${{ needs.resolve.outputs.tag }}
         run: |
           docker buildx imagetools create -t "pennylaneai/pennylane:$TAG" \
             $(sed 's|^|pennylaneai/pennylane@|' digests/*/digest)
