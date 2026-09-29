@@ -31,7 +31,7 @@ from pennylane.decomposition.utils import to_name
 from pennylane.transforms import decompose as pl_decompose
 
 from catalyst.backline import device_pass_pipeline, remote_device_lib
-from catalyst.device import extract_backend_info
+from catalyst.device import extract_backend_info, python_device
 from catalyst.device.qjit_device import is_dynamic_wires
 from catalyst.from_plxpr.decompose import DecompRuleInterpreter
 from catalyst.from_plxpr.qref_jax_primitives import (
@@ -48,6 +48,7 @@ from catalyst.jax_primitives import (
 from catalyst.utils.patching import Patcher
 
 from .device_utils import create_device_preprocessing_pipeline
+from .python_device import PythonDeviceQfuncInterpreter, count_mcm_sites, static_measurement_plan
 from .qfunc_interpreter import PLxPRToQuantumJaxprInterpreter
 
 # dummy hop (higher order primitive) is used to just return a jaxpr
@@ -290,22 +291,41 @@ def handle_qnode(
                 ncargs=non_const_args,
             )
 
+    device_kwargs = _get_device_kwargs(device)
+    num_qubits = len(device.wires)
+    make_converter = partial(PLxPRToQuantumJaxprInterpreter, device, shots)
+
+    # QNodes on Python devices are executed through the Python device bridge. This is decided
+    # here, when the QNode is converted, and recorded on the device instruction (its runtime
+    # library and kwargs), which is carried unchanged through all compilation stages.
+    if python_device.is_python_device(device) and python_device.bridge_rewrites_enabled():
+        python_device.validate_execution_config(device, execution_config)
+        bridge_kwargs = python_device.register_qnode(
+            device, execution_config, static_measurement_plan(qfunc_jaxpr)
+        )
+        device_kwargs["rtd_kwargs"] = str({**extract_backend_info(device).kwargs, **bridge_kwargs})
+        # One virtual wire per mid-circuit measurement site (see ``python_device``)
+        num_qubits += count_mcm_sites(qfunc_jaxpr)
+        make_converter = partial(
+            PythonDeviceQfuncInterpreter, device, shots, num_device_wires=len(device.wires)
+        )
+
     def calling_convention(*args):
         device_init_p.bind(
             shots,
             auto_qubit_management=(device.wires is None),
-            **_get_device_kwargs(device),
+            **device_kwargs,
         )
 
         # https://github.com/PennyLaneAI/pennylane/pull/9248
         assert not is_dynamic_wires(
             device.wires
         ), "plxpr does not support dynamic number of wires on the device yet"
-        qreg = qref_alloc_p.bind(static_num_qubits=len(device.wires))
+        qreg = qref_alloc_p.bind(static_num_qubits=num_qubits)
         self.init_qreg = qreg
 
-        converter = PLxPRToQuantumJaxprInterpreter(
-            device, shots, self.init_qreg, {}, collect_decomp_rules=self._collect_decomp_rules
+        converter = make_converter(
+            self.init_qreg, {}, collect_decomp_rules=self._collect_decomp_rules
         )
         retvals = converter(closed_jaxpr, *args)
         qref_dealloc_p.bind(self.init_qreg)

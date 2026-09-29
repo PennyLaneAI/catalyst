@@ -116,7 +116,8 @@ def test_custom_device_bad_directory():
 
 
 def test_custom_device_no_c_interface():
-    """Test that custom device error."""
+    """Test that a custom Python device without a C interface is executed through the PennyLane
+    Python device bridge (and that its errors reach the user)."""
 
     class CustomDevice(qp.devices.Device):
         """Custom Device"""
@@ -138,11 +139,9 @@ def test_custom_device_no_c_interface():
     @qjit
     @qp.qnode(CustomDevice(wires=1))
     def f():
-        return measure(0)
+        return qp.expval(qp.Z(0))
 
-    with pytest.raises(
-        CompileError, match="The custom.device device does not provide C interface for compilation."
-    ):
+    with pytest.raises(NotImplementedError):
         f()
 
 

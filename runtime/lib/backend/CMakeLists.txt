@@ -1,6 +1,9 @@
 add_subdirectory(null_qubit)
 configure_file(null_qubit/null_qubit.toml null_qubit.toml)
 
+add_subdirectory(pennylane_python)
+configure_file(pennylane_python/pennylane_python.toml pennylane_python.toml)
+
 if(ENABLE_OQD)
 add_subdirectory(oqd)
 configure_file(oqd/oqd.toml oqd.toml)

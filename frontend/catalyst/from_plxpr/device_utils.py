@@ -28,6 +28,7 @@ from pennylane.transforms import (
 )
 from pennylane.transforms.core import BoundTransform, Transform
 
+from catalyst.device import python_device
 from catalyst.device.decomposition import (
     measurements_from_counts,
     measurements_from_samples,
@@ -130,6 +131,10 @@ def _mcm_preprocessing(
             f"'qp.qjit(capture=True)'. Currently, only 'fill_shots' or None are supported."
         )
 
+    if python_device.is_python_device(device):
+        # The MCM method is applied by the device's own preprocessing at runtime.
+        return
+
     if mcm_config.mcm_method == MCM_METHOD.ONE_SHOT:
         shots_present = qp.math.is_abstract(shots) or shots != 0
         if not shots_present:
@@ -157,6 +162,10 @@ def _measurements_preprocessing(
     capabilities: DeviceCapabilities,
 ) -> None:
     """Preprocess terminal measurements."""
+    if python_device.is_python_device(device):
+        # Applied by the device's own preprocessing (e.g. ``split_non_commuting``) at runtime.
+        return
+
     # Check if split_non_commuting is needed
     need_split_non_commuting = False
     if not capabilities.non_commuting_observables:

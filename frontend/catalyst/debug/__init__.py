@@ -24,6 +24,7 @@ from catalyst.debug.compiler_functions import (
 )
 from catalyst.debug.instruments import instrumentation
 from catalyst.debug.printing import print, print_memref  # pylint: disable=redefined-builtin
+from catalyst.device.python_device import InterceptedTape, intercept_runtime_tape
 
 __all__ = (
     "callback",
@@ -35,4 +36,6 @@ __all__ = (
     "instrumentation",
     "replace_ir",
     "compile_executable",
+    "intercept_runtime_tape",
+    "InterceptedTape",
 )
