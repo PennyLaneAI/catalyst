@@ -97,11 +97,8 @@ void CpuControllerSession::stop() {}
 void CpuControllerSession::commit_work_item(std::uint32_t work_item_idx, std::uint64_t in_bytes,
                                             std::uint64_t out_bytes) {
     TP_CHECK(work_item_idx == 0, "Only work_item_idx=0 supported");
-    // The wire carries an 8-byte payload; anything larger would be silently truncated in kick().
-    // Match the RDMA backend's contract (rdma/cpu_verbs/.../CpuControllerSession.cpp) rather than
-    // accepting and dropping bytes.
-    TP_CHECK(in_bytes <= common::PAYLOAD_DATA_BYTES && out_bytes <= common::PAYLOAD_DATA_BYTES,
-             "In/out_bytes exceeds 8 B payload area");
+    TP_CHECK(in_bytes <= common::MAX_MESSAGE_BYTES && out_bytes <= common::MAX_MESSAGE_BYTES,
+             "In/out_bytes exceeds the %zu B message limit", common::MAX_MESSAGE_BYTES);
     TP_CHECK(!committed_, "Only one commit_work_item per session");
     in_bytes_ = in_bytes;
     out_bytes_ = out_bytes;
@@ -117,16 +114,18 @@ int CpuControllerSession::kick(std::uint32_t work_item_idx) {
 
     kick_ns_ = now_ns();
 
-    // Synthesize a wire-shaped Payload so `in` looks the same as it does over cpu_verbs:
-    // value bytes at offset 0, decoder_id at PAYLOAD_DATA_BYTES, then seq_num.
-    common::Payload frame{};
+    // Synthesize a wire-shaped frame, so `in` looks the same as it does over cpu_verbs: payload
+    // bytes at offset 0, then decoder_id, then seq_num (see common::frame_bytes). For
+    // in_bytes <= 8 this is exactly a common::Payload.
+    const std::size_t data_bytes = common::frame_data_bytes(static_cast<std::size_t>(in_bytes_));
+    frame_.assign(common::frame_bytes(data_bytes), std::byte{0});
     if (staged_bytes_ != 0) {
-        std::memcpy(&frame.value, request_staging_.data(),
-                    std::min<std::size_t>(static_cast<std::size_t>(staged_bytes_),
-                                          common::PAYLOAD_DATA_BYTES));
+        std::memcpy(frame_.data(), request_staging_.data(),
+                    std::min<std::size_t>(static_cast<std::size_t>(staged_bytes_), data_bytes));
     }
-    frame.decoder_id = decoder_id_;
-    frame.seq_num = static_cast<std::uint32_t>(next_send_ + 1);
+    const std::uint32_t seq_num = static_cast<std::uint32_t>(next_send_ + 1);
+    std::memcpy(frame_.data() + data_bytes, &decoder_id_, sizeof(decoder_id_));
+    std::memcpy(frame_.data() + data_bytes + sizeof(decoder_id_), &seq_num, sizeof(seq_num));
     ++next_send_;
 
     std::size_t reply_bytes = 0;
@@ -134,7 +133,7 @@ int CpuControllerSession::kick(std::uint32_t work_item_idx) {
         // Held across check and call so teardown can't clear process_message mid-call.
         std::lock_guard<std::mutex> lock(link_->mu);
         TP_CHECK(link_->process_message, "No paired coprocessor");
-        reply_bytes = link_->process_message(&frame, sizeof(frame), local_reply_.addr,
+        reply_bytes = link_->process_message(frame_.data(), frame_.size(), local_reply_.addr,
                                              static_cast<std::size_t>(out_bytes_));
     }
     reply_bytes_ = static_cast<std::uint64_t>(reply_bytes);

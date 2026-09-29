@@ -20,6 +20,7 @@
 
 #include "CpuControllerSession.hpp"
 #include "CpuCoprocessorSession.hpp"
+#include "WireProtocol.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -277,18 +278,87 @@ TEST_CASE("memcpy incumbent coprocessor survives a rejected second coprocessor",
     CHECK(got == word);
 }
 
-// Match RDMA: reject in/out_bytes > wire payload instead of truncating in kick().
-TEST_CASE("memcpy rejects in/out_bytes exceeding the wire payload", "[transport_memcpy]") {
+namespace {
+// Replies with the frame's payload bytes inverted, followed by its decoder_id, after checking the
+// frame is laid out as common::frame_bytes describes and the reply capacity is the committed size.
+struct WideFrameCheck {
+    std::size_t in_bytes;
+    std::size_t out_bytes;
+};
+
+std::size_t wide_frame_fn(const void *in, std::size_t in_len, void *out, std::size_t out_cap,
+                          void *ctx) {
+    const auto *want = static_cast<const WideFrameCheck *>(ctx);
+    const std::size_t data_bytes = common::frame_data_bytes(want->in_bytes);
+    if (in_len != common::frame_bytes(data_bytes) || out_cap != want->out_bytes) {
+        return 0;
+    }
+    const auto *frame = static_cast<const std::uint8_t *>(in);
+    auto *reply = static_cast<std::uint8_t *>(out);
+    std::uint32_t decoder_id = 0;
+    std::memcpy(&decoder_id, frame + data_bytes, sizeof(decoder_id));
+    for (std::size_t i = 0; i < want->in_bytes; ++i) {
+        reply[i] = static_cast<std::uint8_t>(~frame[i]);
+    }
+    reply[want->in_bytes] = static_cast<std::uint8_t>(decoder_id);
+    return want->in_bytes + 1;
+}
+} // namespace
+
+TEST_CASE("memcpy carries messages wider than the 16 B wire frame", "[transport_memcpy]") {
+    constexpr std::size_t in_bytes = 120;
+    constexpr std::size_t out_bytes = in_bytes + 1;
     ConnectInfo ci{.peer = "loopback", .oob_port = 19021};
     CpuControllerSession controller(pair_cfg(ci.oob_port));
     CpuCoprocessorSession coprocessor(pair_cfg(ci.oob_port));
     REQUIRE(controller.connect(ci) == 0);
     REQUIRE(coprocessor.connect(ci) == 0);
 
-    REQUIRE_THROWS_AS(controller.commit_work_item(0, /*in_bytes=*/32, sizeof(std::uint64_t)),
+    MemRegion reply = controller.alloc_memory(out_bytes, MemKind::CpuRam);
+    PeerRef peer_request = controller.exchange_keys(reply);
+    MemRegion request = coprocessor.alloc_memory(in_bytes, MemKind::CpuRam);
+    PeerRef peer_reply = coprocessor.exchange_keys(request);
+    ChannelDesc desc{.transport = "memcpy"};
+    controller.establish_channel(desc, reply, peer_request);
+    coprocessor.establish_channel(desc, request, peer_reply);
+
+    WideFrameCheck check{in_bytes, out_bytes};
+    controller.commit_work_item(0, in_bytes, out_bytes);
+    coprocessor.set_coprocessor_fn(wide_frame_fn, &check);
+    controller.start();
+    coprocessor.start();
+
+    for (std::uint32_t round = 0; round < 3; ++round) {
+        std::uint8_t payload[in_bytes];
+        for (std::size_t i = 0; i < in_bytes; ++i) {
+            payload[i] = static_cast<std::uint8_t>(i * 7 + round);
+        }
+        controller.write_data_slot(payload, in_bytes, /*decoder_id=*/round + 5);
+        REQUIRE(controller.kick(0) == 0);
+
+        std::uint8_t got[out_bytes] = {};
+        void *outs[1] = {got};
+        std::uint64_t outs_bytes[1] = {out_bytes};
+        REQUIRE(controller.collect(outs, outs_bytes, 1) == 0);
+        for (std::size_t i = 0; i < in_bytes; ++i) {
+            REQUIRE(got[i] == static_cast<std::uint8_t>(~payload[i]));
+        }
+        CHECK(got[in_bytes] == round + 5);
+    }
+}
+
+TEST_CASE("memcpy rejects in/out_bytes above MAX_MESSAGE_BYTES", "[transport_memcpy]") {
+    ConnectInfo ci{.peer = "loopback", .oob_port = 19030};
+    CpuControllerSession controller(pair_cfg(ci.oob_port));
+    CpuCoprocessorSession coprocessor(pair_cfg(ci.oob_port));
+    REQUIRE(controller.connect(ci) == 0);
+    REQUIRE(coprocessor.connect(ci) == 0);
+
+    REQUIRE_THROWS_AS(controller.commit_work_item(0, common::MAX_MESSAGE_BYTES + 1, 8),
                       std::runtime_error);
-    REQUIRE_THROWS_AS(controller.commit_work_item(0, sizeof(std::uint64_t), /*out_bytes=*/32),
+    REQUIRE_THROWS_AS(controller.commit_work_item(0, 8, common::MAX_MESSAGE_BYTES + 1),
                       std::runtime_error);
+    controller.commit_work_item(0, common::MAX_MESSAGE_BYTES, common::MAX_MESSAGE_BYTES);
 }
 
 // Distinct pair keys stay isolated even on the same peer+oob_port.

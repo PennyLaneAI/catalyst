@@ -62,6 +62,8 @@ class CpuControllerSession : public ControllerSession {
     std::vector<std::unique_ptr<std::byte[]>> caller_memory_regions_;
 
     std::vector<std::byte> request_staging_;
+    /// The frame kick() hands the coprocessor. Reused across kicks, so it allocates once.
+    std::vector<std::byte> frame_;
 
     /// Set on the first commit_work_item(). Subsequent commits are rejected so any pointer a
     /// prior data_slot() handed out cannot dangle behind a request_staging_ reallocation.
