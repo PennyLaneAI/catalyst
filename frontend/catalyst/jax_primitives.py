@@ -131,6 +131,7 @@ with Patcher(
         create_call_op,
         get_cached,
         get_call_jaxpr,
+        get_mlir_attribute_from_pyval,
         get_symbolref,
         lower_callable,
         lower_jaxpr,
@@ -651,13 +652,34 @@ def _decomposition_rule_abstract(*, pyfun, func_jaxpr, is_qreg, num_params):
 
 
 @decomp_definition_p.def_abstract_eval
-def _decomposition_definition_abstract(*, pyfun, func_jaxpr):
+def _decomposition_definition_abstract(
+    *, pyfun, func_jaxpr, target_gate, resources, frontend_name, num_wires
+):
     return ()
 
 
-def _decomposition_definition_lowering(ctx, *, pyfun, func_jaxpr):
+def _decomposition_definition_lowering(
+    ctx, *, pyfun, func_jaxpr, target_gate, resources, frontend_name, num_wires
+):
     """Lower a finalized Catalyst decomposition-rule as a function definition."""
-    lower_callable(ctx, pyfun, func_jaxpr)
+    # differentiate functions in the lowering cache
+    metadata = (target_gate, resources, frontend_name, num_wires)
+    func_op = lower_callable(ctx, pyfun, func_jaxpr, metadata=metadata)
+
+    func_op.attributes["target_gate"] = get_mlir_attribute_from_pyval(target_gate)
+    func_op.attributes["sym_visibility"] = ir.StringAttr.get("private")
+
+    # TODO: remove extra field/branch with DecompRuleInterpreter removal
+    if resources is not None:
+        func_op.attributes["resources"] = get_mlir_attribute_from_pyval(
+            {"operations": dict(resources)}
+        )
+        assert frontend_name is not None
+        func_op.attributes["frontend_name"] = get_mlir_attribute_from_pyval(frontend_name)
+    else:
+        assert num_wires is not None
+        func_op.attributes["num_wires"] = get_mlir_attribute_from_pyval(num_wires)
+
     return ()
 
 

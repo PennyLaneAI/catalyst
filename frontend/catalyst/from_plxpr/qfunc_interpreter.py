@@ -437,9 +437,6 @@ def _convert_decomp_target_spec(interpreter, target_spec):
         pyfun = rule.pyfun
         if not pyfun.__name__.startswith("__builtin_"):
             pyfun.__name__ = "__builtin_" + pyfun.__name__
-        setattr(pyfun, "target_gate", target_spec.target_id)
-        setattr(pyfun, "resources", {"operations": rule.resources})
-        setattr(pyfun, "frontend_name", rule.frontend_name)
 
         with take_current_trace():
             try:
@@ -506,6 +503,10 @@ def capture_and_bind_kernel_rules(interpreter):
         decomp_definition_p.bind(
             pyfun=traced_rule.pyfun,
             func_jaxpr=traced_rule.closed_jaxpr,
+            target_gate=traced_rule.target_gate,
+            resources=tuple(sorted(traced_rule.resources.items())),
+            frontend_name=traced_rule.frontend_name,
+            num_wires=None,
         )
 
 
@@ -743,7 +744,14 @@ def handle_decomposition_rule(self, *, pyfun, func_jaxpr, is_qreg, num_params):
         ]
         converted_closed_jaxpr_branch = jax.make_jaxpr(wrapper)(*new_in_avals)
 
-    decomp_definition_p.bind(pyfun=pyfun, func_jaxpr=converted_closed_jaxpr_branch)
+    decomp_definition_p.bind(
+        pyfun=pyfun,
+        func_jaxpr=converted_closed_jaxpr_branch,
+        target_gate=getattr(pyfun, "target_gate", None),
+        resources=None,
+        frontend_name=getattr(pyfun, "frontend_name", None),
+        num_wires=getattr(pyfun, "num_wires", None),
+    )
 
     return ()
 
