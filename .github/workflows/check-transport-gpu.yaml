@@ -95,8 +95,12 @@ jobs:
         # not just the question: it is what pulls in nvidia-modprobe and gets the device
         # nodes created.
         run: |
-          set -uo pipefail
-          # Quiet on failure: this runs up to 30 times, and a driver that is not up yet is the
+          set -u
+          # GitHub runs step shells as `bash -e`. Every probe below is expected to fail
+          # sometimes -- that is the thing being measured, not an error -- so -e has to come
+          # off, and the diagnostics at the end must not abort the step before they print.
+          set +e
+          # Quiet on failure: this runs up to 60 times, and a driver that is not up yet is the
           # expected case rather than something to print a traceback about.
           probe='
           import ctypes, sys
@@ -105,25 +109,36 @@ jobs:
           except OSError:
               sys.exit(1)
           '
-          cc=""
-          for i in $(seq 1 30); do
-            nvidia-smi -L >/dev/null 2>&1
-            if python3 -c "$probe"; then
-              cc=$(nvidia-smi --query-gpu=compute_cap --format=csv,noheader 2>&1 | head -1)
-              case "$cc" in
-                [0-9]*.[0-9]*)
-                  echo "GPU usable after $(( (i - 1) * 10 ))s: compute capability $cc"
-                  nvidia-smi
-                  exit 0
-                  ;;
-              esac
+          # Three consecutive clean rounds, not one. On this pool nvidia-smi was seen
+          # reporting compute capability 8.6 and then "No devices were found" 330 ms later on
+          # the same host, so one passing probe says nothing about whether the GPU is still
+          # there when pytest runs twenty minutes on. Rounds are 10s apart, so this asks for
+          # roughly 20s of uninterrupted health before the job commits to any work.
+          need=3
+          streak=0
+          cc=""; devs=""; cuinit=""
+          for i in $(seq 1 60); do
+            devs=$(nvidia-smi -L 2>&1)
+            cc=$(nvidia-smi --query-gpu=compute_cap --format=csv,noheader 2>&1 | head -1)
+            python3 -c "$probe"; cuinit=$?
+            ok=1
+            printf '%s\n' "$devs" | grep -q '^GPU [0-9]' || ok=0
+            case "$cc" in [0-9]*.[0-9]*) ;; *) ok=0 ;; esac
+            [ "$cuinit" -eq 0 ] || ok=0
+            if [ "$ok" -eq 1 ]; then streak=$((streak + 1)); else streak=0; fi
+            if [ "$streak" -ge "$need" ]; then
+              echo "GPU healthy for $(( (need - 1) * 10 ))s, first seen after $(( (i - need) * 10 ))s"
+              echo "compute capability $cc"
+              printf '%s\n' "$devs"
+              exit 0
             fi
             sleep 10
           done
-          echo "::error::The GPU was not usable within 5 minutes, so the backline tests would" \
-               "skip and this job would cover nothing. Last compute_cap reading: '${cc:-(cuInit never succeeded)}'."
-          nvidia-smi || echo "nvidia-smi unavailable"
-          ls -l /dev/nvidia* 2>&1 || echo "(no /dev/nvidia* device nodes)"
+          echo "::error::The GPU never stayed healthy for $(( (need - 1) * 10 ))s within 10 minutes." \
+               "The backline tests would skip and this job would report success over zero coverage." \
+               "Last round -- nvidia-smi -L: '$devs' | compute_cap: '$cc' | cuInit exit: $cuinit."
+          nvidia-smi
+          ls -l /dev/nvidia*
           exit 1
 
       - name: Checkout Catalyst repo
