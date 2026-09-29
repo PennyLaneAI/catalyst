@@ -613,6 +613,8 @@
 
 <h3>Breaking changes 💔</h3>
 
+* `catalyst.logging` has been removed. `pennylane.logging` should be used instead.
+
 * Removes :func:`~.passes.ppm_specs` and the ``--ppm-specs`` MLIR pass. Use :func:`~.specs` and
   the ``ResourceAnalysis`` pass instead for PPR/PPM resource counts and PBC layer depth
   (``any_commuting_depth`` / ``qubit_disjoint_depth``).

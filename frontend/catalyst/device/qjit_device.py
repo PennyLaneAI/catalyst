@@ -53,7 +53,7 @@ from catalyst.device.verification import (
     verify_no_state_variance_returns,
     verify_operations,
 )
-from catalyst.logging import debug_logger, debug_logger_init
+from pennylane.logging import debug_logger, debug_logger_init
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.runtime_environment import get_lib_path
 

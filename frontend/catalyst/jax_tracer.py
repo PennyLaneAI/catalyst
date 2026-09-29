@@ -113,7 +113,7 @@ from catalyst.jax_primitives import (
     unitary_p,
     var_p,
 )
-from catalyst.logging import debug_logger, debug_logger_init
+from pennylane.logging import debug_logger, debug_logger_init
 from catalyst.tracing.contexts import EvaluationContext, EvaluationMode
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.patching import DictPatchWrapper, Patcher

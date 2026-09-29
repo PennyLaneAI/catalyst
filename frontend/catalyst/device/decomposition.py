@@ -46,7 +46,7 @@ from catalyst.device.op_support import (
     is_supported,
 )
 from catalyst.jax_tracer import HybridOpRegion, has_nested_tapes
-from catalyst.logging import debug_logger
+from pennylane.logging import debug_logger
 from catalyst.tracing.contexts import EvaluationContext
 from catalyst.utils.exceptions import CompileError
 
