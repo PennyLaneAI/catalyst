@@ -34,7 +34,6 @@ runs:
         sudo depmod -a
         if have_rxe; then
           echo "rdma_rxe.ko provided by linux-modules-extra-$KVER"
-          find /lib/modules/"$KVER" -name 'rdma_rxe*' -print
           exit 0
         fi
 
@@ -63,22 +62,10 @@ runs:
           M="$SRC/drivers/infiniband/sw/rxe" modules
 
         KO="$SRC/drivers/infiniband/sw/rxe/rdma_rxe.ko"
-        if [ ! -f "$KO" ]; then
-          echo "::error::rdma_rxe.ko not produced by build"
-          ls -la "$SRC/drivers/infiniband/sw/rxe/"
-          exit 1
-        fi
-
         sudo install -D -m 644 "$KO" \
           "/lib/modules/$KVER/kernel/drivers/infiniband/sw/rxe/rdma_rxe.ko"
         sudo depmod -a
-
-        if ! have_rxe; then
-          echo "::error::rdma_rxe.ko not resolvable after install"
-          exit 1
-        fi
         echo "Built and installed rdma_rxe.ko from linux-${KVER_MAJMIN}.y"
-        modinfo rdma_rxe | head -20
 
     - name: Configure Soft-RoCE (rxe0 on loopback)
       shell: bash
@@ -86,8 +73,6 @@ runs:
         # Attach rdma_rxe to `lo` so the tests find an ibverbs device named rxe0.
         sudo modprobe rdma_rxe
         sudo rdma link add rxe0 type rxe netdev lo
-        rdma link show
         ibv_devices
-        ibv_devinfo -d rxe0
         # Fail fast if rxe0 didn't come up: the Catch2 tests would otherwise silently SKIP.
         ibv_devices | awk '{print $1}' | grep -q '^rxe0$'

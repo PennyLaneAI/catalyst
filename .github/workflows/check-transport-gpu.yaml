@@ -84,6 +84,8 @@ jobs:
         # reads it, and the runtime build runs before that tree exists. CATALYST_LIB_DIR is
         # set here so the frontend build sees it, or precompile_decomposition_rules only warns.
         run: |
+          sudo apt-get update
+          sudo apt-get install -y clang lld
           python3 -m pip install "cmake>=3.26" ninja "nanobind<2.13" pybind11 numpy PyYAML
           {
             echo "C_COMPILER=$(which gcc)"
@@ -151,33 +153,98 @@ jobs:
           # Triton dlopens libcuda.so.1 from the driver, not the toolkit stub.
           echo "TRITON_LIBCUDA_PATH=/lib/x86_64-linux-gnu" >> $GITHUB_ENV
 
-      # After the pip steps: requirements.txt pins numpy/nanobind/pybind11, which the MLIR
-      # bindings compile against. Late, because a cache miss here costs two hours.
-      - name: Restore or build LLVM, StableHLO and Enzyme
-        uses: ./.github/actions/build-mlir-stack
+      # This host builds its own MLIR stack: check-catalyst.yaml's caches are produced on
+      # GH-hosted 24.04 images, whose mlir-tblgen needs a newer GLIBC than this jammy host has.
+      # The selfhosted-gpu prefix keeps the two sets of keys apart. Entries are ref-scoped, so a
+      # push to main is what seeds every branch. After the pip steps, because requirements.txt
+      # pins the numpy/nanobind/pybind11 the MLIR bindings compile against.
+      - name: Point the builds at the MLIR stack directories
+        # After `make runtime`, which reads LLVM_BUILD_DIR before that tree exists. Every make
+        # below inherits these, so they need no env prefix of their own.
+        run: |
+          {
+            echo "LLVM_BUILD_DIR=$(pwd)/llvm-build"
+            echo "STABLEHLO_BUILD_DIR=$(pwd)/stablehlo-build"
+            echo "ENZYME_BUILD_DIR=$(pwd)/enzyme-build"
+          } >> "$GITHUB_ENV"
+
+      - name: Cache LLVM Build
+        id: cache-llvm-build
+        uses: actions/cache@v4
         with:
-          llvm-version: ${{ needs.constants.outputs.llvm_version }}
-          stablehlo-version: ${{ needs.constants.outputs.stablehlo_version }}
-          enzyme-version: ${{ needs.constants.outputs.enzyme_version }}
-          # Cache entries are ref-scoped, so a push to main is what seeds every branch. Own
-          # keys, because check-catalyst.yaml builds on 24.04 and its mlir-tblgen needs a
-          # newer GLIBC than this jammy host has.
+          path: llvm-build
+          key: selfhosted-gpu-${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-ci-build-gcc
+
+      - name: Build LLVM
+        if: steps.cache-llvm-build.outputs.cache-hit != 'true'
+        run: make llvm
+
+      - name: Cache Stablehlo Source
+        id: cache-stablehlo-source
+        uses: actions/cache@v4
+        with:
+          path: mlir/stablehlo
+          key: stablehlo-${{ needs.constants.outputs.stablehlo_version }}-default-source
+          enableCrossOsArchive: true
+
+      - name: Clone Stablehlo Submodule
+        if: steps.cache-stablehlo-source.outputs.cache-hit != 'true'
+        uses: actions/checkout@v4
+        with:
+          repository: openxla/stablehlo
+          ref: ${{ needs.constants.outputs.stablehlo_version }}
+          path: mlir/stablehlo
+
+      - name: Cache Stablehlo Build
+        id: cache-stablehlo-build
+        uses: actions/cache@v4
+        with:
+          path: stablehlo-build
+          key: selfhosted-gpu-${{ runner.os }}-stablehlo-${{ needs.constants.outputs.stablehlo_version }}-ci-build-gcc
+
+      - name: Build Stablehlo Dialect
+        if: steps.cache-stablehlo-build.outputs.cache-hit != 'true'
+        run: make stablehlo
+
+      - name: Cache Enzyme Source
+        id: cache-enzyme-source
+        uses: actions/cache@v4
+        with:
+          path: mlir/Enzyme
+          key: enzyme-${{ needs.constants.outputs.enzyme_version }}-default-source
+          enableCrossOsArchive: true
+
+      - name: Clone Enzyme Submodule
+        if: steps.cache-enzyme-source.outputs.cache-hit != 'true'
+        uses: actions/checkout@v4
+        with:
+          repository: EnzymeAD/Enzyme
+          ref: ${{ needs.constants.outputs.enzyme_version }}
+          path: mlir/Enzyme
+
+      - name: Cache Enzyme Build
+        id: cache-enzyme-build
+        uses: actions/cache@v4
+        with:
+          path: enzyme-build
+          key: selfhosted-gpu-${{ runner.os }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-ci-build-gcc
+
+      - name: Build Enzyme
+        if: steps.cache-enzyme-build.outputs.cache-hit != 'true'
+        run: make enzyme
 
       - name: Build Catalyst frontend (reusing the transport-enabled runtime)
         run: |
           ENABLE_LLD=ON \
-          LLVM_BUILD_DIR="$(pwd)/llvm-build" \
-          STABLEHLO_BUILD_DIR="$(pwd)/stablehlo-build" \
-          ENZYME_BUILD_DIR="$(pwd)/enzyme-build" \
           ENABLE_TRANSPORT=ON \
           make catalyst
 
       - name: Add Frontend Dependencies to PATH
         run: |
-          echo "$(pwd)/llvm-build/bin" >> $GITHUB_PATH
+          echo "$LLVM_BUILD_DIR/bin" >> $GITHUB_PATH
           echo "$DIALECTS_BUILD_DIR/bin" >> $GITHUB_PATH
           echo "RUNTIME_LIB_DIR=$RT_BUILD_DIR/lib" >> $GITHUB_ENV
-          echo "MLIR_LIB_DIR=$(pwd)/llvm-build/lib" >> $GITHUB_ENV
+          echo "MLIR_LIB_DIR=$LLVM_BUILD_DIR/lib" >> $GITHUB_ENV
           echo "CATALYST_BIN_DIR=$DIALECTS_BUILD_DIR/bin" >> $GITHUB_ENV
           echo "CATALYST_TRANSPORT_PATH=$RT_BUILD_DIR/lib" >> $GITHUB_ENV
 
