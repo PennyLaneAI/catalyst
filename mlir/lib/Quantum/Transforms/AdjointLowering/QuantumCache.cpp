@@ -26,23 +26,14 @@ using namespace catalyst;
 namespace catalyst {
 namespace quantum {
 
-// ============================================================================================
-// Integer/boolean parameters are cached by round-tripping through the *f64* parameter buffer
-// (`arith.uitofp` on the way in, `arith.fptoui` on the way out).
-// f64 represents every integer in [0, 2^53] EXACTLY, and nothing outside that range contiguously.
-// So the round-trip is lossless precisely for widths <= 53 bits.
-// That covers every gate parameter seen in practice (a MultiX bitstring, wire indices,
-// control counts, QROM bitstring rows, ...).
-//
-// Wider integers (e.g. a genuinely large i64) are NOT supported: a value >= 2^53 would round to a
-// nearby f64 and silently fail to round-trip. Rather than cache such a value lossily, let's reject
-// it here so `verifyTypeIsCacheable` fails loudly with a diagnostic.
-// TODO: to support wide integers, cache them in a dedicated integer (e.g. i64) buffer instead of
-// via f64, which would be lossless for all widths.
-// ============================================================================================
+// Integer/boolean parameters are recorded in a dedicated i64 buffer (`cache.intVector`): each value
+// is zero-extended to i64 on push (`arith.extui`) and truncated back on pop (`arith.trunci`), which
+// is lossless for every element width <= 64 bits. This covers every integer gate parameter seen in
+// practice (a MultiX `tensor<Nxi1>` bitstring, wire indices, control counts, a QROM
+// `tensor<Nxi64>` bitstring, ...). Wider integers (e.g. i128) are not supported.
 static bool isCacheableInteger(Type ty) {
     auto intType = dyn_cast<IntegerType>(ty);
-    return intType && intType.getWidth() <= 53;
+    return intType && intType.getWidth() <= 64;
 }
 
 LogicalResult verifyTypeIsCacheable(Type ty, Operation *op) {
@@ -104,9 +95,11 @@ bool isAvailableToReversePass(Value param, Region &adjointRegion) {
 QuantumCache QuantumCache::initialize(Region &region, OpBuilder &builder, Location loc) {
     MLIRContext *ctx = builder.getContext();
     auto paramVectorType = ArrayListType::get(ctx, builder.getF64Type());
+    auto intVectorType = ArrayListType::get(ctx, builder.getI64Type());
     auto wireVectorType = ArrayListType::get(ctx, builder.getI64Type());
     auto controlFlowTapeType = ArrayListType::get(ctx, builder.getIndexType());
     auto paramVector = ListInitOp::create(builder, loc, paramVectorType);
+    auto intVector = ListInitOp::create(builder, loc, intVectorType);
     auto wireVector = ListInitOp::create(builder, loc, wireVectorType);
 
     // Initialize the tapes that store the structure of control flow.
@@ -117,12 +110,15 @@ QuantumCache QuantumCache::initialize(Region &region, OpBuilder &builder, Locati
             controlFlowTapes.insert({op, tape});
         }
     });
-    return quantum::QuantumCache{
-        .paramVector = paramVector, .wireVector = wireVector, .controlFlowTapes = controlFlowTapes};
+    return quantum::QuantumCache{.paramVector = paramVector,
+                                 .intVector = intVector,
+                                 .wireVector = wireVector,
+                                 .controlFlowTapes = controlFlowTapes};
 }
 
 void QuantumCache::emitDealloc(OpBuilder &builder, Location loc) {
     ListDeallocOp::create(builder, loc, paramVector);
+    ListDeallocOp::create(builder, loc, intVector);
     ListDeallocOp::create(builder, loc, wireVector);
     for (const auto &[_key, controlFlowTape] : controlFlowTapes) {
         ListDeallocOp::create(builder, loc, controlFlowTape);

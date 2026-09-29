@@ -15,8 +15,10 @@
 #include <cstddef>
 #include <cstdint>
 #include <numeric>
+#include <sstream>
 #include <string>
 #include <tuple>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -28,6 +30,7 @@
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/DebugLog.h"
+#include "llvm/Support/LogicalResult.h"
 #include "llvm/Support/raw_ostream.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
@@ -104,6 +107,28 @@ namespace quantum {
 
 struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDecompositionPass> {
     using GraphDecompositionPassBase::GraphDecompositionPassBase;
+
+    LogicalResult runModifiersLowering(Operation *module) {
+        // Distribute any `quantum.ctrl`/`quantum.adjoint` regions the rules emitted, lazily.
+        // `modifiers-lowering` reduces both (including nested `ctrl(adjoint(...))`) to a
+        // fixpoint in one greedy pass.
+        bool hasModifierRegion = module
+                                     ->walk([&](mlir::Operation *op) {
+                                         return (isa<CtrlOp, AdjointOp>(op))
+                                                    ? mlir::WalkResult::interrupt()
+                                                    : mlir::WalkResult::advance();
+                                     })
+                                     .wasInterrupted();
+        if (hasModifierRegion) {
+            OpPassManager modifierPm("builtin.module");
+            modifierPm.addPass(createModifiersLoweringPass());
+            if (failed(runPipeline(modifierPm, module))) {
+                return failure();
+            }
+        }
+        return success();
+    }
+
     void runOnOperation() final {
         ScopedDiagnosticTimer totalTimer("decomp:total");
 
@@ -128,6 +153,13 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
             }
             llvm::dbgs() << "\n";
         });
+
+        // Strip away adjoint and control regions to match the graph, where modifiers are on
+        // the individual ops
+        // Note that both adj lowering and ctrl lowering are still in value semantics now
+        if (failed(runModifiersLowering(getOperation()))) {
+            return signalPassFailure();
+        }
 
         ///////////////////////////
         // Step 1: Gather inputs for graph
@@ -171,7 +203,19 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
             DecompositionSolver solver(graph);
             solution = solver.solve();
         }
-        LLVM_DEBUG(showSolution(solution));
+        // Dump the solver's choices when asked for (`graph_decomposition(..., verbose=True)`), or
+        // whenever the pass runs under `-debug-only=graph-decomposition` on a debug build. The
+        // debug build routes the dump through `llvm::dbgs()` like the rest of this pass's debug
+        // output, so it honours `-debug-output=...` rather than going straight to stderr.
+        if (verboseOption) {
+            showSolution(solution);
+        } else {
+            LLVM_DEBUG({
+                std::ostringstream dump;
+                showSolution(solution, dump);
+                llvm::dbgs() << dump.str();
+            });
+        }
 
         ///////////////////////////
         // Step 3: Convert python-decompositions from reference to value semantics and run
@@ -187,8 +231,41 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         ModuleOp module = getOperation();
 
         qref::DecomposeLoweringPassOptions dlOptions;
-        for (auto &[op, chosenRule] : solution) {
-            dlOptions.targetRulesOption.push_back(chosenRule.ruleName);
+        // Collect only the rules on the chosen decomp tree, reachable from the circuit
+        // root operators by following each op's chosen rule inputs.
+        //
+        // Note `solution` is the solver's map to target gateset, so it also holds ops explored
+        // while costing rejected candidate rules (their inputs are solved to compute costs).
+        // Feeding every one of those rules to the greedy decompose-lowering rewriter would
+        // let stray rules fire on ops the chosen plan never routes through,
+        // emitting gates beyond the planned resource counts.
+        //
+        // Basis rule names are collected too. `decompose-lowering` treats an empty
+        // target-rules list as "apply every rule", so a circuit already in the target gateset
+        // must still produce a non-empty list, or its terminals would be
+        // decomposed by whatever rules happen to be loaded.
+        {
+            std::unordered_set<OperatorNode, OperatorNodeHash> visited;
+            llvm::StringSet<> seenRules;
+            std::vector<OperatorNode> worklist = setOfOps;
+            while (!worklist.empty()) {
+                OperatorNode op = worklist.back();
+                worklist.pop_back();
+                if (!visited.insert(op).second) {
+                    continue;
+                }
+                auto it = solution.find(op);
+                if (it == solution.end()) {
+                    continue;
+                }
+                const ChosenDecompRule &chosenRule = it->second;
+                if (seenRules.insert(chosenRule.ruleName).second) {
+                    dlOptions.targetRulesOption.push_back(chosenRule.ruleName);
+                }
+                for (const RuleTerm &input : chosenRule.inputs) {
+                    worklist.push_back(input.op);
+                }
+            }
         }
 
         // Convert reference-semantics python decompositions to value semantics.
@@ -211,7 +288,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         // until the module stops changing.
         constexpr unsigned maxIterations = 64;
         size_t previousOpCount = countOps(module);
-        ScopedDiagnosticTimer fixpointTimer("decomp:lowering-fixpoint");
+        ScopedDiagnosticTimer fixpointTimer("decomp:greedy-lowering");
         unsigned iterationsRun = 0;
         for (unsigned iter = 0; iter < maxIterations; ++iter) {
             iterationsRun = iter + 1;
@@ -219,31 +296,6 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
                 OpPassManager decomposePm("builtin.module");
                 decomposePm.addPass(createDecomposeLoweringPass(dlOptions));
                 if (failed(runPipeline(decomposePm, module))) {
-                    return signalPassFailure();
-                }
-            }
-
-            // Distribute a `quantum.ctrl` region lazily.
-            bool hasCtrlRegion = module->walk([&](CtrlOp) { return mlir::WalkResult::interrupt(); })
-                                     .wasInterrupted();
-            if (hasCtrlRegion) {
-                OpPassManager ctrlPm("builtin.module");
-                ctrlPm.addPass(createCtrlLoweringPass());
-                if (failed(runPipeline(ctrlPm, module))) {
-                    return signalPassFailure();
-                }
-            }
-
-            // Distribute a `quantum.adjoint` region lazily.
-            // It uses a greedy rewriter that would otherwise DCE gates in circuits that
-            // never needed adjoint handling.
-            bool hasAdjointRegion =
-                module->walk([&](AdjointOp) { return mlir::WalkResult::interrupt(); })
-                    .wasInterrupted();
-            if (hasAdjointRegion) {
-                OpPassManager adjointPm("builtin.module");
-                adjointPm.addPass(createAdjointLoweringPass());
-                if (failed(runPipeline(adjointPm, module))) {
                     return signalPassFailure();
                 }
             }

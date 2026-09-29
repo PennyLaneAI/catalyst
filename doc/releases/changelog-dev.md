@@ -46,6 +46,7 @@
   [(#3129)](https://github.com/PennyLaneAI/catalyst/pull/3129)
   [(#3127)](https://github.com/PennyLaneAI/catalyst/pull/3127)
   [(#3213)](https://github.com/PennyLaneAI/catalyst/pull/3213)
+  [(#3248)](https://github.com/PennyLaneAI/catalyst/pull/3248)
 
   Control is folded into the operator identity *control-outermost* (e.g. `C(Adjoint(Op))`), so
   `ctrl(adjoint(Op))` and `adjoint(ctrl(Op))` collapse to a single node, while a distinct control
@@ -112,6 +113,11 @@
 
 <h3>Improvements 🛠</h3>
 
+* :func:`~.passes.graph_decomposition` accepts a `verbose` keyword argument. When `True`, the pass
+  prints the decomposition rule the solver chose for each operator, along with its cost and the
+  resulting gate counts, to `stderr`.
+  [(#3250)](https://github.com/PennyLaneAI/catalyst/pull/3250)
+
 * When the graph-based decomposition solver cannot reach the target gate set, the error now lists
   the actual operators that could not be decomposed (e.g. arbitrary-angle rotations) and the rules
   it tried, instead of only naming the top-level operator.
@@ -163,6 +169,7 @@
     [(#3052)](https://github.com/PennyLaneAI/catalyst/pull/3052)
     [(#3053)](https://github.com/PennyLaneAI/catalyst/pull/3053)
     [(#3229)](https://github.com/PennyLaneAI/catalyst/pull/3229)
+    [(#3251)](https://github.com/PennyLaneAI/catalyst/pull/3251)
 
     The format of `graphOpID` is as follows:
         op_name{dynamic_shape_dictionary}{wire_lens_dictionary}{static_data_dictionary}[UID]
@@ -195,6 +202,8 @@
     [(#3237)](https://github.com/PennyLaneAI/catalyst/pull/3237)
     [(#3239)](https://github.com/PennyLaneAI/catalyst/pull/3239)
     [(#3243)](https://github.com/PennyLaneAI/catalyst/pull/3243)
+    [(#3252)](https://github.com/PennyLaneAI/catalyst/pull/3252)
+    [(#3261)](https://github.com/PennyLaneAI/catalyst/pull/3261)
 
     This pathway of rule injection can be opted-out via a new keyword argument on `qp.qjit` named `collect_decomp_rules`.
     This kwarg controls whether or not to compile the decomposition rules during lower-time. Default value is `True`.
@@ -596,6 +605,7 @@
 
 * ``to_ppr`` now directly lowers PennyLane's discrete ``PPR`` operator to ``pbc.ppr``.
   [(#3185)](https://github.com/PennyLaneAI/catalyst/pull/3185)
+  [(#3262)](https://github.com/PennyLaneAI/catalyst/pull/3262)
 
 * The `--adjoint-lowering` pass no longer caches all classical gate parameters.
   Parameters that are trivially available to the reverse pass are no longer cached.
@@ -632,6 +642,12 @@
 <h3>Deprecations 👋</h3>
 
 <h3>Bug fixes 🐛</h3>
+
+* `adjoint-lowering` no longer fails on gates whose parameter is a wide-integer tensor. Integer and
+  boolean gate parameters (e.g. a `QROM` `tensor<Nxi64>` bitstring) are now recorded in a dedicated
+  i64 cache buffer during adjoint reversal, zero-extended in and truncated out, instead of being
+  round-tripped through the f64 buffer.
+  [(#3265)](https://github.com/PennyLaneAI/catalyst/pull/3265)
 
 * Fixed a bug where an executor's SSH connection multiplexing was silently disabled on macOS,
   making every remote operation pay a fresh authentication handshake. The control socket went in
@@ -709,6 +725,16 @@
   [(#3242)](https://github.com/PennyLaneAI/catalyst/pull/3242)
 
 <h3>Internal changes ⚙️</h3>
+
+* A new `modifiers-lowering` pass reduces `quantum.ctrl` and `quantum.adjoint` regions to op-level
+  modifiers by running the `ctrl-lowering` and `adjoint-lowering` rewrite patterns together under a
+  single greedy driver. Each pattern defers (a match failure) while its region still holds the other
+  modifier, so the greedy worklist interleaves them and resolves arbitrarily nested modifiers (e.g.
+  `ctrl(adjoint(ctrl(...)))`) to a fixpoint in one pass. This replaces the manual alternation of the
+  two passes in the default pipeline (functional modifiers such as `qp.adjoint(op)(...)` and
+  `qp.ctrl(op, ...)` are now lowered before the transform sequence) and in the graph-decomposition
+  apply fixpoint.
+  [(#3257)](https://github.com/PennyLaneAI/catalyst/pull/3257)
 
 * Adds ability to lower `None` attributes to `get_mlir_attribute_from_pyval`.
   [(#3196)](https://github.com/PennyLaneAI/catalyst/pull/3196)

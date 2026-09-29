@@ -157,7 +157,7 @@ GraphResult DecompositionSolver::solve() {
         const auto chosen_rule = solveOperator(root);
         if (isInvalidRule(chosen_rule)) {
             // Debugging output:
-            graph.showGraph();
+            showGraph(graph);
             showSolution(solvedMap);
 
             // Prepare error msg:

@@ -21,6 +21,7 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #include "Quantum/IR/QuantumOps.h"
+#include "Quantum/Transforms/Patterns.h"
 
 using namespace mlir;
 using namespace catalyst::quantum;
@@ -561,10 +562,11 @@ struct CtrlLoweringRewritePattern : public OpRewritePattern<CtrlOp> {
     LogicalResult matchAndRewrite(CtrlOp ctrl, PatternRewriter &rewriter) const override {
         // Defer (not an error) if the region still contains a nested quantum.adjoint region.
         // Distributing controls needs an op-level body, so the inner region must be reduced first.
-        // The pipeline runs (ctrl-lowering, adjoint-lowering) to a fixpoint: adjoint-lowering
-        // reduces the inner region to op-level gates, then this ctrl op lowers on a later
-        // iteration. A pre-scan avoids a partial rewrite (creating ops, then bailing out
-        // mid-region).
+        // Returning failure() drives the greedy fixpoint: adjoint-lowering reduces the inner region
+        // to op-level gates, then the greedy driver re-tries this ctrl op and it lowers. This works
+        // whether the two patterns run in separate alternating passes or together in the combined
+        // modifiers-lowering pass. A pre-scan avoids a partial rewrite (creating ops, then bailing
+        // out mid-region).
         if (ctrl.getRegion()
                 .walk([](AdjointOp) { return WalkResult::interrupt(); })
                 .wasInterrupted()) {
@@ -605,6 +607,10 @@ struct CtrlLoweringRewritePattern : public OpRewritePattern<CtrlOp> {
 
 } // namespace
 
+void catalyst::quantum::populateCtrlLoweringPatterns(RewritePatternSet &patterns) {
+    patterns.add<CtrlLoweringRewritePattern>(patterns.getContext(), 1);
+}
+
 namespace catalyst {
 namespace quantum {
 
@@ -616,7 +622,7 @@ struct CtrlLoweringPass : impl::CtrlLoweringPassBase<CtrlLoweringPass> {
 
     void runOnOperation() final {
         RewritePatternSet patterns(&getContext());
-        patterns.add<CtrlLoweringRewritePattern>(patterns.getContext(), 1);
+        populateCtrlLoweringPatterns(patterns);
 
         if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
             return signalPassFailure();

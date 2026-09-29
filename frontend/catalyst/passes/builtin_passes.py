@@ -1719,6 +1719,7 @@ def graph_decomposition_setup_inputs(
     _builtin_rule_path: str = BYTECODE_FILE_PATH,
     libQPD_path: Path | None = None,
     libpython_path: Path | None = None,
+    verbose: bool = False,
 ):  # pylint: disable=unused-argument, too-many-arguments, too-many-positional-arguments
     R"""
     Specify that the ``-graph-decomposition`` MLIR compiler pass for applying the graph-based
@@ -1749,6 +1750,8 @@ def graph_decomposition_setup_inputs(
                                      operators need to be decomposed (i.e. when they're not
                                      in the target gate set).
        alt_decomps (dict | None): map operators to lists of decomposition rules that the graph system will consider as alternative rules for operators.
+        verbose (bool): if ``True``, the pass prints the decomposition rule the solver chose for
+            each operator, along with its cost and the resulting gate counts, to stderr. ``False`` by default.
 
     Returns:
         ~.QNode:
@@ -1847,6 +1850,9 @@ def graph_decomposition_setup_inputs(
                 for op, rules in alt_decomps.items()
             }
         }
+
+    if verbose:
+        options |= {"verbose": True}
 
     return (), options
 
