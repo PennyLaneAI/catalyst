@@ -314,7 +314,7 @@ func.func @test_negative_and_adjoint_ppr_operator(%q0 : !quantum.bit) {
     // CHECK-NOT: quantum.operator
     // CHECK: [[q0_0:%.+]] = pbc.ppr ["Z"](-2) [[q0:%.+]]
     %0 = quantum.operator "PPR"() qubits(%q0)
-        static_data = {angle_denominator = -2 : i64, pauli_word = "Z"}
+        static_data = {angle_denominator = -2 : si64, pauli_word = "Z"} // use si64 to verify signed cast
     // The second PPR consumes the first PPR's output, not the original input qubit.
     // CHECK: pbc.ppr ["X"](-8) [[q0_0]]
     %1 = quantum.operator "PPR"() adj qubits(%0)

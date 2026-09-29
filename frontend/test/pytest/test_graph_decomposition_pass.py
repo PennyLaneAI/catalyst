@@ -136,6 +136,27 @@ class TestAltDecompsOption:
         assert "fixed_decomps" not in options
 
 
+class TestVerboseOption:
+    """Cover the ``verbose`` option."""
+
+    def test_absent_when_not_requested(self):
+        """Test the option is omitted unless asked for, so an ordinary compilation emits the same pass
+        options it did before this option existed."""
+        assert "verbose" not in _setup()
+        assert "verbose" not in _setup(verbose=False)
+
+    def test_present_when_requested(self):
+        """Test ``verbose=True`` is carried into the pass options."""
+        assert _setup(verbose=True)["verbose"] is True
+
+    def test_coexists_with_other_options(self):
+        """Test requesting verbosity leaves the rest of the pass options untouched."""
+        options = _setup(verbose=True, fixed_decomps={qp.PauliX: "custom_x_rule"})
+        assert options["verbose"] is True
+        assert options["fixed_decomps"] == {"PauliX": "custom_x_rule"}
+        assert options["gate_set"] == {"RX": 1.0}
+
+
 class TestGateSetOption:
     """Cover how gate-set names are carried into the pass options."""
 

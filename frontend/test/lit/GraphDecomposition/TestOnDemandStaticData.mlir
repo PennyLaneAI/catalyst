@@ -21,7 +21,7 @@
 
 // CHECK-LABEL: func.func @circuit
 // CHECK-NOT: quantum.pcphase
-// CHECK: quantum.operator "PhaseShift"
+// CHECK: quantum.custom "PhaseShift"
 // CHECK: quantum.gphase
 func.func @circuit(%theta: f64) attributes {quantum.node} {
     %r = quantum.alloc(2) : !quantum.reg
