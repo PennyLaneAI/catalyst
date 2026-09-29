@@ -21,7 +21,7 @@
 #include "mlir/IR/Operation.h"
 
 namespace catalyst {
-namespace quantum {
+namespace qref {
 
 /**
  * @brief Shared helpers for the graph-decomposition and decompose-lowering passes.
@@ -48,5 +48,5 @@ uint64_t getNumWires(mlir::func::FuncOp func);
 bool isInDecompRule(mlir::Operation *op);
 
 } // namespace DecompUtils
-} // namespace quantum
+} // namespace qref
 } // namespace catalyst

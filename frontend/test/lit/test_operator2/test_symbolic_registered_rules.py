@@ -79,6 +79,38 @@ def test_registered_self_adjoint_rule_targets_the_adjoint_op():
 test_registered_self_adjoint_rule_targets_the_adjoint_op()
 
 
+def test_registered_symbolic_rule_accepts_mcm():
+    """Test the lowering into a rule for ``Adjoint(NoParams)`` that contains MCMs."""
+
+    @qp.register_resources({NoParams(Wire[1]): 1, qp.ops.MidMeasure(Wire[1]): 1})
+    def rule_with_mcm(base):
+        m0 = qp.measure(base.wires[0])
+        qp.cond(m0, NoParams)(base.wires[0])
+
+    with qp.decomposition.local_decomps():
+
+        qp.add_decomps("Adjoint(NoParams)", rule_with_mcm)
+
+        print(
+            "\n".join(
+                fetch_all_reachable_decomposition_rules_from_op(
+                    op_name="NoParams",
+                    op_id="NoParams{}{reg:1}{}",
+                    dynamic_shape={},
+                    wire_lens={"reg": 1},
+                    static_data={},
+                    op_cls=NoParams,
+                )
+            )
+        )
+
+    # CHECK-LABEL: func.func private @"__builtin_rule_with_mcm_Adjoint(NoParams){}{reg:1}{}"
+    # CHECK-SAME: target_gate = "Adjoint(NoParams){}{reg:1}{}"
+
+
+test_registered_symbolic_rule_accepts_mcm()
+
+
 def _controlled_rule():
     """A rule registered against ``C(NoParams)`` and written against the controlled operator's own
     arguments: the base operator plus its control wires, values and work wires."""

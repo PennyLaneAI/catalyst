@@ -351,7 +351,7 @@ def test_unitary():
     # CHECK: [[q2:%.+]] = qref.get [[reg]][ 2] : !qref.reg<4> -> !qref.bit
     # CHECK: qref.operator "ControlledQubitUnitary"(%arg1: tensor<4x4xf64>, %arg2: tensor<1xi1>) qubits([[q0]], [[q1]], [[q2]])
     # CHECK:   static_data = {unitary_check = false, work_wire_type = "borrowed"}
-    # CHECK:   param_map = {U = [0], control_values = [1]} qubit_map = {wires = [0, 1, 2]}
+    # CHECK:   param_map = {U = [0], control_values = [1]} qubit_map = {wires = [0, 1, 2], work_wires = []}
     qp.ctrl(qp.QubitUnitary(np.identity(4), wires=[1, 2]), control=[0])
 
     return qp.expval(qp.X(0))

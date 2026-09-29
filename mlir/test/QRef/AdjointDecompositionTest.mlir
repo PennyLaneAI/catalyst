@@ -37,7 +37,7 @@ func.func private @adj_h(%q: !quantum.bit) -> !quantum.bit
 /// An adjoint op must NOT fall back to a plain base-name rule.
 ///
 // CHECK-LABEL: func.func @no_base_rule_fallback(
-// CHECK-SAME:  %[[Q:.*]]: !quantum.bit, %[[T:.*]]: f64
+// CHECK-SAME:  %[[T:.*]]: f64, %[[Q:.*]]: !quantum.bit
 func.func @no_base_rule_fallback(%q: !quantum.bit, %theta: f64) -> !quantum.bit {
   // CHECK: %[[O:.*]] = quantum.custom "RX"(%[[T]]) %[[Q]] adj : !quantum.bit
   // CHECK-NOT: PauliX
@@ -57,7 +57,7 @@ func.func private @plain_rx(%theta: f64, %q: !quantum.bit) -> !quantum.bit
 /// Parametric adjoint of a basis gate: Adjoint(RZ)(theta) -> RZ(-theta).
 ///
 // CHECK-LABEL: func.func @parametric_negation(
-// CHECK-SAME:  %[[Q:.*]]: !quantum.bit, %[[T:.*]]: f64
+// CHECK-SAME:  %[[T:.*]]: f64, %[[Q:.*]]: !quantum.bit
 func.func @parametric_negation(%q: !quantum.bit, %theta: f64) -> !quantum.bit {
   // CHECK: %[[NEG:.*]] = arith.negf %[[T]] : f64
   // CHECK: %[[O:.*]] = quantum.custom "RZ"(%[[NEG]]) %[[Q]] : !quantum.bit

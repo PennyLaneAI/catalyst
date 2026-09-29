@@ -24,15 +24,12 @@ from pennylane.pytrees import PyTreeStructure
 from pennylane.wires import AbstractQubit
 
 
-# pylint: disable=too-many-arguments,too-many-positional-arguments
 def generate_uid(
     *avals_in: tuple[Any, ...],
     op_cls: type[Operator2],
     wire_lens: tuple[int, ...],
     hybrid_lens: tuple[int, ...],
     hybrid_trees: tuple[PyTreeStructure, ...],
-    adjoint: bool,
-    n_ctrls: int,
     static_args: dict[str, Any],
 ):
     """Generate a unique identifier that allows us to distinguish between
@@ -66,8 +63,6 @@ def generate_uid(
     reduced.append(("wires", wire_lens))
     reduced.append(("hybrid", hybrid_trees, tuple(hybrid_avals)))
     reduced.append(("static", reduced_static_args))
-    reduced.append(("adjoint", adjoint))
-    reduced.append(("n_ctrls", n_ctrls))
 
     encoded_bytes = str(reduced).encode("utf-8")
     sha_hash = hashlib.sha256(encoded_bytes).hexdigest()

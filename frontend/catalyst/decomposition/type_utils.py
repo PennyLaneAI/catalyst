@@ -60,7 +60,7 @@ def convert_item_to_mlir_type(item, is_special_lowering=False):
         return str(ir.RankedTensorType.get(item.shape, element_type))
 
 
-def get_dummy_values_for_arg(arg):
+def get_dummy_values_for_dynamic_shape(arg):
     """Given a container of python or MLIR types, replace the types with corresponding dummy values.
 
     The types are expected to be formatted for ``GraphOpId``s. Lists/Tuples must contain homogeneous
@@ -78,14 +78,16 @@ def get_dummy_values_for_arg(arg):
             else:
                 return jnp.zeros((), dtype=_MLIR_DTYPES_TO_PY_DTYPES[arg])
         case list() | tuple():
+            if len(arg) == 1 and isinstance(arg[0], str):
+                return get_dummy_values_for_dynamic_shape(arg[0])
             if all(isinstance(e, str) for e in arg) and arg[0].startswith("tensor"):
                 # if arg is something like [tensor<...>], i.e. a single tensor but carrying the
                 # layer of brackets from StringMap<Vector<Type>>, np str parsing fails to realize
                 # the actual tensor shape, and we need to do it manually
                 assert len(arg) == 1, "cannot create a tensor of tensors"
-                return get_dummy_values_for_arg(arg[0])
+                return get_dummy_values_for_dynamic_shape(arg[0])
             else:
-                dtype = get_dummy_values_for_arg(arg[0]).dtype
+                dtype = get_dummy_values_for_dynamic_shape(arg[0]).dtype
                 # NOTE: numpy is required since jax won't create an array of strings
                 return jnp.zeros(np.array(arg, str).shape, dtype)
         case ShapedArray():

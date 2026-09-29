@@ -15,7 +15,7 @@
 // RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{gate-set=C(Adjoint(H))=1.0,C(H)=1.0 alt-decomps=C(Adjoint(U)){}{wires:1}{}=ctrl_adj_u,C(U){}{wires:1}{}=ctrl_u})' %s | FileCheck %s
 
 // CHECK-LABEL: func.func @controlled_adjoint(
-// CHECK-SAME:  %[[C:.*]]: !quantum.bit, %[[Q:.*]]: !quantum.bit
+// CHECK-SAME:  %[[Q:.*]]: !quantum.bit, %[[C:.*]]: !quantum.bit
 func.func @controlled_adjoint(%ctrl: !quantum.bit, %q: !quantum.bit) -> (!quantum.bit, !quantum.bit) {
   %true = arith.constant true
   // C(Adjoint(U)) takes the ctrl_adj_u rule -> two C(Adjoint(H)) (adj + ctrls)
@@ -27,7 +27,7 @@ func.func @controlled_adjoint(%ctrl: !quantum.bit, %q: !quantum.bit) -> (!quantu
 }
 
 // CHECK-LABEL: func.func @plain_controlled(
-// CHECK-SAME:  %[[C:.*]]: !quantum.bit, %[[Q:.*]]: !quantum.bit
+// CHECK-SAME:  %[[Q:.*]]: !quantum.bit, %[[C:.*]]: !quantum.bit
 func.func @plain_controlled(%ctrl: !quantum.bit, %q: !quantum.bit) -> (!quantum.bit, !quantum.bit) {
   %true = arith.constant true
   // C(U) (no adjoint) is a distinct node: it takes ctrl_u -> a single non-adjoint C(H)
