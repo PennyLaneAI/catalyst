@@ -27,7 +27,6 @@ import pennylane as qp
 from jax.extend.core import ClosedJaxpr, Jaxpr
 from pennylane.capture import PlxprInterpreter, qnode_prim
 from pennylane.capture.primitives import transform_prim
-from pennylane.decomposition.utils import to_name
 from pennylane.transforms import decompose as pl_decompose
 
 from catalyst.backline import device_pass_pipeline, remote_device_lib
@@ -324,16 +323,6 @@ def handle_qnode(
         device_release_p.bind()
         return retvals
 
-    if self.requires_decompose_lowering:
-        # Add gate_set attribute to the quantum kernel primitive
-        # decompose_gatesets is treated as a queue of gatesets to be used
-        # but we only support a single gateset for now in from_plxpr
-        # as supporting multiple gatesets requires an MLIR/C++ graph-decomposition
-        # implementation. The current Python implementation cannot be mixed
-        # with other transforms in between.
-        gateset = [to_name(op) for op in self.decompose_tkwargs.get("gate_set", [])]
-        gateset = list(sorted(gateset))  # consistent ordering for testing
-        setattr(qnode, "decompose_gatesets", [gateset])
     # The device may require passes of its own, e.g. a backline placement naming a QEC code implies
     # implicit encoding applied to it. Therefore we append the pass pipeline with the qec lowering
     # passes.
