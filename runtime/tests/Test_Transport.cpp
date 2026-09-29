@@ -14,7 +14,11 @@
 
 // Unit tests for the transport CAPI session registry and per-call behavior
 
+#include <algorithm>
 #include <cstdint>
+#include <cstring>
+#include <string>
+#include <string_view>
 
 #include "catch2/catch_test_macros.hpp"
 
@@ -170,6 +174,88 @@ TEST_CASE("create rejects a config that already sets the reserved 'pair' key", "
     auto *s = __catalyst__transport__create(STUB_BACKEND_PATH, "pair=caller_supplied",
                                             CATALYST_TRANSPORT_ROLE_CONTROLLER, "reserved_key");
     CHECK(s == nullptr);
+}
+
+namespace {
+// State observed by the scaling coprocessor function below.
+std::string g_init_config;
+void *g_fini_ctx = nullptr;
+struct ScaleCtx {
+    std::uint64_t factor;
+};
+} // namespace
+
+// A per-message coprocessor function configured through `<symbol>_init`: it multiplies the
+// payload by the `factor` key of its config. The executable exports these for dlsym.
+extern "C" void *capi_test_scale_fn_init(const char *config) {
+    g_init_config = config;
+    const std::string_view cfg(config);
+    const auto at = cfg.find("factor=");
+    if (at == std::string_view::npos) {
+        return nullptr;
+    }
+    return new ScaleCtx{std::stoull(std::string(cfg.substr(at + 7)))};
+}
+
+extern "C" void capi_test_scale_fn_fini(void *ctx) {
+    g_fini_ctx = ctx;
+    delete static_cast<ScaleCtx *>(ctx);
+}
+
+extern "C" std::size_t capi_test_scale_fn(const void *in, std::size_t, void *out,
+                                          std::size_t out_cap, void *ctx) {
+    std::uint64_t value = 0;
+    std::memcpy(&value, in, sizeof(value));
+    value *= static_cast<const ScaleCtx *>(ctx)->factor;
+    std::memcpy(out, &value, std::min(out_cap, sizeof(value)));
+    return std::min(out_cap, sizeof(value));
+}
+
+TEST_CASE("set_coprocessor_fn hands a function its fn. config through <symbol>_init",
+          "[transport]") {
+    g_init_config.clear();
+    g_fini_ctx = nullptr;
+    auto *ct = make_memcpy_controller("fn_config");
+    auto *co = __catalyst__transport__create(MEMCPY_COPROCESSOR_BACKEND_PATH,
+                                             "fn.factor=3;other=1;fn.note=x",
+                                             CATALYST_TRANSPORT_ROLE_COPROCESSOR, "fn_config");
+    REQUIRE(ct != nullptr);
+    REQUIRE(co != nullptr);
+    REQUIRE(__catalyst__transport__connect(ct, "loopback", 19012) == CATALYST_TRANSPORT_OK);
+    REQUIRE(__catalyst__transport__connect(co, "loopback", 19012) == CATALYST_TRANSPORT_OK);
+    REQUIRE(__catalyst__transport__exchange_keys(ct) == CATALYST_TRANSPORT_OK);
+    REQUIRE(__catalyst__transport__exchange_keys(co) == CATALYST_TRANSPORT_OK);
+    REQUIRE(__catalyst__transport__establish_channel(ct, "memcpy") == CATALYST_TRANSPORT_OK);
+    REQUIRE(__catalyst__transport__establish_channel(co, "memcpy") == CATALYST_TRANSPORT_OK);
+    REQUIRE(__catalyst__transport__set_message_sizes(
+                ct, 0, sizeof(std::uint64_t), sizeof(std::uint64_t)) == CATALYST_TRANSPORT_OK);
+    REQUIRE(__catalyst__transport__set_coprocessor_fn(co, "capi_test_scale_fn") ==
+            CATALYST_TRANSPORT_OK);
+    CHECK(g_init_config == "factor=3;note=x");
+
+    __catalyst__transport__start(ct);
+    __catalyst__transport__start(co);
+    const std::uint64_t request = 14;
+    REQUIRE(__catalyst__transport__stage_payload(ct, &request, sizeof(request), 0) ==
+            CATALYST_TRANSPORT_OK);
+    REQUIRE(__catalyst__transport__post(ct, 0) == CATALYST_TRANSPORT_OK);
+    std::uint64_t reply = 0;
+    REQUIRE(__catalyst__transport__collect(ct, &reply, sizeof(reply)) == CATALYST_TRANSPORT_OK);
+    CHECK(reply == 42);
+
+    __catalyst__transport__destroy(ct);
+    CHECK(g_fini_ctx == nullptr);
+    __catalyst__transport__destroy(co);
+    CHECK(g_fini_ctx != nullptr);
+}
+
+TEST_CASE("set_coprocessor_fn fails when <symbol>_init fails", "[transport]") {
+    auto *co = __catalyst__transport__create(MEMCPY_COPROCESSOR_BACKEND_PATH, "fn.unrelated=1",
+                                             CATALYST_TRANSPORT_ROLE_COPROCESSOR, "fn_init_fails");
+    REQUIRE(co != nullptr);
+    CHECK(__catalyst__transport__set_coprocessor_fn(co, "capi_test_scale_fn") ==
+          CATALYST_TRANSPORT_ERR);
+    __catalyst__transport__destroy(co);
 }
 
 TEST_CASE("memcpy backend plugins round-trip through the transport CAPI", "[transport]") {

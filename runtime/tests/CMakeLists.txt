@@ -202,6 +202,8 @@ if(ENABLE_TRANSPORT)
         stub_transport_backend
         catalyst_transport_memcpy_controller
         catalyst_transport_memcpy_coprocessor)
+    # Test_Transport.cpp defines coprocessor functions the runtime resolves with dlsym.
+    set_property(TARGET runner_tests_transport PROPERTY ENABLE_EXPORTS ON)
     catch_discover_tests(runner_tests_transport)
 
     if(IBVERBS_LIB)

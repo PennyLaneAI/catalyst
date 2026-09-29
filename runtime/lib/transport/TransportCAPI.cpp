@@ -25,6 +25,7 @@
 #include <memory>
 #include <mutex>
 #include <string>
+#include <string_view>
 #include <type_traits>
 #include <unordered_map>
 #include <vector>
@@ -63,6 +64,13 @@ struct CatalystTransportSession {
     std::uint64_t in_bytes = 0;
     std::uint64_t out_bytes = 0;
     bool work_item_ready = false;
+
+    std::string config; // the backend config, as passed to the factory
+
+    // The context a bound coprocessor function's `<symbol>_init` returned, and the
+    // `<symbol>_fini` that releases it once the session has stopped.
+    void *coprocessor_fn_ctx = nullptr;
+    void (*coprocessor_fn_fini)(void *) = nullptr;
 };
 
 namespace {
@@ -251,6 +259,35 @@ void *resolve_coprocessor_fn_symbol(CatalystTransportSession *s, const char *sym
     return dlsym(RTLD_DEFAULT, symbol);
 }
 
+// The keys of `config` addressed to the coprocessor function, `fn.<key>=<value>`, with the prefix
+// removed and joined as `<key>=<value>;...`.
+std::string coprocessor_fn_config(std::string_view config) {
+    constexpr std::string_view prefix = "fn.";
+    std::string out;
+    catalyst::transport::common::configparser::for_each_kv(
+        config, [&](std::string_view key, std::string_view value) {
+            if (key.substr(0, prefix.size()) != prefix) {
+                return;
+            }
+            if (!out.empty()) {
+                out += ';';
+            }
+            out.append(key.substr(prefix.size()));
+            out += '=';
+            out.append(value);
+        });
+    return out;
+}
+
+// Release the context of the session's coprocessor function, if it has one.
+void release_coprocessor_fn_ctx(CatalystTransportSession *s) {
+    if (s->coprocessor_fn_fini && s->coprocessor_fn_ctx) {
+        s->coprocessor_fn_fini(s->coprocessor_fn_ctx);
+    }
+    s->coprocessor_fn_ctx = nullptr;
+    s->coprocessor_fn_fini = nullptr;
+}
+
 } // namespace
 
 extern "C" {
@@ -265,6 +302,7 @@ CatalystTransportSession *__catalyst__transport__create(const char *backend_lib,
         auto h = std::make_unique<CatalystTransportSession>();
         h->backend = std::make_unique<DynamicLibraryLoader>(backend_lib);
         const std::string cfg = fold_pair_key(config, key);
+        h->config = cfg;
         if (role == CATALYST_TRANSPORT_ROLE_COPROCESSOR) {
             auto *factory = h->backend->getSymbol<CatalystTransportCoprocessorFactoryFn *>(
                 CATALYST_TRANSPORT_COPROCESSOR_FACTORY_SYMBOL);
@@ -357,24 +395,41 @@ int __catalyst__transport__set_coprocessor_fn(CatalystTransportSession *s, const
             return CATALYST_TRANSPORT_ERR;
         }
         void *resolved_fn = nullptr;
+        void *ctx = nullptr;
         if (symbol && *symbol) {
             resolved_fn = resolve_coprocessor_fn_symbol(s, symbol);
             if (!resolved_fn) {
                 std::cerr << "[transport] set_coprocessor_fn: symbol not found: " << symbol << "\n";
                 return CATALYST_TRANSPORT_ERR;
             }
+            // A function with a `<symbol>_init` is configured before it is bound: init receives
+            // the node's `fn.` config keys and returns the ctx the function is called with.
+            const std::string name(symbol);
+            using InitFn = void *(*)(const char *);
+            using FiniFn = void (*)(void *);
+            if (auto init = reinterpret_cast<InitFn>(
+                    resolve_coprocessor_fn_symbol(s, (name + "_init").c_str()))) {
+                release_coprocessor_fn_ctx(s);
+                ctx = init(coprocessor_fn_config(s->config).c_str());
+                if (!ctx) {
+                    std::cerr << "[transport] set_coprocessor_fn: " << name << "_init failed\n";
+                    return CATALYST_TRANSPORT_ERR;
+                }
+                s->coprocessor_fn_ctx = ctx;
+                s->coprocessor_fn_fini = reinterpret_cast<FiniFn>(
+                    resolve_coprocessor_fn_symbol(s, (name + "_fini").c_str()));
+            }
         }
         switch (co->coprocessor_fn_convention()) {
         case CoprocConvention::PerMessage:
             // No symbol -> the core's built-in echo.
             co->set_coprocessor_fn(
-                resolved_fn ? reinterpret_cast<CoprocessorFn>(resolved_fn) : &echo_fn, nullptr);
+                resolved_fn ? reinterpret_cast<CoprocessorFn>(resolved_fn) : &echo_fn, ctx);
             return CATALYST_TRANSPORT_OK;
         case CoprocConvention::LaunchOnce:
             // No symbol -> null, letting the backend pick its own default
             // launcher; the core holds no device launcher of its own.
-            co->set_coprocessor_launcher(reinterpret_cast<CoprocessorLauncherFn>(resolved_fn),
-                                         nullptr);
+            co->set_coprocessor_launcher(reinterpret_cast<CoprocessorLauncherFn>(resolved_fn), ctx);
             return CATALYST_TRANSPORT_OK;
         }
         std::cerr << "[transport] set_coprocessor_fn: backend reported an unknown convention "
@@ -601,7 +656,8 @@ void __catalyst__transport__destroy(CatalystTransportSession *s) {
     if (s->sess) {
         guard([&] { s->sess->stop(); });
     }
-    delete s->sess; // owned by the backend factory
+    delete s->sess;                // owned by the backend factory
+    release_coprocessor_fn_ctx(s); // after the session, whose worker may still hold the ctx
     s->backend.reset();
     delete s;
 }
