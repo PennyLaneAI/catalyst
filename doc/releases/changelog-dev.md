@@ -614,6 +614,7 @@
 <h3>Breaking changes 💔</h3>
 
 * `catalyst.logging` has been removed. `pennylane.logging` should be used instead.
+  [(#3283)](https://github.com/PennyLaneAI/catalyst/pull/3283)
 
 * Removes :func:`~.passes.ppm_specs` and the ``--ppm-specs`` MLIR pass. Use :func:`~.specs` and
   the ``ResourceAnalysis`` pass instead for PPR/PPM resource counts and PBC layer depth
