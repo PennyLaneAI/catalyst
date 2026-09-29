@@ -32,7 +32,7 @@ from pennylane.decomposition.utils import to_name
 from pennylane.wires import Wires
 
 from catalyst.compiler import _quantum_opt
-from catalyst.decomposition.capture_session import RuleRequest
+from catalyst.decomposition.capture_session import OpDecompRequest
 from catalyst.decomposition.graph_op_id import GraphOpID
 from catalyst.decomposition.rule_lowering_warning import RuleLoweringWarning
 from catalyst.decomposition.type_utils import get_dummy_values_for_dynamic_shape
@@ -1263,7 +1263,7 @@ def _append_decomp_target_spec(out, description, factory, *, contributes_to_disc
 
 
 def build_decomp_rule_variants(
-    request: RuleRequest, control_counts: set[int], *, include_base: bool
+    request: OpDecompRequest, control_counts: set[int], *, include_base: bool
 ) -> tuple[list[DecompTargetSpec], dict[int, list[DecompTargetSpec]]]:
     """Build target specifications for one base request without materializing MLIR."""
 
@@ -1371,7 +1371,7 @@ def build_decomp_rule_variants(
 
 
 def walk_reachable_decomp_rule_sets(
-    initial_requests: list[tuple[RuleRequest, set[int]]],
+    initial_requests: list[tuple[OpDecompRequest, set[int]]],
 ) -> list[DecompTargetSpec]:
     """Build every reachable decomposition rule set in one worklist traversal."""
 
@@ -1392,8 +1392,8 @@ def walk_reachable_decomp_rule_sets(
                 continue
             for rule in target_spec.rules:
                 for op in rule.resource_ops:
-                    if isinstance(op, Operator2):
-                        children.append(RuleRequest.from_operation(op))
+                    if isinstance(op, Operator2):  # TODO: remove after Operator2 migration
+                        children.append(OpDecompRequest.from_operation(op))
         return children
 
     while queue:
@@ -1561,7 +1561,7 @@ def materialize_reachable_rule_strings(
     Returns:
         list[str]: the rules, as MLIR strings
     """
-    request = RuleRequest(
+    request = OpDecompRequest(
         base_id=op_id,
         op_name=op_name,
         op_cls=op_cls,

@@ -44,7 +44,7 @@ from pennylane.measurements import CountsMP
 from pennylane.pytrees import flatten, unflatten
 from pennylane.wires import AbstractQubit, Wires, is_abstract_qubit
 
-from catalyst.decomposition.capture_session import RuleDef, RuleRequest
+from catalyst.decomposition.capture_session import OpDecompRequest, TracedRule
 from catalyst.decomposition.decomposition_rules import (
     rule_call_operands,
     walk_reachable_decomp_rule_sets,
@@ -153,7 +153,7 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
             if isinstance(eqn.outvars[0], jax.core.DropVar):
                 if self.decomposition_scope is not None:
                     self.decomposition_scope.record_root(
-                        RuleRequest.from_operation(op, len(self.control_wires))
+                        OpDecompRequest.from_operation(op, len(self.control_wires))
                     )
                 _apply_operator2_gate(self, *invals, **eqn.params)
                 return ()
@@ -473,7 +473,7 @@ def _convert_decomp_target_spec(interpreter, target_spec):
                 )
                 continue
         out.append(
-            RuleDef(
+            TracedRule(
                 pyfun=pyfun,
                 closed_jaxpr=converted,
                 target_gate=target_spec.target_id,
@@ -488,8 +488,8 @@ def _capture_scope_rules(interpreter, scope):
     """Populate one decomposition scope outside the active program trace."""
 
     for target_spec in walk_reachable_decomp_rule_sets(list(scope.roots.values())):
-        for rule_def in _convert_decomp_target_spec(interpreter, target_spec):
-            scope.record_definition(rule_def)
+        for traced_rule in _convert_decomp_target_spec(interpreter, target_spec):
+            scope.record_definition(traced_rule)
 
 
 def capture_and_bind_kernel_rules(interpreter):
@@ -502,10 +502,10 @@ def capture_and_bind_kernel_rules(interpreter):
     with take_current_trace():
         _capture_scope_rules(interpreter, scope)
 
-    for rule_def in scope.definitions.values():
+    for traced_rule in scope.definitions.values():
         decomp_definition_p.bind(
-            pyfun=rule_def.pyfun,
-            func_jaxpr=rule_def.closed_jaxpr,
+            pyfun=traced_rule.pyfun,
+            func_jaxpr=traced_rule.closed_jaxpr,
         )
 
 

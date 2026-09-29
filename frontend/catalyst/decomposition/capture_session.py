@@ -15,7 +15,7 @@
 """Managed state for the decomposition rule discovery and capture mechanism."""
 
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Callable
 
 import pennylane as qp
 from jax.extend.core import ClosedJaxpr
@@ -25,7 +25,7 @@ from catalyst.decomposition.graph_op_id import GraphOpID
 
 
 @dataclass(frozen=True)
-class RuleRequest:
+class OpDecompRequest:
     """Dataclass with information needed to discover decomposition rules for one operator (variant).
 
     Attributes:
@@ -33,8 +33,7 @@ class RuleRequest:
             as the starting point for adjoint/control target IDs.
         op_name: Frontend operator name used to query PennyLane's decomposition registry.
         op_cls: Concrete Operator2 class used to rebuild the base for registered symbolic rules.
-            It is unavailable for an on-demand root supplied by the compiler, but recovered for
-            descendants represented by Python operators.
+            It is unavailable for the on-demand pathway.
         dynamic_shape: Non-hybrid dynamic argument names mapped to MLIR-style type spellings.
         wire_lens: Non-hybrid wire argument names mapped to their lengths.
         static_data: Compiler-known static/compilable arguments used by applicability, resource
@@ -57,7 +56,7 @@ class RuleRequest:
     control_count: int = 0
 
     @classmethod
-    def from_operation(cls, op, ambient_control_count: int = 0) -> "RuleRequest":
+    def from_operation(cls, op, ambient_control_count: int = 0) -> "OpDecompRequest":
         """Build a request from a settled captured Operator2 instance.
 
         A rule is a template keyed by the operator's identity, so only shapes, dtypes and pytree
@@ -72,7 +71,6 @@ class RuleRequest:
         static_data = {
             name: getattr(base, name) for name in (*base.compilable_argnames, *base.static_argnames)
         }
-        extra_data = {name: getattr(base, name) for name in base.hybrid_argnames}
         return cls(
             base_id=graph_op_id.getBaseGraphOpId(),
             op_name=graph_op_id.get_operator_name(),
@@ -88,14 +86,14 @@ class RuleRequest:
                 if name not in base.hybrid_argnames
             },
             static_data=static_data,
-            extra_data=extra_data,
+            extra_data=base.hybrid_args,
             is_custom_op=graph_op_id.is_custom_op,
             control_count=graph_op_id.num_controls + ambient_control_count,
         )
 
 
 @dataclass
-class RuleDef:
+class TracedRule:
     """Wrapper for traced decomposition rules and associated metadata.
 
     Each rule is associated with an identifier to avoid compiling the same named alternative
@@ -109,7 +107,7 @@ class RuleDef:
         frontend_name: PennyLane rule name used for fixed and alternative rule selection.
     """
 
-    pyfun: Any
+    pyfun: Callable
     closed_jaxpr: ClosedJaxpr
     target_gate: str
     resources: dict[str, int]
@@ -128,17 +126,17 @@ class RuleDef:
 
 @dataclass
 class DecompositionScope:
-    """A context to collect decomposition requests and the resulting traced definitions.
+    """A context to collect decomposition requests and the resulting traced rules.
 
     Attributes:
         roots: Map of (base) GraphOpID to a request object, as well as observed control counts.
-        definitions: Map of rule identifiers to traced definitions, in first-seen order.
+        definitions: Map of rule identifiers to traced rules, in first-seen order.
     """
 
-    roots: dict[str, tuple[RuleRequest, set[int]]] = field(default_factory=dict)
-    definitions: dict[tuple, RuleDef] = field(default_factory=dict)
+    roots: dict[str, tuple[OpDecompRequest, set[int]]] = field(default_factory=dict)
+    definitions: dict[tuple, TracedRule] = field(default_factory=dict)
 
-    def record_root(self, request: RuleRequest) -> None:
+    def record_root(self, request: OpDecompRequest) -> None:
         """Record root nodes for later decomp rule capture, which are explored recursively."""
 
         previous = self.roots.get(request.base_id)
@@ -147,7 +145,7 @@ class DecompositionScope:
         else:
             previous[1].add(request.control_count)
 
-    def record_definition(self, rule_def: RuleDef) -> None:
+    def record_definition(self, traced_rule: TracedRule) -> None:
         """Record a definition once, preserving first-seen order."""
 
-        self.definitions.setdefault(rule_def.identifier, rule_def)
+        self.definitions.setdefault(traced_rule.identifier, traced_rule)
