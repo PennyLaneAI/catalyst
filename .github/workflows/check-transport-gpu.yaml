@@ -73,6 +73,59 @@ jobs:
           echo "/usr/local/cuda/bin" >> $GITHUB_PATH
           echo "LD_LIBRARY_PATH=/usr/local/cuda/lib64${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}" >> $GITHUB_ENV
 
+      - name: Wait for the GPU to be usable
+        # This pool hands out a freshly booted instance per run, and both gates the tests
+        # depend on have been seen failing early in one and passing late in another:
+        #
+        #   * cuInit returned "CUDA unknown error" nine minutes in, on a run whose driver was
+        #     otherwise fine -- the kernel modules are not loaded and the /dev/nvidia* nodes
+        #     do not exist yet that soon after boot.
+        #   * `nvidia-smi --query-gpu=compute_cap` reported nothing usable twenty-four minutes
+        #     in, sixteen minutes after Triton had activated a CUDA driver in the same job.
+        #
+        # Rebuilding the MLIR stack from source used to hide both: two hours of compiling was
+        # an accidental warm-up, and nothing touched the GPU until well past it. Restoring the
+        # stack from cache took that away, so the wait has to be explicit.
+        #
+        # Wait on exactly what the tests need, not a proxy. cuInit is asked through ctypes
+        # because torch is not installed until much later in the job, and compute_cap is the
+        # query `gpu_triton_platform` itself runs -- when that one comes back unparseable the
+        # fixture skips as "No NVIDIA or AMD GPU detected", which is indistinguishable in the
+        # log from a runner that genuinely has no GPU. nvidia-smi is also the trigger here,
+        # not just the question: it is what pulls in nvidia-modprobe and gets the device
+        # nodes created.
+        run: |
+          set -uo pipefail
+          # Quiet on failure: this runs up to 30 times, and a driver that is not up yet is the
+          # expected case rather than something to print a traceback about.
+          probe='
+          import ctypes, sys
+          try:
+              sys.exit(0 if ctypes.CDLL("libcuda.so.1").cuInit(0) == 0 else 1)
+          except OSError:
+              sys.exit(1)
+          '
+          cc=""
+          for i in $(seq 1 30); do
+            nvidia-smi -L >/dev/null 2>&1
+            if python3 -c "$probe"; then
+              cc=$(nvidia-smi --query-gpu=compute_cap --format=csv,noheader 2>&1 | head -1)
+              case "$cc" in
+                [0-9]*.[0-9]*)
+                  echo "GPU usable after $(( (i - 1) * 10 ))s: compute capability $cc"
+                  nvidia-smi
+                  exit 0
+                  ;;
+              esac
+            fi
+            sleep 10
+          done
+          echo "::error::The GPU was not usable within 5 minutes, so the backline tests would" \
+               "skip and this job would cover nothing. Last compute_cap reading: '${cc:-(cuInit never succeeded)}'."
+          nvidia-smi || echo "nvidia-smi unavailable"
+          ls -l /dev/nvidia* 2>&1 || echo "(no /dev/nvidia* device nodes)"
+          exit 1
+
       - name: Checkout Catalyst repo
         uses: actions/checkout@v4
 
