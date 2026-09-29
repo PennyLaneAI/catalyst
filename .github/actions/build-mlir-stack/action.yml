@@ -24,21 +24,6 @@ inputs:
     description: Cache key prefix; keep distinct from the GH-hosted keys so the two never collide
     required: false
     default: selfhosted-gpu
-  llvm-variant:
-    description: >
-      Names this LLVM configuration. Variants configured with different cmake options get
-      their own cache entry instead of overwriting each other. `default` is a plain
-      `make llvm`, and its key carries no variant suffix so existing caches keep hitting.
-    required: false
-    default: default
-  llvm-build-options:
-    description: >
-      `make llvm` variable overrides defining a non-default variant, space separated, e.g.
-      "LLVM_TARGETS_TO_BUILD=host;AArch64". Ignored for the default variant. Whatever is set
-      here has to be reflected in `llvm-variant`, which is what the key is named after -- the
-      options themselves are not part of it.
-    required: false
-    default: ""
 
 runs:
   using: composite
@@ -47,44 +32,26 @@ runs:
       shell: bash
       run: |
         sudo apt-get update
-        sudo apt-get install -y cmake ninja-build clang lld ccache
+        sudo apt-get install -y cmake ninja-build clang lld
         python3 -m pip install numpy "nanobind<2.13" pybind11 PyYAML
-
-        # ccache cannot hit across runs here -- the pool hands out a fresh instance each time,
-        # so its directory starts empty. Kept because COMPILER_LAUNCHER is passed below either
-        # way; caching ~/.cache/ccache is what would make it earn its keep.
-        ccache --max-size=20G
-        ccache --zero-stats
 
     - name: Restore LLVM build
       id: cache-llvm-build
       uses: actions/cache/restore@v4
       with:
         path: llvm-build
-        # The variant is appended only when it is not `default`, so the default key stays
-        # byte-identical to the one already in the cache -- adding a variant must not cost
-        # everyone else a fresh LLVM build.
-        key: ${{ inputs.cache-prefix }}-${{ runner.os }}-llvm-${{ inputs.llvm-version }}-ci-build-gcc${{ inputs.llvm-variant != 'default' && format('-{0}', inputs.llvm-variant) || '' }}
+        key: ${{ inputs.cache-prefix }}-${{ runner.os }}-llvm-${{ inputs.llvm-version }}-ci-build-gcc
 
     - name: Build LLVM
       if: steps.cache-llvm-build.outputs.cache-hit != 'true'
       shell: bash
-      env:
-        LLVM_BUILD_OPTIONS: ${{ inputs.llvm-build-options }}
       run: |
-        # $LLVM_BUILD_OPTIONS is unquoted on purpose: the overrides are several words, and
-        # as make command-line variables they propagate into the `-C mlir` sub-make and beat
-        # its `?=` defaults. It must stay above the assignments -- a comment between a `\`
-        # continuation and `make` silently detaches every assignment from the command.
         C_COMPILER=$(which gcc) \
         CXX_COMPILER=$(which g++) \
         LLVM_BUILD_DIR="$(pwd)/llvm-build" \
-        COMPILER_LAUNCHER="$(which ccache)" \
-        make llvm $LLVM_BUILD_OPTIONS
-        # Verify the tree actually landed in llvm-build. `make` exits 0 after building
-        # into its own default directory if the env prefix above ever stops reaching it --
-        # which already happened once, and only surfaced two hours later as a confusing
-        # find_package failure in the next component.
+        make llvm
+        # `make` exits 0 even if the env prefix above stopped reaching it, having built
+        # somewhere else; check for the artifact the next component consumes.
         if [ ! -e "$(pwd)/llvm-build/lib/cmake/mlir/MLIRConfig.cmake" ]; then
           echo "::error::llvm-build/lib/cmake/mlir/MLIRConfig.cmake is missing after 'make llvm' reported success."
           exit 1
@@ -128,12 +95,9 @@ runs:
         CXX_COMPILER=$(which g++) \
         LLVM_BUILD_DIR="$(pwd)/llvm-build" \
         STABLEHLO_BUILD_DIR="$(pwd)/stablehlo-build" \
-        COMPILER_LAUNCHER="$(which ccache)" \
         make stablehlo
-        # Verify the tree actually landed in stablehlo-build. `make` exits 0 after building
-        # into its own default directory if the env prefix above ever stops reaching it --
-        # which already happened once, and only surfaced two hours later as a confusing
-        # find_package failure in the next component.
+        # `make` exits 0 even if the env prefix above stopped reaching it, having built
+        # somewhere else; check for the artifact the next component consumes.
         if [ ! -e "$(pwd)/stablehlo-build/CMakeCache.txt" ]; then
           echo "::error::stablehlo-build/CMakeCache.txt is missing after 'make stablehlo' reported success."
           exit 1
@@ -177,12 +141,9 @@ runs:
         CXX_COMPILER=$(which g++) \
         LLVM_BUILD_DIR="$(pwd)/llvm-build" \
         ENZYME_BUILD_DIR="$(pwd)/enzyme-build" \
-        COMPILER_LAUNCHER="$(which ccache)" \
         make enzyme
-        # Verify the tree actually landed in enzyme-build. `make` exits 0 after building
-        # into its own default directory if the env prefix above ever stops reaching it --
-        # which already happened once, and only surfaced two hours later as a confusing
-        # find_package failure in the next component.
+        # `make` exits 0 even if the env prefix above stopped reaching it, having built
+        # somewhere else; check for the artifact the next component consumes.
         if [ ! -e "$(pwd)/enzyme-build/CMakeCache.txt" ]; then
           echo "::error::enzyme-build/CMakeCache.txt is missing after 'make enzyme' reported success."
           exit 1

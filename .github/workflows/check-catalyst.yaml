@@ -150,6 +150,22 @@ jobs:
           sudo apt-get -y -q install ninja-build make cmake clang libibverbs-dev
           python3 -m pip install "nanobind<2.13" pybind11 numpy PyYAML
 
+      - name: Resolve the toolchain and build locations
+        # Both `make` calls below need identical values: a differing flag makes the `configure`
+        # prerequisite reset the cmake cache and drop the already-built .sos.
+        run: |
+          {
+            echo "COMPILER_LAUNCHER="
+            echo "C_COMPILER=$(which clang)"
+            echo "CXX_COMPILER=$(which clang++)"
+            echo "RT_BUILD_DIR=$(pwd)/runtime-build"
+            echo "LLVM_SRC_DIR=$(pwd)/mlir/llvm-project"
+            echo "LLVM_BUILD_DIR=$(pwd)/llvm-build"
+            echo "ENABLE_TRANSPORT=ON"
+            echo "ENABLE_EXECUTOR=ON"
+            echo "ENABLE_OPENQASM=OFF"
+          } >> "$GITHUB_ENV"
+
       - name: Get Cached LLVM Source
         id: cache-llvm-source
         uses: actions/cache/restore@v4
@@ -176,41 +192,15 @@ jobs:
           fail-on-cache-miss: true
 
       - name: Build Catalyst-Runtime with transport and the executor
-        run: |
-          # `-C runtime`, not the top-level target: with ENABLE_EXECUTOR=ON that depends on
-          # `llvm`, whose last step runs the whole MLIR lit suite on every invocation, restored
-          # cache or not -- the real cost here. Backends are trimmed to what the tests reach,
-          # and OpenQASM defaults ON so it is turned off explicitly. clang matches how
-          # backline's INSTALL.md builds the runtime.
-          COMPILER_LAUNCHER="" \
-          C_COMPILER=$(which clang) \
-          CXX_COMPILER=$(which clang++) \
-          RT_BUILD_DIR="$(pwd)/runtime-build" \
-          LLVM_SRC_DIR="$(pwd)/mlir/llvm-project" \
-          LLVM_BUILD_DIR="$(pwd)/llvm-build" \
-          ENABLE_ASAN=OFF \
-          ENABLE_TRANSPORT=ON \
-          ENABLE_EXECUTOR=ON \
-          ENABLE_OPENQASM=OFF \
-          make -C runtime runtime
+        # `-C runtime`, not the top-level target: with ENABLE_EXECUTOR=ON that depends on
+        # `llvm`, whose last step runs the whole MLIR lit suite every time, cache or not.
+        run: make -C runtime runtime
 
       - name: Set up Soft-RoCE loopback
         uses: ./.github/actions/setup-soft-roce
 
       - name: Run transport C++ test suite (Catch2 + soft-RoCE loopback)
-        run: |
-          # Same ENABLE_* flags, RT_BUILD_DIR and LLVM dirs as the build step, so the `configure`
-          # prerequisite does not reset the cmake cache and drop the already-built .sos.
-          COMPILER_LAUNCHER="" \
-          C_COMPILER=$(which clang) \
-          CXX_COMPILER=$(which clang++) \
-          RT_BUILD_DIR="$(pwd)/runtime-build" \
-          LLVM_SRC_DIR="$(pwd)/mlir/llvm-project" \
-          LLVM_BUILD_DIR="$(pwd)/llvm-build" \
-          ENABLE_TRANSPORT=ON \
-          ENABLE_EXECUTOR=ON \
-          ENABLE_OPENQASM=OFF \
-          make test-runtime-transport
+        run: make test-runtime-transport
 
       - name: Download Quantum Build Artifact
         uses: actions/download-artifact@v4
@@ -222,7 +212,7 @@ jobs:
         run: |
           echo "$(pwd)/llvm-build/bin" >> $GITHUB_PATH
           echo "$(pwd)/quantum-build/bin" >> $GITHUB_PATH
-          echo "PYTHONPATH=$PYTHONPATH:$(pwd)/quantum-build/python_packages/quantum" >> $GITHUB_ENV
+          echo "PYTHONPATH=${PYTHONPATH:-}:$(pwd)/quantum-build/python_packages/quantum" >> $GITHUB_ENV
           echo "RUNTIME_LIB_DIR=$(pwd)/runtime-build/lib" >> $GITHUB_ENV
           echo "MLIR_LIB_DIR=$(pwd)/llvm-build/lib" >> $GITHUB_ENV
           echo "CATALYST_BIN_DIR=$(pwd)/quantum-build/bin" >> $GITHUB_ENV
@@ -233,7 +223,6 @@ jobs:
 
       - name: Build the Catalyst frontend
         run: |
-          sudo apt-get install -y make
           python3 -m pip install -r requirements.txt
           make frontend
 
@@ -253,14 +242,6 @@ jobs:
     strategy:
       matrix:
         compiler: ${{ fromJson(needs.constants.outputs.compilers) }}
-        # One leg per LLVM configuration. Adding a value here builds and caches that variant
-        # alongside `default` rather than overwriting it; the `include` below carries the
-        # `make llvm` overrides defining it. Consumer jobs opt in by restoring the matching
-        # key, and every one of them restores `default` today.
-        variant: [default]
-        include:
-          - variant: default
-            llvm_build_options: ""
 
     steps:
     - name: Checkout Catalyst repo
@@ -290,9 +271,7 @@ jobs:
       uses: actions/cache@v4
       with:
         path: llvm-build
-        # The variant is appended only when it is not `default`, so the default key stays
-        # byte-identical to what is already cached and to what the consumer jobs restore.
-        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-ci-build-${{ matrix.compiler }}${{ matrix.variant != 'default' && format('-{0}', matrix.variant) || '' }}
+        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-ci-build-${{ matrix.compiler }}
 
     - name: Set up Python # Ensure the "primary" python version is used
       uses: actions/setup-python@v5
@@ -312,18 +291,14 @@ jobs:
       if: steps.cache-llvm-build.outputs.cache-hit != 'true'
       # Note: Disable instrumentation for the mlir runtime support library,
       #       as user programs aren't instrumented.
-      env:
-        LLVM_BUILD_OPTIONS: ${{ matrix.llvm_build_options }}
       run: |
         # echo 'target_compile_options(mlir_c_runner_utils PRIVATE "-fno-sanitize=all")' \
         #       >> mlir/llvm-project/mlir/lib/ExecutionEngine/CMakeLists.txt
-        # LLVM_BUILD_OPTIONS is unquoted on purpose: as make command-line variables the
-        # overrides propagate into the `-C mlir` sub-make and beat its `?=` defaults.
         C_COMPILER=$(which ${{ needs.constants.outputs[format('c_compiler.{0}', matrix.compiler)] }}) \
         CXX_COMPILER=$(which ${{ needs.constants.outputs[format('cxx_compiler.{0}', matrix.compiler)] }}) \
         LLVM_BUILD_DIR="$(pwd)/llvm-build" \
         COMPILER_LAUNCHER="" \
-        make llvm $LLVM_BUILD_OPTIONS
+        make llvm
 
   stablehlo:
     name: Stablehlo Dialect Build

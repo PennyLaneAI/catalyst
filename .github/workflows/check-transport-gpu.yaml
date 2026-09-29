@@ -74,11 +74,11 @@ jobs:
           echo "LD_LIBRARY_PATH=/usr/local/cuda/lib64${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}" >> $GITHUB_ENV
 
       - name: Wait for the GPU to be usable
-        # `single-gpu-x64` hands out a freshly booted EC2 instance per run, and the GPU needs
-        # time to settle: cuInit and `--query-gpu=compute_cap` have each been seen failing
-        # minutes in, the second surfacing as a "No NVIDIA or AMD GPU detected" skip. Two
-        # hours of building the MLIR stack used to hide it; the cache took that away.
-        # nvidia-smi is the trigger as well as the question -- it creates the device nodes.
+        # `single-gpu-x64` hands out a freshly booted instance, and cuInit has been seen
+        # failing minutes into a run; building the MLIR stack from source used to hide that,
+        # and the cache took the delay away. Waits on what the tests need: cuInit (via ctypes,
+        # torch is installed much later) and the compute_cap query the fixture itself runs.
+        # A GPU that answers and then disappears is a runner-image bug, not one to fix here.
         run: |
           set -u
           # `bash -e` is the step default, and a probe failing is the measurement here.
@@ -93,33 +93,23 @@ jobs:
               sys.exit(1)
           '
 
-          # Three rounds, not one: nvidia-smi reported compute capability 8.6 and then
-          # "No devices were found" 330 ms later on the same host.
-          interval=10
-          need=3
-          deadline=60
-          stable_for=$(( (need - 1) * interval ))
-
-          streak=0
-          for round in $(seq 1 "$deadline"); do
+          # A fresh instance needs a moment; 5 min then give up.
+          for _ in $(seq 1 30); do
             cc=$(nvidia-smi --query-gpu=compute_cap --format=csv,noheader 2>&1 | head -1)
-            python3 -c "$cuinit"
-            rc=$?
-            case "$cc:$rc" in
-              [0-9]*.[0-9]*:0) streak=$((streak + 1)) ;;
-              *)               streak=0 ;;
-            esac
-            if [ "$streak" -ge "$need" ]; then
-              echo "GPU healthy for ${stable_for}s, first seen after $(( (round - need) * interval ))s"
-              nvidia-smi
-              exit 0
+            if python3 -c "$cuinit"; then
+              case "$cc" in
+                [0-9]*.[0-9]*)
+                  echo "GPU ready: compute capability $cc"
+                  nvidia-smi
+                  exit 0
+                  ;;
+              esac
             fi
-            sleep "$interval"
+            sleep 10
           done
 
-          echo "::error::GPU not healthy for ${stable_for}s within" \
-               "$(( deadline * interval / 60 )) minutes, so the backline tests would skip and" \
-               "this job would cover nothing. compute_cap: '$cc' | cuInit: $rc"
+          echo "::error::GPU not usable within 5 minutes, so the backline tests would skip" \
+               "and this job would cover nothing. Last compute_cap: '$cc'."
           nvidia-smi
           ls -l /dev/nvidia*
           exit 1
@@ -138,18 +128,43 @@ jobs:
         # set here so the frontend build sees it, or precompile_decomposition_rules only warns.
         run: |
           python3 -m pip install "cmake>=3.26" ninja "nanobind<2.13" pybind11 numpy PyYAML
-          # ccache here as well as in build-mlir-stack: the runtime build runs before that
-          # action, and COMPILER_LAUNCHER resolves to whatever `which ccache` finds now.
-          sudo apt-get update && sudo apt-get install -y ccache
           {
             echo "C_COMPILER=$(which gcc)"
             echo "CXX_COMPILER=$(which g++)"
-            echo "COMPILER_LAUNCHER=$(which ccache)"
             echo "RT_BUILD_DIR=$(pwd)/runtime-build"
             echo "DIALECTS_BUILD_DIR=$(pwd)/quantum-build"
             echo "CATALYST_LIB_DIR=$(pwd)/quantum-build/lib"
             echo "PYTHONPATH=${PYTHONPATH:-}:$(pwd)/quantum-build/python_packages/quantum"
           } >> "$GITHUB_ENV"
+
+      - name: Install the HIP headers
+        # nvcc is the HIP compiler on this host; ROCm supplies only the headers. `apt-get
+        # download` rather than `install`: hip-dev Depends on rocm-llvm and comgr, 611 MB of
+        # AMD-GPU toolchain nothing here uses. 7.1+ for the dma-buf API, absent from 6.4.
+        # Both packages are MIT (c) AMD, fetched and not redistributed.
+        #
+        # Suite and versions are pinned together -- if the pool image stops being jammy the
+        # pinned versions will not resolve and this fails, rather than silently skipping the
+        # GPU tests later.
+        run: |
+          set -euo pipefail
+          curl -fsSL https://repo.radeon.com/rocm/rocm.gpg.key \
+            | sudo gpg --dearmor --yes -o /usr/share/keyrings/rocm.gpg
+          echo "deb [arch=amd64 signed-by=/usr/share/keyrings/rocm.gpg]" \
+               "https://repo.radeon.com/rocm/apt/7.1.1 jammy main" \
+            | sudo tee /etc/apt/sources.list.d/rocm.list
+          sudo apt-get update
+          tmp=$(mktemp -d)
+          ( cd "$tmp" && apt-get download \
+              hip-dev=7.1.52802.70101-38~22.04 \
+              hipcc-nvidia=1.1.1.70101-38~22.04 )
+          for deb in "$tmp"/*.deb; do sudo dpkg-deb -x "$deb" /; done
+          rm -rf "$tmp"
+          # An unmatched glob stays literal, so check rather than exporting a path that does
+          # not exist -- CMake would just not find HIP and the GPU tests would skip.
+          rocm=$(echo /opt/rocm-*)
+          [ -d "$rocm" ] || { echo "::error::hip-dev did not unpack to /opt/rocm-*"; exit 1; }
+          echo "ROCM_PATH=$rocm" >> $GITHUB_ENV
 
       - name: Get Cached LLVM Source
         id: cache-llvm-source
