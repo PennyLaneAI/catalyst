@@ -14,8 +14,39 @@
 
 // RUN: quantum-opt --adjoint-lowering --split-input-file -verify-diagnostics %s | FileCheck %s
 
-// COM: Both cache helpers are inserted at the start of the module body, so they appear in the
+// COM: All four cache helpers are inserted at the start of the module body, so they appear in the
 // COM: reverse of the order in which they are created.
+
+// COM: The cache buffers are allocated and freed inside helpers rather than at the point of the
+// COM: quantum.adjoint op, so that no memref.alloc/memref.dealloc for them appears in the function
+// COM: being lowered. For an adjoint nested inside a loop, -buffer-loop-hoisting would otherwise
+// COM: hoist the allocation out of the loop and leave the deallocation inside it.
+
+// CHECK:  func.func private @__adjoint_lowering_dealloc_param_vector(
+// CHECK-SAME:   %arg0: memref<memref<?xi8>>, %arg1: memref<index>, %arg2: memref<index>) {
+// CHECK:    [[dealloc_data:%.+]] = memref.load %arg0[] : memref<memref<?xi8>>
+// CHECK:    memref.dealloc [[dealloc_data]] : memref<?xi8>
+// CHECK:    memref.dealloc %arg0 : memref<memref<?xi8>>
+// CHECK:    memref.dealloc %arg1 : memref<index>
+// CHECK:    memref.dealloc %arg2 : memref<index>
+// CHECK:    return
+// CHECK:  }
+
+// CHECK:  func.func private @__adjoint_lowering_init_param_vector()
+// CHECK-SAME:   -> (memref<memref<?xi8>>, memref<index>, memref<index>) {
+// CHECK-DAG:    [[init_capacity:%.+]] = index.constant 2048
+// CHECK-DAG:    [[init_zero:%.+]] = index.constant 0
+// CHECK:    [[init_data:%.+]] = memref.alloc([[init_capacity]]) {alignment = 64 : i64}
+// CHECK-SAME:   : memref<?xi8>
+// CHECK:    [[init_data_vector:%.+]] = memref.alloc() : memref<memref<?xi8>>
+// CHECK:    memref.store [[init_data]], [[init_data_vector]][] : memref<memref<?xi8>>
+// CHECK:    [[init_capacity_field:%.+]] = memref.alloc() : memref<index>
+// CHECK:    memref.store [[init_capacity]], [[init_capacity_field]][] : memref<index>
+// CHECK:    [[init_offset_field:%.+]] = memref.alloc() : memref<index>
+// CHECK:    memref.store [[init_zero]], [[init_offset_field]][] : memref<index>
+// CHECK:    return [[init_data_vector]], [[init_capacity_field]], [[init_offset_field]]
+// CHECK-SAME:   : memref<memref<?xi8>>, memref<index>, memref<index>
+// CHECK:  }
 
 // COM: The byte buffer holding the params is dynamically sized and kept behind a rank-0 memref,
 // COM: so that it can be reallocated in place when a param does not fit. The new capacity is
@@ -66,29 +97,24 @@ func.func @qubit_unitary_test() -> tensor<4xcomplex<f64>> {
 
     // COM: 4x4xcomplex<f64> is 4*4*128/8 = 256 bytes
     // CHECK-DAG: [[_256:%.+]] = index.constant 256
-    // CHECK-DAG: [[zero:%.+]] = index.constant 0
     // CHECK-DAG: [[_64:%.+]] = index.constant 64
-    // CHECK-DAG: [[_2048:%.+]] = index.constant 2048
 
-    // CHECK: [[data:%.+]] = memref.alloc([[_2048]]) {alignment = 64 : i64} : memref<?xi8>
-    // CHECK: [[data_vector:%.+]] = memref.alloc() : memref<memref<?xi8>>
-    // CHECK: memref.store [[data]], [[data_vector]][] : memref<memref<?xi8>>
-    // CHECK: [[capacity:%.+]] = memref.alloc() : memref<index>
-    // CHECK: memref.store [[_2048]], [[capacity]][] : memref<index>
-    // CHECK: [[cur_offset:%.+]] = memref.alloc() : memref<index>
-    // CHECK: memref.store [[zero]], [[cur_offset]][] : memref<index>
+    // COM: The cache buffers are allocated by a call rather than in place, so that no memref.alloc
+    // COM: for them appears in the function being lowered. See getOrInsertInitParamVectorFunc.
+    // CHECK: [[cache:%.+]]:3 = call @__adjoint_lowering_init_param_vector()
+    // CHECK-SAME:   : () -> (memref<memref<?xi8>>, memref<index>, memref<index>)
     // CHECK: [[offset_vector:%.+]] = catalyst.list_init : <index>
 
     // CHECK: scf.for
     // CHECK:   [[param:%.+]] = "test.op"() : () -> tensor<4x4xcomplex<f64>>
-    // CHECK:   [[raw_offset:%.+]] = memref.load [[cur_offset]][] : memref<index>
+    // CHECK:   [[raw_offset:%.+]] = memref.load [[cache]]#2[] : memref<index>
     // CHECK:   [[offset:%.+]] = func.call @__adjoint_lowering_roundup_offset_to_alignment
     // CHECK-SAME:   ([[raw_offset]], [[_64]]) : (index, index) -> index
     // CHECK:   [[new_offset:%.+]] = index.add [[offset]], [[_256]]
     // CHECK:   func.call @__adjoint_lowering_ensure_param_vector_capacity
-    // CHECK-SAME:   ([[data_vector]], [[capacity]], [[new_offset]])
+    // CHECK-SAME:   ([[cache]]#0, [[cache]]#1, [[new_offset]])
     // CHECK-SAME:   : (memref<memref<?xi8>>, memref<index>, index) -> ()
-    // CHECK:   [[loaded_data:%.+]] = memref.load [[data_vector]][] : memref<memref<?xi8>>
+    // CHECK:   [[loaded_data:%.+]] = memref.load [[cache]]#0[] : memref<memref<?xi8>>
     // CHECK:   [[param_memref:%.+]] = bufferization.to_buffer [[param]]
     // CHECK-SAME:    tensor<4x4xcomplex<f64>> to memref<4x4xcomplex<f64>>
     // CHECK:   [[view:%.+]] = memref.view [[loaded_data]][[[offset]]][]
@@ -96,7 +122,7 @@ func.func @qubit_unitary_test() -> tensor<4xcomplex<f64>> {
     // CHECK:   memref.copy [[param_memref]], [[view]]
     // CHECK-SAME:    memref<4x4xcomplex<f64>> to memref<4x4xcomplex<f64>>
     // CHECK:   catalyst.list_push [[offset]], [[offset_vector]] : <index>
-    // CHECK:   memref.store [[new_offset]], [[cur_offset]][] : memref<index>
+    // CHECK:   memref.store [[new_offset]], [[cache]]#2[] : memref<index>
 
     // CHECK: scf.for
     // CHECK-SAME:  -> (!quantum.reg) {
@@ -106,7 +132,7 @@ func.func @qubit_unitary_test() -> tensor<4xcomplex<f64>> {
       %7 = quantum.extract %reg[ 1] : !quantum.reg -> !quantum.bit
 
       // CHECK: [[offset:%.+]] = catalyst.list_pop [[offset_vector]] : <index>
-      // CHECK: [[loaded_data:%.+]] = memref.load [[data_vector]][] : memref<memref<?xi8>>
+      // CHECK: [[loaded_data:%.+]] = memref.load [[cache]]#0[] : memref<memref<?xi8>>
       // CHECK: [[view:%.+]] = memref.view [[loaded_data]][[[offset]]][]
       // CHECK-SAME:    memref<?xi8> to memref<4x4xcomplex<f64>>
       // CHECK: [[param_tensor:%.+]] = bufferization.to_tensor [[view]] restrict
@@ -118,11 +144,9 @@ func.func @qubit_unitary_test() -> tensor<4xcomplex<f64>> {
       %10 = quantum.insert %9[ 1], %8#1 : !quantum.reg, !quantum.bit
       scf.yield %10 : !quantum.reg
     }
-    // CHECK: [[loaded_data:%.+]] = memref.load [[data_vector]][] : memref<memref<?xi8>>
-    // CHECK: memref.dealloc [[loaded_data]] : memref<?xi8>
-    // CHECK: memref.dealloc [[data_vector]] : memref<memref<?xi8>>
-    // CHECK: memref.dealloc [[capacity]] : memref<index>
-    // CHECK: memref.dealloc [[cur_offset]] : memref<index>
+    // CHECK: call @__adjoint_lowering_dealloc_param_vector
+    // CHECK-SAME:   ([[cache]]#0, [[cache]]#1, [[cache]]#2)
+    // CHECK-SAME:   : (memref<memref<?xi8>>, memref<index>, memref<index>) -> ()
     // CHECK: catalyst.list_dealloc [[offset_vector]] : <index>
 
     quantum.yield %for_reg : !quantum.reg
@@ -150,33 +174,28 @@ func.func @adjoint_real_matrix_param(%arg0: !quantum.reg) -> !quantum.reg {
     // COM: tensor<2x2xf64> is 2*2*64/8 = 32 bytes
     // CHECK-DAG: [[_32:%.+]] = index.constant 32
     // CHECK-DAG: [[_64:%.+]] = index.constant 64
-    // CHECK-DAG: [[zero:%.+]] = index.constant 0
-    // CHECK-DAG: [[_2048:%.+]] = index.constant 2048
 
-    // CHECK: [[data:%.+]] = memref.alloc([[_2048]]) {alignment = 64 : i64} : memref<?xi8>
-    // CHECK: [[data_vector:%.+]] = memref.alloc() : memref<memref<?xi8>>
-    // CHECK: memref.store [[data]], [[data_vector]][] : memref<memref<?xi8>>
-    // CHECK: [[capacity:%.+]] = memref.alloc() : memref<index>
-    // CHECK: memref.store [[_2048]], [[capacity]][] : memref<index>
-    // CHECK: [[cur_offset:%.+]] = memref.alloc() : memref<index>
-    // CHECK: memref.store [[zero]], [[cur_offset]][] : memref<index>
+    // COM: The cache buffers are allocated by a call rather than in place, so that no memref.alloc
+    // COM: for them appears in the function being lowered. See getOrInsertInitParamVectorFunc.
+    // CHECK: [[cache:%.+]]:3 = call @__adjoint_lowering_init_param_vector()
+    // CHECK-SAME:   : () -> (memref<memref<?xi8>>, memref<index>, memref<index>)
     // CHECK: [[offset_vector:%.+]] = catalyst.list_init : <index>
 
     // CHECK: scf.for
     // CHECK:   [[param:%.+]] = "test.op"() : () -> tensor<2x2xf64>
-    // CHECK:   [[raw_offset:%.+]] = memref.load [[cur_offset]][] : memref<index>
+    // CHECK:   [[raw_offset:%.+]] = memref.load [[cache]]#2[] : memref<index>
     // CHECK:   [[offset:%.+]] = func.call @__adjoint_lowering_roundup_offset_to_alignment
     // CHECK-SAME:  ([[raw_offset]], [[_64]]) : (index, index) -> index
     // CHECK:   [[new_offset:%.+]] = index.add [[offset]], [[_32]]
     // CHECK:   func.call @__adjoint_lowering_ensure_param_vector_capacity
-    // CHECK-SAME:  ([[data_vector]], [[capacity]], [[new_offset]])
+    // CHECK-SAME:  ([[cache]]#0, [[cache]]#1, [[new_offset]])
     // CHECK-SAME:  : (memref<memref<?xi8>>, memref<index>, index) -> ()
-    // CHECK:   [[loaded_data:%.+]] = memref.load [[data_vector]][] : memref<memref<?xi8>>
+    // CHECK:   [[loaded_data:%.+]] = memref.load [[cache]]#0[] : memref<memref<?xi8>>
     // CHECK:   [[param_memref:%.+]] = bufferization.to_buffer [[param]] : tensor<2x2xf64> to memref<2x2xf64>
     // CHECK:   [[view:%.+]] = memref.view [[loaded_data]][[[offset]]][] : memref<?xi8> to memref<2x2xf64>
     // CHECK:   memref.copy [[param_memref]], [[view]] : memref<2x2xf64> to memref<2x2xf64>
     // CHECK:   catalyst.list_push [[offset]], [[offset_vector]] : <index>
-    // CHECK:   memref.store [[new_offset]], [[cur_offset]][] : memref<index>
+    // CHECK:   memref.store [[new_offset]], [[cache]]#2[] : memref<index>
 
     // CHECK: scf.for
     // CHECK-SAME:  -> (!quantum.reg) {
@@ -186,7 +205,7 @@ func.func @adjoint_real_matrix_param(%arg0: !quantum.reg) -> !quantum.reg {
       %q1 = quantum.extract %reg[ 1] : !quantum.reg -> !quantum.bit
 
       // CHECK: [[offset:%.+]] = catalyst.list_pop [[offset_vector]] : <index>
-      // CHECK: [[loaded_data:%.+]] = memref.load [[data_vector]][] : memref<memref<?xi8>>
+      // CHECK: [[loaded_data:%.+]] = memref.load [[cache]]#0[] : memref<memref<?xi8>>
       // CHECK: [[view:%.+]] = memref.view [[loaded_data]][[[offset]]][]
       // CHECK-SAME:    memref<?xi8> to memref<2x2xf64>
       // CHECK: [[param_tensor:%.+]] = bufferization.to_tensor [[view]] restrict
@@ -200,11 +219,9 @@ func.func @adjoint_real_matrix_param(%arg0: !quantum.reg) -> !quantum.reg {
       %r1 = quantum.insert %r0[ 1], %op#1 : !quantum.reg, !quantum.bit
       scf.yield %r1 : !quantum.reg
     }
-    // CHECK: [[loaded_data:%.+]] = memref.load [[data_vector]][] : memref<memref<?xi8>>
-    // CHECK: memref.dealloc [[loaded_data]] : memref<?xi8>
-    // CHECK: memref.dealloc [[data_vector]] : memref<memref<?xi8>>
-    // CHECK: memref.dealloc [[capacity]] : memref<index>
-    // CHECK: memref.dealloc [[cur_offset]] : memref<index>
+    // CHECK: call @__adjoint_lowering_dealloc_param_vector
+    // CHECK-SAME:   ([[cache]]#0, [[cache]]#1, [[cache]]#2)
+    // CHECK-SAME:   : (memref<memref<?xi8>>, memref<index>, memref<index>) -> ()
     // CHECK: catalyst.list_dealloc [[offset_vector]] : <index>
 
     quantum.yield %for_reg : !quantum.reg
@@ -232,16 +249,11 @@ func.func @mixed_param_types(%0: !quantum.reg) -> !quantum.reg {
     // CHECK-DAG: [[_6:%.+]] = index.constant 6
     // CHECK-DAG: [[_8:%.+]] = index.constant 8
     // CHECK-DAG: [[_64:%.+]] = index.constant 64
-    // CHECK-DAG: [[zero:%.+]] = index.constant 0
-    // CHECK-DAG: [[_2048:%.+]] = index.constant 2048
 
-    // CHECK: [[data:%.+]] = memref.alloc([[_2048]]) {alignment = 64 : i64} : memref<?xi8>
-    // CHECK: [[data_vector:%.+]] = memref.alloc() : memref<memref<?xi8>>
-    // CHECK: memref.store [[data]], [[data_vector]][] : memref<memref<?xi8>>
-    // CHECK: [[capacity:%.+]] = memref.alloc() : memref<index>
-    // CHECK: memref.store [[_2048]], [[capacity]][] : memref<index>
-    // CHECK: [[cur_offset:%.+]] = memref.alloc() : memref<index>
-    // CHECK: memref.store [[zero]], [[cur_offset]][] : memref<index>
+    // COM: The cache buffers are allocated by a call rather than in place, so that no memref.alloc
+    // COM: for them appears in the function being lowered. See getOrInsertInitParamVectorFunc.
+    // CHECK: [[cache:%.+]]:3 = call @__adjoint_lowering_init_param_vector()
+    // CHECK-SAME:   : () -> (memref<memref<?xi8>>, memref<index>, memref<index>)
     // CHECK: [[offset_vector:%.+]] = catalyst.list_init : <index>
 
     // CHECK: scf.for [[i:%.+]] =
@@ -250,54 +262,54 @@ func.func @mixed_param_types(%0: !quantum.reg) -> !quantum.reg {
     // CHECK:   [[c3:%.+]] = "test.op"([[i]]) : (index) -> complex<i32>
     // CHECK:   [[c4:%.+]] = "test.op"([[i]]) : (index) -> tensor<6xi1>
     //
-    // CHECK: [[raw_offset:%.+]] = memref.load [[cur_offset]][] : memref<index>
+    // CHECK: [[raw_offset:%.+]] = memref.load [[cache]]#2[] : memref<index>
     // CHECK: [[offset:%.+]] = func.call @__adjoint_lowering_roundup_offset_to_alignment
     // CHECK-SAME:  ([[raw_offset]], [[_8]]) : (index, index) -> index
     // CHECK: [[new_offset:%.+]] = index.add [[offset]], [[_8]]
     // CHECK: func.call @__adjoint_lowering_ensure_param_vector_capacity
-    // CHECK-SAME:  ([[data_vector]], [[capacity]], [[new_offset]])
-    // CHECK: [[loaded_data:%.+]] = memref.load [[data_vector]][] : memref<memref<?xi8>>
+    // CHECK-SAME:  ([[cache]]#0, [[cache]]#1, [[new_offset]])
+    // CHECK: [[loaded_data:%.+]] = memref.load [[cache]]#0[] : memref<memref<?xi8>>
     // CHECK: [[view:%.+]] = memref.view [[loaded_data]][[[offset]]][] : memref<?xi8> to memref<f64>
     // CHECK: memref.store [[c1]], [[view]][] : memref<f64>
     // CHECK: catalyst.list_push [[offset]], [[offset_vector]] : <index>
-    // CHECK: memref.store [[new_offset]], [[cur_offset]][] : memref<index>
+    // CHECK: memref.store [[new_offset]], [[cache]]#2[] : memref<index>
     //
-    // CHECK: [[raw_offset:%.+]] = memref.load [[cur_offset]][] : memref<index>
+    // CHECK: [[raw_offset:%.+]] = memref.load [[cache]]#2[] : memref<index>
     // CHECK: [[offset:%.+]] = func.call @__adjoint_lowering_roundup_offset_to_alignment
     // CHECK-SAME:  ([[raw_offset]], [[_1]]) : (index, index) -> index
     // CHECK: [[new_offset:%.+]] = index.add [[offset]], [[_1]]
     // CHECK: func.call @__adjoint_lowering_ensure_param_vector_capacity
-    // CHECK-SAME:  ([[data_vector]], [[capacity]], [[new_offset]])
-    // CHECK: [[loaded_data:%.+]] = memref.load [[data_vector]][] : memref<memref<?xi8>>
+    // CHECK-SAME:  ([[cache]]#0, [[cache]]#1, [[new_offset]])
+    // CHECK: [[loaded_data:%.+]] = memref.load [[cache]]#0[] : memref<memref<?xi8>>
     // CHECK: [[view:%.+]] = memref.view [[loaded_data]][[[offset]]][] : memref<?xi8> to memref<i1>
     // CHECK: memref.store [[c2]], [[view]][] : memref<i1>
     // CHECK: catalyst.list_push [[offset]], [[offset_vector]] : <index>
-    // CHECK: memref.store [[new_offset]], [[cur_offset]][] : memref<index>
+    // CHECK: memref.store [[new_offset]], [[cache]]#2[] : memref<index>
     //
-    // CHECK: [[raw_offset:%.+]] = memref.load [[cur_offset]][] : memref<index>
+    // CHECK: [[raw_offset:%.+]] = memref.load [[cache]]#2[] : memref<index>
     // CHECK: [[offset:%.+]] = func.call @__adjoint_lowering_roundup_offset_to_alignment
     // CHECK-SAME:  ([[raw_offset]], [[_8]]) : (index, index) -> index
     // CHECK: [[new_offset:%.+]] = index.add [[offset]], [[_8]]
     // CHECK: func.call @__adjoint_lowering_ensure_param_vector_capacity
-    // CHECK-SAME:  ([[data_vector]], [[capacity]], [[new_offset]])
-    // CHECK: [[loaded_data:%.+]] = memref.load [[data_vector]][] : memref<memref<?xi8>>
+    // CHECK-SAME:  ([[cache]]#0, [[cache]]#1, [[new_offset]])
+    // CHECK: [[loaded_data:%.+]] = memref.load [[cache]]#0[] : memref<memref<?xi8>>
     // CHECK: [[view:%.+]] = memref.view [[loaded_data]][[[offset]]][] : memref<?xi8> to memref<complex<i32>>
     // CHECK: memref.store [[c3]], [[view]][] : memref<complex<i32>>
     // CHECK: catalyst.list_push [[offset]], [[offset_vector]] : <index>
-    // CHECK: memref.store [[new_offset]], [[cur_offset]][] : memref<index>
+    // CHECK: memref.store [[new_offset]], [[cache]]#2[] : memref<index>
     //
-    // CHECK:   [[raw_offset:%.+]] = memref.load [[cur_offset]][] : memref<index>
+    // CHECK:   [[raw_offset:%.+]] = memref.load [[cache]]#2[] : memref<index>
     // CHECK:   [[offset:%.+]] = func.call @__adjoint_lowering_roundup_offset_to_alignment
     // CHECK-SAME:  ([[raw_offset]], [[_64]]) : (index, index) -> index
     // CHECK:   [[new_offset:%.+]] = index.add [[offset]], [[_6]]
     // CHECK:   func.call @__adjoint_lowering_ensure_param_vector_capacity
-    // CHECK-SAME:  ([[data_vector]], [[capacity]], [[new_offset]])
-    // CHECK:   [[loaded_data:%.+]] = memref.load [[data_vector]][] : memref<memref<?xi8>>
+    // CHECK-SAME:  ([[cache]]#0, [[cache]]#1, [[new_offset]])
+    // CHECK:   [[loaded_data:%.+]] = memref.load [[cache]]#0[] : memref<memref<?xi8>>
     // CHECK:   [[c4_memref:%.+]] = bufferization.to_buffer [[c4]] : tensor<6xi1> to memref<6xi1>
     // CHECK:   [[view:%.+]] = memref.view [[loaded_data]][[[offset]]][] : memref<?xi8> to memref<6xi1>
     // CHECK:   memref.copy [[c4_memref]], [[view]] : memref<6xi1> to memref<6xi1>
     // CHECK:   catalyst.list_push [[offset]], [[offset_vector]] : <index>
-    // CHECK:   memref.store [[new_offset]], [[cur_offset]][] : memref<index>
+    // CHECK:   memref.store [[new_offset]], [[cache]]#2[] : memref<index>
 
     // CHECK: scf.for
     // CHECK-SAME:  -> (!quantum.reg) {
@@ -309,22 +321,22 @@ func.func @mixed_param_types(%0: !quantum.reg) -> !quantum.reg {
       %q0 = quantum.extract %reg[ 0] : !quantum.reg -> !quantum.bit
 
       // CHECK: [[offset:%.+]] = catalyst.list_pop [[offset_vector]] : <index>
-      // CHECK: [[loaded_data:%.+]] = memref.load [[data_vector]][] : memref<memref<?xi8>>
+      // CHECK: [[loaded_data:%.+]] = memref.load [[cache]]#0[] : memref<memref<?xi8>>
       // CHECK: [[view:%.+]] = memref.view [[loaded_data]][[[offset]]][] : memref<?xi8> to memref<6xi1>
       // CHECK: [[c4:%.+]] = bufferization.to_tensor [[view]] restrict : memref<6xi1> to tensor<6xi1>
       //
       // CHECK: [[offset:%.+]] = catalyst.list_pop [[offset_vector]] : <index>
-      // CHECK: [[loaded_data:%.+]] = memref.load [[data_vector]][] : memref<memref<?xi8>>
+      // CHECK: [[loaded_data:%.+]] = memref.load [[cache]]#0[] : memref<memref<?xi8>>
       // CHECK: [[view:%.+]] = memref.view [[loaded_data]][[[offset]]][] : memref<?xi8> to memref<complex<i32>>
       // CHECK: [[c3:%.+]] = memref.load [[view]][] : memref<complex<i32>>
       //
       // CHECK: [[offset:%.+]] = catalyst.list_pop [[offset_vector]] : <index>
-      // CHECK: [[loaded_data:%.+]] = memref.load [[data_vector]][] : memref<memref<?xi8>>
+      // CHECK: [[loaded_data:%.+]] = memref.load [[cache]]#0[] : memref<memref<?xi8>>
       // CHECK: [[view:%.+]] = memref.view [[loaded_data]][[[offset]]][] : memref<?xi8> to memref<i1>
       // CHECK: [[c2:%.+]] = memref.load [[view]][] : memref<i1>
       //
       // CHECK: [[offset:%.+]] = catalyst.list_pop [[offset_vector]] : <index>
-      // CHECK: [[loaded_data:%.+]] = memref.load [[data_vector]][] : memref<memref<?xi8>>
+      // CHECK: [[loaded_data:%.+]] = memref.load [[cache]]#0[] : memref<memref<?xi8>>
       // CHECK: [[view:%.+]] = memref.view [[loaded_data]][[[offset]]][] : memref<?xi8> to memref<f64>
       // CHECK: [[c1:%.+]] = memref.load [[view]][] : memref<f64>
       //
@@ -334,11 +346,9 @@ func.func @mixed_param_types(%0: !quantum.reg) -> !quantum.reg {
       %r1 = quantum.insert %reg[ 0], %q1 : !quantum.reg, !quantum.bit
       scf.yield %r1 : !quantum.reg
     }
-    // CHECK: [[loaded_data:%.+]] = memref.load [[data_vector]][] : memref<memref<?xi8>>
-    // CHECK: memref.dealloc [[loaded_data]] : memref<?xi8>
-    // CHECK: memref.dealloc [[data_vector]] : memref<memref<?xi8>>
-    // CHECK: memref.dealloc [[capacity]] : memref<index>
-    // CHECK: memref.dealloc [[cur_offset]] : memref<index>
+    // CHECK: call @__adjoint_lowering_dealloc_param_vector
+    // CHECK-SAME:   ([[cache]]#0, [[cache]]#1, [[cache]]#2)
+    // CHECK-SAME:   : (memref<memref<?xi8>>, memref<index>, memref<index>) -> ()
     // CHECK: catalyst.list_dealloc [[offset_vector]] : <index>
 
     quantum.yield %for_reg : !quantum.reg

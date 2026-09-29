@@ -52,6 +52,15 @@ struct QuantumCache {
     mlir::func::FuncOp offsetRoundupFunc;
     mlir::func::FuncOp ensureCapacityFunc;
 
+    /// Helper that frees `paramVector`, `paramVectorCapacity` and `currentOffset`.
+    ///
+    /// Both the allocation and the deallocation of these buffers are kept inside module-level
+    /// helpers so that no `memref.alloc`/`memref.dealloc` for the cache appears in the function
+    /// being lowered. Otherwise, for an adjoint nested inside a loop, `-buffer-loop-hoisting`
+    /// hoists the allocation out of the loop and leaves the deallocation inside it, which frees the
+    /// cache once per iteration.
+    mlir::func::FuncOp deallocParamVectorFunc;
+
     mlir::TypedValue<ArrayListType> wireVector;
     /// For every structured control flow op, store the values required for it to execute.
     /// Specifically: store the conditions for scf.if ops, the start/stop/step of scf.for ops, and

@@ -44,6 +44,9 @@ constexpr llvm::StringLiteral offsetRoundupFuncName =
     "__adjoint_lowering_roundup_offset_to_alignment";
 constexpr llvm::StringLiteral ensureCapacityFuncName =
     "__adjoint_lowering_ensure_param_vector_capacity";
+constexpr llvm::StringLiteral initParamVectorFuncName = "__adjoint_lowering_init_param_vector";
+constexpr llvm::StringLiteral deallocParamVectorFuncName =
+    "__adjoint_lowering_dealloc_param_vector";
 
 // `memref<?xi8>`: the growable raw byte buffer that gate parameters are recorded into.
 MemRefType getParamVectorDataType(OpBuilder &builder) {
@@ -151,6 +154,133 @@ func::FuncOp getOrInsertEnsureCapacityFunc(ModuleOp moduleOp, OpBuilder &builder
     return ensureCapacityFuncOp;
 }
 
+// Get or create the helper that allocates the parameter cache.
+//
+// The allocations live in a helper, rather than being emitted at the point of the `quantum.adjoint`
+// op, so that the function being lowered contains no `memref.alloc` for the cache. A nested adjoint
+// has its cache created inside the enclosing loop body, and `-buffer-loop-hoisting` would hoist
+// such an `memref.alloc` out of the loop while leaving the matching `memref.dealloc` behind:
+// `-buffer-deallocation` only relocates a `memref.dealloc` whose operand is in the allocation's
+// alias set, and the one emitted by `emitDealloc` frees `memref.load %param_vector[]`, which is
+// not. The result is one allocation and one free per loop iteration, i.e. a double free. A
+// `func.call` is opaque to all three passes, which keeps the allocation and deallocation paired.
+//
+//   func.func private @__adjoint_lowering_init_param_vector()
+//       -> (memref<memref<?xi8>>, memref<index>, memref<index>) {
+//     %capacity = index.constant 2048
+//     %data = memref.alloc(%capacity) {alignment = 64} : memref<?xi8>
+//     %param_vector = memref.alloc() : memref<memref<?xi8>>
+//     memref.store %data, %param_vector[]
+//     %capacity_field = memref.alloc() : memref<index>
+//     memref.store %capacity, %capacity_field[]
+//     %offset_field = memref.alloc() : memref<index>
+//     %zero = index.constant 0
+//     memref.store %zero, %offset_field[]
+//     return %param_vector, %capacity_field, %offset_field
+//   }
+func::FuncOp getOrInsertInitParamVectorFunc(ModuleOp moduleOp, OpBuilder &builder, Location loc) {
+    if (auto existing = moduleOp.lookupSymbol<func::FuncOp>(initParamVectorFuncName)) {
+        return existing;
+    }
+
+    MLIRContext *ctx = builder.getContext();
+    OpBuilder::InsertionGuard guard(builder);
+    builder.setInsertionPointToStart(moduleOp.getBody());
+
+    MemRefType indexMemRefType = MemRefType::get({}, builder.getIndexType());
+    auto initParamVectorFuncType =
+        FunctionType::get(ctx, /*inputs=*/{},
+                          /*outputs=*/
+                          {getParamVectorType(builder), indexMemRefType, indexMemRefType});
+
+    auto initParamVectorFuncOp =
+        func::FuncOp::create(builder, loc, initParamVectorFuncName, initParamVectorFuncType);
+    initParamVectorFuncOp.setPrivate();
+
+    Block *entryBlock = initParamVectorFuncOp.addEntryBlock();
+    builder.setInsertionPointToStart(entryBlock);
+
+    // The byte buffer that parameters get recorded into. It is dynamically sized and held behind a
+    // rank-0 memref so that it can be reallocated in place as the cache fills up; see the comment
+    // on QuantumCache::paramVector.
+    Value initialCapacity = index::ConstantOp::create(builder, loc, initialParamVectorCapacity);
+    Value paramVectorData =
+        memref::AllocOp::create(builder, loc, getParamVectorDataType(builder),
+                                /*dynamicSizes=*/ValueRange{initialCapacity},
+                                /*alignment=*/builder.getI64IntegerAttr(paramVectorAlignment))
+            .getMemref();
+    Value paramVector =
+        memref::AllocOp::create(builder, loc, getParamVectorType(builder)).getMemref();
+    memref::StoreOp::create(builder, loc, paramVectorData, paramVector, ValueRange{});
+
+    Value paramVectorCapacity = memref::AllocOp::create(builder, loc, indexMemRefType).getMemref();
+    memref::StoreOp::create(builder, loc, initialCapacity, paramVectorCapacity, ValueRange{});
+
+    Value currentOffset = memref::AllocOp::create(builder, loc, indexMemRefType).getMemref();
+    Value zero = index::ConstantOp::create(builder, loc, 0);
+    memref::StoreOp::create(builder, loc, zero, currentOffset, ValueRange{});
+
+    func::ReturnOp::create(builder, loc,
+                           ValueRange{paramVector, paramVectorCapacity, currentOffset});
+
+    return initParamVectorFuncOp;
+}
+
+// Get or create the helper that frees the parameter cache.
+//
+// The counterpart of getOrInsertInitParamVectorFunc: the deallocations have to be hidden from
+// `-buffer-loop-hoisting` and `-buffer-deallocation` for the same reason the allocations are.
+//
+//   func.func private @__adjoint_lowering_dealloc_param_vector(
+//       %param_vector: memref<memref<?xi8>>, %capacity_field: memref<index>,
+//       %offset_field: memref<index>) {
+//     %data = memref.load %param_vector[]
+//     memref.dealloc %data : memref<?xi8>
+//     memref.dealloc %param_vector : memref<memref<?xi8>>
+//     memref.dealloc %capacity_field : memref<index>
+//     memref.dealloc %offset_field : memref<index>
+//     return
+//   }
+func::FuncOp getOrInsertDeallocParamVectorFunc(ModuleOp moduleOp, OpBuilder &builder,
+                                               Location loc) {
+    if (auto existing = moduleOp.lookupSymbol<func::FuncOp>(deallocParamVectorFuncName)) {
+        return existing;
+    }
+
+    MLIRContext *ctx = builder.getContext();
+    OpBuilder::InsertionGuard guard(builder);
+    builder.setInsertionPointToStart(moduleOp.getBody());
+
+    MemRefType indexMemRefType = MemRefType::get({}, builder.getIndexType());
+    auto deallocParamVectorFuncType =
+        FunctionType::get(ctx,
+                          /*inputs=*/
+                          {getParamVectorType(builder), indexMemRefType, indexMemRefType},
+                          /*outputs=*/{});
+
+    auto deallocParamVectorFuncOp =
+        func::FuncOp::create(builder, loc, deallocParamVectorFuncName, deallocParamVectorFuncType);
+    deallocParamVectorFuncOp.setPrivate();
+
+    Block *entryBlock = deallocParamVectorFuncOp.addEntryBlock();
+    builder.setInsertionPointToStart(entryBlock);
+    BlockArgument paramVector = deallocParamVectorFuncOp.getArgument(0);
+    BlockArgument paramVectorCapacity = deallocParamVectorFuncOp.getArgument(1);
+    BlockArgument currentOffset = deallocParamVectorFuncOp.getArgument(2);
+
+    // The buffer to free is whichever one the last growth left behind, so it has to be loaded
+    // rather than captured at allocation time.
+    Value paramVectorData = memref::LoadOp::create(builder, loc, paramVector, ValueRange{});
+    memref::DeallocOp::create(builder, loc, paramVectorData);
+    memref::DeallocOp::create(builder, loc, paramVector);
+    memref::DeallocOp::create(builder, loc, paramVectorCapacity);
+    memref::DeallocOp::create(builder, loc, currentOffset);
+
+    func::ReturnOp::create(builder, loc);
+
+    return deallocParamVectorFuncOp;
+}
+
 } // namespace
 
 namespace catalyst {
@@ -202,33 +332,23 @@ QuantumCache QuantumCache::initialize(Region &region, OpBuilder &builder, Locati
 
     Type indexType = builder.getIndexType();
 
-    // The byte buffer that parameters get recorded into. It is dynamically sized and held behind a
-    // rank-0 memref so that it can be reallocated in place as the cache fills up; see the comment
-    // on QuantumCache::paramVector.
-    Value initialCapacity = index::ConstantOp::create(builder, loc, initialParamVectorCapacity);
-    auto paramVectorData =
-        memref::AllocOp::create(builder, loc, getParamVectorDataType(builder),
-                                /*dynamicSizes=*/ValueRange{initialCapacity},
-                                /*alignment=*/builder.getI64IntegerAttr(paramVectorAlignment))
-            .getMemref();
-    auto paramVector =
-        memref::AllocOp::create(builder, loc, getParamVectorType(builder)).getMemref();
-    memref::StoreOp::create(builder, loc, paramVectorData, paramVector, ValueRange{});
-
-    auto paramVectorCapacity =
-        memref::AllocOp::create(builder, loc, MemRefType::get({}, indexType)).getMemref();
-    memref::StoreOp::create(builder, loc, initialCapacity, paramVectorCapacity, ValueRange{});
-
-    auto currentOffset =
-        memref::AllocOp::create(builder, loc, MemRefType::get({}, indexType)).getMemref();
-    auto zero = index::ConstantOp::create(builder, loc, 0);
-    memref::StoreOp::create(builder, loc, zero, currentOffset, ValueRange{});
-    auto offsetVectorType = ArrayListType::get(ctx, indexType);
-    auto offsetVector = ListInitOp::create(builder, loc, offsetVectorType);
-
     auto moduleOp = region.getParentOfType<ModuleOp>();
     func::FuncOp offsetRoundupFunc = getOrInsertOffsetRoundupFunc(moduleOp, builder, loc);
     func::FuncOp ensureCapacityFunc = getOrInsertEnsureCapacityFunc(moduleOp, builder, loc);
+    func::FuncOp initParamVectorFunc = getOrInsertInitParamVectorFunc(moduleOp, builder, loc);
+    func::FuncOp deallocParamVectorFunc = getOrInsertDeallocParamVectorFunc(moduleOp, builder, loc);
+
+    // The byte buffer that parameters get recorded into, the byte capacity of that buffer, and the
+    // offset of the next free slot in it. These are allocated by a call rather than in place: see
+    // the comment on getOrInsertInitParamVectorFunc.
+    auto initParamVectorCall =
+        func::CallOp::create(builder, loc, initParamVectorFunc, ValueRange{});
+    Value paramVector = initParamVectorCall.getResult(0);
+    Value paramVectorCapacity = initParamVectorCall.getResult(1);
+    Value currentOffset = initParamVectorCall.getResult(2);
+
+    auto offsetVectorType = ArrayListType::get(ctx, indexType);
+    auto offsetVector = ListInitOp::create(builder, loc, offsetVectorType);
 
     auto wireVectorType = ArrayListType::get(ctx, builder.getI64Type());
     auto wireVector = ListInitOp::create(builder, loc, wireVectorType);
@@ -248,6 +368,7 @@ QuantumCache QuantumCache::initialize(Region &region, OpBuilder &builder, Locati
                                  .offsetVector = offsetVector,
                                  .offsetRoundupFunc = offsetRoundupFunc,
                                  .ensureCapacityFunc = ensureCapacityFunc,
+                                 .deallocParamVectorFunc = deallocParamVectorFunc,
                                  .wireVector = wireVector,
                                  .controlFlowTapes = controlFlowTapes};
 }
@@ -263,10 +384,8 @@ Value QuantumCache::emitLoadParamVectorData(OpBuilder &builder, Location loc) co
 }
 
 void QuantumCache::emitDealloc(OpBuilder &builder, Location loc) {
-    memref::DeallocOp::create(builder, loc, emitLoadParamVectorData(builder, loc));
-    memref::DeallocOp::create(builder, loc, paramVector);
-    memref::DeallocOp::create(builder, loc, paramVectorCapacity);
-    memref::DeallocOp::create(builder, loc, currentOffset);
+    func::CallOp::create(builder, loc, deallocParamVectorFunc,
+                         ValueRange{paramVector, paramVectorCapacity, currentOffset});
     ListDeallocOp::create(builder, loc, offsetVector);
     ListDeallocOp::create(builder, loc, wireVector);
     for (const auto &[_key, controlFlowTape] : controlFlowTapes) {
