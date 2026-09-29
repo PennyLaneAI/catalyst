@@ -68,7 +68,8 @@ RUN if [ -n "${PENNYLANE_VERSION}" ]; then \
 
 
 RUN if [ -n "${LIGHTNING_VERSION}" ]; then \
-        git clone -q https://github.com/PennyLaneAI/pennylane-lightning.git /tmp/lightning \
+        pip install --no-cache-dir toml \
+        && git clone -q https://github.com/PennyLaneAI/pennylane-lightning.git /tmp/lightning \
         && cd /tmp/lightning && git checkout -q "${LIGHTNING_VERSION}" \
         && python scripts/configure_pyproject_toml.py \
         && pip install --no-cache-dir --no-deps --force-reinstall . \
