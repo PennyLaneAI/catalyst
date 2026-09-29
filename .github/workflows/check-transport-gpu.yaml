@@ -74,69 +74,52 @@ jobs:
           echo "LD_LIBRARY_PATH=/usr/local/cuda/lib64${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}" >> $GITHUB_ENV
 
       - name: Wait for the GPU to be usable
-        # This pool hands out a freshly booted instance per run, and both gates the tests
-        # depend on have been seen failing early in one and passing late in another:
-        #
-        #   * cuInit returned "CUDA unknown error" nine minutes in, on a run whose driver was
-        #     otherwise fine -- the kernel modules are not loaded and the /dev/nvidia* nodes
-        #     do not exist yet that soon after boot.
-        #   * `nvidia-smi --query-gpu=compute_cap` reported nothing usable twenty-four minutes
-        #     in, sixteen minutes after Triton had activated a CUDA driver in the same job.
-        #
-        # Rebuilding the MLIR stack from source used to hide both: two hours of compiling was
-        # an accidental warm-up, and nothing touched the GPU until well past it. Restoring the
-        # stack from cache took that away, so the wait has to be explicit.
-        #
-        # Wait on exactly what the tests need, not a proxy. cuInit is asked through ctypes
-        # because torch is not installed until much later in the job, and compute_cap is the
-        # query `gpu_triton_platform` itself runs -- when that one comes back unparseable the
-        # fixture skips as "No NVIDIA or AMD GPU detected", which is indistinguishable in the
-        # log from a runner that genuinely has no GPU. nvidia-smi is also the trigger here,
-        # not just the question: it is what pulls in nvidia-modprobe and gets the device
-        # nodes created.
+        # `single-gpu-x64` hands out a freshly booted EC2 instance per run, and the GPU needs
+        # time to settle: cuInit and `--query-gpu=compute_cap` have each been seen failing
+        # minutes in, the second surfacing as a "No NVIDIA or AMD GPU detected" skip. Two
+        # hours of building the MLIR stack used to hide it; the cache took that away.
+        # nvidia-smi is the trigger as well as the question -- it creates the device nodes.
         run: |
           set -u
-          # GitHub runs step shells as `bash -e`. Every probe below is expected to fail
-          # sometimes -- that is the thing being measured, not an error -- so -e has to come
-          # off, and the diagnostics at the end must not abort the step before they print.
+          # `bash -e` is the step default, and a probe failing is the measurement here.
           set +e
-          # Quiet on failure: this runs up to 60 times, and a driver that is not up yet is the
-          # expected case rather than something to print a traceback about.
-          probe='
+
+          # ctypes, not torch: torch is not installed until much later in the job.
+          cuinit='
           import ctypes, sys
           try:
               sys.exit(0 if ctypes.CDLL("libcuda.so.1").cuInit(0) == 0 else 1)
           except OSError:
               sys.exit(1)
           '
-          # Three consecutive clean rounds, not one. On this pool nvidia-smi was seen
-          # reporting compute capability 8.6 and then "No devices were found" 330 ms later on
-          # the same host, so one passing probe says nothing about whether the GPU is still
-          # there when pytest runs twenty minutes on. Rounds are 10s apart, so this asks for
-          # roughly 20s of uninterrupted health before the job commits to any work.
+
+          # Three rounds, not one: nvidia-smi reported compute capability 8.6 and then
+          # "No devices were found" 330 ms later on the same host.
+          interval=10
           need=3
+          deadline=60
+          stable_for=$(( (need - 1) * interval ))
+
           streak=0
-          cc=""; devs=""; cuinit=""
-          for i in $(seq 1 60); do
-            devs=$(nvidia-smi -L 2>&1)
+          for round in $(seq 1 "$deadline"); do
             cc=$(nvidia-smi --query-gpu=compute_cap --format=csv,noheader 2>&1 | head -1)
-            python3 -c "$probe"; cuinit=$?
-            ok=1
-            printf '%s\n' "$devs" | grep -q '^GPU [0-9]' || ok=0
-            case "$cc" in [0-9]*.[0-9]*) ;; *) ok=0 ;; esac
-            [ "$cuinit" -eq 0 ] || ok=0
-            if [ "$ok" -eq 1 ]; then streak=$((streak + 1)); else streak=0; fi
+            python3 -c "$cuinit"
+            rc=$?
+            case "$cc:$rc" in
+              [0-9]*.[0-9]*:0) streak=$((streak + 1)) ;;
+              *)               streak=0 ;;
+            esac
             if [ "$streak" -ge "$need" ]; then
-              echo "GPU healthy for $(( (need - 1) * 10 ))s, first seen after $(( (i - need) * 10 ))s"
-              echo "compute capability $cc"
-              printf '%s\n' "$devs"
+              echo "GPU healthy for ${stable_for}s, first seen after $(( (round - need) * interval ))s"
+              nvidia-smi
               exit 0
             fi
-            sleep 10
+            sleep "$interval"
           done
-          echo "::error::The GPU never stayed healthy for $(( (need - 1) * 10 ))s within 10 minutes." \
-               "The backline tests would skip and this job would report success over zero coverage." \
-               "Last round -- nvidia-smi -L: '$devs' | compute_cap: '$cc' | cuInit exit: $cuinit."
+
+          echo "::error::GPU not healthy for ${stable_for}s within" \
+               "$(( deadline * interval / 60 )) minutes, so the backline tests would skip and" \
+               "this job would cover nothing. compute_cap: '$cc' | cuInit: $rc"
           nvidia-smi
           ls -l /dev/nvidia*
           exit 1
@@ -149,12 +132,24 @@ jobs:
         with:
           python-version: ${{ needs.constants.outputs.primary_python_version }}
 
-      - name: Install Python build dependencies
+      - name: Install build dependencies and resolve the toolchain
+        # LLVM_BUILD_DIR and its siblings stay on the frontend build step: runtime's Makefile
+        # reads it, and the runtime build runs before that tree exists. CATALYST_LIB_DIR is
+        # set here so the frontend build sees it, or precompile_decomposition_rules only warns.
         run: |
           python3 -m pip install "cmake>=3.26" ninja "nanobind<2.13" pybind11 numpy PyYAML
-          # Installed here, not only in build-mlir-stack: the runtime build below runs first,
-          # and COMPILER_LAUNCHER resolves to whatever `which ccache` finds at that point.
+          # ccache here as well as in build-mlir-stack: the runtime build runs before that
+          # action, and COMPILER_LAUNCHER resolves to whatever `which ccache` finds now.
           sudo apt-get update && sudo apt-get install -y ccache
+          {
+            echo "C_COMPILER=$(which gcc)"
+            echo "CXX_COMPILER=$(which g++)"
+            echo "COMPILER_LAUNCHER=$(which ccache)"
+            echo "RT_BUILD_DIR=$(pwd)/runtime-build"
+            echo "DIALECTS_BUILD_DIR=$(pwd)/quantum-build"
+            echo "CATALYST_LIB_DIR=$(pwd)/quantum-build/lib"
+            echo "PYTHONPATH=${PYTHONPATH:-}:$(pwd)/quantum-build/python_packages/quantum"
+          } >> "$GITHUB_ENV"
 
       - name: Get Cached LLVM Source
         id: cache-llvm-source
@@ -177,59 +172,26 @@ jobs:
       # That also keeps the build to LLVM source headers alone (header-only via rt_capi).
       - name: Build Catalyst-Runtime with transport enabled
         run: |
-          COMPILER_LAUNCHER="$(which ccache)" \
-          C_COMPILER=$(which gcc) \
-          CXX_COMPILER=$(which g++) \
-          RT_BUILD_DIR="$(pwd)/runtime-build" \
           LLVM_SRC_DIR="$(pwd)/mlir/llvm-project" \
           ENABLE_TRANSPORT=ON \
           make runtime
 
       - name: Verify the GPU coprocessor backend was built
-        # gpu_transport_backend skips when this .so is absent, which reads as "tests passed". It
-        # exists only when CMake set TRANSPORT_HAS_HIP, so a miss means HIP was not resolved.
+        # A missing .so makes gpu_transport_backend skip, which reads as "tests passed". No
+        # ROCm here: lib/transport/CMakeLists.txt fetches the HIP headers and nvcc drives them.
         run: |
           name=libcatalyst_transport_memcpy_gpu_coprocessor.so
-          if ! find "$(pwd)/runtime-build/lib" -name "$name" -print | grep -q .; then
+          if ! find "$RT_BUILD_DIR/lib" -name "$name" -print | grep -q .; then
             echo "::error::$name was not built -- CMake did not resolve HIP."
             grep -E "^(_nvcc|_hip_include_dir|CMAKE_HIP_|TRANSPORT_HIP_PACKAGES)" \
-              "$(pwd)/runtime-build/CMakeCache.txt" || echo "(no HIP entries in the cache at all)"
+              "$RT_BUILD_DIR/CMakeCache.txt" || echo "(no HIP entries in the cache at all)"
             exit 1
           fi
 
-      - name: Build the memcpy test binary
+      - name: Build and run the memcpy transport tests
         run: |
-          cmake --build "$(pwd)/runtime-build" --target runner_tests_transport_memcpy -j
-
-      - name: Run memcpy transport tests
-        run: |
-          "$(pwd)/runtime-build/tests/runner_tests_transport_memcpy"
-
-      # No ROCm install needed: lib/transport/CMakeLists.txt fetches the HIP headers (hip-dev
-      # plus hipcc-nvidia, pinned by sha256) into the build tree, and nvcc drives them.
-
-      # Not reused from check-catalyst.yaml: its GH-hosted mlir-tblgen hits a GLIBC mismatch here.
-      - name: Build LLVM, StableHLO and Enzyme
-        uses: ./.github/actions/build-mlir-stack
-        with:
-          llvm-version: ${{ needs.constants.outputs.llvm_version }}
-          stablehlo-version: ${{ needs.constants.outputs.stablehlo_version }}
-          enzyme-version: ${{ needs.constants.outputs.enzyme_version }}
-          # No persist-root, so the action caches instead of building into a directory on the
-          # runner. `single-gpu-x64` is an autoscaled pool that hands out a fresh EC2 instance
-          # per run -- the runner name carries the instance id and it differs every time -- so
-          # nothing under $HOME survives and an on-disk slot came up empty on every run. The
-          # cache does persist, and it restores from in-region storage at ~200 MB/s; llvm-build
-          # packs to about 1 GB, which is seconds against the two hours it takes to build.
-          #
-          # Entries are scoped to the ref that wrote them: one written by a PR run serves later
-          # runs of that same PR and no other branch. A run on main writes one every branch can
-          # read, so the first push to main after an LLVM bump is what seeds this for everyone.
-          #
-          # These get their own keys rather than reusing the ones check-catalyst.yaml writes:
-          # that LLVM job builds on ubuntu-24.04 and this host is jammy, so its mlir-tblgen
-          # hits a GLIBC mismatch here. `cache-prefix` defaults to selfhosted-gpu to keep the
-          # two sets apart.
+          cmake --build "$RT_BUILD_DIR" --target runner_tests_transport_memcpy -j
+          "$RT_BUILD_DIR/tests/runner_tests_transport_memcpy"
 
       - name: Install Python runtime requirements
         run: |
@@ -240,26 +202,26 @@ jobs:
         # copy links but cannot initialize a device ("0 active drivers"). Resolve the real one.
         run: |
           set -euo pipefail
-          # torch is here only so triton <3.8 can probe the driver through it; nothing imports
-          # it. cu129 matches the gpu_runners driver -- the default torch targets CUDA 13 and
-          # leaves torch.cuda.is_available() false. The cap restates what 2.13.0+cu129 already
-          # resolves (triton 3.7.1), so a bump past 3.8 -- whose PTX this ptxas rejects -- fails
-          # while resolving instead of inside triton.jit.
+          # torch exists only so triton <3.8 can probe the driver through it. cu129 matches the
+          # gpu_runners driver; default torch targets CUDA 13 and leaves cuda.is_available()
+          # false. The cap fails a bump past triton 3.8, whose PTX this ptxas rejects.
           pip install 'torch==2.13.0+cu129' 'triton<3.8' \
             --index-url https://download.pytorch.org/whl/cu129
 
-          # `|| true`: grep exits 1 on no match, which under pipefail aborts before the diagnostic.
-          libcuda=$(ldconfig -p | awk '/libcuda\.so\.1/ {print $NF}' | grep -v /stubs/ | head -1 || true)
+          # One awk, not grep | head: it skips the stubs and exits 0 on no match, so pipefail
+          # needs no `|| true`. The find covers a stale loader cache, which is also the only
+          # case where prepending to LD_LIBRARY_PATH below does anything.
+          libcuda=$(ldconfig -p | awk '/libcuda\.so\.1/ && !/stubs/ {print $NF; exit}')
           if [ -z "$libcuda" ]; then
             libcuda=$(find /usr/lib /usr/lib64 -name 'libcuda.so.1' -not -path '*/stubs/*' 2>/dev/null | head -1 || true)
           fi
           if [ -z "$libcuda" ]; then
-            echo "No real libcuda.so.1 here -- only the toolkit stub, if that."
-            nvidia-smi || echo "nvidia-smi unavailable"
+            echo "::error::No real libcuda.so.1 here -- only the toolkit stub, if that."
             ldconfig -p | grep -i libcuda || echo "(no libcuda in the loader cache at all)"
             exit 1
           fi
 
+          # Exported for the check below, written to the environment file for later steps.
           libcuda_dir=$(dirname "$libcuda")
           echo "libcuda: $libcuda"
           export TRITON_LIBCUDA_PATH="$libcuda_dir"
@@ -267,51 +229,51 @@ jobs:
           echo "TRITON_LIBCUDA_PATH=$libcuda_dir" >> $GITHUB_ENV
           echo "LD_LIBRARY_PATH=$LD_LIBRARY_PATH" >> $GITHUB_ENV
 
-          # driver.active raises on 0 or >1 drivers -- the same call conftest turns into a skip.
+          # Triton's own activation, which the fixture turns into a skip. A different question
+          # from the wait step's cuInit: this one goes through torch.
           python3 -c "
           import triton
           from triton.runtime.driver import driver
           print('triton', triton.__version__, '| active driver:', driver.active)
           "
 
+      # After the pip steps: requirements.txt pins numpy/nanobind/pybind11, which the MLIR
+      # bindings compile against. Late, because a cache miss here costs two hours.
+      - name: Restore or build LLVM, StableHLO and Enzyme
+        uses: ./.github/actions/build-mlir-stack
+        with:
+          llvm-version: ${{ needs.constants.outputs.llvm_version }}
+          stablehlo-version: ${{ needs.constants.outputs.stablehlo_version }}
+          enzyme-version: ${{ needs.constants.outputs.enzyme_version }}
+          # Cache entries are ref-scoped, so a push to main is what seeds every branch. Own
+          # keys, because check-catalyst.yaml builds on 24.04 and its mlir-tblgen needs a
+          # newer GLIBC than this jammy host has.
+
       - name: Build Catalyst frontend (reusing the transport-enabled runtime)
         run: |
-          # precompile_decomposition_rules runs at the end of `make frontend`, before the step that
-          # exports these for the rest of the job. Without CATALYST_LIB_DIR it is skipped with only
-          # a warning, and rules are derived during tracing where a signature mismatch aborts.
-          export PYTHONPATH="${PYTHONPATH:-}:$(pwd)/quantum-build/python_packages/quantum"
-          export CATALYST_LIB_DIR="$(pwd)/quantum-build/lib"
-          COMPILER_LAUNCHER="$(which ccache)" \
-          C_COMPILER=$(which gcc) \
-          CXX_COMPILER=$(which g++) \
           ENABLE_LLD=ON \
-          RT_BUILD_DIR="$(pwd)/runtime-build" \
           LLVM_BUILD_DIR="$(pwd)/llvm-build" \
           STABLEHLO_BUILD_DIR="$(pwd)/stablehlo-build" \
           ENZYME_BUILD_DIR="$(pwd)/enzyme-build" \
-          DIALECTS_BUILD_DIR="$(pwd)/quantum-build" \
           ENABLE_TRANSPORT=ON \
           make catalyst
 
       - name: Add Frontend Dependencies to PATH
         run: |
           echo "$(pwd)/llvm-build/bin" >> $GITHUB_PATH
-          echo "$(pwd)/quantum-build/bin" >> $GITHUB_PATH
-          echo "PYTHONPATH=${PYTHONPATH:-}:$(pwd)/quantum-build/python_packages/quantum" >> $GITHUB_ENV
-          echo "RUNTIME_LIB_DIR=$(pwd)/runtime-build/lib" >> $GITHUB_ENV
+          echo "$DIALECTS_BUILD_DIR/bin" >> $GITHUB_PATH
+          echo "RUNTIME_LIB_DIR=$RT_BUILD_DIR/lib" >> $GITHUB_ENV
           echo "MLIR_LIB_DIR=$(pwd)/llvm-build/lib" >> $GITHUB_ENV
-          echo "CATALYST_BIN_DIR=$(pwd)/quantum-build/bin" >> $GITHUB_ENV
-          echo "CATALYST_LIB_DIR=$(pwd)/quantum-build/lib" >> $GITHUB_ENV
-          echo "CATALYST_TRANSPORT_PATH=$(pwd)/runtime-build/lib" >> $GITHUB_ENV
+          echo "CATALYST_BIN_DIR=$DIALECTS_BUILD_DIR/bin" >> $GITHUB_ENV
+          echo "CATALYST_TRANSPORT_PATH=$RT_BUILD_DIR/lib" >> $GITHUB_ENV
 
       - name: Run backline GPU integration tests
         id: gpu-tests
         env:
           # Without this Triton discards ptxas diagnostics, leaving codegen failures as "status 255".
           TRITON_DUMP_PTXAS_LOG: "1"
-        # CPU-CPU memcpy is covered by check-catalyst.yaml; these three need the local GPU. Two
-        # fixtures gate them: gpu_transport_backend (the coproc .so built above) and
-        # gpu_triton_platform (the only one able to skip everything). -rs makes skips visible.
+        # CPU-CPU memcpy is covered by check-catalyst.yaml; these three need the local GPU,
+        # and -rs makes the gpu_transport_backend / gpu_triton_platform skips visible.
         run: |
           python3 -m pytest -v -rs --junit-xml=gpu-backline-results.xml \
             "frontend/test/pytest/test_backline.py::TestBacklineDemoIntegration::test_cpu_controller_to_gpu_coproc_memcpy_precompiled" \
@@ -319,24 +281,17 @@ jobs:
             "frontend/test/pytest/test_backline.py::TestBacklineDemoIntegration::test_cpu_controller_to_gpu_coproc_memcpy_manual_qec"
 
       - name: Require at least one GPU test to have executed
-        # pytest exits 0 when every selected test is skipped, so the job would report success
-        # covering nothing after ~20 min of GPU time. Guarded on the tests having actually run:
-        # an earlier failure leaves no junit file, and failing here would bury the real error.
+        # pytest exits 0 when every test skips, so success could cover nothing. Skipped when
+        # pytest never ran: no junit file, and the real error is already reported.
         if: always() && steps.gpu-tests.outcome != 'skipped'
         run: |
-          set -euo pipefail
-          # Read the attributes by name: pytest emits them alphabetically, so `skipped` lands
-          # before `tests`, and the <skipped> child elements carry a message, never a count.
-          attr() { grep -o " $1=\"[0-9]*\"" gpu-backline-results.xml | head -1 | tr -dc '0-9'; }
-          total=$(attr tests); skipped=$(attr skipped)
-          if [ -z "$total" ] || [ -z "$skipped" ]; then
-            echo "::error::could not read the test counts out of gpu-backline-results.xml"
-            head -5 gpu-backline-results.xml
-            exit 1
-          fi
-          echo "$((total - skipped))/$total backline GPU tests executed ($skipped skipped)"
-          if [ "$total" -eq 0 ] || [ "$total" -eq "$skipped" ]; then
-            echo "::error::No backline GPU test executed -- all selected tests were skipped." \
-                 "Refusing to report success for a run with zero GPU coverage."
-            exit 1
-          fi
+          python3 - gpu-backline-results.xml <<'PY'
+          import sys, xml.etree.ElementTree as ET
+          r = ET.parse(sys.argv[1]).getroot()
+          s = r if r.tag == "testsuite" else r[0]
+          total, skipped = int(s.get("tests")), int(s.get("skipped"))
+          print(f"{total - skipped}/{total} backline GPU tests executed ({skipped} skipped)")
+          if total == skipped:
+              sys.exit("::error::No backline GPU test executed -- refusing to report "
+                       "success for a run with zero GPU coverage.")
+          PY
