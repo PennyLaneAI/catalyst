@@ -1,8 +1,7 @@
 name: Transport path filter
 description: >
-  Report whether this push or pull request touched anything the transport build and its tests
-  are derived from, so jobs can gate on `transport == 'true'` instead of running unconditionally.
-  Requires a checkout with fetch-depth: 0, since it diffs against the base ref.
+  Report whether this change touched anything the transport build or its tests derive from,
+  so jobs can gate on `transport == 'true'`. Needs fetch-depth: 0 to diff against the base ref.
 
 outputs:
   transport:

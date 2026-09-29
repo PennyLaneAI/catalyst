@@ -17,8 +17,10 @@ runs:
     - name: Ensure rdma_rxe.ko is available for the running kernel
       shell: bash
       run: |
-        # linux-modules-extra first; build rdma_rxe out-of-tree if it lacks the .ko.
-        set -euo pipefail
+        # linux-modules-extra first, then an out-of-tree build. On the GitHub-hosted image
+        # the package has never carried rdma_rxe, so Path 2 is what runs (~90s); Path 1 is a
+        # cheap check in case that changes. `shell: bash` already sets -e and pipefail.
+        set -u
 
         KVER=$(uname -r)
         echo "Running kernel: $KVER"

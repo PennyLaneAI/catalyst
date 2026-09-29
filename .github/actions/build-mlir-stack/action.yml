@@ -5,15 +5,10 @@ description: >
   images and the cached mlir-tblgen hits a GLIBC mismatch here. Expects the LLVM source at
   mlir/llvm-project already.
 
-  Two ways to avoid rebuilding, picked by `persist-root`:
-
-  * unset -- the GitHub cache. Restore and save are separate steps rather than the combined
-    `actions/cache`, which only saves in a post-job step: the caller spends another hour on
-    Triton and GPU tests after this action returns, and anything that ends the job in there --
-    a failure, a timeout, a cancel -- would otherwise discard a finished multi-hour LLVM build.
-  * set -- a directory on the runner itself, which is what a dedicated self-hosted box wants.
-    Nothing is uploaded or downloaded, and the result is not scoped to a PR ref, so it is still
-    there for the next run on any branch.
+  Restore and save are separate steps rather than the combined `actions/cache`, which only
+  saves in a post-job step: the caller spends another twenty minutes on the frontend build
+  and the GPU tests after this returns, and anything that ends the job in there -- a failure,
+  a timeout, a cancel -- would otherwise discard a finished multi-hour LLVM build.
 
 inputs:
   llvm-version:
@@ -31,26 +26,17 @@ inputs:
     default: selfhosted-gpu
   llvm-variant:
     description: >
-      Names this LLVM configuration. Variants configured with different cmake options get their
-      own cache entry, or their own on-disk slot, instead of overwriting each other. `default` is
-      a plain `make llvm`; its cache key is spelled exactly as before so existing caches keep
-      hitting.
+      Names this LLVM configuration. Variants configured with different cmake options get
+      their own cache entry instead of overwriting each other. `default` is a plain
+      `make llvm`, and its key carries no variant suffix so existing caches keep hitting.
     required: false
     default: default
   llvm-build-options:
     description: >
       `make llvm` variable overrides defining a non-default variant, space separated, e.g.
       "LLVM_TARGETS_TO_BUILD=host;AArch64". Ignored for the default variant. Whatever is set
-      here has to be reflected in `llvm-variant`, which is what the slot is named after -- the
-      options themselves are not part of the key.
-    required: false
-    default: ""
-  persist-root:
-    description: >
-      Directory on the runner to build into, outside the workspace so `actions/checkout`'s
-      `git clean -ffdx` cannot delete it. A leading `~` is expanded. Set this on a dedicated
-      self-hosted runner to reuse the built stack directly; leave it empty on ephemeral runners,
-      where the GitHub cache is the only thing that survives.
+      here has to be reflected in `llvm-variant`, which is what the key is named after -- the
+      options themselves are not part of it.
     required: false
     default: ""
 
@@ -64,53 +50,14 @@ runs:
         sudo apt-get install -y cmake ninja-build clang lld ccache
         python3 -m pip install numpy "nanobind<2.13" pybind11 PyYAML
 
-        # ccache earns its keep only where its directory survives between jobs, which is the
-        # case on a dedicated self-hosted runner ($HOME persists) and not on an ephemeral one.
-        # It covers what the build slot cannot: a fresh tree after an LLVM bump, a new variant,
-        # or an invalidated slot still recompiles all ~4900 targets, and on this 4-core host
-        # that is two hours. Most of those translation units are unchanged, so they hit.
+        # ccache cannot hit across runs here -- the pool hands out a fresh instance each time,
+        # so its directory starts empty. Kept because COMPILER_LAUNCHER is passed below either
+        # way; caching ~/.cache/ccache is what would make it earn its keep.
         ccache --max-size=20G
         ccache --zero-stats
 
-    - name: Prepare the persistent build directories
-      id: persist
-      if: inputs.persist-root != ''
-      shell: bash
-      env:
-        PERSIST_ROOT: ${{ inputs.persist-root }}
-        SLOT: llvm-${{ inputs.llvm-version }}-${{ inputs.llvm-variant }}-${{ inputs.stablehlo-version }}-${{ inputs.enzyme-version }}-gcc
-      run: |
-        set -euo pipefail
-        # One slot per set of refs, so bumping any of them starts from an empty tree rather than
-        # reconfiguring an incompatible one. Old slots are left behind deliberately -- reclaiming
-        # that disk is a judgement call for whoever owns the runner, not something to do silently
-        # from a workflow.
-        base="${PERSIST_ROOT/#\~/$HOME}/$SLOT"
-        # The stamp alone is not enough to trust a tree: a build that reported success while
-        # writing somewhere else stamped a directory that is actually empty, and every later run
-        # then skipped the build and failed seconds later in the next component. Require the
-        # artifact the next component consumes, and drop a stamp that is not backed by one.
-        for d in llvm-build stablehlo-build enzyme-build; do
-          case "$d" in
-            llvm-build) marker=lib/cmake/mlir/MLIRConfig.cmake ;;
-            *)          marker=CMakeCache.txt ;;
-          esac
-          mkdir -p "$base/$d"
-          # Symlinked into the workspace so every `$(pwd)/<d>` in the caller keeps resolving.
-          ln -sfn "$base/$d" "$GITHUB_WORKSPACE/$d"
-          if [ -e "$base/$d/.catalyst-complete" ] && [ -e "$base/$d/$marker" ]; then
-            echo "${d%%-*}_ready=true" >> "$GITHUB_OUTPUT"
-            echo "reusing $d from $base"
-          else
-            rm -f "$base/$d/.catalyst-complete"
-          fi
-        done
-        echo "PERSIST_BASE=$base" >> "$GITHUB_ENV"
-        du -sh "$base" 2>/dev/null || true
-
     - name: Restore LLVM build
       id: cache-llvm-build
-      if: inputs.persist-root == ''
       uses: actions/cache/restore@v4
       with:
         path: llvm-build
@@ -120,23 +67,11 @@ runs:
         key: ${{ inputs.cache-prefix }}-${{ runner.os }}-llvm-${{ inputs.llvm-version }}-ci-build-gcc${{ inputs.llvm-variant != 'default' && format('-{0}', inputs.llvm-variant) || '' }}
 
     - name: Build LLVM
-      if: steps.cache-llvm-build.outputs.cache-hit != 'true' && steps.persist.outputs.llvm_ready != 'true'
+      if: steps.cache-llvm-build.outputs.cache-hit != 'true'
       shell: bash
       env:
         LLVM_BUILD_OPTIONS: ${{ inputs.llvm-build-options }}
       run: |
-        # Jobs from different PRs share this runner and this slot -- three were seen
-        # building at once. Serialize on the slot, then re-check the stamp, so a job
-        # that waited here reuses the finished tree instead of clobbering it.
-        if [ -n "${PERSIST_BASE:-}" ]; then
-          exec 9>"$PERSIST_BASE/llvm-build.lock"
-          flock 9
-          if [ -e "$PERSIST_BASE/llvm-build/.catalyst-complete" ] \
-             && [ -e "$PERSIST_BASE/llvm-build/lib/cmake/mlir/MLIRConfig.cmake" ]; then
-            echo "llvm-build was completed by a concurrent job; reusing it"
-            exit 0
-          fi
-        fi
         # $LLVM_BUILD_OPTIONS is unquoted on purpose: the overrides are several words, and
         # as make command-line variables they propagate into the `-C mlir` sub-make and beat
         # its `?=` defaults. It must stay above the assignments -- a comment between a `\`
@@ -154,12 +89,9 @@ runs:
           echo "::error::llvm-build/lib/cmake/mlir/MLIRConfig.cmake is missing after 'make llvm' reported success."
           exit 1
         fi
-        if [ -n "${PERSIST_BASE:-}" ]; then
-          touch "$PERSIST_BASE/llvm-build/.catalyst-complete"
-        fi
 
     - name: Save llvm-build
-      if: inputs.persist-root == '' && steps.cache-llvm-build.outputs.cache-hit != 'true'
+      if: steps.cache-llvm-build.outputs.cache-hit != 'true'
       uses: actions/cache/save@v4
       with:
         path: llvm-build
@@ -183,28 +115,15 @@ runs:
 
     - name: Restore StableHLO build
       id: cache-stablehlo-build
-      if: inputs.persist-root == ''
       uses: actions/cache/restore@v4
       with:
         path: stablehlo-build
         key: ${{ inputs.cache-prefix }}-${{ runner.os }}-stablehlo-${{ inputs.stablehlo-version }}-ci-build-gcc
 
     - name: Build StableHLO
-      if: steps.cache-stablehlo-build.outputs.cache-hit != 'true' && steps.persist.outputs.stablehlo_ready != 'true'
+      if: steps.cache-stablehlo-build.outputs.cache-hit != 'true'
       shell: bash
       run: |
-        # Jobs from different PRs share this runner and this slot -- three were seen
-        # building at once. Serialize on the slot, then re-check the stamp, so a job
-        # that waited here reuses the finished tree instead of clobbering it.
-        if [ -n "${PERSIST_BASE:-}" ]; then
-          exec 9>"$PERSIST_BASE/stablehlo-build.lock"
-          flock 9
-          if [ -e "$PERSIST_BASE/stablehlo-build/.catalyst-complete" ] \
-             && [ -e "$PERSIST_BASE/stablehlo-build/CMakeCache.txt" ]; then
-            echo "stablehlo-build was completed by a concurrent job; reusing it"
-            exit 0
-          fi
-        fi
         C_COMPILER=$(which gcc) \
         CXX_COMPILER=$(which g++) \
         LLVM_BUILD_DIR="$(pwd)/llvm-build" \
@@ -219,12 +138,9 @@ runs:
           echo "::error::stablehlo-build/CMakeCache.txt is missing after 'make stablehlo' reported success."
           exit 1
         fi
-        if [ -n "${PERSIST_BASE:-}" ]; then
-          touch "$PERSIST_BASE/stablehlo-build/.catalyst-complete"
-        fi
 
     - name: Save stablehlo-build
-      if: inputs.persist-root == '' && steps.cache-stablehlo-build.outputs.cache-hit != 'true'
+      if: steps.cache-stablehlo-build.outputs.cache-hit != 'true'
       uses: actions/cache/save@v4
       with:
         path: stablehlo-build
@@ -248,28 +164,15 @@ runs:
 
     - name: Restore Enzyme build
       id: cache-enzyme-build
-      if: inputs.persist-root == ''
       uses: actions/cache/restore@v4
       with:
         path: enzyme-build
         key: ${{ inputs.cache-prefix }}-${{ runner.os }}-enzyme-${{ inputs.llvm-version }}-${{ inputs.enzyme-version }}-ci-build-gcc
 
     - name: Build Enzyme
-      if: steps.cache-enzyme-build.outputs.cache-hit != 'true' && steps.persist.outputs.enzyme_ready != 'true'
+      if: steps.cache-enzyme-build.outputs.cache-hit != 'true'
       shell: bash
       run: |
-        # Jobs from different PRs share this runner and this slot -- three were seen
-        # building at once. Serialize on the slot, then re-check the stamp, so a job
-        # that waited here reuses the finished tree instead of clobbering it.
-        if [ -n "${PERSIST_BASE:-}" ]; then
-          exec 9>"$PERSIST_BASE/enzyme-build.lock"
-          flock 9
-          if [ -e "$PERSIST_BASE/enzyme-build/.catalyst-complete" ] \
-             && [ -e "$PERSIST_BASE/enzyme-build/CMakeCache.txt" ]; then
-            echo "enzyme-build was completed by a concurrent job; reusing it"
-            exit 0
-          fi
-        fi
         C_COMPILER=$(which gcc) \
         CXX_COMPILER=$(which g++) \
         LLVM_BUILD_DIR="$(pwd)/llvm-build" \
@@ -284,12 +187,9 @@ runs:
           echo "::error::enzyme-build/CMakeCache.txt is missing after 'make enzyme' reported success."
           exit 1
         fi
-        if [ -n "${PERSIST_BASE:-}" ]; then
-          touch "$PERSIST_BASE/enzyme-build/.catalyst-complete"
-        fi
 
     - name: Save enzyme-build
-      if: inputs.persist-root == '' && steps.cache-enzyme-build.outputs.cache-hit != 'true'
+      if: steps.cache-enzyme-build.outputs.cache-hit != 'true'
       uses: actions/cache/save@v4
       with:
         path: enzyme-build
