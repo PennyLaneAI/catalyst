@@ -125,13 +125,13 @@
   from the host rather than a persistent kernel. `coproc_fn=launch_once` remains the default. The
   frontend selects the per-message mode for a GPU coprocessor whose function is marked
   `per_message`.
-  [(#YYYY)](https://github.com/PennyLaneAI/catalyst/pull/YYYY)
+  [(#3282)](https://github.com/PennyLaneAI/catalyst/pull/3282)
 
 * A coprocessor function can now be configured: if it exports `<symbol>_init`, that is called
   with the node's `fn.`-prefixed config keys before the first message, and what it returns is the
   `ctx` the function is called with. `<symbol>_fini` releases it when the session is destroyed.
   The frontend passes a coprocessor function's `config` to it with that prefix.
-  [(#YYYY)](https://github.com/PennyLaneAI/catalyst/pull/YYYY)
+  [(#3282)](https://github.com/PennyLaneAI/catalyst/pull/3282)
 
 * Catalyst ships a coprocessor function that runs an ONNX model on each message,
   `catalyst_onnx_coprocessor` in `libcatalyst_onnx_coprocessor.so`. It loads onnxruntime and the
@@ -139,7 +139,7 @@
   (MIGraphX, CUDA, TensorRT or ROCm), and the frontend loads the library for a coprocessor naming
   it. Building it needs only onnxruntime's C API header, from `ONNXRUNTIME_INCLUDE_DIR` or fetched
   pinned to a release.
-  [(#YYYY)](https://github.com/PennyLaneAI/catalyst/pull/YYYY)
+  [(#3282)](https://github.com/PennyLaneAI/catalyst/pull/3282)
 
 * :func:`~.passes.graph_decomposition` accepts a `verbose` keyword argument. When `True`, the pass
   prints the decomposition rule the solver chose for each operator, along with its cost and the
