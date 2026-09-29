@@ -35,8 +35,6 @@ struct CtrlLoweringRewritePattern : public OpRewritePattern<CtrlOp> {
     using OpRewritePattern<CtrlOp>::OpRewritePattern;
 
     LogicalResult matchAndRewrite(CtrlOp ctrl, PatternRewriter &rewriter) const override {
-        Block &block = ctrl.getRegion().front();
-
         // Defer (not an error) if the region still contains a nested quantum.adjoint region.
         // Distributing controls needs an op-level body, so the inner region must be reduced first.
         // The pipeline runs (ctrl-lowering, adjoint-lowering) to a fixpoint: adjoint-lowering
@@ -80,7 +78,8 @@ struct CtrlLoweringRewritePattern : public OpRewritePattern<CtrlOp> {
             }
             return WalkResult::advance();
         });
-
+        
+        Block &block = ctrl.getRegion().front();
         rewriter.inlineBlockBefore(&block, ctrl);
         // Assemble the ctrl op results: out_ctrl_qubits followed by the target results.
         rewriter.eraseOp(ctrl);
