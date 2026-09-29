@@ -1,4 +1,4 @@
-name: Docker::Linux::Catalyst
+name: Build Catalyst Docker Image on Linux
 
 permissions:
   contents: read
@@ -51,12 +51,23 @@ jobs:
         id: pins
         run: grep -E '^(llvm|stablehlo|enzyme|pennylane|lightning)=' .dep-versions >> "$GITHUB_OUTPUT"
 
-      - name: Validate image tag
+      - name: Compute image tag
         id: tag
-        if: ${{ inputs.push-to-dockerhub }}
         env:
-          TAG: ${{ inputs.pennylane-version || steps.pins.outputs.pennylane }}-catalyst-${{ inputs.catalyst-version }}-lightning-${{ inputs.lightning-version || steps.pins.outputs.lightning }}
+          PENNYLANE_VERSION: ${{ inputs.pennylane-version }}
+          LIGHTNING_VERSION: ${{ inputs.lightning-version }}
+          PENNYLANE_PIN: ${{ steps.pins.outputs.pennylane }}
+          LIGHTNING_PIN: ${{ steps.pins.outputs.lightning }}
         run: |
+          # Short commit SHA of a branch/tag (^{} is an annotated tag's commit); an input
+          # that is already a SHA is used as is.
+          sha() {
+            s=$(git ls-remote "https://github.com/PennyLaneAI/$1.git" "refs/heads/$2" "refs/tags/$2" "refs/tags/$2^{}" | tail -1)
+            s=${s:-$2}; echo "${s:0:7}"
+          }
+          pennylane=${PENNYLANE_VERSION:+$(sha pennylane "$PENNYLANE_VERSION")}; pennylane=${pennylane:-$PENNYLANE_PIN}
+          lightning=${LIGHTNING_VERSION:+$(sha pennylane-lightning "$LIGHTNING_VERSION")}; lightning=${lightning:-$LIGHTNING_PIN}
+          TAG="pennylane-$pennylane-lightning-$lightning-catalyst-$(git rev-parse --short=7 HEAD)"
           [[ "$TAG" =~ ^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$ ]] || { echo "::error::Invalid Docker tag: $TAG"; exit 1; }
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
 
@@ -113,7 +124,7 @@ jobs:
           context: .
           file: docker/Dockerfile
           target: catalyst
-          tags: catalyst:test
+          tags: pennylaneai/pennylane:${{ steps.tag.outputs.tag }}
           cache-from: type=registry,ref=${{ env.DEPS_CACHE }}
           build-args: |
             LIGHTNING_VERSION=${{ inputs.lightning-version }}
@@ -121,7 +132,7 @@ jobs:
 
       - name: Test
         run: |
-          docker run --rm -i catalyst:test python - <<'EOF'
+          docker run --rm -i pennylaneai/pennylane:${{ steps.tag.outputs.tag }} python - <<'EOF'
           import pennylane as qp
           qp.about()
           for dev in ["lightning.qubit", "lightning.kokkos"]:
@@ -135,7 +146,7 @@ jobs:
           EOF
 
       - name: Save image
-        run: docker save catalyst:test | gzip > pennylane-catalyst.tar.gz
+        run: docker save pennylaneai/pennylane:${{ steps.tag.outputs.tag }} | gzip > pennylane-catalyst.tar.gz
 
       - name: Upload image as artifact
         uses: actions/upload-artifact@v4

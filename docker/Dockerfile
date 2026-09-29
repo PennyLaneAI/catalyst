@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-FROM ubuntu:noble AS base
+FROM ubuntu:noble-20260911 AS base
 RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
         build-essential ca-certificates git lld python3-dev python3-venv zlib1g-dev libzstd-dev \
     && rm -rf /var/lib/apt/lists/*
