@@ -135,36 +135,8 @@ void AugmentedCircuitGenerator::cacheGate(quantum::ParametrizedGate gate, OpBuil
                                                    {currentOffsetIndex, alignmentIndex})
                                   ->getResult(0);
 
-        // 2. Store the param value into the cache at the current offset
-        // The cache is a raw <some_size x i8> byte memref, so need to view it with the
-        // param type size
-        if (isa<RankedTensorType>(paramType)) {
-            // Param is a tensor, need to convert to memrefs via bufferization ops
-            auto tensorType = cast<RankedTensorType>(paramType);
-            MemRefType memrefType =
-                MemRefType::get(tensorType.getShape(), tensorType.getElementType());
-            auto buffer = bufferization::ToBufferOp::create(builder, loc, memrefType, clonedParam)
-                              .getBuffer();
-            Value view = memref::ViewOp::create(builder, loc, memrefType, cache.paramVector,
-                                                alignedOffset, ValueRange{} // Empty dynamic sizes
-                                                )
-                             ->getResult(0);
-            memref::CopyOp::create(builder, loc, buffer, view);
-        } else {
-            // Param not a tensor, just use a raw memref without buffers
-            auto targetViewType = MemRefType::get({}, paramType);
-            Value view = memref::ViewOp::create(builder, loc, targetViewType, cache.paramVector,
-                                                alignedOffset, ValueRange{} // Empty dynamic sizes
-                                                )
-                             ->getResult(0);
-
-            memref::StoreOp::create(builder, loc, clonedParam, view, ValueRange{});
-        }
-
-        // 3. Push the current offset onto the offset stack
-        ListPushOp::create(builder, loc, alignedOffset, cache.offsetVector);
-
-        // 4. Increment the current offset with the byte size of this param
+        // 2. Compute where this param ends, which is both the number of bytes the cache needs to
+        // hold and the new current offset.
         int64_t paramNumBytes = 0;
         if (isa<RankedTensorType>(paramType)) {
             auto tensorType = cast<RankedTensorType>(paramType);
@@ -184,6 +156,42 @@ void AugmentedCircuitGenerator::cacheGate(quantum::ParametrizedGate gate, OpBuil
             index::ConstantOp::create(builder, loc, paramNumBytes).getResult();
         Value newOffset =
             index::AddOp::create(builder, loc, alignedOffset, paramNumBytesValue).getResult();
+
+        // 3. Grow the byte buffer if this param does not fit in it. This has to happen before the
+        // buffer is loaded below, since growing it may move it.
+        cache.emitEnsureCapacity(builder, loc, newOffset);
+        Value paramVectorData = cache.emitLoadParamVectorData(builder, loc);
+
+        // 4. Store the param value into the cache at the current offset
+        // The cache is a raw <some_size x i8> byte memref, so need to view it with the
+        // param type size
+        if (isa<RankedTensorType>(paramType)) {
+            // Param is a tensor, need to convert to memrefs via bufferization ops
+            auto tensorType = cast<RankedTensorType>(paramType);
+            MemRefType memrefType =
+                MemRefType::get(tensorType.getShape(), tensorType.getElementType());
+            auto buffer = bufferization::ToBufferOp::create(builder, loc, memrefType, clonedParam)
+                              .getBuffer();
+            Value view = memref::ViewOp::create(builder, loc, memrefType, paramVectorData,
+                                                alignedOffset, ValueRange{} // Empty dynamic sizes
+                                                )
+                             ->getResult(0);
+            memref::CopyOp::create(builder, loc, buffer, view);
+        } else {
+            // Param not a tensor, just use a raw memref without buffers
+            auto targetViewType = MemRefType::get({}, paramType);
+            Value view = memref::ViewOp::create(builder, loc, targetViewType, paramVectorData,
+                                                alignedOffset, ValueRange{} // Empty dynamic sizes
+                                                )
+                             ->getResult(0);
+
+            memref::StoreOp::create(builder, loc, clonedParam, view, ValueRange{});
+        }
+
+        // 5. Push the current offset onto the offset stack
+        ListPushOp::create(builder, loc, alignedOffset, cache.offsetVector);
+
+        // 6. Advance the current offset past this param
         memref::StoreOp::create(builder, loc, newOffset, cache.currentOffset, ValueRange{});
     }
 }

@@ -239,8 +239,13 @@ class AdjointGenerator {
                     ListPopOp::create(builder, loc, cache.offsetVector).getResult();
 
                 // 2. Load the param value from the cache at the current offset
-                // The cache is a raw <some_size x i8> byte memref, so need to view it with the
-                // param type size
+                // The cache is a raw <some_size x i8> byte memref held behind a rank-0 memref, so
+                // load the buffer out first, then view it with the param type size.
+                // The reverse pass only reads, so the buffer never moves here, but it is loaded per
+                // param anyway: the forward pass may have grown it, and CSE will collapse the
+                // redundant loads.
+                Value paramVectorData = cache.emitLoadParamVectorData(builder, loc);
+
                 Value loadedParam;
                 if (isa<RankedTensorType>(paramType)) {
                     // Param is a tensor, need to convert to tensors via bufferization ops
@@ -250,7 +255,7 @@ class AdjointGenerator {
 
                     MemRefType memrefType =
                         MemRefType::get(tensorType.getShape(), tensorType.getElementType());
-                    Value view = memref::ViewOp::create(builder, loc, memrefType, cache.paramVector,
+                    Value view = memref::ViewOp::create(builder, loc, memrefType, paramVectorData,
                                                         currentOffsetIndex,
                                                         ValueRange{} // Empty dynamic sizes
                                                         )
@@ -270,7 +275,7 @@ class AdjointGenerator {
                     // Param not a tensor, just use a raw memref without buffers
                     auto targetViewType = MemRefType::get({}, paramType);
                     Value view = memref::ViewOp::create(builder, loc, targetViewType,
-                                                        cache.paramVector, currentOffsetIndex,
+                                                        paramVectorData, currentOffsetIndex,
                                                         ValueRange{} // Empty dynamic sizes
                                                         )
                                      ->getResult(0);
