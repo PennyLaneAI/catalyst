@@ -1,19 +1,38 @@
 name: Check Catalyst GPU
 
-# Runs the transport tests on a GPU host. PRs need the ``gpu`` label; pushes to main always run.
+# The only CI that builds and tests the transport stack, on a self-hosted GPU host -- the one
+# runner with libibverbs and HIP together, which is the combination that builds every backend.
+#
+#   backend      what runs against it here
+#   memcpy       runtime C++ (stub + CPU) and backline frontend (CPU controller to CPU coproc)
+#   memcpy_gpu   runtime C++ (GPU) and backline frontend (CPU controller to GPU coproc, incl.
+#                the Triton CSS/BP decoder)
+#   cpu_verbs    runtime C++ and backline frontend, over an rxe0 soft-RoCE loopback
+#   gpu_verbs    runtime C++, over the same loopback
+#
+# Not covered: the out-of-process executor, which needs ENABLE_EXECUTOR=ON -- that adds
+# find_package(LLVM CONFIG REQUIRED) at configure time and would push the runtime build, and
+# so the cheapest tests in the job, behind the LLVM build.
+#
+# Pushes to main and workflow_dispatch always run. A PR runs only when it carries the ``gpu``
+# label, so transport changes on an unlabelled PR get no CI.
 
 on:
   push:
     branches: [ main ]
     paths:
       - "runtime/lib/transport/**"
+      - "runtime/lib/executor/**"
+      - "runtime/lib/backend/**"
       - "runtime/include/Transport*"
       - "runtime/tests/Test_Transport*"
+      - "runtime/Makefile"
       - "mlir/lib/Transport/**"
       - "mlir/include/Transport/**"
       - "frontend/catalyst/backline.py"
       - "frontend/test/pytest/test_backline.py"
       - "frontend/test/pytest/conftest.py"
+      - ".github/actions/setup-soft-roce/**"
       - ".github/workflows/check-transport-gpu.yaml"
   pull_request:
     types:
@@ -24,13 +43,17 @@ on:
       - labeled
     paths:
       - "runtime/lib/transport/**"
+      - "runtime/lib/executor/**"
+      - "runtime/lib/backend/**"
       - "runtime/include/Transport*"
       - "runtime/tests/Test_Transport*"
+      - "runtime/Makefile"
       - "mlir/lib/Transport/**"
       - "mlir/include/Transport/**"
       - "frontend/catalyst/backline.py"
       - "frontend/test/pytest/test_backline.py"
       - "frontend/test/pytest/conftest.py"
+      - ".github/actions/setup-soft-roce/**"
       - ".github/workflows/check-transport-gpu.yaml"
   workflow_dispatch:
 
@@ -66,6 +89,12 @@ jobs:
       }}
 
     steps:
+      # --------------------------------------------------------------------------------------
+      # 0. Toolchain, sources and Python deps
+      #
+      #   Produces: gcc/HIP/ibverbs toolchain, the requirements.txt pins every build below
+      #   compiles against, and the LLVM source tree.
+      # --------------------------------------------------------------------------------------
       - name: Update PATH and LD_LIBRARY_PATH for CUDA
         run: |
           echo "/usr/local/cuda/bin" >> $GITHUB_PATH
@@ -80,16 +109,23 @@ jobs:
           python-version: ${{ needs.constants.outputs.primary_python_version }}
 
       - name: Install build dependencies and resolve the toolchain
-        # LLVM_BUILD_DIR and its siblings stay on the frontend build step: runtime's Makefile
-        # reads it, and the runtime build runs before that tree exists. CATALYST_LIB_DIR is
-        # set here so the frontend build sees it, or precompile_decomposition_rules only warns.
+        # Every `make` below has to see identical values: a flag that differs between two calls
+        # makes the `configure` prerequisite reset the cmake cache and drop the built .sos.
+        # LLVM_BUILD_DIR is the exception and is set later -- runtime's Makefile reads it, and
+        # the runtime build runs before that tree exists. CATALYST_LIB_DIR is set here so the
+        # frontend build sees it, or precompile_decomposition_rules only warns.
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang lld
+          # libibverbs-dev: without it the RDMA backends are silently skipped at configure
+          # time. With it, this host has ibverbs and HIP together -- the only combination that
+          # builds gpu_verbs -- so `make runtime` covers all four backends in one configure.
+          sudo apt-get install -y clang lld libibverbs-dev
           python3 -m pip install "cmake>=3.26" ninja "nanobind<2.13" pybind11 numpy PyYAML
           {
             echo "C_COMPILER=$(which gcc)"
             echo "CXX_COMPILER=$(which g++)"
+            echo "ENABLE_TRANSPORT=ON"
+            echo "LLVM_SRC_DIR=$(pwd)/mlir/llvm-project"
             echo "RT_BUILD_DIR=$(pwd)/runtime-build"
             echo "DIALECTS_BUILD_DIR=$(pwd)/quantum-build"
             echo "CATALYST_LIB_DIR=$(pwd)/quantum-build/lib"
@@ -112,6 +148,12 @@ jobs:
           sudo apt-get install -y --no-install-recommends hip-dev hipcc-nvidia
           echo "ROCM_PATH=$(echo /opt/rocm-*)" >> $GITHUB_ENV
 
+      # Ahead of every build below: requirements.txt pins the numpy/nanobind/pybind11 the MLIR
+      # bindings and the runtime compile against. Torch and Triton are not needed until the
+      # frontend tests, so they are installed there instead.
+      - name: Install Python runtime requirements
+        run: python3 -m pip install -r requirements.txt
+
       - name: Get Cached LLVM Source
         id: cache-llvm-source
         uses: actions/cache/restore@v4
@@ -128,37 +170,39 @@ jobs:
           ref: ${{ needs.constants.outputs.llvm_version }}
           path: mlir/llvm-project
 
-      # ENABLE_EXECUTOR is left OFF: the out-of-process executor cases reach the coprocessor
-      # over RDMA, and this host has no RDMA-capable NIC, so only the memcpy tests run here.
-      # That also keeps the build to LLVM source headers alone (header-only via rt_capi).
-      - name: Build Catalyst-Runtime with transport enabled
-        run: |
-          LLVM_SRC_DIR="$(pwd)/mlir/llvm-project" \
-          ENABLE_TRANSPORT=ON \
-          make runtime
+      # --------------------------------------------------------------------------------------
+      # 1. Runtime build and the device-free C++ suites
+      #
+      #   Needs: LLVM's source headers only -- ENABLE_EXECUTOR is OFF, so no built LLVM.
+      #   Produces: runtime-build/ with all four backends and every transport test binary.
+      #   First tests in the job, and the cheapest.
+      # --------------------------------------------------------------------------------------
+      # Turning ENABLE_EXECUTOR on would add find_package(LLVM CONFIG REQUIRED) at configure
+      # time and force this whole phase behind the LLVM build.
+      - name: Build Catalyst-Runtime with all four transport backends
+        run: make -C runtime runtime
 
-      - name: Build and run the memcpy transport tests
+      # Builds every transport suite, runs only the two that need no device. The verbs suites
+      # are built here rather than after soft-RoCE so a compile error -- likely, since this is
+      # the first host where cpu_verbs and gpu_verbs compile at all -- lands before the MLIR
+      # stack, not after it. They run at the end of the job, once rxe0 exists.
+      - name: Build all transport C++ suites, run the device-free ones
         run: |
-          cmake --build "$RT_BUILD_DIR" --target runner_tests_transport_memcpy -j
+          cmake --build "$RT_BUILD_DIR" --target transport_tests_all -j
+          "$RT_BUILD_DIR/tests/runner_tests_transport"
           "$RT_BUILD_DIR/tests/runner_tests_transport_memcpy"
 
-      - name: Install Python runtime requirements and Triton
-        run: |
-          python3 -m pip install -r requirements.txt
-          # torch exists only so triton <3.8 can probe the driver through it; cu129 matches
-          # the gpu_runners driver. Installed after requirements.txt so it resolves against
-          # the pinned set.
-          pip install 'torch==2.13.0+cu129' 'triton<3.8' \
-            --index-url https://download.pytorch.org/whl/cu129
-          # Triton dlopens libcuda.so.1 from the driver, not the toolkit stub.
-          echo "TRITON_LIBCUDA_PATH=/lib/x86_64-linux-gnu" >> $GITHUB_ENV
-
-      # This host builds its own MLIR stack: check-catalyst.yaml's caches are produced on
-      # GH-hosted 24.04 images, whose mlir-tblgen needs a newer GLIBC than this jammy host has.
-      # The selfhosted-gpu prefix keeps the two sets of keys apart. Entries are ref-scoped, so a
-      # push to main is what seeds every branch. After the pip steps, because requirements.txt
-      # pins the numpy/nanobind/pybind11 the MLIR bindings compile against.
-      - name: Point the builds at the MLIR stack directories
+      # --------------------------------------------------------------------------------------
+      # 2. MLIR stack -- LLVM, StableHLO, Enzyme
+      #
+      #   Needs: the requirements.txt pins from phase 0.
+      #   Produces: llvm-build/, stablehlo-build/, enzyme-build/.
+      #   Only the frontend build consumes these, so they sit in front of it, not earlier.
+      # --------------------------------------------------------------------------------------
+      # Built here rather than restored from a GH-hosted image's cache: that mlir-tblgen needs
+      # a newer GLIBC than this jammy host has, hence the selfhosted-gpu key prefix. Entries are
+      # ref-scoped, so a push to main is what seeds every branch.
+      - name: Export the MLIR stack build directories
         # After `make runtime`, which reads LLVM_BUILD_DIR before that tree exists. Every make
         # below inherits these, so they need no env prefix of their own.
         run: |
@@ -233,13 +277,19 @@ jobs:
         if: steps.cache-enzyme-build.outputs.cache-hit != 'true'
         run: make enzyme
 
-      - name: Build Catalyst frontend (reusing the transport-enabled runtime)
-        run: |
-          ENABLE_LLD=ON \
-          ENABLE_TRANSPORT=ON \
-          make catalyst
+      # --------------------------------------------------------------------------------------
+      # 3. Catalyst frontend and the memcpy-transport tests
+      #
+      #   Needs: the three build dirs from phase 2 and runtime-build/ from phase 1.
+      #   Produces: quantum-build/ and an installed frontend.
+      #   No device needed: every case here goes over the memcpy backend.
+      # --------------------------------------------------------------------------------------
+      - name: Build the Catalyst dialects, plugin and frontend
+        # The `catalyst` target's components minus `runtime`, which is already built above
+        # with the transport flags this job needs; re-entering it here would reconfigure.
+        run: ENABLE_LLD=ON make dialects plugin frontend oqc
 
-      - name: Add Frontend Dependencies to PATH
+      - name: Export the frontend and transport library locations
         run: |
           echo "$LLVM_BUILD_DIR/bin" >> $GITHUB_PATH
           echo "$DIALECTS_BUILD_DIR/bin" >> $GITHUB_PATH
@@ -248,14 +298,55 @@ jobs:
           echo "CATALYST_BIN_DIR=$DIALECTS_BUILD_DIR/bin" >> $GITHUB_ENV
           echo "CATALYST_TRANSPORT_PATH=$RT_BUILD_DIR/lib" >> $GITHUB_ENV
 
-      - name: Run backline GPU integration tests
+      # Here rather than with requirements.txt: this pulls ~2.5GB from an external index, and
+      # nothing before this step needs it. A failure now cannot cost the runtime unit tests
+      # their result. Installed after requirements.txt so it resolves against the pinned set.
+      - name: Install Torch and Triton
+        run: |
+          # torch exists only so triton <3.8 can probe the driver through it; cu129 matches
+          # the gpu_runners driver.
+          pip install 'torch==2.13.0+cu129' 'triton<3.8' \
+            --index-url https://download.pytorch.org/whl/cu129
+          # Triton dlopens libcuda.so.1 from the driver, not the toolkit stub.
+          echo "TRITON_LIBCUDA_PATH=/lib/x86_64-linux-gnu" >> $GITHUB_ENV
+
+      - name: Run the backline memcpy tests (CPU coproc, GPU coproc, GPU Triton)
         env:
           # Without this Triton discards ptxas diagnostics, leaving codegen failures as "status 255".
           TRITON_DUMP_PTXAS_LOG: "1"
-        # CPU-CPU memcpy is covered by check-catalyst.yaml; these three need the local GPU,
-        # and -rs makes the gpu_transport_backend / gpu_triton_platform skips visible.
+        # Every memcpy-transport case, so this host covers the backend end to end: the CPU-CPU
+        # one also runs in check-catalyst.yaml, but here it runs on jammy/gcc with memcpy_gpu
+        # built alongside. -rs makes the gpu_transport_backend / gpu_triton_platform skips visible.
         run: |
           python3 -m pytest -v -rs \
+            "frontend/test/pytest/test_backline.py::TestBacklineDemoIntegration::test_local_cpu_to_local_cpu_memcpy" \
             "frontend/test/pytest/test_backline.py::TestBacklineDemoIntegration::test_cpu_controller_to_gpu_coproc_memcpy_precompiled" \
             "frontend/test/pytest/test_backline.py::TestBacklineDemoIntegration::test_cpu_controller_to_gpu_coproc_triton_css_bp" \
             "frontend/test/pytest/test_backline.py::TestBacklineDemoIntegration::test_cpu_controller_to_gpu_coproc_memcpy_manual_qec"
+
+      # --------------------------------------------------------------------------------------
+      # 4. Soft-RoCE, then every test that needs an RDMA device
+      #
+      #   Needs: the test binaries from phase 1, the frontend from phase 3, and rxe0.
+      #   Last on purpose -- this modprobes an out-of-tree rdma_rxe that outlives the job on
+      #   a persistent runner, and everything above has already reported by now.
+      # --------------------------------------------------------------------------------------
+      - name: Set up Soft-RoCE loopback
+        uses: ./.github/actions/setup-soft-roce
+
+      # Built in the runtime unit-test step; only the run waits for rxe0. gpu_verbs has never
+      # executed on any runner, so this is its first real exercise.
+      - name: Run the cpu_verbs and gpu_verbs C++ suites over rxe0
+        run: |
+          "$RT_BUILD_DIR/tests/runner_tests_transport_common"
+          "$RT_BUILD_DIR/tests/runner_tests_transport_cpu"
+          "$RT_BUILD_DIR/tests/runner_tests_transport_gpu"
+
+      # in_process only: the out_of_process param needs a runtime built with ENABLE_EXECUTOR=ON,
+      # which this job leaves off to keep the runtime build ahead of LLVM. check-catalyst.yaml
+      # runs both params. -rs so a skip is visible -- these have no skip conditions.
+      - name: Run the backline cpu_verbs test over rxe0
+        run: |
+          python3 -m pytest -v -rs -k in_process \
+            "frontend/test/pytest/test_backline.py::TestBacklineDemoIntegration::test_local_cpu_to_local_cpu_rdma_loopback"
+

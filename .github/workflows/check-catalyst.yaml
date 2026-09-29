@@ -34,19 +34,6 @@ jobs:
       multiple_compilers: ${{ github.trigger == 'push' && github.ref_name == 'main' }}
       runs_on: ${{ needs.determine_runner.outputs.runner_group }}
 
-  transport_changes:
-    name: "Detect transport changes"
-    runs-on: ubuntu-latest
-    outputs:
-      transport: ${{ steps.filter.outputs.transport }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0        # need history to diff against the base ref
-
-      - id: filter
-        uses: ./.github/actions/transport-path-filter
-
   runtime:
     name: Catalyst-Runtime Build
     needs: [constants, determine_runner]
@@ -122,118 +109,6 @@ jobs:
             oqc-build/*.so
             oqc-build/backend/*.toml
           retention-days: 1
-
-  transport:
-    name: Transport Build and Tests
-    needs: [constants, transport_changes, llvm, quantum]
-    # Everything below is dead weight on a PR that does not touch transport.
-    if: needs.transport_changes.outputs.transport == 'true'
-    # Pinned, not determine_runner: setup-soft-roce builds rdma_rxe out-of-tree, which is only
-    # known to work on the GitHub-hosted Azure image.
-    runs-on: ubuntu-24.04
-
-    # No compiler matrix: transport sources are not compiler-sensitive, a clang leg would
-    # rebuild LLVM for the executor, and soft-RoCE mutates the runner's RDMA links.
-    steps:
-      - name: Checkout Catalyst repo
-        uses: actions/checkout@v4
-
-      - name: Set up Python # Ensure the "primary" python version is used
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ needs.constants.outputs.primary_python_version }}
-
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          # libibverbs-dev: without it the RDMA backends are silently skipped at configure time.
-          sudo apt-get -y -q install ninja-build make cmake clang libibverbs-dev
-          python3 -m pip install "nanobind<2.13" pybind11 numpy PyYAML
-
-      - name: Resolve the toolchain and build locations
-        # Both `make` calls below need identical values: a differing flag makes the `configure`
-        # prerequisite reset the cmake cache and drop the already-built .sos.
-        run: |
-          {
-            echo "COMPILER_LAUNCHER="
-            echo "C_COMPILER=$(which clang)"
-            echo "CXX_COMPILER=$(which clang++)"
-            echo "RT_BUILD_DIR=$(pwd)/runtime-build"
-            echo "LLVM_SRC_DIR=$(pwd)/mlir/llvm-project"
-            echo "LLVM_BUILD_DIR=$(pwd)/llvm-build"
-            echo "ENABLE_TRANSPORT=ON"
-            echo "ENABLE_EXECUTOR=ON"
-            echo "ENABLE_OPENQASM=OFF"
-          } >> "$GITHUB_ENV"
-
-      - name: Get Cached LLVM Source
-        id: cache-llvm-source
-        uses: actions/cache/restore@v4
-        with:
-          path: mlir/llvm-project
-          key: llvm-${{ needs.constants.outputs.llvm_version }}-default-source
-          enableCrossOsArchive: true
-
-      - name: Clone LLVM Submodule
-        if: steps.cache-llvm-source.outputs.cache-hit != 'true'
-        uses: actions/checkout@v4
-        with:
-          repository: llvm/llvm-project
-          ref: ${{ needs.constants.outputs.llvm_version }}
-          path: mlir/llvm-project
-
-      # The executor links LLVM via find_package(LLVM CONFIG REQUIRED), so unlike the runtime
-      # job this one needs a built LLVM, not just its headers. Restored from what `llvm` cached.
-      - name: Get Cached LLVM Build
-        uses: actions/cache/restore@v4
-        with:
-          path: llvm-build
-          key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-ci-build-gcc
-          fail-on-cache-miss: true
-
-      - name: Build Catalyst-Runtime with transport and the executor
-        # `-C runtime`, not the top-level target: with ENABLE_EXECUTOR=ON that depends on
-        # `llvm`, whose last step runs the whole MLIR lit suite every time, cache or not.
-        run: make -C runtime runtime
-
-      - name: Set up Soft-RoCE loopback
-        uses: ./.github/actions/setup-soft-roce
-
-      - name: Run transport C++ test suite (Catch2 + soft-RoCE loopback)
-        run: make test-runtime-transport
-
-      - name: Download Quantum Build Artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: quantum-build-gcc
-          path: quantum-build
-
-      - name: Add Frontend Dependencies to PATH
-        run: |
-          echo "$(pwd)/llvm-build/bin" >> $GITHUB_PATH
-          echo "$(pwd)/quantum-build/bin" >> $GITHUB_PATH
-          echo "PYTHONPATH=${PYTHONPATH:-}:$(pwd)/quantum-build/python_packages/quantum" >> $GITHUB_ENV
-          echo "RUNTIME_LIB_DIR=$(pwd)/runtime-build/lib" >> $GITHUB_ENV
-          echo "MLIR_LIB_DIR=$(pwd)/llvm-build/lib" >> $GITHUB_ENV
-          echo "CATALYST_BIN_DIR=$(pwd)/quantum-build/bin" >> $GITHUB_ENV
-          echo "CATALYST_LIB_DIR=$(pwd)/quantum-build/lib" >> $GITHUB_ENV
-          # catalyst-executor is built in this job rather than downloaded, so it keeps its mode.
-          echo "CATALYST_TRANSPORT_PATH=$(pwd)/runtime-build/lib" >> $GITHUB_ENV
-          chmod +x $(pwd)/quantum-build/bin/catalyst  # artifact upload does not preserve permissions
-
-      - name: Build the Catalyst frontend
-        run: |
-          python3 -m pip install -r requirements.txt
-          make frontend
-
-      - name: Run backline transport integration tests
-        run: |
-          # Only the CPU cases; the GPU-coproc ones need the self-hosted runner (check-transport-gpu).
-          # -rs so a skip is visible: pytest exits 0 on skip and these have no skip conditions,
-          # so anything reported is a regression. _rdma_loopback selects both of its cases.
-          python3 -m pytest -v -rs \
-            "frontend/test/pytest/test_backline.py::TestBacklineDemoIntegration::test_local_cpu_to_local_cpu_memcpy" \
-            "frontend/test/pytest/test_backline.py::TestBacklineDemoIntegration::test_local_cpu_to_local_cpu_rdma_loopback"
 
   llvm:
     name: LLVM Build
