@@ -50,12 +50,12 @@ MemRefType getParamVectorDataType(OpBuilder &builder) {
     return MemRefType::get({ShapedType::kDynamic}, builder.getI8Type());
 }
 
-/// `memref<memref<?xi8>>`: the rank-0 indirection that holds the byte buffer.
+// `memref<memref<?xi8>>`: the rank-0 indirection that holds the byte buffer.
 MemRefType getParamVectorType(OpBuilder &builder) {
     return MemRefType::get({}, getParamVectorDataType(builder));
 }
 
-/// Get or create the helper rounding a raw byte offset up to a required alignment.
+// Get or create the helper rounding a raw byte offset up to a required alignment.
 func::FuncOp getOrInsertOffsetRoundupFunc(ModuleOp moduleOp, OpBuilder &builder, Location loc) {
     if (auto existing = moduleOp.lookupSymbol<func::FuncOp>(offsetRoundupFuncName)) {
         return existing;
@@ -94,22 +94,7 @@ func::FuncOp getOrInsertOffsetRoundupFunc(ModuleOp moduleOp, OpBuilder &builder,
     return offsetRoundupFuncOp;
 }
 
-/// Get or create the helper that grows the parameter byte buffer.
-///
-/// The emitted function is
-///
-///   func.func private @__adjoint_lowering_ensure_param_vector_capacity(
-///       %data: memref<memref<?xi8>>, %capacity: memref<index>, %required: index) {
-///     %cap = memref.load %capacity[]
-///     %grow = index.cmp ult(%cap, %required)
-///     scf.if %grow {
-///       %new_cap = index.maxu (2 * %cap), %required
-///       %new_data = memref.realloc (memref.load %data[]) (%new_cap) {alignment = 64}
-///       memref.store %new_data, %data[]
-///       memref.store %new_cap, %capacity[]
-///     }
-///     return
-///   }
+// Get or create the helper that grows the parameter byte buffer.
 func::FuncOp getOrInsertEnsureCapacityFunc(ModuleOp moduleOp, OpBuilder &builder, Location loc) {
     if (auto existing = moduleOp.lookupSymbol<func::FuncOp>(ensureCapacityFuncName)) {
         return existing;

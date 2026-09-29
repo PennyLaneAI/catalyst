@@ -33,27 +33,25 @@ namespace quantum {
 /// are pushed in program order during the forward pass and popped in reverse during the backward
 /// pass.
 struct QuantumCache {
+
     /// A rank-0 memref holding the raw byte buffer that gate parameters are recorded into:
     /// `memref<memref<?xi8>>`.
-    ///
     /// The byte buffer is kept *behind* a rank-0 indirection so that it can grow. `memref.realloc`
     /// returns a new SSA value, and the buffer is used from inside the regions of the `scf` ops the
     /// forward pass emits; without the indirection, a reallocated buffer could not be made visible
     /// to the rest of the program without threading it through every enclosing loop as an
-    /// iter_arg. This mirrors how `catalyst.arraylist` is lowered in ArrayListToMemRefPass.
-    ///
-    /// Do not `memref.view` this value directly: load the inner buffer first, via
-    /// `emitLoadParamVectorData`.
+    /// iter_arg
     mlir::Value paramVector;
+
     /// `memref<index>` holding the byte capacity of the buffer currently in `paramVector`.
     mlir::Value paramVectorCapacity;
+
     /// `memref<index>` holding the offset, in bytes, of the next free slot in the byte buffer.
     mlir::Value currentOffset;
     mlir::TypedValue<ArrayListType> offsetVector;
     mlir::func::FuncOp offsetRoundupFunc;
-    /// Helper that grows the byte buffer in `paramVector` so that a requested number of bytes is
-    /// addressable, updating both `paramVector` and `paramVectorCapacity` in place.
     mlir::func::FuncOp ensureCapacityFunc;
+
     mlir::TypedValue<ArrayListType> wireVector;
     /// For every structured control flow op, store the values required for it to execute.
     /// Specifically: store the conditions for scf.if ops, the start/stop/step of scf.for ops, and
