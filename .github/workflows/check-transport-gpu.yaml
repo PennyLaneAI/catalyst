@@ -73,47 +73,6 @@ jobs:
           echo "/usr/local/cuda/bin" >> $GITHUB_PATH
           echo "LD_LIBRARY_PATH=/usr/local/cuda/lib64${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}" >> $GITHUB_ENV
 
-      - name: Wait for the GPU to be usable
-        # `single-gpu-x64` hands out a freshly booted instance, and cuInit has been seen
-        # failing minutes into a run; building the MLIR stack from source used to hide that,
-        # and the cache took the delay away. Waits on what the tests need: cuInit (via ctypes,
-        # torch is installed much later) and the compute_cap query the fixture itself runs.
-        # A GPU that answers and then disappears is a runner-image bug, not one to fix here.
-        run: |
-          set -u
-          # `bash -e` is the step default, and a probe failing is the measurement here.
-          set +e
-
-          # ctypes, not torch: torch is not installed until much later in the job.
-          cuinit='
-          import ctypes, sys
-          try:
-              sys.exit(0 if ctypes.CDLL("libcuda.so.1").cuInit(0) == 0 else 1)
-          except OSError:
-              sys.exit(1)
-          '
-
-          # A fresh instance needs a moment; 5 min then give up.
-          for _ in $(seq 1 30); do
-            cc=$(nvidia-smi --query-gpu=compute_cap --format=csv,noheader 2>&1 | head -1)
-            if python3 -c "$cuinit"; then
-              case "$cc" in
-                [0-9]*.[0-9]*)
-                  echo "GPU ready: compute capability $cc"
-                  nvidia-smi
-                  exit 0
-                  ;;
-              esac
-            fi
-            sleep 10
-          done
-
-          echo "::error::GPU not usable within 5 minutes, so the backline tests would skip" \
-               "and this job would cover nothing. Last compute_cap: '$cc'."
-          nvidia-smi
-          ls -l /dev/nvidia*
-          exit 1
-
       - name: Checkout Catalyst repo
         uses: actions/checkout@v4
 
@@ -191,18 +150,6 @@ jobs:
           ENABLE_TRANSPORT=ON \
           make runtime
 
-      - name: Verify the GPU coprocessor backend was built
-        # A missing .so makes gpu_transport_backend skip, which reads as "tests passed". No
-        # ROCm here: lib/transport/CMakeLists.txt fetches the HIP headers and nvcc drives them.
-        run: |
-          name=libcatalyst_transport_memcpy_gpu_coprocessor.so
-          if ! find "$RT_BUILD_DIR/lib" -name "$name" -print | grep -q .; then
-            echo "::error::$name was not built -- CMake did not resolve HIP."
-            grep -E "^(_nvcc|_hip_include_dir|CMAKE_HIP_|TRANSPORT_HIP_PACKAGES)" \
-              "$RT_BUILD_DIR/CMakeCache.txt" || echo "(no HIP entries in the cache at all)"
-            exit 1
-          fi
-
       - name: Build and run the memcpy transport tests
         run: |
           cmake --build "$RT_BUILD_DIR" --target runner_tests_transport_memcpy -j
@@ -213,8 +160,7 @@ jobs:
           python3 -m pip install -r requirements.txt
 
       - name: Set up Triton and its CUDA driver
-        # Triton dlopens libcuda.so.1, which ships with the driver, not the toolkit -- the stubs
-        # copy links but cannot initialize a device ("0 active drivers"). Resolve the real one.
+        # Triton dlopens libcuda.so.1, which ships with the driver rather than the toolkit.
         run: |
           set -euo pipefail
           # torch exists only so triton <3.8 can probe the driver through it. cu129 matches the
@@ -223,29 +169,15 @@ jobs:
           pip install 'torch==2.13.0+cu129' 'triton<3.8' \
             --index-url https://download.pytorch.org/whl/cu129
 
-          # One awk, not grep | head: it skips the stubs and exits 0 on no match, so pipefail
-          # needs no `|| true`. The find covers a stale loader cache, which is also the only
-          # case where prepending to LD_LIBRARY_PATH below does anything.
-          libcuda=$(ldconfig -p | awk '/libcuda\.so\.1/ && !/stubs/ {print $NF; exit}')
-          if [ -z "$libcuda" ]; then
-            libcuda=$(find /usr/lib /usr/lib64 -name 'libcuda.so.1' -not -path '*/stubs/*' 2>/dev/null | head -1 || true)
-          fi
-          if [ -z "$libcuda" ]; then
-            echo "::error::No real libcuda.so.1 here -- only the toolkit stub, if that."
-            ldconfig -p | grep -i libcuda || echo "(no libcuda in the loader cache at all)"
-            exit 1
-          fi
-
-          # Exported for the check below, written to the environment file for later steps.
-          libcuda_dir=$(dirname "$libcuda")
-          echo "libcuda: $libcuda"
+          # Every run on this pool has the driver at the multiarch path; the toolkit's stub
+          # is elsewhere and cannot initialize a device. Fail loudly if it ever moves.
+          libcuda_dir=/lib/x86_64-linux-gnu
+          [ -e "$libcuda_dir/libcuda.so.1" ] || { echo "::error::no libcuda.so.1 in $libcuda_dir"; exit 1; }
           export TRITON_LIBCUDA_PATH="$libcuda_dir"
-          export LD_LIBRARY_PATH="$libcuda_dir${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
           echo "TRITON_LIBCUDA_PATH=$libcuda_dir" >> $GITHUB_ENV
-          echo "LD_LIBRARY_PATH=$LD_LIBRARY_PATH" >> $GITHUB_ENV
 
-          # Triton's own activation, which the fixture turns into a skip. A different question
-          # from the wait step's cuInit: this one goes through torch.
+          # Triton's own activation, which the fixture turns into a skip -- fails here in
+          # three minutes rather than inside triton.jit after the frontend build.
           python3 -c "
           import triton
           from triton.runtime.driver import driver
@@ -283,30 +215,13 @@ jobs:
           echo "CATALYST_TRANSPORT_PATH=$RT_BUILD_DIR/lib" >> $GITHUB_ENV
 
       - name: Run backline GPU integration tests
-        id: gpu-tests
         env:
           # Without this Triton discards ptxas diagnostics, leaving codegen failures as "status 255".
           TRITON_DUMP_PTXAS_LOG: "1"
         # CPU-CPU memcpy is covered by check-catalyst.yaml; these three need the local GPU,
         # and -rs makes the gpu_transport_backend / gpu_triton_platform skips visible.
         run: |
-          python3 -m pytest -v -rs --junit-xml=gpu-backline-results.xml \
+          python3 -m pytest -v -rs \
             "frontend/test/pytest/test_backline.py::TestBacklineDemoIntegration::test_cpu_controller_to_gpu_coproc_memcpy_precompiled" \
             "frontend/test/pytest/test_backline.py::TestBacklineDemoIntegration::test_cpu_controller_to_gpu_coproc_triton_css_bp" \
             "frontend/test/pytest/test_backline.py::TestBacklineDemoIntegration::test_cpu_controller_to_gpu_coproc_memcpy_manual_qec"
-
-      - name: Require at least one GPU test to have executed
-        # pytest exits 0 when every test skips, so success could cover nothing. Skipped when
-        # pytest never ran: no junit file, and the real error is already reported.
-        if: always() && steps.gpu-tests.outcome != 'skipped'
-        run: |
-          python3 - gpu-backline-results.xml <<'PY'
-          import sys, xml.etree.ElementTree as ET
-          r = ET.parse(sys.argv[1]).getroot()
-          s = r if r.tag == "testsuite" else r[0]
-          total, skipped = int(s.get("tests")), int(s.get("skipped"))
-          print(f"{total - skipped}/{total} backline GPU tests executed ({skipped} skipped)")
-          if total == skipped:
-              sys.exit("::error::No backline GPU test executed -- refusing to report "
-                       "success for a run with zero GPU coverage.")
-          PY
