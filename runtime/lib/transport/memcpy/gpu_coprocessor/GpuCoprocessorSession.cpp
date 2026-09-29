@@ -28,8 +28,9 @@
 
 namespace catalyst::transport::memcpy {
 
-GpuCoprocessorSession::GpuCoprocessorSession(const std::string &config, int gpu_device)
-    : pair_key_(parse_pair_key(config)), gpu_device_(gpu_device) {}
+GpuCoprocessorSession::GpuCoprocessorSession(const std::string &config, int gpu_device,
+                                             bool per_message)
+    : pair_key_(parse_pair_key(config)), gpu_device_(gpu_device), per_message_(per_message) {}
 
 GpuCoprocessorSession::~GpuCoprocessorSession() {
     try {
@@ -103,6 +104,11 @@ void GpuCoprocessorSession::establish_channel(const ChannelDesc &desc, const Mem
 
 void GpuCoprocessorSession::start() {
     stop();
+    if (per_message_) {
+        const int device = gpu_device_;
+        worker_.start([device] { HIP_CHECK(hipSetDevice(device), "hipSetDevice(coprocessor)"); });
+        return;
+    }
     ensure_gpu_state();
     // Reset per-session state: cursors, ring slots, handoff slots, stop flag, error.
     process_cursor_ = 0;
@@ -144,6 +150,7 @@ int GpuCoprocessorSession::collect(void *const * /*replies*/,
 }
 
 void GpuCoprocessorSession::stop() {
+    worker_.stop();
     if (kernel_running_ && handoff_.stop_host) {
         *handoff_.stop_host = 1; // let the persistent kernel exit its poll loop
     }
@@ -188,13 +195,26 @@ void GpuCoprocessorSession::run(std::stop_token st) {
 }
 
 void GpuCoprocessorSession::set_coprocessor_launcher(CoprocessorLauncherFn fn, void *ctx) {
+    TP_CHECK(!per_message_, "A per-message GPU coprocessor takes a CoprocessorFn, not a launcher");
     launcher_ = fn;
     launcher_ctx_ = ctx;
 }
 
+void GpuCoprocessorSession::set_coprocessor_fn(CoprocessorFn fn, void *ctx) {
+    TP_CHECK(per_message_,
+             "A launch-once GPU coprocessor takes a launcher; set coproc_fn=per_message "
+             "in its config to bind a CoprocessorFn");
+    worker_.bind(fn, ctx);
+}
+
 std::size_t GpuCoprocessorSession::process_message(const void *in, std::size_t in_len, void *out,
                                                    std::size_t out_cap) {
-    TP_CHECK(in_len == sizeof(common::Payload), "Expected one wire-shaped Payload");
+    if (per_message_) {
+        return worker_.process_message(in, in_len, out, out_cap);
+    }
+    TP_CHECK(in_len == sizeof(common::Payload),
+             "A launch-once GPU coprocessor carries 8 B messages; set coproc_fn=per_message in its "
+             "config for larger ones");
     TP_CHECK(out_cap >= sizeof(std::int64_t), "Reply buffer too small for GPU correction");
     TP_CHECK(kernel_running_, "Call start() before process_message");
     if (failed_.load(std::memory_order_acquire)) {

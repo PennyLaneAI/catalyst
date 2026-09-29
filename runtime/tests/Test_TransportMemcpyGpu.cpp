@@ -13,11 +13,13 @@
 // limitations under the License.
 
 #include <cstdint>
+#include <cstring>
 #include <stdexcept>
 #include <string>
 
 #include "CpuControllerSession.hpp"
 #include "GpuCoprocessorSession.hpp"
+#include "WireProtocol.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -26,6 +28,20 @@ using namespace catalyst::transport::memcpy;
 
 namespace {
 std::string pair_cfg(std::uint16_t port) { return "pair=p" + std::to_string(port); }
+
+// Replies with each payload byte plus one, for the payload size given as ctx.
+std::size_t increment_fn(const void *in, std::size_t /*in_len*/, void *out, std::size_t out_cap,
+                         void *ctx) {
+    const std::size_t n = *static_cast<const std::size_t *>(ctx);
+    if (out_cap < n) {
+        return 0;
+    }
+    for (std::size_t i = 0; i < n; ++i) {
+        static_cast<std::uint8_t *>(out)[i] =
+            static_cast<std::uint8_t>(static_cast<const std::uint8_t *>(in)[i] + 1);
+    }
+    return n;
+}
 } // namespace
 
 TEST_CASE("memcpy CPU controller can drive the local GPU coprocessor", "[transport_memcpy]") {
@@ -69,4 +85,73 @@ TEST_CASE("memcpy rejects a second local GPU coprocessor on the same pair", "[tr
     GpuCoprocessorSession second(pair_cfg(ci.oob_port));
     REQUIRE(first.connect(ci) == 0);
     REQUIRE_THROWS_AS(second.connect(ci), std::runtime_error);
+}
+
+TEST_CASE("a per-message GPU coprocessor runs a host function on wide messages",
+          "[transport_memcpy]") {
+    constexpr std::size_t bytes = 300;
+    ConnectInfo ci{.peer = "loopback", .oob_port = 19031};
+    CpuControllerSession controller(pair_cfg(ci.oob_port));
+    GpuCoprocessorSession coprocessor(pair_cfg(ci.oob_port), /*gpu_device=*/0,
+                                      /*per_message=*/true);
+    CHECK(coprocessor.coprocessor_fn_convention() == CoprocConvention::PerMessage);
+    REQUIRE(controller.connect(ci) == 0);
+    REQUIRE(coprocessor.connect(ci) == 0);
+
+    MemRegion reply = controller.alloc_memory(bytes, MemKind::CpuRam);
+    PeerRef peer_request = controller.exchange_keys(reply);
+    MemRegion request = coprocessor.alloc_memory(bytes, MemKind::CpuRam);
+    PeerRef peer_reply = coprocessor.exchange_keys(request);
+    ChannelDesc desc{.transport = "memcpy"};
+    controller.establish_channel(desc, reply, peer_request);
+    coprocessor.establish_channel(desc, request, peer_reply);
+
+    std::size_t n = bytes;
+    controller.commit_work_item(0, bytes, bytes);
+    coprocessor.set_coprocessor_fn(increment_fn, &n);
+    REQUIRE_THROWS_AS(coprocessor.set_coprocessor_launcher(nullptr, nullptr), std::runtime_error);
+    controller.start();
+    coprocessor.start();
+
+    std::uint8_t payload[bytes];
+    for (std::size_t i = 0; i < bytes; ++i) {
+        payload[i] = static_cast<std::uint8_t>(i);
+    }
+    controller.write_data_slot(payload, bytes, /*decoder_id=*/0);
+    REQUIRE(controller.kick(0) == 0);
+
+    std::uint8_t got[bytes] = {};
+    void *outs[1] = {got};
+    std::uint64_t out_bytes[1] = {bytes};
+    REQUIRE(controller.collect(outs, out_bytes, 1) == 0);
+    for (std::size_t i = 0; i < bytes; ++i) {
+        REQUIRE(got[i] == static_cast<std::uint8_t>(i + 1));
+    }
+}
+
+TEST_CASE("a launch-once GPU coprocessor refuses a per-message function and wide messages",
+          "[transport_memcpy]") {
+    ConnectInfo ci{.peer = "loopback", .oob_port = 19032};
+    CpuControllerSession controller(pair_cfg(ci.oob_port));
+    GpuCoprocessorSession coprocessor(pair_cfg(ci.oob_port));
+    CHECK(coprocessor.coprocessor_fn_convention() == CoprocConvention::LaunchOnce);
+    REQUIRE_THROWS_AS(coprocessor.set_coprocessor_fn(increment_fn, nullptr), std::runtime_error);
+    REQUIRE(controller.connect(ci) == 0);
+    REQUIRE(coprocessor.connect(ci) == 0);
+
+    MemRegion reply = controller.alloc_memory(16, MemKind::CpuRam);
+    PeerRef peer_request = controller.exchange_keys(reply);
+    MemRegion request = coprocessor.alloc_memory(16, MemKind::CpuRam);
+    PeerRef peer_reply = coprocessor.exchange_keys(request);
+    ChannelDesc desc{.transport = "memcpy"};
+    controller.establish_channel(desc, reply, peer_request);
+    coprocessor.establish_channel(desc, request, peer_reply);
+
+    controller.commit_work_item(0, 16, 8);
+    controller.start();
+    coprocessor.set_coprocessor_launcher(nullptr, nullptr); // built-in GPU echo
+    coprocessor.start();
+    const std::uint8_t payload[16] = {};
+    controller.write_data_slot(payload, sizeof(payload), /*decoder_id=*/0);
+    REQUIRE_THROWS_AS(controller.kick(0), std::runtime_error);
 }
