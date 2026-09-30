@@ -1,4 +1,4 @@
-name: Check Catalyst GPU
+name: Check Catalyst GPU 
 
 # Runs the runtime transport tests on a GPU host. To keep GPU runner time cheap, pull requests
 # only trigger a run once labeled ``gpu``; ``push`` to main runs unconditionally.
