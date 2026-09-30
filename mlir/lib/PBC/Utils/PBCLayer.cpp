@@ -36,8 +36,7 @@ namespace pbc {
 // consistently offsets its construction cost once four operations are already in the layer.
 static constexpr size_t MinOpsForCommutationBasis = 4;
 
-FailureOr<int64_t> PBCLayerContext::ifWorstCaseDepth(scf::IfOp ifOp)
-{
+FailureOr<int64_t> PBCLayerContext::ifWorstCaseDepth(scf::IfOp ifOp) {
     FailureOr<int64_t> thenDepth =
         worstCaseDepthOfBlock(&ifOp.getThenRegion().front(), /*liftForLoops=*/false);
     if (failed(thenDepth)) {
@@ -267,8 +266,7 @@ PBCLayerContext::groupLayers(mlir::Operation *root, bool onlyOnDisjointQubit) {
 }
 
 PBCLayer::PackedPauli PBCLayer::packPauli(PBCOpInterface op,
-                                          llvm::ArrayRef<Value> entryQubits) const
-{
+                                          llvm::ArrayRef<Value> entryQubits) const {
     assert(entryQubits.size() == op.getPauliProduct().size() &&
            "Pauli product must have one entry per qubit");
 
@@ -295,22 +293,19 @@ PBCLayer::PackedPauli PBCLayer::packPauli(PBCOpInterface op,
     return packed;
 }
 
-bool PBCLayer::commutesWithBasis(const PackedPauli &candidate) const
-{
+bool PBCLayer::commutesWithBasis(const PackedPauli &candidate) const {
     return llvm::all_of(commutationBasis, [&](const PackedPauli &basisRow) {
         unsigned parity = 0;
         for (size_t word = 0; word < candidate.x.size(); ++word) {
             uint64_t localAnticommutations =
-                (candidate.x[word] & basisRow.z[word]) ^
-                (candidate.z[word] & basisRow.x[word]);
+                (candidate.x[word] & basisRow.z[word]) ^ (candidate.z[word] & basisRow.x[word]);
             parity ^= std::popcount(localAnticommutations) & 1U;
         }
         return parity == 0;
     });
 }
 
-void PBCLayer::insertIntoCommutationBasis(PackedPauli candidate)
-{
+void PBCLayer::insertIntoCommutationBasis(PackedPauli candidate) {
     auto xorWithRow = [&](size_t rowIndex) {
         const PackedPauli &basisRow = commutationBasis[rowIndex];
         for (size_t word = 0; word < candidate.x.size(); ++word) {
@@ -346,8 +341,7 @@ void PBCLayer::insertIntoCommutationBasis(PackedPauli candidate)
     }
 }
 
-void PBCLayer::addToCommutationBasis(PBCOpInterface op, llvm::ArrayRef<Value> entryQubits)
-{
+void PBCLayer::addToCommutationBasis(PBCOpInterface op, llvm::ArrayRef<Value> entryQubits) {
     const size_t oldNumWords = (commutationQubits.size() + 63) / 64;
     for (Value qubit : entryQubits) {
         if (commutationQubitIndices.contains(qubit)) {
@@ -369,8 +363,7 @@ void PBCLayer::addToCommutationBasis(PBCOpInterface op, llvm::ArrayRef<Value> en
     insertIntoCommutationBasis(packPauli(op, entryQubits));
 }
 
-void PBCLayer::buildCommutationBasis()
-{
+void PBCLayer::buildCommutationBasis() {
     assert(!commutationBasisValid && "commutation basis is already available");
     commutationQubits.clear();
     commutationQubitIndices.clear();
@@ -383,8 +376,7 @@ void PBCLayer::buildCommutationBasis()
     commutationBasisValid = true;
 }
 
-void PBCLayer::insertToLayer(PBCOpInterface op)
-{
+void PBCLayer::insertToLayer(PBCOpInterface op) {
     ops.emplace_back(op);
     updateResultAndOperand(op);
 
@@ -510,12 +502,12 @@ bool PBCLayer::commute(PBCOpInterface src, PBCOpInterface dst) {
 }
 
 // Commute an op to all the ops in the layer
-bool PBCLayer::commuteToLayer(PBCOpInterface op)
-{
+bool PBCLayer::commuteToLayer(PBCOpInterface op) {
     // Pairwise checks avoid basis construction overhead for the short layers
     // that dominate small programs. Larger layers use packed basis rows.
     if (ops.size() < MinOpsForCommutationBasis) {
-        return llvm::all_of(ops, [&](PBCOpInterface existingOp) { return commute(op, existingOp); });
+        return llvm::all_of(ops,
+                            [&](PBCOpInterface existingOp) { return commute(op, existingOp); });
     }
 
     if (!commutationBasisValid) {
