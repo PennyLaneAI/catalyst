@@ -23,6 +23,8 @@ from pennylane.core.operator import abstractify
 
 from catalyst.decomposition.graph_op_id import GraphOpID
 
+ModifierState = tuple[bool, int]
+
 
 @dataclass(frozen=True)
 class OpDecompRequest:
@@ -30,7 +32,7 @@ class OpDecompRequest:
 
     Attributes:
         base_id: Canonical GraphOpID of the unmodified base operator. Used as the traversal key and
-            as the starting point for adjoint/control target IDs.
+            as the starting point for adjoint/control target IDs. Intentionally excludes modifiers.
         op_name: Frontend operator name used to query PennyLane's decomposition registry.
         op_cls: Concrete Operator2 class used to rebuild the base for registered symbolic rules.
             It is unavailable for the on-demand pathway.
@@ -41,8 +43,9 @@ class OpDecompRequest:
         extra_data: Abstract hybrid-argument pytrees used to reconstruct rule arguments without
             retaining values or tracers from a specific program instance.
         is_custom_op: Whether the operator uses the positional, scalar-f64 signature of qref.custom.
+        adjoint: Whether the encountered operation is adjointed, including from region contexts.
         control_count: Controls carried by the encountered operation, including ambient control
-            transform context. The base ID itself intentionally excludes modifiers.
+            transform context.
     """
 
     base_id: str
@@ -53,19 +56,28 @@ class OpDecompRequest:
     static_data: dict
     extra_data: dict
     is_custom_op: bool
+    adjoint: bool = False
     control_count: int = 0
 
     @classmethod
-    def from_operation(cls, op, ambient_control_count: int = 0) -> "OpDecompRequest":
+    def from_operation(
+        cls,
+        op,
+        modifier_context: ModifierState = (False, 0),
+    ) -> "OpDecompRequest":
         """Build a request from a settled captured Operator2 instance.
 
         A rule is a template keyed by the operator's identity, so only shapes, dtypes and pytree
         structure may reach it. The operator is abstractified first: that canonicalizes the
         properties by removing tracers (no leaks) and giving shapes/dtypes to Python constants.
+
+        Ambient modifiers compose with symbolic wrappers already carried by ``op``: adjoints
+        cancel pairwise and control counts add.
         """
         with qp.capture.pause():
             op = abstractify(op)
 
+        ambient_adjoint, ambient_control_count = modifier_context
         graph_op_id = GraphOpID(op)
         base = graph_op_id.op
         static_data = {
@@ -88,8 +100,15 @@ class OpDecompRequest:
             static_data=static_data,
             extra_data=base.hybrid_args,
             is_custom_op=graph_op_id.is_custom_op,
+            adjoint=graph_op_id.adjoint != ambient_adjoint,
             control_count=graph_op_id.num_controls + ambient_control_count,
         )
+
+    @property
+    def modifier_state(self) -> ModifierState:
+        """Return the modifier state represented by this request."""
+
+        return self.adjoint, self.control_count
 
 
 @dataclass
@@ -129,11 +148,11 @@ class DecompositionScope:
     """A context to collect decomposition requests and the resulting traced rules.
 
     Attributes:
-        roots: Map of (base) GraphOpID to a request object, as well as observed control counts.
+        roots: Map of (base) GraphOpID to a request object and observed modifier states.
         definitions: Map of rule identifiers to traced rules, in first-seen order.
     """
 
-    roots: dict[str, tuple[OpDecompRequest, set[int]]] = field(default_factory=dict)
+    roots: dict[str, tuple[OpDecompRequest, set[ModifierState]]] = field(default_factory=dict)
     definitions: dict[tuple, TracedRule] = field(default_factory=dict)
 
     def record_root(self, request: OpDecompRequest) -> None:
@@ -141,9 +160,9 @@ class DecompositionScope:
 
         previous = self.roots.get(request.base_id)
         if previous is None:
-            self.roots[request.base_id] = (request, {request.control_count})
+            self.roots[request.base_id] = (request, {request.modifier_state})
         else:
-            previous[1].add(request.control_count)
+            previous[1].add(request.modifier_state)
 
     def record_definition(self, traced_rule: TracedRule) -> None:
         """Record a definition once, preserving first-seen order."""

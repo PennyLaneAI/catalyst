@@ -233,6 +233,7 @@
     [(#3158)](https://github.com/PennyLaneAI/catalyst/pull/3158)
     [(#3206)](https://github.com/PennyLaneAI/catalyst/pull/3206)
     [(#3224)](https://github.com/PennyLaneAI/catalyst/pull/3224)
+    [(#3285)](https://github.com/PennyLaneAI/catalyst/pull/3285)
 
     1. The pass now supports applying a selection of the available decomposition rules via the `target_rules` parameter.
 
@@ -618,6 +619,9 @@
 
 <h3>Breaking changes 💔</h3>
 
+* `catalyst.logging` has been removed. `pennylane.logging` should be used instead.
+  [(#3283)](https://github.com/PennyLaneAI/catalyst/pull/3283)
+
 * Removes :func:`~.passes.ppm_specs` and the ``--ppm-specs`` MLIR pass. Use :func:`~.specs` and
   the ``ResourceAnalysis`` pass instead for PPR/PPM resource counts and PBC layer depth
   (``any_commuting_depth`` / ``qubit_disjoint_depth``).
@@ -721,6 +725,12 @@
   [(#3242)](https://github.com/PennyLaneAI/catalyst/pull/3242)
 
 <h3>Internal changes ⚙️</h3>
+
+* A manually triggered workflow is added to build a Catalyst Docker image with PennyLane and
+  Lightning for `linux/amd64` and `linux/arm64`, and can publish it to Docker Hub as a single
+  multi-arch tag. The LLVM, StableHLO and Enzyme build is cached in the registry, so rebuilds only
+  recompile Catalyst.
+  [(#3182)](https://github.com/PennyLaneAI/catalyst/pull/3182)
 
 * A new `modifiers-lowering` pass reduces `quantum.ctrl` and `quantum.adjoint` regions to op-level
   modifiers by running the `ctrl-lowering` and `adjoint-lowering` rewrite patterns together under a
@@ -953,6 +963,7 @@
 
 This release contains contributions from (in alphabetical order):
 
+Runor Agbaire,
 Ali Asadi,
 Joey Carter,
 Yushao Chen,
