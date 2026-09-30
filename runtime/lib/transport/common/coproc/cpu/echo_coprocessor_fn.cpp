@@ -29,14 +29,16 @@
  * @param out Reply data area.
  * @param out_cap Bytes writable at @p out.
  * @param ctx Unused.
- * @return Bytes written, or 0 if either buffer is missing.
+ * @return 0 on success, nonzero if either buffer is missing.
  */
-extern "C" std::size_t echo_coprocessor(const void *in, std::size_t in_len, void *out,
-                                        std::size_t out_cap, void * /*ctx*/) {
-    if (in == nullptr || out == nullptr || in_len == 0 || out_cap == 0) {
-        return 0;
+extern "C" int echo_coprocessor(const void *in, std::size_t in_len, void *out, std::size_t out_cap,
+                                void * /*ctx*/) {
+    if ((in_len != 0 && in == nullptr) || (out_cap != 0 && out == nullptr)) {
+        return 1;
     }
     const std::size_t n = in_len < out_cap ? in_len : out_cap;
-    std::memcpy(out, in, n);
-    return n;
+    if (n != 0) {
+        std::memcpy(out, in, n);
+    }
+    return 0;
 }

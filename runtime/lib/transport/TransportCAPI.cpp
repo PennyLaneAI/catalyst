@@ -143,12 +143,15 @@ int do_exchange_keys(CatalystTransportSession *s) {
 }
 
 // Built-in fallback coprocessor function: echo the input back.
-std::size_t echo_fn(const void *in, std::size_t in_len, void *out, std::size_t out_cap, void *) {
+int echo_fn(const void *in, std::size_t in_len, void *out, std::size_t out_cap, void *) {
+    if ((in_len != 0 && !in) || (out_cap != 0 && !out)) {
+        return 1;
+    }
     std::size_t n = std::min(in_len, out_cap);
-    if (n && in && out) {
+    if (n != 0) {
         std::memcpy(out, in, n);
     }
-    return n;
+    return 0;
 }
 
 // Async task registry: connect_async / exchange_keys_async run on a worker thread and return a
