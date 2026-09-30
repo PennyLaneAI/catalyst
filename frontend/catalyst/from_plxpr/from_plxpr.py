@@ -17,7 +17,6 @@ This submodule defines a utility for converting plxpr into Catalyst jaxpr.
 
 # pylint: disable=protected-access
 
-import warnings
 from copy import copy
 from functools import partial
 from typing import Callable
@@ -33,7 +32,6 @@ from catalyst.backline import device_pass_pipeline, remote_device_lib
 from catalyst.decomposition.capture_session import DecompositionScope
 from catalyst.device import extract_backend_info
 from catalyst.device.qjit_device import is_dynamic_wires
-from catalyst.from_plxpr.decompose import DecompRuleInterpreter
 from catalyst.from_plxpr.qref_jax_primitives import (
     qref_alloc_p,
     qref_dealloc_p,
@@ -247,7 +245,6 @@ class WorkflowInterpreter(PlxprInterpreter):
         new_version._pass_pipeline = copy(self._pass_pipeline)
         new_version.init_qreg = self.init_qreg
         new_version.requires_decompose_lowering = self.requires_decompose_lowering
-        new_version.decompose_tkwargs = copy(self.decompose_tkwargs)
         return new_version
 
     def __init__(self, skip_preprocess=False, _preprocess_warn=True, collect_decomp_rules=True):
@@ -257,9 +254,8 @@ class WorkflowInterpreter(PlxprInterpreter):
         self._preprocess_warn = _preprocess_warn
         self._collect_decomp_rules = collect_decomp_rules
 
-        # Compiler options for the new decomposition system
+        # Guards against applying more than one decomposition transform (not yet supported).
         self.requires_decompose_lowering = False
-        self.decompose_tkwargs = {}  # target gateset
 
         super().__init__()
 
@@ -551,48 +547,3 @@ def trace_from_pennylane(
         out_treedef = nested_jaxpr.eqns[0].params["out_treedef"]
 
     return jaxpr, out_type, out_treedef
-
-
-def _collect_and_compile_graph_solutions(inner_jaxpr, consts, tkwargs, ncargs):
-    """Collect and compile graph solutions for a given JAXPR.
-
-    This function uses the DecompRuleInterpreter to evaluate
-    the input JAXPR and obtain a new JAXPR that incorporates
-    the graph-based decomposition solutions.
-
-    This function doesn't modify the underlying quantum function
-    but rather constructs a new JAXPR with decomposition rules.
-
-    Args:
-        inner_jaxpr (Jaxpr): The input JAXPR to be decomposed.
-        consts (list): The constants used in the JAXPR.
-        tkwargs (list): The keyword arguments of the decompose transform.
-        ncargs (list): Non-constant arguments for the JAXPR.
-
-    Returns:
-        ClosedJaxpr: The decomposed JAXPR.
-        bool: A flag indicating whether the graph-based decomposition was successful.
-    """
-    gds_interpreter = DecompRuleInterpreter(**tkwargs)
-
-    def gds_wrapper(*args):
-        return gds_interpreter.eval(inner_jaxpr, consts, *args)
-
-    graph_succeeded = True
-
-    with warnings.catch_warnings(record=True) as captured_warnings:
-        warnings.simplefilter("always", UserWarning)
-        final_jaxpr = jax.make_jaxpr(gds_wrapper)(*ncargs)
-
-    for w in captured_warnings:
-        warnings.showwarning(w.message, w.category, w.filename, w.lineno)
-        # TODO: use a custom warning class for this in PennyLane to remove this
-        # string matching and make it more robust.
-        if "The graph-based decomposition system is unable" in str(w.message):  # pragma: no cover
-            graph_succeeded = False
-            warnings.warn(
-                "Falling back to the legacy decomposition system.",
-                UserWarning,
-            )
-
-    return final_jaxpr, graph_succeeded
