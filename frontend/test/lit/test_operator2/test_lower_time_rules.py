@@ -695,11 +695,10 @@ test_basis_rotation_decomposition()
 
 def test_ctrl_rule_is_traversed():
     """
-    Test that rules from a controlled version of a base gate are compiled and traversed from when
-    the circuit just has the base gate.
+    Test that rules from a controlled gate are compiled and traversed contextually.
 
     In this test, a C(NoParams) decomposes to a CompilableData, and a CompilableData decomposes to
-    a SingleParam. We test that just from the base NoParams, both rules are present.
+    a SingleParam. Both rules must be present from the controlled NoParams root.
     """
 
     @qp.register_resources({CompilableData(a="a", b="b", thing="thing", wires=Wire[1]): 1})
@@ -717,7 +716,7 @@ def test_ctrl_rule_is_traversed():
         @qp.qjit(capture=True, target="mlir")
         @qp.qnode(qp.device("null.qubit", wires=3))
         def ctrl_is_traversed():
-            NoParams(reg=0)
+            qp.ctrl(NoParams(reg=0), control=1)
             return qp.probs()
 
         print(ctrl_is_traversed.mlir)
