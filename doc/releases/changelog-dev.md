@@ -647,6 +647,12 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* MLIR passes that recreate `scf.for`, `scf.while`, `scf.if`, and `scf.index_switch` ops
+  (`convert-to-value-semantics`, `ctrl-lowering`, and `adjoint-lowering`) now preserve discardable
+  attributes such as `catalyst.estimated_iterations`, `catalyst.estimated_probability`, and
+  `catalyst.estimated_probabilities`, so resource analysis still sees compiler hints after those
+  rewrites.
+
 * `adjoint-lowering` no longer fails on gates whose parameter is a wide-integer tensor. Integer and
   boolean gate parameters (e.g. a `QROM` `tensor<Nxi64>` bitstring) are now recorded in a dedicated
   i64 cache buffer during adjoint reversal, zero-extended in and truncated out, instead of being

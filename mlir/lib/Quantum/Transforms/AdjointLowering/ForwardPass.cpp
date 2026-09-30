@@ -326,6 +326,8 @@ void AugmentedCircuitGenerator::visitOperation(scf::ForOp forOp, OpBuilder &buil
             generate(forOp.getRegion(), builder);
             cloneTerminatorClassicalOperands(forOp.getBody()->getTerminator(), builder);
         });
+    // Carry over hints such as `catalyst.estimated_iterations`.
+    newForOp->setDiscardableAttrs(forOp->getDiscardableAttrDictionary());
 
     mapResults(forOp, newForOp, argIdxMapping);
 }
@@ -377,6 +379,8 @@ void AugmentedCircuitGenerator::visitOperation(scf::WhileOp whileOp, OpBuilder &
                              // The frontend does not support putting quantum operations in the
                              // "Before" region, which only computes the iteration condition.
                              getRegionBuilder(whileOp.getAfter(), /*incrementCounter=*/true));
+    // Carry over hints such as `catalyst.estimated_iterations`.
+    newWhileOp->setDiscardableAttrs(whileOp->getDiscardableAttrDictionary());
 
     mapResults(whileOp, newWhileOp, argIdxMapping);
 
@@ -410,6 +414,8 @@ void AugmentedCircuitGenerator::visitOperation(scf::IndexSwitchOp switchOp, OpBu
 
     auto newSwitchOp = scf::IndexSwitchOp::create(builder, switchOp.getLoc(), classicalResultTypes,
                                                   arg, switchOp.getCases(), switchOp.getNumCases());
+    // Carry over hints such as `catalyst.estimated_probabilities`.
+    newSwitchOp->setDiscardableAttrs(switchOp->getDiscardableAttrDictionary());
 
     // Case and default regions are gotten by different APIs
     // Here we handle them separately.
@@ -454,6 +460,8 @@ void AugmentedCircuitGenerator::visitOperation(scf::IfOp ifOp, OpBuilder &builde
     auto newIfOp =
         scf::IfOp::create(builder, ifOp.getLoc(), condition, getRegionBuilder(ifOp.getThenRegion()),
                           getRegionBuilder(ifOp.getElseRegion()));
+    // Carry over hints such as `catalyst.estimated_probability`.
+    newIfOp->setDiscardableAttrs(ifOp->getDiscardableAttrDictionary());
 
     mapResults(ifOp, newIfOp, argIdxMapping);
 }

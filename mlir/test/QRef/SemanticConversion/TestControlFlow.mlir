@@ -903,3 +903,64 @@ func.func @test_switch(%arg0: index, %arg1: f64) attributes {quantum.node} {
 
     return
 }
+
+// -----
+
+// Resource hints on SCF ops must survive convert-to-value-semantics recreation.
+
+// CHECK-LABEL: test_preserves_scf_hints
+func.func @test_preserves_scf_hints(%cond: i1, %idx: index) attributes {quantum.node} {
+    %start = arith.constant 0 : index
+    %step = arith.constant 1 : index
+    %stop = arith.constant 37 : index
+    %c0 = arith.constant 0 : i64
+    %c1 = arith.constant 1 : i64
+    %n = arith.constant 5 : i64
+
+    // CHECK: [[qreg:%.+]] = quantum.alloc( 1) : !quantum.reg
+    %a = qref.alloc(1) : !qref.reg<1>
+    %q0 = qref.get %a[0] : !qref.reg<1> -> !qref.bit
+
+    // CHECK: scf.for
+    // CHECK: } {catalyst.estimated_iterations = 1.000000e+01 : f64}
+    scf.for %i = %start to %stop step %step {
+        qref.custom "Hadamard"() %q0 : !qref.bit
+        scf.yield
+    } {catalyst.estimated_iterations = 1.000000e+01 : f64}
+
+    // CHECK: scf.while
+    // CHECK: } attributes {catalyst.estimated_iterations = 2.500000e+00 : f64}
+    scf.while () : () -> () {
+        %cmp = arith.cmpi slt, %c0, %n : i64
+        scf.condition(%cmp)
+    } do {
+        qref.custom "PauliX"() %q0 : !qref.bit
+        scf.yield
+    } attributes {catalyst.estimated_iterations = 2.500000e+00 : f64}
+
+    // CHECK: scf.if
+    // CHECK: } {catalyst.estimated_probability = 7.500000e-01 : f64}
+    scf.if %cond {
+        qref.custom "PauliY"() %q0 : !qref.bit
+        scf.yield
+    } else {
+        scf.yield
+    } {catalyst.estimated_probability = 7.500000e-01 : f64}
+
+    // CHECK: scf.index_switch {{.+}} {catalyst.estimated_probabilities = [2.000000e-01, 3.000000e-01]}
+    scf.index_switch %idx {catalyst.estimated_probabilities = [2.000000e-01, 3.000000e-01]}
+    case 0 {
+        qref.custom "PauliZ"() %q0 : !qref.bit
+        scf.yield
+    }
+    case 1 {
+        scf.yield
+    }
+    default {
+        scf.yield
+    }
+
+    // CHECK: quantum.dealloc
+    qref.dealloc %a : !qref.reg<1>
+    return
+}
