@@ -903,3 +903,36 @@ func.func @test_switch(%arg0: index, %arg1: f64) attributes {quantum.node} {
 
     return
 }
+
+// -----
+
+// Region-bearing control flow outside the supported set (scf.if / scf.for / scf.while /
+// scf.index_switch) has no conversion rule, so it is rejected rather than silently left
+// unconverted. scf.execute_region stands in for any such op here.
+func.func @execute_region_in_body() attributes {quantum.node} {
+  %a = qref.alloc(1) : !qref.reg<1>
+  %q0 = qref.get %a[0] : !qref.reg<1> -> !qref.bit
+
+  // expected-error @+1 {{Only scf operations with regions that are supported are scf.if, scf.for, scf.while, and scf.index_switch, got: scf.execute_region}}
+  scf.execute_region {
+    qref.custom "Hadamard"() %q0 : !qref.bit
+    scf.yield
+  }
+
+  qref.dealloc %a : !qref.reg<1>
+  return
+}
+
+// -----
+
+// Purely classical scf.execute_region ops do not need a conversion rule and must be allowed.
+// CHECK-LABEL: func.func @classical_execute_region
+func.func @classical_execute_region() -> i32 attributes {quantum.node} {
+  %c = arith.constant 1 : i32
+  %y = scf.execute_region -> i32 {
+    %x = arith.addi %c, %c : i32
+    scf.yield %x : i32
+  }
+  return %y : i32
+}
+

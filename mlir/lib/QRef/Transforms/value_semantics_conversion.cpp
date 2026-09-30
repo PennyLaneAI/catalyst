@@ -52,6 +52,8 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Support/LLVM.h"
 #include "mlir/Support/WalkResult.h"
+#include "llvm/Support/Debug.h"
+#include "llvm/Support/DebugLog.h"
 
 #include "Catalyst/IR/CatalystOps.h"
 #include "MBQC/IR/MBQCOps.h"
@@ -107,17 +109,31 @@ LogicalResult ensureNoScfExecuteRegionOps(Operation *op) {
                     mbqc::RefGraphStatePrepOp>(op);
     };
 
-    WalkResult walkResult = op->walk([&](scf::ExecuteRegionOp executeRegionOp) {
-        WalkResult walkResultER = executeRegionOp->walk([&](Operation *innerOp) {
-            if (!isClassicalOp(innerOp)) {
-                executeRegionOp.emitError("scf.execute_region is not supported");
-                return WalkResult::interrupt();
-            }
-            return WalkResult::advance();
-        });
+    WalkResult walkResult = op->walk([&](Operation *opInWalk) {
+        if (isa<scf::SCFDialect>(opInWalk->getDialect()) &&
+            !isa<scf::IfOp, scf::WhileOp, scf::ForOp, scf::IndexSwitchOp>(opInWalk)) {
+            if (opInWalk->getNumRegions() > 0) {
+                WalkResult walkResultER = opInWalk->walk([&](Operation *innerOp) {
+                    if (!isClassicalOp(innerOp)) {
+                        llvm::errs()
+                            << "value semantics conversion only supports the following "
+                            << "scf ops: scf.if, scf.for, scf.while, scf.index_switch, but got "
+                            << opInWalk->getName().getStringRef() << "\n";
+                        opInWalk->emitError(
+                            "Only scf operations with regions that are supported "
+                            "are scf.if, scf.for, scf.while, and scf.index_switch, got: " +
+                            opInWalk->getName().getStringRef());
+                        LDBG() << opInWalk;
+                        return WalkResult::interrupt();
+                    }
+                    return WalkResult::advance();
+                });
 
-        if (walkResultER.wasInterrupted()) {
-            return WalkResult::interrupt();
+                if (walkResultER.wasInterrupted()) {
+                    return WalkResult::interrupt();
+                }
+                return WalkResult::advance();
+            }
         }
 
         return WalkResult::advance();
