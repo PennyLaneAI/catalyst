@@ -279,20 +279,6 @@ def handle_qnode(
 
     closed_jaxpr = ClosedJaxpr(qfunc_jaxpr, consts)
 
-    if self.decompose_tkwargs.get("stopping_condition"):
-        raise NotImplementedError(
-            "A stopping condition is not currently supported with catalyst decomposition."
-        )
-    if self.requires_decompose_lowering:
-        with warnings.catch_warnings():
-            warnings.simplefilter("error", qp.exceptions.DecompositionWarning)
-            closed_jaxpr, _ = _collect_and_compile_graph_solutions(
-                inner_jaxpr=closed_jaxpr.jaxpr,
-                consts=closed_jaxpr.consts,
-                tkwargs=self.decompose_tkwargs,
-                ncargs=non_const_args,
-            )
-
     decomposition_scope = DecompositionScope() if self._collect_decomp_rules else None
 
     def calling_convention(*args):
@@ -378,6 +364,12 @@ def _validate_decompose_tkwargs(tkwargs):
 # pylint: disable=too-many-positional-arguments
 def _handle_decompose_transform(self, inner_jaxpr, consts, non_const_args, tkwargs):
     """Route a captured ``qp.decompose`` onto the ``graph-decomposition`` pass.
+
+    ``qp.decompose`` is an alias for :func:`catalyst.passes.graph_decomposition`: both build the same
+    pass options and run the same C++ ``graph-decomposition`` pass, which solves and lowers the
+    decomposition. Inline ``fixed_decomps``/``alt_decomps`` rule bodies are registered into a local
+    decomposition scope so the trace-time rule-collection closure can capture them (the pass options
+    only carry rule *names*; the bodies come from PennyLane's decomposition registry).
     """
     # Local imports avoid an import cycle (catalyst.passes imports from_plxpr indirectly).
     from pennylane.decomposition import add_decomps, enabled_graph, local_decomps
