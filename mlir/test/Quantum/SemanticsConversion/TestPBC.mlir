@@ -60,8 +60,6 @@ func.func @test_PPR_op(%sw: i1) attributes {quantum.node} {
     %2 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
     %3 = quantum.extract %0[ 2] : !quantum.reg -> !quantum.bit
 
-    // The reference PPR acts in place, so the same qubit references thread through
-    // subsequent ops rather than being re-plumbed via new SSA values.
     // CHECK: pbc.ref.ppr ["X", "I", "Z"](4) [[q0]], [[q1]], [[q2]]
     // CHECK: pbc.ref.ppr ["Z", "Y", "X"](-2) [[q0]], [[q1]], [[q2]] cond(%arg0)
     %o:3 = pbc.ppr ["X", "I", "Z"](4) %1, %2, %3 : !quantum.bit, !quantum.bit, !quantum.bit
