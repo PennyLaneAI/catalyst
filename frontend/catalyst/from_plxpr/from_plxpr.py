@@ -346,51 +346,83 @@ def handle_qnode(
     )
 
 
-def _set_decompose_lowering_state(self):
-    """Set requires_decompose_lowering and decompose_tkwargs; raise if already set."""
+def _guard_single_decompose(self):
+    """Raise if a second decomposition transform is applied (not yet supported)."""
     if not self.requires_decompose_lowering:
         self.requires_decompose_lowering = True
     else:
         raise NotImplementedError("Multiple decomposition transforms are not yet supported.")
 
 
+# qp.decompose arguments the graph-decomposition pass supports (mapped 1:1). ``tkwargs`` holds only
+# the arguments the user passed, so any other key means an unsupported argument was set.
+_SUPPORTED_DECOMPOSE_TKWARGS = frozenset({"gate_set", "fixed_decomps", "alt_decomps"})
+
+
+def _validate_decompose_tkwargs(tkwargs):
+    """Reject qp.decompose arguments the graph-decomposition pass cannot honor.
+    """
+    unsupported = sorted(k for k in tkwargs if k not in _SUPPORTED_DECOMPOSE_TKWARGS)
+    if unsupported:
+        raise NotImplementedError(
+            f"qp.decompose argument(s) {unsupported} are not supported under qjit with graph-based "
+            "decomposition. Supported arguments are: 'gate_set', 'fixed_decomps', 'alt_decomps'."
+        )
+    if tkwargs.get("gate_set") is None:
+        raise ValueError(
+            "qp.decompose requires an explicit 'gate_set' under qjit; the graph-based decomposition "
+            "has no default target gate set."
+        )
+
+
 # pylint: disable=too-many-positional-arguments
 def _handle_decompose_transform(self, inner_jaxpr, consts, non_const_args, tkwargs):
-    _set_decompose_lowering_state(self)
+    """Route a captured ``qp.decompose`` onto the ``graph-decomposition`` pass.
+    """
+    # Local imports avoid an import cycle (catalyst.passes imports from_plxpr indirectly).
+    from pennylane.decomposition import add_decomps, enabled_graph, local_decomps
+
+    from catalyst.passes.builtin_passes import graph_decomposition
+
+    _guard_single_decompose(self)
+    _validate_decompose_tkwargs(tkwargs)
+
+    if not enabled_graph():
+        raise RuntimeError(
+            "qp.decompose under qjit requires graph-based decomposition. Call "
+            "qml.decomposition.enable_graph() before compiling."
+        )
+
+    fixed_decomps = tkwargs.get("fixed_decomps") or {}
+    alt_decomps = tkwargs.get("alt_decomps") or {}
+
+    # The pass receives inline rules by name only; the bodies must be discoverable through the
+    # trace-time rule closure, which reads the decomposition registry. That closure runs during the
+    # eval below (inside the local_decomps scope). The compile-time on-demand loader runs later,
+    # after the scope exits, so inline rules require rule collection to be enabled.
+    if (fixed_decomps or alt_decomps) and not self._collect_decomp_rules:
+        raise NotImplementedError(
+            "Inline fixed_decomps/alt_decomps with qp.decompose require rule collection "
+            "(collect_decomp_rules=True)."
+        )
 
     next_eval = copy(self)
-    # Update the decompose_gateset to be used by the quantum kernel primitive
-    # TODO: we originally wanted to treat decompose_gateset as a queue of
-    # gatesets to be used by the decompose-lowering pass at MLIR
-    # but this requires a C++ implementation of the graph-based decomposition
-    # which doesn't exist yet.
-    next_eval.decompose_tkwargs = tkwargs
+    with local_decomps():
+        for op, rule in fixed_decomps.items():
+            add_decomps(op, rule)
+        for op, rules in alt_decomps.items():
+            add_decomps(op, *rules)
 
-    # Note. We don't perform the compiler-specific decomposition here
-    # to be able to support multiple decomposition transforms
-    # and collect all the required gatesets
-    # as well as being able to support other transforms in between.
+        # Reusing the graph_decomposition transform (not a fork) guarantees identical pass options
+        # to the explicit catalyst.passes.graph_decomposition entry point.
+        bound_pass = graph_decomposition(
+            gate_set=tkwargs["gate_set"],
+            fixed_decomps=fixed_decomps or None,
+            alt_decomps=alt_decomps or None,
+        )
+        next_eval._pass_pipeline.insert(0, bound_pass)
 
-    # The compiler specific transformation will be performed
-    # in the qnode handler.
-
-    # Add the decompose-lowering pass to the start of the pipeline
-    t = qp.transform(pass_name="decompose-lowering")
-    pass_container = qp.transforms.core.BoundTransform(t)
-    next_eval._pass_pipeline.insert(0, pass_container)
-
-    # We still need to construct and solve the graph based on
-    # the current jaxpr based on the current gateset
-    # but we don't rewrite the jaxpr at this stage.
-
-    # gds_interpreter = DecompRuleInterpreter(*targs, **tkwargs)
-
-    # def gds_wrapper(*args):
-    #     return gds_interpreter.eval(inner_jaxpr, consts, *args)
-
-    # final_jaxpr = jax.make_jaxpr(gds_wrapper)(*args)
-    # return self.eval(final_jaxpr.jaxpr, consts, *non_const_args)
-    return next_eval.eval(inner_jaxpr, consts, *non_const_args)
+        return next_eval.eval(inner_jaxpr, consts, *non_const_args)
 
 
 # pylint: disable=too-many-arguments
