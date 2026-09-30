@@ -90,8 +90,7 @@ LogicalResult ensureNoReferenceSemanticsOps(Operation *op) {
 }
 
 // Only scf.if, scf.for, scf.while and scf.index_switch have conversion rules. A quantum-bearing
-// scf.execute_region must be rejected before conversion starts: converting the gates nested in its
-// region erases values that the region's own terminator still refers to. Purely classical
+// scf.execute_region must be rejected before conversion starts. Purely classical
 // scf.execute_region ops are left alone.
 LogicalResult ensureNoScfExecuteRegionOps(Operation *op) {
     auto hasQrefType = [](TypeRange types) {
