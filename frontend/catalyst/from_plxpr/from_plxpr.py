@@ -27,10 +27,10 @@ import pennylane as qp
 from jax.extend.core import ClosedJaxpr, Jaxpr
 from pennylane.capture import PlxprInterpreter, qnode_prim
 from pennylane.capture.primitives import transform_prim
-from pennylane.decomposition.utils import to_name
 from pennylane.transforms import decompose as pl_decompose
 
 from catalyst.backline import device_pass_pipeline, remote_device_lib
+from catalyst.decomposition.capture_session import DecompositionScope
 from catalyst.device import extract_backend_info
 from catalyst.device.qjit_device import is_dynamic_wires
 from catalyst.from_plxpr.decompose import DecompRuleInterpreter
@@ -48,7 +48,10 @@ from catalyst.jax_primitives import (
 from catalyst.utils.patching import Patcher
 
 from .device_utils import create_device_preprocessing_pipeline
-from .qfunc_interpreter import PLxPRToQuantumJaxprInterpreter
+from .qfunc_interpreter import (
+    PLxPRToQuantumJaxprInterpreter,
+    capture_and_bind_kernel_rules,
+)
 
 # dummy hop (higher order primitive) is used to just return a jaxpr
 # produced inside of a another jaxpr
@@ -290,6 +293,8 @@ def handle_qnode(
                 ncargs=non_const_args,
             )
 
+    decomposition_scope = DecompositionScope() if self._collect_decomp_rules else None
+
     def calling_convention(*args):
         device_init_p.bind(
             shots,
@@ -305,23 +310,19 @@ def handle_qnode(
         self.init_qreg = qreg
 
         converter = PLxPRToQuantumJaxprInterpreter(
-            device, shots, self.init_qreg, {}, collect_decomp_rules=self._collect_decomp_rules
+            device,
+            shots,
+            self.init_qreg,
+            {},
+            decomposition_scope=decomposition_scope,
         )
         retvals = converter(closed_jaxpr, *args)
+        # Discover and inject all relevant decomposition rules for this QNode as module functions.
+        capture_and_bind_kernel_rules(converter)
         qref_dealloc_p.bind(self.init_qreg)
         device_release_p.bind()
         return retvals
 
-    if self.requires_decompose_lowering:
-        # Add gate_set attribute to the quantum kernel primitive
-        # decompose_gatesets is treated as a queue of gatesets to be used
-        # but we only support a single gateset for now in from_plxpr
-        # as supporting multiple gatesets requires an MLIR/C++ graph-decomposition
-        # implementation. The current Python implementation cannot be mixed
-        # with other transforms in between.
-        gateset = [to_name(op) for op in self.decompose_tkwargs.get("gate_set", [])]
-        gateset = list(sorted(gateset))  # consistent ordering for testing
-        setattr(qnode, "decompose_gatesets", [gateset])
     # The device may require passes of its own, e.g. a backline placement naming a QEC code implies
     # implicit encoding applied to it. Therefore we append the pass pipeline with the qec lowering
     # passes.
