@@ -530,7 +530,7 @@ jobs:
 
     - name: Install PennyLane branch
       run: |
-        pip install --no-deps --force git+https://github.com/PennyLaneAI/pennylane@feat/qpe-only-acc-ops
+        pip install --no-deps --force git+https://github.com/PennyLaneAI/pennylane@feat/port-qpe-to-op2
 
     - name: Verify Graphviz installation
       run: |
