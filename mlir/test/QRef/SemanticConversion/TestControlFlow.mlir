@@ -913,7 +913,7 @@ func.func @execute_region_in_body() attributes {quantum.node} {
   %a = qref.alloc(1) : !qref.reg<1>
   %q0 = qref.get %a[0] : !qref.reg<1> -> !qref.bit
 
-  // expected-error @+1 {{Only scf operations with regions that are supported are scf.if, scf.for, scf.while, and scf.index_switch, got: scf.execute_region}}
+  // expected-error @+1 {{Value semantics conversion only supports the following scf operations: scf.if, scf.for, scf.while, and scf.index_switch, got: scf.execute_region}}
   scf.execute_region {
     qref.custom "Hadamard"() %q0 : !qref.bit
     scf.yield

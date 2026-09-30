@@ -74,7 +74,7 @@ LogicalResult ensureNoValueSemanticsOps(Operation *op) {
 // Only scf.if, scf.for, scf.while and scf.index_switch have conversion rules. Any other
 // region-bearing scf op must be rejected before conversion starts: converting the gates nested in
 // its region erases values that the region's own terminator still refers to.
-LogicalResult ensureNoScfExecuteRegionOps(Operation *op) {
+LogicalResult ensureNoScfUnsupportedOps(Operation *op) {
     auto hasQrefType = [](TypeRange types) {
         return llvm::any_of(types, llvm::IsaPred<qref::QubitType, qref::QuregType>);
     };
@@ -90,30 +90,32 @@ LogicalResult ensureNoScfExecuteRegionOps(Operation *op) {
                     mbqc::RefGraphStatePrepOp>(op);
     };
 
-    WalkResult walkResult = op->walk([&](Operation *opInWalk) {
-        if (isa<scf::SCFDialect>(opInWalk->getDialect()) &&
-            !isa<scf::IfOp, scf::WhileOp, scf::ForOp, scf::IndexSwitchOp>(opInWalk)) {
-            if (opInWalk->getNumRegions() > 0) {
-                WalkResult walkResultER = opInWalk->walk([&](Operation *innerOp) {
-                    if (!isClassicalOp(innerOp)) {
-                        opInWalk->emitError(
-                            "Only scf operations with regions that are supported "
-                            "are scf.if, scf.for, scf.while, and scf.index_switch, got: " +
-                            opInWalk->getName().getStringRef());
-                        LDBG() << innerOp;
-                        return WalkResult::interrupt();
-                    }
-                    return WalkResult::advance();
-                });
+    auto isUnsupportedScfRegionOp = [](Operation *o) {
+        return isa<scf::SCFDialect>(o->getDialect()) &&
+               !isa<scf::IfOp, scf::WhileOp, scf::ForOp, scf::IndexSwitchOp>(o) &&
+               o->getNumRegions() > 0;
+    };
 
-                if (walkResultER.wasInterrupted()) {
-                    return WalkResult::interrupt();
-                }
-                return WalkResult::advance();
-            }
+    auto containsNonClassicalOp = [&](Operation *o) {
+        return o
+            ->walk([&](Operation *inner) {
+                return isClassicalOp(inner) ? WalkResult::advance() : WalkResult::interrupt();
+            })
+            .wasInterrupted();
+    };
+
+    WalkResult walkResult = op->walk([&](Operation *o) {
+        if (!(isUnsupportedScfRegionOp(o) && containsNonClassicalOp(o))) {
+            return WalkResult::advance();
         }
 
-        return WalkResult::advance();
+        StringRef name = o->getName().getStringRef();
+
+        o->emitError(
+            "Reference semantics conversion only supports the following scf operations: scf.if, "
+            "scf.for, scf.while, and scf.index_switch, got: ")
+            << name;
+        return WalkResult::interrupt();
     });
 
     if (walkResult.wasInterrupted()) {
@@ -1032,7 +1034,7 @@ struct ReferenceSemanticsConversionPass
         // Convert the main quantum.mode functions
         for (auto targetFunc : targetFuncs) {
             QubitValueTracker tracker;
-            if (failed(ensureNoScfExecuteRegionOps(targetFunc))) {
+            if (failed(ensureNoScfUnsupportedOps(targetFunc))) {
                 return signalPassFailure();
             }
             handleRegion(builder, targetFunc.getBody(), tracker);
@@ -1073,7 +1075,7 @@ struct ReferenceSemanticsConversionPass
         // By default, scc iterates call graph in post order (callee before caller), so we reverse
         // the visit order.
         for (func::FuncOp subroutine : llvm::reverse(subroutinesPostOrder)) {
-            if (failed(ensureNoScfExecuteRegionOps(subroutine))) {
+            if (failed(ensureNoScfUnsupportedOps(subroutine))) {
                 return signalPassFailure();
             }
             QubitValueTracker tracker;
