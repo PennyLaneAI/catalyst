@@ -1683,6 +1683,23 @@ class TestVerboseSolution:
         assert "Decomposition Solution:" not in capture.out + capture.err
 
 
+def test_gate_already_in_gateset():
+    """
+    Test that decomposing a gate that's already in the gateset works.
+    """
+
+    @qp.qjit(capture=True)
+    @graph_decomposition(gate_set={"Hadamard"})
+    @qp.qnode(qp.device("lightning.qubit", wires=1))
+    def circuit():
+        qp.Hadamard(0)
+        return qp.expval(qp.X(0))
+
+    result = circuit()
+    assert np.allclose(result, 1.0)
+    assert "llvm.call @__catalyst__qis__Hadamard" in circuit.mlir_opt
+
+
 class TestCustomRuleApplication:
     """Integration tests for applying custom decomposition rules end-to-end."""
 
