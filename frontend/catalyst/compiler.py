@@ -184,10 +184,25 @@ class LinkerDriver:
         if os.path.isfile(os.path.join(rt_lib_path, rt_executor_so)):
             default_flags.append("-lrt_executor")
 
+        rt_transport_so = "librt_transport" + file_extension
+        if os.path.isfile(os.path.join(rt_lib_path, rt_transport_so)):
+            default_flags.append("-lrt_transport")
+
         # If OQD runtime capi is built, link to it as well
         # TODO: This is not ideal and should be replaced when the compiler is device aware
         if os.path.isfile(os.path.join(rt_lib_path, "librt_OQD_capi" + file_extension)):
             default_flags.append("-lrt_OQD_capi")
+
+        # Shared libraries exporting symbols reached by a local `runtime_call`, recorded on the
+        # module via `catalyst.runtime_artifacts` and collected into the options.
+        for artifact_path in options.runtime_artifacts:
+            artifact_path = os.path.abspath(artifact_path)
+            dir_name = os.path.dirname(artifact_path)
+            default_flags += [
+                f"-Wl,-rpath,{dir_name}",
+                f"-L{dir_name}",
+                artifact_path,
+            ]
 
         return default_flags
 
@@ -302,27 +317,37 @@ def _get_catalyst_cli_cmd(*args, stdin=None):
     return cmd
 
 
-def _catalyst(*args, stdin=None, text=True):
+def _catalyst(*args, stdin=None, text=True, stderr_return=False):
     """Raw interface to catalyst
 
     echo ${stdin} | catalyst *args -
     catalyst *args
     """
     cmd = _get_catalyst_cli_cmd(*args, stdin=stdin)
+
+    if sys.stderr.isatty():
+        cmd.insert(1, "--color")
+
     try:
         result = subprocess.run(cmd, input=stdin, check=True, capture_output=True, text=text)
+
+        # Capture the diagnostic output from the compiler
+        if stderr_return and result.stderr:
+            stderr = result.stderr.decode() if isinstance(result.stderr, bytes) else result.stderr
+            print(stderr, end="", file=sys.stderr)
+
         return result.stdout
     except subprocess.CalledProcessError as e:
         raise CompileError(f"catalyst failed with error code {e.returncode}: {e.stderr}") from e
 
 
-def _quantum_opt(*args, stdin=None, text=True):
+def _quantum_opt(*args, stdin=None, text=True, stderr_return=False):
     """Raw interface to quantum-opt
 
     echo ${stdin} | catalyst --tool=opt *args -
     catalyst --tool=opt *args
     """
-    return _catalyst(("--tool", "opt"), *args, stdin=stdin, text=text)
+    return _catalyst(("--tool", "opt"), *args, stdin=stdin, text=text, stderr_return=stderr_return)
 
 
 def canonicalize(*args, stdin=None, options: Optional[CompileOptions] = None):
@@ -404,6 +429,7 @@ def to_mlir_opt(
     options: Optional[CompileOptions] = None,
     using_python_compiler=False,
     workspace=None,
+    stderr_return=True,
 ):
     """echo ${input} | catalyst --tool=opt *args *opts -"""
     # Check if we need to use the Python interface for xDSL passes
@@ -417,12 +443,12 @@ def to_mlir_opt(
 
     # These are the options that may affect compilation
     if not options:
-        return _quantum_opt(*args, stdin=stdin)
+        return _quantum_opt(*args, stdin=stdin, stderr_return=stderr_return)
 
     opts = _options_to_cli_flags(options)
     if workspace is not None:
         opts += [("--workspace", str(workspace))]
-    return _quantum_opt(*opts, *args, stdin=stdin)
+    return _quantum_opt(*opts, *args, stdin=stdin, stderr_return=stderr_return)
 
 
 class Compiler:

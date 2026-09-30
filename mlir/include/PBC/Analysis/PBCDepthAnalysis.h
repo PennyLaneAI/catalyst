@@ -29,7 +29,7 @@ namespace pbc {
 // PBC depth data stored in ResourceResult::extensions.
 class PBCDepthExtension : public ResourceResultExtension {
   public:
-    llvm::StringRef name() const override { return "depth"; }
+    llvm::StringRef name() const override { return "pbc_depth"; }
 
     llvm::json::Value toJson() const override;
 
@@ -46,7 +46,7 @@ class PBCDepthExtension : public ResourceResultExtension {
 // Computes PBC depth for a region into a PBCDepthExtension.
 class PBCDepthAnalysis : public ResourceAnalysisExtensionOf<PBCDepthExtension> {
   public:
-    llvm::StringRef name() const override { return "depth"; }
+    llvm::StringRef name() const override { return "pbc_depth"; }
 
   protected:
     void analyze(mlir::Region &region, PBCDepthExtension &ext, bool isAdjoint) override;

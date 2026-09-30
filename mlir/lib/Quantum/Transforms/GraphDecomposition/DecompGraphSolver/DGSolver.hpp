@@ -25,14 +25,12 @@
 
 #pragma once
 
-#include <optional>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
 #include "DGBuilder.hpp"
 #include "DGTypes.hpp"
-#include "DGUtils.hpp"
 
 namespace DecompGraph::Solver {
 
@@ -68,6 +66,7 @@ class DecompositionSolver {
         solvedMap{};
     std::unordered_set<Core::OperatorNode, Core::OperatorNodeHash> visited{};
     std::vector<Core::OperatorNode> solvingStack{};
+    std::unordered_set<Core::OperatorNode, Core::OperatorNodeHash> unsolvableOps{};
 
     /**
      * @brief basisRule constructs a ChosenDecompRule for a target gate operator,

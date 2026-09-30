@@ -35,9 +35,11 @@ class ResourceAnalysis {
 
     // walk all func::FuncOps within the operation.
     explicit ResourceAnalysis(ModuleOp moduleOp,
-                              ArrayRef<ExtensionProvider> extensionProviders = {});
+                              ArrayRef<ExtensionProvider> extensionProviders = {},
+                              bool collectDetailedOperations = false);
     explicit ResourceAnalysis(func::FuncOp funcOp,
-                              ArrayRef<ExtensionProvider> extensionProviders = {});
+                              ArrayRef<ExtensionProvider> extensionProviders = {},
+                              bool collectDetailedOperations = false);
 
     const llvm::StringMap<ResourceResult> &getResults() const { return funcResults; }
 
@@ -55,6 +57,8 @@ class ResourceAnalysis {
     const ResourceResult *getFlattenedResource(llvm::StringRef funcName) const;
 
   private:
+    bool collectDetailedOperations;
+
     // per-function resource counts
     llvm::StringMap<ResourceResult> funcResults;
 
@@ -79,16 +83,24 @@ class ResourceAnalysis {
     std::string makeUniqueSyntheticName(llvm::StringRef prefix, int64_t &counter);
 
     // analyze a region and accumulate results
-    void analyzeRegion(Region &region, ResourceResult &result, bool isAdjoint);
+    void analyzeRegion(Region &region, ResourceResult &result, bool isAdjoint,
+                       unsigned numControlQubits);
 
-    void analyzeForLoop(scf::ForOp forOp, ResourceResult &result, bool isAdjoint);
-    void analyzeWhileLoop(scf::WhileOp whileOp, ResourceResult &result, bool isAdjoint);
-    void analyzeIfOp(scf::IfOp ifOp, ResourceResult &result, bool isAdjoint);
-    void analyzeIndexSwitchOp(scf::IndexSwitchOp switchOp, ResourceResult &result, bool isAdjoint);
-    void analyzePBCLayer(pbc::LayerOp layerOp, ResourceResult &result, bool isAdjoint);
+    void analyzeForLoop(scf::ForOp forOp, ResourceResult &result, bool isAdjoint,
+                        unsigned numControlQubits);
+    void analyzeWhileLoop(scf::WhileOp whileOp, ResourceResult &result, bool isAdjoint,
+                          unsigned numControlQubits);
+    void analyzeIfOp(scf::IfOp ifOp, ResourceResult &result, bool isAdjoint,
+                     unsigned numControlQubits);
+    void analyzeIndexSwitchOp(scf::IndexSwitchOp switchOp, ResourceResult &result, bool isAdjoint,
+                              unsigned numControlQubits);
+    void analyzePBCLayer(pbc::LayerOp layerOp, ResourceResult &result, bool isAdjoint,
+                         unsigned numControlQubits);
 
     // categorize and count a single operation
-    void collectOperation(Operation *op, ResourceResult &result, bool isAdjoint) const;
+    void collectOperation(Operation *op, ResourceResult &result, bool isAdjoint,
+                          unsigned numControlQubits) const;
+    void collectDetailedOperation(Operation *op, ResourceResult &result, bool isAdjoint) const;
 };
 
 } // namespace catalyst

@@ -23,7 +23,7 @@ namespace catalyst::transport {
 /**
  * @brief Memory kind: selects the allocation and registration path.
  */
-enum class MemKind : std::uint8_t {
+enum class MemKind : int {
     CpuRam,
     GpuHbm,
     Ddr,
@@ -59,10 +59,10 @@ struct PeerRef {
 };
 
 /**
- * @brief Configuration for the data-movement channel a session uses.
+ * @brief Transport kind a session uses for request/reply movement.
  */
 struct ChannelDesc {
-    std::string data_path = "cpu_verbs";
+    std::string transport = "rdma";
 };
 
 /**
@@ -98,6 +98,16 @@ class TransportSession {
      * @return `MemRegion` The allocated and registered region.
      */
     virtual MemRegion alloc_memory(std::size_t size, MemKind kind) = 0;
+
+    /**
+     * @brief Where this backend wants the regions the core provisions for it.
+     *
+     * The core does not know which memory a backend can register; a device-side one may accept
+     * only its own. Reported here so the core asks for what the backend supports.
+     *
+     * @return `MemKind`
+     */
+    virtual MemKind preferred_mem_kind() const { return MemKind::CpuRam; }
 
     /**
      * @brief Advertise a local region and receive the peer's region over the out-of-band channel.

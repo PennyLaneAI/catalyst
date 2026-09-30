@@ -608,23 +608,26 @@ def test_jvpvjp_argument_checks(diff_method, capture_mode):
     for r_j, r_c in zip(res_jax, res_cat):
         assert_allclose(r_j, r_c)
 
-    with pytest.raises(ValueError, match="must be a Sequence"):
+    @qjit(capture=capture_mode)
+    def C_workflow_bad1():
+        return qp.jvp(f, 33, tuple(t), argnums=list(range(len(x))))
 
-        @qjit(capture=capture_mode)
-        def C_workflow_bad1():
-            return qp.jvp(f, 33, tuple(t), argnums=list(range(len(x))))
+    with pytest.raises(ValueError, match="must be a Sequence"):
+        C_workflow_bad1()
+
+    @qjit(capture=capture_mode)
+    def C_workflow_bad2():
+        return qp.vjp(f, list(x), 33, argnums=list(range(len(x))))
 
     with pytest.raises(TypeError, match="function output params and cotangents arguments"):
+        C_workflow_bad2()
 
-        @qjit(capture=capture_mode)
-        def C_workflow_bad2():
-            return qp.vjp(f, list(x), 33, argnums=list(range(len(x))))
+    @qjit(capture=capture_mode)
+    def C_workflow_bad3():
+        return qp.vjp(f, x, ct, argnums="invalid")
 
     with pytest.raises(ValueError, match="argnums should be an integer or a Sequence of integers"):
-
-        @qjit(capture=capture_mode)
-        def C_workflow_bad3():
-            return qp.vjp(f, x, ct, argnums="invalid")
+        C_workflow_bad3()
 
 
 @pytest.mark.parametrize("diff_method", diff_methods)
@@ -868,17 +871,18 @@ def test_jvp_argument_type_checks_incompatible_n_inputs(diff_method, capture_mod
     and tangent arguments are incompatible.
     """
 
+    @qjit(capture=capture_mode)
+    def C_workflow():
+        # If `f` takes 1 differentiable param (argnums=[0]), then `tangents` must have length 1
+        x = (1.0,)
+        tangents = (1.0, 1.0)
+        return qp.jvp(f_R1_to_R2, x, tangents, method=diff_method, argnums=[0])
+
     with pytest.raises(
         TypeError,
         match=("number of tangents and number of differentiable parameters in"),
     ):
-
-        @qjit(capture=capture_mode)
-        def C_workflow():
-            # If `f` takes 1 differentiable param (argnums=[0]), then `tangents` must have length 1
-            x = (1.0,)
-            tangents = (1.0, 1.0)
-            return qp.jvp(f_R1_to_R2, x, tangents, method=diff_method, argnums=[0])
+        C_workflow()
 
 
 @pytest.mark.parametrize("diff_method", diff_methods)
@@ -887,14 +891,15 @@ def test_jvp_argument_type_checks_incompatible_input_types(diff_method, capture_
     params and tangent arguments are incompatible.
     """
 
-    with pytest.raises(TypeError, match="function params and tangents arguments to "):
+    @qjit(capture=capture_mode)
+    def C_workflow():
+        # If `x` has type float, then `tangents` should also have type float
+        x = (1.0,)
+        tangents = (1,)
+        return qp.jvp(f_R1_to_R2, x, tangents, method=diff_method, argnums=[0])
 
-        @qjit(capture=capture_mode)
-        def C_workflow():
-            # If `x` has type float, then `tangents` should also have type float
-            x = (1.0,)
-            tangents = (1,)
-            return qp.jvp(f_R1_to_R2, x, tangents, method=diff_method, argnums=[0])
+    with pytest.raises(TypeError, match="function params and tangents arguments to "):
+        C_workflow()
 
 
 @pytest.mark.parametrize("diff_method", diff_methods)
@@ -903,17 +908,18 @@ def test_jvp_argument_type_checks_incompatible_input_shapes(diff_method, capture
     params and tangent arguments are incompatible.
     """
 
+    @qjit(capture=capture_mode)
+    def C_workflow():
+        # If `x` has shape (3,), then `tangents` must also have shape (3,),
+        # but it has shape (4,)
+        x = jnp.array([2.0, 3.0, 4.0])
+        tangents = jnp.ones([4], dtype=float)
+        return qp.jvp(g_R3_to_R2, [1, x], [tangents], method=diff_method, argnums=[1])
+
     with pytest.raises(
         ValueError, match="jvp called with different function params and tangent shapes"
     ):
-
-        @qjit(capture=capture_mode)
-        def C_workflow():
-            # If `x` has shape (3,), then `tangents` must also have shape (3,),
-            # but it has shape (4,)
-            x = jnp.array([2.0, 3.0, 4.0])
-            tangents = jnp.ones([4], dtype=float)
-            return qp.jvp(g_R3_to_R2, [1, x], [tangents], method=diff_method, argnums=[1])
+        C_workflow()
 
 
 @pytest.mark.parametrize("diff_method", diff_methods)
@@ -940,17 +946,18 @@ def test_vjp_argument_type_checks_incompatible_n_inputs(diff_method):
     and cotangent arguments are incompatible.
     """
 
+    @qjit
+    def C_workflow():
+        # If `f` returns two outputs, then `cotangents` must have length 2
+        x = (1.0,)
+        cotangents = (1.0,)
+        return C_vjp(f_R1_to_R2, x, cotangents, method=diff_method, argnums=[0])
+
     with pytest.raises(
         TypeError,
         match=("number of cotangent and number of function output parameters in"),
     ):
-
-        @qjit
-        def C_workflow():
-            # If `f` returns two outputs, then `cotangents` must have length 2
-            x = (1.0,)
-            cotangents = (1.0,)
-            return C_vjp(f_R1_to_R2, x, cotangents, method=diff_method, argnums=[0])
+        C_workflow()
 
 
 @pytest.mark.parametrize("diff_method", diff_methods)
@@ -960,17 +967,18 @@ def test_vjp_argument_type_checks_incompatible_input_types(diff_method, vjp_fn, 
     and cotangent arguments are incompatible.
     """
 
+    @qjit(capture=capture_mode)
+    def C_workflow():
+        # If `x` has type float, then `cotangents` should also have type float
+        x = (1.0,)
+        cotangents = (1, 1)
+        return vjp_fn(f_R1_to_R2, x, cotangents, method=diff_method, argnums=[0])
+
     with pytest.raises(
         TypeError,
         match="function output params and cotangents arguments to ",
     ):
-
-        @qjit(capture=capture_mode)
-        def C_workflow():
-            # If `x` has type float, then `cotangents` should also have type float
-            x = (1.0,)
-            cotangents = (1, 1)
-            return vjp_fn(f_R1_to_R2, x, cotangents, method=diff_method, argnums=[0])
+        C_workflow()
 
 
 @pytest.mark.parametrize("diff_method", diff_methods)
@@ -979,18 +987,20 @@ def test_vjp_argument_type_checks_incompatible_input_shapes(diff_method, vjp_fn,
     """Tests error handling of Catalyst's vjp when the shapes of the function output params
     and cotangent arguments are incompatible.
     """
+
+    @qjit(capture=capture_mode)
+    def C_workflow():
+        # If `f` returns object with shape (2,), then `cotangents` must also have
+        # shape (2,), but it has shape (3,)
+        x = jnp.array([2.0, 3.0, 4.0])
+        cotangents = jnp.ones([3], dtype=float)
+        return vjp_fn(g_R3_to_R2, [1, x], [cotangents], method=diff_method, argnums=[1])
+
     with pytest.raises(
         ValueError,
         match="vjp called with different function output params and cotangent shapes",
     ):
-
-        @qjit(capture=capture_mode)
-        def C_workflow():
-            # If `f` returns object with shape (2,), then `cotangents` must also have
-            # shape (2,), but it has shape (3,)
-            x = jnp.array([2.0, 3.0, 4.0])
-            cotangents = jnp.ones([3], dtype=float)
-            return vjp_fn(g_R3_to_R2, [1, x], [cotangents], method=diff_method, argnums=[1])
+        C_workflow()
 
 
 if __name__ == "__main__":

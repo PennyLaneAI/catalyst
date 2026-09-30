@@ -38,9 +38,6 @@ inline constexpr llvm::StringRef target_gate_attr_name = "target_gate";
 /// Attribute holding the target gate set a circuit function should decompose into.
 inline constexpr llvm::StringRef decomp_gateset_attr_name = "decomp_gateset";
 
-/// True if @p func is a decomposition rule (i.e. carries the `target_gate` attribute).
-bool isDecompositionFunction(mlir::func::FuncOp func);
-
 /// The target gate a decomposition rule decomposes, or an empty ref if @p func is not a rule.
 llvm::StringRef getTargetGateName(mlir::func::FuncOp func);
 

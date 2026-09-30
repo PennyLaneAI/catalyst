@@ -76,6 +76,7 @@ with Patcher(
         AssertionOp,
         CallbackCallOp,
         CallbackOp,
+        CustomCallOp,
         PrintOp,
         SymbolicArrayOp,
     )
@@ -130,11 +131,17 @@ with Patcher(
         create_call_op,
         get_cached,
         get_call_jaxpr,
+        get_mlir_attribute_from_pyval,
         get_symbolref,
         lower_callable,
         lower_jaxpr,
+        set_estimated_iterations_attr,
+        set_estimated_probabilities_attr,
+        set_estimated_probability_attr,
+        unconditional_to_conditional_if_probs,
     )
 
+from pennylane.backline.runtime import get_runtime_call_prim
 from pennylane.capture.primitives import cond_prim as pl_cond_prim
 from pennylane.capture.primitives import for_loop_prim as pl_for_loop_prim
 from pennylane.capture.primitives import jacobian_prim as pl_jac_prim
@@ -157,6 +164,7 @@ from catalyst.jax_extras import (
 )
 from catalyst.utils.calculate_grad_shape import Signature, calculate_grad_shape
 from catalyst.utils.extra_bindings import FromElementsOp, TensorExtractOp
+from catalyst.utils.runtime_artifacts import record_runtime_artifact
 from catalyst.utils.types import convert_shaped_arrays_to_tensors
 
 # pylint: disable=unused-argument,too-many-lines,too-many-statements,protected-access
@@ -349,6 +357,8 @@ quantum_kernel_p = core.CallPrimitive("quantum_kernel")
 quantum_kernel_p.multiple_results = True
 decomprule_p = core.Primitive("decomposition_rule")
 decomprule_p.multiple_results = True
+decomp_definition_p = core.Primitive("decomposition_rule_definition")
+decomp_definition_p.multiple_results = True
 
 
 def decomposition_rule(func=None, *, is_qreg=True, num_params=0, pauli_word=None, op_type=None):
@@ -547,6 +557,25 @@ def _python_callback_lowering(
 
 
 #
+# runtime_call
+#
+def _runtime_call_lowering(
+    jax_ctx: mlir.LoweringRuleContext, *operands, signature, symbol, out_bytes, dispatch, library
+):
+    """Lower a `qp.runtime_call` operation to a `catalyst.custom_call` on the runtime symbol"""
+    # pylint: disable=unused-argument
+    results_ty = list(convert_shaped_arrays_to_tensors(jax_ctx.avals_out))
+    call_op = CustomCallOp(results_ty, list(operands), symbol, number_original_arg=len(operands))
+    if dispatch is not None:
+        call_op.operation.attributes["backend_config"] = ir.DictAttr.get(
+            {"dispatch": ir.StringAttr.get(dispatch)}
+        )
+    elif library:
+        record_runtime_artifact(jax_ctx.module_context.module.operation, library)
+    return call_op.results
+
+
+#
 # print
 #
 @print_p.def_abstract_eval
@@ -617,17 +646,40 @@ def _func_lowering(ctx, *args, call_jaxpr, fn):
 #
 # Decomp rule
 #
-@decomprule_p.def_abstract_eval
-def _decomposition_rule_abstract(*, pyfun, func_jaxpr, is_qreg=False, num_params=None, **params):
+@decomprule_p.def_abstract_eval  # TODO: remove this primitive once DecompRuleInterpreter is gone
+def _decomposition_rule_abstract(*, pyfun, func_jaxpr, is_qreg, num_params):
     return ()
 
 
-def _decomposition_rule_lowering(ctx, *, pyfun, func_jaxpr, **params):
-    """Lower a quantum decomposition rule into MLIR in a single step process.
-    The step is the compilation of the definition of the function fn.
-    """
+@decomp_definition_p.def_abstract_eval
+def _decomposition_definition_abstract(
+    *, pyfun, func_jaxpr, target_gate, resources, frontend_name, num_wires
+):
+    return ()
 
-    lower_callable(ctx, pyfun, func_jaxpr, **params)
+
+def _decomposition_definition_lowering(
+    ctx, *, pyfun, func_jaxpr, target_gate, resources, frontend_name, num_wires
+):
+    """Lower a finalized Catalyst decomposition-rule as a function definition."""
+    # differentiate functions in the lowering cache
+    metadata = (target_gate, resources, frontend_name, num_wires)
+    func_op = lower_callable(ctx, pyfun, func_jaxpr, metadata=metadata)
+
+    func_op.attributes["target_gate"] = get_mlir_attribute_from_pyval(target_gate)
+    func_op.attributes["sym_visibility"] = ir.StringAttr.get("private")
+
+    # TODO: remove extra field/branch with DecompRuleInterpreter removal
+    if resources is not None:
+        func_op.attributes["resources"] = get_mlir_attribute_from_pyval(
+            {"operations": dict(resources)}
+        )
+        assert frontend_name is not None
+        func_op.attributes["frontend_name"] = get_mlir_attribute_from_pyval(frontend_name)
+    else:
+        assert num_wires is not None
+        func_op.attributes["num_wires"] = get_mlir_attribute_from_pyval(num_wires)
+
     return ()
 
 
@@ -2234,12 +2286,15 @@ def _cond_lowering(
     *preds_and_branch_args_plus_consts: tuple,
     branch_jaxprs: List[core.ClosedJaxpr],
     num_implicit_outputs: int,
+    estimated_probabilities: tuple[float, ...] | None = None,
 ):
     result_types = [mlir.aval_to_ir_types(a)[0] for a in jax_ctx.avals_out]
     num_preds = len(branch_jaxprs) - 1
     preds = preds_and_branch_args_plus_consts[:num_preds]
     branch_args_plus_consts = preds_and_branch_args_plus_consts[num_preds:]
     flat_args_plus_consts = mlir.flatten_ir_values(branch_args_plus_consts)
+
+    conditional_probs = unconditional_to_conditional_if_probs(estimated_probabilities)
 
     # recursively lower if-else chains to nested IfOps
     def emit_branches(preds, branch_jaxprs, ip):
@@ -2248,6 +2303,9 @@ def _cond_lowering(
         with ip:
             pred_extracted = TensorExtractOp(ir.IntegerType.get_signless(1), preds[0], []).result
             if_op_scf = IfOp(pred_extracted, result_types, hasElse=True)
+            if conditional_probs is not None:
+                depth = num_preds - len(preds)
+                set_estimated_probability_attr(if_op_scf.operation, conditional_probs[depth])
             true_jaxpr = branch_jaxprs[0]
             if_block = if_op_scf.then_block
 
@@ -2305,11 +2363,14 @@ def _pl_cond_lowering(
     jaxpr_branches,
     consts_slices,
     args_slice,
+    estimated_probabilities: tuple[float, ...] | None = None,
 ):
     result_types = [mlir.aval_to_ir_types(a)[0] for a in jax_ctx.avals_out]
     num_preds = len(jaxpr_branches) - 1
     preds = invals[:num_preds]
     args = invals[slice(*args_slice)]
+
+    conditional_probs = unconditional_to_conditional_if_probs(estimated_probabilities)
 
     # recursively lower if-else chains to nested IfOps
     def emit_branches(preds, sub_branches, sub_consts_slices, insertion_point):
@@ -2320,6 +2381,9 @@ def _pl_cond_lowering(
         with insertion_point:
             pred_extracted = TensorExtractOp(ir.IntegerType.get_signless(1), preds[0], []).result
             if_op_scf = IfOp(pred_extracted, result_types, hasElse=True)
+            if conditional_probs is not None:
+                depth = num_preds - len(preds)
+                set_estimated_probability_attr(if_op_scf.operation, conditional_probs[depth])
             true_jaxpr = sub_branches[0]
             if_block = if_op_scf.then_block
 
@@ -2414,6 +2478,7 @@ def _switch_lowering(
     *index_and_cases_and_branch_args_plus_consts: tuple,
     branch_jaxprs: List[core.ClosedJaxpr],
     num_implicit_outputs: int,
+    estimated_probabilities: tuple[float, ...] | None = None,
 ):
     result_types = [mlir.aval_to_ir_types(outvar)[0] for outvar in branch_jaxprs[0].out_avals]
 
@@ -2431,6 +2496,7 @@ def _switch_lowering(
     )
 
     scf_switch_op = IndexSwitchOp(result_types, index, cases, len(branch_jaxprs) - 1)
+    set_estimated_probabilities_attr(scf_switch_op.operation, estimated_probabilities)
 
     # construct switch branches
     for i in range(len(branch_jaxprs) - 1):
@@ -2515,6 +2581,7 @@ def _while_loop_lowering(
     body_nconsts: int,
     num_implicit_inputs: int,
     preserve_dimensions: bool,
+    estimated_iterations: int | float | None = None,
 ):
     loop_carry_types_plus_consts = [mlir.aval_to_ir_types(a)[0] for a in jax_ctx.avals_in]
     flat_args_plus_consts = mlir.flatten_ir_values(iter_args_plus_consts)
@@ -2536,6 +2603,7 @@ def _while_loop_lowering(
     )
 
     while_op_scf = WhileOp(loop_carry_types, loop_args)
+    set_estimated_iterations_attr(while_op_scf.operation, estimated_iterations)
 
     # cond block
     cond_block = while_op_scf.regions[0].blocks.append(*loop_carry_types)
@@ -2592,6 +2660,7 @@ def _pl_while_loop_lowering(
     body_slice,
     cond_slice,
     args_slice,
+    estimated_iterations: int | float | None = None,
 ):
     body_consts = plxpr_invals[slice(*body_slice)]
     cond_consts = plxpr_invals[slice(*cond_slice)]
@@ -2601,6 +2670,7 @@ def _pl_while_loop_lowering(
     args_types = all_args_types[slice(*args_slice)]
 
     while_op_scf = WhileOp(args_types, args)
+    set_estimated_iterations_attr(while_op_scf.operation, estimated_iterations)
 
     # cond block
     cond_block = while_op_scf.regions[0].blocks.append(*args_types)
@@ -2698,6 +2768,7 @@ def _for_loop_lowering(
     apply_reverse_transform: bool,
     num_implicit_inputs: int,
     preserve_dimensions,
+    estimated_iterations: int | float | None = None,
 ):
     body_consts = iter_args_plus_consts[:body_nconsts]
     body_implicits = iter_args_plus_consts[body_nconsts : body_nconsts + num_implicit_inputs]
@@ -2744,6 +2815,7 @@ def _for_loop_lowering(
         lower_bound, upper_bound, step = zero, num_iterations, one
 
     for_op_scf = ForOp(lower_bound, upper_bound, step, iter_args=loop_args)
+    set_estimated_iterations_attr(for_op_scf.operation, estimated_iterations)
 
     name_stack = jax_ctx.name_stack.extend("for")
     body_block = for_op_scf.body
@@ -2796,6 +2868,7 @@ def _pl_for_loop_lowering(
     consts_slice,
     args_slice,
     abstract_shapes_slice,
+    estimated_iterations: int | float | None = None,
 ):
     body_consts = plxpr_invals[slice(*consts_slice)]
     abstract_shapes = plxpr_invals[slice(*abstract_shapes_slice)]
@@ -2808,6 +2881,7 @@ def _pl_for_loop_lowering(
     # slicing out index, as passed to block independently
     loop_args = abstract_shapes + args
     for_op_scf = ForOp(start, stop, step, iter_args=loop_args)
+    set_estimated_iterations_attr(for_op_scf.operation, estimated_iterations)
 
     name_stack = jax_ctx.name_stack.extend("for")
     body_block = for_op_scf.body
@@ -3129,6 +3203,7 @@ CUSTOM_LOWERING_RULES = (
     (print_p, _print_lowering),
     (assert_p, _assert_lowering),
     (python_callback_p, _python_callback_lowering),
+    (get_runtime_call_prim(), _runtime_call_lowering),
     (value_and_grad_p, _value_and_grad_lowering),
     (set_state_p, _set_state_lowering),
     (set_basis_state_p, _set_basis_state_lowering),
@@ -3136,7 +3211,7 @@ CUSTOM_LOWERING_RULES = (
     (cos_p, _cos_lowering2),
     (quantum_kernel_p, _quantum_kernel_lowering),
     (quantum_subroutine_prim, subroutine_lowering),
-    (decomprule_p, _decomposition_rule_lowering),
+    (decomp_definition_p, _decomposition_definition_lowering),
 )
 
 

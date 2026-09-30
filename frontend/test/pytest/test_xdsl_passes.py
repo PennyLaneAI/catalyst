@@ -169,7 +169,7 @@ class TestXDSLPassesIntegration:
         # pylint: disable-next=import-outside-toplevel
         from catalyst.python_interface.transforms import merge_rotations_pass
 
-        @qjit(keep_intermediate="changed", verbose=True, capture=True)
+        @qjit(keep_intermediate="changed", verbose=True, capture=True, collect_decomp_rules=False)
         def workflow(x):
             @merge_rotations_pass
             @qp.transforms.cancel_inverses

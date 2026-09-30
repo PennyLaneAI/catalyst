@@ -18,13 +18,23 @@
 
 #include "DGBuilder.hpp"
 
+#include <cstddef>
 #include <cstdint>
 #include <iostream>
+#include <memory>
+#include <unordered_map>
+#include <unordered_set>
+#include <utility>
 #include <variant>
+#include <vector>
 
+#include "boost/graph/adjacency_list.hpp"
+#include "boost/graph/detail/adjacency_list.hpp"
+#include "boost/graph/graph_selectors.hpp"
+#include "boost/graph/graph_traits.hpp"
+
+#include "DGTypes.hpp"
 #include "DGUtils.hpp"
-
-#include <boost/graph/adjacency_list.hpp>
 
 using namespace DecompGraph::Core;
 
@@ -157,11 +167,6 @@ struct DecompositionGraph::Impl {
             registerOp(op);
         }
 
-        // Register all target gates
-        for (const auto &[op, _] : gateset.ops) {
-            registerOp(op);
-        }
-
         // Register all rules
         for (RuleId ruleId = 0; ruleId < rules.size(); ruleId++) {
             const auto &rule = rules[ruleId];
@@ -260,40 +265,45 @@ bool DecompositionGraph::hasOperator(const OperatorNode &op) const {
     return impl->opToId.find(op) != impl->opToId.end();
 }
 
-void DecompositionGraph::showGraph() const {
-    std::cerr << "Decomposition Graph:\n";
+} // namespace DecompGraph::Solver
+
+namespace DecompGraph::Core {
+
+void showGraph(const Solver::DecompositionGraph &graph, std::ostream &os) {
+    const auto *impl = graph.impl.get();
+    os << "Decomposition Graph:\n";
     // Show all operators by their names
-    std::cerr << "Operators:\n";
+    os << "Operators:\n";
     for (const auto &[op, id] : impl->opToId) {
-        std::cerr << "  ID " << id << ": " << print_op(op) << "\n";
+        os << "  ID " << id << ": " << print_op(op) << "\n";
     }
 
     // Show all rules by their names and their input/output operators
-    std::cerr << "Rules:\n";
+    os << "Rules:\n";
     for (const auto &[ruleId, _] : impl->ruleIdToVertex) {
         const auto &rule = impl->rules[ruleId];
-        std::cerr << "  Rule ID " << ruleId << ": " << rule.name;
+        os << "  Rule ID " << ruleId << ": " << rule.name;
         if (rule.origin == RuleOrigin::Fixed) {
-            std::cerr << " [fixed]";
+            os << " [fixed]";
         } else if (rule.origin == RuleOrigin::Alternative) {
-            std::cerr << " [alt]";
+            os << " [alt]";
         } else {
-            std::cerr << " [default]";
+            os << " [default]";
         }
-        std::cerr << "\n";
-        std::cerr << "    Output: " << print_op(rule.output) << "\n";
-        std::cerr << "    Inputs:\n";
+        os << "\n";
+        os << "    Output: " << print_op(rule.output) << "\n";
+        os << "    Inputs:\n";
         for (const auto &input : rule.inputs) {
-            std::cerr << "      - " << print_op(input.op)
-                      << " (multiplicity: " << input.multiplicity << ")\n";
+            os << "      - " << print_op(input.op) << " (multiplicity: " << input.multiplicity
+               << ")\n";
         }
     }
 
     // Show target gateset
-    std::cerr << "Target Gateset:\n";
-    for (const auto &[op, cost] : impl->gateset.ops) {
-        std::cerr << "  " << print_op(op) << " with cost " << cost << "\n";
+    os << "Target Gateset:\n";
+    for (const auto &[name, cost] : impl->gateset.ops) {
+        os << "  " << name << " with cost " << cost << "\n";
     }
 }
 
-} // namespace DecompGraph::Solver
+} // namespace DecompGraph::Core

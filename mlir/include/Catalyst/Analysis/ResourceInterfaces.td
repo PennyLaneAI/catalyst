@@ -41,6 +41,11 @@ def ResourceQuantumOpInterface : OpInterface<"ResourceQuantumOpInterface"> {
         "llvm::StringRef", "getResourceName", (ins), /*methodBody*/[{}]
     >,
     InterfaceMethod<
+        "Return the resource display name for this op (with detailed information).",
+        "llvm::StringRef", "getResourceDetailedName", (ins), /*methodBody*/[{}],
+        /*default=*/[{ return $_op.getResourceName(); }]
+    >,
+    InterfaceMethod<
         "Return the number of target qubits this op acts on (excluding controls).",
         "uint64_t", "getResourceNumQubits", (ins), /*methodBody*/[{}]
     >,

@@ -55,18 +55,18 @@ TEST_CASE("parse_backend_config requires an explicit dev and gid", "[common]") {
         CHECK(c.gid == 2);
     }
     SECTION("a missing key is rejected rather than defaulted") {
-        CHECK_THROWS_AS(parse_backend_config(""), RdmaError);
-        CHECK_THROWS_AS(parse_backend_config("dev=rxe0"), RdmaError);
-        CHECK_THROWS_AS(parse_backend_config("gid=1"), RdmaError);
-        CHECK_THROWS_AS(parse_backend_config("junk"), RdmaError);
+        CHECK_THROWS_AS(parse_backend_config(""), TransportError);
+        CHECK_THROWS_AS(parse_backend_config("dev=rxe0"), TransportError);
+        CHECK_THROWS_AS(parse_backend_config("gid=1"), TransportError);
+        CHECK_THROWS_AS(parse_backend_config("junk"), TransportError);
     }
     SECTION("an empty or malformed value is rejected") {
-        CHECK_THROWS_AS(parse_backend_config("dev=;gid=1"), RdmaError);
-        CHECK_THROWS_AS(parse_backend_config("dev=rxe0;gid="), RdmaError);
+        CHECK_THROWS_AS(parse_backend_config("dev=;gid=1"), TransportError);
+        CHECK_THROWS_AS(parse_backend_config("dev=rxe0;gid="), TransportError);
         // std::atoi would have silently turned each of these into gid 0.
-        CHECK_THROWS_AS(parse_backend_config("dev=rxe0;gid=abc"), RdmaError);
-        CHECK_THROWS_AS(parse_backend_config("dev=rxe0;gid=1x"), RdmaError);
-        CHECK_THROWS_AS(parse_backend_config("dev=rxe0;gid=-1"), RdmaError);
+        CHECK_THROWS_AS(parse_backend_config("dev=rxe0;gid=abc"), TransportError);
+        CHECK_THROWS_AS(parse_backend_config("dev=rxe0;gid=1x"), TransportError);
+        CHECK_THROWS_AS(parse_backend_config("dev=rxe0;gid=-1"), TransportError);
     }
 }
 

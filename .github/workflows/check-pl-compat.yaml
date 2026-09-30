@@ -12,6 +12,10 @@ on:
       lightning:
         required: true
         type: string
+      runner:
+        required: false
+        type: string
+        default: blacksmith-2vcpu-ubuntu-2404
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -30,7 +34,7 @@ jobs:
   check-config:
     name: Build Configuration
     needs: [constants]
-    runs-on: ubuntu-24.04
+    runs-on: ${{ inputs.runner }}
 
     steps:
     - name: Checkout Catalyst repo
@@ -38,8 +42,11 @@ jobs:
       with:
         fetch-depth: 0
     - if: ${{ inputs.catalyst == 'stable' }}
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        git checkout $(git tag -l 'v*' | sort -V | tail -1)
+        git checkout "$(gh release list --repo ${{ github.repository }} \
+            --exclude-pre-releases --limit 1 --json tagName --jq '.[0].tagName')"
     - if: ${{ inputs.catalyst == 'release-candidate' }}
       run: |
         # For rc, we install all packages from TestPyPI.

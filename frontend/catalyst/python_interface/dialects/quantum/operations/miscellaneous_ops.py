@@ -22,11 +22,14 @@ from typing import ClassVar
 from xdsl.dialects.builtin import (
     StringAttr,
     UnitAttr,
+    i1,
     i64,
 )
 from xdsl.ir import Block, Operation, Region
 from xdsl.irdl import (
     AnyOf,
+    AttrSizedOperandSegments,
+    AttrSizedResultSegments,
     IRDLOperation,
     ParsePropInAttrDict,
     RangeOf,
@@ -81,6 +84,52 @@ class AdjointOp(IRDLOperation):
     ):
         result_types = tuple(arg.type for arg in args)
         super().__init__(operands=(args,), result_types=(result_types,), regions=(region,))
+
+
+@irdl_op_definition
+class CtrlOp(IRDLOperation):
+    """Apply the enclosed operations controlled on the given control qubits."""
+
+    C: ClassVar = RangeVarConstraint("C", RangeOf(AnyOf([QubitType])))
+    T: ClassVar = RangeVarConstraint("T", RangeOf(AnyOf([QubitType, QuregType])))
+
+    name = "quantum.ctrl"
+
+    assembly_format = """
+        `(` $in_ctrl_qubits `)` `ctrlvals` `(` $in_ctrl_values `)` `(` $args `)`
+        attr-dict `:` type($out_ctrl_qubits) `->` type($outs) $region
+    """
+
+    in_ctrl_qubits = var_operand_def(C)
+    in_ctrl_values = var_operand_def(i1)
+    args = var_operand_def(T)
+
+    out_ctrl_qubits = var_result_def(C)
+    outs = var_result_def(T)
+
+    region = region_def("single_block")
+
+    irdl_options = (
+        AttrSizedOperandSegments(as_property=True),
+        AttrSizedResultSegments(as_property=True),
+    )
+
+    traits = lazy_traits_def(lambda: (NoMemoryEffect(), SingleBlockImplicitTerminator(YieldOp)))
+
+    def __init__(
+        self,
+        in_ctrl_qubits: Sequence[QubitSSAValue] | Operation,
+        in_ctrl_values: Sequence[Operation],
+        args: Sequence[QuregSSAValue | QubitSSAValue] | Operation,
+        region: Region | Sequence[Operation] | Sequence[Block],
+    ):
+        ctrl_result_types = tuple(q.type for q in in_ctrl_qubits)
+        arg_result_types = tuple(a.type for a in args)
+        super().__init__(
+            operands=(in_ctrl_qubits, in_ctrl_values, args),
+            result_types=(ctrl_result_types, arg_result_types),
+            regions=(region,),
+        )
 
 
 @irdl_op_definition

@@ -9,4 +9,6 @@ target_link_libraries(CatalystQuantumInterfaceTests PRIVATE
     MLIRQuantum
     MLIRQRef
     MLIRTestDialect
+    MLIRPBC
+    MLIRMBQC
 )

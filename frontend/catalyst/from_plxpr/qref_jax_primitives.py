@@ -25,10 +25,12 @@ from jax.extend.core import Primitive
 from jax.interpreters import mlir
 from jaxlib.mlir._mlir_libs import _mlir as _ods_cext
 from jaxlib.mlir.dialects.arith import (
+    ConstantOp,
     ExtUIOp,
 )
 from jaxlib.mlir.dialects.stablehlo import ConvertOp as StableHLOConvertOp
 from pennylane.capture.primitives import adjoint_transform_prim as plxpr_adjoint_transform_prim
+from pennylane.capture.primitives import ctrl_transform_prim as plxpr_ctrl_transform_prim
 from pennylane.wires import AbstractQubit
 
 # TODO: remove after jax v0.7.2 upgrade
@@ -66,6 +68,7 @@ with Patcher(
         AdjointOp,
         AllocOp,
         ComputationalBasisOp,
+        CtrlOp,
         CustomOp,
         DeallocOp,
         GetOp,
@@ -656,6 +659,47 @@ def _pl_adjoint_lowering(
 
 
 #
+# qref ctrl region
+#
+# pylint: disable=unused-argument
+def _pl_ctrl_lowering(
+    jax_ctx,
+    *plxpr_invals,
+    jaxpr,
+    n_control,
+    control_values,
+    work_wires,
+    n_consts,
+):
+    """Lower a `qp.ctrl` transform to a `qref.ctrl` region op."""
+    body_invals = plxpr_invals[: len(plxpr_invals) - n_control]
+    control_qubits = list(plxpr_invals[len(plxpr_invals) - n_control :])
+
+    i1 = ir.IntegerType.get_signless(1)
+    control_values_i1 = [
+        ConstantOp(i1, ir.IntegerAttr.get(i1, 1 if v else 0)).result for v in control_values
+    ]
+
+    op = CtrlOp(ctrl_qubits=control_qubits, ctrl_values=control_values_i1)
+    ctrl_block = op.regions[0].blocks.append()
+    with ir.InsertionPoint(ctrl_block):
+        source_info_util.extend_name_stack("ctrl")
+        body_jaxpr = jaxpr.replace(constvars=(), invars=jaxpr.constvars + jaxpr.invars)
+        mlir.jaxpr_subcomp(
+            jax_ctx.module_context,
+            body_jaxpr,
+            jax_ctx.name_stack.extend("ctrl"),
+            mlir.TokenSet(),
+            [],
+            *body_invals,
+            dim_var_values=jax_ctx.dim_var_values,
+            const_lowering=jax_ctx.const_lowering,
+        )
+
+    return ()
+
+
+#
 # measure
 #
 @qref_measure_p.def_abstract_eval
@@ -855,4 +899,5 @@ CUSTOM_LOWERING_RULES = (
     (qref_namedobs_p, _qref_named_obs_lowering),
     (qref_hermitian_p, _qref_hermitian_lowering),
     (plxpr_adjoint_transform_prim, _pl_adjoint_lowering),
+    (plxpr_ctrl_transform_prim, _pl_ctrl_lowering),
 )

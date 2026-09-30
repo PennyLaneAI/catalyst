@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#pragma once
 #include <optional>
 
 #include "mlir/Dialect/SCF/IR/SCF.h"
@@ -49,5 +50,25 @@ std::optional<double> getEstimatedIterationsHint(Operation *op);
 //   3. recursively-resolved constant lower/upper bounds and step.
 // Returns std::nullopt when the trip count cannot be determined statically.
 std::optional<double> resolveForLoopTripCount(scf::ForOp forOp);
+
+// Resolve the average trip count of a loop whose upper bound is either a fixed constant or the
+// induction variable of an enclosing scf.for loop. Chains of nested loops are supported to any
+// depth, and a loop may depend on any enclosing loop rather than only its immediate parent.
+//
+// Enclosing loops contribute in one of two ways:
+//   - If a later loop uses its induction variable, it is enumerated. Its domain comes from its
+//     own resolved bounds, or from an *integral* `catalyst.estimated_iterations = K` hint, which
+//     stands in for the first K induction values starting at its lower bound.
+//   - Otherwise it only scales how often the target loop is reached, so it contributes a scalar
+//     multiplicity taken from its `catalyst.estimated_iterations` hint (integer or fractional) or
+//     its static trip count.
+//
+// Returns std::nullopt when any bound in the chain stays unresolved: an arithmetic expression, an
+// unrelated dynamic loop, a non-scf.for ancestor such as `scf.if`, or an enclosing loop that must
+// be enumerated but offers only a fractional estimate.
+//
+// Note that the result is an *average* over every enumerated context, so it may be fractional
+// even when all bounds are static.
+std::optional<double> resolveDirectNestedForLoopAverageTripCount(scf::ForOp forOp);
 
 } // namespace catalyst

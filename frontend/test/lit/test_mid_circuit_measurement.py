@@ -99,7 +99,7 @@ def test_one_shot_with_passes():
 print(test_one_shot_with_passes.mlir)
 
 
-@qjit(capture=True, target="mlir")
+@qjit(capture=True, collect_decomp_rules=False, target="mlir")
 def test_mcm_obs():
     """
     Test generation of mcm observable operation.

@@ -27,12 +27,12 @@
 // CHECK-NOT: module @target_compute
 // CHECK-NOT: noop_helper
 
-// dump-intermediate writes the extracted MLIR and translated LLVM IR to the workspace. The entry
+// save-ir-after-each writes the extracted MLIR and translated LLVM IR to the workspace. The entry
 // points are derived from the launch_kernel call edges (no separate visibility pass): @noop is the
 // callee, so it is exposed through the C ABI (public + llvm.emit_c_interface); @noop_helper is not
 // referenced from the host, so it is privatized.
 // RUN: rm -rf %t/target_compute
-// RUN: quantum-opt %s --cross-compile-targets="workspace=%t dump-intermediate=true"
+// RUN: quantum-opt %s --cross-compile-targets="workspace=%t save-ir-after-each=pipeline"
 // RUN: cat %t/target_compute/extracted.mlir | FileCheck %s --check-prefix=EXTRACTED
 // RUN: cat %t/target_compute/target_compute.ll | FileCheck %s --check-prefix=LL
 // EXTRACTED: func.func @noop() attributes {llvm.emit_c_interface}

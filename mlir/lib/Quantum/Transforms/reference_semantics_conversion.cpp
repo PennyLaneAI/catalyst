@@ -465,6 +465,40 @@ void handleAdjoint(IRRewriter &builder, quantum::AdjointOp vAdjointOp, QubitValu
     });
 }
 
+void handleCtrl(IRRewriter &builder, quantum::CtrlOp vCtrlOp, QubitValueTracker &tracker,
+                SmallVector<Operation *> &erasureWorklist) {
+    OpBuilder::InsertionGuard guard(builder);
+    builder.setInsertionPoint(vCtrlOp);
+    Location loc = vCtrlOp->getLoc();
+    QubitValueTracker regionTracker = tracker;
+
+    // Add block args to the map
+    for (auto [blockArg, operand] :
+         llvm::zip_equal(vCtrlOp.getRegion().front().getArguments(), vCtrlOp.getArgs())) {
+        if (isa<quantum::QubitType>(blockArg.getType())) {
+            regionTracker.setRQubit(blockArg, tracker.getRQubit(operand));
+        } else if (isa<quantum::QuregType>(blockArg.getType())) {
+            regionTracker.setRQreg(blockArg, tracker.getRQreg(operand));
+        }
+    }
+
+    // Create the rCtrlOp op and handle
+    SmallVector<Value> rCtrlQubits;
+    for (auto vCtrlQubit : vCtrlOp.getInCtrlQubits()) {
+        rCtrlQubits.push_back(tracker.getRQubit(vCtrlQubit));
+    }
+    auto rCtrlOp = qref::CtrlOp::create(builder, loc, rCtrlQubits, vCtrlOp.getInCtrlValues());
+    builder.inlineRegionBefore(vCtrlOp.getRegion(), rCtrlOp.getRegion(), rCtrlOp.getRegion().end());
+    handleRegion(builder, rCtrlOp.getRegion(), regionTracker);
+    cascadeMapAhead(vCtrlOp, tracker);
+    erasureWorklist.push_back(vCtrlOp);
+
+    // Remove the moved over value semantics block args
+    rCtrlOp.getRegion().front().eraseArguments([](BlockArgument arg) {
+        return isa<quantum::QubitType, quantum::QuregType>(arg.getType());
+    });
+}
+
 void handleIf(IRRewriter &builder, scf::IfOp ifOp, QubitValueTracker &tracker,
               SmallVector<Operation *> &erasureWorklist) {
     OpBuilder::InsertionGuard guard(builder);
@@ -494,15 +528,20 @@ void handleIf(IRRewriter &builder, scf::IfOp ifOp, QubitValueTracker &tracker,
     });
 
     // Handle Else region
-    QubitValueTracker elseRegionTracker = tracker;
-    eraseSCFYieldQuantumOperands(cast<scf::YieldOp>(ifOp.getElseRegion().front().getTerminator()));
-    handleRegion(builder, ifOp.getElseRegion(), elseRegionTracker);
-    ifOp.getElseRegion().front().eraseArguments([](BlockArgument arg) {
-        return isa<quantum::QubitType, quantum::QuregType>(arg.getType());
-    });
+    bool hasElseBlock = !ifOp.getElseRegion().empty();
+    if (hasElseBlock) {
+        QubitValueTracker elseRegionTracker = tracker;
+        eraseSCFYieldQuantumOperands(
+            cast<scf::YieldOp>(ifOp.getElseRegion().front().getTerminator()));
+        handleRegion(builder, ifOp.getElseRegion(), elseRegionTracker);
+        ifOp.getElseRegion().front().eraseArguments([](BlockArgument arg) {
+            return isa<quantum::QubitType, quantum::QuregType>(arg.getType());
+        });
+    }
 
     // The else block is empty if the only remaining op is the mandatory scf.yield terminator
-    bool hasElseRegion = &(ifOp.elseBlock()->front()) != ifOp.elseBlock()->getTerminator();
+    bool hasElseRegion =
+        hasElseBlock && (&(ifOp.elseBlock()->front()) != ifOp.elseBlock()->getTerminator());
 
     // Collect classical returns of the old if op
     SmallVector<unsigned> classicalReturnIndices;
@@ -764,6 +803,8 @@ std::optional<SmallVector<Operation *>> handleRegion(IRRewriter &builder, Region
                 [&](auto o) { handlePPM(builder, o, tracker, erasureWorklist); })
             .Case<quantum::AdjointOp>(
                 [&](auto o) { handleAdjoint(builder, o, tracker, erasureWorklist); })
+            .Case<quantum::CtrlOp>(
+                [&](auto o) { handleCtrl(builder, o, tracker, erasureWorklist); })
             .Case<scf::IfOp>([&](auto o) { handleIf(builder, o, tracker, erasureWorklist); })
             .Case<scf::IndexSwitchOp>(
                 [&](auto o) { handleSwitch(builder, o, tracker, erasureWorklist); })
@@ -836,7 +877,7 @@ void handleSubroutine(IRRewriter &builder, func::FuncOp f,
     SmallVector<unsigned> newRargIndices;
     SmallVector<Value> oldVargs;
     size_t numNewArgsAdded = 0;
-    int qregSizeIdx = 0;
+    size_t qregSizeIdx = 0;
     for (auto [i, t] : llvm::enumerate(f.getFunctionType().getInputs())) {
         if (!isa<quantum::QubitType, quantum::QuregType>(t)) {
             continue;
@@ -847,8 +888,11 @@ void handleSubroutine(IRRewriter &builder, func::FuncOp f,
             newRargIndices.push_back(i + (numNewArgsAdded++));
             oldVargs.push_back(f.getBody().front().getArgument(i));
         } else if (isa<quantum::QuregType>(t)) {
-            typesToInsertArgs.push_back(
-                qref::QuregType::get(ctx, qregSizesAtCallsite[qregSizeIdx++]));
+            // Fallback to dynamic if there's no size deducible
+            IntegerAttr qregSize = qregSizeIdx < qregSizesAtCallsite.size()
+                                       ? qregSizesAtCallsite[qregSizeIdx++]
+                                       : builder.getI64IntegerAttr(ShapedType::kDynamic);
+            typesToInsertArgs.push_back(qref::QuregType::get(ctx, qregSize));
             newRargIndices.push_back(i + (numNewArgsAdded++));
             oldVargs.push_back(f.getBody().front().getArgument(i));
         }

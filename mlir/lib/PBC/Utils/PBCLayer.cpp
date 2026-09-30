@@ -32,7 +32,9 @@ using namespace mlir;
 namespace catalyst {
 namespace pbc {
 
-static constexpr size_t MinOpsForCommutationBasis = 32;
+// Crossover benchmarks on low- and high-rank commuting layers show that the packed basis
+// consistently offsets its construction cost once four operations are already in the layer.
+static constexpr size_t MinOpsForCommutationBasis = 4;
 
 FailureOr<int64_t> PBCLayerContext::ifWorstCaseDepth(scf::IfOp ifOp)
 {

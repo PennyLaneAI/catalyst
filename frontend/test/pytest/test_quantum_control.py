@@ -20,6 +20,7 @@
 # pylint: disable=expression-not-assigned
 # pylint: disable=too-many-arguments
 # pylint: disable=too-many-lines
+# pylint: disable=no-member # for pnp.pi, sqrt, eye, sort
 
 import copy
 from typing import Callable
@@ -33,7 +34,13 @@ from pennylane import adjoint as PL_adjoint
 from pennylane import cond
 from pennylane import ctrl as PL_ctrl
 from pennylane import for_loop, qjit, while_loop
-from pennylane.operation import DecompositionUndefinedError, Operation, Operator, Wires
+from pennylane.operation import (
+    DecompositionUndefinedError,
+    Operation,
+    Operator,
+    Operator2,
+    Wires,
+)
 from pennylane.ops.op_math.controlled import Controlled
 from pennylane.tape import QuantumTape
 
@@ -124,6 +131,10 @@ class TestControlled:
 
     def test_adjoint_qctrl_func_simple(self, backend, capture_mode):
         """Test the quantum control distribution over the group of operations"""
+        if backend == "lightning.kokkos":
+            pytest.xfail(
+                "Waiting for a Lightning nightly release with Operator2 adjoint parameters fix"
+            )
 
         def circuit(arg, ctrl_fn, adjoint_fn):
             def _func(theta):
@@ -222,7 +233,13 @@ class TestControlled:
             return qp.state()
 
         verify_catalyst_ctrl_against_pennylane(
-            circuit, qp.device(backend, wires=3), 0.1, 0, 2, 2, capture_mode=capture_mode
+            circuit,
+            qp.device(backend, wires=3),
+            0.1,
+            0,
+            2,
+            2,
+            capture_mode=capture_mode,
         )
 
     def test_qctrl_func_nested(self, backend, capture_mode):
@@ -306,6 +323,14 @@ class TestControlled:
         expected = native_controlled()
         assert_allclose(result, expected, atol=1e-5, rtol=1e-5)
 
+    @pytest.mark.xfail(reason="""
+        ControlledQubitUnitary's decomp rules are buggy and not jittable.
+        https://app.shortcut.com/xanaduai/story/128492/ctrl-decomp-bisect-rule-of-controlledqubitunitary-is-not-jittable,
+        https://app.shortcut.com/xanaduai/story/128494/controlled-two-qubit-unitary-rule-on-controlledqubitunitary-is-not-jittable
+
+        Since qp.ctrl(qp.Unitary) now lowers to `quantum.operator "ControlledUnitary"`, which does
+        not have a runtime lowering, the only way to execute it is through decomposition rules.
+    """)
     def test_native_controlled_unitary(self, capture_mode):
         """Test native control of a custom operation."""
         dev = qp.device("lightning.qubit", wires=4)
@@ -580,7 +605,10 @@ class TestCatalystOnlyControlled:
             qp.SemiAdder(x_wires=x_wires, y_wires=output, work_wires=work_wires_add)
 
         hybrid_ctrl = C_ctrl(
-            _func, control=c_wire, work_wires=work_wires_ctrl, work_wire_type=work_wire_type
+            _func,
+            control=c_wire,
+            work_wires=work_wires_ctrl,
+            work_wire_type=work_wire_type,
         )()
         assert hybrid_ctrl.work_wire_type == work_wire_type
 
@@ -599,7 +627,7 @@ class TestCatalystOnlyControlled:
         assert result.name == expected.name
         assert qp.equal(result.base, expected.base)
         assert result.control_wires == expected.control_wires
-        assert result.control_values == expected.control_values
+        assert result.control_values.tolist() == expected.control_values.tolist()
         assert result.work_wires == expected.work_wires
 
     def test_control_decomp_trotter(self):
@@ -772,7 +800,8 @@ class TestControlledProperties:
         assert op.data == (x,)
 
         with pytest.raises(
-            AttributeError, match="property 'data' of 'ControlledOp' object has no setter"
+            AttributeError,
+            match="has no setter",
         ):
             setattr(op, "data", (pnp.array(2.3454),))
 
@@ -800,13 +829,18 @@ class TestControlledProperties:
         assert op.has_matrix is value
 
     @pytest.mark.parametrize(
-        "base", (qp.RX(1.23, 0), qp.Rot(1.2, 2.3, 3.4, 0), qp.QubitUnitary([[0, 1], [1, 0]], 0))
+        "base",
+        (
+            qp.RX(1.23, 0),
+            qp.Rot(1.2, 2.3, 3.4, 0),
+            qp.QubitUnitary([[0, 1], [1, 0]], 0),
+        ),
     )
     def test_ndim_params(self, base):
         """Test that `catalyst.ctrl` defers to base ndim_params"""
 
         op = C_ctrl(base, 1)
-        assert op.ndim_params == base.ndim_params
+        assert op.ndim_params == qp.ctrl(base, 1).ndim_params
 
     @pytest.mark.parametrize("cwires, cvalues", [(0, [0]), ([3, 0, 2], [1, 1, 0])])
     def test_has_decomposition_true_via_control_values(self, cwires, cvalues):
@@ -947,20 +981,18 @@ class TestControlledMiscMethods:
         op = C_ctrl(target, control_wires, control_values=control_values, work_wires=work_wires)
 
         data, metadata = op._flatten()
-        assert data[0] is target
-        assert len(data) == 1
+        dynamic_data, wire_data, hybrid_data = data
+        assert dynamic_data[0].tolist() == list(control_values)
+        assert wire_data == [control_wires, work_wires]
+        assert hybrid_data == [target]
 
-        assert len(metadata) == 4
-        assert metadata[0] == control_wires
-        assert metadata[1] == control_values
-        assert metadata[2] == work_wires
-        assert metadata[3] == work_wire_type
+        assert metadata == (work_wire_type,)
 
         assert hash(metadata)
 
         new_op = type(op)._unflatten(*op._flatten())
         assert qp.equal(op, new_op)
-        assert new_op._name == "C(S)"  # make sure initialization was called
+        assert new_op.name == "C(S)"  # make sure initialization was called
 
     def test_copy(self):
         """Test that a copy of a controlled oeprator can have its parameters updated
@@ -976,7 +1008,7 @@ class TestControlledMiscMethods:
 
         assert copied_op.__class__ is op.__class__
         assert copied_op.control_wires == op.control_wires
-        assert copied_op.control_values == op.control_values
+        assert qp.math.allclose(copied_op.control_values, op.control_values)
         assert copied_op.data == (param1,)
 
         copied_op = qp.ops.functions.bind_new_parameters(copied_op, (6.54,))
@@ -989,9 +1021,11 @@ class TestControlledMiscMethods:
         base = qp.U1(1.23, wires=0)
         op = C_ctrl(base, "a")
 
-        assert op.label() == base.label()
-        assert op.label(decimals=2) == base.label(decimals=2)
-        assert op.label(base_label="hi") == base.label(base_label="hi")
+        # NOTE: As of https://github.com/PennyLaneAI/pennylane/pull/9981,
+        # ctrl(U1) eagerly dispatches to controlled phase shift.
+        assert op.label() == "Rϕ"
+        assert op.label(decimals=2) == "Rϕ\n(1.23)"
+        assert op.label(base_label="hi") == "hi"
 
     def test_label_matrix_param(self):
         """Test that the label method simply returns the label of the base and updates the cache."""
@@ -1051,9 +1085,10 @@ class TestControlledMiscMethods:
         assert len(ob) == 1
         assert ob[0].__class__ is base_gen.__class__
 
-        expected = qp.exp(op.generator(), 1j * op.data[0])
+        expected = qp.exp(op.generator(), 1j * op.base.data[0])
         assert qp.math.allclose(
-            expected.matrix(wire_order=["a", "b", "c"]), op.matrix(wire_order=["a", "b", "c"])
+            expected.matrix(wire_order=["a", "b", "c"]),
+            op.matrix(wire_order=["a", "b", "c"]),
         )
 
     def test_diagonalizing_gates(self):
@@ -1130,7 +1165,7 @@ class TestControlledOperationProperties:
         """Test parameter-frequencies against expected values."""
 
         op = C_ctrl(base, (4, 5))
-        assert op.parameter_frequencies == expected
+        assert qp.gradients.parameter_frequencies(op) == expected
 
     def test_parameter_frequencies_no_generator_error(self):
         """An error should be raised if the base doesn't have a generator."""
@@ -1195,7 +1230,7 @@ class TestControlledSimplify:
         assert isinstance(simplified_op.base, qp.Hadamard)
         assert simplified_op.name == final_op.name
         assert simplified_op.wires == final_op.wires
-        assert simplified_op.data == final_op.data
+        qp.assert_equal(simplified_op, final_op)
         assert simplified_op.arithmetic_depth == final_op.arithmetic_depth
 
 
@@ -1384,13 +1419,13 @@ pauli_x_based_op_decomps = [
         qp.PauliX,
         [2],
         [0, 1],
-        qp.Toffoli.compute_decomposition(wires=[0, 1, 2]),
+        [qp.Toffoli(wires=[0, 1, 2])],
     ),
     (
         qp.CNOT,
         [1, 2],
         [0],
-        qp.Toffoli.compute_decomposition(wires=[0, 1, 2]),
+        [qp.Toffoli(wires=[0, 1, 2])],
     ),
     (
         qp.PauliX,
@@ -1446,20 +1481,20 @@ class TestDecomposition:
             assert qp.equal(actual_op, expected_op)
 
     def test_non_differentiable_one_qubit_special_unitary(self):
-        """Assert that a non-differentiable on qubit special unitary uses the bisect
-        decomposition."""
+        """Assert that a controlled RZ uses the specialized Operator2 decomposition."""
 
         op = C_ctrl(qp.RZ(1.2, wires=0), (1, 2, 3, 4))
         decomp = op.decomposition()
 
-        assert qp.equal(decomp[0], qp.MultiControlledX(wires=(1, 2, 0), work_wires=(3, 4)))
-        assert isinstance(decomp[1], qp.QubitUnitary)
-        assert qp.equal(decomp[2], qp.MultiControlledX(wires=(3, 4, 0), work_wires=(1, 2)))
-        assert isinstance(decomp[3].base, qp.QubitUnitary)
-        assert qp.equal(decomp[4], qp.MultiControlledX(wires=(1, 2, 0), work_wires=(3, 4)))
-        assert isinstance(decomp[5], qp.QubitUnitary)
-        assert qp.equal(decomp[6], qp.MultiControlledX(wires=(3, 4, 0), work_wires=(1, 2)))
-        assert isinstance(decomp[7].base, qp.QubitUnitary)
+        expected = [
+            qp.RZ(0.6, wires=0),
+            qp.MultiControlledX(wires=(1, 2, 3, 4, 0)),
+            qp.RZ(-0.6, wires=0),
+            qp.MultiControlledX(wires=(1, 2, 3, 4, 0)),
+        ]
+        assert all(
+            qp.equal(actual, target) for actual, target in zip(decomp, expected, strict=True)
+        )
 
         decomp_mat = qp.matrix(op.decomposition, wire_order=op.wires)()
         assert qp.math.allclose(op.matrix(), decomp_mat)
@@ -1529,16 +1564,19 @@ class TestDecomposition:
         assert qp.equal(decomp[4], qp.PauliX(2))
 
     @pytest.mark.parametrize(
-        "base_cls, params, base_wires, ctrl_wires, _, expected",
+        "base_cls, params, base_wires, ctrl_wires, custom_ctrl_op, expected",
         custom_ctrl_op_decomps,
     )
     def test_control_on_zero_custom_ops(
-        self, base_cls, params, base_wires, ctrl_wires, _, expected
+        self, base_cls, params, base_wires, ctrl_wires, custom_ctrl_op, expected
     ):
         """Tests that custom ops are not converted when wires are control-on-zero."""
 
         base_op = base_cls(*params, wires=base_wires)
         op = C_ctrl(base_op, control=ctrl_wires, control_values=[False] * len(ctrl_wires))
+
+        if isinstance(base_op, Operator2):
+            expected = [custom_ctrl_op(*params, wires=ctrl_wires + base_wires)]
 
         decomp = op.decomposition()
 

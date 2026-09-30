@@ -89,6 +89,7 @@ Catalyst
    Compiler Passes <dev/transforms>
    Compiler Plugins <dev/plugins>
    Quantum Runtime <modules/runtime>
+   Backline <dev/backline>
    dev/debugging
    dev/custom_devices
    dev/roadmap

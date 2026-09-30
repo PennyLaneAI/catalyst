@@ -198,13 +198,14 @@ func.func @test_partition_layers_4(%qr0 : !quantum.bit, %qr1 : !quantum.bit, %qr
 
 // -----
 
-// The first 32 operators commute but span only a few independent basis rows.
-// This crosses the adaptive basis threshold. The final X anticommutes with
+// The first four operators reach the adaptive basis threshold. The remaining
+// commuting operators, including an independent ZZII row and the dependent
+// IIZZ row, are accepted through the basis path. The final X anticommutes with
 // ZZZZ and must start a new layer.
 func.func @test_dependent_commuting_basis(%q0 : !quantum.bit, %q1 : !quantum.bit, %q2 : !quantum.bit, %q3 : !quantum.bit) {
     // CHECK-LABEL: func.func @test_dependent_commuting_basis
     // CHECK: [[L0:%.+]]:4 = pbc.layer
-    // CHECK-COUNT-32: pbc.ppr
+    // CHECK-COUNT-34: pbc.ppr
     // CHECK:   pbc.yield
     // CHECK: [[L1:%.+]] = pbc.layer
     // CHECK:   pbc.ppr ["X"]
@@ -242,6 +243,8 @@ func.func @test_dependent_commuting_basis(%q0 : !quantum.bit, %q1 : !quantum.bit
     %29:4 = pbc.ppr ["Z", "Z", "Z", "Z"] (8) %28#0, %28#1, %28#2, %28#3 : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
     %30:4 = pbc.ppr ["Y", "Y", "Y", "Y"] (8) %29#0, %29#1, %29#2, %29#3 : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
     %31:4 = pbc.ppr ["X", "X", "I", "I"] (8) %30#0, %30#1, %30#2, %30#3 : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
-    %32 = pbc.ppr ["X"] (8) %31#0 : !quantum.bit
+    %32:4 = pbc.ppr ["Z", "Z", "I", "I"] (8) %31#0, %31#1, %31#2, %31#3 : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
+    %33:4 = pbc.ppr ["I", "I", "Z", "Z"] (8) %32#0, %32#1, %32#2, %32#3 : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
+    %34 = pbc.ppr ["X"] (8) %33#0 : !quantum.bit
     func.return
 }

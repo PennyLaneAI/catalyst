@@ -11,11 +11,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 """This module contains JAX-compatible quantum primitives to support the lowering
 of quantum operations to reference semantics JAXPR.
 """
 
 # pylint: disable=unused-argument
+import pennylane as qp
 from jax._src.lib.mlir import ir
 from jax.extend.core import Primitive
 from jax.interpreters import mlir
@@ -23,14 +25,13 @@ from jaxlib.mlir._mlir_libs import _mlir as _ods_cext
 from jaxlib.mlir.dialects.stablehlo import ConvertOp as StableHLOConvertOp
 from pennylane.pytrees import unflatten
 
-from catalyst.jax_extras.lowering import get_mlir_attribute_from_pyval
-
 # TODO: remove after jax v0.7.2 upgrade
 # Mock _ods_cext.globals.register_traceback_file_exclusion due to API conflicts between
 # Catalyst's MLIR version and the MLIR version used by JAX. The current JAX version has not
 # yet updated to the latest MLIR, causing compatibility issues. This workaround will be removed
 # once JAX updates to a compatible MLIR version
-# pylint: disable=ungrouped-imports
+from catalyst.decomposition.graph_op_id import _SPECIAL_LOWERINGS, _is_custom_op
+from catalyst.jax_extras.lowering import get_mlir_attribute_from_pyval
 from catalyst.jax_extras.patches import mock_attributes
 from catalyst.jax_primitives import (
     extract_scalar,
@@ -60,15 +61,13 @@ with Patcher(
         PauliRotOp,
         PCPhaseOp,
         QubitUnitaryOp,
+        SetBasisStateOp,
     )
 
 
-_SPECIAL_LOWERINGS = {}
-
-
-def _register_special_lowering(op_name):
+def _register_special_lowering(op_cls):
     def decorator(f):
-        _SPECIAL_LOWERINGS[op_name] = f
+        _SPECIAL_LOWERINGS[op_cls] = f
         return f
 
     return decorator
@@ -81,14 +80,6 @@ qref_operator_p.multiple_results = True
 @qref_operator_p.def_abstract_eval
 def _qref_operator_p_abstract_eval(*args, **kwargs):
     return []
-
-
-def _is_custom_op(op_cls, avals_in):
-    if op_cls.static_argnames or op_cls.hybrid_argnames or op_cls.compilable_argnames:
-        return False
-    if op_cls.wire_argnames != ("wires",):
-        return False
-    return all(p.shape == () and "float" in p.dtype.name for p in avals_in)
 
 
 def _is_qref_qubit(val) -> bool:
@@ -156,6 +147,8 @@ def _process_params(
         args_idx += hsize
 
     param_map = get_mlir_attribute_from_pyval(param_map) if param_map else None
+    for param in params:
+        assert isinstance(param.type, ir.RankedTensorType)
     return params, forward_params, param_map
 
 
@@ -174,12 +167,13 @@ def _process_qubits(*args, op_cls, wire_lens, hybrid_lens) -> tuple[list, dict[s
     args_idx = len(op_cls.dynamic_argnames)
     map_idx = 0
     for wname, wsize in zip(flat_wire_argnames, wire_lens, strict=True):
-        if wsize:
-            # If wsize is 0, then we don't need to populate the qubit map. It will be empty anyway
-            qubits += args[args_idx : args_idx + wsize]
-            qubit_map[wname] = ir.DenseI64ArrayAttr.get(list(range(map_idx, map_idx + wsize)))
-            map_idx += wsize
-            args_idx += wsize
+        # If wsize is 0, then we need to populate the qubit map anyway because the signature must match the operation.
+        # This is also needed to ensure that the lowered op generates the same GOID as the frontend.
+        # TODO: see if we can remove this requirement or upstream it to PL to simplify the IR
+        qubits += args[args_idx : args_idx + wsize]
+        qubit_map[wname] = ir.DenseI64ArrayAttr.get(list(range(map_idx, map_idx + wsize)))
+        map_idx += wsize
+        args_idx += wsize
 
     # Hybrid wire arguments and nested-operator wires from non-wire hybrid arguments
     for hname, hsize in zip(op_cls.hybrid_argnames, hybrid_lens, strict=True):
@@ -214,6 +208,8 @@ def _qref_operator_p_lowering(jax_ctx: mlir.LoweringRuleContext, *args, op_cls, 
     n_ctrls = kwargs.pop("n_ctrls")
     wire_lens = kwargs.pop("wire_lens")
 
+    repack_static_data = {k: unflatten(*v) for k, v in kwargs.items()}
+
     if n_ctrls:
         ctrl_qubits = args[-2 * n_ctrls : -n_ctrls]
         ctrl_values = [
@@ -225,16 +221,22 @@ def _qref_operator_p_lowering(jax_ctx: mlir.LoweringRuleContext, *args, op_cls, 
         ctrl_qubits = ctrl_values = ()
 
     # Custom lowerings (qref.multirz, qref.pcphase, etc.)
-    if op_cls.__name__ in _SPECIAL_LOWERINGS:
+    if op_cls in _SPECIAL_LOWERINGS:
         expected_len = len(op_cls.dynamic_argnames) + sum(wire_lens)
         assert len(args) == expected_len, f"Incorrect number of operands for {op_cls.__name__}."
-        return _SPECIAL_LOWERINGS[op_cls.__name__](
-            *args, ctrl_qubits=ctrl_qubits, ctrl_values=ctrl_values, adjoint=adjoint, **kwargs
+
+        return _SPECIAL_LOWERINGS[op_cls](
+            *args,
+            ctrl_qubits=ctrl_qubits,
+            ctrl_values=ctrl_values,
+            adjoint=adjoint,
+            **kwargs,
         )
 
     name_attr = get_mlir_attribute_from_pyval(op_cls.__name__)
 
     # Lowering to qref.custom
+    # Custom op only has float dynamic args, followed by a single wire argname "wires" at the end
     if _is_custom_op(op_cls, jax_ctx.avals_in[: len(op_cls.dynamic_argnames)]):
         expected_len = len(op_cls.dynamic_argnames) + sum(wire_lens)
         assert len(args) == expected_len, f"Incorrect number of operands for {op_cls.__name__}."
@@ -254,6 +256,7 @@ def _qref_operator_p_lowering(jax_ctx: mlir.LoweringRuleContext, *args, op_cls, 
             ctrl_values=ctrl_values,
             adjoint=adjoint,
         )
+
         return []
 
     params, forward_args, param_map = _process_params(
@@ -266,7 +269,6 @@ def _qref_operator_p_lowering(jax_ctx: mlir.LoweringRuleContext, *args, op_cls, 
     qubits, qubit_map = _process_qubits(
         *args, op_cls=op_cls, wire_lens=wire_lens, hybrid_lens=hybrid_lens
     )
-    repack_static_data = {k: unflatten(*v) for k, v in kwargs.items()}
 
     if op_cls.hybrid_argnames or op_cls.static_argnames:
         uid = generate_uid(
@@ -275,8 +277,6 @@ def _qref_operator_p_lowering(jax_ctx: mlir.LoweringRuleContext, *args, op_cls, 
             wire_lens=wire_lens,
             hybrid_lens=hybrid_lens,
             hybrid_trees=hybrid_trees,
-            adjoint=adjoint,
-            n_ctrls=n_ctrls,
             static_args=repack_static_data,
         )
         static_data = None
@@ -303,7 +303,7 @@ def _qref_operator_p_lowering(jax_ctx: mlir.LoweringRuleContext, *args, op_cls, 
     return []
 
 
-@_register_special_lowering("MultiRZ")
+@_register_special_lowering(qp.MultiRZ)
 def _multirz_lowering(theta, *qubits, ctrl_qubits, ctrl_values, adjoint):
     MultiRZOp(
         theta=extract_scalar(safe_cast_to_f64(theta, "MultiRZ"), "MultiRZ"),
@@ -315,7 +315,7 @@ def _multirz_lowering(theta, *qubits, ctrl_qubits, ctrl_values, adjoint):
     return []
 
 
-@_register_special_lowering("PCPhase")
+@_register_special_lowering(qp.PCPhase)
 def _pcphase_lowering(theta, *qubits, ctrl_qubits, ctrl_values, adjoint, dim):
     dim = unflatten(*dim)
     PCPhaseOp(
@@ -329,7 +329,7 @@ def _pcphase_lowering(theta, *qubits, ctrl_qubits, ctrl_values, adjoint, dim):
     return ()
 
 
-@_register_special_lowering("GlobalPhase")
+@_register_special_lowering(qp.GlobalPhase)
 def _special_gphase_lowering(angle, *_, ctrl_qubits, ctrl_values, adjoint):
     GlobalPhaseOp(
         angle=extract_scalar(safe_cast_to_f64(angle, "GlobalPhase"), "GlobalPhase"),
@@ -340,8 +340,8 @@ def _special_gphase_lowering(angle, *_, ctrl_qubits, ctrl_values, adjoint):
     return ()
 
 
-@_register_special_lowering("QubitUnitary")
-def _special_unitary_lowering(matrix, *qubits, ctrl_qubits, ctrl_values, adjoint):
+@_register_special_lowering(qp.QubitUnitary)
+def _special_unitary_lowering(matrix, *qubits, ctrl_qubits, ctrl_values, adjoint, unitary_check):
     matrix_type = matrix.type
     is_tensor = ir.RankedTensorType.isinstance(matrix_type)
     shape = ir.RankedTensorType(matrix_type).shape if is_tensor else None
@@ -376,7 +376,7 @@ def _special_unitary_lowering(matrix, *qubits, ctrl_qubits, ctrl_values, adjoint
     return ()
 
 
-@_register_special_lowering("PauliRot")
+@_register_special_lowering(qp.PauliRot)
 def _special_paulirot_lowering(angle, *qubits, ctrl_qubits, ctrl_values, adjoint, pauli_word):
     pauli_word = unflatten(*pauli_word)
     pauli_word = ir.ArrayAttr.get([ir.StringAttr.get(p) for p in pauli_word])

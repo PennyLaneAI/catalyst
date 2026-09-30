@@ -12,23 +12,26 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: catalyst --tool=opt --split-input-file --pass-pipeline='builtin.module( graph-decomposition{gate-set=Hadamard=1.0 fixed-decomps=PauliX=x_to_h bytecode-rules="%BYTECODE_PATH"}, graph-decomposition{gate-set=PauliX=1.0 fixed-decomps=Hadamard=h_to_x bytecode-rules="%BYTECODE_PATH"}, graph-decomposition{gate-set=Hadamard=1.0 fixed-decomps=PauliX=x_to_h bytecode-rules="%BYTECODE_PATH"})' %s | FileCheck %s --check-prefixes TRIPLE
+// RUN: catalyst --tool=opt --split-input-file --pass-pipeline='builtin.module( graph-decomposition{gate-set=testHadamard=1.0 fixed-decomps=testPauliX=x_to_h bytecode-rules="%BYTECODE_PATH"}, graph-decomposition{gate-set=testPauliX=1.0 fixed-decomps=testHadamard=h_to_x bytecode-rules="%BYTECODE_PATH"}, graph-decomposition{gate-set=testHadamard=1.0 fixed-decomps=testPauliX=x_to_h bytecode-rules="%BYTECODE_PATH"})' %s | FileCheck %s
 
-func.func @circuit() -> !quantum.bit {
+func.func @circuit() {
     %0 = quantum.alloc(2) : !quantum.reg
     %q = quantum.extract %0[0] : !quantum.reg -> !quantum.bit
-    // TRIPLE-NOT PauliX
-    // TRIPLE: Hadamard
-    %qout = quantum.custom "PauliX"() %q : !quantum.bit
-    return %qout : !quantum.bit
+    // CHECK-NOT testPauliX
+    // CHECK: testHadamard
+    %qout = quantum.custom "testPauliX"() %q : !quantum.bit
+    %1 = quantum.insert %0[ 0], %qout : !quantum.reg, !quantum.bit
+    quantum.dealloc %1 : !quantum.reg
+    return
 }
 
-func.func @h_to_x(%q : !quantum.bit) -> !quantum.bit attributes {target_gate="Hadamard"} {
-    %q1 = quantum.custom "PauliX"() %q : !quantum.bit
+// CHECK-LABEL: h_to_x
+func.func @h_to_x(%q : !quantum.bit) -> !quantum.bit attributes {target_gate="testHadamard{}{wires:1}{}", frontend_name = "h_to_x"} {
+    %q1 = quantum.custom "testPauliX"() %q : !quantum.bit
     return %q1 : !quantum.bit
 }
 
-func.func @x_to_h(%q : !quantum.bit) -> !quantum.bit attributes {target_gate="PauliX"} {
-    %q1 = quantum.custom "Hadamard"() %q : !quantum.bit
+func.func @x_to_h(%q : !quantum.bit) -> !quantum.bit attributes {target_gate="testPauliX{}{wires:1}{}", frontend_name = "x_to_h"} {
+    %q1 = quantum.custom "testHadamard"() %q : !quantum.bit
     return %q1 : !quantum.bit
 }

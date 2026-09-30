@@ -16,6 +16,7 @@
 
 #include <algorithm>
 #include <cstring>
+#include <ctime>
 #include <dlfcn.h>
 #include <exception>
 #include <functional>
@@ -28,9 +29,11 @@
 #include <unordered_map>
 #include <vector>
 
+#include "ConfigParser.hpp"
 #include "DynamicLibraryLoader.hpp"
 #include "Transport.hpp"
 #include "TransportBackend.h"
+#include "WireProtocol.hpp"
 
 using catalyst::transport::ChannelDesc;
 using catalyst::transport::ConnectInfo;
@@ -55,9 +58,21 @@ struct CatalystTransportSession {
     PeerRef peer; // peer region learned in exchange_keys
     bool peer_ready = false;
     std::vector<std::int64_t> pending_tokens;
+
+    std::uint32_t work_item = 0;
+    std::uint64_t in_bytes = 0;
+    std::uint64_t out_bytes = 0;
+    bool work_item_ready = false;
 };
 
 namespace {
+
+std::uint64_t now_ns() {
+    timespec ts = {};
+    clock_gettime(CLOCK_MONOTONIC_RAW, &ts);
+    return static_cast<std::uint64_t>(ts.tv_sec) * 1000000000ull +
+           static_cast<std::uint64_t>(ts.tv_nsec);
+}
 
 // (role, key) -> live session registry. Populated at create, read by get_session so a session
 // brought up in one function can be resolved in another.
@@ -87,10 +102,23 @@ template <typename Fn> auto guard(Fn &&fn) -> decltype(fn()) {
     }
 }
 
+const char *collect_error_name(int rc) {
+    switch (rc) {
+    case CATALYST_TRANSPORT_ERR_MEMORY:
+        return "memory";
+    case CATALYST_TRANSPORT_ERR_TIMEOUT:
+        return "timeout";
+    case CATALYST_TRANSPORT_ERR_STUCK:
+        return "stuck - no reply before the deadline";
+    default:
+        return "error";
+    }
+}
+
 // Provision the local reply region on first use (idempotent).
 void ensure_reply(CatalystTransportSession *s) {
     if (!s->reply_ready) {
-        s->reply = s->sess->alloc_memory(kReplyBytes, MemKind::CpuRam);
+        s->reply = s->sess->alloc_memory(kReplyBytes, s->sess->preferred_mem_kind());
         s->reply_ready = true;
     }
 }
@@ -177,6 +205,40 @@ void drain_pending(CatalystTransportSession *s) {
     }
 }
 
+// Fold the compiler-emitted session key (unique per controller/coprocessor pair, as emitted by
+// inject-transport-session in MLIR) into the config as `pair=<key>` so backends that need to
+// pair endpoints in-process (e.g. memcpy) share one identifier for both sides. Transparent to
+// backends that don't parse `pair`.
+std::string fold_pair_key(const char *config, const char *key) {
+    std::string cfg = config ? config : "";
+    if (!key || !*key) {
+        return cfg;
+    }
+    const std::string_view k(key);
+    if (k.find(';') != std::string_view::npos) {
+        throw std::runtime_error("session key must not contain ';' (got '" + std::string(k) +
+                                 "'); it would split the backend config into two entries");
+    }
+    // A caller-supplied `pair=` and ours would coexist, and the backend would silently pick one.
+    bool reserved_in_use = false;
+    catalyst::transport::common::configparser::for_each_kv(
+        cfg, [&](std::string_view entry_key, std::string_view) {
+            if (entry_key == "pair") {
+                reserved_in_use = true;
+            }
+        });
+    if (reserved_in_use) {
+        throw std::runtime_error("backend config must not set 'pair'; it is reserved for the "
+                                 "compiler-emitted session key");
+    }
+    if (!cfg.empty()) {
+        cfg += ";";
+    }
+    cfg += "pair=";
+    cfg += k;
+    return cfg;
+}
+
 // Try the plugin handle first, then the process-global namespace (main image).
 void *resolve_coprocessor_fn_symbol(CatalystTransportSession *s, const char *symbol) {
     dlerror();
@@ -202,15 +264,15 @@ CatalystTransportSession *__catalyst__transport__create(const char *backend_lib,
         }
         auto h = std::make_unique<CatalystTransportSession>();
         h->backend = std::make_unique<DynamicLibraryLoader>(backend_lib);
-        const char *cfg = config ? config : "";
+        const std::string cfg = fold_pair_key(config, key);
         if (role == CATALYST_TRANSPORT_ROLE_COPROCESSOR) {
             auto *factory = h->backend->getSymbol<CatalystTransportCoprocessorFactoryFn *>(
                 CATALYST_TRANSPORT_COPROCESSOR_FACTORY_SYMBOL);
-            h->sess = factory(cfg);
+            h->sess = factory(cfg.c_str());
         } else {
             auto *factory = h->backend->getSymbol<CatalystTransportControllerFactoryFn *>(
                 CATALYST_TRANSPORT_CONTROLLER_FACTORY_SYMBOL);
-            h->sess = factory(cfg);
+            h->sess = factory(cfg.c_str());
         }
         if (!h->sess) {
             std::cerr << "[transport] backend factory returned null for config: " << cfg << "\n";
@@ -270,15 +332,15 @@ std::int64_t __catalyst__transport__exchange_keys_async(CatalystTransportSession
     return dispatch_async(s, [s] { return do_exchange_keys(s); });
 }
 
-int __catalyst__transport__barrier(std::int64_t token) { return await_token(token); }
+int __catalyst__transport__await(std::int64_t token) { return await_token(token); }
 
-int __catalyst__transport__establish_channel(CatalystTransportSession *s, const char *data_path) {
+int __catalyst__transport__establish_channel(CatalystTransportSession *s, const char *transport) {
     if (!s || !s->sess) {
         return CATALYST_TRANSPORT_ERR;
     }
     return guard([&] {
         ChannelDesc desc;
-        desc.data_path = data_path ? data_path : ""; // opaque; the backend interprets it
+        desc.transport = transport ? transport : ""; // opaque; the backend interprets it
         s->sess->establish_channel(desc, s->reply, s->peer);
         return CATALYST_TRANSPORT_OK;
     });
@@ -321,9 +383,9 @@ int __catalyst__transport__set_coprocessor_fn(CatalystTransportSession *s, const
     });
 }
 
-int __catalyst__transport__commit_work_item(CatalystTransportSession *s,
-                                            std::uint32_t work_item_idx, std::uint64_t in_bytes,
-                                            std::uint64_t out_bytes) {
+int __catalyst__transport__set_message_sizes(CatalystTransportSession *s,
+                                             std::uint32_t work_item_idx, std::uint64_t in_bytes,
+                                             std::uint64_t out_bytes) {
     auto *c = cast_to_controller(s);
     if (!c) {
         return CATALYST_TRANSPORT_ERR;
@@ -335,11 +397,15 @@ int __catalyst__transport__commit_work_item(CatalystTransportSession *s,
             return CATALYST_TRANSPORT_ERR;
         }
         c->commit_work_item(work_item_idx, in_bytes, out_bytes);
+        s->work_item = work_item_idx;
+        s->in_bytes = in_bytes;
+        s->out_bytes = out_bytes;
+        s->work_item_ready = true;
         return CATALYST_TRANSPORT_OK;
     });
 }
 
-void *__catalyst__transport__data_slot(CatalystTransportSession *s) {
+void *__catalyst__transport__request_slot(CatalystTransportSession *s) {
     auto *c = cast_to_controller(s);
     void *slot = nullptr;
     if (c) {
@@ -348,8 +414,8 @@ void *__catalyst__transport__data_slot(CatalystTransportSession *s) {
     return slot;
 }
 
-int __catalyst__transport__write_data_slot(CatalystTransportSession *s, const void *src,
-                                           std::uint64_t bytes, std::uint32_t decoder_id) {
+int __catalyst__transport__stage_payload(CatalystTransportSession *s, const void *src,
+                                         std::uint64_t bytes, std::uint32_t decoder_id) {
     auto *c = cast_to_controller(s);
     if (!c) {
         return CATALYST_TRANSPORT_ERR;
@@ -369,7 +435,7 @@ void *__catalyst__transport__reply_slot(CatalystTransportSession *s) {
     return slot;
 }
 
-int __catalyst__transport__kick(CatalystTransportSession *s, std::uint32_t work_item_idx) {
+int __catalyst__transport__post(CatalystTransportSession *s, std::uint32_t work_item_idx) {
     auto *c = cast_to_controller(s);
     if (!c) {
         return CATALYST_TRANSPORT_ERR;
@@ -382,11 +448,21 @@ int __catalyst__transport__collect(CatalystTransportSession *s, void *reply,
     if (!s || !s->sess) {
         return CATALYST_TRANSPORT_ERR;
     }
-    return guard([&] {
+    if (!reply) {
+        return CATALYST_TRANSPORT_ERR;
+    }
+    const int rc = guard([&] {
         void *replies[1] = {reply};
         std::uint64_t replies_bytes[1] = {reply_bytes};
         return s->sess->collect(replies, replies_bytes, 1);
     });
+    if (rc != CATALYST_TRANSPORT_OK) {
+        // The generated code discards this return value, so a failed round is otherwise silent:
+        // `reply` keeps whatever it held, and the caller consumes that as a valid result.
+        std::cerr << "[transport] collect failed (rc=" << rc << ": " << collect_error_name(rc)
+                  << "); the reply buffer was not written\n";
+    }
+    return rc;
 }
 
 std::uint64_t __catalyst__transport__last_rtt_ns(CatalystTransportSession *s) {
@@ -394,6 +470,101 @@ std::uint64_t __catalyst__transport__last_rtt_ns(CatalystTransportSession *s) {
         return guard([&] { return s->sess->last_rtt_ns(); });
     }
     return 0;
+}
+
+// The benchmark loop
+// Flags:
+//     CATALYST_BENCH_FORCE_SW_RTT: Force the use of the software RTT.
+//     CATALYST_BENCH_PROGRESS: Print progress information.
+int __catalyst__transport__start_benchmark(CatalystTransportSession *s, std::uint32_t iters,
+                                           std::uint32_t decoder_id, std::uint32_t flags,
+                                           std::uint64_t *samples, std::uint64_t samples_bytes,
+                                           std::uint64_t *rounds) {
+    if (rounds) {
+        *rounds = 0;
+    }
+    auto *c = cast_to_controller(s);
+    if (!c || (iters && !samples)) {
+        return CATALYST_TRANSPORT_ERR;
+    }
+
+    const std::uint64_t samples_wanted = static_cast<std::uint64_t>(iters) * sizeof(std::uint64_t);
+    if (samples_bytes < samples_wanted) {
+        std::cerr << "[transport] start_benchmark: samples buffer is " << samples_bytes
+                  << " B, short of the " << samples_wanted << " B that " << iters
+                  << " rounds report\n";
+        return CATALYST_TRANSPORT_ERR;
+    }
+
+    if (!s->work_item_ready) {
+        std::cerr << "[transport] start_benchmark: no work item committed; call "
+                     "commit_work_item first so the round's sizes are known\n";
+        return CATALYST_TRANSPORT_ERR;
+    }
+
+    // The round's shape is whatever was committed, so it cannot disagree with it.
+    const std::uint32_t work_item_idx = s->work_item;
+    const auto outgoing_message_bytes = static_cast<std::uint32_t>(s->in_bytes);
+    const auto reply_bytes = static_cast<std::uint32_t>(s->out_bytes);
+
+    const bool force_sw_rtt = (flags & CATALYST_BENCH_FORCE_SW_RTT) != 0;
+    const bool progress = (flags & CATALYST_BENCH_PROGRESS) != 0;
+
+    return guard([&] {
+        std::vector<std::uint8_t> outgoing_message(
+            std::max<std::size_t>(outgoing_message_bytes, sizeof(std::uint64_t)), 0);
+        std::uint64_t written = 0;
+        int rc = CATALYST_TRANSPORT_OK;
+
+        for (std::uint32_t i = 0; i < iters; ++i) {
+            const std::uint64_t value = static_cast<std::uint64_t>(i) + 1;
+            std::memcpy(outgoing_message.data(), &value, sizeof(value));
+
+            c->write_data_slot(outgoing_message.data(), outgoing_message_bytes, decoder_id);
+
+            void *rslot = c->reply_slot();
+            std::uint64_t t0 = now_ns();
+
+            rc = c->kick(work_item_idx);
+            if (rc == CATALYST_TRANSPORT_OK) {
+                void *replies[1] = {rslot};
+                std::uint64_t replies_bytes[1] = {reply_bytes};
+                rc = s->sess->collect(replies, replies_bytes, 1);
+            }
+            std::uint64_t sw_rtt = now_ns() - t0;
+
+            if (rc != CATALYST_TRANSPORT_OK) {
+                std::uint64_t reply_value = 0;
+                std::uint32_t reply_seq = 0;
+                std::memcpy(&reply_value, rslot, sizeof(reply_value));
+                std::memcpy(&reply_seq,
+                            static_cast<const std::uint8_t *>(rslot) +
+                                offsetof(catalyst::transport::common::Payload, seq_num),
+                            sizeof(reply_seq));
+                std::cerr << "[transport] start_benchmark: round " << i << " failed rc=" << rc
+                          << " [sent 0x" << std::hex << value << ", reply slot 0x" << reply_value
+                          << std::dec << " seq=" << reply_seq << "; work_item=" << work_item_idx
+                          << " in=" << outgoing_message_bytes << "B out=" << reply_bytes << "B]\n";
+                break;
+            }
+
+            std::uint64_t hw_rtt = force_sw_rtt ? 0 : s->sess->last_rtt_ns();
+            samples[written++] = (hw_rtt != 0) ? hw_rtt : sw_rtt;
+
+            if (progress && ((i & 1023) == 0 || i == iters - 1)) {
+                std::uint64_t cval = 0;
+                std::memcpy(&cval, rslot, std::min<std::size_t>(reply_bytes, sizeof(cval)));
+                std::cerr << "[transport] round " << i << " rtt=" << samples[written - 1] << " ns ["
+                          << (hw_rtt ? "hw" : "sw") << "] reply[0:8]=0x" << std::hex << cval
+                          << std::dec << "\n";
+            }
+        }
+
+        if (rounds) {
+            *rounds = written;
+        }
+        return rc;
+    });
 }
 
 void __catalyst__transport__start(CatalystTransportSession *s) {

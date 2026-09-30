@@ -168,14 +168,15 @@ def CrossCompileTargetsPass : Pass<"cross-compile-targets", "mlir::ModuleOp"> {
             "Filesystem directory to write cross-compiled `.o` files into."
         >,
         Option<
-            /*C++ var name=*/"dumpIntermediate",
-            /*CLI arg name=*/"dump-intermediate",
-            /*type=*/"bool",
-            /*default=*/"false",
+            /*C++ var name=*/"saveIrAfterEach",
+            /*CLI arg name=*/"save-ir-after-each",
+            /*type=*/"std::string",
+            /*default=*/"\"\"",
             /*description=*/
-            "Also write each target module's extracted MLIR and translated LLVM IR "
-            "(`extracted.mlir`, `<name>.ll`) into its workspace subdirectory. Set by the "
-            "driver from `keep_intermediate`."
+            "How much of each target module's lowering to write into its workspace subdirectory."
+            "Empty writes  nothing; `pipeline` writes the extracted MLIR and translated LLVM IR "
+            "(`extracted.mlir`, `<name>.ll`); `changed` and `pass` add the IR after each pass "
+            "that altered it, or after every pass. Set by the driver from `keep_intermediate`."
         >,
     ];
 }

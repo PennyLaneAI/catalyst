@@ -70,6 +70,42 @@ def AdjointLoweringPass : Pass<"adjoint-lowering"> {
     ];
 }
 
+def ResolveGateLevelAdjoint : Pass<"resolve-gate-level-adjoint"> {
+    let summary = "Applies canonicalization patterns for adjoint quantum operations.";
+}
+
+def CtrlLoweringPass : Pass<"ctrl-lowering"> {
+    let summary = "Lower ctrl regions by distributing the controls over the enclosed operations.";
+
+    let dependentDialects = ["scf::SCFDialect"];
+}
+
+def ModifiersLoweringPass : Pass<"modifiers-lowering"> {
+    let summary = "Lower quantum.ctrl and quantum.adjoint regions to op-level modifiers.";
+
+    let description = [{
+        Runs the ctrl-lowering and adjoint-lowering rewrite patterns together under a single greedy
+        driver until a fixed point. This allows arbitrarily nested control and adjoint regions to be
+        resolved. Each pattern defers (returns a match failure) while its region still contains the
+        other modifier, so the greedy worklist naturally interleaves them: an inner adjoint region is
+        reduced, then the enclosing control lowers on a re-try, and vice versa. This reaches the same
+        fixed point as manually alternating the standalone ctrl-lowering and adjoint-lowering passes,
+        in a single pass and regardless of nesting depth or order.
+    }];
+
+    let dependentDialects = [
+        "catalyst::CatalystDialect",
+        "index::IndexDialect",
+        "tensor::TensorDialect",
+        "complex::ComplexDialect",
+        "scf::SCFDialect"
+    ];
+}
+
+def RemoveGlobalPhasesPass : Pass<"remove-global-phases"> {
+    let summary = "Remove global phases by deleting phase operations without control wires.";
+}
+
 def SplitMultipleTapesPass : Pass<"split-multiple-tapes"> {
     let summary = "Given a qnode containing multiple tapes, split each tape into its own function.";
 }
@@ -174,7 +210,13 @@ def GraphDecompositionPass : Pass<"graph-decomposition", "mlir::ModuleOp"> {
             /*CLI name*/"libpython-path",
             /*Type*/"std::string",
             /*Default*/[{ "" }],
-            /*Description*/"A path to the python shared library.">
+            /*Description*/"A path to the python shared library.">,
+        Option<
+            /*C++ name*/"verboseOption",
+            /*CLI name*/"verbose",
+            /*Type*/"bool",
+            /*Default*/[{ false }],
+            /*Description*/"Print the decomposition rule chosen for each operator to stderr.">
     ];
 
     let dependentDialects = [
@@ -184,19 +226,15 @@ def GraphDecompositionPass : Pass<"graph-decomposition", "mlir::ModuleOp"> {
         "LLVM::LLVMDialect",
         "stablehlo::StablehloDialect",
         "tensor::TensorDialect",
+        "catalyst::CatalystDialect",
+        "catalyst::qref::QRefDialect",
+        "catalyst::pbc::PBCDialect",
+        "catalyst::mbqc::MBQCDialect",
     ];
 }
 
-def DecomposeLoweringPass : Pass<"decompose-lowering"> {
-    let summary = "Replace quantum operations with compiled decomposition rules.";
-
-    let options = [
-        ListOption<
-            /*C++ name*/"targetRulesOption",
-            /*CLI name*/"target-rules",
-            /*Type*/"std::string",
-            /*Description*/"The set of decomposition rules to apply. If empty, applies all rules.">
-    ];
+def ResolveStatePrepOperatorPass : Pass<"resolve-state-prep-operator"> {
+    let summary = "Replace all quantum.operator ops of StatePrep/BasisState to equivalent quantum.set_state/set_basis_state operations ";
 }
 
 def DisentangleCNOTPass : Pass<"disentangle-cnot"> {
