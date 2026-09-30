@@ -819,7 +819,7 @@ def test_quantum_phase_estimation(backend):
     estimation_wires = range(1, n_estimation_wires + 1)
 
     def quantum_phase_estimation():
-        qp.Hadamard(wires=target_wires)
+        qp.Hadamard(0)
         qp.QuantumPhaseEstimation(unitary, estimation_wires=estimation_wires)
         return qp.probs(estimation_wires)
 
