@@ -612,7 +612,8 @@
   [(#3233)](https://github.com/PennyLaneAI/catalyst/pull/3233)
 
 * Added a guard in the `--convert-to-value-semantics` pass to raise an error when an `scf.execute_region`
-  contains quantum operations. [(#3238)](https://github.com/PennyLaneAI/catalyst/pull/3238)
+  contains quantum operations. 
+  [(#3238)](https://github.com/PennyLaneAI/catalyst/pull/3238)
 
 <h3>Breaking changes 💔</h3>
 
