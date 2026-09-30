@@ -41,6 +41,19 @@ from catalyst.api_extensions.quantum_operators import (
     pauli_measure,
 )
 
+
+def flatten(qjit_fn):
+    """Return a function that produces the compiled tape of a ``qjit``-compiled program.
+
+    See :func:`catalyst.python_interface.tape_extract.flatten`.
+    """
+    # Imported lazily: the tape extraction depends on ``catalyst.jit`` and xDSL.
+    # pylint: disable-next=import-outside-toplevel
+    from catalyst.python_interface.tape_extract import flatten as _flatten
+
+    return _flatten(qjit_fn)
+
+
 __all__ = (
     "accelerate",
     "pure_callback",
@@ -60,4 +73,5 @@ __all__ = (
     "pauli_measure",
     "adjoint",
     "ctrl",
+    "flatten",
 )
