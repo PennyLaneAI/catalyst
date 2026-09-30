@@ -36,6 +36,8 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Casting.h"
+#include "llvm/Support/Debug.h"
+#include "llvm/Support/DebugLog.h"
 #include "mlir/Analysis/CallGraph.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
@@ -52,8 +54,6 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Support/LLVM.h"
 #include "mlir/Support/WalkResult.h"
-#include "llvm/Support/Debug.h"
-#include "llvm/Support/DebugLog.h"
 
 #include "Catalyst/IR/CatalystOps.h"
 #include "MBQC/IR/MBQCOps.h"
@@ -114,15 +114,11 @@ LogicalResult ensureNoScfExecuteRegionOps(Operation *op) {
             if (opInWalk->getNumRegions() > 0) {
                 WalkResult walkResultER = opInWalk->walk([&](Operation *innerOp) {
                     if (!isClassicalOp(innerOp)) {
-                        llvm::errs()
-                            << "value semantics conversion only supports the following "
-                            << "scf ops: scf.if, scf.for, scf.while, scf.index_switch, but got "
-                            << opInWalk->getName().getStringRef() << "\n";
                         opInWalk->emitError(
                             "Only scf operations with regions that are supported "
                             "are scf.if, scf.for, scf.while, and scf.index_switch, got: " +
                             opInWalk->getName().getStringRef());
-                        LDBG() << opInWalk;
+                        LDBG() << innerOp;
                         return WalkResult::interrupt();
                     }
                     return WalkResult::advance();
