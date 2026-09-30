@@ -682,7 +682,7 @@ jobs:
 
     - name: Install PennyLane branch
       run: |
-        pip install --no-deps --force git+https://github.com/PennyLaneAI/pennylane@feat/qpe-only-acc-ops
+        pip install --no-deps --force git+https://github.com/PennyLaneAI/pennylane@feat/port-qpe-to-op2
 
   runtime-device-tests:
     name: Third-Party Device Tests (C++)
