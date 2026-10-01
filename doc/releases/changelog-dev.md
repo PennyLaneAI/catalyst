@@ -606,6 +606,11 @@
 
 <h3>Breaking changes 💔</h3>
 
+* Catalyst now provides its own :func:`~.polynomial_extrapolate` and
+  :func:`~.exponential_extrapolate` functions for use with :func:`~.mitigate_with_zne`, replacing
+  ``pennylane.noise.poly_extrapolate`` and ``pennylane.noise.exponential_extrapolate``, which has been removed from PennyLane.
+  [(#XXXX)](https://github.com/PennyLaneAI/catalyst/pull/XXXX)
+
 * Removes :func:`~.passes.ppm_specs` and the ``--ppm-specs`` MLIR pass. Use :func:`~.specs` and
   the ``ResourceAnalysis`` pass instead for PPR/PPM resource counts and PBC layer depth
   (``any_commuting_depth`` / ``qubit_disjoint_depth``).
