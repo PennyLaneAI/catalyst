@@ -17,6 +17,7 @@
 #include <cstring>
 #include <stdexcept>
 #include <string>
+#include <vector>
 
 #include "CpuControllerSession.hpp"
 #include "CpuCoprocessorSession.hpp"
@@ -347,18 +348,62 @@ TEST_CASE("memcpy carries messages wider than the 16 B wire frame", "[transport_
     }
 }
 
-TEST_CASE("memcpy rejects in/out_bytes above MAX_MESSAGE_BYTES", "[transport_memcpy]") {
+TEST_CASE("memcpy carries messages larger than one memory page", "[transport_memcpy]") {
+    constexpr std::size_t in_bytes = 65536 + 3;
+    constexpr std::size_t out_bytes = in_bytes + 1;
     ConnectInfo ci{.peer = "loopback", .oob_port = 19030};
     CpuControllerSession controller(pair_cfg(ci.oob_port));
     CpuCoprocessorSession coprocessor(pair_cfg(ci.oob_port));
     REQUIRE(controller.connect(ci) == 0);
     REQUIRE(coprocessor.connect(ci) == 0);
 
-    REQUIRE_THROWS_AS(controller.commit_work_item(0, common::MAX_MESSAGE_BYTES + 1, 8),
+    MemRegion reply = controller.alloc_memory(out_bytes, MemKind::CpuRam);
+    PeerRef peer_request = controller.exchange_keys(reply);
+    MemRegion request = coprocessor.alloc_memory(in_bytes, MemKind::CpuRam);
+    PeerRef peer_reply = coprocessor.exchange_keys(request);
+    ChannelDesc desc{.transport = "memcpy"};
+    controller.establish_channel(desc, reply, peer_request);
+    coprocessor.establish_channel(desc, request, peer_reply);
+
+    WideFrameCheck check{in_bytes, out_bytes};
+    controller.commit_work_item(0, in_bytes, out_bytes);
+    coprocessor.set_coprocessor_fn(wide_frame_fn, &check);
+    controller.start();
+    coprocessor.start();
+
+    std::vector<std::uint8_t> payload(in_bytes);
+    for (std::size_t i = 0; i < in_bytes; ++i) {
+        payload[i] = static_cast<std::uint8_t>(i * 13);
+    }
+    controller.write_data_slot(payload.data(), in_bytes, /*decoder_id=*/9);
+    REQUIRE(controller.kick(0) == 0);
+
+    std::vector<std::uint8_t> got(out_bytes);
+    void *outs[1] = {got.data()};
+    std::uint64_t outs_bytes[1] = {out_bytes};
+    REQUIRE(controller.collect(outs, outs_bytes, 1) == 0);
+    for (std::size_t i = 0; i < in_bytes; ++i) {
+        REQUIRE(got[i] == static_cast<std::uint8_t>(~payload[i]));
+    }
+    CHECK(got[in_bytes] == 9);
+}
+
+TEST_CASE("memcpy coprocessor rejects a frame larger than its session's first",
+          "[transport_memcpy]") {
+    ConnectInfo ci{.peer = "loopback", .oob_port = 19037};
+    CpuCoprocessorSession coprocessor(pair_cfg(ci.oob_port));
+    REQUIRE(coprocessor.connect(ci) == 0);
+    coprocessor.start();
+
+    // The first message sizes the rings: a 16 B frame and an 8 B reply.
+    std::uint8_t frame[32] = {1, 2, 3, 4, 5, 6, 7, 8};
+    std::uint8_t reply[16] = {};
+    CHECK(coprocessor.process_message(frame, 16, reply, 8) == 8);
+    CHECK(reply[0] == 1);
+    REQUIRE_THROWS_AS(coprocessor.process_message(frame, sizeof(frame), reply, 8),
                       std::runtime_error);
-    REQUIRE_THROWS_AS(controller.commit_work_item(0, 8, common::MAX_MESSAGE_BYTES + 1),
+    REQUIRE_THROWS_AS(coprocessor.process_message(frame, 16, reply, sizeof(reply)),
                       std::runtime_error);
-    controller.commit_work_item(0, common::MAX_MESSAGE_BYTES, common::MAX_MESSAGE_BYTES);
 }
 
 TEST_CASE("memcpy rejects staging and kick before the message sizes are committed",
@@ -370,8 +415,7 @@ TEST_CASE("memcpy rejects staging and kick before the message sizes are committe
     REQUIRE(coprocessor.connect(ci) == 0);
 
     // A rejected commit leaves the session uncommitted, with no staging buffer.
-    REQUIRE_THROWS_AS(controller.commit_work_item(0, common::MAX_MESSAGE_BYTES + 1, 8),
-                      std::runtime_error);
+    REQUIRE_THROWS_AS(controller.commit_work_item(/*work_item_idx=*/1, 8, 8), std::runtime_error);
     const std::uint64_t word = 42;
     REQUIRE_THROWS_AS(controller.write_data_slot(&word, sizeof(word), /*decoder_id=*/0),
                       std::runtime_error);

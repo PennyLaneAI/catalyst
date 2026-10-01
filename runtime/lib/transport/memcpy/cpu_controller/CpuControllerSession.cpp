@@ -97,8 +97,6 @@ void CpuControllerSession::stop() {}
 void CpuControllerSession::commit_work_item(std::uint32_t work_item_idx, std::uint64_t in_bytes,
                                             std::uint64_t out_bytes) {
     TP_CHECK(work_item_idx == 0, "Only work_item_idx=0 supported");
-    TP_CHECK(in_bytes <= common::MAX_MESSAGE_BYTES && out_bytes <= common::MAX_MESSAGE_BYTES,
-             "In/out_bytes exceeds the %zu B message limit", common::MAX_MESSAGE_BYTES);
     TP_CHECK(!committed_, "Only one commit_work_item per session");
     in_bytes_ = in_bytes;
     out_bytes_ = out_bytes;

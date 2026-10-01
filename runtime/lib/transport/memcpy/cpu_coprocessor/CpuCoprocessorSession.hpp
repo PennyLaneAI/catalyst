@@ -28,7 +28,7 @@ namespace catalyst::transport::memcpy {
 
 // The coprocessor of the in-process memcpy transport. A MessageWorker runs the bound
 // CoprocessorFn on a worker thread, once per message. process_message is called inline from the
-// controller's kick() and carries messages of up to common::MAX_MESSAGE_BYTES each way.
+// controller's kick() and carries messages of any size each way.
 class CpuCoprocessorSession : public CoprocessorSession {
   public:
     explicit CpuCoprocessorSession(const std::string &config = {})

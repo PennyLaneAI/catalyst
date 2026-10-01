@@ -113,8 +113,9 @@
 
 <h3>Improvements 🛠</h3>
 
-* The memcpy transport's controller and CPU coprocessor carry messages of any size up to 4096
-  bytes in each direction, as committed by `__catalyst__transport__set_message_sizes`. A frame of
+* The memcpy transport's controller and CPU coprocessor carry messages of any size in each
+  direction, as committed by `__catalyst__transport__set_message_sizes`. The coprocessor's message
+  rings are sized by the first message, so their memory follows the committed sizes. A frame of
   up to 8 bytes keeps the 16 B `Payload` layout, so existing coprocessor functions and launchers
   are unaffected. The memcpy GPU coprocessor, whose persistent kernel reads one 8-byte value per
   message, still carries 8 bytes and now accepts a reply size below 8. The RDMA backends still

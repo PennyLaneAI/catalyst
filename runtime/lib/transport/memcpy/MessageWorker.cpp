@@ -16,7 +16,7 @@
 
 #include <algorithm>
 #include <cstring>
-#include <initializer_list>
+#include <new>
 
 #include "Error.hpp"
 
@@ -32,10 +32,30 @@ std::size_t echo_fn(const void *in, std::size_t in_len, void *out, std::size_t o
     return n;
 }
 
+constexpr std::size_t SLOT_ALIGN = 64;
+
+constexpr std::size_t round_up(std::size_t n, std::size_t to) { return (n + to - 1) / to * to; }
+
 } // namespace
 
-MessageWorker::MessageWorker()
-    : request_ring_(common::K_RING_SLOTS), reply_ring_(common::K_RING_SLOTS) {}
+void MessageWorker::Ring::allocate(std::size_t capacity) {
+    static_assert(sizeof(Header) == SLOT_ALIGN, "a slot header fills one 64 B line");
+    stride_ = sizeof(Header) + round_up(std::max<std::size_t>(capacity, 1), SLOT_ALIGN);
+    storage_.assign(common::K_RING_SLOTS * stride_ + SLOT_ALIGN, std::byte{0});
+    const auto addr = reinterpret_cast<std::uintptr_t>(storage_.data());
+    base_ = storage_.data() + (SLOT_ALIGN - addr % SLOT_ALIGN) % SLOT_ALIGN;
+    capacity_ = capacity;
+    for (std::size_t i = 0; i < common::K_RING_SLOTS; ++i) {
+        new (slot(i)) Header{};
+    }
+}
+
+void MessageWorker::Ring::release() {
+    std::vector<std::byte>().swap(storage_);
+    base_ = nullptr;
+    stride_ = 0;
+    capacity_ = 0;
+}
 
 MessageWorker::~MessageWorker() {
     try {
@@ -53,20 +73,41 @@ void MessageWorker::bind(CoprocessorFn fn, void *ctx) {
 
 void MessageWorker::start(ThreadInit init) {
     stop();
+    request_ring_.release();
+    reply_ring_.release();
     process_cursor_ = 0;
-    for (auto *ring : {&request_ring_, &reply_ring_}) {
-        for (Slot &slot : *ring) {
-            slot.bytes = slot.cap = slot.seq = 0;
-        }
-    }
     failed_.store(false, std::memory_order_relaxed);
     error_ = nullptr;
+    init_ = std::move(init);
+    started_ = true;
+}
+
+void MessageWorker::stop() {
+    if (engine_.joinable()) {
+        engine_.request_stop();
+        engine_.join();
+    }
+    started_ = false;
+}
+
+void MessageWorker::launch(std::size_t frame_bytes, std::size_t reply_bytes) {
+    const std::size_t reply_capacity =
+        std::max<std::size_t>(reply_bytes, common::PAYLOAD_DATA_BYTES);
+    try {
+        request_ring_.allocate(frame_bytes);
+        reply_ring_.allocate(reply_capacity);
+    } catch (const std::bad_alloc &) {
+        request_ring_.release();
+        reply_ring_.release();
+        TP_CHECK(false, "Cannot allocate the message rings for %zu B frames and %zu B replies",
+                 frame_bytes, reply_capacity);
+    }
     // Exceptions are captured into error_ so process_message surfaces the real error instead of
     // the thread terminating the process.
-    engine_ = std::jthread([this, init = std::move(init)](std::stop_token st) {
+    engine_ = std::jthread([this](std::stop_token st) {
         try {
-            if (init) {
-                init();
+            if (init_) {
+                init_();
             }
             run(st);
         } catch (...) {
@@ -76,19 +117,12 @@ void MessageWorker::start(ThreadInit init) {
     });
 }
 
-void MessageWorker::stop() {
-    if (engine_.joinable()) {
-        engine_.request_stop();
-        engine_.join();
-    }
-}
-
 void MessageWorker::run(std::stop_token st) {
     constexpr std::uint32_t STOP_CHECK_SPINS = 4096;
     for (std::uint64_t c = 0; !st.stop_requested(); ++c) {
         const std::size_t idx = c & (common::K_RING_SLOTS - 1);
         const std::uint32_t expect = static_cast<std::uint32_t>(c + 1);
-        const Slot &req = request_ring_[idx];
+        const Ring::Header &req = request_ring_.header(idx);
         volatile const std::uint32_t *rseq = &req.seq;
         // Check for stop periodically, so a request that never arrives cannot hang teardown.
         std::uint32_t spins = 0;
@@ -102,13 +136,16 @@ void MessageWorker::run(std::stop_token st) {
         }
         std::atomic_thread_fence(std::memory_order_acquire);
 
-        Slot &out = reply_ring_[idx];
-        const std::size_t cap = std::max<std::size_t>(req.cap, common::PAYLOAD_DATA_BYTES);
-        std::memset(out.data, 0, cap);
+        Ring::Header &out = reply_ring_.header(idx);
+        std::byte *out_data = reply_ring_.data(idx);
+        const std::size_t cap =
+            std::max<std::size_t>(static_cast<std::size_t>(req.cap), common::PAYLOAD_DATA_BYTES);
+        std::memset(out_data, 0, cap);
         CoprocessorFn fn = fn_ ? fn_ : &echo_fn;
-        const std::size_t nb = fn(req.data, req.bytes, out.data, cap, ctx_);
+        const std::size_t nb =
+            fn(request_ring_.data(idx), static_cast<std::size_t>(req.bytes), out_data, cap, ctx_);
         TP_CHECK(nb <= cap, "Coprocessor fn overran reply");
-        out.bytes = static_cast<std::uint32_t>(nb);
+        out.bytes = nb;
         std::atomic_thread_fence(std::memory_order_release);
         out.seq = expect; // publish
     }
@@ -116,11 +153,16 @@ void MessageWorker::run(std::stop_token st) {
 
 std::size_t MessageWorker::process_message(const void *in, std::size_t in_len, void *out,
                                            std::size_t out_cap) {
-    TP_CHECK(in_len <= common::MAX_FRAME_BYTES, "Request frame of %zu B exceeds %zu B", in_len,
-             common::MAX_FRAME_BYTES);
-    TP_CHECK(out_cap <= common::MAX_MESSAGE_BYTES, "Reply of %zu B exceeds %zu B", out_cap,
-             common::MAX_MESSAGE_BYTES);
     TP_CHECK(running(), "Call start() before process_message");
+    if (!engine_.joinable()) {
+        launch(in_len, out_cap);
+    }
+    TP_CHECK(in_len <= request_ring_.capacity(),
+             "Request frame of %zu B exceeds the %zu B frame this session started with", in_len,
+             request_ring_.capacity());
+    TP_CHECK(out_cap <= reply_ring_.capacity(),
+             "Reply of %zu B exceeds the %zu B reply this session started with", out_cap,
+             reply_ring_.capacity());
     if (failed_.load(std::memory_order_acquire)) {
         std::rethrow_exception(error_);
     }
@@ -129,16 +171,16 @@ std::size_t MessageWorker::process_message(const void *in, std::size_t in_len, v
     const std::uint64_t c = process_cursor_++;
     const std::size_t idx = c & (common::K_RING_SLOTS - 1);
     const std::uint32_t expect = static_cast<std::uint32_t>(c + 1);
-    Slot &req = request_ring_[idx];
+    Ring::Header &req = request_ring_.header(idx);
     if (in_len != 0) {
-        std::memcpy(req.data, in, in_len);
+        std::memcpy(request_ring_.data(idx), in, in_len);
     }
-    req.bytes = static_cast<std::uint32_t>(in_len);
-    req.cap = static_cast<std::uint32_t>(out_cap);
+    req.bytes = in_len;
+    req.cap = out_cap;
     std::atomic_thread_fence(std::memory_order_release);
     req.seq = expect;
 
-    const Slot &rep = reply_ring_[idx];
+    const Ring::Header &rep = reply_ring_.header(idx);
     volatile const std::uint32_t *sseq = &rep.seq;
     while (*sseq != expect) {
         if (failed_.load(std::memory_order_acquire)) {
@@ -147,7 +189,7 @@ std::size_t MessageWorker::process_message(const void *in, std::size_t in_len, v
     }
     std::atomic_thread_fence(std::memory_order_acquire);
     if (out_cap != 0 && out) {
-        std::memcpy(out, rep.data, out_cap);
+        std::memcpy(out, reply_ring_.data(idx), out_cap);
     }
     return out_cap;
 }
