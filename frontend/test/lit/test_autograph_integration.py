@@ -21,7 +21,7 @@ import inspect
 import pennylane as qp
 from jax.core import ShapedArray
 
-from catalyst import jacobian, mitigate_with_zne, qjit, vmap
+from catalyst import jacobian, qjit, vmap
 
 # pylint: disable=missing-function-docstring
 
@@ -86,21 +86,3 @@ def test_grad(c: bool, data: float):
 # CHECK-LABEL: @test_grad
 # CHECK:         scf.if
 print(test_grad.mlir)
-
-
-# -----
-# Test autograph on nested ZNE object.
-
-
-@qjit(autograph=True, target="mlir")
-@mitigate_with_zne(scale_factors=[1, 3, 5])
-@qp.qnode(qp.device("lightning.qubit", wires=1))
-def test_zne(c: bool, data: float):
-    if c:
-        qp.RY(data, wires=0)
-    return qp.expval(qp.PauliZ(0))
-
-
-# CHECK-LABEL: @test_zne
-# CHECK:         scf.if
-print(test_zne.mlir)

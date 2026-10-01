@@ -28,11 +28,6 @@ from catalyst.api_extensions.control_flow import (
     while_loop,
 )
 from catalyst.api_extensions.differentiation import grad, jacobian, jvp, value_and_grad, vjp
-from catalyst.api_extensions.error_mitigation import (
-    exponential_extrapolate,
-    mitigate_with_zne,
-    polynomial_extrapolate,
-)
 from catalyst.api_extensions.function_maps import vmap
 from catalyst.api_extensions.quantum_operators import (
     HybridAdjoint,
@@ -58,9 +53,6 @@ __all__ = (
     "jacobian",
     "vjp",
     "jvp",
-    "mitigate_with_zne",
-    "polynomial_extrapolate",
-    "exponential_extrapolate",
     "vmap",
     "measure",
     "pauli_measure",

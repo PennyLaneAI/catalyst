@@ -18,7 +18,6 @@ of quantum operations, measurements, and observables to JAXPR.
 import functools
 import sys
 from dataclasses import dataclass
-from enum import Enum
 from itertools import chain
 from typing import Iterable, List, Union
 
@@ -89,7 +88,6 @@ with Patcher(
         ValueAndGradOp,
         VJPOp,
     )
-    from mlir_quantum.dialects.mitigation import ZneOp
     from mlir_quantum.dialects.pbc import PPMeasurementOp
     from mlir_quantum.dialects.quantum import (
         AdjointOp,
@@ -271,21 +269,10 @@ mlir.ir_type_handlers[AbstractQreg] = _qreg_lowering
 mlir.ir_type_handlers[AbstractObs] = _obs_lowering
 
 
-class Folding(Enum):
-    """
-    Folding types supported by ZNE mitigation
-    """
-
-    GLOBAL = "global"
-    RANDOM = "local-random"
-    ALL = "local-all"
-
-
 ##############
 # Primitives #
 ##############
 
-zne_p = Primitive("zne")
 device_init_p = Primitive("device_init")
 device_init_p.multiple_results = True
 device_release_p = Primitive("device_release")
@@ -1071,69 +1058,6 @@ def _capture_vjp_lowering(ctx, *args, jaxpr, fn, method, argnums, h):
         mlir.flatten_ir_values(cotang_args),
         diffArgIndices=ir.DenseIntElementsAttr.get(new_argnums),
         finiteDiffParam=ir.FloatAttr.get(ir.F64Type.get(mlir_ctx), h) if h else None,
-    ).results
-
-
-#
-# zne
-#
-
-
-@zne_p.def_impl
-def _zne_def_impl(ctx, *args, folding, jaxpr, fn):  # pragma: no cover
-    raise NotImplementedError()
-
-
-@zne_p.def_abstract_eval
-def _zne_abstract_eval(*args, folding, jaxpr, fn):  # pylint: disable=unused-argument
-    shape = list(args[-1].shape)
-    if len(jaxpr.out_avals) > 1:
-        shape.append(len(jaxpr.out_avals))
-    return core.ShapedArray(shape, jaxpr.out_avals[0].dtype)
-
-
-def _folding_attribute(ctx, folding):
-    ctx = ctx.module_context.context
-    return ir.OpaqueAttr.get(
-        "mitigation",
-        ("folding " + Folding(folding).name.lower()).encode("utf-8"),
-        ir.NoneType.get(ctx),
-        ctx,
-    )
-
-
-def _zne_lowering(ctx, *args, folding, jaxpr, fn):
-    """Lowering function to the ZNE opearation.
-    Args:
-        ctx: the MLIR context
-        args: the arguments with scale factors as last
-        jaxpr: the jaxpr representation of the circuit
-        fn: the function to be mitigated
-    """
-    func_op = lower_jaxpr(ctx, jaxpr)
-    symbol_ref = get_symbolref(ctx, func_op)
-    output_types = list(map(mlir.aval_to_ir_types, ctx.avals_out))
-    flat_output_types = util.flatten(output_types)
-    num_folds = args[-1]
-
-    constants = []
-    for const in jaxpr.consts:
-        const_type = ir.RankedTensorType.get(const.shape, mlir.dtype_to_ir_type(const.dtype))
-        nparray = np.asarray(const)
-        if const.dtype == bool:
-            nparray = np.packbits(nparray, bitorder="little")
-        attr = ir.DenseElementsAttr.get(nparray, type=const_type)
-        constantVals = StableHLOConstantOp(attr).results
-        constants.append(constantVals)
-
-    args_and_consts = constants + list(args[0:-1])
-
-    return ZneOp(
-        flat_output_types,
-        symbol_ref,
-        mlir.flatten_ir_values(args_and_consts),
-        _folding_attribute(ctx, folding),
-        num_folds,
     ).results
 
 
@@ -3157,7 +3081,6 @@ def _symbolic_array_lowering(ctx, *, shape, dtype):
 
 CUSTOM_LOWERING_RULES = (
     (symbolic_array_prim, _symbolic_array_lowering),
-    (zne_p, _zne_lowering),
     (device_init_p, _device_init_lowering),
     (device_release_p, _device_release_lowering),
     (qalloc_p, _qalloc_lowering),
