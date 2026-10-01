@@ -11,9 +11,6 @@ This document contains the respective Catalyst-defined MLIR dialects, and their 
 :doc:`gradient`
    Automatic differentiation support in Catalyst
 
-:doc:`mitigation`
-   Quantum error mitigation techniques
-
 :doc:`catalyst`
    Support dialect for the Catalyst compiler
 
@@ -38,7 +35,6 @@ This document contains the respective Catalyst-defined MLIR dialects, and their 
    
    quantum
    gradient
-   mitigation
    catalyst
    ion
    pbc

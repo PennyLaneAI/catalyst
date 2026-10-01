@@ -614,9 +614,13 @@
 
 <h3>Breaking changes 💔</h3>
 
-* Catalyst now provides its own :func:`~.polynomial_extrapolate` and
-  :func:`~.exponential_extrapolate` functions for use with :func:`~.mitigate_with_zne`, replacing
-  ``pennylane.noise.poly_extrapolate`` and ``pennylane.noise.exponential_extrapolate``, which has been removed from PennyLane.
+* The error mitigation feature has been removed in its entirety, including the
+  ``mitigate_with_zne`` API extension, the ``mitigation`` MLIR dialect and its
+  ``lower-mitigation`` pass, the ``zne`` JAX primitive, and the
+  ``__catalyst__rt__random_double`` runtime symbol that only ZNE local-random folding used.
+  Its default extrapolation depended on ``pennylane.noise.poly_extrapolate``, which has been
+  removed from PennyLane. Zero-noise extrapolation can still be performed outside Catalyst, for
+  example with `Mitiq <https://github.com/unitaryfund/mitiq>`_.
   [(#3289)](https://github.com/PennyLaneAI/catalyst/pull/3289)
 
 * `catalyst.logging` has been removed. `pennylane.logging` should be used instead.

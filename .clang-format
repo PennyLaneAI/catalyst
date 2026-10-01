@@ -27,7 +27,7 @@ IncludeCategories:
     Priority: 2
 
   # Local headers
-  - Regex:    '^(")(CAPI|Catalyst|Driver|Gradient|GradMethods|hlo-extensions|Ion|MBQC|Mitigation|PBC|PauliFrame|QRef|QecLogical|QecPhysical|Quantum|RTIO|Standalone|Test)(.*\/.*)\.([hcp]+)(")$'
+  - Regex:    '^(")(CAPI|Catalyst|Driver|Gradient|GradMethods|hlo-extensions|Ion|MBQC|PBC|PauliFrame|QRef|QecLogical|QecPhysical|Quantum|RTIO|Standalone|Test)(.*\/.*)\.([hcp]+)(")$'
     Priority: 3
 
   # Private headers

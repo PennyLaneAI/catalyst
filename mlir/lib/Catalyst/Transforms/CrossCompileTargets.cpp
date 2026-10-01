@@ -50,7 +50,6 @@
 #include "Gradient/IR/GradientDialect.h"
 #include "Ion/IR/IonDialect.h"
 #include "MBQC/IR/MBQCDialect.h"
-#include "Mitigation/IR/MitigationDialect.h"
 #include "PBC/IR/PBCDialect.h"
 #include "PauliFrame/IR/PauliFrameDialect.h"
 #include "QRef/IR/QRefDialect.h"
@@ -180,7 +179,6 @@ struct CrossCompileTargetsPass : impl::CrossCompileTargetsPassBase<CrossCompileT
         registry.insert<catalyst::CatalystDialect, catalyst::quantum::QuantumDialect,
                         catalyst::qref::QRefDialect, catalyst::pbc::PBCDialect,
                         catalyst::gradient::GradientDialect, catalyst::mbqc::MBQCDialect,
-                        catalyst::mitigation::MitigationDialect,
                         catalyst::pauli_frame::PauliFrameDialect, catalyst::ion::IonDialect,
                         catalyst::rtio::RTIODialect, catalyst::qecl::QecLogicalDialect,
                         catalyst::qecp::QecPhysicalDialect, catalyst::executor::ExecutorDialect>();

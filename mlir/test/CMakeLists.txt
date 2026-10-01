@@ -22,7 +22,6 @@ set(TEST_SUITES
     Quantum
     QRef
     Gradient
-    Mitigation
     Catalyst
     Ion
     MBQC

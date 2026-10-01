@@ -55,7 +55,6 @@ try:
             os.path.join(config.quantum_build_dir, "python_packages", "quantum"),
             os.path.join(config.quantum_build_dir, "python_packages", "gradient"),
             os.path.join(config.quantum_build_dir, "python_packages", "catalyst"),
-            os.path.join(config.quantum_build_dir, "python_packages", "mitigation"),
             os.path.join(config.quantum_build_dir, "python_packages", "pbc"),
             os.path.join(config.quantum_build_dir, "python_packages", "ion"),
         ],
