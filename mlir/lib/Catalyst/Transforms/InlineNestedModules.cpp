@@ -78,6 +78,7 @@
 #include "Catalyst/IR/CatalystOps.h"
 #include "Catalyst/Transforms/Patterns.h"
 #include "Gradient/IR/GradientInterfaces.h"
+#include "Mitigation/IR/MitigationOps.h"
 
 using namespace mlir;
 
@@ -354,6 +355,26 @@ struct SymbolReplacerPattern
     const DenseMap<SymbolRefAttr, SymbolRefAttr> *_map;
 };
 
+struct ZNEReplacerPattern : public OpRewritePattern<catalyst::mitigation::ZneOp> {
+    using OpRewritePattern<catalyst::mitigation::ZneOp>::OpRewritePattern;
+
+    ZNEReplacerPattern(MLIRContext *context, const DenseMap<SymbolRefAttr, SymbolRefAttr> *map)
+        : OpRewritePattern<catalyst::mitigation::ZneOp>::OpRewritePattern(context), _map(map) {}
+
+    LogicalResult matchAndRewrite(catalyst::mitigation::ZneOp op,
+                                  PatternRewriter &rewriter) const override {
+        auto found = _map->find(op.getCallee()) != _map->end();
+        if (!found) {
+            return failure();
+        }
+        auto newSymbolRefAttr = _map->find(op.getCallee())->getSecond();
+        rewriter.modifyOpInPlace(op, [&] { op->setAttr("callee", newSymbolRefAttr); });
+        return success();
+    }
+
+    const DenseMap<SymbolRefAttr, SymbolRefAttr> *_map;
+};
+
 struct NestedToFlatCallPattern : public OpRewritePattern<catalyst::LaunchKernelOp> {
     using OpRewritePattern<catalyst::LaunchKernelOp>::OpRewritePattern;
     /// This overload constructs a pattern that matches any operation type.
@@ -495,7 +516,8 @@ struct InlineNestedSymbolTablePass : PassWrapper<InlineNestedSymbolTablePass, Op
         }
 
         RewritePatternSet nestedToFlat(context);
-        nestedToFlat.add<NestedToFlatCallPattern, SymbolReplacerPattern>(context, &old_to_new);
+        nestedToFlat.add<NestedToFlatCallPattern, SymbolReplacerPattern, ZNEReplacerPattern>(
+            context, &old_to_new);
         run = _stopAfterStep >= 4 || _stopAfterStep == 0;
         if (run && failed(applyPatternsGreedily(symbolTable, std::move(nestedToFlat), config))) {
             signalPassFailure();

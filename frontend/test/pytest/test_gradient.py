@@ -32,6 +32,7 @@ from catalyst import (
     CompileError,
     DifferentiableCompileError,
     measure,
+    mitigate_with_zne,
     pure_callback,
     value_and_grad,
     vmap,
@@ -1887,6 +1888,24 @@ class TestGradientErrors:
         @qjit
         def cir(x: float):
             return grad(f)(x)
+
+        with pytest.raises(CompileError, match=".*Compilation failed.*"):
+            cir(1.0)
+
+    def test_with_zne(self):
+        """Test with ZNE"""
+
+        @qp.qnode(qp.device("lightning.qubit", wires=1))
+        def f(x):
+            qp.RX(x, wires=0)
+            return qp.expval(qp.PauliX(0))
+
+        def g(x):
+            return mitigate_with_zne(f, scale_factors=[1, 3, 5])(x)
+
+        @qjit
+        def cir(x: float):
+            return grad(g)(x)
 
         with pytest.raises(CompileError, match=".*Compilation failed.*"):
             cir(1.0)

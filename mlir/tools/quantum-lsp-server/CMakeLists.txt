@@ -12,6 +12,7 @@ set(LIBS
     MLIRPBC
     MLIRGradient
     MLIRMBQC
+    MLIRMitigation
     MLIRPauliFrame
     MLIRIon
     MLIRRTIO

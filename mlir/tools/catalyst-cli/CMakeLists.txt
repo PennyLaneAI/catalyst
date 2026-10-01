@@ -39,6 +39,8 @@ set(LIBS
     gradient-transforms
     MLIRMBQC
     mbqc-transforms
+    MLIRMitigation
+    mitigation-transforms
     MLIRPauliFrame
     pauli-frame-transforms
     MLIRIon

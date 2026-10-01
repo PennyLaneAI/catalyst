@@ -549,6 +549,7 @@ def converted_call(fn, args, kwargs, caller_fn_scope=None, options=None):
             catalyst.jvp,
             qp.jvp,
             catalyst.vmap,
+            catalyst.mitigate_with_zne,
         )
 
         # HOTFIX: pass through calls of known Catalyst wrapper functions

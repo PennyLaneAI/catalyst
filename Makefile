@@ -244,7 +244,7 @@ wheel:
 	mkdir -p $(MK_DIR)/frontend/mlir_quantum
 	cp -R $(COPY_FLAGS) $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/runtime $(MK_DIR)/frontend/mlir_quantum
 	mkdir -p $(MK_DIR)/frontend/mlir_quantum/dialects
-	for file in gradient qref quantum _ods_common catalyst mbqc pbc _transform; do \
+	for file in gradient qref quantum _ods_common catalyst mbqc mitigation pbc _transform; do \
 		cp $(COPY_FLAGS) $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/dialects/*$${file}* $(MK_DIR)/frontend/mlir_quantum/dialects ; \
 	done
 	mkdir -p $(MK_DIR)/frontend/catalyst/bin
@@ -256,6 +256,7 @@ wheel:
 	mkdir -p $(MK_DIR)/frontend/catalyst/include
 	find $(DIALECTS_SRC_DIR)/include/Quantum $(DIALECTS_BUILD_DIR)/include/Quantum \
 	    $(DIALECTS_SRC_DIR)/include/Gradient $(DIALECTS_BUILD_DIR)/include/Gradient \
+	    $(DIALECTS_SRC_DIR)/include/Mitigation $(DIALECTS_BUILD_DIR)/include/Mitigation \
 	    \( -name "*.h" -o -name "*.h.inc" \) -type f -exec sh -c \
 	    'for file do \
 	        if [ "$$file" = "$${file#$(DIALECTS_BUILD_DIR)}" ]; then \

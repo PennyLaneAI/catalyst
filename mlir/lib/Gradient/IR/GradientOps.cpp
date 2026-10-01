@@ -68,6 +68,7 @@ LogicalResult verifyGradInputs(OpState *op_state, func::FuncOp callee, ValueRang
                 "Example of operations not allowed:\n"
                 " * mid circuit measurements\n"
                 " * callbacks\n"
+                " * ZNE mitigation.\n"
                 " Try setting method=\"fd\" to directly compute the gradient with finite "
                 "difference.");
         }

@@ -117,7 +117,7 @@ the compilation will fail with the following message:
     example.mlir:4:10: error: Dialect `standalone' not found for custom op 'standalone.foo'
     %1 = standalone.foo %0 : i32
          ^
-    a.mlir:4:10: note: Registered dialects: acc, affine, amdgpu, amx, arith, arm_neon, arm_sme, arm_sve, async, bufferization, builtin, catalyst, cf, chlo, complex, dlti, emitc, func, gpu, gradient, index, irdl, linalg, llvm, math, memref, mesh, mhlo, ml_program, mpi, nvgpu, nvvm, omp, pdl, pdl_interp, polynomial, quant, quantum, rocdl, scf, shape, sparse_tensor, spirv, stablehlo, tensor, test, tosa, transform, ub, vector, vhlo, x86vector, xegpu ; for more info on dialect registration see https://mlir.llvm.org/getting_started/Faq/#registered-loaded-dependent-whats-up-with-dialects-management
+    a.mlir:4:10: note: Registered dialects: acc, affine, amdgpu, amx, arith, arm_neon, arm_sme, arm_sve, async, bufferization, builtin, catalyst, cf, chlo, complex, dlti, emitc, func, gpu, gradient, index, irdl, linalg, llvm, math, memref, mesh, mhlo, mitigation, ml_program, mpi, nvgpu, nvvm, omp, pdl, pdl_interp, polynomial, quant, quantum, rocdl, scf, shape, sparse_tensor, spirv, stablehlo, tensor, test, tosa, transform, ub, vector, vhlo, x86vector, xegpu ; for more info on dialect registration see https://mlir.llvm.org/getting_started/Faq/#registered-loaded-dependent-whats-up-with-dialects-management
 
 In order to parse operations from this dialect, we need to load the dialect from the plugin shared object file:
 

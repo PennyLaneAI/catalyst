@@ -109,7 +109,7 @@ Will print out something close to the following:
 
         [SYSTEM] catalyst -o circuit.ll --module-name circuit --workspace ./ -verify-each=false \
             --catalyst-pipeline \
-            QuantumCompilationStage(split-multiple-tapes;builtin.module(apply-transform-sequence);inline-nested-module;adjoint-lowering), \
+            QuantumCompilationStage(split-multiple-tapes;builtin.module(apply-transform-sequence);inline-nested-module;lower-mitigation;adjoint-lowering), \
             HLOLoweringStage(canonicalize;func.func(chlo-legalize-to-stablehlo);func.func(stablehlo-legalize-control-flow);func.func(stablehlo-aggressive-simplification);stablehlo-legalize-to-linalg;func.func(stablehlo-legalize-to-std);func.func(stablehlo-legalize-sort);stablehlo-convert-to-signless;canonicalize;scatter-lowering;hlo-custom-call-lowering;cse;func.func(linalg-detensorize{aggressive-mode});detensorize-scf;detensorize-function-boundary;canonicalize;symbol-dce), \
             GradientLoweringStage(annotate-invalid-gradient-functions;lower-gradients), \
             BufferizationStage(inline;convert-tensor-to-linalg;convert-elementwise-to-linalg;gradient-preprocess;one-shot-bufferize{bufferize-function-boundaries allow-return-allocs-from-loops function-boundary-type-conversion=identity-layout-map unknown-type-conversion=identity-layout-map};canonicalize;gradient-postprocess;func.func(buffer-hoisting);func.func(buffer-loop-hoisting);func.func(buffer-deallocation);convert-arraylist-to-memref;convert-bufferization-to-memref;canonicalize;cp-global-memref), \

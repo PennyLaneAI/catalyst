@@ -47,6 +47,14 @@ declare_mlir_dialect_python_bindings(
 declare_mlir_dialect_python_bindings(
   ADD_TO_PARENT QuantumPythonSources
   ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/"
+  TD_FILE dialects/MitigationOps.td
+  SOURCES
+  dialects/mitigation.py
+  DIALECT_NAME mitigation)
+
+declare_mlir_dialect_python_bindings(
+  ADD_TO_PARENT QuantumPythonSources
+  ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/"
   TD_FILE dialects/MBQCOps.td
   SOURCES
   dialects/mbqc.py

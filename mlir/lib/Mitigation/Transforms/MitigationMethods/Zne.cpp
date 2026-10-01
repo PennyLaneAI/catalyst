@@ -1,0 +1,708 @@
+// Copyright 2023 Xanadu Quantum Technologies Inc.
+
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+
+//     http://www.apache.org/licenses/LICENSE-2.0
+
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+#include "Zne.hpp"
+
+#include <algorithm>
+#include <cstdint>
+#include <deque>
+#include <iostream>
+#include <sstream>
+#include <vector>
+
+#include "llvm/ADT/SmallPtrSet.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/Index/IR/IndexOps.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/IR/IRMapping.h"
+
+#include "Catalyst/Utils/CallGraph.h"
+#include "Mitigation/IR/MitigationOps.h"
+#include "Quantum/IR/QuantumOps.h"
+#include "Quantum/Utils/RemoveQuantum.h"
+
+namespace catalyst {
+namespace mitigation {
+
+bool containsQnodes(func::FuncOp funcOp) {
+    bool containsQnodes = false;
+    funcOp.walk([&](func::CallOp op) {
+        auto insideFuncOp =
+            SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, op.getCalleeAttr());
+        if (insideFuncOp->hasAttr("qnode")) {
+            containsQnodes = true;
+            return WalkResult::interrupt();
+        }
+        return WalkResult::advance();
+    });
+    return containsQnodes;
+}
+
+func::FuncOp createZneFunc(func::FuncOp funcOp, PatternRewriter &rewriter, Type foldCountType) {
+    PatternRewriter::InsertionGuard insertGuard(rewriter);
+    auto loc = funcOp.getLoc();
+    TypeRange originalTypes = funcOp.getArgumentTypes();
+    SmallVector<Type> typesFolded(originalTypes.begin(), originalTypes.end());
+    typesFolded.push_back(foldCountType);
+    FunctionType fnFoldedType = FunctionType::get(funcOp.getContext(),
+                                                  /*inputs=*/typesFolded,
+                                                  /*outputs=*/funcOp.getResultTypes());
+    std::string fnFoldedName = funcOp.getName().str() + ".zne";
+    rewriter.setInsertionPointToStart(funcOp->getParentOfType<ModuleOp>().getBody());
+    auto fnFoldedOp = func::FuncOp::create(rewriter, loc, fnFoldedName, fnFoldedType);
+
+    rewriter.cloneRegionBefore(funcOp.getBody(), fnFoldedOp.getBody(), fnFoldedOp.end());
+
+    Block *fnFoldedOpBlock = &fnFoldedOp.getBody().front();
+    fnFoldedOpBlock->addArgument(fnFoldedOp.getArgumentTypes().back(), loc);
+    return fnFoldedOp;
+}
+
+// TODO: Optimize the traversal of call graphs (currently used twice)
+// Also all functions exploree in the call graph get their ZNE version.
+func::FuncOp ZneLowering::getOrCreateFoldedCallee(Location loc, PatternRewriter &rewriter,
+                                                  mitigation::ZneOp op, func::FuncOp calleeOp,
+                                                  Folding foldingAlgorithm, Type foldCountType) {
+    auto moduleOp = op->getParentOfType<ModuleOp>();
+
+    if (calleeOp->hasAttr("qnode")) {
+        // Create the folded circuit function
+        FlatSymbolRefAttr foldedOpRefAttr =
+            getOrInsertFoldedCircuit(loc, rewriter, calleeOp, foldingAlgorithm);
+        return SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(calleeOp, foldedOpRefAttr);
+    }
+
+    // Traverse the callgraph, copy all the function to a `.zne` version and fold qnodes
+    traverseCallGraph(calleeOp, /*symbolTable=*/nullptr, [&](func::FuncOp funcOp) {
+        if (!funcOp->hasAttr("qnode")) {
+            // Copy the function and create a .zne counter part and add the scale factor as last
+            // argument
+            auto currentFnFoldedOp = createZneFunc(funcOp, rewriter, foldCountType);
+            // Folding of the qnodes and replace their calls with the folded version
+            if (containsQnodes(currentFnFoldedOp)) {
+                currentFnFoldedOp.walk([&](func::CallOp callOp) {
+                    PatternRewriter::InsertionGuard insertGuard(rewriter);
+                    func::FuncOp funcOp = SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(
+                        op, callOp.getCalleeAttr());
+                    std::string foldedName = callOp.getCalleeAttrName().str() + ".folded";
+                    func::FuncOp foldedOp = SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(
+                        moduleOp, rewriter.getStringAttr(foldedName));
+                    if (funcOp->hasAttr("qnode") and !foldedOp) {
+                        // Create the folded circuit function
+                        auto foldedCircuitAttr =
+                            getOrInsertFoldedCircuit(loc, rewriter, funcOp, foldingAlgorithm);
+                        foldedOp = SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(
+                            moduleOp, foldedCircuitAttr);
+                    }
+                    if (foldedOp) {
+                        std::vector<Value> args = {callOp.getArgOperands().begin(),
+                                                   callOp.getArgOperands().end()};
+                        args.push_back(currentFnFoldedOp.getArguments().back());
+                        rewriter.setInsertionPoint(callOp);
+                        rewriter.replaceOpWithNewOp<func::CallOp>(callOp, foldedOp, args);
+                    }
+                });
+            }
+        }
+    });
+
+    std::string fnName = calleeOp.getName().str() + ".zne";
+    FlatSymbolRefAttr foldedOpRefAttr = SymbolRefAttr::get(op.getContext(), fnName);
+    func::FuncOp fnFoldedOp =
+        SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(moduleOp, foldedOpRefAttr);
+    // Traverse the call graph a second time, in orderd to replace the function calls to their
+    // .zne counterparts.
+    traverseCallGraph(fnFoldedOp, /*symbolTable=*/nullptr, [&](func::FuncOp funcOp) {
+        funcOp.walk([&](func::CallOp callOp) {
+            PatternRewriter::InsertionGuard insertionGuard(rewriter);
+            std::string fnName = callOp.getCallee().str() + ".zne";
+            FlatSymbolRefAttr foldedOpRefAttr = SymbolRefAttr::get(op.getContext(), fnName);
+            auto currentFnFoldedOp =
+                SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(moduleOp, foldedOpRefAttr);
+            if (currentFnFoldedOp) {
+                rewriter.modifyOpInPlace(callOp, [&] {
+                    callOp.setCallee(currentFnFoldedOp.getName());
+                    auto parentFunc = callOp->getParentOfType<func::FuncOp>();
+                    callOp.getOperandsMutable().append(parentFunc.getArguments().back());
+                });
+            }
+        });
+    });
+
+    return fnFoldedOp;
+}
+
+Value ZneLowering::buildFoldedResultsLoop(Location loc, PatternRewriter &rewriter,
+                                          mitigation::ZneOp op, func::FuncOp fnFoldedOp,
+                                          Value numFolds, bool randomFolding,
+                                          int64_t numScaleFactors, RankedTensorType resultType) {
+    // Loop over the num fold to create a folded circuit per factor
+    Value c0 = index::ConstantOp::create(rewriter, loc, 0);
+    Value c1 = index::ConstantOp::create(rewriter, loc, 1);
+    Value size = index::ConstantOp::create(rewriter, loc, numScaleFactors);
+    // Initialize the results as empty tensor
+
+    Value results =
+        tensor::EmptyOp::create(rewriter, loc, resultType.getShape(), resultType.getElementType());
+    return scf::ForOp::create(
+               rewriter, loc, c0, size, c1, /*iterArgsInit=*/results,
+               [&](OpBuilder &builder, Location loc, Value i, ValueRange iterArgs) {
+                   std::vector<Value> newArgs(op.getArgs().begin(), op.getArgs().end());
+                   SmallVector<Value> index = {i};
+                   Value numFold = tensor::ExtractOp::create(builder, loc, numFolds, index);
+                   if (randomFolding) {
+                       // Keep the f64 fold count; its fractional part drives the
+                       // probabilistic extra fold.
+                       newArgs.push_back(numFold);
+                   } else {
+                       // Integral by construction convert
+                       // to an index for the fold loops.
+                       Value numFoldInt =
+                           arith::FPToSIOp::create(builder, loc, builder.getI64Type(), numFold);
+                       Value numFoldCasted =
+                           index::CastSOp::create(builder, loc, builder.getIndexType(), numFoldInt);
+                       newArgs.push_back(numFoldCasted);
+                   }
+                   func::CallOp callOp = func::CallOp::create(builder, loc, fnFoldedOp, newArgs);
+
+                   int64_t numResults = callOp.getNumResults();
+
+                   // Measurements
+                   ValueRange resultValuesMulti = callOp.getResults();
+                   SmallVector<Value> vectorResultsMulti;
+                   // Create a tensor
+                   for (Value resultValue : resultValuesMulti) {
+                       Value resultExtracted;
+                       if (isa<RankedTensorType>(resultValue.getType())) {
+                           resultExtracted = tensor::ExtractOp::create(builder, loc, resultValue);
+                       } else {
+                           resultExtracted = resultValue;
+                       }
+                       vectorResultsMulti.push_back(resultExtracted);
+                   }
+                   SmallVector<int64_t> resShape = {numResults};
+                   Type type = RankedTensorType::get(resShape, vectorResultsMulti[0].getType());
+                   auto tensorResults =
+                       tensor::FromElementsOp::create(builder, loc, type, vectorResultsMulti);
+                   Value sizeResultsValue = index::ConstantOp::create(rewriter, loc, numResults);
+                   Value resultValuesFor =
+                       scf::ForOp::create(
+                           rewriter, loc, c0, sizeResultsValue, c1,
+                           /*iterArgsInit=*/iterArgs.front(),
+                           [&](OpBuilder &builder, Location loc, Value j, ValueRange iterArgsIn) {
+                               Value resultExtracted =
+                                   tensor::ExtractOp::create(builder, loc, tensorResults, j);
+                               SmallVector<Value> indices;
+                               if (numResults == 1) {
+                                   indices = {i};
+                               } else {
+                                   indices = {i, j};
+                               }
+                               Value resultInserted = tensor::InsertOp::create(
+                                   builder, loc, resultExtracted, iterArgsIn.front(), indices);
+
+                               scf::YieldOp::create(builder, loc, resultInserted);
+                           })
+                           .getResult(0);
+                   scf::YieldOp::create(builder, loc, resultValuesFor);
+               })
+        .getResult(0);
+}
+
+LogicalResult ZneLowering::matchAndRewrite(mitigation::ZneOp op, PatternRewriter &rewriter) const {
+    Location loc = op.getLoc();
+    // Number of folds
+    auto numFolds = op.getNumFolds();
+    RankedTensorType numFoldType = cast<RankedTensorType>(numFolds.getType());
+    const auto sizeInt = numFoldType.getDimSize(0);
+
+    // Folding type
+    auto foldingAlgorithm = op.getFolding();
+    auto calleeOp = SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, op.getCalleeAttr());
+
+    // The fold counts `(scale_factor-1)/2` always arrive as an f64 tensor. `random`
+    // folding threads the count through as an f64 so the fractional remainder survives
+    // to the folded circuit; the other methods require integral values and convert the
+    // count to an `index`.
+    const bool randomFolding = foldingAlgorithm == Folding::random;
+    Type foldCountType =
+        randomFolding ? Type(rewriter.getF64Type()) : Type(rewriter.getIndexType());
+
+    // Resolve (creating as needed) the folded callee, then evaluate it once per scale factor.
+    func::FuncOp fnFoldedOp =
+        getOrCreateFoldedCallee(loc, rewriter, op, calleeOp, foldingAlgorithm, foldCountType);
+
+    rewriter.setInsertionPoint(op);
+    RankedTensorType resultType = cast<RankedTensorType>(op.getResultTypes().front());
+    Value resultValues = buildFoldedResultsLoop(loc, rewriter, op, fnFoldedOp, numFolds,
+                                                randomFolding, sizeInt, resultType);
+
+    // Replace the original results
+    rewriter.replaceOp(op, resultValues);
+
+    return success();
+}
+
+// In *.cpp module only, to keep extraneous headers out of *.hpp
+FlatSymbolRefAttr globalFolding(Location loc, PatternRewriter &rewriter, std::string fnFoldedName,
+                                Operation *shots, StringAttr lib, StringAttr name,
+                                StringAttr kwargs, int64_t numberQubits, FunctionType fnFoldedType,
+                                SmallVector<Type> typesFolded, func::FuncOp fnFoldedOp,
+                                func::FuncOp fnAllocOp, func::FuncOp fnWithoutMeasurementsOp,
+                                func::FuncOp fnWithMeasurementsOp) {
+    // Function folded: Create the folded circuit (withoutMeasurement *
+    // Adjoint(withoutMeasurement))**num_fold * withMeasurements
+    Type qregType = quantum::QuregType::get(rewriter.getContext());
+
+    rewriter.setInsertionPointToStart(fnFoldedOp.addEntryBlock());
+    // Loop control variables
+    Value c0 = index::ConstantOp::create(rewriter, loc, 0);
+    Value c1 = index::ConstantOp::create(rewriter, loc, 1);
+    TypedAttr numberQubitsAttr = rewriter.getI64IntegerAttr(numberQubits);
+    Value numberQubitsValue = arith::ConstantOp::create(rewriter, loc, numberQubitsAttr);
+
+    // TODO: in the frontend, calculation of shots will happen outside of the qnode,
+    // before qp.device(..., shots = <some value computed earlier>) is called,
+    // so the SSA def-use computation chain of the shots will actually not be inside the qnode
+    // For now, we simply create a single arith.constant SSA shots value for the ZNE tests.
+    // Revisit when discussing the frontend design of dynamic shots/device/qnode interaction.
+    Operation *shotsLocal = shots->clone();
+
+    rewriter.insert(shotsLocal);
+    quantum::DeviceInitOp::create(rewriter, loc, shotsLocal->getResult(0), lib, name, kwargs);
+
+    Value allocQreg =
+        func::CallOp::create(rewriter, loc, fnAllocOp, numberQubitsValue).getResult(0);
+
+    int64_t sizeArgs = fnFoldedOp.getArguments().size();
+    Value size = fnFoldedOp.getArgument(sizeArgs - 1);
+    // Add scf for loop to create the folding
+    Value loopedQreg =
+        scf::ForOp::create(
+            rewriter, loc, c0, size, c1, /*iterArgsInit=*/allocQreg,
+            [&](OpBuilder &builder, Location loc, Value i, ValueRange iterArgs) {
+                Value qreg = iterArgs.front();
+                std::vector<Value> argsAndQreg(fnFoldedOp.getArguments().begin(),
+                                               fnFoldedOp.getArguments().end());
+                argsAndQreg.pop_back();
+                argsAndQreg.push_back(qreg);
+
+                // Call the function without measurements
+                Value fnWithoutMeasurementsQreg =
+                    func::CallOp::create(builder, loc, fnWithoutMeasurementsOp, argsAndQreg)
+                        .getResult(0);
+
+                // Call the function without measurements in an adjoint region
+                auto adjointOp =
+                    quantum::AdjointOp::create(builder, loc, qregType, fnWithoutMeasurementsQreg);
+                Region *adjointRegion = &adjointOp.getRegion();
+                Block *adjointBlock = builder.createBlock(adjointRegion, {}, qregType, loc);
+
+                std::vector<Value> argsAndQregAdjoint(fnFoldedOp.getArguments().begin(),
+                                                      fnFoldedOp.getArguments().end());
+                argsAndQregAdjoint.pop_back();
+                argsAndQregAdjoint.push_back(adjointBlock->getArgument(0));
+                Value fnWithoutMeasurementsAdjointQreg =
+                    func::CallOp::create(builder, loc, fnWithoutMeasurementsOp, argsAndQregAdjoint)
+                        .getResult(0);
+                quantum::YieldOp::create(builder, loc, fnWithoutMeasurementsAdjointQreg);
+                builder.setInsertionPointAfter(adjointOp);
+                scf::YieldOp::create(builder, loc, adjointOp.getResults());
+            })
+            .getResult(0);
+    std::vector<Value> argsAndRegMeasurement(fnFoldedOp.getArguments().begin(),
+                                             fnFoldedOp.getArguments().end());
+    argsAndRegMeasurement.pop_back();
+    argsAndRegMeasurement.push_back(loopedQreg);
+    ValueRange funcFolded =
+        func::CallOp::create(rewriter, loc, fnWithMeasurementsOp, argsAndRegMeasurement)
+            .getResults();
+    // Remove device
+    quantum::DeviceReleaseOp::create(rewriter, loc);
+    func::ReturnOp::create(rewriter, loc, funcFolded);
+    return SymbolRefAttr::get(rewriter.getContext(), fnFoldedName);
+}
+
+static func::FuncOp getOrInsertRandomDecl(PatternRewriter &rewriter, ModuleOp moduleOp,
+                                          Location loc) {
+    StringRef rngName = "__catalyst__rt__random_double";
+    if (auto existing = moduleOp.lookupSymbol<func::FuncOp>(rngName)) {
+        return existing;
+    }
+    OpBuilder::InsertionGuard guard(rewriter);
+    rewriter.setInsertionPointToStart(moduleOp.getBody());
+    auto rngType = FunctionType::get(rewriter.getContext(), /*inputs=*/{},
+                                     /*results=*/rewriter.getF64Type());
+    func::FuncOp rngFunc = func::FuncOp::create(rewriter, loc, rngName, rngType);
+    rngFunc.setPrivate();
+    return rngFunc;
+}
+
+// Helper: clone `op` as a folding pair $G G^\dagger$ acting on `inQubits`, returning
+// the qubit values produced by the adjoint gate.
+static ValueRange cloneFoldingPair(OpBuilder &builder, quantum::QuantumGate op,
+                                   ValueRange inQubits) {
+    quantum::QuantumGate origOp = dyn_cast<quantum::QuantumGate>(builder.clone(*op));
+    origOp.setQubitOperands(inQubits);
+    quantum::QuantumGate adjointOp = dyn_cast<quantum::QuantumGate>(builder.clone(*origOp));
+    adjointOp.setQubitOperands(origOp->getResults());
+    adjointOp.setAdjointFlag(!adjointOp.getAdjointFlag());
+    return adjointOp->getResults();
+}
+
+// Random local folding, reproducing Mitiq's `fold_gates_at_random` (equal-weight case).
+// The fold count `(scale_factor - 1) / 2` arrives as an f64 `size`. Of `n` gates, every gate
+// is folded `base = floor(size)` times, and then exactly `k = round((size - base) * n)` gates
+// are folded once more, giving `n + 2*(base*n + k) ~= scale_factor * n` gates. Odd-integer
+// scale factors yield `k == 0`, matching `allLocalFolding`.
+// The `k`-of-`n` subset is drawn at run time with Knuth's selection sampling (Algorithm S):
+// gate `i`, with `chosen` already selected, is folded when `random_double() < (k - chosen) /
+// (n - i)`; this picks exactly `k` gates, each `k`-subset equally likely. Fidelity-weighted
+// folding (Mitiq's optional `fidelities` argument) is not modelled.
+FlatSymbolRefAttr randomLocalFolding(PatternRewriter &rewriter, std::string fnFoldedName,
+                                     func::FuncOp fnFoldedOp, Value c0, Value c1) {
+    int64_t sizeArgs = fnFoldedOp.getArguments().size();
+    Value size = fnFoldedOp.getArgument(sizeArgs - 1);
+
+    ModuleOp moduleOp = fnFoldedOp->getParentOfType<ModuleOp>();
+    func::FuncOp rngFunc = getOrInsertRandomDecl(rewriter, moduleOp, fnFoldedOp.getLoc());
+
+    // Collect candidate gates first so in-place edits don't disturb the walk.
+    SmallVector<quantum::QuantumGate> gates;
+    fnFoldedOp.walk([&](quantum::QuantumGate op) { gates.push_back(op); });
+    const int64_t numGates = static_cast<int64_t>(gates.size());
+
+    // Entry-block setup: split `size` into an integer base count and the number of extra
+    // folds `k = round((size - base) * numGates)`, and seed the `chosen` counter.
+    Location entryLoc = fnFoldedOp.getLoc();
+    Type f64Ty = rewriter.getF64Type();
+    Type i64Ty = rewriter.getI64Type();
+    rewriter.setInsertionPointToStart(&fnFoldedOp.getBody().front());
+    // `size >= 0`, so truncation toward zero equals floor.
+    Value baseI64 = arith::FPToSIOp::create(rewriter, entryLoc, i64Ty, size);
+    Value baseIndex = index::CastSOp::create(rewriter, entryLoc, rewriter.getIndexType(), baseI64);
+    Value baseF64 = arith::SIToFPOp::create(rewriter, entryLoc, f64Ty, baseI64);
+    Value delta = arith::SubFOp::create(rewriter, entryLoc, size, baseF64);
+    Value numGatesF64 =
+        arith::ConstantOp::create(rewriter, entryLoc, rewriter.getF64FloatAttr(numGates));
+    Value half = arith::ConstantOp::create(rewriter, entryLoc, rewriter.getF64FloatAttr(0.5));
+    Value oneI64 = arith::ConstantOp::create(rewriter, entryLoc, rewriter.getI64IntegerAttr(1));
+    // k = round(delta * numGates) = floor(delta * numGates + 0.5).
+    Value deltaN = arith::MulFOp::create(rewriter, entryLoc, delta, numGatesF64);
+    Value deltaNRounded = arith::AddFOp::create(rewriter, entryLoc, deltaN, half);
+    Value kI64 = arith::FPToSIOp::create(rewriter, entryLoc, i64Ty, deltaNRounded);
+    Value chosen = arith::ConstantOp::create(rewriter, entryLoc, rewriter.getI64IntegerAttr(0));
+
+    for (int64_t gateIdx = 0; gateIdx < numGates; ++gateIdx) {
+        quantum::QuantumGate op = gates[gateIdx];
+        rewriter.setInsertionPoint(op);
+        auto loc = op->getLoc();
+        const std::vector<Value> opQubitArgs = op.getQubitOperands();
+
+        // Unconditional base folds: apply $G G^\dagger$ `base` times.
+        const auto forVal =
+            scf::ForOp::create(rewriter, loc, c0, baseIndex, c1, /*iterArgsInit=*/opQubitArgs,
+                               [&](OpBuilder &builder, Location loc, Value i, ValueRange iterArgs) {
+                                   scf::YieldOp::create(builder, loc,
+                                                        cloneFoldingPair(builder, op, iterArgs));
+                               })
+                .getResults();
+
+        // Selection-sampling probability for this gate: (k - chosen) / (numGates - gateIdx).
+        Value remainingF64 =
+            arith::ConstantOp::create(rewriter, loc, rewriter.getF64FloatAttr(numGates - gateIdx));
+        Value neededI64 = arith::SubIOp::create(rewriter, loc, kI64, chosen);
+        Value neededF64 = arith::SIToFPOp::create(rewriter, loc, f64Ty, neededI64);
+        Value prob = arith::DivFOp::create(rewriter, loc, neededF64, remainingF64);
+        Value randVal = func::CallOp::create(rewriter, loc, rngFunc, ValueRange{}).getResult(0);
+        Value coin = arith::CmpFOp::create(rewriter, loc, arith::CmpFPredicate::OLT, randVal, prob);
+
+        // if selectedfold once more and increment `chosen`; otherwise pass through
+        // updated `chosen` is yielded as the last result so it threads to the next gate.
+        auto ifOp = scf::IfOp::create(
+            rewriter, loc, coin,
+            [&](OpBuilder &thenBuilder, Location thenLoc) {
+                ValueRange folded = cloneFoldingPair(thenBuilder, op, forVal);
+                Value chosenNext = arith::AddIOp::create(thenBuilder, thenLoc, chosen, oneI64);
+                SmallVector<Value> yields(folded.begin(), folded.end());
+                yields.push_back(chosenNext);
+                scf::YieldOp::create(thenBuilder, thenLoc, yields);
+            },
+            [&](OpBuilder &elseBuilder, Location elseLoc) {
+                SmallVector<Value> yields(forVal.begin(), forVal.end());
+                yields.push_back(chosen);
+                scf::YieldOp::create(elseBuilder, elseLoc, yields);
+            });
+
+        SmallVector<Value> ifResults(ifOp.getResults().begin(), ifOp.getResults().end());
+        chosen = ifResults.back();
+        ifResults.pop_back();
+        op.setQubitOperands(ifResults);
+    }
+
+    // Return the function symbol reference
+    return SymbolRefAttr::get(rewriter.getContext(), fnFoldedName);
+}
+// In *.cpp module only, to keep extraneous headers out of *.hpp
+FlatSymbolRefAttr allLocalFolding(PatternRewriter &rewriter, std::string fnFoldedName,
+                                  func::FuncOp fnFoldedOp, Value c0, Value c1) {
+    int64_t sizeArgs = fnFoldedOp.getArguments().size();
+    Value size = fnFoldedOp.getArgument(sizeArgs - 1);
+
+    // Walk through the operations in fnFoldedOp
+    fnFoldedOp.walk([&](quantum::QuantumGate op) {
+        rewriter.setInsertionPoint(op);
+        auto loc = op->getLoc();
+        const std::vector<Value> opQubitArgs = op.getQubitOperands();
+
+        // Insert a for loop immediately before each quantum::QuantumGate
+        const auto forVal =
+            scf::ForOp::create(rewriter, loc, c0, size, c1, /*iterArgsInit=*/opQubitArgs,
+                               [&](OpBuilder &builder, Location loc, Value i, ValueRange iterArgs) {
+                                   // Create adjoint and original operations
+                                   quantum::QuantumGate origOp =
+                                       dyn_cast<quantum::QuantumGate>(builder.clone(*op));
+                                   origOp.setQubitOperands(iterArgs);
+                                   auto origOpVal = origOp->getResults();
+
+                                   quantum::QuantumGate adjointOp =
+                                       dyn_cast<quantum::QuantumGate>(builder.clone(*origOp));
+                                   adjointOp.setQubitOperands(origOpVal);
+                                   adjointOp.setAdjointFlag(!adjointOp.getAdjointFlag());
+                                   auto adjointOpVal = adjointOp->getResults();
+
+                                   // Yield the qubits.
+                                   scf::YieldOp::create(builder, loc, adjointOpVal);
+                               })
+                .getResults();
+
+        op.setQubitOperands(forVal);
+
+        return WalkResult::advance();
+    });
+
+    // Return the function symbol reference
+    return SymbolRefAttr::get(rewriter.getContext(), fnFoldedName);
+}
+FlatSymbolRefAttr ZneLowering::getOrInsertFoldedCircuit(Location loc, PatternRewriter &rewriter,
+                                                        func::FuncOp op, Folding foldingAlgorithm) {
+    OpBuilder::InsertionGuard guard(rewriter);
+    ModuleOp moduleOp = op->getParentOfType<ModuleOp>();
+    std::string fnFoldedName = op.getName().str() + ".folded";
+
+    MLIRContext *ctx = rewriter.getContext();
+
+    if (moduleOp.lookupSymbol<func::FuncOp>(fnFoldedName)) {
+        return SymbolRefAttr::get(ctx, fnFoldedName);
+    }
+
+    // Original function
+    func::FuncOp fnOp = SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, op.getNameAttr());
+
+    // Set insertion in the module
+    rewriter.setInsertionPointToStart(moduleOp.getBody());
+
+    // Get the number of qubits
+    const int64_t numberQubits =
+        (*fnOp.getOps<quantum::AllocOp>().begin()).getNqubitsAttr().value_or(0);
+    // Get the device
+    quantum::DeviceInitOp deviceInitOp = *fnOp.getOps<quantum::DeviceInitOp>().begin();
+
+    Operation *shots = deviceInitOp.getShots().getDefiningOp();
+    StringAttr lib = deviceInitOp.getLibAttr();
+    StringAttr name = deviceInitOp.getDeviceNameAttr();
+    StringAttr kwargs = deviceInitOp.getKwargsAttr();
+
+    TypeRange originalTypes = op.getArgumentTypes();
+    SmallVector<Type> typesFolded(originalTypes.begin(), originalTypes.end());
+    // `random` folding receives an f64 fold count to retain the fractional part of
+    // `(scale_factor-1)/2`; the integer folding methods use an `index` count.
+    Type foldCountType = foldingAlgorithm == Folding::random ? Type(rewriter.getF64Type())
+                                                             : Type(rewriter.getIndexType());
+    typesFolded.push_back(foldCountType);
+
+    rewriter.setInsertionPointToStart(moduleOp.getBody());
+
+    FunctionType fnFoldedType = FunctionType::get(ctx, /*inputs=*/
+                                                  typesFolded,
+                                                  /*outputs=*/fnOp.getResultTypes());
+
+    func::FuncOp fnFoldedOp = func::FuncOp::create(rewriter, loc, fnFoldedName, fnFoldedType);
+    fnFoldedOp.setPrivate();
+    if (foldingAlgorithm == Folding(1)) {
+        // Quantum Alloc function
+        FlatSymbolRefAttr quantumAllocRefAttr = getOrInsertQuantumAlloc(loc, rewriter, op);
+        func::FuncOp fnAllocOp =
+            SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, quantumAllocRefAttr);
+
+        // Function without measurements: Create function without measurements and with qreg as last
+        // argument
+        FlatSymbolRefAttr fnWithoutMeasurementsRefAttr =
+            getOrInsertFnWithoutMeasurements(loc, rewriter, op);
+        func::FuncOp fnWithoutMeasurementsOp =
+            SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, fnWithoutMeasurementsRefAttr);
+
+        // Function with measurements: Modify the original function to take a quantum register as
+        // last arg and keep measurements
+        FlatSymbolRefAttr fnWithMeasurementsRefAttr =
+            getOrInsertFnWithMeasurements(loc, rewriter, op);
+        func::FuncOp fnWithMeasurementsOp =
+            SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, fnWithMeasurementsRefAttr);
+
+        return globalFolding(loc, rewriter, fnFoldedName, shots, lib, name, kwargs, numberQubits,
+                             fnFoldedType, typesFolded, fnFoldedOp, fnAllocOp,
+                             fnWithoutMeasurementsOp, fnWithMeasurementsOp);
+    }
+    rewriter.cloneRegionBefore(fnOp.getBody(), fnFoldedOp.getBody(), fnFoldedOp.end());
+
+    Block *fnFoldedOpBlock = &fnFoldedOp.getBody().front();
+    rewriter.setInsertionPointToStart(fnFoldedOpBlock);
+    // Loop control variables
+    Value c0 = index::ConstantOp::create(rewriter, loc, 0);
+    Value c1 = index::ConstantOp::create(rewriter, loc, 1);
+
+    fnFoldedOpBlock->addArgument(fnFoldedOp.getArgumentTypes().back(), loc);
+
+    if (foldingAlgorithm == Folding(2)) {
+        return allLocalFolding(rewriter, fnFoldedName, fnFoldedOp, c0, c1);
+    }
+    // Else, if (foldingAlgorithm == Folding(3)):
+    return randomLocalFolding(rewriter, fnFoldedName, fnFoldedOp, c0, c1);
+}
+FlatSymbolRefAttr ZneLowering::getOrInsertQuantumAlloc(Location loc, PatternRewriter &rewriter,
+                                                       func::FuncOp op) {
+    // Quantum Alloc function
+    MLIRContext *ctx = rewriter.getContext();
+    OpBuilder::InsertionGuard guard(rewriter);
+    ModuleOp moduleOp = op->getParentOfType<ModuleOp>();
+    Type qregType = quantum::QuregType::get(rewriter.getContext());
+
+    std::string fnAllocName = op.getName().str() + ".quantumAlloc";
+
+    if (moduleOp.lookupSymbol<func::FuncOp>(fnAllocName)) {
+        return SymbolRefAttr::get(ctx, fnAllocName);
+    }
+    Type i64Type = rewriter.getI64Type();
+    FunctionType fnAllocType = FunctionType::get(ctx, /*inputs=*/
+                                                 i64Type,
+                                                 /*outputs=*/qregType);
+    func::FuncOp fnAlloc = func::FuncOp::create(rewriter, loc, fnAllocName, fnAllocType);
+    fnAlloc.setPrivate();
+    Block *allocBloc = fnAlloc.addEntryBlock();
+    rewriter.setInsertionPointToStart(allocBloc);
+    Value nQubits = allocBloc->getArgument(0);
+    IntegerAttr intAttr{};
+    auto qreg = quantum::AllocOp::create(rewriter, loc, qregType, nQubits, intAttr);
+    func::ReturnOp::create(rewriter, loc, qreg.getResult());
+    return SymbolRefAttr::get(ctx, fnAllocName);
+}
+FlatSymbolRefAttr ZneLowering::getOrInsertFnWithoutMeasurements(Location loc,
+                                                                PatternRewriter &rewriter,
+                                                                func::FuncOp op) {
+    MLIRContext *ctx = rewriter.getContext();
+    OpBuilder::InsertionGuard guard(rewriter);
+    ModuleOp moduleOp = op->getParentOfType<ModuleOp>();
+    std::string fnWithoutMeasurementsName = op.getName().str() + ".withoutMeasurements";
+    if (moduleOp.lookupSymbol<func::FuncOp>(fnWithoutMeasurementsName)) {
+        return SymbolRefAttr::get(ctx, fnWithoutMeasurementsName);
+    }
+    Type qregType = quantum::QuregType::get(rewriter.getContext());
+    func::FuncOp fnOp = SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, op.getNameAttr());
+    TypeRange originalTypes = op.getArgumentTypes();
+
+    SmallVector<Type> typesWithoutMeasurements(originalTypes.begin(), originalTypes.end());
+    typesWithoutMeasurements.push_back(qregType);
+
+    FunctionType fnWithoutMeasurementsType = FunctionType::get(ctx, /*inputs=*/
+                                                               typesWithoutMeasurements,
+                                                               /*outputs=*/qregType);
+    func::FuncOp fnWithoutMeasurementsOp =
+        func::FuncOp::create(rewriter, loc, fnWithoutMeasurementsName, fnWithoutMeasurementsType);
+    fnWithoutMeasurementsOp.setPrivate();
+    rewriter.cloneRegionBefore(fnOp.getBody(), fnWithoutMeasurementsOp.getBody(),
+                               fnWithoutMeasurementsOp.end());
+    Block *fnWithoutMeasurementsBlock = &fnWithoutMeasurementsOp.front();
+    fnWithoutMeasurementsBlock->addArgument(qregType, loc);
+    quantum::AllocOp allocOp = *fnWithoutMeasurementsOp.getOps<quantum::AllocOp>().begin();
+
+    auto lastArgIndex = fnWithoutMeasurementsBlock->getArguments().size();
+    allocOp.replaceAllUsesWith(fnWithoutMeasurementsBlock->getArgument(lastArgIndex - 1));
+
+    rewriter.eraseOp(allocOp);
+    quantum::DeviceInitOp deviceInitOp =
+        *fnWithoutMeasurementsOp.getOps<quantum::DeviceInitOp>().begin();
+    rewriter.eraseOp(deviceInitOp);
+    quantum::DeviceReleaseOp deviceReleaseOp =
+        *fnWithoutMeasurementsOp.getOps<quantum::DeviceReleaseOp>().begin();
+    rewriter.eraseOp(deviceReleaseOp);
+    rewriter.setInsertionPointToStart(&fnWithoutMeasurementsOp.getBody().front());
+
+    Operation *lastOp;
+    fnWithoutMeasurementsOp.walk([&](quantum::DeallocOp deallocOp) { lastOp = deallocOp; });
+    fnWithoutMeasurementsOp.walk(
+        [&](func::ReturnOp returnOp) { returnOp->setOperands(lastOp->getOperands()); });
+
+    quantum::DeallocOp localDealloc = *fnWithoutMeasurementsOp.getOps<quantum::DeallocOp>().begin();
+    rewriter.eraseOp(localDealloc);
+    quantum::replaceQuantumMeasurements(fnWithoutMeasurementsOp, rewriter);
+    return SymbolRefAttr::get(ctx, fnWithoutMeasurementsName);
+}
+FlatSymbolRefAttr ZneLowering::getOrInsertFnWithMeasurements(Location loc,
+                                                             PatternRewriter &rewriter,
+                                                             func::FuncOp op) {
+    MLIRContext *ctx = rewriter.getContext();
+    OpBuilder::InsertionGuard guard(rewriter);
+    ModuleOp moduleOp = op->getParentOfType<ModuleOp>();
+
+    std::string fnWithMeasurementsName = op.getName().str() + ".withMeasurements";
+
+    if (moduleOp.lookupSymbol<func::FuncOp>(fnWithMeasurementsName)) {
+        return SymbolRefAttr::get(ctx, fnWithMeasurementsName);
+    }
+
+    Type qregType = quantum::QuregType::get(rewriter.getContext());
+    func::FuncOp fnOp = SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, op.getNameAttr());
+    TypeRange originalTypes = op.getArgumentTypes();
+
+    SmallVector<Type> typesWithQreg(originalTypes.begin(), originalTypes.end());
+    typesWithQreg.push_back(qregType);
+
+    FunctionType fnWithMeasurementsType = FunctionType::get(ctx, /*inputs=*/
+                                                            typesWithQreg,
+                                                            /*outputs=*/fnOp.getResultTypes());
+    func::FuncOp fnWithMeasurementsOp =
+        func::FuncOp::create(rewriter, loc, fnWithMeasurementsName, fnWithMeasurementsType);
+    fnWithMeasurementsOp.setPrivate();
+    rewriter.cloneRegionBefore(fnOp.getBody(), fnWithMeasurementsOp.getBody(),
+                               fnWithMeasurementsOp.end());
+    Block *fnWithMeasurementsBlock = &fnWithMeasurementsOp.front();
+    fnWithMeasurementsBlock->addArgument(qregType, loc);
+    quantum::DeviceInitOp deviceInitOp =
+        *fnWithMeasurementsOp.getOps<quantum::DeviceInitOp>().begin();
+    rewriter.eraseOp(deviceInitOp);
+    quantum::DeviceReleaseOp deviceReleaseOp =
+        *fnWithMeasurementsOp.getOps<quantum::DeviceReleaseOp>().begin();
+    rewriter.eraseOp(deviceReleaseOp);
+    quantum::AllocOp allocOpWithMeasurements =
+        *fnWithMeasurementsOp.getOps<quantum::AllocOp>().begin();
+
+    auto lastArgQregIndex = fnWithMeasurementsBlock->getArguments().size();
+    allocOpWithMeasurements.replaceAllUsesWith(
+        fnWithMeasurementsBlock->getArgument(lastArgQregIndex - 1));
+    rewriter.eraseOp(allocOpWithMeasurements);
+    return SymbolRefAttr::get(ctx, fnWithMeasurementsName);
+}
+} // namespace mitigation
+} // namespace catalyst
