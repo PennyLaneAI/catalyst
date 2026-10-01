@@ -244,7 +244,7 @@ class WorkflowInterpreter(PlxprInterpreter):
         )
         new_version._pass_pipeline = copy(self._pass_pipeline)
         new_version.init_qreg = self.init_qreg
-        new_version.requires_decompose_lowering = self.requires_decompose_lowering
+        new_version._decompose_applied = self._decompose_applied
         return new_version
 
     def __init__(self, skip_preprocess=False, _preprocess_warn=True, collect_decomp_rules=True):
@@ -254,8 +254,8 @@ class WorkflowInterpreter(PlxprInterpreter):
         self._preprocess_warn = _preprocess_warn
         self._collect_decomp_rules = collect_decomp_rules
 
-        # Guards against applying more than one decomposition transform (not yet supported).
-        self.requires_decompose_lowering = False
+        # Set once a decomposition transform is applied; guards against a second one (unsupported).
+        self._decompose_applied = False
 
         super().__init__()
 
@@ -328,14 +328,6 @@ def handle_qnode(
     )
 
 
-def _guard_single_decompose(self):
-    """Raise if a second decomposition transform is applied (not yet supported)."""
-    if not self.requires_decompose_lowering:
-        self.requires_decompose_lowering = True
-    else:
-        raise NotImplementedError("Multiple decomposition transforms are not yet supported.")
-
-
 # qp.decompose arguments the graph-decomposition pass supports (mapped 1:1). ``tkwargs`` holds only
 # the arguments the user passed, so any other key means an unsupported argument was set.
 _SUPPORTED_DECOMPOSE_TKWARGS = frozenset({"gate_set", "fixed_decomps", "alt_decomps"})
@@ -367,7 +359,11 @@ def _handle_decompose_transform(self, inner_jaxpr, consts, non_const_args, tkwar
 
     from catalyst.passes.builtin_passes import graph_decomposition
 
-    _guard_single_decompose(self)
+    # Multiple decomposition transforms are not yet supported.
+    if self._decompose_applied:
+        raise NotImplementedError("Multiple decomposition transforms are not yet supported.")
+    self._decompose_applied = True
+
     _validate_decompose_tkwargs(tkwargs)
 
     fixed_decomps = tkwargs.get("fixed_decomps") or {}
@@ -420,8 +416,7 @@ def handle_transform(
     targs = args[_tuple_to_slice(targs_slice)]
     pl_tkwargs = _tuple_to_dict(tkwargs)
 
-    # If the transform is a decomposition transform
-    # and the graph-based decomposition is enabled
+    # qp.decompose is routed to the graph-decomposition pass (see _handle_decompose_transform).
     if transform == pl_decompose:
         return _handle_decompose_transform(self, inner_jaxpr, consts, non_const_args, pl_tkwargs)
 
