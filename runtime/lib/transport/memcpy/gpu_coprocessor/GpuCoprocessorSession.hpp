@@ -44,7 +44,7 @@ namespace catalyst::transport::memcpy {
 // Per-message (`per_message` true): a MessageWorker runs a host CoprocessorFn once per message on a
 // thread whose current GPU is `gpu_device`, and the function launches whatever GPU work it needs.
 // This suits a model compiled ahead of time, which is launched from the host per call rather than
-// resident as a persistent kernel. Messages carry up to common::MAX_MESSAGE_BYTES each way.
+// resident as a persistent kernel. Messages carry any size each way.
 class GpuCoprocessorSession : public CoprocessorSession {
   public:
     explicit GpuCoprocessorSession(const std::string &config = {}, int gpu_device = 0,
@@ -72,9 +72,10 @@ class GpuCoprocessorSession : public CoprocessorSession {
     // slot, spin-waits for the engine thread to publish the paired reply slot (fed by the
     // persistent decode kernel's handoff), and copies the reply into `out`.
     //
-    // Launch-once expects `in_len == sizeof(common::Payload)` (16, a wire-shaped frame) and
-    // `out_cap >= sizeof(int64_t)`, and the reply is always `sizeof(int64_t)` bytes. Anything else
-    // throws. Per-message accepts any frame MessageWorker does.
+    // Launch-once expects `in_len == sizeof(common::Payload)` (16, a wire-shaped frame), so
+    // messages carry 8 B each way, and throws otherwise. The kernel's correction is
+    // `sizeof(int64_t)` bytes, of which the first `min(out_cap, 8)` are copied to `out`, and that
+    // count is returned. Per-message accepts any frame MessageWorker does.
     std::size_t process_message(const void *in, std::size_t in_len, void *out, std::size_t out_cap);
 
   private:

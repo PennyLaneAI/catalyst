@@ -73,13 +73,12 @@ inline constexpr std::size_t REGION_BYTES = K_RING_SLOTS * sizeof(PayloadSlot);
 
 // Messages larger than PAYLOAD_DATA_BYTES.
 //
-// A backend that is not bound to the fixed 16 B frame (the memcpy backends) carries a message of up
-// to MAX_MESSAGE_BYTES in each direction. Its frame has the same shape as Payload with a wider data
-// area: `frame_data_bytes(in_bytes)` data bytes at offset 0, then the u32 decoder_id, then the u32
+// A backend that is not bound to the fixed 16 B frame (the memcpy backends) carries a message of
+// any size in each direction. Its frame has the same shape as Payload with a wider data area:
+// `frame_data_bytes(in_bytes)` data bytes at offset 0, then the u32 decoder_id, then the u32
 // seq_num. For in_bytes <= PAYLOAD_DATA_BYTES the data area is PAYLOAD_DATA_BYTES and the frame is
 // byte-for-byte a Payload, so a coprocessor function written against Payload reads it unchanged.
 // Backends bound to the 16 B frame reject a committed size above PAYLOAD_DATA_BYTES.
-inline constexpr std::size_t MAX_MESSAGE_BYTES = 4096;
 
 // Bytes in the data area of a frame carrying `in_bytes` of payload: at least PAYLOAD_DATA_BYTES,
 // and rounded up to a multiple of 8 so decoder_id and seq_num stay aligned.
@@ -92,9 +91,6 @@ inline constexpr std::size_t frame_data_bytes(std::size_t in_bytes) {
 inline constexpr std::size_t frame_bytes(std::size_t data_bytes) {
     return data_bytes + sizeof(Payload::decoder_id) + sizeof(Payload::seq_num);
 }
-
-// The largest frame a memcpy backend carries.
-inline constexpr std::size_t MAX_FRAME_BYTES = frame_bytes(frame_data_bytes(MAX_MESSAGE_BYTES));
 
 static_assert(frame_bytes(frame_data_bytes(PAYLOAD_DATA_BYTES)) == sizeof(Payload),
               "a frame of PAYLOAD_DATA_BYTES must be exactly a Payload");

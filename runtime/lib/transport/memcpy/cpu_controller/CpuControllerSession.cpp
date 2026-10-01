@@ -97,8 +97,6 @@ void CpuControllerSession::stop() {}
 void CpuControllerSession::commit_work_item(std::uint32_t work_item_idx, std::uint64_t in_bytes,
                                             std::uint64_t out_bytes) {
     TP_CHECK(work_item_idx == 0, "Only work_item_idx=0 supported");
-    TP_CHECK(in_bytes <= common::MAX_MESSAGE_BYTES && out_bytes <= common::MAX_MESSAGE_BYTES,
-             "In/out_bytes exceeds the %zu B message limit", common::MAX_MESSAGE_BYTES);
     TP_CHECK(!committed_, "Only one commit_work_item per session");
     in_bytes_ = in_bytes;
     out_bytes_ = out_bytes;
@@ -109,6 +107,7 @@ void CpuControllerSession::commit_work_item(std::uint32_t work_item_idx, std::ui
 
 int CpuControllerSession::kick(std::uint32_t work_item_idx) {
     TP_CHECK(work_item_idx == 0, "Only work_item_idx=0 supported");
+    TP_CHECK(committed_, "Commit the message sizes (commit_work_item) before kick");
     TP_CHECK(link_, "No paired coprocessor");
     TP_CHECK(local_reply_.size >= out_bytes_, "Reply region too small for committed out_bytes");
 
@@ -124,8 +123,10 @@ int CpuControllerSession::kick(std::uint32_t work_item_idx) {
                     std::min<std::size_t>(static_cast<std::size_t>(staged_bytes_), data_bytes));
     }
     const std::uint32_t seq_num = static_cast<std::uint32_t>(next_send_ + 1);
-    std::memcpy(frame_.data() + data_bytes, &decoder_id_, sizeof(decoder_id_));
-    std::memcpy(frame_.data() + data_bytes + sizeof(decoder_id_), &seq_num, sizeof(seq_num));
+    const std::size_t decoder_id_offset = data_bytes;
+    const std::size_t seq_num_offset = data_bytes + sizeof(decoder_id_);
+    std::memcpy(frame_.data() + decoder_id_offset, &decoder_id_, sizeof(decoder_id_));
+    std::memcpy(frame_.data() + seq_num_offset, &seq_num, sizeof(seq_num));
     ++next_send_;
 
     std::size_t reply_bytes = 0;
@@ -146,6 +147,7 @@ void *CpuControllerSession::data_slot() {
 
 void CpuControllerSession::write_data_slot(const void *src, std::uint64_t bytes,
                                            std::uint32_t decoder_id) {
+    TP_CHECK(committed_, "Commit the message sizes (commit_work_item) before staging a payload");
     TP_CHECK(bytes <= in_bytes_, "Payload exceeds committed in_bytes");
     TP_CHECK(bytes == 0 || src != nullptr, "Null source with non-zero payload");
     if (bytes != 0) {

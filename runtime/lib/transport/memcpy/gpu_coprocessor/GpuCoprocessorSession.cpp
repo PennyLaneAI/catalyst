@@ -213,9 +213,9 @@ std::size_t GpuCoprocessorSession::process_message(const void *in, std::size_t i
         return worker_.process_message(in, in_len, out, out_cap);
     }
     TP_CHECK(in_len == sizeof(common::Payload),
-             "A launch-once GPU coprocessor carries 8 B messages; set coproc_fn=per_message in its "
-             "config for larger ones");
-    TP_CHECK(out_cap >= sizeof(std::int64_t), "Reply buffer too small for GPU correction");
+             "A launch-once GPU coprocessor carries 8 B messages, got a %zu B frame; set "
+             "coproc_fn=per_message in its config for larger ones",
+             in_len);
     TP_CHECK(kernel_running_, "Call start() before process_message");
     if (failed_.load(std::memory_order_acquire)) {
         std::rethrow_exception(error_);
@@ -242,8 +242,11 @@ std::size_t GpuCoprocessorSession::process_message(const void *in, std::size_t i
 
     std::int64_t correction = 0;
     std::memcpy(&correction, &reply_ring_[idx].p.value, sizeof(correction));
-    std::memcpy(out, &correction, sizeof(correction));
-    return sizeof(correction);
+    const std::size_t n = std::min(out_cap, sizeof(correction));
+    if (n != 0 && out) {
+        std::memcpy(out, &correction, n);
+    }
+    return n;
 }
 
 } // namespace catalyst::transport::memcpy

@@ -194,8 +194,8 @@ class ControllerSession : public TransportSession {
  *
  * `in` is the request frame: the payload at offset 0, then the u32 decoder_id and the u32 seq_num
  * in its last 8 bytes, so its payload area is `in_len - 8` bytes. Over a backend bound to the 16 B
- * wire frame that area is 8 bytes. A memcpy backend widens it to hold the committed in_bytes, up
- * to MAX_MESSAGE_BYTES (see WireProtocol.hpp). `out_cap` is at least 8.
+ * wire frame that area is 8 bytes. A memcpy backend widens it to hold the committed in_bytes, of
+ * any size (see WireProtocol.hpp). `out_cap` is at least 8.
  *
  * Returning COPROCESSOR_FN_ERROR reports that the message could not be processed: the backend
  * fails that round instead of delivering the reply.
