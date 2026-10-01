@@ -27,6 +27,12 @@ from catalyst.decomposition.decomposition_rules import (
 )
 from catalyst.utils.runtime_environment import BYTECODE_FILE_PATH
 
+PRECOMPILED_MODIFIERS = (
+    (False, 0),
+    (True, 0),
+    (False, 1),
+)
+
 
 def precompile_decomp_rules(decomp_file_path: str = BYTECODE_FILE_PATH) -> None:
     """Compile PennyLane built-in decomposition rules to MLIR Bytecode.
@@ -43,7 +49,8 @@ def precompile_decomp_rules(decomp_file_path: str = BYTECODE_FILE_PATH) -> None:
 
     for abstract_ops in qp.decomposition.signature_registry().values():
         for op in abstract_ops:
-            scope.record_root(OpDecompRequest.from_operation(op))
+            for modifier_context in PRECOMPILED_MODIFIERS:
+                scope.record_root(OpDecompRequest.from_operation(op, modifier_context))
 
     with ir.Context():
         target_specs = walk_reachable_decomp_rule_sets(list(scope.roots.values()))
