@@ -14,8 +14,6 @@
 
 """Unit tests for the python decompositions module."""
 
-from functools import partial
-
 import jax.numpy as jnp
 import numpy as np
 import pennylane as qp
@@ -1082,7 +1080,7 @@ class TestSymbolicRules:
             add_decomps("C(CtrlWired)", ctrl_rule)
 
             @qjit(capture=True)
-            @graph_decomposition(gate_set=["CNOT", "PauliX"])
+            @qp.decompose(gate_set=["CNOT", "PauliX"])
             @qnode(qp.device("lightning.qubit", wires=2))
             def circuit():
                 # The X both prepares the control in |1> -- so a swapped control/target leaves
@@ -1203,7 +1201,7 @@ class TestSymbolicRules:
                 add_decomps("C(MultiCtrlWired)", ctrl_rule)
 
                 @qjit(capture=True)
-                @graph_decomposition(gate_set=["Toffoli", "PauliX"])
+                @qp.decompose(gate_set=["Toffoli", "PauliX"])
                 @qnode(qp.device("lightning.qubit", wires=3))
                 def circuit():
                     for wire in prepared_controls:
@@ -1253,7 +1251,7 @@ class TestSymbolicRules:
             add_decomps("C(ZeroCtrl)", ctrl_rule)
 
             @qjit(capture=True)
-            @graph_decomposition(gate_set=["CNOT", "PauliX"])
+            @qp.decompose(gate_set=["CNOT", "PauliX"])
             @qnode(qp.device("lightning.qubit", wires=2))
             def circuit():
                 # The control is off, and the control value is zero, so the op fires.
@@ -1691,7 +1689,7 @@ def test_gate_already_in_gateset():
     """
 
     @qp.qjit(capture=True)
-    @graph_decomposition(gate_set={"Hadamard"})
+    @qp.decompose(gate_set={"Hadamard"})
     @qp.qnode(qp.device("lightning.qubit", wires=1))
     def circuit():
         qp.Hadamard(0)
@@ -1864,7 +1862,7 @@ class TestDecomposeAlias:
 
             return circuit
 
-        via_decompose = build(partial(qp.transforms.decompose, gate_set=gate_set))
+        via_decompose = build(qp.decompose(gate_set=gate_set))
         via_graph = build(graph_decomposition(gate_set=gate_set))
 
         assert 'apply_registered_pass "graph-decomposition"' in via_decompose.mlir
@@ -1886,7 +1884,7 @@ class TestDecomposeAlias:
         with pytest.raises(exc):
 
             @qjit(capture=True, target="mlir")
-            @partial(qp.transforms.decompose, **tkwargs)
+            @qp.decompose(**tkwargs)
             @qnode(qp.device("null.qubit", wires=1))
             def circuit():
                 qp.Rot(0.1, 0.2, 0.3, wires=0)
@@ -1899,8 +1897,8 @@ class TestDecomposeAlias:
         with pytest.raises(NotImplementedError, match="Multiple decomposition"):
 
             @qjit(capture=True, target="mlir")
-            @partial(qp.transforms.decompose, gate_set={"RX", "RY", "RZ"})
-            @partial(qp.transforms.decompose, gate_set={"RX", "RY", "RZ"})
+            @qp.decompose(gate_set={"RX", "RY", "RZ"})
+            @qp.decompose(gate_set={"RX", "RY", "RZ"})
             @qnode(qp.device("null.qubit", wires=1))
             def circuit():
                 qp.Rot(0.1, 0.2, 0.3, wires=0)
@@ -1919,8 +1917,7 @@ class TestDecomposeAlias:
         try:
 
             @qjit(capture=True, target="mlir")
-            @partial(
-                qp.transforms.decompose,
+            @qp.decompose(
                 gate_set={"NoParams"},
                 fixed_decomps={qp.Rot: rot_to_noparams},
             )
@@ -1950,8 +1947,7 @@ class TestDecomposeAlias:
             with pytest.raises(NotImplementedError, match="collect_decomp_rules"):
 
                 @qjit(capture=True, target="mlir", collect_decomp_rules=False)
-                @partial(
-                    qp.transforms.decompose,
+                @qp.decompose(
                     gate_set={"NoParams"},
                     fixed_decomps={qp.Rot: rot_to_noparams},
                 )
@@ -2036,8 +2032,8 @@ class TestNumericHamiltonianDecomposition:
         all_wires = qp.wires.Wires.all_wires(list(registers.values()))
 
         @qjit(capture=True, target="mlir")
-        @graph_decomposition(
-            gate_set={"QROM", "AQFT", "CNOT", "PhaseShift", "RZ", "Hadamard", "GlobalPhase"}
+        @qp.decompose(
+            gate_set={"QROM", "AQFT", "CNOT", "PhaseShift", "RZ", "Hadamard", "GlobalPhase"},
         )
         @qnode(qp.device("null.qubit", wires=len(all_wires)))
         def circuit():

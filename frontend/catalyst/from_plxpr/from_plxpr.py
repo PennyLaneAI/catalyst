@@ -342,7 +342,7 @@ _SUPPORTED_DECOMPOSE_TKWARGS = frozenset({"gate_set", "fixed_decomps", "alt_deco
 
 
 def _validate_decompose_tkwargs(tkwargs):
-    """Reject qp.decompose arguments the graph-decomposition pass cannot honor.
+    """Reject qp.decompose arguments the graph-decomposition pass doesn't support yet.
     """
     unsupported = sorted(k for k in tkwargs if k not in _SUPPORTED_DECOMPOSE_TKWARGS)
     if unsupported:
@@ -361,11 +361,7 @@ def _validate_decompose_tkwargs(tkwargs):
 def _handle_decompose_transform(self, inner_jaxpr, consts, non_const_args, tkwargs):
     """Route a captured ``qp.decompose`` onto the ``graph-decomposition`` pass.
 
-    ``qp.decompose`` is an alias for :func:`catalyst.passes.graph_decomposition`: both build the same
-    pass options and run the same C++ ``graph-decomposition`` pass, which solves and lowers the
-    decomposition. Inline ``fixed_decomps``/``alt_decomps`` rule bodies are registered into a local
-    decomposition scope so the trace-time rule-collection closure can capture them (the pass options
-    only carry rule *names*; the bodies come from PennyLane's decomposition registry).
+    ``qp.decompose`` is an alias for :func:`catalyst.passes.graph_decomposition`.
     """
     # Local imports avoid an import cycle (catalyst.passes imports from_plxpr indirectly).
     from pennylane.decomposition import add_decomps, local_decomps
@@ -378,10 +374,9 @@ def _handle_decompose_transform(self, inner_jaxpr, consts, non_const_args, tkwar
     fixed_decomps = tkwargs.get("fixed_decomps") or {}
     alt_decomps = tkwargs.get("alt_decomps") or {}
 
-    # The pass receives inline rules by name only; the bodies must be discoverable through the
-    # trace-time rule closure, which reads the decomposition registry. That closure runs during the
-    # eval below (inside the local_decomps scope). The compile-time on-demand loader runs later,
-    # after the scope exits, so inline rules require rule collection to be enabled.
+    # FIXME: The graph_decomposition pass currently requires rule collection to be enabled, but this
+    # is not strictly necessary. We should remove this restriction once the pass is updated to not
+    # require rule collection when we automate this part.
     if (fixed_decomps or alt_decomps) and not self._collect_decomp_rules:
         raise NotImplementedError(
             "Inline fixed_decomps/alt_decomps with qp.decompose require rule collection "

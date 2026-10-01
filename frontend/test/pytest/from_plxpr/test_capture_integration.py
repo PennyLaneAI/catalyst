@@ -1153,7 +1153,7 @@ class TestCapture:
         """
 
         @qjit(capture=True, collect_decomp_rules=False)
-        @partial(qp.transforms.decompose, gate_set=[qp.RX, qp.RY, qp.RZ])
+        @qp.decompose(gate_set=[qp.RX, qp.RY, qp.RZ])
         @qp.qnode(qp.device(backend, wires=2))
         def captured_circuit(x: float, y: float, z: float):
             m = qp.measure(0)
@@ -1168,7 +1168,7 @@ class TestCapture:
         capture_result = captured_circuit(1.5, 2.5, 3.5)
 
         # Capture disabled
-        @partial(qp.transforms.decompose, gate_set=[qp.RX, qp.RY, qp.RZ])
+        @qp.decompose(gate_set=[qp.RX, qp.RY, qp.RZ])
         @qp.qnode(qp.device(backend, wires=2))
         def circuit(x: float, y: float, z: float):
             m = catalyst.measure(0)
