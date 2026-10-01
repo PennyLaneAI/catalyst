@@ -428,15 +428,18 @@ def test_to_hybrid_wires():
 
 
 # CHECK: func.func private @"rule_NoParams{}{reg:3}{}"
-# CHECK-DAG: "HybridWires{}{}{}[[[uid_1:[0-9]+]]]" = 1
-# CHECK-DAG: "HybridWires{}{}{}[[[uid_2:[0-9]+]]]" = 2
+# CHECK-DAG: "HybridWires{}{cwires:3}{}[[[uid_1:[0-9]+]]]" = 1
+# CHECK-DAG: "HybridWires{}{cwires:1}{}[[[uid_2:[0-9]+]]]" = 2
 # CHECK-DAG:   target_gate = "NoParams{}{reg:3}{}"
 # CHECK: "qref.operator"
 # CHECK-SAME: UID = [[uid_2]]
+# CHECK-SAME: qubit_map = {cwires = array<i64: 0>}
 # CHECK: "qref.operator"
 # CHECK-SAME: UID = [[uid_2]]
+# CHECK-SAME: qubit_map = {cwires = array<i64: 0>}
 # CHECK: "qref.operator"
 # CHECK-SAME: UID = [[uid_1]]
+# CHECK-SAME: qubit_map = {cwires = array<i64: 0, 1, 2>}
 test_to_hybrid_wires()
 
 
@@ -527,15 +530,18 @@ def test_to_hybrid_op():
 
 
 # CHECK: func.func private @"rule_NoParams{}{reg:3}{}"
-# CHECK-DAG: "HybridOpArg{angle:[tensor<f64>]}{cwires:1}{}[[[uid_1:[0-9]+]]]" = 1
-# CHECK-DAG: "HybridOpArg{angle:[tensor<f64>]}{cwires:1}{}[[[uid_2:[0-9]+]]]" = 2
+# CHECK-DAG: "HybridOpArg{angle:[tensor<f64>]}{cwires:1,op:3}{}[[[uid_1:[0-9]+]]]" = 1
+# CHECK-DAG: "HybridOpArg{angle:[tensor<f64>]}{cwires:1,op:3}{}[[[uid_2:[0-9]+]]]" = 2
 # CHECK-DAG:   target_gate = "NoParams{}{reg:3}{}"
 # CHECK: "qref.operator"
 # CHECK-SAME: UID = [[uid_2]]
+# CHECK-SAME: qubit_map = {cwires = array<i64: 0>, op = array<i64: 1, 2, 3>}
 # CHECK: "qref.operator"
 # CHECK-SAME: UID = [[uid_2]]
+# CHECK-SAME: qubit_map = {cwires = array<i64: 0>, op = array<i64: 1, 2, 3>}
 # CHECK: "qref.operator"
 # CHECK-SAME: UID = [[uid_1]]
+# CHECK-SAME: qubit_map = {cwires = array<i64: 0>, op = array<i64: 1, 2, 3>}
 test_to_hybrid_op()
 
 
@@ -621,10 +627,11 @@ def test_to_hybrid_op_nested():
 
 
 # CHECK: func.func private @"rule_NoParams{}{reg:3}{}"
-# CHECK-SAME: "HybridOpArg{angle:[tensor<f64>]}{cwires:1}{}[[[uid:[0-9]+]]]" = 1
+# CHECK-SAME: "HybridOpArg{angle:[tensor<f64>]}{cwires:1,op:6}{}[[[uid:[0-9]+]]]" = 1
 # CHECK-SAME:   target_gate = "NoParams{}{reg:3}{}"
 # CHECK: "qref.operator"
 # CHECK-SAME: UID = [[uid]]
+# CHECK-SAME: qubit_map = {cwires = array<i64: 0>, op = array<i64: 1, 2, 3, 4, 5, 6>}
 test_to_hybrid_op_nested()
 
 
@@ -665,12 +672,13 @@ def test_from_hybrid_op_nested():
 
 # CHECK: func.func private @"rule_HybridOpArg{angle:[tensor<f64>]}{cwires:1}{}[7654]"
 # CHECK-SAME:   resources = {operations = {
-# CHECK-SAME:   "HybridOpArg{angle:[tensor<f64>]}{cwires:1}{}[[[uid_outer:[0-9]+]]]" = 1 : i64,
+# CHECK-SAME:   "HybridOpArg{angle:[tensor<f64>]}{cwires:1,op:3}{}[[[uid_outer:[0-9]+]]]" = 1 : i64,
 # CHECK-SAME:   "NoParams{}{reg:1}{}" = 1 : i64,
 # CHECK-SAME:   "StaticDataMultiReg{theta:[tensor<f64>]}{reg:1,reg2:2}{}[[[uid_inner:[0-9]+]]]" = 1 : i64
 # CHECK-SAME:   target_gate = "HybridOpArg{angle:[tensor<f64>]}{cwires:1}{}[7654]"
 # CHECK: "qref.operator"
 # CHECK-SAME:   UID = [[uid_outer]] : i64, op_name = "HybridOpArg"
+# CHECK-SAME:   qubit_map = {cwires = array<i64: 0>, op = array<i64: 1, 2, 3>}
 # CHECK: "qref.operator"
 # CHECK-SAME:   UID = [[uid_inner]] : i64, op_name = "StaticDataMultiReg"
 test_from_hybrid_op_nested()
@@ -733,12 +741,14 @@ def test_to_multiple_full_args_op():
 
 
 # CHECK: func.func private @"rule_NoParams{}{reg:3}{}"
-# CHECK-DAG: "MultipleFullArgs{angles1:[tensor<f64>],angles2:[tensor<2xf64>]}{reg1:1,reg2:2}{}[[[uid:[0-9]+]]]" = 2
+# CHECK-DAG: "MultipleFullArgs{angles1:[tensor<f64>],angles2:[tensor<2xf64>]}{hwires1:2,hwires2:1,op1:1,op2:1,reg1:1,reg2:2}{}[[[uid:[0-9]+]]]" = 2
 # CHECK-DAG:   target_gate = "NoParams{}{reg:3}{}"
 # CHECK: "qref.operator"
 # CHECK-SAME: UID = [[uid]]
+# CHECK-SAME: qubit_map = {hwires1 = array<i64: 5, 6>, hwires2 = array<i64: 7>, op1 = array<i64: 3>, op2 = array<i64: 4>, reg1 = array<i64: 0>, reg2 = array<i64: 1, 2>}
 # CHECK: "qref.operator"
 # CHECK-SAME: UID = [[uid]]
+# CHECK-SAME: qubit_map = {hwires1 = array<i64: 5, 6>, hwires2 = array<i64: 7>, op1 = array<i64: 3>, op2 = array<i64: 4>, reg1 = array<i64: 0>, reg2 = array<i64: 1, 2>}
 test_to_multiple_full_args_op()
 
 

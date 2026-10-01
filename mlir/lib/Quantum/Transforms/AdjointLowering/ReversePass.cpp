@@ -256,13 +256,18 @@ class AdjointGenerator {
                     continue;
                 }
 
-                // Integer/boolean scalar params were cached as f64 (widths > 53 bits already
-                // rejected by verifyTypeIsCacheable); pop and cast back.
+                // This is a temporary trick to make it lossless for widths <= 64 bits.
+                Type i64Ty = builder.getI64Type();
+                auto truncFromI64 = [&](Value v, Type target, Location l) -> Value {
+                    if (target == i64Ty) {
+                        return v;
+                    }
+                    return arith::TruncIOp::create(builder, l, target, v);
+                };
                 if (auto intType = dyn_cast<IntegerType>(paramType)) {
-                    Value popped =
-                        ListPopOp::create(builder, parametrizedGate.getLoc(), cache.paramVector);
-                    cachedParams[numParams - 1 - idx] = arith::FPToUIOp::create(
-                        builder, parametrizedGate.getLoc(), intType, popped);
+                    Location l = parametrizedGate.getLoc();
+                    Value popped = ListPopOp::create(builder, l, cache.intVector);
+                    cachedParams[numParams - 1 - idx] = truncFromI64(popped, intType, l);
                     idx++;
                     continue;
                 }
@@ -276,22 +281,24 @@ class AdjointGenerator {
 
                 // Real-valued tensor params (e.g. `quantum.operator` angle tensors, or a
                 // BasisRotation's `tensor<NxNxf64>` matrix) were cached element-by-element in
-                // row-major order in the forward pass; rebuild the tensor by popping them back.
-                // Integer/boolean tensors (e.g. a MultiX `tensor<Nxi1>` bitstring) were cached the
-                // same way, each element cast to f64 (widths > 53 bits already rejected by
-                // verifyTypeIsCacheable); cast back on rebuild.
+                // row-major order in `paramVector`; rebuild the tensor by popping them back.
+                // Integer/boolean tensors (e.g. a MultiX `tensor<Nxi1>` bitstring or a QROM
+                // `tensor<Nxi64>` bitstring) were recorded the same way in the i64 buffer
+                // `intVector` (widths > 64 bits already rejected by verifyTypeIsCacheable);
+                // truncate each popped element back on rebuild.
                 // Note that the complex-matrix path below is specific to QubitUnitary. We can
                 // revisit this when we have more complex-valued tensor params to handle.
                 if (elementType.isF64() || elementType.isInteger()) {
-                    // Cast a popped f64 back to the tensor's integer/boolean element type.
-                    auto fromF64 = [&](Value popped) -> Value {
+                    // Pop one element from the buffer matching the tensor's element type.
+                    auto readElement = [&]() -> Value {
                         if (elementType.isInteger()) {
-                            return arith::FPToUIOp::create(builder, loc, elementType, popped);
+                            Value popped = ListPopOp::create(builder, loc, cache.intVector);
+                            return truncFromI64(popped, elementType, loc);
                         }
-                        return popped;
+                        return ListPopOp::create(builder, loc, cache.paramVector);
                     };
                     if (aTensorType.getRank() == 0) {
-                        Value element = fromF64(ListPopOp::create(builder, loc, cache.paramVector));
+                        Value element = readElement();
                         cachedParams[numParams - 1 - idx] =
                             tensor::FromElementsOp::create(builder, loc, paramType, element);
                         idx++;
@@ -328,7 +335,7 @@ class AdjointGenerator {
                         Value revLinear = index::SubOp::create(builder, loc, total, iPlusOne);
                         SmallVector<Value> coords =
                             delinearizeIndex(builder, loc, revLinear, dimSizes);
-                        Value element = fromF64(ListPopOp::create(builder, loc, cache.paramVector));
+                        Value element = readElement();
                         Value updated =
                             tensor::InsertOp::create(builder, loc, element, acc, coords);
                         scf::YieldOp::create(builder, loc, updated);

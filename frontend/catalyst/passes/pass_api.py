@@ -91,9 +91,9 @@ def pipeline(pass_pipeline: PipelineDict):
 
     .. note::
 
-        As of Python 3.7, the CPython dictionary implementation orders dictionaries based on
-        insertion order. However, for an API guarantee of dictionary order,
-        ``collections.OrderedDict`` may also be used.
+        Dictionaries preserve insertion order as guaranteed by the Python language
+        since version 3.7, so the pass pipeline is executed in the order its entries
+        are defined.
 
     Note that the pass pipeline order and options can be configured *globally* for a
     qjit-compiled function, by using the ``circuit_transform_pipeline`` argument of

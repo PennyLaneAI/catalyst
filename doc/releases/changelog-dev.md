@@ -113,6 +113,11 @@
 
 <h3>Improvements 🛠</h3>
 
+* :func:`~.passes.graph_decomposition` accepts a `verbose` keyword argument. When `True`, the pass
+  prints the decomposition rule the solver chose for each operator, along with its cost and the
+  resulting gate counts, to `stderr`.
+  [(#3250)](https://github.com/PennyLaneAI/catalyst/pull/3250)
+
 * When the graph-based decomposition solver cannot reach the target gate set, the error now lists
   the actual operators that could not be decomposed (e.g. arbitrary-angle rotations) and the rules
   it tried, instead of only naming the top-level operator.
@@ -198,6 +203,7 @@
     [(#3239)](https://github.com/PennyLaneAI/catalyst/pull/3239)
     [(#3243)](https://github.com/PennyLaneAI/catalyst/pull/3243)
     [(#3252)](https://github.com/PennyLaneAI/catalyst/pull/3252)
+    [(#3261)](https://github.com/PennyLaneAI/catalyst/pull/3261)
 
     This pathway of rule injection can be opted-out via a new keyword argument on `qp.qjit` named `collect_decomp_rules`.
     This kwarg controls whether or not to compile the decomposition rules during lower-time. Default value is `True`.
@@ -227,6 +233,7 @@
     [(#3158)](https://github.com/PennyLaneAI/catalyst/pull/3158)
     [(#3206)](https://github.com/PennyLaneAI/catalyst/pull/3206)
     [(#3224)](https://github.com/PennyLaneAI/catalyst/pull/3224)
+    [(#3285)](https://github.com/PennyLaneAI/catalyst/pull/3285)
 
     1. The pass now supports applying a selection of the available decomposition rules via the `target_rules` parameter.
 
@@ -599,6 +606,7 @@
 
 * ``to_ppr`` now directly lowers PennyLane's discrete ``PPR`` operator to ``pbc.ppr``.
   [(#3185)](https://github.com/PennyLaneAI/catalyst/pull/3185)
+  [(#3262)](https://github.com/PennyLaneAI/catalyst/pull/3262)
 
 * The `--adjoint-lowering` pass no longer caches all classical gate parameters.
   Parameters that are trivially available to the reverse pass are no longer cached.
@@ -609,7 +617,10 @@
 * Catalyst now provides its own :func:`~.polynomial_extrapolate` and
   :func:`~.exponential_extrapolate` functions for use with :func:`~.mitigate_with_zne`, replacing
   ``pennylane.noise.poly_extrapolate`` and ``pennylane.noise.exponential_extrapolate``, which has been removed from PennyLane.
-  [(#XXXX)](https://github.com/PennyLaneAI/catalyst/pull/XXXX)
+  [(#3289)](https://github.com/PennyLaneAI/catalyst/pull/3289)
+
+* `catalyst.logging` has been removed. `pennylane.logging` should be used instead.
+  [(#3283)](https://github.com/PennyLaneAI/catalyst/pull/3283)
 
 * Removes :func:`~.passes.ppm_specs` and the ``--ppm-specs`` MLIR pass. Use :func:`~.specs` and
   the ``ResourceAnalysis`` pass instead for PPR/PPM resource counts and PBC layer depth
@@ -640,6 +651,12 @@
 <h3>Deprecations 👋</h3>
 
 <h3>Bug fixes 🐛</h3>
+
+* `adjoint-lowering` no longer fails on gates whose parameter is a wide-integer tensor. Integer and
+  boolean gate parameters (e.g. a `QROM` `tensor<Nxi64>` bitstring) are now recorded in a dedicated
+  i64 cache buffer during adjoint reversal, zero-extended in and truncated out, instead of being
+  round-tripped through the f64 buffer.
+  [(#3265)](https://github.com/PennyLaneAI/catalyst/pull/3265)
 
 * Fixed a bug where an executor's SSH connection multiplexing was silently disabled on macOS,
   making every remote operation pay a fresh authentication handshake. The control socket went in
@@ -714,6 +731,22 @@
   [(#3242)](https://github.com/PennyLaneAI/catalyst/pull/3242)
 
 <h3>Internal changes ⚙️</h3>
+
+* A manually triggered workflow is added to build a Catalyst Docker image with PennyLane and
+  Lightning for `linux/amd64` and `linux/arm64`, and can publish it to Docker Hub as a single
+  multi-arch tag. The LLVM, StableHLO and Enzyme build is cached in the registry, so rebuilds only
+  recompile Catalyst.
+  [(#3182)](https://github.com/PennyLaneAI/catalyst/pull/3182)
+
+* A new `modifiers-lowering` pass reduces `quantum.ctrl` and `quantum.adjoint` regions to op-level
+  modifiers by running the `ctrl-lowering` and `adjoint-lowering` rewrite patterns together under a
+  single greedy driver. Each pattern defers (a match failure) while its region still holds the other
+  modifier, so the greedy worklist interleaves them and resolves arbitrarily nested modifiers (e.g.
+  `ctrl(adjoint(ctrl(...)))`) to a fixpoint in one pass. This replaces the manual alternation of the
+  two passes in the default pipeline (functional modifiers such as `qp.adjoint(op)(...)` and
+  `qp.ctrl(op, ...)` are now lowered before the transform sequence) and in the graph-decomposition
+  apply fixpoint.
+  [(#3257)](https://github.com/PennyLaneAI/catalyst/pull/3257)
 
 * Adds ability to lower `None` attributes to `get_mlir_attribute_from_pyval`.
   [(#3196)](https://github.com/PennyLaneAI/catalyst/pull/3196)
@@ -936,6 +969,7 @@
 
 This release contains contributions from (in alphabetical order):
 
+Runor Agbaire,
 Ali Asadi,
 Joey Carter,
 Yushao Chen,
