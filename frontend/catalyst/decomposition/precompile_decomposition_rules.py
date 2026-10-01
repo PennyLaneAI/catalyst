@@ -30,7 +30,6 @@ from catalyst.utils.runtime_environment import BYTECODE_FILE_PATH
 PRECOMPILED_MODIFIERS = (
     (False, 0),
     (True, 0),
-    (False, 1),
 )
 
 
