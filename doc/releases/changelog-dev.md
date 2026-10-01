@@ -652,6 +652,7 @@
   attributes such as `catalyst.estimated_iterations`, `catalyst.estimated_probability`, and
   `catalyst.estimated_probabilities`, so resource analysis still sees compiler hints after those
   rewrites.
+  [(#3291)](https://github.com/PennyLaneAI/catalyst/pull/3291)
 
 * `adjoint-lowering` no longer fails on gates whose parameter is a wide-integer tensor. Integer and
   boolean gate parameters (e.g. a `QROM` `tensor<Nxi64>` bitstring) are now recorded in a dedicated
