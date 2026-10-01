@@ -648,7 +648,7 @@
 <h3>Bug fixes 🐛</h3>
 
 * MLIR passes that recreate `scf.for`, `scf.while`, `scf.if`, and `scf.index_switch` ops
-  (`convert-to-value-semantics`, `ctrl-lowering`, and `adjoint-lowering`) now preserve discardable
+  (`ctrl-lowering`, and `adjoint-lowering`) now preserve discardable
   attributes such as `catalyst.estimated_iterations`, `catalyst.estimated_probability`, and
   `catalyst.estimated_probabilities`, so resource analysis still sees compiler hints after those
   rewrites.
