@@ -27,6 +27,7 @@
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/Operation.h"
 #include "mlir/IR/PatternMatch.h"
+#include "mlir/IR/SymbolTable.h"
 #include "mlir/IR/Types.h"
 #include "mlir/IR/Value.h"
 #include "mlir/IR/ValueRange.h"
@@ -47,22 +48,30 @@ using namespace mlir;
 namespace catalyst {
 namespace qref {
 
-/**
- * @brief
- * Inline the body of `rule` at `rewriter`'s current insertion point, using `operands` to
- * replace the parameters of `rule` and returning the results. `rewriter`'s insertion point will be
- * moved to the end of the inlined function body.
- */
-void inlineRuleBody(PatternRewriter &rewriter, func::FuncOp rule, ValueRange operands) {
-    assert(rule.getBlocks().size() == 1);
-    Block &body = rule.front();
+// Clone a rule function and create a call to the clone
+func::CallOp cloneAndCallRule(PatternRewriter &rewriter, func::FuncOp originalRule,
+                              ValueRange operands) {
+    OpBuilder::InsertionGuard guard(rewriter);
+    MLIRContext *ctx = originalRule->getContext();
+    Location loc = originalRule.getLoc();
 
-    IRMapping mapping;
-    mapping.map(body.getArguments(), operands);
+    func::FuncOp clonedFunc = originalRule.clone();
+    clonedFunc.setName(StringAttr::get(ctx, originalRule.getName() + "_clone"));
+    clonedFunc.setVisibility(SymbolTable::Visibility::Private);
 
-    for (Operation &op : body.without_terminator()) {
-        rewriter.clone(op, mapping);
-    }
+    // The clones are not rules in the decomp graph: they are just functions to be called
+    // by the main circuit, and must not interfere with potential future graph solutions
+    clonedFunc->removeAttr("frontend_name");
+    clonedFunc->removeAttr("target_gate");
+    clonedFunc->removeAttr("resources");
+
+    Operation *moduleOp = originalRule->getParentOfType<ModuleOp>();
+    SymbolTable symbolTable(moduleOp);
+
+    // SymbolTable::insert will automatically resolve naming collisions
+    symbolTable.insert(clonedFunc);
+
+    return func::CallOp::create(rewriter, loc, clonedFunc, operands);
 }
 
 struct DecomposableGatePattern final : public OpInterfaceRewritePattern<DecomposableGate> {
@@ -153,8 +162,10 @@ struct DecomposableGatePattern final : public OpInterfaceRewritePattern<Decompos
         assert(analyzer && "Analyzer should be valid");
 
         auto operands = analyzer.prepareOperands(rule, rewriter, op.getLoc());
-        inlineRuleBody(rewriter, rule, operands);
-        rewriter.eraseOp(op);
+        func::CallOp callOp = cloneAndCallRule(rewriter, rule, operands);
+
+        // DL is in reference semantics, so only classical results will be returned from the rules
+        rewriter.replaceOp(op, callOp);
         return success();
     }
 };
