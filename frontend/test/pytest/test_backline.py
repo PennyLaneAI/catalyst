@@ -174,12 +174,37 @@ def test_a_per_message_function_selects_the_per_message_gpu_mode():
     )
 
 
-def test_an_explicit_gpu_mode_is_kept():
-    """A config that already chooses the mode is not overridden."""
+def test_an_explicit_per_message_mode_is_kept():
+    """A config that already selects the per-message mode is not changed."""
+    fn = qp.CoprocessorFunction("coproc_fn", per_message=True)
+    coproc = _gpu_coproc(fn, "coproc_fn=per_message")
+    dev = qp.Backline(controller=_controller(), coprocessors=[coproc], transport="memcpy")
+    assert serialize_backline(dev.placement)["coprocessors"][0]["config"] == "coproc_fn=per_message"
+
+
+def test_a_per_message_function_with_an_explicit_launch_once_mode_is_rejected():
+    """A per-message function cannot be bound as a persistent-kernel launcher."""
     fn = qp.CoprocessorFunction("coproc_fn", per_message=True)
     coproc = _gpu_coproc(fn, "coproc_fn=launch_once")
     dev = qp.Backline(controller=_controller(), coprocessors=[coproc], transport="memcpy")
-    assert serialize_backline(dev.placement)["coprocessors"][0]["config"] == "coproc_fn=launch_once"
+    with pytest.raises(CompileError, match="selects coproc_fn=launch_once"):
+        serialize_backline(dev.placement)
+
+
+def test_the_onnx_coprocessor_function_is_rejected_on_a_dispatched_coprocessor():
+    """The ONNX function's model and onnxruntime paths are local, so it runs only in-process."""
+    fn = qp.CoprocessorFunction("catalyst_onnx_coprocessor", config="model=/m.onnx")
+    coproc = qp.Coprocessor(
+        name="gpu0",
+        hardware="cpu",
+        coprocessor_fn=fn,
+        executor_options={"host": "192.0.2.11", "port": 7813},
+    )
+    dev = qp.Backline(controller=_controller(), coprocessors=[coproc], transport="memcpy")
+    with pytest.raises(
+        CompileError, match="does not yet support a coprocessor dispatched to an executor"
+    ):
+        serialize_backline(dev.placement)
 
 
 def test_a_launcher_on_a_gpu_keeps_the_default_mode():

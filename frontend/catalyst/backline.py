@@ -77,6 +77,10 @@ _BUILTIN_COPROCESSOR_FN_LIBS = {
     "catalyst_onnx_coprocessor": "libcatalyst_onnx_coprocessor.so",
 }
 
+# Coprocessor functions whose configuration names files on the compiling machine (a model, a
+# runtime library), so they do not yet run on a coprocessor dispatched to an executor.
+_IN_PROCESS_COPROCESSOR_FNS = frozenset({"catalyst_onnx_coprocessor"})
+
 
 def _resolve_backend(transport: str, hardware: str) -> str:
     """Return Catalyst's concrete backend for a transport and hardware pair."""
@@ -234,7 +238,8 @@ def _runs_per_message_on_gpu(coproc, transport: str) -> bool:
 
     A function marked ``per_message`` is a host function called once per message. A GPU
     coprocessor otherwise takes a launcher for a persistent kernel, and only the memcpy GPU backend
-    also runs per-message functions. A config that already chooses a mode is left as it is.
+    also runs per-message functions. A config that already selects ``coproc_fn=per_message`` is left
+    as it is, and one that selects another mode is rejected.
     """
     fn = coproc.coprocessor_fn
     if not getattr(fn, "per_message", False) or getattr(coproc, "hardware", None) != "gpu":
@@ -245,14 +250,28 @@ def _runs_per_message_on_gpu(coproc, transport: str) -> bool:
             f"coprocessor supports only over the memcpy transport, not {transport!r}"
         )
     config = (coproc.init_args or {}).get("config", "")
-    return not any(entry.partition("=")[0] == "coproc_fn" for entry in config.split(";"))
+    modes = [
+        value
+        for key, _, value in (e.partition("=") for e in config.split(";"))
+        if key == "coproc_fn"
+    ]
+    if not modes:
+        return True
+    if modes[-1] != "per_message":
+        raise CompileError(
+            f"coprocessor function {fn.symbol_name!r} runs once per message, but its GPU "
+            f"coprocessor's config selects coproc_fn={modes[-1]}"
+        )
+    return False
 
 
 def _coprocessor_fn_config(fn) -> str:
     """A coprocessor function's own ``key=value;...`` config, with each key prefixed ``fn.``.
 
     The prefix keeps the function's keys apart from the backend's in the node's config string. The
-    transport runtime removes it again and hands the keys to the function's ``<symbol>_init``.
+    transport runtime removes it again and hands the keys to the function's ``init`` hook, which its
+    library exports as ``<symbol>_info`` (see ``CatalystCoprocessorFnInfo`` in
+    ``TransportABI.h``).
     """
     config = getattr(fn, "config", "") or ""
     entries = []
@@ -279,6 +298,12 @@ def serialize_backline(placement: Placement) -> dict:
         # ``symbol`` names the decode function; the library providing it is loaded as an executor
         # plugin, so it must not be written into ``backend_lib``, which is the transport backend.
         node["symbol"] = coproc.coprocessor_fn.symbol_name
+        if node["symbol"] in _IN_PROCESS_COPROCESSOR_FNS and _out_of_process(coproc):
+            raise CompileError(
+                f"coprocessor function {node['symbol']!r} does not yet support a coprocessor "
+                f"dispatched to an executor, as {coproc.name!r} is: its model and onnxruntime "
+                f"paths are resolved on this machine"
+            )
         entries = [node["config"]] if node.get("config") else []
         if _runs_per_message_on_gpu(coproc, transport):
             entries.append("coproc_fn=per_message")
@@ -353,8 +378,8 @@ def _check_machine_agrees(node: Node, host, address=None, preset: bool = False) 
 def _coprocessor_fn_lib(node: Node) -> Path | None:
     """The library providing a coprocessor's CoprocessorFn, or ``None`` if it names none.
 
-    That is its ``lib_path``, or for one of Catalyst's own coprocessor functions, the runtime library
-    that exports it.
+    That is its ``lib_path``, or for one of Catalyst's own coprocessor functions, the runtime
+    library that exports it.
     """
     fn = getattr(node, "coprocessor_fn", None)
     lib_path = getattr(fn, "lib_path", None)

@@ -40,7 +40,9 @@ using catalyst::transport::ChannelDesc;
 using catalyst::transport::ConnectInfo;
 using catalyst::transport::ControllerSession;
 using catalyst::transport::CoprocConvention;
+using catalyst::transport::COPROCESSOR_FN_ERROR;
 using catalyst::transport::CoprocessorFn;
+using catalyst::transport::CoprocessorFnInfo;
 using catalyst::transport::CoprocessorLauncherFn;
 using catalyst::transport::CoprocessorSession;
 using catalyst::transport::MemKind;
@@ -67,8 +69,8 @@ struct CatalystTransportSession {
 
     std::string config; // the backend config, as passed to the factory
 
-    // The context a bound coprocessor function's `<symbol>_init` returned, and the
-    // `<symbol>_fini` that releases it once the session has stopped.
+    // The context a bound coprocessor function's CoprocessorFnInfo::init returned, and the fini
+    // that releases it once the session has stopped.
     void *coprocessor_fn_ctx = nullptr;
     void (*coprocessor_fn_fini)(void *) = nullptr;
 };
@@ -158,6 +160,15 @@ std::size_t echo_fn(const void *in, std::size_t in_len, void *out, std::size_t o
     }
     return n;
 }
+
+// Bound in place of a coprocessor function that could not be configured: fails every message.
+std::size_t failing_fn(const void *, std::size_t, void *, std::size_t, void *) {
+    return COPROCESSOR_FN_ERROR;
+}
+
+// Bound in place of a launcher that could not be configured: fails to launch, so the session does
+// not start and its messages fail.
+int failing_launcher(const catalyst::transport::CoprocLaunchDesc *, void *) { return 1; }
 
 // Async task registry: connect_async / exchange_keys_async run on a worker thread and return a
 // token; barrier awaits it. Tokens start at 1 so a 0 return can signal a dispatch failure.
@@ -257,6 +268,29 @@ void *resolve_coprocessor_fn_symbol(CatalystTransportSession *s, const char *sym
         dlerror();
     }
     return dlsym(RTLD_DEFAULT, symbol);
+}
+
+// The `<symbol>_info` exported by the shared object that defines `fn`, or null if that object
+// exports none. Another library's `<symbol>_info` is never returned.
+void *resolve_own_fn_info(void *fn, const std::string &info_name) {
+    Dl_info fn_where{};
+    if (!dladdr(fn, &fn_where) || !fn_where.dli_fbase) {
+        return nullptr;
+    }
+    // A shared object is searched through its own handle. The main program has none under its
+    // path, and comes first in the global scope instead.
+    void *object =
+        fn_where.dli_fname ? dlopen(fn_where.dli_fname, RTLD_LAZY | RTLD_NOLOAD) : nullptr;
+    dlerror();
+    void *info = dlsym(object ? object : RTLD_DEFAULT, info_name.c_str());
+    if (object) {
+        dlclose(object);
+    }
+    Dl_info info_where{};
+    if (!info || !dladdr(info, &info_where) || info_where.dli_fbase != fn_where.dli_fbase) {
+        return nullptr;
+    }
+    return info;
 }
 
 // The keys of `config` addressed to the coprocessor function, `fn.<key>=<value>`, with the prefix
@@ -394,43 +428,88 @@ int __catalyst__transport__set_coprocessor_fn(CatalystTransportSession *s, const
             std::cerr << "[transport] set_coprocessor_fn on a non-coprocessor session\n";
             return CATALYST_TRANSPORT_ERR;
         }
+        using FiniFn = void (*)(void *);
+        using InfoFn = const CoprocessorFnInfo *(*)();
+        // A session whose function could not be configured fails its messages, instead of running
+        // the backend's default echo function or launcher.
+        const auto fail_unconfigured = [&] {
+            try {
+                if (co->coprocessor_fn_convention() == CoprocConvention::PerMessage) {
+                    co->set_coprocessor_fn(&failing_fn, nullptr);
+                } else {
+                    co->set_coprocessor_launcher(&failing_launcher, nullptr);
+                }
+            } catch (...) {
+            }
+            return CATALYST_TRANSPORT_ERR;
+        };
         void *resolved_fn = nullptr;
         void *ctx = nullptr;
+        FiniFn fini = nullptr;
         if (symbol && *symbol) {
             resolved_fn = resolve_coprocessor_fn_symbol(s, symbol);
             if (!resolved_fn) {
                 std::cerr << "[transport] set_coprocessor_fn: symbol not found: " << symbol << "\n";
                 return CATALYST_TRANSPORT_ERR;
             }
-            // A function with a `<symbol>_init` is configured before it is bound: init receives
-            // the node's `fn.` config keys and returns the ctx the function is called with.
+            // A function whose library exports `<symbol>_info` is configured through its hooks
+            // before it is bound (see CatalystCoprocessorFnInfo). Fields of versions above
+            // COPROCESSOR_FN_ABI_VERSION are optional by contract, so they are left unread.
             const std::string name(symbol);
-            using InitFn = void *(*)(const char *);
-            using FiniFn = void (*)(void *);
-            if (auto init = reinterpret_cast<InitFn>(
-                    resolve_coprocessor_fn_symbol(s, (name + "_init").c_str()))) {
-                release_coprocessor_fn_ctx(s);
-                ctx = init(coprocessor_fn_config(s->config).c_str());
-                if (!ctx) {
-                    std::cerr << "[transport] set_coprocessor_fn: " << name << "_init failed\n";
-                    return CATALYST_TRANSPORT_ERR;
+            if (auto info_fn =
+                    reinterpret_cast<InfoFn>(resolve_own_fn_info(resolved_fn, name + "_info"))) {
+                const CoprocessorFnInfo *info = info_fn();
+                if (!info || info->abi_version < 1) {
+                    std::cerr << "[transport] set_coprocessor_fn: " << name
+                              << "_info has no ABI version (expected at least 1)\n";
+                    return fail_unconfigured();
                 }
-                s->coprocessor_fn_ctx = ctx;
-                s->coprocessor_fn_fini = reinterpret_cast<FiniFn>(
-                    resolve_coprocessor_fn_symbol(s, (name + "_fini").c_str()));
+                if (info->init) {
+                    ctx = info->init(coprocessor_fn_config(s->config).c_str());
+                    if (!ctx) {
+                        std::cerr << "[transport] set_coprocessor_fn: " << name
+                                  << " could not be configured\n";
+                        return fail_unconfigured();
+                    }
+                }
+                fini = info->fini;
             }
         }
-        switch (co->coprocessor_fn_convention()) {
-        case CoprocConvention::PerMessage:
-            // No symbol -> the core's built-in echo.
-            co->set_coprocessor_fn(
-                resolved_fn ? reinterpret_cast<CoprocessorFn>(resolved_fn) : &echo_fn, ctx);
+        // Bind first, and release the previous function's ctx only once the new binding holds: a
+        // rejected bind (e.g. after start()) leaves the running function and its ctx untouched.
+        const auto bind = [&] {
+            switch (co->coprocessor_fn_convention()) {
+            case CoprocConvention::PerMessage:
+                // No symbol -> the core's built-in echo.
+                co->set_coprocessor_fn(
+                    resolved_fn ? reinterpret_cast<CoprocessorFn>(resolved_fn) : &echo_fn, ctx);
+                return true;
+            case CoprocConvention::LaunchOnce:
+                // No symbol -> null, letting the backend pick its own default
+                // launcher; the core holds no device launcher of its own.
+                co->set_coprocessor_launcher(reinterpret_cast<CoprocessorLauncherFn>(resolved_fn),
+                                             ctx);
+                return true;
+            }
+            return false;
+        };
+        bool bound = false;
+        try {
+            bound = bind();
+        } catch (...) {
+            if (fini && ctx) {
+                fini(ctx);
+            }
+            throw;
+        }
+        if (bound) {
+            release_coprocessor_fn_ctx(s);
+            s->coprocessor_fn_ctx = ctx;
+            s->coprocessor_fn_fini = fini;
             return CATALYST_TRANSPORT_OK;
-        case CoprocConvention::LaunchOnce:
-            // No symbol -> null, letting the backend pick its own default
-            // launcher; the core holds no device launcher of its own.
-            co->set_coprocessor_launcher(reinterpret_cast<CoprocessorLauncherFn>(resolved_fn), ctx);
-            return CATALYST_TRANSPORT_OK;
+        }
+        if (fini && ctx) {
+            fini(ctx);
         }
         std::cerr << "[transport] set_coprocessor_fn: backend reported an unknown convention "
                   << static_cast<std::int32_t>(co->coprocessor_fn_convention()) << "\n";

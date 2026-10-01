@@ -21,19 +21,24 @@
 // Built into libcatalyst_onnx_coprocessor.so. onnxruntime is loaded at run time, so the library
 // neither links against it nor depends on a particular build: only onnxruntime's C API header is
 // needed to compile it.
-// The function is configured through the coprocessor's `fn.`-prefixed config keys, which reach
-// catalyst_onnx_coprocessor_init without the prefix:
+// The function is configured through the coprocessor's `fn.`-prefixed config keys, which reach the
+// init hook of catalyst_onnx_coprocessor_info() without the prefix:
 //
 //   model=<path>      the .onnx file (required)
 //   ort_lib=<path>    the onnxruntime shared library (default: libonnxruntime.so)
 //   provider=<name>   auto (default), cpu, migraphx, cuda, tensorrt or rocm
 //   device=<index>    the GPU a GPU provider runs on (default 0)
+//   threads=<count>   onnxruntime's intra-op threads (default 1), with one inter-op thread and
+//                     intra-op spinning off, so the pool does not compete with the transport's
+//                     spinning threads
 //
 // A GPU provider attaches through onnxruntime's OrtSessionOptionsAppendExecutionProvider_<Name>
 // export, which only an onnxruntime build containing that provider has: onnxruntime-migraphx for
-// migraphx on AMD GPUs, onnxruntime-gpu for cuda and tensorrt on NVIDIA GPUs. `auto` uses the first
-// GPU provider the loaded onnxruntime can attach, in the order migraphx, cuda, rocm, and otherwise
-// runs on the CPU, so one program runs on either vendor's GPU.
+// migraphx on AMD GPUs, onnxruntime-gpu for cuda and tensorrt on NVIDIA GPUs. `auto` attaches the
+// first GPU provider the loaded onnxruntime has, in the order migraphx, cuda, rocm, and fails if
+// that provider cannot attach (for example when its GPU libraries are missing). Only an
+// onnxruntime with no GPU provider runs on the CPU under `auto`. The provider in use is printed
+// when the model loads.
 //
 // One context serves one coprocessor, whose worker calls the function from a single thread.
 
@@ -41,35 +46,21 @@
 #include <cstdlib>
 #include <cstring>
 #include <dlfcn.h>
+#include <filesystem>
 #include <iostream>
 #include <stdexcept>
 #include <string>
 #include <string_view>
 #include <vector>
 
+#include "ConfigParser.hpp"
+#include "Transport.hpp"
 #include "onnxruntime_c_api.h"
 
 namespace {
 
 // The u32 decoder_id and u32 seq_num that end every request frame (see WireProtocol.hpp).
 constexpr std::size_t kFrameTrailerBytes = 8;
-
-// Call `visit(key, value)` for each `key=value` entry of a `;`-separated config string.
-template <typename Visit> void for_each_kv(std::string_view config, Visit visit) {
-    while (!config.empty()) {
-        const std::size_t end = config.find(';');
-        const std::string_view entry = config.substr(0, end);
-        config = end == std::string_view::npos ? std::string_view{} : config.substr(end + 1);
-        if (entry.empty()) {
-            continue;
-        }
-        const std::size_t eq = entry.find('=');
-        if (eq == std::string_view::npos) {
-            throw std::runtime_error("config entry '" + std::string(entry) + "' is not key=value");
-        }
-        visit(entry.substr(0, eq), entry.substr(eq + 1));
-    }
-}
 
 // A GPU provider: its config name and the name onnxruntime exports its attach function under.
 struct GpuProvider {
@@ -109,9 +100,11 @@ std::size_t element_bytes(ONNXTensorElementDataType type) {
 class OnnxCoprocessor {
   public:
     explicit OnnxCoprocessor(std::string_view config) {
+        namespace cfg = catalyst::transport::common::configparser;
         std::string model, ort_lib = "libonnxruntime.so", provider = "auto";
         int device = 0;
-        for_each_kv(config, [&](std::string_view key, std::string_view value) {
+        int threads = 1;
+        cfg::for_each_kv(config, [&](std::string_view key, std::string_view value) {
             if (key == "model") {
                 model.assign(value);
             } else if (key == "ort_lib") {
@@ -119,13 +112,26 @@ class OnnxCoprocessor {
             } else if (key == "provider") {
                 provider.assign(value);
             } else if (key == "device") {
-                device = std::stoi(std::string(value));
+                device = cfg::parse_index(value, "device");
+            } else if (key == "threads") {
+                threads = cfg::parse_index(value, "threads");
             } else {
                 throw std::runtime_error("unknown config key '" + std::string(key) + "'");
             }
         });
+        // Validate everything the config controls before onnxruntime is loaded.
         if (model.empty()) {
             throw std::runtime_error("config needs model=<path to .onnx>");
+        }
+        if (!is_known_provider(provider)) {
+            throw std::runtime_error("unknown provider '" + provider +
+                                     "', expected auto, cpu, migraphx, cuda, tensorrt or rocm");
+        }
+        if (threads < 1) {
+            throw std::runtime_error("threads must be at least 1");
+        }
+        if (!std::filesystem::is_regular_file(model)) {
+            throw std::runtime_error("no model file at '" + model + "'");
         }
 
         handle_ = dlopen(ort_lib.c_str(), RTLD_NOW | RTLD_LOCAL);
@@ -147,12 +153,21 @@ class OnnxCoprocessor {
         OrtSessionOptions *options = nullptr;
         check(api_->CreateSessionOptions(&options));
         try {
+            check(api_->SetIntraOpNumThreads(options, threads));
+            check(api_->SetInterOpNumThreads(options, 1));
+            check(api_->AddSessionConfigEntry(options, "session.intra_op.allow_spinning", "0"));
+            std::string in_use = "cpu";
             if (provider == "auto") {
-                append_first_gpu_provider(options, device);
+                in_use = append_first_gpu_provider(options, device);
             } else if (provider != "cpu") {
                 append_provider(options, provider, device);
+                in_use = provider;
             }
             check(api_->CreateSession(env_, model.c_str(), options, &session_));
+            std::cerr << "[onnx] running " << model << " on "
+                      << (in_use == "cpu" ? std::string("the CPU")
+                                          : in_use + " (device " + std::to_string(device) + ")")
+                      << "\n";
         } catch (...) {
             api_->ReleaseSessionOptions(options);
             throw;
@@ -183,12 +198,13 @@ class OnnxCoprocessor {
     OnnxCoprocessor &operator=(const OnnxCoprocessor &) = delete;
 
     // Run the model on `in_bytes` of payload, write the output tensor to `out`, and return its size
-    // in bytes, or 0 if the payload is too small, the output does not fit, or inference fails.
+    // in bytes, or COPROCESSOR_FN_ERROR if the payload is too small, the output does not fit, or
+    // inference fails.
     std::size_t run(const void *in, std::size_t in_bytes, void *out, std::size_t out_cap) {
         if (in_bytes < input_bytes_) {
             std::cerr << "[onnx] " << in_bytes << " B of input is smaller than the model input of "
                       << input_bytes_ << " B\n";
-            return 0;
+            return catalyst::transport::COPROCESSOR_FN_ERROR;
         }
         OrtValue *input = nullptr;
         OrtValue *output = nullptr;
@@ -203,7 +219,7 @@ class OnnxCoprocessor {
             written = copy_output(output, out, out_cap);
         } catch (const std::exception &e) {
             std::cerr << "[onnx] " << e.what() << "\n";
-            written = 0;
+            written = catalyst::transport::COPROCESSOR_FN_ERROR;
         }
         if (output) {
             api_->ReleaseValue(output);
@@ -247,20 +263,38 @@ class OnnxCoprocessor {
                                  "', expected auto, cpu, migraphx, cuda, tensorrt or rocm");
     }
 
-    // Attach the first GPU provider, in kGpuProviders order, that this onnxruntime has and that
-    // accepts `device`. With none, the model runs on onnxruntime's CPU provider.
-    void append_first_gpu_provider(OrtSessionOptions *options, int device) {
+    static bool is_known_provider(const std::string &provider) {
+        if (provider == "auto" || provider == "cpu") {
+            return true;
+        }
+        for (const GpuProvider &gpu : kGpuProviders) {
+            if (provider == gpu.key) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    // Attach the first GPU provider, in kGpuProviders order, that this onnxruntime has, and return
+    // its name. A provider it has but that fails to attach is an error. With no GPU provider at
+    // all, return "cpu": the model runs on onnxruntime's CPU provider.
+    std::string append_first_gpu_provider(OrtSessionOptions *options, int device) {
         for (std::size_t i = 0; i < kAutoProviders; ++i) {
             Append append = provider_attach(kGpuProviders[i]);
             if (!append) {
                 continue;
             }
             if (OrtStatus *status = append(options, device)) {
+                std::string reason = api_->GetErrorMessage(status);
                 api_->ReleaseStatus(status);
-                continue;
+                throw std::runtime_error(std::string("provider=auto: this onnxruntime has the ") +
+                                         kGpuProviders[i].key +
+                                         " provider, but it failed to attach: " + reason +
+                                         ". Pass provider=cpu to run on the CPU");
             }
-            return;
+            return kGpuProviders[i].key;
         }
+        return "cpu";
     }
 
     // Record the single input's name, type and shape, and the single output's name.
@@ -342,15 +376,9 @@ class OnnxCoprocessor {
     std::size_t input_bytes_ = 0;
 };
 
-} // namespace
-
-#define CATALYST_ONNX_EXPORT __attribute__((visibility("default")))
-
-extern "C" {
-
 // Load the model named by `config` and return the context the function is called with, or null
 // with the reason on stderr.
-CATALYST_ONNX_EXPORT void *catalyst_onnx_coprocessor_init(const char *config) {
+void *onnx_init(const char *config) {
     try {
         return new OnnxCoprocessor(config ? config : "");
     } catch (const std::exception &e) {
@@ -359,8 +387,25 @@ CATALYST_ONNX_EXPORT void *catalyst_onnx_coprocessor_init(const char *config) {
     }
 }
 
-CATALYST_ONNX_EXPORT void catalyst_onnx_coprocessor_fini(void *ctx) {
-    delete static_cast<OnnxCoprocessor *>(ctx);
+void onnx_fini(void *ctx) { delete static_cast<OnnxCoprocessor *>(ctx); }
+
+// Version 1: the fields this library fills.
+constexpr catalyst::transport::CoprocessorFnInfo kInfo{
+    .abi_version = 1,
+    .init = &onnx_init,
+    .fini = &onnx_fini,
+};
+
+} // namespace
+
+#define CATALYST_ONNX_EXPORT __attribute__((visibility("default")))
+
+extern "C" {
+
+// The function's lifecycle hooks: init loads the model, fini releases it.
+CATALYST_ONNX_EXPORT const catalyst::transport::CoprocessorFnInfo *
+catalyst_onnx_coprocessor_info() {
+    return &kInfo;
 }
 
 // The model runs on the frame's payload, which ends where the frame's decoder_id and seq_num begin.
@@ -368,7 +413,7 @@ CATALYST_ONNX_EXPORT std::size_t catalyst_onnx_coprocessor(const void *in, std::
                                                            void *out, std::size_t out_cap,
                                                            void *ctx) {
     if (!ctx || !in || !out || in_len < kFrameTrailerBytes) {
-        return 0;
+        return catalyst::transport::COPROCESSOR_FN_ERROR;
     }
     return static_cast<OnnxCoprocessor *>(ctx)->run(in, in_len - kFrameTrailerBytes, out, out_cap);
 }

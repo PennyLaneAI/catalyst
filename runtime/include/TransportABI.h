@@ -42,6 +42,33 @@ typedef struct {
     size_t size;
 } CatalystWrapperResult;
 
+/// The highest CatalystCoprocessorFnInfo version this runtime knows the fields of.
+#define CATALYST_COPROCESSOR_FN_ABI_VERSION 1
+
+/**
+ * The lifecycle hooks of a coprocessor function or launcher. The library defining the function
+ * may export them as `const CatalystCoprocessorFnInfo *<symbol>_info(void)`, where `<symbol>` is
+ * the function's name. The runtime looks `<symbol>_info` up only in the library that defines
+ * `<symbol>`. A function without it is bound with a null ctx.
+ *
+ * - `abi_version`: the version whose fields the library fills, at least 1. The struct only grows
+ *   at its end, and the runtime reads only the fields of the versions it knows. A field added by
+ *   a later version must be optional: null or zero keeps the behaviour of the earlier versions.
+ * - `reserved`: zero.
+ * - `init` (may be null): called once, before the function is bound, with the node's
+ *   `fn.`-prefixed config keys, prefix removed, as `key=value;...`. Returns the ctx the function
+ *   is called with, or null if the function cannot be configured.
+ * - `fini` (may be null): releases the ctx `init` returned, once the session using it has stopped.
+ *
+ * The returned pointer must stay valid for the life of the library.
+ */
+typedef struct {
+    uint32_t abi_version;
+    uint32_t reserved;
+    void *(*init)(const char *config);
+    void (*fini)(void *ctx);
+} CatalystCoprocessorFnInfo;
+
 #ifdef __cplusplus
 } // extern "C"
 #endif

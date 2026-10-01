@@ -127,18 +127,22 @@
   `per_message`.
   [(#3282)](https://github.com/PennyLaneAI/catalyst/pull/3282)
 
-* A coprocessor function can now be configured: if it exports `<symbol>_init`, that is called
-  with the node's `fn.`-prefixed config keys before the first message, and what it returns is the
-  `ctx` the function is called with. `<symbol>_fini` releases it when the session is destroyed.
-  The frontend passes a coprocessor function's `config` to it with that prefix.
+* A coprocessor function can now be configured. Its library exports
+  `const CatalystCoprocessorFnInfo *<symbol>_info()` (`TransportABI.h`), a versioned descriptor of
+  optional `init` and `fini` hooks, which the runtime looks up only in the function's own library.
+  `init` is called with the node's `fn.`-prefixed config keys before the first message and returns
+  the `ctx` the function is called with, and `fini` releases it when the session is destroyed. The
+  frontend passes a coprocessor function's `config` to it with that prefix. A function can also
+  fail a single message by returning `COPROCESSOR_FN_ERROR`.
   [(#3282)](https://github.com/PennyLaneAI/catalyst/pull/3282)
 
 * Catalyst ships a coprocessor function that runs an ONNX model on each message,
   `catalyst_onnx_coprocessor` in `libcatalyst_onnx_coprocessor.so`. It loads onnxruntime and the
   model when the coprocessor starts, on the CPU or on the GPU the installed onnxruntime supports
   (MIGraphX, CUDA, TensorRT or ROCm), and the frontend loads the library for a coprocessor naming
-  it. Building it needs only onnxruntime's C API header, from `ONNXRUNTIME_INCLUDE_DIR` or fetched
-  pinned to a release.
+  it. Building it needs only onnxruntime's C API header, from `ONNXRUNTIME_INCLUDE_DIR` or
+  downloaded at a pinned, checksummed release. `CATALYST_TRANSPORT_ONNX=OFF` disables it, and a
+  build that cannot download the header skips it with a warning.
   [(#3282)](https://github.com/PennyLaneAI/catalyst/pull/3282)
 
 * :func:`~.passes.graph_decomposition` accepts a `verbose` keyword argument. When `True`, the pass

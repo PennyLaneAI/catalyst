@@ -47,6 +47,17 @@ std::size_t invert_fn(const void *in, std::size_t in_len, void *out, std::size_t
     std::memcpy(out, &v, n);
     return n;
 }
+
+// Inverts the payload like invert_fn, except that it fails a payload of 0.
+std::size_t invert_unless_zero_fn(const void *in, std::size_t in_len, void *out,
+                                  std::size_t out_cap, void *ctx) {
+    std::uint64_t v = 0;
+    std::memcpy(&v, in, std::min(in_len, sizeof(v)));
+    if (v == 0) {
+        return COPROCESSOR_FN_ERROR;
+    }
+    return invert_fn(in, in_len, out, out_cap, ctx);
+}
 } // namespace
 
 TEST_CASE("memcpy round-trip echoes through peer memory", "[transport_memcpy]") {
@@ -116,6 +127,42 @@ TEST_CASE("memcpy uses the bound coprocessor function", "[transport_memcpy]") {
     std::uint64_t out_bytes[1] = {sizeof(reply_word)};
     REQUIRE(controller.collect(outs, out_bytes, 1) == 0);
 
+    CHECK(reply_word == ~request_word);
+}
+
+TEST_CASE("memcpy fails a message its coprocessor function cannot process, then carries on",
+          "[transport_memcpy]") {
+    ConnectInfo ci{.peer = "loopback", .oob_port = 19036};
+    CpuControllerSession controller(pair_cfg(ci.oob_port));
+    CpuCoprocessorSession coprocessor(pair_cfg(ci.oob_port));
+    REQUIRE(controller.connect(ci) == 0);
+    REQUIRE(coprocessor.connect(ci) == 0);
+
+    MemRegion reply = controller.alloc_memory(sizeof(std::uint64_t), MemKind::CpuRam);
+    PeerRef peer_request = controller.exchange_keys(reply);
+    MemRegion request = coprocessor.alloc_memory(sizeof(std::uint64_t), MemKind::CpuRam);
+    PeerRef peer_reply = coprocessor.exchange_keys(request);
+    ChannelDesc desc{.transport = "memcpy"};
+    controller.establish_channel(desc, reply, peer_request);
+    coprocessor.establish_channel(desc, request, peer_reply);
+
+    controller.commit_work_item(0, sizeof(std::uint64_t), sizeof(std::uint64_t));
+    coprocessor.set_coprocessor_fn(invert_unless_zero_fn, nullptr);
+    controller.start();
+    coprocessor.start();
+
+    const std::uint64_t failing_word = 0;
+    controller.write_data_slot(&failing_word, sizeof(failing_word), /*decoder_id=*/0);
+    REQUIRE_THROWS_AS(controller.kick(0), std::runtime_error);
+
+    // The failure is the message's alone: the next one is processed.
+    const std::uint64_t request_word = 0x0123456789ABCDEFull;
+    controller.write_data_slot(&request_word, sizeof(request_word), /*decoder_id=*/0);
+    REQUIRE(controller.kick(0) == 0);
+    std::uint64_t reply_word = 0;
+    void *outs[1] = {&reply_word};
+    std::uint64_t out_bytes[1] = {sizeof(reply_word)};
+    REQUIRE(controller.collect(outs, out_bytes, 1) == 0);
     CHECK(reply_word == ~request_word);
 }
 
