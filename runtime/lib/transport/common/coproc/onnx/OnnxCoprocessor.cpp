@@ -25,7 +25,8 @@
 // init hook of catalyst_onnx_coprocessor_info() without the prefix:
 //
 //   model=<path>      the .onnx file (required)
-//   ort_lib=<path>    the onnxruntime shared library (default: libonnxruntime.so)
+//   ort_lib=<path>    the onnxruntime shared library (default: libonnxruntime.so, or
+//                     libonnxruntime.dylib on macOS)
 //   provider=<name>   auto (default), cpu, migraphx, cuda, tensorrt or rocm
 //   device=<index>    the GPU a GPU provider runs on (default 0)
 //   threads=<count>   onnxruntime's intra-op threads (default 1), with one inter-op thread and
@@ -58,6 +59,13 @@
 #include "onnxruntime_c_api.h"
 
 namespace {
+
+// The onnxruntime library loaded when the config names none, from the dynamic loader's search path.
+#ifdef __APPLE__
+constexpr const char *kDefaultOrtLib = "libonnxruntime.dylib";
+#else
+constexpr const char *kDefaultOrtLib = "libonnxruntime.so";
+#endif
 
 // The u32 decoder_id and u32 seq_num that end every request frame (see WireProtocol.hpp).
 constexpr std::size_t kFrameTrailerBytes = 8;
@@ -101,7 +109,7 @@ class OnnxCoprocessor {
   public:
     explicit OnnxCoprocessor(std::string_view config) {
         namespace cfg = catalyst::transport::common::configparser;
-        std::string model, ort_lib = "libonnxruntime.so", provider = "auto";
+        std::string model, ort_lib = kDefaultOrtLib, provider = "auto";
         int device = 0;
         int threads = 1;
         cfg::for_each_kv(config, [&](std::string_view key, std::string_view value) {

@@ -286,6 +286,33 @@ def test_a_builtin_coprocessor_fn_loads_catalysts_own_library(monkeypatch):
     assert loaded == ["/opt/catalyst/runtime/lib/libcatalyst_onnx_coprocessor.so"]
 
 
+def test_a_builtin_coprocessor_fn_library_is_found_as_a_dylib(monkeypatch, tmp_path):
+    """On macOS the runtime library is a .dylib, and it is the one loaded."""
+    (tmp_path / "libcatalyst_onnx_coprocessor.dylib").write_bytes(b"")
+    loaded = []
+    monkeypatch.setattr("ctypes.CDLL", lambda path, mode=None: loaded.append(path) or object())
+    monkeypatch.setattr("catalyst.backline.get_lib_path", lambda project, env: str(tmp_path))
+    fn = qp.CoprocessorFunction("catalyst_onnx_coprocessor")
+    dev = qp.Backline(
+        controller=_controller(), coprocessors=[_coproc("cop0", fn=fn)], transport="rdma"
+    )
+    launch_executors(dev.placement)
+    assert loaded == [str(tmp_path / "libcatalyst_onnx_coprocessor.dylib")]
+
+
+def test_a_remote_node_names_a_builtin_coprocessor_fn_library_as_a_so(monkeypatch, tmp_path):
+    """A node on another machine is Linux, so it is given the .so even when this one has a .dylib."""
+    from catalyst.backline import _executor_plugins  # pylint: disable=import-outside-toplevel
+
+    (tmp_path / "libcatalyst_onnx_coprocessor.dylib").write_bytes(b"")
+    monkeypatch.setattr("catalyst.backline.get_lib_path", lambda project, env: str(tmp_path))
+    fn = qp.CoprocessorFunction("catalyst_onnx_coprocessor")
+    coproc = qp.Coprocessor(
+        name="cop0", coprocessor_fn=fn, remote=True, executor_options={"host": "192.0.2.11"}
+    )
+    assert "libcatalyst_onnx_coprocessor.so" in _executor_plugins(coproc, [])
+
+
 def test_unlaunched_executor_names_the_node_it_came_from():
     """An executor with no address fails with the node named."""
     from catalyst import Executor  # pylint: disable=import-outside-toplevel

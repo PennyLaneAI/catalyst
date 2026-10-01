@@ -142,12 +142,13 @@
   [(#3282)](https://github.com/PennyLaneAI/catalyst/pull/3282)
 
 * Catalyst ships a coprocessor function that runs an ONNX model on each message,
-  `catalyst_onnx_coprocessor` in `libcatalyst_onnx_coprocessor.so`. It loads onnxruntime and the
-  model when the coprocessor starts, on the CPU or on the GPU the installed onnxruntime supports
-  (MIGraphX, CUDA, TensorRT or ROCm), and the frontend loads the library for a coprocessor naming
-  it. Building it needs only onnxruntime's C API header, from `ONNXRUNTIME_INCLUDE_DIR` or
-  downloaded at a pinned, checksummed release. `CATALYST_TRANSPORT_ONNX=OFF` disables it, and a
-  build that cannot download the header skips it with a warning.
+  `catalyst_onnx_coprocessor` in `libcatalyst_onnx_coprocessor.so` (`.dylib` on macOS). It loads
+  onnxruntime and the model when the coprocessor starts, on the CPU or on the GPU the installed
+  onnxruntime supports (MIGraphX, CUDA, TensorRT or ROCm), and the frontend loads the library for a
+  coprocessor naming it. Building it needs only onnxruntime's C API header, from
+  `ONNXRUNTIME_INCLUDE_DIR` or downloaded at a pinned, checksummed release.
+  `CATALYST_TRANSPORT_ONNX=OFF` disables it, and a build that cannot download the header skips it
+  with a warning.
   [(#3282)](https://github.com/PennyLaneAI/catalyst/pull/3282)
 
 * :func:`~.passes.graph_decomposition` accepts a `verbose` keyword argument. When `True`, the pass

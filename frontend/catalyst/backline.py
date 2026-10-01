@@ -71,10 +71,11 @@ _BACKEND_LIB_EXTS = ("so", "dylib")
 # ``__catalyst__transport__*`` and ``__catalyst__rt__*`` directly.
 _EXECUTOR_RUNTIME_PLUGINS = ("librt_transport.so", "librt_capi.so")
 
-# Coprocessor functions Catalyst ships, by symbol, and the runtime library exporting each. A
-# coprocessor function naming one of these needs no ``lib_path``.
+# Coprocessor functions Catalyst ships, by symbol, and the stem of the runtime library exporting
+# each (``.so`` on Linux, ``.dylib`` on macOS). A coprocessor function naming one of these needs no
+# ``lib_path``.
 _BUILTIN_COPROCESSOR_FN_LIBS = {
-    "catalyst_onnx_coprocessor": "libcatalyst_onnx_coprocessor.so",
+    "catalyst_onnx_coprocessor": "libcatalyst_onnx_coprocessor",
 }
 
 # Coprocessor functions whose configuration names files on the compiling machine (a model, a
@@ -385,10 +386,12 @@ def _coprocessor_fn_lib(node: Node) -> Path | None:
     lib_path = getattr(fn, "lib_path", None)
     if lib_path:
         return Path(lib_path)
-    builtin = _BUILTIN_COPROCESSOR_FN_LIBS.get(getattr(fn, "symbol_name", None))
-    if builtin is not None:
-        return Path(get_lib_path("runtime", "RUNTIME_LIB_DIR")) / builtin
-    return None
+    stem = _BUILTIN_COPROCESSOR_FN_LIBS.get(getattr(fn, "symbol_name", None))
+    if stem is None:
+        return None
+    lib_dir = Path(get_lib_path("runtime", "RUNTIME_LIB_DIR"))
+    candidates = [lib_dir / f"{stem}.{ext}" for ext in _BACKEND_LIB_EXTS]
+    return next((c for c in candidates if c.exists()), candidates[0])
 
 
 def _executor_plugins(node: Node, given) -> list[str]:
@@ -413,7 +416,13 @@ def _executor_plugins(node: Node, given) -> list[str]:
     implied = []
     fn_lib = _coprocessor_fn_lib(node)
     if fn_lib is not None:
-        implied.append((fn_lib, fn_lib.name))
+        fn = getattr(node, "coprocessor_fn", None)
+        stem = _BUILTIN_COPROCESSOR_FN_LIBS.get(getattr(fn, "symbol_name", None))
+        # A node on another machine is Linux, so one of Catalyst's own libraries is its ``.so``.
+        if stem is not None and not getattr(fn, "lib_path", None):
+            implied.append((fn_lib, f"{stem}.{_BACKEND_LIB_EXTS[0]}"))
+        else:
+            implied.append((fn_lib, fn_lib.name))
     device = getattr(node, "device", None)
     if device is not None:
         # Last: plugins open RTLD_GLOBAL and the first definition of a symbol wins, and the device
