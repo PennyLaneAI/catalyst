@@ -636,7 +636,17 @@ def _extract_passes(transform_program):
     pass_pipeline = []
     i = len(transform_program)
     for t in reversed(transform_program):
-        if t.pass_name is None:
+        # ``qp.decompose`` carries ``pass_name="graph-decomposition"`` so that, under program
+        # capture, it routes to the C++ ``graph-decomposition`` pass. That pass relies on
+        # capture-time rule embedding, which the legacy (non-capture) frontend does not provide.
+        # ``qp.decompose`` always has a tape definition, so here we fall back to running it as an
+        # ordinary tape transform (its pre-migration behavior). The explicit
+        # ``catalyst.passes.graph_decomposition`` entry point is pass-only (no tape definition) and
+        # continues to be lowered as a pass.
+        is_capture_only_pass = (
+            t.pass_name == "graph-decomposition" and t.tape_transform is not None
+        )
+        if t.pass_name is None or is_capture_only_pass:
             break
         i -= 1
     pass_pipeline = transform_program[i:]
