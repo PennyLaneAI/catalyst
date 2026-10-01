@@ -1848,8 +1848,7 @@ class TestDecomposeAlias:
     """``qp.decompose`` under capture is an alias for ``graph_decomposition`` (same C++ pass)."""
 
     def test_decompose_matches_graph_decomposition(self):
-        """``qp.decompose`` compiles to the exact same MLIR as ``graph_decomposition``.
-        """
+        """``qp.decompose`` compiles to the exact same MLIR as ``graph_decomposition``."""
         gate_set = {"RX", "RY", "RZ"}
 
         def build(dec):

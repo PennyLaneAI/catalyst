@@ -342,8 +342,7 @@ _SUPPORTED_DECOMPOSE_TKWARGS = frozenset({"gate_set", "fixed_decomps", "alt_deco
 
 
 def _validate_decompose_tkwargs(tkwargs):
-    """Reject qp.decompose arguments the graph-decomposition pass doesn't support yet.
-    """
+    """Reject qp.decompose arguments the graph-decomposition pass doesn't support yet."""
     unsupported = sorted(k for k in tkwargs if k not in _SUPPORTED_DECOMPOSE_TKWARGS)
     if unsupported:
         raise NotImplementedError(
