@@ -933,7 +933,7 @@ func.func @test_preserves_compiler_hints(%cond: i1, %idx: index) attributes {qua
         scf.yield
     } attributes {catalyst.estimated_iterations = 2.500000e+00 : f64}
 
-    // CHECK: scf.if %arg0 -> (!quantum.bit) {
+    // CHECK: scf.if {{.+}} -> (!quantum.bit) {
     // CHECK: } {catalyst.estimated_probability = 7.500000e-01 : f64}
     scf.if %cond {
         qref.custom "PauliY"() %q : !qref.bit
@@ -942,7 +942,7 @@ func.func @test_preserves_compiler_hints(%cond: i1, %idx: index) attributes {qua
         scf.yield
     } {catalyst.estimated_probability = 7.500000e-01 : f64}
 
-    // CHECK: scf.index_switch %arg1 {catalyst.estimated_probabilities = [2.000000e-01, 3.000000e-01]} -> !quantum.bit
+    // CHECK: scf.index_switch {{.+}} {catalyst.estimated_probabilities = [2.000000e-01, 3.000000e-01]}
     scf.index_switch %idx {catalyst.estimated_probabilities = [2.000000e-01, 3.000000e-01]}
     case 0 {
         qref.custom "PauliZ"() %q : !qref.bit
