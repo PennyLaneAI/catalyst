@@ -339,8 +339,6 @@ void handleGate(IRRewriter &builder, quantum::QuantumOperation vGateOp, QubitVal
         auto rGateOp =
             migrateOpToReferenceSemantics<qref::OperatorOp>(builder, vOperatorOp, tracker);
         rGateOp->removeAttr("resultSegmentSizes");
-    } else if (auto vPPROp = dyn_cast<pbc::PPRotationOp>(_vGateOp)) {
-        migrateOpToReferenceSemantics<pbc::RefPPRotationOp>(builder, vPPROp, tracker);
     } else {
         vGateOp->emitOpError("unknown gate op in quantum dialect");
     }
