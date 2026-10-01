@@ -612,6 +612,10 @@
   Parameters that are trivially available to the reverse pass are no longer cached.
   [(#3233)](https://github.com/PennyLaneAI/catalyst/pull/3233)
 
+* Added a guard in the `--convert-to-value-semantics` pass to raise an error when 
+  unsupported quantum-bearing `scf` operations are encountered.
+  [(#3238)](https://github.com/PennyLaneAI/catalyst/pull/3238)
+
 <h3>Breaking changes 💔</h3>
 
 * `catalyst.logging` has been removed. `pennylane.logging` should be used instead.
@@ -808,6 +812,7 @@
   [(#2948)](https://github.com/PennyLaneAI/catalyst/pull/2948)
   [(#3224)](https://github.com/PennyLaneAI/catalyst/pull/3224)
   [(#3232)](https://github.com/PennyLaneAI/catalyst/pull/3232)
+  [(#3238)](https://github.com/PennyLaneAI/catalyst/pull/3238)
 
 * Removed the internal ``mlir_specs`` function which was the old backend for :func:`qp.specs`. The resource analysis pass replaces its use.
   [(#2841)](https://github.com/PennyLaneAI/catalyst/pull/2841)
