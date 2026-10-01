@@ -903,3 +903,59 @@ func.func @test_switch(%arg0: index, %arg1: f64) attributes {quantum.node} {
 
     return
 }
+
+// -----
+
+// Resource analysis hints on SCF ops must survive convert-to-value-semantics.
+
+// CHECK-LABEL: test_preserves_compiler_hints
+func.func @test_preserves_compiler_hints(%cond: i1, %idx: index) attributes {quantum.node} {
+    %start = arith.constant 0 : index
+    %step = arith.constant 1 : index
+    %stop = arith.constant 37 : index
+
+    // CHECK: [[qubit:%.+]] = quantum.alloc_qb : !quantum.bit
+    %q = qref.alloc_qb : !qref.bit
+
+    // CHECK: scf.for {{.+}} iter_args({{.+}} = [[qubit]]) -> (!quantum.bit) {
+    // CHECK: } {catalyst.estimated_iterations = 1.000000e+01 : f64}
+    scf.for %i = %start to %stop step %step {
+        qref.custom "Hadamard"() %q : !qref.bit
+        scf.yield
+    } {catalyst.estimated_iterations = 1.000000e+01 : f64}
+
+    // CHECK: scf.while ({{.+}} = {{%.+}}) : (!quantum.bit) -> !quantum.bit {
+    // CHECK: } attributes {catalyst.estimated_iterations = 2.500000e+00 : f64}
+    scf.while () : () -> () {
+        scf.condition(%cond)
+    } do {
+        qref.custom "PauliX"() %q : !qref.bit
+        scf.yield
+    } attributes {catalyst.estimated_iterations = 2.500000e+00 : f64}
+
+    // CHECK: scf.if %arg0 -> (!quantum.bit) {
+    // CHECK: } {catalyst.estimated_probability = 7.500000e-01 : f64}
+    scf.if %cond {
+        qref.custom "PauliY"() %q : !qref.bit
+        scf.yield
+    } else {
+        scf.yield
+    } {catalyst.estimated_probability = 7.500000e-01 : f64}
+
+    // CHECK: scf.index_switch %arg1 {catalyst.estimated_probabilities = [2.000000e-01, 3.000000e-01]} -> !quantum.bit
+    scf.index_switch %idx {catalyst.estimated_probabilities = [2.000000e-01, 3.000000e-01]}
+    case 0 {
+        qref.custom "PauliZ"() %q : !qref.bit
+        scf.yield
+    }
+    case 1 {
+        scf.yield
+    }
+    default {
+        scf.yield
+    }
+
+    // CHECK: quantum.dealloc_qb
+    qref.dealloc_qb %q : !qref.bit
+    return
+}
