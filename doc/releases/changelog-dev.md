@@ -734,6 +734,9 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* The value semantics conversion pass now preserves compiler hints on for, while, and cond.
+  [(#3288)](https://github.com/PennyLaneAI/catalyst/pull/3288)
+
 * A manually triggered workflow is added to build a Catalyst Docker image with PennyLane and
   Lightning for `linux/amd64` and `linux/arm64`, and can publish it to Docker Hub as a single
   multi-arch tag. The LLVM, StableHLO and Enzyme build is cached in the registry, so rebuilds only
