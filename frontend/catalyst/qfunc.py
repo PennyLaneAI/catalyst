@@ -643,9 +643,7 @@ def _extract_passes(transform_program):
         # ordinary tape transform (its pre-migration behavior). The explicit
         # ``catalyst.passes.graph_decomposition`` entry point is pass-only (no tape definition) and
         # continues to be lowered as a pass.
-        is_capture_only_pass = (
-            t.pass_name == "graph-decomposition" and t.tape_transform is not None
-        )
+        is_capture_only_pass = t.pass_name == "graph-decomposition" and t.tape_transform is not None
         if t.pass_name is None or is_capture_only_pass:
             break
         i -= 1
