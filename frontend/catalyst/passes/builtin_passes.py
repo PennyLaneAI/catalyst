@@ -1820,7 +1820,7 @@ def graph_decomposition_setup_inputs(
 
     options: dict[str, dict | tuple | str] = {
         "gate_set": gate_set,
-        "bytecode_rules": _builtin_rule_path,
+        "bytecode_rules": bytecode_rules or _builtin_rule_path,
         "libQPD_path": str(
             libQPD_path if libQPD_path else get_lib_path("catalyst", "CATALYST_LIB_DIR")
         ),
