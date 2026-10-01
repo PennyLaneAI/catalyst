@@ -554,6 +554,8 @@ void handleIf(IRRewriter &builder, scf::IfOp ifOp, QubitValueTracker &tracker,
     }
     auto newIfOp = scf::IfOp::create(builder, loc, classicalReturnTypes, ifOp.getCondition(),
                                      /*withElseRegion=*/hasElseRegion);
+    newIfOp->setDiscardableAttrs(ifOp->getDiscardableAttrDictionary());
+
     builder.eraseBlock(newIfOp.thenBlock());
     builder.inlineRegionBefore(ifOp.getThenRegion(), newIfOp.getThenRegion(),
                                newIfOp.getThenRegion().end());
@@ -589,6 +591,7 @@ void handleSwitch(IRRewriter &builder, scf::IndexSwitchOp switchOp, QubitValueTr
     auto newSwitchOp =
         scf::IndexSwitchOp::create(builder, loc, classicalReturnTypes, switchOp.getArg(),
                                    switchOp.getCases(), switchOp.getNumCases());
+    newSwitchOp->setDiscardableAttrs(switchOp->getDiscardableAttrDictionary());
 
     // Handle the default region
     // Cannot just use `cascadeMapAhead` util to update the outside flow, since switch op does not
@@ -661,6 +664,8 @@ void handleFor(IRRewriter &builder, scf::ForOp forOp, QubitValueTracker &tracker
     // Create the new for op and handle
     auto newLoop = scf::ForOp::create(builder, loc, forOp.getLowerBound(), forOp.getUpperBound(),
                                       forOp.getStep(), newIterArgs);
+    newLoop->setDiscardableAttrs(forOp->getDiscardableAttrDictionary());
+
     builder.eraseBlock(newLoop.getBody());
 
     builder.inlineRegionBefore(forOp.getRegion(), newLoop.getRegion(), newLoop.getRegion().end());
@@ -716,6 +721,7 @@ void handleWhile(IRRewriter &builder, scf::WhileOp whileOp, QubitValueTracker &t
 
     // Create the new while op
     auto newLoop = scf::WhileOp::create(builder, loc, newResultTypes, newBeforeArgs);
+    newLoop->setDiscardableAttrs(whileOp->getDiscardableAttrDictionary());
     builder.inlineRegionBefore(whileOp.getBefore(), newLoop.getBefore(), newLoop.getBefore().end());
     builder.inlineRegionBefore(whileOp.getAfter(), newLoop.getAfter(), newLoop.getAfter().end());
 
