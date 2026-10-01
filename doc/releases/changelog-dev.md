@@ -611,8 +611,8 @@
   Parameters that are trivially available to the reverse pass are no longer cached.
   [(#3233)](https://github.com/PennyLaneAI/catalyst/pull/3233)
 
-* Added a guard in the `--convert-to-value-semantics` pass to raise an error when an `scf.execute_region`
-  contains quantum operations. 
+* Added a guard in the `--convert-to-value-semantics` pass to raise an error when 
+  unsupported quantum-bearing `scf` operations are encountered.
   [(#3238)](https://github.com/PennyLaneAI/catalyst/pull/3238)
 
 <h3>Breaking changes 💔</h3>
