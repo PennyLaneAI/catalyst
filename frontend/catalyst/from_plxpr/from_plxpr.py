@@ -368,18 +368,12 @@ def _handle_decompose_transform(self, inner_jaxpr, consts, non_const_args, tkwar
     only carry rule *names*; the bodies come from PennyLane's decomposition registry).
     """
     # Local imports avoid an import cycle (catalyst.passes imports from_plxpr indirectly).
-    from pennylane.decomposition import add_decomps, enabled_graph, local_decomps
+    from pennylane.decomposition import add_decomps, local_decomps
 
     from catalyst.passes.builtin_passes import graph_decomposition
 
     _guard_single_decompose(self)
     _validate_decompose_tkwargs(tkwargs)
-
-    if not enabled_graph():
-        raise RuntimeError(
-            "qp.decompose under qjit requires graph-based decomposition. Call "
-            "qml.decomposition.enable_graph() before compiling."
-        )
 
     fixed_decomps = tkwargs.get("fixed_decomps") or {}
     alt_decomps = tkwargs.get("alt_decomps") or {}
