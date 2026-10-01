@@ -269,10 +269,8 @@ void LayerOp::print(OpAsmPrinter &p) {
 //===----------------------------------------------------------------------===//
 // Implement ResourceQuantumOpInterface methods.
 //===----------------------------------------------------------------------===//
-llvm::StringRef PrepareStateOp::getResourceName() { return "pbc.prepare"; }
-llvm::StringRef FabricateOp::getResourceName() { return "pbc.fabricate"; }
-llvm::StringRef PPRotationOp::getResourceName() {
-    switch (std::abs(getRotationKind())) {
+template <typename OpType> static llvm::StringRef getPPRResourceName(OpType op) {
+    switch (std::abs(op.getRotationKind())) {
     case 1:
         return "PPR-identity";
     case 2:
@@ -282,28 +280,19 @@ llvm::StringRef PPRotationOp::getResourceName() {
     case 8:
         return "PPR-pi/8";
     }
-    assert(false && "PPRotationOp::getResourceName: invalid rotation kind");
+    assert(false && "getPPRResourceName: invalid rotation kind");
     return "PPR-invalid";
 }
+
+llvm::StringRef PrepareStateOp::getResourceName() { return "pbc.prepare"; }
+llvm::StringRef FabricateOp::getResourceName() { return "pbc.fabricate"; }
+llvm::StringRef PPRotationOp::getResourceName() { return getPPRResourceName(*this); }
 llvm::StringRef PPRotationArbitraryOp::getResourceName() { return "PPR-Phi"; }
 llvm::StringRef PPMeasurementOp::getResourceName() { return "PPM"; }
 llvm::StringRef SelectPPMeasurementOp::getResourceName() { return "PPM"; }
 llvm::StringRef RefPrepareStateOp::getResourceName() { return "pbc.prepare"; }
 llvm::StringRef RefFabricateOp::getResourceName() { return "pbc.fabricate"; }
-llvm::StringRef RefPPRotationOp::getResourceName() {
-    switch (std::abs(getRotationKind())) {
-    case 1:
-        return "PPR-identity";
-    case 2:
-        return "PPR-pi/2";
-    case 4:
-        return "PPR-pi/4";
-    case 8:
-        return "PPR-pi/8";
-    }
-    assert(false && "RefPPRotationOp::getResourceName: invalid rotation kind");
-    return "PPR-invalid";
-}
+llvm::StringRef RefPPRotationOp::getResourceName() { return getPPRResourceName(*this); }
 llvm::StringRef RefPPMeasurementOp::getResourceName() { return "PPM"; }
 llvm::StringRef RefSelectPPMeasurementOp::getResourceName() { return "PPM"; }
 

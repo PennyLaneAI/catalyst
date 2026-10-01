@@ -639,6 +639,9 @@
   for Python 3.11.
   [(#2984)](https://github.com/PennyLaneAI/catalyst/pull/2984)
 
+* Added reference semantics support for PBC operations.
+  [(#3136)](https://github.com/PennyLaneAI/catalyst/pull/3136)
+
 <h3>Deprecations 👋</h3>
 
 <h3>Bug fixes 🐛</h3>
@@ -705,9 +708,6 @@
 
 * Fixed the assembly format for `quantum.adjoint` when it has no quantum operands/results.
   [(#2938)](https://github.com/PennyLaneAI/catalyst/pull/2938)
-
-* Added reference semantics support for PBC operations.
-  [(#3136)](https://github.com/PennyLaneAI/catalyst/pull/3136)
 
 * Fixed a performance degradation issue with `catalyst.runtime_artifacts`. It now visits module
   operations only, instead of every operation in the program.
