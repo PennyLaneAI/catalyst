@@ -14,6 +14,8 @@
 
 """Unit tests for the python decompositions module."""
 
+from functools import partial
+
 import jax.numpy as jnp
 import numpy as np
 import pennylane as qp
@@ -1842,6 +1844,125 @@ class TestCustomRuleApplication:
         after = resources["graph-decomposition"].counts
         assert "C(NoParams)" not in after
         assert after.get("NoParams", 0) == 1
+
+
+class TestDecomposeAlias:
+    """``qp.decompose`` under capture is an alias for ``graph_decomposition`` (same C++ pass)."""
+
+    def test_decompose_matches_graph_decomposition(self):
+        """``qp.decompose`` compiles to the exact same MLIR as ``graph_decomposition``.
+        """
+        gate_set = {"RX", "RY", "RZ"}
+
+        def build(dec):
+            @qjit(capture=True, target="mlir")
+            @dec
+            @qnode(qp.device("null.qubit", wires=1))
+            def circuit():
+                qp.Rot(0.1, 0.2, 0.3, wires=0)
+                return qp.probs()
+
+            return circuit
+
+        via_decompose = build(partial(qp.transforms.decompose, gate_set=gate_set))
+        via_graph = build(graph_decomposition(gate_set=gate_set))
+
+        assert 'apply_registered_pass "graph-decomposition"' in via_decompose.mlir
+        assert via_decompose.mlir == via_graph.mlir
+
+    @pytest.mark.parametrize(
+        "tkwargs, exc",
+        [
+            ({"gate_set": {"RX"}, "stopping_condition": lambda op: True}, NotImplementedError),
+            ({"gate_set": {"RX"}, "max_expansion": 2}, NotImplementedError),
+            ({"gate_set": {"RX"}, "num_work_wires": 2}, NotImplementedError),
+            ({"gate_set": {"RX"}, "minimize_work_wires": True}, NotImplementedError),
+            ({"gate_set": {"RX"}, "strict": False}, NotImplementedError),
+            ({"gate_set": None}, ValueError),
+        ],
+    )
+    def test_decompose_rejects_unsupported_kwargs(self, tkwargs, exc):
+        """Kwargs the graph-decomposition pass cannot honor are rejected with a clear error."""
+        with pytest.raises(exc):
+
+            @qjit(capture=True, target="mlir")
+            @partial(qp.transforms.decompose, **tkwargs)
+            @qnode(qp.device("null.qubit", wires=1))
+            def circuit():
+                qp.Rot(0.1, 0.2, 0.3, wires=0)
+                return qp.probs()
+
+            qp.specs(circuit, level="all-mlir")()
+
+    def test_decompose_multiple_not_supported(self):
+        """Stacking two decomposition transforms is rejected."""
+        with pytest.raises(NotImplementedError, match="Multiple decomposition"):
+
+            @qjit(capture=True, target="mlir")
+            @partial(qp.transforms.decompose, gate_set={"RX", "RY", "RZ"})
+            @partial(qp.transforms.decompose, gate_set={"RX", "RY", "RZ"})
+            @qnode(qp.device("null.qubit", wires=1))
+            def circuit():
+                qp.Rot(0.1, 0.2, 0.3, wires=0)
+                return qp.probs()
+
+            qp.specs(circuit, level="all-mlir")()
+
+    def test_decompose_inline_fixed_decomps(self):
+        """Inline ``fixed_decomps`` rule bodies are registered for the graph pass."""
+
+        @register_resources({NoParams(Wire[1]): 1})
+        def rot_to_noparams(phi, theta, omega, wires):  # pylint: disable=unused-argument
+            NoParams(wires[0])
+
+        qp.decomposition.enable_graph()
+        try:
+
+            @qjit(capture=True, target="mlir")
+            @partial(
+                qp.transforms.decompose,
+                gate_set={"NoParams"},
+                fixed_decomps={qp.Rot: rot_to_noparams},
+            )
+            @qnode(qp.device("null.qubit", wires=1))
+            def circuit():
+                qp.Rot(0.1, 0.2, 0.3, wires=0)
+                return qp.probs()
+
+            mlir = circuit.mlir
+        finally:
+            qp.decomposition.disable_graph()
+
+        # The inline rule body is registered (via add_decomps in a local scope) and captured into
+        # the module by the trace-time rule closure, and the circuit routes to graph-decomposition.
+        assert 'apply_registered_pass "graph-decomposition"' in mlir
+        assert "NoParams" in mlir
+
+    def test_decompose_inline_rules_require_rule_collection(self):
+        """Inline rules with ``collect_decomp_rules=False`` raise a clear error."""
+
+        @register_resources({NoParams(Wire[1]): 1})
+        def rot_to_noparams(phi, theta, omega, wires):  # pylint: disable=unused-argument
+            NoParams(wires[0])
+
+        qp.decomposition.enable_graph()
+        try:
+            with pytest.raises(NotImplementedError, match="collect_decomp_rules"):
+
+                @qjit(capture=True, target="mlir", collect_decomp_rules=False)
+                @partial(
+                    qp.transforms.decompose,
+                    gate_set={"NoParams"},
+                    fixed_decomps={qp.Rot: rot_to_noparams},
+                )
+                @qnode(qp.device("null.qubit", wires=1))
+                def circuit():
+                    qp.Rot(0.1, 0.2, 0.3, wires=0)
+                    return qp.probs()
+
+                qp.specs(circuit, level="all-mlir")()
+        finally:
+            qp.decomposition.disable_graph()
 
 
 class TestNumericHamiltonianDecomposition:
