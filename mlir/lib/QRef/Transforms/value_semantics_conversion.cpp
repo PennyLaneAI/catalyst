@@ -1561,6 +1561,7 @@ void handleIf(IRRewriter &builder, scf::IfOp ifOp, QubitValueTracker &tracker) {
         // scf.if op always requires an else block if returning any results
         newIfOp = scf::IfOp::create(builder, loc, newResultTypes, ifOp.getCondition(),
                                     /*withElseRegion=*/true);
+        newIfOp->setDiscardableAttrs(ifOp->getDiscardableAttrDictionary());
 
         // 2. Handle the "then" region
         builder.eraseBlock(newIfOp.thenBlock());
@@ -1644,6 +1645,7 @@ void handleSwitch(IRRewriter &builder, scf::IndexSwitchOp switchOp, QubitValueTr
 
         newSwitchOp = scf::IndexSwitchOp::create(builder, loc, newResultTypes, switchOp.getArg(),
                                                  switchOp.getCases(), switchOp.getNumCases());
+        newSwitchOp->setDiscardableAttrs(switchOp->getDiscardableAttrDictionary());
 
         // 2. Handle the "default" region
         builder.inlineRegionBefore(switchOp.getDefaultRegion(), newSwitchOp.getDefaultRegion(),
@@ -1720,6 +1722,8 @@ void handleFor(IRRewriter &builder, scf::ForOp forOp, QubitValueTracker &tracker
 
         newLoop = scf::ForOp::create(builder, loc, forOp.getLowerBound(), forOp.getUpperBound(),
                                      forOp.getStep(), newIterArgs);
+        // Carry over hints such as `catalyst.estimated_iterations`, which later analyses read.
+        newLoop->setDiscardableAttrs(forOp->getDiscardableAttrDictionary());
 
         // 2. Move operations from old body to new body
         builder.eraseBlock(newLoop.getBody());
@@ -1801,6 +1805,7 @@ void handleWhile(IRRewriter &builder, scf::WhileOp whileOp, QubitValueTracker &t
         }
 
         newLoop = scf::WhileOp::create(builder, loc, newResultTypes, newIterArgs);
+        newLoop->setDiscardableAttrs(whileOp->getDiscardableAttrDictionary());
 
         // 2. Move operations from old body to new body
         builder.inlineRegionBefore(whileOp.getBefore(), newLoop.getBefore(),
