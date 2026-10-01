@@ -339,6 +339,8 @@ void handleGate(IRRewriter &builder, quantum::QuantumOperation vGateOp, QubitVal
         auto rGateOp =
             migrateOpToReferenceSemantics<qref::OperatorOp>(builder, vOperatorOp, tracker);
         rGateOp->removeAttr("resultSegmentSizes");
+    } else if (auto vPPROp = dyn_cast<pbc::PPRotationOp>(_vGateOp)) {
+        migrateOpToReferenceSemantics<pbc::RefPPRotationOp>(builder, vPPROp, tracker);
     } else {
         vGateOp->emitOpError("unknown gate op in quantum dialect");
     }
@@ -397,8 +399,8 @@ void handleSelectPPM(IRRewriter &builder, pbc::SelectPPMeasurementOp vSelPPMOp,
 
 // Shared handler for pbc.fabricate / pbc.prepare. VOpTy is deduced from the producer argument.
 template <typename ROpTy, typename VOpTy>
-void handleQubitProducer(IRRewriter &builder, VOpTy vProducerOp, QubitValueTracker &tracker,
-                         SmallVector<Operation *> &erasureWorklist) {
+void handlePBCQubitProducer(IRRewriter &builder, VOpTy vProducerOp, QubitValueTracker &tracker,
+                            SmallVector<Operation *> &erasureWorklist) {
     OpBuilder::InsertionGuard guard(builder);
     builder.setInsertionPoint(vProducerOp);
     Location loc = vProducerOp.getLoc();
@@ -846,10 +848,11 @@ std::optional<SmallVector<Operation *>> handleRegion(IRRewriter &builder, Region
             .Case<pbc::SelectPPMeasurementOp>(
                 [&](auto o) { handleSelectPPM(builder, o, tracker, erasureWorklist); })
             .Case<pbc::FabricateOp>([&](auto o) {
-                handleQubitProducer<pbc::RefFabricateOp>(builder, o, tracker, erasureWorklist);
+                handlePBCQubitProducer<pbc::RefFabricateOp>(builder, o, tracker, erasureWorklist);
             })
             .Case<pbc::PrepareStateOp>([&](auto o) {
-                handleQubitProducer<pbc::RefPrepareStateOp>(builder, o, tracker, erasureWorklist);
+                handlePBCQubitProducer<pbc::RefPrepareStateOp>(builder, o, tracker,
+                                                               erasureWorklist);
             })
             .Case<quantum::AdjointOp>(
                 [&](auto o) { handleAdjoint(builder, o, tracker, erasureWorklist); })
