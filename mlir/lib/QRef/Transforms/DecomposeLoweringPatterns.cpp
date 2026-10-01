@@ -16,6 +16,7 @@
 #include <cstddef>
 #include <string>
 
+#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringSet.h"
@@ -50,10 +51,15 @@ namespace qref {
 
 // Clone a rule function and create a call to the clone
 func::CallOp cloneAndCallRule(PatternRewriter &rewriter, func::FuncOp originalRule,
-                              ValueRange operands) {
+                              ValueRange operands, SymbolTable moduleSymbolTable,
+                              llvm::DenseMap<func::FuncOp, func::FuncOp> &rulesToClonedFuncs) {
     OpBuilder::InsertionGuard guard(rewriter);
-    MLIRContext *ctx = originalRule->getContext();
     Location loc = originalRule.getLoc();
+    MLIRContext *ctx = originalRule->getContext();
+
+    if (rulesToClonedFuncs.contains(originalRule)) {
+        return func::CallOp::create(rewriter, loc, rulesToClonedFuncs[originalRule], operands);
+    }
 
     func::FuncOp clonedFunc = originalRule.clone();
     clonedFunc.setName(StringAttr::get(ctx, originalRule.getName() + "_clone"));
@@ -65,11 +71,9 @@ func::CallOp cloneAndCallRule(PatternRewriter &rewriter, func::FuncOp originalRu
     clonedFunc->removeAttr("target_gate");
     clonedFunc->removeAttr("resources");
 
-    Operation *moduleOp = originalRule->getParentOfType<ModuleOp>();
-    SymbolTable symbolTable(moduleOp);
-
     // SymbolTable::insert will automatically resolve naming collisions
-    symbolTable.insert(clonedFunc);
+    moduleSymbolTable.insert(clonedFunc);
+    rulesToClonedFuncs[originalRule] = clonedFunc;
 
     return func::CallOp::create(rewriter, loc, clonedFunc, operands);
 }
@@ -78,12 +82,15 @@ struct DecomposableGatePattern final : public OpInterfaceRewritePattern<Decompos
   private:
     const llvm::StringMap<func::FuncOp> &decompositionRegistry;
     const llvm::StringSet<llvm::MallocAllocator> &targetGateSet;
+    SymbolTable &moduleSymbolTable;
+    mutable llvm::DenseMap<func::FuncOp, func::FuncOp> rulesToClonedFuncs;
 
   public:
     DecomposableGatePattern(MLIRContext *context, const llvm::StringMap<func::FuncOp> &registry,
-                            const llvm::StringSet<llvm::MallocAllocator> &gateSet)
+                            const llvm::StringSet<llvm::MallocAllocator> &gateSet,
+                            SymbolTable &symbolTable)
         : OpInterfaceRewritePattern<DecomposableGate>(context), decompositionRegistry(registry),
-          targetGateSet(gateSet) {}
+          targetGateSet(gateSet), moduleSymbolTable(symbolTable) {};
 
     LogicalResult matchAndRewrite(DecomposableGate op, PatternRewriter &rewriter) const override {
         std::string gateName = op.getOperatorName();
@@ -162,7 +169,8 @@ struct DecomposableGatePattern final : public OpInterfaceRewritePattern<Decompos
         assert(analyzer && "Analyzer should be valid");
 
         auto operands = analyzer.prepareOperands(rule, rewriter, op.getLoc());
-        func::CallOp callOp = cloneAndCallRule(rewriter, rule, operands);
+        func::CallOp callOp =
+            cloneAndCallRule(rewriter, rule, operands, moduleSymbolTable, rulesToClonedFuncs);
 
         // DL is in reference semantics, so only classical results will be returned from the rules
         rewriter.replaceOp(op, callOp);
@@ -170,11 +178,12 @@ struct DecomposableGatePattern final : public OpInterfaceRewritePattern<Decompos
     }
 };
 
-void populateDecomposeLoweringPatterns(
-    RewritePatternSet &patterns, const llvm::StringMap<func::FuncOp> &decompositionRegistry,
-    const llvm::StringSet<llvm::MallocAllocator> &targetGateSet) {
+void populateDecomposeLoweringPatterns(RewritePatternSet &patterns,
+                                       const llvm::StringMap<func::FuncOp> &decompositionRegistry,
+                                       const llvm::StringSet<llvm::MallocAllocator> &targetGateSet,
+                                       SymbolTable &moduleSymbolTable) {
     patterns.add<DecomposableGatePattern>(patterns.getContext(), decompositionRegistry,
-                                          targetGateSet);
+                                          targetGateSet, moduleSymbolTable);
 }
 
 } // namespace qref

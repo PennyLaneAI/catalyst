@@ -28,6 +28,7 @@
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/DialectRegistry.h"
 #include "mlir/IR/PatternMatch.h"
+#include "mlir/IR/SymbolTable.h"
 #include "mlir/IR/Value.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
@@ -154,8 +155,9 @@ struct DecomposeLoweringPass : impl::DecomposeLoweringPassBase<DecomposeLowering
 
         // Step 3: Apply the decomposition patterns
         RewritePatternSet decompositionPatterns(&getContext());
+        SymbolTable moduleSymbolTable(module);
         populateDecomposeLoweringPatterns(decompositionPatterns, decompositionRegistry,
-                                          targetGateSet);
+                                          targetGateSet, moduleSymbolTable);
         if (failed(applyPatternsGreedily(module, std::move(decompositionPatterns)))) {
             return signalPassFailure();
         }
