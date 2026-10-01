@@ -113,10 +113,12 @@
 
 <h3>Improvements 🛠</h3>
 
-* The memcpy transport carries messages of any size up to 4096 bytes in each direction, as
-  committed by `__catalyst__transport__set_message_sizes`. A frame of up to 8 bytes keeps the
-  16 B `Payload` layout, so existing coprocessor functions and launchers are unaffected. The RDMA
-  backends still carry 8 bytes and reject a larger size.
+* The memcpy transport's controller and CPU coprocessor carry messages of any size up to 4096
+  bytes in each direction, as committed by `__catalyst__transport__set_message_sizes`. A frame of
+  up to 8 bytes keeps the 16 B `Payload` layout, so existing coprocessor functions and launchers
+  are unaffected. The memcpy GPU coprocessor, whose persistent kernel reads one 8-byte value per
+  message, still carries 8 bytes and now accepts a reply size below 8. The RDMA backends still
+  carry 8 bytes and reject a larger size.
   [(#3281)](https://github.com/PennyLaneAI/catalyst/pull/3281)
 
 * :func:`~.passes.graph_decomposition` accepts a `verbose` keyword argument. When `True`, the pass
@@ -648,6 +650,11 @@
 <h3>Deprecations 👋</h3>
 
 <h3>Bug fixes 🐛</h3>
+
+* The memcpy controller rejects staging or posting a payload before its message sizes have been
+  committed. After a rejected `__catalyst__transport__set_message_sizes`, staging a payload used to
+  write into an unallocated buffer.
+  [(#3281)](https://github.com/PennyLaneAI/catalyst/pull/3281)
 
 * `adjoint-lowering` no longer fails on gates whose parameter is a wide-integer tensor. Integer and
   boolean gate parameters (e.g. a `QROM` `tensor<Nxi64>` bitstring) are now recorded in a dedicated

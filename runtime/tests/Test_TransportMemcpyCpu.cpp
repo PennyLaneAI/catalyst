@@ -361,6 +361,23 @@ TEST_CASE("memcpy rejects in/out_bytes above MAX_MESSAGE_BYTES", "[transport_mem
     controller.commit_work_item(0, common::MAX_MESSAGE_BYTES, common::MAX_MESSAGE_BYTES);
 }
 
+TEST_CASE("memcpy rejects staging and kick before the message sizes are committed",
+          "[transport_memcpy]") {
+    ConnectInfo ci{.peer = "loopback", .oob_port = 19031};
+    CpuControllerSession controller(pair_cfg(ci.oob_port));
+    CpuCoprocessorSession coprocessor(pair_cfg(ci.oob_port));
+    REQUIRE(controller.connect(ci) == 0);
+    REQUIRE(coprocessor.connect(ci) == 0);
+
+    // A rejected commit leaves the session uncommitted, with no staging buffer.
+    REQUIRE_THROWS_AS(controller.commit_work_item(0, common::MAX_MESSAGE_BYTES + 1, 8),
+                      std::runtime_error);
+    const std::uint64_t word = 42;
+    REQUIRE_THROWS_AS(controller.write_data_slot(&word, sizeof(word), /*decoder_id=*/0),
+                      std::runtime_error);
+    REQUIRE_THROWS_AS(controller.kick(0), std::runtime_error);
+}
+
 // Distinct pair keys stay isolated even on the same peer+oob_port.
 TEST_CASE("memcpy pair keys isolate independent sessions", "[transport_memcpy]") {
     ConnectInfo ci{.peer = "loopback", .oob_port = 19022};
