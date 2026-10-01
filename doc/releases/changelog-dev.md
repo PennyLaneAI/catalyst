@@ -233,6 +233,7 @@
     [(#3158)](https://github.com/PennyLaneAI/catalyst/pull/3158)
     [(#3206)](https://github.com/PennyLaneAI/catalyst/pull/3206)
     [(#3224)](https://github.com/PennyLaneAI/catalyst/pull/3224)
+    [(#3232)](https://github.com/PennyLaneAI/catalyst/pull/3232)
     [(#3285)](https://github.com/PennyLaneAI/catalyst/pull/3285)
 
     1. The pass now supports applying a selection of the available decomposition rules via the `target_rules` parameter.
@@ -648,10 +649,11 @@
 <h3>Bug fixes 🐛</h3>
 
 * MLIR passes that recreate `scf.for`, `scf.while`, `scf.if`, and `scf.index_switch` ops
-  (`ctrl-lowering`, and `adjoint-lowering`) now preserve discardable
+  (`ctrl-lowering`, `adjoint-lowering`, `--convert-to-value-semantics`) now preserve discardable
   attributes such as `catalyst.estimated_iterations`, `catalyst.estimated_probability`, and
   `catalyst.estimated_probabilities`, so resource analysis still sees compiler hints after those
   rewrites.
+  [(#3288)](https://github.com/PennyLaneAI/catalyst/pull/3288)
   [(#3291)](https://github.com/PennyLaneAI/catalyst/pull/3291)
 
 * `adjoint-lowering` no longer fails on gates whose parameter is a wide-integer tensor. Integer and
@@ -734,9 +736,6 @@
 
 <h3>Internal changes ⚙️</h3>
 
-* The value semantics conversion pass now preserves compiler hints on for, while, and cond.
-  [(#3288)](https://github.com/PennyLaneAI/catalyst/pull/3288)
-
 * A manually triggered workflow is added to build a Catalyst Docker image with PennyLane and
   Lightning for `linux/amd64` and `linux/arm64`, and can publish it to Docker Hub as a single
   multi-arch tag. The LLVM, StableHLO and Enzyme build is cached in the registry, so rebuilds only
@@ -814,7 +813,7 @@
   [(#2945)](https://github.com/PennyLaneAI/catalyst/pull/2945)
   [(#2948)](https://github.com/PennyLaneAI/catalyst/pull/2948)
   [(#3224)](https://github.com/PennyLaneAI/catalyst/pull/3224)
-  [(#3232)](https://github.com/PennyLaneAI/catalyst/pull/3232)
+  [(#3291)](https://github.com/PennyLaneAI/catalyst/pull/3291)
 
 * Removed the internal ``mlir_specs`` function which was the old backend for :func:`qp.specs`. The resource analysis pass replaces its use.
   [(#2841)](https://github.com/PennyLaneAI/catalyst/pull/2841)
