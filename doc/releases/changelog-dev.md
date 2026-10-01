@@ -127,6 +127,11 @@
   `per_message`.
   [(#3282)](https://github.com/PennyLaneAI/catalyst/pull/3282)
 
+* A compiled program now checks the result of every transport call it makes (creating, connecting
+  and configuring sessions, and posting and collecting messages), and stops with an error naming
+  the call when one fails, instead of continuing with a session that does not work.
+  [(#3282)](https://github.com/PennyLaneAI/catalyst/pull/3282)
+
 * A coprocessor function can now be configured. Its library exports
   `const CatalystCoprocessorFnInfo *<symbol>_info()` (`TransportABI.h`), a versioned descriptor of
   optional `init` and `fini` hooks, which the runtime looks up only in the function's own library.
@@ -1002,6 +1007,7 @@ Mehrdad Malekmohammadi,
 River McCubbin,
 Shuli Shu,
 Nikhil Sreekumar,
+Kalman Szenes,
 Paul Haochen Wang,
 Jake Zaia,
 Haider Sajjad,
