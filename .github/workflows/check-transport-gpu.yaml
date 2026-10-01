@@ -145,7 +145,7 @@ jobs:
           sudo apt-get update
           # --no-install-recommends: hip-dev and rocm-llvm recommend libdrm-amdgpu and a
           # multilib gcc, neither of which an NVIDIA host compiling with nvcc needs.
-          sudo apt-get install -y --no-install-recommends hip-dev hipcc-nvidia
+          sudo apt-get install -y --no-install-recommends hip-dev
           echo "ROCM_PATH=$(echo /opt/rocm-*)" >> $GITHUB_ENV
 
       # Ahead of every build below: requirements.txt pins the numpy/nanobind/pybind11 the MLIR
