@@ -51,18 +51,16 @@ namespace qref {
 
 // Clone a rule function and create a call to the clone
 func::CallOp cloneAndCallRule(PatternRewriter &rewriter, func::FuncOp originalRule,
-                              ValueRange operands, SymbolTable moduleSymbolTable,
+                              ValueRange operands, SymbolTable &moduleSymbolTable,
                               llvm::DenseMap<func::FuncOp, func::FuncOp> &rulesToClonedFuncs) {
     OpBuilder::InsertionGuard guard(rewriter);
     Location loc = originalRule.getLoc();
-    MLIRContext *ctx = originalRule->getContext();
 
     if (rulesToClonedFuncs.contains(originalRule)) {
         return func::CallOp::create(rewriter, loc, rulesToClonedFuncs[originalRule], operands);
     }
 
     func::FuncOp clonedFunc = originalRule.clone();
-    clonedFunc.setName(StringAttr::get(ctx, originalRule.getName() + "_clone"));
     clonedFunc.setVisibility(SymbolTable::Visibility::Private);
 
     // The clones are not rules in the decomp graph: they are just functions to be called
@@ -71,7 +69,8 @@ func::CallOp cloneAndCallRule(PatternRewriter &rewriter, func::FuncOp originalRu
     clonedFunc->removeAttr("target_gate");
     clonedFunc->removeAttr("resources");
 
-    // SymbolTable::insert will automatically resolve naming collisions
+    // We must do SymbolTable::insert instead of rewriter::insert, because rewriter
+    // cannot manage name collisions
     moduleSymbolTable.insert(clonedFunc);
     rulesToClonedFuncs[originalRule] = clonedFunc;
 
