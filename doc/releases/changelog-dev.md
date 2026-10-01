@@ -233,6 +233,7 @@
     [(#3158)](https://github.com/PennyLaneAI/catalyst/pull/3158)
     [(#3206)](https://github.com/PennyLaneAI/catalyst/pull/3206)
     [(#3224)](https://github.com/PennyLaneAI/catalyst/pull/3224)
+    [(#3285)](https://github.com/PennyLaneAI/catalyst/pull/3285)
 
     1. The pass now supports applying a selection of the available decomposition rules via the `target_rules` parameter.
 
@@ -611,7 +612,14 @@
   Parameters that are trivially available to the reverse pass are no longer cached.
   [(#3233)](https://github.com/PennyLaneAI/catalyst/pull/3233)
 
+* Added a guard in the `--convert-to-value-semantics` pass to raise an error when 
+  unsupported quantum-bearing `scf` operations are encountered.
+  [(#3238)](https://github.com/PennyLaneAI/catalyst/pull/3238)
+
 <h3>Breaking changes 💔</h3>
+
+* `catalyst.logging` has been removed. `pennylane.logging` should be used instead.
+  [(#3283)](https://github.com/PennyLaneAI/catalyst/pull/3283)
 
 * Removes :func:`~.passes.ppm_specs` and the ``--ppm-specs`` MLIR pass. Use :func:`~.specs` and
   the ``ResourceAnalysis`` pass instead for PPR/PPM resource counts and PBC layer depth
@@ -639,9 +647,17 @@
   for Python 3.11.
   [(#2984)](https://github.com/PennyLaneAI/catalyst/pull/2984)
 
+* Added reference semantics support for PBC operations.
+  [(#3136)](https://github.com/PennyLaneAI/catalyst/pull/3136)
+
 <h3>Deprecations 👋</h3>
 
 <h3>Bug fixes 🐛</h3>
+
+* Fixed the CNOT decomposition of the `ions-decomposition` pass, which did not implement a CNOT:
+  it rotated the target with `RY(-π/2)` instead of `RX(-π/2)` and returned the two qubits in
+  swapped order.
+  [(#3277)](https://github.com/PennyLaneAI/catalyst/pull/3277)
 
 * `adjoint-lowering` no longer fails on gates whose parameter is a wide-integer tensor. Integer and
   boolean gate parameters (e.g. a `QROM` `tensor<Nxi64>` bitstring) are now recorded in a dedicated
@@ -726,6 +742,15 @@
 * Integration tests for :func:`pennylane.specs` have been migrated from the Catalyst frontend to PennyLane.
   [(#3107)](https://github.com/PennyLaneAI/catalyst/pull/3107)
 
+* The value semantics conversion pass now preserves compiler hints on for, while, and cond.
+  [(#3288)](https://github.com/PennyLaneAI/catalyst/pull/3288)
+
+* A manually triggered workflow is added to build a Catalyst Docker image with PennyLane and
+  Lightning for `linux/amd64` and `linux/arm64`, and can publish it to Docker Hub as a single
+  multi-arch tag. The LLVM, StableHLO and Enzyme build is cached in the registry, so rebuilds only
+  recompile Catalyst.
+  [(#3182)](https://github.com/PennyLaneAI/catalyst/pull/3182)
+
 * A new `modifiers-lowering` pass reduces `quantum.ctrl` and `quantum.adjoint` regions to op-level
   modifiers by running the `ctrl-lowering` and `adjoint-lowering` rewrite patterns together under a
   single greedy driver. Each pattern defers (a match failure) while its region still holds the other
@@ -798,6 +823,7 @@
   [(#2948)](https://github.com/PennyLaneAI/catalyst/pull/2948)
   [(#3224)](https://github.com/PennyLaneAI/catalyst/pull/3224)
   [(#3232)](https://github.com/PennyLaneAI/catalyst/pull/3232)
+  [(#3238)](https://github.com/PennyLaneAI/catalyst/pull/3238)
 
 * Removed the internal ``mlir_specs`` function which was the old backend for :func:`qp.specs`. The resource analysis pass replaces its use.
   [(#2841)](https://github.com/PennyLaneAI/catalyst/pull/2841)
@@ -957,13 +983,16 @@
 
 This release contains contributions from (in alphabetical order):
 
+Runor Agbaire,
 Ali Asadi,
 Joey Carter,
 Yushao Chen,
+Filip Dobrosavljevic,
 Lillian Frederiksen,
 Sengthai Heng,
 David Ittah,
 JiaRung Jian,
+Jeffrey Kam,
 Jacob Kitchen,
 Korbinian Kottmann,
 Christina Lee,
