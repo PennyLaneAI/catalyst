@@ -101,6 +101,13 @@ class CompileOptions:
             Default is ``False``.
         logfile (Optional[TextIOWrapper]): The logfile to write output to.
             Default is ``sys.stderr``.
+        target (Optional[str]): The compilation stage at which to stop. One of ``"jaxpr"``,
+            ``"mlir"``, ``"llvmir"`` or ``"binary"``, where each value includes all of the
+            preceding stages. Only ``"binary"`` produces a callable shared object; the earlier
+            stages are useful for inspecting the generated program. Default is ``"binary"``.
+        link (Optional[bool]): Whether to link the generated object code into a shared object that
+            can be executed. If ``False``, compilation stops after producing LLVM IR and no
+            callable is generated. Default is ``True``.
         keep_intermediate (Optional[Union[str, int, bool]]): Level controlling intermediate file
             generation.
 
@@ -110,9 +117,10 @@ class CompileOptions:
             - ``3`` or ``"pass"``: Intermediate files are saved after each pass, even if unchanged.
         use_nameloc (Optional[bool]): If ``True``, add function parameter names to the IR as name
             locations.
-        pipelines (Optional[List[Tuple[str,List[str]]]]): A list of tuples. The first entry of the
-            tuple corresponds to the name of a pipeline. The second entry of the tuple corresponds
-            to a list of MLIR passes.
+        pipelines (Optional[List[Tuple[str,List[str]]]]): A list of tuples, each consisting of a
+            pipeline name followed by a list of MLIR passes. If provided, this list *replaces* the
+            default compilation stages rather than adding to them; use ``default_pipeline()`` to
+            start from the defaults and modify them. Default is ``None``.
         autograph (Optional[bool]): Flag indicating whether experimental autograph support is to
             be enabled.
         autograph_include (Optional[Iterable[str]]): A list of (sub)modules to be allow-listed
@@ -121,6 +129,9 @@ class CompileOptions:
             of QNodes support is to be enabled.
         lower_to_llvm (Optional[bool]): Flag indicating whether to attempt the LLVM lowering after
             the main compilation pipeline is complete. Default is ``True``.
+        checkpoint_stage (Optional[str]): The name of a compilation stage to resume from when
+            recompiling with a replaced IR, as used by ``catalyst.debug.replace_ir``. An empty
+            string (the default) starts compilation from the beginning.
         static_argnums (Optional[Union[int, Iterable[int]]]): Indices of static arguments.
             Default is ``None``.
         static_argnames (Optional[Union[str, Iterable[str]]]): Names of static arguments.
@@ -151,6 +162,9 @@ class CompileOptions:
             decomposition rules reachable from all gates in the circuit will be compiled. If
             ``capture=False``, or ``capture="global"`` and ``qp.capture.enabled() == False``, this
             argument will be ignored. ``True`` by default.
+        runtime_artifacts (tuple[str, ...]): Internal. Paths to the shared libraries exporting
+            symbols reached by a local ``runtime_call``, recorded on the module via
+            ``catalyst.runtime_artifacts`` and collected into the options. Default is ``()``.
     """
 
     verbose: Optional[bool] = False
