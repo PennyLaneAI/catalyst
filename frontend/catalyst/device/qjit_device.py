@@ -239,21 +239,6 @@ def get_qjit_device_capabilities(target_capabilities: DeviceCapabilities) -> Dev
         target_capabilities.measurement_processes, RUNTIME_MPS
     )
 
-    # Control-flow gates to be lowered down to the LLVM control-flow instructions
-    qjit_capabilities.operations.update(
-        {
-            # CF inversion is only support via hybrid adjoint in the compiler, never via PL Operator
-            # adjoint, so we have to set this flag to False. Supported ops will be "decomposed" to
-            # hybrid adjoints automatically.
-            "Cond": OperatorProperties(invertible=False, controllable=True, differentiable=True),
-            "WhileLoop": OperatorProperties(
-                invertible=False, controllable=True, differentiable=True
-            ),
-            "ForLoop": OperatorProperties(invertible=False, controllable=True, differentiable=True),
-            "Switch": OperatorProperties(invertible=False, controllable=True, differentiable=True),
-        }
-    )
-
     # Optionally enable runtime-powered mid-circuit measurements
     if target_capabilities.supported_mcm_methods:  # pragma: no branch
         qjit_capabilities.operations.update(
@@ -283,11 +268,6 @@ def get_qjit_device_capabilities(target_capabilities: DeviceCapabilities) -> Dev
                 )
             }
         )
-
-    # Enable runtime-powered snapshot of quantum state at any particular instance
-    qjit_capabilities.operations.update(
-        {"Snapshot": OperatorProperties(invertible=False, controllable=False, differentiable=False)}
-    )
 
     # TODO: Optionally enable runtime-powered quantum gate controlling once they
     #       are supported natively in MLIR.
@@ -337,6 +317,8 @@ class QJITDevice(qp.devices.Device):
         # Capability loading
         # During initilization of QJITDevice, we just load the static toml device specs
         self.capabilities = get_qjit_device_capabilities(_load_device_capabilities(original_device))
+        self.add_control_flow_capabilities()
+        self.add_snapshot_capabilities()
 
         backend = QJITDevice.extract_backend_info(original_device)
 
@@ -505,6 +487,36 @@ class QJITDevice(qp.devices.Device):
         # samples or counts (without diagonalizing or modifying observables). See ToDo above.
 
         return measurement_pipeline
+
+    def add_control_flow_capabilities(self):
+        """Add control flow capabilities to the device."""
+
+        # Control-flow gates to be lowered down to the LLVM control-flow instructions
+        self.capabilities.operations.update(
+            {
+                # CF inversion is only support via hybrid adjoint in the compiler, never via PL Operator
+                # adjoint, so we have to set this flag to False. Supported ops will be "decomposed" to
+                # hybrid adjoints automatically.
+                "Cond": OperatorProperties(invertible=False, controllable=True, differentiable=True),
+                "WhileLoop": OperatorProperties(
+                    invertible=False, controllable=True, differentiable=True
+                ),
+                "ForLoop": OperatorProperties(invertible=False, controllable=True, differentiable=True),
+                "Switch": OperatorProperties(invertible=False, controllable=True, differentiable=True),
+            }
+        )
+
+    def add_snapshot_capabilities(self):
+        """Add snapshot capabilities to the device."""
+
+        # Enable runtime-powered snapshot of quantum state at any particular instance
+        self.capabilities.operations.update(
+            {
+                "Snapshot": OperatorProperties(
+                    invertible=False, controllable=False, differentiable=False
+                )
+            }
+        )
 
     def execute(self, circuits, execution_config):
         """
