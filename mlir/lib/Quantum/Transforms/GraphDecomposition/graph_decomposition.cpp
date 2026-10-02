@@ -180,9 +180,11 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         parseFixedDecomps(opToFixedDecompName, userRuleNames);
         parseAltDecomps(opToAltDecompNames, userRuleNames);
 
-        // If the target gate set is empty, assume all gates are supported by device and skip graph decomposition
-        if(targetGateSetOption.empty()) {
-            LLVM_DEBUG(llvm::dbgs() << "targetGateSetOption is empty, skipping graph decomposition\n");
+        // If the target gate set is empty, assume all gates are supported by device and skip graph
+        // decomposition
+        if (targetGateSetOption.empty()) {
+            LLVM_DEBUG(llvm::dbgs()
+                       << "targetGateSetOption is empty, skipping graph decomposition\n");
             return;
         }
 

@@ -497,12 +497,18 @@ class QJITDevice(qp.devices.Device):
                 # CF inversion is only support via hybrid adjoint in the compiler, never via PL Operator
                 # adjoint, so we have to set this flag to False. Supported ops will be "decomposed" to
                 # hybrid adjoints automatically.
-                "Cond": OperatorProperties(invertible=False, controllable=True, differentiable=True),
+                "Cond": OperatorProperties(
+                    invertible=False, controllable=True, differentiable=True
+                ),
                 "WhileLoop": OperatorProperties(
                     invertible=False, controllable=True, differentiable=True
                 ),
-                "ForLoop": OperatorProperties(invertible=False, controllable=True, differentiable=True),
-                "Switch": OperatorProperties(invertible=False, controllable=True, differentiable=True),
+                "ForLoop": OperatorProperties(
+                    invertible=False, controllable=True, differentiable=True
+                ),
+                "Switch": OperatorProperties(
+                    invertible=False, controllable=True, differentiable=True
+                ),
             }
         )
 
