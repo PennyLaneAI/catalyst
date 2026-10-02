@@ -53,27 +53,37 @@ namespace qref {
 func::CallOp cloneAndCallRule(PatternRewriter &rewriter, func::FuncOp originalRule,
                               ValueRange operands, SymbolTable &moduleSymbolTable,
                               llvm::DenseMap<func::FuncOp, func::FuncOp> &rulesToClonedFuncs) {
-    OpBuilder::InsertionGuard guard(rewriter);
     Location loc = originalRule.getLoc();
 
+    // Already cloned before, just create a call
     if (rulesToClonedFuncs.contains(originalRule)) {
         return func::CallOp::create(rewriter, loc, rulesToClonedFuncs[originalRule], operands);
     }
 
-    func::FuncOp clonedFunc = originalRule.clone();
-    clonedFunc.setVisibility(SymbolTable::Visibility::Private);
+    // First encounter, need to clone and call
+    func::FuncOp clonedFunc;
+    {
+        // Only the function cloning needs to change insertion point:
+        // the call to the clone needs to happen at where the gate op originally was
+        OpBuilder::InsertionGuard guard(rewriter);
+        auto module = cast<ModuleOp>(moduleSymbolTable.getOp());
+        rewriter.setInsertionPointToEnd(module.getBody());
+
+        // IR modifications in a rewrite pattern must go through the rewriter, so it can
+        // record the changes and rewrite until fixed point
+        // Then, insert into the symbol table to resolve naming collisions
+        clonedFunc = cast<func::FuncOp>(rewriter.clone(*originalRule));
+    }
 
     // The clones are not rules in the decomp graph: they are just functions to be called
     // by the main circuit, and must not interfere with potential future graph solutions
+    clonedFunc.setVisibility(SymbolTable::Visibility::Private);
     clonedFunc->removeAttr("frontend_name");
     clonedFunc->removeAttr("target_gate");
     clonedFunc->removeAttr("resources");
-
-    // We must do SymbolTable::insert instead of rewriter::insert, because rewriter
-    // cannot manage name collisions
     moduleSymbolTable.insert(clonedFunc);
-    rulesToClonedFuncs[originalRule] = clonedFunc;
 
+    rulesToClonedFuncs[originalRule] = clonedFunc;
     return func::CallOp::create(rewriter, loc, clonedFunc, operands);
 }
 
