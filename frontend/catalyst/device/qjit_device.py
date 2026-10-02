@@ -239,46 +239,51 @@ def get_qjit_device_capabilities(target_capabilities: DeviceCapabilities) -> Dev
         target_capabilities.measurement_processes, RUNTIME_MPS
     )
 
-    # Optionally enable runtime-powered mid-circuit measurements
-    if target_capabilities.supported_mcm_methods:  # pragma: no branch
-        qjit_capabilities.operations.update(
-            {
-                "MidCircuitMeasure": OperatorProperties(
-                    invertible=False, controllable=False, differentiable=False
-                )
-            }
-        )
+    if not target_capabilities.supports_all_gates_in_device_gateset():
+        # Only add capabilities if target device doesn't already support all the gates in the device gateset.
 
-    # Optionally enable runtime-powered Pauli-product mid-circuit measurements
-    if "PauliMeasure" in target_capabilities.operations:
-        qjit_capabilities.operations.update(
-            {
-                "MidCircuitPauliMeasure": OperatorProperties(
-                    invertible=False, controllable=False, differentiable=False
-                )
-            }
-        )
+        # Optionally enable runtime-powered mid-circuit measurements
+        if target_capabilities.supported_mcm_methods:  # pragma: no branch
+            qjit_capabilities.operations.update(
+                {
+                    "MidCircuitMeasure": OperatorProperties(
+                        invertible=False, controllable=False, differentiable=False
+                    )
+                }
+            )
 
-    # Optionally enable runtime-powered adjoint of quantum gates (inversions)
-    if any(ng.invertible for ng in target_capabilities.operations.values()):  # pragma: no branch
-        qjit_capabilities.operations.update(
-            {
-                "HybridAdjoint": OperatorProperties(
-                    invertible=True, controllable=True, differentiable=True
-                )
-            }
-        )
+        # Optionally enable runtime-powered Pauli-product mid-circuit measurements
+        if "PauliMeasure" in target_capabilities.operations:
+            qjit_capabilities.operations.update(
+                {
+                    "MidCircuitPauliMeasure": OperatorProperties(
+                        invertible=False, controllable=False, differentiable=False
+                    )
+                }
+            )
 
-    # TODO: Optionally enable runtime-powered quantum gate controlling once they
-    #       are supported natively in MLIR.
-    # if any(ng.controllable for ng in target_capabilities.operations.values()):
-    #     qjit_capabilities.operations.update(
-    #         {
-    #             "HybridCtrl": OperatorProperties(
-    #                 invertible=True, controllable=True, differentiable=True
-    #             )
-    #         }
-    #     )
+        # Optionally enable runtime-powered adjoint of quantum gates (inversions)
+        if any(
+            ng.invertible for ng in target_capabilities.operations.values()
+        ):  # pragma: no branch
+            qjit_capabilities.operations.update(
+                {
+                    "HybridAdjoint": OperatorProperties(
+                        invertible=True, controllable=True, differentiable=True
+                    )
+                }
+            )
+
+        # TODO: Optionally enable runtime-powered quantum gate controlling once they
+        #       are supported natively in MLIR.
+        # if any(ng.controllable for ng in target_capabilities.operations.values()):
+        #     qjit_capabilities.operations.update(
+        #         {
+        #             "HybridCtrl": OperatorProperties(
+        #                 invertible=True, controllable=True, differentiable=True
+        #             )
+        #         }
+        #     )
 
     return qjit_capabilities
 
