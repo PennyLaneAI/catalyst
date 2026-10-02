@@ -129,16 +129,6 @@ struct DecomposeLoweringPass : impl::DecomposeLoweringPassBase<DecomposeLowering
     void runOnOperation() final {
         ModuleOp module = cast<ModuleOp>(getOperation());
 
-        // 1. The core DL pattern is on qref
-        // 2. DL expects no adj and ctrl regions
-        // Hence the preprocessing passes
-        OpPassManager pm_preprocess("builtin.module");
-        pm_preprocess.addPass(createModifiersLoweringPass());
-        pm_preprocess.addPass(createReferenceSemanticsConversionPass());
-        if (failed(runPipeline(pm_preprocess, module))) {
-            return signalPassFailure();
-        }
-
         // Step 1: Discover and register all decomposition functions in the module
         llvm::StringSet<> targetRules;
         for (auto rule : targetRulesOption) {
@@ -147,6 +137,16 @@ struct DecomposeLoweringPass : impl::DecomposeLoweringPassBase<DecomposeLowering
         discoverAndRegisterDecompositions(module, decompositionRegistry, targetRules);
         if (decompositionRegistry.empty()) {
             return;
+        }
+
+        // 1. The core DL pattern is on qref
+        // 2. DL expects no adj and ctrl regions
+        // Hence the preprocessing passes
+        OpPassManager pm_preprocess("builtin.module");
+        pm_preprocess.addPass(createModifiersLoweringPass());
+        pm_preprocess.addPass(createReferenceSemanticsConversionPass());
+        if (failed(runPipeline(pm_preprocess, module))) {
+            return signalPassFailure();
         }
 
         // Step 2: Find the target gate set

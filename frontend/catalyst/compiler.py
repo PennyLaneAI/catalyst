@@ -30,7 +30,8 @@ import warnings
 from os import path
 from typing import List, Optional
 
-from catalyst.logging import debug_logger, debug_logger_init
+from pennylane.logging import debug_logger, debug_logger_init
+
 from catalyst.pipelines import CompileOptions, KeepIntermediateLevel
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.filesystem import Directory

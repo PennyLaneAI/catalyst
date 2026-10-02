@@ -24,9 +24,9 @@ from typing import ContextManager, List, Optional, Set
 
 from jax._src.interpreters.partial_eval import DynamicJaxprTrace
 from jax.core import find_top_trace, set_current_trace, take_current_trace
+from pennylane.logging import debug_logger_init
 from pennylane.queuing import QueuingManager
 
-from catalyst.logging import debug_logger_init
 from catalyst.utils.exceptions import CompileError
 
 logger = logging.getLogger(__name__)
