@@ -430,7 +430,7 @@ def stop_node_executors():
     reason=(
         "Backline demo integration tests need the transport backend libraries built with "
         "-DENABLE_TRANSPORT=ON, which the wheel does not ship. Add that build directory to "
-        "CATALYST_TRANSPORT_PATH to run them; the check-transport-gpu workflow does this on a "
+        "CATALYST_TRANSPORT_PATH to run them; the check-transport workflow does this on a "
         "GPU runner."
     ),
 )
@@ -727,7 +727,7 @@ class TestBacklineDemoIntegration:
         ``lib_path``; the runtime resolves the symbol after dlopen of the backend .so.
 
         Skipped by ``gpu_triton_platform`` on runners without a GPU; executes end-to-end on
-        the check-transport-gpu workflow.
+        the check-transport workflow.
         """
         # Both are gates only: one for GPU + Triton driver presence, one for the HIP-built
         # backend library. Neither value is consumed here.

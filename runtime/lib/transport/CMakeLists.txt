@@ -54,7 +54,7 @@ endif()
 
 # On NVIDIA the compiler is nvcc and ROCm supplies only the headers, so point CMake at both
 # for check_language(HIP) below. Whoever installs hip-dev sets ROCM_PATH; see the
-# check-transport-gpu workflow, which pins the packages it fetches.
+# check-transport workflow, which pins the packages it fetches.
 find_path(_hip_include_dir hip/hip_runtime.h PATH_SUFFIXES include)
 find_program(_nvcc nvcc HINTS ENV CUDA_PATH ENV CUDA_HOME /usr/local/cuda PATH_SUFFIXES bin)
 if(_hip_include_dir AND _nvcc)

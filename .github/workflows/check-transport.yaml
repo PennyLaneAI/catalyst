@@ -1,4 +1,4 @@
-name: Check Catalyst GPU
+name: Check Transport
 
 # The only CI that builds and tests the transport stack, on a self-hosted GPU host -- the one
 # runner with libibverbs and HIP together, which is the combination that builds every backend.
@@ -33,7 +33,7 @@ on:
       - "frontend/test/pytest/test_backline.py"
       - "frontend/test/pytest/conftest.py"
       - ".github/actions/setup-soft-roce/**"
-      - ".github/workflows/check-transport-gpu.yaml"
+      - ".github/workflows/check-transport.yaml"
   pull_request:
     types:
       - opened
@@ -54,7 +54,7 @@ on:
       - "frontend/test/pytest/test_backline.py"
       - "frontend/test/pytest/conftest.py"
       - ".github/actions/setup-soft-roce/**"
-      - ".github/workflows/check-transport-gpu.yaml"
+      - ".github/workflows/check-transport.yaml"
   workflow_dispatch:
 
 permissions:
@@ -71,8 +71,8 @@ jobs:
     name: Set build matrix
     uses: ./.github/workflows/constants.yaml
 
-  gpu-transport-tests:
-    name: Runtime transport tests (GPU)
+  transport-tests:
+    name: Transport build and tests (self-hosted GPU)
     needs: [constants]
     runs-on:
       - single-gpu-x64
