@@ -78,6 +78,9 @@ _BUILTIN_COPROCESSOR_FN_LIBS = {
     "catalyst_onnx_coprocessor": "libcatalyst_onnx_coprocessor",
 }
 
+# The message size in bytes, each way, of a placement that sets none.
+_DEFAULT_MESSAGE_BYTES = 8
+
 # The keys a coprocessor function's ``init`` receives the placement's message sizes under.
 _FN_MESSAGE_SIZE_KEYS = ("in_bytes", "out_bytes")
 
@@ -266,6 +269,18 @@ def _runs_per_message_on_gpu(coproc, transport: str) -> bool:
     return False
 
 
+def _message_size(placement: Placement, name: str) -> int:
+    """The placement's ``in_bytes`` or ``out_bytes``: the size every controller session commits.
+
+    A PennyLane whose ``Placement`` has no such attribute keeps the size on the controller, where
+    ``None`` means unset, so that is read next, then the 8 B default.
+    """
+    size = getattr(placement, name, None)
+    if size is None:
+        size = getattr(placement.controller, name, None)
+    return _DEFAULT_MESSAGE_BYTES if size is None else size
+
+
 def _coprocessor_fn_config(fn, placement: Placement) -> str:
     """A coprocessor function's own ``key=value;...`` config, then ``in_bytes`` and ``out_bytes``
     set to the placement's message sizes, with each key prefixed ``fn.``.
@@ -290,7 +305,7 @@ def _coprocessor_fn_config(fn, placement: Placement) -> str:
                 f"placement's message size"
             )
         entries.append(f"fn.{entry}")
-    entries += [f"fn.{key}={getattr(placement, key)}" for key in _FN_MESSAGE_SIZE_KEYS]
+    entries += [f"fn.{key}={_message_size(placement, key)}" for key in _FN_MESSAGE_SIZE_KEYS]
     return ";".join(entries)
 
 
@@ -301,8 +316,8 @@ def serialize_backline(placement: Placement) -> dict:
         "transport": transport,
         "controller": {
             **_node_dict(placement.controller, "controller", transport),
-            "in_bytes": placement.in_bytes,
-            "out_bytes": placement.out_bytes,
+            "in_bytes": _message_size(placement, "in_bytes"),
+            "out_bytes": _message_size(placement, "out_bytes"),
         },
     }
     nodes = []

@@ -16,6 +16,7 @@
 import os
 import platform
 from pathlib import Path
+from types import SimpleNamespace
 from unittest import mock
 
 import pennylane as qp
@@ -27,6 +28,7 @@ from catalyst.backline import (
     _EXECUTOR_RUNTIME_PLUGINS,
     _TRANSPORT_PASSES,
     _insert_passes,
+    _message_size,
     _qec_pass_specs,
     _realize_executor,
     _resolve_backend,
@@ -169,6 +171,19 @@ def test_coprocessor_fn_config_must_not_set_a_message_size(key):
         serialize_backline(dev.placement)
 
 
+@pytest.mark.parametrize(
+    "placement, size",
+    [
+        (SimpleNamespace(in_bytes=120, controller=SimpleNamespace(in_bytes=16)), 120),
+        (SimpleNamespace(controller=SimpleNamespace(in_bytes=16)), 16),
+        (SimpleNamespace(controller=SimpleNamespace(in_bytes=None)), 8),
+    ],
+)
+def test_message_size_is_read_from_the_placement_then_the_controller(placement, size):
+    """The placement's size wins, then the controller's, then the 8 B default."""
+    assert _message_size(placement, "in_bytes") == size
+
+
 def test_coprocessor_fn_config_entry_without_a_value_is_rejected():
     """An entry that is not key=value is rejected at compile time."""
     fn = qp.CoprocessorFunction("coproc_fn", config="model")
@@ -299,6 +314,7 @@ def test_coprocessor_fn_without_lib_path_loads_nothing(monkeypatch):
 
 def test_a_builtin_coprocessor_fn_loads_catalysts_own_library(monkeypatch):
     """A coprocessor function Catalyst ships needs no lib_path: its runtime library is loaded."""
+    monkeypatch.delenv("CATALYST_TRANSPORT_PATH", raising=False)
     loaded = []
     monkeypatch.setattr("ctypes.CDLL", lambda path, mode=None: loaded.append(path) or object())
     monkeypatch.setattr(
@@ -314,6 +330,7 @@ def test_a_builtin_coprocessor_fn_loads_catalysts_own_library(monkeypatch):
 
 def test_a_builtin_coprocessor_fn_library_is_found_as_a_dylib(monkeypatch, tmp_path):
     """On macOS the runtime library is a .dylib, and it is the one loaded."""
+    monkeypatch.delenv("CATALYST_TRANSPORT_PATH", raising=False)
     (tmp_path / "libcatalyst_onnx_coprocessor.dylib").write_bytes(b"")
     loaded = []
     monkeypatch.setattr("ctypes.CDLL", lambda path, mode=None: loaded.append(path) or object())
