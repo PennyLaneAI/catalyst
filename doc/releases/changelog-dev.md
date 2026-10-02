@@ -111,6 +111,8 @@
   require integral values and convert the count internally.
   [(#2956)](https://github.com/PennyLaneAI/catalyst/pull/2956)
 
+* ``null.qubit`` device toml leaves ``[operators.gates]`` empty, which means the device supports all gates.
+
 <h3>Improvements 🛠</h3>
 
 * :func:`~.passes.graph_decomposition` accepts a `verbose` keyword argument. When `True`, the pass
