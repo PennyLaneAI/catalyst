@@ -134,7 +134,9 @@ def test_coprocessor_fn_config_is_appended_with_the_fn_prefix():
         controller=_controller(), coprocessors=[_coproc("cop0", fn=fn)], transport="rdma"
     )
     node = serialize_backline(dev.placement)["coprocessors"][0]
-    assert node["config"] == "cfg;fn.model=/m.onnx;fn.provider=migraphx"
+    assert (
+        node["config"] == "cfg;fn.model=/m.onnx;fn.provider=migraphx;fn.in_bytes=8;fn.out_bytes=8"
+    )
 
 
 def test_coprocessor_fn_config_without_a_node_config():
@@ -143,7 +145,28 @@ def test_coprocessor_fn_config_without_a_node_config():
     coproc = _coproc("cop0", fn=fn, init_args={"backend_lib": "backend.so"})
     dev = qp.Backline(controller=_controller(), coprocessors=[coproc], transport="rdma")
     node = serialize_backline(dev.placement)
-    assert node["coprocessors"][0]["config"] == "fn.model=/m.onnx"
+    assert node["coprocessors"][0]["config"] == "fn.model=/m.onnx;fn.in_bytes=8;fn.out_bytes=8"
+
+
+def test_coprocessor_fn_config_carries_the_placement_message_sizes():
+    """A function's init receives the sizes the placement commits, after its own keys."""
+    fn = qp.CoprocessorFunction("coproc_fn", config="model=/m.onnx", message_bytes=(120, 121))
+    coproc = _coproc("cop0", fn=fn, init_args={"backend_lib": "backend.so"})
+    dev = qp.Backline(controller=_controller(), coprocessors=[coproc], transport="memcpy")
+    d = serialize_backline(dev.placement)
+    assert d["coprocessors"][0]["config"] == "fn.model=/m.onnx;fn.in_bytes=120;fn.out_bytes=121"
+    assert (d["controller"]["in_bytes"], d["controller"]["out_bytes"]) == (120, 121)
+
+
+@pytest.mark.parametrize("key", ["in_bytes", "out_bytes"])
+def test_coprocessor_fn_config_must_not_set_a_message_size(key):
+    """The message-size keys are reserved for the compiler."""
+    fn = qp.CoprocessorFunction("coproc_fn", config=f"{key}=4")
+    dev = qp.Backline(
+        controller=_controller(), coprocessors=[_coproc("cop0", fn=fn)], transport="rdma"
+    )
+    with pytest.raises(CompileError, match=f"config key '{key}' is reserved"):
+        serialize_backline(dev.placement)
 
 
 def test_coprocessor_fn_config_entry_without_a_value_is_rejected():
@@ -170,7 +193,7 @@ def test_a_per_message_function_selects_the_per_message_gpu_mode():
         controller=_controller(), coprocessors=[_gpu_coproc(fn, "gpu=1")], transport="memcpy"
     )
     assert serialize_backline(dev.placement)["coprocessors"][0]["config"] == (
-        "gpu=1;coproc_fn=per_message"
+        "gpu=1;coproc_fn=per_message;fn.in_bytes=8;fn.out_bytes=8"
     )
 
 
@@ -179,7 +202,9 @@ def test_an_explicit_per_message_mode_is_kept():
     fn = qp.CoprocessorFunction("coproc_fn", per_message=True)
     coproc = _gpu_coproc(fn, "coproc_fn=per_message")
     dev = qp.Backline(controller=_controller(), coprocessors=[coproc], transport="memcpy")
-    assert serialize_backline(dev.placement)["coprocessors"][0]["config"] == "coproc_fn=per_message"
+    assert serialize_backline(dev.placement)["coprocessors"][0]["config"] == (
+        "coproc_fn=per_message;fn.in_bytes=8;fn.out_bytes=8"
+    )
 
 
 def test_a_per_message_function_with_an_explicit_launch_once_mode_is_rejected():
@@ -208,11 +233,12 @@ def test_the_onnx_coprocessor_function_is_rejected_on_a_dispatched_coprocessor()
 
 
 def test_a_launcher_on_a_gpu_keeps_the_default_mode():
-    """A function not marked per_message leaves a GPU coprocessor's config alone."""
+    """A function not marked per_message leaves a GPU coprocessor in its default mode."""
     dev = qp.Backline(
         controller=_controller(), coprocessors=[_gpu_coproc("coproc_fn")], transport="memcpy"
     )
-    assert "config" not in serialize_backline(dev.placement)["coprocessors"][0]
+    config = serialize_backline(dev.placement)["coprocessors"][0]["config"]
+    assert "coproc_fn=" not in config
 
 
 def test_a_per_message_function_on_an_rdma_gpu_is_rejected():

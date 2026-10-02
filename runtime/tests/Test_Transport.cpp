@@ -536,6 +536,23 @@ TEST_CASE("the ONNX coprocessor function runs a model", "[transport]") {
           catalyst::transport::COPROCESSOR_FN_ERROR);
     onnx_info().fini(ctx);
 }
+
+TEST_CASE("the ONNX coprocessor function requires the message sizes to match its model",
+          "[transport]") {
+    const char *ort_lib = std::getenv("CATALYST_TEST_ONNXRUNTIME_LIB");
+    if (!ort_lib || !*ort_lib) {
+        SKIP("set CATALYST_TEST_ONNXRUNTIME_LIB to an onnxruntime shared library");
+    }
+    // The test model is uint8[1, 8] in and uint8[1, 8] out.
+    const std::string base = kModel + ";provider=cpu;ort_lib=" + std::string(ort_lib);
+    CHECK(onnx_init_error(base + ";in_bytes=8;out_bytes=8").empty());
+    CHECK(onnx_init_error(base + ";in_bytes=9;out_bytes=8")
+              .find("the model input is 8 B, but the controller sends 9 B (in_bytes)") !=
+          std::string::npos);
+    CHECK(onnx_init_error(base + ";in_bytes=8;out_bytes=16")
+              .find("the model output is 8 B, but the controller expects 16 B (out_bytes)") !=
+          std::string::npos);
+}
 #endif
 
 TEST_CASE("memcpy backend plugins round-trip through the transport CAPI", "[transport]") {

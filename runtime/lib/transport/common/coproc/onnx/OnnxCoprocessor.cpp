@@ -49,6 +49,8 @@
 #include <dlfcn.h>
 #include <filesystem>
 #include <iostream>
+#include <memory>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -123,6 +125,11 @@ class OnnxCoprocessor {
                 device = cfg::parse_index(value, "device");
             } else if (key == "threads") {
                 threads = cfg::parse_index(value, "threads");
+            } else if (key == "in_bytes") {
+                expected_in_bytes_ = static_cast<std::size_t>(cfg::parse_index(value, "in_bytes"));
+            } else if (key == "out_bytes") {
+                expected_out_bytes_ =
+                    static_cast<std::size_t>(cfg::parse_index(value, "out_bytes"));
             } else {
                 throw std::runtime_error("unknown config key '" + std::string(key) + "'");
             }
@@ -208,6 +215,21 @@ class OnnxCoprocessor {
 
     OnnxCoprocessor(const OnnxCoprocessor &) = delete;
     OnnxCoprocessor &operator=(const OnnxCoprocessor &) = delete;
+
+    // Throw if the message sizes the config names (in_bytes, out_bytes) differ from the model's
+    // input and output tensors. A size the config does not name is not checked.
+    void check_message_sizes() const {
+        if (expected_in_bytes_ && *expected_in_bytes_ != input_bytes_) {
+            throw std::runtime_error("the model input is " + std::to_string(input_bytes_) +
+                                     " B, but the controller sends " +
+                                     std::to_string(*expected_in_bytes_) + " B (in_bytes)");
+        }
+        if (expected_out_bytes_ && *expected_out_bytes_ != output_bytes_) {
+            throw std::runtime_error("the model output is " + std::to_string(output_bytes_) +
+                                     " B, but the controller expects " +
+                                     std::to_string(*expected_out_bytes_) + " B (out_bytes)");
+        }
+    }
 
     // Run the model on `in_bytes` of payload, write the output tensor to `out`, and return its size
     // in bytes, or COPROCESSOR_FN_ERROR if the payload is too small, the output does not fit, or
@@ -309,7 +331,8 @@ class OnnxCoprocessor {
         return "cpu";
     }
 
-    // Record the single input's name, type and shape, and the single output's name.
+    // Record the single input's name, type and shape, the single output's name, and both tensors'
+    // sizes in bytes.
     void describe_io() {
         std::size_t inputs = 0, outputs = 0;
         check(api_->SessionGetInputCount(session_, &inputs));
@@ -352,6 +375,27 @@ class OnnxCoprocessor {
             elements *= static_cast<std::size_t>(dim);
         }
         input_bytes_ = elements * element_bytes(input_type_);
+
+        check(api_->SessionGetOutputTypeInfo(session_, 0, &type_info));
+        try {
+            const OrtTensorTypeAndShapeInfo *tensor = nullptr;
+            check(api_->CastTypeInfoToTensorInfo(type_info, &tensor));
+            ONNXTensorElementDataType type = ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED;
+            check(api_->GetTensorElementType(tensor, &type));
+            std::size_t rank = 0;
+            check(api_->GetDimensionsCount(tensor, &rank));
+            std::vector<std::int64_t> shape(rank);
+            check(api_->GetDimensions(tensor, shape.data(), rank));
+            std::size_t out_elements = 1;
+            for (std::int64_t dim : shape) {
+                out_elements *= static_cast<std::size_t>(dim < 0 ? 1 : dim);
+            }
+            output_bytes_ = out_elements * element_bytes(type);
+        } catch (...) {
+            api_->ReleaseTypeInfo(type_info);
+            throw;
+        }
+        api_->ReleaseTypeInfo(type_info);
     }
 
     std::size_t copy_output(const OrtValue *output, void *out, std::size_t out_cap) const {
@@ -386,13 +430,18 @@ class OnnxCoprocessor {
     ONNXTensorElementDataType input_type_ = ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED;
     std::vector<std::int64_t> input_shape_;
     std::size_t input_bytes_ = 0;
+    std::size_t output_bytes_ = 0; // the declared output tensor, a dynamic dimension taken as 1
+    std::optional<std::size_t> expected_in_bytes_;
+    std::optional<std::size_t> expected_out_bytes_;
 };
 
 // Load the model named by `config` and return the context the function is called with, or null
 // with the reason on stderr.
 void *onnx_init(const char *config) {
     try {
-        return new OnnxCoprocessor(config ? config : "");
+        auto ctx = std::make_unique<OnnxCoprocessor>(config ? config : "");
+        ctx->check_message_sizes();
+        return ctx.release();
     } catch (const std::exception &e) {
         std::cerr << "[onnx] " << e.what() << "\n";
         return nullptr;

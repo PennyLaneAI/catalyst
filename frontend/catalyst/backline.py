@@ -78,6 +78,9 @@ _BUILTIN_COPROCESSOR_FN_LIBS = {
     "catalyst_onnx_coprocessor": "libcatalyst_onnx_coprocessor",
 }
 
+# The keys a coprocessor function's ``init`` receives the placement's message sizes under.
+_FN_MESSAGE_SIZE_KEYS = ("in_bytes", "out_bytes")
+
 # Coprocessor functions whose configuration names files on the compiling machine (a model, a
 # runtime library), so they do not yet run on a coprocessor dispatched to an executor.
 _IN_PROCESS_COPROCESSOR_FNS = frozenset({"catalyst_onnx_coprocessor"})
@@ -164,9 +167,6 @@ def _node_dict(node: Node, role: str, transport: str) -> dict:
     d: dict = {"out_of_process": bool(_out_of_process(node))}
     if node.name is not None:
         d["name"] = node.name
-    if role == "controller":
-        d["in_bytes"] = node.in_bytes
-        d["out_bytes"] = node.out_bytes
 
     endpoint = getattr(node, "endpoint", None)
     if endpoint is not None:
@@ -266,13 +266,15 @@ def _runs_per_message_on_gpu(coproc, transport: str) -> bool:
     return False
 
 
-def _coprocessor_fn_config(fn) -> str:
-    """A coprocessor function's own ``key=value;...`` config, with each key prefixed ``fn.``.
+def _coprocessor_fn_config(fn, placement: Placement) -> str:
+    """A coprocessor function's own ``key=value;...`` config, then ``in_bytes`` and ``out_bytes``
+    set to the placement's message sizes, with each key prefixed ``fn.``.
 
     The prefix keeps the function's keys apart from the backend's in the node's config string. The
     transport runtime removes it again and hands the keys to the function's ``init`` hook, which its
     library exports as ``<symbol>_info`` (see ``CatalystCoprocessorFnInfo`` in
-    ``TransportABI.h``).
+    ``TransportABI.h``). ``in_bytes`` and ``out_bytes`` are reserved for the message sizes, so a
+    function's own config must not set them.
     """
     config = getattr(fn, "config", "") or ""
     entries = []
@@ -282,7 +284,13 @@ def _coprocessor_fn_config(fn) -> str:
             raise CompileError(
                 f"coprocessor function config entry {entry!r} is not of the form key=value"
             )
+        if key in _FN_MESSAGE_SIZE_KEYS:
+            raise CompileError(
+                f"coprocessor function config key {key!r} is reserved: the compiler sets it to the "
+                f"placement's message size"
+            )
         entries.append(f"fn.{entry}")
+    entries += [f"fn.{key}={getattr(placement, key)}" for key in _FN_MESSAGE_SIZE_KEYS]
     return ";".join(entries)
 
 
@@ -291,7 +299,11 @@ def serialize_backline(placement: Placement) -> dict:
     transport = placement.transport.name
     result = {
         "transport": transport,
-        "controller": _node_dict(placement.controller, "controller", transport),
+        "controller": {
+            **_node_dict(placement.controller, "controller", transport),
+            "in_bytes": placement.in_bytes,
+            "out_bytes": placement.out_bytes,
+        },
     }
     nodes = []
     for coproc in placement.coprocessors:
@@ -310,7 +322,7 @@ def serialize_backline(placement: Placement) -> dict:
         entries = [node["config"]] if node.get("config") else []
         if _runs_per_message_on_gpu(coproc, transport):
             entries.append("coproc_fn=per_message")
-        if fn_config := _coprocessor_fn_config(coproc.coprocessor_fn):
+        if fn_config := _coprocessor_fn_config(coproc.coprocessor_fn, placement):
             entries.append(fn_config)
         if entries:
             node["config"] = ";".join(entries)

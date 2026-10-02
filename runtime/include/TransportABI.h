@@ -57,7 +57,9 @@ typedef struct {
  * - `reserved`: zero.
  * - `init` (may be null): called once, before the function is bound, with the node's
  *   `fn.`-prefixed config keys, prefix removed, as `key=value;...`. Returns the ctx the function
- *   is called with, or null if the function cannot be configured.
+ *   is called with, or null if the function cannot be configured. Catalyst's frontend adds the
+ *   controller's message sizes as `in_bytes=<n>` and `out_bytes=<n>`, so `init` must accept both
+ *   keys. A function may check them against what it processes and return null on a mismatch.
  * - `fini` (may be null): releases the ctx `init` returned, once the session using it has stopped.
  *
  * The returned pointer must stay valid for the life of the library.

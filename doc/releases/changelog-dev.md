@@ -151,7 +151,9 @@
   coprocessor naming it. Building it needs only onnxruntime's C API header, from
   `ONNXRUNTIME_INCLUDE_DIR` or downloaded at a pinned, checksummed release.
   `CATALYST_TRANSPORT_ONNX=OFF` disables it, and a build that cannot download the header skips it
-  with a warning.
+  with a warning. A coprocessor function's `init` receives the placement's message sizes as
+  `in_bytes` and `out_bytes`, and the ONNX function fails to start when they differ from its
+  model's input and output tensors.
   [(#3282)](https://github.com/PennyLaneAI/catalyst/pull/3282)
 
 * Under program capture, PennyLane :func:`~.transforms.decompose` (``qp.decompose``) is now an
