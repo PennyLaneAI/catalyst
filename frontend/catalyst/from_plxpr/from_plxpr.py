@@ -244,7 +244,6 @@ class WorkflowInterpreter(PlxprInterpreter):
         )
         new_version._pass_pipeline = copy(self._pass_pipeline)
         new_version.init_qreg = self.init_qreg
-        new_version._decompose_applied = self._decompose_applied
         return new_version
 
     def __init__(self, skip_preprocess=False, _preprocess_warn=True, collect_decomp_rules=True):
@@ -253,9 +252,6 @@ class WorkflowInterpreter(PlxprInterpreter):
         self._skip_preprocess = skip_preprocess
         self._preprocess_warn = _preprocess_warn
         self._collect_decomp_rules = collect_decomp_rules
-
-        # Set once a decomposition transform is applied; guards against a second one (unsupported).
-        self._decompose_applied = False
 
         super().__init__()
 
@@ -358,11 +354,6 @@ def _handle_decompose_transform(self, inner_jaxpr, consts, non_const_args, tkwar
     from pennylane.decomposition import add_decomps, local_decomps
 
     from catalyst.passes.builtin_passes import graph_decomposition
-
-    # Multiple decomposition transforms are not yet supported.
-    if self._decompose_applied:
-        raise NotImplementedError("Multiple decomposition transforms are not yet supported.")
-    self._decompose_applied = True
 
     _validate_decompose_tkwargs(tkwargs)
 

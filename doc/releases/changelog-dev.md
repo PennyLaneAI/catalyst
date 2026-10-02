@@ -114,7 +114,8 @@
 <h3>Improvements 🛠</h3>
 
 * Under program capture, PennyLane :func:`~.transforms.decompose` (``qp.decompose``) is now an
-  alias for :func:`~.passes.graph_decomposition`.
+  alias for :func:`~.passes.graph_decomposition`. Multiple ``qp.decompose`` transforms is also
+  supported.
   [(#3290)](https://github.com/PennyLaneAI/catalyst/pull/3290)
 
 * :func:`~.passes.graph_decomposition` accepts a `verbose` keyword argument. When `True`, the pass

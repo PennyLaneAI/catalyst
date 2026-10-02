@@ -49,6 +49,7 @@ from pennylane.typing import Bool, Complex, Float, Int, Wire
 from pennylane.wires import Wires
 
 from catalyst import qjit
+from catalyst.debug import get_compilation_stage
 from catalyst.decomposition import GraphOpID, RuleLoweringWarning
 from catalyst.decomposition.decomposition_rules import (
     _MODIFIER_CANONICAL_ORDER,
@@ -1891,19 +1892,48 @@ class TestDecomposeAlias:
 
             qp.specs(circuit, level="all-mlir")()
 
-    def test_decompose_multiple_not_supported(self):
-        """Stacking two decomposition transforms is rejected."""
-        with pytest.raises(NotImplementedError, match="Multiple decomposition"):
+    def test_decompose_multiple_matches_graph_decomposition(self):
+        """Stacking two ``qp.decompose`` transforms matches stacking ``graph_decomposition``."""
+        outer = {"RX", "RY", "RZ", "GlobalPhase"}
+        inner = {"RZ", "RY", "PhaseShift", "GlobalPhase"}
 
+        def build(dec_outer, dec_inner):
             @qjit(capture=True, target="mlir")
-            @qp.decompose(gate_set={"RX", "RY", "RZ"})
-            @qp.decompose(gate_set={"RX", "RY", "RZ"})
+            @dec_outer
+            @dec_inner
             @qnode(qp.device("null.qubit", wires=1))
             def circuit():
                 qp.Rot(0.1, 0.2, 0.3, wires=0)
                 return qp.probs()
 
-            qp.specs(circuit, level="all-mlir")()
+            return circuit
+
+        via_decompose = build(qp.decompose(gate_set=outer), qp.decompose(gate_set=inner))
+        via_graph = build(graph_decomposition(gate_set=outer), graph_decomposition(gate_set=inner))
+
+        # Two graph-decomposition passes are inserted, and the result is identical to the
+        # explicit graph_decomposition stacking (alias, not a fork).
+        assert via_decompose.mlir.count('apply_registered_pass "graph-decomposition"') == 2
+        assert via_decompose.mlir == via_graph.mlir
+
+    def test_decompose_multiple_ordering(self):
+        """Stacked ``qp.decompose`` apply innermost-first: a gate produced by the inner pass and
+        excluded from the outer gate set is further decomposed away."""
+
+        @qjit(capture=True, keep_intermediate=True)
+        # Outer gate set excludes PhaseShift, which the inner pass introduces.
+        @qp.decompose(gate_set={"RX", "RY", "RZ", "CNOT", "GlobalPhase"})
+        @qp.decompose(gate_set={"RZ", "RY", "CNOT", "GlobalPhase", "PhaseShift"})
+        @qnode(qp.device("null.qubit", wires=2))
+        def circuit():
+            qp.Rot(0.1, 0.2, 0.3, wires=0)
+            qp.CNOT(wires=[0, 1])
+            return qp.expval(qp.PauliZ(0))
+
+        circuit()
+        optimized = get_compilation_stage(circuit, "QuantumCompilationStage")
+        # Inner runs first (PhaseShift appears), then outer removes it.
+        assert "PhaseShift" not in optimized
 
     def test_decompose_inline_fixed_decomps(self):
         """Inline ``fixed_decomps`` rule bodies are registered for the graph pass."""
