@@ -18,6 +18,8 @@
 #include <stdexcept>
 #include <string>
 
+#include "TransportABI.h"
+
 namespace catalyst::transport {
 
 /**
@@ -194,9 +196,22 @@ class ControllerSession : public TransportSession {
  * in its last 8 bytes, so its payload area is `in_len - 8` bytes. Over a backend bound to the 16 B
  * wire frame that area is 8 bytes. A memcpy backend widens it to hold the committed in_bytes, of
  * any size (see WireProtocol.hpp). `out_cap` is at least 8.
+ *
+ * Returning COPROCESSOR_FN_ERROR reports that the message could not be processed: the backend
+ * fails that round instead of delivering the reply.
  */
 using CoprocessorFn = std::size_t (*)(const void *in, std::size_t in_len, void *out,
                                       std::size_t out_cap, void *ctx);
+
+/// The value a CoprocessorFn returns when it cannot process a message.
+inline constexpr std::size_t COPROCESSOR_FN_ERROR = static_cast<std::size_t>(-1);
+
+/// The lifecycle hooks a coprocessor function's library may export as `<symbol>_info`. See
+/// CatalystCoprocessorFnInfo in TransportABI.h.
+using CoprocessorFnInfo = CatalystCoprocessorFnInfo;
+
+/// The highest CoprocessorFnInfo version this runtime knows the fields of.
+inline constexpr std::uint32_t COPROCESSOR_FN_ABI_VERSION = CATALYST_COPROCESSOR_FN_ABI_VERSION;
 
 /**
  * @brief Data description for a persistent engine to receive and consume

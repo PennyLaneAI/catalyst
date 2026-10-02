@@ -27,18 +27,28 @@
 
 #include "GpuRuntime.hpp"
 #include "MemcpyLink.hpp"
+#include "MessageWorker.hpp"
 #include "Transport.hpp"
 #include "WireProtocol.hpp"
 
 namespace catalyst::transport::memcpy {
 
-// Two roles in one process: the controller writes into the request ring, a persistent decode
-// kernel drains it and publishes into the handoff ring, and an engine jthread reads the
-// handoff and republishes into a reply ring the controller consumes. process_message runs on
-// the controller thread; the engine thread bridges kernel completions to reply publication.
+// The GPU coprocessor of the in-process memcpy transport, in one of two modes.
+//
+// Launch-once (the default): the controller writes into the request ring, a persistent decode
+// kernel drains it and publishes into the handoff ring, and an engine jthread reads the handoff and
+// republishes into a reply ring the controller consumes. process_message runs on the controller
+// thread, and the engine thread bridges kernel completions to reply publication. Messages are the
+// 16 B common::Payload frame, carrying 8 B each way.
+//
+// Per-message (`per_message` true): a MessageWorker runs a host CoprocessorFn once per message on a
+// thread whose current GPU is `gpu_device`, and the function launches whatever GPU work it needs.
+// This suits a model compiled ahead of time, which is launched from the host per call rather than
+// resident as a persistent kernel. Messages carry any size each way.
 class GpuCoprocessorSession : public CoprocessorSession {
   public:
-    explicit GpuCoprocessorSession(const std::string &config = {}, int gpu_device = 0);
+    explicit GpuCoprocessorSession(const std::string &config = {}, int gpu_device = 0,
+                                   bool per_message = false);
     ~GpuCoprocessorSession() override;
 
     // TransportSession
@@ -53,17 +63,19 @@ class GpuCoprocessorSession : public CoprocessorSession {
 
     // CoprocessorSession
     void set_coprocessor_launcher(CoprocessorLauncherFn fn, void *ctx) override;
+    void set_coprocessor_fn(CoprocessorFn fn, void *ctx) override;
     CoprocConvention coprocessor_fn_convention() const override {
-        return CoprocConvention::LaunchOnce;
+        return per_message_ ? CoprocConvention::PerMessage : CoprocConvention::LaunchOnce;
     }
 
     // Called on the controller thread from kick(). Publishes the request into the next request
     // slot, spin-waits for the engine thread to publish the paired reply slot (fed by the
     // persistent decode kernel's handoff), and copies the reply into `out`.
     //
-    // Expects `in_len == sizeof(common::Payload)` (16, a wire-shaped frame), so messages carry
-    // 8 B each way, and throws otherwise. The kernel's correction is `sizeof(int64_t)` bytes, of
-    // which the first `min(out_cap, 8)` are copied to `out`, and that count is returned.
+    // Launch-once expects `in_len == sizeof(common::Payload)` (16, a wire-shaped frame), so
+    // messages carry 8 B each way, and throws otherwise. The kernel's correction is
+    // `sizeof(int64_t)` bytes, of which the first `min(out_cap, 8)` are copied to `out`, and that
+    // count is returned. Per-message accepts any frame MessageWorker does.
     std::size_t process_message(const void *in, std::size_t in_len, void *out, std::size_t out_cap);
 
   private:
@@ -78,6 +90,8 @@ class GpuCoprocessorSession : public CoprocessorSession {
     std::vector<std::unique_ptr<std::byte[]>> caller_memory_regions_;
 
     int gpu_device_ = 0;
+    bool per_message_ = false;
+    MessageWorker worker_;
     std::unique_ptr<coproc::GpuRuntime> gpu_;
     coproc::GpuRuntime::Handoff handoff_{};
     // Host-mapped request ring polled by the persistent decode kernel via `ring_dev_`.

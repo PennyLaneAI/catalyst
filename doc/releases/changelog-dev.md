@@ -124,6 +124,26 @@
 
   [(#3281)](https://github.com/PennyLaneAI/catalyst/pull/3281)
 
+* The memcpy GPU coprocessor can now run a host coprocessor function once per message, for a model
+  launched from the host rather than as a persistent kernel. The frontend selects this mode for a
+  function marked `per_message`.
+  [(#3282)](https://github.com/PennyLaneAI/catalyst/pull/3282)
+
+* A compiled Backline program now stops with an error naming the transport call that failed,
+  instead of continuing with a session that does not work.
+  [(#3282)](https://github.com/PennyLaneAI/catalyst/pull/3282)
+
+* Coprocessor functions can now be configured. A function whose library exports `<symbol>_info`
+  receives its `config` and the message sizes in an `init` hook before its first message (see
+  `CatalystCoprocessorFnInfo` in `TransportABI.h`).
+  [(#3282)](https://github.com/PennyLaneAI/catalyst/pull/3282)
+
+* Catalyst now ships `catalyst_onnx_coprocessor`, a coprocessor function that runs an ONNX model
+  on the CPU or a GPU through onnxruntime, built with the transport runtime. PennyLane's
+  [`qp.backline.onnx_decoder`](https://docs.pennylane.ai/en/latest/code/api/pennylane.backline.onnx_decoder.html)
+  uses it.
+  [(#3282)](https://github.com/PennyLaneAI/catalyst/pull/3282)
+
 * Under program capture, PennyLane :func:`~.transforms.decompose` (``qp.decompose``) is now an
   alias for :func:`~.passes.graph_decomposition`. Multiple ``qp.decompose`` transforms is also
   supported.
@@ -1019,6 +1039,7 @@ Mehrdad Malekmohammadi,
 River McCubbin,
 Shuli Shu,
 Nikhil Sreekumar,
+Kalman Szenes,
 Paul Haochen Wang,
 Jake Zaia,
 Haider Sajjad,
