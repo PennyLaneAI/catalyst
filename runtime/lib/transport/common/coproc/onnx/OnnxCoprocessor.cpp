@@ -151,10 +151,14 @@ class OnnxCoprocessor {
         if (!get_api_base) {
             throw std::runtime_error(ort_lib + " does not export OrtGetApiBase");
         }
-        api_ = get_api_base()->GetApi(ORT_API_VERSION);
+        const OrtApiBase *api_base = get_api_base();
+        api_ = api_base->GetApi(ORT_API_VERSION);
         if (!api_) {
-            throw std::runtime_error(ort_lib + " does not provide onnxruntime C API version " +
-                                     std::to_string(ORT_API_VERSION));
+            // C API version N ships with onnxruntime 1.N.
+            throw std::runtime_error(ort_lib + " is onnxruntime " + api_base->GetVersionString() +
+                                     ", which does not provide C API version " +
+                                     std::to_string(ORT_API_VERSION) + ": onnxruntime 1." +
+                                     std::to_string(ORT_API_VERSION) + " or newer is required");
         }
 
         check(api_->CreateEnv(ORT_LOGGING_LEVEL_WARNING, "catalyst", &env_));
