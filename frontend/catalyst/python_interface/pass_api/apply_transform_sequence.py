@@ -221,7 +221,7 @@ class ApplyTransformSequenceNoCallbackPattern(RewritePattern):
         if transformer.next_op is not None:
             insertion_point = InsertPoint.before(transformer.next_op)
         else:
-            insertion_point = InsertPoint.at_start(payload.body.block)
+            insertion_point = InsertPoint.at_end(payload.body.block)
 
         transformer.detach()
 
