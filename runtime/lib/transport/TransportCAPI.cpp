@@ -544,11 +544,6 @@ int __catalyst__transport__set_message_sizes(CatalystTransportSession *s,
         return CATALYST_TRANSPORT_ERR;
     }
     return guard([&] {
-        if (s->reply_ready && out_bytes > s->reply.size) {
-            std::cerr << "[transport] commit_work_item: out_bytes (" << out_bytes
-                      << ") exceeds the reply region (" << s->reply.size << ")\n";
-            return CATALYST_TRANSPORT_ERR;
-        }
         c->commit_work_item(work_item_idx, in_bytes, out_bytes);
         s->work_item = work_item_idx;
         s->in_bytes = in_bytes;
