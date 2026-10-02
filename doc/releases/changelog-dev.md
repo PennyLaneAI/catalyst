@@ -618,6 +618,11 @@
 
 <h3>Breaking changes 💔</h3>
 
+* Catalyst now provides its own :func:`~.polynomial_extrapolate` and
+  :func:`~.exponential_extrapolate` functions for use with :func:`~.mitigate_with_zne`, replacing
+  ``pennylane.noise.poly_extrapolate`` and ``pennylane.noise.exponential_extrapolate``, which has been removed from PennyLane.
+  [(#3289)](https://github.com/PennyLaneAI/catalyst/pull/3289)
+
 * `catalyst.logging` has been removed. `pennylane.logging` should be used instead.
   [(#3283)](https://github.com/PennyLaneAI/catalyst/pull/3283)
 

@@ -51,46 +51,6 @@ from catalyst.utils.exceptions import CompileError
 # pylint: disable=too-many-lines,line-too-long
 
 
-def test_add_noise(backend):
-    """Test the add_noise transform on a simple circuit"""
-
-    def qnode_builder(device_name):
-        """Builder"""
-
-        fcond1 = qp.noise.op_eq(qp.RX) & qp.noise.wires_in([0, 1])
-        noise1 = qp.noise.partial_wires(qp.RX, 0.4)
-
-        fcond2 = qp.noise.op_in([qp.RX, qp.RZ])
-
-        def noise2(op, **_):
-            qp.CRX(op.data[0], wires=[op.wires[0], (op.wires[0] + 1) % 2])
-
-        noise_model = qp.NoiseModel({fcond1: noise1, fcond2: noise2}, t1=2.0, t2=0.2)
-
-        @partial(qp.noise.add_noise, noise_model=noise_model)
-        @qp.qnode(qp.device(device_name, wires=2), interface="jax")
-        def qfunc(w, x, y, z):
-            qp.RX(w, wires=0)
-            qp.RY(x, wires=1)
-            qp.CNOT(wires=[0, 1])
-            qp.RY(y, wires=0)
-            qp.RX(z, wires=1)
-            return qp.expval(qp.Z(0) @ qp.Z(1))
-
-        return qfunc
-
-    qnode_control = qnode_builder("default.mixed")
-    qnode_backend = qnode_builder(backend)
-
-    expected = jax.jit(qnode_control)(0.9, 0.4, 0.5, 0.6)
-    observed = qjit(qnode_backend)(0.9, 0.4, 0.5, 0.6)
-    assert np.allclose(expected, observed)
-
-    _, expected_shape = jax.tree_util.tree_flatten(expected)
-    _, observed_shape = jax.tree_util.tree_flatten(observed)
-    assert expected_shape == observed_shape
-
-
 @pytest.mark.skip(reason="Uses part of old API")
 def test_batch_input(backend):
     """Test that batching works for a simple circuit"""
@@ -363,39 +323,6 @@ def test_diagonalize_measurements(backend):
     assert expected_shape == observed_shape
 
 
-def test_insert(backend):
-    """Test insert"""
-
-    def qnode_builder(device_name):
-        """Builder"""
-
-        @partial(qp.noise.insert, op=qp.X, op_args=(), position="end")
-        @qp.qnode(qp.device(device_name, wires=2), interface="jax")
-        def qfunc(w, x, y, z):
-            qp.RX(w, wires=0)
-            qp.RY(x, wires=1)
-            qp.CNOT(wires=[0, 1])
-            qp.RY(y, wires=0)
-            qp.RX(z, wires=1)
-            return qp.expval(qp.Z(0) @ qp.Z(1))
-
-        return qfunc
-
-    qnode_control = qnode_builder("default.qubit")
-    qnode_backend = qnode_builder(backend)
-
-    jax_jit = jax.jit(qnode_control)
-    compiled = qjit(qnode_backend)
-
-    expected = jax_jit(0.9, 0.4, 0.5, 0.6)
-    observed = compiled(0.9, 0.4, 0.5, 0.6)
-    _, expected_shape = jax.tree_util.tree_flatten(expected)
-    _, observed_shape = jax.tree_util.tree_flatten(observed)
-
-    assert np.allclose(expected, observed)
-    assert expected_shape == observed_shape
-
-
 def test_merge_amplitude_embedding(backend):
     """Test merge_amplitude_embedding"""
 
@@ -598,90 +525,6 @@ def test_undo_swaps(backend):
     _, expected_shape = jax.tree_util.tree_flatten(expected)
     _, observed_shape = jax.tree_util.tree_flatten(observed)
     assert expected_shape == observed_shape
-
-
-class TestMitigate:
-    """Test error mitigation transforms"""
-
-    def test_fold_global(self, backend):
-        """Test fold_global"""
-
-        def qnode_builder(device_name):
-            """Builder"""
-
-            @partial(qp.noise.fold_global, scale_factor=2)
-            @qp.qnode(qp.device(device_name, wires=3), interface="jax")
-            def qfunc(x):
-                qp.RX(x[0], wires=0)
-                qp.RY(x[1], wires=1)
-                qp.RZ(x[2], wires=2)
-                qp.CNOT(wires=(0, 1))
-                qp.CNOT(wires=(1, 2))
-                qp.RX(x[3], wires=0)
-                qp.RY(x[4], wires=1)
-                qp.RZ(x[5], wires=2)
-                return qp.expval(qp.Z(0) @ qp.Z(1) @ qp.Z(2))
-
-            return qfunc
-
-        qnode_control = qnode_builder("default.qubit")
-        qnode_backend = qnode_builder(backend)
-        x = np.arange(6)
-
-        compiled = qjit(qnode_backend)
-        observed = compiled(x)
-        expected = qnode_control(x)
-        assert np.allclose(expected, observed)
-
-        jax_jit = jax.jit(qnode_control)
-        expected = jax_jit(x)
-        assert np.allclose(expected, observed)
-
-        _, expected_shape = jax.tree_util.tree_flatten(expected)
-        _, observed_shape = jax.tree_util.tree_flatten(observed)
-        assert expected_shape == observed_shape
-
-    def test_mitigate_with_zne(self, backend):
-        """Test mitigate_with_zne"""
-
-        def qnode_builder(device_name):
-            """Builder"""
-
-            @partial(
-                qp.noise.mitigate_with_zne,
-                scale_factors=[1.0, 2.0, 3.0],
-                folding=qp.noise.fold_global,
-                extrapolate=qp.noise.poly_extrapolate,
-                extrapolate_kwargs={"order": 2},
-            )
-            @qp.qnode(qp.device(device_name, wires=2), interface="jax")
-            def qfunc(w1, w2):
-                qp.SimplifiedTwoDesign(w1, w2, wires=range(2))
-                return qp.expval(qp.Z(0))
-
-            return qfunc
-
-        n_wires = 2
-        n_layers = 2
-        shapes = qp.SimplifiedTwoDesign.shape(n_layers, n_wires)
-        np.random.seed(0)
-        w1, w2 = [np.random.random(s) for s in shapes]
-
-        qnode_control = qnode_builder("default.qubit")
-        qnode_backend = qnode_builder(backend)
-
-        compiled = qjit(qnode_backend)
-        observed = compiled(w1, w2)
-        expected = qnode_control(w1, w2)
-        assert np.allclose(expected, observed)
-
-        jax_jit = jax.jit(qnode_control)
-        expected = jax_jit(w1, w2)
-        assert np.allclose(expected, observed)
-
-        _, expected_shape = jax.tree_util.tree_flatten(expected)
-        _, observed_shape = jax.tree_util.tree_flatten(observed)
-        assert expected_shape == observed_shape
 
 
 class TestQuantumMonteCarlo:
