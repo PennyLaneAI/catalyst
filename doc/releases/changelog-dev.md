@@ -609,6 +609,10 @@
 * Added ``CZ`` support to ``to-ppr`` pass.
   [(#3009)](https://github.com/PennyLaneAI/catalyst/pull/3009)
 
+* PBC layer commutation checks now use packed binary symplectic bases for large overlapping layers,
+  reducing repeated pairwise normalization while preserving the resulting partition.
+  [(#3095)](https://github.com/PennyLaneAI/catalyst/pull/3095)
+
 * ``to_ppr`` now directly lowers PennyLane's discrete ``PPR`` operator to ``pbc.ppr``.
   [(#3185)](https://github.com/PennyLaneAI/catalyst/pull/3185)
   [(#3262)](https://github.com/PennyLaneAI/catalyst/pull/3262)
