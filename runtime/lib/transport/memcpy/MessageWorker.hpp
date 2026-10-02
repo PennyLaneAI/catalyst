@@ -93,12 +93,15 @@ class MessageWorker {
             std::uint32_t seq;   // cursor + 1 once the slot is fully written
         };
 
+        /// Bytes from the start of a slot to its data: the 64 B header.
+        static constexpr std::size_t DATA_OFFSET = sizeof(Header);
+
         /// Allocate zeroed slots of `capacity` data bytes. Throws std::bad_alloc.
         void allocate(std::size_t capacity);
         void release();
         std::size_t capacity() const { return capacity_; }
         Header &header(std::size_t i) { return *reinterpret_cast<Header *>(slot(i)); }
-        std::byte *data(std::size_t i) { return reinterpret_cast<std::byte *>(&header(i) + 1); }
+        std::byte *data(std::size_t i) { return slot(i) + DATA_OFFSET; }
 
       private:
         std::byte *slot(std::size_t i) { return base_ + i * stride_; }
