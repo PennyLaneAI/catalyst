@@ -15,12 +15,13 @@
 """Tests for trace-embedded decomposition-rule definitions."""
 
 import pennylane as qp
-from pennylane.typing import Wire
+from pennylane.typing import Float, Wire
 
 from catalyst import qjit
 from catalyst.decomposition.capture_session import OpDecompRequest
 from catalyst.decomposition.decomposition_rules import walk_reachable_decomp_rule_sets
 from catalyst.jax_primitives import decomp_definition_p, decomprule_p
+from catalyst.passes import graph_decomposition
 
 
 class RepeatedGate(qp.core.Operator2):
@@ -57,6 +58,29 @@ def test_repeated_gate_captures_only_plain_variant(mocker):
     assert mlir.count("target_gate =") == 1
     assert sum(eqn.primitive is decomp_definition_p for eqn in kernel_jaxpr.eqns) == 1
     assert all(eqn.primitive is not decomprule_p for eqn in kernel_jaxpr.eqns)
+
+
+def test_embedded_rules_bypass_on_demand_plugin(monkeypatch):
+    """A complete embedded rule set does not load the compiler-to-frontend callback."""
+
+    @qp.register_resources({qp.RX(Float, Wire[1]): 1})
+    def rx_rule(wires):
+        qp.RX(0.1, wires)
+
+    monkeypatch.setenv("CATALYST_QPD", "/does/not/exist")
+    with qp.decomposition.local_decomps():
+        qp.add_decomps(RepeatedGate, rx_rule)
+
+        @qjit(capture=True, target="mlir")
+        @graph_decomposition(gate_set={"RX"})
+        @qp.qnode(qp.device("null.qubit", wires=1))
+        def circuit():
+            RepeatedGate(0)
+            return qp.state()
+
+        specs = qp.specs(circuit, level="all-mlir")()
+
+    assert specs.resources["graph-decomposition"].counts["RX"] == 1
 
 
 def test_ambient_modifier_states_are_captured_independently(mocker):
@@ -339,6 +363,39 @@ def test_modifier_changing_identity_cycle_is_closed():
         "CyclicGate{}{wires:1}{}",
         "C(CyclicGate){}{wires:1}{}",
     }
+
+
+def test_indirect_control_cycle_uses_same_ancestor_count():
+    """An intervening uncontrolled operator does not hide increasing controls."""
+
+    class IndirectCycleGate(qp.core.Operator2):
+        def __init__(self, wires):
+            super().__init__(wires=wires)
+
+    class CycleBridge(qp.core.Operator2):
+        def __init__(self, wires):
+            super().__init__(wires=wires)
+
+    @qp.register_resources({CycleBridge(Wire[1]): 1})
+    def controlled_rule(base, **_):
+        del base
+
+    twice_controlled_root = qp.ctrl(IndirectCycleGate(Wire[1]), control=Wire[2])
+
+    @qp.register_resources({twice_controlled_root: 1})
+    def bridge_rule(wires):
+        del wires
+
+    with qp.decomposition.local_decomps():
+        qp.add_decomps("C(IndirectCycleGate)", controlled_rule)
+        qp.add_decomps(CycleBridge, bridge_rule)
+        request = OpDecompRequest.from_operation(IndirectCycleGate(Wire[1]), (False, 1))
+        target_specs = walk_reachable_decomp_rule_sets([(request, {request.modifier_state})])
+
+    targets = {target_spec.target_id for target_spec in target_specs}
+    assert "C(IndirectCycleGate){}{wires:1}{}" in targets
+    assert "CycleBridge{}{wires:1}{}" in targets
+    assert "2C(IndirectCycleGate){}{wires:1}{}" not in targets
 
 
 def test_same_base_modifier_transition_reopens_closure():
