@@ -16,6 +16,7 @@
 #include <cstddef>
 #include <string>
 
+#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringSet.h"
@@ -27,6 +28,7 @@
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/Operation.h"
 #include "mlir/IR/PatternMatch.h"
+#include "mlir/IR/SymbolTable.h"
 #include "mlir/IR/Types.h"
 #include "mlir/IR/Value.h"
 #include "mlir/IR/ValueRange.h"
@@ -47,34 +49,57 @@ using namespace mlir;
 namespace catalyst {
 namespace qref {
 
-/**
- * @brief
- * Inline the body of `rule` at `rewriter`'s current insertion point, using `operands` to
- * replace the parameters of `rule` and returning the results. `rewriter`'s insertion point will be
- * moved to the end of the inlined function body.
- */
-void inlineRuleBody(PatternRewriter &rewriter, func::FuncOp rule, ValueRange operands) {
-    assert(rule.getBlocks().size() == 1);
-    Block &body = rule.front();
+// Clone a rule function and create a call to the clone
+func::CallOp cloneAndCallRule(PatternRewriter &rewriter, func::FuncOp originalRule,
+                              ValueRange operands, SymbolTable &moduleSymbolTable,
+                              llvm::DenseMap<func::FuncOp, func::FuncOp> &rulesToClonedFuncs) {
+    Location loc = originalRule.getLoc();
 
-    IRMapping mapping;
-    mapping.map(body.getArguments(), operands);
-
-    for (Operation &op : body.without_terminator()) {
-        rewriter.clone(op, mapping);
+    // Already cloned before, just create a call
+    if (rulesToClonedFuncs.contains(originalRule)) {
+        return func::CallOp::create(rewriter, loc, rulesToClonedFuncs[originalRule], operands);
     }
+
+    // First encounter, need to clone and call
+    func::FuncOp clonedFunc;
+    {
+        // Only the function cloning needs to change insertion point:
+        // the call to the clone needs to happen at where the gate op originally was
+        OpBuilder::InsertionGuard guard(rewriter);
+        auto module = cast<ModuleOp>(moduleSymbolTable.getOp());
+        rewriter.setInsertionPointToEnd(module.getBody());
+
+        // IR modifications in a rewrite pattern must go through the rewriter, so it can
+        // record the changes and rewrite until fixed point
+        // Then, insert into the symbol table to resolve naming collisions
+        clonedFunc = cast<func::FuncOp>(rewriter.clone(*originalRule));
+    }
+
+    // The clones are not rules in the decomp graph: they are just functions to be called
+    // by the main circuit, and must not interfere with potential future graph solutions
+    clonedFunc.setVisibility(SymbolTable::Visibility::Private);
+    clonedFunc->removeAttr("frontend_name");
+    clonedFunc->removeAttr("target_gate");
+    clonedFunc->removeAttr("resources");
+    moduleSymbolTable.insert(clonedFunc);
+
+    rulesToClonedFuncs[originalRule] = clonedFunc;
+    return func::CallOp::create(rewriter, loc, clonedFunc, operands);
 }
 
 struct DecomposableGatePattern final : public OpInterfaceRewritePattern<DecomposableGate> {
   private:
     const llvm::StringMap<func::FuncOp> &decompositionRegistry;
     const llvm::StringSet<llvm::MallocAllocator> &targetGateSet;
+    SymbolTable &moduleSymbolTable;
+    mutable llvm::DenseMap<func::FuncOp, func::FuncOp> rulesToClonedFuncs;
 
   public:
     DecomposableGatePattern(MLIRContext *context, const llvm::StringMap<func::FuncOp> &registry,
-                            const llvm::StringSet<llvm::MallocAllocator> &gateSet)
+                            const llvm::StringSet<llvm::MallocAllocator> &gateSet,
+                            SymbolTable &symbolTable)
         : OpInterfaceRewritePattern<DecomposableGate>(context), decompositionRegistry(registry),
-          targetGateSet(gateSet) {}
+          targetGateSet(gateSet), moduleSymbolTable(symbolTable) {};
 
     LogicalResult matchAndRewrite(DecomposableGate op, PatternRewriter &rewriter) const override {
         std::string gateName = op.getOperatorName();
@@ -153,17 +178,21 @@ struct DecomposableGatePattern final : public OpInterfaceRewritePattern<Decompos
         assert(analyzer && "Analyzer should be valid");
 
         auto operands = analyzer.prepareOperands(rule, rewriter, op.getLoc());
-        inlineRuleBody(rewriter, rule, operands);
-        rewriter.eraseOp(op);
+        func::CallOp callOp =
+            cloneAndCallRule(rewriter, rule, operands, moduleSymbolTable, rulesToClonedFuncs);
+
+        // DL is in reference semantics, so only classical results will be returned from the rules
+        rewriter.replaceOp(op, callOp);
         return success();
     }
 };
 
-void populateDecomposeLoweringPatterns(
-    RewritePatternSet &patterns, const llvm::StringMap<func::FuncOp> &decompositionRegistry,
-    const llvm::StringSet<llvm::MallocAllocator> &targetGateSet) {
+void populateDecomposeLoweringPatterns(RewritePatternSet &patterns,
+                                       const llvm::StringMap<func::FuncOp> &decompositionRegistry,
+                                       const llvm::StringSet<llvm::MallocAllocator> &targetGateSet,
+                                       SymbolTable &moduleSymbolTable) {
     patterns.add<DecomposableGatePattern>(patterns.getContext(), decompositionRegistry,
-                                          targetGateSet);
+                                          targetGateSet, moduleSymbolTable);
 }
 
 } // namespace qref

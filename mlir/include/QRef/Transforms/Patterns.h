@@ -21,6 +21,7 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/PatternMatch.h"
+#include "mlir/IR/SymbolTable.h"
 #include "mlir/Transforms/DialectConversion.h"
 
 namespace catalyst {
@@ -28,7 +29,8 @@ namespace qref {
 
 void populateDecomposeLoweringPatterns(mlir::RewritePatternSet &,
                                        const llvm::StringMap<mlir::func::FuncOp> &,
-                                       const llvm::StringSet<llvm::MallocAllocator> &);
+                                       const llvm::StringSet<llvm::MallocAllocator> &,
+                                       mlir::SymbolTable &);
 
 } // namespace qref
 } // namespace catalyst
