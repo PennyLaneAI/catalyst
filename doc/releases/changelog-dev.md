@@ -113,13 +113,15 @@
 
 <h3>Improvements 🛠</h3>
 
-* The memcpy transport's controller and CPU coprocessor carry messages of any size in each
-  direction, as committed by `__catalyst__transport__set_message_sizes`. The coprocessor's message
-  rings are sized by the first message, so their memory follows the committed sizes. A frame of
-  up to 8 bytes keeps the 16 B `Payload` layout, so existing coprocessor functions and launchers
-  are unaffected. The memcpy GPU coprocessor, whose persistent kernel reads one 8-byte value per
-  message, still carries 8 bytes and now accepts a reply size below 8. The RDMA backends still
-  carry 8 bytes and reject a larger size.
+* The memcpy transport now carries messages of any size in each direction, as set by a PennyLane
+  `qp.Controller`'s `in_bytes` and `out_bytes`. The RDMA transports, and the memcpy GPU
+  coprocessor's persistent kernel, still carry 8 bytes.
+
+  ```python
+  ctrl = qp.Controller(in_bytes=120, out_bytes=121)
+  dev = qp.Backline(controller=ctrl, coprocessors=[coproc], transport="memcpy")
+  ```
+
   [(#3281)](https://github.com/PennyLaneAI/catalyst/pull/3281)
 
 * The memcpy GPU coprocessor can now run a host coprocessor function once per message, for a model
@@ -688,9 +690,8 @@
 
 <h3>Bug fixes 🐛</h3>
 
-* The memcpy controller rejects staging or posting a payload before its message sizes have been
-  committed. After a rejected `__catalyst__transport__set_message_sizes`, staging a payload used to
-  write into an unallocated buffer.
+* The memcpy controller now rejects staging or posting a payload before its message sizes are
+  committed, instead of writing into an unallocated buffer.
   [(#3281)](https://github.com/PennyLaneAI/catalyst/pull/3281)
 
 * Fixed the CNOT decomposition of the `ions-decomposition` pass, which did not implement a CNOT:
