@@ -122,38 +122,24 @@
   carry 8 bytes and reject a larger size.
   [(#3281)](https://github.com/PennyLaneAI/catalyst/pull/3281)
 
-* The memcpy GPU coprocessor also runs in a per-message mode, selected with
-  `coproc_fn=per_message` in its config. It then runs a host `CoprocessorFn` once per message on
-  a thread bound to the configured GPU, which suits a model compiled ahead of time and launched
-  from the host rather than a persistent kernel. `coproc_fn=launch_once` remains the default. The
-  frontend selects the per-message mode for a GPU coprocessor whose function is marked
-  `per_message`.
+* The memcpy GPU coprocessor can now run a host coprocessor function once per message, for a model
+  launched from the host rather than as a persistent kernel. The frontend selects this mode for a
+  function marked `per_message`.
   [(#3282)](https://github.com/PennyLaneAI/catalyst/pull/3282)
 
-* A compiled program now checks the result of every transport call it makes (creating, connecting
-  and configuring sessions, and posting and collecting messages), and stops with an error naming
-  the call when one fails, instead of continuing with a session that does not work.
+* A compiled Backline program now stops with an error naming the transport call that failed,
+  instead of continuing with a session that does not work.
   [(#3282)](https://github.com/PennyLaneAI/catalyst/pull/3282)
 
-* A coprocessor function can now be configured. Its library exports
-  `const CatalystCoprocessorFnInfo *<symbol>_info()` (`TransportABI.h`), a versioned descriptor of
-  optional `init` and `fini` hooks, which the runtime looks up only in the function's own library.
-  `init` is called with the node's `fn.`-prefixed config keys before the first message and returns
-  the `ctx` the function is called with, and `fini` releases it when the session is destroyed. The
-  frontend passes a coprocessor function's `config` to it with that prefix. A function can also
-  fail a single message by returning `COPROCESSOR_FN_ERROR`.
+* Coprocessor functions can now be configured. A function whose library exports `<symbol>_info`
+  receives its `config` and the message sizes in an `init` hook before its first message (see
+  `CatalystCoprocessorFnInfo` in `TransportABI.h`).
   [(#3282)](https://github.com/PennyLaneAI/catalyst/pull/3282)
 
-* Catalyst ships a coprocessor function that runs an ONNX model on each message,
-  `catalyst_onnx_coprocessor` in `libcatalyst_onnx_coprocessor.so` (`.dylib` on macOS). It loads
-  onnxruntime and the model when the coprocessor starts, on the CPU or on the GPU the installed
-  onnxruntime supports (MIGraphX, CUDA, TensorRT or ROCm), and the frontend loads the library for a
-  coprocessor naming it. Building it needs only onnxruntime's C API header, from
-  `ONNXRUNTIME_INCLUDE_DIR` or downloaded at a pinned, checksummed release.
-  `CATALYST_TRANSPORT_ONNX=OFF` disables it, and a build that cannot download the header skips it
-  with a warning. A coprocessor function's `init` receives the placement's message sizes as
-  `in_bytes` and `out_bytes`, so an `init` must accept both keys, and the ONNX function fails to
-  start when they differ from its model's input and output tensors.
+* Catalyst now ships `catalyst_onnx_coprocessor`, a coprocessor function that runs an ONNX model
+  on the CPU or a GPU through onnxruntime, built with the transport runtime. PennyLane's
+  [`qp.backline.onnx_decoder`](https://docs.pennylane.ai/en/latest/code/api/pennylane.backline.onnx_decoder.html)
+  uses it.
   [(#3282)](https://github.com/PennyLaneAI/catalyst/pull/3282)
 
 * Under program capture, PennyLane :func:`~.transforms.decompose` (``qp.decompose``) is now an
