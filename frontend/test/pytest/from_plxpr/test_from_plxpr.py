@@ -33,6 +33,8 @@ from catalyst.from_plxpr.qref_jax_primitives import (
     qref_get_p,
     qref_operator_p,
 )
+from catalyst.jax_primitives import decomp_definition_p
+from catalyst.passes import graph_decomposition
 
 pytestmark = pytest.mark.usefixtures("disable_capture")
 
@@ -839,6 +841,39 @@ class TestHybridPrograms:
         expected = -np.sin(0.5) + np.cos(1.2)
 
         assert qp.math.allclose(results, expected)
+
+
+class TestCollectRules:
+    """Tests for collecting decomposition rules."""
+
+    @pytest.mark.parametrize("collect_rules", (True, False))
+    @pytest.mark.parametrize("use_graph_decomp", (True, False))
+    def test_collect_rules(self, collect_rules, use_graph_decomp):
+        """Tests if decomposition rules are only collected when `collect_decomp_rules` is True or
+        graph-decomposition is present in the pass pipeline and the gate set is not empty."""
+
+        @qp.qnode(qp.device("lightning.qubit", wires=1))
+        def circuit_plain():
+            qp.X(0)
+            return qp.state()
+
+        @graph_decomposition(gate_set={qp.X})
+        @qp.qnode(qp.device("lightning.qubit", wires=1))
+        def circuit_graph():
+            qp.X(0)
+            return qp.state()
+
+        circuit = circuit_graph if use_graph_decomp else circuit_plain
+
+        qp.capture.enable()
+        plxpr = jax.make_jaxpr(circuit)()
+        jaxpr = from_plxpr(plxpr, collect_decomp_rules=collect_rules)()
+        qp.capture.disable()
+
+        kernel_jaxpr = jaxpr.eqns[0].params["call_jaxpr"]
+        expect_collect = collect_rules or use_graph_decomp
+        has_defs = any(eqn.primitive is decomp_definition_p for eqn in kernel_jaxpr.eqns)
+        assert has_defs is expect_collect
 
 
 if __name__ == "__main__":

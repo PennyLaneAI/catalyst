@@ -293,7 +293,31 @@ def handle_qnode(
                 ncargs=non_const_args,
             )
 
-    decomposition_scope = DecompositionScope() if self._collect_decomp_rules else None
+    # The device may require passes of its own, e.g. a backline placement naming a QEC code implies
+    # implicit encoding applied to it. Therefore we append the pass pipeline with the qec lowering
+    # passes.
+    pipelines = (("main", tuple(self._pass_pipeline) + device_pass_pipeline(qnode.device)),)
+    if not self._skip_preprocess:
+        device_preprocessing_pipeline = create_device_preprocessing_pipeline(
+            qnode.device, execution_config, shots, warn=self._preprocess_warn
+        )
+        pipelines += (("device", device_preprocessing_pipeline),)
+
+    pipelines_flattened = tuple(t for _, stage_passes in pipelines for t in stage_passes)
+
+    graph_decomp_pass = next(
+        (t for t in pipelines_flattened if t.pass_name == "graph-decomposition"),
+        None,
+    )
+
+    is_gate_set = False
+
+    if graph_decomp_pass:
+        is_gate_set = bool(graph_decomp_pass.kwargs.get("gate_set"))
+
+    decomposition_scope = (
+        DecompositionScope() if (self._collect_decomp_rules or is_gate_set) else None
+    )
 
     def calling_convention(*args):
         device_init_p.bind(
@@ -322,16 +346,6 @@ def handle_qnode(
         qref_dealloc_p.bind(self.init_qreg)
         device_release_p.bind()
         return retvals
-
-    # The device may require passes of its own, e.g. a backline placement naming a QEC code implies
-    # implicit encoding applied to it. Therefore we append the pass pipeline with the qec lowering
-    # passes.
-    pipelines = (("main", tuple(self._pass_pipeline) + device_pass_pipeline(qnode.device)),)
-    if not self._skip_preprocess:
-        device_preprocessing_pipeline = create_device_preprocessing_pipeline(
-            qnode.device, execution_config, shots, warn=self._preprocess_warn
-        )
-        pipelines += (("device", device_preprocessing_pipeline),)
 
     # no idea what deduce_avals is doing, but this seems to make dynamic shapes work
     flattened_fn = deduce_avals(

@@ -207,7 +207,8 @@
 
     This pathway of rule injection can be opted-out via a new keyword argument on `qp.qjit` named `collect_decomp_rules`.
     This kwarg controls whether or not to compile the decomposition rules during lower-time. Default value is `True`.
-    If ``False``, only the circuit itself will be compiled (aka standard legacy behavior).
+    If ``False``, only the circuit itself will be compiled (aka standard legacy behavior), unless a
+    ``graph-decomposition`` pass with a non-empty ``gate_set`` is added in user/device transform sequence.
     If `True`, all the decomposition rules reachable from all gates in the circuit will be compiled.
     If `capture=False`, or `capture="global"` and `qp.capture.enabled() == False`, this argument will be ignored.
 
