@@ -49,6 +49,7 @@ from pennylane.typing import Bool, Complex, Float, Int, Wire
 from pennylane.wires import Wires
 
 from catalyst import qjit
+from catalyst.debug import get_compilation_stage
 from catalyst.decomposition import GraphOpID, RuleLoweringWarning
 from catalyst.decomposition.decomposition_rules import (
     _MODIFIER_CANONICAL_ORDER,
@@ -1080,7 +1081,7 @@ class TestSymbolicRules:
             add_decomps("C(CtrlWired)", ctrl_rule)
 
             @qjit(capture=True)
-            @graph_decomposition(gate_set=["CNOT", "PauliX"])
+            @qp.decompose(gate_set=["CNOT", "PauliX"])
             @qnode(qp.device("lightning.qubit", wires=2))
             def circuit():
                 # The X both prepares the control in |1> -- so a swapped control/target leaves
@@ -1201,7 +1202,7 @@ class TestSymbolicRules:
                 add_decomps("C(MultiCtrlWired)", ctrl_rule)
 
                 @qjit(capture=True)
-                @graph_decomposition(gate_set=["Toffoli", "PauliX"])
+                @qp.decompose(gate_set=["Toffoli", "PauliX"])
                 @qnode(qp.device("lightning.qubit", wires=3))
                 def circuit():
                     for wire in prepared_controls:
@@ -1251,7 +1252,7 @@ class TestSymbolicRules:
             add_decomps("C(ZeroCtrl)", ctrl_rule)
 
             @qjit(capture=True)
-            @graph_decomposition(gate_set=["CNOT", "PauliX"])
+            @qp.decompose(gate_set=["CNOT", "PauliX"])
             @qnode(qp.device("lightning.qubit", wires=2))
             def circuit():
                 # The control is off, and the control value is zero, so the op fires.
@@ -1689,7 +1690,7 @@ def test_gate_already_in_gateset():
     """
 
     @qp.qjit(capture=True)
-    @graph_decomposition(gate_set={"Hadamard"})
+    @qp.decompose(gate_set={"Hadamard"})
     @qp.qnode(qp.device("lightning.qubit", wires=1))
     def circuit():
         qp.Hadamard(0)
@@ -1844,6 +1845,151 @@ class TestCustomRuleApplication:
         assert after.get("NoParams", 0) == 1
 
 
+class TestDecomposeAlias:
+    """``qp.decompose`` under capture is an alias for ``graph_decomposition`` (same C++ pass)."""
+
+    def test_decompose_matches_graph_decomposition(self):
+        """``qp.decompose`` compiles to the exact same MLIR as ``graph_decomposition``."""
+        gate_set = {"RX", "RY", "RZ"}
+
+        def build(dec):
+            @qjit(capture=True, target="mlir")
+            @dec
+            @qnode(qp.device("null.qubit", wires=1))
+            def circuit():
+                qp.Rot(0.1, 0.2, 0.3, wires=0)
+                return qp.probs()
+
+            return circuit
+
+        via_decompose = build(qp.decompose(gate_set=gate_set))
+        via_graph = build(graph_decomposition(gate_set=gate_set))
+
+        assert 'apply_registered_pass "graph-decomposition"' in via_decompose.mlir
+        assert via_decompose.mlir == via_graph.mlir
+
+    @pytest.mark.parametrize(
+        "tkwargs, exc",
+        [
+            ({"gate_set": {"RX"}, "stopping_condition": lambda op: True}, NotImplementedError),
+            ({"gate_set": {"RX"}, "max_expansion": 2}, NotImplementedError),
+            ({"gate_set": {"RX"}, "num_work_wires": 2}, NotImplementedError),
+            ({"gate_set": {"RX"}, "minimize_work_wires": True}, NotImplementedError),
+            ({"gate_set": {"RX"}, "strict": False}, NotImplementedError),
+            ({"gate_set": None}, ValueError),
+        ],
+    )
+    def test_decompose_rejects_unsupported_kwargs(self, tkwargs, exc):
+        """Kwargs the graph-decomposition pass cannot honor are rejected with a clear error."""
+        with pytest.raises(exc):
+
+            @qjit(capture=True, target="mlir")
+            @qp.decompose(**tkwargs)
+            @qnode(qp.device("null.qubit", wires=1))
+            def circuit():
+                qp.Rot(0.1, 0.2, 0.3, wires=0)
+                return qp.probs()
+
+            qp.specs(circuit, level="all-mlir")()
+
+    def test_decompose_multiple_matches_graph_decomposition(self):
+        """Stacking two ``qp.decompose`` transforms matches stacking ``graph_decomposition``."""
+        outer = {"RX", "RY", "RZ", "GlobalPhase"}
+        inner = {"RZ", "RY", "PhaseShift", "GlobalPhase"}
+
+        def build(dec_outer, dec_inner):
+            @qjit(capture=True, target="mlir")
+            @dec_outer
+            @dec_inner
+            @qnode(qp.device("null.qubit", wires=1))
+            def circuit():
+                qp.Rot(0.1, 0.2, 0.3, wires=0)
+                return qp.probs()
+
+            return circuit
+
+        via_decompose = build(qp.decompose(gate_set=outer), qp.decompose(gate_set=inner))
+        via_graph = build(graph_decomposition(gate_set=outer), graph_decomposition(gate_set=inner))
+
+        # Two graph-decomposition passes are inserted, and the result is identical to the
+        # explicit graph_decomposition stacking (alias, not a fork).
+        assert via_decompose.mlir.count('apply_registered_pass "graph-decomposition"') == 2
+        assert via_decompose.mlir == via_graph.mlir
+
+    def test_decompose_multiple_ordering(self):
+        """Stacked ``qp.decompose`` apply innermost-first: a gate produced by the inner pass and
+        excluded from the outer gate set is further decomposed away."""
+
+        @qjit(capture=True, keep_intermediate=True)
+        # Outer gate set excludes PhaseShift, which the inner pass introduces.
+        @qp.decompose(gate_set={"RX", "RY", "RZ", "CNOT", "GlobalPhase"})
+        @qp.decompose(gate_set={"RZ", "RY", "CNOT", "GlobalPhase", "PhaseShift"})
+        @qnode(qp.device("null.qubit", wires=2))
+        def circuit():
+            qp.Rot(0.1, 0.2, 0.3, wires=0)
+            qp.CNOT(wires=[0, 1])
+            return qp.expval(qp.PauliZ(0))
+
+        circuit()
+        optimized = get_compilation_stage(circuit, "QuantumCompilationStage")
+        # Inner runs first (PhaseShift appears), then outer removes it.
+        assert "PhaseShift" not in optimized
+
+    def test_decompose_inline_fixed_decomps(self):
+        """Inline ``fixed_decomps`` rule bodies are registered for the graph pass."""
+
+        @register_resources({NoParams(Wire[1]): 1})
+        def rot_to_noparams(phi, theta, omega, wires):  # pylint: disable=unused-argument
+            NoParams(wires[0])
+
+        qp.decomposition.enable_graph()
+        try:
+
+            @qjit(capture=True, target="mlir")
+            @qp.decompose(
+                gate_set={"NoParams"},
+                fixed_decomps={qp.Rot: rot_to_noparams},
+            )
+            @qnode(qp.device("null.qubit", wires=1))
+            def circuit():
+                qp.Rot(0.1, 0.2, 0.3, wires=0)
+                return qp.probs()
+
+            mlir = circuit.mlir
+        finally:
+            qp.decomposition.disable_graph()
+
+        # The inline rule body is registered (via add_decomps in a local scope) and captured into
+        # the module by the trace-time rule closure, and the circuit routes to graph-decomposition.
+        assert 'apply_registered_pass "graph-decomposition"' in mlir
+        assert "NoParams" in mlir
+
+    def test_decompose_inline_rules_require_rule_collection(self):
+        """Inline rules with ``collect_decomp_rules=False`` raise a clear error."""
+
+        @register_resources({NoParams(Wire[1]): 1})
+        def rot_to_noparams(phi, theta, omega, wires):  # pylint: disable=unused-argument
+            NoParams(wires[0])
+
+        qp.decomposition.enable_graph()
+        try:
+            with pytest.raises(NotImplementedError, match="collect_decomp_rules"):
+
+                @qjit(capture=True, target="mlir", collect_decomp_rules=False)
+                @qp.decompose(
+                    gate_set={"NoParams"},
+                    fixed_decomps={qp.Rot: rot_to_noparams},
+                )
+                @qnode(qp.device("null.qubit", wires=1))
+                def circuit():
+                    qp.Rot(0.1, 0.2, 0.3, wires=0)
+                    return qp.probs()
+
+                qp.specs(circuit, level="all-mlir")()
+        finally:
+            qp.decomposition.disable_graph()
+
+
 class TestNumericHamiltonianDecomposition:
     """Tests decomposing Trotter operators that carry a numeric Hamiltonian as a
     hybrid argument, in both their plain and ``qp.adjoint`` forms.
@@ -1915,8 +2061,8 @@ class TestNumericHamiltonianDecomposition:
         all_wires = qp.wires.Wires.all_wires(list(registers.values()))
 
         @qjit(capture=True, target="mlir")
-        @graph_decomposition(
-            gate_set={"QROM", "AQFT", "CNOT", "PhaseShift", "RZ", "Hadamard", "GlobalPhase"}
+        @qp.decompose(
+            gate_set={"QROM", "AQFT", "CNOT", "PhaseShift", "RZ", "Hadamard", "GlobalPhase"},
         )
         @qnode(qp.device("null.qubit", wires=len(all_wires)))
         def circuit():
