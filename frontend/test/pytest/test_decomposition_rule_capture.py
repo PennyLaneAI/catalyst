@@ -341,6 +341,39 @@ def test_modifier_changing_identity_cycle_is_closed():
     }
 
 
+def test_indirect_control_cycle_uses_same_ancestor_count():
+    """An intervening uncontrolled operator does not hide increasing controls."""
+
+    class IndirectCycleGate(qp.core.Operator2):
+        def __init__(self, wires):
+            super().__init__(wires=wires)
+
+    class CycleBridge(qp.core.Operator2):
+        def __init__(self, wires):
+            super().__init__(wires=wires)
+
+    @qp.register_resources({CycleBridge(Wire[1]): 1})
+    def controlled_rule(base, **_):
+        del base
+
+    twice_controlled_root = qp.ctrl(IndirectCycleGate(Wire[1]), control=Wire[2])
+
+    @qp.register_resources({twice_controlled_root: 1})
+    def bridge_rule(wires):
+        del wires
+
+    with qp.decomposition.local_decomps():
+        qp.add_decomps("C(IndirectCycleGate)", controlled_rule)
+        qp.add_decomps(CycleBridge, bridge_rule)
+        request = OpDecompRequest.from_operation(IndirectCycleGate(Wire[1]), (False, 1))
+        target_specs = walk_reachable_decomp_rule_sets([(request, {request.modifier_state})])
+
+    targets = {target_spec.target_id for target_spec in target_specs}
+    assert "C(IndirectCycleGate){}{wires:1}{}" in targets
+    assert "CycleBridge{}{wires:1}{}" in targets
+    assert "2C(IndirectCycleGate){}{wires:1}{}" not in targets
+
+
 def test_same_base_modifier_transition_reopens_closure():
     """A symbolic rule may transition back to another state of the same base identity."""
 
