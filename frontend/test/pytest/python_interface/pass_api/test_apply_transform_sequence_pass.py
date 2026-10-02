@@ -64,6 +64,35 @@ def _get_xdsl_attr_from_pyval(val) -> Attribute:
 
     return attr
 
+def _mock_and_get_active_passes(input: str, active_mlir_passes: list) -> str:
+    """Collect non-empty apply_registered_pass ops from ``input``.
+
+    Mimics ``--apply-transform-sequence`` by detaching transform modules
+    afterwards, and returns the remaining IR for use as mock stdout.
+    """
+    mod = parse_generic_to_xdsl_module(input)
+    for op in mod.walk():
+        if not isinstance(op, transform.ApplyRegisteredPassOp):
+            continue
+        if op.pass_name.data == "empty":
+            continue
+        options = get_pyval_from_xdsl_attr(op.options)
+        active_mlir_passes.append((op.pass_name.data, options))
+
+    # Find and remove all transform.with_named_sequence ops.
+    to_detach = [
+        op
+        for op in mod.walk()
+        if isinstance(op, builtin.ModuleOp)
+        and op is not mod
+        and op.get_attr_or_prop("transform.with_named_sequence") is not None
+    ]
+    for op in to_detach:
+        op.detach()
+
+    buffer = StringIO()
+    Printer(stream=buffer, print_generic_format=True).print_op(mod)
+    return buffer.getvalue()
 
 def _mock_and_get_active_passes(input: str, active_mlir_passes: list) -> str:
     """Collect non-empty apply_registered_pass ops from ``input``.
@@ -308,9 +337,7 @@ class TestApplyTransformSequencePass:
             nonlocal active_mlir_passes
             captured_cmds.append(subprocess.list2cmdline(cmd))
             num_calls += 1
-            transformed_ir = _mock_and_get_active_passes(
-                kwargs.get("input", ""), active_mlir_passes
-            )
+            transformed_ir = _mock_and_get_active_passes(kwargs.get("input", ""), active_mlir_passes)
             return MagicMock(args=cmd, stdout=transformed_ir, returncode=0)
 
         mocker.patch("subprocess.run", side_effect=mock_subprocess_run)
@@ -372,9 +399,7 @@ class TestApplyTransformSequencePass:
             nonlocal active_mlir_passes
             captured_cmds.append(subprocess.list2cmdline(cmd))
             num_calls += 1
-            transformed_ir = _mock_and_get_active_passes(
-                kwargs.get("input", ""), active_mlir_passes
-            )
+            transformed_ir = _mock_and_get_active_passes(kwargs.get("input", ""), active_mlir_passes)
             return MagicMock(args=cmd, stdout=transformed_ir, returncode=0)
 
         mocker.patch("subprocess.run", side_effect=mock_subprocess_run)
