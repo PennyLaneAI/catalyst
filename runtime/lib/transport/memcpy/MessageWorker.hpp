@@ -93,7 +93,7 @@ class MessageWorker {
         void release();
         std::size_t capacity() const { return capacity_; }
         Header &header(std::size_t i) { return *reinterpret_cast<Header *>(slot(i)); }
-        std::byte *data(std::size_t i) { return slot(i) + sizeof(Header); }
+        std::byte *data(std::size_t i) { return reinterpret_cast<std::byte *>(&header(i) + 1); }
 
       private:
         std::byte *slot(std::size_t i) { return base_ + i * stride_; }
