@@ -300,6 +300,38 @@ def test_a_builtin_coprocessor_fn_library_is_found_as_a_dylib(monkeypatch, tmp_p
     assert loaded == [str(tmp_path / "libcatalyst_onnx_coprocessor.dylib")]
 
 
+def test_a_builtin_coprocessor_fn_library_is_found_on_the_transport_path(monkeypatch, tmp_path):
+    """A directory in CATALYST_TRANSPORT_PATH is searched before the runtime library directory."""
+    extra = tmp_path / "extra"
+    extra.mkdir()
+    (extra / "libcatalyst_onnx_coprocessor.so").write_bytes(b"")
+    loaded = []
+    monkeypatch.setattr("ctypes.CDLL", lambda path, mode=None: loaded.append(path) or object())
+    monkeypatch.setattr("catalyst.backline.get_lib_path", lambda project, env: str(tmp_path))
+    monkeypatch.setenv("CATALYST_TRANSPORT_PATH", str(extra))
+    fn = qp.CoprocessorFunction("catalyst_onnx_coprocessor")
+    dev = qp.Backline(
+        controller=_controller(), coprocessors=[_coproc("cop0", fn=fn)], transport="memcpy"
+    )
+    serialize_backline(dev.placement)
+    launch_executors(dev.placement)
+    assert loaded == [str(extra / "libcatalyst_onnx_coprocessor.so")]
+
+
+def test_a_missing_builtin_coprocessor_fn_library_fails_to_compile(monkeypatch, tmp_path):
+    """Compiling fails, naming the library and the directories searched, when it is not built."""
+    monkeypatch.setattr("catalyst.backline.get_lib_path", lambda project, env: str(tmp_path))
+    monkeypatch.delenv("CATALYST_TRANSPORT_PATH", raising=False)
+    fn = qp.CoprocessorFunction("catalyst_onnx_coprocessor")
+    dev = qp.Backline(
+        controller=_controller(), coprocessors=[_coproc("cop0", fn=fn)], transport="memcpy"
+    )
+    with pytest.raises(
+        CompileError, match=rf"needs libcatalyst_onnx_coprocessor\.so.*not found in: {tmp_path}"
+    ):
+        serialize_backline(dev.placement)
+
+
 def test_a_remote_node_names_a_builtin_coprocessor_fn_library_as_a_so(monkeypatch, tmp_path):
     """A node on another machine is Linux, so it is given the .so even when this one has a .dylib."""
     from catalyst.backline import _executor_plugins  # pylint: disable=import-outside-toplevel

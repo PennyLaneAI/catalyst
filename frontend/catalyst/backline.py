@@ -305,6 +305,8 @@ def serialize_backline(placement: Placement) -> dict:
                 f"dispatched to an executor, as {coproc.name!r} is: its model and onnxruntime "
                 f"paths are resolved on this machine"
             )
+        if not _out_of_process(coproc):
+            _check_builtin_fn_lib(coproc)
         entries = [node["config"]] if node.get("config") else []
         if _runs_per_message_on_gpu(coproc, transport):
             entries.append("coproc_fn=per_message")
@@ -376,11 +378,21 @@ def _check_machine_agrees(node: Node, host, address=None, preset: bool = False) 
         )
 
 
+def _builtin_fn_lib_dirs() -> list[Path]:
+    """Directories searched for a coprocessor function library Catalyst ships, in order: each
+    directory in ``CATALYST_TRANSPORT_PATH``, then ``<RUNTIME_LIB_DIR>``."""
+    override = os.environ.get(_BACKEND_PATH_ENV, "")
+    dirs = [Path(p) for p in override.split(os.pathsep) if p]
+    dirs.append(Path(get_lib_path("runtime", "RUNTIME_LIB_DIR")))
+    return dirs
+
+
 def _coprocessor_fn_lib(node: Node) -> Path | None:
     """The library providing a coprocessor's CoprocessorFn, or ``None`` if it names none.
 
-    That is its ``lib_path``, or for one of Catalyst's own coprocessor functions, the runtime
-    library that exports it.
+    That is its ``lib_path``, or for one of Catalyst's own coprocessor functions, the first library
+    exporting it found in ``_builtin_fn_lib_dirs()``. When none is found, it is the ``.so`` under
+    ``<RUNTIME_LIB_DIR>``, which need not exist.
     """
     fn = getattr(node, "coprocessor_fn", None)
     lib_path = getattr(fn, "lib_path", None)
@@ -389,9 +401,27 @@ def _coprocessor_fn_lib(node: Node) -> Path | None:
     stem = _BUILTIN_COPROCESSOR_FN_LIBS.get(getattr(fn, "symbol_name", None))
     if stem is None:
         return None
-    lib_dir = Path(get_lib_path("runtime", "RUNTIME_LIB_DIR"))
-    candidates = [lib_dir / f"{stem}.{ext}" for ext in _BACKEND_LIB_EXTS]
-    return next((c for c in candidates if c.exists()), candidates[0])
+    dirs = _builtin_fn_lib_dirs()
+    candidates = [d / f"{stem}.{ext}" for d in dirs for ext in _BACKEND_LIB_EXTS]
+    return next((c for c in candidates if c.exists()), dirs[-1] / f"{stem}.{_BACKEND_LIB_EXTS[0]}")
+
+
+def _check_builtin_fn_lib(coproc: Node) -> None:
+    """Raise a ``CompileError`` if an in-process coprocessor uses one of Catalyst's own coprocessor
+    functions and no library exporting it is found."""
+    fn = coproc.coprocessor_fn
+    if fn.lib_path or fn.symbol_name not in _BUILTIN_COPROCESSOR_FN_LIBS:
+        return
+    lib = _coprocessor_fn_lib(coproc)
+    if lib.exists():
+        return
+    stem = _BUILTIN_COPROCESSOR_FN_LIBS[fn.symbol_name]
+    searched = ", ".join(str(d) for d in _builtin_fn_lib_dirs())
+    raise CompileError(
+        f"coprocessor function {fn.symbol_name!r} of {coproc.name!r} needs {stem}.so (or .dylib), "
+        f"which was not found in: {searched}. Build the runtime with transport enabled "
+        f"(ENABLE_TRANSPORT=ON), or add the directory holding it to {_BACKEND_PATH_ENV}."
+    )
 
 
 def _executor_plugins(node: Node, given) -> list[str]:
