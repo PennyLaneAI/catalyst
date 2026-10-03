@@ -814,7 +814,7 @@ def test_quantum_phase_estimation(backend):
     """Test QuantumPhaseEstimation."""
 
     phase = 5
-    unitary = qp.RX(phase, wires=0)
+    unitary = qp.RX(phase, wires=0).matrix()
     n_estimation_wires = 5
     estimation_wires = range(1, n_estimation_wires + 1)
 
