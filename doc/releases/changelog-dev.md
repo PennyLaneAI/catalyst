@@ -113,6 +113,17 @@
 
 <h3>Improvements 🛠</h3>
 
+* The memcpy transport now carries messages of any size in each direction, as set by a PennyLane
+  `qp.Controller`'s `in_bytes` and `out_bytes`. The RDMA transports, and the memcpy GPU
+  coprocessor's persistent kernel, still carry 8 bytes.
+
+  ```python
+  ctrl = qp.Controller(in_bytes=120, out_bytes=121)
+  dev = qp.Backline(controller=ctrl, coprocessors=[coproc], transport="memcpy")
+  ```
+
+  [(#3281)](https://github.com/PennyLaneAI/catalyst/pull/3281)
+
 * Under program capture, PennyLane :func:`~.transforms.decompose` (``qp.decompose``) is now an
   alias for :func:`~.passes.graph_decomposition`. Multiple ``qp.decompose`` transforms is also
   supported.
@@ -658,6 +669,10 @@
 <h3>Deprecations 👋</h3>
 
 <h3>Bug fixes 🐛</h3>
+
+* The memcpy controller now rejects staging or posting a payload before its message sizes are
+  committed, instead of writing into an unallocated buffer.
+  [(#3281)](https://github.com/PennyLaneAI/catalyst/pull/3281)
 
 * Fixed the CNOT decomposition of the `ions-decomposition` pass, which did not implement a CNOT:
   it rotated the target with `RY(-π/2)` instead of `RX(-π/2)` and returned the two qubits in

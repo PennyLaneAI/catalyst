@@ -49,19 +49,23 @@ class CpuControllerSession : public ControllerSession {
     int kick(std::uint32_t work_item_idx = 0) override;
     void *data_slot() override;
     void write_data_slot(const void *src, std::uint64_t bytes, std::uint32_t decoder_id) override;
-    void *reply_slot() override { return local_reply_.addr; }
+    void *reply_slot() override { return reply_.empty() ? nullptr : reply_.data(); }
 
   private:
     std::string pair_key_;
     std::shared_ptr<MemcpyLink> link_;
 
-    /// Reply buffer the paired coprocessor writes into during kick().
-    MemRegion local_reply_{};
+    /// Reply buffer the paired coprocessor writes into during kick(). commit_work_item() sizes it
+    /// to the committed out_bytes, and to at least one Payload, which reply_slot() readers may read
+    /// in full. The region provisioned through alloc_memory() and exchange_keys() is not used.
+    std::vector<std::byte> reply_;
 
     /// Owns the buffers backing MemRegions handed out by alloc_memory().
     std::vector<std::unique_ptr<std::byte[]>> caller_memory_regions_;
 
     std::vector<std::byte> request_staging_;
+    /// The frame kick() hands the coprocessor. Reused across kicks, so it allocates once.
+    std::vector<std::byte> frame_;
 
     /// Set on the first commit_work_item(). Subsequent commits are rejected so any pointer a
     /// prior data_slot() handed out cannot dangle behind a request_staging_ reallocation.

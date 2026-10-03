@@ -6,6 +6,7 @@
 # reference one copy of `acquire_memcpy_link` and its static registry map.
 add_library(memcpy_cpu_impl SHARED
     MemcpyLink.cpp
+    MessageWorker.cpp
     cpu_controller/CpuControllerSession.cpp
     cpu_coprocessor/CpuCoprocessorSession.cpp
 )
