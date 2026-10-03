@@ -38,6 +38,7 @@ from catalyst.backline import (
     placement_pipeline,
     remote_device_lib,
     serialize_backline,
+    settle_executors,
 )
 from catalyst.device.qjit_device import BackendInfo, extract_backend_info
 from catalyst.from_plxpr.from_plxpr import _get_device_kwargs
@@ -231,20 +232,89 @@ def test_a_per_message_function_with_an_explicit_launch_once_mode_is_rejected():
         serialize_backline(dev.placement)
 
 
-def test_the_onnx_coprocessor_function_is_rejected_on_a_dispatched_coprocessor():
-    """The ONNX function's model and onnxruntime paths are local, so it runs only in-process."""
-    fn = qp.CoprocessorFunction("catalyst_onnx_coprocessor", config="model=/m.onnx")
+# The target of the remote executors below, pinned so no test reaches for a host to detect it.
+_TRIPLE = "x86_64-unknown-linux-gnu"
+
+
+@pytest.fixture
+def onnx_files(tmp_path, monkeypatch):
+    """A model, an onnxruntime with one provider beside it, and Catalyst's ONNX function library."""
+    lib_dir = tmp_path / "lib"
+    ort_dir = tmp_path / "capi"
+    lib_dir.mkdir()
+    ort_dir.mkdir()
+    (lib_dir / "libcatalyst_onnx_coprocessor.so").write_bytes(b"")
+    (lib_dir / "libcatalyst_transport_memcpy_coprocessor.so").write_bytes(b"")
+    (ort_dir / "libonnxruntime.so.1.27.1").write_bytes(b"")
+    (ort_dir / "libonnxruntime_providers_migraphx.so").write_bytes(b"")
+    (ort_dir / "unrelated.py").write_bytes(b"")
+    (tmp_path / "model.onnx").write_bytes(b"")
+    monkeypatch.setattr("catalyst.backline.get_lib_path", lambda project, env: str(lib_dir))
+    monkeypatch.delenv("CATALYST_TRANSPORT_PATH", raising=False)
+    config = f"model={tmp_path / 'model.onnx'};ort_lib={ort_dir / 'libonnxruntime.so.1.27.1'}"
+    return SimpleNamespace(root=tmp_path, lib_dir=lib_dir, ort_dir=ort_dir, config=config)
+
+
+def test_a_remote_onnx_coprocessor_deploys_its_files_and_names_them_in_the_workspace(onnx_files):
+    """The model, onnxruntime and its providers travel with the executor, named by filename."""
+    fn = qp.CoprocessorFunction("catalyst_onnx_coprocessor", config=onnx_files.config)
     coproc = qp.Coprocessor(
         name="gpu0",
-        hardware="cpu",
+        remote=True,
         coprocessor_fn=fn,
-        executor_options={"host": "192.0.2.11", "port": 7813},
+        executor_options={"host": "192.0.2.11", "port": 7813, "triple": _TRIPLE},
     )
     dev = qp.Backline(controller=_controller(), coprocessors=[coproc], transport="memcpy")
-    with pytest.raises(
-        CompileError, match="does not yet support a coprocessor dispatched to an executor"
-    ):
-        serialize_backline(dev.placement)
+    settle_executors(dev.placement)
+    config = serialize_backline(dev.placement)["coprocessors"][0]["config"]
+    assert "fn.model=./model.onnx;fn.ort_lib=./libonnxruntime.so.1.27.1" in config
+    deploy = coproc.executor._cfg.deploy  # pylint: disable=protected-access
+    assert set(deploy) == {
+        str(onnx_files.lib_dir / "libcatalyst_onnx_coprocessor.so"),
+        str(onnx_files.root / "model.onnx"),
+        str(onnx_files.ort_dir / "libonnxruntime.so.1.27.1"),
+        str(onnx_files.ort_dir / "libonnxruntime_providers_migraphx.so"),
+    }
+
+
+def test_an_onnx_coprocessor_in_a_local_executor_keeps_its_paths(onnx_files):
+    """An executor on this machine reads the files where they are."""
+    fn = qp.CoprocessorFunction("catalyst_onnx_coprocessor", config=onnx_files.config)
+    coproc = qp.Coprocessor(name="gpu0", coprocessor_fn=fn, executor_options={"port": 7813})
+    dev = qp.Backline(controller=_controller(), coprocessors=[coproc], transport="memcpy")
+    settle_executors(dev.placement)
+    config = serialize_backline(dev.placement)["coprocessors"][0]["config"]
+    assert f"fn.model={onnx_files.root / 'model.onnx'}" in config
+
+
+def test_nodes_pinning_one_executor_share_it():
+    """A controller and a coprocessor on the same host and port run in one executor process."""
+    options = {"host": "192.0.2.11", "port": 7813, "triple": _TRIPLE}
+    ctrl = _controller(remote=True, executor_options=options)
+    coproc = _coproc("cop0", remote=True, executor_options=options, init_args={})
+    dev = qp.Backline(controller=ctrl, coprocessors=[coproc], transport="memcpy")
+    settle_executors(dev.placement)
+    assert ctrl.executor is coproc.executor
+    plugins = ctrl.executor._cfg.plugins  # pylint: disable=protected-access
+    assert plugins[: len(_EXECUTOR_RUNTIME_PLUGINS)] == list(_EXECUTOR_RUNTIME_PLUGINS)
+    assert plugins[-1].startswith("librtd_null_qubit")  # the controller's device runtime, last
+    assert len(plugins) == len(set(plugins))
+
+
+def test_nodes_pinning_one_executor_must_agree_on_its_options():
+    """Nodes sharing an executor run in one process, so they cannot ask for different ones."""
+    ctrl = _controller(
+        remote=True, executor_options={"host": "192.0.2.11", "port": 7813, "triple": _TRIPLE}
+    )
+    coproc = _coproc(
+        "cop0",
+        remote=True,
+        executor_options={"host": "192.0.2.11", "port": 7813, "triple": _TRIPLE, "sudo": True},
+        init_args={},
+    )
+    dev = qp.Backline(controller=ctrl, coprocessors=[coproc], transport="memcpy")
+    with pytest.raises(CompileError, match="pin the same executor"):
+        settle_executors(dev.placement)
 
 
 def test_a_launcher_on_a_gpu_keeps_the_default_mode():

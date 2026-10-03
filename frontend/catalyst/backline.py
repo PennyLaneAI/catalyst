@@ -84,9 +84,14 @@ _DEFAULT_MESSAGE_BYTES = 8
 # The keys a coprocessor function's ``init`` receives the placement's message sizes under.
 _FN_MESSAGE_SIZE_KEYS = ("in_bytes", "out_bytes")
 
-# Coprocessor functions whose configuration names files on the compiling machine (a model, a
-# runtime library), so they do not yet run on a coprocessor dispatched to an executor.
-_IN_PROCESS_COPROCESSOR_FNS = frozenset({"catalyst_onnx_coprocessor"})
+# Coprocessor functions whose configuration names files on the compiling machine, by function, then
+# by config key, each mapped to a glob of the companion files beside it that travel with it
+# (``None`` for none). A coprocessor on another machine takes these files in its executor's
+# deployment, and its config names each one relative to the executor's workspace. onnxruntime loads
+# its execution providers from its own directory, so they travel with ``ort_lib``.
+_COPROCESSOR_FN_FILE_KEYS = {
+    "catalyst_onnx_coprocessor": {"model": None, "ort_lib": "libonnxruntime*"},
+}
 
 
 def _resolve_backend(transport: str, hardware: str) -> str:
@@ -230,6 +235,7 @@ def launch_executors(placement: Placement | None) -> None:
     """
     if placement is None:
         return
+    _share_executors(placement)
     for node in (placement.controller, *placement.coprocessors):
         executor = _realize_executor(node)
         if executor is not None:
@@ -281,9 +287,12 @@ def _message_size(placement: Placement, name: str) -> int:
     return _DEFAULT_MESSAGE_BYTES if size is None else size
 
 
-def _coprocessor_fn_config(fn, placement: Placement) -> str:
+def _coprocessor_fn_config(fn, placement: Placement, in_workspace: bool = False) -> str:
     """A coprocessor function's own ``key=value;...`` config, then ``in_bytes`` and ``out_bytes``
     set to the placement's message sizes, with each key prefixed ``fn.``.
+
+    With ``in_workspace``, each value naming a file listed in :data:`_COPROCESSOR_FN_FILE_KEYS`
+    becomes ``./<filename>``, the file's place in the executor's workspace once deployed.
 
     The prefix keeps the function's keys apart from the backend's in the node's config string. The
     transport runtime removes it again and hands the keys to the function's ``init`` hook, which its
@@ -304,6 +313,8 @@ def _coprocessor_fn_config(fn, placement: Placement) -> str:
                 f"coprocessor function config key {key!r} is reserved: the compiler sets it to the "
                 f"placement's message size"
             )
+        if in_workspace and key in _COPROCESSOR_FN_FILE_KEYS.get(fn.symbol_name, {}):
+            entry = f"{key}=./{Path(entry.partition('=')[2]).name}"
         entries.append(f"fn.{entry}")
     entries += [f"fn.{key}={_message_size(placement, key)}" for key in _FN_MESSAGE_SIZE_KEYS]
     return ";".join(entries)
@@ -326,18 +337,15 @@ def serialize_backline(placement: Placement) -> dict:
         # ``symbol`` names the decode function; the library providing it is loaded as an executor
         # plugin, so it must not be written into ``backend_lib``, which is the transport backend.
         node["symbol"] = coproc.coprocessor_fn.symbol_name
-        if node["symbol"] in _IN_PROCESS_COPROCESSOR_FNS and _out_of_process(coproc):
-            raise CompileError(
-                f"coprocessor function {node['symbol']!r} does not yet support a coprocessor "
-                f"dispatched to an executor, as {coproc.name!r} is: its model and onnxruntime "
-                f"paths are resolved on this machine"
-            )
-        if not _out_of_process(coproc):
+        # The library is loaded from this installation, or deployed from it with the executor.
+        if not _out_of_process(coproc) or coproc.executor_options is not None:
             _check_builtin_fn_lib(coproc)
         entries = [node["config"]] if node.get("config") else []
         if _runs_per_message_on_gpu(coproc, transport):
             entries.append("coproc_fn=per_message")
-        if fn_config := _coprocessor_fn_config(coproc.coprocessor_fn, placement):
+        if fn_config := _coprocessor_fn_config(
+            coproc.coprocessor_fn, placement, in_workspace=bool(coproc.remote)
+        ):
             entries.append(fn_config)
         if entries:
             node["config"] = ";".join(entries)
@@ -451,6 +459,29 @@ def _check_builtin_fn_lib(coproc: Node) -> None:
     )
 
 
+def _coprocessor_fn_files(node: Node) -> list[str]:
+    """The local files a coprocessor function's config names (see
+    :data:`_COPROCESSOR_FN_FILE_KEYS`), with their companions, for deployment beside the function on
+    another machine. Empty for a node with no such function."""
+    fn = getattr(node, "coprocessor_fn", None)
+    keys = _COPROCESSOR_FN_FILE_KEYS.get(getattr(fn, "symbol_name", None), {})
+    files = []
+    for entry in filter(None, (getattr(fn, "config", "") or "").split(";")):
+        key, _, value = entry.partition("=")
+        if key not in keys:
+            continue
+        path = Path(value)
+        if not path.is_file():
+            raise CompileError(
+                f"coprocessor function {fn.symbol_name!r} of {node.name!r} names {key}={value}, "
+                f"which is not a file on this machine, so it cannot be deployed with its executor"
+            )
+        files.append(str(path))
+        if companions := keys[key]:
+            files += [str(c) for c in sorted(path.parent.glob(companions)) if c != path]
+    return files
+
+
 def _executor_plugins(node: Node, given) -> list[str]:
     """The plugins an executor needs: the runtime libraries, those ``given``, then a coprocessor's
     decode function and a controller's device runtime, each appended only if not already listed."""
@@ -495,6 +526,68 @@ def _executor_plugins(node: Node, given) -> list[str]:
     return plugins
 
 
+def _executor_options(node: Node, options: dict) -> dict:
+    """``options`` completed for ``node``: its name, the plugins it needs, and, for a node on
+    another machine, its coprocessor function's library and files in the deployment."""
+    options = dict(options)
+    options.setdefault("name", node.name or "executor")
+    options["plugins"] = _executor_plugins(node, options.get("plugins") or ())
+    if node.remote:
+        # Named by filename among the plugins above, which resolves against the workspace -- so on
+        # another machine the files have to travel there alongside whatever else is deployed.
+        fn_lib = _coprocessor_fn_lib(node)
+        deploy = [*options.get("deploy", []), *([str(fn_lib)] if fn_lib is not None else [])]
+        options["deploy"] = deploy + _coprocessor_fn_files(node)
+    return options
+
+
+def _share_executors(placement: Placement) -> None:
+    """Give the nodes whose ``executor_options`` pin the same ``host`` and ``port`` one executor.
+
+    Such nodes run in one ``catalyst-executor`` process, which is what lets the memcpy transport
+    pair a controller and a coprocessor on another machine. The shared executor loads every plugin
+    and deploys every file the nodes need. Their other options must agree.
+
+    Raises:
+        CompileError: If nodes sharing an executor disagree on an option other than ``name``,
+            ``plugins`` or ``deploy``.
+    """
+    groups: dict[tuple, list[Node]] = {}
+    for node in (placement.controller, *placement.coprocessors):
+        options = node.executor_options
+        if node.executor is not None or options is None or options.get("port") is None:
+            continue
+        groups.setdefault((options.get("host"), options["port"]), []).append(node)
+    merged_keys = {"name", "plugins", "deploy"}
+    for nodes in groups.values():
+        if len(nodes) < 2:
+            continue
+        first = {k: v for k, v in nodes[0].executor_options.items() if k not in merged_keys}
+        for other in nodes[1:]:
+            rest = {k: v for k, v in other.executor_options.items() if k not in merged_keys}
+            if rest != first:
+                raise CompileError(
+                    f"backline nodes {nodes[0].name!r} and {other.name!r} pin the same executor "
+                    f"({first.get('host') or 'local'}:{first['port']}) but disagree on its other "
+                    f"options. Nodes sharing an executor run in one process, so give them the same "
+                    f"executor_options apart from plugins and deploy."
+                )
+        # The controller last, so its device runtime stays the last plugin loaded.
+        ordered = sorted(nodes, key=lambda n: n is placement.controller)
+        plugins, deploy = [], []
+        for node in ordered:
+            options = _executor_options(node, node.executor_options)
+            plugins += [p for p in options["plugins"] if p not in plugins]
+            deploy += [d for d in options.get("deploy", []) if d not in deploy]
+        for node in nodes:
+            _check_machine_agrees(node, first.get("host"), address=first.get("address"))
+        names = "+".join(n.name or "node" for n in nodes)
+        executor = Executor(**{**first, "name": names, "plugins": plugins, "deploy": deploy})
+        executor.resolve()
+        for node in nodes:
+            object.__setattr__(node, "executor", executor)  # cache on the (frozen) node
+
+
 def _realize_executor(node: Node) -> Executor | None:
     """The node's executor, built from its ``executor_options`` on first use and cached on it.
 
@@ -526,15 +619,7 @@ def _realize_executor(node: Node) -> Executor | None:
         return executor
     if options is None:
         return None
-    options = dict(options)
-
-    options.setdefault("name", node.name or "executor")
-    options["plugins"] = _executor_plugins(node, options.get("plugins") or ())
-    fn_lib = _coprocessor_fn_lib(node)
-    if fn_lib is not None and node.remote:
-        # Named by filename among the plugins above, which resolves against the workspace -- so on
-        # another machine the file has to travel there alongside whatever else is deployed.
-        options["deploy"] = [*options.get("deploy", []), str(fn_lib)]
+    options = _executor_options(node, options)
     _check_machine_agrees(node, options.get("host"), address=options.get("address"))
     if options.get("host") and options.get("port") is None:
         raise CompileError(
@@ -783,5 +868,6 @@ def settle_executors(placement: Placement) -> None:
     A compiled program carries those addresses, so they are settled before it is built. Deployment
     waits until :func:`launch_executors`, so this costs no ssh.
     """
+    _share_executors(placement)
     for node in (placement.controller, *placement.coprocessors):
         _realize_executor(node)
