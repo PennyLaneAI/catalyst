@@ -87,6 +87,29 @@ class SSHArgv:
             return None
         return path
 
+    _option_support: dict[str, bool] = {}
+
+    @staticmethod
+    def supports_option(option: str) -> bool:
+        """Whether the local ``ssh`` accepts ``-o <option>``, such as one an older OpenSSH lacks.
+
+        Asks ``ssh -G``, which parses the options and prints the configuration without connecting.
+        The answer is cached per option.
+        """
+        if option not in SSHArgv._option_support:
+            try:
+                rc = subprocess.run(
+                    ["ssh", "-G", "-o", option, "localhost"],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    timeout=10,
+                    check=False,
+                ).returncode
+            except (OSError, subprocess.TimeoutExpired):
+                rc = 1
+            SSHArgv._option_support[option] = rc == 0
+        return SSHArgv._option_support[option]
+
     @staticmethod
     def ctl_opts() -> list[str]:
         """``ControlMaster``/``ControlPath``/``ControlPersist`` flags for connection multiplexing.
@@ -433,7 +456,13 @@ class RemoteLauncher:
     @staticmethod
     def _ssh_opts(port: int, use_password: bool) -> list[str]:
         """Local-side ssh options for the port-forward. ``-tt`` on NOPASSWD so SSH close
-        SIGHUPs the executor; omitted with a password so ``sudo -S`` sees an unechoed pipe."""
+        SIGHUPs the executor; omitted with a password so ``sudo -S`` sees an unechoed pipe.
+
+        With ``-tt`` the session is interactive, and OpenSSH 9.5 and later then send its traffic
+        at fixed intervals (``ObscureKeystrokeTiming``, every 20 ms by default), which would delay
+        every message to and from the executor. The forward turns that off where ``ssh`` supports
+        it.
+        """
         opts = [
             "-o",
             "ExitOnForwardFailure=yes",
@@ -442,6 +471,8 @@ class RemoteLauncher:
         ]
         if not use_password:
             opts = ["-tt"] + opts
+            if SSHArgv.supports_option("ObscureKeystrokeTiming=no"):
+                opts = ["-o", "ObscureKeystrokeTiming=no"] + opts
         return opts
 
     @staticmethod
