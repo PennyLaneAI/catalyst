@@ -49,7 +49,11 @@
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/TargetSelect.h"
 
+#include "WholeMessageFDTransport.hpp"
+
 #include <netdb.h>
+#include <netinet/in.h>
+#include <netinet/tcp.h>
 #include <unistd.h>
 
 using namespace llvm;
@@ -82,50 +86,6 @@ void initialize_targets() {
     }();
     (void)inited;
 }
-
-// FDSimpleRemoteEPCTransport whose disconnect() also shutdown()s the socket, to avoid a
-// teardown deadlock.
-//
-// SimpleRemoteEPC::disconnect() (via ExecutionSession::endSession()) closes the transport, then
-// waits for the listener thread to observe EOF. The stock transport only close()s the fd, but the
-// listener's in-flight read() keeps the socket alive — so close() neither wakes that read nor
-// sends a FIN, and the wait blocks forever (the peer never sees EOF either).
-//
-// shutdown(SHUT_RDWR) forces the read() to return and sends the FIN. We do it in disconnect() so
-// it runs only after endSession() has finished its own messaging (e.g. freeing JIT'd memory).
-class ShutdownFDTransport : public SimpleRemoteEPCTransport {
-  public:
-    static Expected<std::unique_ptr<ShutdownFDTransport>> Create(SimpleRemoteEPCTransportClient &C,
-                                                                 int InFD, int OutFD) {
-        auto Inner = FDSimpleRemoteEPCTransport::Create(C, InFD, OutFD);
-        if (!Inner) {
-            return Inner.takeError();
-        }
-        return std::make_unique<ShutdownFDTransport>(std::move(*Inner), InFD, OutFD);
-    }
-
-    ShutdownFDTransport(std::unique_ptr<FDSimpleRemoteEPCTransport> inner, int inFD, int outFD)
-        : Inner(std::move(inner)), InFD(inFD), OutFD(outFD) {}
-
-    Error start() override { return Inner->start(); }
-
-    Error sendMessage(SimpleRemoteEPCOpcode OpC, uint64_t SeqNo, ExecutorAddr TagAddr,
-                      ArrayRef<char> ArgBytes) override {
-        return Inner->sendMessage(OpC, SeqNo, TagAddr, ArgBytes);
-    }
-
-    void disconnect() override {
-        ::shutdown(InFD, SHUT_RDWR);
-        if (OutFD != InFD) {
-            ::shutdown(OutFD, SHUT_RDWR);
-        }
-        Inner->disconnect();
-    }
-
-  private:
-    std::unique_ptr<FDSimpleRemoteEPCTransport> Inner;
-    int InFD, OutFD;
-};
 
 // For avoiding the error message being overwritten by subsequent errors in async jobs.
 // We use thread_local to store the error message.
@@ -204,6 +164,12 @@ Expected<int> connectTCPSocket(std::string Host, std::string PortStr) {
     if (Server == nullptr) {
         return createTCPSocketError(std::strerror(errno));
     }
+
+    // Each EPC message is a small header write, then its payload. Without TCP_NODELAY, Nagle's
+    // algorithm holds the payload until the header is acknowledged, which a delayed ACK stalls for
+    // up to 40 ms, several times per remote call.
+    int NoDelay = 1;
+    setsockopt(SockFD, IPPROTO_TCP, TCP_NODELAY, &NoDelay, sizeof(NoDelay));
 
     return SockFD;
 }
@@ -320,11 +286,12 @@ struct ExecutorSession {
             });
         }
 
-        // ShutdownFDTransport instead of FDSimpleRemoteEPCTransport so teardown shutdown()s the
-        // socket and doesn't deadlock
-        auto EPC = SimpleRemoteEPC::Create<ShutdownFDTransport>(
+        // SimpleRemoteEPC::disconnect() (via ExecutionSession::endSession()) closes the transport,
+        // then waits for the listener thread to see EOF, so the transport shutdown()s the socket on
+        // disconnect: close() alone would leave the listener's read() blocked and teardown hung.
+        auto EPC = SimpleRemoteEPC::Create<catalyst::executor::WholeMessageFDTransport>(
             std::make_unique<DynamicThreadPoolTaskDispatcher>(std::nullopt), std::move(setup),
-            sockFd, sockFd);
+            sockFd, sockFd, /*shutdownOnDisconnect=*/true);
 
         if (watchdog.joinable()) {
             {

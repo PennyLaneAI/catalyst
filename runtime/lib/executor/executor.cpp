@@ -65,8 +65,11 @@
 #include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/raw_ostream.h"
 
+#include "WholeMessageFDTransport.hpp"
+
 #include <netdb.h>
 #include <netinet/in.h>
+#include <netinet/tcp.h>
 #include <signal.h>
 #include <unistd.h>
 
@@ -350,6 +353,10 @@ void finalizeCatalystRuntime(const std::string &GLabel) {
             std::fprintf(stderr, "[%s] accept failed: %s\n", Label.c_str(), std::strerror(errno));
             ::_exit(1);
         }
+        // Replies are small header and payload writes. TCP_NODELAY keeps Nagle's algorithm from
+        // holding each payload for the client's delayed ACK.
+        int NoDelay = 1;
+        setsockopt(CSock, IPPROTO_TCP, TCP_NODELAY, &NoDelay, sizeof(NoDelay));
 
         pid_t pid = ::fork();
         if (pid < 0) {
@@ -367,8 +374,8 @@ void finalizeCatalystRuntime(const std::string &GLabel) {
             ExitOnError ExitOnErr;
             ExitOnErr.setBanner("CatalystExecutor[" + GLabel + "]: ");
             {
-                std::unique_ptr<SimpleRemoteEPCServer> Server =
-                    ExitOnErr(SimpleRemoteEPCServer::Create<FDSimpleRemoteEPCTransport>(
+                std::unique_ptr<SimpleRemoteEPCServer> Server = ExitOnErr(
+                    SimpleRemoteEPCServer::Create<catalyst::executor::WholeMessageFDTransport>(
                         setupCatalystServer, CSock, CSock));
                 ExitOnErr(Server->waitForDisconnect());
             }
