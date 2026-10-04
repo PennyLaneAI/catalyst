@@ -188,10 +188,11 @@ class ControllerSession : public TransportSession {
 /**
  * @brief Per-message coprocessor function (CPU-style). Invoked once per received
  * message: decode `in` (`in_len` bytes) into `out` (capacity `out_cap`) and
- * return the number of bytes written.
+ * return 0 on success or a nonzero status code on failure. The transport gets
+ * the reply length from the output size configured for the session.
  */
-using CoprocessorFn = std::size_t (*)(const void *in, std::size_t in_len, void *out,
-                                      std::size_t out_cap, void *ctx);
+using CoprocessorFn = int (*)(const void *in, std::size_t in_len, void *out, std::size_t out_cap,
+                              void *ctx);
 
 /**
  * @brief Data description for a persistent engine to receive and consume

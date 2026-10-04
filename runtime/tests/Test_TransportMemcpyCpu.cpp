@@ -28,8 +28,8 @@ using namespace catalyst::transport::memcpy;
 
 // Provided by libsteane_coprocessor_cpu — the same CoprocessorFn plugin production
 // dlopens. Linking it in lets the test exercise a real decoder end-to-end.
-extern "C" std::size_t steane_coprocessor(const void *in, std::size_t in_len, void *out,
-                                          std::size_t out_cap, void *ctx);
+extern "C" int steane_coprocessor(const void *in, std::size_t in_len, void *out,
+                                  std::size_t out_cap, void *ctx);
 
 namespace {
 // Per-test pair keys. Matching keys between the controller and its paired coprocessor is what
@@ -37,15 +37,16 @@ namespace {
 // compile time as the `key` attribute on each transport.create.
 std::string pair_cfg(std::uint16_t port) { return "pair=p" + std::to_string(port); }
 
-std::size_t invert_fn(const void *in, std::size_t in_len, void *out, std::size_t out_cap,
-                      void * /*ctx*/) {
+int invert_fn(const void *in, std::size_t in_len, void *out, std::size_t out_cap, void * /*ctx*/) {
     std::uint64_t v = 0;
     std::memcpy(&v, in, std::min(in_len, sizeof(v)));
     v = ~v;
     const std::size_t n = std::min(out_cap, sizeof(v));
     std::memcpy(out, &v, n);
-    return n;
+    return 0;
 }
+
+int failing_fn(const void *, std::size_t, void *, std::size_t, void *) { return 1; }
 } // namespace
 
 TEST_CASE("memcpy round-trip echoes through peer memory", "[transport_memcpy]") {
@@ -116,6 +117,17 @@ TEST_CASE("memcpy uses the bound coprocessor function", "[transport_memcpy]") {
     REQUIRE(controller.collect(outs, out_bytes, 1) == 0);
 
     CHECK(reply_word == ~request_word);
+}
+
+TEST_CASE("memcpy treats the coprocessor return value as a status code", "[transport_memcpy]") {
+    CpuCoprocessorSession coprocessor("pair=status-code");
+    coprocessor.set_coprocessor_fn(failing_fn, nullptr);
+    coprocessor.start();
+
+    common::Payload request{};
+    std::uint64_t reply = 0;
+    REQUIRE_THROWS_AS(coprocessor.process_message(&request, sizeof(request), &reply, sizeof(reply)),
+                      std::runtime_error);
 }
 
 TEST_CASE("memcpy round-trip drives the steane decoder plugin", "[transport_memcpy]") {

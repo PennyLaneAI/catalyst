@@ -129,16 +129,18 @@ int CpuControllerSession::kick(std::uint32_t work_item_idx) {
     frame.seq_num = static_cast<std::uint32_t>(next_send_ + 1);
     ++next_send_;
 
-    std::size_t reply_bytes = 0;
+    int status = 0;
     {
         // Held across check and call so teardown can't clear process_message mid-call.
         std::lock_guard<std::mutex> lock(link_->mu);
         TP_CHECK(link_->process_message, "No paired coprocessor");
-        reply_bytes = link_->process_message(&frame, sizeof(frame), local_reply_.addr,
-                                             static_cast<std::size_t>(out_bytes_));
+        status = link_->process_message(&frame, sizeof(frame), local_reply_.addr,
+                                        static_cast<std::size_t>(out_bytes_));
     }
-    reply_bytes_ = static_cast<std::uint64_t>(reply_bytes);
-    return 0;
+    if (status == 0) {
+        reply_bytes_ = out_bytes_;
+    }
+    return status;
 }
 
 void *CpuControllerSession::data_slot() {
