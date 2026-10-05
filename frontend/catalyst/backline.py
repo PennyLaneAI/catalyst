@@ -290,6 +290,19 @@ def _coprocessor_fn_config(fn, placement: Placement, in_workspace: bool = False)
     library exports as ``<symbol>_info`` (see ``CatalystCoprocessorFnInfo`` in
     ``TransportABI.h``). ``in_bytes`` and ``out_bytes`` are reserved for the message sizes, so a
     function's own config must not set them.
+
+    Args:
+        fn (CoprocessorFunction): the coprocessor function whose config is built
+        placement (Placement): the placement whose message sizes are added
+        in_workspace (bool): whether the function's declared files are named by their place in
+            the executor's workspace rather than by their path on this machine
+
+    Returns:
+        str: the ``fn.``-prefixed ``key=value;...`` entries
+
+    Raises:
+        CompileError: If an entry of the function's own config is not of the form ``key=value``,
+            or sets ``in_bytes`` or ``out_bytes``.
     """
     config = getattr(fn, "config", "") or ""
     entries = []
@@ -463,7 +476,14 @@ def _check_builtin_fn_lib(coproc: Node) -> None:
 
 
 def _declared_file_keys(fn) -> tuple[str, ...]:
-    """The config keys whose values ``fn`` declares to be local files (its ``files``)."""
+    """The config keys whose values ``fn`` declares to be local files (its ``files``).
+
+    Args:
+        fn (CoprocessorFunction or None): the coprocessor function, or ``None`` for a node with none
+
+    Returns:
+        tuple[str]: the declared keys, empty when the function declares none
+    """
     return tuple(getattr(fn, "files", ()) or ())
 
 
@@ -471,6 +491,12 @@ def _coprocessor_fn_files(node: Node) -> list[str]:
     """The local files a node's coprocessor function declares, for deployment beside the function
     on another machine: the values of the config keys in its ``files``, then its ``extra_files``.
     Empty for a node with no such function.
+
+    Args:
+        node (Node): the coprocessor whose function's files are listed
+
+    Returns:
+        list[str]: the paths of the files, in that order
 
     Raises:
         CompileError: If a declared path is not a file on this machine.
@@ -499,6 +525,13 @@ def _check_deploy_names(deploy: list[str], who: str) -> None:
 
     A deployment places every file directly in the executor's workspace, so two such files would
     overwrite each other there, and a config naming one would read the other.
+
+    Args:
+        deploy (list[str]): the files and directories an executor deploys
+        who (str): the node or nodes the executor serves, as the error message names them
+
+    Raises:
+        CompileError: If two different files share a filename.
     """
     seen: dict[str, str] = {}
     for item in deploy:
@@ -560,7 +593,19 @@ def _executor_plugins(node: Node, given) -> list[str]:
 
 def _executor_options(node: Node, options: dict) -> dict:
     """``options`` completed for ``node``: its name, the plugins it needs, and, for a node on
-    another machine, its coprocessor function's library and files in the deployment."""
+    another machine, its coprocessor function's library and files in the deployment.
+
+    Args:
+        node (Node): the node the executor runs
+        options (dict): the node's ``executor_options``
+
+    Returns:
+        dict: a completed copy of ``options``
+
+    Raises:
+        CompileError: If the node's coprocessor function declares a file that is missing, or two
+            deployed files share a filename.
+    """
     options = dict(options)
     options.setdefault("name", node.name or "executor")
     options["plugins"] = _executor_plugins(node, options.get("plugins") or ())
@@ -580,6 +625,9 @@ def _share_executors(placement: Placement) -> None:
     Such nodes run in one ``catalyst-executor`` process, which is what lets the memcpy transport
     pair a controller and a coprocessor on another machine. The shared executor loads every plugin
     and deploys every file the nodes need. Their other options must agree.
+
+    Args:
+        placement (Placement): the placement whose nodes' executors are shared
 
     Raises:
         CompileError: If nodes sharing an executor disagree on an option other than ``name``,

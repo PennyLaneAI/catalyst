@@ -95,6 +95,12 @@ class SSHArgv:
 
         Asks ``ssh -G``, which parses the options and prints the configuration without connecting.
         The answer is cached per option.
+
+        Args:
+            option (str): the option, as ``Name=value``
+
+        Returns:
+            bool: whether ``ssh`` accepts it
         """
         if option not in SSHArgv._option_support:
             try:
