@@ -311,6 +311,9 @@ def handle_qnode(
         )
         pipelines += (("device", device_preprocessing_pipeline),)
 
+    # Add the post-device pipeline, which contains optional Resource Analysis passes used through `qp.analyze`
+    pipelines += (("post-device", qnode.post_device_pipeline),)
+
     # no idea what deduce_avals is doing, but this seems to make dynamic shapes work
     flattened_fn = deduce_avals(
         calling_convention, non_const_args, {}, [], debug_info=qfunc_jaxpr.debug_info
