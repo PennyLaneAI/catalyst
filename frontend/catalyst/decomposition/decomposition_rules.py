@@ -1402,7 +1402,7 @@ def walk_reachable_decomp_rule_sets(
     """
 
     queue = deque(
-        (request, required_states, frozenset({request.base_id}))
+        (request, required_states, {request.base_id: request.control_count})
         for request, required_states in initial_requests
     )
 
@@ -1420,7 +1420,7 @@ def walk_reachable_decomp_rule_sets(
         return children
 
     while queue:
-        request, demanded_states, ancestors = queue.popleft()
+        request, demanded_states, path_control_counts = queue.popleft()
         demanded_states = set(demanded_states)
         previous_states = processed_states.setdefault(request.base_id, set())
         missing_states = demanded_states - previous_states
@@ -1432,18 +1432,24 @@ def walk_reachable_decomp_rule_sets(
         target_specs.extend(new_specs)
 
         for child in child_requests(new_specs):
-            # A controlled self-cycle can otherwise manufacture an unbounded sequence of control
-            # counts. Allow the first transition from an uncontrolled ancestor, as well as
-            # adjoint changes and non-increasing control counts, but stop a controlled path when
-            # returning to an ancestor with still more controls.
+            # A control-changing cycle can otherwise manufacture an unbounded sequence of modifier
+            # counts. Compare with the same base identity earlier on this path, rather than the
+            # direct parent: intermediate operators may absorb their controls into their identity.
+            # The first uncontrolled-to-controlled revisit remains valid.
+            previous_control_count = path_control_counts.get(child.base_id)
             increases_control_cycle = (
-                child.base_id in ancestors
-                and request.control_count > 0
-                and child.control_count > request.control_count
+                previous_control_count is not None
+                and previous_control_count > 0
+                and child.control_count > previous_control_count
             )
             if increases_control_cycle:
                 continue
-            queue.append((child, {child.modifier_state}, ancestors | frozenset({child.base_id})))
+
+            child_path_control_counts = path_control_counts.copy()
+            child_path_control_counts[child.base_id] = max(
+                previous_control_count or 0, child.control_count
+            )
+            queue.append((child, {child.modifier_state}, child_path_control_counts))
 
     return target_specs
 
