@@ -39,7 +39,13 @@ def DecomposeLoweringPass : Pass<"decompose-lowering"> {
             /*C++ name*/"targetRulesOption",
             /*CLI name*/"target-rules",
             /*Type*/"std::string",
-            /*Description*/"The set of decomposition rules to apply. If empty, applies all rules.">
+            /*Description*/"The set of decomposition rules to apply. If empty, applies all rules.">,
+            Option<
+            /*C++ name*/"inlineRuleBody",
+            /*CLI name*/"inline-rule-body",
+            /*Type*/"bool",
+            /*Default*/[{ false }],
+            /*Description*/"Whether to inline the rule body. Defaults to false.">
     ];
 }
 

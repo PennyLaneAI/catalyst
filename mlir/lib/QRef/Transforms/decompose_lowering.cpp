@@ -157,7 +157,7 @@ struct DecomposeLoweringPass : impl::DecomposeLoweringPassBase<DecomposeLowering
         RewritePatternSet decompositionPatterns(&getContext());
         SymbolTable moduleSymbolTable(module);
         populateDecomposeLoweringPatterns(decompositionPatterns, decompositionRegistry,
-                                          targetGateSet, moduleSymbolTable);
+                                          inlineRuleBody, targetGateSet, moduleSymbolTable);
         if (failed(applyPatternsGreedily(module, std::move(decompositionPatterns)))) {
             return signalPassFailure();
         }

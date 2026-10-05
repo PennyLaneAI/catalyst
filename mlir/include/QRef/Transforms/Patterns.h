@@ -28,7 +28,7 @@ namespace catalyst {
 namespace qref {
 
 void populateDecomposeLoweringPatterns(mlir::RewritePatternSet &,
-                                       const llvm::StringMap<mlir::func::FuncOp> &,
+                                       const llvm::StringMap<mlir::func::FuncOp> &, bool,
                                        const llvm::StringSet<llvm::MallocAllocator> &,
                                        mlir::SymbolTable &);
 

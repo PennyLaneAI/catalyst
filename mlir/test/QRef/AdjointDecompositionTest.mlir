@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: quantum-opt --decompose-lowering --split-input-file -verify-diagnostics %s | FileCheck %s
+// RUN: quantum-opt --decompose-lowering=inline-rule-body --split-input-file -verify-diagnostics %s | FileCheck %s
 
 
 /// Self-adjoint basis gate: Adjoint(H) -> H (the modifier is dropped).
