@@ -21,7 +21,6 @@
 #pragma once
 
 #include <cstddef>
-#include <cstdint>
 #include <functional>
 #include <limits>
 #include <string>
@@ -117,17 +116,6 @@ struct RuleTerm {
 };
 
 /**
- * @brief This represents the origin of a decomposition rule.
- *
- * This enum is used to categorize decomposition rules based on their source or type:
- * - Default: The default rule for decomposing an operator as defined in the decomposition
- * graph.
- * - Fixed: A fixed rule that cannot be changed or overridden by the solver.
- * - Alternative: An alternative rule that can be used in place of the default rule.
- */
-enum class RuleOrigin : uint8_t { Default = 0, Fixed = 1, Alternative = 2 };
-
-/**
  * @brief This represents the decomposition rules in the graph decomposition problem.
  *
  * The RuleNode struct captures the essential information about a decomposition rule, including
@@ -148,26 +136,13 @@ struct RuleNode {
     std::string name;
     OperatorNode output;
     std::vector<RuleTerm> inputs;
-    RuleOrigin origin{RuleOrigin::Default};
 
     bool operator==(const RuleNode &other) const {
-        return name == other.name && output == other.output && origin == other.origin;
+        return name == other.name && output == other.output;
     }
 
     bool isEmpty() const { return inputs.empty(); }
 };
-
-/**
- * @brief This represents the mapping from operators to their fixed decomposition rules,
- * which are rules that cannot be changed or overridden by the solver.
- */
-using FixedDecomps = std::unordered_map<OperatorNode, RuleNode, OperatorNodeHash>;
-
-/**
- * @brief This represents the mapping from operators to their alternative decomposition rules,
- * which are rules that can be used in place of the default rule.
- */
-using AltDecomps = std::unordered_map<OperatorNode, std::vector<RuleNode>, OperatorNodeHash>;
 
 /**
  * @brief This represents the chosen decomposition rule for an operator in
