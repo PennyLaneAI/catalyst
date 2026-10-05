@@ -12,23 +12,28 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{gate-set=testHadamard=1.0 alt-decomps=Adjoint(testU){}{wires:1}{}=adj_u,Adjoint(testHadamard){}{wires:1}{}=adj_h})' %s | FileCheck %s
+// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{gate-set=testHadamard=1.0 alt-decomps=Adjoint(testU){}{wires:1}{}=adj_u,Adjoint(testHadamard){}{wires:1}{}=adj_h})' %s | FileCheck %s --check-prefixes=ALL,CALL
 
-// CHECK-LABEL: func.func @self_adjoint(
-// CHECK-SAME:  [[Q:%.+]]: !quantum.bit
+// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{inline-rule-body gate-set=testHadamard=1.0 alt-decomps=Adjoint(testU){}{wires:1}{}=adj_u,Adjoint(testHadamard){}{wires:1}{}=adj_h})' %s | FileCheck %s --check-prefixes=ALL,INLINE
+
+
+// ALL-LABEL: func.func @self_adjoint(
+// ALL-SAME:  [[Q:%.+]]: !quantum.bit
 func.func @self_adjoint(%q: !quantum.bit) -> !quantum.bit {
-  // CHECK: [[O:%.+]] = quantum.custom "testHadamard"() [[Q]] : !quantum.bit
-  // CHECK: return [[O]]
+  // CALL: [[O:%.+]] = call @adj_h_1([[Q]])
+  // INLINE: [[O:%.+]] = quantum.custom "testHadamard"() [[Q]] : !quantum.bit
+  // ALL: return [[O]]
   %out = quantum.custom "testHadamard"() %q adj : !quantum.bit
   return %out: !quantum.bit
 }
 
-// CHECK-LABEL: func.func @distribution(
-// CHECK-SAME:  [[Q:%.+]]: !quantum.bit
+// ALL-LABEL: func.func @distribution(
+// ALL-SAME:  [[Q:%.+]]: !quantum.bit
 func.func @distribution(%q: !quantum.bit) -> !quantum.bit {
-  // CHECK: [[A:%.+]] = quantum.custom "testHadamard"() [[Q]] : !quantum.bit
-  // CHECK: [[B:%.+]] = quantum.custom "testHadamard"() [[A]] : !quantum.bit
-  // CHECK: return [[B]]
+  // CALL: [[B:%.+]] = call @adj_u_0([[Q]])
+  // INLINE: [[A:%.+]] = quantum.custom "testHadamard"() [[Q]] : !quantum.bit
+  // INLINE: [[B:%.+]] = quantum.custom "testHadamard"() [[A]] : !quantum.bit
+  // ALL: return [[B]]
   %out = quantum.custom "testU"() %q adj : !quantum.bit
   return %out: !quantum.bit
 }
@@ -47,3 +52,10 @@ func.func private @adj_u(%q: !quantum.bit) -> !quantum.bit attributes {
   %b = quantum.custom "testHadamard"() %a adj : !quantum.bit
   return %b : !quantum.bit
 }
+
+// CALL: func.func private @adj_u_0
+// CALL:   call @adj_h_1
+// CALL:   call @adj_h_1
+//
+// CALL: func.func private @adj_h_1
+// CALL:   quantum.custom "testHadamard"()
