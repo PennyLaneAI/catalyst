@@ -29,6 +29,7 @@ import pennylane as qp
 from jax.core import eval_jaxpr
 from jax.tree_util import tree_flatten, tree_unflatten
 from pennylane import exceptions
+from pennylane.logging import debug_logger
 from pennylane.measurements import CountsMP, ExpectationMP, ProbabilityMP, SampleMP, VarianceMP
 from pennylane.transforms.dynamic_one_shot import (
     gather_non_mcm,
@@ -44,7 +45,6 @@ from catalyst.jax_extras import deduce_avals, get_implicit_and_explicit_flat_arg
 from catalyst.jax_extras.tracing import uses_transform
 from catalyst.jax_primitives import quantum_kernel_p
 from catalyst.jax_tracer import Function, trace_quantum_function
-from catalyst.logging import debug_logger
 from catalyst.passes.pass_api import dict_to_compile_pipeline
 from catalyst.tracing.contexts import EvaluationContext
 from catalyst.tracing.type_signatures import filter_static_args
@@ -636,7 +636,15 @@ def _extract_passes(transform_program):
     pass_pipeline = []
     i = len(transform_program)
     for t in reversed(transform_program):
-        if t.pass_name is None:
+        # ``qp.decompose`` carries ``pass_name="graph-decomposition"`` so that, under program
+        # capture, it routes to the C++ ``graph-decomposition`` pass. That pass relies on
+        # capture-time rule embedding, which the legacy (non-capture) frontend does not provide.
+        # ``qp.decompose`` always has a tape definition, so here we fall back to running it as an
+        # ordinary tape transform (its pre-migration behavior). The explicit
+        # ``catalyst.passes.graph_decomposition`` entry point is pass-only (no tape definition) and
+        # continues to be lowered as a pass.
+        is_capture_only_pass = t.pass_name == "graph-decomposition" and t.tape_transform is not None
+        if t.pass_name is None or is_capture_only_pass:
             break
         i -= 1
     pass_pipeline = transform_program[i:]
