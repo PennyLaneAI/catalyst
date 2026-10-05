@@ -112,8 +112,8 @@ std::size_t element_bytes(ONNXTensorElementDataType type) {
 // The onnxruntime environment of the library `api` belongs to, created on first use and kept for
 // the life of the process. onnxruntime has one environment per process, shared by every user of the
 // library, including its Python package: releasing it, or unloading the library, while another user
-// holds sessions leaves them with freed state (a later MIGraphX session then crashes). So no context
-// releases it, and the library is never unloaded.
+// holds sessions leaves them with freed state (a later MIGraphX session then crashes). So no
+// context releases it, and the library is never unloaded.
 OrtEnv *shared_env(const OrtApi *api) {
     static std::mutex mutex;
     static std::map<const OrtApi *, OrtEnv *> envs;
