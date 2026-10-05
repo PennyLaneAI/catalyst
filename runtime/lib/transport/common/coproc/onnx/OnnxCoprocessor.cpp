@@ -49,7 +49,9 @@
 #include <dlfcn.h>
 #include <filesystem>
 #include <iostream>
+#include <map>
 #include <memory>
+#include <mutex>
 #include <optional>
 #include <stdexcept>
 #include <string>
@@ -105,6 +107,27 @@ std::size_t element_bytes(ONNXTensorElementDataType type) {
         throw std::runtime_error("unsupported ONNX tensor element type " +
                                  std::to_string(static_cast<int>(type)));
     }
+}
+
+// The onnxruntime environment of the library `api` belongs to, created on first use and kept for
+// the life of the process. onnxruntime has one environment per process, shared by every user of the
+// library, including its Python package: releasing it, or unloading the library, while another user
+// holds sessions leaves them with freed state (a later MIGraphX session then crashes). So no context
+// releases it, and the library is never unloaded.
+OrtEnv *shared_env(const OrtApi *api) {
+    static std::mutex mutex;
+    static std::map<const OrtApi *, OrtEnv *> envs;
+    std::lock_guard<std::mutex> lock(mutex);
+    OrtEnv *&env = envs[api];
+    if (!env) {
+        if (OrtStatus *status = api->CreateEnv(ORT_LOGGING_LEVEL_WARNING, "catalyst", &env)) {
+            std::string message = api->GetErrorMessage(status);
+            api->ReleaseStatus(status);
+            envs.erase(api);
+            throw std::runtime_error(message);
+        }
+    }
+    return env;
 }
 
 class OnnxCoprocessor {
@@ -168,7 +191,7 @@ class OnnxCoprocessor {
                                      std::to_string(ORT_API_VERSION) + " or newer is required");
         }
 
-        check(api_->CreateEnv(ORT_LOGGING_LEVEL_WARNING, "catalyst", &env_));
+        env_ = shared_env(api_);
         OrtSessionOptions *options = nullptr;
         check(api_->CreateSessionOptions(&options));
         try {
@@ -204,13 +227,8 @@ class OnnxCoprocessor {
             if (session_) {
                 api_->ReleaseSession(session_);
             }
-            if (env_) {
-                api_->ReleaseEnv(env_);
-            }
         }
-        if (handle_) {
-            dlclose(handle_);
-        }
+        // The environment and the library stay for the life of the process (see shared_env).
     }
 
     OnnxCoprocessor(const OnnxCoprocessor &) = delete;

@@ -537,6 +537,34 @@ TEST_CASE("the ONNX coprocessor function runs a model", "[transport]") {
     onnx_info().fini(ctx);
 }
 
+TEST_CASE("an ONNX coprocessor function outlives the other contexts of its onnxruntime",
+          "[transport]") {
+    const char *ort_lib = std::getenv("CATALYST_TEST_ONNXRUNTIME_LIB");
+    if (!ort_lib || !*ort_lib) {
+        SKIP("set CATALYST_TEST_ONNXRUNTIME_LIB to an onnxruntime shared library");
+    }
+    CerrCapture cerr;
+    const std::string config = kModel + ";provider=cpu;ort_lib=" + std::string(ort_lib);
+    std::uint8_t frame[16] = {1, 2, 3, 4, 5, 6, 7, 8, 0, 0, 0, 0, 1, 0, 0, 0};
+    std::uint8_t reply[8] = {};
+
+    void *first = onnx_info().init(config.c_str());
+    void *second = onnx_info().init(config.c_str());
+    REQUIRE(first != nullptr);
+    REQUIRE(second != nullptr);
+    onnx_info().fini(first);
+    CHECK(catalyst_onnx_coprocessor(frame, sizeof(frame), reply, sizeof(reply), second) == 8);
+    onnx_info().fini(second);
+
+    // A context created after every earlier one has finished starts and runs as the first did.
+    void *third = onnx_info().init(config.c_str());
+    REQUIRE(third != nullptr);
+    std::memset(reply, 0, sizeof(reply));
+    CHECK(catalyst_onnx_coprocessor(frame, sizeof(frame), reply, sizeof(reply), third) == 8);
+    CHECK(std::memcmp(reply, frame, 8) == 0);
+    onnx_info().fini(third);
+}
+
 TEST_CASE("the ONNX coprocessor function requires the message sizes to match its model",
           "[transport]") {
     const char *ort_lib = std::getenv("CATALYST_TEST_ONNXRUNTIME_LIB");
