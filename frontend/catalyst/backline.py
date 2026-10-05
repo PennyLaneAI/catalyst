@@ -84,13 +84,6 @@ _DEFAULT_MESSAGE_BYTES = 8
 # The keys a coprocessor function's ``init`` receives the placement's message sizes under.
 _FN_MESSAGE_SIZE_KEYS = ("in_bytes", "out_bytes")
 
-# Companion files that travel with a file a coprocessor function declares (its
-# ``CoprocessorFunction.files``), by function, then by config key, as a glob of the files beside it.
-# onnxruntime loads its execution providers from its own directory, so they travel with ``ort_lib``.
-_COPROCESSOR_FN_FILE_COMPANIONS = {
-    "catalyst_onnx_coprocessor": {"ort_lib": "libonnxruntime*"},
-}
-
 
 def _resolve_backend(transport: str, hardware: str) -> str:
     """Return Catalyst's concrete backend for a transport and hardware pair."""
@@ -475,30 +468,29 @@ def _declared_file_keys(fn) -> tuple[str, ...]:
 
 
 def _coprocessor_fn_files(node: Node) -> list[str]:
-    """The local files a node's coprocessor function declares (``CoprocessorFunction.files``),
-    with their companions (:data:`_COPROCESSOR_FN_FILE_COMPANIONS`), for deployment beside the
-    function on another machine. Empty for a node with no such function.
+    """The local files a node's coprocessor function declares, for deployment beside the function
+    on another machine: the values of the config keys in its ``files``, then its ``extra_files``.
+    Empty for a node with no such function.
 
     Raises:
-        CompileError: If a declared value is not a file on this machine.
+        CompileError: If a declared path is not a file on this machine.
     """
     fn = getattr(node, "coprocessor_fn", None)
     keys = _declared_file_keys(fn)
-    companions = _COPROCESSOR_FN_FILE_COMPANIONS.get(getattr(fn, "symbol_name", None), {})
-    files = []
+    named = []
     for entry in filter(None, (getattr(fn, "config", "") or "").split(";")):
         key, _, value = entry.partition("=")
-        if key not in keys:
-            continue
-        path = Path(value)
-        if not path.is_file():
+        if key in keys:
+            named.append((f"{key}={value}", value))
+    named += [(path, path) for path in getattr(fn, "extra_files", ()) or ()]
+    files = []
+    for what, value in named:
+        if not Path(value).is_file():
             raise CompileError(
-                f"coprocessor function {fn.symbol_name!r} of {node.name!r} names {key}={value}, "
-                f"which is not a file on this machine, so it cannot be deployed with its executor"
+                f"coprocessor function {fn.symbol_name!r} of {node.name!r} declares {what}, which "
+                f"is not a file on this machine, so it cannot be deployed with its executor"
             )
-        files.append(str(path))
-        if glob := companions.get(key):
-            files += [str(c) for c in sorted(path.parent.glob(glob)) if c != path]
+        files.append(str(Path(value)))
     return files
 
 

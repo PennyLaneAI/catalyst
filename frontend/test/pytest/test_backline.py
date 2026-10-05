@@ -256,9 +256,13 @@ def onnx_files(tmp_path, monkeypatch):
 
 
 def test_a_remote_onnx_coprocessor_deploys_its_files_and_names_them_in_the_workspace(onnx_files):
-    """The model, onnxruntime and its providers travel with the executor, named by filename."""
+    """The declared model and onnxruntime, and the extra provider library, travel with the
+    executor, the declared ones renamed to their place in its workspace."""
     fn = qp.CoprocessorFunction(
-        "catalyst_onnx_coprocessor", config=onnx_files.config, files=("model", "ort_lib")
+        "catalyst_onnx_coprocessor",
+        config=onnx_files.config,
+        files=("model", "ort_lib"),
+        extra_files=(str(onnx_files.ort_dir / "libonnxruntime_providers_migraphx.so"),),
     )
     coproc = qp.Coprocessor(
         name="gpu0",
