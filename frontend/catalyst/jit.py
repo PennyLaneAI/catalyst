@@ -537,6 +537,12 @@ def qjit(
     if fn is None:
         return functools.partial(qjit, **kwargs)
 
+    if isinstance(fn, qp.tape.QuantumScript):
+        raise TypeError(
+            "qjit cannot compile a tape. Tapes, such as those produced by qp.flatten, are a "
+            "one-way exit from the qjit pipeline; execute them with qp.execute instead."
+        )
+
     return QJIT(fn, CompileOptions(**kwargs))
 
 
