@@ -18,6 +18,7 @@
 
 #include "DGSolver.hpp"
 
+#include <algorithm>
 #include <optional>
 #include <string>
 #include <unordered_set>
@@ -74,6 +75,7 @@ ChosenDecompRule DecompositionSolver::evalRule(const RuleNode &rule) {
 ChosenDecompRule DecompositionSolver::bestRule(const OperatorNode &op) {
     const auto &all_rules = graph.getAllRulesFor(op);
     if (all_rules.empty()) {
+        unsolvableOps.insert(op);
         return invalidRule(op); // no valid rules
     }
 
@@ -97,6 +99,7 @@ ChosenDecompRule DecompositionSolver::bestRule(const OperatorNode &op) {
     }
 
     if (!best_rule.has_value()) {
+        unsolvableOps.insert(op);
         return invalidRule(op); // no valid rules
     }
 
@@ -154,7 +157,7 @@ GraphResult DecompositionSolver::solve() {
         const auto chosen_rule = solveOperator(root);
         if (isInvalidRule(chosen_rule)) {
             // Debugging output:
-            graph.showGraph();
+            showGraph(graph);
             showSolution(solvedMap);
 
             // Prepare error msg:
@@ -163,8 +166,20 @@ GraphResult DecompositionSolver::solve() {
                 rules_error.push_back(rule.name);
             }
 
-            throw GraphSolverFailedError(root,
-                                         rules_error); // all rules failed for this root operator
+            // List of ops where the chain could not reach the gateset:
+            std::vector<OperatorNode> unsolvable;
+            for (const auto &u : unsolvableOps) {
+                if (u != root) {
+                    unsolvable.push_back(u);
+                }
+            }
+            std::sort(unsolvable.begin(), unsolvable.end(),
+                      [](const OperatorNode &a, const OperatorNode &b) {
+                          return print_op(a) < print_op(b);
+                      });
+
+            throw GraphSolverFailedError(root, rules_error,
+                                         unsolvable); // all rules failed for this root operator
         }
     }
 

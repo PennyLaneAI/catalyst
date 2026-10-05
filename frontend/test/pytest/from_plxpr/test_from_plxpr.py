@@ -442,8 +442,11 @@ class TestAdjointCtrl:
         catalyst_xpr = from_plxpr(plxpr)()
         qfunc_xpr = catalyst_xpr.eqns[0].params["call_jaxpr"]
 
-        assert qfunc_xpr.eqns[-5].primitive == qref_operator_p
-        assert qfunc_xpr.eqns[-5].params == {
+        # Located by primitive rather than position: decomposition-rule definitions are appended
+        # to the end of the kernel, so the operator is not at a fixed offset from it.
+        op_eqns = [eqn for eqn in qfunc_xpr.eqns if eqn.primitive == qref_operator_p]
+        assert len(op_eqns) == 1
+        assert op_eqns[0].params == {
             "adjoint": num_adjoints % 2 == 1,
             "forward_mask": (),
             "hybrid_lens": (),
@@ -451,7 +454,6 @@ class TestAdjointCtrl:
             "n_ctrls": 0,
             "op_cls": qp.S,
             "wire_lens": (1,),
-            "collect_decomp_rules": True,
         }
 
     @pytest.mark.parametrize("inner_adjoint", (True, False))
@@ -483,7 +485,6 @@ class TestAdjointCtrl:
             "forward_mask": (),
             "adjoint": (inner_adjoint + outer_adjoint) % 2 == 1,
             "n_ctrls": 3,
-            "collect_decomp_rules": True,
             "op_cls": qp.RX,
             "wire_lens": (1,),
         }
@@ -563,7 +564,6 @@ class TestAdjointCtrl:
                 "n_ctrls": 2,
                 "op_cls": qp.S,
                 "wire_lens": (1,),
-                "collect_decomp_rules": True,
             }
 
             for i in range(3):
@@ -659,7 +659,6 @@ class TestAdjointCtrl:
                 "n_ctrls": 1,
                 "op_cls": qp.T,
                 "wire_lens": (1,),
-                "collect_decomp_rules": True,
             }
             assert eqn.invars[0] is qfunc_xpr.eqns[5].outvars[0]
             assert eqn.invars[1] is qfunc_xpr.eqns[6].outvars[0]
@@ -705,7 +704,6 @@ class TestAdjointCtrl:
             "n_ctrls": 0,
             "op_cls": qp.X,
             "wire_lens": (1,),
-            "collect_decomp_rules": True,
         }
 
 

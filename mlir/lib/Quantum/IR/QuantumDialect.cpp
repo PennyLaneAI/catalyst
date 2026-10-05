@@ -46,23 +46,24 @@ struct QuantumInlinerInterface : public DialectInlinerInterface {
         return false;
     }
 
-    /// Returns true if the given region 'src' can be inlined into the region
-    /// 'dest'. Only allow for decomposition functions.
-    bool isLegalToInline(Region *dest, Region *src, bool wouldBeCloned,
-                         IRMapping &valueMapping) const final {
-        if (auto funcOp = src->getParentOfType<func::FuncOp>()) {
-            return funcOp->hasAttr(decompAttr);
-        }
-        return false;
+    /// Returns whether the given func op is a decomposition rule.
+    static bool isDecompRuleFunc(func::FuncOp funcOp) {
+        return funcOp && funcOp->hasAttr(decompAttr);
     }
 
-    // Allow to inline operations from decomposition functions.
+    /// Returns true if the given region 'src' can be inlined into the region 'dest'.
+    bool isLegalToInline(Region *dest, Region *src, bool wouldBeCloned,
+                         IRMapping &valueMapping) const final {
+        return isDecompRuleFunc(src->getParentOfType<func::FuncOp>()) ||
+               isDecompRuleFunc(dest->getParentOfType<func::FuncOp>());
+    }
+
+    // Allow inlining an operation into a decomposition function's regions, keyed on either side
+    // being a decomposition rule:
     bool isLegalToInline(Operation *op, Region *dest, bool wouldBeCloned,
                          IRMapping &valueMapping) const final {
-        if (auto funcOp = op->getParentOfType<func::FuncOp>()) {
-            return funcOp->hasAttr(decompAttr);
-        }
-        return false;
+        return isDecompRuleFunc(op->getParentOfType<func::FuncOp>()) ||
+               isDecompRuleFunc(dest->getParentOfType<func::FuncOp>());
     }
 
     /// Handle the given inlined terminator by replacing it with a new operation

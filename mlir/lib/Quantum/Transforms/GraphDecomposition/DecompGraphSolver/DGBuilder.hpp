@@ -25,10 +25,12 @@
 #pragma once
 
 #include <cstddef>
+#include <iostream>
 #include <memory>
 #include <vector>
 
 #include "DGTypes.hpp"
+#include "DGUtils.hpp"
 
 namespace DecompGraph::Solver {
 
@@ -36,6 +38,10 @@ class DecompositionGraph {
   private:
     struct Impl;
     std::unique_ptr<Impl> impl;
+
+    // Debug printer, declared in DGUtils.hpp beside `showSolution`; a friend because it reports
+    // the graph's internals.
+    friend void Core::showGraph(const DecompositionGraph &graph, std::ostream &os);
 
   public:
     using RuleId = std::size_t;
@@ -53,14 +59,9 @@ class DecompositionGraph {
      * associated costs.
      * @param rules The list of decomposition rules that define how operators can be decomposed
      * into other operators.
-     * @param fixedDecomps The mapping from operators to their fixed decomposition rules, which are
-     * rules that cannot be changed or overridden by the solver. Default is an empty map.
-     * @param altDecomps The mapping from operators to their alternative decomposition rules, which
-     * are rules that can be used in place of the default rule. Default is an empty map.
      */
     DecompositionGraph(std::vector<Core::OperatorNode> operators, Core::WeightedGateset gateset,
-                       std::vector<Core::RuleNode> rules, Core::FixedDecomps fixedDecomps = {},
-                       Core::AltDecomps altDecomps = {});
+                       std::vector<Core::RuleNode> rules);
     ~DecompositionGraph();
 
     // copy and move constructors and assignment operators
@@ -100,18 +101,6 @@ class DecompositionGraph {
     [[nodiscard]] const std::vector<Core::RuleNode> &getRules() const noexcept;
 
     /**
-     * @brief Returns the mapping from operators to their fixed decomposition rules,
-     * which are rules that cannot be changed or overridden by the solver.
-     */
-    [[nodiscard]] const Core::FixedDecomps &getFixedDecomps() const noexcept;
-
-    /**
-     * @brief Returns the mapping from operators to their alternative decomposition rules,
-     * which are rules that can be used in place of the default rule.
-     */
-    [[nodiscard]] const Core::AltDecomps &getAltDecomps() const noexcept;
-
-    /**
      * @brief Returns the number of decomposition rules in the graph.
      */
     std::size_t getNumRules() const;
@@ -144,16 +133,6 @@ class DecompositionGraph {
      * either as a root operator or as an operator appearing in the decomposition rules.
      */
     bool hasOperator(const Core::OperatorNode &op) const;
-
-    /**
-     * @brief Prints the graph structure for debugging purposes.
-     *
-     * This method can be used to visualize the graph structure, including the operators, rules,
-     * and their relationships. It can help in understanding how the graph is constructed and how
-     * the decomposition rules are connected to the operators. The exact format of the output can
-     * be designed to be human-readable and informative for debugging.
-     */
-    void showGraph() const;
 };
 
 } // namespace DecompGraph::Solver

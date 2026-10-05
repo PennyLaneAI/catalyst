@@ -55,16 +55,12 @@ const PipelineList pipelineList{
       "lower-mitigation",
       // Decomposition rules are only consumed by graph-decomposition (run inside
       // apply-transform-sequence). Any that survive here are dead; drop them before
-      // adjoint-lowering so their `quantum.adjoint` regions are not lowered as user adjoints.
+      // modifiers-lowering so we don't needlessly lower the ctrl/adjoint regions in their bodies.
       "symbol-dce",
-      // Reduce `quantum.ctrl`/`quantum.adjoint` regions to op-level modifiers.
-      // Nested regions (e.g. `ctrl(adjoint(...))`) require alternating the two
-      // passes: `ctrl-lowering` defers on a nested adjoint region,
-      // `adjoint-lowering` reduces it, then `ctrl-lowering` runs again.
-      "ctrl-lowering",
-      "adjoint-lowering",
-      "ctrl-lowering",
-      "adjoint-lowering",
+      // Reduce any remaining quantum.ctrl/quantum.adjoint regions to op-level modifiers,
+      // including nested regions (e.g. ctrl(adjoint(...))) and the quantum.adjoint/ctrl
+      // regions that lower-mitigation (ZNE) emits.
+      "modifiers-lowering",
       "resolve-gate-level-adjoint",
       // TODO: we can remove the following 2 passes once PBC has its own pipeline.
       "lower-pbc-init-ops",

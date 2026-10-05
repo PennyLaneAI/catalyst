@@ -66,6 +66,7 @@ class DecompositionSolver {
         solvedMap{};
     std::unordered_set<Core::OperatorNode, Core::OperatorNodeHash> visited{};
     std::vector<Core::OperatorNode> solvingStack{};
+    std::unordered_set<Core::OperatorNode, Core::OperatorNodeHash> unsolvableOps{};
 
     /**
      * @brief basisRule constructs a ChosenDecompRule for a target gate operator,

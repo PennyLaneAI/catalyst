@@ -26,6 +26,7 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #include "Quantum/IR/QuantumOps.h"
+#include "Quantum/Transforms/Patterns.h"
 
 #include "QuantumCache.hpp"
 
@@ -45,9 +46,11 @@ struct AdjointSingleOpRewritePattern : public OpRewritePattern<AdjointOp> {
     LogicalResult matchAndRewrite(AdjointOp adjoint, PatternRewriter &rewriter) const override {
         // Defer (not an error) if the region still contains a nested quantum.ctrl region.
         // ctrl-lowering must reduce it to op-level controlled gates first; reversing and adjointing
-        // those gates is then trivial ((C(g))^dagger = C(g^dagger)). The pipeline runs
-        // (ctrl-lowering, adjoint-lowering) to a fixpoint, so this adjoint op lowers on a later
-        // iteration. Pre-scanning here avoids the ReversePass "Unhandled operation" error path.
+        // those gates is then trivial ((C(g))^dagger = C(g^dagger)). Returning failure() drives the
+        // greedy fixpoint: ctrl-lowering reduces the inner region, then the greedy driver re-tries
+        // this adjoint op and it lowers. This works whether the two patterns run in separate
+        // alternating passes or together in the combined modifiers-lowering pass. Pre-scanning here
+        // avoids the ReversePass "Unhandled operation" error path.
         if (adjoint.getRegion()
                 .walk([](CtrlOp) { return WalkResult::interrupt(); })
                 .wasInterrupted()) {
@@ -60,7 +63,9 @@ struct AdjointSingleOpRewritePattern : public OpRewritePattern<AdjointOp> {
         // Forward pass: copy the classical computations to the target insertion point and record
         // the values needed to replay the circuit in reverse.
         IRMapping oldToCloned;
-        generateAdjointForwardPass(adjoint.getRegion(), rewriter, oldToCloned, cache);
+        if (failed(generateAdjointForwardPass(adjoint.getRegion(), rewriter, oldToCloned, cache))) {
+            return failure();
+        }
 
         // Seed the reverse pass with the operands of the quantum.yield.
         auto yieldOp = cast<YieldOp>(adjoint.getRegion().front().getTerminator());
@@ -89,6 +94,10 @@ struct AdjointSingleOpRewritePattern : public OpRewritePattern<AdjointOp> {
 
 } // namespace
 
+void catalyst::quantum::populateAdjointLoweringPatterns(RewritePatternSet &patterns) {
+    patterns.add<AdjointSingleOpRewritePattern>(patterns.getContext(), 1);
+}
+
 namespace catalyst {
 namespace quantum {
 
@@ -100,7 +109,7 @@ struct AdjointLoweringPass : impl::AdjointLoweringPassBase<AdjointLoweringPass> 
 
     void runOnOperation() final {
         RewritePatternSet patterns(&getContext());
-        patterns.add<AdjointSingleOpRewritePattern>(patterns.getContext(), 1);
+        populateAdjointLoweringPatterns(patterns);
 
         if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
             return signalPassFailure();

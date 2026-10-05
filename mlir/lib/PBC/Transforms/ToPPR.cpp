@@ -12,15 +12,34 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <cassert>
+#include <cmath>
 #include <cstdint>
+#include <cstdlib>
+#include <optional>
 
+#include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/STLForwardCompat.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/IR/Attributes.h"
+#include "mlir/IR/BuiltinAttributes.h"
+#include "mlir/IR/Location.h"
+#include "mlir/IR/Operation.h"
+#include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/TypeRange.h"
+#include "mlir/IR/Types.h"
+#include "mlir/IR/Value.h"
+#include "mlir/IR/ValueRange.h"
+#include "mlir/Support/LLVM.h"
+#include "mlir/Support/LogicalResult.h"
+#include "mlir/Transforms/DialectConversion.h"
 
 #include "Catalyst/Utils/ConstantResolve.h"
 #include "PBC/IR/PBCOps.h"
 #include "PBC/Transforms/Patterns.h"
+#include "Quantum/IR/QuantumInterfaces.h"
 #include "Quantum/IR/QuantumOps.h"
+#include "Quantum/IR/QuantumTypes.h"
 
 using namespace mlir;
 using namespace catalyst;
@@ -411,6 +430,32 @@ LogicalResult convertPauliRotGate(PauliRotOp op, ConversionPatternRewriter &rewr
                                    op.getAdjoint(), rewriter);
 }
 
+LogicalResult convertPPROperator(OperatorOp op, ConversionPatternRewriter &rewriter) {
+    assert(op.getAllParams().empty() && "PPR operator does not support dynamic parameters");
+
+    DictionaryAttr staticData = op.getStaticData();
+    auto pauliWordAttr = staticData.getAs<StringAttr>("pauli_word");
+    StringRef pauliWord = pauliWordAttr.getValue();
+    SmallVector<Attribute> pauliCharacters;
+    pauliCharacters.reserve(pauliWord.size());
+    for (char pauli : pauliWord) {
+        pauliCharacters.push_back(rewriter.getStringAttr(StringRef(&pauli, 1)));
+    }
+    ArrayAttr pauliProduct = rewriter.getArrayAttr(pauliCharacters);
+
+    auto denominatorAttr = staticData.getAs<IntegerAttr>("angle_denominator");
+    // don't use getInt, since it asserts signless (cannot handle signed data)
+    int8_t rotationKind = static_cast<int8_t>(denominatorAttr.getValue().getSExtValue());
+    if (op.getAdjoint()) {
+        rotationKind = -rotationKind;
+    }
+
+    auto pprOp =
+        PPRotationOp::create(rewriter, op.getLoc(), pauliProduct, rotationKind, op.getInQubits());
+    rewriter.replaceOp(op, pprOp.getOutQubits());
+    return success();
+}
+
 //===----------------------------------------------------------------------===//
 //                       PBC Lowering Patterns
 //===----------------------------------------------------------------------===//
@@ -420,7 +465,7 @@ struct PBCGateLowering : public OpInterfaceConversionPattern<QuantumOperation> {
 
     LogicalResult matchAndRewrite(QuantumOperation operation, ArrayRef<Value> operands,
                                   ConversionPatternRewriter &rewriter) const final {
-        StringRef supportedGates = "Supported gates: H, S, T, X, Y, Z, S†, T†, I, CNOT, CZ, "
+        StringRef supportedGates = "Supported gates: H, S, T, X, Y, Z, S†, T†, I, CNOT, CZ, PPR,"
                                    "RX, RY, RZ, IsingXX, IsingYY, IsingZZ, MultiRZ, and PauliRot.";
         Operation *op = operation.getOperation();
 
@@ -469,6 +514,10 @@ struct PBCGateLowering : public OpInterfaceConversionPattern<QuantumOperation> {
             return convertMultiRZGate(originOp, rewriter);
         } else if (auto originOp = dyn_cast<PauliRotOp>(op)) {
             return convertPauliRotGate(originOp, rewriter);
+        } else if (auto originOp = dyn_cast<OperatorOp>(op)) {
+            if (originOp.getOpName() == "PPR") {
+                return convertPPROperator(originOp, rewriter);
+            }
         }
 
         return op->emitError("Unsupported operation for PBC conversion. " + supportedGates);

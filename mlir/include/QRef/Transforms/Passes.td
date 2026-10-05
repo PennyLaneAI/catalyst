@@ -31,4 +31,16 @@ def VerifyNoQuantumUseAfterFreePass : Pass<"verify-no-quantum-use-after-free"> {
     let summary = "Verify that the quantum program has no uses of qubits or registers after they have been deallocated";
 }
 
+def DecomposeLoweringPass : Pass<"decompose-lowering"> {
+    let summary = "Replace quantum operations with compiled decomposition rules.";
+
+    let options = [
+        ListOption<
+            /*C++ name*/"targetRulesOption",
+            /*CLI name*/"target-rules",
+            /*Type*/"std::string",
+            /*Description*/"The set of decomposition rules to apply. If empty, applies all rules.">
+    ];
+}
+
 #endif // QREF_PASSES

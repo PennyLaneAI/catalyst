@@ -814,16 +814,13 @@ def test_quantum_phase_estimation(backend):
     """Test QuantumPhaseEstimation."""
 
     phase = 5
-    target_wires = [0]
-    unitary = qp.RX(phase, wires=0).matrix()
+    unitary = qp.RX(phase, wires=0)
     n_estimation_wires = 5
     estimation_wires = range(1, n_estimation_wires + 1)
 
     def quantum_phase_estimation():
-        qp.Hadamard(wires=target_wires)
-        qp.QuantumPhaseEstimation(
-            unitary, target_wires=target_wires, estimation_wires=estimation_wires
-        )
+        qp.Hadamard(0)
+        qp.QuantumPhaseEstimation(unitary, estimation_wires=estimation_wires)
         return qp.probs(estimation_wires)
 
     device = qp.device(backend, wires=6)
@@ -1063,9 +1060,6 @@ def test_out_adder(backend):
     assert np.allclose(interpreted_fn(), jitted_fn())
 
 
-@pytest.mark.xfail(
-    reason="Legacy Catalyst frontend does not support PennyLane's 'borrowed' template argument"
-)
 def test_out_multiplier(backend):
     """Test OutMultiplier."""
     mod = 12

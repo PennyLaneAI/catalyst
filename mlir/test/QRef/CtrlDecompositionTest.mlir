@@ -14,9 +14,24 @@
 
 // RUN: quantum-opt --decompose-lowering --split-input-file -verify-diagnostics %s | FileCheck %s
 
+func.func  @main_circuit() attributes {quantum.node} {
+  %0 = quantum.alloc( 2) : !quantum.reg
+
+  // CHECK: [[q:%.+]] = quantum.extract {{%.+}}[ 1] : !quantum.reg -> !quantum.bit
+  // CHECK: [[c:%.+]] = quantum.extract {{%.+}}[ 0] : !quantum.reg -> !quantum.bit
+  // CHECK: {{%.+}}:2 = call @controlled_id_match([[q]], [[c]])
+  %c = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+  %q = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
+  %1:2 = func.call @controlled_id_match(%c, %q) : (!quantum.bit, !quantum.bit) -> (!quantum.bit, !quantum.bit)
+
+  %2 = quantum.insert %0[ 0], %1#1 : !quantum.reg, !quantum.bit
+  %3 = quantum.insert %2[ 1], %1#0 : !quantum.reg, !quantum.bit
+  quantum.dealloc %3 : !quantum.reg
+  return
+}
 
 // CHECK-LABEL: func.func @controlled_id_match(
-// CHECK-SAME:  %[[C:.*]]: !quantum.bit, %[[Q:.*]]: !quantum.bit
+// CHECK-SAME:  %[[Q:.*]]: !quantum.bit, %[[C:.*]]: !quantum.bit
 func.func @controlled_id_match(%ctrl: !quantum.bit, %q: !quantum.bit) -> (!quantum.bit, !quantum.bit) {
   %true = arith.constant true
   // CHECK: %[[O:.*]], %[[OC:.*]] = quantum.custom "Hadamard"() %[[Q]] ctrls(%[[C]]) ctrlvals(%{{.*}}) : !quantum.bit ctrls !quantum.bit
@@ -34,7 +49,7 @@ func.func private @ctrl_u(%q: !quantum.bit, %ctrl: !quantum.bit, %cv: i1) -> (!q
 // -----
 
 // CHECK-LABEL: func.func @no_base_rule_fallback(
-// CHECK-SAME:  %[[C:.*]]: !quantum.bit, %[[Q:.*]]: !quantum.bit, %[[T:.*]]: f64
+// CHECK-SAME:  %[[T:.*]]: f64, %[[Q:.*]]: !quantum.bit, %[[C:.*]]: !quantum.bit
 func.func @no_base_rule_fallback(%ctrl: !quantum.bit, %q: !quantum.bit, %theta: f64) -> (!quantum.bit, !quantum.bit) {
   %true = arith.constant true
   // CHECK: %[[O:.*]], %[[OC:.*]] = quantum.custom "RX"(%[[T]]) %[[Q]] ctrls(%[[C]]) ctrlvals(%{{.*}}) : !quantum.bit ctrls !quantum.bit
@@ -53,7 +68,7 @@ func.func private @plain_rx(%theta: f64, %q: !quantum.bit) -> !quantum.bit
 // -----
 
 // CHECK-LABEL: func.func @distinct_from_base(
-// CHECK-SAME:  %[[C:.*]]: !quantum.bit, %[[Q0:.*]]: !quantum.bit, %[[Q1:.*]]: !quantum.bit
+// CHECK-SAME:  %[[Q0:.*]]: !quantum.bit, %[[Q1:.*]]: !quantum.bit, %[[C:.*]]: !quantum.bit
 func.func @distinct_from_base(%ctrl: !quantum.bit, %q0: !quantum.bit, %q1: !quantum.bit)
     -> (!quantum.bit, !quantum.bit, !quantum.bit) {
   %true = arith.constant true
