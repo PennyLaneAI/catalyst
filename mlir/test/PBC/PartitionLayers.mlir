@@ -14,6 +14,7 @@
 
 // RUN: quantum-opt --partition-layers --split-input-file --verify-diagnostics %s | FileCheck %s
 // RUN: quantum-opt --partition-layers=disjoint-qubit --split-input-file --verify-diagnostics %s | FileCheck %s --check-prefix=CHECK-DISJOINT
+// RUN: quantum-opt --partition-layers="min-ops-for-commutation-basis=100" --split-input-file --verify-diagnostics %s | FileCheck %s
 
 func.func @test_partition_layers_0(%qr0 : !quantum.bit, %qr1 : !quantum.bit, %qr2 : !quantum.bit) -> i1 {
 

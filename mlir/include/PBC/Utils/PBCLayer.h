@@ -44,7 +44,8 @@ class PBCLayerContext {
     // Clear all per-pass cached layer objects.
     void clear() { layers.clear(); }
 
-    PBCLayerContext() = default;
+    explicit PBCLayerContext(size_t minOpsForCommutationBasis = 4)
+        : minOpsForCommutationBasis_(minOpsForCommutationBasis) {}
     ~PBCLayerContext() = default;
 
     // Disable copy to prevent accidental sharing
@@ -71,7 +72,11 @@ class PBCLayerContext {
     // Falls back to skip-dynamic on strict failure.
     PBCDepths computePBCDepth(mlir::Block *block);
 
+    size_t getMinOpsForCommutationBasis() const { return minOpsForCommutationBasis_; }
+
   private:
+    size_t minOpsForCommutationBasis_;
+
     // Recursive worker for computeBlockWorstCaseDepth.
     mlir::FailureOr<int64_t> worstCaseDepthOfBlock(mlir::Block *block, bool liftForLoops);
 

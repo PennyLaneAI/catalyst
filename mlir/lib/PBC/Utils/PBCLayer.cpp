@@ -32,10 +32,6 @@ using namespace mlir;
 namespace catalyst {
 namespace pbc {
 
-// Crossover benchmarks on low- and high-rank commuting layers show that the packed basis
-// consistently offsets its construction cost once four operations are already in the layer.
-static constexpr size_t MinOpsForCommutationBasis = 4;
-
 FailureOr<int64_t> PBCLayerContext::ifWorstCaseDepth(scf::IfOp ifOp) {
     FailureOr<int64_t> thenDepth =
         worstCaseDepthOfBlock(&ifOp.getThenRegion().front(), /*liftForLoops=*/false);
@@ -505,7 +501,7 @@ bool PBCLayer::commute(PBCOpInterface src, PBCOpInterface dst) {
 bool PBCLayer::commuteToLayer(PBCOpInterface op) {
     // Pairwise checks avoid basis construction overhead for the short layers
     // that dominate small programs. Larger layers use packed basis rows.
-    if (ops.size() < MinOpsForCommutationBasis) {
+    if (ops.size() < context->getMinOpsForCommutationBasis()) {
         return llvm::all_of(ops,
                             [&](PBCOpInterface existingOp) { return commute(op, existingOp); });
     }
