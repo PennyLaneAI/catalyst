@@ -84,13 +84,11 @@ _DEFAULT_MESSAGE_BYTES = 8
 # The keys a coprocessor function's ``init`` receives the placement's message sizes under.
 _FN_MESSAGE_SIZE_KEYS = ("in_bytes", "out_bytes")
 
-# Coprocessor functions whose configuration names files on the compiling machine, by function, then
-# by config key, each mapped to a glob of the companion files beside it that travel with it
-# (``None`` for none). A coprocessor on another machine takes these files in its executor's
-# deployment, and its config names each one relative to the executor's workspace. onnxruntime loads
-# its execution providers from its own directory, so they travel with ``ort_lib``.
-_COPROCESSOR_FN_FILE_KEYS = {
-    "catalyst_onnx_coprocessor": {"model": None, "ort_lib": "libonnxruntime*"},
+# Companion files that travel with a file a coprocessor function declares (its
+# ``CoprocessorFunction.files``), by function, then by config key, as a glob of the files beside it.
+# onnxruntime loads its execution providers from its own directory, so they travel with ``ort_lib``.
+_COPROCESSOR_FN_FILE_COMPANIONS = {
+    "catalyst_onnx_coprocessor": {"ort_lib": "libonnxruntime*"},
 }
 
 
@@ -291,8 +289,8 @@ def _coprocessor_fn_config(fn, placement: Placement, in_workspace: bool = False)
     """A coprocessor function's own ``key=value;...`` config, then ``in_bytes`` and ``out_bytes``
     set to the placement's message sizes, with each key prefixed ``fn.``.
 
-    With ``in_workspace``, each value naming a file listed in :data:`_COPROCESSOR_FN_FILE_KEYS`
-    becomes ``./<filename>``, the file's place in the executor's workspace once deployed.
+    With ``in_workspace``, the value of each key the function declares in its ``files`` becomes
+    ``./<filename>``, the file's place in the executor's workspace once deployed.
 
     The prefix keeps the function's keys apart from the backend's in the node's config string. The
     transport runtime removes it again and hands the keys to the function's ``init`` hook, which its
@@ -313,7 +311,7 @@ def _coprocessor_fn_config(fn, placement: Placement, in_workspace: bool = False)
                 f"coprocessor function config key {key!r} is reserved: the compiler sets it to the "
                 f"placement's message size"
             )
-        if in_workspace and key in _COPROCESSOR_FN_FILE_KEYS.get(fn.symbol_name, {}):
+        if in_workspace and key in _declared_file_keys(fn):
             entry = f"{key}=./{Path(entry.partition('=')[2]).name}"
         entries.append(f"fn.{entry}")
     entries += [f"fn.{key}={_message_size(placement, key)}" for key in _FN_MESSAGE_SIZE_KEYS]
@@ -340,6 +338,18 @@ def serialize_backline(placement: Placement) -> dict:
         # The library is loaded from this installation, or deployed from it with the executor.
         if not _out_of_process(coproc) or coproc.executor_options is not None:
             _check_builtin_fn_lib(coproc)
+        if (
+            coproc.remote
+            and coproc.executor_options is None
+            and _declared_file_keys(coproc.coprocessor_fn)
+        ):
+            raise CompileError(
+                f"coprocessor {coproc.name!r} is given a ready-made executor, but its function "
+                f"declares files ({', '.join(_declared_file_keys(coproc.coprocessor_fn))}) that "
+                f"only an executor built from executor_options deploys. Pass executor_options, "
+                f"or place the files in that executor's workspace and name them there without "
+                f"declaring them as files."
+            )
         entries = [node["config"]] if node.get("config") else []
         if _runs_per_message_on_gpu(coproc, transport):
             entries.append("coproc_fn=per_message")
@@ -459,12 +469,22 @@ def _check_builtin_fn_lib(coproc: Node) -> None:
     )
 
 
+def _declared_file_keys(fn) -> tuple[str, ...]:
+    """The config keys whose values ``fn`` declares to be local files (its ``files``)."""
+    return tuple(getattr(fn, "files", ()) or ())
+
+
 def _coprocessor_fn_files(node: Node) -> list[str]:
-    """The local files a coprocessor function's config names (see
-    :data:`_COPROCESSOR_FN_FILE_KEYS`), with their companions, for deployment beside the function on
-    another machine. Empty for a node with no such function."""
+    """The local files a node's coprocessor function declares (``CoprocessorFunction.files``),
+    with their companions (:data:`_COPROCESSOR_FN_FILE_COMPANIONS`), for deployment beside the
+    function on another machine. Empty for a node with no such function.
+
+    Raises:
+        CompileError: If a declared value is not a file on this machine.
+    """
     fn = getattr(node, "coprocessor_fn", None)
-    keys = _COPROCESSOR_FN_FILE_KEYS.get(getattr(fn, "symbol_name", None), {})
+    keys = _declared_file_keys(fn)
+    companions = _COPROCESSOR_FN_FILE_COMPANIONS.get(getattr(fn, "symbol_name", None), {})
     files = []
     for entry in filter(None, (getattr(fn, "config", "") or "").split(";")):
         key, _, value = entry.partition("=")
@@ -477,9 +497,29 @@ def _coprocessor_fn_files(node: Node) -> list[str]:
                 f"which is not a file on this machine, so it cannot be deployed with its executor"
             )
         files.append(str(path))
-        if companions := keys[key]:
-            files += [str(c) for c in sorted(path.parent.glob(companions)) if c != path]
+        if glob := companions.get(key):
+            files += [str(c) for c in sorted(path.parent.glob(glob)) if c != path]
     return files
+
+
+def _check_deploy_names(deploy: list[str], who: str) -> None:
+    """Raise a ``CompileError`` if two different files in ``deploy`` share a filename.
+
+    A deployment places every file directly in the executor's workspace, so two such files would
+    overwrite each other there, and a config naming one would read the other.
+    """
+    seen: dict[str, str] = {}
+    for item in deploy:
+        path = Path(item)
+        if not path.is_file():
+            continue  # a directory contributes the files inside it
+        other = seen.setdefault(path.name, str(path))
+        if other != str(path):
+            raise CompileError(
+                f"the executor of {who} would deploy two files named {path.name!r}, {other} and "
+                f"{path}, into one workspace, where one would overwrite the other. Give them "
+                f"different names."
+            )
 
 
 def _executor_plugins(node: Node, given) -> list[str]:
@@ -538,6 +578,7 @@ def _executor_options(node: Node, options: dict) -> dict:
         fn_lib = _coprocessor_fn_lib(node)
         deploy = [*options.get("deploy", []), *([str(fn_lib)] if fn_lib is not None else [])]
         options["deploy"] = deploy + _coprocessor_fn_files(node)
+        _check_deploy_names(options["deploy"], repr(node.name))
     return options
 
 
@@ -579,9 +620,10 @@ def _share_executors(placement: Placement) -> None:
             options = _executor_options(node, node.executor_options)
             plugins += [p for p in options["plugins"] if p not in plugins]
             deploy += [d for d in options.get("deploy", []) if d not in deploy]
+        names = "+".join(n.name or "node" for n in nodes)
+        _check_deploy_names(deploy, names)
         for node in nodes:
             _check_machine_agrees(node, first.get("host"), address=first.get("address"))
-        names = "+".join(n.name or "node" for n in nodes)
         executor = Executor(**{**first, "name": names, "plugins": plugins, "deploy": deploy})
         executor.resolve()
         for node in nodes:

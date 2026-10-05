@@ -257,7 +257,9 @@ def onnx_files(tmp_path, monkeypatch):
 
 def test_a_remote_onnx_coprocessor_deploys_its_files_and_names_them_in_the_workspace(onnx_files):
     """The model, onnxruntime and its providers travel with the executor, named by filename."""
-    fn = qp.CoprocessorFunction("catalyst_onnx_coprocessor", config=onnx_files.config)
+    fn = qp.CoprocessorFunction(
+        "catalyst_onnx_coprocessor", config=onnx_files.config, files=("model", "ort_lib")
+    )
     coproc = qp.Coprocessor(
         name="gpu0",
         remote=True,
@@ -279,12 +281,79 @@ def test_a_remote_onnx_coprocessor_deploys_its_files_and_names_them_in_the_works
 
 def test_an_onnx_coprocessor_in_a_local_executor_keeps_its_paths(onnx_files):
     """An executor on this machine reads the files where they are."""
-    fn = qp.CoprocessorFunction("catalyst_onnx_coprocessor", config=onnx_files.config)
+    fn = qp.CoprocessorFunction(
+        "catalyst_onnx_coprocessor", config=onnx_files.config, files=("model", "ort_lib")
+    )
     coproc = qp.Coprocessor(name="gpu0", coprocessor_fn=fn, executor_options={"port": 7813})
     dev = qp.Backline(controller=_controller(), coprocessors=[coproc], transport="memcpy")
     settle_executors(dev.placement)
     config = serialize_backline(dev.placement)["coprocessors"][0]["config"]
     assert f"fn.model={onnx_files.root / 'model.onnx'}" in config
+
+
+def test_a_remote_function_deploys_the_files_it_declares(tmp_path):
+    """Any coprocessor function's declared files travel with its executor, named by filename."""
+    table = tmp_path / "decoder.cfg"
+    table.write_text("")
+    fn = qp.CoprocessorFunction(
+        "decode", lib_path=str(table), config=f"table={table};mode=fast", files=("table",)
+    )
+    coproc = qp.Coprocessor(
+        name="matcher",
+        remote=True,
+        coprocessor_fn=fn,
+        executor_options={"host": "192.0.2.11", "port": 7813, "triple": _TRIPLE},
+        init_args={"backend_lib": "backend.so"},
+    )
+    dev = qp.Backline(controller=_controller(), coprocessors=[coproc], transport="memcpy")
+    settle_executors(dev.placement)
+    config = serialize_backline(dev.placement)["coprocessors"][0]["config"]
+    assert "fn.table=./decoder.cfg;fn.mode=fast" in config
+    assert str(table) in coproc.executor._cfg.deploy  # pylint: disable=protected-access
+
+
+def test_two_deployed_files_with_one_name_are_rejected(tmp_path):
+    """Two different files named alike would overwrite each other in the workspace."""
+    (tmp_path / "a").mkdir()
+    (tmp_path / "b").mkdir()
+    options = {"host": "192.0.2.11", "port": 7813, "triple": _TRIPLE}
+    coprocs = []
+    for name in ("a", "b"):
+        model = tmp_path / name / "model.onnx"
+        model.write_text("")
+        fn = qp.CoprocessorFunction(
+            "decode", lib_path=str(model), config=f"model={model}", files=("model",)
+        )
+        coprocs.append(
+            qp.Coprocessor(
+                name=name,
+                remote=True,
+                coprocessor_fn=fn,
+                executor_options=options,
+                init_args={"backend_lib": "backend.so"},
+            )
+        )
+    ctrl = _controller(remote=True, executor_options=options)
+    dev = qp.Backline(controller=ctrl, coprocessors=coprocs, transport="memcpy")
+    with pytest.raises(CompileError, match="two files named 'model.onnx'"):
+        settle_executors(dev.placement)
+
+
+def test_declared_files_need_an_executor_built_from_options(tmp_path):
+    """A ready-made executor is not deployed by the compiler, so it cannot take declared files."""
+    table = tmp_path / "decoder.cfg"
+    table.write_text("")
+    fn = qp.CoprocessorFunction("decode", config=f"table={table}", files=("table",))
+    coproc = qp.Coprocessor(
+        name="matcher",
+        remote=True,
+        coprocessor_fn=fn,
+        executor=Executor(address="192.0.2.11:7813").resolve(),
+        init_args={"backend_lib": "backend.so"},
+    )
+    dev = qp.Backline(controller=_controller(), coprocessors=[coproc], transport="memcpy")
+    with pytest.raises(CompileError, match="ready-made executor"):
+        serialize_backline(dev.placement)
 
 
 def test_nodes_pinning_one_executor_share_it():
