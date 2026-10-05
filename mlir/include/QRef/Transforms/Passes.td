@@ -47,6 +47,11 @@ def DecomposeLoweringPass : Pass<"decompose-lowering"> {
             /*Default*/[{ false }],
             /*Description*/"Whether to inline the rule body. Defaults to false.">
     ];
+
+    let dependentDialects = [
+       "catalyst::quantum::QuantumDialect",
+       "catalyst::CatalystDialect"
+    ];
 }
 
 #endif // QREF_PASSES

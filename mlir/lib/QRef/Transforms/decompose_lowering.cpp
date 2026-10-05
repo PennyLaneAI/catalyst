@@ -39,6 +39,7 @@
 #include "mlir/Transforms/Passes.h"
 #include "stablehlo/dialect/StablehloOps.h" // When we read the decomposition rules module from file, StablehloDialect may not be registered from start.
 
+#include "Catalyst/IR/CatalystDialect.h"
 #include "QRef/IR/QRefDialect.h"
 #include "QRef/Transforms/Passes.h"
 #include "QRef/Transforms/Patterns.h"
@@ -65,6 +66,7 @@ struct DecomposeLoweringPass : impl::DecomposeLoweringPassBase<DecomposeLowering
 
     void getDependentDialects(DialectRegistry &registry) const override {
         registry.insert<arith::ArithDialect>();
+        registry.insert<catalyst::CatalystDialect>();
         registry.insert<func::FuncDialect>();
         registry.insert<quantum::QuantumDialect>();
         registry.insert<qref::QRefDialect>();
