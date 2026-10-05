@@ -244,6 +244,17 @@ def _runs_per_message_on_gpu(coproc, transport: str) -> bool:
     coprocessor otherwise takes a launcher for a persistent kernel, and only the memcpy GPU backend
     also runs per-message functions. A config that already selects ``coproc_fn=per_message`` is left
     as it is, and one that selects another mode is rejected.
+
+    Args:
+        coproc (Coprocessor): the coprocessor whose function and config are checked
+        transport (str): the placement's transport name
+
+    Returns:
+        bool: whether ``coproc_fn=per_message`` must be added to the coprocessor's config
+
+    Raises:
+        CompileError: If the function runs per message on a GPU coprocessor over a transport other
+            than ``"memcpy"``, or the config selects another mode.
     """
     fn = coproc.coprocessor_fn
     if not getattr(fn, "per_message", False) or getattr(coproc, "hardware", None) != "gpu":
@@ -272,8 +283,15 @@ def _runs_per_message_on_gpu(coproc, transport: str) -> bool:
 def _message_size(placement: Placement, name: str) -> int:
     """The placement's ``in_bytes`` or ``out_bytes``: the size every controller session commits.
 
-    A PennyLane whose ``Placement`` has no such attribute keeps the size on the controller, where
-    ``None`` means unset, so that is read next, then the 8 B default.
+    With a PennyLane version whose ``Placement`` has no such attribute, the size is read from the
+    controller instead, where ``None`` means unset, and an unset size is the 8 B default.
+
+    Args:
+        placement (Placement): the placement whose message size is read
+        name (str): ``"in_bytes"`` or ``"out_bytes"``
+
+    Returns:
+        int: the message size in bytes
     """
     size = getattr(placement, name, None)
     if size is None:
@@ -290,6 +308,17 @@ def _coprocessor_fn_config(fn, placement: Placement) -> str:
     library exports as ``<symbol>_info`` (see ``CatalystCoprocessorFnInfo`` in
     ``TransportABI.h``). ``in_bytes`` and ``out_bytes`` are reserved for the message sizes, so a
     function's own config must not set them.
+
+    Args:
+        fn (CoprocessorFunction): the coprocessor function whose config is built
+        placement (Placement): the placement whose message sizes are added
+
+    Returns:
+        str: the ``fn.``-prefixed ``key=value;...`` entries
+
+    Raises:
+        CompileError: If an entry of the function's own config is not of the form ``key=value``,
+            or sets ``in_bytes`` or ``out_bytes``.
     """
     config = getattr(fn, "config", "") or ""
     entries = []
@@ -420,6 +449,12 @@ def _coprocessor_fn_lib(node: Node) -> Path | None:
     That is its ``lib_path``, or for one of Catalyst's own coprocessor functions, the first library
     exporting it found in ``_builtin_fn_lib_dirs()``. When none is found, it is the ``.so`` under
     ``<RUNTIME_LIB_DIR>``, which need not exist.
+
+    Args:
+        node (Node): the coprocessor whose function's library is found
+
+    Returns:
+        Path or None: the library, or ``None`` when the node's function names none
     """
     fn = getattr(node, "coprocessor_fn", None)
     lib_path = getattr(fn, "lib_path", None)
@@ -435,7 +470,14 @@ def _coprocessor_fn_lib(node: Node) -> Path | None:
 
 def _check_builtin_fn_lib(coproc: Node) -> None:
     """Raise a ``CompileError`` if an in-process coprocessor uses one of Catalyst's own coprocessor
-    functions and no library exporting it is found."""
+    functions and no library exporting it is found.
+
+    Args:
+        coproc (Coprocessor): the coprocessor whose function's library is checked
+
+    Raises:
+        CompileError: If no library exporting the function is found.
+    """
     fn = coproc.coprocessor_fn
     if fn.lib_path or fn.symbol_name not in _BUILTIN_COPROCESSOR_FN_LIBS:
         return
