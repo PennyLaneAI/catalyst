@@ -36,6 +36,8 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Casting.h"
+#include "llvm/Support/Debug.h"
+#include "llvm/Support/DebugLog.h"
 #include "mlir/Analysis/CallGraph.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
@@ -78,6 +80,60 @@ LogicalResult ensureNoReferenceSemanticsOps(Operation *op) {
             return WalkResult::interrupt();
         }
         return WalkResult::advance();
+    });
+
+    if (walkResult.wasInterrupted()) {
+        return failure();
+    } else {
+        return success();
+    }
+}
+
+// Only scf.if, scf.for, scf.while and scf.index_switch have conversion rules. A quantum-bearing
+// scf.execute_region must be rejected before conversion starts. Purely classical
+// scf.execute_region ops are left alone.
+LogicalResult ensureNoScfUnsupportedOps(Operation *op) {
+    auto hasQrefType = [](TypeRange types) {
+        return llvm::any_of(types, llvm::IsaPred<qref::QubitType, qref::QuregType>);
+    };
+
+    auto isClassicalOp = [&](Operation *op) {
+        // Yielding/using qref values is not classical, even for scf.yield / func.call.
+        if (hasQrefType(op->getOperandTypes()) || hasQrefType(op->getResultTypes())) {
+            return false;
+        }
+        // Ops from quantum-related dialects are not classical.
+        return !isa<qref::QRefDialect>(op->getDialect()) &&
+               !isa<REFERENCE_SEMANTICS_GATE_OPS, REFERENCE_SEMANTICS_OBSERVABLE_OPS,
+                    mbqc::RefGraphStatePrepOp>(op);
+    };
+
+    auto isUnsupportedScfRegionOp = [](Operation *o) {
+        return isa<scf::SCFDialect>(o->getDialect()) &&
+               !isa<scf::IfOp, scf::WhileOp, scf::ForOp, scf::IndexSwitchOp>(o) &&
+               o->getNumRegions() > 0;
+    };
+
+    auto containsNonClassicalOp = [&](Operation *o) {
+        return o
+            ->walk([&](Operation *inner) {
+                return isClassicalOp(inner) ? WalkResult::advance() : WalkResult::interrupt();
+            })
+            .wasInterrupted();
+    };
+
+    WalkResult walkResult = op->walk([&](Operation *o) {
+        if (!(isUnsupportedScfRegionOp(o) && containsNonClassicalOp(o))) {
+            return WalkResult::advance();
+        }
+
+        StringRef name = o->getName().getStringRef();
+
+        o->emitError(
+            "Value semantics conversion only supports the following scf operations: scf.if, "
+            "scf.for, scf.while, and scf.index_switch, got: ")
+            << name;
+        return WalkResult::interrupt();
     });
 
     if (walkResult.wasInterrupted()) {
@@ -1974,6 +2030,10 @@ struct ValueSemanticsConversionPass
                 continue;
             }
 
+            if (failed(ensureNoScfUnsupportedOps(subroutine))) {
+                return signalPassFailure();
+            }
+
             SubroutineInfo info(subroutine);
             handleSubroutine(builder, subroutine, info.getNecessarySubroutineRValues());
             if (failed(ensureNoReferenceSemanticsOps(subroutine))) {
@@ -1996,6 +2056,10 @@ struct ValueSemanticsConversionPass
 
         // Convert the main quantum.mode functions
         for (auto targetFunc : targetFuncs) {
+            if (failed(ensureNoScfUnsupportedOps(targetFunc))) {
+                return signalPassFailure();
+            }
+
             QubitValueTracker tracker;
             handleRegion(builder, targetFunc.getBody(), tracker);
             eraseAllRemainingAnchorRValues(targetFunc);

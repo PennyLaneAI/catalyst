@@ -113,6 +113,11 @@
 
 <h3>Improvements 🛠</h3>
 
+* Under program capture, PennyLane :func:`~.transforms.decompose` (``qp.decompose``) is now an
+  alias for :func:`~.passes.graph_decomposition`. Multiple ``qp.decompose`` transforms is also
+  supported.
+  [(#3290)](https://github.com/PennyLaneAI/catalyst/pull/3290)
+
 * :func:`~.passes.graph_decomposition` accepts a `verbose` keyword argument. When `True`, the pass
   prints the decomposition rule the solver chose for each operator, along with its cost and the
   resulting gate counts, to `stderr`.
@@ -612,6 +617,10 @@
   Parameters that are trivially available to the reverse pass are no longer cached.
   [(#3233)](https://github.com/PennyLaneAI/catalyst/pull/3233)
 
+* Added a guard in the `--convert-to-value-semantics` pass to raise an error when 
+  unsupported quantum-bearing `scf` operations are encountered.
+  [(#3238)](https://github.com/PennyLaneAI/catalyst/pull/3238)
+
 <h3>Breaking changes 💔</h3>
 
 * `catalyst.logging` has been removed. `pennylane.logging` should be used instead.
@@ -643,9 +652,17 @@
   for Python 3.11.
   [(#2984)](https://github.com/PennyLaneAI/catalyst/pull/2984)
 
+* Added reference semantics support for PBC operations.
+  [(#3136)](https://github.com/PennyLaneAI/catalyst/pull/3136)
+
 <h3>Deprecations 👋</h3>
 
 <h3>Bug fixes 🐛</h3>
+
+* Fixed the CNOT decomposition of the `ions-decomposition` pass, which did not implement a CNOT:
+  it rotated the target with `RY(-π/2)` instead of `RX(-π/2)` and returned the two qubits in
+  swapped order.
+  [(#3277)](https://github.com/PennyLaneAI/catalyst/pull/3277)
 
 * `adjoint-lowering` no longer fails on gates whose parameter is a wide-integer tensor. Integer and
   boolean gate parameters (e.g. a `QROM` `tensor<Nxi64>` bitstring) are now recorded in a dedicated
@@ -808,6 +825,7 @@
   [(#2948)](https://github.com/PennyLaneAI/catalyst/pull/2948)
   [(#3224)](https://github.com/PennyLaneAI/catalyst/pull/3224)
   [(#3232)](https://github.com/PennyLaneAI/catalyst/pull/3232)
+  [(#3238)](https://github.com/PennyLaneAI/catalyst/pull/3238)
 
 * Removed the internal ``mlir_specs`` function which was the old backend for :func:`qp.specs`. The resource analysis pass replaces its use.
   [(#2841)](https://github.com/PennyLaneAI/catalyst/pull/2841)
@@ -971,10 +989,12 @@ Runor Agbaire,
 Ali Asadi,
 Joey Carter,
 Yushao Chen,
+Filip Dobrosavljevic,
 Lillian Frederiksen,
 Sengthai Heng,
 David Ittah,
 JiaRung Jian,
+Jeffrey Kam,
 Jacob Kitchen,
 Korbinian Kottmann,
 Christina Lee,
