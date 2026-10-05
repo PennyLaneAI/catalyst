@@ -27,7 +27,7 @@
 //   model=<path>      the .onnx file (required)
 //   ort_lib=<path>    the onnxruntime shared library (default: libonnxruntime.so, or
 //                     libonnxruntime.dylib on macOS)
-//   provider=<name>   auto (default), cpu, migraphx, cuda, tensorrt or rocm
+//   provider=<name>   auto (default), cpu, migraphx, cuda or tensorrt
 //   device=<index>    the GPU a GPU provider runs on (default 0)
 //   threads=<count>   onnxruntime's intra-op threads (default 1), with one inter-op thread and
 //                     intra-op spinning off, so the pool does not compete with the transport's
@@ -36,7 +36,7 @@
 // A GPU provider attaches through onnxruntime's OrtSessionOptionsAppendExecutionProvider_<Name>
 // export, which only an onnxruntime build containing that provider has: onnxruntime-migraphx for
 // migraphx on AMD GPUs, onnxruntime-gpu for cuda and tensorrt on NVIDIA GPUs. `auto` attaches the
-// first GPU provider the loaded onnxruntime has, in the order migraphx, cuda, rocm, and fails if
+// first GPU provider the loaded onnxruntime has, in the order migraphx then cuda, and fails if
 // that provider cannot attach (for example when its GPU libraries are missing). Only an
 // onnxruntime with no GPU provider runs on the CPU under `auto`. The provider in use is printed
 // when the model loads.
@@ -81,8 +81,8 @@ struct GpuProvider {
 };
 // The first kAutoProviders entries are the ones `auto` tries, in this order.
 constexpr GpuProvider kGpuProviders[] = {
-    {"migraphx", "MIGraphX"}, {"cuda", "CUDA"}, {"rocm", "ROCM"}, {"tensorrt", "Tensorrt"}};
-constexpr std::size_t kAutoProviders = 3;
+    {"migraphx", "MIGraphX"}, {"cuda", "CUDA"}, {"tensorrt", "Tensorrt"}};
+constexpr std::size_t kAutoProviders = 2;
 
 std::size_t element_bytes(ONNXTensorElementDataType type) {
     switch (type) {
@@ -163,7 +163,7 @@ class OnnxCoprocessor {
         }
         if (!is_known_provider(provider)) {
             throw std::runtime_error("unknown provider '" + provider +
-                                     "', expected auto, cpu, migraphx, cuda, tensorrt or rocm");
+                                     "', expected auto, cpu, migraphx, cuda or tensorrt");
         }
         if (threads < 1) {
             throw std::runtime_error("threads must be at least 1");
@@ -312,7 +312,7 @@ class OnnxCoprocessor {
             }
         }
         throw std::runtime_error("unknown provider '" + provider +
-                                 "', expected auto, cpu, migraphx, cuda, tensorrt or rocm");
+                                 "', expected auto, cpu, migraphx, cuda or tensorrt");
     }
 
     static bool is_known_provider(const std::string &provider) {
