@@ -16,8 +16,9 @@
 ``runtime_call`` records, the libraries a device records through ``get_runtime_artifacts()``,
 and their collection into the compile options."""
 
-import jax.numpy as jnp
 from pathlib import Path
+
+import jax.numpy as jnp
 import pennylane as qp
 import pytest
 from jax._src.lib.mlir import ir

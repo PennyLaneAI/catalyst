@@ -52,7 +52,7 @@ def record_device_runtime_artifacts(module_op, device):
     device_runtime_artifacts = get_artifacts()
     if isinstance(device_runtime_artifacts, (str, bytes, os.PathLike)):
         raise TypeError(
-            "calling device.get_runtime_artifacts should return an iterable of paths,"
+            "calling device.get_runtime_artifacts should return an iterable of paths, "
             f"but got {type(device_runtime_artifacts)}"
         )
     for artifact_path in device_runtime_artifacts:
