@@ -122,6 +122,7 @@ class OpDecompRequest:
             modifier_state=modifier_context.compose(graph_op_id.modifiers),
         )
 
+
 @dataclass
 class TracedRule:
     """Wrapper for traced decomposition rules and associated metadata.

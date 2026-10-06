@@ -19,6 +19,7 @@ import os
 import os.path
 import sys
 import sysconfig
+from pathlib import Path
 
 package_root = os.path.join(os.path.dirname(__file__), "..")
 
@@ -62,6 +63,11 @@ BYTECODE_FILE_PATH = os.path.join(
     "resources",
     "decomposition_rules_" + (__revision__ if __revision__ else __version__) + ".mlirbc",
 )
+
+
+def get_bytecode_manifest_path(bytecode_path: str | Path) -> Path:
+    """Return the manifest path associated with a given bytecode file."""
+    return Path(bytecode_path).with_suffix(".json")
 
 
 def get_libpython_path() -> str:  # pragma: no cover
