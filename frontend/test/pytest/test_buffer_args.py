@@ -143,8 +143,7 @@ class TestReturnValues:
         def return_scalar():
             return jnp.array(0, dtype=dtype)
 
-        with pytest.warns(UserWarning, match="AOT.*failed"):
-            compiled = qjit(return_scalar)
+        compiled = qjit(return_scalar)
 
         with pytest.raises(TypeError, match="Requested return type is unavailable."):
             compiled()

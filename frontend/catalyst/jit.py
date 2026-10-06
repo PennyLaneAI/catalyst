@@ -32,6 +32,7 @@ import pennylane as qp
 from jax.api_util import debug_info
 from jax.interpreters import mlir
 from jax.tree_util import tree_flatten, tree_unflatten
+from pennylane.logging import debug_logger, debug_logger_init
 
 import catalyst
 from catalyst.autograph import run_autograph
@@ -47,7 +48,6 @@ from catalyst.compiler import CompileOptions, Compiler, canonicalize, to_llvmir,
 from catalyst.debug.instruments import instrument
 from catalyst.from_plxpr import trace_from_pennylane
 from catalyst.jax_tracer import lower_jaxpr_to_mlir, trace_to_jaxpr
-from catalyst.logging import debug_logger, debug_logger_init
 from catalyst.qfunc import QFunc
 from catalyst.tracing.contexts import EvaluationContext
 from catalyst.tracing.type_signatures import (
@@ -739,7 +739,6 @@ class QJIT(CatalystCallable):
                 )
             except Exception as e:  # pylint: disable=broad-exception-caught
                 logger.exception(e, exc_info=True)
-                warnings.warn("AOT capture of jaxpr failed. Error logged at exception level")
                 return
 
         if self.compile_options.target in ("mlir", "llvmir", "binary"):
@@ -748,7 +747,6 @@ class QJIT(CatalystCallable):
                 self.mlir_module = self.generate_ir()
             except Exception as e:  # pylint: disable=broad-exception-caught
                 logger.exception(e, exc_info=True)
-                warnings.warn("AOT generation of mlir failed. Error logged at exception level")
                 return
 
         if self.compile_options.target in ("llvmir", "binary"):
@@ -756,7 +754,6 @@ class QJIT(CatalystCallable):
                 self.compiled_function, self.llvm_ir = self.compile()
             except Exception as e:  # pylint: disable=broad-exception-caught
                 logger.exception(e, exc_info=True)
-                warnings.warn("AOT generation of llvmir failed. Error logged at exception level")
                 return
 
         if self.compile_options.target in ("binary",) and self.compile_options.link:

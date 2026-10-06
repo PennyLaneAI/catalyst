@@ -470,6 +470,24 @@ func.func @test_while_loop_nested(%arg0: i1) attributes {quantum.node} {
 //
 
 
+// CHECK-LABEL: test_if_classical
+func.func @test_if_classical(%arg0: i1, %arg1: memref<1xf64>) attributes {quantum.node} {
+
+    // CHECK: scf.if %arg0 {
+    // CHECK:     memref.store
+    // CHECK: }
+    scf.if %arg0 {
+        %c0 = arith.constant 0 : index
+        %0 = arith.constant 0.1 : f64
+        memref.store %0, %arg1[%c0] : memref<1xf64>
+    }
+    return
+}
+
+
+// -----
+
+
 // CHECK-LABEL: test_if_non_root_no_else
 func.func @test_if_non_root_no_else(%arg0: i1) attributes {quantum.node} {
 
@@ -794,4 +812,32 @@ func.func @test_switch(%arg0: index, %arg1: f64) -> f64 attributes {quantum.node
     quantum.dealloc_qb %4#0 : !quantum.bit
     quantum.dealloc %6 : !quantum.reg
     return %4#3 : f64
+}
+
+// -----
+
+// Region-bearing control flow outside the supported set (scf.if / scf.for / scf.while /
+// scf.index_switch) has no rule for controlling its body, so it is rejected rather than silently
+// left uncontrolled. scf.execute_region stands in for any such op here.
+func.func @execute_region_in_body(%q: !quantum.bit) -> !quantum.bit {
+  // expected-error @+1 {{Reference semantics conversion only supports the following scf operations: scf.if, scf.for, scf.while, and scf.index_switch, got: scf.execute_region}}
+  %r = scf.execute_region -> !quantum.bit {
+    %h = quantum.custom "Hadamard"() %q : !quantum.bit
+    scf.yield %h : !quantum.bit
+  }
+  return %r : !quantum.bit
+}
+
+// -----
+
+// Purely classical scf.execute_region ops do not need a conversion rule and must be allowed.
+// CHECK-LABEL: func.func @classical_execute_region
+func.func @classical_execute_region() -> i32 attributes {quantum.node} {
+  %c = arith.constant 1 : i32
+  // CHECK: scf.execute_region
+  %y = scf.execute_region -> i32 {
+    %x = arith.addi %c, %c : i32
+    scf.yield %x : i32
+  }
+  return %y : i32
 }

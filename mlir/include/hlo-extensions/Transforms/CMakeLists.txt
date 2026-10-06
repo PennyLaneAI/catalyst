@@ -11,6 +11,6 @@ add_public_tablegen_target(STABLEHLOCatalystPassIncGen
 # to build the rewrite patterns for the --stablehlo-legalize-to-std pass
 set(LLVM_TARGET_DEFINITIONS stablehlo_legalize_to_standard_patterns.td)
 include_directories(
-    ${CATALYST_MAIN_INCLUDE_DIR}/../stablehlo)
+    ${STABLEHLO_DIR})
 mlir_tablegen(generated_stablehlo_legalize_to_standard.cpp.inc -gen-rewriters)
 add_public_tablegen_target(MLIRStablehloLegalizeToStandardIncGen)

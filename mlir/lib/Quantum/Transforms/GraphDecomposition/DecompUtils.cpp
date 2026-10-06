@@ -24,8 +24,6 @@ namespace catalyst {
 namespace quantum {
 namespace DecompUtils {
 
-bool isDecompositionFunction(func::FuncOp func) { return func->hasAttr(target_gate_attr_name); }
-
 StringRef getTargetGateName(func::FuncOp func) {
     if (auto target_op_attr = func->getAttrOfType<StringAttr>(target_gate_attr_name)) {
         return target_op_attr.getValue();

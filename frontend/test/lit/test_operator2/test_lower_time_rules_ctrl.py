@@ -53,7 +53,6 @@ def controlled_op():
     return qp.state()
 
 
-# CHECK-DAG: target_gate = "S{}{wires:1}{}"
 # CHECK-DAG: target_gate = "C(S){}{wires:1}{}"
 print(controlled_op.mlir)
 
@@ -68,7 +67,6 @@ def controlled_adjoint_op():
     return qp.state()
 
 
-# CHECK-DAG: target_gate = "Adjoint(S){}{wires:1}{}"
 # CHECK-DAG: target_gate = "C(Adjoint(S)){}{wires:1}{}"
 print(controlled_adjoint_op.mlir)
 

@@ -19,7 +19,6 @@
 
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringMap.h"
-#include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/raw_ostream.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinAttributes.h"
@@ -36,36 +35,6 @@ using namespace catalyst::quantum;
 //===----------------------------------------------------------------------===//
 
 namespace {
-
-void printAttr(mlir::Attribute attr, llvm::raw_string_ostream &ss) {
-    llvm::TypeSwitch<mlir::Attribute, void>(attr)
-        .Case<mlir::DictionaryAttr>([&](mlir::DictionaryAttr dict) {
-            ss << "{";
-            for (auto [i, entry] : llvm::enumerate(dict)) {
-                if (i > 0) {
-                    ss << ",";
-                }
-
-                ss << entry.getName().str() << ":";
-                printAttr(entry.getValue(), ss);
-            }
-            ss << "}";
-        })
-        .Case<mlir::ArrayAttr>([&](mlir::ArrayAttr arr) {
-            ss << "[";
-            for (auto [i, attr] : llvm::enumerate(arr)) {
-                if (i > 0) {
-                    ss << ",";
-                }
-                printAttr(attr, ss);
-            }
-            ss << "]";
-        })
-        .Case<mlir::StringAttr>([&](mlir::StringAttr attr) { ss << attr.str(); })
-        .Case<mlir::IntegerAttr>([&](mlir::IntegerAttr attr) { ss << attr.getInt(); })
-        .Case<mlir::FloatAttr>([&](mlir::FloatAttr attr) { ss << attr.getValueAsDouble(); })
-        .Default([&](mlir::Attribute attr) { attr.print(ss); });
-}
 
 template <typename T, typename PrintFunc>
 void printSortedMap(const llvm::StringMap<T> &map, llvm::raw_string_ostream &ss,
@@ -151,7 +120,7 @@ std::string defaultGetGraphOpId(Operation *op) {
     ss << wrapModifiers(gate.getOperatorName(), op);
     printDynamicShape(gate.getDynamicShape(), ss);
     printWireLens(gate.getWireLens(), ss);
-    printAttr(gate.getStaticData(), ss);
+    gate.getStaticData().print(ss);
     if (gate.getExtraData() != "") {
         ss << '[' << gate.getExtraData() << ']';
     }

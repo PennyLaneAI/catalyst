@@ -15,7 +15,9 @@
 #pragma once
 
 #include "mlir/IR/Builders.h"
+#include "mlir/IR/Region.h"
 #include "mlir/IR/Value.h"
+#include "mlir/Support/LogicalResult.h"
 
 #include "Catalyst/IR/CatalystDialect.h"
 
@@ -31,6 +33,7 @@ namespace quantum {
 /// pass.
 struct QuantumCache {
     mlir::TypedValue<ArrayListType> paramVector;
+    mlir::TypedValue<ArrayListType> intVector;
     mlir::TypedValue<ArrayListType> wireVector;
     /// For every structured control flow op, store the values required for it to execute.
     /// Specifically: store the conditions for scf.if ops, the start/stop/step of scf.for ops, and
@@ -45,9 +48,26 @@ struct QuantumCache {
     void emitDealloc(mlir::OpBuilder &builder, mlir::Location loc);
 };
 
-/// Verify that `ty` is a type the cache knows how to record (an f64 scalar or a 2D tensor of
-/// complex<f64>), emitting an error on `op` otherwise.
-void verifyTypeIsCacheable(mlir::Type ty, mlir::Operation *op);
+/// Verify that `ty` is a type the cache knows how to record: an f64 or integer (<= 64-bit) scalar,
+/// a tensor of f64 or integer (<= 64-bit) elements, or a 2D tensor of complex<f64>. Emits an error
+/// on `op` and returns failure otherwise.
+mlir::LogicalResult verifyTypeIsCacheable(mlir::Type ty, mlir::Operation *op);
+
+/// Returns true if `param`, a gate parameter used inside `adjointRegion`, is already available
+/// when the reverse pass emits its gates, and therefore does not need to be recorded in the cache.
+///
+/// This holds in two cases:
+///   - `param` is defined outside `adjointRegion`. It dominates the adjoint operation, hence it
+///     also dominates everything the forward and reverse passes emit in its place.
+///
+///   - `param` is defined at the immediate top level of `adjointRegion`. These classical ops
+///     are cloned during forward-pass emission. Because reverse-pass operations are emitted
+///     only after the forward pass completes, their cloned results dominate and can be reused
+///     directly. They values also have no nested control flow dependence.
+///
+/// It does not hold for values defined inside nested control flow, since the forward pass rebuilds
+/// those regions and their values are neither visible nor loop-invariant: they must be recorded.
+bool isAvailableToReversePass(mlir::Value param, mlir::Region &adjointRegion);
 
 } // namespace quantum
 } // namespace catalyst
