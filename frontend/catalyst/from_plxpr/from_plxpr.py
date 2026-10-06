@@ -310,6 +310,11 @@ def handle_qnode(
             qnode.device, execution_config, shots, warn=self._preprocess_warn
         )
         pipelines += (("device", device_preprocessing_pipeline),)
+    pipelines += (("post-device", qnode._post_device_pipeline),)
+    # pipelines_flattened = tuple(t for _, stage_passes in pipelines for t in stage_passes)
+
+    # Mutate the QNode so resource analysis tools see both user/device transforms
+    # qnode._compile_pipeline = qp.CompilePipeline(list(pipelines_flattened))
 
     # no idea what deduce_avals is doing, but this seems to make dynamic shapes work
     flattened_fn = deduce_avals(
