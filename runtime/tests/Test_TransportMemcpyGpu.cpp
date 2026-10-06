@@ -128,6 +128,35 @@ TEST_CASE("memcpy GPU coprocessor rejects a reply wider than its 8 B correction"
     REQUIRE_THROWS_AS(controller.kick(0), std::runtime_error);
 }
 
+TEST_CASE("memcpy GPU coprocessor rejects a request wider than its 8 B payload",
+          "[transport_memcpy]") {
+    ConnectInfo ci{.peer = "loopback", .oob_port = 19039};
+    CpuControllerSession controller(pair_cfg(ci.oob_port));
+    GpuCoprocessorSession coprocessor(pair_cfg(ci.oob_port));
+
+    REQUIRE(controller.connect(ci) == 0);
+    REQUIRE(coprocessor.connect(ci) == 0);
+
+    MemRegion reply = controller.alloc_memory(sizeof(std::uint64_t), MemKind::CpuRam);
+    PeerRef peer_request = controller.exchange_keys(reply);
+
+    MemRegion request = coprocessor.alloc_memory(2 * sizeof(std::uint64_t), MemKind::CpuRam);
+    PeerRef peer_reply = coprocessor.exchange_keys(request);
+
+    ChannelDesc desc{.transport = "memcpy"};
+    controller.establish_channel(desc, reply, peer_request);
+    coprocessor.establish_channel(desc, request, peer_reply);
+
+    controller.commit_work_item(0, 2 * sizeof(std::uint64_t), sizeof(std::uint64_t));
+    coprocessor.set_coprocessor_launcher(nullptr, nullptr); // built-in GPU echo
+    controller.start();
+    coprocessor.start();
+
+    const std::uint64_t request_words[2] = {0x0123456789ABCDEFull, 0xFEDCBA9876543210ull};
+    controller.write_data_slot(request_words, sizeof(request_words), /*decoder_id=*/0);
+    REQUIRE_THROWS_AS(controller.kick(0), std::runtime_error);
+}
+
 TEST_CASE("memcpy rejects a second local GPU coprocessor on the same pair", "[transport_memcpy]") {
     ConnectInfo ci{.peer = "loopback", .oob_port = 19016};
     GpuCoprocessorSession first(pair_cfg(ci.oob_port));
