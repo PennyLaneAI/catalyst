@@ -247,7 +247,7 @@
 
     By default, the pass now emits call operations to the rule functions instead of inlining.
     A new boolean option `inline-rule-body` is added to the pass, which when set to true will inline the rule functions.
-    The same boolean option is added to the`graph-decomposition` pass as well.
+    The same boolean option is added to the `graph-decomposition` pass as well.
     When inlining is active, decomposition rules are deterministically inlined by a custom function (the upstream MLIR `inline` is non-deterministic, using an estimated benefit and threshold as criteria for inlining).
 
     3. Decomposition rules are no longer removed after the `decompose-lowering` pass, which allows them to be used by subsequent passes, namely `graph-decomposition`.
