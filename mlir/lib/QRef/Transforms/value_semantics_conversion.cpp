@@ -18,7 +18,7 @@
 // values as operands, and do not return any observables as results.
 #define REFERENCE_SEMANTICS_GATE_OPS                                                               \
     qref::QuantumOperation, qref::MeasureOp, qref::CtrlOp, mbqc::RefMeasureInBasisOp,              \
-        pbc::RefPPMeasurementOp
+        pbc::RefPPMeasurementOp, pbc::RefPPRotationOp, pbc::RefSelectPPMeasurementOp
 #define REFERENCE_SEMANTICS_OBSERVABLE_OPS                                                         \
     qref::ComputationalBasisOp, qref::NamedObsOp, qref::HermitianOp
 
@@ -246,8 +246,8 @@ bool isQrefSubroutine(func::FuncOp f) {
 }
 
 /**
- * @brief Erase all remaining qref.alloc, qref.get, qref.mbqc.graph_state_prep operations in a
- * function
+ * @brief Erase all remaining qref.alloc, qref.get, qref.mbqc.graph_state_prep, pbc.ref.fabricate
+ * and pbc.ref.prepare operations in a function
  *
  * During the conversion, these operations cannot be deleted immediately because they might be used
  * by other qref operations after their own conversion is done.
@@ -268,6 +268,16 @@ void eraseAllRemainingAnchorRValues(func::FuncOp f) {
         assert(graphStatePrepOp.use_empty() &&
                "qref.reg Values must have no uses after the semantic conversion");
         graphStatePrepOp->erase();
+    });
+    f.walk([&](pbc::RefFabricateOp fabricateOp) {
+        assert(fabricateOp.use_empty() &&
+               "qref.bit Values must have no uses after the semantic conversion");
+        fabricateOp->erase();
+    });
+    f.walk([&](pbc::RefPrepareStateOp prepareOp) {
+        assert(prepareOp.use_empty() &&
+               "qref.bit Values must have no uses after the semantic conversion");
+        prepareOp->erase();
     });
 }
 
@@ -1201,6 +1211,57 @@ void handlePPM(IRRewriter &builder, pbc::RefPPMeasurementOp rPPMOp, QubitValueTr
     builder.eraseOp(rPPMOp);
 }
 
+void handlePPR(IRRewriter &builder, pbc::RefPPRotationOp rPPROp, QubitValueTracker &tracker) {
+    OpBuilder::InsertionGuard guard(builder);
+    MLIRContext *ctx = rPPROp.getContext();
+
+    SmallVector<Type> qubitResultsType(rPPROp.getQubits().size(), quantum::QubitType::get(ctx));
+
+    // The operandSegmentSizes property is carried over from the ref op: both ops have the same
+    // (qubits, optional condition) operand layout.
+    migrateOpToValueSemantics<pbc::PPRotationOp>(builder, rPPROp, tracker, qubitResultsType);
+
+    builder.eraseOp(rPPROp);
+}
+
+void handleSelectPPM(IRRewriter &builder, pbc::RefSelectPPMeasurementOp rSelPPMOp,
+                     QubitValueTracker &tracker) {
+    OpBuilder::InsertionGuard guard(builder);
+    MLIRContext *ctx = rSelPPMOp.getContext();
+
+    SmallVector<Type> qubitResultsType(rSelPPMOp.getQubits().size(), quantum::QubitType::get(ctx));
+
+    auto vSelPPMOp = migrateOpToValueSemantics<pbc::SelectPPMeasurementOp>(
+        builder, rSelPPMOp, tracker, qubitResultsType);
+
+    builder.replaceAllUsesWith(rSelPPMOp.getMres(), vSelPPMOp.getMres());
+    builder.eraseOp(rSelPPMOp);
+}
+
+/**
+ * @brief Shared handler for pbc.ref.fabricate / pbc.ref.prepare.
+ *
+ * The produced rQubits are root values (like qref.alloc_qb results), so they are recorded in the
+ * tracker directly. The reference semantics op itself is not erased here, since its rQubit results
+ * may still be used by later qref operations that have not been converted yet. It is erased at the
+ * end of the function's conversion by `eraseAllRemainingAnchorRValues`.
+ */
+template <typename VOpTy, typename ROpTy>
+void handlePBCQubitProducer(IRRewriter &builder, ROpTy rProducerOp, QubitValueTracker &tracker) {
+    OpBuilder::InsertionGuard guard(builder);
+    builder.setInsertionPoint(rProducerOp);
+    Location loc = rProducerOp.getLoc();
+    MLIRContext *ctx = rProducerOp.getContext();
+
+    SmallVector<Type> vQubitTypes(rProducerOp.getOutQubits().size(), quantum::QubitType::get(ctx));
+    auto vProducerOp = VOpTy::create(builder, loc, vQubitTypes, rProducerOp.getInitState());
+
+    for (auto [rQubit, vQubit] :
+         llvm::zip_equal(rProducerOp.getOutQubits(), vProducerOp.getOutQubits())) {
+        tracker.setCurrentVQubit(rQubit, vQubit);
+    }
+}
+
 void handleCall(IRRewriter &builder, func::CallOp callOp, QubitValueTracker &tracker) {
     OpBuilder::InsertionGuard guard(builder);
     MLIRContext *ctx = callOp.getContext();
@@ -1928,6 +1989,13 @@ void handleRegion(IRRewriter &builder, Region &r, QubitValueTracker &tracker) {
             .Case<mbqc::RefMeasureInBasisOp>(
                 [&](auto o) { handleMeasureInBasis(builder, o, tracker); })
             .Case<pbc::RefPPMeasurementOp>([&](auto o) { handlePPM(builder, o, tracker); })
+            .Case<pbc::RefPPRotationOp>([&](auto o) { handlePPR(builder, o, tracker); })
+            .Case<pbc::RefSelectPPMeasurementOp>(
+                [&](auto o) { handleSelectPPM(builder, o, tracker); })
+            .Case<pbc::RefFabricateOp>(
+                [&](auto o) { handlePBCQubitProducer<pbc::FabricateOp>(builder, o, tracker); })
+            .Case<pbc::RefPrepareStateOp>(
+                [&](auto o) { handlePBCQubitProducer<pbc::PrepareStateOp>(builder, o, tracker); })
             .Case<qref::AdjointOp>([&](auto o) { handleAdjoint(builder, o, tracker); })
             .Case<qref::CtrlOp>([&](auto o) { handleCtrl(builder, o, tracker); })
             .Case<scf::IfOp>([&](auto o) { handleIf(builder, o, tracker); })

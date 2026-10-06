@@ -659,6 +659,10 @@
 * Added reference semantics support for PBC operations.
   [(#3136)](https://github.com/PennyLaneAI/catalyst/pull/3136)
 
+* The `--convert-to-value-semantics` pass now supports the reference semantics PBC operations
+  `pbc.ref.ppr`, `pbc.ref.select.ppm`, `pbc.ref.fabricate` and `pbc.ref.prepare`, converting them
+  back to `pbc.ppr`, `pbc.select.ppm`, `pbc.fabricate` and `pbc.prepare`.
+
 <h3>Deprecations 👋</h3>
 
 <h3>Bug fixes 🐛</h3>
