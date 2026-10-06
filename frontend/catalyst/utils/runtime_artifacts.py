@@ -25,8 +25,6 @@ import os
 
 from jax._src.lib.mlir import ir
 
-from catalyst.utils.exceptions import CompileError
-
 RUNTIME_ARTIFACTS_ATTR = "catalyst.runtime_artifacts"
 
 
@@ -47,17 +45,18 @@ def record_runtime_artifact(module_op, artifact_path):
 def record_device_runtime_artifacts(module_op, device):
     """Record the runtime libraries optionally declared by ``device``."""
     get_artifacts = getattr(device, "get_runtime_artifacts", None)
+
     if get_artifacts is None:
         return
 
-    for artifact_path in get_artifacts():
-        artifact_path = str(artifact_path)
-        if not os.path.isfile(artifact_path):
-            raise CompileError(
-                f"Device '{device.name}' declares runtime artifact '{artifact_path}', "
-                "which does not exist."
-            )
-        record_runtime_artifact(module_op, artifact_path)
+    device_runtime_artifacts = get_artifacts()
+    if isinstance(device_runtime_artifacts, (str, bytes, os.PathLike)):
+        raise TypeError(
+            "calling device.get_runtime_artifacts should return an iterable of paths,"
+            f"but got {type(device_runtime_artifacts)}"
+        )
+    for artifact_path in device_runtime_artifacts:
+        record_runtime_artifact(module_op, str(artifact_path))
 
 
 def collect_runtime_artifacts(mlir_module, compile_options):

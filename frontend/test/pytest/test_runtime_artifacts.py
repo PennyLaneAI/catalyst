@@ -16,9 +16,8 @@
 ``runtime_call`` records, the libraries a device records through ``get_runtime_artifacts()``,
 and their collection into the compile options."""
 
-import re
-
 import jax.numpy as jnp
+from pathlib import Path
 import pennylane as qp
 import pytest
 from jax._src.lib.mlir import ir
@@ -72,45 +71,26 @@ def test_library_recorded_inside_a_qnode_is_collected():
     assert lower(circuit, (jnp.uint64(0),)) == (LIB_B,)
 
 
-def test_device_runtime_artifacts_are_collected(tmp_path):
+def test_device_runtime_artifacts_are_collected():
     """Libraries a device declares reach the compile options, once each, in declaration order."""
-    first = tmp_path / "first.so"
-    second = tmp_path / "second.so"
-    first.write_bytes(b"")
-    second.write_bytes(b"")
 
-    @qp.qnode(device_with_artifacts(first, second, first))
+    @qp.qnode(device_with_artifacts(LIB_A, LIB_B, LIB_A))
     def circuit():
         return qp.expval(qp.PauliZ(0))
 
-    assert lower(circuit, ()) == (str(first), str(second))
+    assert lower(circuit, ()) == (LIB_A, LIB_B)
 
 
-def test_missing_device_runtime_artifact_is_rejected(tmp_path):
-    """A declared path that is not a file fails compilation with a clear error."""
-    missing = tmp_path / "missing.so"
-
-    @qp.qnode(device_with_artifacts(missing))
-    def circuit():
-        return qp.expval(qp.PauliZ(0))
-
-    message = f"Device 'null.qubit' declares runtime artifact '{missing}', which does not exist."
-    with pytest.raises(CompileError, match=re.escape(message)):
-        lower(circuit, ())
-
-
-def test_device_and_call_libraries_are_both_collected(tmp_path):
+def test_device_and_call_libraries_are_both_collected():
     """The device library is recorded on the enclosing module, ahead of the nested call's library."""
-    device_lib = tmp_path / "device.so"
-    device_lib.write_bytes(b"")
 
-    @qp.qnode(device_with_artifacts(device_lib))
+    @qp.qnode(device_with_artifacts(LIB_B))
     def circuit(session):
         rounds = qp.runtime_call("test_artifacts_symbol", session, 100, library=LIB_A)
         qp.RX(jnp.float64(rounds) * 0.0, wires=0)
         return qp.expval(qp.PauliZ(0))
 
-    assert lower(circuit, (jnp.uint64(0),)) == (str(device_lib), LIB_A)
+    assert lower(circuit, (jnp.uint64(0),)) == (LIB_B, LIB_A)
 
 
 def collect_from(mlir_text):
@@ -150,3 +130,34 @@ def test_only_module_operations_are_consulted():
         """)
 
     assert collected == ("/outer.so",)
+
+
+def test_compile_error_if_library_not_found():
+    """If the library path can't be found when its time to actually link things, a clear
+    error is raised"""
+
+    @qp.qjit
+    @qp.qnode(device_with_artifacts(LIB_A))
+    def circuit():
+        return qp.expval(qp.PauliZ(0))
+
+    with pytest.raises(CompileError, match=f"could not locate runtime library .*{LIB_A}"):
+        circuit()
+
+
+@pytest.mark.parametrize("path", [LIB_A, LIB_A.encode(), Path(LIB_A)])
+def test_error_for_bad_device_artifact_type(path):
+    """Test that a clear error is raised if dev.get_runtime_artifacts returns a
+    single path instead of an iterable"""
+
+    dev = qp.device("null.qubit", wires=1)
+    dev.get_runtime_artifacts = lambda: path
+
+    @qp.qnode(dev)
+    def circuit():
+        return qp.expval(qp.PauliZ(0))
+
+    with pytest.raises(
+        TypeError, match="calling device.get_runtime_artifacts should return an iterable of paths"
+    ):
+        lower(circuit, ())

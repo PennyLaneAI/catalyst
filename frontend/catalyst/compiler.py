@@ -193,6 +193,8 @@ class LinkerDriver:
         # module via `catalyst.runtime_artifacts` and collected into the options.
         for artifact_path in options.runtime_artifacts:
             artifact_path = os.path.abspath(artifact_path)
+            if not os.path.isfile(artifact_path):
+                raise CompileError(f"could not locate runtime library {artifact_path}")
             dir_name = os.path.dirname(artifact_path)
             default_flags += [
                 f"-Wl,-rpath,{dir_name}",
