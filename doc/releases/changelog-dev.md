@@ -621,7 +621,7 @@
   Parameters that are trivially available to the reverse pass are no longer cached.
   [(#3233)](https://github.com/PennyLaneAI/catalyst/pull/3233)
 
-* Added a guard in the `--convert-to-value-semantics` pass to raise an error when 
+* Added a guard in the `--convert-to-value-semantics` pass to raise an error when
   unsupported quantum-bearing `scf` operations are encountered.
   [(#3238)](https://github.com/PennyLaneAI/catalyst/pull/3238)
 
@@ -658,10 +658,7 @@
 
 * Added reference semantics support for PBC operations.
   [(#3136)](https://github.com/PennyLaneAI/catalyst/pull/3136)
-
-* The `--convert-to-value-semantics` pass now supports the reference semantics PBC operations
-  `pbc.ref.ppr`, `pbc.ref.select.ppm`, `pbc.ref.fabricate` and `pbc.ref.prepare`, converting them
-  back to `pbc.ppr`, `pbc.select.ppm`, `pbc.fabricate` and `pbc.prepare`.
+  [(#3305)](https://github.com/PennyLaneAI/catalyst/pull/3305)
 
 <h3>Deprecations 👋</h3>
 
