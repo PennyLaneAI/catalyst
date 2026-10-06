@@ -332,6 +332,7 @@
   `catalyst.estimated_probabilities` attribute, respectively, to indicate the expected probability
   distribution over the branches. The counted resources are then scaled proportionally and summed.
   [(#3059)](https://github.com/PennyLaneAI/catalyst/pull/3059)
+  [(#3195)](https://github.com/PennyLaneAI/catalyst/pull/3195)
 
 * Warnings and diagnostics emitted by successful Catalyst compiler subprocesses are now forwarded to
   Python callers instead of being silently discarded. LLVM diagnostic colors are preserved in
