@@ -1868,20 +1868,25 @@ class TestDecomposeAlias:
         assert 'apply_registered_pass "graph-decomposition"' in via_decompose.mlir
         assert via_decompose.mlir == via_graph.mlir
 
+    @pytest.mark.xfail(
+        strict=True,
+        reason="Specs with decompose is currently broken since the pass_name is not defined. "
+        "This will be fixed with PennyLane PR #10242.",
+    )
     @pytest.mark.parametrize(
-        "tkwargs, exc",
+        "tkwargs, exc, match",
         [
-            ({"gate_set": {"RX"}, "stopping_condition": lambda op: True}, NotImplementedError),
-            ({"gate_set": {"RX"}, "max_expansion": 2}, NotImplementedError),
-            ({"gate_set": {"RX"}, "num_work_wires": 2}, NotImplementedError),
-            ({"gate_set": {"RX"}, "minimize_work_wires": True}, NotImplementedError),
-            ({"gate_set": {"RX"}, "strict": False}, NotImplementedError),
-            ({"gate_set": None}, ValueError),
+            ({"gate_set": {"RX"}, "stopping_condition": lambda op: True}, NotImplementedError, ""),
+            ({"gate_set": {"RX"}, "max_expansion": 2}, NotImplementedError, ""),
+            ({"gate_set": {"RX"}, "num_work_wires": 2}, NotImplementedError, ""),
+            ({"gate_set": {"RX"}, "minimize_work_wires": True}, NotImplementedError, ""),
+            ({"gate_set": {"RX"}, "strict": False}, NotImplementedError, ""),
+            ({"gate_set": None}, ValueError, "requires an explicit 'gate_set'"),
         ],
     )
-    def test_decompose_rejects_unsupported_kwargs(self, tkwargs, exc):
+    def test_decompose_rejects_unsupported_kwargs(self, tkwargs, exc, match):
         """Kwargs the graph-decomposition pass cannot honor are rejected with a clear error."""
-        with pytest.raises(exc):
+        with pytest.raises(exc, match=match):
 
             @qjit(capture=True, target="mlir")
             @qp.decompose(**tkwargs)
@@ -1964,6 +1969,11 @@ class TestDecomposeAlias:
         assert 'apply_registered_pass "graph-decomposition"' in mlir
         assert "NoParams" in mlir
 
+    @pytest.mark.xfail(
+        strict=True,
+        reason="Specs with decompose is currently broken since the pass_name is not defined. "
+        "This will be fixed with PennyLane PR #10242.",
+    )
     def test_decompose_inline_rules_require_rule_collection(self):
         """Inline rules with ``collect_decomp_rules=False`` raise a clear error."""
 
@@ -2041,6 +2051,11 @@ class TestNumericHamiltonianDecomposition:
             kinetic=np.einsum("ab,cd->abcd", np.eye(n_states), np.diag(0.3 * np.ones(n_modes))),
         )
 
+    @pytest.mark.xfail(
+        strict=True,
+        reason="Specs with decompose is currently broken since the pass_name is not defined. "
+        "This will be fixed with PennyLane PR #10242.",
+    )
     def test_trotter_vibronic_captures_numeric_hamiltonian(self):
         """Test a ``TrotterVibronic`` carrying a numeric ``VibronicHamiltonian`` is captured to MLIR with
         the Hamiltonian passed through its decomposition rules.
