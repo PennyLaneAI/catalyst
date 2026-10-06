@@ -189,11 +189,6 @@ class LinkerDriver:
         if os.path.isfile(os.path.join(rt_lib_path, rt_transport_so)):
             default_flags.append("-lrt_transport")
 
-        # If OQD runtime capi is built, link to it as well
-        # TODO: This is not ideal and should be replaced when the compiler is device aware
-        if os.path.isfile(os.path.join(rt_lib_path, "librt_OQD_capi" + file_extension)):
-            default_flags.append("-lrt_OQD_capi")
-
         # Shared libraries exporting symbols reached by a local `runtime_call`, recorded on the
         # module via `catalyst.runtime_artifacts` and collected into the options.
         for artifact_path in options.runtime_artifacts:
