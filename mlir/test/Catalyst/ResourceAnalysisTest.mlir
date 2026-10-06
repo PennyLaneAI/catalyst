@@ -1175,14 +1175,14 @@ func.func @static_trip_count_large_signed_span(%arg0: !quantum.bit) -> !quantum.
 // A branch between the loops prevents the inner loop from being treated as directly nested.
 
 // CHECK-LABEL: "dyn_for_loop_1": {
-// CHECK: metadata
-// CHECK:       "has_branches": true
 // CHECK: "quantum_operations"
 // CHECK:   "PauliX": 1
 // CHECK-LABEL: "for_loop_1": {
 // CHECK: "function_calls"
 // CHECK:   "dynamic":
 // CHECK:       "dyn_for_loop_1"
+// CHECK: metadata
+// CHECK:       "has_branches": true
 // CHECK-LABEL: "intervening_if_nested_for_loop": {
 // CHECK: "function_calls"
 // CHECK:   "static":
