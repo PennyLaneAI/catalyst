@@ -880,6 +880,7 @@ func.func @test_preserves_scf_hints(%arg0: i1, %arg1: index) attributes {quantum
 
     quantum.dealloc %12 : !quantum.reg
     return
+}
 
 
 // -----
