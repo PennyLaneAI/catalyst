@@ -128,9 +128,9 @@ def test_nested_modules_are_collected_and_deduplicated():
 
     collected = collect_from("""
         module attributes {catalyst.runtime_artifacts = ["/outer.so", "/shared.so"]} {
-        module attributes {catalyst.runtime_artifacts = ["/shared.so", "/inner.so"]} {
+          module attributes {catalyst.runtime_artifacts = ["/shared.so", "/inner.so"]} {
             module attributes {catalyst.runtime_artifacts = ["/deepest.so"]} { }
-        }
+          }
         }
         """)
 
