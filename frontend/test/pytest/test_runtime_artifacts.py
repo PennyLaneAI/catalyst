@@ -142,10 +142,10 @@ def test_only_module_operations_are_consulted():
 
     collected = collect_from("""
         module attributes {catalyst.runtime_artifacts = ["/outer.so"]} {
-        "some.holder"() ({
+          "some.holder"() ({
             module attributes {catalyst.runtime_artifacts = ["/under_an_op.so"]} { }
             "some.terminator"() : () -> ()
-        }) {catalyst.runtime_artifacts = ["/on_an_op.so"]} : () -> ()
+          }) {catalyst.runtime_artifacts = ["/on_an_op.so"]} : () -> ()
         }
         """)
 
