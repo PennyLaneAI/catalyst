@@ -14,7 +14,7 @@
 
 // Test that decomposition chooses cheapest decomposition path
 
-// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{gate-set=testRX=1.0,testRY=1.0,testRZ=1.0 bytecode-rules="%BYTECODE_PATH"})' %s | FileCheck %s
+// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{inline-rule-body gate-set=testRX=1.0,testRY=1.0,testRZ=1.0 bytecode-rules="%BYTECODE_PATH"})' %s | FileCheck %s
 
 
 func.func @circuit() -> !quantum.bit {
