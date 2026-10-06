@@ -197,6 +197,8 @@ std::size_t GpuCoprocessorSession::process_message(const void *in, std::size_t i
     TP_CHECK(in_len == sizeof(common::Payload),
              "The GPU coprocessor carries 8 B messages, got a %zu B frame", in_len);
     TP_CHECK(kernel_running_, "Call start() before process_message");
+    TP_CHECK(out_cap <= sizeof(std::int64_t),
+             "The GPU coprocessor carries 8 B messages, got a %zu B reply", out_cap);
     if (failed_.load(std::memory_order_acquire)) {
         std::rethrow_exception(error_);
     }
