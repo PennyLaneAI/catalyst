@@ -217,6 +217,10 @@ std::size_t GpuCoprocessorSession::process_message(const void *in, std::size_t i
              "coproc_fn=per_message in its config for larger ones",
              in_len);
     TP_CHECK(kernel_running_, "Call start() before process_message");
+    TP_CHECK(out_cap <= sizeof(std::int64_t),
+             "A launch-once GPU coprocessor carries 8 B messages, got a %zu B reply; set "
+             "coproc_fn=per_message in its config for larger ones",
+             out_cap);
     if (failed_.load(std::memory_order_acquire)) {
         std::rethrow_exception(error_);
     }
