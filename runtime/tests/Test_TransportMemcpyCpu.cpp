@@ -280,8 +280,9 @@ TEST_CASE("memcpy incumbent coprocessor survives a rejected second coprocessor",
 }
 
 namespace {
-// Replies with the frame's payload bytes inverted, followed by its decoder_id, after checking the
-// frame is laid out as common::frame_bytes describes and the reply capacity is the committed size.
+// Replies with each payload byte's bits flipped, so the reply can't be mistaken for the request,
+// then the frame's decoder_id. Replies with nothing if the frame or reply size is not the
+// committed one.
 struct WideFrameCheck {
     std::size_t in_bytes;
     std::size_t out_bytes;
