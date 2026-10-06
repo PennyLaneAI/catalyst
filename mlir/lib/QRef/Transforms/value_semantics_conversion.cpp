@@ -1221,9 +1221,6 @@ void handlePPR(IRRewriter &builder, pbc::RefPPRotationOp rPPROp, QubitValueTrack
     MLIRContext *ctx = rPPROp.getContext();
 
     SmallVector<Type> qubitResultsType(rPPROp.getQubits().size(), quantum::QubitType::get(ctx));
-
-    // The operandSegmentSizes property is carried over from the ref op: both ops have the same
-    // (qubits, optional condition) operand layout.
     migrateOpToValueSemantics<pbc::PPRotationOp>(builder, rPPROp, tracker, qubitResultsType);
 
     builder.eraseOp(rPPROp);
