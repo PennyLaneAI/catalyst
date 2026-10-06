@@ -144,7 +144,9 @@ static method that takes no parameters and returns the complete path to your sha
 Some devices need additional shared libraries at link time beyond the ``QuantumDevice`` implementation; 
 for example, a support library that defines symbols referenced by device-specific compiler passes.
 For that, implement an optional ``get_runtime_artifacts`` method. It should return an iterable of
-absolute paths to the shared libraries Catalyst should pass to the linker.
+absolute paths to the shared libraries Catalyst should pass to the linker. A concrete example of this is
+the `OQD device <https://github.com/PennyLaneAI/catalyst/blob/7ca367714f57883b88b8cda4f30a36b757017b9f/frontend/catalyst/third_party/oqd/oqd_device.py>`_ ,
+which uses this method to extend the runtime API with additional functions.
 
 The Pennylane device API allows you to build a QJIT compatible device in a simple way:
 
