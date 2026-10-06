@@ -14,6 +14,7 @@
 
 """Utilities for AOT compiling PennyLane's decomposition rules to MLIR Bytecode."""
 
+import json
 from pathlib import Path
 
 import pennylane as qp
@@ -21,52 +22,82 @@ from jax._src.lib.mlir import ir
 
 from catalyst.compiler import _quantum_opt
 from catalyst.decomposition.capture_session import DecompositionScope, OpDecompRequest
-from catalyst.decomposition.decomposition_rules import (
-    materialize_decomp_rule_strings,
-    walk_reachable_decomp_rule_sets,
+from catalyst.decomposition.decomposition_cache import (
+    get_bytecode_hash,
+    get_rule_entry,
 )
-from catalyst.utils.runtime_environment import BYTECODE_FILE_PATH
+from catalyst.from_plxpr.qfunc_interpreter import (
+    PLxPRToQuantumJaxprInterpreter,
+    capture_and_bind_kernel_rules,
+)
+from catalyst.from_plxpr.qref_jax_primitives import QrefQreg
+from catalyst.utils.runtime_environment import BYTECODE_FILE_PATH, get_bytecode_manifest_path
 
-PRECOMPILED_MODIFIERS = (
+PRECOMPILATION_MODIFIERS = (
     (False, 0),
     (True, 0),
 )
 
 
-def precompile_decomp_rules(decomp_file_path: str = BYTECODE_FILE_PATH) -> None:
+def _capture_rule_module(scope: DecompositionScope) -> ir.Operation:
+    """Capture every reachable rule in scope into one MLIR module."""
+    interpreter = PLxPRToQuantumJaxprInterpreter(
+        qp.device("null.qubit", wires=1),
+        None,
+        QrefQreg(),
+        {},
+        decomposition_scope=scope,
+    )
+
+    # use target="mlir" and .mlir_module to skip compiler invocation
+    @qp.qjit(capture=True, target="mlir", collect_decomp_rules=False)
+    def rules_module():
+        capture_and_bind_kernel_rules(interpreter, precompiled_rule_identities=frozenset())
+
+    return rules_module.mlir_module
+
+
+def precompile_decomp_rules(_decomp_file_path: str | Path = BYTECODE_FILE_PATH) -> None:
     """Compile PennyLane built-in decomposition rules to MLIR Bytecode.
 
     Args:
         decomp_file_path (Path): path to compile rules to.
     """
-    Path(decomp_file_path).parent.mkdir(parents=True, exist_ok=True)
-
-    # newline to ensure emptystring is never passed
-    bytecode_lib = "\n"
+    Path(_decomp_file_path).parent.mkdir(parents=True, exist_ok=True)
+    _decomp_file_path = Path(_decomp_file_path)
 
     scope = DecompositionScope()
 
     for abstract_ops in qp.decomposition.signature_registry().values():
         for op in abstract_ops:
-            for modifier_context in PRECOMPILED_MODIFIERS:
-                scope.record_root(OpDecompRequest.from_operation(op, modifier_context))
+            for modifier_state in PRECOMPILATION_MODIFIERS:
+                scope.record_root(OpDecompRequest.from_operation(op, modifier_state))
 
-    with ir.Context():
-        target_specs = walk_reachable_decomp_rule_sets(list(scope.roots.values()))
-        bytecode_lib += "\n".join(materialize_decomp_rule_strings(target_specs))
+    rule_module = _capture_rule_module(scope)
 
     bytecode = _quantum_opt(
         "--emit-bytecode",
-        "--canonicalize",
+        "--canonicalize",  # TODO: do we need these passes anymore?
         "--convert-to-value-semantics",
         "--canonicalize",
         "--register-decomp-rule-resource",
-        stdin=bytecode_lib.encode("utf-8"),
+        stdin=str(rule_module).encode("utf-8"),
         text=None,
+        stderr_return=True,
     )
 
-    with open(decomp_file_path, "wb") as bytecode_file:
+    with open(_decomp_file_path, "wb") as bytecode_file:
         bytecode_file.write(bytecode)
+
+    with open(
+        get_bytecode_manifest_path(_decomp_file_path), "w", encoding="utf-8"
+    ) as manifest_file:
+        manifest = {
+            "bytecode_hash": get_bytecode_hash(bytecode),
+            "precompiled_rules": [get_rule_entry(rule) for rule in scope.definitions],
+        }
+
+        json.dump(manifest, manifest_file)
 
 
 if __name__ == "__main__":  # pragma: no cover
