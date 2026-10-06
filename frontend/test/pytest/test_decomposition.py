@@ -1890,7 +1890,7 @@ class TestDecomposeAlias:
                 qp.Rot(0.1, 0.2, 0.3, wires=0)
                 return qp.probs()
 
-            qp.specs(circuit, level="all-mlir")()
+            qp.specs(circuit, level="all")()
 
     def test_decompose_multiple_matches_graph_decomposition(self):
         """Stacking two ``qp.decompose`` transforms matches stacking ``graph_decomposition``."""
@@ -1985,7 +1985,7 @@ class TestDecomposeAlias:
                     qp.Rot(0.1, 0.2, 0.3, wires=0)
                     return qp.probs()
 
-                qp.specs(circuit, level="all-mlir")()
+                qp.specs(circuit, level="all")()
         finally:
             qp.decomposition.disable_graph()
 
