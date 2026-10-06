@@ -85,8 +85,9 @@ def test_device_runtime_artifacts_are_collected(tmp_path):
 
     assert lower(circuit, ()) == (str(first), str(second))
 
+
 def test_missing_device_runtime_artifact_is_rejected(tmp_path):
-    """A declared path that is not a file fails compilation and names the device and the path."""
+    """A declared path that is not a file fails compilation with a clear error."""
     missing = tmp_path / "missing.so"
 
     @qp.qnode(device_with_artifacts(missing))
