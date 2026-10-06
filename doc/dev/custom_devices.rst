@@ -119,7 +119,7 @@ One can follow the ``catalyst/runtime/tests/third_party/CMakeLists.txt``
 Integration with Python devices
 ===============================
 
-There are two things that are needed in order to integrate with PennyLane devices:
+There are a few things that are needed in order to integrate with PennyLane devices:
 
 * Adding a ``get_c_interface`` method to your ``qp.devices.Device`` class.
 * Adding a ``config_filepath`` class variable pointing to your configuration file. This file should
@@ -127,6 +127,8 @@ There are two things that are needed in order to integrate with PennyLane device
   supported by your device.
 * Optionally, adding a ``device_kwargs`` dictionary for runtime parameters to pass from the
   PennyLane device to the ``QuantumDevice`` upon initialization.
+* Optionally, adding a ``get_runtime_artifacts`` method if your device needs additional shared
+  libraries linked into the compiled program.
 
 If you already have a custom PennyLane device defined in Python and have added a shared object that
 corresponds to your implementation of the ``QuantumDevice`` class, then all you need to do is to add
@@ -138,6 +140,11 @@ static method that takes no parameters and returns the complete path to your sha
 
     The first result of ``get_c_interface`` needs to match the ``<DeviceIdentifier>``
     as described in the first section.
+
+Some devices need additional shared libraries at link time beyond the ``QuantumDevice`` implementation; 
+for example, a support library that defines symbols referenced by device-specific compiler passes.
+For that, implement an optional ``get_runtime_artifacts`` method. It should return an iterable of
+absolute paths to the shared libraries Catalyst should pass to the linker.
 
 The Pennylane device API allows you to build a QJIT compatible device in a simple way:
 
@@ -155,6 +162,13 @@ The Pennylane device API allows you to build a QJIT compatible device in a simpl
             """
 
             return "CustomDevice", "absolute/path/to/librtd_custom.so"
+
+        @staticmethod
+        def get_runtime_artifacts():
+            """Returns a tuple of extra shared libraries that must be linked with the program.
+            """
+
+            return ("absolute/path/to/librtd_support.so",)
 
         def __init__(self, shots=None, wires=None):
             super().__init__(wires=wires, shots=shots)
