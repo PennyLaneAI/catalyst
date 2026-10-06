@@ -12,28 +12,38 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{gate-set=C(Adjoint(H))=1.0,C(H)=1.0 alt-decomps=C(Adjoint(U)){}{wires:1}{}=ctrl_adj_u,C(U){}{wires:1}{}=ctrl_u})' %s | FileCheck %s
+// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{gate-set=C(Adjoint(H))=1.0,C(H)=1.0 alt-decomps=C(Adjoint(U)){}{wires:1}{}=ctrl_adj_u,C(U){}{wires:1}{}=ctrl_u})' %s | FileCheck %s --check-prefixes=ALL,CALL
 
-// CHECK-LABEL: func.func @controlled_adjoint(
-// CHECK-SAME:  %[[Q:.*]]: !quantum.bit, %[[C:.*]]: !quantum.bit
+// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{inline-rule-body gate-set=C(Adjoint(H))=1.0,C(H)=1.0 alt-decomps=C(Adjoint(U)){}{wires:1}{}=ctrl_adj_u,C(U){}{wires:1}{}=ctrl_u})' %s | FileCheck %s --check-prefixes=ALL,INLINE
+
+// ALL-LABEL: func.func @controlled_adjoint(
+// ALL-SAME:  %[[Q:.*]]: !quantum.bit, %[[C:.*]]: !quantum.bit
 func.func @controlled_adjoint(%ctrl: !quantum.bit, %q: !quantum.bit) -> (!quantum.bit, !quantum.bit) {
   %true = arith.constant true
   // C(Adjoint(U)) takes the ctrl_adj_u rule -> two C(Adjoint(H)) (adj + ctrls)
-  // CHECK: %[[A:.*]], %[[AC:.*]] = quantum.custom "H"() %[[Q]] adj ctrls(%[[C]]) ctrlvals(%{{.*}}) : !quantum.bit ctrls !quantum.bit
-  // CHECK: %[[B:.*]], %[[BC:.*]] = quantum.custom "H"() %[[A]] adj ctrls(%[[AC]]) ctrlvals(%{{.*}}) : !quantum.bit ctrls !quantum.bit
-  // CHECK: return %[[B]], %[[BC]]
+
+  // CALL: %[[OQ:.*]]:2 = call @ctrl_adj_u_1(%[[Q]], %[[C]]) : (!quantum.bit, !quantum.bit) -> (!quantum.bit, !quantum.bit)
+  // CALL: return %[[OQ]]#0, %[[OQ]]#1 : !quantum.bit, !quantum.bit
+
+  // INLINE: %[[A:.*]], %[[AC:.*]] = quantum.custom "H"() %[[Q]] adj ctrls(%[[C]]) ctrlvals(%{{.*}}) : !quantum.bit ctrls !quantum.bit
+  // INLINE: %[[B:.*]], %[[BC:.*]] = quantum.custom "H"() %[[A]] adj ctrls(%[[AC]]) ctrlvals(%{{.*}}) : !quantum.bit ctrls !quantum.bit
+  // INLINE: return %[[B]], %[[BC]]
   %out, %outc = quantum.custom "U"() %q adj ctrls(%ctrl) ctrlvals(%true) : !quantum.bit ctrls !quantum.bit
   return %out, %outc : !quantum.bit, !quantum.bit
 }
 
-// CHECK-LABEL: func.func @plain_controlled(
-// CHECK-SAME:  %[[Q:.*]]: !quantum.bit, %[[C:.*]]: !quantum.bit
+// ALL-LABEL: func.func @plain_controlled(
+// ALL-SAME:  %[[Q:.*]]: !quantum.bit, %[[C:.*]]: !quantum.bit
 func.func @plain_controlled(%ctrl: !quantum.bit, %q: !quantum.bit) -> (!quantum.bit, !quantum.bit) {
   %true = arith.constant true
   // C(U) (no adjoint) is a distinct node: it takes ctrl_u -> a single non-adjoint C(H)
-  // CHECK: %[[O:.*]], %[[OC:.*]] = quantum.custom "H"() %[[Q]] ctrls(%[[C]]) ctrlvals(%{{.*}}) : !quantum.bit ctrls !quantum.bit
-  // CHECK-NOT: adj
-  // CHECK: return %[[O]], %[[OC]]
+
+  // CALL: %[[OQ:.*]]:2 = call @ctrl_u_0(%[[Q]], %[[C]]) : (!quantum.bit, !quantum.bit) -> (!quantum.bit, !quantum.bit)
+  // CALL: return %[[OQ]]#0, %[[OQ]]#1 : !quantum.bit, !quantum.bit
+
+  // INLINE: %[[O:.*]], %[[OC:.*]] = quantum.custom "H"() %[[Q]] ctrls(%[[C]]) ctrlvals(%{{.*}}) : !quantum.bit ctrls !quantum.bit
+  // INLINE-NOT: adj
+  // INLINE: return %[[O]], %[[OC]]
   %out, %outc = quantum.custom "U"() %q ctrls(%ctrl) ctrlvals(%true) : !quantum.bit ctrls !quantum.bit
   return %out, %outc : !quantum.bit, !quantum.bit
 }
@@ -56,3 +66,14 @@ func.func private @ctrl_u(%q: !quantum.bit, %ctrl: !quantum.bit) -> (!quantum.bi
   %o, %oc = quantum.custom "H"() %q ctrls(%ctrl) ctrlvals(%true) : !quantum.bit ctrls !quantum.bit
   return %o, %oc : !quantum.bit, !quantum.bit
 }
+
+// CALL: func.func private @ctrl_u_0(%arg0: !quantum.bit, %arg1: !quantum.bit) -> (!quantum.bit, !quantum.bit) {
+// CALL:   %[[T:.*]] = arith.constant true
+// CALL:   %[[O:.*]], %[[OC:.*]] = quantum.custom "H"() %arg0 ctrls(%arg1) ctrlvals(%[[T]]) : !quantum.bit ctrls !quantum.bit
+// CALL:   return %[[O]], %[[OC]] : !quantum.bit, !quantum.bit
+//
+// CALL: func.func private @ctrl_adj_u_1(%arg0: !quantum.bit, %arg1: !quantum.bit) -> (!quantum.bit, !quantum.bit) {
+// CALL:   %[[T:.*]] = arith.constant true
+// CALL:   %[[O:.*]], %[[OC:.*]] = quantum.custom "H"() %arg0 adj ctrls(%arg1) ctrlvals(%[[T]]) : !quantum.bit ctrls !quantum.bit
+// CALL:   %[[O1:.*]], %[[OC1:.*]] = quantum.custom "H"() %[[O]] adj ctrls(%[[OC]]) ctrlvals(%[[T]]) : !quantum.bit ctrls !quantum.bit
+// CALL:   return %[[O1]], %[[OC1]] : !quantum.bit, !quantum.bit

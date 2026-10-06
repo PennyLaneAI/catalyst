@@ -12,16 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{gate-set=C(Hadamard)=1.0 alt-decomps=C(U){}{wires:1}{}=ctrl_u})' %s | FileCheck %s
+// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{gate-set=C(Hadamard)=1.0 alt-decomps=C(U){}{wires:1}{}=ctrl_u})' %s | FileCheck %s --check-prefixes=ALL,CALL
 
-// CHECK-LABEL: func.func @distribute_region(
-// CHECK-SAME:  %[[CTRL:.*]]: !quantum.bit, %[[Q:.*]]: !quantum.bit
+// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{inline-rule-body gate-set=C(Hadamard)=1.0 alt-decomps=C(U){}{wires:1}{}=ctrl_u})' %s | FileCheck %s --check-prefixes=ALL,INLINE
+
+// ALL-LABEL: func.func @distribute_region(
+// ALL-SAME:  %[[Q:.*]]: !quantum.bit, %[[C:.*]]: !quantum.bit
 func.func @distribute_region(%ctrl: !quantum.bit, %q: !quantum.bit) -> (!quantum.bit, !quantum.bit) {
   %true = arith.constant true
-  // CHECK-NOT: quantum.ctrl
-  // CHECK: %[[A:.*]], %[[AC:.*]] = quantum.custom "Hadamard"() %[[Q]] ctrls(%{{.*}}) ctrlvals(%{{.*}}) : !quantum.bit ctrls !quantum.bit
-  // CHECK: %[[B:.*]], %[[BC:.*]] = quantum.custom "Hadamard"() %[[A]] ctrls(%[[AC]]) ctrlvals(%{{.*}}) : !quantum.bit ctrls !quantum.bit
-  // CHECK: return %[[B]], %[[BC]]
+
+  // CALL: %[[OQ:.*]]:2 = call @ctrl_u_0(%{{.*}}, %[[Q]], %[[C]])
+  // CALL: return %[[OQ]]#0, %[[OQ]]#1
+
+  // INLINE-NOT: quantum.ctrl
+  // INLINE: %[[A:.*]], %[[AC:.*]] = quantum.custom "Hadamard"() %[[Q]] ctrls(%[[C]]) ctrlvals(%{{.*}}) : !quantum.bit ctrls !quantum.bit
+  // INLINE: %[[B:.*]], %[[BC:.*]] = quantum.custom "Hadamard"() %[[A]] ctrls(%[[AC]]) ctrlvals(%{{.*}}) : !quantum.bit ctrls !quantum.bit
+  // INLINE: return %[[B]], %[[BC]]
   %out, %outc = quantum.custom "U"() %q ctrls(%ctrl) ctrlvals(%true) : !quantum.bit ctrls !quantum.bit
   return %out, %outc : !quantum.bit, !quantum.bit
 }
@@ -39,3 +45,6 @@ func.func private @ctrl_u(%q: !quantum.bit, %ctrl: !quantum.bit, %cv: i1)
   }
   return %oq, %oc : !quantum.bit, !quantum.bit
 }
+
+// CALL: func.func private @ctrl_u_0
+// CALL-NOT: quantum.ctrl
