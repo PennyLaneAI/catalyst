@@ -275,7 +275,8 @@ wheel:
 	$(PYTHON) -m catalyst.decomposition.precompile_decomposition_rules
 
 	mkdir -p $(MK_DIR)/frontend/catalyst/resources
-	cp $$($(PYTHON) -c 'from catalyst.utils.runtime_environment import BYTECODE_FILE_PATH; print(BYTECODE_FILE_PATH)') $(MK_DIR)/frontend/catalyst/resources/
+	rules_path=$$($(PYTHON) -c 'from catalyst.utils.runtime_environment import BYTECODE_FILE_PATH; print(BYTECODE_FILE_PATH)'); \
+		cp "$$rules_path" "$${rules_path%.*}.json" $(MK_DIR)/frontend/catalyst/resources/
 
 	$(PYTHON) -m pip wheel --no-deps . -w dist
 
