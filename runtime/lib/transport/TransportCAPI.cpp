@@ -67,6 +67,8 @@ struct CatalystTransportSession {
     std::uint64_t in_bytes = 0;
     std::uint64_t out_bytes = 0;
     bool work_item_ready = false;
+    // Set from start() to stop(), while the session's coprocessor function may be running.
+    bool started = false;
 
     std::string config; // the backend config, as passed to the factory
 
@@ -447,6 +449,11 @@ int __catalyst__transport__set_coprocessor_fn(CatalystTransportSession *s, const
             std::cerr << "[transport] set_coprocessor_fn on a non-coprocessor session\n";
             return CATALYST_TRANSPORT_ERR;
         }
+        // The bound function and its ctx stay in use until the session stops.
+        if (s->started) {
+            std::cerr << "[transport] set_coprocessor_fn after start(): stop the session first\n";
+            return CATALYST_TRANSPORT_ERR;
+        }
         using FiniFn = void (*)(void *);
         using InfoFn = const CoprocessorFnInfo *(*)();
         // A session whose function could not be configured fails its messages, instead of running
@@ -717,6 +724,7 @@ int __catalyst__transport__start_benchmark(CatalystTransportSession *s, std::uin
 
 void __catalyst__transport__start(CatalystTransportSession *s) {
     if (s && s->sess) {
+        s->started = true;
         guard([&] { s->sess->start(); });
     }
 }
@@ -724,6 +732,7 @@ void __catalyst__transport__start(CatalystTransportSession *s) {
 void __catalyst__transport__stop(CatalystTransportSession *s) {
     if (s && s->sess) {
         guard([&] { s->sess->stop(); });
+        s->started = false;
     }
 }
 

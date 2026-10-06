@@ -215,21 +215,16 @@ class OnnxCoprocessor {
             throw;
         }
         api_->ReleaseSessionOptions(options);
-        check(api_->CreateCpuMemoryInfo(OrtArenaAllocator, OrtMemTypeDefault, &memory_));
-        describe_io();
+        try {
+            check(api_->CreateCpuMemoryInfo(OrtArenaAllocator, OrtMemTypeDefault, &memory_));
+            describe_io();
+        } catch (...) {
+            release_session();
+            throw;
+        }
     }
 
-    ~OnnxCoprocessor() {
-        if (api_) {
-            if (memory_) {
-                api_->ReleaseMemoryInfo(memory_);
-            }
-            if (session_) {
-                api_->ReleaseSession(session_);
-            }
-        }
-        // The environment and the library stay for the life of the process (see shared_env).
-    }
+    ~OnnxCoprocessor() { release_session(); }
 
     OnnxCoprocessor(const OnnxCoprocessor &) = delete;
     OnnxCoprocessor &operator=(const OnnxCoprocessor &) = delete;
@@ -374,6 +369,9 @@ class OnnxCoprocessor {
         try {
             const OrtTensorTypeAndShapeInfo *tensor = nullptr;
             check(api_->CastTypeInfoToTensorInfo(type_info, &tensor));
+            if (!tensor) {
+                throw std::runtime_error("the model's input must be a tensor");
+            }
             check(api_->GetTensorElementType(tensor, &input_type_));
             std::size_t rank = 0;
             check(api_->GetDimensionsCount(tensor, &rank));
@@ -398,6 +396,9 @@ class OnnxCoprocessor {
         try {
             const OrtTensorTypeAndShapeInfo *tensor = nullptr;
             check(api_->CastTypeInfoToTensorInfo(type_info, &tensor));
+            if (!tensor) {
+                throw std::runtime_error("the model's output must be a tensor");
+            }
             ONNXTensorElementDataType type = ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED;
             check(api_->GetTensorElementType(tensor, &type));
             std::size_t rank = 0;
@@ -414,6 +415,21 @@ class OnnxCoprocessor {
             throw;
         }
         api_->ReleaseTypeInfo(type_info);
+    }
+
+    // Release the session and its memory info. The environment and the library stay for the
+    // life of the process (see shared_env).
+    void release_session() noexcept {
+        if (api_) {
+            if (memory_) {
+                api_->ReleaseMemoryInfo(memory_);
+            }
+            if (session_) {
+                api_->ReleaseSession(session_);
+            }
+        }
+        memory_ = nullptr;
+        session_ = nullptr;
     }
 
     std::size_t copy_output(const OrtValue *output, void *out, std::size_t out_cap) const {

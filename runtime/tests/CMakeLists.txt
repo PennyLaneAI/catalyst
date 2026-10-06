@@ -207,10 +207,12 @@ if(ENABLE_TRANSPORT)
     # Test_Transport.cpp defines coprocessor functions the runtime resolves with dlsym.
     set_property(TARGET runner_tests_transport PROPERTY ENABLE_EXPORTS ON)
     if(TARGET catalyst_onnx_coprocessor)
-        # The ONNX coprocessor function's tests, on a committed identity model over uint8[1, 8].
+        # The ONNX coprocessor function's tests, on committed models over uint8[1, 8]: an identity,
+        # and one whose output is a sequence of tensors.
         target_link_libraries(runner_tests_transport PRIVATE catalyst_onnx_coprocessor)
         target_compile_definitions(runner_tests_transport PRIVATE
-            CATALYST_TEST_ONNX_MODEL="${CMAKE_CURRENT_SOURCE_DIR}/data/identity_u8x8.onnx")
+            CATALYST_TEST_ONNX_MODEL="${CMAKE_CURRENT_SOURCE_DIR}/data/identity_u8x8.onnx"
+            CATALYST_TEST_ONNX_SEQUENCE_MODEL="${CMAKE_CURRENT_SOURCE_DIR}/data/sequence_u8x8.onnx")
     endif()
     catch_discover_tests(runner_tests_transport)
 

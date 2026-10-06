@@ -240,10 +240,10 @@ def launch_executors(placement: Placement | None) -> None:
 def _runs_per_message_on_gpu(coproc, transport: str) -> bool:
     """Whether a GPU coprocessor's config must select the per-message mode for its function.
 
-    A function marked ``per_message`` is a host function called once per message. A GPU
-    coprocessor otherwise takes a launcher for a persistent kernel, and only the memcpy GPU backend
-    also runs per-message functions. A config that already selects ``coproc_fn=per_message`` is left
-    as it is, and one that selects another mode is rejected.
+    A function marked ``per_message``, or one Catalyst ships, is a host function called once per
+    message. A GPU coprocessor otherwise takes a launcher for a persistent kernel, and only the
+    memcpy GPU backend also runs per-message functions. A config that already selects
+    ``coproc_fn=per_message`` is left as it is, and one that selects another mode is rejected.
 
     Args:
         coproc (Coprocessor): the coprocessor whose function and config are checked
@@ -257,7 +257,10 @@ def _runs_per_message_on_gpu(coproc, transport: str) -> bool:
             than ``"memcpy"``, or the config selects another mode.
     """
     fn = coproc.coprocessor_fn
-    if not getattr(fn, "per_message", False) or getattr(coproc, "hardware", None) != "gpu":
+    per_message = getattr(fn, "per_message", False) or (
+        getattr(fn, "symbol_name", None) in _BUILTIN_COPROCESSOR_FN_LIBS
+    )
+    if not per_message or getattr(coproc, "hardware", None) != "gpu":
         return False
     if transport != "memcpy":
         raise CompileError(
@@ -351,16 +354,17 @@ def serialize_backline(placement: Placement) -> dict:
     }
     nodes = []
     for coproc in placement.coprocessors:
-        node = _node_dict(coproc, "coprocessor", transport)
-        # ``symbol`` names the decode function; the library providing it is loaded as an executor
-        # plugin, so it must not be written into ``backend_lib``, which is the transport backend.
-        node["symbol"] = coproc.coprocessor_fn.symbol_name
-        if node["symbol"] in _IN_PROCESS_COPROCESSOR_FNS and _out_of_process(coproc):
+        symbol = coproc.coprocessor_fn.symbol_name
+        if symbol in _IN_PROCESS_COPROCESSOR_FNS and _out_of_process(coproc):
             raise CompileError(
-                f"coprocessor function {node['symbol']!r} does not yet support a coprocessor "
+                f"coprocessor function {symbol!r} does not yet support a coprocessor "
                 f"dispatched to an executor, as {coproc.name!r} is: its model and onnxruntime "
                 f"paths are resolved on this machine"
             )
+        node = _node_dict(coproc, "coprocessor", transport)
+        # ``symbol`` names the decode function; the library providing it is loaded as an executor
+        # plugin, so it must not be written into ``backend_lib``, which is the transport backend.
+        node["symbol"] = symbol
         if not _out_of_process(coproc):
             _check_builtin_fn_lib(coproc)
         entries = [node["config"]] if node.get("config") else []

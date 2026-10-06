@@ -394,12 +394,12 @@ TEST_CASE("a rejected set_coprocessor_fn keeps the bound function and its ctx", 
     __catalyst__transport__start(ct);
     __catalyst__transport__start(co);
 
-    // A function cannot be rebound once the session has started. The rejected call releases only
-    // the ctx it created, never the one the running function uses.
+    // A function cannot be rebound once the session has started. The rejected call configures
+    // nothing, so the running function keeps its ctx and none is released.
     CHECK(__catalyst__transport__set_coprocessor_fn(co, "capi_test_scale_fn") ==
           CATALYST_TRANSPORT_ERR);
-    CHECK(g_fini_ctx != nullptr);
-    CHECK(g_fini_ctx != bound_ctx);
+    CHECK(g_init_ctx == bound_ctx);
+    CHECK(g_fini_ctx == nullptr);
 
     const std::uint64_t request = 14;
     REQUIRE(__catalyst__transport__stage_payload(ct, &request, sizeof(request), 0) ==
@@ -581,7 +581,35 @@ TEST_CASE("the ONNX coprocessor function requires the message sizes to match its
               .find("the model output is 8 B, but the controller expects 16 B (out_bytes)") !=
           std::string::npos);
 }
+
+TEST_CASE("the ONNX coprocessor function rejects a model whose output is not a tensor",
+          "[transport]") {
+    const char *ort_lib = std::getenv("CATALYST_TEST_ONNXRUNTIME_LIB");
+    if (!ort_lib || !*ort_lib) {
+        SKIP("set CATALYST_TEST_ONNXRUNTIME_LIB to an onnxruntime shared library");
+    }
+    // The test model takes uint8[1, 8] and returns a sequence holding it.
+    const std::string config =
+        "model=" CATALYST_TEST_ONNX_SEQUENCE_MODEL ";provider=cpu;ort_lib=" + std::string(ort_lib) +
+        ";in_bytes=8;out_bytes=8";
+    CHECK(onnx_init_error(config).find("the model's output must be a tensor") != std::string::npos);
+}
 #endif
+
+TEST_CASE("set_coprocessor_fn is rejected between start and stop", "[transport]") {
+    auto *co = make_memcpy_coprocessor("fn_rebind_echo");
+    REQUIRE(co != nullptr);
+    REQUIRE(__catalyst__transport__set_coprocessor_fn(co, "") == CATALYST_TRANSPORT_OK);
+    __catalyst__transport__start(co);
+    {
+        CerrCapture cerr;
+        CHECK(__catalyst__transport__set_coprocessor_fn(co, "") == CATALYST_TRANSPORT_ERR);
+        CHECK(cerr.str().find("after start()") != std::string::npos);
+    }
+    __catalyst__transport__stop(co);
+    CHECK(__catalyst__transport__set_coprocessor_fn(co, "") == CATALYST_TRANSPORT_OK);
+    __catalyst__transport__destroy(co);
+}
 
 TEST_CASE("memcpy backend plugins round-trip through the transport CAPI", "[transport]") {
     auto *ct = make_memcpy_controller("memcpy_roundtrip");
