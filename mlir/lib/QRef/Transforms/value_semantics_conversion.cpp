@@ -246,8 +246,8 @@ bool isQrefSubroutine(func::FuncOp f) {
 }
 
 /**
- * @brief Erase all remaining qref.alloc, qref.get, qref.mbqc.graph_state_prep, pbc.ref.fabricate
- * and pbc.ref.prepare operations in a function
+ * @brief Erase all remaining qref.alloc, qref.alloc_qb, qref.get, qref.mbqc.graph_state_prep,
+ * pbc.ref.fabricate and pbc.ref.prepare operations in a function
  *
  * During the conversion, these operations cannot be deleted immediately because they might be used
  * by other qref operations after their own conversion is done.
@@ -263,6 +263,11 @@ void eraseAllRemainingAnchorRValues(func::FuncOp f) {
         assert(allocOp.use_empty() &&
                "qref.reg Values must have no uses after the semantic conversion");
         allocOp->erase();
+    });
+    f.walk([&](qref::AllocQubitOp allocQbOp) {
+        assert(allocQbOp.use_empty() &&
+               "qref.bit Values must have no uses after the semantic conversion");
+        allocQbOp->erase();
     });
     f.walk([&](mbqc::RefGraphStatePrepOp graphStatePrepOp) {
         assert(graphStatePrepOp.use_empty() &&
