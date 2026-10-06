@@ -16,11 +16,16 @@
 
 The attribute records shared-library paths that a compiled program needs at link time. The write
 side is used by JAX primitive lowering, when emitting a ``catalyst.custom_call`` that targets a
-local (in-process) external symbol exported by library. The read side is used by the compiler driver
-to add those libraries to the link command.
+local (in-process) external symbol exported by library. Devices can also declare libraries through
+``get_runtime_artifacts()``. The read side is used by the compiler driver to add those libraries to
+the link command.
 """
 
+import os
+
 from jax._src.lib.mlir import ir
+
+from catalyst.utils.exceptions import CompileError
 
 RUNTIME_ARTIFACTS_ATTR = "catalyst.runtime_artifacts"
 
@@ -37,6 +42,22 @@ def record_runtime_artifact(module_op, artifact_path):
         return
     existing.append(artifact_path)
     attrs[RUNTIME_ARTIFACTS_ATTR] = ir.ArrayAttr.get([ir.StringAttr.get(p) for p in existing])
+
+
+def record_device_runtime_artifacts(module_op, device):
+    """Record the runtime libraries optionally declared by ``device``."""
+    get_artifacts = getattr(device, "get_runtime_artifacts", None)
+    if get_artifacts is None:
+        return
+
+    for artifact_path in get_artifacts():
+        artifact_path = str(artifact_path)
+        if not os.path.isfile(artifact_path):
+            raise CompileError(
+                f"Device '{device.name}' declares runtime artifact '{artifact_path}', "
+                "which does not exist."
+            )
+        record_runtime_artifact(module_op, artifact_path)
 
 
 def collect_runtime_artifacts(mlir_module, compile_options):
