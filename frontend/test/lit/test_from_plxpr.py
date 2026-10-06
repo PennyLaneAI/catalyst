@@ -234,7 +234,7 @@ def test_pass_decomposition():
     def circuit1():
         return qp.probs()
 
-    # CHECK: [[first_pass:%.+]] = transform.apply_registered_pass "decompose-lowering"
+    # CHECK: [[first_pass:%.+]] = transform.apply_registered_pass "graph-decomposition"
     # CHECK-NEXT: [[second_pass:%.+]] = transform.apply_registered_pass "merge-rotations"
     # CHECK-NEXT: transform.apply_registered_pass "cancel-inverses" to [[second_pass]]
 
@@ -249,7 +249,7 @@ def test_pass_decomposition():
         return qp.probs()
 
     # CHECK: [[first_pass:%.+]] = transform.apply_registered_pass "merge-rotations"
-    # CHECK-NEXT: [[second_pass:%.+]] = transform.apply_registered_pass "decompose-lowering"
+    # CHECK-NEXT: [[second_pass:%.+]] = transform.apply_registered_pass "graph-decomposition"
     # CHECK-NEXT: transform.apply_registered_pass "cancel-inverses" to [[second_pass]]
 
     print(circuit2.mlir)
@@ -264,7 +264,7 @@ def test_pass_decomposition():
 
     # CHECK: [[first_pass:%.+]] = transform.apply_registered_pass "merge-rotations"
     # CHECK-NEXT: [[second_pass:%.+]] = transform.apply_registered_pass "cancel-inverses"
-    # CHECK-NEXT: transform.apply_registered_pass "decompose-lowering" to [[second_pass]]
+    # CHECK-NEXT: transform.apply_registered_pass "graph-decomposition" {{.*}} to [[second_pass]]
 
     print(circuit3.mlir)
 

@@ -36,6 +36,8 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Casting.h"
+#include "llvm/Support/Debug.h"
+#include "llvm/Support/DebugLog.h"
 #include "mlir/Analysis/CallGraph.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
@@ -78,6 +80,60 @@ LogicalResult ensureNoReferenceSemanticsOps(Operation *op) {
             return WalkResult::interrupt();
         }
         return WalkResult::advance();
+    });
+
+    if (walkResult.wasInterrupted()) {
+        return failure();
+    } else {
+        return success();
+    }
+}
+
+// Only scf.if, scf.for, scf.while and scf.index_switch have conversion rules. A quantum-bearing
+// scf.execute_region must be rejected before conversion starts. Purely classical
+// scf.execute_region ops are left alone.
+LogicalResult ensureNoScfUnsupportedOps(Operation *op) {
+    auto hasQrefType = [](TypeRange types) {
+        return llvm::any_of(types, llvm::IsaPred<qref::QubitType, qref::QuregType>);
+    };
+
+    auto isClassicalOp = [&](Operation *op) {
+        // Yielding/using qref values is not classical, even for scf.yield / func.call.
+        if (hasQrefType(op->getOperandTypes()) || hasQrefType(op->getResultTypes())) {
+            return false;
+        }
+        // Ops from quantum-related dialects are not classical.
+        return !isa<qref::QRefDialect>(op->getDialect()) &&
+               !isa<REFERENCE_SEMANTICS_GATE_OPS, REFERENCE_SEMANTICS_OBSERVABLE_OPS,
+                    mbqc::RefGraphStatePrepOp>(op);
+    };
+
+    auto isUnsupportedScfRegionOp = [](Operation *o) {
+        return isa<scf::SCFDialect>(o->getDialect()) &&
+               !isa<scf::IfOp, scf::WhileOp, scf::ForOp, scf::IndexSwitchOp>(o) &&
+               o->getNumRegions() > 0;
+    };
+
+    auto containsNonClassicalOp = [&](Operation *o) {
+        return o
+            ->walk([&](Operation *inner) {
+                return isClassicalOp(inner) ? WalkResult::advance() : WalkResult::interrupt();
+            })
+            .wasInterrupted();
+    };
+
+    WalkResult walkResult = op->walk([&](Operation *o) {
+        if (!(isUnsupportedScfRegionOp(o) && containsNonClassicalOp(o))) {
+            return WalkResult::advance();
+        }
+
+        StringRef name = o->getName().getStringRef();
+
+        o->emitError(
+            "Value semantics conversion only supports the following scf operations: scf.if, "
+            "scf.for, scf.while, and scf.index_switch, got: ")
+            << name;
+        return WalkResult::interrupt();
     });
 
     if (walkResult.wasInterrupted()) {
@@ -1160,9 +1216,16 @@ void handleRefFabricate(IRRewriter &builder, pbc::RefFabricateOp rFabricateOp,
     OpBuilder::InsertionGuard guard(builder);
     builder.setInsertionPoint(rFabricateOp);
     Location loc = rFabricateOp.getLoc();
+    MLIRContext *ctx = rFabricateOp.getContext();
 
-    auto fabricateOp = pbc::FabricateOp::create(builder, loc, rFabricateOp.getInitState());
-    tracker.setCurrentVQubit(rFabricateOp.getQubit(), fabricateOp.getOutQubits().front());
+    SmallVector<Type> vQubitTypes(rFabricateOp.getOutQubits().size(), quantum::QubitType::get(ctx));
+    auto vFabricateOp =
+        pbc::FabricateOp::create(builder, loc, vQubitTypes, rFabricateOp.getInitState());
+
+    for (auto [rQubit, vQubit] :
+         llvm::zip_equal(rFabricateOp.getOutQubits(), vFabricateOp.getOutQubits())) {
+        tracker.setCurrentVQubit(rQubit, vQubit);
+    }
 }
 
 void handleCall(IRRewriter &builder, func::CallOp callOp, QubitValueTracker &tracker) {
@@ -1525,6 +1588,7 @@ void handleIf(IRRewriter &builder, scf::IfOp ifOp, QubitValueTracker &tracker) {
         // scf.if op always requires an else block if returning any results
         newIfOp = scf::IfOp::create(builder, loc, newResultTypes, ifOp.getCondition(),
                                     /*withElseRegion=*/true);
+        newIfOp->setDiscardableAttrs(ifOp->getDiscardableAttrDictionary());
 
         // 2. Handle the "then" region
         builder.eraseBlock(newIfOp.thenBlock());
@@ -1608,6 +1672,7 @@ void handleSwitch(IRRewriter &builder, scf::IndexSwitchOp switchOp, QubitValueTr
 
         newSwitchOp = scf::IndexSwitchOp::create(builder, loc, newResultTypes, switchOp.getArg(),
                                                  switchOp.getCases(), switchOp.getNumCases());
+        newSwitchOp->setDiscardableAttrs(switchOp->getDiscardableAttrDictionary());
 
         // 2. Handle the "default" region
         builder.inlineRegionBefore(switchOp.getDefaultRegion(), newSwitchOp.getDefaultRegion(),
@@ -1684,6 +1749,8 @@ void handleFor(IRRewriter &builder, scf::ForOp forOp, QubitValueTracker &tracker
 
         newLoop = scf::ForOp::create(builder, loc, forOp.getLowerBound(), forOp.getUpperBound(),
                                      forOp.getStep(), newIterArgs);
+        // Carry over hints such as `catalyst.estimated_iterations`, which later analyses read.
+        newLoop->setDiscardableAttrs(forOp->getDiscardableAttrDictionary());
 
         // 2. Move operations from old body to new body
         builder.eraseBlock(newLoop.getBody());
@@ -1765,6 +1832,7 @@ void handleWhile(IRRewriter &builder, scf::WhileOp whileOp, QubitValueTracker &t
         }
 
         newLoop = scf::WhileOp::create(builder, loc, newResultTypes, newIterArgs);
+        newLoop->setDiscardableAttrs(whileOp->getDiscardableAttrDictionary());
 
         // 2. Move operations from old body to new body
         builder.inlineRegionBefore(whileOp.getBefore(), newLoop.getBefore(),
@@ -1990,6 +2058,10 @@ struct ValueSemanticsConversionPass
                 continue;
             }
 
+            if (failed(ensureNoScfUnsupportedOps(subroutine))) {
+                return signalPassFailure();
+            }
+
             SubroutineInfo info(subroutine);
             handleSubroutine(builder, subroutine, info.getNecessarySubroutineRValues());
             if (failed(ensureNoReferenceSemanticsOps(subroutine))) {
@@ -2012,6 +2084,10 @@ struct ValueSemanticsConversionPass
 
         // Convert the main quantum.mode functions
         for (auto targetFunc : targetFuncs) {
+            if (failed(ensureNoScfUnsupportedOps(targetFunc))) {
+                return signalPassFailure();
+            }
+
             QubitValueTracker tracker;
             handleRegion(builder, targetFunc.getBody(), tracker);
             eraseAllRemainingAnchorRValues(targetFunc);

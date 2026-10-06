@@ -258,10 +258,7 @@ def _allocate_prim_lowering(jax_ctx: mlir.LoweringRuleContext, *, num_wires, sta
     if state_val in ("magic", "magic_conj"):
         qubit_type = ir.OpaqueType.get("qref", "bit", ctx)
         init_state_attr = _pbc_logical_init_attr(ctx, state_val)
-        return [
-            RefFabricateOp(qubit=qubit_type, init_state=init_state_attr).results[0]
-            for _ in range(num_wires)
-        ]
+        return list(RefFabricateOp([qubit_type] * num_wires, init_state_attr).results)
 
     # PL allocate_prim passes a static num_wires (capture cannot produce a dynamic wire count).
     size_attr = ir.IntegerAttr.get(ir.IntegerType.get_signless(64, ctx), num_wires)

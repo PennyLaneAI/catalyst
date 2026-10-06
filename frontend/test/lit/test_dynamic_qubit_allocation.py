@@ -215,6 +215,29 @@ def test_magic_state_fabricate():
 print(test_magic_state_fabricate.mlir)
 
 
+@qjit(target="mlir", capture=True)
+@qp.qnode(qp.device("lightning.qubit", wires=2))
+def test_magic_state_fabricate_multiple():
+    """
+    Test that allocating several magic states lowers to a single multi-result pbc.ref.fabricate.
+    """
+
+    # CHECK: [[magic:%.+]]:2 = pbc.ref.fabricate magic : !qref.bit, !qref.bit
+    # CHECK: qref.custom "PauliX"() [[magic]]#0
+    # CHECK: qref.custom "PauliZ"() [[magic]]#1
+    # CHECK: qref.dealloc_qb [[magic]]#0
+    # CHECK: qref.dealloc_qb [[magic]]#1
+
+    with qp.allocate(2, state="magic-T") as q:
+        qp.X(q[0])
+        qp.Z(q[1])
+
+    return qp.probs(wires=[0])
+
+
+print(test_magic_state_fabricate_multiple.mlir)
+
+
 # pylint: disable=line-too-long
 def test_quantum_subroutine():
     """

@@ -14,7 +14,8 @@
 
 #define DEBUG_TYPE "reference-semantics-conversion"
 #define VALUE_SEMANTICS_GATE_OPS                                                                   \
-    quantum::QuantumOperation, quantum::MeasureOp, pbc::PPMeasurementOp, mbqc::MeasureInBasisOp
+    quantum::QuantumOperation, quantum::MeasureOp, pbc::PPMeasurementOp, pbc::PPRotationOp,        \
+        pbc::SelectPPMeasurementOp, mbqc::MeasureInBasisOp
 #define VALUE_SEMANTICS_OBSERVABLE_OPS                                                             \
     quantum::ComputationalBasisOp, quantum::HermitianOp, quantum::NamedObsOp
 
@@ -29,6 +30,8 @@
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/TypeSwitch.h"
+#include "llvm/Support/Debug.h"
+#include "llvm/Support/DebugLog.h"
 #include "mlir/Analysis/CallGraph.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
@@ -60,6 +63,60 @@ LogicalResult ensureNoValueSemanticsOps(Operation *op) {
             return WalkResult::interrupt();
         }
         return WalkResult::advance();
+    });
+
+    if (walkResult.wasInterrupted()) {
+        return failure();
+    } else {
+        return success();
+    }
+}
+
+// Only scf.if, scf.for, scf.while and scf.index_switch have conversion rules. Any other
+// region-bearing scf op must be rejected before conversion starts: converting the gates nested in
+// its region erases values that the region's own terminator still refers to.
+LogicalResult ensureNoScfUnsupportedOps(Operation *op) {
+    auto hasQrefType = [](TypeRange types) {
+        return llvm::any_of(types, llvm::IsaPred<qref::QubitType, qref::QuregType>);
+    };
+
+    auto isClassicalOp = [&](Operation *op) {
+        // Yielding/using qref values is not classical, even for scf.yield / func.call.
+        if (hasQrefType(op->getOperandTypes()) || hasQrefType(op->getResultTypes())) {
+            return false;
+        }
+        // Ops from quantum-related dialects are not classical.
+        return !isa<qref::QRefDialect>(op->getDialect()) &&
+               !isa<VALUE_SEMANTICS_GATE_OPS, VALUE_SEMANTICS_OBSERVABLE_OPS,
+                    mbqc::RefGraphStatePrepOp>(op);
+    };
+
+    auto isUnsupportedScfRegionOp = [](Operation *o) {
+        return isa<scf::SCFDialect>(o->getDialect()) &&
+               !isa<scf::IfOp, scf::WhileOp, scf::ForOp, scf::IndexSwitchOp>(o) &&
+               o->getNumRegions() > 0;
+    };
+
+    auto containsNonClassicalOp = [&](Operation *o) {
+        return o
+            ->walk([&](Operation *inner) {
+                return isClassicalOp(inner) ? WalkResult::advance() : WalkResult::interrupt();
+            })
+            .wasInterrupted();
+    };
+
+    WalkResult walkResult = op->walk([&](Operation *o) {
+        if (!(isUnsupportedScfRegionOp(o) && containsNonClassicalOp(o))) {
+            return WalkResult::advance();
+        }
+
+        StringRef name = o->getName().getStringRef();
+
+        o->emitError(
+            "Reference semantics conversion only supports the following scf operations: scf.if, "
+            "scf.for, scf.while, and scf.index_switch, got: ")
+            << name;
+        return WalkResult::interrupt();
     });
 
     if (walkResult.wasInterrupted()) {
@@ -374,19 +431,43 @@ void handlePPM(IRRewriter &builder, pbc::PPMeasurementOp vPPMOp, QubitValueTrack
     erasureWorklist.push_back(vPPMOp);
 }
 
-void handleFabricate(IRRewriter &builder, pbc::FabricateOp vFabricateOp, QubitValueTracker &tracker,
-                     SmallVector<Operation *> &erasureWorklist) {
+void handlePPR(IRRewriter &builder, pbc::PPRotationOp vPPROp, QubitValueTracker &tracker,
+               SmallVector<Operation *> &erasureWorklist) {
     OpBuilder::InsertionGuard guard(builder);
-    builder.setInsertionPoint(vFabricateOp);
-    Location loc = vFabricateOp.getLoc();
 
-    for (Value vQubit : vFabricateOp.getOutQubits()) {
-        auto rFabricateOp = pbc::RefFabricateOp::create(
-            builder, loc, qref::QubitType::get(vFabricateOp.getContext()),
-            vFabricateOp.getInitState());
-        tracker.setRQubit(vQubit, rFabricateOp.getQubit());
+    migrateOpToReferenceSemantics<pbc::RefPPRotationOp>(builder, vPPROp, tracker);
+
+    erasureWorklist.push_back(vPPROp);
+}
+
+void handleSelectPPM(IRRewriter &builder, pbc::SelectPPMeasurementOp vSelPPMOp,
+                     QubitValueTracker &tracker, SmallVector<Operation *> &erasureWorklist) {
+    OpBuilder::InsertionGuard guard(builder);
+
+    auto rSelPPMOp =
+        migrateOpToReferenceSemantics<pbc::RefSelectPPMeasurementOp>(builder, vSelPPMOp, tracker);
+
+    builder.replaceAllUsesWith(vSelPPMOp.getMres(), rSelPPMOp.getMres());
+    erasureWorklist.push_back(vSelPPMOp);
+}
+
+// Shared handler for pbc.fabricate / pbc.prepare. VOpTy is deduced from the producer argument.
+template <typename ROpTy, typename VOpTy>
+void handlePBCQubitProducer(IRRewriter &builder, VOpTy vProducerOp, QubitValueTracker &tracker,
+                            SmallVector<Operation *> &erasureWorklist) {
+    OpBuilder::InsertionGuard guard(builder);
+    builder.setInsertionPoint(vProducerOp);
+    Location loc = vProducerOp.getLoc();
+    MLIRContext *ctx = vProducerOp.getContext();
+
+    SmallVector<Type> rQubitTypes(vProducerOp.getOutQubits().size(), qref::QubitType::get(ctx));
+    auto rProducerOp = ROpTy::create(builder, loc, rQubitTypes, vProducerOp.getInitState());
+
+    for (auto [vQubit, rQubit] :
+         llvm::zip_equal(vProducerOp.getOutQubits(), rProducerOp.getOutQubits())) {
+        tracker.setRQubit(vQubit, rQubit);
     }
-    erasureWorklist.push_back(vFabricateOp);
+    erasureWorklist.push_back(vProducerOp);
 }
 
 void handleCall(IRRewriter &builder, func::CallOp callOp, QubitValueTracker &tracker,
@@ -816,8 +897,17 @@ std::optional<SmallVector<Operation *>> handleRegion(IRRewriter &builder, Region
                 [&](auto o) { handleMeasureInBasis(builder, o, tracker, erasureWorklist); })
             .Case<pbc::PPMeasurementOp>(
                 [&](auto o) { handlePPM(builder, o, tracker, erasureWorklist); })
-            .Case<pbc::FabricateOp>(
-                [&](auto o) { handleFabricate(builder, o, tracker, erasureWorklist); })
+            .Case<pbc::PPRotationOp>(
+                [&](auto o) { handlePPR(builder, o, tracker, erasureWorklist); })
+            .Case<pbc::SelectPPMeasurementOp>(
+                [&](auto o) { handleSelectPPM(builder, o, tracker, erasureWorklist); })
+            .Case<pbc::FabricateOp>([&](auto o) {
+                handlePBCQubitProducer<pbc::RefFabricateOp>(builder, o, tracker, erasureWorklist);
+            })
+            .Case<pbc::PrepareStateOp>([&](auto o) {
+                handlePBCQubitProducer<pbc::RefPrepareStateOp>(builder, o, tracker,
+                                                               erasureWorklist);
+            })
             .Case<quantum::AdjointOp>(
                 [&](auto o) { handleAdjoint(builder, o, tracker, erasureWorklist); })
             .Case<quantum::CtrlOp>(
@@ -995,6 +1085,9 @@ struct ReferenceSemanticsConversionPass
         // Convert the main quantum.mode functions
         for (auto targetFunc : targetFuncs) {
             QubitValueTracker tracker;
+            if (failed(ensureNoScfUnsupportedOps(targetFunc))) {
+                return signalPassFailure();
+            }
             handleRegion(builder, targetFunc.getBody(), tracker);
             if (failed(ensureNoValueSemanticsOps(targetFunc))) {
                 targetFunc.emitOpError(
@@ -1033,6 +1126,9 @@ struct ReferenceSemanticsConversionPass
         // By default, scc iterates call graph in post order (callee before caller), so we reverse
         // the visit order.
         for (func::FuncOp subroutine : llvm::reverse(subroutinesPostOrder)) {
+            if (failed(ensureNoScfUnsupportedOps(subroutine))) {
+                return signalPassFailure();
+            }
             QubitValueTracker tracker;
             handleSubroutine(builder, subroutine, collectQregSizesAtCallsite(subroutine, mod));
             if (failed(ensureNoValueSemanticsOps(subroutine))) {

@@ -74,3 +74,20 @@ func.func @test_ref_fabricate_magic_conj() attributes {quantum.node} {
     qref.dealloc_qb %q : !qref.bit
     return
 }
+
+// -----
+
+// CHECK-LABEL: test_ref_fabricate_multiple
+func.func @test_ref_fabricate_multiple() attributes {quantum.node} {
+    // CHECK: [[magic:%.+]]:2 = pbc.fabricate magic : !quantum.bit, !quantum.bit
+    %q:2 = pbc.ref.fabricate magic : !qref.bit, !qref.bit
+    qref.custom "PauliX"() %q#0 : !qref.bit
+    qref.custom "PauliZ"() %q#1 : !qref.bit
+    // CHECK: [[out0:%.+]] = quantum.custom "PauliX"() [[magic]]#0 : !quantum.bit
+    // CHECK: [[out1:%.+]] = quantum.custom "PauliZ"() [[magic]]#1 : !quantum.bit
+    // CHECK-DAG: quantum.dealloc_qb [[out0]] : !quantum.bit
+    // CHECK-DAG: quantum.dealloc_qb [[out1]] : !quantum.bit
+    qref.dealloc_qb %q#0 : !qref.bit
+    qref.dealloc_qb %q#1 : !qref.bit
+    return
+}

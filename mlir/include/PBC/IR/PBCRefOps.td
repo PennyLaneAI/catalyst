@@ -14,6 +14,34 @@
 
 include "QRef/IR/QRefTypes.td"
 
+def RefPPRotationOp : PBC_Op<"ref.ppr", [AttrSizedOperandSegments,
+    DeclareOpInterfaceMethods<ResourceQuantumOpInterface, ["getResourceDetailedName"]>]> {
+    let summary = "Pauli Product Rotation on qubit references.";
+
+    let description = [{
+        Identical to the pbc.ppr operation, except in reference semantics.
+    }];
+
+    let arguments = (ins
+        PauliWord:$pauli_product,  // The Pauli product to apply (e.g., ["X", "I", "Z"])
+        ConfinedAttr<SI8Attr, [RotationKindConstraint]>:$rotation_kind,  // angle in fractions of π
+        Variadic<QubitRefType>:$qubits,  // The qubits to apply the rotation to
+        Optional<I1>:$condition
+    );
+
+    let assemblyFormat = [{
+        $pauli_product `(` $rotation_kind `)` $qubits attr-dict (`cond` `(` $condition^ `)`)?
+    }];
+
+    let hasVerifier = 1;
+
+    let hasCanonicalizeMethod = 1;
+
+    let extraClassDeclaration = [{
+        mlir::ValueRange getQubitOperands() { return getQubits(); }
+    }];
+}
+
 def RefPPMeasurementOp : PBC_Op<"ref.ppm",
     [DeclareOpInterfaceMethods<ResourceQuantumOpInterface, ["getResourceDetailedName"]>]> {
     let summary = "Pauli Product Measurement on qubit references.";
@@ -37,20 +65,50 @@ def RefPPMeasurementOp : PBC_Op<"ref.ppm",
     }];
 
     let hasVerifier = 1;
+
+    let extraClassDeclaration = [{
+        mlir::ValueRange getQubitOperands() { return getQubits(); }
+    }];
 }
 
-def RefFabricateOp : PBC_Op<"ref.fabricate"> {
-    let summary = "Fabricate auxiliary qubits from qubit factories (reference semantics).";
+def RefSelectPPMeasurementOp : PBC_Op<"ref.select.ppm",
+    [DeclareOpInterfaceMethods<ResourceQuantumOpInterface, ["getResourceDetailedName"]>]> {
+    let summary = "Multiplexed Pauli product measurement on qubit references.";
+
+    let description = [{
+        Identical to the pbc.select.ppm operation, except in reference semantics.
+    }];
+
+    let arguments = (ins
+        I1:$select_switch,
+        PauliWord:$pauli_product_0,
+        UnitAttr:$negated_0,
+        PauliWord:$pauli_product_1,
+        UnitAttr:$negated_1,
+        Variadic<QubitRefType>:$qubits  // The qubits to measure
+    );
+
+    let results = (outs
+        I1:$mres  // The measurement result (0 or 1)
+    );
+
+    let assemblyFormat = [{
+        ` ` `(` $select_switch `?` $pauli_product_0 (`(``-``)` $negated_0^)? `:` $pauli_product_1 (`(``-``)` $negated_1^)? `)` $qubits attr-dict `:` type(results)
+    }];
+
+    let hasVerifier = 1;
+
+    let extraClassDeclaration = [{
+        mlir::ValueRange getQubitOperands() { return getQubits(); }
+    }];
+}
+
+def RefFabricateOp : PBC_Op<"ref.fabricate",
+    [DeclareOpInterfaceMethods<ResourceQuantumOpInterface, ["getResourceDetailedName"]>, DeclareOpInterfaceMethods<ResourceAllocQubitOpInterface>]> {
+    let summary = "Fabricate auxiliary qubit references from qubit factories.";
 
     let description = [{
         Identical to the pbc.fabricate operation, except in reference semantics.
-        Only magic states (``magic`` and ``magic_conj``) are supported.
-
-        Example:
-        ```mlir
-        %0 = pbc.ref.fabricate magic : !qref.bit
-        %1 = pbc.ref.fabricate magic_conj : !qref.bit
-        ```
     }];
 
     let arguments = (ins
@@ -58,11 +116,34 @@ def RefFabricateOp : PBC_Op<"ref.fabricate"> {
     );
 
     let results = (outs
-        QubitRefType:$qubit
+        Variadic<QubitRefType>:$out_qubits
     );
 
     let assemblyFormat = [{
-        $init_state attr-dict `:` type($qubit)
+        $init_state attr-dict `:` type($out_qubits)
+    }];
+
+    let hasVerifier = 1;
+}
+
+def RefPrepareStateOp : PBC_Op<"ref.prepare",
+    [DeclareOpInterfaceMethods<ResourceQuantumOpInterface, ["getResourceDetailedName"]>, DeclareOpInterfaceMethods<ResourceAllocQubitOpInterface>]> {
+    let summary = "Prepare auxiliary qubit references in a given state.";
+
+    let description = [{
+        Identical to the pbc.prepare operation, except in reference semantics.
+    }];
+
+    let arguments = (ins
+        LogicalInit:$init_state
+    );
+
+    let results = (outs
+        Variadic<QubitRefType>:$out_qubits
+    );
+
+    let assemblyFormat = [{
+        $init_state attr-dict `:` type($out_qubits)
     }];
 
     let hasVerifier = 1;
