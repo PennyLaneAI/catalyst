@@ -71,4 +71,28 @@ static_assert(alignof(PayloadSlot) == 64, "PayloadSlot must be 64-B aligned");
 // K_RING_SLOTS]. K_RING_SLOTS must be a power of two.
 inline constexpr std::size_t REGION_BYTES = K_RING_SLOTS * sizeof(PayloadSlot);
 
+// Messages larger than PAYLOAD_DATA_BYTES.
+//
+// A backend that is not bound to the fixed 16 B frame (the memcpy backends) carries a message of
+// any size in each direction. Its frame has the same shape as Payload with a wider data area:
+// `frame_data_bytes(in_bytes)` data bytes at offset 0, then the u32 decoder_id, then the u32
+// seq_num. For in_bytes <= PAYLOAD_DATA_BYTES the data area is PAYLOAD_DATA_BYTES and the frame is
+// byte-for-byte a Payload, so a coprocessor function written against Payload reads it unchanged.
+// Backends bound to the 16 B frame reject a committed size above PAYLOAD_DATA_BYTES.
+
+// Bytes in the data area of a frame carrying `in_bytes` of payload: at least PAYLOAD_DATA_BYTES,
+// and rounded up to a multiple of 8 so decoder_id and seq_num stay aligned.
+inline constexpr std::size_t frame_data_bytes(std::size_t in_bytes) {
+    const std::size_t rounded = (in_bytes + 7) & ~std::size_t{7};
+    return rounded < PAYLOAD_DATA_BYTES ? PAYLOAD_DATA_BYTES : rounded;
+}
+
+// Total bytes of a frame whose data area is `data_bytes`: the data, decoder_id and seq_num.
+inline constexpr std::size_t frame_bytes(std::size_t data_bytes) {
+    return data_bytes + sizeof(Payload::decoder_id) + sizeof(Payload::seq_num);
+}
+
+static_assert(frame_bytes(frame_data_bytes(PAYLOAD_DATA_BYTES)) == sizeof(Payload),
+              "a frame of PAYLOAD_DATA_BYTES must be exactly a Payload");
+
 } // namespace catalyst::transport::common
