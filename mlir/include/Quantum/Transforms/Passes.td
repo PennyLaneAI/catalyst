@@ -217,7 +217,13 @@ def GraphDecompositionPass : Pass<"graph-decomposition", "mlir::ModuleOp"> {
             /*CLI name*/"verbose",
             /*Type*/"bool",
             /*Default*/[{ false }],
-            /*Description*/"Print the decomposition rule chosen for each operator to stderr.">
+            /*Description*/"Print the decomposition rule chosen for each operator to stderr.">,
+        Option<
+            /*C++ name*/"inlineRuleBody",
+            /*CLI name*/"inline-rule-body",
+            /*Type*/"bool",
+            /*Default*/[{ false }],
+            /*Description*/"Whether to inline the rule body. Defaults to false.">
     ];
 
     let dependentDialects = [

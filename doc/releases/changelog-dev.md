@@ -113,6 +113,11 @@
 
 <h3>Improvements 🛠</h3>
 
+* Under program capture, PennyLane :func:`~.transforms.decompose` (``qp.decompose``) is now an
+  alias for :func:`~.passes.graph_decomposition`. Multiple ``qp.decompose`` transforms is also
+  supported.
+  [(#3290)](https://github.com/PennyLaneAI/catalyst/pull/3290)
+
 * :func:`~.passes.graph_decomposition` accepts a `verbose` keyword argument. When `True`, the pass
   prints the decomposition rule the solver chose for each operator, along with its cost and the
   resulting gate counts, to `stderr`.
@@ -234,11 +239,16 @@
     [(#3206)](https://github.com/PennyLaneAI/catalyst/pull/3206)
     [(#3224)](https://github.com/PennyLaneAI/catalyst/pull/3224)
     [(#3285)](https://github.com/PennyLaneAI/catalyst/pull/3285)
+    [(#3292)](https://github.com/PennyLaneAI/catalyst/pull/3292)
 
     1. The pass now supports applying a selection of the available decomposition rules via the `target_rules` parameter.
 
     2. The pass also no longer applies the `inline`, `cse` and `canonicalize` passes to avoid unnecessary IR mutations.
-    Instead, decomposition rules are deterministically inlined by a custom function (`inline` is non-deterministic, using an estimated benefit and threshold as criteria for inlining).
+
+    By default, the pass now emits call operations to the rule functions instead of inlining.
+    A new boolean option `inline-rule-body` is added to the pass, which when set to true will inline the rule functions.
+    The same boolean option is added to the `graph-decomposition` pass as well.
+    When inlining is active, decomposition rules are deterministically inlined by a custom function (the upstream MLIR `inline` is non-deterministic, using an estimated benefit and threshold as criteria for inlining).
 
     3. Decomposition rules are no longer removed after the `decompose-lowering` pass, which allows them to be used by subsequent passes, namely `graph-decomposition`.
     Instead, rules are removed by the `symbol-dce` pass at the end of the `QuantumCompilationStage`.
@@ -613,9 +623,17 @@
 * Added ``CZ`` support to ``to-ppr`` pass.
   [(#3009)](https://github.com/PennyLaneAI/catalyst/pull/3009)
 
+* PBC layer commutation checks now use packed binary symplectic bases for large overlapping layers,
+  reducing repeated pairwise normalization while preserving the resulting partition.
+  [(#3095)](https://github.com/PennyLaneAI/catalyst/pull/3095)
+
 * ``to_ppr`` now directly lowers PennyLane's discrete ``PPR`` operator to ``pbc.ppr``.
   [(#3185)](https://github.com/PennyLaneAI/catalyst/pull/3185)
   [(#3262)](https://github.com/PennyLaneAI/catalyst/pull/3262)
+
+* Added a guard in the `--convert-to-value-semantics` pass to raise an error when
+  unsupported quantum-bearing `scf` operations are encountered.
+  [(#3238)](https://github.com/PennyLaneAI/catalyst/pull/3238)
 
 <h3>Breaking changes 💔</h3>
 
@@ -648,9 +666,17 @@
   for Python 3.11.
   [(#2984)](https://github.com/PennyLaneAI/catalyst/pull/2984)
 
+* Added reference semantics support for PBC operations.
+  [(#3136)](https://github.com/PennyLaneAI/catalyst/pull/3136)
+
 <h3>Deprecations 👋</h3>
 
 <h3>Bug fixes 🐛</h3>
+
+* Fixed the CNOT decomposition of the `ions-decomposition` pass, which did not implement a CNOT:
+  it rotated the target with `RY(-π/2)` instead of `RX(-π/2)` and returned the two qubits in
+  swapped order.
+  [(#3277)](https://github.com/PennyLaneAI/catalyst/pull/3277)
 
 * Fixed a bug where an executor's SSH connection multiplexing was silently disabled on macOS,
   making every remote operation pay a fresh authentication handshake. The control socket went in
@@ -725,6 +751,12 @@
   [(#3242)](https://github.com/PennyLaneAI/catalyst/pull/3242)
 
 <h3>Internal changes ⚙️</h3>
+
+* Integration tests for :func:`pennylane.specs` have been migrated from the Catalyst frontend to PennyLane.
+  [(#3107)](https://github.com/PennyLaneAI/catalyst/pull/3107)
+
+* The value semantics conversion pass now preserves compiler hints on for, while, and cond.
+  [(#3288)](https://github.com/PennyLaneAI/catalyst/pull/3288)
 
 * A manually triggered workflow is added to build a Catalyst Docker image with PennyLane and
   Lightning for `linux/amd64` and `linux/arm64`, and can publish it to Docker Hub as a single
@@ -804,6 +836,7 @@
   [(#2948)](https://github.com/PennyLaneAI/catalyst/pull/2948)
   [(#3224)](https://github.com/PennyLaneAI/catalyst/pull/3224)
   [(#3232)](https://github.com/PennyLaneAI/catalyst/pull/3232)
+  [(#3238)](https://github.com/PennyLaneAI/catalyst/pull/3238)
 
 * Removed the internal ``mlir_specs`` function which was the old backend for :func:`qp.specs`. The resource analysis pass replaces its use.
   [(#2841)](https://github.com/PennyLaneAI/catalyst/pull/2841)
@@ -967,10 +1000,12 @@ Runor Agbaire,
 Ali Asadi,
 Joey Carter,
 Yushao Chen,
+Filip Dobrosavljevic,
 Lillian Frederiksen,
 Sengthai Heng,
 David Ittah,
 JiaRung Jian,
+Jeffrey Kam,
 Jacob Kitchen,
 Korbinian Kottmann,
 Christina Lee,
