@@ -189,8 +189,9 @@ class LinkerDriver:
         if os.path.isfile(os.path.join(rt_lib_path, rt_transport_so)):
             default_flags.append("-lrt_transport")
 
-        # Shared libraries exporting symbols reached by a local `runtime_call`, recorded on the
-        # module via `catalyst.runtime_artifacts` and collected into the options.
+        # Link shared libraries from local `runtime_call`s and from device's
+        # `get_runtime_artifacts()` method, which have been recorded on the module
+        # via `catalyst.runtime_artifacts` and collected into the options.
         for artifact_path in options.runtime_artifacts:
             artifact_path = os.path.abspath(artifact_path)
             if not os.path.isfile(artifact_path):
