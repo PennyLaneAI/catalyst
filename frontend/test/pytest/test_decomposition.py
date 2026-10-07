@@ -1039,7 +1039,9 @@ class TestSymbolicRules:
         (rule,) = get_rule_strings_from_module(module)
 
         name = "C(PPR)" if wrap_control else "PPR"
-        resource = f'"{name}{{}}{{wires:2}}{{angle_denominator = -8 : si64, pauli_word = \\22XY\\22}}"'
+        resource = (
+            f'"{name}{{}}{{wires:2}}{{angle_denominator = -8 : si64, pauli_word = \\22XY\\22}}"'
+        )
         assert f"resources = {{operations = {{{resource} = 1 : i64}}}}" in rule
         assert 'static_data = {angle_denominator = -8 : si64, pauli_word = "XY"}' in rule
 
