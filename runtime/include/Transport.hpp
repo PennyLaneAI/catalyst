@@ -15,6 +15,7 @@
 #pragma once
 #include <cstddef>
 #include <cstdint>
+#include <limits>
 #include <stdexcept>
 #include <string>
 
@@ -206,7 +207,7 @@ using CoprocessorFn = std::size_t (*)(const void *in, std::size_t in_len, void *
                                       std::size_t out_cap, void *ctx);
 
 /// The value a CoprocessorFn returns when it cannot process a message.
-inline constexpr std::size_t COPROCESSOR_FN_ERROR = static_cast<std::size_t>(-1);
+inline constexpr std::size_t COPROCESSOR_FN_ERROR = std::numeric_limits<std::size_t>::max();
 
 /// The lifecycle hooks a coprocessor function's library may export as `<symbol>_info`. See
 /// CatalystCoprocessorFnInfo in TransportABI.h.

@@ -19,6 +19,7 @@
 #include <cstdint>
 #include <exception>
 #include <functional>
+#include <limits>
 #include <stop_token>
 #include <thread>
 #include <vector>
@@ -81,7 +82,7 @@ class MessageWorker {
 
   private:
     /// Reply `bytes` value marking a message the function failed to process.
-    static constexpr std::uint64_t FAILED_REPLY = UINT64_MAX;
+    static constexpr std::uint64_t FAILED_REPLY = std::numeric_limits<std::uint64_t>::max();
 
     // A ring of common::K_RING_SLOTS slots. Each slot is a 64 B header, then `capacity` data bytes,
     // padded so every slot, and its data, stays 64-B aligned.
