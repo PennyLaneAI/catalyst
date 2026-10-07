@@ -159,14 +159,12 @@ def test_single_coprocessor():
 
 def test_coprocessor_fn_config_is_appended_with_the_fn_prefix():
     """A coprocessor function's config joins the node config, each key prefixed ``fn.``."""
-    fn = _Fn("coproc_fn", config="model=/m.onnx;provider=migraphx")
+    fn = _Fn("coproc_fn", config="model=/m.onnx;provider=auto")
     dev = qp.Backline(
         controller=_controller(), coprocessors=[_coproc("cop0", fn=fn)], transport="rdma"
     )
     node = serialize_backline(dev.placement)["coprocessors"][0]
-    assert (
-        node["config"] == "cfg;fn.model=/m.onnx;fn.provider=migraphx;fn.in_bytes=8;fn.out_bytes=8"
-    )
+    assert node["config"] == "cfg;fn.model=/m.onnx;fn.provider=auto;fn.in_bytes=8;fn.out_bytes=8"
 
 
 def test_coprocessor_fn_config_without_a_node_config():
