@@ -332,5 +332,9 @@ jobs:
         env:
           # Without this Triton discards ptxas diagnostics, leaving codegen failures as "status 255".
           TRITON_DUMP_PTXAS_LOG: "1"
+        # Everything but the out_of_process RDMA case: that one launches a catalyst-executor
+        # subprocess, which needs a runtime built with ENABLE_EXECUTOR=ON -- left off here to keep
+        # the runtime build ahead of LLVM, so the binary is absent and the spawn fails rather than
+        # skipping. No workflow sets that flag, so the param runs nowhere in CI; see the header.
         run: |
-          python3 -m pytest -v -rs frontend/test/pytest/test_backline.py
+          python3 -m pytest -v -rs -k "not out_of_process" frontend/test/pytest/test_backline.py
