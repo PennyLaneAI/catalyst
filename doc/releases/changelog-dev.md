@@ -367,7 +367,7 @@
 * `qp.specs` now reports realistic resource estimates for the `gridsynth` pass, based on the
   average gate sequences it produces at runtime. Expected (fractional) counts in the
   `ResourceAnalysis` output are no longer rounded before being multiplied by loop trip counts.
-  [(#XXXX)](https://github.com/PennyLaneAI/catalyst/pull/XXXX)
+  [(#3308)](https://github.com/PennyLaneAI/catalyst/pull/3308)
 
 * Warnings and diagnostics emitted by successful Catalyst compiler subprocesses are now forwarded to
   Python callers instead of being silently discarded. LLVM diagnostic colors are preserved in
@@ -706,7 +706,7 @@
 * `qp.specs` no longer fails on programs compiled with the `gridsynth` pass, and no longer counts
   an extra wire per decomposed rotation. The pass also leaves controlled `RZ` and `PhaseShift`
   gates untouched instead of crashing.
-  [(#XXXX)](https://github.com/PennyLaneAI/catalyst/pull/XXXX)
+  [(#3308)](https://github.com/PennyLaneAI/catalyst/pull/3308)
 
 * Fixed the CNOT decomposition of the `ions-decomposition` pass, which did not implement a CNOT:
   it rotated the target with `RY(-π/2)` instead of `RX(-π/2)` and returned the two qubits in
