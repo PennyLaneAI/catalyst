@@ -127,13 +127,14 @@ jobs:
         run: |
           cmake --build "$(pwd)/runtime-build" --target transport_tests_all -j
 
+      # A suite whose tests all skip, such as an RDMA suite on a runner with no RDMA device, passes.
       - name: Run the transport tests
         run: |
           test -x "$(pwd)/runtime-build/tests/runner_tests_transport"
           for t in "$(pwd)"/runtime-build/tests/runner_tests_transport*; do
             [ -x "$t" ] && [ ! -d "$t" ] || continue
             echo "::group::${t##*/}"
-            "$t"
+            "$t" --allow-running-no-tests
             echo "::endgroup::"
           done
 
