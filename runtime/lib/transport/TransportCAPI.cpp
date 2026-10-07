@@ -459,13 +459,10 @@ int __catalyst__transport__set_coprocessor_fn(CatalystTransportSession *s, const
         // A session whose function could not be configured fails its messages, instead of running
         // the backend's default echo function or launcher.
         const auto fail_unconfigured = [&] {
-            try {
-                if (co->coprocessor_fn_convention() == CoprocConvention::PerMessage) {
-                    co->set_coprocessor_fn(&failing_fn, nullptr);
-                } else {
-                    co->set_coprocessor_launcher(&failing_launcher, nullptr);
-                }
-            } catch (...) {
+            if (co->coprocessor_fn_convention() == CoprocConvention::PerMessage) {
+                co->set_coprocessor_fn(&failing_fn, nullptr);
+            } else {
+                co->set_coprocessor_launcher(&failing_launcher, nullptr);
             }
             return CATALYST_TRANSPORT_ERR;
         };
