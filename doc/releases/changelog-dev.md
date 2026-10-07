@@ -145,6 +145,10 @@
   require integral values and convert the count internally.
   [(#2956)](https://github.com/PennyLaneAI/catalyst/pull/2956)
 
+* A device can now declare shared runtime libraries via an optional `get_runtime_artifacts` method. 
+  These will be linked by the compiler.
+  [(#3303)](https://github.com/PennyLaneAI/catalyst/pull/3303)
+
 <h3>Improvements 🛠</h3>
 
 * The memcpy transport now carries messages of any size in each direction, as set by a PennyLane
@@ -1037,6 +1041,11 @@
 
 * A new pass `--resolve-gate-level-adjoint` was added. This pass now handles gate-level adjoint canonicalization, moving it out of the `--canonicalize` pass.
   [#3155](https://github.com/PennyLaneAI/catalyst/pull/3155)
+
+* The OQD device now implements the optional `get_runtime_artifacts` to inform the compiler of its runtime library, 
+  `librt_OQD_capi`. This replaces the previous work-around that had the compiler check directly for the library and
+  link it if present.
+  [(#3303)](https://github.com/PennyLaneAI/catalyst/pull/3303)
 
 <h3>Documentation 📝</h3>
 
