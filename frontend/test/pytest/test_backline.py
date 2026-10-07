@@ -367,7 +367,7 @@ def test_a_builtin_coprocessor_fn_loads_catalysts_own_library():
     dev = qp.Backline(
         controller=_controller(), coprocessors=[_coproc("cop0", fn=fn)], transport="memcpy"
     )
-    runtime = Path("/opt/catalyst/runtime/lib")
+    runtime = Path("/nonexistent/runtime/lib")
     assert _coprocessor_fn_libs(dev.placement, [runtime]) == [runtime / f"{_ONNX_LIB}.so"]
 
 
