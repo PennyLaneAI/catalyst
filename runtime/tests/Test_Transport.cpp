@@ -15,6 +15,7 @@
 // Unit tests for the transport CAPI session registry and per-call behavior
 
 #include <cstdint>
+#include <vector>
 
 #include "catch2/catch_test_macros.hpp"
 
@@ -137,16 +138,6 @@ TEST_CASE("null session arguments are rejected without crashing", "[transport]")
     SUCCEED();
 }
 
-TEST_CASE("commit_work_item rejects a reply larger than the provisioned region", "[transport]") {
-    auto *s = make(CATALYST_TRANSPORT_ROLE_CONTROLLER, "");
-    REQUIRE(s != nullptr);
-    // exchange_keys provisions the local reply region (the stub reports a zero-size region).
-    REQUIRE(__catalyst__transport__exchange_keys(s) == CATALYST_TRANSPORT_OK);
-    CHECK(__catalyst__transport__set_message_sizes(s, 0, 0, 1) == CATALYST_TRANSPORT_ERR);
-    CHECK(__catalyst__transport__set_message_sizes(s, 0, 0, 0) == CATALYST_TRANSPORT_OK);
-    __catalyst__transport__destroy(s);
-}
-
 TEST_CASE("destroy drains outstanding async tokens without a prior barrier", "[transport]") {
     auto *s = make(CATALYST_TRANSPORT_ROLE_CONTROLLER, "");
     REQUIRE(s != nullptr);
@@ -198,6 +189,44 @@ TEST_CASE("memcpy backend plugins round-trip through the transport CAPI", "[tran
 
     std::uint64_t reply = 0;
     REQUIRE(__catalyst__transport__collect(ct, &reply, sizeof(reply)) == CATALYST_TRANSPORT_OK);
+    CHECK(reply == request);
+
+    __catalyst__transport__destroy(ct);
+    __catalyst__transport__destroy(co);
+}
+
+TEST_CASE("memcpy carries a reply larger than the provisioned reply region through the CAPI",
+          "[transport]") {
+    // exchange_keys provisions a 16 KiB reply region. The memcpy controller sizes its own reply
+    // buffer from the committed out_bytes instead.
+    constexpr std::size_t bytes = 40000;
+    auto *ct = make_memcpy_controller("memcpy_wide_reply");
+    auto *co = make_memcpy_coprocessor("memcpy_wide_reply");
+    REQUIRE(ct != nullptr);
+    REQUIRE(co != nullptr);
+
+    REQUIRE(__catalyst__transport__connect(ct, "loopback", 19090) == CATALYST_TRANSPORT_OK);
+    REQUIRE(__catalyst__transport__connect(co, "loopback", 19090) == CATALYST_TRANSPORT_OK);
+    REQUIRE(__catalyst__transport__exchange_keys(ct) == CATALYST_TRANSPORT_OK);
+    REQUIRE(__catalyst__transport__exchange_keys(co) == CATALYST_TRANSPORT_OK);
+    REQUIRE(__catalyst__transport__establish_channel(ct, "memcpy") == CATALYST_TRANSPORT_OK);
+    REQUIRE(__catalyst__transport__establish_channel(co, "memcpy") == CATALYST_TRANSPORT_OK);
+    REQUIRE(__catalyst__transport__set_message_sizes(ct, 0, bytes, bytes) == CATALYST_TRANSPORT_OK);
+    REQUIRE(__catalyst__transport__set_coprocessor_fn(co, "") == CATALYST_TRANSPORT_OK);
+
+    __catalyst__transport__start(ct);
+    __catalyst__transport__start(co);
+
+    std::vector<std::uint8_t> request(bytes);
+    for (std::size_t i = 0; i < bytes; ++i) {
+        request[i] = static_cast<std::uint8_t>(i * 7);
+    }
+    REQUIRE(__catalyst__transport__stage_payload(ct, request.data(), bytes, 0) ==
+            CATALYST_TRANSPORT_OK);
+    REQUIRE(__catalyst__transport__post(ct, 0) == CATALYST_TRANSPORT_OK);
+
+    std::vector<std::uint8_t> reply(bytes);
+    REQUIRE(__catalyst__transport__collect(ct, reply.data(), bytes) == CATALYST_TRANSPORT_OK);
     CHECK(reply == request);
 
     __catalyst__transport__destroy(ct);
