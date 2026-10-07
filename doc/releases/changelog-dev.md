@@ -414,6 +414,7 @@
 * A `remove-global-phases` pass is added, which removes global phases by deleting `quantum.gphase`
   operations without control wires.
   [(#3143)](https://github.com/PennyLaneAI/catalyst/pull/3143)
+  [(#3310)](https://github.com/PennyLaneAI/catalyst/pull/3310)
 
 * An X/Z syndrome decode can now be routed to its own decoder in a backline coprocessor.
   `qecp.decode_esm_css` carries an optional `check_type` attribute recording which check family a
