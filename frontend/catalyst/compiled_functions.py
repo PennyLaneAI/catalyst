@@ -43,6 +43,25 @@ logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
 
 
+def _run_setup(setup, teardown):
+    """Call ``setup``, and if it raises, call ``teardown`` and raise the setup's error.
+
+    A setup that fails part way leaves what it created, such as transport sessions registered under
+    their keys, which the teardown releases. An error the teardown raises is suppressed, so the
+    setup's error, which names the cause, is the one raised.
+
+    Args:
+        setup (Callable[[], None]): runs the compiled program's setup
+        teardown (Callable[[], None]): runs the compiled program's teardown
+    """
+    try:
+        setup()
+    except Exception:
+        with contextlib.suppress(Exception):
+            teardown()
+        raise
+
+
 class SharedObjectManager:
     """Shared object manager.
 
@@ -110,15 +129,10 @@ class SharedObjectManager:
         return function, setup, teardown, mem_transfer
 
     def __enter__(self):
-        try:
-            wrapper.invoke_setup(self.setup, ["jitted-function"])
-        except Exception:
-            # A setup that fails part way leaves what it created, such as transport sessions
-            # registered under their keys, which the teardown releases. The setup's error is
-            # the one raised.
-            with contextlib.suppress(Exception):
-                wrapper.invoke_teardown(self.teardown)
-            raise
+        _run_setup(
+            lambda: wrapper.invoke_setup(self.setup, ["jitted-function"]),
+            lambda: wrapper.invoke_teardown(self.teardown),
+        )
         return self
 
     def __exit__(self, _type, _value, _traceback):

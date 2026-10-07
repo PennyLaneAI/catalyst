@@ -13,6 +13,7 @@
 # limitations under the License.
 """Unit tests for the backline frontend: serialize_backline and the pipeline helpers."""
 
+import ctypes.util
 import dataclasses
 import os
 import platform
@@ -30,10 +31,16 @@ from catalyst import Executor, compiled_functions, qjit
 from catalyst.backline import (
     _EXECUTOR_RUNTIME_PLUGINS,
     _TRANSPORT_PASSES,
+    _builtin_fn_lib_dirs,
+    _check_builtin_fn_lib,
+    _coprocessor_fn_libs,
+    _find_builtin_fn_lib,
     _insert_passes,
+    _installed_builtin_fn_lib_dirs,
     _message_size,
     _qec_pass_specs,
     _realize_executor,
+    _remote_fn_lib_name,
     _resolve_backend,
     _resolve_backend_lib,
     _runs_per_message_on_gpu,
@@ -353,81 +360,75 @@ def test_coprocessor_fn_without_lib_path_loads_nothing(monkeypatch):
     assert loaded == []
 
 
-def test_a_builtin_coprocessor_fn_loads_catalysts_own_library(monkeypatch):
+_ONNX_LIB = "libcatalyst_onnx_coprocessor"
+
+
+def test_a_builtin_coprocessor_fn_loads_catalysts_own_library():
     """A coprocessor function Catalyst ships needs no lib_path: its runtime library is loaded."""
-    monkeypatch.delenv("CATALYST_TRANSPORT_PATH", raising=False)
-    loaded = []
-    monkeypatch.setattr("ctypes.CDLL", lambda path, mode=None: loaded.append(path) or object())
-    monkeypatch.setattr(
-        "catalyst.backline.get_lib_path", lambda project, env: "/opt/catalyst/runtime/lib"
-    )
     fn = qp.CoprocessorFunction("catalyst_onnx_coprocessor")
     dev = qp.Backline(
-        controller=_controller(), coprocessors=[_coproc("cop0", fn=fn)], transport="rdma"
+        controller=_controller(), coprocessors=[_coproc("cop0", fn=fn)], transport="memcpy"
     )
-    launch_executors(dev.placement)
-    assert loaded == ["/opt/catalyst/runtime/lib/libcatalyst_onnx_coprocessor.so"]
+    runtime = Path("/nonexistent/runtime/lib")
+    assert _coprocessor_fn_libs(dev.placement, [runtime]) == [runtime / f"{_ONNX_LIB}.so"]
 
 
-def test_a_builtin_coprocessor_fn_library_is_found_as_a_dylib(monkeypatch, tmp_path):
-    """On macOS the runtime library is a .dylib, and it is the one loaded."""
-    monkeypatch.delenv("CATALYST_TRANSPORT_PATH", raising=False)
-    (tmp_path / "libcatalyst_onnx_coprocessor.dylib").write_bytes(b"")
-    loaded = []
-    monkeypatch.setattr("ctypes.CDLL", lambda path, mode=None: loaded.append(path) or object())
-    monkeypatch.setattr("catalyst.backline.get_lib_path", lambda project, env: str(tmp_path))
-    fn = qp.CoprocessorFunction("catalyst_onnx_coprocessor")
-    dev = qp.Backline(
-        controller=_controller(), coprocessors=[_coproc("cop0", fn=fn)], transport="rdma"
-    )
-    launch_executors(dev.placement)
-    assert loaded == [str(tmp_path / "libcatalyst_onnx_coprocessor.dylib")]
+def test_a_builtin_coprocessor_fn_library_is_found_as_a_dylib(tmp_path):
+    """On macOS the runtime library is a .dylib, and it is the one found."""
+    (tmp_path / f"{_ONNX_LIB}.dylib").write_bytes(b"")
+    assert _find_builtin_fn_lib(_ONNX_LIB, [tmp_path]) == tmp_path / f"{_ONNX_LIB}.dylib"
 
 
-def test_a_builtin_coprocessor_fn_library_is_found_on_the_transport_path(monkeypatch, tmp_path):
+def test_a_builtin_coprocessor_fn_library_is_found_on_the_transport_path(tmp_path):
     """A directory in CATALYST_TRANSPORT_PATH is searched before the runtime library directory."""
-    extra = tmp_path / "extra"
-    extra.mkdir()
-    (extra / "libcatalyst_onnx_coprocessor.so").write_bytes(b"")
-    loaded = []
-    monkeypatch.setattr("ctypes.CDLL", lambda path, mode=None: loaded.append(path) or object())
-    monkeypatch.setattr("catalyst.backline.get_lib_path", lambda project, env: str(tmp_path))
-    monkeypatch.setenv("CATALYST_TRANSPORT_PATH", str(extra))
-    fn = qp.CoprocessorFunction("catalyst_onnx_coprocessor")
+    extra, runtime = tmp_path / "extra", tmp_path / "runtime"
+    for d in (extra, runtime):
+        d.mkdir()
+        (d / f"{_ONNX_LIB}.so").write_bytes(b"")
+    dirs = _builtin_fn_lib_dirs(str(extra), runtime)
+    assert dirs == [extra, runtime]
+    assert _find_builtin_fn_lib(_ONNX_LIB, dirs) == extra / f"{_ONNX_LIB}.so"
+
+
+def test_the_transport_path_may_list_several_directories():
+    """CATALYST_TRANSPORT_PATH lists directories separated by the platform's path separator."""
+    override = os.pathsep.join(["/a", "", "/b"])
+    assert _builtin_fn_lib_dirs(override, Path("/rt")) == [Path("/a"), Path("/b"), Path("/rt")]
+
+
+def test_the_installed_search_ends_with_catalysts_runtime_library_directory():
+    """This process searches its CATALYST_TRANSPORT_PATH, then Catalyst's runtime library
+    directory."""
+    runtime = Path(get_lib_path("runtime", "RUNTIME_LIB_DIR"))
+    assert _installed_builtin_fn_lib_dirs()[-1] == runtime
+
+
+def test_an_in_process_coprocessor_fn_library_is_loaded():
+    """launch_executors loads the library an in-process coprocessor's function names."""
+    libc = ctypes.util.find_library("c")
+    fn = qp.CoprocessorFunction("decode", lib_path=libc)
     dev = qp.Backline(
         controller=_controller(), coprocessors=[_coproc("cop0", fn=fn)], transport="memcpy"
     )
-    serialize_backline(dev.placement)
+    assert _coprocessor_fn_libs(dev.placement, _installed_builtin_fn_lib_dirs()) == [Path(libc)]
     launch_executors(dev.placement)
-    assert loaded == [str(extra / "libcatalyst_onnx_coprocessor.so")]
 
 
-def test_a_missing_builtin_coprocessor_fn_library_fails_to_compile(monkeypatch, tmp_path):
+def test_a_missing_builtin_coprocessor_fn_library_fails_to_compile(tmp_path):
     """Compiling fails, naming the library and the directories searched, when it is not built."""
-    monkeypatch.setattr("catalyst.backline.get_lib_path", lambda project, env: str(tmp_path))
-    monkeypatch.delenv("CATALYST_TRANSPORT_PATH", raising=False)
     fn = qp.CoprocessorFunction("catalyst_onnx_coprocessor")
-    dev = qp.Backline(
-        controller=_controller(), coprocessors=[_coproc("cop0", fn=fn)], transport="memcpy"
-    )
-    with pytest.raises(
-        CompileError, match=rf"needs libcatalyst_onnx_coprocessor\.so.*not found in: {tmp_path}"
-    ):
-        serialize_backline(dev.placement)
+    coproc = _coproc("cop0", fn=fn)
+    with pytest.raises(CompileError, match=rf"needs {_ONNX_LIB}\.so.*not found in: {tmp_path}"):
+        _check_builtin_fn_lib(coproc, [tmp_path])
 
 
-def test_a_remote_node_names_a_builtin_coprocessor_fn_library_as_a_so(monkeypatch, tmp_path):
+def test_a_remote_node_names_a_builtin_coprocessor_fn_library_as_a_so():
     """A node on another machine is Linux, so it is given the .so even when this one has a
-    .dylib."""
-    from catalyst.backline import _executor_plugins  # pylint: disable=import-outside-toplevel
-
-    (tmp_path / "libcatalyst_onnx_coprocessor.dylib").write_bytes(b"")
-    monkeypatch.setattr("catalyst.backline.get_lib_path", lambda project, env: str(tmp_path))
-    fn = qp.CoprocessorFunction("catalyst_onnx_coprocessor")
-    coproc = qp.Coprocessor(
-        name="cop0", coprocessor_fn=fn, remote=True, executor_options={"host": "192.0.2.11"}
-    )
-    assert "libcatalyst_onnx_coprocessor.so" in _executor_plugins(coproc, [])
+    .dylib, while a library the function names keeps its own filename."""
+    builtin = qp.CoprocessorFunction("catalyst_onnx_coprocessor")
+    assert _remote_fn_lib_name(builtin, Path(f"/rt/{_ONNX_LIB}.dylib")) == f"{_ONNX_LIB}.so"
+    own = qp.CoprocessorFunction("decode", lib_path="/opt/libdecode.dylib")
+    assert _remote_fn_lib_name(own, Path("/opt/libdecode.dylib")) == "libdecode.dylib"
 
 
 def test_unlaunched_executor_names_the_node_it_came_from():
@@ -1777,24 +1778,26 @@ class TestExecutorRealization:
         assert "-25536" not in circuit.mlir
 
 
-def test_a_failed_setup_is_torn_down(monkeypatch):
+def test_a_failed_setup_is_torn_down():
     """A setup that fails runs the teardown, which releases what the setup created, such as its
     transport sessions, and the setup's error is the one raised."""
     calls = []
 
-    def failing_setup(_setup, _argv):
+    def failing_setup():
         calls.append("setup")
         raise RuntimeError("setup failed")
 
-    def failing_teardown(_teardown):
+    def failing_teardown():
         calls.append("teardown")
         raise RuntimeError("teardown failed")
 
-    monkeypatch.setattr(compiled_functions.wrapper, "invoke_setup", failing_setup)
-    monkeypatch.setattr(compiled_functions.wrapper, "invoke_teardown", failing_teardown)
-    manager = object.__new__(compiled_functions.SharedObjectManager)
-    manager.setup, manager.teardown = "setup", "teardown"
     with pytest.raises(RuntimeError, match="setup failed"):
-        with manager:
-            pass
+        compiled_functions._run_setup(failing_setup, failing_teardown)
     assert calls == ["setup", "teardown"]
+
+
+def test_a_setup_that_succeeds_is_not_torn_down():
+    """The teardown runs only after a setup that fails."""
+    calls = []
+    compiled_functions._run_setup(lambda: calls.append("setup"), lambda: calls.append("teardown"))
+    assert calls == ["setup"]
