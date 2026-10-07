@@ -691,6 +691,7 @@
 
 * Added reference semantics support for PBC operations.
   [(#3136)](https://github.com/PennyLaneAI/catalyst/pull/3136)
+  [(#3305)](https://github.com/PennyLaneAI/catalyst/pull/3305)
 
 <h3>Deprecations 👋</h3>
 
