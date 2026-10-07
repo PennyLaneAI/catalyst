@@ -2,6 +2,24 @@
 
 <h3>New features since last release</h3>
 
+* A new coprocessor function called `catalyst_onnx_coprocessor` has been added, which runs an
+  ONNX model on the CPU or a GPU through onnxruntime, and is built with the transport runtime.
+  PennyLane's
+  [`qp.backline.onnx_decoder`](https://docs.pennylane.ai/en/latest/code/api/pennylane.backline.onnx_decoder.html)
+  creates it for a model.
+  [(#3282)](https://github.com/PennyLaneAI/catalyst/pull/3282)
+
+  ```pycon
+  >>> fn = qp.backline.onnx_decoder("predecoder.onnx")
+  >>> fn.name
+  'catalyst_onnx_coprocessor'
+  >>> dev = qp.Backline(
+  ...     controller=qp.Controller(),
+  ...     coprocessors=[qp.Coprocessor(hardware="gpu", coprocessor_fn=fn)],
+  ...     transport="memcpy",
+  ... )
+  ```
+
 * You can now dynamically prepare magic T states inside captured Catalyst workflows using
   ``qp.allocate(state="magic-T")`` and ``qp.allocate(state="magic-T-adj")``, which makes it
   easier to compile FTQC-style routines that need T-state ancillas on the fly (for example
@@ -139,6 +157,16 @@
   ```
 
   [(#3281)](https://github.com/PennyLaneAI/catalyst/pull/3281)
+
+* The memcpy GPU coprocessor can now run a host coprocessor function once per message, for a model
+  launched from the host rather than as a persistent kernel. The frontend selects this mode for a
+  function marked `per_message`.
+  [(#3282)](https://github.com/PennyLaneAI/catalyst/pull/3282)
+
+* Coprocessor functions can now be configured. A function whose library exports `<symbol>_info`
+  receives its `config` and the message sizes in an `init` hook before its first message (see
+  `CatalystCoprocessorFnInfo` in `TransportABI.h`).
+  [(#3282)](https://github.com/PennyLaneAI/catalyst/pull/3282)
 
 * Under program capture, PennyLane :func:`~.transforms.decompose` (``qp.decompose``) is now an
   alias for :func:`~.passes.graph_decomposition`. Multiple ``qp.decompose`` transforms is also
@@ -697,6 +725,13 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* Fixed a bug where a compiled Backline program continued with a session that does not work,
+  for example echoing the controller's own message back as the reply, after a transport call or a
+  coprocessor function's set-up failed. It now stops with an error naming the call that failed,
+  and releases the program's transport sessions, so a later program in the same process can
+  run.
+  [(#3282)](https://github.com/PennyLaneAI/catalyst/pull/3282)
+
 * The memcpy controller now rejects staging or posting a payload before its message sizes are
   committed, instead of writing into an unallocated buffer.
   [(#3281)](https://github.com/PennyLaneAI/catalyst/pull/3281)
@@ -1049,6 +1084,7 @@ Mehrdad Malekmohammadi,
 River McCubbin,
 Shuli Shu,
 Nikhil Sreekumar,
+Kalman Szenes,
 Paul Haochen Wang,
 Jake Zaia,
 Haider Sajjad,
