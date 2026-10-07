@@ -12,14 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{gate-set=testRZ=1.0 alt-decomps=Adjoint(testRZ){0:[f64]}{wires:1}{}=adj_rz})' %s | FileCheck %s
+// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{gate-set=testRZ=1.0 alt-decomps=Adjoint(testRZ){0:[f64]}{wires:1}{}=adj_rz})' %s | FileCheck %s --check-prefixes=ALL,CALL
 
-// CHECK-LABEL: func.func @parametric(
-// CHECK-SAME:  [[T:%.+]]: f64, [[Q:%.+]]: !quantum.bit
+// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{inline-rule-body gate-set=testRZ=1.0 alt-decomps=Adjoint(testRZ){0:[f64]}{wires:1}{}=adj_rz})' %s | FileCheck %s --check-prefixes=ALL,INLINE
+
+// ALL-LABEL: func.func @parametric(
+// ALL-SAME:  [[T:%.+]]: f64, [[Q:%.+]]: !quantum.bit
 func.func @parametric(%q: !quantum.bit, %theta: f64) -> !quantum.bit {
-  // CHECK: [[NEG:%.+]] = arith.negf [[T]] : f64
-  // CHECK: [[O:%.+]] = quantum.custom "testRZ"([[NEG]]) [[Q]] : !quantum.bit
-  // CHECK: return [[O]]
+  // CALL: [[O:%.+]] = call @adj_rz_0([[T]], [[Q]])
+  // INLINE: [[NEG:%.+]] = arith.negf [[T]] : f64
+  // INLINE: [[O:%.+]] = quantum.custom "testRZ"([[NEG]]) [[Q]] : !quantum.bit
+  // ALL: return [[O]]
   %out = quantum.custom "testRZ"(%theta) %q adj : !quantum.bit
   return %out: !quantum.bit
 }
@@ -31,3 +34,5 @@ func.func private @adj_rz(%theta: f64, %q: !quantum.bit) -> !quantum.bit attribu
   %o = quantum.custom "testRZ"(%neg) %q : !quantum.bit
   return %o : !quantum.bit
 }
+
+// CALL: func.func private @adj_rz_0

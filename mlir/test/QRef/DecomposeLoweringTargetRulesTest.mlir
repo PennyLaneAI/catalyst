@@ -12,25 +12,26 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: quantum-opt --pass-pipeline='builtin.module(decompose-lowering{target-rules=my_X_decomp,my_Z_decomp})' --split-input-file -verify-diagnostics %s | FileCheck %s
+// RUN: quantum-opt --pass-pipeline='builtin.module(decompose-lowering{target-rules=my_X_decomp,my_Z_decomp})' --split-input-file -verify-diagnostics %s | FileCheck %s --check-prefixes=ALL,CALL
+// RUN: quantum-opt --pass-pipeline='builtin.module(decompose-lowering{target-rules=my_X_decomp,my_Z_decomp inline-rule-body})' --split-input-file -verify-diagnostics %s | FileCheck %s --check-prefixes=ALL,INLINE
 
 // Test that decompose-lowering only applies the rules requested by the `target-rules` option when present
 
-// CHECK: func.func private @my_X_decomp
+// ALL: func.func private @my_X_decomp
 func.func private @my_X_decomp(%q: !quantum.bit) -> !quantum.bit attributes {target_gate="X"} {
     %angle = arith.constant 1.57 : f64
     %out = quantum.custom "RX"(%angle) %q : !quantum.bit
     return %out : !quantum.bit
 }
 
-// CHECK: func.func private @my_Y_decomp
+// ALL: func.func private @my_Y_decomp
 func.func private @my_Y_decomp(%q: !quantum.bit) -> !quantum.bit attributes {target_gate="Y"} {
     %angle = arith.constant 1.57 : f64
     %out = quantum.custom "RY"(%angle) %q : !quantum.bit
     return %out : !quantum.bit
 }
 
-// CHECK: func.func private @my_Z_decomp
+// ALL: func.func private @my_Z_decomp
 func.func private @my_Z_decomp(%q: !quantum.bit) -> !quantum.bit attributes {target_gate="Z"} {
     %angle = arith.constant 1.57 : f64
     %out = quantum.custom "RZ"(%angle) %q : !quantum.bit
@@ -38,11 +39,17 @@ func.func private @my_Z_decomp(%q: !quantum.bit) -> !quantum.bit attributes {tar
 }
 
 func.func  @main_circuit() attributes {quantum.node} {
-    // CHECK: [[q:%.+]] = quantum.alloc_qb
-    // CHECK: [[x_out:%.+]] = quantum.custom "RX"(%{{.+}}) [[q]]
-    // CHECK: [[y_out:%.+]] = quantum.custom "Y"() [[x_out]]
-    // CHECK: [[z_out:%.+]] = quantum.custom "RZ"(%{{.+}}) [[y_out]]
-    // CHECK: quantum.dealloc_qb [[z_out]]
+    // ALL: [[q:%.+]] = quantum.alloc_qb
+
+    // CALL: [[x_out:%.+]] = call @my_X_decomp_1([[q]])
+    // INLINE: [[x_out:%.+]] = quantum.custom "RX"(%{{.+}}) [[q]]
+
+    // ALL: [[y_out:%.+]] = quantum.custom "Y"() [[x_out]]
+
+    // CALL: [[z_out:%.+]] = call @my_Z_decomp_0([[y_out]])
+    // INLINE: [[z_out:%.+]] = quantum.custom "RZ"(%{{.+}}) [[y_out]]
+
+    // ALL: quantum.dealloc_qb [[z_out]]
     %0 = quantum.alloc_qb : !quantum.bit
     %1 = quantum.custom "X"() %0 : !quantum.bit
     %2 = quantum.custom "Y"() %1 : !quantum.bit
@@ -50,3 +57,8 @@ func.func  @main_circuit() attributes {quantum.node} {
     quantum.dealloc_qb %3 : !quantum.bit
     return
 }
+
+// CALL: func.func private @my_Z_decomp_0
+// CALL:   quantum.custom "RZ"
+// CALL: func.func private @my_X_decomp_1
+// CALL:   quantum.custom "RX"
