@@ -25,6 +25,7 @@ include "mlir/IR/OpBase.td"
 
 include "Gradient/IR/GradientDialect.td"
 include "Gradient/IR/GradientInterfaces.td"
+include "Gradient/IR/GradientAttrDefs.td"
 
 def GradOp : Gradient_Op<"grad", [
         DeclareOpInterfaceMethods<CallOpInterface>,
@@ -55,7 +56,7 @@ def GradOp : Gradient_Op<"grad", [
     }];
 
     let arguments = (ins
-        StrAttr:$method,
+        GradientDiffMethodAttr:$method,
         SymbolRefAttr:$callee,
         Variadic<AnyType>:$operands,
         OptionalAttr<AnyIntElementsAttr>:$diffArgIndices,
@@ -81,7 +82,7 @@ def ValueAndGradOp : Gradient_Op<"value_and_grad", [
     let summary = "Compute the value and gradient of a function.";
 
     let arguments = (ins
-        StrAttr:$method,
+        GradientDiffMethodAttr:$method,
         SymbolRefAttr:$callee,
         Variadic<AnyType>:$operands,
         OptionalAttr<AnyIntElementsAttr>:$diffArgIndices,
@@ -184,7 +185,7 @@ def JVPOp : Gradient_Op<"jvp", [
     let summary = "Compute the jvp of a function.";
 
     let arguments = (ins
-        StrAttr:$method,
+        GradientDiffMethodAttr:$method,
         SymbolRefAttr:$callee,
         Variadic<AnyType>:$params,
         Variadic<AnyType>:$tangents,
@@ -219,7 +220,7 @@ def VJPOp : Gradient_Op<"vjp", [
     let summary = "Compute the vjp of a function.";
 
     let arguments = (ins
-        StrAttr:$method,
+        GradientDiffMethodAttr:$method,
         SymbolRefAttr:$callee,
         Variadic<AnyType>:$params,
         Variadic<AnyType>:$cotangents,

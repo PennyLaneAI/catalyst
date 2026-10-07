@@ -1,4 +1,4 @@
-// Copyright 2022-2024 Xanadu Quantum Technologies Inc.
+// Copyright 2026 Xanadu Quantum Technologies Inc.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,16 +12,28 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#pragma once
+#ifndef GRADIENT_ATTR_DEFS
+#define GRADIENT_ATTR_DEFS
 
-#include "mlir/Bytecode/BytecodeOpInterface.h"
-#include "mlir/IR/Dialect.h"
-#include "mlir/Interfaces/FunctionInterfaces.h"
+include "mlir/IR/EnumAttr.td"
 
-#include "Gradient/IR/GradientAttrDefs.h"
+include "Gradient/IR/GradientDialect.td"
 
 //===----------------------------------------------------------------------===//
-// Gradient dialect declarations.
+// Gradient dialect enums and attributes.
 //===----------------------------------------------------------------------===//
 
-#include "Gradient/IR/GradientOpsDialect.h.inc"
+def GradientDiffMethod : I32EnumAttr<"GradientDiffMethod",
+    "Known gradient differentiation methods",
+    [
+        I32EnumAttrCase<"FiniteDifference", 0, "fd">,
+        I32EnumAttrCase<"Auto", 1, "auto">,
+    ]> {
+    let cppNamespace = "::catalyst::gradient";
+    let genSpecializedAttr = 0;
+}
+
+def GradientDiffMethodAttr : EnumAttr<Gradient_Dialect, GradientDiffMethod, "gradient_differentiation_method">;
+
+#endif // GRADIENT_ATTR_DEFS
+

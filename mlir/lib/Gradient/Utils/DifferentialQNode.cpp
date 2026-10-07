@@ -26,6 +26,7 @@ bool catalyst::gradient::isQNode(func::FuncOp funcOp) {
     return funcOp->hasAttrOfType<UnitAttr>("qnode");
 }
 
+// TODO?
 StringRef catalyst::gradient::getQNodeDiffMethod(func::FuncOp funcOp) {
     bool hasDiffMethod = isQNode(funcOp) && funcOp->hasAttrOfType<StringAttr>(diffMethodKey);
     if (hasDiffMethod) {

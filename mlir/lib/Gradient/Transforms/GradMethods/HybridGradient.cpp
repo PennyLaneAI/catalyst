@@ -25,6 +25,7 @@
 
 #include "Catalyst/Utils/CallGraph.h"
 #include "Catalyst/Utils/StaticAllocas.h"
+#include "Gradient/IR/GradientAttrDefs.h"
 #include "Gradient/Utils/DifferentialQNode.h"
 #include "Gradient/Utils/GradientShape.h"
 #include "Quantum/IR/QuantumInterfaces.h"
@@ -209,7 +210,7 @@ static FailureOr<func::FuncOp> cloneCallee(PatternRewriter &rewriter, Operation 
 }
 
 LogicalResult HybridGradientLowering::matchAndRewrite(GradOp op, PatternRewriter &rewriter) const {
-    if (op.getMethod() != "auto") {
+    if (op.getMethod() != GradientDiffMethod::Auto) {
         return failure();
     }
 
@@ -243,7 +244,7 @@ LogicalResult HybridGradientLowering::matchAndRewrite(GradOp op, PatternRewriter
 
 LogicalResult HybridValueAndGradientLowering::matchAndRewrite(ValueAndGradOp op,
                                                               PatternRewriter &rewriter) const {
-    if (op.getMethod() != "auto") {
+    if (op.getMethod() != GradientDiffMethod::FiniteDifference) {
         return failure();
     }
 

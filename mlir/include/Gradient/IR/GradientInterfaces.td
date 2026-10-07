@@ -29,7 +29,7 @@ def GradientOpInterface : OpInterface<"GradientOpInterface">{
     let methods = [
         InterfaceMethod<
         "Return the gradient method, which can be one of [\"auto\", \"fd\"].",
-        "llvm::StringRef", "getMethod"
+        "::catalyst::gradient::GradientDiffMethod", "getMethod"
         >,
         InterfaceMethod<
         "Return the name of the callee, aka the function being differentiated by the gradient operation.",

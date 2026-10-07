@@ -49,6 +49,10 @@ void GradientDialect::initialize() {
 #define GET_OP_LIST
 #include "Gradient/IR/GradientOps.cpp.inc"
         >();
+     addAttributes<
+#define GET_ATTRDEF_LIST
+#include "Gradient/IR/GradientAttributes.cpp.inc"
+        >();
     addInterface<GradientInlinerInterface>();
 
     declarePromisedInterfaces<bufferization::BufferizableOpInterface, AdjointOp, BackpropOp,
@@ -94,3 +98,10 @@ void ReverseOp::print(OpAsmPrinter &p) {
                                              getFunctionTypeAttrName(), getArgAttrsAttrName(),
                                              getResAttrsAttrName());
 }
+
+//===----------------------------------------------------------------------===//
+// Gradient Type definitions.
+//===----------------------------------------------------------------------===//
+
+#define GET_ATTRDEF_CLASSES
+#include "Gradient/IR/GradientAttributes.cpp.inc"
