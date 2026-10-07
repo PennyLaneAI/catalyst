@@ -1021,6 +1021,28 @@ class TestSymbolicRules:
         assert "qref.adjoint" not in rule
         assert "stablehlo.negate" in rule
 
+    @pytest.mark.parametrize("wrap_control", [False, True])
+    def test_adjoint_rule_changing_static_data_does_not_fold(self, wrap_control):
+        """Test that a rule producing the base op with different static data, like
+        ``Adjoint(PPR(8)) -> PPR(-8)``, declares the op it emits rather than the base op."""
+
+        module = compile_registered_symbolic_rules(
+            "PPR",
+            'Adjoint(PPR){}{wires:2}{angle_denominator = 8 : i64, pauli_word = "XY"}',
+            {},
+            {"wires": 2},
+            {"angle_denominator": 8, "pauli_word": "XY"},
+            op_cls=qp.PPR,
+            kind="adjoint",
+            wrap_control=wrap_control,
+        )
+        (rule,) = get_rule_strings_from_module(module)
+
+        name = "C(PPR)" if wrap_control else "PPR"
+        resource = f'"{name}{{}}{{wires:2}}{{angle_denominator = -8 : si64, pauli_word = \\22XY\\22}}"'
+        assert f"resources = {{operations = {{{resource} = 1 : i64}}}}" in rule
+        assert 'static_data = {angle_denominator = -8 : si64, pauli_word = "XY"}' in rule
+
     @pytest.mark.parametrize(
         "n_ctrl, target_id, signature, resource",
         [
