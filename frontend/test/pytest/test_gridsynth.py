@@ -83,7 +83,7 @@ def test_gridsynth_specs(ppr_basis):
         qp.RZ(x, 1)
         return qp.expval(qp.Z(0))
 
-    resources = qp.specs(circuit, level="all-mlir")(0.5).resources["gridsynth"]
+    resources = qp.specs(circuit, level=1)(0.5).resources
     assert resources.num_wires == 2
 
     ops = resources.quantum_operations
@@ -107,7 +107,7 @@ def test_gridsynth_specs_matches_runtime(eps, ppr_basis):
             qp.RZ(theta, 0)
         return qp.expval(qp.Z(0))
 
-    estimated = qp.specs(circuit, level="all-mlir")(angles).resources["gridsynth"]
+    estimated = qp.specs(circuit, level=1)(angles).resources
     executed = qp.specs(circuit, level="device")(angles).resources
 
     estimated_t = estimated.quantum_operations["PPR-pi/8-w1" if ppr_basis else "T"]
