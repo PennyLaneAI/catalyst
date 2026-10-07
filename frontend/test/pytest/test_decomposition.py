@@ -981,6 +981,7 @@ class TestModifierIds:
 _PPR_8_ID = 'PPR{}{wires:2}{angle_denominator = 8 : i64, pauli_word = "XY"}'
 _RZ_ID = "RZ{0:[f64]}{wires:1}{}"
 
+
 @pytest.mark.parametrize(
     "resource_ids, base_id, expected",
     [
@@ -1011,7 +1012,6 @@ _RZ_ID = "RZ{0:[f64]}{wires:1}{}"
 def test_adjoint_folds_to_base_util(resource_ids, base_id, expected):
     """Test that _adjoint_folds_to_base works as expected."""
     assert _adjoint_folds_to_base(resource_ids, base_id) is expected
-
 
 
 class TestSymbolicRules:
