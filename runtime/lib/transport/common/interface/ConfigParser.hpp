@@ -52,7 +52,7 @@ template <class Fn> void for_each_kv(std::string_view config, Fn fn) {
     }
 }
 
-/// Parse a non-negative integer from `val`; throw with a message naming `key` on any error.
+/// Parse a non-negative integer from `val`. Throws TransportError, naming `key`, on any error.
 inline int parse_index(std::string_view val, const char *key) {
     int out = 0;
     const char *last = val.data() + val.size();

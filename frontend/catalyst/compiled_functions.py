@@ -14,6 +14,7 @@
 
 """This module contains classes to manage compiled functions and their underlying resources."""
 
+import contextlib
 import ctypes
 import logging
 from dataclasses import dataclass
@@ -109,7 +110,15 @@ class SharedObjectManager:
         return function, setup, teardown, mem_transfer
 
     def __enter__(self):
-        wrapper.invoke_setup(self.setup, ["jitted-function"])
+        try:
+            wrapper.invoke_setup(self.setup, ["jitted-function"])
+        except Exception:
+            # A setup that fails part way leaves what it created, such as transport sessions
+            # registered under their keys, which the teardown releases. The setup's error is
+            # the one raised.
+            with contextlib.suppress(Exception):
+                wrapper.invoke_teardown(self.teardown)
+            raise
         return self
 
     def __exit__(self, _type, _value, _traceback):

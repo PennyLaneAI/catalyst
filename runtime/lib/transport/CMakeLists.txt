@@ -90,6 +90,12 @@ add_subdirectory(common)
 # CoprocessorFn plugins are always built (no RDMA deps); any backend dlopens them at runtime.
 add_dependencies(transport_all steane_coprocessor_cpu echo_coprocessor_cpu)
 add_dependencies(transport_backends steane_coprocessor_cpu echo_coprocessor_cpu)
+# The ONNX CoprocessorFn library is absent when CATALYST_TRANSPORT_ONNX is OFF or its header is
+# unavailable (see common/coproc/onnx).
+if(TARGET catalyst_onnx_coprocessor)
+    add_dependencies(transport_all catalyst_onnx_coprocessor)
+    add_dependencies(transport_backends catalyst_onnx_coprocessor)
+endif()
 
 # --- RDMA (cpu_verbs / gpu_verbs) --------------------------------------------
 if(IBVERBS_LIB)

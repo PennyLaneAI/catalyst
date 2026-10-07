@@ -13,10 +13,12 @@
 # limitations under the License.
 """Unit tests for the backline frontend: serialize_backline and the pipeline helpers."""
 
+import dataclasses
 import os
 import platform
 import subprocess
 from pathlib import Path
+from types import SimpleNamespace
 from unittest import mock
 
 import numpy as np
@@ -24,15 +26,17 @@ import pennylane as qp
 import pytest
 from pennylane.backline import Transport
 
-from catalyst import Executor, qjit
+from catalyst import Executor, compiled_functions, qjit
 from catalyst.backline import (
     _EXECUTOR_RUNTIME_PLUGINS,
     _TRANSPORT_PASSES,
     _insert_passes,
+    _message_size,
     _qec_pass_specs,
     _realize_executor,
     _resolve_backend,
     _resolve_backend_lib,
+    _runs_per_message_on_gpu,
     device_pass_pipeline,
     launch_executors,
     placement_pipeline,
@@ -69,6 +73,32 @@ class _Attached:
 
     def launch(self):
         return self
+
+
+@dataclasses.dataclass(frozen=True)
+class _FnStandIn:
+    """A coprocessor function with every field Catalyst's frontend reads, whichever fields the
+    installed PennyLane's ``CoprocessorFunction`` has."""
+
+    name: str
+    lib_path: str | None = None
+    config: str = ""
+    per_message: bool = False
+    message_bytes: tuple[int, int] | None = None
+
+    @property
+    def symbol_name(self) -> str:
+        """The library symbol the function is called through."""
+        return self.name
+
+
+_PL_DECLARES_MESSAGE_BYTES = "message_bytes" in {
+    f.name for f in dataclasses.fields(qp.CoprocessorFunction)
+}
+
+# The coprocessor function the tests build: PennyLane's own when it has every field the frontend
+# reads, and the stand-in otherwise.
+_Fn = qp.CoprocessorFunction if _PL_DECLARES_MESSAGE_BYTES else _FnStandIn
 
 
 def _controller(**kw):
@@ -130,6 +160,160 @@ def test_single_coprocessor():
     assert d["coprocessors"][0]["symbol"] == "coproc_fn"
 
 
+def test_coprocessor_fn_config_is_appended_with_the_fn_prefix():
+    """A coprocessor function's config joins the node config, each key prefixed ``fn.``."""
+    fn = _Fn("coproc_fn", config="model=/m.onnx;provider=migraphx")
+    dev = qp.Backline(
+        controller=_controller(), coprocessors=[_coproc("cop0", fn=fn)], transport="rdma"
+    )
+    node = serialize_backline(dev.placement)["coprocessors"][0]
+    assert (
+        node["config"] == "cfg;fn.model=/m.onnx;fn.provider=migraphx;fn.in_bytes=8;fn.out_bytes=8"
+    )
+
+
+def test_coprocessor_fn_config_without_a_node_config():
+    """A coprocessor with no config of its own carries the function's alone."""
+    fn = _Fn("coproc_fn", config="model=/m.onnx")
+    coproc = _coproc("cop0", fn=fn, init_args={"backend_lib": "backend.so"})
+    dev = qp.Backline(controller=_controller(), coprocessors=[coproc], transport="rdma")
+    node = serialize_backline(dev.placement)
+    assert node["coprocessors"][0]["config"] == "fn.model=/m.onnx;fn.in_bytes=8;fn.out_bytes=8"
+
+
+@pytest.mark.skipif(
+    not _PL_DECLARES_MESSAGE_BYTES,
+    reason="the installed PennyLane's CoprocessorFunction declares no message sizes",
+)
+def test_coprocessor_fn_config_carries_the_placement_message_sizes():
+    """A function's init receives the sizes the placement commits, after its own keys."""
+    fn = qp.CoprocessorFunction("coproc_fn", config="model=/m.onnx", message_bytes=(120, 121))
+    coproc = _coproc("cop0", fn=fn, init_args={"backend_lib": "backend.so"})
+    dev = qp.Backline(controller=_controller(), coprocessors=[coproc], transport="memcpy")
+    d = serialize_backline(dev.placement)
+    assert d["coprocessors"][0]["config"] == "fn.model=/m.onnx;fn.in_bytes=120;fn.out_bytes=121"
+    assert (d["controller"]["in_bytes"], d["controller"]["out_bytes"]) == (120, 121)
+
+
+@pytest.mark.parametrize("key", ["in_bytes", "out_bytes"])
+def test_coprocessor_fn_config_must_not_set_a_message_size(key):
+    """The message-size keys are reserved for the compiler."""
+    fn = _Fn("coproc_fn", config=f"{key}=4")
+    dev = qp.Backline(
+        controller=_controller(), coprocessors=[_coproc("cop0", fn=fn)], transport="rdma"
+    )
+    with pytest.raises(CompileError, match=f"config key '{key}' is reserved"):
+        serialize_backline(dev.placement)
+
+
+@pytest.mark.parametrize(
+    "placement, size",
+    [
+        (SimpleNamespace(in_bytes=120, controller=SimpleNamespace(in_bytes=16)), 120),
+        (SimpleNamespace(controller=SimpleNamespace(in_bytes=16)), 16),
+        (SimpleNamespace(controller=SimpleNamespace(in_bytes=None)), 8),
+    ],
+)
+def test_message_size_is_read_from_the_placement_then_the_controller(placement, size):
+    """The placement's size wins, then the controller's, then the 8 B default."""
+    assert _message_size(placement, "in_bytes") == size
+
+
+def test_coprocessor_fn_config_entry_without_a_value_is_rejected():
+    """An entry that is not key=value is rejected at compile time."""
+    fn = _Fn("coproc_fn", config="model")
+    dev = qp.Backline(
+        controller=_controller(), coprocessors=[_coproc("cop0", fn=fn)], transport="rdma"
+    )
+    with pytest.raises(CompileError, match="not of the form key=value"):
+        serialize_backline(dev.placement)
+
+
+def _gpu_coproc(fn, config=None):
+    init = {"backend_lib": "backend.so"}
+    if config is not None:
+        init["config"] = config
+    return qp.Coprocessor(name="gpu0", hardware="gpu", coprocessor_fn=fn, init_args=init)
+
+
+def test_a_per_message_function_selects_the_per_message_gpu_mode():
+    """A GPU coprocessor running a per-message function is configured for it automatically."""
+    fn = _Fn("coproc_fn", per_message=True)
+    dev = qp.Backline(
+        controller=_controller(), coprocessors=[_gpu_coproc(fn, "gpu=1")], transport="memcpy"
+    )
+    assert serialize_backline(dev.placement)["coprocessors"][0]["config"] == (
+        "gpu=1;coproc_fn=per_message;fn.in_bytes=8;fn.out_bytes=8"
+    )
+
+
+def test_catalysts_own_onnx_function_runs_per_message():
+    """Catalyst's ONNX function selects the per-message GPU mode, even when it is not marked."""
+    fn = _Fn("catalyst_onnx_coprocessor", config="model=/m.onnx")
+    assert _runs_per_message_on_gpu(_gpu_coproc(fn, "gpu=1"), "memcpy")
+    with pytest.raises(CompileError, match="only over the memcpy transport"):
+        _runs_per_message_on_gpu(_gpu_coproc(fn), "rdma")
+
+
+def test_an_explicit_per_message_mode_is_kept():
+    """A config that already selects the per-message mode is not changed."""
+    fn = _Fn("coproc_fn", per_message=True)
+    coproc = _gpu_coproc(fn, "coproc_fn=per_message")
+    dev = qp.Backline(controller=_controller(), coprocessors=[coproc], transport="memcpy")
+    assert serialize_backline(dev.placement)["coprocessors"][0]["config"] == (
+        "coproc_fn=per_message;fn.in_bytes=8;fn.out_bytes=8"
+    )
+
+
+def test_a_per_message_function_with_an_explicit_launch_once_mode_is_rejected():
+    """A per-message function cannot be bound as a persistent-kernel launcher."""
+    fn = _Fn("coproc_fn", per_message=True)
+    coproc = _gpu_coproc(fn, "coproc_fn=launch_once")
+    dev = qp.Backline(controller=_controller(), coprocessors=[coproc], transport="memcpy")
+    with pytest.raises(CompileError, match="selects coproc_fn=launch_once"):
+        serialize_backline(dev.placement)
+
+
+def test_the_onnx_coprocessor_function_is_rejected_on_a_dispatched_coprocessor():
+    """The ONNX function's model and onnxruntime paths are local, so it runs only in-process."""
+    fn = _Fn("catalyst_onnx_coprocessor", config="model=/m.onnx")
+    coproc = qp.Coprocessor(
+        name="gpu0",
+        hardware="cpu",
+        coprocessor_fn=fn,
+        executor_options={"host": "192.0.2.11", "port": 7813},
+    )
+    dev = qp.Backline(controller=_controller(), coprocessors=[coproc], transport="memcpy")
+    with pytest.raises(
+        CompileError, match="does not yet support a coprocessor dispatched to an executor"
+    ):
+        serialize_backline(dev.placement)
+
+
+def test_a_launcher_on_a_gpu_keeps_the_default_mode():
+    """A function not marked per_message leaves a GPU coprocessor in its default mode."""
+    dev = qp.Backline(
+        controller=_controller(), coprocessors=[_gpu_coproc("coproc_fn")], transport="memcpy"
+    )
+    config = serialize_backline(dev.placement)["coprocessors"][0]["config"]
+    assert "coproc_fn=" not in config
+
+
+def test_a_per_message_function_on_an_rdma_gpu_is_rejected():
+    """Only the memcpy GPU backend runs per-message functions."""
+    fn = _Fn("coproc_fn", per_message=True)
+    coproc = qp.Coprocessor(
+        name="gpu0",
+        hardware="gpu",
+        coprocessor_fn=fn,
+        endpoint=qp.Endpoint("127.0.0.1", 18590),
+        init_args={"backend_lib": "backend.so"},
+    )
+    dev = qp.Backline(controller=_controller(), coprocessors=[coproc], transport="rdma")
+    with pytest.raises(CompileError, match="only over the memcpy transport"):
+        serialize_backline(dev.placement)
+
+
 def test_in_process_coprocessor_fn_lib_is_loaded(monkeypatch):
     """An in-process coprocessor's CoprocessorFn library is loaded, so its symbol can resolve.
 
@@ -169,6 +353,83 @@ def test_coprocessor_fn_without_lib_path_loads_nothing(monkeypatch):
     dev = qp.Backline(controller=_controller(), coprocessors=[_coproc("cop0")], transport="rdma")
     launch_executors(dev.placement)
     assert loaded == []
+
+
+def test_a_builtin_coprocessor_fn_loads_catalysts_own_library(monkeypatch):
+    """A coprocessor function Catalyst ships needs no lib_path: its runtime library is loaded."""
+    monkeypatch.delenv("CATALYST_TRANSPORT_PATH", raising=False)
+    loaded = []
+    monkeypatch.setattr("ctypes.CDLL", lambda path, mode=None: loaded.append(path) or object())
+    monkeypatch.setattr(
+        "catalyst.backline.get_lib_path", lambda project, env: "/opt/catalyst/runtime/lib"
+    )
+    fn = qp.CoprocessorFunction("catalyst_onnx_coprocessor")
+    dev = qp.Backline(
+        controller=_controller(), coprocessors=[_coproc("cop0", fn=fn)], transport="rdma"
+    )
+    launch_executors(dev.placement)
+    assert loaded == ["/opt/catalyst/runtime/lib/libcatalyst_onnx_coprocessor.so"]
+
+
+def test_a_builtin_coprocessor_fn_library_is_found_as_a_dylib(monkeypatch, tmp_path):
+    """On macOS the runtime library is a .dylib, and it is the one loaded."""
+    monkeypatch.delenv("CATALYST_TRANSPORT_PATH", raising=False)
+    (tmp_path / "libcatalyst_onnx_coprocessor.dylib").write_bytes(b"")
+    loaded = []
+    monkeypatch.setattr("ctypes.CDLL", lambda path, mode=None: loaded.append(path) or object())
+    monkeypatch.setattr("catalyst.backline.get_lib_path", lambda project, env: str(tmp_path))
+    fn = qp.CoprocessorFunction("catalyst_onnx_coprocessor")
+    dev = qp.Backline(
+        controller=_controller(), coprocessors=[_coproc("cop0", fn=fn)], transport="rdma"
+    )
+    launch_executors(dev.placement)
+    assert loaded == [str(tmp_path / "libcatalyst_onnx_coprocessor.dylib")]
+
+
+def test_a_builtin_coprocessor_fn_library_is_found_on_the_transport_path(monkeypatch, tmp_path):
+    """A directory in CATALYST_TRANSPORT_PATH is searched before the runtime library directory."""
+    extra = tmp_path / "extra"
+    extra.mkdir()
+    (extra / "libcatalyst_onnx_coprocessor.so").write_bytes(b"")
+    loaded = []
+    monkeypatch.setattr("ctypes.CDLL", lambda path, mode=None: loaded.append(path) or object())
+    monkeypatch.setattr("catalyst.backline.get_lib_path", lambda project, env: str(tmp_path))
+    monkeypatch.setenv("CATALYST_TRANSPORT_PATH", str(extra))
+    fn = qp.CoprocessorFunction("catalyst_onnx_coprocessor")
+    dev = qp.Backline(
+        controller=_controller(), coprocessors=[_coproc("cop0", fn=fn)], transport="memcpy"
+    )
+    serialize_backline(dev.placement)
+    launch_executors(dev.placement)
+    assert loaded == [str(extra / "libcatalyst_onnx_coprocessor.so")]
+
+
+def test_a_missing_builtin_coprocessor_fn_library_fails_to_compile(monkeypatch, tmp_path):
+    """Compiling fails, naming the library and the directories searched, when it is not built."""
+    monkeypatch.setattr("catalyst.backline.get_lib_path", lambda project, env: str(tmp_path))
+    monkeypatch.delenv("CATALYST_TRANSPORT_PATH", raising=False)
+    fn = qp.CoprocessorFunction("catalyst_onnx_coprocessor")
+    dev = qp.Backline(
+        controller=_controller(), coprocessors=[_coproc("cop0", fn=fn)], transport="memcpy"
+    )
+    with pytest.raises(
+        CompileError, match=rf"needs libcatalyst_onnx_coprocessor\.so.*not found in: {tmp_path}"
+    ):
+        serialize_backline(dev.placement)
+
+
+def test_a_remote_node_names_a_builtin_coprocessor_fn_library_as_a_so(monkeypatch, tmp_path):
+    """A node on another machine is Linux, so it is given the .so even when this one has a
+    .dylib."""
+    from catalyst.backline import _executor_plugins  # pylint: disable=import-outside-toplevel
+
+    (tmp_path / "libcatalyst_onnx_coprocessor.dylib").write_bytes(b"")
+    monkeypatch.setattr("catalyst.backline.get_lib_path", lambda project, env: str(tmp_path))
+    fn = qp.CoprocessorFunction("catalyst_onnx_coprocessor")
+    coproc = qp.Coprocessor(
+        name="cop0", coprocessor_fn=fn, remote=True, executor_options={"host": "192.0.2.11"}
+    )
+    assert "libcatalyst_onnx_coprocessor.so" in _executor_plugins(coproc, [])
 
 
 def test_unlaunched_executor_names_the_node_it_came_from():
@@ -1516,3 +1777,26 @@ class TestExecutorRealization:
 
         assert "oob_port = 40000" in circuit.mlir
         assert "-25536" not in circuit.mlir
+
+
+def test_a_failed_setup_is_torn_down(monkeypatch):
+    """A setup that fails runs the teardown, which releases what the setup created, such as its
+    transport sessions, and the setup's error is the one raised."""
+    calls = []
+
+    def failing_setup(_setup, _argv):
+        calls.append("setup")
+        raise RuntimeError("setup failed")
+
+    def failing_teardown(_teardown):
+        calls.append("teardown")
+        raise RuntimeError("teardown failed")
+
+    monkeypatch.setattr(compiled_functions.wrapper, "invoke_setup", failing_setup)
+    monkeypatch.setattr(compiled_functions.wrapper, "invoke_teardown", failing_teardown)
+    manager = object.__new__(compiled_functions.SharedObjectManager)
+    manager.setup, manager.teardown = "setup", "teardown"
+    with pytest.raises(RuntimeError, match="setup failed"):
+        with manager:
+            pass
+    assert calls == ["setup", "teardown"]

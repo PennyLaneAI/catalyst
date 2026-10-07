@@ -197,11 +197,23 @@ if(ENABLE_TRANSPORT)
     target_compile_definitions(runner_tests_transport PRIVATE
         STUB_BACKEND_PATH="$<TARGET_FILE:stub_transport_backend>"
         MEMCPY_CONTROLLER_BACKEND_PATH="$<TARGET_FILE:catalyst_transport_memcpy_controller>"
-        MEMCPY_COPROCESSOR_BACKEND_PATH="$<TARGET_FILE:catalyst_transport_memcpy_coprocessor>")
+        MEMCPY_COPROCESSOR_BACKEND_PATH="$<TARGET_FILE:catalyst_transport_memcpy_coprocessor>"
+        STEANE_CPU_LIB_PATH="$<TARGET_FILE:steane_coprocessor_cpu>")
     add_dependencies(runner_tests_transport
         stub_transport_backend
         catalyst_transport_memcpy_controller
-        catalyst_transport_memcpy_coprocessor)
+        catalyst_transport_memcpy_coprocessor
+        steane_coprocessor_cpu)
+    # Test_Transport.cpp defines coprocessor functions the runtime resolves with dlsym.
+    set_property(TARGET runner_tests_transport PROPERTY ENABLE_EXPORTS ON)
+    if(TARGET catalyst_onnx_coprocessor)
+        # The ONNX coprocessor function's tests, on committed models over uint8[1, 8]: an identity,
+        # and one whose output is a sequence of tensors.
+        target_link_libraries(runner_tests_transport PRIVATE catalyst_onnx_coprocessor)
+        target_compile_definitions(runner_tests_transport PRIVATE
+            CATALYST_TEST_ONNX_MODEL="${CMAKE_CURRENT_SOURCE_DIR}/data/identity_u8x8.onnx"
+            CATALYST_TEST_ONNX_SEQUENCE_MODEL="${CMAKE_CURRENT_SOURCE_DIR}/data/sequence_u8x8.onnx")
+    endif()
     catch_discover_tests(runner_tests_transport)
 
     if(IBVERBS_LIB)

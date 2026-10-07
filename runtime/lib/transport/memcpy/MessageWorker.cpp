@@ -144,8 +144,12 @@ void MessageWorker::run(std::stop_token st) {
         CoprocessorFn fn = fn_ ? fn_ : &echo_fn;
         const std::size_t nb =
             fn(request_ring_.data(idx), static_cast<std::size_t>(req.bytes), out_data, cap, ctx_);
-        TP_CHECK(nb <= cap, "Coprocessor fn overran reply");
-        out.bytes = nb;
+        if (nb == COPROCESSOR_FN_ERROR) {
+            out.bytes = FAILED_REPLY;
+        } else {
+            TP_CHECK(nb <= cap, "Coprocessor fn overran reply");
+            out.bytes = nb;
+        }
         std::atomic_thread_fence(std::memory_order_release);
         out.seq = expect; // publish
     }
@@ -188,6 +192,8 @@ std::size_t MessageWorker::process_message(const void *in, std::size_t in_len, v
         }
     }
     std::atomic_thread_fence(std::memory_order_acquire);
+    TP_CHECK(rep.bytes != FAILED_REPLY, "The coprocessor function failed to process message %llu",
+             static_cast<unsigned long long>(c));
     if (out_cap != 0 && out) {
         std::memcpy(out, reply_ring_.data(idx), out_cap);
     }
