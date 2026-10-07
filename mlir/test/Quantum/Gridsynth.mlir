@@ -35,7 +35,7 @@
 // CLIFFORD:      [[PHASE:%.+]] = call @rs_decomposition_get_phase
 // CLIFFORD:      [[LOOP_RES:%.+]] = scf.for [[IV:%.+]] = [[C0]] to [[NUM_GATES]] step [[C1]] iter_args([[L_QBIT:%.+]] = [[ARG_QBIT]])
 // CLIFFORD:        [[CASE_ID:%.+]] = memref.load [[MEM]]{{\[}}[[IV]]{{\]}}
-// CLIFFORD:        [[SWITCH_RES:%.+]] = scf.index_switch [[CASE_ID]]
+// CLIFFORD:        [[SWITCH_RES:%.+]] = scf.index_switch [[CASE_ID]] {catalyst.estimated_probabilities = [{{.*}}]}
 // CLIFFORD:        case 0 {
 // CLIFFORD:          [[RES:%.+]] = quantum.custom "T"() [[L_QBIT]]
 // CLIFFORD:          scf.yield [[RES]]
@@ -81,7 +81,8 @@
 // CLIFFORD:        }
 // CLIFFORD:      }
 // CLIFFORD:      scf.yield [[SWITCH_RES]]
-// CLIFFORD:      }
+// COM: expected length 3.1063 * log2(1/0.01) + 2.2211
+// CLIFFORD:      } {catalyst.estimated_iterations = 22.8{{[0-9]+}} : f64}
 // CLIFFORD:      memref.dealloc [[MEM]]
 // CLIFFORD:      return [[LOOP_RES]], [[PHASE]] : !quantum.bit, f64
 
@@ -90,7 +91,7 @@
 // PPR:       [[MEM:%.+]] = memref.alloc
 // PPR:       [[PHASE:%.+]] = call @rs_decomposition_get_phase
 // PPR:       [[LOOP_RES:%.+]] = scf.for {{.*}} iter_args([[LOOP_QBIT:%.+]] = [[ARG_QBIT]])
-// PPR:       scf.index_switch
+// PPR:       scf.index_switch {{.*}} {catalyst.estimated_probabilities = [{{.*}}]}
 // PPR:       case 0 {
 // PPR:         scf.yield [[LOOP_QBIT]]
 // PPR:       }
@@ -166,6 +167,8 @@
 // PPR:         [[RES:%.+]] = pbc.ppr ["Z"](-8) [[LOOP_QBIT]]
 // PPR:         scf.yield [[RES]]
 // PPR:       }
+// COM: expected length 4.6657 * log2(1/0.01) + 4.2260
+// PPR:       } {catalyst.estimated_iterations = 35.2{{[0-9]+}} : f64}
 // PPR:       memref.dealloc [[MEM]]
 // PPR:       return [[LOOP_RES]], [[PHASE]]
 
@@ -283,4 +286,18 @@ func.func @test_ppr_arbitrary_ignored(%arg0: !quantum.bit, %theta: f64) -> (!qua
     %q4 = pbc.ppr.arbitrary ["Z"](%theta) %q3#0 cond(%c_true) : !quantum.bit
 
     return %q1, %q3#1, %q4 : !quantum.bit, !quantum.bit, !quantum.bit
+}
+
+// -----
+
+// Controlled rotations are left untouched.
+
+// CHECK-LABEL: @test_controlled_rz_ignored
+func.func @test_controlled_rz_ignored(%q: !quantum.bit, %c: !quantum.bit, %x: f64) -> (!quantum.bit, !quantum.bit) {
+    %true = arith.constant true
+
+    // CHECK: quantum.custom "RZ"({{.*}}) {{.*}} ctrls
+    // CHECK-NOT: call @__catalyst_decompose_RZ
+    %out, %cout = quantum.custom "RZ"(%x) %q ctrls(%c) ctrlvals(%true) : !quantum.bit ctrls !quantum.bit
+    return %out, %cout : !quantum.bit, !quantum.bit
 }

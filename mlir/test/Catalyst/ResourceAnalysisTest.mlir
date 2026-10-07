@@ -399,6 +399,53 @@ func.func @depth_caller(%arg0: !quantum.bit) -> !quantum.bit {
 
 // -----
 
+// Calls to declaration-only functions (e.g. runtime library functions) are counted as
+// classical instructions rather than function calls, because they have no entry of their own.
+
+// CHECK-LABEL: "external_caller": {
+// CHECK: "classical_instructions"
+// CHECK:   "func.call": 1
+// CHECK: "function_calls"
+// CHECK:   "dynamic": {}
+// CHECK:   "static": {}
+// CHECK: "quantum_operations"
+// CHECK:     "RZ": 1
+func.func private @external_angle(f64) -> f64
+
+func.func @external_caller(%arg0: !quantum.bit, %x: f64) -> !quantum.bit {
+    %y = func.call @external_angle(%x) : (f64) -> f64
+    %out = quantum.custom "RZ"(%y) %arg0 : !quantum.bit
+    return %out : !quantum.bit
+}
+
+// -----
+
+// Without an `llvm.emit_c_interface` function, the first public definition is the entry
+// function, so the argument qubits of a private helper defined before it are not counted.
+
+// CHECK-LABEL: "private_helper": {
+// CHECK: "num_qubits"
+// CHECK:   "alloc": 0
+// CHECK:   "arg": 0
+// CHECK:   "total": 0
+
+// CHECK-LABEL: "public_entry": {
+// CHECK: "num_qubits"
+// CHECK:   "alloc": 0
+// CHECK:   "arg": 1
+// CHECK:   "total": 1
+func.func private @private_helper(%arg0: !quantum.bit) -> !quantum.bit {
+    %out = quantum.custom "Hadamard"() %arg0 : !quantum.bit
+    return %out : !quantum.bit
+}
+
+func.func @public_entry(%arg0: !quantum.bit) -> !quantum.bit {
+    %out = func.call @private_helper(%arg0) : (!quantum.bit) -> !quantum.bit
+    return %out : !quantum.bit
+}
+
+// -----
+
 // Dynamic for loop with catalyst.estimated_iterations: treated as static for the
 // purposes of counting, so it lifts into "for_loop_1" with the
 // attribute's iteration count as the call multiplier.
@@ -2087,12 +2134,11 @@ func.func @if_estimated_probability(%arg0: !quantum.bit, %cond: i1) -> !quantum.
 
 // scf.if with only a then-branch and `estimated_probability` = 0.5: the (empty)
 // else-branch contributes nothing, so the expected Hadamard count is
-// 0.5 * 3 = 1.5. Counts are tracked as doubles internally, but the JSON output
-// rounds each count to the nearest integer, so 1.5 is reported as 2.
+// 0.5 * 3 = 1.5. Fractional counts are reported as is in the JSON output.
 
 // CHECK-LABEL: "if_estimated_probability_then_only"
 // CHECK: quantum_operations
-// CHECK:   "Hadamard": 2
+// CHECK:   "Hadamard": 1.5
 func.func @if_estimated_probability_then_only(%arg0: !quantum.bit, %cond: i1) {
     scf.if %cond {
         %t1 = quantum.custom "Hadamard"() %arg0 : !quantum.bit
@@ -2107,13 +2153,12 @@ func.func @if_estimated_probability_then_only(%arg0: !quantum.bit, %cond: i1) {
 
 // Qubit allocations are probability-weighted like every other count. Here the
 // then-branch allocates 1 qubit and the (empty) else-branch allocates none,
-// with p(then) = 0.5, so the expected allocation count is 0.5. The JSON output
-// rounds each count to the nearest integer, so 0.5 is reported as 1.
+// with p(then) = 0.5, so the expected allocation count is 0.5.
 
 // CHECK-LABEL: "if_estimated_probability_qubits"
 // CHECK: "num_qubits"
-// CHECK:   "alloc": 1
-// CHECK:   "total": 1
+// CHECK:   "alloc": 0.5
+// CHECK:   "total": 0.5
 func.func @if_estimated_probability_qubits(%cond: i1) {
     scf.if %cond {
         %r = quantum.alloc(1) : !quantum.reg
@@ -2129,13 +2174,12 @@ func.func @if_estimated_probability_qubits(%cond: i1) {
 // A probabilistic conditional inside a loop body: the fractional expected count
 // (0.5 Hadamard per iteration, p(then) = 0.5) is carried as a double internally so
 // it survives lifting into the for_loop_1 body and can be combined with the trip
-// count downstream (0.5 * 10 = 5, see the STATS check). The per-function JSON output
-// rounds counts to the nearest integer, so the lifted body reports 1, and the parent
-// records function_calls = { for_loop_1: 10 }.
+// count downstream (0.5 * 10 = 5, see the STATS check). The lifted body reports the
+// fractional count 0.5, and the parent records function_calls = { for_loop_1: 10 }.
 
 // CHECK-LABEL: "for_loop_1": {
 // CHECK: "quantum_operations"
-// CHECK:   "Hadamard": 1
+// CHECK:   "Hadamard": 0.5
 
 // CHECK-LABEL: "prob_if_in_loop": {
 // CHECK: "function_calls"

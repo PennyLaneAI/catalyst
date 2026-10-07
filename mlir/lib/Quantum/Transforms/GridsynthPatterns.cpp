@@ -14,7 +14,11 @@
 
 #define DEBUG_TYPE "gridsynth-patterns"
 
+#include <algorithm>
+#include <cassert>
+#include <cmath>
 #include <cstdint>
+#include <iterator>
 #include <vector>
 
 #include "llvm/ADT/SmallVector.h"
@@ -189,6 +193,62 @@ void populatePPRBasisSwitchCases(PatternRewriter &rewriter, Location loc,
     scf::YieldOp::create(rewriter, loc, qbitIn);
 }
 
+/**
+ * @brief Average statistics of the gate sequences returned by the runtime.
+ *
+ * The expected sequence length is `slope * log2(1/epsilon) + offset` and `caseFrequencies` holds
+ * the relative frequency of each `scf.index_switch` case. They are used as resource-analysis
+ * hints, since the actual sequences are only known at execution time.
+ */
+struct SequenceStatistics {
+    double slope;
+    double offset;
+    ArrayRef<double> caseFrequencies;
+};
+
+// The switch cases are the runtime's gate enums (`GateType` and `PPRGateType` in
+// runtime/lib/RSDecompRuntime/CliffordData.hpp), in enum order. The switch population above and
+// the frequencies below must follow the same order.
+constexpr int64_t numCliffordTCases = 10;
+constexpr int64_t numPPRCases = 19;
+
+// Relative frequency of each switch case, fitted over 200 uniformly random angles per epsilon,
+// for operator-norm epsilon in [1e-6, 1e-2].
+// Clifford+T cases: T, HT, SHT, I, X, ...
+constexpr double cliffordTCaseFrequencies[] = {0.0113, 0.4745, 0.4721, 0.0014, 0.0031,
+                                               0.0027, 0.0071, 0.0112, 0.0100, 0.0067};
+// PPR cases: I, X2, X4, X8, adjX2, ...
+constexpr double pprCaseFrequencies[] = {0.0009, 0.0021, 0.1644, 0.3107, 0.0000, 0.0038, 0.0000,
+                                         0.0017, 0.0000, 0.0000, 0.0000, 0.0000, 0.0038, 0.0085,
+                                         0.1850, 0.3146, 0.0000, 0.0044, 0.0000};
+static_assert(std::size(cliffordTCaseFrequencies) == numCliffordTCases);
+static_assert(std::size(pprCaseFrequencies) == numPPRCases);
+constexpr SequenceStatistics cliffordTStatistics{3.1063, 2.2211, cliffordTCaseFrequencies};
+constexpr SequenceStatistics pprStatistics{4.6657, 4.2260, pprCaseFrequencies};
+
+/**
+ * @brief Attach the expected trip count and case probabilities to the decomposition loop.
+ */
+void setResourceHints(PatternRewriter &rewriter, scf::ForOp forOp, scf::IndexSwitchOp switchOp,
+                      const SequenceStatistics &stats, double epsilon) {
+    double estimatedLength = stats.slope * std::log2(1 / epsilon) + stats.offset;
+    forOp->setAttr(catalyst::EstimatedIterationsAttrName,
+                   rewriter.getF64FloatAttr(std::max(estimatedLength, 1.0)));
+
+    assert(stats.caseFrequencies.size() == switchOp.getCases().size() &&
+           "Mismatch in case frequencies and case values");
+    double total = 0.0;
+    for (double frequency : stats.caseFrequencies) {
+        total += frequency;
+    }
+    SmallVector<Attribute> probabilities;
+    for (double frequency : stats.caseFrequencies) {
+        probabilities.push_back(rewriter.getF64FloatAttr(frequency / total));
+    }
+    switchOp->setAttr(catalyst::EstimatedProbabilitiesAttrName,
+                      rewriter.getArrayAttr(probabilities));
+}
+
 struct DecompositionExternalFuncs {
     func::FuncOp getSize;
     func::FuncOp getGates;
@@ -232,11 +292,6 @@ Value buildDecompositionLoop(PatternRewriter &rewriter, Location loc, Value qbit
     // The loop carries the Qubit as an argument
     auto forOp = scf::ForOp::create(rewriter, loc, c0, numGates, c1, ValueRange{qbitIn});
 
-    // Add attribute to the for op to indicate the estimated iterations of the loop
-    auto estimatedRanges = static_cast<int64_t>(std::ceil(10 * std::log2(1 / epsilon)));
-    auto estimatedRangesAttr = rewriter.getI16IntegerAttr(estimatedRanges);
-    forOp->setAttr(catalyst::EstimatedIterationsAttrName, estimatedRangesAttr);
-
     {
         OpBuilder::InsertionGuard loopGuard(rewriter);
         rewriter.setInsertionPointToStart(forOp.getBody());
@@ -247,7 +302,7 @@ Value buildDecompositionLoop(PatternRewriter &rewriter, Location loc, Value qbit
 
         // 19 cases for PPR basis: Identity + (X, Y, Z) x (2, 4, 8) x (normal, adjoint)
         // 10 cases for Clifford+T basis: {T, H T, S H T, I, X, Y, Z, H, S, adjS}
-        const int64_t numCases = pprBasis ? 19 : 10;
+        const int64_t numCases = pprBasis ? numPPRCases : numCliffordTCases;
         SmallVector<int64_t> caseValues;
         caseValues.reserve(numCases);
         for (int64_t i = 0; i < numCases; i++) {
@@ -266,6 +321,8 @@ Value buildDecompositionLoop(PatternRewriter &rewriter, Location loc, Value qbit
         } else {
             populateCliffordTSwitchCases(rewriter, loc, switchOp, currentQbit);
         }
+        setResourceHints(rewriter, forOp, switchOp, pprBasis ? pprStatistics : cliffordTStatistics,
+                         epsilon);
 
         // Yield the result of the switch op from the for loop
         rewriter.setInsertionPointAfter(switchOp);
@@ -372,11 +429,14 @@ struct DecomposeCustomOpPattern : public OpRewritePattern<CustomOp> {
             return failure();
         }
 
-        assert(op.getQubitOperands().size() == 1 && op.getParams().size() == 1 &&
-               "only RZ and PhaseShift are allowed in Gridsynth decomposition");
+        // Controlled rotations are not single-qubit rotations and cannot be discretized here.
+        if (op.getInQubits().size() != 1 || !op.getInCtrlQubits().empty() ||
+            op.getParams().size() != 1) {
+            return failure();
+        }
 
         // Directly grab the SSA value of the qubit. No need to look up ExtractOps.
-        Value qbitOperand = op.getQubitOperands()[0];
+        Value qbitOperand = op.getInQubits()[0];
         Value angle = op.getParams()[0];
 
         ModuleOp mod = op->getParentOfType<ModuleOp>();

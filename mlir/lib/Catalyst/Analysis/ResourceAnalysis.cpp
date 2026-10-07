@@ -29,6 +29,7 @@
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/Operation.h"
+#include "mlir/IR/SymbolTable.h"
 
 #include "Catalyst/Analysis/ResourceAnalysis.h"
 #include "Catalyst/Analysis/ResourceResult.h"
@@ -114,6 +115,17 @@ ResourceAnalysis::ResourceAnalysis(ModuleOp moduleOp,
         if (funcOp->hasAttr("llvm.emit_c_interface")) {
             entryFunc = funcOp.getName();
             break;
+        }
+    }
+
+    // Fallback: use the first public definition as entry function, since passes may insert
+    // private helpers (e.g. gridsynth decomposition functions) at the start of the module.
+    if (entryFunc.empty()) {
+        for (auto funcOp : definedFuncOps) {
+            if (!funcOp.isPrivate()) {
+                entryFunc = funcOp.getName();
+                break;
+            }
         }
     }
 
@@ -467,6 +479,15 @@ void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result, b
 
     // Function calls
     if (auto callOp = dyn_cast<func::CallOp>(op)) {
+        // Declaration-only callees (e.g. runtime library functions) have no body to analyze and
+        // no entry of their own in the output, so they are counted as classical instructions.
+        auto callee =
+            SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(callOp, callOp.getCalleeAttr());
+        if (callee && callee.isDeclaration()) {
+            result.classicalInstructions[op->getName().getStringRef()] += 1;
+            return;
+        }
+
         result.functionCalls[callOp.getCallee()] += 1;
         if (auto parentFunc = op->getParentOfType<func::FuncOp>();
             parentFunc && callOp.getCallee() == parentFunc.getName()) {
