@@ -66,6 +66,14 @@ def test_load_valid_default_cache(monkeypatch, tmp_path):
     assert identities == frozenset({RuleIdentity("Target", "rule", {"A": 1, "Z": 2})})
 
 
+def test_load_empty_cache(tmp_path):
+    """An empty manifest is a valid cache with no precompiled rules."""
+    bytecode_path = tmp_path / "rules.mlirbc"
+    _write_test_cache(bytecode_path, _get_test_manifest([]))
+
+    assert load_precompiled_rule_identities(bytecode_path) == frozenset()
+
+
 def test_manifest_entry_canonicalizes_resources():
     """Manifest entries use the same canonical resource ordering as rule identities."""
     identity = RuleIdentity("Target", "rule", {"Z": 2, "A": 1})
@@ -104,6 +112,7 @@ def test_malformed_manifest(tmp_path):
 @pytest.mark.parametrize(
     "manifest",
     [
+        [],
         {},
         {"bytecode_hash": 1, "precompiled_rules": []},
         {"bytecode_hash": "wrong", "precompiled_rules": []},
@@ -129,6 +138,7 @@ def test_invalid_manifest_raises(tmp_path, manifest):
     [
         None,
         {"target_gate": "Target", "frontend_name": "rule"},
+        {"target_gate": "Target", "frontend_name": "rule", "resources": {}, "extra": None},
         {"target_gate": 1, "frontend_name": "rule", "resources": {}},
         {"target_gate": "Target", "frontend_name": 1, "resources": {}},
         {"target_gate": "Target", "frontend_name": "rule", "resources": []},

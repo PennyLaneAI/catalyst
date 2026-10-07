@@ -53,7 +53,8 @@ def _validate_rule_entry(entry) -> RuleIdentity:
         raise ValueError("Malformed precompiled rule.")
 
     if not isinstance(resources, dict) or any(
-        not isinstance(gate, str) or not isinstance(count, int) for gate, count in resources.items()
+        not isinstance(gate, str) or not isinstance(count, int) or isinstance(count, bool)
+        for gate, count in resources.items()
     ):
         raise ValueError("Malformed precompiled rule resources.")
 

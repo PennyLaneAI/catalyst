@@ -31,6 +31,7 @@ from catalyst.from_plxpr.qfunc_interpreter import (
     capture_and_bind_kernel_rules,
 )
 from catalyst.from_plxpr.qref_jax_primitives import QrefQreg
+from catalyst.utils.exceptions import CompileError
 from catalyst.utils.runtime_environment import BYTECODE_FILE_PATH, get_bytecode_manifest_path
 
 PRECOMPILATION_MODIFIERS = (
@@ -54,7 +55,10 @@ def _capture_rule_module(scope: DecompositionScope) -> ir.Operation:
     def rules_module():
         capture_and_bind_kernel_rules(interpreter, precompiled_rule_identities=frozenset())
 
-    return rules_module.mlir_module
+    module = rules_module.mlir_module
+    if module is None:
+        raise CompileError("Failed to generate the precompiled decomposition-rule module")
+    return module
 
 
 def precompile_decomp_rules(_decomp_file_path: str | Path = BYTECODE_FILE_PATH) -> None:

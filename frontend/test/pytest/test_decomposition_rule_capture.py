@@ -309,6 +309,41 @@ def test_precompilation_preserves_traversal(mocker):
     assert 'frontend_name = "cacheleaf_to_leaf"' in mlir
 
 
+def test_changed_resources_get_recaptured(mocker):
+    """A rule is recaptured when its resources differ from a precompiled rule."""
+
+    import catalyst.from_plxpr.qfunc_interpreter as capture_frontend
+
+    @qp.register_resources({})
+    def current_rule(wires):
+        del wires
+
+    stale_identity = RuleIdentity(
+        "RepeatedGate{}{wires:1}{}",
+        "current_rule",
+        {"PauliX{}{wires:1}{}": 1},
+    )
+    load_cache = mocker.patch.object(
+        capture_frontend,
+        "load_precompiled_rule_identities",
+        return_value=frozenset({stale_identity}),
+    )
+
+    with qp.decomposition.local_decomps():
+        qp.add_decomps(RepeatedGate, current_rule)
+
+        @qjit(capture=True, target="mlir")
+        @qp.qnode(qp.device("null.qubit", wires=1))
+        def circuit():
+            RepeatedGate(0)
+            return qp.state()
+
+        mlir = str(circuit.mlir_module)
+
+    load_cache.assert_called_once_with()
+    assert 'frontend_name = "current_rule"' in mlir
+
+
 def test_tracing_recovers_missed_cache(mocker):
     """Test that the trace-time traversal captures all rules if loading the cache fails."""
 
