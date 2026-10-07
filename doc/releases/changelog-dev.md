@@ -658,6 +658,9 @@
   unsupported quantum-bearing `scf` operations are encountered.
   [(#3238)](https://github.com/PennyLaneAI/catalyst/pull/3238)
 
+* Add `post-device-pipeline` to the `transform-sequence` when `qp.qjit(capture=True)`
+  [(#3312)](https://github.com/PennyLaneAI/catalyst/pull/3312)
+
 <h3>Breaking changes 💔</h3>
 
 * `catalyst.logging` has been removed. `pennylane.logging` should be used instead.
