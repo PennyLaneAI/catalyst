@@ -26,6 +26,8 @@ on:
       - "runtime/lib/backend/**"
       - "runtime/include/Transport*"
       - "runtime/tests/Test_Transport*"
+      - "runtime/tests/CMakeLists.txt"
+      - "runtime/tests/data/**"
       - "runtime/Makefile"
       - "mlir/lib/Transport/**"
       - "mlir/include/Transport/**"
@@ -47,6 +49,8 @@ on:
       - "runtime/lib/backend/**"
       - "runtime/include/Transport*"
       - "runtime/tests/Test_Transport*"
+      - "runtime/tests/CMakeLists.txt"
+      - "runtime/tests/data/**"
       - "runtime/Makefile"
       - "mlir/lib/Transport/**"
       - "mlir/include/Transport/**"
@@ -121,10 +125,15 @@ jobs:
           # builds gpu_verbs -- so `make runtime` covers all four backends in one configure.
           sudo apt-get install -y clang lld libibverbs-dev
           python3 -m pip install "cmake>=3.26" ninja "nanobind<2.13" pybind11 numpy PyYAML
+          # The ONNX coprocessor function's tests run a model through this onnxruntime, on its
+          # CPU provider, and skip unless CATALYST_TEST_ONNXRUNTIME_LIB names its library. Only
+          # the C API header is needed to build the library; cmake downloads that itself.
+          python3 -m pip install onnxruntime
           {
             echo "C_COMPILER=$(which gcc)"
             echo "CXX_COMPILER=$(which g++)"
             echo "ENABLE_TRANSPORT=ON"
+            echo "CATALYST_TEST_ONNXRUNTIME_LIB=$(python3 -c "import glob, os, onnxruntime; print(sorted(glob.glob(os.path.join(os.path.dirname(onnxruntime.__file__), 'capi', 'libonnxruntime.so*')))[0])")"
             echo "LLVM_SRC_DIR=$(pwd)/mlir/llvm-project"
             echo "RT_BUILD_DIR=$(pwd)/runtime-build"
             echo "DIALECTS_BUILD_DIR=$(pwd)/quantum-build"
@@ -186,11 +195,14 @@ jobs:
       # are built here rather than after soft-RoCE so a compile error -- likely, since this is
       # the first host where cpu_verbs and gpu_verbs compile at all -- lands before the MLIR
       # stack, not after it. They run at the end of the job, once rxe0 exists.
+      # --allow-running-no-tests: Catch2 fails a run in which no test ran, and a suite whose
+      # tests all skip -- an RDMA suite with no device, the ONNX tests with no onnxruntime --
+      # counts as one.
       - name: Build all transport C++ suites, run the device-free ones
         run: |
           cmake --build "$RT_BUILD_DIR" --target transport_tests_all -j
-          "$RT_BUILD_DIR/tests/runner_tests_transport"
-          "$RT_BUILD_DIR/tests/runner_tests_transport_memcpy"
+          "$RT_BUILD_DIR/tests/runner_tests_transport" --allow-running-no-tests
+          "$RT_BUILD_DIR/tests/runner_tests_transport_memcpy" --allow-running-no-tests
 
       # --------------------------------------------------------------------------------------
       # 2. MLIR stack -- LLVM, StableHLO, Enzyme
@@ -324,9 +336,9 @@ jobs:
       # executed on any runner, so this is its first real exercise.
       - name: Run the cpu_verbs and gpu_verbs C++ suites over rxe0
         run: |
-          "$RT_BUILD_DIR/tests/runner_tests_transport_common"
-          "$RT_BUILD_DIR/tests/runner_tests_transport_cpu"
-          "$RT_BUILD_DIR/tests/runner_tests_transport_gpu"
+          "$RT_BUILD_DIR/tests/runner_tests_transport_common" --allow-running-no-tests
+          "$RT_BUILD_DIR/tests/runner_tests_transport_cpu" --allow-running-no-tests
+          "$RT_BUILD_DIR/tests/runner_tests_transport_gpu" --allow-running-no-tests
 
       - name: Run the backline test file
         env:
