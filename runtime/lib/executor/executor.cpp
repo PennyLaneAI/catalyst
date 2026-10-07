@@ -53,6 +53,15 @@
 #include <utility>
 #include <vector>
 
+// GCC false-positives -Wmaybe-uninitialized inside llvm::unique_function
+// (ADT/FunctionExtras.h), instantiated from SimpleRemoteEPCServer::Create below; -Werror makes
+// it fatal. Scoped to the includes rather than the call site: GCC reports the diagnostic against
+// the header, so a pragma around our own call does not cover it. Clang has no such warning and
+// rejects the name in a pragma under -Werror, hence the guard.
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
+#endif
 #include "llvm/ExecutionEngine/Orc/Shared/SimpleRemoteEPCUtils.h"
 #include "llvm/ExecutionEngine/Orc/Shared/WrapperFunctionUtils.h"
 #include "llvm/ExecutionEngine/Orc/TargetProcess/DefaultHostBootstrapValues.h"
@@ -64,6 +73,9 @@
 #include "llvm/Support/Error.h"
 #include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/raw_ostream.h"
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic pop
+#endif
 
 #include <netdb.h>
 #include <netinet/in.h>

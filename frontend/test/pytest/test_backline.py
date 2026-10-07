@@ -1014,6 +1014,10 @@ def fake_lib_dir(tmp_path, monkeypatch):
     layout ``make -C runtime`` produces.
     """
     monkeypatch.setattr("catalyst.backline.get_lib_path", lambda *_: str(tmp_path))
+    # ``CATALYST_TRANSPORT_PATH`` is searched ahead of the in-tree lib dir, so an ambient value
+    # -- the transport CI job exports one -- would shadow what this fixture lays down. The tests
+    # that want it set it themselves.
+    monkeypatch.delenv("CATALYST_TRANSPORT_PATH", raising=False)
 
     def make(*entries):
         for e in entries:
@@ -1033,6 +1037,8 @@ def flat_lib_dir(tmp_path, monkeypatch):
     ``<RUNTIME_LIB_DIR>``, so entries are bare library names.
     """
     monkeypatch.setattr("catalyst.backline.get_lib_path", lambda *_: str(tmp_path))
+    # Would shadow this fixture if left set; see :func:`fake_lib_dir`.
+    monkeypatch.delenv("CATALYST_TRANSPORT_PATH", raising=False)
 
     def make(*entries):
         for e in entries:
