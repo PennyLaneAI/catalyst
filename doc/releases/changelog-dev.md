@@ -657,6 +657,12 @@
   unsupported quantum-bearing `scf` operations are encountered.
   [(#3238)](https://github.com/PennyLaneAI/catalyst/pull/3238)
 
+* A remote `Executor` now takes its sudo password from an environment variable named by
+  `sudo_password_env=`, so the password is no longer directly in source, config files or reprs.
+  Once read, the password is held in a `Secret` that prints as `***`, so it does not leak
+  through logs or tracebacks.
+  [(#XXXX)](https://github.com/PennyLaneAI/catalyst/pull/XXXX)
+
 <h3>Breaking changes 💔</h3>
 
 * `catalyst.logging` has been removed. `pennylane.logging` should be used instead.
