@@ -765,6 +765,9 @@
   through logs or tracebacks.
   [(#3309)](https://github.com/PennyLaneAI/catalyst/pull/3309)
 
+* Add `post-device-pipeline` to the `transform-sequence` when `qp.qjit(capture=True)`
+  [(#3312)](https://github.com/PennyLaneAI/catalyst/pull/3312)
+
 <h3>Breaking changes 💔</h3>
 
 * `catalyst.logging` has been removed. `pennylane.logging` should be used instead.
