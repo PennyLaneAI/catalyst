@@ -72,7 +72,14 @@ runs:
       run: |
         # Attach rdma_rxe to `lo` so the tests find an ibverbs device named rxe0.
         sudo modprobe rdma_rxe
-        sudo rdma link add rxe0 type rxe netdev lo
+        # The link outlives the job on a persistent self-hosted runner, and `rdma link add` then
+        # fails with "File exists". Reuse what is already there; the check below still has to pass,
+        # so a stale or misattached rxe0 fails the step rather than slipping through.
+        if ibv_devices | awk '{print $1}' | grep -q '^rxe0$'; then
+          echo "rxe0 already attached from an earlier run on this runner; reusing it"
+        else
+          sudo rdma link add rxe0 type rxe netdev lo
+        fi
         ibv_devices
         # Fail fast if rxe0 didn't come up: the Catch2 tests would otherwise silently SKIP.
         ibv_devices | awk '{print $1}' | grep -q '^rxe0$'
