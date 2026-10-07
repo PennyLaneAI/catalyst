@@ -81,8 +81,8 @@
 // CLIFFORD:        }
 // CLIFFORD:      }
 // CLIFFORD:      scf.yield [[SWITCH_RES]]
-// COM: expected length 3.1063 * log2(1/0.01) + 2.2211
-// CLIFFORD:      } {catalyst.estimated_iterations = 22.8{{[0-9]+}} : f64}
+// COM: expected T and other entries (3.0590 - 0.0074) * log2(1/0.01) + 1.1278 + 1.9849
+// CLIFFORD:      } {catalyst.estimated_iterations = 23.3{{[0-9]+}} : f64}
 // CLIFFORD:      memref.dealloc [[MEM]]
 // CLIFFORD:      return [[LOOP_RES]], [[PHASE]] : !quantum.bit, f64
 
@@ -167,8 +167,8 @@
 // PPR:         [[RES:%.+]] = pbc.ppr ["Z"](-8) [[LOOP_QBIT]]
 // PPR:         scf.yield [[RES]]
 // PPR:       }
-// COM: expected length 4.6657 * log2(1/0.01) + 4.2260
-// PPR:       } {catalyst.estimated_iterations = 35.2{{[0-9]+}} : f64}
+// COM: expected T and other entries (3.0590 + 1.5324) * log2(1/0.01) + 1.1278 + 4.2326
+// PPR:       } {catalyst.estimated_iterations = 35.8{{[0-9]+}} : f64}
 // PPR:       memref.dealloc [[MEM]]
 // PPR:       return [[LOOP_RES]], [[PHASE]]
 
