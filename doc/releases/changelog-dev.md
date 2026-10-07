@@ -62,6 +62,7 @@
   [(#3127)](https://github.com/PennyLaneAI/catalyst/pull/3127)
   [(#3213)](https://github.com/PennyLaneAI/catalyst/pull/3213)
   [(#3248)](https://github.com/PennyLaneAI/catalyst/pull/3248)
+  [(#3307)](https://github.com/PennyLaneAI/catalyst/pull/3307)
 
   Control is folded into the operator identity *control-outermost* (e.g. `C(Adjoint(Op))`), so
   `ctrl(adjoint(Op))` and `adjoint(ctrl(Op))` collapse to a single node, while a distinct control
@@ -693,11 +694,6 @@
 <h3>Deprecations 👋</h3>
 
 <h3>Bug fixes 🐛</h3>
-
-* Fixed a bug where decompositions of adjoint operators that return a single operator of the same
-  class as the base operator, but with modified static data, were considered an adjoint fold,
-  leading to wrong resource accounting in the decomposition graph construction.
-  [(#3307)](https://github.com/PennyLaneAI/catalyst/pull/3307)
 
 * The memcpy controller now rejects staging or posting a payload before its message sizes are
   committed, instead of writing into an unallocated buffer.

@@ -53,6 +53,7 @@ from catalyst.debug import get_compilation_stage
 from catalyst.decomposition import GraphOpID, RuleLoweringWarning
 from catalyst.decomposition.decomposition_rules import (
     _MODIFIER_CANONICAL_ORDER,
+    _adjoint_folds_to_base,
     _control_modifier,
     _leading_modifier_kind,
     _modifier_kind,
@@ -975,6 +976,42 @@ class TestModifierIds:
         assert _MODIFIER_CANONICAL_ORDER == ("C", "Adjoint")
         with pytest.raises(ValueError, match="Non-canonical modifier order"):
             wrap_modifier_id(op_id, "Adjoint")
+
+
+_PPR_8_ID = 'PPR{}{wires:2}{angle_denominator = 8 : i64, pauli_word = "XY"}'
+_RZ_ID = "RZ{0:[f64]}{wires:1}{}"
+
+@pytest.mark.parametrize(
+    "resource_ids, base_id, expected",
+    [
+        # A single unmodified copy of the base op folds (adjoint_rotation / self_adjoint).
+        ({_RZ_ID: 1}, _RZ_ID, True),
+        ({"Hadamard{}{wires:1}{}": 1}, "Hadamard{}{wires:1}{}", True),
+        ({_PPR_8_ID: 1}, _PPR_8_ID, True),
+        ({"HybridOp{a:[[f64]]}{w:1}{}[42]": 1}, "HybridOp{a:[[f64]]}{w:1}{}[42]", True),
+        # Same op with different static data, e.g. Adjoint(PPR(8)) -> PPR(-8), does not fold.
+        (
+            {'PPR{}{wires:2}{angle_denominator = -8 : si64, pauli_word = "XY"}': 1},
+            _PPR_8_ID,
+            False,
+        ),
+        # Different op, wires, dynamic params or uid do not fold.
+        ({"RX{0:[f64]}{wires:1}{}": 1}, _RZ_ID, False),
+        ({"MultiRZ{theta:[f64]}{wires:3}{}": 1}, "MultiRZ{theta:[f64]}{wires:2}{}", False),
+        ({"RZ{0:[tensor<1xf64>]}{wires:1}{}": 1}, _RZ_ID, False),
+        ({"HybridOp{a:[[f64]]}{w:1}{}[43]": 1}, "HybridOp{a:[[f64]]}{w:1}{}[42]", False),
+        # A modified copy of the base op does not fold.
+        ({"Adjoint(RZ){0:[f64]}{wires:1}{}": 1}, _RZ_ID, False),
+        # More than one copy, or extra resources, do not fold.
+        ({_RZ_ID: 2}, _RZ_ID, False),
+        ({_RZ_ID: 1, "GlobalPhase{0:[f64]}{wires:0}{}": 1}, _RZ_ID, False),
+        ({}, _RZ_ID, False),
+    ],
+)
+def test_adjoint_folds_to_base_util(resource_ids, base_id, expected):
+    """Test that _adjoint_folds_to_base works as expected."""
+    assert _adjoint_folds_to_base(resource_ids, base_id) is expected
+
 
 
 class TestSymbolicRules:
