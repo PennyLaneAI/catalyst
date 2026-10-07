@@ -724,7 +724,9 @@
 
 * Fixed a bug where a compiled Backline program continued with a session that does not work,
   for example echoing the controller's own message back as the reply, after a transport call or a
-  coprocessor function's set-up failed. It now stops with an error naming the call that failed.
+  coprocessor function's set-up failed. It now stops with an error naming the call that failed,
+  and releases the program's transport sessions, so a later program in the same process can
+  run.
   [(#3282)](https://github.com/PennyLaneAI/catalyst/pull/3282)
 
 * The memcpy controller now rejects staging or posting a payload before its message sizes are

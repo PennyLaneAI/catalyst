@@ -416,7 +416,8 @@ def test_a_missing_builtin_coprocessor_fn_library_fails_to_compile(monkeypatch, 
 
 
 def test_a_remote_node_names_a_builtin_coprocessor_fn_library_as_a_so(monkeypatch, tmp_path):
-    """A node on another machine is Linux, so it is given the .so even when this one has a .dylib."""
+    """A node on another machine is Linux, so it is given the .so even when this one has a
+    .dylib."""
     from catalyst.backline import _executor_plugins  # pylint: disable=import-outside-toplevel
 
     (tmp_path / "libcatalyst_onnx_coprocessor.dylib").write_bytes(b"")
