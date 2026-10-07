@@ -697,7 +697,7 @@
 * Fixed a bug where decompositions of adjoint operators that return a single operator of the same
   class as the base operator, but with modified static data, were considered an adjoint fold,
   leading to wrong resource accounting in the decomposition graph construction.
-  [(#3281)](https://github.com/PennyLaneAI/catalyst/pull/3281)
+  [(#3307)](https://github.com/PennyLaneAI/catalyst/pull/3307)
 
 * The memcpy controller now rejects staging or posting a payload before its message sizes are
   committed, instead of writing into an unallocated buffer.
