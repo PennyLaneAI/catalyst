@@ -164,10 +164,7 @@ from catalyst.jax_extras import (
 )
 from catalyst.utils.calculate_grad_shape import Signature, calculate_grad_shape
 from catalyst.utils.extra_bindings import FromElementsOp, TensorExtractOp
-from catalyst.utils.runtime_artifacts import (
-    record_device_runtime_artifacts,
-    record_runtime_artifact,
-)
+from catalyst.utils.runtime_artifacts import record_runtime_artifact
 from catalyst.utils.types import convert_shaped_arrays_to_tensors
 
 # pylint: disable=unused-argument,too-many-lines,too-many-statements,protected-access
@@ -620,7 +617,6 @@ def _quantum_kernel_lowering(ctx, *args, call_jaxpr, qnode, pipelines=None):
     pipelines = pipelines or ()
 
     func_op = lower_callable(ctx, qnode, call_jaxpr, pipelines)
-    record_device_runtime_artifacts(ctx.module_context.module.operation, qnode.device)
     call_op = create_call_op(ctx, func_op, *args)
     return call_op.results
 
