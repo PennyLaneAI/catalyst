@@ -2,6 +2,21 @@
 
 <h3>New features since last release</h3>
 
+* You can now dynamically prepare magic T states inside captured Catalyst workflows using
+  ``qp.allocate(state="magic-T")`` and ``qp.allocate(state="magic-T-adj")``, which makes it
+  easier to compile FTQC-style routines that need T-state ancillas on the fly (for example
+  TemporaryAND) with ``qjit(capture=True)``.
+  [(#3029)](https://github.com/PennyLaneAI/catalyst/pull/3029)
+
+  ```python
+  @qjit(capture=True)
+  @qnode(dev)
+  def circuit():
+      qb = qp.allocate(state="magic-T")
+      # ... use qb in your circuit ...
+      qp.deallocate(qb)
+  ```
+
 * A new `quantum.ctrl` region op and a `ctrl-lowering` pass are added to the Quantum Dialect
   for controlled subcircuits in Catalyst.
 
@@ -112,6 +127,17 @@
   [(#2956)](https://github.com/PennyLaneAI/catalyst/pull/2956)
 
 <h3>Improvements 🛠</h3>
+
+* The memcpy transport now carries messages of any size in each direction, as set by a PennyLane
+  `qp.Controller`'s `in_bytes` and `out_bytes`. The RDMA transports, and the memcpy GPU
+  coprocessor's persistent kernel, still carry 8 bytes.
+
+  ```python
+  ctrl = qp.Controller(in_bytes=120, out_bytes=121)
+  dev = qp.Backline(controller=ctrl, coprocessors=[coproc], transport="memcpy")
+  ```
+
+  [(#3281)](https://github.com/PennyLaneAI/catalyst/pull/3281)
 
 * Under program capture, PennyLane :func:`~.transforms.decompose` (``qp.decompose``) is now an
   alias for :func:`~.passes.graph_decomposition`. Multiple ``qp.decompose`` transforms is also
@@ -337,6 +363,7 @@
   `catalyst.estimated_probabilities` attribute, respectively, to indicate the expected probability
   distribution over the branches. The counted resources are then scaled proportionally and summed.
   [(#3059)](https://github.com/PennyLaneAI/catalyst/pull/3059)
+  [(#3195)](https://github.com/PennyLaneAI/catalyst/pull/3195)
 
 * Warnings and diagnostics emitted by successful Catalyst compiler subprocesses are now forwarded to
   Python callers instead of being silently discarded. LLVM diagnostic colors are preserved in
@@ -668,6 +695,10 @@
 <h3>Deprecations 👋</h3>
 
 <h3>Bug fixes 🐛</h3>
+
+* The memcpy controller now rejects staging or posting a payload before its message sizes are
+  committed, instead of writing into an unallocated buffer.
+  [(#3281)](https://github.com/PennyLaneAI/catalyst/pull/3281)
 
 * Fixed the CNOT decomposition of the `ions-decomposition` pass, which did not implement a CNOT:
   it rotated the target with `RY(-π/2)` instead of `RX(-π/2)` and returned the two qubits in

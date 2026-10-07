@@ -61,9 +61,9 @@ class GpuCoprocessorSession : public CoprocessorSession {
     // slot, spin-waits for the engine thread to publish the paired reply slot (fed by the
     // persistent decode kernel's handoff), and copies the reply into `out`.
     //
-    // Expects `in_len == sizeof(common::Payload)` (16, a wire-shaped frame) and
-    // `out_cap >= sizeof(int64_t)`; the reply is always `sizeof(int64_t)` bytes.
-    // Anything else throws.
+    // Expects `in_len == sizeof(common::Payload)` (16, a wire-shaped frame) and `out_cap <= 8`, so
+    // messages carry at most 8 B each way, and throws otherwise. The first `out_cap` bytes of the
+    // kernel's `sizeof(int64_t)`-byte correction are copied to `out`, and `out_cap` is returned.
     std::size_t process_message(const void *in, std::size_t in_len, void *out, std::size_t out_cap);
 
   private:
