@@ -36,9 +36,10 @@ std::size_t increment_fn(const void *in, std::size_t /*in_len*/, void *out, std:
     if (out_cap < n) {
         return 0;
     }
+    const auto *request = static_cast<const std::uint8_t *>(in);
+    auto *reply = static_cast<std::uint8_t *>(out);
     for (std::size_t i = 0; i < n; ++i) {
-        static_cast<std::uint8_t *>(out)[i] =
-            static_cast<std::uint8_t>(static_cast<const std::uint8_t *>(in)[i] + 1);
+        reply[i] = static_cast<std::uint8_t>(request[i] + 1); // wraps 255 to 0
     }
     return n;
 }

@@ -80,6 +80,7 @@
   [(#3127)](https://github.com/PennyLaneAI/catalyst/pull/3127)
   [(#3213)](https://github.com/PennyLaneAI/catalyst/pull/3213)
   [(#3248)](https://github.com/PennyLaneAI/catalyst/pull/3248)
+  [(#3307)](https://github.com/PennyLaneAI/catalyst/pull/3307)
 
   Control is folded into the operator identity *control-outermost* (e.g. `C(Adjoint(Op))`), so
   `ctrl(adjoint(Op))` and `adjoint(ctrl(Op))` collapse to a single node, while a distinct control
@@ -143,6 +144,10 @@
   operation's `numFolds` operand is now always a floating-point tensor; the integer folding methods
   require integral values and convert the count internally.
   [(#2956)](https://github.com/PennyLaneAI/catalyst/pull/2956)
+
+* A device can now declare shared runtime libraries via an optional `get_runtime_artifacts` method. 
+  These will be linked by the compiler.
+  [(#3303)](https://github.com/PennyLaneAI/catalyst/pull/3303)
 
 <h3>Improvements 🛠</h3>
 
@@ -718,6 +723,7 @@
 
 * Added reference semantics support for PBC operations.
   [(#3136)](https://github.com/PennyLaneAI/catalyst/pull/3136)
+  [(#3305)](https://github.com/PennyLaneAI/catalyst/pull/3305)
 
 <h3>Deprecations 👋</h3>
 
@@ -1039,6 +1045,11 @@
 * Pull requests touching transport now run its Catch2 suites and the backline tests: CPU over a
   soft-RoCE loopback link, and CPU-to-GPU over memcpy on the GPU runner.
   [(#3074)](https://github.com/PennyLaneAI/catalyst/pull/3074)
+
+* The OQD device now implements the optional `get_runtime_artifacts` to inform the compiler of its runtime library, 
+  `librt_OQD_capi`. This replaces the previous work-around that had the compiler check directly for the library and
+  link it if present.
+  [(#3303)](https://github.com/PennyLaneAI/catalyst/pull/3303)
 
 <h3>Documentation 📝</h3>
 

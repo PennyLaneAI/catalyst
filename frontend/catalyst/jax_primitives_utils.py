@@ -30,6 +30,7 @@ from pennylane.transforms.core import BoundTransform
 from catalyst.backline import module_attributes
 from catalyst.jax_extras.lowering import get_mlir_attribute_from_pyval
 from catalyst.passes import PassPlugin
+from catalyst.utils.runtime_artifacts import record_device_runtime_artifacts
 
 
 def _all_expval(call_jaxpr: core.ClosedJaxpr) -> bool:
@@ -231,6 +232,8 @@ def lower_qnode_to_funcop(ctx, callable_, call_jaxpr, pipelines):
     with NestedModule(ctx, name) as module, ir.InsertionPoint(module.regions[0].blocks[0]) as ip:
         for attr_name, value in device_attrs.items():
             module.operation.attributes[attr_name] = get_mlir_attribute_from_pyval(value)
+        # record runtime artifacts regarding device-specific runtime libraries on the qnode module
+        record_device_runtime_artifacts(module.operation, callable_.device)
         transform_module_lowering(ctx, pipelines)
         ctx.module_context.ip = ip
         func_op = get_or_create_funcop(ctx, callable_, call_jaxpr, pipelines)

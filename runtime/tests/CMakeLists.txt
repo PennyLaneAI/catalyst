@@ -209,6 +209,7 @@ if(ENABLE_TRANSPORT)
     if(TARGET catalyst_onnx_coprocessor)
         # The ONNX coprocessor function's tests, on committed models over uint8[1, 8]: an identity,
         # and one whose output is a sequence of tensors.
+        target_sources(runner_tests_transport PRIVATE Test_TransportOnnx.cpp)
         target_link_libraries(runner_tests_transport PRIVATE catalyst_onnx_coprocessor)
         target_compile_definitions(runner_tests_transport PRIVATE
             CATALYST_TEST_ONNX_MODEL="${CMAKE_CURRENT_SOURCE_DIR}/data/identity_u8x8.onnx"
