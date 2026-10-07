@@ -1204,11 +1204,7 @@ void handlePPM(IRRewriter &builder, pbc::RefPPMeasurementOp rPPMOp, QubitValueTr
     OpBuilder::InsertionGuard guard(builder);
     MLIRContext *ctx = rPPMOp.getContext();
 
-    SmallVector<Type> qubitResultsType;
-    for (size_t i = 0; i < rPPMOp.getQubits().size(); i++) {
-        qubitResultsType.push_back(quantum::QubitType::get(ctx));
-    }
-
+    SmallVector<Type> qubitResultsType(rPPMOp.getQubits().size(), quantum::QubitType::get(ctx));
     auto vPPMOp =
         migrateOpToValueSemantics<pbc::PPMeasurementOp>(builder, rPPMOp, tracker, qubitResultsType);
 
