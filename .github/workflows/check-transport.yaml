@@ -310,22 +310,8 @@ jobs:
           # Triton dlopens libcuda.so.1 from the driver, not the toolkit stub.
           echo "TRITON_LIBCUDA_PATH=/lib/x86_64-linux-gnu" >> $GITHUB_ENV
 
-      - name: Run the backline memcpy tests (CPU coproc, GPU coproc, GPU Triton)
-        env:
-          # Without this Triton discards ptxas diagnostics, leaving codegen failures as "status 255".
-          TRITON_DUMP_PTXAS_LOG: "1"
-        # Every memcpy-transport case, so this host covers the backend end to end: the CPU-CPU
-        # one also runs in check-catalyst.yaml, but here it runs on jammy/gcc with memcpy_gpu
-        # built alongside. -rs makes the gpu_transport_backend / gpu_triton_platform skips visible.
-        run: |
-          python3 -m pytest -v -rs \
-            "frontend/test/pytest/test_backline.py::TestBacklineDemoIntegration::test_local_cpu_to_local_cpu_memcpy" \
-            "frontend/test/pytest/test_backline.py::TestBacklineDemoIntegration::test_cpu_controller_to_gpu_coproc_memcpy_precompiled" \
-            "frontend/test/pytest/test_backline.py::TestBacklineDemoIntegration::test_cpu_controller_to_gpu_coproc_triton_css_bp" \
-            "frontend/test/pytest/test_backline.py::TestBacklineDemoIntegration::test_cpu_controller_to_gpu_coproc_memcpy_manual_qec"
-
       # --------------------------------------------------------------------------------------
-      # 4. Soft-RoCE, then every test that needs an RDMA device
+      # 4. Soft-RoCE (For tests that work with an emulated RDMA device)
       #
       #   Needs: the test binaries from phase 1, the frontend from phase 3, and rxe0.
       #   Last on purpose -- this modprobes an out-of-tree rdma_rxe that outlives the job on
@@ -342,11 +328,9 @@ jobs:
           "$RT_BUILD_DIR/tests/runner_tests_transport_cpu"
           "$RT_BUILD_DIR/tests/runner_tests_transport_gpu"
 
-      # in_process only: the out_of_process param needs a runtime built with ENABLE_EXECUTOR=ON,
-      # which this job leaves off to keep the runtime build ahead of LLVM. check-catalyst.yaml
-      # runs both params. -rs so a skip is visible -- these have no skip conditions.
-      - name: Run the backline cpu_verbs test over rxe0
+      - name: Run the backline test file
+        env:
+          # Without this Triton discards ptxas diagnostics, leaving codegen failures as "status 255".
+          TRITON_DUMP_PTXAS_LOG: "1"
         run: |
-          python3 -m pytest -v -rs -k in_process \
-            "frontend/test/pytest/test_backline.py::TestBacklineDemoIntegration::test_local_cpu_to_local_cpu_rdma_loopback"
-
+          python3 -m pytest -v -rs frontend/test/pytest/test_backline.py

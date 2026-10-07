@@ -812,7 +812,7 @@ class TestBacklineDemoIntegration:
             decoder = qp.backline.css_bp_decoder(
                 Hx, Hz, postprocess="osd", num_iters=1, prob=0.1, platform=platform
             )
-        except (ImportError, RuntimeError, OSError) as exc:
+        except (ImportError) as exc:
             pytest.skip(f"Triton css_bp_decoder build unavailable: {exc}")
 
         ctrl = qp.Controller(

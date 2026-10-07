@@ -43,15 +43,6 @@ ifeq ($(ENABLE_ASAN), ON)
 ASAN_COMMAND = $(ASAN_FLAGS)
 endif
 
-# Run all transport tests in the runtime build directory. 
-define run_transport_tests
-@set -e; for t in $(RT_BUILD_DIR)/tests/runner_tests_transport*; do \
-	[ -x "$$t" ] || continue; \
-	echo "Catalyst runtime test suite - $${t##*/}"; \
-	$(ASAN_COMMAND) $$t; \
-done
-endef
-
 BUILD_TARGETS := rt_capi rtd_null_qubit rt_rsdecomp rt_decoder
 TEST_TARGETS := runner_tests_qir_runtime runner_tests_mbqc_runtime runner_tests_rsdecomp_runtime runner_tests_decoder_runtime
 
@@ -137,7 +128,11 @@ ifeq ($(ENABLE_OQD), ON)
 	$(ASAN_COMMAND) $(RT_BUILD_DIR)/tests/runner_tests_oqd
 endif
 ifeq ($(ENABLE_TRANSPORT), ON)
-	$(run_transport_tests)
+	# Transport suites; which binaries exist depends on the toolchain (libibverbs, HIP).
+	@set -e; for t in $(RT_BUILD_DIR)/tests/runner_tests_transport*; do \
+		echo "Catalyst runtime test suite - $${t##*/}"; \
+		$(ASAN_COMMAND) $$t; \
+	done
 endif
 ifeq ($(ENABLE_EXECUTOR), ON)
 	# Test the catalyst-executor server over a loopback connection
@@ -147,12 +142,12 @@ endif
 .PHONY: test-transport
 test-transport: BUILD_TYPE?=RelWithDebInfo
 test-transport: configure
-	# Only build the transport suite; going through `test_runner` would rebuild the QIR,
-	# MBQC, RSDecomp, Decoder, OpenQASM, OQD binaries too -- pure waste when only the
-	# transport tests will run below.
 	cmake --build $(RT_BUILD_DIR) --target transport_tests_all -j$(NPROC)
 	@echo "Catalyst runtime transport test suites"
-	$(run_transport_tests)
+		@set -e; for t in $(RT_BUILD_DIR)/tests/runner_tests_transport*; do \
+		echo "Catalyst runtime test suite - $${t##*/}"; \
+		$(ASAN_COMMAND) $$t; \
+	done
 
 .PHONY: coverage
 coverage: RT_BUILD_DIR := $(RT_BUILD_DIR)_cov
@@ -174,7 +169,11 @@ ifeq ($(ENABLE_OQD), ON)
 	$(ASAN_COMMAND) $(RT_BUILD_DIR)/tests/runner_tests_oqd
 endif
 ifeq ($(ENABLE_TRANSPORT), ON)
-	$(run_transport_tests)
+	# Transport suites; which binaries exist depends on the toolchain (libibverbs, HIP).
+	@set -e; for t in $(RT_BUILD_DIR)/tests/runner_tests_transport*; do \
+		echo "Catalyst runtime test suite - $${t##*/}"; \
+		$(ASAN_COMMAND) $$t; \
+	done
 endif
 ifeq ($(ENABLE_EXECUTOR), ON)
 	$(ASAN_COMMAND) $(RT_BUILD_DIR)/tests/runner_tests_executor
