@@ -12,19 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{gate-set=C(testT)=1.0 alt-decomps=myCZ{}{wires:2}{}=cz_region})' %s | FileCheck %s
+// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{gate-set=C(testT)=1.0 alt-decomps=myCZ{}{wires:2}{}=cz_region})' %s | FileCheck %s --check-prefixes=ALL,CALL
 
-// CHECK-LABEL: func.func @distribute_ctrl_region(
-// CHECK-SAME:  [[Q0:%.+]]: !quantum.bit, [[Q1:%.+]]: !quantum.bit
+// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{inline-rule-body gate-set=C(testT)=1.0 alt-decomps=myCZ{}{wires:2}{}=cz_region})' %s | FileCheck %s --check-prefixes=ALL,INLINE
+
+// ALL-LABEL: func.func @distribute_ctrl_region(
+// ALL-SAME:  [[Q0:%.+]]: !quantum.bit, [[Q1:%.+]]: !quantum.bit
 func.func @distribute_ctrl_region(%q0: !quantum.bit, %q1: !quantum.bit) -> (!quantum.bit, !quantum.bit) {
-  // CHECK-NOT: quantum.ctrl(
-  // CHECK: quantum.custom "testT"() [[Q0]] ctrls([[Q1]]) ctrlvals({{%.+}}) : !quantum.bit ctrls !quantum.bit
+  // ALL-NOT: quantum.ctrl(
+  // CALL: call @cz_region_0([[Q0]], [[Q1]])
+  // INLINE: quantum.custom "testT"() [[Q0]] ctrls([[Q1]]) ctrlvals({{%.+}}) : !quantum.bit ctrls !quantum.bit
   %o:2 = quantum.custom "myCZ"() %q0, %q1 : !quantum.bit, !quantum.bit
   return %o#0, %o#1 : !quantum.bit, !quantum.bit
 }
 
 // myCZ decomposes to a single controlled testT, expressed as a `quantum.ctrl` region over testT.
-// CHECK-LABEL: func.func private @cz_region
+// ALL-LABEL: func.func private @cz_region
 func.func private @cz_region(%q0: !quantum.bit, %q1: !quantum.bit) -> (!quantum.bit, !quantum.bit) attributes {
     target_gate = "myCZ{}{wires:2}{}",
     resources = {operations = {"C(testT){}{wires:1}{}" = 1 : i64}} } {
@@ -36,3 +39,7 @@ func.func private @cz_region(%q0: !quantum.bit, %q1: !quantum.bit) -> (!quantum.
   }
   return %oc, %oq : !quantum.bit, !quantum.bit
 }
+
+// CALL: func.func private @cz_region_0
+// CALL-NOT: quantum.ctrl
+// CALL: quantum.custom "testT"() {{%.+}} ctrls({{%.+}})

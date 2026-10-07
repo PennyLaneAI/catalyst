@@ -12,25 +12,29 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{gate-set=2C(H)=1.0,3C(H)=1.0 alt-decomps=2C(U){}{wires:1}{}=cc_u,3C(U){}{wires:1}{}=ccc_u})' %s | FileCheck %s
+// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{gate-set=2C(H)=1.0,3C(H)=1.0 alt-decomps=2C(U){}{wires:1}{}=cc_u,3C(U){}{wires:1}{}=ccc_u})' %s | FileCheck %s --check-prefixes=ALL,CALL
 
-// CHECK-LABEL: func.func @two_controls(
+// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{inline-rule-body gate-set=2C(H)=1.0,3C(H)=1.0 alt-decomps=2C(U){}{wires:1}{}=cc_u,3C(U){}{wires:1}{}=ccc_u})' %s | FileCheck %s --check-prefixes=ALL,INLINE
+
+// ALL-LABEL: func.func @two_controls(
 func.func @two_controls(%c1: !quantum.bit, %c2: !quantum.bit, %q: !quantum.bit)
     -> (!quantum.bit, !quantum.bit, !quantum.bit) {
   %true = arith.constant true
-  // CHECK-NOT: "U"
-  // CHECK: %[[A:.*]], %[[AC:.*]]:2 = quantum.custom "H"() %{{.*}} ctrls(%{{.*}}, %{{.*}}) ctrlvals(%{{.*}}, %{{.*}}) : !quantum.bit ctrls !quantum.bit, !quantum.bit
-  // CHECK: %[[B:.*]], %[[BC:.*]]:2 = quantum.custom "H"() %[[A]] ctrls(%[[AC]]#0, %[[AC]]#1) ctrlvals(%{{.*}}, %{{.*}}) : !quantum.bit ctrls !quantum.bit, !quantum.bit
+  // ALL-NOT: "U"
+  // CALL: call @cc_u_1
+  // INLINE: %[[A:.*]], %[[AC:.*]]:2 = quantum.custom "H"() %{{.*}} ctrls(%{{.*}}, %{{.*}}) ctrlvals(%{{.*}}, %{{.*}}) : !quantum.bit ctrls !quantum.bit, !quantum.bit
+  // INLINE: %[[B:.*]], %[[BC:.*]]:2 = quantum.custom "H"() %[[A]] ctrls(%[[AC]]#0, %[[AC]]#1) ctrlvals(%{{.*}}, %{{.*}}) : !quantum.bit ctrls !quantum.bit, !quantum.bit
   %out, %outc:2 = quantum.custom "U"() %q ctrls(%c1, %c2) ctrlvals(%true, %true) : !quantum.bit ctrls !quantum.bit, !quantum.bit
   return %out, %outc#0, %outc#1 : !quantum.bit, !quantum.bit, !quantum.bit
 }
 
-// CHECK-LABEL: func.func @three_controls(
+// ALL-LABEL: func.func @three_controls(
 func.func @three_controls(%c1: !quantum.bit, %c2: !quantum.bit, %c3: !quantum.bit, %q: !quantum.bit)
     -> (!quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit) {
   %true = arith.constant true
-  // CHECK-NOT: "U"
-  // CHECK: %{{.*}}, %{{.*}}:3 = quantum.custom "H"() %{{.*}} ctrls(%{{.*}}, %{{.*}}, %{{.*}}) ctrlvals(%{{.*}}, %{{.*}}, %{{.*}}) : !quantum.bit ctrls !quantum.bit, !quantum.bit, !quantum.bit
+  // ALL-NOT: "U"
+  // CALL: call @ccc_u_0
+  // INLINE: %{{.*}}, %{{.*}}:3 = quantum.custom "H"() %{{.*}} ctrls(%{{.*}}, %{{.*}}, %{{.*}}) ctrlvals(%{{.*}}, %{{.*}}, %{{.*}}) : !quantum.bit ctrls !quantum.bit, !quantum.bit, !quantum.bit
   %out, %outc:3 = quantum.custom "U"() %q ctrls(%c1, %c2, %c3) ctrlvals(%true, %true, %true) : !quantum.bit ctrls !quantum.bit, !quantum.bit, !quantum.bit
   return %out, %outc#0, %outc#1, %outc#2 : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
 }
@@ -55,3 +59,6 @@ func.func private @ccc_u(%q: !quantum.bit, %c1: !quantum.bit, %c2: !quantum.bit,
   %o, %oc:3 = quantum.custom "H"() %q ctrls(%c1, %c2, %c3) ctrlvals(%true, %true, %true) : !quantum.bit ctrls !quantum.bit, !quantum.bit, !quantum.bit
   return %o, %oc#0, %oc#1, %oc#2 : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
 }
+
+// CALL: func.func private @ccc_u_0
+// CALL: func.func private @cc_u_1
