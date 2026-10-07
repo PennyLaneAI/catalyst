@@ -502,7 +502,8 @@ int __catalyst__transport__set_coprocessor_fn(CatalystTransportSession *s, const
             }
         }
         // Bind first, and release the previous function's ctx only once the new binding holds: a
-        // rejected bind (e.g. after start()) leaves the running function and its ctx untouched.
+        // rejected bind, which the backend throws or reports with an unknown convention, leaves the
+        // bound function and its ctx untouched.
         const auto bind = [&] {
             switch (co->coprocessor_fn_convention()) {
             case CoprocConvention::PerMessage:
@@ -724,8 +725,10 @@ int __catalyst__transport__start_benchmark(CatalystTransportSession *s, std::uin
 
 void __catalyst__transport__start(CatalystTransportSession *s) {
     if (s && s->sess) {
-        s->started = true;
-        guard([&] { s->sess->start(); });
+        guard([&] {
+            s->sess->start();
+            s->started = true;
+        });
     }
 }
 

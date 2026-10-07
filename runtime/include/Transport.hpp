@@ -197,8 +197,10 @@ class ControllerSession : public TransportSession {
  * wire frame that area is 8 bytes. A memcpy backend widens it to hold the committed in_bytes, of
  * any size (see WireProtocol.hpp). `out_cap` is at least 8.
  *
- * Returning COPROCESSOR_FN_ERROR reports that the message could not be processed: the backend
- * fails that round instead of delivering the reply.
+ * Returning COPROCESSOR_FN_ERROR reports that the message could not be processed. A memcpy
+ * backend fails that round instead of delivering the reply. The cpu_verbs coprocessor treats it,
+ * like any return outside 1..8, as an error that stops its engine, so the controller receives no
+ * reply.
  */
 using CoprocessorFn = std::size_t (*)(const void *in, std::size_t in_len, void *out,
                                       std::size_t out_cap, void *ctx);
