@@ -21,6 +21,8 @@ from copy import copy
 from functools import partial
 from typing import Callable
 
+from importlib.metadata import entry_points
+
 import jax
 import pennylane as qp
 from jax.extend.core import ClosedJaxpr, Jaxpr
@@ -146,6 +148,7 @@ def from_plxpr(
     skip_preprocess: bool = False,
     _preprocess_warn: bool = True,
     collect_decomp_rules: bool = True,
+    plugin_paths : list[str] | None = None,
 ) -> Callable[..., Jaxpr]:
     """Convert PennyLane variant jaxpr to Catalyst variant jaxpr.
 
@@ -160,6 +163,8 @@ def from_plxpr(
             generally not be used. ``True`` by default.
         collect_decomp_rules (bool): Controls whether or not to compile the reachable
             decomposition rules from the gates in the circuit. ``True`` by default.
+        plugin_paths (None | list[str]): a list that will be **mutated in place** with
+            the paths of any transforms from plugins encountered
 
     Returns:
         Callable: A function that accepts the same arguments as the plxpr and returns catalyst
@@ -221,6 +226,7 @@ def from_plxpr(
         skip_preprocess=skip_preprocess,
         _preprocess_warn=_preprocess_warn,
         collect_decomp_rules=collect_decomp_rules,
+        plugin_paths=plugin_paths,
     )
     original_fn = partial(interpreter.eval, plxpr.jaxpr, plxpr.consts)
 
@@ -241,17 +247,19 @@ class WorkflowInterpreter(PlxprInterpreter):
             skip_preprocess=self._skip_preprocess,
             _preprocess_warn=self._preprocess_warn,
             collect_decomp_rules=self._collect_decomp_rules,
+            plugin_paths=self.plugin_paths,
         )
         new_version._pass_pipeline = copy(self._pass_pipeline)
         new_version.init_qreg = self.init_qreg
         return new_version
 
-    def __init__(self, skip_preprocess=False, _preprocess_warn=True, collect_decomp_rules=True):
+    def __init__(self, skip_preprocess=False, _preprocess_warn=True, collect_decomp_rules=True, plugin_paths : None | list[str] = None):
         self._pass_pipeline = []
         self.init_qreg = None
         self._skip_preprocess = skip_preprocess
         self._preprocess_warn = _preprocess_warn
         self._collect_decomp_rules = collect_decomp_rules
+        self.plugin_paths = plugin_paths if plugin_paths is not None else []
 
         super().__init__()
 
@@ -416,11 +424,21 @@ def handle_transform(
             f"{transform} does not have a pass_name and is not supported with the "
             "capture frontend. Set capture=False to apply tape-only transforms with qjit."
         )
+    if "." in transform.pass_name:
+        resolution_functions = entry_points(group="catalyst.passes_resolution")
+        key, passname = transform.pass_name.split(".")
+        resolution_function = resolution_functions[key + ".passes"]
+        module = resolution_function.load()
+        path, name = module.name2pass(passname)
+        self.plugin_paths.append(path)
+    else:
+        name = transform.pass_name
+
 
     # Apply the corresponding Catalyst pass counterpart
     next_eval = copy(self)
-    t = qp.transform(pass_name=transform.pass_name)
-    bound_pass = qp.transforms.core.BoundTransform(t, args=targs, kwargs=pl_tkwargs)
+    t = qp.transform(pass_name=name)
+    bound_pass = t(*targs, **pl_tkwargs)
     next_eval._pass_pipeline.insert(0, bound_pass)
     return next_eval.eval(inner_jaxpr, consts, *non_const_args)
 
@@ -473,6 +491,7 @@ def trace_from_pennylane(
         Tuple[Tuple[ShapedArray, bool]]: the return type of the captured JAXPR.
             The boolean indicates whether each result is a value returned by the user function.
         PyTreeDef: PyTree metadata of the function output
+        list[str]: the plugin paths encountered in the transforms
     """
     if abstracted_axes and any(isinstance(arg, jax.core.ShapedArray) for arg in args):
         # ShapedArrays incompatible with abstracted_axes, so need to create dummy arrays
@@ -495,6 +514,12 @@ def trace_from_pennylane(
             "abstracted_axes": abstracted_axes,
         }
 
+        # passing plugin_paths to from_plxpr as an argument for in-place mutation for now
+        # as otherwise would require a signature change
+        # we should redesign either from_plxpr or handling plugin_paths to
+        # no longer need inplace mutation of an argument
+        plugin_paths = []
+
         # we want to have the same tracers as inputs to plxpr capture and from_plxpr
         # translation, as this tells jax which inputs match which dynamic shapes
         # if we have concrete inputs to both, jax will get confused.
@@ -510,7 +535,7 @@ def trace_from_pennylane(
             flat_inputs = [a for a in flat_inputs if qp.math.is_abstract(a)]
             abstract_shapes = _extract_abstract_shapes(flat_inputs)
             jaxpr = from_plxpr(
-                plxpr, skip_preprocess=skip_preprocess, collect_decomp_rules=collect_decomp_rules
+                plxpr, skip_preprocess=skip_preprocess, collect_decomp_rules=collect_decomp_rules, plugin_paths=plugin_paths
             )(*abstract_shapes, *flat_inputs)
 
             return _dummy_hop.bind(jaxpr=jaxpr, out_type=out_type, out_treedef=out_treedef)
@@ -520,4 +545,4 @@ def trace_from_pennylane(
         out_type = nested_jaxpr.eqns[0].params["out_type"]
         out_treedef = nested_jaxpr.eqns[0].params["out_treedef"]
 
-    return jaxpr, out_type, out_treedef
+    return jaxpr, out_type, out_treedef, plugin_paths
