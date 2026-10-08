@@ -1852,6 +1852,33 @@ class TestCustomRuleApplication:
         assert after.get("NoParams", 0) == 1
         assert after.get("MidCircuitMeasure", 0) == 1
 
+    def test_fix_decomp_by_name(self):
+        """Tests that referring to decomposition rules by name in fixed_decomps work."""
+
+        @qp.register_resources({qp.X: 1})
+        def rule1(wires):
+            qp.X(wires)
+
+        @qp.register_resources({qp.X: 2})
+        def rule2(wires):
+            qp.X(wires)
+
+        with local_decomps():
+
+            add_decomps(NoParams, rule1, rule2)
+
+            @qjit(capture=True, target="mlir")
+            @graph_decomposition(gate_set={qp.X: 1}, fixed_decomps={NoParams: "rule2"})
+            @qnode(qp.device("null.qubit", wires=1))
+            def circuit():
+                NoParams(0)
+
+            resources = qp.specs(circuit, level="all")().resources
+
+        decomposed = resources["graph-decomposition"].counts
+        assert decomposed.get("NoParams", 0) == 0
+        assert decomposed.get("PauliX", 0) == 2  # assert that the second rule got used
+
     def test_functional_adjoint_region_is_lowered(self):
         """Test that a functional modifier ``qp.adjoint(op)(...)`` is captured as a ``quantum.adjoint``
         region and lowered to an op-level modifier before graph-decomposition (which builds its graph
