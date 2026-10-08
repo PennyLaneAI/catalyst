@@ -438,7 +438,8 @@ def handle_transform(
     # Apply the corresponding Catalyst pass counterpart
     next_eval = copy(self)
     t = qp.transform(pass_name=name)
-    bound_pass = t(*targs, **pl_tkwargs)
+    # Transform.__call__() rejects empty args/kwargs; construct BoundTransform directly.
+    bound_pass = qp.transforms.core.BoundTransform(t, args=targs, kwargs=pl_tkwargs)
     next_eval._pass_pipeline.insert(0, bound_pass)
     return next_eval.eval(inner_jaxpr, consts, *non_const_args)
 
