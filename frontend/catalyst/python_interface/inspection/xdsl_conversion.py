@@ -29,6 +29,7 @@ from pennylane.operation import Operator
 from pennylane.ops import MidMeasure
 from pennylane.ops import __all__ as ops_all
 from pennylane.ops import measure
+from pennylane.typing import AbstractArray, Bool
 from xdsl.dialects.builtin import DenseIntOrFPElementsAttr, IntegerAttr, IntegerType
 from xdsl.dialects.scf import ForOp
 from xdsl.dialects.tensor import ExtractOp as TensorExtractOp
@@ -208,27 +209,42 @@ def _extract_dense_constant_value(op) -> float | int:
     raise NotImplementedError(f"Unexpected attr type in constant: {type(attr)}")
 
 
-def _resolve_control_value(ssa: SSAValue) -> float | int | str:
-    """Resolve a control value passed as a constant kernel argument."""
-    op = ssa.owner
-    if not (
-        isinstance(op, TensorExtractOp)
-        and isinstance(op.tensor.owner, Block)
-        and len(op.indices) == 1
-    ):
-        return resolve_constant_params(ssa)
+def _resolve_kernel_argument(ssa: SSAValue) -> SSAValue:
+    """Return the caller operand for a kernel argument, or the original SSA value."""
+    if not isinstance(ssa.owner, Block):
+        return ssa
 
-    tensor = op.tensor
-    func_op = tensor.owner.parent_op()
-    launch_op = next(
-        candidate
-        for candidate in func_op.get_toplevel_object().walk()
-        if candidate.name == "catalyst.launch_kernel"
-        and SymbolTable.lookup_symbol(candidate, candidate.callee) is func_op
-    )
-    tensor = launch_op.operands[tensor.index]
-    values = tensor.owner.properties["value"].get_values()
-    return values[resolve_constant_params(op.indices[0])]
+    func_op = ssa.owner.parent_op()
+    if func_op is None:
+        return ssa
+    for candidate in func_op.get_toplevel_object().walk():
+        if (
+            candidate.name == "catalyst.launch_kernel"
+            and SymbolTable.lookup_symbol(candidate, candidate.callee) is func_op
+        ):
+            return candidate.operands[ssa.index]
+    return ssa
+
+
+def _resolve_control_value(ssa: SSAValue) -> bool | AbstractArray:
+    """Return ``True`` or ``False`` when the control value is known; otherwise return
+    ``Bool``, meaning an unknown Boolean value.
+    """
+    op = ssa.owner
+    if getattr(op, "name", None) in ("arith.constant", "stablehlo.constant"):
+        return bool(resolve_constant_params(ssa))
+    if not isinstance(op, TensorExtractOp) or len(op.indices) > 1:
+        return Bool
+
+    tensor = _resolve_kernel_argument(op.tensor)
+    value = getattr(tensor.owner, "properties", {}).get("value")
+    if not isinstance(value, DenseIntOrFPElementsAttr):
+        return Bool
+
+    index = resolve_constant_params(op.indices[0]) if op.indices else 0
+    if not isinstance(index, int):
+        return Bool
+    return bool(value.get_values()[index])
 
 
 def _apply_adjoint_and_ctrls(qp_op: Operator, xdsl_op) -> Operator:
@@ -237,7 +253,10 @@ def _apply_adjoint_and_ctrls(qp_op: Operator, xdsl_op) -> Operator:
         qp_op = ops.op_math.adjoint(qp_op)
     ctrls = ssa_to_qp_wires(xdsl_op, control=True)
     if ctrls:
-        cvals = _extract(xdsl_op, "in_ctrl_values", _resolve_control_value)
+        cvals = ssa_to_qp_params(xdsl_op, control=True)
+        if any(isinstance(value, AbstractArray) for value in cvals):
+            # PennyLane represents a partially dynamic control vector as one abstract array.
+            cvals = Bool[len(cvals)]
         qp_op = ops.op_math.ctrl(qp_op, control=ctrls, control_values=cvals)
     return qp_op
 
@@ -441,9 +460,12 @@ def resolve_constant_wire(ssa: SSAValue) -> float | int | str:
 
 def ssa_to_qp_params(
     op, control: bool = False, single: bool = False
-) -> list[float | int | str] | float | int | str | None:
+) -> list[float | int | str | AbstractArray] | float | int | str | AbstractArray | None:
     """Get the parameters from the operation."""
-    return _extract(op, "in_ctrl_values" if control else "params", resolve_constant_params, single)
+    if control:
+        return _extract(op, "in_ctrl_values", _resolve_control_value, single)
+    else:
+        return _extract(op, "params", resolve_constant_params, single)
 
 
 def ssa_to_qp_wires(op: CustomOp, control: bool = False) -> list[int]:

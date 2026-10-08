@@ -28,12 +28,14 @@ from xdsl.ir.core import Block, Region
 
 from catalyst import measure
 from catalyst.python_interface.conversion import parse_generic_to_xdsl_module, xdsl_from_qjit
+from catalyst.python_interface.dialects import quantum
 from catalyst.python_interface.inspection.construct_circuit_dag import (
     ConstructCircuitDAG,
     VisualizationError,
     get_label,
 )
 from catalyst.python_interface.inspection.dag_builder import DAGBuilder
+from catalyst.python_interface.inspection.xdsl_conversion import xdsl_to_qp_op
 
 pytestmark = pytest.mark.xdsl
 
@@ -2701,6 +2703,42 @@ class TestTerminalMeasurementConnectivity:
 
 class TestCtrl:
     """Tests that the ctrl transform is visualized correctly."""
+
+    @pytest.mark.parametrize(
+        "gate_type, params, dynamic_controls",
+        [
+            pytest.param(qp.RX, (0.5,), False, id="constant_false_control"),
+            pytest.param(qp.RX, (0.5,), True, id="runtime_control"),
+            pytest.param(qp.Hadamard, (), True, id="runtime_control_without_gate_params"),
+        ],
+    )
+    def test_captured_control_values(self, gate_type, params, dynamic_controls):
+        """A false constant is preserved, and runtime controls do not become truthy strings."""
+
+        @xdsl_from_qjit
+        @qp.qjit(target="mlir", capture=True, collect_decomp_rules=False)
+        @qp.qnode(qp.device("null.qubit", wires=2))
+        def circuit(flags):
+            qp.ctrl(
+                gate_type(*params, wires=1),
+                control=0,
+                control_values=flags if dynamic_controls else [False],
+            )
+
+        module = circuit(jax.numpy.array([False]))
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+        assert (
+            utility.dag_builder.nodes["node1"]["label"]
+            == f"<name> C({gate_type.__name__})|<wire> [0, 1]"
+        )
+
+        gate = next(op for op in module.walk() if isinstance(op, quantum.GateOp))
+        reconstructed = xdsl_to_qp_op(gate)
+        if dynamic_controls:
+            assert reconstructed.control_values == qp.typing.Bool[1]
+        else:
+            assert list(reconstructed.control_values) == [False]
 
     def test_ctrl_function(self, capture_mode):
         """Test that the ctrl of a function works."""
