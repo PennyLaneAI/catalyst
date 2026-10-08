@@ -24,7 +24,7 @@
   approximation of [arXiv:2203.10064](https://arxiv.org/abs/2203.10064) (Section 3.4). Each
   rotation randomly applies one of two Clifford+T sequences whose errors cancel on average, which
   roughly halves the T-count at the same accuracy.
-  [(#XXXX)](https://github.com/PennyLaneAI/catalyst/pull/XXXX)
+  [(#3314)](https://github.com/PennyLaneAI/catalyst/pull/3314)
 
   ```python
   from catalyst.passes import gridsynth
