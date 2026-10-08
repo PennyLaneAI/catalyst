@@ -379,7 +379,11 @@ def _handle_decompose_transform(self, inner_jaxpr, consts, non_const_args, tkwar
                 assert isinstance(rule, str)
                 if rule not in list_decomps(op):
                     raise ValueError(f"Unknown decomposition rule with name {rule}")
-
+            elif isinstance(rule, str):
+                if rule not in list_decomps(op):
+                    raise ValueError(f"Unknown decomposition rule with name {rule}")
+            else:
+                raise ValueError(f"Fixed decompositions should be a rule or the name of a rule. Got {rule}")
         for op, rules in alt_decomps.items():
             add_decomps(op, *rules)
 
