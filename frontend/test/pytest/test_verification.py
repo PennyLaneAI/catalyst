@@ -38,7 +38,7 @@ from catalyst.api_extensions import HybridAdjoint, HybridCtrl
 from catalyst.compiler import get_lib_path
 from catalyst.device import get_device_capabilities
 from catalyst.device.qjit_device import RUNTIME_OPERATIONS, get_qjit_device_capabilities
-from catalyst.device.verification import validate_measurements
+from catalyst.device.verification import validate_measurements, verify_operations
 
 # pylint: disable = unused-argument, unnecessary-lambda-assignment, unnecessary-lambda
 
@@ -922,6 +922,64 @@ def test_no_variance_returns():
 
     with pytest.raises(DifferentiableCompileError, match="Variance returns.*forbidden"):
         cir(1.2)
+
+
+class TestDynamicQubitAllocationVerification:
+    """Test verify_operations handling of Allocate/Deallocate and qjit capability override."""
+
+    def test_qjit_compatible_devices_enable_dynamic_qubit_management(self, backend):
+        """qjit-compatible backends expose Catalyst dynamic allocation even if TOML is false."""
+        dev = qp.device(backend, wires=1)
+        dev_capabilities = get_device_capabilities(dev)
+        qjit_capabilities = get_qjit_device_capabilities(dev_capabilities)
+
+        assert dev_capabilities.qjit_compatible
+        assert qjit_capabilities.dynamic_qubit_management
+
+    def test_non_qjit_compatible_devices_keep_toml_dynamic_qubit_flag(self, backend):
+        """Do not override dynamic_qubit_management when the backend is not qjit-compatible."""
+        dev = qp.device(backend, wires=1)
+        dev_capabilities = deepcopy(get_device_capabilities(dev))
+        dev_capabilities.qjit_compatible = False
+        dev_capabilities.dynamic_qubit_management = False
+        qjit_capabilities = get_qjit_device_capabilities(dev_capabilities)
+
+        assert not qjit_capabilities.dynamic_qubit_management
+
+    def test_allocate_and_deallocate_accepted_when_dynamic_qubits_supported(self, backend):
+        """Allocate/Deallocate tape ops are allowed when dynamic qubit management is on."""
+        qjit_dev = type("QJITDevice", (), {})()
+        qjit_dev.original_device = qp.device(backend, wires=1)
+        qjit_dev.capabilities = get_qjit_device_capabilities(
+            get_device_capabilities(qjit_dev.original_device)
+        )
+        qjit_dev.capabilities.dynamic_qubit_management = True
+
+        tape = qp.tape.QuantumScript(
+            [
+                qp.allocation.Allocate(wires=[10], state=qp.allocation.AllocateState.MAGIC_T),
+                qp.X(0),
+                qp.allocation.Deallocate(wires=[10]),
+            ],
+            [qp.expval(qp.Z(0))],
+        )
+        verify_operations(tape, None, qjit_dev)
+
+    def test_allocate_rejected_when_dynamic_qubits_unsupported(self, backend):
+        """Allocate is rejected when the qjit device does not support dynamic qubits."""
+        qjit_dev = type("QJITDevice", (), {})()
+        qjit_dev.original_device = qp.device(backend, wires=1)
+        qjit_dev.capabilities = deepcopy(
+            get_qjit_device_capabilities(get_device_capabilities(qjit_dev.original_device))
+        )
+        qjit_dev.capabilities.dynamic_qubit_management = False
+
+        tape = qp.tape.QuantumScript(
+            [qp.allocation.Allocate(wires=[10])],
+            [qp.expval(qp.Z(0))],
+        )
+        with pytest.raises(CompileError, match="Dynamic qubit allocation is not supported"):
+            verify_operations(tape, None, qjit_dev)
 
 
 if __name__ == "__main__":

@@ -13,7 +13,7 @@ on:
         value: ${{ jobs.determine_workflow_runner.outputs.runner_group || inputs.default_runner }}
 
 env:
-  LARGE_RUNNER_GROUP_NAME: blacksmith-32vcpu-ubuntu-2404
+  LARGE_RUNNER_GROUP_NAME: blacksmith-8vcpu-ubuntu-2404
 
 permissions:
   contents: read

@@ -32,6 +32,7 @@ import pennylane as qp
 from jax.api_util import debug_info
 from jax.interpreters import mlir
 from jax.tree_util import tree_flatten, tree_unflatten
+from pennylane.logging import debug_logger, debug_logger_init
 
 import catalyst
 from catalyst.autograph import run_autograph
@@ -47,7 +48,6 @@ from catalyst.compiler import CompileOptions, Compiler, canonicalize, to_llvmir,
 from catalyst.debug.instruments import instrument
 from catalyst.from_plxpr import trace_from_pennylane
 from catalyst.jax_tracer import lower_jaxpr_to_mlir, trace_to_jaxpr
-from catalyst.logging import debug_logger, debug_logger_init
 from catalyst.qfunc import QFunc
 from catalyst.tracing.contexts import EvaluationContext
 from catalyst.tracing.type_signatures import (
@@ -940,7 +940,7 @@ class QJIT(CatalystCallable):
         # Inject Runtime Library-specific functions (e.g. setup/teardown).
         inject_functions(mlir_module, ctx, self.compile_options.seed)
 
-        # Collect the shared libraries a local `runtime_call` recorded, so the linker gets them.
+        # Collect the shared libraries recorded during lowering, so the linker gets them.
         collect_runtime_artifacts(mlir_module, self.compile_options)
         # If the device declares a backline placement, serialize it onto the top module.
         if self._placement is not None:

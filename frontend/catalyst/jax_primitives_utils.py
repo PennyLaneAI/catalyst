@@ -30,6 +30,7 @@ from pennylane.transforms.core import BoundTransform
 from catalyst.backline import module_attributes
 from catalyst.jax_extras.lowering import get_mlir_attribute_from_pyval
 from catalyst.passes import PassPlugin
+from catalyst.utils.runtime_artifacts import record_device_runtime_artifacts
 
 
 def _all_expval(call_jaxpr: core.ClosedJaxpr) -> bool:
@@ -184,26 +185,6 @@ def lower_callable_to_funcop(ctx, callable_, call_jaxpr):
 
     func_op = mlir.lower_jaxpr_to_fun(**kwargs)
 
-    if isinstance(callable_, qp.QNode):
-        func_op.attributes["quantum.node"] = ir.UnitAttr.get()
-
-        diff_method = _calculate_diff_method(callable_, call_jaxpr)
-
-        func_op.attributes["diff_method"] = ir.StringAttr.get(diff_method)
-
-        # Register the decomposition gatesets to the QNode FuncOp
-        # This will set a queue of gatesets that enables support for multiple
-        # levels of decomposition in the MLIR decomposition pass
-        if gateset := getattr(callable_, "decompose_gatesets", []):
-            func_op.attributes["decompose_gatesets"] = get_mlir_attribute_from_pyval(gateset)
-
-    # Extract the target gate and number of wires from decomposition rules
-    # and set them as attributes on the FuncOp for use in the MLIR decomposition pass
-    if target_gate := getattr(callable_, "target_gate", None):
-        func_op.attributes["target_gate"] = get_mlir_attribute_from_pyval(target_gate)
-    if num_wires := getattr(callable_, "num_wires", None):
-        func_op.attributes["num_wires"] = get_mlir_attribute_from_pyval(num_wires)
-
     return func_op
 
 
@@ -251,10 +232,15 @@ def lower_qnode_to_funcop(ctx, callable_, call_jaxpr, pipelines):
     with NestedModule(ctx, name) as module, ir.InsertionPoint(module.regions[0].blocks[0]) as ip:
         for attr_name, value in device_attrs.items():
             module.operation.attributes[attr_name] = get_mlir_attribute_from_pyval(value)
+        # record runtime artifacts regarding device-specific runtime libraries on the qnode module
+        record_device_runtime_artifacts(module.operation, callable_.device)
         transform_module_lowering(ctx, pipelines)
         ctx.module_context.ip = ip
         func_op = get_or_create_funcop(ctx, callable_, call_jaxpr, pipelines)
         func_op.sym_visibility = ir.StringAttr.get("public")
+        func_op.attributes["quantum.node"] = ir.UnitAttr.get()
+        diff_method = _calculate_diff_method(callable_, call_jaxpr)
+        func_op.attributes["diff_method"] = ir.StringAttr.get(diff_method)
 
     return func_op
 

@@ -12,17 +12,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{gate-set=testRZ=1.0 alt-decomps=Adjoint(testRot){}{wires:1}{}=[dedicated,distribute],Adjoint(testRZ){}{wires:1}{}=adj_rz})' %s | FileCheck %s
+// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{gate-set=testRZ=1.0 alt-decomps=Adjoint(testRot){}{wires:1}{}=[dedicated,distribute],Adjoint(testRZ){}{wires:1}{}=adj_rz})' %s | FileCheck %s --check-prefixes=ALL,CALL
 
-// CHECK-LABEL: func.func @competing(
-// CHECK-SAME:  [[Q:%.+]]: !quantum.bit
+// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{inline-rule-body gate-set=testRZ=1.0 alt-decomps=Adjoint(testRot){}{wires:1}{}=[dedicated,distribute],Adjoint(testRZ){}{wires:1}{}=adj_rz})' %s | FileCheck %s --check-prefixes=ALL,INLINE
+
+
+// ALL-LABEL: func.func @competing(
+// ALL-SAME:  [[Q:%.+]]: !quantum.bit
 func.func @competing(%q: !quantum.bit) -> !quantum.bit {
-  // CHECK-COUNT-1: quantum.custom "testRZ"()
-  // CHECK-NOT: quantum.custom "testRZ"
-  // CHECK: return
+  // CALL: call @dedicated_0
+  // INLINE-COUNT-1: quantum.custom "testRZ"()
+  // ALL-NOT: quantum.custom "testRot"
+  // ALL-NOT: quantum.custom "testRZ"
+  // ALL: return
   %out = quantum.custom "testRot"() %q adj : !quantum.bit
   return %out: !quantum.bit
 }
+
+// CALL: func.func private @dedicated_0
 
 // pathway 1: Adjoint(testRot) -> testRZ (cost 1).
 func.func private @dedicated(%q: !quantum.bit) -> !quantum.bit attributes {

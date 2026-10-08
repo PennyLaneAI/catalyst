@@ -14,19 +14,27 @@
 
 // Test that graph-decomposition succeeds when using graphOpIds
 
-// RUN: catalyst --tool=opt --split-input-file --pass-pipeline='builtin.module(graph-decomposition{gate-set=testPauliX=1.0 alt-decomps=testHadamard=my_decomp})' %s | FileCheck %s
+// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{gate-set=testPauliX=1.0 alt-decomps=testHadamard=my_decomp})' %s | FileCheck %s --check-prefixes=ALL,CALL
+
+// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{inline-rule-body gate-set=testPauliX=1.0 alt-decomps=testHadamard=my_decomp})' %s | FileCheck %s --check-prefixes=ALL,INLINE
 
 func.func @circuit(%q: !quantum.bit) -> !quantum.bit {
-  // CHECK-NOT: testHadamard
-  // CHECK: testPauliX
-  // CHECK: testPauliX
+  // ALL-NOT: testHadamard
+  // CALL: call @my_decomp_0
+  // INLINE: testPauliX
+  // INLINE: testPauliX
   %out = quantum.custom "testHadamard"() %q: !quantum.bit
   return %out: !quantum.bit
 }
 
+// ALL: func.func private @my_decomp(
 func.func private @my_decomp(%q: !quantum.bit) -> !quantum.bit attributes {target_gate="testHadamard{}{wires:1}{}", frontend_name = "my_decomp"
 } {
   %q0 = quantum.custom "testPauliX"() %q : !quantum.bit
   %q1 = quantum.custom "testPauliX"() %q0 : !quantum.bit
   return %q1 : !quantum.bit
 }
+
+// CALL: func.func private @my_decomp_0
+// CALL: quantum.custom "testPauliX"
+// CALL: quantum.custom "testPauliX"

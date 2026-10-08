@@ -21,7 +21,7 @@ module @unused_param {
     %0 = quantum.alloc( 1) : !quantum.reg
     %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
     // CHECK-NOT: quantum.custom "UnusedParamOp"
-    // CHECK: quantum.custom "Terminal"
+    // CHECK: call @unused_param_rule_0
     %out = quantum.custom "UnusedParamOp"(%cst) %1 : !quantum.bit
     %2 = quantum.insert %0[ 0], %out : !quantum.reg, !quantum.bit
     %3 = quantum.compbasis qreg %2 : !quantum.obs
@@ -31,7 +31,7 @@ module @unused_param {
     return %4 : tensor<2xf64>
   }
 
-  // CHECK: func.func private @unused_param_rule
+  // CHECK: func.func private @unused_param_rule_0
   func.func private @unused_param_rule(%arg0: !quantum.reg, %arg1: tensor<f64>, %arg2: tensor<1xi64>)
       -> !quantum.reg attributes {target_gate = "UnusedParamOp", llvm.linkage = #llvm.linkage<internal>} {
     // %arg1 (the parameter) is intentionally unused by this rule body.
