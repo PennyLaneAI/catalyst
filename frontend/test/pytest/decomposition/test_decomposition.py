@@ -957,6 +957,34 @@ class TestCollectedResources:
 class TestPrecompiled:
     """Tests for precompiled decomposition rules."""
 
+    def test_builtin_rules_are_precompiled(self, tmp_path):
+        """Built-in rules omitted from trace-time MLIR are present in the precompiled bytecode."""
+        bytecode_path = tmp_path / "rules.mlirbc"
+        precompile_decomp_rules(bytecode_path)
+
+        bytecode = _quantum_opt("--empty", str(bytecode_path))
+        expected_rules = [
+            ("_rz_to_ppr", "RZ{0:[f64]}{wires:1}{}"),
+            ("_rz_to_rot", "RZ{0:[f64]}{wires:1}{}"),
+            ("_multi_rz_decomposition", "MultiRZ{theta:[f64]}{wires:1}{}"),
+            ("_multi_rz_decomposition", "MultiRZ{theta:[f64]}{wires:2}{}"),
+            (
+                "_pauli_rot_decomposition",
+                "PauliRot{theta:[f64]}{wires:1}{pauli_word = \\22Z\\22}",
+            ),
+            (
+                "_pauli_rot_decomposition",
+                "PauliRot{theta:[f64]}{wires:2}{pauli_word = \\22XX\\22}",
+            ),
+        ]
+
+        for frontend_name, target_gate in expected_rules:
+            assert any(
+                f'frontend_name = "{frontend_name}"' in line
+                and f'target_gate = "{target_gate}"' in line
+                for line in bytecode.splitlines()
+            )
+
     def test_precompile_writes_hash_to_manifest(self, mocker, tmp_path):
         """The manifest contains the hash of the associated bytecode."""
         # this test doesn't need any actual rules

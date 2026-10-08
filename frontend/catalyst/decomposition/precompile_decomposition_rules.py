@@ -85,7 +85,6 @@ def precompile_decomp_rules(_decomp_file_path: str | Path = BYTECODE_FILE_PATH) 
         "--canonicalize",  # TODO: do we need these passes anymore?
         "--convert-to-value-semantics",
         "--canonicalize",
-        "--register-decomp-rule-resource",
         stdin=str(rule_module).encode("utf-8"),
         text=None,
         stderr_return=True,
