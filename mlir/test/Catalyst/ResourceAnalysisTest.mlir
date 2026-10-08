@@ -688,6 +688,8 @@ func.func @outer_dyn_loop_calls_nested_helper(%arg0: !quantum.bit, %c4 : index) 
 // If-else branching (take max per op)
 
 // CHECK-LABEL: "if_else_branching"
+// CHECK: metadata
+// CHECK:       "has_branches": true
 // CHECK: "quantum_operations"
 // CHECK:   "Hadamard": 3
 // CHECK:   "PauliX": 2
@@ -1260,6 +1262,8 @@ func.func @static_trip_count_large_signed_span(%arg0: !quantum.bit) -> !quantum.
 // CHECK: "function_calls"
 // CHECK:   "dynamic":
 // CHECK:       "dyn_for_loop_1"
+// CHECK: metadata
+// CHECK:       "has_branches": true
 // CHECK-LABEL: "intervening_if_nested_for_loop": {
 // CHECK: "function_calls"
 // CHECK:   "static":
@@ -2140,7 +2144,7 @@ func.func @qref(%arg0: !qref.bit, %arg1: !qref.reg<2>) {
 
 // CHECK-LABEL: "if_estimated_probability"
 // CHECK: metadata
-// CHECK:       "has_branches": true
+// CHECK:       "has_branches": false
 // CHECK: quantum_operations
 // CHECK:       "Hadamard": 5
 func.func @if_estimated_probability(%arg0: !quantum.bit, %cond: i1) -> !quantum.bit {
@@ -2242,7 +2246,7 @@ func.func @prob_if_in_loop(%arg0: !quantum.bit, %cond: i1) -> !quantum.bit {
 // 0.2*5 + 0.3*10 + 0.5*2 = 5.
 
 // CHECK-LABEL: "switch_estimated_probabilities"
-// CHECK: "has_branches": true
+// CHECK: "has_branches": false
 // CHECK: "quantum_operations"
 // CHECK:       "PauliX": 5
 func.func @switch_estimated_probabilities(%arg0: !quantum.bit, %sel: index) -> !quantum.bit {

@@ -14,6 +14,7 @@
 
 """This module contains classes to manage compiled functions and their underlying resources."""
 
+import contextlib
 import ctypes
 import logging
 from dataclasses import dataclass
@@ -40,6 +41,25 @@ from catalyst.utils.jnp_to_memref import get_ranked_memref_descriptor
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
+
+
+def _run_setup(setup, teardown):
+    """Call ``setup``, and if it raises, call ``teardown`` and raise the setup's error.
+
+    A setup that fails part way leaves what it created, such as transport sessions registered under
+    their keys, which the teardown releases. An error the teardown raises is suppressed, so the
+    setup's error, which names the cause, is the one raised.
+
+    Args:
+        setup (Callable[[], None]): runs the compiled program's setup
+        teardown (Callable[[], None]): runs the compiled program's teardown
+    """
+    try:
+        setup()
+    except Exception:
+        with contextlib.suppress(Exception):
+            teardown()
+        raise
 
 
 class SharedObjectManager:
@@ -109,7 +129,10 @@ class SharedObjectManager:
         return function, setup, teardown, mem_transfer
 
     def __enter__(self):
-        wrapper.invoke_setup(self.setup, ["jitted-function"])
+        _run_setup(
+            lambda: wrapper.invoke_setup(self.setup, ["jitted-function"]),
+            lambda: wrapper.invoke_teardown(self.teardown),
+        )
         return self
 
     def __exit__(self, _type, _value, _traceback):

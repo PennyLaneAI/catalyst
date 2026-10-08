@@ -2,6 +2,24 @@
 
 <h3>New features since last release</h3>
 
+* A new coprocessor function called `catalyst_onnx_coprocessor` has been added, which runs an
+  ONNX model on the CPU or a GPU through onnxruntime, and is built with the transport runtime.
+  PennyLane's
+  [`qp.backline.onnx_decoder`](https://docs.pennylane.ai/en/latest/code/api/pennylane.backline.onnx_decoder.html)
+  creates it for a model.
+  [(#3282)](https://github.com/PennyLaneAI/catalyst/pull/3282)
+
+  ```pycon
+  >>> fn = qp.backline.onnx_decoder("predecoder.onnx")
+  >>> fn.name
+  'catalyst_onnx_coprocessor'
+  >>> dev = qp.Backline(
+  ...     controller=qp.Controller(),
+  ...     coprocessors=[qp.Coprocessor(hardware="gpu", coprocessor_fn=fn)],
+  ...     transport="memcpy",
+  ... )
+  ```
+
 * You can now dynamically prepare magic T states inside captured Catalyst workflows using
   ``qp.allocate(state="magic-T")`` and ``qp.allocate(state="magic-T-adj")``, which makes it
   easier to compile FTQC-style routines that need T-state ancillas on the fly (for example
@@ -62,6 +80,7 @@
   [(#3127)](https://github.com/PennyLaneAI/catalyst/pull/3127)
   [(#3213)](https://github.com/PennyLaneAI/catalyst/pull/3213)
   [(#3248)](https://github.com/PennyLaneAI/catalyst/pull/3248)
+  [(#3307)](https://github.com/PennyLaneAI/catalyst/pull/3307)
 
   Control is folded into the operator identity *control-outermost* (e.g. `C(Adjoint(Op))`), so
   `ctrl(adjoint(Op))` and `adjoint(ctrl(Op))` collapse to a single node, while a distinct control
@@ -126,6 +145,10 @@
   require integral values and convert the count internally.
   [(#2956)](https://github.com/PennyLaneAI/catalyst/pull/2956)
 
+* A device can now declare shared runtime libraries via an optional `get_runtime_artifacts` method. 
+  These will be linked by the compiler.
+  [(#3303)](https://github.com/PennyLaneAI/catalyst/pull/3303)
+
 <h3>Improvements 🛠</h3>
 
 * The memcpy transport now carries messages of any size in each direction, as set by a PennyLane
@@ -138,6 +161,16 @@
   ```
 
   [(#3281)](https://github.com/PennyLaneAI/catalyst/pull/3281)
+
+* The memcpy GPU coprocessor can now run a host coprocessor function once per message, for a model
+  launched from the host rather than as a persistent kernel. The frontend selects this mode for a
+  function marked `per_message`.
+  [(#3282)](https://github.com/PennyLaneAI/catalyst/pull/3282)
+
+* Coprocessor functions can now be configured. A function whose library exports `<symbol>_info`
+  receives its `config` and the message sizes in an `init` hook before its first message (see
+  `CatalystCoprocessorFnInfo` in `TransportABI.h`).
+  [(#3282)](https://github.com/PennyLaneAI/catalyst/pull/3282)
 
 * Under program capture, PennyLane :func:`~.transforms.decompose` (``qp.decompose``) is now an
   alias for :func:`~.passes.graph_decomposition`. Multiple ``qp.decompose`` transforms is also
@@ -363,6 +396,7 @@
   `catalyst.estimated_probabilities` attribute, respectively, to indicate the expected probability
   distribution over the branches. The counted resources are then scaled proportionally and summed.
   [(#3059)](https://github.com/PennyLaneAI/catalyst/pull/3059)
+  [(#3195)](https://github.com/PennyLaneAI/catalyst/pull/3195)
 
 * `qp.specs` now reports realistic resource estimates for the `gridsynth` pass, based on the
   average gate sequences it produces at runtime. Expected (fractional) counts in the
@@ -694,10 +728,18 @@
 
 * Added reference semantics support for PBC operations.
   [(#3136)](https://github.com/PennyLaneAI/catalyst/pull/3136)
+  [(#3305)](https://github.com/PennyLaneAI/catalyst/pull/3305)
 
 <h3>Deprecations 👋</h3>
 
 <h3>Bug fixes 🐛</h3>
+
+* Fixed a bug where a compiled Backline program continued with a session that does not work,
+  for example echoing the controller's own message back as the reply, after a transport call or a
+  coprocessor function's set-up failed. It now stops with an error naming the call that failed,
+  and releases the program's transport sessions, so a later program in the same process can
+  run.
+  [(#3282)](https://github.com/PennyLaneAI/catalyst/pull/3282)
 
 * The memcpy controller now rejects staging or posting a payload before its message sizes are
   committed, instead of writing into an unallocated buffer.
@@ -1014,6 +1056,11 @@
 * A new pass `--resolve-gate-level-adjoint` was added. This pass now handles gate-level adjoint canonicalization, moving it out of the `--canonicalize` pass.
   [#3155](https://github.com/PennyLaneAI/catalyst/pull/3155)
 
+* The OQD device now implements the optional `get_runtime_artifacts` to inform the compiler of its runtime library, 
+  `librt_OQD_capi`. This replaces the previous work-around that had the compiler check directly for the library and
+  link it if present.
+  [(#3303)](https://github.com/PennyLaneAI/catalyst/pull/3303)
+
 <h3>Documentation 📝</h3>
 
 * A broken link was removed in the [Compiler Core](https://docs.pennylane.ai/projects/catalyst/en/stable/modules/mlir.html) documentation page. The link referred to where precompiled decomposition rules were implemented, which has since been refactored.
@@ -1060,6 +1107,7 @@ Mehrdad Malekmohammadi,
 River McCubbin,
 Shuli Shu,
 Nikhil Sreekumar,
+Kalman Szenes,
 Paul Haochen Wang,
 Jake Zaia,
 Haider Sajjad,
