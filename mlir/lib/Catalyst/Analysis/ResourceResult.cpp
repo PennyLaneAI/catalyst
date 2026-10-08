@@ -127,7 +127,9 @@ void ResourceResult::multiplyBy(double scalar) {
 }
 
 // Emit a count as a JSON number. Counts are tracked as doubles to support probabilistic
-// (fractional) count values, but the JSON output always reports the nearest integer.
+// and hint-driven (fractional) expected counts; those fractions are preserved in the JSON
+// so downstream consumers (e.g. PennyLane specs) can keep expected values such as 0.5.
+// Integral values still serialize without a decimal (matching function_calls emission).
 //
 // JSON Schema (per function, keyed by name at the root):
 //   metadata: { qnode, auto_qubit_management?, has_branches, device_name? }
@@ -138,9 +140,7 @@ void ResourceResult::multiplyBy(double scalar) {
 //   measurement_processes: { "meas_type": count, ... }
 //   extended_fields: { "<extension>": { ... }, ... }  // e.g. pbc_depth: { any_commuting_depth,
 //   qubit_disjoint_depth }
-static llvm::json::Value countToJson(double count) {
-    return llvm::json::Value(static_cast<int64_t>(std::llround(count)));
-}
+static llvm::json::Value countToJson(double count) { return llvm::json::Value(count); }
 
 llvm::json::Object ResourceResult::toJson() const {
     llvm::json::Object funcObj;
