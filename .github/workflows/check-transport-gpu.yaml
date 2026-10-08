@@ -10,10 +10,12 @@ on:
       - "runtime/lib/transport/**"
       - "runtime/include/Transport*"
       - "runtime/tests/Test_Transport*"
+      - "runtime/tests/CMakeLists.txt"
+      - "runtime/tests/data/**"
       - "mlir/lib/Transport/**"
       - "mlir/include/Transport/**"
       - "frontend/catalyst/backline.py"
-      - ".github/workflows/check-catalyst-gpu.yaml"
+      - ".github/workflows/check-transport-gpu.yaml"
   pull_request:
     types:
       - opened
@@ -25,10 +27,12 @@ on:
       - "runtime/lib/transport/**"
       - "runtime/include/Transport*"
       - "runtime/tests/Test_Transport*"
+      - "runtime/tests/CMakeLists.txt"
+      - "runtime/tests/data/**"
       - "mlir/lib/Transport/**"
       - "mlir/include/Transport/**"
       - "frontend/catalyst/backline.py"
-      - ".github/workflows/check-catalyst-gpu.yaml"
+      - ".github/workflows/check-transport-gpu.yaml"
   workflow_dispatch:
 
 permissions:
@@ -79,6 +83,14 @@ jobs:
         run: |
           python3 -m pip install "cmake>=3.26" ninja "nanobind<2.13" pybind11 numpy PyYAML
 
+      # The ONNX coprocessor function's tests run a model through this onnxruntime, on its CPU
+      # provider, and are skipped unless CATALYST_TEST_ONNXRUNTIME_LIB names its library.
+      - name: Install onnxruntime for the ONNX coprocessor function's tests
+        run: |
+          python3 -m pip install onnxruntime
+          ORT_LIB=$(python3 -c "import glob, os, onnxruntime; print(sorted(glob.glob(os.path.join(os.path.dirname(onnxruntime.__file__), 'capi', 'libonnxruntime.so*')))[0])")
+          echo "CATALYST_TEST_ONNXRUNTIME_LIB=${ORT_LIB}" >> $GITHUB_ENV
+
       - name: Get Cached LLVM Source
         id: cache-llvm-source
         uses: actions/cache/restore@v4
@@ -108,11 +120,21 @@ jobs:
           ENABLE_TRANSPORT=ON \
           make runtime
 
-      - name: Build the memcpy test binary
+      # transport_tests_all builds every transport suite this runner's toolchain supports: the
+      # transport CAPI, coprocessor-function and ONNX tests, memcpy, and, with libibverbs and a HIP
+      # compiler, the RDMA and GPU backends.
+      - name: Build the transport test binaries
         run: |
-          cmake --build "$(pwd)/runtime-build" --target runner_tests_transport_memcpy -j
+          cmake --build "$(pwd)/runtime-build" --target transport_tests_all -j
 
-      - name: Run memcpy transport tests
+      # A suite whose tests all skip, such as an RDMA suite on a runner with no RDMA device, passes.
+      - name: Run the transport tests
         run: |
-          "$(pwd)/runtime-build/tests/runner_tests_transport_memcpy"
+          test -x "$(pwd)/runtime-build/tests/runner_tests_transport"
+          for t in "$(pwd)"/runtime-build/tests/runner_tests_transport*; do
+            [ -x "$t" ] && [ ! -d "$t" ] || continue
+            echo "::group::${t##*/}"
+            "$t" --allow-running-no-tests
+            echo "::endgroup::"
+          done
 
