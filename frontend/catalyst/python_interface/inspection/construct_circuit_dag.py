@@ -199,8 +199,8 @@ class ConstructCircuitDAG:
     @_visualize_operation.register
     def _gate_op(self, op: quantum.GateOp) -> None:
         """Generic handler for unitary gates."""
-        # Create PennyLane instance
         qp_op: Operator = xdsl_to_qp_op(op)
+        wires = list(qp_op.wires)
 
         # Add node to current cluster
         node_uid = self.dag_builder.add_node(
@@ -216,8 +216,8 @@ class ConstructCircuitDAG:
         # a disjoint or 'floating' node within the current cluster to reflect
         # that it has no strict ordering requirements relative to other
         # quantum operations.
-        if len(qp_op.wires) != 0:
-            self._connect(qp_op.wires, node_uid)
+        if wires:
+            self._connect(wires, node_uid)
 
     @_visualize_operation.register
     def _projective_measure_op(self, op: quantum.MeasureOp) -> None:
