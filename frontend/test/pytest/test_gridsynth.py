@@ -175,6 +175,12 @@ def test_mixed_gridsynth_seeded():
     assert np.allclose(qjitted_circuit(1.1), qjitted_circuit_same_seed(1.1))
 
 
+def test_invalid_method():
+    """Test that an unknown synthesis method raises an error."""
+    with pytest.raises(ValueError, match="method must be 'deterministic' or 'mixed'"):
+        gridsynth(method="rus")
+
+
 def test_mixed_gridsynth_ppr_basis():
     """Test that the mixed method in the PPR basis matches the target up to its accuracy."""
     eps = 1e-6
