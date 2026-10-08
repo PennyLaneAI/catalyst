@@ -364,7 +364,7 @@ def _handle_decompose_transform(self, inner_jaxpr, consts, non_const_args, tkwar
     ``qp.decompose`` is an alias for :func:`catalyst.passes.graph_decomposition`.
     """
     # Local imports avoid an import cycle (catalyst.passes imports from_plxpr indirectly).
-    from pennylane.decomposition import add_decomps, local_decomps
+    from pennylane.decomposition import DecompositionRule, add_decomps, list_decomps, local_decomps
 
     from catalyst.passes.builtin_passes import graph_decomposition
 
@@ -385,7 +385,7 @@ def _handle_decompose_transform(self, inner_jaxpr, consts, non_const_args, tkwar
     next_eval = copy(self)
     with local_decomps():
         for op, rule in fixed_decomps.items():
-            add_decomps(op, rule)
+            _add_decomp_or_verify_name_exists(op, rule)
         for op, rules in alt_decomps.items():
             add_decomps(op, *rules)
 
@@ -399,6 +399,21 @@ def _handle_decompose_transform(self, inner_jaxpr, consts, non_const_args, tkwar
         next_eval._pass_pipeline.insert(0, bound_pass)
 
         return next_eval.eval(inner_jaxpr, consts, *non_const_args)
+
+
+def _add_decomp_or_verify_name_exists(op, rule):
+
+    from pennylane.decomposition import DecompositionRule, add_decomps, list_decomps
+
+    if isinstance(rule, DecompositionRule):
+        add_decomps(op, rule)
+
+    elif isinstance(rule, str):
+        if rule not in list_decomps(op):
+            raise ValueError(f"Unknown decomposition rule with name {rule}")
+
+    else:
+        raise TypeError(f"fixed_decomps accepts rules or the names of rules. Got {rule}")
 
 
 # pylint: disable=too-many-arguments
