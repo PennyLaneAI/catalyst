@@ -1869,7 +1869,9 @@ class TestCustomRuleApplication:
             add_decomps(NoParamsCustomOp, rule1, rule2)
 
             @qjit(capture=True, target="mlir")
-            @graph_decomposition(gate_set={qp.X: 1, qp.Y: 1}, fixed_decomps={NoParamsCustomOp: "rule2"})
+            @graph_decomposition(
+                gate_set={qp.X: 1, qp.Y: 1}, fixed_decomps={NoParamsCustomOp: "rule2"}
+            )
             @qnode(qp.device("null.qubit", wires=1))
             def circuit():
                 NoParamsCustomOp(0)
