@@ -226,7 +226,7 @@ class ConstructCircuitDAG:
             label = f"<name> {gate_name}|<wire> {wires_str}"
         else:
             qp_op: Operator = xdsl_to_qp_op(op)
-            wires = qp_op.wires
+            wires = list(qp_op.wires)
             label = get_label(qp_op)
 
         # Add node to current cluster
