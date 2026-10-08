@@ -869,5 +869,5 @@ module @outer {
 
 // -----
 
-// expected-error @+1 {{'quantum.kernel_entry_point' is only valid in a quantum kernel}}
+// Tools may process a quantum kernel module on its own, so the attribute is also valid there.
 func.func private @kernel_entry() attributes {quantum.kernel_entry_point}

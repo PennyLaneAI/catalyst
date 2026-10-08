@@ -121,11 +121,6 @@ LogicalResult QuantumDialect::verifyOperationAttribute(Operation *op, NamedAttri
         if (!isa<UnitAttr>(namedAttr.getValue())) {
             return op->emitOpError() << "attribute '" << attrName << "' must be a unit attribute";
         }
-        auto parentModule = op->getParentOfType<ModuleOp>();
-        if (!parentModule || !parentModule->getParentOfType<ModuleOp>()) {
-            return op->emitOpError() << "attribute '" << attrName
-                                     << "' is only valid in a quantum kernel (nested module)";
-        }
         return success();
     }
 
