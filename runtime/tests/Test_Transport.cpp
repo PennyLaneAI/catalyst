@@ -34,8 +34,6 @@
 
 using Catch::Matchers::ContainsSubstring;
 
-using Catch::Matchers::ContainsSubstring;
-
 namespace {
 CatalystTransportSession *make(std::int32_t role, const char *key) {
     return __catalyst__transport__create(STUB_BACKEND_PATH, "cfg", role, key);
