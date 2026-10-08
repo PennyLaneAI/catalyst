@@ -431,8 +431,15 @@ def handle_transform(
         )
     if "." in transform.pass_name:
         resolution_functions = entry_points(group="catalyst.passes_resolution")
-        key, passname = transform.pass_name.split(".")
-        resolution_function = resolution_functions[key + ".passes"]
+        key, passname = transform.pass_name.split(".", 1)
+        try:
+            resolution_function = resolution_functions[key + ".passes"]
+        except KeyError as e:
+            raise ValueError(
+                f"No pass plugin registered under '{key}'. Available: "
+                f"{[ep.name for ep in resolution_functions]}. "
+                "Is the plugin package installed?"
+            ) from e
         module = resolution_function.load()
         path, name = module.name2pass(passname)
         self.plugin_paths.append(path)
