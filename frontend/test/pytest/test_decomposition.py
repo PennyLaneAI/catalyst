@@ -1859,16 +1859,17 @@ class TestCustomRuleApplication:
         def rule1(wires):
             qp.X(wires)
 
-        @qp.register_resources({qp.X: 2})
+        @qp.register_resources({qp.Y: 2})
         def rule2(wires):
-            qp.X(wires)
+            qp.Y(wires)
+            qp.Y(wires)
 
         with local_decomps():
 
             add_decomps(NoParamsCustomOp, rule1, rule2)
 
             @qjit(capture=True, target="mlir")
-            @graph_decomposition(gate_set={qp.X: 1}, fixed_decomps={NoParamsCustomOp: "rule2"})
+            @graph_decomposition(gate_set={qp.X: 1, qp.Y: 1}, fixed_decomps={NoParamsCustomOp: "rule2"})
             @qnode(qp.device("null.qubit", wires=1))
             def circuit():
                 NoParamsCustomOp(0)
@@ -1877,7 +1878,8 @@ class TestCustomRuleApplication:
 
         decomposed = resources["graph-decomposition"].counts
         assert decomposed.get("NoParamsCustomOp", 0) == 0
-        assert decomposed.get("PauliX", 0) == 2  # assert that the second rule got used
+        assert decomposed.get("PauliX", 0) == 0  # assert that the second rule got used
+        assert decomposed.get("PauliY", 0) == 2  # assert that the second rule got used
 
     def test_functional_adjoint_region_is_lowered(self):
         """Test that a functional modifier ``qp.adjoint(op)(...)`` is captured as a ``quantum.adjoint``
