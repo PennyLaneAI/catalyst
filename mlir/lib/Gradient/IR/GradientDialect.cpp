@@ -15,8 +15,8 @@
 #include "Gradient/IR/GradientDialect.h"
 
 #include "llvm/ADT/TypeSwitch.h" // needed for generated type parser
-#include "mlir/IR/DialectImplementation.h" // needed for generated type parser
 #include "mlir/Dialect/Bufferization/IR/BufferizableOpInterface.h"
+#include "mlir/IR/DialectImplementation.h" // needed for generated type parser
 #include "mlir/Interfaces/FunctionImplementation.h"
 #include "mlir/Transforms/InliningUtils.h"
 
@@ -51,7 +51,7 @@ void GradientDialect::initialize() {
 #define GET_OP_LIST
 #include "Gradient/IR/GradientOps.cpp.inc"
         >();
-     addAttributes<
+    addAttributes<
 #define GET_ATTRDEF_LIST
 #include "Gradient/IR/GradientAttributes.cpp.inc"
         >();

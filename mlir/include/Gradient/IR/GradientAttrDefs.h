@@ -19,4 +19,3 @@
 #include "Gradient/IR/GradientEnums.h.inc"
 #define GET_ATTRDEF_CLASSES
 #include "Gradient/IR/GradientAttributes.h.inc"
-
