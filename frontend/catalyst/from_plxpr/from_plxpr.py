@@ -148,7 +148,7 @@ def from_plxpr(
     skip_preprocess: bool = False,
     _preprocess_warn: bool = True,
     collect_decomp_rules: bool = True,
-    plugin_paths : list[str] | None = None,
+    plugin_paths: list[str] | None = None,
 ) -> Callable[..., Jaxpr]:
     """Convert PennyLane variant jaxpr to Catalyst variant jaxpr.
 
@@ -253,7 +253,13 @@ class WorkflowInterpreter(PlxprInterpreter):
         new_version.init_qreg = self.init_qreg
         return new_version
 
-    def __init__(self, skip_preprocess=False, _preprocess_warn=True, collect_decomp_rules=True, plugin_paths : None | list[str] = None):
+    def __init__(
+        self,
+        skip_preprocess=False,
+        _preprocess_warn=True,
+        collect_decomp_rules=True,
+        plugin_paths: None | list[str] = None,
+    ):
         self._pass_pipeline = []
         self.init_qreg = None
         self._skip_preprocess = skip_preprocess
@@ -434,7 +440,6 @@ def handle_transform(
     else:
         name = transform.pass_name
 
-
     # Apply the corresponding Catalyst pass counterpart
     next_eval = copy(self)
     t = qp.transform(pass_name=name)
@@ -536,7 +541,10 @@ def trace_from_pennylane(
             flat_inputs = [a for a in flat_inputs if qp.math.is_abstract(a)]
             abstract_shapes = _extract_abstract_shapes(flat_inputs)
             jaxpr = from_plxpr(
-                plxpr, skip_preprocess=skip_preprocess, collect_decomp_rules=collect_decomp_rules, plugin_paths=plugin_paths
+                plxpr,
+                skip_preprocess=skip_preprocess,
+                collect_decomp_rules=collect_decomp_rules,
+                plugin_paths=plugin_paths,
             )(*abstract_shapes, *flat_inputs)
 
             return _dummy_hop.bind(jaxpr=jaxpr, out_type=out_type, out_treedef=out_treedef)
