@@ -78,8 +78,12 @@ def test_pauli_rot_to_ppr():
     assert "pbc.ppr" in optimized_ir
 
 
-def test_ppr_operator_capture():
-    """Test that PPR remains a generic operator before applying to_ppr."""
+PPR_OPS = [(qp.PPR_2, 2), (qp.PPR_4, 4), (qp.PPR_8, 8)]
+
+
+@pytest.mark.parametrize("op_cls, _", PPR_OPS)
+def test_ppr_operator_capture(op_cls, _):
+    """Test that PPR operators remain generic operators before applying to_ppr."""
     pipe = [("pipe", ["quantum-compilation-stage"])]
 
     @qjit(pipelines=pipe, target="mlir", capture=True)
@@ -87,17 +91,19 @@ def test_ppr_operator_capture():
 
         @qp.qnode(qp.device("null.qubit", wires=2))
         def f():
-            qp.PPR(4, "XY", wires=[0, 1])
+            op_cls(1, "XY", wires=[0, 1])
 
         return f()
 
     optimized_ir = test_ppr_operator_capture_workflow.mlir_opt
-    assert 'quantum.operator "PPR"' in optimized_ir
+    assert f'quantum.operator "{op_cls.__name__}"' in optimized_ir
     assert "pbc.ppr" not in optimized_ir
 
 
-def test_ppr_operator_to_ppr():
-    """Test that to_ppr converts a PPR operator to pbc.ppr."""
+@pytest.mark.parametrize("sign", [1, -1])
+@pytest.mark.parametrize("op_cls, denominator", PPR_OPS)
+def test_ppr_operator_to_ppr(op_cls, denominator, sign):
+    """Test that to_ppr converts PPR operators and their adjoints to pbc.ppr."""
     pipe = [("pipe", ["quantum-compilation-stage"])]
 
     @qjit(pipelines=pipe, target="mlir", capture=True)
@@ -106,13 +112,15 @@ def test_ppr_operator_to_ppr():
 
         @qp.qnode(qp.device("null.qubit", wires=2))
         def f():
-            qp.PPR(4, "XY", wires=[0, 1])
+            op_cls(sign, "XY", wires=[0, 1])
+            qp.adjoint(op_cls(sign, "ZX", wires=[0, 1]))
 
         return f()
 
     optimized_ir = test_ppr_operator_to_ppr_workflow.mlir_opt
-    assert 'pbc.ppr ["X", "Y"](4)' in optimized_ir
-    assert 'quantum.operator "PPR"' not in optimized_ir
+    assert f'pbc.ppr ["X", "Y"]({sign * denominator})' in optimized_ir
+    assert f'pbc.ppr ["Z", "X"]({-sign * denominator})' in optimized_ir
+    assert "quantum.operator" not in optimized_ir
     assert "quantum.paulirot" not in optimized_ir
 
 
