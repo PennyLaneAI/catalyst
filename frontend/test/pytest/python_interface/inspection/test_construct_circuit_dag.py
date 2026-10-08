@@ -1542,22 +1542,30 @@ class TestCreateDynamicMeasurementNodes:
 class TestOperatorConnectivity:
     """Tests that operators are properly connected."""
 
-    def test_global_phase_connectivity(self, capture_mode):
-        """Tests the connectivity of the global phase operator."""
+    @pytest.mark.parametrize("dynamic_angle", [False, True], ids=["constant", "symbolic"])
+    @pytest.mark.parametrize(
+        "control_on_instance", [False, True], ids=["controlled_class", "controlled_instance"]
+    )
+    def test_global_phase_connectivity(self, capture_mode, dynamic_angle, control_on_instance):
+        """Tests labels and connectivity for constant and symbolic global phases."""
 
         dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
         @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
         @qp.qnode(dev)
-        def my_circuit():
+        def my_circuit(x):
+            angle = x if dynamic_angle else 0.5
             qp.X(0)
-            qp.GlobalPhase(0.5)
-            qp.adjoint(qp.GlobalPhase(0.5))
-            qp.ctrl(qp.GlobalPhase, control=0)(0.5)
+            qp.GlobalPhase(angle)
+            qp.adjoint(qp.GlobalPhase(angle))
+            if control_on_instance:
+                qp.ctrl(qp.GlobalPhase(angle), control=0)
+            else:
+                qp.ctrl(qp.GlobalPhase, control=0)(angle)
             qp.Y(0)
 
-        module = my_circuit()
+        module = my_circuit(0.5)
 
         # Construct DAG
         utility = ConstructCircuitDAG(FakeDAGBuilder())
@@ -1567,20 +1575,22 @@ class TestOperatorConnectivity:
         nodes = utility.dag_builder.nodes
 
         # Ensure disjoint globalphase nodes show up
-        assert "GlobalPhase" in nodes["node2"]["label"]
-        assert "Adjoint(GlobalPhase)" in nodes["node3"]["label"]
+        assert nodes["node2"]["label"] == "GlobalPhase"
+        assert nodes["node3"]["label"] == "Adjoint(GlobalPhase)"
 
         # Ensure proper connectivity
-        if capture_mode:
+        if capture_mode and not control_on_instance:
             # `qp.ctrl(qp.GlobalPhase, ...)` is a qfunc (class) control, so it lowers to a
             # `quantum.ctrl` region. GlobalPhase has no target wires, so the controlled node floats
             # in the `ctrl` cluster and the wire threads PauliX -> PauliY directly through the
             # (control-only) region.
+            assert nodes["node4"]["label"] == "GlobalPhase"
             expected_edges = (
                 ("NullQubit", "PauliX"),
                 ("PauliX", "PauliY"),
             )
         else:
+            assert nodes["node4"]["label"] == "<name> C(GlobalPhase)|<wire> [0]"
             expected_edges = (
                 ("NullQubit", "PauliX"),
                 ("PauliX", "C(GlobalPhase)"),
