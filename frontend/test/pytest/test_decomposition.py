@@ -763,6 +763,19 @@ class TestPrecompiled:
 
         assert circuit.mlir_opt is not None
 
+    def test_precompiled_with_decomposition_E2E(self):
+        """Test that precompiled rules are used in E2E decomposition."""
+
+        @qp.qjit(target="mlir", capture=True, collect_decomp_rules=False)
+        @qp.decompose(gate_set={qp.RZ, qp.GlobalPhase})
+        @qp.qnode(qp.device("null.qubit", wires=2))
+        def test_phaseshift():
+            qp.PhaseShift(0.5, 1)
+            return qp.probs()
+
+        results = qp.specs(test_phaseshift, level="all")().resources
+        assert results["graph-decomposition"].counts == {"GlobalPhase": 1, "RZ": 1}
+
 
 class TestTraceTime:
     """Tests of trace-time decomposition rule lowering."""
