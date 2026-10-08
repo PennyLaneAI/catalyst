@@ -14,10 +14,16 @@
 
 #include "RSDecomp.hpp"
 
+#include <algorithm>
+#include <array>
 #include <cassert>
 #include <cmath>
+#include <complex>
 #include <cstring>
+#include <optional>
+#include <sstream>
 #include <string>
+#include <tuple>
 #include <vector>
 
 #include "DataView.hpp"
@@ -27,6 +33,12 @@
 #include "Rings.hpp"
 
 #define MAX_SEARCH_TRIALS 10000
+#define MAX_MIXED_CANDIDATES 64
+// Mixed synthesis search: candidates may each have up to MIXED_LOOSENESS * epsilon / 2 error
+// (1 is the even split), and the search continues MIXED_SEARCH_MARGIN T gates past the best
+// pair. Increasing either slightly lowers the T-count at a large cost in synthesis time.
+#define MIXED_LOOSENESS 1.0
+#define MIXED_SEARCH_MARGIN 0.0
 #define ROSS_CACHE_SIZE 10000
 
 namespace {
@@ -45,6 +57,62 @@ using namespace RSDecomp::Utils;
 using namespace RSDecomp::CliffordData;
 using namespace RSDecomp::NormalForms;
 
+namespace {
+/**
+ * @brief Reduce the grid-problem angle -angle/2 into [-pi/4, pi/4].
+ * @return The reduced angle and the scale that maps grid solutions back to the original frame.
+ */
+std::pair<double, ZOmega> grid_problem_frame(double angle) {
+    double modified_angle = -angle / 2.0;
+    long k = std::lround(modified_angle / M_PI_2);
+    double shift = -static_cast<double>(k) * M_PI_2;
+    int idx = ((k % 4) + 4) % 4;
+
+    ZOmega scale(0, 0, 0, 1);
+    switch (idx) {
+    case 0:                         // 0 shift (Identity)
+        scale = ZOmega(0, 0, 0, 1); // d=1
+        break;
+    case 1:                         // pi/2 shift
+        scale = ZOmega(0, 1, 0, 0); // b=1
+        break;
+    case 2:                          // pi shift
+        scale = ZOmega(0, 0, 0, -1); // d=-1
+        break;
+    case 3:                          // 3pi/2 (or -pi/2) shift
+        scale = ZOmega(0, -1, 0, 0); // b=-1
+        break;
+    }
+    return {modified_angle + shift, scale};
+}
+
+/**
+ * @brief Complete a grid solution `u_sol / sqrt(2)^k` to a unitary and compute its normal form.
+ * @return The gate sequence and global phase, or std::nullopt if the norm equation has no solution.
+ */
+std::optional<std::pair<std::vector<GateType>, double>>
+normal_form_from_grid_solution(const ZOmega &u_sol, int k_val, const ZOmega &scale) {
+    INT_TYPE two_pow_k = INT_TYPE(1) << k_val;
+    auto xi = ZSqrtTwo(two_pow_k, 0) - u_sol.norm2().to_sqrt_two();
+    auto t_sol = NormSolver::solve_diophantine(xi, MAX_FACTORING_TRIALS);
+    if (!t_sol) {
+        return std::nullopt;
+    }
+
+    ZOmega u = u_sol * scale;
+    ZOmega t = *t_sol * scale;
+    DyadicMatrix dyd_mat(u, -t.conj(), t, u.conj(), INT_TYPE(k_val));
+    SO3Matrix so3_mat(dyd_mat);
+    return ma_normal_form(so3_mat);
+}
+
+size_t count_t_gates(const std::vector<GateType> &gates) {
+    return std::count_if(gates.begin(), gates.end(), [](GateType gate) {
+        return gate == GateType::T || gate == GateType::HT || gate == GateType::SHT;
+    });
+}
+} // namespace
+
 /**
  * @brief Core function to compute the Clifford+T decomposition using the Ross-Selinger algorithm.
  * @param angle The target rotation angle.
@@ -54,15 +122,8 @@ using namespace RSDecomp::NormalForms;
  */
 std::pair<std::vector<GateType>, double> compute_clifford_T_decomposition(double angle,
                                                                           double epsilon) {
-    ZOmega scale(0, 0, 0, 1);
     double phase = 0.0;
-
-    ZOmega u(0, 0, 0, 1);
-    ZOmega t(0, 0, 0, 0);
-    INT_TYPE k = 0;
-
     std::vector<GateType> decomposition;
-    DyadicMatrix dyd_mat(ZOmega(0), ZOmega(0), ZOmega(0), ZOmega(0), INT_TYPE(0));
 
     if (is_odd_multiple_of_pi_4(angle)) {
         const double pi_over_4 = M_PI / 4.0;
@@ -85,44 +146,22 @@ std::pair<std::vector<GateType>, double> compute_clifford_T_decomposition(double
 
         phase = static_cast<double>(units) * (M_PI / 8.0);
     } else {
-        double modified_angle = -angle / 2.0;
-        long k = std::lround(modified_angle / M_PI_2);
-        double shift = -static_cast<double>(k) * M_PI_2;
-        int idx = ((k % 4) + 4) % 4;
+        auto [grid_angle, scale] = grid_problem_frame(angle);
+        GridProblem::GridIterator u_solutions(grid_angle, epsilon, MAX_SEARCH_TRIALS);
 
-        switch (idx) {
-        case 0:                         // 0 shift (Identity)
-            scale = ZOmega(0, 0, 0, 1); // d=1
-            break;
-        case 1:                         // pi/2 shift
-            scale = ZOmega(0, 1, 0, 0); // b=1
-            break;
-        case 2:                          // pi shift
-            scale = ZOmega(0, 0, 0, -1); // d=-1
-            break;
-        case 3:                          // 3pi/2 (or -pi/2) shift
-            scale = ZOmega(0, -1, 0, 0); // b=-1
-            break;
-        }
-        GridProblem::GridIterator u_solutions(modified_angle + shift, epsilon, MAX_SEARCH_TRIALS);
-
+        std::optional<std::pair<std::vector<GateType>, double>> result;
         for (const auto &[u_sol, k_val] : u_solutions) {
-            // Calculate 2^k_val as an INT_TYPE
-            INT_TYPE two_pow_k = INT_TYPE(1) << k_val;
-            auto xi = ZSqrtTwo(two_pow_k, 0) - u_sol.norm2().to_sqrt_two();
-            auto t_sol = NormSolver::solve_diophantine(xi, MAX_FACTORING_TRIALS);
-
-            if (t_sol) {
-                u = u_sol * scale;
-                t = *t_sol * scale;
-                k = k_val;
+            if ((result = normal_form_from_grid_solution(u_sol, k_val, scale))) {
                 break;
             }
         }
 
-        dyd_mat = DyadicMatrix(u, -t.conj(), t, u.conj(), INT_TYPE(k));
-        SO3Matrix so3_mat(dyd_mat);
-        std::tie(decomposition, phase) = ma_normal_form(so3_mat);
+        if (!result) {
+            DyadicMatrix identity(ZOmega(0, 0, 0, 1), ZOmega(0), ZOmega(0), ZOmega(0, 0, 0, 1),
+                                  INT_TYPE(0));
+            result = ma_normal_form(SO3Matrix(identity));
+        }
+        std::tie(decomposition, phase) = *result;
     }
     return {std::move(decomposition), phase};
 }
@@ -281,6 +320,188 @@ std::pair<std::vector<PPRGateType>, double> HST_to_PPR(const std::vector<GateTyp
     return {output_gates, phase_update};
 }
 
+/**
+ * @brief Compute a mixed diagonal approximation of RZ(angle) with diamond-norm accuracy epsilon.
+ *
+ * Implements the mixed diagonal approximation of Kliuchnikov et al., "Shorter quantum circuits via
+ * single-qubit gate approximation", Quantum 7, 1208 (2023), arXiv:2203.10064, Section 3.4
+ * (Proposition 3.13, with the diamond-norm bound of Theorem 3.12). Writing each
+ * candidate's top-left entry as `w * exp(-i angle/2)`, an under-rotation (Im(w) < 0) and an
+ * over-rotation (Im(w) > 0) are mixed with probabilities p and 1 - p, and each is
+ * {Z, S}-twirled when applied. Of the candidate pairs found, the one with the lowest expected
+ * T-count whose mixture meets the diamond-norm bound of Theorem 3.12 is kept.
+ */
+MixedDecomposition compute_mixed_diagonal_decomposition(double angle, double epsilon) {
+    if (is_odd_multiple_of_pi_4(angle)) {
+        auto exact = compute_clifford_T_decomposition(angle, epsilon);
+        return {{exact.first, exact.first}, {exact.second, exact.second}, 1.0};
+    }
+
+    // With MIXED_LOOSENESS > 1, candidates may individually miss the even split
+    // 1 - Re(w)^2 <= epsilon/2 of Proposition 3.13, as long as the pair satisfies the exact bound
+    // of Theorem 3.12.
+    const double min_overlap = std::sqrt(1.0 - MIXED_LOOSENESS * epsilon / 2.0);
+    // Operator-norm accuracy of the grid search whose target region is Re(w) >= min_overlap,
+    // i.e. 1 - search_epsilon^2 / 2 = min_overlap, written to avoid cancellation.
+    const double search_epsilon = std::sqrt(MIXED_LOOSENESS * epsilon / (1.0 + min_overlap));
+    const std::complex<double> inverse_target = std::polar(1.0, angle / 2.0);
+
+    auto [grid_angle, scale] = grid_problem_frame(angle);
+    GridProblem::GridIterator u_solutions(grid_angle, search_epsilon, MAX_SEARCH_TRIALS);
+
+    struct Candidate {
+        std::vector<GateType> gates;
+        double phase;
+        std::complex<double> w;
+        size_t t_count;
+    };
+    std::vector<Candidate> unders;
+    std::vector<Candidate> overs;
+
+    struct Pair {
+        size_t under;
+        size_t over;
+        double probability;
+        double cost;
+    };
+    std::optional<Pair> best;
+
+    auto evaluate = [&](size_t i, size_t j) {
+        const Candidate &under = unders[i];
+        const Candidate &over = overs[j];
+        // p = r2^2 sin(2 delta2) / (r2^2 sin(2 delta2) - r1^2 sin(2 delta1)), with
+        // r^2 sin(2 delta) = 2 Re(w) Im(w).
+        double under_weight = under.w.real() * under.w.imag();
+        double over_weight = over.w.real() * over.w.imag();
+        double denominator = over_weight - under_weight;
+        double p = denominator > 0.0 ? over_weight / denominator : 1.0;
+        double diamond = 2.0 * (1.0 - p * under.w.real() * under.w.real() -
+                                (1.0 - p) * over.w.real() * over.w.real());
+        if (diamond > epsilon) {
+            return;
+        }
+        double cost = p * under.t_count + (1.0 - p) * over.t_count;
+        if (!best || cost < best->cost) {
+            best = Pair{i, j, p, cost};
+        }
+    };
+
+    for (const auto &[u_sol, k_val] : u_solutions) {
+        std::complex<double> w =
+            (u_sol * scale).to_complex() * inverse_target / std::pow(M_SQRT2, k_val);
+        if (w.real() < min_overlap) {
+            continue;
+        }
+
+        bool is_under = w.imag() <= 0.0;
+        bool is_over = w.imag() >= 0.0;
+        // Until both sides have a candidate, further candidates on a filled side cannot form the
+        // first pair, so skip their (expensive) norm equation.
+        if (!best && (!is_under || !unders.empty()) && (!is_over || !overs.empty())) {
+            continue;
+        }
+        if (unders.size() + overs.size() >= MAX_MIXED_CANDIDATES) {
+            break;
+        }
+        auto normal_form = normal_form_from_grid_solution(u_sol, k_val, scale);
+        if (!normal_form) {
+            continue;
+        }
+        size_t t_count = count_t_gates(normal_form->first);
+        // Later candidates have larger T-counts, so they can no longer improve the best pair.
+        if (best && t_count > best->cost + MIXED_SEARCH_MARGIN) {
+            break;
+        }
+
+        Candidate candidate{std::move(normal_form->first), normal_form->second, w, t_count};
+        if (is_under) {
+            unders.push_back(candidate);
+            for (size_t j = 0; j < overs.size(); j++) {
+                evaluate(unders.size() - 1, j);
+            }
+        }
+        if (is_over) {
+            overs.push_back(std::move(candidate));
+            for (size_t i = 0; i < unders.size(); i++) {
+                evaluate(i, overs.size() - 1);
+            }
+        }
+    }
+
+    if (!best) {
+        // A unitary with operator-norm error epsilon/2 has diamond-norm error at most epsilon.
+        auto fallback = compute_clifford_T_decomposition(angle, epsilon / 2.0);
+        return {{fallback.first, fallback.first}, {fallback.second, fallback.second}, 1.0};
+    }
+
+    return {{std::move(unders[best->under].gates), std::move(overs[best->over].gates)},
+            {unders[best->under].phase, overs[best->over].phase},
+            best->probability};
+}
+
+namespace {
+using MixedCacheKey = std::tuple<double, double>;
+lru_cache<MixedCacheKey, MixedDecomposition, ROSS_CACHE_SIZE> mixed_cache;
+
+MixedDecomposition eval_mixed_decomposition(double angle, double epsilon) {
+    MixedCacheKey key = {angle, epsilon};
+    if (auto val_opt = mixed_cache.get(key); val_opt) {
+        return *val_opt;
+    }
+
+    auto result = compute_mixed_diagonal_decomposition(angle, epsilon);
+    mixed_cache.put(key, result);
+    return result;
+}
+} // namespace
+
+/**
+ * @brief Select the branch and twirl of a mixed decomposition from a uniform sample in [0, 1).
+ */
+MixedSample sample_mixed_decomposition(double probability, double uniform_sample) {
+    double u = std::clamp(uniform_sample, 0.0, std::nextafter(1.0, 0.0));
+    size_t branch = u < probability ? 0 : 1;
+    double fraction = branch == 0 ? u / probability : (u - probability) / (1.0 - probability);
+    size_t twirl = std::min<size_t>(3, static_cast<size_t>(4.0 * fraction));
+    return {branch, twirl};
+}
+
+/**
+ * @brief Apply the {Z, S} twirl sigma U sigma^dagger to a gate sequence (applied first to last).
+ */
+std::vector<GateType> twirl_sequence(const std::vector<GateType> &gates, size_t twirl) {
+    // (sigma^dagger, sigma) for sigma in {I, S, Z, S^dagger}.
+    static constexpr std::array<std::pair<GateType, GateType>, 4> twirls = {{
+        {GateType::I, GateType::I},
+        {GateType::Sd, GateType::S},
+        {GateType::Z, GateType::Z},
+        {GateType::S, GateType::Sd},
+    }};
+    if (twirl == 0) {
+        return gates;
+    }
+    std::vector<GateType> twirled;
+    twirled.reserve(gates.size() + 2);
+    twirled.push_back(twirls[twirl].first);
+    twirled.insert(twirled.end(), gates.begin(), gates.end());
+    twirled.push_back(twirls[twirl].second);
+    return twirled;
+}
+
+std::pair<std::vector<GateType>, double> eval_mixed_ross_algorithm(double angle, double epsilon,
+                                                                   double uniform_sample) {
+    MixedDecomposition mixed = eval_mixed_decomposition(angle, epsilon);
+    auto [branch, twirl] = sample_mixed_decomposition(mixed.probability, uniform_sample);
+    return {twirl_sequence(mixed.gates[branch], twirl), mixed.phases[branch]};
+}
+
+std::pair<std::vector<PPRGateType>, double>
+eval_mixed_ross_algorithm_ppr(double angle, double epsilon, double uniform_sample) {
+    auto [gates, phase] = eval_mixed_ross_algorithm(angle, epsilon, uniform_sample);
+    auto [ppr_gates, ppr_phase_update] = HST_to_PPR(gates);
+    return {std::move(ppr_gates), phase + ppr_phase_update};
+}
+
 // Extern C implementation
 extern "C" {
 
@@ -365,6 +586,72 @@ double rs_decomposition_get_phase(double theta, double epsilon, bool ppr_basis) 
     } else {
         return eval_ross_algorithm(theta, epsilon).second;
     }
+}
+
+/**
+ * @brief Returns the length of the sampled mixed decomposition.
+ *
+ * The three `rs_mixed_decomposition_*` functions are deterministic in `uniform_sample`, so calling
+ * them with the same sample returns the size, gates, and phase of the same sequence.
+ *
+ * @param theta Angle
+ * @param epsilon Diamond-norm error of the mixed channel
+ * @param ppr_basis Whether to use PPR basis
+ * @param uniform_sample Uniform random number in [0, 1) selecting the branch and twirl
+ */
+size_t rs_mixed_decomposition_get_size(double theta, double epsilon, bool ppr_basis,
+                                       double uniform_sample) {
+    double search_epsilon = std::sqrt(epsilon / (1.0 + std::sqrt(1.0 - epsilon / 2.0)));
+    if (search_epsilon < 1e-6) {
+        std::ostringstream oss;
+        oss << std::scientific << epsilon;
+        RT_WARN("Mixed gridsynth received epsilon=" + oss.str() +
+                ". For epsilon smaller than 2e-12, results may be inaccurate, or errors may"
+                " occur during decomposition. To guarantee correctness, please provide a larger "
+                "epsilon value.");
+    }
+    if (ppr_basis) {
+        return eval_mixed_ross_algorithm_ppr(theta, epsilon, uniform_sample).first.size();
+    }
+    return eval_mixed_ross_algorithm(theta, epsilon, uniform_sample).first.size();
+}
+
+/**
+ * @brief Fills a pre-allocated memref with the sampled mixed gate sequence.
+ *
+ * See `rs_decomposition_get_gates` for the memref arguments.
+ */
+void rs_mixed_decomposition_get_gates([[maybe_unused]] size_t *data_allocated, size_t *data_aligned,
+                                      size_t offset, size_t size0, size_t stride0, double theta,
+                                      double epsilon, bool ppr_basis, double uniform_sample) {
+    const size_t sizes[1] = {size0};
+    const size_t strides[1] = {stride0};
+    DataView<size_t, 1> gates_view(data_aligned, offset, sizes, strides);
+
+    auto fill = [&](const auto &gates) {
+        RT_FAIL_IF(gates_view.size() < gates.size(),
+                   "Error: memref allocated too small for mixed gates.\n")
+        for (size_t i = 0; i < gates.size(); ++i) {
+            gates_view(i) = static_cast<size_t>(gates[i]);
+        }
+    };
+
+    if (ppr_basis) {
+        fill(eval_mixed_ross_algorithm_ppr(theta, epsilon, uniform_sample).first);
+    } else {
+        fill(eval_mixed_ross_algorithm(theta, epsilon, uniform_sample).first);
+    }
+}
+
+/**
+ * @brief Returns the global phase of the sampled mixed decomposition.
+ */
+double rs_mixed_decomposition_get_phase(double theta, double epsilon, bool ppr_basis,
+                                        double uniform_sample) {
+    if (ppr_basis) {
+        return eval_mixed_ross_algorithm_ppr(theta, epsilon, uniform_sample).second;
+    }
+    return eval_mixed_ross_algorithm(theta, epsilon, uniform_sample).second;
 }
 
 } // extern "C"

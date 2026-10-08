@@ -247,6 +247,180 @@ TEST_CASE("Test C-API Wrapper (Memref Interface)", "[RSDecomp][Ross Selinger]") 
     CHECK(static_cast<PPRGateType>(buffer_ppr[0]) == PPRGateType::Z8);
 }
 
+// Helpers for the mixed decomposition tests. Matrices are row-major 2x2.
+using Matrix2 = std::vector<std::complex<double>>;
+
+Matrix2 dagger(const Matrix2 &A) {
+    return {std::conj(A[0]), std::conj(A[2]), std::conj(A[1]), std::conj(A[3])};
+}
+
+Matrix2 sequence_unitary(const std::vector<GateType> &gates, double phase) {
+    Matrix2 U = matrix_from_decomp_result(gates);
+    std::complex<double> phase_factor = {std::cos(phase), -std::sin(phase)};
+    for (auto &entry : U) {
+        entry *= phase_factor;
+    }
+    return U;
+}
+
+size_t t_count(const std::vector<GateType> &gates) {
+    size_t count = 0;
+    for (GateType gate : gates) {
+        count += gate == GateType::T || gate == GateType::HT || gate == GateType::SHT;
+    }
+    return count;
+}
+
+/**
+ * Pauli transfer matrix R_ij = Tr(P_i E(P_j)) / 2 of the error channel
+ * E(rho) = V^dagger M(rho) V, where M is the {Z, S}-twirled mixture and V = RZ(angle).
+ */
+std::vector<std::vector<double>> mixed_error_ptm(const MixedDecomposition &mixed, double angle) {
+    const std::vector<Matrix2> paulis = {{1.0, 0.0, 0.0, 1.0},
+                                         {0.0, 1.0, 1.0, 0.0},
+                                         {0.0, {0.0, -1.0}, {0.0, 1.0}, 0.0},
+                                         {1.0, 0.0, 0.0, -1.0}};
+    Matrix2 V = {std::polar(1.0, -angle / 2.0), 0.0, 0.0, std::polar(1.0, angle / 2.0)};
+
+    std::vector<std::pair<double, Matrix2>> kraus;
+    for (size_t branch = 0; branch < 2; branch++) {
+        double weight = branch == 0 ? mixed.probability : 1.0 - mixed.probability;
+        for (size_t twirl = 0; twirl < 4; twirl++) {
+            Matrix2 U =
+                sequence_unitary(twirl_sequence(mixed.gates[branch], twirl), mixed.phases[branch]);
+            kraus.emplace_back(weight / 4.0, multiply_matrices(dagger(V), U));
+        }
+    }
+
+    std::vector<std::vector<double>> ptm(4, std::vector<double>(4, 0.0));
+    for (size_t j = 0; j < 4; j++) {
+        Matrix2 image(4, 0.0);
+        for (const auto &[weight, K] : kraus) {
+            Matrix2 term = multiply_matrices(multiply_matrices(K, paulis[j]), dagger(K));
+            for (size_t e = 0; e < 4; e++) {
+                image[e] += weight * term[e];
+            }
+        }
+        for (size_t i = 0; i < 4; i++) {
+            Matrix2 product = multiply_matrices(paulis[i], image);
+            ptm[i][j] = 0.5 * (product[0] + product[3]).real();
+        }
+    }
+    return ptm;
+}
+
+TEST_CASE("Test mixed diagonal decomposition accuracy", "[RSDecomp][Mixed]") {
+    double epsilon = GENERATE(1e-2, 1e-4, 1e-6, 1e-8, 1e-10);
+    int angle_int = GENERATE(range(-70, 71, 7));
+    double angle = angle_int / 10.0 + 0.01;
+    CAPTURE(angle, epsilon);
+
+    MixedDecomposition mixed = compute_mixed_diagonal_decomposition(angle, epsilon);
+    REQUIRE(mixed.probability >= 0.0);
+    REQUIRE(mixed.probability <= 1.0);
+
+    // The first branch under-rotates and the second over-rotates the target.
+    std::complex<double> inverse_target = std::polar(1.0, angle / 2.0);
+    std::complex<double> w_under =
+        sequence_unitary(mixed.gates[0], mixed.phases[0])[0] * inverse_target;
+    std::complex<double> w_over =
+        sequence_unitary(mixed.gates[1], mixed.phases[1])[0] * inverse_target;
+    if (mixed.probability < 1.0) {
+        CHECK(w_under.imag() <= 1e-12);
+        CHECK(w_over.imag() >= -1e-12);
+    }
+
+    // The error channel is a Pauli channel, so its diamond distance to the identity
+    // channel is 2 (1 - p_I), with p_I = (1 + R_XX + R_YY + R_ZZ) / 4.
+    auto ptm = mixed_error_ptm(mixed, angle);
+    for (size_t i = 0; i < 4; i++) {
+        for (size_t j = 0; j < 4; j++) {
+            if (i != j) {
+                CHECK(std::abs(ptm[i][j]) <= 1e-9);
+            }
+        }
+    }
+    double identity_weight = (ptm[0][0] + ptm[1][1] + ptm[2][2] + ptm[3][3]) / 4.0;
+    double diamond_distance = 2.0 * (1.0 - identity_weight);
+    CHECK(diamond_distance <= epsilon * (1.0 + 1e-6) + 1e-12);
+}
+
+TEST_CASE("Test mixed diagonal decomposition halves the T-count", "[RSDecomp][Mixed]") {
+    // Compare at matched diamond-norm accuracy: a unitary with operator-norm error epsilon/2 has
+    // diamond-norm error at most epsilon.
+    const double epsilon = 1e-6;
+    double mixed_t = 0.0;
+    double deterministic_t = 0.0;
+    for (int angle_int = 1; angle_int < 60; angle_int++) {
+        double angle = angle_int / 10.0;
+        MixedDecomposition mixed = compute_mixed_diagonal_decomposition(angle, epsilon);
+        mixed_t += mixed.probability * t_count(mixed.gates[0]) +
+                   (1.0 - mixed.probability) * t_count(mixed.gates[1]);
+        deterministic_t += t_count(eval_ross_algorithm(angle, epsilon / 2.0).first);
+    }
+    CAPTURE(mixed_t, deterministic_t);
+    CHECK(mixed_t < 0.6 * deterministic_t);
+}
+
+TEST_CASE("Test mixed diagonal decomposition of exact angles", "[RSDecomp][Mixed]") {
+    MixedDecomposition mixed = compute_mixed_diagonal_decomposition(M_PI / 4.0, 1e-4);
+    CHECK(mixed.probability == 1.0);
+    CHECK(mixed.gates[0] == std::vector<GateType>{GateType::T});
+}
+
+TEST_CASE("Test mixed decomposition sampling", "[RSDecomp][Mixed]") {
+    CHECK(sample_mixed_decomposition(0.25, 0.0).branch == 0);
+    CHECK(sample_mixed_decomposition(0.25, 0.0).twirl == 0);
+    CHECK(sample_mixed_decomposition(0.25, 0.24).twirl == 3);
+    CHECK(sample_mixed_decomposition(0.25, 0.25).branch == 1);
+    CHECK(sample_mixed_decomposition(0.25, 0.25).twirl == 0);
+    CHECK(sample_mixed_decomposition(0.25, 0.99).twirl == 3);
+    CHECK(sample_mixed_decomposition(1.0, 0.99).branch == 0);
+    CHECK(sample_mixed_decomposition(0.25, 1.0).branch == 1);
+
+    std::vector<GateType> gates = {GateType::HT};
+    CHECK(twirl_sequence(gates, 0) == gates);
+    CHECK(twirl_sequence(gates, 1) ==
+          std::vector<GateType>{GateType::Sd, GateType::HT, GateType::S});
+    CHECK(twirl_sequence(gates, 2) ==
+          std::vector<GateType>{GateType::Z, GateType::HT, GateType::Z});
+    CHECK(twirl_sequence(gates, 3) ==
+          std::vector<GateType>{GateType::S, GateType::HT, GateType::Sd});
+}
+
+TEST_CASE("Test mixed C-API Wrapper (Memref Interface)", "[RSDecomp][Mixed]") {
+    const double angle = 0.7;
+    const double epsilon = 1e-6;
+    bool ppr_basis = GENERATE(false, true);
+    double uniform_sample = GENERATE(0.1, 0.6, 0.95);
+    CAPTURE(ppr_basis, uniform_sample);
+
+    size_t size = rs_mixed_decomposition_get_size(angle, epsilon, ppr_basis, uniform_sample);
+    std::vector<size_t> buffer(size);
+    rs_mixed_decomposition_get_gates(nullptr, buffer.data(), 0, size, 1, angle, epsilon, ppr_basis,
+                                     uniform_sample);
+    double phase = rs_mixed_decomposition_get_phase(angle, epsilon, ppr_basis, uniform_sample);
+
+    if (ppr_basis) {
+        auto [gates, expected_phase] =
+            eval_mixed_ross_algorithm_ppr(angle, epsilon, uniform_sample);
+        REQUIRE(buffer.size() == gates.size());
+        for (size_t i = 0; i < gates.size(); i++) {
+            CHECK(static_cast<PPRGateType>(buffer[i]) == gates[i]);
+        }
+        CHECK(phase == expected_phase);
+    } else {
+        MixedDecomposition mixed = compute_mixed_diagonal_decomposition(angle, epsilon);
+        auto [branch, twirl] = sample_mixed_decomposition(mixed.probability, uniform_sample);
+        std::vector<GateType> expected = twirl_sequence(mixed.gates[branch], twirl);
+        REQUIRE(buffer.size() == expected.size());
+        for (size_t i = 0; i < expected.size(); i++) {
+            CHECK(static_cast<GateType>(buffer[i]) == expected[i]);
+        }
+        CHECK(phase == mixed.phases[branch]);
+    }
+}
+
 TEST_CASE("rs_decomposition_get_size emits warning for epsilon < 1e-6", "[RSDecomp][Warning]") {
     const double theta = 0.5;
 

@@ -44,6 +44,12 @@ struct GridsynthPass : impl::GridsynthPassBase<GridsynthPass> {
         mlir::MLIRContext *context = &getContext();
         RewritePatternSet patterns(context);
 
+        if (method != "deterministic" && method != "mixed") {
+            module->emitError() << "gridsynth method must be 'deterministic' or 'mixed', got '"
+                                << method << "'";
+            return signalPassFailure();
+        }
+
         WalkResult controlledRotation = module->walk([](CustomOp op) {
             StringRef gateName = op.getGateName();
             if ((gateName == "RZ" || gateName == "PhaseShift") && !op.getInCtrlQubits().empty()) {
@@ -57,7 +63,7 @@ struct GridsynthPass : impl::GridsynthPassBase<GridsynthPass> {
             return signalPassFailure();
         }
 
-        populateGridsynthPatterns(patterns, epsilon, pprBasis);
+        populateGridsynthPatterns(patterns, epsilon, pprBasis, method == "mixed");
 
         if (failed(applyPatternsGreedily(module, std::move(patterns)))) {
             signalPassFailure();

@@ -157,7 +157,13 @@ def GridsynthPass : Pass<"gridsynth"> {
         /*CLI name=*/"ppr-basis",
         /*Type=*/"bool",
         /*Default=*/"false",
-        /*Description=*/desc="Whether to decompose into the PPR basis set instead of the standard Clifford+T basis set.">,];
+        /*Description=*/desc="Whether to decompose into the PPR basis set instead of the standard Clifford+T basis set.">,
+        Option<
+        /*C++ var name=*/"method",
+        /*CLI name=*/"method",
+        /*Type=*/"std::string",
+        /*Default=*/"\"deterministic\"",
+        /*Description=*/"Synthesis method: 'deterministic' (Ross-Selinger) or 'mixed' (probabilistic mixture of under- and over-rotations, with the same diamond-norm guarantee of 2 * epsilon).">,];
 
         let dependentDialects = [
         "memref::MemRefDialect",

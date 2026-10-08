@@ -19,6 +19,7 @@
 #include <cmath>
 #include <cstdint>
 #include <iterator>
+#include <string>
 #include <vector>
 
 #include "llvm/ADT/STLExtras.h"
@@ -238,6 +239,29 @@ constexpr SequenceStatistics cliffordTStatistics{3.0590, 1.1278, -0.0074, 1.9849
                                                  cliffordTCaseFrequencies};
 constexpr SequenceStatistics pprStatistics{3.0590, 1.1278, 1.5324, 4.2326, pprCaseFrequencies};
 
+// Mixed synthesis: fitted over 200 uniformly random angles and 8 samples per angle and epsilon,
+// for diamond-norm epsilon in [1e-11, 1e-3]. The samples include the twirling Cliffords.
+// Clifford+T cases: T, HT, SHT, I, X, ...
+constexpr double mixedCliffordTCaseFrequencies[] = {0.0112, 0.4949, 0.4939, 0.0162, 0.0275,
+                                                    0.0311, 0.2462, 0.1633, 0.2739, 0.2419};
+// PPR cases: I, X2, X4, X8, adjX2, ...
+constexpr double mixedPPRCaseFrequencies[] = {
+    0.0022, 0.0038, 0.4146, 0.4941, 0.0000, 0.0092, 0.0000, 0.0043, 0.0000, 0.0000,
+    0.0000, 0.0000, 0.0059, 0.0433, 0.4890, 0.5000, 0.0000, 0.0335, 0.0000};
+static_assert(std::size(mixedCliffordTCaseFrequencies) == numCliffordTCases);
+static_assert(std::size(mixedPPRCaseFrequencies) == numPPRCases);
+constexpr SequenceStatistics mixedCliffordTStatistics{1.5356, 3.2211, 0.0010, 3.4275,
+                                                      mixedCliffordTCaseFrequencies};
+constexpr SequenceStatistics mixedPPRStatistics{1.5356, 3.2211, 0.7723, 6.9217,
+                                                mixedPPRCaseFrequencies};
+
+const SequenceStatistics &getSequenceStatistics(bool pprBasis, bool mixed) {
+    if (mixed) {
+        return pprBasis ? mixedPPRStatistics : mixedCliffordTStatistics;
+    }
+    return pprBasis ? pprStatistics : cliffordTStatistics;
+}
+
 /**
  * @brief Attach the expected trip count and case probabilities to the decomposition loop.
  */
@@ -273,26 +297,40 @@ struct DecompositionExternalFuncs {
     func::FuncOp getPhase;
 };
 
-DecompositionExternalFuncs getOrDeclareExternalFuncs(PatternRewriter &rewriter, func::FuncOp func) {
+/**
+ * @brief Declare the runtime functions returning the gate sequence.
+ *
+ * The mixed variants take an additional f64 uniform sample selecting the branch and twirl.
+ */
+DecompositionExternalFuncs getOrDeclareExternalFuncs(PatternRewriter &rewriter, func::FuncOp func,
+                                                     bool mixed) {
     auto f64Type = rewriter.getF64Type();
     auto i1Type = rewriter.getI1Type();
     auto indexType = rewriter.getIndexType();
     auto rankedMemRefType = MemRefType::get({ShapedType::kDynamic}, indexType);
 
-    // Ensure or declare Get Size: (f64, f64, i1) -> index
-    auto getSizeType = rewriter.getFunctionType({f64Type, f64Type, i1Type}, {indexType});
+    SmallVector<Type> scalarArgs = {f64Type, f64Type, i1Type};
+    if (mixed) {
+        scalarArgs.push_back(f64Type);
+    }
+    SmallVector<Type> gatesArgs = {rankedMemRefType};
+    gatesArgs.append(scalarArgs.begin(), scalarArgs.end());
+    StringRef prefix = mixed ? "rs_mixed_decomposition_" : "rs_decomposition_";
+
+    // Ensure or declare Get Size: (f64, f64, i1[, f64]) -> index
+    auto getSizeType = rewriter.getFunctionType(scalarArgs, {indexType});
     auto getSizeFunc = catalyst::ensureFunctionDeclaration<func::FuncOp>(
-        rewriter, func, "rs_decomposition_get_size", getSizeType);
+        rewriter, func, (prefix + "get_size").str(), getSizeType);
 
-    // Ensure or declare Get Gates: (memref, f64, f64, i1) -> void
-    auto getGatesType = rewriter.getFunctionType({rankedMemRefType, f64Type, f64Type, i1Type}, {});
+    // Ensure or declare Get Gates: (memref, f64, f64, i1[, f64]) -> void
+    auto getGatesType = rewriter.getFunctionType(gatesArgs, {});
     auto getGatesFunc = catalyst::ensureFunctionDeclaration<func::FuncOp>(
-        rewriter, func, "rs_decomposition_get_gates", getGatesType);
+        rewriter, func, (prefix + "get_gates").str(), getGatesType);
 
-    // Ensure or declare Get Phase: (f64, f64, i1) -> f64
-    auto getPhaseType = rewriter.getFunctionType({f64Type, f64Type, i1Type}, {f64Type});
+    // Ensure or declare Get Phase: (f64, f64, i1[, f64]) -> f64
+    auto getPhaseType = rewriter.getFunctionType(scalarArgs, {f64Type});
     auto getPhaseFunc = catalyst::ensureFunctionDeclaration<func::FuncOp>(
-        rewriter, func, "rs_decomposition_get_phase", getPhaseType);
+        rewriter, func, (prefix + "get_phase").str(), getPhaseType);
 
     return {getSizeFunc, getGatesFunc, getPhaseFunc};
 }
@@ -301,7 +339,8 @@ DecompositionExternalFuncs getOrDeclareExternalFuncs(PatternRewriter &rewriter, 
  * @brief Builds the main loop that iterates over the gate sequence and applies the quantum gates.
  */
 Value buildDecompositionLoop(PatternRewriter &rewriter, Location loc, Value qbitIn,
-                             Value gatesMemref, Value numGates, double epsilon, bool pprBasis) {
+                             Value gatesMemref, Value numGates, double epsilon, bool pprBasis,
+                             bool mixed) {
     auto qbitType = QubitType::get(rewriter.getContext());
     Value c0 = arith::ConstantIndexOp::create(rewriter, loc, 0);
     Value c1 = arith::ConstantIndexOp::create(rewriter, loc, 1);
@@ -339,12 +378,9 @@ Value buildDecompositionLoop(PatternRewriter &rewriter, Location loc, Value qbit
         } else {
             populateCliffordTSwitchCases(rewriter, loc, switchOp, currentQbit);
         }
-        if (pprBasis) {
-            setResourceHints(rewriter, forOp, switchOp, pprStatistics, pprTCases, epsilon);
-        } else {
-            setResourceHints(rewriter, forOp, switchOp, cliffordTStatistics, cliffordTTCases,
-                             epsilon);
-        }
+        setResourceHints(
+            rewriter, forOp, switchOp, getSequenceStatistics(pprBasis, mixed),
+            pprBasis ? ArrayRef<int64_t>(pprTCases) : ArrayRef<int64_t>(cliffordTTCases), epsilon);
 
         // Yield the result of the switch op from the for loop
         rewriter.setInsertionPointAfter(switchOp);
@@ -360,8 +396,14 @@ Value buildDecompositionLoop(PatternRewriter &rewriter, Location loc, Value qbit
  * This function contains the loop and switch logic acting on a Qubit.
  */
 func::FuncOp getOrCreateDecompositionFunc(ModuleOp module, PatternRewriter &rewriter,
-                                          double epsilon, bool pprBasis) {
-    StringRef funcName = pprBasis ? "__catalyst_decompose_RZ_ppr_basis" : "__catalyst_decompose_RZ";
+                                          double epsilon, bool pprBasis, bool mixed) {
+    std::string funcName = "__catalyst_decompose_RZ";
+    if (mixed) {
+        funcName += "_mixed";
+    }
+    if (pprBasis) {
+        funcName += "_ppr_basis";
+    }
 
     // Check if it exists
     auto func = module.lookupSymbol<func::FuncOp>(funcName);
@@ -386,7 +428,7 @@ func::FuncOp getOrCreateDecompositionFunc(ModuleOp module, PatternRewriter &rewr
     func.setPrivate();
 
     // Get or declare external functions (GetSize, GetGates, GetPhase)
-    DecompositionExternalFuncs extFuncs = getOrDeclareExternalFuncs(rewriter, func);
+    DecompositionExternalFuncs extFuncs = getOrDeclareExternalFuncs(rewriter, func, mixed);
 
     // Build function body
     Block *entryBlock = func.addEntryBlock();
@@ -397,13 +439,27 @@ func::FuncOp getOrCreateDecompositionFunc(ModuleOp module, PatternRewriter &rewr
     Value qbitIn = entryBlock->getArgument(0);
     Value angle = entryBlock->getArgument(1);
 
-    // Parameters for compilation
-    Value epsilonVal = arith::ConstantOp::create(rewriter, loc, rewriter.getF64FloatAttr(epsilon));
+    // Parameters for compilation. The mixed runtime functions take a diamond-norm error; 2 *
+    // epsilon is the guarantee of a deterministic sequence with operator-norm error epsilon.
+    double runtimeEpsilon = mixed ? 2.0 * epsilon : epsilon;
+    Value epsilonVal =
+        arith::ConstantOp::create(rewriter, loc, rewriter.getF64FloatAttr(runtimeEpsilon));
     Value pprBasisVal = arith::ConstantOp::create(rewriter, loc, rewriter.getBoolAttr(pprBasis));
 
+    SmallVector<Value> scalarArgs = {angle, epsilonVal, pprBasisVal};
+
+    // A mixed decomposition draws one uniform sample per application, shared by the three calls
+    // so they describe the same sampled sequence.
+    if (mixed) {
+        auto rngType = rewriter.getFunctionType({}, {rewriter.getF64Type()});
+        auto rngFunc = catalyst::ensureFunctionDeclaration<func::FuncOp>(
+            rewriter, func, "__catalyst__rt__random_double", rngType);
+        scalarArgs.push_back(
+            func::CallOp::create(rewriter, loc, rngFunc, ValueRange{})->getResult(0));
+    }
+
     // Call GetSize
-    auto callGetSizeOp = func::CallOp::create(rewriter, loc, extFuncs.getSize,
-                                              ValueRange{angle, epsilonVal, pprBasisVal});
+    auto callGetSizeOp = func::CallOp::create(rewriter, loc, extFuncs.getSize, scalarArgs);
     Value num_gates = callGetSizeOp->getResult(0);
 
     // Call GetGates
@@ -411,17 +467,17 @@ func::FuncOp getOrCreateDecompositionFunc(ModuleOp module, PatternRewriter &rewr
     auto gatesMemRefType = MemRefType::get({ShapedType::kDynamic}, rewriter.getIndexType());
     Value gatesMemref = memref::AllocOp::create(rewriter, loc, gatesMemRefType, num_gates);
 
-    func::CallOp::create(rewriter, loc, extFuncs.getGates,
-                         ValueRange{gatesMemref, angle, epsilonVal, pprBasisVal});
+    SmallVector<Value> gatesArgs = {gatesMemref};
+    gatesArgs.append(scalarArgs.begin(), scalarArgs.end());
+    func::CallOp::create(rewriter, loc, extFuncs.getGates, gatesArgs);
 
     // Call GetPhase
-    auto callGetPhaseOp = func::CallOp::create(rewriter, loc, extFuncs.getPhase,
-                                               ValueRange{angle, epsilonVal, pprBasisVal});
+    auto callGetPhaseOp = func::CallOp::create(rewriter, loc, extFuncs.getPhase, scalarArgs);
     Value runtimePhase = callGetPhaseOp->getResult(0);
 
     // Build the Loop logic
-    Value finalQbit =
-        buildDecompositionLoop(rewriter, loc, qbitIn, gatesMemref, num_gates, epsilon, pprBasis);
+    Value finalQbit = buildDecompositionLoop(rewriter, loc, qbitIn, gatesMemref, num_gates,
+                                             runtimeEpsilon, pprBasis, mixed);
 
     // Clean up heap memory
     memref::DeallocOp::create(rewriter, loc, gatesMemref);
@@ -439,9 +495,10 @@ struct DecomposeCustomOpPattern : public OpRewritePattern<CustomOp> {
 
     const double epsilon;
     const bool pprBasis;
+    const bool mixed;
 
-    DecomposeCustomOpPattern(MLIRContext *context, double epsilon, bool pprBasis)
-        : OpRewritePattern<CustomOp>(context), epsilon(epsilon), pprBasis(pprBasis) {}
+    DecomposeCustomOpPattern(MLIRContext *context, double epsilon, bool pprBasis, bool mixed)
+        : OpRewritePattern<CustomOp>(context), epsilon(epsilon), pprBasis(pprBasis), mixed(mixed) {}
 
     LogicalResult matchAndRewrite(CustomOp op, PatternRewriter &rewriter) const override {
         StringRef gateName = op.getGateName();
@@ -464,7 +521,8 @@ struct DecomposeCustomOpPattern : public OpRewritePattern<CustomOp> {
         ModuleOp mod = op->getParentOfType<ModuleOp>();
         Location loc = op.getLoc();
 
-        func::FuncOp decompFunc = getOrCreateDecompositionFunc(mod, rewriter, epsilon, pprBasis);
+        func::FuncOp decompFunc =
+            getOrCreateDecompositionFunc(mod, rewriter, epsilon, pprBasis, mixed);
 
         // Call the function using the qubit directly
         auto callDecompOp =
@@ -504,10 +562,11 @@ struct DecomposePPRArbitraryOpPattern
 
     const double epsilon;
     const bool pprBasis;
+    const bool mixed;
 
-    DecomposePPRArbitraryOpPattern(MLIRContext *context, double epsilon, bool pprBasis)
+    DecomposePPRArbitraryOpPattern(MLIRContext *context, double epsilon, bool pprBasis, bool mixed)
         : OpRewritePattern<catalyst::pbc::PPRotationArbitraryOp>(context), epsilon(epsilon),
-          pprBasis(pprBasis) {}
+          pprBasis(pprBasis), mixed(mixed) {}
 
     LogicalResult matchAndRewrite(catalyst::pbc::PPRotationArbitraryOp op,
                                   PatternRewriter &rewriter) const override {
@@ -531,7 +590,8 @@ struct DecomposePPRArbitraryOpPattern
         Value cMinus2 = arith::ConstantOp::create(rewriter, loc, rewriter.getF64FloatAttr(2.0));
         Value rzAngle = arith::MulFOp::create(rewriter, loc, angle, cMinus2);
 
-        func::FuncOp decompFunc = getOrCreateDecompositionFunc(mod, rewriter, epsilon, pprBasis);
+        func::FuncOp decompFunc =
+            getOrCreateDecompositionFunc(mod, rewriter, epsilon, pprBasis, mixed);
 
         auto callDecompOp =
             func::CallOp::create(rewriter, loc, decompFunc, ValueRange{qbitOperand, rzAngle});
@@ -555,9 +615,10 @@ struct DecomposePPRArbitraryOpPattern
 namespace catalyst {
 namespace quantum {
 
-void populateGridsynthPatterns(RewritePatternSet &patterns, double epsilon, bool pprBasis) {
-    patterns.add<DecomposeCustomOpPattern>(patterns.getContext(), epsilon, pprBasis);
-    patterns.add<DecomposePPRArbitraryOpPattern>(patterns.getContext(), epsilon, pprBasis);
+void populateGridsynthPatterns(RewritePatternSet &patterns, double epsilon, bool pprBasis,
+                               bool mixed) {
+    patterns.add<DecomposeCustomOpPattern>(patterns.getContext(), epsilon, pprBasis, mixed);
+    patterns.add<DecomposePPRArbitraryOpPattern>(patterns.getContext(), epsilon, pprBasis, mixed);
 }
 
 } // namespace quantum

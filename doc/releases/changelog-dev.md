@@ -20,6 +20,23 @@
   ... )
   ```
 
+* The `gridsynth` pass has a new `method="mixed"` option, implementing the mixed diagonal
+  approximation of [arXiv:2203.10064](https://arxiv.org/abs/2203.10064) (Section 3.4). Each
+  rotation randomly applies one of two Clifford+T sequences whose errors cancel on average, which
+  roughly halves the T-count at the same accuracy.
+  [(#XXXX)](https://github.com/PennyLaneAI/catalyst/pull/XXXX)
+
+  ```python
+  from catalyst.passes import gridsynth
+
+  @qp.qjit(capture=True)
+  @gridsynth(epsilon=1e-6, method="mixed")
+  @qp.qnode(qp.device("lightning.qubit", wires=1))
+  def circuit(x: float):
+      qp.RZ(x, wires=0)
+      return qp.state()
+  ```
+
 * You can now dynamically prepare magic T states inside captured Catalyst workflows using
   ``qp.allocate(state="magic-T")`` and ``qp.allocate(state="magic-T-adj")``, which makes it
   easier to compile FTQC-style routines that need T-state ancillas on the fly (for example

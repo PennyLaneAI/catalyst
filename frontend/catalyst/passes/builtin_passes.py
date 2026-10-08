@@ -819,7 +819,7 @@ combine_global_phases = qp.transform(
 )
 
 
-def gridsynth_setup_inputs(epsilon=1e-4, ppr_basis=False):
+def gridsynth_setup_inputs(epsilon=1e-4, ppr_basis=False, method="deterministic"):
     r"""A quantum compilation pass to discretize
     single-qubit RZ and PhaseShift gates into the Clifford+T basis or the PPR basis using the Ross-Selinger Gridsynth algorithm.
     Reference: https://arxiv.org/abs/1403.2975
@@ -831,8 +831,16 @@ def gridsynth_setup_inputs(epsilon=1e-4, ppr_basis=False):
 
     Args:
         qnode (QNode): the QNode to apply the gridsynth compiler pass to
-        epsilon (float): The maximum permissible operator norm error per rotation gate. Defaults to ``1e-4``.
+        epsilon (float): The maximum permissible operator norm error per rotation gate. Defaults
+            to ``1e-4``. Both methods give the same accuracy guarantee for a given ``epsilon``: a
+            diamond norm error of at most :math:`2\epsilon` per rotation.
         ppr_basis (bool): If true, decompose directly to Pauli Product Rotations (PPRs) in PBC dialect. Defaults to ``False``
+        method (str): The synthesis method. ``"deterministic"`` (default) applies a single
+            Ross-Selinger gate sequence per rotation. ``"mixed"`` applies, per execution, one of
+            two {Z, S}-twirled sequences that under- and over-rotate the target, which roughly
+            halves the T-count at the same accuracy. This is the mixed diagonal approximation of
+            Kliuchnikov et al., Section 3.4 (Proposition 3.13), in
+            `arXiv:2203.10064 <https://arxiv.org/abs/2203.10064>`__.
 
     Returns:
         :class:`QNode <pennylane.QNode>`
@@ -841,6 +849,13 @@ def gridsynth_setup_inputs(epsilon=1e-4, ppr_basis=False):
 
         The circuit generated from this pass with ``ppr_basis=True`` are currently only executable on the
         ``lightning.qubit`` device with program  enabled.
+
+    .. note::
+
+        With ``method="mixed"``, each application of a rotation samples its gate sequence from the
+        runtime random number generator, which is seeded by the ``seed`` argument of
+        :func:`~.qjit`. Its diamond norm error of at most :math:`2\epsilon` holds for the channel
+        averaged over these samples.
 
     **Example**
 
@@ -905,7 +920,9 @@ def gridsynth_setup_inputs(epsilon=1e-4, ppr_basis=False):
 
 
     """
-    return (), {"epsilon": epsilon, "ppr_basis": ppr_basis}
+    if method not in ("deterministic", "mixed"):
+        raise ValueError(f"method must be 'deterministic' or 'mixed'. Got {method!r}.")
+    return (), {"epsilon": epsilon, "ppr_basis": ppr_basis, "method": method}
 
 
 gridsynth = qp.transform(pass_name="gridsynth", setup_inputs=gridsynth_setup_inputs)

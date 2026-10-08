@@ -34,7 +34,8 @@ mlir::Value getGlobalString(mlir::Location loc, mlir::OpBuilder &rewriter, mlir:
 void populateResolveGateLevelAdjointPatterns(mlir::RewritePatternSet &);
 void populateAdjointLoweringPatterns(mlir::RewritePatternSet &);
 void populateCtrlLoweringPatterns(mlir::RewritePatternSet &);
-void populateGridsynthPatterns(mlir::RewritePatternSet &patterns, double epsilon, bool pprBasis);
+void populateGridsynthPatterns(mlir::RewritePatternSet &patterns, double epsilon, bool pprBasis,
+                               bool mixed);
 void populateQIRConversionPatterns(mlir::TypeConverter &, mlir::RewritePatternSet &, bool);
 void populateCancelInversesPatterns(mlir::RewritePatternSet &);
 void populateMergeRotationsPatterns(mlir::RewritePatternSet &);
