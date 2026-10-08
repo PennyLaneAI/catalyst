@@ -21,7 +21,7 @@ from unittest.mock import MagicMock, Mock
 import jax
 import pennylane as qp
 import pytest
-from xdsl.dialects import builtin, func, test
+from xdsl.dialects import arith, builtin, func, test
 from xdsl.dialects.builtin import ModuleOp
 from xdsl.ir import Operation
 from xdsl.ir.core import Block, Region
@@ -2703,6 +2703,42 @@ class TestTerminalMeasurementConnectivity:
 
 class TestCtrl:
     """Tests that the ctrl transform is visualized correctly."""
+
+    @pytest.mark.parametrize(
+        "gate_name, num_params, num_controls, adjoint, expected_name",
+        [
+            ("RX", 1, 1, False, "CRX"),
+            ("Rot", 3, 1, False, "CRot"),
+            ("RX", 1, 2, True, "C(Adjoint(RX))"),
+        ],
+    )
+    def test_gate_control_operands(
+        self, gate_name, num_params, num_controls, adjoint, expected_name
+    ):
+        """Symbolic angles retain canonical names when controls are explicit IR operands."""
+        block = Block(arg_types=[builtin.f64])
+        block.args[0].name_hint = "theta"
+        control_value = arith.ConstantOp.from_int_and_width(1, 1)
+        register = quantum.AllocOp(3)
+        qubits = [quantum.ExtractOp(register, wire) for wire in range(3)]
+        gate = quantum.CustomOp(
+            gate_name=gate_name,
+            params=[block.args[0]] * num_params,
+            in_qubits=qubits[2],
+            in_ctrl_qubits=qubits[:num_controls],
+            in_ctrl_values=[control_value] * num_controls,
+            adjoint=adjoint,
+        )
+        block.add_ops([control_value, register, *qubits, gate, func.ReturnOp()])
+        module = ModuleOp([func.FuncOp("circuit", ([builtin.f64], []), Region(block))])
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+        expected_wires = list(range(num_controls)) + [2]
+        assert (
+            utility.dag_builder.nodes["node0"]["label"]
+            == f"<name> {expected_name}|<wire> {expected_wires}"
+        )
 
     @pytest.mark.parametrize(
         "gate_type, params, dynamic_controls",

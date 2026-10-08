@@ -29,7 +29,7 @@ from pennylane.operation import Operator
 from pennylane.ops import MidMeasure
 from pennylane.ops import __all__ as ops_all
 from pennylane.ops import measure
-from pennylane.typing import AbstractArray, Bool
+from pennylane.typing import AbstractArray, Bool, Float
 from xdsl.dialects.builtin import DenseIntOrFPElementsAttr, IntegerAttr, IntegerType
 from xdsl.dialects.scf import ForOp
 from xdsl.dialects.tensor import ExtractOp as TensorExtractOp
@@ -247,6 +247,12 @@ def _resolve_control_value(ssa: SSAValue) -> bool | AbstractArray:
     return bool(value.get_values()[index])
 
 
+def _resolve_gate_parameter(ssa: SSAValue) -> float | int | AbstractArray:
+    """Represent symbolic gate parameters as typed scalars accepted by PennyLane."""
+    value = resolve_constant_params(ssa)
+    return Float if isinstance(value, str) else value
+
+
 def _apply_adjoint_and_ctrls(qp_op: Operator, xdsl_op) -> Operator:
     """Apply adjoint and control modifiers to a gate if needed."""
     if xdsl_op.properties.get("adjoint"):
@@ -460,12 +466,12 @@ def resolve_constant_wire(ssa: SSAValue) -> float | int | str:
 
 def ssa_to_qp_params(
     op, control: bool = False, single: bool = False
-) -> list[float | int | str | AbstractArray] | float | int | str | AbstractArray | None:
+) -> list[float | int | AbstractArray] | float | int | AbstractArray | None:
     """Get the parameters from the operation."""
     if control:
         return _extract(op, "in_ctrl_values", _resolve_control_value, single)
     else:
-        return _extract(op, "params", resolve_constant_params, single)
+        return _extract(op, "params", _resolve_gate_parameter, single)
 
 
 def ssa_to_qp_wires(op: CustomOp, control: bool = False) -> list[int]:
@@ -488,6 +494,9 @@ def ssa_to_qp_wires_named(op: NamedObsOp) -> int:
 def xdsl_to_qp_op(op) -> Operator:
     """Convert an xDSL operation into a PennyLane Operator.
 
+    Symbolic parameters and control values are represented by typed abstract values
+    so that operator names and wires can still be inspected.
+
     Args:
         op: The xDSL operation to convert.
 
@@ -503,12 +512,12 @@ def xdsl_to_qp_op(op) -> Operator:
                     pw.append(str(str_attr).replace('"', ""))
                 pw = "".join(pw)
                 gate = ops.PauliRot(
-                    theta=_extract(op, "angle", resolve_constant_params, single=True),
+                    theta=_extract(op, "angle", _resolve_gate_parameter, single=True),
                     pauli_word=pw,
                     wires=ssa_to_qp_wires(op),
                 )
             case "quantum.gphase":
-                phi = _extract(op, "angle", resolve_constant_params, single=True)
+                phi = _extract(op, "angle", _resolve_gate_parameter, single=True)
                 assert phi is not None
                 gate = ops.GlobalPhase(phi)
 
@@ -526,7 +535,7 @@ def xdsl_to_qp_op(op) -> Operator:
 
             case "quantum.multirz":
                 gate = ops.qubit.parametric_ops_multi_qubit.MultiRZ(
-                    theta=_extract(op, "theta", resolve_constant_params, single=True),
+                    theta=_extract(op, "theta", _resolve_gate_parameter, single=True),
                     wires=ssa_to_qp_wires(op),
                 )
 
