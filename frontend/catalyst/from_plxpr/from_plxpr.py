@@ -400,7 +400,7 @@ def _add_decomp_or_verify_name_exists(op, rule):
             raise ValueError(f"Unknown decomposition rule with name {rule}")
 
     else:
-        raise ValueError(f"fixed_decomps accepts rules or the names of rules. Got {rule}")
+        raise TypeError(f"fixed_decomps accepts rules or the names of rules. Got {rule}")
 
 
 # pylint: disable=too-many-arguments

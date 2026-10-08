@@ -1893,6 +1893,21 @@ class TestCustomRuleApplication:
         with pytest.raises(ValueError, match="Unknown decomposition rule"):
             resources = qp.specs(circuit, level="all")().resources
 
+    def test_fix_decomp_invalid_type(self):
+        """Tests that an error is raised by referring to an invalid object."""
+
+        def qfunc():
+            pass
+
+        @qjit(capture=True, target="mlir")
+        @qp.decompose(gate_set={qp.X}, fixed_decomps={NoParamsCustomOp: qfunc})
+        @qnode(qp.device("null.qubit", wires=1))
+        def circuit():
+            NoParamsCustomOp(0)
+
+        with pytest.raises(TypeError, match="fixed_decomps accepts rules or the names"):
+            qp.specs(circuit, level="all")().resources
+
     def test_functional_adjoint_region_is_lowered(self):
         """Test that a functional modifier ``qp.adjoint(op)(...)`` is captured as a ``quantum.adjoint``
         region and lowered to an op-level modifier before graph-decomposition (which builds its graph
