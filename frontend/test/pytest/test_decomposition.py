@@ -1869,9 +1869,7 @@ class TestCustomRuleApplication:
             add_decomps(NoParamsCustomOp, rule1, rule2)
 
             @qjit(capture=True, target="mlir")
-            @graph_decomposition(
-                gate_set={qp.X: 1, qp.Y: 1}, fixed_decomps={NoParamsCustomOp: "rule2"}
-            )
+            @qp.decompose(gate_set={qp.X: 1, qp.Y: 1}, fixed_decomps={NoParamsCustomOp: "rule2"})
             @qnode(qp.device("null.qubit", wires=1))
             def circuit():
                 NoParamsCustomOp(0)
@@ -1882,6 +1880,18 @@ class TestCustomRuleApplication:
         assert decomposed.get("NoParamsCustomOp", 0) == 0
         assert decomposed.get("PauliX", 0) == 0  # assert that the second rule got used
         assert decomposed.get("PauliY", 0) == 2  # assert that the second rule got used
+
+    def test_fix_decomp_invalid_name(self):
+        """Tests that an error is raised by referring to an inexistant rule name."""
+
+        @qjit(capture=True, target="mlir")
+        @qp.decompose(gate_set={qp.X}, fixed_decomps={NoParamsCustomOp: "custom_rule"})
+        @qnode(qp.device("null.qubit", wires=1))
+        def circuit():
+            NoParamsCustomOp(0)
+
+        with pytest.raises(ValueError, match="Unknown decomposition rule"):
+            resources = qp.specs(circuit, level="all")().resources
 
     def test_functional_adjoint_region_is_lowered(self):
         """Test that a functional modifier ``qp.adjoint(op)(...)`` is captured as a ``quantum.adjoint``
