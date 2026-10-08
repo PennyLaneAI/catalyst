@@ -62,6 +62,10 @@ struct ResourceAnalysisPass : public impl::ResourceAnalysisPassBase<ResourceAnal
         auto moduleOp = cast<ModuleOp>(getOperation());
         ResourceAnalysis analysis(moduleOp, ResourceAnalysisRegistry::get().all());
         const auto &results = analysis.getResults();
+        
+        if (!targetGateSetOption.empty()) {
+            // GraphDecompositionPassOptions opts;
+        }
 
         // Populate statistics from the entry function. The flattened view
         // walks the structural call graph (function_calls) for us, so we
