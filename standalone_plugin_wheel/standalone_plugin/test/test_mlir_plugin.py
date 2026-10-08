@@ -23,13 +23,14 @@ have_standalone_plugin = True
 
 from standalone_plugin import SwitchBarToFoo, getStandalonePluginAbsolutePath
 
+
 def test_pass_automatically_adds_to_required_plugins():
     """Test that applying the pass from the plugin automatically adds
     to the list of required plugins."""
 
     @qp.qjit(capture=True)
     @SwitchBarToFoo
-    @qp.qnode(qp.device('null.qubit', wires=1))
+    @qp.qnode(qp.device("null.qubit", wires=1))
     def c():
         return qp.expval(qp.Z(0))
 

@@ -32,4 +32,5 @@ def name2pass(_name):
 
     return getStandalonePluginAbsolutePath(), "standalone-switch-bar-foo"
 
+
 SwitchBarToFoo = transform(pass_name="standalone.standalone-switch-bar-foo")

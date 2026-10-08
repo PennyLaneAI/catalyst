@@ -19,9 +19,8 @@ This submodule defines a utility for converting plxpr into Catalyst jaxpr.
 
 from copy import copy
 from functools import partial
-from typing import Callable
-
 from importlib.metadata import entry_points
+from typing import Callable
 
 import jax
 import pennylane as qp
