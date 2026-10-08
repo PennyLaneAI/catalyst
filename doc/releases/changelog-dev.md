@@ -731,6 +731,10 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* Fixed `draw_graph` failures with symbolic gate parameters or control values, preserving
+  PennyLane gate names such as `CRX`.
+  [(#3134)](https://github.com/PennyLaneAI/catalyst/pull/3134)
+
 * Fixed a bug where a compiled Backline program continued with a session that does not work,
   for example echoing the controller's own message back as the reply, after a transport call or a
   coprocessor function's set-up failed. It now stops with an error naming the call that failed,
