@@ -210,7 +210,7 @@ static FailureOr<func::FuncOp> cloneCallee(PatternRewriter &rewriter, Operation 
 }
 
 LogicalResult HybridGradientLowering::matchAndRewrite(GradOp op, PatternRewriter &rewriter) const {
-    if (op.getMethod() != GradientDiffMethod::Auto) {
+    if (op.getMethod() != DiffMethod::Auto) {
         return failure();
     }
 
@@ -244,7 +244,7 @@ LogicalResult HybridGradientLowering::matchAndRewrite(GradOp op, PatternRewriter
 
 LogicalResult HybridValueAndGradientLowering::matchAndRewrite(ValueAndGradOp op,
                                                               PatternRewriter &rewriter) const {
-    if (op.getMethod() != GradientDiffMethod::FiniteDifference) {
+    if (op.getMethod() != DiffMethod::Auto) {
         return failure();
     }
 

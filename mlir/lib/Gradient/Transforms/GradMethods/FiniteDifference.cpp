@@ -35,7 +35,7 @@ namespace catalyst {
 namespace gradient {
 
 LogicalResult FiniteDiffLowering::matchAndRewrite(GradOp op, PatternRewriter &rewriter) const {
-    if (op.getMethod() != GradientDiffMethod::FiniteDifference) {
+    if (op.getMethod() != DiffMethod::FiniteDifference) {
         return failure();
     }
 

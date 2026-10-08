@@ -14,6 +14,8 @@
 
 #include "Gradient/IR/GradientDialect.h"
 
+#include "llvm/ADT/TypeSwitch.h" // needed for generated type parser
+#include "mlir/IR/DialectImplementation.h" // needed for generated type parser
 #include "mlir/Dialect/Bufferization/IR/BufferizableOpInterface.h"
 #include "mlir/Interfaces/FunctionImplementation.h"
 #include "mlir/Transforms/InliningUtils.h"

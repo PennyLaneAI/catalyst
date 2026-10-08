@@ -23,7 +23,7 @@ include "Gradient/IR/GradientDialect.td"
 // Gradient dialect enums and attributes.
 //===----------------------------------------------------------------------===//
 
-def GradientDiffMethod : I32EnumAttr<"GradientDiffMethod",
+def DiffMethod : I32EnumAttr<"DiffMethod",
     "Known gradient differentiation methods",
     [
         I32EnumAttrCase<"FiniteDifference", 0, "fd">,
@@ -33,7 +33,7 @@ def GradientDiffMethod : I32EnumAttr<"GradientDiffMethod",
     let genSpecializedAttr = 0;
 }
 
-def GradientDiffMethodAttr : EnumAttr<Gradient_Dialect, GradientDiffMethod, "gradient_differentiation_method">;
+def DiffMethodAttr : EnumAttr<Gradient_Dialect, DiffMethod, "diff_method">;
 
 #endif // GRADIENT_ATTR_DEFS
 

@@ -61,7 +61,8 @@ LogicalResult verifyGradInputs(OpState *op_state, func::FuncOp callee, ValueRang
         // available
         auto gradOpInterface = cast<GradientOpInterface>(op_state->getOperation());
 
-        if (gradOpInterface.getMethod() != GradientDiffMethod::FiniteDifference) {
+        if (gradOpInterface.getMethod() != DiffMethod::FiniteDifference) {
+            // TODO: Message
             return op_state->emitOpError(
                 "An operation without a valid gradient was found in code "
                 "reachable from the gradient operation.\n"
@@ -173,9 +174,9 @@ LogicalResult CustomGradOp::verifySymbolUses(SymbolTableCollection &symbolTable)
 //===----------------------------------------------------------------------===//
 
 LogicalResult GradOp::verify() {
-    GradientDiffMethod method = this->getMethod();
-    if (method != GradientDiffMethod::FiniteDifference && method != GradientDiffMethod::Auto) {
-        return emitOpError("got invalid differentiation method: ") << method;
+    DiffMethod method = this->getMethod();
+    if (method != DiffMethod::FiniteDifference && method != DiffMethod::Auto) {
+        return emitOpError("got invalid differentiation method: ") << stringifyDiffMethod(method);
     }
     return success();
 }
@@ -242,9 +243,9 @@ LogicalResult ValueAndGradOp::verifySymbolUses(SymbolTableCollection &symbolTabl
 //===----------------------------------------------------------------------===//
 
 LogicalResult ValueAndGradOp::verify() {
-    GradientDiffMethodAttr method = this->getMethod();
-    if (method != GradientDiffMethod::FiniteDifference && method != GradientDiffMethod::Auto) {
-        return emitOpError("got invalid differentiation method: ") << method;
+    DiffMethod method = this->getMethod();
+    if (method != DiffMethod::FiniteDifference && method != DiffMethod::Auto) {
+        return emitOpError("got invalid differentiation method: ") << stringifyDiffMethod(method);
     }
     return success();
 }
@@ -348,10 +349,10 @@ LogicalResult JVPOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
 //===----------------------------------------------------------------------===//
 
 LogicalResult JVPOp::verify() {
-    GradientDiffMethodAttr method = this->getMethod();
+    DiffMethod method = this->getMethod();
     // TODO: Do we need "ps" and "adj"?
-    if (method != GradientDiffMethod::FiniteDifference && method != GradientDiffMethod::Auto) {
-        return emitOpError("got invalid differentiation method: ") << method;
+    if (method != DiffMethod::FiniteDifference && method != DiffMethod::Auto) {
+        return emitOpError("got invalid differentiation method: ") << stringifyDiffMethod(method);
     }
     return success();
 }
@@ -432,10 +433,10 @@ LogicalResult VJPOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
 //===----------------------------------------------------------------------===//
 
 LogicalResult VJPOp::verify() {
-    GradientDiffMethodAttr method = this->getMethod();
+    DiffMethod method = this->getMethod();
     // TODO: Do we need "ps" and "adj"?
-    if (method != GradientDiffMethod::FiniteDifference && method != GradientDiffMethod::Auto) {
-        return emitOpError("got invalid differentiation method: ") << method;
+    if (method != DiffMethod::FiniteDifference && method != DiffMethod::Auto) {
+        return emitOpError("got invalid differentiation method: ") << stringifyDiffMethod(method);
     }
     return success();
 }

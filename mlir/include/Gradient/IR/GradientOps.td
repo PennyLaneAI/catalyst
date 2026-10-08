@@ -56,7 +56,7 @@ def GradOp : Gradient_Op<"grad", [
     }];
 
     let arguments = (ins
-        GradientDiffMethodAttr:$method,
+        DiffMethodAttr:$method,
         SymbolRefAttr:$callee,
         Variadic<AnyType>:$operands,
         OptionalAttr<AnyIntElementsAttr>:$diffArgIndices,
@@ -82,7 +82,7 @@ def ValueAndGradOp : Gradient_Op<"value_and_grad", [
     let summary = "Compute the value and gradient of a function.";
 
     let arguments = (ins
-        GradientDiffMethodAttr:$method,
+        DiffMethodAttr:$method,
         SymbolRefAttr:$callee,
         Variadic<AnyType>:$operands,
         OptionalAttr<AnyIntElementsAttr>:$diffArgIndices,
@@ -185,7 +185,7 @@ def JVPOp : Gradient_Op<"jvp", [
     let summary = "Compute the jvp of a function.";
 
     let arguments = (ins
-        GradientDiffMethodAttr:$method,
+        DiffMethodAttr:$method,
         SymbolRefAttr:$callee,
         Variadic<AnyType>:$params,
         Variadic<AnyType>:$tangents,
@@ -220,7 +220,7 @@ def VJPOp : Gradient_Op<"vjp", [
     let summary = "Compute the vjp of a function.";
 
     let arguments = (ins
-        GradientDiffMethodAttr:$method,
+        DiffMethodAttr:$method,
         SymbolRefAttr:$callee,
         Variadic<AnyType>:$params,
         Variadic<AnyType>:$cotangents,
