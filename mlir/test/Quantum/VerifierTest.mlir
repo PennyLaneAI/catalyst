@@ -850,3 +850,24 @@ func.func @operator_custom_invalid_ctrl_static_length(%r : !quantum.reg, %idx : 
 }
 
 // -----
+
+module @outer {
+    func.func private @kernel_entry() attributes {quantum.kernel_entry_point}
+}
+
+// -----
+
+// expected-error @+1 {{'quantum.kernel_entry_point' is only valid on 'func.func'}}
+%c0 = arith.constant {quantum.kernel_entry_point} 0 : i64
+
+// -----
+
+// expected-error @+2 {{'quantum.kernel_entry_point' must be a unit attribute}}
+module @outer {
+    func.func private @kernel_entry() attributes {quantum.kernel_entry_point = "wrong"}
+}
+
+// -----
+
+// expected-error @+1 {{'quantum.kernel_entry_point' is only valid in a quantum kernel}}
+func.func private @kernel_entry() attributes {quantum.kernel_entry_point}

@@ -29,7 +29,6 @@
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/Operation.h"
-#include "mlir/IR/SymbolTable.h"
 
 #include "Catalyst/Analysis/ResourceAnalysis.h"
 #include "Catalyst/Analysis/ResourceResult.h"
@@ -99,6 +98,10 @@ ResourceAnalysis::ResourceAnalysis(ModuleOp moduleOp,
     moduleOp.walk([&](func::FuncOp funcOp) {
         if (!funcOp.isDeclaration()) {
             definedFuncOps.push_back(funcOp);
+        } else {
+            // Declaration-only functions (e.g. runtime library functions) have no resources of
+            // their own, but get an empty entry so that calls to them can be resolved.
+            funcResults.try_emplace(funcOp.getName(), makeEmptyResult());
         }
     });
 
@@ -118,6 +121,17 @@ ResourceAnalysis::ResourceAnalysis(ModuleOp moduleOp,
         }
     }
 
+    // Inside a quantum kernel (nested module), the entry function is tagged with
+    // `quantum.kernel_entry_point`.
+    if (entryFunc.empty()) {
+        for (auto funcOp : definedFuncOps) {
+            if (funcOp->hasAttr("quantum.kernel_entry_point")) {
+                entryFunc = funcOp.getName();
+                break;
+            }
+        }
+    }
+
     // Fallback: use the first public definition as entry function, since passes may insert
     // private helpers (e.g. gridsynth decomposition functions) at the start of the module.
     if (entryFunc.empty()) {
@@ -126,14 +140,6 @@ ResourceAnalysis::ResourceAnalysis(ModuleOp moduleOp,
                 entryFunc = funcOp.getName();
                 break;
             }
-        }
-    }
-
-    // Fallback: use the first definition as entry function
-    if (entryFunc.empty()) {
-        for (auto funcOp : definedFuncOps) {
-            entryFunc = funcOp.getName();
-            break;
         }
     }
 
@@ -479,15 +485,6 @@ void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result, b
 
     // Function calls
     if (auto callOp = dyn_cast<func::CallOp>(op)) {
-        // Declaration-only callees (e.g. runtime library functions) have no body to analyze and
-        // no entry of their own in the output, so they are counted as classical instructions.
-        auto callee =
-            SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(callOp, callOp.getCalleeAttr());
-        if (callee && callee.isDeclaration()) {
-            result.classicalInstructions[op->getName().getStringRef()] += 1;
-            return;
-        }
-
         result.functionCalls[callOp.getCallee()] += 1;
         if (auto parentFunc = op->getParentOfType<func::FuncOp>();
             parentFunc && callOp.getCallee() == parentFunc.getName()) {

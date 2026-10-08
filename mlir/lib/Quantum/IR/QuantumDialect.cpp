@@ -110,9 +110,25 @@ void QuantumDialect::initialize() {
                               SetBasisStateOp>();
 }
 
-/// Verify the QNode attribute invariants
+/// Verify the QNode and kernel entry point attribute invariants
 LogicalResult QuantumDialect::verifyOperationAttribute(Operation *op, NamedAttribute namedAttr) {
     StringRef attrName = namedAttr.getName().getValue();
+    if (attrName == "quantum.kernel_entry_point") {
+        if (!isa<func::FuncOp>(op)) {
+            return op->emitOpError()
+                   << "attribute '" << attrName << "' is only valid on 'func.func'";
+        }
+        if (!isa<UnitAttr>(namedAttr.getValue())) {
+            return op->emitOpError() << "attribute '" << attrName << "' must be a unit attribute";
+        }
+        auto parentModule = op->getParentOfType<ModuleOp>();
+        if (!parentModule || !parentModule->getParentOfType<ModuleOp>()) {
+            return op->emitOpError() << "attribute '" << attrName
+                                     << "' is only valid in a quantum kernel (nested module)";
+        }
+        return success();
+    }
+
     if (attrName != "quantum.node") {
         return success();
     }

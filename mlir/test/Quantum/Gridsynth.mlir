@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: quantum-opt --pass-pipeline="builtin.module(gridsynth{epsilon=0.01 ppr-basis=False})" --split-input-file %s | FileCheck %s --check-prefixes=CHECK,CLIFFORD
-// RUN: quantum-opt --pass-pipeline="builtin.module(gridsynth{epsilon=0.01 ppr-basis=True})" --split-input-file %s | FileCheck %s --check-prefixes=CHECK,PPR
+// RUN: quantum-opt --pass-pipeline="builtin.module(gridsynth{epsilon=0.01 ppr-basis=False})" --split-input-file -verify-diagnostics %s | FileCheck %s --check-prefixes=CHECK,CLIFFORD
+// RUN: quantum-opt --pass-pipeline="builtin.module(gridsynth{epsilon=0.01 ppr-basis=True})" --split-input-file -verify-diagnostics %s | FileCheck %s --check-prefixes=CHECK,PPR
 
 
 
@@ -290,14 +290,12 @@ func.func @test_ppr_arbitrary_ignored(%arg0: !quantum.bit, %theta: f64) -> (!qua
 
 // -----
 
-// Controlled rotations are left untouched.
+// Controlled rotations are not supported.
 
-// CHECK-LABEL: @test_controlled_rz_ignored
-func.func @test_controlled_rz_ignored(%q: !quantum.bit, %c: !quantum.bit, %x: f64) -> (!quantum.bit, !quantum.bit) {
+func.func @test_controlled_rz_error(%q: !quantum.bit, %c: !quantum.bit, %x: f64) -> (!quantum.bit, !quantum.bit) {
     %true = arith.constant true
 
-    // CHECK: quantum.custom "RZ"({{.*}}) {{.*}} ctrls
-    // CHECK-NOT: call @__catalyst_decompose_RZ
+    // expected-error @+1 {{Unsupported controlled gate for gridsynth}}
     %out, %cout = quantum.custom "RZ"(%x) %q ctrls(%c) ctrlvals(%true) : !quantum.bit ctrls !quantum.bit
     return %out, %cout : !quantum.bit, !quantum.bit
 }

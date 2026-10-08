@@ -399,15 +399,21 @@ func.func @depth_caller(%arg0: !quantum.bit) -> !quantum.bit {
 
 // -----
 
-// Calls to declaration-only functions (e.g. runtime library functions) are counted as
-// classical instructions rather than function calls, because they have no entry of their own.
+// Declaration-only functions (e.g. runtime library functions) get an empty entry, so that calls
+// to them are counted as function calls that can be resolved.
 
-// CHECK-LABEL: "external_caller": {
-// CHECK: "classical_instructions"
-// CHECK:   "func.call": 1
+// CHECK-LABEL: "external_angle": {
+// CHECK: "classical_instructions": {}
 // CHECK: "function_calls"
 // CHECK:   "dynamic": {}
 // CHECK:   "static": {}
+// CHECK: "quantum_operations": {}
+
+// CHECK-LABEL: "external_caller": {
+// CHECK: "function_calls"
+// CHECK:   "dynamic": {}
+// CHECK:   "static":
+// CHECK:     "external_angle": 1
 // CHECK: "quantum_operations"
 // CHECK:     "RZ": 1
 func.func private @external_angle(f64) -> f64
@@ -442,6 +448,34 @@ func.func private @private_helper(%arg0: !quantum.bit) -> !quantum.bit {
 func.func @public_entry(%arg0: !quantum.bit) -> !quantum.bit {
     %out = func.call @private_helper(%arg0) : (!quantum.bit) -> !quantum.bit
     return %out : !quantum.bit
+}
+
+// -----
+
+// In a quantum kernel, the function tagged with `quantum.kernel_entry_point` is the entry
+// function, even if another public function is defined before it.
+
+// CHECK-LABEL: "kernel_entry": {
+// CHECK: "num_qubits"
+// CHECK:   "alloc": 0
+// CHECK:   "arg": 1
+// CHECK:   "total": 1
+
+// CHECK-LABEL: "other_public": {
+// CHECK: "num_qubits"
+// CHECK:   "alloc": 0
+// CHECK:   "arg": 0
+// CHECK:   "total": 0
+module @kernel {
+    func.func @other_public(%arg0: !quantum.bit) -> !quantum.bit {
+        %out = quantum.custom "Hadamard"() %arg0 : !quantum.bit
+        return %out : !quantum.bit
+    }
+
+    func.func @kernel_entry(%arg0: !quantum.bit) -> !quantum.bit attributes {quantum.kernel_entry_point} {
+        %out = func.call @other_public(%arg0) : (!quantum.bit) -> !quantum.bit
+        return %out : !quantum.bit
+    }
 }
 
 // -----

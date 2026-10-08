@@ -704,8 +704,8 @@
   [(#3281)](https://github.com/PennyLaneAI/catalyst/pull/3281)
 
 * `qp.specs` no longer fails on programs compiled with the `gridsynth` pass, and no longer counts
-  an extra wire per decomposed rotation. The pass also leaves controlled `RZ` and `PhaseShift`
-  gates untouched instead of crashing.
+  an extra wire per decomposed rotation. The pass also reports an error for controlled `RZ` and
+  `PhaseShift` gates instead of crashing.
   [(#3308)](https://github.com/PennyLaneAI/catalyst/pull/3308)
 
 * Fixed the CNOT decomposition of the `ions-decomposition` pass, which did not implement a CNOT:
@@ -792,6 +792,10 @@
   [(#3242)](https://github.com/PennyLaneAI/catalyst/pull/3242)
 
 <h3>Internal changes ⚙️</h3>
+
+* QNode functions are now marked with a `quantum.kernel_entry_point` attribute in their quantum
+  kernel module, which the `ResourceAnalysis` pass uses to identify the entry function.
+  [(#3308)](https://github.com/PennyLaneAI/catalyst/pull/3308)
 
 * Integration tests for :func:`pennylane.specs` have been migrated from the Catalyst frontend to PennyLane.
   [(#3107)](https://github.com/PennyLaneAI/catalyst/pull/3107)
