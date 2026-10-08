@@ -351,7 +351,7 @@ def _handle_decompose_transform(self, inner_jaxpr, consts, non_const_args, tkwar
     ``qp.decompose`` is an alias for :func:`catalyst.passes.graph_decomposition`.
     """
     # Local imports avoid an import cycle (catalyst.passes imports from_plxpr indirectly).
-    from pennylane.decomposition import add_decomps, local_decomps, DecompositionRule, list_decomps
+    from pennylane.decomposition import DecompositionRule, add_decomps, list_decomps, local_decomps
 
     from catalyst.passes.builtin_passes import graph_decomposition
 
