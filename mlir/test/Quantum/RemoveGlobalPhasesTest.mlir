@@ -64,13 +64,76 @@ func.func @keep_only_controlled_global_phases(%ctrl: !quantum.bit, %q: !quantum.
 
 // -----
 
-// CHECK-LABEL: func.func @keep_global_phases_non_qnode
-func.func @keep_global_phases_non_qnode(%arg0: f64) {
+// CHECK-LABEL: func.func @keep_global_phases_non_qnode_ctrl_callsite
+func.func @keep_global_phases_non_qnode_ctrl_callsite(%arg0: f64, %ctrl: !quantum.bit, %target: !quantum.bit) -> (!quantum.bit, !quantum.bit) attributes {quantum.node} {
+    %true = arith.constant true
+
+    // CHECK: quantum.ctrl
+    %outc, %outq = quantum.ctrl(%ctrl) ctrlvals(%true) (%target) : !quantum.bit -> !quantum.bit {
+    ^bb0(%arg1: !quantum.bit):
+
+        // CHECK: call @subroutine
+        %oq = func.call @subroutine(%arg0, %arg1) : (f64, !quantum.bit) -> (!quantum.bit)
+        quantum.yield %oq : !quantum.bit
+    }
+    return %outc, %outq : !quantum.bit, !quantum.bit
+}
+
+// CHECK-LABEL: func.func @subroutine
+func.func @subroutine(%arg0: f64, %arg1: !quantum.bit) -> !quantum.bit {
 
     // CHECK: quantum.gphase
     quantum.gphase(%arg0)
-
-    return
+    %h = quantum.custom "Hadamard"() %arg1 : !quantum.bit
+    return %h : !quantum.bit
 }
 
 // -----
+
+// CHECK-LABEL: func.func @remove_global_phases_non_qnode_no_ctrl_callsite
+func.func @remove_global_phases_non_qnode_no_ctrl_callsite(%arg0: f64, %arg1: !quantum.bit) -> (!quantum.bit) attributes {quantum.node} {
+    %oq = func.call @subroutine(%arg0, %arg1) : (f64, !quantum.bit) -> (!quantum.bit)
+    return %oq : !quantum.bit
+}
+
+// CHECK-LABEL: func.func @subroutine
+func.func @subroutine(%arg0: f64, %arg1: !quantum.bit) -> !quantum.bit {
+    // CHECK-NOT: quantum.gphase
+    quantum.gphase(%arg0)
+    %h = quantum.custom "Hadamard"() %arg1 : !quantum.bit
+    return %h : !quantum.bit
+}
+
+// -----
+
+// CHECK-LABEL: func.func @keep_global_phases_non_qnode_ctrl_callsite_nested
+func.func @keep_global_phases_non_qnode_ctrl_callsite_nested(%arg0: f64, %ctrl: !quantum.bit, %target: !quantum.bit) -> (!quantum.bit, !quantum.bit) attributes {quantum.node} {
+    %true = arith.constant true
+
+    // CHECK: quantum.ctrl
+    %outc, %outq = quantum.ctrl(%ctrl) ctrlvals(%true) (%target) : !quantum.bit -> !quantum.bit {
+    ^bb0(%arg1: !quantum.bit):
+
+        // CHECK: call @middleman_subroutine
+        %oq = func.call @middleman_subroutine(%arg0, %arg1) : (f64, !quantum.bit) -> (!quantum.bit)
+        quantum.yield %oq : !quantum.bit
+    }
+    return %outc, %outq : !quantum.bit, !quantum.bit
+}
+
+// CHECK-LABEL: func.func @middleman_subroutine
+func.func @middleman_subroutine(%arg0: f64, %arg1: !quantum.bit) -> !quantum.bit {
+
+    // CHECK: call @subroutine
+    %q = call @subroutine(%arg0, %arg1) : (f64, !quantum.bit) -> (!quantum.bit)
+    return %q : !quantum.bit
+}
+
+// CHECK-LABEL: func.func @subroutine
+func.func @subroutine(%arg0: f64, %arg1: !quantum.bit) -> !quantum.bit {
+
+    // CHECK: quantum.gphase
+    quantum.gphase(%arg0)
+    %h = quantum.custom "Hadamard"() %arg1 : !quantum.bit
+    return %h : !quantum.bit
+}
