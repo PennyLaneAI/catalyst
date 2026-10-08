@@ -96,13 +96,15 @@ def test_gridsynth_specs(ppr_basis):
 
 @pytest.mark.parametrize("method", ["deterministic", "mixed"])
 @pytest.mark.parametrize("ppr_basis", [False, True])
-@pytest.mark.parametrize("eps", [1e-3, 1e-5])
+# Within the epsilon ranges that the resource hints are fitted on.
+@pytest.mark.parametrize("eps", [1e-4, 1e-6])
 def test_gridsynth_specs_matches_runtime(eps, ppr_basis, method):
     """Test that the specs T-count estimate matches the T-count executed at runtime, on average
     over random angles."""
     angles = np.random.default_rng(42).uniform(0, 4 * np.pi, 50)
 
-    @qp.qjit(capture=True)
+    # The seed fixes the sequences sampled by the mixed method.
+    @qp.qjit(capture=True, seed=37)
     @gridsynth(epsilon=eps, ppr_basis=ppr_basis, method=method)
     @qp.qnode(qp.device("null.qubit", wires=1))
     def circuit(angles):
