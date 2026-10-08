@@ -371,19 +371,8 @@ def _handle_decompose_transform(self, inner_jaxpr, consts, non_const_args, tkwar
 
     next_eval = copy(self)
     with local_decomps():
-
         for op, rule in fixed_decomps.items():
-            if isinstance(rule, DecompositionRule):
-                add_decomps(op, rule)
-            else:
-                assert isinstance(rule, str)
-                if rule not in list_decomps(op):
-                    raise ValueError(f"Unknown decomposition rule with name {rule}")
-            elif isinstance(rule, str):
-                if rule not in list_decomps(op):
-                    raise ValueError(f"Unknown decomposition rule with name {rule}")
-            else:
-                raise ValueError(f"Fixed decompositions should be a rule or the name of a rule. Got {rule}")
+            _add_decomp_or_verify_name_exists(op, rule)
         for op, rules in alt_decomps.items():
             add_decomps(op, *rules)
 
@@ -397,6 +386,20 @@ def _handle_decompose_transform(self, inner_jaxpr, consts, non_const_args, tkwar
         next_eval._pass_pipeline.insert(0, bound_pass)
 
         return next_eval.eval(inner_jaxpr, consts, *non_const_args)
+
+
+def _add_decomp_or_verify_name_exists(op, rule):
+
+    from pennylane.decomposition import DecompositionRule, add_decomps, list_decomps
+
+    if isinstance(rule, DecompositionRule):
+        add_decomps(op, rule)
+
+    elif isinstance(rule, str):
+        if rule not in list_decomps(op):
+            raise ValueError(f"Unknown decomposition rule with name {rule}")
+
+    raise ValueError(f"fixed_decomps accepts rules or the names of rules. Got {rule}")
 
 
 # pylint: disable=too-many-arguments
