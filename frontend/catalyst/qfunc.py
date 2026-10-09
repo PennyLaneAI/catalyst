@@ -21,9 +21,9 @@ the default behaviour and replacing it with a function-like "QNode" primitive.
 import logging
 from copy import copy
 from dataclasses import dataclass
+from importlib.metadata import entry_points
 from numbers import Integral
 from typing import Callable, Sequence
-from importlib.metadata import entry_points
 
 import jax.numpy as jnp
 import pennylane as qp
@@ -677,7 +677,5 @@ def _extract_passes(transform_program):
             new_t = qp.transform(pass_name=name)
             new_bound_t = qp.core.transforms.BoundTransform(new_t, t.args, t.kwargs)
             pass_pipeline.append(new_bound_t)
-
-
 
     return qp.CompilePipeline(tape_transforms), tuple(pass_pipeline)

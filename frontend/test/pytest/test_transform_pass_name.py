@@ -170,9 +170,7 @@ def test_pass_plugin_transform_with_options(mocker, tmp_path, backend):
     mlir = circuit.mlir
     assert circuit.compile_options.pass_plugins == {plugin_path}
     assert 'transform.apply_registered_pass "my-custom-pass"' in mlir
-    assert (
-        'with options = {"my-option" = "my_option_value", "my-other-option" = false}' in mlir
-    )
+    assert 'with options = {"my-option" = "my_option_value", "my-other-option" = false}' in mlir
 
 
 def test_pass_plugin_transform_with_multiple_dots(mocker, tmp_path, backend):
