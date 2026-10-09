@@ -151,7 +151,7 @@
 
 <h3>Improvements 🛠</h3>
 
-* Transforms from pass plugins can now be used with `capture=True`. The plugin must
+* Transforms from pass plugins can now be used. The plugin must
   have an entry point for `catalyst.passes_resolution`, provide a `name2pass` in its
   namespace, and provide the package name via
   `pennylane.transform(pass_name=f"{package_name}.{pass_name}")`.
