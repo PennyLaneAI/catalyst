@@ -129,9 +129,12 @@ ifeq ($(ENABLE_OQD), ON)
 endif
 ifeq ($(ENABLE_TRANSPORT), ON)
 	# Transport suites; which binaries exist depends on the toolchain (libibverbs, HIP).
+	# -f/-x skips the _tests.cmake files catch_discover_tests writes beside each binary, and
+	# --allow-running-no-tests passes a suite whose tests all skip rather than exiting 4.
 	@set -e; for t in $(RT_BUILD_DIR)/tests/runner_tests_transport*; do \
+		[ -f "$$t" ] && [ -x "$$t" ] || continue; \
 		echo "Catalyst runtime test suite - $${t##*/}"; \
-		$(ASAN_COMMAND) $$t; \
+		$(ASAN_COMMAND) $$t --allow-running-no-tests; \
 	done
 endif
 ifeq ($(ENABLE_EXECUTOR), ON)
@@ -144,9 +147,10 @@ test-transport: BUILD_TYPE?=RelWithDebInfo
 test-transport: configure
 	cmake --build $(RT_BUILD_DIR) --target transport_tests_all -j$(NPROC)
 	@echo "Catalyst runtime transport test suites"
-		@set -e; for t in $(RT_BUILD_DIR)/tests/runner_tests_transport*; do \
+	@set -e; for t in $(RT_BUILD_DIR)/tests/runner_tests_transport*; do \
+		[ -f "$$t" ] && [ -x "$$t" ] || continue; \
 		echo "Catalyst runtime test suite - $${t##*/}"; \
-		$(ASAN_COMMAND) $$t; \
+		$(ASAN_COMMAND) $$t --allow-running-no-tests; \
 	done
 
 .PHONY: coverage
@@ -171,8 +175,9 @@ endif
 ifeq ($(ENABLE_TRANSPORT), ON)
 	# Transport suites; which binaries exist depends on the toolchain (libibverbs, HIP).
 	@set -e; for t in $(RT_BUILD_DIR)/tests/runner_tests_transport*; do \
+		[ -f "$$t" ] && [ -x "$$t" ] || continue; \
 		echo "Catalyst runtime test suite - $${t##*/}"; \
-		$(ASAN_COMMAND) $$t; \
+		$(ASAN_COMMAND) $$t --allow-running-no-tests; \
 	done
 endif
 ifeq ($(ENABLE_EXECUTOR), ON)

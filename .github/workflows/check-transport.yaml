@@ -207,8 +207,8 @@ jobs:
         run: |
           cmake --build "$RT_BUILD_DIR" --target transport_tests_all -j
           test -x "$RT_BUILD_DIR/tests/runner_tests_transport"
-          "$RT_BUILD_DIR/tests/runner_tests_transport"
-          "$RT_BUILD_DIR/tests/runner_tests_transport_memcpy"
+          "$RT_BUILD_DIR/tests/runner_tests_transport" --allow-running-no-tests
+          "$RT_BUILD_DIR/tests/runner_tests_transport_memcpy" --allow-running-no-tests
 
       # --------------------------------------------------------------------------------------
       # 2. MLIR stack -- LLVM, StableHLO, Enzyme
@@ -342,9 +342,9 @@ jobs:
       # executed on any runner, so this is its first real exercise.
       - name: Run the cpu_verbs and gpu_verbs C++ suites over rxe0
         run: |
-          "$RT_BUILD_DIR/tests/runner_tests_transport_common"
-          "$RT_BUILD_DIR/tests/runner_tests_transport_cpu"
-          "$RT_BUILD_DIR/tests/runner_tests_transport_gpu"
+          "$RT_BUILD_DIR/tests/runner_tests_transport_common" --allow-running-no-tests
+          "$RT_BUILD_DIR/tests/runner_tests_transport_cpu" --allow-running-no-tests
+          "$RT_BUILD_DIR/tests/runner_tests_transport_gpu" --allow-running-no-tests
 
       - name: Run the backline test file
         env:
