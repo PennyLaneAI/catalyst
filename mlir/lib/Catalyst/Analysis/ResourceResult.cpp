@@ -284,10 +284,10 @@ DictionaryAttr buildResourceDict(MLIRContext *ctx, const ResourceResult &result)
     entries.push_back(
         NamedAttribute(StringAttr::get(ctx, "num_arg_qubits"),
                        IntegerAttr::get(IntegerType::get(ctx, 64), result.numArgQubits)));
-    entries.push_back(NamedAttribute(
-        StringAttr::get(ctx, "num_alloc_qubits"),
-        IntegerAttr::get(IntegerType::get(ctx, 64),
-                         static_cast<int64_t>(std::ceil(result.numAllocQubits)))));
+    entries.push_back(
+        NamedAttribute(StringAttr::get(ctx, "num_alloc_qubits"),
+                       IntegerAttr::get(IntegerType::get(ctx, 64),
+                                        static_cast<int64_t>(std::ceil(result.numAllocQubits)))));
 
     return DictionaryAttr::get(ctx, entries);
 }
