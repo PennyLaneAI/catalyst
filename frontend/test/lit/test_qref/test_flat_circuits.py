@@ -332,6 +332,29 @@ def test_global_phase():
 print(test_global_phase.mlir)
 
 
+# CHECK: func.func public @test_global_phase_ctrl_value_false() -> tensor<f64>
+@qp.qjit(capture=True, target="mlir", collect_decomp_rules=False)
+@qp.qnode(qp.device("null.qubit", wires=4))
+def test_global_phase_ctrl_value_false():
+    """
+    Test that C(GlobalPhase) with a zero control value stays a controlled gphase
+    (it does not decompose to PhaseShift).
+    """
+    # CHECK-DAG: [[false:%.+]] = arith.constant false
+    # CHECK-DAG: [[angle:%.+]] = arith.constant 0.78539816339744828 : f64
+
+    # CHECK: [[reg:%.+]] = qref.alloc( 4) : !qref.reg<4>
+
+    # CHECK: [[q0:%.+]] = qref.get [[reg]][ 0] : !qref.reg<4> -> !qref.bit
+    # CHECK: qref.gphase([[angle]]) ctrls([[q0]]) ctrlvals([[false]]) : ctrls !qref.bit
+    qp.ctrl(qp.GlobalPhase(np.pi / 4), control=[0], control_values=[False])
+
+    return qp.expval(qp.X(0))
+
+
+print(test_global_phase_ctrl_value_false.mlir)
+
+
 # CHECK: func.func public @test_unitary(%arg0: tensor<2x2xf64>, %arg1: tensor<4x4xf64>, %arg2: tensor<1xi1>) -> tensor<f64>
 @qp.qjit(capture=True, target="mlir", collect_decomp_rules=False)
 @qp.qnode(qp.device("null.qubit", wires=4))
