@@ -400,6 +400,11 @@
   [(#3059)](https://github.com/PennyLaneAI/catalyst/pull/3059)
   [(#3195)](https://github.com/PennyLaneAI/catalyst/pull/3195)
 
+* `qp.specs` now reports realistic resource estimates for the `gridsynth` pass, based on the
+  average gate sequences it produces at runtime. Expected (fractional) counts in the
+  `ResourceAnalysis` output are no longer rounded before being multiplied by loop trip counts.
+  [(#3308)](https://github.com/PennyLaneAI/catalyst/pull/3308)
+
 * Warnings and diagnostics emitted by successful Catalyst compiler subprocesses are now forwarded to
   Python callers instead of being silently discarded. LLVM diagnostic colors are preserved in
   interactive terminals.
@@ -742,6 +747,11 @@
   committed, instead of writing into an unallocated buffer.
   [(#3281)](https://github.com/PennyLaneAI/catalyst/pull/3281)
 
+* `qp.specs` no longer fails on programs compiled with the `gridsynth` pass, and no longer counts
+  an extra wire per decomposed rotation. The pass also reports an error for controlled `RZ` and
+  `PhaseShift` gates instead of crashing.
+  [(#3308)](https://github.com/PennyLaneAI/catalyst/pull/3308)
+
 * Fixed the CNOT decomposition of the `ions-decomposition` pass, which did not implement a CNOT:
   it rotated the target with `RY(-π/2)` instead of `RX(-π/2)` and returned the two qubits in
   swapped order.
@@ -826,6 +836,10 @@
   [(#3242)](https://github.com/PennyLaneAI/catalyst/pull/3242)
 
 <h3>Internal changes ⚙️</h3>
+
+* QNode functions are now marked with a `quantum.kernel_entry_point` attribute in their quantum
+  kernel module, which the `ResourceAnalysis` pass uses to identify the entry function.
+  [(#3308)](https://github.com/PennyLaneAI/catalyst/pull/3308)
 
 * Integration tests for :func:`pennylane.specs` have been migrated from the Catalyst frontend to PennyLane.
   [(#3107)](https://github.com/PennyLaneAI/catalyst/pull/3107)

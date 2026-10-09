@@ -70,6 +70,52 @@ def test_gridsynth_ppr_basis(param, eps):
     assert np.allclose(result, result_with_ppr, atol=eps)
 
 
+@pytest.mark.parametrize("ppr_basis", [False, True])
+def test_gridsynth_specs(ppr_basis):
+    """Test that specs counts the runtime gridsynth decomposition without extra wires."""
+    eps = 1e-4
+
+    @qp.qjit(capture=True, target="mlir")
+    @qp.transforms.gridsynth(epsilon=eps, ppr_basis=ppr_basis)
+    @qp.qnode(qp.device("null.qubit", wires=2))
+    def circuit(x: float):
+        qp.RZ(x, 0)
+        qp.RZ(x, 1)
+        return qp.expval(qp.Z(0))
+
+    resources = qp.specs(circuit, level=1)(0.5).resources
+    assert resources.num_wires == 2
+
+    ops = resources.quantum_operations
+    t_per_rotation = (ops["PPR-pi/8-w1"] if ppr_basis else ops["T"]) / 2
+    # Ross-Selinger sequences have about 3 log2(1/eps) T gates.
+    assert 2.5 * np.log2(1 / eps) < t_per_rotation < 3.5 * np.log2(1 / eps)
+
+
+@pytest.mark.parametrize("ppr_basis", [False, True])
+@pytest.mark.parametrize("eps", [1e-3, 1e-5])
+def test_gridsynth_specs_matches_runtime(eps, ppr_basis):
+    """Test that the specs T-count estimate matches the T-count executed at runtime, on average
+    over random angles."""
+    angles = np.random.default_rng(42).uniform(0, 4 * np.pi, 50)
+
+    @qp.qjit(capture=True)
+    @qp.transforms.gridsynth(epsilon=eps, ppr_basis=ppr_basis)
+    @qp.qnode(qp.device("null.qubit", wires=1))
+    def circuit(angles):
+        for theta in angles:
+            qp.RZ(theta, 0)
+        return qp.expval(qp.Z(0))
+
+    estimated = qp.specs(circuit, level=1)(angles).resources
+    executed = qp.specs(circuit, level="device")(angles).resources
+
+    estimated_t = estimated.quantum_operations["PPR-pi/8-w1" if ppr_basis else "T"]
+    # The device reports the PPR exp(-i pi/8 P) as PauliRot(pi/4).
+    executed_t = executed.quantum_operations["PauliRot-pi/4-w1" if ppr_basis else "T"]
+    assert estimated_t == pytest.approx(executed_t, rel=0.05)
+
+
 _EPSILON_WARN_FRAGMENT = "For epsilon smaller than 1e-6"
 
 

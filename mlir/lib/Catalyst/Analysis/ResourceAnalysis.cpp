@@ -98,6 +98,10 @@ ResourceAnalysis::ResourceAnalysis(ModuleOp moduleOp,
     moduleOp.walk([&](func::FuncOp funcOp) {
         if (!funcOp.isDeclaration()) {
             definedFuncOps.push_back(funcOp);
+        } else {
+            // Declaration-only functions (e.g. runtime library functions) have no resources of
+            // their own, but get an empty entry so that calls to them can be resolved.
+            funcResults.try_emplace(funcOp.getName(), makeEmptyResult());
         }
     });
 
@@ -117,11 +121,25 @@ ResourceAnalysis::ResourceAnalysis(ModuleOp moduleOp,
         }
     }
 
-    // Fallback: use the first definition as entry function
+    // Inside a quantum kernel (nested module), the entry function is tagged with
+    // `quantum.kernel_entry_point`.
     if (entryFunc.empty()) {
         for (auto funcOp : definedFuncOps) {
-            entryFunc = funcOp.getName();
-            break;
+            if (funcOp->hasAttr("quantum.kernel_entry_point")) {
+                entryFunc = funcOp.getName();
+                break;
+            }
+        }
+    }
+
+    // Fallback: use the first public definition as entry function, since passes may insert
+    // private helpers (e.g. gridsynth decomposition functions) at the start of the module.
+    if (entryFunc.empty()) {
+        for (auto funcOp : definedFuncOps) {
+            if (!funcOp.isPrivate()) {
+                entryFunc = funcOp.getName();
+                break;
+            }
         }
     }
 
