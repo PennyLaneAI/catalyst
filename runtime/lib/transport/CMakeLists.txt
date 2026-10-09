@@ -42,12 +42,59 @@ add_custom_target(transport_all)
 add_custom_target(transport_backends)
 add_dependencies(transport_all rt_transport)
 
-# Detect HIP before add_subdirectory(common) so coproc/gpu can gate on TRANSPORT_HAS_HIP.
+# Search multiple layers for the HIP tooling: the path env-var, a venv install, and system install
 if(DEFINED ENV{ROCM_PATH})
-    list(APPEND CMAKE_PREFIX_PATH "$ENV{ROCM_PATH}")
+    set(ROCM_ROOT "$ENV{ROCM_PATH}")
+elseif(DEFINED ENV{VIRTUAL_ENV} AND EXISTS "$ENV{VIRTUAL_ENV}/bin/rocm-sdk")
+    message("!!!!!!!!!!!!!!HERE 2")
+    execute_process(
+        COMMAND rocm-sdk path --root
+        OUTPUT_VARIABLE ROCM_SDK_ROOT_DIR
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+        RESULT_VARIABLE ROCM_SDK_RESULT
+    )
+    if(ROCM_SDK_RESULT EQUAL 0 AND EXISTS "${ROCM_SDK_ROOT_DIR}")
+        message(STATUS "Found rocm-sdk root inside venv: ${ROCM_SDK_ROOT_DIR}")
+
+        # Force CMake to find hip-lang-config.cmake inside the venv
+        set(CMAKE_HIP_COMPILER_ROCM_ROOT "${ROCM_SDK_ROOT_DIR}" CACHE PATH "ROCm SDK root")
+        set(CMAKE_PREFIX_PATH "${ROCM_SDK_ROOT_DIR}" ${CMAKE_PREFIX_PATH})
+
+        # Force where amdclang++ lives
+        set(CMAKE_HIP_COMPILER "${ROCM_SDK_ROOT_DIR}/llvm/bin/amdclang++" CACHE FILEPATH "HIP Compiler")
+
+        set(ENV{HIP_PATH} "${ROCM_SDK_ROOT_DIR}")
+        set(ENV{ROCM_PATH} "${ROCM_SDK_ROOT_DIR}")
+        set(ENV{HIPCXX} "${ROCM_SDK_ROOT_DIR}/llvm/bin/clang++")
+        
+        # Also seed the standard cache variables just in case
+        set(CMAKE_HIP_COMPILER "${ROCM_SDK_ROOT_DIR}/llvm/bin/clang++" CACHE FILEPATH "HIP Compiler" FORCE)
+        set(CMAKE_HIP_COMPILER_ROCM_ROOT "${ROCM_SDK_ROOT_DIR}" CACHE PATH "ROCm SDK root" FORCE)
+        set(CMAKE_PREFIX_PATH "${ROCM_SDK_ROOT_DIR}" ${CMAKE_PREFIX_PATH})
+
+        list(APPEND CMAKE_BUILD_RPATH "${ROCM_SDK_ROOT_DIR}/lib")
+    else()
+        message(WARNING "rocm-sdk CLI failed or was not found in the active environment.")
+    endif()
+
 elseif(EXISTS "/opt/rocm")
-    list(APPEND CMAKE_PREFIX_PATH "/opt/rocm")
+    set(ROCM_ROOT "/opt/rocm")
 endif()
+
+
+# If value is set, force the compiler bin path to the above
+if(ROCM_ROOT AND NOT CMAKE_HIP_COMPILER)
+    list(APPEND CMAKE_BUILD_RPATH "${ROCM_ROOT}/lib")
+    if(NOT CMAKE_HIP_COMPILER) # SDK found, but nothing set yet
+        list(APPEND CMAKE_PREFIX_PATH "${ROCM_ROOT}")
+        set(CMAKE_HIP_COMPILER_ROCM_ROOT "${ROCM_ROOT}" CACHE PATH "ROCm root directory")
+
+        if(NOT CMAKE_HIP_COMPILER AND EXISTS "${ROCM_ROOT}/bin/amdclang++")
+            set(CMAKE_HIP_COMPILER "${ROCM_ROOT}/bin/amdclang++" CACHE FILEPATH "HIP compiler")
+        endif()
+    endif()
+endif()
+
 
 include(CheckLanguage)
 check_language(HIP)
