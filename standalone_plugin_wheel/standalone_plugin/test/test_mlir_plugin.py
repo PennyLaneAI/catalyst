@@ -40,3 +40,7 @@ def test_pass_automatically_adds_to_required_plugins(capture):
     assert c.compile_options.dialect_plugins == {getStandalonePluginAbsolutePath()}
 
     assert 'transform.apply_registered_pass "standalone-switch-bar-foo"' in c.mlir
+
+
+if __name__ == "__main__":
+    pytest.main(["-x", __file__])
