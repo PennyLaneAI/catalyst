@@ -245,6 +245,12 @@ class QFunc:
         assert isinstance(self, qp.QNode)
         new_compile_pipeline, pass_pipeline = _extract_passes(self.compile_pipeline)
 
+        # One-shot / autograph may re-enter with already-extracted MLIR passes forwarded
+        # via kwargs (compile_pipeline on the QNode only keeps tape transforms).
+        forwarded_pass_pipeline = kwargs.pop("pass_pipeline", None)
+        if not pass_pipeline and forwarded_pass_pipeline is not None:
+            pass_pipeline = tuple(forwarded_pass_pipeline)
+
         # Update the QNode's original compile_pipeline
         new_qnode = copy(self)
         # pylint: disable=attribute-defined-outside-init, protected-access
