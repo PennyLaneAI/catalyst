@@ -945,7 +945,9 @@ def to_ppr_setup_inputs():
     ``qp.IsingZZ``,
     ``qp.MultiRZ``,
     ``qp.PauliRot``,
-    ``qp.PPR``,
+    ``qp.PPR_2``,
+    ``qp.PPR_4``,
+    ``qp.PPR_8``,
     and adjoint versions thereof, as well as
     ``qp.measure`` and
     ``qp.pauli_measure``.
@@ -967,7 +969,8 @@ def to_ppr_setup_inputs():
         capture is enabled with ``@qjit(capture=True)``.
 
         Note that the angle convention of ``qp.PauliRot`` differs from Catalyst's angle convention
-        for PPRs by a factor of two, whereas ``qp.PPR`` follows Catalyst's convention.
+        for PPRs by a factor of two, whereas ``qp.PPR_2``, ``qp.PPR_4`` and ``qp.PPR_8`` follow
+        Catalyst's convention.
 
     **Example**
 
@@ -1072,17 +1075,17 @@ def commute_ppr_setup_inputs(max_pauli_size=0):
         def circuit():
 
             # equivalent to a Hadamard gate
-            qp.PPR(4, pauli_word="Z", wires=0)
-            qp.PPR(4, pauli_word="X", wires=0)
-            qp.PPR(4, pauli_word="Z", wires=0)
+            qp.PPR_4(1, pauli_word="Z", wires=0)
+            qp.PPR_4(1, pauli_word="X", wires=0)
+            qp.PPR_4(1, pauli_word="Z", wires=0)
 
             # equivalent to a CNOT gate
-            qp.PPR(4, pauli_word="ZX", wires=[0, 1])
-            qp.PPR(-4, pauli_word="Z", wires=0)
-            qp.PPR(-4, pauli_word="X", wires=1)
+            qp.PPR_4(1, pauli_word="ZX", wires=[0, 1])
+            qp.PPR_4(-1, pauli_word="Z", wires=0)
+            qp.PPR_4(-1, pauli_word="X", wires=1)
 
             # equivalent to a T gate
-            qp.PPR(8, pauli_word="Z", wires=0)
+            qp.PPR_8(1, pauli_word="Z", wires=0)
 
             return qp.expval(qp.Z(0))
 
@@ -1104,9 +1107,8 @@ def commute_ppr_setup_inputs(max_pauli_size=0):
     - expval(PauliZ): 1
     Depth: Not computed
 
-    In the example above, the Clifford PPRs (:class:`~.PPR` instances with an angle denominator
-    of :math:`\pm 4`) will be commuted past the non-Clifford PPR (:class:`~.PPR`
-    instances with an angle denominator :math:`\pm 8`). In the above output,
+    In the example above, the Clifford PPRs (:class:`~.PPR_4` instances) will be commuted past the
+    non-Clifford PPR (:class:`~.PPR_8` instance). In the above output,
     ``PPR-theta-w<int>`` denotes the type of PPR present in the circuit, where ``theta`` is the PPR
     angle (:math:`\theta`) and ``w<int>`` denotes the PPR weight (the number of qubits it acts on,
     or the length of the Pauli word).
@@ -1174,8 +1176,8 @@ def merge_ppr_ppm_setup_inputs(max_pauli_size=0):
         @qp.transforms.to_ppr
         @qp.qnode(qp.device("lightning.qubit", wires=2))
         def circuit():
-            qp.PPR(4, pauli_word="Z", wires=0)
-            qp.PPR(4, pauli_word="X", wires=1)
+            qp.PPR_4(1, pauli_word="Z", wires=0)
+            qp.PPR_4(1, pauli_word="X", wires=1)
 
             ppm = qp.pauli_measure(pauli_word="ZX", wires=[0, 1])
 
@@ -1274,17 +1276,17 @@ def ppr_to_ppm_setup_inputs(decompose_method="pauli-corrected", avoid_y_measure=
         @qp.qnode(qp.device("null.qubit", wires=2))
         def circuit():
             # equivalent to a Hadamard gate
-            qp.PPR(4, pauli_word="Z", wires=0)
-            qp.PPR(4, pauli_word="X", wires=0)
-            qp.PPR(4, pauli_word="Z", wires=0)
+            qp.PPR_4(1, pauli_word="Z", wires=0)
+            qp.PPR_4(1, pauli_word="X", wires=0)
+            qp.PPR_4(1, pauli_word="Z", wires=0)
 
             # equivalent to a CNOT gate
-            qp.PPR(4, pauli_word="ZX", wires=[0, 1])
-            qp.PPR(-4, pauli_word="Z", wires=[0])
-            qp.PPR(-4, pauli_word="X", wires=[1])
+            qp.PPR_4(1, pauli_word="ZX", wires=[0, 1])
+            qp.PPR_4(-1, pauli_word="Z", wires=[0])
+            qp.PPR_4(-1, pauli_word="X", wires=[1])
 
             # equivalent to a T gate
-            qp.PPR(8, pauli_word="Z", wires=0)
+            qp.PPR_8(1, pauli_word="Z", wires=0)
 
             return qp.expval(qp.Z(0))
 
@@ -1494,11 +1496,11 @@ def reduce_t_depth_setup_inputs():
         @qp.transforms.to_ppr
         @qp.qnode(qp.device("null.qubit", wires=4))
         def circuit():
-            qp.PPR(8, pauli_word="Z", wires=1)
-            qp.PPR(-8, pauli_word="XYZ", wires=[0, 2, 3])
-            qp.PPR(-4, pauli_word="XYZY", wires=[0, 1, 2, 3])
-            qp.PPR(8, pauli_word="XZX", wires=[0, 1, 3])
-            qp.PPR(-8, pauli_word="XZY", wires=[0, 1, 2])
+            qp.PPR_8(1, pauli_word="Z", wires=1)
+            qp.PPR_8(-1, pauli_word="XYZ", wires=[0, 2, 3])
+            qp.PPR_4(-1, pauli_word="XYZY", wires=[0, 1, 2, 3])
+            qp.PPR_8(1, pauli_word="XZX", wires=[0, 1, 3])
+            qp.PPR_8(-1, pauli_word="XZY", wires=[0, 1, 2])
 
             return qp.expval(qp.Z(0))
 

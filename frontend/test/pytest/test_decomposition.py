@@ -978,7 +978,7 @@ class TestModifierIds:
             wrap_modifier_id(op_id, "Adjoint")
 
 
-_PPR_8_ID = 'PPR{}{wires:2}{angle_denominator = 8 : i64, pauli_word = "XY"}'
+_PPR_8_ID = 'PPR_8{}{wires:2}{pauli_word = "XY", sign = 1 : i64}'
 _RZ_ID = "RZ{0:[f64]}{wires:1}{}"
 
 
@@ -990,9 +990,9 @@ _RZ_ID = "RZ{0:[f64]}{wires:1}{}"
         ({"Hadamard{}{wires:1}{}": 1}, "Hadamard{}{wires:1}{}", True),
         ({_PPR_8_ID: 1}, _PPR_8_ID, True),
         ({"HybridOp{a:[[f64]]}{w:1}{}[42]": 1}, "HybridOp{a:[[f64]]}{w:1}{}[42]", True),
-        # Same op with different static data, e.g. Adjoint(PPR(8)) -> PPR(-8), does not fold.
+        # Same op with different static data, e.g. Adjoint(PPR_8(1)) -> PPR_8(-1), does not fold.
         (
-            {'PPR{}{wires:2}{angle_denominator = -8 : si64, pauli_word = "XY"}': 1},
+            {'PPR_8{}{wires:2}{pauli_word = "XY", sign = -1 : si64}': 1},
             _PPR_8_ID,
             False,
         ),
@@ -1061,26 +1061,24 @@ class TestSymbolicRules:
     @pytest.mark.parametrize("wrap_control", [False, True])
     def test_adjoint_rule_changing_static_data_does_not_fold(self, wrap_control):
         """Test that a rule producing the base op with different static data, like
-        ``Adjoint(PPR(8)) -> PPR(-8)``, declares the op it emits rather than the base op."""
+        ``Adjoint(PPR_8(1)) -> PPR_8(-1)``, declares the op it emits rather than the base op."""
 
         module = compile_registered_symbolic_rules(
-            "PPR",
-            'Adjoint(PPR){}{wires:2}{angle_denominator = 8 : i64, pauli_word = "XY"}',
+            "PPR_8",
+            'Adjoint(PPR_8){}{wires:2}{pauli_word = "XY", sign = 1 : i64}',
             {},
             {"wires": 2},
-            {"angle_denominator": 8, "pauli_word": "XY"},
-            op_cls=qp.PPR,
+            {"sign": 1, "pauli_word": "XY"},
+            op_cls=qp.PPR_8,
             kind="adjoint",
             wrap_control=wrap_control,
         )
         (rule,) = get_rule_strings_from_module(module)
 
-        name = "C(PPR)" if wrap_control else "PPR"
-        resource = (
-            f'"{name}{{}}{{wires:2}}{{angle_denominator = -8 : si64, pauli_word = \\22XY\\22}}"'
-        )
+        name = "C(PPR_8)" if wrap_control else "PPR_8"
+        resource = f'"{name}{{}}{{wires:2}}{{pauli_word = \\22XY\\22, sign = -1 : si64}}"'
         assert f"resources = {{operations = {{{resource} = 1 : i64}}}}" in rule
-        assert 'static_data = {angle_denominator = -8 : si64, pauli_word = "XY"}' in rule
+        assert 'static_data = {pauli_word = "XY", sign = -1 : si64}' in rule
 
     @pytest.mark.parametrize(
         "n_ctrl, target_id, signature, resource",

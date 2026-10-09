@@ -20,6 +20,7 @@
 
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/STLForwardCompat.h"
+#include "llvm/ADT/StringSwitch.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinAttributes.h"
@@ -430,8 +431,18 @@ LogicalResult convertPauliRotGate(PauliRotOp op, ConversionPatternRewriter &rewr
                                    op.getAdjoint(), rewriter);
 }
 
-LogicalResult convertPPROperator(OperatorOp op, ConversionPatternRewriter &rewriter) {
-    assert(op.getAllParams().empty() && "PPR operator does not support dynamic parameters");
+// The PPR_k operators (k = 2, 4, 8) carry their angle denominator in the op name.
+std::optional<int8_t> getPPROperatorDenominator(OperatorOp op) {
+    return llvm::StringSwitch<std::optional<int8_t>>(op.getOpName())
+        .Case("PPR_2", 2)
+        .Case("PPR_4", 4)
+        .Case("PPR_8", 8)
+        .Default(std::nullopt);
+}
+
+LogicalResult convertPPROperator(OperatorOp op, int8_t denominator,
+                                 ConversionPatternRewriter &rewriter) {
+    assert(op.getAllParams().empty() && "PPR operators do not support dynamic parameters");
 
     DictionaryAttr staticData = op.getStaticData();
     auto pauliWordAttr = staticData.getAs<StringAttr>("pauli_word");
@@ -443,9 +454,10 @@ LogicalResult convertPPROperator(OperatorOp op, ConversionPatternRewriter &rewri
     }
     ArrayAttr pauliProduct = rewriter.getArrayAttr(pauliCharacters);
 
-    auto denominatorAttr = staticData.getAs<IntegerAttr>("angle_denominator");
+    auto signAttr = staticData.getAs<IntegerAttr>("sign");
     // don't use getInt, since it asserts signless (cannot handle signed data)
-    int8_t rotationKind = static_cast<int8_t>(denominatorAttr.getValue().getSExtValue());
+    int8_t sign = static_cast<int8_t>(signAttr.getValue().getSExtValue());
+    int8_t rotationKind = sign * denominator;
     if (op.getAdjoint()) {
         rotationKind = -rotationKind;
     }
@@ -465,8 +477,9 @@ struct PBCGateLowering : public OpInterfaceConversionPattern<QuantumOperation> {
 
     LogicalResult matchAndRewrite(QuantumOperation operation, ArrayRef<Value> operands,
                                   ConversionPatternRewriter &rewriter) const final {
-        StringRef supportedGates = "Supported gates: H, S, T, X, Y, Z, S†, T†, I, CNOT, CZ, PPR,"
-                                   "RX, RY, RZ, IsingXX, IsingYY, IsingZZ, MultiRZ, and PauliRot.";
+        StringRef supportedGates =
+            "Supported gates: H, S, T, X, Y, Z, S†, T†, I, CNOT, CZ, PPR_2, PPR_4, PPR_8, "
+            "RX, RY, RZ, IsingXX, IsingYY, IsingZZ, MultiRZ, and PauliRot.";
         Operation *op = operation.getOperation();
 
         if (auto gateLikeOp = dyn_cast<QuantumGate>(op)) {
@@ -515,8 +528,8 @@ struct PBCGateLowering : public OpInterfaceConversionPattern<QuantumOperation> {
         } else if (auto originOp = dyn_cast<PauliRotOp>(op)) {
             return convertPauliRotGate(originOp, rewriter);
         } else if (auto originOp = dyn_cast<OperatorOp>(op)) {
-            if (originOp.getOpName() == "PPR") {
-                return convertPPROperator(originOp, rewriter);
+            if (auto denominator = getPPROperatorDenominator(originOp)) {
+                return convertPPROperator(originOp, *denominator, rewriter);
             }
         }
 

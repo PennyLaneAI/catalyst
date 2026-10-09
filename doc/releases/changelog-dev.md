@@ -680,9 +680,11 @@
   reducing repeated pairwise normalization while preserving the resulting partition.
   [(#3095)](https://github.com/PennyLaneAI/catalyst/pull/3095)
 
-* ``to_ppr`` now directly lowers PennyLane's discrete ``PPR`` operator to ``pbc.ppr``.
+* ``to_ppr`` now directly lowers PennyLane's discrete ``PPR_2``, ``PPR_4`` and ``PPR_8`` operators
+  to ``pbc.ppr``.
   [(#3185)](https://github.com/PennyLaneAI/catalyst/pull/3185)
   [(#3262)](https://github.com/PennyLaneAI/catalyst/pull/3262)
+  [(#3319)](https://github.com/PennyLaneAI/catalyst/pull/3319)
 
 * The `--adjoint-lowering` pass no longer caches all classical gate parameters.
   Parameters that are trivially available to the reverse pass are no longer cached.
