@@ -370,7 +370,7 @@ From here, you can change the name of the pass, change the name of the shared ob
 
 Now that you have your ``StandalonePlugin.so``, you can ship it in a Python wheel.
 
-You will need to register your pass with Catalyst via Python's `entry_points <https://packaging.python.org/en/latest/specifications/entry-points/>`_ .
+You will need to register your pass with Catalyst via Python's `entry_points <https://packaging.python.org/en/latest/specifications/entry-points/>`_.
 For reference, we have an `example in the Catalyst Github repository <https://github.com/PennyLaneAI/catalyst/tree/main/standalone_plugin_wheel/standalone_plugin>`_
 that implements the standalone plugin as a Python package.
 To do this, you only need to define a function named ``name2pass``—it must be named ``name2pass``—that
