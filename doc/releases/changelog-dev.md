@@ -174,8 +174,10 @@
 
 * Under program capture, PennyLane :func:`~.transforms.decompose` (``qp.decompose``) is now an
   alias for :func:`~.passes.graph_decomposition`. Multiple ``qp.decompose`` transforms is also
-  supported.
+  supported. Additionally, the ``fixed_decomps`` argument now accepts strings referring to the
+  names of existing decomposition rules.
   [(#3290)](https://github.com/PennyLaneAI/catalyst/pull/3290)
+  [(#3317)](https://github.com/PennyLaneAI/catalyst/pull/3317)
 
 * :func:`~.passes.graph_decomposition` accepts a `verbose` keyword argument. When `True`, the pass
   prints the decomposition rule the solver chose for each operator, along with its cost and the
@@ -1044,6 +1046,10 @@
 * A new pass `--resolve-gate-level-adjoint` was added. This pass now handles gate-level adjoint canonicalization, moving it out of the `--canonicalize` pass.
   [#3155](https://github.com/PennyLaneAI/catalyst/pull/3155)
 
+* Pull requests touching transport now run its Catch2 suites and the backline tests: CPU over a
+  soft-RoCE loopback link, and CPU-to-GPU over memcpy on the GPU runner.
+  [(#3074)](https://github.com/PennyLaneAI/catalyst/pull/3074)
+
 * The OQD device now implements the optional `get_runtime_artifacts` to inform the compiler of its runtime library, 
   `librt_OQD_capi`. This replaces the previous work-around that had the compiler check directly for the library and
   link it if present.
@@ -1078,6 +1084,7 @@ This release contains contributions from (in alphabetical order):
 
 Runor Agbaire,
 Ali Asadi,
+Astral Cai,
 Joey Carter,
 Yushao Chen,
 Filip Dobrosavljevic,
