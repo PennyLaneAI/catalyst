@@ -29,6 +29,7 @@
 #include "DataView.hpp"
 #include "Exception.hpp"
 #include "QuantumDevice.hpp"
+#include "RecordingQuantumDevice.hpp"
 
 namespace Catalyst::Runtime {
 
@@ -259,10 +260,15 @@ class RTDevice {
         rtd_dylib = std::make_unique<SharedLibraryManager>(rtd_lib);
         std::string factory_name{rtd_name + "Factory"};
         void *f_ptr = rtd_dylib->getSymbol(factory_name);
+        auto split = splitDeviceKwargs(rtd_kwargs);
         rtd_qdevice = std::unique_ptr<QuantumDevice>(
-            (f_ptr != nullptr)
-                ? reinterpret_cast<decltype(GenericDeviceFactory) *>(f_ptr)(rtd_kwargs.c_str())
-                : nullptr);
+            (f_ptr != nullptr) ? reinterpret_cast<decltype(GenericDeviceFactory) *>(f_ptr)(
+                                     split.factory_kwargs.c_str())
+                               : nullptr);
+        if (rtd_qdevice && !split.record_path.empty()) {
+            rtd_qdevice =
+                std::make_unique<RecordingQuantumDevice>(std::move(rtd_qdevice), split.record_path);
+        }
         return rtd_qdevice;
     }
 
