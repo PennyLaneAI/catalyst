@@ -424,6 +424,7 @@ to check parameters, do some other validation or perhaps just to improve the use
 See the documentation on :func:`pennylane.transform` for more information.
 
 For example:
+
 .. code-block:: python
 
     from standalone import SwitchBarToFoo
