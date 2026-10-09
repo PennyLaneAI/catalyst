@@ -1050,6 +1050,10 @@
 * A new pass `--resolve-gate-level-adjoint` was added. This pass now handles gate-level adjoint canonicalization, moving it out of the `--canonicalize` pass.
   [#3155](https://github.com/PennyLaneAI/catalyst/pull/3155)
 
+* Pull requests touching transport now run its Catch2 suites and the backline tests: CPU over a
+  soft-RoCE loopback link, and CPU-to-GPU over memcpy on the GPU runner.
+  [(#3074)](https://github.com/PennyLaneAI/catalyst/pull/3074)
+
 * The OQD device now implements the optional `get_runtime_artifacts` to inform the compiler of its runtime library, 
   `librt_OQD_capi`. This replaces the previous work-around that had the compiler check directly for the library and
   link it if present.
