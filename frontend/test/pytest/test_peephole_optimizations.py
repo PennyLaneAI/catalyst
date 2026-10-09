@@ -19,7 +19,7 @@ import pennylane as qp
 import pytest
 from pennylane.transforms import to_ppr as qp_to_ppr
 
-from catalyst import measure, pipeline, qjit
+from catalyst import measure, qjit
 from catalyst.passes import (
     cancel_inverses,
     commute_ppr,
@@ -113,36 +113,6 @@ def test_cancel_inverses_functionality_outside_qjit(theta, backend):
         return _f, _g
 
     assert np.allclose(workflow()[0], workflow()[1])
-
-
-@pytest.mark.parametrize("theta", [42.42])
-def test_pipeline_functionality(theta, backend):
-    """
-    Test that the @pipeline decorator does not change functionality
-    when all the passes in the pipeline does not change functionality.
-    """
-    my_pipeline = {
-        "cancel_inverses": {},
-        "merge_rotations": {},
-    }
-
-    @qjit
-    def workflow():
-        @qp.qnode(qp.device(backend, wires=2))
-        def f(x):
-            qp.RX(0.1, wires=[0])
-            qp.RX(x, wires=[0])
-            qp.Hadamard(wires=[1])
-            qp.Hadamard(wires=[1])
-            return qp.expval(qp.PauliY(wires=0))
-
-        no_pipeline_result = f(theta)
-        pipeline_result = pipeline(my_pipeline)(f)(theta)
-
-        return no_pipeline_result, pipeline_result
-
-    res = workflow()
-    assert np.allclose(res[0], res[1])
 
 
 def test_chained_passes():

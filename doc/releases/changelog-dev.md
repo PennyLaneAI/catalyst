@@ -700,6 +700,12 @@
 
 <h3>Breaking changes 💔</h3>
 
+* Removed ``catalyst.pipeline``, ``catalyst.passes.apply_pass``,
+  ``catalyst.passes.apply_pass_plugin``, ``catalyst.passes.Pass``,
+  ``catalyst.passes.PassPlugin``, and the ``circuit_transform_pipeline`` argument of
+  :func:`~.qjit`. Apply transforms with :func:`pennylane.transform` and
+  :class:`~pennylane.transforms.core.CompilePipeline` on individual QNodes instead.
+
 * `catalyst.logging` has been removed. `pennylane.logging` should be used instead.
   [(#3283)](https://github.com/PennyLaneAI/catalyst/pull/3283)
 
