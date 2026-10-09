@@ -153,7 +153,7 @@ def test_dynamic_qubit_allocation(i: int):
         # CHECK: qref.pcphase({{%.+}}, dim : 0) [[alloc_q0]], [[alloc_q1]] : !qref.bit, !qref.bit
         qp.PCPhase(0.1, dim=0, wires=[q[0], q[1]])
 
-        # CHECK: qref.gphase({{%.+}}) ctrls([[alloc_q0]]) ctrlvals({{%.+}}) : ctrls !qref.bit
+        # CHECK: qref.custom "PhaseShift"({{%.+}}) [[alloc_q0]] : !qref.bit
         qp.ctrl(qp.GlobalPhase(np.pi / 4), control=[q[0]])
 
         # CHECK: qref.paulirot ["X"]({{%.+}}) [[alloc_q0]] : !qref.bit
@@ -314,7 +314,7 @@ def test_global_phase():
     """
     Test global phase.
     """
-    # CHECK-DAG: [[true:%.+]] = arith.constant true
+    # CHECK-DAG: [[neg_angle:%.+]] = arith.constant -0.78539816339744828 : f64
     # CHECK-DAG: [[angle:%.+]] = arith.constant 0.78539816339744828 : f64
 
     # CHECK: [[reg:%.+]] = qref.alloc( 4) : !qref.reg<4>
@@ -323,7 +323,7 @@ def test_global_phase():
     qp.GlobalPhase(np.pi / 4)
 
     # CHECK: [[q0:%.+]] = qref.get [[reg]][ 0] : !qref.reg<4> -> !qref.bit
-    # CHECK: qref.gphase([[angle]]) ctrls([[q0]]) ctrlvals([[true]]) : ctrls !qref.bit
+    # CHECK: qref.custom "PhaseShift"([[neg_angle]]) [[q0]] : !qref.bit
     qp.ctrl(qp.GlobalPhase(np.pi / 4), control=[0])
 
     return qp.expval(qp.X(0))
