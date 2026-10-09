@@ -191,8 +191,10 @@
 
 * Under program capture, PennyLane :func:`~.transforms.decompose` (``qp.decompose``) is now an
   alias for :func:`~.passes.graph_decomposition`. Multiple ``qp.decompose`` transforms is also
-  supported.
+  supported. Additionally, the ``fixed_decomps`` argument now accepts strings referring to the
+  names of existing decomposition rules.
   [(#3290)](https://github.com/PennyLaneAI/catalyst/pull/3290)
+  [(#3317)](https://github.com/PennyLaneAI/catalyst/pull/3317)
 
 * :func:`~.passes.graph_decomposition` accepts a `verbose` keyword argument. When `True`, the pass
   prints the decomposition rule the solver chose for each operator, along with its cost and the
@@ -1107,6 +1109,7 @@ This release contains contributions from (in alphabetical order):
 
 Runor Agbaire,
 Ali Asadi,
+Astral Cai,
 Joey Carter,
 Yushao Chen,
 Filip Dobrosavljevic,
