@@ -151,6 +151,13 @@
 
 <h3>Improvements 🛠</h3>
 
+* Controlled :class:`~pennylane.GlobalPhase` operations now decompose to
+  :class:`~pennylane.PhaseShift` on the control wire when possible (or
+  :class:`~pennylane.ControlledPhaseShift` for multiple controls), via an updated
+  PennyLane dependency. The common single-control case no longer lowers as a controlled
+  ``gphase``.
+  [(#3323)](https://github.com/PennyLaneAI/catalyst/pull/3323)
+
 * Transforms from pass plugins can now be used. The plugin must
   have an entry point for `catalyst.passes_resolution`, provide a `name2pass` in its
   namespace, and provide the package name via
@@ -1092,6 +1099,7 @@ Astral Cai,
 Joey Carter,
 Yushao Chen,
 Filip Dobrosavljevic,
+Marcus Edwards,
 Lillian Frederiksen,
 Sengthai Heng,
 David Ittah,
