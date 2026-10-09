@@ -151,6 +151,12 @@
 
 <h3>Improvements 🛠</h3>
 
+* Transforms from pass plugins can now be used. The plugin must
+  have an entry point for `catalyst.passes_resolution`, provide a `name2pass` in its
+  namespace, and provide the package name via
+  `pennylane.transform(pass_name=f"{package_name}.{pass_name}")`.
+  [(#3316)](https://github.com/PennyLaneAI/catalyst/pull/3316)
+
 * The memcpy transport now carries messages of any size in each direction, as set by a PennyLane
   `qp.Controller`'s `in_bytes` and `out_bytes`. The RDMA transports, and the memcpy GPU
   coprocessor's persistent kernel, still carry 8 bytes.
