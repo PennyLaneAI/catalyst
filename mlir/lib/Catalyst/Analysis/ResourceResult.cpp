@@ -127,7 +127,8 @@ void ResourceResult::multiplyBy(double scalar) {
 }
 
 // Emit a count as a JSON number. Counts are tracked as doubles to support probabilistic
-// (fractional) count values, but the JSON output always reports the nearest integer.
+// and hint-driven (fractional) expected counts; the JSON output rounds each count up to
+// the next integer so small expected values are never dropped to zero (e.g. 0.5 -> 1).
 //
 // JSON Schema (per function, keyed by name at the root):
 //   metadata: { qnode, auto_qubit_management?, has_branches, device_name? }
@@ -139,7 +140,7 @@ void ResourceResult::multiplyBy(double scalar) {
 //   extended_fields: { "<extension>": { ... }, ... }  // e.g. pbc_depth: { any_commuting_depth,
 //   qubit_disjoint_depth }
 static llvm::json::Value countToJson(double count) {
-    return llvm::json::Value(static_cast<int64_t>(std::llround(count)));
+    return llvm::json::Value(static_cast<int64_t>(std::ceil(count)));
 }
 
 llvm::json::Object ResourceResult::toJson() const {
@@ -258,7 +259,7 @@ DictionaryAttr buildResourceDict(MLIRContext *ctx, const ResourceResult &result)
     SmallVector<NamedAttribute> opsEntries;
     for (const auto &opEntry : result.detailedOperations) {
         llvm::StringRef opName = opEntry.getKey();
-        int64_t count = static_cast<int64_t>(std::llround(opEntry.getValue()));
+        int64_t count = static_cast<int64_t>(std::ceil(opEntry.getValue()));
         opsEntries.push_back(NamedAttribute(StringAttr::get(ctx, opName),
                                             IntegerAttr::get(IntegerType::get(ctx, 64), count)));
     }
@@ -268,7 +269,7 @@ DictionaryAttr buildResourceDict(MLIRContext *ctx, const ResourceResult &result)
     // measurements
     SmallVector<NamedAttribute> measEntries;
     for (const auto &entry : result.measurements) {
-        int64_t count = static_cast<int64_t>(std::llround(entry.getValue()));
+        int64_t count = static_cast<int64_t>(std::ceil(entry.getValue()));
         measEntries.push_back(NamedAttribute(StringAttr::get(ctx, entry.getKey()),
                                              IntegerAttr::get(IntegerType::get(ctx, 64), count)));
     }
@@ -279,14 +280,14 @@ DictionaryAttr buildResourceDict(MLIRContext *ctx, const ResourceResult &result)
     entries.push_back(
         NamedAttribute(StringAttr::get(ctx, "num_qubits"),
                        IntegerAttr::get(IntegerType::get(ctx, 64),
-                                        static_cast<int64_t>(std::llround(result.numQubits())))));
+                                        static_cast<int64_t>(std::ceil(result.numQubits())))));
     entries.push_back(
         NamedAttribute(StringAttr::get(ctx, "num_arg_qubits"),
                        IntegerAttr::get(IntegerType::get(ctx, 64), result.numArgQubits)));
-    entries.push_back(NamedAttribute(
-        StringAttr::get(ctx, "num_alloc_qubits"),
-        IntegerAttr::get(IntegerType::get(ctx, 64),
-                         static_cast<int64_t>(std::llround(result.numAllocQubits)))));
+    entries.push_back(
+        NamedAttribute(StringAttr::get(ctx, "num_alloc_qubits"),
+                       IntegerAttr::get(IntegerType::get(ctx, 64),
+                                        static_cast<int64_t>(std::ceil(result.numAllocQubits)))));
 
     return DictionaryAttr::get(ctx, entries);
 }

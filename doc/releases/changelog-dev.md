@@ -151,6 +151,11 @@
 
 <h3>Improvements 🛠</h3>
 
+* Resource analysis JSON now rounds expected counts (from
+  ``catalyst.estimated_iterations`` / ``catalyst.estimated_probability`` hints) up to the next
+  integer instead of to the nearest integer. This avoids dropping small expected counts such as
+  ``0.5`` to zero for PennyLane :func:`~.specs`.
+
 * The memcpy transport now carries messages of any size in each direction, as set by a PennyLane
   `qp.Controller`'s `in_bytes` and `out_bytes`. The RDMA transports, and the memcpy GPU
   coprocessor's persistent kernel, still carry 8 bytes.

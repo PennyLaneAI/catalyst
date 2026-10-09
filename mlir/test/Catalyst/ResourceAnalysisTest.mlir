@@ -2092,7 +2092,7 @@ func.func @if_estimated_probability(%arg0: !quantum.bit, %cond: i1) -> !quantum.
 // scf.if with only a then-branch and `estimated_probability` = 0.5: the (empty)
 // else-branch contributes nothing, so the expected Hadamard count is
 // 0.5 * 3 = 1.5. Counts are tracked as doubles internally, but the JSON output
-// rounds each count to the nearest integer, so 1.5 is reported as 2.
+// rounds each count up to the next integer, so 1.5 is reported as 2.
 
 // CHECK-LABEL: "if_estimated_probability_then_only"
 // CHECK: quantum_operations
@@ -2109,10 +2109,26 @@ func.func @if_estimated_probability_then_only(%arg0: !quantum.bit, %cond: i1) {
 
 // -----
 
+// Expected counts below 0.5 would round to 0 under nearest-integer rounding.
+// Ceiling keeps a conservative non-zero report: 0.25 * 1 = 0.25 -> 1.
+
+// CHECK-LABEL: "if_estimated_probability_ceil_small"
+// CHECK: quantum_operations
+// CHECK:   "Hadamard": 1
+func.func @if_estimated_probability_ceil_small(%arg0: !quantum.bit, %cond: i1) {
+    scf.if %cond {
+        %t1 = quantum.custom "Hadamard"() %arg0 : !quantum.bit
+        scf.yield
+    } {catalyst.estimated_probability = 0.25 : f64}
+    return
+}
+
+// -----
+
 // Qubit allocations are probability-weighted like every other count. Here the
 // then-branch allocates 1 qubit and the (empty) else-branch allocates none,
 // with p(then) = 0.5, so the expected allocation count is 0.5. The JSON output
-// rounds each count to the nearest integer, so 0.5 is reported as 1.
+// rounds each count up to the next integer, so 0.5 is reported as 1.
 
 // CHECK-LABEL: "if_estimated_probability_qubits"
 // CHECK: "num_qubits"
@@ -2133,9 +2149,9 @@ func.func @if_estimated_probability_qubits(%cond: i1) {
 // A probabilistic conditional inside a loop body: the fractional expected count
 // (0.5 Hadamard per iteration, p(then) = 0.5) is carried as a double internally so
 // it survives lifting into the for_loop_1 body and can be combined with the trip
-// count downstream (0.5 * 10 = 5, see the STATS check). The per-function JSON output
-// rounds counts to the nearest integer, so the lifted body reports 1, and the parent
-// records function_calls = { for_loop_1: 10 }.
+// count downstream (0.5 * 10 = 5). The per-function JSON output rounds counts up
+// to the next integer, so the lifted body reports 1, and the parent records
+// function_calls = { for_loop_1: 10 }.
 
 // CHECK-LABEL: "for_loop_1": {
 // CHECK: "quantum_operations"
