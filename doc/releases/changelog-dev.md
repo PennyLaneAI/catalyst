@@ -737,6 +737,14 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* Graph-based decomposition now handles operators with a nested-operator ("hybrid") argument, such
+  as ``GQSP``. Previously the operator counted the nested operator's wires among its own, but the
+  generated decomposition rule did not, so ``decompose-lowering`` built a ``tensor.from_elements``
+  of the wrong arity and aborted the compiler (``SIGABRT``). The rule's wire is now kept
+  consistent with the operator, and ``decompose-lowering`` emits a clear error (instead
+  of crashing) if any such rule/operator inconsistency reaches during the circuit rewrite.
+  [(#3322)](https://github.com/PennyLaneAI/catalyst/pull/3322)
+
 * Fixed a bug where a compiled Backline program continued with a session that does not work,
   for example echoing the controller's own message back as the reply, after a transport call or a
   coprocessor function's set-up failed. It now stops with an error naming the call that failed,
