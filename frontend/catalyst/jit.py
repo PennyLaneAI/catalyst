@@ -940,7 +940,7 @@ class QJIT(CatalystCallable):
         # Inject Runtime Library-specific functions (e.g. setup/teardown).
         inject_functions(mlir_module, ctx, self.compile_options.seed)
 
-        # Collect the shared libraries a local `runtime_call` recorded, so the linker gets them.
+        # Collect the shared libraries recorded during lowering, so the linker gets them.
         collect_runtime_artifacts(mlir_module, self.compile_options)
         # If the device declares a backline placement, serialize it onto the top module.
         if self._placement is not None:
