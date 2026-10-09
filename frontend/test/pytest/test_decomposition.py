@@ -14,6 +14,11 @@
 
 """Unit tests for the python decompositions module."""
 
+import hashlib
+import json
+import warnings
+from types import SimpleNamespace
+
 import jax.numpy as jnp
 import numpy as np
 import pennylane as qp
@@ -49,8 +54,10 @@ from pennylane.typing import Bool, Complex, Float, Int, Wire
 from pennylane.wires import Wires
 
 from catalyst import qjit
+from catalyst.compiler import _quantum_opt
 from catalyst.debug import get_compilation_stage
-from catalyst.decomposition import GraphOpID, RuleLoweringWarning
+from catalyst.decomposition import GraphOpID, RuleLoweringWarning, decomposition_rules
+from catalyst.decomposition.capture_session import RuleIdentity
 from catalyst.decomposition.decomposition_rules import (
     _MODIFIER_CANONICAL_ORDER,
     _adjoint_folds_to_base,
@@ -78,6 +85,9 @@ from catalyst.decomposition.decomposition_rules import (
     wrap_modifier_id,
 )
 from catalyst.decomposition.graph_op_id import GraphOpID, build_graph_op_id
+from catalyst.decomposition.precompile_decomposition_rules import (
+    precompile_decomp_rules,
+)
 from catalyst.decomposition.type_utils import (
     convert_item_to_mlir_type,
     get_dummy_values_for_dynamic_shape,
@@ -85,6 +95,7 @@ from catalyst.decomposition.type_utils import (
 )
 from catalyst.passes import graph_decomposition
 from catalyst.utils.exceptions import CompileError
+from catalyst.utils.runtime_environment import BYTECODE_FILE_PATH, get_bytecode_manifest_path
 
 
 class TestGenericUtilities:
@@ -526,6 +537,268 @@ class TestGenericUtilities:
 
 class TestPrecompiled:
     """Tests for precompiled decomposition rules."""
+
+    def test_builtin_rules_are_precompiled(self, tmp_path):
+        """Built-in rules omitted from trace-time MLIR are present in the precompiled bytecode."""
+        bytecode_path = tmp_path / "rules.mlirbc"
+        precompile_decomp_rules(bytecode_path)
+
+        bytecode = _quantum_opt("--empty", str(bytecode_path))
+        expected_rules = [
+            "__builtin__rz_to_ppr_RZ{0:[f64]}{wires:1}{}",
+            "__builtin__rz_to_rot_RZ{0:[f64]}{wires:1}{}",
+            "__builtin__multi_rz_decomposition_MultiRZ{theta:[f64]}{wires:1}{}",
+            "__builtin__multi_rz_decomposition_MultiRZ{theta:[f64]}{wires:2}{}",
+            (
+                "__builtin__pauli_rot_decomposition_"
+                "PauliRot{theta:[f64]}{wires:1}{pauli_word = \\22Z\\22}"
+            ),
+            (
+                "__builtin__pauli_rot_decomposition_"
+                "PauliRot{theta:[f64]}{wires:2}{pauli_word = \\22XX\\22}"
+            ),
+        ]
+
+        for rule in expected_rules:
+            assert rule in bytecode
+
+    def test_precompile_writes_hash_to_manifest(self, mocker, tmp_path):
+        """The manifest contains the hash of the associated bytecode."""
+        # this test doesn't need any actual rules
+        mocker.patch("pennylane.decomposition.signature_registry", return_value={})
+        compiler = mocker.patch(
+            "catalyst.decomposition.precompile_decomposition_rules._quantum_opt",
+            return_value=b"bytecode",
+        )
+        bytecode_path = tmp_path / "nested" / "rules.mlirbc"
+
+        precompile_decomp_rules(str(bytecode_path))
+
+        compiler.assert_called_once()
+        manifest = json.loads(get_bytecode_manifest_path(bytecode_path).read_text())
+        assert bytecode_path.read_bytes() == b"bytecode"
+        assert manifest == {
+            "bytecode_hash": hashlib.sha256(b"bytecode").hexdigest(),
+            "precompiled_rules": [],
+        }
+
+    def test_failed_rules_are_not_written(self, mocker, tmp_path):
+        """A rule that fails compilation should be omitted from the bytecode and manifest."""
+
+        @register_resources({})
+        def failing_rule(reg):
+            del reg
+            raise RuntimeError("intentional capture failure")
+
+        mocker.patch(
+            "pennylane.decomposition.signature_registry",
+            return_value={NoParams: {NoParams(reg=Wire[1])}},
+        )
+        bytecode_path = tmp_path / "rules.mlirbc"
+
+        with local_decomps():
+            add_decomps(NoParams, failing_rule)
+            with pytest.warns(RuleLoweringWarning, match="intentional capture failure"):
+                precompile_decomp_rules(bytecode_path)
+
+        bytecode = _quantum_opt("--empty", str(bytecode_path))
+        manifest = json.loads(get_bytecode_manifest_path(bytecode_path).read_text())
+        assert "failing_rule" not in bytecode
+        assert manifest["precompiled_rules"] == []
+
+    def test_failed_rules_dont_block_successful_rules(self, mocker, tmp_path):
+        """A failed rules does not prevent a successful rule for the same op from being registered."""
+
+        @register_resources({NoParamsCustomOp(wires=Wire[1]): 1})
+        def good_rule(reg):
+            NoParamsCustomOp(wires=reg)
+
+        @register_resources({})
+        def failing_rule(reg):
+            del reg
+            raise RuntimeError("intentional capture failure")
+
+        mocker.patch(
+            "pennylane.decomposition.signature_registry",
+            return_value={NoParams: {NoParams(reg=Wire[1])}},
+        )
+        bytecode_path = tmp_path / "rules.mlirbc"
+
+        with local_decomps():
+            add_decomps(NoParams, good_rule, failing_rule)
+            with pytest.warns(RuleLoweringWarning, match="intentional capture failure"):
+                precompile_decomp_rules(bytecode_path)
+
+        bytecode = _quantum_opt("--empty", str(bytecode_path))
+        manifest = json.loads(get_bytecode_manifest_path(bytecode_path).read_text())
+        assert "good_rule" in bytecode
+        assert "failing_rule" not in bytecode
+        assert {rule["frontend_name"] for rule in manifest["precompiled_rules"]} == {"good_rule"}
+        assert {rule["target_gate"] for rule in manifest["precompiled_rules"]} == {
+            "NoParams{}{reg:1}{}",
+            "Adjoint(NoParams){}{reg:1}{}",
+        }
+
+    def test_precompile_registers_variants(self, mocker, tmp_path):
+        """Precompilation includes descendants and synthesized modifier variants."""
+
+        @register_resources({SingleParam(x=Float, reg=Wire[1]): 1})
+        def root_to_single(reg):
+            SingleParam(x=0.5, reg=reg)
+
+        @register_resources({NoParamsCustomOp(wires=Wire[1]): 1})
+        def single_to_leaf(x, reg):
+            del x
+            NoParamsCustomOp(wires=reg)
+
+        mocker.patch(
+            "pennylane.decomposition.signature_registry",
+            return_value={NoParams: {NoParams(reg=Wire[1])}},
+        )
+
+        bytecode_path = tmp_path / "bytecode.mlirbc"
+        with local_decomps():
+            add_decomps(NoParams, root_to_single)
+            add_decomps(SingleParam, single_to_leaf)
+            precompile_decomp_rules(bytecode_path)
+
+        bytecode = _quantum_opt("--empty", str(bytecode_path))
+        assert 'target_gate = "NoParams{}{reg:1}{}"' in bytecode
+        assert 'target_gate = "SingleParam{x:[tensor<f64>]}{reg:1}{}"' in bytecode
+
+        # we should include adjoint variants
+        assert 'target_gate = "Adjoint(NoParams){}{reg:1}{}"' in bytecode
+        # children of adjoint variants should be synthesized as well
+        assert 'target_gate = "Adjoint(SingleParam){x:[tensor<f64>]}{reg:1}{}"' in bytecode
+
+        # we should not include control variants
+        assert 'target_gate = "C(NoParams){}{reg:1}{}"' not in bytecode
+
+        manifest = json.loads(get_bytecode_manifest_path(bytecode_path).read_text())
+        assert {
+            (rule["target_gate"], rule["frontend_name"]) for rule in manifest["precompiled_rules"]
+        } == {
+            ("NoParams{}{reg:1}{}", "root_to_single"),
+            ("Adjoint(NoParams){}{reg:1}{}", "root_to_single"),
+            ("SingleParam{x:[tensor<f64>]}{reg:1}{}", "single_to_leaf"),
+            ("Adjoint(SingleParam){x:[tensor<f64>]}{reg:1}{}", "single_to_leaf"),
+        }
+
+    def test_precompilation_ignores_precompiled_rules(self, mocker, tmp_path):
+        """Test that regenerating precompiled rules ignores existing precompiled rules."""
+
+        @register_resources({SingleParam(x=Float, reg=Wire[1]): 1})
+        def root_to_single(reg):
+            SingleParam(x=0.5, reg=reg)
+
+        cached_root = RuleIdentity(
+            "NoParams{}{reg:1}{}",
+            "root_to_single",
+            {"SingleParam{x:[tensor<f64>]}{reg:1}{}": 1},
+        )
+        mocker.patch(
+            "pennylane.decomposition.signature_registry",
+            return_value={NoParams: {NoParams(reg=Wire[1])}},
+        )
+        load_cache = mocker.patch(
+            "catalyst.from_plxpr.qfunc_interpreter.load_precompiled_rule_identities",
+            return_value=frozenset({cached_root}),
+        )
+        bytecode_path = tmp_path / "bytecode.mlirbc"
+
+        with local_decomps():
+            add_decomps(NoParams, root_to_single)
+            precompile_decomp_rules(bytecode_path)
+
+        bytecode = _quantum_opt("--empty", str(bytecode_path))
+        load_cache.assert_not_called()
+        assert 'target_gate = "NoParams{}{reg:1}{}"' in bytecode
+        manifest = json.loads(get_bytecode_manifest_path(bytecode_path).read_text())
+        assert any(
+            rule["target_gate"] == "NoParams{}{reg:1}{}"
+            and rule["frontend_name"] == "root_to_single"
+            for rule in manifest["precompiled_rules"]
+        )
+
+    def test_trace_uses_generated_manifest(self, mocker, tmp_path):
+        """Trace-time capture skips a rule advertised by a generated manifest."""
+
+        @register_resources({NoParamsCustomOp(wires=Wire[1]): 1})
+        def root_to_leaf(reg):
+            NoParamsCustomOp(wires=reg)
+
+        mocker.patch(
+            "pennylane.decomposition.signature_registry",
+            return_value={NoParams: {NoParams(reg=Wire[1])}},
+        )
+        bytecode_path = tmp_path / "bytecode.mlirbc"
+
+        with local_decomps():
+            add_decomps(NoParams, root_to_leaf)
+            precompile_decomp_rules(bytecode_path)
+            manifest = json.loads(get_bytecode_manifest_path(bytecode_path).read_text())
+            assert {rule["frontend_name"] for rule in manifest["precompiled_rules"]} == {
+                "root_to_leaf"
+            }
+            mocker.patch(
+                "catalyst.decomposition.decomposition_cache.BYTECODE_FILE_PATH",
+                str(bytecode_path),
+            )
+
+            @qjit(capture=True, target="mlir")
+            @qp.qnode(qp.device("null.qubit", wires=1))
+            def circuit():
+                NoParams(reg=0)
+                return qp.state()
+
+            mlir = str(circuit.mlir_module)
+
+        assert 'frontend_name = "root_to_leaf"' not in mlir
+
+    def test_graph_decomposition_uses_precompiled_rules(self, mocker, tmp_path):
+        """The graph pass can use generated bytecode without invoking on-demand materialization."""
+
+        @register_resources({NoParamsCustomOp(wires=Wire[1]): 1})
+        def root_to_leaf(reg):
+            NoParamsCustomOp(wires=reg)
+
+        mocker.patch(
+            "pennylane.decomposition.signature_registry",
+            return_value={NoParams: {NoParams(reg=Wire[1])}},
+        )
+        bytecode_path = tmp_path / "bytecode.mlirbc"
+        with local_decomps():
+            add_decomps(NoParams, root_to_leaf)
+            precompile_decomp_rules(bytecode_path)
+
+        mocker.patch(
+            "catalyst.decomposition.decomposition_rules.compile_reachable_decomposition_rules_wrapper",
+            side_effect=AssertionError(
+                "on-demand rules were used when precompiled rules should provide the necessary decompositions."
+            ),
+        )
+
+        @qjit(capture=True, target="mlir", collect_decomp_rules=False)
+        @graph_decomposition(gate_set={NoParamsCustomOp}, bytecode_rules=str(bytecode_path))
+        @qp.qnode(qp.device("null.qubit", wires=1))
+        def circuit():
+            NoParams(reg=0)
+            return qp.state()
+
+        assert circuit.mlir_opt is not None
+
+    def test_precompiled_with_decomposition_E2E(self):
+        """Test that precompiled rules are used in E2E decomposition."""
+
+        @qp.qjit(target="mlir", capture=True, collect_decomp_rules=False)
+        @qp.decompose(gate_set={qp.RZ, qp.GlobalPhase})
+        @qp.qnode(qp.device("null.qubit", wires=2))
+        def test_phaseshift():
+            qp.PhaseShift(0.5, 1)
+            return qp.probs()
+
+        results = qp.specs(test_phaseshift, level="all")().resources
+        assert results["graph-decomposition"].counts == {"GlobalPhase": 1, "RZ": 1}
 
 
 class TestTraceTime:

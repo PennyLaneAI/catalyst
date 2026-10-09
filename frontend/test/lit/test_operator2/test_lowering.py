@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 """Tests for lowering PennyLane Operator2 classes in Catalyst."""
 
 # pylint: disable = missing-function-docstring,line-too-long
@@ -579,14 +580,6 @@ def test_rz():
     # CHECK-LABEL: func.func public @test_rz
 
     # CHECK: RZ
-
-    # TODO: uncomment as migration enables these rules
-    # CHECK-DAG: _rz_to_ppr
-    # COM: CHECK-DAG: _rz_to_rx_cliff
-    # COM: CHECK-DAG: _rz_to_ry_cliff
-    # COM: CHECK-DAG: _rz_to_ry_rx
-    # CHECK-DAG: _rz_to_rot
-    # COM: CHECK-DAG: _rz_to_ps
     qp.RZ(0.1, wires=0)
 
 

@@ -15,15 +15,39 @@
 """Managed state for the decomposition rule discovery and capture mechanism."""
 
 from dataclasses import dataclass, field
-from typing import Callable
+from typing import Callable, Mapping
 
 import pennylane as qp
 from jax.extend.core import ClosedJaxpr
+from pennylane.core import Operator2
 from pennylane.core.operator import abstractify
 
 from catalyst.decomposition.graph_op_id import GraphOpID
 
 ModifierState = tuple[bool, int]
+
+ResourceEntry = tuple[str, int]
+
+
+@dataclass(frozen=True, init=False)
+class RuleIdentity:
+    """Dataclass with information needed to distinguish unique decomposition rules.
+
+    Attributes:
+        target_gate: The GraphOpID of the gate this decomposition rule applies to
+        frontend_name: the name used to identify this decomposition rule in the frontend
+        resources: sorted pairs of GraphOpIDs and integer resource counts for the rule.
+    """
+
+    target_gate: str
+    frontend_name: str
+    resources: tuple[ResourceEntry, ...]
+
+    def __init__(self, target_gate: str, frontend_name: str, resources: Mapping[str, int]):
+        """Create an identity with a canonical resource ordering."""
+        object.__setattr__(self, "target_gate", target_gate)
+        object.__setattr__(self, "frontend_name", frontend_name)
+        object.__setattr__(self, "resources", tuple(sorted(resources.items())))
 
 
 @dataclass(frozen=True)
@@ -62,7 +86,7 @@ class OpDecompRequest:
     @classmethod
     def from_operation(
         cls,
-        op,
+        op: Operator2,
         modifier_context: ModifierState = (False, 0),
     ) -> "OpDecompRequest":
         """Build a request from a settled captured Operator2 instance.
@@ -107,7 +131,6 @@ class OpDecompRequest:
     @property
     def modifier_state(self) -> ModifierState:
         """Return the modifier state represented by this request."""
-
         return self.adjoint, self.control_count
 
 
@@ -133,14 +156,9 @@ class TracedRule:
     frontend_name: str
 
     @property
-    def identifier(self) -> tuple:
+    def identifier(self) -> RuleIdentity:
         """Rule identifier for deduplication."""
-
-        return (
-            self.target_gate,
-            self.frontend_name,
-            tuple(sorted(self.resources.items())),
-        )
+        return RuleIdentity(self.target_gate, self.frontend_name, self.resources)
 
 
 @dataclass
@@ -153,11 +171,10 @@ class DecompositionScope:
     """
 
     roots: dict[str, tuple[OpDecompRequest, set[ModifierState]]] = field(default_factory=dict)
-    definitions: dict[tuple, TracedRule] = field(default_factory=dict)
+    definitions: dict[RuleIdentity, TracedRule] = field(default_factory=dict)
 
     def record_root(self, request: OpDecompRequest) -> None:
         """Record root nodes for later decomp rule capture, which are explored recursively."""
-
         previous = self.roots.get(request.base_id)
         if previous is None:
             self.roots[request.base_id] = (request, {request.modifier_state})
@@ -166,5 +183,4 @@ class DecompositionScope:
 
     def record_definition(self, traced_rule: TracedRule) -> None:
         """Record a definition once, preserving first-seen order."""
-
         self.definitions.setdefault(traced_rule.identifier, traced_rule)

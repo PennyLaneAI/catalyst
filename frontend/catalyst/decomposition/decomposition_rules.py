@@ -1605,7 +1605,13 @@ def materialize_reachable_rule_strings(
     )
     target_specs = walk_reachable_decomp_rule_sets([(request, {request.modifier_state})])
 
+    return materialize_decomp_rule_strings(target_specs)
+
+
+def materialize_decomp_rule_strings(target_specs: list[DecompTargetSpec]) -> list[str]:
+    """Materialize decomposition rules from DecompTargetSpecs as MLIR rule strings."""
     rules = []
+
     for target_spec in target_specs:
         if not target_spec.rules:
             continue
