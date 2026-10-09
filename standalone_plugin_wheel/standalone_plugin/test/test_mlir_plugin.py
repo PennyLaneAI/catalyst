@@ -17,9 +17,8 @@ The Standalone plugin may be found here:
 https://github.com/llvm/llvm-project/tree/main/mlir/examples/standalone
 """
 
-import pytest
-
 import pennylane as qp
+import pytest
 
 have_standalone_plugin = True
 
