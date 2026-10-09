@@ -34,6 +34,9 @@ set_property(TARGET rt_transport PROPERTY POSITION_INDEPENDENT_CODE ON)
 #   common/interface   headers (WireProtocol, ConfigParser)         ::common
 #   common/coproc/cpu  CoprocessorFn plugins (steane, echo)         ::coproc
 #   common/coproc/gpu  HIP plumbing + device decoders               ::coproc
+#
+# "HIP" above is the HIP language: headers plus a compiler. On AMD both come from an installed
+# ROCm; on NVIDIA the compiler is nvcc and only the headers come from ROCm.
 
 find_package(Threads REQUIRED)
 find_library(IBVERBS_LIB ibverbs)
@@ -47,6 +50,21 @@ if(DEFINED ENV{ROCM_PATH})
     list(APPEND CMAKE_PREFIX_PATH "$ENV{ROCM_PATH}")
 elseif(EXISTS "/opt/rocm")
     list(APPEND CMAKE_PREFIX_PATH "/opt/rocm")
+endif()
+
+# On NVIDIA the compiler is nvcc and ROCm supplies only the headers, so point CMake at both
+# for check_language(HIP) below. Whoever installs hip-dev sets ROCM_PATH; see the
+# check-transport workflow, which pins the packages it fetches.
+find_path(_hip_include_dir hip/hip_runtime.h PATH_SUFFIXES include)
+find_program(_nvcc nvcc HINTS ENV CUDA_PATH ENV CUDA_HOME /usr/local/cuda PATH_SUFFIXES bin)
+if(_hip_include_dir AND _nvcc)
+    get_filename_component(_hip_root "${_hip_include_dir}" DIRECTORY)
+    # CMakeDetermineHIPCompiler reads ROCM_ROOT when set, else shells out to hipconfig, which
+    # is not on PATH. check_language(HIP) probes in a nested project, so the other two are
+    # cached rather than plain variables. No FORCE: a developer can still override them.
+    set(CMAKE_HIP_COMPILER_ROCM_ROOT "${_hip_root}")
+    set(CMAKE_HIP_PLATFORM "nvidia" CACHE STRING "HIP platform")
+    set(CMAKE_HIP_COMPILER "${_nvcc}" CACHE FILEPATH "HIP compiler")
 endif()
 
 include(CheckLanguage)
@@ -63,7 +81,8 @@ if(CMAKE_HIP_COMPILER)
     endif()
     set(TRANSPORT_HAS_HIP TRUE CACHE INTERNAL "transport: HIP toolchain available")
 else()
-    message(STATUS "transport: no HIP compiler -> GPU backends skipped")
+    message(STATUS "transport: no HIP compiler -> GPU backends skipped "
+                   "(no installed ROCm, or no nvcc)")
 endif()
 
 add_subdirectory(common)

@@ -1,0 +1,358 @@
+name: Check Transport
+
+# The only CI that builds and tests the transport stack, on a self-hosted GPU host -- the one
+# runner with libibverbs and HIP together, which is the combination that builds every backend.
+#
+#   backend      what runs against it here
+#   memcpy       runtime C++ (stub + CPU) and backline frontend (CPU controller to CPU coproc)
+#   memcpy_gpu   runtime C++ (GPU) and backline frontend (CPU controller to GPU coproc, incl.
+#                the Triton CSS/BP decoder)
+#   cpu_verbs    runtime C++ and backline frontend, over an rxe0 soft-RoCE loopback
+#   gpu_verbs    runtime C++, over the same loopback
+#
+# Not covered: the out-of-process executor, which needs ENABLE_EXECUTOR=ON -- that adds
+# find_package(LLVM CONFIG REQUIRED) at configure time and would push the runtime build, and
+# so the cheapest tests in the job, behind the LLVM build.
+#
+# Pushes to main and workflow_dispatch always run. A PR runs only when it carries the ``gpu``
+# label, so transport changes on an unlabelled PR get no CI.
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - "runtime/lib/transport/**"
+      - "runtime/lib/executor/**"
+      - "runtime/lib/backend/**"
+      - "runtime/include/Transport*"
+      - "runtime/tests/Test_Transport*"
+      - "runtime/tests/CMakeLists.txt"
+      - "runtime/tests/data/**"
+      - "runtime/Makefile"
+      - "mlir/lib/Transport/**"
+      - "mlir/include/Transport/**"
+      - "frontend/catalyst/backline.py"
+      - "frontend/test/pytest/test_backline.py"
+      - "frontend/test/pytest/conftest.py"
+      - ".github/actions/setup-soft-roce/**"
+      - ".github/workflows/check-transport.yaml"
+  pull_request:
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - ready_for_review
+      - labeled
+    paths:
+      - "runtime/lib/transport/**"
+      - "runtime/lib/executor/**"
+      - "runtime/lib/backend/**"
+      - "runtime/include/Transport*"
+      - "runtime/tests/Test_Transport*"
+      - "runtime/tests/CMakeLists.txt"
+      - "runtime/tests/data/**"
+      - "runtime/Makefile"
+      - "mlir/lib/Transport/**"
+      - "mlir/include/Transport/**"
+      - "frontend/catalyst/backline.py"
+      - "frontend/test/pytest/test_backline.py"
+      - "frontend/test/pytest/conftest.py"
+      - ".github/actions/setup-soft-roce/**"
+      - ".github/workflows/check-transport.yaml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  # Not keyed on the commit -- that started a new group per push instead of superseding it. The
+  # event is in the key so workflow_dispatch and pull_request do not cancel each other.
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  constants:
+    name: Set build matrix
+    uses: ./.github/workflows/constants.yaml
+
+  transport-tests:
+    name: Transport build and tests (self-hosted GPU)
+    needs: [constants]
+    runs-on:
+      - single-gpu-x64
+
+    if: >-
+      ${{
+        github.event_name == 'push' ||
+        github.event_name == 'workflow_dispatch' ||
+        (
+          github.event_name == 'pull_request' &&
+          github.event.pull_request.draft == false &&
+          contains(github.event.pull_request.labels.*.name, 'gpu')
+        )
+      }}
+
+    steps:
+      # --------------------------------------------------------------------------------------
+      # 0. Toolchain, sources and Python deps
+      #
+      #   Produces: gcc/HIP/ibverbs toolchain, the requirements.txt pins every build below
+      #   compiles against, and the LLVM source tree.
+      # --------------------------------------------------------------------------------------
+      - name: Update PATH and LD_LIBRARY_PATH for CUDA
+        run: |
+          echo "/usr/local/cuda/bin" >> $GITHUB_PATH
+          echo "LD_LIBRARY_PATH=/usr/local/cuda/lib64${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}" >> $GITHUB_ENV
+
+      - name: Checkout Catalyst repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ needs.constants.outputs.primary_python_version }}
+
+      - name: Install build dependencies and resolve the toolchain
+        # Every `make` below has to see identical values: a flag that differs between two calls
+        # makes the `configure` prerequisite reset the cmake cache and drop the built .sos.
+        # LLVM_BUILD_DIR is the exception and is set later -- runtime's Makefile reads it, and
+        # the runtime build runs before that tree exists. CATALYST_LIB_DIR is set here so the
+        # frontend build sees it, or precompile_decomposition_rules only warns.
+        run: |
+          sudo apt-get update
+          # libibverbs-dev: without it the RDMA backends are silently skipped at configure
+          # time. With it, this host has ibverbs and HIP together -- the only combination that
+          # builds gpu_verbs -- so `make runtime` covers all four backends in one configure.
+          sudo apt-get install -y clang lld libibverbs-dev
+          python3 -m pip install "cmake>=3.26" ninja "nanobind<2.13" pybind11 numpy PyYAML
+          {
+            echo "C_COMPILER=$(which gcc)"
+            echo "CXX_COMPILER=$(which g++)"
+            echo "ENABLE_TRANSPORT=ON"
+            echo "LLVM_SRC_DIR=$(pwd)/mlir/llvm-project"
+            echo "RT_BUILD_DIR=$(pwd)/runtime-build"
+            echo "DIALECTS_BUILD_DIR=$(pwd)/quantum-build"
+            echo "CATALYST_LIB_DIR=$(pwd)/quantum-build/lib"
+            echo "PYTHONPATH=${PYTHONPATH:-}:$(pwd)/quantum-build/python_packages/quantum"
+          } >> "$GITHUB_ENV"
+
+      - name: Install the HIP headers
+        # nvcc compiles the HIP; ROCm supplies the headers. The repo URL pins 7.1.1, needed for
+        # the dma-buf API that 6.4 lacks. Both packages are MIT (c) AMD.
+        run: |
+          set -euo pipefail
+          curl -fsSL https://repo.radeon.com/rocm/rocm.gpg.key \
+            | sudo gpg --dearmor --yes -o /usr/share/keyrings/rocm.gpg
+          echo "deb [arch=amd64 signed-by=/usr/share/keyrings/rocm.gpg]" \
+               "https://repo.radeon.com/rocm/apt/7.1.1 jammy main" \
+            | sudo tee /etc/apt/sources.list.d/rocm.list
+          sudo apt-get update
+          # --no-install-recommends: hip-dev and rocm-llvm recommend libdrm-amdgpu and a
+          # multilib gcc, neither of which an NVIDIA host compiling with nvcc needs.
+          sudo apt-get install -y --no-install-recommends hip-dev
+          echo "ROCM_PATH=$(echo /opt/rocm-*)" >> $GITHUB_ENV
+
+      # The ONNX coprocessor function's tests run a model through this onnxruntime, on its CPU
+      # provider, and are skipped unless CATALYST_TEST_ONNXRUNTIME_LIB names its library.
+      - name: Install onnxruntime for the ONNX coprocessor function's tests
+        run: |
+          python3 -m pip install onnxruntime
+          ORT_LIB=$(python3 -c "import glob, os, onnxruntime; print(sorted(glob.glob(os.path.join(os.path.dirname(onnxruntime.__file__), 'capi', 'libonnxruntime.so*')))[0])")
+          echo "CATALYST_TEST_ONNXRUNTIME_LIB=${ORT_LIB}" >> $GITHUB_ENV
+
+      # Ahead of every build below: requirements.txt pins the numpy/nanobind/pybind11 the MLIR
+      # bindings and the runtime compile against. Torch and Triton are not needed until the
+      # frontend tests, so they are installed there instead.
+      - name: Install Python runtime requirements
+        run: python3 -m pip install -r requirements.txt
+
+      - name: Get Cached LLVM Source
+        id: cache-llvm-source
+        uses: actions/cache/restore@v4
+        with:
+          path: mlir/llvm-project
+          key: llvm-${{ needs.constants.outputs.llvm_version }}-default-source
+          enableCrossOsArchive: true
+
+      - name: Clone LLVM Submodule
+        if: steps.cache-llvm-source.outputs.cache-hit != 'true'
+        uses: actions/checkout@v4
+        with:
+          repository: llvm/llvm-project
+          ref: ${{ needs.constants.outputs.llvm_version }}
+          path: mlir/llvm-project
+
+      # --------------------------------------------------------------------------------------
+      # 1. Runtime build and the device-free C++ suites
+      #
+      #   Needs: LLVM's source headers only -- ENABLE_EXECUTOR is OFF, so no built LLVM.
+      #   Produces: runtime-build/ with all four backends and every transport test binary.
+      #   First tests in the job, and the cheapest.
+      # --------------------------------------------------------------------------------------
+      # Turning ENABLE_EXECUTOR on would add find_package(LLVM CONFIG REQUIRED) at configure
+      # time and force this whole phase behind the LLVM build.
+      - name: Build Catalyst-Runtime with all four transport backends
+        run: make -C runtime runtime
+
+      # transport_tests_all builds every transport suite this runner's toolchain supports: the
+      # transport CAPI, coprocessor-function and ONNX tests, memcpy, and, with libibverbs and a
+      # HIP compiler, the RDMA and GPU backends. The verbs suites are built here rather than
+      # after soft-RoCE so a compile error -- likely, since this is the first host where
+      # cpu_verbs and gpu_verbs compile at all -- lands before the MLIR stack, not after it.
+      # They run at the end of the job, once rxe0 exists; only the two needing no device run now.
+      #
+      # test -x: the CAPI suite is the one that always builds, so its absence means the build
+      # quietly produced nothing rather than that this toolchain skipped a backend.
+      - name: Build all transport C++ suites, run the device-free ones
+        run: |
+          cmake --build "$RT_BUILD_DIR" --target transport_tests_all -j
+          test -x "$RT_BUILD_DIR/tests/runner_tests_transport"
+          "$RT_BUILD_DIR/tests/runner_tests_transport" --allow-running-no-tests
+          "$RT_BUILD_DIR/tests/runner_tests_transport_memcpy" --allow-running-no-tests
+
+      # --------------------------------------------------------------------------------------
+      # 2. MLIR stack -- LLVM, StableHLO, Enzyme
+      #
+      #   Needs: the requirements.txt pins from phase 0.
+      #   Produces: llvm-build/, stablehlo-build/, enzyme-build/.
+      #   Only the frontend build consumes these, so they sit in front of it, not earlier.
+      # --------------------------------------------------------------------------------------
+      # Built here rather than restored from a GH-hosted image's cache: that mlir-tblgen needs
+      # a newer GLIBC than this jammy host has, hence the selfhosted-gpu key prefix. Entries are
+      # ref-scoped, so a push to main is what seeds every branch.
+      - name: Export the MLIR stack build directories
+        # After `make runtime`, which reads LLVM_BUILD_DIR before that tree exists. Every make
+        # below inherits these, so they need no env prefix of their own.
+        run: |
+          {
+            echo "LLVM_BUILD_DIR=$(pwd)/llvm-build"
+            echo "STABLEHLO_BUILD_DIR=$(pwd)/stablehlo-build"
+            echo "ENZYME_BUILD_DIR=$(pwd)/enzyme-build"
+          } >> "$GITHUB_ENV"
+
+      - name: Cache LLVM Build
+        id: cache-llvm-build
+        uses: actions/cache@v4
+        with:
+          path: llvm-build
+          key: selfhosted-gpu-${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-ci-build-gcc
+
+      - name: Build LLVM
+        if: steps.cache-llvm-build.outputs.cache-hit != 'true'
+        run: make llvm
+
+      - name: Cache Stablehlo Source
+        id: cache-stablehlo-source
+        uses: actions/cache@v4
+        with:
+          path: mlir/stablehlo
+          key: stablehlo-${{ needs.constants.outputs.stablehlo_version }}-default-source
+          enableCrossOsArchive: true
+
+      - name: Clone Stablehlo Submodule
+        if: steps.cache-stablehlo-source.outputs.cache-hit != 'true'
+        uses: actions/checkout@v4
+        with:
+          repository: openxla/stablehlo
+          ref: ${{ needs.constants.outputs.stablehlo_version }}
+          path: mlir/stablehlo
+
+      - name: Cache Stablehlo Build
+        id: cache-stablehlo-build
+        uses: actions/cache@v4
+        with:
+          path: stablehlo-build
+          key: selfhosted-gpu-${{ runner.os }}-stablehlo-${{ needs.constants.outputs.stablehlo_version }}-ci-build-gcc
+
+      - name: Build Stablehlo Dialect
+        if: steps.cache-stablehlo-build.outputs.cache-hit != 'true'
+        run: make stablehlo
+
+      - name: Cache Enzyme Source
+        id: cache-enzyme-source
+        uses: actions/cache@v4
+        with:
+          path: mlir/Enzyme
+          key: enzyme-${{ needs.constants.outputs.enzyme_version }}-default-source
+          enableCrossOsArchive: true
+
+      - name: Clone Enzyme Submodule
+        if: steps.cache-enzyme-source.outputs.cache-hit != 'true'
+        uses: actions/checkout@v4
+        with:
+          repository: EnzymeAD/Enzyme
+          ref: ${{ needs.constants.outputs.enzyme_version }}
+          path: mlir/Enzyme
+
+      - name: Cache Enzyme Build
+        id: cache-enzyme-build
+        uses: actions/cache@v4
+        with:
+          path: enzyme-build
+          key: selfhosted-gpu-${{ runner.os }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-ci-build-gcc
+
+      - name: Build Enzyme
+        if: steps.cache-enzyme-build.outputs.cache-hit != 'true'
+        run: make enzyme
+
+      # --------------------------------------------------------------------------------------
+      # 3. Catalyst frontend and the memcpy-transport tests
+      #
+      #   Needs: the three build dirs from phase 2 and runtime-build/ from phase 1.
+      #   Produces: quantum-build/ and an installed frontend.
+      #   No device needed: every case here goes over the memcpy backend.
+      # --------------------------------------------------------------------------------------
+      - name: Build the Catalyst dialects, plugin and frontend
+        # The `catalyst` target's components minus `runtime`, which is already built above
+        # with the transport flags this job needs; re-entering it here would reconfigure.
+        run: ENABLE_LLD=ON make dialects plugin frontend oqc
+
+      - name: Export the frontend and transport library locations
+        run: |
+          echo "$LLVM_BUILD_DIR/bin" >> $GITHUB_PATH
+          echo "$DIALECTS_BUILD_DIR/bin" >> $GITHUB_PATH
+          echo "RUNTIME_LIB_DIR=$RT_BUILD_DIR/lib" >> $GITHUB_ENV
+          echo "MLIR_LIB_DIR=$LLVM_BUILD_DIR/lib" >> $GITHUB_ENV
+          echo "CATALYST_BIN_DIR=$DIALECTS_BUILD_DIR/bin" >> $GITHUB_ENV
+          echo "CATALYST_TRANSPORT_PATH=$RT_BUILD_DIR/lib" >> $GITHUB_ENV
+
+      # Here rather than with requirements.txt: this pulls ~2.5GB from an external index, and
+      # nothing before this step needs it. A failure now cannot cost the runtime unit tests
+      # their result. Installed after requirements.txt so it resolves against the pinned set.
+      - name: Install Torch and Triton
+        run: |
+          # torch exists only so triton <3.8 can probe the driver through it; cu129 matches
+          # the gpu_runners driver.
+          pip install 'torch==2.13.0+cu129' 'triton<3.8' \
+            --index-url https://download.pytorch.org/whl/cu129
+          # Triton dlopens libcuda.so.1 from the driver, not the toolkit stub.
+          echo "TRITON_LIBCUDA_PATH=/lib/x86_64-linux-gnu" >> $GITHUB_ENV
+
+      # --------------------------------------------------------------------------------------
+      # 4. Soft-RoCE (For tests that work with an emulated RDMA device)
+      #
+      #   Needs: the test binaries from phase 1, the frontend from phase 3, and rxe0.
+      #   Last on purpose -- this modprobes an out-of-tree rdma_rxe that outlives the job on
+      #   a persistent runner, and everything above has already reported by now.
+      # --------------------------------------------------------------------------------------
+      - name: Set up Soft-RoCE loopback
+        uses: ./.github/actions/setup-soft-roce
+
+      # Built in the runtime unit-test step; only the run waits for rxe0. gpu_verbs has never
+      # executed on any runner, so this is its first real exercise.
+      - name: Run the cpu_verbs and gpu_verbs C++ suites over rxe0
+        run: |
+          "$RT_BUILD_DIR/tests/runner_tests_transport_common" --allow-running-no-tests
+          "$RT_BUILD_DIR/tests/runner_tests_transport_cpu" --allow-running-no-tests
+          "$RT_BUILD_DIR/tests/runner_tests_transport_gpu" --allow-running-no-tests
+
+      - name: Run the backline test file
+        env:
+          # Without this Triton discards ptxas diagnostics, leaving codegen failures as "status 255".
+          TRITON_DUMP_PTXAS_LOG: "1"
+        # Everything but the out_of_process RDMA case: that one launches a catalyst-executor
+        # subprocess, which needs a runtime built with ENABLE_EXECUTOR=ON -- left off here to keep
+        # the runtime build ahead of LLVM, so the binary is absent and the spawn fails rather than
+        # skipping. No workflow sets that flag, so the param runs nowhere in CI; see the header.
+        run: |
+          python3 -m pytest -v -rs -k "not out_of_process" frontend/test/pytest/test_backline.py
