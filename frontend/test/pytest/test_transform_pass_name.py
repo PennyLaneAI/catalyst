@@ -113,6 +113,119 @@ def test_pass_with_unsupported_options(backend):
         qjc()
 
 
+def test_pass_plugin_transform(mocker, tmp_path, backend):
+    """Test that a transform from a pass plugin works with capture disabled."""
+
+    plugin_path = tmp_path / "FakePlugin.so"
+    plugin_path.touch()
+
+    mock_plugin_module = mocker.Mock()
+    mock_plugin_module.name2pass.return_value = (plugin_path, "my-custom-pass")
+
+    mock_entry_point = mocker.Mock()
+    mock_entry_point.load.return_value = mock_plugin_module
+    mocker.patch(
+        "catalyst.qfunc.entry_points",
+        return_value={"fakeplugin.passes": mock_entry_point},
+    )
+
+    plugin_pass = qp.transform(pass_name="fakeplugin.my-custom-pass")
+
+    @qp.qjit(target="mlir", capture=False)
+    @plugin_pass
+    @qp.qnode(qp.device(backend, wires=1))
+    def circuit():
+        return qp.expval(qp.PauliZ(0))
+
+    assert circuit.compile_options.pass_plugins == {plugin_path}
+    assert circuit.compile_options.dialect_plugins == {plugin_path}
+    assert 'transform.apply_registered_pass "my-custom-pass"' in circuit.mlir
+    mock_plugin_module.name2pass.assert_called_once_with("my-custom-pass")
+
+
+def test_pass_plugin_transform_with_options(mocker, tmp_path, backend):
+    """Test that a pass plugin transform forwards options under capture=False."""
+
+    plugin_path = tmp_path / "FakePlugin.so"
+    plugin_path.touch()
+
+    mock_plugin_module = mocker.Mock()
+    mock_plugin_module.name2pass.return_value = (plugin_path, "my-custom-pass")
+
+    mock_entry_point = mocker.Mock()
+    mock_entry_point.load.return_value = mock_plugin_module
+    mocker.patch(
+        "catalyst.qfunc.entry_points",
+        return_value={"fakeplugin.passes": mock_entry_point},
+    )
+
+    plugin_pass = qp.transform(pass_name="fakeplugin.my-custom-pass")
+
+    @qp.qjit(target="mlir", capture=False)
+    @partial(plugin_pass, my_option="my_option_value", my_other_option=False)
+    @qp.qnode(qp.device(backend, wires=1))
+    def circuit():
+        return qp.expval(qp.PauliZ(0))
+
+    mlir = circuit.mlir
+    assert circuit.compile_options.pass_plugins == {plugin_path}
+    assert 'transform.apply_registered_pass "my-custom-pass"' in mlir
+    assert (
+        'with options = {"my-option" = "my_option_value", "my-other-option" = false}' in mlir
+    )
+
+
+def test_pass_plugin_transform_with_multiple_dots(mocker, tmp_path, backend):
+    """Test that a pass_name with more than one '.' splits only on the first '.'."""
+
+    plugin_path = tmp_path / "FakePlugin.so"
+    plugin_path.touch()
+
+    mock_plugin_module = mocker.Mock()
+    mock_plugin_module.name2pass.return_value = (plugin_path, "my.nested.pass")
+
+    mock_entry_point = mocker.Mock()
+    mock_entry_point.load.return_value = mock_plugin_module
+    mocker.patch(
+        "catalyst.qfunc.entry_points",
+        return_value={"fakeplugin.passes": mock_entry_point},
+    )
+
+    plugin_pass = qp.transform(pass_name="fakeplugin.my.nested.pass")
+
+    @qp.qjit(target="mlir", capture=False)
+    @plugin_pass
+    @qp.qnode(qp.device(backend, wires=1))
+    def circuit():
+        return qp.expval(qp.PauliZ(0))
+
+    assert circuit.compile_options.pass_plugins == {plugin_path}
+    assert 'transform.apply_registered_pass "my.nested.pass"' in circuit.mlir
+    mock_plugin_module.name2pass.assert_called_once_with("my.nested.pass")
+
+
+def test_pass_plugin_not_installed(mocker, backend):
+    """Test that a clear error is raised when the pass plugin is not installed."""
+
+    mocker.patch(
+        "catalyst.qfunc.entry_points",
+        return_value={},
+    )
+
+    missing_plugin_pass = qp.transform(pass_name="missingplugin.my-custom-pass")
+
+    @missing_plugin_pass
+    @qp.qnode(qp.device(backend, wires=1))
+    def circuit():
+        return qp.expval(qp.PauliZ(0))
+
+    with pytest.raises(
+        ValueError,
+        match="No pass plugin registered under 'missingplugin'.*Is the plugin package installed",
+    ):
+        qp.qjit(circuit, capture=False)()
+
+
 def test_pass_before_tape_transform(backend):
     """Test that provided an mlir-only transform prior to a tape transform raises an error."""
 
