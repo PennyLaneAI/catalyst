@@ -194,9 +194,16 @@ struct DecomposableGatePattern final : public OpInterfaceRewritePattern<Decompos
         auto enableQreg = llvm::any_of(rule.getFunctionType().getInputs(),
                                        [](mlir::Type t) { return isa<qref::QuregType>(t); });
         auto analyzer = DecomposableGateSignatureAnalyzer(op, enableQreg);
-        assert(analyzer && "Analyzer should be valid");
+        if (!analyzer) {
+            return failure();
+        }
 
         auto operands = analyzer.prepareOperands(rule, rewriter, op.getLoc());
+        // prepareOperands flags the analyzer invalid (and emits a diagnostic) when the rule's
+        // signature cannot be reconciled with the operator, rather than building a malformed op.
+        if (!analyzer) {
+            return failure();
+        }
 
         if (inlineRuleBody) {
             inlineRule(rewriter, rule, operands);
