@@ -23,6 +23,7 @@ from copy import copy
 from dataclasses import dataclass
 from numbers import Integral
 from typing import Callable, Sequence
+from importlib.metadata import entry_points
 
 import jax.numpy as jnp
 import pennylane as qp
@@ -634,6 +635,7 @@ def _extract_passes(transform_program):
     """Extract transforms with pass names from the end of the CompilePipeline."""
     tape_transforms = []
     pass_pipeline = []
+
     i = len(transform_program)
     for t in reversed(transform_program):
         # ``qp.decompose`` carries ``pass_name="graph-decomposition"`` so that, under program
@@ -647,11 +649,35 @@ def _extract_passes(transform_program):
         if t.pass_name is None or is_capture_only_pass:
             break
         i -= 1
-    pass_pipeline = transform_program[i:]
+
     tape_transforms = transform_program[:i]
     for t in tape_transforms:
         if t.tape_transform is None:
             raise ValueError(
                 f"{t} without a tape definition occurs before tape transform {tape_transforms[-1]}."
             )
+    pass_pipeline = []
+    for t in transform_program[i:]:
+        if "." not in t.pass_name:
+            pass_pipeline.append(t)
+        else:
+            resolution_functions = entry_points(group="catalyst.passes_resolution")
+            key, passname = t.pass_name.split(".", 1)
+            try:
+                resolution_function = resolution_functions[key + ".passes"]
+            except KeyError as e:
+                raise ValueError(
+                    f"No pass plugin registered under '{key}'. Available: "
+                    f"{[ep.name for ep in resolution_functions]}. "
+                    "Is the plugin package installed?"
+                ) from e
+            module = resolution_function.load()
+            path, name = module.name2pass(passname)
+            EvaluationContext.add_plugin(path)
+            new_t = qp.transform(pass_name=name)
+            new_bound_t = qp.core.transforms.BoundTransform(new_t, t.args, t.kwargs)
+            pass_pipeline.append(new_bound_t)
+
+
+
     return qp.CompilePipeline(tape_transforms), tuple(pass_pipeline)

@@ -465,7 +465,7 @@ def handle_transform(
     next_eval = copy(self)
     t = qp.transform(pass_name=name)
     # Transform.__call__() rejects empty args/kwargs; construct BoundTransform directly.
-    bound_pass = qp.transforms.core.BoundTransform(t, args=targs, kwargs=pl_tkwargs)
+    bound_pass = qp.core.transforms.BoundTransform(t, args=targs, kwargs=pl_tkwargs)
     next_eval._pass_pipeline.insert(0, bound_pass)
     return next_eval.eval(inner_jaxpr, consts, *non_const_args)
 

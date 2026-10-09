@@ -17,6 +17,8 @@ The Standalone plugin may be found here:
 https://github.com/llvm/llvm-project/tree/main/mlir/examples/standalone
 """
 
+import pytest
+
 import pennylane as qp
 
 have_standalone_plugin = True
@@ -24,11 +26,12 @@ have_standalone_plugin = True
 from standalone_plugin import SwitchBarToFoo, getStandalonePluginAbsolutePath
 
 
-def test_pass_automatically_adds_to_required_plugins():
+@pytest.mark.parametrize("capture", (True, False))
+def test_pass_automatically_adds_to_required_plugins(capture):
     """Test that applying the pass from the plugin automatically adds
     to the list of required plugins."""
 
-    @qp.qjit(capture=True)
+    @qp.qjit(capture=capture)
     @SwitchBarToFoo
     @qp.qnode(qp.device("null.qubit", wires=1))
     def c():
