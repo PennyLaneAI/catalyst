@@ -807,6 +807,49 @@ class TestTraceTime:
             assert specs.resources.counts["NoParams"] == 2
 
 
+class TestHybridOperatorArgDecomposition:
+    """Decomposing operators that carry a nested-operator ("hybrid") argument, e.g. ``GQSP``."""
+
+    @staticmethod
+    def _gqsp_circuit(dev):
+        def circuit():
+            # angles shape (3, 1): the control-only branch of GQSP's decomposition.
+            qp.GQSP(qp.X(1), angles=np.ones((3, 1)), control=0)
+            return qp.probs(wires=0)
+
+        return circuit
+
+    def test_gqsp_rule_wire_arity_matches_operator(self):
+        """The GQSP decomposition rule's grouped wire tensor spans all the operator's wires."""
+        gate_set = {"X", "Z", "Hadamard", "CNOT", "RZ", "RY", "GlobalPhase"}
+
+        @qjit(capture=True, target="mlir")
+        @graph_decomposition(gate_set=gate_set)
+        @qnode(qp.device("null.qubit", wires=2))
+        def circuit():
+            qp.GQSP(qp.X(1), angles=np.ones((3, 1)), control=0)
+            return qp.probs(wires=0)
+
+        mlir = circuit.mlir
+        assert 'tensor<2xi64>) attributes {frontend_name = "_GQSP_decomposition"' in mlir
+        assert 'tensor<1xi64>) attributes {frontend_name = "_GQSP_decomposition"' not in mlir
+
+    def test_gqsp_decomposes_to_correct_state(self):
+        """GQSP decomposed via graph-decomposition matches the reference execution."""
+        gate_set = {"X", "Z", "Hadamard", "CNOT", "RZ", "RY", "GlobalPhase"}
+        dev = qp.device("lightning.qubit", wires=2)
+
+        reference = qp.QNode(self._gqsp_circuit(dev), dev)
+
+        @qjit(capture=True)
+        @graph_decomposition(gate_set=gate_set)
+        @qnode(dev)
+        def decomposed():
+            return self._gqsp_circuit(dev)()
+
+        assert np.allclose(np.asarray(decomposed()), np.asarray(reference()))
+
+
 class TestOnDemand:
     """Test the python wrapper functions used for on-demand,
     compile-time decomposition rule lowering.
