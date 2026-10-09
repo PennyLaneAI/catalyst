@@ -40,6 +40,7 @@
 #include "Catalyst/Utils/EnsureFunctionDeclaration.h"
 #include "PBC/IR/PBCOps.h"
 #include "Quantum/IR/QuantumOps.h"
+#include "Quantum/Transforms/Passes.h"
 #include "Quantum/Transforms/Patterns.h"
 
 using namespace mlir;
@@ -239,24 +240,24 @@ constexpr SequenceStatistics cliffordTStatistics{3.0590, 1.1278, -0.0074, 1.9849
                                                  cliffordTCaseFrequencies};
 constexpr SequenceStatistics pprStatistics{3.0590, 1.1278, 1.5324, 4.2326, pprCaseFrequencies};
 
-// Mixed synthesis: fitted over 200 uniformly random angles and 8 samples per angle and epsilon,
-// for diamond-norm epsilon in [1e-11, 1e-3]. The samples include the twirling Cliffords.
+// Mixed synthesis: fitted over 1000 uniformly random angles and 8 samples per angle and epsilon,
+// for diamond-norm epsilon in [1e-11, 1e-3]. The samples include the (merged) twirling Cliffords.
 // Clifford+T cases: T, HT, SHT, I, X, ...
-constexpr double mixedCliffordTCaseFrequencies[] = {0.0112, 0.4949, 0.4939, 0.0162, 0.0275,
-                                                    0.0311, 0.2462, 0.1633, 0.2739, 0.2419};
+constexpr double mixedCliffordTCaseFrequencies[] = {0.0111, 0.4939, 0.4950, 0.0054, 0.0395,
+                                                    0.0386, 0.2380, 0.2109, 0.2551, 0.2124};
 // PPR cases: I, X2, X4, X8, adjX2, ...
 constexpr double mixedPPRCaseFrequencies[] = {
-    0.0022, 0.0038, 0.4146, 0.4941, 0.0000, 0.0092, 0.0000, 0.0043, 0.0000, 0.0000,
-    0.0000, 0.0000, 0.0059, 0.0433, 0.4890, 0.5000, 0.0000, 0.0335, 0.0000};
+    0.0006, 0.0044, 0.4277, 0.4944, 0.0000, 0.0091, 0.0000, 0.0043, 0.0000, 0.0000,
+    0.0000, 0.0000, 0.0056, 0.0355, 0.4949, 0.5000, 0.0000, 0.0235, 0.0000};
 static_assert(std::size(mixedCliffordTCaseFrequencies) == numCliffordTCases);
 static_assert(std::size(mixedPPRCaseFrequencies) == numPPRCases);
-constexpr SequenceStatistics mixedCliffordTStatistics{1.5356, 3.2211, 0.0010, 3.4275,
+constexpr SequenceStatistics mixedCliffordTStatistics{1.5394, 3.1421, 0.0027, 2.6123,
                                                       mixedCliffordTCaseFrequencies};
-constexpr SequenceStatistics mixedPPRStatistics{1.5356, 3.2211, 0.7723, 6.9217,
+constexpr SequenceStatistics mixedPPRStatistics{1.5394, 3.1421, 0.7751, 6.1278,
                                                 mixedPPRCaseFrequencies};
 
-const SequenceStatistics &getSequenceStatistics(bool pprBasis, bool mixed) {
-    if (mixed) {
+const SequenceStatistics &getSequenceStatistics(bool pprBasis, GridsynthMethod method) {
+    if (method == GridsynthMethod::Mixed) {
         return pprBasis ? mixedPPRStatistics : mixedCliffordTStatistics;
     }
     return pprBasis ? pprStatistics : cliffordTStatistics;
@@ -303,7 +304,8 @@ struct DecompositionExternalFuncs {
  * The mixed variants take an additional f64 uniform sample selecting the branch and twirl.
  */
 DecompositionExternalFuncs getOrDeclareExternalFuncs(PatternRewriter &rewriter, func::FuncOp func,
-                                                     bool mixed) {
+                                                     GridsynthMethod method) {
+    bool mixed = method == GridsynthMethod::Mixed;
     auto f64Type = rewriter.getF64Type();
     auto i1Type = rewriter.getI1Type();
     auto indexType = rewriter.getIndexType();
@@ -340,7 +342,7 @@ DecompositionExternalFuncs getOrDeclareExternalFuncs(PatternRewriter &rewriter, 
  */
 Value buildDecompositionLoop(PatternRewriter &rewriter, Location loc, Value qbitIn,
                              Value gatesMemref, Value numGates, double epsilon, bool pprBasis,
-                             bool mixed) {
+                             GridsynthMethod method) {
     auto qbitType = QubitType::get(rewriter.getContext());
     Value c0 = arith::ConstantIndexOp::create(rewriter, loc, 0);
     Value c1 = arith::ConstantIndexOp::create(rewriter, loc, 1);
@@ -379,7 +381,7 @@ Value buildDecompositionLoop(PatternRewriter &rewriter, Location loc, Value qbit
             populateCliffordTSwitchCases(rewriter, loc, switchOp, currentQbit);
         }
         setResourceHints(
-            rewriter, forOp, switchOp, getSequenceStatistics(pprBasis, mixed),
+            rewriter, forOp, switchOp, getSequenceStatistics(pprBasis, method),
             pprBasis ? ArrayRef<int64_t>(pprTCases) : ArrayRef<int64_t>(cliffordTTCases), epsilon);
 
         // Yield the result of the switch op from the for loop
@@ -396,7 +398,8 @@ Value buildDecompositionLoop(PatternRewriter &rewriter, Location loc, Value qbit
  * This function contains the loop and switch logic acting on a Qubit.
  */
 func::FuncOp getOrCreateDecompositionFunc(ModuleOp module, PatternRewriter &rewriter,
-                                          double epsilon, bool pprBasis, bool mixed) {
+                                          double epsilon, bool pprBasis, GridsynthMethod method) {
+    bool mixed = method == GridsynthMethod::Mixed;
     std::string funcName = "__catalyst_decompose_RZ";
     if (mixed) {
         funcName += "_mixed";
@@ -428,7 +431,7 @@ func::FuncOp getOrCreateDecompositionFunc(ModuleOp module, PatternRewriter &rewr
     func.setPrivate();
 
     // Get or declare external functions (GetSize, GetGates, GetPhase)
-    DecompositionExternalFuncs extFuncs = getOrDeclareExternalFuncs(rewriter, func, mixed);
+    DecompositionExternalFuncs extFuncs = getOrDeclareExternalFuncs(rewriter, func, method);
 
     // Build function body
     Block *entryBlock = func.addEntryBlock();
@@ -477,7 +480,7 @@ func::FuncOp getOrCreateDecompositionFunc(ModuleOp module, PatternRewriter &rewr
 
     // Build the Loop logic
     Value finalQbit = buildDecompositionLoop(rewriter, loc, qbitIn, gatesMemref, num_gates,
-                                             runtimeEpsilon, pprBasis, mixed);
+                                             runtimeEpsilon, pprBasis, method);
 
     // Clean up heap memory
     memref::DeallocOp::create(rewriter, loc, gatesMemref);
@@ -495,10 +498,12 @@ struct DecomposeCustomOpPattern : public OpRewritePattern<CustomOp> {
 
     const double epsilon;
     const bool pprBasis;
-    const bool mixed;
+    const GridsynthMethod method;
 
-    DecomposeCustomOpPattern(MLIRContext *context, double epsilon, bool pprBasis, bool mixed)
-        : OpRewritePattern<CustomOp>(context), epsilon(epsilon), pprBasis(pprBasis), mixed(mixed) {}
+    DecomposeCustomOpPattern(MLIRContext *context, double epsilon, bool pprBasis,
+                             GridsynthMethod method)
+        : OpRewritePattern<CustomOp>(context), epsilon(epsilon), pprBasis(pprBasis),
+          method(method) {}
 
     LogicalResult matchAndRewrite(CustomOp op, PatternRewriter &rewriter) const override {
         StringRef gateName = op.getGateName();
@@ -522,7 +527,7 @@ struct DecomposeCustomOpPattern : public OpRewritePattern<CustomOp> {
         Location loc = op.getLoc();
 
         func::FuncOp decompFunc =
-            getOrCreateDecompositionFunc(mod, rewriter, epsilon, pprBasis, mixed);
+            getOrCreateDecompositionFunc(mod, rewriter, epsilon, pprBasis, method);
 
         // Call the function using the qubit directly
         auto callDecompOp =
@@ -562,11 +567,12 @@ struct DecomposePPRArbitraryOpPattern
 
     const double epsilon;
     const bool pprBasis;
-    const bool mixed;
+    const GridsynthMethod method;
 
-    DecomposePPRArbitraryOpPattern(MLIRContext *context, double epsilon, bool pprBasis, bool mixed)
+    DecomposePPRArbitraryOpPattern(MLIRContext *context, double epsilon, bool pprBasis,
+                                   GridsynthMethod method)
         : OpRewritePattern<catalyst::pbc::PPRotationArbitraryOp>(context), epsilon(epsilon),
-          pprBasis(pprBasis), mixed(mixed) {}
+          pprBasis(pprBasis), method(method) {}
 
     LogicalResult matchAndRewrite(catalyst::pbc::PPRotationArbitraryOp op,
                                   PatternRewriter &rewriter) const override {
@@ -591,7 +597,7 @@ struct DecomposePPRArbitraryOpPattern
         Value rzAngle = arith::MulFOp::create(rewriter, loc, angle, cMinus2);
 
         func::FuncOp decompFunc =
-            getOrCreateDecompositionFunc(mod, rewriter, epsilon, pprBasis, mixed);
+            getOrCreateDecompositionFunc(mod, rewriter, epsilon, pprBasis, method);
 
         auto callDecompOp =
             func::CallOp::create(rewriter, loc, decompFunc, ValueRange{qbitOperand, rzAngle});
@@ -616,9 +622,9 @@ namespace catalyst {
 namespace quantum {
 
 void populateGridsynthPatterns(RewritePatternSet &patterns, double epsilon, bool pprBasis,
-                               bool mixed) {
-    patterns.add<DecomposeCustomOpPattern>(patterns.getContext(), epsilon, pprBasis, mixed);
-    patterns.add<DecomposePPRArbitraryOpPattern>(patterns.getContext(), epsilon, pprBasis, mixed);
+                               GridsynthMethod method) {
+    patterns.add<DecomposeCustomOpPattern>(patterns.getContext(), epsilon, pprBasis, method);
+    patterns.add<DecomposePPRArbitraryOpPattern>(patterns.getContext(), epsilon, pprBasis, method);
 }
 
 } // namespace quantum

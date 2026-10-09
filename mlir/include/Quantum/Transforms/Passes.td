@@ -161,9 +161,15 @@ def GridsynthPass : Pass<"gridsynth"> {
         Option<
         /*C++ var name=*/"method",
         /*CLI name=*/"method",
-        /*Type=*/"std::string",
-        /*Default=*/"\"deterministic\"",
-        /*Description=*/"Synthesis method: 'deterministic' (Ross-Selinger) or 'mixed' (probabilistic mixture of under- and over-rotations, with the same diamond-norm guarantee of 2 * epsilon).">,];
+        /*Type=*/"::catalyst::quantum::GridsynthMethod",
+        /*Default=*/"::catalyst::quantum::GridsynthMethod::Deterministic",
+        /*Description=*/desc="Synthesis method. 'mixed' matches the accuracy of 'deterministic' on average over samples.",
+        /*Additional flags=*/additionalFlags=[{::llvm::cl::values(
+            clEnumValN(::catalyst::quantum::GridsynthMethod::Deterministic, "deterministic",
+                       "A single Ross-Selinger sequence per rotation."),
+            clEnumValN(::catalyst::quantum::GridsynthMethod::Mixed, "mixed",
+                       "A probabilistic mixture of under- and over-rotations.")
+        )}]>,];
 
         let dependentDialects = [
         "memref::MemRefDialect",

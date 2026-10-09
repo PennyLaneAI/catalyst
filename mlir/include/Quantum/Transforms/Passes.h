@@ -25,6 +25,9 @@
 namespace catalyst {
 namespace quantum {
 
+/// Synthesis method of the gridsynth pass.
+enum class GridsynthMethod : int { Deterministic, Mixed };
+
 #define GEN_PASS_DECL
 #define GEN_PASS_REGISTRATION
 #include "Quantum/Transforms/Passes.h.inc"

@@ -23,6 +23,7 @@
 
 #include "PBC/IR/PBCDialect.h"
 #include "Quantum/IR/QuantumOps.h"
+#include "Quantum/Transforms/Passes.h"
 #include "Quantum/Transforms/Patterns.h"
 
 using namespace llvm;
@@ -31,7 +32,6 @@ using namespace mlir;
 namespace catalyst {
 namespace quantum {
 
-#define GEN_PASS_DECL_GRIDSYNTHPASS
 #define GEN_PASS_DEF_GRIDSYNTHPASS
 #include "Quantum/Transforms/Passes.h.inc"
 
@@ -43,12 +43,6 @@ struct GridsynthPass : impl::GridsynthPassBase<GridsynthPass> {
         mlir::Operation *module = getOperation();
         mlir::MLIRContext *context = &getContext();
         RewritePatternSet patterns(context);
-
-        if (method != "deterministic" && method != "mixed") {
-            module->emitError() << "gridsynth method must be 'deterministic' or 'mixed', got '"
-                                << method << "'";
-            return signalPassFailure();
-        }
 
         WalkResult controlledRotation = module->walk([](CustomOp op) {
             StringRef gateName = op.getGateName();
@@ -63,7 +57,7 @@ struct GridsynthPass : impl::GridsynthPassBase<GridsynthPass> {
             return signalPassFailure();
         }
 
-        populateGridsynthPatterns(patterns, epsilon, pprBasis, method == "mixed");
+        populateGridsynthPatterns(patterns, epsilon, pprBasis, method);
 
         if (failed(applyPatternsGreedily(module, std::move(patterns)))) {
             signalPassFailure();

@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <array>
 #include <complex>
 #include <cstdio>
 #include <map>
@@ -384,8 +385,37 @@ TEST_CASE("Test mixed decomposition sampling", "[RSDecomp][Mixed]") {
           std::vector<GateType>{GateType::Sd, GateType::HT, GateType::S});
     CHECK(twirl_sequence(gates, 2) ==
           std::vector<GateType>{GateType::Z, GateType::HT, GateType::Z});
-    CHECK(twirl_sequence(gates, 3) ==
-          std::vector<GateType>{GateType::S, GateType::HT, GateType::Sd});
+    CHECK(twirl_sequence(gates, 3) == std::vector<GateType>{GateType::SHT, GateType::Sd});
+
+    // Twirl gates merge with adjacent diagonal Cliffords and S/Sd prefixes of HT/SHT.
+    CHECK(twirl_sequence({GateType::SHT, GateType::S}, 1) ==
+          std::vector<GateType>{GateType::HT, GateType::Z});
+    CHECK(twirl_sequence({GateType::T, GateType::Z}, 2) ==
+          std::vector<GateType>{GateType::Z, GateType::T});
+    CHECK(twirl_sequence({GateType::Sd}, 1) == std::vector<GateType>{GateType::Sd});
+    CHECK(twirl_sequence({GateType::Z}, 2) == std::vector<GateType>{GateType::Z});
+    CHECK(twirl_sequence({GateType::I}, 3) == std::vector<GateType>{GateType::I});
+}
+
+TEST_CASE("Test mixed decomposition sampling frequencies", "[RSDecomp][Mixed]") {
+    // Uniform samples on a fine grid select branch 0 with frequency p and the twirls uniformly
+    // within each branch.
+    const double probability = GENERATE(0.0, 0.3, 0.75, 1.0);
+    CAPTURE(probability);
+    const size_t num_samples = 100000;
+    std::array<std::array<size_t, 4>, 2> counts{};
+    for (size_t i = 0; i < num_samples; i++) {
+        double uniform_sample = (i + 0.5) / num_samples;
+        auto [branch, twirl] = sample_mixed_decomposition(probability, uniform_sample);
+        counts[branch][twirl]++;
+    }
+    for (size_t branch = 0; branch < 2; branch++) {
+        double branch_probability = branch == 0 ? probability : 1.0 - probability;
+        for (size_t twirl = 0; twirl < 4; twirl++) {
+            CHECK_THAT(static_cast<double>(counts[branch][twirl]) / num_samples,
+                       Catch::Matchers::WithinAbs(branch_probability / 4.0, 1e-4));
+        }
+    }
 }
 
 TEST_CASE("Test mixed C-API Wrapper (Memref Interface)", "[RSDecomp][Mixed]") {

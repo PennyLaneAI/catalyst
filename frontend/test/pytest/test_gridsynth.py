@@ -175,6 +175,25 @@ def test_mixed_gridsynth_seeded():
     assert np.allclose(qjitted_circuit(1.1), qjitted_circuit_same_seed(1.1))
 
 
+def test_mixed_gridsynth_different_seeds():
+    """Test that different qjit seeds lead to different runtime samples."""
+    dev = qp.device("lightning.qubit", wires=1)
+
+    @qp.qnode(dev)
+    def circuit(x: float):
+        qp.Hadamard(0)
+        for i in range(5):
+            qp.RZ(x * (i + 1), wires=0)
+        return qp.state()
+
+    mixed_circuit = gridsynth(circuit, epsilon=1e-2, method="mixed")
+    results = [
+        qp.qjit(mixed_circuit, capture=True, collect_decomp_rules=False, seed=seed)(1.1)
+        for seed in (37, 38)
+    ]
+    assert not np.allclose(*results)
+
+
 def test_invalid_method():
     """Test that an unknown synthesis method raises an error."""
     with pytest.raises(ValueError, match="method must be 'deterministic' or 'mixed'"):

@@ -23,7 +23,7 @@
 * The `gridsynth` pass has a new `method="mixed"` option, implementing the mixed diagonal
   approximation of [arXiv:2203.10064](https://arxiv.org/abs/2203.10064) (Section 3.4). Each
   rotation randomly applies one of two Clifford+T sequences whose errors cancel on average, which
-  roughly halves the T-count at the same accuracy.
+  roughly halves the T-count at the same accuracy, on average over executions.
   [(#3314)](https://github.com/PennyLaneAI/catalyst/pull/3314)
 
   ```python

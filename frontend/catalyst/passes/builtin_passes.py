@@ -831,9 +831,9 @@ def gridsynth_setup_inputs(epsilon=1e-4, ppr_basis=False, method="deterministic"
 
     Args:
         qnode (QNode): the QNode to apply the gridsynth compiler pass to
-        epsilon (float): The maximum permissible operator norm error per rotation gate. Defaults
-            to ``1e-4``. Both methods give the same accuracy guarantee for a given ``epsilon``: a
-            diamond norm error of at most :math:`2\epsilon` per rotation.
+        epsilon (float): The accuracy per rotation gate. Defaults to ``1e-4``. With
+            ``"deterministic"``, each rotation has operator norm error at most ``epsilon``.
+            ``"mixed"`` matches this accuracy on average over samples.
         ppr_basis (bool): If true, decompose directly to Pauli Product Rotations (PPRs) in PBC dialect. Defaults to ``False``
         method (str): The synthesis method. ``"deterministic"`` (default) applies a single
             Ross-Selinger gate sequence per rotation. ``"mixed"`` applies, per execution, one of
@@ -852,10 +852,11 @@ def gridsynth_setup_inputs(epsilon=1e-4, ppr_basis=False, method="deterministic"
 
     .. note::
 
-        With ``method="mixed"``, each application of a rotation samples its gate sequence from the
-        runtime random number generator, which is seeded by the ``seed`` argument of
-        :func:`~.qjit`. Its diamond norm error of at most :math:`2\epsilon` holds for the channel
-        averaged over these samples.
+        With ``method="mixed"``, the accuracy guarantee holds on average over calls. Each call
+        samples one sequence per rotation, shared by all its shots, with error of order
+        :math:`\sqrt{\epsilon}`. Samples are drawn from the runtime random number generator seeded
+        by the ``seed`` argument of :func:`~.qjit`, so with a fixed seed every call repeats the
+        same samples.
 
     **Example**
 

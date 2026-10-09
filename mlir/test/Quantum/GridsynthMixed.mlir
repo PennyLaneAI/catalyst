@@ -16,7 +16,7 @@
 // RUN: quantum-opt --pass-pipeline="builtin.module(gridsynth{epsilon=0.01 ppr-basis=True method=mixed})" --split-input-file %s | FileCheck %s --check-prefixes=CHECK,PPR
 // RUN: not quantum-opt --pass-pipeline="builtin.module(gridsynth{method=unknown})" --split-input-file %s 2>&1 | FileCheck %s --check-prefix=ERROR
 
-// ERROR: gridsynth method must be 'deterministic' or 'mixed', got 'unknown'
+// ERROR: for the --method option: Cannot find option named 'unknown'!
 
 // CHECK-DAG: func.func private @__catalyst__rt__random_double() -> f64
 // CHECK-DAG: func.func private @rs_mixed_decomposition_get_size(f64, f64, i1, f64) -> index
@@ -37,9 +37,9 @@
 // CHECK:          [[PHASE:%.+]] = call @rs_mixed_decomposition_get_phase([[ARG_ANGLE]], [[EPS]], {{%.+}}, [[SAMPLE]])
 // CHECK:          scf.for {{.*}} iter_args({{%.+}} = [[ARG_QBIT]])
 // CHECK:            scf.index_switch {{%.+}} {catalyst.estimated_probabilities = [{{.*}}]}
-// COM: expected T and other entries (1.5356 + 0.0010) * log2(1/0.02) + 3.2211 + 3.4275 (Clifford+T), (1.5356 + 0.7723) * log2(1/0.02) + 3.2211 + 6.9217 (PPR)
-// CLIFFORD:       } {catalyst.estimated_iterations = 15.3{{[0-9]+}} : f64}
-// PPR:            } {catalyst.estimated_iterations = 23.1{{[0-9]+}} : f64}
+// COM: expected T and other entries (1.5394 + 0.0027) * log2(1/0.02) + 3.1421 + 2.6123 (Clifford+T), (1.5394 + 0.7751) * log2(1/0.02) + 3.1421 + 6.1278 (PPR)
+// CLIFFORD:       } {catalyst.estimated_iterations = 14.4{{[0-9]+}} : f64}
+// PPR:            } {catalyst.estimated_iterations = 22.3{{[0-9]+}} : f64}
 // CHECK:          return {{%.+}}, [[PHASE]]
 
 // CHECK-LABEL: @test_rz_mixed_decomposition
