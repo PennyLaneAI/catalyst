@@ -94,12 +94,14 @@ class TestGeneralPreprocessing:
         pipelines = get_pipelines(f, skip_preprocess=skip_preprocess)
 
         if skip_preprocess:
-            assert len(pipelines) == 1
-            assert pipelines[0][0] == "main"
-        else:
             assert len(pipelines) == 2
             assert pipelines[0][0] == "main"
+            assert pipelines[1][0] == "post-device"
+        else:
+            assert len(pipelines) == 3
+            assert pipelines[0][0] == "main"
             assert pipelines[1][0] == "device"
+            assert pipelines[2][0] == "post-device"
 
     def test_finite_shots_only(self):
         """Test that an error is raised if trying to do an analytic execution with
@@ -629,8 +631,8 @@ class TestIntegration:
         assert f2_pipelines[0][1][0].pass_name == "cancel-inverses"
 
         if skip_preprocess:
-            assert len(f1_pipelines) == 1
-            assert len(f2_pipelines) == 1
+            assert len(f1_pipelines) == 2
+            assert len(f2_pipelines) == 2
             assert len(recwarn) == 0
         else:
             assert len(f1_pipelines) > 1
