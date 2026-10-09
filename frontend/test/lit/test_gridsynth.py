@@ -46,7 +46,7 @@ def test_rz_registration():
         return qp.probs()
 
     # CHECK: transform.named_sequence @__transform_main
-    # CHECK: transform.apply_registered_pass "gridsynth" with options = {"epsilon" = 1.000000e-02 : f64, "ppr-basis" = false}
+    # CHECK: transform.apply_registered_pass "gridsynth" with options = {"epsilon" = 1.000000e-02 : f64, "method" = "deterministic", "ppr-basis" = false}
     # CHECK-LABEL: func.func public @circuit
     # CHECK: quantum.custom "RZ"
     print(circuit.mlir)
@@ -154,7 +154,7 @@ def test_ppr_registration():
         qp.RZ(x, wires=0)
         return qp.probs()
 
-    # CHECK: transform.apply_registered_pass "gridsynth" with options = {"epsilon" = 1.000000e-02 : f64, "ppr-basis" = true}
+    # CHECK: transform.apply_registered_pass "gridsynth" with options = {"epsilon" = 1.000000e-02 : f64, "method" = "deterministic", "ppr-basis" = true}
     print(circuit.mlir)
 
 
@@ -263,3 +263,54 @@ def test_capture_workflow_ppr():
 
 
 test_capture_workflow_ppr()
+
+# ==============================================================================
+# Test 9: Mixed method Registration
+# ==============================================================================
+
+
+def test_mixed_registration():
+    """Test that method="mixed" is passed to the transform."""
+
+    @qjit(target="mlir", capture=True)
+    @gridsynth(epsilon=0.01, method="mixed")
+    @qp.qnode(qp.device("lightning.qubit", wires=1))
+    def circuit(x: float):
+        qp.RZ(x, wires=0)
+        return qp.probs()
+
+    # CHECK: transform.apply_registered_pass "gridsynth" with options = {"epsilon" = 1.000000e-02 : f64, "method" = "mixed", "ppr-basis" = false}
+    print(circuit.mlir)
+
+
+test_mixed_registration()
+
+# ==============================================================================
+# Test 10: Capture Workflow Lowering (mixed)
+# ==============================================================================
+
+
+def test_capture_workflow_mixed():
+    """Test the capture workflow with the mixed gridsynth method."""
+
+    @qjit(target="mlir", capture=True, pipelines=pipe, collect_decomp_rules=False)
+    @partial(gridsynth, epsilon=0.01, method="mixed")
+    @qp.qnode(qp.device("lightning.qubit", wires=1))
+    def circuit(x: float):
+        qp.RZ(x, wires=0)
+        return qp.probs()
+
+    # CHECK-DAG:   func.func private @__catalyst__rt__random_double() -> f64
+    # CHECK-DAG:   func.func private @rs_mixed_decomposition_get_size(f64, f64, i1, f64) -> index
+
+    # CHECK-LABEL: func.func private @__catalyst_decompose_RZ_mixed{{.*}}
+    # CHECK:       call @__catalyst__rt__random_double()
+    # CHECK:       scf.index_switch
+
+    # CHECK-LABEL: func.func public @circuit{{.*}}
+    # CHECK-NOT:   quantum.custom "RZ"
+    # CHECK:       call @__catalyst_decompose_RZ_mixed{{.*}}
+    print(circuit.mlir_opt)
+
+
+test_capture_workflow_mixed()
