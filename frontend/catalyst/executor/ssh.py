@@ -32,13 +32,14 @@ from __future__ import annotations
 
 import getpass
 import logging
+import os
 import shlex
 import subprocess
 import sys
 import time
 from pathlib import Path
 
-from .utils import ExecutorFlags, ExecutorPaths, ShellText, log_cmd, verbose_level
+from .utils import ExecutorFlags, ExecutorPaths, Secret, ShellText, log_cmd, verbose_level
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
@@ -205,7 +206,7 @@ class RemoteOps:
         pat: str,
         *,
         sudo: bool = False,
-        sudo_password: str | None = None,
+        sudo_password: Secret | None = None,
     ) -> int:
         """Fire-and-forget ``pkill -f <pat>`` on the remote.
 
@@ -216,7 +217,9 @@ class RemoteOps:
         if not sudo:
             return RemoteOps.run(user, host, cmd)
         if sudo_password is not None:
-            return RemoteOps.run(user, host, ShellText.sudo_pw(cmd), input=sudo_password + "\n")
+            return RemoteOps.run(
+                user, host, ShellText.sudo_pw(cmd), input=sudo_password.get_secret_value() + "\n"
+            )
         return RemoteOps.run(user, host, ShellText.sudo_np(cmd))
 
     @staticmethod
@@ -281,24 +284,27 @@ class RemoteOps:
         return rc != 0
 
     @staticmethod
-    def resolve_sudo(user: str, host: str, sudo_password: str | None = None) -> str | None:
-        """Return the remote sudo password, or ``None`` if NOPASSWD is set.
+    def resolve_sudo(user: str, host: str, password_env: str | None = None) -> Secret | None:
+        """Return the remote sudo password as a :class:`Secret`, or ``None`` if NOPASSWD is set.
 
-        Precedence: explicit ``sudo_password`` > one-time getpass prompt.
+        Precedence: the environment variable named by ``password_env`` > one-time getpass prompt.
 
         Raises:
             RuntimeError: If SSH is unreachable or the user aborted the prompt.
         """
         if not RemoteOps.needs_sudo_password(user, host):
             return None
-        if sudo_password is not None:
-            return sudo_password
+        if password_env is not None:
+            if (password := os.environ.get(password_env)) is not None:
+                return Secret(password)
+            logger.warning("sudo_password_env names %s, which is not set", password_env)
         logger.info("remote sudo needs a password (no NOPASSWD) — prompting once")
         try:
-            return getpass.getpass(f"[remote] sudo password for {user}@{host}: ")
+            return Secret(getpass.getpass(f"[remote] sudo password for {user}@{host}: "))
         except (EOFError, KeyboardInterrupt) as e:
             raise RuntimeError(
-                "no sudo password provided — pass sudo_password= or run interactively"
+                "no sudo password provided — set sudo_password_env= to an environment variable "
+                "holding it, or run interactively"
             ) from e
 
 
@@ -385,7 +391,7 @@ class RemoteLauncher:
         env: dict[str, str],
         *,
         sudo: bool = False,
-        sudo_password: str | None = None,
+        use_password: bool = False,
         executor_bin: str = f"./{ExecutorPaths.EXECUTOR_BIN}",
     ) -> list[str]:
         """Full ``ssh -L ...`` argv that opens a port-forward and starts ``catalyst-executor`` on
@@ -394,18 +400,17 @@ class RemoteLauncher:
         ``port`` is used at both ends of the forward: the executor binds it on the remote, and the
         tunnel listens on it here. ``env`` and ``plugins`` values are shell-quoted.
         """
-        use_pw = sudo_password is not None
         remote_cmd = RemoteLauncher._remote_cmd(
             workspace,
             port,
             plugins,
             env,
             sudo=sudo,
-            use_password=use_pw,
+            use_password=use_password,
             executor_bin=executor_bin,
         )
         logger.debug(f"remote: {remote_cmd}")
-        opts = RemoteLauncher._ssh_opts(port, use_pw)
+        opts = RemoteLauncher._ssh_opts(port, use_password)
         return SSHArgv.base(user, host, opts, multiplex=False) + [remote_cmd]
 
     @staticmethod
