@@ -1089,6 +1089,11 @@
   dialects, the compilation pipeline, and the runtime.
   [(#3208)](https://github.com/PennyLaneAI/catalyst/pull/3208)
 
+* The `CompileOptions` reference now documents the `target`, `link`, `checkpoint_stage` and
+  `runtime_artifacts` attributes, and clarifies that a user-provided `pipelines` list replaces
+  the default pipeline stages rather than extending them.
+  [(#3278)](https://github.com/PennyLaneAI/catalyst/pull/3278)
+
 <h3>Contributors ✍️</h3>
 
 This release contains contributions from (in alphabetical order):
@@ -1113,6 +1118,7 @@ Rylan Malarchick,
 Mehrdad Malekmohammadi,
 River McCubbin,
 Shuli Shu,
+Daksh Singh,
 Nikhil Sreekumar,
 Kalman Szenes,
 Paul Haochen Wang,
