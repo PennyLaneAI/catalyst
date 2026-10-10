@@ -62,7 +62,6 @@ LogicalResult verifyGradInputs(OpState *op_state, func::FuncOp callee, ValueRang
         auto gradOpInterface = cast<GradientOpInterface>(op_state->getOperation());
 
         if (gradOpInterface.getMethod() != DiffMethod::FiniteDifference) {
-            // TODO: Message
             return op_state->emitOpError(
                 "An operation without a valid gradient was found in code "
                 "reachable from the gradient operation.\n"
@@ -350,7 +349,6 @@ LogicalResult JVPOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
 
 LogicalResult JVPOp::verify() {
     DiffMethod method = this->getMethod();
-    // TODO: Do we need "ps" and "adj"?
     if (method != DiffMethod::FiniteDifference && method != DiffMethod::Auto) {
         return emitOpError("got invalid differentiation method: ") << stringifyDiffMethod(method);
     }
@@ -434,7 +432,6 @@ LogicalResult VJPOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
 
 LogicalResult VJPOp::verify() {
     DiffMethod method = this->getMethod();
-    // TODO: Do we need "ps" and "adj"?
     if (method != DiffMethod::FiniteDifference && method != DiffMethod::Auto) {
         return emitOpError("got invalid differentiation method: ") << stringifyDiffMethod(method);
     }
