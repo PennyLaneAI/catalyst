@@ -42,23 +42,6 @@ using namespace catalyst::quantum;
 using namespace DecompGraph::Core;
 using namespace DecompGraph::Solver;
 
-namespace {
-
-class ScopedDiagnosticTimer {
-  public:
-    explicit ScopedDiagnosticTimer(std::string name) : name(std::move(name)) { timer.start(); }
-    ~ScopedDiagnosticTimer() { timer.dump(name); }
-
-    ScopedDiagnosticTimer(const ScopedDiagnosticTimer &) = delete;
-    ScopedDiagnosticTimer &operator=(const ScopedDiagnosticTimer &) = delete;
-
-  private:
-    catalyst::utils::Timer<> timer;
-    std::string name;
-};
-
-} // namespace
-
 namespace catalyst {
 
 #define GEN_PASS_DECL_RESOURCEANALYSISPASS
