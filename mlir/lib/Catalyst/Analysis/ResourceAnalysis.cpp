@@ -42,6 +42,8 @@
 #include "Quantum/IR/QuantumInterfaces.h"
 #include "Quantum/IR/QuantumOps.h"
 
+#include "GraphDecompositionPrep.hpp"
+
 using namespace mlir;
 using namespace llvm;
 
@@ -85,8 +87,11 @@ ResourceResult ResourceAnalysis::makeEmptyResult() const {
 
 ResourceAnalysis::ResourceAnalysis(ModuleOp moduleOp,
                                    ArrayRef<ExtensionProvider> extensionProviders,
-                                   bool collectDetailedOperations)
-    : collectDetailedOperations(collectDetailedOperations) {
+                                   bool collectDetailedOperations,
+                                   DecompGraph::Core::GraphResult *graphResult,
+                                   const DecompGraph::Core::WeightedGateset *gateset)
+    : collectDetailedOperations(collectDetailedOperations), graphResult(graphResult),
+      gateset(gateset) {
     extensionAnalyses.reserve(extensionProviders.size());
     for (const auto &provider : extensionProviders) {
         extensionAnalyses.push_back(provider());
@@ -429,6 +434,23 @@ void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result, b
         result.autoQubitManagement = deviceOp.getAutoQubitManagement();
         return;
     }
+    DecompGraph::Core::GraphResult::iterator graphOp;
+    std::string graphOpId;
+    DecompGraph::Core::OperatorNode operatorNode;
+    // Graph decomposition for qp.estimate
+    if (graphResult) {
+        // check if op is decomposablegate op
+        if (auto decomposableGate = dyn_cast<quantum::DecomposableGate>(op)) {
+            // get the graph op id
+            graphOpId = decomposableGate.getGraphOpId();
+            operatorNode = catalyst::quantum::GraphDecompositionPrep::parseOperator(graphOpId);
+            graphOp = graphResult->find(operatorNode);
+        } else {
+            // It can't ever not be a decomposable gate if graphResult is not nullptr
+            // because the graphsolver would fail if the op is not decomposable and graphResult
+            // would be not null.
+        }
+    }
 
     // Quantum operations
     if (auto inst = dyn_cast<ResourceQuantumOpInterface>(op)) {
@@ -444,6 +466,21 @@ void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result, b
             name = std::to_string(nCtrlQubits) + "C(" + name + ")";
         }
 
+        // if the op is in the graph and not in the gateset that means it has been decomposed
+        // Go through the graph's decomp rule for the op, and the basis counts for the op,
+        // which is the target gate set which the op decomposes into. And accumulate the counts for
+        // the target gate set.
+        if (graphResult && graphOp != graphResult->end() && gateset &&
+            !gateset->contains(operatorNode)) {
+            const DecompGraph::Core::ChosenDecompRule &chosenRule = graphOp->second;
+            for (const auto &[basisOp, count] : chosenRule.basisCounts) {
+                result.operations[basisOp.name][{basisOp.numWires, basisOp.numParams}] += count;
+            }
+            return;
+        }
+
+        // if the op is in the gate set, I don't need to look for it in the graph as I can just
+        // count it, so then count it like how its counted
         uint64_t nParams = inst.getResourceNumParams();
         uint64_t nQubits = inst.getResourceNumQubits() + nCtrlQubits;
         result.operations[name][{nQubits, nParams}] += 1;

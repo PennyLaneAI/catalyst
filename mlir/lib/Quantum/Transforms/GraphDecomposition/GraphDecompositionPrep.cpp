@@ -47,6 +47,7 @@
 #include "Quantum/IR/QuantumOps.h"
 #include "Quantum/Transforms/QPDLoader.h"
 
+#include "DGBuilder.hpp"
 #include "DGTypes.hpp"
 #include "DecompUtils.hpp"
 
@@ -425,8 +426,7 @@ void getOperators(ModuleOp module, std::vector<OperatorNode> &operators) {
         // nodes and rule nodes agree on the spelling of `C(...)`/`Adjoint(...)`.
         OperatorNode node = GraphDecompositionPrep::parseOperator(op.getGraphOpId());
 
-        // numWires/numParams are debug-only; parseOperator leaves them at defaults for the
-        // graphOpId form, so we need to fill them accurately from the op here.
+        // Prefer live op sizes when available (GOID `{wires:N}` is non-ctrl wires only).
         node.numWires = op.getNonCtrlQubitOperands().size();
         if (auto paramOp = llvm::dyn_cast<catalyst::quantum::ParametrizedGate>(op.getOperation())) {
             node.numParams = paramOp.getAllParams().size();
@@ -443,41 +443,6 @@ void getOperators(ModuleOp module, std::vector<OperatorNode> &operators) {
 namespace catalyst {
 namespace quantum {
 namespace GraphDecompositionPrep {
-
-OperatorNode parseOperator(llvm::StringRef raw) {
-    OperatorNode node;
-
-    // Base op: either the graphOpId "Name{...}..." form or the legacy "Name(w,p)" form.
-    if (raw.contains('[') || raw.contains('{')) {
-        node.id = raw.str();
-        node.name = raw.take_until([](char c) { return c == '[' || c == '{'; });
-    } else {
-        auto openIdx = raw.find('(');
-        if (openIdx == llvm::StringRef::npos) {
-            node.name = raw.trim().str();
-            return node;
-        }
-        node.name = raw.take_front(openIdx).trim().str();
-        raw = raw.drop_front(openIdx); // leftover: "(w,p)" or "(w)"
-    }
-
-    // Parse "(w,p)" (new) or "(w)" (legacy) suffix.
-    if (raw.consume_front("(") && raw.consume_back(")")) {
-        llvm::StringRef wStr, pStr;
-        std::tie(wStr, pStr) = raw.split(',');
-        int w = -1, p = -1;
-        if (!wStr.getAsInteger(10, w)) {
-            node.numWires = w;
-        }
-        if (!pStr.empty() && !pStr.getAsInteger(10, p)) {
-            node.numParams = p;
-        }
-        // If pStr is empty we were given the legacy "(w)" format; leave
-        // numParams at the wildcard default so old bytecode keeps working.
-    }
-
-    return node;
-}
 
 std::unique_ptr<DecompositionGraph> prepareGraph(Operation *op, const PrepOptions &opts,
                                                  LowerModifiersFn lowerModifiers) {

@@ -58,5 +58,7 @@ target_include_directories(${LIBRARY_NAME} PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
     $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
     $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/include>
+    $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/lib/Quantum/Transforms/GraphDecomposition/>
+    $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/lib/Quantum/Transforms/GraphDecomposition/DecompGraphSolver/>
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )
