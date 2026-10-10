@@ -469,11 +469,12 @@ void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result, b
             name = std::to_string(nCtrlQubits) + "C(" + name + ")";
         }
 
-
         // if the op is in the graph and not in the gateset that means it has been decomposed
         // Go through the graph's decomp rule for the op, and the basis counts for the op,
-        // which is the target gate set which the op decomposes into. And accumulate the counts for the target gate set.
-        if (graphResult && graphOp != graphResult->end() && gateset && !gateset->contains(operatorNode)) {
+        // which is the target gate set which the op decomposes into. And accumulate the counts for
+        // the target gate set.
+        if (graphResult && graphOp != graphResult->end() && gateset &&
+            !gateset->contains(operatorNode)) {
             const DecompGraph::Core::ChosenDecompRule &chosenRule = graphOp->second;
             for (const auto &[basisOp, count] : chosenRule.basisCounts) {
                 result.operations[basisOp.name][{basisOp.numWires, basisOp.numParams}] += count;
@@ -481,10 +482,10 @@ void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result, b
             return;
         }
 
-      
-        // if the op is in the gate set, I don't need to look for it in the graph as I can just count it, so then count it like how its counted    
+        // if the op is in the gate set, I don't need to look for it in the graph as I can just
+        // count it, so then count it like how its counted
         uint64_t nParams = inst.getResourceNumParams();
-        uint64_t nQubits = inst.getResourceNumQubits() + nCtrlQubits;  
+        uint64_t nQubits = inst.getResourceNumQubits() + nCtrlQubits;
         result.operations[name][{nQubits, nParams}] += 1;
 
         // Ops may also allocate (e.g. mbqc.graph_state_prep, pbc.prepare, pbc.fabricate).
