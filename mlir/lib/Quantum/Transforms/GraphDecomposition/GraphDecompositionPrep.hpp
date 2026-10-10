@@ -102,9 +102,8 @@ inline int parseWireLen(llvm::StringRef content) {
     if (pos == llvm::StringRef::npos) {
         return -1;
     }
-    llvm::StringRef num = content.drop_front(pos + key.size()).take_until([](char c) {
-        return c == ',';
-    });
+    llvm::StringRef num =
+        content.drop_front(pos + key.size()).take_until([](char c) { return c == ','; });
     int w = -1;
     if (num.getAsInteger(10, w)) {
         return -1;
