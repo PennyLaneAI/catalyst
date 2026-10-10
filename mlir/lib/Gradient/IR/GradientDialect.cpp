@@ -14,7 +14,9 @@
 
 #include "Gradient/IR/GradientDialect.h"
 
+#include "llvm/ADT/TypeSwitch.h" // needed for generated type parser
 #include "mlir/Dialect/Bufferization/IR/BufferizableOpInterface.h"
+#include "mlir/IR/DialectImplementation.h" // needed for generated type parser
 #include "mlir/Interfaces/FunctionImplementation.h"
 #include "mlir/Transforms/InliningUtils.h"
 
@@ -48,6 +50,10 @@ void GradientDialect::initialize() {
     addOperations<
 #define GET_OP_LIST
 #include "Gradient/IR/GradientOps.cpp.inc"
+        >();
+    addAttributes<
+#define GET_ATTRDEF_LIST
+#include "Gradient/IR/GradientAttributes.cpp.inc"
         >();
     addInterface<GradientInlinerInterface>();
 
@@ -94,3 +100,10 @@ void ReverseOp::print(OpAsmPrinter &p) {
                                              getFunctionTypeAttrName(), getArgAttrsAttrName(),
                                              getResAttrsAttrName());
 }
+
+//===----------------------------------------------------------------------===//
+// Gradient Type definitions.
+//===----------------------------------------------------------------------===//
+
+#define GET_ATTRDEF_CLASSES
+#include "Gradient/IR/GradientAttributes.cpp.inc"

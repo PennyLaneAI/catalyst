@@ -840,6 +840,10 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* The `method` attribute of the Gradient dialect operations (`grad`, `value_and_grad`, `jvp`,
+  `vjp`) is now an enum attribute (`#gradient<diff_method auto>`) instead of a string attribute.
+  [(#3318)](https://github.com/PennyLaneAI/catalyst/pull/3318)
+
 * Integration tests for :func:`pennylane.specs` have been migrated from the Catalyst frontend to PennyLane.
   [(#3107)](https://github.com/PennyLaneAI/catalyst/pull/3107)
 
@@ -1116,6 +1120,7 @@ Shuli Shu,
 Nikhil Sreekumar,
 Kalman Szenes,
 Paul Haochen Wang,
+Johannes Wittmann,
 Jake Zaia,
 Haider Sajjad,
 Hongsheng Zheng.

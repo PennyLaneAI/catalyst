@@ -30,6 +30,8 @@ def Gradient_Dialect : Dialect {
         gradients.
     }];
     let cppNamespace = "::catalyst::gradient";
+
+    let useDefaultAttributePrinterParser = 1;
 }
 
 //===----------------------------------------------------------------------===//

@@ -25,6 +25,7 @@
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 
+#include "Gradient/IR/GradientAttrDefs.h"
 #include "Gradient/Utils/DifferentialQNode.h"
 #include "Gradient/Utils/GradientShape.h"
 
@@ -34,7 +35,7 @@ namespace catalyst {
 namespace gradient {
 
 LogicalResult FiniteDiffLowering::matchAndRewrite(GradOp op, PatternRewriter &rewriter) const {
-    if (op.getMethod() != "fd") {
+    if (op.getMethod() != DiffMethod::FiniteDifference) {
         return failure();
     }
 

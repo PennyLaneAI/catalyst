@@ -1,4 +1,4 @@
-// Copyright 2024 Xanadu Quantum Technologies Inc.
+// Copyright 2026 Xanadu Quantum Technologies Inc.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,12 +14,8 @@
 
 #pragma once
 
-#include "mlir/IR/OpDefinition.h"
+#include "mlir/IR/Attributes.h"
 
-#include "Gradient/IR/GradientAttrDefs.h"
-
-//===----------------------------------------------------------------------===//
-// Gradient interface declarations.
-//===----------------------------------------------------------------------===//
-
-#include "Gradient/IR/GradientInterfaces.h.inc"
+#include "Gradient/IR/GradientEnums.h.inc"
+#define GET_ATTRDEF_CLASSES
+#include "Gradient/IR/GradientAttributes.h.inc"
