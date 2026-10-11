@@ -35,6 +35,7 @@ from catalyst.device.decomposition import (
 
 # pylint: disable=protected-access
 from catalyst.device.qjit_device import (
+    _get_original_device,
     _load_device_capabilities,
     filter_device_capabilities_with_shots,
     get_qjit_device_capabilities,
@@ -60,6 +61,7 @@ def create_device_preprocessing_pipeline(
     device: qp.devices.Device, execution_config: ExecutionConfig, shots: int, warn: bool = True
 ) -> list[BoundTransform]:
     """Create a pipeline of device preprocessing transforms for lowering QNodes."""
+    device = _get_original_device(device)
     shots_present = qp.math.is_abstract(shots) or shots != 0
     raw_capabilities: DeviceCapabilities = get_qjit_device_capabilities(
         _load_device_capabilities(device)
