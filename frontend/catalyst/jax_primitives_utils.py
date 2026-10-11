@@ -29,7 +29,6 @@ from pennylane.transforms.core import BoundTransform
 
 from catalyst.backline import module_attributes
 from catalyst.jax_extras.lowering import get_mlir_attribute_from_pyval
-from catalyst.passes import PassPlugin
 from catalyst.utils.runtime_artifacts import record_device_runtime_artifacts
 
 
@@ -309,12 +308,10 @@ class NestedModule:
         self.ctx.module_context = self.old_module_context
 
 
-def _lowered_options(_pass: BoundTransform | PassPlugin):
-    args = _pass.args if isinstance(_pass, BoundTransform) else _pass.options
-    kwargs = _pass.kwargs if isinstance(_pass, BoundTransform) else _pass.valued_options
+def _lowered_options(_pass: BoundTransform):
     return get_mlir_attribute_from_pyval(
-        {str(arg).replace("_", "-"): True for arg in args}
-        | {k.replace("_", "-"): v for k, v in kwargs.items()}
+        {str(arg).replace("_", "-"): True for arg in _pass.args}
+        | {k.replace("_", "-"): v for k, v in _pass.kwargs.items()}
     )
 
 
@@ -381,8 +378,8 @@ def transform_named_sequence_lowering(pipeline, sym_name):
     with ir.InsertionPoint(bb_named_sequence):
         target = bb_named_sequence.arguments[0]
         for _pass in pipeline:
-            assert isinstance(_pass, (BoundTransform, PassPlugin))
-            name = _pass.pass_name if isinstance(_pass, BoundTransform) else _pass.name
+            assert isinstance(_pass, BoundTransform)
+            name = _pass.pass_name
             options = _lowered_options(_pass)
             apply_registered_pass_op = ApplyRegisteredPassOp(
                 result=transform_mod_type,

@@ -46,7 +46,6 @@ from catalyst.jax_extras import deduce_avals, get_implicit_and_explicit_flat_arg
 from catalyst.jax_extras.tracing import uses_transform
 from catalyst.jax_primitives import quantum_kernel_p
 from catalyst.jax_tracer import Function, trace_quantum_function
-from catalyst.passes.pass_api import dict_to_compile_pipeline
 from catalyst.tracing.contexts import EvaluationContext
 from catalyst.tracing.type_signatures import filter_static_args
 from catalyst.utils.exceptions import CompileError
@@ -244,14 +243,13 @@ class QFunc:
             raise CompileError("Can't nest qnodes under qjit")
 
         assert isinstance(self, qp.QNode)
-        new_compile_pipeline, new_pass_pipeline = _extract_passes(self.compile_pipeline)
+        new_compile_pipeline, pass_pipeline = _extract_passes(self.compile_pipeline)
 
-        # Update the qnode with peephole pipeline
-        old_pass_pipeline = kwargs.pop("pass_pipeline", None)
-        processed_old_pass_pipeline = tuple(dict_to_compile_pipeline(old_pass_pipeline))
-
-        # Local pass pipelines should override global ones
-        pass_pipeline = new_pass_pipeline if new_pass_pipeline else processed_old_pass_pipeline
+        # One-shot / autograph may re-enter with already-extracted MLIR passes forwarded
+        # via kwargs (compile_pipeline on the QNode only keeps tape transforms).
+        forwarded_pass_pipeline = kwargs.pop("pass_pipeline", None)
+        if not pass_pipeline and forwarded_pass_pipeline is not None:
+            pass_pipeline = tuple(forwarded_pass_pipeline)
 
         # Update the QNode's original compile_pipeline
         new_qnode = copy(self)

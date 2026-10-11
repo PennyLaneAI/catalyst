@@ -129,10 +129,6 @@ class CompileOptions:
         disable_assertions (Optional[bool]): Disable all assertions. Default is ``False``.
         seed (Optional[int]) : the seed for random operations in a qjit call.
             Default is ``None``.
-        circuit_transform_pipeline (Optional[dict[str, dict[str, str]]]):
-            A dictionary that specifies the quantum circuit transformation pass pipeline order,
-            and optionally arguments for each pass in the pipeline.
-            Default is ``None``.
         pass_plugins (Optional[Iterable[Path]]): List of paths to pass plugins.
         dialect_plugins (Optional[Iterable[Path]]): List of paths to dialect plugins.
         capture (Optional[Union[str, bool]]): Controls whether to use PennyLane program capture.
@@ -170,7 +166,6 @@ class CompileOptions:
     checkpoint_stage: Optional[str] = ""
     disable_assertions: Optional[bool] = False
     seed: Optional[int] = None
-    circuit_transform_pipeline: Optional[dict[str, dict[str, str]]] = None
     pass_plugins: Optional[Set[Path]] = None
     dialect_plugins: Optional[Set[Path]] = None
     capture: bool | Literal["global"] = "global"
