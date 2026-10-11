@@ -24,6 +24,8 @@ TOML_SPECS ?= $(shell find ./runtime ./frontend -name '*.toml' -not -name 'pypro
 ENABLE_FLAKY ?= OFF
 XDSL_TESTS ?= ON
 
+# Test
+
 PLATFORM := $(shell uname -s)
 ifeq ($(PLATFORM),Linux)
 COPY_FLAGS := --dereference
