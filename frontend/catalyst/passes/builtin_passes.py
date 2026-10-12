@@ -829,6 +829,12 @@ def gridsynth_setup_inputs(epsilon=1e-4, ppr_basis=False, method="deterministic"
 
         The actual discretization is only performed during execution time.
 
+    .. note::
+
+        Controlled ``RZ`` and ``PhaseShift`` gates are not supported, and the pass raises an error
+        if it encounters them. Decompose them into single-qubit rotations first, for example with
+        :func:`~.passes.graph_decomposition`.
+
     Args:
         qnode (QNode): the QNode to apply the gridsynth compiler pass to
         epsilon (float): The accuracy per rotation gate. Defaults to ``1e-4``. With

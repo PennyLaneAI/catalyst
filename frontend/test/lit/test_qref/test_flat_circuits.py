@@ -153,7 +153,7 @@ def test_dynamic_qubit_allocation(i: int):
         # CHECK: qref.pcphase({{%.+}}, dim : 0) [[alloc_q0]], [[alloc_q1]] : !qref.bit, !qref.bit
         qp.PCPhase(0.1, dim=0, wires=[q[0], q[1]])
 
-        # CHECK: qref.gphase({{%.+}}) ctrls([[alloc_q0]]) ctrlvals({{%.+}}) : ctrls !qref.bit
+        # CHECK: qref.custom "PhaseShift"({{%.+}}) [[alloc_q0]] : !qref.bit
         qp.ctrl(qp.GlobalPhase(np.pi / 4), control=[q[0]])
 
         # CHECK: qref.paulirot ["X"]({{%.+}}) [[alloc_q0]] : !qref.bit
@@ -314,7 +314,7 @@ def test_global_phase():
     """
     Test global phase.
     """
-    # CHECK-DAG: [[true:%.+]] = arith.constant true
+    # CHECK-DAG: [[neg_angle:%.+]] = arith.constant -0.78539816339744828 : f64
     # CHECK-DAG: [[angle:%.+]] = arith.constant 0.78539816339744828 : f64
 
     # CHECK: [[reg:%.+]] = qref.alloc( 4) : !qref.reg<4>
@@ -323,13 +323,36 @@ def test_global_phase():
     qp.GlobalPhase(np.pi / 4)
 
     # CHECK: [[q0:%.+]] = qref.get [[reg]][ 0] : !qref.reg<4> -> !qref.bit
-    # CHECK: qref.gphase([[angle]]) ctrls([[q0]]) ctrlvals([[true]]) : ctrls !qref.bit
+    # CHECK: qref.custom "PhaseShift"([[neg_angle]]) [[q0]] : !qref.bit
     qp.ctrl(qp.GlobalPhase(np.pi / 4), control=[0])
 
     return qp.expval(qp.X(0))
 
 
 print(test_global_phase.mlir)
+
+
+# CHECK: func.func public @test_global_phase_ctrl_value_false() -> tensor<f64>
+@qp.qjit(capture=True, target="mlir", collect_decomp_rules=False)
+@qp.qnode(qp.device("null.qubit", wires=4))
+def test_global_phase_ctrl_value_false():
+    """
+    Test that C(GlobalPhase) with a zero control value stays a controlled gphase
+    (it does not decompose to PhaseShift).
+    """
+    # CHECK-DAG: [[false:%.+]] = arith.constant false
+    # CHECK-DAG: [[angle:%.+]] = arith.constant 0.78539816339744828 : f64
+
+    # CHECK: [[reg:%.+]] = qref.alloc( 4) : !qref.reg<4>
+
+    # CHECK: [[q0:%.+]] = qref.get [[reg]][ 0] : !qref.reg<4> -> !qref.bit
+    # CHECK: qref.gphase([[angle]]) ctrls([[q0]]) ctrlvals([[false]]) : ctrls !qref.bit
+    qp.ctrl(qp.GlobalPhase(np.pi / 4), control=[0], control_values=[False])
+
+    return qp.expval(qp.X(0))
+
+
+print(test_global_phase_ctrl_value_false.mlir)
 
 
 # CHECK: func.func public @test_unitary(%arg0: tensor<2x2xf64>, %arg1: tensor<4x4xf64>, %arg2: tensor<1xi1>) -> tensor<f64>

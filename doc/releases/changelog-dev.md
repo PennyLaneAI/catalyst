@@ -168,6 +168,19 @@
 
 <h3>Improvements 🛠</h3>
 
+* Controlled :class:`~pennylane.GlobalPhase` operations now decompose to
+  :class:`~pennylane.PhaseShift` on the control wire when possible (or
+  :class:`~pennylane.ControlledPhaseShift` for multiple controls), via an updated
+  PennyLane dependency. The common single-control case no longer lowers as a controlled
+  ``gphase``.
+  [(#3323)](https://github.com/PennyLaneAI/catalyst/pull/3323)
+
+* Transforms from pass plugins can now be used. The plugin must
+  have an entry point for `catalyst.passes_resolution`, provide a `name2pass` in its
+  namespace, and provide the package name via
+  `pennylane.transform(pass_name=f"{package_name}.{pass_name}")`.
+  [(#3316)](https://github.com/PennyLaneAI/catalyst/pull/3316)
+
 * The memcpy transport now carries messages of any size in each direction, as set by a PennyLane
   `qp.Controller`'s `in_bytes` and `out_bytes`. The RDMA transports, and the memcpy GPU
   coprocessor's persistent kernel, still carry 8 bytes.
@@ -1075,6 +1088,10 @@
 * A new pass `--resolve-gate-level-adjoint` was added. This pass now handles gate-level adjoint canonicalization, moving it out of the `--canonicalize` pass.
   [#3155](https://github.com/PennyLaneAI/catalyst/pull/3155)
 
+* Pull requests touching transport now run its Catch2 suites and the backline tests: CPU over a
+  soft-RoCE loopback link, and CPU-to-GPU over memcpy on the GPU runner.
+  [(#3074)](https://github.com/PennyLaneAI/catalyst/pull/3074)
+
 * The OQD device now implements the optional `get_runtime_artifacts` to inform the compiler of its runtime library, 
   `librt_OQD_capi`. This replaces the previous work-around that had the compiler check directly for the library and
   link it if present.
@@ -1113,6 +1130,7 @@ Astral Cai,
 Joey Carter,
 Yushao Chen,
 Filip Dobrosavljevic,
+Marcus Edwards,
 Lillian Frederiksen,
 Sengthai Heng,
 David Ittah,

@@ -162,7 +162,7 @@ runtime:
 oqc:
 	$(MAKE) -C frontend/catalyst/third_party/oqc/src oqc
 
-.PHONY: test test-runtime test-frontend lit pytest test-demos test-oqc test-toml-spec
+.PHONY: test test-runtime test-runtime-transport test-frontend lit pytest test-demos test-oqc test-toml-spec
 test: test-runtime test-frontend test-demos
 
 test-toml-spec:
@@ -170,6 +170,9 @@ test-toml-spec:
 
 test-runtime:
 	$(MAKE) -C runtime test
+
+test-runtime-transport:
+	$(MAKE) -C runtime test-transport ENABLE_TRANSPORT=ON
 
 test-mlir:
 	$(MAKE) -C mlir test
