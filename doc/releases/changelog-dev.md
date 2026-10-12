@@ -749,6 +749,12 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* The `gridsynth` pass now discretizes adjoint gates such as `qp.adjoint(qp.RZ(x, 0))` as the
+  inverse rotation instead of the rotation itself. For `qp.adjoint` or `qp.ctrl` applied to a
+  function containing rotations, it now raises an error instead of crashing or silently dropping
+  the control.
+  [(#3330)](https://github.com/PennyLaneAI/catalyst/pull/3330)
+
 * Fixed a bug where a compiled Backline program continued with a session that does not work,
   for example echoing the controller's own message back as the reply, after a transport call or a
   coprocessor function's set-up failed. It now stops with an error naming the call that failed,
