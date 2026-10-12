@@ -176,6 +176,21 @@ void fill_gates(size_t *data_aligned, size_t offset, size_t size0, size_t stride
         gates_view(i) = static_cast<size_t>(gates[i]);
     }
 }
+
+/**
+ * @brief Select the branch and twirl of `mixed` from a uniform sample and return its sequence.
+ */
+std::pair<std::vector<GateType>, double> sample_twirled_sequence(const MixedDecomposition &mixed,
+                                                                 double uniform_sample) {
+    auto [branch, twirl] = sample_mixed_decomposition(mixed.probability, uniform_sample);
+    return {twirl_sequence(mixed.gates[branch], twirl), mixed.phases[branch]};
+}
+
+std::pair<std::vector<PPRGateType>, double>
+sequence_to_ppr(const std::pair<std::vector<GateType>, double> &sequence) {
+    auto [ppr_gates, ppr_phase_update] = HST_to_PPR(sequence.first);
+    return {std::move(ppr_gates), sequence.second + ppr_phase_update};
+}
 } // namespace
 
 /**
@@ -392,6 +407,114 @@ size_t count_t_gates(const std::vector<GateType> &gates) {
     });
 }
 
+namespace {
+/**
+ * @brief Search for the cheapest mixture of an under-rotating and an over-rotating candidate.
+ *
+ * Writing a candidate's top-left entry as `w * exp(-i angle/2)`, it under-rotates the target if
+ * Im(w) <= 0 and over-rotates it if Im(w) >= 0. A pair is mixed with the probability p of
+ * Equation (33) of arXiv:2203.10064, and admissible if `diamond_error(p, w_under, w_over)` is at
+ * most `epsilon`. Of the admissible pairs found, the one with the lowest expected T-count is kept.
+ */
+class MixedPairSearch {
+  public:
+    struct Candidate {
+        std::vector<GateType> gates;
+        double phase;
+        std::complex<double> w;
+        size_t t_count;
+    };
+    using DiamondError = double (*)(double p, std::complex<double> w_under,
+                                    std::complex<double> w_over);
+
+    MixedPairSearch(const ZOmega &scale, double epsilon, DiamondError diamond_error)
+        : scale(scale), epsilon(epsilon), diamond_error(diamond_error) {}
+
+    /**
+     * @brief Consider the grid solution `u_sol / sqrt(2)^k` with relative top-left entry `w`.
+     * @return false if the search should stop.
+     */
+    bool offer(const ZOmega &u_sol, int k_val, std::complex<double> w) {
+        bool is_under = w.imag() <= 0.0;
+        bool is_over = w.imag() >= 0.0;
+        // Until the other side has a candidate, more candidates on a filled side cannot form a
+        // pair, so skip their (expensive) norm equation.
+        bool same_side_filled = is_under ? !unders.empty() : !overs.empty();
+        bool other_side_empty = is_under ? overs.empty() : unders.empty();
+        if (!best && !(is_under && is_over) && same_side_filled && other_side_empty) {
+            return true;
+        }
+        if (unders.size() + overs.size() >= MAX_MIXED_CANDIDATES) {
+            return false;
+        }
+        auto normal_form = normal_form_from_grid_solution(u_sol, k_val, scale);
+        if (!normal_form) {
+            return true;
+        }
+        size_t t_count = count_t_gates(normal_form->first);
+        // Heuristic stop: T-counts mostly, but not strictly, grow along the search.
+        if (best && t_count > best->cost) {
+            return false;
+        }
+
+        Candidate candidate{std::move(normal_form->first), normal_form->second, w, t_count};
+        if (is_under) {
+            unders.push_back(candidate);
+            for (size_t j = 0; j < overs.size(); j++) {
+                evaluate(unders.size() - 1, j);
+            }
+        }
+        if (is_over) {
+            overs.push_back(std::move(candidate));
+            for (size_t i = 0; i < unders.size(); i++) {
+                evaluate(i, overs.size() - 1);
+            }
+        }
+        return true;
+    }
+
+    bool found() const { return best.has_value(); }
+    const Candidate &under() const { return unders[best->under]; }
+    const Candidate &over() const { return overs[best->over]; }
+    double probability() const { return best->probability; }
+
+  private:
+    struct Pair {
+        size_t under;
+        size_t over;
+        double probability;
+        double cost;
+    };
+
+    void evaluate(size_t i, size_t j) {
+        const Candidate &under = unders[i];
+        const Candidate &over = overs[j];
+        // p = r2^2 sin(2 delta2) / (r2^2 sin(2 delta2) - r1^2 sin(2 delta1)), with
+        // r^2 sin(2 delta) = 2 Re(w) Im(w).
+        double under_weight = under.w.real() * under.w.imag();
+        double over_weight = over.w.real() * over.w.imag();
+        double denominator = over_weight - under_weight;
+        double p = denominator > 0.0 ? over_weight / denominator : 1.0;
+        double diamond = diamond_error(p, under.w, over.w);
+        // Tolerate rounding for candidates on the bound.
+        if (diamond > epsilon * (1.0 + 1e-12)) {
+            return;
+        }
+        double cost = p * under.t_count + (1.0 - p) * over.t_count;
+        if (!best || cost < best->cost) {
+            best = Pair{i, j, p, cost};
+        }
+    }
+
+    ZOmega scale;
+    double epsilon;
+    DiamondError diamond_error;
+    std::vector<Candidate> unders;
+    std::vector<Candidate> overs;
+    std::optional<Pair> best;
+};
+} // namespace
+
 /**
  * @brief Compute a mixed diagonal approximation of RZ(angle) with diamond-norm accuracy epsilon.
  *
@@ -416,44 +539,12 @@ MixedDecomposition compute_mixed_diagonal_decomposition(double angle, double eps
     auto [grid_angle, scale] = grid_problem_frame(angle);
     GridProblem::GridIterator u_solutions(grid_angle, mixed_search_epsilon(epsilon),
                                           MAX_SEARCH_TRIALS);
-
-    struct Candidate {
-        std::vector<GateType> gates;
-        double phase;
-        std::complex<double> w;
-        size_t t_count;
-    };
-    std::vector<Candidate> unders;
-    std::vector<Candidate> overs;
-
-    struct Pair {
-        size_t under;
-        size_t over;
-        double probability;
-        double cost;
-    };
-    std::optional<Pair> best;
-
-    auto evaluate = [&](size_t i, size_t j) {
-        const Candidate &under = unders[i];
-        const Candidate &over = overs[j];
-        // p = r2^2 sin(2 delta2) / (r2^2 sin(2 delta2) - r1^2 sin(2 delta1)), with
-        // r^2 sin(2 delta) = 2 Re(w) Im(w).
-        double under_weight = under.w.real() * under.w.imag();
-        double over_weight = over.w.real() * over.w.imag();
-        double denominator = over_weight - under_weight;
-        double p = denominator > 0.0 ? over_weight / denominator : 1.0;
-        double diamond = 2.0 * (1.0 - p * under.w.real() * under.w.real() -
-                                (1.0 - p) * over.w.real() * over.w.real());
-        // Tolerate rounding for candidates on the bound.
-        if (diamond > epsilon * (1.0 + 1e-12)) {
-            return;
-        }
-        double cost = p * under.t_count + (1.0 - p) * over.t_count;
-        if (!best || cost < best->cost) {
-            best = Pair{i, j, p, cost};
-        }
-    };
+    // Theorem 3.12.
+    MixedPairSearch search(scale, epsilon,
+                           [](double p, std::complex<double> w_under, std::complex<double> w_over) {
+                               return 2.0 * (1.0 - p * w_under.real() * w_under.real() -
+                                             (1.0 - p) * w_over.real() * w_over.real());
+                           });
 
     for (const auto &[u_sol, k_val] : u_solutions) {
         std::complex<double> w =
@@ -461,53 +552,20 @@ MixedDecomposition compute_mixed_diagonal_decomposition(double angle, double eps
         if (w.real() < min_overlap) {
             continue;
         }
-
-        bool is_under = w.imag() <= 0.0;
-        bool is_over = w.imag() >= 0.0;
-        // Until the other side has a candidate, more candidates on a filled side cannot form a
-        // pair, so skip their (expensive) norm equation.
-        bool same_side_filled = is_under ? !unders.empty() : !overs.empty();
-        bool other_side_empty = is_under ? overs.empty() : unders.empty();
-        if (!best && !(is_under && is_over) && same_side_filled && other_side_empty) {
-            continue;
-        }
-        if (unders.size() + overs.size() >= MAX_MIXED_CANDIDATES) {
+        if (!search.offer(u_sol, k_val, w)) {
             break;
-        }
-        auto normal_form = normal_form_from_grid_solution(u_sol, k_val, scale);
-        if (!normal_form) {
-            continue;
-        }
-        size_t t_count = count_t_gates(normal_form->first);
-        // Heuristic stop: T-counts mostly, but not strictly, grow along the search.
-        if (best && t_count > best->cost) {
-            break;
-        }
-
-        Candidate candidate{std::move(normal_form->first), normal_form->second, w, t_count};
-        if (is_under) {
-            unders.push_back(candidate);
-            for (size_t j = 0; j < overs.size(); j++) {
-                evaluate(unders.size() - 1, j);
-            }
-        }
-        if (is_over) {
-            overs.push_back(std::move(candidate));
-            for (size_t i = 0; i < unders.size(); i++) {
-                evaluate(i, overs.size() - 1);
-            }
         }
     }
 
-    if (!best) {
+    if (!search.found()) {
         // A unitary with operator-norm error epsilon/2 has diamond-norm error at most epsilon.
         auto fallback = compute_clifford_T_decomposition(angle, epsilon / 2.0);
         return {{fallback.first, fallback.first}, {fallback.second, fallback.second}, 1.0};
     }
 
-    return {{std::move(unders[best->under].gates), std::move(overs[best->over].gates)},
-            {unders[best->under].phase, overs[best->over].phase},
-            best->probability};
+    return {{search.under().gates, search.over().gates},
+            {search.under().phase, search.over().phase},
+            search.probability()};
 }
 
 /**
@@ -569,15 +627,12 @@ std::pair<std::vector<GateType>, double> eval_mixed_ross_algorithm(double angle,
         mixed = compute_mixed_diagonal_decomposition(angle, 2.0 * epsilon);
         mixed_cache.put(key, *mixed);
     }
-    auto [branch, twirl] = sample_mixed_decomposition(mixed->probability, uniform_sample);
-    return {twirl_sequence(mixed->gates[branch], twirl), mixed->phases[branch]};
+    return sample_twirled_sequence(*mixed, uniform_sample);
 }
 
 std::pair<std::vector<PPRGateType>, double>
 eval_mixed_ross_algorithm_ppr(double angle, double epsilon, double uniform_sample) {
-    auto [gates, phase] = eval_mixed_ross_algorithm(angle, epsilon, uniform_sample);
-    auto [ppr_gates, ppr_phase_update] = HST_to_PPR(gates);
-    return {std::move(ppr_gates), phase + ppr_phase_update};
+    return sequence_to_ppr(eval_mixed_ross_algorithm(angle, epsilon, uniform_sample));
 }
 
 // Extern C implementation

@@ -858,11 +858,12 @@ def gridsynth_setup_inputs(epsilon=1e-4, ppr_basis=False, method="deterministic"
 
     .. note::
 
-        With ``method="mixed"``, the accuracy guarantee holds on average over calls. Each call
-        samples one sequence per rotation, shared by all its shots, with error of order
-        :math:`\sqrt{\epsilon}`. Samples are drawn from the runtime random number generator seeded
-        by the ``seed`` argument of :func:`~.qjit`, so with a fixed seed every call repeats the
-        same samples.
+        With ``method="mixed"``, the accuracy guarantee holds on average over samples, and each
+        sampled sequence has error of order :math:`\sqrt{\epsilon}`. By default, and with
+        ``mcm_method="single-branch-statistics"``, a call samples one sequence per rotation, shared
+        by all its shots. With ``mcm_method="one-shot"``, every shot samples its own. Samples are
+        drawn from the runtime random number generator seeded by the ``seed`` argument of
+        :func:`~.qjit`, so with a fixed seed every call repeats the same samples.
 
     **Example**
 

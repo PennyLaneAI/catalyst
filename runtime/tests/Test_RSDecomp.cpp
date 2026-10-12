@@ -264,10 +264,11 @@ Matrix2 sequence_unitary(const std::vector<GateType> &gates, double phase) {
 }
 
 /**
- * Pauli transfer matrix R_ij = Tr(P_i E(P_j)) / 2 of the error channel
- * E(rho) = V^dagger M(rho) V, where M is the {Z, S}-twirled mixture and V = RZ(angle).
+ * Pauli transfer matrix of the error channel E(rho) = V^dagger M(rho) V, where M has the weighted
+ * Kraus operators `channel` and V = RZ(angle).
  */
-std::vector<std::vector<double>> mixed_error_ptm(const MixedDecomposition &mixed, double angle) {
+std::vector<std::vector<double>> error_ptm(const std::vector<std::pair<double, Matrix2>> &channel,
+                                           double angle) {
     const std::vector<Matrix2> paulis = {{1.0, 0.0, 0.0, 1.0},
                                          {0.0, 1.0, 1.0, 0.0},
                                          {0.0, {0.0, -1.0}, {0.0, 1.0}, 0.0},
@@ -275,13 +276,8 @@ std::vector<std::vector<double>> mixed_error_ptm(const MixedDecomposition &mixed
     Matrix2 V = {std::polar(1.0, -angle / 2.0), 0.0, 0.0, std::polar(1.0, angle / 2.0)};
 
     std::vector<std::pair<double, Matrix2>> kraus;
-    for (size_t branch = 0; branch < 2; branch++) {
-        double weight = branch == 0 ? mixed.probability : 1.0 - mixed.probability;
-        for (size_t twirl = 0; twirl < 4; twirl++) {
-            Matrix2 U =
-                sequence_unitary(twirl_sequence(mixed.gates[branch], twirl), mixed.phases[branch]);
-            kraus.emplace_back(weight / 4.0, multiply_matrices(dagger(V), U));
-        }
+    for (const auto &[weight, K] : channel) {
+        kraus.emplace_back(weight, multiply_matrices(dagger(V), K));
     }
 
     std::vector<std::vector<double>> ptm(4, std::vector<double>(4, 0.0));
@@ -299,6 +295,26 @@ std::vector<std::vector<double>> mixed_error_ptm(const MixedDecomposition &mixed
         }
     }
     return ptm;
+}
+
+/**
+ * Weighted Kraus operators of the {Z, S}-twirled mixture of a mixed decomposition.
+ */
+std::vector<std::pair<double, Matrix2>> mixed_kraus(const MixedDecomposition &mixed) {
+    std::vector<std::pair<double, Matrix2>> kraus;
+    for (size_t branch = 0; branch < 2; branch++) {
+        double weight = branch == 0 ? mixed.probability : 1.0 - mixed.probability;
+        for (size_t twirl = 0; twirl < 4; twirl++) {
+            Matrix2 U =
+                sequence_unitary(twirl_sequence(mixed.gates[branch], twirl), mixed.phases[branch]);
+            kraus.emplace_back(weight / 4.0, U);
+        }
+    }
+    return kraus;
+}
+
+std::vector<std::vector<double>> mixed_error_ptm(const MixedDecomposition &mixed, double angle) {
+    return error_ptm(mixed_kraus(mixed), angle);
 }
 
 TEST_CASE("Test mixed diagonal decomposition accuracy", "[RSDecomp][Mixed]") {
