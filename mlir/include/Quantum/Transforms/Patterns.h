@@ -23,10 +23,10 @@
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Transforms/DialectConversion.h"
 
+#include "Quantum/Transforms/PassesEnums.h"
+
 namespace catalyst {
 namespace quantum {
-
-enum class GridsynthMethod : int; // defined in Quantum/Transforms/Passes.h
 
 /// Create or lookup a global string constant and return a pointer to it.
 /// This is useful for creating string constants for QIR function calls.

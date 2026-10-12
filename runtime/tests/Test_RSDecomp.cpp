@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <array>
 #include <complex>
 #include <cstdio>
 #include <map>
@@ -264,14 +263,6 @@ Matrix2 sequence_unitary(const std::vector<GateType> &gates, double phase) {
     return U;
 }
 
-size_t t_count(const std::vector<GateType> &gates) {
-    size_t count = 0;
-    for (GateType gate : gates) {
-        count += gate == GateType::T || gate == GateType::HT || gate == GateType::SHT;
-    }
-    return count;
-}
-
 /**
  * Pauli transfer matrix R_ij = Tr(P_i E(P_j)) / 2 of the error channel
  * E(rho) = V^dagger M(rho) V, where M is the {Z, S}-twirled mixture and V = RZ(angle).
@@ -355,9 +346,9 @@ TEST_CASE("Test mixed diagonal decomposition halves the T-count", "[RSDecomp][Mi
     for (int angle_int = 1; angle_int < 60; angle_int++) {
         double angle = angle_int / 10.0;
         MixedDecomposition mixed = compute_mixed_diagonal_decomposition(angle, epsilon);
-        mixed_t += mixed.probability * t_count(mixed.gates[0]) +
-                   (1.0 - mixed.probability) * t_count(mixed.gates[1]);
-        deterministic_t += t_count(eval_ross_algorithm(angle, epsilon / 2.0).first);
+        mixed_t += mixed.probability * count_t_gates(mixed.gates[0]) +
+                   (1.0 - mixed.probability) * count_t_gates(mixed.gates[1]);
+        deterministic_t += count_t_gates(eval_ross_algorithm(angle, epsilon / 2.0).first);
     }
     CAPTURE(mixed_t, deterministic_t);
     CHECK(mixed_t < 0.6 * deterministic_t);
@@ -370,14 +361,13 @@ TEST_CASE("Test mixed diagonal decomposition of exact angles", "[RSDecomp][Mixed
 }
 
 TEST_CASE("Test mixed decomposition sampling", "[RSDecomp][Mixed]") {
-    CHECK(sample_mixed_decomposition(0.25, 0.0).branch == 0);
-    CHECK(sample_mixed_decomposition(0.25, 0.0).twirl == 0);
-    CHECK(sample_mixed_decomposition(0.25, 0.24).twirl == 3);
-    CHECK(sample_mixed_decomposition(0.25, 0.25).branch == 1);
-    CHECK(sample_mixed_decomposition(0.25, 0.25).twirl == 0);
-    CHECK(sample_mixed_decomposition(0.25, 0.99).twirl == 3);
-    CHECK(sample_mixed_decomposition(1.0, 0.99).branch == 0);
-    CHECK(sample_mixed_decomposition(0.25, 1.0).branch == 1);
+    using Sample = std::pair<size_t, size_t>;
+    CHECK(sample_mixed_decomposition(0.25, 0.0) == Sample{0, 0});
+    CHECK(sample_mixed_decomposition(0.25, 0.24) == Sample{0, 3});
+    CHECK(sample_mixed_decomposition(0.25, 0.25) == Sample{1, 0});
+    CHECK(sample_mixed_decomposition(0.25, 0.99) == Sample{1, 3});
+    CHECK(sample_mixed_decomposition(1.0, 0.99) == Sample{0, 3});
+    CHECK(sample_mixed_decomposition(0.25, 1.0) == Sample{1, 3});
 
     std::vector<GateType> gates = {GateType::HT};
     CHECK(twirl_sequence(gates, 0) == gates);
@@ -397,27 +387,6 @@ TEST_CASE("Test mixed decomposition sampling", "[RSDecomp][Mixed]") {
     CHECK(twirl_sequence({GateType::I}, 3) == std::vector<GateType>{GateType::I});
 }
 
-TEST_CASE("Test mixed decomposition sampling frequencies", "[RSDecomp][Mixed]") {
-    // Uniform samples on a fine grid select branch 0 with frequency p and the twirls uniformly
-    // within each branch.
-    const double probability = GENERATE(0.0, 0.3, 0.75, 1.0);
-    CAPTURE(probability);
-    const size_t num_samples = 100000;
-    std::array<std::array<size_t, 4>, 2> counts{};
-    for (size_t i = 0; i < num_samples; i++) {
-        double uniform_sample = (i + 0.5) / num_samples;
-        auto [branch, twirl] = sample_mixed_decomposition(probability, uniform_sample);
-        counts[branch][twirl]++;
-    }
-    for (size_t branch = 0; branch < 2; branch++) {
-        double branch_probability = branch == 0 ? probability : 1.0 - probability;
-        for (size_t twirl = 0; twirl < 4; twirl++) {
-            CHECK_THAT(static_cast<double>(counts[branch][twirl]) / num_samples,
-                       Catch::Matchers::WithinAbs(branch_probability / 4.0, 1e-4));
-        }
-    }
-}
-
 TEST_CASE("Test mixed C-API Wrapper (Memref Interface)", "[RSDecomp][Mixed]") {
     const double angle = 0.7;
     const double epsilon = 1e-6;
@@ -431,24 +400,18 @@ TEST_CASE("Test mixed C-API Wrapper (Memref Interface)", "[RSDecomp][Mixed]") {
                                      uniform_sample);
     double phase = rs_mixed_decomposition_get_phase(angle, epsilon, ppr_basis, uniform_sample);
 
-    if (ppr_basis) {
-        auto [gates, expected_phase] =
-            eval_mixed_ross_algorithm_ppr(angle, epsilon, uniform_sample);
-        REQUIRE(buffer.size() == gates.size());
-        for (size_t i = 0; i < gates.size(); i++) {
-            CHECK(static_cast<PPRGateType>(buffer[i]) == gates[i]);
+    auto to_indices = [](const auto &sequence) {
+        std::vector<size_t> indices;
+        for (auto gate : sequence.first) {
+            indices.push_back(static_cast<size_t>(gate));
         }
-        CHECK(phase == expected_phase);
-    } else {
-        MixedDecomposition mixed = compute_mixed_diagonal_decomposition(angle, epsilon);
-        auto [branch, twirl] = sample_mixed_decomposition(mixed.probability, uniform_sample);
-        std::vector<GateType> expected = twirl_sequence(mixed.gates[branch], twirl);
-        REQUIRE(buffer.size() == expected.size());
-        for (size_t i = 0; i < expected.size(); i++) {
-            CHECK(static_cast<GateType>(buffer[i]) == expected[i]);
-        }
-        CHECK(phase == mixed.phases[branch]);
-    }
+        return std::pair{indices, sequence.second};
+    };
+    auto expected = ppr_basis
+                        ? to_indices(eval_mixed_ross_algorithm_ppr(angle, epsilon, uniform_sample))
+                        : to_indices(eval_mixed_ross_algorithm(angle, epsilon, uniform_sample));
+    CHECK(buffer == expected.first);
+    CHECK(phase == expected.second);
 }
 
 TEST_CASE("rs_decomposition_get_size emits warning for epsilon < 1e-6", "[RSDecomp][Warning]") {

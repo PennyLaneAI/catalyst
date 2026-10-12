@@ -20,7 +20,6 @@
 #include <cmath>
 #include <complex>
 #include <cstring>
-#include <memory>
 #include <optional>
 #include <sstream>
 #include <string>
@@ -102,16 +101,80 @@ normal_form_from_grid_solution(const ZOmega &u_sol, int k_val, const ZOmega &sca
     return ma_normal_form(so3_mat);
 }
 
-size_t count_t_gates(const std::vector<GateType> &gates) {
-    return std::count_if(gates.begin(), gates.end(), [](GateType gate) {
-        return gate == GateType::T || gate == GateType::HT || gate == GateType::SHT;
-    });
-}
-
 // Grid-search accuracy for which every candidate satisfies 1 - Re(w)^2 <= epsilon / 2 (written to
 // avoid cancellation).
 double mixed_search_epsilon(double epsilon) {
     return std::sqrt(epsilon / (1.0 + std::sqrt(1.0 - epsilon / 2.0)));
+}
+
+/**
+ * @brief Power k of diag(1, i^k) for the diagonal Cliffords I, S, Z, S^dagger, or -1 otherwise.
+ */
+int diagonal_clifford_power(GateType gate) {
+    switch (gate) {
+    case GateType::I:
+        return 0;
+    case GateType::S:
+        return 1;
+    case GateType::Z:
+        return 2;
+    case GateType::Sd:
+        return 3;
+    default:
+        return -1;
+    }
+}
+
+/**
+ * @brief Append `gate` to `gates`, merging it into the last gate when the product is exactly
+ * (including global phase) a single gate.
+ */
+void append_merged(std::vector<GateType> &gates, GateType gate) {
+    if (gates.empty()) {
+        gates.push_back(gate);
+        return;
+    }
+    GateType &last = gates.back();
+    int last_power = diagonal_clifford_power(last);
+    int power = diagonal_clifford_power(gate);
+    if (last_power >= 0 && power >= 0) {
+        static constexpr std::array<GateType, 4> powers = {GateType::I, GateType::S, GateType::Z,
+                                                           GateType::Sd};
+        last = powers[(last_power + power) % 4];
+        if (last == GateType::I) {
+            gates.pop_back();
+        }
+    } else if (last == GateType::S && gate == GateType::HT) {
+        last = GateType::SHT;
+    } else if (last == GateType::Sd && gate == GateType::SHT) {
+        last = GateType::HT;
+    } else {
+        gates.push_back(gate);
+    }
+}
+
+void warn_small_epsilon(double epsilon, const std::string &min_epsilon) {
+    std::ostringstream oss;
+    oss << std::scientific << epsilon;
+    RT_WARN("Gridsynth received epsilon=" + oss.str() + ". For epsilon smaller than " +
+            min_epsilon +
+            ", results may be inaccurate, or errors may occur during decomposition. To guarantee "
+            "correctness, please provide a larger epsilon value.");
+}
+
+/**
+ * @brief Write a gate sequence into a memref passed as its unpacked descriptor fields.
+ */
+template <typename Gate>
+void fill_gates(size_t *data_aligned, size_t offset, size_t size0, size_t stride0,
+                const std::vector<Gate> &gates) {
+    const size_t sizes[1] = {size0};
+    const size_t strides[1] = {stride0};
+    DataView<size_t, 1> gates_view(data_aligned, offset, sizes, strides);
+    RT_FAIL_IF(gates_view.size() < gates.size(), "Error: memref allocated too small for gates.\n")
+    for (size_t i = 0; i < gates.size(); ++i) {
+        gates_view(i) = static_cast<size_t>(gates[i]);
+    }
 }
 } // namespace
 
@@ -153,7 +216,8 @@ std::pair<std::vector<GateType>, double> compute_clifford_T_decomposition(double
 
         std::optional<std::pair<std::vector<GateType>, double>> result;
         for (const auto &[u_sol, k_val] : u_solutions) {
-            if ((result = normal_form_from_grid_solution(u_sol, k_val, scale))) {
+            result = normal_form_from_grid_solution(u_sol, k_val, scale);
+            if (result) {
                 break;
             }
         }
@@ -322,6 +386,12 @@ std::pair<std::vector<PPRGateType>, double> HST_to_PPR(const std::vector<GateTyp
     return {output_gates, phase_update};
 }
 
+size_t count_t_gates(const std::vector<GateType> &gates) {
+    return std::count_if(gates.begin(), gates.end(), [](GateType gate) {
+        return gate == GateType::T || gate == GateType::HT || gate == GateType::SHT;
+    });
+}
+
 /**
  * @brief Compute a mixed diagonal approximation of RZ(angle) with diamond-norm accuracy epsilon.
  *
@@ -440,80 +510,17 @@ MixedDecomposition compute_mixed_diagonal_decomposition(double angle, double eps
             best->probability};
 }
 
-namespace {
-using MixedCacheKey = std::tuple<double, double>;
-lru_cache<MixedCacheKey, MixedDecomposition, ROSS_CACHE_SIZE> mixed_cache;
-
-MixedDecomposition eval_mixed_decomposition(double angle, double epsilon) {
-    MixedCacheKey key = {angle, epsilon};
-    if (auto val_opt = mixed_cache.get(key); val_opt) {
-        return *val_opt;
-    }
-
-    auto result = compute_mixed_diagonal_decomposition(angle, epsilon);
-    mixed_cache.put(key, result);
-    return result;
-}
-} // namespace
-
 /**
  * @brief Select the branch and twirl of a mixed decomposition from a uniform sample in [0, 1).
+ * @return The pair (branch, twirl).
  */
-MixedSample sample_mixed_decomposition(double probability, double uniform_sample) {
+std::pair<size_t, size_t> sample_mixed_decomposition(double probability, double uniform_sample) {
     double u = std::clamp(uniform_sample, 0.0, std::nextafter(1.0, 0.0));
     size_t branch = u < probability ? 0 : 1;
     double fraction = branch == 0 ? u / probability : (u - probability) / (1.0 - probability);
     size_t twirl = std::min<size_t>(3, static_cast<size_t>(4.0 * fraction));
     return {branch, twirl};
 }
-
-namespace {
-/**
- * @brief Power k of diag(1, i^k) for the diagonal Cliffords I, S, Z, S^dagger, or -1 otherwise.
- */
-int diagonal_clifford_power(GateType gate) {
-    switch (gate) {
-    case GateType::I:
-        return 0;
-    case GateType::S:
-        return 1;
-    case GateType::Z:
-        return 2;
-    case GateType::Sd:
-        return 3;
-    default:
-        return -1;
-    }
-}
-
-/**
- * @brief Append `gate` to `gates`, merging it into the last gate when the product is exactly
- * (including global phase) a single gate.
- */
-void append_merged(std::vector<GateType> &gates, GateType gate) {
-    if (gates.empty()) {
-        gates.push_back(gate);
-        return;
-    }
-    GateType &last = gates.back();
-    int last_power = diagonal_clifford_power(last);
-    int power = diagonal_clifford_power(gate);
-    if (last_power >= 0 && power >= 0) {
-        static constexpr std::array<GateType, 4> powers = {GateType::I, GateType::S, GateType::Z,
-                                                           GateType::Sd};
-        last = powers[(last_power + power) % 4];
-        if (last == GateType::I) {
-            gates.pop_back();
-        }
-    } else if (last == GateType::S && gate == GateType::HT) {
-        last = GateType::SHT;
-    } else if (last == GateType::Sd && gate == GateType::SHT) {
-        last = GateType::HT;
-    } else {
-        gates.push_back(gate);
-    }
-}
-} // namespace
 
 /**
  * @brief Apply the {Z, S} twirl sigma U sigma^dagger to a gate sequence (applied first to last),
@@ -544,77 +551,33 @@ std::vector<GateType> twirl_sequence(const std::vector<GateType> &gates, size_t 
     return twirled;
 }
 
-namespace {
-constexpr size_t NUM_TWIRLS = 4;
+// Cache for mixed decompositions
+using MixedCacheKey = std::tuple<double, double>;
+static lru_cache<MixedCacheKey, MixedDecomposition, ROSS_CACHE_SIZE> mixed_cache;
 
 /**
- * @brief All sequences a mixed decomposition can apply, indexed by `branch * NUM_TWIRLS + twirl`,
- * with the probability of the first branch.
+ * @brief Sample a twirled sequence of the mixed decomposition of RZ(angle).
+ *
+ * `epsilon` has the meaning of `eval_ross_algorithm`: the mixed channel has diamond-norm error at
+ * most 2 * epsilon, the guarantee of a single sequence with operator-norm error epsilon.
  */
-template <typename Gate> struct MixedSequences {
-    double probability;
-    std::array<std::pair<std::vector<Gate>, double>, 2 * NUM_TWIRLS> sequences;
-};
-
-// Shared pointers keep cache lookups from copying all sequences.
-using MixedStdCacheValue = std::shared_ptr<const MixedSequences<GateType>>;
-using MixedPPRCacheValue = std::shared_ptr<const MixedSequences<PPRGateType>>;
-lru_cache<MixedCacheKey, MixedStdCacheValue, ROSS_CACHE_SIZE> mixed_cache_std;
-lru_cache<MixedCacheKey, MixedPPRCacheValue, ROSS_CACHE_SIZE> mixed_cache_ppr;
-
-MixedStdCacheValue eval_mixed_sequences(double angle, double epsilon) {
-    MixedCacheKey key = {angle, epsilon};
-    if (auto val_opt = mixed_cache_std.get(key); val_opt) {
-        return *val_opt;
-    }
-
-    MixedDecomposition mixed = eval_mixed_decomposition(angle, epsilon);
-    auto result = std::make_shared<MixedSequences<GateType>>();
-    result->probability = mixed.probability;
-    for (size_t branch = 0; branch < 2; branch++) {
-        for (size_t twirl = 0; twirl < NUM_TWIRLS; twirl++) {
-            result->sequences[branch * NUM_TWIRLS + twirl] = {
-                twirl_sequence(mixed.gates[branch], twirl), mixed.phases[branch]};
-        }
-    }
-    mixed_cache_std.put(key, result);
-    return result;
-}
-
-MixedPPRCacheValue eval_mixed_sequences_ppr(double angle, double epsilon) {
-    MixedCacheKey key = {angle, epsilon};
-    if (auto val_opt = mixed_cache_ppr.get(key); val_opt) {
-        return *val_opt;
-    }
-
-    MixedStdCacheValue std_sequences = eval_mixed_sequences(angle, epsilon);
-    auto result = std::make_shared<MixedSequences<PPRGateType>>();
-    result->probability = std_sequences->probability;
-    for (size_t i = 0; i < result->sequences.size(); i++) {
-        const auto &[gates, phase] = std_sequences->sequences[i];
-        auto [ppr_gates, ppr_phase_update] = HST_to_PPR(gates);
-        result->sequences[i] = {std::move(ppr_gates), phase + ppr_phase_update};
-    }
-    mixed_cache_ppr.put(key, result);
-    return result;
-}
-
-template <typename Gate>
-std::pair<std::vector<Gate>, double> select_sample(const MixedSequences<Gate> &mixed,
-                                                   double uniform_sample) {
-    auto [branch, twirl] = sample_mixed_decomposition(mixed.probability, uniform_sample);
-    return mixed.sequences[branch * NUM_TWIRLS + twirl];
-}
-} // namespace
-
 std::pair<std::vector<GateType>, double> eval_mixed_ross_algorithm(double angle, double epsilon,
                                                                    double uniform_sample) {
-    return select_sample(*eval_mixed_sequences(angle, epsilon), uniform_sample);
+    MixedCacheKey key = {angle, epsilon};
+    auto mixed = mixed_cache.get(key);
+    if (!mixed) {
+        mixed = compute_mixed_diagonal_decomposition(angle, 2.0 * epsilon);
+        mixed_cache.put(key, *mixed);
+    }
+    auto [branch, twirl] = sample_mixed_decomposition(mixed->probability, uniform_sample);
+    return {twirl_sequence(mixed->gates[branch], twirl), mixed->phases[branch]};
 }
 
 std::pair<std::vector<PPRGateType>, double>
 eval_mixed_ross_algorithm_ppr(double angle, double epsilon, double uniform_sample) {
-    return select_sample(*eval_mixed_sequences_ppr(angle, epsilon), uniform_sample);
+    auto [gates, phase] = eval_mixed_ross_algorithm(angle, epsilon, uniform_sample);
+    auto [ppr_gates, ppr_phase_update] = HST_to_PPR(gates);
+    return {std::move(ppr_gates), phase + ppr_phase_update};
 }
 
 // Extern C implementation
@@ -622,12 +585,7 @@ extern "C" {
 
 size_t rs_decomposition_get_size(double theta, double epsilon, bool ppr_basis) {
     if (epsilon < 1e-6) {
-        std::ostringstream oss;
-        oss << std::scientific << epsilon;
-        RT_WARN("Gridsynth received epsilon=" + oss.str() +
-                ". For epsilon smaller than 1e-6, results may be inaccurate, or errors may"
-                " occur during decomposition. To guarantee correctness, please provide a larger "
-                "epsilon value.");
+        warn_small_epsilon(epsilon, "1e-6");
     }
     if (ppr_basis) {
         auto result = eval_ross_algorithm_ppr(theta, epsilon);
@@ -659,31 +617,11 @@ size_t rs_decomposition_get_size(double theta, double epsilon, bool ppr_basis) {
 void rs_decomposition_get_gates([[maybe_unused]] size_t *data_allocated, size_t *data_aligned,
                                 size_t offset, size_t size0, size_t stride0, double theta,
                                 double epsilon, bool ppr_basis) {
-    (void)data_allocated;
-
-    const size_t sizes[1] = {size0};
-    const size_t strides[1] = {stride0};
-
-    // Wrap the memref descriptor in a DataView for access
-    DataView<size_t, 1> gates_view(data_aligned, offset, sizes, strides);
-
     if (ppr_basis) {
-        const auto &[gates, phase] = eval_ross_algorithm_ppr(theta, epsilon);
-        size_t s = gates.size();
-        RT_FAIL_IF(gates_view.size() < s, "Error: memref allocated too small for PPR gates.\n")
-
-        for (size_t i = 0; i < s; ++i) {
-            gates_view(i) = static_cast<size_t>(gates[i]);
-        }
+        fill_gates(data_aligned, offset, size0, stride0,
+                   eval_ross_algorithm_ppr(theta, epsilon).first);
     } else {
-        const auto &[gates, phase] = eval_ross_algorithm(theta, epsilon);
-
-        size_t s = gates.size();
-        RT_FAIL_IF(gates_view.size() < s, "Error: memref allocated too small for PPR gates.\n")
-
-        for (size_t i = 0; i < s; ++i) {
-            gates_view(i) = static_cast<size_t>(gates[i]);
-        }
+        fill_gates(data_aligned, offset, size0, stride0, eval_ross_algorithm(theta, epsilon).first);
     }
 }
 
@@ -710,19 +648,15 @@ double rs_decomposition_get_phase(double theta, double epsilon, bool ppr_basis) 
  * them with the same sample returns the size, gates, and phase of the same sequence.
  *
  * @param theta Angle
- * @param epsilon Diamond-norm error of the mixed channel
+ * @param epsilon Error, as in `rs_decomposition_get_size`
  * @param ppr_basis Whether to use PPR basis
  * @param uniform_sample Uniform random number in [0, 1) selecting the branch and twirl
  */
 size_t rs_mixed_decomposition_get_size(double theta, double epsilon, bool ppr_basis,
                                        double uniform_sample) {
-    if (mixed_search_epsilon(epsilon) < 1e-6) {
-        std::ostringstream oss;
-        oss << std::scientific << epsilon;
-        RT_WARN("Mixed gridsynth received diamond-norm epsilon=" + oss.str() +
-                ", for which the per-sequence search accuracy falls below 1e-6. Results may be"
-                " inaccurate, or errors may occur during decomposition. To guarantee correctness,"
-                " please provide a larger epsilon value.");
+    // The mixed grid search runs at an accuracy of about sqrt(epsilon).
+    if (epsilon < 1e-12) {
+        warn_small_epsilon(epsilon, "1e-12");
     }
     if (ppr_basis) {
         return eval_mixed_ross_algorithm_ppr(theta, epsilon, uniform_sample).first.size();
@@ -741,29 +675,19 @@ size_t rs_mixed_decomposition_get_size(double theta, double epsilon, bool ppr_ba
  * @param size0 Size of dimension 0
  * @param stride0 Stride of dimension 0
  * @param theta Angle
- * @param epsilon Diamond-norm error of the mixed channel
+ * @param epsilon Error, as in `rs_decomposition_get_size`
  * @param ppr_basis Whether to use PPR basis
  * @param uniform_sample Uniform random number in [0, 1) selecting the branch and twirl
  */
 void rs_mixed_decomposition_get_gates([[maybe_unused]] size_t *data_allocated, size_t *data_aligned,
                                       size_t offset, size_t size0, size_t stride0, double theta,
                                       double epsilon, bool ppr_basis, double uniform_sample) {
-    const size_t sizes[1] = {size0};
-    const size_t strides[1] = {stride0};
-    DataView<size_t, 1> gates_view(data_aligned, offset, sizes, strides);
-
-    auto fill = [&](const auto &gates) {
-        RT_FAIL_IF(gates_view.size() < gates.size(),
-                   "Error: memref allocated too small for mixed gates.\n")
-        for (size_t i = 0; i < gates.size(); ++i) {
-            gates_view(i) = static_cast<size_t>(gates[i]);
-        }
-    };
-
     if (ppr_basis) {
-        fill(eval_mixed_ross_algorithm_ppr(theta, epsilon, uniform_sample).first);
+        fill_gates(data_aligned, offset, size0, stride0,
+                   eval_mixed_ross_algorithm_ppr(theta, epsilon, uniform_sample).first);
     } else {
-        fill(eval_mixed_ross_algorithm(theta, epsilon, uniform_sample).first);
+        fill_gates(data_aligned, offset, size0, stride0,
+                   eval_mixed_ross_algorithm(theta, epsilon, uniform_sample).first);
     }
 }
 
@@ -771,7 +695,7 @@ void rs_mixed_decomposition_get_gates([[maybe_unused]] size_t *data_allocated, s
  * @brief Returns the global phase of the sampled mixed decomposition.
  *
  * @param theta Angle
- * @param epsilon Diamond-norm error of the mixed channel
+ * @param epsilon Error, as in `rs_decomposition_get_size`
  * @param ppr_basis Whether to use PPR basis
  * @param uniform_sample Uniform random number in [0, 1) selecting the branch and twirl
  * @return double The global phase

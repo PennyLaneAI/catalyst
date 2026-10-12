@@ -38,13 +38,9 @@ struct MixedDecomposition {
     double probability;
 };
 
-struct MixedSample {
-    size_t branch;
-    size_t twirl;
-};
-
+size_t count_t_gates(const std::vector<GateType> &gates);
 MixedDecomposition compute_mixed_diagonal_decomposition(double angle, double epsilon);
-MixedSample sample_mixed_decomposition(double probability, double uniform_sample);
+std::pair<size_t, size_t> sample_mixed_decomposition(double probability, double uniform_sample);
 std::vector<GateType> twirl_sequence(const std::vector<GateType> &gates, size_t twirl);
 std::pair<std::vector<GateType>, double> eval_mixed_ross_algorithm(double angle, double epsilon,
                                                                    double uniform_sample);

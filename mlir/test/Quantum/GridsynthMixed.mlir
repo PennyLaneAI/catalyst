@@ -23,13 +23,12 @@
 // CHECK-DAG: func.func private @rs_mixed_decomposition_get_gates(memref<?xindex>, f64, f64, i1, f64)
 // CHECK-DAG: func.func private @rs_mixed_decomposition_get_phase(f64, f64, i1, f64) -> f64
 
-// COMMENT: One uniform sample is shared by the three runtime calls, which receive the diamond-norm
-// COMMENT: error 2 * epsilon.
+// COMMENT: One uniform sample is shared by the three runtime calls.
 
 // CLIFFORD-LABEL: func.func private @__catalyst_decompose_RZ_mixed(
 // PPR-LABEL:      func.func private @__catalyst_decompose_RZ_mixed_ppr_basis(
 // CHECK-SAME:     [[ARG_QBIT:%.+]]: !quantum.bit, [[ARG_ANGLE:%.+]]: f64)
-// CHECK:          [[EPS:%.+]] = arith.constant 2.000000e-02 : f64
+// CHECK:          [[EPS:%.+]] = arith.constant 1.000000e-02 : f64
 // CHECK:          [[SAMPLE:%.+]] = call @__catalyst__rt__random_double()
 // CHECK:          [[NUM_GATES:%.+]] = call @rs_mixed_decomposition_get_size([[ARG_ANGLE]], [[EPS]], {{%.+}}, [[SAMPLE]])
 // CHECK:          [[MEM:%.+]] = memref.alloc([[NUM_GATES]]) : memref<?xindex>
@@ -37,7 +36,7 @@
 // CHECK:          [[PHASE:%.+]] = call @rs_mixed_decomposition_get_phase([[ARG_ANGLE]], [[EPS]], {{%.+}}, [[SAMPLE]])
 // CHECK:          scf.for {{.*}} iter_args({{%.+}} = [[ARG_QBIT]])
 // CHECK:            scf.index_switch {{%.+}} {catalyst.estimated_probabilities = [{{.*}}]}
-// COM: expected T and other entries (1.5394 + 0.0027) * log2(1/0.02) + 3.1421 + 2.6123 (Clifford+T), (1.5394 + 0.7751) * log2(1/0.02) + 3.1421 + 6.1278 (PPR)
+// COM: expected T and other entries (1.5394 + 0.0027) * log2(1/0.01) + 1.6027 + 2.6096 (Clifford+T), (1.5394 + 0.7751) * log2(1/0.01) + 1.6027 + 5.3527 (PPR)
 // CLIFFORD:       } {catalyst.estimated_iterations = 14.4{{[0-9]+}} : f64}
 // PPR:            } {catalyst.estimated_iterations = 22.3{{[0-9]+}} : f64}
 // CHECK:          return {{%.+}}, [[PHASE]]

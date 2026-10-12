@@ -23,7 +23,6 @@
 
 #include "PBC/IR/PBCDialect.h"
 #include "Quantum/IR/QuantumOps.h"
-#include "Quantum/Transforms/Passes.h"
 #include "Quantum/Transforms/Patterns.h"
 
 using namespace llvm;
@@ -32,6 +31,7 @@ using namespace mlir;
 namespace catalyst {
 namespace quantum {
 
+#define GEN_PASS_DECL_GRIDSYNTHPASS
 #define GEN_PASS_DEF_GRIDSYNTHPASS
 #include "Quantum/Transforms/Passes.h.inc"
 

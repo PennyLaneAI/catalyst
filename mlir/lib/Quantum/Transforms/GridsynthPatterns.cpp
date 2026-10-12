@@ -40,7 +40,6 @@
 #include "Catalyst/Utils/EnsureFunctionDeclaration.h"
 #include "PBC/IR/PBCOps.h"
 #include "Quantum/IR/QuantumOps.h"
-#include "Quantum/Transforms/Passes.h"
 #include "Quantum/Transforms/Patterns.h"
 
 using namespace mlir;
@@ -241,7 +240,7 @@ constexpr SequenceStatistics cliffordTStatistics{3.0590, 1.1278, -0.0074, 1.9849
 constexpr SequenceStatistics pprStatistics{3.0590, 1.1278, 1.5324, 4.2326, pprCaseFrequencies};
 
 // Mixed synthesis: fitted over 1000 uniformly random angles and 8 samples per angle and epsilon,
-// for diamond-norm epsilon in [1e-11, 1e-3]. The samples include the (merged) twirling Cliffords.
+// for epsilon in [5e-12, 5e-4]. The samples include the (merged) twirling Cliffords.
 // Clifford+T cases: T, HT, SHT, I, X, ...
 constexpr double mixedCliffordTCaseFrequencies[] = {0.0111, 0.4939, 0.4950, 0.0054, 0.0395,
                                                     0.0386, 0.2380, 0.2109, 0.2551, 0.2124};
@@ -251,9 +250,9 @@ constexpr double mixedPPRCaseFrequencies[] = {
     0.0000, 0.0000, 0.0056, 0.0355, 0.4949, 0.5000, 0.0000, 0.0235, 0.0000};
 static_assert(std::size(mixedCliffordTCaseFrequencies) == numCliffordTCases);
 static_assert(std::size(mixedPPRCaseFrequencies) == numPPRCases);
-constexpr SequenceStatistics mixedCliffordTStatistics{1.5394, 3.1421, 0.0027, 2.6123,
+constexpr SequenceStatistics mixedCliffordTStatistics{1.5394, 1.6027, 0.0027, 2.6096,
                                                       mixedCliffordTCaseFrequencies};
-constexpr SequenceStatistics mixedPPRStatistics{1.5394, 3.1421, 0.7751, 6.1278,
+constexpr SequenceStatistics mixedPPRStatistics{1.5394, 1.6027, 0.7751, 5.3527,
                                                 mixedPPRCaseFrequencies};
 
 const SequenceStatistics &getSequenceStatistics(bool pprBasis, GridsynthMethod method) {
@@ -442,11 +441,8 @@ func::FuncOp getOrCreateDecompositionFunc(ModuleOp module, PatternRewriter &rewr
     Value qbitIn = entryBlock->getArgument(0);
     Value angle = entryBlock->getArgument(1);
 
-    // Parameters for compilation. The mixed runtime functions take a diamond-norm error; 2 *
-    // epsilon is the guarantee of a deterministic sequence with operator-norm error epsilon.
-    double runtimeEpsilon = mixed ? 2.0 * epsilon : epsilon;
-    Value epsilonVal =
-        arith::ConstantOp::create(rewriter, loc, rewriter.getF64FloatAttr(runtimeEpsilon));
+    // Parameters for compilation
+    Value epsilonVal = arith::ConstantOp::create(rewriter, loc, rewriter.getF64FloatAttr(epsilon));
     Value pprBasisVal = arith::ConstantOp::create(rewriter, loc, rewriter.getBoolAttr(pprBasis));
 
     SmallVector<Value> scalarArgs = {angle, epsilonVal, pprBasisVal};
@@ -479,8 +475,8 @@ func::FuncOp getOrCreateDecompositionFunc(ModuleOp module, PatternRewriter &rewr
     Value runtimePhase = callGetPhaseOp->getResult(0);
 
     // Build the Loop logic
-    Value finalQbit = buildDecompositionLoop(rewriter, loc, qbitIn, gatesMemref, num_gates,
-                                             runtimeEpsilon, pprBasis, method);
+    Value finalQbit = buildDecompositionLoop(rewriter, loc, qbitIn, gatesMemref, num_gates, epsilon,
+                                             pprBasis, method);
 
     // Clean up heap memory
     memref::DeallocOp::create(rewriter, loc, gatesMemref);
