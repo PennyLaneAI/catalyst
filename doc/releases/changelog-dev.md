@@ -749,6 +749,11 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* Fixed a bug in the conversion between unconditional and conditional probabilities in chains of
+  ``scf.if`` statements, which could lead to branch probabilities above ``1.0`` due to floating
+  point rounding errors.
+  [(#3328)](https://github.com/PennyLaneAI/catalyst/pull/3328)
+
 * Fixed a bug where a compiled Backline program continued with a session that does not work,
   for example echoing the controller's own message back as the reply, after a transport call or a
   coprocessor function's set-up failed. It now stops with an error naming the call that failed,
