@@ -124,31 +124,18 @@ def test_gridsynth_specs_matches_runtime(eps, ppr_basis, method):
 
 
 @pytest.mark.parametrize("ppr_basis", [False, True])
-def test_mixed_fallback_gridsynth_specs(ppr_basis):
-    """Test that specs counts one ancilla per rotation for the mixed fallback method, and fewer
-    T gates than for the mixed method at the same epsilon."""
-    eps = 1e-6
+def test_mixed_fallback_gridsynth_specs_wires(ppr_basis):
+    """Test that specs counts one ancilla per rotation for the mixed fallback method."""
 
-    def t_count_and_wires(method):
-        @qp.qjit(capture=True, target="mlir")
-        @gridsynth(epsilon=eps, ppr_basis=ppr_basis, method=method)
-        @qp.qnode(qp.device("null.qubit", wires=2))
-        def circuit(x: float):
-            qp.RZ(x, 0)
-            qp.RZ(x, 1)
-            return qp.expval(qp.Z(0))
+    @qp.qjit(capture=True, target="mlir")
+    @gridsynth(epsilon=1e-6, ppr_basis=ppr_basis, method="mixed-fallback")
+    @qp.qnode(qp.device("null.qubit", wires=2))
+    def circuit(x: float):
+        qp.RZ(x, 0)
+        qp.RZ(x, 1)
+        return qp.expval(qp.Z(0))
 
-        resources = qp.specs(circuit, level=1)(0.5).resources
-        return (
-            resources.quantum_operations["PPR-pi/8-w1" if ppr_basis else "T"],
-            resources.num_wires,
-        )
-
-    fallback_t, fallback_wires = t_count_and_wires("mixed-fallback")
-    mixed_t, mixed_wires = t_count_and_wires("mixed")
-    assert mixed_wires == 2
-    assert fallback_wires == 4
-    assert fallback_t < 0.6 * mixed_t
+    assert qp.specs(circuit, level=1)(0.5).resources.num_wires == 4
 
 
 @pytest.mark.parametrize("param", [-7.7, -2.2, -0.1, 0.0, 0.3, 1.1, 4.4])

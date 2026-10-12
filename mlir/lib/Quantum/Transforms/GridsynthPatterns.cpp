@@ -26,6 +26,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/MathExtras.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
@@ -47,6 +48,10 @@ using namespace mlir;
 using namespace catalyst::quantum;
 
 namespace {
+
+StringRef xPauli[] = {"X"};
+StringRef yPauli[] = {"Y"};
+StringRef zPauli[] = {"Z"};
 
 // --- Helper Functions to build switch cases ---
 
@@ -152,10 +157,6 @@ void populatePPRBasisSwitchCases(PatternRewriter &rewriter, Location loc,
         int8_t n;       // The denominator (2, 4, 8)
         bool isAdjoint; // True if adjX, adjY, etc.
     };
-
-    static StringRef xPauli[] = {"X"};
-    static StringRef yPauli[] = {"Y"};
-    static StringRef zPauli[] = {"Z"};
 
     SmallVector<PPRConfig> caseConfigs;
 
@@ -287,6 +288,8 @@ constexpr SequenceStatistics fallbackRecoveryPPRStatistics{1.5753, -7.0269, 0.81
 constexpr double fallbackFailureProbability = 0.0244;
 
 const SequenceStatistics &getSequenceStatistics(bool pprBasis, GridsynthMethod method) {
+    assert(method != GridsynthMethod::MixedFallback &&
+           "the mixed fallback loops use the fallback statistics");
     if (method == GridsynthMethod::Mixed) {
         return pprBasis ? mixedPPRStatistics : mixedCliffordTStatistics;
     }
@@ -492,15 +495,13 @@ std::tuple<Value, Value, double> applyCY(PatternRewriter &rewriter, Location loc
         return {cy.getOutQubits()[0], cy.getOutQubits()[1], 0.0};
     }
     static StringRef zy[] = {"Z", "Y"};
-    static StringRef z[] = {"Z"};
-    static StringRef y[] = {"Y"};
     auto g0 =
         catalyst::pbc::PPRotationOp::create(rewriter, loc, zy, 4, ValueRange{control, target});
-    auto g1 =
-        catalyst::pbc::PPRotationOp::create(rewriter, loc, z, -4, ValueRange{g0.getOutQubits()[0]});
-    auto g2 =
-        catalyst::pbc::PPRotationOp::create(rewriter, loc, y, -4, ValueRange{g0.getOutQubits()[1]});
-    return {g1.getOutQubits()[0], g2.getOutQubits()[0], M_PI / 4};
+    auto g1 = catalyst::pbc::PPRotationOp::create(rewriter, loc, zPauli, -4,
+                                                  ValueRange{g0.getOutQubits()[0]});
+    auto g2 = catalyst::pbc::PPRotationOp::create(rewriter, loc, yPauli, -4,
+                                                  ValueRange{g0.getOutQubits()[1]});
+    return {g1.getOutQubits()[0], g2.getOutQubits()[0], llvm::numbers::pi / 4};
 }
 
 /**
@@ -508,29 +509,28 @@ std::tuple<Value, Value, double> applyCY(PatternRewriter &rewriter, Location loc
  *
  * The projective rotation V = [[u, -v*], [v, u*]] acts on an ancilla between two CY gates
  * controlled by the target. Measuring the ancilla in |0> applies diag(u, u*) to the target, and
- * measuring it in |1> applies diag(v, v*), in which case the ancilla is reset and the fallback
- * sequence is applied to the target.
+ * measuring it in |1> applies diag(v, v*), in which case the mixed diagonal fallback sequence is
+ * applied to the target.
  * @return The output qubit and the global phase.
  */
 std::pair<Value, Value> buildMixedFallback(PatternRewriter &rewriter, Location loc,
-                                           func::FuncOp func, Value qbitIn,
-                                           SmallVector<Value> scalarArgs, double epsilon,
-                                           bool pprBasis) {
+                                           func::FuncOp func, Value qbitIn, ValueRange baseArgs,
+                                           double epsilon, bool pprBasis) {
     auto qbitType = QubitType::get(rewriter.getContext());
     auto f64Type = rewriter.getF64Type();
 
     // One sample selects the projective rotation, and a second one, drawn on failure, the
     // fallback sequence.
-    scalarArgs.push_back(drawUniformSample(rewriter, loc, func));
+    Value sample = drawUniformSample(rewriter, loc, func);
+    SmallVector<Value> projectiveArgs(baseArgs);
+    projectiveArgs.push_back(sample);
     DecompositionExternalFuncs projectiveFuncs =
         getOrDeclareExternalFuncs(rewriter, func, "rs_fallback_projective_", 1);
-    DecompositionExternalFuncs recoveryFuncs =
-        getOrDeclareExternalFuncs(rewriter, func, "rs_fallback_recovery_", 2);
 
     Value ancilla = AllocQubitOp::create(rewriter, loc).getResult();
     auto [target, rotatedAncilla, cyPhase] = applyCY(rewriter, loc, qbitIn, ancilla, pprBasis);
     auto [projectedAncilla, projectivePhase] = applyRuntimeSequence(
-        rewriter, loc, rotatedAncilla, projectiveFuncs, scalarArgs, epsilon, pprBasis,
+        rewriter, loc, rotatedAncilla, projectiveFuncs, projectiveArgs, epsilon, pprBasis,
         pprBasis ? fallbackProjectivePPRStatistics : fallbackProjectiveCliffordTStatistics);
     auto [projectedTarget, finalAncilla, cyPhase2] =
         applyCY(rewriter, loc, target, projectedAncilla, pprBasis);
@@ -538,9 +538,8 @@ std::pair<Value, Value> buildMixedFallback(PatternRewriter &rewriter, Location l
     Value failed;
     Value measuredAncilla;
     if (pprBasis) {
-        static StringRef z[] = {"Z"};
         auto ppm =
-            catalyst::pbc::PPMeasurementOp::create(rewriter, loc, z, ValueRange{finalAncilla});
+            catalyst::pbc::PPMeasurementOp::create(rewriter, loc, zPauli, ValueRange{finalAncilla});
         failed = ppm.getMres();
         measuredAncilla = ppm.getOutQubits()[0];
     } else {
@@ -549,45 +548,48 @@ std::pair<Value, Value> buildMixedFallback(PatternRewriter &rewriter, Location l
         failed = measure.getMres();
         measuredAncilla = measure.getOutQubit();
     }
+    // The measured ancilla is disentangled, so it is released without a reset.
+    DeallocQubitOp::create(rewriter, loc, measuredAncilla);
 
-    auto ifOp = scf::IfOp::create(rewriter, loc, TypeRange{qbitType, qbitType, f64Type}, failed,
+    auto ifOp = scf::IfOp::create(rewriter, loc, TypeRange{qbitType, f64Type}, failed,
                                   /*addThenBlock=*/true, /*addElseBlock=*/true);
     ifOp->setAttr(catalyst::EstimatedProbabilityAttrName,
                   rewriter.getF64FloatAttr(fallbackFailureProbability));
     {
         OpBuilder::InsertionGuard guard(rewriter);
         rewriter.setInsertionPointToStart(ifOp.thenBlock());
-        // Reset the ancilla from |1> to |0>.
-        Value resetAncilla;
-        double resetPhase = 0.0;
-        if (pprBasis) {
-            static StringRef x[] = {"X"};
-            resetAncilla = catalyst::pbc::PPRotationOp::create(rewriter, loc, x, 2,
-                                                               ValueRange{measuredAncilla})
-                               ->getResult(0);
-            resetPhase = -M_PI / 2;
-        } else {
-            static StringRef pauliX[] = {"PauliX"};
-            resetAncilla = createGateChain(rewriter, loc, measuredAncilla, pauliX);
-        }
-        SmallVector<Value> recoveryArgs(scalarArgs);
-        recoveryArgs.push_back(drawUniformSample(rewriter, loc, func));
+        // The fallback is the mixed decomposition of an angle and epsilon given by the runtime.
+        auto recoveryParamType = rewriter.getFunctionType({f64Type, f64Type, f64Type}, {f64Type});
+        SmallVector<Value> recoveryParamArgs = {baseArgs[0], baseArgs[1], sample};
+        Value recoveryAngle =
+            func::CallOp::create(
+                rewriter, loc,
+                catalyst::ensureFunctionDeclaration<func::FuncOp>(
+                    rewriter, func, "rs_fallback_recovery_angle", recoveryParamType),
+                recoveryParamArgs)
+                ->getResult(0);
+        Value recoveryEpsilon =
+            func::CallOp::create(
+                rewriter, loc,
+                catalyst::ensureFunctionDeclaration<func::FuncOp>(
+                    rewriter, func, "rs_fallback_recovery_epsilon", recoveryParamType),
+                recoveryParamArgs)
+                ->getResult(0);
+        SmallVector<Value> recoveryArgs = {recoveryAngle, recoveryEpsilon, baseArgs[2],
+                                           drawUniformSample(rewriter, loc, func)};
+        DecompositionExternalFuncs recoveryFuncs =
+            getOrDeclareExternalFuncs(rewriter, func, "rs_mixed_decomposition_", 1);
         auto [recoveredTarget, recoveryPhase] = applyRuntimeSequence(
             rewriter, loc, projectedTarget, recoveryFuncs, recoveryArgs, epsilon, pprBasis,
             pprBasis ? fallbackRecoveryPPRStatistics : fallbackRecoveryCliffordTStatistics);
-        if (resetPhase != 0.0) {
-            recoveryPhase = addConstantPhase(rewriter, loc, recoveryPhase, resetPhase);
-        }
-        scf::YieldOp::create(rewriter, loc,
-                             ValueRange{recoveredTarget, resetAncilla, recoveryPhase});
+        scf::YieldOp::create(rewriter, loc, ValueRange{recoveredTarget, recoveryPhase});
 
         rewriter.setInsertionPointToStart(ifOp.elseBlock());
         Value noPhase = arith::ConstantOp::create(rewriter, loc, rewriter.getF64FloatAttr(0.0));
-        scf::YieldOp::create(rewriter, loc, ValueRange{projectedTarget, measuredAncilla, noPhase});
+        scf::YieldOp::create(rewriter, loc, ValueRange{projectedTarget, noPhase});
     }
 
-    DeallocQubitOp::create(rewriter, loc, ifOp.getResult(1));
-    Value phase = arith::AddFOp::create(rewriter, loc, projectivePhase, ifOp.getResult(2));
+    Value phase = arith::AddFOp::create(rewriter, loc, projectivePhase, ifOp.getResult(1));
     if (cyPhase + cyPhase2 != 0.0) {
         phase = addConstantPhase(rewriter, loc, phase, cyPhase + cyPhase2);
     }
@@ -660,7 +662,7 @@ func::FuncOp getOrCreateDecompositionFunc(ModuleOp module, PatternRewriter &rewr
             scalarArgs.push_back(drawUniformSample(rewriter, loc, func));
         }
         DecompositionExternalFuncs extFuncs = getOrDeclareExternalFuncs(
-            rewriter, func, mixed ? "rs_mixed_decomposition_" : "rs_decomposition_", mixed);
+            rewriter, func, mixed ? "rs_mixed_decomposition_" : "rs_decomposition_", mixed ? 1 : 0);
         std::tie(finalQbit, runtimePhase) =
             applyRuntimeSequence(rewriter, loc, qbitIn, extFuncs, scalarArgs, epsilon, pprBasis,
                                  getSequenceStatistics(pprBasis, method));

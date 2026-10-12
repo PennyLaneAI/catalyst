@@ -42,7 +42,6 @@
 #define FALLBACK_SUCCESS_PROBABILITY 0.95
 #define FALLBACK_PROJECTIVE_SHARE 0.9
 #define MAX_FALLBACK_EPSILON 0.25
-#define MAX_SECTOR_LEVELS 200
 
 namespace {
 bool is_odd_multiple_of_pi_4(double angle) {
@@ -434,6 +433,119 @@ size_t count_t_gates(const std::vector<GateType> &gates) {
  * {Z, S}-twirled when applied. Of the candidate pairs found, the one with the lowest expected
  * T-count whose mixture meets the diamond-norm bound of Theorem 3.12 is kept.
  */
+namespace {
+/**
+ * @brief Search for the cheapest mixture of an under-rotating and an over-rotating candidate.
+ *
+ * Writing a candidate's top-left entry as `w * exp(-i angle/2)`, it under-rotates the target if
+ * Im(w) <= 0 and over-rotates it if Im(w) >= 0. A pair is mixed with the probability p of
+ * Equation (33) of arXiv:2203.10064, and admissible if `diamond_error(p, w_under, w_over)` is at
+ * most `epsilon`. Of the admissible pairs found, the one with the lowest expected T-count is kept.
+ */
+class MixedPairSearch {
+  public:
+    struct Candidate {
+        std::vector<GateType> gates;
+        double phase;
+        std::complex<double> w;
+        // Bottom-left entry of the unitary the gate sequence implements.
+        std::complex<double> v;
+        size_t t_count;
+    };
+    using DiamondError = double (*)(double p, std::complex<double> w_under,
+                                    std::complex<double> w_over);
+
+    MixedPairSearch(const ZOmega &scale, double epsilon, DiamondError diamond_error)
+        : scale(scale), epsilon(epsilon), diamond_error(diamond_error) {}
+
+    /**
+     * @brief Consider the grid solution `u_sol / sqrt(2)^k` with relative top-left entry `w`.
+     * @return false if the search should stop.
+     */
+    bool offer(const ZOmega &u_sol, int k_val, std::complex<double> w) {
+        bool is_under = w.imag() <= 0.0;
+        bool is_over = w.imag() >= 0.0;
+        // Until the other side has a candidate, more candidates on a filled side cannot form a
+        // pair, so skip their (expensive) norm equation.
+        bool same_side_filled = is_under ? !unders.empty() : !overs.empty();
+        bool other_side_empty = is_under ? overs.empty() : unders.empty();
+        if (!best && !(is_under && is_over) && same_side_filled && other_side_empty) {
+            return true;
+        }
+        if (unders.size() + overs.size() >= MAX_MIXED_CANDIDATES) {
+            return false;
+        }
+        std::complex<double> v;
+        auto normal_form = normal_form_from_grid_solution(u_sol, k_val, scale, &v);
+        if (!normal_form) {
+            return true;
+        }
+        size_t t_count = count_t_gates(normal_form->first);
+        // Heuristic stop: T-counts mostly, but not strictly, grow along the search.
+        if (best && t_count > best->cost) {
+            return false;
+        }
+
+        Candidate candidate{std::move(normal_form->first), normal_form->second, w, v, t_count};
+        if (is_under) {
+            unders.push_back(candidate);
+            for (size_t j = 0; j < overs.size(); j++) {
+                evaluate(unders.size() - 1, j);
+            }
+        }
+        if (is_over) {
+            overs.push_back(std::move(candidate));
+            for (size_t i = 0; i < unders.size(); i++) {
+                evaluate(i, overs.size() - 1);
+            }
+        }
+        return true;
+    }
+
+    bool found() const { return best.has_value(); }
+    const Candidate &under() const { return unders[best->under]; }
+    const Candidate &over() const { return overs[best->over]; }
+    double probability() const { return best->probability; }
+    double diamond() const { return best->diamond; }
+
+  private:
+    struct Pair {
+        size_t under;
+        size_t over;
+        double probability;
+        double diamond;
+        double cost;
+    };
+
+    void evaluate(size_t i, size_t j) {
+        const Candidate &under = unders[i];
+        const Candidate &over = overs[j];
+        // p = r2^2 sin(2 delta2) / (r2^2 sin(2 delta2) - r1^2 sin(2 delta1)), with
+        // r^2 sin(2 delta) = 2 Re(w) Im(w).
+        double under_weight = under.w.real() * under.w.imag();
+        double over_weight = over.w.real() * over.w.imag();
+        double denominator = over_weight - under_weight;
+        double p = denominator > 0.0 ? over_weight / denominator : 1.0;
+        double diamond = diamond_error(p, under.w, over.w);
+        // Tolerate rounding for candidates on the bound.
+        if (diamond > epsilon * (1.0 + 1e-12)) {
+            return;
+        }
+        double cost = p * under.t_count + (1.0 - p) * over.t_count;
+        if (!best || cost < best->cost) {
+            best = Pair{i, j, p, diamond, cost};
+        }
+    }
+
+    ZOmega scale;
+    double epsilon;
+    DiamondError diamond_error;
+    std::vector<Candidate> unders;
+    std::vector<Candidate> overs;
+    std::optional<Pair> best;
+};
+} // namespace
+
 MixedDecomposition compute_mixed_diagonal_decomposition(double angle, double epsilon) {
     if (is_odd_multiple_of_pi_4(angle)) {
         auto exact = compute_clifford_T_decomposition(angle, epsilon);
@@ -447,44 +559,12 @@ MixedDecomposition compute_mixed_diagonal_decomposition(double angle, double eps
     auto [grid_angle, scale] = grid_problem_frame(angle);
     GridProblem::GridIterator u_solutions(grid_angle, mixed_search_epsilon(epsilon),
                                           MAX_SEARCH_TRIALS);
-
-    struct Candidate {
-        std::vector<GateType> gates;
-        double phase;
-        std::complex<double> w;
-        size_t t_count;
-    };
-    std::vector<Candidate> unders;
-    std::vector<Candidate> overs;
-
-    struct Pair {
-        size_t under;
-        size_t over;
-        double probability;
-        double cost;
-    };
-    std::optional<Pair> best;
-
-    auto evaluate = [&](size_t i, size_t j) {
-        const Candidate &under = unders[i];
-        const Candidate &over = overs[j];
-        // p = r2^2 sin(2 delta2) / (r2^2 sin(2 delta2) - r1^2 sin(2 delta1)), with
-        // r^2 sin(2 delta) = 2 Re(w) Im(w).
-        double under_weight = under.w.real() * under.w.imag();
-        double over_weight = over.w.real() * over.w.imag();
-        double denominator = over_weight - under_weight;
-        double p = denominator > 0.0 ? over_weight / denominator : 1.0;
-        double diamond = 2.0 * (1.0 - p * under.w.real() * under.w.real() -
-                                (1.0 - p) * over.w.real() * over.w.real());
-        // Tolerate rounding for candidates on the bound.
-        if (diamond > epsilon * (1.0 + 1e-12)) {
-            return;
-        }
-        double cost = p * under.t_count + (1.0 - p) * over.t_count;
-        if (!best || cost < best->cost) {
-            best = Pair{i, j, p, cost};
-        }
-    };
+    // Theorem 3.12.
+    MixedPairSearch search(scale, epsilon,
+                           [](double p, std::complex<double> w_under, std::complex<double> w_over) {
+                               return 2.0 * (1.0 - p * w_under.real() * w_under.real() -
+                                             (1.0 - p) * w_over.real() * w_over.real());
+                           });
 
     for (const auto &[u_sol, k_val] : u_solutions) {
         std::complex<double> w =
@@ -492,53 +572,20 @@ MixedDecomposition compute_mixed_diagonal_decomposition(double angle, double eps
         if (w.real() < min_overlap) {
             continue;
         }
-
-        bool is_under = w.imag() <= 0.0;
-        bool is_over = w.imag() >= 0.0;
-        // Until the other side has a candidate, more candidates on a filled side cannot form a
-        // pair, so skip their (expensive) norm equation.
-        bool same_side_filled = is_under ? !unders.empty() : !overs.empty();
-        bool other_side_empty = is_under ? overs.empty() : unders.empty();
-        if (!best && !(is_under && is_over) && same_side_filled && other_side_empty) {
-            continue;
-        }
-        if (unders.size() + overs.size() >= MAX_MIXED_CANDIDATES) {
+        if (!search.offer(u_sol, k_val, w)) {
             break;
-        }
-        auto normal_form = normal_form_from_grid_solution(u_sol, k_val, scale);
-        if (!normal_form) {
-            continue;
-        }
-        size_t t_count = count_t_gates(normal_form->first);
-        // Heuristic stop: T-counts mostly, but not strictly, grow along the search.
-        if (best && t_count > best->cost) {
-            break;
-        }
-
-        Candidate candidate{std::move(normal_form->first), normal_form->second, w, t_count};
-        if (is_under) {
-            unders.push_back(candidate);
-            for (size_t j = 0; j < overs.size(); j++) {
-                evaluate(unders.size() - 1, j);
-            }
-        }
-        if (is_over) {
-            overs.push_back(std::move(candidate));
-            for (size_t i = 0; i < unders.size(); i++) {
-                evaluate(i, overs.size() - 1);
-            }
         }
     }
 
-    if (!best) {
+    if (!search.found()) {
         // A unitary with operator-norm error epsilon/2 has diamond-norm error at most epsilon.
         auto fallback = compute_clifford_T_decomposition(angle, epsilon / 2.0);
         return {{fallback.first, fallback.first}, {fallback.second, fallback.second}, 1.0};
     }
 
-    return {{std::move(unders[best->under].gates), std::move(overs[best->over].gates)},
-            {unders[best->under].phase, overs[best->over].phase},
-            best->probability};
+    return {{search.under().gates, search.over().gates},
+            {search.under().phase, search.over().phase},
+            search.probability()};
 }
 
 /**
@@ -618,20 +665,16 @@ eval_mixed_ross_algorithm_ppr(double angle, double epsilon, double uniform_sampl
  * (Section 3.3), in which case a mixed diagonal fallback B ~ exp(i (-angle/2 - Arg(v)) Z) follows.
  * An under-rotating and an over-rotating projective rotation are mixed with probabilities p and
  * 1 - p. Of the candidate pairs found, the one with the lowest expected T-count of the projective
- * rotations is kept, as the fallbacks only add (1 - |u|^2) times their T-count.
+ * rotations is kept, as the fallbacks only add (1 - |u|^2) times their T-count. The grid search
+ * stops after level `max_levels`.
  */
-MixedFallbackDecomposition compute_mixed_fallback_decomposition(double angle, double epsilon) {
-    const MixedDecomposition no_fallback{
-        {std::vector<GateType>{GateType::I}, std::vector<GateType>{GateType::I}}, {0.0, 0.0}, 1.0};
+MixedFallbackDecomposition compute_mixed_fallback_decomposition(double angle, double epsilon,
+                                                                int max_levels) {
     if (is_odd_multiple_of_pi_4(angle)) {
         // The exact diagonal V never fails.
-        auto exact = compute_clifford_T_decomposition(angle, epsilon);
-        return {{exact.first, exact.first},
-                {exact.second, exact.second},
-                {0.0, 0.0},
-                {1.0, 1.0},
-                {no_fallback, no_fallback},
-                1.0};
+        auto [gates, phase] = compute_clifford_T_decomposition(angle, epsilon);
+        FallbackBranch exact{gates, phase, 1.0, 0.0, epsilon};
+        return {{exact, exact}, 1.0};
     }
 
     const double min_overlap = std::sqrt(FALLBACK_SUCCESS_PROBABILITY);
@@ -640,182 +683,72 @@ MixedFallbackDecomposition compute_mixed_fallback_decomposition(double angle, do
     const double max_sin = std::sqrt(projective_epsilon / 2.0);
     const std::complex<double> inverse_target = std::polar(1.0, angle / 2.0);
     auto [grid_angle, scale] = grid_problem_frame(angle);
+    // Equation (34), with q sin(delta)^2 = Im(w)^2.
+    MixedPairSearch search(scale, projective_epsilon,
+                           [](double p, std::complex<double> w_under, std::complex<double> w_over) {
+                               return 2.0 * (p * w_under.imag() * w_under.imag() +
+                                             (1.0 - p) * w_over.imag() * w_over.imag());
+                           });
 
-    struct Candidate {
-        std::vector<GateType> gates;
-        double phase;
-        std::complex<double> w;
-        std::complex<double> v;
-        size_t t_count;
-    };
-    std::vector<Candidate> unders;
-    std::vector<Candidate> overs;
+    GridProblem::enumerate_sector_solutions(grid_angle, std::asin(max_sin), min_overlap, max_levels,
+                                            [&](const ZOmega &u_sol, int k_val) {
+                                                std::complex<double> w =
+                                                    (u_sol * scale).to_complex() * inverse_target /
+                                                    std::pow(M_SQRT2, k_val);
+                                                return search.offer(u_sol, k_val, w);
+                                            });
 
-    struct Pair {
-        size_t under;
-        size_t over;
-        double probability;
-        double diamond;
-        double cost;
-    };
-    std::optional<Pair> best;
-
-    auto evaluate = [&](size_t i, size_t j) {
-        const Candidate &under = unders[i];
-        const Candidate &over = overs[j];
-        // Equation (37): p = q2 sin(2 delta2) / (q2 sin(2 delta2) - q1 sin(2 delta1)), with
-        // q sin(2 delta) = 2 Re(w) Im(w).
-        double under_weight = under.w.real() * under.w.imag();
-        double over_weight = over.w.real() * over.w.imag();
-        double denominator = over_weight - under_weight;
-        double p = denominator > 0.0 ? over_weight / denominator : 1.0;
-        // Equation (34), with q sin(delta)^2 = Im(w)^2.
-        double diamond =
-            2.0 * (p * under.w.imag() * under.w.imag() + (1.0 - p) * over.w.imag() * over.w.imag());
-        if (diamond > projective_epsilon * (1.0 + 1e-12)) {
-            return;
-        }
-        double cost = p * under.t_count + (1.0 - p) * over.t_count;
-        if (!best || cost < best->cost) {
-            best = Pair{i, j, p, diamond, cost};
-        }
-    };
-
-    GridProblem::enumerate_sector_solutions(
-        grid_angle, std::asin(max_sin), min_overlap, MAX_SECTOR_LEVELS,
-        [&](const ZOmega &u_sol, int k_val) {
-            std::complex<double> w =
-                (u_sol * scale).to_complex() * inverse_target / std::pow(M_SQRT2, k_val);
-            if (std::abs(w) < min_overlap || w.real() <= 0.0 ||
-                std::abs(w.imag()) > std::abs(w) * max_sin) {
-                return true;
-            }
-
-            bool is_under = w.imag() <= 0.0;
-            bool is_over = w.imag() >= 0.0;
-            // Until the other side has a candidate, more candidates on a filled side cannot form
-            // a pair, so skip their (expensive) norm equation.
-            bool same_side_filled = is_under ? !unders.empty() : !overs.empty();
-            bool other_side_empty = is_under ? overs.empty() : unders.empty();
-            if (!best && !(is_under && is_over) && same_side_filled && other_side_empty) {
-                return true;
-            }
-            if (unders.size() + overs.size() >= MAX_MIXED_CANDIDATES) {
-                return false;
-            }
-            std::complex<double> v;
-            auto normal_form = normal_form_from_grid_solution(u_sol, k_val, scale, &v);
-            if (!normal_form) {
-                return true;
-            }
-            size_t t_count = count_t_gates(normal_form->first);
-            // Heuristic stop: T-counts mostly, but not strictly, grow along the search.
-            if (best && t_count > best->cost) {
-                return false;
-            }
-
-            Candidate candidate{std::move(normal_form->first), normal_form->second, w, v, t_count};
-            if (is_under) {
-                unders.push_back(candidate);
-                for (size_t j = 0; j < overs.size(); j++) {
-                    evaluate(unders.size() - 1, j);
-                }
-            }
-            if (is_over) {
-                overs.push_back(std::move(candidate));
-                for (size_t i = 0; i < unders.size(); i++) {
-                    evaluate(i, overs.size() - 1);
-                }
-            }
-            return true;
-        });
-
-    if (!best) {
-        // V = [[0, 1], [-1, 0]] always fails, which leaves the full accuracy to the fallback of
-        // RZ(angle + 2 pi) = -RZ(angle).
-        DyadicMatrix flip(ZOmega(0), ZOmega(0, 0, 0, -1), ZOmega(0, 0, 0, 1), ZOmega(0),
-                          INT_TYPE(0));
-        auto [gates, phase] = ma_normal_form(SO3Matrix(flip));
-        MixedDecomposition fallback = compute_mixed_diagonal_decomposition(angle, epsilon);
-        return {{gates, gates}, {phase, phase},       {M_PI, M_PI},
-                {0.0, 0.0},     {fallback, fallback}, 1.0};
+    if (!search.found()) {
+        // V = -iY = [[0, -1], [1, 0]] always fails, which leaves the full accuracy to the fallback
+        // of RZ(angle).
+        FallbackBranch always_fail{{GateType::Y}, M_PI / 2, 0.0, 0.0, epsilon};
+        return {{always_fail, always_fail}, 1.0};
     }
 
-    const Candidate &under = unders[best->under];
-    const Candidate &over = overs[best->over];
-    const std::array<const Candidate *, 2> chosen = {&under, &over};
-    const std::array<double, 2> weights = {best->probability, 1.0 - best->probability};
     // Equation (36): split the remaining accuracy evenly between the two fallback terms
     // p_k (1 - q_k) ||B_k - Z_theta||.
-    const double fallback_budget = (epsilon - best->diamond) / 2.0;
-
-    MixedFallbackDecomposition result;
-    result.probability = best->probability;
-    for (size_t branch = 0; branch < 2; branch++) {
-        const Candidate &candidate = *chosen[branch];
+    const double fallback_budget = (epsilon - search.diamond()) / 2.0;
+    auto make_branch = [&](const MixedPairSearch::Candidate &candidate, double weight) {
         double success = std::norm(candidate.w);
-        result.projective_gates[branch] = candidate.gates;
-        result.projective_phases[branch] = candidate.phase;
-        result.failure_angles[branch] = std::arg(candidate.v);
-        result.success_probabilities[branch] = success;
-        double failure_weight = weights[branch] * (1.0 - success);
-        if (failure_weight <= 0.0) {
-            result.fallbacks[branch] = no_fallback;
-            continue;
-        }
-        // B_k ~ exp(i (-angle/2 - Arg(v)) Z) = RZ(angle + 2 Arg(v)).
-        double fallback_epsilon = std::min(fallback_budget / failure_weight, MAX_FALLBACK_EPSILON);
-        result.fallbacks[branch] = compute_mixed_diagonal_decomposition(
-            angle + 2.0 * std::arg(candidate.v), fallback_epsilon);
-    }
-    return result;
-}
-
-size_t select_fallback_branch(double probability, double uniform_sample) {
-    return sample_mixed_decomposition(probability, uniform_sample).first;
+        double failure_weight = weight * (1.0 - success);
+        double fallback_epsilon =
+            failure_weight > 0.0 ? std::min(fallback_budget / failure_weight, MAX_FALLBACK_EPSILON)
+                                 : MAX_FALLBACK_EPSILON;
+        return FallbackBranch{candidate.gates, candidate.phase, success, std::arg(candidate.v),
+                              fallback_epsilon};
+    };
+    return {{make_branch(search.under(), search.probability()),
+             make_branch(search.over(), 1.0 - search.probability())},
+            search.probability()};
 }
 
 // Cache for mixed fallback decompositions
 static lru_cache<MixedCacheKey, MixedFallbackDecomposition, ROSS_CACHE_SIZE> fallback_cache;
 
 /**
- * @brief The mixed fallback decomposition of RZ(angle), with `epsilon` as in
- * `eval_mixed_ross_algorithm`.
+ * @brief The branch of the mixed fallback decomposition of RZ(angle) selected by `uniform_sample`,
+ * with `epsilon` as in `eval_mixed_ross_algorithm`.
  */
-static MixedFallbackDecomposition eval_mixed_fallback(double angle, double epsilon) {
+static FallbackBranch eval_fallback_branch(double angle, double epsilon, double uniform_sample) {
     MixedCacheKey key = {angle, epsilon};
     auto fallback = fallback_cache.get(key);
     if (!fallback) {
         fallback = compute_mixed_fallback_decomposition(angle, 2.0 * epsilon);
         fallback_cache.put(key, *fallback);
     }
-    return *fallback;
+    size_t branch = sample_mixed_decomposition(fallback->probability, uniform_sample).first;
+    return fallback->branches[branch];
 }
 
 std::pair<std::vector<GateType>, double> eval_fallback_projective(double angle, double epsilon,
                                                                   double uniform_sample) {
-    MixedFallbackDecomposition fallback = eval_mixed_fallback(angle, epsilon);
-    size_t branch = select_fallback_branch(fallback.probability, uniform_sample);
-    return {fallback.projective_gates[branch], fallback.projective_phases[branch]};
+    FallbackBranch branch = eval_fallback_branch(angle, epsilon, uniform_sample);
+    return {std::move(branch.projective_gates), branch.projective_phase};
 }
 
 std::pair<std::vector<PPRGateType>, double>
 eval_fallback_projective_ppr(double angle, double epsilon, double uniform_sample) {
     return sequence_to_ppr(eval_fallback_projective(angle, epsilon, uniform_sample));
-}
-
-std::pair<std::vector<GateType>, double> eval_fallback_recovery(double angle, double epsilon,
-                                                                double uniform_sample,
-                                                                double recovery_sample) {
-    MixedFallbackDecomposition fallback = eval_mixed_fallback(angle, epsilon);
-    size_t branch = select_fallback_branch(fallback.probability, uniform_sample);
-    return sample_twirled_sequence(fallback.fallbacks[branch], recovery_sample);
-}
-
-std::pair<std::vector<PPRGateType>, double> eval_fallback_recovery_ppr(double angle, double epsilon,
-                                                                       double uniform_sample,
-                                                                       double recovery_sample) {
-    return sequence_to_ppr(eval_fallback_recovery(angle, epsilon, uniform_sample, recovery_sample));
 }
 
 // Extern C implementation
@@ -949,8 +882,8 @@ double rs_mixed_decomposition_get_phase(double theta, double epsilon, bool ppr_b
 /**
  * @brief Returns the length of the sampled projective rotation of a mixed fallback decomposition.
  *
- * The `rs_fallback_projective_*` and `rs_fallback_recovery_*` functions are deterministic in their
- * samples, so calling them with the same samples refers to the same sequences.
+ * The `rs_fallback_*` functions are deterministic in `uniform_sample`, so calling them with the
+ * same sample refers to the same projective rotation.
  *
  * @param theta Angle
  * @param epsilon Error, as in `rs_decomposition_get_size`
@@ -998,53 +931,27 @@ double rs_fallback_projective_get_phase(double theta, double epsilon, bool ppr_b
 }
 
 /**
- * @brief Returns the length of the sampled fallback sequence, applied when the projective rotation
- * selected by `uniform_sample` fails.
+ * @brief Returns the angle of the RZ rotation that the fallback approximates when the projective
+ * rotation selected by `uniform_sample` fails.
+ *
+ * The fallback is the mixed decomposition of the `rs_mixed_decomposition_*` functions for this
+ * angle and the epsilon of `rs_fallback_recovery_epsilon`.
  *
  * @param theta Angle
  * @param epsilon Error, as in `rs_decomposition_get_size`
- * @param ppr_basis Whether to use PPR basis
  * @param uniform_sample Uniform random number in [0, 1) selecting the projective rotation
- * @param recovery_sample Uniform random number in [0, 1) selecting the branch and twirl of the
- * mixed diagonal fallback
  */
-size_t rs_fallback_recovery_get_size(double theta, double epsilon, bool ppr_basis,
-                                     double uniform_sample, double recovery_sample) {
-    if (ppr_basis) {
-        return eval_fallback_recovery_ppr(theta, epsilon, uniform_sample, recovery_sample)
-            .first.size();
-    }
-    return eval_fallback_recovery(theta, epsilon, uniform_sample, recovery_sample).first.size();
+double rs_fallback_recovery_angle(double theta, double epsilon, double uniform_sample) {
+    // B ~ exp(i (-theta/2 - Arg(v)) Z) = RZ(theta + 2 Arg(v)).
+    return theta + 2.0 * eval_fallback_branch(theta, epsilon, uniform_sample).failure_angle;
 }
 
 /**
- * @brief Fills a pre-allocated memref with the sampled fallback sequence.
- *
- * The memref is unpacked into individual arguments, as in `rs_decomposition_get_gates`.
+ * @brief Returns the epsilon of the fallback for `rs_fallback_recovery_angle`, in the convention of
+ * `rs_mixed_decomposition_get_size`.
  */
-void rs_fallback_recovery_get_gates([[maybe_unused]] size_t *data_allocated, size_t *data_aligned,
-                                    size_t offset, size_t size0, size_t stride0, double theta,
-                                    double epsilon, bool ppr_basis, double uniform_sample,
-                                    double recovery_sample) {
-    if (ppr_basis) {
-        fill_gates(
-            data_aligned, offset, size0, stride0,
-            eval_fallback_recovery_ppr(theta, epsilon, uniform_sample, recovery_sample).first);
-    } else {
-        fill_gates(data_aligned, offset, size0, stride0,
-                   eval_fallback_recovery(theta, epsilon, uniform_sample, recovery_sample).first);
-    }
-}
-
-/**
- * @brief Returns the global phase of the sampled fallback sequence.
- */
-double rs_fallback_recovery_get_phase(double theta, double epsilon, bool ppr_basis,
-                                      double uniform_sample, double recovery_sample) {
-    if (ppr_basis) {
-        return eval_fallback_recovery_ppr(theta, epsilon, uniform_sample, recovery_sample).second;
-    }
-    return eval_fallback_recovery(theta, epsilon, uniform_sample, recovery_sample).second;
+double rs_fallback_recovery_epsilon(double theta, double epsilon, double uniform_sample) {
+    return eval_fallback_branch(theta, epsilon, uniform_sample).fallback_epsilon / 2.0;
 }
 
 } // extern "C"

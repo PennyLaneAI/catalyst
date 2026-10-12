@@ -870,8 +870,10 @@ def gridsynth_setup_inputs(epsilon=1e-4, ppr_basis=False, method="deterministic"
     .. note::
 
         With ``method="mixed-fallback"``, each rotation allocates, measures and releases one
-        ancilla qubit. Resource estimates count every allocation, so they report one additional
-        wire per rotation.
+        ancilla qubit, so the device needs to support mid-circuit measurements and dynamic qubit
+        allocation, as ``lightning.qubit`` does. Like the sampled sequences, the measurement
+        outcome is shared by all shots of a call. Resource estimates count every allocation, so
+        they report one additional wire per rotation.
 
     **Example**
 
