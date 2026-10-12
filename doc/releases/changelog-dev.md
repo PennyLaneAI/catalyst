@@ -40,8 +40,7 @@
 * The `gridsynth` pass has a new `method="mixed-fallback"` option, implementing the mixed fallback
   approximation of [arXiv:2203.10064](https://arxiv.org/abs/2203.10064) (Section 3.5). It roughly
   halves the T-count of `method="mixed"` at the same accuracy, at the cost of one temporary ancilla
-  per rotation, and requires a device with mid-circuit measurements and dynamic qubit allocation.
-  The `to_ppr` pass now also supports `CY` gates.
+  qubit and a mid-circuit measurement per rotation. The `to_ppr` pass now also supports `CY` gates.
   [(#3327)](https://github.com/PennyLaneAI/catalyst/pull/3327)
 
 * You can now dynamically prepare magic T states inside captured Catalyst workflows using
