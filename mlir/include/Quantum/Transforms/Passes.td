@@ -145,6 +145,11 @@ def CancelInversesPass : Pass<"cancel-inverses"> {
 
 def GridsynthPass : Pass<"gridsynth"> {
     let summary = "Perform Ross-Selinger/Gridsynth decomposition.";
+    let description = [{
+        Discretizes single-qubit RZ and PhaseShift gates, and PPR-Z rotations with an arbitrary
+        angle, at execution time. The pass fails on controlled RZ and PhaseShift gates, which need
+        to be decomposed into single-qubit rotations first.
+    }];
 
     let options = [Option<
         /*C++ var name=*/"epsilon",
