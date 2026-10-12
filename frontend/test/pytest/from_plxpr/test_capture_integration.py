@@ -1032,6 +1032,116 @@ class TestCapture:
             in capture_mlir
         )
 
+    def test_pass_plugin_transform(self, mocker, tmp_path, backend):
+        """Test that a transform from a pass plugin works with capture enabled."""
+
+        plugin_path = tmp_path / "FakePlugin.so"
+        plugin_path.touch()
+
+        mock_plugin_module = mocker.Mock()
+        mock_plugin_module.name2pass.return_value = (plugin_path, "my-custom-pass")
+
+        mock_entry_point = mocker.Mock()
+        mock_entry_point.load.return_value = mock_plugin_module
+        mocker.patch(
+            "catalyst.from_plxpr.from_plxpr.entry_points",
+            return_value={"fakeplugin.passes": mock_entry_point},
+        )
+
+        plugin_pass = qp.transform(pass_name="fakeplugin.my-custom-pass")
+
+        @qjit(target="mlir", capture=True, collect_decomp_rules=False)
+        @plugin_pass
+        @qp.qnode(qp.device(backend, wires=1))
+        def captured_circuit():
+            return qp.expval(qp.PauliZ(0))
+
+        assert captured_circuit.compile_options.pass_plugins == {plugin_path}
+        assert captured_circuit.compile_options.dialect_plugins == {plugin_path}
+        assert 'transform.apply_registered_pass "my-custom-pass"' in captured_circuit.mlir
+        mock_plugin_module.name2pass.assert_called_once_with("my-custom-pass")
+
+    def test_pass_plugin_transform_with_options(self, mocker, tmp_path, backend):
+        """Test that a pass plugin transform forwards options under capture."""
+
+        plugin_path = tmp_path / "FakePlugin.so"
+        plugin_path.touch()
+
+        mock_plugin_module = mocker.Mock()
+        mock_plugin_module.name2pass.return_value = (plugin_path, "my-custom-pass")
+
+        mock_entry_point = mocker.Mock()
+        mock_entry_point.load.return_value = mock_plugin_module
+        mocker.patch(
+            "catalyst.from_plxpr.from_plxpr.entry_points",
+            return_value={"fakeplugin.passes": mock_entry_point},
+        )
+
+        plugin_pass = qp.transform(pass_name="fakeplugin.my-custom-pass")
+
+        @qjit(target="mlir", capture=True, collect_decomp_rules=False)
+        @partial(plugin_pass, my_option="my_option_value", my_other_option=False)
+        @qp.qnode(qp.device(backend, wires=1))
+        def captured_circuit():
+            return qp.expval(qp.PauliZ(0))
+
+        capture_mlir = captured_circuit.mlir
+        assert captured_circuit.compile_options.pass_plugins == {plugin_path}
+        assert 'transform.apply_registered_pass "my-custom-pass"' in capture_mlir
+        assert (
+            'with options = {"my-option" = "my_option_value", "my-other-option" = false}'
+            in capture_mlir
+        )
+
+    def test_pass_plugin_transform_with_multiple_dots(self, mocker, tmp_path, backend):
+        """Test that a pass_name with more than one '.' splits only on the first '.'."""
+
+        plugin_path = tmp_path / "FakePlugin.so"
+        plugin_path.touch()
+
+        mock_plugin_module = mocker.Mock()
+        mock_plugin_module.name2pass.return_value = (plugin_path, "my.nested.pass")
+
+        mock_entry_point = mocker.Mock()
+        mock_entry_point.load.return_value = mock_plugin_module
+        mocker.patch(
+            "catalyst.from_plxpr.from_plxpr.entry_points",
+            return_value={"fakeplugin.passes": mock_entry_point},
+        )
+
+        plugin_pass = qp.transform(pass_name="fakeplugin.my.nested.pass")
+
+        @qjit(target="mlir", capture=True, collect_decomp_rules=False)
+        @plugin_pass
+        @qp.qnode(qp.device(backend, wires=1))
+        def captured_circuit():
+            return qp.expval(qp.PauliZ(0))
+
+        assert captured_circuit.compile_options.pass_plugins == {plugin_path}
+        assert 'transform.apply_registered_pass "my.nested.pass"' in captured_circuit.mlir
+        mock_plugin_module.name2pass.assert_called_once_with("my.nested.pass")
+
+    def test_pass_plugin_not_installed(self, mocker, backend):
+        """Test that a clear error is raised when the pass plugin is not installed."""
+
+        mocker.patch(
+            "catalyst.from_plxpr.from_plxpr.entry_points",
+            return_value={},
+        )
+
+        missing_plugin_pass = qp.transform(pass_name="missingplugin.my-custom-pass")
+
+        @missing_plugin_pass
+        @qp.qnode(qp.device(backend, wires=1))
+        def circuit():
+            return qp.expval(qp.PauliZ(0))
+
+        with pytest.raises(
+            ValueError,
+            match="No pass plugin registered under 'missingplugin'.*Is the plugin package installed",
+        ):
+            qjit(circuit, capture=True, collect_decomp_rules=False)()
+
     def test_transform_cancel_inverses_workflow(self, backend):
         """Test the integration for a circuit with a 'cancel_inverses' transform."""
 
