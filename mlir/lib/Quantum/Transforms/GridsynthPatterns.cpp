@@ -49,9 +49,10 @@ using namespace catalyst::quantum;
 
 namespace {
 
-StringRef xPauli[] = {"X"};
-StringRef yPauli[] = {"Y"};
-StringRef zPauli[] = {"Z"};
+const StringRef xPauli[] = {"X"};
+const StringRef yPauli[] = {"Y"};
+const StringRef zPauli[] = {"Z"};
+const StringRef zyPauli[] = {"Z", "Y"};
 
 // --- Helper Functions to build switch cases ---
 
@@ -260,7 +261,9 @@ constexpr SequenceStatistics mixedPPRStatistics{1.5394, 1.6027, 0.7751, 5.3527,
 // Mixed fallback synthesis: the projective rotations on the ancilla, and the fallbacks applied on
 // failure, with probability `fallbackFailureProbability`. Fitted over 200 uniformly random angles,
 // 4 projective and 4 fallback samples per angle and epsilon, for epsilon in [5e-12, 5e-4]. The
-// fallback statistics are weighted by the failure probability.
+// fallback statistics count one execution of the fallback sequence; the failure probability is
+// attached to the `scf.if` instead. `fallbackFailureProbability` depends on
+// FALLBACK_SUCCESS_PROBABILITY in runtime/lib/RSDecompRuntime/RSDecomp.cpp.
 // Clifford+T cases: T, HT, SHT, I, X, ...
 constexpr double fallbackProjectiveCliffordTCaseFrequencies[] = {
     0.0252, 0.4823, 0.4925, 0.0323, 0.0540, 0.0474, 0.1711, 0.2933, 0.2227, 0.1791};
@@ -467,20 +470,16 @@ Value drawUniformSample(PatternRewriter &rewriter, Location loc, func::FuncOp fu
     return func::CallOp::create(rewriter, loc, rngFunc, ValueRange{})->getResult(0);
 }
 
-Value addConstantPhase(PatternRewriter &rewriter, Location loc, Value phase, double offset) {
-    Value offsetVal = arith::ConstantOp::create(rewriter, loc, rewriter.getF64FloatAttr(offset));
-    return arith::AddFOp::create(rewriter, loc, phase, offsetVal);
-}
-
 /**
  * @brief Apply CY with control `control` and target `target`.
  *
- * In the PPR basis, CY = (Z ⊗ Y)π/4 · (Z ⊗ 1)−π/4 · (1 ⊗ Y)−π/4 up to a global phase of π/4, as in
- * the `to_ppr` pass.
- * @return The output control and target qubits, and the global phase.
+ * In the PPR basis, CY = (Z ⊗ Y)π/4 · (Z ⊗ 1)−π/4 · (1 ⊗ Y)−π/4 up to a global phase of π/4, which
+ * the caller applies. This is the conversion of CY in the `to_ppr` pass (`convertCYGate` in
+ * mlir/lib/PBC/Transforms/ToPPR.cpp).
+ * @return The output control and target qubits.
  */
-std::tuple<Value, Value, double> applyCY(PatternRewriter &rewriter, Location loc, Value control,
-                                         Value target, bool pprBasis) {
+std::pair<Value, Value> applyCY(PatternRewriter &rewriter, Location loc, Value control,
+                                Value target, bool pprBasis) {
     auto qbitType = QubitType::get(rewriter.getContext());
     if (!pprBasis) {
         auto cy = CustomOp::create(rewriter, loc,
@@ -492,16 +491,15 @@ std::tuple<Value, Value, double> applyCY(PatternRewriter &rewriter, Location loc
                                    /*adjoint=*/false,
                                    /*in_ctrl_qubits=*/ValueRange{},
                                    /*in_ctrl_values=*/ValueRange{});
-        return {cy.getOutQubits()[0], cy.getOutQubits()[1], 0.0};
+        return {cy.getOutQubits()[0], cy.getOutQubits()[1]};
     }
-    static StringRef zy[] = {"Z", "Y"};
     auto g0 =
-        catalyst::pbc::PPRotationOp::create(rewriter, loc, zy, 4, ValueRange{control, target});
+        catalyst::pbc::PPRotationOp::create(rewriter, loc, zyPauli, 4, ValueRange{control, target});
     auto g1 = catalyst::pbc::PPRotationOp::create(rewriter, loc, zPauli, -4,
                                                   ValueRange{g0.getOutQubits()[0]});
     auto g2 = catalyst::pbc::PPRotationOp::create(rewriter, loc, yPauli, -4,
                                                   ValueRange{g0.getOutQubits()[1]});
-    return {g1.getOutQubits()[0], g2.getOutQubits()[0], llvm::numbers::pi / 4};
+    return {g1.getOutQubits()[0], g2.getOutQubits()[0]};
 }
 
 /**
@@ -528,11 +526,11 @@ std::pair<Value, Value> buildMixedFallback(PatternRewriter &rewriter, Location l
         getOrDeclareExternalFuncs(rewriter, func, "rs_fallback_projective_", 1);
 
     Value ancilla = AllocQubitOp::create(rewriter, loc).getResult();
-    auto [target, rotatedAncilla, cyPhase] = applyCY(rewriter, loc, qbitIn, ancilla, pprBasis);
+    auto [target, rotatedAncilla] = applyCY(rewriter, loc, qbitIn, ancilla, pprBasis);
     auto [projectedAncilla, projectivePhase] = applyRuntimeSequence(
         rewriter, loc, rotatedAncilla, projectiveFuncs, projectiveArgs, epsilon, pprBasis,
         pprBasis ? fallbackProjectivePPRStatistics : fallbackProjectiveCliffordTStatistics);
-    auto [projectedTarget, finalAncilla, cyPhase2] =
+    auto [projectedTarget, finalAncilla] =
         applyCY(rewriter, loc, target, projectedAncilla, pprBasis);
 
     Value failed;
@@ -590,8 +588,11 @@ std::pair<Value, Value> buildMixedFallback(PatternRewriter &rewriter, Location l
     }
 
     Value phase = arith::AddFOp::create(rewriter, loc, projectivePhase, ifOp.getResult(1));
-    if (cyPhase + cyPhase2 != 0.0) {
-        phase = addConstantPhase(rewriter, loc, phase, cyPhase + cyPhase2);
+    if (pprBasis) {
+        // The global phases π/4 of the two CY gates.
+        Value cyPhases = arith::ConstantOp::create(rewriter, loc,
+                                                   rewriter.getF64FloatAttr(llvm::numbers::pi / 2));
+        phase = arith::AddFOp::create(rewriter, loc, phase, cyPhases);
     }
     return {ifOp.getResult(0), phase};
 }

@@ -120,12 +120,14 @@ def test_gridsynth_specs_matches_runtime(eps, ppr_basis, method):
     executed_t = executed.quantum_operations["PauliRot-pi/4-w1" if ppr_basis else "T"]
     # Device-level measurements return 0, so mixed-fallback's fallbacks, which add about 3% to the
     # estimate, never execute.
-    assert estimated_t == pytest.approx(executed_t, rel=0.08)
+    rel = 0.08 if method == "mixed-fallback" else 0.05
+    assert estimated_t == pytest.approx(executed_t, rel=rel)
 
 
 @pytest.mark.parametrize("ppr_basis", [False, True])
 def test_mixed_fallback_gridsynth_specs_wires(ppr_basis):
-    """Test that specs counts one ancilla per rotation for the mixed fallback method."""
+    """Test the known limitation that specs counts every ancilla allocation of the mixed fallback
+    method as a wire, although each ancilla is released before the next one is allocated."""
 
     @qp.qjit(capture=True, target="mlir")
     @gridsynth(epsilon=1e-6, ppr_basis=ppr_basis, method="mixed-fallback")
@@ -162,6 +164,37 @@ def test_mixed_gridsynth_samples(param, op, eps, ppr_basis):
         result = qjitted_circuit(param)
         fidelity = np.abs(np.vdot(expected, result)) ** 2
         assert 1 - fidelity <= eps
+
+
+@pytest.mark.parametrize("op", [qp.RZ, qp.PhaseShift])
+@pytest.mark.parametrize("eps", [1e-2, 1e-4])
+@pytest.mark.parametrize("ppr_basis", [False, True])
+def test_mixed_fallback_gridsynth_samples(op, eps, ppr_basis):
+    """Test the sampled states of the mixed fallback method. A successful projective rotation has
+    infidelity at most eps, and it succeeds with probability at least 0.95. A failed one is
+    corrected by a fallback with diamond-norm error at most MAX_FALLBACK_EPSILON = 0.25, so its
+    infidelity is at most 0.125."""
+    dev = qp.device("lightning.qubit", wires=1)
+
+    @qp.qnode(dev)
+    def circuit(x: float):
+        qp.Hadamard(0)
+        op(x, wires=0)
+        return qp.state()
+
+    fallback_circuit = gridsynth(circuit, epsilon=eps, ppr_basis=ppr_basis, method="mixed-fallback")
+    qjitted_circuit = qp.qjit(fallback_circuit, capture=True, collect_decomp_rules=False)
+
+    infidelities = []
+    for param in [-2.2, 0.3, 1.1, 4.4]:
+        expected = circuit(param)
+        for _ in range(30):
+            result = qjitted_circuit(param)
+            infidelities.append(1 - np.abs(np.vdot(expected, result)) ** 2)
+
+    infidelities = np.array(infidelities)
+    assert np.all(infidelities <= 0.125)
+    assert np.mean(infidelities <= eps) >= 0.85
 
 
 @pytest.mark.parametrize("method", ["mixed", "mixed-fallback"])

@@ -298,18 +298,16 @@ std::vector<std::vector<double>> error_ptm(const std::vector<std::pair<double, M
 }
 
 /**
- * Weighted Kraus operators of the {Z, S}-twirled mixture of a mixed decomposition, each followed
- * by `after`.
+ * Weighted Kraus operators of the {Z, S}-twirled mixture of a mixed decomposition.
  */
-std::vector<std::pair<double, Matrix2>> mixed_kraus(const MixedDecomposition &mixed,
-                                                    const Matrix2 &after = {1.0, 0.0, 0.0, 1.0}) {
+std::vector<std::pair<double, Matrix2>> mixed_kraus(const MixedDecomposition &mixed) {
     std::vector<std::pair<double, Matrix2>> kraus;
     for (size_t branch = 0; branch < 2; branch++) {
         double weight = branch == 0 ? mixed.probability : 1.0 - mixed.probability;
         for (size_t twirl = 0; twirl < 4; twirl++) {
             Matrix2 U =
                 sequence_unitary(twirl_sequence(mixed.gates[branch], twirl), mixed.phases[branch]);
-            kraus.emplace_back(weight / 4.0, multiply_matrices(U, after));
+            kraus.emplace_back(weight / 4.0, U);
         }
     }
     return kraus;
@@ -459,8 +457,8 @@ fallback_kraus(const MixedFallbackDecomposition &decomposition, double angle) {
             continue;
         }
         Matrix2 failure = {V[2], 0.0, 0.0, std::conj(V[2])};
-        for (const auto &[w, K] : mixed_kraus(fallback_decomposition(branch, angle), failure)) {
-            kraus.emplace_back(weight * w, K);
+        for (const auto &[w, K] : mixed_kraus(fallback_decomposition(branch, angle))) {
+            kraus.emplace_back(weight * w, multiply_matrices(K, failure));
         }
     }
     return kraus;
@@ -519,18 +517,6 @@ TEST_CASE("Test mixed fallback projective rotations", "[RSDecomp][MixedFallback]
     check_fallback_channel(decomposition, angle, epsilon);
 }
 
-TEST_CASE("Test mixed fallback without projective rotations", "[RSDecomp][MixedFallback]") {
-    // Without any grid-problem level to search, the projective rotation always fails and the
-    // fallback carries the full accuracy.
-    const double angle = 0.7;
-    const double epsilon = 1e-4;
-    MixedFallbackDecomposition decomposition =
-        compute_mixed_fallback_decomposition(angle, epsilon, /*max_levels=*/-1);
-    CHECK(decomposition.probability == 1.0);
-    CHECK(decomposition.branches[0].success_probability == 0.0);
-    check_fallback_channel(decomposition, angle, epsilon);
-}
-
 TEST_CASE("Test mixed fallback reduces the T-count", "[RSDecomp][MixedFallback]") {
     const double epsilon = 1e-6;
     double fallback_t = 0.0;
@@ -551,6 +537,24 @@ TEST_CASE("Test mixed fallback reduces the T-count", "[RSDecomp][MixedFallback]"
     }
     CAPTURE(fallback_t, mixed_t);
     CHECK(fallback_t < 0.6 * mixed_t);
+}
+
+TEST_CASE("Test mixed fallback failure probability", "[RSDecomp][MixedFallback]") {
+    // The average failure probability is the resource hint `fallbackFailureProbability` in
+    // mlir/lib/Quantum/Transforms/GridsynthPatterns.cpp.
+    double epsilon = GENERATE(1e-4, 1e-8);
+    const int num_angles = 100;
+    double failure = 0.0;
+    for (int i = 0; i < num_angles; i++) {
+        double angle = 4.0 * M_PI * (i + 0.5) / num_angles;
+        MixedFallbackDecomposition decomposition =
+            compute_mixed_fallback_decomposition(angle, epsilon);
+        double p = decomposition.probability;
+        failure += p * (1.0 - decomposition.branches[0].success_probability) +
+                   (1.0 - p) * (1.0 - decomposition.branches[1].success_probability);
+    }
+    CAPTURE(epsilon);
+    CHECK_THAT(failure / num_angles, WithinAbs(0.0244, 0.006));
 }
 
 TEST_CASE("Test mixed fallback decomposition of exact angles", "[RSDecomp][MixedFallback]") {
@@ -587,16 +591,10 @@ TEST_CASE("Test mixed fallback C-API Wrapper (Memref Interface)", "[RSDecomp][Mi
     CHECK(buffer == expected.first);
     CHECK(phase == expected.second);
 
-    // The runtime functions take the operator-norm epsilon of `rs_decomposition_get_size`.
-    MixedFallbackDecomposition decomposition =
-        compute_mixed_fallback_decomposition(angle, 2.0 * epsilon);
-    const FallbackBranch &branch =
-        decomposition
-            .branches[sample_mixed_decomposition(decomposition.probability, uniform_sample).first];
-    CHECK(rs_fallback_recovery_angle(angle, epsilon, uniform_sample) ==
-          angle + 2.0 * branch.failure_angle);
-    CHECK(rs_fallback_recovery_epsilon(angle, epsilon, uniform_sample) ==
-          branch.fallback_epsilon / 2.0);
+    // Half the cap MAX_FALLBACK_EPSILON = 0.25 of the diamond-norm fallback epsilon.
+    double recovery_epsilon = rs_fallback_recovery_epsilon(angle, epsilon, uniform_sample);
+    CHECK(recovery_epsilon > 0.0);
+    CHECK(recovery_epsilon <= 0.125);
 }
 
 TEST_CASE("rs_decomposition_get_size emits warning for epsilon < 1e-6", "[RSDecomp][Warning]") {

@@ -846,10 +846,9 @@ def gridsynth_setup_inputs(epsilon=1e-4, ppr_basis=False, method="deterministic"
             two {Z, S}-twirled sequences that under- and over-rotate the target, which roughly
             halves the T-count at the same accuracy. This is the mixed diagonal approximation of
             Kliuchnikov et al., Section 3.4 (Proposition 3.13), in
-            `arXiv:2203.10064 <https://arxiv.org/abs/2203.10064>`__. ``"mixed-fallback"``
-            applies one of two projective rotations on an ancilla qubit, followed by a mixed
-            diagonal fallback if measuring the ancilla signals failure, which roughly halves the
-            T-count again (Section 3.5, Proposition 3.18).
+            `arXiv:2203.10064 <https://arxiv.org/abs/2203.10064>`__. ``"mixed-fallback"`` is the
+            mixed fallback approximation of Section 3.5 (Proposition 3.18), which roughly halves
+            the T-count of ``"mixed"`` at the cost of one temporary ancilla qubit per rotation.
 
     Returns:
         :class:`QNode <pennylane.QNode>`
@@ -862,17 +861,19 @@ def gridsynth_setup_inputs(epsilon=1e-4, ppr_basis=False, method="deterministic"
     .. note::
 
         With ``method="mixed"`` or ``method="mixed-fallback"``, the accuracy guarantee holds on
-        average over calls. Each call samples one sequence per rotation, shared by all its shots,
-        with error of order :math:`\sqrt{\epsilon}`. Samples are drawn from the runtime random
-        number generator seeded by the ``seed`` argument of :func:`~.qjit`, so with a fixed seed
-        every call repeats the same samples.
+        average over samples, and each sampled sequence has error of order
+        :math:`\sqrt{\epsilon}`. By default, and with ``mcm_method="single-branch-statistics"``,
+        a call samples one sequence per rotation, and one ancilla measurement outcome for
+        ``"mixed-fallback"``, shared by all its shots. With ``mcm_method="one-shot"``, every shot
+        samples its own. Samples are drawn from the runtime random number generator seeded by the
+        ``seed`` argument of :func:`~.qjit`, so with a fixed seed every call repeats the same
+        samples.
 
     .. note::
 
         With ``method="mixed-fallback"``, each rotation allocates, measures and releases one
         ancilla qubit, so the device needs to support mid-circuit measurements and dynamic qubit
-        allocation, as ``lightning.qubit`` does. Like the sampled sequences, the measurement
-        outcome is shared by all shots of a call. Resource estimates count every allocation, so
+        allocation, as ``lightning.qubit`` does. Resource estimates count every allocation, so
         they report one additional wire per rotation.
 
     **Example**

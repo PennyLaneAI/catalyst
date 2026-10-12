@@ -1021,35 +1021,30 @@ void enumerate_sector_solutions(double theta, double delta, double r_min, int ma
     const double sin_delta = std::sin(delta);
 
     for (int k = 0; k <= max_k; k++) {
-        std::vector<ZOmega> level_solutions;
+        std::optional<two_dim_problem_solution_iterator> solutions;
         try {
             double radius = std::pow(2.0, -k);
             Ellipse disk({radius, 0.0, radius}, {0.0, 0.0});
-            EllipseState state = EllipseState(Ellipse::from_sector(theta, delta, r_min, k), disk)
-                                     .apply_grid_op(grid_op);
-            for (two_dim_problem_solution_iterator it(state); it != it.end(); ++it) {
-                auto [scaled_sol, kf] = (grid_op * *it).normalize();
-                // Solutions with a common factor of √2 were visited at a smaller k.
-                if (kf != 0) {
-                    continue;
-                }
-                double norm = std::abs(scaled_sol.norm2().to_sqrt_two().to_double());
-                if (norm > std::pow(2.0, k)) {
-                    continue;
-                }
-                std::complex<double> w =
-                    scaled_sol.to_complex() * inverse_target / std::pow(M_SQRT2, k);
-                double magnitude = std::abs(w);
-                if (magnitude >= r_min && w.real() > 0.0 &&
-                    std::abs(w.imag()) <= magnitude * sin_delta) {
-                    level_solutions.push_back(scaled_sol);
-                }
-            }
+            solutions.emplace(EllipseState(Ellipse::from_sector(theta, delta, r_min, k), disk)
+                                  .apply_grid_op(grid_op));
         } catch (const std::exception &) {
             return;
         }
-        for (const ZOmega &solution : level_solutions) {
-            if (!visit(solution, k)) {
+        for (auto &it = *solutions; it != it.end(); ++it) {
+            auto [scaled_sol, kf] = (grid_op * *it).normalize();
+            // Solutions with a common factor of √2 were visited at a smaller k.
+            if (kf != 0) {
+                continue;
+            }
+            double norm = std::abs(scaled_sol.norm2().to_sqrt_two().to_double());
+            if (norm > std::pow(2.0, k)) {
+                continue;
+            }
+            std::complex<double> w =
+                scaled_sol.to_complex() * inverse_target / std::pow(M_SQRT2, k);
+            double magnitude = std::abs(w);
+            if (magnitude >= r_min && w.real() > 0.0 &&
+                std::abs(w.imag()) <= magnitude * sin_delta && !visit(scaled_sol, k)) {
                 return;
             }
         }

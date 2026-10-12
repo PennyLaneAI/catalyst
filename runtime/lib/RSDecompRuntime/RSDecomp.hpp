@@ -70,9 +70,7 @@ struct MixedFallbackDecomposition {
     double probability;
 };
 
-// `max_levels` is the largest grid-problem level k searched for projective rotations.
-MixedFallbackDecomposition compute_mixed_fallback_decomposition(double angle, double epsilon,
-                                                                int max_levels = 200);
+MixedFallbackDecomposition compute_mixed_fallback_decomposition(double angle, double epsilon);
 std::pair<std::vector<GateType>, double> eval_fallback_projective(double angle, double epsilon,
                                                                   double uniform_sample);
 std::pair<std::vector<PPRGateType>, double>

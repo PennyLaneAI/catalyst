@@ -160,6 +160,10 @@ def GridsynthPass : Pass<"gridsynth"> {
         Discretizes single-qubit RZ and PhaseShift gates, and PPR-Z rotations with an arbitrary
         angle, at execution time. The pass fails on controlled RZ and PhaseShift gates, which need
         to be decomposed into single-qubit rotations first.
+
+        With `method=mixed-fallback`, each rotation allocates an ancilla qubit, measures it and
+        releases it, and applies the fallback sequence inside an `scf.if` on the measurement
+        result.
     }];
 
     let options = [Option<

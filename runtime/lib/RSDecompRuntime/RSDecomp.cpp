@@ -38,10 +38,13 @@
 // Minimum success probability |u|^2 of a fallback projective rotation, and the share of the
 // diamond-norm error budget given to the projective rotations (fallbacks are rare, so they can use
 // the remainder at a much looser accuracy). These minimize the expected T-count; with 0.99 and 0.5
-// it is about 2 T gates higher.
+// it is about 2 T gates higher. The resource hints in
+// mlir/lib/Quantum/Transforms/GridsynthPatterns.cpp, e.g. `fallbackFailureProbability`, are fitted
+// for these values.
 #define FALLBACK_SUCCESS_PROBABILITY 0.95
 #define FALLBACK_PROJECTIVE_SHARE 0.9
 #define MAX_FALLBACK_EPSILON 0.25
+#define MAX_FALLBACK_LEVELS 200
 
 namespace {
 bool is_odd_multiple_of_pi_4(double angle) {
@@ -422,17 +425,6 @@ size_t count_t_gates(const std::vector<GateType> &gates) {
     });
 }
 
-/**
- * @brief Compute a mixed diagonal approximation of RZ(angle) with diamond-norm accuracy epsilon.
- *
- * Implements the mixed diagonal approximation of Kliuchnikov et al., "Shorter quantum circuits via
- * single-qubit gate approximation", Quantum 7, 1208 (2023), arXiv:2203.10064, Section 3.4
- * (Proposition 3.13, with the diamond-norm bound of Theorem 3.12). Writing each
- * candidate's top-left entry as `w * exp(-i angle/2)`, an under-rotation (Im(w) < 0) and an
- * over-rotation (Im(w) > 0) are mixed with probabilities p and 1 - p, and each is
- * {Z, S}-twirled when applied. Of the candidate pairs found, the one with the lowest expected
- * T-count whose mixture meets the diamond-norm bound of Theorem 3.12 is kept.
- */
 namespace {
 /**
  * @brief Search for the cheapest mixture of an under-rotating and an over-rotating candidate.
@@ -506,14 +498,12 @@ class MixedPairSearch {
     const Candidate &under() const { return unders[best->under]; }
     const Candidate &over() const { return overs[best->over]; }
     double probability() const { return best->probability; }
-    double diamond() const { return best->diamond; }
 
   private:
     struct Pair {
         size_t under;
         size_t over;
         double probability;
-        double diamond;
         double cost;
     };
 
@@ -533,7 +523,7 @@ class MixedPairSearch {
         }
         double cost = p * under.t_count + (1.0 - p) * over.t_count;
         if (!best || cost < best->cost) {
-            best = Pair{i, j, p, diamond, cost};
+            best = Pair{i, j, p, cost};
         }
     }
 
@@ -546,6 +536,17 @@ class MixedPairSearch {
 };
 } // namespace
 
+/**
+ * @brief Compute a mixed diagonal approximation of RZ(angle) with diamond-norm accuracy epsilon.
+ *
+ * Implements the mixed diagonal approximation of Kliuchnikov et al., "Shorter quantum circuits via
+ * single-qubit gate approximation", Quantum 7, 1208 (2023), arXiv:2203.10064, Section 3.4
+ * (Proposition 3.13, with the diamond-norm bound of Theorem 3.12). Writing each
+ * candidate's top-left entry as `w * exp(-i angle/2)`, an under-rotation (Im(w) < 0) and an
+ * over-rotation (Im(w) > 0) are mixed with probabilities p and 1 - p, and each is
+ * {Z, S}-twirled when applied. Of the candidate pairs found, the one with the lowest expected
+ * T-count whose mixture meets the diamond-norm bound of Theorem 3.12 is kept.
+ */
 MixedDecomposition compute_mixed_diagonal_decomposition(double angle, double epsilon) {
     if (is_odd_multiple_of_pi_4(angle)) {
         auto exact = compute_clifford_T_decomposition(angle, epsilon);
@@ -665,11 +666,9 @@ eval_mixed_ross_algorithm_ppr(double angle, double epsilon, double uniform_sampl
  * (Section 3.3), in which case a mixed diagonal fallback B ~ exp(i (-angle/2 - Arg(v)) Z) follows.
  * An under-rotating and an over-rotating projective rotation are mixed with probabilities p and
  * 1 - p. Of the candidate pairs found, the one with the lowest expected T-count of the projective
- * rotations is kept, as the fallbacks only add (1 - |u|^2) times their T-count. The grid search
- * stops after level `max_levels`.
+ * rotations is kept, as the fallbacks only add (1 - |u|^2) times their T-count.
  */
-MixedFallbackDecomposition compute_mixed_fallback_decomposition(double angle, double epsilon,
-                                                                int max_levels) {
+MixedFallbackDecomposition compute_mixed_fallback_decomposition(double angle, double epsilon) {
     if (is_odd_multiple_of_pi_4(angle)) {
         // The exact diagonal V never fails.
         auto [gates, phase] = compute_clifford_T_decomposition(angle, epsilon);
@@ -684,19 +683,20 @@ MixedFallbackDecomposition compute_mixed_fallback_decomposition(double angle, do
     const std::complex<double> inverse_target = std::polar(1.0, angle / 2.0);
     auto [grid_angle, scale] = grid_problem_frame(angle);
     // Equation (34), with q sin(delta)^2 = Im(w)^2.
-    MixedPairSearch search(scale, projective_epsilon,
-                           [](double p, std::complex<double> w_under, std::complex<double> w_over) {
-                               return 2.0 * (p * w_under.imag() * w_under.imag() +
-                                             (1.0 - p) * w_over.imag() * w_over.imag());
-                           });
+    MixedPairSearch::DiamondError projective_diamond = [](double p, std::complex<double> w_under,
+                                                          std::complex<double> w_over) {
+        return 2.0 *
+               (p * w_under.imag() * w_under.imag() + (1.0 - p) * w_over.imag() * w_over.imag());
+    };
+    MixedPairSearch search(scale, projective_epsilon, projective_diamond);
 
-    GridProblem::enumerate_sector_solutions(grid_angle, std::asin(max_sin), min_overlap, max_levels,
-                                            [&](const ZOmega &u_sol, int k_val) {
-                                                std::complex<double> w =
-                                                    (u_sol * scale).to_complex() * inverse_target /
-                                                    std::pow(M_SQRT2, k_val);
-                                                return search.offer(u_sol, k_val, w);
-                                            });
+    GridProblem::enumerate_sector_solutions(
+        grid_angle, std::asin(max_sin), min_overlap, MAX_FALLBACK_LEVELS,
+        [&](const ZOmega &u_sol, int k_val) {
+            std::complex<double> w =
+                (u_sol * scale).to_complex() * inverse_target / std::pow(M_SQRT2, k_val);
+            return search.offer(u_sol, k_val, w);
+        });
 
     if (!search.found()) {
         // V = -iY = [[0, -1], [1, 0]] always fails, which leaves the full accuracy to the fallback
@@ -707,7 +707,9 @@ MixedFallbackDecomposition compute_mixed_fallback_decomposition(double angle, do
 
     // Equation (36): split the remaining accuracy evenly between the two fallback terms
     // p_k (1 - q_k) ||B_k - Z_theta||.
-    const double fallback_budget = (epsilon - search.diamond()) / 2.0;
+    const double fallback_budget =
+        (epsilon - projective_diamond(search.probability(), search.under().w, search.over().w)) /
+        2.0;
     auto make_branch = [&](const MixedPairSearch::Candidate &candidate, double weight) {
         double success = std::norm(candidate.w);
         double failure_weight = weight * (1.0 - success);
