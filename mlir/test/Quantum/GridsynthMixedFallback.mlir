@@ -25,15 +25,14 @@
 
 // COMMENT: The projective rotation acts on an ancilla between two CY gates controlled by the
 // COMMENT: target. If measuring the ancilla returns 1, the ancilla is reset and the fallback
-// COMMENT: sequence, selected by a second sample, is applied to the target. The runtime calls
-// COMMENT: receive the diamond-norm error 2 * epsilon.
+// COMMENT: sequence, selected by a second sample, is applied to the target.
 
 // CLIFFORD-LABEL: func.func private @__catalyst_decompose_RZ_mixed_fallback(
 // PPR-LABEL:      func.func private @__catalyst_decompose_RZ_mixed_fallback_ppr_basis(
 // CHECK-SAME:     [[ARG_QBIT:%.+]]: !quantum.bit, [[ARG_ANGLE:%.+]]: f64)
 // PPR-DAG:        [[CY_PHASES:%.+]] = arith.constant 1.5707963267948966 : f64
 // PPR-DAG:        [[RESET_PHASE:%.+]] = arith.constant -1.5707963267948966 : f64
-// CHECK-DAG:      [[EPS:%.+]] = arith.constant 2.000000e-02 : f64
+// CHECK-DAG:      [[EPS:%.+]] = arith.constant 1.000000e-02 : f64
 // CHECK:          [[SAMPLE:%.+]] = call @__catalyst__rt__random_double()
 // CHECK:          [[ANCILLA:%.+]] = quantum.alloc_qb : !quantum.bit
 // CLIFFORD:       [[CY:%.+]]:2 = quantum.custom "CY"() [[ARG_QBIT]], [[ANCILLA]]
@@ -47,7 +46,7 @@
 // CLIFFORD:       [[ROTATED:%.+]] = scf.for {{.*}} iter_args({{%.+}} = [[CY]]#1)
 // PPR:            [[ROTATED:%.+]] = scf.for {{.*}} iter_args({{%.+}} = [[CY_ANCILLA]])
 // CHECK:            scf.index_switch {{%.+}} {catalyst.estimated_probabilities = [{{.*}}]}
-// COM: expected T and other entries (0.5505 - 0.0008) * log2(1/0.02) + 4.3138 + 1.9589 (Clifford+T), (0.5505 + 0.2777) * log2(1/0.02) + 4.3138 + 6.1166 (PPR)
+// COM: expected T and other entries (0.5505 - 0.0008) * log2(1/0.01) + 3.7633 + 1.9597 (Clifford+T), (0.5505 + 0.2777) * log2(1/0.01) + 3.7633 + 5.8389 (PPR)
 // CLIFFORD:       } {catalyst.estimated_iterations = 9.37{{[0-9]+}} : f64}
 // PPR:            } {catalyst.estimated_iterations = 15.10{{[0-9]+}} : f64}
 // CLIFFORD:       [[CY2:%.+]]:2 = quantum.custom "CY"() [[CY]]#0, [[ROTATED]]
@@ -65,7 +64,7 @@
 // CHECK:            [[RECOVERY_PHASE:%.+]] = func.call @rs_fallback_recovery_get_phase([[ARG_ANGLE]], [[EPS]], {{%.+}}, [[SAMPLE]], [[SAMPLE2]])
 // CLIFFORD:         [[RECOVERED:%.+]] = scf.for {{.*}} iter_args({{%.+}} = [[CY2]]#0)
 // PPR:              [[RECOVERED:%.+]] = scf.for {{.*}} iter_args({{%.+}} = [[TARGET]])
-// COM: expected T and other entries (1.5753 + 0.0115) * log2(1/0.02) - 5.4516 + 2.3716 (Clifford+T), (1.5753 + 0.8159) * log2(1/0.02) - 5.4516 + 1.2658 (PPR)
+// COM: expected T and other entries (1.5753 + 0.0115) * log2(1/0.01) - 7.0269 + 2.3601 (Clifford+T), (1.5753 + 0.8159) * log2(1/0.01) - 7.0269 + 0.4499 (PPR)
 // CLIFFORD:         } {catalyst.estimated_iterations = 5.87{{[0-9]+}} : f64}
 // PPR:              } {catalyst.estimated_iterations = 9.30{{[0-9]+}} : f64}
 // CLIFFORD:         scf.yield [[RECOVERED]], [[RESET]], [[RECOVERY_PHASE]]

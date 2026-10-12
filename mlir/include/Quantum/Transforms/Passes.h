@@ -21,12 +21,10 @@
 #include "MBQC/IR/MBQCDialect.h"
 #include "PBC/IR/PBCDialect.h"
 #include "QRef/IR/QRefDialect.h"
+#include "Quantum/Transforms/PassesEnums.h"
 
 namespace catalyst {
 namespace quantum {
-
-/// Synthesis method of the gridsynth pass.
-enum class GridsynthMethod : int { Deterministic, Mixed, MixedFallback };
 
 #define GEN_PASS_DECL
 #define GEN_PASS_REGISTRATION

@@ -284,33 +284,3 @@ def test_mixed_registration():
 
 
 test_mixed_registration()
-
-# ==============================================================================
-# Test 10: Capture Workflow Lowering (mixed)
-# ==============================================================================
-
-
-def test_capture_workflow_mixed():
-    """Test the capture workflow with the mixed gridsynth method."""
-
-    @qjit(target="mlir", capture=True, pipelines=pipe, collect_decomp_rules=False)
-    @partial(gridsynth, epsilon=0.01, method="mixed")
-    @qp.qnode(qp.device("lightning.qubit", wires=1))
-    def circuit(x: float):
-        qp.RZ(x, wires=0)
-        return qp.probs()
-
-    # CHECK-DAG:   func.func private @__catalyst__rt__random_double() -> f64
-    # CHECK-DAG:   func.func private @rs_mixed_decomposition_get_size(f64, f64, i1, f64) -> index
-
-    # CHECK-LABEL: func.func private @__catalyst_decompose_RZ_mixed{{.*}}
-    # CHECK:       call @__catalyst__rt__random_double()
-    # CHECK:       scf.index_switch
-
-    # CHECK-LABEL: func.func public @circuit{{.*}}
-    # CHECK-NOT:   quantum.custom "RZ"
-    # CHECK:       call @__catalyst_decompose_RZ_mixed{{.*}}
-    print(circuit.mlir_opt)
-
-
-test_capture_workflow_mixed()

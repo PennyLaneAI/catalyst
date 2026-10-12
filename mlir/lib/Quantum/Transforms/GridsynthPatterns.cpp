@@ -41,7 +41,6 @@
 #include "Catalyst/Utils/EnsureFunctionDeclaration.h"
 #include "PBC/IR/PBCOps.h"
 #include "Quantum/IR/QuantumOps.h"
-#include "Quantum/Transforms/Passes.h"
 #include "Quantum/Transforms/Patterns.h"
 
 using namespace mlir;
@@ -242,7 +241,7 @@ constexpr SequenceStatistics cliffordTStatistics{3.0590, 1.1278, -0.0074, 1.9849
 constexpr SequenceStatistics pprStatistics{3.0590, 1.1278, 1.5324, 4.2326, pprCaseFrequencies};
 
 // Mixed synthesis: fitted over 1000 uniformly random angles and 8 samples per angle and epsilon,
-// for diamond-norm epsilon in [1e-11, 1e-3]. The samples include the (merged) twirling Cliffords.
+// for epsilon in [5e-12, 5e-4]. The samples include the (merged) twirling Cliffords.
 // Clifford+T cases: T, HT, SHT, I, X, ...
 constexpr double mixedCliffordTCaseFrequencies[] = {0.0111, 0.4939, 0.4950, 0.0054, 0.0395,
                                                     0.0386, 0.2380, 0.2109, 0.2551, 0.2124};
@@ -252,15 +251,15 @@ constexpr double mixedPPRCaseFrequencies[] = {
     0.0000, 0.0000, 0.0056, 0.0355, 0.4949, 0.5000, 0.0000, 0.0235, 0.0000};
 static_assert(std::size(mixedCliffordTCaseFrequencies) == numCliffordTCases);
 static_assert(std::size(mixedPPRCaseFrequencies) == numPPRCases);
-constexpr SequenceStatistics mixedCliffordTStatistics{1.5394, 3.1421, 0.0027, 2.6123,
+constexpr SequenceStatistics mixedCliffordTStatistics{1.5394, 1.6027, 0.0027, 2.6096,
                                                       mixedCliffordTCaseFrequencies};
-constexpr SequenceStatistics mixedPPRStatistics{1.5394, 3.1421, 0.7751, 6.1278,
+constexpr SequenceStatistics mixedPPRStatistics{1.5394, 1.6027, 0.7751, 5.3527,
                                                 mixedPPRCaseFrequencies};
 
 // Mixed fallback synthesis: the projective rotations on the ancilla, and the fallbacks applied on
 // failure, with probability `fallbackFailureProbability`. Fitted over 200 uniformly random angles,
-// 4 projective and 4 fallback samples per angle and epsilon, for diamond-norm epsilon in
-// [1e-11, 1e-3]. The fallback statistics are weighted by the failure probability.
+// 4 projective and 4 fallback samples per angle and epsilon, for epsilon in [5e-12, 5e-4]. The
+// fallback statistics are weighted by the failure probability.
 // Clifford+T cases: T, HT, SHT, I, X, ...
 constexpr double fallbackProjectiveCliffordTCaseFrequencies[] = {
     0.0252, 0.4823, 0.4925, 0.0323, 0.0540, 0.0474, 0.1711, 0.2933, 0.2227, 0.1791};
@@ -278,12 +277,12 @@ static_assert(std::size(fallbackRecoveryCliffordTCaseFrequencies) == numClifford
 static_assert(std::size(fallbackProjectivePPRCaseFrequencies) == numPPRCases);
 static_assert(std::size(fallbackRecoveryPPRCaseFrequencies) == numPPRCases);
 constexpr SequenceStatistics fallbackProjectiveCliffordTStatistics{
-    0.5505, 4.3138, -0.0008, 1.9589, fallbackProjectiveCliffordTCaseFrequencies};
-constexpr SequenceStatistics fallbackProjectivePPRStatistics{0.5505, 4.3138, 0.2777, 6.1166,
+    0.5505, 3.7633, -0.0008, 1.9597, fallbackProjectiveCliffordTCaseFrequencies};
+constexpr SequenceStatistics fallbackProjectivePPRStatistics{0.5505, 3.7633, 0.2777, 5.8389,
                                                              fallbackProjectivePPRCaseFrequencies};
 constexpr SequenceStatistics fallbackRecoveryCliffordTStatistics{
-    1.5753, -5.4516, 0.0115, 2.3716, fallbackRecoveryCliffordTCaseFrequencies};
-constexpr SequenceStatistics fallbackRecoveryPPRStatistics{1.5753, -5.4516, 0.8159, 1.2658,
+    1.5753, -7.0269, 0.0115, 2.3601, fallbackRecoveryCliffordTCaseFrequencies};
+constexpr SequenceStatistics fallbackRecoveryPPRStatistics{1.5753, -7.0269, 0.8159, 0.4499,
                                                            fallbackRecoveryPPRCaseFrequencies};
 constexpr double fallbackFailureProbability = 0.0244;
 
@@ -642,11 +641,8 @@ func::FuncOp getOrCreateDecompositionFunc(ModuleOp module, PatternRewriter &rewr
     Value qbitIn = entryBlock->getArgument(0);
     Value angle = entryBlock->getArgument(1);
 
-    // Parameters for compilation. The mixed runtime functions take a diamond-norm error; 2 *
-    // epsilon is the guarantee of a deterministic sequence with operator-norm error epsilon.
-    double runtimeEpsilon = method == GridsynthMethod::Deterministic ? epsilon : 2.0 * epsilon;
-    Value epsilonVal =
-        arith::ConstantOp::create(rewriter, loc, rewriter.getF64FloatAttr(runtimeEpsilon));
+    // Parameters for compilation
+    Value epsilonVal = arith::ConstantOp::create(rewriter, loc, rewriter.getF64FloatAttr(epsilon));
     Value pprBasisVal = arith::ConstantOp::create(rewriter, loc, rewriter.getBoolAttr(pprBasis));
 
     SmallVector<Value> scalarArgs = {angle, epsilonVal, pprBasisVal};
@@ -655,7 +651,7 @@ func::FuncOp getOrCreateDecompositionFunc(ModuleOp module, PatternRewriter &rewr
     Value runtimePhase;
     if (method == GridsynthMethod::MixedFallback) {
         std::tie(finalQbit, runtimePhase) =
-            buildMixedFallback(rewriter, loc, func, qbitIn, scalarArgs, runtimeEpsilon, pprBasis);
+            buildMixedFallback(rewriter, loc, func, qbitIn, scalarArgs, epsilon, pprBasis);
     } else {
         bool mixed = method == GridsynthMethod::Mixed;
         // A mixed decomposition draws one uniform sample per application, shared by the three
@@ -666,8 +662,8 @@ func::FuncOp getOrCreateDecompositionFunc(ModuleOp module, PatternRewriter &rewr
         DecompositionExternalFuncs extFuncs = getOrDeclareExternalFuncs(
             rewriter, func, mixed ? "rs_mixed_decomposition_" : "rs_decomposition_", mixed);
         std::tie(finalQbit, runtimePhase) =
-            applyRuntimeSequence(rewriter, loc, qbitIn, extFuncs, scalarArgs, runtimeEpsilon,
-                                 pprBasis, getSequenceStatistics(pprBasis, method));
+            applyRuntimeSequence(rewriter, loc, qbitIn, extFuncs, scalarArgs, epsilon, pprBasis,
+                                 getSequenceStatistics(pprBasis, method));
     }
 
     // Return the final qubit and the computed runtime phase

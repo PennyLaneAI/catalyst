@@ -16,6 +16,17 @@
 #define QUANTUM_PASSES
 
 include "mlir/Pass/PassBase.td"
+include "mlir/IR/EnumAttr.td"
+
+def GridsynthMethod : I32EnumAttr<"GridsynthMethod", "Synthesis method of the gridsynth pass",
+    [
+        I32EnumAttrCase<"Deterministic", 0, "deterministic">,
+        I32EnumAttrCase<"Mixed", 1, "mixed">,
+        I32EnumAttrCase<"MixedFallback", 2, "mixed-fallback">,
+    ]> {
+    let cppNamespace = "catalyst::quantum";
+    let genSpecializedAttr = 0;
+}
 
 def QuantumConversionPass : Pass<"convert-quantum-to-llvm"> {
     let summary = "Perform a dialect conversion from Quantum to LLVM (QIR).";
