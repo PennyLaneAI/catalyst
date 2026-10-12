@@ -51,6 +51,33 @@ std::pair<std::vector<GateType>, double> eval_mixed_ross_algorithm(double angle,
 std::pair<std::vector<PPRGateType>, double>
 eval_mixed_ross_algorithm_ppr(double angle, double epsilon, double uniform_sample);
 
+/**
+ * @brief Two projective rotations V_k = [[u_k, -v_k*], [v_k, u_k*]], applied with probabilities
+ * `probability` and `1 - probability`, and the mixed diagonal fallbacks applied when they fail.
+ */
+struct MixedFallbackDecomposition {
+    std::array<std::vector<GateType>, 2> projective_gates;
+    std::array<double, 2> projective_phases;
+    // Arg(v_k), the angle of exp(i Arg(v_k) Z) applied to the target on failure.
+    std::array<double, 2> failure_angles;
+    // |u_k|^2
+    std::array<double, 2> success_probabilities;
+    std::array<MixedDecomposition, 2> fallbacks;
+    double probability;
+};
+
+MixedFallbackDecomposition compute_mixed_fallback_decomposition(double angle, double epsilon);
+size_t select_fallback_branch(double probability, double uniform_sample);
+std::pair<std::vector<GateType>, double> eval_fallback_projective(double angle, double epsilon,
+                                                                  double uniform_sample);
+std::pair<std::vector<PPRGateType>, double>
+eval_fallback_projective_ppr(double angle, double epsilon, double uniform_sample);
+std::pair<std::vector<GateType>, double>
+eval_fallback_recovery(double angle, double epsilon, double uniform_sample, double recovery_sample);
+std::pair<std::vector<PPRGateType>, double> eval_fallback_recovery_ppr(double angle, double epsilon,
+                                                                       double uniform_sample,
+                                                                       double recovery_sample);
+
 extern "C" {
 
 size_t rs_decomposition_get_size(double theta, double epsilon, bool ppr_basis);
@@ -70,6 +97,26 @@ void rs_mixed_decomposition_get_gates(size_t *data_allocated, size_t *data_align
 
 double rs_mixed_decomposition_get_phase(double theta, double epsilon, bool ppr_basis,
                                         double uniform_sample);
+
+size_t rs_fallback_projective_get_size(double theta, double epsilon, bool ppr_basis,
+                                       double uniform_sample);
+
+void rs_fallback_projective_get_gates(size_t *data_allocated, size_t *data_aligned, size_t offset,
+                                      size_t size0, size_t stride0, double theta, double epsilon,
+                                      bool ppr_basis, double uniform_sample);
+
+double rs_fallback_projective_get_phase(double theta, double epsilon, bool ppr_basis,
+                                        double uniform_sample);
+
+size_t rs_fallback_recovery_get_size(double theta, double epsilon, bool ppr_basis,
+                                     double uniform_sample, double recovery_sample);
+
+void rs_fallback_recovery_get_gates(size_t *data_allocated, size_t *data_aligned, size_t offset,
+                                    size_t size0, size_t stride0, double theta, double epsilon,
+                                    bool ppr_basis, double uniform_sample, double recovery_sample);
+
+double rs_fallback_recovery_get_phase(double theta, double epsilon, bool ppr_basis,
+                                      double uniform_sample, double recovery_sample);
 
 } // extern "C"
 } // namespace RSDecomp::RossSelinger

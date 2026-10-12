@@ -276,7 +276,37 @@ size_t t_count(const std::vector<GateType> &gates) {
  * Pauli transfer matrix R_ij = Tr(P_i E(P_j)) / 2 of the error channel
  * E(rho) = V^dagger M(rho) V, where M is the {Z, S}-twirled mixture and V = RZ(angle).
  */
+std::vector<std::vector<double>> error_ptm(const std::vector<std::pair<double, Matrix2>> &channel,
+                                           double angle);
+
+/**
+ * Weighted Kraus operators of the {Z, S}-twirled mixture of a mixed decomposition, each followed
+ * by `after`.
+ */
+std::vector<std::pair<double, Matrix2>> mixed_kraus(const MixedDecomposition &mixed,
+                                                    const Matrix2 &after = {1.0, 0.0, 0.0, 1.0}) {
+    std::vector<std::pair<double, Matrix2>> kraus;
+    for (size_t branch = 0; branch < 2; branch++) {
+        double weight = branch == 0 ? mixed.probability : 1.0 - mixed.probability;
+        for (size_t twirl = 0; twirl < 4; twirl++) {
+            Matrix2 U =
+                sequence_unitary(twirl_sequence(mixed.gates[branch], twirl), mixed.phases[branch]);
+            kraus.emplace_back(weight / 4.0, multiply_matrices(U, after));
+        }
+    }
+    return kraus;
+}
+
 std::vector<std::vector<double>> mixed_error_ptm(const MixedDecomposition &mixed, double angle) {
+    return error_ptm(mixed_kraus(mixed), angle);
+}
+
+/**
+ * Pauli transfer matrix of the error channel E(rho) = V^dagger M(rho) V, where M has the weighted
+ * Kraus operators `channel` and V = RZ(angle).
+ */
+std::vector<std::vector<double>> error_ptm(const std::vector<std::pair<double, Matrix2>> &channel,
+                                           double angle) {
     const std::vector<Matrix2> paulis = {{1.0, 0.0, 0.0, 1.0},
                                          {0.0, 1.0, 1.0, 0.0},
                                          {0.0, {0.0, -1.0}, {0.0, 1.0}, 0.0},
@@ -284,13 +314,8 @@ std::vector<std::vector<double>> mixed_error_ptm(const MixedDecomposition &mixed
     Matrix2 V = {std::polar(1.0, -angle / 2.0), 0.0, 0.0, std::polar(1.0, angle / 2.0)};
 
     std::vector<std::pair<double, Matrix2>> kraus;
-    for (size_t branch = 0; branch < 2; branch++) {
-        double weight = branch == 0 ? mixed.probability : 1.0 - mixed.probability;
-        for (size_t twirl = 0; twirl < 4; twirl++) {
-            Matrix2 U =
-                sequence_unitary(twirl_sequence(mixed.gates[branch], twirl), mixed.phases[branch]);
-            kraus.emplace_back(weight / 4.0, multiply_matrices(dagger(V), U));
-        }
+    for (const auto &[weight, K] : channel) {
+        kraus.emplace_back(weight, multiply_matrices(dagger(V), K));
     }
 
     std::vector<std::vector<double>> ptm(4, std::vector<double>(4, 0.0));
@@ -448,6 +473,159 @@ TEST_CASE("Test mixed C-API Wrapper (Memref Interface)", "[RSDecomp][Mixed]") {
             CHECK(static_cast<GateType>(buffer[i]) == expected[i]);
         }
         CHECK(phase == mixed.phases[branch]);
+    }
+}
+
+double expected_t_count(const MixedDecomposition &mixed) {
+    return mixed.probability * t_count(mixed.gates[0]) +
+           (1.0 - mixed.probability) * t_count(mixed.gates[1]);
+}
+
+/**
+ * Weighted Kraus operators of the mixed fallback channel on the target. The projective rotation
+ * V = [[u, -v*], [v, u*]] applies diag(u, u*) on success and diag(v, v*) followed by the
+ * fallback on failure.
+ */
+std::vector<std::pair<double, Matrix2>>
+fallback_kraus(const MixedFallbackDecomposition &decomposition) {
+    std::vector<std::pair<double, Matrix2>> kraus;
+    for (size_t branch = 0; branch < 2; branch++) {
+        double weight = branch == 0 ? decomposition.probability : 1.0 - decomposition.probability;
+        Matrix2 V = sequence_unitary(decomposition.projective_gates[branch],
+                                     decomposition.projective_phases[branch]);
+        kraus.emplace_back(weight, Matrix2{V[0], 0.0, 0.0, std::conj(V[0])});
+        Matrix2 failure = {V[2], 0.0, 0.0, std::conj(V[2])};
+        for (const auto &[w, K] : mixed_kraus(decomposition.fallbacks[branch], failure)) {
+            kraus.emplace_back(weight * w, K);
+        }
+    }
+    return kraus;
+}
+
+TEST_CASE("Test mixed fallback projective rotations", "[RSDecomp][MixedFallback]") {
+    double epsilon = GENERATE(1e-2, 1e-4, 1e-6, 1e-8);
+    int angle_int = GENERATE(range(-70, 71, 7));
+    double angle = angle_int / 10.0 + 0.01;
+    CAPTURE(angle, epsilon);
+
+    MixedFallbackDecomposition decomposition = compute_mixed_fallback_decomposition(angle, epsilon);
+    REQUIRE(decomposition.probability >= 0.0);
+    REQUIRE(decomposition.probability <= 1.0);
+
+    std::complex<double> inverse_target = std::polar(1.0, angle / 2.0);
+    for (size_t branch = 0; branch < 2; branch++) {
+        CAPTURE(branch);
+        Matrix2 V = sequence_unitary(decomposition.projective_gates[branch],
+                                     decomposition.projective_phases[branch]);
+        // V = [[u, -v*], [v, u*]] up to sign, and the success probability is at least 0.95.
+        CHECK(std::abs(V[3] - std::conj(V[0])) <= 1e-9);
+        CHECK(std::abs(V[1] + std::conj(V[2])) <= 1e-9);
+        CHECK_THAT(std::norm(V[0]), WithinAbs(decomposition.success_probabilities[branch], 1e-9));
+        CHECK(decomposition.success_probabilities[branch] >= 0.95 - 1e-12);
+        // Arg(v) is defined up to the sign of V, which does not change the applied channel.
+        double failure_offset = std::arg(V[2]) - decomposition.failure_angles[branch];
+        CHECK(std::abs(std::sin(failure_offset)) <= 1e-9);
+
+        // The first projective rotation under-rotates and the second over-rotates the target.
+        std::complex<double> w = V[0] * inverse_target;
+        w *= w.real() < 0.0 ? -1.0 : 1.0;
+        if (decomposition.probability < 1.0) {
+            CHECK((branch == 0 ? -w.imag() : w.imag()) >= -1e-12);
+        }
+    }
+
+    // The fallback channel is a Pauli channel within diamond distance epsilon of RZ(angle).
+    auto ptm = error_ptm(fallback_kraus(decomposition), angle);
+    for (size_t i = 0; i < 4; i++) {
+        for (size_t j = 0; j < 4; j++) {
+            if (i != j) {
+                CHECK(std::abs(ptm[i][j]) <= 1e-9);
+            }
+        }
+    }
+    double identity_weight = (ptm[0][0] + ptm[1][1] + ptm[2][2] + ptm[3][3]) / 4.0;
+    double diamond_distance = 2.0 * (1.0 - identity_weight);
+    CHECK(diamond_distance <= epsilon * (1.0 + 1e-6) + 1e-12);
+}
+
+TEST_CASE("Test mixed fallback reduces the T-count", "[RSDecomp][MixedFallback]") {
+    const double epsilon = 1e-6;
+    double fallback_t = 0.0;
+    double mixed_t = 0.0;
+    for (int angle_int = 1; angle_int < 60; angle_int++) {
+        double angle = angle_int / 10.0;
+        MixedFallbackDecomposition decomposition =
+            compute_mixed_fallback_decomposition(angle, epsilon);
+        for (size_t branch = 0; branch < 2; branch++) {
+            double weight =
+                branch == 0 ? decomposition.probability : 1.0 - decomposition.probability;
+            fallback_t += weight * (t_count(decomposition.projective_gates[branch]) +
+                                    (1.0 - decomposition.success_probabilities[branch]) *
+                                        expected_t_count(decomposition.fallbacks[branch]));
+        }
+        mixed_t += expected_t_count(compute_mixed_diagonal_decomposition(angle, epsilon));
+    }
+    CAPTURE(fallback_t, mixed_t);
+    CHECK(fallback_t < 0.6 * mixed_t);
+}
+
+TEST_CASE("Test mixed fallback decomposition of exact angles", "[RSDecomp][MixedFallback]") {
+    MixedFallbackDecomposition decomposition =
+        compute_mixed_fallback_decomposition(M_PI / 4.0, 1e-4);
+    CHECK(decomposition.probability == 1.0);
+    CHECK(decomposition.projective_gates[0] == std::vector<GateType>{GateType::T});
+    CHECK(decomposition.success_probabilities[0] == 1.0);
+}
+
+TEST_CASE("Test mixed fallback C-API Wrapper (Memref Interface)", "[RSDecomp][MixedFallback]") {
+    const double angle = 0.7;
+    const double epsilon = 1e-6;
+    bool ppr_basis = GENERATE(false, true);
+    double uniform_sample = GENERATE(0.1, 0.6, 0.95);
+    double recovery_sample = GENERATE(0.2, 0.7);
+    CAPTURE(ppr_basis, uniform_sample, recovery_sample);
+
+    size_t size = rs_fallback_projective_get_size(angle, epsilon, ppr_basis, uniform_sample);
+    std::vector<size_t> buffer(size);
+    rs_fallback_projective_get_gates(nullptr, buffer.data(), 0, size, 1, angle, epsilon, ppr_basis,
+                                     uniform_sample);
+    double phase = rs_fallback_projective_get_phase(angle, epsilon, ppr_basis, uniform_sample);
+
+    size_t recovery_size =
+        rs_fallback_recovery_get_size(angle, epsilon, ppr_basis, uniform_sample, recovery_sample);
+    std::vector<size_t> recovery_buffer(recovery_size);
+    rs_fallback_recovery_get_gates(nullptr, recovery_buffer.data(), 0, recovery_size, 1, angle,
+                                   epsilon, ppr_basis, uniform_sample, recovery_sample);
+    double recovery_phase =
+        rs_fallback_recovery_get_phase(angle, epsilon, ppr_basis, uniform_sample, recovery_sample);
+
+    auto check_gates = [](const std::vector<size_t> &actual, const auto &expected) {
+        REQUIRE(actual.size() == expected.size());
+        for (size_t i = 0; i < expected.size(); i++) {
+            CHECK(actual[i] == static_cast<size_t>(expected[i]));
+        }
+    };
+
+    if (ppr_basis) {
+        auto [gates, expected_phase] = eval_fallback_projective_ppr(angle, epsilon, uniform_sample);
+        check_gates(buffer, gates);
+        CHECK(phase == expected_phase);
+        auto [recovery, expected_recovery_phase] =
+            eval_fallback_recovery_ppr(angle, epsilon, uniform_sample, recovery_sample);
+        check_gates(recovery_buffer, recovery);
+        CHECK(recovery_phase == expected_recovery_phase);
+    } else {
+        MixedFallbackDecomposition decomposition =
+            compute_mixed_fallback_decomposition(angle, epsilon);
+        size_t branch = select_fallback_branch(decomposition.probability, uniform_sample);
+        check_gates(buffer, decomposition.projective_gates[branch]);
+        CHECK(phase == decomposition.projective_phases[branch]);
+
+        const MixedDecomposition &fallback = decomposition.fallbacks[branch];
+        auto [fallback_branch, twirl] =
+            sample_mixed_decomposition(fallback.probability, recovery_sample);
+        check_gates(recovery_buffer, twirl_sequence(fallback.gates[fallback_branch], twirl));
+        CHECK(recovery_phase == fallback.phases[fallback_branch]);
     }
 }
 

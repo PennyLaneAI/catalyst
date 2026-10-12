@@ -57,6 +57,7 @@ enum class GateEnum {
     S,
     T,
     CNOT,
+    CY,
     CZ,
     X,
     Y,
@@ -82,6 +83,8 @@ GateEnum hashGate(CustomOp op) {
         return GateEnum::T;
     } else if (gateName == "CNOT") {
         return GateEnum::CNOT;
+    } else if (gateName == "CY") {
+        return GateEnum::CY;
     } else if (gateName == "CZ") {
         return GateEnum::CZ;
     } else if (gateName == "PauliX" || gateName == "X") {
@@ -272,6 +275,11 @@ LogicalResult convertIGate(CustomOp op, ConversionPatternRewriter &rewriter) {
 LogicalResult convertCNOTGate(CustomOp op, ConversionPatternRewriter &rewriter) {
     applyGlobalPhase(op->getLoc(), llvm::numbers::pi / 4, rewriter);
     return controlledConversion(op, "Z", "X", rewriter);
+}
+
+LogicalResult convertCYGate(CustomOp op, ConversionPatternRewriter &rewriter) {
+    applyGlobalPhase(op->getLoc(), llvm::numbers::pi / 4, rewriter);
+    return controlledConversion(op, "Z", "Y", rewriter);
 }
 
 LogicalResult convertCZGate(CustomOp op, ConversionPatternRewriter &rewriter) {
@@ -465,8 +473,9 @@ struct PBCGateLowering : public OpInterfaceConversionPattern<QuantumOperation> {
 
     LogicalResult matchAndRewrite(QuantumOperation operation, ArrayRef<Value> operands,
                                   ConversionPatternRewriter &rewriter) const final {
-        StringRef supportedGates = "Supported gates: H, S, T, X, Y, Z, S†, T†, I, CNOT, CZ, PPR,"
-                                   "RX, RY, RZ, IsingXX, IsingYY, IsingZZ, MultiRZ, and PauliRot.";
+        StringRef supportedGates =
+            "Supported gates: H, S, T, X, Y, Z, S†, T†, I, CNOT, CY, CZ, PPR,"
+            "RX, RY, RZ, IsingXX, IsingYY, IsingZZ, MultiRZ, and PauliRot.";
         Operation *op = operation.getOperation();
 
         if (auto gateLikeOp = dyn_cast<QuantumGate>(op)) {
@@ -491,6 +500,8 @@ struct PBCGateLowering : public OpInterfaceConversionPattern<QuantumOperation> {
                 return convertZGate(originOp, rewriter);
             case GateEnum::CNOT:
                 return convertCNOTGate(originOp, rewriter);
+            case GateEnum::CY:
+                return convertCYGate(originOp, rewriter);
             case GateEnum::CZ:
                 return convertCZGate(originOp, rewriter);
             case GateEnum::I:

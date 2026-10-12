@@ -302,6 +302,29 @@ struct Ellipse {
     }
 
     /**
+     * @brief Create an ellipse that bounds the annular sector of u such that r_min <= |u| <= 1
+     * and |Arg(u) - theta| <= delta, scaled by √2^k. (Figure 8, arXiv:2203.10064)
+     *
+     * The sector lies in the rectangle with radial extent [r_min cos(delta), 1] and tangential
+     * extent [-sin(delta), sin(delta)], and the smallest ellipse containing a rectangle has
+     * semi-axes √2 times its half-widths.
+     */
+    static Ellipse from_sector(double theta, double delta, double r_min, int k = 0) {
+        double scale = std::pow(2.0, static_cast<double>(k) / 2.0);
+        double inner = r_min * std::cos(delta);
+        double radial_axis = M_SQRT2 * scale * (1.0 - inner) / 2.0;
+        double tangential_axis = M_SQRT2 * scale * std::sin(delta);
+        double r2 = 1.0 / (radial_axis * radial_axis);
+        double t2 = 1.0 / (tangential_axis * tangential_axis);
+        double zx = std::cos(theta);
+        double zy = std::sin(theta);
+        double centre = scale * (1.0 + inner) / 2.0;
+        return Ellipse(
+            {r2 * zx * zx + t2 * zy * zy, (r2 - t2) * zx * zy, r2 * zy * zy + t2 * zx * zx},
+            {centre * zx, centre * zy});
+    }
+
+    /**
      * @brief Calculate the discriminant of the characteristic polynomial associated with the
      * ellipse.
      */

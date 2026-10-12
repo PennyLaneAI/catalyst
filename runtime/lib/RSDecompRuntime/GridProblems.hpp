@@ -1003,4 +1003,57 @@ class GridIterator {
     GridIterator end() { return GridIterator(); }
 };
 
+/**
+ * @brief Enumerate the solutions u = u_sol / √2^k of the scaled grid problem over the annular
+ * sector r_min <= |u| <= 1, |Arg(u) - theta| <= delta and the unit disk, in order of increasing k.
+ *
+ * This follows the main loop of `GridIterator` with the ellipse of `Ellipse::from_sector` in place
+ * of the epsilon-region. Solutions outside the sector are discarded, and each solution is visited
+ * once, at its smallest k. Enumeration stops when `visit(u_sol, k)` returns false, after `max_k`,
+ * or when the grid problem becomes numerically infeasible.
+ */
+template <typename Visit>
+void enumerate_sector_solutions(double theta, double delta, double r_min, int max_k, Visit visit) {
+    const Ellipse unit_disk({1.0, 0.0, 1.0}, {0.0, 0.0});
+    auto [normalized, _] = Ellipse::from_sector(theta, delta, r_min).normalize();
+    const GridOp grid_op = EllipseState(normalized, unit_disk).skew_grid_op();
+    const std::complex<double> inverse_target = std::polar(1.0, -theta);
+    const double sin_delta = std::sin(delta);
+
+    for (int k = 0; k <= max_k; k++) {
+        std::vector<ZOmega> level_solutions;
+        try {
+            double radius = std::pow(2.0, -k);
+            Ellipse disk({radius, 0.0, radius}, {0.0, 0.0});
+            EllipseState state = EllipseState(Ellipse::from_sector(theta, delta, r_min, k), disk)
+                                     .apply_grid_op(grid_op);
+            for (two_dim_problem_solution_iterator it(state); it != it.end(); ++it) {
+                auto [scaled_sol, kf] = (grid_op * *it).normalize();
+                // Solutions with a common factor of √2 were visited at a smaller k.
+                if (kf != 0) {
+                    continue;
+                }
+                double norm = std::abs(scaled_sol.norm2().to_sqrt_two().to_double());
+                if (norm > std::pow(2.0, k)) {
+                    continue;
+                }
+                std::complex<double> w =
+                    scaled_sol.to_complex() * inverse_target / std::pow(M_SQRT2, k);
+                double magnitude = std::abs(w);
+                if (magnitude >= r_min && w.real() > 0.0 &&
+                    std::abs(w.imag()) <= magnitude * sin_delta) {
+                    level_solutions.push_back(scaled_sol);
+                }
+            }
+        } catch (const std::exception &) {
+            return;
+        }
+        for (const ZOmega &solution : level_solutions) {
+            if (!visit(solution, k)) {
+                return;
+            }
+        }
+    }
+}
+
 } // namespace RSDecomp::GridProblem

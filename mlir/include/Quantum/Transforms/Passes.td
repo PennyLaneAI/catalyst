@@ -168,12 +168,14 @@ def GridsynthPass : Pass<"gridsynth"> {
         /*CLI name=*/"method",
         /*Type=*/"::catalyst::quantum::GridsynthMethod",
         /*Default=*/"::catalyst::quantum::GridsynthMethod::Deterministic",
-        /*Description=*/desc="Synthesis method. 'mixed' matches the accuracy of 'deterministic' on average over samples.",
+        /*Description=*/desc="Synthesis method. 'mixed' and 'mixed-fallback' match the accuracy of 'deterministic' on average over samples.",
         /*Additional flags=*/additionalFlags=[{::llvm::cl::values(
             clEnumValN(::catalyst::quantum::GridsynthMethod::Deterministic, "deterministic",
                        "A single Ross-Selinger sequence per rotation."),
             clEnumValN(::catalyst::quantum::GridsynthMethod::Mixed, "mixed",
-                       "A probabilistic mixture of under- and over-rotations.")
+                       "A probabilistic mixture of under- and over-rotations."),
+            clEnumValN(::catalyst::quantum::GridsynthMethod::MixedFallback, "mixed-fallback",
+                       "A probabilistic mixture of projective rotations on an ancilla, with a mixed fallback on failure.")
         )}]>,];
 
         let dependentDialects = [

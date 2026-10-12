@@ -94,7 +94,7 @@ def test_gridsynth_specs(ppr_basis):
     assert 2.5 * np.log2(1 / eps) < t_per_rotation < 3.5 * np.log2(1 / eps)
 
 
-@pytest.mark.parametrize("method", ["deterministic", "mixed"])
+@pytest.mark.parametrize("method", ["deterministic", "mixed", "mixed-fallback"])
 @pytest.mark.parametrize("ppr_basis", [False, True])
 # Within the epsilon ranges that the resource hints are fitted on.
 @pytest.mark.parametrize("eps", [1e-4, 1e-6])
@@ -118,7 +118,37 @@ def test_gridsynth_specs_matches_runtime(eps, ppr_basis, method):
     estimated_t = estimated.quantum_operations["PPR-pi/8-w1" if ppr_basis else "T"]
     # The device reports the PPR exp(-i pi/8 P) as PauliRot(pi/4).
     executed_t = executed.quantum_operations["PauliRot-pi/4-w1" if ppr_basis else "T"]
-    assert estimated_t == pytest.approx(executed_t, rel=0.05)
+    # Device-level measurements return 0, so mixed-fallback's fallbacks, which add about 3% to the
+    # estimate, never execute.
+    assert estimated_t == pytest.approx(executed_t, rel=0.08)
+
+
+@pytest.mark.parametrize("ppr_basis", [False, True])
+def test_mixed_fallback_gridsynth_specs(ppr_basis):
+    """Test that specs counts one ancilla per rotation for the mixed fallback method, and fewer
+    T gates than for the mixed method at the same epsilon."""
+    eps = 1e-6
+
+    def t_count_and_wires(method):
+        @qp.qjit(capture=True, target="mlir")
+        @gridsynth(epsilon=eps, ppr_basis=ppr_basis, method=method)
+        @qp.qnode(qp.device("null.qubit", wires=2))
+        def circuit(x: float):
+            qp.RZ(x, 0)
+            qp.RZ(x, 1)
+            return qp.expval(qp.Z(0))
+
+        resources = qp.specs(circuit, level=1)(0.5).resources
+        return (
+            resources.quantum_operations["PPR-pi/8-w1" if ppr_basis else "T"],
+            resources.num_wires,
+        )
+
+    fallback_t, fallback_wires = t_count_and_wires("mixed-fallback")
+    mixed_t, mixed_wires = t_count_and_wires("mixed")
+    assert mixed_wires == 2
+    assert fallback_wires == 4
+    assert fallback_t < 0.6 * mixed_t
 
 
 def _mixed_circuit(op, eps, seed=None):
@@ -196,8 +226,36 @@ def test_mixed_gridsynth_different_seeds():
 
 def test_invalid_method():
     """Test that an unknown synthesis method raises an error."""
-    with pytest.raises(ValueError, match="method must be 'deterministic' or 'mixed'"):
+    with pytest.raises(ValueError, match="method must be 'deterministic', 'mixed' or"):
         gridsynth(method="rus")
+
+
+@pytest.mark.parametrize("ppr_basis", [False, True])
+def test_mixed_fallback_gridsynth_average_channel(ppr_basis):
+    """Test that samples of the mixed fallback method differ, and that their average is closer to
+    the target than individual samples."""
+    eps = 1e-2
+    param = 1.1
+    dev = qp.device("lightning.qubit", wires=1)
+
+    @qp.qnode(dev)
+    def circuit(x: float):
+        qp.Hadamard(0)
+        qp.RZ(x, wires=0)
+        return qp.state()
+
+    fallback_circuit = gridsynth(circuit, epsilon=eps, ppr_basis=ppr_basis, method="mixed-fallback")
+    qjitted_circuit = qp.qjit(fallback_circuit, capture=True, collect_decomp_rules=False)
+    expected = np.asarray(circuit(param))
+    expected_dm = np.outer(expected, expected.conj())
+
+    num_samples = 400
+    states = [np.asarray(qjitted_circuit(param)) for _ in range(num_samples)]
+    average_dm = sum(np.outer(s, s.conj()) for s in states) / num_samples
+    sample_errors = [np.linalg.norm(np.outer(s, s.conj()) - expected_dm) for s in states]
+
+    assert len({tuple(np.round(s, 8)) for s in states}) > 1
+    assert np.linalg.norm(average_dm - expected_dm) < np.mean(sample_errors)
 
 
 def test_mixed_gridsynth_ppr_basis():

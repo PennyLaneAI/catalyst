@@ -36,6 +36,14 @@
 #define MAX_SEARCH_TRIALS 10000
 #define MAX_MIXED_CANDIDATES 64
 #define ROSS_CACHE_SIZE 10000
+// Minimum success probability |u|^2 of a fallback projective rotation, and the share of the
+// diamond-norm error budget given to the projective rotations (fallbacks are rare, so they can use
+// the remainder at a much looser accuracy). These minimize the expected T-count; with 0.99 and 0.5
+// it is about 2 T gates higher.
+#define FALLBACK_SUCCESS_PROBABILITY 0.95
+#define FALLBACK_PROJECTIVE_SHARE 0.9
+#define MAX_FALLBACK_EPSILON 0.25
+#define MAX_SECTOR_LEVELS 200
 
 namespace {
 bool is_odd_multiple_of_pi_4(double angle) {
@@ -84,10 +92,14 @@ std::pair<double, ZOmega> grid_problem_frame(double angle) {
 
 /**
  * @brief Complete a grid solution `u_sol / sqrt(2)^k` to a unitary and compute its normal form.
+ *
+ * Applied first to last, the gate sequence implements [[u, -v*], [v, u*]] with u = u_sol /
+ * sqrt(2)^k. If `v_out` is given, it receives v.
  * @return The gate sequence and global phase, or std::nullopt if the norm equation has no solution.
  */
 std::optional<std::pair<std::vector<GateType>, double>>
-normal_form_from_grid_solution(const ZOmega &u_sol, int k_val, const ZOmega &scale) {
+normal_form_from_grid_solution(const ZOmega &u_sol, int k_val, const ZOmega &scale,
+                               std::complex<double> *v_out = nullptr) {
     INT_TYPE two_pow_k = INT_TYPE(1) << k_val;
     auto xi = ZSqrtTwo(two_pow_k, 0) - u_sol.norm2().to_sqrt_two();
     auto t_sol = NormSolver::solve_diophantine(xi, MAX_FACTORING_TRIALS);
@@ -97,6 +109,10 @@ normal_form_from_grid_solution(const ZOmega &u_sol, int k_val, const ZOmega &sca
 
     ZOmega u = u_sol * scale;
     ZOmega t = *t_sol * scale;
+    if (v_out) {
+        // The normal form of [[u, -t*], [t, u*]] implements its transpose, [[u, t], [-t*, u*]].
+        *v_out = -std::conj(t.to_complex()) / std::pow(M_SQRT2, k_val);
+    }
     DyadicMatrix dyd_mat(u, -t.conj(), t, u.conj(), INT_TYPE(k_val));
     SO3Matrix so3_mat(dyd_mat);
     return ma_normal_form(so3_mat);
@@ -562,21 +578,41 @@ using MixedPPRCacheValue = std::shared_ptr<const MixedSequences<PPRGateType>>;
 lru_cache<MixedCacheKey, MixedStdCacheValue, ROSS_CACHE_SIZE> mixed_cache_std;
 lru_cache<MixedCacheKey, MixedPPRCacheValue, ROSS_CACHE_SIZE> mixed_cache_ppr;
 
+MixedSequences<GateType> make_mixed_sequences(const MixedDecomposition &mixed) {
+    MixedSequences<GateType> result;
+    result.probability = mixed.probability;
+    for (size_t branch = 0; branch < 2; branch++) {
+        for (size_t twirl = 0; twirl < NUM_TWIRLS; twirl++) {
+            result.sequences[branch * NUM_TWIRLS + twirl] = {
+                twirl_sequence(mixed.gates[branch], twirl), mixed.phases[branch]};
+        }
+    }
+    return result;
+}
+
+std::pair<std::vector<PPRGateType>, double>
+sequence_to_ppr(const std::pair<std::vector<GateType>, double> &sequence) {
+    auto [ppr_gates, ppr_phase_update] = HST_to_PPR(sequence.first);
+    return {std::move(ppr_gates), sequence.second + ppr_phase_update};
+}
+
+MixedSequences<PPRGateType> mixed_sequences_to_ppr(const MixedSequences<GateType> &mixed) {
+    MixedSequences<PPRGateType> result;
+    result.probability = mixed.probability;
+    for (size_t i = 0; i < result.sequences.size(); i++) {
+        result.sequences[i] = sequence_to_ppr(mixed.sequences[i]);
+    }
+    return result;
+}
+
 MixedStdCacheValue eval_mixed_sequences(double angle, double epsilon) {
     MixedCacheKey key = {angle, epsilon};
     if (auto val_opt = mixed_cache_std.get(key); val_opt) {
         return *val_opt;
     }
 
-    MixedDecomposition mixed = eval_mixed_decomposition(angle, epsilon);
-    auto result = std::make_shared<MixedSequences<GateType>>();
-    result->probability = mixed.probability;
-    for (size_t branch = 0; branch < 2; branch++) {
-        for (size_t twirl = 0; twirl < NUM_TWIRLS; twirl++) {
-            result->sequences[branch * NUM_TWIRLS + twirl] = {
-                twirl_sequence(mixed.gates[branch], twirl), mixed.phases[branch]};
-        }
-    }
+    auto result = std::make_shared<const MixedSequences<GateType>>(
+        make_mixed_sequences(eval_mixed_decomposition(angle, epsilon)));
     mixed_cache_std.put(key, result);
     return result;
 }
@@ -587,14 +623,8 @@ MixedPPRCacheValue eval_mixed_sequences_ppr(double angle, double epsilon) {
         return *val_opt;
     }
 
-    MixedStdCacheValue std_sequences = eval_mixed_sequences(angle, epsilon);
-    auto result = std::make_shared<MixedSequences<PPRGateType>>();
-    result->probability = std_sequences->probability;
-    for (size_t i = 0; i < result->sequences.size(); i++) {
-        const auto &[gates, phase] = std_sequences->sequences[i];
-        auto [ppr_gates, ppr_phase_update] = HST_to_PPR(gates);
-        result->sequences[i] = {std::move(ppr_gates), phase + ppr_phase_update};
-    }
+    auto result = std::make_shared<const MixedSequences<PPRGateType>>(
+        mixed_sequences_to_ppr(*eval_mixed_sequences(angle, epsilon)));
     mixed_cache_ppr.put(key, result);
     return result;
 }
@@ -615,6 +645,286 @@ std::pair<std::vector<GateType>, double> eval_mixed_ross_algorithm(double angle,
 std::pair<std::vector<PPRGateType>, double>
 eval_mixed_ross_algorithm_ppr(double angle, double epsilon, double uniform_sample) {
     return select_sample(*eval_mixed_sequences_ppr(angle, epsilon), uniform_sample);
+}
+
+/**
+ * @brief Compute a mixed fallback approximation of RZ(angle) with diamond-norm accuracy epsilon.
+ *
+ * Implements the mixed fallback protocol of Kliuchnikov et al., arXiv:2203.10064, Section 3.5
+ * (Proposition 3.18 and Theorem 3.17). Each projective rotation V = [[u, -v*], [v, u*]] acts on an
+ * ancilla between two CY gates controlled by the target. Measuring the ancilla in the Z basis
+ * applies exp(i Arg(u) Z) to the target with probability |u|^2 and exp(i Arg(v) Z) otherwise
+ * (Section 3.3), in which case a mixed diagonal fallback B ~ exp(i (-angle/2 - Arg(v)) Z) follows.
+ * An under-rotating and an over-rotating projective rotation are mixed with probabilities p and
+ * 1 - p. Of the candidate pairs found, the one with the lowest expected T-count of the projective
+ * rotations is kept, as the fallbacks only add (1 - |u|^2) times their T-count.
+ */
+MixedFallbackDecomposition compute_mixed_fallback_decomposition(double angle, double epsilon) {
+    const MixedDecomposition no_fallback{
+        {std::vector<GateType>{GateType::I}, std::vector<GateType>{GateType::I}}, {0.0, 0.0}, 1.0};
+    if (is_odd_multiple_of_pi_4(angle)) {
+        // The exact diagonal V never fails.
+        auto exact = compute_clifford_T_decomposition(angle, epsilon);
+        return {{exact.first, exact.first},
+                {exact.second, exact.second},
+                {0.0, 0.0},
+                {1.0, 1.0},
+                {no_fallback, no_fallback},
+                1.0};
+    }
+
+    const double min_overlap = std::sqrt(FALLBACK_SUCCESS_PROBABILITY);
+    // Each candidate satisfies sin|Arg(u) - target|^2 <= epsilon_1 / 2 of Proposition 3.18.
+    const double projective_epsilon = FALLBACK_PROJECTIVE_SHARE * epsilon;
+    const double max_sin = std::sqrt(projective_epsilon / 2.0);
+    const std::complex<double> inverse_target = std::polar(1.0, angle / 2.0);
+    auto [grid_angle, scale] = grid_problem_frame(angle);
+
+    struct Candidate {
+        std::vector<GateType> gates;
+        double phase;
+        std::complex<double> w;
+        std::complex<double> v;
+        size_t t_count;
+    };
+    std::vector<Candidate> unders;
+    std::vector<Candidate> overs;
+
+    struct Pair {
+        size_t under;
+        size_t over;
+        double probability;
+        double diamond;
+        double cost;
+    };
+    std::optional<Pair> best;
+
+    auto evaluate = [&](size_t i, size_t j) {
+        const Candidate &under = unders[i];
+        const Candidate &over = overs[j];
+        // Equation (37): p = q2 sin(2 delta2) / (q2 sin(2 delta2) - q1 sin(2 delta1)), with
+        // q sin(2 delta) = 2 Re(w) Im(w).
+        double under_weight = under.w.real() * under.w.imag();
+        double over_weight = over.w.real() * over.w.imag();
+        double denominator = over_weight - under_weight;
+        double p = denominator > 0.0 ? over_weight / denominator : 1.0;
+        // Equation (34), with q sin(delta)^2 = Im(w)^2.
+        double diamond =
+            2.0 * (p * under.w.imag() * under.w.imag() + (1.0 - p) * over.w.imag() * over.w.imag());
+        if (diamond > projective_epsilon * (1.0 + 1e-12)) {
+            return;
+        }
+        double cost = p * under.t_count + (1.0 - p) * over.t_count;
+        if (!best || cost < best->cost) {
+            best = Pair{i, j, p, diamond, cost};
+        }
+    };
+
+    GridProblem::enumerate_sector_solutions(
+        grid_angle, std::asin(max_sin), min_overlap, MAX_SECTOR_LEVELS,
+        [&](const ZOmega &u_sol, int k_val) {
+            std::complex<double> w =
+                (u_sol * scale).to_complex() * inverse_target / std::pow(M_SQRT2, k_val);
+            if (std::abs(w) < min_overlap || w.real() <= 0.0 ||
+                std::abs(w.imag()) > std::abs(w) * max_sin) {
+                return true;
+            }
+
+            bool is_under = w.imag() <= 0.0;
+            bool is_over = w.imag() >= 0.0;
+            // Until the other side has a candidate, more candidates on a filled side cannot form
+            // a pair, so skip their (expensive) norm equation.
+            bool same_side_filled = is_under ? !unders.empty() : !overs.empty();
+            bool other_side_empty = is_under ? overs.empty() : unders.empty();
+            if (!best && !(is_under && is_over) && same_side_filled && other_side_empty) {
+                return true;
+            }
+            if (unders.size() + overs.size() >= MAX_MIXED_CANDIDATES) {
+                return false;
+            }
+            std::complex<double> v;
+            auto normal_form = normal_form_from_grid_solution(u_sol, k_val, scale, &v);
+            if (!normal_form) {
+                return true;
+            }
+            size_t t_count = count_t_gates(normal_form->first);
+            // Heuristic stop: T-counts mostly, but not strictly, grow along the search.
+            if (best && t_count > best->cost) {
+                return false;
+            }
+
+            Candidate candidate{std::move(normal_form->first), normal_form->second, w, v, t_count};
+            if (is_under) {
+                unders.push_back(candidate);
+                for (size_t j = 0; j < overs.size(); j++) {
+                    evaluate(unders.size() - 1, j);
+                }
+            }
+            if (is_over) {
+                overs.push_back(std::move(candidate));
+                for (size_t i = 0; i < unders.size(); i++) {
+                    evaluate(i, overs.size() - 1);
+                }
+            }
+            return true;
+        });
+
+    if (!best) {
+        // V = [[0, 1], [-1, 0]] always fails, which leaves the full accuracy to the fallback of
+        // RZ(angle + 2 pi) = -RZ(angle).
+        DyadicMatrix flip(ZOmega(0), ZOmega(0, 0, 0, -1), ZOmega(0, 0, 0, 1), ZOmega(0),
+                          INT_TYPE(0));
+        auto [gates, phase] = ma_normal_form(SO3Matrix(flip));
+        MixedDecomposition fallback = eval_mixed_decomposition(angle, epsilon);
+        return {{gates, gates}, {phase, phase},       {M_PI, M_PI},
+                {0.0, 0.0},     {fallback, fallback}, 1.0};
+    }
+
+    const Candidate &under = unders[best->under];
+    const Candidate &over = overs[best->over];
+    const std::array<const Candidate *, 2> chosen = {&under, &over};
+    const std::array<double, 2> weights = {best->probability, 1.0 - best->probability};
+    // Equation (36): split the remaining accuracy evenly between the two fallback terms
+    // p_k (1 - q_k) ||B_k - Z_theta||.
+    const double fallback_budget = (epsilon - best->diamond) / 2.0;
+
+    MixedFallbackDecomposition result;
+    result.probability = best->probability;
+    for (size_t branch = 0; branch < 2; branch++) {
+        const Candidate &candidate = *chosen[branch];
+        double success = std::norm(candidate.w);
+        result.projective_gates[branch] = candidate.gates;
+        result.projective_phases[branch] = candidate.phase;
+        result.failure_angles[branch] = std::arg(candidate.v);
+        result.success_probabilities[branch] = success;
+        double failure_weight = weights[branch] * (1.0 - success);
+        if (failure_weight <= 0.0) {
+            result.fallbacks[branch] = no_fallback;
+            continue;
+        }
+        // B_k ~ exp(i (-angle/2 - Arg(v)) Z) = RZ(angle + 2 Arg(v)).
+        double fallback_epsilon = std::min(fallback_budget / failure_weight, MAX_FALLBACK_EPSILON);
+        result.fallbacks[branch] =
+            eval_mixed_decomposition(angle + 2.0 * std::arg(candidate.v), fallback_epsilon);
+    }
+    return result;
+}
+
+size_t select_fallback_branch(double probability, double uniform_sample) {
+    return sample_mixed_decomposition(probability, uniform_sample).branch;
+}
+
+namespace {
+/**
+ * @brief The projective rotations of a mixed fallback decomposition and all sequences their
+ * fallbacks can apply.
+ */
+template <typename Gate> struct FallbackSequences {
+    double probability;
+    std::array<std::pair<std::vector<Gate>, double>, 2> projective;
+    std::array<MixedSequences<Gate>, 2> recovery;
+};
+
+using FallbackStdCacheValue = std::shared_ptr<const FallbackSequences<GateType>>;
+using FallbackPPRCacheValue = std::shared_ptr<const FallbackSequences<PPRGateType>>;
+lru_cache<MixedCacheKey, FallbackStdCacheValue, ROSS_CACHE_SIZE> fallback_cache_std;
+lru_cache<MixedCacheKey, FallbackPPRCacheValue, ROSS_CACHE_SIZE> fallback_cache_ppr;
+
+FallbackStdCacheValue eval_fallback_sequences(double angle, double epsilon) {
+    MixedCacheKey key = {angle, epsilon};
+    if (auto val_opt = fallback_cache_std.get(key); val_opt) {
+        return *val_opt;
+    }
+
+    MixedFallbackDecomposition decomposition = compute_mixed_fallback_decomposition(angle, epsilon);
+    auto result = std::make_shared<FallbackSequences<GateType>>();
+    result->probability = decomposition.probability;
+    for (size_t branch = 0; branch < 2; branch++) {
+        result->projective[branch] = {decomposition.projective_gates[branch],
+                                      decomposition.projective_phases[branch]};
+        result->recovery[branch] = make_mixed_sequences(decomposition.fallbacks[branch]);
+    }
+    fallback_cache_std.put(key, result);
+    return result;
+}
+
+FallbackPPRCacheValue eval_fallback_sequences_ppr(double angle, double epsilon) {
+    MixedCacheKey key = {angle, epsilon};
+    if (auto val_opt = fallback_cache_ppr.get(key); val_opt) {
+        return *val_opt;
+    }
+
+    FallbackStdCacheValue std_sequences = eval_fallback_sequences(angle, epsilon);
+    auto result = std::make_shared<FallbackSequences<PPRGateType>>();
+    result->probability = std_sequences->probability;
+    for (size_t branch = 0; branch < 2; branch++) {
+        result->projective[branch] = sequence_to_ppr(std_sequences->projective[branch]);
+        result->recovery[branch] = mixed_sequences_to_ppr(std_sequences->recovery[branch]);
+    }
+    fallback_cache_ppr.put(key, result);
+    return result;
+}
+
+template <typename Gate>
+const std::pair<std::vector<Gate>, double> &
+select_projective(const FallbackSequences<Gate> &fallback, double uniform_sample) {
+    return fallback.projective[select_fallback_branch(fallback.probability, uniform_sample)];
+}
+
+template <typename Gate>
+std::pair<std::vector<Gate>, double> select_recovery(const FallbackSequences<Gate> &fallback,
+                                                     double uniform_sample,
+                                                     double recovery_sample) {
+    size_t branch = select_fallback_branch(fallback.probability, uniform_sample);
+    return select_sample(fallback.recovery[branch], recovery_sample);
+}
+
+void warn_small_fallback_epsilon(double epsilon) {
+    if (std::sqrt(FALLBACK_PROJECTIVE_SHARE * epsilon / 2.0) < 1e-6) {
+        std::ostringstream oss;
+        oss << std::scientific << epsilon;
+        RT_WARN("Mixed fallback gridsynth received diamond-norm epsilon=" + oss.str() +
+                ", for which the projective rotation search accuracy falls below 1e-6. Results "
+                "may be inaccurate, or errors may occur during decomposition. To guarantee "
+                "correctness, please provide a larger epsilon value.");
+    }
+}
+
+template <typename Sequence>
+void fill_gates(size_t *data_aligned, size_t offset, size_t size0, size_t stride0,
+                const Sequence &gates) {
+    const size_t sizes[1] = {size0};
+    const size_t strides[1] = {stride0};
+    DataView<size_t, 1> gates_view(data_aligned, offset, sizes, strides);
+    RT_FAIL_IF(gates_view.size() < gates.size(), "Error: memref allocated too small for gates.\n")
+    for (size_t i = 0; i < gates.size(); ++i) {
+        gates_view(i) = static_cast<size_t>(gates[i]);
+    }
+}
+} // namespace
+
+std::pair<std::vector<GateType>, double> eval_fallback_projective(double angle, double epsilon,
+                                                                  double uniform_sample) {
+    return select_projective(*eval_fallback_sequences(angle, epsilon), uniform_sample);
+}
+
+std::pair<std::vector<PPRGateType>, double>
+eval_fallback_projective_ppr(double angle, double epsilon, double uniform_sample) {
+    return select_projective(*eval_fallback_sequences_ppr(angle, epsilon), uniform_sample);
+}
+
+std::pair<std::vector<GateType>, double> eval_fallback_recovery(double angle, double epsilon,
+                                                                double uniform_sample,
+                                                                double recovery_sample) {
+    return select_recovery(*eval_fallback_sequences(angle, epsilon), uniform_sample,
+                           recovery_sample);
+}
+
+std::pair<std::vector<PPRGateType>, double> eval_fallback_recovery_ppr(double angle, double epsilon,
+                                                                       double uniform_sample,
+                                                                       double recovery_sample) {
+    return select_recovery(*eval_fallback_sequences_ppr(angle, epsilon), uniform_sample,
+                           recovery_sample);
 }
 
 // Extern C implementation
@@ -782,6 +1092,104 @@ double rs_mixed_decomposition_get_phase(double theta, double epsilon, bool ppr_b
         return eval_mixed_ross_algorithm_ppr(theta, epsilon, uniform_sample).second;
     }
     return eval_mixed_ross_algorithm(theta, epsilon, uniform_sample).second;
+}
+
+/**
+ * @brief Returns the length of the sampled projective rotation of a mixed fallback decomposition.
+ *
+ * The `rs_fallback_projective_*` and `rs_fallback_recovery_*` functions are deterministic in their
+ * samples, so calling them with the same samples refers to the same sequences.
+ *
+ * @param theta Angle
+ * @param epsilon Diamond-norm error of the mixed fallback channel
+ * @param ppr_basis Whether to use PPR basis
+ * @param uniform_sample Uniform random number in [0, 1) selecting the projective rotation
+ */
+size_t rs_fallback_projective_get_size(double theta, double epsilon, bool ppr_basis,
+                                       double uniform_sample) {
+    warn_small_fallback_epsilon(epsilon);
+    if (ppr_basis) {
+        return eval_fallback_projective_ppr(theta, epsilon, uniform_sample).first.size();
+    }
+    return eval_fallback_projective(theta, epsilon, uniform_sample).first.size();
+}
+
+/**
+ * @brief Fills a pre-allocated memref with the sampled projective rotation sequence.
+ *
+ * The memref is unpacked into individual arguments, as in `rs_decomposition_get_gates`.
+ */
+void rs_fallback_projective_get_gates([[maybe_unused]] size_t *data_allocated, size_t *data_aligned,
+                                      size_t offset, size_t size0, size_t stride0, double theta,
+                                      double epsilon, bool ppr_basis, double uniform_sample) {
+    if (ppr_basis) {
+        fill_gates(data_aligned, offset, size0, stride0,
+                   eval_fallback_projective_ppr(theta, epsilon, uniform_sample).first);
+    } else {
+        fill_gates(data_aligned, offset, size0, stride0,
+                   eval_fallback_projective(theta, epsilon, uniform_sample).first);
+    }
+}
+
+/**
+ * @brief Returns the global phase of the sampled projective rotation sequence.
+ */
+double rs_fallback_projective_get_phase(double theta, double epsilon, bool ppr_basis,
+                                        double uniform_sample) {
+    if (ppr_basis) {
+        return eval_fallback_projective_ppr(theta, epsilon, uniform_sample).second;
+    }
+    return eval_fallback_projective(theta, epsilon, uniform_sample).second;
+}
+
+/**
+ * @brief Returns the length of the sampled fallback sequence, applied when the projective rotation
+ * selected by `uniform_sample` fails.
+ *
+ * @param theta Angle
+ * @param epsilon Diamond-norm error of the mixed fallback channel
+ * @param ppr_basis Whether to use PPR basis
+ * @param uniform_sample Uniform random number in [0, 1) selecting the projective rotation
+ * @param recovery_sample Uniform random number in [0, 1) selecting the branch and twirl of the
+ * mixed diagonal fallback
+ */
+size_t rs_fallback_recovery_get_size(double theta, double epsilon, bool ppr_basis,
+                                     double uniform_sample, double recovery_sample) {
+    if (ppr_basis) {
+        return eval_fallback_recovery_ppr(theta, epsilon, uniform_sample, recovery_sample)
+            .first.size();
+    }
+    return eval_fallback_recovery(theta, epsilon, uniform_sample, recovery_sample).first.size();
+}
+
+/**
+ * @brief Fills a pre-allocated memref with the sampled fallback sequence.
+ *
+ * The memref is unpacked into individual arguments, as in `rs_decomposition_get_gates`.
+ */
+void rs_fallback_recovery_get_gates([[maybe_unused]] size_t *data_allocated, size_t *data_aligned,
+                                    size_t offset, size_t size0, size_t stride0, double theta,
+                                    double epsilon, bool ppr_basis, double uniform_sample,
+                                    double recovery_sample) {
+    if (ppr_basis) {
+        fill_gates(
+            data_aligned, offset, size0, stride0,
+            eval_fallback_recovery_ppr(theta, epsilon, uniform_sample, recovery_sample).first);
+    } else {
+        fill_gates(data_aligned, offset, size0, stride0,
+                   eval_fallback_recovery(theta, epsilon, uniform_sample, recovery_sample).first);
+    }
+}
+
+/**
+ * @brief Returns the global phase of the sampled fallback sequence.
+ */
+double rs_fallback_recovery_get_phase(double theta, double epsilon, bool ppr_basis,
+                                      double uniform_sample, double recovery_sample) {
+    if (ppr_basis) {
+        return eval_fallback_recovery_ppr(theta, epsilon, uniform_sample, recovery_sample).second;
+    }
+    return eval_fallback_recovery(theta, epsilon, uniform_sample, recovery_sample).second;
 }
 
 } // extern "C"

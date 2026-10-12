@@ -839,14 +839,17 @@ def gridsynth_setup_inputs(epsilon=1e-4, ppr_basis=False, method="deterministic"
         qnode (QNode): the QNode to apply the gridsynth compiler pass to
         epsilon (float): The accuracy per rotation gate. Defaults to ``1e-4``. With
             ``"deterministic"``, each rotation has operator norm error at most ``epsilon``.
-            ``"mixed"`` matches this accuracy on average over samples.
+            ``"mixed"`` and ``"mixed-fallback"`` match this accuracy on average over samples.
         ppr_basis (bool): If true, decompose directly to Pauli Product Rotations (PPRs) in PBC dialect. Defaults to ``False``
         method (str): The synthesis method. ``"deterministic"`` (default) applies a single
             Ross-Selinger gate sequence per rotation. ``"mixed"`` applies, per execution, one of
             two {Z, S}-twirled sequences that under- and over-rotate the target, which roughly
             halves the T-count at the same accuracy. This is the mixed diagonal approximation of
             Kliuchnikov et al., Section 3.4 (Proposition 3.13), in
-            `arXiv:2203.10064 <https://arxiv.org/abs/2203.10064>`__.
+            `arXiv:2203.10064 <https://arxiv.org/abs/2203.10064>`__. ``"mixed-fallback"``
+            applies one of two projective rotations on an ancilla qubit, followed by a mixed
+            diagonal fallback if measuring the ancilla signals failure, which roughly halves the
+            T-count again (Section 3.5, Proposition 3.18).
 
     Returns:
         :class:`QNode <pennylane.QNode>`
@@ -858,11 +861,17 @@ def gridsynth_setup_inputs(epsilon=1e-4, ppr_basis=False, method="deterministic"
 
     .. note::
 
-        With ``method="mixed"``, the accuracy guarantee holds on average over calls. Each call
-        samples one sequence per rotation, shared by all its shots, with error of order
-        :math:`\sqrt{\epsilon}`. Samples are drawn from the runtime random number generator seeded
-        by the ``seed`` argument of :func:`~.qjit`, so with a fixed seed every call repeats the
-        same samples.
+        With ``method="mixed"`` or ``method="mixed-fallback"``, the accuracy guarantee holds on
+        average over calls. Each call samples one sequence per rotation, shared by all its shots,
+        with error of order :math:`\sqrt{\epsilon}`. Samples are drawn from the runtime random
+        number generator seeded by the ``seed`` argument of :func:`~.qjit`, so with a fixed seed
+        every call repeats the same samples.
+
+    .. note::
+
+        With ``method="mixed-fallback"``, each rotation allocates, measures and releases one
+        ancilla qubit. Resource estimates count every allocation, so they report one additional
+        wire per rotation.
 
     **Example**
 
@@ -927,8 +936,10 @@ def gridsynth_setup_inputs(epsilon=1e-4, ppr_basis=False, method="deterministic"
 
 
     """
-    if method not in ("deterministic", "mixed"):
-        raise ValueError(f"method must be 'deterministic' or 'mixed'. Got {method!r}.")
+    if method not in ("deterministic", "mixed", "mixed-fallback"):
+        raise ValueError(
+            f"method must be 'deterministic', 'mixed' or 'mixed-fallback'. Got {method!r}."
+        )
     return (), {"epsilon": epsilon, "ppr_basis": ppr_basis, "method": method}
 
 
