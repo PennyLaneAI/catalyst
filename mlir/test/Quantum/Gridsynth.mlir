@@ -299,3 +299,62 @@ func.func @test_controlled_rz_error(%q: !quantum.bit, %c: !quantum.bit, %x: f64)
     %out, %cout = quantum.custom "RZ"(%x) %q ctrls(%c) ctrlvals(%true) : !quantum.bit ctrls !quantum.bit
     return %out, %cout : !quantum.bit, !quantum.bit
 }
+
+// -----
+
+// Adjoint rotations are discretized with the negated angle.
+
+// CHECK-LABEL: @test_adjoint_rz_decomposition
+// CHECK-SAME: ([[Q_IN:%.+]]: !quantum.bit, [[THETA:%.+]]: f64)
+func.func @test_adjoint_rz_decomposition(%arg0: !quantum.bit, %theta: f64) -> !quantum.bit {
+    // CHECK: [[NEG:%.+]] = arith.negf [[THETA]]
+    // CLIFFORD: [[RES:%.+]]:2 = call @__catalyst_decompose_RZ([[Q_IN]], [[NEG]])
+    // PPR:      [[RES:%.+]]:2 = call @__catalyst_decompose_RZ_ppr_basis([[Q_IN]], [[NEG]])
+    // CHECK: quantum.gphase([[RES]]#1)
+    %q_out = quantum.custom "RZ"(%theta) %arg0 adj : !quantum.bit
+    return %q_out : !quantum.bit
+}
+
+// -----
+
+// CHECK-LABEL: @test_adjoint_phaseshift_decomposition
+// CHECK-SAME: ([[Q_IN:%.+]]: !quantum.bit, [[THETA:%.+]]: f64)
+func.func @test_adjoint_phaseshift_decomposition(%arg0: !quantum.bit, %theta: f64) -> !quantum.bit {
+    // CHECK: [[NEG:%.+]] = arith.negf [[THETA]]
+    // CLIFFORD: [[RES:%.+]]:2 = call @__catalyst_decompose_RZ([[Q_IN]], [[NEG]])
+    // PPR:      [[RES:%.+]]:2 = call @__catalyst_decompose_RZ_ppr_basis([[Q_IN]], [[NEG]])
+    // CHECK: [[HALF:%.+]] = arith.divf [[NEG]]
+    // CHECK: [[PHASE:%.+]] = arith.subf [[RES]]#1, [[HALF]]
+    // CHECK: quantum.gphase([[PHASE]])
+    %q_out = quantum.custom "PhaseShift"(%theta) %arg0 adj : !quantum.bit
+    return %q_out : !quantum.bit
+}
+
+// -----
+
+// Rotations inside adjoint and control regions are not supported.
+
+func.func @test_adjoint_region_error(%r: !quantum.reg, %x: f64) -> !quantum.reg {
+    %out = quantum.adjoint(%r) : !quantum.reg {
+    ^bb0(%arg0: !quantum.reg):
+        %q = quantum.extract %arg0[0] : !quantum.reg -> !quantum.bit
+        // expected-error @+1 {{Unsupported rotation inside an adjoint or control region for gridsynth}}
+        %q1 = quantum.custom "RZ"(%x) %q : !quantum.bit
+        %r1 = quantum.insert %arg0[0], %q1 : !quantum.reg, !quantum.bit
+        quantum.yield %r1 : !quantum.reg
+    }
+    return %out : !quantum.reg
+}
+
+// -----
+
+func.func @test_ctrl_region_error(%c: !quantum.bit, %q: !quantum.bit, %x: f64) -> (!quantum.bit, !quantum.bit) {
+    %true = arith.constant true
+    %outc, %outq = quantum.ctrl(%c) ctrlvals(%true) (%q) : !quantum.bit -> !quantum.bit {
+    ^bb0(%arg0: !quantum.bit):
+        // expected-error @+1 {{Unsupported rotation inside an adjoint or control region for gridsynth}}
+        %q1 = quantum.custom "RZ"(%x) %arg0 : !quantum.bit
+        quantum.yield %q1 : !quantum.bit
+    }
+    return %outc, %outq : !quantum.bit, !quantum.bit
+}

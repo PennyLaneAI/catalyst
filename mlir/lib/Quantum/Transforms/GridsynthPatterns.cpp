@@ -464,6 +464,11 @@ struct DecomposeCustomOpPattern : public OpRewritePattern<CustomOp> {
         ModuleOp mod = op->getParentOfType<ModuleOp>();
         Location loc = op.getLoc();
 
+        // RZ(theta)^dagger = RZ(-theta) and PhaseShift(phi)^dagger = PhaseShift(-phi).
+        if (op.getAdjoint()) {
+            angle = arith::NegFOp::create(rewriter, loc, angle);
+        }
+
         func::FuncOp decompFunc = getOrCreateDecompositionFunc(mod, rewriter, epsilon, pprBasis);
 
         // Call the function using the qubit directly

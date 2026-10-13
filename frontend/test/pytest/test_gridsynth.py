@@ -18,6 +18,8 @@ import numpy as np
 import pennylane as qp
 import pytest
 
+from catalyst.utils.exceptions import CompileError
+
 
 @pytest.mark.parametrize(
     "param",
@@ -42,6 +44,44 @@ def test_PhaseShift_gridsynth(param, op, eps):
     result = qjitted_circuit(param)
 
     assert qp.math.allclose(result, expected, atol=eps)
+
+
+@pytest.mark.parametrize("param", [-2.2, 0.3, 1.1])
+@pytest.mark.parametrize("op", [qp.RZ, qp.PhaseShift])
+def test_adjoint_gridsynth(param, op):
+    """Test that adjoint rotations are discretized as the inverse rotation."""
+    eps = 1e-6
+    dev = qp.device("lightning.qubit", wires=1)
+
+    @qp.qnode(dev)
+    def circuit(x: float):
+        qp.Hadamard(0)
+        qp.adjoint(op(x, wires=0))
+        return qp.state()
+
+    expected = circuit(param)
+    gridsynthed_circuit = qp.transforms.gridsynth(circuit, epsilon=eps)
+    qjitted_circuit = qp.qjit(gridsynthed_circuit, capture=True, collect_decomp_rules=False)
+    assert qp.math.allclose(qjitted_circuit(param), expected, atol=eps)
+
+
+@pytest.mark.parametrize("region", [qp.adjoint, lambda fn: qp.ctrl(fn, control=1)])
+def test_gridsynth_region_error(region):
+    """Test that gridsynth raises an error for rotations inside adjoint and control regions."""
+    dev = qp.device("lightning.qubit", wires=2)
+
+    def rotation(x):
+        qp.RZ(x, 0)
+
+    @qp.qnode(dev)
+    def circuit(x: float):
+        region(rotation)(x)
+        return qp.state()
+
+    with pytest.raises(CompileError, match="Unsupported rotation inside an adjoint or control"):
+        qp.qjit(
+            qp.transforms.gridsynth(circuit, epsilon=1e-6), capture=True, collect_decomp_rules=False
+        )(0.7)
 
 
 @pytest.mark.parametrize(

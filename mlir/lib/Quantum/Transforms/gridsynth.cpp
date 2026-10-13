@@ -22,8 +22,11 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #include "PBC/IR/PBCDialect.h"
+#include "PBC/IR/PBCOps.h"
 #include "Quantum/IR/QuantumOps.h"
 #include "Quantum/Transforms/Patterns.h"
+
+#include "GraphDecomposition/DecompUtils.hpp"
 
 using namespace llvm;
 using namespace mlir;
@@ -44,16 +47,32 @@ struct GridsynthPass : impl::GridsynthPassBase<GridsynthPass> {
         mlir::MLIRContext *context = &getContext();
         RewritePatternSet patterns(context);
 
-        WalkResult controlledRotation = module->walk([](CustomOp op) {
-            StringRef gateName = op.getGateName();
-            if ((gateName == "RZ" || gateName == "PhaseShift") && !op.getInCtrlQubits().empty()) {
-                op.emitError("Unsupported controlled gate for gridsynth. Only single-qubit RZ and "
-                             "PhaseShift gates can be discretized.");
+        WalkResult unsupportedRotation = module->walk([](Operation *op) {
+            auto customOp = dyn_cast<CustomOp>(op);
+            auto pprOp = dyn_cast<pbc::PPRotationArbitraryOp>(op);
+            bool isRotation =
+                (customOp &&
+                 (customOp.getGateName() == "RZ" || customOp.getGateName() == "PhaseShift")) ||
+                (pprOp && !pprOp.getCondition() && pprOp.getPauliProduct().size() == 1 &&
+                 cast<StringAttr>(pprOp.getPauliProduct()[0]).getValue() == "Z");
+            // Decomposition rules are templates for graph decomposition, not part of the circuit.
+            if (!isRotation || DecompUtils::isInDecompRule(op)) {
+                return WalkResult::advance();
+            }
+            if (customOp && !customOp.getInCtrlQubits().empty()) {
+                op->emitError("Unsupported controlled gate for gridsynth. Only single-qubit RZ and "
+                              "PhaseShift gates can be discretized.");
+                return WalkResult::interrupt();
+            }
+            // The lowering of adjoint and control regions cannot transform the discretization.
+            if (op->getParentOfType<AdjointOp>() || op->getParentOfType<CtrlOp>()) {
+                op->emitError("Unsupported rotation inside an adjoint or control region for "
+                              "gridsynth. Decompose the region into single-qubit rotations first.");
                 return WalkResult::interrupt();
             }
             return WalkResult::advance();
         });
-        if (controlledRotation.wasInterrupted()) {
+        if (unsupportedRotation.wasInterrupted()) {
             return signalPassFailure();
         }
 
