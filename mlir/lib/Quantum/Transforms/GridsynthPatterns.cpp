@@ -337,9 +337,6 @@ struct DecompositionExternalFuncs {
 /**
  * @brief Declare the runtime functions `<prefix>get_size`, `<prefix>get_gates` and
  * `<prefix>get_phase` returning a gate sequence.
- *
- * After (angle, epsilon, ppr_basis), they take `numSamples` f64 uniform samples selecting the
- * sequence.
  */
 DecompositionExternalFuncs getOrDeclareExternalFuncs(PatternRewriter &rewriter, func::FuncOp func,
                                                      StringRef prefix, unsigned numSamples) {
@@ -349,6 +346,7 @@ DecompositionExternalFuncs getOrDeclareExternalFuncs(PatternRewriter &rewriter, 
     auto rankedMemRefType = MemRefType::get({ShapedType::kDynamic}, indexType);
 
     SmallVector<Type> scalarArgs = {f64Type, f64Type, i1Type};
+    // Uniform samples selecting the sequence.
     scalarArgs.append(numSamples, f64Type);
     SmallVector<Type> gatesArgs = {rankedMemRefType};
     gatesArgs.append(scalarArgs.begin(), scalarArgs.end());
