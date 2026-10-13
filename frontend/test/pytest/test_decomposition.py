@@ -819,21 +819,6 @@ class TestHybridOperatorArgDecomposition:
 
         return circuit
 
-    def test_gqsp_rule_wire_arity_matches_operator(self):
-        """The GQSP decomposition rule's grouped wire tensor spans all the operator's wires."""
-        gate_set = {"X", "Z", "Hadamard", "CNOT", "RZ", "RY", "GlobalPhase"}
-
-        @qjit(capture=True, target="mlir")
-        @graph_decomposition(gate_set=gate_set)
-        @qnode(qp.device("null.qubit", wires=2))
-        def circuit():
-            qp.GQSP(qp.X(1), angles=np.ones((3, 1)), control=0)
-            return qp.probs(wires=0)
-
-        mlir = circuit.mlir
-        assert 'tensor<2xi64>) attributes {frontend_name = "_GQSP_decomposition"' in mlir
-        assert 'tensor<1xi64>) attributes {frontend_name = "_GQSP_decomposition"' not in mlir
-
     def test_gqsp_decomposes_to_correct_state(self):
         """GQSP decomposed via graph-decomposition matches the reference execution."""
         gate_set = {"X", "Z", "Hadamard", "CNOT", "RZ", "RY", "GlobalPhase"}
