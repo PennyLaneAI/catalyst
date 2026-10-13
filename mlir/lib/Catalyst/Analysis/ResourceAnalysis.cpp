@@ -89,9 +89,9 @@ ResourceAnalysis::ResourceAnalysis(ModuleOp moduleOp,
                                    ArrayRef<ExtensionProvider> extensionProviders,
                                    bool collectDetailedOperations,
                                    DecompGraph::Core::GraphResult *graphResult,
-                                   const DecompGraph::Core::WeightedGateset *gateset)
+                                   std::unique_ptr<DecompGraph::Solver::DecompositionGraph> graph)
     : collectDetailedOperations(collectDetailedOperations), graphResult(graphResult),
-      gateset(gateset) {
+      graph(std::move(graph)) {
     extensionAnalyses.reserve(extensionProviders.size());
     for (const auto &provider : extensionProviders) {
         extensionAnalyses.push_back(provider());
@@ -483,13 +483,13 @@ void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result, b
         } else if (nCtrlQubits > 1) {
             name = std::to_string(nCtrlQubits) + "C(" + name + ")";
         }
-
+        DecompGraph::Core::WeightedGateset gateset = graph ? graph->getGateset() : DecompGraph::Core::WeightedGateset();
         // if the op is in the graph and not in the gateset that means it has been decomposed
         // Go through the graph's decomp rule for the op, and the basis counts for the op,
         // which is the target gate set which the op decomposes into. And accumulate the counts for
         // the target gate set.
-        if (graphResult && graphOp != graphResult->end() && gateset &&
-            !gateset->contains(operatorNode)) {
+        if (graphResult && graphOp != graphResult->end() && gateset.ops.size() > 0 &&
+            !gateset.contains(operatorNode)) {
             const DecompGraph::Core::ChosenDecompRule &chosenRule = graphOp->second;
             for (const auto &[basisOp, count] : chosenRule.basisCounts) {
                 result.operations[basisOp.name][{basisOp.numWires, basisOp.numParams}] += count;

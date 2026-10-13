@@ -449,7 +449,7 @@ def handle_transform(
     pl_tkwargs = _tuple_to_dict(tkwargs)
 
     # qp.decompose is routed to the graph-decomposition pass (see _handle_decompose_transform).
-    if transform == pl_decompose or transform.pass_name == "resource-analysis":
+    if transform == pl_decompose or (transform.pass_name == "resource-analysis" and pl_tkwargs.get("gate_set") is not None):
     # if transform == pl_decompose:
         x = _handle_decompose_transform(self, inner_jaxpr, consts, non_const_args, pl_tkwargs)
         return x

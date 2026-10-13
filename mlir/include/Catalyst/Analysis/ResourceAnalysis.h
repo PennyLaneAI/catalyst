@@ -25,6 +25,7 @@
 #include "PBC/IR/PBCOps.h"
 
 #include "DGTypes.hpp"
+#include "DGBuilder.hpp"
 
 using namespace mlir;
 
@@ -40,7 +41,7 @@ class ResourceAnalysis {
                               ArrayRef<ExtensionProvider> extensionProviders = {},
                               bool collectDetailedOperations = false,
                               DecompGraph::Core::GraphResult *graphResult = nullptr,
-                              const DecompGraph::Core::WeightedGateset *gateset = nullptr);
+                              std::unique_ptr<DecompGraph::Solver::DecompositionGraph> graph = nullptr);
     explicit ResourceAnalysis(func::FuncOp funcOp,
                               ArrayRef<ExtensionProvider> extensionProviders = {},
                               bool collectDetailedOperations = false);
@@ -64,7 +65,8 @@ class ResourceAnalysis {
     bool collectDetailedOperations;
 
     DecompGraph::Core::GraphResult *graphResult;
-    const DecompGraph::Core::WeightedGateset *gateset;
+    std::unique_ptr<DecompGraph::Solver::DecompositionGraph> graph;
+    // const DecompGraph::Core::WeightedGateset *gateset;
 
     // per-function resource counts
     llvm::StringMap<ResourceResult> funcResults;

@@ -72,9 +72,9 @@ struct ResourceAnalysisPass : public impl::ResourceAnalysisPassBase<ResourceAnal
         pbc::registerPBCResourceAnalysisExtensions();
 
         auto moduleOp = cast<ModuleOp>(getOperation());
-        DecompGraph::Core::GraphResult *graphResult = nullptr;
-        const DecompGraph::Core::WeightedGateset *gateset = nullptr;
-        GraphResult solution;
+        // const DecompGraph::Core::WeightedGateset *gateset = nullptr;
+        // GraphResult solution;
+        std::optional<GraphResult> solution;
         // Keep `graph` alive for as long as `gateset` points into it.
         std::unique_ptr<DecompositionGraph> graph;
 
@@ -100,13 +100,12 @@ struct ResourceAnalysisPass : public impl::ResourceAnalysisPassBase<ResourceAnal
             }
 
             DecompositionSolver solver(*graph);
-            solution = solver.solve();
-            graphResult = &solution;
-            gateset = &graph->getGateset();
+            solution = std::make_optional(solver.solve());
+            // gateset = &graph->getGateset();
         }
 
         ResourceAnalysis analysis(moduleOp, ResourceAnalysisRegistry::get().all(),
-                                  /*collectDetailedOperations=*/false, graphResult, gateset);
+                                  /*collectDetailedOperations=*/false, solution ? &solution.value() : nullptr, std::move(graph));
         const auto &results = analysis.getResults();
 
         // Populate statistics from the entry function. The flattened view
