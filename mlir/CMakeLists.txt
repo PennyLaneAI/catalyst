@@ -41,6 +41,7 @@ set(MLIR_BINARY_DIR ${CMAKE_BINARY_DIR})
 list(APPEND CMAKE_MODULE_PATH "${MLIR_CMAKE_DIR}")
 list(APPEND CMAKE_MODULE_PATH "${LLVM_CMAKE_DIR}")
 list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake/modules")
+list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/../cmake")  # shared with runtime/
 
 
 # Discover stablehlo libraries and bundle them into a cmake target for catalyst to link to
@@ -146,34 +147,12 @@ FetchContent_MakeAvailable(tomlplusplus)
 ## Catalyst Version ##
 ######################
 
-set(CATALYST_VERSION_PY_FILE "${PROJECT_SOURCE_DIR}/../frontend/catalyst/_version.py")
-
-# Extracts __version__ from frontend/catalyst/_version.py into ${out_var} in the
-# caller's scope, or "unknown" (with a warning) if it cannot be read.
-function(read_catalyst_version input_file out_var)
-    set(version_number "unknown")
-    if (NOT EXISTS ${input_file})
-        message(WARNING "Could not find ${input_file}")
-    else()
-        file(READ ${input_file} input_content)
-        if (NOT input_content MATCHES "__version__ = \"([^\"]+)\"")
-            message(WARNING "Could not find Catalyst version in ${input_file}")
-        else()
-            set(version_number "${CMAKE_MATCH_1}")
-        endif()
-    endif()
-    set(${out_var} "${version_number}" PARENT_SCOPE)
-endfunction(read_catalyst_version)
+include(ReadCatalystVersion)
 
 # Read here, in the top-level scope, rather than in a subdirectory: variables set
 # inside an add_subdirectory() scope do not propagate back up, and the CPack
 # configuration at the bottom of this file needs the version.
-read_catalyst_version("${CATALYST_VERSION_PY_FILE}" CATALYST_PACKAGE_VERSION)
-if (CATALYST_PACKAGE_VERSION STREQUAL "unknown")
-    message(FATAL_ERROR
-        "Failed to read Catalyst package version from ${CATALYST_VERSION_PY_FILE}")
-endif()
-message(STATUS "Found Catalyst package version: ${CATALYST_PACKAGE_VERSION}")
+require_catalyst_version(CATALYST_PACKAGE_VERSION)
 
 ################################################################################
 ## Generate frontend_catalyst_version_py.h from frontend/catalyst/_version.py ##
