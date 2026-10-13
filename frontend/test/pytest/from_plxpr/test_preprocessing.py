@@ -670,6 +670,49 @@ class TestIntegration:
                     in str(w.message)
                 )
 
+    def test_insertion_of_device_and_post_device_transforms(self):
+        """
+        Integration test that checks for modification of the IR caused by
+        insertion of device and post-device transforms.
+        """
+
+        # Create a device s.t split to single terms (Device Preprocessing) is
+        dev = CapabilitiesDevice(wires=2)
+        dev.capabilities = DeviceCapabilities(
+            non_commuting_observables=True,
+            observables={
+                "PauliX": OperatorProperties(),
+                "PauliY": OperatorProperties(),
+                "PauliZ": OperatorProperties(),
+                "Hadamard": OperatorProperties(),
+            },
+            measurement_processes={"ExpectationMP": [], "SampleMP": [], "CountsMP": []},
+        )
+
+        # Device Preprocessing should perform split to single terms
+        @qp.qjit(capture=True, collect_decomp_rules=False)
+        @qp.qnode(dev)
+        def circuit(x):
+            qp.Hadamard(wires=0)
+            qp.Hadamard(wires=0)
+            return qp.expval(qp.sum(qp.H(0), qp.Z(1)))
+
+        # This is the expected approach to insert a post-device transform into the pipeline
+        circuit.original_function._post_device_pipeline = qp.CompilePipeline(
+            qp.transforms.cancel_inverses
+        )
+
+        # JIT compile the circuit
+        _ = circuit(0.1)
+
+        # cancel_inverses (device)
+        assert "Hadamard" in circuit.mlir
+        assert "Hadamard" not in circuit.mlir_opt
+
+        # split_to_single_terms (post-device)
+        assert "hamiltonian" in circuit.mlir
+        assert "Hamiltonian" not in circuit.mlir_opt
+
 
 if __name__ == "__main__":
     pytest.main(["-x", __file__])
