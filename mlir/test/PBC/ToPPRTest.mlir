@@ -333,3 +333,43 @@ func.func @test_negative_and_adjoint_ppr_operators(%q0 : !quantum.bit) {
     // CHECK: return
     func.return
 }
+
+// -----
+
+func.func @test_ppr_operator_missing_sign(%q0 : !quantum.bit) {
+    // expected-error @+2 {{failed to legalize operation 'quantum.operator' that was explicitly marked illegal}}
+    // expected-error @+1 {{PPR operators require static_data with a string 'pauli_word' and an integer 'sign'}}
+    %0 = quantum.operator "PPR_4"() qubits(%q0)
+        static_data = {pauli_word = "Z"}
+    func.return
+}
+
+// -----
+
+func.func @test_ppr_operator_bool_sign(%q0 : !quantum.bit) {
+    // expected-error @+2 {{failed to legalize operation 'quantum.operator' that was explicitly marked illegal}}
+    // expected-error @+1 {{PPR operators require static_data with a string 'pauli_word' and an integer 'sign'}}
+    %0 = quantum.operator "PPR_4"() qubits(%q0)
+        static_data = {sign = true, pauli_word = "Z"}
+    func.return
+}
+
+// -----
+
+func.func @test_ppr_operator_float_sign(%q0 : !quantum.bit) {
+    // expected-error @+2 {{failed to legalize operation 'quantum.operator' that was explicitly marked illegal}}
+    // expected-error @+1 {{PPR operators require static_data with a string 'pauli_word' and an integer 'sign'}}
+    %0 = quantum.operator "PPR_8"() qubits(%q0)
+        static_data = {sign = 1.0 : f64, pauli_word = "Z"}
+    func.return
+}
+
+// -----
+
+func.func @test_ppr_operator_invalid_sign(%q0 : !quantum.bit) {
+    // expected-error @+2 {{failed to legalize operation 'quantum.operator' that was explicitly marked illegal}}
+    // expected-error @+1 {{PPR operators require a sign of 1 or -1, but got 2}}
+    %0 = quantum.operator "PPR_2"() qubits(%q0)
+        static_data = {sign = 2 : i64, pauli_word = "Z"}
+    func.return
+}

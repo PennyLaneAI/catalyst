@@ -442,10 +442,24 @@ std::optional<int8_t> getPPROperatorDenominator(OperatorOp op) {
 
 LogicalResult convertPPROperator(OperatorOp op, int8_t denominator,
                                  ConversionPatternRewriter &rewriter) {
-    assert(op.getAllParams().empty() && "PPR operators do not support dynamic parameters");
+    if (!op.getAllParams().empty()) {
+        return op.emitError("PPR operators do not support dynamic parameters");
+    }
 
     DictionaryAttr staticData = op.getStaticData();
-    auto pauliWordAttr = staticData.getAs<StringAttr>("pauli_word");
+    StringAttr pauliWordAttr = staticData ? staticData.getAs<StringAttr>("pauli_word") : nullptr;
+    IntegerAttr signAttr = staticData ? staticData.getAs<IntegerAttr>("sign") : nullptr;
+    // A boolean sign is stored as an i1 attribute, which must not be read as +-1.
+    if (!pauliWordAttr || !signAttr || signAttr.getType().isInteger(1)) {
+        return op.emitError("PPR operators require static_data with a string 'pauli_word' and an "
+                            "integer 'sign'");
+    }
+    // don't use getInt, since it asserts signless (cannot handle signed data)
+    int64_t sign = signAttr.getValue().getSExtValue();
+    if (sign != 1 && sign != -1) {
+        return op.emitError("PPR operators require a sign of 1 or -1, but got ") << sign;
+    }
+
     StringRef pauliWord = pauliWordAttr.getValue();
     SmallVector<Attribute> pauliCharacters;
     pauliCharacters.reserve(pauliWord.size());
@@ -454,10 +468,7 @@ LogicalResult convertPPROperator(OperatorOp op, int8_t denominator,
     }
     ArrayAttr pauliProduct = rewriter.getArrayAttr(pauliCharacters);
 
-    auto signAttr = staticData.getAs<IntegerAttr>("sign");
-    // don't use getInt, since it asserts signless (cannot handle signed data)
-    int8_t sign = static_cast<int8_t>(signAttr.getValue().getSExtValue());
-    int8_t rotationKind = sign * denominator;
+    int8_t rotationKind = static_cast<int8_t>(sign * denominator);
     if (op.getAdjoint()) {
         rotationKind = -rotationKind;
     }
