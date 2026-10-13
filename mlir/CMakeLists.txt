@@ -142,11 +142,15 @@ FetchContent_Declare(tomlplusplus
 )
 FetchContent_MakeAvailable(tomlplusplus)
 
-################################################################################
-## Generate frontend_catalyst_version_py.h from frontend/catalyst/_version.py ##
-################################################################################
+######################
+## Catalyst Version ##
+######################
 
-function(make_version_header_file input_file output_file)
+set(CATALYST_VERSION_PY_FILE "${PROJECT_SOURCE_DIR}/../frontend/catalyst/_version.py")
+
+# Extracts __version__ from frontend/catalyst/_version.py into ${out_var} in the
+# caller's scope, or "unknown" (with a warning) if it cannot be read.
+function(read_catalyst_version input_file out_var)
     set(version_number "unknown")
     if (NOT EXISTS ${input_file})
         message(WARNING "Could not find ${input_file}")
@@ -158,6 +162,25 @@ function(make_version_header_file input_file output_file)
             set(version_number "${CMAKE_MATCH_1}")
         endif()
     endif()
+    set(${out_var} "${version_number}" PARENT_SCOPE)
+endfunction(read_catalyst_version)
+
+# Read here, in the top-level scope, rather than in a subdirectory: variables set
+# inside an add_subdirectory() scope do not propagate back up, and the CPack
+# configuration at the bottom of this file needs the version.
+read_catalyst_version("${CATALYST_VERSION_PY_FILE}" CATALYST_PACKAGE_VERSION)
+if (CATALYST_PACKAGE_VERSION STREQUAL "unknown")
+    message(FATAL_ERROR
+        "Failed to read Catalyst package version from ${CATALYST_VERSION_PY_FILE}")
+endif()
+message(STATUS "Found Catalyst package version: ${CATALYST_PACKAGE_VERSION}")
+
+################################################################################
+## Generate frontend_catalyst_version_py.h from frontend/catalyst/_version.py ##
+################################################################################
+
+function(make_version_header_file input_file output_file)
+    read_catalyst_version(${input_file} version_number)
     set(header_content "#pragma once\n\nstatic constexpr const char *CATALYST_VERSION = \"${version_number}\";\n")
     # Avoid touching the output when content is unchanged. This prevents
     # unnecessary recompilation of translation units that include this header.
@@ -174,7 +197,7 @@ function(make_version_header_file input_file output_file)
 endfunction(make_version_header_file)
 
 make_version_header_file(
-    "${PROJECT_SOURCE_DIR}/../frontend/catalyst/_version.py"
+    "${CATALYST_VERSION_PY_FILE}"
     "${PROJECT_BINARY_DIR}/include/Catalyst/Utils/frontend_catalyst_version_py.h"
 )
 
@@ -361,9 +384,10 @@ set(CPACK_PACKAGE_VERSION "${CATALYST_PACKAGE_VERSION}")
 set(CPACK_PACKAGE_VENDOR "Xanadu Quantum Technologies Inc.")
 set(CPACK_RESOURCE_FILE_LICENSE "${PROJECT_SOURCE_DIR}/../LICENSE")
 set(CPACK_GENERATOR "TGZ")
-set(CPACK_PACKAGE_FILE_NAME "${CPACK_PACKAGE_NAME}_${CMAKE_SYSTEM_NAME}_${CMAKE_SYSTEM_PROCESSOR}_${CATALYST_PACKAGE_VERSION}")
+set(CPACK_PACKAGE_FILE_NAME "${CPACK_PACKAGE_NAME}-${CMAKE_SYSTEM_NAME}-${CMAKE_SYSTEM_PROCESSOR}-${CATALYST_PACKAGE_VERSION}")
 set(CPACK_ARCHIVE_COMPONENT_INSTALL ON)
-set(CPACK_INCLUDE_TOPLEVEL_DIRECTORY ON)             # extracts into catalyst-dev-<ver>/
+set(CPACK_INCLUDE_TOPLEVEL_DIRECTORY ON)             # extracts into catalyst-dev-<ver>
+set(CPACK_COMPONENT_INCLUDE_TOPLEVEL_DIRECTORY ON)   # as above
 set(CPACK_COMPONENTS_ALL catalyst-dev)               # only catalyst-dev component
 set(CPACK_COMPONENTS_GROUPING ALL_COMPONENTS_IN_ONE) # single archive, no per-component split
 
