@@ -324,6 +324,9 @@ def handle_qnode(
         )
         pipelines += (("device", device_preprocessing_pipeline),)
 
+    # Add the post-device pipeline, which contains optional Resource Analysis passes used through `qp.analyze`
+    pipelines += (("post-device", qnode.post_device_pipeline),)
+
     # no idea what deduce_avals is doing, but this seems to make dynamic shapes work
     flattened_fn = deduce_avals(
         calling_convention, non_const_args, {}, [], debug_info=qfunc_jaxpr.debug_info
@@ -337,8 +340,19 @@ def handle_qnode(
     )
 
 
-def _require_decompose_gate_set(tkwargs):
-    """Reject a qp.decompose without a gate set, which the graph-decomposition pass needs."""
+# qp.decompose arguments the graph-decomposition pass supports (mapped 1:1). ``tkwargs`` holds only
+# the arguments the user passed, so any other key means an unsupported argument was set.
+_SUPPORTED_DECOMPOSE_TKWARGS = frozenset({"gate_set", "fixed_decomps", "alt_decomps", "output_json", "output_fname"})
+
+
+def _validate_decompose_tkwargs(tkwargs):
+    """Reject qp.decompose arguments the graph-decomposition pass doesn't support yet."""
+    unsupported = tkwargs.keys() - _SUPPORTED_DECOMPOSE_TKWARGS
+    if unsupported:
+        raise NotImplementedError(
+            f"qp.decompose argument(s) {unsupported} are not supported under qjit with graph-based "
+            "decomposition. Supported arguments are: 'gate_set', 'fixed_decomps', 'alt_decomps'."
+        )
     if tkwargs.get("gate_set") is None:
         raise ValueError(
             "qp.decompose requires an explicit 'gate_set' under qjit; the graph-based decomposition "
@@ -355,7 +369,7 @@ def _handle_decompose_transform(self, inner_jaxpr, consts, non_const_args, tkwar
     # Local imports avoid an import cycle (catalyst.passes imports from_plxpr indirectly).
     from pennylane.decomposition import DecompositionRule, add_decomps, list_decomps, local_decomps
 
-    from catalyst.passes.builtin_passes import graph_decomposition
+    from catalyst.passes.builtin_passes import graph_decomposition, resource_analysis
 
     _require_decompose_gate_set(tkwargs)
 
@@ -378,14 +392,24 @@ def _handle_decompose_transform(self, inner_jaxpr, consts, non_const_args, tkwar
         for op, rules in alt_decomps.items():
             add_decomps(op, *rules)
 
-        # Reusing the graph_decomposition transform (not a fork) guarantees identical pass options
-        # to the explicit catalyst.passes.graph_decomposition entry point.
-        bound_pass = graph_decomposition(
-            gate_set=tkwargs["gate_set"],
-            fixed_decomps=fixed_decomps or None,
-            alt_decomps=alt_decomps or None,
-        )
-        next_eval._pass_pipeline.insert(0, bound_pass)
+        if tkwargs.get("output_json") is not None and tkwargs.get("output_fname") is not None:
+            bound_pass = resource_analysis(
+                gate_set=tkwargs["gate_set"],
+            )
+            bound_pass.kwargs["output_json"] = tkwargs["output_json"]
+            bound_pass.kwargs["output_fname"] = tkwargs["output_fname"]
+            # bound_pass.
+            next_eval._pass_pipeline.insert(0, bound_pass)
+        else:
+            # Reusing the graph_decomposition transform (not a fork) guarantees identical pass options
+            # to the explicit catalyst.passes.graph_decomposition entry point.
+            bound_pass = graph_decomposition(
+                gate_set=tkwargs["gate_set"],
+                fixed_decomps=fixed_decomps or None,
+                alt_decomps=alt_decomps or None,
+            )
+
+            next_eval._pass_pipeline.insert(0, bound_pass)
 
         return next_eval.eval(inner_jaxpr, consts, *non_const_args)
 
@@ -425,8 +449,10 @@ def handle_transform(
     pl_tkwargs = _tuple_to_dict(tkwargs)
 
     # qp.decompose is routed to the graph-decomposition pass (see _handle_decompose_transform).
-    if transform == pl_decompose:
-        return _handle_decompose_transform(self, inner_jaxpr, consts, non_const_args, pl_tkwargs)
+    if transform == pl_decompose or transform.pass_name == "resource-analysis":
+    # if transform == pl_decompose:
+        x = _handle_decompose_transform(self, inner_jaxpr, consts, non_const_args, pl_tkwargs)
+        return x
 
     if transform.pass_name is None:
         raise ValueError(

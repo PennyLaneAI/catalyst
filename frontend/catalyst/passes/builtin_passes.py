@@ -1869,6 +1869,10 @@ graph_decomposition = qp.transform(
     pass_name="graph-decomposition", setup_inputs=graph_decomposition_setup_inputs
 )
 
+resource_analysis = qp.transform(
+    pass_name="resource-analysis", setup_inputs=graph_decomposition_setup_inputs
+)
+
 __all__ = [
     "cancel_inverses",
     "combine_global_phases",
