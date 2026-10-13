@@ -90,7 +90,9 @@ const PipelineList pipelineList{
      {"annotate-invalid-gradient-functions",
       "lower-gradients"}},
     {"bufferization-stage",
-     {// Dispatched runtime calls are lowered to executor.call
+     {// Resolve the mangled symbols for the runtime calls.
+      "resolve-runtime-symbols",
+      // Dispatched runtime calls are lowered to executor.call
       "lower-runtime-dispatch",
       // tensor.pad
       "convert-tensor-to-linalg",
