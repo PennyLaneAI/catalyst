@@ -30,6 +30,7 @@ IGNORE_PATTERNS = [
     "Enzyme",
     "stablehlo",
     "rdma/vendor/infiniband",
+    "coproc/onnx/vendor",
 ]
 
 DEFAULT_CLANG_FORMAT_VERSION = 20
