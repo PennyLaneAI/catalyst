@@ -13,26 +13,37 @@
 # limitations under the License.
 """Unit tests for the backline frontend: serialize_backline and the pipeline helpers."""
 
+import ctypes.util
+import dataclasses
 import os
 import platform
+import subprocess
 from pathlib import Path
 from types import SimpleNamespace
 from unittest import mock
 
+import numpy as np
 import pennylane as qp
 import pytest
 from pennylane.backline import Transport
 
-from catalyst import Executor, qjit
+from catalyst import Executor, compiled_functions, qjit
 from catalyst.backline import (
     _EXECUTOR_RUNTIME_PLUGINS,
     _TRANSPORT_PASSES,
+    _builtin_fn_lib_dirs,
+    _check_builtin_fn_lib,
+    _coprocessor_fn_libs,
+    _find_builtin_fn_lib,
     _insert_passes,
+    _installed_builtin_fn_lib_dirs,
     _message_size,
     _qec_pass_specs,
     _realize_executor,
+    _remote_fn_lib_name,
     _resolve_backend,
     _resolve_backend_lib,
+    _runs_per_message_on_gpu,
     device_pass_pipeline,
     launch_executors,
     placement_pipeline,
@@ -43,6 +54,7 @@ from catalyst.backline import (
 from catalyst.device.qjit_device import BackendInfo, extract_backend_info
 from catalyst.from_plxpr.from_plxpr import _get_device_kwargs
 from catalyst.utils.exceptions import CompileError
+from catalyst.utils.runtime_environment import get_lib_path
 
 if hasattr(qp, "backline"):
     from pennylane.backline import Transport
@@ -69,6 +81,41 @@ class _Attached:
 
     def launch(self):
         return self
+
+
+@dataclasses.dataclass(frozen=True)
+class _FnStandIn:
+    """A coprocessor function with every field Catalyst's frontend reads, whichever fields the
+    installed PennyLane's ``CoprocessorFunction`` has."""
+
+    name: str
+    lib_path: str | None = None
+    config: str = ""
+    per_message: bool = False
+    message_bytes: tuple[int, int] | None = None
+    files: tuple[str, ...] = ()
+    extra_files: tuple[str, ...] = ()
+
+    @property
+    def symbol_name(self) -> str:
+        """The library symbol the function is called through."""
+        return self.name
+
+
+_PL_DECLARES_MESSAGE_BYTES = "message_bytes" in {
+    f.name for f in dataclasses.fields(qp.CoprocessorFunction)
+}
+
+# The coprocessor function the tests build: PennyLane's own when it has every field the frontend
+# reads, and the stand-in otherwise.
+_Fn = qp.CoprocessorFunction if _PL_DECLARES_MESSAGE_BYTES else _FnStandIn
+
+# The same, for the tests of files a function declares, which a PennyLane without ``files`` and
+# ``extra_files`` cannot build.
+_PL_DECLARES_FILES = {"files", "extra_files"} <= {
+    f.name for f in dataclasses.fields(qp.CoprocessorFunction)
+}
+_FilesFn = qp.CoprocessorFunction if _PL_DECLARES_FILES else _FnStandIn
 
 
 def _controller(**kw):
@@ -132,25 +179,27 @@ def test_single_coprocessor():
 
 def test_coprocessor_fn_config_is_appended_with_the_fn_prefix():
     """A coprocessor function's config joins the node config, each key prefixed ``fn.``."""
-    fn = qp.CoprocessorFunction("coproc_fn", config="model=/m.onnx;provider=migraphx")
+    fn = _Fn("coproc_fn", config="model=/m.onnx;provider=auto")
     dev = qp.Backline(
-        controller=_controller(), coprocessors=[_coproc("cop0", fn=fn)], transport="rdma"
+        controller=_controller(), coprocessors=[_coproc("cop0", fn=fn)], transport="memcpy"
     )
     node = serialize_backline(dev.placement)["coprocessors"][0]
-    assert (
-        node["config"] == "cfg;fn.model=/m.onnx;fn.provider=migraphx;fn.in_bytes=8;fn.out_bytes=8"
-    )
+    assert node["config"] == "cfg;fn.model=/m.onnx;fn.provider=auto;fn.in_bytes=8;fn.out_bytes=8"
 
 
 def test_coprocessor_fn_config_without_a_node_config():
     """A coprocessor with no config of its own carries the function's alone."""
-    fn = qp.CoprocessorFunction("coproc_fn", config="model=/m.onnx")
+    fn = _Fn("coproc_fn", config="model=/m.onnx")
     coproc = _coproc("cop0", fn=fn, init_args={"backend_lib": "backend.so"})
     dev = qp.Backline(controller=_controller(), coprocessors=[coproc], transport="rdma")
     node = serialize_backline(dev.placement)
     assert node["coprocessors"][0]["config"] == "fn.model=/m.onnx;fn.in_bytes=8;fn.out_bytes=8"
 
 
+@pytest.mark.skipif(
+    not _PL_DECLARES_MESSAGE_BYTES,
+    reason="the installed PennyLane's CoprocessorFunction declares no message sizes",
+)
 def test_coprocessor_fn_config_carries_the_placement_message_sizes():
     """A function's init receives the sizes the placement commits, after its own keys."""
     fn = qp.CoprocessorFunction("coproc_fn", config="model=/m.onnx", message_bytes=(120, 121))
@@ -164,7 +213,7 @@ def test_coprocessor_fn_config_carries_the_placement_message_sizes():
 @pytest.mark.parametrize("key", ["in_bytes", "out_bytes"])
 def test_coprocessor_fn_config_must_not_set_a_message_size(key):
     """The message-size keys are reserved for the compiler."""
-    fn = qp.CoprocessorFunction("coproc_fn", config=f"{key}=4")
+    fn = _Fn("coproc_fn", config=f"{key}=4")
     dev = qp.Backline(
         controller=_controller(), coprocessors=[_coproc("cop0", fn=fn)], transport="rdma"
     )
@@ -187,7 +236,7 @@ def test_message_size_is_read_from_the_placement_then_the_controller(placement, 
 
 def test_coprocessor_fn_config_entry_without_a_value_is_rejected():
     """An entry that is not key=value is rejected at compile time."""
-    fn = qp.CoprocessorFunction("coproc_fn", config="model")
+    fn = _Fn("coproc_fn", config="model")
     dev = qp.Backline(
         controller=_controller(), coprocessors=[_coproc("cop0", fn=fn)], transport="rdma"
     )
@@ -204,7 +253,7 @@ def _gpu_coproc(fn, config=None):
 
 def test_a_per_message_function_selects_the_per_message_gpu_mode():
     """A GPU coprocessor running a per-message function is configured for it automatically."""
-    fn = qp.CoprocessorFunction("coproc_fn", per_message=True)
+    fn = _Fn("coproc_fn", per_message=True)
     dev = qp.Backline(
         controller=_controller(), coprocessors=[_gpu_coproc(fn, "gpu=1")], transport="memcpy"
     )
@@ -213,9 +262,17 @@ def test_a_per_message_function_selects_the_per_message_gpu_mode():
     )
 
 
+def test_catalysts_own_onnx_function_runs_per_message():
+    """Catalyst's ONNX function selects the per-message GPU mode, even when it is not marked."""
+    fn = _Fn("catalyst_onnx_coprocessor", config="model=/m.onnx")
+    assert _runs_per_message_on_gpu(_gpu_coproc(fn, "gpu=1"), "memcpy")
+    with pytest.raises(CompileError, match="only over the memcpy transport"):
+        _runs_per_message_on_gpu(_gpu_coproc(fn), "rdma")
+
+
 def test_an_explicit_per_message_mode_is_kept():
     """A config that already selects the per-message mode is not changed."""
-    fn = qp.CoprocessorFunction("coproc_fn", per_message=True)
+    fn = _Fn("coproc_fn", per_message=True)
     coproc = _gpu_coproc(fn, "coproc_fn=per_message")
     dev = qp.Backline(controller=_controller(), coprocessors=[coproc], transport="memcpy")
     assert serialize_backline(dev.placement)["coprocessors"][0]["config"] == (
@@ -225,7 +282,7 @@ def test_an_explicit_per_message_mode_is_kept():
 
 def test_a_per_message_function_with_an_explicit_launch_once_mode_is_rejected():
     """A per-message function cannot be bound as a persistent-kernel launcher."""
-    fn = qp.CoprocessorFunction("coproc_fn", per_message=True)
+    fn = _Fn("coproc_fn", per_message=True)
     coproc = _gpu_coproc(fn, "coproc_fn=launch_once")
     dev = qp.Backline(controller=_controller(), coprocessors=[coproc], transport="memcpy")
     with pytest.raises(CompileError, match="selects coproc_fn=launch_once"):
@@ -258,7 +315,7 @@ def onnx_files(tmp_path, monkeypatch):
 def test_a_remote_onnx_coprocessor_deploys_its_files_and_names_them_in_the_workspace(onnx_files):
     """The declared model and onnxruntime, and the extra provider library, travel with the
     executor, the declared ones renamed to their place in its workspace."""
-    fn = qp.CoprocessorFunction(
+    fn = _FilesFn(
         "catalyst_onnx_coprocessor",
         config=onnx_files.config,
         files=("model", "ort_lib"),
@@ -285,9 +342,7 @@ def test_a_remote_onnx_coprocessor_deploys_its_files_and_names_them_in_the_works
 
 def test_an_onnx_coprocessor_in_a_local_executor_keeps_its_paths(onnx_files):
     """An executor on this machine reads the files where they are."""
-    fn = qp.CoprocessorFunction(
-        "catalyst_onnx_coprocessor", config=onnx_files.config, files=("model", "ort_lib")
-    )
+    fn = _FilesFn("catalyst_onnx_coprocessor", config=onnx_files.config, files=("model", "ort_lib"))
     coproc = qp.Coprocessor(name="gpu0", coprocessor_fn=fn, executor_options={"port": 7813})
     dev = qp.Backline(controller=_controller(), coprocessors=[coproc], transport="memcpy")
     settle_executors(dev.placement)
@@ -299,7 +354,7 @@ def test_a_remote_function_deploys_the_files_it_declares(tmp_path):
     """Any coprocessor function's declared files travel with its executor, named by filename."""
     table = tmp_path / "decoder.cfg"
     table.write_text("")
-    fn = qp.CoprocessorFunction(
+    fn = _FilesFn(
         "decode", lib_path=str(table), config=f"table={table};mode=fast", files=("table",)
     )
     coproc = qp.Coprocessor(
@@ -325,9 +380,7 @@ def test_two_deployed_files_with_one_name_are_rejected(tmp_path):
     for name in ("a", "b"):
         model = tmp_path / name / "model.onnx"
         model.write_text("")
-        fn = qp.CoprocessorFunction(
-            "decode", lib_path=str(model), config=f"model={model}", files=("model",)
-        )
+        fn = _FilesFn("decode", lib_path=str(model), config=f"model={model}", files=("model",))
         coprocs.append(
             qp.Coprocessor(
                 name=name,
@@ -347,7 +400,7 @@ def test_declared_files_need_an_executor_built_from_options(tmp_path):
     """A ready-made executor is not deployed by the compiler, so it cannot take declared files."""
     table = tmp_path / "decoder.cfg"
     table.write_text("")
-    fn = qp.CoprocessorFunction("decode", config=f"table={table}", files=("table",))
+    fn = _FilesFn("decode", config=f"table={table}", files=("table",))
     coproc = qp.Coprocessor(
         name="matcher",
         remote=True,
@@ -401,7 +454,7 @@ def test_a_launcher_on_a_gpu_keeps_the_default_mode():
 
 def test_a_per_message_function_on_an_rdma_gpu_is_rejected():
     """Only the memcpy GPU backend runs per-message functions."""
-    fn = qp.CoprocessorFunction("coproc_fn", per_message=True)
+    fn = _Fn("coproc_fn", per_message=True)
     coproc = qp.Coprocessor(
         name="gpu0",
         hardware="gpu",
@@ -455,80 +508,75 @@ def test_coprocessor_fn_without_lib_path_loads_nothing(monkeypatch):
     assert loaded == []
 
 
-def test_a_builtin_coprocessor_fn_loads_catalysts_own_library(monkeypatch):
+_ONNX_LIB = "libcatalyst_onnx_coprocessor"
+
+
+def test_a_builtin_coprocessor_fn_loads_catalysts_own_library():
     """A coprocessor function Catalyst ships needs no lib_path: its runtime library is loaded."""
-    monkeypatch.delenv("CATALYST_TRANSPORT_PATH", raising=False)
-    loaded = []
-    monkeypatch.setattr("ctypes.CDLL", lambda path, mode=None: loaded.append(path) or object())
-    monkeypatch.setattr(
-        "catalyst.backline.get_lib_path", lambda project, env: "/opt/catalyst/runtime/lib"
-    )
     fn = qp.CoprocessorFunction("catalyst_onnx_coprocessor")
     dev = qp.Backline(
-        controller=_controller(), coprocessors=[_coproc("cop0", fn=fn)], transport="rdma"
+        controller=_controller(), coprocessors=[_coproc("cop0", fn=fn)], transport="memcpy"
     )
-    launch_executors(dev.placement)
-    assert loaded == ["/opt/catalyst/runtime/lib/libcatalyst_onnx_coprocessor.so"]
+    runtime = Path("/nonexistent/runtime/lib")
+    assert _coprocessor_fn_libs(dev.placement, [runtime]) == [runtime / f"{_ONNX_LIB}.so"]
 
 
-def test_a_builtin_coprocessor_fn_library_is_found_as_a_dylib(monkeypatch, tmp_path):
-    """On macOS the runtime library is a .dylib, and it is the one loaded."""
-    monkeypatch.delenv("CATALYST_TRANSPORT_PATH", raising=False)
-    (tmp_path / "libcatalyst_onnx_coprocessor.dylib").write_bytes(b"")
-    loaded = []
-    monkeypatch.setattr("ctypes.CDLL", lambda path, mode=None: loaded.append(path) or object())
-    monkeypatch.setattr("catalyst.backline.get_lib_path", lambda project, env: str(tmp_path))
-    fn = qp.CoprocessorFunction("catalyst_onnx_coprocessor")
-    dev = qp.Backline(
-        controller=_controller(), coprocessors=[_coproc("cop0", fn=fn)], transport="rdma"
-    )
-    launch_executors(dev.placement)
-    assert loaded == [str(tmp_path / "libcatalyst_onnx_coprocessor.dylib")]
+def test_a_builtin_coprocessor_fn_library_is_found_as_a_dylib(tmp_path):
+    """On macOS the runtime library is a .dylib, and it is the one found."""
+    (tmp_path / f"{_ONNX_LIB}.dylib").write_bytes(b"")
+    assert _find_builtin_fn_lib(_ONNX_LIB, [tmp_path]) == tmp_path / f"{_ONNX_LIB}.dylib"
 
 
-def test_a_builtin_coprocessor_fn_library_is_found_on_the_transport_path(monkeypatch, tmp_path):
+def test_a_builtin_coprocessor_fn_library_is_found_on_the_transport_path(tmp_path):
     """A directory in CATALYST_TRANSPORT_PATH is searched before the runtime library directory."""
-    extra = tmp_path / "extra"
-    extra.mkdir()
-    (extra / "libcatalyst_onnx_coprocessor.so").write_bytes(b"")
-    loaded = []
-    monkeypatch.setattr("ctypes.CDLL", lambda path, mode=None: loaded.append(path) or object())
-    monkeypatch.setattr("catalyst.backline.get_lib_path", lambda project, env: str(tmp_path))
-    monkeypatch.setenv("CATALYST_TRANSPORT_PATH", str(extra))
-    fn = qp.CoprocessorFunction("catalyst_onnx_coprocessor")
+    extra, runtime = tmp_path / "extra", tmp_path / "runtime"
+    for d in (extra, runtime):
+        d.mkdir()
+        (d / f"{_ONNX_LIB}.so").write_bytes(b"")
+    dirs = _builtin_fn_lib_dirs(str(extra), runtime)
+    assert dirs == [extra, runtime]
+    assert _find_builtin_fn_lib(_ONNX_LIB, dirs) == extra / f"{_ONNX_LIB}.so"
+
+
+def test_the_transport_path_may_list_several_directories():
+    """CATALYST_TRANSPORT_PATH lists directories separated by the platform's path separator."""
+    override = os.pathsep.join(["/a", "", "/b"])
+    assert _builtin_fn_lib_dirs(override, Path("/rt")) == [Path("/a"), Path("/b"), Path("/rt")]
+
+
+def test_the_installed_search_ends_with_catalysts_runtime_library_directory():
+    """This process searches its CATALYST_TRANSPORT_PATH, then Catalyst's runtime library
+    directory."""
+    runtime = Path(get_lib_path("runtime", "RUNTIME_LIB_DIR"))
+    assert _installed_builtin_fn_lib_dirs()[-1] == runtime
+
+
+def test_an_in_process_coprocessor_fn_library_is_loaded():
+    """launch_executors loads the library an in-process coprocessor's function names."""
+    libc = ctypes.util.find_library("c")
+    fn = qp.CoprocessorFunction("decode", lib_path=libc)
     dev = qp.Backline(
         controller=_controller(), coprocessors=[_coproc("cop0", fn=fn)], transport="memcpy"
     )
-    serialize_backline(dev.placement)
+    assert _coprocessor_fn_libs(dev.placement, _installed_builtin_fn_lib_dirs()) == [Path(libc)]
     launch_executors(dev.placement)
-    assert loaded == [str(extra / "libcatalyst_onnx_coprocessor.so")]
 
 
-def test_a_missing_builtin_coprocessor_fn_library_fails_to_compile(monkeypatch, tmp_path):
+def test_a_missing_builtin_coprocessor_fn_library_fails_to_compile(tmp_path):
     """Compiling fails, naming the library and the directories searched, when it is not built."""
-    monkeypatch.setattr("catalyst.backline.get_lib_path", lambda project, env: str(tmp_path))
-    monkeypatch.delenv("CATALYST_TRANSPORT_PATH", raising=False)
     fn = qp.CoprocessorFunction("catalyst_onnx_coprocessor")
-    dev = qp.Backline(
-        controller=_controller(), coprocessors=[_coproc("cop0", fn=fn)], transport="memcpy"
-    )
-    with pytest.raises(
-        CompileError, match=rf"needs libcatalyst_onnx_coprocessor\.so.*not found in: {tmp_path}"
-    ):
-        serialize_backline(dev.placement)
+    coproc = _coproc("cop0", fn=fn)
+    with pytest.raises(CompileError, match=rf"needs {_ONNX_LIB}\.so.*not found in: {tmp_path}"):
+        _check_builtin_fn_lib(coproc, [tmp_path])
 
 
-def test_a_remote_node_names_a_builtin_coprocessor_fn_library_as_a_so(monkeypatch, tmp_path):
-    """A node on another machine is Linux, so it is given the .so even when this one has a .dylib."""
-    from catalyst.backline import _executor_plugins  # pylint: disable=import-outside-toplevel
-
-    (tmp_path / "libcatalyst_onnx_coprocessor.dylib").write_bytes(b"")
-    monkeypatch.setattr("catalyst.backline.get_lib_path", lambda project, env: str(tmp_path))
-    fn = qp.CoprocessorFunction("catalyst_onnx_coprocessor")
-    coproc = qp.Coprocessor(
-        name="cop0", coprocessor_fn=fn, remote=True, executor_options={"host": "192.0.2.11"}
-    )
-    assert "libcatalyst_onnx_coprocessor.so" in _executor_plugins(coproc, [])
+def test_a_remote_node_names_a_builtin_coprocessor_fn_library_as_a_so():
+    """A node on another machine is Linux, so it is given the .so even when this one has a
+    .dylib, while a library the function names keeps its own filename."""
+    builtin = qp.CoprocessorFunction("catalyst_onnx_coprocessor")
+    assert _remote_fn_lib_name(builtin, Path(f"/rt/{_ONNX_LIB}.dylib")) == f"{_ONNX_LIB}.so"
+    own = qp.CoprocessorFunction("decode", lib_path="/opt/libdecode.dylib")
+    assert _remote_fn_lib_name(own, Path("/opt/libdecode.dylib")) == "libdecode.dylib"
 
 
 def test_unlaunched_executor_names_the_node_it_came_from():
@@ -635,7 +683,7 @@ def test_backline_qnode_capture_path(use_capture):
     """A backline qnode compiles to MLIR carrying the catalyst.backline attribute."""
     dev = qp.Backline(controller=_controller(), coprocessors=[_coproc("cop0")], transport="rdma")
 
-    @qjit(target="mlir", capture=True, collect_decomp_rules=False)
+    @qjit(target="mlir", capture=True)
     @qp.qnode(dev)
     def circuit():
         qp.Hadamard(0)
@@ -653,7 +701,7 @@ def test_backline_qnode_capture_path_memcpy(use_capture):
     """
     dev = qp.Backline(controller=_controller(), coprocessors=[_coproc("cop0")], transport="memcpy")
 
-    @qjit(target="mlir", capture=True, collect_decomp_rules=False)
+    @qjit(target="mlir", capture=True)
     @qp.qnode(dev)
     def circuit():
         qp.Hadamard(0)
@@ -663,6 +711,566 @@ def test_backline_qnode_capture_path_memcpy(use_capture):
     ir = circuit.mlir
     assert "catalyst.backline" in ir
     assert 'transport = "memcpy"' in ir
+
+
+def _detect_gpu_triton_platform():
+    """Return a Triton ``platform`` string matching this runner's GPU, or ``None``.
+
+    Auto-detects NVIDIA (via ``nvidia-smi``) and AMD (via ``rocminfo``) so the same test
+    body runs against whichever hardware is attached. Preferring NVIDIA when both are
+    somehow present is arbitrary but consistent across runners.
+    """
+    # NVIDIA: nvidia-smi reports compute cap as e.g. "8.0". Warp size is always 32.
+    try:
+        cc = (
+            subprocess.check_output(
+                ["nvidia-smi", "--query-gpu=compute_cap", "--format=csv,noheader"],
+                text=True,
+                stderr=subprocess.DEVNULL,
+            )
+            .strip()
+            .splitlines()[0]
+            .strip()
+        )
+        major, minor = cc.split(".")
+        return f"cuda:{major}{minor}:32"
+    except (FileNotFoundError, subprocess.CalledProcessError, ValueError, IndexError):
+        pass
+
+    # AMD: rocminfo lists ``Name: gfxNNN`` for each agent. Wave size is 64 on gfx9/10,
+    # some gfx11 SKUs use 32; default to 64 which matches the demo examples.
+    try:
+        rocm = subprocess.check_output(["rocminfo"], text=True, stderr=subprocess.DEVNULL)
+        for line in rocm.splitlines():
+            stripped = line.strip()
+            if stripped.startswith("Name:") and "gfx" in stripped:
+                arch = stripped.split(":", 1)[1].strip()
+                return f"hip:{arch}:64"
+    except (FileNotFoundError, subprocess.CalledProcessError):
+        pass
+
+    return None
+
+
+def _triton_driver_active():
+    """Whether Triton can actually initialize a backend driver on this runner.
+
+    ``nvidia-smi`` / ``rocminfo`` detect the GPU as hardware, but Triton has its own
+    activation path (``triton.runtime.driver.active`` -> ``is_active()`` on the CUDA or
+    HIP driver), which needs ``libcuda.so`` / ``libamdhip64.so`` and their python bindings.
+    A runner with an NVIDIA GPU visible via nvidia-smi but no CUDA runtime installed lands
+    at ``0 active drivers`` when Triton probes.
+    """
+    try:
+        import triton  # noqa: F401  -- pylint: disable=import-outside-toplevel
+        from triton.runtime.driver import (
+            driver as _driver,  # pylint: disable=import-outside-toplevel
+        )
+    except (ImportError, RuntimeError):
+        return False
+    try:
+        _driver.active  # forces driver selection; raises RuntimeError on 0 or >1 active
+    except RuntimeError:
+        return False
+    return True
+
+
+@pytest.fixture(scope="module")
+def gpu_triton_platform():
+    """Skip cleanly if no usable Triton backend is attached to this runner.
+
+    Two gates: hardware detected via ``nvidia-smi`` / ``rocminfo``, and Triton's own
+    driver activation. The second catches the "GPU present, CUDA runtime missing"
+    case that surfaces as ``RuntimeError: 0 active drivers`` deep in ``triton.jit``.
+    """
+    platform = _detect_gpu_triton_platform()
+    if platform is None:
+        pytest.skip("No NVIDIA or AMD GPU detected on this runner")
+    if not _triton_driver_active():
+        pytest.skip(
+            "GPU detected but Triton has no active driver "
+            "(missing CUDA / HIP runtime for the installed triton wheel)"
+        )
+    return platform
+
+
+@pytest.fixture(scope="module")
+def gpu_transport_backend():
+    """Skip unless the GPU coprocessor transport backend was actually built.
+
+    The library sits behind ``if(TRANSPORT_HAS_HIP)``, so a runtime built without a HIP
+    toolchain has none, and ``backline._resolve_backend_lib`` then raises ``ValueError``
+    rather than skipping. A runner can pass :func:`gpu_triton_platform` and still fail this
+    one: a working Triton driver does not imply HIP.
+    """
+    lib_dir = Path(get_lib_path("runtime", "RUNTIME_LIB_DIR"))
+    names = [f"libcatalyst_transport_memcpy_gpu_coprocessor.{ext}" for ext in ("so", "dylib")]
+    if not any((lib_dir / name).exists() for name in names):
+        pytest.skip(
+            f"GPU coprocessor transport backend not built: none of {names} found in {lib_dir}. "
+            "CMake sets TRANSPORT_HAS_HIP once it has HIP headers and a compiler for them. On an "
+            "NVIDIA host it fetches the headers itself, so the usual cause is a missing nvcc: "
+            "check that a CUDA toolkit, not just the driver, is installed."
+        )
+
+
+@pytest.fixture(scope="function")
+def stop_node_executors():
+    """Stop the executors the compiler launched for the backline nodes registered here.
+
+    ``_SessionRegistry`` only cleans up at process exit, too late inside a pytest session: the
+    ``catalyst-executor`` subprocess keeps the coprocessor's out-of-band TCP port, so a rerun,
+    ``pytest-xdist``, or a second out-of-process case would meet ``EADDRINUSE``. Register each
+    node that asked for an executor; ``stop()`` is idempotent and runs on teardown either way.
+    """
+    nodes = []
+    try:
+        yield nodes.append
+    finally:
+        for node in nodes:
+            executor = getattr(node, "executor", None)
+            if executor is not None:
+                executor.stop()
+
+
+@pytest.mark.skipif(
+    "CATALYST_TRANSPORT_PATH" not in os.environ,
+    reason=(
+        "Backline demo integration tests need the transport backend libraries built with "
+        "-DENABLE_TRANSPORT=ON, which the wheel does not ship. Add that build directory to "
+        "CATALYST_TRANSPORT_PATH to run them; the check-transport workflow does this on a "
+        "GPU runner."
+    ),
+)
+class TestBacklineDemoIntegration:
+    """Mirrors ``backline/demos`` end-to-end, adapted to run in the unit-test environment.
+
+    Each test mirrors a ``backline/demos`` script and JIT-compiles the whole placement. The ones
+    that call the QNode also execute it, so they need the transport backend libraries and the
+    decoder library reachable to the dynamic loader.
+    """
+
+    def test_local_cpu_to_local_cpu_memcpy(self, use_capture):
+        """Demo 1: local CPU ↔ local CPU over ``memcpy``, JIT-compiled and executed.
+
+        Mirrors ``demos/demo_1_local_cpu_to_local_cpu_memcpy.py``: both roles in this process,
+        exchanging the decode round through a shared buffer. Executes the QNode end-to-end.
+
+        As in the RDMA case, ``backend_lib`` is left off ``init_args`` so the compiler resolves
+        each role's backend to an absolute path under ``RUNTIME_LIB_DIR``, rather than handing
+        the runtime a bare filename to ``dlopen`` off the loader's search path.
+        """
+        steane_lib = str(
+            Path(get_lib_path("runtime", "RUNTIME_LIB_DIR")) / "libsteane_coprocessor_cpu.so"
+        )
+        ctrl = qp.Controller(
+            name="cpu-controller",
+            device=qp.device("null.qubit", wires=3),
+        )
+        coproc = qp.Coprocessor(
+            name="cpu-coproc",
+            coprocessor_fn=qp.CoprocessorFunction("steane_coprocessor", lib_path=steane_lib),
+        )
+        dev = qp.Backline(
+            controller=ctrl, coprocessors=[coproc], transport="memcpy", qec_code="steane"
+        )
+
+        @qjit(capture=True)
+        @qp.set_shots(1)
+        @qp.qnode(dev, mcm_method="one-shot")
+        def ghz():
+            qp.Hadamard(0)
+            qp.CNOT([0, 1])
+            qp.CNOT([1, 2])
+            return qp.sample([qp.measure(0), qp.measure(1), qp.measure(2)])
+
+        ir = ghz.mlir
+        assert "catalyst.backline" in ir
+        assert 'transport = "memcpy"' in ir
+        assert 'symbol = "steane_coprocessor"' in ir
+        # Asserted rather than left to the loader: a bare filename would also execute here, on
+        # whatever the search path happens to hold.
+        for role in ("controller", "coprocessor"):
+            resolved = _resolve_backend_lib("memcpy", "cpu", role, False)
+            assert os.path.isabs(resolved), f"{role} backend was not resolved to a path: {resolved}"
+            assert resolved in ir, f"{resolved} missing from the IR"
+        for pass_name, _ in _qec_pass_specs("steane"):
+            assert pass_name in ir, f"{pass_name} missing from the scheduled pipeline"
+
+        samples = np.asarray(ghz())
+        # qp.sample keeps the shots axis explicit: shots=1 with 3 measurements -> (1, 3).
+        assert samples.shape == (1, 3), f"expected shape (1, 3), got {samples.shape}"
+
+    @pytest.mark.parametrize(
+        "executor_options, oob_port",
+        [
+            pytest.param(None, 18590, id="in_process"),
+            pytest.param({}, 18591, id="out_of_process"),
+        ],
+    )
+    def test_local_cpu_to_local_cpu_rdma_loopback(
+        self, use_capture, stop_node_executors, executor_options, oob_port
+    ):
+        """Demo 1a: local CPU to local CPU over RDMA loopback, in-process and out-of-process.
+
+        Both roles reach each other through the ``rxe0`` soft-RoCE device installed by the
+        ``setup-soft-roce`` action, so the ibverbs path is real while the fabric is software.
+        The cases differ only in where the coprocessor runs:
+
+        * ``in_process`` -- ``executor_options=None``: no executor is built, both roles stay in
+          this process. Mirrors ``demos/demo_1a_local_cpu_to_local_cpu_rdma.py``.
+        * ``out_of_process`` -- ``executor_options={}``: a ``catalyst-executor`` subprocess on
+          this machine. This is how the roles actually deploy, one queue pair per process; an
+          in-process version SIGSEGV'd inside ``ghz()`` on GH-hosted ubuntu's ``rdma_rxe`` with
+          two queue pairs in one process. Needs a runtime built with ``ENABLE_EXECUTOR=ON``.
+
+        A port per case, so both run in one session without colliding on the coprocessor's
+        out-of-band port. Config strings follow ``dev=<rxe device>;gid=<idx>``, which
+        ``BackendConfig.hpp`` requires. ``backend_lib`` is left off ``init_args`` so the compiler
+        resolves the backend to an absolute path under ``RUNTIME_LIB_DIR``, avoiding a ``dlopen``
+        of a bare filename searched on ``LD_LIBRARY_PATH``.
+        """
+        steane_lib = str(
+            Path(get_lib_path("runtime", "RUNTIME_LIB_DIR")) / "libsteane_coprocessor_cpu.so"
+        )
+        ctrl = qp.Controller(
+            name="cpu-controller",
+            device=qp.device("null.qubit", wires=3),
+            init_args={"config": "dev=rxe0;gid=1"},
+        )
+        coproc = qp.Coprocessor(
+            name="cpu-coproc",
+            coprocessor_fn=qp.CoprocessorFunction("steane_coprocessor", lib_path=steane_lib),
+            endpoint=qp.Endpoint("127.0.0.1", oob_port),
+            executor_options=executor_options,
+            init_args={"config": "dev=rxe0;gid=1"},
+        )
+        # Registered before compiling: ``_realize_executor`` launches the subprocess during
+        # compilation, and a failure after that still has to release the port.
+        stop_node_executors(coproc)
+        dev = qp.Backline(
+            controller=ctrl, coprocessors=[coproc], transport="rdma", qec_code="steane"
+        )
+
+        @qjit(capture=True)
+        @qp.set_shots(1)
+        @qp.qnode(dev, mcm_method="one-shot")
+        def ghz():
+            qp.Hadamard(0)
+            qp.CNOT([0, 1])
+            qp.CNOT([1, 2])
+            return qp.sample([qp.measure(0), qp.measure(1), qp.measure(2)])
+
+        ir = ghz.mlir
+        assert "catalyst.backline" in ir
+        assert 'transport = "rdma"' in ir
+        assert 'symbol = "steane_coprocessor"' in ir
+        assert 'peer = "127.0.0.1"' in ir
+        assert "libcatalyst_transport_cpu_verbs_controller.so" in ir
+        assert "libcatalyst_transport_cpu_verbs_coprocessor.so" in ir
+        for pass_name, _ in _qec_pass_specs("steane"):
+            assert pass_name in ir, f"{pass_name} missing from the scheduled pipeline"
+
+        # Where the coprocessor ended up, asserted rather than inferred from a passing execution.
+        executor = coproc.executor
+        if executor_options is None:
+            assert executor is None, "the default asks for no executor, so the node stays here"
+        else:
+            assert executor is not None, "executor_options={} did not produce an executor"
+            # ``address`` raises unless the executor is up, and only a local one serves on
+            # loopback, so this pins the mode as well as the liveness.
+            assert executor.address.startswith(
+                "127.0.0.1:"
+            ), f"a local executor serves on loopback, got {executor.address}"
+            plugins = executor._cfg.plugins  # pylint: disable=protected-access
+            plugin_names = [Path(plugin).name for plugin in plugins]
+            for required in (*_EXECUTOR_RUNTIME_PLUGINS, "libsteane_coprocessor_cpu.so"):
+                assert required in plugin_names, f"{required} missing from the executor's plugins"
+            assert all(plugin.startswith("/") for plugin in plugins), (
+                "a node on this machine needs absolute plugin paths: "
+                "the runtime is not on the loader's search path"
+            )
+
+        samples = np.asarray(ghz())
+        # qp.sample keeps the shots axis explicit: shots=1 with 3 measurements -> (1, 3).
+        assert samples.shape == (1, 3), f"expected shape (1, 3), got {samples.shape}"
+
+    def test_cpu_controller_to_gpu_coproc_memcpy_manual_qec(
+        self, use_capture, gpu_triton_platform, gpu_transport_backend
+    ):
+        """CPU controller ↔ GPU coprocessor over ``memcpy`` with a manually-scheduled QEC cycle.
+
+        Ports demo 2's CSS BP decoder + manual QEC pattern to local memcpy transport, executed
+        on whichever GPU is attached (NVIDIA via ``cuda:*`` or AMD via ``hip:*`` — the platform
+        is picked by ``gpu_triton_platform``). The QNode extracts syndromes, calls the
+        coprocessor's Triton-built ``hgp_bp_osd_decoder`` via ``qp.backline.decode`` for each of
+        the 13 data qubits, and applies corrections in the same shot. The elaborate encoded /
+        logical-op / iterated-error-injection structure follows demo 2 and is what distinguishes
+        this test from the shorter ``*_triton_css_bp`` variant below.
+        """
+        del gpu_transport_backend  # gate only: the HIP-built backend library must exist
+
+        n_data = 13
+        aux = n_data
+        checks = np.array([[1] * 7 + [0] * 6, [0] * 6 + [1] * 7])
+        logical_support = list(range(n_data))
+        swap_pairs = [(0, 1), (2, 3)]
+
+        decoder = qp.backline.css_bp_decoder(
+            checks, checks, postprocess="osd", num_iters=1, prob=0.1, platform=gpu_triton_platform
+        )
+
+        ctrl = qp.Controller(
+            name="cpu-controller",
+            device=qp.device("null.qubit", wires=n_data + 1),
+        )
+        coproc = qp.Coprocessor(
+            name="gpu-coproc",
+            coprocessor_fn=decoder,
+            hardware="gpu",
+        )
+        dev = qp.Backline(controller=ctrl, coprocessors=[coproc], transport="memcpy")
+
+        def encode_logical_zero():
+            encoder = {
+                0: [6, 9, 11],
+                1: [7, 9, 10, 11, 12],
+                2: [8, 10, 12],
+                3: [6, 11],
+                4: [7, 11, 12],
+                5: [8, 12],
+            }
+            for pivot, targets in encoder.items():
+                qp.Hadamard(wires=pivot)
+                for t in targets:
+                    qp.CNOT(wires=[pivot, t])
+
+        def logical_circuit():
+            for w in logical_support:
+                qp.X(wires=w)
+            for w in range(n_data):
+                qp.Hadamard(wires=w)
+            for a, b in swap_pairs:
+                qp.SWAP(wires=[a, b])
+            for w in logical_support:
+                qp.Z(wires=w)
+            for w in range(n_data):
+                qp.Hadamard(wires=w)
+            for a, b in swap_pairs:
+                qp.SWAP(wires=[a, b])
+
+        def add_error(error_qubit, error_kind):
+            for q in range(n_data):
+                is_target = error_qubit == q
+                qp.cond(is_target & (error_kind == 1), qp.X)(wires=q)
+                qp.cond(is_target & (error_kind == 2), qp.Y)(wires=q)
+                qp.cond(is_target & (error_kind == 3), qp.Z)(wires=q)
+
+        def extract_syndromes():
+            z_syndrome = []
+            for row in checks:
+                for q in np.flatnonzero(row):
+                    qp.CNOT(wires=[int(q), aux])
+                z_syndrome.append(qp.measure(aux, reset=True))
+            x_syndrome = []
+            for row in checks:
+                qp.Hadamard(wires=aux)
+                for q in np.flatnonzero(row):
+                    qp.CNOT(wires=[aux, int(q)])
+                qp.Hadamard(wires=aux)
+                x_syndrome.append(qp.measure(aux, reset=True))
+            return z_syndrome, x_syndrome
+
+        def apply_correction(correction, pauli):
+            for q in range(n_data):
+                qp.cond(correction[q], pauli)(wires=q)
+
+        def mean_stabilizer(rows, pauli):
+            return qp.dot(
+                [1 / len(rows)] * len(rows),
+                [qp.prod(*(pauli(wires=int(q)) for q in np.flatnonzero(row))) for row in rows],
+            )
+
+        @qjit(capture=True)
+        @qp.set_shots(1)
+        @qp.qnode(dev, mcm_method="one-shot")
+        def encoded_decoded_circuit(error_kind: int):
+            encode_logical_zero()
+            logical_circuit()
+            for error_qubit in range(n_data):
+                add_error(error_qubit, error_kind)
+                z_syndrome, x_syndrome = extract_syndromes()
+                correction_z = qp.backline.decode(x_syndrome, decoder_id=0)
+                correction_x = qp.backline.decode(z_syndrome, decoder_id=1)
+                apply_correction(correction_x, qp.X)
+                apply_correction(correction_z, qp.Z)
+            return (
+                qp.expval(mean_stabilizer(checks, qp.Z)),
+                qp.expval(mean_stabilizer(checks, qp.X)),
+            )
+
+        ir = encoded_decoded_circuit.mlir
+        assert "catalyst.backline" in ir
+        assert 'transport = "memcpy"' in ir
+        assert decoder.symbol_name in ir
+        # Only the symbol reaches the IR: backline dlopens an in-process coprocessor's library
+        # itself and backend_lib names the transport plugin instead.
+        assert decoder.lib_path is not None and Path(decoder.lib_path).exists()
+        assert "libcatalyst_transport_memcpy_controller.so" in ir
+        assert "libcatalyst_transport_memcpy_gpu_coprocessor.so" in ir
+
+        result = encoded_decoded_circuit(0)  # error_kind=0: identity, no injected error
+        assert len(result) == 2
+
+    def test_cpu_controller_to_gpu_coproc_memcpy_precompiled(
+        self, use_capture, gpu_triton_platform, gpu_transport_backend
+    ):
+        """Precompiled GPU decoder (``gpu_steane_launcher``) reached over local memcpy, executed.
+
+        Adapts demo 4's steane-on-GPU pattern to local memcpy transport - remote SSH
+        executors from the demo are stripped so both roles run in this process on the GPU
+        runner. The ``gpu_steane_launcher`` symbol lives inside
+        ``libcatalyst_transport_memcpy_gpu_coprocessor.so`` (via the static
+        ``catalyst_transport_coproc_gpu`` lib), so ``CoprocessorFunction`` carries no
+        ``lib_path``; the runtime resolves the symbol after dlopen of the backend .so.
+
+        Skipped by ``gpu_triton_platform`` on runners without a GPU; executes end-to-end on
+        the check-transport workflow.
+        """
+        # Both are gates only: one for GPU + Triton driver presence, one for the HIP-built
+        # backend library. Neither value is consumed here.
+        del gpu_triton_platform, gpu_transport_backend
+        ctrl = qp.Controller(
+            name="cpu-controller",
+            device=qp.device("null.qubit", wires=3),
+        )
+        coproc = qp.Coprocessor(
+            name="gpu-coproc",
+            coprocessor_fn=qp.CoprocessorFunction("gpu_steane_launcher"),
+            hardware="gpu",
+        )
+        dev = qp.Backline(
+            controller=ctrl, coprocessors=[coproc], transport="memcpy", qec_code="steane"
+        )
+
+        @qjit(capture=True)
+        @qp.set_shots(1)
+        @qp.qnode(dev, mcm_method="one-shot")
+        def ghz():
+            qp.Hadamard(0)
+            qp.CNOT([0, 1])
+            qp.CNOT([1, 2])
+            return qp.sample([qp.measure(0), qp.measure(1), qp.measure(2)])
+
+        ir = ghz.mlir
+        assert "catalyst.backline" in ir
+        assert 'transport = "memcpy"' in ir
+        assert 'symbol = "gpu_steane_launcher"' in ir
+        assert "libcatalyst_transport_memcpy_gpu_coprocessor.so" in ir
+        for pass_name, _ in _qec_pass_specs("steane"):
+            assert pass_name in ir, f"{pass_name} missing from the scheduled pipeline"
+
+        samples = np.asarray(ghz())
+        # qp.sample keeps the shots axis explicit: shots=1 with 3 measurements -> (1, 3).
+        assert samples.shape == (1, 3), f"expected shape (1, 3), got {samples.shape}"
+
+    def test_cpu_controller_to_gpu_coproc_triton_css_bp(
+        self, use_capture, gpu_triton_platform, gpu_transport_backend
+    ):
+        """CSS BP decoder built via Triton, adapted from demo 2 to a local memcpy placement.
+
+        Mirrors ``demos/demo_2_remote_cpu_to_remote_gpu_triton.py``: X- and Z-type parity checks
+        of the [[13,1,3]] hypergraph-product code fed to ``qp.backline.css_bp_decoder`` to
+        produce a Triton-compiled coprocessor library, wired into the QNode. Remote SSH
+        executors from the demo are replaced with a local memcpy backend so both roles run in
+        this process on the GPU runner, and the QNode is executed.
+
+        The decoder is Triton-generated rather than built into the runtime, which is what this
+        case covers that its siblings do not: codegen for the detected ``cuda:<cc>:<warp>``
+        platform, the [[13,1,3]] hypergraph-product lowering, and the GPU transport backend
+        loading the generated ``.so`` to run the decode round.
+        """
+        platform = gpu_triton_platform
+        del gpu_transport_backend  # gate only: the built backend library must exist to execute
+
+        n_data = 13
+        aux = n_data
+        Hx = np.array(
+            [
+                [1, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0],
+                [0, 1, 0, 0, 1, 0, 0, 0, 0, 1, 1, 0, 0],
+                [0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0],
+                [0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 1, 0],
+                [0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 1, 1],
+                [0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 1],
+            ]
+        )
+        Hz = np.array(
+            [
+                [1, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0],
+                [0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0],
+                [0, 0, 0, 1, 1, 0, 0, 0, 0, 1, 0, 1, 0],
+                [0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 1, 0, 1],
+                [0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 1, 0],
+                [0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 1],
+            ]
+        )
+
+        try:
+            decoder = qp.backline.css_bp_decoder(
+                Hx, Hz, postprocess="osd", num_iters=1, prob=0.1, platform=platform
+            )
+        except ImportError as exc:
+            pytest.skip(f"Triton css_bp_decoder build unavailable: {exc}")
+
+        ctrl = qp.Controller(
+            name="cpu-controller",
+            device=qp.device("null.qubit", wires=n_data + 1),
+        )
+        coproc = qp.Coprocessor(
+            name="gpu-coproc",
+            coprocessor_fn=decoder,
+            hardware="gpu",
+        )
+        dev = qp.Backline(controller=ctrl, coprocessors=[coproc], transport="memcpy")
+
+        @qjit(capture=True)
+        @qp.set_shots(1)
+        @qp.qnode(dev, mcm_method="one-shot")
+        def circuit():
+            qp.Hadamard(0)
+            z_syndrome = []
+            for row in Hz:
+                for q in np.flatnonzero(row):
+                    qp.CNOT(wires=[int(q), aux])
+                z_syndrome.append(qp.measure(aux, reset=True))
+            x_syndrome = []
+            for row in Hx:
+                qp.Hadamard(wires=aux)
+                for q in np.flatnonzero(row):
+                    qp.CNOT(wires=[aux, int(q)])
+                qp.Hadamard(wires=aux)
+                x_syndrome.append(qp.measure(aux, reset=True))
+            correction_z = qp.backline.decode(x_syndrome, decoder_id=0)
+            correction_x = qp.backline.decode(z_syndrome, decoder_id=1)
+            for q in range(n_data):
+                qp.cond(correction_x[q], qp.X)(wires=q)
+                qp.cond(correction_z[q], qp.Z)(wires=q)
+            return qp.sample([qp.measure(q) for q in range(n_data)])
+
+        ir = circuit.mlir
+        assert "catalyst.backline" in ir
+        assert 'transport = "memcpy"' in ir
+        assert "libcatalyst_transport_memcpy_controller.so" in ir
+        assert "libcatalyst_transport_memcpy_gpu_coprocessor.so" in ir
+        assert decoder.symbol_name in ir
+        # Only the symbol, as above: writing the path into backend_lib would displace the
+        # transport plugin.
+        assert decoder.lib_path is not None and Path(decoder.lib_path).exists()
+
+        samples = np.asarray(circuit())
+        # qp.sample keeps the shots axis explicit: shots=1 with 13 measurements -> (1, 13).
+        assert samples.shape == (1, n_data), f"expected shape (1, {n_data}), got {samples.shape}"
 
 
 def test_placement_behind_a_wrapper_is_found(use_capture):
@@ -682,7 +1290,7 @@ def test_placement_behind_a_wrapper_is_found(use_capture):
         qp.Hadamard(0)
         return qp.probs()
 
-    @qjit(target="mlir", capture=True, collect_decomp_rules=False)
+    @qjit(target="mlir", capture=True)
     def workflow():
         return 2.0 * circuit()
 
@@ -728,7 +1336,7 @@ def test_qec_encoding_reaches_a_qnode_behind_a_wrapper(use_capture):
         qp.Hadamard(0)
         return qp.probs()
 
-    @qjit(target="mlir", capture=True, collect_decomp_rules=False)
+    @qjit(target="mlir", capture=True)
     def workflow():
         return 2.0 * circuit()
 
@@ -753,7 +1361,7 @@ def test_remote_controller_behind_a_wrapper_is_still_tagged(use_capture):
         qp.Hadamard(0)
         return qp.probs()
 
-    @qjit(target="mlir", capture=True, collect_decomp_rules=False)
+    @qjit(target="mlir", capture=True)
     def workflow():
         return 2.0 * circuit()
 
@@ -774,7 +1382,7 @@ def test_two_qnodes_over_one_placement_are_accepted(use_capture):
         qp.CNOT([0, 1])
         return qp.probs()
 
-    @qjit(target="mlir", capture=True, collect_decomp_rules=False)
+    @qjit(target="mlir", capture=True)
     def workflow():
         return circuit_a() + circuit_b()
 
@@ -800,7 +1408,7 @@ def test_two_placements_in_one_program_are_rejected(use_capture):
 
     with pytest.raises(CompileError, match="2 different backline placements"):
 
-        @qjit(target="mlir", capture=True, collect_decomp_rules=False)
+        @qjit(target="mlir", capture=True)
         def workflow():
             return circuit_a() + circuit_b()
 
@@ -814,6 +1422,9 @@ def fake_lib_dir(tmp_path, monkeypatch):
     layout ``make -C runtime`` produces.
     """
     monkeypatch.setattr("catalyst.backline.get_lib_path", lambda *_: str(tmp_path))
+    # Searched ahead of the in-tree lib dir, so an ambient value shadows this fixture; the tests
+    # that want it set it themselves.
+    monkeypatch.delenv("CATALYST_TRANSPORT_PATH", raising=False)
 
     def make(*entries):
         for e in entries:
@@ -833,6 +1444,8 @@ def flat_lib_dir(tmp_path, monkeypatch):
     ``<RUNTIME_LIB_DIR>``, so entries are bare library names.
     """
     monkeypatch.setattr("catalyst.backline.get_lib_path", lambda *_: str(tmp_path))
+    # Would shadow this fixture if left set; see :func:`fake_lib_dir`.
+    monkeypatch.delenv("CATALYST_TRANSPORT_PATH", raising=False)
 
     def make(*entries):
         for e in entries:
@@ -1303,7 +1916,7 @@ class TestExecutorRealization:
         cop = _coproc("cop0", oob_port=40000)
         dev = qp.Backline(controller=_controller(), coprocessors=[cop], transport="rdma")
 
-        @qjit(target="mlir", capture=True, collect_decomp_rules=False)
+        @qjit(target="mlir", capture=True)
         @qp.qnode(dev)
         def circuit():
             qp.Hadamard(0)
@@ -1311,3 +1924,28 @@ class TestExecutorRealization:
 
         assert "oob_port = 40000" in circuit.mlir
         assert "-25536" not in circuit.mlir
+
+
+def test_a_failed_setup_is_torn_down():
+    """A setup that fails runs the teardown, which releases what the setup created, such as its
+    transport sessions, and the setup's error is the one raised."""
+    calls = []
+
+    def failing_setup():
+        calls.append("setup")
+        raise RuntimeError("setup failed")
+
+    def failing_teardown():
+        calls.append("teardown")
+        raise RuntimeError("teardown failed")
+
+    with pytest.raises(RuntimeError, match="setup failed"):
+        compiled_functions._run_setup(failing_setup, failing_teardown)
+    assert calls == ["setup", "teardown"]
+
+
+def test_a_setup_that_succeeds_is_not_torn_down():
+    """The teardown runs only after a setup that fails."""
+    calls = []
+    compiled_functions._run_setup(lambda: calls.append("setup"), lambda: calls.append("teardown"))
+    assert calls == ["setup"]

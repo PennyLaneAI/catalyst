@@ -28,6 +28,7 @@
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/DialectRegistry.h"
 #include "mlir/IR/PatternMatch.h"
+#include "mlir/IR/SymbolTable.h"
 #include "mlir/IR/Value.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
@@ -38,6 +39,7 @@
 #include "mlir/Transforms/Passes.h"
 #include "stablehlo/dialect/StablehloOps.h" // When we read the decomposition rules module from file, StablehloDialect may not be registered from start.
 
+#include "Catalyst/IR/CatalystDialect.h"
 #include "QRef/IR/QRefDialect.h"
 #include "QRef/Transforms/Passes.h"
 #include "QRef/Transforms/Patterns.h"
@@ -64,6 +66,7 @@ struct DecomposeLoweringPass : impl::DecomposeLoweringPassBase<DecomposeLowering
 
     void getDependentDialects(DialectRegistry &registry) const override {
         registry.insert<arith::ArithDialect>();
+        registry.insert<catalyst::CatalystDialect>();
         registry.insert<func::FuncDialect>();
         registry.insert<quantum::QuantumDialect>();
         registry.insert<qref::QRefDialect>();
@@ -154,8 +157,9 @@ struct DecomposeLoweringPass : impl::DecomposeLoweringPassBase<DecomposeLowering
 
         // Step 3: Apply the decomposition patterns
         RewritePatternSet decompositionPatterns(&getContext());
+        SymbolTable moduleSymbolTable(module);
         populateDecomposeLoweringPatterns(decompositionPatterns, decompositionRegistry,
-                                          targetGateSet);
+                                          inlineRuleBody, targetGateSet, moduleSymbolTable);
         if (failed(applyPatternsGreedily(module, std::move(decompositionPatterns)))) {
             return signalPassFailure();
         }

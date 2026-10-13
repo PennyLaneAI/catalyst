@@ -109,15 +109,17 @@ def _resources_have_measurement(gate_counts) -> bool:
     return any(isinstance(op, _NON_INVERTIBLE_RESOURCE_TYPES) for op in gate_counts)
 
 
-def _adjoint_folds_to_base(resource_ids, op_name) -> bool:
+def _adjoint_folds_to_base(resource_ids, base_id) -> bool:
     """Whether an ``Adjoint(op)`` rule's resources are a single unmodified copy of the base op.
 
     This holds for ``adjoint_rotation`` and ``self_adjoint`` to simplify the rule registry
     and avoid the solver having to match a rule that produces a modified gate back to the base op.
+    Note that there are other rules that produce a single op of the same class but with
+    modified static data; such rules are not considered a fold.
 
     Args:
         resource_ids (dict): the rule's resources as ``{resource graphOpId: count}``
-        op_name (str): the base operator's GraphOpID name
+        base_id (str): the graphOpId of the base operator the rule was probed with
 
     Returns:
         bool: whether the rule folds ``Adjoint(op)`` to a single unmodified ``op``
@@ -125,7 +127,7 @@ def _adjoint_folds_to_base(resource_ids, op_name) -> bool:
     if len(resource_ids) != 1:
         return False
     ((rid, count),) = resource_ids.items()
-    return count == 1 and rid.split("{", 1)[0] == op_name
+    return count == 1 and rid == base_id
 
 
 def build_base_op(op_cls, kwargs, is_custom_op):
@@ -1123,9 +1125,10 @@ def build_registered_decomp_target_spec(
     #  - Under ctrl, every other produced op additionally gains the control modifier.
     if kind == "adjoint":
         ctrl_mod = _control_modifier(n_ctrl) if wrap_control else None
+        base_id = GraphOpID(probe_args["base"]).getGraphOpId()
         rewritten = {}
         for rule_name, ids in name_to_resource_ids.items():
-            if _adjoint_folds_to_base(ids, op_name):
+            if _adjoint_folds_to_base(ids, base_id):
                 rewritten[rule_name] = {target_id.replace(f"Adjoint({op_name})", op_name, 1): 1}
             elif wrap_control:
                 rewritten[rule_name] = {
@@ -1402,7 +1405,7 @@ def walk_reachable_decomp_rule_sets(
     """
 
     queue = deque(
-        (request, required_states, frozenset({request.base_id}))
+        (request, required_states, {request.base_id: request.control_count})
         for request, required_states in initial_requests
     )
 
@@ -1420,7 +1423,7 @@ def walk_reachable_decomp_rule_sets(
         return children
 
     while queue:
-        request, demanded_states, ancestors = queue.popleft()
+        request, demanded_states, path_control_counts = queue.popleft()
         demanded_states = set(demanded_states)
         previous_states = processed_states.setdefault(request.base_id, set())
         missing_states = demanded_states - previous_states
@@ -1432,18 +1435,24 @@ def walk_reachable_decomp_rule_sets(
         target_specs.extend(new_specs)
 
         for child in child_requests(new_specs):
-            # A controlled self-cycle can otherwise manufacture an unbounded sequence of control
-            # counts. Allow the first transition from an uncontrolled ancestor, as well as
-            # adjoint changes and non-increasing control counts, but stop a controlled path when
-            # returning to an ancestor with still more controls.
+            # A control-changing cycle can otherwise manufacture an unbounded sequence of modifier
+            # counts. Compare with the same base identity earlier on this path, rather than the
+            # direct parent: intermediate operators may absorb their controls into their identity.
+            # The first uncontrolled-to-controlled revisit remains valid.
+            previous_control_count = path_control_counts.get(child.base_id)
             increases_control_cycle = (
-                child.base_id in ancestors
-                and request.control_count > 0
-                and child.control_count > request.control_count
+                previous_control_count is not None
+                and previous_control_count > 0
+                and child.control_count > previous_control_count
             )
             if increases_control_cycle:
                 continue
-            queue.append((child, {child.modifier_state}, ancestors | frozenset({child.base_id})))
+
+            child_path_control_counts = path_control_counts.copy()
+            child_path_control_counts[child.base_id] = max(
+                previous_control_count or 0, child.control_count
+            )
+            queue.append((child, {child.modifier_state}, child_path_control_counts))
 
     return target_specs
 

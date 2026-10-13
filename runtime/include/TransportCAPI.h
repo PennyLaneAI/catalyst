@@ -46,11 +46,12 @@ enum {
     CATALYST_TRANSPORT_ROLE_COPROCESSOR = 1,
 };
 
-// Abort if `rc` is not CATALYST_TRANSPORT_OK. Compiled-program adapters call this so a failed
-// round cannot be mistaken for success. The C functions themselves still return `rc`.
+// Raise a runtime error if `rc` is not CATALYST_TRANSPORT_OK. Compiled-program adapters call this
+// so a failed round cannot be mistaken for success. The C functions themselves still return `rc`.
 void __catalyst__transport__check(int rc, const char *what);
 
-// Abort if `s` is `nullptr`. Compiled-program adapters call this after create / get_session.
+// Raise a runtime error if `s` is `nullptr`. Compiled-program adapters call this after create /
+// get_session.
 void __catalyst__transport__check_session(CatalystTransportSession *s, const char *what);
 
 // Create a session from a named backend plugin `.so` (dlopen'd by the runtime). `role` selects

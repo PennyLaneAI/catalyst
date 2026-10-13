@@ -205,19 +205,29 @@ def _node_dict(node: Node, role: str, transport: str) -> dict:
     return d
 
 
-def _load_coprocessor_fn_libs(placement: Placement) -> None:
-    """Load the library providing each in-process coprocessor's CoprocessorFn.
+def _coprocessor_fn_libs(placement: Placement, dirs: list[Path]) -> list[Path]:
+    """The libraries providing the in-process coprocessors' CoprocessorFns, in coprocessor order.
 
     Keyed on the coprocessor being in this process rather than on ``remote``: one dispatched to an
     executor loads the library itself, and its own installation is where the path resolves -- even
     when that executor is a subprocess of this one on the same machine.
+
+    Args:
+        placement (Placement): the placement whose coprocessors' libraries are listed
+        dirs (list[Path]): the directories searched, in order, for a coprocessor function
+            Catalyst ships
+
+    Returns:
+        list[Path]: one library for each in-process coprocessor whose function names one
     """
+    libs = []
     for coproc in placement.coprocessors:
         if _out_of_process(coproc):
             continue
-        lib = _coprocessor_fn_lib(coproc)
+        lib = _coprocessor_fn_lib(coproc, dirs)
         if lib is not None:
-            ctypes.CDLL(str(lib), mode=ctypes.RTLD_GLOBAL)
+            libs.append(lib)
+    return libs
 
 
 def launch_executors(placement: Placement | None) -> None:
@@ -231,19 +241,34 @@ def launch_executors(placement: Placement | None) -> None:
         executor = _realize_executor(node)
         if executor is not None:
             executor.launch()
-    _load_coprocessor_fn_libs(placement)
+    for lib in _coprocessor_fn_libs(placement, _installed_builtin_fn_lib_dirs()):
+        ctypes.CDLL(str(lib), mode=ctypes.RTLD_GLOBAL)
 
 
 def _runs_per_message_on_gpu(coproc, transport: str) -> bool:
     """Whether a GPU coprocessor's config must select the per-message mode for its function.
 
-    A function marked ``per_message`` is a host function called once per message. A GPU
-    coprocessor otherwise takes a launcher for a persistent kernel, and only the memcpy GPU backend
-    also runs per-message functions. A config that already selects ``coproc_fn=per_message`` is left
-    as it is, and one that selects another mode is rejected.
+    A function marked ``per_message``, or one Catalyst ships, is a host function called once per
+    message. A GPU coprocessor otherwise takes a launcher for a persistent kernel, and only the
+    memcpy GPU backend also runs per-message functions. A config that already selects
+    ``coproc_fn=per_message`` is left as it is, and one that selects another mode is rejected.
+
+    Args:
+        coproc (Coprocessor): the coprocessor whose function and config are checked
+        transport (str): the placement's transport name
+
+    Returns:
+        bool: whether ``coproc_fn=per_message`` must be added to the coprocessor's config
+
+    Raises:
+        CompileError: If the function runs per message on a GPU coprocessor over a transport other
+            than ``"memcpy"``, or the config selects another mode.
     """
     fn = coproc.coprocessor_fn
-    if not getattr(fn, "per_message", False) or getattr(coproc, "hardware", None) != "gpu":
+    per_message = getattr(fn, "per_message", False) or (
+        getattr(fn, "symbol_name", None) in _BUILTIN_COPROCESSOR_FN_LIBS
+    )
+    if not per_message or getattr(coproc, "hardware", None) != "gpu":
         return False
     if transport != "memcpy":
         raise CompileError(
@@ -269,8 +294,15 @@ def _runs_per_message_on_gpu(coproc, transport: str) -> bool:
 def _message_size(placement: Placement, name: str) -> int:
     """The placement's ``in_bytes`` or ``out_bytes``: the size every controller session commits.
 
-    A PennyLane whose ``Placement`` has no such attribute keeps the size on the controller, where
-    ``None`` means unset, so that is read next, then the 8 B default.
+    With a PennyLane version whose ``Placement`` has no such attribute, the size is read from the
+    controller instead, where ``None`` means unset, and an unset size is the 8 B default.
+
+    Args:
+        placement (Placement): the placement whose message size is read
+        name (str): ``"in_bytes"`` or ``"out_bytes"``
+
+    Returns:
+        int: the message size in bytes
     """
     size = getattr(placement, name, None)
     if size is None:
@@ -343,7 +375,7 @@ def serialize_backline(placement: Placement) -> dict:
         node["symbol"] = coproc.coprocessor_fn.symbol_name
         # The library is loaded from this installation, or deployed from it with the executor.
         if not _out_of_process(coproc) or coproc.executor_options is not None:
-            _check_builtin_fn_lib(coproc)
+            _check_builtin_fn_lib(coproc, _installed_builtin_fn_lib_dirs())
         if (
             coproc.remote
             and coproc.executor_options is None
@@ -429,21 +461,40 @@ def _check_machine_agrees(node: Node, host, address=None, preset: bool = False) 
         )
 
 
-def _builtin_fn_lib_dirs() -> list[Path]:
+def _builtin_fn_lib_dirs(override: str, runtime_lib_dir: Path) -> list[Path]:
     """Directories searched for a coprocessor function library Catalyst ships, in order: each
-    directory in ``CATALYST_TRANSPORT_PATH``, then ``<RUNTIME_LIB_DIR>``."""
-    override = os.environ.get(_BACKEND_PATH_ENV, "")
-    dirs = [Path(p) for p in override.split(os.pathsep) if p]
-    dirs.append(Path(get_lib_path("runtime", "RUNTIME_LIB_DIR")))
-    return dirs
+    directory in ``override``, a ``CATALYST_TRANSPORT_PATH`` value, then ``runtime_lib_dir``."""
+    return [Path(p) for p in override.split(os.pathsep) if p] + [runtime_lib_dir]
 
 
-def _coprocessor_fn_lib(node: Node) -> Path | None:
+def _installed_builtin_fn_lib_dirs() -> list[Path]:
+    """The :func:`_builtin_fn_lib_dirs` of this process: its ``CATALYST_TRANSPORT_PATH``, then
+    Catalyst's ``<RUNTIME_LIB_DIR>``."""
+    return _builtin_fn_lib_dirs(
+        os.environ.get(_BACKEND_PATH_ENV, ""), Path(get_lib_path("runtime", "RUNTIME_LIB_DIR"))
+    )
+
+
+def _find_builtin_fn_lib(stem: str, dirs: list[Path]) -> Path:
+    """The library named ``stem`` in the first of ``dirs`` that holds it as a ``.so`` or a
+    ``.dylib``, or the ``.so`` in the last of ``dirs`` when none does, which then need not exist."""
+    candidates = [d / f"{stem}.{ext}" for d in dirs for ext in _BACKEND_LIB_EXTS]
+    return next((c for c in candidates if c.exists()), dirs[-1] / f"{stem}.{_BACKEND_LIB_EXTS[0]}")
+
+
+def _coprocessor_fn_lib(node: Node, dirs: list[Path]) -> Path | None:
     """The library providing a coprocessor's CoprocessorFn, or ``None`` if it names none.
 
-    That is its ``lib_path``, or for one of Catalyst's own coprocessor functions, the first library
-    exporting it found in ``_builtin_fn_lib_dirs()``. When none is found, it is the ``.so`` under
-    ``<RUNTIME_LIB_DIR>``, which need not exist.
+    That is its ``lib_path``, or for one of Catalyst's own coprocessor functions, the library
+    :func:`_find_builtin_fn_lib` finds in ``dirs``.
+
+    Args:
+        node (Node): the coprocessor whose function's library is found
+        dirs (list[Path]): the directories searched, in order, for a coprocessor function
+            Catalyst ships
+
+    Returns:
+        Path or None: the library, or ``None`` when the node's function names none
     """
     fn = getattr(node, "coprocessor_fn", None)
     lib_path = getattr(fn, "lib_path", None)
@@ -452,27 +503,40 @@ def _coprocessor_fn_lib(node: Node) -> Path | None:
     stem = _BUILTIN_COPROCESSOR_FN_LIBS.get(getattr(fn, "symbol_name", None))
     if stem is None:
         return None
-    dirs = _builtin_fn_lib_dirs()
-    candidates = [d / f"{stem}.{ext}" for d in dirs for ext in _BACKEND_LIB_EXTS]
-    return next((c for c in candidates if c.exists()), dirs[-1] / f"{stem}.{_BACKEND_LIB_EXTS[0]}")
+    return _find_builtin_fn_lib(stem, dirs)
 
 
-def _check_builtin_fn_lib(coproc: Node) -> None:
+def _check_builtin_fn_lib(coproc: Node, dirs: list[Path]) -> None:
     """Raise a ``CompileError`` if an in-process coprocessor uses one of Catalyst's own coprocessor
-    functions and no library exporting it is found."""
+    functions and no library exporting it is found in ``dirs``.
+
+    Args:
+        coproc (Coprocessor): the coprocessor whose function's library is checked
+        dirs (list[Path]): the directories searched, in order
+
+    Raises:
+        CompileError: If no library exporting the function is found.
+    """
     fn = coproc.coprocessor_fn
-    if fn.lib_path or fn.symbol_name not in _BUILTIN_COPROCESSOR_FN_LIBS:
+    stem = _BUILTIN_COPROCESSOR_FN_LIBS.get(fn.symbol_name)
+    if fn.lib_path or stem is None or _find_builtin_fn_lib(stem, dirs).exists():
         return
-    lib = _coprocessor_fn_lib(coproc)
-    if lib.exists():
-        return
-    stem = _BUILTIN_COPROCESSOR_FN_LIBS[fn.symbol_name]
-    searched = ", ".join(str(d) for d in _builtin_fn_lib_dirs())
+    searched = ", ".join(str(d) for d in dirs)
     raise CompileError(
         f"coprocessor function {fn.symbol_name!r} of {coproc.name!r} needs {stem}.so (or .dylib), "
         f"which was not found in: {searched}. Build the runtime with transport enabled "
         f"(ENABLE_TRANSPORT=ON), or add the directory holding it to {_BACKEND_PATH_ENV}."
     )
+
+
+def _remote_fn_lib_name(fn, lib: Path) -> str:
+    """The filename a node on another machine loads ``lib``, the library of coprocessor function
+    ``fn``, by: the ``.so`` for one of Catalyst's own functions, since that machine is Linux, and
+    otherwise ``lib``'s own name."""
+    stem = _BUILTIN_COPROCESSOR_FN_LIBS.get(getattr(fn, "symbol_name", None))
+    if stem is not None and not getattr(fn, "lib_path", None):
+        return f"{stem}.{_BACKEND_LIB_EXTS[0]}"
+    return lib.name
 
 
 def _declared_file_keys(fn) -> tuple[str, ...]:
@@ -567,15 +631,9 @@ def _executor_plugins(node: Node, given) -> list[str]:
     ]
     plugins += list(given)
     implied = []
-    fn_lib = _coprocessor_fn_lib(node)
+    fn_lib = _coprocessor_fn_lib(node, _installed_builtin_fn_lib_dirs())
     if fn_lib is not None:
-        fn = getattr(node, "coprocessor_fn", None)
-        stem = _BUILTIN_COPROCESSOR_FN_LIBS.get(getattr(fn, "symbol_name", None))
-        # A node on another machine is Linux, so one of Catalyst's own libraries is its ``.so``.
-        if stem is not None and not getattr(fn, "lib_path", None):
-            implied.append((fn_lib, f"{stem}.{_BACKEND_LIB_EXTS[0]}"))
-        else:
-            implied.append((fn_lib, fn_lib.name))
+        implied.append((fn_lib, _remote_fn_lib_name(getattr(node, "coprocessor_fn", None), fn_lib)))
     device = getattr(node, "device", None)
     if device is not None:
         # Last: plugins open RTLD_GLOBAL and the first definition of a symbol wins, and the device
@@ -612,7 +670,7 @@ def _executor_options(node: Node, options: dict) -> dict:
     if node.remote:
         # Named by filename among the plugins above, which resolves against the workspace -- so on
         # another machine the files have to travel there alongside whatever else is deployed.
-        fn_lib = _coprocessor_fn_lib(node)
+        fn_lib = _coprocessor_fn_lib(node, _installed_builtin_fn_lib_dirs())
         deploy = [*options.get("deploy", []), *([str(fn_lib)] if fn_lib is not None else [])]
         options["deploy"] = deploy + _coprocessor_fn_files(node)
         _check_deploy_names(options["deploy"], repr(node.name))

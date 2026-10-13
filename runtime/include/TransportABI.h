@@ -54,7 +54,9 @@ typedef struct {
  * - `abi_version`: the version whose fields the library fills, at least 1. The struct only grows
  *   at its end, and the runtime reads only the fields of the versions it knows. A field added by
  *   a later version must be optional: null or zero keeps the behaviour of the earlier versions.
- * - `reserved`: zero.
+ * - `reserved`: zero. It fills the 4 bytes before `init`, which would otherwise be padding, and
+ *   the runtime ignores it. A later version may give it a meaning, for which zero keeps the
+ *   behaviour of this one.
  * - `init` (may be null): called once, before the function is bound, with the node's
  *   `fn.`-prefixed config keys, prefix removed, as `key=value;...`. Returns the ctx the function
  *   is called with, or null if the function cannot be configured. Catalyst's frontend adds the

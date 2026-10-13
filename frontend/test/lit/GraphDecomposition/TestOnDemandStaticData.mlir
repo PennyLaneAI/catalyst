@@ -12,17 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{gate-set=PhaseShift=1.0,GlobalPhase=1.0})' %s | FileCheck %s
+// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{gate-set=PhaseShift=1.0,GlobalPhase=1.0})' %s | FileCheck %s --check-prefixes=ALL,CALL
+
+// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{inline-rule-body gate-set=PhaseShift=1.0,GlobalPhase=1.0})' %s | FileCheck %s --check-prefixes=ALL,INLINE
 
 // PCPhase keeps its `dim` in its static data as an integer attribute, so asking the frontend for its
 // rules on demand only works if that attribute reaches Python as an int (see
 // getPyvalFromMlirAttribute in PythonFunction.cpp). If it arrives as anything else, the rule fails
 // to build, the solver finds nothing for the op, and the pass reports it as undecomposable.
 
-// CHECK-LABEL: func.func @circuit
-// CHECK-NOT: quantum.pcphase
-// CHECK: quantum.custom "PhaseShift"
-// CHECK: quantum.gphase
+// ALL-LABEL: func.func @circuit
+// ALL-NOT: quantum.pcphase
+// CALL: call @"__builtin__decompose_pcphase_PCPhase{phi:[f64]}{wires:2}{dim = 2 : i64}_0"
+// INLINE: quantum.custom "PhaseShift"
+// INLINE: quantum.gphase
 func.func @circuit(%theta: f64) attributes {quantum.node} {
     %r = quantum.alloc(2) : !quantum.reg
     %q0 = quantum.extract %r[0] : !quantum.reg -> !quantum.bit
@@ -35,4 +38,4 @@ func.func @circuit(%theta: f64) attributes {quantum.node} {
 }
 
 // The rule came back keyed on the id the compiler prints for the op, `dim` included.
-// CHECK: target_gate = "PCPhase{phi:[f64]}{wires:2}{dim = 2 : i64}"
+// ALL: target_gate = "PCPhase{phi:[f64]}{wires:2}{dim = 2 : i64}"

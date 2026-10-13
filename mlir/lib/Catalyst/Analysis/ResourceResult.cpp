@@ -127,7 +127,9 @@ void ResourceResult::multiplyBy(double scalar) {
 }
 
 // Emit a count as a JSON number. Counts are tracked as doubles to support probabilistic
-// (fractional) count values, but the JSON output always reports the nearest integer.
+// (fractional) count values. Integral counts are reported as integers; fractional counts are
+// kept as is, since a caller may still multiply them (e.g. a hinted loop body), and rounding
+// each body first would compound the error.
 //
 // JSON Schema (per function, keyed by name at the root):
 //   metadata: { qnode, auto_qubit_management?, has_branches, device_name? }
@@ -139,7 +141,11 @@ void ResourceResult::multiplyBy(double scalar) {
 //   extended_fields: { "<extension>": { ... }, ... }  // e.g. pbc_depth: { any_commuting_depth,
 //   qubit_disjoint_depth }
 static llvm::json::Value countToJson(double count) {
-    return llvm::json::Value(static_cast<int64_t>(std::llround(count)));
+    double rounded = std::round(count);
+    if (std::abs(count - rounded) < 1e-9) {
+        return llvm::json::Value(static_cast<int64_t>(rounded));
+    }
+    return llvm::json::Value(count);
 }
 
 llvm::json::Object ResourceResult::toJson() const {

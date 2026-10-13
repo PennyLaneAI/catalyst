@@ -67,6 +67,8 @@ struct CatalystTransportSession {
     std::uint64_t in_bytes = 0;
     std::uint64_t out_bytes = 0;
     bool work_item_ready = false;
+    // Set from start() to stop(), while the session's coprocessor function may be running.
+    bool started = false;
 
     std::string config; // the backend config, as passed to the factory
 
@@ -447,18 +449,20 @@ int __catalyst__transport__set_coprocessor_fn(CatalystTransportSession *s, const
             std::cerr << "[transport] set_coprocessor_fn on a non-coprocessor session\n";
             return CATALYST_TRANSPORT_ERR;
         }
+        // The bound function and its ctx stay in use until the session stops.
+        if (s->started) {
+            std::cerr << "[transport] set_coprocessor_fn after start(): stop the session first\n";
+            return CATALYST_TRANSPORT_ERR;
+        }
         using FiniFn = void (*)(void *);
         using InfoFn = const CoprocessorFnInfo *(*)();
         // A session whose function could not be configured fails its messages, instead of running
         // the backend's default echo function or launcher.
         const auto fail_unconfigured = [&] {
-            try {
-                if (co->coprocessor_fn_convention() == CoprocConvention::PerMessage) {
-                    co->set_coprocessor_fn(&failing_fn, nullptr);
-                } else {
-                    co->set_coprocessor_launcher(&failing_launcher, nullptr);
-                }
-            } catch (...) {
+            if (co->coprocessor_fn_convention() == CoprocConvention::PerMessage) {
+                co->set_coprocessor_fn(&failing_fn, nullptr);
+            } else {
+                co->set_coprocessor_launcher(&failing_launcher, nullptr);
             }
             return CATALYST_TRANSPORT_ERR;
         };
@@ -495,7 +499,8 @@ int __catalyst__transport__set_coprocessor_fn(CatalystTransportSession *s, const
             }
         }
         // Bind first, and release the previous function's ctx only once the new binding holds: a
-        // rejected bind (e.g. after start()) leaves the running function and its ctx untouched.
+        // rejected bind, which the backend throws or reports with an unknown convention, leaves the
+        // bound function and its ctx untouched.
         const auto bind = [&] {
             switch (co->coprocessor_fn_convention()) {
             case CoprocConvention::PerMessage:
@@ -717,13 +722,17 @@ int __catalyst__transport__start_benchmark(CatalystTransportSession *s, std::uin
 
 void __catalyst__transport__start(CatalystTransportSession *s) {
     if (s && s->sess) {
-        guard([&] { s->sess->start(); });
+        guard([&] {
+            s->sess->start();
+            s->started = true;
+        });
     }
 }
 
 void __catalyst__transport__stop(CatalystTransportSession *s) {
     if (s && s->sess) {
         guard([&] { s->sess->stop(); });
+        s->started = false;
     }
 }
 

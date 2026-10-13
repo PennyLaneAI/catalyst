@@ -27,7 +27,7 @@
 //   model=<path>      the .onnx file (required)
 //   ort_lib=<path>    the onnxruntime shared library (default: libonnxruntime.so, or
 //                     libonnxruntime.dylib on macOS)
-//   provider=<name>   auto (default), cpu, migraphx, cuda, tensorrt or rocm
+//   provider=<name>   auto (default), cpu, migraphx, cuda or tensorrt
 //   device=<index>    the GPU a GPU provider runs on (default 0)
 //   threads=<count>   onnxruntime's intra-op threads (default 1), with one inter-op thread and
 //                     intra-op spinning off, so the pool does not compete with the transport's
@@ -36,7 +36,7 @@
 // A GPU provider attaches through onnxruntime's OrtSessionOptionsAppendExecutionProvider_<Name>
 // export, which only an onnxruntime build containing that provider has: onnxruntime-migraphx for
 // migraphx on AMD GPUs, onnxruntime-gpu for cuda and tensorrt on NVIDIA GPUs. `auto` attaches the
-// first GPU provider the loaded onnxruntime has, in the order migraphx, cuda, rocm, and fails if
+// first GPU provider the loaded onnxruntime has, in the order migraphx then cuda, and fails if
 // that provider cannot attach (for example when its GPU libraries are missing). Only an
 // onnxruntime with no GPU provider runs on the CPU under `auto`. The provider in use is printed
 // when the model loads.
@@ -81,8 +81,8 @@ struct GpuProvider {
 };
 // The first kAutoProviders entries are the ones `auto` tries, in this order.
 constexpr GpuProvider kGpuProviders[] = {
-    {"migraphx", "MIGraphX"}, {"cuda", "CUDA"}, {"rocm", "ROCM"}, {"tensorrt", "Tensorrt"}};
-constexpr std::size_t kAutoProviders = 3;
+    {"migraphx", "MIGraphX"}, {"cuda", "CUDA"}, {"tensorrt", "Tensorrt"}};
+constexpr std::size_t kAutoProviders = 2;
 
 std::size_t element_bytes(ONNXTensorElementDataType type) {
     switch (type) {
@@ -163,7 +163,7 @@ class OnnxCoprocessor {
         }
         if (!is_known_provider(provider)) {
             throw std::runtime_error("unknown provider '" + provider +
-                                     "', expected auto, cpu, migraphx, cuda, tensorrt or rocm");
+                                     "', expected auto, cpu, migraphx, cuda or tensorrt");
         }
         if (threads < 1) {
             throw std::runtime_error("threads must be at least 1");
@@ -215,21 +215,16 @@ class OnnxCoprocessor {
             throw;
         }
         api_->ReleaseSessionOptions(options);
-        check(api_->CreateCpuMemoryInfo(OrtArenaAllocator, OrtMemTypeDefault, &memory_));
-        describe_io();
+        try {
+            check(api_->CreateCpuMemoryInfo(OrtArenaAllocator, OrtMemTypeDefault, &memory_));
+            describe_io();
+        } catch (...) {
+            release_session();
+            throw;
+        }
     }
 
-    ~OnnxCoprocessor() {
-        if (api_) {
-            if (memory_) {
-                api_->ReleaseMemoryInfo(memory_);
-            }
-            if (session_) {
-                api_->ReleaseSession(session_);
-            }
-        }
-        // The environment and the library stay for the life of the process (see shared_env).
-    }
+    ~OnnxCoprocessor() { release_session(); }
 
     OnnxCoprocessor(const OnnxCoprocessor &) = delete;
     OnnxCoprocessor &operator=(const OnnxCoprocessor &) = delete;
@@ -312,7 +307,7 @@ class OnnxCoprocessor {
             }
         }
         throw std::runtime_error("unknown provider '" + provider +
-                                 "', expected auto, cpu, migraphx, cuda, tensorrt or rocm");
+                                 "', expected auto, cpu, migraphx, cuda or tensorrt");
     }
 
     static bool is_known_provider(const std::string &provider) {
@@ -374,6 +369,9 @@ class OnnxCoprocessor {
         try {
             const OrtTensorTypeAndShapeInfo *tensor = nullptr;
             check(api_->CastTypeInfoToTensorInfo(type_info, &tensor));
+            if (!tensor) {
+                throw std::runtime_error("the model's input must be a tensor");
+            }
             check(api_->GetTensorElementType(tensor, &input_type_));
             std::size_t rank = 0;
             check(api_->GetDimensionsCount(tensor, &rank));
@@ -398,6 +396,9 @@ class OnnxCoprocessor {
         try {
             const OrtTensorTypeAndShapeInfo *tensor = nullptr;
             check(api_->CastTypeInfoToTensorInfo(type_info, &tensor));
+            if (!tensor) {
+                throw std::runtime_error("the model's output must be a tensor");
+            }
             ONNXTensorElementDataType type = ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED;
             check(api_->GetTensorElementType(tensor, &type));
             std::size_t rank = 0;
@@ -414,6 +415,21 @@ class OnnxCoprocessor {
             throw;
         }
         api_->ReleaseTypeInfo(type_info);
+    }
+
+    // Release the session and its memory info. The environment and the library stay for the
+    // life of the process (see shared_env).
+    void release_session() noexcept {
+        if (api_) {
+            if (memory_) {
+                api_->ReleaseMemoryInfo(memory_);
+            }
+            if (session_) {
+                api_->ReleaseSession(session_);
+            }
+        }
+        memory_ = nullptr;
+        session_ = nullptr;
     }
 
     std::size_t copy_output(const OrtValue *output, void *out, std::size_t out_cap) const {

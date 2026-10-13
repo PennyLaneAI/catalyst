@@ -145,6 +145,11 @@ def CancelInversesPass : Pass<"cancel-inverses"> {
 
 def GridsynthPass : Pass<"gridsynth"> {
     let summary = "Perform Ross-Selinger/Gridsynth decomposition.";
+    let description = [{
+        Discretizes single-qubit RZ and PhaseShift gates, and PPR-Z rotations with an arbitrary
+        angle, at execution time. The pass fails on controlled RZ and PhaseShift gates, which need
+        to be decomposed into single-qubit rotations first.
+    }];
 
     let options = [Option<
         /*C++ var name=*/"epsilon",
@@ -216,7 +221,13 @@ def GraphDecompositionPass : Pass<"graph-decomposition", "mlir::ModuleOp"> {
             /*CLI name*/"verbose",
             /*Type*/"bool",
             /*Default*/[{ false }],
-            /*Description*/"Print the decomposition rule chosen for each operator to stderr.">
+            /*Description*/"Print the decomposition rule chosen for each operator to stderr.">,
+        Option<
+            /*C++ name*/"inlineRuleBody",
+            /*CLI name*/"inline-rule-body",
+            /*Type*/"bool",
+            /*Default*/[{ false }],
+            /*Description*/"Whether to inline the rule body. Defaults to false.">
     ];
 
     let dependentDialects = [

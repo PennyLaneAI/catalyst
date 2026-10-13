@@ -98,6 +98,10 @@ ResourceAnalysis::ResourceAnalysis(ModuleOp moduleOp,
     moduleOp.walk([&](func::FuncOp funcOp) {
         if (!funcOp.isDeclaration()) {
             definedFuncOps.push_back(funcOp);
+        } else {
+            // Declaration-only functions (e.g. runtime library functions) have no resources of
+            // their own, but get an empty entry so that calls to them can be resolved.
+            funcResults.try_emplace(funcOp.getName(), makeEmptyResult());
         }
     });
 
@@ -117,11 +121,25 @@ ResourceAnalysis::ResourceAnalysis(ModuleOp moduleOp,
         }
     }
 
-    // Fallback: use the first definition as entry function
+    // Inside a quantum kernel (nested module), the entry function is tagged with
+    // `quantum.kernel_entry_point`.
     if (entryFunc.empty()) {
         for (auto funcOp : definedFuncOps) {
-            entryFunc = funcOp.getName();
-            break;
+            if (funcOp->hasAttr("quantum.kernel_entry_point")) {
+                entryFunc = funcOp.getName();
+                break;
+            }
+        }
+    }
+
+    // Fallback: use the first public definition as entry function, since passes may insert
+    // private helpers (e.g. gridsynth decomposition functions) at the start of the module.
+    if (entryFunc.empty()) {
+        for (auto funcOp : definedFuncOps) {
+            if (!funcOp.isPrivate()) {
+                entryFunc = funcOp.getName();
+                break;
+            }
         }
     }
 
@@ -229,7 +247,6 @@ void ResourceAnalysis::analyzeWhileLoop(scf::WhileOp whileOp, ResourceResult &re
 
 void ResourceAnalysis::analyzeIfOp(scf::IfOp ifOp, ResourceResult &result, bool isAdjoint,
                                    unsigned numControlQubits) {
-    result.hasBranches = true;
 
     ResourceResult thenResult = makeEmptyResult();
     analyzeRegion(ifOp.getThenRegion(), thenResult, isAdjoint, numControlQubits);
@@ -255,6 +272,8 @@ void ResourceAnalysis::analyzeIfOp(scf::IfOp ifOp, ResourceResult &result, bool 
     }
 
     // No hint: fall back to worst-case (max across branches).
+    result.hasBranches = true;
+
     if (!ifOp.getElseRegion().empty()) {
         ResourceResult elseResult = makeEmptyResult();
         analyzeRegion(ifOp.getElseRegion(), elseResult, isAdjoint, numControlQubits);
@@ -265,7 +284,6 @@ void ResourceAnalysis::analyzeIfOp(scf::IfOp ifOp, ResourceResult &result, bool 
 
 void ResourceAnalysis::analyzeIndexSwitchOp(scf::IndexSwitchOp switchOp, ResourceResult &result,
                                             bool isAdjoint, unsigned numControlQubits) {
-    result.hasBranches = true;
 
     // If branch probabilities are provided, compute the expected (average) resource counts.
     // `catalyst.estimated_probabilities` is an array of floats with one entry per case
@@ -300,6 +318,8 @@ void ResourceAnalysis::analyzeIndexSwitchOp(scf::IndexSwitchOp switchOp, Resourc
     }
 
     // No hint: fall back to worst-case (max across all cases).
+    result.hasBranches = true;
+
     ResourceResult maxResult = makeEmptyResult();
     bool first = true;
 
