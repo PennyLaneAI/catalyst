@@ -238,6 +238,7 @@ def lower_qnode_to_funcop(ctx, callable_, call_jaxpr, pipelines):
         ctx.module_context.ip = ip
         func_op = get_or_create_funcop(ctx, callable_, call_jaxpr, pipelines)
         func_op.sym_visibility = ir.StringAttr.get("public")
+        func_op.attributes["quantum.kernel_entry_point"] = ir.UnitAttr.get()
         func_op.attributes["quantum.node"] = ir.UnitAttr.get()
         diff_method = _calculate_diff_method(callable_, call_jaxpr)
         func_op.attributes["diff_method"] = ir.StringAttr.get(diff_method)
