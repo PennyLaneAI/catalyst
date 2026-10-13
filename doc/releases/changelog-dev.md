@@ -757,6 +757,11 @@
   of crashing) if any such rule/operator inconsistency reaches during the circuit rewrite.
   [(#3322)](https://github.com/PennyLaneAI/catalyst/pull/3322)
 
+* Fixed a bug where converting unconditional branch probabilities to per-``scf.if``
+  conditional probabilities could yield values slightly above ``1.0`` due to floating-point
+  rounding, which was then rejected by the ``catalyst.estimated_probability`` verifier.
+  [(#3328)](https://github.com/PennyLaneAI/catalyst/pull/3328)
+
 * Fixed a bug where a compiled Backline program continued with a session that does not work,
   for example echoing the controller's own message back as the reply, after a transport call or a
   coprocessor function's set-up failed. It now stops with an error naming the call that failed,
