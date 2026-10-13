@@ -373,3 +373,31 @@ func.func @test_ppr_operator_invalid_sign(%q0 : !quantum.bit) {
         static_data = {sign = 2 : i64, pauli_word = "Z"}
     func.return
 }
+
+// -----
+
+func.func @test_ppr_operator_dynamic_params(%q0 : !quantum.bit, %p : f64) {
+    // expected-error @+2 {{failed to legalize operation 'quantum.operator' that was explicitly marked illegal}}
+    // expected-error @+1 {{PPR operators do not support dynamic parameters}}
+    %0 = quantum.operator "PPR_4"(%p: f64) qubits(%q0)
+        static_data = {sign = 1 : i64, pauli_word = "Z"}
+    func.return
+}
+
+// -----
+
+func.func @test_ppr_operator_missing_pauli_word(%q0 : !quantum.bit) {
+    // expected-error @+2 {{failed to legalize operation 'quantum.operator' that was explicitly marked illegal}}
+    // expected-error @+1 {{PPR operators require static_data with a string 'pauli_word' and an integer 'sign'}}
+    %0 = quantum.operator "PPR_4"() qubits(%q0)
+        static_data = {sign = 1 : i64}
+    func.return
+}
+
+// -----
+
+func.func @test_ppr_operator_missing_static_data(%q0 : !quantum.bit) {
+    // expected-error @+1 {{failed to legalize operation 'quantum.operator' that was explicitly marked illegal}}
+    %0 = quantum.operator "PPR_8"() qubits(%q0) // expected-error @+0 {{PPR operators require static_data with a string 'pauli_word' and an integer 'sign'}}
+    func.return
+}
