@@ -128,22 +128,26 @@ def test_gridsynth_specs_matches_runtime(eps, ppr_basis, method):
 def test_mixed_gridsynth_samples(param, op, eps, ppr_basis):
     """Test that every sampled sequence of the mixed method is close to the target. For the
     diamond-norm error 2 * eps of the mixture, each branch satisfies Re(w) >= sqrt(1 - eps), so its
-    infidelity is at most eps."""
-    dev = qp.device("lightning.qubit", wires=1)
+    infidelity is at most eps. Each wire samples its own sequence."""
+    num_wires = 5
+    dev = qp.device("lightning.qubit", wires=num_wires)
 
     @qp.qnode(dev)
     def circuit(x: float):
-        qp.Hadamard(0)
-        op(x, wires=0)
+        for wire in range(num_wires):
+            qp.Hadamard(wire)
+            op(x, wires=wire)
         return qp.state()
 
     mixed_circuit = gridsynth(circuit, epsilon=eps, ppr_basis=ppr_basis, method="mixed")
-    qjitted_circuit = qp.qjit(mixed_circuit, capture=True, collect_decomp_rules=False)
-    expected = circuit(param)
+    qjitted_circuit = qp.qjit(mixed_circuit, capture=True, collect_decomp_rules=False, seed=37)
+    expected = qp.matrix(op(param, wires=0)) @ np.array([1, 1]) / np.sqrt(2)
 
-    for _ in range(5):
-        result = qjitted_circuit(param)
-        fidelity = np.abs(np.vdot(expected, result)) ** 2
+    result = np.reshape(qjitted_circuit(param), [2] * num_wires)
+    for wire in range(num_wires):
+        wire_state = np.moveaxis(result, wire, 0).reshape(2, -1)
+        density_matrix = wire_state @ wire_state.conj().T
+        fidelity = np.real(np.vdot(expected, density_matrix @ expected))
         assert 1 - fidelity <= eps
 
 

@@ -22,8 +22,9 @@
 
 * The `gridsynth` pass has a new `method="mixed"` option, implementing the mixed diagonal
   approximation of [arXiv:2203.10064](https://arxiv.org/abs/2203.10064) (Section 3.4). Each
-  rotation randomly applies one of two Clifford+T sequences whose errors cancel on average, which
-  roughly halves the T-count at the same accuracy, on average over executions.
+  rotation randomly applies an under- or an over-rotating Clifford+T sequence, with probabilities
+  that cancel their coherent errors and leave a smaller incoherent error. This roughly halves the
+  T-count at the same accuracy of the channel averaged over executions.
   [(#3314)](https://github.com/PennyLaneAI/catalyst/pull/3314)
 
   ```python
@@ -33,8 +34,19 @@
   @gridsynth(epsilon=1e-6, method="mixed")
   @qp.qnode(qp.device("lightning.qubit", wires=1))
   def circuit(x: float):
+      qp.Hadamard(0)
       qp.RZ(x, wires=0)
-      return qp.state()
+      return qp.expval(qp.X(0))
+  ```
+
+  Each execution samples a sequence, so results can differ around the exact value
+  `cos(0.3) = 0.95534`:
+
+  ```pycon
+  >>> circuit(0.3)
+  Array(0.95551714, dtype=float64)
+  >>> circuit(0.3)
+  Array(0.95507396, dtype=float64)
   ```
 
 * You can now dynamically prepare magic T states inside captured Catalyst workflows using

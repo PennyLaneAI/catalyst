@@ -299,8 +299,6 @@ struct DecompositionExternalFuncs {
 
 /**
  * @brief Declare the runtime functions returning the gate sequence.
- *
- * The mixed variants take an additional f64 uniform sample selecting the branch and twirl.
  */
 DecompositionExternalFuncs getOrDeclareExternalFuncs(PatternRewriter &rewriter, func::FuncOp func,
                                                      GridsynthMethod method) {
@@ -312,6 +310,7 @@ DecompositionExternalFuncs getOrDeclareExternalFuncs(PatternRewriter &rewriter, 
 
     SmallVector<Type> scalarArgs = {f64Type, f64Type, i1Type};
     if (mixed) {
+        // Uniform sample selecting the branch and twirl.
         scalarArgs.push_back(f64Type);
     }
     SmallVector<Type> gatesArgs = {rankedMemRefType};

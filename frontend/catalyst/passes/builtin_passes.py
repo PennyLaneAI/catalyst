@@ -838,8 +838,9 @@ def gridsynth_setup_inputs(epsilon=1e-4, ppr_basis=False, method="deterministic"
     Args:
         qnode (QNode): the QNode to apply the gridsynth compiler pass to
         epsilon (float): The accuracy per rotation gate. Defaults to ``1e-4``. With
-            ``"deterministic"``, each rotation has operator norm error at most ``epsilon``.
-            ``"mixed"`` matches this accuracy on average over samples.
+            ``"deterministic"``, each rotation has operator norm error at most ``epsilon``, and
+            therefore diamond norm error at most ``2 * epsilon``. With ``"mixed"``, the channel
+            averaged over samples has diamond norm error at most ``2 * epsilon``.
         ppr_basis (bool): If true, decompose directly to Pauli Product Rotations (PPRs) in PBC dialect. Defaults to ``False``
         method (str): The synthesis method. ``"deterministic"`` (default) applies a single
             Ross-Selinger gate sequence per rotation. ``"mixed"`` applies, per execution, one of
@@ -858,12 +859,18 @@ def gridsynth_setup_inputs(epsilon=1e-4, ppr_basis=False, method="deterministic"
 
     .. note::
 
-        With ``method="mixed"``, the accuracy guarantee holds on average over samples, and each
-        sampled sequence has error of order :math:`\sqrt{\epsilon}`. By default, and with
+        With ``method="mixed"``, each rotation applies the under- or the over-rotating sequence,
+        conjugated as :math:`\sigma U \sigma^\dagger` with :math:`\sigma` drawn uniformly from
+        :math:`\{I, S, Z, S^\dagger\}` (the {Z, S} twirl). This gives eight possible sequences
+        per rotation. The twirl leaves the target rotation unchanged, since it commutes with
+        :math:`\sigma`.
+
+        The accuracy guarantee holds on average over samples, and each sampled sequence has error
+        of order :math:`\sqrt{\epsilon}`. By default, and with
         ``mcm_method="single-branch-statistics"``, a call samples one sequence per rotation, shared
         by all its shots. With ``mcm_method="one-shot"``, every shot samples its own. Samples are
         drawn from the runtime random number generator seeded by the ``seed`` argument of
-        :func:`~.qjit`, so with a fixed seed every call repeats the same samples.
+        :func:`~.qjit`, so with a fixed seed every call uses the same gate sequences.
 
     **Example**
 
