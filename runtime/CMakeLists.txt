@@ -132,3 +132,152 @@ if(APPLE AND (${CMAKE_SYSTEM_PROCESSOR} STREQUAL arm64))
     )
     add_dependencies(rt_capi lapacke-accelerate)  # automatically build with the runtime
 endif()  # if(APPLE AND (${CMAKE_SYSTEM_PROCESSOR} STREQUAL arm64))
+
+
+##############################
+## Catalyst Runtime Version ##
+##############################
+
+set(CATALYST_VERSION_PY_FILE "${PROJECT_SOURCE_DIR}/../frontend/catalyst/_version.py")
+
+# Extracts __version__ from frontend/catalyst/_version.py into ${out_var} in the
+# caller's scope, or "unknown" (with a warning) if it cannot be read.
+# NOTE: kept in sync with the identical helper in mlir/CMakeLists.txt. The two
+# builds are configured as independent CMake projects, so they cannot share it.
+function(read_catalyst_version input_file out_var)
+    set(version_number "unknown")
+    if (NOT EXISTS ${input_file})
+        message(WARNING "Could not find ${input_file}")
+    else()
+        file(READ ${input_file} input_content)
+        if (NOT input_content MATCHES "__version__ = \"([^\"]+)\"")
+            message(WARNING "Could not find Catalyst version in ${input_file}")
+        else()
+            set(version_number "${CMAKE_MATCH_1}")
+        endif()
+    endif()
+    set(${out_var} "${version_number}" PARENT_SCOPE)
+endfunction(read_catalyst_version)
+
+read_catalyst_version("${CATALYST_VERSION_PY_FILE}" CATALYST_PACKAGE_VERSION)
+if (CATALYST_PACKAGE_VERSION STREQUAL "unknown")
+    message(FATAL_ERROR
+        "Failed to read Catalyst package version from ${CATALYST_VERSION_PY_FILE}")
+endif()
+message(STATUS "Found Catalyst package version: ${CATALYST_PACKAGE_VERSION}")
+
+
+###########################################################################
+## Generate a Catalyst Runtime Development Package for External Projects ##
+###########################################################################
+
+include(GNUInstallDirs)
+
+# Recursively collect the shared libraries and Python modules defined under
+# runtime/lib. We walk the directory tree instead of hard-coding a target list so
+# the package automatically follows the ENABLE_* options (OpenQASM, OQD,
+# transport, executor) without this list drifting out of sync with the Makefile.
+function(collect_runtime_libraries dir out_var)
+    set(result "")
+
+    get_property(subdirs DIRECTORY ${dir} PROPERTY SUBDIRECTORIES)
+    foreach(subdir IN LISTS subdirs)
+        # FetchContent (Boost, ...) adds its sources under the build tree, which
+        # shows up here as a subdirectory. Those are not ours to ship, so keep
+        # only directories that live under runtime/lib in the source tree.
+        string(FIND "${subdir}" "${PROJECT_SOURCE_DIR}/lib" prefix_pos)
+        if(prefix_pos EQUAL 0)
+            collect_runtime_libraries(${subdir} subdir_result)
+            list(APPEND result ${subdir_result})
+        endif()
+    endforeach()
+
+    get_property(targets DIRECTORY ${dir} PROPERTY BUILDSYSTEM_TARGETS)
+    foreach(target IN LISTS targets)
+        get_target_property(target_type ${target} TYPE)
+        # Only real artifacts: STATIC helpers (transport_common, *_impl) are
+        # already linked into the shared libs, INTERFACE libs have no artifact,
+        # and custom targets (transport_all, ...) build nothing to install.
+        if(target_type STREQUAL "SHARED_LIBRARY" OR target_type STREQUAL "MODULE_LIBRARY")
+            list(APPEND result ${target})
+        endif()
+    endforeach()
+
+    set(${out_var} "${result}" PARENT_SCOPE)
+endfunction(collect_runtime_libraries)
+
+collect_runtime_libraries("${PROJECT_SOURCE_DIR}/lib" CATALYST_RUNTIME_INSTALL_TARGETS)
+list(SORT CATALYST_RUNTIME_INSTALL_TARGETS)
+message(STATUS "Catalyst runtime package libraries: ${CATALYST_RUNTIME_INSTALL_TARGETS}")
+
+# rt_capi dlopen()s catalyst_callback_registry.so, and the transport/executor
+# libs load their siblings the same way. CMake strips the build-tree RPATH on
+# install, so the installed libs need their own $ORIGIN lookup to stay loadable
+# once unpacked somewhere else.
+if(APPLE)
+    set(CATALYST_RUNTIME_INSTALL_RPATH "@loader_path")
+else()
+    set(CATALYST_RUNTIME_INSTALL_RPATH "$ORIGIN")
+endif()
+set_target_properties(${CATALYST_RUNTIME_INSTALL_TARGETS} PROPERTIES
+    INSTALL_RPATH "${CATALYST_RUNTIME_INSTALL_RPATH}")
+
+install(TARGETS ${CATALYST_RUNTIME_INSTALL_TARGETS}
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT catalyst-runtime-dev)
+
+# Public runtime headers (QuantumDevice.hpp, RuntimeCAPI.h, Types.h, ...). These
+# only include each other, so the directory is self-contained.
+install(DIRECTORY ${runtime_includes}/
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+    COMPONENT catalyst-runtime-dev
+    FILES_MATCHING
+      PATTERN "*.h"
+      PATTERN "*.hpp")
+
+# Device capability configs. runtime/lib/backend/CMakeLists.txt configure_file()s
+# one per enabled backend into ${CMAKE_BINARY_DIR}/lib/backend, so globbing picks
+# up exactly the backends this build enabled. That runs during add_subdirectory(lib)
+# above, i.e. before this glob is evaluated.
+#
+# The destination is load-bearing: _load_device_capabilities() in
+# frontend/catalyst/device/qjit_device.py resolves a config as
+# <RUNTIME_LIB_DIR>/../lib/backend/<device_name>.toml, so these must sit in
+# lib/backend/ beside the libs, not in share/.
+file(GLOB CATALYST_DEVICE_CONFIG_FILES "${CMAKE_BINARY_DIR}/lib/backend/*.toml")
+if(CATALYST_DEVICE_CONFIG_FILES)
+    install(FILES ${CATALYST_DEVICE_CONFIG_FILES}
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/backend
+        COMPONENT catalyst-runtime-dev)
+else()
+    message(WARNING "No device config (*.toml) files found in ${CMAKE_BINARY_DIR}/lib/backend")
+endif()
+
+# On macOS arm64 the LAPACKE-over-Accelerate shim is built by ExternalProject and
+# copied next to our libs; rt_capi needs it at load time. FILES_MATCHING makes
+# this a no-op on platforms/configurations where it was never built.
+if(APPLE AND (${CMAKE_SYSTEM_PROCESSOR} STREQUAL arm64))
+    install(DIRECTORY "${CMAKE_BINARY_DIR}/lib/"
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        COMPONENT catalyst-runtime-dev
+        FILES_MATCHING PATTERN "liblapacke*")
+endif()
+
+# Install license to share/doc/catalyst_runtime/LICENSE
+install(FILES "${PROJECT_SOURCE_DIR}/../LICENSE"
+    DESTINATION "${CMAKE_INSTALL_DOCDIR}"
+    COMPONENT catalyst-runtime-dev)
+
+set(CPACK_PACKAGE_NAME "catalyst-runtime-dev")
+set(CPACK_PACKAGE_VERSION "${CATALYST_PACKAGE_VERSION}")
+set(CPACK_PACKAGE_VENDOR "Xanadu Quantum Technologies Inc.")
+set(CPACK_RESOURCE_FILE_LICENSE "${PROJECT_SOURCE_DIR}/../LICENSE")
+set(CPACK_GENERATOR "TGZ")
+set(CPACK_PACKAGE_FILE_NAME "${CPACK_PACKAGE_NAME}-${CMAKE_SYSTEM_NAME}-${CMAKE_SYSTEM_PROCESSOR}-${CATALYST_PACKAGE_VERSION}")
+set(CPACK_ARCHIVE_COMPONENT_INSTALL ON)
+set(CPACK_INCLUDE_TOPLEVEL_DIRECTORY ON)                   # extracts into catalyst-runtime-dev-<ver>
+set(CPACK_COMPONENT_INCLUDE_TOPLEVEL_DIRECTORY ON)         # as above
+set(CPACK_COMPONENTS_ALL catalyst-runtime-dev)             # only catalyst-runtime-dev component
+set(CPACK_COMPONENTS_GROUPING ALL_COMPONENTS_IN_ONE)       # single archive, no per-component split
+
+message(STATUS "Preparing CPack package ${CPACK_PACKAGE_FILE_NAME}")
+include(CPack)
