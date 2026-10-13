@@ -284,7 +284,7 @@ def _gradient_preprocessing(
 def _safe_create_bound_transform(
     transform: Transform, unsupported_transforms: list[str], warn=True, args=(), kwargs=None
 ) -> BoundTransform:
-    """Create a bound transform safely. If the transform is not supported at the MLIR/xDSL
+    """Create a bound transform safely for device transforms. If the transform is not supported at the MLIR/xDSL
     layer, an identity xDSL transform is inserted for it."""
     if not transform.pass_name:
         transform_name = transform.tape_transform.__name__
@@ -292,6 +292,6 @@ def _safe_create_bound_transform(
             unsupported_transforms.append(transform_name)
 
         empty_transform = Transform(pass_name="empty")
-        return BoundTransform(empty_transform, kwargs={"key": transform_name})
+        return BoundTransform(empty_transform, is_device_transform=True, kwargs={"key": transform_name})
 
     return BoundTransform(transform, args, kwargs)
