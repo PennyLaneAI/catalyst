@@ -749,9 +749,9 @@
 
 <h3>Bug fixes 🐛</h3>
 
-* Fixed a bug in the conversion between unconditional and conditional probabilities in chains of
-  ``scf.if`` statements, which could lead to branch probabilities above ``1.0`` due to floating
-  point rounding errors.
+* Fixed a bug where converting unconditional branch probabilities to per-``scf.if``
+  conditional probabilities could yield values slightly above ``1.0`` due to floating-point
+  rounding, which was then rejected by the ``catalyst.estimated_probability`` verifier.
   [(#3328)](https://github.com/PennyLaneAI/catalyst/pull/3328)
 
 * Fixed a bug where a compiled Backline program continued with a session that does not work,
