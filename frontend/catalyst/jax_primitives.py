@@ -608,7 +608,6 @@ def _runtime_call_lowering(
     ``out_bytes`` is consumed when the call is traced.
     """
     ctx = jax_ctx.module_context.context
-    ctx.allow_unregistered_dialects = True
 
     dynamic_operands = iter(operands)
     call_inputs = []
