@@ -83,6 +83,10 @@ elseif(NOT ROCM_ROOT AND EXISTS "/opt/rocm")
     set(ROCM_ROOT "/opt/rocm")
 endif()
 
+if(ROCM_ROOT) 
+  list(PREPEND CMAKE_PREFIX_PATH "${ROCM_ROOT}") 
+endif()
+
 # On NVIDIA the compiler is nvcc and ROCm supplies only the headers, so point CMake at both
 # for check_language(HIP) below. Whoever installs hip-dev sets ROCM_PATH; see the
 # check-transport workflow, which pins the packages it fetches.
