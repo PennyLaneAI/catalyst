@@ -406,7 +406,8 @@ def _handle_decompose_transform(self, inner_jaxpr, consts, non_const_args, tkwar
 
         # Set resource analysis estimation options after graph_decomposition_setup_inputs.
         if resource_analysis_enabled:
-            bound_pass.kwargs.update({key: tkwargs[key] for key in _RESOURCE_ANALYSIS_TKWARGS})
+            bound_pass.kwargs["output_json"] = tkwargs["output_json"]
+            bound_pass.kwargs["output_fname"] = tkwargs["output_fname"]
         next_eval._pass_pipeline.insert(0, bound_pass)
 
         return next_eval.eval(inner_jaxpr, consts, *non_const_args)
