@@ -99,7 +99,6 @@ def qjit(
     abstracted_axes=None,
     disable_assertions=False,
     seed=None,
-    circuit_transform_pipeline=None,
     pass_plugins=None,
     dialect_plugins=None,
     capture="global",
@@ -170,15 +169,6 @@ def qjit(
             :func:`qp.sample() <pennylane.sample>`, :func:`qp.counts() <pennylane.counts>`,
             :func:`qp.probs() <pennylane.probs>`, :func:`qp.expval() <pennylane.expval>`,
             :func:`qp.var() <pennylane.var>`.
-        circuit_transform_pipeline (Optional[dict[str, dict[str, str]]]):
-            A dictionary that specifies the quantum circuit transformation pass pipeline order,
-            and optionally arguments for each pass in the pipeline. Keys of this dictionary
-            should correspond to names of passes found in the `catalyst.passes <https://docs.
-            pennylane.ai/projects/catalyst/en/stable/code/__init__.html#module-catalyst.passes>`_
-            module, values should either be empty dictionaries (for default pass options) or
-            dictionaries of valid keyword arguments and values for the specific pass.
-            The order of keys in this dictionary will determine the pass pipeline.
-            If not specified, the default pass pipeline will be applied.
         pass_plugins (Optional[List[Path]]): List of paths to pass plugins.
         dialect_plugins (Optional[List[Path]]): List of paths to dialect plugins.
         capture (str or bool): Controls whether to use PennyLane program capture for tracing.
@@ -905,9 +895,6 @@ class QJIT(CatalystCallable):
             params["_out_tree_expected"] = []
             params["_classical_return_indices"] = []
             params["_num_mcm_expected"] = []
-            default_pass_pipeline = self.compile_options.circuit_transform_pipeline
-            pass_pipeline = params.get("pass_pipeline", default_pass_pipeline)
-            params["pass_pipeline"] = pass_pipeline
             params["debug_info"] = dbg
 
             return QFunc.__call__(
