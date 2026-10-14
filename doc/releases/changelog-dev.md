@@ -727,9 +727,11 @@
   reducing repeated pairwise normalization while preserving the resulting partition.
   [(#3095)](https://github.com/PennyLaneAI/catalyst/pull/3095)
 
-* ``to_ppr`` now directly lowers PennyLane's discrete ``PPR`` operator to ``pbc.ppr``.
+* `to_ppr` now directly lowers PennyLane's discrete `PPR_2`, `PPR_4` and `PPR_8` operators
+  to `pbc.ppr`.
   [(#3185)](https://github.com/PennyLaneAI/catalyst/pull/3185)
   [(#3262)](https://github.com/PennyLaneAI/catalyst/pull/3262)
+  [(#3319)](https://github.com/PennyLaneAI/catalyst/pull/3319)
 
 * The `--adjoint-lowering` pass no longer caches all classical gate parameters.
   Parameters that are trivially available to the reverse pass are no longer cached.
@@ -777,6 +779,11 @@
 <h3>Deprecations 👋</h3>
 
 <h3>Bug fixes 🐛</h3>
+
+* Fixed a bug where converting unconditional branch probabilities to per-``scf.if``
+  conditional probabilities could yield values slightly above ``1.0`` due to floating-point
+  rounding, which was then rejected by the ``catalyst.estimated_probability`` verifier.
+  [(#3328)](https://github.com/PennyLaneAI/catalyst/pull/3328)
 
 * Fixed a bug where a compiled Backline program continued with a session that does not work,
   for example echoing the controller's own message back as the reply, after a transport call or a
