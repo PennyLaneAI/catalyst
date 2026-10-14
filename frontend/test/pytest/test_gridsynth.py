@@ -222,6 +222,34 @@ def test_mixed_gridsynth_seed(method):
     assert not np.allclose(results[0], results[2])
 
 
+@pytest.mark.parametrize("method", ["mixed", "mixed-fallback"])
+@pytest.mark.parametrize("mcm_method", ["single-branch-statistics", "one-shot"])
+def test_mixed_gridsynth_samples_per_shot(method, mcm_method):
+    """Test that the shots of a call share one sample with single-branch statistics, and that
+    every shot draws its own with one-shot. With a coarse epsilon, samples differ visibly, so the
+    means of calls spread far more than shot noise if their shots share a sample."""
+    x = 1.1
+    shots = 1000
+    dev = qp.device("lightning.qubit", wires=1)
+
+    @qp.qnode(dev, shots=shots, mcm_method=mcm_method)
+    def circuit(x: float):
+        qp.Hadamard(0)
+        qp.RZ(x, wires=0)
+        return qp.expval(qp.X(0))
+
+    qjitted_circuit = qp.qjit(
+        gridsynth(circuit, epsilon=0.05, method=method), capture=True, collect_decomp_rules=False
+    )
+    spread = np.std([qjitted_circuit(x) for _ in range(20)])
+    shot_noise = np.sqrt((1 - np.cos(x) ** 2) / shots)
+
+    if mcm_method == "one-shot":
+        assert spread < 2 * shot_noise
+    else:
+        assert spread > 4 * shot_noise
+
+
 def test_invalid_method():
     """Test that an unknown synthesis method raises an error."""
     with pytest.raises(ValueError, match="method must be 'deterministic', 'mixed' or"):
