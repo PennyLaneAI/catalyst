@@ -14,6 +14,7 @@
 
 #pragma once
 
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/Region.h"
 #include "mlir/IR/Value.h"
@@ -32,8 +33,34 @@ namespace quantum {
 /// are pushed in program order during the forward pass and popped in reverse during the backward
 /// pass.
 struct QuantumCache {
-    mlir::TypedValue<ArrayListType> paramVector;
-    mlir::TypedValue<ArrayListType> intVector;
+
+    /// A rank-0 memref holding the raw byte buffer that gate parameters are recorded into:
+    /// `memref<memref<?xi8>>`.
+    /// The byte buffer is kept *behind* a rank-0 indirection so that it can grow. `memref.realloc`
+    /// returns a new SSA value, and the buffer is used from inside the regions of the `scf` ops the
+    /// forward pass emits; without the indirection, a reallocated buffer could not be made visible
+    /// to the rest of the program without threading it through every enclosing loop as an
+    /// iter_arg
+    mlir::Value paramVector;
+
+    /// `memref<index>` holding the byte capacity of the buffer currently in `paramVector`.
+    mlir::Value paramVectorCapacity;
+
+    /// `memref<index>` holding the offset, in bytes, of the next free slot in the byte buffer.
+    mlir::Value currentOffset;
+    mlir::TypedValue<ArrayListType> offsetVector;
+    mlir::func::FuncOp offsetRoundupFunc;
+    mlir::func::FuncOp ensureCapacityFunc;
+
+    /// Helper that frees `paramVector`, `paramVectorCapacity` and `currentOffset`.
+    ///
+    /// Both the allocation and the deallocation of these buffers are kept inside module-level
+    /// helpers so that no `memref.alloc`/`memref.dealloc` for the cache appears in the function
+    /// being lowered. Otherwise, for an adjoint nested inside a loop, `-buffer-loop-hoisting`
+    /// hoists the allocation out of the loop and leaves the deallocation inside it, which frees the
+    /// cache once per iteration.
+    mlir::func::FuncOp deallocParamVectorFunc;
+
     mlir::TypedValue<ArrayListType> wireVector;
     /// For every structured control flow op, store the values required for it to execute.
     /// Specifically: store the conditions for scf.if ops, the start/stop/step of scf.for ops, and
@@ -45,13 +72,21 @@ struct QuantumCache {
     static QuantumCache initialize(mlir::Region &topLevelRegion, mlir::OpBuilder &builder,
                                    mlir::Location loc);
 
+    /// Emit a call to `ensureCapacityFunc` growing the byte buffer, if needed, so that the first
+    /// `requiredNumBytes` bytes of it are addressable.
+    void emitEnsureCapacity(mlir::OpBuilder &builder, mlir::Location loc,
+                            mlir::Value requiredNumBytes) const;
+
+    /// Emit a load of the byte buffer currently held in `paramVector`, yielding a `memref<?xi8>`
+    /// that is a valid `memref.view` source.
+    ///
+    /// Growing the cache may move the buffer, so this must be re-emitted after every
+    /// `emitEnsureCapacity` call rather than hoisted: a value loaded before a growth point is
+    /// dangling after it.
+    mlir::Value emitLoadParamVectorData(mlir::OpBuilder &builder, mlir::Location loc) const;
+
     void emitDealloc(mlir::OpBuilder &builder, mlir::Location loc);
 };
-
-/// Verify that `ty` is a type the cache knows how to record: an f64 or integer (<= 64-bit) scalar,
-/// a tensor of f64 or integer (<= 64-bit) elements, or a 2D tensor of complex<f64>. Emits an error
-/// on `op` and returns failure otherwise.
-mlir::LogicalResult verifyTypeIsCacheable(mlir::Type ty, mlir::Operation *op);
 
 /// Returns true if `param`, a gate parameter used inside `adjointRegion`, is already available
 /// when the reverse pass emits its gates, and therefore does not need to be recorded in the cache.
@@ -68,6 +103,10 @@ mlir::LogicalResult verifyTypeIsCacheable(mlir::Type ty, mlir::Operation *op);
 /// It does not hold for values defined inside nested control flow, since the forward pass rebuilds
 /// those regions and their values are neither visible nor loop-invariant: they must be recorded.
 bool isAvailableToReversePass(mlir::Value param, mlir::Region &adjointRegion);
+
+/// Verify that `ty` is a type the cache knows how to record
+/// Scalar and tensor types are allowed
+mlir::LogicalResult verifyTypeIsCacheable(mlir::Type ty, mlir::Operation *op);
 
 } // namespace quantum
 } // namespace catalyst

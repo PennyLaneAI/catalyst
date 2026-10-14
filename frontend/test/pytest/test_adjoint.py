@@ -251,6 +251,37 @@ class TestCatalyst:
             func, qp.device(backend, wires=2), _input, capture_mode=capture_mode
         )
 
+    def test_adjoint_param_cache_growth(self, backend, capture_mode):
+        """Ensures that the adjoint parameter cache grows beyond its initial capacity.
+
+        Each iteration caches a 4x4 complex<f64> matrix, i.e. 256 bytes, so 32 iterations need
+        8192 bytes against an initial capacity of 2048. This exercises repeated reallocation of
+        the cache byte buffer.
+        """
+
+        def func(gate):
+            @for_loop(0, 32, 1)
+            def loop_body(_i, s):
+                # Nonsensical, but good enough
+                gate_modified = gate + s
+                qp.QubitUnitary(gate_modified, wires=[0, 1])
+                return s + 1
+
+            loop_body(1)  # pylint: disable=no-value-for-parameter
+
+        _input = jnp.array(
+            [
+                [0.99500417 - 0.09983342j, 0.0 + 0.0j, 0.0 + 0.0j, 0.0 + 0.0j],
+                [0.0 + 0.0j, 0.99500417 + 0.09983342j, 0.0 + 0.0j, 0.0 + 0.0j],
+                [0.0 + 0.0j, 0.0 + 0.0j, 0.99500417 + 0.09983342j, 0.0 + 0.0j],
+                [0.0 + 0.0j, 0.0 + 0.0j, 0.0 + 0.0j, 0.99500417 - 0.09983342j],
+            ]
+        )
+
+        self.verify_catalyst_adjoint_against_pennylane(
+            func, qp.device(backend, wires=2), _input, capture_mode=capture_mode
+        )
+
     def test_adjoint_multirz(self, backend, capture_mode):
         """Ensures that catalyst.adjoint supports MultiRZ operations."""
         if backend == "lightning.kokkos":
@@ -1242,7 +1273,7 @@ class TestMatrix:
 
 def test_sparse_matrix():
     """Test that the spare_matrix method returns the adjoint of the base sparse matrix."""
-    # pylint: disable=import-outside-toplevel
+    # pylint: disable=import-outside-toplevel,no-member
     from scipy.sparse import coo_matrix, csr_matrix
 
     H = np.array([[6 + 0j, 1 - 2j], [1 + 2j, -1]])
