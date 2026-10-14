@@ -2539,5 +2539,35 @@ def test_best_diff_method_mixed_return():
     assert "adjoint" not in qjit_jacobian.mlir
 
 
+def test_grad_atan2_classical():
+    """Test that the llvm.atan2 intrinsic can be differentiated (issue #3325)."""
+
+    @qjit
+    def f(y, x):
+        return grad(jnp.arctan2, argnums=[0, 1])(y, x)
+
+    expected = jax.grad(jnp.arctan2, argnums=[0, 1])(0.3, 0.7)
+    assert np.allclose(f(0.3, 0.7), expected)
+
+
+def test_grad_amplitude_embedding(backend):
+    """Test differentiating a QNode with AmplitudeEmbedding, which lowers to the
+    llvm.atan2 intrinsic (issue #3325)."""
+
+    def circuit(features, theta):
+        qml.AmplitudeEmbedding(features, wires=[0], normalize=True)
+        qml.RY(theta, wires=0)
+        return qml.expval(qml.PauliZ(0))
+
+    features = jnp.array([0.3, 1.1])
+    theta = 0.4
+
+    compiled = qjit(grad(qml.qnode(qml.device(backend, wires=1))(circuit), argnums=[0, 1]))
+    expected = jax.grad(qml.qnode(qml.device("default.qubit", wires=1))(circuit), argnums=[0, 1])
+
+    for res, exp in zip(compiled(features, theta), expected(features, theta)):
+        assert np.allclose(res, exp)
+
+
 if __name__ == "__main__":
     pytest.main(["-x", __file__])

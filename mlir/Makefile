@@ -126,6 +126,10 @@ enzyme:
 	@if cd Enzyme; git apply --check $(MK_DIR)/patches/enzyme-nvvm-fabs-intrinsics.patch; then \
 		git apply $(MK_DIR)/patches/enzyme-nvvm-fabs-intrinsics.patch; \
 	fi
+	# Backport Enzyme PR #3222 (reverse-mode support for the llvm.atan2 intrinsic)
+	@if cd Enzyme; git apply --check $(MK_DIR)/patches/enzyme-atan2-intrinsic.patch; then \
+		git apply $(MK_DIR)/patches/enzyme-atan2-intrinsic.patch; \
+	fi
 	cmake -G Ninja -S Enzyme/enzyme -B $(ENZYME_BUILD_DIR) \
 		-DENZYME_STATIC_LIB=ON \
 		-DCMAKE_BUILD_TYPE=$(BUILD_TYPE) \

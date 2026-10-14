@@ -97,7 +97,7 @@ jobs:
       uses: actions/cache@v4
       with:
         path: ${{ github.workspace }}/mlir/Enzyme
-        key: enzyme-${{ needs.constants.outputs.enzyme_version }}-container-source
+        key: enzyme-${{ needs.constants.outputs.enzyme_version }}-${{ hashFiles('mlir/patches/enzyme-*.patch') }}-container-source
         enableCrossOsArchive: True
 
     - name: Clone LLVM Submodule
@@ -135,6 +135,7 @@ jobs:
       run: |
         cd $GITHUB_WORKSPACE/mlir/Enzyme
         git apply $GITHUB_WORKSPACE/mlir/patches/enzyme-nvvm-fabs-intrinsics.patch
+        git apply $GITHUB_WORKSPACE/mlir/patches/enzyme-atan2-intrinsic.patch
 
     # Cache external project builds
     - name: Restore LLVM Build
@@ -157,7 +158,7 @@ jobs:
       uses: actions/cache/restore@v4
       with:
         path: ${{ github.workspace }}/enzyme-build
-        key: ${{ matrix.container_img }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-wheel-build
+        key: ${{ matrix.container_img }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-${{ hashFiles('mlir/patches/enzyme-*.patch') }}-wheel-build
         lookup-only: True
 
     - name: Install dependencies
@@ -239,7 +240,7 @@ jobs:
       uses: actions/cache/save@v4
       with:
         path: ${{ github.workspace }}/enzyme-build
-        key: ${{ matrix.container_img }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-wheel-build
+        key: ${{ matrix.container_img }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-${{ hashFiles('mlir/patches/enzyme-*.patch') }}-wheel-build
 
   catalyst-linux-wheels-arm64:
     needs: [constants, build-dependencies]
@@ -313,7 +314,7 @@ jobs:
       uses: actions/cache/restore@v4
       with:
         path: ${{ github.workspace }}/mlir/Enzyme
-        key: enzyme-${{ needs.constants.outputs.enzyme_version }}-container-source
+        key: enzyme-${{ needs.constants.outputs.enzyme_version }}-${{ hashFiles('mlir/patches/enzyme-*.patch') }}-container-source
         enableCrossOsArchive: True
         fail-on-cache-miss: True
 
@@ -322,7 +323,7 @@ jobs:
       uses: actions/cache/restore@v4
       with:
         path: ${{ github.workspace }}/enzyme-build
-        key: ${{ matrix.container_img }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-wheel-build
+        key: ${{ matrix.container_img }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-${{ hashFiles('mlir/patches/enzyme-*.patch') }}-wheel-build
         fail-on-cache-miss: True
 
     - name: Build Catalyst-Runtime

@@ -1,4 +1,4 @@
-# Release 0.14.1 (current release)
+# Release 0.14.1
 
 <h3>Bug fixes</h3>
 
