@@ -68,6 +68,33 @@ TEST_CASE("Test ZSqrtTwo class", "[RSDecomp][Rings]") {
     CHECK(z2.to_omega() == ZOmega(-4, 0, 4, 3));
 }
 
+TEST_CASE("Test ZSqrtTwo sign and ordering", "[RSDecomp][Rings]") {
+    CHECK(ZSqrtTwo(0, 0).sign() == 0);
+    CHECK(ZSqrtTwo(3, 0).sign() == 1);
+    CHECK(ZSqrtTwo(0, -2).sign() == -1);
+    CHECK(ZSqrtTwo(2, 5).sign() == 1);
+    CHECK(ZSqrtTwo(-2, -5).sign() == -1);
+    // 3 - 2√2 ≈ 0.17 and -3 + 2√2 ≈ -0.17
+    CHECK(ZSqrtTwo(3, -2).sign() == 1);
+    CHECK(ZSqrtTwo(-3, 2).sign() == -1);
+    // 1 - √2 ≈ -0.41
+    CHECK(ZSqrtTwo(1, -1).sign() == -1);
+
+    // With (1 + √2)^80 = a + b√2, the conjugate a - b√2 = (1 - √2)^80 ≈ 1e-31 has large
+    // coefficients that cancel far beyond double precision.
+    ZSqrtTwo lambda_n = ZSqrtTwo(1, 1).pow(80);
+    ZSqrtTwo tiny(lambda_n.a, -lambda_n.b);
+    CHECK(tiny.sign() == 1);
+    CHECK(ZSqrtTwo(-lambda_n.a, lambda_n.b).sign() == -1);
+    CHECK(ZSqrtTwo(0, 0) < tiny);
+    CHECK(tiny < ZSqrtTwo(1, 0));
+
+    CHECK(ZSqrtTwo(1, 1) < ZSqrtTwo(3, 0));
+    CHECK_FALSE(ZSqrtTwo(3, 0) < ZSqrtTwo(1, 1));
+    CHECK(ZSqrtTwo(2, 1) <= ZSqrtTwo(2, 1));
+    CHECK_FALSE(ZSqrtTwo(2, 1) < ZSqrtTwo(2, 1));
+}
+
 TEST_CASE("Test ZOmega class", "[RSDecomp][Rings]") {
     const double tol = 1e-10;
     ZOmega z1(1, 2, 3, 4);

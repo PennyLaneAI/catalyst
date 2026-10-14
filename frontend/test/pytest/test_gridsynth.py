@@ -116,11 +116,27 @@ def test_gridsynth_specs_matches_runtime(eps, ppr_basis):
     assert estimated_t == pytest.approx(executed_t, rel=0.05)
 
 
-_EPSILON_WARN_FRAGMENT = "For epsilon smaller than 1e-6"
+@pytest.mark.parametrize("param", [-4.4, -0.3, 0.1, 2.2])
+@pytest.mark.parametrize("eps", [1e-10, 1e-12, 1e-15])
+def test_gridsynth_high_precision(param, eps):
+    """Test that gridsynth reaches precisions beyond double-precision geometry."""
+    dev = qp.device("lightning.qubit", wires=1)
+
+    @qp.qnode(dev)
+    def circuit(x: float):
+        qp.Hadamard(0)
+        qp.RZ(x, wires=0)
+        return qp.state()
+
+    expected = circuit(param)
+    gridsynthed_circuit = qp.transforms.gridsynth(circuit, epsilon=eps)
+    result = qp.qjit(gridsynthed_circuit, capture=True, collect_decomp_rules=False)(param)
+
+    assert qp.math.allclose(result, expected, atol=eps)
 
 
-def test_epsilon_warning_emitted_for_small_epsilon(capfd):
-    """Test that a runtime warning is written to stderr when epsilon < 1e-6."""
+def test_no_warning_for_small_epsilon(capfd):
+    """Test that no runtime warning is written to stderr for small epsilon."""
     dev = qp.device("lightning.qubit", wires=1)
 
     @qp.qnode(dev)
@@ -133,11 +149,11 @@ def test_epsilon_warning_emitted_for_small_epsilon(capfd):
     )(0.5)
 
     captured = capfd.readouterr()
-    assert _EPSILON_WARN_FRAGMENT in captured.err
+    assert "Gridsynth" not in captured.err
 
 
-def test_epsilon_warning_not_emitted_for_safe_epsilon(capfd):
-    """Test that no runtime warning is written to stderr when epsilon >= 1e-6."""
+def test_error_for_unsupported_epsilon():
+    """Test that an epsilon below the supported precision raises an error at runtime."""
     dev = qp.device("lightning.qubit", wires=1)
 
     @qp.qnode(dev)
@@ -145,9 +161,8 @@ def test_epsilon_warning_not_emitted_for_safe_epsilon(capfd):
         qp.RZ(x, wires=0)
         return qp.state()
 
-    qp.qjit(
-        qp.transforms.gridsynth(circuit, epsilon=1e-4), capture=True, collect_decomp_rules=False
-    )(0.5)
-
-    captured = capfd.readouterr()
-    assert _EPSILON_WARN_FRAGMENT not in captured.err
+    qjitted_circuit = qp.qjit(
+        qp.transforms.gridsynth(circuit, epsilon=1e-16), capture=True, collect_decomp_rules=False
+    )
+    with pytest.raises(RuntimeError, match="the smallest supported epsilon is 1e-15"):
+        qjitted_circuit(0.5)

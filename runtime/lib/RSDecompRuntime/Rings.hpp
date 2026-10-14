@@ -24,15 +24,9 @@
 namespace RSDecomp::Rings {
 
 // Note on multiprecision:
-// Multiprecision INTs are required to achieve down to epsilon ~ 1e-7
-// Beyond this, we need to make full use of multiprecision FLOATs as well
-// to avoid precision issues in intermediate calculations.
-// In the current implementation, we make minimal use of multiprecision FLOATs,
-// Only in the modulo calculation here. In the core Ellipse and GridSolver computation,
-// we are just using doubles for now.
-//
-// TODO: Extend multiprecision FLOAT usage in Ellipse and GridSolver computation
-// to allow even smaller epsilon values.
+// All ring arithmetic is exact with multiprecision INTs. The geometric part of the search
+// (Ellipse.hpp, GridProblems.hpp) uses the multiprecision reals from Real.hpp, with a precision
+// chosen from epsilon.
 
 using INT_TYPE = boost::multiprecision::cpp_int;
 using FLOAT_TYPE = boost::multiprecision::cpp_dec_float_50;
@@ -66,8 +60,11 @@ struct ZSqrtTwo {
     ZSqrtTwo operator/(ZSqrtTwo other) const;
     ZSqrtTwo operator/(INT_TYPE scalar) const;
     bool operator==(const ZSqrtTwo &other) const;
+    bool operator<(const ZSqrtTwo &other) const;
+    bool operator<=(const ZSqrtTwo &other) const;
     ZSqrtTwo operator%(const ZSqrtTwo &other) const;
 
+    int sign() const;
     INT_TYPE norm() const;
     ZSqrtTwo adj2() const;
     double to_double() const;
