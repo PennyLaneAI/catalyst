@@ -870,7 +870,7 @@ class QJIT(CatalystCallable):
         with _ensure_capture_mode(target_mode):
             if target_mode:
                 # New capture pathway
-                jaxpr, out_type, out_treedef = trace_from_pennylane(
+                jaxpr, out_type, out_treedef, plugin_paths = trace_from_pennylane(
                     self.user_function,
                     args,
                     kwargs,
@@ -880,6 +880,9 @@ class QJIT(CatalystCallable):
                     collect_decomp_rules=self.compile_options.collect_decomp_rules,
                     debug_info=dbg,
                 )
+                self.compile_options.pass_plugins.update(plugin_paths)
+                self.compile_options.dialect_plugins.update(plugin_paths)
+
                 return jaxpr, out_type, out_treedef, full_sig
             else:
                 # Legacy pathway

@@ -156,6 +156,19 @@
   integer instead of to the nearest integer. This avoids dropping small expected counts such as
   ``0.5`` to zero for PennyLane :func:`~.specs`.
 
+* Controlled :class:`~pennylane.GlobalPhase` operations now decompose to
+  :class:`~pennylane.PhaseShift` on the control wire when possible (or
+  :class:`~pennylane.ControlledPhaseShift` for multiple controls), via an updated
+  PennyLane dependency. The common single-control case no longer lowers as a controlled
+  ``gphase``.
+  [(#3323)](https://github.com/PennyLaneAI/catalyst/pull/3323)
+
+* Transforms from pass plugins can now be used. The plugin must
+  have an entry point for `catalyst.passes_resolution`, provide a `name2pass` in its
+  namespace, and provide the package name via
+  `pennylane.transform(pass_name=f"{package_name}.{pass_name}")`.
+  [(#3316)](https://github.com/PennyLaneAI/catalyst/pull/3316)
+
 * The memcpy transport now carries messages of any size in each direction, as set by a PennyLane
   `qp.Controller`'s `in_bytes` and `out_bytes`. The RDMA transports, and the memcpy GPU
   coprocessor's persistent kernel, still carry 8 bytes.
@@ -404,6 +417,11 @@
   distribution over the branches. The counted resources are then scaled proportionally and summed.
   [(#3059)](https://github.com/PennyLaneAI/catalyst/pull/3059)
   [(#3195)](https://github.com/PennyLaneAI/catalyst/pull/3195)
+
+* `qp.specs` now reports realistic resource estimates for the `gridsynth` pass, based on the
+  average gate sequences it produces at runtime. Expected (fractional) counts in the
+  `ResourceAnalysis` output are no longer rounded before being multiplied by loop trip counts.
+  [(#3308)](https://github.com/PennyLaneAI/catalyst/pull/3308)
 
 * Warnings and diagnostics emitted by successful Catalyst compiler subprocesses are now forwarded to
   Python callers instead of being silently discarded. LLVM diagnostic colors are preserved in
@@ -685,9 +703,11 @@
   reducing repeated pairwise normalization while preserving the resulting partition.
   [(#3095)](https://github.com/PennyLaneAI/catalyst/pull/3095)
 
-* ``to_ppr`` now directly lowers PennyLane's discrete ``PPR`` operator to ``pbc.ppr``.
+* `to_ppr` now directly lowers PennyLane's discrete `PPR_2`, `PPR_4` and `PPR_8` operators
+  to `pbc.ppr`.
   [(#3185)](https://github.com/PennyLaneAI/catalyst/pull/3185)
   [(#3262)](https://github.com/PennyLaneAI/catalyst/pull/3262)
+  [(#3319)](https://github.com/PennyLaneAI/catalyst/pull/3319)
 
 * The `--adjoint-lowering` pass no longer caches all classical gate parameters.
   Parameters that are trivially available to the reverse pass are no longer cached.
@@ -736,6 +756,11 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* Fixed a bug where converting unconditional branch probabilities to per-``scf.if``
+  conditional probabilities could yield values slightly above ``1.0`` due to floating-point
+  rounding, which was then rejected by the ``catalyst.estimated_probability`` verifier.
+  [(#3328)](https://github.com/PennyLaneAI/catalyst/pull/3328)
+
 * Fixed a bug where a compiled Backline program continued with a session that does not work,
   for example echoing the controller's own message back as the reply, after a transport call or a
   coprocessor function's set-up failed. It now stops with an error naming the call that failed,
@@ -746,6 +771,11 @@
 * The memcpy controller now rejects staging or posting a payload before its message sizes are
   committed, instead of writing into an unallocated buffer.
   [(#3281)](https://github.com/PennyLaneAI/catalyst/pull/3281)
+
+* `qp.specs` no longer fails on programs compiled with the `gridsynth` pass, and no longer counts
+  an extra wire per decomposed rotation. The pass also reports an error for controlled `RZ` and
+  `PhaseShift` gates instead of crashing.
+  [(#3308)](https://github.com/PennyLaneAI/catalyst/pull/3308)
 
 * Fixed the CNOT decomposition of the `ions-decomposition` pass, which did not implement a CNOT:
   it rotated the target with `RY(-π/2)` instead of `RX(-π/2)` and returned the two qubits in
@@ -831,6 +861,10 @@
   [(#3242)](https://github.com/PennyLaneAI/catalyst/pull/3242)
 
 <h3>Internal changes ⚙️</h3>
+
+* QNode functions are now marked with a `quantum.kernel_entry_point` attribute in their quantum
+  kernel module, which the `ResourceAnalysis` pass uses to identify the entry function.
+  [(#3308)](https://github.com/PennyLaneAI/catalyst/pull/3308)
 
 * Integration tests for :func:`pennylane.specs` have been migrated from the Catalyst frontend to PennyLane.
   [(#3107)](https://github.com/PennyLaneAI/catalyst/pull/3107)
@@ -1049,6 +1083,10 @@
 * A new pass `--resolve-gate-level-adjoint` was added. This pass now handles gate-level adjoint canonicalization, moving it out of the `--canonicalize` pass.
   [#3155](https://github.com/PennyLaneAI/catalyst/pull/3155)
 
+* Pull requests touching transport now run its Catch2 suites and the backline tests: CPU over a
+  soft-RoCE loopback link, and CPU-to-GPU over memcpy on the GPU runner.
+  [(#3074)](https://github.com/PennyLaneAI/catalyst/pull/3074)
+
 * The OQD device now implements the optional `get_runtime_artifacts` to inform the compiler of its runtime library, 
   `librt_OQD_capi`. This replaces the previous work-around that had the compiler check directly for the library and
   link it if present.
@@ -1087,6 +1125,7 @@ Astral Cai,
 Joey Carter,
 Yushao Chen,
 Filip Dobrosavljevic,
+Marcus Edwards,
 Lillian Frederiksen,
 Sengthai Heng,
 David Ittah,
