@@ -355,6 +355,13 @@ Value buildDecompositionLoop(PatternRewriter &rewriter, Location loc, Value qbit
     return forOp.getResult(0);
 }
 
+void createGlobalPhase(PatternRewriter &rewriter, Location loc, Value phase) {
+    NamedAttrList gphaseAttrs;
+    gphaseAttrs.append(
+        rewriter.getNamedAttr("operandSegmentSizes", rewriter.getDenseI32ArrayAttr({1, 0, 0})));
+    GlobalPhaseOp::create(rewriter, loc, TypeRange{}, ValueRange{phase}, gphaseAttrs.getAttrs());
+}
+
 /**
  * @brief Gets or creates the RZ/PhaseShift decomposition function.
  * This function contains the loop and switch logic acting on a Qubit.
@@ -369,16 +376,17 @@ func::FuncOp getOrCreateDecompositionFunc(ModuleOp module, PatternRewriter &rewr
         return func;
     }
 
-    // Define function type: (qubit, f64) -> (qubit, f64)
+    // Define function type: (qubit, f64) -> qubit
     // inputs:
     // qubit: input qubit wire
     // f64: rotation angle
     // returns:
     // qubit: output qubit wire
-    // f64: runtime phase
+    // The function applies the global phase of the gate sequence itself, so that it only has
+    // quantum results and can be inverted by the adjoint lowering.
     auto qbitType = QubitType::get(rewriter.getContext());
     auto f64Type = rewriter.getF64Type();
-    auto funcType = rewriter.getFunctionType({qbitType, f64Type}, {qbitType, f64Type});
+    auto funcType = rewriter.getFunctionType({qbitType, f64Type}, {qbitType});
 
     OpBuilder::InsertionGuard guard(rewriter);
     rewriter.setInsertionPointToStart(module.getBody());
@@ -426,8 +434,9 @@ func::FuncOp getOrCreateDecompositionFunc(ModuleOp module, PatternRewriter &rewr
     // Clean up heap memory
     memref::DeallocOp::create(rewriter, loc, gatesMemref);
 
-    // Return the final qubit and the computed runtime phase
-    func::ReturnOp::create(rewriter, loc, ValueRange{finalQbit, runtimePhase});
+    createGlobalPhase(rewriter, loc, runtimePhase);
+
+    func::ReturnOp::create(rewriter, loc, ValueRange{finalQbit});
 
     return func;
 }
@@ -476,24 +485,14 @@ struct DecomposeCustomOpPattern : public OpRewritePattern<CustomOp> {
             func::CallOp::create(rewriter, loc, decompFunc, ValueRange{qbitOperand, angle});
 
         Value finalQbitResult = callDecompOp->getResult(0);
-        Value runtimePhase = callDecompOp.getResult(1);
 
-        // Handle Global Phase for PhaseShift
-        Value finalPhase;
         if (isPhaseShift) {
             // PhaseShift(phi) = RZ(phi) * GlobalPhase(-phi/2)
             Value c2 = arith::ConstantOp::create(rewriter, loc, rewriter.getF64FloatAttr(2.0));
             Value halfAngle = arith::DivFOp::create(rewriter, loc, angle, c2);
-            finalPhase = arith::SubFOp::create(rewriter, loc, runtimePhase, halfAngle);
-        } else {
-            finalPhase = runtimePhase;
+            Value negHalfAngle = arith::NegFOp::create(rewriter, loc, halfAngle);
+            createGlobalPhase(rewriter, loc, negHalfAngle);
         }
-
-        NamedAttrList gphaseAttrs;
-        gphaseAttrs.append(
-            rewriter.getNamedAttr("operandSegmentSizes", rewriter.getDenseI32ArrayAttr({1, 0, 0})));
-        GlobalPhaseOp::create(rewriter, loc, TypeRange{}, ValueRange{finalPhase},
-                              gphaseAttrs.getAttrs());
 
         // Replace the RZ/PhaseShift op with the resulting qubit
         rewriter.replaceOp(op, finalQbitResult);
@@ -541,16 +540,7 @@ struct DecomposePPRArbitraryOpPattern
         auto callDecompOp =
             func::CallOp::create(rewriter, loc, decompFunc, ValueRange{qbitOperand, rzAngle});
 
-        Value finalQbitResult = callDecompOp->getResult(0);
-        Value runtimePhase = callDecompOp.getResult(1);
-
-        NamedAttrList gphaseAttrs;
-        gphaseAttrs.append(
-            rewriter.getNamedAttr("operandSegmentSizes", rewriter.getDenseI32ArrayAttr({1, 0, 0})));
-        GlobalPhaseOp::create(rewriter, loc, TypeRange{}, ValueRange{runtimePhase},
-                              gphaseAttrs.getAttrs());
-
-        rewriter.replaceOp(op, finalQbitResult);
+        rewriter.replaceOp(op, callDecompOp->getResult(0));
         return success();
     }
 };

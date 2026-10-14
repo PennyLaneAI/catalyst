@@ -64,10 +64,10 @@ struct GridsynthPass : impl::GridsynthPassBase<GridsynthPass> {
                               "PhaseShift gates can be discretized.");
                 return WalkResult::interrupt();
             }
-            // The lowering of adjoint and control regions cannot transform the discretization.
-            if (op->getParentOfType<AdjointOp>() || op->getParentOfType<CtrlOp>()) {
-                op->emitError("Unsupported rotation inside an adjoint or control region for "
-                              "gridsynth. Decompose the region into single-qubit rotations first.");
+            // Controlling the discretized sequence would leave the Clifford+T or PPR basis.
+            if (op->getParentOfType<CtrlOp>()) {
+                op->emitError("Unsupported rotation inside a control region for gridsynth. "
+                              "Decompose the region into single-qubit rotations first.");
                 return WalkResult::interrupt();
             }
             return WalkResult::advance();
