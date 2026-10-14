@@ -156,7 +156,7 @@
   and a warning was raised. The geometric part of the Ross-Selinger search now uses
   multiprecision reals, and the decomposition is also faster for `epsilon` below `1e-3`.
   An error is raised for unsupported `epsilon` values.
-  [(#XXXX)](https://github.com/PennyLaneAI/catalyst/pull/XXXX)
+  [(#3333)](https://github.com/PennyLaneAI/catalyst/pull/3333)
 
 * Controlled :class:`~pennylane.GlobalPhase` operations now decompose to
   :class:`~pennylane.PhaseShift` on the control wire when possible (or
