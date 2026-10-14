@@ -324,8 +324,6 @@ def handle_qnode(
         )
         pipelines += (("device", device_preprocessing_pipeline),)
 
-    # Add the post-device pipeline, which contains optional Resource Analysis passes used through `qp.analyze`
-    pipelines += (("post-device", qnode.post_device_pipeline),)
 
     # no idea what deduce_avals is doing, but this seems to make dynamic shapes work
     flattened_fn = deduce_avals(
@@ -392,25 +390,21 @@ def _handle_decompose_transform(self, inner_jaxpr, consts, non_const_args, tkwar
         for op, rules in alt_decomps.items():
             add_decomps(op, *rules)
 
-        if tkwargs.get("output_json") is not None and tkwargs.get("output_fname") is not None:
-            bound_pass = resource_analysis(
-                gate_set=tkwargs["gate_set"],
-            )
+        # Reusing graph_decomposition pass options setup for resource analysis estimation.
+        bound_transform = graph_decomposition if tkwargs.get("output_json") is None or tkwargs.get("output_fname") is None else resource_analysis
+        bound_transform_params = {
+            "gate_set": tkwargs["gate_set"],
+            "fixed_decomps": fixed_decomps or None,
+            "alt_decomps": alt_decomps or None,
+        }
+        bound_pass = bound_transform(**bound_transform_params)
+
+        # Set resource analysis estimation options after graph_decomposition_setup_inputs.
+        if bound_transform == resource_analysis:
             bound_pass.kwargs["output_json"] = tkwargs["output_json"]
             bound_pass.kwargs["output_fname"] = tkwargs["output_fname"]
-            # bound_pass.
-            next_eval._pass_pipeline.insert(0, bound_pass)
-        else:
-            # Reusing the graph_decomposition transform (not a fork) guarantees identical pass options
-            # to the explicit catalyst.passes.graph_decomposition entry point.
-            bound_pass = graph_decomposition(
-                gate_set=tkwargs["gate_set"],
-                fixed_decomps=fixed_decomps or None,
-                alt_decomps=alt_decomps or None,
-            )
-
-            next_eval._pass_pipeline.insert(0, bound_pass)
-
+        next_eval._pass_pipeline.insert(0, bound_pass)
+        
         return next_eval.eval(inner_jaxpr, consts, *non_const_args)
 
 
