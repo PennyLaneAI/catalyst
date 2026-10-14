@@ -299,8 +299,8 @@ set(TARGETS_TO_REMOVE
     PBCUtils
     QuantumCAPI
     pbc-transforms
-    quantum-transforms  # depends on decompsolver, which depends on boost; exclude
-    decompsolver        # depends on boost; exclude
+    quantum-transforms  # depends on decompsolver; exclude
+    decompsolver        # its public include dir is a source-tree path; exclude
     )
 list(REMOVE_ITEM CATALYST_INSTALL_TARGETS ${TARGETS_TO_REMOVE})
 
