@@ -324,7 +324,6 @@ def handle_qnode(
         )
         pipelines += (("device", device_preprocessing_pipeline),)
 
-
     # no idea what deduce_avals is doing, but this seems to make dynamic shapes work
     flattened_fn = deduce_avals(
         calling_convention, non_const_args, {}, [], debug_info=qfunc_jaxpr.debug_info
@@ -340,12 +339,14 @@ def handle_qnode(
 
 # qp.decompose arguments the graph-decomposition pass supports (mapped 1:1). ``tkwargs`` holds only
 # the arguments the user passed, so any other key means an unsupported argument was set.
-_SUPPORTED_DECOMPOSE_TKWARGS = frozenset({"gate_set", "fixed_decomps", "alt_decomps", "output_json", "output_fname"})
+_SUPPORTED_DECOMPOSE_TKWARGS = frozenset({"gate_set", "fixed_decomps", "alt_decomps"})
+# Internal options that route the decomposition to the resource-analysis pass (used by qp.estimate)
+_RESOURCE_ANALYSIS_TKWARGS = frozenset({"output_json", "output_fname"})
 
 
-def _validate_decompose_tkwargs(tkwargs):
+def _validate_decompose_tkwargs(tkwargs, ADDITIONAL_TKWARGS=frozenset()):
     """Reject qp.decompose arguments the graph-decomposition pass doesn't support yet."""
-    unsupported = tkwargs.keys() - _SUPPORTED_DECOMPOSE_TKWARGS
+    unsupported = tkwargs.keys() - _SUPPORTED_DECOMPOSE_TKWARGS - ADDITIONAL_TKWARGS
     if unsupported:
         raise NotImplementedError(
             f"qp.decompose argument(s) {unsupported} are not supported under qjit with graph-based "
@@ -369,7 +370,11 @@ def _handle_decompose_transform(self, inner_jaxpr, consts, non_const_args, tkwar
 
     from catalyst.passes.builtin_passes import graph_decomposition, resource_analysis
 
-    _require_decompose_gate_set(tkwargs)
+    resource_analysis_enabled = tkwargs.get("output_json") is not None and tkwargs.get("output_fname") is not None
+    if resource_analysis_enabled:
+        _validate_decompose_tkwargs(tkwargs, _RESOURCE_ANALYSIS_TKWARGS)
+    else:
+        _require_decompose_gate_set(tkwargs)
 
     fixed_decomps = tkwargs.get("fixed_decomps") or {}
     alt_decomps = tkwargs.get("alt_decomps") or {}
@@ -391,7 +396,7 @@ def _handle_decompose_transform(self, inner_jaxpr, consts, non_const_args, tkwar
             add_decomps(op, *rules)
 
         # Reusing graph_decomposition pass options setup for resource analysis estimation.
-        bound_transform = graph_decomposition if tkwargs.get("output_json") is None or tkwargs.get("output_fname") is None else resource_analysis
+        bound_transform = resource_analysis if resource_analysis_enabled else graph_decomposition
         bound_transform_params = {
             "gate_set": tkwargs["gate_set"],
             "fixed_decomps": fixed_decomps or None,
@@ -400,11 +405,10 @@ def _handle_decompose_transform(self, inner_jaxpr, consts, non_const_args, tkwar
         bound_pass = bound_transform(**bound_transform_params)
 
         # Set resource analysis estimation options after graph_decomposition_setup_inputs.
-        if bound_transform == resource_analysis:
-            bound_pass.kwargs["output_json"] = tkwargs["output_json"]
-            bound_pass.kwargs["output_fname"] = tkwargs["output_fname"]
+        if resource_analysis_enabled:
+            bound_pass.kwargs.update({key: tkwargs[key] for key in _RESOURCE_ANALYSIS_TKWARGS})
         next_eval._pass_pipeline.insert(0, bound_pass)
-        
+
         return next_eval.eval(inner_jaxpr, consts, *non_const_args)
 
 
