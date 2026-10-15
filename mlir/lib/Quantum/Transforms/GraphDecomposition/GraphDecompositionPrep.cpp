@@ -88,6 +88,8 @@ void parseFixedDecomps(ArrayRef<std::string> fixedDecompsOption,
 
         auto [opName, ruleName] = pairRef.split("=");
         opName = opName.trim();
+        opName.consume_front("\"");
+        opName.consume_back("\"");
         ruleName = ruleName.trim();
         ruleName.consume_front("\"");
         ruleName.consume_back("\"");
@@ -108,6 +110,8 @@ void parseAltDecomps(ArrayRef<std::string> altDecompsOption,
 
         auto [opName, rulesRef] = pairRef.split("=");
         opName = opName.trim();
+        opName.consume_front("\"");
+        opName.consume_back("\"");
         llvm::SmallVector<llvm::StringRef> splitRulesRef;
 
         rulesRef = rulesRef.trim();
