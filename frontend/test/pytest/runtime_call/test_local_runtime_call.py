@@ -112,6 +112,22 @@ def test_narrow_integers_are_extended(native):
 
 
 @pytest.mark.parametrize(
+    "view, expected",
+    [(lambda m: m[:, 1], 2 + 4 + 6 + 8), (lambda m: m[1:3], 3 + 4 + 5 + 6)],
+    ids=["strided-column", "contiguous-rows"],
+)
+def test_buffer_views_are_passed_contiguously(native, view, expected):
+    """Handling buffer views."""
+    declare("native_sum", "(buf, u64) -> i32", library=native)
+
+    @qp.qjit
+    def prog(m):
+        return runtime_call("native_sum", view(m), 4)
+
+    assert prog(np.arange(1, 9, dtype=np.int8).reshape(4, 2)) == expected
+
+
+@pytest.mark.parametrize(
     "callee, library, error",
     [
         ("demo::missing", True, "because no library exports it"),
