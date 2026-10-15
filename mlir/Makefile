@@ -23,7 +23,7 @@ LLVM_TARGETS_TO_BUILD ?= host
 LLVM_INSTALL_STAGING_DIR ?= $(LLVM_BUILD_DIR)/install
 LLVM_DISTRIBUTION_COMPONENTS ?= $\
 	"cmake-exports;llvm-headers;llvm-libraries;$\
-	mlir-cmake-exports;mlir-headers;mlir-libraries;$\
+	mlir-cmake-exports;mlir-headers;mlir-libraries;mlir-python-sources;$\
 	FileCheck;llvm-tblgen;llvm-config;mlir-tblgen;not;count"
 
 ifeq ($(shell uname), Darwin)
@@ -59,7 +59,7 @@ help:
 	@echo "  dialects           to build custom Catalyst MLIR dialects"
 	@echo "  dialect-docs       to build custom Catalyst MLIR dialect documentation"
 	@echo "  pack-catalyst-dev  to build the catalyst-dev package"
-	@echo "  pack-mlir-dev      to build the catalyst-mlir-dev package"
+	@echo "  pack-llvm-dev      to build the catalyst-llvm-dev package"
 	@echo "  test               to run the Catalyst MLIR dialects test suite"
 	@echo "  clean              to delete all temporary, cache, and build files"
 	@echo "  format [check=1]   to apply C++ formatter; use with 'check=1' to check instead of modify (requires clang-format)"
@@ -242,20 +242,29 @@ pack-catalyst-dev: dialects
 	mkdir -p $(DIST_DIR)
 	mv $(DIALECTS_BUILD_DIR)/catalyst-dev*.tar.gz $(DIST_DIR)
 
-# Get the LLVM version as, e.g. 22.0.0git-8f264586
-LLVM_VERSION := $(shell $(LLVM_INSTALL_STAGING_DIR)/bin/llvm-config --version)
-LLVM_COMMIT := $(shell grep llvm ../.dep-versions | awk -F '=' '{ print $$2 }' | cut -c1-8)
-LLVM_VERSION_FULL := $(LLVM_VERSION)-$(LLVM_COMMIT)
+# Get the LLVM version as, e.g. 22.0.0git-8f264586.
+# Deferred (=, not :=) on purpose: these shell out, and with := they would run on
+# every make invocation, including on a clean tree where llvm-config does not
+# exist yet, silently yielding an empty version. They are only referenced from
+# the pack-llvm-dev recipe, by which point the llvm prerequisite has built it.
+LLVM_VERSION = $(shell $(LLVM_BUILD_DIR)/bin/llvm-config --version)
+LLVM_COMMIT = $(shell grep '^llvm=' $(MK_DIR)/../.dep-versions | awk -F '=' '{ print $$2 }' | cut -c1-8)
+LLVM_VERSION_FULL = $(LLVM_VERSION)-$(LLVM_COMMIT)
 
-.PHONY: pack-mlir-dev
-pack-mlir-dev: llvm
+.PHONY: pack-llvm-dev
+pack-llvm-dev: llvm
 
-	@echo "build the catalyst-mlir-dev package"
+	@echo "build the catalyst-llvm-dev package"
+	# Install from scratch: the staging dir is a plain install prefix, so files
+	# left by an earlier run with a different LLVM_DISTRIBUTION_COMPONENTS would
+	# otherwise linger and end up in the archive.
+	rm -rf $(LLVM_INSTALL_STAGING_DIR)
 	cmake --build $(LLVM_BUILD_DIR) --target install-distribution
-	tar -czf catalyst-mlir-dev_$(shell uname -s)_$(shell uname -m)_$(LLVM_VERSION_FULL).tar.gz \
-		-C $(LLVM_INSTALL_STAGING_DIR) bin lib include
-	mkdir -p $(DIST_DIR)
-	mv catalyst-mlir-dev*.tar.gz $(DIST_DIR)
+	cp $(LLVM_SRC_DIR)/LICENSE.TXT $(LLVM_INSTALL_STAGING_DIR)/
+	CATALYST_LLVM_STAGING_DIR=$(LLVM_INSTALL_STAGING_DIR) \
+	CATALYST_LLVM_VERSION=$(LLVM_VERSION_FULL) \
+		cpack --config $(MK_DIR)/cmake/LLVMDevCPackConfig.cmake -B $(DIST_DIR)
+	rm -rf $(DIST_DIR)/_CPack_Packages
 
 .PHONY: test
 test:
