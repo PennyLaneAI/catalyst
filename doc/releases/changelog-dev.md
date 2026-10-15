@@ -24,9 +24,9 @@
   [arXiv:2203.10064](https://arxiv.org/abs/2203.10064). `method="mixed"` (Section 3.4) randomly
   applies an under- or an over-rotating Clifford+T sequence to each rotation, with probabilities
   that cancel their coherent errors and leave a smaller incoherent error. This roughly halves the
-  T-count at the same accuracy of the channel averaged over executions. `method="mixed-fallback"`
-  (Section 3.5) roughly halves the T-count again, at the cost of one temporary ancilla qubit and a
-  mid-circuit measurement per rotation.
+  T-count compared to `method="deterministic"` (the default) at the same accuracy of the channel
+  averaged over executions. `method="mixed-fallback"` (Section 3.5) roughly halves the T-count
+  again, at the cost of one temporary ancilla qubit and a mid-circuit measurement per rotation.
   [(#3314)](https://github.com/PennyLaneAI/catalyst/pull/3314)
   [(#3327)](https://github.com/PennyLaneAI/catalyst/pull/3327)
 
