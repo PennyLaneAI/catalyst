@@ -105,7 +105,7 @@ def qjit(
     capture="global",
     skip_preprocess=False,
     collect_decomp_rules=True,
-    skip_aot_compilation=False,
+    enable_aot_compilation=True,
 ):  # pylint: disable=too-many-arguments,unused-argument
     """A just-in-time decorator for PennyLane and JAX programs using Catalyst.
 
@@ -204,9 +204,9 @@ def qjit(
             decomposition rules reachable from all gates in the circuit will be compiled. If
             ``capture=False``, or ``capture="global"`` and ``qp.capture.enabled() == False``, this
             argument will be ignored. ``True`` by default.
-        skip_aot_compilation (bool): Controls whether or not to skip ahead-of-time compilation.
-            If ``True``, AOT compilation will never happen during object initialization.
-            ``False`` by default.
+        enable_aot_compilation (bool): Controls whether or not to enable ahead-of-time compilation.
+            If ``True``, the QJIT object will attempt AOT compilation during object initialization.
+            ``True`` by default.
 
     Returns:
         QJIT object.
@@ -610,7 +610,7 @@ class QJIT(CatalystCallable):
 
         # Static arguments require values, so we cannot AOT compile.
         if (
-            not self.compile_options.skip_aot_compilation
+            self.compile_options.enable_compilation
             and self.user_sig is not None
             and not self.compile_options.static_argnums
         ):

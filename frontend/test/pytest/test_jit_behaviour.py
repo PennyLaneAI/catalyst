@@ -1159,18 +1159,18 @@ class TestAOTFailures:
         assert "RX" in c.mlir
 
 
-@pytest.mark.parametrize("skip_aot", [True, False])
-def test_skip_aot_compilation(skip_aot):
-    @qp.qjit(capture=True, skip_aot_compilation=skip_aot)
+@pytest.mark.parametrize("enable_aot", [True, False])
+def test_toggle_aot_compilation(enable_aot):
+    @qp.qjit(capture=True, enable_aot_compilation=enable_aot)
     @qp.qnode(qp.device("null.qubit", wires=2))
     def circ():
         qp.RX(0.5, wires=0)
         return qp.expval(qp.PauliZ(0))
 
-    if skip_aot:
-        assert circ.mlir is None
-    else:
+    if enable_aot:
         assert circ.mlir is not None
+    else:
+        assert circ.mlir is None
 
 
 if __name__ == "__main__":
