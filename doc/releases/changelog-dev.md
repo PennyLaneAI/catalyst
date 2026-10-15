@@ -151,6 +151,11 @@
 
 <h3>Improvements 🛠</h3>
 
+* Resource analysis JSON now rounds expected counts (from
+  ``catalyst.estimated_iterations`` / ``catalyst.estimated_probability`` hints) up to the next
+  integer instead of to the nearest integer. This avoids dropping small expected counts such as
+  ``0.5`` to zero for PennyLane :func:`~.specs`.
+
 * Controlled :class:`~pennylane.GlobalPhase` operations now decompose to
   :class:`~pennylane.PhaseShift` on the control wire when possible (or
   :class:`~pennylane.ControlledPhaseShift` for multiple controls), via an updated
