@@ -297,27 +297,25 @@ def test_convert_to_numpy_parameters(backend):
 
 
 def test_decompose(backend):
-    """Test decompose"""
+    """Test decompose under capture via the graph-decomposition pass."""
 
-    def qnode_builder(device_name):
-        """Builder"""
+    def circuit():
+        qp.Hadamard(wires=[0])
+        qp.Toffoli(wires=[0, 1, 2])
+        return qp.expval(qp.Z(0))
 
-        @qp.transforms.decompose
-        @qp.qnode(qp.device(device_name, wires=3), interface="jax")
-        def qfunc():
-            qp.Hadamard(wires=[0])
-            qp.Toffoli(wires=[0, 1, 2])
-            return qp.expval(qp.Z(0))
+    @qp.qnode(qp.device("default.qubit", wires=3), interface="jax")
+    def qnode_control():
+        return circuit()
 
-        return qfunc
 
-    qnode_control = qnode_builder("default.qubit")
-    qnode_backend = qnode_builder(backend)
+    @qjit(capture=True)
+    @qp.decompose(gate_set=qp.decomposition.gate_sets.CLIFFORD_T)
+    @qp.qnode(qp.device(backend, wires=3), interface="jax")
+    def compiled():
+        return circuit()
 
-    jax_jit = jax.jit(qnode_control)
-    compiled = qjit(qnode_backend)
-
-    expected = jax_jit()
+    expected = qnode_control()
     observed = compiled()
     _, expected_shape = jax.tree_util.tree_flatten(expected)
     _, observed_shape = jax.tree_util.tree_flatten(observed)
