@@ -619,6 +619,8 @@ class AdjointGenerator {
 
                 scf::YieldOp::create(builder, loc, yields);
             });
+        // Carry over hints such as `catalyst.estimated_iterations`.
+        replacedFor->setDiscardableAttrs(forOp->getDiscardableAttrDictionary());
 
         for (auto [newForResult, initArg] :
              llvm::zip_equal(replacedFor.getResults(), getQuantumValues(forOp.getInitArgs()))) {
@@ -687,6 +689,8 @@ class AdjointGenerator {
         auto reversedIf = scf::IfOp::create(builder, ifOp.getLoc(), condition,
                                             getRegionBuilder(ifOp.getThenRegion()),
                                             getRegionBuilder(ifOp.getElseRegion()));
+        // Carry over hints such as `catalyst.estimated_probability`.
+        reversedIf->setDiscardableAttrs(ifOp->getDiscardableAttrDictionary());
 
         SetVector<Value> startingThenQvalues = findOldestQvaluesInRegion(ifOp.getThenRegion());
         SetVector<Value> startingElseQvalues = findOldestQvaluesInRegion(ifOp.getElseRegion());
@@ -738,6 +742,8 @@ class AdjointGenerator {
 
                 scf::YieldOp::create(builder, loc, yields);
             });
+        // Carry over hints such as `catalyst.estimated_iterations` onto the reversed for-loop.
+        replacedWhile->setDiscardableAttrs(whileOp->getDiscardableAttrDictionary());
 
         for (auto [newWhileResult, initArg] :
              llvm::zip_equal(replacedWhile.getResults(), getQuantumValues(whileOp.getInits()))) {
@@ -779,6 +785,8 @@ class AdjointGenerator {
         auto newSwitchOp =
             scf::IndexSwitchOp::create(builder, switchOp.getLoc(), TypeRange{reversedResults},
                                        index, switchOp.getCases(), switchOp.getNumCases());
+        // Carry over hints such as `catalyst.estimated_probabilities`.
+        newSwitchOp->setDiscardableAttrs(switchOp->getDiscardableAttrDictionary());
 
         auto fillRegion = [&](Region &oldRegion, Region &newRegion) {
             OpBuilder::InsertionGuard guard(builder);

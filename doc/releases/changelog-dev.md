@@ -316,6 +316,7 @@
     [(#3158)](https://github.com/PennyLaneAI/catalyst/pull/3158)
     [(#3206)](https://github.com/PennyLaneAI/catalyst/pull/3206)
     [(#3224)](https://github.com/PennyLaneAI/catalyst/pull/3224)
+    [(#3232)](https://github.com/PennyLaneAI/catalyst/pull/3232)
     [(#3285)](https://github.com/PennyLaneAI/catalyst/pull/3285)
     [(#3292)](https://github.com/PennyLaneAI/catalyst/pull/3292)
 
@@ -755,6 +756,18 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* MLIR passes that recreate `scf.for`, `scf.while`, `scf.if`, and `scf.index_switch` ops
+  (`ctrl-lowering`, `adjoint-lowering`, `--convert-to-value-semantics`) now preserve discardable
+  attributes such as `catalyst.estimated_iterations`, `catalyst.estimated_probability`, and
+  `catalyst.estimated_probabilities`, so resource analysis still sees compiler hints after those
+  rewrites.
+  [(#3288)](https://github.com/PennyLaneAI/catalyst/pull/3288)
+  [(#3291)](https://github.com/PennyLaneAI/catalyst/pull/3291)
+
+* Fixed a bug where graph decomposition ignored entries in `fixed_decomps` and `alt_decomps` that
+  use a string key containing parentheses, such as `"C(PauliZ)"` or `"Adjoint(TemporaryAND)"`.
+  [(#3336)](https://github.com/PennyLaneAI/catalyst/pull/3336)
+
 * Graph-based decomposition now handles operators with a nested-operator ("hybrid") argument, such
   as `GQSP`. Previously the operator counted the nested operator's wires among its own, but the
   generated decomposition rule did not, so `decompose-lowering` built a `tensor.from_elements`
@@ -1149,6 +1162,7 @@ Shuli Shu,
 Nikhil Sreekumar,
 Kalman Szenes,
 Paul Haochen Wang,
+David Wierichs,
 Jake Zaia,
 Haider Sajjad,
 Hongsheng Zheng.
