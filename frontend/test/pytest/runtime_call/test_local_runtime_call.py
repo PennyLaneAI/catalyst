@@ -39,7 +39,9 @@ def native(tmp_path_factory):
     suffix = ".dylib" if platform.system() == "Darwin" else ".so"
     library = tmp_path_factory.mktemp("native") / f"libnative{suffix}"
     source = Path(__file__).with_name("native.cpp")
-    subprocess.run(["c++", "-std=c++17", "-shared", "-fPIC", "-o", library, source], check=True)
+    # Optimized, as a library would ship: an optimized callee relies on the caller's ABI duties.
+    command = ["c++", "-std=c++17", "-O2", "-shared", "-fPIC", "-o", library, source]
+    subprocess.run(command, check=True)
     return str(library)
 
 
@@ -92,6 +94,21 @@ def test_void_calls_keep_their_order(native):
         return runtime_call("native_load")
 
     assert prog(np.uint64(73)) == 73
+
+
+def test_narrow_integers_are_extended(native):
+    """Narrow integers are zero- or sign-extended by the caller."""
+    declare("native_widen_u8", "(u8) -> u32", library=native)
+    declare("native_widen_i16", "(i16) -> i32", library=native)
+
+    @qp.qjit
+    def prog(value):
+        return (
+            runtime_call("native_widen_u8", value.astype(np.uint8)),
+            runtime_call("native_widen_i16", value.astype(np.int16)),
+        )
+
+    assert prog(np.int64(0x1FFFF)) == (0xFF, -1)
 
 
 @pytest.mark.parametrize(

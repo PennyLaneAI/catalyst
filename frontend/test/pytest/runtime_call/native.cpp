@@ -27,6 +27,8 @@ const void *native_echo(const void *ptr) { return ptr; }
 std::uint64_t native_strlen(const char *text) { return std::strlen(text); }
 void native_store(std::uint64_t value) { stored = value; }
 std::uint64_t native_load() { return stored; }
+std::uint32_t native_widen_u8(std::uint8_t value) { return value; }
+std::int32_t native_widen_i16(std::int16_t value) { return value; }
 
 std::int32_t native_sum(const std::int8_t *data, std::uint64_t size) {
     std::int32_t sum = 0;

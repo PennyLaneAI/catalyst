@@ -331,6 +331,18 @@ FailureOr<Type> runtimeCABIType(StringRef name, MLIRContext *ctx) {
     llvm_unreachable("unhandled runtime C ABI kind");
 }
 
+// Get the sext or zext attribute for a C ABI integer parameter or result.
+DictionaryAttr runtimeCABIAttrs(StringRef name, MLIRContext *ctx) {
+    std::optional<RuntimeCABIType> abi = classifyRuntimeCABIType(name);
+    if (!abi || abi->kind != RuntimeCABIKind::Integer || abi->width >= 32) {
+        return DictionaryAttr::get(ctx);
+    }
+    bool isUnsigned = (name == "i1") || (name.starts_with("u"));
+    StringRef ext =
+        isUnsigned ? LLVM::LLVMDialect::getZExtAttrName() : LLVM::LLVMDialect::getSExtAttrName();
+    return DictionaryAttr::get(ctx, {NamedAttribute(ext, UnitAttr::get(ctx))});
+}
+
 // Materialize `text` as a NUL-terminated constant and return a pointer to its first byte.
 Value getRuntimeCallString(Location loc, OpBuilder &rewriter, StringRef text, ModuleOp mod) {
     std::string key = ("runtime_call_cstr_" + Twine(llvm::xxh3_64bits(text))).str();
@@ -370,6 +382,7 @@ struct RuntimeCallOpPattern : public OpConversionPattern<RuntimeCallOp> {
 
         // Handle each C parameter in order.
         SmallVector<Type> paramTypes;
+        SmallVector<Attribute> paramAttrs;
         SmallVector<Value> callArgs;
         unsigned inputIndex = 0;
         unsigned destIndex = 0;
@@ -383,6 +396,7 @@ struct RuntimeCallOpPattern : public OpConversionPattern<RuntimeCallOp> {
                 return op.emitOpError("unsupported native C ABI parameter type '") << param << "'";
             }
             paramTypes.push_back(*type);
+            paramAttrs.push_back(runtimeCABIAttrs(param, ctx));
 
             if (param == "str") {
                 assert(strings && stringIndex < strings.size() && "verified compile-time strings");
@@ -442,6 +456,21 @@ struct RuntimeCallOpPattern : public OpConversionPattern<RuntimeCallOp> {
         rewriter.restoreInsertionPoint(point);
 
         LLVM::CallOp call = LLVM::CallOp::create(rewriter, loc, *function, callArgs);
+
+        // Set the sext or zext attribute to the call.
+        DictionaryAttr resultAttrs = runtimeCABIAttrs(resultKind, ctx);
+        auto isEmpty = [](Attribute attrs) { return cast<DictionaryAttr>(attrs).empty(); };
+        if (!llvm::all_of(paramAttrs, isEmpty)) {
+            for (auto [index, attrs] : llvm::enumerate(paramAttrs)) {
+                function->setArgAttrs(index, cast<DictionaryAttr>(attrs));
+            }
+            call.setArgAttrsAttr(rewriter.getArrayAttr(paramAttrs));
+        }
+        if (!resultAttrs.empty()) {
+            function->setResultAttrs(0, resultAttrs);
+            call.setResAttrsAttr(rewriter.getArrayAttr({resultAttrs}));
+        }
+
         if (!hasResult) {
             rewriter.eraseOp(op);
             return success();

@@ -131,6 +131,19 @@ func.func @runtime_call_scalars(%lhs: i32, %rhs: i32) -> i32 {
 
 // -----
 
+// CHECK: llvm.func @native_narrow(i8 {llvm.zeroext}, i16 {llvm.signext}, i32) -> (i8 {llvm.zeroext})
+// CHECK-LABEL: @runtime_call_narrow_integers
+func.func @runtime_call_narrow_integers(%a: i8, %b: i16, %c: i32) -> i8 {
+    // CHECK: llvm.call @native_narrow(%arg0, %arg1, %arg2) : (i8 {llvm.zeroext}, i16 {llvm.signext}, i32) -> (i8 {llvm.zeroext})
+    %0 = catalyst.runtime_call fn("native_narrow") (%a, %b, %c) {
+        c_params = ["u8", "i16", "i32"],
+        c_result = "u8"
+    } : (i8, i16, i32) -> (i8)
+    return %0 : i8
+}
+
+// -----
+
 // CHECK-LABEL: @runtime_call_buffers
 func.func @runtime_call_buffers(
     %input: memref<4xi8>,
