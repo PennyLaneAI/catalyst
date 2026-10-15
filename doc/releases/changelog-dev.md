@@ -757,7 +757,7 @@
   for rules requested by the compiler on demand, in hash order), while the operator passes its
   wires in declaration order, so the rule acted on the wrong qubits. Both paths now use the
   declaration order.
-  [(#XXXX)](https://github.com/PennyLaneAI/catalyst/pull/XXXX)
+  [(#3347)](https://github.com/PennyLaneAI/catalyst/pull/3347)
 
 * Graph-based decomposition now handles operators with a nested-operator ("hybrid") argument, such
   as `GQSP`. Previously the operator counted the nested operator's wires among its own, but the
