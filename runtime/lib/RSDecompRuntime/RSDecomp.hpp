@@ -30,7 +30,7 @@ std::pair<std::vector<PPRGateType>, double> HST_to_PPR(const std::vector<GateTyp
 
 /**
  * @brief Two gate sequences and their global phases, applied with probabilities
- * `probability` and `1 - probability`. Each is {Z, S}-twirled when applied.
+ * `probability` and `1 - probability`. Each is twirled over {I, S, Z, S^dagger} when applied.
  */
 struct MixedDecomposition {
     std::array<std::vector<GateType>, 2> gates;

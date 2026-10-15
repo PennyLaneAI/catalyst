@@ -544,8 +544,8 @@ class MixedPairSearch {
  * (Proposition 3.13, with the diamond-norm bound of Theorem 3.12). Writing each
  * candidate's top-left entry as `w * exp(-i angle/2)`, an under-rotation (Im(w) < 0) and an
  * over-rotation (Im(w) > 0) are mixed with probabilities p and 1 - p, and each is
- * {Z, S}-twirled when applied. Of the candidate pairs found, the one with the lowest expected
- * T-count whose mixture meets the diamond-norm bound of Theorem 3.12 is kept.
+ * twirled over {I, S, Z, S^dagger} when applied. Of the candidate pairs found, the one with the
+ * lowest expected T-count whose mixture meets the diamond-norm bound of Theorem 3.12 is kept.
  */
 MixedDecomposition compute_mixed_diagonal_decomposition(double angle, double epsilon) {
     if (is_odd_multiple_of_pi_4(angle)) {
@@ -602,8 +602,8 @@ std::pair<size_t, size_t> sample_mixed_decomposition(double probability, double 
 }
 
 /**
- * @brief Apply the {Z, S} twirl sigma U sigma^dagger to a gate sequence (applied first to last),
- * merging the twirl gates into adjacent gates where possible.
+ * @brief Apply the twirl sigma U sigma^dagger, sigma in {I, S, Z, S^dagger}, to a gate sequence
+ * (applied first to last), merging the twirl gates into adjacent gates where possible.
  */
 std::vector<GateType> twirl_sequence(const std::vector<GateType> &gates, size_t twirl) {
     // (sigma^dagger, sigma) for sigma in {I, S, Z, S^dagger}.

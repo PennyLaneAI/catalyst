@@ -168,6 +168,13 @@ class TestUnconditionalToConditionalIfProbs:
         result = unconditional_to_conditional_if_probs((0.5, 0.5, 0.3))
         assert result == pytest.approx((0.5, 1.0, 0.0))
 
+    def test_conditional_probs_bounded_by_one(self):
+        """Floating-point error in the remaining probability mass must not push a conditional
+        probability above 1, which would be rejected by the ``scf.if`` attribute verifier."""
+        result = unconditional_to_conditional_if_probs((13 / 14, 1 / 14, 0.0))
+        assert all(0.0 <= p <= 1.0 for p in result)
+        assert result == pytest.approx((13 / 14, 1.0, 0.0))
+
     @pytest.mark.parametrize(
         "unconditional",
         [(0.2, 0.6, 0.1), (0.5, 0.25), (0.1, 0.1, 0.1, 0.1), (1.0,)],

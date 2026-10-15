@@ -20,6 +20,7 @@
 
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/STLForwardCompat.h"
+#include "llvm/ADT/StringSwitch.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinAttributes.h"
@@ -438,11 +439,35 @@ LogicalResult convertPauliRotGate(PauliRotOp op, ConversionPatternRewriter &rewr
                                    op.getAdjoint(), rewriter);
 }
 
-LogicalResult convertPPROperator(OperatorOp op, ConversionPatternRewriter &rewriter) {
-    assert(op.getAllParams().empty() && "PPR operator does not support dynamic parameters");
+// The PPR_k operators (k = 2, 4, 8) carry their angle denominator in the op name.
+std::optional<int8_t> getPPROperatorDenominator(OperatorOp op) {
+    return llvm::StringSwitch<std::optional<int8_t>>(op.getOpName())
+        .Case("PPR_2", 2)
+        .Case("PPR_4", 4)
+        .Case("PPR_8", 8)
+        .Default(std::nullopt);
+}
+
+LogicalResult convertPPROperator(OperatorOp op, int8_t denominator,
+                                 ConversionPatternRewriter &rewriter) {
+    if (!op.getAllParams().empty()) {
+        return op.emitError("PPR operators do not support dynamic parameters");
+    }
 
     DictionaryAttr staticData = op.getStaticData();
-    auto pauliWordAttr = staticData.getAs<StringAttr>("pauli_word");
+    StringAttr pauliWordAttr = staticData ? staticData.getAs<StringAttr>("pauli_word") : nullptr;
+    IntegerAttr signAttr = staticData ? staticData.getAs<IntegerAttr>("sign") : nullptr;
+    // A boolean sign is stored as an i1 attribute, which must not be read as +-1.
+    if (!pauliWordAttr || !signAttr || signAttr.getType().isInteger(1)) {
+        return op.emitError("PPR operators require static_data with a string 'pauli_word' and an "
+                            "integer 'sign'");
+    }
+    // don't use getInt, since it asserts signless (cannot handle signed data)
+    int64_t sign = signAttr.getValue().getSExtValue();
+    if (sign != 1 && sign != -1) {
+        return op.emitError("PPR operators require a sign of 1 or -1, but got ") << sign;
+    }
+
     StringRef pauliWord = pauliWordAttr.getValue();
     SmallVector<Attribute> pauliCharacters;
     pauliCharacters.reserve(pauliWord.size());
@@ -451,9 +476,7 @@ LogicalResult convertPPROperator(OperatorOp op, ConversionPatternRewriter &rewri
     }
     ArrayAttr pauliProduct = rewriter.getArrayAttr(pauliCharacters);
 
-    auto denominatorAttr = staticData.getAs<IntegerAttr>("angle_denominator");
-    // don't use getInt, since it asserts signless (cannot handle signed data)
-    int8_t rotationKind = static_cast<int8_t>(denominatorAttr.getValue().getSExtValue());
+    int8_t rotationKind = static_cast<int8_t>(sign * denominator);
     if (op.getAdjoint()) {
         rotationKind = -rotationKind;
     }
@@ -474,7 +497,7 @@ struct PBCGateLowering : public OpInterfaceConversionPattern<QuantumOperation> {
     LogicalResult matchAndRewrite(QuantumOperation operation, ArrayRef<Value> operands,
                                   ConversionPatternRewriter &rewriter) const final {
         StringRef supportedGates =
-            "Supported gates: H, S, T, X, Y, Z, S†, T†, I, CNOT, CY, CZ, PPR,"
+            "Supported gates: H, S, T, X, Y, Z, S†, T†, I, CNOT, CY, CZ, PPR_2, PPR_4, PPR_8, "
             "RX, RY, RZ, IsingXX, IsingYY, IsingZZ, MultiRZ, and PauliRot.";
         Operation *op = operation.getOperation();
 
@@ -526,8 +549,8 @@ struct PBCGateLowering : public OpInterfaceConversionPattern<QuantumOperation> {
         } else if (auto originOp = dyn_cast<PauliRotOp>(op)) {
             return convertPauliRotGate(originOp, rewriter);
         } else if (auto originOp = dyn_cast<OperatorOp>(op)) {
-            if (originOp.getOpName() == "PPR") {
-                return convertPPROperator(originOp, rewriter);
+            if (auto denominator = getPPROperatorDenominator(originOp)) {
+                return convertPPROperator(originOp, *denominator, rewriter);
             }
         }
 
