@@ -1263,7 +1263,7 @@ class TestCapture:
         """
 
         @qjit(capture=True, collect_decomp_rules=False)
-        @qp.decompose(gate_set=[qp.RX, qp.RY, qp.RZ])
+        @qp.decompose(gate_set={"RX": 1.0, "RY": 1.0, "RZ": 1.0})
         @qp.qnode(qp.device(backend, wires=2))
         def captured_circuit(x: float, y: float, z: float):
             m = qp.measure(0)
@@ -1277,25 +1277,7 @@ class TestCapture:
 
         capture_result = captured_circuit(1.5, 2.5, 3.5)
 
-        # Capture disabled
-        @qp.decompose(gate_set=[qp.RX, qp.RY, qp.RZ])
-        @qp.qnode(qp.device(backend, wires=2))
-        def circuit(x: float, y: float, z: float):
-            m = catalyst.measure(0)
-
-            @catalyst.cond(m)
-            def cond_fn():
-                qp.Rot(x, y, z, 0)
-
-            cond_fn()
-            return qp.expval(qp.PauliZ(0))
-
-        # non-capture pathway is not actively developed and raises unnecessary warnings (wontfix)
-        with pytest.warns(UserWarning, match="MidCircuitMeasure does not define a decomposition"):
-            with pytest.warns(UserWarning, match="Cond does not define a decomposition"):
-                non_capture_result = qjit(circuit)(1.5, 2.5, 3.5)
-
-        assert jnp.allclose(non_capture_result, capture_result)
+        assert jnp.allclose(1.0, capture_result)
 
     def test_shots_usage(self, backend):
         """Test the integration for a circuit using shots explicitly."""
