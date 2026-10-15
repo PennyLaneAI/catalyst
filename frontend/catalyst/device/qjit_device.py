@@ -289,6 +289,11 @@ def get_qjit_device_capabilities(target_capabilities: DeviceCapabilities) -> Dev
         {"Snapshot": OperatorProperties(invertible=False, controllable=False, differentiable=False)}
     )
 
+    # Compiler-only optimization barrier (no runtime / QIR counterpart)
+    qjit_capabilities.operations.update(
+        {"Barrier": OperatorProperties(invertible=False, controllable=False, differentiable=False)}
+    )
+
     # Catalyst supports dynamic qubit allocation on qjit-compatible devices. Target device
     # TOMLs (e.g. lightning) still default this flag to false; expose Catalyst support via
     # qjit capabilities so verification can check the field rather than bypassing Allocate.

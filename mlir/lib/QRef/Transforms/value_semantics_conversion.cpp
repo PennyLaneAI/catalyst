@@ -1158,6 +1158,9 @@ void handleGate(IRRewriter &builder, qref::QuantumOperation rGateOp, QubitValueT
     } else if (auto rSetBasisStateOp = dyn_cast<qref::SetBasisStateOp>(_rGateOp)) {
         vGateOp = migrateOpToValueSemantics<quantum::SetBasisStateOp>(builder, rSetBasisStateOp,
                                                                       tracker, qubitResultsType);
+    } else if (auto rBarrierOp = dyn_cast<qref::BarrierOp>(_rGateOp)) {
+        vGateOp = migrateOpToValueSemantics<quantum::BarrierOp>(builder, rBarrierOp, tracker,
+                                                                qubitResultsType);
     } else if (auto rOperatorOp = dyn_cast<qref::OperatorOp>(_rGateOp)) {
         // Special case for the register mode of this op (existing vector only gathers qubits).
         if (rOperatorOp.getQreg()) {
