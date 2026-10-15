@@ -277,6 +277,8 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
 
             auto [opName, ruleName] = pairRef.split("=");
             opName = opName.trim();
+            opName.consume_front("\"");
+            opName.consume_back("\"");
             ruleName = ruleName.trim();
             ruleName.consume_front("\"");
             ruleName.consume_back("\"");
@@ -296,6 +298,8 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
 
             auto [opName, rulesRef] = pairRef.split("=");
             opName = opName.trim();
+            opName.consume_front("\"");
+            opName.consume_back("\"");
             llvm::SmallVector<llvm::StringRef> splitRulesRef;
 
             rulesRef = rulesRef.trim();

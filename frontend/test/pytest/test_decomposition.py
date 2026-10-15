@@ -1907,6 +1907,41 @@ class TestCustomRuleApplication:
         assert decomposed.get("PauliX", 0) == 0  # assert that the second rule got used
         assert decomposed.get("PauliY", 0) == 2  # assert that the second rule got used
 
+    @pytest.mark.parametrize("option", ["fixed_decomps", "alt_decomps"])
+    def test_fixed_and_alt_decomps_for_modifier_wrapped_op(self, option):
+        """Tests that fixed and alt decomps keyed by a modifier-wrapped operator name,
+        which is quoted in the pass options, are respected."""
+
+        @qp.register_resources({qp.X: 1})
+        def rule1(base):
+            qp.X(base.wires)
+
+        @qp.register_resources({qp.Y: 2})
+        def rule2(base):
+            qp.Y(base.wires)
+            qp.Y(base.wires)
+
+        rules = {"fixed_decomps": rule2, "alt_decomps": [rule2]}[option]
+
+        with local_decomps():
+
+            add_decomps("Adjoint(NoParamsCustomOp)", rule1, rule2)
+
+            @qjit(capture=True, target="mlir")
+            @graph_decomposition(
+                gate_set={qp.X: 1, qp.Y: 1}, **{option: {"Adjoint(NoParamsCustomOp)": rules}}
+            )
+            @qnode(qp.device("null.qubit", wires=1))
+            def circuit():
+                qp.adjoint(NoParamsCustomOp(0))
+
+            resources = qp.specs(circuit, level="all")().resources
+
+        decomposed = resources["graph-decomposition"].counts
+        assert decomposed.get("Adjoint(NoParamsCustomOp)", 0) == 0
+        assert decomposed.get("PauliX", 0) == 0
+        assert decomposed.get("PauliY", 0) == 2
+
     def test_fix_decomp_invalid_name(self):
         """Tests that an error is raised by referring to an inexistant rule name."""
 
