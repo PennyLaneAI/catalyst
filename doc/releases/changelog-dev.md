@@ -878,6 +878,9 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* `qp.decompose` now dispatches to `graph_decomposition`. Tests have been updated to reflect this.
+  [(#3346)](https://github.com/PennyLaneAI/catalyst/pull/3346)
+
 * QNode functions are now marked with a `quantum.kernel_entry_point` attribute in their quantum
   kernel module, which the `ResourceAnalysis` pass uses to identify the entry function.
   [(#3308)](https://github.com/PennyLaneAI/catalyst/pull/3308)
