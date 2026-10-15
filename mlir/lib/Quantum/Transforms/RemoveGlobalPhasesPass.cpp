@@ -14,10 +14,13 @@
 
 #define DEBUG_TYPE "remove-global-phases"
 
-#include "llvm/Support/Debug.h"
+#include "llvm/ADT/DenseSet.h"
+#include "llvm/ADT/SmallVector.h"
+#include "llvm/Support/LogicalResult.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Operation.h"
 #include "mlir/IR/PatternMatch.h"
+#include "mlir/IR/SymbolTable.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -34,24 +37,72 @@ struct RemoveGlobalPhasesRewritePattern : public OpRewritePattern<GlobalPhaseOp>
     using OpRewritePattern<GlobalPhaseOp>::OpRewritePattern;
 
     LogicalResult matchAndRewrite(GlobalPhaseOp op, PatternRewriter &rewriter) const override {
-
-        // Cannot remove gphase ops in subroutines, as they might be called in a control region.
-        if (auto parentFunc = op->getParentOfType<func::FuncOp>();
-            !parentFunc || !parentFunc->hasAttr("quantum.node")) {
+        func::FuncOp parentFunc = op->getParentOfType<func::FuncOp>();
+        if (!parentFunc) {
             return failure();
         }
 
-        // Find out if there are any control regions in the parent chain,
-        // Or if there are control qubits associated with this operation.
-        // If so, it must be ignored
+        // If the gphase op itself is directly controlled or directly inside a CtrlOp,
+        // cannot remove it (regardless of whether it's in subroutine or in main qnode func)
         if (op->getParentOfType<CtrlOp>() || !op.getInCtrlQubits().empty()) {
             return failure();
         }
 
-        // Erase global phase op
-        rewriter.eraseOp(op);
+        bool isInSubroutine = !parentFunc->hasAttr("quantum.node");
 
-        // Successful application of pattern
+        // If in main qnode function, safe to erase
+        if (!isInSubroutine) {
+            rewriter.eraseOp(op);
+            return success();
+        }
+
+        // Subroutine case: Traverse the call graph upwards to see if ANY ancestor is in a CtrlOp
+        Operation *mod = op->getParentOfType<ModuleOp>();
+
+        SmallVector<func::FuncOp> queue;
+        llvm::DenseSet<Operation *> visited;
+
+        queue.push_back(parentFunc);
+        visited.insert(parentFunc);
+
+        bool isControlledAnywhere = false;
+
+        while (!queue.empty()) {
+            func::FuncOp currentFunc = queue.pop_back_val();
+
+            auto uses = SymbolTable::getSymbolUses(currentFunc, mod);
+            if (!uses) {
+                continue;
+            }
+
+            for (auto use : *uses) {
+                Operation *user = use.getUser();
+                if (auto callOp = dyn_cast<func::CallOp>(user)) {
+                    // 1. Is this specific callsite inside a CtrlOp?
+                    if (callOp->getParentOfType<CtrlOp>()) {
+                        isControlledAnywhere = true;
+                        break;
+                    }
+                    // 2. If not, add the caller function to the queue to keep traversing up
+                    if (func::FuncOp callerFunc = callOp->getParentOfType<func::FuncOp>()) {
+                        // DenseSet::insert().second is true if the element was newly inserted
+                        if (visited.insert(callerFunc).second) {
+                            queue.push_back(callerFunc);
+                        }
+                    }
+                }
+            }
+
+            if (isControlledAnywhere) {
+                break;
+            }
+        }
+
+        if (isControlledAnywhere) {
+            return failure();
+        }
+
+        rewriter.eraseOp(op);
         return success();
     }
 };
