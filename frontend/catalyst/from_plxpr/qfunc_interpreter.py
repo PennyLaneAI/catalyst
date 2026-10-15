@@ -18,7 +18,9 @@ Sets up the PLxPRToQuantumJaxprInterpreter for converting plxpr to catalyst jaxp
 # pylint: disable=protected-access
 import textwrap
 import warnings
+from contextlib import nullcontext
 from copy import copy
+from dataclasses import replace
 from functools import partial
 
 import jax
@@ -47,6 +49,7 @@ from pennylane.wires import AbstractQubit, Wires, is_abstract_qubit
 
 from catalyst.decomposition.capture_session import ModifierState, OpDecompRequest, TracedRule
 from catalyst.decomposition.decomposition_rules import (
+    resource_requests,
     rule_call_operands,
     walk_reachable_decomp_rule_sets,
 )
@@ -483,11 +486,38 @@ def _convert_decomp_target_spec(interpreter, target_spec):
 
 
 def _capture_scope_rules(interpreter, scope):
-    """Populate one decomposition scope outside the active program trace."""
+    """Populate one decomposition scope outside the active program trace.
 
-    for target_spec in walk_reachable_decomp_rule_sets(list(scope.roots.values())):
-        for traced_rule in _convert_decomp_target_spec(interpreter, target_spec):
-            scope.record_definition(traced_rule)
+    Each pass gets the rules its registry allows for the operators it can encounter: the roots and
+    the operators reachable by the passes applied before it.
+    """
+
+    requests = list(scope.roots.values())
+    captured = set()
+    for registry in scope.registries or (nullcontext,):
+        with registry():
+            target_specs = walk_reachable_decomp_rule_sets(requests)
+            for target_spec in target_specs:
+                rules = []
+                for rule in target_spec.rules:
+                    key = (
+                        target_spec.target_id,
+                        rule.frontend_name,
+                        tuple(sorted(rule.resources.items())),
+                    )
+                    if key not in captured:
+                        captured.add(key)
+                        rules.append(rule)
+                if not rules:
+                    continue
+                traced_rules = _convert_decomp_target_spec(
+                    interpreter, replace(target_spec, rules=rules)
+                )
+                for traced_rule in traced_rules:
+                    scope.record_definition(traced_rule)
+        requests += [
+            (request, {request.modifier_state}) for request in resource_requests(target_specs)
+        ]
 
 
 def capture_and_bind_kernel_rules(interpreter):

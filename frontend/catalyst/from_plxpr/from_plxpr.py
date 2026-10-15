@@ -17,6 +17,7 @@ This submodule defines a utility for converting plxpr into Catalyst jaxpr.
 
 # pylint: disable=protected-access
 
+from contextlib import contextmanager, nullcontext
 from copy import copy
 from functools import partial
 from importlib.metadata import entry_points
@@ -27,6 +28,8 @@ import pennylane as qp
 from jax.extend.core import ClosedJaxpr, Jaxpr
 from pennylane.capture import PlxprInterpreter, qnode_prim
 from pennylane.capture.primitives import transform_prim
+from pennylane.decomposition import DecompositionRule, add_decomps, list_decomps, local_decomps
+from pennylane.decomposition.decomposition_rule import _fix_decomp
 from pennylane.transforms import decompose as pl_decompose
 
 from catalyst.backline import device_pass_pipeline, remote_device_lib
@@ -44,6 +47,7 @@ from catalyst.jax_primitives import (
     device_release_p,
     quantum_kernel_p,
 )
+from catalyst.passes.builtin_passes import graph_decomposition
 from catalyst.utils.patching import Patcher
 
 from .device_utils import create_device_preprocessing_pipeline
@@ -249,6 +253,7 @@ class WorkflowInterpreter(PlxprInterpreter):
             plugin_paths=self.plugin_paths,
         )
         new_version._pass_pipeline = copy(self._pass_pipeline)
+        new_version._decomp_registries = copy(self._decomp_registries)
         new_version.init_qreg = self.init_qreg
         return new_version
 
@@ -260,6 +265,7 @@ class WorkflowInterpreter(PlxprInterpreter):
         plugin_paths: None | list[str] = None,
     ):
         self._pass_pipeline = []
+        self._decomp_registries = []
         self.init_qreg = None
         self._skip_preprocess = skip_preprocess
         self._preprocess_warn = _preprocess_warn
@@ -284,7 +290,11 @@ def handle_qnode(
 
     closed_jaxpr = ClosedJaxpr(qfunc_jaxpr, consts)
 
-    decomposition_scope = DecompositionScope() if self._collect_decomp_rules else None
+    decomposition_scope = (
+        DecompositionScope(registries=tuple(self._decomp_registries))
+        if self._collect_decomp_rules
+        else None
+    )
 
     def calling_convention(*args):
         device_init_p.bind(
@@ -363,11 +373,6 @@ def _handle_decompose_transform(self, inner_jaxpr, consts, non_const_args, tkwar
 
     ``qp.decompose`` is an alias for :func:`catalyst.passes.graph_decomposition`.
     """
-    # Local imports avoid an import cycle (catalyst.passes imports from_plxpr indirectly).
-    from pennylane.decomposition import DecompositionRule, add_decomps, list_decomps, local_decomps
-
-    from catalyst.passes.builtin_passes import graph_decomposition
-
     _validate_decompose_tkwargs(tkwargs)
 
     fixed_decomps = tkwargs.get("fixed_decomps") or {}
@@ -383,37 +388,46 @@ def _handle_decompose_transform(self, inner_jaxpr, consts, non_const_args, tkwar
         )
 
     next_eval = copy(self)
+    bound_pass = graph_decomposition(
+        gate_set=tkwargs["gate_set"],
+        fixed_decomps=fixed_decomps or None,
+        alt_decomps=alt_decomps or None,
+    )
+    next_eval._pass_pipeline.insert(0, bound_pass)
+    next_eval._decomp_registries.insert(0, partial(_decomp_registry, fixed_decomps, alt_decomps))
+
+    return next_eval.eval(inner_jaxpr, consts, *non_const_args)
+
+
+@contextmanager
+def _decomp_registry(fixed_decomps, alt_decomps):
+    """Scope the decomposition registry to the rules a ``qp.decompose`` pass can apply."""
     with local_decomps():
         for op, rule in fixed_decomps.items():
-            _add_decomp_or_verify_name_exists(op, rule)
+            _fix_decomp_in_scope(op, rule)
         for op, rules in alt_decomps.items():
             add_decomps(op, *rules)
-
-        # Reusing the graph_decomposition transform (not a fork) guarantees identical pass options
-        # to the explicit catalyst.passes.graph_decomposition entry point.
-        bound_pass = graph_decomposition(
-            gate_set=tkwargs["gate_set"],
-            fixed_decomps=fixed_decomps or None,
-            alt_decomps=alt_decomps or None,
-        )
-        next_eval._pass_pipeline.insert(0, bound_pass)
-
-        return next_eval.eval(inner_jaxpr, consts, *non_const_args)
+        yield
 
 
-def _add_decomp_or_verify_name_exists(op, rule):
+def _fix_decomp_in_scope(op, rule):
+    """Register ``rule`` (or the existing rule named ``rule``) as the only rule for ``op``.
 
-    from pennylane.decomposition import DecompositionRule, add_decomps, list_decomps
-
+    Fixing the rule, not just adding it, keeps the alternatives out of the captured rule set: the
+    graph-decomposition pass discards them anyway, but capturing them is expensive.
+    """
     if isinstance(rule, DecompositionRule):
         add_decomps(op, rule)
 
     elif isinstance(rule, str):
         if rule not in list_decomps(op):
             raise ValueError(f"Unknown decomposition rule with name {rule}")
+        rule = list_decomps(op)[rule]
 
     else:
         raise TypeError(f"fixed_decomps accepts rules or the names of rules. Got {rule}")
+
+    _fix_decomp(op, rule)
 
 
 # pylint: disable=too-many-arguments
@@ -467,6 +481,8 @@ def handle_transform(
     # Transform.__call__() rejects empty args/kwargs; construct BoundTransform directly.
     bound_pass = qp.core.transforms.BoundTransform(t, args=targs, kwargs=pl_tkwargs)
     next_eval._pass_pipeline.insert(0, bound_pass)
+    if name == graph_decomposition.pass_name:
+        next_eval._decomp_registries.insert(0, nullcontext)
     return next_eval.eval(inner_jaxpr, consts, *non_const_args)
 
 
