@@ -30,6 +30,8 @@ namespace RSDecomp::GridProblem {
 
 /**
  * @brief Widen [lo, hi] by the working tolerance so that rounding does not drop grid points.
+ * @param lo The lower bound of the interval, decreased in place.
+ * @param hi The upper bound of the interval, increased in place.
  */
 inline void fatten(Real &lo, Real &hi) {
     Real slack = (abs(lo) + abs(hi) + 1) * tolerance();
@@ -44,6 +46,14 @@ inline void fatten(Real &lo, Real &hi) {
  * The problem is rescaled by a power of λ = 1 + √2 such that both intervals have comparable
  * widths, and shifted close to the origin, before enumerating α = a + b√2 directly.
  * This is based on Lemmas 16 and 17 of arXiv:1212.6253.
+ *
+ * @tparam Visit A callable `visit(const ZSqrtTwo &alpha) -> bool`.
+ * @param x0 The lower bound on α.
+ * @param x1 The upper bound on α.
+ * @param y0 The lower bound on α•.
+ * @param y1 The upper bound on α•.
+ * @param visit Called for every solution, returns false to stop the enumeration.
+ * @return False if the enumeration was stopped by visit, true otherwise.
  */
 template <typename Visit>
 bool solve_one_dim_problem(Real x0, Real x1, Real y0, Real y1, Visit &&visit) {
@@ -108,6 +118,14 @@ bool solve_one_dim_problem(Real x0, Real x1, Real y0, Real y1, Visit &&visit) {
  * α runs over the 1D grid problem given by the x-ranges of both sets, and for each α, β runs over
  * the 1D grid problem given by the vertical sections of the sets at α and α•. The sets provide
  * x_range() and y_section(x), as Ellipse does.
+ *
+ * @tparam Set1 The type of the first set.
+ * @tparam Set2 The type of the second set.
+ * @tparam Visit A callable `visit(const ZSqrtTwo &alpha, const ZSqrtTwo &beta) -> bool`.
+ * @param s1 The set containing α + iβ.
+ * @param s2 The set containing α• + iβ•.
+ * @param visit Called for every solution, returns false to stop the enumeration.
+ * @return False if the enumeration was stopped by visit, true otherwise.
  */
 template <typename Set1, typename Set2, typename Visit>
 bool solve_by_sections(const Set1 &s1, const Set2 &s2, Visit &&visit) {
@@ -135,6 +153,15 @@ bool solve_by_sections(const Set1 &s1, const Set2 &s2, Visit &&visit) {
  * The outer 1D problem is taken along the axis where the product of the widths of both sets is
  * smaller. Otherwise, most of its solutions can have no solutions of the inner 1D problem.
  * The sets provide x_range(), y_range(), y_section(x) and transpose(), as Ellipse does.
+ *
+ * @tparam Set1 The type of the first set.
+ * @tparam Set2 The type of the second set.
+ * @tparam Visit A callable `visit(const ZOmega &u) -> bool`.
+ * @param s1 The set containing u - shift.
+ * @param s2 The set containing (u - shift)•.
+ * @param shift The offset of the coset in Z[ω].
+ * @param visit Called for every candidate, returns false to stop the enumeration.
+ * @return False if the enumeration was stopped by visit, true otherwise.
  */
 template <typename Set1, typename Set2, typename Visit>
 bool solve_upright_coset(const Set1 &s1, const Set2 &s2, const ZOmega &shift, Visit &&visit) {
@@ -159,6 +186,11 @@ bool solve_upright_coset(const Set1 &s1, const Set2 &s2, const ZOmega &shift, Vi
  * Z[ω] is the union of the cosets Z[√2] + iZ[√2] and Z[√2] + iZ[√2] + ω, where ω = (1 + i)/√2
  * and ω• = -ω. Candidates can lie slightly outside the ellipses and must be checked by the caller.
  * This is based on Proposition 5.21 and Theorem 5.18 of arXiv:1403.2975.
+ *
+ * @tparam Visit A callable `visit(const ZOmega &u) -> bool`.
+ * @param state The upright state.
+ * @param visit Called for every candidate, returns false to stop the enumeration.
+ * @return False if the enumeration was stopped by visit, true otherwise.
  */
 template <typename Visit> bool solve_two_dim_problem(const EllipseState &state, Visit &&visit) {
     if (!solve_upright_coset(state.e1, state.e2, ZOmega(0), visit)) {
@@ -186,6 +218,8 @@ struct PulledBackRegion {
 
     /**
      * @brief The entries of √2 G for the grid operator G.
+     * @param op The grid operator G.
+     * @return The entries {a, b, c, d} of √2 G in Z[√2].
      */
     static std::array<ZSqrtTwo, 4> scaled_entries(const GridOp &op) {
         return {ZSqrtTwo(op.a[1], op.a[0]), ZSqrtTwo(op.b[1], op.b[0]), ZSqrtTwo(op.c[1], op.c[0]),
@@ -204,6 +238,8 @@ struct PulledBackRegion {
 
     /**
      * @brief The range of y-values of the set along the vertical line at x, if it intersects.
+     * @param x The x-coordinate of the line.
+     * @return The range {y_min, y_max}, or std::nullopt if the line misses the set.
      */
     std::optional<std::pair<Real, Real>> y_section(const ZSqrtTwo &x) const {
         auto bound_section = bound.y_section(x);
@@ -280,6 +316,11 @@ struct PulledBackRegion {
  */
 class RzGridSearch {
   public:
+    /**
+     * @brief Constructor for RzGridSearch.
+     * @param theta The angle of z.
+     * @param epsilon The precision ε.
+     */
     RzGridSearch(const Real &theta, const Real &epsilon)
         : zx(cos(theta)), zy(sin(theta)), target(1 - epsilon * epsilon / 2) {
         Ellipse region = Ellipse::from_region(theta, epsilon);
@@ -291,7 +332,11 @@ class RzGridSearch {
     }
 
     /**
-     * @brief Visit the solutions at level k as visit(u) -> bool.
+     * @brief Visit the solutions at level k.
+     * @tparam Visit A callable `visit(const ZOmega &u) -> bool`.
+     * @param k The level.
+     * @param visit Called for every solution, returns false to stop the enumeration.
+     * @return False if the enumeration was stopped by visit, true otherwise.
      */
     template <typename Visit> bool visit_level(int k, Visit &&visit) const {
         Real scale = pow(sqrt2(), k);

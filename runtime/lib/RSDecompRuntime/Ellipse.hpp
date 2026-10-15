@@ -278,6 +278,10 @@ struct Ellipse {
      *
      * The ellipse is centred on the chord of the region, with semi-axes ε^2/2 along z and ε
      * orthogonal to it.
+     *
+     * @param theta The angle of z.
+     * @param epsilon The precision ε.
+     * @return The bounding ellipse.
      */
     static Ellipse from_region(const Real &theta, const Real &epsilon) {
         Real t = epsilon * epsilon / 2;
@@ -305,6 +309,9 @@ struct Ellipse {
 
     /**
      * @brief Check if the point (x, y) is inside the ellipse.
+     * @param x The x-coordinate of the point.
+     * @param y The y-coordinate of the point.
+     * @return True if the point is inside the ellipse or on its boundary.
      */
     bool contains(const Real &x, const Real &y) const {
         Real x_ = x - p[0];
@@ -314,6 +321,7 @@ struct Ellipse {
 
     /**
      * @brief Normalize the ellipse so that its determinant is 1.
+     * @return The normalized ellipse and the factor its matrix was scaled by.
      */
     std::pair<Ellipse, Real> normalize() const {
         Real root = sqrt(determinant());
@@ -322,6 +330,8 @@ struct Ellipse {
 
     /**
      * @brief Return the image of the ellipse under the dilation x -> factor * x.
+     * @param factor The dilation factor.
+     * @return The dilated ellipse.
      */
     Ellipse dilate(const Real &factor) const {
         Real factor2 = factor * factor;
@@ -330,6 +340,8 @@ struct Ellipse {
 
     /**
      * @brief Return the ellipse shifted by the offset along both axes.
+     * @param offset_val The shift along each axis.
+     * @return The shifted ellipse.
      */
     Ellipse offset(const Real &offset_val) const {
         return Ellipse({a, b, d}, {p[0] + offset_val, p[1] + offset_val});
@@ -355,6 +367,8 @@ struct Ellipse {
 
     /**
      * @brief The range of y-values of the ellipse along the vertical line at x, if it intersects.
+     * @param x The x-coordinate of the line.
+     * @return The range {y_min, y_max}, or std::nullopt if the line misses the ellipse.
      */
     std::optional<std::pair<Real, Real>> y_section(const Real &x) const {
         Real x_shifted = x - p[0];
@@ -373,6 +387,8 @@ struct Ellipse {
 
     /**
      * @brief Apply a grid operation G to the ellipse, i.e., return G^{-1}(E) with matrix G^T D G.
+     * @param grid_op The grid operation G.
+     * @return The transformed ellipse.
      */
     Ellipse apply_grid_op(const GridOp &grid_op) const {
         const auto [ga, gb, gc, gd] = grid_op.flatten();
@@ -428,6 +444,7 @@ struct EllipseState {
 
     /**
      * @brief Whether |bias| > n.
+     * @param n The bound on the bias.
      */
     bool bias_exceeds(int n) const {
         Real ratio = bias_ratio();
@@ -437,6 +454,8 @@ struct EllipseState {
 
     /**
      * @brief Apply a grid operation G to the state (Definition A.3, arXiv:1403.2975).
+     * @param grid_op The grid operation G, which acts on the second ellipse as G•.
+     * @return The transformed state.
      */
     EllipseState apply_grid_op(const GridOp &grid_op) const {
         return EllipseState(e1.apply_grid_op(grid_op), e2.apply_grid_op(grid_op.adj2()));

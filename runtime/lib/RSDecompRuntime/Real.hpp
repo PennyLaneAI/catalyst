@@ -83,11 +83,13 @@ inline Real to_real(const ZSqrtTwo &x) { return Real(x.a) + Real(x.b) * sqrt2();
 
 /**
  * @brief Real part of a*ω^3 + b*ω^2 + c*ω + d with ω = (1 + i)/√2.
+ * @param x The element a*ω^3 + b*ω^2 + c*ω + d of Z[ω].
  */
 inline Real real_part(const ZOmega &x) { return Real(x.d) + Real(x.c - x.a) * inv_sqrt2(); }
 
 /**
  * @brief Imaginary part of a*ω^3 + b*ω^2 + c*ω + d with ω = (1 + i)/√2.
+ * @param x The element a*ω^3 + b*ω^2 + c*ω + d of Z[ω].
  */
 inline Real imag_part(const ZOmega &x) { return Real(x.b) + Real(x.c + x.a) * inv_sqrt2(); }
 

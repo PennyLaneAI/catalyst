@@ -56,6 +56,9 @@ struct RzSolution {
 /**
  * @brief Find the integer number of units of π/4 that the angle is equal to, within an error
  * that keeps the decomposition within epsilon.
+ * @param angle The target rotation angle.
+ * @param epsilon The desired approximation precision.
+ * @return The number of units of π/4, or std::nullopt if the angle is not close enough to one.
  */
 std::optional<INT_TYPE> as_multiple_of_pi_4(double angle, double epsilon) {
     Real pi_4 = pi() / 4;
@@ -69,6 +72,10 @@ std::optional<INT_TYPE> as_multiple_of_pi_4(double angle, double epsilon) {
 
 /**
  * @brief Solve the grid problem and Diophantine equation for RZ(angle) at level k = 0, 1, 2, ....
+ * @param angle The target rotation angle.
+ * @param epsilon The desired approximation precision.
+ * @return The solution at the smallest level, or std::nullopt if none was found up to the
+ * maximum level.
  */
 std::optional<RzSolution> solve_rz(double angle, double epsilon) {
     // RZ(angle)[0, 0] = e^{-i angle / 2}
@@ -100,6 +107,8 @@ std::optional<RzSolution> solve_rz(double angle, double epsilon) {
 /**
  * @brief Fail for inputs that have no decomposition. This must happen before the cache lookups,
  * as NaN keys compare equal to any cached key.
+ * @param angle The target rotation angle.
+ * @param epsilon The desired approximation precision.
  */
 void validate_inputs(double angle, double epsilon) {
     RT_FAIL_IF(!std::isfinite(angle), "Gridsynth requires a finite angle.");
