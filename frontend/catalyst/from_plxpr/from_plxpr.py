@@ -446,12 +446,11 @@ def handle_transform(
     non_const_args = args[_tuple_to_slice(args_slice)]
     targs = args[_tuple_to_slice(targs_slice)]
     pl_tkwargs = _tuple_to_dict(tkwargs)
-
+    resource_analysis_enabled = (transform.pass_name == "resource-analysis" and pl_tkwargs.get("gate_set") is not None)
+    
     # qp.decompose is routed to the graph-decomposition pass (see _handle_decompose_transform).
-    if transform == pl_decompose or (transform.pass_name == "resource-analysis" and pl_tkwargs.get("gate_set") is not None):
-    # if transform == pl_decompose:
-        x = _handle_decompose_transform(self, inner_jaxpr, consts, non_const_args, pl_tkwargs)
-        return x
+    if transform == pl_decompose or resource_analysis_enabled:
+        return _handle_decompose_transform(self, inner_jaxpr, consts, non_const_args, pl_tkwargs)
 
     if transform.pass_name is None:
         raise ValueError(

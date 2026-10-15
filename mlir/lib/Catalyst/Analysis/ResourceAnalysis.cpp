@@ -492,7 +492,9 @@ void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result, b
             !gateset.contains(operatorNode)) {
             const DecompGraph::Core::ChosenDecompRule &chosenRule = graphOp->second;
             for (const auto &[basisOp, count] : chosenRule.basisCounts) {
-                result.operations[basisOp.name][{basisOp.numWires, basisOp.numParams}] += count;
+                // Getting wires and params from GOID is unreliable. The JSON is flattened anyways,
+                // so for qp.estimate this will be enough.
+                result.operations[basisOp.name][{-1, -1}] += count;
             }
             return;
         }
