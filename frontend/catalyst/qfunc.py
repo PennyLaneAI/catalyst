@@ -637,6 +637,8 @@ def _decompose_as_tape_transform(transform_program):
     """Replace each ``qp.decompose`` with its tape-based implementation.
 
     Without capture, this qp.decompose runs as the tape transform it used to be.
+    ``catalyst.passes.graph_decomposition`` is a separate transform, so it is still lowered as a
+    pass.
     """
     # pylint: disable=protected-access
     if not any(t._transform is pl_decompose for t in transform_program):
