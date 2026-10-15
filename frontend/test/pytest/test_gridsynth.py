@@ -98,6 +98,10 @@ def test_gridsynth_specs_matches_runtime(eps, ppr_basis):
     """Test that the specs T-count estimate matches the T-count executed at runtime, on average
     over random angles."""
     angles = np.random.default_rng(42).uniform(0, 4 * np.pi, 50)
+    # The estimate cannot know which angles are within 2 * eps of a multiple of pi/4, which need at
+    # most one T gate.
+    distance_to_pi_4 = np.abs(np.remainder(angles + np.pi / 8, np.pi / 4) - np.pi / 8)
+    angles = angles[distance_to_pi_4 > 2 * eps]
 
     @qp.qjit(capture=True)
     @qp.transforms.gridsynth(epsilon=eps, ppr_basis=ppr_basis)

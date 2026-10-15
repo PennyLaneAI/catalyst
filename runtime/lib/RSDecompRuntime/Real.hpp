@@ -60,6 +60,11 @@ inline const Real &log2_lambda() {
     return value;
 }
 
+inline const Real &pi() {
+    static const Real value = 4 * atan(Real(1));
+    return value;
+}
+
 /**
  * @brief Slack used to widen intervals so that rounding never drops a grid point.
  */

@@ -57,10 +57,11 @@ struct RzSolution {
  * @brief Find the integer number of units of π/4 that the angle is equal to, within an error
  * that keeps the decomposition within epsilon.
  */
-std::optional<long> as_multiple_of_pi_4(double angle, double epsilon) {
-    long units = std::lround(angle / M_PI_4);
+std::optional<INT_TYPE> as_multiple_of_pi_4(double angle, double epsilon) {
+    Real pi_4 = pi() / 4;
+    INT_TYPE units = round_int(Real(angle / pi_4));
     // ||RZ(a) - RZ(b)|| <= |a - b| / 2
-    if (std::abs(angle - static_cast<double>(units) * M_PI_4) < std::min(1e-10, epsilon)) {
+    if (abs(Real(angle - Real(units) * pi_4)) <= 2 * Real(epsilon)) {
         return units;
     }
     return std::nullopt;
@@ -96,6 +97,23 @@ std::optional<RzSolution> solve_rz(double angle, double epsilon) {
     return solution;
 }
 
+/**
+ * @brief Fail for inputs that have no decomposition. This must happen before the cache lookups,
+ * as NaN keys compare equal to any cached key.
+ */
+void validate_inputs(double angle, double epsilon) {
+    RT_FAIL_IF(!std::isfinite(angle), "Gridsynth requires a finite angle.");
+    RT_FAIL_IF(!(epsilon > 0) || !std::isfinite(epsilon),
+               "Gridsynth requires a positive, finite epsilon.");
+    if (epsilon < MIN_EPSILON) {
+        std::ostringstream oss;
+        oss << "Gridsynth received epsilon=" << std::scientific << epsilon
+            << ", but the smallest supported epsilon is " << std::defaultfloat << MIN_EPSILON
+            << ".";
+        RT_FAIL(oss.str().c_str());
+    }
+}
+
 } // namespace
 
 /**
@@ -107,18 +125,11 @@ std::optional<RzSolution> solve_rz(double angle, double epsilon) {
  */
 std::pair<std::vector<GateType>, double> compute_clifford_T_decomposition(double angle,
                                                                           double epsilon) {
-    RT_FAIL_IF(!(epsilon > 0), "Gridsynth requires a positive epsilon.");
-    if (epsilon < MIN_EPSILON) {
-        std::ostringstream oss;
-        oss << "Gridsynth received epsilon=" << std::scientific << epsilon
-            << ", but the smallest supported epsilon is " << std::defaultfloat << MIN_EPSILON
-            << ".";
-        RT_FAIL(oss.str().c_str());
-    }
+    validate_inputs(angle, epsilon);
 
     if (auto units = as_multiple_of_pi_4(angle, epsilon)) {
         std::vector<GateType> decomposition;
-        int normalized = static_cast<int>(((*units % 8) + 8) % 8);
+        int normalized = (((*units % 8) + 8) % 8).convert_to<int>();
 
         if (normalized & 4) {
             decomposition.emplace_back(GateType::Z);
@@ -134,7 +145,7 @@ std::pair<std::vector<GateType>, double> compute_clifford_T_decomposition(double
             decomposition.emplace_back(GateType::I);
         }
 
-        return {std::move(decomposition), static_cast<double>(*units) * (M_PI / 8.0)};
+        return {std::move(decomposition), units->convert_to<double>() * (M_PI / 8.0)};
     }
 
     auto solution = solve_rz(angle, epsilon);
@@ -156,6 +167,7 @@ using StdCacheValue = std::pair<std::vector<GateType>, double>;
 static lru_cache<StdCacheKey, StdCacheValue, ROSS_CACHE_SIZE> ross_cache_std;
 
 std::pair<std::vector<GateType>, double> eval_ross_algorithm(double angle, double epsilon) {
+    validate_inputs(angle, epsilon);
     StdCacheKey key = {angle, epsilon};
 
     if (auto val_opt = ross_cache_std.get(key); val_opt) {
@@ -173,6 +185,7 @@ using PPRCacheValue = std::pair<std::vector<PPRGateType>, double>;
 static lru_cache<PPRCacheKey, PPRCacheValue, ROSS_CACHE_SIZE> ross_cache_ppr;
 
 std::pair<std::vector<PPRGateType>, double> eval_ross_algorithm_ppr(double angle, double epsilon) {
+    validate_inputs(angle, epsilon);
     PPRCacheKey key = {angle, epsilon};
 
     if (auto val_opt = ross_cache_ppr.get(key); val_opt) {

@@ -15,6 +15,7 @@
 #include <algorithm>
 #include <complex>
 #include <cstdio>
+#include <limits>
 #include <map>
 
 #include "boost/multiprecision/cpp_bin_float.hpp"
@@ -272,6 +273,30 @@ TEST_CASE("Test ross_selinger near multiples of pi/4", "[RSDecomp][Ross Selinger
     CHECK(decomposition_error(gates, phase, angle) <= VerifyReal(epsilon));
 }
 
+TEST_CASE("Test ross_selinger at large multiples of pi/4 in double", "[RSDecomp][Ross Selinger]") {
+    // units * M_PI_4 differs from units * π/4 by more than epsilon, so it must not be snapped.
+    double epsilon = GENERATE(1e-12, 1e-15);
+    double units = GENERATE(99.0, 1001.0, -12345.0);
+    double angle = units * M_PI_4;
+    CAPTURE(epsilon, angle);
+
+    const auto [gates, phase] = eval_ross_algorithm(angle, epsilon);
+    CHECK(decomposition_error(gates, phase, angle) <= VerifyReal(epsilon));
+}
+
+TEST_CASE("Test ross_selinger snaps to multiples of pi/4 within epsilon",
+          "[RSDecomp][Ross Selinger]") {
+    double epsilon = GENERATE(1e-3, 1e-8);
+    double offset = GENERATE(0.0, 1.9, -1.9);
+    int units = GENERATE(-3, 0, 1, 6);
+    double angle = units * M_PI_4 + offset * epsilon;
+    CAPTURE(epsilon, angle);
+
+    const auto [gates, phase] = eval_ross_algorithm(angle, epsilon);
+    CHECK(t_count(gates) <= 1);
+    CHECK(decomposition_error(gates, phase, angle) <= VerifyReal(epsilon));
+}
+
 TEST_CASE("Test Zero Angle (Identity)", "[RSDecomp][Ross Selinger]") {
     // An angle of 0.0 should result in Identity
     const auto [gates, phase] = eval_ross_algorithm(0.0, 1e-10);
@@ -388,8 +413,16 @@ TEST_CASE("rs_decomposition_get_size does not warn for small epsilon", "[RSDecom
 TEST_CASE("rs_decomposition_get_size fails for unsupported epsilon", "[RSDecomp][Ross Selinger]") {
     REQUIRE_THROWS_WITH(rs_decomposition_get_size(0.5, 1e-16, false),
                         ContainsSubstring("the smallest supported epsilon is 1e-15"));
-    REQUIRE_THROWS_WITH(rs_decomposition_get_size(0.5, 0.0, false),
-                        ContainsSubstring("Gridsynth requires a positive epsilon"));
-    REQUIRE_THROWS_WITH(rs_decomposition_get_size(0.5, -1e-3, false),
-                        ContainsSubstring("Gridsynth requires a positive epsilon"));
+    double bad_epsilon = GENERATE(0.0, -1e-3, std::numeric_limits<double>::quiet_NaN(),
+                                  std::numeric_limits<double>::infinity());
+    REQUIRE_THROWS_WITH(rs_decomposition_get_size(0.5, bad_epsilon, false),
+                        ContainsSubstring("Gridsynth requires a positive, finite epsilon"));
+}
+
+TEST_CASE("rs_decomposition_get_size fails for non-finite angles", "[RSDecomp][Ross Selinger]") {
+    double angle =
+        GENERATE(std::numeric_limits<double>::quiet_NaN(), std::numeric_limits<double>::infinity(),
+                 -std::numeric_limits<double>::infinity());
+    REQUIRE_THROWS_WITH(rs_decomposition_get_size(angle, 1e-3, false),
+                        ContainsSubstring("Gridsynth requires a finite angle"));
 }
