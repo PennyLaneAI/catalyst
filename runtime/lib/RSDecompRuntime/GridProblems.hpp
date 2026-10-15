@@ -56,17 +56,21 @@ bool solve_one_dim_problem(Real x0, Real x1, Real y0, Real y1, Visit &&visit) {
     const Real &sqrt2 = Reals::sqrt2();
 
     // Solutions β = λ^n α satisfy β ∈ λ^n [x0, x1] and β• = (-1)^n λ^{-n} α• ∈ (-1)^n λ^{-n} [y0,
-    // y1]. Any n gives all solutions, n only balances the widths, so double precision suffices.
-    long n = std::lround((approx_log(Real(y1 - y0)) - approx_log(Real(x1 - x0))) /
-                         (2 * std::log(1 + std::sqrt(2.0))));
-    Real lambda_n = pow(lambda(), n);
-    Real conj_scale = (n % 2 == 0 ? 1 : -1) / lambda_n;
+    // y1]. Any n gives all solutions, n only balances the widths, so it is taken from their binary
+    // exponents.
+    int x_exp, y_exp;
+    frexp(Real(x1 - x0), &x_exp);
+    frexp(Real(y1 - y0), &y_exp);
+    INT_TYPE n = round_int(Real((y_exp - x_exp) / (2 * log2_lambda())));
+    Real lambda_n = pow(lambda(), n.convert_to<int>());
     x0 *= lambda_n;
     x1 *= lambda_n;
-    y0 *= conj_scale;
-    y1 *= conj_scale;
-    if (y1 < y0) {
+    y0 /= lambda_n;
+    y1 /= lambda_n;
+    if (n % 2 != 0) {
         std::swap(y0, y1);
+        y0 = -y0;
+        y1 = -y1;
     }
 
     // Shift by a nearby β0 ∈ Z[√2] so that the enumerated coordinates stay small.

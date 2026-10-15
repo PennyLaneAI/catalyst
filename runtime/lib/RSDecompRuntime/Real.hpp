@@ -50,6 +50,16 @@ inline const Real &lambda() {
     return value;
 }
 
+inline const Real &log_lambda() {
+    static const Real value = log(lambda());
+    return value;
+}
+
+inline const Real &log2_lambda() {
+    static const Real value = log_lambda() / log(Real(2));
+    return value;
+}
+
 /**
  * @brief Slack used to widen intervals so that rounding never drops a grid point.
  */
@@ -63,11 +73,6 @@ inline INT_TYPE floor_int(const Real &x) { return floor(x).convert_to<INT_TYPE>(
 inline INT_TYPE ceil_int(const Real &x) { return ceil(x).convert_to<INT_TYPE>(); }
 
 inline INT_TYPE round_int(const Real &x) { return round(x).convert_to<INT_TYPE>(); }
-
-/**
- * @brief Natural logarithm of a positive x in double precision.
- */
-inline double approx_log(const Real &x) { return std::log(x.convert_to<double>()); }
 
 inline Real to_real(const ZSqrtTwo &x) { return Real(x.a) + Real(x.b) * sqrt2(); }
 

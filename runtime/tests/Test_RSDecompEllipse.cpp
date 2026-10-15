@@ -36,7 +36,9 @@ TEST_CASE("Test Ellipse class", "[RSDecomp][Ellipse]") {
     CHECK(e.a == 1);
     CHECK(e.b == 0);
     CHECK(e.d == 1);
-    CHECK(e.z == 0.0);
+    CHECK(e.lambda_pow_2z() == 1);
+    CHECK(near(Ellipse({lambda(), Real(0), 1 / lambda()}).lambda_pow_2z(),
+               1 / (lambda() * lambda())));
     CHECK(e.determinant() == 1);
     CHECK(e.positive_semi_definite());
     CHECK(e.offset(Real(1)) == Ellipse({Real(1), Real(0), Real(1)}, {Real(5), Real(6)}));
@@ -98,7 +100,15 @@ TEST_CASE("Test EllipseState class", "[RSDecomp][EllipseState]") {
     CHECK(es.e1 == e1);
     CHECK(es.e2 == e2);
     CHECK(es.skew() == 1);
-    CHECK(es.bias() == 0.0);
+    CHECK(es.bias() == 0);
+
+    // z1 = -1 and z2 = 2, so that bias = 3.
+    Real l = lambda();
+    EllipseState skewed{Ellipse({l, Real(0), 1 / l}), Ellipse({1 / (l * l), Real(0), l * l})};
+    CHECK(near(skewed.bias(), Real(3)));
+    CHECK(skewed.bias_exceeds(2));
+    CHECK_FALSE(skewed.bias_exceeds(4));
+    CHECK_FALSE(skewed.negative_z_sum());
 }
 
 TEST_CASE("Test EllipseState skew_grid_op", "[RSDecomp][EllipseState]") {

@@ -246,16 +246,12 @@ inline GridOp GridOp::pow(INT_TYPE n) const {
  * Represents the ellipse {x : (x - p)^T D (x - p) <= 1} for a positive definite matrix
  * D = [[a, b], [b, d]] with centre p.
  *
- * z is used by the step lemma of EllipseState, with D = [[e * λ^(-z), b], [b, e * λ^(z)]]
- * (Eq 31, arXiv:1403.2975).
+ * The step lemma of EllipseState uses the z of the ellipse, with D = [[e * λ^(-z), b],
+ * [b, e * λ^(z)]] (Eq 31, arXiv:1403.2975).
  */
 struct Ellipse {
     Real a, b, d;
     std::array<Real, 2> p;
-
-    // 2z * log(λ) = log(d / a). Only steers the case distinctions of the step lemma, which have
-    // slack, so double precision suffices.
-    double z;
 
     /**
      * @brief Constructor for Ellipse.
@@ -264,9 +260,13 @@ struct Ellipse {
      */
     Ellipse(const std::array<Real, 3> &D = {Real(1), Real(0), Real(1)},
             const std::array<Real, 2> &p_val = {Real(0), Real(0)})
-        : a(D[0]), b(D[1]), d(D[2]), p(p_val) {
-        z = (approx_log(d) - approx_log(a)) / (2 * std::log(1 + std::sqrt(2.0)));
-    }
+        : a(D[0]), b(D[1]), d(D[2]), p(p_val) {}
+
+    /**
+     * @brief λ^(2z) = d / a. The step lemma compares this against powers of λ instead of
+     * computing z.
+     */
+    Real lambda_pow_2z() const { return d / a; }
 
     bool operator==(const Ellipse &other) const {
         return a == other.a && b == other.b && d == other.d && p == other.p;
@@ -412,9 +412,28 @@ struct EllipseState {
     Real skew() const { return e1.b * e1.b + e2.b * e2.b; }
 
     /**
-     * @brief Calculate the bias of the state (Eq. 34, arXiv:1403.2975).
+     * @brief Calculate the bias z2 - z1 of the state (Eq. 34, arXiv:1403.2975).
      */
-    double bias() const { return e2.z - e1.z; }
+    Real bias() const { return log(bias_ratio()) / (2 * log_lambda()); }
+
+    /**
+     * @brief λ^(2 * bias), which decides the cases of the step lemma without a logarithm.
+     */
+    Real bias_ratio() const { return e2.lambda_pow_2z() / e1.lambda_pow_2z(); }
+
+    /**
+     * @brief Whether z1 + z2 < 0.
+     */
+    bool negative_z_sum() const { return e1.lambda_pow_2z() * e2.lambda_pow_2z() < 1; }
+
+    /**
+     * @brief Whether |bias| > n.
+     */
+    bool bias_exceeds(int n) const {
+        Real ratio = bias_ratio();
+        Real bound = pow(lambda(), 2 * n);
+        return ratio > bound || ratio * bound < 1;
+    }
 
     /**
      * @brief Apply a grid operation G to the state (Definition A.3, arXiv:1403.2975).
@@ -445,22 +464,18 @@ struct EllipseState {
      * @brief Apply a shift operator to the state. (Definition A.6 and Lemma A.8 , arXiv:1403.2975).
      */
     std::pair<EllipseState, INT_TYPE> apply_shift_op() const {
-        double k = std::floor((1 - bias()) / 2);
-        Real pk_pow = pow(lambda(), Real(k));
-        Real nk_pow = 1 / pk_pow;
+        INT_TYPE k = floor_int(Real((1 - bias()) / 2));
+        Real pk_pow = pow(lambda(), k.convert_to<int>());
         Ellipse new_e1 = e1;
         Ellipse new_e2 = e2;
         new_e1.a *= pk_pow;
-        new_e1.d *= nk_pow;
-        new_e1.z -= k;
-        new_e2.a *= nk_pow;
+        new_e1.d /= pk_pow;
+        new_e2.a /= pk_pow;
         new_e2.d *= pk_pow;
-        new_e2.z += k;
-        INT_TYPE k_int = static_cast<long long>(k);
-        if (k_int % 2 != 0) {
+        if (k % 2 != 0) {
             new_e2.b = -new_e2.b;
         }
-        return {EllipseState(new_e1, new_e2), k_int};
+        return {EllipseState(new_e1, new_e2), k};
     }
 
     /**
@@ -474,13 +489,13 @@ struct EllipseState {
             op = op * GridOp::from_string("Z");
         }
 
-        if ((e1.z + e2.z) < 0) {
+        if (negative_z_sum()) {
             sign = -1;
             op = op * GridOp::from_string("X");
         }
 
-        if (std::abs(bias()) > 2) {
-            INT_TYPE n = static_cast<long long>(std::round((1 - sign * bias()) / 4));
+        if (bias_exceeds(2)) {
+            INT_TYPE n = round_int(Real((1 - sign * bias()) / 4));
             op = op * GridOp::from_string("U").pow(n);
         }
         return op;
@@ -498,7 +513,7 @@ struct EllipseState {
         INT_TYPE k = 0;
         GridOp op = GridOp::from_string("I");
 
-        if (std::abs(state.bias()) > 1) {
+        if (state.bias_exceeds(1)) {
             // Apply the shift defined in Lemma A.1 / A.8
             auto shift_result = state.apply_shift_op();
             state = shift_result.first;
@@ -510,7 +525,7 @@ struct EllipseState {
                 state = state.apply_grid_op(z_op);
                 op = op * z_op;
             }
-            if ((state.e1.z + state.e2.z) < 0) {
+            if (state.negative_z_sum()) {
                 GridOp x_op = GridOp::from_string("X");
                 state = state.apply_grid_op(x_op);
                 op = op * x_op;
@@ -525,27 +540,34 @@ struct EllipseState {
      * Selects the specific grid operator (R, K, A, or B) to reduce the skew
      */
     static GridOp reduce_skew_select_operator(const Ellipse &e1, const Ellipse &e2) {
-        if (-0.8 <= e1.z && e1.z <= 0.8 && -0.8 <= e2.z && e2.z <= 0.8) {
+        // The thresholds z = 0.8, 0.3 and -0.2 as thresholds on λ^(2z).
+        static const Real z_08 = pow(lambda(), Real(1.6));
+        static const Real z_03 = pow(lambda(), Real(0.6));
+        static const Real z_m02 = pow(lambda(), Real(-0.4));
+        Real r1 = e1.lambda_pow_2z(), r2 = e2.lambda_pow_2z();
+
+        if (r1 * z_08 >= 1 && r1 <= z_08 && r2 * z_08 >= 1 && r2 <= z_08) {
             return GridOp::from_string("R");
         }
 
-        auto lambda_min_z = [&]() { return pow(lambda(), Real(std::min(e1.z, e2.z))); };
+        // λ^min(z1, z2)
+        Real lambda_min_z = sqrt(std::min(r1, r2));
         if (e1.b >= 0) {
-            if (e1.z <= 0.3 && e2.z >= 0.8) {
+            if (r1 <= z_03 && r2 >= z_08) {
                 return GridOp::from_string("K");
             }
-            if (e1.z >= 0.8 && e2.z <= 0.3) {
+            if (r1 >= z_08 && r2 <= z_03) {
                 return GridOp::from_string("K").adj2();
             }
-            if (e1.z >= 0.3 && e2.z >= 0.3) {
-                INT_TYPE n = floor_int(Real(lambda_min_z() / 2));
+            if (r1 >= z_03 && r2 >= z_03) {
+                INT_TYPE n = floor_int(Real(lambda_min_z / 2));
                 return GridOp::from_string("A").pow(max(n, INT_TYPE(1)));
             }
             RT_FAIL("Skew couldn't be reduced (Case A/K failed)");
         }
 
-        if (e1.z >= -0.2 && e2.z >= -0.2) {
-            INT_TYPE n = floor_int(Real(lambda_min_z() / sqrt2()));
+        if (r1 >= z_m02 && r2 >= z_m02) {
+            INT_TYPE n = floor_int(Real(lambda_min_z / sqrt2()));
             return GridOp::from_string("B").pow(max(n, INT_TYPE(1)));
         }
 
