@@ -102,25 +102,15 @@ if(APPLE AND (${CMAKE_SYSTEM_PROCESSOR} STREQUAL arm64))
         endif()
     endif()
 
-    set(LAPACKE_ACCELERATE_CMAKE_ARGS
-        "--preset" "accelerate-lapacke32"
-        "-DCMAKE_STAGING_PREFIX=<INSTALL_DIR>"
-        "-DCMAKE_INSTALL_PREFIX=${CMAKE_BINARY_DIR}/lib"
-        "-DCMAKE_OSX_SYSROOT=${OSX_SDK_PATH}"
-    )
-
-    # macOS 26 SDKs ship Accelerate LAPACK 3.12.x. LAPACK 3.12.1 builds the
-    # Index-64 extended API by default, then disables it only for unsupported
-    # Fortran compilers. AppleClang still links those symbols, and the 32-bit
-    # Accelerate preset does not provide them.
-    set(OSX_SDK_VERSION "")
+    # macOS 26+ SDKs ship LAPACK 3.12.x. The 32-bit Accelerate preset does not
+    # provide the Index-64 symbols that build still links.
+    set(LAPACKE_INDEX64_ARG)
     if(EXISTS "${OSX_SDK_PATH}/SDKSettings.json")
         file(READ "${OSX_SDK_PATH}/SDKSettings.json" _osx_sdk_settings)
         string(JSON OSX_SDK_VERSION GET "${_osx_sdk_settings}" Version)
-    endif()
-    if(OSX_SDK_VERSION VERSION_GREATER_EQUAL "26.0")
-        list(APPEND LAPACKE_ACCELERATE_CMAKE_ARGS "-DBUILD_INDEX64_EXT_API=OFF")
-        message(STATUS "macOS SDK ${OSX_SDK_VERSION}: disabling LAPACKE Index-64 extended API")
+        if(OSX_SDK_VERSION VERSION_GREATER_EQUAL "26.0")
+            set(LAPACKE_INDEX64_ARG "-DBUILD_INDEX64_EXT_API=OFF")
+        endif()
     endif()
 
     # Let CMake figure out, if rebuilding the external project is necessary
@@ -129,7 +119,11 @@ if(APPLE AND (${CMAKE_SYSTEM_PROCESSOR} STREQUAL arm64))
         GIT_TAG v2.0.0
         PREFIX _lapacke-accelerate
         INSTALL_DIR _lapacke-accelerate/install
-        CMAKE_ARGS ${LAPACKE_ACCELERATE_CMAKE_ARGS}
+        CMAKE_ARGS "--preset" "accelerate-lapacke32"
+                   "-DCMAKE_STAGING_PREFIX=<INSTALL_DIR>"
+                   "-DCMAKE_INSTALL_PREFIX=${CMAKE_BINARY_DIR}/lib"
+                   "-DCMAKE_OSX_SYSROOT=${OSX_SDK_PATH}"
+                   ${LAPACKE_INDEX64_ARG}
         INSTALL_COMMAND "${CMAKE_COMMAND}" --build <BINARY_DIR> --target install
         COMMAND "${CMAKE_COMMAND}" -E copy_if_different "<INSTALL_DIR>/lib/liblapacke.3.dylib" "${CMAKE_BINARY_DIR}/lib"
         LOG_CONFIGURE ON
