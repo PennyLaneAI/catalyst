@@ -80,48 +80,6 @@ bool hasModifierRegion(ModuleOp module) {
         .wasInterrupted();
 }
 
-/**
- * @brief Parse a graphOpId string into an OperatorNode.
- *
- * The graphOpId format is "<name>{params}{wires}{static}[uid]", where <name> already
- * carries any name-wrapped op-level modifiers produced by `defaultGetGraphOpId`, e.g.
- * "C(Adjoint(RX)){0:[f64]}{wires:1}{}".
- */
-OperatorNode parseOperator(llvm::StringRef raw) {
-    OperatorNode node;
-
-    // Base op: either the graphOpId "Name{...}..." form or the legacy "Name(w,p)" form.
-    if (raw.contains('[') || raw.contains('{')) {
-        node.id = raw.str();
-        node.name = raw.take_until([](char c) { return c == '[' || c == '{'; });
-    } else {
-        auto openIdx = raw.find('(');
-        if (openIdx == llvm::StringRef::npos) {
-            node.name = raw.trim().str();
-            return node;
-        }
-        node.name = raw.take_front(openIdx).trim().str();
-        raw = raw.drop_front(openIdx); // leftover: "(w,p)" or "(w)"
-    }
-
-    // Parse "(w,p)" (new) or "(w)" (legacy) suffix.
-    if (raw.consume_front("(") && raw.consume_back(")")) {
-        llvm::StringRef wStr, pStr;
-        std::tie(wStr, pStr) = raw.split(',');
-        int w = -1, p = -1;
-        if (!wStr.getAsInteger(10, w)) {
-            node.numWires = w;
-        }
-        if (!pStr.empty() && !pStr.getAsInteger(10, p)) {
-            node.numParams = p;
-        }
-        // If pStr is empty we were given the legacy "(w)" format; leave
-        // numParams at the wildcard default so old bytecode keeps working.
-    }
-
-    return node;
-}
-
 void parseFixedDecomps(ArrayRef<std::string> fixedDecompsOption,
                        llvm::StringMap<std::string> &opToFixedDecompName,
                        llvm::StringSet<> &userRuleNames) {
@@ -240,12 +198,13 @@ LogicalResult addRuleNode(func::FuncOp rule, std::vector<RuleNode> &ruleNodes) {
     // 3. Populate RuleNode
     RuleNode ruleNode;
     ruleNode.name = ruleName.str();
-    ruleNode.output = parseOperator(targetGateAttr.getValue());
+    ruleNode.output = GraphDecompositionPrep::parseOperator(targetGateAttr.getValue());
 
     for (const auto &namedAttr : operations) {
         if (auto intAttr = dyn_cast<IntegerAttr>(namedAttr.getValue())) {
-            ruleNode.inputs.push_back({parseOperator(namedAttr.getName().strref()),
-                                       static_cast<uint32_t>(intAttr.getInt())});
+            ruleNode.inputs.push_back(
+                {GraphDecompositionPrep::parseOperator(namedAttr.getName().strref()),
+                 static_cast<uint32_t>(intAttr.getInt())});
         }
     }
 
@@ -475,7 +434,7 @@ void getOperators(ModuleOp module, std::vector<OperatorNode> &operators) {
 
         // Derive the id and modifier-wrapped name from the single parse path, so operator
         // nodes and rule nodes agree on the spelling of `C(...)`/`Adjoint(...)`.
-        OperatorNode node = parseOperator(op.getGraphOpId());
+        OperatorNode node = GraphDecompositionPrep::parseOperator(op.getGraphOpId());
 
         // numWires/numParams are debug-only; parseOperator leaves them at defaults for the
         // graphOpId form, so we need to fill them accurately from the op here.
@@ -495,6 +454,41 @@ void getOperators(ModuleOp module, std::vector<OperatorNode> &operators) {
 namespace catalyst {
 namespace quantum {
 namespace GraphDecompositionPrep {
+
+OperatorNode parseOperator(llvm::StringRef raw) {
+    OperatorNode node;
+
+    // Base op: either the graphOpId "Name{...}..." form or the legacy "Name(w,p)" form.
+    if (raw.contains('[') || raw.contains('{')) {
+        node.id = raw.str();
+        node.name = raw.take_until([](char c) { return c == '[' || c == '{'; });
+    } else {
+        auto openIdx = raw.find('(');
+        if (openIdx == llvm::StringRef::npos) {
+            node.name = raw.trim().str();
+            return node;
+        }
+        node.name = raw.take_front(openIdx).trim().str();
+        raw = raw.drop_front(openIdx); // leftover: "(w,p)" or "(w)"
+    }
+
+    // Parse "(w,p)" (new) or "(w)" (legacy) suffix.
+    if (raw.consume_front("(") && raw.consume_back(")")) {
+        llvm::StringRef wStr, pStr;
+        std::tie(wStr, pStr) = raw.split(',');
+        int w = -1, p = -1;
+        if (!wStr.getAsInteger(10, w)) {
+            node.numWires = w;
+        }
+        if (!pStr.empty() && !pStr.getAsInteger(10, p)) {
+            node.numParams = p;
+        }
+        // If pStr is empty we were given the legacy "(w)" format; leave
+        // numParams at the wildcard default so old bytecode keeps working.
+    }
+
+    return node;
+}
 
 std::unique_ptr<DecompositionGraph> prepareGraph(Operation *op, const PrepOptions &opts,
                                                  LowerModifiersFn lowerModifiers) {
