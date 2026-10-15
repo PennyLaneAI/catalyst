@@ -308,7 +308,6 @@ def test_decompose(backend):
     def qnode_control():
         return circuit()
 
-
     @qjit(capture=True)
     @qp.decompose(gate_set=qp.decomposition.gate_sets.CLIFFORD_T)
     @qp.qnode(qp.device(backend, wires=3), interface="jax")

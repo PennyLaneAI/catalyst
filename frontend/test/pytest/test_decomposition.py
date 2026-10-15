@@ -2049,11 +2049,31 @@ class TestDecomposeAlias:
     @pytest.mark.parametrize(
         "tkwargs, exc, match",
         [
-            ({"gate_set": {"RX"}, "stopping_condition": lambda op: True}, TypeError, "got an unexpected keyword argument 'stopping_condition'"),
-            ({"gate_set": {"RX"}, "max_expansion": 2}, TypeError, "got an unexpected keyword argument 'max_expansion'"),
-            ({"gate_set": {"RX"}, "num_work_wires": 2}, TypeError, "got an unexpected keyword argument 'num_work_wires'"),
-            ({"gate_set": {"RX"}, "minimize_work_wires": True}, TypeError, "got an unexpected keyword argument 'minimize_work_wires'"),
-            ({"gate_set": {"RX"}, "strict": False}, TypeError, "got an unexpected keyword argument 'strict'"),
+            (
+                {"gate_set": {"RX"}, "stopping_condition": lambda op: True},
+                TypeError,
+                "got an unexpected keyword argument 'stopping_condition'",
+            ),
+            (
+                {"gate_set": {"RX"}, "max_expansion": 2},
+                TypeError,
+                "got an unexpected keyword argument 'max_expansion'",
+            ),
+            (
+                {"gate_set": {"RX"}, "num_work_wires": 2},
+                TypeError,
+                "got an unexpected keyword argument 'num_work_wires'",
+            ),
+            (
+                {"gate_set": {"RX"}, "minimize_work_wires": True},
+                TypeError,
+                "got an unexpected keyword argument 'minimize_work_wires'",
+            ),
+            (
+                {"gate_set": {"RX"}, "strict": False},
+                TypeError,
+                "got an unexpected keyword argument 'strict'",
+            ),
             ({"gate_set": None}, ValueError, "requires an explicit 'gate_set'"),
         ],
     )
