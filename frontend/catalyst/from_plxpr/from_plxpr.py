@@ -337,12 +337,8 @@ def handle_qnode(
     )
 
 
-def _validate_decompose_tkwargs(tkwargs):
-    """Reject qp.decompose arguments the graph-decomposition pass can't honor.
-
-    PennyLane's ``qp.decompose`` only accepts ``gate_set``, ``fixed_decomps`` and ``alt_decomps``,
-    so we only check for a missing gate set.
-    """
+def _require_decompose_gate_set(tkwargs):
+    """Reject a qp.decompose without a gate set, which the graph-decomposition pass needs."""
     if tkwargs.get("gate_set") is None:
         raise ValueError(
             "qp.decompose requires an explicit 'gate_set' under qjit; the graph-based decomposition "
@@ -361,7 +357,7 @@ def _handle_decompose_transform(self, inner_jaxpr, consts, non_const_args, tkwar
 
     from catalyst.passes.builtin_passes import graph_decomposition
 
-    _validate_decompose_tkwargs(tkwargs)
+    _require_decompose_gate_set(tkwargs)
 
     fixed_decomps = tkwargs.get("fixed_decomps") or {}
     alt_decomps = tkwargs.get("alt_decomps") or {}
