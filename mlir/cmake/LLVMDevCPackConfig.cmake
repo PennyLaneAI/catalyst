@@ -8,7 +8,8 @@
 #
 # which is the only supported way to honour LLVM_DISTRIBUTION_COMPONENTS, and it
 # belongs to LLVM's CMake project rather than ours. So instead of hooking into a
-# CMakeLists.txt, this is a standalone config driven by mlir/Makefile as
+# CMakeLists.txt, this is a standalone config driven by the pack-llvm-dev target
+# in mlir/Makefile as
 #
 #     CATALYST_LLVM_STAGING_DIR=<staged install prefix> \
 #     CATALYST_LLVM_VERSION=<llvm version>-<llvm commit> \
@@ -29,14 +30,14 @@ if(NOT CATALYST_LLVM_STAGING_DIR)
     message(FATAL_ERROR
         "CATALYST_LLVM_STAGING_DIR is not set. Run this via 'make pack-llvm-dev'.")
 endif()
+if(NOT CATALYST_LLVM_VERSION)
+    message(FATAL_ERROR
+        "CATALYST_LLVM_VERSION is not set. Run this via 'make pack-llvm-dev'.")
+endif()
 if(NOT EXISTS "${CATALYST_LLVM_STAGING_DIR}")
     message(FATAL_ERROR
         "Staging directory ${CATALYST_LLVM_STAGING_DIR} does not exist. "
         "The install-distribution target must run before cpack.")
-endif()
-if(NOT CATALYST_LLVM_VERSION)
-    message(FATAL_ERROR
-        "CATALYST_LLVM_VERSION is not set. Run this via 'make pack-mlir-dev'.")
 endif()
 # Guard against a half-resolved version.
 if(NOT CATALYST_LLVM_VERSION MATCHES "^.+-[0-9a-f]+$")

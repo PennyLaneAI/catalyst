@@ -59,7 +59,7 @@ help:
 	@echo "  dialects           to build custom Catalyst MLIR dialects"
 	@echo "  dialect-docs       to build custom Catalyst MLIR dialect documentation"
 	@echo "  pack-catalyst-dev  to build the catalyst-dev package"
-	@echo "  pack-llvm-dev      to build the catalyst-llvm-dev package"
+	@echo "  pack-llvm-dev      to package an already-built LLVM/MLIR as catalyst-llvm-dev"
 	@echo "  test               to run the Catalyst MLIR dialects test suite"
 	@echo "  clean              to delete all temporary, cache, and build files"
 	@echo "  format [check=1]   to apply C++ formatter; use with 'check=1' to check instead of modify (requires clang-format)"
@@ -243,21 +243,51 @@ pack-catalyst-dev: dialects
 	mv $(DIALECTS_BUILD_DIR)/catalyst-dev*.tar.gz $(DIST_DIR)
 
 # Get the LLVM version as, e.g. 22.0.0git-8f264586.
-# Deferred (=, not :=) on purpose: these shell out, and with := they would run on
-# every make invocation, including on a clean tree where llvm-config does not
-# exist yet, silently yielding an empty version. They are only referenced from
-# the pack-llvm-dev recipe, by which point the llvm prerequisite has built it.
-LLVM_VERSION = $(shell $(LLVM_BUILD_DIR)/bin/llvm-config --version)
+# Lazy assignment (=, not :=) on purpose: we want them to be evaluated only when referenced, i.e.
+# from pack-llvm-dev where we have already confirmed that an LLVM build tree exists. With := they
+# would run on every make invocation, including on a clean tree where llvm-config does not exist
+# yet.
+LLVM_VERSION = $(shell $(LLVM_BUILD_DIR)/bin/llvm-config --version 2>/dev/null)
 LLVM_COMMIT = $(shell grep '^llvm=' $(MK_DIR)/../.dep-versions | awk -F '=' '{ print $$2 }' | cut -c1-8)
 LLVM_VERSION_FULL = $(LLVM_VERSION)-$(LLVM_COMMIT)
 
+# Package an already-built LLVM/MLIR tree as catalyst-llvm-dev.
+# Deliberately *not* dependent on the llvm target: that would force a rebuild and a full check-mlir
+# run even when LLVM_BUILD_DIR already holds a complete build, as it does in CI where the build is
+# restored from cache. The guards below check for that build directly instead.
 .PHONY: pack-llvm-dev
-pack-llvm-dev: llvm
+pack-llvm-dev:
 
 	@echo "build the catalyst-llvm-dev package"
-	# Install from scratch: the staging dir is a plain install prefix, so files
-	# left by an earlier run with a different LLVM_DISTRIBUTION_COMPONENTS would
-	# otherwise linger and end up in the archive.
+	@if [ ! -f "$(LLVM_BUILD_DIR)/CMakeCache.txt" ] || [ ! -x "$(LLVM_BUILD_DIR)/bin/llvm-config" ]; then \
+		echo "error: no LLVM build found in $(LLVM_BUILD_DIR)." >&2; \
+		echo "       Run 'make llvm' first, or set LLVM_BUILD_DIR to an existing build tree." >&2; \
+		exit 1; \
+	fi
+	@if [ ! -f "$(LLVM_SRC_DIR)/LICENSE.TXT" ]; then \
+		echo "error: no LLVM checkout found in $(LLVM_SRC_DIR); its LICENSE.TXT goes in the package." >&2; \
+		echo "       Set LLVM_SRC_DIR to the checkout $(LLVM_BUILD_DIR) was built from." >&2; \
+		exit 1; \
+	fi
+	# install-distribution is generated at configure time, so a tree configured with a different
+	# LLVM_DISTRIBUTION_COMPONENTS silently packages different contents. Say so rather than let it
+	# pass unnoticed.
+	@cached=$$(sed -n 's/^LLVM_DISTRIBUTION_COMPONENTS:[^=]*=//p' "$(LLVM_BUILD_DIR)/CMakeCache.txt"); \
+	wanted='$(subst ",,$(LLVM_DISTRIBUTION_COMPONENTS))'; \
+	if [ -z "$$cached" ]; then \
+		echo "error: $(LLVM_BUILD_DIR) was configured without LLVM_DISTRIBUTION_COMPONENTS," >&2; \
+		echo "       so it has no install-distribution target to package." >&2; \
+		exit 1; \
+	elif [ "$$cached" != "$$wanted" ]; then \
+		echo "warning: $(LLVM_BUILD_DIR) was configured with"; \
+		echo "warning:   $$cached"; \
+		echo "warning: but LLVM_DISTRIBUTION_COMPONENTS is now"; \
+		echo "warning:   $$wanted"; \
+		echo "warning: the package will follow the former; re-run 'make llvm' to update it."; \
+	fi
+	# Install from scratch: the staging dir is a plain install prefix, so files left by an earlier
+	# run with a different LLVM_DISTRIBUTION_COMPONENTS would otherwise linger and end up in the
+	# archive.
 	rm -rf $(LLVM_INSTALL_STAGING_DIR)
 	cmake --build $(LLVM_BUILD_DIR) --target install-distribution
 	cp $(LLVM_SRC_DIR)/LICENSE.TXT $(LLVM_INSTALL_STAGING_DIR)/
