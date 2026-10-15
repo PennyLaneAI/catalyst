@@ -151,6 +151,10 @@
 
 <h3>Improvements 🛠</h3>
 
+* A new `user-transform-stage` pipeline runs the quantum compilation stage only up to and including
+  `apply-transform-sequence`, where the user transforms are applied. 
+  [(#3345)](https://github.com/PennyLaneAI/catalyst/pull/3345)
+
 * Controlled :class:`~pennylane.GlobalPhase` operations now decompose to
   :class:`~pennylane.PhaseShift` on the control wire when possible (or
   :class:`~pennylane.ControlledPhaseShift` for multiple controls), via an updated
@@ -1144,6 +1148,7 @@ River McCubbin,
 Shuli Shu,
 Nikhil Sreekumar,
 Kalman Szenes,
+Jaume Villasante,
 Paul Haochen Wang,
 Jake Zaia,
 Haider Sajjad,

@@ -30,6 +30,8 @@ struct PipelineInfo {
 using PipelineNames = std::vector<std::string>;
 using PipelineList = std::vector<PipelineInfo>;
 
+inline constexpr char ApplyTransformSequencePassName[] = "builtin.module(apply-transform-sequence)";
+
 // clang-format off
 const PipelineList pipelineList{
     {"quantum-compilation-stage",
@@ -42,7 +44,7 @@ const PipelineList pipelineList{
       // Split multiple tapes enforces that invariant.
       "split-multiple-tapes",
       // Run the transform sequence defined in the MLIR module
-      "builtin.module(apply-transform-sequence)",
+      ApplyTransformSequencePassName,
       // Nested modules are something that will be used in the future
       // for making device-specific transformations.
       // Since at the moment, nothing in the runtime is using them
@@ -194,6 +196,15 @@ inline PassNames getQuantumCompilationStage(bool disableAssertion = true) {
                  std::back_inserter(ret), [&disableAssertion](const auto &passName) {
                      return !(!disableAssertion && (passName == "disable-assertion"));
                  });
+    return ret;
+}
+
+inline PassNames getUserTransformStage() {
+    PassNames ret = getQuantumCompilationStage();
+    auto it = std::find(ret.begin(), ret.end(), ApplyTransformSequencePassName);
+    if (it != ret.end()) {
+        ret.erase(it + 1, ret.end());
+    }
     return ret;
 }
 
