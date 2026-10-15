@@ -452,10 +452,11 @@ void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result, b
         result.autoQubitManagement = deviceOp.getAutoQubitManagement();
         return;
     }
+
+    // Graph decomposition for qp.estimate
     DecompGraph::Core::GraphResult::iterator graphOp;
     std::string graphOpId;
     DecompGraph::Core::OperatorNode operatorNode;
-    // Graph decomposition for qp.estimate
     if (graphResult) {
         // check if op is decomposablegate op
         if (auto decomposableGate = dyn_cast<quantum::DecomposableGate>(op)) {
@@ -483,7 +484,8 @@ void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result, b
         } else if (nCtrlQubits > 1) {
             name = std::to_string(nCtrlQubits) + "C(" + name + ")";
         }
-        DecompGraph::Core::WeightedGateset gateset = graph ? graph->getGateset() : DecompGraph::Core::WeightedGateset();
+        DecompGraph::Core::WeightedGateset gateset =
+            graph ? graph->getGateset() : DecompGraph::Core::WeightedGateset();
         // if the op is in the graph and not in the gateset that means it has been decomposed
         // Go through the graph's decomp rule for the op, and the basis counts for the op,
         // which is the target gate set which the op decomposes into. And accumulate the counts for

@@ -370,7 +370,9 @@ def _handle_decompose_transform(self, inner_jaxpr, consts, non_const_args, tkwar
 
     from catalyst.passes.builtin_passes import graph_decomposition, resource_analysis
 
-    resource_analysis_enabled = tkwargs.get("output_json") is not None and tkwargs.get("output_fname") is not None
+    resource_analysis_enabled = (
+        tkwargs.get("output_json") is not None and tkwargs.get("output_fname") is not None
+    )
     if resource_analysis_enabled:
         _validate_decompose_tkwargs(tkwargs, _RESOURCE_ANALYSIS_TKWARGS)
     else:
@@ -446,8 +448,10 @@ def handle_transform(
     non_const_args = args[_tuple_to_slice(args_slice)]
     targs = args[_tuple_to_slice(targs_slice)]
     pl_tkwargs = _tuple_to_dict(tkwargs)
-    resource_analysis_enabled = (transform.pass_name == "resource-analysis" and pl_tkwargs.get("gate_set") is not None)
-    
+    resource_analysis_enabled = (
+        transform.pass_name == "resource-analysis" and pl_tkwargs.get("gate_set") is not None
+    )
+
     # qp.decompose is routed to the graph-decomposition pass (see _handle_decompose_transform).
     if transform == pl_decompose or resource_analysis_enabled:
         return _handle_decompose_transform(self, inner_jaxpr, consts, non_const_args, pl_tkwargs)
