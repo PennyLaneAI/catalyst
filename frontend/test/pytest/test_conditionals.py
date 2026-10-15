@@ -56,6 +56,7 @@ class TestCondToJaxpr:
                     c:i64[] = cond[
                     args_slice=(3, None, None)
                     consts_slices=((1, 2, None), (2, 3, None))
+                    estimated_probabilities=None
                     jaxpr_branches=(
                         { lambda d:i64[]; . let e:i64[] = integer_pow[y=2] d in (e,) }
                         { lambda f:i64[]; . let g:i64[] = integer_pow[y=3] f in (g,) }
