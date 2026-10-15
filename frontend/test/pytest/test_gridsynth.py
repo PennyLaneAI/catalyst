@@ -174,12 +174,7 @@ def test_mixed_gridsynth_samples(param, op, eps, ppr_basis):
 @pytest.mark.parametrize("eps", [1e-2, 1e-4])
 @pytest.mark.parametrize("ppr_basis", [False, True])
 def test_mixed_fallback_gridsynth_samples(op, eps, ppr_basis):
-    """Test the sampled states of the mixed fallback method. A successful projective rotation has
-    infidelity at most eps, and it succeeds with probability at least 0.95. A failed one is
-    corrected by a fallback with diamond-norm error at most MAX_FALLBACK_EPSILON = 0.25, so its
-    infidelity is at most 0.125. The threshold of 85% successes leaves room for sampling noise
-    below the 95% success probability: with 120 samples, a failure rate of 5% exceeds it with
-    probability below 1e-5."""
+    """Test the sampled states of the mixed fallback method."""
     dev = qp.device("lightning.qubit", wires=1)
 
     @qp.qnode(dev)
@@ -199,6 +194,9 @@ def test_mixed_fallback_gridsynth_samples(op, eps, ppr_basis):
             infidelities.append(1 - np.abs(np.vdot(expected, result)) ** 2)
 
     infidelities = np.array(infidelities)
+    # A call succeeds with probability at least 0.95, with infidelity at most eps, and otherwise
+    # its fallback has infidelity at most 0.125. The 85% threshold leaves room for sampling noise:
+    # at a 95% success rate, 120 calls fall below it with probability <1e-5.
     assert np.all(infidelities <= 0.125)
     assert np.mean(infidelities <= eps) >= 0.85
 
