@@ -194,9 +194,11 @@ def test_mixed_fallback_gridsynth_samples(op, eps, ppr_basis):
             infidelities.append(1 - np.abs(np.vdot(expected, result)) ** 2)
 
     infidelities = np.array(infidelities)
-    # A call succeeds with probability at least 0.95, with infidelity at most eps, and otherwise
-    # its fallback has infidelity at most 0.125. The 85% threshold leaves room for sampling noise:
-    # at a 95% success rate, 120 calls fall below it with probability <1e-5.
+    # Each circuit execution samples one projective rotation. Its ancilla measurement succeeds with
+    # probability at least 0.95, leaving infidelity at most eps. Otherwise a fallback only loosely
+    # corrects the rotation, with infidelity at most MAX_FALLBACK_EPSILON / 2 = 0.125. The
+    # threshold is 85% rather than 95% to allow for sampling noise: at a 95% success rate, 120
+    # executions fall below it with probability <1e-5.
     assert np.all(infidelities <= 0.125)
     assert np.mean(infidelities <= eps) >= 0.85
 
