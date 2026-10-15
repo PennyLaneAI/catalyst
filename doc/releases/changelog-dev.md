@@ -751,6 +751,11 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* `qp.pauli_measure(..., postselect=...)` now raises a `NotImplementedError` under
+  `qjit(capture=True)`, as `catalyst.pauli_measure` already does. Previously the postselection was
+  silently dropped and the measurement outcome was random.
+  [(#XXXX)](https://github.com/PennyLaneAI/catalyst/pull/XXXX)
+
 * Graph-based decomposition now handles operators with a nested-operator ("hybrid") argument, such
   as `GQSP`. Previously the operator counted the nested operator's wires among its own, but the
   generated decomposition rule did not, so `decompose-lowering` built a `tensor.from_elements`
