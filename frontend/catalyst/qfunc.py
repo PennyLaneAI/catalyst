@@ -633,18 +633,32 @@ def dynamic_one_shot(qnode, **kwargs):
     return one_shot_wrapper
 
 
+def _decompose_as_tape_transform(transform_program):
+    """Replace each ``qp.decompose`` with its tape-based implementation.
+
+    Without capture, this qp.decompose runs as the tape transform it used to be.
+    """
+    # pylint: disable=protected-access
+    if not any(t._transform is pl_decompose for t in transform_program):
+        return transform_program
+    pipeline = qp.CompilePipeline(
+        [
+            (
+                qp.core.transforms.BoundTransform(_tape_decompose, t.args, t.kwargs)
+                if t._transform is pl_decompose
+                else t
+            )
+            for t in transform_program
+        ]
+    )
+    for marker in transform_program.markers:
+        pipeline.add_marker(marker, transform_program.get_marker_level(marker))
+    return pipeline
+
+
 def _extract_passes(transform_program):
     """Extract transforms with pass names from the end of the CompilePipeline."""
-    # Without capture, the decomposition rules the graph-decomposition pass needs are never
-    # collected, so run qp.decompose as the tape transform it used to be.
-    transform_program = [
-        (
-            qp.core.transforms.BoundTransform(_tape_decompose, t.args, t.kwargs)
-            if t._transform is pl_decompose  # pylint: disable=protected-access
-            else t
-        )
-        for t in transform_program
-    ]
+    transform_program = _decompose_as_tape_transform(transform_program)
     tape_transforms = []
     pass_pipeline = []
 

@@ -35,11 +35,12 @@ import scipy
 from jax import numpy as jnp
 from numpy.testing import assert_allclose
 from pennylane import numpy as pnp
-from pennylane.transforms import merge_rotations
+from pennylane.transforms import _tape_decompose, merge_rotations
 
 from catalyst import measure, qjit
 from catalyst.device import QJITDevice
 from catalyst.device.decomposition import measurements_from_counts, measurements_from_samples
+from catalyst.qfunc import _extract_passes
 from catalyst.utils.exceptions import CompileError
 
 # pylint: disable=too-many-lines,line-too-long
@@ -326,6 +327,25 @@ def test_decompose(backend):
     assert np.allclose(expected, observed)
     assert expected_shape == observed_shape
     assert "Toffoli" not in compiled.mlir
+
+
+def test_decompose_keeps_markers():
+    """Running qp.decompose as a tape transform."""
+
+    @qp.transforms.decompose(gate_set={"RX", "RZ"})
+    @qp.marker("before-decompose")
+    @qp.transforms.convert_to_numpy_parameters
+    @qp.marker("start")
+    @qp.qnode(qp.device("null.qubit", wires=1))
+    def circuit():
+        return qp.expval(qp.Z(0))
+
+    tape_transforms, pass_pipeline = _extract_passes(circuit.compile_pipeline)
+
+    assert tape_transforms[1].tape_transform is _tape_decompose.tape_transform
+    assert tape_transforms.get_marker_level("start") == 0
+    assert tape_transforms.get_marker_level("before-decompose") == 1
+    assert not pass_pipeline
 
 
 def test_diagonalize_measurements(backend):
