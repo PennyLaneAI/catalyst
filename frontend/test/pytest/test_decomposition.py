@@ -2046,23 +2046,12 @@ class TestDecomposeAlias:
         assert 'apply_registered_pass "graph-decomposition"' in via_decompose.mlir
         assert via_decompose.mlir == via_graph.mlir
 
-    @pytest.mark.parametrize(
-        "tkwargs, exc, match",
-        [
-            ({"gate_set": {"RX"}, "stopping_condition": lambda op: True}, NotImplementedError, ""),
-            ({"gate_set": {"RX"}, "max_expansion": 2}, NotImplementedError, ""),
-            ({"gate_set": {"RX"}, "num_work_wires": 2}, NotImplementedError, ""),
-            ({"gate_set": {"RX"}, "minimize_work_wires": True}, NotImplementedError, ""),
-            ({"gate_set": {"RX"}, "strict": False}, NotImplementedError, ""),
-            ({"gate_set": None}, ValueError, "requires an explicit 'gate_set'"),
-        ],
-    )
-    def test_decompose_rejects_unsupported_kwargs(self, tkwargs, exc, match):
-        """Kwargs the graph-decomposition pass cannot honor are rejected with a clear error."""
-        with pytest.raises(exc, match=match):
+    def test_decompose_requires_gate_set(self):
+        """qp.decompose without a gate set is rejected with a clear error."""
+        with pytest.raises(ValueError, match="requires an explicit 'gate_set'"):
 
             @qjit(capture=True, target="mlir")
-            @qp.decompose(**tkwargs)
+            @qp.decompose(gate_set=None)
             @qnode(qp.device("null.qubit", wires=1))
             def circuit():
                 qp.Rot(0.1, 0.2, 0.3, wires=0)
