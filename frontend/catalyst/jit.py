@@ -610,7 +610,7 @@ class QJIT(CatalystCallable):
 
         # Static arguments require values, so we cannot AOT compile.
         if (
-            self.compile_options.enable_compilation
+            self.compile_options.enable_aot_compilation
             and self.user_sig is not None
             and not self.compile_options.static_argnums
         ):
