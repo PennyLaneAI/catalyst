@@ -751,6 +751,14 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* Graph-based decomposition now gives correct results for operators with several wire arguments
+  whose names are not in alphabetical order, such as `SemiAdder(x_wires, y_wires, work_wires)`.
+  The generated decomposition rule unpacked its grouped wire operand in sorted-name order (or,
+  for rules requested by the compiler on demand, in hash order), while the operator passes its
+  wires in declaration order, so the rule acted on the wrong qubits. Both paths now use the
+  declaration order.
+  [(#XXXX)](https://github.com/PennyLaneAI/catalyst/pull/XXXX)
+
 * Graph-based decomposition now handles operators with a nested-operator ("hybrid") argument, such
   as `GQSP`. Previously the operator counted the nested operator's wires among its own, but the
   generated decomposition rule did not, so `decompose-lowering` built a `tensor.from_elements`

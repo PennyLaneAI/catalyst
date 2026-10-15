@@ -835,6 +835,51 @@ class TestHybridOperatorArgDecomposition:
         assert np.allclose(np.asarray(decomposed()), np.asarray(reference()))
 
 
+class TestMultiRegisterWireOrder:
+    """Operators with several wire arguments whose names are not in alphabetical order, e.g.
+    ``SemiAdder(x_wires, y_wires, work_wires)``. Their rules receive all wires as one grouped
+    operand, which must be unpacked in declaration order."""
+
+    def test_wire_lens_follow_declaration_order(self):
+        """GraphOpID lists the wire lengths in declaration order, while the id stays sorted."""
+        op = qp.SemiAdder(x_wires=[0], y_wires=[1, 2, 3], work_wires=[4, 5])
+        graph_op_id = GraphOpID(op)
+
+        assert list(graph_op_id.wire_lens.items()) == [
+            ("x_wires", 1),
+            ("y_wires", 3),
+            ("work_wires", 2),
+        ]
+        assert graph_op_id.getGraphOpId() == "SemiAdder{}{work_wires:2,x_wires:1,y_wires:3}{}"
+
+    @pytest.mark.parametrize("x, y", [(1, 1), (0, 2), (1, 2), (3, 3)])
+    def test_semi_adder_decomposes_to_correct_state(self, x, y):
+        """SemiAdder decomposed via graph-decomposition matches the reference execution."""
+        x_wires, y_wires, work_wires = [3, 4], [0, 1, 2], [5, 6]
+        gate_set = {"Toffoli", "CNOT", "X", "Hadamard", "S", "Adjoint(S)", "T", "Adjoint(T)"}
+        gate_set |= {"MidMeasure", "MidMeasureMP", "MidCircuitMeasure", "CZ", "Cond"}
+
+        def circuit():
+            for wire, bit in zip(x_wires, format(x, "02b")):
+                if bit == "1":
+                    qp.X(wire)
+            for wire, bit in zip(y_wires, format(y, "03b")):
+                if bit == "1":
+                    qp.X(wire)
+            qp.SemiAdder(x_wires=x_wires, y_wires=y_wires, work_wires=work_wires)
+            return qp.probs(wires=range(7))
+
+        reference = qp.QNode(circuit, qp.device("default.qubit", wires=7))
+
+        @qjit(capture=True)
+        @graph_decomposition(gate_set=gate_set)
+        @qnode(qp.device("lightning.qubit", wires=7))
+        def decomposed():
+            return circuit()
+
+        assert np.allclose(np.asarray(decomposed()), np.asarray(reference()))
+
+
 class TestOnDemand:
     """Test the python wrapper functions used for on-demand,
     compile-time decomposition rule lowering.
