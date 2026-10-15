@@ -844,7 +844,7 @@ def gridsynth_setup_inputs(epsilon=1e-4, ppr_basis=False, method="deterministic"
         ppr_basis (bool): If true, decompose directly to Pauli Product Rotations (PPRs) in PBC dialect. Defaults to ``False``
         method (str): The synthesis method. ``"deterministic"`` (default) applies a single
             Ross-Selinger gate sequence per rotation. ``"mixed"`` applies, per execution, one of
-            two {Z, S}-twirled sequences that under- and over-rotate the target, which roughly
+            two twirled sequences that under- and over-rotate the target, which roughly
             halves the T-count at the same accuracy. This is the mixed diagonal approximation of
             Kliuchnikov et al., Section 3.4 (Proposition 3.13), in
             `arXiv:2203.10064 <https://arxiv.org/abs/2203.10064>`__.
@@ -861,7 +861,7 @@ def gridsynth_setup_inputs(epsilon=1e-4, ppr_basis=False, method="deterministic"
 
         With ``method="mixed"``, each rotation applies the under- or the over-rotating sequence,
         conjugated as :math:`\sigma U \sigma^\dagger` with :math:`\sigma` drawn uniformly from
-        :math:`\{I, S, Z, S^\dagger\}` (the {Z, S} twirl). This gives eight possible sequences
+        :math:`\{I, S, Z, S^\dagger\}`. This gives eight possible sequences
         per rotation. The twirl leaves the target rotation unchanged, since it commutes with
         :math:`\sigma`.
 

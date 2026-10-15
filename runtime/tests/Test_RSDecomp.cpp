@@ -298,7 +298,7 @@ std::vector<std::vector<double>> error_ptm(const std::vector<std::pair<double, M
 }
 
 /**
- * Weighted Kraus operators of the {Z, S}-twirled mixture of a mixed decomposition.
+ * Weighted Kraus operators of the twirled mixture of a mixed decomposition.
  */
 std::vector<std::pair<double, Matrix2>> mixed_kraus(const MixedDecomposition &mixed) {
     std::vector<std::pair<double, Matrix2>> kraus;
