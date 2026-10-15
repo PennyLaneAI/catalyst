@@ -14,6 +14,7 @@ file(GLOB SRC
     RemoveGlobalPhasesPass.cpp
     ConversionPatterns.cpp
     GraphDecomposition/DecompUtils.cpp
+    GraphDecomposition/GraphDecompositionPrep.cpp
     GraphDecomposition/graph_decomposition.cpp
     DisentangleCNOT.cpp
     DisentangleSWAP.cpp
