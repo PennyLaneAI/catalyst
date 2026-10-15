@@ -126,9 +126,9 @@ struct GridOp {
      * @brief Flattens the GridOp into an array of reals. (Lemma 5.11, arXiv:1403.2975)
      */
     std::array<Real, 4> flatten() const {
-        const Real &s = inv_sqrt2();
-        return {Real(a[0]) + Real(a[1]) * s, Real(b[0]) + Real(b[1]) * s,
-                Real(c[0]) + Real(c[1]) * s, Real(d[0]) + Real(d[1]) * s};
+        const Real &s = sqrt2();
+        return {Real(a[0]) + Real(a[1]) / s, Real(b[0]) + Real(b[1]) / s,
+                Real(c[0]) + Real(c[1]) / s, Real(d[0]) + Real(d[1]) / s};
     }
 
     /**
@@ -316,23 +316,16 @@ struct Ellipse {
      * @brief Normalize the ellipse so that its determinant is 1.
      */
     std::pair<Ellipse, Real> normalize() const {
-        Real s_val = 1 / sqrt(determinant());
-        return {scale(s_val), s_val};
-    }
-
-    /**
-     * @brief Scale the matrix of the ellipse by scale_factor, keeping its centre.
-     */
-    Ellipse scale(const Real &scale_factor) const {
-        return Ellipse({a * scale_factor, b * scale_factor, d * scale_factor}, p);
+        Real root = sqrt(determinant());
+        return {Ellipse({a / root, b / root, d / root}, p), 1 / root};
     }
 
     /**
      * @brief Return the image of the ellipse under the dilation x -> factor * x.
      */
     Ellipse dilate(const Real &factor) const {
-        Real inv2 = 1 / (factor * factor);
-        return Ellipse({a * inv2, b * inv2, d * inv2}, {p[0] * factor, p[1] * factor});
+        Real factor2 = factor * factor;
+        return Ellipse({a / factor2, b / factor2, d / factor2}, {p[0] * factor, p[1] * factor});
     }
 
     /**

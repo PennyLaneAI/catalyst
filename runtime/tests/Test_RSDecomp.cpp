@@ -129,13 +129,13 @@ VerifyReal decomposition_error(const std::vector<GateType> &gates, double phase,
     REQUIRE(std::abs(phase - units * (M_PI / 8)) < 1e-12);
     R phase_r = 4 * atan(R(1)) * R(units) / 8;
 
-    R inv_sqrt2 = 1 / sqrt(R(2));
-    R scale = pow(sqrt(R(2)), m.k);
+    R sqrt2 = sqrt(R(2));
+    R scale = pow(sqrt2, m.k);
     R c = cos(phase_r), s = -sin(phase_r);
     auto with_phase = [&](const ZOmega &x) {
         // x = a ω^3 + b ω^2 + c ω + d with ω = (1 + i)/√2
-        R re = (R(x.d) + R(x.c - x.a) * inv_sqrt2) / scale;
-        R im = (R(x.b) + R(x.c + x.a) * inv_sqrt2) / scale;
+        R re = (R(x.d) + R(x.c - x.a) / sqrt2) / scale;
+        R im = (R(x.b) + R(x.c + x.a) / sqrt2) / scale;
         return std::pair<R, R>{c * re - s * im, c * im + s * re};
     };
     auto [u_re, u_im] = with_phase(m.a);

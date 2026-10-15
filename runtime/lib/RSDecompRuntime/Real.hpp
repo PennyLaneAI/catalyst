@@ -41,7 +41,7 @@ inline const Real &sqrt2() {
 }
 
 inline const Real &inv_sqrt2() {
-    static const Real value = 1 / sqrt2();
+    static const Real value = sqrt2() / 2;
     return value;
 }
 
