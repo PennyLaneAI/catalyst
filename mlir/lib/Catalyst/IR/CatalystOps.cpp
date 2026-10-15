@@ -37,11 +37,6 @@ void CustomCallOp::getEffects(
     effects.emplace_back(mlir::MemoryEffects::Read::get());
 }
 
-static bool isRuntimeCABIType(StringRef name, bool allowVoid) {
-    std::optional<RuntimeCABIType> abi = classifyRuntimeCABIType(name);
-    return abi.has_value() && (allowVoid || abi->kind != RuntimeCABIKind::Void);
-}
-
 LogicalResult RuntimeCallOp::verify() {
     StringRef result = getCResult();
     if (!isRuntimeCABIType(result, /*allowVoid=*/true)) {

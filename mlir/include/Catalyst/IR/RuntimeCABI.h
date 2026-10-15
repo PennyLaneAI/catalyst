@@ -49,4 +49,10 @@ inline std::optional<RuntimeCABIType> classifyRuntimeCABIType(llvm::StringRef na
         .Default(std::nullopt);
 }
 
+/// Whether the runtime supports a C ABI type name, with "void" accepted only if `allowVoid`.
+inline bool isRuntimeCABIType(llvm::StringRef name, bool allowVoid) {
+    std::optional<RuntimeCABIType> abi = classifyRuntimeCABIType(name);
+    return abi.has_value() && (allowVoid || abi->kind != RuntimeCABIKind::Void);
+}
+
 } // namespace catalyst
