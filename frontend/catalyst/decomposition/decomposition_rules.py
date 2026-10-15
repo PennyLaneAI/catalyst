@@ -1395,6 +1395,19 @@ def build_decomp_rule_variants(
     return target_specs
 
 
+def resource_requests(target_specs: list[DecompTargetSpec]) -> list[OpDecompRequest]:
+    """Build the decomposition requests for the operators produced by the given rule sets."""
+
+    requests = []
+    for target_spec in target_specs:
+        context = target_spec.modifier_context
+        for rule in target_spec.rules:
+            for op in rule.resource_ops:
+                if isinstance(op, Operator2):
+                    requests.append(OpDecompRequest.from_operation(op, context))
+    return requests
+
+
 def walk_reachable_decomp_rule_sets(
     initial_requests: list[tuple[OpDecompRequest, set[ModifierState]]],
 ) -> list[DecompTargetSpec]:
@@ -1412,16 +1425,6 @@ def walk_reachable_decomp_rule_sets(
     processed_states: dict[str, set[ModifierState]] = {}
     target_specs = []
 
-    def child_requests(rule_sets):
-        children = []
-        for target_spec in rule_sets:
-            context = target_spec.modifier_context
-            for rule in target_spec.rules:
-                for op in rule.resource_ops:
-                    if isinstance(op, Operator2):
-                        children.append(OpDecompRequest.from_operation(op, context))
-        return children
-
     while queue:
         request, demanded_states, path_control_counts = queue.popleft()
         demanded_states = set(demanded_states)
@@ -1434,7 +1437,7 @@ def walk_reachable_decomp_rule_sets(
         new_specs = build_decomp_rule_variants(request, missing_states)
         target_specs.extend(new_specs)
 
-        for child in child_requests(new_specs):
+        for child in resource_requests(new_specs):
             # A control-changing cycle can otherwise manufacture an unbounded sequence of modifier
             # counts. Compare with the same base identity earlier on this path, rather than the
             # direct parent: intermediate operators may absorb their controls into their identity.
