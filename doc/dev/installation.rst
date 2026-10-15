@@ -239,8 +239,8 @@ MLIR Dialects
 """""""""""""
 
 To build the Catalyst MLIR component, along with the necessary `core MLIR
-<https://mlir.llvm.org/>`_ and `MLIR-HLO
-<https://github.com/tensorflow/mlir-hlo>`_ dependencies, run:
+<https://mlir.llvm.org/>`_ and `StableHLO
+<https://github.com/openxla/stablehlo>`_ dependencies, run:
 
 .. code-block:: console
 

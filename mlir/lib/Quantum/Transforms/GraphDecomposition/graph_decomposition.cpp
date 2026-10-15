@@ -239,6 +239,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
             // must still produce a non-empty list, or its terminals would be
             // decomposed by whatever rules happen to be loaded.
             qref::DecomposeLoweringPassOptions dlOptions;
+            dlOptions.inlineRuleBody = inlineRuleBody;
             std::unordered_set<OperatorNode, OperatorNodeHash> visited;
             llvm::StringSet<> seenRules;
             std::vector<OperatorNode> worklist = setOfOps;
@@ -276,6 +277,8 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
 
             auto [opName, ruleName] = pairRef.split("=");
             opName = opName.trim();
+            opName.consume_front("\"");
+            opName.consume_back("\"");
             ruleName = ruleName.trim();
             ruleName.consume_front("\"");
             ruleName.consume_back("\"");
@@ -295,6 +298,8 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
 
             auto [opName, rulesRef] = pairRef.split("=");
             opName = opName.trim();
+            opName.consume_front("\"");
+            opName.consume_back("\"");
             llvm::SmallVector<llvm::StringRef> splitRulesRef;
 
             rulesRef = rulesRef.trim();

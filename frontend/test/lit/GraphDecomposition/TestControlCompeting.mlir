@@ -12,15 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{gate-set=C(V)=1.0 alt-decomps=C(U){}{wires:1}{}=[dedicated,distribute]})' %s | FileCheck %s
+// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{gate-set=C(V)=1.0 alt-decomps=C(U){}{wires:1}{}=[dedicated,distribute]})' %s | FileCheck %s --check-prefixes=ALL,CALL
 
-// CHECK-LABEL: func.func @competing(
-// CHECK-SAME:  %[[Q:.*]]: !quantum.bit, %[[C:.*]]: !quantum.bit
+// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{inline-rule-body gate-set=C(V)=1.0 alt-decomps=C(U){}{wires:1}{}=[dedicated,distribute]})' %s | FileCheck %s --check-prefixes=ALL,INLINE
+
+// ALL-LABEL: func.func @competing(
+// ALL-SAME:  %[[Q:.*]]: !quantum.bit, %[[C:.*]]: !quantum.bit
 func.func @competing(%ctrl: !quantum.bit, %q: !quantum.bit) -> (!quantum.bit, !quantum.bit) {
   %true = arith.constant true
-  // CHECK: %[[O:.*]], %[[OC:.*]] = quantum.custom "V"() %[[Q]] ctrls(%[[C]]) ctrlvals(%{{.*}}) : !quantum.bit ctrls !quantum.bit
-  // CHECK-NOT: quantum.custom "V"
-  // CHECK: return %[[O]], %[[OC]]
+
+  // CALL: %[[OQ:.*]]:2 = call @dedicated_0(%[[Q]], %[[C]])
+  // CALL: return %[[OQ]]#0, %[[OQ]]#1
+
+  // INLINE: %[[O:.*]], %[[OC:.*]] = quantum.custom "V"() %[[Q]] ctrls(%[[C]]) ctrlvals(%{{.*}}) : !quantum.bit ctrls !quantum.bit
+  // INLINE-NOT: quantum.custom "V"
+  // INLINE: return %[[O]], %[[OC]]
+
   %out, %outc = quantum.custom "U"() %q ctrls(%ctrl) ctrlvals(%true) : !quantum.bit ctrls !quantum.bit
   return %out, %outc : !quantum.bit, !quantum.bit
 }
@@ -43,3 +50,5 @@ func.func private @distribute(%q: !quantum.bit, %ctrl: !quantum.bit) -> (!quantu
   %b, %bc = quantum.custom "V"() %a ctrls(%ac) ctrlvals(%true) : !quantum.bit ctrls !quantum.bit
   return %b, %bc : !quantum.bit, !quantum.bit
 }
+
+// CALL: func.func private @dedicated_0
