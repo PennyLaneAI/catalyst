@@ -608,10 +608,10 @@ class QJIT(CatalystCallable):
         with _ensure_capture_mode(target_mode):
             self.user_function = self.pre_compilation()
 
-        # Static arguments require values, so we cannot AOT compile.
         if (
             self.compile_options.enable_aot_compilation
             and self.user_sig is not None
+            # Static arguments require values, so we cannot AOT compile.
             and not self.compile_options.static_argnums
         ):
             self.aot_compile()
@@ -799,7 +799,7 @@ class QJIT(CatalystCallable):
         cached_fn, requires_promotion = self.fn_cache.lookup(args)
 
         if cached_fn is None:
-            if self.user_sig and not opts.static_argnums:
+            if opts.enable_aot_compilation and self.user_sig and not opts.static_argnums:
                 msg = "Provided arguments did not match declared signature, recompiling..."
                 warnings.warn(msg, UserWarning)
 
