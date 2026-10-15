@@ -151,7 +151,7 @@
 
 <h3>Improvements 🛠</h3>
 
-* The :func:`~catalyst.qjit` function now accepts a ``skip_aot_compilation`` argument, which can be
+* The :func:`~catalyst.qjit` function now accepts an ``enable_aot_compilation`` argument, which can be
   used to disable ahead-of-time compilation when set.
   [(#3339)](https://github.com/PennyLaneAI/catalyst/pull/3339)
 
