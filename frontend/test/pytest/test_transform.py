@@ -40,6 +40,7 @@ from pennylane.transforms import _tape_decompose, merge_rotations
 from catalyst import measure, qjit
 from catalyst.device import QJITDevice
 from catalyst.device.decomposition import measurements_from_counts, measurements_from_samples
+from catalyst.passes import graph_decomposition
 from catalyst.qfunc import _extract_passes
 from catalyst.utils.exceptions import CompileError
 
@@ -346,6 +347,40 @@ def test_decompose_keeps_markers():
     assert tape_transforms.get_marker_level("start") == 0
     assert tape_transforms.get_marker_level("before-decompose") == 1
     assert not pass_pipeline
+
+
+def test_decompose_before_passes(backend):
+    """Without capture, qp.decompose runs as a tape transform."""
+
+    @qjit
+    @qp.transforms.cancel_inverses
+    @qp.transforms.decompose(gate_set={"Hadamard", "T", "Adjoint(T)", "CNOT"})
+    @qp.qnode(qp.device(backend, wires=3))
+    def circuit():
+        qp.Hadamard(wires=0)
+        qp.Toffoli(wires=[0, 1, 2])
+        qp.Hadamard(wires=1)
+        qp.Hadamard(wires=1)
+        return qp.expval(qp.Z(0))
+
+    assert np.allclose(circuit(), 0.0)
+    assert 'apply_registered_pass "cancel-inverses"' in circuit.mlir
+    assert "graph-decomposition" not in circuit.mlir
+    assert "Toffoli" not in circuit.mlir
+
+
+def test_graph_decomposition_stays_a_pass():
+    """Without capture, catalyst.passes.graph_decomposition is lowered as a pass."""
+
+    @graph_decomposition(gate_set={"RX", "RZ"})
+    @qp.qnode(qp.device("null.qubit", wires=1))
+    def circuit():
+        return qp.expval(qp.Z(0))
+
+    tape_transforms, pass_pipeline = _extract_passes(circuit.compile_pipeline)
+
+    assert not tape_transforms
+    assert [t.pass_name for t in pass_pipeline] == ["graph-decomposition"]
 
 
 def test_diagonalize_measurements(backend):
