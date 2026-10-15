@@ -41,7 +41,7 @@ def test_PhaseShift_gridsynth(param, op, eps):
     qjitted_circuit = qp.qjit(gridsynthed_circuit, capture=True, collect_decomp_rules=False)
     result = qjitted_circuit(param)
 
-    assert qp.math.allclose(result, expected, atol=eps)
+    assert qp.math.allclose(result, expected, atol=eps, rtol=0)
 
 
 @pytest.mark.parametrize(
@@ -67,7 +67,7 @@ def test_gridsynth_ppr_basis(param, eps):
     )
     result = qjitted_circuit(param)
     result_with_ppr = qjitted_circuit_with_ppr(param)
-    assert np.allclose(result, result_with_ppr, atol=eps)
+    assert np.allclose(result, result_with_ppr, atol=eps, rtol=0)
 
 
 @pytest.mark.parametrize("ppr_basis", [False, True])
@@ -136,7 +136,8 @@ def test_gridsynth_high_precision(param, eps):
     gridsynthed_circuit = qp.transforms.gridsynth(circuit, epsilon=eps)
     result = qp.qjit(gridsynthed_circuit, capture=True, collect_decomp_rules=False)(param)
 
-    assert qp.math.allclose(result, expected, atol=eps)
+    # Simulating the ~150 gates at eps=1e-15 in double precision adds an error of about 1e-14.
+    assert qp.math.allclose(result, expected, atol=max(eps, 1e-13), rtol=0)
 
 
 def test_no_warning_for_small_epsilon(capfd):
