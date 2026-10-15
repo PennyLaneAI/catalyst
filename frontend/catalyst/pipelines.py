@@ -151,6 +151,9 @@ class CompileOptions:
             decomposition rules reachable from all gates in the circuit will be compiled. If
             ``capture=False``, or ``capture="global"`` and ``qp.capture.enabled() == False``, this
             argument will be ignored. ``True`` by default.
+        skip_aot_compilation (bool): Controls whether or not to skip ahead-of-time compilation.
+            If ``True``, AOT compilation will never happen during object initialization.
+            ``False`` by default.
     """
 
     verbose: Optional[bool] = False
@@ -177,6 +180,7 @@ class CompileOptions:
     skip_preprocess: bool = False
     runtime_artifacts: tuple[str, ...] = ()
     collect_decomp_rules: bool = True
+    skip_aot_compilation: bool = False
 
     def __post_init__(self):
         # Convert keep_intermediate to Enum
