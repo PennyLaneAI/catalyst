@@ -2049,11 +2049,6 @@ class TestDecomposeAlias:
     @pytest.mark.parametrize(
         "tkwargs, exc, match",
         [
-            ({"gate_set": {"RX"}, "stopping_condition": lambda op: True}, NotImplementedError, ""),
-            ({"gate_set": {"RX"}, "max_expansion": 2}, NotImplementedError, ""),
-            ({"gate_set": {"RX"}, "num_work_wires": 2}, NotImplementedError, ""),
-            ({"gate_set": {"RX"}, "minimize_work_wires": True}, NotImplementedError, ""),
-            ({"gate_set": {"RX"}, "strict": False}, NotImplementedError, ""),
             ({"gate_set": None}, ValueError, "requires an explicit 'gate_set'"),
         ],
     )

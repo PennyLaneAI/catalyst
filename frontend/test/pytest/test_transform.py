@@ -302,7 +302,6 @@ def test_decompose(backend):
     def qnode_builder(device_name):
         """Builder"""
 
-        @qp.transforms.decompose
         @qp.qnode(qp.device(device_name, wires=3), interface="jax")
         def qfunc():
             qp.Hadamard(wires=[0])
@@ -312,7 +311,9 @@ def test_decompose(backend):
         return qfunc
 
     qnode_control = qnode_builder("default.qubit")
-    qnode_backend = qnode_builder(backend)
+    qnode_backend = qp.transforms.decompose(
+        qnode_builder(backend), gate_set={"Hadamard", "T", "Adjoint(T)", "CNOT"}
+    )
 
     jax_jit = jax.jit(qnode_control)
     compiled = qjit(qnode_backend)
@@ -324,6 +325,7 @@ def test_decompose(backend):
 
     assert np.allclose(expected, observed)
     assert expected_shape == observed_shape
+    assert "Toffoli" not in compiled.mlir
 
 
 def test_diagonalize_measurements(backend):

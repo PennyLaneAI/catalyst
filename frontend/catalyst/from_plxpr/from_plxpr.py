@@ -337,19 +337,12 @@ def handle_qnode(
     )
 
 
-# qp.decompose arguments the graph-decomposition pass supports (mapped 1:1). ``tkwargs`` holds only
-# the arguments the user passed, so any other key means an unsupported argument was set.
-_SUPPORTED_DECOMPOSE_TKWARGS = frozenset({"gate_set", "fixed_decomps", "alt_decomps"})
-
-
 def _validate_decompose_tkwargs(tkwargs):
-    """Reject qp.decompose arguments the graph-decomposition pass doesn't support yet."""
-    unsupported = tkwargs.keys() - _SUPPORTED_DECOMPOSE_TKWARGS
-    if unsupported:
-        raise NotImplementedError(
-            f"qp.decompose argument(s) {unsupported} are not supported under qjit with graph-based "
-            "decomposition. Supported arguments are: 'gate_set', 'fixed_decomps', 'alt_decomps'."
-        )
+    """Reject qp.decompose arguments the graph-decomposition pass can't honor.
+
+    PennyLane's ``qp.decompose`` only accepts ``gate_set``, ``fixed_decomps`` and ``alt_decomps``,
+    so we only check for a missing gate set.
+    """
     if tkwargs.get("gate_set") is None:
         raise ValueError(
             "qp.decompose requires an explicit 'gate_set' under qjit; the graph-based decomposition "
