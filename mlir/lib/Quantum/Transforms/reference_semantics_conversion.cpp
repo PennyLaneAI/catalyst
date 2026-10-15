@@ -1043,20 +1043,23 @@ void handleSubroutine(IRRewriter &builder, func::FuncOp f,
     assert(succeeded(f.eraseArguments(eraseArgsIndices)));
 }
 
-SmallVector<IntegerAttr> collectQregSizesAtCallsite(func::FuncOp subroutine, Operation *mod) {
+SmallVector<IntegerAttr> collectQregSizesAtCallsite(func::FuncOp subroutine,
+                                                   ArrayRef<func::FuncOp> callers) {
     SmallVector<IntegerAttr> qregSizesAtCallsite;
-    auto uses = SymbolTable::getSymbolUses(subroutine, mod);
-    if (uses) {
-        for (auto use : *uses) {
-            Operation *user = use.getUser();
-            if (auto callOp = dyn_cast<func::CallOp>(user)) {
-                for (Type t : callOp.getOperandTypes()) {
-                    if (auto qrefQuregType = dyn_cast<qref::QuregType>(t)) {
-                        qregSizesAtCallsite.push_back(qrefQuregType.getSize());
-                    }
-                }
-                break;
+    for (func::FuncOp caller : callers) {
+        WalkResult walkResult = caller.walk([&](func::CallOp callOp) {
+            if (callOp.getCallee() != subroutine.getSymName()) {
+                return WalkResult::advance();
             }
+            for (Type t : callOp.getOperandTypes()) {
+                if (auto qrefQuregType = dyn_cast<qref::QuregType>(t)) {
+                    qregSizesAtCallsite.push_back(qrefQuregType.getSize());
+                }
+            }
+            return WalkResult::interrupt();
+        });
+        if (walkResult.wasInterrupted()) {
+            break;
         }
     }
     return qregSizesAtCallsite;
@@ -1127,6 +1130,16 @@ struct ReferenceSemanticsConversionPass
             subroutinesPostOrder.push_back(subroutine);
         }
 
+        // Collect the callers once: a per-subroutine `SymbolTable::getSymbolUses` walks the whole
+        // module, which is quadratic in the number of subroutines. The callers stay valid while
+        // their call ops are replaced during conversion.
+        llvm::DenseMap<StringAttr, SetVector<func::FuncOp>> callersOf;
+        mod->walk([&](func::CallOp callOp) {
+            if (auto caller = callOp->getParentOfType<func::FuncOp>()) {
+                callersOf[callOp.getCalleeAttr().getAttr()].insert(caller);
+            }
+        });
+
         // We want to handle the calls before the subroutines, so we know the register sizes on the
         // subroutine qreg arg type
         // By default, scc iterates call graph in post order (callee before caller), so we reverse
@@ -1136,7 +1149,10 @@ struct ReferenceSemanticsConversionPass
                 return signalPassFailure();
             }
             QubitValueTracker tracker;
-            handleSubroutine(builder, subroutine, collectQregSizesAtCallsite(subroutine, mod));
+            handleSubroutine(
+                builder, subroutine,
+                collectQregSizesAtCallsite(subroutine,
+                                           callersOf[subroutine.getSymNameAttr()].getArrayRef()));
             if (failed(ensureNoValueSemanticsOps(subroutine))) {
                 subroutine.emitOpError(
                     "Detected remaining value semantics operations after conversion");
