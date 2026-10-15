@@ -464,10 +464,6 @@ void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result, b
             graphOpId = decomposableGate.getGraphOpId();
             operatorNode = catalyst::quantum::GraphDecompositionPrep::parseOperator(graphOpId);
             graphOp = graphResult->find(operatorNode);
-        } else {
-            // It can't ever not be a decomposable gate if graphResult is not nullptr
-            // because the graphsolver would fail if the op is not decomposable and graphResult
-            // would be not null.
         }
     }
 
