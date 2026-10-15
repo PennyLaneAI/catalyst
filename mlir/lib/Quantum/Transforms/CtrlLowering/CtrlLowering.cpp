@@ -214,6 +214,8 @@ static LogicalResult controlScfIf(PatternRewriter &rewriter, scf::IfOp ifOp, IRM
     Value cond = map.lookupOrDefault(ifOp.getCondition());
     auto newIf = scf::IfOp::create(rewriter, ifOp.getLoc(), resultTypes, cond,
                                    /*withElseRegion=*/true);
+    // Carry over hints such as `catalyst.estimated_probability`.
+    newIf->setDiscardableAttrs(ifOp->getDiscardableAttrDictionary());
 
     // Control one branch: `oldBlock` may be null (a missing else), in which case the branch just
     // threads the incoming controls through unchanged.
@@ -282,6 +284,8 @@ static LogicalResult controlScfFor(PatternRewriter &rewriter, scf::ForOp forOp, 
     // With non-empty iter args and no body-builder, scf.for creates the body block (induction var +
     // iter-arg block args) without a terminator, which we fill in below.
     auto newFor = scf::ForOp::create(rewriter, forOp.getLoc(), lb, ub, step, newInits);
+    // Carry over hints such as `catalyst.estimated_iterations`.
+    newFor->setDiscardableAttrs(forOp->getDiscardableAttrDictionary());
     Block *newBody = newFor.getBody();
     ValueRange newIterArgs = newFor.getRegionIterArgs();
 
@@ -389,6 +393,8 @@ static LogicalResult controlScfWhile(PatternRewriter &rewriter, scf::WhileOp whi
             yielded.append(afterCtrl.begin(), afterCtrl.end());
             scf::YieldOp::create(rewriter, oldYield.getLoc(), yielded);
         });
+    // Carry over hints such as `catalyst.estimated_iterations`.
+    newWhile->setDiscardableAttrs(whileOp->getDiscardableAttrDictionary());
 
     if (failed(status)) {
         return failure();
@@ -419,6 +425,8 @@ static LogicalResult controlScfIndexSwitch(PatternRewriter &rewriter, scf::Index
     SmallVector<int64_t> cases(switchOp.getCases().begin(), switchOp.getCases().end());
     auto newSwitch = scf::IndexSwitchOp::create(rewriter, switchOp.getLoc(), resultTypes, arg,
                                                 cases, cases.size());
+    // Carry over hints such as `catalyst.estimated_probabilities`.
+    newSwitch->setDiscardableAttrs(switchOp->getDiscardableAttrDictionary());
 
     // Control one region.
     // Regions have no block arguments, so bodies reference outer
