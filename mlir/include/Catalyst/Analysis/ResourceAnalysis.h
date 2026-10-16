@@ -64,7 +64,7 @@ class ResourceAnalysis {
   private:
     bool collectDetailedOperations;
 
-    DecompGraph::Core::GraphResult *graphResult;
+    DecompGraph::Core::GraphResult *graphResult = nullptr;
     std::unique_ptr<DecompGraph::Solver::DecompositionGraph> graph;
 
     // per-function resource counts
