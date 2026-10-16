@@ -241,7 +241,10 @@ def _resolve_control_value(ssa: SSAValue) -> bool | AbstractArray:
     if not isinstance(value, DenseIntOrFPElementsAttr):
         return Bool
 
-    index = resolve_constant_params(op.indices[0]) if op.indices else 0
+    try:
+        index = resolve_constant_params(op.indices[0]) if op.indices else 0
+    except NotImplementedError:
+        return Bool
     if not isinstance(index, int):
         return Bool
     return bool(value.get_values()[index])

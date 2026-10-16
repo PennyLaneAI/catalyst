@@ -732,7 +732,8 @@
 <h3>Bug fixes 🐛</h3>
 
 * Fixed `draw_graph` failures with symbolic gate parameters or control values, preserving
-  PennyLane gate names such as `CRX`.
+  PennyLane gate names such as `CRX`. Unresolved indices into control tensors produce abstract
+  Boolean values during circuit DAG reconstruction.
   [(#3134)](https://github.com/PennyLaneAI/catalyst/pull/3134)
 
 * Fixed a bug where a compiled Backline program continued with a session that does not work,
