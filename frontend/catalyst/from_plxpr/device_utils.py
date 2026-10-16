@@ -35,6 +35,7 @@ from catalyst.device.decomposition import (
 
 # pylint: disable=protected-access
 from catalyst.device.qjit_device import (
+    RUNTIME_OPERATIONS,
     _load_device_capabilities,
     filter_device_capabilities_with_shots,
     get_qjit_device_capabilities,
@@ -299,7 +300,7 @@ def _gateset_preprocessing(
     """Insert a `graph-decomposition` pass targetting the gateset
     specified by the specific `device`
     """
-    gate_set = capabilities.gate_set()
+    gate_set = set(capabilities.gate_set()) & set(RUNTIME_OPERATIONS)
 
     # Get the default args/kwargs with the above gate_set
     targs, tkwargs = graph_decomposition_setup_inputs(gate_set=gate_set)
