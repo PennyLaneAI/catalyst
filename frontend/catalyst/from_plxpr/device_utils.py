@@ -304,7 +304,6 @@ def _gateset_preprocessing(
     """Insert a `graph-decomposition` pass targetting the gateset
     specified by the specific `device`
     """
-
     copied_capabilities = copy.deepcopy(capabilities)
 
     # Intersection of gates and observables supported by the device and by Catalyst runtime.
