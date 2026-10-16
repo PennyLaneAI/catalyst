@@ -73,8 +73,14 @@ LogicalResult BacklineAttr::verify(function_ref<InFlightDiagnostic()> emitError,
     if (!controller) {
         return emitError() << "backline requires a controller";
     }
-    if (!transport || (transport.getValue() != "rdma" && transport.getValue() != "memcpy")) {
-        return emitError() << "backline transport must be 'rdma' or 'memcpy'";
+    if (!transport || (transport.getValue() != "rdma" && transport.getValue() != "memcpy" &&
+                       transport.getValue() != "none")) {
+        return emitError() << "backline transport must be 'rdma', 'memcpy' or 'none'";
+    }
+
+    if (transport.getValue() == "none" && !coprocessors.empty()) {
+        return emitError() << "the 'none' transport carries nothing, so it cannot have "
+                              "coprocessors";
     }
     for (NodeAttr c : coprocessors) {
         if (!c) {

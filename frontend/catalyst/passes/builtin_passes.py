@@ -837,11 +837,11 @@ def gridsynth_setup_inputs(epsilon=1e-4, ppr_basis=False, method="deterministic"
 
     Args:
         qnode (QNode): the QNode to apply the gridsynth compiler pass to
-        epsilon (float): The accuracy per rotation gate. Defaults to ``1e-4``. With
-            ``"deterministic"``, each rotation has operator norm error at most ``epsilon``, and
-            therefore diamond norm error at most ``2 * epsilon``. With ``"mixed"`` and
-            ``"mixed-fallback"``, the channel averaged over samples has diamond norm error at most
-            ``2 * epsilon``.
+        epsilon (float): The accuracy per rotation gate. Defaults to ``1e-4``. Values down to
+            ``1e-15`` are supported. With ``"deterministic"``, each rotation has operator norm
+            error at most ``epsilon``, and therefore diamond norm error at most ``2 * epsilon``.
+            With ``"mixed"`` and ``"mixed-fallback"``, the channel averaged over samples has
+            diamond norm error at most ``2 * epsilon``.
         ppr_basis (bool): If true, decompose directly to Pauli Product Rotations (PPRs) in PBC dialect. Defaults to ``False``
         method (str): The synthesis method. ``"deterministic"`` (default) applies a single
             Ross-Selinger gate sequence per rotation. ``"mixed"`` applies, per execution, one of

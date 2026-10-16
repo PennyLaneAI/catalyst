@@ -19,7 +19,6 @@
 #include <cassert>
 #include <cmath>
 #include <complex>
-#include <cstring>
 #include <optional>
 #include <sstream>
 #include <string>
@@ -30,11 +29,15 @@
 #include "GridProblems.hpp"
 #include "NormSolver.hpp"
 #include "NormalForms.hpp"
+#include "Real.hpp"
 #include "Rings.hpp"
 
-#define MAX_SEARCH_TRIALS 10000
-#define MAX_MIXED_CANDIDATES 64
 #define ROSS_CACHE_SIZE 10000
+// Factoring attempts per candidate. Candidates whose norm is hard to factor are skipped, since the
+// next levels of the grid problem provide plenty of further candidates.
+#define CANDIDATE_FACTORING_TRIALS 2
+#define MAX_CANDIDATES 100000
+#define MAX_MIXED_CANDIDATES 64
 // Minimum success probability |u|^2 of a fallback projective rotation, and the share of the
 // diamond-norm error budget given to the projective rotations (fallbacks are rare, so they can use
 // the remainder at a much looser accuracy). These minimize the expected T-count; with 0.99 and 0.5
@@ -46,77 +49,114 @@
 #define MAX_FALLBACK_EPSILON 0.25
 #define MAX_FALLBACK_LEVELS 200
 
-namespace {
-bool is_odd_multiple_of_pi_4(double angle) {
-    const double pi_over_4 = M_PI / 4.0;
-    double multiple = angle / pi_over_4;
-    int rounded_multiple = static_cast<int>(std::round(multiple));
-    return (rounded_multiple % 2 != 0) && (std::abs(multiple - rounded_multiple) < 1e-10);
-}
-} // namespace
-
 namespace RSDecomp::RossSelinger {
 
 using namespace RSDecomp::Rings;
+using namespace RSDecomp::Reals;
 using namespace RSDecomp::Utils;
 using namespace RSDecomp::CliffordData;
 using namespace RSDecomp::NormalForms;
 
 namespace {
-/**
- * @brief Reduce the grid-problem angle -angle/2 into [-pi/4, pi/4].
- * @return The reduced angle and the scale that maps grid solutions back to the original frame.
- */
-std::pair<double, ZOmega> grid_problem_frame(double angle) {
-    double modified_angle = -angle / 2.0;
-    long k = std::lround(modified_angle / M_PI_2);
-    double shift = -static_cast<double>(k) * M_PI_2;
-    int idx = ((k % 4) + 4) % 4;
 
-    ZOmega scale(0, 0, 0, 1);
-    switch (idx) {
-    case 0:                         // 0 shift (Identity)
-        scale = ZOmega(0, 0, 0, 1); // d=1
-        break;
-    case 1:                         // pi/2 shift
-        scale = ZOmega(0, 1, 0, 0); // b=1
-        break;
-    case 2:                          // pi shift
-        scale = ZOmega(0, 0, 0, -1); // d=-1
-        break;
-    case 3:                          // 3pi/2 (or -pi/2) shift
-        scale = ZOmega(0, -1, 0, 0); // b=-1
-        break;
+/**
+ * @brief The unitary [[u, -t^†], [t, u^†]] / √2^k approximating RZ(angle).
+ */
+struct RzSolution {
+    ZOmega u;
+    ZOmega t;
+    int k;
+};
+
+/**
+ * @brief Find the integer number of units of π/4 that the angle is equal to, within an error
+ * that keeps the decomposition within epsilon.
+ * @param angle The target rotation angle.
+ * @param epsilon The desired approximation precision.
+ * @return The number of units of π/4, or std::nullopt if the angle is not close enough to one.
+ */
+std::optional<INT_TYPE> as_multiple_of_pi_4(double angle, double epsilon) {
+    Real pi_4 = pi() / 4;
+    INT_TYPE units = round_int(Real(angle / pi_4));
+    // ||RZ(a) - RZ(b)|| <= |a - b| / 2
+    if (abs(Real(angle - Real(units) * pi_4)) <= 2 * Real(epsilon)) {
+        return units;
     }
-    return {modified_angle + shift, scale};
+    return std::nullopt;
 }
 
 /**
- * @brief Complete a grid solution `u_sol / sqrt(2)^k` to a unitary and compute its normal form.
- *
- * Applied first to last, the gate sequence implements [[u, -v*], [v, u*]] with u = u_sol /
- * sqrt(2)^k. If `v_out` is given, it receives v.
- * @return The gate sequence and global phase, or std::nullopt if the norm equation has no solution.
+ * @brief Solve the Diophantine equation |t|^2 = 2^k - |u|^2 that completes u to a unitary.
+ * @param u A solution of the grid problem at level k.
+ * @param k The level.
+ * @return t, or std::nullopt if no solution was found.
  */
-std::optional<std::pair<std::vector<GateType>, double>>
-normal_form_from_grid_solution(const ZOmega &u_sol, int k_val, const ZOmega &scale,
-                               std::complex<double> *v_out = nullptr) {
-    INT_TYPE two_pow_k = INT_TYPE(1) << k_val;
-    auto xi = ZSqrtTwo(two_pow_k, 0) - u_sol.norm2().to_sqrt_two();
-    auto t_sol = NormSolver::solve_diophantine(xi, MAX_FACTORING_TRIALS);
-    if (!t_sol) {
-        return std::nullopt;
+std::optional<ZOmega> solve_norm_equation(const ZOmega &u, int k) {
+    ZSqrtTwo xi = ZSqrtTwo(INT_TYPE(1) << k, 0) - u.norm2().to_sqrt_two();
+    auto t = NormSolver::solve_diophantine(xi, CANDIDATE_FACTORING_TRIALS);
+    if (t && t->norm2() == xi.to_omega()) {
+        return t;
     }
+    return std::nullopt;
+}
 
-    ZOmega u = u_sol * scale;
-    ZOmega t = *t_sol * scale;
-    if (v_out) {
-        // The normal form of [[u, -t*], [t, u*]] implements its transpose, [[u, t], [-t*, u*]].
-        *v_out = -std::conj(t.to_complex()) / std::pow(M_SQRT2, k_val);
-    }
-    DyadicMatrix dyd_mat(u, -t.conj(), t, u.conj(), INT_TYPE(k_val));
-    SO3Matrix so3_mat(dyd_mat);
+/**
+ * @brief The Clifford+T normal form and global phase of an RzSolution.
+ */
+std::pair<std::vector<GateType>, double> normal_form(const RzSolution &solution) {
+    const auto &[u, t, k] = solution;
+    SO3Matrix so3_mat(DyadicMatrix(u, -t.conj(), t, u.conj(), INT_TYPE(k)));
     return ma_normal_form(so3_mat);
+}
+
+/**
+ * @brief Solve the grid problem and Diophantine equation for RZ(angle) at level k = 0, 1, 2, ....
+ * @param angle The target rotation angle.
+ * @param epsilon The desired approximation precision.
+ * @return The solution at the smallest level, or std::nullopt if none was found up to the
+ * maximum level.
+ */
+std::optional<RzSolution> solve_rz(double angle, double epsilon) {
+    // RZ(angle)[0, 0] = e^{-i angle / 2}
+    GridProblem::RzGridSearch search(-Real(angle) / 2, Real(epsilon));
+
+    // Solutions are expected from level ~1.5 * log2(1/ε), and the number of candidates grows
+    // fourfold with every further level.
+    int max_k = static_cast<int>(1.5 * std::log2(std::max(1.0 / epsilon, 2.0))) + 40;
+    size_t num_candidates = 0;
+    std::optional<RzSolution> solution;
+
+    for (int k = 0; k <= max_k && !solution; k++) {
+        search.visit_level(k, [&](const ZOmega &u) {
+            if (auto t = solve_norm_equation(u, k)) {
+                solution = RzSolution{u, *t, k};
+                return false;
+            }
+            RT_FAIL_IF(++num_candidates > MAX_CANDIDATES,
+                       "Gridsynth exceeded the maximum number of candidate solutions.");
+            return true;
+        });
+    }
+    return solution;
+}
+
+/**
+ * @brief Fail for inputs that have no decomposition. This must happen before the cache lookups,
+ * as NaN keys compare equal to any cached key.
+ * @param angle The target rotation angle.
+ * @param epsilon The desired approximation precision.
+ */
+void validate_inputs(double angle, double epsilon) {
+    RT_FAIL_IF(!std::isfinite(angle), "Gridsynth requires a finite angle.");
+    RT_FAIL_IF(!(epsilon > 0) || !std::isfinite(epsilon),
+               "Gridsynth requires a positive, finite epsilon.");
+    if (epsilon < MIN_EPSILON) {
+        std::ostringstream oss;
+        oss << "Gridsynth received epsilon=" << std::scientific << epsilon
+            << ", but the smallest supported epsilon is " << std::defaultfloat << MIN_EPSILON
+            << ".";
+        RT_FAIL(oss.str().c_str());
+    }
 }
 
 // Grid-search accuracy for which every candidate satisfies 1 - Re(w)^2 <= epsilon / 2 (written to
@@ -171,15 +211,6 @@ void append_merged(std::vector<GateType> &gates, GateType gate) {
     }
 }
 
-void warn_small_epsilon(double epsilon, const std::string &min_epsilon) {
-    std::ostringstream oss;
-    oss << std::scientific << epsilon;
-    RT_WARN("Gridsynth received epsilon=" + oss.str() + ". For epsilon smaller than " +
-            min_epsilon +
-            ", results may be inaccurate, or errors may occur during decomposition. To guarantee "
-            "correctness, please provide a larger epsilon value.");
-}
-
 /**
  * @brief Write a gate sequence into a memref passed as its unpacked descriptor fields.
  */
@@ -209,6 +240,7 @@ sequence_to_ppr(const std::pair<std::vector<GateType>, double> &sequence) {
     auto [ppr_gates, ppr_phase_update] = HST_to_PPR(sequence.first);
     return {std::move(ppr_gates), sequence.second + ppr_phase_update};
 }
+
 } // namespace
 
 /**
@@ -220,13 +252,9 @@ sequence_to_ppr(const std::pair<std::vector<GateType>, double> &sequence) {
  */
 std::pair<std::vector<GateType>, double> compute_clifford_T_decomposition(double angle,
                                                                           double epsilon) {
-    double phase = 0.0;
-    std::vector<GateType> decomposition;
-
-    if (is_odd_multiple_of_pi_4(angle)) {
-        const double pi_over_4 = M_PI / 4.0;
-        long units = std::lround(angle / pi_over_4);
-        int normalized = ((units % 8) + 8) % 8;
+    if (auto units = as_multiple_of_pi_4(angle, epsilon)) {
+        std::vector<GateType> decomposition;
+        int normalized = (((*units % 8) + 8) % 8).convert_to<int>();
 
         if (normalized & 4) {
             decomposition.emplace_back(GateType::Z);
@@ -242,27 +270,17 @@ std::pair<std::vector<GateType>, double> compute_clifford_T_decomposition(double
             decomposition.emplace_back(GateType::I);
         }
 
-        phase = static_cast<double>(units) * (M_PI / 8.0);
-    } else {
-        auto [grid_angle, scale] = grid_problem_frame(angle);
-        GridProblem::GridIterator u_solutions(grid_angle, epsilon, MAX_SEARCH_TRIALS);
-
-        std::optional<std::pair<std::vector<GateType>, double>> result;
-        for (const auto &[u_sol, k_val] : u_solutions) {
-            result = normal_form_from_grid_solution(u_sol, k_val, scale);
-            if (result) {
-                break;
-            }
-        }
-
-        if (!result) {
-            DyadicMatrix identity(ZOmega(0, 0, 0, 1), ZOmega(0), ZOmega(0), ZOmega(0, 0, 0, 1),
-                                  INT_TYPE(0));
-            result = ma_normal_form(SO3Matrix(identity));
-        }
-        std::tie(decomposition, phase) = *result;
+        return {std::move(decomposition), units->convert_to<double>() * (M_PI / 8.0)};
     }
-    return {std::move(decomposition), phase};
+
+    auto solution = solve_rz(angle, epsilon);
+    if (!solution) {
+        std::ostringstream oss;
+        oss << "Gridsynth failed to find a decomposition for angle=" << angle
+            << " and epsilon=" << std::scientific << epsilon << ".";
+        RT_FAIL(oss.str().c_str());
+    }
+    return normal_form(*solution);
 }
 
 // Cache for Standard Basis
@@ -271,6 +289,7 @@ using StdCacheValue = std::pair<std::vector<GateType>, double>;
 static lru_cache<StdCacheKey, StdCacheValue, ROSS_CACHE_SIZE> ross_cache_std;
 
 std::pair<std::vector<GateType>, double> eval_ross_algorithm(double angle, double epsilon) {
+    validate_inputs(angle, epsilon);
     StdCacheKey key = {angle, epsilon};
 
     if (auto val_opt = ross_cache_std.get(key); val_opt) {
@@ -288,6 +307,7 @@ using PPRCacheValue = std::pair<std::vector<PPRGateType>, double>;
 static lru_cache<PPRCacheKey, PPRCacheValue, ROSS_CACHE_SIZE> ross_cache_ppr;
 
 std::pair<std::vector<PPRGateType>, double> eval_ross_algorithm_ppr(double angle, double epsilon) {
+    validate_inputs(angle, epsilon);
     PPRCacheKey key = {angle, epsilon};
 
     if (auto val_opt = ross_cache_ppr.get(key); val_opt) {
@@ -431,8 +451,9 @@ namespace {
  *
  * Writing a candidate's top-left entry as `w * exp(-i angle/2)`, it under-rotates the target if
  * Im(w) <= 0 and over-rotates it if Im(w) >= 0. A pair is mixed with the probability p of
- * Equation (33) of arXiv:2203.10064, and admissible if `diamond_error(p, w_under, w_over)` is at
- * most `epsilon`. Of the admissible pairs found, the one with the lowest expected T-count is kept.
+ * Equation (33) of arXiv:2203.10064, and admissible if the diamond-norm error
+ * 2 (p e_under + (1 - p) e_over) of the mixture is at most `epsilon`, where e is the error of a
+ * candidate. Of the admissible pairs found, the one with the lowest expected T-count is kept.
  */
 class MixedPairSearch {
   public:
@@ -442,19 +463,18 @@ class MixedPairSearch {
         std::complex<double> w;
         // Bottom-left entry of the unitary the gate sequence implements.
         std::complex<double> v;
+        // Computed in multiprecision, since it is of order epsilon.
+        double error;
         size_t t_count;
     };
-    using DiamondError = double (*)(double p, std::complex<double> w_under,
-                                    std::complex<double> w_over);
 
-    MixedPairSearch(const ZOmega &scale, double epsilon, DiamondError diamond_error)
-        : scale(scale), epsilon(epsilon), diamond_error(diamond_error) {}
+    explicit MixedPairSearch(double epsilon) : epsilon(epsilon) {}
 
     /**
-     * @brief Consider the grid solution `u_sol / sqrt(2)^k` with relative top-left entry `w`.
+     * @brief Consider the grid solution `u / sqrt(2)^k` with relative top-left entry `w`.
      * @return false if the search should stop.
      */
-    bool offer(const ZOmega &u_sol, int k_val, std::complex<double> w) {
+    bool offer(const ZOmega &u, int k, std::complex<double> w, double error) {
         bool is_under = w.imag() <= 0.0;
         bool is_over = w.imag() >= 0.0;
         // Until the other side has a candidate, more candidates on a filled side cannot form a
@@ -467,18 +487,20 @@ class MixedPairSearch {
         if (unders.size() + overs.size() >= MAX_MIXED_CANDIDATES) {
             return false;
         }
-        std::complex<double> v;
-        auto normal_form = normal_form_from_grid_solution(u_sol, k_val, scale, &v);
-        if (!normal_form) {
+        auto t = solve_norm_equation(u, k);
+        if (!t) {
             return true;
         }
-        size_t t_count = count_t_gates(normal_form->first);
+        auto [gates, phase] = normal_form(RzSolution{u, *t, k});
+        size_t t_count = count_t_gates(gates);
         // Heuristic stop: T-counts mostly, but not strictly, grow along the search.
         if (best && t_count > best->cost) {
             return false;
         }
 
-        Candidate candidate{std::move(normal_form->first), normal_form->second, w, v, t_count};
+        // The normal form of [[u, -t*], [t, u*]] implements its transpose, [[u, t], [-t*, u*]].
+        std::complex<double> v = -std::conj(t->to_complex()) / std::pow(M_SQRT2, k);
+        Candidate candidate{std::move(gates), phase, w, v, error, t_count};
         if (is_under) {
             unders.push_back(candidate);
             for (size_t j = 0; j < overs.size(); j++) {
@@ -498,12 +520,14 @@ class MixedPairSearch {
     const Candidate &under() const { return unders[best->under]; }
     const Candidate &over() const { return overs[best->over]; }
     double probability() const { return best->probability; }
+    double diamond() const { return best->diamond; }
 
   private:
     struct Pair {
         size_t under;
         size_t over;
         double probability;
+        double diamond;
         double cost;
     };
 
@@ -516,24 +540,47 @@ class MixedPairSearch {
         double over_weight = over.w.real() * over.w.imag();
         double denominator = over_weight - under_weight;
         double p = denominator > 0.0 ? over_weight / denominator : 1.0;
-        double diamond = diamond_error(p, under.w, over.w);
+        double diamond = 2.0 * (p * under.error + (1.0 - p) * over.error);
         // Tolerate rounding for candidates on the bound.
         if (diamond > epsilon * (1.0 + 1e-12)) {
             return;
         }
         double cost = p * under.t_count + (1.0 - p) * over.t_count;
         if (!best || cost < best->cost) {
-            best = Pair{i, j, p, cost};
+            best = Pair{i, j, p, diamond, cost};
         }
     }
 
-    ZOmega scale;
     double epsilon;
-    DiamondError diamond_error;
     std::vector<Candidate> unders;
     std::vector<Candidate> overs;
     std::optional<Pair> best;
 };
+
+/**
+ * @brief Visit the solutions u of `grid_search` at the levels k = 0, ..., max_k, together with
+ * w = u * conj(z) / sqrt(2)^k for z = e^{i theta}, until `visit(u, k, Re(w), Im(w))` returns false
+ * or MAX_CANDIDATES solutions were visited.
+ */
+template <typename Visit>
+void visit_grid_solutions(const GridProblem::RzGridSearch &grid_search, const Real &theta,
+                          int max_k, Visit &&visit) {
+    Real zx = cos(theta);
+    Real zy = sin(theta);
+    size_t num_candidates = 0;
+    bool searching = true;
+    for (int k = 0; k <= max_k && searching; k++) {
+        Real scale = pow(sqrt2(), k);
+        searching = grid_search.visit_level(k, [&](const ZOmega &u) {
+            if (++num_candidates > MAX_CANDIDATES) {
+                return false;
+            }
+            Real re = (zx * real_part(u) + zy * imag_part(u)) / scale;
+            Real im = (zx * imag_part(u) - zy * real_part(u)) / scale;
+            return visit(u, k, re, im);
+        });
+    }
+}
 } // namespace
 
 /**
@@ -542,44 +589,35 @@ class MixedPairSearch {
  * Implements the mixed diagonal approximation of Kliuchnikov et al., "Shorter quantum circuits via
  * single-qubit gate approximation", Quantum 7, 1208 (2023), arXiv:2203.10064, Section 3.4
  * (Proposition 3.13, with the diamond-norm bound of Theorem 3.12). Writing each
- * candidate's top-left entry as `w * exp(-i angle/2)`, an under-rotation (Im(w) < 0) and an
- * over-rotation (Im(w) > 0) are mixed with probabilities p and 1 - p, and each is
+ * candidate's top-left entry as `w * exp(-i angle/2)`, an under-rotation (Im(w) <= 0) and an
+ * over-rotation (Im(w) >= 0) are mixed with probabilities p and 1 - p, and each is
  * twirled over {I, S, Z, S^dagger} when applied. Of the candidate pairs found, the one with the
  * lowest expected T-count whose mixture meets the diamond-norm bound of Theorem 3.12 is kept.
  */
 MixedDecomposition compute_mixed_diagonal_decomposition(double angle, double epsilon) {
-    if (is_odd_multiple_of_pi_4(angle)) {
-        auto exact = compute_clifford_T_decomposition(angle, epsilon);
+    // A unitary with operator-norm error epsilon/2 has diamond-norm error at most epsilon.
+    if (as_multiple_of_pi_4(angle, epsilon / 2.0)) {
+        auto exact = compute_clifford_T_decomposition(angle, epsilon / 2.0);
         return {{exact.first, exact.first}, {exact.second, exact.second}, 1.0};
     }
 
-    // Each candidate satisfies the even split 1 - Re(w)^2 <= epsilon/2 of Proposition 3.13.
-    const double min_overlap = std::sqrt(1.0 - epsilon / 2.0);
-    const std::complex<double> inverse_target = std::polar(1.0, angle / 2.0);
+    // RZ(angle)[0, 0] = e^{-i angle / 2}. Every candidate of the search satisfies the even split
+    // 1 - Re(w)^2 <= epsilon/2 of Proposition 3.13.
+    double search_epsilon = mixed_search_epsilon(epsilon);
+    Real theta = -Real(angle) / 2;
+    GridProblem::RzGridSearch grid_search(theta, Real(search_epsilon));
+    MixedPairSearch search(epsilon);
 
-    auto [grid_angle, scale] = grid_problem_frame(angle);
-    GridProblem::GridIterator u_solutions(grid_angle, mixed_search_epsilon(epsilon),
-                                          MAX_SEARCH_TRIALS);
-    // Theorem 3.12.
-    MixedPairSearch search(scale, epsilon,
-                           [](double p, std::complex<double> w_under, std::complex<double> w_over) {
-                               return 2.0 * (1.0 - p * w_under.real() * w_under.real() -
-                                             (1.0 - p) * w_over.real() * w_over.real());
-                           });
-
-    for (const auto &[u_sol, k_val] : u_solutions) {
-        std::complex<double> w =
-            (u_sol * scale).to_complex() * inverse_target / std::pow(M_SQRT2, k_val);
-        if (w.real() < min_overlap) {
-            continue;
-        }
-        if (!search.offer(u_sol, k_val, w)) {
-            break;
-        }
-    }
+    // Theorem 3.12: the error of a candidate is 1 - Re(w)^2.
+    int max_k = static_cast<int>(1.5 * std::log2(1.0 / search_epsilon)) + 40;
+    visit_grid_solutions(
+        grid_search, theta, max_k, [&](const ZOmega &u, int k, const Real &re, const Real &im) {
+            Real error = 1 - re * re;
+            return search.offer(u, k, {re.convert_to<double>(), im.convert_to<double>()},
+                                error.convert_to<double>());
+        });
 
     if (!search.found()) {
-        // A unitary with operator-norm error epsilon/2 has diamond-norm error at most epsilon.
         auto fallback = compute_clifford_T_decomposition(angle, epsilon / 2.0);
         return {{fallback.first, fallback.first}, {fallback.second, fallback.second}, 1.0};
     }
@@ -642,6 +680,7 @@ static lru_cache<MixedCacheKey, MixedDecomposition, ROSS_CACHE_SIZE> mixed_cache
  */
 std::pair<std::vector<GateType>, double> eval_mixed_ross_algorithm(double angle, double epsilon,
                                                                    double uniform_sample) {
+    validate_inputs(angle, epsilon);
     MixedCacheKey key = {angle, epsilon};
     auto mixed = mixed_cache.get(key);
     if (!mixed) {
@@ -669,33 +708,34 @@ eval_mixed_ross_algorithm_ppr(double angle, double epsilon, double uniform_sampl
  * rotations is kept, as the fallbacks only add (1 - |u|^2) times their T-count.
  */
 MixedFallbackDecomposition compute_mixed_fallback_decomposition(double angle, double epsilon) {
-    if (is_odd_multiple_of_pi_4(angle)) {
-        // The exact diagonal V never fails.
-        auto [gates, phase] = compute_clifford_T_decomposition(angle, epsilon);
+    // A unitary with operator-norm error epsilon/2 has diamond-norm error at most epsilon.
+    if (as_multiple_of_pi_4(angle, epsilon / 2.0)) {
+        // The diagonal V never fails.
+        auto [gates, phase] = compute_clifford_T_decomposition(angle, epsilon / 2.0);
         FallbackBranch exact{gates, phase, 1.0, 0.0, epsilon};
         return {{exact, exact}, 1.0};
     }
 
-    const double min_overlap = std::sqrt(FALLBACK_SUCCESS_PROBABILITY);
-    // Each candidate satisfies sin|Arg(u) - target|^2 <= epsilon_1 / 2 of Proposition 3.18.
+    // Each candidate satisfies sin|Arg(u) - target|^2 <= epsilon_1 / 2 of Proposition 3.18, and
+    // succeeds with probability |u|^2 >= FALLBACK_SUCCESS_PROBABILITY.
     const double projective_epsilon = FALLBACK_PROJECTIVE_SHARE * epsilon;
-    const double max_sin = std::sqrt(projective_epsilon / 2.0);
-    const std::complex<double> inverse_target = std::polar(1.0, angle / 2.0);
-    auto [grid_angle, scale] = grid_problem_frame(angle);
-    // Equation (34), with q sin(delta)^2 = Im(w)^2.
-    MixedPairSearch::DiamondError projective_diamond = [](double p, std::complex<double> w_under,
-                                                          std::complex<double> w_over) {
-        return 2.0 *
-               (p * w_under.imag() * w_under.imag() + (1.0 - p) * w_over.imag() * w_over.imag());
-    };
-    MixedPairSearch search(scale, projective_epsilon, projective_diamond);
+    const Real max_sin = sqrt(Real(projective_epsilon / 2.0));
+    const Real min_overlap = sqrt(Real(FALLBACK_SUCCESS_PROBABILITY));
+    Real theta = -Real(angle) / 2;
+    auto grid_search = GridProblem::RzGridSearch::sector(theta, asin(max_sin), min_overlap);
+    MixedPairSearch search(projective_epsilon);
 
-    GridProblem::enumerate_sector_solutions(
-        grid_angle, std::asin(max_sin), min_overlap, MAX_FALLBACK_LEVELS,
-        [&](const ZOmega &u_sol, int k_val) {
-            std::complex<double> w =
-                (u_sol * scale).to_complex() * inverse_target / std::pow(M_SQRT2, k_val);
-            return search.offer(u_sol, k_val, w);
+    // Equation (34): the error of a candidate is q sin(delta)^2 = Im(w)^2.
+    visit_grid_solutions(
+        grid_search, theta, MAX_FALLBACK_LEVELS,
+        [&](const ZOmega &u, int k, const Real &re, const Real &im) {
+            Real magnitude = sqrt(re * re + im * im);
+            if (magnitude < min_overlap || re <= 0 || abs(im) > magnitude * max_sin) {
+                return true;
+            }
+            Real error = im * im;
+            return search.offer(u, k, {re.convert_to<double>(), im.convert_to<double>()},
+                                error.convert_to<double>());
         });
 
     if (!search.found()) {
@@ -707,9 +747,7 @@ MixedFallbackDecomposition compute_mixed_fallback_decomposition(double angle, do
 
     // Equation (36): split the remaining accuracy evenly between the two fallback terms
     // p_k (1 - q_k) ||B_k - Z_theta||.
-    const double fallback_budget =
-        (epsilon - projective_diamond(search.probability(), search.under().w, search.over().w)) /
-        2.0;
+    const double fallback_budget = (epsilon - search.diamond()) / 2.0;
     auto make_branch = [&](const MixedPairSearch::Candidate &candidate, double weight) {
         double success = std::norm(candidate.w);
         double failure_weight = weight * (1.0 - success);
@@ -732,6 +770,7 @@ static lru_cache<MixedCacheKey, MixedFallbackDecomposition, ROSS_CACHE_SIZE> fal
  * with `epsilon` as in `eval_mixed_ross_algorithm`.
  */
 static FallbackBranch eval_fallback_branch(double angle, double epsilon, double uniform_sample) {
+    validate_inputs(angle, epsilon);
     MixedCacheKey key = {angle, epsilon};
     auto fallback = fallback_cache.get(key);
     if (!fallback) {
@@ -757,9 +796,6 @@ eval_fallback_projective_ppr(double angle, double epsilon, double uniform_sample
 extern "C" {
 
 size_t rs_decomposition_get_size(double theta, double epsilon, bool ppr_basis) {
-    if (epsilon < 1e-6) {
-        warn_small_epsilon(epsilon, "1e-6");
-    }
     if (ppr_basis) {
         auto result = eval_ross_algorithm_ppr(theta, epsilon);
         return result.first.size();
@@ -827,10 +863,6 @@ double rs_decomposition_get_phase(double theta, double epsilon, bool ppr_basis) 
  */
 size_t rs_mixed_decomposition_get_size(double theta, double epsilon, bool ppr_basis,
                                        double uniform_sample) {
-    // The mixed grid search runs at an accuracy of about sqrt(epsilon).
-    if (epsilon < 1e-12) {
-        warn_small_epsilon(epsilon, "1e-12");
-    }
     if (ppr_basis) {
         return eval_mixed_ross_algorithm_ppr(theta, epsilon, uniform_sample).first.size();
     }
@@ -894,10 +926,6 @@ double rs_mixed_decomposition_get_phase(double theta, double epsilon, bool ppr_b
  */
 size_t rs_fallback_projective_get_size(double theta, double epsilon, bool ppr_basis,
                                        double uniform_sample) {
-    // The projective rotation search runs at an accuracy of about sqrt(epsilon).
-    if (epsilon < 1e-12) {
-        warn_small_epsilon(epsilon, "1e-12");
-    }
     if (ppr_basis) {
         return eval_fallback_projective_ppr(theta, epsilon, uniform_sample).first.size();
     }

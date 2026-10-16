@@ -243,50 +243,50 @@ constexpr SequenceStatistics cliffordTStatistics{3.0590, 1.1278, -0.0074, 1.9849
 constexpr SequenceStatistics pprStatistics{3.0590, 1.1278, 1.5324, 4.2326, pprCaseFrequencies};
 
 // Mixed synthesis: fitted over 1000 uniformly random angles and 8 samples per angle and epsilon,
-// for epsilon in [5e-12, 5e-4]. The samples include the (merged) twirling Cliffords.
+// for epsilon in [1e-15, 5e-4]. The samples include the (merged) twirling Cliffords.
 // Clifford+T cases: T, HT, SHT, I, X, ...
-constexpr double mixedCliffordTCaseFrequencies[] = {0.0111, 0.4939, 0.4950, 0.0054, 0.0395,
-                                                    0.0386, 0.2380, 0.2109, 0.2551, 0.2124};
+constexpr double mixedCliffordTCaseFrequencies[] = {0.0096, 0.4944, 0.4960, 0.0058, 0.0410,
+                                                    0.0429, 0.2347, 0.2045, 0.2590, 0.2121};
 // PPR cases: I, X2, X4, X8, adjX2, ...
 constexpr double mixedPPRCaseFrequencies[] = {
-    0.0006, 0.0044, 0.4277, 0.4944, 0.0000, 0.0091, 0.0000, 0.0043, 0.0000, 0.0000,
-    0.0000, 0.0000, 0.0056, 0.0355, 0.4949, 0.5000, 0.0000, 0.0235, 0.0000};
+    0.0005, 0.0040, 0.4352, 0.4952, 0.0000, 0.0080, 0.0000, 0.0042, 0.0000, 0.0000,
+    0.0000, 0.0000, 0.0048, 0.0304, 0.4977, 0.5000, 0.0000, 0.0200, 0.0000};
 static_assert(std::size(mixedCliffordTCaseFrequencies) == numCliffordTCases);
 static_assert(std::size(mixedPPRCaseFrequencies) == numPPRCases);
-constexpr SequenceStatistics mixedCliffordTStatistics{1.5394, 1.6027, 0.0027, 2.6096,
+constexpr SequenceStatistics mixedCliffordTStatistics{1.5346, 0.3606, 0.0024, 2.5843,
                                                       mixedCliffordTCaseFrequencies};
-constexpr SequenceStatistics mixedPPRStatistics{1.5394, 1.6027, 0.7751, 5.3527,
+constexpr SequenceStatistics mixedPPRStatistics{1.5346, 0.3606, 0.7719, 4.6973,
                                                 mixedPPRCaseFrequencies};
 
 // Mixed fallback synthesis: the projective rotations on the ancilla, and the fallbacks applied on
 // failure, with probability `fallbackFailureProbability`. Fitted over 200 uniformly random angles,
-// 4 projective and 4 fallback samples per angle and epsilon, for epsilon in [5e-12, 5e-4]. The
+// 4 projective and 4 fallback samples per angle and epsilon, for epsilon in [1e-15, 5e-4]. The
 // fallback statistics count one execution of the fallback sequence; the failure probability is
 // attached to the `scf.if` instead. `fallbackFailureProbability` depends on
 // FALLBACK_SUCCESS_PROBABILITY in runtime/lib/RSDecompRuntime/RSDecomp.cpp.
 // Clifford+T cases: T, HT, SHT, I, X, ...
 constexpr double fallbackProjectiveCliffordTCaseFrequencies[] = {
-    0.0252, 0.4823, 0.4925, 0.0323, 0.0540, 0.0474, 0.1711, 0.2933, 0.2227, 0.1791};
+    0.0215, 0.4883, 0.4901, 0.0251, 0.0583, 0.0589, 0.1787, 0.2849, 0.2334, 0.1606};
 constexpr double fallbackRecoveryCliffordTCaseFrequencies[] = {
-    0.0129, 0.4934, 0.4937, 0.0075, 0.0342, 0.0344, 0.2412, 0.2222, 0.2439, 0.2165};
+    0.0116, 0.4943, 0.4942, 0.0080, 0.0416, 0.0413, 0.2358, 0.2027, 0.2586, 0.2119};
 // PPR cases: I, X2, X4, X8, adjX2, ...
 constexpr double fallbackProjectivePPRCaseFrequencies[] = {
-    0.0050, 0.0083, 0.3865, 0.4866, 0.0000, 0.0182, 0.0000, 0.0073, 0.0000, 0.0000,
-    0.0000, 0.0000, 0.0134, 0.0446, 0.5024, 0.5000, 0.0000, 0.0276, 0.0000};
+    0.0042, 0.0078, 0.4007, 0.4897, 0.0000, 0.0149, 0.0000, 0.0071, 0.0000, 0.0000,
+    0.0000, 0.0000, 0.0103, 0.0383, 0.5031, 0.5000, 0.0000, 0.0238, 0.0000};
 constexpr double fallbackRecoveryPPRCaseFrequencies[] = {
-    0.0010, 0.0044, 0.4157, 0.4934, 0.0000, 0.0102, 0.0000, 0.0044, 0.0000, 0.0000,
-    0.0000, 0.0000, 0.0066, 0.0411, 0.4955, 0.5000, 0.0000, 0.0277, 0.0000};
+    0.0009, 0.0046, 0.4262, 0.4941, 0.0000, 0.0096, 0.0000, 0.0043, 0.0000, 0.0000,
+    0.0000, 0.0000, 0.0059, 0.0361, 0.4950, 0.5000, 0.0000, 0.0232, 0.0000};
 static_assert(std::size(fallbackProjectiveCliffordTCaseFrequencies) == numCliffordTCases);
 static_assert(std::size(fallbackRecoveryCliffordTCaseFrequencies) == numCliffordTCases);
 static_assert(std::size(fallbackProjectivePPRCaseFrequencies) == numPPRCases);
 static_assert(std::size(fallbackRecoveryPPRCaseFrequencies) == numPPRCases);
 constexpr SequenceStatistics fallbackProjectiveCliffordTStatistics{
-    0.5505, 3.7633, -0.0008, 1.9597, fallbackProjectiveCliffordTCaseFrequencies};
-constexpr SequenceStatistics fallbackProjectivePPRStatistics{0.5505, 3.7633, 0.2777, 5.8389,
+    0.5428, 3.8695, -0.0010, 1.9591, fallbackProjectiveCliffordTCaseFrequencies};
+constexpr SequenceStatistics fallbackProjectivePPRStatistics{0.5428, 3.8695, 0.2671, 5.9068,
                                                              fallbackProjectivePPRCaseFrequencies};
 constexpr SequenceStatistics fallbackRecoveryCliffordTStatistics{
-    1.5753, -7.0269, 0.0115, 2.3601, fallbackRecoveryCliffordTCaseFrequencies};
-constexpr SequenceStatistics fallbackRecoveryPPRStatistics{1.5753, -7.0269, 0.8159, 0.4499,
+    1.5602, -8.6637, 0.0066, 2.4081, fallbackRecoveryCliffordTCaseFrequencies};
+constexpr SequenceStatistics fallbackRecoveryPPRStatistics{1.5602, -8.6637, 0.8029, -0.6293,
                                                            fallbackRecoveryPPRCaseFrequencies};
 constexpr double fallbackFailureProbability = 0.0244;
 
