@@ -35,6 +35,8 @@ from catalyst.device.decomposition import (
     measurements_from_samples,
 )
 
+from catalyst.device.qjit_device import intersect_operations
+
 # pylint: disable=protected-access
 from catalyst.device.qjit_device import (
     RUNTIME_OPERATIONS,
