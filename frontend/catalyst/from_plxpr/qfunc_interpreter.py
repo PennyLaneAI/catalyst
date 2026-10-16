@@ -770,8 +770,11 @@ def handle_decomposition_rule(self, *, pyfun, func_jaxpr, is_qreg, num_params):
 
 
 @PLxPRToQuantumJaxprInterpreter.register_primitive(plxpr_pauli_measure_prim)
-def handle_pauli_measure(self, *wires_inval, pauli_word, **params):
+def handle_pauli_measure(self, *wires_inval, pauli_word, postselect=None):
     """Handle the conversion from plxpr to Catalyst jaxpr for the PauliMeasure primitive"""
+    if postselect is not None:
+        raise NotImplementedError("Postselection on qp.pauli_measure is not supported under qjit.")
+
     in_qubits = []
     for w in wires_inval:
         if is_abstract_qubit(w):

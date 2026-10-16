@@ -765,6 +765,11 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* `qp.pauli_measure(..., postselect=...)` now raises a `NotImplementedError` under
+  `qjit(capture=True)`, as `catalyst.pauli_measure` already does. Previously the postselection was
+  silently dropped and the measurement outcome was random.
+  [(#3348)](https://github.com/PennyLaneAI/catalyst/pull/3348)
+
 * MLIR passes that recreate `scf.for`, `scf.while`, `scf.if`, and `scf.index_switch` ops
   (`ctrl-lowering`, `adjoint-lowering`, `--convert-to-value-semantics`) now preserve discardable
   attributes such as `catalyst.estimated_iterations`, `catalyst.estimated_probability`, and

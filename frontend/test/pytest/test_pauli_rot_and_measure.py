@@ -178,6 +178,23 @@ def test_pauli_measure_to_ppm():
     assert "pbc.ppm" in optimized_ir
 
 
+@pytest.mark.parametrize("postselect", [0, 1])
+def test_pauli_measure_postselect_unsupported(postselect):
+    """Test that postselection on qp.pauli_measure raises instead of being silently dropped."""
+
+    @qjit(capture=True)
+    @qp.qnode(qp.device("lightning.qubit", wires=1))
+    def workflow():
+        qp.pauli_measure("X", wires=0, postselect=postselect)
+        return qp.probs()
+
+    with pytest.raises(
+        NotImplementedError,
+        match="Postselection on qp.pauli_measure is not supported under qjit.",
+    ):
+        workflow()
+
+
 def test_pauli_rot_to_ppr_pauli_word_error():
     """Test that unsupported pauli words raises `ValueError`."""
     pipe = [("pipe", ["quantum-compilation-stage"])]
