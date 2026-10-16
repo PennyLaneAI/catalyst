@@ -454,7 +454,7 @@ void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result, b
     }
 
     // Graph decomposition for qp.estimate
-    DecompGraph::Core::GraphResult::iterator graphOp;
+    DecompGraph::Core::GraphResult::iterator graphOp = graphResult->end();
     std::string graphOpId;
     DecompGraph::Core::OperatorNode operatorNode;
     if (graphResult) {
