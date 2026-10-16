@@ -17,18 +17,30 @@
 #include <cmath>
 #include <cstdint>
 #include <fstream>
+#include <memory>
 #include <string>
 
 #include "llvm/Support/JSON.h"
 #include "mlir/Pass/Pass.h"
+#include "mlir/Pass/PassManager.h"
 
 #include "Catalyst/Analysis/ResourceAnalysis.h"
 #include "Catalyst/Analysis/ResourceAnalysisRegistry.h"
 #include "Catalyst/Analysis/ResourceResult.h"
+#include "Driver/Timer.h"
 #include "PBC/Analysis/PBCDepthAnalysis.h"
+#include "Quantum/Transforms/Passes.h"
+
+#include "DGBuilder.hpp"
+#include "DGSolver.hpp"
+#include "DGTypes.hpp"
+#include "GraphDecompositionPrep.hpp"
 
 using namespace mlir;
 using namespace llvm;
+using namespace catalyst::quantum;
+using namespace DecompGraph::Core;
+using namespace DecompGraph::Solver;
 
 namespace catalyst {
 
@@ -60,7 +72,40 @@ struct ResourceAnalysisPass : public impl::ResourceAnalysisPassBase<ResourceAnal
         pbc::registerPBCResourceAnalysisExtensions();
 
         auto moduleOp = cast<ModuleOp>(getOperation());
-        ResourceAnalysis analysis(moduleOp, ResourceAnalysisRegistry::get().all());
+        std::optional<GraphResult> solution;
+        std::unique_ptr<DecompositionGraph> graph;
+
+        if (!targetGateSetOption.empty()) {
+            // Prepare and solve the decomposition graph for qp.estimate
+            graph = GraphDecompositionPrep::prepareGraph(
+                moduleOp,
+                {
+                    .targetGateSetOption = targetGateSetOption,
+                    .fixedDecompsOption = fixedDecompsOption,
+                    .altDecompsOption = altDecompsOption,
+                    .bytecodeRulesFile = bytecodeRulesFile,
+                    .libQPDPath = libQPDPath,
+                    .libpythonPath = libpythonPath,
+                },
+                [&](Operation *op) {
+                    OpPassManager modifierPm("builtin.module");
+                    modifierPm.addPass(createModifiersLoweringPass());
+                    return runPipeline(modifierPm, op);
+                });
+            if (!graph) {
+                return signalPassFailure();
+            }
+
+            DecompositionSolver solver(*graph);
+            solution = std::make_optional(solver.solve());
+            // gateset = &graph->getGateset();
+        } else {
+            markAllAnalysesPreserved();
+        }
+
+        ResourceAnalysis analysis(moduleOp, ResourceAnalysisRegistry::get().all(),
+                                  /*collectDetailedOperations=*/false,
+                                  solution ? &solution.value() : nullptr, std::move(graph));
         const auto &results = analysis.getResults();
 
         // Populate statistics from the entry function. The flattened view
@@ -87,8 +132,6 @@ struct ResourceAnalysisPass : public impl::ResourceAnalysisPassBase<ResourceAnal
                 writeJsonToFile(jsonStr, outputFname);
             }
         }
-
-        markAllAnalysesPreserved();
     }
 
   private:
