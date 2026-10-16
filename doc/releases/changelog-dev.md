@@ -765,6 +765,13 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* Scatter ops with batching dimensions, such as those from a batched `jnp.linalg.det`, no longer
+  crash `scatter-lowering`, and will instead be rejected as intended.
+  In addition, to support batched scatter operations an additional pass is run in the HLO lowering
+  stage to resolve the batching first.
+  An additional bug is fixed in the scatter lowering that resulted in failed assertions.
+  [(#3352)](https://github.com/PennyLaneAI/catalyst/pull/3352)
+
 * MLIR passes that recreate `scf.for`, `scf.while`, `scf.if`, and `scf.index_switch` ops
   (`ctrl-lowering`, `adjoint-lowering`, `--convert-to-value-semantics`) now preserve discardable
   attributes such as `catalyst.estimated_iterations`, `catalyst.estimated_probability`, and

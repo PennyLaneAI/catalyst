@@ -69,6 +69,9 @@ const PipelineList pipelineList{
     {"hlo-lowering-stage",
      {"canonicalize",
       "func.func(chlo-legalize-to-stablehlo)",
+      // Rewrite gather and scatter with batching dims into plain ones, since our lowering can't
+      // handle it. We leverage the compat rewriter since batching was introduced in StableHLO 1.1.
+      "stablehlo-compatibility-expander{target=1.0.0}",
       "func.func(stablehlo-legalize-control-flow)",
       // builtin.module is added to support nested modules
       "builtin.module(func.func(stablehlo-legalize-control-flow))",
