@@ -169,9 +169,17 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
     /// dropping the X flips that value needs. Constant-false values get an unconditional X;
     /// dynamic (non-constant) values get an X guarded by `scf.if !value`. Constant-true values
     /// are left untouched.
+    ///
+    /// Decomposition rules (`func.func` with a `target_gate` attribute) are skipped: a rule body is
+    /// a template whose control values are bound by the caller when the rule is applied, and
+    /// rewriting it would also change how the rule's qubit arguments are ordered.
     void normalizeZeroControlValues(ModuleOp module) {
         SmallVector<DecomposableGate> gates;
         module.walk([&](DecomposableGate gate) {
+            auto parent = gate->getParentOfType<func::FuncOp>();
+            if (parent && parent->hasAttr(DecompUtils::target_gate_attr_name)) {
+                return;
+            }
             if (!gate.getCtrlValueOperands().empty()) {
                 gates.push_back(gate);
             }
