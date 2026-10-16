@@ -461,6 +461,6 @@ def unconditional_to_conditional_if_probs(
         if remaining <= 0.0:
             conditional.append(0.0)
         else:
-            conditional.append(p / remaining)
+            conditional.append(min(p / remaining, 1.0))
             remaining -= p
     return tuple(conditional)
