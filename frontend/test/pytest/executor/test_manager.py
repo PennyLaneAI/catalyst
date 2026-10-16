@@ -30,7 +30,7 @@ from catalyst.executor.manager import (
     _start_on_free_port,
 )
 from catalyst.executor.ssh import SCP
-from catalyst.executor.utils import ExecutorPaths
+from catalyst.executor.utils import ExecutorPaths, Secret
 
 
 class TestExecutorConfigDefaults:
@@ -465,14 +465,18 @@ class TestMakers:
 
     def test_remote_maker_builds_a_remote_process(self):
         """``host=`` produces a tunnelled process. The one-time sudo resolve runs during setup."""
-        ex = Executor(host="10.0.0.9", user="me", sudo=True, plugins=["libx.so"])
+        ex = Executor(
+            host="10.0.0.9", user="me", sudo=True, sudo_password_env="PW_VAR", plugins=["libx.so"]
+        )
+        pw = Secret("pw")
         with patch(
-            "catalyst.executor.manager.RemoteOps.resolve_sudo", return_value="pw"
+            "catalyst.executor.manager.RemoteOps.resolve_sudo", return_value=pw
         ) as resolve, patch("catalyst.executor.manager.RemoteOps.mkdir"):
             make = ex._remote_maker()
+        resolve.assert_called_once_with("me", "10.0.0.9", "PW_VAR")
         proc = make(9000)
         assert (proc.host, proc.user) == ("10.0.0.9", "me")
-        assert proc.sudo_password == "pw"
+        assert proc.sudo_password is pw
         assert proc.addr == "127.0.0.1:9000"
 
     def test_remote_maker_reuses_one_auth_context_across_retries(self):
