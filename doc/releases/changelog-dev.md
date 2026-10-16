@@ -940,7 +940,7 @@
   - **Local executors:** a placement's local executors are given a port at compile time and launched only when the program runs. They are remembered per node, rather than written onto the frozen placement nodes.
   - **Executor memory:** the remote memory slab is sized by `CATALYST_REMOTE_SLAB_BYTES`.
 
-  [(#XXXX)](https://github.com/PennyLaneAI/catalyst/pull/XXXX)
+  [(#3355)](https://github.com/PennyLaneAI/catalyst/pull/3355)
 
 * QNode functions are now marked with a `quantum.kernel_entry_point` attribute in their quantum
   kernel module, which the `ResourceAnalysis` pass uses to identify the entry function.
