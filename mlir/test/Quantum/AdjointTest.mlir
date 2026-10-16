@@ -864,3 +864,57 @@ func.func @adjoint_integer_tensor_param(%arg0: !quantum.reg) -> !quantum.reg {
   }
   return %out : !quantum.reg
 }
+
+// -----
+
+// Resource hints on SCF ops must survive adjoint-lowering recreation.
+
+// CHECK-LABEL: @adjoint_preserves_scf_hints
+func.func public @adjoint_preserves_scf_hints(%cond: i1, %stop: index, %idx: index) {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %0 = quantum.alloc( 1) : !quantum.reg
+  %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+
+  // CHECK-NOT: quantum.adjoint
+  // CHECK-DAG: catalyst.estimated_iterations = 1.000000e+01 : f64
+  // CHECK-DAG: catalyst.estimated_iterations = 2.500000e+00 : f64
+  // CHECK-DAG: catalyst.estimated_probability = 7.500000e-01 : f64
+  // CHECK-DAG: catalyst.estimated_probabilities = [2.000000e-01, 3.000000e-01]
+  %2 = quantum.adjoint(%1) : !quantum.bit {
+  ^bb0(%arg0: !quantum.bit):
+    %for_out = scf.for %i = %c0 to %stop step %c1 iter_args(%qi = %arg0) -> !quantum.bit {
+      %h = quantum.custom "Hadamard"() %qi : !quantum.bit
+      scf.yield %h : !quantum.bit
+    } {catalyst.estimated_iterations = 1.000000e+01 : f64}
+    %while_out = scf.while (%qi = %for_out) : (!quantum.bit) -> !quantum.bit {
+      scf.condition(%cond) %qi : !quantum.bit
+    } do {
+    ^bb1(%q2: !quantum.bit):
+      %x = quantum.custom "PauliX"() %q2 : !quantum.bit
+      scf.yield %x : !quantum.bit
+    } attributes {catalyst.estimated_iterations = 2.500000e+00 : f64}
+    %if_out = scf.if %cond -> !quantum.bit {
+      %y = quantum.custom "PauliY"() %while_out : !quantum.bit
+      scf.yield %y : !quantum.bit
+    } else {
+      scf.yield %while_out : !quantum.bit
+    } {catalyst.estimated_probability = 7.500000e-01 : f64}
+    %sw = scf.index_switch %idx {catalyst.estimated_probabilities = [2.000000e-01, 3.000000e-01]} -> !quantum.bit
+    case 0 {
+      %z = quantum.custom "PauliZ"() %if_out : !quantum.bit
+      scf.yield %z : !quantum.bit
+    }
+    case 1 {
+      scf.yield %if_out : !quantum.bit
+    }
+    default {
+      scf.yield %if_out : !quantum.bit
+    }
+    quantum.yield %sw : !quantum.bit
+  }
+
+  %3 = quantum.insert %0[ 0], %2 : !quantum.reg, !quantum.bit
+  quantum.dealloc %3 : !quantum.reg
+  return
+}

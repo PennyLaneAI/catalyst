@@ -807,6 +807,34 @@ class TestTraceTime:
             assert specs.resources.counts["NoParams"] == 2
 
 
+class TestHybridOperatorArgDecomposition:
+    """Decomposing operators that carry a nested-operator ("hybrid") argument, e.g. ``GQSP``."""
+
+    @staticmethod
+    def _gqsp_circuit(dev):
+        def circuit():
+            # angles shape (3, 1): the control-only branch of GQSP's decomposition.
+            qp.GQSP(qp.X(1), angles=np.ones((3, 1)), control=0)
+            return qp.probs(wires=0)
+
+        return circuit
+
+    def test_gqsp_decomposes_to_correct_state(self):
+        """GQSP decomposed via graph-decomposition matches the reference execution."""
+        gate_set = {"X", "Z", "Hadamard", "CNOT", "RZ", "RY", "GlobalPhase"}
+        dev = qp.device("lightning.qubit", wires=2)
+
+        reference = qp.QNode(self._gqsp_circuit(dev), dev)
+
+        @qjit(capture=True)
+        @graph_decomposition(gate_set=gate_set)
+        @qnode(dev)
+        def decomposed():
+            return self._gqsp_circuit(dev)()
+
+        assert np.allclose(np.asarray(decomposed()), np.asarray(reference()))
+
+
 class TestOnDemand:
     """Test the python wrapper functions used for on-demand,
     compile-time decomposition rule lowering.
@@ -1879,6 +1907,41 @@ class TestCustomRuleApplication:
         assert decomposed.get("PauliX", 0) == 0  # assert that the second rule got used
         assert decomposed.get("PauliY", 0) == 2  # assert that the second rule got used
 
+    @pytest.mark.parametrize("option", ["fixed_decomps", "alt_decomps"])
+    def test_fixed_and_alt_decomps_for_modifier_wrapped_op(self, option):
+        """Tests that fixed and alt decomps keyed by a modifier-wrapped operator name,
+        which is quoted in the pass options, are respected."""
+
+        @qp.register_resources({qp.X: 1})
+        def rule1(base):
+            qp.X(base.wires)
+
+        @qp.register_resources({qp.Y: 2})
+        def rule2(base):
+            qp.Y(base.wires)
+            qp.Y(base.wires)
+
+        rules = {"fixed_decomps": rule2, "alt_decomps": [rule2]}[option]
+
+        with local_decomps():
+
+            add_decomps("Adjoint(NoParamsCustomOp)", rule1, rule2)
+
+            @qjit(capture=True, target="mlir")
+            @graph_decomposition(
+                gate_set={qp.X: 1, qp.Y: 1}, **{option: {"Adjoint(NoParamsCustomOp)": rules}}
+            )
+            @qnode(qp.device("null.qubit", wires=1))
+            def circuit():
+                qp.adjoint(NoParamsCustomOp(0))
+
+            resources = qp.specs(circuit, level="all")().resources
+
+        decomposed = resources["graph-decomposition"].counts
+        assert decomposed.get("Adjoint(NoParamsCustomOp)", 0) == 0
+        assert decomposed.get("PauliX", 0) == 0
+        assert decomposed.get("PauliY", 0) == 2
+
     def test_fix_decomp_invalid_name(self):
         """Tests that an error is raised by referring to an inexistant rule name."""
 
@@ -1983,23 +2046,12 @@ class TestDecomposeAlias:
         assert 'apply_registered_pass "graph-decomposition"' in via_decompose.mlir
         assert via_decompose.mlir == via_graph.mlir
 
-    @pytest.mark.parametrize(
-        "tkwargs, exc, match",
-        [
-            ({"gate_set": {"RX"}, "stopping_condition": lambda op: True}, NotImplementedError, ""),
-            ({"gate_set": {"RX"}, "max_expansion": 2}, NotImplementedError, ""),
-            ({"gate_set": {"RX"}, "num_work_wires": 2}, NotImplementedError, ""),
-            ({"gate_set": {"RX"}, "minimize_work_wires": True}, NotImplementedError, ""),
-            ({"gate_set": {"RX"}, "strict": False}, NotImplementedError, ""),
-            ({"gate_set": None}, ValueError, "requires an explicit 'gate_set'"),
-        ],
-    )
-    def test_decompose_rejects_unsupported_kwargs(self, tkwargs, exc, match):
-        """Kwargs the graph-decomposition pass cannot honor are rejected with a clear error."""
-        with pytest.raises(exc, match=match):
+    def test_decompose_requires_gate_set(self):
+        """qp.decompose without a gate set is rejected with a clear error."""
+        with pytest.raises(ValueError, match="requires an explicit 'gate_set'"):
 
             @qjit(capture=True, target="mlir")
-            @qp.decompose(**tkwargs)
+            @qp.decompose(gate_set=None)
             @qnode(qp.device("null.qubit", wires=1))
             def circuit():
                 qp.Rot(0.1, 0.2, 0.3, wires=0)

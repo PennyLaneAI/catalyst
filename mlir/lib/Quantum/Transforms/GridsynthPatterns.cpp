@@ -240,19 +240,19 @@ constexpr SequenceStatistics cliffordTStatistics{3.0590, 1.1278, -0.0074, 1.9849
 constexpr SequenceStatistics pprStatistics{3.0590, 1.1278, 1.5324, 4.2326, pprCaseFrequencies};
 
 // Mixed synthesis: fitted over 1000 uniformly random angles and 8 samples per angle and epsilon,
-// for epsilon in [5e-12, 5e-4]. The samples include the (merged) twirling Cliffords.
+// for epsilon in [1e-15, 5e-4]. The samples include the (merged) twirling Cliffords.
 // Clifford+T cases: T, HT, SHT, I, X, ...
-constexpr double mixedCliffordTCaseFrequencies[] = {0.0111, 0.4939, 0.4950, 0.0054, 0.0395,
-                                                    0.0386, 0.2380, 0.2109, 0.2551, 0.2124};
+constexpr double mixedCliffordTCaseFrequencies[] = {0.0096, 0.4944, 0.4960, 0.0058, 0.0410,
+                                                    0.0429, 0.2347, 0.2045, 0.2590, 0.2121};
 // PPR cases: I, X2, X4, X8, adjX2, ...
 constexpr double mixedPPRCaseFrequencies[] = {
-    0.0006, 0.0044, 0.4277, 0.4944, 0.0000, 0.0091, 0.0000, 0.0043, 0.0000, 0.0000,
-    0.0000, 0.0000, 0.0056, 0.0355, 0.4949, 0.5000, 0.0000, 0.0235, 0.0000};
+    0.0005, 0.0040, 0.4352, 0.4952, 0.0000, 0.0080, 0.0000, 0.0042, 0.0000, 0.0000,
+    0.0000, 0.0000, 0.0048, 0.0304, 0.4977, 0.5000, 0.0000, 0.0200, 0.0000};
 static_assert(std::size(mixedCliffordTCaseFrequencies) == numCliffordTCases);
 static_assert(std::size(mixedPPRCaseFrequencies) == numPPRCases);
-constexpr SequenceStatistics mixedCliffordTStatistics{1.5394, 1.6027, 0.0027, 2.6096,
+constexpr SequenceStatistics mixedCliffordTStatistics{1.5346, 0.3606, 0.0024, 2.5843,
                                                       mixedCliffordTCaseFrequencies};
-constexpr SequenceStatistics mixedPPRStatistics{1.5394, 1.6027, 0.7751, 5.3527,
+constexpr SequenceStatistics mixedPPRStatistics{1.5346, 0.3606, 0.7719, 4.6973,
                                                 mixedPPRCaseFrequencies};
 
 const SequenceStatistics &getSequenceStatistics(bool pprBasis, GridsynthMethod method) {
