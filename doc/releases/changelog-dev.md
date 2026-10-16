@@ -20,12 +20,15 @@
   ... )
   ```
 
-* The `gridsynth` pass has a new `method="mixed"` option, implementing the mixed diagonal
-  approximation of [arXiv:2203.10064](https://arxiv.org/abs/2203.10064) (Section 3.4). Each
-  rotation randomly applies an under- or an over-rotating Clifford+T sequence, with probabilities
+* The `gridsynth` pass has a new `method` option with two randomized methods from
+  [arXiv:2203.10064](https://arxiv.org/abs/2203.10064). `method="mixed"` (Section 3.4) randomly
+  applies an under- or an over-rotating Clifford+T sequence to each rotation, with probabilities
   that cancel their coherent errors and leave a smaller incoherent error. This roughly halves the
-  T-count at the same accuracy of the channel averaged over executions.
+  T-count compared to `method="deterministic"` (the default) at the same accuracy of the channel
+  averaged over executions. `method="mixed-fallback"` (Section 3.5) roughly halves the T-count
+  again, at the cost of one temporary ancilla qubit and a mid-circuit measurement per rotation.
   [(#3314)](https://github.com/PennyLaneAI/catalyst/pull/3314)
+  [(#3327)](https://github.com/PennyLaneAI/catalyst/pull/3327)
 
   ```python
   from catalyst.passes import gridsynth
@@ -730,8 +733,9 @@
   which allows backend-specific configuration to be attached to custom calls.
   [(#3037)](https://github.com/PennyLaneAI/catalyst/pull/3037)
 
-* Added ``CZ`` support to ``to-ppr`` pass.
+* Added ``CZ`` and ``CY`` support to ``to-ppr`` pass.
   [(#3009)](https://github.com/PennyLaneAI/catalyst/pull/3009)
+  [(#3327)](https://github.com/PennyLaneAI/catalyst/pull/3327)
 
 * PBC layer commutation checks now use packed binary symplectic bases for large overlapping layers,
   reducing repeated pairwise normalization while preserving the resulting partition.

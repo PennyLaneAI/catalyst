@@ -22,6 +22,7 @@ def GridsynthMethod : I32EnumAttr<"GridsynthMethod", "Synthesis method of the gr
     [
         I32EnumAttrCase<"Deterministic", 0, "deterministic">,
         I32EnumAttrCase<"Mixed", 1, "mixed">,
+        I32EnumAttrCase<"MixedFallback", 2, "mixed-fallback">,
     ]> {
     let cppNamespace = "catalyst::quantum";
     let genSpecializedAttr = 0;
@@ -159,6 +160,10 @@ def GridsynthPass : Pass<"gridsynth"> {
         Discretizes single-qubit RZ and PhaseShift gates, and PPR-Z rotations with an arbitrary
         angle, at execution time. The pass fails on controlled RZ and PhaseShift gates, which need
         to be decomposed into single-qubit rotations first.
+
+        With `method=mixed-fallback`, each rotation allocates an ancilla qubit, measures it and
+        releases it, and applies the fallback sequence inside an `scf.if` on the measurement
+        result.
     }];
 
     let options = [Option<
@@ -178,12 +183,14 @@ def GridsynthPass : Pass<"gridsynth"> {
         /*CLI name=*/"method",
         /*Type=*/"::catalyst::quantum::GridsynthMethod",
         /*Default=*/"::catalyst::quantum::GridsynthMethod::Deterministic",
-        /*Description=*/desc="Synthesis method. 'mixed' is cheaper but matches the accuracy of 'deterministic' only on average over samples.",
+        /*Description=*/desc="Synthesis method. 'mixed' and 'mixed-fallback' are cheaper but match the accuracy of 'deterministic' only on average over samples.",
         /*Additional flags=*/additionalFlags=[{::llvm::cl::values(
             clEnumValN(::catalyst::quantum::GridsynthMethod::Deterministic, "deterministic",
                        "A single Ross-Selinger sequence per rotation."),
             clEnumValN(::catalyst::quantum::GridsynthMethod::Mixed, "mixed",
-                       "A probabilistic mixture of Ross-Selinger sequences for under- and over-rotations.")
+                       "A probabilistic mixture of Ross-Selinger sequences for under- and over-rotations."),
+            clEnumValN(::catalyst::quantum::GridsynthMethod::MixedFallback, "mixed-fallback",
+                       "A probabilistic mixture of projective rotations on an ancilla, with a mixed fallback on failure.")
         )}]>,];
 
         let dependentDialects = [

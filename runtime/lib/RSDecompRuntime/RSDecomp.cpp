@@ -38,6 +38,16 @@
 #define CANDIDATE_FACTORING_TRIALS 2
 #define MAX_CANDIDATES 100000
 #define MAX_MIXED_CANDIDATES 64
+// Minimum success probability |u|^2 of a fallback projective rotation, and the share of the
+// diamond-norm error budget given to the projective rotations (fallbacks are rare, so they can use
+// the remainder at a much looser accuracy). These minimize the expected T-count; with 0.99 and 0.5
+// it is about 2 T gates higher. The resource hints in
+// mlir/lib/Quantum/Transforms/GridsynthPatterns.cpp, e.g. `fallbackFailureProbability`, are fitted
+// for these values.
+#define FALLBACK_SUCCESS_PROBABILITY 0.95
+#define FALLBACK_PROJECTIVE_SHARE 0.9
+#define MAX_FALLBACK_EPSILON 0.25
+#define MAX_FALLBACK_LEVELS 200
 
 namespace RSDecomp::RossSelinger {
 
@@ -441,9 +451,9 @@ namespace {
  *
  * Writing a candidate's top-left entry as `w * exp(-i angle/2)`, it under-rotates the target if
  * Im(w) <= 0 and over-rotates it if Im(w) >= 0. A pair is mixed with the probability p of
- * Equation (33) of arXiv:2203.10064, and admissible if the diamond-norm error of the mixture
- * (Theorem 3.12) is at most `epsilon`. Of the admissible pairs found, the one with the lowest
- * expected T-count is kept.
+ * Equation (33) of arXiv:2203.10064, and admissible if the diamond-norm error
+ * 2 (p e_under + (1 - p) e_over) of the mixture is at most `epsilon`, where e is the error of a
+ * candidate. Of the admissible pairs found, the one with the lowest expected T-count is kept.
  */
 class MixedPairSearch {
   public:
@@ -451,8 +461,10 @@ class MixedPairSearch {
         std::vector<GateType> gates;
         double phase;
         std::complex<double> w;
-        // 1 - Re(w)^2, computed in multiprecision since it is of order epsilon.
-        double infidelity;
+        // Bottom-left entry of the unitary the gate sequence implements.
+        std::complex<double> v;
+        // Computed in multiprecision, since it is of order epsilon.
+        double error;
         size_t t_count;
     };
 
@@ -462,7 +474,7 @@ class MixedPairSearch {
      * @brief Consider the grid solution `u / sqrt(2)^k` with relative top-left entry `w`.
      * @return false if the search should stop.
      */
-    bool offer(const ZOmega &u, int k, std::complex<double> w, double infidelity) {
+    bool offer(const ZOmega &u, int k, std::complex<double> w, double error) {
         bool is_under = w.imag() <= 0.0;
         bool is_over = w.imag() >= 0.0;
         // Until the other side has a candidate, more candidates on a filled side cannot form a
@@ -486,7 +498,9 @@ class MixedPairSearch {
             return false;
         }
 
-        Candidate candidate{std::move(gates), phase, w, infidelity, t_count};
+        // The normal form of [[u, -t*], [t, u*]] implements its transpose, [[u, t], [-t*, u*]].
+        std::complex<double> v = -std::conj(t->to_complex()) / std::pow(M_SQRT2, k);
+        Candidate candidate{std::move(gates), phase, w, v, error, t_count};
         if (is_under) {
             unders.push_back(candidate);
             for (size_t j = 0; j < overs.size(); j++) {
@@ -506,12 +520,14 @@ class MixedPairSearch {
     const Candidate &under() const { return unders[best->under]; }
     const Candidate &over() const { return overs[best->over]; }
     double probability() const { return best->probability; }
+    double diamond() const { return best->diamond; }
 
   private:
     struct Pair {
         size_t under;
         size_t over;
         double probability;
+        double diamond;
         double cost;
     };
 
@@ -524,15 +540,14 @@ class MixedPairSearch {
         double over_weight = over.w.real() * over.w.imag();
         double denominator = over_weight - under_weight;
         double p = denominator > 0.0 ? over_weight / denominator : 1.0;
-        // Theorem 3.12: 2 (1 - p Re(w_under)^2 - (1 - p) Re(w_over)^2).
-        double diamond = 2.0 * (p * under.infidelity + (1.0 - p) * over.infidelity);
+        double diamond = 2.0 * (p * under.error + (1.0 - p) * over.error);
         // Tolerate rounding for candidates on the bound.
         if (diamond > epsilon * (1.0 + 1e-12)) {
             return;
         }
         double cost = p * under.t_count + (1.0 - p) * over.t_count;
         if (!best || cost < best->cost) {
-            best = Pair{i, j, p, cost};
+            best = Pair{i, j, p, diamond, cost};
         }
     }
 
@@ -541,6 +556,31 @@ class MixedPairSearch {
     std::vector<Candidate> overs;
     std::optional<Pair> best;
 };
+
+/**
+ * @brief Visit the solutions u of `grid_search` at the levels k = 0, ..., max_k, together with
+ * w = u * conj(z) / sqrt(2)^k for z = e^{i theta}, until `visit(u, k, Re(w), Im(w))` returns false
+ * or MAX_CANDIDATES solutions were visited.
+ */
+template <typename Visit>
+void visit_grid_solutions(const GridProblem::RzGridSearch &grid_search, const Real &theta,
+                          int max_k, Visit &&visit) {
+    Real zx = cos(theta);
+    Real zy = sin(theta);
+    size_t num_candidates = 0;
+    bool searching = true;
+    for (int k = 0; k <= max_k && searching; k++) {
+        Real scale = pow(sqrt2(), k);
+        searching = grid_search.visit_level(k, [&](const ZOmega &u) {
+            if (++num_candidates > MAX_CANDIDATES) {
+                return false;
+            }
+            Real re = (zx * real_part(u) + zy * imag_part(u)) / scale;
+            Real im = (zx * imag_part(u) - zy * real_part(u)) / scale;
+            return visit(u, k, re, im);
+        });
+    }
+}
 } // namespace
 
 /**
@@ -565,28 +605,17 @@ MixedDecomposition compute_mixed_diagonal_decomposition(double angle, double eps
     // 1 - Re(w)^2 <= epsilon/2 of Proposition 3.13.
     double search_epsilon = mixed_search_epsilon(epsilon);
     Real theta = -Real(angle) / 2;
-    Real zx = cos(theta);
-    Real zy = sin(theta);
     GridProblem::RzGridSearch grid_search(theta, Real(search_epsilon));
     MixedPairSearch search(epsilon);
 
+    // Theorem 3.12: the error of a candidate is 1 - Re(w)^2.
     int max_k = static_cast<int>(1.5 * std::log2(1.0 / search_epsilon)) + 40;
-    size_t num_candidates = 0;
-    bool searching = true;
-    for (int k = 0; k <= max_k && searching; k++) {
-        Real scale = pow(sqrt2(), k);
-        searching = grid_search.visit_level(k, [&](const ZOmega &u) {
-            if (++num_candidates > MAX_CANDIDATES) {
-                return false;
-            }
-            // w = u * conj(z) / sqrt(2)^k with z = e^{i theta}.
-            Real re = (zx * real_part(u) + zy * imag_part(u)) / scale;
-            Real im = (zx * imag_part(u) - zy * real_part(u)) / scale;
-            Real infidelity = 1 - re * re;
+    visit_grid_solutions(
+        grid_search, theta, max_k, [&](const ZOmega &u, int k, const Real &re, const Real &im) {
+            Real error = 1 - re * re;
             return search.offer(u, k, {re.convert_to<double>(), im.convert_to<double>()},
-                                infidelity.convert_to<double>());
+                                error.convert_to<double>());
         });
-    }
 
     if (!search.found()) {
         auto fallback = compute_clifford_T_decomposition(angle, epsilon / 2.0);
@@ -664,6 +693,103 @@ std::pair<std::vector<GateType>, double> eval_mixed_ross_algorithm(double angle,
 std::pair<std::vector<PPRGateType>, double>
 eval_mixed_ross_algorithm_ppr(double angle, double epsilon, double uniform_sample) {
     return sequence_to_ppr(eval_mixed_ross_algorithm(angle, epsilon, uniform_sample));
+}
+
+/**
+ * @brief Compute a mixed fallback approximation of RZ(angle) with diamond-norm accuracy epsilon.
+ *
+ * Implements the mixed fallback protocol of Kliuchnikov et al., arXiv:2203.10064, Section 3.5
+ * (Proposition 3.18 and Theorem 3.17). Each projective rotation V = [[u, -v*], [v, u*]] acts on an
+ * ancilla between two CY gates controlled by the target. Measuring the ancilla in the Z basis
+ * applies exp(i Arg(u) Z) to the target with probability |u|^2 and exp(i Arg(v) Z) otherwise
+ * (Section 3.3), in which case a mixed diagonal fallback B ~ exp(i (-angle/2 - Arg(v)) Z) follows.
+ * An under-rotating and an over-rotating projective rotation are mixed with probabilities p and
+ * 1 - p. Of the candidate pairs found, the one with the lowest expected T-count of the projective
+ * rotations is kept, as the fallbacks only add (1 - |u|^2) times their T-count.
+ */
+MixedFallbackDecomposition compute_mixed_fallback_decomposition(double angle, double epsilon) {
+    // A unitary with operator-norm error epsilon/2 has diamond-norm error at most epsilon.
+    if (as_multiple_of_pi_4(angle, epsilon / 2.0)) {
+        // The diagonal V never fails.
+        auto [gates, phase] = compute_clifford_T_decomposition(angle, epsilon / 2.0);
+        FallbackBranch exact{gates, phase, 1.0, 0.0, epsilon};
+        return {{exact, exact}, 1.0};
+    }
+
+    // Each candidate satisfies sin|Arg(u) - target|^2 <= epsilon_1 / 2 of Proposition 3.18, and
+    // succeeds with probability |u|^2 >= FALLBACK_SUCCESS_PROBABILITY.
+    const double projective_epsilon = FALLBACK_PROJECTIVE_SHARE * epsilon;
+    const Real max_sin = sqrt(Real(projective_epsilon / 2.0));
+    const Real min_overlap = sqrt(Real(FALLBACK_SUCCESS_PROBABILITY));
+    Real theta = -Real(angle) / 2;
+    auto grid_search = GridProblem::RzGridSearch::sector(theta, asin(max_sin), min_overlap);
+    MixedPairSearch search(projective_epsilon);
+
+    // Equation (34): the error of a candidate is q sin(delta)^2 = Im(w)^2.
+    visit_grid_solutions(
+        grid_search, theta, MAX_FALLBACK_LEVELS,
+        [&](const ZOmega &u, int k, const Real &re, const Real &im) {
+            Real magnitude = sqrt(re * re + im * im);
+            if (magnitude < min_overlap || re <= 0 || abs(im) > magnitude * max_sin) {
+                return true;
+            }
+            Real error = im * im;
+            return search.offer(u, k, {re.convert_to<double>(), im.convert_to<double>()},
+                                error.convert_to<double>());
+        });
+
+    if (!search.found()) {
+        // V = -iY = [[0, -1], [1, 0]] always fails, which leaves the full accuracy to the fallback
+        // of RZ(angle).
+        FallbackBranch always_fail{{GateType::Y}, M_PI / 2, 0.0, 0.0, epsilon};
+        return {{always_fail, always_fail}, 1.0};
+    }
+
+    // Equation (36): split the remaining accuracy evenly between the two fallback terms
+    // p_k (1 - q_k) ||B_k - Z_theta||.
+    const double fallback_budget = (epsilon - search.diamond()) / 2.0;
+    auto make_branch = [&](const MixedPairSearch::Candidate &candidate, double weight) {
+        double success = std::norm(candidate.w);
+        double failure_weight = weight * (1.0 - success);
+        double fallback_epsilon =
+            failure_weight > 0.0 ? std::min(fallback_budget / failure_weight, MAX_FALLBACK_EPSILON)
+                                 : MAX_FALLBACK_EPSILON;
+        return FallbackBranch{candidate.gates, candidate.phase, success, std::arg(candidate.v),
+                              fallback_epsilon};
+    };
+    return {{make_branch(search.under(), search.probability()),
+             make_branch(search.over(), 1.0 - search.probability())},
+            search.probability()};
+}
+
+// Cache for mixed fallback decompositions
+static lru_cache<MixedCacheKey, MixedFallbackDecomposition, ROSS_CACHE_SIZE> fallback_cache;
+
+/**
+ * @brief The branch of the mixed fallback decomposition of RZ(angle) selected by `uniform_sample`,
+ * with `epsilon` as in `eval_mixed_ross_algorithm`.
+ */
+static FallbackBranch eval_fallback_branch(double angle, double epsilon, double uniform_sample) {
+    validate_inputs(angle, epsilon);
+    MixedCacheKey key = {angle, epsilon};
+    auto fallback = fallback_cache.get(key);
+    if (!fallback) {
+        fallback = compute_mixed_fallback_decomposition(angle, 2.0 * epsilon);
+        fallback_cache.put(key, *fallback);
+    }
+    size_t branch = sample_mixed_decomposition(fallback->probability, uniform_sample).first;
+    return fallback->branches[branch];
+}
+
+std::pair<std::vector<GateType>, double> eval_fallback_projective(double angle, double epsilon,
+                                                                  double uniform_sample) {
+    FallbackBranch branch = eval_fallback_branch(angle, epsilon, uniform_sample);
+    return {std::move(branch.projective_gates), branch.projective_phase};
+}
+
+std::pair<std::vector<PPRGateType>, double>
+eval_fallback_projective_ppr(double angle, double epsilon, double uniform_sample) {
+    return sequence_to_ppr(eval_fallback_projective(angle, epsilon, uniform_sample));
 }
 
 // Extern C implementation
@@ -785,6 +911,77 @@ double rs_mixed_decomposition_get_phase(double theta, double epsilon, bool ppr_b
         return eval_mixed_ross_algorithm_ppr(theta, epsilon, uniform_sample).second;
     }
     return eval_mixed_ross_algorithm(theta, epsilon, uniform_sample).second;
+}
+
+/**
+ * @brief Returns the length of the sampled projective rotation of a mixed fallback decomposition.
+ *
+ * The `rs_fallback_*` functions are deterministic in `uniform_sample`, so calling them with the
+ * same sample refers to the same projective rotation.
+ *
+ * @param theta Angle
+ * @param epsilon Error, as in `rs_decomposition_get_size`
+ * @param ppr_basis Whether to use PPR basis
+ * @param uniform_sample Uniform random number in [0, 1) selecting the projective rotation
+ */
+size_t rs_fallback_projective_get_size(double theta, double epsilon, bool ppr_basis,
+                                       double uniform_sample) {
+    if (ppr_basis) {
+        return eval_fallback_projective_ppr(theta, epsilon, uniform_sample).first.size();
+    }
+    return eval_fallback_projective(theta, epsilon, uniform_sample).first.size();
+}
+
+/**
+ * @brief Fills a pre-allocated memref with the sampled projective rotation sequence.
+ *
+ * The memref is unpacked into individual arguments, as in `rs_decomposition_get_gates`.
+ */
+void rs_fallback_projective_get_gates([[maybe_unused]] size_t *data_allocated, size_t *data_aligned,
+                                      size_t offset, size_t size0, size_t stride0, double theta,
+                                      double epsilon, bool ppr_basis, double uniform_sample) {
+    if (ppr_basis) {
+        fill_gates(data_aligned, offset, size0, stride0,
+                   eval_fallback_projective_ppr(theta, epsilon, uniform_sample).first);
+    } else {
+        fill_gates(data_aligned, offset, size0, stride0,
+                   eval_fallback_projective(theta, epsilon, uniform_sample).first);
+    }
+}
+
+/**
+ * @brief Returns the global phase of the sampled projective rotation sequence.
+ */
+double rs_fallback_projective_get_phase(double theta, double epsilon, bool ppr_basis,
+                                        double uniform_sample) {
+    if (ppr_basis) {
+        return eval_fallback_projective_ppr(theta, epsilon, uniform_sample).second;
+    }
+    return eval_fallback_projective(theta, epsilon, uniform_sample).second;
+}
+
+/**
+ * @brief Returns the angle of the RZ rotation that the fallback approximates when the projective
+ * rotation selected by `uniform_sample` fails.
+ *
+ * The fallback is the mixed decomposition of the `rs_mixed_decomposition_*` functions for this
+ * angle and the epsilon of `rs_fallback_recovery_epsilon`.
+ *
+ * @param theta Angle
+ * @param epsilon Error, as in `rs_decomposition_get_size`
+ * @param uniform_sample Uniform random number in [0, 1) selecting the projective rotation
+ */
+double rs_fallback_recovery_angle(double theta, double epsilon, double uniform_sample) {
+    // B ~ exp(i (-theta/2 - Arg(v)) Z) = RZ(theta + 2 Arg(v)).
+    return theta + 2.0 * eval_fallback_branch(theta, epsilon, uniform_sample).failure_angle;
+}
+
+/**
+ * @brief Returns the epsilon of the fallback for `rs_fallback_recovery_angle`, in the convention of
+ * `rs_mixed_decomposition_get_size`.
+ */
+double rs_fallback_recovery_epsilon(double theta, double epsilon, double uniform_sample) {
+    return eval_fallback_branch(theta, epsilon, uniform_sample).fallback_epsilon / 2.0;
 }
 
 } // extern "C"
