@@ -337,21 +337,8 @@ def handle_qnode(
     )
 
 
-# qp.decompose arguments the graph-decomposition pass supports (mapped 1:1). ``tkwargs`` holds only
-# the arguments the user passed, so any other key means an unsupported argument was set.
-_SUPPORTED_DECOMPOSE_TKWARGS = frozenset({"gate_set", "fixed_decomps", "alt_decomps"})
-# Internal options that route the decomposition to the resource-analysis pass (used by qp.estimate)
-_RESOURCE_ANALYSIS_TKWARGS = frozenset({"output_json", "output_fname"})
-
-
-def _validate_decompose_tkwargs(tkwargs, ADDITIONAL_TKWARGS=frozenset()):
-    """Reject qp.decompose arguments the graph-decomposition pass doesn't support yet."""
-    unsupported = tkwargs.keys() - _SUPPORTED_DECOMPOSE_TKWARGS - ADDITIONAL_TKWARGS
-    if unsupported:
-        raise NotImplementedError(
-            f"qp.decompose argument(s) {unsupported} are not supported under qjit with graph-based "
-            "decomposition. Supported arguments are: 'gate_set', 'fixed_decomps', 'alt_decomps'."
-        )
+def _require_decompose_gate_set(tkwargs):
+    """Reject a qp.decompose without a gate set, which the graph-decomposition pass needs."""
     if tkwargs.get("gate_set") is None:
         raise ValueError(
             "qp.decompose requires an explicit 'gate_set' under qjit; the graph-based decomposition "
@@ -370,10 +357,7 @@ def _handle_decompose_transform(self, inner_jaxpr, consts, non_const_args, tkwar
 
     from catalyst.passes.builtin_passes import graph_decomposition, resource_analysis
 
-    if resource_analysis_for_estimate:
-        _validate_decompose_tkwargs(tkwargs, _RESOURCE_ANALYSIS_TKWARGS)
-    else:
-        _validate_decompose_tkwargs(tkwargs)
+    _require_decompose_gate_set(tkwargs)
 
     fixed_decomps = tkwargs.get("fixed_decomps") or {}
     alt_decomps = tkwargs.get("alt_decomps") or {}
