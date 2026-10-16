@@ -838,6 +838,7 @@ def gridsynth_setup_inputs(epsilon=1e-4, ppr_basis=False):
     Args:
         qnode (QNode): the QNode to apply the gridsynth compiler pass to
         epsilon (float): The maximum permissible operator norm error per rotation gate. Defaults to ``1e-4``.
+            Values down to ``1e-15`` are supported.
         ppr_basis (bool): If true, decompose directly to Pauli Product Rotations (PPRs) in PBC dialect. Defaults to ``False``
 
     Returns:
