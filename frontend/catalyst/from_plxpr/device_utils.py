@@ -33,6 +33,8 @@ from catalyst.device.decomposition import (
     measurements_from_samples,
 )
 
+from catalyst.device.qjit_device import intersect_operations
+
 # pylint: disable=protected-access
 from catalyst.device.qjit_device import (
     RUNTIME_OPERATIONS,
@@ -300,7 +302,13 @@ def _gateset_preprocessing(
     """Insert a `graph-decomposition` pass targetting the gateset
     specified by the specific `device`
     """
-    gate_set = set(capabilities.gate_set()) & set(RUNTIME_OPERATIONS)
+
+    # Intersection of gates and observables supported by the device and by Catalyst runtime.
+    capabilities.operations = intersect_operations(
+        capabilities.operations, RUNTIME_OPERATIONS
+    )
+
+    gate_set = capabilities.gate_set()
 
     # Get the default args/kwargs with the above gate_set
     targs, tkwargs = graph_decomposition_setup_inputs(gate_set=gate_set)
