@@ -938,7 +938,7 @@
   `ring`, `stride_log2`, `data_mem` and `reply_mem` exactly as `fpga_verbs` does, and reports a
   malformed value by naming its key. The frontend builds the entries it adds to a coprocessor's
   config from a dict.
-  [(#XXXX)](https://github.com/PennyLaneAI/catalyst/pull/XXXX)
+  [(#3359)](https://github.com/PennyLaneAI/catalyst/pull/3359)
 
 * Backline transport backends now report the transport ABI version they were built for and their
   capabilities, through `CatalystTransportAbiVersion` and `CatalystTransportQueryCaps`. The runtime
