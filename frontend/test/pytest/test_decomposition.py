@@ -807,6 +807,34 @@ class TestTraceTime:
             assert specs.resources.counts["NoParams"] == 2
 
 
+class TestHybridOperatorArgDecomposition:
+    """Decomposing operators that carry a nested-operator ("hybrid") argument, e.g. ``GQSP``."""
+
+    @staticmethod
+    def _gqsp_circuit(dev):
+        def circuit():
+            # angles shape (3, 1): the control-only branch of GQSP's decomposition.
+            qp.GQSP(qp.X(1), angles=np.ones((3, 1)), control=0)
+            return qp.probs(wires=0)
+
+        return circuit
+
+    def test_gqsp_decomposes_to_correct_state(self):
+        """GQSP decomposed via graph-decomposition matches the reference execution."""
+        gate_set = {"X", "Z", "Hadamard", "CNOT", "RZ", "RY", "GlobalPhase"}
+        dev = qp.device("lightning.qubit", wires=2)
+
+        reference = qp.QNode(self._gqsp_circuit(dev), dev)
+
+        @qjit(capture=True)
+        @graph_decomposition(gate_set=gate_set)
+        @qnode(dev)
+        def decomposed():
+            return self._gqsp_circuit(dev)()
+
+        assert np.allclose(np.asarray(decomposed()), np.asarray(reference()))
+
+
 class TestOnDemand:
     """Test the python wrapper functions used for on-demand,
     compile-time decomposition rule lowering.
@@ -978,7 +1006,7 @@ class TestModifierIds:
             wrap_modifier_id(op_id, "Adjoint")
 
 
-_PPR_8_ID = 'PPR{}{wires:2}{angle_denominator = 8 : i64, pauli_word = "XY"}'
+_PPR_8_ID = 'PPR_8{}{wires:2}{pauli_word = "XY", sign = 1 : i64}'
 _RZ_ID = "RZ{0:[f64]}{wires:1}{}"
 
 
@@ -990,9 +1018,9 @@ _RZ_ID = "RZ{0:[f64]}{wires:1}{}"
         ({"Hadamard{}{wires:1}{}": 1}, "Hadamard{}{wires:1}{}", True),
         ({_PPR_8_ID: 1}, _PPR_8_ID, True),
         ({"HybridOp{a:[[f64]]}{w:1}{}[42]": 1}, "HybridOp{a:[[f64]]}{w:1}{}[42]", True),
-        # Same op with different static data, e.g. Adjoint(PPR(8)) -> PPR(-8), does not fold.
+        # Same op with different static data, e.g. Adjoint(PPR_8(1)) -> PPR_8(-1), does not fold.
         (
-            {'PPR{}{wires:2}{angle_denominator = -8 : si64, pauli_word = "XY"}': 1},
+            {'PPR_8{}{wires:2}{pauli_word = "XY", sign = -1 : si64}': 1},
             _PPR_8_ID,
             False,
         ),
@@ -1061,26 +1089,24 @@ class TestSymbolicRules:
     @pytest.mark.parametrize("wrap_control", [False, True])
     def test_adjoint_rule_changing_static_data_does_not_fold(self, wrap_control):
         """Test that a rule producing the base op with different static data, like
-        ``Adjoint(PPR(8)) -> PPR(-8)``, declares the op it emits rather than the base op."""
+        ``Adjoint(PPR_8(1)) -> PPR_8(-1)``, declares the op it emits rather than the base op."""
 
         module = compile_registered_symbolic_rules(
-            "PPR",
-            'Adjoint(PPR){}{wires:2}{angle_denominator = 8 : i64, pauli_word = "XY"}',
+            "PPR_8",
+            'Adjoint(PPR_8){}{wires:2}{pauli_word = "XY", sign = 1 : i64}',
             {},
             {"wires": 2},
-            {"angle_denominator": 8, "pauli_word": "XY"},
-            op_cls=qp.PPR,
+            {"sign": 1, "pauli_word": "XY"},
+            op_cls=qp.PPR_8,
             kind="adjoint",
             wrap_control=wrap_control,
         )
         (rule,) = get_rule_strings_from_module(module)
 
-        name = "C(PPR)" if wrap_control else "PPR"
-        resource = (
-            f'"{name}{{}}{{wires:2}}{{angle_denominator = -8 : si64, pauli_word = \\22XY\\22}}"'
-        )
+        name = "C(PPR_8)" if wrap_control else "PPR_8"
+        resource = f'"{name}{{}}{{wires:2}}{{pauli_word = \\22XY\\22, sign = -1 : si64}}"'
         assert f"resources = {{operations = {{{resource} = 1 : i64}}}}" in rule
-        assert 'static_data = {angle_denominator = -8 : si64, pauli_word = "XY"}' in rule
+        assert 'static_data = {pauli_word = "XY", sign = -1 : si64}' in rule
 
     @pytest.mark.parametrize(
         "n_ctrl, target_id, signature, resource",
@@ -1881,6 +1907,41 @@ class TestCustomRuleApplication:
         assert decomposed.get("PauliX", 0) == 0  # assert that the second rule got used
         assert decomposed.get("PauliY", 0) == 2  # assert that the second rule got used
 
+    @pytest.mark.parametrize("option", ["fixed_decomps", "alt_decomps"])
+    def test_fixed_and_alt_decomps_for_modifier_wrapped_op(self, option):
+        """Tests that fixed and alt decomps keyed by a modifier-wrapped operator name,
+        which is quoted in the pass options, are respected."""
+
+        @qp.register_resources({qp.X: 1})
+        def rule1(base):
+            qp.X(base.wires)
+
+        @qp.register_resources({qp.Y: 2})
+        def rule2(base):
+            qp.Y(base.wires)
+            qp.Y(base.wires)
+
+        rules = {"fixed_decomps": rule2, "alt_decomps": [rule2]}[option]
+
+        with local_decomps():
+
+            add_decomps("Adjoint(NoParamsCustomOp)", rule1, rule2)
+
+            @qjit(capture=True, target="mlir")
+            @graph_decomposition(
+                gate_set={qp.X: 1, qp.Y: 1}, **{option: {"Adjoint(NoParamsCustomOp)": rules}}
+            )
+            @qnode(qp.device("null.qubit", wires=1))
+            def circuit():
+                qp.adjoint(NoParamsCustomOp(0))
+
+            resources = qp.specs(circuit, level="all")().resources
+
+        decomposed = resources["graph-decomposition"].counts
+        assert decomposed.get("Adjoint(NoParamsCustomOp)", 0) == 0
+        assert decomposed.get("PauliX", 0) == 0
+        assert decomposed.get("PauliY", 0) == 2
+
     def test_fix_decomp_invalid_name(self):
         """Tests that an error is raised by referring to an inexistant rule name."""
 
@@ -1985,23 +2046,12 @@ class TestDecomposeAlias:
         assert 'apply_registered_pass "graph-decomposition"' in via_decompose.mlir
         assert via_decompose.mlir == via_graph.mlir
 
-    @pytest.mark.parametrize(
-        "tkwargs, exc, match",
-        [
-            ({"gate_set": {"RX"}, "stopping_condition": lambda op: True}, NotImplementedError, ""),
-            ({"gate_set": {"RX"}, "max_expansion": 2}, NotImplementedError, ""),
-            ({"gate_set": {"RX"}, "num_work_wires": 2}, NotImplementedError, ""),
-            ({"gate_set": {"RX"}, "minimize_work_wires": True}, NotImplementedError, ""),
-            ({"gate_set": {"RX"}, "strict": False}, NotImplementedError, ""),
-            ({"gate_set": None}, ValueError, "requires an explicit 'gate_set'"),
-        ],
-    )
-    def test_decompose_rejects_unsupported_kwargs(self, tkwargs, exc, match):
-        """Kwargs the graph-decomposition pass cannot honor are rejected with a clear error."""
-        with pytest.raises(exc, match=match):
+    def test_decompose_requires_gate_set(self):
+        """qp.decompose without a gate set is rejected with a clear error."""
+        with pytest.raises(ValueError, match="requires an explicit 'gate_set'"):
 
             @qjit(capture=True, target="mlir")
-            @qp.decompose(**tkwargs)
+            @qp.decompose(gate_set=None)
             @qnode(qp.device("null.qubit", wires=1))
             def circuit():
                 qp.Rot(0.1, 0.2, 0.3, wires=0)

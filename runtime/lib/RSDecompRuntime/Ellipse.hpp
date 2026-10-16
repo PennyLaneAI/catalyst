@@ -14,22 +14,23 @@
 
 #pragma once
 
+#include <algorithm>
 #include <array>
 #include <cmath>
+#include <optional>
 #include <string_view>
 #include <utility>
 
 #include "Exception.hpp"
 #include "RSUtils.hpp"
+#include "Real.hpp"
 #include "Rings.hpp"
 
 namespace RSDecomp::GridProblem {
 
 using namespace RSDecomp::Rings;
+using namespace RSDecomp::Reals;
 using namespace RSDecomp::Utils;
-struct GridOp;
-struct Ellipse;
-struct EllipseState;
 
 /**
  * @class GridOp
@@ -122,13 +123,12 @@ struct GridOp {
     }
 
     /**
-     * @brief Flattens the GridOp into a vector of doubles. (Lemma 5.11, arXiv:1403.2975)
+     * @brief Flattens the GridOp into an array of reals. (Lemma 5.11, arXiv:1403.2975)
      */
-    std::array<double, 4> flatten() const {
-        return {static_cast<double>(a[0]) + static_cast<double>(a[1]) / M_SQRT2,
-                static_cast<double>(b[0]) + static_cast<double>(b[1]) / M_SQRT2,
-                static_cast<double>(c[0]) + static_cast<double>(c[1]) / M_SQRT2,
-                static_cast<double>(d[0]) + static_cast<double>(d[1]) / M_SQRT2};
+    std::array<Real, 4> flatten() const {
+        const Real &s = sqrt2();
+        return {Real(a[0]) + Real(a[1]) / s, Real(b[0]) + Real(b[1]) / s,
+                Real(c[0]) + Real(c[1]) / s, Real(d[0]) + Real(d[1]) / s};
     }
 
     /**
@@ -171,8 +171,6 @@ struct GridOp {
     }
 
     GridOp pow(INT_TYPE n) const;
-    Ellipse apply_to_ellipse(const Ellipse &ellipse) const;
-    EllipseState apply_to_state(const EllipseState &state) const;
 };
 
 /**
@@ -245,199 +243,163 @@ inline GridOp GridOp::pow(INT_TYPE n) const {
  * @class Ellipse
  * @brief A class representing an ellipse as a positive definite matrix
  *
- * Represents an ellipse as a positive definite matrix D = [[a, b], [b, d]], with centre p.
+ * Represents the ellipse {x : (x - p)^T D (x - p) <= 1} for a positive definite matrix
+ * D = [[a, b], [b, d]] with centre p.
  *
- * z and e are useful for defining the EllipseState as a pair of Ellipses:
- * D = [[e * λ^(-z), b], [b, e * λ^(z)]] (Eq 31, arXiv:1403.2975)
+ * The step lemma of EllipseState uses the z of the ellipse, with D = [[e * λ^(-z), b],
+ * [b, e * λ^(z)]] (Eq 31, arXiv:1403.2975).
  */
 struct Ellipse {
-    double a, b, d;
-    std::array<double, 2> p;
-
-    // Useful parameters for constructing EllipseState
-    // a = eλ^{-z}, d = eλ^z, b^2 = e^2 - 1; (Eq 31, arXiv:1403.2975)
-    // 2z * log(λ) = log(d / a) => z = 0.5 * log(d / a) / log(λ)
-    double z;
-    double e;
+    Real a, b, d;
+    std::array<Real, 2> p;
 
     /**
      * @brief Constructor for Ellipse.
      * @param D The ellipse matrix coefficients as {a, b, d}.
      * @param p_val The centre of the ellipse as {px, py}.
      */
-    Ellipse(const std::array<double, 3> &D = {1.0, 0.0, 1.0},
-            const std::array<double, 2> &p_val = {0.0, 0.0})
-        : p(p_val) {
-        a = D[0];
-        b = D[1];
-        d = D[2];
-        z = 0.5 * std::log2(d / a) / std::log2(LAMBDA_D);
-        e = std::sqrt(a * d);
-    }
+    Ellipse(const std::array<Real, 3> &D = {Real(1), Real(0), Real(1)},
+            const std::array<Real, 2> &p_val = {Real(0), Real(0)})
+        : a(D[0]), b(D[1]), d(D[2]), p(p_val) {}
+
+    /**
+     * @brief λ^(2z) = d / a. The step lemma compares this against powers of λ instead of
+     * computing z.
+     */
+    Real lambda_pow_2z() const { return d / a; }
 
     bool operator==(const Ellipse &other) const {
         return a == other.a && b == other.b && d == other.d && p == other.p;
     }
 
     /**
-     * @brief Create an ellipse that bounds the region u such that u.z >= 1 - ε^2 / 2,
-        with u ∈ 1/√2^k * Z[ω]` and z = e^{-i*theta / 2}`. (Eq 14, arXiv:1403.2975)
+     * @brief Create an ellipse that bounds the region of u such that |u| <= 1 and
+     * Re(u * conj(z)) >= 1 - ε^2 / 2, where z = e^{i*theta}. (Eq 14, arXiv:1403.2975)
+     *
+     * The ellipse is centred on the chord of the region, with semi-axes ε^2/2 along z and ε
+     * orthogonal to it.
+     *
+     * @param theta The angle of z.
+     * @param epsilon The precision ε.
+     * @return The bounding ellipse.
      */
-    static Ellipse from_region(double theta, double epsilon, int k = 0) {
-        double t = epsilon * epsilon / 2.0;
-        double scale = std::pow(2.0, static_cast<double>(k) / 2.0);
-        double a_val = scale * t;
-        double b_val = scale * epsilon;
-        double a2 = 1.0 / (a_val * a_val);
-        double b2 = 1.0 / (b_val * b_val);
-        double d2 = a2 - b2;
-        double zx = std::cos(theta);
-        double zy = std::sin(theta);
-        double new_a = d2 * zx * zx + b2;
-        double new_d = d2 * zy * zy + b2;
-        double new_b = d2 * zx * zy;
-        double const_val = 1.0 - t;
-        std::array<double, 2> p_val = {const_val * scale * zx, const_val * scale * zy};
-        return Ellipse({new_a, new_b, new_d}, p_val);
+    static Ellipse from_region(const Real &theta, const Real &epsilon) {
+        Real t = epsilon * epsilon / 2;
+        Real a2 = 1 / (t * t);
+        Real b2 = 1 / (epsilon * epsilon);
+        Real d2 = a2 - b2;
+        Real zx = cos(theta);
+        Real zy = sin(theta);
+        return Ellipse({d2 * zx * zx + b2, d2 * zx * zy, d2 * zy * zy + b2},
+                       {(1 - t) * zx, (1 - t) * zy});
     }
 
     /**
-     * @brief Calculate the discriminant of the characteristic polynomial associated with the
-     * ellipse.
+     * @brief Calculate the determinant of the ellipse.
      */
-    double discriminant() const { return (a + d) * (a + d) - 4 * (a * d - b * b); }
-
-    /**
-     * @brief Calculate the determinant of the ellipse."
-     */
-    double determinant() const { return a * d - b * b; }
+    Real determinant() const { return a * d - b * b; }
 
     /**
      * @brief Check if the ellipse is positive semi-definite.
      */
-    bool positive_semi_definite() const { return (a + d) + std::sqrt(discriminant()) >= 0; }
-
-    /**
-     * @brief Calculate the uprightness of the ellipse (Eq. 32, arXiv:1403.2975).
-     */
-    double uprightness() const { return M_PI / (4.0 * e * e); }
-
-    /**
-     * @brief alculate the b value of the ellipse from its uprightness (Eq. 33, arXiv:1403.2975).
-     */
-    static double b_from_uprightness(double up) {
-        double temp = M_PI / (4.0 * up);
-        return std::sqrt(temp * temp - 1.0);
+    bool positive_semi_definite() const {
+        Real discriminant = (a - d) * (a - d) + 4 * b * b;
+        return (a + d) + sqrt(discriminant) >= 0;
     }
 
     /**
      * @brief Check if the point (x, y) is inside the ellipse.
+     * @param x The x-coordinate of the point.
+     * @param y The y-coordinate of the point.
+     * @return True if the point is inside the ellipse or on its boundary.
      */
-    bool contains(double x, double y) const {
-        double x_ = x - p[0];
-        double y_ = y - p[1];
-        return (a * x_ * x_ + 2 * b * x_ * y_ + d * y_ * y_) <= 1.0;
+    bool contains(const Real &x, const Real &y) const {
+        Real x_ = x - p[0];
+        Real y_ = y - p[1];
+        return (a * x_ * x_ + 2 * b * x_ * y_ + d * y_ * y_) <= 1;
     }
 
     /**
      * @brief Normalize the ellipse so that its determinant is 1.
+     * @return The normalized ellipse and the factor its matrix was scaled by.
      */
-    std::pair<Ellipse, double> normalize() const {
-        double s_val = 1.0 / std::sqrt(determinant());
-        return {scale(s_val), s_val};
+    std::pair<Ellipse, Real> normalize() const {
+        Real root = sqrt(determinant());
+        return {Ellipse({a / root, b / root, d / root}, p), 1 / root};
     }
 
     /**
-     * @brief Scale the ellipse by a factor of scale.
+     * @brief Return the image of the ellipse under the dilation x -> factor * x.
+     * @param factor The dilation factor.
+     * @return The dilated ellipse.
      */
-    Ellipse scale(double scale_factor) const {
-        std::array<double, 3> D = {a * scale_factor, b * scale_factor, d * scale_factor};
-        return Ellipse(D, p);
+    Ellipse dilate(const Real &factor) const {
+        Real factor2 = factor * factor;
+        return Ellipse({a / factor2, b / factor2, d / factor2}, {p[0] * factor, p[1] * factor});
     }
 
     /**
-     * @brief Compute the x-points of the ellipse for a given y-value.
+     * @brief Return the ellipse shifted by the offset along both axes.
+     * @param offset_val The shift along each axis.
+     * @return The shifted ellipse.
      */
-    std::pair<double, double> x_points(double y) const {
-        double y_shifted = y - p[1];
-        double discriminant = y_shifted * y_shifted * (b * b - a * d) + a;
+    Ellipse offset(const Real &offset_val) const {
+        return Ellipse({a, b, d}, {p[0] + offset_val, p[1] + offset_val});
+    }
 
+    /**
+     * @brief The range of x-values covered by the ellipse.
+     */
+    std::pair<Real, Real> x_range() const {
+        Real half_width = sqrt(d / determinant());
+        return {p[0] - half_width, p[0] + half_width};
+    }
+
+    /**
+     * @brief The range of y-values covered by the ellipse.
+     */
+    std::pair<Real, Real> y_range() const { return transpose().x_range(); }
+
+    /**
+     * @brief Return the ellipse reflected along the diagonal, which swaps the x and y axes.
+     */
+    Ellipse transpose() const { return Ellipse({d, b, a}, {p[1], p[0]}); }
+
+    /**
+     * @brief The range of y-values of the ellipse along the vertical line at x, if it intersects.
+     * @param x The x-coordinate of the line.
+     * @return The range {y_min, y_max}, or std::nullopt if the line misses the ellipse.
+     */
+    std::optional<std::pair<Real, Real>> y_section(const Real &x) const {
+        Real x_shifted = x - p[0];
+        Real discriminant = (b * x_shifted) * (b * x_shifted) - d * (a * x_shifted * x_shifted - 1);
         if (discriminant < 0) {
-            double det = determinant();
-            double y_extent = std::sqrt(a / det);
-            double y_min = p[1] - y_extent;
-            double y_max = p[1] + y_extent;
-
-            std::stringstream ss;
-            ss << "Cannot compute x_points: y=" << y << " is outside ellipse bounds [" << y_min
-               << ", " << y_max << "]";
-
-            RT_FAIL(ss.str().c_str());
+            return std::nullopt;
         }
+        Real root = sqrt(discriminant);
+        return std::make_pair(p[1] + (-b * x_shifted - root) / d,
+                              p[1] + (-b * x_shifted + root) / d);
+    }
 
-        double d0 = std::sqrt(discriminant);
-        double x1 = (-b * y_shifted - d0) / a;
-        double x2 = (-b * y_shifted + d0) / a;
-        return {p[0] + x1, p[0] + x2};
+    std::optional<std::pair<Real, Real>> y_section(const ZSqrtTwo &x) const {
+        return y_section(to_real(x));
     }
 
     /**
-     * @brief Compute the y-points of the ellipse for a given x-value.
-     */
-    std::pair<double, double> y_points(double x) const {
-        double x_shifted = x - p[0];
-        double discriminant =
-            (b * x_shifted) * (b * x_shifted) - d * (a * x_shifted * x_shifted - 1.0);
-
-        if (discriminant < 0) {
-            double det = determinant();
-            double x_extent = std::sqrt(d / det);
-            double x_min = p[0] - x_extent;
-            double x_max = p[0] + x_extent;
-
-            std::stringstream ss;
-            ss << "Cannot compute y_points: x=" << x << " is outside ellipse bounds [" << x_min
-               << ", " << x_max << "]";
-            RT_FAIL(ss.str().c_str());
-        }
-
-        double d0 = std::sqrt(discriminant);
-        double y1 = (-b * x_shifted - d0) / d;
-        double y2 = (-b * x_shifted + d0) / d;
-        return {p[1] + y1, p[1] + y2};
-    }
-
-    /**
-     * @brief Compute the bounding box of the ellipse as {x_min, x_max, y_min, y_max}.
-     */
-    std::array<double, 4> bounding_box() const {
-        double denom = determinant();
-        double x_dim = std::sqrt(d / denom);
-        double y_dim = std::sqrt(a / denom);
-        return {-x_dim, x_dim, -y_dim, y_dim};
-    }
-
-    /**
-     * @brief Return the ellipse shifted by the offset.
-     */
-    Ellipse offset(double offset_val) const {
-        std::array<double, 2> p_offset = {p[0] + offset_val, p[1] + offset_val};
-        return Ellipse({a, b, d}, p_offset);
-    }
-
-    /**
-     * @brief Apply a grid operation G to the ellipse E as (G^T E G).
+     * @brief Apply a grid operation G to the ellipse, i.e., return G^{-1}(E) with matrix G^T D G.
+     * @param grid_op The grid operation G.
+     * @return The transformed ellipse.
      */
     Ellipse apply_grid_op(const GridOp &grid_op) const {
         const auto [ga, gb, gc, gd] = grid_op.flatten();
 
-        std::array<double, 3> D = {ga * ga * a + 2 * ga * gc * b + d * gc * gc,
-                                   ga * gb * a + (ga * gd + gb * gc) * b + gc * gd * d,
-                                   gb * gb * a + 2 * gb * gd * b + d * gd * gd};
+        std::array<Real, 3> D = {ga * ga * a + 2 * ga * gc * b + d * gc * gc,
+                                 ga * gb * a + (ga * gd + gb * gc) * b + gc * gd * d,
+                                 gb * gb * a + 2 * gb * gd * b + d * gd * gd};
 
         const auto [gda, gdb, gdc, gdd] = grid_op.inverse().flatten();
 
-        std::array<double, 2> new_p = {gda * p[0] + gdb * p[1], gdc * p[0] + gdd * p[1]};
+        std::array<Real, 2> new_p = {gda * p[0] + gdb * p[1], gdc * p[0] + gdd * p[1]};
         return Ellipse(D, new_p);
     }
 };
@@ -448,9 +410,6 @@ struct Ellipse {
  *
  * Based on Definition A.1 of arXiv:1403.2975 where the pair of ellipses are represented by real
  * symmetric positive semi-definite matrices of determinant 1
- *
- * Note: the floating point calculation in this class uses doubles, which leads to limited
- * precision. For higher precision, this needs to be replaced by multiprecision floats.
  */
 struct EllipseState {
     Ellipse e1;
@@ -466,53 +425,76 @@ struct EllipseState {
     /**
      * @brief Calculate the skew of the state (Eq. 34, arXiv:1403.2975).
      */
-    double skew() const { return e1.b * e1.b + e2.b * e2.b; }
+    Real skew() const { return e1.b * e1.b + e2.b * e2.b; }
 
     /**
-     * @brief Calculate the bias of the state (Eq. 34, arXiv:1403.2975).
+     * @brief Calculate the bias z2 - z1 of the state (Eq. 34, arXiv:1403.2975).
      */
-    double bias() const { return e2.z - e1.z; }
+    Real bias() const { return log(bias_ratio()) / (2 * log_lambda()); }
+
+    /**
+     * @brief λ^(2 * bias), which decides the cases of the step lemma without a logarithm.
+     */
+    Real bias_ratio() const { return e2.lambda_pow_2z() / e1.lambda_pow_2z(); }
+
+    /**
+     * @brief Whether z1 + z2 < 0.
+     */
+    bool negative_z_sum() const { return e1.lambda_pow_2z() * e2.lambda_pow_2z() < 1; }
+
+    /**
+     * @brief Whether |bias| > n.
+     * @param n The bound on the bias.
+     */
+    bool bias_exceeds(int n) const {
+        Real ratio = bias_ratio();
+        Real bound = pow(lambda(), 2 * n);
+        return ratio > bound || ratio * bound < 1;
+    }
+
+    /**
+     * @brief Apply a grid operation G to the state (Definition A.3, arXiv:1403.2975).
+     * @param grid_op The grid operation G, which acts on the second ellipse as G•.
+     * @return The transformed state.
+     */
+    EllipseState apply_grid_op(const GridOp &grid_op) const {
+        return EllipseState(e1.apply_grid_op(grid_op), e2.apply_grid_op(grid_op.adj2()));
+    }
 
     /**
      * @brief Calculate the special grid operation for the state for reducing the skew
      * (Lemma A.5 (Step Lemma), arXiv:1403.2975).
      */
-    GridOp skew_grid_op() {
+    GridOp skew_grid_op() const {
         GridOp grid_op = GridOp::from_string("I");
         EllipseState state = *this;
-        double current_skew = state.skew();
-        while (current_skew >= 15.0) {
-            auto result = state.reduce_skew();
-            GridOp new_grid_op = result.first;
-            state = result.second;
+        Real current_skew = state.skew();
+        while (current_skew >= 15) {
+            auto [new_grid_op, new_state] = state.reduce_skew();
+            state = new_state;
             grid_op = grid_op * new_grid_op;
-            RT_FAIL_IF(state.skew() > 0.9 * current_skew, "Skew was not decreased for state");
+            RT_FAIL_IF(state.skew() > Real(0.9) * current_skew, "Skew was not decreased for state");
             current_skew = state.skew();
         }
         return grid_op;
     }
 
-    EllipseState apply_grid_op(const GridOp &grid_op) const;
-
     /**
      * @brief Apply a shift operator to the state. (Definition A.6 and Lemma A.8 , arXiv:1403.2975).
      */
     std::pair<EllipseState, INT_TYPE> apply_shift_op() const {
-        double k = std::floor((1.0 - bias()) / 2.0);
-        double pk_pow = std::pow(LAMBDA_D, k);
-        double nk_pow = std::pow(LAMBDA_D, -k);
+        INT_TYPE k = floor_int(Real((1 - bias()) / 2));
+        Real pk_pow = pow(lambda(), k.convert_to<int>());
         Ellipse new_e1 = e1;
         Ellipse new_e2 = e2;
         new_e1.a *= pk_pow;
-        new_e1.d *= nk_pow;
-        new_e1.z -= k;
-        new_e2.a *= nk_pow;
+        new_e1.d /= pk_pow;
+        new_e2.a /= pk_pow;
         new_e2.d *= pk_pow;
-        new_e2.z += k;
-        if (INT_TYPE(k) % 2 != 0) {
-            new_e2.b *= -1.0;
+        if (k % 2 != 0) {
+            new_e2.b = -new_e2.b;
         }
-        return {EllipseState(new_e1, new_e2), INT_TYPE(k)};
+        return {EllipseState(new_e1, new_e2), k};
     }
 
     /**
@@ -520,19 +502,19 @@ struct EllipseState {
      */
     GridOp reduce_skew_apply_symmetry_and_coarse_bias() const {
         GridOp op = GridOp::from_string("I");
-        double sign = 1.0;
+        int sign = 1;
 
         if (e2.b < 0) {
             op = op * GridOp::from_string("Z");
         }
 
-        if ((e1.z + e2.z) < 0) {
-            sign = -1.0;
+        if (negative_z_sum()) {
+            sign = -1;
             op = op * GridOp::from_string("X");
         }
 
-        if (std::abs(bias()) > 2) {
-            INT_TYPE n = INT_TYPE(std::round((1.0 - sign * bias()) / 4.0));
+        if (bias_exceeds(2)) {
+            INT_TYPE n = round_int(Real((1 - sign * bias()) / 4));
             op = op * GridOp::from_string("U").pow(n);
         }
         return op;
@@ -546,11 +528,11 @@ struct EllipseState {
      * - The GridOp applied (Z or X).
      * - The integer shift amount `k` (needed to adjust the final operator).
      */
-    std::pair<GridOp, INT_TYPE> reduce_skew_apply_shift_lemma(EllipseState &state) const {
+    static std::pair<GridOp, INT_TYPE> reduce_skew_apply_shift_lemma(EllipseState &state) {
         INT_TYPE k = 0;
         GridOp op = GridOp::from_string("I");
 
-        if (std::abs(state.bias()) > 1) {
+        if (state.bias_exceeds(1)) {
             // Apply the shift defined in Lemma A.1 / A.8
             auto shift_result = state.apply_shift_op();
             state = shift_result.first;
@@ -562,7 +544,7 @@ struct EllipseState {
                 state = state.apply_grid_op(z_op);
                 op = op * z_op;
             }
-            if ((state.e1.z + state.e2.z) < 0) {
+            if (state.negative_z_sum()) {
                 GridOp x_op = GridOp::from_string("X");
                 state = state.apply_grid_op(x_op);
                 op = op * x_op;
@@ -577,29 +559,35 @@ struct EllipseState {
      * Selects the specific grid operator (R, K, A, or B) to reduce the skew
      */
     static GridOp reduce_skew_select_operator(const Ellipse &e1, const Ellipse &e2) {
-        if (-0.8 <= e1.z && e1.z <= 0.8 && -0.8 <= e2.z && e2.z <= 0.8) {
+        // The thresholds z = 0.8, 0.3 and -0.2 as thresholds on λ^(2z).
+        static const Real z_08 = pow(lambda(), Real(1.6));
+        static const Real z_03 = pow(lambda(), Real(0.6));
+        static const Real z_m02 = pow(lambda(), Real(-0.4));
+        Real r1 = e1.lambda_pow_2z(), r2 = e2.lambda_pow_2z();
+
+        if (r1 * z_08 >= 1 && r1 <= z_08 && r2 * z_08 >= 1 && r2 <= z_08) {
             return GridOp::from_string("R");
         }
 
+        // λ^min(z1, z2)
+        Real lambda_min_z = sqrt(std::min(r1, r2));
         if (e1.b >= 0) {
-            if (e1.z <= 0.3 && e2.z >= 0.8) {
+            if (r1 <= z_03 && r2 >= z_08) {
                 return GridOp::from_string("K");
             }
-            if (e1.z >= 0.8 && e2.z <= 0.3) {
+            if (r1 >= z_08 && r2 <= z_03) {
                 return GridOp::from_string("K").adj2();
             }
-            if (e1.z >= 0.3 && e2.z >= 0.3) {
-                INT_TYPE n = static_cast<INT_TYPE>(
-                    std::max(1.0, std::floor(std::pow(LAMBDA_D, std::min(e1.z, e2.z)) / 2.0)));
-                return GridOp::from_string("A").pow(n);
+            if (r1 >= z_03 && r2 >= z_03) {
+                INT_TYPE n = floor_int(Real(lambda_min_z / 2));
+                return GridOp::from_string("A").pow(max(n, INT_TYPE(1)));
             }
             RT_FAIL("Skew couldn't be reduced (Case A/K failed)");
         }
 
-        if (e1.z >= -0.2 && e2.z >= -0.2) {
-            INT_TYPE n = static_cast<INT_TYPE>(
-                std::max(1.0, std::floor(std::pow(LAMBDA_D, std::min(e1.z, e2.z)) / M_SQRT2)));
-            return GridOp::from_string("B").pow(n);
+        if (r1 >= z_m02 && r2 >= z_m02) {
+            INT_TYPE n = floor_int(Real(lambda_min_z / sqrt2()));
+            return GridOp::from_string("B").pow(max(n, INT_TYPE(1)));
         }
 
         RT_FAIL("Skew couldn't be reduced (Case B failed)");
@@ -614,7 +602,7 @@ struct EllipseState {
      * 2. Applying the Shift Lemma.
      * 3. Applying the specific Geometric Lemma (R, K, A, B).
      */
-    std::pair<GridOp, EllipseState> reduce_skew() {
+    std::pair<GridOp, EllipseState> reduce_skew() const {
         RT_FAIL_IF(!e1.positive_semi_definite() || !e2.positive_semi_definite(),
                    "Ellipse is not positive semi-definite.");
 
@@ -638,27 +626,5 @@ struct EllipseState {
         return {total_op, this->apply_grid_op(total_op)};
     }
 };
-// --- Implementations requiring full class definitions ---
-
-/**
- * @brief Apply the grid operator to an ellipse (Lemma A.4, arXiv:1403.2975).
- */
-inline Ellipse GridOp::apply_to_ellipse(const Ellipse &ellipse) const {
-    return ellipse.apply_grid_op(*this);
-}
-
-/**
- * @brief Apply the grid operator to a state (Lemma A.3, arXiv:1403.2975).
- */
-inline EllipseState GridOp::apply_to_state(const EllipseState &state) const {
-    return state.apply_grid_op(*this);
-}
-
-/**
- * @brief Apply a grid operation G to the state (Definition A.3, arXiv:1403.2975).
- */
-inline EllipseState EllipseState::apply_grid_op(const GridOp &grid_op) const {
-    return EllipseState(e1.apply_grid_op(grid_op), e2.apply_grid_op(grid_op.adj2()));
-}
 
 } // namespace RSDecomp::GridProblem

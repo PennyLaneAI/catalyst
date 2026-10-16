@@ -778,9 +778,7 @@ class TestGetLabel:
     def test_global_phase_operator(self):
         """Tests against a GlobalPhase operator instance."""
         assert get_label(qp.GlobalPhase(0.5)) == "GlobalPhase"
-        assert (
-            get_label(qp.ctrl(qp.GlobalPhase(0.0), control=0)) == "<name> C(GlobalPhase)|<wire> [0]"
-        )
+        assert get_label(qp.ctrl(qp.GlobalPhase(0.0), control=0)) == "<name> PhaseShift|<wire> [0]"
         assert get_label(qp.adjoint(qp.GlobalPhase(0.0))) == "Adjoint(GlobalPhase)"
 
     @pytest.mark.parametrize(
@@ -1597,8 +1595,8 @@ class TestOperatorConnectivity:
             assert nodes["node4"]["label"] == "<name> C(GlobalPhase)|<wire> [0]"
             expected_edges = (
                 ("NullQubit", "PauliX"),
-                ("PauliX", "C(GlobalPhase)"),
-                ("C(GlobalPhase)", "PauliY"),
+                ("PauliX", "PhaseShift"),
+                ("PhaseShift", "PauliY"),
             )
         assert_dag_structure(nodes, edges, expected_edges)
 

@@ -41,7 +41,7 @@ def test_PhaseShift_gridsynth(param, op, eps):
     qjitted_circuit = qp.qjit(gridsynthed_circuit, capture=True, collect_decomp_rules=False)
     result = qjitted_circuit(param)
 
-    assert qp.math.allclose(result, expected, atol=eps)
+    assert qp.math.allclose(result, expected, atol=eps, rtol=0)
 
 
 @pytest.mark.parametrize(
@@ -67,14 +67,82 @@ def test_gridsynth_ppr_basis(param, eps):
     )
     result = qjitted_circuit(param)
     result_with_ppr = qjitted_circuit_with_ppr(param)
-    assert np.allclose(result, result_with_ppr, atol=eps)
+    assert np.allclose(result, result_with_ppr, atol=eps, rtol=0)
 
 
-_EPSILON_WARN_FRAGMENT = "For epsilon smaller than 1e-6"
+@pytest.mark.parametrize("ppr_basis", [False, True])
+def test_gridsynth_specs(ppr_basis):
+    """Test that specs counts the runtime gridsynth decomposition without extra wires."""
+    eps = 1e-4
+
+    @qp.qjit(capture=True, target="mlir")
+    @qp.transforms.gridsynth(epsilon=eps, ppr_basis=ppr_basis)
+    @qp.qnode(qp.device("null.qubit", wires=2))
+    def circuit(x: float):
+        qp.RZ(x, 0)
+        qp.RZ(x, 1)
+        return qp.expval(qp.Z(0))
+
+    resources = qp.specs(circuit, level=1)(0.5).resources
+    assert resources.num_wires == 2
+
+    ops = resources.quantum_operations
+    t_per_rotation = (ops["PPR-pi/8-w1"] if ppr_basis else ops["T"]) / 2
+    # Ross-Selinger sequences have about 3 log2(1/eps) T gates.
+    assert 2.5 * np.log2(1 / eps) < t_per_rotation < 3.5 * np.log2(1 / eps)
 
 
-def test_epsilon_warning_emitted_for_small_epsilon(capfd):
-    """Test that a runtime warning is written to stderr when epsilon < 1e-6."""
+@pytest.mark.parametrize("ppr_basis", [False, True])
+@pytest.mark.parametrize("eps", [1e-3, 1e-5])
+def test_gridsynth_specs_matches_runtime(eps, ppr_basis):
+    """Test that the specs T-count estimate matches the T-count executed at runtime, on average
+    over random angles."""
+    angles = np.random.default_rng(42).uniform(0, 4 * np.pi, 50)
+    # The estimate cannot know which angles are within 2 * eps of a multiple of pi/4, which need at
+    # most one T gate.
+    distance_to_pi_4 = np.abs(np.remainder(angles + np.pi / 8, np.pi / 4) - np.pi / 8)
+    angles = angles[distance_to_pi_4 > 2 * eps]
+
+    @qp.qjit(capture=True)
+    @qp.transforms.gridsynth(epsilon=eps, ppr_basis=ppr_basis)
+    @qp.qnode(qp.device("null.qubit", wires=1))
+    def circuit(angles):
+        for theta in angles:
+            qp.RZ(theta, 0)
+        return qp.expval(qp.Z(0))
+
+    estimated = qp.specs(circuit, level=1)(angles).resources
+    executed = qp.specs(circuit, level="device")(angles).resources
+
+    estimated_t = estimated.quantum_operations["PPR-pi/8-w1" if ppr_basis else "T"]
+    # The device reports the PPR exp(-i pi/8 P) as PauliRot(pi/4).
+    executed_t = executed.quantum_operations["PauliRot-pi/4-w1" if ppr_basis else "T"]
+    assert estimated_t == pytest.approx(executed_t, rel=0.05)
+
+
+@pytest.mark.parametrize("eps", [1e-10, 1e-12, 1e-15])
+def test_gridsynth_high_precision(eps):
+    """Test that gridsynth reaches precisions beyond double-precision geometry."""
+    dev = qp.device("lightning.qubit", wires=1)
+
+    @qp.qnode(dev)
+    def circuit(x: float):
+        qp.Hadamard(0)
+        qp.RZ(x, wires=0)
+        return qp.state()
+
+    gridsynthed_circuit = qp.transforms.gridsynth(circuit, epsilon=eps)
+    qjitted_circuit = qp.qjit(gridsynthed_circuit, capture=True, collect_decomp_rules=False)
+
+    for param in [-4.4, -0.3, 0.1, 2.2]:
+        # Simulating the ~150 gates at eps=1e-15 in double precision adds an error of about 1e-14.
+        assert qp.math.allclose(
+            qjitted_circuit(param), circuit(param), atol=max(eps, 1e-13), rtol=0
+        )
+
+
+def test_error_for_unsupported_epsilon():
+    """Test that an epsilon below the supported precision raises an error at runtime."""
     dev = qp.device("lightning.qubit", wires=1)
 
     @qp.qnode(dev)
@@ -82,26 +150,8 @@ def test_epsilon_warning_emitted_for_small_epsilon(capfd):
         qp.RZ(x, wires=0)
         return qp.state()
 
-    qp.qjit(
-        qp.transforms.gridsynth(circuit, epsilon=1e-8), capture=True, collect_decomp_rules=False
-    )(0.5)
-
-    captured = capfd.readouterr()
-    assert _EPSILON_WARN_FRAGMENT in captured.err
-
-
-def test_epsilon_warning_not_emitted_for_safe_epsilon(capfd):
-    """Test that no runtime warning is written to stderr when epsilon >= 1e-6."""
-    dev = qp.device("lightning.qubit", wires=1)
-
-    @qp.qnode(dev)
-    def circuit(x: float):
-        qp.RZ(x, wires=0)
-        return qp.state()
-
-    qp.qjit(
-        qp.transforms.gridsynth(circuit, epsilon=1e-4), capture=True, collect_decomp_rules=False
-    )(0.5)
-
-    captured = capfd.readouterr()
-    assert _EPSILON_WARN_FRAGMENT not in captured.err
+    qjitted_circuit = qp.qjit(
+        qp.transforms.gridsynth(circuit, epsilon=1e-16), capture=True, collect_decomp_rules=False
+    )
+    with pytest.raises(RuntimeError, match="the smallest supported epsilon is 1e-15"):
+        qjitted_circuit(0.5)
