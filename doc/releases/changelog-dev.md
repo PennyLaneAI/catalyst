@@ -145,7 +145,7 @@
   require integral values and convert the count internally.
   [(#2956)](https://github.com/PennyLaneAI/catalyst/pull/2956)
 
-* A device can now declare shared runtime libraries via an optional `get_runtime_artifacts` method. 
+* A device can now declare shared runtime libraries via an optional `get_runtime_artifacts` method.
   These will be linked by the compiler.
   [(#3303)](https://github.com/PennyLaneAI/catalyst/pull/3303)
 
@@ -751,6 +751,13 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* Scatter ops with batching dimensions, such as those from a batched `jnp.linalg.det`, no longer
+  crash `scatter-lowering`, and will instead be rejected as intended.
+  In addition, to support batched scatter operations an additional pass is run in the HLO lowering
+  stage to resolve the batching first.
+  An additional bug is fixed in the scatter lowering that resulted in failed assertions.
+  [(#3352)](https://github.com/PennyLaneAI/catalyst/pull/3352)
+
 * Graph-based decomposition now handles operators with a nested-operator ("hybrid") argument, such
   as `GQSP`. Previously the operator counted the nested operator's wires among its own, but the
   generated decomposition rule did not, so `decompose-lowering` built a `tensor.from_elements`
@@ -1090,7 +1097,7 @@
   soft-RoCE loopback link, and CPU-to-GPU over memcpy on the GPU runner.
   [(#3074)](https://github.com/PennyLaneAI/catalyst/pull/3074)
 
-* The OQD device now implements the optional `get_runtime_artifacts` to inform the compiler of its runtime library, 
+* The OQD device now implements the optional `get_runtime_artifacts` to inform the compiler of its runtime library,
   `librt_OQD_capi`. This replaces the previous work-around that had the compiler check directly for the library and
   link it if present.
   [(#3303)](https://github.com/PennyLaneAI/catalyst/pull/3303)
