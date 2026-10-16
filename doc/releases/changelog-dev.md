@@ -765,6 +765,14 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* Graph-based decomposition now gives correct results for operators with several wire arguments
+  whose names are not in alphabetical order, such as `SemiAdder(x_wires, y_wires, work_wires)`.
+  The generated decomposition rule unpacked its grouped wire operand in sorted-name order (or,
+  for rules requested by the compiler on demand, in hash order), while the operator passes its
+  wires in declaration order, so the rule acted on the wrong qubits. Both paths now use the
+  declaration order.
+  [(#3347)](https://github.com/PennyLaneAI/catalyst/pull/3347)
+
 * MLIR passes that recreate `scf.for`, `scf.while`, `scf.if`, and `scf.index_switch` ops
   (`ctrl-lowering`, `adjoint-lowering`, `--convert-to-value-semantics`) now preserve discardable
   attributes such as `catalyst.estimated_iterations`, `catalyst.estimated_probability`, and
