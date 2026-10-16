@@ -224,6 +224,23 @@ class AdjointGenerator {
         auto clone = cast<QuantumGate>(builder.clone(*gate, remappedValues));
         clone.setAdjointFlag(!gate.getAdjointFlag());
 
+        // Control values were pushed after the params, so they are popped first.
+        {
+            OpBuilder::InsertionGuard insertionGuard(builder);
+            builder.setInsertionPoint(clone);
+            SmallVector<Value> ctrlValues(gate.getCtrlValueOperands());
+            for (Value &ctrlValue : llvm::reverse(ctrlValues)) {
+                if (isAvailableToReversePass(ctrlValue, adjointRegion)) {
+                    ctrlValue = remappedValues.lookupOrDefault(ctrlValue);
+                    continue;
+                }
+                Location loc = gate.getLoc();
+                Value popped = ListPopOp::create(builder, loc, cache.intVector);
+                ctrlValue = arith::TruncIOp::create(builder, loc, ctrlValue.getType(), popped);
+            }
+            clone.setCtrlValueOperands(ctrlValues);
+        }
+
         // Read cached parameters from the recorded parameter vector.
         Operation *operation = gate;
         if (auto parametrizedGate = dyn_cast<quantum::ParametrizedGate>(operation)) {

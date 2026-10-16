@@ -497,6 +497,45 @@ func.func public @adjoint_for_loop_mixed_static_dynamic(%stop: index) {
 
 // -----
 
+// Test adjoint of scf.for with a control value computed inside the loop: the value is cached in
+// the forward pass and popped in the reverse pass.
+
+// CHECK-LABEL: @adjoint_for_loop_ctrl_value
+func.func public @adjoint_for_loop_ctrl_value(%flags: tensor<4xi1>) {
+  %c1 = arith.constant 1 : index
+  %c4 = arith.constant 4 : index
+  %c0 = arith.constant 0 : index
+  %0 = quantum.alloc( 2) : !quantum.reg
+  %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+  %2 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
+
+  // CHECK: [[intVector:%.+]] = catalyst.list_init : <i64>
+  // CHECK: scf.for
+  // CHECK:   [[cv:%.+]] = tensor.extract %arg0
+  // CHECK:   [[cv_ext:%.+]] = arith.extui [[cv]] : i1 to i64
+  // CHECK:   catalyst.list_push [[cv_ext]], [[intVector]]
+  // CHECK: scf.for
+  // CHECK:   [[popped:%.+]] = catalyst.list_pop [[intVector]]
+  // CHECK:   [[cv_rev:%.+]] = arith.trunci [[popped]] : i64 to i1
+  // CHECK:   quantum.custom "PauliX"() {{%.+}} adj ctrls({{%.+}}) ctrlvals([[cv_rev]])
+  %3:2 = quantum.adjoint(%1, %2) : !quantum.bit, !quantum.bit {
+  ^bb0(%arg1: !quantum.bit, %arg2: !quantum.bit):
+    %8:2 = scf.for %i = %c0 to %c4 step %c1 iter_args(%a = %arg1, %b = %arg2) -> (!quantum.bit, !quantum.bit) {
+      %cv = tensor.extract %flags[%i] : tensor<4xi1>
+      %t, %c = quantum.custom "PauliX"() %a ctrls(%b) ctrlvals(%cv) : !quantum.bit ctrls !quantum.bit
+      scf.yield %t, %c : !quantum.bit, !quantum.bit
+    }
+    quantum.yield %8#0, %8#1 : !quantum.bit, !quantum.bit
+  }
+
+  %4 = quantum.insert %0[ 0], %3#0 : !quantum.reg, !quantum.bit
+  %5 = quantum.insert %4[ 1], %3#1 : !quantum.reg, !quantum.bit
+  quantum.dealloc %5 : !quantum.reg
+  return
+}
+
+// -----
+
 // Test adjoint of scf.while
 
   // CHECK-LABEL: @adjoint_while_loop
