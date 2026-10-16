@@ -891,6 +891,13 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* Backline transport backends now report the transport ABI version they were built for and their
+  capabilities, through `CatalystTransportAbiVersion` and `CatalystTransportQueryCaps`. The runtime
+  checks these when it loads a backend: a backend built for a newer ABI, or asked for a role it
+  does not provide, is refused with an error naming the cause. Backends without the symbols still
+  load, limited to the 16 B frame. Load errors are now included in the error raised to the user.
+  [(#3357)](https://github.com/PennyLaneAI/catalyst/pull/3357)
+
 * Backline housekeeping ahead of the transport ABI improvement:
   - **GPU backends:** the `TRANSPORT_HIP` CMake option (`AUTO`, `ON`, `OFF`) overrides detection of the GPU transport backends.
   - **Demo integration tests:** these now run whenever the runtime is built with transport.
