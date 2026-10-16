@@ -15,6 +15,8 @@
 This submodule defines utilities for device preprocessing for from_plxpr.
 """
 
+import copy
+
 # pylint: disable=too-many-arguments, too-many-positional-arguments
 import warnings
 
@@ -33,14 +35,13 @@ from catalyst.device.decomposition import (
     measurements_from_samples,
 )
 
-from catalyst.device.qjit_device import intersect_operations
-
 # pylint: disable=protected-access
 from catalyst.device.qjit_device import (
     RUNTIME_OPERATIONS,
     _load_device_capabilities,
     filter_device_capabilities_with_shots,
     get_qjit_device_capabilities,
+    intersect_operations,
 )
 from catalyst.device.verification import (
     validate_measurements,
@@ -303,12 +304,14 @@ def _gateset_preprocessing(
     specified by the specific `device`
     """
 
+    copied_capabilities = copy.deepcopy(capabilities)
+
     # Intersection of gates and observables supported by the device and by Catalyst runtime.
-    capabilities.operations = intersect_operations(
+    copied_capabilities.operations = intersect_operations(
         capabilities.operations, RUNTIME_OPERATIONS
     )
 
-    gate_set = capabilities.gate_set()
+    gate_set = copied_capabilities.gate_set()
 
     # Get the default args/kwargs with the above gate_set
     targs, tkwargs = graph_decomposition_setup_inputs(gate_set=gate_set)
