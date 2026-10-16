@@ -318,6 +318,10 @@ def resolve_constant_params(ssa: SSAValue) -> float | int | str:
             )
             return f"({x} - {y})"
 
+        case "stablehlo.negate":
+            value = resolve_constant_params(op.operands[0])
+            return f"(-{value})" if isinstance(value, str) else -value
+
         case "stablehlo.constant":
             return _extract_dense_constant_value(op)
 
