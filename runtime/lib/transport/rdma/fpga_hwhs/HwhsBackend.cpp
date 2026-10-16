@@ -106,3 +106,8 @@ catalyst::transport::ControllerSession *make_hwhs_controller(const std::string &
 } // namespace
 
 GENERATE_TRANSPORT_CONTROLLER_FACTORY(CatalystTransportController, make_hwhs_controller)
+CATALYST_TRANSPORT_BACKEND_CAPS("hwhs", CATALYST_TRANSPORT_ROLE_BIT_CONTROLLER,
+                                CATALYST_TRANSPORT_MEM_BIT(CpuRam) |
+                                    CATALYST_TRANSPORT_MEM_BIT(Ddr) |
+                                    CATALYST_TRANSPORT_MEM_BIT(Other),
+                                0, 8, 8, 1)

@@ -200,7 +200,13 @@ library, named ``libcatalyst_transport_<backend>_<role>.so``. The pairs currentl
 
 A backend is a shared library implementing ``ControllerSession`` or ``CoprocessorSession`` from
 ``runtime/include/Transport.hpp`` and exporting the matching factory symbol declared in
-``runtime/include/TransportBackend.h``. A session follows a strict lifecycle:
+``runtime/include/TransportBackend.h``. It also reports the transport ABI version it was built for
+and its capabilities (roles, memory kinds, frame modes, message sizes and coprocessor conventions)
+through ``CatalystTransportAbiVersion`` and ``CatalystTransportQueryCaps``, which the
+``CATALYST_TRANSPORT_BACKEND_CAPS`` macro defines. The loader refuses a backend built for a newer
+ABI, or asked for a role it does not report. A backend exporting neither symbol is loaded as
+version 1, limited to 16 B frames. The session interface only grows, so a backend keeps working
+with later runtimes. A session follows a strict lifecycle:
 
 ``connect``
     Bring up the connection and the out-of-band channel used to arrange direct data transfers.
