@@ -316,7 +316,48 @@ def ResourceAnalysisPass : Pass<"resource-analysis"> {
             /*type=*/"std::string",
             /*default=*/"",
             /*description=*/"The filename to save the output JSON to (only when output-json is true)"
-        >
+        >,
+        ListOption<
+            /*C++ name*/"targetGateSetOption",
+            /*CLI name*/"gate-set",
+            /*Type*/"std::string",
+            /*Description*/"The accepted gates to decompose to.">,
+        ListOption<
+            /*C++ name*/"fixedDecompsOption",
+            /*CLI name*/"fixed-decomps",
+            /*Type*/"std::string",
+            /*Description*/"Maps an operator to a decomposition rule that will be applied.">,
+        ListOption<
+            /*C++ name*/"altDecompsOption",
+            /*CLI name*/"alt-decomps",
+            /*Type*/"std::string",
+            /*Description*/
+            "Maps an operator to a list of alternative decomposition rules that will be considered"
+            " alongside any built-in rules for the operator.">,
+        Option<
+            /*C++ name*/"bytecodeRulesFile",
+            /*CLI name*/"bytecode-rules",
+            /*Type*/"std::string",
+            /*Default*/[{ "" }],
+            /*Description*/"A path to a bytecode file of compiled decomposition rules.">,
+        Option<
+            /*C++ name*/"libQPDPath",
+            /*CLI name*/"libQPD-path",
+            /*Type*/"std::string",
+            /*Default*/[{ "" }],
+            /*Description*/"A path to the QuantumPythonDecompositions dynamic library.">,
+        Option<
+            /*C++ name*/"libpythonPath",
+            /*CLI name*/"libpython-path",
+            /*Type*/"std::string",
+            /*Default*/[{ "" }],
+            /*Description*/"A path to the python shared library.">,
+        Option<
+            /*C++ name*/"verboseOption",
+            /*CLI name*/"verbose",
+            /*Type*/"bool",
+            /*Default*/[{ false }],
+            /*Description*/"Print the decomposition rule chosen for each operator to stderr.">
     ];
 }
 

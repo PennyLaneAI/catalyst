@@ -24,6 +24,9 @@
 #include "Catalyst/Analysis/ResourceResultExtension.h"
 #include "PBC/IR/PBCOps.h"
 
+#include "DGBuilder.hpp"
+#include "DGTypes.hpp"
+
 using namespace mlir;
 
 namespace catalyst {
@@ -34,9 +37,11 @@ class ResourceAnalysis {
     using ExtensionProvider = std::function<std::unique_ptr<ResourceAnalysisExtension>()>;
 
     // walk all func::FuncOps within the operation.
-    explicit ResourceAnalysis(ModuleOp moduleOp,
-                              ArrayRef<ExtensionProvider> extensionProviders = {},
-                              bool collectDetailedOperations = false);
+    explicit ResourceAnalysis(
+        ModuleOp moduleOp, ArrayRef<ExtensionProvider> extensionProviders = {},
+        bool collectDetailedOperations = false,
+        DecompGraph::Core::GraphResult *graphResult = nullptr,
+        std::unique_ptr<DecompGraph::Solver::DecompositionGraph> graph = nullptr);
     explicit ResourceAnalysis(func::FuncOp funcOp,
                               ArrayRef<ExtensionProvider> extensionProviders = {},
                               bool collectDetailedOperations = false);
@@ -58,6 +63,9 @@ class ResourceAnalysis {
 
   private:
     bool collectDetailedOperations;
+
+    DecompGraph::Core::GraphResult *graphResult = nullptr;
+    std::unique_ptr<DecompGraph::Solver::DecompositionGraph> graph;
 
     // per-function resource counts
     llvm::StringMap<ResourceResult> funcResults;
