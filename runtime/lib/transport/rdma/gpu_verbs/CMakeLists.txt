@@ -22,6 +22,8 @@ if(CMAKE_HIP_COMPILER_ID STREQUAL "NVIDIA")
 endif()
 set_property(TARGET catalyst_transport_gpu_verbs_coprocessor PROPERTY POSITION_INDEPENDENT_CODE ON)
 
+catalyst_runtime_install(catalyst_transport_gpu_verbs_coprocessor)
+
 # Self-contained loopback application for testing
 add_executable(gpu_verbs_selftest gpu_verbs_selftest.cpp)
 target_link_libraries(gpu_verbs_selftest PRIVATE catalyst_transport_gpu_verbs_coprocessor)

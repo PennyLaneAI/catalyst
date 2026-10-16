@@ -19,6 +19,8 @@ target_link_libraries(rt_transport PRIVATE
 
 set_property(TARGET rt_transport PROPERTY POSITION_INDEPENDENT_CODE ON)
 
+catalyst_runtime_install(rt_transport)
+
 ###############################################
 # transport backends                          #
 ###############################################
