@@ -761,6 +761,11 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* Fixed `draw_graph` failures with symbolic gate parameters or control values, preserving
+  PennyLane gate names such as `CRX`. Unresolved indices into control tensors produce abstract
+  Boolean values during circuit DAG reconstruction.
+  [(#3134)](https://github.com/PennyLaneAI/catalyst/pull/3134)
+
 * MLIR passes that recreate `scf.for`, `scf.while`, `scf.if`, and `scf.index_switch` ops
   (`ctrl-lowering`, `adjoint-lowering`, `--convert-to-value-semantics`) now preserve discardable
   attributes such as `catalyst.estimated_iterations`, `catalyst.estimated_probability`, and
