@@ -112,7 +112,7 @@ void check_rz_grid_search(double theta, double epsilon) {
     REQUIRE(first.has_value());
 
     auto [u, k] = *first;
-    CHECK(u.norm2().to_sqrt_two() <= ZSqrtTwo(INT_TYPE(1) << k, 0));
+    CHECK((ZSqrtTwo(INT_TYPE(1) << k, 0) - u.norm2().to_sqrt_two()).sign() >= 0);
     Real scale = pow(sqrt2(), k);
     Real dx = real_part(u) / scale - cos(Real(theta));
     Real dy = imag_part(u) / scale - sin(Real(theta));

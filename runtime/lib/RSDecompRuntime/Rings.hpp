@@ -24,9 +24,9 @@
 namespace RSDecomp::Rings {
 
 // Note on multiprecision:
-// All ring arithmetic is exact with multiprecision INTs. The geometric part of the search
-// (Ellipse.hpp, GridProblems.hpp) uses the multiprecision reals from Real.hpp, with a precision
-// chosen from epsilon.
+// Ring arithmetic is exact with multiprecision INTs, except for the quotient in
+// ZSqrtTwo::operator%, which is rounded via FLOAT_TYPE. The geometric part of the search
+// (Ellipse.hpp, GridProblems.hpp) uses the fixed 192-bit reals from Real.hpp.
 
 using INT_TYPE = boost::multiprecision::cpp_int;
 using FLOAT_TYPE = boost::multiprecision::cpp_dec_float_50;
@@ -60,8 +60,6 @@ struct ZSqrtTwo {
     ZSqrtTwo operator/(ZSqrtTwo other) const;
     ZSqrtTwo operator/(INT_TYPE scalar) const;
     bool operator==(const ZSqrtTwo &other) const;
-    bool operator<(const ZSqrtTwo &other) const;
-    bool operator<=(const ZSqrtTwo &other) const;
     ZSqrtTwo operator%(const ZSqrtTwo &other) const;
 
     int sign() const;

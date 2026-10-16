@@ -134,8 +134,6 @@ void validate_inputs(double angle, double epsilon) {
  */
 std::pair<std::vector<GateType>, double> compute_clifford_T_decomposition(double angle,
                                                                           double epsilon) {
-    validate_inputs(angle, epsilon);
-
     if (auto units = as_multiple_of_pi_4(angle, epsilon)) {
         std::vector<GateType> decomposition;
         int normalized = (((*units % 8) + 8) % 8).convert_to<int>();

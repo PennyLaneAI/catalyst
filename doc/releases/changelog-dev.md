@@ -151,11 +151,8 @@
 
 <h3>Improvements 🛠</h3>
 
-* The `gridsynth` pass now produces correct decompositions for any `epsilon` down to `1e-15`.
-  Previously, results could be inaccurate or decomposition could fail for `epsilon` below `1e-6`,
-  and a warning was raised. The geometric part of the Ross-Selinger search now uses
-  multiprecision reals, and the decomposition is also faster for `epsilon` below `1e-3`.
-  An error is raised for unsupported `epsilon` values.
+* :func:`pennylane.transforms.gridsynth` now produces correct, deterministic decompositions for
+  any `epsilon` down to `1e-15`, and invalid angles or `epsilon` values raise an error.
   [(#3333)](https://github.com/PennyLaneAI/catalyst/pull/3333)
 
 * Controlled :class:`~pennylane.GlobalPhase` operations now decompose to

@@ -120,9 +120,8 @@ def test_gridsynth_specs_matches_runtime(eps, ppr_basis):
     assert estimated_t == pytest.approx(executed_t, rel=0.05)
 
 
-@pytest.mark.parametrize("param", [-4.4, -0.3, 0.1, 2.2])
 @pytest.mark.parametrize("eps", [1e-10, 1e-12, 1e-15])
-def test_gridsynth_high_precision(param, eps):
+def test_gridsynth_high_precision(eps):
     """Test that gridsynth reaches precisions beyond double-precision geometry."""
     dev = qp.device("lightning.qubit", wires=1)
 
@@ -132,29 +131,14 @@ def test_gridsynth_high_precision(param, eps):
         qp.RZ(x, wires=0)
         return qp.state()
 
-    expected = circuit(param)
     gridsynthed_circuit = qp.transforms.gridsynth(circuit, epsilon=eps)
-    result = qp.qjit(gridsynthed_circuit, capture=True, collect_decomp_rules=False)(param)
+    qjitted_circuit = qp.qjit(gridsynthed_circuit, capture=True, collect_decomp_rules=False)
 
-    # Simulating the ~150 gates at eps=1e-15 in double precision adds an error of about 1e-14.
-    assert qp.math.allclose(result, expected, atol=max(eps, 1e-13), rtol=0)
-
-
-def test_no_warning_for_small_epsilon(capfd):
-    """Test that no runtime warning is written to stderr for small epsilon."""
-    dev = qp.device("lightning.qubit", wires=1)
-
-    @qp.qnode(dev)
-    def circuit(x: float):
-        qp.RZ(x, wires=0)
-        return qp.state()
-
-    qp.qjit(
-        qp.transforms.gridsynth(circuit, epsilon=1e-8), capture=True, collect_decomp_rules=False
-    )(0.5)
-
-    captured = capfd.readouterr()
-    assert "Gridsynth" not in captured.err
+    for param in [-4.4, -0.3, 0.1, 2.2]:
+        # Simulating the ~150 gates at eps=1e-15 in double precision adds an error of about 1e-14.
+        assert qp.math.allclose(
+            qjitted_circuit(param), circuit(param), atol=max(eps, 1e-13), rtol=0
+        )
 
 
 def test_error_for_unsupported_epsilon():

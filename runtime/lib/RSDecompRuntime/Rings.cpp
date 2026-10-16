@@ -57,10 +57,6 @@ int ZSqrtTwo::sign() const {
     return a2 > b2 ? sign_a : sign_b;
 }
 
-bool ZSqrtTwo::operator<(const ZSqrtTwo &other) const { return (*this - other).sign() < 0; }
-
-bool ZSqrtTwo::operator<=(const ZSqrtTwo &other) const { return (*this - other).sign() <= 0; }
-
 /**
  * @brief Addition operator for ZSqrtTwo elements.
  */
