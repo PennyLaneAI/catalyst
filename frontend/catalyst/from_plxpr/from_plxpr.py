@@ -373,7 +373,7 @@ def _handle_decompose_transform(self, inner_jaxpr, consts, non_const_args, tkwar
     if resource_analysis_for_estimate:
         _validate_decompose_tkwargs(tkwargs, _RESOURCE_ANALYSIS_TKWARGS)
     else:
-        _require_decompose_gate_set(tkwargs)
+        _validate_decompose_tkwargs(tkwargs)
 
     fixed_decomps = tkwargs.get("fixed_decomps") or {}
     alt_decomps = tkwargs.get("alt_decomps") or {}
