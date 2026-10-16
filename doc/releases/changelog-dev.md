@@ -145,7 +145,7 @@
   require integral values and convert the count internally.
   [(#2956)](https://github.com/PennyLaneAI/catalyst/pull/2956)
 
-* A device can now declare shared runtime libraries via an optional `get_runtime_artifacts` method. 
+* A device can now declare shared runtime libraries via an optional `get_runtime_artifacts` method.
   These will be linked by the compiler.
   [(#3303)](https://github.com/PennyLaneAI/catalyst/pull/3303)
 
@@ -212,6 +212,11 @@
 * a PennyLane `Backline` is serialized to the `catalyst.backline` module attribute and compiled
   through the transport passes.
   [(#3068)](https://github.com/PennyLaneAI/catalyst/pull/3068)
+
+* A PennyLane `Backline` can now have a controller alone, with `transport="none"` and no
+  coprocessors. With this option, no transport session is opened, and the controller can still
+  be dispatched to an executor of its own.
+  [(#3255)](https://github.com/PennyLaneAI/catalyst/pull/3255)
 
 * The new `pennylane.core.Operator2` can now be lowered to MLIR with program capture for operators
   without non-lowerable arguments. `Operator2` classes are now lowered to specialized operations
@@ -316,6 +321,7 @@
     [(#3158)](https://github.com/PennyLaneAI/catalyst/pull/3158)
     [(#3206)](https://github.com/PennyLaneAI/catalyst/pull/3206)
     [(#3224)](https://github.com/PennyLaneAI/catalyst/pull/3224)
+    [(#3232)](https://github.com/PennyLaneAI/catalyst/pull/3232)
     [(#3285)](https://github.com/PennyLaneAI/catalyst/pull/3285)
     [(#3292)](https://github.com/PennyLaneAI/catalyst/pull/3292)
 
@@ -755,6 +761,18 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* MLIR passes that recreate `scf.for`, `scf.while`, `scf.if`, and `scf.index_switch` ops
+  (`ctrl-lowering`, `adjoint-lowering`, `--convert-to-value-semantics`) now preserve discardable
+  attributes such as `catalyst.estimated_iterations`, `catalyst.estimated_probability`, and
+  `catalyst.estimated_probabilities`, so resource analysis still sees compiler hints after those
+  rewrites.
+  [(#3288)](https://github.com/PennyLaneAI/catalyst/pull/3288)
+  [(#3291)](https://github.com/PennyLaneAI/catalyst/pull/3291)
+
+* Fixed a bug where graph decomposition ignored entries in `fixed_decomps` and `alt_decomps` that
+  use a string key containing parentheses, such as `"C(PauliZ)"` or `"Adjoint(TemporaryAND)"`.
+  [(#3336)](https://github.com/PennyLaneAI/catalyst/pull/3336)
+
 * Graph-based decomposition now handles operators with a nested-operator ("hybrid") argument, such
   as `GQSP`. Previously the operator counted the nested operator's wires among its own, but the
   generated decomposition rule did not, so `decompose-lowering` built a `tensor.from_elements`
@@ -1094,7 +1112,7 @@
   soft-RoCE loopback link, and CPU-to-GPU over memcpy on the GPU runner.
   [(#3074)](https://github.com/PennyLaneAI/catalyst/pull/3074)
 
-* The OQD device now implements the optional `get_runtime_artifacts` to inform the compiler of its runtime library, 
+* The OQD device now implements the optional `get_runtime_artifacts` to inform the compiler of its runtime library,
   `librt_OQD_capi`. This replaces the previous work-around that had the compiler check directly for the library and
   link it if present.
   [(#3303)](https://github.com/PennyLaneAI/catalyst/pull/3303)
@@ -1149,6 +1167,7 @@ Shuli Shu,
 Nikhil Sreekumar,
 Kalman Szenes,
 Paul Haochen Wang,
+David Wierichs,
 Jake Zaia,
 Haider Sajjad,
 Hongsheng Zheng.
