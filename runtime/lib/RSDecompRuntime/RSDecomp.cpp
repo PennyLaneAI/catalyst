@@ -413,8 +413,9 @@ namespace {
  *
  * Writing a candidate's top-left entry as `w * exp(-i angle/2)`, it under-rotates the target if
  * Im(w) <= 0 and over-rotates it if Im(w) >= 0. A pair is mixed with the probability p of
- * Equation (33) of arXiv:2203.10064, and admissible if `diamond_error(p, w_under, w_over)` is at
- * most `epsilon`. Of the admissible pairs found, the one with the lowest expected T-count is kept.
+ * Equation (33) of arXiv:2203.10064, and admissible if the diamond-norm error of the mixture
+ * (Theorem 3.12) is at most `epsilon`. Of the admissible pairs found, the one with the lowest
+ * expected T-count is kept.
  */
 class MixedPairSearch {
   public:
@@ -424,11 +425,8 @@ class MixedPairSearch {
         std::complex<double> w;
         size_t t_count;
     };
-    using DiamondError = double (*)(double p, std::complex<double> w_under,
-                                    std::complex<double> w_over);
 
-    MixedPairSearch(const ZOmega &scale, double epsilon, DiamondError diamond_error)
-        : scale(scale), epsilon(epsilon), diamond_error(diamond_error) {}
+    MixedPairSearch(const ZOmega &scale, double epsilon) : scale(scale), epsilon(epsilon) {}
 
     /**
      * @brief Consider the grid solution `u_sol / sqrt(2)^k` with relative top-left entry `w`.
@@ -495,7 +493,9 @@ class MixedPairSearch {
         double over_weight = over.w.real() * over.w.imag();
         double denominator = over_weight - under_weight;
         double p = denominator > 0.0 ? over_weight / denominator : 1.0;
-        double diamond = diamond_error(p, under.w, over.w);
+        // Theorem 3.12.
+        double diamond = 2.0 * (1.0 - p * under.w.real() * under.w.real() -
+                                (1.0 - p) * over.w.real() * over.w.real());
         // Tolerate rounding for candidates on the bound.
         if (diamond > epsilon * (1.0 + 1e-12)) {
             return;
@@ -508,7 +508,6 @@ class MixedPairSearch {
 
     ZOmega scale;
     double epsilon;
-    DiamondError diamond_error;
     std::vector<Candidate> unders;
     std::vector<Candidate> overs;
     std::optional<Pair> best;
@@ -539,12 +538,7 @@ MixedDecomposition compute_mixed_diagonal_decomposition(double angle, double eps
     auto [grid_angle, scale] = grid_problem_frame(angle);
     GridProblem::GridIterator u_solutions(grid_angle, mixed_search_epsilon(epsilon),
                                           MAX_SEARCH_TRIALS);
-    // Theorem 3.12.
-    MixedPairSearch search(scale, epsilon,
-                           [](double p, std::complex<double> w_under, std::complex<double> w_over) {
-                               return 2.0 * (1.0 - p * w_under.real() * w_under.real() -
-                                             (1.0 - p) * w_over.real() * w_over.real());
-                           });
+    MixedPairSearch search(scale, epsilon);
 
     for (const auto &[u_sol, k_val] : u_solutions) {
         std::complex<double> w =
