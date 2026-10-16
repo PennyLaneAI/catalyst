@@ -432,3 +432,26 @@ module @two_dyn_indices_reverted {
       // CHECK: tensor.insert_slice [[updates]] into [[inputs]][[[idx__1]], [[idx__0]], 0] [1, 1, [[dim0]]] [1, 1, 1] : tensor<[[dim0]]xf64> into tensor<9x7x5xf64>
 }
 
+// -----
+
+module @batching_dims {
+      %inputs = "test.op"() : () -> (tensor<13x6xi32>)
+      %scatter_indices = "test.op"() : () -> (tensor<13x1xi32>)
+      %updates = "test.op"() : () -> (tensor<13xi32>)
+      // expected-error@+1 {{Scatter with batching dims is not supported}}
+      %results = "stablehlo.scatter"(%inputs, %scatter_indices, %updates) <{
+          indices_are_sorted = true,
+          unique_indices = true,
+          scatter_dimension_numbers = #stablehlo.scatter<
+              inserted_window_dims = [1],
+              input_batching_dims = [0],
+              scatter_indices_batching_dims = [0],
+              scatter_dims_to_operand_dims = [1],
+              index_vector_dim = 1
+          >
+      }> ({
+      ^bb0(%arg3: tensor<i32>, %arg4: tensor<i32>):
+        stablehlo.return %arg4 : tensor<i32>
+      }) : (tensor<13x6xi32>, tensor<13x1xi32>, tensor<13xi32>) -> tensor<13x6xi32>
+      "test.op"(%results) : (tensor<13x6xi32>) -> ()
+}

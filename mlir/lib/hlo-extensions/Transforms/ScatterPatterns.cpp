@@ -110,14 +110,8 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<stablehlo::Scatte
         // (C17) size(input_batching_dims) == size(scatter_indices_batching_dims)
         // Implies:
         // If there is no input_batching_dims and no scatter_indices_batching
-        // TODO: This will always be success until we update our version of mlir-hlo.
-        // It looks we are using an old version where getInputBatchingDims was not yet available.
-        // See here:
-        // https://github.com/tensorflow/mlir-hlo/commit/5ac7c579c52ef02b13c29886a98672c2ade7c9b0
-        return success();
-        // Until then, keep this code commented:
-        //   auto scatterDimNumbers = op.getScatterDimensionNumbers();
-        //   return scatterDimNumbers.getInputBatchingDims().empty() ? success() : failure();
+        auto scatterDimNumbers = op.getScatterDimensionNumbers();
+        return scatterDimNumbers.getInputBatchingDims().empty() ? success() : failure();
     }
 
     mlir::LogicalResult singleFullSlices(stablehlo::ScatterOp op) const {
@@ -288,6 +282,14 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<stablehlo::Scatte
             op.emitError() << "Only one input, update, and result";
             return failure();
         }
+
+        // The index computation below has no batching dims; stablehlo-compatibility-expander
+        // rewrites them away beforehand.
+        if (failed(noBatching(op))) {
+            op.emitError() << "Scatter with batching dims is not supported";
+            return failure();
+        }
+
         // Compute operation hash in case they are more than one scatter and they have different
         // update function
         auto opHash = OperationEquivalence::computeHash(op);
