@@ -228,9 +228,13 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<stablehlo::Scatte
         Location loc = op.getLoc();
 
         // TODO: upstream to mlir-hlo and stablehlo
-        for (size_t i = 0, inputDim = 0, updateDim = 0; i < inputShape.size(); i++) {
-            if (llvm::is_contained(insertedWindowDims, i)) {
-                int scatterDimIndex = scatterDimsToOperandDims[inputDim];
+        // scatter_dims_to_operand_dims[k] is the input dim whose start offset is
+        // scatter_indices[k]; input dims it does not name start at 0. Inserted window dims have
+        // size 1, the others take the size of the next update window dim.
+        for (size_t inputDim = 0, updateDim = 0; inputDim < inputShape.size(); inputDim++) {
+            auto it = llvm::find(scatterDimsToOperandDims, static_cast<int64_t>(inputDim));
+            if (it != scatterDimsToOperandDims.end()) {
+                int64_t scatterDimIndex = std::distance(scatterDimsToOperandDims.begin(), it);
                 Value scatterDimVal = index::ConstantOp::create(rewriter, loc, scatterDimIndex);
                 auto extractOp =
                     tensor::ExtractOp::create(rewriter, loc, scatterIndices, scatterDimVal)
@@ -240,26 +244,14 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<stablehlo::Scatte
                         .getResult();
                 dynOffsets.push_back(indexCastOp);
                 staticOffsets.push_back(ShapedType::kDynamic);
-                staticSizes.push_back(1);
-            } else if (updateDim == inputDim) {
-                int scatterDimIndex = scatterDimsToOperandDims[inputDim];
-                Value scatterDimVal = index::ConstantOp::create(rewriter, loc, scatterDimIndex);
-                auto extractOp =
-                    tensor::ExtractOp::create(rewriter, loc, scatterIndices, scatterDimVal)
-                        .getResult();
-                auto indexCastOp =
-                    arith::IndexCastOp::create(rewriter, loc, rewriter.getIndexType(), extractOp)
-                        .getResult();
-                dynOffsets.push_back(indexCastOp);
-                staticOffsets.push_back(ShapedType::kDynamic);
-                staticSizes.push_back(updateShape[updateDim]);
-                updateDim++;
             } else {
                 staticOffsets.push_back(0);
-                staticSizes.push_back(updateShape[updateDim]);
-                updateDim++;
             }
-            inputDim++;
+            if (llvm::is_contained(insertedWindowDims, inputDim)) {
+                staticSizes.push_back(1);
+            } else {
+                staticSizes.push_back(updateShape[updateDim++]);
+            }
             staticStrides.push_back(1);
         }
 
