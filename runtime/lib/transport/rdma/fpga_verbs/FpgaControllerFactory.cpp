@@ -23,7 +23,7 @@
 
 namespace {
 catalyst::transport::ControllerSession *make_fpga_controller(const std::string &config) {
-    const auto cfg = rdma::devices::fpga_verbs::parse_fpga_config(config);
+    const auto cfg = catalyst::transport::common::parse_fpga_config(config);
     return new rdma::devices::fpga_verbs::FpgaControllerSession(
         cfg.dev, cfg.gid, cfg.ring, cfg.stride_log2, cfg.data_mem, cfg.reply_mem);
 }
