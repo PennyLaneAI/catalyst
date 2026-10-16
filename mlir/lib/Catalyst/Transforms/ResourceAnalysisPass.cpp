@@ -72,10 +72,7 @@ struct ResourceAnalysisPass : public impl::ResourceAnalysisPassBase<ResourceAnal
         pbc::registerPBCResourceAnalysisExtensions();
 
         auto moduleOp = cast<ModuleOp>(getOperation());
-        // const DecompGraph::Core::WeightedGateset *gateset = nullptr;
-        // GraphResult solution;
         std::optional<GraphResult> solution;
-        // Keep `graph` alive for as long as `gateset` points into it.
         std::unique_ptr<DecompositionGraph> graph;
 
         if (!targetGateSetOption.empty()) {
