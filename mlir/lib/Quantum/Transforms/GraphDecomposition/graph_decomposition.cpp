@@ -33,6 +33,7 @@
 #include "llvm/Support/DebugLog.h"
 #include "llvm/Support/LogicalResult.h"
 #include "llvm/Support/raw_ostream.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
@@ -43,7 +44,9 @@
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/Location.h"
+#include "mlir/IR/Matchers.h"
 #include "mlir/IR/OwningOpRef.h"
+#include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/SymbolTable.h"
 #include "mlir/Parser/Parser.h"
 #include "mlir/Pass/PassManager.h"
@@ -130,6 +133,122 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         return success();
     }
 
+    /// Apply PauliX to `qubit` and return the new qubit value. If `cond` is non-null the X is
+    /// only applied when `cond` is true (via `scf.if`); otherwise it is applied unconditionally.
+    static Value flipQubit(OpBuilder &builder, Location loc, Value qubit, Value cond) {
+        if (!cond) {
+            return CustomOp::create(builder, loc, /*gate_name=*/"PauliX",
+                                    /*in_qubits=*/ValueRange{qubit})
+                .getResult(0);
+        }
+
+        auto ifOp = scf::IfOp::create(builder, loc, TypeRange{qubit.getType()}, cond,
+                                      /*withElseRegion=*/true);
+        {
+            OpBuilder::InsertionGuard guard(builder);
+            builder.setInsertionPointToStart(&ifOp.getThenRegion().front());
+            Value flipped = CustomOp::create(builder, loc, /*gate_name=*/"PauliX",
+                                             /*in_qubits=*/ValueRange{qubit})
+                                .getResult(0);
+            scf::YieldOp::create(builder, loc, flipped);
+        }
+        {
+            OpBuilder::InsertionGuard guard(builder);
+            builder.setInsertionPointToStart(&ifOp.getElseRegion().front());
+            scf::YieldOp::create(builder, loc, qubit);
+        }
+        return ifOp.getResult(0);
+    }
+
+    /// Rewrite zero control values to all-ones by conjugating the matching control qubits with
+    /// PauliX.
+    ///
+    /// GraphOpIds record only the control *count* (`<n>C(...)`), and decomposition rules for
+    /// controlled ops are traced under all-ones ``ctrlvals``. Without this rewrite, an operator
+    /// with a zero control value maps to the same node and is given the same rule, silently
+    /// dropping the X flips that value needs. Constant-false values get an unconditional X;
+    /// dynamic (non-constant) values get an X guarded by `scf.if !value`. Constant-true values
+    /// are left untouched.
+    ///
+    /// Decomposition rules (`func.func` with a `target_gate` attribute) are skipped: a rule body is
+    /// a template whose control values are bound by the caller when the rule is applied, and
+    /// rewriting it would also change how the rule's qubit arguments are ordered.
+    void normalizeZeroControlValues(ModuleOp module) {
+        SmallVector<DecomposableGate> gates;
+        module.walk([&](DecomposableGate gate) {
+            auto parent = gate->getParentOfType<func::FuncOp>();
+            if (parent && parent->hasAttr(DecompUtils::target_gate_attr_name)) {
+                return;
+            }
+            if (!gate.getCtrlValueOperands().empty()) {
+                gates.push_back(gate);
+            }
+        });
+
+        for (DecomposableGate gate : gates) {
+            ValueRange ctrlQubits = gate.getCtrlQubitOperands();
+            ValueRange ctrlValues = gate.getCtrlValueOperands();
+            assert(ctrlQubits.size() == ctrlValues.size());
+
+            // Indices of control qubits whose control value is not a known constant true.
+            SmallVector<unsigned> flipIndices;
+            for (auto [i, v] : llvm::enumerate(ctrlValues)) {
+                if (!matchPattern(v, m_One())) {
+                    flipIndices.push_back(i);
+                }
+            }
+            if (flipIndices.empty()) {
+                continue;
+            }
+
+            Operation *op = gate.getOperation();
+            OpBuilder builder(op);
+            Location loc = op->getLoc();
+            Value trueVal = arith::ConstantOp::create(builder, loc, builder.getBoolAttr(true));
+
+            // Build the flip conditions before the gate; they dominate both the pre- and
+            // post-gate flips. Constant false => null (unconditional); dynamic => !value.
+            SmallVector<Value> conds;
+            for (unsigned i : flipIndices) {
+                Value v = ctrlValues[i];
+                conds.push_back(matchPattern(v, m_Zero())
+                                    ? Value()
+                                    : arith::XOrIOp::create(builder, loc, v, trueVal).getResult());
+            }
+
+            SmallVector<Value> newCtrlQubits(ctrlQubits.begin(), ctrlQubits.end());
+            SmallVector<Value> newCtrlValues(ctrlValues.begin(), ctrlValues.end());
+            for (auto [i, cond] : llvm::zip(flipIndices, conds)) {
+                newCtrlQubits[i] = flipQubit(builder, loc, newCtrlQubits[i], cond);
+                newCtrlValues[i] = trueVal;
+            }
+            gate.setCtrlQubitOperands(newCtrlQubits);
+            gate.setCtrlValueOperands(newCtrlValues);
+
+            // Undo the flips on the outgoing control qubits so later uses stay consistent.
+            builder.setInsertionPointAfter(op);
+            ResultRange outCtrls = gate.getCtrlQubitResults();
+            for (auto [i, cond] : llvm::zip(flipIndices, conds)) {
+                Value outCtrl = outCtrls[i];
+                // Snapshot the uses first: the flip itself consumes `outCtrl`.
+                SmallVector<OpOperand *> uses;
+                for (OpOperand &use : outCtrl.getUses()) {
+                    uses.push_back(&use);
+                }
+                Value flipped = flipQubit(builder, loc, outCtrl, cond);
+                for (OpOperand *use : uses) {
+                    use->set(flipped);
+                }
+            }
+
+            LLVM_DEBUG({
+                llvm::dbgs() << "normalized non-true control values on ";
+                op->print(llvm::dbgs());
+                llvm::dbgs() << "\n";
+            });
+        }
+    }
+
     void runOnOperation() final {
         ScopedDiagnosticTimer totalTimer("decomp:total");
 
@@ -162,9 +281,13 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
             return signalPassFailure();
         }
 
+        ModuleOp module = getOperation();
+        // Make the all-ones ctrlvals assumption of `<n>C(...)` GraphOpIds hold for known
+        // constant-false controls before the decomposition graph is built.
+        normalizeZeroControlValues(module);
+
         ///////////////////////////
         // Step 1: Gather inputs for graph
-        ModuleOp module = getOperation();
         std::vector<OperatorNode> setOfOps;
         std::vector<RuleNode> setOfRules;
         llvm::StringSet<> userRuleNames;
