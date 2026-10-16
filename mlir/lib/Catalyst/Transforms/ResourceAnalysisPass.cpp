@@ -132,7 +132,6 @@ struct ResourceAnalysisPass : public impl::ResourceAnalysisPassBase<ResourceAnal
                 writeJsonToFile(jsonStr, outputFname);
             }
         }
-
     }
 
   private:
