@@ -127,6 +127,31 @@ module attributes {catalyst.backline = #transport.backline<transport = "rdma", c
 
 // -----
 
+// The placement with a local controller: nothing needed to dispatch, so the
+// module is left exactly as it was for the host to inline.
+
+// CHECK-LABEL: module @module_local_ctrl {
+// CHECK-NEXT:    func.func public @circuit
+// CHECK-NOT:   transport.
+// CHECK:       func.func @setup() {
+// CHECK-NEXT:    quantum.init
+module attributes {catalyst.backline = #transport.backline<transport = "memcpy", controller = #transport.node<backend_lib = "x", config = "c", in_bytes = 8 : i64, out_bytes = 8 : i64>>} {
+  func.func public @jit_circuit() -> tensor<4xf64> attributes {llvm.emit_c_interface} {
+    %0 = catalyst.launch_kernel @module_local_ctrl::@circuit() : () -> tensor<4xf64>
+    return %0 : tensor<4xf64>
+  }
+  module @module_local_ctrl {
+    func.func public @circuit() -> tensor<4xf64> {
+      %c = arith.constant dense<0.0> : tensor<4xf64>
+      return %c : tensor<4xf64>
+    }
+  }
+  func.func @setup() { quantum.init  return }
+  func.func @teardown() { quantum.finalize  return }
+}
+
+// -----
+
 // Co-located coprocessor: both roles brought up in @setup, released in @teardown.
 
 // CHECK-LABEL: func.func public @jit_circuit

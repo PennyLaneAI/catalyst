@@ -14,9 +14,10 @@
 
 #include "RSDecomp.hpp"
 
-#include <cassert>
+#include <algorithm>
 #include <cmath>
-#include <cstring>
+#include <optional>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -24,26 +25,105 @@
 #include "GridProblems.hpp"
 #include "NormSolver.hpp"
 #include "NormalForms.hpp"
+#include "Real.hpp"
 #include "Rings.hpp"
 
-#define MAX_SEARCH_TRIALS 10000
 #define ROSS_CACHE_SIZE 10000
-
-namespace {
-bool is_odd_multiple_of_pi_4(double angle) {
-    const double pi_over_4 = M_PI / 4.0;
-    double multiple = angle / pi_over_4;
-    int rounded_multiple = static_cast<int>(std::round(multiple));
-    return (rounded_multiple % 2 != 0) && (std::abs(multiple - rounded_multiple) < 1e-10);
-}
-} // namespace
+// Factoring attempts per candidate. Candidates whose norm is hard to factor are skipped, since the
+// next levels of the grid problem provide plenty of further candidates.
+#define CANDIDATE_FACTORING_TRIALS 2
+#define MAX_CANDIDATES 100000
 
 namespace RSDecomp::RossSelinger {
 
 using namespace RSDecomp::Rings;
+using namespace RSDecomp::Reals;
 using namespace RSDecomp::Utils;
 using namespace RSDecomp::CliffordData;
 using namespace RSDecomp::NormalForms;
+
+namespace {
+
+/**
+ * @brief The unitary [[u, -t^†], [t, u^†]] / √2^k approximating RZ(angle).
+ */
+struct RzSolution {
+    ZOmega u;
+    ZOmega t;
+    int k;
+};
+
+/**
+ * @brief Find the integer number of units of π/4 that the angle is equal to, within an error
+ * that keeps the decomposition within epsilon.
+ * @param angle The target rotation angle.
+ * @param epsilon The desired approximation precision.
+ * @return The number of units of π/4, or std::nullopt if the angle is not close enough to one.
+ */
+std::optional<INT_TYPE> as_multiple_of_pi_4(double angle, double epsilon) {
+    Real pi_4 = pi() / 4;
+    INT_TYPE units = round_int(Real(angle / pi_4));
+    // ||RZ(a) - RZ(b)|| <= |a - b| / 2
+    if (abs(Real(angle - Real(units) * pi_4)) <= 2 * Real(epsilon)) {
+        return units;
+    }
+    return std::nullopt;
+}
+
+/**
+ * @brief Solve the grid problem and Diophantine equation for RZ(angle) at level k = 0, 1, 2, ....
+ * @param angle The target rotation angle.
+ * @param epsilon The desired approximation precision.
+ * @return The solution at the smallest level, or std::nullopt if none was found up to the
+ * maximum level.
+ */
+std::optional<RzSolution> solve_rz(double angle, double epsilon) {
+    // RZ(angle)[0, 0] = e^{-i angle / 2}
+    GridProblem::RzGridSearch search(-Real(angle) / 2, Real(epsilon));
+
+    // Solutions are expected from level ~1.5 * log2(1/ε), and the number of candidates grows
+    // fourfold with every further level.
+    int max_k = static_cast<int>(1.5 * std::log2(std::max(1.0 / epsilon, 2.0))) + 40;
+    size_t num_candidates = 0;
+    std::optional<RzSolution> solution;
+
+    for (int k = 0; k <= max_k && !solution; k++) {
+        ZSqrtTwo two_pow_k(INT_TYPE(1) << k, 0);
+        search.visit_level(k, [&](const ZOmega &u) {
+            ZSqrtTwo xi = two_pow_k - u.norm2().to_sqrt_two();
+            auto t = NormSolver::solve_diophantine(xi, CANDIDATE_FACTORING_TRIALS);
+            if (t && t->norm2() == xi.to_omega()) {
+                solution = RzSolution{u, *t, k};
+                return false;
+            }
+            RT_FAIL_IF(++num_candidates > MAX_CANDIDATES,
+                       "Gridsynth exceeded the maximum number of candidate solutions.");
+            return true;
+        });
+    }
+    return solution;
+}
+
+/**
+ * @brief Fail for inputs that have no decomposition. This must happen before the cache lookups,
+ * as NaN keys compare equal to any cached key.
+ * @param angle The target rotation angle.
+ * @param epsilon The desired approximation precision.
+ */
+void validate_inputs(double angle, double epsilon) {
+    RT_FAIL_IF(!std::isfinite(angle), "Gridsynth requires a finite angle.");
+    RT_FAIL_IF(!(epsilon > 0) || !std::isfinite(epsilon),
+               "Gridsynth requires a positive, finite epsilon.");
+    if (epsilon < MIN_EPSILON) {
+        std::ostringstream oss;
+        oss << "Gridsynth received epsilon=" << std::scientific << epsilon
+            << ", but the smallest supported epsilon is " << std::defaultfloat << MIN_EPSILON
+            << ".";
+        RT_FAIL(oss.str().c_str());
+    }
+}
+
+} // namespace
 
 /**
  * @brief Core function to compute the Clifford+T decomposition using the Ross-Selinger algorithm.
@@ -54,20 +134,9 @@ using namespace RSDecomp::NormalForms;
  */
 std::pair<std::vector<GateType>, double> compute_clifford_T_decomposition(double angle,
                                                                           double epsilon) {
-    ZOmega scale(0, 0, 0, 1);
-    double phase = 0.0;
-
-    ZOmega u(0, 0, 0, 1);
-    ZOmega t(0, 0, 0, 0);
-    INT_TYPE k = 0;
-
-    std::vector<GateType> decomposition;
-    DyadicMatrix dyd_mat(ZOmega(0), ZOmega(0), ZOmega(0), ZOmega(0), INT_TYPE(0));
-
-    if (is_odd_multiple_of_pi_4(angle)) {
-        const double pi_over_4 = M_PI / 4.0;
-        long units = std::lround(angle / pi_over_4);
-        int normalized = ((units % 8) + 8) % 8;
+    if (auto units = as_multiple_of_pi_4(angle, epsilon)) {
+        std::vector<GateType> decomposition;
+        int normalized = (((*units % 8) + 8) % 8).convert_to<int>();
 
         if (normalized & 4) {
             decomposition.emplace_back(GateType::Z);
@@ -83,48 +152,20 @@ std::pair<std::vector<GateType>, double> compute_clifford_T_decomposition(double
             decomposition.emplace_back(GateType::I);
         }
 
-        phase = static_cast<double>(units) * (M_PI / 8.0);
-    } else {
-        double modified_angle = -angle / 2.0;
-        long k = std::lround(modified_angle / M_PI_2);
-        double shift = -static_cast<double>(k) * M_PI_2;
-        int idx = ((k % 4) + 4) % 4;
-
-        switch (idx) {
-        case 0:                         // 0 shift (Identity)
-            scale = ZOmega(0, 0, 0, 1); // d=1
-            break;
-        case 1:                         // pi/2 shift
-            scale = ZOmega(0, 1, 0, 0); // b=1
-            break;
-        case 2:                          // pi shift
-            scale = ZOmega(0, 0, 0, -1); // d=-1
-            break;
-        case 3:                          // 3pi/2 (or -pi/2) shift
-            scale = ZOmega(0, -1, 0, 0); // b=-1
-            break;
-        }
-        GridProblem::GridIterator u_solutions(modified_angle + shift, epsilon, MAX_SEARCH_TRIALS);
-
-        for (const auto &[u_sol, k_val] : u_solutions) {
-            // Calculate 2^k_val as an INT_TYPE
-            INT_TYPE two_pow_k = INT_TYPE(1) << k_val;
-            auto xi = ZSqrtTwo(two_pow_k, 0) - u_sol.norm2().to_sqrt_two();
-            auto t_sol = NormSolver::solve_diophantine(xi, MAX_FACTORING_TRIALS);
-
-            if (t_sol) {
-                u = u_sol * scale;
-                t = *t_sol * scale;
-                k = k_val;
-                break;
-            }
-        }
-
-        dyd_mat = DyadicMatrix(u, -t.conj(), t, u.conj(), INT_TYPE(k));
-        SO3Matrix so3_mat(dyd_mat);
-        std::tie(decomposition, phase) = ma_normal_form(so3_mat);
+        return {std::move(decomposition), units->convert_to<double>() * (M_PI / 8.0)};
     }
-    return {std::move(decomposition), phase};
+
+    auto solution = solve_rz(angle, epsilon);
+    if (!solution) {
+        std::ostringstream oss;
+        oss << "Gridsynth failed to find a decomposition for angle=" << angle
+            << " and epsilon=" << std::scientific << epsilon << ".";
+        RT_FAIL(oss.str().c_str());
+    }
+
+    const auto &[u, t, k] = *solution;
+    SO3Matrix so3_mat(DyadicMatrix(u, -t.conj(), t, u.conj(), INT_TYPE(k)));
+    return ma_normal_form(so3_mat);
 }
 
 // Cache for Standard Basis
@@ -133,6 +174,7 @@ using StdCacheValue = std::pair<std::vector<GateType>, double>;
 static lru_cache<StdCacheKey, StdCacheValue, ROSS_CACHE_SIZE> ross_cache_std;
 
 std::pair<std::vector<GateType>, double> eval_ross_algorithm(double angle, double epsilon) {
+    validate_inputs(angle, epsilon);
     StdCacheKey key = {angle, epsilon};
 
     if (auto val_opt = ross_cache_std.get(key); val_opt) {
@@ -150,6 +192,7 @@ using PPRCacheValue = std::pair<std::vector<PPRGateType>, double>;
 static lru_cache<PPRCacheKey, PPRCacheValue, ROSS_CACHE_SIZE> ross_cache_ppr;
 
 std::pair<std::vector<PPRGateType>, double> eval_ross_algorithm_ppr(double angle, double epsilon) {
+    validate_inputs(angle, epsilon);
     PPRCacheKey key = {angle, epsilon};
 
     if (auto val_opt = ross_cache_ppr.get(key); val_opt) {
@@ -285,14 +328,6 @@ std::pair<std::vector<PPRGateType>, double> HST_to_PPR(const std::vector<GateTyp
 extern "C" {
 
 size_t rs_decomposition_get_size(double theta, double epsilon, bool ppr_basis) {
-    if (epsilon < 1e-6) {
-        std::ostringstream oss;
-        oss << std::scientific << epsilon;
-        RT_WARN("Gridsynth received epsilon=" + oss.str() +
-                ". For epsilon smaller than 1e-6, results may be inaccurate, or errors may"
-                " occur during decomposition. To guarantee correctness, please provide a larger "
-                "epsilon value.");
-    }
     if (ppr_basis) {
         auto result = eval_ross_algorithm_ppr(theta, epsilon);
         return result.first.size();

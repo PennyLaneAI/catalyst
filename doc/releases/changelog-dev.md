@@ -151,6 +151,14 @@
 
 <h3>Improvements 🛠</h3>
 
+* The :func:`~catalyst.qjit` function now accepts an ``enable_aot_compilation`` argument, which can be
+  used to toggle whether or not to use ahead-of-time compilation.
+  [(#3339)](https://github.com/PennyLaneAI/catalyst/pull/3339)
+
+* :func:`pennylane.transforms.gridsynth` now produces correct, deterministic decompositions for
+  any `epsilon` down to `1e-15`, and invalid angles or `epsilon` values raise an error.
+  [(#3333)](https://github.com/PennyLaneAI/catalyst/pull/3333)
+
 * Controlled :class:`~pennylane.GlobalPhase` operations now decompose to
   :class:`~pennylane.PhaseShift` on the control wire when possible (or
   :class:`~pennylane.ControlledPhaseShift` for multiple controls), via an updated
@@ -208,6 +216,11 @@
 * a PennyLane `Backline` is serialized to the `catalyst.backline` module attribute and compiled
   through the transport passes.
   [(#3068)](https://github.com/PennyLaneAI/catalyst/pull/3068)
+
+* A PennyLane `Backline` can now have a controller alone, with `transport="none"` and no
+  coprocessors. With this option, no transport session is opened, and the controller can still
+  be dispatched to an executor of its own.
+  [(#3255)](https://github.com/PennyLaneAI/catalyst/pull/3255)
 
 * The new `pennylane.core.Operator2` can now be lowered to MLIR with program capture for operators
   without non-lowerable arguments. `Operator2` classes are now lowered to specialized operations
@@ -312,6 +325,7 @@
     [(#3158)](https://github.com/PennyLaneAI/catalyst/pull/3158)
     [(#3206)](https://github.com/PennyLaneAI/catalyst/pull/3206)
     [(#3224)](https://github.com/PennyLaneAI/catalyst/pull/3224)
+    [(#3232)](https://github.com/PennyLaneAI/catalyst/pull/3232)
     [(#3285)](https://github.com/PennyLaneAI/catalyst/pull/3285)
     [(#3292)](https://github.com/PennyLaneAI/catalyst/pull/3292)
 
@@ -758,6 +772,18 @@
   An additional bug is fixed in the scatter lowering that resulted in failed assertions.
   [(#3352)](https://github.com/PennyLaneAI/catalyst/pull/3352)
 
+* MLIR passes that recreate `scf.for`, `scf.while`, `scf.if`, and `scf.index_switch` ops
+  (`ctrl-lowering`, `adjoint-lowering`, `--convert-to-value-semantics`) now preserve discardable
+  attributes such as `catalyst.estimated_iterations`, `catalyst.estimated_probability`, and
+  `catalyst.estimated_probabilities`, so resource analysis still sees compiler hints after those
+  rewrites.
+  [(#3288)](https://github.com/PennyLaneAI/catalyst/pull/3288)
+  [(#3291)](https://github.com/PennyLaneAI/catalyst/pull/3291)
+
+* Fixed a bug where graph decomposition ignored entries in `fixed_decomps` and `alt_decomps` that
+  use a string key containing parentheses, such as `"C(PauliZ)"` or `"Adjoint(TemporaryAND)"`.
+  [(#3336)](https://github.com/PennyLaneAI/catalyst/pull/3336)
+
 * Graph-based decomposition now handles operators with a nested-operator ("hybrid") argument, such
   as `GQSP`. Previously the operator counted the nested operator's wires among its own, but the
   generated decomposition rule did not, so `decompose-lowering` built a `tensor.from_elements`
@@ -1152,6 +1178,7 @@ Shuli Shu,
 Nikhil Sreekumar,
 Kalman Szenes,
 Paul Haochen Wang,
+David Wierichs,
 Jake Zaia,
 Haider Sajjad,
 Hongsheng Zheng.
