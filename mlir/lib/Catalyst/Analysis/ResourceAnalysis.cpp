@@ -482,10 +482,9 @@ void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result, b
         }
         DecompGraph::Core::WeightedGateset gateset =
             graph ? graph->getGateset() : DecompGraph::Core::WeightedGateset();
-        // if the op is in the graph and not in the gateset that means it has been decomposed
-        // Go through the graph's decomp rule for the op, and the basis counts for the op,
-        // which is the target gate set which the op decomposes into. And accumulate the counts for
-        // the target gate set.
+        // if the op is in the graph and not in the gateset that means it has been decomposed.
+        // Go through the graph's decomp rule for the op, its basis counts,
+        // which is the target gate set which the op decomposes into, and accumulate.
         if (graphResult && graphOp != graphResult->end() && gateset.ops.size() > 0 &&
             !gateset.contains(operatorNode)) {
             const DecompGraph::Core::ChosenDecompRule &chosenRule = graphOp->second;
@@ -497,8 +496,8 @@ void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result, b
             return;
         }
 
-        // if the op is in the gate set, I don't need to look for it in the graph as I can just
-        // count it, so then count it like how its counted
+        // if the op is in the gate set, don't need to look for it in the graph.
+        // can count it directly.
         uint64_t nParams = inst.getResourceNumParams();
         uint64_t nQubits = inst.getResourceNumQubits() + nCtrlQubits;
         result.operations[name][{nQubits, nParams}] += 1;
