@@ -351,13 +351,19 @@ func.func @test_adjoint_region(%r: !quantum.reg, %x: f64) -> !quantum.reg {
 
 // -----
 
-// Rotations inside control regions are not supported.
+// Rotations inside control regions are discretized; the region is left as is.
 
-func.func @test_ctrl_region_error(%c: !quantum.bit, %q: !quantum.bit, %x: f64) -> (!quantum.bit, !quantum.bit) {
+// CHECK-LABEL: @test_ctrl_region
+// CHECK-SAME: ({{%.+}}: !quantum.bit, {{%.+}}: !quantum.bit, [[THETA:%.+]]: f64)
+func.func @test_ctrl_region(%c: !quantum.bit, %q: !quantum.bit, %x: f64) -> (!quantum.bit, !quantum.bit) {
     %true = arith.constant true
+    // CHECK: quantum.ctrl
+    // CHECK: ^bb0([[ARG:%.+]]: !quantum.bit):
+    // CLIFFORD: [[RES:%.+]] = func.call @__catalyst_decompose_RZ([[ARG]], [[THETA]])
+    // PPR:      [[RES:%.+]] = func.call @__catalyst_decompose_RZ_ppr_basis([[ARG]], [[THETA]])
+    // CHECK: quantum.yield [[RES]]
     %outc, %outq = quantum.ctrl(%c) ctrlvals(%true) (%q) : !quantum.bit -> !quantum.bit {
     ^bb0(%arg0: !quantum.bit):
-        // expected-error @+1 {{Unsupported rotation inside a control region for gridsynth}}
         %q1 = quantum.custom "RZ"(%x) %arg0 : !quantum.bit
         quantum.yield %q1 : !quantum.bit
     }

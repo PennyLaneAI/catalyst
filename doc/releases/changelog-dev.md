@@ -764,9 +764,10 @@
 * The `gridsynth` pass now discretizes adjoint gates such as `qp.adjoint(qp.RZ(x, 0))` as the
   inverse rotation instead of the rotation itself. `qp.adjoint` applied to a function containing
   rotations now compiles instead of crashing, and runs the inverse of the discretized sequence.
-  For `qp.ctrl` applied to such a function, the pass now raises an error instead of silently
-  dropping the control. The adjoint lowering no longer crashes when an adjoint region calls the
-  same function more than once.
+  The control lowering now raises an error for function calls acting on qubits inside a control
+  region instead of silently dropping the control, as happened for `qp.ctrl` applied to a function
+  containing rotations discretized by `gridsynth`. The adjoint lowering no longer crashes when an
+  adjoint region calls the same function more than once.
   [(#3330)](https://github.com/PennyLaneAI/catalyst/pull/3330)
 
 * MLIR passes that recreate `scf.for`, `scf.while`, `scf.if`, and `scf.index_switch` ops

@@ -92,7 +92,8 @@ def test_adjoint_region_gridsynth(param, op, ppr_basis, region):
 
 
 def test_gridsynth_ctrl_region_error():
-    """Test that gridsynth raises an error for rotations inside control regions."""
+    """Test that the control lowering raises an error for rotations discretized inside control
+    regions, instead of dropping the control."""
     dev = qp.device("lightning.qubit", wires=2)
 
     def rotation(x):
@@ -103,7 +104,7 @@ def test_gridsynth_ctrl_region_error():
         qp.ctrl(rotation, control=1)(x)
         return qp.state()
 
-    with pytest.raises(CompileError, match="Unsupported rotation inside a control region"):
+    with pytest.raises(CompileError, match="cannot control a function call"):
         qp.qjit(
             qp.transforms.gridsynth(circuit, epsilon=1e-6), capture=True, collect_decomp_rules=False
         )(0.7)

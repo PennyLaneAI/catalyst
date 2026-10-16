@@ -22,11 +22,8 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #include "PBC/IR/PBCDialect.h"
-#include "PBC/IR/PBCOps.h"
 #include "Quantum/IR/QuantumOps.h"
 #include "Quantum/Transforms/Patterns.h"
-
-#include "GraphDecomposition/DecompUtils.hpp"
 
 using namespace llvm;
 using namespace mlir;
@@ -47,32 +44,16 @@ struct GridsynthPass : impl::GridsynthPassBase<GridsynthPass> {
         mlir::MLIRContext *context = &getContext();
         RewritePatternSet patterns(context);
 
-        WalkResult unsupportedRotation = module->walk([](Operation *op) {
-            auto customOp = dyn_cast<CustomOp>(op);
-            auto pprOp = dyn_cast<pbc::PPRotationArbitraryOp>(op);
-            bool isRotation =
-                (customOp &&
-                 (customOp.getGateName() == "RZ" || customOp.getGateName() == "PhaseShift")) ||
-                (pprOp && !pprOp.getCondition() && pprOp.getPauliProduct().size() == 1 &&
-                 cast<StringAttr>(pprOp.getPauliProduct()[0]).getValue() == "Z");
-            // Decomposition rules are templates for graph decomposition, not part of the circuit.
-            if (!isRotation || DecompUtils::isInDecompRule(op)) {
-                return WalkResult::advance();
-            }
-            if (customOp && !customOp.getInCtrlQubits().empty()) {
-                op->emitError("Unsupported controlled gate for gridsynth. Only single-qubit RZ and "
-                              "PhaseShift gates can be discretized.");
-                return WalkResult::interrupt();
-            }
-            // Controlling the discretized sequence would leave the Clifford+T or PPR basis.
-            if (op->getParentOfType<CtrlOp>()) {
-                op->emitError("Unsupported rotation inside a control region for gridsynth. "
-                              "Decompose the region into single-qubit rotations first.");
+        WalkResult controlledRotation = module->walk([](CustomOp op) {
+            StringRef gateName = op.getGateName();
+            if ((gateName == "RZ" || gateName == "PhaseShift") && !op.getInCtrlQubits().empty()) {
+                op.emitError("Unsupported controlled gate for gridsynth. Only single-qubit RZ and "
+                             "PhaseShift gates can be discretized.");
                 return WalkResult::interrupt();
             }
             return WalkResult::advance();
         });
-        if (unsupportedRotation.wasInterrupted()) {
+        if (controlledRotation.wasInterrupted()) {
             return signalPassFailure();
         }
 

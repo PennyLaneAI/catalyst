@@ -355,13 +355,6 @@ Value buildDecompositionLoop(PatternRewriter &rewriter, Location loc, Value qbit
     return forOp.getResult(0);
 }
 
-void createGlobalPhase(PatternRewriter &rewriter, Location loc, Value phase) {
-    NamedAttrList gphaseAttrs;
-    gphaseAttrs.append(
-        rewriter.getNamedAttr("operandSegmentSizes", rewriter.getDenseI32ArrayAttr({1, 0, 0})));
-    GlobalPhaseOp::create(rewriter, loc, TypeRange{}, ValueRange{phase}, gphaseAttrs.getAttrs());
-}
-
 /**
  * @brief Gets or creates the RZ/PhaseShift decomposition function.
  * This function contains the loop and switch logic acting on a Qubit.
@@ -434,7 +427,7 @@ func::FuncOp getOrCreateDecompositionFunc(ModuleOp module, PatternRewriter &rewr
     // Clean up heap memory
     memref::DeallocOp::create(rewriter, loc, gatesMemref);
 
-    createGlobalPhase(rewriter, loc, runtimePhase);
+    GlobalPhaseOp::create(rewriter, loc, runtimePhase);
 
     func::ReturnOp::create(rewriter, loc, ValueRange{finalQbit});
 
@@ -491,7 +484,7 @@ struct DecomposeCustomOpPattern : public OpRewritePattern<CustomOp> {
             Value c2 = arith::ConstantOp::create(rewriter, loc, rewriter.getF64FloatAttr(2.0));
             Value halfAngle = arith::DivFOp::create(rewriter, loc, angle, c2);
             Value negHalfAngle = arith::NegFOp::create(rewriter, loc, halfAngle);
-            createGlobalPhase(rewriter, loc, negHalfAngle);
+            GlobalPhaseOp::create(rewriter, loc, negHalfAngle);
         }
 
         // Replace the RZ/PhaseShift op with the resulting qubit

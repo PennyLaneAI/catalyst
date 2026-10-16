@@ -790,6 +790,26 @@ def GlobalPhaseOp : UnitaryGate_Op<"gphase", [DifferentiableGate, AttrSizedOpera
         Variadic<QubitType>:$out_ctrl_qubits
     );
 
+    let builders = [
+        OpBuilder<
+        // Convenience builder, by default without controls and not adjoint.
+        // Note that number of out_ctrl_qubits = number of in_ctrl_qubits
+        (ins
+             "mlir::Value":$angle,
+             CArg<"mlir::ValueRange", "{}">:$in_ctrl_qubits,
+             CArg<"mlir::ValueRange", "{}">:$in_ctrl_values,
+             CArg<"bool", "false">:$adjoint
+        ),[{
+            GlobalPhaseOp::build($_builder, $_state,
+            /*out_ctrl_qubits=*/ mlir::TypeRange(in_ctrl_qubits),
+            /*angle=*/ angle,
+            /*adjoint=*/ adjoint,
+            /*in_ctrl_qubits=*/ in_ctrl_qubits,
+            /*in_ctrl_values=*/ in_ctrl_values
+            );
+        }]>
+    ];
+
     let assemblyFormat = [{
         `(` $angle `)` (`adj` $adjoint^)? attr-dict ( `ctrls` `(` $in_ctrl_qubits^ `)` )?  ( `ctrlvals` `(` $in_ctrl_values^ `)` )? ( `:` `ctrls` type($out_ctrl_qubits)^ )?
     }];
