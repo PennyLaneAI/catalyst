@@ -754,6 +754,7 @@
 
 * Executing a circuit with control values, decomposition, and program capture now gives
   correct results.
+  [(#3350)](https://github.com/PennyLaneAI/catalyst/pull/3350)
 
 * MLIR passes that recreate `scf.for`, `scf.while`, `scf.if`, and `scf.index_switch` ops
   (`ctrl-lowering`, `adjoint-lowering`, `--convert-to-value-semantics`) now preserve discardable
