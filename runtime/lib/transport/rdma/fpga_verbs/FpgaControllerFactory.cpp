@@ -30,3 +30,8 @@ catalyst::transport::ControllerSession *make_fpga_controller(const std::string &
 } // namespace
 
 GENERATE_TRANSPORT_CONTROLLER_FACTORY(CatalystTransportController, make_fpga_controller)
+CATALYST_TRANSPORT_BACKEND_CAPS("fpga_verbs", CATALYST_TRANSPORT_ROLE_BIT_CONTROLLER,
+                                CATALYST_TRANSPORT_MEM_BIT(CpuRam) |
+                                    CATALYST_TRANSPORT_MEM_BIT(Ddr) |
+                                    CATALYST_TRANSPORT_MEM_BIT(Other),
+                                0, 8, 8, 16)
