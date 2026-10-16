@@ -14,6 +14,8 @@
 
 """Unit tests for the python decompositions module."""
 
+import itertools
+
 import jax.numpy as jnp
 import numpy as np
 import pennylane as qp
@@ -1305,19 +1307,13 @@ class TestSymbolicRules:
         # Only one control on: the target must be left alone.
         assert np.allclose(run([1]), 1.0)
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason="A <n>C(...) graphOpId records only the control count, so an operator with a zero "
-        "control value is handed a rule traced for all-ones controls. Fixed by normalizing zero "
-        "control values into X flips during capture; see the FIXME in symbolic_arguments.",
-    )
-    def test_zero_control_value_is_mislowered(self):
+    def test_zero_control_value_decomposes_correctly(self):
         """Test an operator with a zero control value decomposes to the right state.
 
-        The registered symbolic rule is traced with every control value on, so the flips a zero
-        value needs are missing from the lowered body and the controlled op fires on the wrong
-        branch. The distribution pathway is unaffected: its ``qref.ctrl`` region is given the
-        control values at runtime.
+        A ``<n>C(...)`` graphOpId records only the control count, and the registered symbolic rule
+        is traced with every control value on. The graph-decomposition pass therefore conjugates
+        the control qubit with ``PauliX`` and rewrites the value to on, so the rule sees the
+        all-ones controls it was traced for.
         """
 
         class ZeroCtrl(qp.core.Operator2):
@@ -1348,8 +1344,141 @@ class TestSymbolicRules:
 
             result = circuit()
 
-        # The op fires and flips wire 0. Today the flips are missing, so it does not and this is 1.
+        # The op fires and flips wire 0. Without the flips it would not, and this would be 1.
         assert np.allclose(result, -1.0)
+
+    @pytest.mark.parametrize("control_values", list(itertools.product((False, True), repeat=2)))
+    @pytest.mark.parametrize("prepared", list(itertools.product((False, True), repeat=2)))
+    def test_static_control_values_select_the_firing_branch(self, control_values, prepared):
+        """Test a multi-controlled op fires exactly when every control qubit matches its value.
+
+        Covers every combination of two constant control values against every computational basis
+        state of the two control qubits, so a flip applied to the wrong control (or left on after
+        the op) shows up as a wrong state.
+        """
+
+        class MultiCtrlValued(qp.core.Operator2):
+            """An operator whose controlled form is a Toffoli onto its wire."""
+
+            def __init__(self, wires):
+                super().__init__(wires=wires)
+
+        @register_resources({qp.PauliX: 1})
+        def x_rule(wires):
+            qp.X(wires=wires)
+
+        @register_resources(lambda base, control_wires, **_: {qp.Toffoli: 1})
+        def ctrl_rule(base, control_wires, **_):
+            qp.Toffoli(wires=list(control_wires) + list(base.wires))
+
+        with local_decomps():
+            add_decomps(MultiCtrlValued, x_rule)
+            add_decomps("C(MultiCtrlValued)", ctrl_rule)
+
+            @qjit(capture=True)
+            @qp.decompose(gate_set=["Toffoli", "PauliX"])
+            @qnode(qp.device("lightning.qubit", wires=3))
+            def circuit():
+                for wire, is_on in zip((1, 2), prepared):
+                    if is_on:
+                        qp.X(wire)
+                qp.ctrl(MultiCtrlValued(0), control=[1, 2], control_values=list(control_values))
+                # The controls must come back in the state they went in, flips undone.
+                return qp.expval(qp.Z(0)), qp.expval(qp.Z(1)), qp.expval(qp.Z(2))
+
+            target, ctrl1, ctrl2 = circuit()
+
+        fires = tuple(control_values) == tuple(prepared)
+        assert np.allclose(target, -1.0 if fires else 1.0)
+        assert np.allclose(ctrl1, -1.0 if prepared[0] else 1.0)
+        assert np.allclose(ctrl2, -1.0 if prepared[1] else 1.0)
+
+    @pytest.mark.parametrize("value", [False, True])
+    @pytest.mark.parametrize("prepared", [False, True])
+    def test_dynamic_control_value_selects_the_firing_branch(self, value, prepared):
+        """Test a control value only known at runtime flips the control only when it is off.
+
+        The value is a traced argument, so the pass cannot fold it away and has to guard the
+        ``PauliX`` flips on it.
+        """
+
+        class DynamicCtrl(qp.core.Operator2):
+            """An operator whose controlled form is a CNOT from the control onto its wire."""
+
+            def __init__(self, wires):
+                super().__init__(wires=wires)
+
+        @register_resources({qp.PauliX: 1})
+        def x_rule(wires):
+            qp.X(wires=wires)
+
+        @register_resources(lambda base, control_wires, **_: {qp.CNOT: 1})
+        def ctrl_rule(base, control_wires, **_):
+            qp.CNOT(wires=list(control_wires) + list(base.wires))
+
+        with local_decomps():
+            add_decomps(DynamicCtrl, x_rule)
+            add_decomps("C(DynamicCtrl)", ctrl_rule)
+
+            @qjit(capture=True)
+            @qp.decompose(gate_set=["CNOT", "PauliX"])
+            @qnode(qp.device("lightning.qubit", wires=2))
+            def circuit(control_value):
+                if prepared:
+                    qp.X(1)
+                qp.ctrl(DynamicCtrl(0), control=[1], control_values=[control_value])
+                return qp.expval(qp.Z(0)), qp.expval(qp.Z(1))
+
+            target, ctrl = circuit(value)
+
+        assert np.allclose(target, -1.0 if value == prepared else 1.0)
+        assert np.allclose(ctrl, -1.0 if prepared else 1.0)
+
+    @pytest.mark.parametrize("dynamic_value", [False, True])
+    @pytest.mark.parametrize("prepared", list(itertools.product((False, True), repeat=2)))
+    def test_mixed_static_and_dynamic_control_values(self, dynamic_value, prepared):
+        """Test a static zero control value alongside a dynamic one, on the same operator.
+
+        The first control is only known at runtime, so its flip is guarded; the second is
+        statically off, so it gets an unconditional flip.
+        """
+
+        class MixedCtrl(qp.core.Operator2):
+            """An operator whose controlled form is a Toffoli onto its wire."""
+
+            def __init__(self, wires):
+                super().__init__(wires=wires)
+
+        @register_resources({qp.PauliX: 1})
+        def x_rule(wires):
+            qp.X(wires=wires)
+
+        @register_resources(lambda base, control_wires, **_: {qp.Toffoli: 1})
+        def ctrl_rule(base, control_wires, **_):
+            qp.Toffoli(wires=list(control_wires) + list(base.wires))
+
+        with local_decomps():
+            add_decomps(MixedCtrl, x_rule)
+            add_decomps("C(MixedCtrl)", ctrl_rule)
+
+            @qjit(capture=True)
+            @qp.decompose(gate_set=["Toffoli", "PauliX"])
+            @qnode(qp.device("lightning.qubit", wires=3))
+            def circuit(control_value):
+                for wire, is_on in zip((1, 2), prepared):
+                    if is_on:
+                        qp.X(wire)
+                # The traced value goes first: PennyLane picks the array backend for the values
+                # from the first entry, so a leading Python bool cannot hold a tracer.
+                qp.ctrl(MixedCtrl(0), control=[1, 2], control_values=[control_value, False])
+                return qp.expval(qp.Z(0)), qp.expval(qp.Z(1)), qp.expval(qp.Z(2))
+
+            target, ctrl1, ctrl2 = circuit(dynamic_value)
+
+        fires = (prepared[0] == dynamic_value) and (not prepared[1])
+        assert np.allclose(target, -1.0 if fires else 1.0)
+        assert np.allclose(ctrl1, -1.0 if prepared[0] else 1.0)
+        assert np.allclose(ctrl2, -1.0 if prepared[1] else 1.0)
 
     def test_discovered_op_gets_multi_controlled_rules(self):
         """Test an op reached through the walk is given rules for *every* control count in play,

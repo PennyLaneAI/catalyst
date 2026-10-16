@@ -752,6 +752,9 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* Executing a circuit with control values, decomposition, and program capture now gives
+  correct results.
+
 * MLIR passes that recreate `scf.for`, `scf.while`, `scf.if`, and `scf.index_switch` ops
   (`ctrl-lowering`, `adjoint-lowering`, `--convert-to-value-semantics`) now preserve discardable
   attributes such as `catalyst.estimated_iterations`, `catalyst.estimated_probability`, and
