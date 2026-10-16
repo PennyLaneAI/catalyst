@@ -94,12 +94,14 @@ class TestGeneralPreprocessing:
         pipelines = get_pipelines(f, skip_preprocess=skip_preprocess)
 
         if skip_preprocess:
-            assert len(pipelines) == 1
-            assert pipelines[0][0] == "main"
-        else:
             assert len(pipelines) == 2
             assert pipelines[0][0] == "main"
+            assert pipelines[1][0] == "post-device"
+        else:
+            assert len(pipelines) == 3
+            assert pipelines[0][0] == "main"
             assert pipelines[1][0] == "device"
+            assert pipelines[2][0] == "post-device"
 
     def test_finite_shots_only(self):
         """Test that an error is raised if trying to do an analytic execution with
@@ -629,8 +631,8 @@ class TestIntegration:
         assert f2_pipelines[0][1][0].pass_name == "cancel-inverses"
 
         if skip_preprocess:
-            assert len(f1_pipelines) == 1
-            assert len(f2_pipelines) == 1
+            assert len(f1_pipelines) == 2
+            assert len(f2_pipelines) == 2
             assert len(recwarn) == 0
         else:
             assert len(f1_pipelines) > 1
@@ -667,6 +669,49 @@ class TestIntegration:
                     "The following device-preprocessing transforms are currently not supported"
                     in str(w.message)
                 )
+
+    def test_insertion_of_device_and_post_device_transforms(self):
+        """
+        Integration test that checks for modification of the IR caused by
+        insertion of device and post-device transforms.
+        """
+
+        # Create a device s.t split to single terms (Device Preprocessing) is
+        dev = CapabilitiesDevice(wires=2)
+        dev.capabilities = DeviceCapabilities(
+            non_commuting_observables=True,
+            observables={
+                "PauliX": OperatorProperties(),
+                "PauliY": OperatorProperties(),
+                "PauliZ": OperatorProperties(),
+                "Hadamard": OperatorProperties(),
+            },
+            measurement_processes={"ExpectationMP": [], "SampleMP": [], "CountsMP": []},
+        )
+
+        # Device Preprocessing should perform split to single terms
+        @qp.qjit(capture=True, collect_decomp_rules=False)
+        @qp.qnode(dev)
+        def circuit(x):
+            qp.Hadamard(wires=0)
+            qp.Hadamard(wires=0)
+            return qp.expval(qp.sum(qp.H(0), qp.Z(1)))
+
+        # This is the expected approach to insert a post-device transform into the pipeline
+        circuit.original_function._post_device_pipeline = qp.CompilePipeline(
+            qp.transforms.cancel_inverses
+        )
+
+        # JIT compile the circuit
+        _ = circuit(0.1)
+
+        # cancel_inverses (device)
+        assert "Hadamard" in circuit.mlir
+        assert "Hadamard" not in circuit.mlir_opt
+
+        # split_to_single_terms (post-device)
+        assert "hamiltonian" in circuit.mlir
+        assert "Hamiltonian" not in circuit.mlir_opt
 
 
 if __name__ == "__main__":
