@@ -1592,7 +1592,7 @@ class TestOperatorConnectivity:
                 ("PauliX", "PauliY"),
             )
         else:
-            assert nodes["node4"]["label"] == "<name> C(GlobalPhase)|<wire> [0]"
+            assert nodes["node4"]["label"] == "<name> PhaseShift|<wire> [0]"
             expected_edges = (
                 ("NullQubit", "PauliX"),
                 ("PauliX", "PhaseShift"),
