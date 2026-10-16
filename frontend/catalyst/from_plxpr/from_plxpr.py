@@ -347,7 +347,9 @@ def _require_decompose_gate_set(tkwargs):
 
 
 # pylint: disable=too-many-positional-arguments
-def _handle_decompose_transform(self, inner_jaxpr, consts, non_const_args, tkwargs, resource_analysis_for_estimate=False):
+def _handle_decompose_transform(
+    self, inner_jaxpr, consts, non_const_args, tkwargs, resource_analysis_for_estimate=False
+):
     """Route a captured ``qp.decompose`` onto the ``graph-decomposition`` pass.
 
     ``qp.decompose`` is an alias for :func:`catalyst.passes.graph_decomposition`.
@@ -379,7 +381,9 @@ def _handle_decompose_transform(self, inner_jaxpr, consts, non_const_args, tkwar
             add_decomps(op, *rules)
 
         # Reusing graph_decomposition pass options setup for resource analysis estimation.
-        bound_transform = resource_analysis if resource_analysis_for_estimate else graph_decomposition
+        bound_transform = (
+            resource_analysis if resource_analysis_for_estimate else graph_decomposition
+        )
         bound_transform_params = {
             "gate_set": tkwargs["gate_set"],
             "fixed_decomps": fixed_decomps or None,
@@ -435,7 +439,9 @@ def handle_transform(
 
     # qp.decompose is routed to the graph-decomposition pass (see _handle_decompose_transform).
     if transform == pl_decompose or resource_analysis_for_estimate:
-        return _handle_decompose_transform(self, inner_jaxpr, consts, non_const_args, pl_tkwargs, resource_analysis_for_estimate)
+        return _handle_decompose_transform(
+            self, inner_jaxpr, consts, non_const_args, pl_tkwargs, resource_analysis_for_estimate
+        )
 
     if transform.pass_name is None:
         raise ValueError(
