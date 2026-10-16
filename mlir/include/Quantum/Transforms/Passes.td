@@ -16,6 +16,16 @@
 #define QUANTUM_PASSES
 
 include "mlir/Pass/PassBase.td"
+include "mlir/IR/EnumAttr.td"
+
+def GridsynthMethod : I32EnumAttr<"GridsynthMethod", "Synthesis method of the gridsynth pass",
+    [
+        I32EnumAttrCase<"Deterministic", 0, "deterministic">,
+        I32EnumAttrCase<"Mixed", 1, "mixed">,
+    ]> {
+    let cppNamespace = "catalyst::quantum";
+    let genSpecializedAttr = 0;
+}
 
 def QuantumConversionPass : Pass<"convert-quantum-to-llvm"> {
     let summary = "Perform a dialect conversion from Quantum to LLVM (QIR).";
@@ -162,7 +172,19 @@ def GridsynthPass : Pass<"gridsynth"> {
         /*CLI name=*/"ppr-basis",
         /*Type=*/"bool",
         /*Default=*/"false",
-        /*Description=*/desc="Whether to decompose into the PPR basis set instead of the standard Clifford+T basis set.">,];
+        /*Description=*/desc="Whether to decompose into the PPR basis set instead of the standard Clifford+T basis set.">,
+        Option<
+        /*C++ var name=*/"method",
+        /*CLI name=*/"method",
+        /*Type=*/"::catalyst::quantum::GridsynthMethod",
+        /*Default=*/"::catalyst::quantum::GridsynthMethod::Deterministic",
+        /*Description=*/desc="Synthesis method. 'mixed' is cheaper but matches the accuracy of 'deterministic' only on average over samples.",
+        /*Additional flags=*/additionalFlags=[{::llvm::cl::values(
+            clEnumValN(::catalyst::quantum::GridsynthMethod::Deterministic, "deterministic",
+                       "A single Ross-Selinger sequence per rotation."),
+            clEnumValN(::catalyst::quantum::GridsynthMethod::Mixed, "mixed",
+                       "A probabilistic mixture of Ross-Selinger sequences for under- and over-rotations.")
+        )}]>,];
 
         let dependentDialects = [
         "memref::MemRefDialect",
