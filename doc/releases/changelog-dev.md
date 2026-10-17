@@ -891,6 +891,10 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* The `method` attribute of the Gradient dialect operations (`grad`, `value_and_grad`, `jvp`,
+  `vjp`) is now an enum attribute (`#gradient<diff_method auto>`) instead of a string attribute.
+  [(#3318)](https://github.com/PennyLaneAI/catalyst/pull/3318)
+
 * QNode functions are now marked with a `quantum.kernel_entry_point` attribute in their quantum
   kernel module, which the `ResourceAnalysis` pass uses to identify the entry function.
   [(#3308)](https://github.com/PennyLaneAI/catalyst/pull/3308)
@@ -1172,6 +1176,7 @@ Nikhil Sreekumar,
 Kalman Szenes,
 Paul Haochen Wang,
 David Wierichs,
+Johannes Wittmann,
 Jake Zaia,
 Haider Sajjad,
 Hongsheng Zheng.
