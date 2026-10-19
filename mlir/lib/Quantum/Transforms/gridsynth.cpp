@@ -57,7 +57,7 @@ struct GridsynthPass : impl::GridsynthPassBase<GridsynthPass> {
             return signalPassFailure();
         }
 
-        populateGridsynthPatterns(patterns, epsilon, pprBasis);
+        populateGridsynthPatterns(patterns, epsilon, pprBasis, method);
 
         if (failed(applyPatternsGreedily(module, std::move(patterns)))) {
             signalPassFailure();

@@ -295,6 +295,33 @@ struct Ellipse {
     }
 
     /**
+     * @brief Create an ellipse that bounds the annular sector of u such that r_min <= |u| <= 1
+     * and |Arg(u) - theta| <= delta. (Figure 8, arXiv:2203.10064)
+     *
+     * The sector lies in the rectangle with radial extent [r_min cos(delta), 1] and tangential
+     * extent [-sin(delta), sin(delta)], and the smallest ellipse containing a rectangle has
+     * semi-axes √2 times its half-widths.
+     *
+     * @param theta The angle of the sector's axis.
+     * @param delta The half-width of the sector in angle.
+     * @param r_min The inner radius of the sector.
+     * @return The bounding ellipse.
+     */
+    static Ellipse from_sector(const Real &theta, const Real &delta, const Real &r_min) {
+        Real inner = r_min * cos(delta);
+        Real radial_axis = sqrt2() * (1 - inner) / 2;
+        Real tangential_axis = sqrt2() * sin(delta);
+        Real r2 = 1 / (radial_axis * radial_axis);
+        Real t2 = 1 / (tangential_axis * tangential_axis);
+        Real zx = cos(theta);
+        Real zy = sin(theta);
+        Real centre = (1 + inner) / 2;
+        return Ellipse(
+            {r2 * zx * zx + t2 * zy * zy, (r2 - t2) * zx * zy, r2 * zy * zy + t2 * zx * zx},
+            {centre * zx, centre * zy});
+    }
+
+    /**
      * @brief Calculate the determinant of the ellipse.
      */
     Real determinant() const { return a * d - b * b; }
