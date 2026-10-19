@@ -1226,22 +1226,20 @@ class TestSymbolicRules:
     def test_control_values_and_work_wires_reach_the_rule(self):
         """Test a rule that reads the control values and work wires is lowered against the ones the
         ``<n>C(...)`` node denotes.
-
-        A rule branching on those values resolves statically at trace time, so the flips it would
-        apply for a zero control value must be absent from the lowered body.
         """
-
         recorded = {}
 
         @register_resources(lambda base, control_wires, **_: {qp.ctrl(qp.X(Wire[1]), Wire[3]): 1})
         def ctrl_rule(base, control_wires, control_values, work_wires, work_wire_type):
-            recorded["values"] = list(control_values)
             recorded["work_wires"] = list(work_wires)
             recorded["work_wire_type"] = work_wire_type
-            # The flips a zero control value would need; all-ones controls emit none of them.
-            for wire, value in zip(control_wires, control_values, strict=True):
-                if not value:
-                    qp.X(wire)
+
+            @qp.for_loop(0, len(control_wires))
+            def _x_flips(i):
+                qp.cond(qp.math.logical_not(control_values[i]), qp.X)(control_wires[i])
+
+            _x_flips()  # pylint:disable=no-value-for-parameter
+
             qp.ctrl(qp.X(base.wires), control=list(control_wires))
 
         with local_decomps():
@@ -1258,15 +1256,16 @@ class TestSymbolicRules:
                 n_ctrl=3,
             )
 
-        assert recorded["values"] == [True, True, True]
         assert recorded["work_wires"] == []
         assert recorded["work_wire_type"] == "borrowed"
 
         (rule,) = [r for r in get_rule_strings_from_module(module) if "ctrl_rule" in r]
         assert 'target_gate = "3C(Hadamard){}{wires:1}{}"' in rule
-        assert "(%arg0: !qref.reg<4>, %arg1: tensor<1xi64>, %arg2: tensor<3xi64>)" in rule
+        assert (
+            "(%arg0: !qref.reg<4>, %arg1: tensor<1xi64>, %arg2: tensor<3xi64>, %arg3: tensor<3xi1>)"
+            in rule
+        )
         assert "MultiControlledX{control_values:[tensor<3xi1>]}{wires:4,work_wires:0}" in rule
-        assert "PauliX" not in rule
 
     def test_multi_controlled_rule_is_wired_up_correctly(self):
         """Test a rule registered on ``C(op)`` and lowered for several controls is given all of
