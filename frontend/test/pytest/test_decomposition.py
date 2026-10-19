@@ -146,9 +146,10 @@ class TestGenericUtilities:
             jnp.array(12.0),
             jnp.array([3, 4, 0, 1, 2]),
             jnp.array([5, 6]),
+            jnp.array([True, False]),
         )
 
-        args, kwargs, ctrl_wires = unpack_rule_operands(
+        args, kwargs, ctrl_wires, ctrl_values = unpack_rule_operands(
             operands, n_params=1, kwarg_names=kwarg_names, wire_lens=wire_lens, has_ctrl_wires=True
         )
 
@@ -159,6 +160,7 @@ class TestGenericUtilities:
         np.testing.assert_array_equal(kwargs["empty_reg"], [])
         np.testing.assert_array_equal(kwargs["reg1"], [0, 1, 2])
         np.testing.assert_array_equal(ctrl_wires, [5, 6])
+        np.testing.assert_array_equal(ctrl_values, [True, False])
 
     def test_probe_wires_dont_overlap(self):
         """Test that the helper for generating probe arguments doesnt create

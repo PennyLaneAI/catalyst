@@ -349,6 +349,10 @@ def unpack_rule_operands(
 
     ctrl_wires = operands[idx] if has_ctrl_wires else None
     ctrl_values = operands[idx + 1] if has_ctrl_wires and len(operands) > idx + 1 else None
+    if has_ctrl_wires:
+        assert len(ctrl_values) == len(
+            ctrl_wires
+        ), "number of control wires and control values must be the same"
     return params, named, ctrl_wires, ctrl_values
 
 
