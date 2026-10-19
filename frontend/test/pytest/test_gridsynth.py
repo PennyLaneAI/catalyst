@@ -94,7 +94,7 @@ def test_gridsynth_specs(ppr_basis):
     assert 2.5 * np.log2(1 / eps) < t_per_rotation < 3.5 * np.log2(1 / eps)
 
 
-@pytest.mark.parametrize("method", ["deterministic", "mixed"])
+@pytest.mark.parametrize("method", ["deterministic", "mixed", "mixed-fallback"])
 @pytest.mark.parametrize("ppr_basis", [False, True])
 # Within the epsilon ranges that the resource hints are fitted on.
 @pytest.mark.parametrize("eps", [1e-4, 1e-6])
@@ -122,7 +122,26 @@ def test_gridsynth_specs_matches_runtime(eps, ppr_basis, method):
     estimated_t = estimated.quantum_operations["PPR-pi/8-w1" if ppr_basis else "T"]
     # The device reports the PPR exp(-i pi/8 P) as PauliRot(pi/4).
     executed_t = executed.quantum_operations["PauliRot-pi/4-w1" if ppr_basis else "T"]
-    assert estimated_t == pytest.approx(executed_t, rel=0.05)
+    # Device-level measurements return 0, so mixed-fallback's fallbacks, which add about 3% to the
+    # estimate, never execute.
+    rel = 0.08 if method == "mixed-fallback" else 0.05
+    assert estimated_t == pytest.approx(executed_t, rel=rel)
+
+
+@pytest.mark.parametrize("ppr_basis", [False, True])
+def test_mixed_fallback_gridsynth_specs_wires(ppr_basis):
+    """Test the known limitation that specs counts every ancilla allocation of the mixed fallback
+    method as a wire, although each ancilla is released before the next one is allocated."""
+
+    @qp.qjit(capture=True, target="mlir")
+    @gridsynth(epsilon=1e-6, ppr_basis=ppr_basis, method="mixed-fallback")
+    @qp.qnode(qp.device("null.qubit", wires=2))
+    def circuit(x: float):
+        qp.RZ(x, 0)
+        qp.RZ(x, 1)
+        return qp.expval(qp.Z(0))
+
+    assert qp.specs(circuit, level=1)(0.5).resources.num_wires == 4
 
 
 @pytest.mark.parametrize("param", [-7.7, -2.2, -0.1, 0.0, 0.3, 1.1, 4.4])
@@ -155,7 +174,41 @@ def test_mixed_gridsynth_samples(param, op, eps, ppr_basis):
         assert 1 - fidelity <= eps
 
 
-def test_mixed_gridsynth_seed():
+@pytest.mark.parametrize("op", [qp.RZ, qp.PhaseShift])
+@pytest.mark.parametrize("eps", [1e-2, 1e-4])
+@pytest.mark.parametrize("ppr_basis", [False, True])
+def test_mixed_fallback_gridsynth_samples(op, eps, ppr_basis):
+    """Test the sampled states of the mixed fallback method."""
+    dev = qp.device("lightning.qubit", wires=1)
+
+    @qp.qnode(dev)
+    def circuit(x: float):
+        qp.Hadamard(0)
+        op(x, wires=0)
+        return qp.state()
+
+    fallback_circuit = gridsynth(circuit, epsilon=eps, ppr_basis=ppr_basis, method="mixed-fallback")
+    qjitted_circuit = qp.qjit(fallback_circuit, capture=True, collect_decomp_rules=False)
+
+    infidelities = []
+    for param in [-2.2, 0.3, 1.1, 4.4]:
+        expected = circuit(param)
+        for _ in range(30):
+            result = qjitted_circuit(param)
+            infidelities.append(1 - np.abs(np.vdot(expected, result)) ** 2)
+
+    infidelities = np.array(infidelities)
+    # Each circuit execution samples one projective rotation. Its ancilla measurement succeeds with
+    # probability at least 0.95, leaving infidelity at most eps. Otherwise a fallback only loosely
+    # corrects the rotation, with infidelity at most MAX_FALLBACK_EPSILON / 2 = 0.125. The
+    # threshold is 85% rather than 95% to allow for sampling noise: at a 95% success rate, 120
+    # executions fall below it with probability <1e-5.
+    assert np.all(infidelities <= 0.125)
+    assert np.mean(infidelities <= eps) >= 0.85
+
+
+@pytest.mark.parametrize("method", ["mixed", "mixed-fallback"])
+def test_mixed_gridsynth_seed(method):
     """Test that the runtime samples are reproducible with a qjit seed and differ across seeds."""
     dev = qp.device("lightning.qubit", wires=1)
 
@@ -166,7 +219,7 @@ def test_mixed_gridsynth_seed():
             qp.RZ(x * (i + 1), wires=0)
         return qp.state()
 
-    mixed_circuit = gridsynth(circuit, epsilon=1e-2, method="mixed")
+    mixed_circuit = gridsynth(circuit, epsilon=1e-2, method=method)
     results = [
         qp.qjit(mixed_circuit, capture=True, collect_decomp_rules=False, seed=seed)(1.1)
         for seed in (37, 37, 38)
@@ -175,9 +228,37 @@ def test_mixed_gridsynth_seed():
     assert not np.allclose(results[0], results[2])
 
 
+@pytest.mark.parametrize("method", ["mixed", "mixed-fallback"])
+@pytest.mark.parametrize("mcm_method", ["single-branch-statistics", "one-shot"])
+def test_mixed_gridsynth_samples_per_shot(method, mcm_method):
+    """Test that the shots of a call share one sample with single-branch statistics, and that
+    every shot draws its own with one-shot. With a coarse epsilon, samples differ visibly, so the
+    means of calls spread far more than shot noise if their shots share a sample."""
+    x = 1.1
+    shots = 1000
+    dev = qp.device("lightning.qubit", wires=1)
+
+    @qp.qnode(dev, shots=shots, mcm_method=mcm_method)
+    def circuit(x: float):
+        qp.Hadamard(0)
+        qp.RZ(x, wires=0)
+        return qp.expval(qp.X(0))
+
+    qjitted_circuit = qp.qjit(
+        gridsynth(circuit, epsilon=0.05, method=method), capture=True, collect_decomp_rules=False
+    )
+    spread = np.std([qjitted_circuit(x) for _ in range(20)])
+    shot_noise = np.sqrt((1 - np.cos(x) ** 2) / shots)
+
+    if mcm_method == "one-shot":
+        assert spread < 2 * shot_noise
+    else:
+        assert spread > 4 * shot_noise
+
+
 def test_invalid_method():
     """Test that an unknown synthesis method raises an error."""
-    with pytest.raises(ValueError, match="method must be 'deterministic' or 'mixed'"):
+    with pytest.raises(ValueError, match="method must be 'deterministic', 'mixed' or"):
         gridsynth(method="rus")
 
 
@@ -202,9 +283,10 @@ def test_gridsynth_high_precision(eps):
         )
 
 
+@pytest.mark.parametrize("method", ["mixed", "mixed-fallback"])
 @pytest.mark.parametrize("eps", [1e-10, 1e-15])
-def test_mixed_gridsynth_high_precision(eps):
-    """Test that the mixed method reaches the precisions of the deterministic method."""
+def test_mixed_gridsynth_high_precision(eps, method):
+    """Test that the mixed methods reach the precisions of the deterministic method."""
     dev = qp.device("lightning.qubit", wires=1)
 
     @qp.qnode(dev)
@@ -213,16 +295,28 @@ def test_mixed_gridsynth_high_precision(eps):
         qp.RZ(x, wires=0)
         return qp.state()
 
-    mixed_circuit = gridsynth(circuit, epsilon=eps, method="mixed")
+    mixed_circuit = gridsynth(circuit, epsilon=eps, method=method)
     qjitted_circuit = qp.qjit(mixed_circuit, capture=True, collect_decomp_rules=False, seed=37)
 
+    infidelities = []
     for param in [-4.4, -0.3, 0.1, 2.2]:
-        fidelity = np.abs(np.vdot(circuit(param), qjitted_circuit(param))) ** 2
-        # Simulating the gates in double precision adds an infidelity of about 1e-14.
-        assert 1 - fidelity <= max(eps, 1e-13)
+        for _ in range(5):
+            fidelity = np.abs(np.vdot(circuit(param), qjitted_circuit(param))) ** 2
+            infidelities.append(1 - fidelity)
+
+    infidelities = np.array(infidelities)
+    # Simulating the gates in double precision adds an infidelity of about 1e-14.
+    accurate = infidelities <= max(eps, 1e-13)
+    if method == "mixed":
+        assert np.all(accurate)
+    else:
+        # The ancilla measurement fails with probability at most 5%, and is followed by a fallback
+        # with infidelity at most MAX_FALLBACK_EPSILON / 2 = 0.125.
+        assert np.all(infidelities <= 0.125)
+        assert np.mean(accurate) >= 0.75
 
 
-@pytest.mark.parametrize("method", ["deterministic", "mixed"])
+@pytest.mark.parametrize("method", ["deterministic", "mixed", "mixed-fallback"])
 def test_error_for_unsupported_epsilon(method):
     """Test that an epsilon below the supported precision raises an error at runtime."""
     dev = qp.device("lightning.qubit", wires=1)

@@ -466,8 +466,35 @@ std::vector<std::pair<double, Matrix2>> mixed_kraus(const MixedDecomposition &mi
     return kraus;
 }
 
-std::vector<std::vector<double>> mixed_error_ptm(const MixedDecomposition &mixed, double angle) {
-    return error_ptm(mixed_kraus(mixed), angle);
+bool is_deterministic(const MixedDecomposition &mixed) {
+    return mixed.gates[0] == mixed.gates[1] && mixed.phases[0] == mixed.phases[1];
+}
+
+/**
+ * Check that a mixed decomposition is within diamond distance epsilon of RZ(angle).
+ */
+void check_mixed_channel(const MixedDecomposition &mixed, double angle, double epsilon) {
+    // Angles within epsilon of a multiple of pi/4 get a single sequence with operator-norm error at
+    // most epsilon/2, and hence diamond-norm error at most epsilon.
+    if (is_deterministic(mixed)) {
+        CHECK(decomposition_error(mixed.gates[0], mixed.phases[0], angle) <=
+              VerifyReal(epsilon / 2.0));
+        return;
+    }
+
+    // The error channel is a Pauli channel, so its diamond distance to the identity
+    // channel is 2 (1 - p_I), with p_I = (1 + R_XX + R_YY + R_ZZ) / 4.
+    auto ptm = error_ptm(mixed_kraus(mixed), angle);
+    for (size_t i = 0; i < 4; i++) {
+        for (size_t j = 0; j < 4; j++) {
+            if (i != j) {
+                CHECK(std::abs(ptm[i][j]) <= 1e-9);
+            }
+        }
+    }
+    double identity_weight = (ptm[0][0] + ptm[1][1] + ptm[2][2] + ptm[3][3]) / 4.0;
+    double diamond_distance = 2.0 * (1.0 - identity_weight);
+    CHECK(diamond_distance <= epsilon * (1.0 + 1e-6) + 1e-12);
 }
 
 TEST_CASE("Test mixed diagonal decomposition accuracy", "[RSDecomp][Mixed]") {
@@ -479,12 +506,8 @@ TEST_CASE("Test mixed diagonal decomposition accuracy", "[RSDecomp][Mixed]") {
     MixedDecomposition mixed = compute_mixed_diagonal_decomposition(angle, epsilon);
     REQUIRE(mixed.probability >= 0.0);
     REQUIRE(mixed.probability <= 1.0);
-
-    // Angles within epsilon of a multiple of pi/4 get a single sequence with operator-norm error at
-    // most epsilon/2, and hence diamond-norm error at most epsilon.
-    if (mixed.gates[0] == mixed.gates[1] && mixed.phases[0] == mixed.phases[1]) {
-        CHECK(decomposition_error(mixed.gates[0], mixed.phases[0], angle) <=
-              VerifyReal(epsilon / 2.0));
+    check_mixed_channel(mixed, angle, epsilon);
+    if (is_deterministic(mixed)) {
         return;
     }
 
@@ -498,20 +521,6 @@ TEST_CASE("Test mixed diagonal decomposition accuracy", "[RSDecomp][Mixed]") {
         CHECK(w_under.imag() <= 1e-12);
         CHECK(w_over.imag() >= -1e-12);
     }
-
-    // The error channel is a Pauli channel, so its diamond distance to the identity
-    // channel is 2 (1 - p_I), with p_I = (1 + R_XX + R_YY + R_ZZ) / 4.
-    auto ptm = mixed_error_ptm(mixed, angle);
-    for (size_t i = 0; i < 4; i++) {
-        for (size_t j = 0; j < 4; j++) {
-            if (i != j) {
-                CHECK(std::abs(ptm[i][j]) <= 1e-9);
-            }
-        }
-    }
-    double identity_weight = (ptm[0][0] + ptm[1][1] + ptm[2][2] + ptm[3][3]) / 4.0;
-    double diamond_distance = 2.0 * (1.0 - identity_weight);
-    CHECK(diamond_distance <= epsilon * (1.0 + 1e-6) + 1e-12);
 }
 
 TEST_CASE("Test mixed diagonal decomposition high precision", "[RSDecomp][Mixed]") {
@@ -613,6 +622,206 @@ TEST_CASE("Test mixed C-API Wrapper (Memref Interface)", "[RSDecomp][Mixed]") {
     CHECK(phase == expected.second);
 }
 
+double expected_t_count(const MixedDecomposition &mixed) {
+    return mixed.probability * count_t_gates(mixed.gates[0]) +
+           (1.0 - mixed.probability) * count_t_gates(mixed.gates[1]);
+}
+
+MixedDecomposition fallback_decomposition(const FallbackBranch &branch, double angle) {
+    return compute_mixed_diagonal_decomposition(angle + 2.0 * branch.failure_angle,
+                                                branch.fallback_epsilon);
+}
+
+/**
+ * Check that the mixed fallback channel is within diamond distance epsilon of RZ(angle), by the
+ * bound of Theorem 3.17: the diamond distance of the channel with exact fallbacks, plus that of
+ * each fallback B_k weighted by its probability p_k (1 - q_k).
+ */
+void check_fallback_channel(const MixedFallbackDecomposition &decomposition, double angle,
+                            double epsilon) {
+    // Angles within epsilon of a multiple of pi/4 get a single diagonal V, which never fails, with
+    // operator-norm error at most epsilon/2.
+    const FallbackBranch &first = decomposition.branches[0];
+    if (decomposition.probability == 1.0 && first.success_probability == 1.0) {
+        CHECK(decomposition_error(first.projective_gates, first.projective_phase, angle) <=
+              VerifyReal(epsilon / 2.0));
+        return;
+    }
+
+    // The projective rotation V = [[u, -v*], [v, u*]] applies diag(u, u*) on success and
+    // diag(v, v*) on failure, after which the exact fallback RZ(angle + 2 Arg(v)) applies
+    // |v| RZ(angle).
+    const Matrix2 target = {std::polar(1.0, -angle / 2.0), 0.0, 0.0, std::polar(1.0, angle / 2.0)};
+    std::vector<std::pair<double, Matrix2>> kraus;
+    double fallback_diamond = 0.0;
+    for (size_t index = 0; index < 2; index++) {
+        const FallbackBranch &branch = decomposition.branches[index];
+        double weight = index == 0 ? decomposition.probability : 1.0 - decomposition.probability;
+        Matrix2 V = sequence_unitary(branch.projective_gates, branch.projective_phase);
+        kraus.emplace_back(weight, Matrix2{V[0], 0.0, 0.0, std::conj(V[0])});
+        if (branch.success_probability == 1.0) {
+            continue;
+        }
+        double failure_weight = weight * (1.0 - branch.success_probability);
+        kraus.emplace_back(failure_weight, target);
+        check_mixed_channel(fallback_decomposition(branch, angle),
+                            angle + 2.0 * branch.failure_angle, branch.fallback_epsilon);
+        fallback_diamond += failure_weight * branch.fallback_epsilon;
+    }
+
+    // With exact fallbacks, the error channel is a Pauli channel.
+    auto ptm = error_ptm(kraus, angle);
+    for (size_t i = 0; i < 4; i++) {
+        for (size_t j = 0; j < 4; j++) {
+            if (i != j) {
+                CHECK(std::abs(ptm[i][j]) <= 1e-9);
+            }
+        }
+    }
+    double identity_weight = (ptm[0][0] + ptm[1][1] + ptm[2][2] + ptm[3][3]) / 4.0;
+    double diamond_distance = 2.0 * (1.0 - identity_weight) + fallback_diamond;
+    CHECK(diamond_distance <= epsilon * (1.0 + 1e-6) + 1e-12);
+}
+
+TEST_CASE("Test mixed fallback projective rotations", "[RSDecomp][MixedFallback]") {
+    double epsilon = GENERATE(1e-2, 1e-4, 1e-6, 1e-8);
+    int angle_int = GENERATE(range(-70, 71, 7));
+    double angle = angle_int / 10.0 + 0.01;
+    CAPTURE(angle, epsilon);
+
+    MixedFallbackDecomposition decomposition = compute_mixed_fallback_decomposition(angle, epsilon);
+    REQUIRE(decomposition.probability >= 0.0);
+    REQUIRE(decomposition.probability <= 1.0);
+
+    std::complex<double> inverse_target = std::polar(1.0, angle / 2.0);
+    for (size_t index = 0; index < 2; index++) {
+        CAPTURE(index);
+        const FallbackBranch &branch = decomposition.branches[index];
+        Matrix2 V = sequence_unitary(branch.projective_gates, branch.projective_phase);
+        // V = [[u, -v*], [v, u*]] up to sign, and the success probability is at least 0.95.
+        CHECK(std::abs(V[3] - std::conj(V[0])) <= 1e-9);
+        CHECK(std::abs(V[1] + std::conj(V[2])) <= 1e-9);
+        CHECK_THAT(std::norm(V[0]), WithinAbs(branch.success_probability, 1e-9));
+        CHECK(branch.success_probability >= 0.95 - 1e-12);
+        // Arg(v) is defined up to the sign of V, which does not change the applied channel.
+        CHECK(std::abs(std::sin(std::arg(V[2]) - branch.failure_angle)) <= 1e-9);
+
+        // The first projective rotation under-rotates and the second over-rotates the target.
+        std::complex<double> w = V[0] * inverse_target;
+        w *= w.real() < 0.0 ? -1.0 : 1.0;
+        if (decomposition.probability < 1.0) {
+            CHECK((index == 0 ? -w.imag() : w.imag()) >= -1e-12);
+        }
+    }
+
+    check_fallback_channel(decomposition, angle, epsilon);
+}
+
+TEST_CASE("Test mixed fallback reduces the T-count", "[RSDecomp][MixedFallback]") {
+    const double epsilon = 1e-6;
+    double fallback_t = 0.0;
+    double mixed_t = 0.0;
+    for (int angle_int = 1; angle_int < 60; angle_int++) {
+        double angle = angle_int / 10.0;
+        MixedFallbackDecomposition decomposition =
+            compute_mixed_fallback_decomposition(angle, epsilon);
+        for (size_t index = 0; index < 2; index++) {
+            const FallbackBranch &branch = decomposition.branches[index];
+            double weight =
+                index == 0 ? decomposition.probability : 1.0 - decomposition.probability;
+            fallback_t += weight * (count_t_gates(branch.projective_gates) +
+                                    (1.0 - branch.success_probability) *
+                                        expected_t_count(fallback_decomposition(branch, angle)));
+        }
+        mixed_t += expected_t_count(compute_mixed_diagonal_decomposition(angle, epsilon));
+    }
+    CAPTURE(fallback_t, mixed_t);
+    CHECK(fallback_t < 0.6 * mixed_t);
+}
+
+TEST_CASE("Test mixed fallback failure probability", "[RSDecomp][MixedFallback]") {
+    // The average failure probability is the resource hint `fallbackFailureProbability` in
+    // mlir/lib/Quantum/Transforms/GridsynthPatterns.cpp.
+    double epsilon = GENERATE(1e-4, 1e-8);
+    const int num_angles = 100;
+    double failure = 0.0;
+    for (int i = 0; i < num_angles; i++) {
+        double angle = 4.0 * M_PI * (i + 0.5) / num_angles;
+        MixedFallbackDecomposition decomposition =
+            compute_mixed_fallback_decomposition(angle, epsilon);
+        double p = decomposition.probability;
+        failure += p * (1.0 - decomposition.branches[0].success_probability) +
+                   (1.0 - p) * (1.0 - decomposition.branches[1].success_probability);
+    }
+    CAPTURE(epsilon);
+    CHECK_THAT(failure / num_angles, WithinAbs(0.0244, 0.006));
+}
+
+TEST_CASE("Test mixed fallback decomposition of exact angles", "[RSDecomp][MixedFallback]") {
+    MixedFallbackDecomposition decomposition =
+        compute_mixed_fallback_decomposition(M_PI / 4.0, 1e-4);
+    CHECK(decomposition.probability == 1.0);
+    CHECK(decomposition.branches[0].projective_gates == std::vector<GateType>{GateType::T});
+    CHECK(decomposition.branches[0].success_probability == 1.0);
+}
+
+TEST_CASE("Test mixed fallback C-API Wrapper (Memref Interface)", "[RSDecomp][MixedFallback]") {
+    const double angle = 0.7;
+    const double epsilon = 1e-6;
+    bool ppr_basis = GENERATE(false, true);
+    double uniform_sample = GENERATE(0.1, 0.6, 0.95);
+    CAPTURE(ppr_basis, uniform_sample);
+
+    size_t size = rs_fallback_projective_get_size(angle, epsilon, ppr_basis, uniform_sample);
+    std::vector<size_t> buffer(size);
+    rs_fallback_projective_get_gates(nullptr, buffer.data(), 0, size, 1, angle, epsilon, ppr_basis,
+                                     uniform_sample);
+    double phase = rs_fallback_projective_get_phase(angle, epsilon, ppr_basis, uniform_sample);
+
+    auto to_indices = [](const auto &sequence) {
+        std::vector<size_t> indices;
+        for (auto gate : sequence.first) {
+            indices.push_back(static_cast<size_t>(gate));
+        }
+        return std::pair{indices, sequence.second};
+    };
+    auto expected = ppr_basis
+                        ? to_indices(eval_fallback_projective_ppr(angle, epsilon, uniform_sample))
+                        : to_indices(eval_fallback_projective(angle, epsilon, uniform_sample));
+    CHECK(buffer == expected.first);
+    CHECK(phase == expected.second);
+
+    // Half the cap MAX_FALLBACK_EPSILON = 0.25 of the diamond-norm fallback epsilon.
+    double recovery_epsilon = rs_fallback_recovery_epsilon(angle, epsilon, uniform_sample);
+    CHECK(recovery_epsilon > 0.0);
+    CHECK(recovery_epsilon <= 0.125);
+}
+
+TEST_CASE("Test mixed fallback decomposition high precision", "[RSDecomp][MixedFallback]") {
+    double epsilon = GENERATE(1e-10, 1e-12, 1e-15);
+    double angle = GENERATE(0.7, -2.3);
+    CAPTURE(angle, epsilon);
+
+    MixedFallbackDecomposition decomposition = compute_mixed_fallback_decomposition(angle, epsilon);
+    REQUIRE(decomposition.probability > 0.0);
+    REQUIRE(decomposition.probability < 1.0);
+
+    // The full channel is below double precision, so check Equation (34) for the projective
+    // rotations, whose error Im(w)^2 is well-conditioned since Im(w) is of order sqrt(epsilon).
+    std::complex<double> inverse_target = std::polar(1.0, angle / 2.0);
+    double projective_diamond = 0.0;
+    for (size_t index = 0; index < 2; index++) {
+        const FallbackBranch &branch = decomposition.branches[index];
+        double weight = index == 0 ? decomposition.probability : 1.0 - decomposition.probability;
+        Matrix2 V = sequence_unitary(branch.projective_gates, branch.projective_phase);
+        double im_w = (V[0] * inverse_target).imag();
+        projective_diamond += 2.0 * weight * im_w * im_w;
+        CHECK(branch.success_probability >= 0.95 - 1e-12);
+        CHECK(branch.fallback_epsilon >= epsilon);
+    }
+    CHECK(projective_diamond <= 0.9 * epsilon * (1.0 + 1e-4));
+}
+
 TEST_CASE("rs_decomposition_get_size does not warn for small epsilon", "[RSDecomp][Warning]") {
     double epsilon = GENERATE(1e-4, 1e-8, 1e-15);
     std::ostringstream buf;
@@ -637,6 +846,15 @@ TEST_CASE("rs_mixed_decomposition_get_size fails for unsupported epsilon", "[RSD
     REQUIRE_THROWS_WITH(rs_mixed_decomposition_get_size(0.5, 1e-16, ppr_basis, 0.5),
                         ContainsSubstring("the smallest supported epsilon is 1e-15"));
     REQUIRE_THROWS_WITH(rs_mixed_decomposition_get_size(0.5, 0.0, ppr_basis, 0.5),
+                        ContainsSubstring("Gridsynth requires a positive, finite epsilon"));
+}
+
+TEST_CASE("rs_fallback_projective_get_size fails for unsupported epsilon",
+          "[RSDecomp][MixedFallback]") {
+    bool ppr_basis = GENERATE(false, true);
+    REQUIRE_THROWS_WITH(rs_fallback_projective_get_size(0.5, 1e-16, ppr_basis, 0.5),
+                        ContainsSubstring("the smallest supported epsilon is 1e-15"));
+    REQUIRE_THROWS_WITH(rs_fallback_projective_get_size(0.5, 0.0, ppr_basis, 0.5),
                         ContainsSubstring("Gridsynth requires a positive, finite epsilon"));
 }
 

@@ -322,8 +322,26 @@ class RzGridSearch {
      * @param epsilon The precision ε.
      */
     RzGridSearch(const Real &theta, const Real &epsilon)
-        : zx(cos(theta)), zy(sin(theta)), target(1 - epsilon * epsilon / 2) {
-        Ellipse region = Ellipse::from_region(theta, epsilon);
+        : RzGridSearch(theta, Ellipse::from_region(theta, epsilon), 1 - epsilon * epsilon / 2) {}
+
+    /**
+     * @brief Search over the annular sector {r_min <= |w| <= 1, |Arg(w) - theta| <= delta}
+     * instead of the epsilon-region (Figure 8, arXiv:2203.10064).
+     *
+     * The visited solutions lie in the half-plane Re(w * conj(z)) >= r_min cos(delta) that contains
+     * the sector, and must be checked against the remaining bounds of the sector by the caller.
+     *
+     * @param theta The angle of the sector's axis.
+     * @param delta The half-width of the sector in angle.
+     * @param r_min The inner radius of the sector.
+     */
+    static RzGridSearch sector(const Real &theta, const Real &delta, const Real &r_min) {
+        return RzGridSearch(theta, Ellipse::from_sector(theta, delta, r_min), r_min * cos(delta));
+    }
+
+  private:
+    RzGridSearch(const Real &theta, const Ellipse &region, const Real &min_dot)
+        : zx(cos(theta)), zy(sin(theta)), target(min_dot) {
         Ellipse disk;
         grid_op = EllipseState(region.normalize().first, disk).skew_grid_op();
         upright = EllipseState(region, disk).apply_grid_op(grid_op);
@@ -331,6 +349,7 @@ class RzGridSearch {
         g_conj = PulledBackRegion::scaled_entries(grid_op.adj2());
     }
 
+  public:
     /**
      * @brief Visit the solutions at level k.
      * @tparam Visit A callable `visit(const ZOmega &u) -> bool`.
