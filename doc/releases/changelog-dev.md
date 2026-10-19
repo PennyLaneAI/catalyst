@@ -943,7 +943,7 @@
   change. A backend is picked by transport, hardware, role and message size. A node can name one
   with `init_args={"backend": ...}`, which makes `fpga_verbs` selectable. The MLIR verifier no
   longer restricts transport names.
-  [(#XXXX)](https://github.com/PennyLaneAI/catalyst/pull/XXXX)
+  [(#3362)](https://github.com/PennyLaneAI/catalyst/pull/3362)
 
 * The FPGA transport backends share one config parser. The VPK120 backend now reads `dev`, `gid`,
   `ring`, `stride_log2`, `data_mem` and `reply_mem` exactly as `fpga_verbs` does, and reports a
