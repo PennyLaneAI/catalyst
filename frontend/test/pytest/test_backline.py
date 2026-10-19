@@ -17,6 +17,7 @@ import ctypes.util
 import dataclasses
 import os
 import platform
+import shutil
 import subprocess
 from pathlib import Path
 from types import SimpleNamespace
@@ -30,6 +31,7 @@ from pennylane.backline import Transport
 from catalyst import Executor, compiled_functions, qjit
 from catalyst.backline import (
     _EXECUTOR_RUNTIME_PLUGINS,
+    _REGISTRY,
     _TRANSPORT_PASSES,
     _builtin_fn_lib_dirs,
     _check_builtin_fn_lib,
@@ -46,10 +48,13 @@ from catalyst.backline import (
     _resolve_backend,
     _resolve_backend_lib,
     _runs_per_message_on_gpu,
+    _select_backend,
+    backend_transports,
     device_pass_pipeline,
     launch_executors,
     node_executor,
     placement_pipeline,
+    register_backend,
     remote_device_lib,
     serialize_backline,
 )
@@ -73,6 +78,13 @@ def _net_transport():
         yield
     finally:
         getattr(_bl, "_transports", {}).pop("net", None)
+
+
+@pytest.fixture
+def isolated_registry(monkeypatch):
+    """Let a test register backends and load plugins without leaking them into other tests."""
+    monkeypatch.setattr("catalyst.backline._REGISTRY", list(_REGISTRY))
+    monkeypatch.setattr("catalyst.backline._plugins_loaded", False)
 
 
 class _Attached:
@@ -720,6 +732,56 @@ class TestBacklineDemoIntegration:
     that call the QNode also execute it, so they need the transport backend libraries and the
     decoder library reachable to the dynamic loader.
     """
+
+    def test_an_out_of_tree_backend_from_a_manifest_runs_demo_1(
+        self, use_capture, isolated_registry, tmp_path, monkeypatch
+    ):
+        """An out-of-tree backend, dropped beside a manifest, runs with no Catalyst change.
+
+        The "toy" backend is the memcpy backend under another name, declared only by
+        ``catalyst_transport_backends.json`` on CATALYST_TRANSPORT_PATH and picked by name.
+        """
+        lib_dir = Path(get_lib_path("runtime", "RUNTIME_LIB_DIR"))
+        for role in ("controller", "coprocessor"):
+            shutil.copy(
+                lib_dir / f"libcatalyst_transport_memcpy_{role}.so",
+                tmp_path / f"libcatalyst_transport_toy_{role}.so",
+            )
+        (tmp_path / "catalyst_transport_backends.json").write_text(
+            '[{"name": "toy", "transport": "memcpy", "hardware": "cpu",'
+            ' "roles": ["controller", "coprocessor"], "max_payload_bytes": null,'
+            ' "max_reply_bytes": null, "default": false}]'
+        )
+        monkeypatch.setenv("CATALYST_TRANSPORT_PATH", str(tmp_path))
+        ctrl = qp.Controller(
+            name="cpu-controller",
+            device=qp.device("null.qubit", wires=3),
+            init_args={"backend": "toy"},
+        )
+        coproc = qp.Coprocessor(
+            name="cpu-coproc",
+            coprocessor_fn=qp.CoprocessorFunction(
+                "steane_coprocessor", lib_path=str(lib_dir / "libsteane_coprocessor_cpu.so")
+            ),
+            init_args={"backend": "toy"},
+        )
+        dev = qp.Backline(
+            controller=ctrl, coprocessors=[coproc], transport="memcpy", qec_code="steane"
+        )
+
+        @qjit(capture=True)
+        @qp.set_shots(1)
+        @qp.qnode(dev, mcm_method="one-shot")
+        def ghz():
+            qp.Hadamard(0)
+            qp.CNOT([0, 1])
+            qp.CNOT([1, 2])
+            return qp.sample([qp.measure(0), qp.measure(1), qp.measure(2)])
+
+        ir = ghz.mlir
+        for role in ("controller", "coprocessor"):
+            assert str(tmp_path / f"libcatalyst_transport_toy_{role}.so") in ir
+        assert np.asarray(ghz()).shape == (1, 3)
 
     def test_local_cpu_to_local_cpu_memcpy(self, use_capture):
         """Demo 1: local CPU ↔ local CPU over ``memcpy``, JIT-compiled and executed.
@@ -1852,3 +1914,113 @@ def test_a_setup_that_succeeds_is_not_torn_down():
     calls = []
     compiled_functions._run_setup(lambda: calls.append("setup"), lambda: calls.append("teardown"))
     assert calls == ["setup"]
+
+
+class TestBackendRegistry:
+    """Backends come from a registry that out-of-tree packages extend without a Catalyst change."""
+
+    def test_a_registered_backend_serves_a_new_transport(self, isolated_registry):
+        """A transport Catalyst has never heard of resolves once a backend registers for it."""
+        register_backend("example_backend", "example", "cpu", ["controller", "coprocessor"])
+        assert _resolve_backend("example", "cpu") == "example_backend"
+        assert (
+            _resolve_backend_lib("example", "cpu", "controller", True)
+            == "libcatalyst_transport_example_backend_controller.so"
+        )
+
+    def test_backend_transports_lists_every_registered_transport(self, isolated_registry):
+        """PennyLane asks for these to accept a transport it has no entry for."""
+        assert {"rdma", "memcpy"} <= backend_transports()
+        register_backend("example_backend", "example", "cpu", ["controller"])
+        assert "example" in backend_transports()
+
+    def test_a_non_default_backend_is_used_only_when_named(self, isolated_registry):
+        """fpga_verbs shares rdma/fpga with hwhs, which stays the default."""
+        assert _select_backend("rdma", "fpga", "controller").name == "hwhs"
+        assert _select_backend("rdma", "fpga", "controller", name="fpga_verbs").name == "fpga_verbs"
+
+    def test_selection_respects_message_sizes(self, isolated_registry):
+        """A backend that cannot carry the placement's messages is not picked."""
+        with pytest.raises(ValueError, match="carrying 16 B requests"):
+            _select_backend("rdma", "cpu", "controller", in_bytes=16, out_bytes=8)
+        register_backend("wide_verbs", "rdma", "cpu", ["controller"], max_payload_bytes=1024)
+        assert _select_backend("rdma", "cpu", "controller", 16, 8).name == "wide_verbs"
+        assert _select_backend("memcpy", "cpu", "controller", 4096, 4096).name == "memcpy"
+
+    def test_manifest_on_the_search_path_registers_backends(
+        self, isolated_registry, tmp_path, monkeypatch
+    ):
+        """A manifest beside out-of-tree libraries is read from CATALYST_TRANSPORT_PATH."""
+        (tmp_path / "catalyst_transport_backends.json").write_text(
+            '[{"name": "toy", "transport": "memcpy", "hardware": "cpu",'
+            ' "roles": ["controller"], "default": false}]'
+        )
+        monkeypatch.setenv("CATALYST_TRANSPORT_PATH", str(tmp_path))
+        assert _select_backend("memcpy", "cpu", "controller", name="toy").name == "toy"
+        assert _select_backend("memcpy", "cpu", "controller").name == "memcpy"
+
+    def test_entry_points_register_backends(self, isolated_registry, monkeypatch):
+        """A pip-installed package declares its backends through an entry point."""
+        ep = mock.Mock()
+        ep.load.return_value = lambda: [
+            {"name": "pkg_verbs", "transport": "pkg", "hardware": "gpu", "roles": ["coprocessor"]}
+        ]
+        monkeypatch.setattr(
+            "catalyst.backline.importlib.metadata.entry_points",
+            lambda group: [ep] if group == "catalyst.transport_backends" else [],
+        )
+        assert _resolve_backend("pkg", "gpu") == "pkg_verbs"
+
+    def test_controller_and_coprocessor_must_share_a_frame_layout(self, isolated_registry):
+        """Two backends that speak no common frame cannot exchange messages."""
+        register_backend("net_ctrl", "net", "cpu", ["controller"], frame_modes=("bl16",))
+        register_backend("net_cop", "net", "gpu", ["coprocessor"], frame_modes=("other",))
+        dev = qp.Backline(
+            controller=_controller(init_args={}),
+            coprocessors=[_coproc("cop0", hardware="gpu", init_args={})],
+            transport="net",
+        )
+        with pytest.raises(CompileError, match="share no frame layout"):
+            serialize_backline(dev.placement)
+
+    def test_a_backend_name_is_read_but_not_forwarded(self, isolated_registry, flat_lib_dir):
+        """``init_args["backend"]`` picks the backend; the attribute carries only its library."""
+        flat_lib_dir("libcatalyst_transport_fpga_verbs_controller.so")
+        ctrl = _controller(hardware="fpga", init_args={"backend": "fpga_verbs"})
+        dev = qp.Backline(controller=ctrl, coprocessors=[_coproc("cop0")], transport="rdma")
+        node = serialize_backline(dev.placement)["controller"]
+        assert node["backend_lib"].endswith("libcatalyst_transport_fpga_verbs_controller.so")
+        assert "backend" not in node
+
+    def test_built_in_rows_match_what_the_built_libraries_report(self):
+        """The registry and CatalystTransportQueryCaps describe each in-tree backend alike."""
+
+        class Caps(ctypes.Structure):  # CatalystTransportCaps, TransportBackend.h
+            _fields_ = [
+                ("abi_version", ctypes.c_uint32),
+                ("roles", ctypes.c_uint32),
+                ("mem_kinds", ctypes.c_uint32),
+                ("frame_modes", ctypes.c_uint32),
+                ("max_payload_bytes", ctypes.c_uint32),
+                ("ordering", ctypes.c_uint32),
+                ("name", ctypes.c_char_p),
+                ("max_reply_bytes", ctypes.c_uint32),
+            ]
+
+        lib_dir = Path(get_lib_path("runtime", "RUNTIME_LIB_DIR"))
+        checked = 0
+        for backend in _REGISTRY:
+            for bit, role in enumerate(("controller", "coprocessor")):
+                path = lib_dir / f"libcatalyst_transport_{backend.name}_{role}.so"
+                if not path.exists():
+                    continue
+                query = ctypes.CDLL(str(path)).CatalystTransportQueryCaps
+                query.restype = ctypes.POINTER(Caps)
+                caps = query().contents
+                assert caps.name.decode() == backend.name
+                assert (role in backend.roles) == bool(caps.roles & (1 << bit))
+                limit = backend.max_payload_bytes
+                assert caps.max_payload_bytes == (0xFFFFFFFF if limit is None else limit)
+                checked += 1
+        if not checked:
+            pytest.skip("no transport backend libraries built")
