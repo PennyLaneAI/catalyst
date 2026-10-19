@@ -145,7 +145,7 @@
   require integral values and convert the count internally.
   [(#2956)](https://github.com/PennyLaneAI/catalyst/pull/2956)
 
-* A device can now declare shared runtime libraries via an optional `get_runtime_artifacts` method. 
+* A device can now declare shared runtime libraries via an optional `get_runtime_artifacts` method.
   These will be linked by the compiler.
   [(#3303)](https://github.com/PennyLaneAI/catalyst/pull/3303)
 
@@ -713,6 +713,10 @@
   unsupported quantum-bearing `scf` operations are encountered.
   [(#3238)](https://github.com/PennyLaneAI/catalyst/pull/3238)
 
+* The `--convert-to-value-semantics` pass now collects subroutine symbol uses only once instead of
+  once per subroutine, improving its performance.
+  [(#3341)](https://github.com/PennyLaneAI/catalyst/pull/3341)
+
 <h3>Breaking changes 💔</h3>
 
 * `catalyst.logging` has been removed. `pennylane.logging` should be used instead.
@@ -967,6 +971,7 @@
   [(#3224)](https://github.com/PennyLaneAI/catalyst/pull/3224)
   [(#3232)](https://github.com/PennyLaneAI/catalyst/pull/3232)
   [(#3238)](https://github.com/PennyLaneAI/catalyst/pull/3238)
+  [(#3341)](https://github.com/PennyLaneAI/catalyst/pull/3341)
 
 * Removed the internal ``mlir_specs`` function which was the old backend for :func:`qp.specs`. The resource analysis pass replaces its use.
   [(#2841)](https://github.com/PennyLaneAI/catalyst/pull/2841)
@@ -1103,7 +1108,7 @@
   soft-RoCE loopback link, and CPU-to-GPU over memcpy on the GPU runner.
   [(#3074)](https://github.com/PennyLaneAI/catalyst/pull/3074)
 
-* The OQD device now implements the optional `get_runtime_artifacts` to inform the compiler of its runtime library, 
+* The OQD device now implements the optional `get_runtime_artifacts` to inform the compiler of its runtime library,
   `librt_OQD_capi`. This replaces the previous work-around that had the compiler check directly for the library and
   link it if present.
   [(#3303)](https://github.com/PennyLaneAI/catalyst/pull/3303)
