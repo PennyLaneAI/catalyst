@@ -431,6 +431,7 @@ def _convert_decomp_target_spec(interpreter, target_spec):
             target_spec.wire_lens,
             target_spec.ctrl_wires,
             target_spec.hybrid_leaves,
+            target_spec.ctrl_values,
         )
         operands = [jax.ShapeDtypeStruct(operand.shape, operand.dtype) for operand in operands]
     out = []

@@ -102,6 +102,7 @@ class DecompTargetSpec:
     num_qreg_qubits: int
     modifier_context: ModifierState
     reject_noninvertible: bool = False
+    ctrl_values: object = None
 
 
 def _resources_have_measurement(gate_counts) -> bool:
@@ -173,7 +174,7 @@ def symbolic_op_name(op_name, kind) -> str:
     raise CompileError(f"Unknown symbolic kind: {kind}")  # pragma: no cover
 
 
-def symbolic_arguments(base_op, kind, ctrl_wires=None) -> dict:
+def symbolic_arguments(base_op, kind, ctrl_wires=None, ctrl_values=None) -> dict:
     """Return the arguments a rule registered against a symbolic operator expects.
 
     PennyLane calls such a rule with the symbolic operator's own ``arguments``: ``base`` alone for
@@ -208,11 +209,23 @@ def symbolic_arguments(base_op, kind, ctrl_wires=None) -> dict:
         return {
             "base": base_op,
             "control_wires": ctrl_wires,
-            "control_values": [True] * len(ctrl_wires),
+            "control_values": ([True] * len(ctrl_wires) if ctrl_values is None else ctrl_values),
             "work_wires": Wires([]),
             "work_wire_type": "borrowed",
         }
     raise CompileError(f"Unknown symbolic kind: {kind}")  # pragma: no cover
+
+
+# def _flip_zero_ctrls(ctrl_wires, ctrl_values):
+#     """Apply X to every control wire whose (possibly traced) control value is False."""
+#     if ctrl_values is None:
+#         return
+
+#     @qp.for_loop(0, len(ctrl_wires))
+#     def _flips(i):
+#         qp.cond(qp.math.logical_not(ctrl_values[i]), qp.X)(ctrl_wires[i])
+
+#     _flips()
 
 
 def ordered_kwarg_names(call_kwargs, dynamic_shape) -> list:
@@ -263,7 +276,13 @@ def flatten_hybrid_args(extra_data) -> tuple:
 
 
 def rule_call_operands(
-    call_args, call_kwargs, kwarg_names, wire_lens, ctrl_wires=None, hybrid_leaves=()
+    call_args,
+    call_kwargs,
+    kwarg_names,
+    wire_lens,
+    ctrl_wires=None,
+    hybrid_leaves=(),
+    ctrl_values=None,
 ) -> list:
     """Flatten a rule call as params, operand-passed hybrid-arg leaves, one grouped base-wire
     operand, then control wires.
@@ -297,6 +316,8 @@ def rule_call_operands(
     ]
     if ctrl_wires is not None:
         operands.append(ctrl_wires)
+        if ctrl_values is not None:
+            operands.append(ctrl_values)
     return operands
 
 
@@ -339,7 +360,8 @@ def unpack_rule_operands(
         offset += length
 
     ctrl_wires = operands[idx] if has_ctrl_wires else None
-    return params, named, ctrl_wires
+    ctrl_values = operands[idx + 1] if has_ctrl_wires and len(operands) > idx + 1 else None
+    return params, named, ctrl_wires, ctrl_values
 
 
 # Canonical nesting order for op-level modifiers, listed OUTERMOST first. The compiler's
@@ -765,7 +787,7 @@ def build_decomp_target_spec(
     # Once we have the correct rules, don't send them into qjit: they are closed over instead.
     def rule_to_callable(rule):
         def decomp_rule(*_operands):
-            _args, _kwargs, _ctrl_wires = unpack_rule_operands(
+            _args, _kwargs, _ctrl_wires, _ctrl_values = unpack_rule_operands(
                 _operands, len(call_args), kwarg_names, wire_lens, wrap_control, hybrid_specs
             )
             # Operand-passed hybrid args are rebuilt from operands in unpack_rule_operands; static
@@ -774,7 +796,10 @@ def build_decomp_target_spec(
             # Apply adjoint innermost, control outermost (canonical C(Adjoint(Op))).
             body = qp.adjoint(rule._impl) if wrap_adjoint else rule._impl
             if wrap_control:
+                # Runtime control values: conjugate the all-ones control with X flips.
+                # _flip_zero_ctrls(_ctrl_wires, _ctrl_values)
                 qp.ctrl(body, control=list(_ctrl_wires))(*_args, **_kwargs)
+                # _flip_zero_ctrls(_ctrl_wires, _ctrl_values)
             else:
                 body(*_args, **_kwargs)
 
@@ -809,8 +834,10 @@ def build_decomp_target_spec(
     ctrl_wires = (
         jnp.array(range(n_base_wires, n_base_wires + n_ctrl), dtype=int) if wrap_control else None
     )
+    ctrl_values = jnp.ones(n_ctrl, dtype=bool) if wrap_control else None
 
     return DecompTargetSpec(
+        ctrl_values=ctrl_values,
         rules=rule_specs,
         call_args=call_args,
         call_kwargs=call_kwargs,
@@ -839,6 +866,7 @@ def materialize_decomp_target_spec(target_spec: DecompTargetSpec) -> ir.Operatio
         {rule.frontend_name: rule.resources for rule in target_spec.rules},
         target_spec.target_id,
         target_spec.hybrid_leaves,
+        target_spec.ctrl_values,
     )
 
 
@@ -882,6 +910,7 @@ def build_rule_module(
     name_to_resource_ids,
     target_id,
     hybrid_leaves=(),
+    ctrl_values=None,
 ) -> ir.Operation:
     """Trace ``subroutines`` into a module of standalone decomposition-rule functions.
 
@@ -905,7 +934,7 @@ def build_rule_module(
     """
 
     operands = rule_call_operands(
-        call_args, call_kwargs, kwarg_names, wire_lens, ctrl_wires, hybrid_leaves
+        call_args, call_kwargs, kwarg_names, wire_lens, ctrl_wires, hybrid_leaves, ctrl_values
     )
 
     @qp.qjit(target="mlir", capture=True, collect_decomp_rules=False)
@@ -1149,7 +1178,7 @@ def build_registered_decomp_target_spec(
 
     def rule_to_callable(rule):
         def decomp_rule(*_operands):
-            _args, _kwargs, _ctrl_wires = unpack_rule_operands(
+            _args, _kwargs, _ctrl_wires, _ctrl_values = unpack_rule_operands(
                 _operands, len(call_args), kwarg_names, wire_lens, has_ctrl, hybrid_specs
             )
             # The base is rebuilt from the traced arguments of the rule function, so the wires and
@@ -1163,12 +1192,14 @@ def build_registered_decomp_target_spec(
             # https://github.com/PennyLaneAI/pennylane/pull/10144
             if wrap_control:
                 # Reduce the adjoint under control: C(Adjoint(op)) -> C(<adjoint decomposition>).
+                # _flip_zero_ctrls(_ctrl_wires, _ctrl_values)
                 qp.ctrl(
                     lambda: rule._impl(**symbolic_arguments(base, kind, None)),
                     control=list(_ctrl_wires),
                 )()
+                # _flip_zero_ctrls(_ctrl_wires, _ctrl_values)
             else:
-                rule._impl(**symbolic_arguments(base, kind, _ctrl_wires))
+                rule._impl(**symbolic_arguments(base, kind, _ctrl_wires, _ctrl_values))
 
         decomp_rule.__name__ = rule.name + "_" + target_id
         return decomp_rule
@@ -1203,8 +1234,10 @@ def build_registered_decomp_target_spec(
     ctrl_wires = (
         jnp.array(range(n_base_wires, n_base_wires + n_ctrl), dtype=int) if has_ctrl else None
     )
+    ctrl_values = jnp.ones(n_ctrl, dtype=bool) if has_ctrl else None
 
     return DecompTargetSpec(
+        ctrl_values=ctrl_values,
         rules=rule_specs,
         call_args=call_args,
         call_kwargs=call_kwargs,
