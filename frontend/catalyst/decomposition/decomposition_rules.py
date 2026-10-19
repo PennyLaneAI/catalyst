@@ -216,18 +216,6 @@ def symbolic_arguments(base_op, kind, ctrl_wires=None, ctrl_values=None) -> dict
     raise CompileError(f"Unknown symbolic kind: {kind}")  # pragma: no cover
 
 
-# def _flip_zero_ctrls(ctrl_wires, ctrl_values):
-#     """Apply X to every control wire whose (possibly traced) control value is False."""
-#     if ctrl_values is None:
-#         return
-
-#     @qp.for_loop(0, len(ctrl_wires))
-#     def _flips(i):
-#         qp.cond(qp.math.logical_not(ctrl_values[i]), qp.X)(ctrl_wires[i])
-
-#     _flips()
-
-
 def ordered_kwarg_names(call_kwargs, dynamic_shape) -> list:
     """Order a rule's keyword operands params-first, followed by wires in declaration order."""
     params = sorted(name for name in call_kwargs if name in dynamic_shape)
@@ -797,9 +785,7 @@ def build_decomp_target_spec(
             body = qp.adjoint(rule._impl) if wrap_adjoint else rule._impl
             if wrap_control:
                 # Runtime control values: conjugate the all-ones control with X flips.
-                # _flip_zero_ctrls(_ctrl_wires, _ctrl_values)
                 qp.ctrl(body, control=list(_ctrl_wires))(*_args, **_kwargs)
-                # _flip_zero_ctrls(_ctrl_wires, _ctrl_values)
             else:
                 body(*_args, **_kwargs)
 
@@ -1192,12 +1178,10 @@ def build_registered_decomp_target_spec(
             # https://github.com/PennyLaneAI/pennylane/pull/10144
             if wrap_control:
                 # Reduce the adjoint under control: C(Adjoint(op)) -> C(<adjoint decomposition>).
-                # _flip_zero_ctrls(_ctrl_wires, _ctrl_values)
                 qp.ctrl(
                     lambda: rule._impl(**symbolic_arguments(base, kind, None)),
                     control=list(_ctrl_wires),
                 )()
-                # _flip_zero_ctrls(_ctrl_wires, _ctrl_values)
             else:
                 rule._impl(**symbolic_arguments(base, kind, _ctrl_wires, _ctrl_values))
 
