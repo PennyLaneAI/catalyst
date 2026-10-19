@@ -1116,13 +1116,13 @@ class TestSymbolicRules:
             (
                 1,
                 "C(Hadamard){}{wires:1}{}",
-                "(%arg0: !qref.reg<2>, %arg1: tensor<1xi64>, %arg2: tensor<1xi64>)",
+                "(%arg0: !qref.reg<2>, %arg1: tensor<1xi64>, %arg2: tensor<1xi64>, %arg3: tensor<1xi1>)",
                 '"CH{}{wires:2}{}" = 1 : i64',
             ),
             (
                 2,
                 "2C(Hadamard){}{wires:1}{}",
-                "(%arg0: !qref.reg<3>, %arg1: tensor<1xi64>, %arg2: tensor<2xi64>)",
+                "(%arg0: !qref.reg<3>, %arg1: tensor<1xi64>, %arg2: tensor<2xi64>, %arg3: tensor<2xi1>)",
                 '"Toffoli{}{wires:3}{}" = 1 : i64',
             ),
         ],
@@ -1190,7 +1190,9 @@ class TestSymbolicRules:
         the controlled operator's own ``arguments`` so all five entries have to be there."""
 
         base = qp.Hadamard(Wire[1])
-        args = symbolic_arguments(base, "control", ctrl_wires=range(n_ctrl))
+        args = symbolic_arguments(
+            base, "control", ctrl_wires=range(n_ctrl), ctrl_values=[False] * n_ctrl
+        )
 
         assert set(args) == {
             "base",
@@ -1201,8 +1203,7 @@ class TestSymbolicRules:
         }
         assert args["base"] is base
         assert len(args["control_wires"]) == n_ctrl
-        assert args["control_values"] == [True] * n_ctrl
-        assert all(value is True for value in args["control_values"])
+        assert args["control_values"] == [False] * n_ctrl
         assert args["work_wires"] == Wires([])
         assert args["work_wire_type"] == "borrowed"
 
