@@ -802,8 +802,9 @@
   whose names are not in alphabetical order, such as `SemiAdder(x_wires, y_wires, work_wires)`.
   The generated decomposition rule unpacked its grouped wire operand in sorted-name order (or,
   for rules requested by the compiler on demand, in hash order), while the operator passes its
-  wires in declaration order, so the rule acted on the wrong qubits. Both paths now use the
-  declaration order.
+  wires in qubit operand order (plain wire arguments in declaration order, then any hybrid
+  arguments carrying wires), so the rule acted on the wrong qubits. Both paths now use the qubit
+  operand order.
   [(#3347)](https://github.com/PennyLaneAI/catalyst/pull/3347)
 
 * MLIR passes that recreate `scf.for`, `scf.while`, `scf.if`, and `scf.index_switch` ops

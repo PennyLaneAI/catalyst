@@ -17,7 +17,7 @@
 // A decomposition rule receives all base wires of the operator as one grouped operand, packed in
 // the order of the operator's qubit operands (its declared wire arguments). SemiAdder declares
 // x_wires, y_wires, work_wires, which is not alphabetical, so a rule that unpacks the group in
-// sorted-name order would read the registers as work = [0:1], x = [1:2], y = [2:6] and act on the
+// sorted-name order would read the registers as work = [0:2], x = [2:3], y = [3:6] and act on the
 // wrong qubits. The register sizes are all different so that only the declared order produces
 // these three slices.
 

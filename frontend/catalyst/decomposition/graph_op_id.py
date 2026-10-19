@@ -224,10 +224,11 @@ class GraphOpID:
             return dynamic_shape
 
     def parse_wire_lens(self) -> dict[str, int]:
-        """Return a dictionary of wire arg names to lengths, in declaration order.
+        """Return a dictionary of wire arg names to lengths, in qubit operand order.
 
         Decomposition rules unpack their grouped wire operand in the order of this dictionary, so
-        it must follow the qubit operand order of the lowered operator (see ``_process_qubits``).
+        it must match ``_process_qubits``: plain wire arguments in declaration order, followed by
+        the hybrid arguments that carry wires, in declaration order.
         """
         wire_lens = {}
         for wire_name, wire_arg in self.op.wire_args.items():

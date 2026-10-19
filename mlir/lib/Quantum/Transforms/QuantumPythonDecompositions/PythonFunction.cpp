@@ -74,8 +74,8 @@ static nb::dict getPyvalFromWireLens(catalyst::quantum::DecomposableGate op) {
     llvm::StringMap<size_t> wireLens = op.getWireLens();
 
     llvm::SmallVector<std::pair<int64_t, llvm::StringRef>> orderedNames;
-    if (auto qubitMap = op->getAttrOfType<mlir::DictionaryAttr>("qubit_map")) {
-        for (mlir::NamedAttribute entry : qubitMap) {
+    if (auto operatorOp = llvm::dyn_cast<catalyst::quantum::OperatorOp>(op.getOperation())) {
+        for (mlir::NamedAttribute entry : operatorOp.getQubitMap()) {
             llvm::ArrayRef<int64_t> indices =
                 llvm::cast<mlir::DenseI64ArrayAttr>(entry.getValue()).asArrayRef();
             // An empty wire argument takes no slice of the group, so its position is irrelevant.
