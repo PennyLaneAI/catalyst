@@ -185,10 +185,6 @@ class LinkerDriver:
         if os.path.isfile(os.path.join(rt_lib_path, rt_executor_so)):
             default_flags.append("-lrt_executor")
 
-        rt_transport_so = "librt_transport" + file_extension
-        if os.path.isfile(os.path.join(rt_lib_path, rt_transport_so)):
-            default_flags.append("-lrt_transport")
-
         # Link shared libraries from local `runtime_call`s and from device's
         # `get_runtime_artifacts()` method, which have been recorded on the module
         # via `catalyst.runtime_artifacts` and collected into the options.
