@@ -1044,7 +1044,7 @@ void handleSubroutine(IRRewriter &builder, func::FuncOp f,
 }
 
 SmallVector<IntegerAttr> collectQregSizesAtCallsite(func::FuncOp subroutine,
-                                                   ArrayRef<func::FuncOp> callers) {
+                                                    ArrayRef<func::FuncOp> callers) {
     SmallVector<IntegerAttr> qregSizesAtCallsite;
     for (func::FuncOp caller : callers) {
         WalkResult walkResult = caller.walk([&](func::CallOp callOp) {
@@ -1149,10 +1149,9 @@ struct ReferenceSemanticsConversionPass
                 return signalPassFailure();
             }
             QubitValueTracker tracker;
-            handleSubroutine(
-                builder, subroutine,
-                collectQregSizesAtCallsite(subroutine,
-                                           callersOf[subroutine.getSymNameAttr()].getArrayRef()));
+            handleSubroutine(builder, subroutine,
+                             collectQregSizesAtCallsite(
+                                 subroutine, callersOf[subroutine.getSymNameAttr()].getArrayRef()));
             if (failed(ensureNoValueSemanticsOps(subroutine))) {
                 subroutine.emitOpError(
                     "Detected remaining value semantics operations after conversion");
