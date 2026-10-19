@@ -562,7 +562,9 @@ static LogicalResult distributeControls(PatternRewriter &rewriter, Block &block,
         auto isQuantum = [](Type type) { return isa<QubitType, QuregType>(type); };
         if (isa<CallOpInterface>(op) && (llvm::any_of(op.getOperandTypes(), isQuantum) ||
                                          llvm::any_of(op.getResultTypes(), isQuantum))) {
-            op.emitError("cannot control a function call inside a quantum.ctrl region");
+            op.emitError("cannot control a function call inside a quantum.ctrl region; decompose "
+                         "the controlled operations before passes that introduce function calls, "
+                         "such as gridsynth");
             return failure();
         }
         // Classical op: clone it:
