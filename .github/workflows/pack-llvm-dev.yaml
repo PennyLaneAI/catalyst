@@ -1,0 +1,182 @@
+name: Package catalyst-llvm-dev
+
+# Manual-only: no schedule, no push/PR triggers. Runs solely via the "Run workflow" button in the
+# Actions tab (or `gh workflow run`).
+#
+# Produces catalyst-llvm-dev-<system>-<arch>-<llvm version>-<llvm commit>.tar.gz, the subset of the
+# LLVM/MLIR distribution that Catalyst builds against, as selected by LLVM_DISTRIBUTION_COMPONENTS
+# in mlir/Makefile.
+#
+# This workflow packages only; it never builds LLVM. It consumes the LLVM source and build caches
+# populated by the wheel workflows (build-wheel-linux-x86_64.yaml, build-wheel-macos-arm64.yaml) and
+# fails fast if either is missing, rather than duplicating their build steps here and letting the
+# two drift apart. On a cache miss, run the corresponding wheel workflow first and retry.
+#
+# Note that the build cache is keyed on the pinned LLVM commit, *not* on
+# LLVM_DISTRIBUTION_COMPONENTS, while install-distribution is generated at configure time. After
+# changing that list, `make pack-llvm-dev` warns that the cached build predates it; drop the LLVM
+# build cache entry (Actions > Caches, or `gh cache delete`) and let a wheel workflow repopulate it.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: Package catalyst-llvm-dev-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  constants:
+    name: Set constants
+    uses: ./.github/workflows/constants.yaml
+
+  linux-x86-64:
+    needs: [constants]
+
+    strategy:
+      fail-fast: false
+      matrix:
+        # Keep these in a matrix: container_img is part of the LLVM build cache
+        # key below, so it has to stay in sync with the image we run in.
+        python_version: ${{ fromJson(format('["{0}"]', needs.constants.outputs.primary_python_version)) }}
+        container_img: ["manylinux_2_28_x86_64"]
+
+    name: Pack catalyst-llvm-dev (Linux x86_64)
+    runs-on: ubuntu-24.04
+    container: quay.io/pypa/${{ matrix.container_img }}
+
+    steps:
+    - name: Checkout Catalyst repo
+      uses: actions/checkout@v4
+
+    - name: Set Ownership in Container
+      run: |
+        # To fix the git issue with the owner of the checkout dir
+        chown -R $(id -u):$(id -g) $PWD
+
+    # No LLVM configure or compile happens here, but install-distribution may still do incremental
+    # work on the restored build tree, so the toolchain it was built with has to be available.
+    - name: Install dependencies (AlmaLinux)
+      run: |
+        # Reduce wait time for repos not responding
+        cat /etc/dnf.conf | sed "s/\[main\]/\[main\]\ntimeout=5/g" > /etc/dnf.conf
+        dnf update -y && dnf install -y libzstd-devel gcc-toolset-13
+        # Update env vars valid for all tasks of this job
+        echo '/opt/rh/gcc-toolset-13/root/usr/bin' >> $GITHUB_PATH
+
+    - name: Install Dependencies (Python)
+      run: |
+        python${{ matrix.python_version }} -m pip install numpy "nanobind<2.13" pybind11 PyYAML cmake ninja
+        # Add cmake, cpack and ninja to the PATH env var
+        PYTHON_BINS=$(find /opt/_internal/cpython-${{ matrix.python_version }}.*/bin -maxdepth 1 -type d | tr '\n' ':' | sed 's/:$//')
+        echo $PYTHON_BINS >> $GITHUB_PATH
+
+    # Restore-only, with the same keys build-wheel-linux-x86_64.yaml saves under. The source tree is
+    # needed for LICENSE.TXT, which goes into the package.
+    - name: Get Cached LLVM Source
+      id: cache-llvm-source
+      uses: actions/cache/restore@v4
+      with:
+        path: ${{ github.workspace }}/mlir/llvm-project
+        key: llvm-${{ needs.constants.outputs.llvm_version }}-container-source
+        enableCrossOsArchive: True
+        fail-on-cache-miss: True
+
+    - name: Get Cached LLVM Build
+      id: cache-llvm-build
+      uses: actions/cache/restore@v4
+      with:
+        path: ${{ github.workspace }}/llvm-build
+        key: ${{ matrix.container_img }}-llvm-${{ needs.constants.outputs.llvm_version }}-${{ matrix.python_version }}-wheel-build
+        fail-on-cache-miss: True
+
+    # pack-llvm-dev does not depend on the llvm target; it checks for a usable build in
+    # LLVM_BUILD_DIR instead, so it will not kick off a rebuild (and a full check-mlir run) on top of
+    # the build restored above.
+    - name: Package catalyst-llvm-dev (CPack)
+      run: |
+        export PATH=$GITHUB_WORKSPACE/llvm-build/bin:$PATH
+        make -C $GITHUB_WORKSPACE/mlir pack-llvm-dev \
+          LLVM_BUILD_DIR="$GITHUB_WORKSPACE/llvm-build"
+        ls -lh $GITHUB_WORKSPACE/mlir/dist
+
+    - name: Upload catalyst-llvm-dev Archive
+      uses: actions/upload-artifact@v4
+      with:
+        name: catalyst-llvm-dev-Linux-x86_64
+        # Glob rather than spell out the platform and version: the file name is
+        # built from CMAKE_HOST_SYSTEM_NAME/CMAKE_HOST_SYSTEM_PROCESSOR and the
+        # LLVM version and commit (see mlir/cmake/LLVMDevCPackConfig.cmake).
+        path: ${{ github.workspace }}/mlir/dist/catalyst-llvm-dev-*.tar.gz
+        retention-days: 14
+        if-no-files-found: error
+
+  macos-arm64:
+    needs: [constants]
+
+    strategy:
+      fail-fast: false
+      matrix:
+        python_version: ${{ fromJson(format('["{0}"]', needs.constants.outputs.primary_python_version)) }}
+
+    name: Pack catalyst-llvm-dev (macOS arm64)
+    # Must match the runner build-wheel-macos-arm64.yaml builds LLVM on, since
+    # runner.os/runner.arch are part of the shared build cache key.
+    runs-on: macos-15
+
+    steps:
+    - name: Checkout Catalyst repo
+      uses: actions/checkout@v4
+
+    - name: Setup Python version
+      # There are multiple Python versions installed on the GitHub image, 3.12 - 3.14 is already
+      # available under /Library/Frameworks/Python.framework/Versions/, but homebrew also provides
+      # 3.12 - 3.14. Make sure to consistently use the system versions.
+      run: |
+        echo /Library/Frameworks/Python.framework/Versions/${{ matrix.python_version }}/bin >> $GITHUB_PATH
+
+    # No LLVM configure or compile happens here, but install-distribution may still do incremental
+    # work on the restored build tree, so these have to be available.
+    - name: Install Dependencies (Python)
+      run: |
+        python${{ matrix.python_version }} -m pip install numpy "nanobind<2.13" pybind11 PyYAML cmake ninja
+
+    # Restore-only, with the same keys build-wheel-macos-arm64.yaml saves under. The source tree is
+    # needed for LICENSE.TXT, which goes into the package.
+    - name: Get Cached LLVM Source
+      id: cache-llvm-source
+      uses: actions/cache/restore@v4
+      with:
+        path: ${{ github.workspace }}/mlir/llvm-project
+        key: llvm-${{ needs.constants.outputs.llvm_version }}-default-source
+        enableCrossOsArchive: True
+        fail-on-cache-miss: True
+
+    - name: Get Cached LLVM Build
+      id: cache-llvm-build
+      uses: actions/cache/restore@v4
+      with:
+        path: ${{ github.workspace }}/llvm-build
+        key: ${{ runner.os }}-${{ runner.arch }}-llvm-${{ needs.constants.outputs.llvm_version }}-${{ matrix.python_version }}-wheel-build
+        fail-on-cache-miss: True
+
+    # pack-llvm-dev does not depend on the llvm target; it checks for a usable build in
+    # LLVM_BUILD_DIR instead, so it will not kick off a rebuild (and a full check-mlir run) on top of
+    # the build restored above.
+    - name: Package catalyst-llvm-dev (CPack)
+      run: |
+        make -C $GITHUB_WORKSPACE/mlir pack-llvm-dev \
+          LLVM_BUILD_DIR="$GITHUB_WORKSPACE/llvm-build"
+        ls -lh $GITHUB_WORKSPACE/mlir/dist
+
+    - name: Upload catalyst-llvm-dev Archive
+      uses: actions/upload-artifact@v4
+      with:
+        name: catalyst-llvm-dev-Darwin-arm64
+        # Glob rather than spell out the platform and version: the file name is
+        # built from CMAKE_HOST_SYSTEM_NAME/CMAKE_HOST_SYSTEM_PROCESSOR and the
+        # LLVM version and commit (see mlir/cmake/LLVMDevCPackConfig.cmake).
+        path: ${{ github.workspace }}/mlir/dist/catalyst-llvm-dev-*.tar.gz
+        retention-days: 14
+        if-no-files-found: error

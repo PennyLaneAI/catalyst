@@ -13,3 +13,5 @@ set_property(TARGET steane_coprocessor_cpu PROPERTY POSITION_INDEPENDENT_CODE ON
 add_library(echo_coprocessor_cpu SHARED echo_coprocessor_fn.cpp)
 target_link_libraries(echo_coprocessor_cpu PRIVATE catalyst_transport_common)
 set_property(TARGET echo_coprocessor_cpu PROPERTY POSITION_INDEPENDENT_CODE ON)
+
+catalyst_runtime_install(steane_coprocessor_cpu echo_coprocessor_cpu)

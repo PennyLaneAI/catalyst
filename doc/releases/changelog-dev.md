@@ -183,6 +183,10 @@
 
 <h3>Improvements 🛠</h3>
 
+* The :func:`~catalyst.qjit` function now accepts an ``enable_aot_compilation`` argument, which can be
+  used to toggle whether or not to use ahead-of-time compilation.
+  [(#3339)](https://github.com/PennyLaneAI/catalyst/pull/3339)
+
 * :func:`pennylane.transforms.gridsynth` now produces correct, deterministic decompositions for
   any `epsilon` down to `1e-15`, and invalid angles or `epsilon` values raise an error.
   [(#3333)](https://github.com/PennyLaneAI/catalyst/pull/3333)
