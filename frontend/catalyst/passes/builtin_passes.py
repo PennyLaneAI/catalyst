@@ -819,7 +819,7 @@ combine_global_phases = qp.transform(
 )
 
 
-def gridsynth_setup_inputs(epsilon=1e-4, ppr_basis=False):
+def gridsynth_setup_inputs(epsilon=1e-4, ppr_basis=False, method="deterministic"):
     r"""A quantum compilation pass to discretize
     single-qubit RZ and PhaseShift gates into the Clifford+T basis or the PPR basis using the Ross-Selinger Gridsynth algorithm.
     Reference: https://arxiv.org/abs/1403.2975
@@ -837,9 +837,18 @@ def gridsynth_setup_inputs(epsilon=1e-4, ppr_basis=False):
 
     Args:
         qnode (QNode): the QNode to apply the gridsynth compiler pass to
-        epsilon (float): The maximum permissible operator norm error per rotation gate. Defaults to ``1e-4``.
-            Values down to ``1e-15`` are supported.
+        epsilon (float): The accuracy per rotation gate. Defaults to ``1e-4``. Values down to
+            ``1e-15`` are supported. With ``"deterministic"``, each rotation has operator norm
+            error at most ``epsilon``, and therefore diamond norm error at most ``2 * epsilon``.
+            With ``"mixed"``, the channel averaged over samples has diamond norm error at most
+            ``2 * epsilon``.
         ppr_basis (bool): If true, decompose directly to Pauli Product Rotations (PPRs) in PBC dialect. Defaults to ``False``
+        method (str): The synthesis method. ``"deterministic"`` (default) applies a single
+            Ross-Selinger gate sequence per rotation. ``"mixed"`` applies, per execution, one of
+            two twirled sequences that under- and over-rotate the target, which roughly
+            halves the T-count at the same accuracy. This is the mixed diagonal approximation of
+            Kliuchnikov et al., Section 3.4 (Proposition 3.13), in
+            `arXiv:2203.10064 <https://arxiv.org/abs/2203.10064>`__.
 
     Returns:
         :class:`QNode <pennylane.QNode>`
@@ -848,6 +857,21 @@ def gridsynth_setup_inputs(epsilon=1e-4, ppr_basis=False):
 
         The circuit generated from this pass with ``ppr_basis=True`` are currently only executable on the
         ``lightning.qubit`` device with program  enabled.
+
+    .. note::
+
+        With ``method="mixed"``, each rotation applies the under- or the over-rotating sequence,
+        conjugated as :math:`\sigma U \sigma^\dagger` with :math:`\sigma` drawn uniformly from
+        :math:`\{I, S, Z, S^\dagger\}`. This gives eight possible sequences
+        per rotation. The twirl leaves the target rotation unchanged, since it commutes with
+        :math:`\sigma`.
+
+        The accuracy guarantee holds on average over samples, and each sampled sequence has error
+        of order :math:`\sqrt{\epsilon}`. By default, and with
+        ``mcm_method="single-branch-statistics"``, a call samples one sequence per rotation, shared
+        by all its shots. With ``mcm_method="one-shot"``, every shot samples its own. Samples are
+        drawn from the runtime random number generator seeded by the ``seed`` argument of
+        :func:`~.qjit`, so with a fixed seed every call uses the same gate sequences.
 
     **Example**
 
@@ -912,7 +936,9 @@ def gridsynth_setup_inputs(epsilon=1e-4, ppr_basis=False):
 
 
     """
-    return (), {"epsilon": epsilon, "ppr_basis": ppr_basis}
+    if method not in ("deterministic", "mixed"):
+        raise ValueError(f"method must be 'deterministic' or 'mixed'. Got {method!r}.")
+    return (), {"epsilon": epsilon, "ppr_basis": ppr_basis, "method": method}
 
 
 gridsynth = qp.transform(pass_name="gridsynth", setup_inputs=gridsynth_setup_inputs)
