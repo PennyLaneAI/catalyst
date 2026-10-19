@@ -1043,25 +1043,22 @@ void handleSubroutine(IRRewriter &builder, func::FuncOp f,
     assert(succeeded(f.eraseArguments(eraseArgsIndices)));
 }
 
-SmallVector<IntegerAttr> collectQregSizesAtCallsite(func::FuncOp subroutine,
-                                                    ArrayRef<func::FuncOp> callers) {
+SmallVector<IntegerAttr> collectQregSizesAtCallsite(func::FuncOp subroutine, func::FuncOp caller) {
     SmallVector<IntegerAttr> qregSizesAtCallsite;
-    for (func::FuncOp caller : callers) {
-        WalkResult walkResult = caller.walk([&](func::CallOp callOp) {
-            if (callOp.getCallee() != subroutine.getSymName()) {
-                return WalkResult::advance();
-            }
-            for (Type t : callOp.getOperandTypes()) {
-                if (auto qrefQuregType = dyn_cast<qref::QuregType>(t)) {
-                    qregSizesAtCallsite.push_back(qrefQuregType.getSize());
-                }
-            }
-            return WalkResult::interrupt();
-        });
-        if (walkResult.wasInterrupted()) {
-            break;
-        }
+    if (!caller) {
+        return qregSizesAtCallsite;
     }
+    caller.walk([&](func::CallOp callOp) {
+        if (callOp.getCallee() != subroutine.getSymName()) {
+            return WalkResult::advance();
+        }
+        for (Type t : callOp.getOperandTypes()) {
+            if (auto qrefQuregType = dyn_cast<qref::QuregType>(t)) {
+                qregSizesAtCallsite.push_back(qrefQuregType.getSize());
+            }
+        }
+        return WalkResult::interrupt();
+    });
     return qregSizesAtCallsite;
 }
 
@@ -1130,13 +1127,18 @@ struct ReferenceSemanticsConversionPass
             subroutinesPostOrder.push_back(subroutine);
         }
 
-        // Collect the callers once: a per-subroutine `SymbolTable::getSymbolUses` walks the whole
-        // module, which is quadratic in the number of subroutines. The callers stay valid while
-        // their call ops are replaced during conversion.
-        llvm::DenseMap<StringAttr, SetVector<func::FuncOp>> callersOf;
+        // Collect the first caller of each subroutine once: a per-subroutine
+        // `SymbolTable::getSymbolUses` walks the whole module, which is quadratic in the number of
+        // subroutines. Callers are recorded instead of call ops (e.g. with a `SymbolUserMap`)
+        // because callers are converted before their callees, which replaces their call ops.
+        SymbolTableCollection symbolTables;
+        llvm::DenseMap<func::FuncOp, func::FuncOp> firstCallerOf;
         mod->walk([&](func::CallOp callOp) {
-            if (auto caller = callOp->getParentOfType<func::FuncOp>()) {
-                callersOf[callOp.getCalleeAttr().getAttr()].insert(caller);
+            auto callee =
+                symbolTables.lookupNearestSymbolFrom<func::FuncOp>(callOp, callOp.getCalleeAttr());
+            auto caller = callOp->getParentOfType<func::FuncOp>();
+            if (callee && caller) {
+                firstCallerOf.try_emplace(callee, caller);
             }
         });
 
@@ -1149,9 +1151,9 @@ struct ReferenceSemanticsConversionPass
                 return signalPassFailure();
             }
             QubitValueTracker tracker;
-            handleSubroutine(builder, subroutine,
-                             collectQregSizesAtCallsite(
-                                 subroutine, callersOf[subroutine.getSymNameAttr()].getArrayRef()));
+            handleSubroutine(
+                builder, subroutine,
+                collectQregSizesAtCallsite(subroutine, firstCallerOf.lookup(subroutine)));
             if (failed(ensureNoValueSemanticsOps(subroutine))) {
                 subroutine.emitOpError(
                     "Detected remaining value semantics operations after conversion");
