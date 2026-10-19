@@ -111,6 +111,32 @@ int __catalyst__transport__start_benchmark(CatalystTransportSession *s, uint32_t
                                            uint32_t decoder_id, uint32_t flags, uint64_t *samples,
                                            uint64_t samples_bytes, uint64_t *rounds);
 
+// Checked variants. Each `__call` run and checks the return code in the runtime.
+CatalystTransportSession *__catalyst__transport__create__call(const char *backend_lib,
+                                                              const char *config, int32_t role,
+                                                              const char *key);
+CatalystTransportSession *__catalyst__transport__get_session__call(int32_t role, const char *key);
+int __catalyst__transport__connect__call(CatalystTransportSession *s, const char *peer,
+                                         uint16_t oob_port);
+int __catalyst__transport__exchange_keys__call(CatalystTransportSession *s);
+int __catalyst__transport__await__call(int64_t token);
+int __catalyst__transport__establish_channel__call(CatalystTransportSession *s,
+                                                   const char *transport);
+int __catalyst__transport__set_coprocessor_fn__call(CatalystTransportSession *s,
+                                                    const char *symbol);
+int __catalyst__transport__set_message_sizes__call(CatalystTransportSession *s,
+                                                   uint32_t work_item_idx, uint64_t in_bytes,
+                                                   uint64_t out_bytes);
+int __catalyst__transport__stage_payload__call(CatalystTransportSession *s, const void *src,
+                                               uint64_t bytes, uint32_t decoder_id);
+int __catalyst__transport__post__call(CatalystTransportSession *s, uint32_t work_item_idx);
+int __catalyst__transport__collect__call(CatalystTransportSession *s, void *reply,
+                                         uint64_t reply_bytes);
+int __catalyst__transport__start_benchmark__call(CatalystTransportSession *s, uint32_t iters,
+                                                 uint32_t decoder_id, uint32_t flags,
+                                                 uint64_t *samples, uint64_t samples_bytes,
+                                                 uint64_t *rounds);
+
 #ifdef __cplusplus
 } // extern "C"
 #endif
