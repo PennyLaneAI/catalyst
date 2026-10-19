@@ -765,8 +765,8 @@
   through logs or tracebacks.
   [(#3309)](https://github.com/PennyLaneAI/catalyst/pull/3309)
 
-* The `--convert-to-value-semantics` pass now collects subroutine symbol uses only once instead of
-  once per subroutine, improving its performance.
+* The `--convert-to-value-semantics` and `--convert-to-reference-semantics` passes now collect
+  subroutine symbol uses only once instead of once per subroutine, improving their performance.
   [(#3341)](https://github.com/PennyLaneAI/catalyst/pull/3341)
 
 <h3>Breaking changes 💔</h3>
