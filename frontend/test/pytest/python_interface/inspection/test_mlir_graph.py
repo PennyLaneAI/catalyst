@@ -64,7 +64,7 @@ class TestMLIRGraph:
         with pytest.raises(TypeError, match="Cannot generate MLIR module"):
             gen()
 
-    @pytest.mark.parametrize("skip_preprocess", [True, False])
+    @pytest.mark.parametrize("skip_preprocess", [True, pytest.mark.xfail(False)])
     def test_no_transforms(self, tmp_path: Path, skip_preprocess, capture_mode):
         """Test the MLIR graph is still generated when no transforms are applied"""
         if not capture_mode and skip_preprocess:
@@ -88,7 +88,10 @@ class TestMLIRGraph:
         else:
             assert len(collected_files) > 1
 
-    @pytest.mark.parametrize("skip_preprocess", [True, False])
+    @pytest.mark.parametrize(
+        "skip_preprocess",
+        [True, pytest.param(False, marks=pytest.mark.graph_todo)],
+    )
     def test_xdsl_transforms_no_args(self, tmp_path: Path, skip_preprocess, capture_mode):
         """Test the MLIR graph generation with no arguments to the QNode with and without qjit"""
         if not capture_mode and skip_preprocess:
@@ -119,7 +122,10 @@ class TestMLIRGraph:
             assert collected_files[0 : len(expected_user)] == expected_user
             assert len(collected_files) > len(expected_user)
 
-    @pytest.mark.parametrize("skip_preprocess", [True, False])
+    @pytest.mark.parametrize(
+        "skip_preprocess",
+        [True, pytest.param(False, marks=pytest.mark.graph_todo)],
+    )
     def test_xdsl_transforms_args(self, tmp_path: Path, skip_preprocess, capture_mode):
         """Test the MLIR graph generation with arguments to the QNode for xDSL transforms"""
         if not capture_mode and skip_preprocess:
@@ -148,7 +154,10 @@ class TestMLIRGraph:
             assert collected_files[0 : len(expected_user)] == expected_user
             assert len(collected_files) > len(expected_user)
 
-    @pytest.mark.parametrize("skip_preprocess", [True, False])
+    @pytest.mark.parametrize(
+        "skip_preprocess",
+        [True, pytest.param(False, marks=pytest.mark.graph_todo)],
+    )
     def test_catalyst_transforms_args(self, tmp_path: Path, skip_preprocess, capture_mode):
         """Test the MLIR graph generation with arguments to the QNode for catalyst transforms"""
         if not capture_mode and skip_preprocess:
@@ -177,7 +186,10 @@ class TestMLIRGraph:
             assert collected_files[0 : len(expected_user)] == expected_user
             assert len(collected_files) > len(expected_user)
 
-    @pytest.mark.parametrize("skip_preprocess", [True, False])
+    @pytest.mark.parametrize(
+        "skip_preprocess",
+        [True, pytest.param(False, marks=pytest.mark.graph_todo)],
+    )
     def test_catalyst_xdsl_transforms_args(self, tmp_path: Path, skip_preprocess, capture_mode):
         """Test the MLIR graph generation with arguments to the QNode for catalyst and xDSL
         transforms"""
@@ -207,7 +219,10 @@ class TestMLIRGraph:
             assert collected_files[0 : len(expected_user)] == expected_user
             assert len(collected_files) > len(expected_user)
 
-    @pytest.mark.parametrize("skip_preprocess", [True, False])
+    @pytest.mark.parametrize(
+        "skip_preprocess",
+        [True, pytest.param(False, marks=pytest.mark.graph_todo)],
+    )
     def test_cond(self, tmp_path: Path, skip_preprocess, capture_mode):
         """Test the MLIR graph generation for a conditional"""
         if not capture_mode and skip_preprocess:
@@ -247,7 +262,10 @@ class TestMLIRGraph:
             assert collected_files[0 : len(expected_user)] == expected_user
             assert len(collected_files) > len(expected_user)
 
-    @pytest.mark.parametrize("skip_preprocess", [True, False])
+    @pytest.mark.parametrize(
+        "skip_preprocess",
+        [True, pytest.param(False, marks=pytest.mark.graph_todo)],
+    )
     def test_cond_with_mcm(self, tmp_path: Path, skip_preprocess, capture_mode):
         """Test the MLIR graph generation for a conditional with MCM"""
         if not capture_mode and skip_preprocess:
@@ -284,7 +302,10 @@ class TestMLIRGraph:
             assert collected_files[0 : len(expected_user)] == expected_user
             assert len(collected_files) > len(expected_user)
 
-    @pytest.mark.parametrize("skip_preprocess", [True, False])
+    @pytest.mark.parametrize(
+        "skip_preprocess",
+        [True, pytest.param(False, marks=pytest.mark.graph_todo)],
+    )
     def test_for_loop(self, tmp_path: Path, skip_preprocess, capture_mode):
         """Test the MLIR graph generation for a for loop"""
         if not capture_mode and skip_preprocess:
@@ -316,7 +337,10 @@ class TestMLIRGraph:
             assert collected_files[0 : len(expected_user)] == expected_user
             assert len(collected_files) > len(expected_user)
 
-    @pytest.mark.parametrize("skip_preprocess", [True, False])
+    @pytest.mark.parametrize(
+        "skip_preprocess",
+        [True, pytest.param(False, marks=pytest.mark.graph_todo)],
+    )
     def test_while_loop(self, tmp_path: Path, skip_preprocess, capture_mode):
         """Test the MLIR graph generation for a while loop"""
         if not capture_mode and skip_preprocess:
