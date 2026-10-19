@@ -103,7 +103,7 @@ def test_gridsynth_specs_matches_runtime(eps, ppr_basis):
     distance_to_pi_4 = np.abs(np.remainder(angles + np.pi / 8, np.pi / 4) - np.pi / 8)
     angles = angles[distance_to_pi_4 > 2 * eps]
 
-    @qp.qjit(capture=True)
+    @qp.qjit(capture=True, skip_preprocess=True)
     @qp.transforms.gridsynth(epsilon=eps, ppr_basis=ppr_basis)
     @qp.qnode(qp.device("null.qubit", wires=1))
     def circuit(angles):
