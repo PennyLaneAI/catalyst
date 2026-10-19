@@ -247,7 +247,7 @@ pack-catalyst-dev: dialects
 # from pack-llvm-dev where we have already confirmed that an LLVM build tree exists. With := they
 # would run on every make invocation, including on a clean tree where llvm-config does not exist
 # yet.
-LLVM_VERSION = $(shell $(LLVM_BUILD_DIR)/bin/llvm-config --version 2>/dev/null)
+LLVM_VERSION = $(shell $(LLVM_INSTALL_STAGING_DIR)/bin/llvm-config --version 2>/dev/null)
 LLVM_COMMIT = $(shell grep '^llvm=' $(MK_DIR)/../.dep-versions | awk -F '=' '{ print $$2 }' | cut -c1-8)
 LLVM_VERSION_FULL = $(LLVM_VERSION)-$(LLVM_COMMIT)
 
@@ -259,13 +259,6 @@ LLVM_VERSION_FULL = $(LLVM_VERSION)-$(LLVM_COMMIT)
 pack-llvm-dev:
 
 	@echo "build the catalyst-llvm-dev package"
-	-echo "LLVM_BUILD_DIR: $(LLVM_BUILD_DIR)"
-	-ls -lh "$(LLVM_BUILD_DIR)"
-	-ls -lh "$(LLVM_BUILD_DIR)/bin"
-	-find $(LLVM_BUILD_DIR) -name "CMakeCache.txt"
-	-find $(LLVM_BUILD_DIR)/bin -name "llvm-config"
-	-echo "LLVM_INSTALL_STAGING_DIR: $(LLVM_INSTALL_STAGING_DIR)"
-	-ls -lh "$(LLVM_INSTALL_STAGING_DIR)"
 	@if [ ! -f "$(LLVM_BUILD_DIR)/CMakeCache.txt" ]; then \
 		echo "error: no LLVM build found in $(LLVM_BUILD_DIR)." >&2; \
 		echo "       Run 'make llvm' first, or set LLVM_BUILD_DIR to an existing build tree." >&2; \
