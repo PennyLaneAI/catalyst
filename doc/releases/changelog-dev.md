@@ -804,6 +804,9 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* Controlled quantum regions now keeps track of the `work_wire_type` passed from `qp.ctrl`.
+  [(#XXXX)](https://github.com/PennyLaneAI/catalyst/pull/XXXX)
+
 * MLIR passes that recreate `scf.for`, `scf.while`, `scf.if`, and `scf.index_switch` ops
   (`ctrl-lowering`, `adjoint-lowering`, `--convert-to-value-semantics`) now preserve discardable
   attributes such as `catalyst.estimated_iterations`, `catalyst.estimated_probability`, and
