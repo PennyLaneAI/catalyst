@@ -259,19 +259,19 @@ LLVM_VERSION_FULL = $(LLVM_VERSION)-$(LLVM_COMMIT)
 pack-llvm-dev:
 
 	@echo "build the catalyst-llvm-dev package"
-	echo "LLVM_BUILD_DIR: $(LLVM_BUILD_DIR)"
-	ls -lh "$(LLVM_BUILD_DIR)"
-	ls -lh "$(LLVM_BUILD_DIR)/bin"
-	find . -name "$(LLVM_BUILD_DIR)/CMakeCache.txt"
-	find . -name "$(LLVM_BUILD_DIR)/bin/llvm-config"
-	echo "LLVM_INSTALL_STAGING_DIR: $(LLVM_INSTALL_STAGING_DIR)"
-	ls -lh "$(LLVM_INSTALL_STAGING_DIR)"
-	ls -lh "$(LLVM_INSTALL_STAGING_DIR)/bin"
-	find . -name "$(LLVM_INSTALL_STAGING_DIR)/CMakeCache.txt"
-	find . -name "$(LLVM_INSTALL_STAGING_DIR)/bin/llvm-config"
-	@if [ ! -f "$(LLVM_INSTALL_STAGING_DIR)/CMakeCache.txt" ] || [ ! -x "$(LLVM_INSTALL_STAGING_DIR)/bin/llvm-config" ]; then \
-		echo "error: no LLVM build found in $(LLVM_INSTALL_STAGING_DIR)." >&2; \
-		echo "       Run 'make llvm' first, or set LLVM_INSTALL_STAGING_DIR to an existing build tree." >&2; \
+	-echo "LLVM_BUILD_DIR: $(LLVM_BUILD_DIR)"
+	-ls -lh "$(LLVM_BUILD_DIR)"
+	-ls -lh "$(LLVM_BUILD_DIR)/bin"
+	-find . -name "$(LLVM_BUILD_DIR)/CMakeCache.txt"
+	-find . -name "$(LLVM_BUILD_DIR)/bin/llvm-config"
+	-echo "LLVM_INSTALL_STAGING_DIR: $(LLVM_INSTALL_STAGING_DIR)"
+	-ls -lh "$(LLVM_INSTALL_STAGING_DIR)"
+	-ls -lh "$(LLVM_INSTALL_STAGING_DIR)/bin"
+	-find . -name "$(LLVM_INSTALL_STAGING_DIR)/CMakeCache.txt"
+	-find . -name "$(LLVM_INSTALL_STAGING_DIR)/bin/llvm-config"
+	@if [ ! -f "$(LLVM_BUILD_DIR)/CMakeCache.txt" ] || [ ! -x "$(LLVM_BUILD_DIR)/bin/llvm-config" ]; then \
+		echo "error: no LLVM build found in $(LLVM_BUILD_DIR)." >&2; \
+		echo "       Run 'make llvm' first, or set LLVM_BUILD_DIR to an existing build tree." >&2; \
 		exit 1; \
 	fi
 	@if [ ! -f "$(LLVM_SRC_DIR)/LICENSE.TXT" ]; then \
