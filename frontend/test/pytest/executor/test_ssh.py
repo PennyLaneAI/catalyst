@@ -534,6 +534,55 @@ class TestRemoteLauncherSshOpts:
         opts = RemoteLauncher._ssh_opts(5, use_password=True)
         assert "-tt" not in opts
 
+    def test_interactive_forward_turns_off_keystroke_timing(self, monkeypatch):
+        """With ``-tt``, OpenSSH's 20 ms keystroke-timing pacing is turned off where supported."""
+        monkeypatch.setattr(SSHArgv, "supports_option", staticmethod(lambda option: True))
+        opts = RemoteLauncher._ssh_opts(5, use_password=False)
+        assert opts[opts.index("ObscureKeystrokeTiming=no") - 1] == "-o"
+
+    def test_keystroke_timing_is_left_alone_where_unsupported(self, monkeypatch):
+        """An ssh without the option (before OpenSSH 9.5) is not passed it, since it would reject
+        it."""
+        monkeypatch.setattr(SSHArgv, "supports_option", staticmethod(lambda option: False))
+        assert "ObscureKeystrokeTiming=no" not in RemoteLauncher._ssh_opts(5, use_password=False)
+
+    def test_keystroke_timing_is_left_alone_without_a_pseudo_terminal(self, monkeypatch):
+        """The password path has no ``-tt``, so ssh does not pace its traffic."""
+        monkeypatch.setattr(SSHArgv, "supports_option", staticmethod(lambda option: True))
+        assert "ObscureKeystrokeTiming=no" not in RemoteLauncher._ssh_opts(5, use_password=True)
+
+
+class TestSSHArgvSupportsOption:
+    """Probing which ``-o`` options the local ssh accepts."""
+
+    def test_the_answer_comes_from_ssh_g_and_is_cached(self, monkeypatch):
+        """``ssh -G`` is asked once per option, and its exit status is the answer."""
+        calls = []
+
+        def fake_run(argv, **_kwargs):
+            calls.append(argv)
+            return SimpleNamespace(returncode=0 if "Good=yes" in argv else 255)
+
+        monkeypatch.setattr(SSHArgv, "_option_support", {})
+        monkeypatch.setattr(subprocess, "run", fake_run)
+        assert SSHArgv.supports_option("Good=yes")
+        assert not SSHArgv.supports_option("Bad=yes")
+        assert SSHArgv.supports_option("Good=yes")
+        assert calls == [
+            ["ssh", "-G", "-o", "Good=yes", "localhost"],
+            ["ssh", "-G", "-o", "Bad=yes", "localhost"],
+        ]
+
+    def test_a_missing_ssh_counts_as_unsupported(self, monkeypatch):
+        """An ssh that cannot be run supports no option."""
+
+        def missing(*_args, **_kwargs):
+            raise FileNotFoundError("ssh")
+
+        monkeypatch.setattr(SSHArgv, "_option_support", {})
+        monkeypatch.setattr(subprocess, "run", missing)
+        assert not SSHArgv.supports_option("Any=yes")
+
 
 class TestRemoteLauncherSshArgv:
     """Top-level argv shape produced by :meth:`RemoteLauncher.ssh_argv`."""

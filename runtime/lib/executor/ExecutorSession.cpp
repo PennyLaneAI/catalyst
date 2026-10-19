@@ -49,7 +49,11 @@
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/TargetSelect.h"
 
+#include "WholeMessageFDTransport.hpp"
+
 #include <netdb.h>
+#include <netinet/in.h>
+#include <netinet/tcp.h>
 #include <unistd.h>
 
 using namespace llvm;
@@ -82,50 +86,6 @@ void initialize_targets() {
     }();
     (void)inited;
 }
-
-// FDSimpleRemoteEPCTransport whose disconnect() also shutdown()s the socket, to avoid a
-// teardown deadlock.
-//
-// SimpleRemoteEPC::disconnect() (via ExecutionSession::endSession()) closes the transport, then
-// waits for the listener thread to observe EOF. The stock transport only close()s the fd, but the
-// listener's in-flight read() keeps the socket alive — so close() neither wakes that read nor
-// sends a FIN, and the wait blocks forever (the peer never sees EOF either).
-//
-// shutdown(SHUT_RDWR) forces the read() to return and sends the FIN. We do it in disconnect() so
-// it runs only after endSession() has finished its own messaging (e.g. freeing JIT'd memory).
-class ShutdownFDTransport : public SimpleRemoteEPCTransport {
-  public:
-    static Expected<std::unique_ptr<ShutdownFDTransport>> Create(SimpleRemoteEPCTransportClient &C,
-                                                                 int InFD, int OutFD) {
-        auto Inner = FDSimpleRemoteEPCTransport::Create(C, InFD, OutFD);
-        if (!Inner) {
-            return Inner.takeError();
-        }
-        return std::make_unique<ShutdownFDTransport>(std::move(*Inner), InFD, OutFD);
-    }
-
-    ShutdownFDTransport(std::unique_ptr<FDSimpleRemoteEPCTransport> inner, int inFD, int outFD)
-        : Inner(std::move(inner)), InFD(inFD), OutFD(outFD) {}
-
-    Error start() override { return Inner->start(); }
-
-    Error sendMessage(SimpleRemoteEPCOpcode OpC, uint64_t SeqNo, ExecutorAddr TagAddr,
-                      ArrayRef<char> ArgBytes) override {
-        return Inner->sendMessage(OpC, SeqNo, TagAddr, ArgBytes);
-    }
-
-    void disconnect() override {
-        ::shutdown(InFD, SHUT_RDWR);
-        if (OutFD != InFD) {
-            ::shutdown(OutFD, SHUT_RDWR);
-        }
-        Inner->disconnect();
-    }
-
-  private:
-    std::unique_ptr<FDSimpleRemoteEPCTransport> Inner;
-    int InFD, OutFD;
-};
 
 // For avoiding the error message being overwritten by subsequent errors in async jobs.
 // We use thread_local to store the error message.
@@ -204,6 +164,12 @@ Expected<int> connectTCPSocket(std::string Host, std::string PortStr) {
     if (Server == nullptr) {
         return createTCPSocketError(std::strerror(errno));
     }
+
+    // Each EPC message is a small header write, then its payload. Without TCP_NODELAY, Nagle's
+    // algorithm holds the payload until the header is acknowledged, which a delayed ACK stalls for
+    // up to 40 ms, several times per remote call.
+    int NoDelay = 1;
+    setsockopt(SockFD, IPPROTO_TCP, TCP_NODELAY, &NoDelay, sizeof(NoDelay));
 
     return SockFD;
 }
@@ -320,11 +286,12 @@ struct ExecutorSession {
             });
         }
 
-        // ShutdownFDTransport instead of FDSimpleRemoteEPCTransport so teardown shutdown()s the
-        // socket and doesn't deadlock
-        auto EPC = SimpleRemoteEPC::Create<ShutdownFDTransport>(
+        // SimpleRemoteEPC::disconnect() (via ExecutionSession::endSession()) closes the transport,
+        // then waits for the listener thread to see EOF, so the transport shutdown()s the socket on
+        // disconnect: close() alone would leave the listener's read() blocked and teardown hung.
+        auto EPC = SimpleRemoteEPC::Create<catalyst::executor::WholeMessageFDTransport>(
             std::make_unique<DynamicThreadPoolTaskDispatcher>(std::nullopt), std::move(setup),
-            sockFd, sockFd);
+            sockFd, sockFd, /*shutdownOnDisconnect=*/true);
 
         if (watchdog.joinable()) {
             {
@@ -415,10 +382,8 @@ void remote_free(ExecutorSession *s, ExecutorAddr addr) {
     }
 }
 
-void remote_write(ExecutorSession *s, ExecutorAddr addr, const void *data, size_t size) {
-    auto &epc = s->getEPC();
-    tpctypes::BufferWrite w{addr, ArrayRef<char>(static_cast<const char *>(data), size)};
-    check(epc.getMemoryAccess().writeBuffers({w}), "write");
+void remote_write(ExecutorSession *s, ArrayRef<tpctypes::BufferWrite> writes) {
+    check(s->getEPC().getMemoryAccess().writeBuffers(writes), "write");
 }
 
 void remote_read(ExecutorSession *s, ExecutorAddr addr, void *data, size_t size) {
@@ -460,27 +425,26 @@ size_t memref_data_size(const char *desc, size_t rank, size_t elem_size) {
     return std::accumulate(shape, shape + rank, elem_size, std::multiplies<size_t>());
 }
 
-class RemoteAllocator {
+// One remote allocation, freed when the block goes out of scope.
+class RemoteBlock {
   private:
     ExecutorSession *sess;
-    std::vector<ExecutorAddr> addrs;
+    ExecutorAddr addr;
 
   public:
-    explicit RemoteAllocator(ExecutorSession *s) : sess(s) {}
-    ~RemoteAllocator() {
-        for (ExecutorAddr a : addrs) {
-            remote_free(sess, a);
-        }
-    }
-    RemoteAllocator(const RemoteAllocator &) = delete;
-    RemoteAllocator &operator=(const RemoteAllocator &) = delete;
+    RemoteBlock(ExecutorSession *s, size_t size) : sess(s), addr(remote_alloc(s, size)) {}
+    ~RemoteBlock() { remote_free(sess, addr); }
+    RemoteBlock(const RemoteBlock &) = delete;
+    RemoteBlock &operator=(const RemoteBlock &) = delete;
 
-    ExecutorAddr alloc(size_t size) {
-        ExecutorAddr addr = remote_alloc(sess, size);
-        addrs.push_back(addr);
-        return addr;
-    }
+    ExecutorAddr at(size_t offset) const { return addr + offset; }
 };
+
+// `size` rounded up to the alignment of every buffer in a launch's remote block.
+size_t align_up(size_t size) {
+    constexpr size_t kAlign = 64;
+    return (size + kAlign - 1) / kAlign * kAlign;
+}
 
 } // namespace
 
@@ -628,66 +592,12 @@ uint64_t lookup(ExecutorSession *s, const char *name, const char *object) {
 }
 
 /**
- * @brief Push one host memref to the remote:
- *        1. allocates the data buffer on the remote
- *        2. allocates the descriptor on the remote (which has a pointer to the data buffer)
- *        3. returns the descriptor's remote addr.
- *        4. If `copy_data` is true, the data will be copied to the remote.
- *           It's used for input memrefs like arguments.
- *           In the case of output memrefs, the data will be copied back to the host,
- *           so we don't need to copy the data to the remote.
- *
- * @param s the session object
- * @param alloc the remote allocator
- * @param host_desc the host memref descriptor
- * @param rank the rank of the memref
- * @param elem_size the element size of the memref
- * @param copy_data whether to copy the data to the remote
- * @return ExecutorAddr the remote address of the memref descriptor
- */
-ExecutorAddr push_memref(ExecutorSession *s, RemoteAllocator &alloc, void *host_desc, size_t rank,
-                         size_t elem_size, bool copy_data) {
-    char *desc_host = static_cast<char *>(host_desc);
-    size_t desc_size = memref_desc_size(rank);
-    size_t data_size = memref_data_size(desc_host, rank, elem_size);
-
-    // memref descriptor layout:
-    // ┌──────────────────────┐   ┌──────┐
-    // │memref      .allocated┼┬─►│buffer│
-    // │descriptor  .aligned ─┼┘  └──────┘
-    // │            .offset   │
-    // │            .shape    │
-    // │            .strides  │
-    // └──────────────────────┘
-
-    std::vector<char> desc(desc_size);
-    std::memcpy(desc.data(), desc_host, desc_size);
-
-    ExecutorAddr data_remote = ExecutorAddr(0);
-    if (data_size > 0) {
-        data_remote = alloc.alloc(data_size);
-        if (copy_data) {
-            void *aligned_host = *reinterpret_cast<void **>(desc_host + kAlignedOff);
-            if (aligned_host) {
-                int64_t host_offset = 0;
-                std::memcpy(&host_offset, desc_host + kOffsetOff, sizeof(int64_t));
-                char *src = static_cast<char *>(aligned_host) +
-                            host_offset * static_cast<int64_t>(elem_size);
-                remote_write(s, data_remote, src, data_size);
-            }
-        }
-    }
-    std::memcpy(desc.data() + kAllocatedOff, &data_remote, sizeof(uintptr_t));
-    std::memcpy(desc.data() + kAlignedOff, &data_remote, sizeof(uintptr_t));
-    std::memset(desc.data() + kOffsetOff, 0, sizeof(int64_t));
-
-    ExecutorAddr desc_remote = alloc.alloc(desc_size);
-    remote_write(s, desc_remote, desc.data(), desc.size());
-    return desc_remote;
-}
-
-/**
  * @brief Invoke a remote kernel.
+ *
+ * A launch costs a fixed number of round trips to the remote, whatever the number of memrefs: one
+ * allocation holding every input descriptor and buffer, the argument array and the result
+ * descriptors, one write of all the inputs, the call, one read of the result descriptors, one read
+ * of all the output buffers, and one free.
  *
  * @param s the session object
  * @param entry_addr the address of the kernel entry function
@@ -706,7 +616,6 @@ int invoke_kernel(ExecutorSession *s, uint64_t entry_addr, size_t num_inputs,
                   const size_t *input_elem_sizes, size_t num_outputs, void *const *output_descs,
                   const size_t *output_ranks, const size_t *output_elem_sizes) {
     clear_error();
-    RemoteAllocator allocator(s);
     try {
         // The remote executor's catalyst_remote_invoke calls the entry as Catalyst's pyface ABI:
         // `void(rv*, av*)`.
@@ -731,62 +640,105 @@ int invoke_kernel(ExecutorSession *s, uint64_t entry_addr, size_t num_inputs,
         //       └─────┴─────┴─────┴─────┴─────────┘
         // Each slot maps to a output memref descriptor
 
-        // Step 1. Push the input memref descriptors (with data) to the remote.
-        std::vector<ExecutorAddr> input_remote_descs(num_inputs);
+        // The remote block, as offsets: each input's data then its descriptor, then av, then rv.
+        struct Input {
+            size_t data_off, data_size, desc_off;
+        };
+        std::vector<Input> inputs(num_inputs);
+        size_t total = 0;
         for (size_t i = 0; i < num_inputs; ++i) {
-            input_remote_descs[i] = push_memref(s, allocator, input_descs[i], input_ranks[i],
-                                                input_elem_sizes[i], /*copy_data=*/true);
+            const char *desc = static_cast<const char *>(input_descs[i]);
+            inputs[i].data_size = memref_data_size(desc, input_ranks[i], input_elem_sizes[i]);
+            inputs[i].data_off = total;
+            total += align_up(inputs[i].data_size);
+            inputs[i].desc_off = total;
+            total += align_up(memref_desc_size(input_ranks[i]));
         }
-
-        // Step 2. Allocate a remote buffer holding the input memref descriptors' pointers.
-        ExecutorAddr av_remote = ExecutorAddr(0);
-        if (num_inputs > 0) {
-            av_remote = allocator.alloc(sizeof(uintptr_t) * num_inputs);
-            std::vector<uintptr_t> av_buf(num_inputs);
-            for (size_t i = 0; i < num_inputs; ++i) {
-                av_buf[i] = input_remote_descs[i].getValue();
-            }
-            remote_write(s, av_remote, av_buf.data(), sizeof(uintptr_t) * num_inputs);
-        }
-
-        // Step 3. Allocate a remote buffer for kernel to write the output memref descriptors.
+        const size_t av_off = total;
+        total += align_up(sizeof(uintptr_t) * num_inputs);
         std::vector<size_t> output_offsets(num_outputs);
         size_t rv_total = 0;
         for (size_t i = 0; i < num_outputs; ++i) {
             output_offsets[i] = rv_total;
             rv_total += memref_desc_size(output_ranks[i]);
         }
-        ExecutorAddr rv_remote = ExecutorAddr(0);
-        if (rv_total > 0) {
-            rv_remote = allocator.alloc(rv_total);
+        const size_t rv_off = total;
+        total += align_up(rv_total);
+        RemoteBlock block(s, std::max<size_t>(total, 1));
+
+        // Every input's data and descriptor, with the descriptor pointing at the remote data, and
+        // av pointing at the descriptors, in one write.
+        std::vector<std::vector<char>> descs(num_inputs);
+        std::vector<uintptr_t> av(num_inputs);
+        std::vector<tpctypes::BufferWrite> writes;
+        for (size_t i = 0; i < num_inputs; ++i) {
+            const char *desc_host = static_cast<const char *>(input_descs[i]);
+            const ExecutorAddr data_remote =
+                inputs[i].data_size > 0 ? block.at(inputs[i].data_off) : ExecutorAddr(0);
+            void *aligned_host = *reinterpret_cast<void *const *>(desc_host + kAlignedOff);
+            if (inputs[i].data_size > 0 && aligned_host) {
+                int64_t host_offset = 0;
+                std::memcpy(&host_offset, desc_host + kOffsetOff, sizeof(int64_t));
+                const char *src = static_cast<const char *>(aligned_host) +
+                                  host_offset * static_cast<int64_t>(input_elem_sizes[i]);
+                writes.push_back({data_remote, ArrayRef<char>(src, inputs[i].data_size)});
+            }
+            descs[i].assign(desc_host, desc_host + memref_desc_size(input_ranks[i]));
+            const uintptr_t data_value = data_remote.getValue();
+            std::memcpy(descs[i].data() + kAllocatedOff, &data_value, sizeof(uintptr_t));
+            std::memcpy(descs[i].data() + kAlignedOff, &data_value, sizeof(uintptr_t));
+            std::memset(descs[i].data() + kOffsetOff, 0, sizeof(int64_t));
+            writes.push_back({block.at(inputs[i].desc_off), ArrayRef<char>(descs[i])});
+            av[i] = block.at(inputs[i].desc_off).getValue();
+        }
+        const ExecutorAddr av_remote = num_inputs > 0 ? block.at(av_off) : ExecutorAddr(0);
+        if (num_inputs > 0) {
+            writes.push_back({av_remote, ArrayRef<char>(reinterpret_cast<const char *>(av.data()),
+                                                        sizeof(uintptr_t) * num_inputs)});
+        }
+        if (!writes.empty()) {
+            remote_write(s, writes);
         }
 
-        // Step 4. Invoke the kernel remotely.
+        // Invoke the kernel remotely.
+        const ExecutorAddr rv_remote = rv_total > 0 ? block.at(rv_off) : ExecutorAddr(0);
         std::vector<ExecutorAddr> arg_addrs = {rv_remote, av_remote};
         remote_invoke(s, ExecutorAddr(entry_addr), arg_addrs);
 
-        // Step 5. Pull each output descriptor back from rv buffer.
+        // The output descriptors, then every output's data in one read.
         if (rv_total > 0) {
             std::vector<char> rv_buf(rv_total);
             remote_read(s, rv_remote, rv_buf.data(), rv_total);
+            std::vector<ExecutorAddrRange> ranges;
+            std::vector<void *> destinations;
             for (size_t i = 0; i < num_outputs; ++i) {
-                size_t desc_size = memref_desc_size(output_ranks[i]);
-                size_t elem_size = output_elem_sizes[i];
                 char *desc = rv_buf.data() + output_offsets[i];
-
                 uintptr_t aligned_remote;
                 std::memcpy(&aligned_remote, desc + kAlignedOff, sizeof(uintptr_t));
-
-                size_t data_size = memref_data_size(desc, output_ranks[i], elem_size);
-                size_t alloc_size = std::max<size_t>(data_size, 1);
-                void *aligned_host = __catalyst__rt__alloc_managed(alloc_size);
+                const size_t data_size =
+                    memref_data_size(desc, output_ranks[i], output_elem_sizes[i]);
+                void *aligned_host = __catalyst__rt__alloc_managed(std::max<size_t>(data_size, 1));
                 if (data_size && aligned_remote) {
-                    remote_read(s, ExecutorAddr(aligned_remote), aligned_host, data_size);
+                    ranges.emplace_back(ExecutorAddr(aligned_remote),
+                                        ExecutorAddr(aligned_remote) + data_size);
+                    destinations.push_back(aligned_host);
                 }
                 uintptr_t aligned_addr = reinterpret_cast<uintptr_t>(aligned_host);
                 std::memcpy(desc + kAllocatedOff, &aligned_addr, sizeof(uintptr_t));
                 std::memcpy(desc + kAlignedOff, &aligned_addr, sizeof(uintptr_t));
-                std::memcpy(output_descs[i], desc, desc_size);
+                std::memcpy(output_descs[i], desc, memref_desc_size(output_ranks[i]));
+            }
+            if (!ranges.empty()) {
+                auto data = unwrap(s->getEPC().getMemoryAccess().readBuffers(ranges), "read");
+                if (data.size() != ranges.size()) {
+                    throw std::runtime_error("read: size mismatch");
+                }
+                for (size_t i = 0; i < ranges.size(); ++i) {
+                    if (data[i].size() != ranges[i].size()) {
+                        throw std::runtime_error("read: size mismatch");
+                    }
+                    std::memcpy(destinations[i], data[i].data(), data[i].size());
+                }
             }
         }
         return 0;
