@@ -190,7 +190,7 @@ def test_BasisState(backend):
     Test qp.allocate with qp.BasisState ops.
     """
 
-    @qjit(capture=True, collect_decomp_rules=False)
+    @qjit(capture=True, collect_decomp_rules=False, skip_preprocess=True)
     @qp.qnode(qp.device(backend, wires=1))
     def circuit():
         with qp.allocate(1) as q:
