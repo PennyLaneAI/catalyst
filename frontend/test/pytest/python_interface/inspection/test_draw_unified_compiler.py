@@ -623,7 +623,7 @@ class TestDrawGraph:
     def test_level_greater_than_num_of_passes(self, capture_mode):
         """Tests that a user warning is raised if the level is greater than number of passes."""
 
-        @qp.qjit(capture=capture_mode)
+        @qp.qjit(capture=capture_mode, skip_preprocess=True)
         @qp.transforms.merge_rotations
         @qp.transforms.cancel_inverses
         @qp.qnode(qp.device("null.qubit", wires=3))
@@ -657,7 +657,7 @@ class TestDrawGraph:
         # pylint: disable=import-outside-toplevel
         import matplotlib
 
-        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qjit(autograph=True, target="mlir", capture=capture_mode, skip_preprocess=True)
         @qp.qnode(qp.device("null.qubit", wires=2))
         def qjit_qnode():
             qp.H(0)
@@ -682,7 +682,7 @@ class TestDrawGraph:
     def test_transforms_step_through(self, capture_mode):
         """Tests that the level argument controls transformations step through."""
 
-        @qp.qjit(capture=capture_mode)
+        @qp.qjit(capture=capture_mode, skip_preprocess=True)
         @qp.transforms.merge_rotations
         @qp.transforms.cancel_inverses
         @qp.qnode(qp.device("null.qubit", wires=3))
