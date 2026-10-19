@@ -19,6 +19,7 @@
 #include <cstdint>
 #include <exception>
 #include <functional>
+#include <limits>
 #include <stop_token>
 #include <thread>
 #include <vector>
@@ -45,7 +46,9 @@ namespace catalyst::transport::memcpy {
  *
  * where `frame` is the controller's frame as common::frame_bytes describes it, and `reply_cap` is
  * the controller's reply size, raised to at least common::PAYLOAD_DATA_BYTES. The reply is
- * zero-filled before the call, and the controller receives exactly its reply size.
+ * zero-filled before the call, and the controller receives exactly its reply size. A function that
+ * returns COPROCESSOR_FN_ERROR fails that message only: process_message() throws for it, and the
+ * worker goes on to the next message.
  *
  * Bind the function before start(). process_message() is not reentrant: one controller drives the
  * worker, one message at a time.
@@ -78,6 +81,9 @@ class MessageWorker {
     std::size_t process_message(const void *in, std::size_t in_len, void *out, std::size_t out_cap);
 
   private:
+    /// Reply `bytes` value marking a message the function failed to process.
+    static constexpr std::uint64_t FAILED_REPLY = std::numeric_limits<std::uint64_t>::max();
+
     // A ring of common::K_RING_SLOTS slots. Each slot is a 64 B header, then `capacity` data bytes,
     // padded so every slot, and its data, stays 64-B aligned.
     class Ring {

@@ -92,11 +92,7 @@ class OpDecompRequest:
                 for name, types in graph_op_id.dynamic_shape.items()
                 if name not in base.hybrid_argnames
             },
-            wire_lens={
-                name: length
-                for name, length in graph_op_id.wire_lens.items()
-                if name not in base.hybrid_argnames
-            },
+            wire_lens=dict(graph_op_id.wire_lens),
             static_data=static_data,
             extra_data=base.hybrid_args,
             is_custom_op=graph_op_id.is_custom_op,

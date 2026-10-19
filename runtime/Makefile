@@ -9,6 +9,7 @@ NPROC ?= $(shell python3 -c "import os; print(os.cpu_count())")
 MK_ABSPATH := $(abspath $(lastword $(MAKEFILE_LIST)))
 MK_DIR := $(dir $(MK_ABSPATH))
 RT_BUILD_DIR ?= $(MK_DIR)/build
+DIST_DIR ?= $(MK_DIR)/dist
 CODE_COVERAGE ?= OFF
 BUILD_TYPE ?= RelWithDebInfo
 ENABLE_OPENQASM ?= ON
@@ -76,6 +77,7 @@ help:
 	@echo "  format [check=1]   to apply C++ formatter; use with 'check=1' to check instead of modify (requires clang-format)"
 	@echo "  format [version=?] to apply C++ formatter; use with 'version={version}' to run clang-format-{version} instead of clang-format"
 	@echo "  check-tidy         to build Catalyst Runtime with RUNTIME_CLANG_TIDY=ON (requires clang-tidy)"
+	@echo "  pack-catalyst-runtime-dev  to build the catalyst-runtime-dev package"
 
 .PHONY: configure
 configure:
@@ -129,15 +131,29 @@ ifeq ($(ENABLE_OQD), ON)
 endif
 ifeq ($(ENABLE_TRANSPORT), ON)
 	# Transport suites; which binaries exist depends on the toolchain (libibverbs, HIP).
+	# -f/-x skips the _tests.cmake files catch_discover_tests writes beside each binary, and
+	# --allow-running-no-tests passes a suite whose tests all skip rather than exiting 4.
 	@set -e; for t in $(RT_BUILD_DIR)/tests/runner_tests_transport*; do \
+		[ -f "$$t" ] && [ -x "$$t" ] || continue; \
 		echo "Catalyst runtime test suite - $${t##*/}"; \
-		$(ASAN_COMMAND) $$t; \
+		$(ASAN_COMMAND) $$t --allow-running-no-tests; \
 	done
 endif
 ifeq ($(ENABLE_EXECUTOR), ON)
 	# Test the catalyst-executor server over a loopback connection
 	$(ASAN_COMMAND) $(RT_BUILD_DIR)/tests/runner_tests_executor
 endif
+
+.PHONY: test-transport
+test-transport: BUILD_TYPE?=RelWithDebInfo
+test-transport: configure
+	cmake --build $(RT_BUILD_DIR) --target transport_tests_all -j$(NPROC)
+	@echo "Catalyst runtime transport test suites"
+	@set -e; for t in $(RT_BUILD_DIR)/tests/runner_tests_transport*; do \
+		[ -f "$$t" ] && [ -x "$$t" ] || continue; \
+		echo "Catalyst runtime test suite - $${t##*/}"; \
+		$(ASAN_COMMAND) $$t --allow-running-no-tests; \
+	done
 
 .PHONY: coverage
 coverage: RT_BUILD_DIR := $(RT_BUILD_DIR)_cov
@@ -161,8 +177,9 @@ endif
 ifeq ($(ENABLE_TRANSPORT), ON)
 	# Transport suites; which binaries exist depends on the toolchain (libibverbs, HIP).
 	@set -e; for t in $(RT_BUILD_DIR)/tests/runner_tests_transport*; do \
+		[ -f "$$t" ] && [ -x "$$t" ] || continue; \
 		echo "Catalyst runtime test suite - $${t##*/}"; \
-		$(ASAN_COMMAND) $$t; \
+		$(ASAN_COMMAND) $$t --allow-running-no-tests; \
 	done
 endif
 ifeq ($(ENABLE_EXECUTOR), ON)
@@ -184,10 +201,18 @@ else
 		$(MK_DIR)/include $(MK_DIR)/lib $(MK_DIR)/tests
 endif
 
+.PHONY: pack-catalyst-runtime-dev
+pack-catalyst-runtime-dev: runtime
+
+	@echo "build the catalyst-runtime-dev package"
+	cd $(RT_BUILD_DIR) && cpack
+	mkdir -p $(DIST_DIR)
+	mv $(RT_BUILD_DIR)/catalyst-runtime-dev*.tar.gz $(DIST_DIR)
+
 .PHONY: clean
 clean:
 	@echo "clean build files"
-	rm -rf $(RT_BUILD_DIR) $(RT_BUILD_DIR)_cov cov coverage.info $(MK_DIR)/BuildTidy
+	rm -rf $(RT_BUILD_DIR) $(RT_BUILD_DIR)_cov cov coverage.info $(MK_DIR)/BuildTidy $(DIST_DIR)
 
 .PHONY: format
 format:

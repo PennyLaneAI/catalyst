@@ -110,10 +110,10 @@ void QuantumDialect::initialize() {
                               SetBasisStateOp>();
 }
 
-/// Verify the QNode attribute invariants
+/// Verify the QNode and kernel entry point attribute invariants
 LogicalResult QuantumDialect::verifyOperationAttribute(Operation *op, NamedAttribute namedAttr) {
     StringRef attrName = namedAttr.getName().getValue();
-    if (attrName != "quantum.node") {
+    if (attrName != "quantum.node" && attrName != "quantum.kernel_entry_point") {
         return success();
     }
 

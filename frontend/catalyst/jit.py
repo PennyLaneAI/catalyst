@@ -105,6 +105,7 @@ def qjit(
     capture="global",
     skip_preprocess=False,
     collect_decomp_rules=True,
+    enable_aot_compilation=True,
 ):  # pylint: disable=too-many-arguments,unused-argument
     """A just-in-time decorator for PennyLane and JAX programs using Catalyst.
 
@@ -203,6 +204,9 @@ def qjit(
             decomposition rules reachable from all gates in the circuit will be compiled. If
             ``capture=False``, or ``capture="global"`` and ``qp.capture.enabled() == False``, this
             argument will be ignored. ``True`` by default.
+        enable_aot_compilation (bool): Controls whether or not to enable ahead-of-time compilation.
+            If ``True``, the QJIT object will attempt AOT compilation during object initialization.
+            ``True`` by default.
 
     Returns:
         QJIT object.
@@ -604,8 +608,12 @@ class QJIT(CatalystCallable):
         with _ensure_capture_mode(target_mode):
             self.user_function = self.pre_compilation()
 
-        # Static arguments require values, so we cannot AOT compile.
-        if self.user_sig is not None and not self.compile_options.static_argnums:
+        if (
+            self.compile_options.enable_aot_compilation
+            and self.user_sig is not None
+            # Static arguments require values, so we cannot AOT compile.
+            and not self.compile_options.static_argnums
+        ):
             self.aot_compile()
 
         super().__init__("user_function")
@@ -791,7 +799,7 @@ class QJIT(CatalystCallable):
         cached_fn, requires_promotion = self.fn_cache.lookup(args)
 
         if cached_fn is None:
-            if self.user_sig and not opts.static_argnums:
+            if opts.enable_aot_compilation and self.user_sig and not opts.static_argnums:
                 msg = "Provided arguments did not match declared signature, recompiling..."
                 warnings.warn(msg, UserWarning)
 
@@ -870,7 +878,7 @@ class QJIT(CatalystCallable):
         with _ensure_capture_mode(target_mode):
             if target_mode:
                 # New capture pathway
-                jaxpr, out_type, out_treedef = trace_from_pennylane(
+                jaxpr, out_type, out_treedef, plugin_paths = trace_from_pennylane(
                     self.user_function,
                     args,
                     kwargs,
@@ -880,6 +888,9 @@ class QJIT(CatalystCallable):
                     collect_decomp_rules=self.compile_options.collect_decomp_rules,
                     debug_info=dbg,
                 )
+                self.compile_options.pass_plugins.update(plugin_paths)
+                self.compile_options.dialect_plugins.update(plugin_paths)
+
                 return jaxpr, out_type, out_treedef, full_sig
             else:
                 # Legacy pathway
@@ -940,7 +951,7 @@ class QJIT(CatalystCallable):
         # Inject Runtime Library-specific functions (e.g. setup/teardown).
         inject_functions(mlir_module, ctx, self.compile_options.seed)
 
-        # Collect the shared libraries a local `runtime_call` recorded, so the linker gets them.
+        # Collect the shared libraries recorded during lowering, so the linker gets them.
         collect_runtime_artifacts(mlir_module, self.compile_options)
         # If the device declares a backline placement, serialize it onto the top module.
         if self._placement is not None:
