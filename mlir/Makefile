@@ -259,6 +259,9 @@ LLVM_VERSION_FULL = $(LLVM_VERSION)-$(LLVM_COMMIT)
 pack-llvm-dev:
 
 	@echo "build the catalyst-llvm-dev package"
+	echo "$(LLVM_BUILD_DIR)"
+	ls -lh "$(LLVM_BUILD_DIR)"
+	ls -lh "$(LLVM_BUILD_DIR)/bin"
 	find . -name "$(LLVM_BUILD_DIR)/CMakeCache.txt"
 	find . -name "$(LLVM_BUILD_DIR)/bin/llvm-config"
 	@if [ ! -f "$(LLVM_BUILD_DIR)/CMakeCache.txt" ] || [ ! -x "$(LLVM_BUILD_DIR)/bin/llvm-config" ]; then \
