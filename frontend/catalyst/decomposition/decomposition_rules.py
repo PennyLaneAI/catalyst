@@ -83,6 +83,7 @@ class DecompTargetSpec:
         kwarg_names: Stable parameter-first, wire-second ordering for flattened keyword operands.
         wire_lens: Non-hybrid wire argument lengths used to split the grouped wire operand.
         ctrl_wires: Optional dummy control-wire tensor for a controlled target.
+        ctrl_values: Optional dummy control-value tensor for a controlled target.
         hybrid_leaves: Numeric hybrid leaves passed as rule operands instead of being closed over.
         target_id: Full GraphOpID that every rule in the set decomposes.
         num_qreg_qubits: Register size required by the legacy standalone materializer.
@@ -97,12 +98,12 @@ class DecompTargetSpec:
     kwarg_names: list[str]
     wire_lens: dict[str, int]
     ctrl_wires: object
+    ctrl_values: object
     hybrid_leaves: tuple
     target_id: str
     num_qreg_qubits: int
     modifier_context: ModifierState
     reject_noninvertible: bool = False
-    ctrl_values: object = None
 
 
 def _resources_have_measurement(gate_counts) -> bool:
@@ -186,6 +187,7 @@ def symbolic_arguments(base_op, kind, ctrl_wires=None, ctrl_values=None) -> dict
         base_op (Operator2): the base operator the rule acts on
         kind (str): ``"adjoint"`` or ``"control"``
         ctrl_wires: the control wires, for ``kind="control"``
+        ctrl_values: the control values, for ``kind="control"``
 
     Returns:
         dict: the arguments to call the rule with
@@ -196,20 +198,13 @@ def symbolic_arguments(base_op, kind, ctrl_wires=None, ctrl_values=None) -> dict
     if kind == "adjoint":
         return {"base": base_op}
     if kind == "control":
-        # FIXME: the all-ones assumption is unsound for an operator that carries a zero control
-        # value. A `<n>C(...)` graphOpId records only the control count, so such an operator maps
-        # to the same node as an all-ones one and the solver hands it this rule, which was traced
-        # without the `X` flips the zero value needs. It's silently giving the wrong state.
-        #
-        # The values cannot be spelled in the id (they may be dynamic), so the fix is to normalize
-        # them away where they are known, by emitting the flips around the operator during capture
-        # so that every controlled operator the decomposition sees really does denote all-ones
-        # controls.
+        assert ctrl_wires is not None
+        assert ctrl_values is not None
         ctrl_wires = Wires(ctrl_wires)
         return {
             "base": base_op,
             "control_wires": ctrl_wires,
-            "control_values": ([True] * len(ctrl_wires) if ctrl_values is None else ctrl_values),
+            "control_values": ctrl_values,
             "work_wires": Wires([]),
             "work_wire_type": "borrowed",
         }
@@ -269,8 +264,8 @@ def rule_call_operands(
     kwarg_names,
     wire_lens,
     ctrl_wires=None,
-    hybrid_leaves=(),
     ctrl_values=None,
+    hybrid_leaves=(),
 ) -> list:
     """Flatten a rule call as params, operand-passed hybrid-arg leaves, one grouped base-wire
     operand, then control wires.
@@ -284,6 +279,7 @@ def rule_call_operands(
         kwarg_names (list[str]): parameter names first, followed by wire names
         wire_lens (dict[str, int]): wire names in declaration order and their lengths
         ctrl_wires: the control wires to append, or None when the rule is not controlled
+        ctrl_values: the control values to append, or None when the rule is not controlled
         hybrid_leaves (list): flattened hybrid-argument leaves, inserted after the parameter kwargs
 
     Returns:
@@ -304,8 +300,8 @@ def rule_call_operands(
     ]
     if ctrl_wires is not None:
         operands.append(ctrl_wires)
-        if ctrl_values is not None:
-            operands.append(ctrl_values)
+    if ctrl_values is not None:
+        operands.append(ctrl_values)
     return operands
 
 
@@ -788,7 +784,6 @@ def build_decomp_target_spec(
             # Apply adjoint innermost, control outermost (canonical C(Adjoint(Op))).
             body = qp.adjoint(rule._impl) if wrap_adjoint else rule._impl
             if wrap_control:
-                # Runtime control values: conjugate the all-ones control with X flips.
                 qp.ctrl(body, control=list(_ctrl_wires))(*_args, **_kwargs)
             else:
                 body(*_args, **_kwargs)
@@ -827,13 +822,13 @@ def build_decomp_target_spec(
     ctrl_values = jnp.ones(n_ctrl, dtype=bool) if wrap_control else None
 
     return DecompTargetSpec(
-        ctrl_values=ctrl_values,
         rules=rule_specs,
         call_args=call_args,
         call_kwargs=call_kwargs,
         kwarg_names=kwarg_names,
         wire_lens=wire_lens,
         ctrl_wires=ctrl_wires,
+        ctrl_values=ctrl_values,
         hybrid_leaves=tuple(hybrid_leaves),
         target_id=target_id,
         num_qreg_qubits=n_base_wires + (n_ctrl if wrap_control else 0),
@@ -853,10 +848,10 @@ def materialize_decomp_target_spec(target_spec: DecompTargetSpec) -> ir.Operatio
         target_spec.kwarg_names,
         target_spec.wire_lens,
         target_spec.ctrl_wires,
+        target_spec.ctrl_values,
         {rule.frontend_name: rule.resources for rule in target_spec.rules},
         target_spec.target_id,
         target_spec.hybrid_leaves,
-        target_spec.ctrl_values,
     )
 
 
@@ -897,10 +892,10 @@ def build_rule_module(
     kwarg_names,
     wire_lens,
     ctrl_wires,
+    ctrl_values,
     name_to_resource_ids,
     target_id,
     hybrid_leaves=(),
-    ctrl_values=None,
 ) -> ir.Operation:
     """Trace ``subroutines`` into a module of standalone decomposition-rule functions.
 
@@ -912,6 +907,7 @@ def build_rule_module(
         kwarg_names (list[str]): the keyword argument names, in the order to flatten them
         wire_lens (dict[str, int]): wire names in declaration order and their lengths
         ctrl_wires: the control wires to append, or None when the rules are not controlled
+        ctrl_values: the control wires to append, or None when the rules are not controlled
         hybrid_leaves (list): flattened hybrid-argument leaves passed to :func:`rule_call_operands`
         name_to_resource_ids (dict): rule name to the graphOpId of each resource
         target_id (str): the graphOpId of the gate the rules decompose
@@ -924,7 +920,7 @@ def build_rule_module(
     """
 
     operands = rule_call_operands(
-        call_args, call_kwargs, kwarg_names, wire_lens, ctrl_wires, hybrid_leaves, ctrl_values
+        call_args, call_kwargs, kwarg_names, wire_lens, ctrl_wires, ctrl_values, hybrid_leaves
     )
 
     @qp.qjit(target="mlir", capture=True, collect_decomp_rules=False)
@@ -1007,7 +1003,9 @@ def build_rule_module(
     return inlined_module
 
 
-def collect_symbolic_resources(op_cls, op_name, kwargs, is_custom_op, *, kind, ctrl_wires=()):
+def collect_symbolic_resources(
+    op_cls, op_name, kwargs, is_custom_op, *, kind, ctrl_wires=(), ctrl_values=()
+):
     """Return resource data for the rules registered against ``Adjoint(op_name)``/``C(op_name)``.
 
     PennyLane names a controlled operator ``C(Op)`` whatever its control count, so the registry is
@@ -1020,6 +1018,7 @@ def collect_symbolic_resources(op_cls, op_name, kwargs, is_custom_op, *, kind, c
         is_custom_op (bool): whether the operator lowers to ``qref.custom``
         kind (str): ``"adjoint"`` or ``"control"``
         ctrl_wires: the control wires, for ``kind="control"``
+        ctrl_values: the control values, for ``kind="control"``
 
     Returns:
         list: the rules that apply to the probed operator
@@ -1036,7 +1035,7 @@ def collect_symbolic_resources(op_cls, op_name, kwargs, is_custom_op, *, kind, c
     # resources in terms of abstract operators, matching `_get_kwargs` in PennyLane's graph.
     with qp.capture.pause():  # do not bind more primitives from abstract instantiation
         base_op = abstractify(build_base_op(op_cls, kwargs, is_custom_op))
-    probe_args = symbolic_arguments(base_op, kind, ctrl_wires)
+    probe_args = symbolic_arguments(base_op, kind, ctrl_wires, ctrl_values)
 
     name_to_resources = {}
     name_to_resource_ids = {}
@@ -1125,6 +1124,7 @@ def build_registered_decomp_target_spec(
     # A kind="control" rule takes the control wires as its own arguments; a wrap_control adjoint
     # rule instead has the control applied around its body so it is probed without control wires.
     collect_ctrl_wires = range(n_base_wires, n_base_wires + n_ctrl) if kind == "control" else ()
+    collect_ctrl_values = [True] * len(collect_ctrl_wires)
     rules, probe_args, name_to_resources, name_to_resource_ids = collect_symbolic_resources(
         op_cls,
         op_name,
@@ -1132,6 +1132,7 @@ def build_registered_decomp_target_spec(
         is_custom_op,
         kind=kind,
         ctrl_wires=collect_ctrl_wires,
+        ctrl_values=collect_ctrl_values,
     )
     if not rules:
         return None
@@ -1225,13 +1226,13 @@ def build_registered_decomp_target_spec(
     ctrl_values = jnp.ones(n_ctrl, dtype=bool) if has_ctrl else None
 
     return DecompTargetSpec(
-        ctrl_values=ctrl_values,
         rules=rule_specs,
         call_args=call_args,
         call_kwargs=call_kwargs,
         kwarg_names=kwarg_names,
         wire_lens=wire_lens,
         ctrl_wires=ctrl_wires,
+        ctrl_values=ctrl_values,
         hybrid_leaves=tuple(hybrid_leaves),
         target_id=target_id,
         num_qreg_qubits=n_base_wires + n_ctrl,
