@@ -172,7 +172,7 @@ class TestOutlineStateEvolutionPass:
         """Test the outline_state_evolution_pass only."""
         dev = qp.device("lightning.qubit", wires=1000)
 
-        @qp.qjit(capture=True, collect_decomp_rules=False, target="mlir")
+        @qp.qjit(capture=True, collect_decomp_rules=False, target="mlir", skip_preprocess=True)
         @outline_state_evolution_pass
         @qp.set_shots(1000)
         @qp.qnode(dev)
