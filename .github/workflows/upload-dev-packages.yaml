@@ -142,7 +142,7 @@ jobs:
       inputs.channel || github.event_name != 'pull_request' ||
       (github.event.pull_request.head.repo.full_name == github.repository &&
        github.head_ref == 'joeycarter/upload-dev-package-workflow')
-    runs-on: ubuntu-24.04
+    runs-on: blacksmith-2vcpu-ubuntu-2404
 
     # PR events have no inputs; use the nightly caller's settings for this test.
     env:
