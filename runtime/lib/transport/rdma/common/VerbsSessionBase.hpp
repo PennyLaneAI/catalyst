@@ -29,24 +29,40 @@
 #include "Transport.hpp"
 #include "WireProtocol.hpp"
 
-namespace catalyst::transport::cpu_verbs {
+namespace catalyst::transport::common {
 using namespace catalyst::transport;
 
+/// Sizes of one queue pair: send-queue depth, completion-queue depth and inline capacity.
+struct QpShape {
+    int sq_depth;
+    int cq_depth;
+    int inline_max;
+};
+
+/// The shape both queue pairs get unless a backend asks otherwise: deep enough for a full ring of
+/// signaled sends, with inline capacity for a Payload.
+inline constexpr QpShape DEFAULT_QP_SHAPE{.sq_depth = 4096, .cq_depth = 4096, .inline_max = 256};
+
 /**
- * @brief Connection bring-up and data-path primitives shared by both roles.
+ * @brief Connection bring-up and data-path primitives shared by the libibverbs backends.
  *
  * Parameterised on the role interface (`ControllerSession` or
- * `CoprocessorSession`) so each role derives from these directly.
+ * `CoprocessorSession`) so each role derives from these directly. cpu_verbs uses it as is;
+ * gpu_verbs replaces the memory allocation with GPU memory and shrinks the fwd queue pair, which
+ * its coprocessor only receives on.
  */
-template <class Role> class CpuSessionBase : public Role {
+template <class Role> class VerbsSessionBase : public Role {
   public:
-    explicit CpuSessionBase(std::string dev, int gid_idx);
-    ~CpuSessionBase() override = default;
+    /// @param backend Name used in error messages, e.g. "cpu_verbs".
+    /// @param fwd_shape Shape of the controller-to-coprocessor queue pair.
+    VerbsSessionBase(std::string dev, int gid_idx, const char *backend,
+                     QpShape fwd_shape = DEFAULT_QP_SHAPE);
+    ~VerbsSessionBase() override = default;
 
-    CpuSessionBase(const CpuSessionBase &) = delete;
-    CpuSessionBase &operator=(const CpuSessionBase &) = delete;
-    CpuSessionBase(CpuSessionBase &&) = delete;
-    CpuSessionBase &operator=(CpuSessionBase &&) = delete;
+    VerbsSessionBase(const VerbsSessionBase &) = delete;
+    VerbsSessionBase &operator=(const VerbsSessionBase &) = delete;
+    VerbsSessionBase(VerbsSessionBase &&) = delete;
+    VerbsSessionBase &operator=(VerbsSessionBase &&) = delete;
 
     int connect(const ConnectInfo &info) override;
     MemRegion alloc_memory(std::size_t size, MemKind kind) override;
@@ -67,6 +83,8 @@ template <class Role> class CpuSessionBase : public Role {
 
     std::string dev_name_;
     int gid_idx_;
+    const char *backend_;
+    QpShape fwd_shape_;
     ibv_gid mygid_{};              // local GID, cached in connect() for exchange_keys()
     std::uint32_t active_mtu_ = 0; // local active_mtu enum, cached in connect()
     std::shared_ptr<common::Context> ctx_;
@@ -81,7 +99,7 @@ template <class Role> class CpuSessionBase : public Role {
     ChannelDesc desc_{};
 };
 
-extern template class CpuSessionBase<ControllerSession>;
-extern template class CpuSessionBase<CoprocessorSession>;
+extern template class VerbsSessionBase<ControllerSession>;
+extern template class VerbsSessionBase<CoprocessorSession>;
 
-} // namespace catalyst::transport::cpu_verbs
+} // namespace catalyst::transport::common
