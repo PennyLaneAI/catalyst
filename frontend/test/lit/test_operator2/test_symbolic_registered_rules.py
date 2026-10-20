@@ -129,7 +129,7 @@ def test_registered_control_rule_targets_the_controlled_op():
     with qp.decomposition.local_decomps():
         qp.add_decomps(NoParams, _base_rule())
         qp.add_decomps("C(NoParams)", _controlled_rule())
-        print("##########################################")
+
         print(
             "\n".join(
                 materialize_reachable_rule_strings(
