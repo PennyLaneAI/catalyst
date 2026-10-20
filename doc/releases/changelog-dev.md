@@ -969,6 +969,11 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* Backline transport frames are built and read through a shared frame codec, which the `cpu_verbs`
+  backends now use instead of laying out the 16 B frame themselves. The bytes on the wire are
+  unchanged, and other frame layouts can now be added in one place.
+  [(#XXXX)](https://github.com/PennyLaneAI/catalyst/pull/XXXX)
+
 * The `cpu_verbs` and `gpu_verbs` transport backends share one session base for RDMA bring-up and
   the reply path, instead of `gpu_verbs` keeping its own copy. Behaviour and library names are
   unchanged.

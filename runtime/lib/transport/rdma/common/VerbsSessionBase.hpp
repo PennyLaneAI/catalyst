@@ -22,6 +22,7 @@
 
 #include "CompletionQueue.hpp"
 #include "Context.hpp"
+#include "Frame.hpp"
 #include "MemoryRegion.hpp"
 #include "OobSocket.hpp"
 #include "ProtectionDomain.hpp"
@@ -74,11 +75,16 @@ template <class Role> class VerbsSessionBase : public Role {
     // True for the coprocessor (listens/sends first on the OOB socket).
     virtual bool oob_listens() const = 0;
 
+    // Seal the staged send frame with round `cursor`'s seq and write it into the peer's ring.
     void post_write(ibv_qp *qp, std::uint64_t cursor, bool inline_data, bool signaled);
     void reap(ibv_cq *cq, int &outstanding, bool drain);
-    common::Payload *poll_message_arrival(std::uint64_t cursor, std::stop_token st);
-    common::Payload *send_payload() {
-        return reinterpret_cast<common::Payload *>(send_buf_->addr());
+    // Wait for round `cursor`'s frame in the local ring and decode it into `out`. Returns false if
+    // `st` is stopped first.
+    bool poll_message_arrival(std::uint64_t cursor, std::stop_token st, frame::FrameView &out);
+    // The frame the next post_write sends; stage it with frame::stage first.
+    void *send_frame() { return send_buf_->addr(); }
+    void *ring_slot(std::uint64_t cursor) {
+        return static_cast<std::uint8_t *>(local_.addr) + ring_.slot_offset(cursor);
     }
 
     std::string dev_name_;
@@ -93,7 +99,8 @@ template <class Role> class VerbsSessionBase : public Role {
     std::shared_ptr<common::QueuePair> fwd_qp_, bwd_qp_;
     common::FdGuard oob_fd_;
     std::vector<common::MemoryRegion> caller_memory_regions_;
-    std::optional<common::MemoryRegion> send_buf_; // local send source (one Payload)
+    std::optional<common::MemoryRegion> send_buf_; // local send source (one frame)
+    frame::RingGeometry ring_ = frame::BL16_RING;  // both rings, local and the peer's
     MemRegion local_{};
     PeerRef peer_{};
     ChannelDesc desc_{};
