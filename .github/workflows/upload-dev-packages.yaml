@@ -1,0 +1,286 @@
+name: Upload dev packages to S3
+
+# Publishes the Catalyst development packages produced by the wheel workflows
+# (build-wheel-linux-x86_64.yaml, build-wheel-macos-arm64.yaml) and by pack-llvm-dev.yaml to the
+# dev-package S3 bucket.
+#
+# This workflow only publishes; it never builds. It consumes the artifacts uploaded by those
+# workflows, so it is normally called as a reusable workflow from the same run (see
+# build-nightly-release.yaml and pack-llvm-dev.yaml). It can also be dispatched manually with
+# `run_id` to re-publish a previous run's artifacts without rebuilding, which matters because an
+# LLVM rebuild costs hours and artifact retention is only 14 days.
+#
+# Bucket layout (see make_dev_package_manifest.py for how the version is derived):
+#
+#   nightly/<catalyst version>/   e.g. nightly/0.14.0-dev56/
+#   release/<catalyst version>/   e.g. release/0.14.0/
+#   llvm/<llvm version>-<commit>/ e.g. llvm/22.0.0git-8f264586/
+#
+# Each version prefix holds one coherent, mutually-compatible set: every platform's archive, a
+# `.sha256` sidecar per archive, and a `manifest.json`. The package name and platform stay in the
+# file name rather than becoming prefixes, so "is this version complete?" is a single list call.
+# `<channel>/latest.json` is a copy of the newest manifest, because the nightly `-devN` suffix does
+# not sort lexically (e.g. 0.14.0-dev9 sorts above 0.14.0-dev56) and a consumer cannot pick the
+# newest build by listing the channel prefix.
+
+on:
+  workflow_call:
+    inputs:
+      channel:
+        description: "Bucket channel to publish into: nightly, release or llvm"
+        required: true
+        type: string
+      platforms:
+        description: Comma separated platforms that must all be present before anything is uploaded
+        required: false
+        default: Linux-x86_64,Darwin-arm64
+        type: string
+      branch:
+        description: Branch to take the manifest script from
+        required: false
+        default: ''
+        type: string
+      update_latest:
+        description: Point <channel>/latest.json at this package set
+        required: false
+        default: true
+        type: boolean
+      overwrite:
+        description: Allow republishing over an existing version prefix
+        required: false
+        default: false
+        type: boolean
+      skip_if_exists:
+        description: Succeed without uploading when the version prefix is already published
+        required: false
+        default: false
+        type: boolean
+      dry_run:
+        description: Validate and summarize, but do not write to S3
+        required: false
+        default: false
+        type: boolean
+    secrets:
+      AWS_DEV_PACKAGES_ROLE_ARN:
+        description: IAM role assumed via OIDC to write to the dev-package bucket
+        required: true
+    outputs:
+      version:
+        description: The version the packages were published under
+        value: ${{ jobs.upload.outputs.version }}
+      prefix:
+        description: The S3 prefix the packages were published to
+        value: ${{ jobs.upload.outputs.prefix }}
+      skipped:
+        description: True when the version was already published and nothing was uploaded
+        value: ${{ jobs.upload.outputs.skipped }}
+
+  workflow_dispatch:
+    inputs:
+      channel:
+        description: Bucket channel to publish into
+        type: choice
+        options: [nightly, release, llvm]
+        required: true
+        default: nightly
+      run_id:
+        description: Workflow run ID to pull the dev package artifacts from
+        required: true
+        type: string
+      platforms:
+        description: Comma separated platforms that must all be present
+        required: false
+        default: Linux-x86_64,Darwin-arm64
+        type: string
+      update_latest:
+        description: Point <channel>/latest.json at this package set
+        required: false
+        default: true
+        type: boolean
+      overwrite:
+        description: Allow republishing over an existing version prefix
+        required: false
+        default: false
+        type: boolean
+      skip_if_exists:
+        description: Succeed without uploading when the version prefix is already published
+        required: false
+        default: false
+        type: boolean
+      dry_run:
+        description: Validate and summarize, but do not write to S3
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+# Serialize per channel so two runs cannot interleave their latest.json writes.
+concurrency:
+  group: upload-dev-packages-${{ inputs.channel }}
+  cancel-in-progress: false
+
+jobs:
+  upload:
+    name: Upload ${{ inputs.channel }} dev packages
+    runs-on: ubuntu-24.04
+
+    # The release channel is a good candidate for a protected environment, so that publishing a
+    # non-nightly package set requires a reviewer and can hold its own scoped role ARN:
+    #   environment: dev-packages-release
+
+    permissions:
+      id-token: write   # OIDC: required to assume the AWS role, no long-lived keys
+      contents: read
+      actions: read     # required only for the workflow_dispatch + run_id path
+
+    outputs:
+      version: ${{ steps.manifest.outputs.version }}
+      prefix: ${{ steps.manifest.outputs.prefix }}
+      skipped: ${{ steps.existing.outputs.exists == 'true' }}
+
+    steps:
+    # Only the manifest script is needed; no build sources are checked out into a job that holds
+    # publishing credentials.
+    - name: Checkout manifest script
+      uses: actions/checkout@v4
+      with:
+        ref: ${{ inputs.branch || github.ref }}
+        sparse-checkout: |
+          .github/workflows/make_dev_package_manifest.py
+        sparse-checkout-cone-mode: false
+        persist-credentials: false
+
+    # The two download paths differ only in where the artifacts come from. The glob matches
+    # catalyst-dev-*, catalyst-runtime-dev-* and catalyst-llvm-dev-* while excluding the wheel and
+    # standalone-plugin artifacts, which are published to TestPyPI instead.
+    #
+    # `inputs.run_id` is the discriminator rather than github.event_name, because a reusable
+    # workflow sees the *caller's* event: a manually dispatched build-nightly-release.yaml run
+    # reaches this workflow as 'workflow_dispatch' and would take the run_id path with no run_id to
+    # use. run_id belongs to the workflow_dispatch input set only, so it is empty on every
+    # workflow_call, whatever triggered the caller.
+    - name: Download dev package artifacts (this run)
+      if: ${{ !inputs.run_id }}
+      uses: actions/download-artifact@v4
+      with:
+        pattern: catalyst*-dev-*
+        merge-multiple: true
+        path: dist
+
+    - name: Download dev package artifacts (run ${{ inputs.run_id }})
+      if: ${{ inputs.run_id }}
+      uses: actions/download-artifact@v4
+      with:
+        pattern: catalyst*-dev-*
+        merge-multiple: true
+        path: dist
+        run-id: ${{ inputs.run_id }}
+        github-token: ${{ github.token }}
+
+    # Derives the version from the CPack file names, rejects incomplete or mixed-version sets,
+    # writes the .sha256 sidecars and manifest.json. Runs before any credentials are configured, so
+    # a malformed set fails without ever touching AWS.
+    - name: Validate set and generate checksums + manifest
+      id: manifest
+      run: |
+        python3 .github/workflows/make_dev_package_manifest.py \
+          --dist-dir dist \
+          --channel "${{ inputs.channel }}" \
+          --platforms "${{ inputs.platforms }}" \
+          --summary-file "${{ runner.temp }}/dev-packages-summary.md"
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        role-to-assume: ${{ secrets.AWS_DEV_PACKAGES_ROLE_ARN }}
+        aws-region: ${{ vars.DEV_PACKAGES_AWS_REGION || 'us-east-1' }}
+
+    # Content keys are immutable: a published version prefix is never silently replaced. Rerunning
+    # a failed upload for the same version needs `overwrite: true`.
+    #
+    # `skip_if_exists` is for callers that re-publish the same version by design rather than by
+    # accident: pack-llvm-dev.yaml re-packs whatever LLVM commit is currently pinned, so most runs
+    # produce a version that is already in the bucket. That is the expected outcome there, not a
+    # failure, so the upload is skipped and the run finishes green.
+    - name: Check for an existing package set
+      id: existing
+      if: ${{ !inputs.overwrite }}
+      env:
+        AWS_MAX_ATTEMPTS: "3"
+        AWS_RETRY_MODE: standard
+        BUCKET: ${{ vars.DEV_PACKAGES_BUCKET }}
+        PREFIX: ${{ steps.manifest.outputs.prefix }}
+        SKIP_IF_EXISTS: ${{ inputs.skip_if_exists }}
+      run: |
+        EXISTING=$(aws s3api list-objects-v2 \
+          --bucket "$BUCKET" --prefix "$PREFIX" --max-keys 1 \
+          --query 'Contents[].Key' --output text)
+        if [[ -z "$EXISTING" || "$EXISTING" == "None" ]]; then
+          echo "exists=false" >> "$GITHUB_OUTPUT"
+          exit 0
+        fi
+        echo "exists=true" >> "$GITHUB_OUTPUT"
+        if [[ "$SKIP_IF_EXISTS" != "true" ]]; then
+          echo "::error::s3://$BUCKET/$PREFIX already exists (found $EXISTING)." \
+               "Re-run with overwrite: true if this is a deliberate republish."
+          exit 1
+        fi
+        echo "::notice::s3://$BUCKET/$PREFIX is already published; skipping the upload."
+
+    - name: Upload package set
+      if: ${{ steps.existing.outputs.exists != 'true' }}
+      env:
+        AWS_MAX_ATTEMPTS: "3"
+        AWS_RETRY_MODE: standard
+        S3_URI: s3://${{ vars.DEV_PACKAGES_BUCKET }}/${{ steps.manifest.outputs.prefix }}
+        DRY_RUN: ${{ inputs.dry_run }}
+      run: |
+        ARGS=(--recursive --no-progress --only-show-errors --checksum-algorithm SHA256)
+        if [[ "$DRY_RUN" == "true" ]]; then
+          ARGS+=(--dryrun)
+        fi
+        aws s3 cp dist "$S3_URI" "${ARGS[@]}"
+
+    # A pointer file rather than a latest/ directory of copies: no duplicated storage, and every
+    # content key stays immutable. Written last so it never advertises a prefix that failed to
+    # upload completely. Short max-age in case the bucket is fronted by a CDN.
+    #
+    # Nothing was uploaded in the skip case, so the pointer is left alone rather than moved back
+    # onto an older version that a later run has since superseded.
+    - name: Update channel pointer
+      if: ${{ inputs.update_latest && !inputs.dry_run && steps.existing.outputs.exists != 'true' }}
+      env:
+        AWS_MAX_ATTEMPTS: "3"
+        AWS_RETRY_MODE: standard
+        LATEST_URI: s3://${{ vars.DEV_PACKAGES_BUCKET }}/${{ steps.manifest.outputs.latest_key }}
+      run: |
+        aws s3 cp dist/manifest.json "$LATEST_URI" \
+          --no-progress --only-show-errors \
+          --content-type application/json \
+          --cache-control "no-cache, max-age=60"
+
+    - name: Summary
+      if: always() && steps.manifest.outcome == 'success'
+      env:
+        BUCKET: ${{ vars.DEV_PACKAGES_BUCKET }}
+        PREFIX: ${{ steps.manifest.outputs.prefix }}
+        DRY_RUN: ${{ inputs.dry_run }}
+        SKIPPED: ${{ steps.existing.outputs.exists == 'true' }}
+        TABLE: ${{ runner.temp }}/dev-packages-summary.md
+      run: |
+        {
+          echo "### ${{ inputs.channel }} dev packages"
+          echo
+          if [[ "$SKIPPED" == "true" ]]; then
+            echo "> Already published: this version is in the bucket and was left untouched."
+            echo
+          elif [[ "$DRY_RUN" == "true" ]]; then
+            echo "> Dry run: nothing was written to S3."
+            echo
+          fi
+          echo "Destination: \`s3://$BUCKET/$PREFIX\`"
+          echo
+          cat "$TABLE"
+        } >> "$GITHUB_STEP_SUMMARY"
