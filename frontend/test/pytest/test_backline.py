@@ -33,11 +33,13 @@ from catalyst.backline import (
     _TRANSPORT_PASSES,
     _builtin_fn_lib_dirs,
     _check_builtin_fn_lib,
+    _config_text,
     _coprocessor_fn_libs,
     _find_builtin_fn_lib,
     _insert_passes,
     _installed_builtin_fn_lib_dirs,
     _message_size,
+    _parse_config,
     _qec_pass_specs,
     _realize_executor,
     _remote_fn_lib_name,
@@ -166,6 +168,16 @@ def test_single_coprocessor():
     assert len(d["coprocessors"]) == 1
     assert d["coprocessors"][0]["name"] == "cop0"
     assert d["coprocessors"][0]["symbol"] == "coproc_fn"
+
+
+def test_config_text_round_trips_as_the_runtime_reads_it():
+    """A repeated key keeps its last value and an entry without ``=`` is dropped, as in the runtime."""
+    assert _parse_config("dev=rxe0;junk;gid=1;dev=mlx5_1;fn.k=a=b") == {
+        "dev": "mlx5_1",
+        "gid": "1",
+        "fn.k": "a=b",
+    }
+    assert _config_text({"dev": "rxe0", "gid": "1"}) == "dev=rxe0;gid=1"
 
 
 def test_coprocessor_fn_config_is_appended_with_the_fn_prefix():
