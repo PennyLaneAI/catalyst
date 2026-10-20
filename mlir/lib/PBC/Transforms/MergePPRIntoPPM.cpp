@@ -37,15 +37,18 @@ bool verifyNextNonClifford(PPMeasurementOp op, Operation *nextOp) {
     }
 
     for (auto userOp : nextOp->getUsers()) {
-        if (userOp == op) {
+        // Users nested in a region (e.g. scf.if) are represented by their ancestor in the PPM's
+        // block, so that values flowing out of the region are also followed.
+        Operation *ancestor = op->getBlock()->findAncestorOpInBlock(*userOp);
+        if (ancestor == nullptr || ancestor == op) {
             return false;
         }
 
-        if (!userOp->isBeforeInBlock(op)) {
+        if (!ancestor->isBeforeInBlock(op)) {
             continue;
         }
 
-        if (!verifyNextNonClifford(op, userOp)) {
+        if (!verifyNextNonClifford(op, ancestor)) {
             return false;
         }
     }
@@ -96,6 +99,9 @@ LogicalResult visitValidCliffordPPR(PPMeasurementOp op,
         }
 
         if (auto pprOp = llvm::dyn_cast<PPRotationOp>(qubit.getDefiningOp())) {
+            if (pprOp->getBlock() != op->getBlock()) {
+                continue;
+            }
             if (verifyPrevNonClifford(op, pprOp)) {
                 return callback(pprOp);
             }
