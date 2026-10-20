@@ -105,6 +105,14 @@ def GEPInboundsPass : Pass<"gep-inbounds"> {
     let summary = "Mark GEPOp inbounds.";
 }
 
+def ResolveRuntimeSymbolsPass : Pass<"resolve-runtime-symbols", "mlir::ModuleOp"> {
+    let summary = "Resolve the C++ functions local runtime calls name to the symbols they export.";
+    let description = [{
+        This pass resolves local runtime calls that name a C++ function to the mangled
+        symbol exported by the libraries in `catalyst.runtime_artifacts`.
+    }];
+}
+
 def MemrefCopyToLinalgCopyPass : Pass<"memrefcpy-to-linalgcpy"> {
     let summary = "Switch memref.copy to linalg.copy when the layout is not the identity.";
 

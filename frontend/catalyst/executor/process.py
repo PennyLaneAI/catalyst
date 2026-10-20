@@ -32,6 +32,7 @@ from .utils import (
     ExecutorFlags,
     ExecutorPaths,
     OutputPatterns,
+    Secret,
     log_cmd,
 )
 
@@ -298,7 +299,7 @@ class _RemoteProcess(_ExecutorProcess):
         plugins: list[str] | None = None,
         env: dict[str, str] | None = None,
         sudo: bool = False,
-        sudo_password: str | None = None,
+        sudo_password: Secret | None = None,
         executor_bin: str = f"./{ExecutorPaths.EXECUTOR_BIN}",
         cleanup_ws: bool = False,
         ready_timeout: float = 60.0,
@@ -363,7 +364,7 @@ class _RemoteProcess(_ExecutorProcess):
             self._plugins,
             self._env,
             sudo=self.sudo,
-            sudo_password=self.sudo_password,
+            use_password=use_pw,
             executor_bin=self.executor_bin,
         )
         self._log_message(
@@ -381,7 +382,7 @@ class _RemoteProcess(_ExecutorProcess):
             return
         assert self.proc is not None and self.proc.stdin is not None
         with contextlib.suppress(BrokenPipeError, OSError):
-            self.proc.stdin.write(self.sudo_password + "\n")
+            self.proc.stdin.write(self.sudo_password.get_secret_value() + "\n")
             self.proc.stdin.flush()
 
     def _auth_help(self) -> str:
@@ -398,7 +399,8 @@ class _RemoteProcess(_ExecutorProcess):
                 f"    {self.user} ALL=(ALL) NOPASSWD:SETENV: {self.executor_bin}"
             )
         return (
-            f"Remote sudo rejected the password. Pass sudo_password= or run interactively.\n"
+            f"Remote sudo rejected the password. Check the variable sudo_password_env= names, or "
+            f"run interactively.\n"
             f"    ssh {self.user}@{self.host} sudo -v"
         )
 
