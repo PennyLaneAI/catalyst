@@ -24,15 +24,6 @@ name: Upload dev packages to S3
 # newest build by listing the channel prefix.
 
 on:
-  # Temporary: exercise this workflow before it exists on the default branch.
-  # Set the repository variable DEV_PACKAGES_PR_RUN_ID to a build run containing
-  # both platforms' dev packages. Remove this trigger after testing.
-  pull_request:
-    types: [opened, reopened, synchronize]
-    paths:
-      - .github/workflows/upload-dev-packages.yaml
-      - .github/workflows/make_dev_package_manifest.py
-
   workflow_call:
     inputs:
       channel:
@@ -130,26 +121,13 @@ permissions:
 
 # Serialize per channel so two runs cannot interleave their latest.json writes.
 concurrency:
-  group: upload-dev-packages-${{ inputs.channel || 'nightly' }}
+  group: upload-dev-packages-${{ inputs.channel }}
   cancel-in-progress: false
 
 jobs:
   upload:
-    name: Upload ${{ inputs.channel || 'nightly' }} dev packages
-    # Limit the temporary PR entry point to this branch in this repository.
-    # Reusable calls provide inputs.channel and retain their existing behavior.
-    if: >-
-      inputs.channel || github.event_name != 'pull_request' ||
-      (github.event.pull_request.head.repo.full_name == github.repository &&
-       github.head_ref == 'joeycarter/upload-dev-package-workflow')
+    name: Upload ${{ inputs.channel }} dev packages
     runs-on: blacksmith-2vcpu-ubuntu-2404
-
-    # PR events have no inputs; use the nightly caller's settings for this test.
-    env:
-      DEV_PACKAGE_CHANNEL: ${{ inputs.channel || 'nightly' }}
-      DEV_PACKAGE_PLATFORMS: ${{ inputs.platforms || 'Linux-x86_64,Darwin-arm64' }}
-      DEV_PACKAGE_RUN_ID: ${{ inputs.run_id || (github.event_name == 'pull_request' && !inputs.channel && vars.DEV_PACKAGES_PR_RUN_ID) || '' }}
-      DEV_PACKAGE_UPDATE_LATEST: ${{ (github.event_name == 'pull_request' && !inputs.channel) || inputs.update_latest }}
 
     # The release channel is a good candidate for a protected environment, so that publishing a
     # non-nightly package set requires a reviewer and can hold its own scoped role ARN:
@@ -158,7 +136,7 @@ jobs:
     permissions:
       id-token: write   # OIDC: required to assume the AWS role, no long-lived keys
       contents: read
-      actions: read     # required when downloading artifacts from another run
+      actions: read     # required only for the workflow_dispatch + run_id path
 
     outputs:
       version: ${{ steps.manifest.outputs.version }}
@@ -166,15 +144,6 @@ jobs:
       skipped: ${{ steps.existing.outputs.exists == 'true' }}
 
     steps:
-    - name: Check temporary PR artifact source
-      if: ${{ github.event_name == 'pull_request' && !inputs.channel }}
-      shell: bash
-      run: |
-        if [[ ! "$DEV_PACKAGE_RUN_ID" =~ ^[0-9]+$ ]]; then
-          echo "::error::Set repository variable DEV_PACKAGES_PR_RUN_ID to the build run ID containing the dev package artifacts."
-          exit 1
-        fi
-
     # Only the manifest script is needed; no build sources are checked out into a job that holds
     # publishing credentials.
     - name: Checkout manifest script
@@ -190,27 +159,27 @@ jobs:
     # catalyst-dev-*, catalyst-runtime-dev-* and catalyst-llvm-dev-* while excluding the wheel and
     # standalone-plugin artifacts, which are published to TestPyPI instead.
     #
-    # The source run ID is the discriminator rather than github.event_name, because a reusable
+    # `inputs.run_id` is the discriminator rather than github.event_name, because a reusable
     # workflow sees the *caller's* event: a manually dispatched build-nightly-release.yaml run
     # reaches this workflow as 'workflow_dispatch' and would take the run_id path with no run_id to
-    # use. Reusable calls leave the source run ID empty; manual dispatch supplies inputs.run_id,
-    # and the temporary PR entry point uses DEV_PACKAGES_PR_RUN_ID.
+    # use. run_id belongs to the workflow_dispatch input set only, so it is empty on every
+    # workflow_call, whatever triggered the caller.
     - name: Download dev package artifacts (this run)
-      if: ${{ !env.DEV_PACKAGE_RUN_ID }}
+      if: ${{ !inputs.run_id }}
       uses: actions/download-artifact@v4
       with:
         pattern: catalyst*-dev-*
         merge-multiple: true
         path: dist
 
-    - name: Download dev package artifacts (run ${{ env.DEV_PACKAGE_RUN_ID }})
-      if: ${{ env.DEV_PACKAGE_RUN_ID }}
+    - name: Download dev package artifacts (run ${{ inputs.run_id }})
+      if: ${{ inputs.run_id }}
       uses: actions/download-artifact@v4
       with:
         pattern: catalyst*-dev-*
         merge-multiple: true
         path: dist
-        run-id: ${{ env.DEV_PACKAGE_RUN_ID }}
+        run-id: ${{ inputs.run_id }}
         github-token: ${{ github.token }}
 
     # Derives the version from the CPack file names, rejects incomplete or mixed-version sets,
@@ -221,8 +190,8 @@ jobs:
       run: |
         python3 .github/workflows/make_dev_package_manifest.py \
           --dist-dir dist \
-          --channel "$DEV_PACKAGE_CHANNEL" \
-          --platforms "$DEV_PACKAGE_PLATFORMS" \
+          --channel "${{ inputs.channel }}" \
+          --platforms "${{ inputs.platforms }}" \
           --summary-file "${{ runner.temp }}/dev-packages-summary.md"
 
     - name: Configure AWS credentials
@@ -284,7 +253,7 @@ jobs:
     # Nothing was uploaded in the skip case, so the pointer is left alone rather than moved back
     # onto an older version that a later run has since superseded.
     - name: Update channel pointer
-      if: ${{ env.DEV_PACKAGE_UPDATE_LATEST == 'true' && !inputs.dry_run && steps.existing.outputs.exists != 'true' }}
+      if: ${{ inputs.update_latest && !inputs.dry_run && steps.existing.outputs.exists != 'true' }}
       env:
         AWS_MAX_ATTEMPTS: "3"
         AWS_RETRY_MODE: standard
@@ -305,7 +274,7 @@ jobs:
         TABLE: ${{ runner.temp }}/dev-packages-summary.md
       run: |
         {
-          echo "### $DEV_PACKAGE_CHANNEL dev packages"
+          echo "### ${{ inputs.channel }} dev packages"
           echo
           if [[ "$SKIPPED" == "true" ]]; then
             echo "> Already published: this version is in the bucket and was left untouched."
