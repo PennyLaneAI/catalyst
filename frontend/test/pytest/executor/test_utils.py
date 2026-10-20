@@ -25,6 +25,7 @@ from catalyst.executor.utils import (
     ExecutorFlags,
     ExecutorPaths,
     OutputPatterns,
+    Secret,
     ShellText,
     log_cmd,
     random_port,
@@ -32,6 +33,20 @@ from catalyst.executor.utils import (
     triple_from_uname,
     verbose_level,
 )
+
+
+class TestSecret:
+    """:class:`Secret` hides its value from every way of printing it."""
+
+    def test_printing_never_shows_the_value(self):
+        """repr, str, f-strings, formatting and containers all render a mask."""
+        s = Secret("hunter2")
+        shown = [repr(s), str(s), f"{s}", "%s" % s, repr([s]), repr({"pw": s})]
+        assert not any("hunter2" in x for x in shown)
+
+    def test_get_secret_value_returns_the_value(self):
+        """The wrapped string is returned at the point of use."""
+        assert Secret("hunter2").get_secret_value() == "hunter2"
 
 
 class TestOutputPatterns:

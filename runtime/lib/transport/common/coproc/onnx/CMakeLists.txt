@@ -28,3 +28,7 @@ target_link_libraries(catalyst_onnx_coprocessor PRIVATE catalyst_transport_commo
 set_target_properties(catalyst_onnx_coprocessor PROPERTIES
     POSITION_INDEPENDENT_CODE ON
     CXX_VISIBILITY_PRESET hidden)
+
+# Only reached when CATALYST_TRANSPORT_ONNX is on; the early return() above keeps
+# the library out of the package otherwise.
+catalyst_runtime_install(catalyst_onnx_coprocessor)

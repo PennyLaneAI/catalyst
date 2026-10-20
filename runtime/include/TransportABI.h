@@ -26,13 +26,6 @@
 extern "C" {
 #endif
 
-// What the compiler passes for each operand of an in-process external call.
-typedef struct {
-    int64_t rank;
-    void *data_aligned;
-    int8_t dtype;
-} CatalystEncodedMemref;
-
 // LLVM ORC's CWrapperFunctionResult, exported so the adapters need not link LLVM.
 typedef struct {
     union {
