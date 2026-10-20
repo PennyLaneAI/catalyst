@@ -438,11 +438,11 @@ Current limitations
 As an experimental feature, several components are provisional. Each of these can change as the
 platform is built out.
 
-**Fixed remote memory slab.**
-    A session reserves a single 1 GB slab on the remote for the sections of every object it loads
-    (``.text``, ``.rodata``, and so on), released when the session is destroyed. The size is a
-    compile-time constant in ``runtime/lib/executor/ExecutorSession.cpp`` and is not currently
-    tunable at runtime.
+**Single remote memory slab.**
+    A session reserves a single slab on the remote for the sections of every object it loads
+    (``.text``, ``.rodata``, and so on), released when the session is destroyed. It is 1 GB unless
+    the ``CATALYST_REMOTE_SLAB_BYTES`` environment variable of the process opening the session sets
+    another size in bytes.
 
 **Fixed transport reply region.**
     A transport session provisions a 16 KB local reply region at ``exchange_keys``. The size is a

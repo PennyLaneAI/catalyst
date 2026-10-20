@@ -29,6 +29,7 @@ Note: "node" here is a backline participant (a controller or coprocessor), disti
 
 import ctypes
 import os
+import socket
 from pathlib import Path
 from typing import NamedTuple
 
@@ -156,7 +157,8 @@ def _out_of_process(node: Node) -> bool:
 
 
 def _node_dict(node: Node, role: str, transport: str | None) -> dict:
-    """Map a backline node to a ``catalyst.backline`` node dict. Reads ``node.executor`` as-is.
+    """Map a backline node to a ``catalyst.backline`` node dict. Its executor, if any, is read
+    through :func:`node_executor`.
 
     Coprocessor connection information is carried by ``endpoint`` in current PennyLane Backline;
     a controller carries no connection endpoint of its own.
@@ -187,7 +189,7 @@ def _node_dict(node: Node, role: str, transport: str | None) -> dict:
     if transport is not None and hardware is not None and not init.get("backend_lib"):
         d["backend_lib"] = _resolve_backend_lib(transport, hardware, role, bool(node.remote))
     # A node may be handed any object as its executor, so its fields are read rather than assumed.
-    executor = node.executor
+    executor = node_executor(node)
     if executor is not None:
         triple = getattr(executor, "triple", None)
         if triple is not None:
@@ -568,10 +570,28 @@ def _executor_plugins(node: Node, given) -> list[str]:
     return plugins
 
 
-def _realize_executor(node: Node) -> Executor | None:
-    """The node's executor, built from its ``executor_options`` on first use and cached on it.
+# The executor built for each node, keyed by ``id(node)``. Nodes are frozen, so it can't live on
+# them; the node is kept alongside so its id is never reused while the entry exists.
+_EXECUTORS: dict[int, tuple[Node, Executor]] = {}
 
-    ``None`` when the node requested none, which leaves it running in this process.
+
+def node_executor(node: Node):
+    """The executor a backline node's code is dispatched to, or ``None`` if it runs in this process.
+
+    This is the executor the compiler built from the node's ``executor_options``, else the one
+    attached as ``node.executor``. The compiler keeps the executors it builds here rather than on the
+    frozen node, so this is how to reach one, for example to ``stop()`` it before the process exits.
+    """
+    entry = _EXECUTORS.get(id(node))
+    return entry[1] if entry is not None else node.executor
+
+
+def _realize_executor(node: Node) -> Executor | None:
+    """The node's executor, built from its ``executor_options`` on first use and reused after.
+
+    ``None`` when the node requested none, which leaves it running in this process. Nothing is
+    launched: every executor returned has committed to its address, which the compiled program
+    carries, and is deployed by :func:`launch_executors` when the program runs.
 
     Raises:
         CompileError: If ``remote`` and the executor disagree about which machine the node is on, if
@@ -599,7 +619,13 @@ def _realize_executor(node: Node) -> Executor | None:
         return executor
     if options is None:
         return None
+    if id(node) in _EXECUTORS:
+        return _EXECUTORS[id(node)][1]
     options = dict(options)
+    if not options.get("host") and not options.get("address") and options.get("port") is None:
+        # A local executor would otherwise search for a free port at launch, so its address would
+        # be knowable only by launching it now. Pick the port here instead.
+        options["port"] = _free_local_port()
 
     options.setdefault("name", node.name or "executor")
     options["plugins"] = _executor_plugins(node, options.get("plugins") or ())
@@ -617,12 +643,20 @@ def _realize_executor(node: Node) -> Executor | None:
             f"wait until execution."
         )
     executor = Executor(**options)
-    if executor.resolve() is None:
-        # Only a local executor reaches here: it searches for a free port, so its address is
-        # knowable only once it is up. That search stays on loopback and costs no network.
-        executor.launch()
-    object.__setattr__(node, "executor", executor)  # cache on the (frozen) node
+    if executor.resolve() is None:  # every path above pins a port or an address, so never taken
+        raise CompileError(
+            f"backline node {node.name!r} has an executor whose address is only known once it is "
+            f"launched, so the compiled program would have nowhere to dispatch it."
+        )
+    _EXECUTORS[id(node)] = (node, executor)
     return executor
+
+
+def _free_local_port() -> int:
+    """A loopback port nothing is bound to right now, for a local executor to serve on."""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind(("127.0.0.1", 0))
+        return s.getsockname()[1]
 
 
 def attach_backline_attr(mlir_module, placement: Placement) -> None:
