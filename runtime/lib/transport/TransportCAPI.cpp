@@ -45,12 +45,19 @@ using catalyst::transport::CoprocConvention;
 using catalyst::transport::COPROCESSOR_FN_ERROR;
 using catalyst::transport::CoprocessorFn;
 using catalyst::transport::CoprocessorFnInfo;
+using catalyst::transport::CoprocessorFrameFn;
 using catalyst::transport::CoprocessorLauncherFn;
 using catalyst::transport::CoprocessorSession;
 using catalyst::transport::MemKind;
 using catalyst::transport::MemRegion;
 using catalyst::transport::PeerRef;
 using catalyst::transport::TransportSession;
+
+// A CoprocessorFrameFn and its ctx, bound to a backend through call_frame_fn.
+struct FrameFnBinding {
+    CoprocessorFrameFn fn;
+    void *ctx;
+};
 
 // The opaque handle. `sess` is the base type; the concrete role is chosen by the factory at
 // create. The peer region learned in exchange_keys is kept here so establish_channel needs no peer
@@ -80,6 +87,9 @@ struct CatalystTransportSession {
     // that releases it once the session has stopped.
     void *coprocessor_fn_ctx = nullptr;
     void (*coprocessor_fn_fini)(void *) = nullptr;
+    // Set while the bound function is a CoprocessorFrameFn, which the backend reaches through
+    // call_frame_fn with this as its ctx.
+    std::unique_ptr<FrameFnBinding> frame_fn;
 };
 
 namespace {
@@ -203,6 +213,23 @@ std::size_t failing_fn(const void *, std::size_t, void *, std::size_t, void *) {
 
 // Bound in place of a launcher that could not be configured: fails to launch, so the session does
 // not start and its messages fail.
+// The CoprocessorFn a backend calls for a bound CoprocessorFrameFn (`ctx` is its FrameFnBinding).
+// The frame the backend hands over is the payload, then the u32 fn_id and the u32 seq (see
+// WireProtocol.hpp), so both fields sit at fixed offsets from its end.
+std::size_t call_frame_fn(const void *in, std::size_t in_len, void *out, std::size_t out_cap,
+                          void *ctx) {
+    using catalyst::transport::common::Payload;
+    constexpr std::size_t trailer = sizeof(Payload::decoder_id) + sizeof(Payload::seq_num);
+    if (in_len < trailer) {
+        return COPROCESSOR_FN_ERROR;
+    }
+    const std::size_t len = in_len - trailer;
+    std::uint32_t fn_id = 0;
+    std::memcpy(&fn_id, static_cast<const std::uint8_t *>(in) + len, sizeof(fn_id));
+    const auto *binding = static_cast<const FrameFnBinding *>(ctx);
+    return binding->fn(in, len, fn_id, out, out_cap, binding->ctx);
+}
+
 int failing_launcher(const catalyst::transport::CoprocLaunchDesc *, void *) { return 1; }
 
 // Async task registry: connect_async / exchange_keys_async run on a worker thread and return a
@@ -514,6 +541,7 @@ int __catalyst__transport__set_coprocessor_fn(CatalystTransportSession *s, const
         void *resolved_fn = nullptr;
         void *ctx = nullptr;
         FiniFn fini = nullptr;
+        bool frame_fields = false; // resolved_fn is a CoprocessorFrameFn
         if (symbol && *symbol) {
             resolved_fn = resolve_coprocessor_fn_symbol(s, symbol);
             if (!resolved_fn) {
@@ -532,6 +560,20 @@ int __catalyst__transport__set_coprocessor_fn(CatalystTransportSession *s, const
                               << "_info has no ABI version (expected at least 1)\n";
                     return fail_unconfigured();
                 }
+                if (info->flags & ~CATALYST_COPROCESSOR_FN_FRAME_FIELDS) {
+                    std::cerr << "[transport] set_coprocessor_fn: " << name
+                              << "_info sets flags this runtime does not know: 0x" << std::hex
+                              << info->flags << std::dec << "\n";
+                    return fail_unconfigured();
+                }
+                frame_fields = info->flags & CATALYST_COPROCESSOR_FN_FRAME_FIELDS;
+                if (frame_fields &&
+                    co->coprocessor_fn_convention() != CoprocConvention::PerMessage) {
+                    std::cerr << "[transport] set_coprocessor_fn: " << name
+                              << " takes message fields, but this backend launches its "
+                                 "function once rather than calling it per message\n";
+                    return fail_unconfigured();
+                }
                 if (info->init) {
                     ctx = info->init(coprocessor_fn_config(s->config).c_str());
                     if (!ctx) {
@@ -546,9 +588,16 @@ int __catalyst__transport__set_coprocessor_fn(CatalystTransportSession *s, const
         // Bind first, and release the previous function's ctx only once the new binding holds: a
         // rejected bind, which the backend throws or reports with an unknown convention, leaves the
         // bound function and its ctx untouched.
+        std::unique_ptr<FrameFnBinding> frame_fn;
         const auto bind = [&] {
             switch (co->coprocessor_fn_convention()) {
             case CoprocConvention::PerMessage:
+                if (frame_fields) {
+                    frame_fn = std::make_unique<FrameFnBinding>(
+                        FrameFnBinding{reinterpret_cast<CoprocessorFrameFn>(resolved_fn), ctx});
+                    co->set_coprocessor_fn(&call_frame_fn, frame_fn.get());
+                    return true;
+                }
                 // No symbol -> the core's built-in echo.
                 co->set_coprocessor_fn(
                     resolved_fn ? reinterpret_cast<CoprocessorFn>(resolved_fn) : &echo_fn, ctx);
@@ -575,6 +624,7 @@ int __catalyst__transport__set_coprocessor_fn(CatalystTransportSession *s, const
             release_coprocessor_fn_ctx(s);
             s->coprocessor_fn_ctx = ctx;
             s->coprocessor_fn_fini = fini;
+            s->frame_fn = std::move(frame_fn);
             return CATALYST_TRANSPORT_OK;
         }
         if (fini && ctx) {

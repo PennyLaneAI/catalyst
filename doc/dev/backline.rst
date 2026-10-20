@@ -260,8 +260,13 @@ slot ``n mod 256``. The only frame layout implemented so far is the 16 B one, BL
       - ``seq``: the round's number plus one.
 
 A sender writes the whole frame in one in-order transfer, ``seq`` last, and a receiver reads the
-payload only once the slot's ``seq`` matches the round it expects. A per-message coprocessor
-function is passed the whole request frame and writes the reply's payload. In-tree backends build
+payload only once the slot's ``seq`` matches the round it expects.
+
+A per-message coprocessor function is passed the whole request frame and writes the reply's
+payload. One whose library sets ``CATALYST_COPROCESSOR_FN_FRAME_FIELDS`` in its
+``CatalystCoprocessorFnInfo`` takes the ``CatalystCoprocessorFrameFn`` signature instead
+(``runtime/include/TransportABI.h``): it is passed the payload, its length and the ``fn_id``, so
+one function can serve several decoders without reading the frame itself. In-tree backends build
 and read frames through ``runtime/lib/transport/common/interface/Frame.hpp``. An out-of-tree
 backend lays them out as above, since that header is not installed. The ``memcpy`` backends carry
 messages over 8 B in a wider frame of the same shape, its payload area grown to fit.

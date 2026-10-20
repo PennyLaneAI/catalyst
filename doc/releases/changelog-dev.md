@@ -1004,7 +1004,9 @@
 
 * Backline transport frames are built and read through a shared frame codec, which the `cpu_verbs`
   backends now use instead of laying out the 16 B frame themselves. The bytes on the wire are
-  unchanged, and other frame layouts can now be added in one place.
+  unchanged, and other frame layouts can now be added in one place. A per-message coprocessor
+  function can now take the payload, its length and the fn_id as arguments instead of the raw
+  frame, by setting `CATALYST_COPROCESSOR_FN_FRAME_FIELDS` in its `CatalystCoprocessorFnInfo`.
   [(#3378)](https://github.com/PennyLaneAI/catalyst/pull/3378)
 
 * The `cpu_verbs` and `gpu_verbs` transport backends share one session base for RDMA bring-up and
