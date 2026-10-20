@@ -511,15 +511,16 @@ func.func @estimated_iterations_loop(%arg0: !quantum.bit, %n: index) -> !quantum
 // into while_loop_<N> and records the (possibly non-integer) call count on the
 // parent: 2 gates * 2.5 = 5 when totals are resolved.
 
-// CHECK-LABEL: "while_loop_1": {
-// CHECK: "quantum_operations"
-// CHECK:     "PauliZ": 2
 
 // CHECK-LABEL: "estimated_iterations_while_fractional": {
 // CHECK: "function_calls"
 // CHECK:   "static":
 // CHECK:       "while_loop_1": 2.5
 // CHECK: "quantum_operations": {}
+
+// CHECK-LABEL: "while_loop_1": {
+// CHECK: "quantum_operations"
+// CHECK:     "PauliZ": 2
 func.func @estimated_iterations_while_fractional(%arg0: !quantum.bit, %n: index) -> !quantum.bit {
     %c0 = arith.constant 0 : index
     %c1 = arith.constant 1 : index
