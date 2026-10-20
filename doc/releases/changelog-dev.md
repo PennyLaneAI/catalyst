@@ -810,7 +810,7 @@
 
 * Fixes mixed static and dynamic `control_values` for callable `qp.ctrl` under
   `qjit(capture=True)`.
-  [(#XXXX)](https://github.com/PennyLaneAI/catalyst/pull/XXXX)
+  [(#3373)](https://github.com/PennyLaneAI/catalyst/pull/3373)
 
 * MLIR passes that recreate `scf.for`, `scf.while`, `scf.if`, and `scf.index_switch` ops
   (`ctrl-lowering`, `adjoint-lowering`, `--convert-to-value-semantics`) now preserve discardable
