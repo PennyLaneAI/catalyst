@@ -91,27 +91,35 @@ class CtrlOp(IRDLOperation):
     """Apply the enclosed operations controlled on the given control qubits."""
 
     C: ClassVar = RangeVarConstraint("C", RangeOf(AnyOf([QubitType])))
+    W: ClassVar = RangeVarConstraint("W", RangeOf(AnyOf([QubitType])))
     T: ClassVar = RangeVarConstraint("T", RangeOf(AnyOf([QubitType, QuregType])))
 
     name = "quantum.ctrl"
 
     assembly_format = """
-        `(` $in_ctrl_qubits `)` `ctrlvals` `(` $in_ctrl_values `)` `(` $args `)`
-        attr-dict `:` type($out_ctrl_qubits) `->` type($outs) $region
+        `(` $in_ctrl_qubits `)` `ctrlvals` `(` $in_ctrl_values `)`
+        (`work_wires` `(` $in_work_qubits^ `)`)?
+        `(` $args `)` attr-dict `:` type($out_ctrl_qubits)
+        (`work_wires` type($out_work_qubits)^)? `->` type($outs) $region
     """
 
     in_ctrl_qubits = var_operand_def(C)
     in_ctrl_values = var_operand_def(i1)
+    in_work_qubits = var_operand_def(W)
     args = var_operand_def(T)
 
     out_ctrl_qubits = var_result_def(C)
+    out_work_qubits = var_result_def(W)
     outs = var_result_def(T)
+
+    work_wire_type = opt_prop_def(StringAttr)
 
     region = region_def("single_block")
 
     irdl_options = (
         AttrSizedOperandSegments(as_property=True),
         AttrSizedResultSegments(as_property=True),
+        ParsePropInAttrDict(),
     )
 
     traits = lazy_traits_def(lambda: (NoMemoryEffect(), SingleBlockImplicitTerminator(YieldOp)))
@@ -122,12 +130,16 @@ class CtrlOp(IRDLOperation):
         in_ctrl_values: Sequence[Operation],
         args: Sequence[QuregSSAValue | QubitSSAValue] | Operation,
         region: Region | Sequence[Operation] | Sequence[Block],
+        in_work_qubits: Sequence[QubitSSAValue] | Operation = (),
+        work_wire_type: str = "borrowed",
     ):
         ctrl_result_types = tuple(q.type for q in in_ctrl_qubits)
+        work_result_types = tuple(q.type for q in in_work_qubits)
         arg_result_types = tuple(a.type for a in args)
         super().__init__(
-            operands=(in_ctrl_qubits, in_ctrl_values, args),
-            result_types=(ctrl_result_types, arg_result_types),
+            operands=(in_ctrl_qubits, in_ctrl_values, in_work_qubits, args),
+            result_types=(ctrl_result_types, work_result_types, arg_result_types),
+            properties={"work_wire_type": StringAttr(work_wire_type)},
             regions=(region,),
         )
 
