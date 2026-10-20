@@ -676,7 +676,6 @@ class TestIntegration:
         insertion of device and post-device transforms.
         """
 
-        # Create a device s.t split to single terms (Device Preprocessing) is
         dev = CapabilitiesDevice(wires=2)
         dev.capabilities = DeviceCapabilities(
             non_commuting_observables=True,
