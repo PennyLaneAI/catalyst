@@ -46,7 +46,7 @@ def test_rz_registration():
         return qp.probs()
 
     # CHECK: transform.named_sequence @__transform_main
-    # CHECK: transform.apply_registered_pass "gridsynth" with options = {"epsilon" = 1.000000e-02 : f64, "ppr-basis" = false}
+    # CHECK: transform.apply_registered_pass "gridsynth" with options = {"epsilon" = 1.000000e-02 : f64, "method" = "deterministic", "ppr-basis" = false}
     # CHECK-LABEL: func.func public @circuit
     # CHECK: quantum.custom "RZ"
     print(circuit.mlir)
@@ -154,7 +154,7 @@ def test_ppr_registration():
         qp.RZ(x, wires=0)
         return qp.probs()
 
-    # CHECK: transform.apply_registered_pass "gridsynth" with options = {"epsilon" = 1.000000e-02 : f64, "ppr-basis" = true}
+    # CHECK: transform.apply_registered_pass "gridsynth" with options = {"epsilon" = 1.000000e-02 : f64, "method" = "deterministic", "ppr-basis" = true}
     print(circuit.mlir)
 
 
@@ -263,3 +263,24 @@ def test_capture_workflow_ppr():
 
 
 test_capture_workflow_ppr()
+
+# ==============================================================================
+# Test 9: Mixed method Registration
+# ==============================================================================
+
+
+def test_mixed_registration():
+    """Test that method="mixed" is passed to the transform."""
+
+    @qjit(target="mlir", capture=True)
+    @gridsynth(epsilon=0.01, method="mixed")
+    @qp.qnode(qp.device("lightning.qubit", wires=1))
+    def circuit(x: float):
+        qp.RZ(x, wires=0)
+        return qp.probs()
+
+    # CHECK: transform.apply_registered_pass "gridsynth" with options = {"epsilon" = 1.000000e-02 : f64, "method" = "mixed", "ppr-basis" = false}
+    print(circuit.mlir)
+
+
+test_mixed_registration()
