@@ -937,6 +937,27 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* The FPGA transport backends share one config parser. The VPK120 backend now reads `dev`, `gid`,
+  `ring`, `stride_log2`, `data_mem` and `reply_mem` exactly as `fpga_verbs` does, and reports a
+  malformed value by naming its key. The frontend builds the entries it adds to a coprocessor's
+  config from a dict.
+  [(#3359)](https://github.com/PennyLaneAI/catalyst/pull/3359)
+
+* Backline transport backends now report the transport ABI version they were built for and their
+  capabilities, through `CatalystTransportAbiVersion` and `CatalystTransportQueryCaps`. The runtime
+  checks these when it loads a backend: a backend built for a newer ABI, or asked for a role it
+  does not provide, is refused with an error naming the cause. Backends without the symbols still
+  load, limited to the 16 B frame. Load errors are now included in the error raised to the user.
+  [(#3357)](https://github.com/PennyLaneAI/catalyst/pull/3357)
+
+* Backline housekeeping ahead of the transport ABI improvement:
+  - **GPU backends:** the `TRANSPORT_HIP` CMake option (`AUTO`, `ON`, `OFF`) overrides detection of the GPU transport backends.
+  - **Demo integration tests:** these now run whenever the runtime is built with transport.
+  - **Local executors:** a placement's local executors are given a port at compile time and launched only when the program runs. They are remembered per node, rather than written onto the frozen placement nodes.
+  - **Executor memory:** the remote memory slab is sized by `CATALYST_REMOTE_SLAB_BYTES`.
+
+  [(#3355)](https://github.com/PennyLaneAI/catalyst/pull/3355)
+
 * QNode functions are now marked with a `quantum.kernel_entry_point` attribute in their quantum
   kernel module, which the `ResourceAnalysis` pass uses to identify the entry function.
   [(#3308)](https://github.com/PennyLaneAI/catalyst/pull/3308)

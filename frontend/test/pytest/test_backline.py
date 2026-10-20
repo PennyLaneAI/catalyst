@@ -33,11 +33,13 @@ from catalyst.backline import (
     _TRANSPORT_PASSES,
     _builtin_fn_lib_dirs,
     _check_builtin_fn_lib,
+    _config_text,
     _coprocessor_fn_libs,
     _find_builtin_fn_lib,
     _insert_passes,
     _installed_builtin_fn_lib_dirs,
     _message_size,
+    _parse_config,
     _qec_pass_specs,
     _realize_executor,
     _remote_fn_lib_name,
@@ -46,6 +48,7 @@ from catalyst.backline import (
     _runs_per_message_on_gpu,
     device_pass_pipeline,
     launch_executors,
+    node_executor,
     placement_pipeline,
     remote_device_lib,
     serialize_backline,
@@ -165,6 +168,16 @@ def test_single_coprocessor():
     assert len(d["coprocessors"]) == 1
     assert d["coprocessors"][0]["name"] == "cop0"
     assert d["coprocessors"][0]["symbol"] == "coproc_fn"
+
+
+def test_config_text_round_trips_as_the_runtime_reads_it():
+    """A repeated key keeps its last value and an entry without ``=`` is dropped, as in the runtime."""
+    assert _parse_config("dev=rxe0;junk;gid=1;dev=mlx5_1;fn.k=a=b") == {
+        "dev": "mlx5_1",
+        "gid": "1",
+        "fn.k": "a=b",
+    }
+    assert _config_text({"dev": "rxe0", "gid": "1"}) == "dev=rxe0;gid=1"
 
 
 def test_coprocessor_fn_config_is_appended_with_the_fn_prefix():
@@ -680,18 +693,24 @@ def stop_node_executors():
         yield nodes.append
     finally:
         for node in nodes:
-            executor = getattr(node, "executor", None)
+            executor = node_executor(node)
             if executor is not None:
                 executor.stop()
 
 
+def _transport_backends_built():
+    """Whether the runtime was built with ENABLE_TRANSPORT=ON, which builds the memcpy backend."""
+    lib_dir = Path(get_lib_path("runtime", "RUNTIME_LIB_DIR"))
+    names = [f"libcatalyst_transport_memcpy_controller.{ext}" for ext in ("so", "dylib")]
+    return any((lib_dir / name).exists() for name in names)
+
+
 @pytest.mark.skipif(
-    "CATALYST_TRANSPORT_PATH" not in os.environ,
+    not (_transport_backends_built() or "CATALYST_TRANSPORT_PATH" in os.environ),
     reason=(
         "Backline demo integration tests need the transport backend libraries built with "
-        "-DENABLE_TRANSPORT=ON, which the wheel does not ship. Add that build directory to "
-        "CATALYST_TRANSPORT_PATH to run them; the check-transport workflow does this on a "
-        "GPU runner."
+        "-DENABLE_TRANSPORT=ON, which the wheel does not ship. Build the runtime with it, or add "
+        "a directory holding them to CATALYST_TRANSPORT_PATH."
     ),
 )
 class TestBacklineDemoIntegration:
@@ -797,8 +816,8 @@ class TestBacklineDemoIntegration:
             executor_options=executor_options,
             init_args={"config": "dev=rxe0;gid=1"},
         )
-        # Registered before compiling: ``_realize_executor`` launches the subprocess during
-        # compilation, and a failure after that still has to release the port.
+        # Registered before compiling: the executor is launched when ``ghz()`` runs, and a failure
+        # after that still has to release the port.
         stop_node_executors(coproc)
         dev = qp.Backline(
             controller=ctrl, coprocessors=[coproc], transport="rdma", qec_code="steane"
@@ -824,13 +843,13 @@ class TestBacklineDemoIntegration:
             assert pass_name in ir, f"{pass_name} missing from the scheduled pipeline"
 
         # Where the coprocessor ended up, asserted rather than inferred from a passing execution.
-        executor = coproc.executor
+        executor = node_executor(coproc)
         if executor_options is None:
             assert executor is None, "the default asks for no executor, so the node stays here"
         else:
             assert executor is not None, "executor_options={} did not produce an executor"
-            # ``address`` raises unless the executor is up, and only a local one serves on
-            # loopback, so this pins the mode as well as the liveness.
+            # ``address`` raises unless the executor has committed to one, and only a local one
+            # serves on loopback, so this pins the mode.
             assert executor.address.startswith(
                 "127.0.0.1:"
             ), f"a local executor serves on loopback, got {executor.address}"
@@ -1560,8 +1579,8 @@ class TestExecutorRealization:
         assert _realize_executor(node) is None
         assert node.executor is None
 
-    def test_options_produce_a_launched_executor_cached_on_the_node(self):
-        """The executor is built, launched, and cached back onto the frozen node."""
+    def test_options_produce_an_executor_with_an_address(self):
+        """The executor is built and committed to its address; the frozen node is left alone."""
         node = _controller(
             executor_options={"address": "10.0.0.9:1373", "triple": "aarch64-unknown-linux-gnu"}
         )
@@ -1569,12 +1588,26 @@ class TestExecutorRealization:
         assert ex is not None
         assert ex.address == "10.0.0.9:1373"
         assert ex.triple == "aarch64-unknown-linux-gnu"
-        assert node.executor is ex
+        assert node.executor is None
 
-    def test_realization_is_idempotent(self):
-        """A second call returns the same executor rather than launching another."""
+    @pytest.mark.parametrize("options", [{"address": "10.0.0.9:1373"}, {}])
+    def test_realization_is_idempotent(self, options, no_launch):
+        """A second call returns the same executor rather than building another. With ``{}`` a
+        second build would pick a different free port, so the address must not move either."""
+        node = _controller(executor_options=options)
+        first = _realize_executor(node)
+        assert _realize_executor(node) is first
+        assert node_executor(node) is first
+        assert first.address == _realize_executor(node).address
+        no_launch.assert_not_called()
+
+    def test_an_executor_with_no_predictable_address_is_rejected(self):
+        """Should an executor fail to commit to an address, compiling fails rather than carrying
+        none."""
         node = _controller(executor_options={"address": "10.0.0.9:1373"})
-        assert _realize_executor(node) is _realize_executor(node)
+        with mock.patch.object(Executor, "resolve", autospec=True, return_value=None):
+            with pytest.raises(CompileError, match="nowhere to dispatch"):
+                _realize_executor(node)
 
     def test_node_name_seeds_the_executor_name(self):
         """The node's name names the executor."""
@@ -1587,7 +1620,8 @@ class TestExecutorRealization:
             ex = _realize_executor(node)
         assert node.remote is False
         assert ex.host is None
-        launch.assert_called_once()  # a free-port search settles its address only once it is up
+        assert ex.address.startswith("127.0.0.1:")  # a port is picked now
+        launch.assert_not_called()  # and the launch waits until the program runs
 
     def test_a_remote_node_without_an_executor_is_rejected(self):
         """Another machine is reached by dispatching to an executor deployed there."""
@@ -1612,8 +1646,7 @@ class TestExecutorRealization:
         program would otherwise name by the compiling host's own absolute path. A remote node names
         it by filename, the deployed bundle supplying the file."""
         node = _controller(remote=True, executor_options={"host": "192.0.2.10", "port": 7810})
-        _realize_executor(node)
-        plugins = node.executor._cfg.plugins  # pylint: disable=protected-access
+        plugins = _realize_executor(node)._cfg.plugins  # pylint: disable=protected-access
         assert plugins[-1] == "librtd_null_qubit.so"
 
     def test_a_remote_nodes_device_runtime_drops_this_platforms_extension(self, no_launch):
@@ -1625,8 +1658,7 @@ class TestExecutorRealization:
             info.device_name, info.c_interface_name, "/opt/lib/librtd_null_qubit.dylib", info.kwargs
         )
         with mock.patch("catalyst.device.qjit_device.extract_backend_info", return_value=macos):
-            _realize_executor(node)
-        plugins = node.executor._cfg.plugins  # pylint: disable=protected-access
+            plugins = _realize_executor(node)._cfg.plugins  # pylint: disable=protected-access
         assert plugins[-1] == "librtd_null_qubit.so"
 
     def test_a_dispatched_controller_names_its_runtime_by_filename(self):
@@ -1660,8 +1692,7 @@ class TestExecutorRealization:
         displacing the right one.
         """
         node = _controller(remote=True, executor_options={"host": "192.0.2.10", "port": 7810})
-        _realize_executor(node)
-        cfg = node.executor._cfg  # pylint: disable=protected-access
+        cfg = _realize_executor(node)._cfg  # pylint: disable=protected-access
         assert cfg.plugins[-1] == "librtd_null_qubit.so"
         assert not cfg.deploy
 
@@ -1673,9 +1704,7 @@ class TestExecutorRealization:
         node = _coproc(
             "cop0", fn=fn, remote=True, executor_options={"host": "192.0.2.11", "port": 7813}
         )
-        with mock.patch.object(Executor, "launch", autospec=True):
-            _realize_executor(node)
-        cfg = node.executor._cfg  # pylint: disable=protected-access
+        cfg = _realize_executor(node)._cfg  # pylint: disable=protected-access
         assert cfg.plugins[-1] == "libdecoder.so"  # by filename: resolves against the workspace
         assert cfg.deploy == [str(lib)]  # and the file is carried there
 
@@ -1683,16 +1712,14 @@ class TestExecutorRealization:
         """Its library is already reachable, so the full path is enough and nothing travels."""
         fn = qp.CoprocessorFunction("fn", lib_path="/opt/libdecode.so")
         node = _coproc("cop0", fn=fn, executor_options={})
-        _realize_executor(node)
-        cfg = node.executor._cfg  # pylint: disable=protected-access
+        cfg = _realize_executor(node)._cfg  # pylint: disable=protected-access
         assert cfg.plugins[-1] == "/opt/libdecode.so"
         assert not cfg.deploy
 
     def test_a_coprocessor_gets_no_device_runtime(self, no_launch):
         """Only a controller dispatches a QNode, so only it needs a device runtime."""
         node = _coproc("cop0", remote=True, executor_options={"host": "h", "port": 7812})
-        _realize_executor(node)
-        plugins = node.executor._cfg.plugins  # pylint: disable=protected-access
+        plugins = _realize_executor(node)._cfg.plugins  # pylint: disable=protected-access
         assert plugins == list(_EXECUTOR_RUNTIME_PLUGINS)
 
     def test_plugins_the_node_named_keep_their_place(self, no_launch):
@@ -1702,8 +1729,7 @@ class TestExecutorRealization:
             remote=True,
             executor_options={"host": "h", "port": 1, "plugins": ["libsteane.so", "librt_capi.so"]},
         )
-        _realize_executor(node)
-        plugins = node.executor._cfg.plugins  # pylint: disable=protected-access
+        plugins = _realize_executor(node)._cfg.plugins  # pylint: disable=protected-access
         assert plugins.index("libsteane.so") < plugins.index("librt_capi.so")  # order kept
         assert plugins.count("librt_capi.so") == 1
         assert plugins[-1] == "librtd_null_qubit.so"
@@ -1713,8 +1739,7 @@ class TestExecutorRealization:
         device runtime keeps this platform's extension rather than a remote node's ``.so``."""
         ext = "dylib" if platform.system() == "Darwin" else "so"
         node = _controller(executor_options={})
-        _realize_executor(node)
-        plugins = node.executor._cfg.plugins  # pylint: disable=protected-access
+        plugins = _realize_executor(node)._cfg.plugins  # pylint: disable=protected-access
         assert all(p.startswith("/") for p in plugins)
         assert [p.rsplit("/", 1)[-1] for p in plugins][-1] == f"librtd_null_qubit.{ext}"
 
@@ -1775,8 +1800,8 @@ class TestExecutorRealization:
         cop = _coproc("cop0", executor_options={"address": "cop:2"})
         dev = qp.Backline(controller=ctrl, coprocessors=[cop], transport="rdma")
         launch_executors(dev.placement)
-        assert ctrl.executor.address == "ctrl:1"
-        assert cop.executor.address == "cop:2"
+        assert node_executor(ctrl).address == "ctrl:1"
+        assert node_executor(cop).address == "cop:2"
 
     def test_executor_address_and_triple_reach_the_serialized_node(self):
         """The launched executor supplies the node's dispatch address and target triple."""
