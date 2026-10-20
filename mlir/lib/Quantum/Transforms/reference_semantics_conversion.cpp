@@ -583,7 +583,12 @@ void handleCtrl(IRRewriter &builder, quantum::CtrlOp vCtrlOp, QubitValueTracker 
     for (auto vCtrlQubit : vCtrlOp.getInCtrlQubits()) {
         rCtrlQubits.push_back(tracker.getRQubit(vCtrlQubit));
     }
-    auto rCtrlOp = qref::CtrlOp::create(builder, loc, rCtrlQubits, vCtrlOp.getInCtrlValues());
+    SmallVector<Value> rWorkQubits;
+    for (auto vWorkQubit : vCtrlOp.getInWorkQubits()) {
+        rWorkQubits.push_back(tracker.getRQubit(vWorkQubit));
+    }
+    auto rCtrlOp = qref::CtrlOp::create(builder, loc, rCtrlQubits, vCtrlOp.getInCtrlValues(),
+                                        rWorkQubits, vCtrlOp.getWorkWireType());
     builder.inlineRegionBefore(vCtrlOp.getRegion(), rCtrlOp.getRegion(), rCtrlOp.getRegion().end());
     handleRegion(builder, rCtrlOp.getRegion(), regionTracker);
     cascadeMapAhead(vCtrlOp, tracker);

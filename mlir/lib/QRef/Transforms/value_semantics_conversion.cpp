@@ -1638,24 +1638,37 @@ void handleCtrl(IRRewriter &builder, qref::CtrlOp rCtrlOp, QubitValueTracker &tr
     builder.setInsertionPoint(rCtrlOp);
     Location loc = rCtrlOp->getLoc();
 
+    // Enclosing control work wires are supplied again during control lowering. Remove shared
+    // wires from nested controls so they are neither captured as targets nor passed twice.
+    rCtrlOp.getRegion().walk([&](qref::CtrlOp inner) {
+        SmallVector<Value> workQubits;
+        for (Value work : inner.getWorkQubits()) {
+            if (!llvm::is_contained(rCtrlOp.getWorkQubits(), work)) {
+                workQubits.push_back(work);
+            }
+        }
+        inner.getWorkQubitsMutable().assign(workQubits);
+    });
+
     SetVector<Value> rTargetValues;
     collectNecessaryRegionRValues(rCtrlOp.getRegion(), rTargetValues);
 
-    // Special: ctrl qubits are passed in as operands explicitly instead of closure.
-    // Insert them first so they occupy the front of the combined set, then append the
-    // region targets. numCtrlQubits must be the number of *distinct* control values (as
-    // deduplicated by the SetVector), not the raw operand count: a duplicate or
-    // target-overlapping control value would otherwise make the take_front/take_back
-    // split below land on the wrong values and leave a qubit untracked, crashing later
-    // with a DenseMap::at missing-key assertion.
+    // Control and work qubits are passed explicitly instead of through the region closure. Keep
+    // them before the region targets so the value-semantics op has the segment order
+    // [controls, work, targets]. The counts must be the numbers of distinct values after SetVector
+    // deduplication; raw operand counts could make the slices below land on the wrong values.
     SetVector<Value> rValuesUsedByRegion;
     for (Value rCtrlQubit : rCtrlOp.getCtrlQubits()) {
         rValuesUsedByRegion.insert(rCtrlQubit);
     }
     size_t numCtrlQubits = rValuesUsedByRegion.size();
+    for (Value rWorkQubit : rCtrlOp.getWorkQubits()) {
+        rValuesUsedByRegion.insert(rWorkQubit);
+    }
+    size_t numWorkQubits = rValuesUsedByRegion.size() - numCtrlQubits;
     rValuesUsedByRegion.insert(rTargetValues.begin(), rTargetValues.end());
-    assert(rValuesUsedByRegion.size() >= numCtrlQubits);
-    size_t numTargetQubits = rValuesUsedByRegion.size() - numCtrlQubits;
+    assert(rValuesUsedByRegion.size() >= numCtrlQubits + numWorkQubits);
+    size_t numTargetQubits = rValuesUsedByRegion.size() - numCtrlQubits - numWorkQubits;
 
     quantum::CtrlOp vCtrlOp;
     {
@@ -1683,10 +1696,13 @@ void handleCtrl(IRRewriter &builder, qref::CtrlOp rCtrlOp, QubitValueTracker &tr
         }
 
         ArrayRef<Value> vCtrlQubitOperands = ArrayRef(vCtrlOperands).take_front(numCtrlQubits);
+        ArrayRef<Value> vWorkQubitOperands =
+            ArrayRef(vCtrlOperands).slice(numCtrlQubits, numWorkQubits);
         ArrayRef<Value> vTargetQubitOperands = ArrayRef(vCtrlOperands).take_back(numTargetQubits);
-        vCtrlOp = quantum::CtrlOp::create(builder, loc, TypeRange(vCtrlQubitOperands),
-                                          TypeRange(vTargetQubitOperands), vCtrlQubitOperands,
-                                          rCtrlOp.getCtrlValues(), vTargetQubitOperands);
+        vCtrlOp = quantum::CtrlOp::create(
+            builder, loc, TypeRange(vCtrlQubitOperands), TypeRange(vWorkQubitOperands),
+            TypeRange(vTargetQubitOperands), vCtrlQubitOperands, rCtrlOp.getCtrlValues(),
+            vWorkQubitOperands, rCtrlOp.getWorkWireType(), vTargetQubitOperands);
 
         // 2. Move operations from old body to new body
         builder.inlineRegionBefore(rCtrlOp.getRegion(), vCtrlOp.getRegion(),

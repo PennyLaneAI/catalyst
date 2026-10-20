@@ -15,6 +15,7 @@
 // Test conversion to value semantics quantum dialect for flat circuits with only classical arguments.
 
 // RUN: quantum-opt --convert-to-value-semantics --canonicalize --split-input-file --verify-diagnostics %s | FileCheck %s
+// RUN: quantum-opt --convert-to-value-semantics --ctrl-lowering --split-input-file --verify-diagnostics %s | FileCheck %s --check-prefix=LOWERED
 
 
 // CHECK-LABEL: test_set_state
@@ -690,6 +691,90 @@ func.func @test_ctrl_op_nested() attributes {quantum.node}
     // CHECK: quantum.dealloc [[insert_ctrl_inner]] : !quantum.reg
     qref.dealloc %r : !qref.reg<2>
     qref.dealloc %ctrl_r : !qref.reg<3>
+    return
+}
+
+
+// -----
+
+
+// CHECK-LABEL: @ctrl_work_wires
+// CHECK: %[[CTRL:.*]] = quantum.alloc_qb
+// CHECK: %[[WORK:.*]] = quantum.alloc_qb
+// CHECK: %[[TARGET:.*]] = quantum.alloc_qb
+// CHECK: %[[OC:.*]], %[[OW:.*]], %[[OQ:.*]] = quantum.ctrl(%[[CTRL]])
+// CHECK-SAME: ctrlvals(%{{.*}}) work_wires(%[[WORK]]) (%[[TARGET]])
+// CHECK-SAME: {work_wire_type = "zeroed"}
+// CHECK-SAME: : !quantum.bit work_wires !quantum.bit -> !quantum.bit
+
+// LOWERED-LABEL: @ctrl_work_wires
+// LOWERED: %[[Q:.*]]:2, %[[C:.*]] = quantum.operator "PauliX"()
+// LOWERED-SAME: qubits(%{{.*}}, %{{.*}})
+// LOWERED-NEXT: ctrls(%{{.*}}) ctrl_vals(%{{.*}})
+// LOWERED: static_data = {ctrl_work_wire_type = "zeroed"}
+// LOWERED: qubit_map = {ctrl_work_wires = [1], wires = [0]}
+
+func.func @ctrl_work_wires() attributes {quantum.node} {
+    %true = llvm.mlir.constant (1 : i1) : i1
+    %ctrl = qref.alloc_qb : !qref.bit
+    %work = qref.alloc_qb : !qref.bit
+    %target = qref.alloc_qb : !qref.bit
+
+    qref.ctrl (%ctrl) ctrlvals (%true) work_wires (%work)
+            attributes {work_wire_type = "zeroed"} {
+        qref.custom "PauliX"() %target : !qref.bit
+    }
+
+    qref.dealloc_qb %ctrl : !qref.bit
+    qref.dealloc_qb %work : !qref.bit
+    qref.dealloc_qb %target : !qref.bit
+    return
+}
+
+// -----
+
+
+// Shared work wires are supplied by the enclosing region, without being captured as targets
+// or duplicated on the lowered operator.
+
+// CHECK-LABEL: @nested_ctrl_shared_work_wire
+// CHECK: %[[OUTER:.*]] = quantum.alloc_qb
+// CHECK: %[[INNER:.*]] = quantum.alloc_qb
+// CHECK: %[[WORK:.*]] = quantum.alloc_qb
+// CHECK: %[[TARGET:.*]] = quantum.alloc_qb
+// CHECK: quantum.ctrl(%[[OUTER]]) ctrlvals(%{{.*}}) work_wires(%[[WORK]]) (%[[TARGET]], %[[INNER]])
+// CHECK: quantum.ctrl(%{{.*}}) ctrlvals(%{{.*}}) (%{{.*}}) : !quantum.bit -> !quantum.bit
+
+// LOWERED-LABEL: @nested_ctrl_shared_work_wire
+// LOWERED: %[[OUTER:.*]] = quantum.alloc_qb
+// LOWERED: %[[INNER:.*]] = quantum.alloc_qb
+// LOWERED: %[[WORK:.*]] = quantum.alloc_qb
+// LOWERED: %[[TARGET:.*]] = quantum.alloc_qb
+// LOWERED: %[[Q:.*]]:2, %[[C:.*]]:2 = quantum.operator "PauliX"() qubits(%[[TARGET]], %[[WORK]])
+// LOWERED-NEXT: ctrls(%[[INNER]], %[[OUTER]]) ctrl_vals(%{{.*}}, %{{.*}})
+// LOWERED: qubit_map = {ctrl_work_wires = [1], wires = [0]}
+// LOWERED-NEXT: quantum.dealloc_qb %[[C]]#1
+// LOWERED-NEXT: quantum.dealloc_qb %[[C]]#0
+// LOWERED-NEXT: quantum.dealloc_qb %[[Q]]#1
+// LOWERED-NEXT: quantum.dealloc_qb %[[Q]]#0
+
+func.func @nested_ctrl_shared_work_wire() attributes {quantum.node} {
+    %true = arith.constant true
+    %outer = qref.alloc_qb : !qref.bit
+    %inner = qref.alloc_qb : !qref.bit
+    %work = qref.alloc_qb : !qref.bit
+    %target = qref.alloc_qb : !qref.bit
+
+    qref.ctrl (%outer) ctrlvals (%true) work_wires (%work) {
+        qref.ctrl (%inner) ctrlvals (%true) work_wires (%work) {
+            qref.custom "PauliX"() %target : !qref.bit
+        }
+    }
+
+    qref.dealloc_qb %outer : !qref.bit
+    qref.dealloc_qb %inner : !qref.bit
+    qref.dealloc_qb %work : !qref.bit
+    qref.dealloc_qb %target : !qref.bit
     return
 }
 
