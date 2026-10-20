@@ -1503,6 +1503,36 @@ def test_adjoint_transform_integration():
     assert qp.math.allclose(res, expected)
 
 
+@pytest.mark.parametrize(
+    "operator_instance, container, static_first",
+    ((True, list, True), (True, list, False), (False, tuple, False), (False, list, False)),
+)
+def test_mixed_control_values(operator_instance, container, static_first):
+    """The four reported mixed-control cases follow the runtime Boolean value."""
+
+    def circuit(x, val):
+        qp.X(0 if static_first else 1)
+        values = container((True, val) if static_first else (val, True))
+        if operator_instance:
+            qp.ctrl(qp.RX(x, 2), (0, 1), values)
+        else:
+            qp.ctrl(qp.RX, (0, 1), values)(x, 2)
+        return qp.expval(qp.Z(2))
+
+    compiled = qjit(
+        qp.QNode(circuit, qp.device("lightning.qubit", wires=4)),
+        capture=True,
+        skip_preprocess=True,
+    )
+    reference = qp.QNode(circuit, qp.device("default.qubit", wires=4))
+    x = jnp.array(0.5)
+
+    for val in (False, True):
+        with qp.capture.pause():
+            expected = reference(x, val)
+        assert qp.math.allclose(compiled(x, val), expected)
+
+
 @pytest.mark.parametrize("separate_funcs", (True, False))
 def test_ctrl_transform_integration(separate_funcs):
     """Test that the ctrl transform can be applied."""

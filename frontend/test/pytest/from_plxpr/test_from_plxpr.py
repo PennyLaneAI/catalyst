@@ -513,8 +513,9 @@ class TestAdjointCtrl:
         eqn = qfunc_xpr.eqns[3]
         assert eqn.primitive == ctrl_transform_prim
         assert eqn.params["n_control"] == 1
-        assert eqn.params["control_values"] == (False,)
-        assert eqn.invars[-1] is qfunc_xpr.eqns[2].outvars[0]
+        assert "control_values" not in eqn.params
+        assert eqn.invars[-2] is qfunc_xpr.eqns[2].outvars[0]
+        assert not eqn.invars[-1].val
         body_xpr = eqn.params["jaxpr"]
         s_eqn = body_xpr.eqns[1]
         assert s_eqn.primitive == qref_operator_p
@@ -544,11 +545,13 @@ class TestAdjointCtrl:
             outer = qfunc_xpr.eqns[3]
             assert outer.primitive == ctrl_transform_prim
             assert outer.params["n_control"] == 1
-            assert outer.params["control_values"] == (False,)
+            assert "control_values" not in outer.params
+            assert not outer.invars[-1].val
             inner = outer.params["jaxpr"].eqns[1]
             assert inner.primitive == ctrl_transform_prim
             assert inner.params["n_control"] == 1
-            assert inner.params["control_values"] == (True,)
+            assert "control_values" not in inner.params
+            assert inner.invars[-1].val
             s_eqn = inner.params["jaxpr"].eqns[1]
             assert s_eqn.primitive == qref_operator_p
             assert s_eqn.params["n_ctrls"] == 0
@@ -636,8 +639,9 @@ class TestAdjointCtrl:
             eqn = qfunc_xpr.eqns[6]
             assert eqn.primitive == ctrl_transform_prim
             assert eqn.params["n_control"] == 1
-            assert eqn.params["control_values"] == (True,)
-            assert eqn.invars[-1] is qfunc_xpr.eqns[5].outvars[0]
+            assert "control_values" not in eqn.params
+            assert eqn.invars[-2] is qfunc_xpr.eqns[5].outvars[0]
+            assert eqn.invars[-1].val
             t_eqn = eqn.params["jaxpr"].eqns[1]
             assert t_eqn.primitive == qref_operator_p
             assert t_eqn.params["n_ctrls"] == 0
@@ -689,7 +693,8 @@ class TestAdjointCtrl:
         ctrl_eqn = qfunc_xpr.eqns[4]
         assert ctrl_eqn.primitive == ctrl_transform_prim
         assert ctrl_eqn.params["n_control"] == 2
-        assert ctrl_eqn.params["control_values"] == (True, True)
+        assert "control_values" not in ctrl_eqn.params
+        assert [var.val for var in ctrl_eqn.invars[-2:]] == [True, True]
 
         for_loop_eqn = ctrl_eqn.params["jaxpr"].eqns[0]
         for_loop_xpr = for_loop_eqn.params["jaxpr_body_fn"]
