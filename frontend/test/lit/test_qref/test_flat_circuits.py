@@ -75,6 +75,32 @@ def test_custom_op(i: int):
 print(test_custom_op.mlir)
 
 
+# CHECK-LABEL: func.func public @test_ctrl_work_wire_type(
+@qp.qjit(capture=True, target="mlir", collect_decomp_rules=False)
+@qp.qnode(qp.device("null.qubit", wires=2))
+def test_ctrl_work_wire_type(angle: float):
+    """Lower both explicit work-wire types from qp.ctrl to qref.ctrl."""
+
+    # CHECK: [[false:%.+]] = arith.constant false
+    # CHECK: [[reg:%.+]] = qref.alloc( 2) : !qref.reg<2>
+    # CHECK: [[ctrl:%.+]] = qref.get [[reg]][ 1] : !qref.reg<2> -> !qref.bit
+    # CHECK: qref.ctrl([[ctrl]]) ctrlvals([[false]]) {
+    # CHECK: qref.custom "RX"
+    # CHECK: }
+    qp.ctrl(qp.RX, control=1, control_values=False, work_wire_type="borrowed")(angle, 0)
+
+    # CHECK: [[ctrl:%.+]] = qref.get [[reg]][ 1] : !qref.reg<2> -> !qref.bit
+    # CHECK: qref.ctrl([[ctrl]]) ctrlvals([[false]]) attributes {work_wire_type = "zeroed"} {
+    # CHECK: qref.custom "RX"
+    # CHECK: }
+    qp.ctrl(qp.RX, control=1, control_values=False, work_wire_type="zeroed")(angle, 0)
+
+    return qp.state()
+
+
+print(test_ctrl_work_wire_type.mlir)
+
+
 # CHECK: func.func public @test_measure() -> tensor<2xf64>
 @qp.qjit(capture=True, target="mlir", collect_decomp_rules=False)
 @qp.qnode(qp.device("null.qubit", wires=3))
