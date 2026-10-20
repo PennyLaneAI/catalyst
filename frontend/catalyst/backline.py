@@ -157,7 +157,8 @@ def _out_of_process(node: Node) -> bool:
 
 
 def _node_dict(node: Node, role: str, transport: str | None) -> dict:
-    """Map a backline node to a ``catalyst.backline`` node dict. Reads ``node.executor`` as-is.
+    """Map a backline node to a ``catalyst.backline`` node dict. Its executor, if any, is read
+    through :func:`node_executor`.
 
     Coprocessor connection information is carried by ``endpoint`` in current PennyLane Backline;
     a controller carries no connection endpoint of its own.
@@ -188,7 +189,7 @@ def _node_dict(node: Node, role: str, transport: str | None) -> dict:
     if transport is not None and hardware is not None and not init.get("backend_lib"):
         d["backend_lib"] = _resolve_backend_lib(transport, hardware, role, bool(node.remote))
     # A node may be handed any object as its executor, so its fields are read rather than assumed.
-    executor = _settled_executor(node)
+    executor = node_executor(node)
     if executor is not None:
         triple = getattr(executor, "triple", None)
         if triple is not None:
@@ -574,8 +575,13 @@ def _executor_plugins(node: Node, given) -> list[str]:
 _EXECUTORS: dict[int, tuple[Node, Executor]] = {}
 
 
-def _settled_executor(node: Node):
-    """The executor :func:`_realize_executor` built for ``node``, else the one attached to it."""
+def node_executor(node: Node):
+    """The executor a backline node's code is dispatched to, or ``None`` if it runs in this process.
+
+    This is the executor the compiler built from the node's ``executor_options``, else the one
+    attached as ``node.executor``. The compiler keeps the executors it builds here rather than on the
+    frozen node, so this is how to reach one, for example to ``stop()`` it before the process exits.
+    """
     entry = _EXECUTORS.get(id(node))
     return entry[1] if entry is not None else node.executor
 
@@ -637,7 +643,11 @@ def _realize_executor(node: Node) -> Executor | None:
             f"wait until execution."
         )
     executor = Executor(**options)
-    executor.resolve()  # every path above pins a port or an address, so this always commits
+    if executor.resolve() is None:  # every path above pins a port or an address, so never taken
+        raise CompileError(
+            f"backline node {node.name!r} has an executor whose address is only known once it is "
+            f"launched, so the compiled program would have nowhere to dispatch it."
+        )
     _EXECUTORS[id(node)] = (node, executor)
     return executor
 

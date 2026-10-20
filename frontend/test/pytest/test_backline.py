@@ -44,9 +44,9 @@ from catalyst.backline import (
     _resolve_backend,
     _resolve_backend_lib,
     _runs_per_message_on_gpu,
-    _settled_executor,
     device_pass_pipeline,
     launch_executors,
+    node_executor,
     placement_pipeline,
     remote_device_lib,
     serialize_backline,
@@ -681,7 +681,7 @@ def stop_node_executors():
         yield nodes.append
     finally:
         for node in nodes:
-            executor = _settled_executor(node)
+            executor = node_executor(node)
             if executor is not None:
                 executor.stop()
 
@@ -831,7 +831,7 @@ class TestBacklineDemoIntegration:
             assert pass_name in ir, f"{pass_name} missing from the scheduled pipeline"
 
         # Where the coprocessor ended up, asserted rather than inferred from a passing execution.
-        executor = _settled_executor(coproc)
+        executor = node_executor(coproc)
         if executor_options is None:
             assert executor is None, "the default asks for no executor, so the node stays here"
         else:
@@ -1578,10 +1578,24 @@ class TestExecutorRealization:
         assert ex.triple == "aarch64-unknown-linux-gnu"
         assert node.executor is None
 
-    def test_realization_is_idempotent(self):
-        """A second call returns the same executor rather than launching another."""
+    @pytest.mark.parametrize("options", [{"address": "10.0.0.9:1373"}, {}])
+    def test_realization_is_idempotent(self, options, no_launch):
+        """A second call returns the same executor rather than building another. With ``{}`` a
+        second build would pick a different free port, so the address must not move either."""
+        node = _controller(executor_options=options)
+        first = _realize_executor(node)
+        assert _realize_executor(node) is first
+        assert node_executor(node) is first
+        assert first.address == _realize_executor(node).address
+        no_launch.assert_not_called()
+
+    def test_an_executor_with_no_predictable_address_is_rejected(self):
+        """Should an executor fail to commit to an address, compiling fails rather than carrying
+        none."""
         node = _controller(executor_options={"address": "10.0.0.9:1373"})
-        assert _realize_executor(node) is _realize_executor(node)
+        with mock.patch.object(Executor, "resolve", autospec=True, return_value=None):
+            with pytest.raises(CompileError, match="nowhere to dispatch"):
+                _realize_executor(node)
 
     def test_node_name_seeds_the_executor_name(self):
         """The node's name names the executor."""
@@ -1774,8 +1788,8 @@ class TestExecutorRealization:
         cop = _coproc("cop0", executor_options={"address": "cop:2"})
         dev = qp.Backline(controller=ctrl, coprocessors=[cop], transport="rdma")
         launch_executors(dev.placement)
-        assert _settled_executor(ctrl).address == "ctrl:1"
-        assert _settled_executor(cop).address == "cop:2"
+        assert node_executor(ctrl).address == "ctrl:1"
+        assert node_executor(cop).address == "cop:2"
 
     def test_executor_address_and_triple_reach_the_serialized_node(self):
         """The launched executor supplies the node's dispatch address and target triple."""
