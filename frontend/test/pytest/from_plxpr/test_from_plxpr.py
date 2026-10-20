@@ -520,11 +520,10 @@ class TestAdjointCtrl:
         assert s_eqn.primitive == qref_operator_p
         assert s_eqn.params["n_ctrls"] == 0
 
+    @pytest.mark.usefixtures("use_capture")
     @pytest.mark.parametrize("work_wire_type", ("zeroed", "borrowed"))
     def test_qfunc_ctrl_work_wire_type(self, work_wire_type):
         """Test that a qfunc control with a work wire type is converted and keeps the type."""
-
-        qp.capture.enable()
 
         @qp.qnode(qp.device("lightning.qubit", wires=3))
         def circuit():
