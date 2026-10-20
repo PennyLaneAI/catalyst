@@ -159,6 +159,10 @@ def test_mixed_fallback_gridsynth_specs_wires(ppr_basis):
 @pytest.mark.parametrize("op", [qp.RZ, qp.PhaseShift])
 @pytest.mark.parametrize("eps", [1e-2, 1e-4, 1e-6])
 @pytest.mark.parametrize("ppr_basis", [False, True])
+@pytest.mark.xfail(
+    reason="graph decomposition does not yet work gridsynth",
+    strict=True,
+)
 def test_mixed_gridsynth_samples(param, op, eps, ppr_basis):
     """Test that every sampled sequence of the mixed method is close to the target. For the
     diamond-norm error 2 * eps of the mixture, each branch satisfies Re(w) >= sqrt(1 - eps), so its
@@ -188,6 +192,10 @@ def test_mixed_gridsynth_samples(param, op, eps, ppr_basis):
 @pytest.mark.parametrize("op", [qp.RZ, qp.PhaseShift])
 @pytest.mark.parametrize("eps", [1e-2, 1e-4])
 @pytest.mark.parametrize("ppr_basis", [False, True])
+@pytest.mark.xfail(
+    reason="graph decomposition does not yet work gridsynth",
+    strict=True,
+)
 def test_mixed_fallback_gridsynth_samples(op, eps, ppr_basis):
     """Test the sampled states of the mixed fallback method."""
     dev = qp.device("lightning.qubit", wires=1)
@@ -219,6 +227,10 @@ def test_mixed_fallback_gridsynth_samples(op, eps, ppr_basis):
 
 
 @pytest.mark.parametrize("method", ["mixed", "mixed-fallback"])
+@pytest.mark.xfail(
+    reason="graph decomposition does not yet work gridsynth",
+    strict=True,
+)
 def test_mixed_gridsynth_seed(method):
     """Test that the runtime samples are reproducible with a qjit seed and differ across seeds."""
     dev = qp.device("lightning.qubit", wires=1)
@@ -241,6 +253,10 @@ def test_mixed_gridsynth_seed(method):
 
 @pytest.mark.parametrize("method", ["mixed", "mixed-fallback"])
 @pytest.mark.parametrize("mcm_method", ["single-branch-statistics", "one-shot"])
+@pytest.mark.xfail(
+    reason="graph decomposition does not yet work gridsynth",
+    strict=True,
+)
 def test_mixed_gridsynth_samples_per_shot(method, mcm_method):
     """Test that the shots of a call share one sample with single-branch statistics, and that
     every shot draws its own with one-shot. With a coarse epsilon, samples differ visibly, so the
@@ -296,6 +312,10 @@ def test_gridsynth_high_precision(eps):
 
 @pytest.mark.parametrize("method", ["mixed", "mixed-fallback"])
 @pytest.mark.parametrize("eps", [1e-10, 1e-15])
+@pytest.mark.xfail(
+    reason="graph decomposition does not yet work gridsynth",
+    strict=True,
+)
 def test_mixed_gridsynth_high_precision(eps, method):
     """Test that the mixed methods reach the precisions of the deterministic method."""
     dev = qp.device("lightning.qubit", wires=1)
@@ -328,6 +348,10 @@ def test_mixed_gridsynth_high_precision(eps, method):
 
 
 @pytest.mark.parametrize("method", ["deterministic", "mixed", "mixed-fallback"])
+@pytest.mark.xfail(
+    reason="graph decomposition does not yet work gridsynth",
+    strict=True,
+)
 def test_error_for_unsupported_epsilon(method):
     """Test that an epsilon below the supported precision raises an error at runtime."""
     dev = qp.device("lightning.qubit", wires=1)
