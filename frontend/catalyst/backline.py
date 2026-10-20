@@ -29,6 +29,7 @@ Note: "node" here is a backline participant (a controller or coprocessor), disti
 
 import ctypes
 import os
+import socket
 from pathlib import Path
 from typing import NamedTuple
 
@@ -156,7 +157,8 @@ def _out_of_process(node: Node) -> bool:
 
 
 def _node_dict(node: Node, role: str, transport: str | None) -> dict:
-    """Map a backline node to a ``catalyst.backline`` node dict. Reads ``node.executor`` as-is.
+    """Map a backline node to a ``catalyst.backline`` node dict. Its executor, if any, is read
+    through :func:`node_executor`.
 
     Coprocessor connection information is carried by ``endpoint`` in current PennyLane Backline;
     a controller carries no connection endpoint of its own.
@@ -187,7 +189,7 @@ def _node_dict(node: Node, role: str, transport: str | None) -> dict:
     if transport is not None and hardware is not None and not init.get("backend_lib"):
         d["backend_lib"] = _resolve_backend_lib(transport, hardware, role, bool(node.remote))
     # A node may be handed any object as its executor, so its fields are read rather than assumed.
-    executor = node.executor
+    executor = node_executor(node)
     if executor is not None:
         triple = getattr(executor, "triple", None)
         if triple is not None:
@@ -249,6 +251,17 @@ def launch_executors(placement: Placement | None) -> None:
         ctypes.CDLL(str(lib), mode=ctypes.RTLD_GLOBAL)
 
 
+def _parse_config(text: str) -> dict[str, str]:
+    """A backend's ``key=value;...`` config as a dict, read as the transport runtime reads it:
+    entries without ``=`` are ignored, and a repeated key keeps its last value."""
+    return dict(entry.split("=", 1) for entry in text.split(";") if "=" in entry)
+
+
+def _config_text(config: dict[str, str]) -> str:
+    """The ``key=value;...`` form of ``config``."""
+    return ";".join(f"{key}={value}" for key, value in config.items())
+
+
 def _runs_per_message_on_gpu(coproc, transport: str) -> bool:
     """Whether a GPU coprocessor's config must select the per-message mode for its function.
 
@@ -279,18 +292,13 @@ def _runs_per_message_on_gpu(coproc, transport: str) -> bool:
             f"coprocessor function {fn.symbol_name!r} runs once per message, which a GPU "
             f"coprocessor supports only over the memcpy transport, not {transport!r}"
         )
-    config = (coproc.init_args or {}).get("config", "")
-    modes = [
-        value
-        for key, _, value in (e.partition("=") for e in config.split(";"))
-        if key == "coproc_fn"
-    ]
-    if not modes:
+    mode = _parse_config((coproc.init_args or {}).get("config", "")).get("coproc_fn")
+    if mode is None:
         return True
-    if modes[-1] != "per_message":
+    if mode != "per_message":
         raise CompileError(
             f"coprocessor function {fn.symbol_name!r} runs once per message, but its GPU "
-            f"coprocessor's config selects coproc_fn={modes[-1]}"
+            f"coprocessor's config selects coproc_fn={mode}"
         )
     return False
 
@@ -314,7 +322,7 @@ def _message_size(placement: Placement, name: str) -> int:
     return _DEFAULT_MESSAGE_BYTES if size is None else size
 
 
-def _coprocessor_fn_config(fn, placement: Placement) -> str:
+def _coprocessor_fn_config(fn, placement: Placement) -> dict[str, str]:
     """A coprocessor function's own ``key=value;...`` config, then ``in_bytes`` and ``out_bytes``
     set to the placement's message sizes, with each key prefixed ``fn.``.
 
@@ -329,16 +337,16 @@ def _coprocessor_fn_config(fn, placement: Placement) -> str:
         placement (Placement): the placement whose message sizes are added
 
     Returns:
-        str: the ``fn.``-prefixed ``key=value;...`` entries
+        dict[str, str]: the ``fn.``-prefixed entries
 
     Raises:
         CompileError: If an entry of the function's own config is not of the form ``key=value``,
             or sets ``in_bytes`` or ``out_bytes``.
     """
     config = getattr(fn, "config", "") or ""
-    entries = []
+    entries = {}
     for entry in filter(None, config.split(";")):
-        key, sep, _ = entry.partition("=")
+        key, sep, value = entry.partition("=")
         if not sep or not key:
             raise CompileError(
                 f"coprocessor function config entry {entry!r} is not of the form key=value"
@@ -348,9 +356,11 @@ def _coprocessor_fn_config(fn, placement: Placement) -> str:
                 f"coprocessor function config key {key!r} is reserved: the compiler sets it to the "
                 f"placement's message size"
             )
-        entries.append(f"fn.{entry}")
-    entries += [f"fn.{key}={_message_size(placement, key)}" for key in _FN_MESSAGE_SIZE_KEYS]
-    return ";".join(entries)
+        entries[f"fn.{key}"] = value
+    entries.update(
+        {f"fn.{key}": str(_message_size(placement, key)) for key in _FN_MESSAGE_SIZE_KEYS}
+    )
+    return entries
 
 
 def serialize_backline(placement: Placement) -> dict:
@@ -381,13 +391,12 @@ def serialize_backline(placement: Placement) -> dict:
         node["symbol"] = symbol
         if not _out_of_process(coproc):
             _check_builtin_fn_lib(coproc, _installed_builtin_fn_lib_dirs())
-        entries = [node["config"]] if node.get("config") else []
+        # The node's own config is passed on as given, since a backend may read it whole; the
+        # compiler's entries follow it.
+        added = _coprocessor_fn_config(coproc.coprocessor_fn, placement)
         if _runs_per_message_on_gpu(coproc, transport):
-            entries.append("coproc_fn=per_message")
-        if fn_config := _coprocessor_fn_config(coproc.coprocessor_fn, placement):
-            entries.append(fn_config)
-        if entries:
-            node["config"] = ";".join(entries)
+            added = {"coproc_fn": "per_message", **added}
+        node["config"] = ";".join(filter(None, [node.get("config", ""), _config_text(added)]))
         nodes.append(node)
     if nodes:
         result["coprocessors"] = nodes
@@ -568,10 +577,28 @@ def _executor_plugins(node: Node, given) -> list[str]:
     return plugins
 
 
-def _realize_executor(node: Node) -> Executor | None:
-    """The node's executor, built from its ``executor_options`` on first use and cached on it.
+# The executor built for each node, keyed by ``id(node)``. Nodes are frozen, so it can't live on
+# them; the node is kept alongside so its id is never reused while the entry exists.
+_EXECUTORS: dict[int, tuple[Node, Executor]] = {}
 
-    ``None`` when the node requested none, which leaves it running in this process.
+
+def node_executor(node: Node):
+    """The executor a backline node's code is dispatched to, or ``None`` if it runs in this process.
+
+    This is the executor the compiler built from the node's ``executor_options``, else the one
+    attached as ``node.executor``. The compiler keeps the executors it builds here rather than on the
+    frozen node, so this is how to reach one, for example to ``stop()`` it before the process exits.
+    """
+    entry = _EXECUTORS.get(id(node))
+    return entry[1] if entry is not None else node.executor
+
+
+def _realize_executor(node: Node) -> Executor | None:
+    """The node's executor, built from its ``executor_options`` on first use and reused after.
+
+    ``None`` when the node requested none, which leaves it running in this process. Nothing is
+    launched: every executor returned has committed to its address, which the compiled program
+    carries, and is deployed by :func:`launch_executors` when the program runs.
 
     Raises:
         CompileError: If ``remote`` and the executor disagree about which machine the node is on, if
@@ -599,7 +626,13 @@ def _realize_executor(node: Node) -> Executor | None:
         return executor
     if options is None:
         return None
+    if id(node) in _EXECUTORS:
+        return _EXECUTORS[id(node)][1]
     options = dict(options)
+    if not options.get("host") and not options.get("address") and options.get("port") is None:
+        # A local executor would otherwise search for a free port at launch, so its address would
+        # be knowable only by launching it now. Pick the port here instead.
+        options["port"] = _free_local_port()
 
     options.setdefault("name", node.name or "executor")
     options["plugins"] = _executor_plugins(node, options.get("plugins") or ())
@@ -617,12 +650,20 @@ def _realize_executor(node: Node) -> Executor | None:
             f"wait until execution."
         )
     executor = Executor(**options)
-    if executor.resolve() is None:
-        # Only a local executor reaches here: it searches for a free port, so its address is
-        # knowable only once it is up. That search stays on loopback and costs no network.
-        executor.launch()
-    object.__setattr__(node, "executor", executor)  # cache on the (frozen) node
+    if executor.resolve() is None:  # every path above pins a port or an address, so never taken
+        raise CompileError(
+            f"backline node {node.name!r} has an executor whose address is only known once it is "
+            f"launched, so the compiled program would have nowhere to dispatch it."
+        )
+    _EXECUTORS[id(node)] = (node, executor)
     return executor
+
+
+def _free_local_port() -> int:
+    """A loopback port nothing is bound to right now, for a local executor to serve on."""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind(("127.0.0.1", 0))
+        return s.getsockname()[1]
 
 
 def attach_backline_attr(mlir_module, placement: Placement) -> None:
