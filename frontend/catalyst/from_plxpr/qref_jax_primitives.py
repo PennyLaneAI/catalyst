@@ -756,7 +756,7 @@ def _pl_ctrl_lowering(
         ConstantOp(i1, ir.IntegerAttr.get(i1, 1 if v else 0)).result for v in control_values
     ]
 
-    op = CtrlOp(ctrl_qubits=control_qubits, ctrl_values=control_values_i1)
+    op = CtrlOp(ctrl_qubits=control_qubits, ctrl_values=control_values_i1, work_qubits=[])
     ctrl_block = op.regions[0].blocks.append()
     with ir.InsertionPoint(ctrl_block):
         source_info_util.extend_name_stack("ctrl")

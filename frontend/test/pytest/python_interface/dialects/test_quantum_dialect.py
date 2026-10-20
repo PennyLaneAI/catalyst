@@ -140,7 +140,15 @@ expected_ops_init_kwargs = {
             "in_ctrl_values": (bool_ssa,),
             "args": (q1, q2),
             "region": Region(Block((CustomOp(gate_name="CNOT", in_qubits=(q1, q2)),))),
-        }
+        },
+        {
+            "in_ctrl_qubits": (q0,),
+            "in_ctrl_values": (bool_ssa,),
+            "in_work_qubits": (q1,),
+            "args": (q2,),
+            "region": Region(Block((CustomOp(gate_name="PauliX", in_qubits=(q2,)),))),
+            "work_wire_type": "zeroed",
+        },
     ],
     "CustomOp": [
         {
