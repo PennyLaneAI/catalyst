@@ -759,6 +759,16 @@
   unsupported quantum-bearing `scf` operations are encountered.
   [(#3238)](https://github.com/PennyLaneAI/catalyst/pull/3238)
 
+* A remote `Executor` now takes its sudo password from an environment variable named by
+  `sudo_password_env=`, so the password is no longer directly in source, config files or reprs.
+  Once read, the password is held in a `Secret` that prints as `***`, so it does not leak
+  through logs or tracebacks.
+  [(#3309)](https://github.com/PennyLaneAI/catalyst/pull/3309)
+
+* The `--convert-to-value-semantics` and `--convert-to-reference-semantics` passes now collect
+  subroutine symbol uses only once instead of once per subroutine, improving their performance.
+  [(#3341)](https://github.com/PennyLaneAI/catalyst/pull/3341)
+
 <h3>Breaking changes 💔</h3>
 
 * `catalyst.logging` has been removed. `pennylane.logging` should be used instead.
@@ -1018,6 +1028,7 @@
   [(#3224)](https://github.com/PennyLaneAI/catalyst/pull/3224)
   [(#3232)](https://github.com/PennyLaneAI/catalyst/pull/3232)
   [(#3238)](https://github.com/PennyLaneAI/catalyst/pull/3238)
+  [(#3341)](https://github.com/PennyLaneAI/catalyst/pull/3341)
 
 * Removed the internal ``mlir_specs`` function which was the old backend for :func:`qp.specs`. The resource analysis pass replaces its use.
   [(#2841)](https://github.com/PennyLaneAI/catalyst/pull/2841)
@@ -1205,6 +1216,7 @@ Joseph Lee,
 Rylan Malarchick,
 Mehrdad Malekmohammadi,
 River McCubbin,
+Mudit Pandey,
 Shuli Shu,
 Nikhil Sreekumar,
 Kalman Szenes,

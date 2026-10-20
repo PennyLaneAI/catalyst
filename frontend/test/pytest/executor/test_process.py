@@ -24,7 +24,7 @@ import pytest
 
 from catalyst.executor.process import _ExecutorProcess, _LocalProcess, _RemoteProcess
 from catalyst.executor.ssh import RemoteLauncher
-from catalyst.executor.utils import ExecutorFlags, ExecutorPaths, OutputPatterns
+from catalyst.executor.utils import ExecutorFlags, ExecutorPaths, OutputPatterns, Secret
 
 
 def _mk_base_proc(**overrides):
@@ -361,11 +361,11 @@ class TestRemoteProcessAuthHelp:
         assert "ssh-copy-id alice@hostx" in msg
 
     def test_sudo_help(self):
-        """Sudo help text mentions the :attr:`sudo_password` option."""
+        """Sudo help text mentions the :attr:`sudo_password_env` option."""
         p = _RemoteProcess(host="h", user="me", port=1, workspace="~/ws")
         p._auth_kind = "sudo"
         msg = p._auth_help()
-        assert "sudo_password=" in msg
+        assert "sudo_password_env=" in msg
 
 
 class TestRemoteProcessTeardownExtra:
@@ -463,7 +463,9 @@ class TestRemoteProcessPipeSudoPassword:
 
     def test_writes_password(self):
         """Writes the attached password with a trailing newline and flushes stdin."""
-        p = _RemoteProcess(host="h", user="me", port=1, workspace="~/ws", sudo_password="pw")
+        p = _RemoteProcess(
+            host="h", user="me", port=1, workspace="~/ws", sudo_password=Secret("pw")
+        )
         p.proc = MagicMock()
         p._pipe_sudo_password()
         p.proc.stdin.write.assert_called_once_with("pw\n")
@@ -471,7 +473,9 @@ class TestRemoteProcessPipeSudoPassword:
 
     def test_swallows_broken_pipe(self):
         """Swallows :class:`BrokenPipeError` when the child stdin has already closed."""
-        p = _RemoteProcess(host="h", user="me", port=1, workspace="~/ws", sudo_password="pw")
+        p = _RemoteProcess(
+            host="h", user="me", port=1, workspace="~/ws", sudo_password=Secret("pw")
+        )
         p.proc = MagicMock()
         p.proc.stdin.write.side_effect = BrokenPipeError()
         # Must not raise.
@@ -620,7 +624,7 @@ class TestRemoteSpawn:
 
     def test_password_is_piped_not_argv(self):
         """A sudo password goes over stdin, never into argv where ps or the log would show it."""
-        p, cap = self._spawn(sudo=True, sudo_password="hunter2")
+        p, cap = self._spawn(sudo=True, sudo_password=Secret("hunter2"))
         assert cap["stdin"] == subprocess.PIPE
         assert not any("hunter2" in a for a in cap["argv"]), "password leaked into argv"
         p.proc.stdin.write.assert_called_once_with("hunter2\n")
@@ -633,7 +637,7 @@ class TestRemoteProcessSetenvRefusal:
         return _RemoteProcess(host="h", user="me", port=9000, workspace="~/ws", sudo=True)
 
     def test_flagged_as_its_own_kind(self):
-        """Kept apart from ``sudo``: that help suggests sudo_password=, which cannot fix a policy."""
+        """Kept apart from ``sudo``: that help suggests sudo_password_env=, which cannot fix a policy."""
         p = self._proc()
         p._scan_line("sudo: sorry, you are not allowed to preserve the environment")
         assert p._auth_prompt.is_set()
