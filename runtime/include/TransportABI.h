@@ -38,6 +38,21 @@ typedef struct {
 /// The highest CatalystCoprocessorFnInfo version this runtime knows the fields of.
 #define CATALYST_COPROCESSOR_FN_ABI_VERSION 1
 
+/// CatalystCoprocessorFnInfo::flags: the function takes the CatalystCoprocessorFrameFn signature.
+#define CATALYST_COPROCESSOR_FN_FRAME_FIELDS (1u << 0)
+
+/**
+ * A per-message coprocessor function that is handed the decoded fields of each message, rather
+ * than the message's frame. `payload` points at the `len` payload bytes, and `fn_id` is the id the
+ * controller staged the message with, so one function can serve several decoders. It writes its
+ * reply into `out` (capacity `out_cap`) and returns the bytes written, or SIZE_MAX
+ * (COPROCESSOR_FN_ERROR) on failure. On the 16 B frame, `len` is 8 and the payload is zero-padded.
+ * A library declares that its function takes this signature with
+ * CATALYST_COPROCESSOR_FN_FRAME_FIELDS in its info's `flags`.
+ */
+typedef size_t (*CatalystCoprocessorFrameFn)(const void *payload, size_t len, uint32_t fn_id,
+                                             void *out, size_t out_cap, void *ctx);
+
 /**
  * The lifecycle hooks of a coprocessor function or launcher. The library defining the function
  * may export them as `const CatalystCoprocessorFnInfo *<symbol>_info(void)`, where `<symbol>` is
@@ -47,9 +62,9 @@ typedef struct {
  * - `abi_version`: the version whose fields the library fills, at least 1. The struct only grows
  *   at its end, and the runtime reads only the fields of the versions it knows. A field added by
  *   a later version must be optional: null or zero keeps the behaviour of the earlier versions.
- * - `reserved`: zero. It fills the 4 bytes before `init`, which would otherwise be padding, and
- *   the runtime ignores it. A later version may give it a meaning, for which zero keeps the
- *   behaviour of this one.
+ * - `flags`: CATALYST_COPROCESSOR_FN_* bits, zero for none. CATALYST_COPROCESSOR_FN_FRAME_FIELDS
+ *   declares that a per-message function takes the CatalystCoprocessorFrameFn signature. Bits
+ *   this runtime does not know are refused.
  * - `init` (may be null): called once, before the function is bound, with the node's
  *   `fn.`-prefixed config keys, prefix removed, as `key=value;...`. Returns the ctx the function
  *   is called with, or null if the function cannot be configured. Catalyst's frontend adds the
@@ -61,7 +76,7 @@ typedef struct {
  */
 typedef struct {
     uint32_t abi_version;
-    uint32_t reserved;
+    uint32_t flags;
     void *(*init)(const char *config);
     void (*fini)(void *ctx);
 } CatalystCoprocessorFnInfo;
