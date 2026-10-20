@@ -49,8 +49,6 @@ from catalyst.utils.runtime_environment import get_lib_path
 
 # Backend hints forwarded verbatim from a node's ``init_args`` to the attribute node.
 _INIT_KEYS = ("backend_lib", "config")
-# ``init_args`` read here to pick a backend from the registry by name, and not forwarded.
-_SELECT_KEYS = ("backend",)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -69,7 +67,7 @@ class TransportBackend:
         max_payload_bytes: The largest request it carries per message, ``None`` for no limit.
         max_reply_bytes: The largest reply it carries per message, ``None`` for no limit.
         default: Whether it is picked for its transport and hardware without being named. A node
-            names any backend with ``init_args={"backend": name}``.
+            names any backend with ``backend=name``.
     """
 
     name: str
@@ -315,7 +313,7 @@ def _node_dict(
         transport: The transport the node opens a session on. Together with ``node.hardware``, this
             selects the concrete backend. ``None`` if the node opens no session, as for a controller
             without coprocessors. An explicit ``init_args["backend_lib"]`` path takes precedence,
-            and ``init_args["backend"]`` names a registered backend.
+            and ``node.backend`` names a registered backend.
         in_bytes: The request size the backend has to carry.
         out_bytes: The reply size the backend has to carry.
     """
@@ -330,15 +328,20 @@ def _node_dict(
             d["oob_port"] = endpoint.port
 
     init = node.init_args or {}
-    if unknown := sorted(set(init) - set(_INIT_KEYS) - set(_SELECT_KEYS)):
+    if unknown := sorted(set(init) - set(_INIT_KEYS)):
         raise CompileError(
-            f"backline node has unrecognized init_args {unknown}; "
-            f"recognized: {list(_INIT_KEYS + _SELECT_KEYS)}."
+            f"backline node has unrecognized init_args {unknown}; recognized: {list(_INIT_KEYS)}."
         )
     hardware = getattr(node, "hardware", None)
     if transport is not None and hardware is not None and not init.get("backend_lib"):
         d["backend_lib"] = _resolve_backend_lib(
-            transport, hardware, role, bool(node.remote), in_bytes, out_bytes, init.get("backend")
+            transport,
+            hardware,
+            role,
+            bool(node.remote),
+            in_bytes,
+            out_bytes,
+            getattr(node, "backend", None),
         )
     # A node may be handed any object as its executor, so its fields are read rather than assumed.
     executor = node_executor(node)
@@ -526,7 +529,7 @@ def _check_frame_modes(placement: Placement, transport: str, in_bytes: int, out_
         if init.get("backend_lib") or getattr(node, "hardware", None) is None:
             return None
         return _select_backend(
-            transport, node.hardware, role, in_bytes, out_bytes, init.get("backend")
+            transport, node.hardware, role, in_bytes, out_bytes, getattr(node, "backend", None)
         )
 
     if not placement.coprocessors:

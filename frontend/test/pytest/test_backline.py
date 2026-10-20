@@ -756,14 +756,14 @@ class TestBacklineDemoIntegration:
         ctrl = qp.Controller(
             name="cpu-controller",
             device=qp.device("null.qubit", wires=3),
-            init_args={"backend": "toy"},
+            backend="toy",
         )
         coproc = qp.Coprocessor(
             name="cpu-coproc",
             coprocessor_fn=qp.CoprocessorFunction(
                 "steane_coprocessor", lib_path=str(lib_dir / "libsteane_coprocessor_cpu.so")
             ),
-            init_args={"backend": "toy"},
+            backend="toy",
         )
         dev = qp.Backline(
             controller=ctrl, coprocessors=[coproc], transport="memcpy", qec_code="steane"
@@ -1984,9 +1984,9 @@ class TestBackendRegistry:
             serialize_backline(dev.placement)
 
     def test_a_backend_name_is_read_but_not_forwarded(self, isolated_registry, flat_lib_dir):
-        """``init_args["backend"]`` picks the backend; the attribute carries only its library."""
+        """``backend=`` picks the backend; the attribute carries only its library."""
         flat_lib_dir("libcatalyst_transport_fpga_verbs_controller.so")
-        ctrl = _controller(hardware="fpga", init_args={"backend": "fpga_verbs"})
+        ctrl = _controller(hardware="fpga", backend="fpga_verbs", init_args={})
         dev = qp.Backline(controller=ctrl, coprocessors=[_coproc("cop0")], transport="rdma")
         node = serialize_backline(dev.placement)["controller"]
         assert node["backend_lib"].endswith("libcatalyst_transport_fpga_verbs_controller.so")

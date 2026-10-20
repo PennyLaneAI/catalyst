@@ -205,7 +205,7 @@ A transport is characterized by:
 Catalyst picks a node's backend from a registry. A backend qualifies when it implements the
 placement's transport on the node's hardware, provides the node's role and carries the placement's
 message sizes. A default backend is preferred, and a node can name another with
-``init_args={"backend": name}``. The controller's and coprocessors' backends must share a frame
+``backend=name``. The controller's and coprocessors' backends must share a frame
 layout. The backend's library is named ``libcatalyst_transport_<backend>_<role>.so``.
 
 The built-in backends are:

@@ -941,8 +941,7 @@
   backends register through the `catalyst.transport_backends` entry point or a
   `catalyst_transport_backends.json` manifest on `CATALYST_TRANSPORT_PATH`, with no Catalyst
   change. A backend is picked by transport, hardware, role and message size. A node can name one
-  with `init_args={"backend": ...}`, which makes `fpga_verbs` selectable. The MLIR verifier no
-  longer restricts transport names.
+  with `backend=...`. The MLIR verifier no longer restricts transport names.
   [(#3362)](https://github.com/PennyLaneAI/catalyst/pull/3362)
 
 * The FPGA transport backends share one config parser. The VPK120 backend now reads `dev`, `gid`,
