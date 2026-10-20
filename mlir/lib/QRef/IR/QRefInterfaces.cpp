@@ -73,8 +73,19 @@ void printDynamicShape(const llvm::StringMap<llvm::SmallVector<mlir::Type>> &map
     });
 }
 
-void printWireLens(const llvm::StringMap<size_t> &map, llvm::raw_string_ostream &ss) {
-    printSortedMap(map, ss, [](size_t len, llvm::raw_string_ostream &stream) { stream << len; });
+void printWireLens(llvm::ArrayRef<std::pair<std::string, size_t>> wireLens,
+                   llvm::raw_string_ostream &ss) {
+    llvm::SmallVector<std::pair<std::string, size_t>> sortedWireLens(wireLens);
+    llvm::sort(sortedWireLens, llvm::less_first());
+
+    ss << "{";
+    for (auto [i, entry] : llvm::enumerate(sortedWireLens)) {
+        if (i > 0) {
+            ss << ",";
+        }
+        ss << entry.first << ":" << entry.second;
+    }
+    ss << "}";
 }
 
 } // namespace

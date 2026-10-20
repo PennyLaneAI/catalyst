@@ -18,7 +18,6 @@
 #include <cstddef>
 #include <exception>
 #include <iostream>
-#include <limits>
 #include <string>
 
 #include "llvm/ADT/STLExtras.h"
@@ -67,31 +66,10 @@ getPyvalFromDynamicShape(const llvm::StringMap<llvm::SmallVector<mlir::Type>> &m
     return name_to_shape;
 }
 
-// A rule unpacks its grouped wire operand in the order of this dict, which must therefore follow
-// the operator's qubit operands (as recorded in its `qubit_map`) rather than the StringMap's
-// iteration order.
-static nb::dict getPyvalFromWireLens(catalyst::quantum::DecomposableGate op) {
-    llvm::StringMap<size_t> wireLens = op.getWireLens();
-
-    llvm::SmallVector<std::pair<int64_t, llvm::StringRef>> orderedNames;
-    if (auto operatorOp = llvm::dyn_cast<catalyst::quantum::OperatorOp>(op.getOperation())) {
-        for (mlir::NamedAttribute entry : operatorOp.getQubitMap()) {
-            llvm::ArrayRef<int64_t> indices =
-                llvm::cast<mlir::DenseI64ArrayAttr>(entry.getValue()).asArrayRef();
-            // An empty wire argument takes no slice of the group, so its position is irrelevant.
-            int64_t position = indices.empty() ? std::numeric_limits<int64_t>::max() : indices[0];
-            orderedNames.emplace_back(position, entry.getName().getValue());
-        }
-        llvm::stable_sort(orderedNames, llvm::less_first());
-    } else {
-        for (const auto &entry : wireLens) {
-            orderedNames.emplace_back(0, entry.getKey());
-        }
-    }
-
+static nb::dict getPyvalFromWireLens(llvm::ArrayRef<std::pair<std::string, size_t>> wireLens) {
     nb::dict dict;
-    for (const auto &[position, name] : orderedNames) {
-        dict[nb::str(name.str().c_str())] = wireLens.lookup(name);
+    for (const auto &[name, len] : wireLens) {
+        dict[nb::str(name.c_str())] = len;
     }
     return dict;
 }
@@ -244,7 +222,8 @@ std::string pythonRuleLowering(catalyst::quantum::DecomposableGate op) {
 
             nb::object pythonResult = wrapperFunction(
                 op.getOperatorName(), op.getGraphOpId(),
-                getPyvalFromDynamicShape(op.getDynamicShape()), getPyvalFromWireLens(op),
+                getPyvalFromDynamicShape(op.getDynamicShape()),
+                getPyvalFromWireLens(op.getWireLens()),
                 getPyvalFromMlirAttribute(op.getStaticData()), nb::arg("extra_data") = nb::none(),
                 nb::arg("is_custom_op") = isa<catalyst::quantum::CustomOp>(op));
             return nb::borrow<nb::str>(pythonResult).c_str();

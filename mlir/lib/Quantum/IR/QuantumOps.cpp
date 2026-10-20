@@ -17,6 +17,7 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <limits>
 #include <optional>
 #include <sstream>
 #include <string>
@@ -1179,7 +1180,7 @@ llvm::StringMap<llvm::SmallVector<mlir::Type>> CustomOp::getDynamicShape() {
     return ret;
 }
 
-llvm::StringMap<size_t> CustomOp::getWireLens() {
+llvm::SmallVector<std::pair<std::string, size_t>> CustomOp::getWireLens() {
     return {{"wires", getNonCtrlQubitOperands().size()}};
 }
 
@@ -1195,7 +1196,7 @@ llvm::StringMap<llvm::SmallVector<mlir::Type>> MultiRZOp::getDynamicShape() {
     return {{"theta", {mlir::Float64Type::get(getContext())}}};
 }
 
-llvm::StringMap<size_t> MultiRZOp::getWireLens() {
+llvm::SmallVector<std::pair<std::string, size_t>> MultiRZOp::getWireLens() {
     return {{"wires", getNonCtrlQubitOperands().size()}};
 }
 
@@ -1211,7 +1212,7 @@ llvm::StringMap<llvm::SmallVector<mlir::Type>> PauliRotOp::getDynamicShape() {
     return {{"theta", {mlir::Float64Type::get(getContext())}}};
 }
 
-llvm::StringMap<size_t> PauliRotOp::getWireLens() {
+llvm::SmallVector<std::pair<std::string, size_t>> PauliRotOp::getWireLens() {
     return {{"wires", getNonCtrlQubitOperands().size()}};
 }
 
@@ -1230,7 +1231,7 @@ llvm::StringMap<llvm::SmallVector<mlir::Type>> PCPhaseOp::getDynamicShape() {
     return {{"phi", {mlir::Float64Type::get(getContext())}}};
 }
 
-llvm::StringMap<size_t> PCPhaseOp::getWireLens() {
+llvm::SmallVector<std::pair<std::string, size_t>> PCPhaseOp::getWireLens() {
     return {{"wires", getNonCtrlQubitOperands().size()}};
 }
 
@@ -1249,7 +1250,7 @@ llvm::StringMap<llvm::SmallVector<mlir::Type>> GlobalPhaseOp::getDynamicShape() 
     return {{"phi", {mlir::Float64Type::get(getContext())}}};
 }
 
-llvm::StringMap<size_t> GlobalPhaseOp::getWireLens() { return {}; }
+llvm::SmallVector<std::pair<std::string, size_t>> GlobalPhaseOp::getWireLens() { return {}; }
 
 mlir::DictionaryAttr GlobalPhaseOp::getStaticData() {
     return mlir::DictionaryAttr::get(getContext(), {});
@@ -1263,7 +1264,7 @@ llvm::StringMap<llvm::SmallVector<mlir::Type>> QubitUnitaryOp::getDynamicShape()
     return {{"U", {getMatrix().getType()}}};
 }
 
-llvm::StringMap<size_t> QubitUnitaryOp::getWireLens() {
+llvm::SmallVector<std::pair<std::string, size_t>> QubitUnitaryOp::getWireLens() {
     return {{"wires", getNonCtrlQubitOperands().size()}};
 }
 
@@ -1293,15 +1294,18 @@ llvm::StringMap<llvm::SmallVector<mlir::Type>> OperatorOp::getDynamicShape() {
     return map;
 }
 
-llvm::StringMap<size_t> OperatorOp::getWireLens() {
-    llvm::StringMap<size_t> wireLens;
+llvm::SmallVector<std::pair<std::string, size_t>> OperatorOp::getWireLens() {
+    // Each wire argument covers a contiguous run of qubit operands (or index arrays), so sorting by
+    // its first index recovers the grouping order. An empty argument covers none and goes last.
+    llvm::SmallVector<std::pair<int64_t, std::pair<std::string, size_t>>> positionedWireLens;
 
     for (mlir::NamedAttribute entry : getQubitMap()) {
-        auto indices = cast<mlir::DenseI64ArrayAttr>(entry.getValue());
+        llvm::ArrayRef<int64_t> indices =
+            cast<mlir::DenseI64ArrayAttr>(entry.getValue()).asArrayRef();
         size_t numQubits;
         if (getInQreg()) {
             numQubits = 0;
-            for (int64_t index : indices.asArrayRef()) {
+            for (int64_t index : indices) {
                 auto indexTensorType =
                     cast<mlir::RankedTensorType>(getArrQubitIndices()[index].getType());
                 numQubits += indexTensorType.getDimSize(0);
@@ -1310,9 +1314,15 @@ llvm::StringMap<size_t> OperatorOp::getWireLens() {
             numQubits = indices.size();
         }
 
-        wireLens[entry.getName()] = numQubits;
+        int64_t position = indices.empty() ? std::numeric_limits<int64_t>::max() : indices[0];
+        positionedWireLens.push_back({position, {entry.getName().str(), numQubits}});
     }
+    llvm::stable_sort(positionedWireLens, llvm::less_first());
 
+    llvm::SmallVector<std::pair<std::string, size_t>> wireLens;
+    for (auto &[position, wireLen] : positionedWireLens) {
+        wireLens.push_back(std::move(wireLen));
+    }
     return wireLens;
 }
 

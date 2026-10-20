@@ -328,6 +328,7 @@
     [(#3243)](https://github.com/PennyLaneAI/catalyst/pull/3243)
     [(#3252)](https://github.com/PennyLaneAI/catalyst/pull/3252)
     [(#3261)](https://github.com/PennyLaneAI/catalyst/pull/3261)
+    [(#3347)](https://github.com/PennyLaneAI/catalyst/pull/3347)
 
     This pathway of rule injection can be opted-out via a new keyword argument on `qp.qjit` named `collect_decomp_rules`.
     This kwarg controls whether or not to compile the decomposition rules during lower-time. Default value is `True`.
@@ -338,6 +339,7 @@
     3. When the `--graph-decomposition` pass encounters a gate operation without an existing rule in the IR, it will compile rules from that gate with a newly launched Python subprocess on-demand.
     [(#2769)](https://github.com/PennyLaneAI/catalyst/pull/2769)
     [(#3110)](https://github.com/PennyLaneAI/catalyst/pull/3110)
+    [(#3347)](https://github.com/PennyLaneAI/catalyst/pull/3347)
 
     With pathways 2 and 3, gates with static data only known at compile time can now be decomposed using the decomposition rule defined in PennyLane.
     For example, this includes `quantum.paulirot`, with Pauli words being the static data.
@@ -803,15 +805,6 @@
 <h3>Deprecations 👋</h3>
 
 <h3>Bug fixes 🐛</h3>
-
-* Graph-based decomposition now gives correct results for operators with several wire arguments
-  whose names are not in alphabetical order, such as `SemiAdder(x_wires, y_wires, work_wires)`.
-  The generated decomposition rule unpacked its grouped wire operand in sorted-name order (or,
-  for rules requested by the compiler on demand, in hash order), while the operator passes its
-  wires in qubit operand order (plain wire arguments in declaration order, then any hybrid
-  arguments carrying wires), so the rule acted on the wrong qubits. Both paths now use the qubit
-  operand order.
-  [(#3347)](https://github.com/PennyLaneAI/catalyst/pull/3347)
 
 * MLIR passes that recreate `scf.for`, `scf.while`, `scf.if`, and `scf.index_switch` ops
   (`ctrl-lowering`, `adjoint-lowering`, `--convert-to-value-semantics`) now preserve discardable

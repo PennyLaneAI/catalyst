@@ -155,8 +155,9 @@ def DecomposableGate : OpInterface<"DecomposableGate", [QuantumGate]> {
             "llvm::StringMap<llvm::SmallVector<mlir::Type>>", "getDynamicShape"
         >,
         InterfaceMethod<
-            "Return a map of frontend parameter name to number of wires (excluding control wires).",
-            "llvm::StringMap<size_t>", "getWireLens"
+            "Return the frontend wire argument names with their number of wires (excluding control "
+            "wires), in the order the operator's qubit operands group them.",
+            "llvm::SmallVector<std::pair<std::string, size_t>>", "getWireLens"
         >,
         InterfaceMethod<
             "Return a map of frontend parameter name to static data values.",
