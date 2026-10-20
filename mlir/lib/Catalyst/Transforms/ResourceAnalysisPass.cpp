@@ -98,7 +98,6 @@ struct ResourceAnalysisPass : public impl::ResourceAnalysisPassBase<ResourceAnal
 
             DecompositionSolver solver(*graph);
             solution = std::make_optional(solver.solve());
-            // gateset = &graph->getGateset();
         } else {
             markAllAnalysesPreserved();
         }
