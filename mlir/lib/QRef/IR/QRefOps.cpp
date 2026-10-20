@@ -16,6 +16,7 @@
 
 #include <cstdint>
 
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/LogicalResult.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -314,6 +315,9 @@ LogicalResult CtrlOp::verify() {
     if (this->getCtrlValues().size() != this->getCtrlQubits().size()) {
         return emitOpError("Ctrl op number of control values must be the same as the number of "
                            "control qubits");
+    }
+    if (getWorkWireType() != "borrowed" && getWorkWireType() != "zeroed") {
+        return emitOpError("work_wire_type must be either \"borrowed\" or \"zeroed\"");
     }
 
     return success();

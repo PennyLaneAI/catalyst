@@ -420,6 +420,40 @@ module {
               "myStaticArray = [1, 2, 3], myStaticInt = 4 : i64, myStaticString = \"Test\"}");
 }
 
+TEST(DecomposableGateInterfaceTests, OperatorOpDistinguishesGenericAndControlWorkWires) {
+    std::string moduleStr = R"mlir(
+module {
+  %true = arith.constant true
+  %q0 = quantum.alloc_qb : !quantum.bit
+  %generic_work = quantum.alloc_qb : !quantum.bit
+  %ctrl_work = quantum.alloc_qb : !quantum.bit
+  %ctrl = quantum.alloc_qb : !quantum.bit
+  %oq:3, %oc = quantum.operator "MultiControlledX"() qubits(%q0, %generic_work, %ctrl_work)
+      ctrls(%ctrl) ctrl_vals(%true)
+      static_data = {ctrl_work_wire_type = "zeroed", work_wire_type = "borrowed"}
+      param_map = {}
+      qubit_map = {ctrl_work_wires = [2], wires = [0], work_wires = [1]}
+}
+    )mlir";
+
+    DialectRegistry registry;
+    registry.insert<mlir::arith::ArithDialect, QuantumDialect>();
+    MLIRContext context(registry);
+    ParserConfig config(&context, /*verifyAfterParse=*/false);
+    OwningOpRef<ModuleOp> module = parseSourceString<ModuleOp>(moduleStr, config);
+
+    auto operatorOp = *module->getOps<OperatorOp>().begin();
+    DecomposableGate op = operatorOp;
+    llvm::StringMap<size_t> expectedWires = {
+        {"ctrl_work_wires", 1}, {"wires", 1}, {"work_wires", 1}};
+
+    ASSERT_EQ(op.getWireLens(), expectedWires);
+    ASSERT_EQ(op.getNonCtrlQubitOperands().size(), 3u);
+    ASSERT_EQ(op.getGraphOpId(),
+              "C(MultiControlledX){}{ctrl_work_wires:1,wires:1,work_wires:1}{"
+              "ctrl_work_wire_type = \"zeroed\", work_wire_type = \"borrowed\"}");
+}
+
 TEST(DecomposableGateInterfaceTests, OperatorOpQureg) {
     std::string moduleStr = R"mlir(
 func.func @testfunc(%first : tensor<1xi64>, %secondthird : tensor<2xi64>) {

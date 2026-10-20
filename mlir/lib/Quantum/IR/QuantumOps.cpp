@@ -690,6 +690,9 @@ LogicalResult CtrlOp::verify() {
         return emitOpError("Ctrl op number of control values must be the same as the number of "
                            "control qubits");
     }
+    if (getWorkWireType() != "borrowed" && getWorkWireType() != "zeroed") {
+        return emitOpError("work_wire_type must be either \"borrowed\" or \"zeroed\"");
+    }
 
     Block &b = this->getRegion().front();
     if (b.getNumArguments() != this->getArgs().size()) {
@@ -716,16 +719,15 @@ void OperatorOp::build(OpBuilder &odsBuilder, OperationState &odsState, llvm::St
                        ValueRange in_ctrl_values, ValueRange forward_args, bool adjoint,
                        std::optional<int64_t> UID, DictionaryAttr static_data,
                        DictionaryAttr param_map, DictionaryAttr qubit_map) {
-    SmallVector<Type> resultTypes;
     TypeRange qubitTypes = TypeRange(in_qubits);
     TypeRange ctrlQubitTypes = TypeRange(in_ctrl_qubits);
-    resultTypes.append(qubitTypes.begin(), qubitTypes.end());
-    resultTypes.append(ctrlQubitTypes.begin(), ctrlQubitTypes.end());
 
     IntegerAttr uidAttr = UID ? odsBuilder.getI64IntegerAttr(*UID) : IntegerAttr();
 
     build(odsBuilder, odsState,
-          /*resultTypes=*/resultTypes,
+          /*out_qubits=*/qubitTypes,
+          /*out_ctrl_qubits=*/ctrlQubitTypes,
+          /*out_qreg=*/Type(),
           /*op_name=*/op_name,
           /*params=*/params,
           /*forward_args=*/forward_args,
@@ -748,12 +750,12 @@ void OperatorOp::build(OpBuilder &odsBuilder, OperationState &odsState, llvm::St
                        Value arr_ctrl_indices, Value arr_ctrl_values, ValueRange forward_args,
                        bool adjoint, std::optional<int64_t> UID, DictionaryAttr static_data,
                        DictionaryAttr param_map, DictionaryAttr qubit_map) {
-    SmallVector<Type> resultTypes = {in_qreg.getType()};
-
     IntegerAttr uidAttr = UID ? odsBuilder.getI64IntegerAttr(*UID) : IntegerAttr();
 
     build(odsBuilder, odsState,
-          /*resultTypes=*/resultTypes,
+          /*out_qubits=*/TypeRange(),
+          /*out_ctrl_qubits=*/TypeRange(),
+          /*out_qreg=*/in_qreg.getType(),
           /*op_name=*/op_name,
           /*params=*/params,
           /*forward_args=*/forward_args,
