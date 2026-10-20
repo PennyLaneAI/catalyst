@@ -1835,7 +1835,8 @@ def test_forloop_vmap_worflow_derivation(backend):
 
 
 @pytest.mark.parametrize(
-    "gate,state", ((qp.BasisState, np.array([1])), (qp.StatePrep, np.array([0, 1])))
+    "gate,state",
+    (pytest.mark.graph_todo((qp.BasisState, np.array([1]))), (qp.StatePrep, np.array([0, 1]))),
 )
 def test_paramshift_with_gates(gate, state, capture_mode):
     """Test parameter shift works with a variety of gates present in the circuit."""

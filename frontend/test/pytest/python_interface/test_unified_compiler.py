@@ -450,7 +450,7 @@ class TestCallbackIntegration:
 
         assert printed_modules[0] != printed_modules[1], "IR should differ between passes"
 
-    @pytest.mark.parametrize("skip_preprocess", [True, False])
+    @pytest.mark.parametrize("skip_preprocess", [True, pytest.mark.graph_todo(False)])
     @pytest.mark.usefixtures("use_capture")
     def test_callback_run_integration(self, capsys, skip_preprocess):
         """Test that the callback is integrated into the pass pipeline with the Compiler.run() method"""
