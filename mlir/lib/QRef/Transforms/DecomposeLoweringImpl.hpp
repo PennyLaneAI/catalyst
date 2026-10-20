@@ -353,17 +353,38 @@ class BaseSignatureAnalyzer {
     }
 };
 
+namespace {
+
+llvm::SmallVector<mlir::Value> getReorderedQubitOperands(OperatorOp op) {
+    mlir::ValueRange originalOperands = op.getNonCtrlQubitOperands();
+    llvm::SmallVector<mlir::Value> reorderedOperands;
+
+    for (mlir::NamedAttribute entry : op.getQubitMap()) {
+        auto indices = cast<mlir::DenseI64ArrayAttr>(entry.getValue());
+        for (int64_t idx : indices.asArrayRef()) {
+            reorderedOperands.push_back(originalOperands[idx]);
+        }
+    }
+
+    return reorderedOperands;
+}
+
+} // namespace
+
 class DecomposableGateSignatureAnalyzer : public BaseSignatureAnalyzer {
   public:
     DecomposableGateSignatureAnalyzer() = delete;
 
     DecomposableGateSignatureAnalyzer(DecomposableGate op, bool enableQregMode)
-        : BaseSignatureAnalyzer(op,
-                                isa<ParametrizedGate>(op.getOperation())
-                                    ? cast<ParametrizedGate>(op.getOperation()).getAllParams()
-                                    : mlir::ValueRange{},
-                                op.getNonCtrlQubitOperands(), op.getCtrlQubitOperands(),
-                                op.getCtrlValueOperands(), enableQregMode) {}
+        : BaseSignatureAnalyzer(
+              op,
+              isa<ParametrizedGate>(op.getOperation())
+                  ? cast<ParametrizedGate>(op.getOperation()).getAllParams()
+                  : mlir::ValueRange{},
+              isa<OperatorOp>(op.getOperation())
+                  ? mlir::ValueRange(getReorderedQubitOperands(cast<OperatorOp>(op.getOperation())))
+                  : op.getNonCtrlQubitOperands(),
+              op.getCtrlQubitOperands(), op.getCtrlValueOperands(), enableQregMode) {}
 };
 
 } // namespace qref
