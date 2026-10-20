@@ -1002,6 +1002,11 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* The `cpu_verbs` and `gpu_verbs` transport backends share one session base for RDMA bring-up and
+  the reply path, instead of `gpu_verbs` keeping its own copy. Behaviour and library names are
+  unchanged.
+  [(#XXXX)](https://github.com/PennyLaneAI/catalyst/pull/XXXX)
+
 * Backline transport backends are chosen from a registry instead of a fixed table. Out-of-tree
   backends register through the `catalyst.transport_backends` entry point or a
   `catalyst_transport_backends.json` manifest on `CATALYST_TRANSPORT_PATH`, with no Catalyst
