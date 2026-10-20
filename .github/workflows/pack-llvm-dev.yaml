@@ -204,4 +204,5 @@ jobs:
       # publishes normally.
       skip_if_exists: true
     secrets:
-      AWS_DEV_PACKAGES_ROLE_ARN: ${{ secrets.AWS_DEV_PACKAGES_ROLE_ARN }}
+      AWS_ASSUME_ROLE_ARN: ${{ secrets.AWS_ASSUME_ROLE_ARN }}
+      AWS_REGION: ${{ secrets.AWS_REGION }}

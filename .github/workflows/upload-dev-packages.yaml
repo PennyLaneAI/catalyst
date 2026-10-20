@@ -61,9 +61,12 @@ on:
         default: false
         type: boolean
     secrets:
-      AWS_DEV_PACKAGES_ROLE_ARN:
-        description: IAM role assumed via OIDC to write to the dev-package bucket
+      AWS_ASSUME_ROLE_ARN:
+        description: AWS IAM role assumed via OIDC to write to the dev-package bucket
         required: true
+      AWS_REGION:
+        description: AWS region of the dev-package bucket
+        required: false
     outputs:
       version:
         description: The version the packages were published under
@@ -194,8 +197,8 @@ jobs:
     - name: Configure AWS credentials
       uses: aws-actions/configure-aws-credentials@v4
       with:
-        role-to-assume: ${{ secrets.AWS_DEV_PACKAGES_ROLE_ARN }}
-        aws-region: ${{ vars.DEV_PACKAGES_AWS_REGION || 'us-east-1' }}
+        role-to-assume: ${{ secrets.AWS_ASSUME_ROLE_ARN }}
+        aws-region: ${{ secrets.AWS_REGION }}
 
     # Content keys are immutable: a published version prefix is never silently replaced. Rerunning
     # a failed upload for the same version needs `overwrite: true`.
