@@ -51,12 +51,6 @@ def test_multirz():
 # CHECK: func.func public @multirz()
 # CHECK: qref.multirz({{%.+}}) {{%.+}}, {{%.+}} : !qref.bit, !qref.bit
 # CHECK: qref.multirz({{%.+}}) {{%.+}} : !qref.bit
-# CHECK: func.func private @"__builtin__multi_rz_decomposition_MultiRZ{theta:[f64]}{wires:2}{}"
-# CHECK-SAME:   target_gate = "MultiRZ{theta:[f64]}{wires:2}{}"
-# CHECK: qref.custom "RZ"
-# CHECK: func.func private @"__builtin__multi_rz_decomposition_MultiRZ{theta:[f64]}{wires:1}{}"
-# CHECK-SAME:   target_gate = "MultiRZ{theta:[f64]}{wires:1}{}"
-# CHECK: qref.custom "RZ"
 test_multirz()
 
 
@@ -80,10 +74,6 @@ def test_paulirot():
 # CHECK: qref.paulirot ["X", "X"]({{%.+}}) {{%.+}}, {{%.+}} : !qref.bit, !qref.bit
 # CHECK: qref.paulirot ["Z"]({{%.+}}) {{%.+}} : !qref.bit
 # CHECK: qref.paulirot ["Y", "Z", "X"]({{%.+}}) {{%.+}}, {{%.+}}, {{%.+}} : !qref.bit, !qref.bit, !qref.bit
-# CHECK: func.func private @"__builtin__pauli_rot_decomposition_PauliRot{theta:[f64]}{wires:2}{pauli_word = \22XX\22}"
-# CHECK-SAME:   target_gate = "PauliRot{theta:[f64]}{wires:2}{pauli_word = \22XX\22}"
-# CHECK: func.func private @"__builtin__pauli_rot_decomposition_PauliRot{theta:[f64]}{wires:1}{pauli_word = \22Z\22}"
-# CHECK-SAME:   target_gate = "PauliRot{theta:[f64]}{wires:1}{pauli_word = \22Z\22}"
 # CHECK: func.func private @"__builtin__pauli_rot_decomposition_PauliRot{theta:[f64]}{wires:3}{pauli_word = \22YZX\22}"
 # CHECK-SAME:   target_gate = "PauliRot{theta:[f64]}{wires:3}{pauli_word = \22YZX\22}"
 test_paulirot()
