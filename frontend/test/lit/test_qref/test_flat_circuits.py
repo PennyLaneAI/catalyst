@@ -77,7 +77,7 @@ print(test_custom_op.mlir)
 
 # CHECK-LABEL: func.func public @test_dynamic_control_values(
 # CHECK-SAME: %arg0: tensor<f64>, %arg1: tensor<i1>
-@qp.qjit(capture=True, target="mlir", skip_preprocess=True, collect_decomp_rules=False)
+@qp.qjit(capture=True, target="mlir", collect_decomp_rules=False)
 @qp.qnode(qp.device("null.qubit", wires=3))
 def test_dynamic_control_values(x: float, val: bool):
     """Dynamic control operands lower to SSA values in the controlled region."""
