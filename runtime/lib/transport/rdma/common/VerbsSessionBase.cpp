@@ -37,6 +37,9 @@ constexpr std::uint8_t PORT = 1;
 constexpr int REAP_BATCH = 16;
 // Page alignment for registered host buffers.
 constexpr std::size_t PAGE_ALIGN = 4096;
+// How often a CUQR receive wait checks for a stop. Each check of the completion queue costs far
+// more than the memory poll STOP_CHECK_SPINS is sized for, so this is much smaller.
+constexpr std::uint32_t RECV_STOP_CHECK_POLLS = 4096;
 } // namespace
 
 template <class Role>
@@ -186,7 +189,10 @@ void VerbsSessionBase<Role>::post_write(ibv_qp *qp, std::uint64_t cursor, bool i
     wr.wr.rdma.remote_addr = peer_.remote_addr + ring_.slot_offset(cursor);
     wr.wr.rdma.rkey = peer_.rkey;
     if (cuqr()) {
-        if (cuqr_.write_imm) { // the immediate names the slot written
+        // A coprocessor answers a cudaq-realtime peer by SEND, as cudaq-realtime's own servers do:
+        // its clients take a reply's slot from the order replies arrive in.
+        if (cuqr_.write_imm && !(cuqr_.cudaq_peer && oob_listens())) {
+            // the immediate names the slot written
             wr.opcode = IBV_WR_RDMA_WRITE_WITH_IMM;
             wr.imm_data = htonl(static_cast<std::uint32_t>(cursor & (ring_.slots - 1)));
         } else { // lands in the receive buffer the peer posted for this slot
@@ -232,7 +238,9 @@ bool VerbsSessionBase<Role>::poll_message_arrival(std::uint64_t cursor, std::sto
         if (!wait_recv(cursor, st)) {
             return false;
         }
-        frame::poll(ring_, ring_slot(cursor), static_cast<std::uint32_t>(cursor + 1), out);
+        if (!frame::poll(ring_, ring_slot(cursor), static_cast<std::uint32_t>(cursor + 1), out)) {
+            out = frame::FrameView{}; // not a frame: the caller drops it
+        }
         return true;
     }
     // Slots are reused (the slot count is a power of two). The peer writes each frame into the
@@ -285,7 +293,8 @@ PeerRef VerbsSessionBase<Role>::exchange_keys_with_cudaq(const MemRegion &local)
 }
 
 template <class Role> void VerbsSessionBase<Role>::post_recv(std::uint64_t slot) {
-    // A SEND lands in the buffer its receive request names; a write with immediate needs none.
+    // A SEND lands in the buffer its receive request names; a write with immediate ignores it. Both
+    // can arrive whichever verb this end sends by: a cudaq-realtime server always answers by SEND.
     ibv_sge sge{
         .addr = (cuqr_.cudaq_peer ? 0 : reinterpret_cast<std::uint64_t>(local_.addr)) +
                 ring_.slot_offset(slot), // a cudaq peer's ring is registered at iova 0
@@ -294,8 +303,8 @@ template <class Role> void VerbsSessionBase<Role>::post_recv(std::uint64_t slot)
     };
     ibv_recv_wr wr{
         .wr_id = slot,
-        .sg_list = cuqr_.write_imm ? nullptr : &sge,
-        .num_sge = cuqr_.write_imm ? 0 : 1,
+        .sg_list = &sge,
+        .num_sge = 1,
     };
     ibv_recv_wr *bad = nullptr;
     const int rc = ibv_post_recv(recv_qp(), &wr, &bad);
@@ -308,7 +317,7 @@ bool VerbsSessionBase<Role>::wait_recv(std::uint64_t cursor, std::stop_token st)
     ibv_wc wc{};
     std::uint32_t spins = 0;
     while (ibv_poll_cq(recv_cq(), 1, &wc) == 0) {
-        if (++spins == STOP_CHECK_SPINS) {
+        if (++spins == RECV_STOP_CHECK_POLLS) {
             spins = 0;
             if (st.stop_requested()) {
                 return false;
@@ -319,7 +328,8 @@ bool VerbsSessionBase<Role>::wait_recv(std::uint64_t cursor, std::stop_token st)
     TP_CHECK(wc.status == IBV_WC_SUCCESS, "%s: receive completion status=%d", backend_, wc.status);
     // Receive requests complete in the order they were posted, so a SEND filled `slot`; a write
     // names its slot in the immediate.
-    const std::uint64_t got = cuqr_.write_imm ? ntohl(wc.imm_data) : wc.wr_id;
+    const std::uint64_t got =
+        wc.opcode == IBV_WC_RECV_RDMA_WITH_IMM ? ntohl(wc.imm_data) : wc.wr_id;
     TP_CHECK(got == slot, "%s: a CUQR message arrived for slot %llu, expected slot %llu", backend_,
              static_cast<unsigned long long>(got), static_cast<unsigned long long>(slot));
     // Repost now: the peer reaches this slot again only after wrapping the whole ring, which it

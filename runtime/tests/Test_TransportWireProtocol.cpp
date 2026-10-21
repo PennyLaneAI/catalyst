@@ -234,17 +234,16 @@ TEST_CASE("a CUQR request_id is opaque: poll decodes whatever the peer sent") {
     CHECK(v.data == slot.data() + 24);
 }
 
-TEST_CASE("a CUQR slot without a valid header is refused") {
+TEST_CASE("a CUQR slot without a valid frame is not decoded, so it can be dropped") {
     namespace frame = catalyst::transport::common::frame;
+    // cudaq-realtime drops such a message and keeps serving; poll reports it rather than throwing.
     const auto ring = frame::geometry_for(frame::Mode::CUQR, 8);
     std::vector<std::uint8_t> slot(ring.stride, 0);
     frame::FrameView v;
-    CHECK_THROWS_WITH(frame::poll(ring, slot.data(), 1, v),
-                      Catch::Matchers::ContainsSubstring("no CUQR frame"));
+    CHECK_FALSE(frame::poll(ring, slot.data(), 1, v));
     const RPCHeader too_long{0x43555152u, 0, 1000, 1, 0};
     std::memcpy(slot.data(), &too_long, sizeof(too_long));
-    CHECK_THROWS_WITH(frame::poll(ring, slot.data(), 1, v),
-                      Catch::Matchers::ContainsSubstring("more than its"));
+    CHECK_FALSE(frame::poll(ring, slot.data(), 1, v));
 }
 
 TEST_CASE("a session's config can ask for CUQR frames") {
@@ -260,5 +259,19 @@ TEST_CASE("a CUQR session's config can set the slot count, as a cudaq-realtime s
     CHECK(ring.slots == 8);
     CHECK(ring.stride == 256); // cudaq-realtime's default cpu_roce slot
     CHECK_THROWS_WITH(frame::geometry_from_config("frame=cuqr;frame_slots=6"),
+                      Catch::Matchers::ContainsSubstring("power of two"));
+}
+
+TEST_CASE("a CUQR session's config can set the slot size, as a cudaq-realtime server does") {
+    namespace frame = catalyst::transport::common::frame;
+    // A server's replies fill its whole slot, so our slots match it even for small messages.
+    const auto ring =
+        frame::geometry_from_config("frame=cuqr;frame_payload=8;frame_slot_bytes=256");
+    CHECK(ring.stride == 256);
+    CHECK(frame::data_capacity(ring) == 232);
+    CHECK_THROWS_WITH(
+        frame::geometry_from_config("frame=cuqr;frame_payload=300;frame_slot_bytes=256"),
+        Catch::Matchers::ContainsSubstring("324 B frame"));
+    CHECK_THROWS_WITH(frame::geometry_from_config("frame=cuqr;frame_slot_bytes=200"),
                       Catch::Matchers::ContainsSubstring("power of two"));
 }

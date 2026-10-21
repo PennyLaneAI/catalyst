@@ -146,6 +146,15 @@ __global__ void fused(const std::uint8_t *requests, std::uint8_t *replies,
             // CUQR: the payload, then cudaq-realtime's RPCResponse, then the reply flag last.
             const volatile frame::CuqrHeader *rh =
                 reinterpret_cast<const volatile frame::CuqrHeader *>(req);
+            if (rh->magic != frame::CUQR_MAGIC) { // not a frame: no reply, the host drops it
+                if (lead) {
+                    *reinterpret_cast<volatile std::uint32_t *>(rep) = 0;
+                    __threadfence_system();
+                    tx_flags[cursor & (ring.slots - 1)] = expect;
+                    __threadfence_system();
+                }
+                continue;
+            }
             const std::uint32_t fn_id = rh->word;
             const std::uint32_t len = rh->len < cap ? rh->len : cap;
             const std::uint32_t request_id = rh->request_id;

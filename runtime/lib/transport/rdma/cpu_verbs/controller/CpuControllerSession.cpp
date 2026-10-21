@@ -105,6 +105,7 @@ int CpuControllerSession::collect(void *const *replies, const std::uint64_t *rep
     rtt_ns_ = now_ns() - kick_ns_;
     ++next_recv_;
     if (cuqr()) { // next_recv_ is now this round's seq, the request_id the request carried
+        TP_CHECK(r.data != nullptr, "cpu_verbs: the coprocessor's reply is not a CUQR frame");
         TP_CHECK(r.request_id == static_cast<std::uint32_t>(next_recv_),
                  "cpu_verbs: a CUQR reply answers request %u, expected %u", r.request_id,
                  static_cast<std::uint32_t>(next_recv_));

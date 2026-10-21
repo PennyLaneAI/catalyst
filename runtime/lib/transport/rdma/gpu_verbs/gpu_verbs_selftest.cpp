@@ -36,7 +36,7 @@ int main(int argc, char **argv) {
     std::uint16_t port = 18560;
     std::uint32_t bytes = sizeof(std::uint64_t);
     bool cuqr = false, write_imm = false, cudaq_peer = false;
-    std::uint32_t frame_slots = 0;
+    std::uint32_t frame_slots = 0, frame_slot_bytes = 0;
     for (int i = 1; i + 1 < argc; i += 2) {
         std::string k = argv[i], v = argv[i + 1];
         if (k == "--dev") {
@@ -59,6 +59,8 @@ int main(int argc, char **argv) {
             cudaq_peer = v == "cudaq";
         } else if (k == "--frame-slots") {
             frame_slots = static_cast<std::uint32_t>(std::strtoul(v.c_str(), nullptr, 0));
+        } else if (k == "--frame-slot-bytes") {
+            frame_slot_bytes = static_cast<std::uint32_t>(std::strtoul(v.c_str(), nullptr, 0));
         }
     }
     if (dev.empty() || gid < 0) {
@@ -81,6 +83,9 @@ int main(int argc, char **argv) {
                                     bytes);
     if (frame_slots != 0) {
         ring.slots = frame_slots;
+    }
+    if (frame_slot_bytes != 0) { // a cudaq-realtime server's slot size
+        ring.stride = frame_slot_bytes;
     }
     const common::CuqrConfig cuqr_cfg{.write_imm = write_imm, .cudaq_peer = cudaq_peer};
     GpuCoprocessorSession s(dev, gid, gpu_device, ring, cuqr_cfg);

@@ -98,6 +98,9 @@ void CpuCoprocessorSession::run(std::stop_token st) {
             reap(bwd_cq_->get(), signaled_outstanding, /*drain=*/true);
             return;
         }
+        if (r.data == nullptr) {
+            continue; // not a CUQR frame: dropped unanswered, as cudaq-realtime does
+        }
         std::uint64_t word = 0;
         std::memcpy(&word, r.data, std::min<std::size_t>(r.len, sizeof(word)));
         last_word_.store(word, std::memory_order_relaxed);

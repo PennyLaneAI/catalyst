@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include <algorithm>
+#include <chrono>
 #include <cstdint>
 #include <cstring>
 #include <string>
@@ -307,13 +308,16 @@ TEST_CASE("cpu_verbs carries messages larger than 8 B in BLV frames", "[cpu_libi
 
 // Runs `rounds` CUQR round trips of `bytes` B over rxe0 with the given verb, checking each reply.
 static void cuqr_echo(std::size_t bytes, bool write_imm, std::uint16_t port, std::uint32_t rounds,
-                      bool cudaq_peer = false, std::uint32_t slots = 256) {
+                      bool cudaq_peer = false, std::uint32_t slots = 256,
+                      bool replies_by_send = false) {
     namespace frame = catalyst::transport::common::frame;
     auto ring = frame::geometry_for(frame::Mode::CUQR, bytes);
     ring.slots = slots;
     const common::CuqrConfig cuqr{.write_imm = write_imm, .cudaq_peer = cudaq_peer};
     std::thread t([&] {
-        CpuCoprocessorSession coproc("rxe0", 1, ring, cuqr);
+        CpuCoprocessorSession coproc(
+            "rxe0", 1, ring,
+            {.write_imm = write_imm && !replies_by_send, .cudaq_peer = cudaq_peer});
         coproc.connect(ConnectInfo{.peer = "127.0.0.1", .oob_port = port});
         MemRegion m = coproc.alloc_memory(ring.region_bytes(), MemKind::CpuRam);
         PeerRef p = coproc.exchange_keys(m);
@@ -439,4 +443,33 @@ TEST_CASE("cpu_verbs talks to a cudaq-realtime peer: UC, rendezvous, zero-based 
     // cudaq-realtime's cpu_roce default: 8 slots of 256 B; 20 rounds wrap the ring twice.
     cuqr_echo(232, /*write_imm=*/false, 18650, 20, /*cudaq_peer=*/true, /*slots=*/8);
     cuqr_echo(232, /*write_imm=*/true, 18651, 20, /*cudaq_peer=*/true, /*slots=*/8);
+    // A cudaq-realtime server answers with SEND whichever verb its requests came by.
+    cuqr_echo(232, /*write_imm=*/true, 18652, 20, /*cudaq_peer=*/true, /*slots=*/8,
+              /*replies_by_send=*/true);
+}
+
+TEST_CASE("an idle CUQR coprocessor stops promptly", "[cpu_libibverbs]") {
+    if (!have_rxe()) {
+        SKIP("no rxe0 RDMA device");
+    }
+    namespace frame = catalyst::transport::common::frame;
+    const auto ring = frame::geometry_for(frame::Mode::CUQR, 8);
+    std::thread t([&] {
+        CpuControllerSession controller("rxe0", 1, ring);
+        controller.connect(ConnectInfo{.peer = "127.0.0.1", .oob_port = 18660});
+        MemRegion m = controller.alloc_memory(ring.region_bytes(), MemKind::CpuRam);
+        PeerRef p = controller.exchange_keys(m);
+        controller.establish_channel(ChannelDesc{.transport = "rdma"}, m, p);
+    });
+    CpuCoprocessorSession coproc("rxe0", 1, ring);
+    coproc.connect(ConnectInfo{.peer = "127.0.0.1", .oob_port = 18660});
+    MemRegion m = coproc.alloc_memory(ring.region_bytes(), MemKind::CpuRam);
+    PeerRef p = coproc.exchange_keys(m);
+    coproc.establish_channel(ChannelDesc{.transport = "rdma"}, m, p);
+    t.join();
+    coproc.start(); // waits on its receive completion queue; nothing arrives
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    const auto t0 = std::chrono::steady_clock::now();
+    coproc.stop();
+    CHECK(std::chrono::steady_clock::now() - t0 < std::chrono::seconds(1));
 }

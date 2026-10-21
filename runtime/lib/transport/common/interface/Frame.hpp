@@ -155,7 +155,18 @@ inline RingGeometry geometry_from_config(std::string_view config) {
     }
     if (*mode == "cuqr") {
         RingGeometry ring = geometry_for(Mode::CUQR, max_payload);
-        // A cudaq-realtime server sets its slot count (cpu_roce: 8 by default).
+        // A cudaq-realtime server sets its slot size and count (cpu_roce: 8 of 256 B by default),
+        // and answers with whole slots, so a session talking to one matches them.
+        if (const auto bytes = configparser::find(config, "frame_slot_bytes")) {
+            const std::uint64_t n = configparser::parse_u64(*bytes, "frame_slot_bytes");
+            TP_CHECK(n >= MIN_STRIDE && n <= UINT32_MAX && std::has_single_bit(n),
+                     "config: 'frame_slot_bytes' must be a power of two of at least %zu, got %llu",
+                     MIN_STRIDE, static_cast<unsigned long long>(n));
+            TP_CHECK(n >= sizeof(CuqrHeader) + max_payload,
+                     "config: %llu B slots cannot hold a %zu B frame (frame_slot_bytes)",
+                     static_cast<unsigned long long>(n), sizeof(CuqrHeader) + max_payload);
+            ring.stride = static_cast<std::uint32_t>(n);
+        }
         if (const auto slots = configparser::find(config, "frame_slots")) {
             const std::uint64_t n = configparser::parse_u64(*slots, "frame_slots");
             TP_CHECK(n > 0 && n <= UINT32_MAX && std::has_single_bit(n),
@@ -309,14 +320,15 @@ inline bool poll(const RingGeometry &ring, void *frame, std::uint32_t expect, Fr
     detail::require_mode(ring.mode);
     if (ring.mode == Mode::CUQR) {
         // Called once the transport has signalled the arrival, as the header has no completion
-        // word. request_id is the sender's own (a stock client need not count from 1), so it is
-        // returned rather than compared; a controller checks the echo of its own.
+        // word; false means the slot holds no valid frame. request_id is the sender's own (a stock
+        // client need not count from 1), so it is returned rather than compared; a controller
+        // checks the echo of its own.
         const CuqrHeader *h = detail::cuqr(frame);
-        TP_CHECK(h->magic == CUQR_MAGIC || h->magic == CUQS_MAGIC,
-                 "slot holds no CUQR frame (magic 0x%08x)", h->magic);
-        TP_CHECK(h->len <= data_capacity(ring),
-                 "CUQR frame claims %u B, more than its %zu B slot holds", h->len,
-                 data_capacity(ring));
+        // Not a frame (wrong magic, or a length past the slot): cudaq-realtime drops such a
+        // message and keeps serving, so the caller can too.
+        if ((h->magic != CUQR_MAGIC && h->magic != CUQS_MAGIC) || h->len > data_capacity(ring)) {
+            return false;
+        }
         const bool reply = h->magic == CUQS_MAGIC;
         out = FrameView{
             .data = data(ring, frame),

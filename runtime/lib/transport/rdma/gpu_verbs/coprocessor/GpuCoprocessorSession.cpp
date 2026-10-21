@@ -161,7 +161,9 @@ void GpuCoprocessorSession::run_cuqr(std::stop_token st) {
             cpu_relax();
         }
         frame::FrameView reply;
-        frame::poll(ring_, handoff_.host + ring_.slot_offset(c), expect, reply);
+        if (!frame::poll(ring_, handoff_.host + ring_.slot_offset(c), expect, reply)) {
+            continue; // the kernel found no CUQR frame: dropped unanswered
+        }
         if (post_reply(c, reply)) {
             ++signaled_outstanding;
             reap(bwd_cq_->get(), signaled_outstanding, /*drain=*/false);
