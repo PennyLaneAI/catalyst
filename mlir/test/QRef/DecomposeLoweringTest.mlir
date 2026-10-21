@@ -641,6 +641,53 @@ module @circuit_with_operator_op {
 
 // -----
 
+// ALL-LABEL: module @operator_op_unsorted_qubit_map
+module @operator_op_unsorted_qubit_map {
+  func.func public @test_unsorted_qubit_map() attributes {quantum.node} {
+    // ALL: [[wires:%.+]] = arith.constant dense<[3, 0, 1, 2]> : tensor<4xi64>
+    // ALL: [[reg:%.+]] = quantum.alloc( 4) : !quantum.reg
+    // CALL: [[out_reg:%.+]] = call @_unsorted_decomp_0([[wires]], [[reg]]) : (tensor<4xi64>, !quantum.reg) -> !quantum.reg
+    // INLINE: [[work:%.+]] = stablehlo.slice [[wires]] [0:1] : (tensor<4xi64>) -> tensor<1xi64>
+    // INLINE: [[work_i64:%.+]] = stablehlo.reshape [[work]] : (tensor<1xi64>) -> tensor<i64>
+    // INLINE: [[work_idx:%.+]] = tensor.extract [[work_i64]][] : tensor<i64>
+    // INLINE: [[q:%.+]] = quantum.extract [[reg]][[[work_idx]]] : !quantum.reg -> !quantum.bit
+    // INLINE: [[out_q:%.+]] = quantum.custom "PauliX"() [[q]] : !quantum.bit
+    // INLINE: [[out_reg:%.+]] = quantum.insert [[reg]][[[work_idx]]], [[out_q]] : !quantum.reg, !quantum.bit
+    // ALL-NOT: quantum.operator
+    // ALL: quantum.dealloc [[out_reg]] : !quantum.reg
+    %r = quantum.alloc( 4) : !quantum.reg
+    %0 = quantum.extract %r[ 0] : !quantum.reg -> !quantum.bit
+    %1 = quantum.extract %r[ 1] : !quantum.reg -> !quantum.bit
+    %2 = quantum.extract %r[ 2] : !quantum.reg -> !quantum.bit
+    %3 = quantum.extract %r[ 3] : !quantum.reg -> !quantum.bit
+    %out:4 = quantum.operator "UnsortedOp"() qubits(%0, %1, %2, %3) qubit_map = {x_wires = [0], y_wires = [1, 2], work_wires = [3]}
+    %5 = quantum.insert %r[ 0], %out#0 : !quantum.reg, !quantum.bit
+    %6 = quantum.insert %5[ 1], %out#1 : !quantum.reg, !quantum.bit
+    %7 = quantum.insert %6[ 2], %out#2 : !quantum.reg, !quantum.bit
+    %8 = quantum.insert %7[ 3], %out#3 : !quantum.reg, !quantum.bit
+    quantum.dealloc %8 : !quantum.reg
+    return
+  }
+
+  // COM: the rule expects the indices to come in as (work, x, y)
+  // COM: i.e. in the same order as GOID
+  // ALL-LABEL: func.func private @_unsorted_decomp
+  func.func private @_unsorted_decomp(%arg0: !quantum.reg, %arg1: tensor<4xi64>) -> !quantum.reg attributes
+      {target_gate = "UnsortedOp{}{work_wires:1,x_wires:1,y_wires:2}{}"} {
+    %0 = stablehlo.slice %arg1 [0:1] : (tensor<4xi64>) -> tensor<1xi64>
+    %1 = stablehlo.reshape %0 : (tensor<1xi64>) -> tensor<i64>
+    %extracted = tensor.extract %1[] : tensor<i64>
+    %2 = quantum.extract %arg0[%extracted] : !quantum.reg -> !quantum.bit
+    %out_qubits = quantum.custom "PauliX"() %2 : !quantum.bit
+    %3 = quantum.insert %arg0[%extracted], %out_qubits : !quantum.reg, !quantum.bit
+    return %3 : !quantum.reg
+  }
+
+  // CALL: func.func private @_unsorted_decomp_0
+}
+
+// -----
+
 // ALL-LABEL: module @qreg_at_not_first_arg
 module @qreg_at_not_first_arg {
   func.func public @test_qreg_at_not_first_arg() attributes {quantum.node} {

@@ -466,6 +466,45 @@ module {
               "myStaticArray = [1, 2, 3], myStaticInt = 4 : i64, myStaticString = \"Test\"}");
 }
 
+TEST(DecomposableGateInterfaceTests, OperatorOpUnsortedQubitMap) {
+    // The qubit operands order is not the alphabetical order of the qubit_map
+    // keys (work_wires, x_wires, y_wires)
+    std::string moduleStr = R"mlir(
+module {
+  %q0 = quantum.alloc_qb : !quantum.bit
+  %q1 = quantum.alloc_qb : !quantum.bit
+  %q2 = quantum.alloc_qb : !quantum.bit
+  %q3 = quantum.alloc_qb : !quantum.bit
+  %0:4 = quantum.operator "testUnsortedQubitMap"() qubits(%q0, %q1, %q2, %q3) qubit_map = {x_wires = [0], y_wires = [1, 2], work_wires = [3]}
+}
+    )mlir";
+
+    // Parsing boilerplate
+    DialectRegistry registry;
+    registry.insert<mlir::arith::ArithDialect, QuantumDialect>();
+    MLIRContext context(registry);
+    ParserConfig config(&context, /*verifyAfterParse=*/false);
+    OwningOpRef<ModuleOp> module = parseSourceString<ModuleOp>(moduleStr, config);
+
+    DecomposableGate op = *module->getOps<OperatorOp>().begin();
+
+    ASSERT_EQ(op.getOperatorName(), "testUnsortedQubitMap");
+
+    // Rule wire args follow the sorted qubit_map keys, not the operand order.
+    llvm::SmallVector<mlir::Value> qubits;
+    for (AllocQubitOp alloc : module->getOps<AllocQubitOp>()) {
+        qubits.push_back(alloc.getResult());
+    }
+    llvm::SmallVector<mlir::Value> expectedRuleWireArgs = {qubits[3], qubits[0], qubits[1],
+                                                           qubits[2]};
+    ASSERT_EQ(op.getRuleWireArgs(), expectedRuleWireArgs);
+
+    llvm::StringMap<size_t> expectedWires = {{"work_wires", 1}, {"x_wires", 1}, {"y_wires", 2}};
+    ASSERT_EQ(op.getWireLens(), expectedWires);
+
+    ASSERT_EQ(op.getGraphOpId(), "testUnsortedQubitMap{}{work_wires:1,x_wires:1,y_wires:2}{}");
+}
+
 TEST(DecomposableGateInterfaceTests, OperatorOpQureg) {
     std::string moduleStr = R"mlir(
 func.func @testfunc(%first : tensor<1xi64>, %secondthird : tensor<2xi64>) {
