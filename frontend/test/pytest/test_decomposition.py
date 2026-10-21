@@ -1306,7 +1306,7 @@ class TestSymbolicRules:
         # Only one control on: the target must be left alone.
         assert np.allclose(run([1]), 1.0)
 
-    def test_zero_control_value_is_mislowered(self):
+    def test_zero_control_value_is_not_mislowered(self):
         """Test an operator with a zero control value decomposes to the right state."""
 
         class ZeroCtrl(qp.core.Operator2):
