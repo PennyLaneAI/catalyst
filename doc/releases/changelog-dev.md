@@ -187,7 +187,7 @@
   used to toggle whether or not to use ahead-of-time compilation.
   [(#3339)](https://github.com/PennyLaneAI/catalyst/pull/3339)
 
-* `QJIT.aot_compile` now accepts the arguments to compile for, so functions without type hints
+* `QJIT.aot_compile` now accepts function arguments, so functions without type hints
   can be compiled ahead of time.
   [(#3369)](https://github.com/PennyLaneAI/catalyst/pull/3369)
 
