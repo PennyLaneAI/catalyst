@@ -38,7 +38,7 @@ catalyst::transport::CoprocessorSession *make_gpu_coprocessor(const std::string 
         config, "gpu", /*fallback=*/0);
     auto *session = new catalyst::transport::gpu_verbs::GpuCoprocessorSession(
         cfg.dev, cfg.gid, gpu_device,
-        catalyst::transport::common::frame::geometry_from_config(config), cfg.cuqr_write_imm);
+        catalyst::transport::common::frame::geometry_from_config(config), cfg.cuqr);
     session->set_thread_affinity(
         catalyst::transport::common::configparser::parse_optional_index(config, "cpu_pin", -1),
         catalyst::transport::common::configparser::parse_optional_index(config, "rt", 0) != 0);

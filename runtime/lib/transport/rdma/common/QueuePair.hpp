@@ -27,7 +27,7 @@ class QueuePair {
   public:
     QueuePair(std::shared_ptr<ProtectionDomain> pd, std::shared_ptr<CompletionQueue> send_cq,
               std::shared_ptr<CompletionQueue> recv_cq, int max_send_wr, int max_inline = 0,
-              std::uint32_t max_recv_wr = 4);
+              std::uint32_t max_recv_wr = 4, bool uc = false);
     ~QueuePair();
     QueuePair(const QueuePair &) = delete;
     QueuePair &operator=(const QueuePair &) = delete;
@@ -49,5 +49,6 @@ class QueuePair {
     std::shared_ptr<CompletionQueue> recv_cq_;
     ibv_qp *qp_ = nullptr;
     QpState state_ = QpState::RESET;
+    bool uc_; // unreliable connected (cudaq-realtime's peers), else reliable connected
 };
 } // namespace catalyst::transport::common

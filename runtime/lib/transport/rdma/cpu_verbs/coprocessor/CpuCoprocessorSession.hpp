@@ -35,9 +35,8 @@ class CpuCoprocessorSession : public common::VerbsSessionBase<CoprocessorSession
   public:
     explicit CpuCoprocessorSession(std::string dev, int gid_idx,
                                    common::frame::RingGeometry ring = common::frame::BL16_RING,
-                                   bool cuqr_write_imm = false)
-        : Base(std::move(dev), gid_idx, "cpu_verbs", common::DEFAULT_QP_SHAPE, ring,
-               cuqr_write_imm) {}
+                                   common::CuqrConfig cuqr = {})
+        : Base(std::move(dev), gid_idx, "cpu_verbs", common::DEFAULT_QP_SHAPE, ring, cuqr) {}
     ~CpuCoprocessorSession() override { stop(); }
 
     void start() override;

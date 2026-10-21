@@ -253,3 +253,12 @@ TEST_CASE("a session's config can ask for CUQR frames") {
     CHECK(ring.mode == frame::Mode::CUQR);
     CHECK(ring.stride == 128); // 24 + 100 -> 128
 }
+
+TEST_CASE("a CUQR session's config can set the slot count, as a cudaq-realtime server does") {
+    namespace frame = catalyst::transport::common::frame;
+    const auto ring = frame::geometry_from_config("frame=cuqr;frame_payload=232;frame_slots=8");
+    CHECK(ring.slots == 8);
+    CHECK(ring.stride == 256); // cudaq-realtime's default cpu_roce slot
+    CHECK_THROWS_WITH(frame::geometry_from_config("frame=cuqr;frame_slots=6"),
+                      Catch::Matchers::ContainsSubstring("power of two"));
+}

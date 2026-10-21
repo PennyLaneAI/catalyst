@@ -29,7 +29,7 @@ catalyst::transport::CoprocessorSession *make_cpu_coprocessor(const std::string 
     namespace common = catalyst::transport::common;
     const auto cfg = common::parse_backend_config(config);
     auto *session = new catalyst::transport::cpu_verbs::CpuCoprocessorSession(
-        cfg.dev, cfg.gid, common::frame::geometry_from_config(config), cfg.cuqr_write_imm);
+        cfg.dev, cfg.gid, common::frame::geometry_from_config(config), cfg.cuqr);
     session->set_thread_affinity(common::configparser::parse_optional_index(config, "cpu_pin", -1),
                                  common::configparser::parse_optional_index(config, "rt", 0) != 0);
     return session;

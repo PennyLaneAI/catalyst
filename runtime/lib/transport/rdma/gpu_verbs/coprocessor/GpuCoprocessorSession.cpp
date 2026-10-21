@@ -39,16 +39,16 @@ constexpr QpShape FWD_QP_SHAPE{.sq_depth = 16, .cq_depth = 256, .inline_max = 0}
 } // namespace
 
 GpuCoprocessorSession::GpuCoprocessorSession(std::string dev, int gid_idx, int gpu_device,
-                                             frame::RingGeometry ring, bool cuqr_write_imm)
-    : Base(std::move(dev), gid_idx, "gpu_verbs", FWD_QP_SHAPE, ring, cuqr_write_imm),
-      gpu_(gpu_device) {}
+                                             frame::RingGeometry ring, common::CuqrConfig cuqr)
+    : Base(std::move(dev), gid_idx, "gpu_verbs", FWD_QP_SHAPE, ring, cuqr), gpu_(gpu_device) {}
 
 MemRegion GpuCoprocessorSession::alloc_memory(std::size_t size, MemKind kind) {
     TP_CHECK(kind == MemKind::GpuHbm, "gpu_verbs: only MemKind::GpuHbm supported");
     hbm_ = gpu_.alloc_hbm_ring(size);
     hbm_ring_.emplace(pd_, /*offset=*/static_cast<std::uint64_t>(0), hbm_.size,
-                      /*iova=*/reinterpret_cast<std::uint64_t>(hbm_.ptr), hbm_.dmabuf_fd,
-                      MemAccess::REMOTE_WRITE);
+                      // a cudaq-realtime peer addresses the ring from 0
+                      /*iova=*/cuqr_.cudaq_peer ? 0 : reinterpret_cast<std::uint64_t>(hbm_.ptr),
+                      hbm_.dmabuf_fd, MemAccess::REMOTE_WRITE);
     ::close(hbm_.dmabuf_fd); // MR holds its own reference
     hbm_.dmabuf_fd = -1;
     return MemRegion{

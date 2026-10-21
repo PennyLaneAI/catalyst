@@ -41,8 +41,10 @@ int main(int argc, char **argv) {
     std::uint32_t correction_bytes = sizeof(std::uint64_t);
     // Rounds the controller runs; with more than one it reports RTT percentiles.
     std::uint32_t rounds = 1;
-    // --frame cuqr selects cudaq-realtime's frames, completed with --tx send or write_imm.
-    bool cuqr = false, write_imm = false;
+    // --frame cuqr selects cudaq-realtime's frames, completed with --tx send or write_imm;
+    // --peer-mode cudaq talks to a cudaq-realtime peer, whose slot count --frame-slots matches.
+    bool cuqr = false, write_imm = false, cudaq_peer = false;
+    std::uint32_t frame_slots = 0;
     for (int i = 1; i + 1 < argc; i += 2) {
         std::string k = argv[i], v = argv[i + 1];
         if (k == "--role") {
@@ -65,26 +67,34 @@ int main(int argc, char **argv) {
             cuqr = v == "cuqr";
         } else if (k == "--tx") {
             write_imm = v == "write_imm";
+        } else if (k == "--peer-mode") {
+            cudaq_peer = v == "cudaq";
+        } else if (k == "--frame-slots") {
+            frame_slots = static_cast<std::uint32_t>(std::strtoul(v.c_str(), nullptr, 0));
         }
     }
     const bool is_coprocessor = (role == "coprocessor");
     // Both roles derive the same ring from the message sizes, as the compiler's frame keys make
     // them.
     const std::size_t largest = std::max(syndrome_bytes, correction_bytes);
-    const auto ring = frame::geometry_for(cuqr                            ? frame::Mode::CUQR
-                                          : largest <= PAYLOAD_DATA_BYTES ? frame::Mode::BL16
-                                                                          : frame::Mode::BLV,
-                                          largest);
+    auto ring = frame::geometry_for(cuqr                            ? frame::Mode::CUQR
+                                    : largest <= PAYLOAD_DATA_BYTES ? frame::Mode::BL16
+                                                                    : frame::Mode::BLV,
+                                    largest);
+    if (frame_slots != 0) {
+        ring.slots = frame_slots;
+    }
+    const common::CuqrConfig cuqr_cfg{.write_imm = write_imm, .cudaq_peer = cudaq_peer};
 
     std::unique_ptr<TransportSession> s;
     CpuCoprocessorSession *coproc = nullptr;
     CpuControllerSession *controller = nullptr;
     if (is_coprocessor) {
-        auto up = std::make_unique<CpuCoprocessorSession>(dev, gid, ring, write_imm);
+        auto up = std::make_unique<CpuCoprocessorSession>(dev, gid, ring, cuqr_cfg);
         coproc = up.get();
         s = std::move(up);
     } else {
-        auto up = std::make_unique<CpuControllerSession>(dev, gid, ring, write_imm);
+        auto up = std::make_unique<CpuControllerSession>(dev, gid, ring, cuqr_cfg);
         controller = up.get();
         s = std::move(up);
     }

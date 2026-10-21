@@ -35,7 +35,8 @@ int main(int argc, char **argv) {
     int gpu_device = 0;
     std::uint16_t port = 18560;
     std::uint32_t bytes = sizeof(std::uint64_t);
-    bool cuqr = false, write_imm = false;
+    bool cuqr = false, write_imm = false, cudaq_peer = false;
+    std::uint32_t frame_slots = 0;
     for (int i = 1; i + 1 < argc; i += 2) {
         std::string k = argv[i], v = argv[i + 1];
         if (k == "--dev") {
@@ -54,13 +55,18 @@ int main(int argc, char **argv) {
             cuqr = v == "cuqr";
         } else if (k == "--tx") {
             write_imm = v == "write_imm";
+        } else if (k == "--peer-mode") {
+            cudaq_peer = v == "cudaq";
+        } else if (k == "--frame-slots") {
+            frame_slots = static_cast<std::uint32_t>(std::strtoul(v.c_str(), nullptr, 0));
         }
     }
     if (dev.empty() || gid < 0) {
         std::fprintf(stderr,
                      "usage: %s --dev <rdma_device> --gid <gid_index>"
                      " [--gpu <index>] [--peer <ip>] [--port <n>] [--bytes <n>]"
-                     " [--frame cuqr [--tx send|write_imm]]\n"
+                     " [--frame cuqr [--tx send|write_imm] [--peer-mode cudaq]"
+                     " [--frame-slots <n>]]\n"
                      "  --dev and --gid are required; the device needs dma-buf MR support\n"
                      "  --bytes is the message size each way (default 8), and must match the\n"
                      "  controller's; over 8 B the frames are BLV\n"
@@ -69,11 +75,15 @@ int main(int argc, char **argv) {
         return 2;
     }
     // The same layout cpu_verbs_selftest picks for these message sizes.
-    const auto ring = frame::geometry_for(cuqr                          ? frame::Mode::CUQR
-                                          : bytes <= PAYLOAD_DATA_BYTES ? frame::Mode::BL16
-                                                                        : frame::Mode::BLV,
-                                          bytes);
-    GpuCoprocessorSession s(dev, gid, gpu_device, ring, write_imm);
+    auto ring = frame::geometry_for(cuqr                          ? frame::Mode::CUQR
+                                    : bytes <= PAYLOAD_DATA_BYTES ? frame::Mode::BL16
+                                                                  : frame::Mode::BLV,
+                                    bytes);
+    if (frame_slots != 0) {
+        ring.slots = frame_slots;
+    }
+    const common::CuqrConfig cuqr_cfg{.write_imm = write_imm, .cudaq_peer = cudaq_peer};
+    GpuCoprocessorSession s(dev, gid, gpu_device, ring, cuqr_cfg);
     ConnectInfo ci{
         .peer = peer,
         .oob_port = port,

@@ -20,6 +20,7 @@
 #include <string>
 #include <vector>
 
+#include "BackendConfig.hpp"
 #include "CompletionQueue.hpp"
 #include "Context.hpp"
 #include "Frame.hpp"
@@ -60,7 +61,7 @@ template <class Role> class VerbsSessionBase : public Role {
     /// (frame::geometry_from_config).
     VerbsSessionBase(std::string dev, int gid_idx, const char *backend,
                      QpShape fwd_shape = DEFAULT_QP_SHAPE,
-                     frame::RingGeometry ring = frame::BL16_RING, bool cuqr_write_imm = false);
+                     frame::RingGeometry ring = frame::BL16_RING, CuqrConfig cuqr = {});
     ~VerbsSessionBase() override = default;
 
     VerbsSessionBase(const VerbsSessionBase &) = delete;
@@ -89,8 +90,12 @@ template <class Role> class VerbsSessionBase : public Role {
     // `cursor`'s message is in its slot, or false if `st` is stopped first.
     bool wait_recv(std::uint64_t cursor, std::stop_token st);
     void post_recv(std::uint64_t slot);
-    // The coprocessor receives on the fwd queue pair and the controller on the bwd one.
-    ibv_qp *recv_qp() { return oob_listens() ? fwd_qp_->get() : bwd_qp_->get(); }
+    // The coprocessor receives on the fwd queue pair and the controller on the bwd one; with a
+    // cudaq-realtime peer, each receives on the one it sends on.
+    ibv_qp *recv_qp() {
+        return oob_listens() != cuqr_.cudaq_peer ? fwd_qp_->get() : bwd_qp_->get();
+    }
+    PeerRef exchange_keys_with_cudaq(const MemRegion &local);
     ibv_cq *recv_cq() { return oob_listens() ? fwd_cq_->get() : bwd_cq_->get(); }
     bool cuqr() const { return ring_.mode == frame::Mode::CUQR; }
     // The frame the next post_write sends; stage it with frame::stage first.
@@ -113,7 +118,7 @@ template <class Role> class VerbsSessionBase : public Role {
     std::vector<common::MemoryRegion> caller_memory_regions_;
     std::optional<common::MemoryRegion> send_buf_; // local send source (one frame)
     frame::RingGeometry ring_;                     // both rings, local and the peer's
-    bool cuqr_write_imm_;                          // CUQR: write with immediate, else SEND
+    CuqrConfig cuqr_;                              // how CUQR frames complete, and to whom
     MemRegion local_{};
     PeerRef peer_{};
     ChannelDesc desc_{};

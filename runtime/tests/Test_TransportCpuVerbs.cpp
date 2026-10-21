@@ -306,11 +306,14 @@ TEST_CASE("cpu_verbs carries messages larger than 8 B in BLV frames", "[cpu_libi
 }
 
 // Runs `rounds` CUQR round trips of `bytes` B over rxe0 with the given verb, checking each reply.
-static void cuqr_echo(std::size_t bytes, bool write_imm, std::uint16_t port, std::uint32_t rounds) {
+static void cuqr_echo(std::size_t bytes, bool write_imm, std::uint16_t port, std::uint32_t rounds,
+                      bool cudaq_peer = false, std::uint32_t slots = 256) {
     namespace frame = catalyst::transport::common::frame;
-    const auto ring = frame::geometry_for(frame::Mode::CUQR, bytes);
+    auto ring = frame::geometry_for(frame::Mode::CUQR, bytes);
+    ring.slots = slots;
+    const common::CuqrConfig cuqr{.write_imm = write_imm, .cudaq_peer = cudaq_peer};
     std::thread t([&] {
-        CpuCoprocessorSession coproc("rxe0", 1, ring, write_imm);
+        CpuCoprocessorSession coproc("rxe0", 1, ring, cuqr);
         coproc.connect(ConnectInfo{.peer = "127.0.0.1", .oob_port = port});
         MemRegion m = coproc.alloc_memory(ring.region_bytes(), MemKind::CpuRam);
         PeerRef p = coproc.exchange_keys(m);
@@ -322,7 +325,7 @@ static void cuqr_echo(std::size_t bytes, bool write_imm, std::uint16_t port, std
         }
         coproc.stop();
     });
-    CpuControllerSession controller("rxe0", 1, ring, write_imm);
+    CpuControllerSession controller("rxe0", 1, ring, cuqr);
     controller.connect(ConnectInfo{.peer = "127.0.0.1", .oob_port = port});
     MemRegion m = controller.alloc_memory(ring.region_bytes(), MemKind::CpuRam);
     PeerRef p = controller.exchange_keys(m);
@@ -369,12 +372,12 @@ TEST_CASE("cpu_verbs refuses a CUQR peer using the other completion verb", "[cpu
     namespace frame = catalyst::transport::common::frame;
     const auto ring = frame::geometry_for(frame::Mode::CUQR, 8);
     std::thread t([&] {
-        CpuCoprocessorSession coproc("rxe0", 1, ring, /*cuqr_write_imm=*/true);
+        CpuCoprocessorSession coproc("rxe0", 1, ring, {.write_imm = true});
         coproc.connect(ConnectInfo{.peer = "127.0.0.1", .oob_port = 18630});
         MemRegion m = coproc.alloc_memory(ring.region_bytes(), MemKind::CpuRam);
         CHECK_THROWS_WITH(coproc.exchange_keys(m), Catch::Matchers::ContainsSubstring("cuqr_tx"));
     });
-    CpuControllerSession controller("rxe0", 1, ring, /*cuqr_write_imm=*/false);
+    CpuControllerSession controller("rxe0", 1, ring, {.write_imm = false});
     controller.connect(ConnectInfo{.peer = "127.0.0.1", .oob_port = 18630});
     MemRegion m = controller.alloc_memory(ring.region_bytes(), MemKind::CpuRam);
     CHECK_THROWS_WITH(controller.exchange_keys(m), Catch::Matchers::ContainsSubstring("cuqr_tx"));
@@ -426,4 +429,14 @@ TEST_CASE("a CUQR coprocessor answers a failing function with a status and keeps
     CHECK(reply == 0x0101010101010106ULL); // add_fn_id adds fn_id 1 to every byte of 5
     controller.stop();
     t.join();
+}
+
+TEST_CASE("cpu_verbs talks to a cudaq-realtime peer: UC, rendezvous, zero-based addressing",
+          "[cpu_libibverbs]") {
+    if (!have_rxe()) {
+        SKIP("no rxe0 RDMA device");
+    }
+    // cudaq-realtime's cpu_roce default: 8 slots of 256 B; 20 rounds wrap the ring twice.
+    cuqr_echo(232, /*write_imm=*/false, 18650, 20, /*cudaq_peer=*/true, /*slots=*/8);
+    cuqr_echo(232, /*write_imm=*/true, 18651, 20, /*cudaq_peer=*/true, /*slots=*/8);
 }

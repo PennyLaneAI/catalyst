@@ -18,6 +18,7 @@
 #include "ConfigParser.hpp"
 #include "Context.hpp"
 #include "FpgaBackendConfig.hpp"
+#include "Handshake.hpp"
 #include "QpState.hpp"
 
 #include <catch2/catch_test_macros.hpp>
@@ -78,11 +79,31 @@ TEST_CASE("parse_fpga_config has defaults and reads the FPGA keys", "[common]") 
 }
 
 TEST_CASE("cuqr_tx picks the CUQR completion verb", "[common]") {
-    CHECK_FALSE(parse_backend_config("dev=rxe0;gid=1").cuqr_write_imm);
-    CHECK_FALSE(parse_backend_config("dev=rxe0;gid=1;cuqr_tx=send").cuqr_write_imm);
-    CHECK(parse_backend_config("dev=rxe0;gid=1;cuqr_tx=write_imm").cuqr_write_imm);
+    CHECK_FALSE(parse_backend_config("dev=rxe0;gid=1").cuqr.write_imm);
+    CHECK_FALSE(parse_backend_config("dev=rxe0;gid=1;cuqr_tx=send").cuqr.write_imm);
+    CHECK(parse_backend_config("dev=rxe0;gid=1;cuqr_tx=write_imm").cuqr.write_imm);
     CHECK_THROWS_WITH(parse_backend_config("dev=rxe0;gid=1;cuqr_tx=read"),
                       Catch::Matchers::ContainsSubstring("'send' or 'write_imm'"));
+}
+
+TEST_CASE("peer=cudaq makes a session talk to a cudaq-realtime peer", "[common]") {
+    CHECK_FALSE(parse_backend_config("dev=rxe0;gid=1").cuqr.cudaq_peer);
+    CHECK(parse_backend_config("dev=rxe0;gid=1;peer=cudaq").cuqr.cudaq_peer);
+    CHECK_THROWS_WITH(parse_backend_config("dev=rxe0;gid=1;peer=other"),
+                      Catch::Matchers::ContainsSubstring("'peer' must be 'cudaq'"));
+}
+
+TEST_CASE("the cudaq-realtime rendezvous is 12 B in network byte order", "[common]") {
+    std::uint8_t gid[16] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xff, 0xff, 192, 168, 1, 2};
+    const CudaqRendezvous r = cudaq_rendezvous(0x00123456, 0xA1B2C3D4, gid);
+    static_assert(sizeof(r) == 12);
+    std::uint8_t bytes[12];
+    std::memcpy(bytes, &r, sizeof(bytes));
+    const std::uint8_t want[12] = {0x00, 0x12, 0x34, 0x56, 0xA1, 0xB2, 0xC3, 0xD4, 192, 168, 1, 2};
+    CHECK(std::memcmp(bytes, want, sizeof(want)) == 0);
+    std::uint8_t back[16];
+    cudaq_peer_gid(r, back);
+    CHECK(std::memcmp(back, gid, sizeof(gid)) == 0); // the IPv4-mapped RoCEv2 GID
 }
 
 TEST_CASE("parse_backend_config requires an explicit dev and gid", "[common]") {

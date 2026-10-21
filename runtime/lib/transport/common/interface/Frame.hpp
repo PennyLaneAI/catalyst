@@ -154,7 +154,16 @@ inline RingGeometry geometry_from_config(std::string_view config) {
         return geometry_for(Mode::BL16, max_payload);
     }
     if (*mode == "cuqr") {
-        return geometry_for(Mode::CUQR, max_payload);
+        RingGeometry ring = geometry_for(Mode::CUQR, max_payload);
+        // A cudaq-realtime server sets its slot count (cpu_roce: 8 by default).
+        if (const auto slots = configparser::find(config, "frame_slots")) {
+            const std::uint64_t n = configparser::parse_u64(*slots, "frame_slots");
+            TP_CHECK(n > 0 && n <= UINT32_MAX && std::has_single_bit(n),
+                     "config: 'frame_slots' must be a power of two, got %llu",
+                     static_cast<unsigned long long>(n));
+            ring.slots = static_cast<std::uint32_t>(n);
+        }
+        return ring;
     }
     TP_CHECK(*mode == "blv", "config: 'frame' must be 'bl16', 'blv' or 'cuqr', got '%.*s'",
              static_cast<int>(mode->size()), mode->data());

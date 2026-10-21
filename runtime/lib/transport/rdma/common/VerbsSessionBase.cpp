@@ -42,9 +42,9 @@ constexpr std::size_t PAGE_ALIGN = 4096;
 template <class Role>
 VerbsSessionBase<Role>::VerbsSessionBase(std::string dev, int gid_idx, const char *backend,
                                          QpShape fwd_shape, frame::RingGeometry ring,
-                                         bool cuqr_write_imm)
+                                         CuqrConfig cuqr)
     : dev_name_(std::move(dev)), gid_idx_(gid_idx), backend_(backend), fwd_shape_(fwd_shape),
-      ring_(ring), cuqr_write_imm_(cuqr_write_imm) {}
+      ring_(ring), cuqr_(cuqr) {}
 
 template <class Role> int VerbsSessionBase<Role>::connect(const ConnectInfo &info) {
     ctx_ = std::make_shared<Context>(dev_name_);
@@ -57,15 +57,21 @@ template <class Role> int VerbsSessionBase<Role>::connect(const ConnectInfo &inf
     TP_CHECK(!cuqr() || static_cast<std::uint32_t>(fwd_shape_.cq_depth) >= ring_.slots,
              "%s: a %d-entry CQ cannot hold a %u-slot ring's receive completions", backend_,
              fwd_shape_.cq_depth, ring_.slots);
-    fwd_qp_ = std::make_shared<QueuePair>(pd_, fwd_cq_, fwd_cq_, fwd_shape_.sq_depth,
-                                          fwd_shape_.inline_max, recv_wr);
-    bwd_qp_ =
-        std::make_shared<QueuePair>(pd_, bwd_cq_, bwd_cq_, bwd.sq_depth, bwd.inline_max, recv_wr);
+    // A cudaq-realtime peer uses one UC queue pair both ways: this end's sending one (the
+    // controller's fwd, the coprocessor's bwd) also receives, into the CQ the other would use.
+    const bool cudaq = cuqr_.cudaq_peer;
+    TP_CHECK(!cudaq || cuqr(), "%s: peer=cudaq needs CUQR frames (frame=cuqr)", backend_);
+    const bool listen = oob_listens();
+    fwd_qp_ = std::make_shared<QueuePair>(pd_, fwd_cq_, cudaq && !listen ? bwd_cq_ : fwd_cq_,
+                                          fwd_shape_.sq_depth, fwd_shape_.inline_max, recv_wr,
+                                          /*uc=*/cudaq && !listen);
+    bwd_qp_ = std::make_shared<QueuePair>(pd_, bwd_cq_, cudaq && listen ? fwd_cq_ : bwd_cq_,
+                                          bwd.sq_depth, bwd.inline_max, recv_wr,
+                                          /*uc=*/cudaq && listen);
     fwd_qp_->to_init(PORT);
     bwd_qp_->to_init(PORT);
     active_mtu_ = static_cast<std::uint32_t>(ctx_->port_attr(PORT).active_mtu);
     mygid_ = ctx_->gid(PORT, gid_idx_);
-    const bool listen = oob_listens();
     oob_fd_ =
         listen ? tcp_listen_accept(info.oob_port) : tcp_connect(info.peer.c_str(), info.oob_port);
     return 0;
@@ -75,7 +81,8 @@ template <class Role>
 MemRegion VerbsSessionBase<Role>::alloc_memory(std::size_t size, MemKind kind) {
     TP_CHECK(kind == MemKind::CpuRam, "cpu_libibverbs: only MemKind::CpuRam supported");
     caller_memory_regions_.push_back(MemoryRegion::alloc_host(
-        pd_, size, PAGE_ALIGN, MemAccess::LOCAL_WRITE | MemAccess::REMOTE_WRITE));
+        pd_, size, PAGE_ALIGN, MemAccess::LOCAL_WRITE | MemAccess::REMOTE_WRITE,
+        /*zero_iova=*/cuqr_.cudaq_peer));
     const MemoryRegion &mr = caller_memory_regions_.back();
     return MemRegion{
         .addr = mr.addr(),
@@ -87,6 +94,9 @@ MemRegion VerbsSessionBase<Role>::alloc_memory(std::size_t size, MemKind kind) {
 }
 
 template <class Role> PeerRef VerbsSessionBase<Role>::exchange_keys(const MemRegion &local) {
+    if (cuqr_.cudaq_peer) {
+        return exchange_keys_with_cudaq(local);
+    }
     HandshakeMsg my{
         .fwd = {.qpn = fwd_qp_->qpn(), .psn = 0},
         .bwd = {.qpn = bwd_qp_->qpn(), .psn = 0},
@@ -95,7 +105,7 @@ template <class Role> PeerRef VerbsSessionBase<Role>::exchange_keys(const MemReg
         .mtu_enum = active_mtu_,
         .frame_mode = static_cast<std::uint32_t>(ring_.mode),
         .frame_stride = ring_.stride,
-        .cuqr_tx = cuqr_write_imm_ ? 1U : 0U,
+        .cuqr_tx = cuqr_.write_imm ? 1U : 0U,
     };
     // gid is a 16-byte array copied from the local GID after the aggregate
     // init.
@@ -176,7 +186,7 @@ void VerbsSessionBase<Role>::post_write(ibv_qp *qp, std::uint64_t cursor, bool i
     wr.wr.rdma.remote_addr = peer_.remote_addr + ring_.slot_offset(cursor);
     wr.wr.rdma.rkey = peer_.rkey;
     if (cuqr()) {
-        if (cuqr_write_imm_) { // the immediate names the slot written
+        if (cuqr_.write_imm) { // the immediate names the slot written
             wr.opcode = IBV_WR_RDMA_WRITE_WITH_IMM;
             wr.imm_data = htonl(static_cast<std::uint32_t>(cursor & (ring_.slots - 1)));
         } else { // lands in the receive buffer the peer posted for this slot
@@ -243,17 +253,49 @@ bool VerbsSessionBase<Role>::poll_message_arrival(std::uint64_t cursor, std::sto
     return true;
 }
 
+// cudaq-realtime's rendezvous over the out-of-band socket, the caller (controller) first; then the
+// one UC queue pair goes to RTS at MTU 4096, which cudaq-realtime fixes. Its ring is addressed from
+// 0, like ours in this mode.
+template <class Role>
+PeerRef VerbsSessionBase<Role>::exchange_keys_with_cudaq(const MemRegion &local) {
+    QueuePair &qp = oob_listens() ? *bwd_qp_ : *fwd_qp_;
+    const CudaqRendezvous my = cudaq_rendezvous(qp.qpn(), local.rkey, mygid_.raw);
+    CudaqRendezvous peer{};
+    const int fd = oob_fd_.get();
+    if (oob_listens()) {
+        recv_exact(fd, &peer, sizeof(peer));
+        send_exact(fd, &my, sizeof(my));
+    } else {
+        send_exact(fd, &my, sizeof(my));
+        recv_exact(fd, &peer, sizeof(peer));
+    }
+    std::uint8_t gid[16];
+    cudaq_peer_gid(peer, gid);
+    qp.to_rtr(ntohl(peer.qpn), /*dest_psn=*/0, gid, gid_idx_, PORT, IBV_MTU_4096);
+    local_ = local;
+    for (std::uint64_t s = 0; s < ring_.slots; ++s) {
+        post_recv(s);
+    }
+    qp.to_rts(/*sq_psn=*/0);
+    return PeerRef{
+        .rkey = ntohl(peer.rkey),
+        .remote_addr = 0,
+        .size = ring_.region_bytes(),
+    };
+}
+
 template <class Role> void VerbsSessionBase<Role>::post_recv(std::uint64_t slot) {
     // A SEND lands in the buffer its receive request names; a write with immediate needs none.
     ibv_sge sge{
-        .addr = reinterpret_cast<std::uint64_t>(local_.addr) + ring_.slot_offset(slot),
+        .addr = (cuqr_.cudaq_peer ? 0 : reinterpret_cast<std::uint64_t>(local_.addr)) +
+                ring_.slot_offset(slot), // a cudaq peer's ring is registered at iova 0
         .length = ring_.stride,
         .lkey = local_.lkey,
     };
     ibv_recv_wr wr{
         .wr_id = slot,
-        .sg_list = cuqr_write_imm_ ? nullptr : &sge,
-        .num_sge = cuqr_write_imm_ ? 0 : 1,
+        .sg_list = cuqr_.write_imm ? nullptr : &sge,
+        .num_sge = cuqr_.write_imm ? 0 : 1,
     };
     ibv_recv_wr *bad = nullptr;
     const int rc = ibv_post_recv(recv_qp(), &wr, &bad);
@@ -277,7 +319,7 @@ bool VerbsSessionBase<Role>::wait_recv(std::uint64_t cursor, std::stop_token st)
     TP_CHECK(wc.status == IBV_WC_SUCCESS, "%s: receive completion status=%d", backend_, wc.status);
     // Receive requests complete in the order they were posted, so a SEND filled `slot`; a write
     // names its slot in the immediate.
-    const std::uint64_t got = cuqr_write_imm_ ? ntohl(wc.imm_data) : wc.wr_id;
+    const std::uint64_t got = cuqr_.write_imm ? ntohl(wc.imm_data) : wc.wr_id;
     TP_CHECK(got == slot, "%s: a CUQR message arrived for slot %llu, expected slot %llu", backend_,
              static_cast<unsigned long long>(got), static_cast<unsigned long long>(slot));
     // Repost now: the peer reaches this slot again only after wrapping the whole ring, which it
