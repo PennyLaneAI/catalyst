@@ -65,9 +65,17 @@ The RDMA transport backends need ``libibverbs-dev`` and a verbs device that ``ib
 lists. Soft-RoCE counts, so an RDMA NIC is not required to run them. GPU coprocessor backends need
 ROCm on the machine that builds them and the GPU on the machine that runs them.
 
-Transport backends are not shipped in the Catalyst wheel. An out-of-tree backend is found through
-``CATALYST_TRANSPORT_PATH``, a ``:``-separated list of directories searched ahead of the
-installation's own library directory.
+Transport backends are not shipped in the Catalyst wheel. An out-of-tree backend's libraries are
+found through ``CATALYST_TRANSPORT_PATH``, a ``:``-separated list of directories searched ahead of
+the installation's own library directory. The backend itself is registered either by a
+``catalyst_transport_backends.json`` manifest in one of those directories or by a
+``catalyst.transport_backends`` entry point of an installed package. Both give a list of
+:func:`catalyst.backline.register_backend` arguments, for example:
+
+.. code-block:: json
+
+    [{"name": "example_backend", "transport": "example", "hardware": "cpu",
+      "roles": ["controller", "coprocessor"], "max_payload_bytes": 1024}]
 
 Running against remote hardware also needs a deployed bundle on each remote machine, holding the
 ``catalyst-executor`` binary and the runtime libraries the dispatched code loads. The
@@ -194,13 +202,27 @@ A transport is characterized by:
 - a **role**, distinguishing the controller which drives requests from the coprocessor which
   handles them, for instance by running a decoder kernel.
 
-Catalyst resolves a placement's transport name and a node's hardware to a concrete backend
-library, named ``libcatalyst_transport_<backend>_<role>.so``. The pairs currently mapped are
-``rdma`` with ``cpu``, ``gpu``, or ``fpga``, and ``memcpy`` with ``cpu`` or ``gpu``.
+Catalyst picks a node's backend from a registry. A backend qualifies when it implements the
+placement's transport on the node's hardware, provides the node's role and carries the placement's
+message sizes. A default backend is preferred, and a node can name another with
+``backend=name``. The controller's and coprocessors' backends must share a frame
+layout. The backend's library is named ``libcatalyst_transport_<backend>_<role>.so``.
+
+The built-in backends are:
+
+* ``rdma``: ``cpu_verbs`` on ``cpu``, ``gpu_verbs`` on ``gpu``, and ``hwhs`` on ``fpga``.
+  ``fpga_verbs`` is also available on ``fpga`` when named.
+* ``memcpy``: ``memcpy`` on ``cpu`` and ``memcpy_gpu`` on ``gpu``.
 
 A backend is a shared library implementing ``ControllerSession`` or ``CoprocessorSession`` from
 ``runtime/include/Transport.hpp`` and exporting the matching factory symbol declared in
-``runtime/include/TransportBackend.h``. A session follows a strict lifecycle:
+``runtime/include/TransportBackend.h``. It also reports the transport ABI version it was built for
+and its capabilities (roles, memory kinds, frame modes, message sizes and coprocessor conventions)
+through ``CatalystTransportAbiVersion`` and ``CatalystTransportQueryCaps``, which the
+``CATALYST_TRANSPORT_BACKEND_CAPS`` macro defines. The loader refuses a backend built for a newer
+ABI, or asked for a role it does not report. A backend exporting neither symbol is loaded as
+version 1, limited to 16 B frames. The session interface only grows, so a backend keeps working
+with later runtimes. A session follows a strict lifecycle:
 
 ``connect``
     Bring up the connection and the out-of-band channel used to arrange direct data transfers.
@@ -438,11 +460,11 @@ Current limitations
 As an experimental feature, several components are provisional. Each of these can change as the
 platform is built out.
 
-**Fixed remote memory slab.**
-    A session reserves a single 1 GB slab on the remote for the sections of every object it loads
-    (``.text``, ``.rodata``, and so on), released when the session is destroyed. The size is a
-    compile-time constant in ``runtime/lib/executor/ExecutorSession.cpp`` and is not currently
-    tunable at runtime.
+**Single remote memory slab.**
+    A session reserves a single slab on the remote for the sections of every object it loads
+    (``.text``, ``.rodata``, and so on), released when the session is destroyed. It is 1 GB unless
+    the ``CATALYST_REMOTE_SLAB_BYTES`` environment variable of the process opening the session sets
+    another size in bytes.
 
 **Fixed transport reply region.**
     A transport session provisions a 16 KB local reply region at ``exchange_keys``. The size is a
@@ -455,16 +477,11 @@ platform is built out.
     or index element type. This keeps the wire format a flat buffer with no descriptor
     marshalling, at the cost of ruling out kernels with other signatures.
 
-**Overlapping interfaces.**
-    ``qp.runtime_declare`` and ``qp.runtime_call`` declare and invoke external symbols directly
-    by C symbol name, and can themselves be dispatched to an executor. These lower-level entry
-    points coexist with the Backline placement frontend and are expected to be consolidated.
-
-**Transport backends are build-time.**
-    A transport backend is selected by resolving the placement's transport name and the node's
-    hardware against a fixed table in ``catalyst.backline``. Adding a backend to that table
-    requires a Catalyst change, even though the backend itself loads as an out-of-tree shared
-    library.
+**Two ways to call coprocessor code.**
+    The supported way is a placement with ``qp.backline.decode`` (or ``qec_code=``).
+    ``qp.runtime_declare`` and ``qp.runtime_call`` are an advanced, lower-level alternative: they
+    call external symbols directly by C symbol name, and can themselves be dispatched to an
+    executor.
 
 .. _Backline module documentation: https://docs.pennylane.ai/en/latest/code/qp_backline.html
 .. _pennylane.backline: https://docs.pennylane.ai/en/latest/code/qp_backline.html
