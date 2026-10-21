@@ -47,15 +47,6 @@ struct PrepOptions {
 using LowerModifiersFn = mlir::function_ref<mlir::LogicalResult(mlir::Operation *)>;
 
 /**
- * @brief Parse a graphOpId string into an OperatorNode.
- *
- * The graphOpId format is "<name>{params}{wires}{static}[uid]", where <name> already
- * carries any name-wrapped op-level modifiers produced by `defaultGetGraphOpId`, e.g.
- * "C(Adjoint(RX)){0:[f64]}{wires:1}{}".
- */
-DecompGraph::Core::OperatorNode parseOperator(llvm::StringRef raw);
-
-/**
  * @brief Prepare a decomposition graph from a module.
  *
  * Invokes `lowerModifiers` to strip `quantum.ctrl` / `quantum.adjoint` regions
