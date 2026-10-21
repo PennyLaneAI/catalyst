@@ -86,7 +86,16 @@ MemRegion VerbsSessionBase<Role>::alloc_memory(std::size_t size, MemKind kind) {
     caller_memory_regions_.push_back(MemoryRegion::alloc_host(
         pd_, size, PAGE_ALIGN, MemAccess::LOCAL_WRITE | MemAccess::REMOTE_WRITE,
         /*zero_iova=*/cuqr_.cudaq_peer));
-    const MemoryRegion &mr = caller_memory_regions_.back();
+    if (cuqr_.cudaq_peer) {
+        // The peer addresses the ring from 0, but the driver may copy a small message into a
+        // receive buffer with the CPU (mlx5 delivers it through the completion entry), so receive
+        // requests name the ring by its address, through a second, local registration.
+        void *addr = caller_memory_regions_.back().addr();
+        caller_memory_regions_.emplace_back(pd_, addr, size, MemAccess::LOCAL_WRITE);
+        recv_lkey_ = caller_memory_regions_.back().lkey();
+    }
+    const MemoryRegion &mr =
+        caller_memory_regions_[caller_memory_regions_.size() - (cuqr_.cudaq_peer ? 2 : 1)];
     return MemRegion{
         .addr = mr.addr(),
         .size = size,
@@ -295,16 +304,18 @@ PeerRef VerbsSessionBase<Role>::exchange_keys_with_cudaq(const MemRegion &local)
 template <class Role> void VerbsSessionBase<Role>::post_recv(std::uint64_t slot) {
     // A SEND lands in the buffer its receive request names; a write with immediate ignores it. Both
     // can arrive whichever verb this end sends by: a cudaq-realtime server always answers by SEND.
+    // A GPU ring takes writes with immediate only, as the driver may copy a small SEND into its
+    // buffer with the CPU; with no buffer named, a SEND fails visibly instead.
+    const bool gpu = local_.kind == MemKind::GpuHbm;
     ibv_sge sge{
-        .addr = (cuqr_.cudaq_peer ? 0 : reinterpret_cast<std::uint64_t>(local_.addr)) +
-                ring_.slot_offset(slot), // a cudaq peer's ring is registered at iova 0
+        .addr = reinterpret_cast<std::uint64_t>(local_.addr) + ring_.slot_offset(slot),
         .length = ring_.stride,
-        .lkey = local_.lkey,
+        .lkey = recv_lkey_ != 0 ? recv_lkey_ : local_.lkey,
     };
     ibv_recv_wr wr{
         .wr_id = slot,
-        .sg_list = &sge,
-        .num_sge = 1,
+        .sg_list = gpu ? nullptr : &sge,
+        .num_sge = gpu ? 0 : 1,
     };
     ibv_recv_wr *bad = nullptr;
     const int rc = ibv_post_recv(recv_qp(), &wr, &bad);

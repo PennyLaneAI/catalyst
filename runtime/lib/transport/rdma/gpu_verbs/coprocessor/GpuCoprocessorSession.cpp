@@ -40,7 +40,13 @@ constexpr QpShape FWD_QP_SHAPE{.sq_depth = 16, .cq_depth = 256, .inline_max = 0}
 
 GpuCoprocessorSession::GpuCoprocessorSession(std::string dev, int gid_idx, int gpu_device,
                                              frame::RingGeometry ring, common::CuqrConfig cuqr)
-    : Base(std::move(dev), gid_idx, "gpu_verbs", FWD_QP_SHAPE, ring, cuqr), gpu_(gpu_device) {}
+    : Base(std::move(dev), gid_idx, "gpu_verbs", FWD_QP_SHAPE, ring, cuqr), gpu_(gpu_device) {
+    // mlx5 hands a small SEND to the CPU to copy into its receive buffer, which in GPU memory it
+    // cannot, so requests must be writes with immediate (a cudaq-realtime client picks its own).
+    TP_CHECK(ring.mode != frame::Mode::CUQR || cuqr.write_imm || cuqr.cudaq_peer,
+             "gpu_verbs: CUQR requests reach GPU memory only by write with immediate; set "
+             "cuqr_tx=write_imm");
+}
 
 MemRegion GpuCoprocessorSession::alloc_memory(std::size_t size, MemKind kind) {
     TP_CHECK(kind == MemKind::GpuHbm, "gpu_verbs: only MemKind::GpuHbm supported");

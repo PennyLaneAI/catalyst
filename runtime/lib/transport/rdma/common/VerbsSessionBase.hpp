@@ -120,6 +120,7 @@ template <class Role> class VerbsSessionBase : public Role {
     std::optional<common::MemoryRegion> send_buf_; // local send source (one frame)
     frame::RingGeometry ring_;                     // both rings, local and the peer's
     CuqrConfig cuqr_;                              // how CUQR frames complete, and to whom
+    std::uint32_t recv_lkey_ = 0; // a cudaq peer's ring: the local registration receives use
     MemRegion local_{};
     PeerRef peer_{};
     ChannelDesc desc_{};
