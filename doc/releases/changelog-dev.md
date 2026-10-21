@@ -1197,7 +1197,7 @@
   [(#3303)](https://github.com/PennyLaneAI/catalyst/pull/3303)
 
 * Tests now use `qp.testing.find_eqns` from PennyLane instead of hand-written equation filters.
-  [(#XXXX)](https://github.com/PennyLaneAI/catalyst/pull/XXXX)
+  [(#3381)](https://github.com/PennyLaneAI/catalyst/pull/3381)
 
 <h3>Documentation 📝</h3>
 
