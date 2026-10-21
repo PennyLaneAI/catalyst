@@ -41,6 +41,8 @@ int main(int argc, char **argv) {
     std::uint32_t correction_bytes = sizeof(std::uint64_t);
     // Rounds the controller runs; with more than one it reports RTT percentiles.
     std::uint32_t rounds = 1;
+    // --frame cuqr selects cudaq-realtime's frames, completed with --tx send or write_imm.
+    bool cuqr = false, write_imm = false;
     for (int i = 1; i + 1 < argc; i += 2) {
         std::string k = argv[i], v = argv[i + 1];
         if (k == "--role") {
@@ -59,24 +61,30 @@ int main(int argc, char **argv) {
             correction_bytes = static_cast<std::uint32_t>(std::strtoul(v.c_str(), nullptr, 0));
         } else if (k == "--rounds") {
             rounds = static_cast<std::uint32_t>(std::strtoul(v.c_str(), nullptr, 0));
+        } else if (k == "--frame") {
+            cuqr = v == "cuqr";
+        } else if (k == "--tx") {
+            write_imm = v == "write_imm";
         }
     }
     const bool is_coprocessor = (role == "coprocessor");
     // Both roles derive the same ring from the message sizes, as the compiler's frame keys make
     // them.
     const std::size_t largest = std::max(syndrome_bytes, correction_bytes);
-    const auto ring = frame::geometry_for(
-        largest <= PAYLOAD_DATA_BYTES ? frame::Mode::BL16 : frame::Mode::BLV, largest);
+    const auto ring = frame::geometry_for(cuqr                            ? frame::Mode::CUQR
+                                          : largest <= PAYLOAD_DATA_BYTES ? frame::Mode::BL16
+                                                                          : frame::Mode::BLV,
+                                          largest);
 
     std::unique_ptr<TransportSession> s;
     CpuCoprocessorSession *coproc = nullptr;
     CpuControllerSession *controller = nullptr;
     if (is_coprocessor) {
-        auto up = std::make_unique<CpuCoprocessorSession>(dev, gid, ring);
+        auto up = std::make_unique<CpuCoprocessorSession>(dev, gid, ring, write_imm);
         coproc = up.get();
         s = std::move(up);
     } else {
-        auto up = std::make_unique<CpuControllerSession>(dev, gid, ring);
+        auto up = std::make_unique<CpuControllerSession>(dev, gid, ring, write_imm);
         controller = up.get();
         s = std::move(up);
     }
@@ -144,8 +152,11 @@ int main(int argc, char **argv) {
             std::fprintf(stderr,
                          "[controller] %s %u B in, %u B out, %u rounds: RTT p50=%.2f us p99=%.2f "
                          "us max=%.2f us\n",
-                         ring.mode == frame::Mode::BL16 ? "BL16" : "BLV", syndrome_bytes,
-                         correction_bytes, rounds, pct(0.50) / 1e3, pct(0.99) / 1e3,
+                         ring.mode == frame::Mode::BL16 ? "BL16"
+                         : ring.mode == frame::Mode::BLV
+                             ? "BLV"
+                             : (write_imm ? "CUQR/write_imm" : "CUQR/send"),
+                         syndrome_bytes, correction_bytes, rounds, pct(0.50) / 1e3, pct(0.99) / 1e3,
                          rtt_ns.back() / 1e3);
         }
     }

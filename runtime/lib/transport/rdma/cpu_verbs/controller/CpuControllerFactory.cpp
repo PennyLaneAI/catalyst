@@ -33,5 +33,6 @@ catalyst::transport::ControllerSession *make_cpu_controller(const std::string &c
 GENERATE_TRANSPORT_CONTROLLER_FACTORY(CatalystTransportController, make_cpu_controller)
 CATALYST_TRANSPORT_BACKEND_CAPS("cpu_verbs", CATALYST_TRANSPORT_ROLE_BIT_CONTROLLER,
                                 CATALYST_TRANSPORT_MEM_BIT(CpuRam),
-                                CATALYST_TRANSPORT_FRAME_BL16 | CATALYST_TRANSPORT_FRAME_BLV, 0,
-                                UINT32_MAX, UINT32_MAX, 1)
+                                CATALYST_TRANSPORT_FRAME_BL16 | CATALYST_TRANSPORT_FRAME_BLV |
+                                    CATALYST_TRANSPORT_FRAME_CUQR,
+                                0, UINT32_MAX, UINT32_MAX, 1)

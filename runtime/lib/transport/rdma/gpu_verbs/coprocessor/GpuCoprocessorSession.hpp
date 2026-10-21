@@ -67,6 +67,12 @@ class GpuCoprocessorSession : public common::VerbsSessionBase<CoprocessorSession
 
   private:
     void run_coprocessor(std::stop_token st);
+    void run_cuqr(std::stop_token st);
+    // CUQR's per-slot arrival and reply flags (CoprocLaunchDesc), after the handoff ring.
+    std::uint32_t *rx_flags_host() {
+        return reinterpret_cast<std::uint32_t *>(handoff_.host + ring_.region_bytes());
+    }
+    std::uint32_t *tx_flags_host() { return rx_flags_host() + ring_.slots; }
     // Stage the kernel's reply frame and post one RDMA_WRITE, inline when it fits. Returns true
     // if this send was signaled (selective signalling: 1 in SIGNAL_EVERY), so the caller can
     // track the signaled-completion count.
