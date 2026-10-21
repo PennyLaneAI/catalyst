@@ -1306,20 +1306,8 @@ class TestSymbolicRules:
         # Only one control on: the target must be left alone.
         assert np.allclose(run([1]), 1.0)
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason="A <n>C(...) graphOpId records only the control count, so an operator with a zero "
-        "control value is handed a rule traced for all-ones controls. Fixed by normalizing zero "
-        "control values into X flips during capture; see the FIXME in symbolic_arguments.",
-    )
     def test_zero_control_value_is_mislowered(self):
-        """Test an operator with a zero control value decomposes to the right state.
-
-        The registered symbolic rule is traced with every control value on, so the flips a zero
-        value needs are missing from the lowered body and the controlled op fires on the wrong
-        branch. The distribution pathway is unaffected: its ``qref.ctrl`` region is given the
-        control values at runtime.
-        """
+        """Test an operator with a zero control value decomposes to the right state."""
 
         class ZeroCtrl(qp.core.Operator2):
             """An operator whose controlled form is a CNOT from the control onto its wire."""
@@ -1331,8 +1319,8 @@ class TestSymbolicRules:
         def x_rule(wires):
             qp.X(wires=wires)
 
-        @register_resources(lambda base, control_wires, **_: {qp.CNOT: 1})
-        def ctrl_rule(base, control_wires, **_):
+        @register_resources(lambda base, control_wires, control_values: {qp.CNOT: 1})
+        def ctrl_rule(base, control_wires, control_values):
             qp.CNOT(wires=list(control_wires) + list(base.wires))
 
         with local_decomps():
