@@ -24,6 +24,10 @@ namespace catalyst::transport::coproc {
 extern "C" int gpu_echo_launcher(const CoprocLaunchDesc *desc, void *ctx);
 extern "C" int gpu_steane_launcher(const CoprocLaunchDesc *desc, void *ctx);
 
+// Each launcher's `_info`: built for this runtime's frame layout (see CoprocLaunchDesc).
+extern "C" const CatalystCoprocessorFnInfo *gpu_echo_launcher_info();
+extern "C" const CatalystCoprocessorFnInfo *gpu_steane_launcher_info();
+
 // Built-in launcher the session uses when no launcher is bound
 // (coproc_launcher_ == nullptr); identical to the echo launcher.
 int default_echo_launcher(const CoprocLaunchDesc *desc, void *ctx);

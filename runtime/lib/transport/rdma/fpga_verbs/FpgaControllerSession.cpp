@@ -282,13 +282,15 @@ void FpgaControllerSession::commit_work_item(std::uint32_t work_item_idx, std::u
     TP_CHECK(work_item_idx < K_NUM_WORK_ITEMS,
              "commit_work_item: work_item_idx out of range (0..15)");
     TP_CHECK(in_bytes != 0, "commit_work_item: in_bytes is 0");
-    TP_CHECK(in_bytes <= stride_, "commit_work_item: in_bytes exceeds ring-slot stride");
-    TP_CHECK(out_bytes <= stride_, "commit_work_item: out_bytes exceeds ring-slot stride");
+    // The 16 B frame carries 8 B each way; fn_id and seq follow the payload in the same frame.
+    TP_CHECK(in_bytes <= PAYLOAD_DATA_BYTES && out_bytes <= PAYLOAD_DATA_BYTES,
+             "commit_work_item: fpga_verbs carries 16 B frames, so at most %zu B each way, not "
+             "%zu B in and %zu B out",
+             PAYLOAD_DATA_BYTES, static_cast<std::size_t>(in_bytes),
+             static_cast<std::size_t>(out_bytes));
 
-    // Always transfer at least a full Payload so the reader sees a complete
-    // framed message (value + seq trailer), even if the decode input is smaller.
-    std::uint32_t xfer = (in_bytes < sizeof(Payload)) ? static_cast<std::uint32_t>(sizeof(Payload))
-                                                      : static_cast<std::uint32_t>(in_bytes);
+    // Each round sends exactly one frame.
+    const auto xfer = static_cast<std::uint32_t>(sizeof(Payload));
 
     ibv_send_wr &wr = wr_[work_item_idx];
     ibv_sge &sge = sge_[work_item_idx];
@@ -320,7 +322,8 @@ void *FpgaControllerSession::data_slot() {
 void FpgaControllerSession::write_data_slot(const void *src, std::uint64_t bytes,
                                             std::uint32_t decoder_id) {
     TP_CHECK(out_.va != 0, "write_data_slot before establish_channel()");
-    TP_CHECK(bytes <= stride_, "write_data_slot: bytes exceeds ring-slot capacity");
+    TP_CHECK(bytes <= PAYLOAD_DATA_BYTES,
+             "write_data_slot: bytes exceeds the 16 B frame's payload");
     pending_decoder_ = decoder_id;
     std::uint32_t slot = static_cast<std::uint32_t>(submitted_ % ring_slots_);
     auto *dst = reinterpret_cast<volatile std::uint8_t *>(
@@ -379,7 +382,9 @@ int FpgaControllerSession::kick(std::uint32_t work_item_idx) {
     return 0;
 }
 
-// TODO: build and read frames through the frame codec (Frame.hpp), as cpu_verbs does.
+// The frames here are the codec's 16 B layout (Payload), but written and read field by field
+// through volatile pointers rather than by the codec's functions: the rings live in device-mapped
+// FPGA memory, where memcpy and wide or exclusive accesses fault (see set_zero).
 volatile PayloadSlot *FpgaControllerSession::poll_message_arrival(std::uint64_t cursor) {
     std::uint32_t slot = static_cast<std::uint32_t>(cursor % ring_slots_);
     std::uint32_t expected = static_cast<std::uint32_t>(cursor + 1);
