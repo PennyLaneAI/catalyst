@@ -23,6 +23,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest import mock
 
+import jax.numpy as jnp
 import numpy as np
 import pennylane as qp
 import pytest
@@ -216,12 +217,15 @@ def test_coprocessor_fn_config_without_a_node_config():
     reason="the installed PennyLane's CoprocessorFunction declares no message sizes",
 )
 def test_coprocessor_fn_config_carries_the_placement_message_sizes():
-    """A function's init receives the sizes the placement commits, after its own keys."""
+    """A function's init receives the sizes the placement commits, after its own keys. Messages
+    above 8 B also give the session BLV frames, written ahead of the function's keys."""
     fn = qp.CoprocessorFunction("coproc_fn", config="model=/m.onnx", message_bytes=(120, 121))
     coproc = _coproc("cop0", fn=fn, init_args={"backend_lib": "backend.so"})
     dev = qp.Backline(controller=_controller(), coprocessors=[coproc], transport="memcpy")
     d = serialize_backline(dev.placement)
-    assert d["coprocessors"][0]["config"] == "fn.model=/m.onnx;fn.in_bytes=120;fn.out_bytes=121"
+    assert d["coprocessors"][0]["config"] == (
+        "frame=blv;frame_payload=121;fn.model=/m.onnx;fn.in_bytes=120;fn.out_bytes=121"
+    )
     assert (d["controller"]["in_bytes"], d["controller"]["out_bytes"]) == (120, 121)
 
 
@@ -732,6 +736,53 @@ class TestBacklineDemoIntegration:
     that call the QNode also execute it, so they need the transport backend libraries and the
     decoder library reachable to the dynamic loader.
     """
+
+    @pytest.mark.parametrize("transport", ["memcpy", "rdma"])
+    def test_messages_larger_than_8_bytes_round_trip(
+        self, use_capture, stop_node_executors, transport
+    ):
+        """BLV frames carry 64 B each way through a compiled program: over memcpy, and over RDMA on
+        the ``rxe0`` soft-RoCE device to a coprocessor in an executor subprocess, as the roles
+        deploy."""
+        echo_lib = str(
+            Path(get_lib_path("runtime", "RUNTIME_LIB_DIR")) / "libecho_coprocessor_cpu.so"
+        )
+        rdma = transport == "rdma"
+        init_args = {"config": "dev=rxe0;gid=1"} if rdma else {}
+        ctrl = qp.Controller(
+            name="cpu-controller",
+            device=qp.device("lightning.qubit", wires=1),
+            in_bytes=64,
+            out_bytes=64,
+            init_args=init_args,
+        )
+        coproc = qp.Coprocessor(
+            name="cpu-coproc",
+            coprocessor_fn=qp.CoprocessorFunction("echo_coprocessor", lib_path=echo_lib),
+            endpoint=qp.Endpoint("127.0.0.1", 18733) if rdma else None,
+            executor_options={} if rdma else None,
+            init_args=init_args,
+        )
+        stop_node_executors(coproc)
+        try:
+            dev = qp.Backline(controller=ctrl, coprocessors=[coproc], transport=transport)
+        except ValueError as e:
+            if "carries at most" in str(e):
+                pytest.skip("this PennyLane limits RDMA messages to 8 B")
+            raise
+
+        # A QNode returns measurements, so the reply is checked inside it: the qubit is flipped
+        # only if all 64 bytes came back.
+        @qjit(capture=True)
+        @qp.qnode(dev)
+        def echo():
+            payload = jnp.arange(64, dtype=jnp.uint8)
+            reply = qp.backline.decode(payload, bitpack=False)
+            qp.cond(jnp.all(reply == payload), qp.X)(wires=0)
+            return qp.expval(qp.Z(0))
+
+        assert "frame=blv;frame_payload=64" in echo.mlir
+        assert echo() == pytest.approx(-1.0)
 
     def test_an_out_of_tree_backend_from_a_manifest_runs_demo_1(
         self, use_capture, isolated_registry, tmp_path, monkeypatch
@@ -1941,10 +1992,10 @@ class TestBackendRegistry:
 
     def test_selection_respects_message_sizes(self, isolated_registry):
         """A backend that cannot carry the placement's messages is not picked."""
-        with pytest.raises(ValueError, match="carrying 16 B requests"):
-            _select_backend("rdma", "cpu", "controller", in_bytes=16, out_bytes=8)
-        register_backend("wide_verbs", "rdma", "cpu", ["controller"], max_payload_bytes=1024)
-        assert _select_backend("rdma", "cpu", "controller", 16, 8).name == "wide_verbs"
+        with pytest.raises(ValueError, match="carrying 2048 B requests"):
+            _select_backend("rdma", "gpu", "coprocessor", in_bytes=2048, out_bytes=8)
+        register_backend("wide_verbs", "rdma", "gpu", ["coprocessor"], max_payload_bytes=4096)
+        assert _select_backend("rdma", "gpu", "coprocessor", 2048, 8).name == "wide_verbs"
         assert _select_backend("memcpy", "cpu", "controller", 4096, 4096).name == "memcpy"
 
     def test_manifest_on_the_search_path_registers_backends(
@@ -1972,7 +2023,7 @@ class TestBackendRegistry:
         assert _resolve_backend("pkg", "gpu") == "pkg_verbs"
 
     def test_controller_and_coprocessor_must_share_a_frame_layout(self, isolated_registry):
-        """Two backends that speak no common frame cannot exchange messages."""
+        """A backend that does not speak the placement's frame layout cannot exchange messages."""
         register_backend("net_ctrl", "net", "cpu", ["controller"], frame_modes=("bl16",))
         register_backend("net_cop", "net", "gpu", ["coprocessor"], frame_modes=("other",))
         dev = qp.Backline(
@@ -1980,7 +2031,7 @@ class TestBackendRegistry:
             coprocessors=[_coproc("cop0", hardware="gpu", init_args={})],
             transport="net",
         )
-        with pytest.raises(CompileError, match="share no frame layout"):
+        with pytest.raises(CompileError, match="'net_cop' carries \\['other'\\] frames"):
             serialize_backline(dev.placement)
 
     def test_a_backend_name_is_read_but_not_forwarded(self, isolated_registry, flat_lib_dir):
@@ -1991,6 +2042,68 @@ class TestBackendRegistry:
         node = serialize_backline(dev.placement)["controller"]
         assert node["backend_lib"].endswith("libcatalyst_transport_fpga_verbs_controller.so")
         assert "backend" not in node
+
+    def test_messages_of_up_to_8_bytes_keep_the_16_byte_frame(self):
+        """Such placements get no frame entries, so they compile exactly as before."""
+        dev = qp.Backline(
+            controller=_controller(init_args={}),
+            coprocessors=[_coproc("cop0", init_args={})],
+            transport="memcpy",
+        )
+        d = serialize_backline(dev.placement)
+        assert "frame" not in d["controller"].get("config", "")
+        assert "frame=" not in d["coprocessors"][0]["config"]
+
+    @pytest.mark.parametrize("in_bytes, out_bytes", [(64, 16), (4, 9)])
+    def test_larger_messages_select_blv_frames_on_both_ends(self, in_bytes, out_bytes):
+        """Both ends of a session get the same layout, sized for the larger message."""
+        dev = qp.Backline(
+            controller=_controller(init_args={}, in_bytes=in_bytes, out_bytes=out_bytes),
+            coprocessors=[_coproc("cop0", init_args={})],
+            transport="memcpy",
+        )
+        d = serialize_backline(dev.placement)
+        largest = max(in_bytes, out_bytes)
+        assert d["controller"]["config"] == f"frame=blv;frame_payload={largest}"
+        assert d["coprocessors"][0]["config"].startswith(f"frame=blv;frame_payload={largest};fn.")
+
+    def test_a_backend_without_blv_frames_cannot_carry_larger_messages(self, isolated_registry):
+        """A backend speaking only the 16 B frame is refused for messages above 8 B."""
+        register_backend(
+            "bl16_only",
+            "net",
+            "cpu",
+            ["controller", "coprocessor"],
+            max_payload_bytes=None,
+            max_reply_bytes=None,
+        )
+        dev = qp.Backline(
+            controller=_controller(init_args={}, in_bytes=64),
+            coprocessors=[_coproc("cop0", init_args={})],
+            transport="net",
+        )
+        with pytest.raises(CompileError, match="64 B messages need 'blv' frames"):
+            serialize_backline(dev.placement)
+
+    def test_a_persistent_gpu_kernel_carries_at_most_8_bytes(self):
+        """GPU kernels read 16 B frames; only per-message functions take larger messages."""
+        dev = qp.Backline(
+            controller=_controller(init_args={}, in_bytes=64),
+            coprocessors=[_coproc("gpu0", hardware="gpu", init_args={})],
+            transport="memcpy",
+        )
+        with pytest.raises(CompileError, match="persistent GPU kernel"):
+            serialize_backline(dev.placement)
+
+    def test_a_node_config_cannot_set_the_frame_layout(self):
+        """The frame layout is the compiler's to choose, from the placement's message sizes."""
+        dev = qp.Backline(
+            controller=_controller(init_args={"config": "frame=blv"}),
+            coprocessors=[_coproc("cop0", init_args={})],
+            transport="memcpy",
+        )
+        with pytest.raises(CompileError, match="'frame' is reserved"):
+            serialize_backline(dev.placement)
 
     def test_built_in_rows_match_what_the_built_libraries_report(self):
         """The registry and CatalystTransportQueryCaps describe each in-tree backend alike."""

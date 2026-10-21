@@ -17,9 +17,11 @@
 #include <cstring>
 #include <string>
 #include <thread>
+#include <vector>
 
 #include "CpuControllerSession.hpp"
 #include "CpuCoprocessorSession.hpp"
+#include "Frame.hpp"
 #include "WireProtocol.hpp"
 
 #include <catch2/catch_test_macros.hpp>
@@ -46,8 +48,8 @@ static bool have_rxe() {
 
 // A custom coprocessor function (bitwise-invert) to exercise the set_coprocessor_fn
 // path with a non-null, non-echo function.
-static std::size_t invert_fn(const void *in, std::size_t in_len, void *out, std::size_t out_cap,
-                             void * /*ctx*/) {
+static std::size_t invert_fn(const void *in, std::size_t in_len, std::uint32_t /*fn_id*/, void *out,
+                             std::size_t out_cap, void * /*ctx*/) {
     std::uint64_t v = 0;
     std::memcpy(&v, in, std::min(in_len, sizeof(v)));
     v = ~v;
@@ -234,4 +236,70 @@ TEST_CASE("round-trip with a custom coprocessor function runs on the coprocessor
 
     REQUIRE(got == ~DEMO_SYNDROME); // controller received the coprocessor's result
     REQUIRE(got != DEMO_SYNDROME);  // and it is not a mere echo
+}
+
+// Replies with each payload byte plus the fn_id, for as many bytes as the reply holds, and
+// records the payload length it was handed.
+static std::size_t g_blv_len = 0;
+static std::size_t add_fn_id(const void *in, std::size_t in_len, std::uint32_t fn_id, void *out,
+                             std::size_t out_cap, void * /*ctx*/) {
+    g_blv_len = in_len;
+    const std::size_t n = std::min(in_len, out_cap);
+    for (std::size_t i = 0; i < n; ++i) {
+        static_cast<std::uint8_t *>(out)[i] =
+            static_cast<std::uint8_t>(static_cast<const std::uint8_t *>(in)[i] + fn_id);
+    }
+    return n;
+}
+
+TEST_CASE("cpu_verbs carries messages larger than 8 B in BLV frames", "[cpu_libibverbs]") {
+    if (!have_rxe()) {
+        SKIP("no rxe0 RDMA device");
+    }
+    namespace frame = catalyst::transport::common::frame;
+    // 64 B fits a 128 B slot and is sent inline; 1000 B needs a 2 KiB slot, sent from the
+    // registered buffer because it exceeds the queue pair's inline capacity.
+    for (const std::size_t in_bytes : {std::size_t{64}, std::size_t{1000}}) {
+        const std::size_t out_bytes = in_bytes / 2;
+        const auto ring = frame::geometry_for(frame::Mode::BLV, in_bytes);
+        const auto port = static_cast<std::uint16_t>(in_bytes == 64 ? 18598 : 18599);
+        std::thread t([&] {
+            CpuCoprocessorSession coproc("rxe0", 1, ring);
+            coproc.connect(ConnectInfo{.peer = "127.0.0.1", .oob_port = port});
+            MemRegion m = coproc.alloc_memory(ring.region_bytes(), MemKind::CpuRam);
+            PeerRef p = coproc.exchange_keys(m);
+            coproc.establish_channel(ChannelDesc{.transport = "rdma"}, m, p);
+            coproc.set_coprocessor_fn(add_fn_id, nullptr);
+            coproc.start();
+            std::uint64_t first = 0;
+            void *outs[1] = {&first};
+            std::uint64_t obytes[1] = {sizeof(first)};
+            coproc.collect(outs, obytes, 1);
+            coproc.stop();
+        });
+        CpuControllerSession controller("rxe0", 1, ring);
+        controller.connect(ConnectInfo{.peer = "127.0.0.1", .oob_port = port});
+        MemRegion m = controller.alloc_memory(ring.region_bytes(), MemKind::CpuRam);
+        PeerRef p = controller.exchange_keys(m);
+        controller.establish_channel(ChannelDesc{.transport = "rdma"}, m, p);
+        controller.commit_work_item(0, in_bytes, out_bytes);
+        controller.start();
+        std::vector<std::uint8_t> request(in_bytes);
+        for (std::size_t i = 0; i < in_bytes; ++i) {
+            request[i] = static_cast<std::uint8_t>(i);
+        }
+        controller.write_data_slot(request.data(), in_bytes, /*decoder_id=*/3);
+        controller.kick(0);
+        std::vector<std::uint8_t> reply(out_bytes);
+        void *outs[1] = {reply.data()};
+        std::uint64_t obytes[1] = {out_bytes};
+        REQUIRE(controller.collect(outs, obytes, 1) == 0);
+        controller.stop();
+        t.join();
+
+        CHECK(g_blv_len == in_bytes); // the payload's own length, not a padded frame
+        for (std::size_t i = 0; i < out_bytes; ++i) {
+            REQUIRE(reply[i] == static_cast<std::uint8_t>(i + 3));
+        }
+    }
 }

@@ -69,10 +69,7 @@ void CpuControllerSession::establish_channel(const ChannelDesc &desc, const MemR
     TP_CHECK(desc.transport == "memcpy", "Only transport=memcpy is supported");
 }
 
-void CpuControllerSession::start() {
-    rtt_ns_ = 0;
-    next_send_ = 0;
-}
+void CpuControllerSession::start() { rtt_ns_ = 0; }
 
 int CpuControllerSession::collect(void *const *replies, const std::uint64_t *replies_bytes,
                                   std::size_t n) {
@@ -95,9 +92,15 @@ void CpuControllerSession::commit_work_item(std::uint32_t work_item_idx, std::ui
                                             std::uint64_t out_bytes) {
     TP_CHECK(work_item_idx == 0, "Only work_item_idx=0 supported");
     TP_CHECK(!committed_, "Only one commit_work_item per session");
+    const std::size_t cap = common::frame::data_capacity(ring_);
+    TP_CHECK(in_bytes <= cap && out_bytes <= cap,
+             "Messages of %llu B in and %llu B out exceed the %zu B this session's frames carry; "
+             "its config needs frame=blv;frame_payload=<bytes>",
+             static_cast<unsigned long long>(in_bytes), static_cast<unsigned long long>(out_bytes),
+             cap);
     in_bytes_ = in_bytes;
     out_bytes_ = out_bytes;
-    staged_bytes_ = 0;
+    staged_bytes_ = -1;
     request_staging_.resize(static_cast<std::size_t>(in_bytes_));
     reply_.assign(
         std::max<std::size_t>(static_cast<std::size_t>(out_bytes_), sizeof(common::Payload)),
@@ -112,29 +115,18 @@ int CpuControllerSession::kick(std::uint32_t work_item_idx) {
 
     kick_ns_ = now_ns();
 
-    // Synthesize a wire-shaped frame, so `in` looks the same as it does over cpu_verbs: payload
-    // bytes at offset 0, then decoder_id, then seq_num (see common::frame_bytes). For
-    // in_bytes <= 8 this is exactly a common::Payload.
-    const std::size_t data_bytes = common::frame_data_bytes(static_cast<std::size_t>(in_bytes_));
-    frame_.assign(common::frame_bytes(data_bytes), std::byte{0});
-    if (staged_bytes_ != 0) {
-        std::memcpy(frame_.data(), request_staging_.data(),
-                    std::min<std::size_t>(static_cast<std::size_t>(staged_bytes_), data_bytes));
-    }
-    const std::uint32_t seq_num = static_cast<std::uint32_t>(next_send_ + 1);
-    const std::size_t decoder_id_offset = data_bytes;
-    const std::size_t seq_num_offset = data_bytes + sizeof(decoder_id_);
-    std::memcpy(frame_.data() + decoder_id_offset, &decoder_id_, sizeof(decoder_id_));
-    std::memcpy(frame_.data() + seq_num_offset, &seq_num, sizeof(seq_num));
-    ++next_send_;
+    // The coprocessor frames the payload in its own ring, as an RDMA backend's peer receives it.
+    const std::size_t len = staged_bytes_ < 0 ? static_cast<std::size_t>(in_bytes_)
+                                              : static_cast<std::size_t>(staged_bytes_);
+    staged_bytes_ = -1;
 
     std::size_t reply_bytes = 0;
     {
         // Held across check and call so teardown can't clear process_message mid-call.
         std::lock_guard<std::mutex> lock(link_->mu);
         TP_CHECK(link_->process_message, "No paired coprocessor");
-        reply_bytes = link_->process_message(frame_.data(), frame_.size(), reply_.data(),
-                                             static_cast<std::size_t>(out_bytes_));
+        reply_bytes = link_->process_message(request_staging_.data(), len, decoder_id_,
+                                             reply_.data(), static_cast<std::size_t>(out_bytes_));
     }
     reply_bytes_ = static_cast<std::uint64_t>(reply_bytes);
     return 0;
@@ -152,7 +144,7 @@ void CpuControllerSession::write_data_slot(const void *src, std::uint64_t bytes,
     if (bytes != 0) {
         std::memcpy(request_staging_.data(), src, static_cast<std::size_t>(bytes));
     }
-    staged_bytes_ = bytes;
+    staged_bytes_ = static_cast<std::int64_t>(bytes);
     decoder_id_ = decoder_id;
 }
 

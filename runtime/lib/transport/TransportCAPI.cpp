@@ -34,6 +34,7 @@
 #include "ConfigParser.hpp"
 #include "DynamicLibraryLoader.hpp"
 #include "Exception.hpp"
+#include "Frame.hpp"
 #include "Transport.hpp"
 #include "TransportBackend.h"
 #include "WireProtocol.hpp"
@@ -163,7 +164,11 @@ const char *collect_error_name(int rc) {
 // Provision the local reply region on first use (idempotent).
 void ensure_reply(CatalystTransportSession *s) {
     if (!s->reply_ready) {
-        s->reply = s->sess->alloc_memory(kReplyBytes, s->sess->preferred_mem_kind());
+        // Large enough for the ring of frames the session's config asks for.
+        const std::uint64_t bytes = std::max<std::uint64_t>(
+            kReplyBytes,
+            catalyst::transport::common::frame::geometry_from_config(s->config).region_bytes());
+        s->reply = s->sess->alloc_memory(bytes, s->sess->preferred_mem_kind());
         s->reply_ready = true;
     }
 }
@@ -187,17 +192,18 @@ int do_exchange_keys(CatalystTransportSession *s) {
     return CATALYST_TRANSPORT_OK;
 }
 
-// Built-in fallback coprocessor function: echo the input back.
-std::size_t echo_fn(const void *in, std::size_t in_len, void *out, std::size_t out_cap, void *) {
-    std::size_t n = std::min(in_len, out_cap);
-    if (n && in && out) {
-        std::memcpy(out, in, n);
+// Built-in fallback coprocessor function: echo the payload back.
+std::size_t echo_fn(const void *payload, std::size_t len, std::uint32_t, void *out,
+                    std::size_t out_cap, void *) {
+    std::size_t n = std::min(len, out_cap);
+    if (n && payload && out) {
+        std::memcpy(out, payload, n);
     }
     return n;
 }
 
 // Bound in place of a coprocessor function that could not be configured: fails every message.
-std::size_t failing_fn(const void *, std::size_t, void *, std::size_t, void *) {
+std::size_t failing_fn(const void *, std::size_t, std::uint32_t, void *, std::size_t, void *) {
     return COPROCESSOR_FN_ERROR;
 }
 

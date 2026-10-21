@@ -318,10 +318,14 @@ PeerRef HwhsControllerSession::exchange_keys(const MemRegion & /*local*/) {
     my.mr_vaddr = reply_.adv_va;
     my.mr_rkey = reply_.mr->rkey;
     my.mtu_enum = active_mtu_;
+    my.frame_mode = 0; // BL16
+    my.frame_stride = stride_;
 
     common::recv_exact(oob_.get(), &peer, sizeof(peer));
     common::send_exact(oob_.get(), &my, sizeof(my));
     oob_.reset();
+    RT_FAIL_IF(peer.frame_mode != my.frame_mode || peer.frame_stride != my.frame_stride,
+               "hwhs: the peer's frames differ from this end's (BL16, 64 B slots)");
 
     peer_rkey_ = peer.mr_rkey;
     peer_addr_ = peer.mr_vaddr;
@@ -804,6 +808,7 @@ int HwhsControllerSession::collect(void *const *replies, const std::uint64_t * /
     volatile std::uint8_t *slot = static_cast<volatile std::uint8_t *>(replies[0]);
 
     if (sw_poll_) {
+        // TODO: read the reply through the frame codec (Frame.hpp), as cpu_verbs does.
         volatile std::uint32_t *seq =
             reinterpret_cast<volatile std::uint32_t *>(slot + offsetof(common::Payload, seq_num));
         const std::uint32_t expected = static_cast<std::uint32_t>(collected_ + 1);

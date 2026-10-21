@@ -26,7 +26,8 @@
 #include "TransportTestUtils.hpp"
 
 extern "C" const catalyst::transport::CoprocessorFnInfo *catalyst_onnx_coprocessor_info();
-extern "C" std::size_t catalyst_onnx_coprocessor(const void *in, std::size_t in_len, void *out,
+extern "C" std::size_t catalyst_onnx_coprocessor(const void *in, std::size_t in_len,
+                                                 std::uint32_t fn_id, void *out,
                                                  std::size_t out_cap, void *ctx);
 
 namespace {
@@ -93,15 +94,14 @@ TEST_CASE("the ONNX coprocessor function runs a model", "[transport]") {
     REQUIRE(ctx != nullptr);
     CHECK(cerr.str().find("on the CPU") != std::string::npos);
 
-    // The test model is the identity on uint8[1, 8]. A frame is the payload, then decoder_id and
-    // seq_num.
-    std::uint8_t frame[16] = {1, 2, 3, 4, 5, 6, 7, 8, 0, 0, 0, 0, 1, 0, 0, 0};
+    // The test model is the identity on uint8[1, 8].
+    std::uint8_t payload[8] = {1, 2, 3, 4, 5, 6, 7, 8};
     std::uint8_t reply[8] = {};
-    CHECK(catalyst_onnx_coprocessor(frame, sizeof(frame), reply, sizeof(reply), ctx) == 8);
-    CHECK(std::memcmp(reply, frame, 8) == 0);
+    CHECK(catalyst_onnx_coprocessor(payload, sizeof(payload), 0, reply, sizeof(reply), ctx) == 8);
+    CHECK(std::memcmp(reply, payload, 8) == 0);
 
     // A payload shorter than the model input is an error, not a zero reply.
-    CHECK(catalyst_onnx_coprocessor(frame, 12, reply, sizeof(reply), ctx) ==
+    CHECK(catalyst_onnx_coprocessor(payload, 4, 0, reply, sizeof(reply), ctx) ==
           catalyst::transport::COPROCESSOR_FN_ERROR);
     onnx_info().fini(ctx);
 }
@@ -114,7 +114,7 @@ TEST_CASE("an ONNX coprocessor function outlives the other contexts of its onnxr
     }
     CerrCapture cerr;
     const std::string config = kModel + ";provider=cpu;ort_lib=" + std::string(ort_lib);
-    std::uint8_t frame[16] = {1, 2, 3, 4, 5, 6, 7, 8, 0, 0, 0, 0, 1, 0, 0, 0};
+    std::uint8_t payload[8] = {1, 2, 3, 4, 5, 6, 7, 8};
     std::uint8_t reply[8] = {};
 
     void *first = onnx_info().init(config.c_str());
@@ -122,15 +122,16 @@ TEST_CASE("an ONNX coprocessor function outlives the other contexts of its onnxr
     REQUIRE(first != nullptr);
     REQUIRE(second != nullptr);
     onnx_info().fini(first);
-    CHECK(catalyst_onnx_coprocessor(frame, sizeof(frame), reply, sizeof(reply), second) == 8);
+    CHECK(catalyst_onnx_coprocessor(payload, sizeof(payload), 0, reply, sizeof(reply), second) ==
+          8);
     onnx_info().fini(second);
 
     // A context created after every earlier one has finished starts and runs as the first did.
     void *third = onnx_info().init(config.c_str());
     REQUIRE(third != nullptr);
     std::memset(reply, 0, sizeof(reply));
-    CHECK(catalyst_onnx_coprocessor(frame, sizeof(frame), reply, sizeof(reply), third) == 8);
-    CHECK(std::memcmp(reply, frame, 8) == 0);
+    CHECK(catalyst_onnx_coprocessor(payload, sizeof(payload), 0, reply, sizeof(reply), third) == 8);
+    CHECK(std::memcmp(reply, payload, 8) == 0);
     onnx_info().fini(third);
 }
 
