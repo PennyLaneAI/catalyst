@@ -944,6 +944,13 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* Backline transport backends are chosen from a registry instead of a fixed table. Out-of-tree
+  backends register through the `catalyst.transport_backends` entry point or a
+  `catalyst_transport_backends.json` manifest on `CATALYST_TRANSPORT_PATH`, with no Catalyst
+  change. A backend is picked by transport, hardware, role and message size. A node can name one
+  with `backend=...`. The MLIR verifier no longer restricts transport names.
+  [(#3362)](https://github.com/PennyLaneAI/catalyst/pull/3362)
+
 * The FPGA transport backends share one config parser. The VPK120 backend now reads `dev`, `gid`,
   `ring`, `stride_log2`, `data_mem` and `reply_mem` exactly as `fpga_verbs` does, and reports a
   malformed value by naming its key. The frontend builds the entries it adds to a coprocessor's

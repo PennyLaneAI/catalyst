@@ -28,6 +28,9 @@ Note: "node" here is a backline participant (a controller or coprocessor), disti
 """
 
 import ctypes
+import dataclasses
+import importlib.metadata
+import json
 import os
 import socket
 from pathlib import Path
@@ -47,15 +50,98 @@ from catalyst.utils.runtime_environment import get_lib_path
 # Backend hints forwarded verbatim from a node's ``init_args`` to the attribute node.
 _INIT_KEYS = ("backend_lib", "config")
 
-# Concrete runtime backends are a Catalyst implementation detail. PennyLane describes only the
-# transport protocol and the hardware on which each node runs.
-_BACKENDS = {
-    ("rdma", "cpu"): "cpu_verbs",
-    ("rdma", "gpu"): "gpu_verbs",
-    ("rdma", "fpga"): "hwhs",
-    ("memcpy", "cpu"): "memcpy",
-    ("memcpy", "gpu"): "memcpy_gpu",
-}
+
+@dataclasses.dataclass(frozen=True)
+class TransportBackend:
+    """A transport backend Catalyst can place a node on, and what it supports.
+
+    Its libraries are named ``libcatalyst_transport_<name>_<role>.so``. The runtime checks the same
+    capabilities again when it loads one (``CatalystTransportQueryCaps``).
+
+    Args:
+        name: The backend name, e.g. ``"cpu_verbs"``.
+        transport: The placement transport it implements, e.g. ``"rdma"``.
+        hardware: The node hardware it runs on: ``"cpu"``, ``"gpu"`` or ``"fpga"``.
+        roles: The roles it provides, ``"controller"`` and/or ``"coprocessor"``.
+        frame_modes: The frame layouts it speaks; ``"bl16"`` is original 16 B frame.
+        max_payload_bytes: The largest request it carries per message, ``None`` for no limit.
+        max_reply_bytes: The largest reply it carries per message, ``None`` for no limit.
+        default: Whether it is picked for its transport and hardware without being named. A node
+            names any backend with ``backend=name``.
+    """
+
+    name: str
+    transport: str
+    hardware: str
+    roles: tuple[str, ...]
+    frame_modes: tuple[str, ...] = ("bl16",)
+    max_payload_bytes: int | None = 8
+    max_reply_bytes: int | None = 8
+    default: bool = True
+
+
+_REGISTRY: list[TransportBackend] = [
+    TransportBackend("cpu_verbs", "rdma", "cpu", ("controller", "coprocessor")),
+    TransportBackend("gpu_verbs", "rdma", "gpu", ("coprocessor",)),
+    TransportBackend("hwhs", "rdma", "fpga", ("controller",)),
+    TransportBackend("fpga_verbs", "rdma", "fpga", ("controller",), default=False),
+    TransportBackend(
+        "memcpy",
+        "memcpy",
+        "cpu",
+        ("controller", "coprocessor"),
+        max_payload_bytes=None,
+        max_reply_bytes=None,
+    ),
+    TransportBackend("memcpy_gpu", "memcpy", "gpu", ("coprocessor",)),
+]
+
+# Out-of-tree backends register through this entry-point group, or a manifest of this name in a
+# CATALYST_TRANSPORT_PATH directory. Either gives a list of ``register_backend`` keyword dicts.
+_BACKEND_ENTRY_POINTS = "catalyst.transport_backends"
+_BACKEND_MANIFEST = "catalyst_transport_backends.json"
+_plugins_loaded = False
+
+
+def register_backend(name: str, transport: str, hardware: str, roles, **capabilities):
+    """Make a transport backend available to backline placements.
+
+    Takes the fields of :class:`TransportBackend`. A backend registered under an existing name
+    replaces it. Out-of-tree packages usually register through the ``catalyst.transport_backends``
+    entry point instead, or a ``catalyst_transport_backends.json`` manifest beside their libraries
+    on ``CATALYST_TRANSPORT_PATH``.
+    """
+    backend = TransportBackend(name, transport, hardware, tuple(roles), **capabilities)
+    _REGISTRY[:] = [b for b in _REGISTRY if b.name != name] + [backend]
+    return backend
+
+
+def backend_transports() -> set[str]:
+    """The transport names the registered backends implement.
+
+    PennyLane accepts these as placement transports, so a backend package adds a transport without
+    a PennyLane change.
+    """
+    _load_backend_plugins()
+    return {b.transport for b in _REGISTRY}
+
+
+def _load_backend_plugins() -> None:
+    """Register the backends that entry points and manifests declare, once per process."""
+    global _plugins_loaded  # pylint: disable=global-statement
+    if _plugins_loaded:
+        return
+    _plugins_loaded = True
+    for ep in importlib.metadata.entry_points(group=_BACKEND_ENTRY_POINTS):
+        declared = ep.load()
+        for fields in declared() if callable(declared) else declared:
+            register_backend(**fields)
+    for directory in os.environ.get(_BACKEND_PATH_ENV, "").split(os.pathsep):
+        manifest = Path(directory) / _BACKEND_MANIFEST if directory else None
+        if manifest is not None and manifest.is_file():
+            for fields in json.loads(manifest.read_text()):
+                register_backend(**fields)
+
 
 # A transport backend library is named for its backend and role:
 #     libcatalyst_transport_<backend>_<role>.<ext>
@@ -90,15 +176,60 @@ _FN_MESSAGE_SIZE_KEYS = ("in_bytes", "out_bytes")
 _IN_PROCESS_COPROCESSOR_FNS = frozenset({"catalyst_onnx_coprocessor"})
 
 
+def _fits(limit: int | None, size: int) -> bool:
+    return limit is None or size <= limit
+
+
+def _select_backend(
+    transport: str,
+    hardware: str,
+    role: str | None = None,
+    in_bytes: int = 0,
+    out_bytes: int = 0,
+    name: str | None = None,
+) -> TransportBackend:
+    """The registered backend for a node: one for its transport and hardware that provides
+    ``role`` and carries ``in_bytes`` and ``out_bytes``. ``name`` picks one explicitly; otherwise
+    a default backend is preferred, then the earliest registered.
+
+    Raises:
+        ValueError: If no registered backend fits, naming what was asked for.
+    """
+    _load_backend_plugins()
+    candidates = [
+        b
+        for b in _REGISTRY
+        if b.transport == transport and b.hardware == hardware and (name is None or b.name == name)
+    ]
+    asked = f"transport={transport!r}, hardware={hardware!r}" + (
+        f", backend={name!r}" if name else ""
+    )
+    if not candidates:
+        raise ValueError(f"unsupported backline transport/hardware combination: {asked}")
+    fitting = [
+        b
+        for b in candidates
+        if (role is None or role in b.roles)
+        and _fits(b.max_payload_bytes, in_bytes)
+        and _fits(b.max_reply_bytes, out_bytes)
+    ]
+    if not fitting:
+        raise ValueError(
+            f"no transport backend for {asked}, role={role!r} carrying {in_bytes} B requests and "
+            f"{out_bytes} B replies; registered: "
+            + ", ".join(
+                f"{b.name} (roles {list(b.roles)}, up to {b.max_payload_bytes}/{b.max_reply_bytes} B)"
+                for b in candidates
+            )
+        )
+    if name is None and (defaults := [b for b in fitting if b.default]):
+        return defaults[0]
+    return fitting[0]
+
+
 def _resolve_backend(transport: str, hardware: str) -> str:
     """Return Catalyst's concrete backend for a transport and hardware pair."""
-    try:
-        return _BACKENDS[(transport, hardware)]
-    except KeyError:
-        raise ValueError(
-            f"unsupported backline transport/hardware combination: "
-            f"transport={transport!r}, hardware={hardware!r}"
-        ) from None
+    return _select_backend(transport, hardware).name
 
 
 def _backend_search_dirs(transport: str, backend: str) -> list[Path]:
@@ -113,7 +244,15 @@ def _backend_search_dirs(transport: str, backend: str) -> list[Path]:
     return dirs
 
 
-def _resolve_backend_lib(transport: str, hardware: str, role: str, remote: bool) -> str:
+def _resolve_backend_lib(
+    transport: str,
+    hardware: str,
+    role: str,
+    remote: bool,
+    in_bytes: int = 0,
+    out_bytes: int = 0,
+    name: str | None = None,
+) -> str:
     """Resolve transport, hardware, and node role to the backend library the node should load.
 
     Args:
@@ -124,6 +263,9 @@ def _resolve_backend_lib(transport: str, hardware: str, role: str, remote: bool)
             bundle deployed alongside it, so it is named by filename only, and always with a ``.so``
             extension: a node on another machine has to be Linux. A local node is given the full
             path into this installation, which may be either ``.so`` or ``.dylib``.
+        in_bytes: The request size the node's session commits.
+        out_bytes: The reply size the node's session commits.
+        name: A backend to use rather than the default for the transport and hardware.
 
     Returns:
         str: The library path for a local node, or its bare filename for a remote one.
@@ -132,7 +274,7 @@ def _resolve_backend_lib(transport: str, hardware: str, role: str, remote: bool)
         ValueError: If the transport/hardware pair is unsupported or no library matches on a local
             node, naming every directory searched.
     """
-    backend = _resolve_backend(transport, hardware)
+    backend = _select_backend(transport, hardware, role, in_bytes, out_bytes, name).name
     names = [f"libcatalyst_transport_{backend}_{role}.{ext}" for ext in _BACKEND_LIB_EXTS]
     if remote:
         return names[0]
@@ -156,7 +298,9 @@ def _out_of_process(node: Node) -> bool:
     return node.executor_options is not None or node.executor is not None
 
 
-def _node_dict(node: Node, role: str, transport: str | None) -> dict:
+def _node_dict(
+    node: Node, role: str, transport: str | None, in_bytes: int = 0, out_bytes: int = 0
+) -> dict:
     """Map a backline node to a ``catalyst.backline`` node dict. Its executor, if any, is read
     through :func:`node_executor`.
 
@@ -168,7 +312,10 @@ def _node_dict(node: Node, role: str, transport: str | None) -> dict:
         role: The node's role, used when resolving the backend library.
         transport: The transport the node opens a session on. Together with ``node.hardware``, this
             selects the concrete backend. ``None`` if the node opens no session, as for a controller
-            without coprocessors. An explicit ``init_args["backend_lib"]`` path takes precedence.
+            without coprocessors. An explicit ``init_args["backend_lib"]`` path takes precedence,
+            and ``node.backend`` names a registered backend.
+        in_bytes: The request size the backend has to carry.
+        out_bytes: The reply size the backend has to carry.
     """
     d: dict = {"out_of_process": bool(_out_of_process(node))}
     if node.name is not None:
@@ -187,7 +334,15 @@ def _node_dict(node: Node, role: str, transport: str | None) -> dict:
         )
     hardware = getattr(node, "hardware", None)
     if transport is not None and hardware is not None and not init.get("backend_lib"):
-        d["backend_lib"] = _resolve_backend_lib(transport, hardware, role, bool(node.remote))
+        d["backend_lib"] = _resolve_backend_lib(
+            transport,
+            hardware,
+            role,
+            bool(node.remote),
+            in_bytes,
+            out_bytes,
+            getattr(node, "backend", None),
+        )
     # A node may be handed any object as its executor, so its fields are read rather than assumed.
     executor = node_executor(node)
     if executor is not None:
@@ -363,17 +518,49 @@ def _coprocessor_fn_config(fn, placement: Placement) -> dict[str, str]:
     return entries
 
 
+def _check_frame_modes(placement: Placement, transport: str, in_bytes: int, out_bytes: int) -> None:
+    """Fail unless the controller and each coprocessor can share a frame layout.
+
+    Nodes given an explicit ``backend_lib`` are taken at their word; the runtime checks them.
+    """
+
+    def backend(node, role):
+        init = node.init_args or {}
+        if init.get("backend_lib") or getattr(node, "hardware", None) is None:
+            return None
+        return _select_backend(
+            transport, node.hardware, role, in_bytes, out_bytes, getattr(node, "backend", None)
+        )
+
+    if not placement.coprocessors:
+        return  # a controller alone exchanges no frames
+    ctrl = backend(placement.controller, "controller")
+    for coproc in placement.coprocessors:
+        cop = backend(coproc, "coprocessor")
+        if ctrl and cop and not set(ctrl.frame_modes) & set(cop.frame_modes):
+            raise CompileError(
+                f"backline controller backend {ctrl.name!r} (frames {list(ctrl.frame_modes)}) and "
+                f"coprocessor backend {cop.name!r} (frames {list(cop.frame_modes)}) share no frame "
+                f"layout"
+            )
+
+
 def serialize_backline(placement: Placement) -> dict:
     """Serialize a ``Placement`` into the ``catalyst.backline`` attribute dict."""
     transport = placement.transport.name
     # The controller opens a transport session only for its coprocessors.
     controller_transport = transport if placement.coprocessors else None
+    in_bytes = _message_size(placement, "in_bytes")
+    out_bytes = _message_size(placement, "out_bytes")
+    _check_frame_modes(placement, transport, in_bytes, out_bytes)
     result = {
         "transport": transport,
         "controller": {
-            **_node_dict(placement.controller, "controller", controller_transport),
-            "in_bytes": _message_size(placement, "in_bytes"),
-            "out_bytes": _message_size(placement, "out_bytes"),
+            **_node_dict(
+                placement.controller, "controller", controller_transport, in_bytes, out_bytes
+            ),
+            "in_bytes": in_bytes,
+            "out_bytes": out_bytes,
         },
     }
     nodes = []
@@ -385,7 +572,7 @@ def serialize_backline(placement: Placement) -> dict:
                 f"dispatched to an executor, as {coproc.name!r} is: its model and onnxruntime "
                 f"paths are resolved on this machine"
             )
-        node = _node_dict(coproc, "coprocessor", transport)
+        node = _node_dict(coproc, "coprocessor", transport, in_bytes, out_bytes)
         # ``symbol`` names the decode function; the library providing it is loaded as an executor
         # plugin, so it must not be written into ``backend_lib``, which is the transport backend.
         node["symbol"] = symbol
