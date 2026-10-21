@@ -773,7 +773,7 @@
 * The `--convert-to-value-semantics` and `--convert-to-reference-semantics` passes now collect
   subroutine symbol uses only once instead of once per subroutine, improving their performance.
   [(#3341)](https://github.com/PennyLaneAI/catalyst/pull/3341)
-  
+
 * Add `post-device-pipeline` to the `transform-sequence` when `qp.qjit(capture=True)`
   [(#3312)](https://github.com/PennyLaneAI/catalyst/pull/3312)
 
@@ -815,6 +815,10 @@
 <h3>Deprecations 👋</h3>
 
 <h3>Bug fixes 🐛</h3>
+
+* Fixes mixed static and dynamic `control_values` for callable `qp.ctrl` under
+  `qjit(capture=True)`.
+  [(#3373)](https://github.com/PennyLaneAI/catalyst/pull/3373)
 
 * Controlled quantum regions now keeps track of the `work_wire_type` passed from `qp.ctrl`.
   [(#3366)](https://github.com/PennyLaneAI/catalyst/pull/3366)
@@ -938,6 +942,13 @@
   [(#3242)](https://github.com/PennyLaneAI/catalyst/pull/3242)
 
 <h3>Internal changes ⚙️</h3>
+
+* Backline transport backends are chosen from a registry instead of a fixed table. Out-of-tree
+  backends register through the `catalyst.transport_backends` entry point or a
+  `catalyst_transport_backends.json` manifest on `CATALYST_TRANSPORT_PATH`, with no Catalyst
+  change. A backend is picked by transport, hardware, role and message size. A node can name one
+  with `backend=...`. The MLIR verifier no longer restricts transport names.
+  [(#3362)](https://github.com/PennyLaneAI/catalyst/pull/3362)
 
 * The FPGA transport backends share one config parser. The VPK120 backend now reads `dev`, `gid`,
   `ring`, `stride_log2`, `data_mem` and `reply_mem` exactly as `fpga_verbs` does, and reports a
