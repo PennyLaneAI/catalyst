@@ -206,10 +206,6 @@ class ControllerSession : public TransportSession {
 using CoprocessorFn = std::size_t (*)(const void *in, std::size_t in_len, void *out,
                                       std::size_t out_cap, void *ctx);
 
-/// A per-message coprocessor function handed each message's payload, length and fn_id instead of
-/// its frame. See CatalystCoprocessorFrameFn in TransportABI.h.
-using CoprocessorFrameFn = CatalystCoprocessorFrameFn;
-
 /// The value a CoprocessorFn returns when it cannot process a message.
 inline constexpr std::size_t COPROCESSOR_FN_ERROR = std::numeric_limits<std::size_t>::max();
 
