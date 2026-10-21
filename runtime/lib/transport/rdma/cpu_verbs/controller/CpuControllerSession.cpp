@@ -104,6 +104,12 @@ int CpuControllerSession::collect(void *const *replies, const std::uint64_t *rep
     }
     rtt_ns_ = now_ns() - kick_ns_;
     ++next_recv_;
+    if (cuqr()) { // next_recv_ is now this round's seq, the request_id the request carried
+        TP_CHECK(r.request_id == static_cast<std::uint32_t>(next_recv_),
+                 "cpu_verbs: a CUQR reply answers request %u, expected %u", r.request_id,
+                 static_cast<std::uint32_t>(next_recv_));
+        TP_CHECK(r.status == 0, "cpu_verbs: the coprocessor answered with status %d", r.status);
+    }
     if (n > 0 && replies && replies[0] && replies[0] != r.data) {
         // The coprocessor zero-fills the reply's payload area, so all of `cap` is defined.
         const std::size_t cap = replies_bytes ? replies_bytes[0] : out_bytes_;

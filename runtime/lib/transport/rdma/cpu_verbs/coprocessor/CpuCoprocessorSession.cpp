@@ -110,14 +110,21 @@ void CpuCoprocessorSession::run(std::stop_token st) {
         const std::size_t cap = frame::data_capacity(ring_);
         std::memset(reply, 0, cap);
         std::size_t nb = r.len;
+        std::int32_t status = 0;
         if (coproc_fn_) {
             nb = coproc_fn_(r.data, r.len, r.fn_id, reply, cap, coproc_ctx_);
-            TP_CHECK(nb > 0 && nb <= cap, "coprocessor function wrote %zu bytes, expected 1..%zu",
-                     nb, cap);
+            if (nb == 0 && cuqr()) {
+                status = 1; // CUQR reports a failed function in its reply, as cudaq-realtime does
+            } else {
+                TP_CHECK(nb > 0 && nb <= cap,
+                         "coprocessor function wrote %zu bytes, expected 1..%zu", nb, cap);
+            }
         } else {
             std::memcpy(reply, r.data, nb);
         }
-        frame::stage(ring_, send, r.fn_id, reply, nb);
+        const frame::ReplyTo reply_to{
+            .request_id = r.request_id, .t_ptp_ns = r.t_ptp_ns, .status = status};
+        frame::stage(ring_, send, r.fn_id, reply, nb, &reply_to);
         const bool sig = (c % SIGNAL_EVERY == 0);
         post_write(bwd_qp_->get(), c, /*inline_data=*/true, sig);
         if (sig) {

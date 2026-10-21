@@ -380,3 +380,50 @@ TEST_CASE("cpu_verbs refuses a CUQR peer using the other completion verb", "[cpu
     CHECK_THROWS_WITH(controller.exchange_keys(m), Catch::Matchers::ContainsSubstring("cuqr_tx"));
     t.join();
 }
+
+static std::size_t fail_on_fn_7(const void *in, std::size_t in_len, std::uint32_t fn_id, void *out,
+                                std::size_t out_cap, void *ctx) {
+    return fn_id == 7 ? 0 : add_fn_id(in, in_len, fn_id, out, out_cap, ctx);
+}
+
+TEST_CASE("a CUQR coprocessor answers a failing function with a status and keeps serving",
+          "[cpu_libibverbs]") {
+    if (!have_rxe()) {
+        SKIP("no rxe0 RDMA device");
+    }
+    namespace frame = catalyst::transport::common::frame;
+    const auto ring = frame::geometry_for(frame::Mode::CUQR, 8);
+    std::thread t([&] {
+        CpuCoprocessorSession coproc("rxe0", 1, ring);
+        coproc.connect(ConnectInfo{.peer = "127.0.0.1", .oob_port = 18640});
+        MemRegion m = coproc.alloc_memory(ring.region_bytes(), MemKind::CpuRam);
+        PeerRef p = coproc.exchange_keys(m);
+        coproc.establish_channel(ChannelDesc{.transport = "rdma"}, m, p);
+        coproc.set_coprocessor_fn(fail_on_fn_7, nullptr);
+        coproc.start();
+        while (coproc.completed() < 2) {
+            std::this_thread::yield();
+        }
+        coproc.stop();
+    });
+    CpuControllerSession controller("rxe0", 1, ring);
+    controller.connect(ConnectInfo{.peer = "127.0.0.1", .oob_port = 18640});
+    MemRegion m = controller.alloc_memory(ring.region_bytes(), MemKind::CpuRam);
+    PeerRef p = controller.exchange_keys(m);
+    controller.establish_channel(ChannelDesc{.transport = "rdma"}, m, p);
+    controller.commit_work_item(0, 8, 8);
+    controller.start();
+    std::uint64_t word = 5, reply = 0;
+    void *outs[1] = {&reply};
+    std::uint64_t obytes[1] = {8};
+    controller.write_data_slot(&word, 8, /*decoder_id=*/7);
+    controller.kick(0);
+    CHECK_THROWS_WITH(controller.collect(outs, obytes, 1),
+                      Catch::Matchers::ContainsSubstring("status 1"));
+    controller.write_data_slot(&word, 8, /*decoder_id=*/1); // the coprocessor is still serving
+    controller.kick(0);
+    REQUIRE(controller.collect(outs, obytes, 1) == 0);
+    CHECK(reply == 0x0101010101010106ULL); // add_fn_id adds fn_id 1 to every byte of 5
+    controller.stop();
+    t.join();
+}
