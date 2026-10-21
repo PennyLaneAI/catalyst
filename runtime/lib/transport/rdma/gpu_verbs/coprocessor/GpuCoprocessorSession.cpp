@@ -39,8 +39,9 @@ constexpr QpShape FWD_QP_SHAPE{.sq_depth = 16, .cq_depth = 256, .inline_max = 0}
 } // namespace
 
 GpuCoprocessorSession::GpuCoprocessorSession(std::string dev, int gid_idx, int gpu_device,
-                                             frame::RingGeometry ring)
-    : Base(std::move(dev), gid_idx, "gpu_verbs", FWD_QP_SHAPE, ring), gpu_(gpu_device) {}
+                                             frame::RingGeometry ring, bool cuqr_write_imm)
+    : Base(std::move(dev), gid_idx, "gpu_verbs", FWD_QP_SHAPE, ring, cuqr_write_imm),
+      gpu_(gpu_device) {}
 
 MemRegion GpuCoprocessorSession::alloc_memory(std::size_t size, MemKind kind) {
     TP_CHECK(kind == MemKind::GpuHbm, "gpu_verbs: only MemKind::GpuHbm supported");

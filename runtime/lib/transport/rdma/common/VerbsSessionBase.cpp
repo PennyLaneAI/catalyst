@@ -25,6 +25,8 @@
 #include "RealtimeThread.hpp"
 #include "WireProtocol.hpp"
 
+#include <arpa/inet.h>
+
 namespace catalyst::transport::common {
 using namespace catalyst::transport;
 
@@ -39,9 +41,10 @@ constexpr std::size_t PAGE_ALIGN = 4096;
 
 template <class Role>
 VerbsSessionBase<Role>::VerbsSessionBase(std::string dev, int gid_idx, const char *backend,
-                                         QpShape fwd_shape, frame::RingGeometry ring)
+                                         QpShape fwd_shape, frame::RingGeometry ring,
+                                         bool cuqr_write_imm)
     : dev_name_(std::move(dev)), gid_idx_(gid_idx), backend_(backend), fwd_shape_(fwd_shape),
-      ring_(ring) {}
+      ring_(ring), cuqr_write_imm_(cuqr_write_imm) {}
 
 template <class Role> int VerbsSessionBase<Role>::connect(const ConnectInfo &info) {
     ctx_ = std::make_shared<Context>(dev_name_);
@@ -49,9 +52,15 @@ template <class Role> int VerbsSessionBase<Role>::connect(const ConnectInfo &inf
     constexpr QpShape bwd = DEFAULT_QP_SHAPE;
     fwd_cq_ = std::make_shared<CompletionQueue>(ctx_, fwd_shape_.cq_depth);
     bwd_cq_ = std::make_shared<CompletionQueue>(ctx_, bwd.cq_depth);
+    // A CUQR receiver holds one receive request per slot, and its CQ must hold their completions.
+    const std::uint32_t recv_wr = cuqr() ? ring_.slots : 4;
+    TP_CHECK(!cuqr() || static_cast<std::uint32_t>(fwd_shape_.cq_depth) >= ring_.slots,
+             "%s: a %d-entry CQ cannot hold a %u-slot ring's receive completions", backend_,
+             fwd_shape_.cq_depth, ring_.slots);
     fwd_qp_ = std::make_shared<QueuePair>(pd_, fwd_cq_, fwd_cq_, fwd_shape_.sq_depth,
-                                          fwd_shape_.inline_max);
-    bwd_qp_ = std::make_shared<QueuePair>(pd_, bwd_cq_, bwd_cq_, bwd.sq_depth, bwd.inline_max);
+                                          fwd_shape_.inline_max, recv_wr);
+    bwd_qp_ =
+        std::make_shared<QueuePair>(pd_, bwd_cq_, bwd_cq_, bwd.sq_depth, bwd.inline_max, recv_wr);
     fwd_qp_->to_init(PORT);
     bwd_qp_->to_init(PORT);
     active_mtu_ = static_cast<std::uint32_t>(ctx_->port_attr(PORT).active_mtu);
@@ -86,6 +95,7 @@ template <class Role> PeerRef VerbsSessionBase<Role>::exchange_keys(const MemReg
         .mtu_enum = active_mtu_,
         .frame_mode = static_cast<std::uint32_t>(ring_.mode),
         .frame_stride = ring_.stride,
+        .cuqr_tx = cuqr_write_imm_ ? 1U : 0U,
     };
     // gid is a 16-byte array copied from the local GID after the aggregate
     // init.
@@ -105,9 +115,20 @@ template <class Role> PeerRef VerbsSessionBase<Role>::exchange_keys(const MemReg
              "%s: the peer's frames (mode %u, %u B slots) differ from this end's (mode %u, %u B "
              "slots); both ends need the same frame config",
              backend_, peer.frame_mode, peer.frame_stride, my.frame_mode, my.frame_stride);
+    TP_CHECK(!cuqr() || peer.cuqr_tx == my.cuqr_tx,
+             "%s: the peer completes CUQR frames with %s and this end with %s; set the same "
+             "cuqr_tx on both",
+             backend_, peer.cuqr_tx != 0 ? "write_imm" : "send",
+             my.cuqr_tx != 0 ? "write_imm" : "send");
     const std::uint32_t mtu = std::min(my.mtu_enum, peer.mtu_enum);
     fwd_qp_->to_rtr(peer.fwd.qpn, peer.fwd.psn, peer.fwd.gid, gid_idx_, PORT, mtu);
     bwd_qp_->to_rtr(peer.bwd.qpn, peer.bwd.psn, peer.bwd.gid, gid_idx_, PORT, mtu);
+    if (cuqr()) { // receive requests are in place before the peer can send
+        local_ = local;
+        for (std::uint64_t s = 0; s < ring_.slots; ++s) {
+            post_recv(s);
+        }
+    }
     fwd_qp_->to_rts(my.fwd.psn);
     bwd_qp_->to_rts(my.bwd.psn);
     return PeerRef{
@@ -135,7 +156,7 @@ void VerbsSessionBase<Role>::post_write(ibv_qp *qp, std::uint64_t cursor, bool i
                                         bool signaled) {
     void *send = send_frame(); // staged by the caller
     frame::seal(ring_, send, static_cast<std::uint32_t>(cursor + 1));
-    const std::size_t bytes = frame::frame_bytes(ring_);
+    const std::size_t bytes = frame::wire_bytes(ring_, send);
     // A frame larger than the queue pair's inline capacity goes from the registered send buffer.
     const int inline_max =
         qp == fwd_qp_->get() ? fwd_shape_.inline_max : DEFAULT_QP_SHAPE.inline_max;
@@ -154,6 +175,14 @@ void VerbsSessionBase<Role>::post_write(ibv_qp *qp, std::uint64_t cursor, bool i
     };
     wr.wr.rdma.remote_addr = peer_.remote_addr + ring_.slot_offset(cursor);
     wr.wr.rdma.rkey = peer_.rkey;
+    if (cuqr()) {
+        if (cuqr_write_imm_) { // the immediate names the slot written
+            wr.opcode = IBV_WR_RDMA_WRITE_WITH_IMM;
+            wr.imm_data = htonl(static_cast<std::uint32_t>(cursor & (ring_.slots - 1)));
+        } else { // lands in the receive buffer the peer posted for this slot
+            wr.opcode = IBV_WR_SEND;
+        }
+    }
     ibv_send_wr *bad = nullptr;
     const int rc = ibv_post_send(qp, &wr, &bad);
     TP_CHECK(rc == 0, "ibv_post_send rc=%d (%s)", rc, std::strerror(rc));
@@ -189,6 +218,13 @@ template <class Role> void VerbsSessionBase<Role>::reap(ibv_cq *cq, int &outstan
 template <class Role>
 bool VerbsSessionBase<Role>::poll_message_arrival(std::uint64_t cursor, std::stop_token st,
                                                   frame::FrameView &out) {
+    if (cuqr()) {
+        if (!wait_recv(cursor, st)) {
+            return false;
+        }
+        frame::poll(ring_, ring_slot(cursor), static_cast<std::uint32_t>(cursor + 1), out);
+        return true;
+    }
     // Slots are reused (the slot count is a power of two). The peer writes each frame into the
     // head of its slot in a single RDMA_WRITE, seq last, so once frame::poll sees the expected seq
     // the payload before it is present.
@@ -204,6 +240,49 @@ bool VerbsSessionBase<Role>::poll_message_arrival(std::uint64_t cursor, std::sto
         }
         cpu_relax();
     }
+    return true;
+}
+
+template <class Role> void VerbsSessionBase<Role>::post_recv(std::uint64_t slot) {
+    // A SEND lands in the buffer its receive request names; a write with immediate needs none.
+    ibv_sge sge{
+        .addr = reinterpret_cast<std::uint64_t>(local_.addr) + ring_.slot_offset(slot),
+        .length = ring_.stride,
+        .lkey = local_.lkey,
+    };
+    ibv_recv_wr wr{
+        .wr_id = slot,
+        .sg_list = cuqr_write_imm_ ? nullptr : &sge,
+        .num_sge = cuqr_write_imm_ ? 0 : 1,
+    };
+    ibv_recv_wr *bad = nullptr;
+    const int rc = ibv_post_recv(recv_qp(), &wr, &bad);
+    TP_CHECK(rc == 0, "ibv_post_recv rc=%d (%s)", rc, std::strerror(rc));
+}
+
+template <class Role>
+bool VerbsSessionBase<Role>::wait_recv(std::uint64_t cursor, std::stop_token st) {
+    const std::uint64_t slot = cursor & (ring_.slots - 1);
+    ibv_wc wc{};
+    std::uint32_t spins = 0;
+    while (ibv_poll_cq(recv_cq(), 1, &wc) == 0) {
+        if (++spins == STOP_CHECK_SPINS) {
+            spins = 0;
+            if (st.stop_requested()) {
+                return false;
+            }
+        }
+        cpu_relax();
+    }
+    TP_CHECK(wc.status == IBV_WC_SUCCESS, "%s: receive completion status=%d", backend_, wc.status);
+    // Receive requests complete in the order they were posted, so a SEND filled `slot`; a write
+    // names its slot in the immediate.
+    const std::uint64_t got = cuqr_write_imm_ ? ntohl(wc.imm_data) : wc.wr_id;
+    TP_CHECK(got == slot, "%s: a CUQR message arrived for slot %llu, expected slot %llu", backend_,
+             static_cast<unsigned long long>(got), static_cast<unsigned long long>(slot));
+    // Repost now: the peer reaches this slot again only after wrapping the whole ring, which it
+    // cannot do before this message is answered.
+    post_recv(slot);
     return true;
 }
 

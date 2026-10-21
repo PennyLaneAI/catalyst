@@ -27,8 +27,10 @@ class CpuControllerSession : public common::VerbsSessionBase<ControllerSession> 
 
   public:
     explicit CpuControllerSession(std::string dev, int gid_idx,
-                                  common::frame::RingGeometry ring = common::frame::BL16_RING)
-        : Base(std::move(dev), gid_idx, "cpu_verbs", common::DEFAULT_QP_SHAPE, ring) {}
+                                  common::frame::RingGeometry ring = common::frame::BL16_RING,
+                                  bool cuqr_write_imm = false)
+        : Base(std::move(dev), gid_idx, "cpu_verbs", common::DEFAULT_QP_SHAPE, ring,
+               cuqr_write_imm) {}
     // Drains the fwd CQ before the base's verbs objects go away. stop() is
     // idempotent, so calling it here and from start() is harmless.
     ~CpuControllerSession() override { stop(); }

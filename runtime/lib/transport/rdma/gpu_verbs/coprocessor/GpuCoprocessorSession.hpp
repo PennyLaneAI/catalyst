@@ -35,7 +35,8 @@ class GpuCoprocessorSession : public common::VerbsSessionBase<CoprocessorSession
 
   public:
     GpuCoprocessorSession(std::string dev, int gid_idx, int gpu_device,
-                          common::frame::RingGeometry ring = common::frame::BL16_RING);
+                          common::frame::RingGeometry ring = common::frame::BL16_RING,
+                          bool cuqr_write_imm = false);
     ~GpuCoprocessorSession() override { stop(); }
 
     GpuCoprocessorSession(const GpuCoprocessorSession &) = delete;

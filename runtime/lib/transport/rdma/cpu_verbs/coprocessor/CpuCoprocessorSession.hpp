@@ -34,8 +34,10 @@ class CpuCoprocessorSession : public common::VerbsSessionBase<CoprocessorSession
 
   public:
     explicit CpuCoprocessorSession(std::string dev, int gid_idx,
-                                   common::frame::RingGeometry ring = common::frame::BL16_RING)
-        : Base(std::move(dev), gid_idx, "cpu_verbs", common::DEFAULT_QP_SHAPE, ring) {}
+                                   common::frame::RingGeometry ring = common::frame::BL16_RING,
+                                   bool cuqr_write_imm = false)
+        : Base(std::move(dev), gid_idx, "cpu_verbs", common::DEFAULT_QP_SHAPE, ring,
+               cuqr_write_imm) {}
     ~CpuCoprocessorSession() override { stop(); }
 
     void start() override;
@@ -43,6 +45,9 @@ class CpuCoprocessorSession : public common::VerbsSessionBase<CoprocessorSession
     void stop() override;
 
     void set_coprocessor_fn(CoprocessorFn fn, void *ctx) override;
+
+    /// Messages answered since start().
+    std::uint64_t completed() const { return completed_.load(std::memory_order_acquire); }
 
     void set_thread_affinity(int cpu, bool realtime) {
         pin_cpu_ = cpu;

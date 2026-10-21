@@ -27,8 +27,10 @@ namespace catalyst::transport::common {
 // they arrive later via connect(). Both keys are required and have no defaults, e.g.
 // "dev=rxe0;gid=1".
 struct BackendConfig {
-    std::string dev; // RDMA device name
-    int gid;         // GID index on that device's port
+    std::string dev;             // RDMA device name
+    int gid;                     // GID index on that device's port
+    bool cuqr_write_imm = false; // CUQR completion verb: write with immediate (cuqr_tx=write_imm)
+                                 // instead of SEND (cuqr_tx=send, the default)
 };
 
 /**
@@ -44,7 +46,7 @@ struct BackendConfig {
 inline BackendConfig parse_backend_config(const std::string &config) {
     std::string dev;
     int gid = 0;
-    bool have_dev = false, have_gid = false;
+    bool have_dev = false, have_gid = false, write_imm = false;
     configparser::for_each_kv(config, [&](std::string_view key, std::string_view val) {
         if (key == "dev") {
             TP_CHECK(!val.empty(), "config: 'dev' must not be empty");
@@ -53,12 +55,17 @@ inline BackendConfig parse_backend_config(const std::string &config) {
         } else if (key == "gid") {
             gid = configparser::parse_index(val, "gid");
             have_gid = true;
+        } else if (key == "cuqr_tx") {
+            TP_CHECK(val == "send" || val == "write_imm",
+                     "config: 'cuqr_tx' must be 'send' or 'write_imm', got '%.*s'",
+                     static_cast<int>(val.size()), val.data());
+            write_imm = val == "write_imm";
         }
     });
     TP_CHECK(have_dev && have_gid,
              "config requires both 'dev' and 'gid' (e.g. \"dev=rxe0;gid=1\"), got \"%s\"",
              config.c_str());
-    return BackendConfig{std::move(dev), gid};
+    return BackendConfig{std::move(dev), gid, write_imm};
 }
 
 } // namespace catalyst::transport::common

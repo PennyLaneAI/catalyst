@@ -21,6 +21,7 @@
 #include "QpState.hpp"
 
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/matchers/catch_matchers_string.hpp>
 #include <infiniband/verbs.h>
 
 using namespace catalyst::transport::common;
@@ -74,6 +75,14 @@ TEST_CASE("parse_fpga_config has defaults and reads the FPGA keys", "[common]") 
 
     CHECK_THROWS(parse_fpga_config("data_mem=dram"));
     CHECK_THROWS_AS(parse_fpga_config("gid=abc"), TransportError);
+}
+
+TEST_CASE("cuqr_tx picks the CUQR completion verb", "[common]") {
+    CHECK_FALSE(parse_backend_config("dev=rxe0;gid=1").cuqr_write_imm);
+    CHECK_FALSE(parse_backend_config("dev=rxe0;gid=1;cuqr_tx=send").cuqr_write_imm);
+    CHECK(parse_backend_config("dev=rxe0;gid=1;cuqr_tx=write_imm").cuqr_write_imm);
+    CHECK_THROWS_WITH(parse_backend_config("dev=rxe0;gid=1;cuqr_tx=read"),
+                      Catch::Matchers::ContainsSubstring("'send' or 'write_imm'"));
 }
 
 TEST_CASE("parse_backend_config requires an explicit dev and gid", "[common]") {
