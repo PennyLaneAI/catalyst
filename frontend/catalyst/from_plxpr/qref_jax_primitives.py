@@ -745,6 +745,7 @@ def _pl_ctrl_lowering(
     control_values,
     work_wires,
     n_consts,
+    work_wire_type="borrowed",
 ):
     """Lower a `qp.ctrl` transform to a `qref.ctrl` region op."""
     body_invals = plxpr_invals[: len(plxpr_invals) - n_control]
