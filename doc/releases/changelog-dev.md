@@ -768,6 +768,9 @@
 * The `--convert-to-value-semantics` and `--convert-to-reference-semantics` passes now collect
   subroutine symbol uses only once instead of once per subroutine, improving their performance.
   [(#3341)](https://github.com/PennyLaneAI/catalyst/pull/3341)
+  
+* Add `post-device-pipeline` to the `transform-sequence` when `qp.qjit(capture=True)`
+  [(#3312)](https://github.com/PennyLaneAI/catalyst/pull/3312)
 
 <h3>Breaking changes 💔</h3>
 
