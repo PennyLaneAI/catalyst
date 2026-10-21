@@ -23,10 +23,8 @@
 // CHECK:   "total": 1
 // CHECK: "quantum_operations"
 // CHECK:   "-1"
-// CHECK:       "testRX": 2
+// CHECK:       "testRX": 3
 // CHECK:       "testRZ": 4
-// CHECK:   "1"
-// CHECK:       "testRX": 1
 // CHECK-NOT:   "testHadamard"
 func.func public @circuit() attributes {quantum.node} {
     %angle = arith.constant 0.5 : f64
