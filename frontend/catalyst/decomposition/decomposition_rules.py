@@ -784,7 +784,9 @@ def build_decomp_target_spec(
             # Apply adjoint innermost, control outermost (canonical C(Adjoint(Op))).
             body = qp.adjoint(rule._impl) if wrap_adjoint else rule._impl
             if wrap_control:
-                qp.ctrl(body, control=list(_ctrl_wires))(*_args, **_kwargs)
+                qp.ctrl(body, control=list(_ctrl_wires), control_values=_ctrl_values)(
+                    *_args, **_kwargs
+                )
             else:
                 body(*_args, **_kwargs)
 
@@ -1186,6 +1188,7 @@ def build_registered_decomp_target_spec(
                 qp.ctrl(
                     lambda: rule._impl(**symbolic_arguments(base, kind, None)),
                     control=list(_ctrl_wires),
+                    control_values=_ctrl_values,
                 )()
             else:
                 rule._impl(**symbolic_arguments(base, kind, _ctrl_wires, _ctrl_values))
