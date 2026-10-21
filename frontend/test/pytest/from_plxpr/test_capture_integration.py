@@ -1504,15 +1504,17 @@ def test_adjoint_transform_integration():
 
 
 @pytest.mark.parametrize(
-    "operator_instance, container, static_first",
-    ((True, list, True), (True, list, False), (False, tuple, False), (False, list, False)),
+    "operator_instance, container, static_control_wire",
+    ((True, list, 0), (True, list, 1), (False, tuple, 1), (False, list, 1)),
 )
-def test_mixed_control_values(operator_instance, container, static_first):
+def test_mixed_control_values(operator_instance, container, static_control_wire):
     """The four reported mixed-control cases follow the runtime Boolean value."""
 
     def circuit(x, val):
-        qp.X(0 if static_first else 1)
-        values = container((True, val) if static_first else (val, True))
+        qp.X(static_control_wire)
+        values = [val, val]
+        values[static_control_wire] = True
+        values = container(values)
         if operator_instance:
             qp.ctrl(qp.RX(x, 2), (0, 1), values)
         else:
