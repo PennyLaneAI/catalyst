@@ -2043,8 +2043,12 @@ class TestBackendRegistry:
         assert node["backend_lib"].endswith("libcatalyst_transport_fpga_verbs_controller.so")
         assert "backend" not in node
 
-    def test_messages_of_up_to_8_bytes_keep_the_16_byte_frame(self):
+    def test_messages_of_up_to_8_bytes_keep_the_16_byte_frame(self, flat_lib_dir):
         """Such placements get no frame entries, so they compile exactly as before."""
+        flat_lib_dir(
+            "libcatalyst_transport_memcpy_controller.so",
+            "libcatalyst_transport_memcpy_coprocessor.so",
+        )
         dev = qp.Backline(
             controller=_controller(init_args={}),
             coprocessors=[_coproc("cop0", init_args={})],
@@ -2055,8 +2059,14 @@ class TestBackendRegistry:
         assert "frame=" not in d["coprocessors"][0]["config"]
 
     @pytest.mark.parametrize("in_bytes, out_bytes", [(64, 16), (4, 9)])
-    def test_larger_messages_select_blv_frames_on_both_ends(self, in_bytes, out_bytes):
+    def test_larger_messages_select_blv_frames_on_both_ends(
+        self, in_bytes, out_bytes, flat_lib_dir
+    ):
         """Both ends of a session get the same layout, sized for the larger message."""
+        flat_lib_dir(
+            "libcatalyst_transport_memcpy_controller.so",
+            "libcatalyst_transport_memcpy_coprocessor.so",
+        )
         dev = qp.Backline(
             controller=_controller(init_args={}, in_bytes=in_bytes, out_bytes=out_bytes),
             coprocessors=[_coproc("cop0", init_args={})],
