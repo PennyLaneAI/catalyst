@@ -462,7 +462,7 @@ void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result, b
         if (auto decomposableGate = dyn_cast<quantum::DecomposableGate>(op)) {
             // get the graph op id
             graphOpId = decomposableGate.getGraphOpId();
-            operatorNode = catalyst::quantum::GraphDecompositionPrep::parseOperator(graphOpId);
+            operatorNode.id = graphOpId;
             graphOp = graphResult->find(operatorNode);
         }
     }
