@@ -224,7 +224,7 @@
   Catalyst's own GPU kernels (`gpu_echo_launcher`, `gpu_steane_launcher`) carry messages of any
   size over `memcpy` and `gpu_verbs`. Other persistent kernels, such as PennyLane's Triton
   decoders, still carry at most 8 B.
-  [(#XXXX)](https://github.com/PennyLaneAI/catalyst/pull/XXXX)
+  [(#3383)](https://github.com/PennyLaneAI/catalyst/pull/3383)
 
 * The :func:`~catalyst.qjit` function now accepts an ``enable_aot_compilation`` argument, which can be
   used to toggle whether or not to use ahead-of-time compilation.
@@ -888,7 +888,7 @@
   frame mode it now carries. The runtime refuses a launcher without it, rather than letting the
   session wait for replies the old layout never produces. PennyLane's Triton decoders need the
   matching PennyLane release.
-  [(#XXXX)](https://github.com/PennyLaneAI/catalyst/pull/XXXX)
+  [(#3383)](https://github.com/PennyLaneAI/catalyst/pull/3383)
 
 * A `memcpy` transport session whose backend config has no `frame` keys now uses the 16 B frame, and
   refuses messages over 8 bytes. Programs compiled with Catalyst are unaffected, since the compiler
