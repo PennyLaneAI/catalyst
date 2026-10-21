@@ -28,6 +28,7 @@ from pennylane.typing import Float, Wire
 from catalyst.decomposition.decomposition_rules import (
     materialize_reachable_rule_strings,
 )
+from catalyst.decomposition.modifier_state import ModifierState
 
 
 def _base_rule():
@@ -68,7 +69,7 @@ def test_registered_self_adjoint_rule_targets_the_adjoint_op():
                     wire_lens={"reg": 2},
                     static_data={},
                     op_cls=NoParams,
-                    adjoint=True,
+                    modifiers=ModifierState(adjoint=True),
                 )
             )
         )
@@ -100,7 +101,7 @@ def test_registered_symbolic_rule_accepts_mcm():
                     wire_lens={"reg": 1},
                     static_data={},
                     op_cls=NoParams,
-                    adjoint=True,
+                    modifiers=ModifierState(adjoint=True),
                 )
             )
         )
@@ -139,7 +140,7 @@ def test_registered_control_rule_targets_the_controlled_op():
                     wire_lens={"reg": 2},
                     static_data={},
                     op_cls=NoParams,
-                    n_ctrls=2,
+                    modifiers=ModifierState(control_count=2),
                 )
             )
         )

@@ -20,6 +20,7 @@ from pennylane.typing import Wire
 from catalyst import qjit
 from catalyst.decomposition.capture_session import OpDecompRequest
 from catalyst.decomposition.decomposition_rules import walk_reachable_decomp_rule_sets
+from catalyst.decomposition.modifier_state import ModifierState
 from catalyst.jax_primitives import decomp_definition_p, decomprule_p
 
 
@@ -309,7 +310,7 @@ def test_registered_symbolic_resources_keep_their_own_modifiers():
         qp.add_decomps("C(SymbolicRoot)", direct_control_rule)
         qp.add_decomps(SymbolicLeaf, leaf_rule)
         request = OpDecompRequest.from_operation(SymbolicRoot(Wire[1]))
-        target_specs = walk_reachable_decomp_rule_sets([(request, {(False, 1)})])
+        target_specs = walk_reachable_decomp_rule_sets([(request, {ModifierState(False, 1)})])
 
     targets = {target_spec.target_id for target_spec in target_specs}
     assert "2C(SymbolicLeaf){}{wires:1}{}" in targets
@@ -332,7 +333,7 @@ def test_modifier_changing_identity_cycle_is_closed():
     with qp.decomposition.local_decomps():
         qp.add_decomps(CyclicGate, cyclic_rule)
         request = OpDecompRequest.from_operation(CyclicGate(Wire[1]))
-        target_specs = walk_reachable_decomp_rule_sets([(request, {(False, 0)})])
+        target_specs = walk_reachable_decomp_rule_sets([(request, {ModifierState()})])
 
     targets = {target_spec.target_id for target_spec in target_specs}
     assert targets == {
@@ -365,7 +366,9 @@ def test_indirect_control_cycle_uses_same_ancestor_count():
     with qp.decomposition.local_decomps():
         qp.add_decomps("C(IndirectCycleGate)", controlled_rule)
         qp.add_decomps(CycleBridge, bridge_rule)
-        request = OpDecompRequest.from_operation(IndirectCycleGate(Wire[1]), (False, 1))
+        request = OpDecompRequest.from_operation(
+            IndirectCycleGate(Wire[1]), ModifierState(False, 1)
+        )
         target_specs = walk_reachable_decomp_rule_sets([(request, {request.modifier_state})])
 
     targets = {target_spec.target_id for target_spec in target_specs}
@@ -392,7 +395,7 @@ def test_same_base_modifier_transition_reopens_closure():
     with qp.decomposition.local_decomps():
         qp.add_decomps(TransitionGate, base_rule)
         qp.add_decomps("Adjoint(TransitionGate)", adjoint_rule)
-        request = OpDecompRequest.from_operation(TransitionGate(Wire[1]), (True, 0))
+        request = OpDecompRequest.from_operation(TransitionGate(Wire[1]), ModifierState(True))
         target_specs = walk_reachable_decomp_rule_sets([(request, {request.modifier_state})])
 
     targets = {target_spec.target_id for target_spec in target_specs}
