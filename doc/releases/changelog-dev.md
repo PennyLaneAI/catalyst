@@ -187,6 +187,19 @@
   used to toggle whether or not to use ahead-of-time compilation.
   [(#3339)](https://github.com/PennyLaneAI/catalyst/pull/3339)
 
+* `QJIT.aot_compile` now accepts the arguments to compile for, so functions without type hints
+  can be compiled ahead of time.
+  [(#3369)](https://github.com/PennyLaneAI/catalyst/pull/3369)
+
+  ```python
+  @qjit
+  def f(x):
+      return x * 2
+
+  f.aot_compile(jax.ShapeDtypeStruct((3,), jnp.float64))
+  f(jnp.array([1.0, 2.0, 3.0]))  # no compilation
+  ```
+
 * :func:`pennylane.transforms.gridsynth` now produces correct, deterministic decompositions for
   any `epsilon` down to `1e-15`, and invalid angles or `epsilon` values raise an error.
   [(#3333)](https://github.com/PennyLaneAI/catalyst/pull/3333)
@@ -1215,6 +1228,7 @@ Mudit Pandey,
 Shuli Shu,
 Nikhil Sreekumar,
 Kalman Szenes,
+Jaume Villasante,
 Paul Haochen Wang,
 David Wierichs,
 Jake Zaia,
