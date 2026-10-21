@@ -109,15 +109,17 @@ def _resources_have_measurement(gate_counts) -> bool:
     return any(isinstance(op, _NON_INVERTIBLE_RESOURCE_TYPES) for op in gate_counts)
 
 
-def _adjoint_folds_to_base(resource_ids, op_name) -> bool:
+def _adjoint_folds_to_base(resource_ids, base_id) -> bool:
     """Whether an ``Adjoint(op)`` rule's resources are a single unmodified copy of the base op.
 
     This holds for ``adjoint_rotation`` and ``self_adjoint`` to simplify the rule registry
     and avoid the solver having to match a rule that produces a modified gate back to the base op.
+    Note that there are other rules that produce a single op of the same class but with
+    modified static data; such rules are not considered a fold.
 
     Args:
         resource_ids (dict): the rule's resources as ``{resource graphOpId: count}``
-        op_name (str): the base operator's GraphOpID name
+        base_id (str): the graphOpId of the base operator the rule was probed with
 
     Returns:
         bool: whether the rule folds ``Adjoint(op)`` to a single unmodified ``op``
@@ -125,7 +127,7 @@ def _adjoint_folds_to_base(resource_ids, op_name) -> bool:
     if len(resource_ids) != 1:
         return False
     ((rid, count),) = resource_ids.items()
-    return count == 1 and rid.split("{", 1)[0] == op_name
+    return count == 1 and rid == base_id
 
 
 def build_base_op(op_cls, kwargs, is_custom_op):
@@ -1123,9 +1125,10 @@ def build_registered_decomp_target_spec(
     #  - Under ctrl, every other produced op additionally gains the control modifier.
     if kind == "adjoint":
         ctrl_mod = _control_modifier(n_ctrl) if wrap_control else None
+        base_id = GraphOpID(probe_args["base"]).getGraphOpId()
         rewritten = {}
         for rule_name, ids in name_to_resource_ids.items():
-            if _adjoint_folds_to_base(ids, op_name):
+            if _adjoint_folds_to_base(ids, base_id):
                 rewritten[rule_name] = {target_id.replace(f"Adjoint({op_name})", op_name, 1): 1}
             elif wrap_control:
                 rewritten[rule_name] = {

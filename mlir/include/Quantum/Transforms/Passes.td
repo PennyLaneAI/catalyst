@@ -16,6 +16,17 @@
 #define QUANTUM_PASSES
 
 include "mlir/Pass/PassBase.td"
+include "mlir/IR/EnumAttr.td"
+
+def GridsynthMethod : I32EnumAttr<"GridsynthMethod", "Synthesis method of the gridsynth pass",
+    [
+        I32EnumAttrCase<"Deterministic", 0, "deterministic">,
+        I32EnumAttrCase<"Mixed", 1, "mixed">,
+        I32EnumAttrCase<"MixedFallback", 2, "mixed-fallback">,
+    ]> {
+    let cppNamespace = "catalyst::quantum";
+    let genSpecializedAttr = 0;
+}
 
 def QuantumConversionPass : Pass<"convert-quantum-to-llvm"> {
     let summary = "Perform a dialect conversion from Quantum to LLVM (QIR).";
@@ -146,6 +157,15 @@ def CancelInversesPass : Pass<"cancel-inverses"> {
 
 def GridsynthPass : Pass<"gridsynth"> {
     let summary = "Perform Ross-Selinger/Gridsynth decomposition.";
+    let description = [{
+        Discretizes single-qubit RZ and PhaseShift gates, and PPR-Z rotations with an arbitrary
+        angle, at execution time. The pass fails on controlled RZ and PhaseShift gates, which need
+        to be decomposed into single-qubit rotations first.
+
+        With `method=mixed-fallback`, each rotation allocates an ancilla qubit, measures it and
+        releases it, and applies the fallback sequence inside an `scf.if` on the measurement
+        result.
+    }];
 
     let options = [Option<
         /*C++ var name=*/"epsilon",
@@ -158,7 +178,21 @@ def GridsynthPass : Pass<"gridsynth"> {
         /*CLI name=*/"ppr-basis",
         /*Type=*/"bool",
         /*Default=*/"false",
-        /*Description=*/desc="Whether to decompose into the PPR basis set instead of the standard Clifford+T basis set.">,];
+        /*Description=*/desc="Whether to decompose into the PPR basis set instead of the standard Clifford+T basis set.">,
+        Option<
+        /*C++ var name=*/"method",
+        /*CLI name=*/"method",
+        /*Type=*/"::catalyst::quantum::GridsynthMethod",
+        /*Default=*/"::catalyst::quantum::GridsynthMethod::Deterministic",
+        /*Description=*/desc="Synthesis method. 'mixed' and 'mixed-fallback' are cheaper but match the accuracy of 'deterministic' only on average over samples.",
+        /*Additional flags=*/additionalFlags=[{::llvm::cl::values(
+            clEnumValN(::catalyst::quantum::GridsynthMethod::Deterministic, "deterministic",
+                       "A single Ross-Selinger sequence per rotation."),
+            clEnumValN(::catalyst::quantum::GridsynthMethod::Mixed, "mixed",
+                       "A probabilistic mixture of Ross-Selinger sequences for under- and over-rotations."),
+            clEnumValN(::catalyst::quantum::GridsynthMethod::MixedFallback, "mixed-fallback",
+                       "A probabilistic mixture of projective rotations on an ancilla, with a mixed fallback on failure.")
+        )}]>,];
 
         let dependentDialects = [
         "memref::MemRefDialect",

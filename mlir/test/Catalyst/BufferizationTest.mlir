@@ -111,6 +111,39 @@ func.func @custom_call_backend_config(%arg0: tensor<3x3xf64>) -> tensor<3x3xf64>
 
 // -----
 
+// CHECK-LABEL: func.func @runtime_call_buf
+// CHECK: [[source:%.+]] = bufferization.to_buffer %arg0
+// CHECK: [[status:%.+]] = catalyst.runtime_call fn("native_sum") ([[source]], %arg1)
+// CHECK-SAME: {c_params = ["buf", "u64"], c_result = "i32"}
+// CHECK-SAME: (memref<4xi8>, i64) -> (i32)
+// CHECK: return [[status]]
+func.func @runtime_call_buf(%arg0: tensor<4xi8>, %arg1: i64) -> i32 {
+    %0 = catalyst.runtime_call fn("native_sum") (%arg0, %arg1) {
+        c_params = ["buf", "u64"],
+        c_result = "i32"
+    } : (tensor<4xi8>, i64) -> (i32)
+    return %0 : i32
+}
+
+// -----
+
+// CHECK-LABEL: func.func @runtime_call_out
+// CHECK: [[dest:%.+]] = memref.alloc() {{.*}}: memref<4xi8>
+// CHECK: [[status:%.+]] = catalyst.runtime_call fn("native_fill") (%arg0, %arg1) in([[dest]] : memref<4xi8>)
+// CHECK-SAME: {c_params = ["out", "u64", "u8"], c_result = "i32"}
+// CHECK-SAME: (i64, i8) -> (i32)
+// CHECK: [[tensor:%.+]] = bufferization.to_tensor [[dest]]
+// CHECK: return [[status]], [[tensor]]
+func.func @runtime_call_out(%arg0: i64, %arg1: i8) -> (i32, tensor<4xi8>) {
+    %status, %out = catalyst.runtime_call fn("native_fill") (%arg0, %arg1) {
+        c_params = ["out", "u64", "u8"],
+        c_result = "i32"
+    } : (i64, i8) -> (i32) outs(tensor<4xi8>)
+    return %status, %out : i32, tensor<4xi8>
+}
+
+// -----
+
 // CHECK-LABEL: @test0
 module @test0 {
   // CHECK: catalyst.callback @callback_1(memref<f64>, memref<f64>)

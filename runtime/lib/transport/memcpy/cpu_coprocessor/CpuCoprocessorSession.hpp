@@ -14,27 +14,21 @@
 
 #pragma once
 
-#include <array>
-#include <atomic>
 #include <cstddef>
 #include <cstdint>
-#include <exception>
 #include <memory>
-#include <stop_token>
 #include <string>
-#include <thread>
 #include <vector>
 
 #include "MemcpyLink.hpp"
+#include "MessageWorker.hpp"
 #include "Transport.hpp"
-#include "WireProtocol.hpp"
 
 namespace catalyst::transport::memcpy {
 
-// A persistent worker jthread polls a
-// request ring, runs the bound CoprocessorFn, and publishes to a reply ring. process_message
-// is called inline from the controller's kick(), stages the request into the next request
-// slot, spin-waits for the worker to publish the paired reply, and copies it out.
+// The coprocessor of the in-process memcpy transport. A MessageWorker runs the bound
+// CoprocessorFn on a worker thread, once per message. process_message is called inline from the
+// controller's kick() and carries messages of any size each way.
 class CpuCoprocessorSession : public CoprocessorSession {
   public:
     explicit CpuCoprocessorSession(const std::string &config = {})
@@ -58,32 +52,11 @@ class CpuCoprocessorSession : public CoprocessorSession {
     std::size_t process_message(const void *in, std::size_t in_len, void *out, std::size_t out_cap);
 
   private:
-    // The worker loop; runs on engine_.
-    void run(std::stop_token st);
-
     std::string pair_key_;
     std::shared_ptr<MemcpyLink> link_;
-
     /// Owns the buffers backing MemRegions handed out by alloc_memory().
     std::vector<std::unique_ptr<std::byte[]>> caller_memory_regions_;
-
-    CoprocessorFn fn_ = nullptr;
-    void *ctx_ = nullptr;
-
-    // Rings backing the worker pipeline. Both sides index by `cursor & (K_RING_SLOTS - 1)` and
-    // publish `seq = cursor + 1` after the payload writes, so the reader only observes a slot
-    // once it is fully written.
-    std::array<common::PayloadSlot, common::K_RING_SLOTS> request_ring_{};
-    std::array<common::PayloadSlot, common::K_RING_SLOTS> reply_ring_{};
-    // Monotonic cursor advanced by process_message (single-writer: controller's kick() is
-    // synchronous, so no concurrent process_message on the same session).
-    std::uint64_t process_cursor_ = 0;
-
-    // Engine error plumbing: mirrors the cpu_verbs pattern. If run() throws, error_ is set and
-    // failed_ published (release); process_message acquire-loads failed_ and rethrows.
-    std::atomic<bool> failed_{false};
-    std::exception_ptr error_;
-    std::jthread engine_;
+    MessageWorker worker_;
 };
 
 } // namespace catalyst::transport::memcpy

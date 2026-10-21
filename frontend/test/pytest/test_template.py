@@ -106,6 +106,7 @@ def test_cosine_window(backend):
     assert np.allclose(interpreted_fn(), jitted_fn())
 
 
+@pytest.mark.xfail(reason="IQPEmbedding is not decomposed under capture qjit", strict=True)
 def test_iqp_embedding(backend):
     """Test iqp embedding."""
 
@@ -116,7 +117,7 @@ def test_iqp_embedding(backend):
     device = qp.device(backend, wires=3)
     params = jnp.array([1.0, 2.0, 3.0])
     interpreted_fn = qp.QNode(iqp_embedding, device)
-    jitted_fn = qjit(interpreted_fn)
+    jitted_fn = qjit(interpreted_fn, capture=True)
 
     assert np.allclose(interpreted_fn(params), jitted_fn(params))
 

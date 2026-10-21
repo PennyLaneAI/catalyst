@@ -66,6 +66,12 @@ class TestOQDDevice:
         name, _ = dev.get_c_interface()
         assert name == "oqd"
 
+    def test_get_runtime_artifacts(self):
+        """The device declares the OQD runtime library for the linker."""
+        artifacts = OQDDevice.get_runtime_artifacts()
+        assert len(artifacts) == 1
+        assert "librt_OQD_capi" in artifacts[0]
+
     def test_unsupported_one_shot_device(self):
         """Test unsupported device edge case."""
 

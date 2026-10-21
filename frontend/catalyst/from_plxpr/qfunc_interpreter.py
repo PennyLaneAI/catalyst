@@ -54,9 +54,7 @@ from catalyst.decomposition.rule_lowering_warning import RuleLoweringWarning
 from catalyst.from_plxpr.qref_jax_primitives import (
     MeasurementPlane,
     QrefQreg,
-    qref_alloc_p,
     qref_compbasis_p,
-    qref_dealloc_p,
     qref_get_p,
     qref_gphase_p,
     qref_hermitian_p,
@@ -598,31 +596,43 @@ _special_op_bind_call = {
 @PLxPRToQuantumJaxprInterpreter.register_primitive(qp.allocation.allocate_prim)
 def handle_allocate(self, *, num_wires, state=None, restored=False):
     """Handle the conversion from plxpr to Catalyst jaxpr for the qp.allocate primitive"""
+    # TODO: remove this wrapper once PLxPRToQuantumJaxprInterpreter can emit Catalyst
+    # jaxpr primitives directly without rebinding PennyLane allocate/deallocate.
 
     assert isinstance(
         num_wires, int
     ), "number of dynamically allocated qubits must be statically known"
 
     self.has_dynamic_allocation = True
-    new_qreg = qref_alloc_p.bind(static_num_qubits=num_wires)
-    return [qref_get_p.bind(new_qreg, i) for i in range(num_wires)]
+
+    state = (
+        qp.allocation.AllocateState(state)
+        if state is not None
+        else qp.allocation.AllocateState.ZERO
+    )
+    if state == qp.allocation.AllocateState.ANY:
+        raise CompileError(
+            'qp.allocate with state="any" is not supported in Catalyst. '
+            'Use state="zero" (default), state="magic-T", or state="magic-T-adj".'
+        )
+    # Catalyst does not track wire-restore semantics; zero/magic allocations behave the same
+    # regardless of PennyLane's ``restored`` flag (including decomposition work wires).
+    restored = False
+    return list(
+        qp.allocation.allocate_prim.bind(
+            num_wires=num_wires,
+            state=state,
+            restored=restored,
+        )
+    )
 
 
 @PLxPRToQuantumJaxprInterpreter.register_primitive(qp.allocation.deallocate_prim)
 def handle_deallocate(self, *wires):
     """Handle the conversion from plxpr to Catalyst jaxpr for the qp.deallocate primitive"""
-    qregs = set()
-    for w in wires:
-        get_op = w.parent
-        assert (
-            get_op.primitive is qref_get_p
-        ), "Manual deallocation is only supported for manually allocated wires"
-        qreg = get_op.in_tracers[0]
-        qregs.add(qreg)
-    assert (
-        len(qregs) == 1
-    ), "Expected all wires to deallocate to come from the same allocation instruction"
-    qref_dealloc_p.bind(list(qregs)[0])
+    # TODO: remove this wrapper once PLxPRToQuantumJaxprInterpreter can emit Catalyst
+    # jaxpr primitives directly without rebinding PennyLane allocate/deallocate.
+    qp.allocation.deallocate_prim.bind(*wires)
     return []
 
 
@@ -878,9 +888,18 @@ def handle_adjoint_transform(self, *invals, jaxpr, lazy, n_consts):
     )
 
 
-# pylint: disable=unused-argument
+# pylint: disable=unused-argument,too-many-arguments
 @PLxPRToQuantumJaxprInterpreter.register_primitive(plxpr_ctrl_transform_prim)
-def handle_ctrl_transform(self, *invals, jaxpr, n_control, control_values, work_wires, n_consts):
+def handle_ctrl_transform(
+    self,
+    *invals,
+    jaxpr,
+    n_control,
+    control_values,
+    work_wires,
+    n_consts,
+    work_wire_type="borrowed",
+):
     """Interpret a control transform, then re-bind it for lowering to a `qref.ctrl` region op."""
     consts = invals[:n_consts]
     args = invals[n_consts:-n_control]
@@ -902,6 +921,7 @@ def handle_ctrl_transform(self, *invals, jaxpr, n_control, control_values, work_
         jaxpr=body.jaxpr,
         control_values=control_values,
         work_wires=work_wires,
+        work_wire_type=work_wire_type,
         n_consts=len(body.consts),
     )
 
