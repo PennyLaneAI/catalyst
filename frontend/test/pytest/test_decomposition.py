@@ -2593,5 +2593,44 @@ def test_custom_op_that_decomposes_to_basis_rotation():
         }
 
 
+@pytest.mark.parametrize(
+    "xv, yv",
+    [(4, 0), (1, 1), (6, 3)],
+)
+def test_unsorted_wire_order(xv, yv):
+    """
+    Test that qp.SemiAdder, which has wire args declared in an alphabetically unsorted way (x_wires, y_wires, work_wires), works properly.
+    """
+    x, y, work = [0, 1, 2], [3, 4, 5], [6, 7]
+    gate_set = {
+        "CNOT",
+        "Toffoli",
+        "Hadamard",
+        "T",
+        "Adjoint(T)",
+        "S",
+        "Adjoint(S)",
+        "PauliX",
+        "CZ",
+        "PauliZ",
+        "GlobalPhase",
+    }
+
+    @qp.qjit(capture=True)
+    @qp.decompose(gate_set=gate_set)
+    @qp.qnode(qp.device("lightning.qubit", wires=8))
+    def c(_xv, _yv):
+        qp.BasisState(qp.math.int_to_binary(_xv, 3), x)
+        qp.BasisState(qp.math.int_to_binary(_yv, 3), y)
+        qp.SemiAdder(x, y, work_wires=work)
+        return qp.probs(wires=y)
+
+    probs = c(xv, yv)
+    ids = np.where(probs)[0]
+    assert len(ids) == 1
+    out = ids[0]
+    assert out == (xv + yv) % 8
+
+
 if __name__ == "__main__":
     pytest.main(["-x", __file__])
