@@ -51,11 +51,9 @@ class BaseSignatureAnalyzer {
 
     llvm::SmallVector<mlir::Value, 4> paramsStorage;
 
-    // Unified Signature Structure: All parameters, regardless of source (params or theta),
-    // are stored in a ValueRange for generalized processing.
     struct Signature {
         mlir::ValueRange params;
-        mlir::ValueRange inQubits;
+        llvm::SmallVector<mlir::Value> inQubits;
         mlir::ValueRange inCtrlQubits;
         mlir::ValueRange inCtrlValues;
 
@@ -353,38 +351,17 @@ class BaseSignatureAnalyzer {
     }
 };
 
-namespace {
-
-llvm::SmallVector<mlir::Value> getReorderedQubitOperands(OperatorOp op) {
-    mlir::ValueRange originalOperands = op.getNonCtrlQubitOperands();
-    llvm::SmallVector<mlir::Value> reorderedOperands;
-
-    for (mlir::NamedAttribute entry : op.getQubitMap()) {
-        auto indices = cast<mlir::DenseI64ArrayAttr>(entry.getValue());
-        for (int64_t idx : indices.asArrayRef()) {
-            reorderedOperands.push_back(originalOperands[idx]);
-        }
-    }
-
-    return reorderedOperands;
-}
-
-} // namespace
-
 class DecomposableGateSignatureAnalyzer : public BaseSignatureAnalyzer {
   public:
     DecomposableGateSignatureAnalyzer() = delete;
 
     DecomposableGateSignatureAnalyzer(DecomposableGate op, bool enableQregMode)
-        : BaseSignatureAnalyzer(
-              op,
-              isa<ParametrizedGate>(op.getOperation())
-                  ? cast<ParametrizedGate>(op.getOperation()).getAllParams()
-                  : mlir::ValueRange{},
-              isa<OperatorOp>(op.getOperation())
-                  ? mlir::ValueRange(getReorderedQubitOperands(cast<OperatorOp>(op.getOperation())))
-                  : op.getNonCtrlQubitOperands(),
-              op.getCtrlQubitOperands(), op.getCtrlValueOperands(), enableQregMode) {}
+        : BaseSignatureAnalyzer(op,
+                                isa<ParametrizedGate>(op.getOperation())
+                                    ? cast<ParametrizedGate>(op.getOperation()).getAllParams()
+                                    : mlir::ValueRange{},
+                                op.getRuleWireArgs(), op.getCtrlQubitOperands(),
+                                op.getCtrlValueOperands(), enableQregMode) {}
 };
 
 } // namespace qref
