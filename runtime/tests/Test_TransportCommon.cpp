@@ -15,7 +15,9 @@
 #include <string>
 
 #include "BackendConfig.hpp"
+#include "ConfigParser.hpp"
 #include "Context.hpp"
+#include "FpgaBackendConfig.hpp"
 #include "QpState.hpp"
 
 #include <catch2/catch_test_macros.hpp>
@@ -36,6 +38,42 @@ static bool have_rxe() {
         ibv_free_device_list(devs);
     }
     return found;
+}
+
+TEST_CASE("configparser::find returns the last value of a key", "[common]") {
+    CHECK(configparser::find("a=1;b=2;a=3", "a") == "3");
+    CHECK(configparser::find("a=1;b=x=y", "b") == "x=y");
+    CHECK_FALSE(configparser::find("a=1", "b").has_value());
+}
+
+TEST_CASE("configparser::parse_u64 reads decimal and 0x hex, naming the key on error", "[common]") {
+    CHECK(configparser::parse_u64("42", "k") == 42);
+    CHECK(configparser::parse_u64("0x80000000", "k") == 0x80000000ull);
+    CHECK_THROWS_AS(configparser::parse_u64("", "k"), TransportError);
+    CHECK_THROWS_AS(configparser::parse_u64("0x", "k"), TransportError);
+    CHECK_THROWS_AS(configparser::parse_u64("12ab", "k"), TransportError);
+    CHECK_THROWS_AS(configparser::parse_u64("-1", "k"), TransportError);
+}
+
+TEST_CASE("parse_fpga_config has defaults and reads the FPGA keys", "[common]") {
+    const FpgaConfig d = parse_fpga_config("");
+    CHECK(d.dev == "xib_0");
+    CHECK(d.gid == 1);
+    CHECK(d.ring == K_RING_SLOTS);
+    CHECK(d.stride_log2 == 6);
+    CHECK_FALSE(d.data_mem.has_value());
+
+    const FpgaConfig c =
+        parse_fpga_config("dev=mlx5_1;gid=3;ring=128;stride_log2=7;data_mem=pl;reply_mem=bram");
+    CHECK(c.dev == "mlx5_1");
+    CHECK(c.gid == 3);
+    CHECK(c.ring == 128);
+    CHECK(c.stride_log2 == 7);
+    CHECK(c.data_mem == catalyst::transport::MemKind::Ddr);
+    CHECK(c.reply_mem == catalyst::transport::MemKind::Other);
+
+    CHECK_THROWS(parse_fpga_config("data_mem=dram"));
+    CHECK_THROWS_AS(parse_fpga_config("gid=abc"), TransportError);
 }
 
 TEST_CASE("parse_backend_config requires an explicit dev and gid", "[common]") {

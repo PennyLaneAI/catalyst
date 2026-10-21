@@ -14,6 +14,8 @@
 
 // HwhsBackend.cpp - the plugin entry point for the VPK120 HWHS transport backend.
 
+#include <cstdint>
+#include <initializer_list>
 #include <iostream>
 #include <optional>
 #include <stdexcept>
@@ -21,88 +23,72 @@
 #include <string_view>
 
 #include "ConfigParser.hpp"
+#include "FpgaBackendConfig.hpp"
 #include "HwhsControllerSession.hpp"
 #include "TransportBackend.h"
-#include "WireProtocol.hpp"
 
 namespace {
 
-std::string cfg_get(const std::string &config, const char *key, const std::string &dflt) {
-    std::string out = dflt;
-    catalyst::transport::common::configparser::for_each_kv(
-        config, [&](std::string_view k, std::string_view v) {
-            if (k == key) {
-                out = std::string(v);
-            }
-        });
-    return out;
+namespace common = catalyst::transport::common;
+namespace cp = catalyst::transport::common::configparser;
+
+// `key`'s value, `dflt` when absent; throws unless it is one of `allowed`.
+std::string pick(const std::string &config, const char *key, const char *dflt,
+                 std::initializer_list<std::string_view> allowed) {
+    const std::string v{cp::find(config, key).value_or(dflt)};
+    for (std::string_view a : allowed) {
+        if (v == a) {
+            return v;
+        }
+    }
+    std::string want;
+    for (std::string_view a : allowed) {
+        want += (want.empty() ? "" : "|") + std::string{a};
+    }
+    throw std::runtime_error("unknown " + std::string{key} + " '" + v + "' (want " + want + ")");
 }
 
-std::optional<catalyst::transport::MemKind> mem_kind_opt(const std::string &config,
-                                                         const char *key) {
-    std::string v = cfg_get(config, key, "");
-    if (v.empty()) {
-        return std::nullopt;
-    }
-    if (v == "ps") {
-        return catalyst::transport::MemKind::CpuRam;
-    }
-    if (v == "pl") {
-        return catalyst::transport::MemKind::Ddr;
-    }
-    if (v == "bram") {
-        return catalyst::transport::MemKind::Other;
-    }
-    throw std::runtime_error("unknown mem placement '" + v + "' (want ps|pl|bram) for key " + key);
+// `key` as an unsigned integer (decimal or 0x hex), `dflt` when absent.
+std::uint64_t number(const std::string &config, const char *key, std::uint64_t dflt) {
+    const auto v = cp::find(config, key);
+    return v ? cp::parse_u64(*v, key) : dflt;
 }
 
 catalyst::transport::ControllerSession *make_hwhs_controller(const std::string &config) {
-    std::string dev = cfg_get(config, "dev", "xib_0");
-    int gid = std::stoi(cfg_get(config, "gid", "1"));
-    // Defaults to the wire protocol's ring size: the peer's slot index is cursor % K_RING_SLOTS.
-    auto ring = static_cast<std::uint32_t>(std::stoul(
-        cfg_get(config, "ring", std::to_string(catalyst::transport::common::K_RING_SLOTS))));
-    auto stride_log2 = static_cast<std::uint32_t>(std::stoul(cfg_get(config, "stride_log2", "6")));
-    auto data_kind = mem_kind_opt(config, "data_mem");
-    auto sq_kind = mem_kind_opt(config, "sq_mem");
-    auto reply_kind = mem_kind_opt(config, "reply_mem");
-
-    std::string rp = cfg_get(config, "reply_poll", "sw");
-    if (rp != "sw" && rp != "hw") {
-        throw std::runtime_error("unknown reply_poll '" + rp + "' (want sw|hw)");
+    // dev, gid, ring, stride_log2, data_mem and reply_mem, with fpga_verbs' defaults.
+    const common::FpgaConfig fpga = common::parse_fpga_config(config);
+    std::optional<catalyst::transport::MemKind> sq_kind;
+    if (const auto v = cp::find(config, "sq_mem")) {
+        sq_kind = common::parse_mem_kind("sq_mem", std::string{*v});
     }
-    bool cpu_poll = (rp == "sw");
-    std::string kk = cfg_get(config, "kick", "mmap");
-    if (kk != "mmap" && kk != "ioctl") {
-        throw std::runtime_error("unknown kick '" + kk + "' (want mmap|ioctl)");
-    }
-    bool kick_ioctl = (kk == "ioctl");
+    const bool cpu_poll = pick(config, "reply_poll", "sw", {"sw", "hw"}) == "sw";
+    const bool kick_ioctl = pick(config, "kick", "mmap", {"mmap", "ioctl"}) == "ioctl";
 
     catalyst::transport::hwhs::DemoCfg demo;
-    std::string dm = cfg_get(config, "demo", "off");
-    if (dm != "off" && dm != "hw") {
-        throw std::runtime_error("unknown demo '" + dm + "' (want off|hw)");
-    }
-    demo.enable = (dm == "hw");
-    demo.freq_num = std::stoull(cfg_get(config, "demo_freq", "0"));
-    demo.cmd_cnt = static_cast<std::uint32_t>(std::stoul(cfg_get(config, "demo_cnt", "1")));
-    demo.syn_depth = static_cast<std::uint32_t>(std::stoul(cfg_get(config, "demo_depth", "256")));
-    demo.bram_pa = std::stoull(cfg_get(config, "demo_bram", "0x80000000"), nullptr, 0);
-    demo.freq_span =
-        static_cast<std::uint32_t>(std::stoul(cfg_get(config, "demo_span", "0"), nullptr, 0));
-    demo.lfsr_seed =
-        static_cast<std::uint32_t>(std::stoul(cfg_get(config, "demo_seed", "0"), nullptr, 0));
+    demo.enable = pick(config, "demo", "off", {"off", "hw"}) == "hw";
+    demo.freq_num = number(config, "demo_freq", 0);
+    demo.cmd_cnt = static_cast<std::uint32_t>(number(config, "demo_cnt", 1));
+    demo.syn_depth = static_cast<std::uint32_t>(number(config, "demo_depth", 256));
+    demo.bram_pa = number(config, "demo_bram", 0x80000000);
+    demo.freq_span = static_cast<std::uint32_t>(number(config, "demo_span", 0));
+    demo.lfsr_seed = static_cast<std::uint32_t>(number(config, "demo_seed", 0));
     //   demo_trace=<pa>    physical address the BD maps the RTT trace RAM at.
     //   demo_table=<file>  a byte-for-byte image of the BRAM table
     //   demo_trace_out=<f> where to write the trace
-    demo.trace_pa = std::stoull(cfg_get(config, "demo_trace", "0x92000000"), nullptr, 0);
-    demo.trace_out = cfg_get(config, "demo_trace_out", "");
-    demo.table_path = cfg_get(config, "demo_table", "");
+    demo.trace_pa = number(config, "demo_trace", 0x92000000);
+    demo.trace_out = std::string{cp::find(config, "demo_trace_out").value_or("")};
+    demo.table_path = std::string{cp::find(config, "demo_table").value_or("")};
 
     return new catalyst::transport::hwhs::HwhsControllerSession(
-        dev, gid, ring, stride_log2, data_kind, sq_kind, reply_kind, cpu_poll, kick_ioctl, demo);
+        fpga.dev, fpga.gid, fpga.ring, fpga.stride_log2, fpga.data_mem, sq_kind, fpga.reply_mem,
+        cpu_poll, kick_ioctl, demo);
 }
 
 } // namespace
 
 GENERATE_TRANSPORT_CONTROLLER_FACTORY(CatalystTransportController, make_hwhs_controller)
+CATALYST_TRANSPORT_BACKEND_CAPS("hwhs", CATALYST_TRANSPORT_ROLE_BIT_CONTROLLER,
+                                CATALYST_TRANSPORT_MEM_BIT(CpuRam) |
+                                    CATALYST_TRANSPORT_MEM_BIT(Ddr) |
+                                    CATALYST_TRANSPORT_MEM_BIT(Other),
+                                0, 8, 8, 1)
