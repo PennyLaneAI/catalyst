@@ -938,6 +938,14 @@
   rule body so each rule is self-contained, instead of leaving a dangling call.
   [(#3242)](https://github.com/PennyLaneAI/catalyst/pull/3242)
 
+* Fixed a bug where `--decompose-lowering` passed the wires of a `qref.operator` to its
+  decomposition rule in operand order rather than in the order of its `qubit_map`. Rules slice
+  their wires by sorted argument name, so operators whose wire arguments are not lowered in
+  alphabetical order (e.g. `SemiAdder`) received the wrong wires. A new `getRuleWireArgs` method on
+  the `DecomposableGate` interface of both the `quantum` and `qref` dialects returns the non-control
+  wires in the order the rule expects.
+  [(#3372)](https://github.com/PennyLaneAI/catalyst/pull/3372)
+
 <h3>Internal changes ⚙️</h3>
 
 * The FPGA transport backends share one config parser. The VPK120 backend now reads `dev`, `gid`,

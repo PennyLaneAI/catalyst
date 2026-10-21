@@ -198,6 +198,10 @@ def DecomposableGate : OpInterface<"DecomposableGate", [QuantumGate]> {
             "llvm::StringMap<llvm::SmallVector<mlir::Type>>", "getDynamicShape"
         >,
         InterfaceMethod<
+            "Return a list of wire values (excluding control wires) sorted in the order that they are expected to appear on their decomposition rules.",
+            "llvm::SmallVector<mlir::Value>", "getRuleWireArgs"
+        >,
+        InterfaceMethod<
             "Return a map of frontend parameter name to number of wires (excluding control wires).",
             "llvm::StringMap<size_t>", "getWireLens"
         >,

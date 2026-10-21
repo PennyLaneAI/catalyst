@@ -922,6 +922,10 @@ llvm::StringMap<llvm::SmallVector<mlir::Type>> OperatorOp::getDynamicShape() {
 }
 
 llvm::SmallVector<mlir::Value> OperatorOp::getRuleWireArgs() {
+    if (getQreg() || getQubitMap().empty()) {
+        return getNonCtrlQubitOperands();
+    }
+
     mlir::ValueRange originalOperands = getNonCtrlQubitOperands();
     llvm::SmallVector<mlir::Value> reorderedOperands;
 

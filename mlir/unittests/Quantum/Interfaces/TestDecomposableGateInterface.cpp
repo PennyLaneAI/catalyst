@@ -73,6 +73,13 @@ module {
         {"0", {Float64Type::get(&context)}}};
     ASSERT_EQ(customOp.getDynamicShape(), expectedDynamicShape);
 
+    llvm::SmallVector<mlir::Value> qubits;
+    for (AllocQubitOp alloc : module->getOps<AllocQubitOp>()) {
+        qubits.push_back(alloc.getResult());
+    }
+    llvm::SmallVector<mlir::Value> expectedRuleWireArgs = {qubits[0], qubits[1]};
+    ASSERT_EQ(customOp.getRuleWireArgs(), expectedRuleWireArgs);
+
     llvm::StringMap<size_t> expectedWires = {{"wires", 2}};
     ASSERT_EQ(customOp.getWireLens(), expectedWires);
 
@@ -177,6 +184,13 @@ module {
         {"theta", {Float64Type::get(&context)}}};
     ASSERT_EQ(multiRZ.getDynamicShape(), expectedDynamicShape);
 
+    llvm::SmallVector<mlir::Value> qubits;
+    for (AllocQubitOp alloc : module->getOps<AllocQubitOp>()) {
+        qubits.push_back(alloc.getResult());
+    }
+    llvm::SmallVector<mlir::Value> expectedRuleWireArgs = {qubits[0], qubits[1], qubits[2]};
+    ASSERT_EQ(multiRZ.getRuleWireArgs(), expectedRuleWireArgs);
+
     llvm::StringMap<size_t> expectedWires = {{"wires", 3}};
     ASSERT_EQ(multiRZ.getWireLens(), expectedWires);
 
@@ -210,6 +224,13 @@ module {
     llvm::StringMap<llvm::SmallVector<mlir::Type>> expectedDynamicShape = {
         {"theta", {Float64Type::get(&context)}}};
     ASSERT_EQ(paulirot.getDynamicShape(), expectedDynamicShape);
+
+    llvm::SmallVector<mlir::Value> qubits;
+    for (AllocQubitOp alloc : module->getOps<AllocQubitOp>()) {
+        qubits.push_back(alloc.getResult());
+    }
+    llvm::SmallVector<mlir::Value> expectedRuleWireArgs = {qubits[0], qubits[1], qubits[2]};
+    ASSERT_EQ(paulirot.getRuleWireArgs(), expectedRuleWireArgs);
 
     llvm::StringMap<size_t> expectedWires = {{"wires", 3}};
     ASSERT_EQ(paulirot.getWireLens(), expectedWires);
@@ -248,6 +269,13 @@ module {
         {"phi", {Float64Type::get(&context)}}};
     ASSERT_EQ(pcphase.getDynamicShape(), expectedDynamicShape);
 
+    llvm::SmallVector<mlir::Value> qubits;
+    for (AllocQubitOp alloc : module->getOps<AllocQubitOp>()) {
+        qubits.push_back(alloc.getResult());
+    }
+    llvm::SmallVector<mlir::Value> expectedRuleWireArgs = {qubits[0], qubits[1]};
+    ASSERT_EQ(pcphase.getRuleWireArgs(), expectedRuleWireArgs);
+
     // Controls are not part of the gate wires considered by the decomp interface
     llvm::StringMap<size_t> expectedWires = {{"wires", 2}};
     ASSERT_EQ(pcphase.getWireLens(), expectedWires);
@@ -284,6 +312,8 @@ module {
         {"phi", {mlir::Float64Type::get(&context)}}};
     ASSERT_EQ(gphase.getDynamicShape(), expectedDynamicShape);
 
+    ASSERT_TRUE(gphase.getRuleWireArgs().empty());
+
     llvm::StringMap<size_t> expectedWires = {};
     ASSERT_EQ(gphase.getWireLens(), expectedWires);
 
@@ -316,6 +346,8 @@ module {
     llvm::StringMap<llvm::SmallVector<mlir::Type>> expectedDynamicShape = {
         {"phi", {mlir::Float64Type::get(&context)}}};
     ASSERT_EQ(gphase.getDynamicShape(), expectedDynamicShape);
+
+    ASSERT_TRUE(gphase.getRuleWireArgs().empty());
 
     llvm::StringMap<size_t> expectedWires = {};
     ASSERT_EQ(gphase.getWireLens(), expectedWires);
@@ -356,6 +388,13 @@ module {
                                       mlir::ComplexType::get(mlir::Float64Type::get(&context)))}}};
     ASSERT_EQ(unitary.getDynamicShape(), expectedDynamicShape);
 
+    llvm::SmallVector<mlir::Value> qubits;
+    for (AllocQubitOp alloc : module->getOps<AllocQubitOp>()) {
+        qubits.push_back(alloc.getResult());
+    }
+    llvm::SmallVector<mlir::Value> expectedRuleWireArgs = {qubits[0], qubits[1]};
+    ASSERT_EQ(unitary.getRuleWireArgs(), expectedRuleWireArgs);
+
     llvm::StringMap<size_t> expectedWires = {{"wires", 2}};
     ASSERT_EQ(unitary.getWireLens(), expectedWires);
 
@@ -393,6 +432,13 @@ module {
         {"angle", {mlir::Float64Type::get(&context)}},
         {"index", {mlir::IntegerType::get(&context, 64)}}};
     ASSERT_EQ(op.getDynamicShape(), expectedDynamicShape);
+
+    llvm::SmallVector<mlir::Value> qubits;
+    for (AllocQubitOp alloc : module->getOps<AllocQubitOp>()) {
+        qubits.push_back(alloc.getResult());
+    }
+    llvm::SmallVector<mlir::Value> expectedRuleWireArgs = {qubits[0], qubits[1]};
+    ASSERT_EQ(op.getRuleWireArgs(), expectedRuleWireArgs);
 
     llvm::StringMap<size_t> expectedWires = {{"wire1", 1}, {"wire2", 1}};
     ASSERT_EQ(op.getWireLens(), expectedWires);
@@ -451,6 +497,8 @@ func.func @testfunc(%first : tensor<1xi64>, %secondthird : tensor<2xi64>) {
         {"angle", {mlir::Float64Type::get(&context)}},
         {"index", {mlir::IntegerType::get(&context, 64)}}};
     ASSERT_EQ(op.getDynamicShape(), expectedDynamicShape);
+
+    ASSERT_TRUE(op.getRuleWireArgs().empty());
 
     llvm::StringMap<size_t> expectedWires = {{"reg", 3}};
     ASSERT_EQ(op.getWireLens(), expectedWires);
@@ -511,6 +559,8 @@ func.func @testfunc(%first : tensor<1xi64>, %secondthird : tensor<2xi64>, %arg1 
          {mlir::RankedTensorType::get({}, mlir::IntegerType::get(&context, 1)),
           mlir::RankedTensorType::get({}, mlir::IntegerType::get(&context, 64))}}};
     ASSERT_EQ(op.getDynamicShape(), expectedDynamicShape);
+
+    ASSERT_TRUE(op.getRuleWireArgs().empty());
 
     llvm::StringMap<size_t> expectedWires = {{"reg", 3}};
     ASSERT_EQ(op.getWireLens(), expectedWires);

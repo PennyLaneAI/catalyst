@@ -25,6 +25,7 @@
 
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSet.h"
@@ -1179,6 +1180,8 @@ llvm::StringMap<llvm::SmallVector<mlir::Type>> CustomOp::getDynamicShape() {
     return ret;
 }
 
+llvm::SmallVector<mlir::Value> CustomOp::getRuleWireArgs() { return getNonCtrlQubitOperands(); }
+
 llvm::StringMap<size_t> CustomOp::getWireLens() {
     return {{"wires", getNonCtrlQubitOperands().size()}};
 }
@@ -1195,6 +1198,8 @@ llvm::StringMap<llvm::SmallVector<mlir::Type>> MultiRZOp::getDynamicShape() {
     return {{"theta", {mlir::Float64Type::get(getContext())}}};
 }
 
+llvm::SmallVector<mlir::Value> MultiRZOp::getRuleWireArgs() { return getNonCtrlQubitOperands(); }
+
 llvm::StringMap<size_t> MultiRZOp::getWireLens() {
     return {{"wires", getNonCtrlQubitOperands().size()}};
 }
@@ -1210,6 +1215,8 @@ std::string PauliRotOp::getOperatorName() { return "PauliRot"; }
 llvm::StringMap<llvm::SmallVector<mlir::Type>> PauliRotOp::getDynamicShape() {
     return {{"theta", {mlir::Float64Type::get(getContext())}}};
 }
+
+llvm::SmallVector<mlir::Value> PauliRotOp::getRuleWireArgs() { return getNonCtrlQubitOperands(); }
 
 llvm::StringMap<size_t> PauliRotOp::getWireLens() {
     return {{"wires", getNonCtrlQubitOperands().size()}};
@@ -1230,6 +1237,8 @@ llvm::StringMap<llvm::SmallVector<mlir::Type>> PCPhaseOp::getDynamicShape() {
     return {{"phi", {mlir::Float64Type::get(getContext())}}};
 }
 
+llvm::SmallVector<mlir::Value> PCPhaseOp::getRuleWireArgs() { return getNonCtrlQubitOperands(); }
+
 llvm::StringMap<size_t> PCPhaseOp::getWireLens() {
     return {{"wires", getNonCtrlQubitOperands().size()}};
 }
@@ -1249,6 +1258,8 @@ llvm::StringMap<llvm::SmallVector<mlir::Type>> GlobalPhaseOp::getDynamicShape() 
     return {{"phi", {mlir::Float64Type::get(getContext())}}};
 }
 
+llvm::SmallVector<mlir::Value> GlobalPhaseOp::getRuleWireArgs() { return {}; }
+
 llvm::StringMap<size_t> GlobalPhaseOp::getWireLens() { return {}; }
 
 mlir::DictionaryAttr GlobalPhaseOp::getStaticData() {
@@ -1261,6 +1272,10 @@ std::string QubitUnitaryOp::getOperatorName() { return "QubitUnitary"; }
 
 llvm::StringMap<llvm::SmallVector<mlir::Type>> QubitUnitaryOp::getDynamicShape() {
     return {{"U", {getMatrix().getType()}}};
+}
+
+llvm::SmallVector<mlir::Value> QubitUnitaryOp::getRuleWireArgs() {
+    return getNonCtrlQubitOperands();
 }
 
 llvm::StringMap<size_t> QubitUnitaryOp::getWireLens() {
@@ -1291,6 +1306,23 @@ llvm::StringMap<llvm::SmallVector<mlir::Type>> OperatorOp::getDynamicShape() {
     }
 
     return map;
+}
+
+llvm::SmallVector<mlir::Value> OperatorOp::getRuleWireArgs() {
+    if (getInQreg() || getQubitMap().empty()) {
+        return getNonCtrlQubitOperands();
+    }
+
+    mlir::ValueRange originalOperands = getNonCtrlQubitOperands();
+    llvm::SmallVector<mlir::Value> reorderedOperands;
+
+    for (mlir::NamedAttribute entry : getQubitMap()) {
+        auto indices = cast<mlir::DenseI64ArrayAttr>(entry.getValue());
+        for (int64_t idx : indices.asArrayRef()) {
+            reorderedOperands.push_back(originalOperands[idx]);
+        }
+    }
+    return reorderedOperands;
 }
 
 llvm::StringMap<size_t> OperatorOp::getWireLens() {
