@@ -16,15 +16,42 @@
 import pennylane as qp
 import pytest
 from jaxlib.mlir._mlir_libs._mlir.ir import Module
+from xdsl.dialects import builtin, func, tensor
+from xdsl.ir import Block, Region
+from xdsl_jax.dialects.stablehlo import ConstantOp, NegateOp
 
 from catalyst.python_interface.conversion import parse_generic_to_xdsl_module
-from catalyst.python_interface.dialects.quantum import CtrlOp
+from catalyst.python_interface.dialects.quantum import AllocOp, CtrlOp, CustomOp, ExtractOp
 from catalyst.python_interface.inspection.xdsl_conversion import (
     get_mlir_module,
     resolve_constant_wire,
+    xdsl_to_qp_op,
 )
 
 pytestmark = pytest.mark.xdsl
+
+
+@pytest.mark.parametrize("dynamic_angle", [False, True], ids=["constant", "symbolic"])
+def test_negated_gate_parameter(dynamic_angle):
+    """Negated angles retain concrete values or become typed symbolic parameters."""
+    tensor_type = builtin.TensorType(builtin.f64, [])
+    block = Block(arg_types=[tensor_type])
+    block.args[0].name_hint = "theta"
+    constant = ConstantOp(builtin.DenseIntOrFPElementsAttr.from_list(tensor_type, [0.5]))
+    negated = NegateOp(block.args[0] if dynamic_angle else constant.output)
+    parameter = tensor.ExtractOp(negated.result, [], builtin.f64)
+    register = AllocOp(1)
+    qubit = ExtractOp(register, 0)
+    gate = CustomOp(gate_name="PhaseShift", params=[parameter], in_qubits=qubit)
+    block.add_ops([constant, negated, parameter, register, qubit, gate, func.ReturnOp()])
+    module = builtin.ModuleOp([func.FuncOp("circuit", ([tensor_type], []), Region(block))])
+    module.verify()
+
+    reconstructed = xdsl_to_qp_op(gate)
+    assert reconstructed.name == "PhaseShift"
+    assert list(reconstructed.wires) == [0]
+    expected = qp.typing.Float if dynamic_angle else -0.5
+    assert reconstructed.data[0] == expected
 
 
 class TestGetMLIRModule:

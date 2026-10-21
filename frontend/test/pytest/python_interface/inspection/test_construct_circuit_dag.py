@@ -21,19 +21,23 @@ from unittest.mock import MagicMock, Mock
 import jax
 import pennylane as qp
 import pytest
-from xdsl.dialects import builtin, func, test
+from xdsl.dialects import arith, builtin, func, tensor, test
 from xdsl.dialects.builtin import ModuleOp
 from xdsl.ir import Operation
 from xdsl.ir.core import Block, Region
+from xdsl_jax.dialects.stablehlo import ConstantOp
 
 from catalyst import measure
 from catalyst.python_interface.conversion import parse_generic_to_xdsl_module, xdsl_from_qjit
+from catalyst.python_interface.dialects import quantum
+from catalyst.python_interface.dialects.catalyst import LaunchKernelOp
 from catalyst.python_interface.inspection.construct_circuit_dag import (
     ConstructCircuitDAG,
     VisualizationError,
     get_label,
 )
 from catalyst.python_interface.inspection.dag_builder import DAGBuilder
+from catalyst.python_interface.inspection.xdsl_conversion import xdsl_to_qp_op
 
 pytestmark = pytest.mark.xdsl
 
@@ -1290,11 +1294,6 @@ class TestCreateDynamicOperatorNodes:
 
     def test_visualize_pythonic_operators(self, capture_mode):
         """Tests that we can use operators like +,-,%"""
-        pytest.xfail(
-            "sc-127303: DAG reconstruction passes symbolic xDSL parameters as strings to typed "
-            "Operator2 gate constructors, which reject string-valued angles"
-        )
-
         dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
@@ -1304,6 +1303,8 @@ class TestCreateDynamicOperatorNodes:
             qp.RX(x % 3, wires=x % 3)
             qp.RY(x - 3, wires=x - 3)
             qp.RZ(x + 3, wires=x + 3)
+            qp.MultiRZ(x + 3, wires=[x % 3, x - 3])
+            qp.PauliRot(x + 3, "XY", wires=[x % 3, x - 3])
 
         args = (1,)
         module = my_workflow(*args)
@@ -1313,11 +1314,13 @@ class TestCreateDynamicOperatorNodes:
         utility.construct(module)
 
         nodes = utility.dag_builder.nodes
-        assert len(nodes) == 4  # Device node + ops
+        assert len(nodes) == 6  # Device node + ops
 
         assert nodes["node1"]["label"] == "<name> RX|<wire> [(arg0 % 3)]"
         assert nodes["node2"]["label"] == "<name> RY|<wire> [(arg0 - 3)]"
         assert nodes["node3"]["label"] == "<name> RZ|<wire> [(arg0 + 3)]"
+        assert nodes["node4"]["label"] == "<name> MultiRZ|<wire> [(arg0 % 3), (arg0 - 3)]"
+        assert nodes["node5"]["label"] == "<name> PauliRot|<wire> [(arg0 % 3), (arg0 - 3)]"
 
     def test_ppm_dynamic(self):
         """Test that PPMs can be captured as nodes."""
@@ -1541,22 +1544,30 @@ class TestCreateDynamicMeasurementNodes:
 class TestOperatorConnectivity:
     """Tests that operators are properly connected."""
 
-    def test_global_phase_connectivity(self, capture_mode):
-        """Tests the connectivity of the global phase operator."""
+    @pytest.mark.parametrize("dynamic_angle", [False, True], ids=["constant", "symbolic"])
+    @pytest.mark.parametrize(
+        "control_on_instance", [False, True], ids=["controlled_class", "controlled_instance"]
+    )
+    def test_global_phase_connectivity(self, capture_mode, dynamic_angle, control_on_instance):
+        """Tests labels and connectivity for constant and symbolic global phases."""
 
         dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
         @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
         @qp.qnode(dev)
-        def my_circuit():
+        def my_circuit(x):
+            angle = x if dynamic_angle else 0.5
             qp.X(0)
-            qp.GlobalPhase(0.5)
-            qp.adjoint(qp.GlobalPhase(0.5))
-            qp.ctrl(qp.GlobalPhase, control=0)(0.5)
+            qp.GlobalPhase(angle)
+            qp.adjoint(qp.GlobalPhase(angle))
+            if control_on_instance:
+                qp.ctrl(qp.GlobalPhase(angle), control=0)
+            else:
+                qp.ctrl(qp.GlobalPhase, control=0)(angle)
             qp.Y(0)
 
-        module = my_circuit()
+        module = my_circuit(0.5)
 
         # Construct DAG
         utility = ConstructCircuitDAG(FakeDAGBuilder())
@@ -1566,20 +1577,22 @@ class TestOperatorConnectivity:
         nodes = utility.dag_builder.nodes
 
         # Ensure disjoint globalphase nodes show up
-        assert "GlobalPhase" in nodes["node2"]["label"]
-        assert "Adjoint(GlobalPhase)" in nodes["node3"]["label"]
+        assert nodes["node2"]["label"] == "GlobalPhase"
+        assert nodes["node3"]["label"] == "Adjoint(GlobalPhase)"
 
         # Ensure proper connectivity
-        if capture_mode:
+        if capture_mode and not control_on_instance:
             # `qp.ctrl(qp.GlobalPhase, ...)` is a qfunc (class) control, so it lowers to a
             # `quantum.ctrl` region. GlobalPhase has no target wires, so the controlled node floats
             # in the `ctrl` cluster and the wire threads PauliX -> PauliY directly through the
             # (control-only) region.
+            assert nodes["node4"]["label"] == "GlobalPhase"
             expected_edges = (
                 ("NullQubit", "PauliX"),
                 ("PauliX", "PauliY"),
             )
         else:
+            assert nodes["node4"]["label"] == "<name> PhaseShift|<wire> [0]"
             expected_edges = (
                 ("NullQubit", "PauliX"),
                 ("PauliX", "PhaseShift"),
@@ -2690,6 +2703,260 @@ class TestTerminalMeasurementConnectivity:
 
 class TestCtrl:
     """Tests that the ctrl transform is visualized correctly."""
+
+    @staticmethod
+    def _add_controlled_hadamard(block, control_values):
+        """Append a Hadamard with fixed control and target wires to a block."""
+        num_qubits = len(control_values) + 1
+        register = quantum.AllocOp(num_qubits)
+        qubits = [quantum.ExtractOp(register, wire) for wire in range(num_qubits)]
+        gate = quantum.CustomOp(
+            gate_name="Hadamard",
+            params=[],
+            in_qubits=qubits[-1],
+            in_ctrl_qubits=qubits[:-1],
+            in_ctrl_values=control_values,
+        )
+        block.add_ops([register, *qubits, gate])
+        return gate
+
+    @pytest.mark.parametrize("index_kind", ["constant", "dynamic", "computed_dynamic"])
+    def test_control_tensor_indices(self, index_kind):
+        """Unknown extraction indices produce abstract controls instead of raising."""
+        block = Block(arg_types=[builtin.IndexType()])
+        block.args[0].name_hint = "i"
+        tensor_type = builtin.TensorType(builtin.i1, [2])
+        flags = ConstantOp.create(
+            result_types=[tensor_type],
+            properties={"value": builtin.DenseIntOrFPElementsAttr.from_list(tensor_type, [1, 0])},
+        )
+        offset = arith.ConstantOp.from_int_and_width(1, builtin.IndexType())
+        block.add_ops([flags, offset])
+        if index_kind == "constant":
+            index = offset.result
+        elif index_kind == "dynamic":
+            index = block.args[0]
+        else:
+            computed_index = arith.AddiOp(block.args[0], offset)
+            block.add_op(computed_index)
+            index = computed_index.result
+
+        control = tensor.ExtractOp(flags.results[0], [index], builtin.i1)
+        block.add_op(control)
+        gate = self._add_controlled_hadamard(block, [control])
+        block.add_op(func.ReturnOp())
+        module = ModuleOp([func.FuncOp("circuit", ([builtin.IndexType()], []), Region(block))])
+        module.verify()
+
+        reconstructed = xdsl_to_qp_op(gate)
+        assert reconstructed.name == "C(Hadamard)"
+        assert list(reconstructed.wires) == [0, 1]
+        if index_kind == "constant":
+            assert list(reconstructed.control_values) == [False]
+        else:
+            assert reconstructed.control_values == qp.typing.Bool[1]
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+        assert utility.dag_builder.nodes["node0"]["label"] == "<name> C(Hadamard)|<wire> [0, 1]"
+
+    @pytest.mark.parametrize("control_value", [False, True])
+    @pytest.mark.parametrize("from_tensor", [False, True], ids=["scalar", "scalar_tensor"])
+    def test_constant_scalar_controls(self, control_value, from_tensor):
+        """Scalar constants and rank-zero tensor extractions preserve Boolean values."""
+        block = Block()
+        if from_tensor:
+            tensor_type = builtin.TensorType(builtin.i1, [])
+            flags = ConstantOp.create(
+                result_types=[tensor_type],
+                properties={
+                    "value": builtin.DenseIntOrFPElementsAttr.from_list(
+                        tensor_type, [int(control_value)]
+                    )
+                },
+            )
+            control = tensor.ExtractOp(flags.results[0], [], builtin.i1)
+            block.add_ops([flags, control])
+        else:
+            control = arith.ConstantOp.from_int_and_width(int(control_value), 1)
+            block.add_op(control)
+        gate = self._add_controlled_hadamard(block, [control])
+        block.add_op(func.ReturnOp())
+        module = ModuleOp([func.FuncOp("circuit", ([], []), Region(block))])
+        module.verify()
+
+        reconstructed = xdsl_to_qp_op(gate)
+        expected_name = "CH" if control_value else "C(Hadamard)"
+        assert reconstructed.name == expected_name
+        assert list(reconstructed.control_values) == [control_value]
+        assert list(reconstructed.wires) == [0, 1]
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+        assert (
+            utility.dag_builder.nodes["node0"]["label"] == f"<name> {expected_name}|<wire> [0, 1]"
+        )
+
+    @pytest.mark.parametrize(
+        "control_type",
+        [
+            pytest.param(builtin.i1, id="scalar_argument"),
+            pytest.param(builtin.TensorType(builtin.i1, [2]), id="tensor_argument"),
+            pytest.param(builtin.TensorType(builtin.i1, [1, 2]), id="matrix_argument"),
+        ],
+    )
+    def test_unresolved_control_arguments(self, control_type):
+        """Unknown controls remain abstract in detached blocks and uncalled functions."""
+        block = Block(arg_types=[control_type])
+        known_control = arith.ConstantOp.from_int_and_width(0, 1)
+        block.add_op(known_control)
+        control = block.args[0]
+        if isinstance(control_type, builtin.TensorType):
+            index = arith.ConstantOp.from_int_and_width(0, builtin.IndexType())
+            control = tensor.ExtractOp(
+                control, [index.result] * len(control_type.get_shape()), builtin.i1
+            )
+            block.add_ops([index, control])
+        gate = self._add_controlled_hadamard(block, [known_control, control])
+        block.verify()
+        assert xdsl_to_qp_op(gate).control_values == qp.typing.Bool[2]
+
+        block.add_op(func.ReturnOp())
+        module = ModuleOp([func.FuncOp("circuit", ([control_type], []), Region(block))])
+        module.verify()
+        reconstructed = xdsl_to_qp_op(gate)
+        assert reconstructed.name == "C(Hadamard)"
+        assert reconstructed.control_values == qp.typing.Bool[2]
+        assert list(reconstructed.wires) == [0, 1, 2]
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+        assert utility.dag_builder.nodes["node0"]["label"] == "<name> C(Hadamard)|<wire> [0, 1, 2]"
+
+    @pytest.mark.parametrize("dynamic_controls", [False, True], ids=["constant", "runtime"])
+    def test_kernel_control_arguments(self, dynamic_controls):
+        """Resolve the matching kernel's tensor argument at its actual operand position."""
+        tensor_type = builtin.TensorType(builtin.i1, [2])
+        argument_types = [builtin.i64, tensor_type]
+        block = Block(arg_types=argument_types)
+        indices = [arith.ConstantOp.from_int_and_width(i, builtin.IndexType()) for i in range(2)]
+        controls = [
+            tensor.ExtractOp(block.args[1], [index.result], builtin.i1) for index in indices
+        ]
+        block.add_ops([*indices, *controls])
+        gate = self._add_controlled_hadamard(block, controls)
+        block.add_op(func.ReturnOp())
+        circuit = func.FuncOp("circuit", (argument_types, []), Region(block))
+
+        other_block = Block(arg_types=argument_types, ops=[func.ReturnOp()])
+        other_circuit = func.FuncOp("other", (argument_types, []), Region(other_block))
+        caller = Block(arg_types=[tensor_type])
+        dummy = arith.ConstantOp.from_int_and_width(0, 64)
+        flags = ConstantOp.create(
+            result_types=[tensor_type],
+            properties={"value": builtin.DenseIntOrFPElementsAttr.from_list(tensor_type, [1, 0])},
+        )
+        other_flags = ConstantOp.create(
+            result_types=[tensor_type],
+            properties={"value": builtin.DenseIntOrFPElementsAttr.from_list(tensor_type, [0, 1])},
+        )
+        other_launch = LaunchKernelOp.create(
+            operands=[dummy.result, other_flags.results[0]],
+            properties={"callee": builtin.SymbolRefAttr("other")},
+        )
+        launch = LaunchKernelOp.create(
+            operands=[dummy.result, caller.args[0] if dynamic_controls else flags.results[0]],
+            properties={"callee": builtin.SymbolRefAttr("circuit")},
+        )
+        caller.add_ops([dummy, flags, other_flags, other_launch, launch, func.ReturnOp()])
+        module = ModuleOp(
+            [circuit, other_circuit, func.FuncOp("caller", ([tensor_type], []), Region(caller))]
+        )
+        module.verify()
+
+        reconstructed = xdsl_to_qp_op(gate)
+        assert reconstructed.name == "C(Hadamard)"
+        assert list(reconstructed.wires) == [0, 1, 2]
+        if dynamic_controls:
+            assert reconstructed.control_values == qp.typing.Bool[2]
+        else:
+            assert list(reconstructed.control_values) == [True, False]
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+        assert utility.dag_builder.nodes["node0"]["label"] == "<name> C(Hadamard)|<wire> [0, 1, 2]"
+
+    @pytest.mark.parametrize(
+        "gate_name, num_params, num_controls, adjoint, expected_name",
+        [
+            ("RX", 1, 1, False, "CRX"),
+            ("Rot", 3, 1, False, "CRot"),
+            ("RX", 1, 2, True, "C(Adjoint(RX))"),
+        ],
+    )
+    def test_gate_control_operands(
+        self, gate_name, num_params, num_controls, adjoint, expected_name
+    ):
+        """Symbolic angles retain canonical names when controls are explicit IR operands."""
+        block = Block(arg_types=[builtin.f64])
+        block.args[0].name_hint = "theta"
+        control_value = arith.ConstantOp.from_int_and_width(1, 1)
+        register = quantum.AllocOp(3)
+        qubits = [quantum.ExtractOp(register, wire) for wire in range(3)]
+        gate = quantum.CustomOp(
+            gate_name=gate_name,
+            params=[block.args[0]] * num_params,
+            in_qubits=qubits[2],
+            in_ctrl_qubits=qubits[:num_controls],
+            in_ctrl_values=[control_value] * num_controls,
+            adjoint=adjoint,
+        )
+        block.add_ops([control_value, register, *qubits, gate, func.ReturnOp()])
+        module = ModuleOp([func.FuncOp("circuit", ([builtin.f64], []), Region(block))])
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+        expected_wires = list(range(num_controls)) + [2]
+        assert (
+            utility.dag_builder.nodes["node0"]["label"]
+            == f"<name> {expected_name}|<wire> {expected_wires}"
+        )
+
+    @pytest.mark.parametrize(
+        "gate_type, params, dynamic_controls",
+        [
+            pytest.param(qp.RX, (0.5,), False, id="constant_false_control"),
+            pytest.param(qp.RX, (0.5,), True, id="runtime_control"),
+            pytest.param(qp.Hadamard, (), True, id="runtime_control_without_gate_params"),
+        ],
+    )
+    def test_captured_control_values(self, gate_type, params, dynamic_controls):
+        """A false constant is preserved, and runtime controls do not become truthy strings."""
+
+        @xdsl_from_qjit
+        @qp.qjit(target="mlir", capture=True, collect_decomp_rules=False)
+        @qp.qnode(qp.device("null.qubit", wires=2))
+        def circuit(flags):
+            qp.ctrl(
+                gate_type(*params, wires=1),
+                control=0,
+                control_values=flags if dynamic_controls else [False],
+            )
+
+        module = circuit(jax.numpy.array([False]))
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+        assert (
+            utility.dag_builder.nodes["node1"]["label"]
+            == f"<name> C({gate_type.__name__})|<wire> [0, 1]"
+        )
+
+        gate = next(op for op in module.walk() if isinstance(op, quantum.GateOp))
+        reconstructed = xdsl_to_qp_op(gate)
+        if dynamic_controls:
+            assert reconstructed.control_values == qp.typing.Bool[1]
+        else:
+            assert list(reconstructed.control_values) == [False]
 
     def test_ctrl_function(self, capture_mode):
         """Test that the ctrl of a function works."""
