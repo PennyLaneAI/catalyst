@@ -197,7 +197,7 @@
   variable-length one otherwise, writing it into both ends' backend configs. The `cpu_verbs`
   and `memcpy` backends carry any size. A GPU coprocessor
   running a persistent kernel still carries at most 8 B.
-  [(#XXXX)](https://github.com/PennyLaneAI/catalyst/pull/XXXX)
+  [(#3379)](https://github.com/PennyLaneAI/catalyst/pull/3379)
 
 * The :func:`~catalyst.qjit` function now accepts an ``enable_aot_compilation`` argument, which can be
   used to toggle whether or not to use ahead-of-time compilation.
@@ -820,12 +820,12 @@
   `fn(payload, len, fn_id, out, out_cap, ctx)`, on every transport, instead of with the raw
   frame. A function written for the previous signature reads its payload at the same pointer but
   must take the extra `fn_id` argument, and no longer subtracts a frame trailer from the length.
-  [(#XXXX)](https://github.com/PennyLaneAI/catalyst/pull/XXXX)
+  [(#3379)](https://github.com/PennyLaneAI/catalyst/pull/3379)
 
 * A `memcpy` transport session whose backend config has no `frame` keys now uses the 16 B frame, and
   refuses messages over 8 bytes. Programs compiled with Catalyst are unaffected, since the compiler
   writes the keys; code that creates such sessions directly adds `frame=blv;frame_payload=<bytes>`.
-  [(#XXXX)](https://github.com/PennyLaneAI/catalyst/pull/XXXX)
+  [(#3379)](https://github.com/PennyLaneAI/catalyst/pull/3379)
 
 * `catalyst.logging` has been removed. `pennylane.logging` should be used instead.
   [(#3283)](https://github.com/PennyLaneAI/catalyst/pull/3283)
