@@ -31,10 +31,10 @@ from pennylane.backline import Transport
 
 from catalyst import Executor, compiled_functions, qjit
 from catalyst.backline import (
-    COPROCESSOR_LAUNCHER_ABI_VERSION,
     _EXECUTOR_RUNTIME_PLUGINS,
     _REGISTRY,
     _TRANSPORT_PASSES,
+    COPROCESSOR_LAUNCHER_ABI_VERSION,
     _builtin_fn_lib_dirs,
     _check_builtin_fn_lib,
     _config_text,
