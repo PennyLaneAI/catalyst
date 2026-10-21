@@ -196,7 +196,8 @@ class ControllerSession : public TransportSession {
  * Returning COPROCESSOR_FN_ERROR reports that the message could not be processed. A memcpy
  * backend fails that round instead of delivering the reply. The cpu_verbs coprocessor treats it,
  * like any return outside 1..out_cap, as an error that stops its engine, so the controller
- * receives no reply.
+ * receives no reply; with CUQR frames it answers it (or any return over out_cap) with status 1
+ * instead and keeps serving, and 0 is an empty result.
  */
 using CoprocessorFn = CatalystCoprocessorFn;
 

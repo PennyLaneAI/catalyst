@@ -99,7 +99,9 @@ int CpuControllerSession::collect(void *const *replies, const std::uint64_t *rep
                                   std::size_t n) {
     std::stop_token none; // blocking wait for this round's reply
     frame::FrameView r;
-    if (!poll_message_arrival(next_recv_, none, r)) {
+    // UC (a cudaq-realtime peer) drops a lost message without telling either side.
+    const auto timeout = cuqr_.cudaq_peer ? CUDAQ_REPLY_TIMEOUT : std::chrono::nanoseconds{0};
+    if (!poll_message_arrival(next_recv_, none, r, timeout)) {
         return -1;
     }
     rtt_ns_ = now_ns() - kick_ns_;
@@ -112,12 +114,15 @@ int CpuControllerSession::collect(void *const *replies, const std::uint64_t *rep
         TP_CHECK(r.status == 0, "cpu_verbs: the coprocessor answered with status %d", r.status);
     }
     if (n > 0 && replies && replies[0] && replies[0] != r.data) {
-        // The coprocessor zero-fills the reply's payload area, so all of `cap` is defined.
+        // The coprocessor zero-fills the reply's payload area, so all of `cap` is defined; a CUQR
+        // frame carries only the reply's own bytes, so the rest is zeroed here.
         const std::size_t cap = replies_bytes ? replies_bytes[0] : out_bytes_;
         TP_CHECK(cap <= frame::data_capacity(ring_),
                  "reply capacity (%zu) exceeds the %zu B a frame of this session carries", cap,
                  frame::data_capacity(ring_));
-        std::memcpy(replies[0], r.data, cap);
+        const std::size_t len = cuqr() ? std::min<std::size_t>(r.len, cap) : cap;
+        std::memcpy(replies[0], r.data, len);
+        std::memset(static_cast<std::uint8_t *>(replies[0]) + len, 0, cap - len);
     }
     return 0;
 }

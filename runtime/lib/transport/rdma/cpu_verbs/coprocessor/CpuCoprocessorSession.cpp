@@ -116,8 +116,13 @@ void CpuCoprocessorSession::run(std::stop_token st) {
         std::int32_t status = 0;
         if (coproc_fn_) {
             nb = coproc_fn_(r.data, r.len, r.fn_id, reply, cap, coproc_ctx_);
-            if (nb == 0 && cuqr()) {
-                status = 1; // CUQR reports a failed function in its reply, as cudaq-realtime does
+            if (cuqr()) {
+                // CUQR reports a failed function in its reply, as cudaq-realtime does; an empty
+                // result is a valid one.
+                if (nb == COPROCESSOR_FN_ERROR || nb > cap) {
+                    status = 1;
+                    nb = 0;
+                }
             } else {
                 TP_CHECK(nb > 0 && nb <= cap,
                          "coprocessor function wrote %zu bytes, expected 1..%zu", nb, cap);

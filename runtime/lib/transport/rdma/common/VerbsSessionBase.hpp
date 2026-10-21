@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #pragma once
+#include <chrono>
 #include <cstdint>
 #include <memory>
 #include <optional>
@@ -85,11 +86,17 @@ template <class Role> class VerbsSessionBase : public Role {
     // Wait for round `cursor`'s frame in the local ring and decode it into `out`. Returns false if
     // `st` is stopped first. A CUQR message that is not a valid frame comes back with
     // out.data == nullptr, to be dropped.
-    bool poll_message_arrival(std::uint64_t cursor, std::stop_token st, frame::FrameView &out);
+    bool poll_message_arrival(std::uint64_t cursor, std::stop_token st, frame::FrameView &out,
+                              std::chrono::nanoseconds timeout = std::chrono::nanoseconds{0});
     // CUQR frames carry no word written last, so arrival is read from the receive completion
     // queue: one receive request per slot, reposted as each message arrives. Returns once round
     // `cursor`'s message is in its slot, or false if `st` is stopped first.
-    bool wait_recv(std::uint64_t cursor, std::stop_token st);
+    // A nonzero `timeout` fails the wait with a "no reply" error once it passes.
+    bool wait_recv(std::uint64_t cursor, std::stop_token st,
+                   std::chrono::nanoseconds timeout = std::chrono::nanoseconds{0});
+    // How long a controller waits for a cudaq-realtime peer's reply before reporting it lost, as
+    // cudaq-realtime's own tests do.
+    static constexpr std::chrono::nanoseconds CUDAQ_REPLY_TIMEOUT = std::chrono::seconds(5);
     void post_recv(std::uint64_t slot);
     // The coprocessor receives on the fwd queue pair and the controller on the bwd one; with a
     // cudaq-realtime peer, each receives on the one it sends on.

@@ -46,7 +46,8 @@ struct HandshakeMsg {
     // ends must agree.
     std::uint32_t frame_mode;
     std::uint32_t frame_stride;
-    std::uint32_t cuqr_tx; // CUQR completion verb: 0 SEND, 1 RDMA write with immediate
+    std::uint32_t cuqr_tx;     // CUQR completion verb: 0 SEND, 1 RDMA write with immediate
+    std::uint32_t frame_slots; // slots in the ring
 };
 
 /**

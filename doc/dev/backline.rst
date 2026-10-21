@@ -323,8 +323,9 @@ with a cudaq-realtime (NVQLink) peer. A request is its 24 B ``RPCHeader`` (magic
 ``function_id`` = the ``fn_id``, ``arg_len``, ``request_id``, ``ptp_timestamp``) and then the
 payload; a reply is its ``RPCResponse`` (magic ``"CUQS"``, ``status``, ``result_len``, and the
 request's ``request_id`` and ``ptp_timestamp`` echoed) and then the result. A coprocessor function
-that fails is answered with ``status`` 1 and no result, and the controller reports the status; a
-message that is not a CUQR frame is dropped unanswered, as cudaq-realtime does.
+that returns ``COPROCESSOR_FN_ERROR`` is answered with ``status`` 1 and no result, and the
+controller reports the status; a message that is not a CUQR frame is dropped unanswered, as
+cudaq-realtime does.
 
 A CUQR frame has no word written last, so its arrival is signalled by the RDMA verb that carries
 it: the receiver posts one receive request per slot and reads arrivals from its receive completion
@@ -338,7 +339,8 @@ Talking to a cudaq-realtime peer takes ``peer=cudaq`` in the rdma node config, w
 session to that peer's conventions: one unreliable connected (UC) queue pair both ways, its 12 B
 handshake (queue pair, rkey and IPv4 address, the caller first), rings addressed from 0, MTU 4096,
 and replies by SEND. Set ``frame_slots`` and ``frame_slot_bytes`` to the server's ``--num-slots``
-and ``--slot-size``: it answers with whole slots. This has been tested on a ConnectX-7 against
+and ``--slot-size``: it answers with whole slots. UC drops a lost message without telling either
+side, so a controller reports a reply that has not come within 5 s instead of waiting forever. This has been tested on a ConnectX-7 against
 cudaq-realtime's own server and client (NVIDIA/cuda-quantum ``b325a40`` with Holoscan Sensor Bridge's
 RoCE transport, ``EA_CUDAQ_10_26``): requests from Backline to its ``rpc_increment`` server, and
 its two-process client against a Backline coprocessor, whose tests pass apart from one difference:

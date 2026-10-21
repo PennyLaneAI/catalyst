@@ -118,6 +118,7 @@ template <class Role> PeerRef VerbsSessionBase<Role>::exchange_keys(const MemReg
         .frame_mode = static_cast<std::uint32_t>(ring_.mode),
         .frame_stride = ring_.stride,
         .cuqr_tx = cuqr_.write_imm ? 1U : 0U,
+        .frame_slots = ring_.slots,
     };
     // gid is a 16-byte array copied from the local GID after the aggregate
     // init.
@@ -133,10 +134,12 @@ template <class Role> PeerRef VerbsSessionBase<Role>::exchange_keys(const MemReg
         recv_exact(fd, &peer, sizeof(peer));
         send_exact(fd, &my, sizeof(my));
     }
-    TP_CHECK(peer.frame_mode == my.frame_mode && peer.frame_stride == my.frame_stride,
-             "%s: the peer's frames (mode %u, %u B slots) differ from this end's (mode %u, %u B "
-             "slots); both ends need the same frame config",
-             backend_, peer.frame_mode, peer.frame_stride, my.frame_mode, my.frame_stride);
+    TP_CHECK(peer.frame_mode == my.frame_mode && peer.frame_stride == my.frame_stride &&
+                 peer.frame_slots == my.frame_slots,
+             "%s: the peer's frames (mode %u, %u slots of %u B) differ from this end's (mode %u, "
+             "%u slots of %u B); both ends need the same frame config",
+             backend_, peer.frame_mode, peer.frame_slots, peer.frame_stride, my.frame_mode,
+             my.frame_slots, my.frame_stride);
     TP_CHECK(!cuqr() || peer.cuqr_tx == my.cuqr_tx,
              "%s: the peer completes CUQR frames with %s and this end with %s; set the same "
              "cuqr_tx on both",
@@ -242,9 +245,10 @@ template <class Role> void VerbsSessionBase<Role>::reap(ibv_cq *cq, int &outstan
 
 template <class Role>
 bool VerbsSessionBase<Role>::poll_message_arrival(std::uint64_t cursor, std::stop_token st,
-                                                  frame::FrameView &out) {
+                                                  frame::FrameView &out,
+                                                  std::chrono::nanoseconds timeout) {
     if (cuqr()) {
-        if (!wait_recv(cursor, st)) {
+        if (!wait_recv(cursor, st, timeout)) {
             return false;
         }
         if (!frame::poll(ring_, ring_slot(cursor), static_cast<std::uint32_t>(cursor + 1), out)) {
@@ -275,25 +279,35 @@ bool VerbsSessionBase<Role>::poll_message_arrival(std::uint64_t cursor, std::sto
 // 0, like ours in this mode.
 template <class Role>
 PeerRef VerbsSessionBase<Role>::exchange_keys_with_cudaq(const MemRegion &local) {
+    TP_CHECK(active_mtu_ >= IBV_MTU_4096,
+             "%s: peer=cudaq needs an active MTU of 4096, which cudaq-realtime fixes; raise the "
+             "port's netdev MTU to 4200 or more",
+             backend_);
     QueuePair &qp = oob_listens() ? *bwd_qp_ : *fwd_qp_;
     const CudaqRendezvous my = cudaq_rendezvous(qp.qpn(), local.rkey, mygid_.raw);
     CudaqRendezvous peer{};
     const int fd = oob_fd_.get();
+    // UC drops anything that reaches a queue pair before it can receive, so the listener (our
+    // coprocessor) is ready to receive before it answers, and the caller only sends after that.
+    const auto ready = [&] {
+        std::uint8_t gid[16];
+        cudaq_peer_gid(peer, gid);
+        qp.to_rtr(ntohl(peer.qpn), /*dest_psn=*/0, gid, gid_idx_, PORT, IBV_MTU_4096);
+        local_ = local;
+        for (std::uint64_t s = 0; s < ring_.slots; ++s) {
+            post_recv(s);
+        }
+        qp.to_rts(/*sq_psn=*/0);
+    };
     if (oob_listens()) {
         recv_exact(fd, &peer, sizeof(peer));
+        ready();
         send_exact(fd, &my, sizeof(my));
     } else {
         send_exact(fd, &my, sizeof(my));
         recv_exact(fd, &peer, sizeof(peer));
+        ready();
     }
-    std::uint8_t gid[16];
-    cudaq_peer_gid(peer, gid);
-    qp.to_rtr(ntohl(peer.qpn), /*dest_psn=*/0, gid, gid_idx_, PORT, IBV_MTU_4096);
-    local_ = local;
-    for (std::uint64_t s = 0; s < ring_.slots; ++s) {
-        post_recv(s);
-    }
-    qp.to_rts(/*sq_psn=*/0);
     return PeerRef{
         .rkey = ntohl(peer.rkey),
         .remote_addr = 0,
@@ -323,8 +337,10 @@ template <class Role> void VerbsSessionBase<Role>::post_recv(std::uint64_t slot)
 }
 
 template <class Role>
-bool VerbsSessionBase<Role>::wait_recv(std::uint64_t cursor, std::stop_token st) {
+bool VerbsSessionBase<Role>::wait_recv(std::uint64_t cursor, std::stop_token st,
+                                       std::chrono::nanoseconds timeout) {
     const std::uint64_t slot = cursor & (ring_.slots - 1);
+    const auto deadline = std::chrono::steady_clock::now() + timeout;
     ibv_wc wc{};
     std::uint32_t spins = 0;
     while (ibv_poll_cq(recv_cq(), 1, &wc) == 0) {
@@ -333,6 +349,12 @@ bool VerbsSessionBase<Role>::wait_recv(std::uint64_t cursor, std::stop_token st)
             if (st.stop_requested()) {
                 return false;
             }
+            TP_CHECK(timeout.count() == 0 || std::chrono::steady_clock::now() < deadline,
+                     "%s: no reply within %lld ms; the peer's UC queue pair may have dropped the "
+                     "message",
+                     backend_,
+                     static_cast<long long>(
+                         std::chrono::duration_cast<std::chrono::milliseconds>(timeout).count()));
         }
         cpu_relax();
     }
