@@ -2092,9 +2092,16 @@ class TestBackendRegistry:
             register_backend("bl16_only", "net", "cpu", ["controller"], max_payload_bytes=None)
 
     @pytest.mark.parametrize("transport", ["memcpy", "rdma"])
-    def test_persistent_gpu_kernels_get_blv_frames(self, transport):
+    def test_persistent_gpu_kernels_get_blv_frames(self, transport, flat_lib_dir):
         """A launcher is handed the session's frame layout and refuses one it cannot read at
         launch, so the compiler holds no launcher to 8 B, over memcpy or gpu_verbs."""
+        ctrl, cop = (
+            ("memcpy", "memcpy_gpu") if transport == "memcpy" else ("cpu_verbs", "gpu_verbs")
+        )
+        flat_lib_dir(
+            f"libcatalyst_transport_{ctrl}_controller.so",
+            f"libcatalyst_transport_{cop}_coprocessor.so",
+        )
         dev = qp.Backline(
             controller=_controller(init_args={}, in_bytes=64),
             coprocessors=[_coproc("gpu0", fn="gpu_steane_launcher", hardware="gpu")],
