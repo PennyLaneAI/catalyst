@@ -1337,7 +1337,6 @@ class TestSymbolicRules:
 
             result = circuit()
 
-        # The op fires and flips wire 0. Today the flips are missing, so it does not and this is 1.
         assert np.allclose(result, -1.0)
 
     def test_discovered_op_gets_multi_controlled_rules(self):
