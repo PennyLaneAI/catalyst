@@ -31,6 +31,7 @@ from pennylane.backline import Transport
 
 from catalyst import Executor, compiled_functions, qjit
 from catalyst.backline import (
+    COPROCESSOR_LAUNCHER_ABI_VERSION,
     _EXECUTOR_RUNTIME_PLUGINS,
     _REGISTRY,
     _TRANSPORT_PASSES,
@@ -1994,16 +1995,16 @@ class TestBackendRegistry:
     def test_selection_respects_message_sizes(self, isolated_registry):
         """A backend that cannot carry the placement's messages is not picked."""
         with pytest.raises(ValueError, match="carrying 2048 B requests"):
-            _select_backend("rdma", "gpu", "coprocessor", in_bytes=2048, out_bytes=8)
+            _select_backend("rdma", "fpga", "controller", in_bytes=2048, out_bytes=8)
         register_backend(
             "wide_verbs",
             "rdma",
-            "gpu",
-            ["coprocessor"],
+            "fpga",
+            ["controller"],
             frame_modes=("bl16", "blv"),
             max_payload_bytes=4096,
         )
-        assert _select_backend("rdma", "gpu", "coprocessor", 2048, 8).name == "wide_verbs"
+        assert _select_backend("rdma", "fpga", "controller", 2048, 8).name == "wide_verbs"
         assert _select_backend("memcpy", "cpu", "controller", 4096, 4096).name == "memcpy"
 
     def test_manifest_on_the_search_path_registers_backends(
@@ -2090,25 +2091,24 @@ class TestBackendRegistry:
         with pytest.raises(ValueError, match="'bl16_only' carries messages over 8 B"):
             register_backend("bl16_only", "net", "cpu", ["controller"], max_payload_bytes=None)
 
-    def test_a_persistent_gpu_kernel_carries_at_most_8_bytes(self):
-        """GPU kernels read 16 B frames; only per-message functions take larger messages."""
+    @pytest.mark.parametrize("transport", ["memcpy", "rdma"])
+    def test_persistent_gpu_kernels_get_blv_frames(self, transport):
+        """A launcher is handed the session's frame layout and refuses one it cannot read at
+        launch, so the compiler holds no launcher to 8 B, over memcpy or gpu_verbs."""
         dev = qp.Backline(
             controller=_controller(init_args={}, in_bytes=64),
-            coprocessors=[_coproc("gpu0", hardware="gpu", init_args={})],
-            transport="memcpy",
-        )
-        with pytest.raises(CompileError, match="persistent GPU kernel"):
-            serialize_backline(dev.placement)
-
-    def test_a_persistent_gpu_kernel_with_its_own_backend_lib_is_taken_at_its_word(self):
-        """A node naming its own backend library may read BLV frames; the runtime checks it."""
-        dev = qp.Backline(
-            controller=_controller(in_bytes=64),
-            coprocessors=[_coproc("gpu0", hardware="gpu")],
-            transport="memcpy",
+            coprocessors=[_coproc("gpu0", fn="gpu_steane_launcher", hardware="gpu")],
+            transport=transport,
         )
         d = serialize_backline(dev.placement)
         assert "frame=blv;frame_payload=64" in d["coprocessors"][0]["config"]
+
+    def test_the_launcher_abi_version_matches_the_runtime(self):
+        """PennyLane reads the Python constant; the runtime enforces the C one."""
+        header = Path(__file__).parents[3] / "runtime" / "include" / "TransportABI.h"
+        define = "#define CATALYST_COPROCESSOR_LAUNCHER_MIN_ABI_VERSION "
+        line = next(l for l in header.read_text().splitlines() if l.startswith(define))
+        assert int(line[len(define) :]) == COPROCESSOR_LAUNCHER_ABI_VERSION
 
     def test_frame_slots_set_on_one_node_reaches_every_node(self, flat_lib_dir):
         """Both ends of a session need the same ring, so the compiler passes the count on."""
