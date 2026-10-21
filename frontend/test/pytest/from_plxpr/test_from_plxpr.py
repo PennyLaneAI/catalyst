@@ -521,6 +521,24 @@ class TestAdjointCtrl:
         assert s_eqn.primitive == qref_operator_p
         assert s_eqn.params["n_ctrls"] == 0
 
+    @pytest.mark.usefixtures("use_capture")
+    @pytest.mark.parametrize("work_wire_type", ("zeroed", "borrowed"))
+    def test_qfunc_ctrl_work_wire_type(self, work_wire_type):
+        """Test that a qfunc control with a work wire type is converted and keeps the type."""
+
+        @qp.qnode(qp.device("lightning.qubit", wires=3))
+        def circuit():
+            qp.ctrl(qp.S, control=1, work_wires=[2], work_wire_type=work_wire_type)(0)
+            return qp.state()
+
+        plxpr = jax.make_jaxpr(circuit)()
+        catalyst_xpr = from_plxpr(plxpr)()
+        qfunc_xpr = catalyst_xpr.eqns[0].params["call_jaxpr"]
+
+        eqn = next(e for e in qfunc_xpr.eqns if e.primitive == ctrl_transform_prim)
+        assert eqn.params["work_wires"] == qp.wires.Wires([2])
+        assert eqn.params["work_wire_type"] == work_wire_type
+
     @pytest.mark.parametrize("as_qfunc", (True, False))
     def test_doubly_ctrl(self, as_qfunc):
         """Test doubly controlled op."""

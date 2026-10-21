@@ -888,9 +888,11 @@ def handle_adjoint_transform(self, *invals, jaxpr, lazy, n_consts):
     )
 
 
-# pylint: disable=unused-argument
+# pylint: disable=unused-argument,too-many-arguments
 @PLxPRToQuantumJaxprInterpreter.register_primitive(plxpr_ctrl_transform_prim)
-def handle_ctrl_transform(self, *invals, jaxpr, n_control, work_wires, n_consts):
+def handle_ctrl_transform(
+    self, *invals, jaxpr, n_control, work_wires, n_consts, work_wire_type="borrowed"
+):
     """Interpret a control transform, then re-bind it for lowering to a `qref.ctrl` region op."""
     values_start = len(invals) - n_control
     controls_start = values_start - n_control
@@ -915,6 +917,7 @@ def handle_ctrl_transform(self, *invals, jaxpr, n_control, work_wires, n_consts)
         n_control=n_control,
         jaxpr=body.jaxpr,
         work_wires=work_wires,
+        work_wire_type=work_wire_type,
         n_consts=len(body.consts),
     )
 
