@@ -15,6 +15,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <vector>
 
 #include "Frame.hpp"
 #include "WireProtocol.hpp"
@@ -79,8 +80,8 @@ TEST_CASE("the BL16 ring is today's ring") {
 
 TEST_CASE("a frame mode without a codec is refused") {
     namespace frame = catalyst::transport::common::frame;
-    const frame::RingGeometry cuqr{.mode = frame::Mode::CUQR};
-    CHECK_THROWS_WITH(frame::frame_bytes(cuqr),
+    const frame::RingGeometry unknown{.mode = static_cast<frame::Mode>(3)};
+    CHECK_THROWS_WITH(frame::frame_bytes(unknown),
                       Catch::Matchers::ContainsSubstring("not implemented"));
 }
 
@@ -109,7 +110,7 @@ TEST_CASE("a session's config names its frame layout") {
     CHECK(frame::geometry_from_config("dev=rxe0;gid=1").stride == frame::BL16_RING.stride);
     CHECK(frame::geometry_from_config("frame=bl16").mode == frame::Mode::BL16);
     CHECK_THROWS_WITH(frame::geometry_from_config("frame=wide"),
-                      Catch::Matchers::ContainsSubstring("'bl16' or 'blv'"));
+                      Catch::Matchers::ContainsSubstring("'bl16', 'blv' or 'cuqr'"));
     CHECK_THROWS_WITH(frame::geometry_from_config("frame=blv;frame_payload=lots"),
                       Catch::Matchers::ContainsSubstring("'frame_payload'"));
 }
@@ -168,4 +169,87 @@ TEST_CASE("a BLV slot without a valid header is refused") {
     frame::FrameView view;
     CHECK_THROWS_WITH(frame::poll(ring, slot, 1, view),
                       Catch::Matchers::ContainsSubstring("no BLV frame"));
+}
+
+namespace {
+// cudaq-realtime's wire structs (cudaq/realtime/daemon/dispatcher/dispatch_kernel_launch.h),
+// copied so the tests check our bytes against theirs.
+struct __attribute__((packed)) RPCHeader {
+    std::uint32_t magic, function_id, arg_len, request_id;
+    std::uint64_t ptp_timestamp;
+};
+struct __attribute__((packed)) RPCResponse {
+    std::uint32_t magic;
+    std::int32_t status;
+    std::uint32_t result_len, request_id;
+    std::uint64_t ptp_timestamp;
+};
+} // namespace
+
+TEST_CASE("CUQR frames are byte-identical to cudaq-realtime's RPCHeader and RPCResponse") {
+    namespace frame = catalyst::transport::common::frame;
+    const auto ring = frame::geometry_for(frame::Mode::CUQR, 16);
+    CHECK(ring.stride == 64);
+    CHECK(frame::data_capacity(ring) == 40);
+    std::vector<std::uint8_t> slot(ring.stride, 0xAA);
+    const std::uint8_t payload[3] = {1, 2, 3};
+
+    frame::stage(ring, slot.data(), 0x7ED8BE82u, payload, sizeof(payload));
+    frame::seal(ring, slot.data(), 42);
+    const RPCHeader req{0x43555152u, 0x7ED8BE82u, 3, 42, 0};
+    CHECK(std::memcmp(slot.data(), &req, sizeof(req)) == 0);
+    CHECK(std::vector<std::uint8_t>(slot.begin(), slot.begin() + 4) ==
+          std::vector<std::uint8_t>{0x52, 0x51, 0x55, 0x43}); // "RQUC" on the wire
+    CHECK(std::memcmp(slot.data() + 24, payload, sizeof(payload)) == 0);
+    CHECK(frame::wire_bytes(ring, slot.data()) == 27);
+
+    const frame::ReplyTo ok{.request_id = 42, .t_ptp_ns = 0x1122334455667788ull, .status = 0};
+    frame::stage(ring, slot.data(), 0, payload, sizeof(payload), &ok);
+    frame::seal(ring, slot.data(), 7); // a reply keeps the request_id it echoes
+    const RPCResponse rep{0x43555153u, 0, 3, 42, 0x1122334455667788ull};
+    CHECK(std::memcmp(slot.data(), &rep, sizeof(rep)) == 0);
+
+    const frame::ReplyTo failed{.request_id = 42, .t_ptp_ns = 0, .status = 1};
+    frame::stage(ring, slot.data(), 0, payload, sizeof(payload), &failed);
+    const RPCResponse err{0x43555153u, 1, 0, 42, 0};
+    CHECK(std::memcmp(slot.data(), &err, sizeof(err)) == 0);
+    frame::FrameView v;
+    REQUIRE(frame::poll(ring, slot.data(), 1, v));
+    CHECK(v.status == 1);
+    CHECK(v.len == 0);
+}
+
+TEST_CASE("a CUQR request_id is opaque: poll decodes whatever the peer sent") {
+    namespace frame = catalyst::transport::common::frame;
+    const auto ring = frame::geometry_for(frame::Mode::CUQR, 8);
+    std::vector<std::uint8_t> slot(ring.stride, 0);
+    const RPCHeader req{0x43555152u, 9, 8, 0xDEADBEEFu, 77}; // a stock client's own id
+    std::memcpy(slot.data(), &req, sizeof(req));
+    frame::FrameView v;
+    REQUIRE(frame::poll(ring, slot.data(), /*expect=*/5, v));
+    CHECK(v.fn_id == 9);
+    CHECK(v.len == 8);
+    CHECK(v.request_id == 0xDEADBEEFu);
+    CHECK(v.t_ptp_ns == 77);
+    CHECK(v.data == slot.data() + 24);
+}
+
+TEST_CASE("a CUQR slot without a valid header is refused") {
+    namespace frame = catalyst::transport::common::frame;
+    const auto ring = frame::geometry_for(frame::Mode::CUQR, 8);
+    std::vector<std::uint8_t> slot(ring.stride, 0);
+    frame::FrameView v;
+    CHECK_THROWS_WITH(frame::poll(ring, slot.data(), 1, v),
+                      Catch::Matchers::ContainsSubstring("no CUQR frame"));
+    const RPCHeader too_long{0x43555152u, 0, 1000, 1, 0};
+    std::memcpy(slot.data(), &too_long, sizeof(too_long));
+    CHECK_THROWS_WITH(frame::poll(ring, slot.data(), 1, v),
+                      Catch::Matchers::ContainsSubstring("more than its"));
+}
+
+TEST_CASE("a session's config can ask for CUQR frames") {
+    namespace frame = catalyst::transport::common::frame;
+    const auto ring = frame::geometry_from_config("dev=rxe0;frame=cuqr;frame_payload=100");
+    CHECK(ring.mode == frame::Mode::CUQR);
+    CHECK(ring.stride == 128); // 24 + 100 -> 128
 }
