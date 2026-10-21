@@ -24,6 +24,7 @@
 
 #include "CpuControllerSession.hpp"
 #include "CpuCoprocessorSession.hpp"
+#include "Frame.hpp"
 #include "WireProtocol.hpp"
 
 using namespace catalyst::transport;
@@ -38,6 +39,8 @@ int main(int argc, char **argv) {
     // both roles size the collect() buffer by --correction-bytes.
     std::uint32_t syndrome_bytes = sizeof(std::uint64_t);
     std::uint32_t correction_bytes = sizeof(std::uint64_t);
+    // Rounds the controller runs; with more than one it reports RTT percentiles.
+    std::uint32_t rounds = 1;
     for (int i = 1; i + 1 < argc; i += 2) {
         std::string k = argv[i], v = argv[i + 1];
         if (k == "--role") {
@@ -54,19 +57,26 @@ int main(int argc, char **argv) {
             syndrome_bytes = static_cast<std::uint32_t>(std::strtoul(v.c_str(), nullptr, 0));
         } else if (k == "--correction-bytes") {
             correction_bytes = static_cast<std::uint32_t>(std::strtoul(v.c_str(), nullptr, 0));
+        } else if (k == "--rounds") {
+            rounds = static_cast<std::uint32_t>(std::strtoul(v.c_str(), nullptr, 0));
         }
     }
     const bool is_coprocessor = (role == "coprocessor");
+    // Both roles derive the same ring from the message sizes, as the compiler's frame keys make
+    // them.
+    const std::size_t largest = std::max(syndrome_bytes, correction_bytes);
+    const auto ring = frame::geometry_for(
+        largest <= PAYLOAD_DATA_BYTES ? frame::Mode::BL16 : frame::Mode::BLV, largest);
 
     std::unique_ptr<TransportSession> s;
     CpuCoprocessorSession *coproc = nullptr;
     CpuControllerSession *controller = nullptr;
     if (is_coprocessor) {
-        auto up = std::make_unique<CpuCoprocessorSession>(dev, gid);
+        auto up = std::make_unique<CpuCoprocessorSession>(dev, gid, ring);
         coproc = up.get();
         s = std::move(up);
     } else {
-        auto up = std::make_unique<CpuControllerSession>(dev, gid);
+        auto up = std::make_unique<CpuControllerSession>(dev, gid, ring);
         controller = up.get();
         s = std::move(up);
     }
@@ -76,7 +86,7 @@ int main(int argc, char **argv) {
         .oob_port = port,
     };
     s->connect(ci);
-    MemRegion m = s->alloc_memory(REGION_BYTES, MemKind::CpuRam);
+    MemRegion m = s->alloc_memory(ring.region_bytes(), MemKind::CpuRam);
     PeerRef p = s->exchange_keys(m);
     ChannelDesc desc{
         .transport = "rdma",
@@ -94,18 +104,50 @@ int main(int argc, char **argv) {
         coproc->set_coprocessor_fn(nullptr, nullptr); // built-in echo
         coproc->start();
         std::this_thread::sleep_for(std::chrono::seconds(3)); // serve ~3 s
-        coproc->collect(outs, obytes, 1);
+        // A coprocessor's collect() reports the first 8 B of the last request it served.
+        std::uint64_t first_bytes[1] = {sizeof(std::uint64_t)};
+        coproc->collect(outs, first_bytes, 1);
         coproc->stop();
     } else {
         // Controller: commit a work item sized by --syndrome-bytes/--correction-bytes,
         // write the syndrome into the outbound slot, kick one round, collect the correction.
         controller->commit_work_item(/*work_item_idx=*/0, syndrome_bytes, correction_bytes);
         controller->start();
-        const std::uint64_t syndrome = DEMO_SYNDROME;
-        controller->write_data_slot(&syndrome, syndrome_bytes, /*decoder_id=*/0);
-        controller->kick(0);
-        controller->collect(outs, obytes, 1);
+        std::vector<std::uint8_t> syndrome(std::max<std::size_t>(syndrome_bytes, 8), 0);
+        std::memcpy(syndrome.data(), &DEMO_SYNDROME, sizeof(DEMO_SYNDROME));
+        std::vector<std::uint64_t> rtt_ns;
+        // Past the leading syndrome word, each round carries its own byte pattern, and the
+        // echoed reply is compared in full, so a stale or partly written frame is caught.
+        const std::size_t echoed = std::min(syndrome_bytes, correction_bytes);
+        std::uint32_t mismatched = 0;
+        for (std::uint32_t r = 0; r < rounds; ++r) {
+            for (std::size_t i = sizeof(DEMO_SYNDROME); i < syndrome_bytes; ++i) {
+                syndrome[i] = static_cast<std::uint8_t>(i * 31 + r);
+            }
+            controller->write_data_slot(syndrome.data(), syndrome_bytes, /*decoder_id=*/0);
+            controller->kick(0);
+            controller->collect(outs, obytes, 1);
+            rtt_ns.push_back(controller->last_rtt_ns());
+            mismatched += std::memcmp(corr.data(), syndrome.data(), echoed) != 0;
+        }
         controller->stop();
+        if (mismatched != 0) {
+            std::fprintf(stderr, "[controller] %u of %u replies differ from their request\n",
+                         mismatched, rounds);
+            return 1;
+        }
+        if (rounds > 1) {
+            std::sort(rtt_ns.begin(), rtt_ns.end());
+            const auto pct = [&](double q) {
+                return rtt_ns[static_cast<std::size_t>(q * (rtt_ns.size() - 1))];
+            };
+            std::fprintf(stderr,
+                         "[controller] %s %u B in, %u B out, %u rounds: RTT p50=%.2f us p99=%.2f "
+                         "us max=%.2f us\n",
+                         ring.mode == frame::Mode::BL16 ? "BL16" : "BLV", syndrome_bytes,
+                         correction_bytes, rounds, pct(0.50) / 1e3, pct(0.99) / 1e3,
+                         rtt_ns.back() / 1e3);
+        }
     }
 
     std::uint64_t got = 0;

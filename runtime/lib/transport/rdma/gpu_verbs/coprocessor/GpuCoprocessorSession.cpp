@@ -74,7 +74,7 @@ bool GpuCoprocessorSession::post_inline(std::uint64_t cursor) {
     const auto value = static_cast<std::uint64_t>(last_word_.load(std::memory_order_relaxed));
     // TODO: echo the request's id by forwarding it through.
     // Currently not sent (fn_id 0) to reduce Handoff size.
-    frame::stage(ring_.mode, send_frame(), /*fn_id=*/0, &value, sizeof(value));
+    frame::stage(ring_, send_frame(), /*fn_id=*/0, &value, sizeof(value));
     const bool signaled = (cursor % SIGNAL_EVERY == 0);
     post_write(bwd_qp_->get(), cursor, /*inline_data=*/true, signaled);
     return signaled;

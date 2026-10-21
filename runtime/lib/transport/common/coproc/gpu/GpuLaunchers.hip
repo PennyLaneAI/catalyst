@@ -69,6 +69,7 @@ __global__ void fused(volatile PayloadSlot *ring, volatile HandoffSlot *handoff,
             }
         }
         __threadfence_system(); // seq observed -> ensure value read isn't hoisted/stale
+        // TODO: read the frame through the frame codec, so the kernel takes BLV frames too.
         const std::uint64_t syndrome = ring[index].p.value;
         volatile HandoffSlot *slot = &handoff[index];
         HandoffSlot reply{

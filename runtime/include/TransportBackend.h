@@ -53,7 +53,8 @@
 #define CATALYST_TRANSPORT_ROLE_BIT_CONTROLLER (1u << 0)
 #define CATALYST_TRANSPORT_ROLE_BIT_COPROCESSOR (1u << 1)
 // CatalystTransportCaps::frame_modes
-#define CATALYST_TRANSPORT_FRAME_BL16 (1u << 0) // existing 16 B frame layout
+#define CATALYST_TRANSPORT_FRAME_BL16 (1u << 0) // 16 B frame: 8 B payload, fn_id, seq
+#define CATALYST_TRANSPORT_FRAME_BLV (1u << 1)  // variable length: 32 B header, payload, completion
 // CatalystTransportCaps::ordering
 #define CATALYST_TRANSPORT_ORDER_IN_ORDER 0u // a payload lands before the word written after it
 // CatalystTransportCaps::mem_kinds and ::conventions, e.g. CATALYST_TRANSPORT_MEM_BIT(CpuRam).
@@ -86,16 +87,17 @@ using CatalystTransportQueryCapsFn = const CatalystTransportCaps *();
 
 // Defines CatalystTransportAbiVersion and CatalystTransportQueryCaps for an in-tree backend.
 // e.g. CATALYST_TRANSPORT_BACKEND_CAPS("cpu_verbs", CATALYST_TRANSPORT_ROLE_BIT_CONTROLLER,
-//          CATALYST_TRANSPORT_MEM_BIT(CpuRam), 0, 8, 8, 1)
-#define CATALYST_TRANSPORT_BACKEND_CAPS(NAME, ROLES, MEM_KINDS, CONVENTIONS, MAX_PAYLOAD,          \
-                                        MAX_REPLY, WORK_ITEMS)                                     \
+//          CATALYST_TRANSPORT_MEM_BIT(CpuRam),
+//          CATALYST_TRANSPORT_FRAME_BL16 | CATALYST_TRANSPORT_FRAME_BLV, 0, 1024, 1024, 1)
+#define CATALYST_TRANSPORT_BACKEND_CAPS(NAME, ROLES, MEM_KINDS, FRAME_MODES, CONVENTIONS,          \
+                                        MAX_PAYLOAD, MAX_REPLY, WORK_ITEMS)                        \
     extern "C" uint32_t CatalystTransportAbiVersion() { return CATALYST_TRANSPORT_ABI_VERSION; }   \
     extern "C" const CatalystTransportCaps *CatalystTransportQueryCaps() {                         \
         static const CatalystTransportCaps caps = {                                                \
             CATALYST_TRANSPORT_ABI_VERSION,                                                        \
             (ROLES),                                                                               \
             (MEM_KINDS),                                                                           \
-            CATALYST_TRANSPORT_FRAME_BL16,                                                         \
+            (FRAME_MODES),                                                                         \
             (MAX_PAYLOAD),                                                                         \
             CATALYST_TRANSPORT_ORDER_IN_ORDER,                                                     \
             (NAME),                                                                                \

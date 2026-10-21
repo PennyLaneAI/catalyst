@@ -87,7 +87,8 @@ extern "C" CoprocessorSession *CatalystTransportCoprocessorFactory(const char *c
 // newer ABI.
 #if defined(STUB_ABI_VERSION) && STUB_ABI_VERSION == 2
 CATALYST_TRANSPORT_BACKEND_CAPS("stub", CATALYST_TRANSPORT_ROLE_BIT_CONTROLLER,
-                                CATALYST_TRANSPORT_MEM_BIT(CpuRam), 0, 8, 8, 1)
+                                CATALYST_TRANSPORT_MEM_BIT(CpuRam), CATALYST_TRANSPORT_FRAME_BL16,
+                                0, 8, 8, 1)
 #elif defined(STUB_ABI_VERSION)
 extern "C" uint32_t CatalystTransportAbiVersion() { return STUB_ABI_VERSION; }
 #endif

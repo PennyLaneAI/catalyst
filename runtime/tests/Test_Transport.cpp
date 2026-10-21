@@ -110,7 +110,7 @@ TEST_CASE("in-tree backends report their capabilities", "[transport]") {
         CHECK(version() == CATALYST_TRANSPORT_ABI_VERSION);
         const CatalystTransportCaps *caps = query();
         CHECK(std::string_view{caps->name} == "memcpy");
-        CHECK(caps->frame_modes == CATALYST_TRANSPORT_FRAME_BL16);
+        CHECK(caps->frame_modes == (CATALYST_TRANSPORT_FRAME_BL16 | CATALYST_TRANSPORT_FRAME_BLV));
         CHECK(caps->destroy_session != nullptr);
     }
 }
@@ -310,11 +310,11 @@ extern "C" const catalyst::transport::CoprocessorFnInfo *capi_test_scale_fn_info
 }
 
 // The scaling function again, with an info from an ABI version newer than this runtime knows.
-extern "C" std::size_t capi_test_scale_fn(const void *in, std::size_t in_len, void *out,
-                                          std::size_t out_cap, void *ctx);
-extern "C" std::size_t capi_test_future_fn(const void *in, std::size_t in_len, void *out,
-                                           std::size_t out_cap, void *ctx) {
-    return capi_test_scale_fn(in, in_len, out, out_cap, ctx);
+extern "C" std::size_t capi_test_scale_fn(const void *in, std::size_t in_len, std::uint32_t fn_id,
+                                          void *out, std::size_t out_cap, void *ctx);
+extern "C" std::size_t capi_test_future_fn(const void *in, std::size_t in_len, std::uint32_t fn_id,
+                                           void *out, std::size_t out_cap, void *ctx) {
+    return capi_test_scale_fn(in, in_len, fn_id, out, out_cap, ctx);
 }
 
 extern "C" const catalyst::transport::CoprocessorFnInfo *capi_test_future_fn_info() {
@@ -327,8 +327,8 @@ extern "C" const catalyst::transport::CoprocessorFnInfo *capi_test_future_fn_inf
 }
 
 // A function whose info has no version.
-extern "C" std::size_t capi_test_unversioned_fn(const void *, std::size_t, void *, std::size_t,
-                                                void *) {
+extern "C" std::size_t capi_test_unversioned_fn(const void *, std::size_t, std::uint32_t, void *,
+                                                std::size_t, void *) {
     return 0;
 }
 
@@ -357,7 +357,7 @@ extern "C" const catalyst::transport::CoprocessorFnInfo *steane_coprocessor_info
     return &info;
 }
 
-extern "C" std::size_t capi_test_scale_fn(const void *in, std::size_t, void *out,
+extern "C" std::size_t capi_test_scale_fn(const void *in, std::size_t, std::uint32_t, void *out,
                                           std::size_t out_cap, void *ctx) {
     std::uint64_t value = 0;
     std::memcpy(&value, in, sizeof(value));
@@ -503,6 +503,44 @@ TEST_CASE("set_coprocessor_fn rejects an info without an ABI version", "[transpo
     __catalyst__transport__destroy(co);
 }
 
+// Replies with the payload's first word times ten plus the fn_id, and records the payload length
+// it was handed.
+static std::size_t g_frame_fn_len = 0;
+extern "C" std::size_t capi_test_fields_fn(const void *payload, std::size_t len,
+                                           std::uint32_t fn_id, void *out, std::size_t out_cap,
+                                           void *) {
+    g_frame_fn_len = len;
+    std::uint64_t word = 0;
+    std::memcpy(&word, payload, std::min(len, sizeof(word)));
+    const std::uint64_t reply = word * 10 + fn_id;
+    const std::size_t n = std::min(out_cap, sizeof(reply));
+    std::memcpy(out, &reply, n);
+    return n;
+}
+
+TEST_CASE("a coprocessor function gets the payload, its length and the fn_id", "[transport]") {
+    g_frame_fn_len = 0;
+    auto *ct = make_memcpy_controller("fn_fields");
+    auto *co = make_memcpy_coprocessor("fn_fields");
+    REQUIRE(ct != nullptr);
+    REQUIRE(co != nullptr);
+    establish_memcpy_pair(ct, co, 19035);
+    REQUIRE(__catalyst__transport__set_coprocessor_fn(co, "capi_test_fields_fn") ==
+            CATALYST_TRANSPORT_OK);
+    __catalyst__transport__start(ct);
+    __catalyst__transport__start(co);
+    const std::uint64_t request = 4;
+    REQUIRE(__catalyst__transport__stage_payload(ct, &request, sizeof(request), /*fn_id=*/7) ==
+            CATALYST_TRANSPORT_OK);
+    REQUIRE(__catalyst__transport__post(ct, 0) == CATALYST_TRANSPORT_OK);
+    std::uint64_t reply = 0;
+    REQUIRE(__catalyst__transport__collect(ct, &reply, sizeof(reply)) == CATALYST_TRANSPORT_OK);
+    CHECK(reply == 47);
+    CHECK(g_frame_fn_len == sizeof(std::uint64_t)); // the payload alone, not the frame
+    __catalyst__transport__destroy(ct);
+    __catalyst__transport__destroy(co);
+}
+
 TEST_CASE("set_coprocessor_fn uses only the info of the library defining the function",
           "[transport]") {
     // The Steane decoder's library exports no info, but this executable exports one under the
@@ -608,8 +646,13 @@ TEST_CASE("memcpy carries a reply larger than the provisioned reply region throu
     // exchange_keys provisions a 16 KiB reply region. The memcpy controller sizes its own reply
     // buffer from the committed out_bytes instead.
     constexpr std::size_t bytes = 40000;
-    auto *ct = make_memcpy_controller("memcpy_wide_reply");
-    auto *co = make_memcpy_coprocessor("memcpy_wide_reply");
+    const char *config = "frame=blv;frame_payload=40000";
+    auto *ct =
+        __catalyst__transport__create(MEMCPY_CONTROLLER_BACKEND_PATH, config,
+                                      CATALYST_TRANSPORT_ROLE_CONTROLLER, "memcpy_wide_reply");
+    auto *co =
+        __catalyst__transport__create(MEMCPY_COPROCESSOR_BACKEND_PATH, config,
+                                      CATALYST_TRANSPORT_ROLE_COPROCESSOR, "memcpy_wide_reply");
     REQUIRE(ct != nullptr);
     REQUIRE(co != nullptr);
 

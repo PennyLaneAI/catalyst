@@ -240,11 +240,13 @@ with later runtimes. A session follows a strict lifecycle:
 ``start`` / ``kick`` / ``collect`` / ``stop``
     Run the engine, fire each round, gather its reply, and shut down.
 
-Each round's request and reply travel as a **frame**. Over RDMA, the sender writes it into a slot
-of a ring in the receiver's registered memory: a ring has 256 slots of 64 B, and round ``n`` uses
-slot ``n mod 256``. The only frame layout implemented so far is the 16 B one, BL16:
+Each round's request and reply travel as a **frame**, written into a slot of a ring on the
+receiving side: over RDMA in the receiver's registered memory, over ``memcpy`` in the
+coprocessor's own memory. A ring has 256 slots, and round ``n`` uses slot ``n mod 256``. Every
+transport uses the same two frame layouts, and the compiler picks one per placement from its
+message sizes: the 16 B frame, BL16, when requests and replies fit in 8 B, and BLV otherwise.
 
-.. list-table::
+.. list-table:: BL16, in 64 B slots
     :header-rows: 1
     :widths: 15 85
 
@@ -254,17 +256,50 @@ slot ``n mod 256``. The only frame layout implemented so far is the 16 B one, BL
       - The payload, zero-padded: the staged syndrome, or the coprocessor's reply.
     * - 8–11
       - ``fn_id``: which coprocessor function handles the round, the ``decoder_id`` staged with
-        the payload (see `The transport dialect`_). A reply echoes the request's, except from
-        ``gpu_verbs``, which sends 0.
+        the payload (see `The transport dialect`_). A reply echoes the request's, except from a
+        GPU coprocessor running a persistent kernel, which sends 0.
     * - 12–15
       - ``seq``: the round's number plus one.
 
-A sender writes the whole frame in one in-order transfer, ``seq`` last, and a receiver reads the
-payload only once the slot's ``seq`` matches the round it expects. A per-message coprocessor
-function is passed the whole request frame and writes the reply's payload. In-tree backends build
-and read frames through ``runtime/lib/transport/common/interface/Frame.hpp``. An out-of-tree
-backend lays them out as above, since that header is not installed. The ``memcpy`` backends carry
-messages over 8 B in a wider frame of the same shape, its payload area grown to fit.
+.. list-table:: BLV, filling a slot of ``stride`` bytes
+    :header-rows: 1
+    :widths: 15 85
+
+    * - Bytes
+      - Field
+    * - 0–31
+      - Header: ``magic`` (``"BLV1"``), ``version`` (1), ``flags`` (0), ``fn_id``, ``seq``,
+        ``round`` (0), ``len`` (payload bytes) and ``t_ptp_ns`` (0), as u32 fields apart from
+        the u16 ``version`` and ``flags`` and the u64 ``t_ptp_ns``.
+    * - 32–
+      - The payload, ``len`` bytes. A reply's payload area is zero-filled past what the
+        coprocessor function wrote.
+    * - last 4
+      - The completion word: ``seq`` again.
+
+A BLV slot's ``stride`` is the smallest power of two of at least 64 B that holds the 32 B header,
+the larger of the placement's request and reply, and the 4 B completion word. The compiler writes
+``frame=blv;frame_payload=<bytes>`` into both ends' backend configs, and every backend derives the
+same ring from them; these keys are reserved, so a node's own config cannot set them. A placement
+whose messages fit in 8 B gets no keys and uses BL16.
+
+A sender writes the whole frame, or the whole slot for BLV, in one in-order transfer, and the word
+a receiver polls (BL16's ``seq``, BLV's completion word) sits at a fixed offset and lands last. A
+receiver reads the payload only once that word matches the round it expects.
+
+A per-message coprocessor function, ``CatalystCoprocessorFn`` in ``runtime/include/TransportABI.h``,
+is called with the payload, its length and the ``fn_id``, whatever the transport and frame layout,
+so one function can serve several decoders without reading frames. A GPU coprocessor running a
+persistent kernel reads BL16 frames itself, so it carries messages of at most 8 B. In-tree
+backends build and read frames through ``runtime/lib/transport/common/interface/Frame.hpp``.
+
+``cpu_verbs`` and the ``memcpy`` backends set no limit on message size. Over RDMA, BLV has been
+tested up to 1024 B each way on Soft-RoCE, and up to 256 KiB on a ConnectX-7. A frame larger than the path MTU spans several
+packets (a 1024 B payload already fills a 2048 B slot), and its completion word landing last then
+relies on the NIC placing an RDMA write's bytes in order, which common NICs do but the RDMA
+specification does not guarantee. Rings keep 256 slots whatever the stride, so memory grows with
+message size: a 1 MiB message makes each ring 512 MiB. An
+out-of-tree backend lays them out as above, since that header is not installed.
 
 The transport dialect
 =====================
@@ -492,10 +527,10 @@ platform is built out.
     the ``CATALYST_REMOTE_SLAB_BYTES`` environment variable of the process opening the session sets
     another size in bytes.
 
-**Fixed transport reply region.**
-    A transport session provisions a 16 KB local reply region at ``exchange_keys``. The size is a
-    compile-time constant in ``runtime/lib/transport/TransportCAPI.cpp``. Making it configurable
-    per session would need a runtime entry point to override it.
+**Transport reply region.**
+    A transport session provisions its local reply region at ``exchange_keys``: 16 KB, or the ring
+    its frame layout needs when that is larger, read from the same ``frame`` and ``frame_payload``
+    config keys its backend reads.
 
 **Memref-only data path.**
     Only kernels whose operands and results bufferize cleanly to memrefs are eligible for the

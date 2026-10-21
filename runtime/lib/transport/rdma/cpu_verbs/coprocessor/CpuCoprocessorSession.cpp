@@ -102,19 +102,22 @@ void CpuCoprocessorSession::run(std::stop_token st) {
         std::memcpy(&word, r.data, std::min<std::size_t>(r.len, sizeof(word)));
         last_word_.store(word, std::memory_order_relaxed);
         completed_.fetch_add(1, std::memory_order_release);
-        // The reply goes back under the request's fn_id, its payload zeroed for the function to
-        // fill; the built-in echo copies the request's payload instead.
+        // The reply goes back under the request's fn_id. Its payload area is zero-filled for the
+        // function to fill, so the controller reads zeros past what it wrote; the built-in echo
+        // copies the request's payload instead.
         void *send = send_frame();
-        frame::stage(ring_.mode, send, r.fn_id, coproc_fn_ ? nullptr : r.data,
-                     coproc_fn_ ? 0 : r.len);
+        std::uint8_t *reply = frame::data(ring_, send);
+        const std::size_t cap = frame::data_capacity(ring_);
+        std::memset(reply, 0, cap);
+        std::size_t nb = r.len;
         if (coproc_fn_) {
-            // The function gets the whole request frame (CoprocessorFn's contract).
-            const std::size_t cap = frame::data_capacity(ring_.mode);
-            const std::size_t nb = coproc_fn_(r.data, frame::frame_bytes(ring_.mode),
-                                              frame::data(ring_.mode, send), cap, coproc_ctx_);
+            nb = coproc_fn_(r.data, r.len, r.fn_id, reply, cap, coproc_ctx_);
             TP_CHECK(nb > 0 && nb <= cap, "coprocessor function wrote %zu bytes, expected 1..%zu",
                      nb, cap);
+        } else {
+            std::memcpy(reply, r.data, nb);
         }
+        frame::stage(ring_, send, r.fn_id, reply, nb);
         const bool sig = (c % SIGNAL_EVERY == 0);
         post_write(bwd_qp_->get(), c, /*inline_data=*/true, sig);
         if (sig) {
