@@ -171,6 +171,17 @@ LogicalResult parseGateset(ModuleOp module, ArrayRef<std::string> targetGateSetO
     return success();
 }
 
+OperatorNode parseOperator(llvm::StringRef id) {
+    OperatorNode node;
+
+    node.id = id.str();
+    node.name = id.take_until([](char c) { return c == '[' || c == '{'; }).drop_until([](char c) {
+        return !llvm::isDigit(c);
+    });
+
+    return node;
+}
+
 LogicalResult addRuleNode(func::FuncOp rule, std::vector<RuleNode> &ruleNodes) {
     llvm::StringRef ruleName = rule.getName();
 
@@ -213,13 +224,12 @@ LogicalResult addRuleNode(func::FuncOp rule, std::vector<RuleNode> &ruleNodes) {
     // 3. Populate RuleNode
     RuleNode ruleNode;
     ruleNode.name = ruleName.str();
-    ruleNode.output = GraphDecompositionPrep::parseOperator(targetGateAttr.getValue());
+    ruleNode.output = parseOperator(targetGateAttr.getValue());
 
     for (const auto &namedAttr : operations) {
         if (auto intAttr = dyn_cast<IntegerAttr>(namedAttr.getValue())) {
-            ruleNode.inputs.push_back(
-                {GraphDecompositionPrep::parseOperator(namedAttr.getName().strref()),
-                 static_cast<uint32_t>(intAttr.getInt())});
+            ruleNode.inputs.push_back({parseOperator(namedAttr.getName().strref()),
+                                       static_cast<uint32_t>(intAttr.getInt())});
         }
     }
 
@@ -455,7 +465,7 @@ void getOperators(ModuleOp module, std::vector<OperatorNode> &operators) {
 
         // Derive the id and modifier-wrapped name from the single parse path, so operator
         // nodes and rule nodes agree on the spelling of `C(...)`/`Adjoint(...)`.
-        OperatorNode node = GraphDecompositionPrep::parseOperator(op.getGraphOpId());
+        OperatorNode node = parseOperator(op.getGraphOpId());
 
         // numWires/numParams are debug-only; parseOperator leaves them at defaults for the
         // graphOpId form, so we need to fill them accurately from the op here.
@@ -475,24 +485,6 @@ void getOperators(ModuleOp module, std::vector<OperatorNode> &operators) {
 namespace catalyst {
 namespace quantum {
 namespace GraphDecompositionPrep {
-
-/**
- * @brief Parse a graphOpId string into an OperatorNode.
- *
- * The graphOpId format is "<name>{params}{wires}{static}[uid]", where <name> already
- * carries any name-wrapped op-level modifiers produced by `defaultGetGraphOpId`, e.g.
- * "C(Adjoint(RX)){0:[f64]}{wires:1}{}".
- */
-OperatorNode parseOperator(llvm::StringRef id) {
-    OperatorNode node;
-
-    node.id = id.str();
-    node.name = id.take_until([](char c) { return c == '[' || c == '{'; }).drop_until([](char c) {
-        return !llvm::isDigit(c);
-    });
-
-    return node;
-}
 
 std::unique_ptr<DecompositionGraph> prepareGraph(Operation *op, const PrepOptions &opts,
                                                  LowerModifiersFn lowerModifiers) {
