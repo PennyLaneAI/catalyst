@@ -2087,7 +2087,7 @@ class TestDecomposeAlias:
         """Stacked ``qp.decompose`` apply innermost-first: a gate produced by the inner pass and
         excluded from the outer gate set is further decomposed away."""
 
-        @qjit(capture=True, keep_intermediate=True)
+        @qjit(capture=True)
         # Outer gate set excludes PhaseShift, which the inner pass introduces.
         @qp.decompose(gate_set={"RX", "RY", "RZ", "CNOT", "GlobalPhase"})
         @qp.decompose(gate_set={"RZ", "RY", "CNOT", "GlobalPhase", "PhaseShift"})
