@@ -768,7 +768,7 @@
 * The `--convert-to-value-semantics` and `--convert-to-reference-semantics` passes now collect
   subroutine symbol uses only once instead of once per subroutine, improving their performance.
   [(#3341)](https://github.com/PennyLaneAI/catalyst/pull/3341)
-  
+
 * Add `post-device-pipeline` to the `transform-sequence` when `qp.qjit(capture=True)`
   [(#3312)](https://github.com/PennyLaneAI/catalyst/pull/3312)
 
@@ -810,6 +810,10 @@
 <h3>Deprecations 👋</h3>
 
 <h3>Bug fixes 🐛</h3>
+
+* Fixes mixed static and dynamic `control_values` for callable `qp.ctrl` under
+  `qjit(capture=True)`.
+  [(#3373)](https://github.com/PennyLaneAI/catalyst/pull/3373)
 
 * Controlled quantum regions now keeps track of the `work_wire_type` passed from `qp.ctrl`.
   [(#3366)](https://github.com/PennyLaneAI/catalyst/pull/3366)

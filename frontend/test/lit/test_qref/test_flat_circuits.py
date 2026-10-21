@@ -75,6 +75,28 @@ def test_custom_op(i: int):
 print(test_custom_op.mlir)
 
 
+# CHECK-LABEL: func.func public @test_dynamic_control_values(
+# CHECK-SAME: %arg0: tensor<f64>, %arg1: tensor<i1>
+@qp.qjit(capture=True, target="mlir", collect_decomp_rules=False)
+@qp.qnode(qp.device("null.qubit", wires=3))
+def test_dynamic_control_values(x: float, val: bool):
+    """Dynamic control operands lower to SSA values in the controlled region."""
+    # COM: stablehlo compares bools against "not false" due to overly conservative lowering of
+    # COM: the convert_element_type primitive
+    # CHECK: [[f:%.+]] = stablehlo.constant dense<false> : tensor<i1>
+    # CHECK: [[broadcast:%.+]] = stablehlo.broadcast_in_dim [[f]], dims = [] : (tensor<i1>) -> tensor<i1>
+    # CHECK: [[control_bool:%.+]] = stablehlo.compare NE, %arg1, [[broadcast]], UNSIGNED
+    # CHECK: [[control_tensor:%.+]] = stablehlo.convert [[control_bool]] : tensor<i1>
+    # CHECK: [[control_value:%.+]] = tensor.extract [[control_tensor]][] : tensor<i1>
+    # CHECK: qref.ctrl({{[^)]+}}) ctrlvals({{[^,]+}}, [[control_value]]) {
+    # CHECK: qref.custom "RX"
+    qp.ctrl(qp.RX, (0, 1), [True, val])(x, 2)
+    return qp.expval(qp.Z(2))
+
+
+print(test_dynamic_control_values.mlir)
+
+
 # CHECK: func.func public @test_measure() -> tensor<2xf64>
 @qp.qjit(capture=True, target="mlir", collect_decomp_rules=False)
 @qp.qnode(qp.device("null.qubit", wires=3))
