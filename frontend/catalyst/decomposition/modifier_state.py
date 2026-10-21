@@ -14,6 +14,8 @@
 
 """Dataclass for handling operator modifiers related to graph-decomposition."""
 
+from __future__ import annotations
+
 from dataclasses import dataclass
 
 
