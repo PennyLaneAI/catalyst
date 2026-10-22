@@ -29,26 +29,26 @@ using namespace catalyst::pbc;
 
 namespace {
 
-/// recursively check if the next users of the NextOp are not PPMeasurementOp
+/// Recursively check that nextOp and its users do not reach the PPM.
 bool verifyNextNonClifford(PPMeasurementOp op, Operation *nextOp) {
     // Avoid segmentation fault (should not happen)
     if (nextOp == nullptr) {
         return true;
     }
 
-    for (auto userOp : nextOp->getUsers()) {
-        // Users nested in a region (e.g. scf.if) are represented by their ancestor in the PPM's
-        // block, so that values flowing out of the region are also followed.
-        Operation *ancestor = op->getBlock()->findAncestorOpInBlock(*userOp);
-        if (ancestor == nullptr || ancestor == op) {
-            return false;
-        }
+    // Map the operation before visiting its users, since region terminators (e.g. scf.yield)
+    // have no users. Following the ancestor's results also covers values leaving the region.
+    Operation *ancestor = op->getBlock()->findAncestorOpInBlock(*nextOp);
+    if (ancestor == nullptr || ancestor == op) {
+        return false;
+    }
 
-        if (!ancestor->isBeforeInBlock(op)) {
-            continue;
-        }
+    if (!ancestor->isBeforeInBlock(op)) {
+        return true;
+    }
 
-        if (!verifyNextNonClifford(op, ancestor)) {
+    for (auto userOp : ancestor->getUsers()) {
+        if (!verifyNextNonClifford(op, userOp)) {
             return false;
         }
     }

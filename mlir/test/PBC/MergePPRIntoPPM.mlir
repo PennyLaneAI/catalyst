@@ -339,6 +339,31 @@ func.func public @merge_ppr_ppm_nested_use_before_ppm(%q0: !quantum.bit, %q1: !q
 
 // -----
 
+// Both branches yield the same PPR output directly to the PPM.
+// The yield operations have no users, so the surrounding scf.if must be checked.
+
+// CHECK-LABEL: @merge_ppr_ppm_identical_yields_before_ppm
+func.func public @merge_ppr_ppm_identical_yields_before_ppm(%q0: !quantum.bit, %q1: !quantum.bit, %c: i1) -> (!quantum.bit, !quantum.bit) {
+
+    // CHECK: [[r:%.+]]:2 = pbc.ppr ["Z", "Y"](4)
+    // CHECK: [[if:%.+]] = scf.if
+    // CHECK:   scf.yield [[r]]#0
+    // CHECK: } else {
+    // CHECK:   scf.yield [[r]]#0
+    // CHECK: pbc.ppm ["Z", "Z"] [[r]]#1, [[if]]
+    %0 = pbc.ppr ["Z"](8) %q1 : !quantum.bit
+    %1:2 = pbc.ppr ["Z", "Y"](4) %q0, %0 : !quantum.bit, !quantum.bit
+    %2 = scf.if %c -> !quantum.bit {
+        scf.yield %1#0 : !quantum.bit
+    } else {
+        scf.yield %1#0 : !quantum.bit
+    }
+    %m, %3:2 = pbc.ppm ["Z", "Z"] %1#1, %2 : i1, !quantum.bit, !quantum.bit
+    return %3#0, %3#1 : !quantum.bit, !quantum.bit
+}
+
+// -----
+
 // A PPR is not merged into a PPM in a different block.
 
 // CHECK-LABEL: @merge_ppr_ppm_different_block
