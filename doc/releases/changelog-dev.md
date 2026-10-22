@@ -828,6 +828,11 @@
   back from MLIR instead of aborting with an unsupported-attribute error.
   [(#3385)](https://github.com/PennyLaneAI/catalyst/pull/3385)
 
+* `gridsynth` now correctly discretizes adjoint rotations and rotations inside `qp.adjoint`
+  regions. Control lowering now raises an error for function calls inside `qp.ctrl` regions
+  instead of silently dropping the control.
+  [(#3330)](https://github.com/PennyLaneAI/catalyst/pull/3330)
+
 * Fixes mixed static and dynamic `control_values` for callable `qp.ctrl` under
   `qjit(capture=True)`.
   [(#3373)](https://github.com/PennyLaneAI/catalyst/pull/3373)
