@@ -77,20 +77,14 @@ struct ResourceAnalysisPass : public impl::ResourceAnalysisPassBase<ResourceAnal
         if (!targetGateSetOption.empty()) {
             // Prepare and solve the decomposition graph for qp.estimate
             std::unique_ptr<DecompositionGraph> graph = GraphDecompositionPrep::prepareGraph(
-                moduleOp,
-                {
-                    .targetGateSetOption = targetGateSetOption,
-                    .fixedDecompsOption = fixedDecompsOption,
-                    .altDecompsOption = altDecompsOption,
-                    .bytecodeRulesFile = bytecodeRulesFile,
-                    .libQPDPath = libQPDPath,
-                    .libpythonPath = libpythonPath,
-                },
-                [&](Operation *op) {
-                    OpPassManager modifierPm("builtin.module");
-                    modifierPm.addPass(createModifiersLoweringPass());
-                    return runPipeline(modifierPm, op);
-                });
+                moduleOp, {
+                              .targetGateSetOption = targetGateSetOption,
+                              .fixedDecompsOption = fixedDecompsOption,
+                              .altDecompsOption = altDecompsOption,
+                              .bytecodeRulesFile = bytecodeRulesFile,
+                              .libQPDPath = libQPDPath,
+                              .libpythonPath = libpythonPath,
+                          });
             if (!graph) {
                 return signalPassFailure();
             }
