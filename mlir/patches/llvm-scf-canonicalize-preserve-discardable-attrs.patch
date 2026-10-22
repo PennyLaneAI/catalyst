@@ -18,25 +18,6 @@ index 652414f..bea8546 100644
      if (replacement.thenBlock())
        rewriter.eraseBlock(replacement.thenBlock());
      replacement.getThenRegion().takeBody(op.getThenRegion());
-@@ -2841,6 +2843,18 @@ struct CombineIfs : public OpRewritePattern<IfOp> {
-
-     IfOp combinedIf = IfOp::create(rewriter, nextIf.getLoc(), mergedTypes,
-                                    prevIf.getCondition(), /*hasElse=*/false);
-+    // The combined op branches on `prevIf`'s condition, so it inherits
-+    // `prevIf`'s discardable attributes. Attributes of `nextIf` are only added
-+    // (without overriding) when both ops branch on the exact same condition;
-+    // if `nextIf` branches on the negated condition, its attributes refer to
-+    // swapped regions and are dropped.
-+    NamedAttrList combinedAttrs(prevIf->getDiscardableAttrDictionary());
-+    if (nextIf.getCondition() == prevIf.getCondition())
-+      for (NamedAttribute attr : nextIf->getDiscardableAttrs())
-+        if (!combinedAttrs.get(attr.getName()))
-+          combinedAttrs.push_back(attr);
-+    combinedIf->setDiscardableAttrs(
-+        combinedAttrs.getDictionary(rewriter.getContext()));
-     rewriter.eraseBlock(&combinedIf.getThenRegion().back());
-
-     rewriter.inlineRegionBefore(prevIf.getThenRegion(),
 @@ -3789,6 +3803,7 @@ struct WhileMoveIfDown : public OpRewritePattern<scf::WhileOp> {
 
      auto newWhileOp =
