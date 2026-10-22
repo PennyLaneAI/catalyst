@@ -824,6 +824,9 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* The Python decomposition fallback now converts `None`-valued static attributes
+  back from MLIR instead of aborting with an unsupported-attribute error.
+
 * Fixes mixed static and dynamic `control_values` for callable `qp.ctrl` under
   `qjit(capture=True)`.
   [(#3373)](https://github.com/PennyLaneAI/catalyst/pull/3373)
