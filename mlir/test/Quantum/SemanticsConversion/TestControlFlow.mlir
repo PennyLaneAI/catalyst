@@ -814,6 +814,75 @@ func.func @test_switch(%arg0: index, %arg1: f64) -> f64 attributes {quantum.node
     return %4#3 : f64
 }
 
+
+// -----
+
+
+// Resource hints on SCF ops must survive convert-to-reference-semantics recreation.
+// CHECK-LABEL: test_preserves_scf_hints
+func.func @test_preserves_scf_hints(%arg0: i1, %arg1: index) attributes {quantum.node} {
+    %c0 = arith.constant 0 : index
+    %c1 = arith.constant 1 : index
+    %c37 = arith.constant 37 : index
+    %c0_i64 = arith.constant 0 : i64
+    %c1_i64 = arith.constant 1 : i64
+    %c5_i64 = arith.constant 5 : i64
+
+    %0 = quantum.alloc( 1) : !quantum.reg
+    %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+
+    // CHECK: scf.for
+    // CHECK: } {catalyst.estimated_iterations = 1.000000e+01 : f64}
+    %2 = scf.for %arg2 = %c0 to %c37 step %c1 iter_args(%arg3 = %1) -> (!quantum.bit) {
+        %out_qubits = quantum.custom "Hadamard"() %arg3 : !quantum.bit
+        scf.yield %out_qubits : !quantum.bit
+    } {catalyst.estimated_iterations = 1.000000e+01 : f64}
+    %3 = quantum.insert %0[ 0], %2 : !quantum.reg, !quantum.bit
+
+    // CHECK: scf.while
+    // CHECK: } attributes {catalyst.estimated_iterations = 2.500000e+00 : f64}
+    %4 = quantum.extract %3[ 0] : !quantum.reg -> !quantum.bit
+    %5 = scf.while (%arg2 = %4) : (!quantum.bit) -> !quantum.bit {
+        %13 = arith.cmpi slt, %c0_i64, %c5_i64 : i64
+        scf.condition(%13) %arg2 : !quantum.bit
+    } do {
+    ^bb0(%arg2: !quantum.bit):
+        %out_qubits = quantum.custom "PauliX"() %arg2 : !quantum.bit
+        scf.yield %out_qubits : !quantum.bit
+    } attributes {catalyst.estimated_iterations = 2.500000e+00 : f64}
+    %6 = quantum.insert %3[ 0], %5 : !quantum.reg, !quantum.bit
+
+    // CHECK: scf.if
+    // CHECK: } {catalyst.estimated_probability = 7.500000e-01 : f64}
+    %7 = quantum.extract %6[ 0] : !quantum.reg -> !quantum.bit
+    %8 = scf.if %arg0 -> (!quantum.bit) {
+        %out_qubits = quantum.custom "PauliY"() %7 : !quantum.bit
+        scf.yield %out_qubits : !quantum.bit
+    } else {
+        scf.yield %7 : !quantum.bit
+    } {catalyst.estimated_probability = 7.500000e-01 : f64}
+    %9 = quantum.insert %6[ 0], %8 : !quantum.reg, !quantum.bit
+
+    // CHECK: scf.index_switch {{.+}} {catalyst.estimated_probabilities = [2.000000e-01, 3.000000e-01]}
+    %10 = quantum.extract %9[ 0] : !quantum.reg -> !quantum.bit
+    %11 = scf.index_switch %arg1 {catalyst.estimated_probabilities = [2.000000e-01, 3.000000e-01]} -> !quantum.bit
+    case 0 {
+        %out_qubits = quantum.custom "PauliZ"() %10 : !quantum.bit
+        scf.yield %out_qubits : !quantum.bit
+    }
+    case 1 {
+        scf.yield %10 : !quantum.bit
+    }
+    default {
+        scf.yield %10 : !quantum.bit
+    }
+    %12 = quantum.insert %9[ 0], %11 : !quantum.reg, !quantum.bit
+
+    quantum.dealloc %12 : !quantum.reg
+    return
+}
+
+
 // -----
 
 // Region-bearing control flow outside the supported set (scf.if / scf.for / scf.while /

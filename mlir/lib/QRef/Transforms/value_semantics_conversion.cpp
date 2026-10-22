@@ -2079,6 +2079,12 @@ struct ValueSemanticsConversionPass
         // call op to a callee subroutine.
         const CallGraph callGraph(mod);
 
+        // Collect the symbol users once: a per-subroutine `SymbolTable::getSymbolUses` walks the
+        // whole module, which is quadratic in the number of subroutines. This stays valid because
+        // the calls to a subroutine are only replaced once it has been converted.
+        SymbolTableCollection symbolTables;
+        SymbolUserMap symbolUsers(symbolTables, mod);
+
         for (auto scc = llvm::scc_begin(&callGraph); !scc.isAtEnd(); ++scc) {
             if ((*scc->begin())->isExternal()) {
                 continue;
@@ -2111,14 +2117,10 @@ struct ValueSemanticsConversionPass
                 return signalPassFailure();
             }
 
-            auto uses = SymbolTable::getSymbolUses(subroutine, mod);
-            if (uses) {
-                for (auto use : *uses) {
-                    Operation *user = use.getUser();
-                    if (auto callOp = dyn_cast<func::CallOp>(user)) {
-                        checkNoAliasingQubitsInCallOp(builder, callOp);
-                        stageCallOpForConversion(builder, callOp, info);
-                    }
+            for (Operation *user : symbolUsers.getUsers(subroutine)) {
+                if (auto callOp = dyn_cast<func::CallOp>(user)) {
+                    checkNoAliasingQubitsInCallOp(builder, callOp);
+                    stageCallOpForConversion(builder, callOp, info);
                 }
             }
         }

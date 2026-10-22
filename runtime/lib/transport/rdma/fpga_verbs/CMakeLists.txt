@@ -22,6 +22,8 @@ set_property(TARGET fpga_verbs_impl PROPERTY POSITION_INDEPENDENT_CODE ON)
 add_library(catalyst_transport_fpga_verbs_controller SHARED FpgaControllerFactory.cpp)
 target_link_libraries(catalyst_transport_fpga_verbs_controller PRIVATE fpga_verbs_impl)
 
+catalyst_runtime_install(catalyst_transport_fpga_verbs_controller)
+
 # Self-contained round-trip application for testing
 add_executable(fpga_verbs_selftest fpga_verbs_selftest.cpp)
 target_link_libraries(fpga_verbs_selftest PRIVATE fpga_verbs_impl)

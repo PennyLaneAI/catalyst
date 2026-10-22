@@ -17,6 +17,7 @@
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/IRMapping.h"
 #include "mlir/IR/PatternMatch.h"
+#include "mlir/Interfaces/CallInterfaces.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -214,6 +215,8 @@ static LogicalResult controlScfIf(PatternRewriter &rewriter, scf::IfOp ifOp, IRM
     Value cond = map.lookupOrDefault(ifOp.getCondition());
     auto newIf = scf::IfOp::create(rewriter, ifOp.getLoc(), resultTypes, cond,
                                    /*withElseRegion=*/true);
+    // Carry over hints such as `catalyst.estimated_probability`.
+    newIf->setDiscardableAttrs(ifOp->getDiscardableAttrDictionary());
 
     // Control one branch: `oldBlock` may be null (a missing else), in which case the branch just
     // threads the incoming controls through unchanged.
@@ -282,6 +285,8 @@ static LogicalResult controlScfFor(PatternRewriter &rewriter, scf::ForOp forOp, 
     // With non-empty iter args and no body-builder, scf.for creates the body block (induction var +
     // iter-arg block args) without a terminator, which we fill in below.
     auto newFor = scf::ForOp::create(rewriter, forOp.getLoc(), lb, ub, step, newInits);
+    // Carry over hints such as `catalyst.estimated_iterations`.
+    newFor->setDiscardableAttrs(forOp->getDiscardableAttrDictionary());
     Block *newBody = newFor.getBody();
     ValueRange newIterArgs = newFor.getRegionIterArgs();
 
@@ -389,6 +394,8 @@ static LogicalResult controlScfWhile(PatternRewriter &rewriter, scf::WhileOp whi
             yielded.append(afterCtrl.begin(), afterCtrl.end());
             scf::YieldOp::create(rewriter, oldYield.getLoc(), yielded);
         });
+    // Carry over hints such as `catalyst.estimated_iterations`.
+    newWhile->setDiscardableAttrs(whileOp->getDiscardableAttrDictionary());
 
     if (failed(status)) {
         return failure();
@@ -419,6 +426,8 @@ static LogicalResult controlScfIndexSwitch(PatternRewriter &rewriter, scf::Index
     SmallVector<int64_t> cases(switchOp.getCases().begin(), switchOp.getCases().end());
     auto newSwitch = scf::IndexSwitchOp::create(rewriter, switchOp.getLoc(), resultTypes, arg,
                                                 cases, cases.size());
+    // Carry over hints such as `catalyst.estimated_probabilities`.
+    newSwitch->setDiscardableAttrs(switchOp->getDiscardableAttrDictionary());
 
     // Control one region.
     // Regions have no block arguments, so bodies reference outer
@@ -547,6 +556,15 @@ static LogicalResult distributeControls(PatternRewriter &rewriter, Block &block,
         // which is not supported:
         if (isa<scf::SCFDialect>(op.getDialect()) && op.getNumRegions() > 0) {
             op.emitError("unsupported scf operation inside a quantum.ctrl region");
+            return failure();
+        }
+        // Cloning a call that acts on quantum values would drop the controls for its body.
+        auto isQuantum = [](Type type) { return isa<QubitType, QuregType>(type); };
+        if (isa<CallOpInterface>(op) && (llvm::any_of(op.getOperandTypes(), isQuantum) ||
+                                         llvm::any_of(op.getResultTypes(), isQuantum))) {
+            op.emitError("cannot control a function call inside a quantum.ctrl region; decompose "
+                         "the controlled operations before passes that introduce function calls, "
+                         "such as gridsynth");
             return failure();
         }
         // Classical op: clone it:
