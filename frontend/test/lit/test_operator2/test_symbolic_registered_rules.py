@@ -144,7 +144,7 @@ def test_registered_control_rule_targets_the_controlled_op():
             )
         )
 
-    # CHECK-DAG: func.func private @"__builtin_controlled_2C(NoParams){}{reg:2}{}"(%arg0: !qref.reg<4>, %arg1: tensor<2xi64>, %arg2: tensor<2xi64>){{.*}}target_gate = "2C(NoParams){}{reg:2}{}"
+    # CHECK-DAG: func.func private @"__builtin_controlled_2C(NoParams){}{reg:2}{}"(%arg0: !qref.reg<4>, %arg1: tensor<2xi64>, %arg2: tensor<2xi64>, %arg3: tensor<2xi1>){{.*}}target_gate = "2C(NoParams){}{reg:2}{}"
     # CHECK-DAG: func.func private @"__builtin_base_rule_2C(NoParams){}{reg:2}{}"{{.*}}"2C(SingleParam){x:[tensor<f64>]}{reg:2}{}" = 1 : i64{{.*}}target_gate = "2C(NoParams){}{reg:2}{}"
 
 

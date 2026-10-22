@@ -113,6 +113,7 @@
   [(#3213)](https://github.com/PennyLaneAI/catalyst/pull/3213)
   [(#3248)](https://github.com/PennyLaneAI/catalyst/pull/3248)
   [(#3307)](https://github.com/PennyLaneAI/catalyst/pull/3307)
+  [(#3365)](https://github.com/PennyLaneAI/catalyst/pull/3365)
 
   Control is folded into the operator identity *control-outermost* (e.g. `C(Adjoint(Op))`), so
   `ctrl(adjoint(Op))` and `adjoint(ctrl(Op))` collapse to a single node, while a distinct control
@@ -150,16 +151,9 @@
   way PennyLane's registry spells it, since a multi-controlled id reads `<n>C(...)` and PennyLane
   names every controlled operator `C(...)` whatever its control count.
 
-  Right now, a rule registered against `C(Op)` is traced with every control value on, matching
-  the all-ones controls a `<n>C(...)` graphOpId denotes: it records only the control *count*,
-  so an operator with a zero control value maps to the same node and is given the same rule,
-  without the `X` flips that value needs. Zero control values are therefore not yet supported
-  through this pathway; they still decompose correctly through rule distribution, whose
-  `qref.ctrl` region is given the control values at runtime.
-
   Two defects in applying a register-mode controlled rule are fixed along with it:
 
-  - The rule's operands are now emitted as `func(qreg, param*, inWires*, inCtrlWires*)`, matching
+  - The rule's operands are now emitted as `func(qreg, param*, inWires*, inCtrlWires*, inCtrlValues*)`, matching
     what `DecomposeLoweringPass` reads back. They were previously emitted control-wires-first
     (`qp.capture.subroutine` traces through `jax.jit`, which flattens keyword arguments in sorted
     order, and `_ctrl_wires` sorts ahead of `wires`), which silently swapped a rule's control and
@@ -823,6 +817,10 @@
 <h3>Deprecations 👋</h3>
 
 <h3>Bug fixes 🐛</h3>
+
+* The Python decomposition fallback now converts `None`-valued static attributes
+  back from MLIR instead of aborting with an unsupported-attribute error.
+  [(#3385)](https://github.com/PennyLaneAI/catalyst/pull/3385)
 
 * `gridsynth` now correctly discretizes adjoint rotations and rotations inside `qp.adjoint`
   regions. Control lowering now raises an error for function calls inside `qp.ctrl` regions
