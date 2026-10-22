@@ -177,6 +177,11 @@
 
 <h3>Improvements 🛠</h3>
 
+* The ``target`` argument of :func:`~catalyst.qjit` now accepts ``"mlir_opt"``, which stops the
+  ahead-of-time compilation after running the MLIR passes, without translating the program to
+  LLVM IR. Calling the function still compiles it to a shared library.
+  [(#3391)](https://github.com/PennyLaneAI/catalyst/pull/3391)
+
 * A new `user-transform-stage` pipeline runs the quantum compilation stage only up to and including
   `apply-transform-sequence`, where the user transforms are applied. 
   [(#3345)](https://github.com/PennyLaneAI/catalyst/pull/3345)
@@ -789,6 +794,10 @@
   [(#3312)](https://github.com/PennyLaneAI/catalyst/pull/3312)
 
 <h3>Breaking changes 💔</h3>
+
+* Ahead-of-time compilation with ``target="llvmir"`` no longer links the program into a shared
+  library. Calling the function still compiles it to a shared library.
+  [(#3391)](https://github.com/PennyLaneAI/catalyst/pull/3391)
 
 * `catalyst.logging` has been removed. `pennylane.logging` should be used instead.
   [(#3283)](https://github.com/PennyLaneAI/catalyst/pull/3283)
