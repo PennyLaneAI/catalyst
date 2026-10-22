@@ -323,6 +323,11 @@ def handle_qnode(
             qnode.device, execution_config, shots, warn=self._preprocess_warn
         )
         pipelines += (("device", device_preprocessing_pipeline),)
+    pipelines += (("post-device", qnode._post_device_pipeline),)
+    # pipelines_flattened = tuple(t for _, stage_passes in pipelines for t in stage_passes)
+
+    # Mutate the QNode so resource analysis tools see both user/device transforms
+    # qnode._compile_pipeline = qp.CompilePipeline(list(pipelines_flattened))
 
     # Add the post-device pipeline, which contains optional Resource Analysis passes used through `qp.analyze`
     pipelines += (("post-device", tuple(qnode.post_device_pipeline)),)
