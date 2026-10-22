@@ -9,7 +9,7 @@
   against cudaq-realtime's own server and client on a ConnectX-7. On `gpu_verbs` the format is not
   yet optimized: each request takes a hop through a host thread, adding about 1 µs. On NVIDIA
   GPUs, DOCA GPUNetIO could remove this hop by letting the kernel read the completion queue itself.
-  [(#XXXX)](https://github.com/PennyLaneAI/catalyst/pull/XXXX)
+  [(#3392)](https://github.com/PennyLaneAI/catalyst/pull/3392)
 
 * A new coprocessor function called `catalyst_onnx_coprocessor` has been added, which runs an
   ONNX model on the CPU or a GPU through onnxruntime, and is built with the transport runtime.
