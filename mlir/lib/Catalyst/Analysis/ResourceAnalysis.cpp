@@ -42,6 +42,8 @@
 #include "Quantum/IR/QuantumInterfaces.h"
 #include "Quantum/IR/QuantumOps.h"
 
+#include "GraphDecompositionPrep.hpp"
+
 using namespace mlir;
 using namespace llvm;
 
@@ -85,8 +87,9 @@ ResourceResult ResourceAnalysis::makeEmptyResult() const {
 
 ResourceAnalysis::ResourceAnalysis(ModuleOp moduleOp,
                                    ArrayRef<ExtensionProvider> extensionProviders,
-                                   bool collectDetailedOperations)
-    : collectDetailedOperations(collectDetailedOperations) {
+                                   bool collectDetailedOperations,
+                                   DecompGraph::Core::GraphResult *graphResult)
+    : collectDetailedOperations(collectDetailedOperations), graphResult(graphResult) {
     extensionAnalyses.reserve(extensionProviders.size());
     for (const auto &provider : extensionProviders) {
         extensionAnalyses.push_back(provider());
@@ -448,6 +451,18 @@ void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result, b
         return;
     }
 
+    // Graph decomposition for qp.estimate
+    std::string graphOpId;
+    DecompGraph::Core::OperatorNode operatorNode;
+    if (graphResult) {
+        // check if op is decomposablegate op
+        if (auto decomposableGate = dyn_cast<quantum::DecomposableGate>(op)) {
+            // get the graph op id
+            graphOpId = decomposableGate.getGraphOpId();
+            operatorNode.id = graphOpId;
+        }
+    }
+
     // Quantum operations
     if (auto inst = dyn_cast<ResourceQuantumOpInterface>(op)) {
         std::string name = inst.getResourceName().str();
@@ -462,6 +477,22 @@ void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result, b
             name = std::to_string(nCtrlQubits) + "C(" + name + ")";
         }
 
+        // if the op (GOID) is in the graph, there exists a rule for it.
+        // Go through the decomp rule for the op, its basis counts,
+        // which is the target gate set which the op decomposes into, and accumulate.
+        if (graphResult && graphResult->find(operatorNode) != graphResult->end()) {
+            auto graphOp = graphResult->find(operatorNode);
+            const DecompGraph::Core::ChosenDecompRule &chosenRule = graphOp->second;
+            for (const auto &[basisOp, count] : chosenRule.basisCounts) {
+                // Getting wires and params from GOID is unreliable. The JSON is flattened anyways,
+                // so for qp.estimate this will be enough.
+                result.operations[basisOp.name][{-1, -1}] += count;
+            }
+            return;
+        }
+
+        // if the op is in the gate set, don't need to look for it in the graph.
+        // can count it directly.
         uint64_t nParams = inst.getResourceNumParams();
         uint64_t nQubits = inst.getResourceNumQubits() + nCtrlQubits;
         result.operations[name][{nQubits, nParams}] += 1;
