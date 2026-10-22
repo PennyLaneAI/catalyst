@@ -83,6 +83,12 @@ llvm:
 	@if cd llvm-project; git apply --check $(MK_DIR)/patches/llvm-python-bindinggen-annotations.patch; then \
 		git apply $(MK_DIR)/patches/llvm-python-bindinggen-annotations.patch; \
 	fi
+	# Patch scf canonicalization patterns to preserve discardable attributes
+	# (e.g. catalyst.estimated_iterations) on rebuilt scf.if/scf.while ops
+	# https://github.com/PennyLaneAI/catalyst/issues/3361
+	@if cd llvm-project; git apply --check $(MK_DIR)/patches/llvm-scf-canonicalize-preserve-discardable-attrs.patch; then \
+		git apply $(MK_DIR)/patches/llvm-scf-canonicalize-preserve-discardable-attrs.patch; \
+	fi
 
 	cmake -G Ninja -S llvm-project/llvm -B $(LLVM_BUILD_DIR) \
 		-DCMAKE_BUILD_TYPE=$(BUILD_TYPE) \
