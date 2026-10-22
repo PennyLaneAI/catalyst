@@ -75,8 +75,10 @@ from catalyst.decomposition.decomposition_rules import (
     symbolic_op_name,
     unpack_rule_operands,
     wrap_modifier_id,
+    wrap_modifiers_id,
 )
 from catalyst.decomposition.graph_op_id import GraphOpID, build_graph_op_id
+from catalyst.decomposition.modifier_state import ModifierState
 from catalyst.decomposition.type_utils import (
     convert_item_to_mlir_type,
     get_dummy_values_for_dynamic_shape,
@@ -195,12 +197,43 @@ class TestGenericUtilities:
             {"z": ["f64"], "a": ["i1"]},
             {"right": 2, "left": 1},
             {"label": "value"},
-            adjoint=True,
-            num_controls=2,
+            modifiers=ModifierState(adjoint=True, control_count=2),
             uid=7,
         )
 
         assert op_id == '2C(Adjoint(Example)){a:[i1],z:[f64]}{left:1,right:2}{label = "value"}[7]'
+
+    def test_modifier_state_rejects_invalid_counts(self):
+        """A modifier count cannot be negative."""
+        with pytest.raises(ValueError, match="cannot be negative"):
+            ModifierState(control_count=-1)
+
+    @pytest.mark.parametrize(
+        "outer, inner, expected",
+        [
+            (ModifierState(adjoint=True), ModifierState(adjoint=True), ModifierState()),
+            (ModifierState(adjoint=True), ModifierState(False, 2), ModifierState(True, 2)),
+        ],
+    )
+    def test_modifier_state_compose(self, outer, inner, expected):
+        """Adjoints cancel pairwise and control counts add."""
+        assert outer.compose(inner) == expected
+        assert inner.compose(outer) == expected
+
+    @pytest.mark.parametrize(
+        "modifiers, expected",
+        [
+            (ModifierState(), 'PauliRot{}{wires:2}{pauli_word = "XY"}'),
+            (ModifierState(adjoint=True), 'Adjoint(PauliRot){}{wires:2}{pauli_word = "XY"}'),
+            (ModifierState(False, 2), '2C(PauliRot){}{wires:2}{pauli_word = "XY"}'),
+        ],
+    )
+    def test_wrap_modifiers_id_matches_builder(self, modifiers, expected):
+        """Wrapping modifiers around a finished id agrees with building the id with them."""
+        components = ("PauliRot", {}, {"wires": 2}, {"pauli_word": "XY"})
+
+        assert wrap_modifiers_id(build_graph_op_id(*components), modifiers) == expected
+        assert build_graph_op_id(*components, modifiers=modifiers) == expected
 
     def test_wires_replacement_doesnt_mutate_operator(self):
         """Test that the wires replacement helper does not mutate the incoming operator."""
@@ -379,9 +412,9 @@ class TestGenericUtilities:
     def test_peel_modifiers(self, op, expected_adjoint, expected_controls):
         """Test GraphOpID separates a symbolic operator into its base and the modifiers on it."""
 
-        base, adjoint, num_controls = GraphOpID.peel_modifiers(op)
+        base, modifiers = GraphOpID.peel_modifiers(op)
 
-        assert (adjoint, num_controls) == (expected_adjoint, expected_controls)
+        assert modifiers == ModifierState(expected_adjoint, expected_controls)
         assert not isinstance(base, (Adjoint2, ControlledOp2))
 
     def test_peeled_identity_describes_the_base(self):
@@ -416,7 +449,7 @@ class TestGenericUtilities:
         """Test the modifiers the caller applies compose with the ones the operator carried rather
         than wrapping an already-wrapped id a second time."""
 
-        op_id = GraphOpID(op).getGraphOpId(adjoint=caller_adjoint, num_controls=caller_controls)
+        op_id = GraphOpID(op).getGraphOpId(ModifierState(caller_adjoint, caller_controls))
 
         assert op_id == expected
 
@@ -1050,12 +1083,12 @@ class TestSymbolicRules:
 
         module = compile_registered_symbolic_rules(
             "Hadamard",
-            "Adjoint(Hadamard){}{wires:1}{}",
+            "Hadamard{}{wires:1}{}",
             {},
             {"wires": 1},
             {},
             op_cls=qp.Hadamard,
-            kind="adjoint",
+            modifiers=ModifierState(adjoint=True),
         )
         (rule,) = get_rule_strings_from_module(module)
 
@@ -1070,13 +1103,13 @@ class TestSymbolicRules:
 
         module = compile_registered_symbolic_rules(
             "RZ",
-            "Adjoint(RZ){0:[f64]}{wires:1}{}",
+            "RZ{0:[f64]}{wires:1}{}",
             {"0": ["f64"]},
             {"wires": 1},
             {},
             is_custom_op=True,
             op_cls=qp.RZ,
-            kind="adjoint",
+            modifiers=ModifierState(adjoint=True),
         )
         (rule,) = get_rule_strings_from_module(module)
 
@@ -1092,13 +1125,12 @@ class TestSymbolicRules:
 
         module = compile_registered_symbolic_rules(
             "PPR_8",
-            'Adjoint(PPR_8){}{wires:2}{pauli_word = "XY", sign = 1 : i64}',
+            'PPR_8{}{wires:2}{pauli_word = "XY", sign = 1 : i64}',
             {},
             {"wires": 2},
             {"sign": 1, "pauli_word": "XY"},
             op_cls=qp.PPR_8,
-            kind="adjoint",
-            wrap_control=wrap_control,
+            modifiers=ModifierState(adjoint=True, control_count=int(wrap_control)),
         )
         (rule,) = get_rule_strings_from_module(module)
 
@@ -1131,13 +1163,12 @@ class TestSymbolicRules:
 
         module = compile_registered_symbolic_rules(
             "Hadamard",
-            target_id,
+            "Hadamard{}{wires:1}{}",
             {},
             {"wires": 1},
             {},
             op_cls=qp.Hadamard,
-            kind="control",
-            n_ctrl=n_ctrl,
+            modifiers=ModifierState(control_count=n_ctrl),
         )
         (rule,) = get_rule_strings_from_module(module)
 
@@ -1245,13 +1276,12 @@ class TestSymbolicRules:
 
             module = compile_registered_symbolic_rules(
                 "Hadamard",
-                "3C(Hadamard){}{wires:1}{}",
+                "Hadamard{}{wires:1}{}",
                 {},
                 {"wires": 1},
                 {},
                 op_cls=qp.Hadamard,
-                kind="control",
-                n_ctrl=3,
+                modifiers=ModifierState(control_count=3),
             )
 
         assert recorded["values"] == [True, True, True]
@@ -1370,7 +1400,7 @@ class TestSymbolicRules:
                     {},
                     {"reg": 1},
                     {},
-                    n_ctrls=3,
+                    modifiers=ModifierState(control_count=3),
                 )
             )
 
@@ -1413,13 +1443,12 @@ class TestSymbolicRules:
 
             module = compile_registered_symbolic_rules(
                 "DisjointRegisters",
-                "C(DisjointRegisters){}{control:2,target:1}{}",
+                "DisjointRegisters{}{control:2,target:1}{}",
                 {},
                 {"control": 2, "target": 1},
                 {},
                 op_cls=DisjointRegisters,
-                kind="control",
-                n_ctrl=1,
+                modifiers=ModifierState(control_count=1),
             )
 
         (rule,) = get_rule_strings_from_module(module)
@@ -1436,7 +1465,8 @@ class TestSymbolicRules:
         assert GraphOpID(qp.ctrl(base, control=[1, 2])).getGraphOpId() == "2C(S){}{wires:1}{}"
         # The modifiers a caller applies compose with the operator's own, control outermost.
         assert (
-            GraphOpID(qp.adjoint(base)).getGraphOpId(num_controls=1) == "C(Adjoint(S)){}{wires:1}{}"
+            GraphOpID(qp.adjoint(base)).getGraphOpId(ModifierState(control_count=1))
+            == "C(Adjoint(S)){}{wires:1}{}"
         )
         # The base alone is what owns the rules, so its id leaves the modifiers off.
         assert GraphOpID(qp.ctrl(base, control=[1, 2])).getBaseGraphOpId() == "S{}{wires:1}{}"
@@ -1453,12 +1483,12 @@ class TestSymbolicRules:
             assert (
                 compile_registered_symbolic_rules(
                     "NoParams",
-                    "Adjoint(NoParams){}{reg:2}{}",
+                    "NoParams{}{reg:2}{}",
                     {},
                     {"reg": 2},
                     {},
                     op_cls=NoParams,
-                    kind="adjoint",
+                    modifiers=ModifierState(adjoint=True),
                 )
                 is None
             )
@@ -1478,26 +1508,24 @@ class TestSymbolicRules:
 
             adjoint_module = compile_registered_symbolic_rules(
                 "NoParams",
-                "Adjoint(NoParams){}{reg:1}{}",
+                "NoParams{}{reg:1}{}",
                 {},
                 {"reg": 1},
                 {},
                 op_cls=NoParams,
-                kind="adjoint",
+                modifiers=ModifierState(adjoint=True),
             )
             assert adjoint_module is not None
 
             with pytest.warns(RuleLoweringWarning, match="control region"):
                 control_module = compile_registered_symbolic_rules(
                     "NoParams",
-                    "C(Adjoint(NoParams)){}{reg:1}{}",
+                    "NoParams{}{reg:1}{}",
                     {},
                     {"reg": 1},
                     {},
                     op_cls=NoParams,
-                    kind="adjoint",
-                    n_ctrl=1,
-                    wrap_control=True,
+                    modifiers=ModifierState(adjoint=True, control_count=1),
                 )
 
             # The measurement rule was the only candidate and was skipped, so no module is produced.
@@ -1509,7 +1537,26 @@ class TestSymbolicRules:
 
         with pytest.raises(ValueError, match="operator class of 'Hadamard' is needed"):
             compile_registered_symbolic_rules(
-                "Hadamard", "Adjoint(Hadamard){}{wires:1}{}", {}, {"wires": 1}, {}, kind="adjoint"
+                "Hadamard",
+                "Hadamard{}{wires:1}{}",
+                {},
+                {"wires": 1},
+                {},
+                modifiers=ModifierState(adjoint=True),
+            )
+
+    def test_unmodified_target_raises(self):
+        """Test symbolic rules are not looked up for an operator without any modifier."""
+
+        with pytest.raises(ValueError, match="unmodified Hadamard"):
+            compile_registered_symbolic_rules(
+                "Hadamard",
+                "Hadamard{}{wires:1}{}",
+                {},
+                {"wires": 1},
+                {},
+                op_cls=qp.Hadamard,
+                modifiers=ModifierState(),
             )
 
 
