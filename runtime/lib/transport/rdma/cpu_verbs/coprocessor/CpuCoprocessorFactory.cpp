@@ -36,3 +36,6 @@ catalyst::transport::CoprocessorSession *make_cpu_coprocessor(const std::string 
 } // namespace
 
 GENERATE_TRANSPORT_COPROCESSOR_FACTORY(CatalystTransportCoprocessor, make_cpu_coprocessor)
+CATALYST_TRANSPORT_BACKEND_CAPS("cpu_verbs", CATALYST_TRANSPORT_ROLE_BIT_COPROCESSOR,
+                                CATALYST_TRANSPORT_MEM_BIT(CpuRam),
+                                CATALYST_TRANSPORT_CONV_BIT(PerMessage), 8, 8, 1)
