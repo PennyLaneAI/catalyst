@@ -21,6 +21,7 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/PatternMatch.h"
+#include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/DialectConversion.h"
 
 namespace catalyst {
@@ -30,6 +31,9 @@ namespace quantum {
 /// This is useful for creating string constants for QIR function calls.
 mlir::Value getGlobalString(mlir::Location loc, mlir::OpBuilder &rewriter, mlir::StringRef key,
                             mlir::StringRef value, mlir::ModuleOp mod);
+
+/// Lower `quantum.ctrl` / `quantum.adjoint` regions to op-level modifiers via a greedy fixpoint.
+mlir::LogicalResult lowerModifiers(mlir::Operation *op);
 
 void populateResolveGateLevelAdjointPatterns(mlir::RewritePatternSet &);
 void populateAdjointLoweringPatterns(mlir::RewritePatternSet &);

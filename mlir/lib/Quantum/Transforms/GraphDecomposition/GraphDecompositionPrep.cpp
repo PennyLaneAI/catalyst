@@ -45,6 +45,7 @@
 #include "Driver/Timer.h"
 #include "Quantum/IR/QuantumInterfaces.h"
 #include "Quantum/IR/QuantumOps.h"
+#include "Quantum/Transforms/Patterns.h"
 #include "Quantum/Transforms/QPDLoader.h"
 
 #include "DGTypes.hpp"
@@ -58,19 +59,6 @@ using namespace DecompGraph::Core;
 using namespace DecompGraph::Solver;
 
 namespace {
-
-class ScopedDiagnosticTimer {
-  public:
-    explicit ScopedDiagnosticTimer(std::string name) : name(std::move(name)) { timer.start(); }
-    ~ScopedDiagnosticTimer() { timer.dump(name); }
-
-    ScopedDiagnosticTimer(const ScopedDiagnosticTimer &) = delete;
-    ScopedDiagnosticTimer &operator=(const ScopedDiagnosticTimer &) = delete;
-
-  private:
-    catalyst::utils::Timer<> timer;
-    std::string name;
-};
 
 bool hasModifierRegion(ModuleOp module) {
     return module
@@ -442,7 +430,7 @@ LogicalResult getRuleNodes(ModuleOp module, llvm::StringRef filename,
                            llvm::StringMap<llvm::StringSet<>> &opToAltDecompNames,
                            llvm::StringRef libQPDPath, llvm::StringRef libpythonPath,
                            std::vector<RuleNode> &rules) {
-    ScopedDiagnosticTimer t("decomp:rules");
+
     // Load pre-compiled rules (ignore failure, we can try to solve without) into the module
     if (!filename.empty()) {
         std::ignore = loadBuiltInDecompositionRules(module, filename);
@@ -493,8 +481,7 @@ namespace catalyst {
 namespace quantum {
 namespace GraphDecompositionPrep {
 
-std::unique_ptr<DecompositionGraph> prepareGraph(Operation *op, const PrepOptions &opts,
-                                                 LowerModifiersFn lowerModifiers) {
+std::unique_ptr<DecompositionGraph> prepareGraph(ModuleOp module, const PrepOptions &opts) {
     LLVM_DEBUG(llvm::dbgs() << "Running GraphDecompositionPrep with options:\n");
     LLVM_DEBUG({
         llvm::dbgs() << "targetGateSetOption\n";
@@ -516,7 +503,6 @@ std::unique_ptr<DecompositionGraph> prepareGraph(Operation *op, const PrepOption
         llvm::dbgs() << "\n";
     });
 
-    ModuleOp module = cast<ModuleOp>(op);
     // Strip away adjoint and control regions to match the graph, where modifiers are on
     // the individual ops
     if (hasModifierRegion(module) && failed(lowerModifiers(module))) {
