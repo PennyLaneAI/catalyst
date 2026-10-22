@@ -19,6 +19,7 @@
 
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringRef.h"
+#include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/Operation.h"
 #include "mlir/Support/LogicalResult.h"
 
@@ -56,7 +57,7 @@ using LowerModifiersFn = mlir::function_ref<mlir::LogicalResult(mlir::Operation 
  * Returns nullptr on failure.
  */
 std::unique_ptr<DecompGraph::Solver::DecompositionGraph>
-prepareGraph(mlir::Operation *op, const PrepOptions &opts, LowerModifiersFn lowerModifiers);
+prepareGraph(mlir::ModuleOp module, const PrepOptions &opts, LowerModifiersFn lowerModifiers);
 
 } // namespace GraphDecompositionPrep
 } // namespace quantum

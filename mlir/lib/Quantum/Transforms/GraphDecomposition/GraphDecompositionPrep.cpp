@@ -493,7 +493,7 @@ namespace catalyst {
 namespace quantum {
 namespace GraphDecompositionPrep {
 
-std::unique_ptr<DecompositionGraph> prepareGraph(Operation *op, const PrepOptions &opts,
+std::unique_ptr<DecompositionGraph> prepareGraph(ModuleOp module, const PrepOptions &opts,
                                                  LowerModifiersFn lowerModifiers) {
     LLVM_DEBUG(llvm::dbgs() << "Running GraphDecompositionPrep with options:\n");
     LLVM_DEBUG({
@@ -516,7 +516,6 @@ std::unique_ptr<DecompositionGraph> prepareGraph(Operation *op, const PrepOption
         llvm::dbgs() << "\n";
     });
 
-    ModuleOp module = cast<ModuleOp>(op);
     // Strip away adjoint and control regions to match the graph, where modifiers are on
     // the individual ops
     if (hasModifierRegion(module) && failed(lowerModifiers(module))) {
