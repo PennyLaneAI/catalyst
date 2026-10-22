@@ -29,6 +29,7 @@
 #include "catch2/matchers/catch_matchers_string.hpp"
 
 #include "Transport.hpp"
+#include "TransportBackend.h"
 #include "TransportCAPI.h"
 #include "TransportTestUtils.hpp"
 
@@ -67,6 +68,51 @@ TEST_CASE("check aborts on a non-OK status and a null session", "[transport]") {
                         ContainsSubstring("memory"));
     REQUIRE_THROWS_WITH(__catalyst__transport__check_session(nullptr, "get_session"),
                         ContainsSubstring("get_session: null session"));
+}
+
+TEST_CASE("a backend without a version symbol loads as version 1", "[transport]") {
+    auto *s = make(CATALYST_TRANSPORT_ROLE_COPROCESSOR, "abi_v1");
+    REQUIRE(s != nullptr);
+    __catalyst__transport__destroy(s);
+}
+
+TEST_CASE("a versioned backend is loaded only for the roles it reports", "[transport]") {
+    auto *s = __catalyst__transport__create(STUB_V2_BACKEND_PATH, "cfg",
+                                            CATALYST_TRANSPORT_ROLE_CONTROLLER, "abi_v2_ctrl");
+    REQUIRE(s != nullptr);
+    __catalyst__transport__destroy(s); // through the backend's own destroy hook
+
+    CHECK(__catalyst__transport__create(STUB_V2_BACKEND_PATH, "cfg",
+                                        CATALYST_TRANSPORT_ROLE_COPROCESSOR,
+                                        "abi_v2_coproc") == nullptr);
+    REQUIRE_THROWS_WITH(__catalyst__transport__check_session(nullptr, "create"),
+                        ContainsSubstring("backend 'stub' does not provide the coprocessor role"));
+}
+
+TEST_CASE("a backend built for a newer ABI is refused, naming both versions", "[transport]") {
+    CHECK(__catalyst__transport__create(STUB_V99_BACKEND_PATH, "cfg",
+                                        CATALYST_TRANSPORT_ROLE_CONTROLLER, "abi_v99") == nullptr);
+    REQUIRE_THROWS_WITH(__catalyst__transport__check_session(nullptr, "create"),
+                        ContainsSubstring("transport ABI version 99") &&
+                            ContainsSubstring("supports up to 2"));
+}
+
+TEST_CASE("in-tree backends report their capabilities", "[transport]") {
+    for (const char *path : {MEMCPY_CONTROLLER_BACKEND_PATH, MEMCPY_COPROCESSOR_BACKEND_PATH}) {
+        void *lib = dlopen(path, RTLD_LAZY | RTLD_NODELETE);
+        REQUIRE(lib != nullptr);
+        auto *version = reinterpret_cast<CatalystTransportAbiVersionFn *>(
+            dlsym(lib, CATALYST_TRANSPORT_ABI_VERSION_SYMBOL));
+        auto *query = reinterpret_cast<CatalystTransportQueryCapsFn *>(
+            dlsym(lib, CATALYST_TRANSPORT_QUERY_CAPS_SYMBOL));
+        REQUIRE(version != nullptr);
+        REQUIRE(query != nullptr);
+        CHECK(version() == CATALYST_TRANSPORT_ABI_VERSION);
+        const CatalystTransportCaps *caps = query();
+        CHECK(std::string_view{caps->name} == "memcpy");
+        CHECK(caps->frame_modes == CATALYST_TRANSPORT_FRAME_BL16);
+        CHECK(caps->destroy_session != nullptr);
+    }
 }
 
 TEST_CASE("create registers a session resolvable by (role, key)", "[transport]") {

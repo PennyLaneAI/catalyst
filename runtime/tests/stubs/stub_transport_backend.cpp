@@ -81,3 +81,13 @@ extern "C" CoprocessorSession *CatalystTransportCoprocessorFactory(const char *c
     }
     return new StubCoprocessor();
 }
+
+// Built three ways (tests/CMakeLists.txt): without STUB_ABI_VERSION, a backend predating
+// versioning; with 2, a versioned controller-only backend; with a larger value, one built for a
+// newer ABI.
+#if defined(STUB_ABI_VERSION) && STUB_ABI_VERSION == 2
+CATALYST_TRANSPORT_BACKEND_CAPS("stub", CATALYST_TRANSPORT_ROLE_BIT_CONTROLLER,
+                                CATALYST_TRANSPORT_MEM_BIT(CpuRam), 0, 8, 8, 1)
+#elif defined(STUB_ABI_VERSION)
+extern "C" uint32_t CatalystTransportAbiVersion() { return STUB_ABI_VERSION; }
+#endif
