@@ -60,19 +60,6 @@ using namespace DecompGraph::Solver;
 
 namespace {
 
-class ScopedDiagnosticTimer {
-  public:
-    explicit ScopedDiagnosticTimer(std::string name) : name(std::move(name)) { timer.start(); }
-    ~ScopedDiagnosticTimer() { timer.dump(name); }
-
-    ScopedDiagnosticTimer(const ScopedDiagnosticTimer &) = delete;
-    ScopedDiagnosticTimer &operator=(const ScopedDiagnosticTimer &) = delete;
-
-  private:
-    catalyst::utils::Timer<> timer;
-    std::string name;
-};
-
 bool hasModifierRegion(ModuleOp module) {
     return module
         .walk([&](Operation *op) {
@@ -443,7 +430,7 @@ LogicalResult getRuleNodes(ModuleOp module, llvm::StringRef filename,
                            llvm::StringMap<llvm::StringSet<>> &opToAltDecompNames,
                            llvm::StringRef libQPDPath, llvm::StringRef libpythonPath,
                            std::vector<RuleNode> &rules) {
-    ScopedDiagnosticTimer t("decomp:rules");
+
     // Load pre-compiled rules (ignore failure, we can try to solve without) into the module
     if (!filename.empty()) {
         std::ignore = loadBuiltInDecompositionRules(module, filename);
