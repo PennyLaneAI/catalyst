@@ -39,15 +39,16 @@
 // COM: expected T and other entries (1.5346 + 0.0024) * log2(1/0.01) + 0.3606 + 2.5843 (Clifford+T), (1.5346 + 0.7719) * log2(1/0.01) + 0.3606 + 4.6973 (PPR)
 // CLIFFORD:       } {catalyst.estimated_iterations = 13.1{{[0-9]+}} : f64}
 // PPR:            } {catalyst.estimated_iterations = 20.3{{[0-9]+}} : f64}
-// CHECK:          return {{%.+}}, [[PHASE]]
+// CHECK:          quantum.gphase([[PHASE]])
+// CHECK:          return {{%.+}} : !quantum.bit
 
 // CHECK-LABEL: @test_rz_mixed_decomposition
 // CHECK-SAME: ([[Q_IN:%.+]]: !quantum.bit, [[THETA:%.+]]: f64)
 func.func @test_rz_mixed_decomposition(%arg0: !quantum.bit, %theta: f64) -> !quantum.bit {
-    // CLIFFORD: [[RES:%.+]]:2 = call @__catalyst_decompose_RZ_mixed([[Q_IN]], [[THETA]])
-    // PPR:      [[RES:%.+]]:2 = call @__catalyst_decompose_RZ_mixed_ppr_basis([[Q_IN]], [[THETA]])
-    // CHECK: quantum.gphase([[RES]]#1)
-    // CHECK: return [[RES]]#0 : !quantum.bit
+    // CLIFFORD: [[RES:%.+]] = call @__catalyst_decompose_RZ_mixed([[Q_IN]], [[THETA]])
+    // PPR:      [[RES:%.+]] = call @__catalyst_decompose_RZ_mixed_ppr_basis([[Q_IN]], [[THETA]])
+    // CHECK-NOT: quantum.gphase
+    // CHECK: return [[RES]] : !quantum.bit
     %q_out = quantum.custom "RZ"(%theta) %arg0 : !quantum.bit
     return %q_out : !quantum.bit
 }
@@ -58,9 +59,10 @@ func.func @test_rz_mixed_decomposition(%arg0: !quantum.bit, %theta: f64) -> !qua
 // CHECK-SAME: ([[Q_IN:%.+]]: !quantum.bit, [[THETA:%.+]]: f64)
 func.func @test_ppr_arbitrary_z_mixed_decomposition(%arg0: !quantum.bit, %theta: f64) -> !quantum.bit {
     // CHECK: [[PHI:%.+]] = arith.mulf [[THETA]]
-    // CLIFFORD: [[RES:%.+]]:2 = call @__catalyst_decompose_RZ_mixed([[Q_IN]], [[PHI]])
-    // PPR:      [[RES:%.+]]:2 = call @__catalyst_decompose_RZ_mixed_ppr_basis([[Q_IN]], [[PHI]])
-    // CHECK: quantum.gphase([[RES]]#1)
+    // CLIFFORD: [[RES:%.+]] = call @__catalyst_decompose_RZ_mixed([[Q_IN]], [[PHI]])
+    // PPR:      [[RES:%.+]] = call @__catalyst_decompose_RZ_mixed_ppr_basis([[Q_IN]], [[PHI]])
+    // CHECK-NOT: quantum.gphase
+    // CHECK: return [[RES]] : !quantum.bit
     %q_out = pbc.ppr.arbitrary ["Z"](%theta) %arg0 : !quantum.bit
     return %q_out : !quantum.bit
 }
