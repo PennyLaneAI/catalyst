@@ -20,6 +20,38 @@
   ... )
   ```
 
+* The `gridsynth` pass has a new `method` option with two randomized methods from
+  [arXiv:2203.10064](https://arxiv.org/abs/2203.10064). `method="mixed"` (Section 3.4) randomly
+  applies an under- or an over-rotating Clifford+T sequence to each rotation, with probabilities
+  that cancel their coherent errors and leave a smaller incoherent error. This roughly halves the
+  T-count compared to `method="deterministic"` (the default) at the same accuracy of the channel
+  averaged over executions. `method="mixed-fallback"` (Section 3.5) roughly halves the T-count
+  again, at the cost of one temporary ancilla qubit and a mid-circuit measurement per rotation.
+  [(#3314)](https://github.com/PennyLaneAI/catalyst/pull/3314)
+  [(#3327)](https://github.com/PennyLaneAI/catalyst/pull/3327)
+
+  ```python
+  from catalyst.passes import gridsynth
+
+  @qp.qjit(capture=True)
+  @gridsynth(epsilon=1e-6, method="mixed")
+  @qp.qnode(qp.device("lightning.qubit", wires=1))
+  def circuit(x: float):
+      qp.Hadamard(0)
+      qp.RZ(x, wires=0)
+      return qp.expval(qp.X(0))
+  ```
+
+  Each execution samples a sequence, so results can differ around the exact value
+  `cos(0.3) = 0.95534`:
+
+  ```pycon
+  >>> circuit(0.3)
+  Array(0.95551714, dtype=float64)
+  >>> circuit(0.3)
+  Array(0.95507396, dtype=float64)
+  ```
+
 * You can now dynamically prepare magic T states inside captured Catalyst workflows using
   ``qp.allocate(state="magic-T")`` and ``qp.allocate(state="magic-T-adj")``, which makes it
   easier to compile FTQC-style routines that need T-state ancillas on the fly (for example
@@ -81,6 +113,7 @@
   [(#3213)](https://github.com/PennyLaneAI/catalyst/pull/3213)
   [(#3248)](https://github.com/PennyLaneAI/catalyst/pull/3248)
   [(#3307)](https://github.com/PennyLaneAI/catalyst/pull/3307)
+  [(#3365)](https://github.com/PennyLaneAI/catalyst/pull/3365)
 
   Control is folded into the operator identity *control-outermost* (e.g. `C(Adjoint(Op))`), so
   `ctrl(adjoint(Op))` and `adjoint(ctrl(Op))` collapse to a single node, while a distinct control
@@ -118,16 +151,9 @@
   way PennyLane's registry spells it, since a multi-controlled id reads `<n>C(...)` and PennyLane
   names every controlled operator `C(...)` whatever its control count.
 
-  Right now, a rule registered against `C(Op)` is traced with every control value on, matching
-  the all-ones controls a `<n>C(...)` graphOpId denotes: it records only the control *count*,
-  so an operator with a zero control value maps to the same node and is given the same rule,
-  without the `X` flips that value needs. Zero control values are therefore not yet supported
-  through this pathway; they still decompose correctly through rule distribution, whose
-  `qref.ctrl` region is given the control values at runtime.
-
   Two defects in applying a register-mode controlled rule are fixed along with it:
 
-  - The rule's operands are now emitted as `func(qreg, param*, inWires*, inCtrlWires*)`, matching
+  - The rule's operands are now emitted as `func(qreg, param*, inWires*, inCtrlWires*, inCtrlValues*)`, matching
     what `DecomposeLoweringPass` reads back. They were previously emitted control-wires-first
     (`qp.capture.subroutine` traces through `jax.jit`, which flattens keyword arguments in sorted
     order, and `_ctrl_wires` sorts ahead of `wires`), which silently swapped a rule's control and
@@ -154,6 +180,19 @@
 * The :func:`~catalyst.qjit` function now accepts an ``enable_aot_compilation`` argument, which can be
   used to toggle whether or not to use ahead-of-time compilation.
   [(#3339)](https://github.com/PennyLaneAI/catalyst/pull/3339)
+
+* `QJIT.aot_compile` now accepts function arguments, so functions without type hints
+  can be compiled ahead of time.
+  [(#3369)](https://github.com/PennyLaneAI/catalyst/pull/3369)
+
+  ```python
+  @qjit
+  def f(x):
+      return x * 2
+
+  f.aot_compile(jax.ShapeDtypeStruct((3,), jnp.float64))
+  f(jnp.array([1.0, 2.0, 3.0]))  # no compilation
+  ```
 
 * :func:`pennylane.transforms.gridsynth` now produces correct, deterministic decompositions for
   any `epsilon` down to `1e-15`, and invalid angles or `epsilon` values raise an error.
@@ -705,8 +744,9 @@
   which allows backend-specific configuration to be attached to custom calls.
   [(#3037)](https://github.com/PennyLaneAI/catalyst/pull/3037)
 
-* Added ``CZ`` support to ``to-ppr`` pass.
+* Added ``CZ`` and ``CY`` support to ``to-ppr`` pass.
   [(#3009)](https://github.com/PennyLaneAI/catalyst/pull/3009)
+  [(#3327)](https://github.com/PennyLaneAI/catalyst/pull/3327)
 
 * PBC layer commutation checks now use packed binary symplectic bases for large overlapping layers,
   reducing repeated pairwise normalization while preserving the resulting partition.
@@ -725,6 +765,19 @@
 * Added a guard in the `--convert-to-value-semantics` pass to raise an error when
   unsupported quantum-bearing `scf` operations are encountered.
   [(#3238)](https://github.com/PennyLaneAI/catalyst/pull/3238)
+
+* A remote `Executor` now takes its sudo password from an environment variable named by
+  `sudo_password_env=`, so the password is no longer directly in source, config files or reprs.
+  Once read, the password is held in a `Secret` that prints as `***`, so it does not leak
+  through logs or tracebacks.
+  [(#3309)](https://github.com/PennyLaneAI/catalyst/pull/3309)
+
+* The `--convert-to-value-semantics` and `--convert-to-reference-semantics` passes now collect
+  subroutine symbol uses only once instead of once per subroutine, improving their performance.
+  [(#3341)](https://github.com/PennyLaneAI/catalyst/pull/3341)
+
+* Add `post-device-pipeline` to the `transform-sequence` when `qp.qjit(capture=True)`
+  [(#3312)](https://github.com/PennyLaneAI/catalyst/pull/3312)
 
 <h3>Breaking changes 💔</h3>
 
@@ -771,6 +824,22 @@
   stage to resolve the batching first.
   An additional bug is fixed in the scatter lowering that resulted in failed assertions.
   [(#3352)](https://github.com/PennyLaneAI/catalyst/pull/3352)
+
+* The Python decomposition fallback now converts `None`-valued static attributes
+  back from MLIR instead of aborting with an unsupported-attribute error.
+  [(#3385)](https://github.com/PennyLaneAI/catalyst/pull/3385)
+
+* `gridsynth` now correctly discretizes adjoint rotations and rotations inside `qp.adjoint`
+  regions. Control lowering now raises an error for function calls inside `qp.ctrl` regions
+  instead of silently dropping the control.
+  [(#3330)](https://github.com/PennyLaneAI/catalyst/pull/3330)
+
+* Fixes mixed static and dynamic `control_values` for callable `qp.ctrl` under
+  `qjit(capture=True)`.
+  [(#3373)](https://github.com/PennyLaneAI/catalyst/pull/3373)
+
+* Controlled quantum regions now keeps track of the `work_wire_type` passed from `qp.ctrl`.
+  [(#3366)](https://github.com/PennyLaneAI/catalyst/pull/3366)
 
 * MLIR passes that recreate `scf.for`, `scf.while`, `scf.if`, and `scf.index_switch` ops
   (`ctrl-lowering`, `adjoint-lowering`, `--convert-to-value-semantics`) now preserve discardable
@@ -898,6 +967,34 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* Backline transport backends are chosen from a registry instead of a fixed table. Out-of-tree
+  backends register through the `catalyst.transport_backends` entry point or a
+  `catalyst_transport_backends.json` manifest on `CATALYST_TRANSPORT_PATH`, with no Catalyst
+  change. A backend is picked by transport, hardware, role and message size. A node can name one
+  with `backend=...`. The MLIR verifier no longer restricts transport names.
+  [(#3362)](https://github.com/PennyLaneAI/catalyst/pull/3362)
+
+* The FPGA transport backends share one config parser. The VPK120 backend now reads `dev`, `gid`,
+  `ring`, `stride_log2`, `data_mem` and `reply_mem` exactly as `fpga_verbs` does, and reports a
+  malformed value by naming its key. The frontend builds the entries it adds to a coprocessor's
+  config from a dict.
+  [(#3359)](https://github.com/PennyLaneAI/catalyst/pull/3359)
+
+* Backline transport backends now report the transport ABI version they were built for and their
+  capabilities, through `CatalystTransportAbiVersion` and `CatalystTransportQueryCaps`. The runtime
+  checks these when it loads a backend: a backend built for a newer ABI, or asked for a role it
+  does not provide, is refused with an error naming the cause. Backends without the symbols still
+  load, limited to the 16 B frame. Load errors are now included in the error raised to the user.
+  [(#3357)](https://github.com/PennyLaneAI/catalyst/pull/3357)
+
+* Backline housekeeping ahead of the transport ABI improvement:
+  - **GPU backends:** the `TRANSPORT_HIP` CMake option (`AUTO`, `ON`, `OFF`) overrides detection of the GPU transport backends.
+  - **Demo integration tests:** these now run whenever the runtime is built with transport.
+  - **Local executors:** a placement's local executors are given a port at compile time and launched only when the program runs. They are remembered per node, rather than written onto the frozen placement nodes.
+  - **Executor memory:** the remote memory slab is sized by `CATALYST_REMOTE_SLAB_BYTES`.
+
+  [(#3355)](https://github.com/PennyLaneAI/catalyst/pull/3355)
+
 * QNode functions are now marked with a `quantum.kernel_entry_point` attribute in their quantum
   kernel module, which the `ResourceAnalysis` pass uses to identify the entry function.
   [(#3308)](https://github.com/PennyLaneAI/catalyst/pull/3308)
@@ -987,6 +1084,7 @@
   [(#3224)](https://github.com/PennyLaneAI/catalyst/pull/3224)
   [(#3232)](https://github.com/PennyLaneAI/catalyst/pull/3232)
   [(#3238)](https://github.com/PennyLaneAI/catalyst/pull/3238)
+  [(#3341)](https://github.com/PennyLaneAI/catalyst/pull/3341)
 
 * Removed the internal ``mlir_specs`` function which was the old backend for :func:`qp.specs`. The resource analysis pass replaces its use.
   [(#2841)](https://github.com/PennyLaneAI/catalyst/pull/2841)
@@ -1174,9 +1272,11 @@ Joseph Lee,
 Rylan Malarchick,
 Mehrdad Malekmohammadi,
 River McCubbin,
+Mudit Pandey,
 Shuli Shu,
 Nikhil Sreekumar,
 Kalman Szenes,
+Jaume Villasante,
 Paul Haochen Wang,
 David Wierichs,
 Jake Zaia,

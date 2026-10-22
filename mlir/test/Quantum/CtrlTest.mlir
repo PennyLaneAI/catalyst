@@ -212,6 +212,47 @@ func.func @ctrl_unsupported_scf(%ctrl: !quantum.bit, %q: !quantum.bit) -> !quant
 
 // -----
 
+// A call acting on qubits has no rule for controlling the callee, so it is rejected rather than
+// silently left uncontrolled.
+func.func private @rotate(%q: !quantum.bit, %x: f64) -> !quantum.bit {
+  %out = quantum.custom "RZ"(%x) %q : !quantum.bit
+  return %out : !quantum.bit
+}
+
+func.func @ctrl_call(%ctrl: !quantum.bit, %q: !quantum.bit, %x: f64) -> !quantum.bit {
+  %true = arith.constant true
+  %outc, %outq = quantum.ctrl(%ctrl) ctrlvals(%true) (%q) : !quantum.bit -> !quantum.bit {
+  ^bb0(%arg0: !quantum.bit):
+    // expected-error @+1 {{cannot control a function call inside a quantum.ctrl region}}
+    %r = func.call @rotate(%arg0, %x) : (!quantum.bit, f64) -> !quantum.bit
+    quantum.yield %r : !quantum.bit
+  }
+  return %outc : !quantum.bit
+}
+
+// -----
+
+// Classical calls inside a ctrl region are cloned.
+
+func.func private @double(%x: f64) -> f64
+
+// CHECK-LABEL: @ctrl_classical_call
+func.func @ctrl_classical_call(%ctrl: !quantum.bit, %q: !quantum.bit, %x: f64) -> !quantum.bit {
+  %true = arith.constant true
+  // CHECK-NOT: quantum.ctrl
+  // CHECK: [[Y:%.+]] = call @double
+  // CHECK: quantum.custom "RX"([[Y]]) {{.*}} ctrls
+  %outc, %outq = quantum.ctrl(%ctrl) ctrlvals(%true) (%q) : !quantum.bit -> !quantum.bit {
+  ^bb0(%arg0: !quantum.bit):
+    %y = func.call @double(%x) : (f64) -> f64
+    %rx = quantum.custom "RX"(%y) %arg0 : !quantum.bit
+    quantum.yield %rx : !quantum.bit
+  }
+  return %outc : !quantum.bit
+}
+
+// -----
+
 // Region-bearing ops that are not from scf must be accepted
 
 // CHECK-LABEL: @ctrl_with_region_op_non_scf

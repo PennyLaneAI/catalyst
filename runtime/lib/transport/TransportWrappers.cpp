@@ -14,6 +14,8 @@
 
 // TransportWrappers.cpp
 //
+//   __call      in-process, through the C ABI. Takes and returns what the function it names does,
+//               and raises a runtime error naming the call when that function fails.
 //   __wrapper   dispatched. The executor resolves the symbol through LLVM ORC and calls it with one
 //               flat argument buffer; the result goes back as another flat buffer. Neither buffer
 //               is framed, so the layout comes from the signature the call site declared.
@@ -160,6 +162,77 @@ CatalystTransportSession *checked_session(CatalystTransportSession *s, const cha
 } // namespace
 
 extern "C" {
+
+//===----------------------------------------------------------------------===//
+// In-process, checked: the C function's own arguments, stopping the program if it fails
+//===----------------------------------------------------------------------===//
+
+CatalystTransportSession *__catalyst__transport__create__call(const char *backend_lib,
+                                                              const char *config, int32_t role,
+                                                              const char *key) {
+    return checked_session(__catalyst__transport__create(backend_lib, config, role, key), "create");
+}
+
+CatalystTransportSession *__catalyst__transport__get_session__call(int32_t role, const char *key) {
+    return checked_session(__catalyst__transport__get_session(role, key), "get_session");
+}
+
+int __catalyst__transport__connect__call(CatalystTransportSession *s, const char *peer,
+                                         uint16_t oob_port) {
+    return checked_status(__catalyst__transport__connect(s, peer, oob_port), "connect");
+}
+
+int __catalyst__transport__exchange_keys__call(CatalystTransportSession *s) {
+    return checked_status(__catalyst__transport__exchange_keys(s), "exchange_keys");
+}
+
+int __catalyst__transport__await__call(int64_t token) {
+    return checked_status(__catalyst__transport__await(token), "await");
+}
+
+int __catalyst__transport__establish_channel__call(CatalystTransportSession *s,
+                                                   const char *transport) {
+    return checked_status(__catalyst__transport__establish_channel(s, transport),
+                          "establish_channel");
+}
+
+int __catalyst__transport__set_coprocessor_fn__call(CatalystTransportSession *s,
+                                                    const char *symbol) {
+    return checked_status(__catalyst__transport__set_coprocessor_fn(s, symbol),
+                          "set_coprocessor_fn");
+}
+
+int __catalyst__transport__set_message_sizes__call(CatalystTransportSession *s,
+                                                   uint32_t work_item_idx, uint64_t in_bytes,
+                                                   uint64_t out_bytes) {
+    return checked_status(
+        __catalyst__transport__set_message_sizes(s, work_item_idx, in_bytes, out_bytes),
+        "set_message_sizes");
+}
+
+int __catalyst__transport__stage_payload__call(CatalystTransportSession *s, const void *src,
+                                               uint64_t bytes, uint32_t decoder_id) {
+    return checked_status(__catalyst__transport__stage_payload(s, src, bytes, decoder_id),
+                          "stage_payload");
+}
+
+int __catalyst__transport__post__call(CatalystTransportSession *s, uint32_t work_item_idx) {
+    return checked_status(__catalyst__transport__post(s, work_item_idx), "post");
+}
+
+int __catalyst__transport__collect__call(CatalystTransportSession *s, void *reply,
+                                         uint64_t reply_bytes) {
+    return checked_status(__catalyst__transport__collect(s, reply, reply_bytes), "collect");
+}
+
+int __catalyst__transport__start_benchmark__call(CatalystTransportSession *s, uint32_t iters,
+                                                 uint32_t decoder_id, uint32_t flags,
+                                                 uint64_t *samples, uint64_t samples_bytes,
+                                                 uint64_t *rounds) {
+    return checked_status(__catalyst__transport__start_benchmark(s, iters, decoder_id, flags,
+                                                                 samples, samples_bytes, rounds),
+                          "start_benchmark");
+}
 
 //===----------------------------------------------------------------------===//
 // Dispatched wrappers: sessions
