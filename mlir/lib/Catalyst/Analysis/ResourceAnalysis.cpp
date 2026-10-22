@@ -88,10 +88,8 @@ ResourceResult ResourceAnalysis::makeEmptyResult() const {
 ResourceAnalysis::ResourceAnalysis(ModuleOp moduleOp,
                                    ArrayRef<ExtensionProvider> extensionProviders,
                                    bool collectDetailedOperations,
-                                   DecompGraph::Core::GraphResult *graphResult,
-                                   std::unique_ptr<DecompGraph::Solver::DecompositionGraph> graph)
-    : collectDetailedOperations(collectDetailedOperations), graphResult(graphResult),
-      graph(std::move(graph)) {
+                                   DecompGraph::Core::GraphResult *graphResult)
+    : collectDetailedOperations(collectDetailedOperations), graphResult(graphResult) {
     extensionAnalyses.reserve(extensionProviders.size());
     for (const auto &provider : extensionProviders) {
         extensionAnalyses.push_back(provider());
@@ -454,7 +452,6 @@ void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result, b
     }
 
     // Graph decomposition for qp.estimate
-    DecompGraph::Core::GraphResult::iterator graphOp = graphResult->end();
     std::string graphOpId;
     DecompGraph::Core::OperatorNode operatorNode;
     if (graphResult) {
@@ -463,7 +460,6 @@ void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result, b
             // get the graph op id
             graphOpId = decomposableGate.getGraphOpId();
             operatorNode.id = graphOpId;
-            graphOp = graphResult->find(operatorNode);
         }
     }
 
@@ -480,13 +476,12 @@ void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result, b
         } else if (nCtrlQubits > 1) {
             name = std::to_string(nCtrlQubits) + "C(" + name + ")";
         }
-        DecompGraph::Core::WeightedGateset gateset =
-            graph ? graph->getGateset() : DecompGraph::Core::WeightedGateset();
-        // if the op is in the graph and not in the gateset that means it has been decomposed.
-        // Go through the graph's decomp rule for the op, its basis counts,
+
+        // if the op (GOID) is in the graph, there exists a rule for it.
+        // Go through the decomp rule for the op, its basis counts,
         // which is the target gate set which the op decomposes into, and accumulate.
-        if (graphResult && graphOp != graphResult->end() && gateset.ops.size() > 0 &&
-            !gateset.contains(operatorNode)) {
+        if (graphResult && graphResult->find(operatorNode) != graphResult->end()) {
+            auto graphOp = graphResult->find(operatorNode);
             const DecompGraph::Core::ChosenDecompRule &chosenRule = graphOp->second;
             for (const auto &[basisOp, count] : chosenRule.basisCounts) {
                 // Getting wires and params from GOID is unreliable. The JSON is flattened anyways,

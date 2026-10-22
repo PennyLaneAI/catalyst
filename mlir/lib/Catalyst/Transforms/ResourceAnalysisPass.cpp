@@ -73,11 +73,10 @@ struct ResourceAnalysisPass : public impl::ResourceAnalysisPassBase<ResourceAnal
 
         auto moduleOp = cast<ModuleOp>(getOperation());
         std::optional<GraphResult> solution;
-        std::unique_ptr<DecompositionGraph> graph;
 
         if (!targetGateSetOption.empty()) {
             // Prepare and solve the decomposition graph for qp.estimate
-            graph = GraphDecompositionPrep::prepareGraph(
+            std::unique_ptr<DecompositionGraph> graph = GraphDecompositionPrep::prepareGraph(
                 moduleOp,
                 {
                     .targetGateSetOption = targetGateSetOption,
@@ -104,7 +103,7 @@ struct ResourceAnalysisPass : public impl::ResourceAnalysisPassBase<ResourceAnal
 
         ResourceAnalysis analysis(moduleOp, ResourceAnalysisRegistry::get().all(),
                                   /*collectDetailedOperations=*/false,
-                                  solution ? &solution.value() : nullptr, std::move(graph));
+                                  solution ? &solution.value() : nullptr);
         const auto &results = analysis.getResults();
 
         // Populate statistics from the entry function. The flattened view
