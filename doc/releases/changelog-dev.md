@@ -823,7 +823,7 @@
   In addition, to support batched scatter operations an additional pass is run in the HLO lowering
   stage to resolve the batching first.
   An additional bug is fixed in the scatter lowering that resulted in failed assertions.
-  [(#3352)](https://github.com/PennyLaneAI/catalyst/pull/3352)
+  [(#3356)](https://github.com/PennyLaneAI/catalyst/pull/3356)
 
 * The Python decomposition fallback now converts `None`-valued static attributes
   back from MLIR instead of aborting with an unsupported-attribute error.
