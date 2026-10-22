@@ -839,8 +839,10 @@
   attributes such as `catalyst.estimated_iterations`, `catalyst.estimated_probability`, and
   `catalyst.estimated_probabilities`, so resource analysis still sees compiler hints after those
   rewrites.
+  This includes the upstream mlir canonicalizer, which is now patched to preserve discardable attributes as well.
   [(#3288)](https://github.com/PennyLaneAI/catalyst/pull/3288)
   [(#3291)](https://github.com/PennyLaneAI/catalyst/pull/3291)
+  [(#3389)](https://github.com/PennyLaneAI/catalyst/pull/3389)
 
 * Fixed a bug where graph decomposition ignored entries in `fixed_decomps` and `alt_decomps` that
   use a string key containing parentheses, such as `"C(PauliZ)"` or `"Adjoint(TemporaryAND)"`.
