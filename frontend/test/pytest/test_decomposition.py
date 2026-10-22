@@ -1306,18 +1306,15 @@ class TestSymbolicRules:
         # Only one control on: the target must be left alone.
         assert np.allclose(run([1]), 1.0)
 
-    def test_zero_control_value_is_not_mislowered(self):
-        """Test an operator with a zero control value decomposes to the right state."""
+    def test_zero_control_value_is_not_mislowered_native_rule(self):
+        """Test an operator with a zero control value decomposes to the right state, when
+        the rule is natively registered on C(gate)"""
 
         class ZeroCtrl(qp.core.Operator2):
             """An operator whose controlled form is a CNOT from the control onto its wire."""
 
             def __init__(self, wires):
                 super().__init__(wires=wires)
-
-        @register_resources({qp.PauliX: 1})
-        def x_rule(wires):
-            qp.X(wires=wires)
 
         @register_resources(lambda base, control_wires, control_values, **_: {qp.CNOT: 1, qp.X: 2})
         def ctrl_rule(base, control_wires, control_values, work_wires, work_wire_type):
@@ -1332,7 +1329,6 @@ class TestSymbolicRules:
             flips()  # pylint:disable=no-value-for-parameter
 
         with local_decomps():
-            add_decomps(ZeroCtrl, x_rule)
             add_decomps("C(ZeroCtrl)", ctrl_rule)
 
             @qjit(capture=True)
@@ -1345,8 +1341,37 @@ class TestSymbolicRules:
 
             result = circuit()
 
-        assert "x_rule" in circuit.mlir
         assert "ctrl_rule" in circuit.mlir
+        assert np.allclose(result, -1.0)
+
+    def test_zero_control_value_is_not_mislowered_ctrl_synthesized_rule(self):
+        """Test an operator with a zero control value decomposes to the right state, when
+        the rule is registered on the base op and the control variant rule is synthesized."""
+
+        class ZeroCtrl(qp.core.Operator2):
+            """An operator whose controlled form is a CNOT from the control onto its wire."""
+
+            def __init__(self, wires):
+                super().__init__(wires=wires)
+
+        @register_resources({qp.PauliX: 1})
+        def base_x_rule(wires):
+            qp.X(wires=wires)
+
+        with local_decomps():
+            add_decomps(ZeroCtrl, base_x_rule)
+
+            @qjit(capture=True)
+            @qp.decompose(gate_set=["CNOT", "PauliX"])
+            @qnode(qp.device("lightning.qubit", wires=2))
+            def circuit():
+                # The control is off, and the control value is zero, so the op fires.
+                qp.ctrl(ZeroCtrl(0), control=[1], control_values=[False])
+                return qp.expval(qp.Z(0))
+
+            result = circuit()
+
+        assert "base_x_rule" in circuit.mlir
         assert np.allclose(result, -1.0)
 
     def test_discovered_op_gets_multi_controlled_rules(self):
