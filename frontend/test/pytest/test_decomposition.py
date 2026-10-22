@@ -802,7 +802,7 @@ class TestTraceTime:
             def circuit():
                 NoParamsCustomOp(wires=[0, 1])
 
-            specs = qp.specs(circuit, level="user")()
+            specs = qp.analyze(circuit, level="user")()
             assert specs.resources.counts["NoParams"] == 2
 
 
@@ -1816,7 +1816,7 @@ class TestCustomRuleApplication:
             def circuit():
                 SingleParam(x=0.5, reg=[0, 1])
 
-            resources = qp.specs(circuit, level="all")().resources
+            resources = qp.analyze(circuit, level="all-user")().resources
 
         # The parameterized SingleParam is decomposed by the graph pass into the target NoParams.
         assert resources["Before MLIR Passes"].counts == {"SingleParam": 1}
@@ -1844,7 +1844,7 @@ class TestCustomRuleApplication:
             def circuit():
                 TestQubitUnitary(unitary, wires=[0])
 
-            resources = qp.specs(circuit, level="all")().resources
+            resources = qp.analyze(circuit, level="all-user")().resources
 
         assert "TestQubitUnitary" in resources["Before MLIR Passes"].counts
         after = resources["graph-decomposition"].counts
@@ -1869,7 +1869,7 @@ class TestCustomRuleApplication:
             def circuit():
                 qp.adjoint(NoParams(0))
 
-            resources = qp.specs(circuit, level="all")().resources
+            resources = qp.analyze(circuit, level="all-user")().resources
 
         assert "Adjoint(NoParams)" in resources["Before MLIR Passes"].counts
         after = resources["graph-decomposition"].counts
@@ -1899,7 +1899,7 @@ class TestCustomRuleApplication:
             def circuit():
                 NoParamsCustomOp(0)
 
-            resources = qp.specs(circuit, level="all")().resources
+            resources = qp.analyze(circuit, level="all-user")().resources
 
         decomposed = resources["graph-decomposition"].counts
         assert decomposed.get("NoParamsCustomOp", 0) == 0
@@ -1934,7 +1934,7 @@ class TestCustomRuleApplication:
             def circuit():
                 qp.adjoint(NoParamsCustomOp(0))
 
-            resources = qp.specs(circuit, level="all")().resources
+            resources = qp.analyze(circuit, level="all-user")().resources
 
         decomposed = resources["graph-decomposition"].counts
         assert decomposed.get("Adjoint(NoParamsCustomOp)", 0) == 0
@@ -1951,7 +1951,7 @@ class TestCustomRuleApplication:
             NoParamsCustomOp(0)
 
         with pytest.raises(ValueError, match="Unknown decomposition rule"):
-            resources = qp.specs(circuit, level="all")().resources
+            resources = qp.analyze(circuit, level="all-user")().resources
 
     def test_fix_decomp_invalid_type(self):
         """Tests that an error is raised by referring to an invalid object."""
@@ -1966,7 +1966,7 @@ class TestCustomRuleApplication:
             NoParamsCustomOp(0)
 
         with pytest.raises(TypeError, match="fixed_decomps accepts rules or the names"):
-            qp.specs(circuit, level="all")().resources
+            qp.analyze(circuit, level="all-user")().resources
 
     def test_functional_adjoint_region_is_lowered(self):
         """Test that a functional modifier ``qp.adjoint(op)(...)`` is captured as a ``quantum.adjoint``
@@ -1988,7 +1988,7 @@ class TestCustomRuleApplication:
             def circuit():
                 qp.adjoint(NoParams)(0)
 
-            resources = qp.specs(circuit, level="all")().resources
+            resources = qp.analyze(circuit, level="all-user")().resources
 
         after = resources["graph-decomposition"].counts
         assert "Adjoint(NoParams)" not in after
@@ -2015,7 +2015,7 @@ class TestCustomRuleApplication:
                 # Functional form: captured as a `quantum.ctrl` region, not an op-level modifier.
                 qp.ctrl(NoParams, control=[1])(0)
 
-            resources = qp.specs(circuit, level="all")().resources
+            resources = qp.analyze(circuit, level="all-user")().resources
 
         after = resources["graph-decomposition"].counts
         assert "C(NoParams)" not in after
@@ -2056,7 +2056,7 @@ class TestDecomposeAlias:
                 qp.Rot(0.1, 0.2, 0.3, wires=0)
                 return qp.probs()
 
-            qp.specs(circuit, level="all")()
+            qp.analyze(circuit, level="all-user")()
 
     def test_decompose_multiple_matches_graph_decomposition(self):
         """Stacking two ``qp.decompose`` transforms matches stacking ``graph_decomposition``."""
@@ -2150,7 +2150,7 @@ class TestDecomposeAlias:
                     qp.Rot(0.1, 0.2, 0.3, wires=0)
                     return qp.probs()
 
-                qp.specs(circuit, level="all")()
+                qp.analyze(circuit, level="all-user")()
         finally:
             qp.decomposition.disable_graph()
 
@@ -2245,7 +2245,7 @@ class TestNumericHamiltonianDecomposition:
             )
             return qp.probs(wires=registers["electronic"])
 
-        resources = qp.specs(circuit, level=0)().resources
+        resources = qp.analyze(circuit, level=0)().resources
         assert dict(resources.counts) == {"TrotterVibronic": 1}
 
     def test_trotter_cdf_decomposes(self):
@@ -2260,7 +2260,7 @@ class TestNumericHamiltonianDecomposition:
                 evolution_time=1.0, num_trotter_steps=10, hamiltonian=hamiltonian, wires=range(4)
             )
 
-        resources = qp.specs(circuit, level="all")().resources
+        resources = qp.analyze(circuit, level="all-user")().resources
         assert resources["Before MLIR Passes"].counts == {"TrotterCDF": 1}
         assert resources["graph-decomposition"].counts == {
             "BasisRotation": 44,
@@ -2298,7 +2298,7 @@ class TestNumericHamiltonianDecomposition:
                     wires=range(4),
                 )
 
-            resources = qp.specs(circuit, level="all")().resources
+            resources = qp.analyze(circuit, level="all-user")().resources
 
         assert resources["Before MLIR Passes"].counts == {"TrotterCDF": 1}
         assert resources["graph-decomposition"].counts == {"RZ": 1, "GlobalPhase": 1}
@@ -2327,7 +2327,7 @@ class TestNumericHamiltonianDecomposition:
                 )
             )
 
-        resources = qp.specs(circuit, level="all")().resources
+        resources = qp.analyze(circuit, level="all-user")().resources
         assert resources["Before MLIR Passes"].counts == {"Adjoint(TrotterCDF)": 1}
         assert resources["graph-decomposition"].counts == {
             "Adjoint(BasisRotation)": 44,
@@ -2351,7 +2351,7 @@ class TestNumericHamiltonianDecomposition:
                 evolution_time=1.0, num_trotter_steps=10, hamiltonian=hamiltonian, wires=range(6)
             )
 
-        resources = qp.specs(circuit, level="all")().resources
+        resources = qp.analyze(circuit, level="all-user")().resources
         assert resources["Before MLIR Passes"].counts == {"TrotterCGF": 1}
         assert resources["graph-decomposition"].counts == {
             "BasisRotation": 44,
@@ -2383,7 +2383,7 @@ class TestNumericHamiltonianDecomposition:
                 )
             )
 
-        resources = qp.specs(circuit, level="all")().resources
+        resources = qp.analyze(circuit, level="all-user")().resources
         assert resources["Before MLIR Passes"].counts == {"Adjoint(TrotterCGF)": 1}
         assert resources["graph-decomposition"].counts == {
             "Adjoint(BasisRotation)": 44,
@@ -2424,7 +2424,7 @@ class TestNumericHamiltonianDecomposition:
                 control=[4],
             )
 
-        resources = qp.specs(circuit, level="all")().resources
+        resources = qp.analyze(circuit, level="all-user")().resources
         assert resources["Before MLIR Passes"].counts == {"C(TrotterCDF)": 1}
         assert resources["graph-decomposition"].counts == {
             "C(BasisRotation)": 44,
@@ -2469,7 +2469,7 @@ class TestNumericHamiltonianDecomposition:
                 control=[6],
             )
 
-        resources = qp.specs(circuit, level="all")().resources
+        resources = qp.analyze(circuit, level="all-user")().resources
         assert resources["Before MLIR Passes"].counts == {"C(TrotterCGF)": 1}
         assert resources["graph-decomposition"].counts == {
             "C(BasisRotation)": 44,
@@ -2536,7 +2536,7 @@ class TestNumericHamiltonianDecomposition:
             )
 
         for circuit in (ctrl_of_adjoint, adjoint_of_ctrl):
-            resources = qp.specs(circuit, level="all")().resources
+            resources = qp.analyze(circuit, level="all-user")().resources
             assert resources["Before MLIR Passes"].counts == {"C(Adjoint(TrotterCDF))": 1}
             assert resources["graph-decomposition"].counts == expected
 
@@ -2570,7 +2570,7 @@ def test_custom_op_that_decomposes_to_basis_rotation():
             TestQubitUnitary(complex_mat, [0, 1])
             return qp.probs()
 
-        resources = qp.specs(parent_circuit_complex, level="all")().resources
+        resources = qp.analyze(parent_circuit_complex, level="all-user")().resources
         assert resources["Before MLIR Passes"].counts == {"TestQubitUnitary": 1}
         assert resources["graph-decomposition"].counts == {
             "PhaseShift": 3,
@@ -2585,7 +2585,7 @@ def test_custom_op_that_decomposes_to_basis_rotation():
             TestQubitUnitary(real_mat, [0, 1])
             return qp.probs()
 
-        resources = qp.specs(parent_circuit_real, level="all")().resources
+        resources = qp.analyze(parent_circuit_real, level="all-user")().resources
         assert resources["Before MLIR Passes"].counts == {"TestQubitUnitary": 1}
         assert resources["graph-decomposition"].counts == {
             "PhaseShift": 1,
