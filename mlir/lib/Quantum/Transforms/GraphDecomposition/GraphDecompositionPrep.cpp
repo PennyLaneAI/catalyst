@@ -45,6 +45,7 @@
 #include "Driver/Timer.h"
 #include "Quantum/IR/QuantumInterfaces.h"
 #include "Quantum/IR/QuantumOps.h"
+#include "Quantum/Transforms/Patterns.h"
 #include "Quantum/Transforms/QPDLoader.h"
 
 #include "DGTypes.hpp"
@@ -493,8 +494,7 @@ namespace catalyst {
 namespace quantum {
 namespace GraphDecompositionPrep {
 
-std::unique_ptr<DecompositionGraph> prepareGraph(ModuleOp module, const PrepOptions &opts,
-                                                 LowerModifiersFn lowerModifiers) {
+std::unique_ptr<DecompositionGraph> prepareGraph(ModuleOp module, const PrepOptions &opts) {
     LLVM_DEBUG(llvm::dbgs() << "Running GraphDecompositionPrep with options:\n");
     LLVM_DEBUG({
         llvm::dbgs() << "targetGateSetOption\n";

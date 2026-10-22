@@ -20,8 +20,6 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringRef.h"
 #include "mlir/IR/BuiltinOps.h"
-#include "mlir/IR/Operation.h"
-#include "mlir/Support/LogicalResult.h"
 
 #include "DGBuilder.hpp"
 
@@ -44,20 +42,17 @@ struct PrepOptions {
     llvm::StringRef libpythonPath;
 };
 
-/// Callback to lower `quantum.ctrl` / `quantum.adjoint` regions to op-level modifiers.
-using LowerModifiersFn = mlir::function_ref<mlir::LogicalResult(mlir::Operation *)>;
-
 /**
  * @brief Prepare a decomposition graph from a module.
  *
- * Invokes `lowerModifiers` to strip `quantum.ctrl` / `quantum.adjoint` regions
+ * Strip `quantum.ctrl` / `quantum.adjoint` regions
  * if needed, then gathers rules for the target gateset and builds a
  * DecompositionGraph.
  *
  * Returns nullptr on failure.
  */
-std::unique_ptr<DecompGraph::Solver::DecompositionGraph>
-prepareGraph(mlir::ModuleOp module, const PrepOptions &opts, LowerModifiersFn lowerModifiers);
+std::unique_ptr<DecompGraph::Solver::DecompositionGraph> prepareGraph(mlir::ModuleOp module,
+                                                                      const PrepOptions &opts);
 
 } // namespace GraphDecompositionPrep
 } // namespace quantum
