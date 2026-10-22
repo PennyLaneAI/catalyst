@@ -1196,9 +1196,6 @@
   link it if present.
   [(#3303)](https://github.com/PennyLaneAI/catalyst/pull/3303)
 
-* Tests now use `qp.testing.find_eqns` from PennyLane instead of hand-written equation filters.
-  [(#3381)](https://github.com/PennyLaneAI/catalyst/pull/3381)
-
 <h3>Documentation 📝</h3>
 
 * A broken link was removed in the [Compiler Core](https://docs.pennylane.ai/projects/catalyst/en/stable/modules/mlir.html) documentation page. The link referred to where precompiled decomposition rules were implemented, which has since been refactored.
