@@ -113,6 +113,7 @@
   [(#3213)](https://github.com/PennyLaneAI/catalyst/pull/3213)
   [(#3248)](https://github.com/PennyLaneAI/catalyst/pull/3248)
   [(#3307)](https://github.com/PennyLaneAI/catalyst/pull/3307)
+  [(#3365)](https://github.com/PennyLaneAI/catalyst/pull/3365)
 
   Control is folded into the operator identity *control-outermost* (e.g. `C(Adjoint(Op))`), so
   `ctrl(adjoint(Op))` and `adjoint(ctrl(Op))` collapse to a single node, while a distinct control
@@ -150,16 +151,9 @@
   way PennyLane's registry spells it, since a multi-controlled id reads `<n>C(...)` and PennyLane
   names every controlled operator `C(...)` whatever its control count.
 
-  Right now, a rule registered against `C(Op)` is traced with every control value on, matching
-  the all-ones controls a `<n>C(...)` graphOpId denotes: it records only the control *count*,
-  so an operator with a zero control value maps to the same node and is given the same rule,
-  without the `X` flips that value needs. Zero control values are therefore not yet supported
-  through this pathway; they still decompose correctly through rule distribution, whose
-  `qref.ctrl` region is given the control values at runtime.
-
   Two defects in applying a register-mode controlled rule are fixed along with it:
 
-  - The rule's operands are now emitted as `func(qreg, param*, inWires*, inCtrlWires*)`, matching
+  - The rule's operands are now emitted as `func(qreg, param*, inWires*, inCtrlWires*, inCtrlValues*)`, matching
     what `DecomposeLoweringPass` reads back. They were previously emitted control-wires-first
     (`qp.capture.subroutine` traces through `jax.jit`, which flattens keyword arguments in sorted
     order, and `_ctrl_wires` sorts ahead of `wires`), which silently swapped a rule's control and
@@ -186,6 +180,19 @@
 * The :func:`~catalyst.qjit` function now accepts an ``enable_aot_compilation`` argument, which can be
   used to toggle whether or not to use ahead-of-time compilation.
   [(#3339)](https://github.com/PennyLaneAI/catalyst/pull/3339)
+
+* `QJIT.aot_compile` now accepts function arguments, so functions without type hints
+  can be compiled ahead of time.
+  [(#3369)](https://github.com/PennyLaneAI/catalyst/pull/3369)
+
+  ```python
+  @qjit
+  def f(x):
+      return x * 2
+
+  f.aot_compile(jax.ShapeDtypeStruct((3,), jnp.float64))
+  f(jnp.array([1.0, 2.0, 3.0]))  # no compilation
+  ```
 
 * :func:`pennylane.transforms.gridsynth` now produces correct, deterministic decompositions for
   any `epsilon` down to `1e-15`, and invalid angles or `epsilon` values raise an error.
@@ -811,6 +818,15 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* The Python decomposition fallback now converts `None`-valued static attributes
+  back from MLIR instead of aborting with an unsupported-attribute error.
+  [(#3385)](https://github.com/PennyLaneAI/catalyst/pull/3385)
+
+* `gridsynth` now correctly discretizes adjoint rotations and rotations inside `qp.adjoint`
+  regions. Control lowering now raises an error for function calls inside `qp.ctrl` regions
+  instead of silently dropping the control.
+  [(#3330)](https://github.com/PennyLaneAI/catalyst/pull/3330)
+
 * Fixes mixed static and dynamic `control_values` for callable `qp.ctrl` under
   `qjit(capture=True)`.
   [(#3373)](https://github.com/PennyLaneAI/catalyst/pull/3373)
@@ -1261,6 +1277,7 @@ Mudit Pandey,
 Shuli Shu,
 Nikhil Sreekumar,
 Kalman Szenes,
+Jaume Villasante,
 Paul Haochen Wang,
 David Wierichs,
 Jake Zaia,
