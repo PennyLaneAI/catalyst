@@ -1319,9 +1319,17 @@ class TestSymbolicRules:
         def x_rule(wires):
             qp.X(wires=wires)
 
-        @register_resources(lambda base, control_wires, control_values: {qp.CNOT: 1})
-        def ctrl_rule(base, control_wires, control_values):
+        @register_resources(lambda base, control_wires, control_values, **_: {qp.CNOT: 1, qp.X: 2})
+        def ctrl_rule(base, control_wires, control_values, work_wires, work_wire_type):
+            cw = qp.math.array(control_wires, like="jax")
+
+            @qp.for_loop(0, len(control_wires))
+            def flips(i):
+                qp.cond(qp.math.logical_not(control_values[i]), qp.X)(cw[i])
+
+            flips()  # pylint:disable=no-value-for-parameter
             qp.CNOT(wires=list(control_wires) + list(base.wires))
+            flips()  # pylint:disable=no-value-for-parameter
 
         with local_decomps():
             add_decomps(ZeroCtrl, x_rule)
@@ -1337,6 +1345,8 @@ class TestSymbolicRules:
 
             result = circuit()
 
+        assert "x_rule" in circuit.mlir
+        assert "ctrl_rule" in circuit.mlir
         assert np.allclose(result, -1.0)
 
     def test_discovered_op_gets_multi_controlled_rules(self):
