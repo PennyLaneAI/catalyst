@@ -46,7 +46,7 @@ SCIPY_DIR := $(shell python -c 'import os, scipy_openblas32; print(os.path.dirna
 ASAN_FLAGS += DYLD_LIBRARY_PATH="$(RT_BUILD_DIR)/lib:$(SCIPY_DIR)/lib:$(DYLD_LIBRARY_PATH)"
 endif
 
-PARALLELIZE := -n auto
+PARALLELIZE := -n logical
 ifeq ($(ENABLE_ASAN),ON)
 ifeq ($(PLATFORM),Darwin)
 # Launching subprocesses with ASAN on macOS is not supported (see https://stackoverflow.com/a/47853433).
