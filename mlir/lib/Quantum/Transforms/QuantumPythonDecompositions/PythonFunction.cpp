@@ -176,6 +176,10 @@ static nb::object getPyvalFromDenseAttribute(mlir::DenseIntOrFPElementsAttr dens
 // Convert an MLIR attribute into an equivalent Python value. Generally should represent the
 // inverse of `get_mlir_attribute_from_pyval` from the frontend direction.
 static nb::object getPyvalFromMlirAttribute(mlir::Attribute attr) {
+    if (auto typeAttr = llvm::dyn_cast<mlir::TypeAttr>(attr);
+        typeAttr && llvm::isa<mlir::NoneType>(typeAttr.getValue())) {
+        return nb::none();
+    }
     return llvm::TypeSwitch<mlir::Attribute, nb::object>(attr)
         .Case<mlir::DictionaryAttr>([](auto dictAttr) {
             nb::dict outDict;
