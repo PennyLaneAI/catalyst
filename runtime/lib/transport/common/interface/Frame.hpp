@@ -86,13 +86,6 @@ static_assert(sizeof(CuqrHeader) == 24, "a CUQR header is 24 B");
 inline constexpr std::uint32_t CUQR_MAGIC = 0x43555152; // 'CUQR'
 inline constexpr std::uint32_t CUQS_MAGIC = 0x43555153; // 'CUQS'
 
-/// What a CUQR reply echoes from its request, and its status (0 ok, >0 the function failed).
-struct ReplyTo {
-    std::uint32_t request_id;
-    std::uint64_t t_ptp_ns;
-    std::int32_t status;
-};
-
 /// The smallest slot a ring uses, for the DMA engines that need 64 B alignment.
 inline constexpr std::size_t MIN_STRIDE = 64;
 
@@ -235,9 +228,10 @@ inline std::uint8_t *data(const RingGeometry &ring, void *frame) {
 
 /// Fill a frame's payload, its length and fn_id. `src` may be the frame's own payload area, for a
 /// payload already written in place. BL16 zero-pads the payload to 8 B. seq is left for seal().
-/// With `reply_to`, a CUQR frame is a reply (CUQS) echoing its request; BL16 and BLV ignore it.
+/// With `reply_to` (the request, carrying the reply's status), a CUQR frame is a reply (CUQS)
+/// echoing that request's id and timestamp; BL16 and BLV ignore it.
 inline void stage(const RingGeometry &ring, void *frame, std::uint32_t fn_id, const void *src,
-                  std::size_t len, const ReplyTo *reply_to = nullptr) {
+                  std::size_t len, const FrameView *reply_to = nullptr) {
     const std::size_t cap = data_capacity(ring);
     TP_CHECK(len <= cap, "payload (%zu B) exceeds the %zu B frame", len, cap);
     if (ring.mode == Mode::BL16) {

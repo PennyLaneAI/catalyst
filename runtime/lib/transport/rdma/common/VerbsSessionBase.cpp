@@ -177,11 +177,12 @@ void VerbsSessionBase<Role>::establish_channel(const ChannelDesc &desc, const Me
 }
 
 template <class Role>
+template <bool CUQR>
 void VerbsSessionBase<Role>::post_write(ibv_qp *qp, std::uint64_t cursor, bool inline_data,
                                         bool signaled) {
     void *send = send_frame(); // staged by the caller
     frame::seal(ring_, send, static_cast<std::uint32_t>(cursor + 1));
-    const std::size_t bytes = frame::wire_bytes(ring_, send);
+    const std::size_t bytes = CUQR ? frame::wire_bytes(ring_, send) : frame::frame_bytes(ring_);
     // A frame larger than the queue pair's inline capacity goes from the registered send buffer.
     const int inline_max =
         qp == fwd_qp_->get() ? fwd_shape_.inline_max : DEFAULT_QP_SHAPE.inline_max;
@@ -200,7 +201,7 @@ void VerbsSessionBase<Role>::post_write(ibv_qp *qp, std::uint64_t cursor, bool i
     };
     wr.wr.rdma.remote_addr = peer_.remote_addr + ring_.slot_offset(cursor);
     wr.wr.rdma.rkey = peer_.rkey;
-    if (cuqr()) {
+    if constexpr (CUQR) {
         // A coprocessor answers a cudaq-realtime peer by SEND, as cudaq-realtime's own servers do:
         // its clients take a reply's slot from the order replies arrive in.
         if (cuqr_.write_imm && !(cuqr_.cudaq_peer && oob_listens())) {
@@ -244,10 +245,11 @@ template <class Role> void VerbsSessionBase<Role>::reap(ibv_cq *cq, int &outstan
 }
 
 template <class Role>
+template <bool CUQR>
 bool VerbsSessionBase<Role>::poll_message_arrival(std::uint64_t cursor, std::stop_token st,
                                                   frame::FrameView &out,
                                                   std::chrono::nanoseconds timeout) {
-    if (cuqr()) {
+    if constexpr (CUQR) {
         if (!wait_recv(cursor, st, timeout)) {
             return false;
         }
@@ -373,5 +375,14 @@ bool VerbsSessionBase<Role>::wait_recv(std::uint64_t cursor, std::stop_token st,
 
 template class VerbsSessionBase<ControllerSession>;
 template class VerbsSessionBase<CoprocessorSession>;
+#define INSTANTIATE_FOR_FRAMES(Role, CUQR)                                                         \
+    template void VerbsSessionBase<Role>::post_write<CUQR>(ibv_qp *, std::uint64_t, bool, bool);   \
+    template bool VerbsSessionBase<Role>::poll_message_arrival<CUQR>(                              \
+        std::uint64_t, std::stop_token, frame::FrameView &, std::chrono::nanoseconds);
+INSTANTIATE_FOR_FRAMES(ControllerSession, false)
+INSTANTIATE_FOR_FRAMES(ControllerSession, true)
+INSTANTIATE_FOR_FRAMES(CoprocessorSession, false)
+INSTANTIATE_FOR_FRAMES(CoprocessorSession, true)
+#undef INSTANTIATE_FOR_FRAMES
 
 } // namespace catalyst::transport::common

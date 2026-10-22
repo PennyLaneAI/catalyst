@@ -340,12 +340,32 @@ session to that peer's conventions: one unreliable connected (UC) queue pair bot
 handshake (queue pair, rkey and IPv4 address, the caller first), rings addressed from 0, MTU 4096,
 and replies by SEND. Set ``frame_slots`` and ``frame_slot_bytes`` to the server's ``--num-slots``
 and ``--slot-size``: it answers with whole slots. UC drops a lost message without telling either
-side, so a controller reports a reply that has not come within 5 s instead of waiting forever. This has been tested on a ConnectX-7 against
-cudaq-realtime's own server and client (NVIDIA/cuda-quantum ``b325a40`` with Holoscan Sensor Bridge's
-RoCE transport, ``EA_CUDAQ_10_26``): requests from Backline to its ``rpc_increment`` server, and
-its two-process client against a Backline coprocessor, whose tests pass apart from one difference:
-an unknown ``function_id`` gets a ``status`` reply from Backline, where cudaq-realtime drops it.
-A GPU-resident cudaq-realtime peer (DOCA GPUNetIO) needs an NVIDIA GPU and has not been tested.
+side, so a controller reports a reply that has not come within 5 s instead of waiting forever.
+
+**Setting up CUQR.** Apart from ``frame``, these go in each rdma node's config, e.g.
+``"dev=mlx5_0;gid=3;cuqr_tx=write_imm"``, and none is set for you:
+
+* ``qp.Backline(..., frame="cuqr")`` selects the format; the default ``"auto"`` never picks it.
+* A ``gpu_verbs`` coprocessor needs ``cuqr_tx=write_imm`` on both nodes. The default ``send``
+  is refused when the session starts.
+* Between two Backline nodes, ``cuqr_tx`` must match on both ends, which the session checks.
+* For a cudaq-realtime peer:
+
+  * Set ``peer=cudaq``.
+  * Set ``frame_slots`` and ``frame_slot_bytes`` to the server's ``--num-slots`` and
+    ``--slot-size``. Nothing checks these against the peer: a mismatch shows up only as wrong
+    replies or a missing one.
+  * Use a ``gid`` that is the port's RoCEv2 IPv4 GID, since the handshake carries an IPv4
+    address.
+  * Raise the port's netdev MTU to 4200 or more, for the active MTU of 4096 cudaq-realtime
+    expects. The session refuses a smaller one.
+  * A ``gpu_verbs`` coprocessor in this mode accepts only requests the peer sends by write with
+    immediate.
+
+This has been tested against cudaq-realtime's own server and client on a ConnectX-7. They differ in
+one respect: an unknown ``function_id`` gets a ``status`` reply from Backline, where cudaq-realtime
+drops it. A GPU-resident cudaq-realtime peer (DOCA GPUNetIO) needs an NVIDIA GPU and has not been
+tested.
 
 **Not optimized on gpu_verbs.** A GPU kernel cannot read a completion queue, so the session's host
 thread relays each arrival to the kernel through a host-mapped flag per slot, and the kernel polls
@@ -592,6 +612,10 @@ platform is built out.
     executor path, and the transport operations narrow this further to rank-1 memrefs of integer
     or index element type. This keeps the wire format a flat buffer with no descriptor
     marshalling, at the cost of ruling out kernels with other signatures.
+
+**CUQR is configured by hand.**
+    The compiler does not pick the RDMA verb, the peer mode or the slot geometry for CUQR frames.
+    See the setup list under `CUQR frames`_. On ``gpu_verbs``, CUQR is also slower than BLV.
 
 **Two ways to call coprocessor code.**
     The supported way is a placement with ``qp.backline.decode`` (or ``qec_code=``).

@@ -24,6 +24,7 @@
 #include <thread>
 #include <vector>
 
+#include "BackendConfig.hpp"
 #include "CpuControllerSession.hpp"
 #include "CpuCoprocessorSession.hpp"
 #include "Frame.hpp"
@@ -60,10 +61,9 @@ int main(int argc, char **argv) {
     std::uint32_t correction_bytes = sizeof(std::uint64_t);
     // Rounds the controller runs; with more than one it reports RTT percentiles.
     std::uint32_t rounds = 1;
-    // --frame cuqr selects cudaq-realtime's frames, completed with --tx send or write_imm;
-    // --peer-mode cudaq talks to a cudaq-realtime peer, whose slot count --frame-slots matches.
-    bool cuqr = false, write_imm = false, cudaq_peer = false;
-    std::uint32_t frame_slots = 0, frame_slot_bytes = 0;
+    // --config sets the rdma config keys for CUQR frames, e.g.
+    // "frame=cuqr;frame_payload=232;cuqr_tx=write_imm;peer=cudaq;frame_slots=8;frame_slot_bytes=256".
+    std::string config;
     // --increment 1: the coprocessor serves (and the controller expects) cudaq-realtime's
     // rpc_increment instead of an echo; --fn-id is the function id requests carry;
     // --serve-seconds is how long a coprocessor serves.
@@ -87,16 +87,8 @@ int main(int argc, char **argv) {
             correction_bytes = static_cast<std::uint32_t>(std::strtoul(v.c_str(), nullptr, 0));
         } else if (k == "--rounds") {
             rounds = static_cast<std::uint32_t>(std::strtoul(v.c_str(), nullptr, 0));
-        } else if (k == "--frame") {
-            cuqr = v == "cuqr";
-        } else if (k == "--tx") {
-            write_imm = v == "write_imm";
-        } else if (k == "--peer-mode") {
-            cudaq_peer = v == "cudaq";
-        } else if (k == "--frame-slots") {
-            frame_slots = static_cast<std::uint32_t>(std::strtoul(v.c_str(), nullptr, 0));
-        } else if (k == "--frame-slot-bytes") {
-            frame_slot_bytes = static_cast<std::uint32_t>(std::strtoul(v.c_str(), nullptr, 0));
+        } else if (k == "--config") {
+            config = v;
         } else if (k == "--increment") {
             incr = v == "1";
         } else if (k == "--fn-id") {
@@ -109,17 +101,12 @@ int main(int argc, char **argv) {
     // Both roles derive the same ring from the message sizes, as the compiler's frame keys make
     // them.
     const std::size_t largest = std::max(syndrome_bytes, correction_bytes);
-    auto ring = frame::geometry_for(cuqr                            ? frame::Mode::CUQR
-                                    : largest <= PAYLOAD_DATA_BYTES ? frame::Mode::BL16
-                                                                    : frame::Mode::BLV,
-                                    largest);
-    if (frame_slots != 0) {
-        ring.slots = frame_slots;
-    }
-    if (frame_slot_bytes != 0) { // a cudaq-realtime server's slot size
-        ring.stride = frame_slot_bytes;
-    }
-    const common::CuqrConfig cuqr_cfg{.write_imm = write_imm, .cudaq_peer = cudaq_peer};
+    const auto ring =
+        config.empty()
+            ? frame::geometry_for(
+                  largest <= PAYLOAD_DATA_BYTES ? frame::Mode::BL16 : frame::Mode::BLV, largest)
+            : frame::geometry_from_config(config);
+    const auto cuqr_cfg = common::parse_backend_config("dev=" + dev + ";gid=0;" + config).cuqr;
 
     std::unique_ptr<TransportSession> s;
     CpuCoprocessorSession *coproc = nullptr;
@@ -214,7 +201,7 @@ int main(int argc, char **argv) {
                          ring.mode == frame::Mode::BL16 ? "BL16"
                          : ring.mode == frame::Mode::BLV
                              ? "BLV"
-                             : (write_imm ? "CUQR/write_imm" : "CUQR/send"),
+                             : (cuqr_cfg.write_imm ? "CUQR/write_imm" : "CUQR/send"),
                          syndrome_bytes, correction_bytes, rounds, pct(0.50) / 1e3, pct(0.99) / 1e3,
                          rtt_ns.back() / 1e3);
         }

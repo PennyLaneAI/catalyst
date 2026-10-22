@@ -80,12 +80,17 @@ template <class Role> class VerbsSessionBase : public Role {
     // True for the coprocessor (listens/sends first on the OOB socket).
     virtual bool oob_listens() const = 0;
 
-    // Seal the staged send frame with round `cursor`'s seq and write it into the peer's ring.
+    // Seal the staged send frame with round `cursor`'s seq and write it into the peer's ring. CUQR
+    // sessions call the <true> version, which sends by the session's verb; the frame mode is a
+    // template parameter so BL16 and BLV pay nothing for CUQR.
+    template <bool CUQR = false>
     void post_write(ibv_qp *qp, std::uint64_t cursor, bool inline_data, bool signaled);
     void reap(ibv_cq *cq, int &outstanding, bool drain);
     // Wait for round `cursor`'s frame in the local ring and decode it into `out`. Returns false if
-    // `st` is stopped first. A CUQR message that is not a valid frame comes back with
-    // out.data == nullptr, to be dropped.
+    // `st` is stopped first. CUQR sessions call the <true> version, which waits on the receive
+    // completion queue (up to `timeout`, if nonzero); a message that is not a valid frame comes
+    // back with out.data == nullptr, to be dropped.
+    template <bool CUQR = false>
     bool poll_message_arrival(std::uint64_t cursor, std::stop_token st, frame::FrameView &out,
                               std::chrono::nanoseconds timeout = std::chrono::nanoseconds{0});
     // CUQR frames carry no word written last, so arrival is read from the receive completion

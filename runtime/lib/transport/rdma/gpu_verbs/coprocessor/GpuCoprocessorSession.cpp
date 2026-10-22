@@ -80,19 +80,22 @@ void GpuCoprocessorSession::set_coprocessor_launcher(CoprocessorLauncherFn fn, v
     coproc_ctx_ = ctx;
 }
 
+template <bool CUQR>
 bool GpuCoprocessorSession::post_reply(std::uint64_t cursor, const frame::FrameView &reply) {
     std::int64_t first = 0;
     std::memcpy(&first, reply.data, std::min<std::size_t>(reply.len, sizeof(first)));
     last_word_.store(first, std::memory_order_relaxed);
     void *send = send_frame();
-    const frame::ReplyTo reply_to{
-        .request_id = reply.request_id, .t_ptp_ns = reply.t_ptp_ns, .status = reply.status};
-    frame::stage(ring_, send, reply.fn_id, reply.data, reply.len, &reply_to);
+    if constexpr (CUQR) {
+        frame::stage(ring_, send, reply.fn_id, reply.data, reply.len, &reply);
+    } else {
+        frame::stage(ring_, send, reply.fn_id, reply.data, reply.len);
+    }
     // The kernel writes only the reply's bytes; zero the rest of the payload area, as every other
     // coprocessor's reply is.
     std::memset(frame::data(ring_, send) + reply.len, 0, frame::data_capacity(ring_) - reply.len);
     const bool signaled = (cursor % SIGNAL_EVERY == 0);
-    post_write(bwd_qp_->get(), cursor, /*inline_data=*/true, signaled);
+    post_write<CUQR>(bwd_qp_->get(), cursor, /*inline_data=*/true, signaled);
     return signaled;
 }
 
@@ -121,7 +124,7 @@ void GpuCoprocessorSession::run_coprocessor(std::stop_token st) {
             }
             cpu_relax();
         }
-        if (post_reply(c, reply)) {
+        if (post_reply<false>(c, reply)) {
             ++signaled_outstanding;
             reap(bwd_cq_->get(), signaled_outstanding, /*drain=*/false); // lazy batch reap
         }
@@ -142,6 +145,8 @@ void GpuCoprocessorSession::run_coprocessor(std::stop_token st) {
 //     CQ mapped for the kernel), so no host hop at all. Needs NIC and GPU vendor support.
 //  3. Poll the request header in GPU memory, on NICs that guarantee in-order placement within a
 //     message. Not safe in general, so it needs a capability flag.
+// TODO: optimize this path with option 2 and test it against a GPU-resident cudaq-realtime peer
+// on NVIDIA GPUs, through DOCA GPUNetIO.
 void GpuCoprocessorSession::run_cuqr(std::stop_token st) {
     pin_thread(pin_cpu_, pin_realtime_);
     int signaled_outstanding = 0;
@@ -170,7 +175,7 @@ void GpuCoprocessorSession::run_cuqr(std::stop_token st) {
         if (!frame::poll(ring_, handoff_.host + ring_.slot_offset(c), expect, reply)) {
             continue; // the kernel found no CUQR frame: dropped unanswered
         }
-        if (post_reply(c, reply)) {
+        if (post_reply<true>(c, reply)) {
             ++signaled_outstanding;
             reap(bwd_cq_->get(), signaled_outstanding, /*drain=*/false);
         }

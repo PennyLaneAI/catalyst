@@ -51,6 +51,10 @@ class CpuControllerSession : public common::VerbsSessionBase<ControllerSession> 
     bool oob_listens() const override { return false; }
 
   private:
+    // collect() for one frame layout; the mode is a template parameter so BL16 and BLV pay
+    // nothing for CUQR.
+    template <bool CUQR>
+    int collect_frame(void *const *replies, const std::uint64_t *replies_bytes, std::size_t n);
     // Sizes from commit_work_item are fixed in CPU controller.
     std::uint64_t in_bytes_ = sizeof(common::Payload::value);
     std::uint64_t out_bytes_ = sizeof(common::Payload::value);

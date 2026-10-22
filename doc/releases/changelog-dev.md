@@ -7,7 +7,8 @@
   `qp.Backline(..., frame="cuqr")` selects it, `cuqr_tx=send|write_imm` picks the RDMA verb, and
   `peer=cudaq` in the node config follows a cudaq-realtime peer's connection conventions. Tested
   against cudaq-realtime's own server and client on a ConnectX-7. On `gpu_verbs` the format is not
-  yet optimized: each request takes a hop through a host thread, adding about 1 µs.
+  yet optimized: each request takes a hop through a host thread, adding about 1 µs. On NVIDIA
+  GPUs, DOCA GPUNetIO could remove this hop by letting the kernel read the completion queue itself.
   [(#XXXX)](https://github.com/PennyLaneAI/catalyst/pull/XXXX)
 
 * A new coprocessor function called `catalyst_onnx_coprocessor` has been added, which runs an

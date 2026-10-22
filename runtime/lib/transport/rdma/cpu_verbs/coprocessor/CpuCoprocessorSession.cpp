@@ -91,14 +91,22 @@ void CpuCoprocessorSession::stop() {
 // reaped in batches at signal points.
 void CpuCoprocessorSession::run(std::stop_token st) {
     pin_thread(pin_cpu_, pin_realtime_);
+    if (cuqr()) {
+        serve<true>(st);
+    } else {
+        serve<false>(st);
+    }
+}
+
+template <bool CUQR> void CpuCoprocessorSession::serve(std::stop_token st) {
     int signaled_outstanding = 0;
     for (std::uint64_t c = 0; !st.stop_requested(); c++) {
         frame::FrameView r; // the incoming message
-        if (!poll_message_arrival(c, st, r)) {
+        if (!poll_message_arrival<CUQR>(c, st, r)) {
             reap(bwd_cq_->get(), signaled_outstanding, /*drain=*/true);
             return;
         }
-        if (r.data == nullptr) {
+        if (CUQR && r.data == nullptr) {
             continue; // not a CUQR frame: dropped unanswered, as cudaq-realtime does
         }
         std::uint64_t word = 0;
@@ -116,7 +124,7 @@ void CpuCoprocessorSession::run(std::stop_token st) {
         std::int32_t status = 0;
         if (coproc_fn_) {
             nb = coproc_fn_(r.data, r.len, r.fn_id, reply, cap, coproc_ctx_);
-            if (cuqr()) {
+            if constexpr (CUQR) {
                 // CUQR reports a failed function in its reply, as cudaq-realtime does; an empty
                 // result is a valid one.
                 if (nb == COPROCESSOR_FN_ERROR || nb > cap) {
@@ -130,11 +138,14 @@ void CpuCoprocessorSession::run(std::stop_token st) {
         } else {
             std::memcpy(reply, r.data, nb);
         }
-        const frame::ReplyTo reply_to{
-            .request_id = r.request_id, .t_ptp_ns = r.t_ptp_ns, .status = status};
-        frame::stage(ring_, send, r.fn_id, reply, nb, &reply_to);
+        if constexpr (CUQR) {
+            r.status = status;
+            frame::stage(ring_, send, r.fn_id, reply, nb, &r);
+        } else {
+            frame::stage(ring_, send, r.fn_id, reply, nb);
+        }
         const bool sig = (c % SIGNAL_EVERY == 0);
-        post_write(bwd_qp_->get(), c, /*inline_data=*/true, sig);
+        post_write<CUQR>(bwd_qp_->get(), c, /*inline_data=*/true, sig);
         if (sig) {
             ++signaled_outstanding;
             reap(bwd_cq_->get(), signaled_outstanding, /*drain=*/false);

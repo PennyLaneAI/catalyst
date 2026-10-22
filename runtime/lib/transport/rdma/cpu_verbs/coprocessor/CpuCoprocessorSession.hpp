@@ -59,6 +59,9 @@ class CpuCoprocessorSession : public common::VerbsSessionBase<CoprocessorSession
   private:
     // The engine loop; runs on engine_.
     void run(std::stop_token st);
+    // The engine loop for one frame layout; the mode is a template parameter so BL16 and BLV pay
+    // nothing for CUQR.
+    template <bool CUQR> void serve(std::stop_token st);
 
     int pin_cpu_ = -1; // -1 -> leave affinity alone
     bool pin_realtime_ = false;

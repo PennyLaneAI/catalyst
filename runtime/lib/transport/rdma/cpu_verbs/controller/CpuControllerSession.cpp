@@ -84,7 +84,11 @@ int CpuControllerSession::kick(std::uint32_t /*work_item_idx*/) {
     staged_ = false;
     kick_ns_ = now_ns();
     const bool sig = (next_send_ % SIGNAL_EVERY == 0);
-    post_write(fwd_qp_->get(), next_send_, /*inline_data=*/true, sig);
+    if (cuqr()) {
+        post_write<true>(fwd_qp_->get(), next_send_, /*inline_data=*/true, sig);
+    } else {
+        post_write(fwd_qp_->get(), next_send_, /*inline_data=*/true, sig);
+    }
     if (sig) {
         ++signaled_outstanding_;
         reap(fwd_cq_->get(), signaled_outstanding_, /*drain=*/false); // lazy: free the SQ
@@ -97,16 +101,24 @@ void *CpuControllerSession::reply_slot() { return frame::data(ring_, ring_slot(n
 
 int CpuControllerSession::collect(void *const *replies, const std::uint64_t *replies_bytes,
                                   std::size_t n) {
+    return cuqr() ? collect_frame<true>(replies, replies_bytes, n)
+                  : collect_frame<false>(replies, replies_bytes, n);
+}
+
+template <bool CUQR>
+int CpuControllerSession::collect_frame(void *const *replies, const std::uint64_t *replies_bytes,
+                                        std::size_t n) {
     std::stop_token none; // blocking wait for this round's reply
     frame::FrameView r;
     // UC (a cudaq-realtime peer) drops a lost message without telling either side.
-    const auto timeout = cuqr_.cudaq_peer ? CUDAQ_REPLY_TIMEOUT : std::chrono::nanoseconds{0};
-    if (!poll_message_arrival(next_recv_, none, r, timeout)) {
+    const auto timeout =
+        CUQR && cuqr_.cudaq_peer ? CUDAQ_REPLY_TIMEOUT : std::chrono::nanoseconds{0};
+    if (!poll_message_arrival<CUQR>(next_recv_, none, r, timeout)) {
         return -1;
     }
     rtt_ns_ = now_ns() - kick_ns_;
     ++next_recv_;
-    if (cuqr()) { // next_recv_ is now this round's seq, the request_id the request carried
+    if constexpr (CUQR) { // next_recv_ is now this round's seq, the request_id the request carried
         TP_CHECK(r.data != nullptr, "cpu_verbs: the coprocessor's reply is not a CUQR frame");
         TP_CHECK(r.request_id == static_cast<std::uint32_t>(next_recv_),
                  "cpu_verbs: a CUQR reply answers request %u, expected %u", r.request_id,
@@ -114,15 +126,18 @@ int CpuControllerSession::collect(void *const *replies, const std::uint64_t *rep
         TP_CHECK(r.status == 0, "cpu_verbs: the coprocessor answered with status %d", r.status);
     }
     if (n > 0 && replies && replies[0] && replies[0] != r.data) {
-        // The coprocessor zero-fills the reply's payload area, so all of `cap` is defined; a CUQR
-        // frame carries only the reply's own bytes, so the rest is zeroed here.
+        // The coprocessor zero-fills the reply's payload area, so all of `cap` is defined.
         const std::size_t cap = replies_bytes ? replies_bytes[0] : out_bytes_;
         TP_CHECK(cap <= frame::data_capacity(ring_),
                  "reply capacity (%zu) exceeds the %zu B a frame of this session carries", cap,
                  frame::data_capacity(ring_));
-        const std::size_t len = cuqr() ? std::min<std::size_t>(r.len, cap) : cap;
-        std::memcpy(replies[0], r.data, len);
-        std::memset(static_cast<std::uint8_t *>(replies[0]) + len, 0, cap - len);
+        if constexpr (CUQR) { // a CUQR frame carries only the reply's own bytes
+            const std::size_t len = std::min<std::size_t>(r.len, cap);
+            std::memcpy(replies[0], r.data, len);
+            std::memset(static_cast<std::uint8_t *>(replies[0]) + len, 0, cap - len);
+        } else {
+            std::memcpy(replies[0], r.data, cap);
+        }
     }
     return 0;
 }

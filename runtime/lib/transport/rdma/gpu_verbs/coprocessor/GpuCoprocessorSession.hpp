@@ -76,6 +76,7 @@ class GpuCoprocessorSession : public common::VerbsSessionBase<CoprocessorSession
     // Stage the kernel's reply frame and post one RDMA_WRITE, inline when it fits. Returns true
     // if this send was signaled (selective signalling: 1 in SIGNAL_EVERY), so the caller can
     // track the signaled-completion count.
+    template <bool CUQR>
     bool post_reply(std::uint64_t cursor, const common::frame::FrameView &reply);
 
     GpuRuntime gpu_;                // HIP wrapper: owns GPU mem/stream/sync; the decode

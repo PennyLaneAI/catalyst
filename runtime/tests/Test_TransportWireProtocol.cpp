@@ -203,13 +203,13 @@ TEST_CASE("CUQR frames are byte-identical to cudaq-realtime's RPCHeader and RPCR
     CHECK(std::memcmp(slot.data() + 24, payload, sizeof(payload)) == 0);
     CHECK(frame::wire_bytes(ring, slot.data()) == 27);
 
-    const frame::ReplyTo ok{.request_id = 42, .t_ptp_ns = 0x1122334455667788ull, .status = 0};
+    const frame::FrameView ok{.request_id = 42, .t_ptp_ns = 0x1122334455667788ull};
     frame::stage(ring, slot.data(), 0, payload, sizeof(payload), &ok);
     frame::seal(ring, slot.data(), 7); // a reply keeps the request_id it echoes
     const RPCResponse rep{0x43555153u, 0, 3, 42, 0x1122334455667788ull};
     CHECK(std::memcmp(slot.data(), &rep, sizeof(rep)) == 0);
 
-    const frame::ReplyTo failed{.request_id = 42, .t_ptp_ns = 0, .status = 1};
+    const frame::FrameView failed{.status = 1, .request_id = 42};
     frame::stage(ring, slot.data(), 0, payload, sizeof(payload), &failed);
     const RPCResponse err{0x43555153u, 1, 0, 42, 0};
     CHECK(std::memcmp(slot.data(), &err, sizeof(err)) == 0);
@@ -246,16 +246,11 @@ TEST_CASE("a CUQR slot without a valid frame is not decoded, so it can be droppe
     CHECK_FALSE(frame::poll(ring, slot.data(), 1, v));
 }
 
-TEST_CASE("a session's config can ask for CUQR frames") {
-    namespace frame = catalyst::transport::common::frame;
-    const auto ring = frame::geometry_from_config("dev=rxe0;frame=cuqr;frame_payload=100");
-    CHECK(ring.mode == frame::Mode::CUQR);
-    CHECK(ring.stride == 128); // 24 + 100 -> 128
-}
-
 TEST_CASE("a CUQR session's config can set the slot count, as a cudaq-realtime server does") {
     namespace frame = catalyst::transport::common::frame;
+    CHECK(frame::geometry_from_config("frame=cuqr;frame_payload=100").stride == 128); // 24 + 100
     const auto ring = frame::geometry_from_config("frame=cuqr;frame_payload=232;frame_slots=8");
+    CHECK(ring.mode == frame::Mode::CUQR);
     CHECK(ring.slots == 8);
     CHECK(ring.stride == 256); // cudaq-realtime's default cpu_roce slot
     CHECK_THROWS_WITH(frame::geometry_from_config("frame=cuqr;frame_slots=6"),
