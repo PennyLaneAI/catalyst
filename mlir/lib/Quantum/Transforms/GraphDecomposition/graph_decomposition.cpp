@@ -88,20 +88,14 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         ///////////////////////////
         // Step 1–2: Prepare and solve the decomposition graph
         std::unique_ptr<DecompositionGraph> graph = GraphDecompositionPrep::prepareGraph(
-            module,
-            {
-                .targetGateSetOption = targetGateSetOption,
-                .fixedDecompsOption = fixedDecompsOption,
-                .altDecompsOption = altDecompsOption,
-                .bytecodeRulesFile = bytecodeRulesFile,
-                .libQPDPath = libQPDPath,
-                .libpythonPath = libpythonPath,
-            },
-            [&](Operation *op) {
-                OpPassManager modifierPm("builtin.module");
-                modifierPm.addPass(createModifiersLoweringPass());
-                return runPipeline(modifierPm, op);
-            });
+            module, {
+                        .targetGateSetOption = targetGateSetOption,
+                        .fixedDecompsOption = fixedDecompsOption,
+                        .altDecompsOption = altDecompsOption,
+                        .bytecodeRulesFile = bytecodeRulesFile,
+                        .libQPDPath = libQPDPath,
+                        .libpythonPath = libpythonPath,
+                    });
         if (!graph) {
             return signalPassFailure();
         }

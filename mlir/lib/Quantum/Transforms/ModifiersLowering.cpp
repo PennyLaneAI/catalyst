@@ -18,6 +18,7 @@
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
+#include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #include "Catalyst/IR/CatalystDialect.h"
@@ -36,15 +37,18 @@ namespace quantum {
 // modifier, so the greedy worklist interleaves them: an inner adjoint is reduced, then its
 // enclosing control lowers on a re-try, and vice versa. This resolves arbitrarily nested modifiers
 // without manually alternating the two standalone passes.
+LogicalResult lowerModifiers(Operation *op) {
+    RewritePatternSet patterns(op->getContext());
+    populateAdjointLoweringPatterns(patterns);
+    populateCtrlLoweringPatterns(patterns);
+    return applyPatternsGreedily(op, std::move(patterns));
+}
+
 struct ModifiersLoweringPass : impl::ModifiersLoweringPassBase<ModifiersLoweringPass> {
     using ModifiersLoweringPassBase::ModifiersLoweringPassBase;
 
     void runOnOperation() final {
-        RewritePatternSet patterns(&getContext());
-        populateAdjointLoweringPatterns(patterns);
-        populateCtrlLoweringPatterns(patterns);
-
-        if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
+        if (failed(lowerModifiers(getOperation()))) {
             return signalPassFailure();
         }
     }
