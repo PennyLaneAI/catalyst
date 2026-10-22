@@ -551,7 +551,7 @@ def trace_from_pennylane(
             )(*inner_args, **inner_kwargs)
 
             flat_inputs = jax.tree.flatten((inner_args, inner_kwargs))[0]
-            flat_inputs = [a for a in flat_inputs if qp.math.is_abstract(a)]
+            flat_inputs = [a for a in flat_inputs if qp.math.is_tracer(a)]
             abstract_shapes = _extract_abstract_shapes(flat_inputs)
             jaxpr = from_plxpr(
                 plxpr,
