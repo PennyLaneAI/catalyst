@@ -2157,6 +2157,42 @@ class TestDecomposeAlias:
             qp.decomposition.disable_graph()
 
 
+class TestResourceAnalysis:
+    """Tests for ``resource-analysis`` using the ``qp.estimate`` path.
+
+    ``qp.estimate`` builds ``transform(pass_name="resource-analysis")(gate_set=...)``; under
+    capture that must go through ``_handle_decompose_transform`` and emit the
+    ``resource-analysis`` pass.
+    """
+
+    _resource_analysis = qp.transform(pass_name="resource-analysis")
+
+    def test_resource_analysis_with_estimate(self, tmp_path):
+        """With a gate set, capture inserts ``resource-analysis`` and forwards output kwargs."""
+        out = tmp_path / "resources.json"
+
+        @qjit(capture=True, target="mlir")
+        @self._resource_analysis(
+            gate_set={"RX", "RY", "RZ"},
+            output_json=True,
+            output_fname=str(out),
+        )
+        @qnode(qp.device("null.qubit", wires=1))
+        def circuit():
+            qp.Rot(0.1, 0.2, 0.3, wires=0)
+            return qp.probs()
+
+        mlir = circuit.mlir
+        assert 'apply_registered_pass "resource-analysis"' in mlir
+        assert 'apply_registered_pass "graph-decomposition"' not in mlir
+        assert "gate-set" in mlir
+        assert "bytecode-rules" in mlir
+        assert "libQPD-path" in mlir
+        assert "libpython-path" in mlir
+        assert '"output-json" = true' in mlir
+        assert f'"output-fname" = "{out}"' in mlir
+
+
 class TestNumericHamiltonianDecomposition:
     """Tests decomposing Trotter operators that carry a numeric Hamiltonian as a
     hybrid argument, in both their plain and ``qp.adjoint`` forms.

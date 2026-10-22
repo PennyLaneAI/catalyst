@@ -346,6 +346,19 @@ def _require_decompose_gate_set(tkwargs):
         )
 
 
+def _require_resource_analysis_args(tkwargs):
+    """Reject a qp.estimate without a gate set, which the resource-analysis pass needs."""
+    if tkwargs.get("output_json") is None:
+        raise ValueError(
+            "qp.estimate requires an explicit 'output_json' under qjit; the resource-analysis "
+        )
+    if tkwargs.get("output_fname") is None:
+        raise ValueError(
+            "qp.estimate requires an explicit 'output_fname' under qjit; the resource-analysis "
+            "has no default output file."
+        )
+
+
 # pylint: disable=too-many-positional-arguments
 def _handle_decompose_transform(
     self, inner_jaxpr, consts, non_const_args, tkwargs, resource_analysis_for_estimate=False
@@ -360,6 +373,9 @@ def _handle_decompose_transform(
     from catalyst.passes.builtin_passes import graph_decomposition, resource_analysis
 
     _require_decompose_gate_set(tkwargs)
+
+    if resource_analysis_for_estimate:
+        _require_resource_analysis_args(tkwargs)
 
     fixed_decomps = tkwargs.get("fixed_decomps") or {}
     alt_decomps = tkwargs.get("alt_decomps") or {}
