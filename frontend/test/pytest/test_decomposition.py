@@ -2025,6 +2025,22 @@ class TestCustomRuleApplication:
 class TestDecomposeAlias:
     """``qp.decompose`` under capture is an alias for ``graph_decomposition`` (same C++ pass)."""
 
+    @pytest.mark.usefixtures("use_capture_dgraph")
+    @pytest.mark.parametrize("clean", [False, None], ids=["false", "none"])
+    def test_decompose_none_static_argument_on_demand(self, clean):
+        """The Python fallback accepts a None-valued static argument."""
+
+        @qjit(capture=True, target="mlir", collect_decomp_rules=False)
+        @qp.decompose(gate_set={"PauliX", "CNOT", "Toffoli"})
+        @qnode(qp.device("null.qubit", wires=2))
+        def circuit():
+            qp.QROM(Bool[2, 1], control_wires=[0], target_wires=[1], work_wires=[], clean=clean)
+            return qp.probs()
+
+        resources = qp.analyze(circuit, level=1)().resources
+        # A two-entry, one-bit table needs at most one X and one controlled X.
+        assert resources.quantum_operations == {"PauliX": 1, "C(PauliX)": 1}
+
     def test_decompose_matches_graph_decomposition(self):
         """``qp.decompose`` compiles to the exact same MLIR as ``graph_decomposition``."""
         gate_set = {"RX", "RY", "RZ"}
