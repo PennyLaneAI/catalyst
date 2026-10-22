@@ -867,6 +867,32 @@ func.func @adjoint_integer_tensor_param(%arg0: !quantum.reg) -> !quantum.reg {
 
 // -----
 
+// Repeated calls to the same function in an adjoint region share one adjoint function.
+
+func.func private @rotate(%q: !quantum.bit, %x: f64) -> !quantum.bit {
+  %out = quantum.custom "RX"(%x) %q : !quantum.bit
+  return %out : !quantum.bit
+}
+
+// CHECK:       func.func private @rotate.adjoint(
+// CHECK-NOT:   func.func private @rotate.adjoint(
+// CHECK-LABEL: func.func @repeated_call
+// CHECK-SAME:  ([[Q:%.+]]: !quantum.bit, [[X:%.+]]: f64, [[Y:%.+]]: f64)
+// CHECK:       [[Q1:%.+]] = call @rotate.adjoint([[Q]], [[Y]])
+// CHECK:       [[Q2:%.+]] = call @rotate.adjoint([[Q1]], [[X]])
+// CHECK:       return [[Q2]]
+func.func @repeated_call(%q: !quantum.bit, %x: f64, %y: f64) -> !quantum.bit {
+  %out = quantum.adjoint(%q) : !quantum.bit {
+  ^bb0(%arg0: !quantum.bit):
+    %q1 = func.call @rotate(%arg0, %x) : (!quantum.bit, f64) -> !quantum.bit
+    %q2 = func.call @rotate(%q1, %y) : (!quantum.bit, f64) -> !quantum.bit
+    quantum.yield %q2 : !quantum.bit
+  }
+  return %out : !quantum.bit
+}
+
+// -----
+
 // Resource hints on SCF ops must survive adjoint-lowering recreation.
 
 // CHECK-LABEL: @adjoint_preserves_scf_hints
