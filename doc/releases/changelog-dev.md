@@ -818,6 +818,13 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* Scatter ops with batching dimensions, such as those from a batched `jnp.linalg.det`, no longer
+  crash `scatter-lowering`, and will instead be rejected as intended.
+  In addition, to support batched scatter operations an additional pass is run in the HLO lowering
+  stage to resolve the batching first.
+  An additional bug is fixed in the scatter lowering that resulted in failed assertions.
+  [(#3356)](https://github.com/PennyLaneAI/catalyst/pull/3356)
+
 * The Python decomposition fallback now converts `None`-valued static attributes
   back from MLIR instead of aborting with an unsupported-attribute error.
   [(#3385)](https://github.com/PennyLaneAI/catalyst/pull/3385)
