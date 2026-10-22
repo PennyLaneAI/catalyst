@@ -25,6 +25,7 @@ from pennylane.capture.primitives import (
     for_loop_prim,
     while_loop_prim,
 )
+from pennylane.testing import find_eqns
 
 import catalyst
 from catalyst.from_plxpr import from_plxpr
@@ -444,9 +445,8 @@ class TestAdjointCtrl:
 
         # Located by primitive rather than position: decomposition-rule definitions are appended
         # to the end of the kernel, so the operator is not at a fixed offset from it.
-        op_eqns = [eqn for eqn in qfunc_xpr.eqns if eqn.primitive == qref_operator_p]
-        assert len(op_eqns) == 1
-        assert op_eqns[0].params == {
+        [op_eqn] = find_eqns(qfunc_xpr, qref_operator_p)
+        assert op_eqn.params == {
             "adjoint": num_adjoints % 2 == 1,
             "forward_mask": (),
             "hybrid_lens": (),
