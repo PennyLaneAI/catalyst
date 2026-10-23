@@ -617,16 +617,17 @@ func::FuncOp getOrCreateDecompositionFunc(ModuleOp module, PatternRewriter &rewr
         return func;
     }
 
-    // Define function type: (qubit, f64) -> (qubit, f64)
+    // Define function type: (qubit, f64) -> qubit
     // inputs:
     // qubit: input qubit wire
     // f64: rotation angle
     // returns:
     // qubit: output qubit wire
-    // f64: runtime phase
+    // The function applies the global phase of the gate sequence itself, so that it only has
+    // quantum results and can be inverted by the adjoint lowering.
     auto qbitType = QubitType::get(rewriter.getContext());
     auto f64Type = rewriter.getF64Type();
-    auto funcType = rewriter.getFunctionType({qbitType, f64Type}, {qbitType, f64Type});
+    auto funcType = rewriter.getFunctionType({qbitType, f64Type}, {qbitType});
 
     OpBuilder::InsertionGuard guard(rewriter);
     rewriter.setInsertionPointToStart(module.getBody());
@@ -667,8 +668,9 @@ func::FuncOp getOrCreateDecompositionFunc(ModuleOp module, PatternRewriter &rewr
                                  getSequenceStatistics(pprBasis, method));
     }
 
-    // Return the final qubit and the computed runtime phase
-    func::ReturnOp::create(rewriter, loc, ValueRange{finalQbit, runtimePhase});
+    GlobalPhaseOp::create(rewriter, loc, runtimePhase);
+
+    func::ReturnOp::create(rewriter, loc, ValueRange{finalQbit});
 
     return func;
 }
@@ -708,6 +710,11 @@ struct DecomposeCustomOpPattern : public OpRewritePattern<CustomOp> {
         ModuleOp mod = op->getParentOfType<ModuleOp>();
         Location loc = op.getLoc();
 
+        // RZ(theta)^dagger = RZ(-theta) and PhaseShift(phi)^dagger = PhaseShift(-phi).
+        if (op.getAdjoint()) {
+            angle = arith::NegFOp::create(rewriter, loc, angle);
+        }
+
         func::FuncOp decompFunc =
             getOrCreateDecompositionFunc(mod, rewriter, epsilon, pprBasis, method);
 
@@ -716,24 +723,14 @@ struct DecomposeCustomOpPattern : public OpRewritePattern<CustomOp> {
             func::CallOp::create(rewriter, loc, decompFunc, ValueRange{qbitOperand, angle});
 
         Value finalQbitResult = callDecompOp->getResult(0);
-        Value runtimePhase = callDecompOp.getResult(1);
 
-        // Handle Global Phase for PhaseShift
-        Value finalPhase;
         if (isPhaseShift) {
             // PhaseShift(phi) = RZ(phi) * GlobalPhase(-phi/2)
             Value c2 = arith::ConstantOp::create(rewriter, loc, rewriter.getF64FloatAttr(2.0));
             Value halfAngle = arith::DivFOp::create(rewriter, loc, angle, c2);
-            finalPhase = arith::SubFOp::create(rewriter, loc, runtimePhase, halfAngle);
-        } else {
-            finalPhase = runtimePhase;
+            Value negHalfAngle = arith::NegFOp::create(rewriter, loc, halfAngle);
+            GlobalPhaseOp::create(rewriter, loc, negHalfAngle);
         }
-
-        NamedAttrList gphaseAttrs;
-        gphaseAttrs.append(
-            rewriter.getNamedAttr("operandSegmentSizes", rewriter.getDenseI32ArrayAttr({1, 0, 0})));
-        GlobalPhaseOp::create(rewriter, loc, TypeRange{}, ValueRange{finalPhase},
-                              gphaseAttrs.getAttrs());
 
         // Replace the RZ/PhaseShift op with the resulting qubit
         rewriter.replaceOp(op, finalQbitResult);
@@ -784,16 +781,7 @@ struct DecomposePPRArbitraryOpPattern
         auto callDecompOp =
             func::CallOp::create(rewriter, loc, decompFunc, ValueRange{qbitOperand, rzAngle});
 
-        Value finalQbitResult = callDecompOp->getResult(0);
-        Value runtimePhase = callDecompOp.getResult(1);
-
-        NamedAttrList gphaseAttrs;
-        gphaseAttrs.append(
-            rewriter.getNamedAttr("operandSegmentSizes", rewriter.getDenseI32ArrayAttr({1, 0, 0})));
-        GlobalPhaseOp::create(rewriter, loc, TypeRange{}, ValueRange{runtimePhase},
-                              gphaseAttrs.getAttrs());
-
-        rewriter.replaceOp(op, finalQbitResult);
+        rewriter.replaceOp(op, callDecompOp->getResult(0));
         return success();
     }
 };

@@ -1159,6 +1159,78 @@ class TestAOTFailures:
         assert "RX" in c.mlir
 
 
+class TestAOTCompileWithArguments:
+    """Test ahead-of-time compilation for given arguments."""
+
+    def test_compile_up_to_target(self):
+        """Test that compilation for the given arguments stops at the target, and that a later
+        call still compiles and runs the function."""
+
+        @qjit(target="mlir")
+        def f(x, y=1.0):
+            return x + y
+
+        f.aot_compile(0.5, y=2.0)
+
+        assert f.mlir_module is not None
+        assert f.compiled_function is None
+        assert not f.fn_cache.cache
+        assert f(0.5, y=2.0) == 2.5
+
+    def test_call_reuses_compiled_function(self):
+        """Test that a call with arguments matching those of the ahead-of-time compilation reuses
+        the compiled function."""
+
+        @qjit
+        def f(x):
+            return x * 2
+
+        f.aot_compile(jax.ShapeDtypeStruct((3,), jnp.float64))
+        compiled_function = f.compiled_function
+
+        assert compiled_function is not None
+        assert jnp.allclose(f(jnp.array([1.0, 2.0, 3.0])), jnp.array([2.0, 4.0, 6.0]))
+        assert f.compiled_function is compiled_function
+
+    def test_call_after_aot_compile_with_other_arguments(self):
+        """Test that a function compiled for some arguments can still be called with them after
+        compiling it ahead of time, up to MLIR, for arguments with another structure."""
+
+        @qjit(target="mlir")
+        def f(x):
+            return x
+
+        assert f(1.0) == 1.0
+        f.aot_compile((1.0, 2.0))
+        assert f(1.0) == 1.0
+
+
+class TestAOTCompileErrors:
+    """Test the handling of errors during ahead-of-time compilation."""
+
+    def test_errors_are_raised(self):
+        """Test that the errors of an ahead-of-time compilation requested explicitly are raised."""
+
+        @qjit
+        def f(x):
+            raise ValueError("Cannot compile")
+
+        with pytest.raises(ValueError, match="Cannot compile"):
+            f.aot_compile(0.5)
+
+    def test_errors_on_creation_are_logged(self, caplog):
+        """Test that the errors of the ahead-of-time compilation from the type hints, when the QJIT
+        object is created, are logged instead of raised, and raised when the function is called."""
+
+        @qjit
+        def f(x: float):
+            raise ValueError("Cannot compile")
+
+        assert "Cannot compile" in caplog.text
+        with pytest.raises(ValueError, match="Cannot compile"):
+            f(0.5)
+
+
 @pytest.mark.parametrize("enable_aot", [True, False])
 def test_toggle_aot_compilation(enable_aot):
     @qp.qjit(capture=True, enable_aot_compilation=enable_aot)
