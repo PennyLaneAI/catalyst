@@ -54,6 +54,7 @@ with Patcher(
     ),
 ):
     from mlir_quantum.dialects.qref import (
+        BarrierOp,
         CustomOp,
         GlobalPhaseOp,
         MultiRZOp,
@@ -300,6 +301,14 @@ def _qref_operator_p_lowering(jax_ctx: mlir.LoweringRuleContext, *args, op_cls, 
         qubit_map=qubit_map,
     )
 
+    return []
+
+
+@_register_special_lowering(qp.Barrier)
+def _barrier_lowering(*qubits, ctrl_qubits, ctrl_values, adjoint, **_kwargs):
+    assert not ctrl_qubits, "Barrier does not support control wires"
+    assert not adjoint, "Barrier does not support adjoint"
+    BarrierOp(qubits=qubits)
     return []
 
 

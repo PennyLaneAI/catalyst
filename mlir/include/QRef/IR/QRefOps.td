@@ -333,6 +333,21 @@ def SetBasisStateOp : Gate_Op<"set_basis_state"> {
     }];
 }
 
+// TODO: actually stop optimizations across barriers
+def BarrierOp : Gate_Op<"barrier", [NoMemoryEffect]> {
+    let summary = "Apply a barrier";
+    let description = [{
+        The `qref.barrier` operation creates a barrier over which optimizations such as gate fusion,
+        commutation, etc. will not be applied.
+    }];
+
+    let arguments = (ins Variadic<QubitRefType>:$qubits);
+
+    let assemblyFormat = [{
+        $qubits attr-dict `:` type($qubits)
+    }];
+}
+
 
 def CustomOp : UnitaryGate_Op<"custom", [ParametrizedGate, AttrSizedOperandSegments,
                                          DeclareOpInterfaceMethods<DecomposableGate>]> {

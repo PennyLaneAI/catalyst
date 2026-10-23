@@ -1574,4 +1574,26 @@ def StateOp : Measurement_Op<"state", [AttrSizedOperandSegments]> {
 }
 
 
+// TODO: actually stop optimizations across barriers
+def BarrierOp : Gate_Op<"barrier", [NoMemoryEffect]> {
+    let summary = "Apply a barrier";
+    let description = [{
+        The `quantum.barrier` operation creates a barrier over which optimizations such as gate fusion,
+        commutation, etc. will not be applied.
+    }];
+
+    let arguments = (ins
+        Variadic<QubitType>:$in_qubits
+    );
+
+    let results = (outs
+        Variadic<QubitType>:$out_qubits
+    );
+
+    let assemblyFormat = [{
+        $in_qubits attr-dict `:` type($out_qubits)
+    }];
+}
+
+
 #endif // QUANTUM_OPS
