@@ -868,6 +868,11 @@
   rounding, which was then rejected by the ``catalyst.estimated_probability`` verifier.
   [(#3328)](https://github.com/PennyLaneAI/catalyst/pull/3328)
 
+* Fixed a bug where the `merge-ppr-ppm` pass crashed with an assertion when an output of a Clifford
+  PPR was used inside a nested region, such as an `scf.if`. The pass also no longer attempts to
+  merge a PPR into a PPM located in a different block.
+  [(#3367)](https://github.com/PennyLaneAI/catalyst/pull/3367)
+
 * Fixed a bug where a compiled Backline program continued with a session that does not work,
   for example echoing the controller's own message back as the reply, after a transport call or a
   coprocessor function's set-up failed. It now stops with an error naming the call that failed,
