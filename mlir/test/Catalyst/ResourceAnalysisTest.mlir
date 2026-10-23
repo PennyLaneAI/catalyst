@@ -507,12 +507,18 @@ func.func @estimated_iterations_loop(%arg0: !quantum.bit, %n: index) -> !quantum
 
 // -----
 
-// A fractional catalyst.estimated_iterations on a while loop scales the body's resource
-// counts by the (possibly non-integer) expected iteration count: 2 gates * 2.5 = 5.
+// A fractional catalyst.estimated_iterations on a while loop lifts the body into while_loop_<N>
+// and records the (possibly non-integer) call count on the parent.
 
 // CHECK-LABEL: "estimated_iterations_while_fractional": {
+// CHECK: "function_calls"
+// CHECK:   "static":
+// CHECK:       "while_loop_1": 2.5
+// CHECK: "quantum_operations": {}
+
+// CHECK-LABEL: "while_loop_1": {
 // CHECK: "quantum_operations"
-// CHECK:     "PauliZ": 5
+// CHECK:     "PauliZ": 2
 func.func @estimated_iterations_while_fractional(%arg0: !quantum.bit, %n: index) -> !quantum.bit {
     %c0 = arith.constant 0 : index
     %c1 = arith.constant 1 : index
@@ -527,6 +533,37 @@ func.func @estimated_iterations_while_fractional(%arg0: !quantum.bit, %n: index)
         %inext = arith.addi %i, %c1 : index
         scf.yield %inext, %q2 : index, !quantum.bit
     } attributes {catalyst.estimated_iterations = 2.5 : f64}
+
+    return %r#1 : !quantum.bit
+}
+
+// -----
+
+// Input-driven dynamic while loop: no estimated_iterations hint, so the body is lifted into
+// "dyn_while_loop_1" and the parent records function_calls.dynamic.
+
+// CHECK-LABEL: "dyn_while_loop_1": {
+// CHECK: "quantum_operations"
+// CHECK:   "PauliX": 1
+
+// CHECK-LABEL: "dynamic_while_loop": {
+// CHECK: "function_calls"
+// CHECK:   "dynamic":
+// CHECK:       "dyn_while_loop_1": "{{0x[0-9a-f]+}}"
+// CHECK: "quantum_operations": {}
+func.func @dynamic_while_loop(%arg0: !quantum.bit, %n: index) -> !quantum.bit {
+    %c0 = arith.constant 0 : index
+    %c1 = arith.constant 1 : index
+
+    %r:2 = scf.while (%i = %c0, %q = %arg0) : (index, !quantum.bit) -> (index, !quantum.bit) {
+        %cond = arith.cmpi slt, %i, %n : index
+        scf.condition(%cond) %i, %q : index, !quantum.bit
+    } do {
+    ^bb0(%i: index, %q: !quantum.bit):
+        %out = quantum.custom "PauliX"() %q : !quantum.bit
+        %inext = arith.addi %i, %c1 : index
+        scf.yield %inext, %out : index, !quantum.bit
+    }
 
     return %r#1 : !quantum.bit
 }

@@ -223,8 +223,8 @@ void ResourceAnalysis::analyzeForLoop(scf::ForOp forOp, ResourceResult &result, 
         return;
     }
 
-    // Loop trip count is dynamic. Record the body under dyn_for_loop_<N>
-    // and store a fixed number (hash) so each such loop has its own id in the output.
+    // Loop trip count is dynamic. Record the body under dyn_for_loop_<N> and store a fixed
+    // number (hash) so each such loop has its own id in the output.
     std::string name = makeUniqueSyntheticName("dyn_for_loop_", dynForLoopCounter);
     funcResults[name] = std::move(bodyResult);
     result.varFunctionCalls[name] = static_cast<uint64_t>(llvm::hash_value(forOp.getOperation()));
@@ -236,13 +236,22 @@ void ResourceAnalysis::analyzeWhileLoop(scf::WhileOp whileOp, ResourceResult &re
     ResourceResult bodyResult = makeEmptyResult();
     analyzeRegion(whileOp.getAfter(), bodyResult, isAdjoint, numControlQubits);
 
-    if (auto iters = getEstimatedIterationsHint(whileOp)) {
-        bodyResult.multiplyBy(*iters);
-    } else {
-        result.hasDynLoop = true;
+    // Try to resolve a static or hinted trip count.
+    if (auto tripCount = getEstimatedIterationsHint(whileOp)) {
+        // Record the loop body under a new name (while_loop_1, …).
+        // The parent stores how many times the loop runs.
+        std::string name = makeUniqueSyntheticName("while_loop_", whileLoopCounter);
+        funcResults[name] = std::move(bodyResult);
+        result.functionCalls[name] = *tripCount;
+        return;
     }
 
-    result.mergeWith(bodyResult);
+    // Loop trip count is dynamic. Record the body under dyn_while_loop_<N> and store a fixed
+    // number (hash) so each such loop has its own id in the output.
+    std::string name = makeUniqueSyntheticName("dyn_while_loop_", dynWhileLoopCounter);
+    funcResults[name] = std::move(bodyResult);
+    result.varFunctionCalls[name] = static_cast<uint64_t>(llvm::hash_value(whileOp.getOperation()));
+    result.hasDynLoop = true;
 }
 
 void ResourceAnalysis::analyzeIfOp(scf::IfOp ifOp, ResourceResult &result, bool isAdjoint,
