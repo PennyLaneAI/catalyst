@@ -650,6 +650,8 @@ void handleIf(IRRewriter &builder, scf::IfOp ifOp, QubitValueTracker &tracker,
     }
     auto newIfOp = scf::IfOp::create(builder, loc, classicalReturnTypes, ifOp.getCondition(),
                                      /*withElseRegion=*/hasElseRegion);
+    newIfOp->setDiscardableAttrs(ifOp->getDiscardableAttrDictionary());
+
     builder.eraseBlock(newIfOp.thenBlock());
     builder.inlineRegionBefore(ifOp.getThenRegion(), newIfOp.getThenRegion(),
                                newIfOp.getThenRegion().end());
@@ -685,6 +687,7 @@ void handleSwitch(IRRewriter &builder, scf::IndexSwitchOp switchOp, QubitValueTr
     auto newSwitchOp =
         scf::IndexSwitchOp::create(builder, loc, classicalReturnTypes, switchOp.getArg(),
                                    switchOp.getCases(), switchOp.getNumCases());
+    newSwitchOp->setDiscardableAttrs(switchOp->getDiscardableAttrDictionary());
 
     // Handle the default region
     // Cannot just use `cascadeMapAhead` util to update the outside flow, since switch op does not
@@ -757,6 +760,8 @@ void handleFor(IRRewriter &builder, scf::ForOp forOp, QubitValueTracker &tracker
     // Create the new for op and handle
     auto newLoop = scf::ForOp::create(builder, loc, forOp.getLowerBound(), forOp.getUpperBound(),
                                       forOp.getStep(), newIterArgs);
+    newLoop->setDiscardableAttrs(forOp->getDiscardableAttrDictionary());
+
     builder.eraseBlock(newLoop.getBody());
 
     builder.inlineRegionBefore(forOp.getRegion(), newLoop.getRegion(), newLoop.getRegion().end());
@@ -812,6 +817,7 @@ void handleWhile(IRRewriter &builder, scf::WhileOp whileOp, QubitValueTracker &t
 
     // Create the new while op
     auto newLoop = scf::WhileOp::create(builder, loc, newResultTypes, newBeforeArgs);
+    newLoop->setDiscardableAttrs(whileOp->getDiscardableAttrDictionary());
     builder.inlineRegionBefore(whileOp.getBefore(), newLoop.getBefore(), newLoop.getBefore().end());
     builder.inlineRegionBefore(whileOp.getAfter(), newLoop.getAfter(), newLoop.getAfter().end());
 
@@ -1037,22 +1043,22 @@ void handleSubroutine(IRRewriter &builder, func::FuncOp f,
     assert(succeeded(f.eraseArguments(eraseArgsIndices)));
 }
 
-SmallVector<IntegerAttr> collectQregSizesAtCallsite(func::FuncOp subroutine, Operation *mod) {
+SmallVector<IntegerAttr> collectQregSizesAtCallsite(func::FuncOp subroutine, func::FuncOp caller) {
     SmallVector<IntegerAttr> qregSizesAtCallsite;
-    auto uses = SymbolTable::getSymbolUses(subroutine, mod);
-    if (uses) {
-        for (auto use : *uses) {
-            Operation *user = use.getUser();
-            if (auto callOp = dyn_cast<func::CallOp>(user)) {
-                for (Type t : callOp.getOperandTypes()) {
-                    if (auto qrefQuregType = dyn_cast<qref::QuregType>(t)) {
-                        qregSizesAtCallsite.push_back(qrefQuregType.getSize());
-                    }
-                }
-                break;
+    if (!caller) {
+        return qregSizesAtCallsite;
+    }
+    caller.walk([&](func::CallOp callOp) {
+        if (callOp.getCallee() != subroutine.getSymName()) {
+            return WalkResult::advance();
+        }
+        for (Type t : callOp.getOperandTypes()) {
+            if (auto qrefQuregType = dyn_cast<qref::QuregType>(t)) {
+                qregSizesAtCallsite.push_back(qrefQuregType.getSize());
             }
         }
-    }
+        return WalkResult::interrupt();
+    });
     return qregSizesAtCallsite;
 }
 
@@ -1121,6 +1127,21 @@ struct ReferenceSemanticsConversionPass
             subroutinesPostOrder.push_back(subroutine);
         }
 
+        // Collect the first caller of each subroutine once: a per-subroutine
+        // `SymbolTable::getSymbolUses` walks the whole module, which is quadratic in the number of
+        // subroutines. Callers are recorded instead of call ops (e.g. with a `SymbolUserMap`)
+        // because callers are converted before their callees, which replaces their call ops.
+        SymbolTableCollection symbolTables;
+        llvm::DenseMap<func::FuncOp, func::FuncOp> firstCallerOf;
+        mod->walk([&](func::CallOp callOp) {
+            auto callee =
+                symbolTables.lookupNearestSymbolFrom<func::FuncOp>(callOp, callOp.getCalleeAttr());
+            auto caller = callOp->getParentOfType<func::FuncOp>();
+            if (callee && caller) {
+                firstCallerOf.try_emplace(callee, caller);
+            }
+        });
+
         // We want to handle the calls before the subroutines, so we know the register sizes on the
         // subroutine qreg arg type
         // By default, scc iterates call graph in post order (callee before caller), so we reverse
@@ -1130,7 +1151,9 @@ struct ReferenceSemanticsConversionPass
                 return signalPassFailure();
             }
             QubitValueTracker tracker;
-            handleSubroutine(builder, subroutine, collectQregSizesAtCallsite(subroutine, mod));
+            handleSubroutine(
+                builder, subroutine,
+                collectQregSizesAtCallsite(subroutine, firstCallerOf.lookup(subroutine)));
             if (failed(ensureNoValueSemanticsOps(subroutine))) {
                 subroutine.emitOpError(
                     "Detected remaining value semantics operations after conversion");

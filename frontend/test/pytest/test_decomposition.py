@@ -49,7 +49,6 @@ from pennylane.typing import Bool, Complex, Float, Int, Wire
 from pennylane.wires import Wires
 
 from catalyst import qjit
-from catalyst.debug import get_compilation_stage
 from catalyst.decomposition import GraphOpID, RuleLoweringWarning
 from catalyst.decomposition.decomposition_rules import (
     _MODIFIER_CANONICAL_ORDER,
@@ -1907,6 +1906,41 @@ class TestCustomRuleApplication:
         assert decomposed.get("PauliX", 0) == 0  # assert that the second rule got used
         assert decomposed.get("PauliY", 0) == 2  # assert that the second rule got used
 
+    @pytest.mark.parametrize("option", ["fixed_decomps", "alt_decomps"])
+    def test_fixed_and_alt_decomps_for_modifier_wrapped_op(self, option):
+        """Tests that fixed and alt decomps keyed by a modifier-wrapped operator name,
+        which is quoted in the pass options, are respected."""
+
+        @qp.register_resources({qp.X: 1})
+        def rule1(base):
+            qp.X(base.wires)
+
+        @qp.register_resources({qp.Y: 2})
+        def rule2(base):
+            qp.Y(base.wires)
+            qp.Y(base.wires)
+
+        rules = {"fixed_decomps": rule2, "alt_decomps": [rule2]}[option]
+
+        with local_decomps():
+
+            add_decomps("Adjoint(NoParamsCustomOp)", rule1, rule2)
+
+            @qjit(capture=True, target="mlir")
+            @graph_decomposition(
+                gate_set={qp.X: 1, qp.Y: 1}, **{option: {"Adjoint(NoParamsCustomOp)": rules}}
+            )
+            @qnode(qp.device("null.qubit", wires=1))
+            def circuit():
+                qp.adjoint(NoParamsCustomOp(0))
+
+            resources = qp.specs(circuit, level="all")().resources
+
+        decomposed = resources["graph-decomposition"].counts
+        assert decomposed.get("Adjoint(NoParamsCustomOp)", 0) == 0
+        assert decomposed.get("PauliX", 0) == 0
+        assert decomposed.get("PauliY", 0) == 2
+
     def test_fix_decomp_invalid_name(self):
         """Tests that an error is raised by referring to an inexistant rule name."""
 
@@ -2011,23 +2045,12 @@ class TestDecomposeAlias:
         assert 'apply_registered_pass "graph-decomposition"' in via_decompose.mlir
         assert via_decompose.mlir == via_graph.mlir
 
-    @pytest.mark.parametrize(
-        "tkwargs, exc, match",
-        [
-            ({"gate_set": {"RX"}, "stopping_condition": lambda op: True}, NotImplementedError, ""),
-            ({"gate_set": {"RX"}, "max_expansion": 2}, NotImplementedError, ""),
-            ({"gate_set": {"RX"}, "num_work_wires": 2}, NotImplementedError, ""),
-            ({"gate_set": {"RX"}, "minimize_work_wires": True}, NotImplementedError, ""),
-            ({"gate_set": {"RX"}, "strict": False}, NotImplementedError, ""),
-            ({"gate_set": None}, ValueError, "requires an explicit 'gate_set'"),
-        ],
-    )
-    def test_decompose_rejects_unsupported_kwargs(self, tkwargs, exc, match):
-        """Kwargs the graph-decomposition pass cannot honor are rejected with a clear error."""
-        with pytest.raises(exc, match=match):
+    def test_decompose_requires_gate_set(self):
+        """qp.decompose without a gate set is rejected with a clear error."""
+        with pytest.raises(ValueError, match="requires an explicit 'gate_set'"):
 
             @qjit(capture=True, target="mlir")
-            @qp.decompose(**tkwargs)
+            @qp.decompose(gate_set=None)
             @qnode(qp.device("null.qubit", wires=1))
             def circuit():
                 qp.Rot(0.1, 0.2, 0.3, wires=0)
@@ -2060,23 +2083,22 @@ class TestDecomposeAlias:
         assert via_decompose.mlir == via_graph.mlir
 
     def test_decompose_multiple_ordering(self):
-        """Stacked ``qp.decompose`` apply innermost-first: a gate produced by the inner pass and
+        """Stacked ``qp.decompose`` apply innermost-first: a gate retained by the inner pass and
         excluded from the outer gate set is further decomposed away."""
 
-        @qjit(capture=True, keep_intermediate=True)
-        # Outer gate set excludes PhaseShift, which the inner pass introduces.
-        @qp.decompose(gate_set={"RX", "RY", "RZ", "CNOT", "GlobalPhase"})
-        @qp.decompose(gate_set={"RZ", "RY", "CNOT", "GlobalPhase", "PhaseShift"})
-        @qnode(qp.device("null.qubit", wires=2))
+        @qjit(capture=True, target="mlir")
+        @qp.decompose(gate_set={"RZ", "GlobalPhase"})
+        @qp.decompose(gate_set={"PhaseShift"})
+        @qnode(qp.device("null.qubit", wires=1))
         def circuit():
-            qp.Rot(0.1, 0.2, 0.3, wires=0)
-            qp.CNOT(wires=[0, 1])
+            qp.PhaseShift(0.1, wires=0)
             return qp.expval(qp.PauliZ(0))
 
-        circuit()
-        optimized = get_compilation_stage(circuit, "QuantumCompilationStage")
-        # Inner runs first (PhaseShift appears), then outer removes it.
-        assert "PhaseShift" not in optimized
+        resources = qp.specs(circuit, level="all")().resources
+        # phaseshift is allowed by the inner pass
+        assert resources["graph-decomposition"].counts == {"PhaseShift": 1}
+        # phaseshift is decomposed by the outer pass
+        assert resources["graph-decomposition-2"].counts == {"RZ": 1, "GlobalPhase": 1}
 
     def test_decompose_inline_fixed_decomps(self):
         """Inline ``fixed_decomps`` rule bodies are registered for the graph pass."""

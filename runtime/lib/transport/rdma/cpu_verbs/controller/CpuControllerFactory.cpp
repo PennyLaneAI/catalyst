@@ -29,3 +29,5 @@ catalyst::transport::ControllerSession *make_cpu_controller(const std::string &c
 } // namespace
 
 GENERATE_TRANSPORT_CONTROLLER_FACTORY(CatalystTransportController, make_cpu_controller)
+CATALYST_TRANSPORT_BACKEND_CAPS("cpu_verbs", CATALYST_TRANSPORT_ROLE_BIT_CONTROLLER,
+                                CATALYST_TRANSPORT_MEM_BIT(CpuRam), 0, 8, 8, 1)

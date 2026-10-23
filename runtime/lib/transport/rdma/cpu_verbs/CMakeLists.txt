@@ -24,6 +24,10 @@ target_link_libraries(catalyst_transport_cpu_verbs_controller PRIVATE cpu_verbs_
 add_library(catalyst_transport_cpu_verbs_coprocessor SHARED coprocessor/CpuCoprocessorFactory.cpp)
 target_link_libraries(catalyst_transport_cpu_verbs_coprocessor PRIVATE cpu_verbs_impl)
 
+catalyst_runtime_install(
+    catalyst_transport_cpu_verbs_controller
+    catalyst_transport_cpu_verbs_coprocessor)
+
 
 # Self-contained loopback application for testing
 add_executable(cpu_verbs_selftest cpu_verbs_selftest.cpp)

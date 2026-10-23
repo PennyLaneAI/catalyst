@@ -22,19 +22,19 @@
 #include "Transport.hpp"
 #include "WireProtocol.hpp"
 
-namespace rdma::devices::fpga_verbs {
+namespace catalyst::transport::common {
 
-// Construction parameters parsed from a backend factory `config` string
-// ("key=value;..."). Connection parameters (peer/oob_port) are not here — they
-// arrive later via connect(). Recognised keys: `dev`, `gid`, `ring`,
-// `stride_log2`, `data_mem`, `reply_mem`.
+// Construction parameters shared by the FPGA controller backends (fpga_verbs, hwhs), parsed from a
+// backend factory `config` string ("key=value;..."). Connection parameters (peer/oob_port) are not
+// here — they arrive later via connect(). Recognised keys: `dev`, `gid`, `ring`, `stride_log2`,
+// `data_mem`, `reply_mem`. A backend reads any further keys of its own with configparser.
 struct FpgaConfig {
     // RDMA device name.
     std::string dev = "xib_0";
     // GID index.
     int gid = 1;
     // Ring slots.
-    std::uint32_t ring = static_cast<std::uint32_t>(catalyst::transport::common::K_RING_SLOTS);
+    std::uint32_t ring = static_cast<std::uint32_t>(K_RING_SLOTS);
     // Slot stride, log2 (6 = 64 B).
     std::uint32_t stride_log2 = 6;
     // Request-ring placement; unset lets the session choose.
@@ -60,7 +60,7 @@ inline catalyst::transport::MemKind parse_mem_kind(std::string_view key, const s
 }
 
 inline FpgaConfig parse_fpga_config(const std::string &config) {
-    namespace cp = catalyst::transport::common::configparser;
+    namespace cp = configparser;
     FpgaConfig cfg;
     cp::for_each_kv(config, [&](std::string_view key, std::string_view val) {
         if (key == "dev") {
@@ -80,4 +80,4 @@ inline FpgaConfig parse_fpga_config(const std::string &config) {
     return cfg;
 }
 
-} // namespace rdma::devices::fpga_verbs
+} // namespace catalyst::transport::common
