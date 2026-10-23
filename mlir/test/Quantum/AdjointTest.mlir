@@ -1001,7 +1001,7 @@ func.func @adjoint_dynamic_controls(%target: !quantum.bit, %control: !quantum.bi
 
 // -----
 
-// Parameters, forwarded arguments, and control values use independent typed stacks.
+// Parameters and control values use independent typed stacks.
 // External and constant controls must remain in their original positions without being cached.
 // CHECK-LABEL: @adjoint_mixed_controls
 // CHECK-SAME: [[external:%[^:, ]+]]: i1)

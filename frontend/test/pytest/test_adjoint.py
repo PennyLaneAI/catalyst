@@ -363,6 +363,9 @@ class TestCatalyst:
         dev = qp.device(backend, wires=1)
         self.verify_catalyst_adjoint_against_pennylane(func, dev, 10, capture_mode=capture_mode)
 
+    # Fail if capture falls back to Python unrolling, which would make the control values
+    # constant and let the test pass without exercising dynamic control-value caching. This
+    # should never happen in practice, but adding this just ensures the validity of the test.
     @pytest.mark.filterwarnings("error:Structured capture")
     def test_adjoint_dynamic_control_values(self):
         """Test that loop-local control values stay paired with their angles when reversing
