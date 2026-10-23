@@ -116,7 +116,7 @@ def _is_one_shot_compatible_device(qnode):
     return device_class_name != "OQDDevice"
 
 
-def configure_mcm_and_try_one_shot(qnode, args, kwargs):
+def configure_mcm_and_try_one_shot(qnode, args, kwargs, pass_pipeline=None):
     """Configure mid-circuit measurement settings and handle one-shot execution."""
     # If we are already running a one-shot transformed QNode, do not apply MCM processing again.
     dynamic_one_shot_called = getattr(qnode, "_dynamic_one_shot_called", False)
@@ -154,7 +154,9 @@ def configure_mcm_and_try_one_shot(qnode, args, kwargs):
         )
 
     try:
-        return Function(dynamic_one_shot(qnode, mcm_config=mcm_config))(*args, **kwargs)
+        return Function(
+            dynamic_one_shot(qnode, mcm_config=mcm_config, pass_pipeline=pass_pipeline)
+        )(*args, **kwargs)
     except FallbackToSingleBranchError:
         return None
 
@@ -243,19 +245,24 @@ class QFunc:
             raise CompileError("Can't nest qnodes under qjit")
 
         assert isinstance(self, qp.QNode)
-
-        # Mid-circuit measurement configuration:
-        one_shot_results = configure_mcm_and_try_one_shot(self, args, kwargs)
-        # If we ran one-shot execution, we are done. Otherwise, continue execution as normal.
-        if one_shot_results is not None:
-            return one_shot_results
-
         new_compile_pipeline, pass_pipeline = _extract_passes(self.compile_pipeline)
+
+        # One-shot / autograph may re-enter with already-extracted MLIR passes forwarded
+        # via kwargs (compile_pipeline on the QNode only keeps tape transforms).
+        forwarded_pass_pipeline = kwargs.pop("pass_pipeline", None)
+        if not pass_pipeline and forwarded_pass_pipeline is not None:
+            pass_pipeline = tuple(forwarded_pass_pipeline)
 
         # Update the QNode's original compile_pipeline
         new_qnode = copy(self)
         # pylint: disable=attribute-defined-outside-init, protected-access
         new_qnode._compile_pipeline = new_compile_pipeline
+
+        # Mid-circuit measurement configuration:
+        one_shot_results = configure_mcm_and_try_one_shot(new_qnode, args, kwargs, pass_pipeline)
+        # If we ran one-shot execution, we are done. Otherwise, continue execution as normal.
+        if one_shot_results is not None:
+            return one_shot_results
 
         new_device = copy(new_qnode.device)
         qjit_device = QJITDevice(new_device)
@@ -527,6 +534,7 @@ def dynamic_one_shot(qnode, **kwargs):
 
     cpy_tape = None
     mcm_config = kwargs.pop("mcm_config", None)
+    pass_pipeline = kwargs.pop("pass_pipeline", None)
 
     def transform_to_single_shot(qnode):
         if not qnode._shots:
@@ -571,6 +579,9 @@ def dynamic_one_shot(qnode, **kwargs):
     assert total_shots is not None, "must have a shot value for one-shot"
 
     def one_shot_wrapper(*args, **kwargs):
+        if pass_pipeline is not None:
+            kwargs["pass_pipeline"] = pass_pipeline
+
         def wrap_single_shot_qnode(*_):
             return single_shot_qnode(*args, **kwargs)
 
