@@ -1837,12 +1837,15 @@ def test_forloop_vmap_worflow_derivation(backend):
 @pytest.mark.parametrize(
     "gate,state",
     [
-        pytest.param(qp.BasisState, np.array([1]), marks=pytest.mark.xfail),
+        (qp.BasisState, np.array([1])),
         (qp.StatePrep, np.array([0, 1])),
     ],
 )
 def test_paramshift_with_gates(gate, state, capture_mode):
     """Test parameter shift works with a variety of gates present in the circuit."""
+
+    if gate is qp.BasisState and capture_mode:
+        pytest.xfail("param shift is incompatible with subroutines")
 
     dev = qp.device("lightning.qubit", wires=1)
 

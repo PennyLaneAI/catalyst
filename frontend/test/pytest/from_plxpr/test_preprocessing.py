@@ -730,6 +730,7 @@ class TestIntegration:
 
         dev = CapabilitiesDevice(wires=2)
         dev.capabilities = DeviceCapabilities(
+            operations={"Hadamard": OperatorProperties()},
             non_commuting_observables=True,
             observables={
                 "PauliX": OperatorProperties(),
