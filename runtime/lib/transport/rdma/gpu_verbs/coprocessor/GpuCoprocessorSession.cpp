@@ -14,6 +14,7 @@
 
 #include "GpuCoprocessorSession.hpp"
 
+#include <algorithm>
 #include <atomic>
 #include <cstring>
 #include <memory>
@@ -29,7 +30,7 @@
 namespace catalyst::transport::gpu_verbs {
 using namespace catalyst::transport;
 using namespace catalyst::transport::common;
-using namespace catalyst::transport::coproc; // GpuRuntime, HandoffSlot, launchers
+using namespace catalyst::transport::coproc; // GpuRuntime, launchers
 
 namespace {
 // The coprocessor only receives on the fwd queue pair (the controller writes into its ring), so
@@ -37,8 +38,9 @@ namespace {
 constexpr QpShape FWD_QP_SHAPE{.sq_depth = 16, .cq_depth = 256, .inline_max = 0};
 } // namespace
 
-GpuCoprocessorSession::GpuCoprocessorSession(std::string dev, int gid_idx, int gpu_device)
-    : Base(std::move(dev), gid_idx, "gpu_verbs", FWD_QP_SHAPE), gpu_(gpu_device) {}
+GpuCoprocessorSession::GpuCoprocessorSession(std::string dev, int gid_idx, int gpu_device,
+                                             frame::RingGeometry ring)
+    : Base(std::move(dev), gid_idx, "gpu_verbs", FWD_QP_SHAPE, ring), gpu_(gpu_device) {}
 
 MemRegion GpuCoprocessorSession::alloc_memory(std::size_t size, MemKind kind) {
     TP_CHECK(kind == MemKind::GpuHbm, "gpu_verbs: only MemKind::GpuHbm supported");
@@ -60,7 +62,7 @@ MemRegion GpuCoprocessorSession::alloc_memory(std::size_t size, MemKind kind) {
 void GpuCoprocessorSession::establish_channel(const ChannelDesc &desc, const MemRegion &local,
                                               const PeerRef &peer) {
     Base::establish_channel(desc, local, peer);
-    handoff_ = gpu_.alloc_handoff(ring_.slots);
+    handoff_ = gpu_.alloc_handoff(ring_.region_bytes());
 }
 
 void GpuCoprocessorSession::set_coprocessor_launcher(CoprocessorLauncherFn fn, void *ctx) {
@@ -70,29 +72,32 @@ void GpuCoprocessorSession::set_coprocessor_launcher(CoprocessorLauncherFn fn, v
     coproc_ctx_ = ctx;
 }
 
-bool GpuCoprocessorSession::post_inline(std::uint64_t cursor) {
-    const auto value = static_cast<std::uint64_t>(last_word_.load(std::memory_order_relaxed));
-    // TODO: echo the request's id by forwarding it through.
-    // Currently not sent (fn_id 0) to reduce Handoff size.
-    frame::stage(ring_, send_frame(), /*fn_id=*/0, &value, sizeof(value));
+bool GpuCoprocessorSession::post_reply(std::uint64_t cursor, const frame::FrameView &reply) {
+    std::int64_t first = 0;
+    std::memcpy(&first, reply.data, std::min<std::size_t>(reply.len, sizeof(first)));
+    last_word_.store(first, std::memory_order_relaxed);
+    void *send = send_frame();
+    frame::stage(ring_, send, reply.fn_id, reply.data, reply.len);
+    // The kernel writes only the reply's bytes; zero the rest of the payload area, as every other
+    // coprocessor's reply is.
+    std::memset(frame::data(ring_, send) + reply.len, 0, frame::data_capacity(ring_) - reply.len);
     const bool signaled = (cursor % SIGNAL_EVERY == 0);
     post_write(bwd_qp_->get(), cursor, /*inline_data=*/true, signaled);
     return signaled;
 }
 
-// Coprocessor: wait for the fused kernel to publish each shot's correction into
-// the host-mapped handoff ring, then post it inline on the bwd QP. Sends are
+// Coprocessor: wait for the fused kernel to publish each message's reply frame into the
+// host-mapped handoff ring, then send it on the bwd QP, inline when it fits. Sends are
 // selectively signaled (1 in SIGNAL_EVERY) and the bwd CQ is reaped in batches
-// at those points, so completions stay off the per-shot critical path.
+// at those points, so completions stay off the per-message critical path.
 void GpuCoprocessorSession::run_coprocessor(std::stop_token st) {
     pin_thread(pin_cpu_, pin_realtime_);
     int signaled_outstanding = 0;
     for (std::uint64_t c = 0; !st.stop_requested(); ++c) {
         const std::uint32_t expect = static_cast<std::uint32_t>(c + 1);
-        std::uint32_t index = c & (ring_.slots - 1);
-        volatile std::uint32_t *sptr = &handoff_.host[index].seq;
+        frame::FrameView reply;
         std::uint32_t spins = 0;
-        while (*sptr != expect) {
+        while (!frame::poll(ring_, handoff_.host + ring_.slot_offset(c), expect, reply)) {
             if (++spins == STOP_CHECK_SPINS) {
                 spins = 0;
                 if (st.stop_requested()) {
@@ -102,12 +107,7 @@ void GpuCoprocessorSession::run_coprocessor(std::stop_token st) {
             }
             cpu_relax();
         }
-        // seq observed -> the kernel published correction+seq together in one
-        // 16 B store followed by a single system fence (no fence between the
-        // two fields); larger replies instead use write, fence, seq, fence.
-        std::atomic_thread_fence(std::memory_order_acquire);
-        last_word_.store(handoff_.host[index].correction, std::memory_order_relaxed);
-        if (post_inline(c)) {
+        if (post_reply(c, reply)) {
             ++signaled_outstanding;
             reap(bwd_cq_->get(), signaled_outstanding, /*drain=*/false); // lazy batch reap
         }
@@ -136,6 +136,8 @@ void GpuCoprocessorSession::start() {
         .stop = handoff_.stop_dev,
         .total = 0,
         .stream = gpu_.stream(),
+        .frame_mode = static_cast<std::uint32_t>(ring_.mode),
+        .slot_stride = ring_.stride,
     };
     CoprocessorLauncherFn launch = coproc_launcher_ ? coproc_launcher_ : &default_echo_launcher;
     const int lrc = launch(&L, coproc_ctx_);

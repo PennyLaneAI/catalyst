@@ -181,9 +181,15 @@
   (BLV): a 32 B header, the payload and a completion word written last. The compiler picks the
   16 B frame when requests and replies fit in 8 B, so such programs compile as before, and the
   variable-length one otherwise, writing it into both ends' backend configs. The `cpu_verbs`
-  and `memcpy` backends carry any size. A GPU coprocessor
-  running a persistent kernel still carries at most 8 B.
+  and `memcpy` backends carry any size.
   [(#3379)](https://github.com/PennyLaneAI/catalyst/pull/3379)
+
+* Backline's persistent GPU kernels now read requests and write replies through the shared frame
+  codec, so a GPU coprocessor's replies carry the request's fn_id like every other transport's, and
+  Catalyst's own GPU kernels (`gpu_echo_launcher`, `gpu_steane_launcher`) carry messages of any
+  size over `memcpy` and `gpu_verbs`. Other persistent kernels, such as PennyLane's Triton
+  decoders, still carry at most 8 B.
+  [(#3383)](https://github.com/PennyLaneAI/catalyst/pull/3383)
 
 * The :func:`~catalyst.qjit` function now accepts an ``enable_aot_compilation`` argument, which can be
   used to toggle whether or not to use ahead-of-time compilation.
@@ -795,6 +801,14 @@
   frame. A function written for the previous signature reads its payload at the same pointer but
   must take the extra `fn_id` argument, and no longer subtracts a frame trailer from the length.
   [(#3379)](https://github.com/PennyLaneAI/catalyst/pull/3379)
+
+* A Backline launcher, the function a GPU coprocessor calls once to start its persistent kernel,
+  must now export `<symbol>_info` reporting `abi_version` 2 or later, and its kernel must answer
+  each request with a frame laid out as `CoprocLaunchDesc` describes, in the slot stride and
+  frame mode it now carries. The runtime refuses a launcher without it, rather than letting the
+  session wait for replies the old layout never produces. PennyLane's Triton decoders need the
+  matching PennyLane release.
+  [(#3383)](https://github.com/PennyLaneAI/catalyst/pull/3383)
 
 * A `memcpy` transport session whose backend config has no `frame` keys now uses the 16 B frame, and
   refuses messages over 8 bytes. Programs compiled with Catalyst are unaffected, since the compiler

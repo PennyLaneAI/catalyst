@@ -28,13 +28,14 @@
 
 namespace catalyst::transport::gpu_verbs {
 using namespace catalyst::transport;
-using namespace catalyst::transport::coproc; // GpuRuntime, HandoffSlot, launchers
+using namespace catalyst::transport::coproc; // GpuRuntime, launchers
 
 class GpuCoprocessorSession : public common::VerbsSessionBase<CoprocessorSession> {
     using Base = common::VerbsSessionBase<CoprocessorSession>;
 
   public:
-    GpuCoprocessorSession(std::string dev, int gid_idx, int gpu_device);
+    GpuCoprocessorSession(std::string dev, int gid_idx, int gpu_device,
+                          common::frame::RingGeometry ring = common::frame::BL16_RING);
     ~GpuCoprocessorSession() override { stop(); }
 
     GpuCoprocessorSession(const GpuCoprocessorSession &) = delete;
@@ -65,17 +66,16 @@ class GpuCoprocessorSession : public common::VerbsSessionBase<CoprocessorSession
 
   private:
     void run_coprocessor(std::stop_token st);
-    // Fill the reply + post one inline RDMA_WRITE. Returns true if this send
-    // was signaled (selective signalling: 1 in SIGNAL_EVERY), so the caller can
+    // Stage the kernel's reply frame and post one RDMA_WRITE, inline when it fits. Returns true
+    // if this send was signaled (selective signalling: 1 in SIGNAL_EVERY), so the caller can
     // track the signaled-completion count.
-    bool post_inline(std::uint64_t cursor);
+    bool post_reply(std::uint64_t cursor, const common::frame::FrameView &reply);
 
     GpuRuntime gpu_;                // HIP wrapper: owns GPU mem/stream/sync; the decode
                                     // kernel itself is launched by the bound CoprocessorFn
     GpuRuntime::HbmRing hbm_{};     // the HBM receive-ring buffer itself (device
                                     // ptr + size + dma-buf fd)
-    GpuRuntime::Handoff handoff_{}; // host-mapped GPU->CPU ring: kernel writes
-                                    // {correction,seq}, CPU reads
+    GpuRuntime::Handoff handoff_{}; // host-mapped GPU->CPU ring of reply frames
     std::optional<common::MemoryRegion>
         hbm_ring_; // ibverbs dma-buf MR registering hbm_ (gives the rkey)
 

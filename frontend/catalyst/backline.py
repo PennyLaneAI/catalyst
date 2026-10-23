@@ -90,7 +90,15 @@ _REGISTRY: list[TransportBackend] = [
         max_payload_bytes=None,
         max_reply_bytes=None,
     ),
-    TransportBackend("gpu_verbs", "rdma", "gpu", ("coprocessor",)),
+    TransportBackend(
+        "gpu_verbs",
+        "rdma",
+        "gpu",
+        ("coprocessor",),
+        frame_modes=("bl16", "blv"),
+        max_payload_bytes=None,
+        max_reply_bytes=None,
+    ),
     TransportBackend("hwhs", "rdma", "fpga", ("controller",)),
     TransportBackend("fpga_verbs", "rdma", "fpga", ("controller",), default=False),
     TransportBackend(
@@ -102,7 +110,6 @@ _REGISTRY: list[TransportBackend] = [
         max_payload_bytes=None,
         max_reply_bytes=None,
     ),
-    # Its persistent kernels read BL16 frames only; _frame_config holds them to 8 B.
     TransportBackend(
         "memcpy_gpu",
         "memcpy",
@@ -188,6 +195,12 @@ _DEFAULT_MESSAGE_BYTES = 8
 
 # The keys a coprocessor function's ``init`` receives the placement's message sizes under.
 _FN_MESSAGE_SIZE_KEYS = ("in_bytes", "out_bytes")
+
+# The launch contract this Catalyst's GPU coprocessors follow, the lowest launcher ABI version the
+# runtime accepts (CATALYST_COPROCESSOR_LAUNCHER_MIN_ABI_VERSION in TransportABI.h): frames in both
+# rings, replies carrying the request's fn_id. PennyLane checks it before building a Triton decoder,
+# whose kernel must write replies in the same layout.
+COPROCESSOR_LAUNCHER_ABI_VERSION = 2
 
 # Coprocessor functions whose configuration names files on the compiling machine (a model, a
 # runtime library), so they do not yet run on a coprocessor dispatched to an executor.
@@ -558,8 +571,8 @@ def _frame_config(placement: Placement, transport: str, in_bytes: int, out_bytes
     word; the runtime checks them.
 
     Raises:
-        CompileError: If a node's config sets a frame key, a selected backend cannot carry the
-            layout, or a GPU coprocessor running a persistent kernel would need BLV frames.
+        CompileError: If a node's config sets a frame key, or a selected backend cannot carry the
+            layout. A persistent GPU kernel that cannot read the layout refuses it at launch.
     """
     for node in (placement.controller, *placement.coprocessors):
         given = _parse_config((node.init_args or {}).get("config", ""))
@@ -588,16 +601,6 @@ def _frame_config(placement: Placement, transport: str, in_bytes: int, out_bytes
             )
     if mode == "bl16":
         return {}
-    # TODO: drop this once the persistent GPU kernels read frames through the frame codec.
-    for coproc in placement.coprocessors:
-        if getattr(coproc, "hardware", None) == "gpu" and not _fn_runs_per_message(
-            coproc.coprocessor_fn
-        ):
-            raise CompileError(
-                f"coprocessor function {coproc.coprocessor_fn.symbol_name!r} runs as a persistent "
-                f"GPU kernel, which reads 16 B frames, so it carries messages of at most "
-                f"{_BL16_PAYLOAD_BYTES} B, not {largest} B"
-            )
     return {"frame": "blv", "frame_payload": str(largest)}
 
 

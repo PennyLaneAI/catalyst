@@ -15,10 +15,11 @@
 #include <cstdio>
 #include <exception>
 
+#include "DeviceCopy.hpp"
+#include "Frame.hpp"
 #include "GpuLaunchers.hpp" // CoprocLaunchDesc (via Transport.hpp)
-#include "GpuRuntime.hpp"   // HandoffSlot
 #include "HipCheck.hpp"     // HIP_CHECK
-#include "WireProtocol.hpp"
+#include "TransportABI.h"   // CatalystCoprocessorFnInfo
 #include "echo_decoder.hpp"
 #include "steane_decoder.hpp"
 
@@ -27,90 +28,166 @@
 namespace catalyst::transport::coproc {
 using namespace catalyst::transport::common;
 
+// Threads in the kernel's one block: a single warp on NVIDIA, half a wavefront on AMD, so the
+// block runs in lockstep and its barrier is cheap. The lead polls; for a BLV frame all of them
+// share the payload copy (see device_copy). A 16 B frame needs one load and one store, so the lead
+// handles it alone: about 4.1 us round trip on the setup device_copy describes, the same as
+// with all 32 threads running it.
+constexpr unsigned KERNEL_THREADS = 32;
+
 // How often the spin loop samples the teardown flag. Must be a power of two: the
 // loop tests `(spins & (STOP_POLL_INTERVAL - 1)) == 0`, i.e. spins that are a
 // multiple of the interval.
 constexpr std::uint32_t STOP_POLL_INTERVAL = 1024;
 
+/// A device decoder: reads `len` payload bytes from `in`, writes at most `cap` reply bytes to
+/// `out`, and returns how many it wrote, which become the reply frame's length. Every thread of a
+/// group of `lanes` makes the same call, this one being `lane`, and all must return the same
+/// length; device_copy shares a write among them. It cannot fail a message. The host zero-fills
+/// the reply past its length, which is cheaper there than over PCIe.
+using DeviceDecodeFn = std::uint32_t (*)(const std::uint8_t *in, std::uint32_t len,
+                                         std::uint32_t fn_id, std::uint8_t *out, std::uint32_t cap,
+                                         std::uint32_t lane, std::uint32_t lanes);
+
 /**
- * @brief Persistent kernel templated on a device decoder: polls the HBM ring
- * buffer, executes the inline decoder, and writes corrections to the host
- * handoff buffer.
+ * @brief Persistent kernel templated on a device decoder: polls the request ring, runs the
+ * decoder on each message, and answers it with a reply frame in the handoff ring.
  *
- * Launched once with a single thread and runs until `total` shots
- * are done or the host raises `*stop`.
+ * Launched once as one block of KERNEL_THREADS threads, and runs until `total` messages are done
+ * or the host raises `*stop`. Both rings hold frames in the layout `ring` describes (see
+ * CoprocLaunchDesc).
  *
- * @tparam DECODE Per-shot __device__ decode: syndrome word in, error qubit index out.
- * @param ring Request ring in local HBM, K_RING_SLOTS slots, written by the
- *             peer's RDMA_WRITEs. Slot `cursor % K_RING_SLOTS` carries shot
- *             `cursor`, published via its `seq_num` trailer.
- * @param handoff Host-mapped reply ring, same slot count; this kernel writes
- *                {correction, seq} and the CPU reads it.
+ * @tparam DECODE The device decoder.
+ * @tparam BL16 Whether `ring` holds 16 B frames. A compile-time mode keeps the BLV branches out of
+ *              the 16 B hot loop, which costs about 0.1 us per message otherwise (MI210).
+ * @param requests Request ring, written by the peer: RDMA writes into HBM, or the host.
+ * @param replies Host-mapped reply ring the CPU reads, same layout.
  * @param stop Host-mapped teardown flag; nonzero means exit. Sampled only every
  *             STOP_POLL_INTERVAL spins (host-coherent read over PCIe).
- * @param total Number of shots to process, or 0 to run until stopped.
+ * @param total Number of messages to process, or 0 to run until stopped.
+ * @param ring The frame layout and slot geometry of both rings.
  */
-template <std::int64_t (*DECODE)(std::uint64_t)>
-__global__ void fused(volatile PayloadSlot *ring, volatile HandoffSlot *handoff,
-                      volatile std::uint32_t *stop, std::uint64_t total) {
-    if (threadIdx.x != 0 || blockIdx.x != 0) {
+template <DeviceDecodeFn DECODE, bool BL16>
+__global__ void fused(const std::uint8_t *requests, std::uint8_t *replies,
+                      volatile std::uint32_t *stop, std::uint64_t total, frame::RingGeometry ring) {
+    if (blockIdx.x != 0) {
         return;
     }
+    const std::uint32_t lane = threadIdx.x;
+    const std::uint32_t lanes = blockDim.x;
+    const bool lead = lane == 0;
+    constexpr bool bl16 = BL16;
+    // A 16 B frame is decoded and published by one thread, so the others leave, and the lead
+    // runs with no barrier on its hot path.
+    if (bl16 && !lead) {
+        return;
+    }
+    const auto cap = static_cast<std::uint32_t>(ring.stride - sizeof(frame::BlvHeader) -
+                                                frame::BLV_COMPLETION_BYTES);
+    __shared__ bool halted; // the lead's stop decision, one for the whole block
     for (std::uint64_t cursor = 0; total == 0 || cursor < total; ++cursor) {
         const std::uint32_t expect = static_cast<std::uint32_t>(cursor + 1);
-        const std::size_t index = cursor & (K_RING_SLOTS - 1);
-        volatile std::uint32_t *sptr = &ring[index].p.seq_num;
-        // Poll the request ring on local HBM. The stop flag is a host-coherent
-        // read over PCIe, so sample it only every STOP_POLL_INTERVAL spins to
-        // keep it off the request-detection hot path. Stop is a teardown flag.
-        for (std::uint32_t spins = 0; *sptr != expect; ++spins) {
-            if ((spins & (STOP_POLL_INTERVAL - 1)) == 0u && stop && *stop != 0) {
-                return;
+        const std::uint8_t *req = requests + ring.slot_offset(cursor);
+        std::uint8_t *rep = replies + ring.slot_offset(cursor);
+        // The lead polls the request's completion word and, for BLV, the others wait at the
+        // barrier, so the block makes one stop decision and never splits at a barrier. The stop
+        // flag is a host-coherent read over PCIe, so it is sampled only every STOP_POLL_INTERVAL
+        // spins to keep it off the request-detection hot path. Stop is a teardown flag.
+        bool stopping = false;
+        if (lead) {
+            const volatile std::uint32_t *done =
+                reinterpret_cast<const volatile std::uint32_t *>(req + ring.poll_offset());
+            for (std::uint32_t spins = 0; *done != expect; ++spins) {
+                if ((spins & (STOP_POLL_INTERVAL - 1)) == 0u && stop && *stop != 0) {
+                    stopping = true;
+                    break;
+                }
             }
         }
-        __threadfence_system(); // seq observed -> ensure value read isn't hoisted/stale
-        // TODO: read the frame through the frame codec, so the kernel takes BLV frames too.
-        const std::uint64_t syndrome = ring[index].p.value;
-        volatile HandoffSlot *slot = &handoff[index];
-        HandoffSlot reply{
-            .correction = DECODE(syndrome),
-            .seq = expect,
-            .pad = 0,
-        };
-        if constexpr (sizeof(HandoffSlot) <= sizeof(int4)) {
-            // Reply fits one 16 B aligned store: publish correction+seq together
-            // so the CPU cannot observe the seq trailer without its matching
-            // correction. A single store has no intra-slot order to fence; one
-            // trailing system fence pushes it into host-visible coherent memory.
-            // NOTE: only lowers to a single global_store_dwordx4 at -O2+ (the build
-            // defaults to RelWithDebInfo); at -O0 it splits into multiple stores.
-            *reinterpret_cast<int4 *>(const_cast<HandoffSlot *>(slot)) =
-                *reinterpret_cast<const int4 *>(&reply);
+        if (!bl16) { // share the lead's decision; a 16 B frame's lead is alone
+            if (lead) {
+                halted = stopping;
+            }
+            __syncthreads();
+            stopping = halted;
+        }
+        if (stopping) {
+            return;
+        }
+        __threadfence_system(); // completion observed -> the payload read below is not stale
+        if (bl16) {
+            // One 16 B load brings the payload and fn_id together; the fence above keeps it after
+            // the poll.
+            const int4 raw = *reinterpret_cast<const int4 *>(req);
+            Payload request;
+            __builtin_memcpy(&request, &raw, sizeof(request));
+            // The whole 16 B reply frame is built here and published in one aligned store, so
+            // the CPU cannot see its seq without its payload and fn_id.
+            // NOTE: only lowers to a single global_store_dwordx4 at -O2+, which the build sets.
+            alignas(16)
+                Payload reply{.value = 0, .decoder_id = request.decoder_id, .seq_num = expect};
+            // The lead decodes alone (a group of one), so the 8 B payload and reply stay in its
+            // registers.
+            DECODE(reinterpret_cast<const std::uint8_t *>(&request.value), PAYLOAD_DATA_BYTES,
+                   request.decoder_id, reinterpret_cast<std::uint8_t *>(&reply.value),
+                   PAYLOAD_DATA_BYTES, 0, 1);
+            *reinterpret_cast<int4 *>(rep) = *reinterpret_cast<const int4 *>(&reply);
             __threadfence_system();
-        } else {
-            // Larger reply cannot be published atomically: fall back to the
-            // seq-as-trailer protocol (write payload, fence, release seq, fence).
-            slot->correction = reply.correction;
-            __threadfence_system();
-            slot->seq = reply.seq;
+            continue;
+        }
+        // BLV: the payload, then the header, then the completion word last.
+        const volatile frame::BlvHeader *rh =
+            reinterpret_cast<const volatile frame::BlvHeader *>(req);
+        const std::uint32_t fn_id = rh->fn_id;
+        const std::uint32_t len = rh->len < cap ? rh->len : cap;
+        std::uint8_t *out = rep + ring.data_offset();
+        const std::uint32_t written =
+            DECODE(req + ring.data_offset(), len, fn_id, out, cap, lane, lanes);
+        // The header, as two 16 B stores built in registers: a local BlvHeader would live in
+        // scratch memory, which slows every message, 16 B frames included.
+        if (lead) {
+            int4 *h = reinterpret_cast<int4 *>(rep);
+            h[0] = int4{static_cast<int>(frame::BLV_MAGIC), static_cast<int>(frame::BLV_VERSION),
+                        static_cast<int>(fn_id), static_cast<int>(expect)}; // flags 0
+            h[1] = int4{0, static_cast<int>(written), 0, 0};                // round, len, t_ptp_ns
+        }
+        // Every thread's share of the frame is visible before the lead writes its completion.
+        __threadfence_system();
+        __syncthreads();
+        if (lead) {
+            *reinterpret_cast<volatile std::uint32_t *>(rep + ring.poll_offset()) = expect;
             __threadfence_system();
         }
     }
 }
 
-// Launch fused<DECODE> on the session-owned stream, wired to the datapath in
-// `desc`.
-template <std::int64_t (*DECODE)(std::uint64_t)> static void launch(const CoprocLaunchDesc *desc) {
-    hipLaunchKernelGGL((fused<DECODE>), dim3(1), dim3(1), 0, static_cast<hipStream_t>(desc->stream),
-                       reinterpret_cast<PayloadSlot *>(desc->ring),
-                       reinterpret_cast<HandoffSlot *>(desc->handoff),
-                       reinterpret_cast<std::uint32_t *>(desc->stop), desc->total);
+static_assert(offsetof(frame::BlvHeader, version) == 4 && offsetof(frame::BlvHeader, flags) == 6 &&
+                  offsetof(frame::BlvHeader, fn_id) == 8 && offsetof(frame::BlvHeader, seq) == 12 &&
+                  offsetof(frame::BlvHeader, round) == 16 &&
+                  offsetof(frame::BlvHeader, len) == 20 &&
+                  offsetof(frame::BlvHeader, t_ptp_ns) == 24,
+              "fused writes the BLV header as two int4 in this layout");
+
+// Launch fused<DECODE> on the session-owned stream, wired to the datapath in `desc`.
+template <DeviceDecodeFn DECODE> static void launch(const CoprocLaunchDesc *desc) {
+    TP_CHECK(desc->frame_mode == static_cast<std::uint32_t>(frame::Mode::BL16) ||
+                 desc->frame_mode == static_cast<std::uint32_t>(frame::Mode::BLV),
+             "GPU launcher: frame mode %u is not implemented", desc->frame_mode);
+    const frame::RingGeometry ring{
+        .mode = static_cast<frame::Mode>(desc->frame_mode),
+        .slots = desc->ring_slots,
+        .stride = desc->slot_stride,
+    };
+    auto *kernel = ring.mode == frame::Mode::BL16 ? fused<DECODE, true> : fused<DECODE, false>;
+    hipLaunchKernelGGL(
+        kernel, dim3(1), dim3(KERNEL_THREADS), 0, static_cast<hipStream_t>(desc->stream),
+        static_cast<const std::uint8_t *>(desc->ring), static_cast<std::uint8_t *>(desc->handoff),
+        static_cast<volatile std::uint32_t *>(desc->stop), desc->total, ring);
     HIP_CHECK(hipGetLastError(), "kernel launch");
 }
 
 // Make sure we don't throw exception across C ABI.
-template <std::int64_t (*DECODE)(std::uint64_t)>
-static int launch_noexcept(const CoprocLaunchDesc *desc) noexcept {
+template <DeviceDecodeFn DECODE> static int launch_noexcept(const CoprocLaunchDesc *desc) noexcept {
     try {
         launch<DECODE>(desc);
         return 0;
@@ -123,13 +200,23 @@ static int launch_noexcept(const CoprocLaunchDesc *desc) noexcept {
     }
 }
 
+// Both launchers are built for this runtime's frame layout (see CoprocLaunchDesc).
+static const CatalystCoprocessorFnInfo LAUNCHER_INFO{
+    .abi_version = CATALYST_COPROCESSOR_FN_ABI_VERSION,
+    .reserved = 0,
+    .init = nullptr,
+    .fini = nullptr,
+};
+
 extern "C" int gpu_echo_launcher(const CoprocLaunchDesc *desc, void *) {
     return launch_noexcept<echo_decode>(desc);
 }
+extern "C" const CatalystCoprocessorFnInfo *gpu_echo_launcher_info() { return &LAUNCHER_INFO; }
 
 extern "C" int gpu_steane_launcher(const CoprocLaunchDesc *desc, void *) {
     return launch_noexcept<steane_decode>(desc);
 }
+extern "C" const CatalystCoprocessorFnInfo *gpu_steane_launcher_info() { return &LAUNCHER_INFO; }
 
 int default_echo_launcher(const CoprocLaunchDesc *desc, void *ctx) {
     return gpu_echo_launcher(desc, ctx);

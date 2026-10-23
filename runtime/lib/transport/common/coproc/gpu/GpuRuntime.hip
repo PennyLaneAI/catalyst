@@ -71,14 +71,12 @@ GpuRuntime::HbmRing GpuRuntime::alloc_hbm_ring(std::size_t bytes) {
     return r;
 }
 
-GpuRuntime::Handoff GpuRuntime::alloc_handoff(std::size_t num_slots) {
+GpuRuntime::Handoff GpuRuntime::alloc_handoff(std::size_t bytes) {
     Handoff h;
-    h.num_slots = num_slots;
-    HIP_CHECK(hipHostMalloc((void **)&h.host, num_slots * sizeof(HandoffSlot),
-                            hipHostMallocMapped | hipHostMallocCoherent),
+    HIP_CHECK(hipHostMalloc((void **)&h.host, bytes, hipHostMallocMapped | hipHostMallocCoherent),
               "hipHostMalloc(handoff)");
     // Zero every slot so a stale seq can never look like a published reply.
-    std::fill_n(h.host, num_slots, HandoffSlot{});
+    std::fill_n(h.host, bytes, std::uint8_t{0});
     HIP_CHECK(hipHostGetDevicePointer((void **)&h.dev, h.host, 0),
               "hipHostGetDevicePointer(handoff)");
     HIP_CHECK(hipHostMalloc((void **)&h.stop_host, sizeof(std::uint32_t),

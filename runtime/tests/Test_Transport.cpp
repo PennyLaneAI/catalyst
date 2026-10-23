@@ -198,6 +198,49 @@ TEST_CASE("set_coprocessor_fn binds through the setter the backend implements", 
     __catalyst__transport__destroy(s);
 }
 
+// Launchers for the launch-once stub: one with no info, one built for the version-1 frame layout,
+// and one built for this runtime's.
+extern "C" int capi_test_launcher_no_info(const catalyst::transport::CoprocLaunchDesc *, void *) {
+    return 0;
+}
+extern "C" int capi_test_launcher_v1(const catalyst::transport::CoprocLaunchDesc *, void *) {
+    return 0;
+}
+extern "C" const catalyst::transport::CoprocessorFnInfo *capi_test_launcher_v1_info() {
+    static constexpr catalyst::transport::CoprocessorFnInfo info{.abi_version = 1};
+    return &info;
+}
+extern "C" int capi_test_launcher(const catalyst::transport::CoprocLaunchDesc *, void *) {
+    return 0;
+}
+extern "C" const catalyst::transport::CoprocessorFnInfo *capi_test_launcher_info() {
+    static constexpr catalyst::transport::CoprocessorFnInfo info{
+        .abi_version = CATALYST_COPROCESSOR_LAUNCHER_MIN_ABI_VERSION};
+    return &info;
+}
+
+TEST_CASE("set_coprocessor_fn binds a launcher built for this frame layout", "[transport]") {
+    auto *s = __catalyst__transport__create(STUB_BACKEND_PATH, "launch_once",
+                                            CATALYST_TRANSPORT_ROLE_COPROCESSOR, "");
+    REQUIRE(s != nullptr);
+    CHECK(__catalyst__transport__set_coprocessor_fn(s, "capi_test_launcher") ==
+          CATALYST_TRANSPORT_OK);
+    __catalyst__transport__destroy(s);
+}
+
+TEST_CASE("set_coprocessor_fn refuses a launcher built for an older frame layout", "[transport]") {
+    // Its engine would write replies the backend never recognises, so the session would hang.
+    for (const char *symbol : {"capi_test_launcher_no_info", "capi_test_launcher_v1"}) {
+        auto *s = __catalyst__transport__create(STUB_BACKEND_PATH, "launch_once",
+                                                CATALYST_TRANSPORT_ROLE_COPROCESSOR, "");
+        REQUIRE(s != nullptr);
+        CerrCapture cerr;
+        CHECK(__catalyst__transport__set_coprocessor_fn(s, symbol) == CATALYST_TRANSPORT_ERR);
+        CHECK(cerr.str().find("built for an older frame layout") != std::string::npos);
+        __catalyst__transport__destroy(s);
+    }
+}
+
 TEST_CASE("the __call variants raise an error when the call fails", "[transport]") {
     std::uint8_t buf[8] = {};
     std::uint64_t samples[1] = {};
