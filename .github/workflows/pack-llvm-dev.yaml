@@ -12,6 +12,11 @@ name: Package catalyst-llvm-dev
 # fails fast if either is missing, rather than duplicating their build steps here and letting the
 # two drift apart. On a cache miss, run the corresponding wheel workflow first and retry.
 #
+# Both archives are then published to the llvm channel of the dev-package bucket by
+# upload-dev-packages.yaml. The package version is the pinned LLVM commit, not the date, so a run
+# that re-packs an unchanged pin finds its version already in the bucket; that run skips the upload
+# and still succeeds.
+#
 # Note that the build cache is keyed on the pinned LLVM commit, *not* on
 # LLVM_DISTRIBUTION_COMPONENTS, while install-distribution is generated at configure time. After
 # changing that list, `make pack-llvm-dev` warns that the cached build predates it; drop the LLVM
@@ -179,3 +184,25 @@ jobs:
         path: ${{ github.workspace }}/mlir/dist/catalyst-llvm-dev-*.tar.gz
         retention-days: 14
         if-no-files-found: error
+
+  # Both platforms or none: the called workflow refuses to publish a partial set, so a failure in
+  # either packing job above leaves the llvm channel untouched.
+  upload:
+    name: Upload catalyst-llvm-dev to S3
+    needs: [linux-x86-64, macos-arm64]
+    permissions:
+      id-token: write   # OIDC: required for the called workflow to assume the AWS role
+      contents: read
+      actions: read
+    uses: ./.github/workflows/upload-dev-packages.yaml
+    with:
+      channel: llvm
+      platforms: Linux-x86_64,Darwin-arm64
+      # The LLVM pin usually has not moved since the last run, so re-packing it reproduces a version
+      # that is already published. Repackaging on an unchanged pin is a no-op by design, not an
+      # error: leave the published set alone and finish green. A moved pin yields a new version and
+      # publishes normally.
+      skip_if_exists: true
+    secrets:
+      AWS_ASSUME_S3_ROLE_ARN: ${{ secrets.AWS_ASSUME_S3_ROLE_ARN }}
+      AWS_REGION: ${{ secrets.AWS_REGION }}
