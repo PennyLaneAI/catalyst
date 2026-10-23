@@ -818,6 +818,10 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* Adjoint lowering now correctly handles gate control values computed inside loops or
+  conditional branches.
+  [(#3342)](https://github.com/PennyLaneAI/catalyst/pull/3342)
+
 * Scatter ops with batching dimensions, such as those from a batched `jnp.linalg.det`, no longer
   crash `scatter-lowering`, and will instead be rejected as intended.
   In addition, to support batched scatter operations an additional pass is run in the HLO lowering
