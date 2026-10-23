@@ -128,6 +128,15 @@ def qjit(
         async_qnodes (bool): Experimental support for automatically executing
             QNodes asynchronously, if supported by the device runtime.
         target (str): The compilation target.
+
+            - ``"jaxpr"``: The function is traced to a JAXPR.
+            - ``"mlir"``: The function is lowered to MLIR, without running the MLIR passes.
+            - ``"mlir_opt"``: The MLIR passes are run, without translating the result to LLVM IR.
+            - ``"llvmir"``: The function is compiled to LLVM IR and object code, without linking.
+            - ``"binary"`` (default): The function is compiled to a shared library.
+
+            Regardless of the target, the function is compiled to a shared library when it is
+            called.
         keep_intermediate (Union[str, int, bool]): Level controlling intermediate file generation.
 
             - ``False`` or ``0`` or ``"none"`` or ``None`` (default): No intermediate file is kept.
@@ -752,15 +761,18 @@ class QJIT(CatalystCallable):
         self.workspace = self._get_workspace()
 
         # TODO: awkward, refactor or redesign the target feature
-        if self.compile_options.target in ("jaxpr", "mlir", "llvmir", "binary"):
+        if self.compile_options.target in ("jaxpr", "mlir", "mlir_opt", "llvmir", "binary"):
             self.jaxpr, self.out_type, self.out_treedef, self.c_sig = self.capture(args, **kwargs)
 
-        if self.compile_options.target in ("mlir", "llvmir", "binary"):
+        if self.compile_options.target in ("mlir", "mlir_opt", "llvmir", "binary"):
             self._configure_backline()
             self.mlir_module = self.generate_ir()
 
-        if self.compile_options.target in ("llvmir", "binary"):
-            self.compiled_function, self.llvm_ir = self.compile()
+        if self.compile_options.target in ("mlir_opt", "llvmir", "binary"):
+            with _target_compile_options(self.compile_options):
+                self.compiled_function, llvm_ir = self.compile()
+            # With target="mlir_opt", the IR returned by the compiler is MLIR instead of LLVM IR.
+            self.llvm_ir = None if self.compile_options.target == "mlir_opt" else llvm_ir
 
         if self.compile_options.target in ("binary",) and self.compile_options.link:
             self.fn_cache.insert(self.compiled_function, args, self.out_treedef, self.workspace)
@@ -1188,3 +1200,27 @@ def _ensure_capture_mode(enable_capture: bool):
             qp.capture.enable()
         else:
             qp.capture.disable()
+
+
+@contextmanager
+def _target_compile_options(options: CompileOptions):
+    """Set the ``lower_to_llvm`` and ``link`` compile options for the compilation target, for the
+    duration of the context.
+
+    The original values are restored on exit, since the function must still be compiled to a
+    shared library when it is called.
+
+    Args:
+        options (CompileOptions): The compile options to set for their target.
+    """
+    original_values = options.lower_to_llvm, options.link
+
+    if options.target == "mlir_opt":
+        options.lower_to_llvm, options.link = False, False
+    elif options.target == "llvmir":
+        options.lower_to_llvm, options.link = True, False
+
+    try:
+        yield
+    finally:
+        options.lower_to_llvm, options.link = original_values

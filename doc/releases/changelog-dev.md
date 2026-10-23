@@ -177,6 +177,11 @@
 
 <h3>Improvements 🛠</h3>
 
+* The ``target`` argument of :func:`~catalyst.qjit` now accepts ``"mlir_opt"``, which stops the
+  ahead-of-time compilation after running the MLIR passes, without translating the program to
+  LLVM IR. Calling the function still compiles it to a shared library.
+  [(#3391)](https://github.com/PennyLaneAI/catalyst/pull/3391)
+
 * A new `user-transform-stage` pipeline runs the quantum compilation stage only up to and including
   `apply-transform-sequence`, where the user transforms are applied. 
   [(#3345)](https://github.com/PennyLaneAI/catalyst/pull/3345)
@@ -826,6 +831,10 @@
 <h3>Deprecations 👋</h3>
 
 <h3>Bug fixes 🐛</h3>
+
+* Ahead-of-time compilation with ``target="llvmir"`` no longer links the program into a shared
+  library. Calling the function still compiles it to a shared library.
+  [(#3391)](https://github.com/PennyLaneAI/catalyst/pull/3391)
 
 * Scatter ops with batching dimensions, such as those from a batched `jnp.linalg.det`, no longer
   crash `scatter-lowering`, and will instead be rejected as intended.
