@@ -638,11 +638,11 @@ class TestPreprocessHybridOp:
             _ = catalyst_decompose(tape, None, grad_method="fd", target_gates={"X"})
 
 
-class TestAdjointCallableLazyFalse:
-    """Test adjoint(callable, lazy=False) in @qjit."""
+class TestAdjointCallable:
+    """Test adjoint(callable) in @qjit."""
 
-    def test_qp_adjoint_callable_lazy_false_with_for_loop(self):
-        """Test that qp.adjoint(callable, lazy=False) works."""
+    def test_qp_adjoint_callable_with_for_loop(self):
+        """Test that qp.adjoint(callable) works."""
         dev = qp.device("lightning.qubit", wires=6)
 
         @qjit(capture=False)
@@ -652,13 +652,13 @@ class TestAdjointCallableLazyFalse:
             def loop(i):
                 qp.Toffoli(wires=[i, i + 1, i + 2])
 
-            qp.adjoint(lambda: loop(), lazy=False)()
+            qp.adjoint(lambda: loop())()
             return qp.state()
 
         result = circuit()
         assert np.isclose(result[0], 1.0)
 
-    def test_adjoint_callable_lazy_false_mixed_ops_identity(self):
+    def test_adjoint_callable_mixed_ops_identity(self):
         """Test adjoint(sub) == Identity for a callable with mixed gates and for_loop."""
         dev = qp.device("lightning.qubit", wires=6)
 
@@ -676,15 +676,15 @@ class TestAdjointCallableLazyFalse:
                 loop()
                 qp.T(wires=2)
 
-            qp.adjoint(sub, lazy=False)()
+            qp.adjoint(sub)()
             sub()
             return qp.state()
 
         result = circuit()
         assert np.isclose(result[0], 1.0)
 
-    def test_adjoint_callable_lazy_false_with_nested_hybrid_adjoint(self):
-        """Test adjoint(callable, lazy=False) when the callable contains a HybridAdjoint.
+    def test_adjoint_callable_with_nested_hybrid_adjoint(self):
+        """Test adjoint(callable) when the callable contains a HybridAdjoint.
 
         It's expected to produce a HybridAdjoint of HybridAdjoint(RX) so that the MLIR
         adjoint-lowering pass can handle the reversal.
@@ -701,7 +701,7 @@ class TestAdjointCallableLazyFalse:
         @qp.qnode(dev)
         def circuit():
             g()
-            qp.adjoint(g, lazy=False)()
+            qp.adjoint(g)()
             return qp.state()
 
         result = circuit()

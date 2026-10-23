@@ -331,7 +331,7 @@ class TestAdjoint:
         @qp.qnode(qp.device(backend, wires=2))
         def example_circuit():
             """Example provided by Tom in Slack"""
-            qp.adjoint(qp.StatePrep, 0)([0, 1], 1)
+            qp.adjoint(qp.StatePrep)([0, 1], 1)
             return qp.state()
 
         expected = example_circuit()
@@ -344,7 +344,7 @@ class TestAdjoint:
         @qp.qnode(qp.device(backend, wires=2))
         def example_circuit():
             """Changed from above to use qp.BasisState"""
-            qp.adjoint(qp.BasisState, 0)([1], 1)
+            qp.adjoint(qp.BasisState)([1], 1)
             return qp.state()
 
         expected = example_circuit()
