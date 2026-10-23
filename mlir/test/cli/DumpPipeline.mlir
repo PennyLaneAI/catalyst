@@ -16,6 +16,7 @@
 // RUN: catalyst --tool=opt %s --catalyst-pipeline="pipe1(split-multiple-tapes;apply-transform-sequence),pipe2(inline-nested-module)" --dump-catalyst-pipeline --verify-diagnostics 2>&1 | FileCheck %s --check-prefix=CHECK-CUSTOM
 // RUN: catalyst --tool=opt %s -cse --dump-catalyst-pipeline --verify-diagnostics 2>&1 | FileCheck %s --check-prefix=CHECK-ONE-PASS
 // RUN: not catalyst --tool=opt %s -cse --catalyst-pipeline="pipe1(split-multiple-tapes;apply-transform-sequence),pipe2(inline-nested-module)" --dump-catalyst-pipeline --verify-diagnostics 2>&1 | FileCheck %s --check-prefix=CHECK-FAIL
+// RUN: catalyst --tool=opt %s --catalyst-pipeline="pipe(user-transform-stage)" --dump-catalyst-pipeline --verify-diagnostics 2>&1 | FileCheck %s --check-prefix=CHECK-USER-TRANSFORM
 
 func.func @foo() {
     return
@@ -41,3 +42,10 @@ func.func @foo() {
 
 // CHECK-FAIL: --catalyst-pipeline option can't be used with individual pass options or -pass-pipeline.
 // CHECK-FAIL: Compilation failed
+
+// CHECK-USER-TRANSFORM:      Pass Manager with
+// CHECK-USER-TRANSFORM-NEXT: builtin.module(
+// CHECK-USER-TRANSFORM-NEXT:   canonicalize
+// CHECK-USER-TRANSFORM:        apply-transform-sequence
+// CHECK-USER-TRANSFORM-NEXT:   )
+// CHECK-USER-TRANSFORM-NEXT: )
