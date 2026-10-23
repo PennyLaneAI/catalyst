@@ -138,10 +138,6 @@ def test_gridsynth_ppr_basis(param, eps):
 
 
 @pytest.mark.parametrize("ppr_basis", [False, True])
-@pytest.mark.xfail(
-    reason="graph decomposition does not yet work gridsynth",
-    strict=True,
-)
 def test_gridsynth_specs(ppr_basis):
     """Test that specs counts the runtime gridsynth decomposition without extra wires."""
     eps = 1e-4
@@ -167,10 +163,6 @@ def test_gridsynth_specs(ppr_basis):
 @pytest.mark.parametrize("ppr_basis", [False, True])
 # Within the epsilon ranges that the resource hints are fitted on.
 @pytest.mark.parametrize("eps", [1e-4, 1e-6])
-@pytest.mark.xfail(
-    reason="graph decomposition does not yet work gridsynth",
-    strict=True,
-)
 def test_gridsynth_specs_matches_runtime(eps, ppr_basis, method):
     """Test that the specs T-count estimate matches the T-count executed at runtime, on average
     over random angles."""
@@ -249,10 +241,6 @@ def test_mixed_fallback_gridsynth_specs_wires(ppr_basis):
 @pytest.mark.parametrize("op", [qp.RZ, qp.PhaseShift])
 @pytest.mark.parametrize("eps", [1e-2, 1e-4, 1e-6])
 @pytest.mark.parametrize("ppr_basis", [False, True])
-@pytest.mark.xfail(
-    reason="graph decomposition does not yet work gridsynth",
-    strict=True,
-)
 def test_mixed_gridsynth_samples(param, op, eps, ppr_basis):
     """Test that every sampled sequence of the mixed method is close to the target. For the
     diamond-norm error 2 * eps of the mixture, each branch satisfies Re(w) >= sqrt(1 - eps), so its
