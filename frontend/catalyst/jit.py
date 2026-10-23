@@ -614,7 +614,11 @@ class QJIT(CatalystCallable):
             # Static arguments require values, so we cannot AOT compile.
             and not self.compile_options.static_argnums
         ):
-            self.aot_compile()
+            # Errors are only logged here, since the function is compiled again when it is called.
+            try:
+                self.aot_compile()
+            except Exception as e:  # pylint: disable=broad-exception-caught
+                logger.exception(e, exc_info=True)
 
         super().__init__("user_function")
 
@@ -749,28 +753,14 @@ class QJIT(CatalystCallable):
 
         # TODO: awkward, refactor or redesign the target feature
         if self.compile_options.target in ("jaxpr", "mlir", "llvmir", "binary"):
-            try:
-                self.jaxpr, self.out_type, self.out_treedef, self.c_sig = self.capture(
-                    args, **kwargs
-                )
-            except Exception as e:  # pylint: disable=broad-exception-caught
-                logger.exception(e, exc_info=True)
-                return
+            self.jaxpr, self.out_type, self.out_treedef, self.c_sig = self.capture(args, **kwargs)
 
         if self.compile_options.target in ("mlir", "llvmir", "binary"):
             self._configure_backline()
-            try:
-                self.mlir_module = self.generate_ir()
-            except Exception as e:  # pylint: disable=broad-exception-caught
-                logger.exception(e, exc_info=True)
-                return
+            self.mlir_module = self.generate_ir()
 
         if self.compile_options.target in ("llvmir", "binary"):
-            try:
-                self.compiled_function, self.llvm_ir = self.compile()
-            except Exception as e:  # pylint: disable=broad-exception-caught
-                logger.exception(e, exc_info=True)
-                return
+            self.compiled_function, self.llvm_ir = self.compile()
 
         if self.compile_options.target in ("binary",) and self.compile_options.link:
             self.fn_cache.insert(self.compiled_function, args, self.out_treedef, self.workspace)
