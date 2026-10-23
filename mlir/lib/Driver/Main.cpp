@@ -50,6 +50,7 @@
 
 #include "RegisterAllPasses.h"
 
+#include "Executor/Transforms/BufferizableOpInterfaceImpl.h"
 #include "Transport/Transforms/BufferizableOpInterfaceImpl.h"
 
 using namespace catalyst;
@@ -358,6 +359,7 @@ int QuantumDriverMainFromCL(int argc, char **argv) {
     catalyst::quantum::registerBufferizableOpInterfaceExternalModels(registry);
     catalyst::qecp::registerBufferizableOpInterfaceExternalModels(registry);
     catalyst::transport::registerBufferizableOpInterfaceExternalModels(registry);
+    catalyst::executor::registerBufferizableOpInterfaceExternalModels(registry);
 
     // Register and parse command line options.
     std::string inputFilename, outputFilename;

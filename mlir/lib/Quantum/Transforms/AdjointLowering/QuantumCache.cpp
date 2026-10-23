@@ -97,10 +97,12 @@ QuantumCache QuantumCache::initialize(Region &region, OpBuilder &builder, Locati
     auto paramVectorType = ArrayListType::get(ctx, builder.getF64Type());
     auto intVectorType = ArrayListType::get(ctx, builder.getI64Type());
     auto wireVectorType = ArrayListType::get(ctx, builder.getI64Type());
+    auto controlValueVectorType = ArrayListType::get(ctx, builder.getI1Type());
     auto controlFlowTapeType = ArrayListType::get(ctx, builder.getIndexType());
     auto paramVector = ListInitOp::create(builder, loc, paramVectorType);
     auto intVector = ListInitOp::create(builder, loc, intVectorType);
     auto wireVector = ListInitOp::create(builder, loc, wireVectorType);
+    auto controlValueVector = ListInitOp::create(builder, loc, controlValueVectorType);
 
     // Initialize the tapes that store the structure of control flow.
     DenseMap<Operation *, TypedValue<ArrayListType>> controlFlowTapes;
@@ -113,6 +115,7 @@ QuantumCache QuantumCache::initialize(Region &region, OpBuilder &builder, Locati
     return quantum::QuantumCache{.paramVector = paramVector,
                                  .intVector = intVector,
                                  .wireVector = wireVector,
+                                 .controlValueVector = controlValueVector,
                                  .controlFlowTapes = controlFlowTapes};
 }
 
@@ -120,6 +123,7 @@ void QuantumCache::emitDealloc(OpBuilder &builder, Location loc) {
     ListDeallocOp::create(builder, loc, paramVector);
     ListDeallocOp::create(builder, loc, intVector);
     ListDeallocOp::create(builder, loc, wireVector);
+    ListDeallocOp::create(builder, loc, controlValueVector);
     for (const auto &[_key, controlFlowTape] : controlFlowTapes) {
         ListDeallocOp::create(builder, loc, controlFlowTape);
     }

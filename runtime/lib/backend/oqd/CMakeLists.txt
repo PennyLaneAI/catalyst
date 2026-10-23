@@ -20,3 +20,5 @@ target_include_directories(rtd_oqd_device
 set_property(TARGET rtd_oqd_device PROPERTY POSITION_INDEPENDENT_CODE ON)
 
 target_link_libraries(rtd_oqd_device PRIVATE rt_OQD_capi)
+
+catalyst_runtime_install(rtd_oqd_device)

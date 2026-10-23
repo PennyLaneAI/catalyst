@@ -17,6 +17,7 @@ import ctypes.util
 import dataclasses
 import os
 import platform
+import shutil
 import subprocess
 from pathlib import Path
 from types import SimpleNamespace
@@ -30,23 +31,30 @@ from pennylane.backline import Transport
 from catalyst import Executor, compiled_functions, qjit
 from catalyst.backline import (
     _EXECUTOR_RUNTIME_PLUGINS,
+    _REGISTRY,
     _TRANSPORT_PASSES,
     _builtin_fn_lib_dirs,
     _check_builtin_fn_lib,
+    _config_text,
     _coprocessor_fn_libs,
     _find_builtin_fn_lib,
     _insert_passes,
     _installed_builtin_fn_lib_dirs,
     _message_size,
+    _parse_config,
     _qec_pass_specs,
     _realize_executor,
     _remote_fn_lib_name,
     _resolve_backend,
     _resolve_backend_lib,
     _runs_per_message_on_gpu,
+    _select_backend,
+    backend_transports,
     device_pass_pipeline,
     launch_executors,
+    node_executor,
     placement_pipeline,
+    register_backend,
     remote_device_lib,
     serialize_backline,
 )
@@ -70,6 +78,13 @@ def _net_transport():
         yield
     finally:
         getattr(_bl, "_transports", {}).pop("net", None)
+
+
+@pytest.fixture
+def isolated_registry(monkeypatch):
+    """Let a test register backends and load plugins without leaking them into other tests."""
+    monkeypatch.setattr("catalyst.backline._REGISTRY", list(_REGISTRY))
+    monkeypatch.setattr("catalyst.backline._plugins_loaded", False)
 
 
 class _Attached:
@@ -165,6 +180,16 @@ def test_single_coprocessor():
     assert len(d["coprocessors"]) == 1
     assert d["coprocessors"][0]["name"] == "cop0"
     assert d["coprocessors"][0]["symbol"] == "coproc_fn"
+
+
+def test_config_text_round_trips_as_the_runtime_reads_it():
+    """A repeated key keeps its last value and an entry without ``=`` is dropped, as in the runtime."""
+    assert _parse_config("dev=rxe0;junk;gid=1;dev=mlx5_1;fn.k=a=b") == {
+        "dev": "mlx5_1",
+        "gid": "1",
+        "fn.k": "a=b",
+    }
+    assert _config_text({"dev": "rxe0", "gid": "1"}) == "dev=rxe0;gid=1"
 
 
 def test_coprocessor_fn_config_is_appended_with_the_fn_prefix():
@@ -680,18 +705,24 @@ def stop_node_executors():
         yield nodes.append
     finally:
         for node in nodes:
-            executor = getattr(node, "executor", None)
+            executor = node_executor(node)
             if executor is not None:
                 executor.stop()
 
 
+def _transport_backends_built():
+    """Whether the runtime was built with ENABLE_TRANSPORT=ON, which builds the memcpy backend."""
+    lib_dir = Path(get_lib_path("runtime", "RUNTIME_LIB_DIR"))
+    names = [f"libcatalyst_transport_memcpy_controller.{ext}" for ext in ("so", "dylib")]
+    return any((lib_dir / name).exists() for name in names)
+
+
 @pytest.mark.skipif(
-    "CATALYST_TRANSPORT_PATH" not in os.environ,
+    not (_transport_backends_built() or "CATALYST_TRANSPORT_PATH" in os.environ),
     reason=(
         "Backline demo integration tests need the transport backend libraries built with "
-        "-DENABLE_TRANSPORT=ON, which the wheel does not ship. Add that build directory to "
-        "CATALYST_TRANSPORT_PATH to run them; the check-transport workflow does this on a "
-        "GPU runner."
+        "-DENABLE_TRANSPORT=ON, which the wheel does not ship. Build the runtime with it, or add "
+        "a directory holding them to CATALYST_TRANSPORT_PATH."
     ),
 )
 class TestBacklineDemoIntegration:
@@ -701,6 +732,56 @@ class TestBacklineDemoIntegration:
     that call the QNode also execute it, so they need the transport backend libraries and the
     decoder library reachable to the dynamic loader.
     """
+
+    def test_an_out_of_tree_backend_from_a_manifest_runs_demo_1(
+        self, use_capture, isolated_registry, tmp_path, monkeypatch
+    ):
+        """An out-of-tree backend, dropped beside a manifest, runs with no Catalyst change.
+
+        The "toy" backend is the memcpy backend under another name, declared only by
+        ``catalyst_transport_backends.json`` on CATALYST_TRANSPORT_PATH and picked by name.
+        """
+        lib_dir = Path(get_lib_path("runtime", "RUNTIME_LIB_DIR"))
+        for role in ("controller", "coprocessor"):
+            shutil.copy(
+                lib_dir / f"libcatalyst_transport_memcpy_{role}.so",
+                tmp_path / f"libcatalyst_transport_toy_{role}.so",
+            )
+        (tmp_path / "catalyst_transport_backends.json").write_text(
+            '[{"name": "toy", "transport": "memcpy", "hardware": "cpu",'
+            ' "roles": ["controller", "coprocessor"], "max_payload_bytes": null,'
+            ' "max_reply_bytes": null, "default": false}]'
+        )
+        monkeypatch.setenv("CATALYST_TRANSPORT_PATH", str(tmp_path))
+        ctrl = qp.Controller(
+            name="cpu-controller",
+            device=qp.device("null.qubit", wires=3),
+            backend="toy",
+        )
+        coproc = qp.Coprocessor(
+            name="cpu-coproc",
+            coprocessor_fn=qp.CoprocessorFunction(
+                "steane_coprocessor", lib_path=str(lib_dir / "libsteane_coprocessor_cpu.so")
+            ),
+            backend="toy",
+        )
+        dev = qp.Backline(
+            controller=ctrl, coprocessors=[coproc], transport="memcpy", qec_code="steane"
+        )
+
+        @qjit(capture=True)
+        @qp.set_shots(1)
+        @qp.qnode(dev, mcm_method="one-shot")
+        def ghz():
+            qp.Hadamard(0)
+            qp.CNOT([0, 1])
+            qp.CNOT([1, 2])
+            return qp.sample([qp.measure(0), qp.measure(1), qp.measure(2)])
+
+        ir = ghz.mlir
+        for role in ("controller", "coprocessor"):
+            assert str(tmp_path / f"libcatalyst_transport_toy_{role}.so") in ir
+        assert np.asarray(ghz()).shape == (1, 3)
 
     def test_local_cpu_to_local_cpu_memcpy(self, use_capture):
         """Demo 1: local CPU ↔ local CPU over ``memcpy``, JIT-compiled and executed.
@@ -797,8 +878,8 @@ class TestBacklineDemoIntegration:
             executor_options=executor_options,
             init_args={"config": "dev=rxe0;gid=1"},
         )
-        # Registered before compiling: ``_realize_executor`` launches the subprocess during
-        # compilation, and a failure after that still has to release the port.
+        # Registered before compiling: the executor is launched when ``ghz()`` runs, and a failure
+        # after that still has to release the port.
         stop_node_executors(coproc)
         dev = qp.Backline(
             controller=ctrl, coprocessors=[coproc], transport="rdma", qec_code="steane"
@@ -824,13 +905,13 @@ class TestBacklineDemoIntegration:
             assert pass_name in ir, f"{pass_name} missing from the scheduled pipeline"
 
         # Where the coprocessor ended up, asserted rather than inferred from a passing execution.
-        executor = coproc.executor
+        executor = node_executor(coproc)
         if executor_options is None:
             assert executor is None, "the default asks for no executor, so the node stays here"
         else:
             assert executor is not None, "executor_options={} did not produce an executor"
-            # ``address`` raises unless the executor is up, and only a local one serves on
-            # loopback, so this pins the mode as well as the liveness.
+            # ``address`` raises unless the executor has committed to one, and only a local one
+            # serves on loopback, so this pins the mode.
             assert executor.address.startswith(
                 "127.0.0.1:"
             ), f"a local executor serves on loopback, got {executor.address}"
@@ -1258,11 +1339,12 @@ def test_two_placements_in_one_program_are_rejected(use_capture):
         qp.Hadamard(0)
         return qp.probs()
 
-    with pytest.raises(CompileError, match="2 different backline placements"):
+    @qjit(target="mlir", capture=True)
+    def workflow():
+        return circuit_a() + circuit_b()
 
-        @qjit(target="mlir", capture=True)
-        def workflow():
-            return circuit_a() + circuit_b()
+    with pytest.raises(CompileError, match="2 different backline placements"):
+        workflow.aot_compile()
 
 
 @pytest.fixture
@@ -1506,10 +1588,36 @@ class TestBackendResolution:
 
     def test_default_cpu_hardware_selects_backend(self, fake_lib_dir):
         """Omitting hardware selects the CPU backend."""
-        fake_lib_dir("rdma/cpu_verbs/libcatalyst_transport_cpu_verbs_controller.so")
+        fake_lib_dir(
+            "rdma/cpu_verbs/libcatalyst_transport_cpu_verbs_controller.so",
+            "rdma/cpu_verbs/libcatalyst_transport_cpu_verbs_coprocessor.so",
+        )
         ctrl = qp.Controller(device=qp.device("null.qubit", wires=2), name="ctrl")
-        d = serialize_backline(qp.Backline(controller=ctrl, transport="rdma").placement)
+        cop = qp.Coprocessor(
+            name="cop0", endpoint=qp.Endpoint("127.0.0.1", 18590), coprocessor_fn="coproc_fn"
+        )
+        d = serialize_backline(
+            qp.Backline(controller=ctrl, coprocessors=[cop], transport="rdma").placement
+        )
         assert d["controller"]["backend_lib"].endswith("_cpu_verbs_controller.so")
+
+    def test_a_placement_without_coprocessors(self, fake_lib_dir):
+        """A lone controller opens no transport session, so it needs no transport backend."""
+        fake_lib_dir()  # nothing built
+        ctrl = qp.Controller(device=qp.device("null.qubit", wires=2), name="ctrl", hardware="cpu")
+        d = serialize_backline(qp.Backline(controller=ctrl, transport="rdma").placement)
+        assert "backend_lib" not in d["controller"]
+
+    def test_an_explicit_backend_lib_without_coprocessors(self):
+        """An explicit backend library survives even when nothing would load it."""
+        ctrl = qp.Controller(
+            device=qp.device("null.qubit", wires=2),
+            name="ctrl",
+            hardware="cpu",
+            init_args={"backend_lib": "chosen.so"},
+        )
+        d = serialize_backline(qp.Backline(controller=ctrl, transport="rdma").placement)
+        assert d["controller"]["backend_lib"] == "chosen.so"
 
 
 @pytest.fixture
@@ -1534,8 +1642,8 @@ class TestExecutorRealization:
         assert _realize_executor(node) is None
         assert node.executor is None
 
-    def test_options_produce_a_launched_executor_cached_on_the_node(self):
-        """The executor is built, launched, and cached back onto the frozen node."""
+    def test_options_produce_an_executor_with_an_address(self):
+        """The executor is built and committed to its address; the frozen node is left alone."""
         node = _controller(
             executor_options={"address": "10.0.0.9:1373", "triple": "aarch64-unknown-linux-gnu"}
         )
@@ -1543,12 +1651,26 @@ class TestExecutorRealization:
         assert ex is not None
         assert ex.address == "10.0.0.9:1373"
         assert ex.triple == "aarch64-unknown-linux-gnu"
-        assert node.executor is ex
+        assert node.executor is None
 
-    def test_realization_is_idempotent(self):
-        """A second call returns the same executor rather than launching another."""
+    @pytest.mark.parametrize("options", [{"address": "10.0.0.9:1373"}, {}])
+    def test_realization_is_idempotent(self, options, no_launch):
+        """A second call returns the same executor rather than building another. With ``{}`` a
+        second build would pick a different free port, so the address must not move either."""
+        node = _controller(executor_options=options)
+        first = _realize_executor(node)
+        assert _realize_executor(node) is first
+        assert node_executor(node) is first
+        assert first.address == _realize_executor(node).address
+        no_launch.assert_not_called()
+
+    def test_an_executor_with_no_predictable_address_is_rejected(self):
+        """Should an executor fail to commit to an address, compiling fails rather than carrying
+        none."""
         node = _controller(executor_options={"address": "10.0.0.9:1373"})
-        assert _realize_executor(node) is _realize_executor(node)
+        with mock.patch.object(Executor, "resolve", autospec=True, return_value=None):
+            with pytest.raises(CompileError, match="nowhere to dispatch"):
+                _realize_executor(node)
 
     def test_node_name_seeds_the_executor_name(self):
         """The node's name names the executor."""
@@ -1561,7 +1683,8 @@ class TestExecutorRealization:
             ex = _realize_executor(node)
         assert node.remote is False
         assert ex.host is None
-        launch.assert_called_once()  # a free-port search settles its address only once it is up
+        assert ex.address.startswith("127.0.0.1:")  # a port is picked now
+        launch.assert_not_called()  # and the launch waits until the program runs
 
     def test_a_remote_node_without_an_executor_is_rejected(self):
         """Another machine is reached by dispatching to an executor deployed there."""
@@ -1586,8 +1709,7 @@ class TestExecutorRealization:
         program would otherwise name by the compiling host's own absolute path. A remote node names
         it by filename, the deployed bundle supplying the file."""
         node = _controller(remote=True, executor_options={"host": "192.0.2.10", "port": 7810})
-        _realize_executor(node)
-        plugins = node.executor._cfg.plugins  # pylint: disable=protected-access
+        plugins = _realize_executor(node)._cfg.plugins  # pylint: disable=protected-access
         assert plugins[-1] == "librtd_null_qubit.so"
 
     def test_a_remote_nodes_device_runtime_drops_this_platforms_extension(self, no_launch):
@@ -1599,8 +1721,7 @@ class TestExecutorRealization:
             info.device_name, info.c_interface_name, "/opt/lib/librtd_null_qubit.dylib", info.kwargs
         )
         with mock.patch("catalyst.device.qjit_device.extract_backend_info", return_value=macos):
-            _realize_executor(node)
-        plugins = node.executor._cfg.plugins  # pylint: disable=protected-access
+            plugins = _realize_executor(node)._cfg.plugins  # pylint: disable=protected-access
         assert plugins[-1] == "librtd_null_qubit.so"
 
     def test_a_dispatched_controller_names_its_runtime_by_filename(self):
@@ -1634,8 +1755,7 @@ class TestExecutorRealization:
         displacing the right one.
         """
         node = _controller(remote=True, executor_options={"host": "192.0.2.10", "port": 7810})
-        _realize_executor(node)
-        cfg = node.executor._cfg  # pylint: disable=protected-access
+        cfg = _realize_executor(node)._cfg  # pylint: disable=protected-access
         assert cfg.plugins[-1] == "librtd_null_qubit.so"
         assert not cfg.deploy
 
@@ -1647,9 +1767,7 @@ class TestExecutorRealization:
         node = _coproc(
             "cop0", fn=fn, remote=True, executor_options={"host": "192.0.2.11", "port": 7813}
         )
-        with mock.patch.object(Executor, "launch", autospec=True):
-            _realize_executor(node)
-        cfg = node.executor._cfg  # pylint: disable=protected-access
+        cfg = _realize_executor(node)._cfg  # pylint: disable=protected-access
         assert cfg.plugins[-1] == "libdecoder.so"  # by filename: resolves against the workspace
         assert cfg.deploy == [str(lib)]  # and the file is carried there
 
@@ -1657,16 +1775,14 @@ class TestExecutorRealization:
         """Its library is already reachable, so the full path is enough and nothing travels."""
         fn = qp.CoprocessorFunction("fn", lib_path="/opt/libdecode.so")
         node = _coproc("cop0", fn=fn, executor_options={})
-        _realize_executor(node)
-        cfg = node.executor._cfg  # pylint: disable=protected-access
+        cfg = _realize_executor(node)._cfg  # pylint: disable=protected-access
         assert cfg.plugins[-1] == "/opt/libdecode.so"
         assert not cfg.deploy
 
     def test_a_coprocessor_gets_no_device_runtime(self, no_launch):
         """Only a controller dispatches a QNode, so only it needs a device runtime."""
         node = _coproc("cop0", remote=True, executor_options={"host": "h", "port": 7812})
-        _realize_executor(node)
-        plugins = node.executor._cfg.plugins  # pylint: disable=protected-access
+        plugins = _realize_executor(node)._cfg.plugins  # pylint: disable=protected-access
         assert plugins == list(_EXECUTOR_RUNTIME_PLUGINS)
 
     def test_plugins_the_node_named_keep_their_place(self, no_launch):
@@ -1676,8 +1792,7 @@ class TestExecutorRealization:
             remote=True,
             executor_options={"host": "h", "port": 1, "plugins": ["libsteane.so", "librt_capi.so"]},
         )
-        _realize_executor(node)
-        plugins = node.executor._cfg.plugins  # pylint: disable=protected-access
+        plugins = _realize_executor(node)._cfg.plugins  # pylint: disable=protected-access
         assert plugins.index("libsteane.so") < plugins.index("librt_capi.so")  # order kept
         assert plugins.count("librt_capi.so") == 1
         assert plugins[-1] == "librtd_null_qubit.so"
@@ -1687,8 +1802,7 @@ class TestExecutorRealization:
         device runtime keeps this platform's extension rather than a remote node's ``.so``."""
         ext = "dylib" if platform.system() == "Darwin" else "so"
         node = _controller(executor_options={})
-        _realize_executor(node)
-        plugins = node.executor._cfg.plugins  # pylint: disable=protected-access
+        plugins = _realize_executor(node)._cfg.plugins  # pylint: disable=protected-access
         assert all(p.startswith("/") for p in plugins)
         assert [p.rsplit("/", 1)[-1] for p in plugins][-1] == f"librtd_null_qubit.{ext}"
 
@@ -1749,8 +1863,8 @@ class TestExecutorRealization:
         cop = _coproc("cop0", executor_options={"address": "cop:2"})
         dev = qp.Backline(controller=ctrl, coprocessors=[cop], transport="rdma")
         launch_executors(dev.placement)
-        assert ctrl.executor.address == "ctrl:1"
-        assert cop.executor.address == "cop:2"
+        assert node_executor(ctrl).address == "ctrl:1"
+        assert node_executor(cop).address == "cop:2"
 
     def test_executor_address_and_triple_reach_the_serialized_node(self):
         """The launched executor supplies the node's dispatch address and target triple."""
@@ -1801,3 +1915,113 @@ def test_a_setup_that_succeeds_is_not_torn_down():
     calls = []
     compiled_functions._run_setup(lambda: calls.append("setup"), lambda: calls.append("teardown"))
     assert calls == ["setup"]
+
+
+class TestBackendRegistry:
+    """Backends come from a registry that out-of-tree packages extend without a Catalyst change."""
+
+    def test_a_registered_backend_serves_a_new_transport(self, isolated_registry):
+        """A transport Catalyst has never heard of resolves once a backend registers for it."""
+        register_backend("example_backend", "example", "cpu", ["controller", "coprocessor"])
+        assert _resolve_backend("example", "cpu") == "example_backend"
+        assert (
+            _resolve_backend_lib("example", "cpu", "controller", True)
+            == "libcatalyst_transport_example_backend_controller.so"
+        )
+
+    def test_backend_transports_lists_every_registered_transport(self, isolated_registry):
+        """PennyLane asks for these to accept a transport it has no entry for."""
+        assert {"rdma", "memcpy"} <= backend_transports()
+        register_backend("example_backend", "example", "cpu", ["controller"])
+        assert "example" in backend_transports()
+
+    def test_a_non_default_backend_is_used_only_when_named(self, isolated_registry):
+        """fpga_verbs shares rdma/fpga with hwhs, which stays the default."""
+        assert _select_backend("rdma", "fpga", "controller").name == "hwhs"
+        assert _select_backend("rdma", "fpga", "controller", name="fpga_verbs").name == "fpga_verbs"
+
+    def test_selection_respects_message_sizes(self, isolated_registry):
+        """A backend that cannot carry the placement's messages is not picked."""
+        with pytest.raises(ValueError, match="carrying 16 B requests"):
+            _select_backend("rdma", "cpu", "controller", in_bytes=16, out_bytes=8)
+        register_backend("wide_verbs", "rdma", "cpu", ["controller"], max_payload_bytes=1024)
+        assert _select_backend("rdma", "cpu", "controller", 16, 8).name == "wide_verbs"
+        assert _select_backend("memcpy", "cpu", "controller", 4096, 4096).name == "memcpy"
+
+    def test_manifest_on_the_search_path_registers_backends(
+        self, isolated_registry, tmp_path, monkeypatch
+    ):
+        """A manifest beside out-of-tree libraries is read from CATALYST_TRANSPORT_PATH."""
+        (tmp_path / "catalyst_transport_backends.json").write_text(
+            '[{"name": "toy", "transport": "memcpy", "hardware": "cpu",'
+            ' "roles": ["controller"], "default": false}]'
+        )
+        monkeypatch.setenv("CATALYST_TRANSPORT_PATH", str(tmp_path))
+        assert _select_backend("memcpy", "cpu", "controller", name="toy").name == "toy"
+        assert _select_backend("memcpy", "cpu", "controller").name == "memcpy"
+
+    def test_entry_points_register_backends(self, isolated_registry, monkeypatch):
+        """A pip-installed package declares its backends through an entry point."""
+        ep = mock.Mock()
+        ep.load.return_value = lambda: [
+            {"name": "pkg_verbs", "transport": "pkg", "hardware": "gpu", "roles": ["coprocessor"]}
+        ]
+        monkeypatch.setattr(
+            "catalyst.backline.importlib.metadata.entry_points",
+            lambda group: [ep] if group == "catalyst.transport_backends" else [],
+        )
+        assert _resolve_backend("pkg", "gpu") == "pkg_verbs"
+
+    def test_controller_and_coprocessor_must_share_a_frame_layout(self, isolated_registry):
+        """Two backends that speak no common frame cannot exchange messages."""
+        register_backend("net_ctrl", "net", "cpu", ["controller"], frame_modes=("bl16",))
+        register_backend("net_cop", "net", "gpu", ["coprocessor"], frame_modes=("other",))
+        dev = qp.Backline(
+            controller=_controller(init_args={}),
+            coprocessors=[_coproc("cop0", hardware="gpu", init_args={})],
+            transport="net",
+        )
+        with pytest.raises(CompileError, match="share no frame layout"):
+            serialize_backline(dev.placement)
+
+    def test_a_backend_name_is_read_but_not_forwarded(self, isolated_registry, flat_lib_dir):
+        """``backend=`` picks the backend; the attribute carries only its library."""
+        flat_lib_dir("libcatalyst_transport_fpga_verbs_controller.so")
+        ctrl = _controller(hardware="fpga", backend="fpga_verbs", init_args={})
+        dev = qp.Backline(controller=ctrl, coprocessors=[_coproc("cop0")], transport="rdma")
+        node = serialize_backline(dev.placement)["controller"]
+        assert node["backend_lib"].endswith("libcatalyst_transport_fpga_verbs_controller.so")
+        assert "backend" not in node
+
+    def test_built_in_rows_match_what_the_built_libraries_report(self):
+        """The registry and CatalystTransportQueryCaps describe each in-tree backend alike."""
+
+        class Caps(ctypes.Structure):  # CatalystTransportCaps, TransportBackend.h
+            _fields_ = [
+                ("abi_version", ctypes.c_uint32),
+                ("roles", ctypes.c_uint32),
+                ("mem_kinds", ctypes.c_uint32),
+                ("frame_modes", ctypes.c_uint32),
+                ("max_payload_bytes", ctypes.c_uint32),
+                ("ordering", ctypes.c_uint32),
+                ("name", ctypes.c_char_p),
+                ("max_reply_bytes", ctypes.c_uint32),
+            ]
+
+        lib_dir = Path(get_lib_path("runtime", "RUNTIME_LIB_DIR"))
+        checked = 0
+        for backend in _REGISTRY:
+            for bit, role in enumerate(("controller", "coprocessor")):
+                path = lib_dir / f"libcatalyst_transport_{backend.name}_{role}.so"
+                if not path.exists():
+                    continue
+                query = ctypes.CDLL(str(path)).CatalystTransportQueryCaps
+                query.restype = ctypes.POINTER(Caps)
+                caps = query().contents
+                assert caps.name.decode() == backend.name
+                assert (role in backend.roles) == bool(caps.roles & (1 << bit))
+                limit = backend.max_payload_bytes
+                assert caps.max_payload_bytes == (0xFFFFFFFF if limit is None else limit)
+                checked += 1
+        if not checked:
+            pytest.skip("no transport backend libraries built")

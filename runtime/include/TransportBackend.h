@@ -21,6 +21,7 @@
 #ifndef TRANSPORTBACKEND_H
 #define TRANSPORTBACKEND_H
 
+#include <cstdint>
 #include <exception>
 #include <iostream>
 
@@ -28,6 +29,83 @@
 
 #define CATALYST_TRANSPORT_CONTROLLER_FACTORY_SYMBOL "CatalystTransportControllerFactory"
 #define CATALYST_TRANSPORT_COPROCESSOR_FACTORY_SYMBOL "CatalystTransportCoprocessorFactory"
+
+// Backend ABI version and capabilities.
+//
+// A backend exports `uint32_t CatalystTransportAbiVersion(void)` and
+// `const CatalystTransportCaps *CatalystTransportQueryCaps(void)`; the
+// CATALYST_TRANSPORT_BACKEND_CAPS macro below defines both. The loader checks them before calling
+// a factory:
+//   - no CatalystTransportAbiVersion: a backend built before versioning, loaded as version 1, which
+//     reports no capabilities and whose sessions the runtime deletes;
+//   - a version newer than CATALYST_TRANSPORT_ABI_VERSION: refused, naming both versions;
+//   - a role missing from `roles`: refused.
+// A backend built against an older version keeps working, because the session interface in
+// Transport.hpp follows these rules:
+//   - virtual methods are only appended, never removed or reordered;
+//   - the session base classes gain no data members;
+//   - the runtime never calls a method added in version N on a backend reporting a lower version.
+#define CATALYST_TRANSPORT_ABI_VERSION 2u
+#define CATALYST_TRANSPORT_ABI_VERSION_SYMBOL "CatalystTransportAbiVersion"
+#define CATALYST_TRANSPORT_QUERY_CAPS_SYMBOL "CatalystTransportQueryCaps"
+
+// CatalystTransportCaps::roles
+#define CATALYST_TRANSPORT_ROLE_BIT_CONTROLLER (1u << 0)
+#define CATALYST_TRANSPORT_ROLE_BIT_COPROCESSOR (1u << 1)
+// CatalystTransportCaps::frame_modes
+#define CATALYST_TRANSPORT_FRAME_BL16 (1u << 0) // existing 16 B frame layout
+// CatalystTransportCaps::ordering
+#define CATALYST_TRANSPORT_ORDER_IN_ORDER 0u // a payload lands before the word written after it
+// CatalystTransportCaps::mem_kinds and ::conventions, e.g. CATALYST_TRANSPORT_MEM_BIT(CpuRam).
+#define CATALYST_TRANSPORT_MEM_BIT(KIND)                                                           \
+    (1u << static_cast<unsigned>(catalyst::transport::MemKind::KIND))
+#define CATALYST_TRANSPORT_CONV_BIT(CONVENTION)                                                    \
+    (1u << static_cast<unsigned>(catalyst::transport::CoprocConvention::CONVENTION))
+
+extern "C" {
+/// What a backend library provides. Fields are only ever appended; a backend fills those of the
+/// ABI version it reports.
+typedef struct {
+    uint32_t abi_version;       // CATALYST_TRANSPORT_ABI_VERSION the backend was built with
+    uint32_t roles;             // CATALYST_TRANSPORT_ROLE_BIT_*
+    uint32_t mem_kinds;         // CATALYST_TRANSPORT_MEM_BIT(...)
+    uint32_t frame_modes;       // CATALYST_TRANSPORT_FRAME_*
+    uint32_t max_payload_bytes; // largest request payload per message, whatever the frame mode
+    uint32_t ordering;          // CATALYST_TRANSPORT_ORDER_*
+    const char *name;           // e.g. "cpu_verbs"
+    uint32_t max_reply_bytes;   // largest reply per message
+    uint32_t conventions;       // CATALYST_TRANSPORT_CONV_BIT(...); 0 for controllers
+    uint32_t max_work_items;    // work items a controller can commit
+    uint32_t reserved;          // zero
+    void (*destroy_session)(void *session); // deletes a session this library created
+} CatalystTransportCaps;
+
+using CatalystTransportAbiVersionFn = uint32_t();
+using CatalystTransportQueryCapsFn = const CatalystTransportCaps *();
+}
+
+// Defines CatalystTransportAbiVersion and CatalystTransportQueryCaps for an in-tree backend.
+// e.g. CATALYST_TRANSPORT_BACKEND_CAPS("cpu_verbs", CATALYST_TRANSPORT_ROLE_BIT_CONTROLLER,
+//          CATALYST_TRANSPORT_MEM_BIT(CpuRam), 0, 8, 8, 1)
+#define CATALYST_TRANSPORT_BACKEND_CAPS(NAME, ROLES, MEM_KINDS, CONVENTIONS, MAX_PAYLOAD,          \
+                                        MAX_REPLY, WORK_ITEMS)                                     \
+    extern "C" uint32_t CatalystTransportAbiVersion() { return CATALYST_TRANSPORT_ABI_VERSION; }   \
+    extern "C" const CatalystTransportCaps *CatalystTransportQueryCaps() {                         \
+        static const CatalystTransportCaps caps = {                                                \
+            CATALYST_TRANSPORT_ABI_VERSION,                                                        \
+            (ROLES),                                                                               \
+            (MEM_KINDS),                                                                           \
+            CATALYST_TRANSPORT_FRAME_BL16,                                                         \
+            (MAX_PAYLOAD),                                                                         \
+            CATALYST_TRANSPORT_ORDER_IN_ORDER,                                                     \
+            (NAME),                                                                                \
+            (MAX_REPLY),                                                                           \
+            (CONVENTIONS),                                                                         \
+            (WORK_ITEMS),                                                                          \
+            0,                                                                                     \
+            [](void *s) { delete static_cast<catalyst::transport::TransportSession *>(s); }};      \
+        return &caps;                                                                              \
+    }
 
 // The factory signatures backends must export with C linkage.
 extern "C" {

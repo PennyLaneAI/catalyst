@@ -105,6 +105,7 @@ def qjit(
     capture="global",
     skip_preprocess=False,
     collect_decomp_rules=True,
+    enable_aot_compilation=True,
 ):  # pylint: disable=too-many-arguments,unused-argument
     """A just-in-time decorator for PennyLane and JAX programs using Catalyst.
 
@@ -127,6 +128,15 @@ def qjit(
         async_qnodes (bool): Experimental support for automatically executing
             QNodes asynchronously, if supported by the device runtime.
         target (str): The compilation target.
+
+            - ``"jaxpr"``: The function is traced to a JAXPR.
+            - ``"mlir"``: The function is lowered to MLIR, without running the MLIR passes.
+            - ``"mlir_opt"``: The MLIR passes are run, without translating the result to LLVM IR.
+            - ``"llvmir"``: The function is compiled to LLVM IR and object code, without linking.
+            - ``"binary"`` (default): The function is compiled to a shared library.
+
+            Regardless of the target, the function is compiled to a shared library when it is
+            called.
         keep_intermediate (Union[str, int, bool]): Level controlling intermediate file generation.
 
             - ``False`` or ``0`` or ``"none"`` or ``None`` (default): No intermediate file is kept.
@@ -203,6 +213,9 @@ def qjit(
             decomposition rules reachable from all gates in the circuit will be compiled. If
             ``capture=False``, or ``capture="global"`` and ``qp.capture.enabled() == False``, this
             argument will be ignored. ``True`` by default.
+        enable_aot_compilation (bool): Controls whether or not to enable ahead-of-time compilation.
+            If ``True``, the QJIT object will attempt AOT compilation during object initialization.
+            ``True`` by default.
 
     Returns:
         QJIT object.
@@ -604,9 +617,17 @@ class QJIT(CatalystCallable):
         with _ensure_capture_mode(target_mode):
             self.user_function = self.pre_compilation()
 
-        # Static arguments require values, so we cannot AOT compile.
-        if self.user_sig is not None and not self.compile_options.static_argnums:
-            self.aot_compile()
+        if (
+            self.compile_options.enable_aot_compilation
+            and self.user_sig is not None
+            # Static arguments require values, so we cannot AOT compile.
+            and not self.compile_options.static_argnums
+        ):
+            # Errors are only logged here, since the function is compiled again when it is called.
+            try:
+                self.aot_compile()
+            except Exception as e:  # pylint: disable=broad-exception-caught
+                logger.exception(e, exc_info=True)
 
         super().__init__("user_function")
 
@@ -727,39 +748,34 @@ class QJIT(CatalystCallable):
         return self.run(args, kwargs)
 
     @debug_logger
-    def aot_compile(self):
-        """Compile Python function on initialization using the type hint signature."""
+    def aot_compile(self, *args, **kwargs):
+        """Compile Python function on initialization using the type hint signature.
+        Args:
+            *args: positional arguments to compile the function for
+            **kwargs: keyword arguments to compile the function for
+        """
+
+        if not args and not kwargs:
+            args = self.user_sig or ()
+
         self.workspace = self._get_workspace()
 
         # TODO: awkward, refactor or redesign the target feature
-        if self.compile_options.target in ("jaxpr", "mlir", "llvmir", "binary"):
-            try:
-                self.jaxpr, self.out_type, self.out_treedef, self.c_sig = self.capture(
-                    self.user_sig or ()
-                )
-            except Exception as e:  # pylint: disable=broad-exception-caught
-                logger.exception(e, exc_info=True)
-                return
+        if self.compile_options.target in ("jaxpr", "mlir", "mlir_opt", "llvmir", "binary"):
+            self.jaxpr, self.out_type, self.out_treedef, self.c_sig = self.capture(args, **kwargs)
 
-        if self.compile_options.target in ("mlir", "llvmir", "binary"):
+        if self.compile_options.target in ("mlir", "mlir_opt", "llvmir", "binary"):
             self._configure_backline()
-            try:
-                self.mlir_module = self.generate_ir()
-            except Exception as e:  # pylint: disable=broad-exception-caught
-                logger.exception(e, exc_info=True)
-                return
+            self.mlir_module = self.generate_ir()
 
-        if self.compile_options.target in ("llvmir", "binary"):
-            try:
-                self.compiled_function, self.llvm_ir = self.compile()
-            except Exception as e:  # pylint: disable=broad-exception-caught
-                logger.exception(e, exc_info=True)
-                return
+        if self.compile_options.target in ("mlir_opt", "llvmir", "binary"):
+            with _target_compile_options(self.compile_options):
+                self.compiled_function, llvm_ir = self.compile()
+            # With target="mlir_opt", the IR returned by the compiler is MLIR instead of LLVM IR.
+            self.llvm_ir = None if self.compile_options.target == "mlir_opt" else llvm_ir
 
         if self.compile_options.target in ("binary",) and self.compile_options.link:
-            self.fn_cache.insert(
-                self.compiled_function, self.user_sig, self.out_treedef, self.workspace
-            )
+            self.fn_cache.insert(self.compiled_function, args, self.out_treedef, self.workspace)
 
     @property
     def llvmir(self):
@@ -791,7 +807,7 @@ class QJIT(CatalystCallable):
         cached_fn, requires_promotion = self.fn_cache.lookup(args)
 
         if cached_fn is None:
-            if self.user_sig and not opts.static_argnums:
+            if opts.enable_aot_compilation and self.user_sig and not opts.static_argnums:
                 msg = "Provided arguments did not match declared signature, recompiling..."
                 warnings.warn(msg, UserWarning)
 
@@ -812,15 +828,17 @@ class QJIT(CatalystCallable):
 
             self.fn_cache.insert(self.compiled_function, args, self.out_treedef, self.workspace)
 
-        elif self.compiled_function is not cached_fn.compiled_fn:
+        else:
             # Restore active state from cache.
+            if self.compiled_function is not cached_fn.compiled_fn:
+                self.compiled_function = cached_fn.compiled_fn
+                self.jaxed_function = None
+                self.compiled_function.shared_object.open()
+
+            # aot_compile with other arguments (e.g. target="mlir") may have overwritten this state.
             self.workspace = cached_fn.workspace
-            self.compiled_function = cached_fn.compiled_fn
             self.out_treedef = cached_fn.out_treedef
             self.c_sig = cached_fn.signature
-            self.jaxed_function = None
-
-            self.compiled_function.shared_object.open()
 
         return requires_promotion
 
@@ -1182,3 +1200,27 @@ def _ensure_capture_mode(enable_capture: bool):
             qp.capture.enable()
         else:
             qp.capture.disable()
+
+
+@contextmanager
+def _target_compile_options(options: CompileOptions):
+    """Set the ``lower_to_llvm`` and ``link`` compile options for the compilation target, for the
+    duration of the context.
+
+    The original values are restored on exit, since the function must still be compiled to a
+    shared library when it is called.
+
+    Args:
+        options (CompileOptions): The compile options to set for their target.
+    """
+    original_values = options.lower_to_llvm, options.link
+
+    if options.target == "mlir_opt":
+        options.lower_to_llvm, options.link = False, False
+    elif options.target == "llvmir":
+        options.lower_to_llvm, options.link = True, False
+
+    try:
+        yield
+    finally:
+        options.lower_to_llvm, options.link = original_values

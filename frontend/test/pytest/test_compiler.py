@@ -392,6 +392,64 @@ class TestCompilerState:
         with pytest.raises(AssertionError, match="invalid options for jit_compile"):
             compiled(0.5)
 
+    @pytest.mark.parametrize(
+        "target, num_stages_run", [("mlir_opt", 1), ("llvmir", 3), ("binary", 4)]
+    )
+    def test_aot_compile_up_to_target(self, target, num_stages_run):
+        """Test that ahead-of-time compilation stops at the target, and that a later call still
+        compiles the function to a shared library and runs it."""
+
+        stages = [
+            "opt transformations successful",
+            "LLVMIR translation successful",
+            "object code generation successful",
+            "object linking successful",
+        ]
+        log = io.StringIO()
+
+        @qjit(target=target, verbose=True, logfile=log)
+        def f(x):
+            return x + 1.0
+
+        f.aot_compile(0.5)
+
+        logtext = log.getvalue()
+        for stage in stages[:num_stages_run]:
+            assert stage in logtext
+        for stage in stages[num_stages_run:]:
+            assert stage not in logtext
+        assert f(0.5) == 1.5
+
+    def test_mlir_opt_target_without_llvmir(self):
+        """Test that the MLIR returned by the compiler for the ``mlir_opt`` target, when
+        intermediate files are kept, is not stored as LLVM IR."""
+
+        @qjit(target="mlir_opt", keep_intermediate=True)
+        def f(x):
+            return x + 1.0
+
+        # Create tmp workspaces for intermediates to avoid CI race conditions
+        f.use_cwd_for_workspace = False
+        f.aot_compile(0.5)
+
+        assert f.llvm_ir is None
+        f.workspace.cleanup()
+
+    @pytest.mark.parametrize("target", ["mlir_opt", "llvmir"])
+    def test_compile_options_restored_on_error(self, target):
+        """Test that the compile options set for the target are restored when the ahead-of-time
+        compilation fails."""
+
+        @qjit(target=target, pipelines=[("PipelineA", ["test"])])
+        def f(x):
+            return x + 1.0
+
+        with pytest.raises(CompileError, match="Failed to lower MLIR module"):
+            f.aot_compile(0.5)
+
+        assert f.compile_options.lower_to_llvm
+        assert f.compile_options.link
+
     def test_callable_without_name(self):
         """Test that a callable without __name__ property can be compiled, if it is otherwise
         traceable."""
