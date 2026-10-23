@@ -177,6 +177,10 @@
 
 <h3>Improvements 🛠</h3>
 
+* A new `user-transform-stage` pipeline runs the quantum compilation stage only up to and including
+  `apply-transform-sequence`, where the user transforms are applied. 
+  [(#3345)](https://github.com/PennyLaneAI/catalyst/pull/3345)
+
 * The :func:`~catalyst.qjit` function now accepts an ``enable_aot_compilation`` argument, which can be
   used to toggle whether or not to use ahead-of-time compilation.
   [(#3339)](https://github.com/PennyLaneAI/catalyst/pull/3339)
@@ -193,6 +197,11 @@
   f.aot_compile(jax.ShapeDtypeStruct((3,), jnp.float64))
   f(jnp.array([1.0, 2.0, 3.0]))  # no compilation
   ```
+
+* Calling `QJIT.aot_compile` explicitly now raises any compilation error, instead of silently
+  logging it. Errors in the automatic ahead-of-time compilation from type hints, when the `QJIT`
+  object is created, are still only logged, and are raised when the function is called.
+  [(#3390)](https://github.com/PennyLaneAI/catalyst/pull/3390)
 
 * :func:`pennylane.transforms.gridsynth` now produces correct, deterministic decompositions for
   any `epsilon` down to `1e-15`, and invalid angles or `epsilon` values raise an error.
