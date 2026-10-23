@@ -240,6 +240,32 @@ with later runtimes. A session follows a strict lifecycle:
 ``start`` / ``kick`` / ``collect`` / ``stop``
     Run the engine, fire each round, gather its reply, and shut down.
 
+Each round's request and reply travel as a **frame**. Over RDMA, the sender writes it into a slot
+of a ring in the receiver's registered memory: a ring has 256 slots of 64 B, and round ``n`` uses
+slot ``n mod 256``. The only frame layout implemented so far is the 16 B one, BL16:
+
+.. list-table::
+    :header-rows: 1
+    :widths: 15 85
+
+    * - Bytes
+      - Field
+    * - 0–7
+      - The payload, zero-padded: the staged syndrome, or the coprocessor's reply.
+    * - 8–11
+      - ``fn_id``: which coprocessor function handles the round, the ``decoder_id`` staged with
+        the payload (see `The transport dialect`_). A reply echoes the request's, except from
+        ``gpu_verbs``, which sends 0.
+    * - 12–15
+      - ``seq``: the round's number plus one.
+
+A sender writes the whole frame in one in-order transfer, ``seq`` last, and a receiver reads the
+payload only once the slot's ``seq`` matches the round it expects. A per-message coprocessor
+function is passed the whole request frame and writes the reply's payload. In-tree backends build
+and read frames through ``runtime/lib/transport/common/interface/Frame.hpp``. An out-of-tree
+backend lays them out as above, since that header is not installed. The ``memcpy`` backends carry
+messages over 8 B in a wider frame of the same shape, its payload area grown to fit.
+
 The transport dialect
 =====================
 

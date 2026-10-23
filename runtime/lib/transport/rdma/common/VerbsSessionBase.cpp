@@ -106,7 +106,7 @@ template <class Role> PeerRef VerbsSessionBase<Role>::exchange_keys(const MemReg
     return PeerRef{
         .rkey = peer.mr_rkey,
         .remote_addr = peer.mr_vaddr,
-        .size = REGION_BYTES,
+        .size = ring_.region_bytes(),
     };
 }
 
@@ -114,23 +114,23 @@ template <class Role>
 void VerbsSessionBase<Role>::establish_channel(const ChannelDesc &desc, const MemRegion &local,
                                                const PeerRef &peer) {
     TP_CHECK(desc.transport == "rdma", "%s: only transport \"rdma\" supported", backend_);
-    TP_CHECK(local.size >= REGION_BYTES, "region too small for ring: %zu < %zu",
-             static_cast<std::size_t>(local.size), REGION_BYTES);
+    TP_CHECK(local.size >= ring_.region_bytes(), "region too small for ring: %zu < %zu",
+             static_cast<std::size_t>(local.size), ring_.region_bytes());
     desc_ = desc;
     local_ = local;
     peer_ = peer;
-    send_buf_ = common::MemoryRegion::alloc_host(pd_, sizeof(Payload), alignof(PayloadSlot),
+    send_buf_ = common::MemoryRegion::alloc_host(pd_, frame::frame_bytes(ring_.mode), ring_.stride,
                                                  common::MemAccess::LOCAL_WRITE);
 }
 
 template <class Role>
 void VerbsSessionBase<Role>::post_write(ibv_qp *qp, std::uint64_t cursor, bool inline_data,
                                         bool signaled) {
-    auto *send = send_payload(); // value already written by the caller
-    send->seq_num = static_cast<std::uint32_t>(cursor + 1);
+    void *send = send_frame(); // staged by the caller
+    frame::seal(ring_.mode, send, static_cast<std::uint32_t>(cursor + 1));
     ibv_sge sge{
         .addr = reinterpret_cast<std::uint64_t>(send),
-        .length = sizeof(Payload), // 16 B on the wire, into slot's first 16 B
+        .length = static_cast<std::uint32_t>(frame::frame_bytes(ring_.mode)),
         .lkey = send_buf_->lkey(),
     };
     ibv_send_wr wr{
@@ -140,8 +140,7 @@ void VerbsSessionBase<Role>::post_write(ibv_qp *qp, std::uint64_t cursor, bool i
         .send_flags = static_cast<unsigned>((inline_data ? IBV_SEND_INLINE : 0) |
                                             (signaled ? IBV_SEND_SIGNALED : 0)),
     };
-    wr.wr.rdma.remote_addr =
-        peer_.remote_addr + (cursor & (K_RING_SLOTS - 1)) * sizeof(PayloadSlot);
+    wr.wr.rdma.remote_addr = peer_.remote_addr + ring_.slot_offset(cursor);
     wr.wr.rdma.rkey = peer_.rkey;
     ibv_send_wr *bad = nullptr;
     const int rc = ibv_post_send(qp, &wr, &bad);
@@ -176,28 +175,24 @@ template <class Role> void VerbsSessionBase<Role>::reap(ibv_cq *cq, int &outstan
 }
 
 template <class Role>
-Payload *VerbsSessionBase<Role>::poll_message_arrival(std::uint64_t cursor, std::stop_token st) {
-    // Slots are reused (K_RING_SLOTS is a power of two). The ring contains
-    // 64 B PayloadSlots; the peer writes the 16 B Payload into each slot's
-    // head.
-    auto *ring = reinterpret_cast<PayloadSlot *>(local_.addr);
-    Payload *slot = &ring[cursor & (K_RING_SLOTS - 1)].p;
-    // Poll seq_num with acquire ordering: once it updates, value (written
-    // before it in the single RDMA_WRITE) is present, and the acquire keeps its
-    // read from being hoisted ahead.
-    std::atomic_ref<std::uint32_t> seq_ref(slot->seq_num);
+bool VerbsSessionBase<Role>::poll_message_arrival(std::uint64_t cursor, std::stop_token st,
+                                                  frame::FrameView &out) {
+    // Slots are reused (the slot count is a power of two). The peer writes each frame into the
+    // head of its slot in a single RDMA_WRITE, seq last, so once frame::poll sees the expected seq
+    // the payload before it is present.
+    void *slot = ring_slot(cursor);
     const auto expected = static_cast<std::uint32_t>(cursor + 1);
     std::uint32_t spins = 0;
-    while (seq_ref.load(std::memory_order_acquire) != expected) {
+    while (!frame::poll(ring_.mode, slot, expected, out)) {
         if (++spins == STOP_CHECK_SPINS) {
             spins = 0;
             if (st.stop_requested()) {
-                return nullptr;
+                return false;
             }
         }
         cpu_relax();
     }
-    return slot;
+    return true;
 }
 
 template class VerbsSessionBase<ControllerSession>;

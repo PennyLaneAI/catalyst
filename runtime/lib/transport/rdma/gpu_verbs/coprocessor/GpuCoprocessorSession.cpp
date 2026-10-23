@@ -60,7 +60,7 @@ MemRegion GpuCoprocessorSession::alloc_memory(std::size_t size, MemKind kind) {
 void GpuCoprocessorSession::establish_channel(const ChannelDesc &desc, const MemRegion &local,
                                               const PeerRef &peer) {
     Base::establish_channel(desc, local, peer);
-    handoff_ = gpu_.alloc_handoff(K_RING_SLOTS);
+    handoff_ = gpu_.alloc_handoff(ring_.slots);
 }
 
 void GpuCoprocessorSession::set_coprocessor_launcher(CoprocessorLauncherFn fn, void *ctx) {
@@ -71,11 +71,10 @@ void GpuCoprocessorSession::set_coprocessor_launcher(CoprocessorLauncherFn fn, v
 }
 
 bool GpuCoprocessorSession::post_inline(std::uint64_t cursor) {
-    Payload *reply = send_payload();
-    reply->value = static_cast<std::uint64_t>(last_word_.load(std::memory_order_relaxed));
+    const auto value = static_cast<std::uint64_t>(last_word_.load(std::memory_order_relaxed));
     // TODO: echo the request's id by forwarding it through.
-    // Currently not sent to reduce Handoff size.
-    reply->decoder_id = 0;
+    // Currently not sent (fn_id 0) to reduce Handoff size.
+    frame::stage(ring_.mode, send_frame(), /*fn_id=*/0, &value, sizeof(value));
     const bool signaled = (cursor % SIGNAL_EVERY == 0);
     post_write(bwd_qp_->get(), cursor, /*inline_data=*/true, signaled);
     return signaled;
@@ -90,7 +89,7 @@ void GpuCoprocessorSession::run_coprocessor(std::stop_token st) {
     int signaled_outstanding = 0;
     for (std::uint64_t c = 0; !st.stop_requested(); ++c) {
         const std::uint32_t expect = static_cast<std::uint32_t>(c + 1);
-        std::uint32_t index = c & (K_RING_SLOTS - 1);
+        std::uint32_t index = c & (ring_.slots - 1);
         volatile std::uint32_t *sptr = &handoff_.host[index].seq;
         std::uint32_t spins = 0;
         while (*sptr != expect) {
@@ -132,7 +131,7 @@ void GpuCoprocessorSession::start() {
     // CoprocLaunchDesc is the HIP-free bridge to the launcher.
     CoprocLaunchDesc L{
         .ring = hbm_.ptr,
-        .ring_slots = K_RING_SLOTS,
+        .ring_slots = ring_.slots,
         .handoff = handoff_.dev,
         .stop = handoff_.stop_dev,
         .total = 0,
