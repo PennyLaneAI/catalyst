@@ -15,6 +15,7 @@
 #pragma once
 
 #include <algorithm>
+#include <cassert>
 #include <numeric>
 #include <string>
 #include <vector>
@@ -202,6 +203,7 @@ inline PassNames getQuantumCompilationStage(bool disableAssertion = true) {
 inline PassNames getUserTransformStage() {
     PassNames ret = getQuantumCompilationStage();
     auto it = std::find(ret.begin(), ret.end(), ApplyTransformSequencePassName);
+    assert(it != ret.end() && "apply-transform-sequence missing from quantum-compilation-stage");
     if (it != ret.end()) {
         ret.erase(it + 1, ret.end());
     }
