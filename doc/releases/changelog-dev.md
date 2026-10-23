@@ -795,10 +795,6 @@
 
 <h3>Breaking changes 💔</h3>
 
-* Ahead-of-time compilation with ``target="llvmir"`` no longer links the program into a shared
-  library. Calling the function still compiles it to a shared library.
-  [(#3391)](https://github.com/PennyLaneAI/catalyst/pull/3391)
-
 * `catalyst.logging` has been removed. `pennylane.logging` should be used instead.
   [(#3283)](https://github.com/PennyLaneAI/catalyst/pull/3283)
 
@@ -835,6 +831,10 @@
 <h3>Deprecations 👋</h3>
 
 <h3>Bug fixes 🐛</h3>
+
+* Ahead-of-time compilation with ``target="llvmir"`` no longer links the program into a shared
+  library. Calling the function still compiles it to a shared library.
+  [(#3391)](https://github.com/PennyLaneAI/catalyst/pull/3391)
 
 * Scatter ops with batching dimensions, such as those from a batched `jnp.linalg.det`, no longer
   crash `scatter-lowering`, and will instead be rejected as intended.
