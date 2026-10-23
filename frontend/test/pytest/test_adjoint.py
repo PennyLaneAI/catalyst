@@ -367,8 +367,6 @@ class TestCatalyst:
     def test_adjoint_dynamic_control_values(self):
         """Test that loop-local control values stay paired with their angles when reversing
         the loop.
-
-        This is a regression test for adjoint lowering failing to cache dynamic control values.
         """
 
         @qjit(capture=True, collect_decomp_rules=False)
