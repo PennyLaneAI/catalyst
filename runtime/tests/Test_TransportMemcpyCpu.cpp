@@ -24,14 +24,15 @@
 #include "WireProtocol.hpp"
 
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/matchers/catch_matchers_string.hpp>
 
 using namespace catalyst::transport;
 using namespace catalyst::transport::memcpy;
 
 // Provided by libsteane_coprocessor_cpu — the same CoprocessorFn plugin production
 // dlopens. Linking it in lets the test exercise a real decoder end-to-end.
-extern "C" std::size_t steane_coprocessor(const void *in, std::size_t in_len, void *out,
-                                          std::size_t out_cap, void *ctx);
+extern "C" std::size_t steane_coprocessor(const void *in, std::size_t in_len, std::uint32_t fn_id,
+                                          void *out, std::size_t out_cap, void *ctx);
 
 namespace {
 // Per-test pair keys. Matching keys between the controller and its paired coprocessor is what
@@ -39,8 +40,14 @@ namespace {
 // compile time as the `key` attribute on each transport.create.
 std::string pair_cfg(std::uint16_t port) { return "pair=p" + std::to_string(port); }
 
-std::size_t invert_fn(const void *in, std::size_t in_len, void *out, std::size_t out_cap,
-                      void * /*ctx*/) {
+// The config of a session carrying up to `max_payload` bytes each way in BLV frames, as the
+// compiler writes it for both sides of a placement whose messages exceed 8 B.
+std::string blv_cfg(std::uint16_t port, std::size_t max_payload) {
+    return pair_cfg(port) + ";frame=blv;frame_payload=" + std::to_string(max_payload);
+}
+
+std::size_t invert_fn(const void *in, std::size_t in_len, std::uint32_t /*fn_id*/, void *out,
+                      std::size_t out_cap, void * /*ctx*/) {
     std::uint64_t v = 0;
     std::memcpy(&v, in, std::min(in_len, sizeof(v)));
     v = ~v;
@@ -50,14 +57,14 @@ std::size_t invert_fn(const void *in, std::size_t in_len, void *out, std::size_t
 }
 
 // Inverts the payload like invert_fn, except that it fails a payload of 0.
-std::size_t invert_unless_zero_fn(const void *in, std::size_t in_len, void *out,
-                                  std::size_t out_cap, void *ctx) {
+std::size_t invert_unless_zero_fn(const void *in, std::size_t in_len, std::uint32_t fn_id,
+                                  void *out, std::size_t out_cap, void *ctx) {
     std::uint64_t v = 0;
     std::memcpy(&v, in, std::min(in_len, sizeof(v)));
     if (v == 0) {
         return COPROCESSOR_FN_ERROR;
     }
-    return invert_fn(in, in_len, out, out_cap, ctx);
+    return invert_fn(in, in_len, fn_id, out, out_cap, ctx);
 }
 } // namespace
 
@@ -328,38 +335,35 @@ TEST_CASE("memcpy incumbent coprocessor survives a rejected second coprocessor",
 
 namespace {
 // Replies with each payload byte's bits flipped, so the reply can't be mistaken for the request,
-// then the frame's decoder_id. Replies with nothing if the frame or reply size is not the
+// then the message's fn_id. Replies with nothing if the payload or reply size is not the
 // committed one.
-struct WideFrameCheck {
+struct MessageCheck {
     std::size_t in_bytes;
     std::size_t out_bytes;
 };
 
-std::size_t wide_frame_fn(const void *in, std::size_t in_len, void *out, std::size_t out_cap,
-                          void *ctx) {
-    const auto *want = static_cast<const WideFrameCheck *>(ctx);
-    const std::size_t data_bytes = common::frame_data_bytes(want->in_bytes);
-    if (in_len != common::frame_bytes(data_bytes) || out_cap != want->out_bytes) {
+std::size_t invert_and_tag_fn(const void *in, std::size_t in_len, std::uint32_t fn_id, void *out,
+                              std::size_t out_cap, void *ctx) {
+    const auto *want = static_cast<const MessageCheck *>(ctx);
+    if (in_len != want->in_bytes || out_cap < want->out_bytes) {
         return 0;
     }
-    const auto *frame = static_cast<const std::uint8_t *>(in);
+    const auto *payload = static_cast<const std::uint8_t *>(in);
     auto *reply = static_cast<std::uint8_t *>(out);
-    std::uint32_t decoder_id = 0;
-    std::memcpy(&decoder_id, frame + data_bytes, sizeof(decoder_id));
     for (std::size_t i = 0; i < want->in_bytes; ++i) {
-        reply[i] = static_cast<std::uint8_t>(~frame[i]);
+        reply[i] = static_cast<std::uint8_t>(~payload[i]);
     }
-    reply[want->in_bytes] = static_cast<std::uint8_t>(decoder_id);
+    reply[want->in_bytes] = static_cast<std::uint8_t>(fn_id);
     return want->in_bytes + 1;
 }
 } // namespace
 
-TEST_CASE("memcpy carries messages wider than the 16 B wire frame", "[transport_memcpy]") {
+TEST_CASE("memcpy carries messages larger than 8 B in BLV frames", "[transport_memcpy]") {
     constexpr std::size_t in_bytes = 120;
     constexpr std::size_t out_bytes = in_bytes + 1;
     ConnectInfo ci{.peer = "loopback", .oob_port = 19021};
-    CpuControllerSession controller(pair_cfg(ci.oob_port));
-    CpuCoprocessorSession coprocessor(pair_cfg(ci.oob_port));
+    CpuControllerSession controller(blv_cfg(ci.oob_port, out_bytes));
+    CpuCoprocessorSession coprocessor(blv_cfg(ci.oob_port, out_bytes));
     REQUIRE(controller.connect(ci) == 0);
     REQUIRE(coprocessor.connect(ci) == 0);
 
@@ -371,9 +375,9 @@ TEST_CASE("memcpy carries messages wider than the 16 B wire frame", "[transport_
     controller.establish_channel(desc, reply, peer_request);
     coprocessor.establish_channel(desc, request, peer_reply);
 
-    WideFrameCheck check{in_bytes, out_bytes};
+    MessageCheck check{in_bytes, out_bytes};
     controller.commit_work_item(0, in_bytes, out_bytes);
-    coprocessor.set_coprocessor_fn(wide_frame_fn, &check);
+    coprocessor.set_coprocessor_fn(invert_and_tag_fn, &check);
     controller.start();
     coprocessor.start();
 
@@ -400,8 +404,8 @@ TEST_CASE("memcpy carries messages larger than one memory page", "[transport_mem
     constexpr std::size_t in_bytes = 65536 + 3;
     constexpr std::size_t out_bytes = in_bytes + 1;
     ConnectInfo ci{.peer = "loopback", .oob_port = 19030};
-    CpuControllerSession controller(pair_cfg(ci.oob_port));
-    CpuCoprocessorSession coprocessor(pair_cfg(ci.oob_port));
+    CpuControllerSession controller(blv_cfg(ci.oob_port, out_bytes));
+    CpuCoprocessorSession coprocessor(blv_cfg(ci.oob_port, out_bytes));
     REQUIRE(controller.connect(ci) == 0);
     REQUIRE(coprocessor.connect(ci) == 0);
 
@@ -413,9 +417,9 @@ TEST_CASE("memcpy carries messages larger than one memory page", "[transport_mem
     controller.establish_channel(desc, reply, peer_request);
     coprocessor.establish_channel(desc, request, peer_reply);
 
-    WideFrameCheck check{in_bytes, out_bytes};
+    MessageCheck check{in_bytes, out_bytes};
     controller.commit_work_item(0, in_bytes, out_bytes);
-    coprocessor.set_coprocessor_fn(wide_frame_fn, &check);
+    coprocessor.set_coprocessor_fn(invert_and_tag_fn, &check);
     controller.start();
     coprocessor.start();
 
@@ -436,22 +440,59 @@ TEST_CASE("memcpy carries messages larger than one memory page", "[transport_mem
     CHECK(got[in_bytes] == 9);
 }
 
-TEST_CASE("memcpy coprocessor rejects a frame larger than its session's first",
-          "[transport_memcpy]") {
+TEST_CASE("memcpy rejects messages larger than its session's frames carry", "[transport_memcpy]") {
     ConnectInfo ci{.peer = "loopback", .oob_port = 19037};
-    CpuCoprocessorSession coprocessor(pair_cfg(ci.oob_port));
+    CpuControllerSession bl16(pair_cfg(ci.oob_port));
+    REQUIRE_THROWS_WITH(bl16.commit_work_item(0, 9, 8),
+                        Catch::Matchers::ContainsSubstring("frame=blv;frame_payload"));
+    CpuControllerSession blv(blv_cfg(ci.oob_port, 64));
+    REQUIRE_NOTHROW(blv.commit_work_item(0, 64, 64));
+    CpuControllerSession too_small(blv_cfg(ci.oob_port, 64));
+    CHECK_THROWS_AS(too_small.commit_work_item(0, 128, 8), std::runtime_error);
+}
+
+TEST_CASE("memcpy refuses a request its coprocessor's frames cannot carry, then carries on",
+          "[transport_memcpy]") {
+    // The coprocessor's frames carry less than the controller's, as with a hand-written config.
+    ConnectInfo ci{.peer = "loopback", .oob_port = 19045};
+    CpuControllerSession controller(blv_cfg(ci.oob_port, 128));
+    CpuCoprocessorSession coprocessor(blv_cfg(ci.oob_port, 32));
+    REQUIRE(controller.connect(ci) == 0);
     REQUIRE(coprocessor.connect(ci) == 0);
+
+    MemRegion reply = controller.alloc_memory(128, MemKind::CpuRam);
+    PeerRef peer_request = controller.exchange_keys(reply);
+    MemRegion request = coprocessor.alloc_memory(128, MemKind::CpuRam);
+    PeerRef peer_reply = coprocessor.exchange_keys(request);
+    ChannelDesc desc{.transport = "memcpy"};
+    controller.establish_channel(desc, reply, peer_request);
+    coprocessor.establish_channel(desc, request, peer_reply);
+
+    controller.commit_work_item(0, 100, 16);
+    coprocessor.set_coprocessor_fn(invert_fn, nullptr);
+    controller.start();
     coprocessor.start();
 
-    // The first message sizes the rings: a 16 B frame and an 8 B reply.
-    std::uint8_t frame[32] = {1, 2, 3, 4, 5, 6, 7, 8};
-    std::uint8_t reply[16] = {};
-    CHECK(coprocessor.process_message(frame, 16, reply, 8) == 8);
-    CHECK(reply[0] == 1);
-    REQUIRE_THROWS_AS(coprocessor.process_message(frame, sizeof(frame), reply, 8),
-                      std::runtime_error);
-    REQUIRE_THROWS_AS(coprocessor.process_message(frame, 16, reply, sizeof(reply)),
-                      std::runtime_error);
+    std::uint8_t payload[100] = {};
+    controller.write_data_slot(payload, sizeof(payload), /*decoder_id=*/0);
+    REQUIRE_THROWS_AS(controller.kick(0), std::runtime_error);
+
+    // The refused request took no slot, so the next one is processed. invert_fn writes 8 B of the
+    // 16 B reply; the rest is zero-filled.
+    const std::uint64_t request_word = 0x0123456789ABCDEFull;
+    controller.write_data_slot(&request_word, sizeof(request_word), /*decoder_id=*/0);
+    REQUIRE(controller.kick(0) == 0);
+    std::uint8_t got[16];
+    std::memset(got, 0xAA, sizeof(got));
+    void *outs[1] = {got};
+    std::uint64_t outs_bytes[1] = {sizeof(got)};
+    REQUIRE(controller.collect(outs, outs_bytes, 1) == 0);
+    std::uint64_t reply_word = 0;
+    std::memcpy(&reply_word, got, sizeof(reply_word));
+    CHECK(reply_word == ~request_word);
+    for (std::size_t i = 8; i < sizeof(got); ++i) {
+        CHECK(got[i] == 0);
+    }
 }
 
 TEST_CASE("memcpy rejects staging and kick before the message sizes are committed",

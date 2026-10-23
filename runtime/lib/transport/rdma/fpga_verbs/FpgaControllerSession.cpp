@@ -228,6 +228,8 @@ PeerRef FpgaControllerSession::exchange_keys(const MemRegion &local) {
         .mr_vaddr = local.addr ? reinterpret_cast<std::uint64_t>(local.addr) : reply_.va,
         .mr_rkey = local.rkey ? local.rkey : reply_.mr->rkey,
         .mtu_enum = active_mtu_,
+        .frame_mode = 0, // BL16
+        .frame_stride = stride_,
     };
     std::memcpy(my.fwd.gid, local_gid_, sizeof(local_gid_));
     std::memcpy(my.bwd.gid, local_gid_, sizeof(local_gid_));
@@ -237,6 +239,10 @@ PeerRef FpgaControllerSession::exchange_keys(const MemRegion &local) {
     recv_exact(oob_.get(), &peer, sizeof(peer));
     send_exact(oob_.get(), &my, sizeof(my));
     oob_.reset();
+    TP_CHECK(peer.frame_mode == my.frame_mode && peer.frame_stride == my.frame_stride,
+             "fpga_verbs: the peer's frames (mode %u, %u B slots) differ from this end's (BL16, "
+             "%u B slots)",
+             peer.frame_mode, peer.frame_stride, my.frame_stride);
 
     peer_rkey_ = peer.mr_rkey;
     peer_addr_ = peer.mr_vaddr;
@@ -373,6 +379,7 @@ int FpgaControllerSession::kick(std::uint32_t work_item_idx) {
     return 0;
 }
 
+// TODO: build and read frames through the frame codec (Frame.hpp), as cpu_verbs does.
 volatile PayloadSlot *FpgaControllerSession::poll_message_arrival(std::uint64_t cursor) {
     std::uint32_t slot = static_cast<std::uint32_t>(cursor % ring_slots_);
     std::uint32_t expected = static_cast<std::uint32_t>(cursor + 1);

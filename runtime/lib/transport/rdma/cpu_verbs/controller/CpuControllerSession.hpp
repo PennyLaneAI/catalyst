@@ -26,8 +26,9 @@ class CpuControllerSession : public common::VerbsSessionBase<ControllerSession> 
     using Base = common::VerbsSessionBase<ControllerSession>;
 
   public:
-    explicit CpuControllerSession(std::string dev, int gid_idx)
-        : Base(std::move(dev), gid_idx, "cpu_verbs") {}
+    explicit CpuControllerSession(std::string dev, int gid_idx,
+                                  common::frame::RingGeometry ring = common::frame::BL16_RING)
+        : Base(std::move(dev), gid_idx, "cpu_verbs", common::DEFAULT_QP_SHAPE, ring) {}
     // Drains the fwd CQ before the base's verbs objects go away. stop() is
     // idempotent, so calling it here and from start() is harmless.
     ~CpuControllerSession() override { stop(); }
@@ -53,6 +54,10 @@ class CpuControllerSession : public common::VerbsSessionBase<ControllerSession> 
     std::uint64_t in_bytes_ = sizeof(common::Payload::value);
     std::uint64_t out_bytes_ = sizeof(common::Payload::value);
     std::uint64_t next_send_ = 0, next_recv_ = 0;
+    // Whether write_data_slot() staged this round's frame; if not, the caller wrote all in_bytes_
+    // in place through data_slot(), and kick() stages it under the last fn_id.
+    bool staged_ = false;
+    std::uint32_t fn_id_ = 0;
     int signaled_outstanding_ = 0;
     std::uint64_t kick_ns_ = 0, rtt_ns_ = 0;
 };

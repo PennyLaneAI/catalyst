@@ -56,8 +56,11 @@ template <class Role> class VerbsSessionBase : public Role {
   public:
     /// @param backend Name used in error messages, e.g. "cpu_verbs".
     /// @param fwd_shape Shape of the controller-to-coprocessor queue pair.
+    /// @param ring Frame layout of both rings, from the session's config
+    /// (frame::geometry_from_config).
     VerbsSessionBase(std::string dev, int gid_idx, const char *backend,
-                     QpShape fwd_shape = DEFAULT_QP_SHAPE);
+                     QpShape fwd_shape = DEFAULT_QP_SHAPE,
+                     frame::RingGeometry ring = frame::BL16_RING);
     ~VerbsSessionBase() override = default;
 
     VerbsSessionBase(const VerbsSessionBase &) = delete;
@@ -100,7 +103,7 @@ template <class Role> class VerbsSessionBase : public Role {
     common::FdGuard oob_fd_;
     std::vector<common::MemoryRegion> caller_memory_regions_;
     std::optional<common::MemoryRegion> send_buf_; // local send source (one frame)
-    frame::RingGeometry ring_ = frame::BL16_RING;  // both rings, local and the peer's
+    frame::RingGeometry ring_;                     // both rings, local and the peer's
     MemRegion local_{};
     PeerRef peer_{};
     ChannelDesc desc_{};
