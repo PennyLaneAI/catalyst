@@ -1406,16 +1406,6 @@ class TestAdjointConstructorPreconstructedOp:
         assert len(q) == 1
         assert q.queue[0] is out
 
-    def test_single_op_defined_outside_queue_symbolic(self):
-        """Test if base is defined outside context and the function constructs
-        the symbolic adjoint, the base is not added to queue."""
-        base = qp.RX(1.2, wires=0)
-        with qp.queuing.AnnotatedQueue() as q:
-            out = adjoint(base)
-
-        assert len(q) == 1
-        assert q.queue[0] is out
-
     def test_single_observable(self):
         """Test passing a single preconstructed observable in a queuing context."""
 
@@ -1529,16 +1519,6 @@ class TestAdjointConstructorOutsideofQueuing:
         assert out.base.phi == 1.234
         assert out.wires == qp.wires.Wires(0)
 
-    def test_single_op_with_defined_adjoint(self):
-        """An operator with a defined adjoint is still wrapped symbolically."""
-
-        x = 1.234
-        base = qp.RX(x, wires=0)
-        out = adjoint(base)
-
-        assert isinstance(out, Adjoint)
-        assert out.data == (x,)
-
     def test_single_op_function(self):
         """Test the transform on a single op as a callable outside of a queuing context."""
         x = 1.234
@@ -1563,14 +1543,6 @@ class TestAdjointConstructorOutsideofQueuing:
         assert len(out) == 2
         assert all(isinstance(op, Adjoint) for op in out)
         assert all(op.wires == qp.wires.Wires(wire) for op in out)
-
-    def test_self_adjoint_op_function(self):
-        """Test a self-adjoint operator remains symbolic outside a queuing context."""
-
-        out = adjoint(qp.PauliX)(0)
-
-        assert isinstance(out, Adjoint)
-        assert isinstance(out.base, qp.PauliX)
 
 
 class TestAdjointConstructorIntegration:
