@@ -86,7 +86,7 @@ _REGISTRY: list[TransportBackend] = [
         "rdma",
         "cpu",
         ("controller", "coprocessor"),
-        frame_modes=("bl16", "blv"),
+        frame_modes=("bl16", "blv", "cuqr"),
         max_payload_bytes=None,
         max_reply_bytes=None,
     ),
@@ -95,7 +95,7 @@ _REGISTRY: list[TransportBackend] = [
         "rdma",
         "gpu",
         ("coprocessor",),
-        frame_modes=("bl16", "blv"),
+        frame_modes=("bl16", "blv", "cuqr"),
         max_payload_bytes=None,
         max_reply_bytes=None,
     ),
@@ -567,12 +567,15 @@ def _frame_config(placement: Placement, transport: str, in_bytes: int, out_bytes
 
     Messages of up to 8 B travel in the 16 B frame (BL16), which needs no entries, so such programs
     compile as before. Larger ones travel in BLV frames sized for the larger message, written as
-    ``frame=blv;frame_payload=<bytes>``. Nodes given an explicit ``backend_lib`` are taken at their
-    word; the runtime checks them.
+    ``frame=blv;frame_payload=<bytes>``. The placement's ``frame``, when not ``"auto"``, overrides
+    that choice: ``"bl16"``, ``"blv"``, or ``"cuqr"`` for cudaq-realtime's format, to talk to a
+    cudaq-realtime peer. Nodes given an explicit ``backend_lib`` are taken at their word; the
+    runtime checks them.
 
     Raises:
         CompileError: If a node's config sets a frame key, or a selected backend cannot carry the
-            layout. A persistent GPU kernel that cannot read the layout refuses it at launch.
+            layout, or the messages do not fit the 16 B frame the placement asks for. A persistent
+            GPU kernel that cannot read the layout refuses it at launch.
     """
     for node in (placement.controller, *placement.coprocessors):
         given = _parse_config((node.init_args or {}).get("config", ""))
@@ -584,7 +587,15 @@ def _frame_config(placement: Placement, transport: str, in_bytes: int, out_bytes
     if not placement.coprocessors:
         return {}  # a controller alone exchanges no frames
     largest = max(in_bytes, out_bytes)
-    mode = "bl16" if largest <= _BL16_PAYLOAD_BYTES else "blv"
+    requested = getattr(placement, "frame", "auto")  # an older PennyLane has no ``frame``
+    if requested == "auto":
+        mode = "bl16" if largest <= _BL16_PAYLOAD_BYTES else "blv"
+    elif requested == "bl16" and largest > _BL16_PAYLOAD_BYTES:
+        raise CompileError(
+            f"{largest} B messages do not fit 'bl16' frames, which carry {_BL16_PAYLOAD_BYTES} B"
+        )
+    else:
+        mode = requested
     nodes = [(placement.controller, "controller")]
     nodes += [(coproc, "coprocessor") for coproc in placement.coprocessors]
     for node, role in nodes:
@@ -595,13 +606,16 @@ def _frame_config(placement: Placement, transport: str, in_bytes: int, out_bytes
             transport, node.hardware, role, in_bytes, out_bytes, getattr(node, "backend", None)
         )
         if mode not in backend.frame_modes:
+            needs = (
+                f"{largest} B messages need" if requested == "auto" else "the placement asks for"
+            )
             raise CompileError(
                 f"backline {role} backend {backend.name!r} carries {list(backend.frame_modes)} "
-                f"frames, but {largest} B messages need {mode!r} frames"
+                f"frames, but {needs} {mode!r} frames"
             )
     if mode == "bl16":
         return {}
-    return {"frame": "blv", "frame_payload": str(largest)}
+    return {"frame": mode, "frame_payload": str(largest)}
 
 
 def serialize_backline(placement: Placement) -> dict:

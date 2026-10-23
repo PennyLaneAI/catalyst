@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include <algorithm>
+#include <chrono>
 #include <cstdint>
 #include <cstring>
 #include <string>
@@ -25,6 +26,7 @@
 #include "WireProtocol.hpp"
 
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/matchers/catch_matchers_string.hpp>
 #include <infiniband/verbs.h>
 
 using namespace catalyst::transport;
@@ -302,4 +304,284 @@ TEST_CASE("cpu_verbs carries messages larger than 8 B in BLV frames", "[cpu_libi
             REQUIRE(reply[i] == static_cast<std::uint8_t>(i + 3));
         }
     }
+}
+
+// Runs `rounds` CUQR round trips of `bytes` B over rxe0 with the given verb, checking each reply.
+static void cuqr_echo(std::size_t bytes, bool write_imm, std::uint16_t port, std::uint32_t rounds,
+                      bool cudaq_peer = false, std::uint32_t slots = 256) {
+    namespace frame = catalyst::transport::common::frame;
+    auto ring = frame::geometry_for(frame::Mode::CUQR, bytes);
+    ring.slots = slots;
+    const common::CuqrConfig cuqr{.write_imm = write_imm, .cudaq_peer = cudaq_peer};
+    std::thread t([&] {
+        CpuCoprocessorSession coproc("rxe0", 1, ring, cuqr);
+        coproc.connect(ConnectInfo{.peer = "127.0.0.1", .oob_port = port});
+        MemRegion m = coproc.alloc_memory(ring.region_bytes(), MemKind::CpuRam);
+        PeerRef p = coproc.exchange_keys(m);
+        coproc.establish_channel(ChannelDesc{.transport = "rdma"}, m, p);
+        coproc.set_coprocessor_fn(add_fn_id, nullptr);
+        coproc.start();
+        while (coproc.completed() < rounds) {
+            std::this_thread::yield();
+        }
+        coproc.stop();
+    });
+    CpuControllerSession controller("rxe0", 1, ring, cuqr);
+    controller.connect(ConnectInfo{.peer = "127.0.0.1", .oob_port = port});
+    MemRegion m = controller.alloc_memory(ring.region_bytes(), MemKind::CpuRam);
+    PeerRef p = controller.exchange_keys(m);
+    controller.establish_channel(ChannelDesc{.transport = "rdma"}, m, p);
+    controller.commit_work_item(0, bytes, bytes);
+    controller.start();
+    std::vector<std::uint8_t> request(bytes), reply(bytes);
+    for (std::uint32_t r = 0; r < rounds; ++r) {
+        for (std::size_t i = 0; i < bytes; ++i) {
+            request[i] = static_cast<std::uint8_t>(i * 7 + r);
+        }
+        controller.write_data_slot(request.data(), bytes, /*decoder_id=*/2);
+        controller.kick(0);
+        void *outs[1] = {reply.data()};
+        std::uint64_t obytes[1] = {bytes};
+        REQUIRE(controller.collect(outs, obytes, 1) == 0);
+        for (std::size_t i = 0; i < bytes; ++i) {
+            REQUIRE(reply[i] == static_cast<std::uint8_t>(request[i] + 2));
+        }
+    }
+    controller.stop();
+    t.join();
+}
+
+TEST_CASE("cpu_verbs carries CUQR frames with SEND and with write-with-immediate",
+          "[cpu_libibverbs]") {
+    if (!have_rxe()) {
+        SKIP("no rxe0 RDMA device");
+    }
+    std::uint16_t port = 18610;
+    for (const bool write_imm : {false, true}) {
+        for (const std::size_t bytes :
+             {std::size_t{8}, std::size_t{64}, std::size_t{1024}, std::size_t{4096}}) {
+            // 300 rounds pass a 256-slot ring, so receive requests must be reposted.
+            cuqr_echo(bytes, write_imm, port++, 300);
+        }
+    }
+}
+
+namespace frame = catalyst::transport::common::frame;
+
+// Both ends of a CUQR session must agree on how frames travel: each refuses the other at connect.
+static void refused_at_connect(const frame::RingGeometry &coproc_ring,
+                               common::CuqrConfig coproc_cuqr, const frame::RingGeometry &ctrl_ring,
+                               common::CuqrConfig ctrl_cuqr, std::uint16_t port, const char *why) {
+    std::thread t([&] {
+        CpuCoprocessorSession coproc("rxe0", 1, coproc_ring, coproc_cuqr);
+        coproc.connect(ConnectInfo{.peer = "127.0.0.1", .oob_port = port});
+        MemRegion m = coproc.alloc_memory(coproc_ring.region_bytes(), MemKind::CpuRam);
+        CHECK_THROWS_WITH(coproc.exchange_keys(m), Catch::Matchers::ContainsSubstring(why));
+    });
+    CpuControllerSession controller("rxe0", 1, ctrl_ring, ctrl_cuqr);
+    controller.connect(ConnectInfo{.peer = "127.0.0.1", .oob_port = port});
+    MemRegion m = controller.alloc_memory(ctrl_ring.region_bytes(), MemKind::CpuRam);
+    CHECK_THROWS_WITH(controller.exchange_keys(m), Catch::Matchers::ContainsSubstring(why));
+    t.join();
+}
+
+TEST_CASE("cpu_verbs refuses a CUQR peer using the other completion verb", "[cpu_libibverbs]") {
+    if (!have_rxe()) {
+        SKIP("no rxe0 RDMA device");
+    }
+    const auto ring = frame::geometry_for(frame::Mode::CUQR, 8);
+    refused_at_connect(ring, {.write_imm = true}, ring, {.write_imm = false}, 18630, "cuqr_tx");
+}
+
+// Fails fn 7 with the ABI's error value, answers fn 8 with an empty result, adds fn_id otherwise.
+static std::size_t fail_on_fn_7(const void *in, std::size_t in_len, std::uint32_t fn_id, void *out,
+                                std::size_t out_cap, void *ctx) {
+    if (fn_id == 7) {
+        return COPROCESSOR_FN_ERROR;
+    }
+    return fn_id == 8 ? 0 : add_fn_id(in, in_len, fn_id, out, out_cap, ctx);
+}
+
+TEST_CASE("a CUQR coprocessor answers a failing function with a status and keeps serving",
+          "[cpu_libibverbs]") {
+    if (!have_rxe()) {
+        SKIP("no rxe0 RDMA device");
+    }
+    namespace frame = catalyst::transport::common::frame;
+    const auto ring = frame::geometry_for(frame::Mode::CUQR, 8);
+    std::thread t([&] {
+        CpuCoprocessorSession coproc("rxe0", 1, ring);
+        coproc.connect(ConnectInfo{.peer = "127.0.0.1", .oob_port = 18640});
+        MemRegion m = coproc.alloc_memory(ring.region_bytes(), MemKind::CpuRam);
+        PeerRef p = coproc.exchange_keys(m);
+        coproc.establish_channel(ChannelDesc{.transport = "rdma"}, m, p);
+        coproc.set_coprocessor_fn(fail_on_fn_7, nullptr);
+        coproc.start();
+        while (coproc.completed() < 3) {
+            std::this_thread::yield();
+        }
+        coproc.stop();
+    });
+    CpuControllerSession controller("rxe0", 1, ring);
+    controller.connect(ConnectInfo{.peer = "127.0.0.1", .oob_port = 18640});
+    MemRegion m = controller.alloc_memory(ring.region_bytes(), MemKind::CpuRam);
+    PeerRef p = controller.exchange_keys(m);
+    controller.establish_channel(ChannelDesc{.transport = "rdma"}, m, p);
+    controller.commit_work_item(0, 8, 8);
+    controller.start();
+    std::uint64_t word = 5, reply = 0;
+    void *outs[1] = {&reply};
+    std::uint64_t obytes[1] = {8};
+    controller.write_data_slot(&word, 8, /*decoder_id=*/7);
+    controller.kick(0);
+    CHECK_THROWS_WITH(controller.collect(outs, obytes, 1),
+                      Catch::Matchers::ContainsSubstring("status 1"));
+    controller.write_data_slot(&word, 8, /*decoder_id=*/8); // an empty result is not a failure
+    controller.kick(0);
+    reply = 0xFFFF;
+    REQUIRE(controller.collect(outs, obytes, 1) == 0);
+    CHECK(reply == 0);
+    controller.write_data_slot(&word, 8, /*decoder_id=*/1); // the coprocessor is still serving
+    controller.kick(0);
+    REQUIRE(controller.collect(outs, obytes, 1) == 0);
+    CHECK(reply == 0x0101010101010106ULL); // add_fn_id adds fn_id 1 to every byte of 5
+    controller.stop();
+    t.join();
+}
+
+TEST_CASE("cpu_verbs talks to a cudaq-realtime peer: UC, rendezvous, zero-based addressing",
+          "[cpu_libibverbs]") {
+    if (!have_rxe()) {
+        SKIP("no rxe0 RDMA device");
+    }
+    // cudaq-realtime's cpu_roce default: 8 slots of 256 B; 20 rounds wrap the ring twice.
+    cuqr_echo(232, /*write_imm=*/false, 18650, 20, /*cudaq_peer=*/true, /*slots=*/8);
+    // A coprocessor in peer mode answers by SEND, as a cudaq-realtime server does, so this also
+    // covers a controller that writes with immediate receiving SEND replies.
+    cuqr_echo(232, /*write_imm=*/true, 18651, 20, /*cudaq_peer=*/true, /*slots=*/8);
+}
+
+TEST_CASE("an idle CUQR coprocessor stops promptly", "[cpu_libibverbs]") {
+    if (!have_rxe()) {
+        SKIP("no rxe0 RDMA device");
+    }
+    namespace frame = catalyst::transport::common::frame;
+    const auto ring = frame::geometry_for(frame::Mode::CUQR, 8);
+    std::thread t([&] {
+        CpuControllerSession controller("rxe0", 1, ring);
+        controller.connect(ConnectInfo{.peer = "127.0.0.1", .oob_port = 18660});
+        MemRegion m = controller.alloc_memory(ring.region_bytes(), MemKind::CpuRam);
+        PeerRef p = controller.exchange_keys(m);
+        controller.establish_channel(ChannelDesc{.transport = "rdma"}, m, p);
+    });
+    CpuCoprocessorSession coproc("rxe0", 1, ring);
+    coproc.connect(ConnectInfo{.peer = "127.0.0.1", .oob_port = 18660});
+    MemRegion m = coproc.alloc_memory(ring.region_bytes(), MemKind::CpuRam);
+    PeerRef p = coproc.exchange_keys(m);
+    coproc.establish_channel(ChannelDesc{.transport = "rdma"}, m, p);
+    t.join();
+    coproc.start(); // waits on its receive completion queue; nothing arrives
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    const auto t0 = std::chrono::steady_clock::now();
+    coproc.stop();
+    CHECK(std::chrono::steady_clock::now() - t0 < std::chrono::seconds(1));
+}
+
+// Echoes a request of 0xEE bytes in full, and only the first half of any other.
+static std::size_t half_fn(const void *in, std::size_t in_len, std::uint32_t /*fn_id*/, void *out,
+                           std::size_t /*out_cap*/, void * /*ctx*/) {
+    const std::size_t n = *static_cast<const std::uint8_t *>(in) == 0xEE ? in_len : in_len / 2;
+    std::memcpy(out, in, n);
+    return n;
+}
+
+TEST_CASE("a short CUQR reply reads as zeros past its length, also after the ring wraps",
+          "[cpu_libibverbs]") {
+    if (!have_rxe()) {
+        SKIP("no rxe0 RDMA device");
+    }
+    namespace frame = catalyst::transport::common::frame;
+    const auto ring = frame::geometry_for(frame::Mode::CUQR, 64);
+    constexpr std::uint32_t rounds = 300; // past a 256-slot lap
+    std::thread t([&] {
+        CpuCoprocessorSession coproc("rxe0", 1, ring);
+        coproc.connect(ConnectInfo{.peer = "127.0.0.1", .oob_port = 18670});
+        MemRegion m = coproc.alloc_memory(ring.region_bytes(), MemKind::CpuRam);
+        PeerRef p = coproc.exchange_keys(m);
+        coproc.establish_channel(ChannelDesc{.transport = "rdma"}, m, p);
+        coproc.set_coprocessor_fn(half_fn, nullptr);
+        coproc.start();
+        while (coproc.completed() < rounds) {
+            std::this_thread::yield();
+        }
+        coproc.stop();
+    });
+    CpuControllerSession controller("rxe0", 1, ring);
+    controller.connect(ConnectInfo{.peer = "127.0.0.1", .oob_port = 18670});
+    MemRegion m = controller.alloc_memory(ring.region_bytes(), MemKind::CpuRam);
+    PeerRef p = controller.exchange_keys(m);
+    controller.establish_channel(ChannelDesc{.transport = "rdma"}, m, p);
+    controller.commit_work_item(0, 64, 64);
+    controller.start();
+    std::vector<std::uint8_t> request(64), reply(64);
+    for (std::uint32_t r = 0; r < rounds; ++r) {
+        // The first lap's replies fill the slot; the second lap's are half as long, so a tail
+        // left over from the first lap would show.
+        const bool first_lap = r < ring.slots;
+        std::memset(request.data(), first_lap ? 0xEE : 0x11, request.size());
+        controller.write_data_slot(request.data(), 64, 0);
+        controller.kick(0);
+        void *outs[1] = {reply.data()};
+        std::uint64_t obytes[1] = {64};
+        REQUIRE(controller.collect(outs, obytes, 1) == 0);
+        for (std::size_t i = 32; i < 64; ++i) {
+            REQUIRE(reply[i] == (first_lap ? 0xEE : 0));
+        }
+    }
+    controller.stop();
+    t.join();
+}
+
+TEST_CASE("a controller talking to a cudaq-realtime peer reports a lost reply",
+          "[cpu_libibverbs]") {
+    if (!have_rxe()) {
+        SKIP("no rxe0 RDMA device");
+    }
+    namespace frame = catalyst::transport::common::frame;
+    // UC drops rather than retries, so a reply that never comes must fail, not hang.
+    auto ring = frame::geometry_for(frame::Mode::CUQR, 8);
+    ring.slots = 8;
+    std::thread t([&] {
+        CpuCoprocessorSession coproc("rxe0", 1, ring, {.cudaq_peer = true});
+        coproc.connect(ConnectInfo{.peer = "127.0.0.1", .oob_port = 18680});
+        MemRegion m = coproc.alloc_memory(ring.region_bytes(), MemKind::CpuRam);
+        coproc.exchange_keys(m); // and never started, so nothing answers
+        std::this_thread::sleep_for(std::chrono::seconds(8));
+    });
+    CpuControllerSession controller("rxe0", 1, ring, {.cudaq_peer = true});
+    controller.connect(ConnectInfo{.peer = "127.0.0.1", .oob_port = 18680});
+    MemRegion m = controller.alloc_memory(ring.region_bytes(), MemKind::CpuRam);
+    PeerRef p = controller.exchange_keys(m);
+    controller.establish_channel(ChannelDesc{.transport = "rdma"}, m, p);
+    controller.commit_work_item(0, 8, 8);
+    controller.start();
+    std::uint64_t word = 5, reply = 0;
+    void *outs[1] = {&reply};
+    std::uint64_t obytes[1] = {8};
+    controller.write_data_slot(&word, 8, 0);
+    controller.kick(0);
+    CHECK_THROWS_WITH(controller.collect(outs, obytes, 1),
+                      Catch::Matchers::ContainsSubstring("no reply"));
+    controller.stop();
+    t.join();
+}
+
+TEST_CASE("cpu_verbs refuses a CUQR peer with a different slot count", "[cpu_libibverbs]") {
+    if (!have_rxe()) {
+        SKIP("no rxe0 RDMA device");
+    }
+    const auto large = frame::geometry_for(frame::Mode::CUQR, 8);
+    auto small = large;
+    small.slots = 8;
+    refused_at_connect(large, {}, small, {}, 18690, "slots");
 }

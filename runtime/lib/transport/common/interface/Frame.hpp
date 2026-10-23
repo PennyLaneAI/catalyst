@@ -50,7 +50,7 @@ namespace catalyst::transport::common::frame {
 enum class Mode : std::uint8_t {
     BL16 = 0, // 16 B: 8 B of payload, the fn_id, then seq (Payload)
     BLV = 1,  // variable length: a 32 B header, the payload, then a completion word
-    CUQR = 2, // TODO: cudaq-realtime compatible codec, not implemented yet
+    CUQR = 2, // cudaq-realtime's RPCHeader/RPCResponse: a 24 B header, then the payload
 };
 
 #pragma pack(push, 1)
@@ -71,6 +71,21 @@ static_assert(sizeof(BlvHeader) == 32, "a BLV header is 32 B");
 inline constexpr std::uint32_t BLV_MAGIC = 0x31564C42; // "BLV1", little-endian
 inline constexpr std::uint16_t BLV_VERSION = 1;
 inline constexpr std::size_t BLV_COMPLETION_BYTES = sizeof(std::uint32_t);
+#pragma pack(push, 1)
+/// cudaq-realtime's request (RPCHeader) and reply (RPCResponse) header: the same 24 B, with
+/// `word` the function_id in a request and the status in a reply.
+struct CuqrHeader {
+    std::uint32_t magic;      // CUQR_MAGIC (request) or CUQS_MAGIC (reply)
+    std::uint32_t word;       // request: function_id (our fn_id); reply: int32 status
+    std::uint32_t len;        // payload bytes (arg_len / result_len)
+    std::uint32_t request_id; // opaque: set by the sender of a request, echoed in its reply
+    std::uint64_t t_ptp_ns;   // opaque, echoed
+};
+#pragma pack(pop)
+static_assert(sizeof(CuqrHeader) == 24, "a CUQR header is 24 B");
+inline constexpr std::uint32_t CUQR_MAGIC = 0x43555152; // 'CUQR'
+inline constexpr std::uint32_t CUQS_MAGIC = 0x43555153; // 'CUQS'
+
 /// The smallest slot a ring uses, for the DMA engines that need 64 B alignment.
 inline constexpr std::size_t MIN_STRIDE = 64;
 
@@ -87,7 +102,7 @@ struct RingGeometry {
     }
     /// Byte offset of the payload within a frame.
     FRAME_HOST_DEVICE std::size_t data_offset() const {
-        return mode == Mode::BL16 ? 0 : sizeof(BlvHeader);
+        return mode == Mode::BL16 ? 0 : mode == Mode::CUQR ? sizeof(CuqrHeader) : sizeof(BlvHeader);
     }
     /// Byte offset of the word a receiver polls: BL16's seq, or BLV's completion word.
     FRAME_HOST_DEVICE std::size_t poll_offset() const {
@@ -107,11 +122,15 @@ inline RingGeometry geometry_for(Mode mode, std::size_t max_payload) {
                  PAYLOAD_DATA_BYTES, max_payload);
         return BL16_RING;
     }
-    TP_CHECK(mode == Mode::BLV, "frame mode %d is not implemented", static_cast<int>(mode));
-    const std::size_t frame = sizeof(BlvHeader) + max_payload + BLV_COMPLETION_BYTES;
+    TP_CHECK(mode == Mode::BLV || mode == Mode::CUQR, "frame mode %d is not implemented",
+             static_cast<int>(mode));
+    // A CUQR frame has no completion word: the transport signals its arrival.
+    const std::size_t frame = mode == Mode::CUQR
+                                  ? sizeof(CuqrHeader) + max_payload
+                                  : sizeof(BlvHeader) + max_payload + BLV_COMPLETION_BYTES;
     const std::size_t stride = std::bit_ceil(frame < MIN_STRIDE ? MIN_STRIDE : frame);
     TP_CHECK(stride <= UINT32_MAX, "a %zu B payload is too large for a frame", max_payload);
-    return RingGeometry{.mode = Mode::BLV, .stride = static_cast<std::uint32_t>(stride)};
+    return RingGeometry{.mode = mode, .stride = static_cast<std::uint32_t>(stride)};
 }
 
 /// The ring a session's backend config asks for: `frame=bl16|blv` with `frame_payload=<bytes>`,
@@ -127,7 +146,30 @@ inline RingGeometry geometry_from_config(std::string_view config) {
     if (*mode == "bl16") {
         return geometry_for(Mode::BL16, max_payload);
     }
-    TP_CHECK(*mode == "blv", "config: 'frame' must be 'bl16' or 'blv', got '%.*s'",
+    if (*mode == "cuqr") {
+        RingGeometry ring = geometry_for(Mode::CUQR, max_payload);
+        // A cudaq-realtime server sets its slot size and count (cpu_roce: 8 of 256 B by default),
+        // and answers with whole slots, so a session talking to one matches them.
+        if (const auto bytes = configparser::find(config, "frame_slot_bytes")) {
+            const std::uint64_t n = configparser::parse_u64(*bytes, "frame_slot_bytes");
+            TP_CHECK(n >= MIN_STRIDE && n <= UINT32_MAX && std::has_single_bit(n),
+                     "config: 'frame_slot_bytes' must be a power of two of at least %zu, got %llu",
+                     MIN_STRIDE, static_cast<unsigned long long>(n));
+            TP_CHECK(n >= sizeof(CuqrHeader) + max_payload,
+                     "config: %llu B slots cannot hold a %zu B frame (frame_slot_bytes)",
+                     static_cast<unsigned long long>(n), sizeof(CuqrHeader) + max_payload);
+            ring.stride = static_cast<std::uint32_t>(n);
+        }
+        if (const auto slots = configparser::find(config, "frame_slots")) {
+            const std::uint64_t n = configparser::parse_u64(*slots, "frame_slots");
+            TP_CHECK(n > 0 && n <= UINT32_MAX && std::has_single_bit(n),
+                     "config: 'frame_slots' must be a power of two, got %llu",
+                     static_cast<unsigned long long>(n));
+            ring.slots = static_cast<std::uint32_t>(n);
+        }
+        return ring;
+    }
+    TP_CHECK(*mode == "blv", "config: 'frame' must be 'bl16', 'blv' or 'cuqr', got '%.*s'",
              static_cast<int>(mode->size()), mode->data());
     return geometry_for(Mode::BLV, max_payload);
 }
@@ -138,21 +180,25 @@ struct FrameView {
     std::uint32_t len = 0;        // payload bytes the frame carries (BL16: always 8, zero-padded)
     std::uint32_t fn_id = 0;      // which function on the coprocessor handles it
     std::uint32_t seq = 0;        // the round's sequence number, cursor + 1
+    std::int32_t status = 0;      // CUQR reply: 0 ok, >0 the coprocessor function failed
+    std::uint32_t request_id = 0; // CUQR: the sender's opaque request id
+    std::uint64_t t_ptp_ns = 0;   // CUQR: the sender's opaque timestamp
 };
 
 namespace detail {
 inline void require_mode(Mode mode) {
-    TP_CHECK(mode == Mode::BL16 || mode == Mode::BLV, "frame mode %d is not implemented",
-             static_cast<int>(mode));
+    TP_CHECK(mode == Mode::BL16 || mode == Mode::BLV || mode == Mode::CUQR,
+             "frame mode %d is not implemented", static_cast<int>(mode));
 }
 inline BlvHeader *blv(void *frame) { return static_cast<BlvHeader *>(frame); }
+inline CuqrHeader *cuqr(void *frame) { return static_cast<CuqrHeader *>(frame); }
 inline std::uint32_t *completion(const RingGeometry &ring, void *frame) {
     return reinterpret_cast<std::uint32_t *>(static_cast<std::uint8_t *>(frame) + ring.stride -
                                              BLV_COMPLETION_BYTES);
 }
 } // namespace detail
 
-/// Bytes on the wire for one frame: 16 for BL16, the whole slot for BLV.
+/// Bytes one frame takes in its slot: 16 for BL16, the whole slot for BLV and CUQR.
 inline std::size_t frame_bytes(const RingGeometry &ring) {
     detail::require_mode(ring.mode);
     return ring.mode == Mode::BL16 ? sizeof(Payload) : ring.stride;
@@ -161,20 +207,31 @@ inline std::size_t frame_bytes(const RingGeometry &ring) {
 /// Payload bytes one frame carries.
 inline std::size_t data_capacity(const RingGeometry &ring) {
     detail::require_mode(ring.mode);
-    return ring.mode == Mode::BL16 ? PAYLOAD_DATA_BYTES
-                                   : ring.stride - sizeof(BlvHeader) - BLV_COMPLETION_BYTES;
+    return ring.mode == Mode::BL16   ? PAYLOAD_DATA_BYTES
+           : ring.mode == Mode::CUQR ? ring.stride - sizeof(CuqrHeader)
+                                     : ring.stride - sizeof(BlvHeader) - BLV_COMPLETION_BYTES;
+}
+
+/// Bytes to send for a staged and sealed frame: CUQR sends only its header and payload.
+inline std::size_t wire_bytes(const RingGeometry &ring, const void *frame) {
+    if (ring.mode == Mode::CUQR) {
+        return sizeof(CuqrHeader) + static_cast<const CuqrHeader *>(frame)->len;
+    }
+    return frame_bytes(ring);
 }
 
 /// Where a frame's payload starts, for a caller that writes or reads it in place.
 inline std::uint8_t *data(const RingGeometry &ring, void *frame) {
     detail::require_mode(ring.mode);
-    return static_cast<std::uint8_t *>(frame) + (ring.mode == Mode::BL16 ? 0 : sizeof(BlvHeader));
+    return static_cast<std::uint8_t *>(frame) + ring.data_offset();
 }
 
 /// Fill a frame's payload, its length and fn_id. `src` may be the frame's own payload area, for a
 /// payload already written in place. BL16 zero-pads the payload to 8 B. seq is left for seal().
+/// With `reply_to` (the request, carrying the reply's status), a CUQR frame is a reply (CUQS)
+/// echoing that request's id and timestamp; BL16 and BLV ignore it.
 inline void stage(const RingGeometry &ring, void *frame, std::uint32_t fn_id, const void *src,
-                  std::size_t len) {
+                  std::size_t len, const FrameView *reply_to = nullptr) {
     const std::size_t cap = data_capacity(ring);
     TP_CHECK(len <= cap, "payload (%zu B) exceeds the %zu B frame", len, cap);
     if (ring.mode == Mode::BL16) {
@@ -190,6 +247,17 @@ inline void stage(const RingGeometry &ring, void *frame, std::uint32_t fn_id, co
     std::uint8_t *payload = data(ring, frame);
     if (len != 0 && src != payload) {
         std::memmove(payload, src, len);
+    }
+    if (ring.mode == Mode::CUQR) {
+        const bool failed = reply_to && reply_to->status != 0;
+        *detail::cuqr(frame) = CuqrHeader{
+            .magic = reply_to ? CUQS_MAGIC : CUQR_MAGIC,
+            .word = reply_to ? static_cast<std::uint32_t>(reply_to->status) : fn_id,
+            .len = failed ? 0U : static_cast<std::uint32_t>(len),
+            .request_id = reply_to ? reply_to->request_id : 0,
+            .t_ptp_ns = reply_to ? reply_to->t_ptp_ns : 0,
+        };
+        return;
     }
     *detail::blv(frame) = BlvHeader{
         .magic = BLV_MAGIC,
@@ -210,6 +278,15 @@ inline void seal(const RingGeometry &ring, void *frame, std::uint32_t seq) {
     if (ring.mode == Mode::BL16) {
         std::atomic_ref<std::uint32_t>(static_cast<Payload *>(frame)->seq_num)
             .store(seq, std::memory_order_release);
+        return;
+    }
+    if (ring.mode == Mode::CUQR) {
+        // The transport signals arrival, so this is a plain store. A reply keeps the request_id it
+        // echoes.
+        CuqrHeader *h = detail::cuqr(frame);
+        if (h->magic == CUQR_MAGIC) {
+            h->request_id = seq;
+        }
         return;
     }
     detail::blv(frame)->seq = seq;
@@ -235,6 +312,29 @@ inline bool poll(const RingGeometry &ring, void *frame, std::uint32_t expect, Fr
         return true;
     }
     detail::require_mode(ring.mode);
+    if (ring.mode == Mode::CUQR) {
+        // Called once the transport has signalled the arrival, as the header has no completion
+        // word; false means the slot holds no valid frame. request_id is the sender's own (a stock
+        // client need not count from 1), so it is returned rather than compared; a controller
+        // checks the echo of its own.
+        const CuqrHeader *h = detail::cuqr(frame);
+        // Not a frame (wrong magic, or a length past the slot): cudaq-realtime drops such a
+        // message and keeps serving, so the caller can too.
+        if ((h->magic != CUQR_MAGIC && h->magic != CUQS_MAGIC) || h->len > data_capacity(ring)) {
+            return false;
+        }
+        const bool reply = h->magic == CUQS_MAGIC;
+        out = FrameView{
+            .data = data(ring, frame),
+            .len = h->len,
+            .fn_id = reply ? 0 : h->word,
+            .seq = expect,
+            .status = reply ? static_cast<std::int32_t>(h->word) : 0,
+            .request_id = h->request_id,
+            .t_ptp_ns = h->t_ptp_ns,
+        };
+        return true;
+    }
     if (std::atomic_ref<std::uint32_t>(*detail::completion(ring, frame))
             .load(std::memory_order_acquire) != expect) {
         return false;

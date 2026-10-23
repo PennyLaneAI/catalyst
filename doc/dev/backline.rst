@@ -245,6 +245,9 @@ receiving side: over RDMA in the receiver's registered memory, over ``memcpy`` i
 coprocessor's own memory. A ring has 256 slots, and round ``n`` uses slot ``n mod 256``. Every
 transport uses the same two frame layouts, and the compiler picks one per placement from its
 message sizes: the 16 B frame, BL16, when requests and replies fit in 8 B, and BLV otherwise.
+``qp.Backline(..., frame=...)`` overrides that choice with ``"bl16"``, ``"blv"`` or ``"cuqr"``,
+cudaq-realtime's format (see `CUQR frames`_); the compiler checks that the selected backends carry
+it.
 
 .. list-table:: BL16, in 64 B slots
     :header-rows: 1
@@ -311,6 +314,67 @@ larger than the path MTU spans several packets (a 1024 B payload already fills a
 its completion word landing last then relies on the NIC placing an RDMA write's bytes in order,
 which common NICs do but the RDMA specification does not guarantee. Rings keep 256 slots whatever
 the stride, so memory grows with message size: a 1 MiB message makes each ring 512 MiB.
+
+CUQR frames
+-----------
+
+``cpu_verbs`` and ``gpu_verbs`` also speak cudaq-realtime's RPC format, for exchanging messages
+with a cudaq-realtime (NVQLink) peer. A request is its 24 B ``RPCHeader`` (magic ``"CUQR"``,
+``function_id`` = the ``fn_id``, ``arg_len``, ``request_id``, ``ptp_timestamp``) and then the
+payload; a reply is its ``RPCResponse`` (magic ``"CUQS"``, ``status``, ``result_len``, and the
+request's ``request_id`` and ``ptp_timestamp`` echoed) and then the result. A coprocessor function
+that returns ``COPROCESSOR_FN_ERROR`` is answered with ``status`` 1 and no result, and the
+controller reports the status; a message that is not a CUQR frame is dropped unanswered, as
+cudaq-realtime does.
+
+A CUQR frame has no word written last, so its arrival is signalled by the RDMA verb that carries
+it: the receiver posts one receive request per slot and reads arrivals from its receive completion
+queue. ``cuqr_tx=send`` (the default) or ``cuqr_tx=write_imm`` in an rdma node's config picks the
+verb a session sends by, and both ends of a Backline session must agree. A receiver accepts either,
+apart from ``gpu_verbs``, which takes requests only by write with immediate: mlx5 delivers a small
+SEND through the completion entry for the CPU to copy into its buffer, which in GPU memory it
+cannot.
+
+Talking to a cudaq-realtime peer takes ``peer=cudaq`` in the rdma node config, which switches the
+session to that peer's conventions: one unreliable connected (UC) queue pair both ways, its 12 B
+handshake (queue pair, rkey and IPv4 address, the caller first), rings addressed from 0, MTU 4096,
+and replies by SEND. Set ``frame_slots`` and ``frame_slot_bytes`` to the server's ``--num-slots``
+and ``--slot-size``: it answers with whole slots. UC drops a lost message without telling either
+side, so a controller reports a reply that has not come within 5 s instead of waiting forever.
+
+**Setting up CUQR.** Apart from ``frame``, these go in each rdma node's config, e.g.
+``"dev=mlx5_0;gid=3;cuqr_tx=write_imm"``, and none is set for you:
+
+* ``qp.Backline(..., frame="cuqr")`` selects the format; the default ``"auto"`` never picks it.
+* A ``gpu_verbs`` coprocessor needs ``cuqr_tx=write_imm`` on both nodes. The default ``send``
+  is refused when the session starts.
+* Between two Backline nodes, ``cuqr_tx`` must match on both ends, which the session checks.
+* For a cudaq-realtime peer:
+
+  * Set ``peer=cudaq``.
+  * Set ``frame_slots`` and ``frame_slot_bytes`` to the server's ``--num-slots`` and
+    ``--slot-size``. Nothing checks these against the peer: a mismatch shows up only as wrong
+    replies or a missing one.
+  * Use a ``gid`` that is the port's RoCEv2 IPv4 GID, since the handshake carries an IPv4
+    address.
+  * Raise the port's netdev MTU to 4200 or more, for the active MTU of 4096 cudaq-realtime
+    expects. The session refuses a smaller one.
+  * A ``gpu_verbs`` coprocessor in this mode accepts only requests the peer sends by write with
+    immediate.
+
+This has been tested against cudaq-realtime's own server and client on a ConnectX-7. They differ in
+one respect: an unknown ``function_id`` gets a ``status`` reply from Backline, where cudaq-realtime
+drops it. A GPU-resident cudaq-realtime peer (DOCA GPUNetIO) needs an NVIDIA GPU and has not been
+tested.
+
+**Not optimized on gpu_verbs.** A GPU kernel cannot read a completion queue, so the session's host
+thread relays each arrival to the kernel through a host-mapped flag per slot, and the kernel polls
+that flag over PCIe. A CUQR round trip therefore costs about 1 µs more than BLV for small messages
+on an MI210 behind a ConnectX-7, and more for large ones, which also copy in 8 B rather than 16 B
+chunks (the payload starts at byte 24). Ways to remove the cost: have the NIC write the flag into
+GPU memory (a second RDMA write per message), let the GPU poll the completion queue itself
+(GPUDirect Async, as DOCA GPUNetIO does), or poll the request header in GPU memory on NICs that
+guarantee in-order placement within a message.
 
 The transport dialect
 =====================
@@ -548,6 +612,10 @@ platform is built out.
     executor path, and the transport operations narrow this further to rank-1 memrefs of integer
     or index element type. This keeps the wire format a flat buffer with no descriptor
     marshalling, at the cost of ruling out kernels with other signatures.
+
+**CUQR is configured by hand.**
+    The compiler does not pick the RDMA verb, the peer mode or the slot geometry for CUQR frames.
+    See the setup list under `CUQR frames`_. On ``gpu_verbs``, CUQR is also slower than BLV.
 
 **Two ways to call coprocessor code.**
     The supported way is a placement with ``qp.backline.decode`` (or ``qec_code=``).

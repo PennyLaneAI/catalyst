@@ -12,11 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <atomic>
 #include <cstdint>
 #include <cstring>
 #include <vector>
 
 #include "Frame.hpp"
+#include "GpuCoprocessorSession.hpp"
 #include "GpuLaunchers.hpp"
 #include "GpuRuntime.hpp"
 #include "HipCheck.hpp"
@@ -24,6 +26,7 @@
 #include "TransportABI.h"
 
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/matchers/catch_matchers_string.hpp>
 #include <hip/hip_runtime.h>
 
 using namespace catalyst::transport;
@@ -36,6 +39,8 @@ namespace {
 struct Reply {
     std::vector<std::uint8_t> data;
     std::uint32_t fn_id;
+    std::int32_t status;
+    std::uint32_t request_id;
 };
 std::vector<Reply> run_kernel(CoprocessorLauncherFn launcher, frame::RingGeometry ring,
                               const std::vector<std::vector<std::uint8_t>> &requests) {
@@ -47,7 +52,13 @@ std::vector<Reply> run_kernel(CoprocessorLauncherFn launcher, frame::RingGeometr
     std::memset(req_host, 0, ring.region_bytes());
     void *req_dev = nullptr;
     HIP_CHECK(hipHostGetDevicePointer(&req_dev, req_host, 0), "hipHostGetDevicePointer");
-    GpuRuntime::Handoff replies = gpu.alloc_handoff(ring.region_bytes());
+    // CUQR frames come with a flag per slot each way, after the reply ring, as gpu_verbs lays them.
+    const bool cuqr = ring.mode == frame::Mode::CUQR;
+    const std::size_t flag_bytes = cuqr ? 2 * ring.slots * sizeof(std::uint32_t) : 0;
+    GpuRuntime::Handoff replies = gpu.alloc_handoff(ring.region_bytes() + flag_bytes);
+    auto *rx_host = reinterpret_cast<std::uint32_t *>(replies.host + ring.region_bytes());
+    auto *tx_host = rx_host + ring.slots;
+    std::memset(rx_host, 0, flag_bytes);
 
     CoprocLaunchDesc desc{
         .ring = req_dev,
@@ -58,6 +69,9 @@ std::vector<Reply> run_kernel(CoprocessorLauncherFn launcher, frame::RingGeometr
         .stream = gpu.stream(),
         .frame_mode = static_cast<std::uint32_t>(ring.mode),
         .slot_stride = ring.stride,
+        .rx_flags = cuqr ? replies.dev + ring.region_bytes() : nullptr,
+        .tx_flags =
+            cuqr ? replies.dev + ring.region_bytes() + ring.slots * sizeof(std::uint32_t) : nullptr,
     };
     REQUIRE(launcher(&desc, nullptr) == 0);
     std::vector<Reply> out;
@@ -67,10 +81,18 @@ std::vector<Reply> run_kernel(CoprocessorLauncherFn launcher, frame::RingGeometr
         frame::stage(ring, slot, /*fn_id=*/static_cast<std::uint32_t>(c + 5), requests[c].data(),
                      requests[c].size());
         frame::seal(ring, slot, expect);
+        const std::size_t s = c & (ring.slots - 1);
+        if (cuqr) { // what gpu_verbs does once the receive completion queue shows the request
+            std::atomic_ref<std::uint32_t>(rx_host[s]).store(expect, std::memory_order_release);
+            while (std::atomic_ref<std::uint32_t>(tx_host[s]).load(std::memory_order_acquire) !=
+                   expect) {
+            }
+        }
         frame::FrameView view;
         while (!frame::poll(ring, replies.host + ring.slot_offset(c), expect, view)) {
         }
-        out.push_back({std::vector<std::uint8_t>(view.data, view.data + view.len), view.fn_id});
+        out.push_back({std::vector<std::uint8_t>(view.data, view.data + view.len), view.fn_id,
+                       view.status, view.request_id});
     }
     gpu.sync();
     (void)hipHostFree(req_host);
@@ -113,8 +135,9 @@ TEST_CASE("the GPU echo kernel answers BLV frames over 8 B, past one lap of the 
     }
 }
 
-TEST_CASE("the GPU Steane kernel decodes an unpacked syndrome in either frame layout") {
-    for (const auto ring : {frame::BL16_RING, frame::geometry_for(frame::Mode::BLV, 64)}) {
+TEST_CASE("the GPU Steane kernel decodes an unpacked syndrome in every frame layout") {
+    for (const auto ring : {frame::BL16_RING, frame::geometry_for(frame::Mode::BLV, 64),
+                            frame::geometry_for(frame::Mode::CUQR, 64)}) {
         std::vector<std::vector<std::uint8_t>> requests;
         for (std::uint8_t packed = 0; packed < (1 << STEANE_CHECKS); ++packed) {
             // Check 0 is the most significant bit of the packed syndrome.
@@ -130,4 +153,31 @@ TEST_CASE("the GPU Steane kernel decodes an unpacked syndrome in either frame la
             CHECK(qubit == STEANE_SYNDROME_TO_QUBIT[packed]);
         }
     }
+}
+
+TEST_CASE("the GPU echo kernel answers CUQR frames through the slot flags, echoing request ids") {
+    const auto ring = frame::geometry_for(frame::Mode::CUQR, 300);
+    std::vector<std::vector<std::uint8_t>> requests;
+    for (std::uint32_t r = 0; r < ring.slots + 4; ++r) {
+        std::vector<std::uint8_t> payload(300 - r % 7); // lengths vary, so a stale one would show
+        for (std::size_t i = 0; i < payload.size(); ++i) {
+            payload[i] = static_cast<std::uint8_t>(i * 13 + r);
+        }
+        requests.push_back(payload);
+    }
+    const auto replies = run_kernel(gpu_echo_launcher, ring, requests);
+    for (std::size_t c = 0; c < requests.size(); ++c) {
+        REQUIRE(replies[c].status == 0);
+        REQUIRE(replies[c].request_id == c + 1); // the request's id, echoed
+        REQUIRE(replies[c].data == requests[c]);
+    }
+}
+
+TEST_CASE("gpu_verbs takes CUQR requests only by write with immediate") {
+    // mlx5 hands a small SEND to the CPU to copy into its buffer, which in GPU memory it cannot.
+    const auto ring = frame::geometry_for(frame::Mode::CUQR, 8);
+    CHECK_THROWS_WITH(gpu_verbs::GpuCoprocessorSession("mlx5_1", 3, 0, ring, {.write_imm = false}),
+                      Catch::Matchers::ContainsSubstring("cuqr_tx=write_imm"));
+    // A cudaq-realtime client picks its own verb (its clients write with immediate).
+    CHECK_NOTHROW(gpu_verbs::GpuCoprocessorSession("mlx5_1", 3, 0, ring, {.cudaq_peer = true}));
 }

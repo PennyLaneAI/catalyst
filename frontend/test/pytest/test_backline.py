@@ -2115,6 +2115,53 @@ class TestBackendRegistry:
         d = serialize_backline(dev.placement)
         assert "frame=blv;frame_payload=64" in d["coprocessors"][0]["config"]
 
+    @staticmethod
+    def _with_frame(transport, frame, in_bytes=8):
+        dev = qp.Backline(
+            controller=_controller(init_args={}, in_bytes=in_bytes),
+            coprocessors=[_coproc("cop0", init_args={})],
+            transport=transport,
+        )
+        object.__setattr__(dev.placement, "frame", frame)  # until PennyLane takes ``frame=``
+        return dev.placement
+
+    def test_a_placement_can_ask_for_cuqr_frames(self, flat_lib_dir):
+        """Both ends get cudaq-realtime's frames, sized for the larger message."""
+        flat_lib_dir(
+            "libcatalyst_transport_cpu_verbs_controller.so",
+            "libcatalyst_transport_cpu_verbs_coprocessor.so",
+        )
+        d = serialize_backline(self._with_frame("rdma", "cuqr"))
+        assert d["controller"]["config"] == "frame=cuqr;frame_payload=8"
+        assert d["coprocessors"][0]["config"].startswith("frame=cuqr;frame_payload=8")
+
+    def test_cuqr_frames_need_backends_that_carry_them(self, flat_lib_dir):
+        """memcpy speaks only Backline's own frames."""
+        flat_lib_dir(
+            "libcatalyst_transport_memcpy_controller.so",
+            "libcatalyst_transport_memcpy_coprocessor.so",
+        )
+        with pytest.raises(CompileError, match="'memcpy' carries \\['bl16', 'blv'\\] frames"):
+            serialize_backline(self._with_frame("memcpy", "cuqr"))
+
+    def test_bl16_frames_cannot_carry_larger_messages(self, flat_lib_dir):
+        """A placement asking for the 16 B frame keeps its messages to 8 B."""
+        flat_lib_dir(
+            "libcatalyst_transport_memcpy_controller.so",
+            "libcatalyst_transport_memcpy_coprocessor.so",
+        )
+        with pytest.raises(CompileError, match="64 B messages do not fit 'bl16' frames"):
+            serialize_backline(self._with_frame("memcpy", "bl16", in_bytes=64))
+
+    def test_blv_frames_can_be_asked_for_small_messages(self, flat_lib_dir):
+        """``frame="blv"`` overrides the size-based choice of the 16 B frame."""
+        flat_lib_dir(
+            "libcatalyst_transport_memcpy_controller.so",
+            "libcatalyst_transport_memcpy_coprocessor.so",
+        )
+        d = serialize_backline(self._with_frame("memcpy", "blv"))
+        assert d["controller"]["config"] == "frame=blv;frame_payload=8"
+
     def test_the_launcher_abi_version_matches_the_runtime(self):
         """PennyLane reads the Python constant; the runtime enforces the C one."""
         header = Path(__file__).parents[3] / "runtime" / "include" / "TransportABI.h"

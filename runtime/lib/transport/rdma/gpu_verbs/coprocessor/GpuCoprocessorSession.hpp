@@ -35,7 +35,8 @@ class GpuCoprocessorSession : public common::VerbsSessionBase<CoprocessorSession
 
   public:
     GpuCoprocessorSession(std::string dev, int gid_idx, int gpu_device,
-                          common::frame::RingGeometry ring = common::frame::BL16_RING);
+                          common::frame::RingGeometry ring = common::frame::BL16_RING,
+                          common::CuqrConfig cuqr = {});
     ~GpuCoprocessorSession() override { stop(); }
 
     GpuCoprocessorSession(const GpuCoprocessorSession &) = delete;
@@ -66,9 +67,16 @@ class GpuCoprocessorSession : public common::VerbsSessionBase<CoprocessorSession
 
   private:
     void run_coprocessor(std::stop_token st);
+    void run_cuqr(std::stop_token st);
+    // CUQR's per-slot arrival and reply flags (CoprocLaunchDesc), after the handoff ring.
+    std::uint32_t *rx_flags_host() {
+        return reinterpret_cast<std::uint32_t *>(handoff_.host + ring_.region_bytes());
+    }
+    std::uint32_t *tx_flags_host() { return rx_flags_host() + ring_.slots; }
     // Stage the kernel's reply frame and post one RDMA_WRITE, inline when it fits. Returns true
     // if this send was signaled (selective signalling: 1 in SIGNAL_EVERY), so the caller can
     // track the signaled-completion count.
+    template <bool CUQR>
     bool post_reply(std::uint64_t cursor, const common::frame::FrameView &reply);
 
     GpuRuntime gpu_;                // HIP wrapper: owns GPU mem/stream/sync; the decode

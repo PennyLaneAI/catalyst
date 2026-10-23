@@ -2,6 +2,15 @@
 
 <h3>New features since last release</h3>
 
+* Backline's `cpu_verbs` and `gpu_verbs` backends speak cudaq-realtime's RPC format (CUQR), so a
+  Backline program can exchange messages with a cudaq-realtime (NVQLink) peer over RDMA.
+  `qp.Backline(..., frame="cuqr")` selects it, `cuqr_tx=send|write_imm` picks the RDMA verb, and
+  `peer=cudaq` in the node config follows a cudaq-realtime peer's connection conventions. Tested
+  against cudaq-realtime's own server and client on a ConnectX-7. On `gpu_verbs` the format is not
+  yet optimized: each request takes a hop through a host thread, adding about 1 µs. On NVIDIA
+  GPUs, DOCA GPUNetIO could remove this hop by letting the kernel read the completion queue itself.
+  [(#3392)](https://github.com/PennyLaneAI/catalyst/pull/3392)
+
 * A new coprocessor function called `catalyst_onnx_coprocessor` has been added, which runs an
   ONNX model on the CPU or a GPU through onnxruntime, and is built with the transport runtime.
   PennyLane's
