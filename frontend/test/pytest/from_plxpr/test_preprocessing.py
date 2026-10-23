@@ -26,6 +26,7 @@ from pennylane.devices.capabilities import (
     ExecutionCondition,
     OperatorProperties,
 )
+from pennylane.testing import find_eqns
 
 from catalyst.device.decomposition import measurements_from_counts, measurements_from_samples
 from catalyst.from_plxpr import from_plxpr
@@ -65,12 +66,8 @@ def get_pipelines(f, skip_preprocess=False):
     """Utility to get the transform pipelines for a QNode from jaxpr."""
     jaxpr = jax.make_jaxpr(f)()
     cjaxpr = from_plxpr_no_warn(jaxpr, skip_preprocess=skip_preprocess)()
-    pipelines = None
-
-    for eqn in cjaxpr.eqns:
-        if eqn.primitive == quantum_kernel_p:
-            pipelines = eqn.params.get("pipelines", None)
-            break
+    kernel_eqn = find_eqns(cjaxpr, quantum_kernel_p)[0]
+    pipelines = kernel_eqn.params.get("pipelines", None)
 
     assert pipelines is not None
     return pipelines
@@ -617,12 +614,11 @@ class TestIntegration:
         cjaxpr = workflow.jaxpr
         f1_pipelines = None
         f2_pipelines = None
-        for eqn in cjaxpr.eqns:
-            if eqn.primitive == quantum_kernel_p:
-                if eqn.params["qnode"].__name__ == "f1":
-                    f1_pipelines = eqn.params["pipelines"]
-                elif eqn.params["qnode"].__name__ == "f2":
-                    f2_pipelines = eqn.params["pipelines"]
+        for eqn in find_eqns(cjaxpr, quantum_kernel_p):
+            if eqn.params["qnode"].__name__ == "f1":
+                f1_pipelines = eqn.params["pipelines"]
+            elif eqn.params["qnode"].__name__ == "f2":
+                f2_pipelines = eqn.params["pipelines"]
 
         assert f1_pipelines
         assert f2_pipelines

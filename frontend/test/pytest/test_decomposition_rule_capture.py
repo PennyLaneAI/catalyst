@@ -15,6 +15,7 @@
 """Tests for trace-embedded decomposition-rule definitions."""
 
 import pennylane as qp
+from pennylane.testing import find_eqns
 from pennylane.typing import Wire
 
 from catalyst import qjit
@@ -55,8 +56,8 @@ def test_repeated_gate_captures_only_plain_variant(mocker):
 
     assert spy.call_count == 1
     assert mlir.count("target_gate =") == 1
-    assert sum(eqn.primitive is decomp_definition_p for eqn in kernel_jaxpr.eqns) == 1
-    assert all(eqn.primitive is not decomprule_p for eqn in kernel_jaxpr.eqns)
+    assert len(find_eqns(kernel_jaxpr, decomp_definition_p)) == 1
+    assert not find_eqns(kernel_jaxpr, decomprule_p)
 
 
 def test_ambient_modifier_states_are_captured_independently(mocker):
