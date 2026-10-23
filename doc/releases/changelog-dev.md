@@ -177,6 +177,10 @@
 
 <h3>Improvements 🛠</h3>
 
+* A new `user-transform-stage` pipeline runs the quantum compilation stage only up to and including
+  `apply-transform-sequence`, where the user transforms are applied. 
+  [(#3345)](https://github.com/PennyLaneAI/catalyst/pull/3345)
+
 * The :func:`~catalyst.qjit` function now accepts an ``enable_aot_compilation`` argument, which can be
   used to toggle whether or not to use ahead-of-time compilation.
   [(#3339)](https://github.com/PennyLaneAI/catalyst/pull/3339)
