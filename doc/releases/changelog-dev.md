@@ -832,6 +832,10 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* Adjoint lowering now correctly handles gate control values computed inside loops or
+  conditional branches.
+  [(#3342)](https://github.com/PennyLaneAI/catalyst/pull/3342)
+
 * Ahead-of-time compilation with ``target="llvmir"`` no longer links the program into a shared
   library. Calling the function still compiles it to a shared library.
   [(#3391)](https://github.com/PennyLaneAI/catalyst/pull/3391)
