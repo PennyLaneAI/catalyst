@@ -67,7 +67,7 @@ def create_device_preprocessing_pipeline(
     device: qp.devices.Device, execution_config: ExecutionConfig, shots: int, warn: bool = True
 ) -> list[BoundTransform]:
     """Create a pipeline of device preprocessing transforms for lowering QNodes."""
-    shots_present = qp.math.is_abstract(shots) or shots != 0
+    shots_present = qp.math.is_tracer(shots) or shots != 0
     raw_capabilities: DeviceCapabilities = get_qjit_device_capabilities(
         _load_device_capabilities(device)
     )
@@ -141,7 +141,7 @@ def _mcm_preprocessing(
         )
 
     if mcm_config.mcm_method == MCM_METHOD.ONE_SHOT:
-        shots_present = qp.math.is_abstract(shots) or shots != 0
+        shots_present = qp.math.is_tracer(shots) or shots != 0
         if not shots_present:
             raise CompileError("Cannot use mcm_method='one-shot' with analytic mode.")
         pipeline.append(
@@ -270,7 +270,7 @@ def _gradient_preprocessing(
             )
         )
     if execution_config.gradient_method == "adjoint":
-        shots_present = qp.math.is_abstract(shots) or shots != 0
+        shots_present = qp.math.is_tracer(shots) or shots != 0
         if shots_present:
             raise CompileError("Cannot use diff_method='adjoint' with finite shots.")
         # qjit_device should technically be an instance of QJITDevice,

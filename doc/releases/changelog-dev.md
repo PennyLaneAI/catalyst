@@ -177,6 +177,15 @@
 
 <h3>Improvements 🛠</h3>
 
+* The ``target`` argument of :func:`~catalyst.qjit` now accepts ``"mlir_opt"``, which stops the
+  ahead-of-time compilation after running the MLIR passes, without translating the program to
+  LLVM IR. Calling the function still compiles it to a shared library.
+  [(#3391)](https://github.com/PennyLaneAI/catalyst/pull/3391)
+
+* A new `user-transform-stage` pipeline runs the quantum compilation stage only up to and including
+  `apply-transform-sequence`, where the user transforms are applied. 
+  [(#3345)](https://github.com/PennyLaneAI/catalyst/pull/3345)
+
 * The :func:`~catalyst.qjit` function now accepts an ``enable_aot_compilation`` argument, which can be
   used to toggle whether or not to use ahead-of-time compilation.
   [(#3339)](https://github.com/PennyLaneAI/catalyst/pull/3339)
@@ -193,6 +202,11 @@
   f.aot_compile(jax.ShapeDtypeStruct((3,), jnp.float64))
   f(jnp.array([1.0, 2.0, 3.0]))  # no compilation
   ```
+
+* Calling `QJIT.aot_compile` explicitly now raises any compilation error, instead of silently
+  logging it. Errors in the automatic ahead-of-time compilation from type hints, when the `QJIT`
+  object is created, are still only logged, and are raised when the function is called.
+  [(#3390)](https://github.com/PennyLaneAI/catalyst/pull/3390)
 
 * :func:`pennylane.transforms.gridsynth` now produces correct, deterministic decompositions for
   any `epsilon` down to `1e-15`, and invalid angles or `epsilon` values raise an error.
@@ -781,6 +795,13 @@
 
 <h3>Breaking changes 💔</h3>
 
+* Removed ``catalyst.pipeline``, ``catalyst.passes.apply_pass``,
+  ``catalyst.passes.apply_pass_plugin``, ``catalyst.passes.Pass``,
+  ``catalyst.passes.PassPlugin``, and the ``circuit_transform_pipeline`` argument of
+  :func:`~.qjit`. Apply transforms with :func:`pennylane.transform` and
+  :class:`~pennylane.transforms.core.CompilePipeline` on individual QNodes instead.
+  [(#3324)](https://github.com/PennyLaneAI/catalyst/pull/3324)
+
 * `catalyst.logging` has been removed. `pennylane.logging` should be used instead.
   [(#3283)](https://github.com/PennyLaneAI/catalyst/pull/3283)
 
@@ -818,6 +839,14 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* Adjoint lowering now correctly handles gate control values computed inside loops or
+  conditional branches.
+  [(#3342)](https://github.com/PennyLaneAI/catalyst/pull/3342)
+
+* Ahead-of-time compilation with ``target="llvmir"`` no longer links the program into a shared
+  library. Calling the function still compiles it to a shared library.
+  [(#3391)](https://github.com/PennyLaneAI/catalyst/pull/3391)
+
 * Scatter ops with batching dimensions, such as those from a batched `jnp.linalg.det`, no longer
   crash `scatter-lowering`, and will instead be rejected as intended.
   In addition, to support batched scatter operations an additional pass is run in the HLO lowering
@@ -846,8 +875,10 @@
   attributes such as `catalyst.estimated_iterations`, `catalyst.estimated_probability`, and
   `catalyst.estimated_probabilities`, so resource analysis still sees compiler hints after those
   rewrites.
+  This includes the upstream mlir canonicalizer, which is now patched to preserve discardable attributes as well.
   [(#3288)](https://github.com/PennyLaneAI/catalyst/pull/3288)
   [(#3291)](https://github.com/PennyLaneAI/catalyst/pull/3291)
+  [(#3389)](https://github.com/PennyLaneAI/catalyst/pull/3389)
 
 * Fixed a bug where graph decomposition ignored entries in `fixed_decomps` and `alt_decomps` that
   use a string key containing parentheses, such as `"C(PauliZ)"` or `"Adjoint(TemporaryAND)"`.

@@ -28,7 +28,6 @@ from xdsl.dialects import builtin, transform
 from xdsl.passes import PassPipeline
 
 from catalyst import CompileError, qjit
-from catalyst.passes import apply_pass
 from catalyst.passes import cancel_inverses as catalyst_cancel_inverses
 from catalyst.passes.xdsl_plugin import getXDSLPluginAbsolutePath
 from catalyst.python_interface import Compiler
@@ -283,7 +282,7 @@ class TestCatalystIntegration:
         assert not capture_enabled()
 
         @qjit
-        @apply_pass("hello-world")
+        @qp.transform(pass_name="hello-world")
         @qp.qnode(qp.device("lightning.qubit", wires=2))
         def f(x):
             qp.RX(x, 0)
@@ -323,7 +322,7 @@ class TestCatalystIntegration:
         assert not capture_enabled()
 
         @qjit
-        @apply_pass("hello-world")
+        @qp.transform(pass_name="hello-world")
         @catalyst_cancel_inverses
         @qp.qnode(qp.device("lightning.qubit", wires=2))
         def f(x):

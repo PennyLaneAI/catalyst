@@ -123,6 +123,11 @@ name. Currently, the following pipelines are available:
 ``default-catalyst-pipeline`` which encompasses all the above as the default pipeline used by the
 Catalyst CLI tool if no pass option is specified.
 
+There is also ``user-transform-stage``, a shorter version of ``quantum-compilation-stage`` that
+stops right after ``apply-transform-sequence``, the pass that applies the user transforms. It is
+useful when only the program after the user transforms is needed, for example for resource
+analysis. It is not meant to be followed by the remaining stages.
+
 ``--catalyst-pipeline=<pipeline1(pass1[;pass2[;...]])[,pipeline2(...)]>``
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 

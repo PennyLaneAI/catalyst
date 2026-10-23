@@ -1339,11 +1339,12 @@ def test_two_placements_in_one_program_are_rejected(use_capture):
         qp.Hadamard(0)
         return qp.probs()
 
-    with pytest.raises(CompileError, match="2 different backline placements"):
+    @qjit(target="mlir", capture=True)
+    def workflow():
+        return circuit_a() + circuit_b()
 
-        @qjit(target="mlir", capture=True)
-        def workflow():
-            return circuit_a() + circuit_b()
+    with pytest.raises(CompileError, match="2 different backline placements"):
+        workflow.aot_compile()
 
 
 @pytest.fixture
