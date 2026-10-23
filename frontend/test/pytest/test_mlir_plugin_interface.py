@@ -20,30 +20,17 @@ from tempfile import NamedTemporaryFile
 import pennylane as qp
 import pytest
 from jax.interpreters.mlir import ir
+from pennylane.transforms.core import BoundTransform
 
-import catalyst
 from catalyst import qjit
-
-
-def test_path_does_not_exists():
-    """Test what happens when a pass_plugin is given an path that does not exist"""
-
-    with pytest.raises(FileNotFoundError, match="does not exist"):
-        catalyst.passes.apply_pass_plugin(
-            "this-path-does-not-exist", "this-pass-also-doesnt-exists"
-        )
-
-    with pytest.raises(FileNotFoundError, match="does not exist"):
-        catalyst.passes.apply_pass_plugin(
-            Path("this-path-does-not-exist"), "this-pass-also-doesnt-exists"
-        )
+from catalyst.jax_primitives_utils import _lowered_options
 
 
 def test_pass_can_aot_compile():
-    """Can we AOT compile when using apply_pass?"""
+    """Can we AOT compile when using qp.transform(pass_name=...)?"""
 
     @qjit(target="mlir")
-    @catalyst.passes.apply_pass("some-pass")
+    @qp.transform(pass_name="some-pass")
     @qp.qnode(qp.device("null.qubit", wires=1))
     def example():
         return qp.state()
@@ -53,7 +40,7 @@ def test_pass_can_aot_compile():
 
 @pytest.mark.skip()
 def test_pass_plugin_can_aot_compile():
-    """Can we AOT compile when using apply_pass_plugin?
+    """Can we AOT compile when using pass_plugins with qp.transform?
 
     We can't properly test this because tmp needs to be a valid MLIR plugin.
     And therefore can only be tested when a valid MLIR plugin exists in the path.
@@ -61,8 +48,8 @@ def test_pass_plugin_can_aot_compile():
 
     with NamedTemporaryFile() as tmp:
 
-        @qjit(target="mlir")
-        @catalyst.passes.apply_pass_plugin(Path(tmp.name), "some-pass")
+        @qjit(target="mlir", pass_plugins=[Path(tmp.name)])
+        @qp.transform(pass_name="some-pass")
         @qp.qnode(qp.device("null.qubit", wires=1))
         def example():
             return qp.state()
@@ -72,25 +59,25 @@ def test_pass_plugin_can_aot_compile():
 
 def test_get_options():
     """
-    Test get_options from Pass
+    Test lowered options from BoundTransform
 
     ApplyRegisteredPassOp expects options to be a dictionary from strings to attributes.
     See https://github.com/llvm/llvm-project/pull/143159
     """
     with ir.Context(), ir.Location.unknown():
-        options = catalyst.passes.Pass("example-pass", "single-option").get_options()
-        assert isinstance(options, dict)
+        options = _lowered_options(qp.transform(pass_name="example-pass")("single-option"))
+        assert isinstance(options, ir.DictAttr)
         assert isinstance(options["single-option"], ir.BoolAttr)
         assert options["single-option"].value == True
 
-        options = catalyst.passes.Pass("example-pass", "an-option", "bn-option").get_options()
-        assert isinstance(options, dict)
+        options = _lowered_options(qp.transform(pass_name="example-pass")("an-option", "bn-option"))
+        assert isinstance(options, ir.DictAttr)
         assert isinstance(options["an-option"], ir.BoolAttr)
         assert options["an-option"].value == True
         assert isinstance(options["bn-option"], ir.BoolAttr)
         assert options["bn-option"].value == True
 
-        options = catalyst.passes.Pass("example-pass", option=True).get_options()
-        assert isinstance(options, dict)
+        options = _lowered_options(qp.transform(pass_name="example-pass")(option=True))
+        assert isinstance(options, ir.DictAttr)
         assert isinstance(options["option"], ir.BoolAttr)
         assert options["option"].value == True
