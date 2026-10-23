@@ -22,6 +22,7 @@ from pennylane.ops.op_math.adjoint2 import Adjoint2
 from pennylane.ops.op_math.controlled2 import ControlledOp2
 from pennylane.pytrees import flatten
 
+from catalyst.decomposition.operand_layout import param_layout, pure_wire_argnames, qubit_layout
 from catalyst.decomposition.type_utils import (
     convert_item_to_mlir_type,
     post_process_concretize_leaves,
@@ -205,38 +206,34 @@ class GraphOpID:
         elif issubclass(type(self.op), tuple(_SPECIAL_LOWERINGS.keys())):  # special cases
             return {
                 argname: [convert_item_to_mlir_type(argtype, is_special_lowering=True)]
-                for argname, argtype in sorted(self.op.dynamic_args.items())
+                for argname, argtype in self.op.dynamic_args.items()
             }
         else:
-            dynamic_shape = {
-                argname: [convert_item_to_mlir_type(argtype)]
-                for argname, argtype in sorted(self.op.dynamic_args.items())
+            dynamic_params = {
+                argname: convert_item_to_mlir_type(argtype)
+                for argname, argtype in self.op.dynamic_args.items()
             }
-            # Collect additional dynamic params from hybrid args (have to match _process_params).
-            for argname, value in sorted(self.op.hybrid_args.items()):
-                if argname in self.op.wire_argnames:  # do not include wires
-                    continue
-                # skip operators
+            hybrid_params = {}
+            for argname, value in self.op.hybrid_args.items():
+                # skip operators and wires
                 leaves, _ = flatten(value, is_leaf=_is_op_or_wires)
-                params = [leaf for leaf in leaves if not _is_op_or_wires(leaf)]
-                if params:
-                    dynamic_shape[argname] = [convert_item_to_mlir_type(param) for param in params]
-            return dynamic_shape
+                hybrid_params[argname] = [
+                    convert_item_to_mlir_type(leaf) for leaf in leaves if not _is_op_or_wires(leaf)
+                ]
+            # Same layout as the lowering (``_process_params``), i.e. operand order
+            return param_layout(type(self.op), dynamic_params, hybrid_params)
 
     def parse_wire_lens(self) -> dict[str, int]:
-        """Return a dictionary of wire arg names to lengths."""
-        wire_lens = {}
-        for wire_name, wire_arg in sorted(self.op.wire_args.items()):
-            if wire_name not in self.op.hybrid_argnames:
-                wire_lens[wire_name] = len(wire_arg)
-        # match hybrid arg wires collection from _process_qubits (have to match generated IR op)
-        for argname, value in sorted(self.op.hybrid_args.items()):
+        """Return a dictionary of wire arg names to lengths, in operand order."""
+        op_cls = type(self.op)
+        pure_wire_lens = [len(self.op.wire_args[name]) for name in pure_wire_argnames(op_cls)]
+        hybrid_qubit_counts = []
+        for value in self.op.hybrid_args.values():
             # Descend through nested operators: their wires are qubit operands of this operator.
             leaves, _ = flatten(value, is_leaf=_is_wires)
-            count = sum(len(leaf) for leaf in leaves if _is_wires(leaf))
-            if count:
-                wire_lens[argname] = count
-        return wire_lens
+            hybrid_qubit_counts.append(sum(len(leaf) for leaf in leaves if _is_wires(leaf)))
+        # Same layout as the lowering (``_process_qubits``), i.e. operand order
+        return qubit_layout(op_cls, pure_wire_lens, hybrid_qubit_counts)
 
     def parse_static_data(self) -> dict[str, Any]:
         """Return a dictionary of (compiler-)static data names to values."""
@@ -254,10 +251,9 @@ class GraphOpID:
             hybrid_lens = []
             hybrid_trees = []
             hybrid_args = []
+            # the lowering passes the pure wire lengths in operand order, so must we
             filtered_wire_lens = tuple(
-                length
-                for name, length in self.wire_lens.items()
-                if name not in self.op.hybrid_argnames
+                len(self.op.wire_args[name]) for name in pure_wire_argnames(type(self.op))
             )
             for _, hybrid_argval in self.op.hybrid_args.items():
                 leaves, tree = flatten(replace_wires_with_placeholder_wires(hybrid_argval))
