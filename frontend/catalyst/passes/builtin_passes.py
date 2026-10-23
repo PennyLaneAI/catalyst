@@ -913,7 +913,7 @@ def gridsynth_setup_inputs(epsilon=1e-4, ppr_basis=False, method="deterministic"
         func.func private @rs_decomposition_get_phase(f64, f64, i1) -> f64
         func.func private @rs_decomposition_get_gates(memref<?xindex>, f64, f64, i1)
         func.func private @rs_decomposition_get_size(f64, f64, i1) -> index
-        func.func private @__catalyst_decompose_RZ_0(%arg0: !quantum.bit, %arg1: f64) -> (!quantum.bit, f64) {
+        func.func private @__catalyst_decompose_RZ_0(%arg0: !quantum.bit, %arg1: f64) -> !quantum.bit {
             . . .
             %2 = scf.for %arg2 = %c0 to %0 step %c1 iter_args(%arg3 = %arg0) -> (!quantum.bit) {
                 %3 = memref.load %alloc[%arg2] : memref<?xindex>
@@ -939,7 +939,7 @@ def gridsynth_setup_inputs(epsilon=1e-4, ppr_basis=False, method="deterministic"
 
         func.func public @circuit_0(%arg0: tensor<f64>) -> tensor<f64> attributes {diff_method = "adjoint", llvm.linkage = #llvm.linkage<internal>, qnode} {
             . . .
-            %2:2 = call @__catalyst_decompose_RZ_0(%1, %extracted) : (!quantum.bit, f64) -> (!quantum.bit, f64)
+            %2 = call @__catalyst_decompose_RZ_0(%1, %extracted) : (!quantum.bit, f64) -> !quantum.bit
             . . .
         }
 
