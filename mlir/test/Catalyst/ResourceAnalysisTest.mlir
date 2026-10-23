@@ -507,10 +507,8 @@ func.func @estimated_iterations_loop(%arg0: !quantum.bit, %n: index) -> !quantum
 
 // -----
 
-// A fractional catalyst.estimated_iterations on a while loop lifts the body
-// into while_loop_<N> and records the (possibly non-integer) call count on the
-// parent: 2 gates * 2.5 = 5 when totals are resolved.
-
+// A fractional catalyst.estimated_iterations on a while loop lifts the body into while_loop_<N>
+// and records the (possibly non-integer) call count on the parent.
 
 // CHECK-LABEL: "estimated_iterations_while_fractional": {
 // CHECK: "function_calls"
@@ -541,8 +539,8 @@ func.func @estimated_iterations_while_fractional(%arg0: !quantum.bit, %n: index)
 
 // -----
 
-// Input-driven dynamic while loop: no estimated_iterations hint, so the body
-// is lifted into "dyn_while_loop_1" and the parent records function_calls.dynamic.
+// Input-driven dynamic while loop: no estimated_iterations hint, so the body is lifted into
+// "dyn_while_loop_1" and the parent records function_calls.dynamic.
 
 // CHECK-LABEL: "dyn_while_loop_1": {
 // CHECK: "quantum_operations"

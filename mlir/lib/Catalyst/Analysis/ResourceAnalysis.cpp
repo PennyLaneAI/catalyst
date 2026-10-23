@@ -223,8 +223,8 @@ void ResourceAnalysis::analyzeForLoop(scf::ForOp forOp, ResourceResult &result, 
         return;
     }
 
-    // Loop trip count is dynamic. Record the body under dyn_for_loop_<N>
-    // and store a fixed number (hash) so each such loop has its own id in the output.
+    // Loop trip count is dynamic. Record the body under dyn_for_loop_<N> and store a fixed
+    // number (hash) so each such loop has its own id in the output.
     std::string name = makeUniqueSyntheticName("dyn_for_loop_", dynForLoopCounter);
     funcResults[name] = std::move(bodyResult);
     result.varFunctionCalls[name] = static_cast<uint64_t>(llvm::hash_value(forOp.getOperation()));
@@ -246,8 +246,8 @@ void ResourceAnalysis::analyzeWhileLoop(scf::WhileOp whileOp, ResourceResult &re
         return;
     }
 
-    // Loop trip count is dynamic. Record the body under dyn_while_loop_<N>
-    // and store a fixed number (hash) so each such loop has its own id in the output.
+    // Loop trip count is dynamic. Record the body under dyn_while_loop_<N> and store a fixed
+    // number (hash) so each such loop has its own id in the output.
     std::string name = makeUniqueSyntheticName("dyn_while_loop_", dynWhileLoopCounter);
     funcResults[name] = std::move(bodyResult);
     result.varFunctionCalls[name] = static_cast<uint64_t>(llvm::hash_value(whileOp.getOperation()));
