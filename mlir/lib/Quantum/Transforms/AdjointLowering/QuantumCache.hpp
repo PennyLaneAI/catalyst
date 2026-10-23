@@ -35,6 +35,8 @@ struct QuantumCache {
     mlir::TypedValue<ArrayListType> paramVector;
     mlir::TypedValue<ArrayListType> intVector;
     mlir::TypedValue<ArrayListType> wireVector;
+    /// Gate control values are recorded separately as i1 values.
+    mlir::TypedValue<ArrayListType> controlValueVector;
     /// For every structured control flow op, store the values required for it to execute.
     /// Specifically: store the conditions for scf.if ops, the start/stop/step of scf.for ops, and
     /// the number of iterations for scf.while ops.

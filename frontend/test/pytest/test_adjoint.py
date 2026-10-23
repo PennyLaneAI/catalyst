@@ -363,6 +363,30 @@ class TestCatalyst:
         dev = qp.device(backend, wires=1)
         self.verify_catalyst_adjoint_against_pennylane(func, dev, 10, capture_mode=capture_mode)
 
+    @pytest.mark.filterwarnings("error:Structured capture")
+    def test_adjoint_dynamic_control_values(self):
+        """Test that loop-local control values stay paired with their angles when reversing
+        the loop.
+
+        This is a regression test for adjoint lowering failing to cache dynamic control values.
+        """
+
+        @qjit(capture=True, collect_decomp_rules=False)
+        @qp.qnode(qp.device("lightning.qubit", wires=2))
+        def circuit(theta):
+            @for_loop(2)
+            def body(i):
+                qp.ctrl(qp.RX, control=0, control_values=[i == 1])((i + 1) * theta, wires=1)
+
+            qp.adjoint(body)()
+            return qp.expval(qp.Y(1))
+
+        # The control remains |0>, so only i=0 contributes RX(theta). Its
+        # adjoint gives cos(theta/2)|0> + i sin(theta/2)|1> on wire 1, hence
+        # <Y(1)> = 2 cos(theta/2) sin(theta/2) = sin(theta)
+        theta = 0.3
+        assert_allclose(circuit(theta), np.sin(theta), atol=1e-12)
+
     def test_adjoint_for_loop(self, backend, capture_mode):
         """Tests the correct application of gates (with dynamic wires)"""
 
