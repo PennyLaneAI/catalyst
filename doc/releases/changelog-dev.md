@@ -183,7 +183,7 @@
   [(#3391)](https://github.com/PennyLaneAI/catalyst/pull/3391)
 
 * A new `user-transform-stage` pipeline runs the quantum compilation stage only up to and including
-  `apply-transform-sequence`, where the user transforms are applied. 
+  `apply-transform-sequence`, where the user transforms are applied.
   [(#3345)](https://github.com/PennyLaneAI/catalyst/pull/3345)
 
 * The :func:`~catalyst.qjit` function now accepts an ``enable_aot_compilation`` argument, which can be
@@ -349,6 +349,7 @@
     [(#3243)](https://github.com/PennyLaneAI/catalyst/pull/3243)
     [(#3252)](https://github.com/PennyLaneAI/catalyst/pull/3252)
     [(#3261)](https://github.com/PennyLaneAI/catalyst/pull/3261)
+    [(#3393)](https://github.com/PennyLaneAI/catalyst/pull/3393)
 
     This pathway of rule injection can be opted-out via a new keyword argument on `qp.qjit` named `collect_decomp_rules`.
     This kwarg controls whether or not to compile the decomposition rules during lower-time. Default value is `True`.

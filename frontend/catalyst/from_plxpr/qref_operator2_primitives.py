@@ -31,6 +31,7 @@ from pennylane.pytrees import unflatten
 # yet updated to the latest MLIR, causing compatibility issues. This workaround will be removed
 # once JAX updates to a compatible MLIR version
 from catalyst.decomposition.graph_op_id import _SPECIAL_LOWERINGS, _is_custom_op
+from catalyst.decomposition.operand_layout import param_layout, pure_wire_argnames, qubit_layout
 from catalyst.jax_extras.lowering import get_mlir_attribute_from_pyval
 from catalyst.jax_extras.patches import mock_attributes
 from catalyst.jax_primitives import (
@@ -103,20 +104,18 @@ def _process_params(
     """Process the dynamic arguments of an operator. This function returns the flattened sequence
     of non-qubit operands of the operator, feed-through arguments of any operator arguments,
     and a dictionary mapping argument names to the indices of their respective values.
+
+    The parameters are laid out in the order defined by :func:`catalyst.decomposition.operand_layout.param_layout`.
     """
-    params = []
     forward_params = []
-    param_map = {}
 
     # Flat dynamic arguments
-    for i, dname in enumerate(op_cls.dynamic_argnames):
-        params.append(args[i])
-        param_map[dname] = ir.DenseI64ArrayAttr.get([i])
+    dynamic_params = {dname: args[i] for i, dname in enumerate(op_cls.dynamic_argnames)}
 
     # Hybrid dynamic arguments
+    hybrid_params = {}
     args_idx = len(op_cls.dynamic_argnames) + sum(wire_lens)
     mask_idx = 0
-    map_idx = len(op_cls.dynamic_argnames)
 
     for hname, hsize in zip(op_cls.hybrid_argnames, hybrid_lens, strict=True):
         if hname not in op_cls.wire_argnames:
@@ -136,15 +135,18 @@ def _process_params(
                     # Qubits are handled in _process_qubits
                     cur_params.append(leaf)
 
-            if cur_params:
-                params += cur_params
-                param_map[hname] = ir.DenseI64ArrayAttr.get(
-                    list(range(map_idx, map_idx + len(cur_params)))
-                )
-                map_idx += len(cur_params)
+            hybrid_params[hname] = cur_params
 
         mask_idx += hsize
         args_idx += hsize
+
+    params = []
+    param_map = {}
+    for name, values in param_layout(op_cls, dynamic_params, hybrid_params).items():
+        param_map[name] = ir.DenseI64ArrayAttr.get(
+            list(range(len(params), len(params) + len(values)))
+        )
+        params += values
 
     param_map = get_mlir_attribute_from_pyval(param_map) if param_map else None
     for param in params:
@@ -156,41 +158,38 @@ def _process_qubits(*args, op_cls, wire_lens, hybrid_lens) -> tuple[list, dict[s
     """Process qubit operands of an operator. This function returns the flattened sequence
     of qubit operands of the operator, as well as a dictionary mapping argument names to
     the indices of their respective qubits.
+
+    The qubits are laid out in the order defined by :func:`catalyst.decomposition.operand_layout.qubit_layout`.
     """
-    qubits = []
-    qubit_map = {}
-    flat_wire_argnames = tuple(
-        name for name in op_cls.wire_argnames if name not in op_cls.hybrid_argnames
-    )
+    qubits_by_arg = {}
 
     # Flat wire arguments
     args_idx = len(op_cls.dynamic_argnames)
-    map_idx = 0
-    for wname, wsize in zip(flat_wire_argnames, wire_lens, strict=True):
-        # If wsize is 0, then we need to populate the qubit map anyway because the signature must match the operation.
-        # This is also needed to ensure that the lowered op generates the same GOID as the frontend.
-        # TODO: see if we can remove this requirement or upstream it to PL to simplify the IR
-        qubits += args[args_idx : args_idx + wsize]
-        qubit_map[wname] = ir.DenseI64ArrayAttr.get(list(range(map_idx, map_idx + wsize)))
-        map_idx += wsize
+    for wname, wsize in zip(pure_wire_argnames(op_cls), wire_lens, strict=True):
+        qubits_by_arg[wname] = list(args[args_idx : args_idx + wsize])
         args_idx += wsize
 
     # Hybrid wire arguments and nested-operator wires from non-wire hybrid arguments
+    hybrid_qubit_counts = []
     for hname, hsize in zip(op_cls.hybrid_argnames, hybrid_lens, strict=True):
         leaves = args[args_idx : args_idx + hsize]
         if hname in op_cls.wire_argnames:
-            cur_qubits = leaves
+            cur_qubits = list(leaves)
         else:
             cur_qubits = [l for l in leaves if _is_qref_qubit(l)]
-
-        if cur_qubits:
-            qubits += cur_qubits
-            qubit_map[hname] = ir.DenseI64ArrayAttr.get(
-                list(range(map_idx, map_idx + len(cur_qubits)))
-            )
-            map_idx += len(cur_qubits)
-
+        qubits_by_arg[hname] = cur_qubits
+        hybrid_qubit_counts.append(len(cur_qubits))
         args_idx += hsize
+
+    # If a pure wire argument is empty, the qubit map still names it, because the signature must
+    # match the operation. This is also needed to ensure that the lowered op generates the same
+    # GOID as the frontend.
+    # TODO: see if we can remove this requirement or upstream it to PL to simplify the IR
+    qubits = []
+    qubit_map = {}
+    for name, count in qubit_layout(op_cls, wire_lens, hybrid_qubit_counts).items():
+        qubit_map[name] = ir.DenseI64ArrayAttr.get(list(range(len(qubits), len(qubits) + count)))
+        qubits += qubits_by_arg[name]
 
     qubit_map = get_mlir_attribute_from_pyval(qubit_map) if qubit_map else None
     return qubits, qubit_map

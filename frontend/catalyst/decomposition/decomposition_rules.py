@@ -81,7 +81,8 @@ class DecompTargetSpec:
         call_args: Positional dummy arguments used to trace custom-operation rules.
         call_kwargs: Named dummy parameters and wires used to trace general rules.
         kwarg_names: Stable parameter-first, wire-second ordering for flattened keyword operands.
-        wire_lens: Non-hybrid wire argument lengths used to split the grouped wire operand.
+        wire_lens: Qubit argument lengths, in operand order, used to split the grouped wire
+            operand.
         ctrl_wires: Optional dummy control-wire tensor for a controlled target.
         ctrl_values: Optional dummy control-value tensor for a controlled target.
         hybrid_leaves: Numeric hybrid leaves passed as rule operands instead of being closed over.
@@ -212,8 +213,13 @@ def symbolic_arguments(base_op, kind, ctrl_wires=None, ctrl_values=None) -> dict
 
 
 def ordered_kwarg_names(call_kwargs, dynamic_shape) -> list:
-    """Order a rule's keyword operands params-first, followed by wires in declaration order."""
-    params = sorted(name for name in call_kwargs if name in dynamic_shape)
+    """Order a rule's keyword operands params-first, followed by wires.
+
+    The params keep the order of ``dynamic_shape``, which is the operand order of the operator
+    (see :mod:`catalyst.decomposition.operand_layout`), so that the rule's inputs line up with the
+    operands the compiler passes to it. They must not be sorted.
+    """
+    params = [name for name in dynamic_shape if name in call_kwargs]
     wires = [name for name in call_kwargs if name not in dynamic_shape]
     return params + wires
 
@@ -277,7 +283,7 @@ def rule_call_operands(
         call_args (tuple): the rule's positional arguments
         call_kwargs (dict): the rule's keyword arguments
         kwarg_names (list[str]): parameter names first, followed by wire names
-        wire_lens (dict[str, int]): wire names in declaration order and their lengths
+        wire_lens (dict[str, int]): wire names in operand order and their lengths
         ctrl_wires: the control wires to append, or None when the rule is not controlled
         ctrl_values: the control values to append, or None when the rule is not controlled
         hybrid_leaves (list): flattened hybrid-argument leaves, inserted after the parameter kwargs
@@ -317,7 +323,7 @@ def unpack_rule_operands(
         operands (tuple): the traced operands the rule body received
         n_params (int): how many of them are positional parameters
         kwarg_names (list[str]): parameter names first, followed by wire names
-        wire_lens (dict[str, int]): wire names in declaration order and their lengths
+        wire_lens (dict[str, int]): wire names in operand order and their lengths
         has_ctrl_wires (bool): whether a trailing control-wire operand is present
         hybrid_specs (list[tuple]): ``(name, treedef, num_leaves)`` per hybrid argument, sitting
             between the parameter kwargs and the grouped wire operand
@@ -907,7 +913,7 @@ def build_rule_module(
         call_args (tuple): positional arguments to call each subroutine with
         call_kwargs (dict): keyword arguments to call each subroutine with
         kwarg_names (list[str]): the keyword argument names, in the order to flatten them
-        wire_lens (dict[str, int]): wire names in declaration order and their lengths
+        wire_lens (dict[str, int]): wire names in operand order and their lengths
         ctrl_wires: the control wires to append, or None when the rules are not controlled
         ctrl_values: the control wires to append, or None when the rules are not controlled
         hybrid_leaves (list): flattened hybrid-argument leaves passed to :func:`rule_call_operands`
