@@ -24,6 +24,7 @@
 #include "WireProtocol.hpp"
 
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/generators/catch_generators.hpp>
 #include <catch2/matchers/catch_matchers_string.hpp>
 
 using namespace catalyst::transport;
@@ -397,6 +398,47 @@ TEST_CASE("memcpy carries messages larger than 8 B in BLV frames", "[transport_m
             REQUIRE(got[i] == static_cast<std::uint8_t>(~payload[i]));
         }
         CHECK(got[in_bytes] == round + 5);
+    }
+}
+
+TEST_CASE("memcpy wraps a ring of the slot count its config sets", "[transport_memcpy]") {
+    const std::uint32_t slots = GENERATE(1u, 2u, 8u);
+    const std::size_t bytes = GENERATE(std::size_t{8}, std::size_t{120});
+    const auto port = static_cast<std::uint16_t>(19101 + slots * 2 + (bytes > 8));
+    const std::string cfg = (bytes > 8 ? blv_cfg(port, bytes) : pair_cfg(port)) +
+                            ";frame_slots=" + std::to_string(slots);
+    ConnectInfo ci{.peer = "loopback", .oob_port = port};
+    CpuControllerSession controller(cfg);
+    CpuCoprocessorSession coprocessor(cfg);
+    REQUIRE(controller.connect(ci) == 0);
+    REQUIRE(coprocessor.connect(ci) == 0);
+    MemRegion reply = controller.alloc_memory(bytes, MemKind::CpuRam);
+    PeerRef peer_request = controller.exchange_keys(reply);
+    MemRegion request = coprocessor.alloc_memory(bytes, MemKind::CpuRam);
+    PeerRef peer_reply = coprocessor.exchange_keys(request);
+    ChannelDesc desc{.transport = "memcpy"};
+    controller.establish_channel(desc, reply, peer_request);
+    coprocessor.establish_channel(desc, request, peer_reply);
+
+    controller.commit_work_item(0, bytes, bytes);
+    coprocessor.set_coprocessor_fn(invert_fn, nullptr);
+    controller.start();
+    coprocessor.start();
+
+    // Enough rounds to reuse every slot several times.
+    for (std::uint64_t round = 0; round < 3 * slots + 1; ++round) {
+        std::vector<std::uint8_t> payload(bytes, 0);
+        const std::uint64_t word = 0x1000 + round;
+        std::memcpy(payload.data(), &word, sizeof(word));
+        controller.write_data_slot(payload.data(), bytes, /*decoder_id=*/0);
+        REQUIRE(controller.kick(0) == 0);
+        std::vector<std::uint8_t> got(bytes, 0);
+        void *outs[1] = {got.data()};
+        std::uint64_t outs_bytes[1] = {bytes};
+        REQUIRE(controller.collect(outs, outs_bytes, 1) == 0);
+        std::uint64_t reply_word = 0;
+        std::memcpy(&reply_word, got.data(), sizeof(reply_word));
+        REQUIRE(reply_word == ~word);
     }
 }
 

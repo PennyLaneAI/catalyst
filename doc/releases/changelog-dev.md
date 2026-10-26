@@ -196,7 +196,9 @@
   16 B frame when requests and replies fit in 8 B, so such programs compile as before, and the
   variable-length one otherwise, writing it into both ends' backend configs. The `cpu_verbs`
   and `memcpy` backends carry any size. A GPU coprocessor
-  running a persistent kernel still carries at most 8 B.
+  running a persistent kernel still carries at most 8 B. Each ring has 256 slots unless a node's
+  backend config sets `frame_slots=<n>`, a power of two, which the compiler passes to every node;
+  FPGA controllers keep 256.
   [(#3379)](https://github.com/PennyLaneAI/catalyst/pull/3379)
 
 * The :func:`~catalyst.qjit` function now accepts an ``enable_aot_compilation`` argument, which can be
@@ -825,6 +827,18 @@
 * A `memcpy` transport session whose backend config has no `frame` keys now uses the 16 B frame, and
   refuses messages over 8 bytes. Programs compiled with Catalyst are unaffected, since the compiler
   writes the keys; code that creates such sessions directly adds `frame=blv;frame_payload=<bytes>`.
+  [(#3379)](https://github.com/PennyLaneAI/catalyst/pull/3379)
+
+* The Backline transport backend ABI is now version 3. A coprocessor backend built against an
+  earlier version is refused when its session is created, since it would call coprocessor
+  functions with the previous signature; rebuild it against this Catalyst. Controller backends of
+  earlier versions keep working.
+  [(#3379)](https://github.com/PennyLaneAI/catalyst/pull/3379)
+
+* A Backline transport backend registered with `register_backend`, an entry point or a manifest,
+  whose `max_payload_bytes` or `max_reply_bytes` is above 8 or unlimited, must now list `"blv"` in
+  its `frame_modes`, since such messages travel in BLV frames. Registering one without it raises a
+  `ValueError`.
   [(#3379)](https://github.com/PennyLaneAI/catalyst/pull/3379)
 
 * `catalyst.logging` has been removed. `pennylane.logging` should be used instead.

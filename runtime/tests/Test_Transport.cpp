@@ -71,9 +71,19 @@ TEST_CASE("check aborts on a non-OK status and a null session", "[transport]") {
 }
 
 TEST_CASE("a backend without a version symbol loads as version 1", "[transport]") {
-    auto *s = make(CATALYST_TRANSPORT_ROLE_COPROCESSOR, "abi_v1");
+    auto *s = __catalyst__transport__create(STUB_V1_BACKEND_PATH, "cfg",
+                                            CATALYST_TRANSPORT_ROLE_CONTROLLER, "abi_v1");
     REQUIRE(s != nullptr);
     __catalyst__transport__destroy(s);
+}
+
+TEST_CASE("a coprocessor from a backend before version 3 is refused", "[transport]") {
+    CHECK(__catalyst__transport__create(STUB_V1_BACKEND_PATH, "cfg",
+                                        CATALYST_TRANSPORT_ROLE_COPROCESSOR,
+                                        "abi_v1_coproc") == nullptr);
+    REQUIRE_THROWS_WITH(__catalyst__transport__check_session(nullptr, "create"),
+                        ContainsSubstring("transport ABI version 1") &&
+                            ContainsSubstring("rebuild it against this runtime"));
 }
 
 TEST_CASE("a versioned backend is loaded only for the roles it reports", "[transport]") {
@@ -94,7 +104,7 @@ TEST_CASE("a backend built for a newer ABI is refused, naming both versions", "[
                                         CATALYST_TRANSPORT_ROLE_CONTROLLER, "abi_v99") == nullptr);
     REQUIRE_THROWS_WITH(__catalyst__transport__check_session(nullptr, "create"),
                         ContainsSubstring("transport ABI version 99") &&
-                            ContainsSubstring("supports up to 2"));
+                            ContainsSubstring("supports up to 3"));
 }
 
 TEST_CASE("in-tree backends report their capabilities", "[transport]") {

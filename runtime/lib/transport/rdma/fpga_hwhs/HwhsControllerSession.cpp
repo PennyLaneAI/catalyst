@@ -29,7 +29,7 @@
 #include "Exception.hpp"
 #include "HwhsAbi.h"
 #include "TransportCAPI.h" // CATALYST_TRANSPORT_* status codes
-#include "WireProtocol.hpp"
+#include "Frame.hpp"
 
 #include <fcntl.h>
 #include <infiniband/verbs.h>
@@ -126,8 +126,9 @@ HwhsControllerSession::HwhsControllerSession(std::string dev, int gid_idx, std::
     rtt_samples_.reserve(kRttSamplesReserve);
     RT_FAIL_IF(stride_log2 >= 32, "stride_log2 out of range (must be < 32)");
     RT_FAIL_IF(stride_ < 16, "stride_log2 too small: a ring slot must be >= 16 bytes");
-    RT_FAIL_IF(ring_slots_ != common::K_RING_SLOTS,
-               "ring must equal the wire protocol's K_RING_SLOTS");
+    // TODO: lift this once the engine is tested with other ring lengths.
+    RT_FAIL_IF(ring_slots_ != common::frame::BL16_RING.slots,
+               "hwhs is only tested with a ring of 256 slots; leave frame_slots unset");
     RT_FAIL_IF(stride_ != sizeof(common::PayloadSlot),
                "stride_log2 must give the wire protocol's slot size (sizeof(PayloadSlot))");
 }

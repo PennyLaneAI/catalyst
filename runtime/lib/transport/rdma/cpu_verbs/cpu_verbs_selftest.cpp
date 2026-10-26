@@ -29,7 +29,7 @@
 
 using namespace catalyst::transport;
 using namespace catalyst::transport::cpu_verbs;
-using namespace catalyst::transport::common; // REGION_BYTES, DEMO_SYNDROME, Payload
+using namespace catalyst::transport::common; // DEMO_SYNDROME, Payload
 
 int main(int argc, char **argv) {
     std::string role = "coprocessor", dev = "rxe0", peer = "127.0.0.1";
@@ -41,6 +41,8 @@ int main(int argc, char **argv) {
     std::uint32_t correction_bytes = sizeof(std::uint64_t);
     // Rounds the controller runs; with more than one it reports RTT percentiles.
     std::uint32_t rounds = 1;
+    // Ring slots on both ends, as the frame_slots config key sets them.
+    std::uint32_t slots = 0;
     for (int i = 1; i + 1 < argc; i += 2) {
         std::string k = argv[i], v = argv[i + 1];
         if (k == "--role") {
@@ -59,14 +61,19 @@ int main(int argc, char **argv) {
             correction_bytes = static_cast<std::uint32_t>(std::strtoul(v.c_str(), nullptr, 0));
         } else if (k == "--rounds") {
             rounds = static_cast<std::uint32_t>(std::strtoul(v.c_str(), nullptr, 0));
+        } else if (k == "--slots") {
+            slots = static_cast<std::uint32_t>(std::strtoul(v.c_str(), nullptr, 0));
         }
     }
     const bool is_coprocessor = (role == "coprocessor");
     // Both roles derive the same ring from the message sizes, as the compiler's frame keys make
     // them.
     const std::size_t largest = std::max(syndrome_bytes, correction_bytes);
-    const auto ring = frame::geometry_for(
+    auto ring = frame::geometry_for(
         largest <= PAYLOAD_DATA_BYTES ? frame::Mode::BL16 : frame::Mode::BLV, largest);
+    if (slots != 0) {
+        ring.slots = slots;
+    }
 
     std::unique_ptr<TransportSession> s;
     CpuCoprocessorSession *coproc = nullptr;

@@ -14,6 +14,7 @@
 
 #include "GpuCoprocessorSession.hpp"
 
+#include <algorithm>
 #include <atomic>
 #include <cstring>
 #include <memory>
@@ -37,12 +38,14 @@ namespace {
 constexpr QpShape FWD_QP_SHAPE{.sq_depth = 16, .cq_depth = 256, .inline_max = 0};
 } // namespace
 
-GpuCoprocessorSession::GpuCoprocessorSession(std::string dev, int gid_idx, int gpu_device)
-    : Base(std::move(dev), gid_idx, "gpu_verbs", FWD_QP_SHAPE), gpu_(gpu_device) {}
+GpuCoprocessorSession::GpuCoprocessorSession(std::string dev, int gid_idx, int gpu_device,
+                                             frame::RingGeometry ring)
+    : Base(std::move(dev), gid_idx, "gpu_verbs", FWD_QP_SHAPE, ring), gpu_(gpu_device) {}
 
 MemRegion GpuCoprocessorSession::alloc_memory(std::size_t size, MemKind kind) {
     TP_CHECK(kind == MemKind::GpuHbm, "gpu_verbs: only MemKind::GpuHbm supported");
-    hbm_ = gpu_.alloc_hbm_ring(size);
+    // The peer writes a ring of frames into the region, which may be larger than asked for.
+    hbm_ = gpu_.alloc_hbm_ring(std::max(size, ring_.region_bytes()));
     hbm_ring_.emplace(pd_, /*offset=*/static_cast<std::uint64_t>(0), hbm_.size,
                       /*iova=*/reinterpret_cast<std::uint64_t>(hbm_.ptr), hbm_.dmabuf_fd,
                       MemAccess::REMOTE_WRITE);

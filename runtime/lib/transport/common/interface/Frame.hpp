@@ -70,12 +70,12 @@ inline constexpr std::size_t MIN_STRIDE = 64;
 /// How a ring of frames is laid out: `slots` frames, each starting `stride` bytes after the last.
 struct RingGeometry {
     Mode mode = Mode::BL16;
-    std::uint32_t slots = static_cast<std::uint32_t>(K_RING_SLOTS); // a power of two
-    std::uint32_t stride = sizeof(PayloadSlot);                     // a power of two, >= 64
+    std::uint32_t slots = 256;                  // a power of two; config key frame_slots
+    std::uint32_t stride = sizeof(PayloadSlot); // a power of two, >= 64
 
-    std::size_t region_bytes() const { return std::size_t{slots} * stride; }
+    constexpr std::size_t region_bytes() const { return std::size_t{slots} * stride; }
     /// Byte offset of the slot round `cursor` uses.
-    std::size_t slot_offset(std::uint64_t cursor) const {
+    constexpr std::size_t slot_offset(std::uint64_t cursor) const {
         return static_cast<std::size_t>(cursor & (slots - 1)) * stride;
     }
 };
@@ -100,21 +100,27 @@ inline RingGeometry geometry_for(Mode mode, std::size_t max_payload) {
 }
 
 /// The ring a session's backend config asks for: `frame=bl16|blv` with `frame_payload=<bytes>`,
-/// the largest payload either way. A config without `frame` gets BL16_RING.
+/// the largest payload either way, and `frame_slots=<n>`, a power of two (256 when not given).
+/// A config without `frame` gets BL16 frames.
 inline RingGeometry geometry_from_config(std::string_view config) {
-    const auto mode = configparser::find(config, "frame");
-    if (!mode) {
-        return BL16_RING;
+    RingGeometry ring = BL16_RING;
+    if (const auto mode = configparser::find(config, "frame")) {
+        const auto payload = configparser::find(config, "frame_payload");
+        const std::size_t max_payload =
+            payload ? configparser::parse_u64(*payload, "frame_payload") : PAYLOAD_DATA_BYTES;
+        TP_CHECK(*mode == "bl16" || *mode == "blv",
+                 "config: 'frame' must be 'bl16' or 'blv', got '%.*s'",
+                 static_cast<int>(mode->size()), mode->data());
+        ring = geometry_for(*mode == "blv" ? Mode::BLV : Mode::BL16, max_payload);
     }
-    const auto payload = configparser::find(config, "frame_payload");
-    const std::size_t max_payload =
-        payload ? configparser::parse_u64(*payload, "frame_payload") : PAYLOAD_DATA_BYTES;
-    if (*mode == "bl16") {
-        return geometry_for(Mode::BL16, max_payload);
+    if (const auto slots = configparser::find(config, "frame_slots")) {
+        const std::uint64_t n = configparser::parse_u64(*slots, "frame_slots");
+        TP_CHECK(std::has_single_bit(n) && n <= UINT32_MAX,
+                 "config: 'frame_slots' must be a power of two, got %llu",
+                 static_cast<unsigned long long>(n));
+        ring.slots = static_cast<std::uint32_t>(n);
     }
-    TP_CHECK(*mode == "blv", "config: 'frame' must be 'bl16' or 'blv', got '%.*s'",
-             static_cast<int>(mode->size()), mode->data());
-    return geometry_for(Mode::BLV, max_payload);
+    return ring;
 }
 
 /// A received frame, decoded.

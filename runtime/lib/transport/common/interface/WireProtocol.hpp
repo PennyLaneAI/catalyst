@@ -18,9 +18,6 @@
 
 namespace catalyst::transport::common {
 
-// Ring size, identical on both sides; power of two so index is a mask.
-inline constexpr std::size_t K_RING_SLOTS = 256;
-
 // Selective-signalling stride (flow control on the pipelined send paths).
 inline constexpr std::uint32_t SIGNAL_EVERY = 64;
 
@@ -66,10 +63,6 @@ struct alignas(64) PayloadSlot {
 };
 static_assert(sizeof(PayloadSlot) == 64, "PayloadSlot must be exactly 64 B");
 static_assert(alignof(PayloadSlot) == 64, "PayloadSlot must be 64-B aligned");
-
-// Receive ring is K_RING_SLOTS PayloadSlots; the peer writes slot[cursor %
-// K_RING_SLOTS]. K_RING_SLOTS must be a power of two.
-inline constexpr std::size_t REGION_BYTES = K_RING_SLOTS * sizeof(PayloadSlot);
 
 // Messages larger than PAYLOAD_DATA_BYTES travel in BLV frames; see Frame.hpp.
 

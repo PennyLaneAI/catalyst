@@ -34,7 +34,6 @@
 #include "ConfigParser.hpp"
 #include "DynamicLibraryLoader.hpp"
 #include "Exception.hpp"
-#include "Frame.hpp"
 #include "Transport.hpp"
 #include "TransportBackend.h"
 #include "WireProtocol.hpp"
@@ -164,11 +163,8 @@ const char *collect_error_name(int rc) {
 // Provision the local reply region on first use (idempotent).
 void ensure_reply(CatalystTransportSession *s) {
     if (!s->reply_ready) {
-        // Large enough for the ring of frames the session's config asks for.
-        const std::uint64_t bytes = std::max<std::uint64_t>(
-            kReplyBytes,
-            catalyst::transport::common::frame::geometry_from_config(s->config).region_bytes());
-        s->reply = s->sess->alloc_memory(bytes, s->sess->preferred_mem_kind());
+        // A backend whose peer writes a ring of frames into this region enlarges it to fit.
+        s->reply = s->sess->alloc_memory(kReplyBytes, s->sess->preferred_mem_kind());
         s->reply_ready = true;
     }
 }
@@ -407,6 +403,15 @@ CatalystTransportSession *__catalyst__transport__create(const char *backend_lib,
             throw std::runtime_error(
                 std::string{backend_lib} + ": backend '" + (h->caps->name ? h->caps->name : "?") +
                 "' does not provide the " + (coprocessor ? "coprocessor" : "controller") + " role");
+        }
+        // Version 3 changed the CoprocessorFn signature; an older coprocessor would call it wrong.
+        const std::uint32_t version = h->caps != nullptr ? h->caps->abi_version : 1;
+        if (coprocessor && version < 3) {
+            throw std::runtime_error(std::string{backend_lib} +
+                                     ": coprocessor backend built for transport ABI version " +
+                                     std::to_string(version) +
+                                     ", which calls coprocessor functions with the old signature; "
+                                     "rebuild it against this runtime");
         }
         if (coprocessor) {
             auto *factory = h->backend->getSymbol<CatalystTransportCoprocessorFactoryFn *>(
@@ -739,15 +744,10 @@ int __catalyst__transport__start_benchmark(CatalystTransportSession *s, std::uin
 
             if (rc != CATALYST_TRANSPORT_OK) {
                 std::uint64_t reply_value = 0;
-                std::uint32_t reply_seq = 0;
                 std::memcpy(&reply_value, rslot, sizeof(reply_value));
-                std::memcpy(&reply_seq,
-                            static_cast<const std::uint8_t *>(rslot) +
-                                offsetof(catalyst::transport::common::Payload, seq_num),
-                            sizeof(reply_seq));
                 std::cerr << "[transport] start_benchmark: round " << i << " failed rc=" << rc
                           << " [sent 0x" << std::hex << value << ", reply slot 0x" << reply_value
-                          << std::dec << " seq=" << reply_seq << "; work_item=" << work_item_idx
+                          << std::dec << "; work_item=" << work_item_idx
                           << " in=" << outgoing_message_bytes << "B out=" << reply_bytes << "B]\n";
                 break;
             }

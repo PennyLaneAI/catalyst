@@ -14,7 +14,6 @@
 
 #pragma once
 
-#include <array>
 #include <atomic>
 #include <cstddef>
 #include <cstdint>
@@ -93,6 +92,7 @@ class GpuCoprocessorSession : public CoprocessorSession {
     int gpu_device_ = 0;
     bool per_message_ = false;
     MessageWorker worker_;
+    std::uint32_t slots_; // slot count of the request, handoff and reply rings
     std::unique_ptr<coproc::GpuRuntime> gpu_;
     coproc::GpuRuntime::Handoff handoff_{};
     // Host-mapped request ring polled by the persistent decode kernel via `ring_dev_`.
@@ -100,7 +100,7 @@ class GpuCoprocessorSession : public CoprocessorSession {
     common::PayloadSlot *ring_dev_ = nullptr;
     // Reply ring: engine thread writes here after observing a kernel handoff, controller thread
     // reads here in process_message.
-    std::array<common::PayloadSlot, common::K_RING_SLOTS> reply_ring_{};
+    std::vector<common::PayloadSlot> reply_ring_;
     // Monotonic cursor advanced by process_message (single-writer on controller thread).
     std::uint64_t process_cursor_ = 0;
     bool kernel_running_ = false;

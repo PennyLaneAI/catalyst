@@ -25,8 +25,8 @@
 #include "ProtectionDomain.hpp"
 #include "QueuePair.hpp"
 #include "Transport.hpp"
+#include "Frame.hpp"
 #include "UmmLib.hpp"
-#include "WireProtocol.hpp"
 
 namespace rdma::devices::fpga_verbs {
 using namespace catalyst::transport;
@@ -50,7 +50,7 @@ class FpgaControllerSession : public ControllerSession {
   public:
     FpgaControllerSession(
         std::string dev = "xib_0", int gid_idx = 1,
-        std::uint32_t ring_slots = static_cast<std::uint32_t>(common::K_RING_SLOTS),
+        std::uint32_t ring_slots = common::frame::BL16_RING.slots,
         std::uint32_t stride_log2 = 6, std::optional<MemKind> data_kind = std::nullopt,
         std::optional<MemKind> reply_kind = std::nullopt);
     ~FpgaControllerSession() override { stop(); }
@@ -90,7 +90,7 @@ class FpgaControllerSession : public ControllerSession {
 
     std::string dev_;
     int gid_idx_ = 1;
-    std::uint32_t ring_slots_ = static_cast<std::uint32_t>(common::K_RING_SLOTS);
+    std::uint32_t ring_slots_ = common::frame::BL16_RING.slots;
     std::uint32_t stride_log2_ = 6;
     std::uint32_t stride_ = 64;
     std::uint32_t pending_decoder_ = 0;

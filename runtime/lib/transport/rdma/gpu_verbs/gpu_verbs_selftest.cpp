@@ -19,11 +19,11 @@
 #include <thread>
 
 #include "GpuCoprocessorSession.hpp"
-#include "WireProtocol.hpp"
+#include "Frame.hpp"
 
 using namespace catalyst::transport;
 using namespace catalyst::transport::gpu_verbs;
-using namespace catalyst::transport::common; // REGION_BYTES, DEMO_SYNDROME
+using namespace catalyst::transport::common; // frame, DEMO_SYNDROME
 
 extern "C" int gpu_echo_launcher(const CoprocLaunchDesc *desc, void *ctx);
 
@@ -33,6 +33,7 @@ int main(int argc, char **argv) {
     int gid = -1;
     int gpu_device = 0;
     std::uint16_t port = 18560;
+    frame::RingGeometry ring = frame::BL16_RING;
     for (int i = 1; i + 1 < argc; i += 2) {
         std::string k = argv[i], v = argv[i + 1];
         if (k == "--dev") {
@@ -45,23 +46,25 @@ int main(int argc, char **argv) {
             peer = v;
         } else if (k == "--port") {
             port = static_cast<std::uint16_t>(std::atoi(v.c_str()));
+        } else if (k == "--slots") {
+            ring.slots = static_cast<std::uint32_t>(std::strtoul(v.c_str(), nullptr, 0));
         }
     }
     if (dev.empty() || gid < 0) {
         std::fprintf(stderr,
                      "usage: %s --dev <rdma_device> --gid <gid_index>"
-                     " [--gpu <index>] [--peer <ip>] [--port <n>]\n"
+                     " [--gpu <index>] [--peer <ip>] [--port <n>] [--slots <n>]\n"
                      "  --dev and --gid are required; the device needs dma-buf MR support\n",
                      argv[0]);
         return 2;
     }
-    GpuCoprocessorSession s(dev, gid, gpu_device);
+    GpuCoprocessorSession s(dev, gid, gpu_device, ring);
     ConnectInfo ci{
         .peer = peer,
         .oob_port = port,
     };
     s.connect(ci);
-    MemRegion m = s.alloc_memory(REGION_BYTES, MemKind::GpuHbm);
+    MemRegion m = s.alloc_memory(ring.region_bytes(), MemKind::GpuHbm);
     PeerRef p = s.exchange_keys(m);
     ChannelDesc desc{
         .transport = "rdma",

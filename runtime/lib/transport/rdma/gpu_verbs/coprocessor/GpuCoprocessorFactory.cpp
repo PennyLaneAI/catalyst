@@ -35,14 +35,14 @@ catalyst::transport::CoprocessorSession *make_gpu_coprocessor(const std::string 
     const auto cfg = catalyst::transport::common::parse_backend_config(config);
     // The persistent kernels read 16 B frames.
     // TODO: lift this once they read frames through the frame codec.
-    TP_CHECK(catalyst::transport::common::frame::geometry_from_config(config).mode ==
-                 catalyst::transport::common::frame::Mode::BL16,
+    const auto ring = catalyst::transport::common::frame::geometry_from_config(config);
+    TP_CHECK(ring.mode == catalyst::transport::common::frame::Mode::BL16,
              "gpu_verbs reads 16 B frames, but its config asks for another frame layout");
     // `gpu` is optional and defaults to device 0
     const int gpu_device = catalyst::transport::common::configparser::parse_optional_index(
         config, "gpu", /*fallback=*/0);
-    auto *session =
-        new catalyst::transport::gpu_verbs::GpuCoprocessorSession(cfg.dev, cfg.gid, gpu_device);
+    auto *session = new catalyst::transport::gpu_verbs::GpuCoprocessorSession(cfg.dev, cfg.gid,
+                                                                              gpu_device, ring);
     session->set_thread_affinity(
         catalyst::transport::common::configparser::parse_optional_index(config, "cpu_pin", -1),
         catalyst::transport::common::configparser::parse_optional_index(config, "rt", 0) != 0);

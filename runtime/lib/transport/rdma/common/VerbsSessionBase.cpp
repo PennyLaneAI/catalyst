@@ -65,6 +65,8 @@ template <class Role> int VerbsSessionBase<Role>::connect(const ConnectInfo &inf
 template <class Role>
 MemRegion VerbsSessionBase<Role>::alloc_memory(std::size_t size, MemKind kind) {
     TP_CHECK(kind == MemKind::CpuRam, "cpu_libibverbs: only MemKind::CpuRam supported");
+    // The peer writes a ring of frames into the region, which may be larger than asked for.
+    size = std::max(size, ring_.region_bytes());
     caller_memory_regions_.push_back(MemoryRegion::alloc_host(
         pd_, size, PAGE_ALIGN, MemAccess::LOCAL_WRITE | MemAccess::REMOTE_WRITE));
     const MemoryRegion &mr = caller_memory_regions_.back();
@@ -134,7 +136,10 @@ template <class Role>
 template <frame::Mode M>
 void VerbsSessionBase<Role>::post_write(ibv_qp *qp, std::uint64_t cursor, bool inline_data,
                                         bool signaled) {
+    // A BL16 frame's size and stride are fixed, so they are constants here; the slot count is the
+    // session's.
     const frame::RingGeometry &ring = M == frame::Mode::BL16 ? frame::BL16_RING : ring_;
+    const std::size_t offset = (cursor & (ring_.slots - 1)) * ring.stride;
     void *send = send_frame(); // staged by the caller
     frame::seal<M>(ring, send, static_cast<std::uint32_t>(cursor + 1));
     const std::size_t bytes = frame::frame_bytes<M>(ring);
@@ -156,7 +161,7 @@ void VerbsSessionBase<Role>::post_write(ibv_qp *qp, std::uint64_t cursor, bool i
         .send_flags = static_cast<unsigned>((inline_data ? IBV_SEND_INLINE : 0) |
                                             (signaled ? IBV_SEND_SIGNALED : 0)),
     };
-    wr.wr.rdma.remote_addr = peer_.remote_addr + ring.slot_offset(cursor);
+    wr.wr.rdma.remote_addr = peer_.remote_addr + offset;
     wr.wr.rdma.rkey = peer_.rkey;
     ibv_send_wr *bad = nullptr;
     const int rc = ibv_post_send(qp, &wr, &bad);
@@ -198,7 +203,8 @@ bool VerbsSessionBase<Role>::poll_message_arrival(std::uint64_t cursor, std::sto
     // head of its slot in a single RDMA_WRITE, seq last, so once frame::poll sees the expected seq
     // the payload before it is present.
     const frame::RingGeometry &ring = M == frame::Mode::BL16 ? frame::BL16_RING : ring_;
-    void *slot = static_cast<std::uint8_t *>(local_.addr) + ring.slot_offset(cursor);
+    void *slot =
+        static_cast<std::uint8_t *>(local_.addr) + (cursor & (ring_.slots - 1)) * ring.stride;
     const auto expected = static_cast<std::uint32_t>(cursor + 1);
     std::uint32_t spins = 0;
     while (!frame::poll<M>(ring, slot, expected, out)) {

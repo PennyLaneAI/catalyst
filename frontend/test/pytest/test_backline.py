@@ -800,8 +800,8 @@ class TestBacklineDemoIntegration:
             )
         (tmp_path / "catalyst_transport_backends.json").write_text(
             '[{"name": "toy", "transport": "memcpy", "hardware": "cpu",'
-            ' "roles": ["controller", "coprocessor"], "max_payload_bytes": null,'
-            ' "max_reply_bytes": null, "default": false}]'
+            ' "roles": ["controller", "coprocessor"], "frame_modes": ["bl16", "blv"],'
+            ' "max_payload_bytes": null, "max_reply_bytes": null, "default": false}]'
         )
         monkeypatch.setenv("CATALYST_TRANSPORT_PATH", str(tmp_path))
         ctrl = qp.Controller(
@@ -1995,7 +1995,14 @@ class TestBackendRegistry:
         """A backend that cannot carry the placement's messages is not picked."""
         with pytest.raises(ValueError, match="carrying 2048 B requests"):
             _select_backend("rdma", "gpu", "coprocessor", in_bytes=2048, out_bytes=8)
-        register_backend("wide_verbs", "rdma", "gpu", ["coprocessor"], max_payload_bytes=4096)
+        register_backend(
+            "wide_verbs",
+            "rdma",
+            "gpu",
+            ["coprocessor"],
+            frame_modes=("bl16", "blv"),
+            max_payload_bytes=4096,
+        )
         assert _select_backend("rdma", "gpu", "coprocessor", 2048, 8).name == "wide_verbs"
         assert _select_backend("memcpy", "cpu", "controller", 4096, 4096).name == "memcpy"
 
@@ -2078,23 +2085,10 @@ class TestBackendRegistry:
         assert d["controller"]["config"] == f"frame=blv;frame_payload={largest}"
         assert d["coprocessors"][0]["config"].startswith(f"frame=blv;frame_payload={largest};fn.")
 
-    def test_a_backend_without_blv_frames_cannot_carry_larger_messages(self, isolated_registry):
-        """A backend speaking only the 16 B frame is refused for messages above 8 B."""
-        register_backend(
-            "bl16_only",
-            "net",
-            "cpu",
-            ["controller", "coprocessor"],
-            max_payload_bytes=None,
-            max_reply_bytes=None,
-        )
-        dev = qp.Backline(
-            controller=_controller(init_args={}, in_bytes=64),
-            coprocessors=[_coproc("cop0", init_args={})],
-            transport="net",
-        )
-        with pytest.raises(CompileError, match="64 B messages need 'blv' frames"):
-            serialize_backline(dev.placement)
+    def test_a_backend_carrying_more_than_8_bytes_must_speak_blv(self, isolated_registry):
+        """Messages above 8 B travel in BLV frames, so such a backend is refused when registered."""
+        with pytest.raises(ValueError, match="'bl16_only' carries messages over 8 B"):
+            register_backend("bl16_only", "net", "cpu", ["controller"], max_payload_bytes=None)
 
     def test_a_persistent_gpu_kernel_carries_at_most_8_bytes(self):
         """GPU kernels read 16 B frames; only per-message functions take larger messages."""
@@ -2105,6 +2099,67 @@ class TestBackendRegistry:
         )
         with pytest.raises(CompileError, match="persistent GPU kernel"):
             serialize_backline(dev.placement)
+
+    def test_a_persistent_gpu_kernel_with_its_own_backend_lib_is_taken_at_its_word(self):
+        """A node naming its own backend library may read BLV frames; the runtime checks it."""
+        dev = qp.Backline(
+            controller=_controller(in_bytes=64),
+            coprocessors=[_coproc("gpu0", hardware="gpu")],
+            transport="memcpy",
+        )
+        d = serialize_backline(dev.placement)
+        assert "frame=blv;frame_payload=64" in d["coprocessors"][0]["config"]
+
+    def test_frame_slots_set_on_one_node_reaches_every_node(self, flat_lib_dir):
+        """Both ends of a session need the same ring, so the compiler passes the count on."""
+        flat_lib_dir(
+            "libcatalyst_transport_memcpy_controller.so",
+            "libcatalyst_transport_memcpy_coprocessor.so",
+        )
+        dev = qp.Backline(
+            controller=_controller(init_args={}),
+            coprocessors=[_coproc("cop0", init_args={"config": "frame_slots=8"})],
+            transport="memcpy",
+        )
+        d = serialize_backline(dev.placement)
+        assert d["controller"]["config"] == "frame_slots=8"
+        assert "frame_slots=8" in d["coprocessors"][0]["config"]
+
+    @pytest.mark.parametrize(
+        "ctrl_config, cop_config, match",
+        [
+            ("frame_slots=8", "frame_slots=16", "different frame_slots: \\[8, 16\\]"),
+            ("frame_slots=12", "", "power of two, not '12'"),
+            ("frame_slots=0", "", "power of two, not '0'"),
+        ],
+    )
+    def test_frame_slots_must_be_one_power_of_two(self, ctrl_config, cop_config, match):
+        """Every node reads the same ring, whose slot index is the round masked by the count."""
+        dev = qp.Backline(
+            controller=_controller(init_args={"config": ctrl_config}),
+            coprocessors=[_coproc("cop0", init_args={"config": cop_config})],
+            transport="memcpy",
+        )
+        with pytest.raises(CompileError, match=match):
+            serialize_backline(dev.placement)
+
+    @pytest.mark.parametrize("slots, ok", [(256, True), (8, False)])
+    def test_an_fpga_controller_keeps_256_frame_slots(self, slots, ok, flat_lib_dir):
+        """The FPGA controllers are only tested with a ring of 256 slots."""
+        flat_lib_dir(
+            "libcatalyst_transport_hwhs_controller.so",
+            "libcatalyst_transport_cpu_verbs_coprocessor.so",
+        )
+        dev = qp.Backline(
+            controller=_controller(hardware="fpga", init_args={}),
+            coprocessors=[_coproc("cop0", init_args={"config": f"frame_slots={slots}"})],
+            transport="rdma",
+        )
+        if ok:
+            serialize_backline(dev.placement)
+        else:
+            with pytest.raises(CompileError, match="'fpga' hardware is only tested with a ring"):
+                serialize_backline(dev.placement)
 
     def test_a_node_config_cannot_set_the_frame_layout(self):
         """The frame layout is the compiler's to choose, from the placement's message sizes."""

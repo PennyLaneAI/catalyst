@@ -85,6 +85,42 @@ TEST_CASE("memcpy CPU controller can drive the local GPU coprocessor", "[transpo
     CHECK(reply_word == request_word);
 }
 
+TEST_CASE("memcpy GPU coprocessor wraps a ring of the slot count its config sets",
+          "[transport_memcpy]") {
+    for (const std::uint32_t slots : {1u, 8u}) {
+        ConnectInfo ci{.peer = "loopback", .oob_port = static_cast<std::uint16_t>(19110 + slots)};
+        const std::string cfg = pair_cfg(ci.oob_port) + ";frame_slots=" + std::to_string(slots);
+        CpuControllerSession controller(cfg);
+        GpuCoprocessorSession coprocessor(cfg);
+        REQUIRE(controller.connect(ci) == 0);
+        REQUIRE(coprocessor.connect(ci) == 0);
+        MemRegion reply = controller.alloc_memory(sizeof(std::uint64_t), MemKind::CpuRam);
+        PeerRef peer_request = controller.exchange_keys(reply);
+        MemRegion request = coprocessor.alloc_memory(sizeof(std::uint64_t), MemKind::CpuRam);
+        PeerRef peer_reply = coprocessor.exchange_keys(request);
+        ChannelDesc desc{.transport = "memcpy"};
+        controller.establish_channel(desc, reply, peer_request);
+        coprocessor.establish_channel(desc, request, peer_reply);
+
+        controller.commit_work_item(0, sizeof(std::uint64_t), sizeof(std::uint64_t));
+        coprocessor.set_coprocessor_launcher(nullptr, nullptr); // built-in GPU echo
+        controller.start();
+        coprocessor.start();
+        // Enough rounds to reuse every slot several times.
+        for (std::uint64_t round = 0; round < 3 * slots + 1; ++round) {
+            const std::uint64_t request_word = 0x3000 + round;
+            controller.write_data_slot(&request_word, sizeof(request_word), /*decoder_id=*/0);
+            REQUIRE(controller.kick(0) == 0);
+            std::uint64_t reply_word = 0;
+            void *outs[1] = {&reply_word};
+            std::uint64_t out_bytes[1] = {sizeof(reply_word)};
+            REQUIRE(controller.collect(outs, out_bytes, 1) == 0);
+            REQUIRE(reply_word == request_word);
+        }
+        coprocessor.stop();
+    }
+}
+
 TEST_CASE("memcpy GPU coprocessor returns a reply shorter than its 8 B correction",
           "[transport_memcpy]") {
     ConnectInfo ci{.peer = "loopback", .oob_port = 19032};

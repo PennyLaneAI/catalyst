@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include <algorithm>
+#include <atomic>
 #include <cstdint>
 #include <cstring>
 #include <string>
@@ -29,7 +30,7 @@
 
 using namespace catalyst::transport;
 using namespace catalyst::transport::cpu_verbs;
-using namespace catalyst::transport::common; // DEMO_SYNDROME, REGION_BYTES
+using namespace catalyst::transport::common; // DEMO_SYNDROME
 
 static bool have_rxe() {
     int n = 0;
@@ -90,7 +91,7 @@ TEST_CASE("alloc_memory registers host RAM and exchange_keys swaps regions", "[c
         SKIP("no rxe0 RDMA device");
     }
     const std::uint16_t port = 18591;
-    const std::size_t SIZE = REGION_BYTES;
+    const std::size_t SIZE = frame::BL16_RING.region_bytes();
     std::uint32_t coproc_rkey = 0;
     std::uint64_t coproc_peer_addr = 0;
     std::uint64_t coproc_peer_size = 0;
@@ -132,7 +133,7 @@ TEST_CASE("round-trip: coprocessor gets request, controller gets bounced reply",
         SKIP("no rxe0 RDMA device");
     }
     const std::uint16_t port = 18593;
-    const std::size_t SIZE = REGION_BYTES;
+    const std::size_t SIZE = frame::BL16_RING.region_bytes();
     std::uint64_t coproc_got = 0;
     std::thread t([&] {
         CpuCoprocessorSession coproc("rxe0", 1);
@@ -188,7 +189,7 @@ TEST_CASE("round-trip with a custom coprocessor function runs on the coprocessor
         SKIP("no rxe0 RDMA device");
     }
     const std::uint16_t port = 18595;
-    const std::size_t SIZE = REGION_BYTES;
+    const std::size_t SIZE = frame::BL16_RING.region_bytes();
     std::thread t([&] {
         CpuCoprocessorSession coproc("rxe0", 1);
         ConnectInfo ci{
@@ -300,6 +301,61 @@ TEST_CASE("cpu_verbs carries messages larger than 8 B in BLV frames", "[cpu_libi
         CHECK(g_blv_len == in_bytes); // the payload's own length, not a padded frame
         for (std::size_t i = 0; i < out_bytes; ++i) {
             REQUIRE(reply[i] == static_cast<std::uint8_t>(i + 3));
+        }
+    }
+}
+
+TEST_CASE("cpu_verbs wraps a ring of the slot count its config sets", "[cpu_libibverbs]") {
+    if (!have_rxe()) {
+        SKIP("no rxe0 RDMA device");
+    }
+    namespace frame = catalyst::transport::common::frame;
+    std::uint16_t port = 18610;
+    for (const std::uint32_t slots : {1u, 8u}) {
+        for (const std::size_t bytes : {std::size_t{8}, std::size_t{64}}) {
+            auto ring =
+                frame::geometry_for(bytes > 8 ? frame::Mode::BLV : frame::Mode::BL16, bytes);
+            ring.slots = slots;
+            ++port;
+            std::atomic<bool> done{false};
+            std::thread t([&] {
+                CpuCoprocessorSession coproc("rxe0", 1, ring);
+                coproc.connect(ConnectInfo{.peer = "127.0.0.1", .oob_port = port});
+                MemRegion m = coproc.alloc_memory(ring.region_bytes(), MemKind::CpuRam);
+                PeerRef p = coproc.exchange_keys(m);
+                coproc.establish_channel(ChannelDesc{.transport = "rdma"}, m, p);
+                coproc.set_coprocessor_fn(invert_fn, nullptr);
+                coproc.start();
+                while (!done.load()) {
+                    std::this_thread::yield();
+                }
+                coproc.stop();
+            });
+            CpuControllerSession controller("rxe0", 1, ring);
+            controller.connect(ConnectInfo{.peer = "127.0.0.1", .oob_port = port});
+            MemRegion m = controller.alloc_memory(ring.region_bytes(), MemKind::CpuRam);
+            PeerRef p = controller.exchange_keys(m);
+            controller.establish_channel(ChannelDesc{.transport = "rdma"}, m, p);
+            controller.commit_work_item(0, bytes, bytes);
+            controller.start();
+            // Enough rounds to reuse every slot several times.
+            for (std::uint64_t round = 0; round < 3 * slots + 1; ++round) {
+                std::vector<std::uint8_t> request(bytes, 0);
+                const std::uint64_t word = 0x2000 + round;
+                std::memcpy(request.data(), &word, sizeof(word));
+                controller.write_data_slot(request.data(), bytes, /*decoder_id=*/0);
+                controller.kick(0);
+                std::vector<std::uint8_t> reply(bytes, 0);
+                void *outs[1] = {reply.data()};
+                std::uint64_t obytes[1] = {bytes};
+                REQUIRE(controller.collect(outs, obytes, 1) == 0);
+                std::uint64_t got = 0;
+                std::memcpy(&got, reply.data(), sizeof(got));
+                REQUIRE(got == ~word);
+            }
+            controller.stop();
+            done.store(true);
+            t.join();
         }
     }
 }

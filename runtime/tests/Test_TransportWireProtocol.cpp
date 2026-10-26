@@ -38,9 +38,8 @@ TEST_CASE("PayloadSlot is a 64 B slot") {
 }
 
 TEST_CASE("Ring geometry and constants match the trampoline") {
-    STATIC_REQUIRE(K_RING_SLOTS == 256);
-    STATIC_REQUIRE((K_RING_SLOTS & (K_RING_SLOTS - 1)) == 0);
-    STATIC_REQUIRE(REGION_BYTES == K_RING_SLOTS * sizeof(PayloadSlot));
+    STATIC_REQUIRE(frame::BL16_RING.slots == 256);
+    STATIC_REQUIRE(frame::BL16_RING.region_bytes() == 256 * sizeof(PayloadSlot));
     STATIC_REQUIRE(SIGNAL_EVERY == 64);
     STATIC_REQUIRE(SALT == 0xC0DE1515u);
     STATIC_REQUIRE(DEMO_SYNDROME == 0x0123456789ABCDEFull);
@@ -86,9 +85,8 @@ TEST_CASE("the BL16 codec zero-pads a payload written in place") {
 
 TEST_CASE("the BL16 ring is today's ring") {
     namespace frame = catalyst::transport::common::frame;
-    CHECK(frame::BL16_RING.region_bytes() == REGION_BYTES);
     CHECK(frame::BL16_RING.slot_offset(1) == sizeof(PayloadSlot));
-    CHECK(frame::BL16_RING.slot_offset(K_RING_SLOTS + 3) == 3 * sizeof(PayloadSlot));
+    CHECK(frame::BL16_RING.slot_offset(256 + 3) == 3 * sizeof(PayloadSlot));
 }
 
 TEST_CASE("a frame mode without a codec is refused") {
@@ -107,10 +105,10 @@ TEST_CASE("a BLV ring uses the smallest power-of-two slot that holds its frames"
     CHECK(frame::geometry_for(frame::Mode::BLV, 1024).stride == 2048);
     const auto ring = frame::geometry_for(frame::Mode::BLV, 64);
     CHECK(ring.mode == frame::Mode::BLV);
-    CHECK(ring.slots == K_RING_SLOTS);
+    CHECK(ring.slots == frame::BL16_RING.slots);
     CHECK(frame::data_capacity(ring) == 128 - 32 - 4);
     CHECK(frame::frame_bytes(ring) == 128);
-    CHECK(ring.region_bytes() == K_RING_SLOTS * 128);
+    CHECK(ring.region_bytes() == 256 * 128);
     CHECK_THROWS_WITH(frame::geometry_for(frame::Mode::BL16, 9),
                       Catch::Matchers::ContainsSubstring("at most 8 B"));
 }
@@ -126,6 +124,21 @@ TEST_CASE("a session's config names its frame layout") {
                       Catch::Matchers::ContainsSubstring("'bl16' or 'blv'"));
     CHECK_THROWS_WITH(frame::geometry_from_config("frame=blv;frame_payload=lots"),
                       Catch::Matchers::ContainsSubstring("'frame_payload'"));
+}
+
+TEST_CASE("a session's config may set the ring's slot count") {
+    namespace frame = catalyst::transport::common::frame;
+    CHECK(frame::geometry_from_config("dev=rxe0").slots == 256);
+    const auto bl16 = frame::geometry_from_config("frame_slots=8");
+    CHECK(bl16.mode == frame::Mode::BL16);
+    CHECK(bl16.region_bytes() == 8 * 64);
+    const auto blv = frame::geometry_from_config("frame=blv;frame_payload=64;frame_slots=4");
+    CHECK(blv.region_bytes() == 4 * 128);
+    CHECK(blv.slot_offset(5) == 128); // round 5 reuses slot 1
+    CHECK_THROWS_WITH(frame::geometry_from_config("frame_slots=12"),
+                      Catch::Matchers::ContainsSubstring("power of two"));
+    CHECK_THROWS_WITH(frame::geometry_from_config("frame_slots=0"),
+                      Catch::Matchers::ContainsSubstring("power of two"));
 }
 
 TEST_CASE("a BLV frame carries its payload, length and fn_id, and completes last") {
