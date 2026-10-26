@@ -20,12 +20,12 @@
 
 #include "CompletionQueue.hpp"
 #include "Context.hpp"
+#include "Frame.hpp"
 #include "Handshake.hpp"
 #include "OobSocket.hpp"
 #include "ProtectionDomain.hpp"
 #include "QueuePair.hpp"
 #include "Transport.hpp"
-#include "Frame.hpp"
 #include "UmmLib.hpp"
 
 namespace rdma::devices::fpga_verbs {
@@ -48,11 +48,11 @@ struct Region {
 // FPGA controller with ibverbs software datapath
 class FpgaControllerSession : public ControllerSession {
   public:
-    FpgaControllerSession(
-        std::string dev = "xib_0", int gid_idx = 1,
-        std::uint32_t ring_slots = common::frame::BL16_RING.slots,
-        std::uint32_t stride_log2 = 6, std::optional<MemKind> data_kind = std::nullopt,
-        std::optional<MemKind> reply_kind = std::nullopt);
+    FpgaControllerSession(std::string dev = "xib_0", int gid_idx = 1,
+                          std::uint32_t ring_slots = common::frame::BL16_RING.slots,
+                          std::uint32_t stride_log2 = 6,
+                          std::optional<MemKind> data_kind = std::nullopt,
+                          std::optional<MemKind> reply_kind = std::nullopt);
     ~FpgaControllerSession() override { stop(); }
 
     FpgaControllerSession(const FpgaControllerSession &) = delete;

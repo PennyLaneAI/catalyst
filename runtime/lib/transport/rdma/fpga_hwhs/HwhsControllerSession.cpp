@@ -27,9 +27,9 @@
 #include <vector>
 
 #include "Exception.hpp"
+#include "Frame.hpp"
 #include "HwhsAbi.h"
 #include "TransportCAPI.h" // CATALYST_TRANSPORT_* status codes
-#include "Frame.hpp"
 
 #include <fcntl.h>
 #include <infiniband/verbs.h>

@@ -18,8 +18,8 @@
 #include <string>
 #include <thread>
 
-#include "GpuCoprocessorSession.hpp"
 #include "Frame.hpp"
+#include "GpuCoprocessorSession.hpp"
 
 using namespace catalyst::transport;
 using namespace catalyst::transport::gpu_verbs;

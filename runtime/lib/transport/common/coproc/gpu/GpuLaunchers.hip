@@ -102,11 +102,10 @@ __global__ void fused(volatile PayloadSlot *ring, volatile HandoffSlot *handoff,
 // Launch fused<DECODE> on the session-owned stream, wired to the datapath in
 // `desc`.
 template <std::int64_t (*DECODE)(std::uint64_t)> static void launch(const CoprocLaunchDesc *desc) {
-    hipLaunchKernelGGL((fused<DECODE>), dim3(1), dim3(1), 0, static_cast<hipStream_t>(desc->stream),
-                       reinterpret_cast<PayloadSlot *>(desc->ring),
-                       reinterpret_cast<HandoffSlot *>(desc->handoff),
-                       reinterpret_cast<std::uint32_t *>(desc->stop), desc->total,
-                       desc->ring_slots);
+    hipLaunchKernelGGL(
+        (fused<DECODE>), dim3(1), dim3(1), 0, static_cast<hipStream_t>(desc->stream),
+        reinterpret_cast<PayloadSlot *>(desc->ring), reinterpret_cast<HandoffSlot *>(desc->handoff),
+        reinterpret_cast<std::uint32_t *>(desc->stop), desc->total, desc->ring_slots);
     HIP_CHECK(hipGetLastError(), "kernel launch");
 }
 

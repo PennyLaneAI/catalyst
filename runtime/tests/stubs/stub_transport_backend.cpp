@@ -95,8 +95,17 @@ CATALYST_TRANSPORT_BACKEND_CAPS("stub",
 extern "C" uint32_t CatalystTransportAbiVersion() { return 2; }
 extern "C" const CatalystTransportCaps *CatalystTransportQueryCaps() {
     static const CatalystTransportCaps caps = {
-        2,  CATALYST_TRANSPORT_ROLE_BIT_CONTROLLER, CATALYST_TRANSPORT_MEM_BIT(CpuRam),
-        CATALYST_TRANSPORT_FRAME_BL16, 8, CATALYST_TRANSPORT_ORDER_IN_ORDER, "stub", 8, 0, 1, 0,
+        2,
+        CATALYST_TRANSPORT_ROLE_BIT_CONTROLLER,
+        CATALYST_TRANSPORT_MEM_BIT(CpuRam),
+        CATALYST_TRANSPORT_FRAME_BL16,
+        8,
+        CATALYST_TRANSPORT_ORDER_IN_ORDER,
+        "stub",
+        8,
+        0,
+        1,
+        0,
         [](void *s) { delete static_cast<TransportSession *>(s); }};
     return &caps;
 }
