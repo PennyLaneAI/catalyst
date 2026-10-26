@@ -25,10 +25,8 @@ import pennylane as qp
 import pytest
 from pennylane.decomposition import add_decomps, register_resources
 
-from catalyst import qjit
 from catalyst.decomposition import GraphOpID
 from catalyst.decomposition.decomposition_rules import ordered_kwarg_names
-from catalyst.passes import graph_decomposition
 
 pytestmark = pytest.mark.usefixtures("use_capture")
 
@@ -154,8 +152,8 @@ class TestExecution:
         gate_set = {"Toffoli", "CNOT", "X", "Hadamard", "S", "Adjoint(S)", "T", "Adjoint(T)", "CZ"}
         gate_set |= {"MidMeasure", "MidMeasureMP", "MidCircuitMeasure", "Cond"}
 
-        @qjit(capture=True)
-        @graph_decomposition(gate_set=gate_set)
+        @qp.qjit(capture=True)
+        @qp.decompose(gate_set=gate_set)
         @qp.qnode(qp.device("lightning.qubit", wires=8))
         def circuit():
             qp.X(5)
@@ -168,7 +166,7 @@ class TestExecution:
     def test_unsorted_dynamic_args(self):
         """Each dynamic arg reaches the rule under its own name."""
 
-        @qjit(capture=True)
+        @qp.qjit(capture=True)
         @qp.decompose(gate_set={"RX", "RY"})
         @qp.qnode(qp.device("lightning.qubit", wires=2))
         def circuit():
@@ -184,7 +182,7 @@ class TestExecution:
     def test_unsorted_wire_args_with_uid(self, nx, na):
         """The rule's UID matches the lowered op's, and each wire arg gets its own qubits."""
 
-        @qjit(capture=True)
+        @qp.qjit(capture=True)
         @qp.decompose(gate_set={"X"})
         @qp.qnode(qp.device("lightning.qubit", wires=4))
         def circuit():
@@ -204,7 +202,7 @@ def test_unsorted_wire_args_are_sliced_in_operand_order():
     (``x, y, work``), not sorted order (``work, x, y``)."""
     x, y, work = [0, 1, 2], [3, 4, 5], [6, 7]
 
-    @qjit(capture=True)
+    @qp.qjit(capture=True)
     @qp.decompose(gate_set={"PauliX", "CNOT"})
     @qp.qnode(qp.device("lightning.qubit", wires=8))
     def circuit(xv, yv):
@@ -223,7 +221,7 @@ def test_unsorted_wire_args_with_static_arg_match_uid():
     """TrotterVibronic: the lowered op and the captured rule must hash the wire lengths in the
     same order, otherwise the UIDs differ and the rule is not matched."""
 
-    @qjit(capture=True, target="mlir")
+    @qp.qjit(capture=True, target="mlir")
     @qp.decompose(gate_set={"RZ", "Hadamard", "PauliX"})
     @qp.qnode(qp.device("null.qubit", wires=7))
     def circuit():
