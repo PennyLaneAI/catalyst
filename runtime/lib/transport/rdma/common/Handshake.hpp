@@ -39,10 +39,11 @@ struct HandshakeMsg {
     std::uint64_t mr_vaddr; // where the peer writes into us
     std::uint32_t mr_rkey;
     std::uint32_t mtu_enum; // ibv_mtu enum
-    // The frame ring this end expects the peer to write into (frame::Mode and slot stride); both
-    // ends must agree.
+    // The frame ring this end expects the peer to write into (frame::Mode, slot stride and slot
+    // count); both ends must agree.
     std::uint32_t frame_mode;
     std::uint32_t frame_stride;
+    std::uint32_t frame_slots;
 };
 
 } // namespace catalyst::transport::common

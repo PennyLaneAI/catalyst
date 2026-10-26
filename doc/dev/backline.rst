@@ -242,10 +242,10 @@ with later runtimes. A session follows a strict lifecycle:
 
 Each round's request and reply travel as a **frame**, written into a slot of a ring on the
 receiving side: over RDMA in the receiver's registered memory, over ``memcpy`` in the
-coprocessor's own memory. A ring has 256 slots, and round ``n`` uses slot ``n mod 256``; a node's
-backend config may set ``frame_slots=<n>``, a power of two, which the compiler passes to every
-node, except on FPGA controllers, which are only tested with 256. Every
-transport uses the same two frame layouts, and the compiler picks one per placement from its
+coprocessor's own memory. A ring has ``frame_slots`` slots, 256 unless a node's backend config sets
+``frame_slots=<n>``, a power of two, which the compiler then passes to every node; FPGA controllers
+are only tested with 256. Round ``n`` uses slot ``n mod frame_slots``. Over RDMA, ends whose frame
+configs differ fail to connect. Every transport uses the same two frame layouts, and the compiler picks one per placement from its
 message sizes: the 16 B frame, BL16, when requests and replies fit in 8 B, and BLV otherwise.
 
 .. list-table:: BL16, in 64 B slots
@@ -293,16 +293,16 @@ A per-message coprocessor function, ``CatalystCoprocessorFn`` in ``runtime/inclu
 is called with the payload, its length and the ``fn_id``, whatever the transport and frame layout,
 so one function can serve several decoders without reading frames. A GPU coprocessor running a
 persistent kernel reads BL16 frames itself, so it carries messages of at most 8 B. In-tree
-backends build and read frames through ``runtime/lib/transport/common/interface/Frame.hpp``.
+backends build and read frames through ``runtime/lib/transport/common/interface/Frame.hpp``; an
+out-of-tree backend lays them out as above, since that header is not installed.
 
 ``cpu_verbs`` and the ``memcpy`` backends set no limit on message size. Over RDMA, BLV has been
-tested up to 1024 B each way on Soft-RoCE, and up to 256 KiB on a ConnectX-7. A frame larger than the path MTU spans several
-packets (a 1024 B payload already fills a 2048 B slot), and its completion word landing last then
-relies on the NIC placing an RDMA write's bytes in order, which common NICs do but the RDMA
-specification does not guarantee. Rings keep 256 slots whatever the stride unless
-``frame_slots`` says otherwise, so memory grows with message size: a 1 MiB message makes each ring
-512 MiB. An
-out-of-tree backend lays them out as above, since that header is not installed.
+tested up to 1024 B each way on Soft-RoCE, and up to 256 KiB on a ConnectX-7. A frame larger than
+the path MTU spans several packets (a 1024 B payload already fills a 2048 B slot), and its
+completion word landing last then relies on the NIC placing an RDMA write's bytes in order, which
+common NICs do but the RDMA specification does not guarantee. The slot count does not change with
+the stride, so memory grows with message size: a 1 MiB message makes each ring 512 MiB at the
+default 256 slots.
 
 The transport dialect
 =====================

@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include <algorithm>
+#include <bit>
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
@@ -72,6 +73,10 @@ int main(int argc, char **argv) {
     auto ring = frame::geometry_for(
         largest <= PAYLOAD_DATA_BYTES ? frame::Mode::BL16 : frame::Mode::BLV, largest);
     if (slots != 0) {
+        if (!std::has_single_bit(slots)) {
+            std::fprintf(stderr, "--slots must be a power of two, got %u\n", slots);
+            return 2;
+        }
         ring.slots = slots;
     }
 

@@ -44,8 +44,9 @@ GpuCoprocessorSession::GpuCoprocessorSession(std::string dev, int gid_idx, int g
 
 MemRegion GpuCoprocessorSession::alloc_memory(std::size_t size, MemKind kind) {
     TP_CHECK(kind == MemKind::GpuHbm, "gpu_verbs: only MemKind::GpuHbm supported");
-    // The peer writes a ring of frames into the region, which may be larger than asked for.
-    hbm_ = gpu_.alloc_hbm_ring(std::max(size, ring_.region_bytes()));
+    // The peer writes a ring of frames into the region, which may be larger than asked for; a small
+    // ring still takes a whole page, as the dma-buf export needs.
+    hbm_ = gpu_.alloc_hbm_ring(std::max({size, ring_.region_bytes(), std::size_t{4096}}));
     hbm_ring_.emplace(pd_, /*offset=*/static_cast<std::uint64_t>(0), hbm_.size,
                       /*iova=*/reinterpret_cast<std::uint64_t>(hbm_.ptr), hbm_.dmabuf_fd,
                       MemAccess::REMOTE_WRITE);

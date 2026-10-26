@@ -26,6 +26,7 @@
 #include "WireProtocol.hpp"
 
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/matchers/catch_matchers_string.hpp>
 #include <infiniband/verbs.h>
 
 using namespace catalyst::transport;
@@ -358,4 +359,26 @@ TEST_CASE("cpu_verbs wraps a ring of the slot count its config sets", "[cpu_libi
             t.join();
         }
     }
+}
+
+TEST_CASE("cpu_verbs refuses a peer with a different slot count", "[cpu_libibverbs]") {
+    if (!have_rxe()) {
+        SKIP("no rxe0 RDMA device");
+    }
+    namespace frame = catalyst::transport::common::frame;
+    const auto ring = frame::BL16_RING;
+    auto other = ring;
+    other.slots = 8;
+    const std::uint16_t port = 18620;
+    std::thread t([&] {
+        CpuCoprocessorSession coproc("rxe0", 1, ring);
+        coproc.connect(ConnectInfo{.peer = "127.0.0.1", .oob_port = port});
+        MemRegion m = coproc.alloc_memory(ring.region_bytes(), MemKind::CpuRam);
+        CHECK_THROWS_WITH(coproc.exchange_keys(m), Catch::Matchers::ContainsSubstring("slots"));
+    });
+    CpuControllerSession controller("rxe0", 1, other);
+    controller.connect(ConnectInfo{.peer = "127.0.0.1", .oob_port = port});
+    MemRegion m = controller.alloc_memory(other.region_bytes(), MemKind::CpuRam);
+    CHECK_THROWS_WITH(controller.exchange_keys(m), Catch::Matchers::ContainsSubstring("slots"));
+    t.join();
 }

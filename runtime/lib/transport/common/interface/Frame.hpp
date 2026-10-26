@@ -15,7 +15,7 @@
 // The frame codec: how a message is laid out in a ring slot, and how a ring is laid out.
 //
 // Every backend builds and reads frames through these functions, so the layouts are defined here
-// once. Two layouts are implemented, chosen per session by message size (see geometry_for):
+// once. Two layouts are implemented, chosen per session by its config (see geometry_from_config):
 //
 //   BL16  16 B: | payload 8 | fn_id 4 | seq 4 |            (Payload in WireProtocol.hpp)
 //   BLV   one slot: | header 32 | payload ... | completion 4 |

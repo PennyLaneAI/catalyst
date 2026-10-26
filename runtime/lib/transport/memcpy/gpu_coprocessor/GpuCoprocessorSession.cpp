@@ -31,12 +31,10 @@ namespace catalyst::transport::memcpy {
 GpuCoprocessorSession::GpuCoprocessorSession(const std::string &config, int gpu_device,
                                              bool per_message)
     : pair_key_(parse_pair_key(config)), gpu_device_(gpu_device), per_message_(per_message),
-      worker_(common::frame::geometry_from_config(config)),
-      slots_(common::frame::geometry_from_config(config).slots), reply_ring_(slots_) {
+      ring_(common::frame::geometry_from_config(config)), worker_(ring_), reply_ring_(ring_.slots) {
     // The persistent kernels read 16 B frames, so a launch-once session carries 8 B messages.
     // TODO: lift this once the persistent kernels read frames through the frame codec.
-    TP_CHECK(per_message_ ||
-                 common::frame::geometry_from_config(config).mode == common::frame::Mode::BL16,
+    TP_CHECK(per_message_ || ring_.mode == common::frame::Mode::BL16,
              "A launch-once GPU coprocessor reads 16 B frames, but its config asks for another "
              "frame layout; set coproc_fn=per_message in its config for larger messages");
 }
@@ -62,17 +60,17 @@ void GpuCoprocessorSession::ensure_gpu_state() {
     }
     if (!ring_host_) {
         HIP_CHECK(hipHostMalloc(reinterpret_cast<void **>(&ring_host_),
-                                slots_ * sizeof(common::PayloadSlot),
+                                ring_.slots * sizeof(common::PayloadSlot),
                                 hipHostMallocMapped | hipHostMallocCoherent),
                   "hipHostMalloc(local gpu request ring)");
-        std::memset(ring_host_, 0, slots_ * sizeof(common::PayloadSlot));
+        std::memset(ring_host_, 0, ring_.slots * sizeof(common::PayloadSlot));
         void *ring_dev = nullptr;
         HIP_CHECK(hipHostGetDevicePointer(&ring_dev, ring_host_, 0),
                   "hipHostGetDevicePointer(local gpu request ring)");
         ring_dev_ = static_cast<common::PayloadSlot *>(ring_dev);
     }
     if (!handoff_.host) {
-        handoff_ = gpu_->alloc_handoff(slots_);
+        handoff_ = gpu_->alloc_handoff(ring_.slots);
     }
 }
 
@@ -121,8 +119,8 @@ void GpuCoprocessorSession::start() {
     ensure_gpu_state();
     // Reset per-session state: cursors, ring slots, handoff slots, stop flag, error.
     process_cursor_ = 0;
-    std::memset(ring_host_, 0, slots_ * sizeof(common::PayloadSlot));
-    std::fill_n(handoff_.host, slots_, coproc::HandoffSlot{});
+    std::memset(ring_host_, 0, ring_.slots * sizeof(common::PayloadSlot));
+    std::fill_n(handoff_.host, ring_.slots, coproc::HandoffSlot{});
     std::fill(reply_ring_.begin(), reply_ring_.end(), common::PayloadSlot{});
     if (handoff_.stop_host) {
         *handoff_.stop_host = 0;
@@ -133,7 +131,7 @@ void GpuCoprocessorSession::start() {
     // handoff slots until stop_dev flips (total=0 -> run until stop).
     CoprocLaunchDesc desc{
         .ring = ring_dev_,
-        .ring_slots = slots_,
+        .ring_slots = ring_.slots,
         .handoff = handoff_.dev,
         .stop = handoff_.stop_dev,
         .total = 0,
@@ -179,7 +177,7 @@ void GpuCoprocessorSession::stop() {
 void GpuCoprocessorSession::run(std::stop_token st) {
     constexpr std::uint32_t STOP_CHECK_SPINS = 4096;
     for (std::uint64_t c = 0; !st.stop_requested(); ++c) {
-        const std::size_t idx = c & (slots_ - 1);
+        const std::size_t idx = c & (ring_.slots - 1);
         const std::uint32_t expect = static_cast<std::uint32_t>(c + 1);
         volatile std::uint32_t *hseq = &handoff_.host[idx].seq;
         std::uint32_t spins = 0;
@@ -239,7 +237,7 @@ std::size_t GpuCoprocessorSession::process_message(const void *payload, std::siz
     // Frame the request in ring[cursor % slots]; sealing writes seq_num last, so the kernel never
     // observes a matching seq before the payload is visible.
     const std::uint64_t c = process_cursor_++;
-    const std::size_t idx = c & (slots_ - 1);
+    const std::size_t idx = c & (ring_.slots - 1);
     const std::uint32_t expect = static_cast<std::uint32_t>(c + 1);
     common::frame::stage(common::frame::BL16_RING, &ring_host_[idx].p, fn_id, payload, len);
     common::frame::seal(common::frame::BL16_RING, &ring_host_[idx].p, expect);

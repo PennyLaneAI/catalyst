@@ -127,8 +127,9 @@ HwhsControllerSession::HwhsControllerSession(std::string dev, int gid_idx, std::
     RT_FAIL_IF(stride_log2 >= 32, "stride_log2 out of range (must be < 32)");
     RT_FAIL_IF(stride_ < 16, "stride_log2 too small: a ring slot must be >= 16 bytes");
     // TODO: lift this once the engine is tested with other ring lengths.
-    RT_FAIL_IF(ring_slots_ != common::frame::BL16_RING.slots,
-               "hwhs is only tested with a ring of 256 slots; leave frame_slots unset");
+    RT_FAIL_IF(
+        ring_slots_ != common::frame::BL16_RING.slots,
+        "hwhs is only tested with a ring of 256 slots; set frame_slots=256 or leave it unset");
     RT_FAIL_IF(stride_ != sizeof(common::PayloadSlot),
                "stride_log2 must give the wire protocol's slot size (sizeof(PayloadSlot))");
 }
@@ -319,14 +320,16 @@ PeerRef HwhsControllerSession::exchange_keys(const MemRegion & /*local*/) {
     my.mr_vaddr = reply_.adv_va;
     my.mr_rkey = reply_.mr->rkey;
     my.mtu_enum = active_mtu_;
-    my.frame_mode = 0; // BL16
+    my.frame_mode = static_cast<std::uint32_t>(common::frame::Mode::BL16);
     my.frame_stride = stride_;
+    my.frame_slots = ring_slots_;
 
     common::recv_exact(oob_.get(), &peer, sizeof(peer));
     common::send_exact(oob_.get(), &my, sizeof(my));
     oob_.reset();
-    RT_FAIL_IF(peer.frame_mode != my.frame_mode || peer.frame_stride != my.frame_stride,
-               "hwhs: the peer's frames differ from this end's (BL16, 64 B slots)");
+    RT_FAIL_IF(peer.frame_mode != my.frame_mode || peer.frame_stride != my.frame_stride ||
+                   peer.frame_slots != my.frame_slots,
+               "hwhs: the peer's frames differ from this end's (BL16, 256 slots of 64 B)");
 
     peer_rkey_ = peer.mr_rkey;
     peer_addr_ = peer.mr_vaddr;

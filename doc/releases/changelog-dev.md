@@ -195,10 +195,10 @@
   (BLV): a 32 B header, the payload and a completion word written last. The compiler picks the
   16 B frame when requests and replies fit in 8 B, so such programs compile as before, and the
   variable-length one otherwise, writing it into both ends' backend configs. The `cpu_verbs`
-  and `memcpy` backends carry any size. A GPU coprocessor
-  running a persistent kernel still carries at most 8 B. Each ring has 256 slots unless a node's
-  backend config sets `frame_slots=<n>`, a power of two, which the compiler passes to every node;
-  FPGA controllers keep 256.
+  and `memcpy` backends carry any size. A GPU coprocessor running a persistent kernel still
+  carries at most 8 B. Each ring has 256 slots unless a node's backend config sets
+  `frame_slots=<n>`, a power of two, which the compiler passes to every node; FPGA controllers
+  keep 256. Over RDMA, ends with different frame configs fail to connect.
   [(#3379)](https://github.com/PennyLaneAI/catalyst/pull/3379)
 
 * The :func:`~catalyst.qjit` function now accepts an ``enable_aot_compilation`` argument, which can be
@@ -241,8 +241,8 @@
   [(#3316)](https://github.com/PennyLaneAI/catalyst/pull/3316)
 
 * The memcpy transport now carries messages of any size in each direction, as set by a PennyLane
-  `qp.Controller`'s `in_bytes` and `out_bytes`. The RDMA transports, and the memcpy GPU
-  coprocessor's persistent kernel, still carry 8 bytes.
+  `qp.Controller`'s `in_bytes` and `out_bytes`. The memcpy GPU coprocessor's persistent kernel
+  still carries 8 bytes.
 
   ```python
   ctrl = qp.Controller(in_bytes=120, out_bytes=121)
@@ -829,6 +829,11 @@
   writes the keys; code that creates such sessions directly adds `frame=blv;frame_payload=<bytes>`.
   [(#3379)](https://github.com/PennyLaneAI/catalyst/pull/3379)
 
+* The FPGA transport backends no longer read the `ring` and `stride_log2` config keys. Their ring
+  comes from the frame keys every backend reads, so a config sets its slot count with
+  `frame_slots`.
+  [(#3379)](https://github.com/PennyLaneAI/catalyst/pull/3379)
+
 * The Backline transport backend ABI is now version 3. A coprocessor backend built against an
   earlier version is refused when its session is created, since it would call coprocessor
   functions with the previous signature; rebuild it against this Catalyst. Controller backends of
@@ -1055,7 +1060,7 @@
   [(#3362)](https://github.com/PennyLaneAI/catalyst/pull/3362)
 
 * The FPGA transport backends share one config parser. The VPK120 backend now reads `dev`, `gid`,
-  `ring`, `stride_log2`, `data_mem` and `reply_mem` exactly as `fpga_verbs` does, and reports a
+  `data_mem`, `reply_mem` and the frame keys exactly as `fpga_verbs` does, and reports a
   malformed value by naming its key. The frontend builds the entries it adds to a coprocessor's
   config from a dict.
   [(#3359)](https://github.com/PennyLaneAI/catalyst/pull/3359)

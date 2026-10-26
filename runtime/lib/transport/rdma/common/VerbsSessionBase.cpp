@@ -88,6 +88,7 @@ template <class Role> PeerRef VerbsSessionBase<Role>::exchange_keys(const MemReg
         .mtu_enum = active_mtu_,
         .frame_mode = static_cast<std::uint32_t>(ring_.mode),
         .frame_stride = ring_.stride,
+        .frame_slots = ring_.slots,
     };
     // gid is a 16-byte array copied from the local GID after the aggregate
     // init.
@@ -103,10 +104,12 @@ template <class Role> PeerRef VerbsSessionBase<Role>::exchange_keys(const MemReg
         recv_exact(fd, &peer, sizeof(peer));
         send_exact(fd, &my, sizeof(my));
     }
-    TP_CHECK(peer.frame_mode == my.frame_mode && peer.frame_stride == my.frame_stride,
-             "%s: the peer's frames (mode %u, %u B slots) differ from this end's (mode %u, %u B "
-             "slots); both ends need the same frame config",
-             backend_, peer.frame_mode, peer.frame_stride, my.frame_mode, my.frame_stride);
+    TP_CHECK(peer.frame_mode == my.frame_mode && peer.frame_stride == my.frame_stride &&
+                 peer.frame_slots == my.frame_slots,
+             "%s: the peer's frames (mode %u, %u slots of %u B) differ from this end's (mode %u, "
+             "%u slots of %u B); both ends need the same frame config",
+             backend_, peer.frame_mode, peer.frame_slots, peer.frame_stride, my.frame_mode,
+             my.frame_slots, my.frame_stride);
     const std::uint32_t mtu = std::min(my.mtu_enum, peer.mtu_enum);
     fwd_qp_->to_rtr(peer.fwd.qpn, peer.fwd.psn, peer.fwd.gid, gid_idx_, PORT, mtu);
     bwd_qp_->to_rtr(peer.bwd.qpn, peer.bwd.psn, peer.bwd.gid, gid_idx_, PORT, mtu);

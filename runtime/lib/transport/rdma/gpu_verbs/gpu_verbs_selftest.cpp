@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <bit>
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
@@ -49,6 +50,10 @@ int main(int argc, char **argv) {
         } else if (k == "--slots") {
             ring.slots = static_cast<std::uint32_t>(std::strtoul(v.c_str(), nullptr, 0));
         }
+    }
+    if (!std::has_single_bit(ring.slots)) {
+        std::fprintf(stderr, "--slots must be a power of two, got %u\n", ring.slots);
+        return 2;
     }
     if (dev.empty() || gid < 0) {
         std::fprintf(stderr,

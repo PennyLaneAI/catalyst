@@ -91,8 +91,8 @@ class GpuCoprocessorSession : public CoprocessorSession {
 
     int gpu_device_ = 0;
     bool per_message_ = false;
+    common::frame::RingGeometry ring_; // both rings' layout, from the config
     MessageWorker worker_;
-    std::uint32_t slots_; // slot count of the request, handoff and reply rings
     std::unique_ptr<coproc::GpuRuntime> gpu_;
     coproc::GpuRuntime::Handoff handoff_{};
     // Host-mapped request ring polled by the persistent decode kernel via `ring_dev_`.
