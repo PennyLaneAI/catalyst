@@ -41,7 +41,7 @@ class ZetaAlphaOp(qp.core.Operator2):
         super().__init__(zeta, alpha, reg=reg)
 
 
-@register_resources(lambda **_: {qp.RX: 1, qp.RY: 1})
+@register_resources(lambda zeta, alpha, reg: {qp.RX: 1, qp.RY: 1})
 def _zeta_alpha_rule(zeta, alpha, reg):
     qp.RX(zeta, reg[0])
     qp.RY(alpha, reg[1])
@@ -60,7 +60,7 @@ class XAOp(qp.core.Operator2):
         super().__init__(x_wires=x_wires, a_wires=a_wires, label=label)
 
 
-@register_resources(lambda **_: {qp.X: 1})
+@register_resources(lambda x_wires, a_wires, label: {qp.X: 1})
 def _xa_rule(x_wires, a_wires, label):  # pylint: disable=unused-argument
     qp.X(x_wires[0])
 
@@ -77,7 +77,7 @@ class MySemiAdder(qp.core.Operator2):
         super().__init__(x_wires=x_wires, y_wires=y_wires, work_wires=work_wires)
 
 
-@register_resources(lambda **_: {qp.CNOT: 3})
+@register_resources(lambda x_wires, y_wires, work_wires: {qp.CNOT: 3})
 def _xor_into_rule(x_wires, y_wires, work_wires):
     """``y ^= x``, routed through ``work_wires[0]`` so that every wire arg is used."""
     for xw, yw in zip(x_wires, y_wires):
@@ -107,7 +107,9 @@ class MyTrotterVibronic(qp.core.Operator2):
         )
 
 
-@register_resources(lambda **_: {qp.RZ: 1, qp.H: 1, qp.X: 1})
+@register_resources(
+    lambda time, electronic_wires, vib_wires, cache_wires, num_steps: {qp.RZ: 1, qp.H: 1, qp.X: 1}
+)
 def _multi_register_rule(time, electronic_wires, vib_wires, cache_wires, num_steps):
     """One gate type per wire arg, so the gate counts reveal how the wires were sliced."""
     for _ in range(num_steps):
