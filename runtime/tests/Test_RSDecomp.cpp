@@ -367,7 +367,7 @@ Matrix2 sequence_unitary(const std::vector<GateType> &gates, double phase) {
 
 /**
  * The Pauli (0 = X, 1 = Y, 2 = Z) and signed rotation kind k of the PPR exp(-i π/k P), following
- * the order of `PPRGateType`.
+ * the order of `PPRGateType`. Fails for `PPRGateType::I`, which the PPR conversion never emits.
  */
 std::pair<int, int> ppr_axis_and_kind(PPRGateType gate) {
     int index = static_cast<int>(gate) - 1;
@@ -376,9 +376,7 @@ std::pair<int, int> ppr_axis_and_kind(PPRGateType gate) {
     return {index / 6, kinds[index % 6]};
 }
 
-bool is_pi_8_ppr(PPRGateType gate) {
-    return gate != PPRGateType::I && std::abs(ppr_axis_and_kind(gate).second) == 8;
-}
+bool is_pi_8_ppr(PPRGateType gate) { return std::abs(ppr_axis_and_kind(gate).second) == 8; }
 
 Matrix2 ppr_sequence_unitary(const std::vector<PPRGateType> &gates, double phase) {
     const std::array<Matrix2, 3> paulis = {Matrix2{0.0, 1.0, 1.0, 0.0},
@@ -387,9 +385,6 @@ Matrix2 ppr_sequence_unitary(const std::vector<PPRGateType> &gates, double phase
     std::complex<double> phase_factor = {std::cos(phase), -std::sin(phase)};
     Matrix2 U = {phase_factor, 0.0, 0.0, phase_factor};
     for (PPRGateType gate : gates) {
-        if (gate == PPRGateType::I) {
-            continue;
-        }
         auto [axis, kind] = ppr_axis_and_kind(gate);
         const Matrix2 &P = paulis[axis];
         std::complex<double> c = std::cos(M_PI / kind);
@@ -416,7 +411,6 @@ void check_ppr_conversion(const std::pair<std::vector<GateType>, double> &sequen
     CHECK(static_cast<size_t>(first_clifford - gates.begin()) == t_count(sequence.first));
     CHECK(std::none_of(first_clifford, gates.end(), is_pi_8_ppr));
     CHECK(gates.end() - first_clifford <= 2);
-    CHECK(std::find(gates.begin(), gates.end(), PPRGateType::I) == gates.end());
 }
 
 /**
