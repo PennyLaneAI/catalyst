@@ -1002,6 +1002,16 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* Backline transport frames are built and read through a shared frame codec, which the `cpu_verbs`
+  backends now use instead of laying out the 16 B frame themselves. The bytes on the wire are
+  unchanged, and other frame layouts can now be added in one place.
+  [(#3378)](https://github.com/PennyLaneAI/catalyst/pull/3378)
+
+* The `cpu_verbs` and `gpu_verbs` transport backends share one session base for RDMA bring-up and
+  the reply path, instead of `gpu_verbs` keeping its own copy. Behaviour and library names are
+  unchanged.
+  [(#3375)](https://github.com/PennyLaneAI/catalyst/pull/3375)
+
 * Backline transport backends are chosen from a registry instead of a fixed table. Out-of-tree
   backends register through the `catalyst.transport_backends` entry point or a
   `catalyst_transport_backends.json` manifest on `CATALYST_TRANSPORT_PATH`, with no Catalyst

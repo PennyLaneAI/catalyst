@@ -3,17 +3,15 @@
 ###############################################
 
 add_library(cpu_verbs_impl STATIC
-    base/CpuSessionBase.cpp
     controller/CpuControllerSession.cpp
     coprocessor/CpuCoprocessorSession.cpp
 )
 target_include_directories(cpu_verbs_impl PUBLIC
-    ${CMAKE_CURRENT_SOURCE_DIR}/base
     ${CMAKE_CURRENT_SOURCE_DIR}/controller
     ${CMAKE_CURRENT_SOURCE_DIR}/coprocessor
     ${runtime_includes}                      # Transport.hpp, TransportBackend.h
 )
-target_link_libraries(cpu_verbs_impl PUBLIC transport_common)
+target_link_libraries(cpu_verbs_impl PUBLIC verbs_session_base)
 set_property(TARGET cpu_verbs_impl PROPERTY POSITION_INDEPENDENT_CODE ON)
 
 # Controller library
