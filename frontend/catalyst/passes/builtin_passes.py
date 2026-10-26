@@ -859,17 +859,17 @@ def gridsynth_setup_inputs(epsilon=1e-4, ppr_basis=False, method="deterministic"
 
     .. note::
 
-        The circuit generated from this pass with ``ppr_basis=True`` are currently only executable on the
-        ``lightning.qubit`` device with program  enabled.
+        Note the following for ``ppr_basis=True``:
 
-    .. note::
+        - the circuit generated from this pass with  are currently only executable
+          on the ``lightning.qubit`` device with program enabled.
 
-        With ``ppr_basis=True``, the Clifford gates of each Clifford+T sequence are moved past its
-        T gates to the end of the sequence. Each T gate thereby becomes a :math:`\pi/8` PPR
-        :math:`\exp(\mp i\frac{\pi}{8}P)` about a Pauli :math:`P \in \{X, Y, Z\}`, and the
-        remaining Clifford is applied as at most two :math:`\pi/4` or :math:`\pi/2` PPRs. A
-        sequence therefore has as many :math:`\pi/8` PPRs as its Clifford+T counterpart has T
-        gates, and neighboring :math:`\pi/8` PPRs act about different Paulis.
+        - the Clifford gates of each Clifford+T sequence are moved past its T gates to the end
+          of the sequence. Each T gate thereby becomes a :math:`\pi/8` PPR
+          :math:`\exp(\mp i\frac{\pi}{8}P)` about a Pauli :math:`P \in \{X, Y, Z\}`, and the
+          remaining Clifford is applied as at most two :math:`\pi/4` or :math:`\pi/2` PPRs. A
+          sequence therefore has as many :math:`\pi/8` PPRs as its Clifford+T counterpart has T
+          gates, and neighboring :math:`\pi/8` PPRs rotate about different Paulis.
 
     .. note::
 

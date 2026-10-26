@@ -195,8 +195,8 @@ def test_gridsynth_specs_matches_runtime(eps, ppr_basis, method):
 
 @pytest.mark.parametrize("method", ["deterministic", "mixed"])
 def test_gridsynth_ppr_basis_clifford_count(method):
-    """Test that each PPR-basis sequence ends with at most two Clifford PPRs, and that the specs
-    estimate of the Clifford PPRs matches the count executed at runtime."""
+    """Test that each PPR-basis sequence ends with at most two Clifford PPRs, and that the analyze
+    result of the Clifford PPRs matches the tracked count executed at runtime."""
     angles = np.random.default_rng(42).uniform(0, 4 * np.pi, 50)
 
     @qp.qjit(capture=True, seed=37)
@@ -207,8 +207,8 @@ def test_gridsynth_ppr_basis_clifford_count(method):
             qp.RZ(theta, 0)
         return qp.expval(qp.Z(0))
 
-    estimated = qp.specs(circuit, level=1)(angles).resources.quantum_operations
-    executed = qp.specs(circuit, level="device")(angles).resources.quantum_operations
+    estimated = qp.analyze(circuit, level=1)(angles).resources.quantum_operations
+    executed = qp.track(circuit, level="device")(angles)[1].resources.quantum_operations
 
     estimated_cliffords = estimated["PPR-pi/4-w1"] + estimated["PPR-pi/2-w1"]
     # The device reports the PPR exp(-i pi/k P) as PauliRot(2 pi/k).
