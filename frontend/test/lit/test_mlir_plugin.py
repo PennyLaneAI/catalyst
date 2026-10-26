@@ -35,11 +35,9 @@ something like the following:
   from catalyst import qjit
   from pathlib import Path
 
-  from catalyst.passes import apply_pass
-
   plugin = Path("./mlir/standalone/build/lib/StandalonePlugin.so")
 
-  @apply_pass("standalone-switch-bar-foo")
+  @qp.transform(pass_name="standalone-switch-bar-foo")
   @qp.qnode(qp.device("lightning.qubit", wires=1))
   def bar():
     return qp.state()
@@ -56,7 +54,7 @@ However, after the `standalone-switch-bar-foo` pass, the verifier would fail
 because it would see callsites to `@bar` but no definitions for `@bar`.
 
 As such, this test is perhaps a bit more limited. It does not test the
-apply_pass interface nor the pass_plugins directly. Instead, it tests
+``qp.transform`` interface nor the pass_plugins directly. Instead, it tests
 that the `standalone-switch-bar-foo` pass can be executed using lower level
 APIs, like the Compiler and options.
 """
@@ -66,7 +64,6 @@ from pathlib import Path
 
 import pennylane as qp
 
-import catalyst
 from catalyst import qjit
 from catalyst.compiler import _quantum_opt
 from catalyst.utils.runtime_environment import get_lib_path
@@ -106,7 +103,7 @@ def test_pass_options():
 
     @qjit(target="mlir")
     # CHECK: options = {"an-option" = true, "maxValue" = 1 : i64, "multi-word-option" = 1 : i64}
-    @catalyst.passes.apply_pass("some-pass", "an-option", maxValue=1, multi_word_option=1)
+    @qp.transform(pass_name="some-pass")("an-option", maxValue=1, multi_word_option=1)
     @qp.qnode(qp.device("null.qubit", wires=1))
     def example():
         return qp.state()
