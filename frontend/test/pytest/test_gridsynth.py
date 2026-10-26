@@ -193,6 +193,30 @@ def test_gridsynth_specs_matches_runtime(eps, ppr_basis, method):
     assert estimated_t == pytest.approx(executed_t, rel=rel)
 
 
+@pytest.mark.parametrize("method", ["deterministic", "mixed"])
+def test_gridsynth_ppr_basis_clifford_count(method):
+    """Test that each PPR-basis sequence ends with at most two Clifford PPRs, and that the specs
+    estimate of the Clifford PPRs matches the count executed at runtime."""
+    angles = np.random.default_rng(42).uniform(0, 4 * np.pi, 50)
+
+    @qp.qjit(capture=True, seed=37)
+    @gridsynth(epsilon=1e-4, ppr_basis=True, method=method)
+    @qp.qnode(qp.device("null.qubit", wires=1))
+    def circuit(angles):
+        for theta in angles:
+            qp.RZ(theta, 0)
+        return qp.expval(qp.Z(0))
+
+    estimated = qp.specs(circuit, level=1)(angles).resources.quantum_operations
+    executed = qp.specs(circuit, level="device")(angles).resources.quantum_operations
+
+    estimated_cliffords = estimated["PPR-pi/4-w1"] + estimated["PPR-pi/2-w1"]
+    # The device reports the PPR exp(-i pi/k P) as PauliRot(2 pi/k).
+    executed_cliffords = executed["PauliRot-pi/2-w1"] + executed["PauliRot-pi-w1"]
+    assert executed_cliffords <= 2 * len(angles)
+    assert estimated_cliffords == pytest.approx(executed_cliffords, rel=0.15)
+
+
 @pytest.mark.parametrize("ppr_basis", [False, True])
 def test_mixed_fallback_gridsynth_specs_wires(ppr_basis):
     """Test the known limitation that specs counts every ancilla allocation of the mixed fallback

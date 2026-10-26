@@ -36,9 +36,9 @@
 // CHECK:          [[PHASE:%.+]] = call @rs_mixed_decomposition_get_phase([[ARG_ANGLE]], [[EPS]], {{%.+}}, [[SAMPLE]])
 // CHECK:          scf.for {{.*}} iter_args({{%.+}} = [[ARG_QBIT]])
 // CHECK:            scf.index_switch {{%.+}} {catalyst.estimated_probabilities = [{{.*}}]}
-// COM: expected T and other entries (1.5346 + 0.0024) * log2(1/0.01) + 0.3606 + 2.5843 (Clifford+T), (1.5346 + 0.7719) * log2(1/0.01) + 0.3606 + 4.6973 (PPR)
+// COM: expected T and other entries (1.5346 + 0.0024) * log2(1/0.01) + 0.3606 + 2.5843 (Clifford+T), (1.5346 + 0.0008) * log2(1/0.01) + 0.3606 + 1.5111 (PPR)
 // CLIFFORD:       } {catalyst.estimated_iterations = 13.1{{[0-9]+}} : f64}
-// PPR:            } {catalyst.estimated_iterations = 20.3{{[0-9]+}} : f64}
+// PPR:            } {catalyst.estimated_iterations = 12.0{{[0-9]+}} : f64}
 // CHECK:          quantum.gphase([[PHASE]])
 // CHECK:          return {{%.+}} : !quantum.bit
 

@@ -164,6 +164,10 @@ def GridsynthPass : Pass<"gridsynth"> {
         With `method=mixed-fallback`, each rotation allocates an ancilla qubit, measures it and
         releases it, and applies the fallback sequence inside an `scf.if` on the measurement
         result.
+
+        With `ppr-basis`, the Clifford gates of each sequence are moved past its T gates, so that
+        every T gate becomes a pi/8 PPR about a signed Pauli X, Y or Z. A sequence consists of one
+        pi/8 PPR per T gate, followed by at most two Clifford PPRs.
     }];
 
     let options = [Option<

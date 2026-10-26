@@ -212,6 +212,12 @@
   any `epsilon` down to `1e-15`, and invalid angles or `epsilon` values raise an error.
   [(#3333)](https://github.com/PennyLaneAI/catalyst/pull/3333)
 
+* With `ppr_basis=True`, :func:`pennylane.transforms.gridsynth` now moves all Clifford gates of a
+  sequence past its T gates. Each sequence consists of one :math:`\pi/8` Pauli product rotation
+  per T gate, about :math:`\pm X`, :math:`\pm Y` or :math:`\pm Z`, followed by at most two Clifford
+  Pauli product rotations, instead of about one Clifford rotation for every two :math:`\pi/8`
+  rotations. The number of :math:`\pi/8` rotations is unchanged.
+
 * Controlled :class:`~pennylane.GlobalPhase` operations now decompose to
   :class:`~pennylane.PhaseShift` on the control wire when possible (or
   :class:`~pennylane.ControlledPhaseShift` for multiple controls), via an updated
