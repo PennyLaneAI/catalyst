@@ -898,3 +898,19 @@ TEST_CASE("Test inputs with multiplicity 0 are ignored", "[DecompGraph::Solver]"
     REQUIRE(result.at(multiRZ1).totalCost == 1.0);
     REQUIRE(result.find(cnot) == result.end());
 }
+
+TEST_CASE("Test solve() rethrows after a failed solve instead of returning a partial result",
+          "[DecompGraph::Solver]") {
+    const OperatorNode a{"A[][1]{}", "A"};
+    const OperatorNode b{"B[][1]{}", "B"};
+    const OperatorNode g{"G[][1]{}", "G"};
+    const OperatorNode x{"X[][1]{}", "X"};
+
+    const WeightedGateset gateset{{{g.name, 1.0}}};
+    const std::vector<RuleNode> rules{{"a_to_g", a, {{g, 1}}}, {"b_to_x", b, {{x, 1}}}};
+
+    const DecompositionGraph graph({a, b}, gateset, rules);
+    DecompositionSolver solver(graph);
+    REQUIRE_THROWS_AS(solver.solve(), GraphSolverFailedError);
+    REQUIRE_THROWS_AS(solver.solve(), GraphSolverFailedError);
+}
