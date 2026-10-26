@@ -14,11 +14,12 @@
 
 #include "CpuCoprocessorSession.hpp"
 
+#include <algorithm>
 #include <cstring>
 #include <thread>
 
+#include "Frame.hpp"
 #include "RealtimeThread.hpp"
-#include "WireProtocol.hpp"
 
 namespace catalyst::transport::cpu_verbs {
 using namespace catalyst::transport::common;
@@ -92,24 +93,27 @@ void CpuCoprocessorSession::run(std::stop_token st) {
     pin_thread(pin_cpu_, pin_realtime_);
     int signaled_outstanding = 0;
     for (std::uint64_t c = 0; !st.stop_requested(); c++) {
-        Payload *r = poll_message_arrival(c, st); // the incoming message
-        if (!r) {
+        frame::FrameView r; // the incoming message
+        if (!poll_message_arrival(c, st, r)) {
             reap(bwd_cq_->get(), signaled_outstanding, /*drain=*/true);
             return;
         }
-        last_word_.store(r->value, std::memory_order_relaxed);
+        std::uint64_t word = 0;
+        std::memcpy(&word, r.data, std::min<std::size_t>(r.len, sizeof(word)));
+        last_word_.store(word, std::memory_order_relaxed);
         completed_.fetch_add(1, std::memory_order_release);
-        Payload *send = send_payload();
-        send->value = 0;
-        send->decoder_id = r->decoder_id;
+        // The reply goes back under the request's fn_id, its payload zeroed for the function to
+        // fill; the built-in echo copies the request's payload instead.
+        void *send = send_frame();
+        frame::stage(ring_.mode, send, r.fn_id, coproc_fn_ ? nullptr : r.data,
+                     coproc_fn_ ? 0 : r.len);
         if (coproc_fn_) {
-            const std::size_t nb =
-                coproc_fn_(r, sizeof(Payload), &send->value, PAYLOAD_DATA_BYTES, coproc_ctx_);
-            TP_CHECK(nb > 0 && nb <= PAYLOAD_DATA_BYTES,
-                     "coprocessor function wrote %zu bytes, expected 1..%zu", nb,
-                     PAYLOAD_DATA_BYTES);
-        } else {
-            send->value = r->value; // built-in echo
+            // The function gets the whole request frame (CoprocessorFn's contract).
+            const std::size_t cap = frame::data_capacity(ring_.mode);
+            const std::size_t nb = coproc_fn_(r.data, frame::frame_bytes(ring_.mode),
+                                              frame::data(ring_.mode, send), cap, coproc_ctx_);
+            TP_CHECK(nb > 0 && nb <= cap, "coprocessor function wrote %zu bytes, expected 1..%zu",
+                     nb, cap);
         }
         const bool sig = (c % SIGNAL_EVERY == 0);
         post_write(bwd_qp_->get(), c, /*inline_data=*/true, sig);
