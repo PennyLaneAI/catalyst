@@ -113,6 +113,7 @@
   [(#3213)](https://github.com/PennyLaneAI/catalyst/pull/3213)
   [(#3248)](https://github.com/PennyLaneAI/catalyst/pull/3248)
   [(#3307)](https://github.com/PennyLaneAI/catalyst/pull/3307)
+  [(#3365)](https://github.com/PennyLaneAI/catalyst/pull/3365)
 
   Control is folded into the operator identity *control-outermost* (e.g. `C(Adjoint(Op))`), so
   `ctrl(adjoint(Op))` and `adjoint(ctrl(Op))` collapse to a single node, while a distinct control
@@ -150,16 +151,9 @@
   way PennyLane's registry spells it, since a multi-controlled id reads `<n>C(...)` and PennyLane
   names every controlled operator `C(...)` whatever its control count.
 
-  Right now, a rule registered against `C(Op)` is traced with every control value on, matching
-  the all-ones controls a `<n>C(...)` graphOpId denotes: it records only the control *count*,
-  so an operator with a zero control value maps to the same node and is given the same rule,
-  without the `X` flips that value needs. Zero control values are therefore not yet supported
-  through this pathway; they still decompose correctly through rule distribution, whose
-  `qref.ctrl` region is given the control values at runtime.
-
   Two defects in applying a register-mode controlled rule are fixed along with it:
 
-  - The rule's operands are now emitted as `func(qreg, param*, inWires*, inCtrlWires*)`, matching
+  - The rule's operands are now emitted as `func(qreg, param*, inWires*, inCtrlWires*, inCtrlValues*)`, matching
     what `DecomposeLoweringPass` reads back. They were previously emitted control-wires-first
     (`qp.capture.subroutine` traces through `jax.jit`, which flattens keyword arguments in sorted
     order, and `_ctrl_wires` sorts ahead of `wires`), which silently swapped a rule's control and
@@ -183,9 +177,40 @@
 
 <h3>Improvements 🛠</h3>
 
+* Transforms can now be directly applied to a `QJIT`'d workflow. A new `QJIT` will be produced with
+  the transform applied to the `QJIT`'s body.
+  [(#3397)](https://github.com/PennyLaneAI/catalyst/pull/3397)
+
+* The ``target`` argument of :func:`~catalyst.qjit` now accepts ``"mlir_opt"``, which stops the
+  ahead-of-time compilation after running the MLIR passes, without translating the program to
+  LLVM IR. Calling the function still compiles it to a shared library.
+  [(#3391)](https://github.com/PennyLaneAI/catalyst/pull/3391)
+
+* A new `user-transform-stage` pipeline runs the quantum compilation stage only up to and including
+  `apply-transform-sequence`, where the user transforms are applied. 
+  [(#3345)](https://github.com/PennyLaneAI/catalyst/pull/3345)
+
 * The :func:`~catalyst.qjit` function now accepts an ``enable_aot_compilation`` argument, which can be
   used to toggle whether or not to use ahead-of-time compilation.
   [(#3339)](https://github.com/PennyLaneAI/catalyst/pull/3339)
+
+* `QJIT.aot_compile` now accepts function arguments, so functions without type hints
+  can be compiled ahead of time.
+  [(#3369)](https://github.com/PennyLaneAI/catalyst/pull/3369)
+
+  ```python
+  @qjit
+  def f(x):
+      return x * 2
+
+  f.aot_compile(jax.ShapeDtypeStruct((3,), jnp.float64))
+  f(jnp.array([1.0, 2.0, 3.0]))  # no compilation
+  ```
+
+* Calling `QJIT.aot_compile` explicitly now raises any compilation error, instead of silently
+  logging it. Errors in the automatic ahead-of-time compilation from type hints, when the `QJIT`
+  object is created, are still only logged, and are raised when the function is called.
+  [(#3390)](https://github.com/PennyLaneAI/catalyst/pull/3390)
 
 * :func:`pennylane.transforms.gridsynth` now produces correct, deterministic decompositions for
   any `epsilon` down to `1e-15`, and invalid angles or `epsilon` values raise an error.
@@ -769,7 +794,17 @@
   subroutine symbol uses only once instead of once per subroutine, improving their performance.
   [(#3341)](https://github.com/PennyLaneAI/catalyst/pull/3341)
 
+* Add `post-device-pipeline` to the `transform-sequence` when `qp.qjit(capture=True)`
+  [(#3312)](https://github.com/PennyLaneAI/catalyst/pull/3312)
+
 <h3>Breaking changes 💔</h3>
+
+* Removed ``catalyst.pipeline``, ``catalyst.passes.apply_pass``,
+  ``catalyst.passes.apply_pass_plugin``, ``catalyst.passes.Pass``,
+  ``catalyst.passes.PassPlugin``, and the ``circuit_transform_pipeline`` argument of
+  :func:`~.qjit`. Apply transforms with :func:`pennylane.transform` and
+  :class:`~pennylane.transforms.core.CompilePipeline` on individual QNodes instead.
+  [(#3324)](https://github.com/PennyLaneAI/catalyst/pull/3324)
 
 * `catalyst.logging` has been removed. `pennylane.logging` should be used instead.
   [(#3283)](https://github.com/PennyLaneAI/catalyst/pull/3283)
@@ -808,13 +843,46 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* Adjoint lowering now correctly handles gate control values computed inside loops or
+  conditional branches.
+  [(#3342)](https://github.com/PennyLaneAI/catalyst/pull/3342)
+
+* Ahead-of-time compilation with ``target="llvmir"`` no longer links the program into a shared
+  library. Calling the function still compiles it to a shared library.
+  [(#3391)](https://github.com/PennyLaneAI/catalyst/pull/3391)
+
+* Scatter ops with batching dimensions, such as those from a batched `jnp.linalg.det`, no longer
+  crash `scatter-lowering`, and will instead be rejected as intended.
+  In addition, to support batched scatter operations an additional pass is run in the HLO lowering
+  stage to resolve the batching first.
+  An additional bug is fixed in the scatter lowering that resulted in failed assertions.
+  [(#3356)](https://github.com/PennyLaneAI/catalyst/pull/3356)
+
+* The Python decomposition fallback now converts `None`-valued static attributes
+  back from MLIR instead of aborting with an unsupported-attribute error.
+  [(#3385)](https://github.com/PennyLaneAI/catalyst/pull/3385)
+
+* `gridsynth` now correctly discretizes adjoint rotations and rotations inside `qp.adjoint`
+  regions. Control lowering now raises an error for function calls inside `qp.ctrl` regions
+  instead of silently dropping the control.
+  [(#3330)](https://github.com/PennyLaneAI/catalyst/pull/3330)
+
+* Fixes mixed static and dynamic `control_values` for callable `qp.ctrl` under
+  `qjit(capture=True)`.
+  [(#3373)](https://github.com/PennyLaneAI/catalyst/pull/3373)
+
+* Controlled quantum regions now keeps track of the `work_wire_type` passed from `qp.ctrl`.
+  [(#3366)](https://github.com/PennyLaneAI/catalyst/pull/3366)
+
 * MLIR passes that recreate `scf.for`, `scf.while`, `scf.if`, and `scf.index_switch` ops
   (`ctrl-lowering`, `adjoint-lowering`, `--convert-to-value-semantics`) now preserve discardable
   attributes such as `catalyst.estimated_iterations`, `catalyst.estimated_probability`, and
   `catalyst.estimated_probabilities`, so resource analysis still sees compiler hints after those
   rewrites.
+  This includes the upstream mlir canonicalizer, which is now patched to preserve discardable attributes as well.
   [(#3288)](https://github.com/PennyLaneAI/catalyst/pull/3288)
   [(#3291)](https://github.com/PennyLaneAI/catalyst/pull/3291)
+  [(#3389)](https://github.com/PennyLaneAI/catalyst/pull/3389)
 
 * Fixed a bug where graph decomposition ignored entries in `fixed_decomps` and `alt_decomps` that
   use a string key containing parentheses, such as `"C(PauliZ)"` or `"Adjoint(TemporaryAND)"`.
@@ -933,6 +1001,13 @@
   [(#3242)](https://github.com/PennyLaneAI/catalyst/pull/3242)
 
 <h3>Internal changes ⚙️</h3>
+
+* Backline transport backends are chosen from a registry instead of a fixed table. Out-of-tree
+  backends register through the `catalyst.transport_backends` entry point or a
+  `catalyst_transport_backends.json` manifest on `CATALYST_TRANSPORT_PATH`, with no Catalyst
+  change. A backend is picked by transport, hardware, role and message size. A node can name one
+  with `backend=...`. The MLIR verifier no longer restricts transport names.
+  [(#3362)](https://github.com/PennyLaneAI/catalyst/pull/3362)
 
 * The FPGA transport backends share one config parser. The VPK120 backend now reads `dev`, `gid`,
   `ring`, `stride_log2`, `data_mem` and `reply_mem` exactly as `fpga_verbs` does, and reports a
@@ -1236,6 +1311,7 @@ Mudit Pandey,
 Shuli Shu,
 Nikhil Sreekumar,
 Kalman Szenes,
+Jaume Villasante,
 Paul Haochen Wang,
 David Wierichs,
 Jake Zaia,
