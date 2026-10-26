@@ -193,6 +193,20 @@ func.func @ctrl_measure(%ctrl: !quantum.bit, %q: !quantum.bit) -> !quantum.bit {
 
 // -----
 
+// Having overlapping control qubits between the region and individual gates inside is rejected by the verifier
+func.func @ctrl_overlapping_ctrl_qubits(%ctrl: !quantum.bit, %q: !quantum.bit) -> !quantum.bit {
+  %true = arith.constant true
+  // expected-error @+1 {{Ctrl op ctrl qubits must not reappear as the individual gates' ctrl qubits inside the ctrl region}}
+  %outc, %outq = quantum.ctrl(%ctrl) ctrlvals(%true) (%q) : !quantum.bit -> !quantum.bit {
+  ^bb0(%arg0: !quantum.bit):
+    %h, %h_c = quantum.custom "Hadamard"() %arg0 ctrls(%ctrl) ctrlvals(%true) : !quantum.bit ctrls !quantum.bit
+    quantum.yield %h : !quantum.bit
+  }
+  return %outc : !quantum.bit
+}
+
+// -----
+
 // Region-bearing control flow outside the supported set (scf.if / scf.for / scf.while /
 // scf.index_switch) has no rule for controlling its body, so it is rejected rather than silently
 // left uncontrolled. scf.execute_region stands in for any such op here.

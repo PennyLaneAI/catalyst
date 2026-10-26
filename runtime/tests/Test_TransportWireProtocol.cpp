@@ -13,10 +13,14 @@
 // limitations under the License.
 
 #include <cstddef>
+#include <cstdint>
+#include <cstring>
 
+#include "Frame.hpp"
 #include "WireProtocol.hpp"
 
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/matchers/catch_matchers_string.hpp>
 
 using namespace catalyst::transport::common;
 
@@ -40,4 +44,41 @@ TEST_CASE("Ring geometry and constants match the trampoline") {
     STATIC_REQUIRE(SIGNAL_EVERY == 64);
     STATIC_REQUIRE(SALT == 0xC0DE1515u);
     STATIC_REQUIRE(DEMO_SYNDROME == 0x0123456789ABCDEFull);
+}
+
+TEST_CASE("the BL16 frame codec writes exactly today's Payload bytes") {
+    namespace frame = catalyst::transport::common::frame;
+    const std::uint8_t data[3] = {0xAB, 0xCD, 0xEF};
+    alignas(64) std::uint8_t encoded[64];
+    std::memset(encoded, 0x5A, sizeof(encoded)); // stale bytes the codec must overwrite
+    frame::stage(frame::Mode::BL16, encoded, 7, data, sizeof(data));
+    frame::seal(frame::Mode::BL16, encoded, 42);
+
+    Payload expected{};
+    std::memcpy(&expected.value, data, sizeof(data));
+    expected.decoder_id = 7;
+    expected.seq_num = 42;
+    CHECK(frame::frame_bytes(frame::Mode::BL16) == sizeof(Payload));
+    CHECK(std::memcmp(encoded, &expected, sizeof(Payload)) == 0);
+
+    frame::FrameView view;
+    CHECK_FALSE(frame::poll(frame::Mode::BL16, encoded, 41, view));
+    REQUIRE(frame::poll(frame::Mode::BL16, encoded, 42, view));
+    CHECK(view.data == encoded);
+    CHECK(view.len == PAYLOAD_DATA_BYTES);
+    CHECK(view.fn_id == 7);
+    CHECK(view.seq == 42);
+}
+
+TEST_CASE("the BL16 ring is today's ring") {
+    namespace frame = catalyst::transport::common::frame;
+    CHECK(frame::BL16_RING.region_bytes() == REGION_BYTES);
+    CHECK(frame::BL16_RING.slot_offset(1) == sizeof(PayloadSlot));
+    CHECK(frame::BL16_RING.slot_offset(K_RING_SLOTS + 3) == 3 * sizeof(PayloadSlot));
+}
+
+TEST_CASE("a frame mode without a codec is refused") {
+    namespace frame = catalyst::transport::common::frame;
+    CHECK_THROWS_WITH(frame::frame_bytes(frame::Mode::BLV),
+                      Catch::Matchers::ContainsSubstring("not implemented"));
 }

@@ -16,27 +16,23 @@
 #include <atomic>
 #include <cstdint>
 #include <exception>
-#include <memory>
 #include <optional>
 #include <stop_token>
 #include <string>
 #include <thread>
 
-#include "CompletionQueue.hpp"
-#include "Context.hpp"
 #include "GpuRuntime.hpp"
 #include "MemoryRegion.hpp"
-#include "OobSocket.hpp"
-#include "ProtectionDomain.hpp"
-#include "QueuePair.hpp"
 #include "Transport.hpp"
-#include "WireProtocol.hpp"
+#include "VerbsSessionBase.hpp"
 
 namespace catalyst::transport::gpu_verbs {
 using namespace catalyst::transport;
 using namespace catalyst::transport::coproc; // GpuRuntime, HandoffSlot, launchers
 
-class GpuCoprocessorSession : public CoprocessorSession {
+class GpuCoprocessorSession : public common::VerbsSessionBase<CoprocessorSession> {
+    using Base = common::VerbsSessionBase<CoprocessorSession>;
+
   public:
     GpuCoprocessorSession(std::string dev, int gid_idx, int gpu_device);
     ~GpuCoprocessorSession() override { stop(); }
@@ -46,9 +42,7 @@ class GpuCoprocessorSession : public CoprocessorSession {
     GpuCoprocessorSession(GpuCoprocessorSession &&) = delete;
     GpuCoprocessorSession &operator=(GpuCoprocessorSession &&) = delete;
 
-    int connect(const ConnectInfo &info) override;
     MemRegion alloc_memory(std::size_t size, MemKind kind) override;
-    PeerRef exchange_keys(const MemRegion &local) override;
     void establish_channel(const ChannelDesc &desc, const MemRegion &local,
                            const PeerRef &peer) override;
     void start() override;
@@ -66,25 +60,15 @@ class GpuCoprocessorSession : public CoprocessorSession {
 
     MemKind preferred_mem_kind() const override { return MemKind::GpuHbm; }
 
+  protected:
+    bool oob_listens() const override { return true; }
+
   private:
     void run_coprocessor(std::stop_token st);
     // Fill the reply + post one inline RDMA_WRITE. Returns true if this send
     // was signaled (selective signalling: 1 in SIGNAL_EVERY), so the caller can
     // track the signaled-completion count.
     bool post_inline(std::uint64_t cursor);
-    // Non-blocking batch reap of the bwd CQ; decrements `outstanding` per CQE.
-    // With drain=true, keeps polling until `outstanding` hits 0 (teardown).
-    void reap_bwd(int &outstanding, bool drain);
-
-    std::string dev_name_;
-    int gid_idx_;
-    ibv_gid mygid_{};              // local GID, cached in connect() for exchange_keys()
-    std::uint32_t active_mtu_ = 0; // local active_mtu enum, cached in connect()
-    std::shared_ptr<common::Context> ctx_;
-    std::shared_ptr<common::ProtectionDomain> pd_;
-    std::shared_ptr<common::CompletionQueue> fwd_cq_, bwd_cq_;
-    std::shared_ptr<common::QueuePair> fwd_qp_, bwd_qp_;
-    common::FdGuard oob_fd_;
 
     GpuRuntime gpu_;                // HIP wrapper: owns GPU mem/stream/sync; the decode
                                     // kernel itself is launched by the bound CoprocessorFn
@@ -94,11 +78,7 @@ class GpuCoprocessorSession : public CoprocessorSession {
                                     // {correction,seq}, CPU reads
     std::optional<common::MemoryRegion>
         hbm_ring_; // ibverbs dma-buf MR registering hbm_ (gives the rkey)
-    std::optional<common::MemoryRegion> reply_buf_; // host RAM inline reply source
 
-    MemRegion local_{};
-    PeerRef peer_{};
-    ChannelDesc desc_{};
     // Launcher used by start() to launch the on-device decode kernel (one-shot,
     // not per-message); nullptr selects the built-in echo launcher.
     CoprocessorLauncherFn coproc_launcher_ = nullptr;

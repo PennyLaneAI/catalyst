@@ -15,18 +15,19 @@
 #pragma once
 #include <cstdint>
 
-#include "CpuSessionBase.hpp"
+#include "VerbsSessionBase.hpp"
 
 namespace catalyst::transport::cpu_verbs {
 
 // Controller role: caller-driven. The caller commits a work item,
 // writes the outbound payload into data_slot(), kick()s one round,
 // then collect()s the reply.
-class CpuControllerSession : public CpuSessionBase<ControllerSession> {
-    using Base = CpuSessionBase<ControllerSession>;
+class CpuControllerSession : public common::VerbsSessionBase<ControllerSession> {
+    using Base = common::VerbsSessionBase<ControllerSession>;
 
   public:
-    explicit CpuControllerSession(std::string dev, int gid_idx) : Base(std::move(dev), gid_idx) {}
+    explicit CpuControllerSession(std::string dev, int gid_idx)
+        : Base(std::move(dev), gid_idx, "cpu_verbs") {}
     // Drains the fwd CQ before the base's verbs objects go away. stop() is
     // idempotent, so calling it here and from start() is harmless.
     ~CpuControllerSession() override { stop(); }

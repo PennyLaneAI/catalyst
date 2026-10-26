@@ -83,6 +83,7 @@
   [(#3127)](https://github.com/PennyLaneAI/catalyst/pull/3127)
   [(#3131)](https://github.com/PennyLaneAI/catalyst/pull/3131)
   [(#3227)](https://github.com/PennyLaneAI/catalyst/pull/3227)
+  [(#3401)](https://github.com/PennyLaneAI/catalyst/pull/3401)
 
 * The graph-based decomposition system now supports **adjoint operators** for `Operator2`.
   [(#3120)](https://github.com/PennyLaneAI/catalyst/pull/3120)
@@ -1002,6 +1003,16 @@
   [(#3242)](https://github.com/PennyLaneAI/catalyst/pull/3242)
 
 <h3>Internal changes ⚙️</h3>
+
+* Backline transport frames are built and read through a shared frame codec, which the `cpu_verbs`
+  backends now use instead of laying out the 16 B frame themselves. The bytes on the wire are
+  unchanged, and other frame layouts can now be added in one place.
+  [(#3378)](https://github.com/PennyLaneAI/catalyst/pull/3378)
+
+* The `cpu_verbs` and `gpu_verbs` transport backends share one session base for RDMA bring-up and
+  the reply path, instead of `gpu_verbs` keeping its own copy. Behaviour and library names are
+  unchanged.
+  [(#3375)](https://github.com/PennyLaneAI/catalyst/pull/3375)
 
 * Backline transport backends are chosen from a registry instead of a fixed table. Out-of-tree
   backends register through the `catalyst.transport_backends` entry point or a

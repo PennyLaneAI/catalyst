@@ -677,13 +677,13 @@ LogicalResult AdjointOp::verify() {
 }
 
 LogicalResult CtrlOp::verify() {
-    auto res = this->getRegion().walk([](Operation *op) {
+    auto noMeasureWalkRes = this->getRegion().walk([](Operation *op) {
         return isa<MeasurementProcess, MeasureOp, pbc::PPMeasurementOp, mbqc::MeasureInBasisOp>(op)
                    ? WalkResult::interrupt()
                    : WalkResult::advance();
     });
 
-    if (res.wasInterrupted()) {
+    if (noMeasureWalkRes.wasInterrupted()) {
         return emitOpError("quantum measurements are not allowed in the ctrl regions");
     }
 
@@ -703,6 +703,21 @@ LogicalResult CtrlOp::verify() {
             return emitOpError(
                 "Ctrl op operand types must be the same as the argument types on its block");
         }
+    }
+
+    llvm::SmallDenseSet<Value> regionCtrlQubits(getInCtrlQubits().begin(), getInCtrlQubits().end());
+    auto noOverlappingCtrlQubitWalkRes = this->getRegion().walk([regionCtrlQubits](QuantumGate op) {
+        for (Value opCtrlQubit : op.getCtrlQubitOperands()) {
+            if (regionCtrlQubits.contains(opCtrlQubit)) {
+                return WalkResult::interrupt();
+            }
+        }
+        return WalkResult::advance();
+    });
+
+    if (noOverlappingCtrlQubitWalkRes.wasInterrupted()) {
+        return emitOpError("Ctrl op ctrl qubits must not reappear as the individual gates' ctrl "
+                           "qubits inside the ctrl region");
     }
 
     return success();
