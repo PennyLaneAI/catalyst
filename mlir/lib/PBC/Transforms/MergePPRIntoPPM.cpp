@@ -29,22 +29,25 @@ using namespace catalyst::pbc;
 
 namespace {
 
-/// recursively check if the next users of the NextOp are not PPMeasurementOp
+/// Recursively check that nextOp and its users do not reach the PPM.
 bool verifyNextNonClifford(PPMeasurementOp op, Operation *nextOp) {
     // Avoid segmentation fault (should not happen)
     if (nextOp == nullptr) {
         return true;
     }
 
-    for (auto userOp : nextOp->getUsers()) {
-        if (userOp == op) {
-            return false;
-        }
+    // Map the operation before visiting its users, since region terminators (e.g. scf.yield)
+    // have no users. Following the ancestor's results also covers values leaving the region.
+    Operation *ancestor = op->getBlock()->findAncestorOpInBlock(*nextOp);
+    if (ancestor == nullptr || ancestor == op) {
+        return false;
+    }
 
-        if (!userOp->isBeforeInBlock(op)) {
-            continue;
-        }
+    if (!ancestor->isBeforeInBlock(op)) {
+        return true;
+    }
 
+    for (auto userOp : ancestor->getUsers()) {
         if (!verifyNextNonClifford(op, userOp)) {
             return false;
         }
@@ -96,6 +99,9 @@ LogicalResult visitValidCliffordPPR(PPMeasurementOp op,
         }
 
         if (auto pprOp = llvm::dyn_cast<PPRotationOp>(qubit.getDefiningOp())) {
+            if (pprOp->getBlock() != op->getBlock()) {
+                continue;
+            }
             if (verifyPrevNonClifford(op, pprOp)) {
                 return callback(pprOp);
             }
