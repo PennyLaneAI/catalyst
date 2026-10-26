@@ -351,7 +351,9 @@ QuantumCache QuantumCache::initialize(Region &region, OpBuilder &builder, Locati
     auto offsetVector = ListInitOp::create(builder, loc, offsetVectorType);
 
     auto wireVectorType = ArrayListType::get(ctx, builder.getI64Type());
+    auto controlValueVectorType = ArrayListType::get(ctx, builder.getI1Type());
     auto wireVector = ListInitOp::create(builder, loc, wireVectorType);
+    auto controlValueVector = ListInitOp::create(builder, loc, controlValueVectorType);
 
     // Initialize the tapes that store the structure of control flow.
     auto controlFlowTapeType = ArrayListType::get(ctx, builder.getIndexType());
@@ -370,6 +372,7 @@ QuantumCache QuantumCache::initialize(Region &region, OpBuilder &builder, Locati
                                  .ensureCapacityFunc = ensureCapacityFunc,
                                  .deallocParamVectorFunc = deallocParamVectorFunc,
                                  .wireVector = wireVector,
+                                 .controlValueVector = controlValueVector,
                                  .controlFlowTapes = controlFlowTapes};
 }
 
@@ -388,6 +391,7 @@ void QuantumCache::emitDealloc(OpBuilder &builder, Location loc) {
                          ValueRange{paramVector, paramVectorCapacity, currentOffset});
     ListDeallocOp::create(builder, loc, offsetVector);
     ListDeallocOp::create(builder, loc, wireVector);
+    ListDeallocOp::create(builder, loc, controlValueVector);
     for (const auto &[_key, controlFlowTape] : controlFlowTapes) {
         ListDeallocOp::create(builder, loc, controlFlowTape);
     }

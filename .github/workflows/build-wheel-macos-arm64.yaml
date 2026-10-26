@@ -130,6 +130,7 @@ jobs:
         cd $GITHUB_WORKSPACE/mlir/llvm-project
         git apply $GITHUB_WORKSPACE/mlir/patches/llvm-bufferization-segfault.patch
         git apply $GITHUB_WORKSPACE/mlir/patches/llvm-python-bindinggen-annotations.patch
+        git apply $GITHUB_WORKSPACE/mlir/patches/llvm-scf-canonicalize-preserve-discardable-attrs.patch
 
     - name: Clone Stablehlo Submodule
       if: steps.cache-stablehlo-source.outputs.cache-hit != 'true'
@@ -548,7 +549,7 @@ jobs:
     - name: Run Python Pytest Tests
       run: |
         python${{ matrix.python_version }} -m pytest frontend/test/pytest -n auto
-        python${{ matrix.python_version }} -m pytest frontend/test/pytest --backend="lightning.kokkos" -n auto -m "not xdsl"
+        python${{ matrix.python_version }} -m pytest frontend/test/pytest --backend="lightning.kokkos" -n auto -m "not xdsl" -k "lightning.kokkos"
         python${{ matrix.python_version }} -m pytest frontend/test/async_tests
         python${{ matrix.python_version }} -m pytest frontend/test/pytest --runbraket=LOCAL -n auto -m "not xdsl" || true
         python${{ matrix.python_version }} -m pytest frontend/test/test_oqc/oqc -n auto

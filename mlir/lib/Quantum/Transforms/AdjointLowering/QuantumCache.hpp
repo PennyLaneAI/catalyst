@@ -62,6 +62,7 @@ struct QuantumCache {
     mlir::func::FuncOp deallocParamVectorFunc;
 
     mlir::TypedValue<ArrayListType> wireVector;
+    mlir::TypedValue<ArrayListType> controlValueVector;
     /// For every structured control flow op, store the values required for it to execute.
     /// Specifically: store the conditions for scf.if ops, the start/stop/step of scf.for ops, and
     /// the number of iterations for scf.while ops.

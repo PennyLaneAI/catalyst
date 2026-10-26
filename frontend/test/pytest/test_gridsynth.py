@@ -19,6 +19,7 @@ import pennylane as qp
 import pytest
 
 from catalyst.passes import gridsynth
+from catalyst.utils.exceptions import CompileError
 
 
 @pytest.mark.parametrize(
@@ -44,6 +45,70 @@ def test_PhaseShift_gridsynth(param, op, eps):
     result = qjitted_circuit(param)
 
     assert qp.math.allclose(result, expected, atol=eps, rtol=0)
+
+
+@pytest.mark.parametrize("param", [-2.2, 0.3, 1.1])
+@pytest.mark.parametrize("op", [qp.RZ, qp.PhaseShift])
+def test_adjoint_gridsynth(param, op):
+    """Test that adjoint rotations are discretized as the inverse rotation."""
+    eps = 1e-6
+    dev = qp.device("lightning.qubit", wires=1)
+
+    @qp.qnode(dev)
+    def circuit(x: float):
+        qp.Hadamard(0)
+        qp.adjoint(op(x, wires=0))
+        return qp.state()
+
+    expected = circuit(param)
+    gridsynthed_circuit = qp.transforms.gridsynth(circuit, epsilon=eps)
+    qjitted_circuit = qp.qjit(gridsynthed_circuit, capture=True, collect_decomp_rules=False)
+    assert qp.math.allclose(qjitted_circuit(param), expected, atol=eps)
+
+
+@pytest.mark.parametrize("param", [-2.2, 0.3, 1.1])
+@pytest.mark.parametrize("op", [qp.RZ, qp.PhaseShift])
+@pytest.mark.parametrize("ppr_basis", [False, True])
+@pytest.mark.parametrize("region", [qp.adjoint, lambda fn: qp.adjoint(qp.adjoint(fn))])
+def test_adjoint_region_gridsynth(param, op, ppr_basis, region):
+    """Test that rotations inside adjoint regions are discretized and inverted."""
+    eps = 1e-6
+    dev = qp.device("lightning.qubit", wires=1)
+
+    def rotations(x):
+        op(x, wires=0)
+        qp.Hadamard(0)
+        op(2 * x, wires=0)
+
+    @qp.qnode(dev)
+    def circuit(x: float):
+        qp.Hadamard(0)
+        region(rotations)(x)
+        return qp.state()
+
+    expected = circuit(param)
+    gridsynthed_circuit = qp.transforms.gridsynth(circuit, epsilon=eps, ppr_basis=ppr_basis)
+    qjitted_circuit = qp.qjit(gridsynthed_circuit, capture=True, collect_decomp_rules=False)
+    assert qp.math.allclose(qjitted_circuit(param), expected, atol=2 * eps)
+
+
+def test_gridsynth_ctrl_region_error():
+    """Test that the control lowering raises an error for rotations discretized inside control
+    regions, instead of dropping the control."""
+    dev = qp.device("lightning.qubit", wires=2)
+
+    def rotation(x):
+        qp.RZ(x, 0)
+
+    @qp.qnode(dev)
+    def circuit(x: float):
+        qp.ctrl(rotation, control=1)(x)
+        return qp.state()
+
+    with pytest.raises(CompileError, match="cannot control a function call"):
+        qp.qjit(
+            qp.transforms.gridsynth(circuit, epsilon=1e-6), capture=True, collect_decomp_rules=False
+        )(0.7)
 
 
 @pytest.mark.parametrize(
@@ -85,7 +150,7 @@ def test_gridsynth_specs(ppr_basis):
         qp.RZ(x, 1)
         return qp.expval(qp.Z(0))
 
-    resources = qp.specs(circuit, level=1)(0.5).resources
+    resources = qp.analyze(circuit, level=1)(0.5).resources
     assert resources.num_wires == 2
 
     ops = resources.quantum_operations
@@ -116,8 +181,8 @@ def test_gridsynth_specs_matches_runtime(eps, ppr_basis, method):
             qp.RZ(theta, 0)
         return qp.expval(qp.Z(0))
 
-    estimated = qp.specs(circuit, level=1)(angles).resources
-    executed = qp.specs(circuit, level="device")(angles).resources
+    estimated = qp.analyze(circuit, level=1)(angles).resources
+    executed = qp.track(circuit)(angles)[1].resources
 
     estimated_t = estimated.quantum_operations["PPR-pi/8-w1" if ppr_basis else "T"]
     # The device reports the PPR exp(-i pi/8 P) as PauliRot(pi/4).
@@ -141,7 +206,7 @@ def test_mixed_fallback_gridsynth_specs_wires(ppr_basis):
         qp.RZ(x, 1)
         return qp.expval(qp.Z(0))
 
-    assert qp.specs(circuit, level=1)(0.5).resources.num_wires == 4
+    assert qp.analyze(circuit, level=1)(0.5).resources.num_wires == 4
 
 
 @pytest.mark.parametrize("param", [-7.7, -2.2, -0.1, 0.0, 0.3, 1.1, 4.4])

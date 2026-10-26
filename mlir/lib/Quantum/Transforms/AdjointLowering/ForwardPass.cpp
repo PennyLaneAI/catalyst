@@ -209,10 +209,19 @@ void AugmentedCircuitGenerator::generate(Region &region, OpBuilder &builder) {
             cacheDynamicWire(insertOp, builder);
         } else if (auto extractOp = dyn_cast<quantum::ExtractOp>(op)) {
             cacheDynamicWire(extractOp, builder);
-        } else if (auto gate = dyn_cast<quantum::ParametrizedGate>(op)) {
-            cacheGate(gate, builder);
+        } else if (auto gate = dyn_cast<quantum::QuantumGate>(op)) {
+            if (auto parametrizedGate = dyn_cast<quantum::ParametrizedGate>(op)) {
+                cacheGate(parametrizedGate, builder);
+            }
+            for (Value controlValue : gate.getCtrlValueOperands()) {
+                if (!isAvailableToReversePass(controlValue, adjointRegion)) {
+                    ListPushOp::create(builder, gate.getLoc(),
+                                       oldToCloned.lookupOrDefault(controlValue),
+                                       cache.controlValueVector);
+                }
+            }
         } else if (isa<QuantumDialect>(op.getDialect())) {
-            // Any quantum op other than a parametrized gate/insert/extract is ignored.
+            // Any quantum op other than a gate/insert/extract is ignored.
         } else if (isa<pbc::PPRotationOp>(op)) {
             // PPRs are ignored
         } else if (isClassicalSCFOp(op)) {
