@@ -57,7 +57,7 @@ enum SaveTemps { None, AfterPipeline, AfterPassChanged, AfterPass };
  * @brief Defines the different functional stages of the driver.
  *
  */
-enum Action { OPT, Translate, LLC, All };
+enum Action { OPT, Translate, LLVMOpt, LLC, OptTranslate, OptTranslateLLVM, All };
 
 /**
  * @brief Defines the format of the input data.
