@@ -194,7 +194,7 @@ def test_convert_clifford_to_ppr():
     assert 'transform.apply_registered_pass "to-ppr"' not in optimized_ir
     assert "pbc.ppr" in optimized_ir
 
-    ppm_specs_output = qp.specs(test_convert_clifford_to_ppr_workflow, level=1)().resources
+    ppm_specs_output = qp.analyze(test_convert_clifford_to_ppr_workflow, level=1)().resources
 
     gate_types = ppm_specs_output.quantum_operations
     assert gate_types.get("PPR-pi/4-w1", 0) == 6
@@ -247,7 +247,7 @@ def test_commute_ppr():
     assert "pbc.ppr" in optimized_ir
     assert "pbc.ppm" in optimized_ir
 
-    ppm_specs_output = qp.specs(test_commute_ppr_workflow, level=2)().resources
+    ppm_specs_output = qp.analyze(test_commute_ppr_workflow, level=2)().resources
 
     gate_types = ppm_specs_output.quantum_operations
 
@@ -279,7 +279,7 @@ def test_merge_ppr_ppm():
     assert 'pbc.ppm ["Z", "X"]' in optimized_ir
     assert 'pbc.ppm ["X"]' in optimized_ir
 
-    ppm_specs_output = qp.specs(test_merge_ppr_ppm_workflow, level=2)().resources
+    ppm_specs_output = qp.analyze(test_merge_ppr_ppm_workflow, level=2)().resources
 
     gate_types = ppm_specs_output.quantum_operations
     assert gate_types.get("PPM-w1", 0) == 1
@@ -307,7 +307,7 @@ def test_ppr_to_ppm_auto_corrected():
     optimized_ir = test_ppr_to_ppm_workflow.mlir_opt
     assert 'transform.apply_registered_pass "ppr-to-ppm"' not in optimized_ir
 
-    specs_output = qp.specs(test_ppr_to_ppm_workflow, level=1)()
+    specs_output = qp.analyze(test_ppr_to_ppm_workflow, level=1)()
     gate_types = specs_output.resources.quantum_operations
 
     assert gate_types["GlobalPhase"] == 4
@@ -335,7 +335,7 @@ def test_ppr_to_ppm_inject_magic_state():
     optimized_ir = test_ppr_to_ppm_workflow.mlir_opt
     assert 'transform.apply_registered_pass "ppr-to-ppm"' not in optimized_ir
 
-    specs_output = qp.specs(test_ppr_to_ppm_workflow, level=1)()
+    specs_output = qp.analyze(test_ppr_to_ppm_workflow, level=1)()
     gate_types = specs_output.resources.quantum_operations
 
     assert gate_types["PPR-pi/4-w1"] == 6
@@ -363,7 +363,7 @@ def test_ppr_to_ppm_pauli_corrected():
     optimized_ir = test_ppr_to_ppm_workflow.mlir_opt
     assert 'transform.apply_registered_pass "ppr-to-ppm"' not in optimized_ir
 
-    specs_output = qp.specs(test_ppr_to_ppm_workflow, level=1)()
+    specs_output = qp.analyze(test_ppr_to_ppm_workflow, level=1)()
     gate_types = specs_output.resources.quantum_operations
     assert gate_types["PPR-pi/4-w1"] == 6
     assert gate_types["PPR-pi/4-w2"] == 1
@@ -406,13 +406,13 @@ def test_commute_ppr_and_merge_ppr_ppm_with_max_pauli_size():
         assert 'transform.apply_registered_pass "commute-ppr"' not in optimized_ir
         assert 'transform.apply_registered_pass "merge-ppr-ppm"' not in optimized_ir
 
-    f_specs = qp.specs(f_workflow, level=3)().resources
+    f_specs = qp.analyze(f_workflow, level=3)().resources
     assert f_specs.quantum_operations.get("PPM-w1", 0) == 2
     assert f_specs.quantum_operations.get("PPR-pi/8-w1", 0) == 1
     assert f_specs.any_commuting_depth == 1
     assert f_specs.qubit_disjoint_depth == 2
 
-    g_specs = qp.specs(g_workflow, level=3)().resources
+    g_specs = qp.analyze(g_workflow, level=3)().resources
     gate_types = g_specs.quantum_operations
     assert gate_types.get("PPM-w1", 0) == 2
     assert gate_types.get("PPR-pi/4-w1", 0) == 1
