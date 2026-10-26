@@ -179,6 +179,7 @@
 
 * Transforms can now be directly applied to a `QJIT`'d workflow. A new `QJIT` will be produced with
   the transform applied to the `QJIT`'s body.
+  [(#3397)](https://github.com/PennyLaneAI/catalyst/pull/3397)
 
 * The ``target`` argument of :func:`~catalyst.qjit` now accepts ``"mlir_opt"``, which stops the
   ahead-of-time compilation after running the MLIR passes, without translating the program to
