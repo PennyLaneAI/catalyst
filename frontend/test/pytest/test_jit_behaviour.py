@@ -15,6 +15,7 @@
 import os
 import random
 import warnings
+from copy import deepcopy
 from functools import partial
 from timeit import default_timer as timer
 
@@ -25,7 +26,7 @@ import pytest
 from jax import numpy as jnp
 from numpy import pi
 
-from catalyst import for_loop, grad, measure, qjit
+from catalyst import QJIT, for_loop, grad, measure, qjit
 from catalyst.jax_primitives import _scalar_abstractify
 from catalyst.tracing.type_signatures import (
     TypeCompatibility,
@@ -424,6 +425,130 @@ class TestDecorator:
             return measure(wires=0)
 
         assert f_no_parenthesis(pi) == f_parenthesis(pi)
+
+
+class TestQJITTransforms:
+    """Test transforms applied directly to captured QJIT workflows."""
+
+    def test_transform_qjit_qnode(self, backend: str) -> None:
+        """A transform applied after qjit is scheduled on the wrapped QNode."""
+
+        @qjit(capture=True, collect_decomp_rules=False)
+        @qp.qnode(qp.device(backend, wires=1))
+        def circuit(theta):
+            qp.RX(theta, wires=0)
+            qp.Hadamard(0)
+            qp.Hadamard(0)
+            return qp.expval(qp.Z(0))
+
+        transformed: QJIT = qp.transforms.cancel_inverses(circuit)
+
+        assert isinstance(transformed, QJIT)
+        assert transformed is not circuit
+        assert qp.math.allclose(transformed(0.4), qp.math.cos(0.4))
+        assert qp.math.allclose(circuit(0.4), qp.math.cos(0.4))
+        assert transformed.mlir.count('transform.apply_registered_pass "cancel-inverses"') == 1
+        assert 'transform.apply_registered_pass "cancel-inverses"' not in circuit.mlir
+        assert qp.transforms.cancel_inverses in transformed.original_function.compile_pipeline
+
+        ops = qp.analyze(transformed, level=1)(0.5).resources.quantum_operations
+        assert ops.get("Hadamard", 0) == 0
+
+    def test_transform_qjit_classical_processing(self, backend: str) -> None:
+        """Transforming a QJIT preserves classical processing around its QNode."""
+
+        @qp.qnode(qp.device(backend, wires=1))
+        def circuit(theta):
+            qp.RX(theta, wires=0)
+            qp.Hadamard(0)
+            qp.Hadamard(0)
+            return qp.expval(qp.Z(0))
+
+        @qjit(capture=True, collect_decomp_rules=False)
+        def workflow(theta):
+            return 3 * circuit(2 * theta) + theta
+
+        transformed: QJIT = qp.transforms.cancel_inverses(workflow)
+        expected = 3 * qp.math.cos(0.8) + 0.4
+
+        assert isinstance(transformed, QJIT)
+        assert qp.math.allclose(transformed(0.4), expected)
+        assert qp.math.allclose(workflow(0.4), expected)
+        assert transformed.mlir.count('transform.apply_registered_pass "cancel-inverses"') == 1
+        assert 'transform.apply_registered_pass "cancel-inverses"' not in workflow.mlir
+        assert not circuit.compile_pipeline
+
+    def test_transform_qjit_multiple_qnodes(self, backend: str) -> None:
+        """A transform applied to a QJIT reaches every QNode in the workflow."""
+        device = qp.device(backend, wires=1)
+
+        @qp.qnode(device)
+        def first_circuit(theta):
+            qp.RX(theta, wires=0)
+            qp.Hadamard(0)
+            qp.Hadamard(0)
+            return qp.expval(qp.Z(0))
+
+        @qp.qnode(device)
+        def second_circuit(theta):
+            qp.RY(theta, wires=0)
+            qp.X(0)
+            qp.X(0)
+            return qp.expval(qp.Z(0))
+
+        @qjit(capture=True, collect_decomp_rules=False)
+        def workflow(theta):
+            return first_circuit(theta), 2 * second_circuit(3 * theta)
+
+        transformed: QJIT = qp.transforms.cancel_inverses(workflow)
+        expected = (qp.math.cos(0.4), 2 * qp.math.cos(1.2))
+
+        assert isinstance(transformed, QJIT)
+        assert qp.math.allclose(transformed(0.4), expected)
+        assert qp.math.allclose(workflow(0.4), expected)
+        assert transformed.mlir.count('transform.apply_registered_pass "cancel-inverses"') == 2
+        assert 'transform.apply_registered_pass "cancel-inverses"' not in workflow.mlir
+        assert not first_circuit.compile_pipeline
+        assert not second_circuit.compile_pipeline
+
+    def test_transform_qjit_copies_compile_options(self, backend: str) -> None:
+        """The transformed QJIT owns independent options, including nested mutable values."""
+
+        @qp.qnode(qp.device(backend, wires=1))
+        def circuit(theta):
+            qp.RX(theta, wires=0)
+            return qp.expval(qp.Z(0))
+
+        original = qjit(
+            circuit,
+            capture=True,
+            collect_decomp_rules=False,
+            target="mlir",
+            pipelines=[("custom", ["canonicalize"])],
+            seed=42,
+        )
+        original_options = original.compile_options
+        expected_options = deepcopy(vars(original_options))
+
+        transformed: QJIT = qp.transforms.cancel_inverses(original)
+
+        assert original.compile_options is original_options
+        assert vars(original.compile_options) == expected_options
+        assert transformed.compile_options is not original_options
+        assert transformed.compile_options.capture is True
+        assert transformed.compile_options.collect_decomp_rules is False
+        assert transformed.compile_options.target == "mlir"
+        assert transformed.compile_options.seed == 42
+        assert transformed.compile_options.pipelines == expected_options["pipelines"]
+
+        transformed.compile_options.seed = 123
+        transformed.compile_options.pipelines[0][1].append("cse")
+        transformed.compile_options.pipelines.append(("extra", ["canonicalize"]))
+
+        assert vars(original.compile_options) == expected_options
+        assert original.original_function is circuit
+        assert not circuit.compile_pipeline
+        assert len(transformed.original_function.compile_pipeline) == 1
 
 
 class TestCaching:
