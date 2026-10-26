@@ -511,6 +511,79 @@ class TestQJITTransforms:
         assert not first_circuit.compile_pipeline
         assert not second_circuit.compile_pipeline
 
+    @pytest.mark.parametrize("as_keyword", [False, True], ids=["positional", "keyword"])
+    def test_decompose_qjit_arguments(self, backend: str, as_keyword: bool) -> None:
+        """Decomposition accepts positional and keyword arguments after qjit."""
+
+        @qjit(capture=True)
+        @qp.qnode(qp.device(backend, wires=1))
+        def circuit(theta):
+            qp.Rot(theta, 2 * theta, 3 * theta, wires=0)
+            return qp.expval(qp.Z(0))
+
+        gate_set = [qp.RZ, qp.RY]
+        if as_keyword:
+            transformed = qp.decompose(circuit, gate_set=gate_set)
+        else:
+            transformed = qp.decompose(circuit, gate_set)
+
+        assert qp.math.allclose(transformed(0.4), qp.math.cos(0.8))
+        assert 'transform.apply_registered_pass "graph-decomposition"' in transformed.mlir
+        ops = qp.analyze(transformed, level=1)(0.4).resources.quantum_operations
+        assert ops == {"RZ": 2, "RY": 1}
+        original_ops = qp.analyze(circuit, level=1)(0.4).resources.quantum_operations
+        assert original_ops == {"Rot": 1}
+
+    def test_transform_executed_qjit_does_not_copy_cache(self, backend: str) -> None:
+        """Transforming an executed workflow starts with independent compilation state."""
+
+        @qp.qnode(qp.device(backend, wires=1))
+        def circuit(theta):
+            qp.RX(theta, wires=0)
+            qp.Hadamard(0)
+            qp.Hadamard(0)
+            return qp.expval(qp.Z(0))
+
+        @qjit(capture=True, collect_decomp_rules=False)
+        def workflow(theta):
+            return 2 * circuit(theta)
+
+        expected = 2 * qp.math.cos(0.4)
+        assert qp.math.allclose(workflow(0.4), expected)
+        assert workflow.llvmir is not None
+        original_artifacts = {
+            name: getattr(workflow, name)
+            for name in ("jaxpr", "mlir_module", "llvm_ir", "compiled_function", "workspace")
+        }
+        for name, artifact in original_artifacts.items():
+            assert artifact is not None, name
+        original_cache = workflow.fn_cache.cache.copy()
+        assert original_cache
+
+        transformed = qp.transforms.cancel_inverses(workflow)
+
+        assert transformed.fn_cache is not workflow.fn_cache
+        assert not transformed.fn_cache.cache
+        assert transformed.mlir is None
+        assert transformed.llvmir is None
+        for name, artifact in original_artifacts.items():
+            assert getattr(transformed, name) is None
+            assert getattr(workflow, name) is artifact
+
+        assert qp.math.allclose(transformed(0.4), expected)
+        assert transformed.llvmir is not None
+        assert transformed.fn_cache.cache
+        assert 'transform.apply_registered_pass "cancel-inverses"' in transformed.mlir
+        assert 'transform.apply_registered_pass "cancel-inverses"' not in workflow.mlir
+        for name, artifact in original_artifacts.items():
+            assert getattr(transformed, name) is not None
+            assert getattr(transformed, name) is not artifact
+            assert getattr(workflow, name) is artifact
+        assert workflow.fn_cache.cache.keys() == original_cache.keys()
+        for key, entry in original_cache.items():
+            assert workflow.fn_cache.cache[key] is entry
+        assert qp.math.allclose(workflow(0.4), expected)
+
     def test_transform_qjit_copies_compile_options(self, backend: str) -> None:
         """The transformed QJIT owns independent options, including nested mutable values."""
 
