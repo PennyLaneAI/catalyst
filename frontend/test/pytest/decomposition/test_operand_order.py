@@ -193,8 +193,9 @@ class TestExecution:
 
         assert np.allclose(circuit(), [0.0, 1.0])
 
-        op_uid = re.search(r'qref\.operator "XAOp".*?UID\((\d+)\)', circuit.mlir, re.DOTALL)
-        rule_uid = re.search(r'target_gate = "XAOp[^"]*\[(\d+)\]"', circuit.mlir)
+        ir = circuit.mlir
+        op_uid = re.search(r'qref\.operator "XAOp".*?UID\((\d+)\)', ir, re.DOTALL)
+        rule_uid = re.search(r'target_gate = "XAOp[^"]*\[(\d+)\]"', ir)
         if op_uid and rule_uid:  # the op may already be decomposed in the final IR
             assert op_uid.group(1) == rule_uid.group(1)
 
