@@ -137,42 +137,45 @@ inline std::uint32_t *completion(const RingGeometry &ring, void *frame) {
 }
 } // namespace detail
 
+// Each operation takes the mode at compile time; the plain forms at the end read it from the ring.
+
 /// Bytes on the wire for one frame: 16 for BL16, the whole slot for BLV.
-inline std::size_t frame_bytes(const RingGeometry &ring) {
-    detail::require_mode(ring.mode);
-    return ring.mode == Mode::BL16 ? sizeof(Payload) : ring.stride;
+template <Mode M> inline std::size_t frame_bytes(const RingGeometry &ring) {
+    return M == Mode::BL16 ? sizeof(Payload) : ring.stride;
 }
 
 /// Payload bytes one frame carries.
-inline std::size_t data_capacity(const RingGeometry &ring) {
-    detail::require_mode(ring.mode);
-    return ring.mode == Mode::BL16 ? PAYLOAD_DATA_BYTES
-                                   : ring.stride - sizeof(BlvHeader) - BLV_COMPLETION_BYTES;
+template <Mode M> inline std::size_t data_capacity(const RingGeometry &ring) {
+    return M == Mode::BL16 ? PAYLOAD_DATA_BYTES
+                           : ring.stride - sizeof(BlvHeader) - BLV_COMPLETION_BYTES;
 }
 
 /// Where a frame's payload starts, for a caller that writes or reads it in place.
-inline std::uint8_t *data(const RingGeometry &ring, void *frame) {
-    detail::require_mode(ring.mode);
-    return static_cast<std::uint8_t *>(frame) + (ring.mode == Mode::BL16 ? 0 : sizeof(BlvHeader));
+template <Mode M> inline std::uint8_t *data(const RingGeometry &, void *frame) {
+    return static_cast<std::uint8_t *>(frame) + (M == Mode::BL16 ? 0 : sizeof(BlvHeader));
 }
 
 /// Fill a frame's payload, its length and fn_id. `src` may be the frame's own payload area, for a
 /// payload already written in place. BL16 zero-pads the payload to 8 B. seq is left for seal().
+template <Mode M>
 inline void stage(const RingGeometry &ring, void *frame, std::uint32_t fn_id, const void *src,
                   std::size_t len) {
-    const std::size_t cap = data_capacity(ring);
+    const std::size_t cap = data_capacity<M>(ring);
     TP_CHECK(len <= cap, "payload (%zu B) exceeds the %zu B frame", len, cap);
-    if (ring.mode == Mode::BL16) {
+    if constexpr (M == Mode::BL16) {
         Payload *p = static_cast<Payload *>(frame);
         std::uint64_t value = 0;
-        if (len != 0) {
+        if (src == &p->value) {
+            value =
+                len < sizeof(value) ? p->value & ((std::uint64_t{1} << (8 * len)) - 1) : p->value;
+        } else if (len != 0) {
             std::memcpy(&value, src, len);
         }
         p->value = value;
         p->decoder_id = fn_id;
         return;
     }
-    std::uint8_t *payload = data(ring, frame);
+    std::uint8_t *payload = data<M>(ring, frame);
     if (len != 0 && src != payload) {
         std::memmove(payload, src, len);
     }
@@ -190,9 +193,8 @@ inline void stage(const RingGeometry &ring, void *frame, std::uint32_t fn_id, co
 
 /// Set a staged frame's seq, writing last the word a receiver polls, which makes the frame
 /// complete.
-inline void seal(const RingGeometry &ring, void *frame, std::uint32_t seq) {
-    detail::require_mode(ring.mode);
-    if (ring.mode == Mode::BL16) {
+template <Mode M> inline void seal(const RingGeometry &ring, void *frame, std::uint32_t seq) {
+    if constexpr (M == Mode::BL16) {
         std::atomic_ref<std::uint32_t>(static_cast<Payload *>(frame)->seq_num)
             .store(seq, std::memory_order_release);
         return;
@@ -205,8 +207,9 @@ inline void seal(const RingGeometry &ring, void *frame, std::uint32_t seq) {
 /// Whether the frame for sequence number `expect` has arrived in `frame`; if so, decode it into
 /// `out`. The polled word is read with acquire ordering, so everything written before it is
 /// visible.
+template <Mode M>
 inline bool poll(const RingGeometry &ring, void *frame, std::uint32_t expect, FrameView &out) {
-    if (ring.mode == Mode::BL16) {
+    if constexpr (M == Mode::BL16) {
         Payload *p = static_cast<Payload *>(frame);
         if (std::atomic_ref<std::uint32_t>(p->seq_num).load(std::memory_order_acquire) != expect) {
             return false;
@@ -219,7 +222,6 @@ inline bool poll(const RingGeometry &ring, void *frame, std::uint32_t expect, Fr
         };
         return true;
     }
-    detail::require_mode(ring.mode);
     if (std::atomic_ref<std::uint32_t>(*detail::completion(ring, frame))
             .load(std::memory_order_acquire) != expect) {
         return false;
@@ -227,15 +229,53 @@ inline bool poll(const RingGeometry &ring, void *frame, std::uint32_t expect, Fr
     const BlvHeader *h = detail::blv(frame);
     TP_CHECK(h->magic == BLV_MAGIC && h->version == BLV_VERSION,
              "slot holds no BLV frame (magic 0x%08x, version %u)", h->magic, h->version);
-    TP_CHECK(h->len <= data_capacity(ring), "BLV frame claims %u B, more than its %zu B slot holds",
-             h->len, data_capacity(ring));
+    TP_CHECK(h->len <= data_capacity<M>(ring),
+             "BLV frame claims %u B, more than its %zu B slot holds", h->len,
+             data_capacity<M>(ring));
     out = FrameView{
-        .data = data(ring, frame),
+        .data = data<M>(ring, frame),
         .len = h->len,
         .fn_id = h->fn_id,
         .seq = expect,
     };
     return true;
+}
+
+inline std::size_t frame_bytes(const RingGeometry &ring) {
+    detail::require_mode(ring.mode);
+    return ring.mode == Mode::BL16 ? frame_bytes<Mode::BL16>(ring) : frame_bytes<Mode::BLV>(ring);
+}
+
+inline std::size_t data_capacity(const RingGeometry &ring) {
+    detail::require_mode(ring.mode);
+    return ring.mode == Mode::BL16 ? data_capacity<Mode::BL16>(ring)
+                                   : data_capacity<Mode::BLV>(ring);
+}
+
+inline std::uint8_t *data(const RingGeometry &ring, void *frame) {
+    detail::require_mode(ring.mode);
+    return ring.mode == Mode::BL16 ? data<Mode::BL16>(ring, frame) : data<Mode::BLV>(ring, frame);
+}
+
+inline void stage(const RingGeometry &ring, void *frame, std::uint32_t fn_id, const void *src,
+                  std::size_t len) {
+    detail::require_mode(ring.mode);
+    ring.mode == Mode::BL16 ? stage<Mode::BL16>(ring, frame, fn_id, src, len)
+                            : stage<Mode::BLV>(ring, frame, fn_id, src, len);
+}
+
+inline void seal(const RingGeometry &ring, void *frame, std::uint32_t seq) {
+    detail::require_mode(ring.mode);
+    ring.mode == Mode::BL16 ? seal<Mode::BL16>(ring, frame, seq)
+                            : seal<Mode::BLV>(ring, frame, seq);
+}
+
+inline bool poll(const RingGeometry &ring, void *frame, std::uint32_t expect, FrameView &out) {
+    if (ring.mode == Mode::BL16) {
+        return poll<Mode::BL16>(ring, frame, expect, out);
+    }
+    detail::require_mode(ring.mode);
+    return poll<Mode::BLV>(ring, frame, expect, out);
 }
 
 } // namespace catalyst::transport::common::frame

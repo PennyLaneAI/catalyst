@@ -79,10 +79,13 @@ template <class Role> class VerbsSessionBase : public Role {
     virtual bool oob_listens() const = 0;
 
     // Seal the staged send frame with round `cursor`'s seq and write it into the peer's ring.
+    template <frame::Mode M>
+    void post_write(ibv_qp *qp, std::uint64_t cursor, bool inline_data, bool signaled);
     void post_write(ibv_qp *qp, std::uint64_t cursor, bool inline_data, bool signaled);
     void reap(ibv_cq *cq, int &outstanding, bool drain);
     // Wait for round `cursor`'s frame in the local ring and decode it into `out`. Returns false if
     // `st` is stopped first.
+    template <frame::Mode M>
     bool poll_message_arrival(std::uint64_t cursor, std::stop_token st, frame::FrameView &out);
     // The frame the next post_write sends; stage it with frame::stage first.
     void *send_frame() { return send_buf_->addr(); }

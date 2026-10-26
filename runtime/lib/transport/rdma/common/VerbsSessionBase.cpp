@@ -131,15 +131,19 @@ void VerbsSessionBase<Role>::establish_channel(const ChannelDesc &desc, const Me
 }
 
 template <class Role>
+template <frame::Mode M>
 void VerbsSessionBase<Role>::post_write(ibv_qp *qp, std::uint64_t cursor, bool inline_data,
                                         bool signaled) {
+    const frame::RingGeometry &ring = M == frame::Mode::BL16 ? frame::BL16_RING : ring_;
     void *send = send_frame(); // staged by the caller
-    frame::seal(ring_, send, static_cast<std::uint32_t>(cursor + 1));
-    const std::size_t bytes = frame::frame_bytes(ring_);
-    // A frame larger than the queue pair's inline capacity goes from the registered send buffer.
-    const int inline_max =
-        qp == fwd_qp_->get() ? fwd_shape_.inline_max : DEFAULT_QP_SHAPE.inline_max;
-    inline_data = inline_data && bytes <= static_cast<std::size_t>(inline_max);
+    frame::seal<M>(ring, send, static_cast<std::uint32_t>(cursor + 1));
+    const std::size_t bytes = frame::frame_bytes<M>(ring);
+    if constexpr (M != frame::Mode::BL16) {
+        // A frame larger than the queue pair's inline capacity goes from the registered buffer.
+        const int inline_max =
+            qp == fwd_qp_->get() ? fwd_shape_.inline_max : DEFAULT_QP_SHAPE.inline_max;
+        inline_data = inline_data && bytes <= static_cast<std::size_t>(inline_max);
+    }
     ibv_sge sge{
         .addr = reinterpret_cast<std::uint64_t>(send),
         .length = static_cast<std::uint32_t>(bytes),
@@ -152,7 +156,7 @@ void VerbsSessionBase<Role>::post_write(ibv_qp *qp, std::uint64_t cursor, bool i
         .send_flags = static_cast<unsigned>((inline_data ? IBV_SEND_INLINE : 0) |
                                             (signaled ? IBV_SEND_SIGNALED : 0)),
     };
-    wr.wr.rdma.remote_addr = peer_.remote_addr + ring_.slot_offset(cursor);
+    wr.wr.rdma.remote_addr = peer_.remote_addr + ring.slot_offset(cursor);
     wr.wr.rdma.rkey = peer_.rkey;
     ibv_send_wr *bad = nullptr;
     const int rc = ibv_post_send(qp, &wr, &bad);
@@ -187,15 +191,17 @@ template <class Role> void VerbsSessionBase<Role>::reap(ibv_cq *cq, int &outstan
 }
 
 template <class Role>
+template <frame::Mode M>
 bool VerbsSessionBase<Role>::poll_message_arrival(std::uint64_t cursor, std::stop_token st,
                                                   frame::FrameView &out) {
     // Slots are reused (the slot count is a power of two). The peer writes each frame into the
     // head of its slot in a single RDMA_WRITE, seq last, so once frame::poll sees the expected seq
     // the payload before it is present.
-    void *slot = ring_slot(cursor);
+    const frame::RingGeometry &ring = M == frame::Mode::BL16 ? frame::BL16_RING : ring_;
+    void *slot = static_cast<std::uint8_t *>(local_.addr) + ring.slot_offset(cursor);
     const auto expected = static_cast<std::uint32_t>(cursor + 1);
     std::uint32_t spins = 0;
-    while (!frame::poll(ring_, slot, expected, out)) {
+    while (!frame::poll<M>(ring, slot, expected, out)) {
         if (++spins == STOP_CHECK_SPINS) {
             spins = 0;
             if (st.stop_requested()) {
@@ -207,7 +213,30 @@ bool VerbsSessionBase<Role>::poll_message_arrival(std::uint64_t cursor, std::sto
     return true;
 }
 
+template <class Role>
+void VerbsSessionBase<Role>::post_write(ibv_qp *qp, std::uint64_t cursor, bool inline_data,
+                                        bool signaled) {
+    ring_.mode == frame::Mode::BL16
+        ? post_write<frame::Mode::BL16>(qp, cursor, inline_data, signaled)
+        : post_write<frame::Mode::BLV>(qp, cursor, inline_data, signaled);
+}
+
 template class VerbsSessionBase<ControllerSession>;
 template class VerbsSessionBase<CoprocessorSession>;
+
+template void VerbsSessionBase<CoprocessorSession>::post_write<frame::Mode::BL16>(ibv_qp *,
+                                                                                  std::uint64_t,
+                                                                                  bool, bool);
+template void VerbsSessionBase<CoprocessorSession>::post_write<frame::Mode::BLV>(ibv_qp *,
+                                                                                 std::uint64_t,
+                                                                                 bool, bool);
+template bool VerbsSessionBase<CoprocessorSession>::poll_message_arrival<frame::Mode::BL16>(
+    std::uint64_t, std::stop_token, frame::FrameView &);
+template bool VerbsSessionBase<CoprocessorSession>::poll_message_arrival<frame::Mode::BLV>(
+    std::uint64_t, std::stop_token, frame::FrameView &);
+template bool VerbsSessionBase<ControllerSession>::poll_message_arrival<frame::Mode::BL16>(
+    std::uint64_t, std::stop_token, frame::FrameView &);
+template bool VerbsSessionBase<ControllerSession>::poll_message_arrival<frame::Mode::BLV>(
+    std::uint64_t, std::stop_token, frame::FrameView &);
 
 } // namespace catalyst::transport::common

@@ -99,7 +99,10 @@ int CpuControllerSession::collect(void *const *replies, const std::uint64_t *rep
                                   std::size_t n) {
     std::stop_token none; // blocking wait for this round's reply
     frame::FrameView r;
-    if (!poll_message_arrival(next_recv_, none, r)) {
+    const bool arrived = ring_.mode == frame::Mode::BL16
+                             ? poll_message_arrival<frame::Mode::BL16>(next_recv_, none, r)
+                             : poll_message_arrival<frame::Mode::BLV>(next_recv_, none, r);
+    if (!arrived) {
         return -1;
     }
     rtt_ns_ = now_ns() - kick_ns_;

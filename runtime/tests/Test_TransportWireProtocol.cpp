@@ -70,6 +70,20 @@ TEST_CASE("the BL16 frame codec writes exactly today's Payload bytes") {
     CHECK(view.seq == 42);
 }
 
+TEST_CASE("the BL16 codec zero-pads a payload written in place") {
+    namespace frame = catalyst::transport::common::frame;
+    for (std::size_t len : {0, 3, 8}) {
+        alignas(64) std::uint8_t encoded[64];
+        std::memset(encoded, 0x5A, sizeof(encoded));
+        std::uint8_t *payload = frame::data(frame::BL16_RING, encoded);
+        frame::stage(frame::BL16_RING, encoded, 7, payload, len);
+
+        std::uint8_t expected[PAYLOAD_DATA_BYTES] = {};
+        std::memset(expected, 0x5A, len);
+        CHECK(std::memcmp(payload, expected, sizeof(expected)) == 0);
+    }
+}
+
 TEST_CASE("the BL16 ring is today's ring") {
     namespace frame = catalyst::transport::common::frame;
     CHECK(frame::BL16_RING.region_bytes() == REGION_BYTES);

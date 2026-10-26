@@ -91,35 +91,45 @@ void CpuCoprocessorSession::stop() {
 // reaped in batches at signal points.
 void CpuCoprocessorSession::run(std::stop_token st) {
     pin_thread(pin_cpu_, pin_realtime_);
+    if (ring_.mode == frame::Mode::BL16) {
+        serve<frame::Mode::BL16>(st);
+    } else {
+        serve<frame::Mode::BLV>(st);
+    }
+}
+
+// Compiled once per frame mode, so the BL16 loop has no mode checks.
+template <frame::Mode M> void CpuCoprocessorSession::serve(std::stop_token st) {
     int signaled_outstanding = 0;
     for (std::uint64_t c = 0; !st.stop_requested(); c++) {
         frame::FrameView r; // the incoming message
-        if (!poll_message_arrival(c, st, r)) {
+        if (!poll_message_arrival<M>(c, st, r)) {
             reap(bwd_cq_->get(), signaled_outstanding, /*drain=*/true);
             return;
         }
+        const std::size_t len = M == frame::Mode::BL16 ? PAYLOAD_DATA_BYTES : r.len;
         std::uint64_t word = 0;
-        std::memcpy(&word, r.data, std::min<std::size_t>(r.len, sizeof(word)));
+        std::memcpy(&word, r.data, std::min<std::size_t>(len, sizeof(word)));
         last_word_.store(word, std::memory_order_relaxed);
         completed_.fetch_add(1, std::memory_order_release);
         // The reply goes back under the request's fn_id. Its payload area is zero-filled for the
         // function to fill, so the controller reads zeros past what it wrote; the built-in echo
         // copies the request's payload instead.
         void *send = send_frame();
-        std::uint8_t *reply = frame::data(ring_, send);
-        const std::size_t cap = frame::data_capacity(ring_);
+        std::uint8_t *reply = frame::data<M>(ring_, send);
+        const std::size_t cap = frame::data_capacity<M>(ring_);
         std::memset(reply, 0, cap);
-        std::size_t nb = r.len;
+        std::size_t nb = len;
         if (coproc_fn_) {
-            nb = coproc_fn_(r.data, r.len, r.fn_id, reply, cap, coproc_ctx_);
+            nb = coproc_fn_(r.data, len, r.fn_id, reply, cap, coproc_ctx_);
             TP_CHECK(nb > 0 && nb <= cap, "coprocessor function wrote %zu bytes, expected 1..%zu",
                      nb, cap);
         } else {
             std::memcpy(reply, r.data, nb);
         }
-        frame::stage(ring_, send, r.fn_id, reply, nb);
+        frame::stage<M>(ring_, send, r.fn_id, reply, nb);
         const bool sig = (c % SIGNAL_EVERY == 0);
-        post_write(bwd_qp_->get(), c, /*inline_data=*/true, sig);
+        post_write<M>(bwd_qp_->get(), c, /*inline_data=*/true, sig);
         if (sig) {
             ++signaled_outstanding;
             reap(bwd_cq_->get(), signaled_outstanding, /*drain=*/false);
