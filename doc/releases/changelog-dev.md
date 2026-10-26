@@ -177,6 +177,10 @@
 
 <h3>Improvements 🛠</h3>
 
+* Transforms can now be directly applied to a `QJIT`'d workflow. A new `QJIT` will be produced with
+  the transform applied to the `QJIT`'s body.
+  [(#3397)](https://github.com/PennyLaneAI/catalyst/pull/3397)
+
 * The ``target`` argument of :func:`~catalyst.qjit` now accepts ``"mlir_opt"``, which stops the
   ahead-of-time compilation after running the MLIR passes, without translating the program to
   LLVM IR. Calling the function still compiles it to a shared library.
@@ -997,6 +1001,16 @@
   [(#3242)](https://github.com/PennyLaneAI/catalyst/pull/3242)
 
 <h3>Internal changes ⚙️</h3>
+
+* Backline transport frames are built and read through a shared frame codec, which the `cpu_verbs`
+  backends now use instead of laying out the 16 B frame themselves. The bytes on the wire are
+  unchanged, and other frame layouts can now be added in one place.
+  [(#3378)](https://github.com/PennyLaneAI/catalyst/pull/3378)
+
+* The `cpu_verbs` and `gpu_verbs` transport backends share one session base for RDMA bring-up and
+  the reply path, instead of `gpu_verbs` keeping its own copy. Behaviour and library names are
+  unchanged.
+  [(#3375)](https://github.com/PennyLaneAI/catalyst/pull/3375)
 
 * Backline transport backends are chosen from a registry instead of a fixed table. Out-of-tree
   backends register through the `catalyst.transport_backends` entry point or a
