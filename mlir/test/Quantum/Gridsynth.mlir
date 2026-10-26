@@ -168,8 +168,8 @@
 // PPR:         [[RES:%.+]] = pbc.ppr ["Z"](-8) [[LOOP_QBIT]]
 // PPR:         scf.yield [[RES]]
 // PPR:       }
-// COM: expected T and other entries 3.0590 * log2(1/0.01) + 1.1278 + 1.5542
-// PPR:       } {catalyst.estimated_iterations = 23.0{{[0-9]+}} : f64}
+// COM: expected T and other entries 3.0590 * log2(1/0.01) + 1.1278 + 0.0
+// PPR:       } {catalyst.estimated_iterations = 21.4{{[0-9]+}} : f64}
 // PPR:       memref.dealloc [[MEM]]
 // PPR:       quantum.gphase([[PHASE]])
 // PPR:       return [[LOOP_RES]] : !quantum.bit

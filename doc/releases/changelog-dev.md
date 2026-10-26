@@ -218,9 +218,11 @@
 
 * With `ppr_basis=True`, :func:`pennylane.transforms.gridsynth` now moves all Clifford gates of a
   sequence past its T gates. Each sequence consists of one :math:`\pi/8` Pauli product rotation
-  per T gate, about :math:`\pm X`, :math:`\pm Y` or :math:`\pm Z`, followed by at most two Clifford
-  Pauli product rotations, instead of about one Clifford rotation for every two :math:`\pi/8`
-  rotations. The number of :math:`\pi/8` rotations is unchanged.
+  per T gate, about :math:`\pm X`, :math:`\pm Y` or :math:`\pm Z`, with signs chosen such that no
+  Clifford gates remain. Only short sequences with few T gates may end with up to two Clifford
+  Pauli product rotations. Previously, there was about one Clifford rotation for every two
+  :math:`\pi/8` rotations. The number of :math:`\pi/8` rotations is unchanged.
+  [(#3398)](https://github.com/PennyLaneAI/catalyst/pull/3398)
 
 * Controlled :class:`~pennylane.GlobalPhase` operations now decompose to
   :class:`~pennylane.PhaseShift` on the control wire when possible (or

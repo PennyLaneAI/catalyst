@@ -843,8 +843,8 @@ def gridsynth_setup_inputs(epsilon=1e-4, ppr_basis=False, method="deterministic"
             With ``"mixed"`` and ``"mixed-fallback"``, the channel averaged over samples has
             diamond norm error at most ``2 * epsilon``.
         ppr_basis (bool): If true, decompose directly to Pauli Product Rotations (PPRs) in PBC
-            dialect, with one :math:`\pi/8` PPR per T gate followed by at most two Clifford PPRs.
-            Defaults to ``False``
+            dialect, with one :math:`\pi/8` PPR per T gate and, for short sequences only, up to
+            two Clifford PPRs at the end. Defaults to ``False``
         method (str): The synthesis method. ``"deterministic"`` (default) applies a single
             Ross-Selinger gate sequence per rotation. ``"mixed"`` applies, per execution, one of
             two twirled sequences that under- and over-rotate the target, which roughly
@@ -859,17 +859,18 @@ def gridsynth_setup_inputs(epsilon=1e-4, ppr_basis=False, method="deterministic"
 
     .. note::
 
-        Note the following for ``ppr_basis=True``:
+        The circuits generated from this pass with ``ppr_basis=True`` are currently only
+        executable on the ``lightning.qubit`` device with program capture enabled.
 
-        - the circuit generated from this pass with  are currently only executable
-          on the ``lightning.qubit`` device with program enabled.
+    .. note::
 
-        - the Clifford gates of each Clifford+T sequence are moved past its T gates to the end
-          of the sequence. Each T gate thereby becomes a :math:`\pi/8` PPR
-          :math:`\exp(\mp i\frac{\pi}{8}P)` about a Pauli :math:`P \in \{X, Y, Z\}`, and the
-          remaining Clifford is applied as at most two :math:`\pi/4` or :math:`\pi/2` PPRs. A
-          sequence therefore has as many :math:`\pi/8` PPRs as its Clifford+T counterpart has T
-          gates, and neighboring :math:`\pi/8` PPRs rotate about different Paulis.
+        With ``ppr_basis=True``, the Clifford gates of each Clifford+T sequence are moved past its
+        T gates. Each T gate thereby becomes a :math:`\pi/8` PPR
+        :math:`\exp(\mp i\frac{\pi}{8}P)` about a Pauli :math:`P \in \{X, Y, Z\}`, so a sequence
+        has as many :math:`\pi/8` PPRs as its Clifford+T counterpart has T gates, and neighboring
+        :math:`\pi/8` PPRs rotate about different Paulis. The signs of the :math:`\pi/8` PPRs are
+        chosen such that no Clifford gates remain, except in short sequences with few T gates,
+        which may end with up to two :math:`\pi/4` or :math:`\pi/2` PPRs.
 
     .. note::
 

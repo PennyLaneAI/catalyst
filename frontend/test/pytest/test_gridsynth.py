@@ -194,9 +194,9 @@ def test_gridsynth_specs_matches_runtime(eps, ppr_basis, method):
 
 
 @pytest.mark.parametrize("method", ["deterministic", "mixed"])
-def test_gridsynth_ppr_basis_clifford_count(method):
-    """Test that each PPR-basis sequence ends with at most two Clifford PPRs, and that the analyze
-    result of the Clifford PPRs matches the tracked count executed at runtime."""
+def test_gridsynth_ppr_basis_no_cliffords(method):
+    """Test that the PPR-basis sequences of generic angles have no Clifford PPRs, as the signs of
+    their pi/8 PPRs are chosen to absorb the Clifford gates, and that the analyze result agrees."""
     angles = np.random.default_rng(42).uniform(0, 4 * np.pi, 50)
 
     @qp.qjit(capture=True, seed=37)
@@ -212,9 +212,10 @@ def test_gridsynth_ppr_basis_clifford_count(method):
 
     estimated_cliffords = estimated["PPR-pi/4-w1"] + estimated["PPR-pi/2-w1"]
     # The device reports the PPR exp(-i pi/k P) as PauliRot(2 pi/k).
-    executed_cliffords = executed["PauliRot-pi/2-w1"] + executed["PauliRot-pi-w1"]
-    assert executed_cliffords <= 2 * len(angles)
-    assert estimated_cliffords == pytest.approx(executed_cliffords, rel=0.15)
+    executed_cliffords = executed.get("PauliRot-pi/2-w1", 0) + executed.get("PauliRot-pi-w1", 0)
+    assert executed_cliffords == 0
+    # The mixed estimate includes the rare Clifford PPRs of short sequences, rounded up per case.
+    assert estimated_cliffords <= 2
 
 
 @pytest.mark.parametrize("ppr_basis", [False, True])

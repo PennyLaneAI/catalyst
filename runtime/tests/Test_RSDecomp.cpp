@@ -414,6 +414,14 @@ void check_ppr_conversion(const std::pair<std::vector<GateType>, double> &sequen
 }
 
 /**
+ * Check that no Clifford rotations are left. Used for sequences with many T gates, for which the
+ * signs of the π/8 rotations can be chosen such that the accumulated Clifford is the identity.
+ */
+void check_no_clifford_pprs(const std::vector<PPRGateType> &gates) {
+    CHECK(std::all_of(gates.begin(), gates.end(), is_pi_8_ppr));
+}
+
+/**
  * Check that neighboring π/8 rotations have different axes. Equal axes would merge into a Clifford,
  * which contradicts the T-optimality of the normal forms.
  */
@@ -440,9 +448,15 @@ TEST_CASE("Test HST_to_PPR examples", "[RSDecomp][PPR]") {
     // H X H = Z, so the Hadamards cancel up to a global phase of π.
     check_ppr_sequence(HST_to_PPR({GateType::HT, GateType::HT}), {PPRGateType::X8, PPRGateType::Z8},
                        -M_PI / 4.0);
-    // (S H)^dagger Z (S H) = -Y
-    CHECK(HST_to_PPR({GateType::SHT}).first.front() == PPRGateType::adjY8);
-    CHECK(HST_to_PPR({GateType::HT}).first.front() == PPRGateType::X8);
+    // Sd T = T^dagger, so flipping the sign of the π/8 rotation leaves no Clifford.
+    check_ppr_sequence(HST_to_PPR({GateType::T, GateType::Sd}), {PPRGateType::adjZ8}, M_PI / 8.0);
+    // S T = Z T^dagger, and the Pauli Z is cheaper than the Clifford S of the unflipped sign.
+    check_ppr_sequence(HST_to_PPR({GateType::T, GateType::S}),
+                       {PPRGateType::adjZ8, PPRGateType::Z2}, -3 * M_PI / 8.0);
+    // (S H)^dagger Z (S H) = -Y. With the sign flipped, the remaining Clifford is
+    // S H S = e^{iπ/4} exp(iπ/4 X), which takes one PPR instead of the two of H S.
+    check_ppr_sequence(HST_to_PPR({GateType::SHT}), {PPRGateType::Y8, PPRGateType::adjX4},
+                       M_PI / 8.0);
 }
 
 TEST_CASE("Test HST_to_PPR of arbitrary Clifford+T sequences", "[RSDecomp][PPR]") {
@@ -482,6 +496,7 @@ TEST_CASE("Test PPR form of Ross-Selinger sequences", "[RSDecomp][PPR]") {
         auto ppr = eval_ross_algorithm_ppr(angle, epsilon);
         check_ppr_conversion(eval_ross_algorithm(angle, epsilon), ppr);
         check_distinct_neighbor_axes(ppr.first);
+        check_no_clifford_pprs(ppr.first);
     }
 }
 
@@ -494,9 +509,11 @@ TEST_CASE("Test PPR form of mixed sequences", "[RSDecomp][PPR]") {
         auto mixed = eval_mixed_ross_algorithm_ppr(angle, epsilon, uniform_sample);
         check_ppr_conversion(eval_mixed_ross_algorithm(angle, epsilon, uniform_sample), mixed);
         check_distinct_neighbor_axes(mixed.first);
+        check_no_clifford_pprs(mixed.first);
         auto projective = eval_fallback_projective_ppr(angle, epsilon, uniform_sample);
         check_ppr_conversion(eval_fallback_projective(angle, epsilon, uniform_sample), projective);
         check_distinct_neighbor_axes(projective.first);
+        check_no_clifford_pprs(projective.first);
     }
 }
 
