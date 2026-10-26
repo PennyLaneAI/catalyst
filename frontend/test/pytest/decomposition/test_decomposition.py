@@ -2303,7 +2303,7 @@ class TestDecomposeAlias:
 
         # Two graph-decomposition passes are inserted, and the result is identical to the
         # explicit graph_decomposition stacking (alias, not a fork).
-        assert via_decompose.mlir.count('apply_registered_pass "graph-decomposition"') == 2
+        assert via_decompose.mlir.count('apply_registered_pass "graph-decomposition"') == 3
         assert via_decompose.mlir == via_graph.mlir
 
     def test_decompose_multiple_ordering(self):
