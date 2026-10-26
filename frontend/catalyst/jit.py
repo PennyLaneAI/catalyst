@@ -45,7 +45,7 @@ from catalyst.backline import (
     settle_executors,
 )
 from catalyst.compiled_functions import CompilationCache, CompiledFunction
-from catalyst.compiler import CompileOptions, Compiler, canonicalize, to_llvmir, to_mlir_opt
+from catalyst.compiler import CompileOptions, Compiler, canonicalize, to_llvm_opt, to_mlir_opt
 from catalyst.debug.instruments import instrument
 from catalyst.from_plxpr import trace_from_pennylane
 from catalyst.jax_tracer import lower_jaxpr_to_mlir, trace_to_jaxpr
@@ -778,7 +778,7 @@ class QJIT(CatalystCallable):
             return None
 
         _mlir = str(self.mlir_module)
-        self.llvm_ir = to_llvmir(stdin=_mlir, options=self.compile_options)
+        self.llvm_ir = to_llvm_opt(stdin=_mlir, options=self.compile_options)
         return self.llvm_ir
 
     @debug_logger
