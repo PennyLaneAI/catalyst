@@ -1005,6 +1005,7 @@
 * The gridsynth integration tests compile each circuit once and run it for all angles, instead of
   compiling once per angle. This reduces the runtime of `test_gridsynth.py` from about 140 s to
   40 s.
+  [(#3400)](https://github.com/PennyLaneAI/catalyst/pull/3400)
 
 * Backline transport backends are chosen from a registry instead of a fixed table. Out-of-tree
   backends register through the `catalyst.transport_backends` entry point or a
