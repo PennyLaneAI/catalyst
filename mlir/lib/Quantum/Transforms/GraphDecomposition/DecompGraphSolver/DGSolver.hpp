@@ -95,7 +95,8 @@ class DecompositionSolver {
      * @brief Solves the decomposition graph and returns the chosen rule for every reachable
      * operator that can reach the target gateset.
      *
-     * The result is cached, so later calls return it without solving again.
+     * Successful results are cached, so later calls return them without solving again.
+     * Failed attempts are retried from scratch and never return partial results.
      *
      * @throws GraphError if a gateset cost is negative or NaN.
      * @throws GraphSolverFailedError if a root operator cannot reach the target gateset.
@@ -108,6 +109,7 @@ class DecompositionSolver {
     const DecompositionGraph &graph;
 
     Core::GraphResult solvedMap{};
+    bool solveSucceeded{false};
 
     /**
      * @brief Returns every operator reachable from the given operators by following rule inputs,

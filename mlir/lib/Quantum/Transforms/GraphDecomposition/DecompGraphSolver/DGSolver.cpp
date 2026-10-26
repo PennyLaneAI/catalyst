@@ -159,10 +159,13 @@ ChosenDecompRule DecompositionSolver::evalRule(const RuleNode &rule) const {
  * The solution is computed via a modified Dijkstra's algorithm.
  */
 GraphResult DecompositionSolver::solve() {
-    // Return cached solution if already solved
-    if (!solvedMap.empty()) {
+    // Only reuse a result after every root has been solved successfully.
+    if (solveSucceeded) {
         return solvedMap;
     }
+
+    // A failed attempt may have finalized some operators. Start fresh on retry.
+    solvedMap.clear();
 
     // validate gateset costs
     for (const auto &[name, cost] : graph.getGateset().ops) {
@@ -257,6 +260,7 @@ GraphResult DecompositionSolver::solve() {
         }
     }
 
+    solveSucceeded = true;
     return solvedMap;
 }
 
