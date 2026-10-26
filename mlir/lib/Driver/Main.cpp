@@ -109,7 +109,7 @@ llvm::LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOu
         output.isCheckpointFound = options.checkpointStage == "mlir";
 
         if (options.verbosity == Verbosity::All) {
-            llvm::outs() << "MLIR parsing successful" << "\n";
+            llvm::errs() << "MLIR parsing successful" << "\n";
         }
     } else {
         llvm::SMDiagnostic err;
@@ -125,7 +125,7 @@ llvm::LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOu
         output.isCheckpointFound = options.checkpointStage == "LLVMIRTranslation";
         catalyst::utils::LinesCount::call(*llvmModule);
         if (options.verbosity == Verbosity::All) {
-            llvm::outs() << "LLVMIR parsing successful" << "\n";
+            llvm::errs() << "LLVMIR parsing successful" << "\n";
         }
     }
     if (failed(verifyInputType(options, inType))) {
@@ -154,7 +154,7 @@ llvm::LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOu
         }
         optTiming.stop();
         if (options.verbosity == Verbosity::All) {
-            llvm::outs() << "quantum-opt transformations successful" << "\n";
+            llvm::errs() << "quantum-opt transformations successful" << "\n";
         }
     }
 
@@ -187,7 +187,7 @@ llvm::LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOu
         translateTiming.stop();
 
         if (options.verbosity == Verbosity::All) {
-            llvm::outs() << "MLIR->LLVMIR translation successful" << "\n";
+            llvm::errs() << "MLIR->LLVMIR translation successful" << "\n";
         }
     }
 
@@ -269,7 +269,7 @@ llvm::LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOu
         outputTiming.stop();
 
         if (options.verbosity == Verbosity::All) {
-            llvm::outs() << "LLC object code generation successful" << "\n";
+            llvm::errs() << "LLC object code generation successful" << "\n";
         }
     }
 
@@ -437,7 +437,7 @@ int QuantumDriverMainFromCL(int argc, char **argv) {
     }
 
     if (Verbose) {
-        llvm::outs() << "Compilation successful:\n" << output->diagnosticMessages << "\n";
+        llvm::errs() << "Compilation successful:\n" << output->diagnosticMessages << "\n";
     }
     return llvm::to_underlying(ErrorCode::Success);
 }
