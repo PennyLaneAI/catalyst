@@ -181,7 +181,7 @@ def test_gridsynth_analyze_matches_runtime(eps, ppr_basis, method):
         return qp.expval(qp.Z(0))
 
     estimated = qp.analyze(circuit, level=1)(angles).resources
-    executed = qp.track(circuit, level="device")(angles)[1].resources
+    executed = qp.track(circuit)(angles)[1].resources
 
     estimated_t = estimated.quantum_operations["PPR-pi/8-w1" if ppr_basis else "T"]
     # The device reports the PPR exp(-i pi/8 P) as PauliRot(pi/4).

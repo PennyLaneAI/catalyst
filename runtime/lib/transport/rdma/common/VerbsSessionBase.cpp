@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "CpuSessionBase.hpp"
+#include "VerbsSessionBase.hpp"
 
 #include <algorithm>
 #include <array>
@@ -25,34 +25,32 @@
 #include "RealtimeThread.hpp"
 #include "WireProtocol.hpp"
 
-namespace catalyst::transport::cpu_verbs {
+namespace catalyst::transport::common {
 using namespace catalyst::transport;
-using namespace catalyst::transport::common;
 
 namespace {
 // RDMA device port; rxe0 is single-port -> 1.
 constexpr std::uint8_t PORT = 1;
 // Max CQEs taken per non-blocking batch reap.
 constexpr int REAP_BATCH = 16;
-// QP inline capacity for inline sends (>= sizeof(Payload), 16 B).
-constexpr int INLINE_MAX = 256;
-constexpr int SQ_DEPTH = 4096;
-constexpr int CQ_DEPTH = 4096;
 // Page alignment for registered host buffers.
 constexpr std::size_t PAGE_ALIGN = 4096;
 } // namespace
 
 template <class Role>
-CpuSessionBase<Role>::CpuSessionBase(std::string dev, int gid_idx)
-    : dev_name_(std::move(dev)), gid_idx_(gid_idx) {}
+VerbsSessionBase<Role>::VerbsSessionBase(std::string dev, int gid_idx, const char *backend,
+                                         QpShape fwd_shape)
+    : dev_name_(std::move(dev)), gid_idx_(gid_idx), backend_(backend), fwd_shape_(fwd_shape) {}
 
-template <class Role> int CpuSessionBase<Role>::connect(const ConnectInfo &info) {
+template <class Role> int VerbsSessionBase<Role>::connect(const ConnectInfo &info) {
     ctx_ = std::make_shared<Context>(dev_name_);
     pd_ = std::make_shared<ProtectionDomain>(ctx_);
-    fwd_cq_ = std::make_shared<CompletionQueue>(ctx_, CQ_DEPTH);
-    bwd_cq_ = std::make_shared<CompletionQueue>(ctx_, CQ_DEPTH);
-    fwd_qp_ = std::make_shared<QueuePair>(pd_, fwd_cq_, fwd_cq_, SQ_DEPTH, INLINE_MAX);
-    bwd_qp_ = std::make_shared<QueuePair>(pd_, bwd_cq_, bwd_cq_, SQ_DEPTH, INLINE_MAX);
+    constexpr QpShape bwd = DEFAULT_QP_SHAPE;
+    fwd_cq_ = std::make_shared<CompletionQueue>(ctx_, fwd_shape_.cq_depth);
+    bwd_cq_ = std::make_shared<CompletionQueue>(ctx_, bwd.cq_depth);
+    fwd_qp_ = std::make_shared<QueuePair>(pd_, fwd_cq_, fwd_cq_, fwd_shape_.sq_depth,
+                                          fwd_shape_.inline_max);
+    bwd_qp_ = std::make_shared<QueuePair>(pd_, bwd_cq_, bwd_cq_, bwd.sq_depth, bwd.inline_max);
     fwd_qp_->to_init(PORT);
     bwd_qp_->to_init(PORT);
     active_mtu_ = static_cast<std::uint32_t>(ctx_->port_attr(PORT).active_mtu);
@@ -63,7 +61,8 @@ template <class Role> int CpuSessionBase<Role>::connect(const ConnectInfo &info)
     return 0;
 }
 
-template <class Role> MemRegion CpuSessionBase<Role>::alloc_memory(std::size_t size, MemKind kind) {
+template <class Role>
+MemRegion VerbsSessionBase<Role>::alloc_memory(std::size_t size, MemKind kind) {
     TP_CHECK(kind == MemKind::CpuRam, "cpu_libibverbs: only MemKind::CpuRam supported");
     caller_memory_regions_.push_back(MemoryRegion::alloc_host(
         pd_, size, PAGE_ALIGN, MemAccess::LOCAL_WRITE | MemAccess::REMOTE_WRITE));
@@ -77,7 +76,7 @@ template <class Role> MemRegion CpuSessionBase<Role>::alloc_memory(std::size_t s
     };
 }
 
-template <class Role> PeerRef CpuSessionBase<Role>::exchange_keys(const MemRegion &local) {
+template <class Role> PeerRef VerbsSessionBase<Role>::exchange_keys(const MemRegion &local) {
     HandshakeMsg my{
         .fwd = {.qpn = fwd_qp_->qpn(), .psn = 0},
         .bwd = {.qpn = bwd_qp_->qpn(), .psn = 0},
@@ -107,31 +106,31 @@ template <class Role> PeerRef CpuSessionBase<Role>::exchange_keys(const MemRegio
     return PeerRef{
         .rkey = peer.mr_rkey,
         .remote_addr = peer.mr_vaddr,
-        .size = REGION_BYTES,
+        .size = ring_.region_bytes(),
     };
 }
 
 template <class Role>
-void CpuSessionBase<Role>::establish_channel(const ChannelDesc &desc, const MemRegion &local,
-                                             const PeerRef &peer) {
-    TP_CHECK(desc.transport == "rdma", "cpu_verbs: only transport \"rdma\" supported");
-    TP_CHECK(local.size >= REGION_BYTES, "region too small for ring: %zu < %zu",
-             static_cast<std::size_t>(local.size), REGION_BYTES);
+void VerbsSessionBase<Role>::establish_channel(const ChannelDesc &desc, const MemRegion &local,
+                                               const PeerRef &peer) {
+    TP_CHECK(desc.transport == "rdma", "%s: only transport \"rdma\" supported", backend_);
+    TP_CHECK(local.size >= ring_.region_bytes(), "region too small for ring: %zu < %zu",
+             static_cast<std::size_t>(local.size), ring_.region_bytes());
     desc_ = desc;
     local_ = local;
     peer_ = peer;
-    send_buf_ = common::MemoryRegion::alloc_host(pd_, sizeof(Payload), alignof(PayloadSlot),
+    send_buf_ = common::MemoryRegion::alloc_host(pd_, frame::frame_bytes(ring_.mode), ring_.stride,
                                                  common::MemAccess::LOCAL_WRITE);
 }
 
 template <class Role>
-void CpuSessionBase<Role>::post_write(ibv_qp *qp, std::uint64_t cursor, bool inline_data,
-                                      bool signaled) {
-    auto *send = send_payload(); // value already written by the caller
-    send->seq_num = static_cast<std::uint32_t>(cursor + 1);
+void VerbsSessionBase<Role>::post_write(ibv_qp *qp, std::uint64_t cursor, bool inline_data,
+                                        bool signaled) {
+    void *send = send_frame(); // staged by the caller
+    frame::seal(ring_.mode, send, static_cast<std::uint32_t>(cursor + 1));
     ibv_sge sge{
         .addr = reinterpret_cast<std::uint64_t>(send),
-        .length = sizeof(Payload), // 16 B on the wire, into slot's first 16 B
+        .length = static_cast<std::uint32_t>(frame::frame_bytes(ring_.mode)),
         .lkey = send_buf_->lkey(),
     };
     ibv_send_wr wr{
@@ -141,8 +140,7 @@ void CpuSessionBase<Role>::post_write(ibv_qp *qp, std::uint64_t cursor, bool inl
         .send_flags = static_cast<unsigned>((inline_data ? IBV_SEND_INLINE : 0) |
                                             (signaled ? IBV_SEND_SIGNALED : 0)),
     };
-    wr.wr.rdma.remote_addr =
-        peer_.remote_addr + (cursor & (K_RING_SLOTS - 1)) * sizeof(PayloadSlot);
+    wr.wr.rdma.remote_addr = peer_.remote_addr + ring_.slot_offset(cursor);
     wr.wr.rdma.rkey = peer_.rkey;
     ibv_send_wr *bad = nullptr;
     const int rc = ibv_post_send(qp, &wr, &bad);
@@ -153,7 +151,7 @@ void CpuSessionBase<Role>::post_write(ibv_qp *qp, std::uint64_t cursor, bool inl
 // REAP_BATCH) and decrement `outstanding`. With drain=true, keep polling until
 // every signaled send has completed (teardown), guarded so a lost CQE can't
 // hang the join.
-template <class Role> void CpuSessionBase<Role>::reap(ibv_cq *cq, int &outstanding, bool drain) {
+template <class Role> void VerbsSessionBase<Role>::reap(ibv_cq *cq, int &outstanding, bool drain) {
     std::array<ibv_wc, REAP_BATCH> wc;
     int empty = 0;
     constexpr int DRAIN_MAX_EMPTY = 1000000;
@@ -177,31 +175,27 @@ template <class Role> void CpuSessionBase<Role>::reap(ibv_cq *cq, int &outstandi
 }
 
 template <class Role>
-Payload *CpuSessionBase<Role>::poll_message_arrival(std::uint64_t cursor, std::stop_token st) {
-    // Slots are reused (K_RING_SLOTS is a power of two). The ring contains
-    // 64 B PayloadSlots; the peer writes the 16 B Payload into each slot's
-    // head.
-    auto *ring = reinterpret_cast<PayloadSlot *>(local_.addr);
-    Payload *slot = &ring[cursor & (K_RING_SLOTS - 1)].p;
-    // Poll seq_num with acquire ordering: once it updates, value (written
-    // before it in the single RDMA_WRITE) is present, and the acquire keeps its
-    // read from being hoisted ahead.
-    std::atomic_ref<std::uint32_t> seq_ref(slot->seq_num);
+bool VerbsSessionBase<Role>::poll_message_arrival(std::uint64_t cursor, std::stop_token st,
+                                                  frame::FrameView &out) {
+    // Slots are reused (the slot count is a power of two). The peer writes each frame into the
+    // head of its slot in a single RDMA_WRITE, seq last, so once frame::poll sees the expected seq
+    // the payload before it is present.
+    void *slot = ring_slot(cursor);
     const auto expected = static_cast<std::uint32_t>(cursor + 1);
     std::uint32_t spins = 0;
-    while (seq_ref.load(std::memory_order_acquire) != expected) {
+    while (!frame::poll(ring_.mode, slot, expected, out)) {
         if (++spins == STOP_CHECK_SPINS) {
             spins = 0;
             if (st.stop_requested()) {
-                return nullptr;
+                return false;
             }
         }
         cpu_relax();
     }
-    return slot;
+    return true;
 }
 
-template class CpuSessionBase<ControllerSession>;
-template class CpuSessionBase<CoprocessorSession>;
+template class VerbsSessionBase<ControllerSession>;
+template class VerbsSessionBase<CoprocessorSession>;
 
-} // namespace catalyst::transport::cpu_verbs
+} // namespace catalyst::transport::common
