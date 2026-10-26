@@ -274,8 +274,7 @@
   [(#3316)](https://github.com/PennyLaneAI/catalyst/pull/3316)
 
 * The memcpy transport now carries messages of any size in each direction, as set by a PennyLane
-  `qp.Controller`'s `in_bytes` and `out_bytes`. The memcpy GPU coprocessor's persistent kernel
-  still carries 8 bytes.
+  `qp.Controller`'s `in_bytes` and `out_bytes`.
 
   ```python
   ctrl = qp.Controller(in_bytes=120, out_bytes=121)

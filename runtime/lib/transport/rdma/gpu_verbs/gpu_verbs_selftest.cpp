@@ -54,10 +54,6 @@ int main(int argc, char **argv) {
             slots = static_cast<std::uint32_t>(std::strtoul(v.c_str(), nullptr, 0));
         }
     }
-    if (!std::has_single_bit(ring.slots)) {
-        std::fprintf(stderr, "--slots must be a power of two, got %u\n", ring.slots);
-        return 2;
-    }
     if (dev.empty() || gid < 0) {
         std::fprintf(stderr,
                      "usage: %s --dev <rdma_device> --gid <gid_index>"
@@ -72,6 +68,10 @@ int main(int argc, char **argv) {
     auto ring = frame::geometry_for(
         bytes <= PAYLOAD_DATA_BYTES ? frame::Mode::BL16 : frame::Mode::BLV, bytes);
     if (slots != 0) {
+        if (!std::has_single_bit(slots)) {
+            std::fprintf(stderr, "--slots must be a power of two, got %u\n", slots);
+            return 2;
+        }
         ring.slots = slots;
     }
     GpuCoprocessorSession s(dev, gid, gpu_device, ring);

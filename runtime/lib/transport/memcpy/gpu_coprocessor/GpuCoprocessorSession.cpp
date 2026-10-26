@@ -20,7 +20,6 @@
 #include "Error.hpp"
 #include "GpuLaunchers.hpp"
 #include "HipCheck.hpp"
-#include "WireProtocol.hpp"
 
 #include <hip/hip_runtime.h>
 

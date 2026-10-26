@@ -207,13 +207,12 @@ inline constexpr std::size_t COPROCESSOR_FN_ERROR = std::numeric_limits<std::siz
 /// CatalystCoprocessorFnInfo in TransportABI.h.
 using CoprocessorFnInfo = CatalystCoprocessorFnInfo;
 
-/// The highest CoprocessorFnInfo version this runtime knows the fields of.
+/// The highest CoprocessorFnInfo version this runtime knows.
 inline constexpr std::uint32_t COPROCESSOR_FN_ABI_VERSION = CATALYST_COPROCESSOR_FN_ABI_VERSION;
 
 /**
- * @brief Data description for a persistent engine to receive and consume
- * request messages, then autonomously return processed message to the handoff buffer,
- * which is then replied by a coprocessor host thread.
+ * @brief Data description for a persistent engine to receive and consume request messages, then
+ * autonomously write a reply frame per request into the handoff ring, which the session reads.
  *
  * Both rings hold `ring_slots` frames, `slot_stride` bytes apart, in the frame layout
  * `frame_mode` names (the CATALYST_TRANSPORT_FRAME_* bit index: 0 for the 16 B frame, 1 for
