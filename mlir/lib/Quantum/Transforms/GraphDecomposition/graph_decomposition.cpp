@@ -83,10 +83,28 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
     void runOnOperation() final {
         ScopedDiagnosticTimer totalTimer("decomp:total");
 
+
+        // resource analysis
+        // analysis = resource analysis
+        // const auto &results = analysis.getResults();
+        // ResourceResult *flat = analysis.getFlattenedResource(entry) 
+        // flat->detailedOperations // contains GOIDS
+
         ModuleOp module = getOperation();
 
         ///////////////////////////
         // Step 1–2: Prepare and solve the decomposition graph
+        // graph = GraphDecompositionPrep::prepareGraph(
+        //     flat->detailedOperations, {
+        //                 .targetGateSetOption = targetGateSetOption,
+        //                 .fixedDecompsOption = fixedDecompsOption,
+        //                 .altDecompsOption = altDecompsOption,
+        //                 .bytecodeRulesFile = bytecodeRulesFile,
+        //                 .libQPDPath = libQPDPath,
+        //                 .libpythonPath = libpythonPath,
+        //             });
+
+
         std::unique_ptr<DecompositionGraph> graph;
         {
             ScopedDiagnosticTimer prepareTimer("decomp:prepare");

@@ -527,6 +527,13 @@ std::unique_ptr<DecompositionGraph> prepareGraph(ModuleOp module, const PrepOpti
                             opts.libQPDPath, opts.libpythonPath, setOfRules))) {
         return nullptr;
     }
+    
+    // GraphDecompositionPrep will be called with detailedOps from ResourceAnalysis 
+    // like so (from graph_decomposition.cpp and resource_estimate): 
+    // graph = GraphDecompositionPrep::prepareGraph( flat->detailedOperations, ... )
+    // modify getOperators to use detailedOps from ResourceAnalysis instead of the module
+    // i.e it walks over the detailedOps from ResourceAnalysis instead of the module
+
     getOperators(module, setOfOps);
 
     // NOTE: fixed and alt-decomps are handled by filtering during rule collection.
