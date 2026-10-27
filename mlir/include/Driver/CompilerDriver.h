@@ -123,7 +123,6 @@ struct CompilerOptions {
 struct CompilerOutput {
     using PipelineOutputs = std::unordered_map<std::string, std::string>;
     std::string outputFilename;
-    std::string outIR;
     std::string diagnosticMessages;
     PipelineOutputs pipelineOutputs;
     size_t globalPipelineCounter = 0; // Counter for root-level pipeline summary files

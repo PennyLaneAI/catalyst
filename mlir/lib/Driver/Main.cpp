@@ -83,8 +83,6 @@ llvm::LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOu
     llvm::LLVMContext llvmContext;
     std::shared_ptr<llvm::Module> llvmModule;
 
-    llvm::raw_string_ostream outIRStream(output.outIR);
-
     auto moduleBuffer = llvm::MemoryBuffer::getMemBufferCopy(options.source, options.moduleName);
     auto sourceMgr = std::make_shared<llvm::SourceMgr>();
     sourceMgr->AddNewSourceBuffer(std::move(moduleBuffer), llvm::SMLoc());
@@ -154,10 +152,6 @@ llvm::LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOu
             CO_MSG(options, Verbosity::Urgent, "Failed to lower MLIR module\n");
             return llvm::failure();
         }
-        output.outIR.clear();
-        if (options.keepIntermediate) {
-            mlirModule->print(outIRStream, opPrintingFlags);
-        }
         optTiming.stop();
         if (options.verbosity == Verbosity::All) {
             llvm::errs() << "quantum-opt transformations successful" << "\n";
@@ -185,10 +179,6 @@ llvm::LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOu
             llvmModule->print(rawStringOstream, nullptr);
             auto outFile = output.nextPipelineSummaryFilename("LLVMIRTranslation", ".ll");
             catalyst::driver::dumpToFile(options, outFile, tmp);
-        }
-        output.outIR.clear();
-        if (options.keepIntermediate) {
-            outIRStream << *llvmModule;
         }
         translateTiming.stop();
 
@@ -258,11 +248,6 @@ llvm::LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOu
             enzymePassesTiming.stop();
             catalyst::utils::LinesCount::call(*llvmModule);
         }
-    }
-
-    if (llvmModule && options.keepIntermediate && output.outputFilename != "-") {
-        output.outIR.clear();
-        outIRStream << *llvmModule;
     }
 
     std::string errorMessage;
