@@ -160,6 +160,64 @@ class TestCompilerOptions:
         assert "--save-ir-after-each=pass" in flags
 
 
+class TestCompilerOutput:
+    """Tools write their final artifacts to the requested destination."""
+
+    @pytest.mark.parametrize("destination", [None, "-", "output"])
+    @pytest.mark.parametrize(
+        "tool,source,expected",
+        [
+            ("opt", "func.func @foo() { return }", b"llvm.func @foo"),
+            ("translate", "module { llvm.func @foo() { llvm.return } }", b"define void @foo"),
+            ("llvm-opt", "define void @foo() { ret void }", b"define void @foo"),
+            ("opt-translate", "func.func @foo() { return }", b"define void @foo"),
+            ("opt-translate-llvm", "func.func @foo() { return }", b"define void @foo"),
+        ],
+    )
+    def test_final_output(self, tool, source, expected, destination, tmp_path):
+        workspace = tmp_path / "workspace"
+        workspace.mkdir()
+        flags = [("--tool", tool), ("--workspace", str(workspace)), ("--module-name", "foo")]
+        if destination is not None:
+            flags.append(("-o", str(tmp_path / destination) if destination != "-" else "-"))
+
+        stdout = _catalyst(*flags, stdin=source.encode(), text=False)
+        if destination == "output":
+            assert stdout == b""
+            result = (tmp_path / destination).read_bytes()
+        else:
+            result = stdout
+
+        assert expected in result
+        assert not list(workspace.glob("*.o"))
+        assert not list(workspace.iterdir())
+
+    def test_intermediate_files(self, tmp_path):
+        """Intermediate saving writes snapshots into the requested workspace."""
+        workspace = tmp_path / "workspace"
+        workspace.mkdir()
+        output = tmp_path / "output.ll"
+        _catalyst(
+            ("--tool", "opt-translate"),
+            ("--workspace", workspace),
+            "--keep-intermediate",
+            ("-o", output),
+            stdin="func.func @foo() { return }",
+        )
+
+        assert "define void @foo" in output.read_text()
+        assert list(workspace.rglob("*.mlir"))
+        assert list(workspace.rglob("*.ll"))
+
+    def test_bytecode_file(self, tmp_path):
+        """The compiler can read back MLIR bytecode written to a file."""
+        output = tmp_path / "output.mlirbc"
+        assert (
+            _catalyst(("--tool", "opt"), "--emit-bytecode", ("-o", output), stdin="module {}") == ""
+        )
+        assert "module" in _catalyst(("--tool", "opt"), str(output))
+
+
 class TestCompilerDiagnostics:
     """Unit tests for diagnostics emitted by the Catalyst subprocess."""
 

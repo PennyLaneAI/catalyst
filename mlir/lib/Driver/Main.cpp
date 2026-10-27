@@ -278,22 +278,25 @@ llvm::LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOu
     if (!outfile) {
         llvm::errs() << errorMessage << "\n";
         return llvm::failure();
-    } else if (output.outputFilename == "-" && llvmModule) {
+    } else if (llvmModule) {
         outfile->os() << *llvmModule;
-        outfile->keep();
-    } else if (output.outputFilename == "-" && mlirModule) {
+    } else if (mlirModule) {
         if (options.shouldEmitBytecode) {
-            return mlir::writeBytecodeToFile(mlirModule.get(), outfile->os());
+            if (failed(mlir::writeBytecodeToFile(mlirModule.get(), outfile->os()))) {
+                return llvm::failure();
+            }
         } else {
             mlirModule->print(outfile->os(), opPrintingFlags);
-            outfile->keep();
         }
     }
 
-    if (options.keepIntermediate and output.outputFilename != "-") {
-        outfile->os() << output.outIR;
-        outfile->keep();
+    outfile->os().flush();
+    if (outfile->os().has_error()) {
+        llvm::errs() << "Failed to write output: " << outfile->os().error().message() << "\n";
+        outfile->os().clear_error();
+        return llvm::failure();
     }
+    outfile->keep();
 
     return llvm::success();
 }

@@ -21,13 +21,13 @@ ability to run each stage individually. For example:
 .. code-block:: console
 
     # Run MLIR passes, returning LLVM-dialect MLIR
-    catalyst --tool=opt input.mlir > llvm-dialect.mlir
+    catalyst --tool=opt input.mlir -o llvm-dialect.mlir
 
     # Translate LLVM-dialect MLIR to LLVM IR
-    catalyst --tool=translate llvm-dialect.mlir > llvm-ir.ll
+    catalyst --tool=translate llvm-dialect.mlir -o llvm-ir.ll
 
     # Run Catalyst's LLVM transformations
-    catalyst --tool=llvm-opt llvm-ir.ll > optimized.ll
+    catalyst --tool=llvm-opt llvm-ir.ll -o optimized.ll
 
     # Generate object.o from backend-ready LLVM IR
     catalyst --tool=llc optimized.ll --module-name object
@@ -37,10 +37,10 @@ Stages can be combined for a partial or full execution of the pipeline:
 .. code-block:: console
 
     # Run MLIR passes and translation in one invocation, without LLVM transformations
-    catalyst --tool=opt-translate input.mlir > llvm-ir.ll
+    catalyst --tool=opt-translate input.mlir -o llvm-ir.ll
 
     # Run through LLVM transformations in one invocation, without object generation
-    catalyst --tool=opt-translate-llvm input.mlir > optimized.ll
+    catalyst --tool=opt-translate-llvm input.mlir -o optimized.ll
 
     # Full compilation from mlir to object code
     catalyst input.mlir
