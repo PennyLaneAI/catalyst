@@ -507,12 +507,6 @@ class Compiler:
         if self.options.verbose:
             print(f"[LIB] Running compiler driver in {workspace}", file=self.options.logfile)
 
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".mlir", dir=str(workspace), delete=False
-        ) as tmp_infile:
-            tmp_infile_name = tmp_infile.name
-            tmp_infile.write(ir)
-
         match self.options.compiler_tool:
             case "opt":
                 suffix = ".mlir"
@@ -524,25 +518,30 @@ class Compiler:
                 assert False, "unknown compiler tool"
         output_filename = os.path.join(str(workspace), f"{module_name}{suffix}")
 
-        cmd = self.get_cli_command(tmp_infile_name, output_filename, module_name, workspace)
-        try:
-            if self.options.verbose:
-                print(f"[SYSTEM] {' '.join(cmd)}", file=self.options.logfile)
-            result = subprocess.run(cmd, check=True, capture_output=True, text=True)
-            if self.options.verbose or os.getenv("ENABLE_DIAGNOSTICS"):
-                if result.stdout:
-                    print(result.stdout.strip(), file=self.options.logfile)
-                if result.stderr:
-                    print(result.stderr.strip(), file=self.options.logfile)
-        except subprocess.CalledProcessError as e:  # pragma: nocover
-            raise CompileError(f"catalyst failed with error code {e.returncode}: {e.stderr}") from e
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".mlir", dir=str(workspace)
+        ) as tmp_infile:
+            tmp_infile.write(ir)
+            tmp_infile.flush()
+
+            cmd = self.get_cli_command(tmp_infile.name, output_filename, module_name, workspace)
+            try:
+                if self.options.verbose:
+                    print(f"[SYSTEM] {' '.join(cmd)}", file=self.options.logfile)
+                result = subprocess.run(cmd, check=True, capture_output=True, text=True)
+                if self.options.verbose or os.getenv("ENABLE_DIAGNOSTICS"):
+                    if result.stdout:
+                        print(result.stdout.strip(), file=self.options.logfile)
+                    if result.stderr:
+                        print(result.stderr.strip(), file=self.options.logfile)
+            except subprocess.CalledProcessError as e:  # pragma: nocover
+                raise CompileError(
+                    f"catalyst failed with error code {e.returncode}: {e.stderr}"
+                ) from e
 
         if self.options.link:
             output_filename = LinkerDriver.run(output_filename, options=self.options)
 
-        # Clean up temporary files
-        if os.path.exists(tmp_infile_name):
-            os.remove(tmp_infile_name)
         return str(pathlib.Path(output_filename).absolute())
 
     def has_xdsl_passes_in_transform_modules(self, mlir_module):
