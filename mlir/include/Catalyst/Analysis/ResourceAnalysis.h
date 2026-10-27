@@ -100,7 +100,8 @@ class ResourceAnalysis {
     // categorize and count a single operation
     void collectOperation(Operation *op, ResourceResult &result, bool isAdjoint,
                           unsigned numControlQubits) const;
-    void collectDetailedOperation(Operation *op, ResourceResult &result, bool isAdjoint) const;
+    void collectDetailedOperation(Operation *op, ResourceResult &result, bool isAdjoint,
+                                  unsigned numControlQubits) const;
 };
 
 } // namespace catalyst

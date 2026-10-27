@@ -30,8 +30,10 @@ namespace catalyst {
 namespace quantum {
 
 std::string defaultGetGraphOpId(mlir::Operation *op);
+std::string defaultGetGraphOpIdExplicitModifiers(mlir::Operation *op, bool isAdjoint,
+                                                 unsigned numControlQubits);
 
-}
+} // namespace quantum
 } // namespace catalyst
 
 #include "Quantum/IR/QuantumInterfaces.h.inc"

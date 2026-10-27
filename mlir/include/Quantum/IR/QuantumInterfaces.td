@@ -222,6 +222,11 @@ def DecomposableGate : OpInterface<"DecomposableGate", [QuantumGate]> {
             "depends on identical id generation."
             "In general, this should be computed by the default here and not overridden.",
             "std::string", "getGraphOpId", (ins), [{}], [{ return ::catalyst::quantum::defaultGetGraphOpId($_op.getOperation()); }]
+        >,
+        InterfaceMethod<
+            "Obtains the operation's ID in the same format as getGraphOpId, but with modifiers applied. "
+            "the actual modifiers attributes of the operation are disregarded, and the ID is computed based on the base operator id and explicit modifiers.",
+            "std::string", "getGraphOpIdExplicitModifiers", (ins "bool":$is_adjoint, "unsigned":$num_control_qubits), [{}], [{ return ::catalyst::quantum::defaultGetGraphOpIdExplicitModifiers($_op.getOperation(), is_adjoint, num_control_qubits); }]
         >
     ];
 }
