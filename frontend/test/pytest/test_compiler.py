@@ -20,6 +20,7 @@ import io
 import os
 import pathlib
 import platform
+import re
 import subprocess
 import sys
 import tempfile
@@ -30,7 +31,7 @@ import numpy as np
 import pennylane as qp
 import pytest
 
-from catalyst import QJIT, qjit
+from catalyst import grad, qjit
 from catalyst.compiler import (
     CompileOptions,
     Compiler,
@@ -505,46 +506,19 @@ class TestCompilerState:
         assert f.llvmir is None
         assert f.compiled_function is None
 
-    def test_mlir_only_qjit_compile(self):
-        """Test that the QJIT compilation stage can be run without LLVM lowering or linking."""
-
-        test_pipes = [("test_pipe", ["canonicalize"])]
-
-        def f(x):
-            return x + 1.0
-
-        log = io.StringIO()  # for inspection
-        options = CompileOptions(
-            lower_to_llvm=False, link=False, pipelines=test_pipes, verbose=True, logfile=log
-        )
-
-        compiled = QJIT(f, options)
-        compiled.workspace = compiled._get_workspace()  # pylint: disable=protected-access
-
-        # Call individual QJIT stages
-        compiled.jaxpr, *_ = compiled.capture((0.5,))
-        compiled.mlir_module = compiled.generate_ir()
-        compiled.compile()
-
-        logtext = log.getvalue()
-        assert "MLIR parsing successful" in logtext
-        assert "opt transformations successful" in logtext
-        assert "LLVMIR translation successful" not in logtext
-        assert "object code generation successful" not in logtext
-        assert "Compilation successful" in logtext
-        assert "object linking successful" not in logtext
-
-        # since these are not advertised options, an assertion should be okay
-        with pytest.raises(AssertionError, match="invalid options for jit_compile"):
-            compiled(0.5)
-
     @pytest.mark.parametrize(
-        "target, num_stages_run", [("mlir_opt", 1), ("llvmir", 3), ("binary", 4)]
+        "target, num_stages_run, suffix",
+        [
+            ("mlir_opt", 1, ".mlir"),
+            ("llvmir", 2, ".ll"),
+            ("llvmir_opt", 2, ".ll"),
+            ("object", 3, ".o"),
+            ("binary", 4, ".so"),
+        ],
     )
-    def test_aot_compile_up_to_target(self, target, num_stages_run):
+    def test_aot_compile_up_to_target(self, target, num_stages_run, suffix):
         """Test that ahead-of-time compilation stops at the target, and that a later call still
         compiles the function to a shared library and runs it."""
-
         stages = [
             "opt transformations successful",
             "LLVMIR translation successful",
@@ -564,7 +538,52 @@ class TestCompilerState:
             assert stage in logtext
         for stage in stages[num_stages_run:]:
             assert stage not in logtext
+        workspace = pathlib.Path(str(f.workspace))
+        (artifact,) = workspace.glob(f"*{suffix}")
+        assert artifact.stat().st_size > 0
+        if suffix == ".mlir":
+            assert "llvm.func" in artifact.read_text()
+        elif suffix == ".ll":
+            assert "define" in artifact.read_text()
+        if target != "binary":
+            assert f.compiled_function is None
+            assert not f.fn_cache.cache
+            assert not list(workspace.glob("*.so"))
+        else:
+            assert f.compiled_function is not None
+            assert f.fn_cache.cache
+        if target not in ("object", "binary"):
+            assert not list(workspace.glob("*.o"))
+        assert f.compile_options.compiler_tool == "all"
+        assert f.compile_options.link
         assert f(0.5) == 1.5
+
+    @pytest.mark.parametrize("target", ["llvmir", "llvmir_opt"])
+    def test_aot_llvm_optimization(self, target):
+        """LLVM targets stop before or after resolving autodiff calls."""
+
+        @qjit(target=target)
+        def f(x: float):
+            return grad(lambda y: y * y)(x)
+
+        workspace = pathlib.Path(str(f.workspace))
+        (output,) = workspace.glob("*.ll")
+        has_autodiff = re.search(r"\bcall\b[^\n]*@__enzyme_autodiff", output.read_text())
+        assert bool(has_autodiff) == (target == "llvmir")
+        assert not list(workspace.glob("*.o"))
+        assert f(3.0) == 6.0
+
+    def test_aot_custom_pipeline(self):
+        """AOT runs the configured MLIR pipeline."""
+
+        @qjit(target="mlir_opt", pipelines=[("canonicalization", ["canonicalize"])])
+        def f(x: float):
+            return x + 1
+
+        workspace = pathlib.Path(str(f.workspace))
+        (output,) = workspace.glob("*.mlir")
+        assert "func.func" in output.read_text()
+        assert "llvm.func" not in output.read_text()
 
     def test_mlir_opt_target_without_llvmir(self):
         """Test that the MLIR returned by the compiler for the ``mlir_opt`` target, when
@@ -581,7 +600,7 @@ class TestCompilerState:
         assert f.llvm_ir is None
         f.workspace.cleanup()
 
-    @pytest.mark.parametrize("target", ["mlir_opt", "llvmir"])
+    @pytest.mark.parametrize("target", ["mlir_opt", "llvmir", "llvmir_opt", "object", "binary"])
     def test_compile_options_restored_on_error(self, target):
         """Test that the compile options set for the target are restored when the ahead-of-time
         compilation fails."""
@@ -593,7 +612,7 @@ class TestCompilerState:
         with pytest.raises(CompileError, match="Failed to lower MLIR module"):
             f.aot_compile(0.5)
 
-        assert f.compile_options.lower_to_llvm
+        assert f.compile_options.compiler_tool == "all"
         assert f.compile_options.link
 
     def test_callable_without_name(self):

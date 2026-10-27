@@ -127,12 +127,14 @@ def qjit(
         autograph_include: A list of (sub)modules to be allow-listed for autograph conversion.
         async_qnodes (bool): Experimental support for automatically executing
             QNodes asynchronously, if supported by the device runtime.
-        target (str): The compilation target.
+        target (str): The ahead-of-time compilation target.
 
             - ``"jaxpr"``: The function is traced to a JAXPR.
             - ``"mlir"``: The function is lowered to MLIR, without running the MLIR passes.
             - ``"mlir_opt"``: The MLIR passes are run, without translating the result to LLVM IR.
-            - ``"llvmir"``: The function is compiled to LLVM IR and object code, without linking.
+            - ``"llvmir"``: The function is lowered and translated to LLVM IR.
+            - ``"llvmir_opt"``: The LLVM passes are run, without generating object code.
+            - ``"object"``: The function is compiled to object code, without linking.
             - ``"binary"`` (default): The function is compiled to a shared library.
 
             Regardless of the target, the function is compiled to a shared library when it is
@@ -751,22 +753,27 @@ class QJIT(CatalystCallable):
 
         self.workspace = self._get_workspace()
 
-        # TODO: awkward, refactor or redesign the target feature
-        if self.compile_options.target in ("jaxpr", "mlir", "mlir_opt", "llvmir", "binary"):
-            self.jaxpr, self.out_type, self.out_treedef, self.c_sig = self.capture(args, **kwargs)
+        target = self.compile_options.target
+        if target not in ("jaxpr", "mlir", "mlir_opt", "llvmir", "llvmir_opt", "object", "binary"):
+            raise ValueError(f"Invalid AOT compilation target '{target}'")
 
-        if self.compile_options.target in ("mlir", "mlir_opt", "llvmir", "binary"):
-            self._configure_backline()
-            self.mlir_module = self.generate_ir()
+        self.jaxpr, self.out_type, self.out_treedef, self.c_sig = self.capture(args, **kwargs)
+        if target == "jaxpr":
+            return
 
-        if self.compile_options.target in ("mlir_opt", "llvmir", "binary"):
-            with _target_compile_options(self.compile_options):
-                self.compiled_function, llvm_ir = self.compile()
-            # With target="mlir_opt", the IR returned by the compiler is MLIR instead of LLVM IR.
-            self.llvm_ir = None if self.compile_options.target == "mlir_opt" else llvm_ir
+        self._configure_backline()
+        self.mlir_module = self.generate_ir()
+        if target == "mlir":
+            return
 
-        if self.compile_options.target in ("binary",) and self.compile_options.link:
-            self.fn_cache.insert(self.compiled_function, args, self.out_treedef, self.workspace)
+        with _target_compile_options(self.compile_options):
+            self.compiled_function, llvm_ir = self.compile()
+        # With target="mlir_opt", the IR returned by the compiler is MLIR instead of LLVM IR.
+        self.llvm_ir = None if self.compile_options.target == "mlir_opt" else llvm_ir
+        if target != "binary":
+            return
+
+        self.fn_cache.insert(self.compiled_function, args, self.out_treedef, self.workspace)
 
     @property
     def llvmir(self):
@@ -793,7 +800,7 @@ class QJIT(CatalystCallable):
                   function
         """
         opts = self.compile_options
-        assert opts.lower_to_llvm and opts.link, "invalid options for jit_compile"
+        assert opts.compiler_tool == "all" and opts.link, "invalid options for jit_compile"
 
         cached_fn, requires_promotion = self.fn_cache.lookup(args)
 
@@ -1192,7 +1199,7 @@ def _ensure_capture_mode(enable_capture: bool):
 
 @contextmanager
 def _target_compile_options(options: CompileOptions):
-    """Set the ``lower_to_llvm`` and ``link`` compile options for the compilation target, for the
+    """Set the ``compiler_tool`` and ``link`` compile options for the compilation target, for the
     duration of the context.
 
     The original values are restored on exit, since the function must still be compiled to a
@@ -1201,17 +1208,22 @@ def _target_compile_options(options: CompileOptions):
     Args:
         options (CompileOptions): The compile options to set for their target.
     """
-    original_values = options.lower_to_llvm, options.link
+    original_values = options.compiler_tool, options.link
 
-    if options.target == "mlir_opt":
-        options.lower_to_llvm, options.link = False, False
-    elif options.target == "llvmir":
-        options.lower_to_llvm, options.link = True, False
+    tools = {
+        "mlir_opt": "opt",
+        "llvmir": "opt-translate",
+        "llvmir_opt": "opt-translate-llvm",
+        "object": "all",
+        "binary": "all",
+    }
+    if options.target in tools:
+        options.compiler_tool, options.link = tools[options.target], options.target == "binary"
 
     try:
         yield
     finally:
-        options.lower_to_llvm, options.link = original_values
+        options.compiler_tool, options.link = original_values
 
 
 @Transform.generic_register

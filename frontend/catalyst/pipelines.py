@@ -119,8 +119,7 @@ class CompileOptions:
             for autograph conversion.
         async_qnodes (Optional[bool]): Flag indicating whether experimental asynchronous execution
             of QNodes support is to be enabled.
-        lower_to_llvm (Optional[bool]): Flag indicating whether to attempt the LLVM lowering after
-            the main compilation pipeline is complete. Default is ``True``.
+        compiler_tool (str): Internal compiler driver tool selection. Defaults to ``"all"``.
         static_argnums (Optional[Union[int, Iterable[int]]]): Indices of static arguments.
             Default is ``None``.
         static_argnames (Optional[Union[str, Iterable[str]]]): Names of static arguments.
@@ -165,7 +164,7 @@ class CompileOptions:
     static_argnums: Optional[Union[int, Iterable[int]]] = None
     static_argnames: Optional[Union[str, Iterable[str]]] = None
     abstracted_axes: Optional[Union[Iterable[Iterable[str]], Dict[int, str]]] = None
-    lower_to_llvm: Optional[bool] = True
+    compiler_tool: str = "all"
     checkpoint_stage: Optional[str] = ""
     disable_assertions: Optional[bool] = False
     seed: Optional[int] = None

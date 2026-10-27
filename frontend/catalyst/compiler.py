@@ -472,8 +472,7 @@ class Compiler:
             cmd (str): The command to be executed.
         """
         opts = _options_to_cli_flags(self.options)
-        if not self.options.lower_to_llvm:
-            opts += [("--tool", "opt")]
+        opts += [("--tool", self.options.compiler_tool)]
         cmd = _get_catalyst_cli_cmd(
             ("-o", output_filename),
             ("--module-name", module_name),
@@ -504,6 +503,9 @@ class Compiler:
         ), f"Compiler expects a Directory type, got {type(workspace)}."
         assert workspace.is_dir(), f"Compiler expects an existing directory, got {workspace}."
 
+        if self.options.link:
+            assert self.options.compiler_tool in ("all", "llc"), "linking requires an object file"
+
         if self.options.verbose:
             print(f"[LIB] Running compiler driver in {workspace}", file=self.options.logfile)
 
@@ -513,8 +515,16 @@ class Compiler:
             tmp_infile_name = tmp_infile.name
             tmp_infile.write(ir)
 
-        output_object_name = os.path.join(str(workspace), f"{module_name}.o")
-        output_filename = output_object_name if self.options.lower_to_llvm else os.devnull
+        match self.options.compiler_tool:
+            case "opt":
+                suffix = ".mlir"
+            case "translate" | "opt-translate" | "llvm-opt" | "opt-translate-llvm":
+                suffix = ".ll"
+            case "llc" | "all":
+                suffix = ".o"
+            case _:
+                assert False, "unknown compiler tool"
+        output_filename = os.path.join(str(workspace), f"{module_name}{suffix}")
 
         cmd = self.get_cli_command(tmp_infile_name, output_filename, module_name, workspace)
         try:
@@ -530,7 +540,7 @@ class Compiler:
             raise CompileError(f"catalyst failed with error code {e.returncode}: {e.stderr}") from e
 
         if self.options.link:
-            output = LinkerDriver.run(output_object_name, options=self.options)
+            output = LinkerDriver.run(output_filename, options=self.options)
             output = str(pathlib.Path(output).absolute())
         else:
             output = None
