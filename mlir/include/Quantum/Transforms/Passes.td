@@ -244,6 +244,95 @@ def GraphDecompositionPass : Pass<"graph-decomposition", "mlir::ModuleOp"> {
     ];
 }
 
+def ResourceEstimatePass : Pass<"resource-estimate", "mlir::ModuleOp"> {
+    let summary = "Estimate resources by projecting gate counts onto a target gate set.";
+    let description = [{
+        Solves the decomposition graph for the target gate set like `graph-decomposition`, but
+        without applying the chosen rules. Then runs resource analysis and replaces each gate in
+        the entry function's flattened resources with the basis gates of its chosen rule, scaled
+        by the gate's count.
+
+        Basis gates are recorded with -1 wires and params, as these cannot be reliably recovered
+        from a graph op id.
+
+        Usage:
+            quantum-opt input.mlir -resource-estimate='output-json gate-set=RX=1.0,RZ=1.0'
+    }];
+
+    let options = [
+        Option<
+            /*C++ var name=*/"outputJson",
+            /*CLI arg name=*/"output-json",
+            /*type=*/"bool",
+            /*default=*/"false",
+            /*description=*/"Output resource counts as JSON. Prints to stdout unless output-fname is set"
+        >,
+        Option<
+            /*C++ var name=*/"outputFname",
+            /*CLI arg name=*/"output-fname",
+            /*type=*/"std::string",
+            /*default=*/"",
+            /*description=*/"The filename to save the output JSON to (only when output-json is true)"
+        >,
+        ListOption<
+            /*C++ name*/"targetGateSetOption",
+            /*CLI name*/"gate-set",
+            /*Type*/"std::string",
+            /*Description*/"The accepted gates to decompose to.">,
+        ListOption<
+            /*C++ name*/"fixedDecompsOption",
+            /*CLI name*/"fixed-decomps",
+            /*Type*/"std::string",
+            /*Description*/"Maps an operator to a decomposition rule that will be applied.">,
+        ListOption<
+            /*C++ name*/"altDecompsOption",
+            /*CLI name*/"alt-decomps",
+            /*Type*/"std::string",
+            /*Description*/
+            "Maps an operator to a list of alternative decomposition rules that will be considered"
+            " alongside any built-in rules for the operator.">,
+        Option<
+            /*C++ name*/"bytecodeRulesFile",
+            /*CLI name*/"bytecode-rules",
+            /*Type*/"std::string",
+            /*Default*/[{ "" }],
+            /*Description*/"A path to a bytecode file of compiled decomposition rules.">,
+        Option<
+            /*C++ name*/"libQPDPath",
+            /*CLI name*/"libQPD-path",
+            /*Type*/"std::string",
+            /*Default*/[{ "" }],
+            /*Description*/"A path to the QuantumPythonDecompositions dynamic library.">,
+        Option<
+            /*C++ name*/"libpythonPath",
+            /*CLI name*/"libpython-path",
+            /*Type*/"std::string",
+            /*Default*/[{ "" }],
+            /*Description*/"A path to the python shared library.">,
+        Option<
+            /*C++ name*/"verboseOption",
+            /*CLI name*/"verbose",
+            /*Type*/"bool",
+            /*Default*/[{ false }],
+            /*Description*/"Print the decomposition rule chosen for each operator to stderr.">
+    ];
+
+    let dependentDialects = [
+        "memref::MemRefDialect",
+        "func::FuncDialect",
+        "scf::SCFDialect",
+        "LLVM::LLVMDialect",
+        "stablehlo::StablehloDialect",
+        "tensor::TensorDialect",
+        "index::IndexDialect",
+        "complex::ComplexDialect",
+        "catalyst::CatalystDialect",
+        "catalyst::qref::QRefDialect",
+        "catalyst::pbc::PBCDialect",
+        "catalyst::mbqc::MBQCDialect",
+    ];
+}
+
 def ResolveStatePrepOperatorPass : Pass<"resolve-state-prep-operator"> {
     let summary = "Replace all quantum.operator ops of StatePrep/BasisState to equivalent quantum.set_state/set_basis_state operations ";
 }

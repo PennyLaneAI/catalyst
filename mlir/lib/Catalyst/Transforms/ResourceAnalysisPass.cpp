@@ -106,6 +106,11 @@ struct ResourceAnalysisPass : public impl::ResourceAnalysisPassBase<ResourceAnal
         StringRef entry = analysis.getEntryFunc();
         if (!entry.empty()) {
             if (const ResourceResult *flat = analysis.getFlattenedResource(entry)) {
+                // for (auto &opEntry : flat->detailedOperations) {
+                //     // opEntry.getKey() is the GOID
+                //     // opEntry.getValue() is the count
+
+                // }
                 accumulateStats(*flat);
             }
         } else {
