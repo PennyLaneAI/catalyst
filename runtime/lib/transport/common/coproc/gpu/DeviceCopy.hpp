@@ -20,8 +20,9 @@
 namespace catalyst::transport::coproc {
 
 /// Copy `n` bytes on the device, shared among `lanes` threads that all make the same call, this
-/// one being `lane`. Each copies its 16 B chunks where both ends are 16 B aligned, then its share
-/// of the remaining bytes. A group of one copies everything itself.
+/// one being `lane`. Each copies its 16 B chunks where both ends are 16 B aligned (8 B chunks
+/// where they are 8 B aligned, as a CUQR payload at byte 24 is), then its share of the remaining
+/// bytes. A group of one copies everything itself.
 ///
 /// Sharing matters because each load from the uncached request ring takes about 0.5 us, and one
 /// thread waits for its loads one after another; a group issues them together and waits about
@@ -34,11 +35,18 @@ __device__ inline void device_copy(std::uint8_t *dst, const std::uint8_t *src, s
         return;
     }
     std::uint32_t done = 0;
-    if (n > 16 && ((reinterpret_cast<std::uintptr_t>(dst) | reinterpret_cast<std::uintptr_t>(src)) &
-                   15U) == 0) {
+    const auto align =
+        reinterpret_cast<std::uintptr_t>(dst) | reinterpret_cast<std::uintptr_t>(src);
+    if (n > 16 && (align & 15U) == 0) {
         done = n & ~15U;
         for (std::uint32_t i = lane * 16; i < done; i += lanes * 16) {
             *reinterpret_cast<int4 *>(dst + i) = *reinterpret_cast<const int4 *>(src + i);
+        }
+    } else if (n > 16 && (align & 7U) == 0) {
+        done = n & ~7U;
+        for (std::uint32_t i = lane * 8; i < done; i += lanes * 8) {
+            *reinterpret_cast<std::uint64_t *>(dst + i) =
+                *reinterpret_cast<const std::uint64_t *>(src + i);
         }
     }
     for (std::uint32_t i = done + lane; i < n; i += lanes) {

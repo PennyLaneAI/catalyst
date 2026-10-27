@@ -58,32 +58,38 @@ using DeviceDecodeFn = std::uint32_t (*)(const std::uint8_t *in, std::uint32_t l
  * CoprocLaunchDesc).
  *
  * @tparam DECODE The device decoder.
- * @tparam BL16 Whether `ring` holds 16 B frames. A compile-time mode keeps the BLV branches out of
- *              the 16 B hot loop, which costs about 0.1 us per message otherwise (MI210).
+ * @tparam MODE The frame layout of both rings. A compile-time mode keeps the other layouts'
+ *              branches out of the 16 B hot loop, which costs about 0.1 us per message otherwise
+ *              (MI210).
  * @param requests Request ring, written by the peer: RDMA writes into HBM, or the host.
  * @param replies Host-mapped reply ring the CPU reads, same layout.
  * @param stop Host-mapped teardown flag; nonzero means exit. Sampled only every
  *             STOP_POLL_INTERVAL spins (host-coherent read over PCIe).
  * @param total Number of messages to process, or 0 to run until stopped.
  * @param ring The frame layout and slot geometry of both rings.
+ * @param rx_flags, tx_flags CUQR only: the per-slot arrival and reply flags (CoprocLaunchDesc).
  */
-template <DeviceDecodeFn DECODE, bool BL16>
+template <DeviceDecodeFn DECODE, frame::Mode MODE>
 __global__ void fused(const std::uint8_t *requests, std::uint8_t *replies,
-                      volatile std::uint32_t *stop, std::uint64_t total, frame::RingGeometry ring) {
+                      volatile std::uint32_t *stop, std::uint64_t total, frame::RingGeometry ring,
+                      volatile std::uint32_t *rx_flags, volatile std::uint32_t *tx_flags) {
     if (blockIdx.x != 0) {
         return;
     }
     const std::uint32_t lane = threadIdx.x;
     const std::uint32_t lanes = blockDim.x;
     const bool lead = lane == 0;
-    constexpr bool bl16 = BL16;
+    constexpr bool bl16 = MODE == frame::Mode::BL16;
+    constexpr bool cuqr = MODE == frame::Mode::CUQR;
     // A 16 B frame is decoded and published by one thread, so the others leave, and the lead
     // runs with no barrier on its hot path.
     if (bl16 && !lead) {
         return;
     }
-    const auto cap = static_cast<std::uint32_t>(ring.stride - sizeof(frame::BlvHeader) -
-                                                frame::BLV_COMPLETION_BYTES);
+    // Where the payload starts, fixed by the layout.
+    constexpr std::size_t header = cuqr ? sizeof(frame::CuqrHeader) : sizeof(frame::BlvHeader);
+    const auto cap =
+        static_cast<std::uint32_t>(ring.stride - header - (cuqr ? 0 : frame::BLV_COMPLETION_BYTES));
     __shared__ bool halted; // the lead's stop decision, one for the whole block
     for (std::uint64_t cursor = 0; total == 0 || cursor < total; ++cursor) {
         const std::uint32_t expect = static_cast<std::uint32_t>(cursor + 1);
@@ -95,8 +101,10 @@ __global__ void fused(const std::uint8_t *requests, std::uint8_t *replies,
         // spins to keep it off the request-detection hot path. Stop is a teardown flag.
         bool stopping = false;
         if (lead) {
+            // CUQR polls rx_flags in host memory, across PCIe (see doc/dev/backline.rst).
             const volatile std::uint32_t *done =
-                reinterpret_cast<const volatile std::uint32_t *>(req + ring.poll_offset());
+                cuqr ? rx_flags + (cursor & (ring.slots - 1))
+                     : reinterpret_cast<const volatile std::uint32_t *>(req + ring.poll_offset());
             for (std::uint32_t spins = 0; *done != expect; ++spins) {
                 if ((spins & (STOP_POLL_INTERVAL - 1)) == 0u && stop && *stop != 0) {
                     stopping = true;
@@ -135,14 +143,47 @@ __global__ void fused(const std::uint8_t *requests, std::uint8_t *replies,
             __threadfence_system();
             continue;
         }
+        if (cuqr) {
+            // CUQR: the payload, then cudaq-realtime's RPCResponse, then the reply flag last.
+            const volatile frame::CuqrHeader *rh =
+                reinterpret_cast<const volatile frame::CuqrHeader *>(req);
+            // Not a frame (wrong magic, or longer than its slot): no reply, the host drops it.
+            if (rh->magic != frame::CUQR_MAGIC || rh->len > cap) {
+                if (lead) {
+                    *reinterpret_cast<volatile std::uint32_t *>(rep) = 0;
+                    __threadfence_system();
+                    tx_flags[cursor & (ring.slots - 1)] = expect;
+                    __threadfence_system();
+                }
+                continue;
+            }
+            const std::uint32_t fn_id = rh->word;
+            const std::uint32_t len = rh->len;
+            const std::uint32_t request_id = rh->request_id;
+            const std::uint64_t t_ptp_ns = rh->t_ptp_ns;
+            const std::uint32_t written =
+                DECODE(req + header, len, fn_id, rep + header, cap, lane, lanes);
+            if (lead) { // magic, status 0 (a device decoder cannot fail), len, the request's id
+                *reinterpret_cast<int4 *>(rep) =
+                    int4{static_cast<int>(frame::CUQS_MAGIC), 0, static_cast<int>(written),
+                         static_cast<int>(request_id)};
+                *reinterpret_cast<std::uint64_t *>(rep + 16) = t_ptp_ns;
+            }
+            __threadfence_system();
+            __syncthreads();
+            if (lead) {
+                tx_flags[cursor & (ring.slots - 1)] = expect;
+                __threadfence_system();
+            }
+            continue;
+        }
         // BLV: the payload, then the header, then the completion word last.
         const volatile frame::BlvHeader *rh =
             reinterpret_cast<const volatile frame::BlvHeader *>(req);
         const std::uint32_t fn_id = rh->fn_id;
         const std::uint32_t len = rh->len < cap ? rh->len : cap;
-        std::uint8_t *out = rep + ring.data_offset();
-        const std::uint32_t written =
-            DECODE(req + ring.data_offset(), len, fn_id, out, cap, lane, lanes);
+        std::uint8_t *out = rep + header;
+        const std::uint32_t written = DECODE(req + header, len, fn_id, out, cap, lane, lanes);
         // The header, as two 16 B stores built in registers: a local BlvHeader would live in
         // scratch memory, which slows every message, 16 B frames included.
         if (lead) {
@@ -167,22 +208,31 @@ static_assert(offsetof(frame::BlvHeader, version) == 4 && offsetof(frame::BlvHea
                   offsetof(frame::BlvHeader, len) == 20 &&
                   offsetof(frame::BlvHeader, t_ptp_ns) == 24,
               "fused writes the BLV header as two int4 in this layout");
+static_assert(offsetof(frame::CuqrHeader, len) == 8 &&
+                  offsetof(frame::CuqrHeader, request_id) == 12 &&
+                  offsetof(frame::CuqrHeader, t_ptp_ns) == 16,
+              "fused writes the CUQR header as an int4 and a uint64 in this layout");
 
-// Launch fused<DECODE> on the session-owned stream, wired to the datapath in `desc`.
+// Launch fused<DECODE, mode> on the session-owned stream, wired to the datapath in `desc`.
 template <DeviceDecodeFn DECODE> static void launch(const CoprocLaunchDesc *desc) {
-    TP_CHECK(desc->frame_mode == static_cast<std::uint32_t>(frame::Mode::BL16) ||
-                 desc->frame_mode == static_cast<std::uint32_t>(frame::Mode::BLV),
+    TP_CHECK(desc->frame_mode <= static_cast<std::uint32_t>(frame::Mode::CUQR),
              "GPU launcher: frame mode %u is not implemented", desc->frame_mode);
     const frame::RingGeometry ring{
         .mode = static_cast<frame::Mode>(desc->frame_mode),
         .slots = desc->ring_slots,
         .stride = desc->slot_stride,
     };
-    auto *kernel = ring.mode == frame::Mode::BL16 ? fused<DECODE, true> : fused<DECODE, false>;
+    TP_CHECK(ring.mode != frame::Mode::CUQR || (desc->rx_flags && desc->tx_flags),
+             "GPU launcher: CUQR frames need rx_flags and tx_flags");
+    auto *kernel = ring.mode == frame::Mode::BL16  ? fused<DECODE, frame::Mode::BL16>
+                   : ring.mode == frame::Mode::BLV ? fused<DECODE, frame::Mode::BLV>
+                                                   : fused<DECODE, frame::Mode::CUQR>;
     hipLaunchKernelGGL(
         kernel, dim3(1), dim3(KERNEL_THREADS), 0, static_cast<hipStream_t>(desc->stream),
         static_cast<const std::uint8_t *>(desc->ring), static_cast<std::uint8_t *>(desc->handoff),
-        static_cast<volatile std::uint32_t *>(desc->stop), desc->total, ring);
+        static_cast<volatile std::uint32_t *>(desc->stop), desc->total, ring,
+        static_cast<volatile std::uint32_t *>(desc->rx_flags),
+        static_cast<volatile std::uint32_t *>(desc->tx_flags));
     HIP_CHECK(hipGetLastError(), "kernel launch");
 }
 
