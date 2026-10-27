@@ -248,7 +248,7 @@ class GraphOpID:
             return {}
         return {
             static_argname: getattr(self.op, static_argname)
-            for static_argname in sorted(self.op.compilable_argnames)
+            for static_argname in self.op.compilable_argnames
         }
 
     def parse_extra_data(self):
