@@ -17,10 +17,9 @@
 # pylint: disable=protected-access,bare-except
 
 import itertools
-import re
 import warnings
 from collections import deque
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 
 import jax.numpy as jnp
 import numpy as np
@@ -358,148 +357,6 @@ def unpack_rule_operands(
     return params, named, ctrl_wires, ctrl_values
 
 
-# Canonical nesting order for op-level modifiers, listed OUTERMOST first. The compiler's
-# ``wrapModifiers`` (mlir/lib/Quantum/IR/QuantumInterfaces.cpp) folds modifiers into a graphOpId
-# in this exact order:
-# 1. control outermost
-# 2. adjoint innermost
-# So a single op that is both controlled and adjointed always spells as ``C(Adjoint(Op))``,
-# never ``Adjoint(C(Op))``. This is a canonicalization. So the two spellings denote the same
-# operator and MUST map to the same graph node, or the solver would treat them as distinct gates
-# to match a rule against the op.
-# The parser (``parseOperator``) is a structural round-trip and does NOT re-order, so canonicity
-# has to be guaranteed here at the producer. We add future modifiers to this tuple at their
-# canonical depth.
-_MODIFIER_CANONICAL_ORDER = ("C", "Adjoint")
-
-
-def _modifier_kind(modifier: str) -> str:
-    """Normalise a modifier token to its canonical form."""
-    return "C" if modifier.endswith("C") else modifier
-
-
-def _control_modifier(n_ctrl: int) -> str:
-    """Return the graphOpId control-modifier token for ``n_ctrl`` controls.
-
-    A single control is written ``C`` and ``n > 1`` controls ``<n>C``, mirroring the compiler's
-    ``wrapModifiers``. Used with :func:`wrap_modifier_id`, e.g. ``wrap_modifier_id(op_id, "2C")``.
-    """
-    assert n_ctrl >= 1, "control modifier requires at least one control"
-    return "C" if n_ctrl == 1 else f"{n_ctrl}C"
-
-
-def wrap_modifiers_id(op_id: str, modifiers: ModifierState) -> str:
-    """Wrap ``modifiers`` around a graphOpId, adjoint innermost and control outermost."""
-    if modifiers.adjoint:
-        op_id = name_wrap_adjoint(op_id)
-    if modifiers.control_count:
-        op_id = wrap_modifier_id(op_id, _control_modifier(modifiers.control_count))
-    return op_id
-
-
-def _leading_modifier_kind(op_id: str) -> str | None:
-    """Return the canonical kind of ``op_id``'s current outermost modifier, or None if bare."""
-    if op_id.startswith("Adjoint("):
-        return "Adjoint"
-
-    if re.match(r"\d*C\(", op_id):
-        return "C"
-
-    return None
-
-
-def wrap_modifier_id(op_id: str, modifier: str) -> str:
-    """Name-wrap an op-level ``modifier`` around a graphOpId's operator name.
-
-    The modifier decorates the operator name only; the ``{param}{wire}{static}`` groups (and an
-    optional ``[uid]``) follow it, matching the compiler's ``defaultGetGraphOpId``. This applies to
-    any modifier (e.g. ``"Adjoint"``, ``"C"``), so nested ids compose as ``C(Adjoint(RX)){...}``.
-    Extend callers here to support future op-level modifiers.
-
-    Args:
-        op_id (str): the graphOpId to wrap
-        modifier (str): the modifier token, e.g. ``"Adjoint"``, ``"C"`` or ``"2C"``
-
-    Returns:
-        str: the modified graphOpId
-
-    Raises:
-        ValueError: if the modifier would nest inside one that is canonically outer
-    """
-    new_kind = _modifier_kind(modifier)
-    inner_kind = _leading_modifier_kind(op_id)
-    # The modifier is added as the new *outermost* layer. To keep graphOpIds canonical (see
-    # _MODIFIER_CANONICAL_ORDER), the new outer modifier must not belong *inside* one that is
-    # already applied (e.g. wrapping Adjoint around an already-controlled C(RX){...} would produce
-    # the non-canonical Adjoint(C(RX)) and is rejected, since the canonical form is C(Adjoint(RX))).
-    if inner_kind is not None:
-        new_rank = _MODIFIER_CANONICAL_ORDER.index(new_kind)
-        inner_rank = _MODIFIER_CANONICAL_ORDER.index(inner_kind)
-        if new_rank > inner_rank:
-            raise ValueError(
-                f"Non-canonical modifier order: cannot wrap {modifier!r} (canonically inner) "
-                f"around {op_id!r} whose outermost modifier {inner_kind!r} is canonically outer. "
-                f"Apply modifiers outermost-last in the order {_MODIFIER_CANONICAL_ORDER}."
-            )
-
-    # Only the operator name is wrapped; the first '{' begins the {param}{wire}{static}[uid] suffix
-    # (the dynamic-shape group is always present), which is carried through untouched.
-    assert "{" in op_id, f"Malformed op id for graph decomposition, got {op_id}"
-    split = op_id.find("{")
-    return f"{modifier}({op_id[:split]}){op_id[split:]}"
-
-
-def name_wrap_adjoint(op_id: str) -> str:
-    """Name-wrap the adjoint modifier around a graphOpId (``RX{...}`` -> ``Adjoint(RX){...}``)."""
-    return wrap_modifier_id(op_id, "Adjoint")
-
-
-def name_unwrap_adjoint(op_name: str, op_id: str) -> str:
-    """Inverse of :func:`name_wrap_adjoint` given the base ``op_name``.
-
-    Args:
-        op_name (str): the base operator's name
-        op_id (str): the adjoint graphOpId to unwrap
-
-    Returns:
-        str: the base operator's graphOpId
-
-    Raises:
-        ValueError: if ``op_id`` is not an adjoint id for ``op_name``
-    """
-    prefix = f"Adjoint({op_name})"
-    if not op_id.startswith(prefix):
-        raise ValueError(f"{op_id!r} is not an adjoint id for base op {op_name!r}")
-    return op_name + op_id[len(prefix) :]
-
-
-def name_unwrap_control(op_name: str, op_id: str):
-    """Inverse of control name-wrapping given the base ``op_name``.
-
-    ``("RX", "2C(RX){...}")`` -> ``("RX{...}", 2)`` and ``("RX", "C(RX){...}")`` -> ``("RX{...}", 1)``.
-
-    Args:
-        op_name (str): the base operator's name
-        op_id (str): the controlled graphOpId to unwrap
-
-    Returns:
-        str: the base operator's graphOpId
-        int: the number of controls
-
-    Raises:
-        ValueError: if ``op_id`` is not a control id for ``op_name``
-    """
-    i = 0
-    while i < len(op_id) and op_id[i].isdigit():
-        i += 1
-    digits = op_id[:i]
-    n_ctrl = int(digits) if digits else 1
-    prefix = f"{digits}C({op_name})"
-    if not op_id.startswith(prefix):
-        raise ValueError(f"{op_id!r} is not a control id for base op {op_name!r}")
-    return op_name + op_id[len(prefix) :], n_ctrl
-
-
 def get_rule_strings_from_module(module: ir.Module) -> list[str]:
     """Extract the decomposition rules held by a module as MLIR strings.
 
@@ -755,8 +612,6 @@ def build_decomp_target_spec(
     extra_data = extra_data or {}
     n_base_wires = sum(wire_lens.values())
     n_ctrl = modifiers.control_count
-    wrap_adjoint = modifiers.adjoint
-    wrap_control = n_ctrl > 0
 
     name_to_resources, name_to_resource_ids, decomp_rules = collect_resources_for_op(
         op_name,
@@ -772,7 +627,7 @@ def build_decomp_target_spec(
     # only agree as long as both spellings stay in step. Splicing keeps whatever came in verbatim.
     # TODO: generate it as well, once the loader passes the identity components (or the modifiers)
     # instead of a pre-wrapped id.
-    target_id = wrap_modifiers_id(op_id, modifiers)
+    target_id = modifiers.wrap_id(op_id)
 
     call_args, call_kwargs = split_call_args(kwargs, is_custom_op)
     kwarg_names = ordered_kwarg_names(call_kwargs, dynamic_shape)
@@ -784,19 +639,17 @@ def build_decomp_target_spec(
     def rule_to_callable(rule):
         def decomp_rule(*_operands):
             _args, _kwargs, _ctrl_wires, _ctrl_values = unpack_rule_operands(
-                _operands, len(call_args), kwarg_names, wire_lens, wrap_control, hybrid_specs
+                _operands,
+                len(call_args),
+                kwarg_names,
+                wire_lens,
+                modifiers.is_controlled,
+                hybrid_specs,
             )
             # Operand-passed hybrid args are rebuilt from operands in unpack_rule_operands; static
             # data and closed-over hybrid args are supplied directly.
             _kwargs |= static_data | closed_hybrid
-            # Apply adjoint innermost, control outermost (canonical C(Adjoint(Op))).
-            body = qp.adjoint(rule._impl) if wrap_adjoint else rule._impl
-            if wrap_control:
-                qp.ctrl(body, control=list(_ctrl_wires), control_values=_ctrl_values)(
-                    *_args, **_kwargs
-                )
-            else:
-                body(*_args, **_kwargs)
+            modifiers.wrap_callable(rule._impl, _ctrl_wires, _ctrl_values)(*_args, **_kwargs)
 
         # keep the frontend name for readability, append target op_id for symbol uniqueness
         decomp_rule.__name__ = rule.name + "_" + target_id
@@ -807,9 +660,7 @@ def build_decomp_target_spec(
     for rule in decomp_rules:
         if rule.name not in name_to_resource_ids:
             continue
-        if (wrap_adjoint or wrap_control) and _resources_have_measurement(
-            name_to_resources[rule.name]
-        ):
+        if modifiers.is_modified and _resources_have_measurement(name_to_resources[rule.name]):
             warnings.warn(
                 f"Skipped the {rule.name} decomposition rule for {target_id}: it contains a "
                 "mid-circuit measurement, which is not supported with adjoint or control regions.",
@@ -827,9 +678,11 @@ def build_decomp_target_spec(
 
     # For control distribution, the extra control wires trail the base wires in the rule's operands.
     ctrl_wires = (
-        jnp.array(range(n_base_wires, n_base_wires + n_ctrl), dtype=int) if wrap_control else None
+        jnp.array(range(n_base_wires, n_base_wires + n_ctrl), dtype=int)
+        if modifiers.is_controlled
+        else None
     )
-    ctrl_values = jnp.ones(n_ctrl, dtype=bool) if wrap_control else None
+    ctrl_values = jnp.ones(n_ctrl, dtype=bool) if modifiers.is_controlled else None
 
     return DecompTargetSpec(
         rules=rule_specs,
@@ -841,9 +694,9 @@ def build_decomp_target_spec(
         ctrl_values=ctrl_values,
         hybrid_leaves=tuple(hybrid_leaves),
         target_id=target_id,
-        num_qreg_qubits=n_base_wires + (n_ctrl if wrap_control else 0),
+        num_qreg_qubits=n_base_wires + n_ctrl,
         modifier_context=modifiers,
-        reject_noninvertible=wrap_adjoint or wrap_control,
+        reject_noninvertible=modifiers.is_modified,
     )
 
 
@@ -1057,7 +910,7 @@ def collect_symbolic_resources(
             name_to_resources[rule.name] = resources.gate_counts
             # The rule body names the ops it produces itself, so unlike the distribution pathway
             # these ids carry no added modifier; a resource that is itself symbolic is spelled the
-            # way the compiler spells it (see :meth:`GraphOpID.peel_modifiers`).
+            # way the compiler spells it (see :meth:`ModifierState.peel_modifiers`).
             name_to_resource_ids[rule.name] = {
                 GraphOpID(op).getGraphOpId(): count for op, count in resources.gate_counts.items()
             }
@@ -1112,8 +965,8 @@ def build_registered_decomp_target_spec(
     Raises:
         ValueError: if ``op_cls`` is not given, or ``modifiers`` denotes the unmodified operator
     """
-    target_id = wrap_modifiers_id(op_id, modifiers)
-    if modifiers == ModifierState():
+    target_id = modifiers.wrap_id(op_id)
+    if not modifiers.is_modified:
         raise ValueError(f"No symbolic rules are registered against the unmodified {target_id}")
     if op_cls is None:
         raise ValueError(
@@ -1127,9 +980,8 @@ def build_registered_decomp_target_spec(
     kwargs = prepare_dynamic_op_kwargs(dynamic_shape, wire_lens)
     n_base_wires = sum(wire_lens.values())
     kind = "adjoint" if modifiers.adjoint else "control"
-    controls = replace(modifiers, adjoint=False)
-    wrap_control = modifiers.adjoint and controls.control_count > 0
-    has_ctrl = controls.control_count > 0
+    controls = modifiers.without_adjoint()
+    wrap_control = modifiers.adjoint and controls.is_controlled
     n_wires = n_base_wires + controls.control_count
 
     # A kind="control" rule takes the control wires as its own arguments; a wrap_control adjoint
@@ -1159,11 +1011,9 @@ def build_registered_decomp_target_spec(
         rewritten = {}
         for rule_name, ids in name_to_resource_ids.items():
             if _adjoint_folds_to_base(ids, base_id):
-                rewritten[rule_name] = {wrap_modifiers_id(op_id, controls): 1}
+                rewritten[rule_name] = {controls.wrap_id(op_id): 1}
             elif wrap_control:
-                rewritten[rule_name] = {
-                    wrap_modifiers_id(rid, controls): count for rid, count in ids.items()
-                }
+                rewritten[rule_name] = {controls.wrap_id(rid): count for rid, count in ids.items()}
             else:
                 rewritten[rule_name] = ids
         name_to_resource_ids = rewritten
@@ -1180,7 +1030,12 @@ def build_registered_decomp_target_spec(
     def rule_to_callable(rule):
         def decomp_rule(*_operands):
             _args, _kwargs, _ctrl_wires, _ctrl_values = unpack_rule_operands(
-                _operands, len(call_args), kwarg_names, wire_lens, has_ctrl, hybrid_specs
+                _operands,
+                len(call_args),
+                kwarg_names,
+                wire_lens,
+                modifiers.is_controlled,
+                hybrid_specs,
             )
             # The base is rebuilt from the traced arguments of the rule function, so the wires and
             # parameters the rule body reads off it are this function's own operands. Operand-passed
@@ -1193,10 +1048,10 @@ def build_registered_decomp_target_spec(
             # https://github.com/PennyLaneAI/pennylane/pull/10144
             if wrap_control:
                 # Reduce the adjoint under control: C(Adjoint(op)) -> C(<adjoint decomposition>).
-                qp.ctrl(
+                controls.wrap_callable(
                     lambda: rule._impl(**symbolic_arguments(base, kind, None)),
-                    control=list(_ctrl_wires),
-                    control_values=_ctrl_values,
+                    _ctrl_wires,
+                    _ctrl_values,
                 )()
             else:
                 rule._impl(**symbolic_arguments(base, kind, _ctrl_wires, _ctrl_values))
@@ -1231,8 +1086,10 @@ def build_registered_decomp_target_spec(
     if not rule_specs:
         return None
 
-    ctrl_wires = jnp.array(range(n_base_wires, n_wires), dtype=int) if has_ctrl else None
-    ctrl_values = jnp.ones(controls.control_count, dtype=bool) if has_ctrl else None
+    ctrl_wires = (
+        jnp.array(range(n_base_wires, n_wires), dtype=int) if modifiers.is_controlled else None
+    )
+    ctrl_values = jnp.ones(controls.control_count, dtype=bool) if modifiers.is_controlled else None
 
     return DecompTargetSpec(
         rules=rule_specs,
@@ -1320,8 +1177,8 @@ def build_decomp_rule_variants(
         key=lambda s: (s.control_count, s.adjoint),
     )
     for state in ordered_states:
-        target_id = wrap_modifiers_id(request.base_id, state)
-        if state != ModifierState() and request.op_cls is not None:
+        target_id = state.wrap_id(request.base_id)
+        if state.is_modified and request.op_cls is not None:
             _append_decomp_target_spec(
                 target_specs,
                 f"lower the registered decomposition rules for {target_id}",
@@ -1478,16 +1335,7 @@ def compile_reachable_decomposition_rules_wrapper(
     Returns:
         str: a module holding the whole reachable rule closure
     """
-    base_id = op_id
-    modifiers = ModifierState()
-    if op_id.startswith("Adjoint(") and not op_name.startswith("Adjoint("):
-        base_id = name_unwrap_adjoint(op_name, op_id)
-        modifiers = ModifierState(adjoint=True)
-    elif _leading_modifier_kind(op_id) == "C" and not op_name.startswith("Adjoint("):
-        # A controlled op-id (`C(op)` / `<n>C(op)`): recover the base id and control count so the
-        # closure synthesizes the matching `<n>C(...)` rules.
-        base_id, n_ctrls = name_unwrap_control(op_name, op_id)
-        modifiers = ModifierState(control_count=n_ctrls)
+    base_id, modifiers = ModifierState.from_graph_op_id(op_name, op_id)
 
     rule_strings = materialize_reachable_rule_strings(
         op_name=op_name,

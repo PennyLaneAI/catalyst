@@ -51,11 +51,7 @@ from pennylane.wires import Wires
 from catalyst import qjit
 from catalyst.decomposition import GraphOpID, RuleLoweringWarning
 from catalyst.decomposition.decomposition_rules import (
-    _MODIFIER_CANONICAL_ORDER,
     _adjoint_folds_to_base,
-    _control_modifier,
-    _leading_modifier_kind,
-    _modifier_kind,
     _rule_allocates_work_wires,
     _rule_is_applicable,
     collect_resources_for_op,
@@ -65,17 +61,12 @@ from catalyst.decomposition.decomposition_rules import (
     compile_registered_symbolic_rules,
     get_rule_strings_from_module,
     materialize_reachable_rule_strings,
-    name_unwrap_adjoint,
-    name_unwrap_control,
-    name_wrap_adjoint,
     ordered_kwarg_names,
     prepare_dynamic_op_kwargs,
     rule_call_operands,
     symbolic_arguments,
     symbolic_op_name,
     unpack_rule_operands,
-    wrap_modifier_id,
-    wrap_modifiers_id,
 )
 from catalyst.decomposition.graph_op_id import GraphOpID, build_graph_op_id
 from catalyst.decomposition.modifier_state import ModifierState
@@ -228,13 +219,14 @@ class TestGenericUtilities:
             (ModifierState(), 'PauliRot{}{wires:2}{pauli_word = "XY"}'),
             (ModifierState(adjoint=True), 'Adjoint(PauliRot){}{wires:2}{pauli_word = "XY"}'),
             (ModifierState(False, 2), '2C(PauliRot){}{wires:2}{pauli_word = "XY"}'),
+            (ModifierState(True, 2), '2C(Adjoint(PauliRot)){}{wires:2}{pauli_word = "XY"}'),
         ],
     )
     def test_wrap_modifiers_id_matches_builder(self, modifiers, expected):
         """Wrapping modifiers around a finished id agrees with building the id with them."""
         components = ("PauliRot", {}, {"wires": 2}, {"pauli_word": "XY"})
 
-        assert wrap_modifiers_id(build_graph_op_id(*components), modifiers) == expected
+        assert modifiers.wrap_id(build_graph_op_id(*components)) == expected
         assert build_graph_op_id(*components, modifiers=modifiers) == expected
 
     def test_wires_replacement_doesnt_mutate_operator(self):
@@ -414,7 +406,7 @@ class TestGenericUtilities:
     def test_peel_modifiers(self, op, expected_adjoint, expected_controls):
         """Test GraphOpID separates a symbolic operator into its base and the modifiers on it."""
 
-        base, modifiers = GraphOpID.peel_modifiers(op)
+        base, modifiers = ModifierState.peel_modifiers(op)
 
         assert modifiers == ModifierState(expected_adjoint, expected_controls)
         assert not isinstance(base, (Adjoint2, ControlledOp2))
@@ -884,13 +876,13 @@ class TestOnDemand:
     )
     def test_name_unwrap_adjoint(self, op_name, op_id, expected):
         """name_unwrap_adjoint recovers the base op's id from an adjoint graphOpId, and is the
-        inverse of name_wrap_adjoint for a base id."""
+        inverse of ModifierState.wrap_id for an adjoint state."""
         if op_id.startswith("Adjoint("):
-            assert name_unwrap_adjoint(op_name, op_id) == expected
-            assert name_wrap_adjoint(expected) == op_id
+            assert ModifierState.name_unwrap_adjoint(op_name, op_id) == expected
+            assert ModifierState(adjoint=True).wrap_id(expected) == op_id
         else:
             with pytest.raises(ValueError, match="not an adjoint id"):
-                name_unwrap_adjoint(op_name, op_id)
+                ModifierState.name_unwrap_adjoint(op_name, op_id)
 
     @pytest.mark.parametrize(
         "op_name, op_id, expected_base_id, expected_n_ctrl",
@@ -903,14 +895,17 @@ class TestOnDemand:
     def test_name_unwrap_control(self, op_name, op_id, expected_base_id, expected_n_ctrl):
         """name_unwrap_control recovers the base ID and control count."""
 
-        assert name_unwrap_control(op_name, op_id) == (expected_base_id, expected_n_ctrl)
-        assert wrap_modifier_id(expected_base_id, _control_modifier(expected_n_ctrl)) == op_id
+        assert ModifierState.name_unwrap_control(op_name, op_id) == (
+            expected_base_id,
+            expected_n_ctrl,
+        )
+        assert ModifierState(control_count=expected_n_ctrl).wrap_id(expected_base_id) == op_id
 
     def test_name_unwrap_control_rejects_non_control_id(self):
         """A non-controlled id is rejected for the given base op."""
 
         with pytest.raises(ValueError, match="not a control id"):
-            name_unwrap_control("RX", "Adjoint(RX){0:[f64]}{wires:1}{}")
+            ModifierState.name_unwrap_control("RX", "Adjoint(RX){0:[f64]}{wires:1}{}")
 
     def test_reachable_wrapper_plain_op(self):
         """The on-demand wrapper captures the closure reachable from a plain operator."""
@@ -977,8 +972,68 @@ class TestOnDemand:
             dr.compile_decomposition_rules("S", "S{}{wires:1}{}", {}, {"wires": 1}, {})
 
 
-class TestModifierIds:
-    """Unit tests for the op-level modifier name-wrapping helpers (Adjoint / C canonicalization)."""
+class TestModifierState:
+    """ModifierState owns canonical operator names, graph ids, and rule-body modifiers."""
+
+    @pytest.mark.parametrize("adjoint", [False, True])
+    @pytest.mark.parametrize(
+        "control_count, ctrl_values, block_start",
+        [(0, None, 0), (1, None, 2), (2, None, 6), (1, [False], 0), (2, [True, False], 4)],
+    )
+    def test_wrap_callable(self, adjoint, control_count, ctrl_values, block_start):
+        """Wrapped bodies apply the expected unitary, including reversal under adjoint."""
+        modifiers = ModifierState(adjoint, control_count)
+
+        def body(angle, *, wires):
+            qp.RX(angle, wires)
+            qp.RY(0.3, wires)
+
+        wrapped = modifiers.wrap_callable(body, range(control_count), ctrl_values)
+        wire_order = list(range(control_count + 1))
+        actual = qp.matrix(wrapped, wire_order=wire_order)(0.7, wires=control_count)
+        base_matrix = qp.matrix(body, wire_order=[control_count])(0.7, wires=control_count)
+        expected = np.eye(2 ** (control_count + 1), dtype=complex)
+        expected[block_start : block_start + 2, block_start : block_start + 2] = (
+            base_matrix.conj().T if adjoint else base_matrix
+        )
+
+        np.testing.assert_allclose(actual, expected)
+
+    @pytest.mark.parametrize(
+        "modifiers, expected_name",
+        [
+            (ModifierState(), "RX"),
+            (ModifierState(adjoint=True), "Adjoint(RX)"),
+            (ModifierState(control_count=1), "C(RX)"),
+            (ModifierState(control_count=10), "10C(RX)"),
+            (ModifierState(True, 2), "2C(Adjoint(RX))"),
+        ],
+    )
+    def test_wrap_name(self, modifiers, expected_name):
+        """Names and complete ids use the same canonical modifier spelling."""
+        assert modifiers.wrap_name("RX") == expected_name
+        assert modifiers.wrap_id("RX{0:[f64]}{wires:1}{}") == (
+            expected_name + "{0:[f64]}{wires:1}{}"
+        )
+
+    @pytest.mark.parametrize(
+        "op_name, op_id, base_id, expected",
+        [
+            ("S", "S{}{wires:1}{}", "S{}{wires:1}{}", ModifierState()),
+            ("S", "Adjoint(S){}{wires:1}{}", "S{}{wires:1}{}", ModifierState(adjoint=True)),
+            ("S", "C(S){}{wires:1}{}", "S{}{wires:1}{}", ModifierState(control_count=1)),
+            ("S", "10C(S){}{wires:1}{}", "S{}{wires:1}{}", ModifierState(control_count=10)),
+            (
+                "Adjoint(S)",
+                "Adjoint(S){}{wires:1}{}",
+                "Adjoint(S){}{wires:1}{}",
+                ModifierState(),
+            ),
+        ],
+    )
+    def test_from_graph_op_id(self, op_name, op_id, base_id, expected):
+        """The loader's base name determines whether an id carries an op-level modifier."""
+        assert ModifierState.from_graph_op_id(op_name, op_id) == (base_id, expected)
 
     @pytest.mark.parametrize(
         "modifier, expected",
@@ -991,7 +1046,7 @@ class TestModifierIds:
     )
     def test_modifier_kind(self, modifier, expected):
         """A modifier token normalises to its canonical kind (any ``<n>C`` -> ``C``)."""
-        assert _modifier_kind(modifier) == expected
+        assert ModifierState._modifier_kind(modifier) == expected
 
     @pytest.mark.parametrize(
         "op_id, expected",
@@ -1006,28 +1061,40 @@ class TestModifierIds:
     )
     def test_leading_modifier_kind(self, op_id, expected):
         """The outermost modifier of an id is detected (including ``<n>C(...)``), or None if bare."""
-        assert _leading_modifier_kind(op_id) == expected
+        assert ModifierState._leading_modifier_kind(op_id) == expected
 
     @pytest.mark.parametrize(
-        "op_id, modifier, expected",
+        "op_id, modifiers, expected",
         [
             # Wrapping a bare id with each modifier kind.
-            ("RX{0:[f64]}{wires:1}{}", "C", "C(RX){0:[f64]}{wires:1}{}"),
-            ("RX{0:[f64]}{wires:1}{}", "2C", "2C(RX){0:[f64]}{wires:1}{}"),
-            ("RX{0:[f64]}{wires:1}{}", "Adjoint", "Adjoint(RX){0:[f64]}{wires:1}{}"),
+            ("RX{0:[f64]}{wires:1}{}", ModifierState(control_count=1), "C(RX){0:[f64]}{wires:1}{}"),
+            (
+                "RX{0:[f64]}{wires:1}{}",
+                ModifierState(control_count=2),
+                "2C(RX){0:[f64]}{wires:1}{}",
+            ),
+            (
+                "RX{0:[f64]}{wires:1}{}",
+                ModifierState(adjoint=True),
+                "Adjoint(RX){0:[f64]}{wires:1}{}",
+            ),
             # Canonical nesting: control is outermost, so C may wrap an already-adjointed id.
             (
                 "Adjoint(RX){0:[f64]}{wires:1}{}",
-                "C",
+                ModifierState(control_count=1),
                 "C(Adjoint(RX)){0:[f64]}{wires:1}{}",
             ),
             # Only the name is wrapped; the `{...}...[uid]` suffix is carried through untouched.
-            ("HybridOp{a:[[f64]]}{w:1}{}[42]", "C", "C(HybridOp){a:[[f64]]}{w:1}{}[42]"),
+            (
+                "HybridOp{a:[[f64]]}{w:1}{}[42]",
+                ModifierState(control_count=1),
+                "C(HybridOp){a:[[f64]]}{w:1}{}[42]",
+            ),
         ],
     )
-    def test_wrap_modifier_id_canonical(self, op_id, modifier, expected):
+    def test_wrap_modifier_id_canonical(self, op_id, modifiers, expected):
         """A modifier wraps only the operator name, and control may nest outside adjoint."""
-        assert wrap_modifier_id(op_id, modifier) == expected
+        assert modifiers.wrap_id(op_id) == expected
 
     @pytest.mark.parametrize(
         "op_id",
@@ -1035,9 +1102,9 @@ class TestModifierIds:
     )
     def test_wrap_modifier_id_rejects_non_canonical(self, op_id):
         """Wrapping the canonically-inner ``Adjoint`` around an already-controlled id is rejected."""
-        assert _MODIFIER_CANONICAL_ORDER == ("C", "Adjoint")
+        assert ModifierState._MODIFIER_CANONICAL_ORDER == ("C", "Adjoint")
         with pytest.raises(ValueError, match="Non-canonical modifier order"):
-            wrap_modifier_id(op_id, "Adjoint")
+            ModifierState(adjoint=True).wrap_id(op_id)
 
 
 _PPR_8_ID = 'PPR_8{}{wires:2}{pauli_word = "XY", sign = 1 : i64}'

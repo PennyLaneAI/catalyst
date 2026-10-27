@@ -18,8 +18,6 @@ from collections.abc import Mapping, Sequence
 from typing import Any
 
 import pennylane as qp
-from pennylane.ops.op_math.adjoint2 import Adjoint2
-from pennylane.ops.op_math.controlled2 import ControlledOp2
 from pennylane.pytrees import flatten
 
 from catalyst.decomposition.modifier_state import ModifierState
@@ -96,11 +94,7 @@ def build_graph_op_id(
     uid: int | None = None,
 ) -> str:
     """Build a canonical frontend GraphOpID from its identity components."""
-    name = f"Adjoint({operator_name})" if modifiers.adjoint else operator_name
-    if modifiers.control_count:
-        count = modifiers.control_count
-        prefix = "C" if count == 1 else f"{count}C"
-        name = f"{prefix}({name})"
+    name = modifiers.wrap_name(operator_name)
 
     dynamic_id = format_dynamic_params_for_id(dict(sorted(dynamic_shape.items())))
     wire_id = "{" + ",".join(f"{key}:{value}" for key, value in sorted(wire_lens.items())) + "}"
@@ -147,7 +141,7 @@ class GraphOpID:
         assert isinstance(
             op, qp.core.Operator2
         ), f"Graph-based decomposition expects an Operator2 instance, got {op} of type {type(op)}"
-        op, self.modifiers = self.peel_modifiers(op)
+        op, self.modifiers = ModifierState.peel_modifiers(op)
         self.op = op
         self.is_custom_op = self.parse_is_custom_op()
 
@@ -156,39 +150,6 @@ class GraphOpID:
         self.wire_lens = self.parse_wire_lens()
         self.static_data = self.parse_static_data()
         self.extra_data, self.uid = self.parse_extra_data()
-
-    @staticmethod
-    def peel_modifiers(op: qp.core.Operator2) -> tuple[qp.core.Operator2, ModifierState]:
-        """Return the innermost base of ``op`` together with the modifiers wrapping it.
-
-        A *generic* symbolic operator (``Adjoint2``/``ControlledOp2``, as opposed to a concrete
-        class such as ``CH``) reports its wrapper's own arguments, e.g.
-        ``Adjoint(S){}{}{}[1141126509488406748]``. That is not how the compiler spells a modified
-        operator: ``wrapModifiers`` folds the modifier into the *base* operator's id. So the
-        wrappers are peeled off here and counted, and :meth:`getGraphOpId` puts them back in
-        canonical position (control outermost) rather than splicing them into a finished id.
-
-        The walk terminates structurally: each step moves to ``op.base``, one wrapper shallower,
-        and the chain ends at the first non-symbolic operator. The layers compose as
-        :meth:`ModifierState.compose` does, so adjoints cancel pairwise and control counts add.
-
-        Args:
-            op (Operator2): the operator to unwrap
-
-        Returns:
-            Operator2: the innermost base operator
-            ModifierState: the modifiers wrapping the base
-        """
-        modifiers = ModifierState()
-        while True:
-            if isinstance(op, Adjoint2):
-                layer = ModifierState(adjoint=True)
-            elif isinstance(op, ControlledOp2):
-                layer = ModifierState(control_count=len(op.control_wires))
-            else:
-                return op, modifiers
-            modifiers = modifiers.compose(layer)
-            op = op.base
 
     def parse_dynamic_shape(self) -> dict:
         """Return a dictionary of dynamic arg names to list of dtypes."""
