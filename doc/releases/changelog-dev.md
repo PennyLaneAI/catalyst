@@ -179,6 +179,17 @@
 
 <h3>Improvements 🛠</h3>
 
+* The Catalyst CLI interface is reworked for consistency and flexibility.
+  [(#3403)](https://github.com/PennyLaneAI/catalyst/pull/3403)
+
+  - The `--keep-intermediate` flag no longer affects whether IR is produced in the final output
+    (it continues to affect intermediate outputs). This means it is no longer required in order
+    to use `-o` flag for IR.
+  - Exactly one 'final' output is produced per invocation, either object code or IR, but not both.
+  - `-o` is the unified way to set the location of the final output, regardless of whether its
+    object code or IR. The default is stdout for IR and `<module-name>.o` for object code.
+    Stdout (i.e. `-o -`) is rejected when the output is object code.
+
 * Transforms can now be directly applied to a `QJIT`'d workflow. A new `QJIT` will be produced with
   the transform applied to the `QJIT`'s body.
   [(#3397)](https://github.com/PennyLaneAI/catalyst/pull/3397)
@@ -816,6 +827,11 @@
   [(#3312)](https://github.com/PennyLaneAI/catalyst/pull/3312)
 
 <h3>Breaking changes 💔</h3>
+
+* Instrumentation no longer reports `programsize` for the high-level `compile` stage,
+  since the compiler no longer returns an IR string to Python in addition to producing
+  compiled object code.
+  [(#3403)](https://github.com/PennyLaneAI/catalyst/pull/3403)
 
 * Removed ``catalyst.pipeline``, ``catalyst.passes.apply_pass``,
   ``catalyst.passes.apply_pass_plugin``, ``catalyst.passes.Pass``,
