@@ -14,6 +14,7 @@
 
 """Managed state for the decomposition rule discovery and capture mechanism."""
 
+from contextlib import AbstractContextManager
 from dataclasses import dataclass, field
 from typing import Callable
 
@@ -146,10 +147,14 @@ class DecompositionScope:
     Attributes:
         roots: Map of (base) GraphOpID to a request object and observed modifier states.
         definitions: Map of rule identifiers to traced rules, in first-seen order.
+        registries: Context factories setting up the decomposition registry of each
+            graph-decomposition pass, in the order the passes are applied. Rules are collected
+            under each registry in turn; with none, under the current registry.
     """
 
     roots: dict[str, tuple[OpDecompRequest, set[ModifierState]]] = field(default_factory=dict)
     definitions: dict[tuple, TracedRule] = field(default_factory=dict)
+    registries: tuple[Callable[[], AbstractContextManager], ...] = ()
 
     def record_root(self, request: OpDecompRequest) -> None:
         """Record root nodes for later decomp rule capture, which are explored recursively."""

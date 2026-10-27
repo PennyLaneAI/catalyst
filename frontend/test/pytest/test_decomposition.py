@@ -1930,6 +1930,108 @@ class TestCustomRuleApplication:
         assert decomposed.get("PauliX", 0) == 0  # assert that the second rule got used
         assert decomposed.get("PauliY", 0) == 2  # assert that the second rule got used
 
+    @pytest.mark.parametrize("by_name", [True, False])
+    def test_fixed_decomp_captures_only_fixed_rule(self, by_name):
+        """Tests that the alternatives of a fixed rule are not captured into the module."""
+
+        @qp.register_resources({qp.X: 1})
+        def rule1(wires):
+            qp.X(wires)
+
+        @qp.register_resources({qp.Y: 2})
+        def rule2(wires):
+            qp.Y(wires)
+            qp.Y(wires)
+
+        with local_decomps():
+
+            add_decomps(NoParamsCustomOp, rule1, rule2)
+            fixed = {NoParamsCustomOp: "rule2" if by_name else rule2}
+
+            @qjit(capture=True, target="mlir")
+            @qp.decompose(gate_set={qp.X: 1, qp.Y: 1}, fixed_decomps=fixed)
+            @qnode(qp.device("null.qubit", wires=1))
+            def circuit():
+                NoParamsCustomOp(0)
+
+            mlir = circuit.mlir
+
+        assert 'frontend_name = "rule2"' in mlir
+        assert 'frontend_name = "rule1"' not in mlir
+
+    @pytest.mark.parametrize("unfixed_pass", [False, True])
+    def test_each_pass_captures_its_rules(self, unfixed_pass):
+        """Tests that every decompose pass gets the rules it can apply: its fixed rule, or all the
+        rules if it fixes none."""
+
+        @qp.register_resources({qp.X: 1})
+        def rule1(wires):
+            qp.X(wires)
+
+        @qp.register_resources({qp.Y: 1})
+        def rule2(wires):
+            qp.Y(wires)
+
+        @qp.register_resources({qp.Z: 1})
+        def rule3(wires):
+            qp.Z(wires)
+
+        gate_set = {qp.X, qp.Y, qp.Z}
+        maybe_unfixed_pass = qp.decompose(gate_set=gate_set) if unfixed_pass else lambda f: f
+
+        with local_decomps():
+
+            add_decomps(NoParamsCustomOp, rule1, rule2, rule3)
+
+            @qjit(capture=True, target="mlir")
+            @maybe_unfixed_pass
+            @qp.decompose(gate_set=gate_set, fixed_decomps={NoParamsCustomOp: rule2})
+            @qp.decompose(gate_set=gate_set, fixed_decomps={NoParamsCustomOp: "rule1"})
+            @qnode(qp.device("null.qubit", wires=1))
+            def circuit():
+                NoParamsCustomOp(0)
+
+            mlir = circuit.mlir
+
+        assert 'frontend_name = "rule1"' in mlir
+        assert 'frontend_name = "rule2"' in mlir
+        assert ('frontend_name = "rule3"' in mlir) == unfixed_pass
+
+    def test_pass_captures_rules_for_ops_left_by_earlier_passes(self):
+        """Tests that a pass gets the rules for the ops left by the passes applied before it, even
+        if only the rules of an earlier pass produce them."""
+
+        @register_resources({NoParams(reg=Wire[1]): 1})
+        def custom_to_no_params(wires):
+            NoParams(reg=wires[0])
+
+        @qp.register_resources({qp.X: 1})
+        def no_params_to_x(reg):
+            qp.X(reg)
+
+        @qp.register_resources({qp.Y: 1})
+        def no_params_to_y(reg):
+            qp.Y(reg)
+
+        with local_decomps():
+
+            add_decomps(NoParams, no_params_to_x, no_params_to_y)
+
+            @qjit(capture=True, target="mlir")
+            @qp.decompose(gate_set={qp.X, qp.Y})
+            @qp.decompose(
+                gate_set={NoParams},
+                fixed_decomps={NoParamsCustomOp: custom_to_no_params, NoParams: no_params_to_x},
+            )
+            @qnode(qp.device("null.qubit", wires=1))
+            def circuit():
+                NoParamsCustomOp(0)
+
+            mlir = circuit.mlir
+
+        assert 'frontend_name = "no_params_to_x"' in mlir
+        assert 'frontend_name = "no_params_to_y"' in mlir
+
     @pytest.mark.parametrize("option", ["fixed_decomps", "alt_decomps"])
     def test_fixed_and_alt_decomps_for_modifier_wrapped_op(self, option):
         """Tests that fixed and alt decomps keyed by a modifier-wrapped operator name,
