@@ -786,3 +786,131 @@ TEST_CASE("Test a controlled gate in the gate set is basis", "[DecompGraph::Solv
     REQUIRE(result.at(cv).ruleName == "cv_to_ct");
     REQUIRE(result.at(cv).totalCost == 1.0);
 }
+
+TEST_CASE("Test cyclic rules give the same solution regardless of root order",
+          "[DecompGraph::Solver]") {
+    const OperatorNode h{"Hadamard[][1]{}", "Hadamard"};
+    const OperatorNode cz{"CZ[][2]{}", "CZ"};
+    const OperatorNode cnot{"CNOT[][2]{}", "CNOT"};
+    const OperatorNode cps{"ControlledPhaseShift[f64][2]{}", "ControlledPhaseShift"};
+    const OperatorNode ppr{"PPR_4[][2]{}", "PPR_4"};
+    const OperatorNode gp{"GlobalPhase[f64][]{}", "GlobalPhase"};
+
+    const WeightedGateset gateset{
+        {{h.name, 1.0}, {cps.name, 1.0}, {ppr.name, 100.0}, {gp.name, 0.0}}};
+
+    const std::vector<RuleNode> rules{
+        {"cz_to_cps", cz, {{cps, 1}}},
+        {"cz_to_cnot", cz, {{h, 2}, {cnot, 1}}},
+        {"cnot_to_cz_h", cnot, {{h, 2}, {cz, 1}}},
+        {"cnot_to_ppr", cnot, {{ppr, 3}, {gp, 1}}},
+    };
+
+    const auto roots = GENERATE(std::vector<int>{0, 1}, std::vector<int>{1, 0});
+    std::vector<OperatorNode> rootOps;
+    for (int i : roots) {
+        rootOps.push_back(i == 0 ? cz : cnot);
+    }
+
+    const DecompositionGraph graph(rootOps, gateset, rules);
+    DecompositionSolver solver(graph);
+    const auto result = solver.solve();
+
+    REQUIRE(result.at(cz).ruleName == "cz_to_cps");
+    REQUIRE(result.at(cz).totalCost == 1.0);
+    REQUIRE(result.at(cnot).ruleName == "cnot_to_cz_h");
+    REQUIRE(result.at(cnot).totalCost == 3.0);
+}
+
+TEST_CASE("Test a cycle through an intermediate operator still finds the optimum",
+          "[DecompGraph::Solver]") {
+    // Y -> Z -> X -> Y is a cycle, but each op also has a way out of it. Solving any op while
+    // excluding the rules or ops currently being solved would cache a fallback for X or Y.
+    const OperatorNode x{"X[][1]{}", "X"};
+    const OperatorNode y{"Y[][1]{}", "Y"};
+    const OperatorNode z{"Z[][1]{}", "Z"};
+    const OperatorNode cheap{"Cheap[][1]{}", "Cheap"};
+    const OperatorNode pricey{"Pricey[][1]{}", "Pricey"};
+    const OperatorNode midPricey{"MidPricey[][1]{}", "MidPricey"};
+
+    const WeightedGateset gateset{
+        {{cheap.name, 1.0}, {pricey.name, 100.0}, {midPricey.name, 50.0}}};
+    const std::vector<RuleNode> rules{
+        {"y_to_z", y, {{z, 1}}}, {"y_to_pricey", y, {{pricey, 1}}},
+        {"z_to_x", z, {{x, 1}}}, {"z_to_cheap", z, {{cheap, 1}}},
+        {"x_to_y", x, {{y, 1}}}, {"x_to_mid", x, {{midPricey, 1}}},
+    };
+
+    const auto roots =
+        GENERATE_COPY(values<std::vector<OperatorNode>>({{y, x}, {x, y}, {z, y, x}, {y}, {x}}));
+    const DecompositionGraph graph(roots, gateset, rules);
+    DecompositionSolver solver(graph);
+    const auto result = solver.solve();
+
+    REQUIRE(result.at(z).ruleName == "z_to_cheap");
+    REQUIRE(result.at(z).totalCost == 1.0);
+    REQUIRE(result.at(y).ruleName == "y_to_z");
+    REQUIRE(result.at(y).totalCost == 1.0);
+    REQUIRE(result.at(x).ruleName == "x_to_y");
+    REQUIRE(result.at(x).totalCost == 1.0);
+}
+
+TEST_CASE("Test equal-cost rules prefer the first listed rule", "[DecompGraph::Solver]") {
+    const OperatorNode h{"Hadamard[][1]{}", "Hadamard"};
+    const OperatorNode rx{"RX[f64][1]{}", "RX"};
+    const OperatorNode rz{"RZ[f64][1]{}", "RZ"};
+
+    const WeightedGateset gateset{{{rx.name, 1.0}, {rz.name, 1.0}}};
+    const std::vector<RuleNode> rules{
+        {"h_to_rz", h, {{rz, 2}}},
+        {"h_to_rx", h, {{rx, 2}}},
+    };
+
+    const DecompositionGraph graph({h}, gateset, rules);
+    DecompositionSolver solver(graph);
+    REQUIRE(solver.solve().at(h).ruleName == "h_to_rz");
+}
+
+TEST_CASE("Test a negative gateset cost is rejected", "[DecompGraph::Solver]") {
+    const OperatorNode h{"Hadamard[][1]{}", "Hadamard"};
+    const WeightedGateset gateset{{{h.name, -1.0}}};
+
+    const DecompositionGraph graph({h}, gateset, {});
+    DecompositionSolver solver(graph);
+    REQUIRE_THROWS_AS(solver.solve(), GraphError);
+}
+
+TEST_CASE("Test inputs with multiplicity 0 are ignored", "[DecompGraph::Solver]") {
+    const OperatorNode multiRZ1{"MultiRZ[f64][1]{}", "MultiRZ"};
+    const OperatorNode rz{"RZ[f64][1]{}", "RZ"};
+    const OperatorNode cnot{"CNOT[][2]{}", "CNOT"}; // not solvable
+
+    const WeightedGateset gateset{{{rz.name, 1.0}}};
+    const std::vector<RuleNode> rules{
+        {"multiRZ_to_rz_cnot", multiRZ1, {{cnot, 0}, {rz, 1}}},
+    };
+
+    const DecompositionGraph graph({multiRZ1}, gateset, rules);
+    DecompositionSolver solver(graph);
+    const auto result = solver.solve();
+
+    REQUIRE(result.at(multiRZ1).ruleName == "multiRZ_to_rz_cnot");
+    REQUIRE(result.at(multiRZ1).totalCost == 1.0);
+    REQUIRE(result.find(cnot) == result.end());
+}
+
+TEST_CASE("Test solve() rethrows after a failed solve instead of returning a partial result",
+          "[DecompGraph::Solver]") {
+    const OperatorNode a{"A[][1]{}", "A"};
+    const OperatorNode b{"B[][1]{}", "B"};
+    const OperatorNode g{"G[][1]{}", "G"};
+    const OperatorNode x{"X[][1]{}", "X"};
+
+    const WeightedGateset gateset{{{g.name, 1.0}}};
+    const std::vector<RuleNode> rules{{"a_to_g", a, {{g, 1}}}, {"b_to_x", b, {{x, 1}}}};
+
+    const DecompositionGraph graph({a, b}, gateset, rules);
+    DecompositionSolver solver(graph);
+    REQUIRE_THROWS_AS(solver.solve(), GraphSolverFailedError);
+    REQUIRE_THROWS_AS(solver.solve(), GraphSolverFailedError);
+}
