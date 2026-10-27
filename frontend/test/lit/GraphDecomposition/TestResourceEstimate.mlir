@@ -19,22 +19,22 @@
 // testHadamard decomposes into testRX + 2 testRZ (h_to_rz_rx), and Adjoint(testHadamard) into
 // 3 testRZ (@adj_h). The adjoint region only matches the latter once it is lowered.
 
-// The dynamic loop body is not folded into the flattened entry, so it is estimated separately.
+// Each function is estimated on its own, so calls and loop bodies stay in function_calls.
 // CHECK-LABEL: "dyn_for_loop_1": {
 // CHECK:       "quantum_operations": {
 // CHECK-NEXT:    "-1": {
 // CHECK-NEXT:      "testRX": 1,
 // CHECK-NEXT:      "testRZ": 2
 
-// The entry has 3 testHadamard (one direct and one per call to @helper), 1 testRX, 1 adjoint
-// region, and 1 mid-circuit measurement, which is not a graph operator and is counted as is.
-// Static calls are already folded in, so they are dropped and @helper is not serialized.
+// The entry's own ops are 1 testHadamard, 1 testRX, 1 adjoint region, and 1 mid-circuit
+// measurement, which is not a graph operator and is counted as is.
 // CHECK-LABEL: "estimate_circuit": {
 // CHECK:       "function_calls": {
 // CHECK-NEXT:    "dynamic": {
 // CHECK-NEXT:      "dyn_for_loop_1": "{{0x[0-9a-f]+}}"
 // CHECK-NEXT:    },
-// CHECK-NEXT:    "static": {}
+// CHECK-NEXT:    "static": {
+// CHECK-NEXT:      "helper": 2
 // CHECK:       "num_qubits"
 // CHECK-NEXT:    "alloc": 1,
 // CHECK-NEXT:    "arg": 0,
@@ -42,11 +42,16 @@
 // CHECK:       "quantum_operations": {
 // CHECK-NEXT:    "-1": {
 // CHECK-NEXT:      "MidCircuitMeasure": 1,
-// CHECK-NEXT:      "testRX": 4,
-// CHECK-NEXT:      "testRZ": 9
+// CHECK-NEXT:      "testRX": 2,
+// CHECK-NEXT:      "testRZ": 5
 // CHECK-NEXT:    }
 // CHECK-NEXT:  }
-// CHECK-NOT:   "helper"
+
+// CHECK-LABEL: "helper": {
+// CHECK:       "quantum_operations": {
+// CHECK-NEXT:    "-1": {
+// CHECK-NEXT:      "testRX": 1,
+// CHECK-NEXT:      "testRZ": 2
 func.func public @estimate_circuit(%n: index) attributes {quantum.node} {
     %angle = arith.constant 0.5 : f64
     %c0 = arith.constant 0 : index

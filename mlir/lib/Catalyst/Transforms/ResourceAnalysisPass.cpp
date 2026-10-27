@@ -95,9 +95,10 @@ struct ResourceAnalysisPass : public impl::ResourceAnalysisPassBase<ResourceAnal
             markAllAnalysesPreserved();
         }
 
-        ResourceAnalysis analysis(moduleOp, ResourceAnalysisRegistry::get().all(),
-                                  /*collectDetailedOperations=*/false,
-                                  solution ? &solution.value() : nullptr);
+        ResourceAnalysis analysis =
+            solution ? ResourceAnalysis(moduleOp, ResourceAnalysisRegistry::get().all(), *solution)
+                     : ResourceAnalysis(moduleOp, ResourceAnalysisRegistry::get().all(),
+                                        /*collectDetailedOperations=*/false);
         const auto &results = analysis.getResults();
 
         // Populate statistics from the entry function. The flattened view
