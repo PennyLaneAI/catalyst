@@ -215,9 +215,9 @@ def symbolic_arguments(base_op, kind, ctrl_wires=None, ctrl_values=None) -> dict
 def ordered_kwarg_names(call_kwargs, dynamic_shape) -> list:
     """Order a rule's keyword operands params-first, followed by wires.
 
-    The params keep the order of ``dynamic_shape``, which is the operand order of the operator
-    (see :mod:`catalyst.decomposition.operand_layout`), so that the rule's inputs line up with the
-    operands the compiler passes to it. They must not be sorted.
+    The params keep the order of ``dynamic_shape``, which is the operand order of the operator, so
+    that the rule's inputs line up with the operands the compiler passes to it. They must not be
+    sorted.
     """
     params = [name for name in dynamic_shape if name in call_kwargs]
     wires = [name for name in call_kwargs if name not in dynamic_shape]

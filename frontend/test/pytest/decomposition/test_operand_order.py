@@ -13,9 +13,9 @@
 # limitations under the License.
 """Regression tests for the operand order of ``qref.operator`` and its decomposition rules.
 
-Operand order (declaration order, see ``catalyst.from_plxpr.operand_layout``) is the only positional
-order. Argument names are identity only and are sorted only when printed into a GraphOpID. These
-tests use argument names whose declaration order differs from their sorted order.
+Operand order (the binding order set by PennyLane) is the only positional order. Argument names are
+identity only and are sorted only when printed into a GraphOpID. These tests use argument names
+whose declaration order differs from their sorted order.
 """
 
 import re
@@ -124,6 +124,36 @@ def _multi_register_rule(time, electronic_wires, vib_wires, cache_wires, num_ste
 add_decomps(MyTrotterVibronic, _multi_register_rule)
 
 
+class HybridLayoutOp(qp.core.Operator2):
+    """Every grouping rule at once: unsorted dynamic args, a hybrid wire arg declared between pure
+    wire args (lowered after them), an empty pure wire arg, a nested operator (its wires are qubit
+    operands) and a numeric hybrid arg (its leaves are params)."""
+
+    dynamic_argnames = ("zeta", "alpha")
+    wire_argnames = ("z_reg", "hw", "a_reg", "e_reg")
+    hybrid_argnames = ("hw", "op", "coeffs")
+
+    def __init__(self, zeta, alpha, z_reg, hw, a_reg, e_reg, op, coeffs):
+        # pylint: disable=too-many-arguments,too-many-positional-arguments
+        super().__init__(
+            zeta, alpha, z_reg=z_reg, hw=hw, a_reg=a_reg, e_reg=e_reg, op=op, coeffs=coeffs
+        )
+
+
+def _lowered_maps(ir, op_name):
+    """Return the ``param_map``, ``qubit_map`` and UID of the first ``qref.operator op_name``."""
+    start = ir.index(f'qref.operator "{op_name}"')
+    block = ir[start : ir.index("\n      %", start)]
+
+    def parse(attr):
+        found = re.search(attr + r" = \{([^}]*)\}", block)
+        entries = re.findall(r"(\w+) = \[([^\]]*)\]", found.group(1)) if found else []
+        return {name: [int(i) for i in idx.split(",") if i.strip()] for name, idx in entries}
+
+    uid = re.search(r"UID\((\d+)\)", block)
+    return parse("param_map"), parse("qubit_map"), uid and int(uid.group(1))
+
+
 class TestGraphOpIDLayout:
     """GraphOpID exposes the operand order, and prints a sorted identity."""
 
@@ -149,12 +179,15 @@ class TestGraphOpIDLayout:
 class TestExecution:
     """Rules receive each argument's own operands."""
 
-    def test_semiadder(self):
-        """SemiAdder's wire args are declared x, y, work (issue #3337)."""
+    @pytest.mark.parametrize("collect_decomp_rules", [True, False], ids=["eager", "on-demand"])
+    def test_semiadder(self, collect_decomp_rules):
+        """SemiAdder's wire args are declared x, y, work (issue #3337). This uses the real template
+        rather than a dummy gate, because on-demand rules are compiled in the compiler process,
+        which only knows PennyLane's built-in rules."""
         gate_set = {"Toffoli", "CNOT", "X", "Hadamard", "S", "Adjoint(S)", "T", "Adjoint(T)", "CZ"}
         gate_set |= {"MidMeasure", "MidMeasureMP", "MidCircuitMeasure", "Cond"}
 
-        @qp.qjit(capture=True)
+        @qp.qjit(capture=True, collect_decomp_rules=collect_decomp_rules)
         @qp.decompose(gate_set=gate_set)
         @qp.qnode(qp.device("lightning.qubit", wires=8))
         def circuit():
@@ -241,3 +274,55 @@ def test_unsorted_wire_args_with_static_arg_match_uid():
     # Each wire arg reaches the rule with its own qubits: 1 RZ x 3 steps, 2 H x 3, 4 X x 3.
     resources = qp.analyze(circuit, level=1)().resources
     assert resources.quantum_operations == {"RZ": 3, "Hadamard": 6, "PauliX": 12}
+
+
+_LAYOUT_CASES = {
+    "MySemiAdder": lambda: MySemiAdder([0, 1, 2], [3, 4, 5], work_wires=[6, 7]),
+    "ZetaAlphaOp": lambda: ZetaAlphaOp(np.float64(0.1), np.float64(0.2), reg=[0, 1]),
+    "XAOp": lambda: XAOp(x_wires=[0], a_wires=[1, 2]),
+    "MyTrotterVibronic": lambda: MyTrotterVibronic(
+        np.float64(0.5), electronic_wires=[0], vib_wires=[1, 2], cache_wires=[3, 4, 5, 6]
+    ),
+    "HybridLayoutOp": lambda: HybridLayoutOp(
+        np.float64(0.1),
+        np.float64(0.2),
+        z_reg=[0],
+        hw=[qp.wires.Wires([1, 2]), qp.wires.Wires([3])],
+        a_reg=[4, 5],
+        e_reg=[],
+        op=qp.RX(np.float64(0.3), 6),
+        coeffs=[np.array([1.0, 2.0]), np.array(3.0)],
+    ),
+}
+
+
+@pytest.mark.parametrize("op_name", list(_LAYOUT_CASES))
+def test_graph_op_id_metadata_matches_lowered_operands(op_name):
+    """GraphOpID builds its metadata from the Python operator, without seeing the operands. It must
+    list the arguments in the order of their lowered operands, with matching sizes, and hash the
+    same UID. The GraphOpID string itself stays sorted."""
+    make_op = _LAYOUT_CASES[op_name]
+
+    @qp.qjit(capture=True, target="mlir")
+    @qp.qnode(qp.device("null.qubit", wires=8))
+    def circuit():
+        make_op()
+        return qp.probs(wires=[0])
+
+    param_map, qubit_map, uid = _lowered_maps(circuit.mlir, op_name)
+    with qp.capture.pause():
+        gid = GraphOpID(make_op())
+
+    # Walking the metadata in order visits the operands 0, 1, 2, ... exactly once.
+    assert sorted(gid.dynamic_shape) == sorted(param_map)
+    params = [i for name in gid.dynamic_shape for i in param_map[name]]
+    assert params == list(range(len(params)))
+    assert all(len(gid.dynamic_shape[name]) == len(param_map[name]) for name in param_map)
+
+    assert sorted(gid.wire_lens) == sorted(qubit_map)
+    qubits = [i for name in gid.wire_lens for i in qubit_map[name]]
+    assert qubits == list(range(len(qubits)))
+    assert all(gid.wire_lens[name] == len(qubit_map[name]) for name in qubit_map)
+
+    if uid is not None:
+        assert gid.getGraphOpId().endswith(f"[{uid}]")

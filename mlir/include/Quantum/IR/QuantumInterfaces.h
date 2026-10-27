@@ -34,8 +34,8 @@ namespace quantum {
 /// The arguments of a DecomposableGate, in operand order.
 ///
 /// Operand order is the only positional order of an operator's arguments: the frontend lowering
-/// (frontend/catalyst/from_plxpr/operand_layout.py) and the decomposition rules both lay out their
-/// operands in it. Names are used only for identity, so they are sorted only when printed into a
+/// keeps the binding order set by PennyLane, and the decomposition rules lay out their operands in
+/// it. Names are used only for identity, so they are sorted only when printed into a
 /// graphOpId (see `defaultGetGraphOpId`). Do not use a hash or sorted map for these.
 using DynamicShape = llvm::SmallVector<std::pair<std::string, llvm::SmallVector<mlir::Type>>>;
 using WireLens = llvm::SmallVector<std::pair<std::string, size_t>>;

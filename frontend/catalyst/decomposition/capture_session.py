@@ -37,7 +37,7 @@ class OpDecompRequest:
         op_cls: Concrete Operator2 class used to rebuild the base for registered symbolic rules.
             It is unavailable for the on-demand pathway.
         dynamic_shape: Non-hybrid dynamic argument names mapped to MLIR-style type spellings, in
-            operand order (see :mod:`catalyst.from_plxpr.operand_layout`).
+            operand order.
         wire_lens: Qubit argument names (wire arguments and qubit-carrying hybrid arguments)
             mapped to their lengths, in operand order.
         static_data: Compiler-known static/compilable arguments used by applicability, resource
