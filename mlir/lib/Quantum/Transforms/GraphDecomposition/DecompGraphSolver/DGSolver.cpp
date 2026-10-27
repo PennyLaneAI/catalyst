@@ -21,6 +21,8 @@
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
+#include <format>
+#include <functional>
 #include <queue>
 #include <string>
 #include <unordered_map>
@@ -74,7 +76,7 @@ struct PendingRule {
 
 struct QueueEntry {
     double cost;
-    OperatorNode op;
+    std::reference_wrapper<const OperatorNode> op;
 };
 
 /**
@@ -87,7 +89,7 @@ struct QueueEntryGreater {
         if (lhs.cost != rhs.cost) {
             return lhs.cost > rhs.cost;
         }
-        return lhs.op.id > rhs.op.id;
+        return lhs.op.get().id > rhs.op.get().id;
     }
 };
 
@@ -170,8 +172,9 @@ GraphResult DecompositionSolver::solve() {
     // validate gateset costs
     for (const auto &[name, cost] : graph.getGateset().ops) {
         if (std::isnan(cost) || cost < 0.0) {
-            throw GraphError("Invalid cost " + std::to_string(cost) + " for gate '" + name +
-                             "' in the target gateset: costs must be non-negative.");
+            throw GraphError(std::format(
+                "Invalid cost {} for gate '{}' in the target gateset: costs must be non-negative.",
+                cost, name));
         }
     }
 
@@ -180,19 +183,20 @@ GraphResult DecompositionSolver::solve() {
     std::unordered_map<OperatorNode, RuleCandidate, OperatorNodeHash> opsToRuleCandidates;
     std::priority_queue<QueueEntry, std::vector<QueueEntry>, QueueEntryGreater> opQueue;
 
-    auto offerRule = [&](ChosenDecompRule chosen, bool isEmptyRule, std::size_t ruleOrder) {
-        if (solvedMap.find(chosen.op) != solvedMap.end()) {
+    // Referenced operators belong to reachableOps or the graph, which outlive opQueue.
+    auto offerRule = [&](const OperatorNode &op, ChosenDecompRule chosen, bool isEmptyRule,
+                         std::size_t ruleOrder) {
+        if (solvedMap.find(op) != solvedMap.end()) {
             return;
         }
-        const auto it = opsToRuleCandidates.find(chosen.op);
+        const auto it = opsToRuleCandidates.find(op);
         if (it != opsToRuleCandidates.end() &&
             !isBetter(chosen.totalCost, isEmptyRule, ruleOrder, it->second)) {
             return;
         }
-        opQueue.push({chosen.totalCost, chosen.op});
-        OperatorNode op = chosen.op;
+        opQueue.push({chosen.totalCost, std::cref(op)});
         opsToRuleCandidates.insert_or_assign(
-            std::move(op), RuleCandidate{std::move(chosen), isEmptyRule, ruleOrder});
+            op, RuleCandidate{std::move(chosen), isEmptyRule, ruleOrder});
     };
 
     /*
@@ -207,7 +211,7 @@ GraphResult DecompositionSolver::solve() {
 
     for (const auto &op : reachableOps) {
         if (graph.isTargetGate(op)) {
-            offerRule(basisRule(op), false, 0);
+            offerRule(op, basisRule(op), false, 0);
             continue;
         }
 
@@ -222,7 +226,7 @@ GraphResult DecompositionSolver::solve() {
                 }
             }
             if (numInputs == 0) {
-                offerRule(evalRule(rule), rule.isEmpty(), order);
+                offerRule(op, evalRule(rule), rule.isEmpty(), order);
             } else {
                 pendingRules.push_back({&rule, order, numInputs});
             }
@@ -232,24 +236,26 @@ GraphResult DecompositionSolver::solve() {
     while (!opQueue.empty()) {
         const QueueEntry currentOp = opQueue.top();
         opQueue.pop();
-        if (solvedMap.find(currentOp.op) != solvedMap.end()) {
+        const OperatorNode &op = currentOp.op.get();
+        if (solvedMap.find(op) != solvedMap.end()) {
             continue;
         }
-        auto ruleCandidate = opsToRuleCandidates.find(currentOp.op);
+        auto ruleCandidate = opsToRuleCandidates.find(op);
         if (currentOp.cost != ruleCandidate->second.chosenRule.totalCost) {
             continue; // superseded by a cheaper candidate
         }
-        solvedMap.emplace(currentOp.op, std::move(ruleCandidate->second.chosenRule));
+        solvedMap.emplace(op, std::move(ruleCandidate->second.chosenRule));
         opsToRuleCandidates.erase(ruleCandidate);
 
-        const auto consumingRules = opsToConsumingRules.find(currentOp.op);
+        const auto consumingRules = opsToConsumingRules.find(op);
         if (consumingRules == opsToConsumingRules.end()) {
             continue;
         }
         for (const std::size_t ruleIndex : consumingRules->second) {
             PendingRule &pendingRule = pendingRules[ruleIndex];
             if (--pendingRule.remainingInputs == 0) {
-                offerRule(evalRule(*pendingRule.rule), false, pendingRule.ruleOrder);
+                const RuleNode &rule = *pendingRule.rule;
+                offerRule(rule.output, evalRule(rule), false, pendingRule.ruleOrder);
             }
         }
     }
