@@ -24,7 +24,6 @@
 #include "Catalyst/Analysis/ResourceResultExtension.h"
 #include "PBC/IR/PBCOps.h"
 
-#include "DGBuilder.hpp"
 #include "DGTypes.hpp"
 
 using namespace mlir;
@@ -39,8 +38,11 @@ class ResourceAnalysis {
     // walk all func::FuncOps within the operation.
     explicit ResourceAnalysis(ModuleOp moduleOp,
                               ArrayRef<ExtensionProvider> extensionProviders = {},
-                              bool collectDetailedOperations = false,
-                              DecompGraph::Core::GraphResult *graphResult = nullptr);
+                              bool collectDetailedOperations = false);
+    // Same, then replace each function's operations with the basis gates of their chosen
+    // decomposition in `graphResult`, for qp.estimate.
+    explicit ResourceAnalysis(ModuleOp moduleOp, ArrayRef<ExtensionProvider> extensionProviders,
+                              const DecompGraph::Core::GraphResult &graphResult);
     explicit ResourceAnalysis(func::FuncOp funcOp,
                               ArrayRef<ExtensionProvider> extensionProviders = {},
                               bool collectDetailedOperations = false);
@@ -62,8 +64,6 @@ class ResourceAnalysis {
 
   private:
     bool collectDetailedOperations;
-
-    DecompGraph::Core::GraphResult *graphResult = nullptr;
 
     // per-function resource counts
     llvm::StringMap<ResourceResult> funcResults;

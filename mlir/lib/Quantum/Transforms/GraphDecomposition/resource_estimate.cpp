@@ -81,19 +81,8 @@ struct ResourceEstimatePass : public impl::ResourceEstimatePassBase<ResourceEsti
         const auto &results = analysis.getResults();
 
         llvm::StringMap<ResourceResult> estimates;
-        StringRef entry = analysis.getEntryFunc();
-        if (const ResourceResult *flat = analysis.getFlattenedResource(entry)) {
-            estimates[entry] = estimateResources(*flat, solution);
-        }
-
-        // Flattening only folds in static calls, so dynamic loop bodies are estimated separately
-        // and stay referenced from function_calls.dynamic.
         for (const auto &funcEntry : results) {
-            for (const auto &call : funcEntry.getValue().varFunctionCalls) {
-                if (const ResourceResult *body = analysis.getFlattenedResource(call.getKey())) {
-                    estimates[call.getKey()] = estimateResources(*body, solution);
-                }
-            }
+            estimates[funcEntry.getKey()] = estimateResources(funcEntry.getValue(), solution);
         }
 
         if (outputJson) {
@@ -107,25 +96,25 @@ struct ResourceEstimatePass : public impl::ResourceEstimatePassBase<ResourceEsti
     }
 
   private:
-    /// Replace each op in the flattened resources `flat` with the basis gates of its chosen
+    /// Replace each op in a function's resources `result` with the basis gates of its chosen
     /// decomposition rule, scaled by the op's count.
-    static ResourceResult estimateResources(const ResourceResult &flat,
+    static ResourceResult estimateResources(const ResourceResult &result,
                                             const GraphResult &solution) {
         ResourceResult estimate;
-        estimate.measurements = flat.measurements;
-        estimate.classicalInstructions = flat.classicalInstructions;
-        // Static calls are already folded into `flat`, but dynamic loop bodies are not.
-        estimate.varFunctionCalls = flat.varFunctionCalls;
-        estimate.numAllocQubits = flat.numAllocQubits;
-        estimate.numArgQubits = flat.numArgQubits;
-        estimate.deviceName = flat.deviceName;
-        estimate.isQnode = flat.isQnode;
-        estimate.hasBranches = flat.hasBranches;
-        estimate.hasDynLoop = flat.hasDynLoop;
-        estimate.autoQubitManagement = flat.autoQubitManagement;
+        estimate.measurements = result.measurements;
+        estimate.classicalInstructions = result.classicalInstructions;
+        estimate.functionCalls = result.functionCalls;
+        estimate.varFunctionCalls = result.varFunctionCalls;
+        estimate.numAllocQubits = result.numAllocQubits;
+        estimate.numArgQubits = result.numArgQubits;
+        estimate.deviceName = result.deviceName;
+        estimate.isQnode = result.isQnode;
+        estimate.hasBranches = result.hasBranches;
+        estimate.hasDynLoop = result.hasDynLoop;
+        estimate.autoQubitManagement = result.autoQubitManagement;
 
         // Decomposable gates are keyed by their graph op id (GOID).
-        for (const auto &opEntry : flat.detailedOperations) {
+        for (const auto &opEntry : result.detailedOperations) {
             OperatorNode operatorNode;
             operatorNode.id = opEntry.getKey().str();
 
