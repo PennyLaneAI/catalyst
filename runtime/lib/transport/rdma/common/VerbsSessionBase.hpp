@@ -56,8 +56,11 @@ template <class Role> class VerbsSessionBase : public Role {
   public:
     /// @param backend Name used in error messages, e.g. "cpu_verbs".
     /// @param fwd_shape Shape of the controller-to-coprocessor queue pair.
+    /// @param ring Frame layout of both rings, from the session's config
+    /// (frame::geometry_from_config).
     VerbsSessionBase(std::string dev, int gid_idx, const char *backend,
-                     QpShape fwd_shape = DEFAULT_QP_SHAPE);
+                     QpShape fwd_shape = DEFAULT_QP_SHAPE,
+                     frame::RingGeometry ring = frame::BL16_RING);
     ~VerbsSessionBase() override = default;
 
     VerbsSessionBase(const VerbsSessionBase &) = delete;
@@ -76,10 +79,13 @@ template <class Role> class VerbsSessionBase : public Role {
     virtual bool oob_listens() const = 0;
 
     // Seal the staged send frame with round `cursor`'s seq and write it into the peer's ring.
+    template <frame::Mode M>
+    void post_write(ibv_qp *qp, std::uint64_t cursor, bool inline_data, bool signaled);
     void post_write(ibv_qp *qp, std::uint64_t cursor, bool inline_data, bool signaled);
     void reap(ibv_cq *cq, int &outstanding, bool drain);
     // Wait for round `cursor`'s frame in the local ring and decode it into `out`. Returns false if
     // `st` is stopped first.
+    template <frame::Mode M>
     bool poll_message_arrival(std::uint64_t cursor, std::stop_token st, frame::FrameView &out);
     // The frame the next post_write sends; stage it with frame::stage first.
     void *send_frame() { return send_buf_->addr(); }
@@ -100,7 +106,7 @@ template <class Role> class VerbsSessionBase : public Role {
     common::FdGuard oob_fd_;
     std::vector<common::MemoryRegion> caller_memory_regions_;
     std::optional<common::MemoryRegion> send_buf_; // local send source (one frame)
-    frame::RingGeometry ring_ = frame::BL16_RING;  // both rings, local and the peer's
+    frame::RingGeometry ring_;                     // both rings, local and the peer's
     MemRegion local_{};
     PeerRef peer_{};
     ChannelDesc desc_{};
