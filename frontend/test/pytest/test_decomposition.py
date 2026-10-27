@@ -2157,22 +2157,22 @@ class TestDecomposeAlias:
             qp.decomposition.disable_graph()
 
 
-class TestResourceAnalysis:
-    """Tests for ``resource-analysis`` using the ``qp.estimate`` path.
+class TestResourceEstimate:
+    """Tests for ``resource-estimate`` using the ``qp.estimate`` path.
 
-    ``qp.estimate`` builds ``transform(pass_name="resource-analysis")(gate_set=...)``; under
+    ``qp.estimate`` builds ``transform(pass_name="resource-estimate")(gate_set=...)``; under
     capture that must go through ``_handle_decompose_transform`` and emit the
-    ``resource-analysis`` pass.
+    ``resource-estimate`` pass.
     """
 
-    _resource_analysis = qp.transform(pass_name="resource-analysis")
+    _resource_estimate = qp.transform(pass_name="resource-estimate")
 
-    def test_resource_analysis_with_estimate(self, tmp_path):
-        """With a gate set, capture inserts ``resource-analysis`` and forwards output kwargs."""
+    def test_resource_estimate(self, tmp_path):
+        """With a gate set, capture inserts ``resource-estimate`` and forwards output kwargs."""
         out = tmp_path / "resources.json"
 
         @qjit(capture=True, target="mlir")
-        @self._resource_analysis(
+        @self._resource_estimate(
             gate_set={"RX", "RY", "RZ"},
             output_json=True,
             output_fname=str(out),
@@ -2183,7 +2183,7 @@ class TestResourceAnalysis:
             return qp.probs()
 
         mlir = circuit.mlir
-        assert 'apply_registered_pass "resource-analysis"' in mlir
+        assert 'apply_registered_pass "resource-estimate"' in mlir
         assert 'apply_registered_pass "graph-decomposition"' not in mlir
         assert "gate-set" in mlir
         assert "bytecode-rules" in mlir

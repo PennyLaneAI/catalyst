@@ -169,39 +169,6 @@ ResourceAnalysis::ResourceAnalysis(ModuleOp moduleOp,
     }
 }
 
-ResourceAnalysis::ResourceAnalysis(ModuleOp moduleOp,
-                                   ArrayRef<ExtensionProvider> extensionProviders,
-                                   const DecompGraph::Core::GraphResult &graphResult)
-    : ResourceAnalysis(moduleOp, extensionProviders, /*collectDetailedOperations=*/true) {
-    for (auto &funcEntry : funcResults) {
-        ResourceResult &result = funcEntry.getValue();
-        result.operations.clear();
-
-        // Decomposable gates are keyed by their graph op id (GOID).
-        for (const auto &opEntry : result.detailedOperations) {
-            DecompGraph::Core::OperatorNode operatorNode;
-            operatorNode.id = opEntry.getKey().str();
-
-            auto graphOp = graphResult.find(operatorNode);
-            if (graphOp == graphResult.end()) {
-                // Not a graph operator (e.g. a mid-circuit measurement): count the op itself.
-                result.operations[opEntry.getKey()][{-1, -1}] += opEntry.getValue();
-                continue;
-            }
-            for (const auto &[basisOp, count] : graphOp->second.basisCounts) {
-                // Getting wires and params from GOID is unreliable. The JSON is flattened anyways,
-                // so for qp.estimate this will be enough.
-                result.operations[basisOp.name][{-1, -1}] += count * opEntry.getValue();
-            }
-        }
-
-        // Drop the pre-decomposition ids so they aren't serialized next to the estimated
-        // operations.
-        result.detailedOperations.clear();
-        result.collectDetailedOperations = false;
-    }
-}
-
 ResourceAnalysis::ResourceAnalysis(func::FuncOp funcOp,
                                    ArrayRef<ExtensionProvider> extensionProviders,
                                    bool collectDetailedOperations)

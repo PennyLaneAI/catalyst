@@ -17,30 +17,18 @@
 #include <cmath>
 #include <cstdint>
 #include <fstream>
-#include <memory>
 #include <string>
 
 #include "llvm/Support/JSON.h"
 #include "mlir/Pass/Pass.h"
-#include "mlir/Pass/PassManager.h"
 
 #include "Catalyst/Analysis/ResourceAnalysis.h"
 #include "Catalyst/Analysis/ResourceAnalysisRegistry.h"
 #include "Catalyst/Analysis/ResourceResult.h"
-#include "Driver/Timer.h"
 #include "PBC/Analysis/PBCDepthAnalysis.h"
-#include "Quantum/Transforms/Passes.h"
-
-#include "DGBuilder.hpp"
-#include "DGSolver.hpp"
-#include "DGTypes.hpp"
-#include "GraphDecompositionPrep.hpp"
 
 using namespace mlir;
 using namespace llvm;
-using namespace catalyst::quantum;
-using namespace DecompGraph::Core;
-using namespace DecompGraph::Solver;
 
 namespace catalyst {
 
@@ -72,33 +60,7 @@ struct ResourceAnalysisPass : public impl::ResourceAnalysisPassBase<ResourceAnal
         pbc::registerPBCResourceAnalysisExtensions();
 
         auto moduleOp = cast<ModuleOp>(getOperation());
-        std::optional<GraphResult> solution;
-
-        if (!targetGateSetOption.empty()) {
-            // Prepare and solve the decomposition graph for qp.estimate
-            std::unique_ptr<DecompositionGraph> graph = GraphDecompositionPrep::prepareGraph(
-                moduleOp, {
-                              .targetGateSetOption = targetGateSetOption,
-                              .fixedDecompsOption = fixedDecompsOption,
-                              .altDecompsOption = altDecompsOption,
-                              .bytecodeRulesFile = bytecodeRulesFile,
-                              .libQPDPath = libQPDPath,
-                              .libpythonPath = libpythonPath,
-                          });
-            if (!graph) {
-                return signalPassFailure();
-            }
-
-            DecompositionSolver solver(*graph);
-            solution = std::make_optional(solver.solve());
-        } else {
-            markAllAnalysesPreserved();
-        }
-
-        ResourceAnalysis analysis =
-            solution ? ResourceAnalysis(moduleOp, ResourceAnalysisRegistry::get().all(), *solution)
-                     : ResourceAnalysis(moduleOp, ResourceAnalysisRegistry::get().all(),
-                                        /*collectDetailedOperations=*/false);
+        ResourceAnalysis analysis(moduleOp, ResourceAnalysisRegistry::get().all());
         const auto &results = analysis.getResults();
 
         // Populate statistics from the entry function. The flattened view
@@ -107,11 +69,6 @@ struct ResourceAnalysisPass : public impl::ResourceAnalysisPassBase<ResourceAnal
         StringRef entry = analysis.getEntryFunc();
         if (!entry.empty()) {
             if (const ResourceResult *flat = analysis.getFlattenedResource(entry)) {
-                // for (auto &opEntry : flat->detailedOperations) {
-                //     // opEntry.getKey() is the GOID
-                //     // opEntry.getValue() is the count
-
-                // }
                 accumulateStats(*flat);
             }
         } else {
@@ -130,6 +87,7 @@ struct ResourceAnalysisPass : public impl::ResourceAnalysisPassBase<ResourceAnal
                 writeJsonToFile(jsonStr, outputFname);
             }
         }
+        markAllAnalysesPreserved();
     }
 
   private:
