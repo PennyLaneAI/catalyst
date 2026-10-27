@@ -24,8 +24,6 @@
 #include "Catalyst/Analysis/ResourceResultExtension.h"
 #include "PBC/IR/PBCOps.h"
 
-#include "DGTypes.hpp"
-
 using namespace mlir;
 
 namespace catalyst {
@@ -39,10 +37,6 @@ class ResourceAnalysis {
     explicit ResourceAnalysis(ModuleOp moduleOp,
                               ArrayRef<ExtensionProvider> extensionProviders = {},
                               bool collectDetailedOperations = false);
-    // Same, then replace each function's operations with the basis gates of their chosen
-    // decomposition in `graphResult`, for qp.estimate.
-    explicit ResourceAnalysis(ModuleOp moduleOp, ArrayRef<ExtensionProvider> extensionProviders,
-                              const DecompGraph::Core::GraphResult &graphResult);
     explicit ResourceAnalysis(func::FuncOp funcOp,
                               ArrayRef<ExtensionProvider> extensionProviders = {},
                               bool collectDetailedOperations = false);
