@@ -267,6 +267,9 @@
         PauliRot{angle:[f64]}{wires:2}{pauli_word = "XX"}
     will have different decomposition rules.
 
+  - The solver now uses Knuth's generalization of Dijkstra's algorithm for hypergraphs, which provides improved cycle handling.
+    [(#3334)](https://github.com/PennyLaneAI/catalyst/pull/3334)
+
   - A decomposition rule function can arrive in a piece of MLIR in one of three ways:
     1. As a precompiled rule shipped with the Catalyst package directly.
     This pathway was implemented in Catalyst v0.15.
