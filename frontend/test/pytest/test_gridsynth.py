@@ -124,7 +124,7 @@ def test_gridsynth_ppr_basis():
     for param in [-7.7, -2.2, -0.1, 0.0, 0.1, 2.2, 7.7]:
         result = qjitted_circuit(param)
         result_with_ppr = qjitted_circuit_with_ppr(param)
-        assert np.allclose(result, result_with_ppr, atol=eps, rtol=0)
+        assert np.allclose(result, result_with_ppr, atol=eps, rtol=0), f"param={param}"
 
 
 @pytest.mark.parametrize("ppr_basis", [False, True])
@@ -225,7 +225,7 @@ def test_mixed_gridsynth_samples(eps, ppr_basis):
             wire_state = np.moveaxis(result, wire, 0).reshape(2, -1)
             density_matrix = wire_state @ wire_state.conj().T
             fidelity = np.real(np.vdot(expected, density_matrix @ expected))
-            assert 1 - fidelity <= eps
+            assert 1 - fidelity <= eps, f"param={param}, wire={wire}"
 
 
 @pytest.mark.parametrize("eps", [1e-2, 1e-4])
