@@ -179,6 +179,13 @@
 
 <h3>Improvements 🛠</h3>
 
+* Ahead-of-time compilation with `qjit` can now stop at any of the main internal compiler stages,
+  in addition to the frontend-controlled stages (`target="jaxpr"|"mlir"|"binary"`).
+  The `"llvmir"` target now correctly stops after LLVM IR is first generated from the MLIR, and
+  two new targets (`"llvmir_opt"` and `"object"`) provide additional control over the LLVM-based
+  stages.
+  [(#3406)](https://github.com/PennyLaneAI/catalyst/pull/3406)
+
 * The Catalyst CLI interface is reworked for consistency and flexibility.
   [(#3403)](https://github.com/PennyLaneAI/catalyst/pull/3403)
 
