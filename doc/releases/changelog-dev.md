@@ -177,6 +177,12 @@
 
 <h3>Improvements 🛠</h3>
 
+* Decomposition to the device's gateset is now applied by default with `capture=True`.
+  This may introduce performance slowdowns or failures with cases that are not yet supported by the
+  decomposition pass. In the event of issues, this can be turned off with `skip_preprocess=True` being
+  passed to `qjit`.
+  [(#3275)](https://github.com/PennyLaneAI/catalyst/pull/3275)
+
 * Transforms can now be directly applied to a `QJIT`'d workflow. A new `QJIT` will be produced with
   the transform applied to the `QJIT`'s body.
   [(#3397)](https://github.com/PennyLaneAI/catalyst/pull/3397)
