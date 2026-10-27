@@ -592,21 +592,6 @@ class TestCompilerState:
         assert "func.func" in output.read_text()
         assert "llvm.func" not in output.read_text()
 
-    def test_mlir_opt_target_without_llvmir(self):
-        """Test that the MLIR returned by the compiler for the ``mlir_opt`` target, when
-        intermediate files are kept, is not stored as LLVM IR."""
-
-        @qjit(target="mlir_opt", keep_intermediate=True)
-        def f(x):
-            return x + 1.0
-
-        # Create tmp workspaces for intermediates to avoid CI race conditions
-        f.use_cwd_for_workspace = False
-        f.aot_compile(0.5)
-
-        assert f.llvm_ir is None
-        f.workspace.cleanup()
-
     @pytest.mark.parametrize("target", ["mlir_opt", "llvmir", "llvmir_opt", "object", "binary"])
     def test_compile_options_restored_on_error(self, target):
         """Test that the compile options set for the target are restored when the ahead-of-time

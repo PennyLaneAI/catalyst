@@ -591,7 +591,6 @@ class QJIT(CatalystCallable):
         # ``(jaxpr, placement)`` once searched; see ``_placement``.
         self._placement_cache = None
         self.mlir_module = None
-        self.llvm_ir = None
         self.out_type = None
         self.overwrite_ir = None
         self.use_cwd_for_workspace = self.compile_options.keep_intermediate
@@ -776,15 +775,11 @@ class QJIT(CatalystCallable):
     @property
     def llvmir(self):
         """LLVMIR textual representation."""
-        if self.llvm_ir is not None:
-            return self.llvm_ir
-
         if not self.mlir_module:
             return None
 
         _mlir = str(self.mlir_module)
-        self.llvm_ir = to_llvm_opt(stdin=_mlir, options=self.compile_options)
-        return self.llvm_ir
+        return to_llvm_opt(stdin=_mlir, options=self.compile_options)
 
     @debug_logger
     def jit_compile(self, args, **kwargs):
@@ -820,7 +815,7 @@ class QJIT(CatalystCallable):
 
             self._configure_backline()
             self.mlir_module = self.generate_ir()
-            self.compiled_function, self.llvm_ir = self.compile(), None
+            self.compiled_function = self.compile()
 
             self.fn_cache.insert(self.compiled_function, args, self.out_treedef, self.workspace)
 
