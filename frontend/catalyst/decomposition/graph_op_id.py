@@ -106,7 +106,7 @@ def build_graph_op_id(
 
     dynamic_id = format_dynamic_params_for_id(dict(sorted(dynamic_shape.items())))
     wire_id = "{" + ",".join(f"{key}:{value}" for key, value in sorted(wire_lens.items())) + "}"
-    static_id = format_static_data_dict_for_id(dict(static_data))
+    static_id = format_static_data_dict_for_id(dict(sorted(static_data)))
     uid_id = f"[{uid}]" if uid is not None else ""
     return name + dynamic_id + wire_id + static_id + uid_id
 
