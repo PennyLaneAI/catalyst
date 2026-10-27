@@ -795,7 +795,7 @@ class TestTraceTime:
         with local_decomps():
             add_decomps(NoParamsCustomOp, expensive_fixed_decomp, cheaper_decomp)
 
-            @qjit(capture=True, target="mlir", skip_preprocess=True)
+            @qjit(capture=True, target="mlir")
             @graph_decomposition(
                 gate_set={NoParams: 1},
                 fixed_decomps={NoParamsCustomOp: expensive_fixed_decomp},
