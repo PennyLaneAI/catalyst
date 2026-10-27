@@ -115,6 +115,7 @@
   [(#3248)](https://github.com/PennyLaneAI/catalyst/pull/3248)
   [(#3307)](https://github.com/PennyLaneAI/catalyst/pull/3307)
   [(#3365)](https://github.com/PennyLaneAI/catalyst/pull/3365)
+  [(#3382)](https://github.com/PennyLaneAI/catalyst/pull/3382)
 
   Control is folded into the operator identity *control-outermost* (e.g. `C(Adjoint(Op))`), so
   `ctrl(adjoint(Op))` and `adjoint(ctrl(Op))` collapse to a single node, while a distinct control
