@@ -140,7 +140,7 @@ def test_gridsynth_specs(ppr_basis):
         qp.RZ(x, 1)
         return qp.expval(qp.Z(0))
 
-    resources = qp.specs(circuit, level=1)(0.5).resources
+    resources = qp.analyze(circuit, level=1)(0.5).resources
     assert resources.num_wires == 2
 
     ops = resources.quantum_operations
@@ -171,8 +171,8 @@ def test_gridsynth_specs_matches_runtime(eps, ppr_basis, method):
             qp.RZ(theta, 0)
         return qp.expval(qp.Z(0))
 
-    estimated = qp.specs(circuit, level=1)(angles).resources
-    executed = qp.specs(circuit, level="device")(angles).resources
+    estimated = qp.analyze(circuit, level=1)(angles).resources
+    executed = qp.track(circuit)(angles)[1].resources
 
     estimated_t = estimated.quantum_operations["PPR-pi/8-w1" if ppr_basis else "T"]
     # The device reports the PPR exp(-i pi/8 P) as PauliRot(pi/4).
@@ -196,7 +196,7 @@ def test_mixed_fallback_gridsynth_specs_wires(ppr_basis):
         qp.RZ(x, 1)
         return qp.expval(qp.Z(0))
 
-    assert qp.specs(circuit, level=1)(0.5).resources.num_wires == 4
+    assert qp.analyze(circuit, level=1)(0.5).resources.num_wires == 4
 
 
 @pytest.mark.parametrize("eps", [1e-2, 1e-4, 1e-6])
