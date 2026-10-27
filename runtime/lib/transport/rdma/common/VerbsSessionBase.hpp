@@ -20,6 +20,7 @@
 #include <string>
 #include <vector>
 
+#include "BackendConfig.hpp"
 #include "CompletionQueue.hpp"
 #include "Context.hpp"
 #include "Frame.hpp"
@@ -60,7 +61,7 @@ template <class Role> class VerbsSessionBase : public Role {
     /// (frame::geometry_from_config).
     VerbsSessionBase(std::string dev, int gid_idx, const char *backend,
                      QpShape fwd_shape = DEFAULT_QP_SHAPE,
-                     frame::RingGeometry ring = frame::BL16_RING);
+                     frame::RingGeometry ring = frame::BL16_RING, CuqrConfig cuqr = {});
     ~VerbsSessionBase() override = default;
 
     VerbsSessionBase(const VerbsSessionBase &) = delete;
@@ -78,17 +79,35 @@ template <class Role> class VerbsSessionBase : public Role {
     // True for the coprocessor (listens/sends first on the OOB socket).
     virtual bool oob_listens() const = 0;
 
-    // Seal the staged send frame with round `cursor`'s seq and write it into the peer's ring.
-    // post_frame reads the frame mode from the ring. (A distinct name: GCC rejects explicitly
-    // instantiating post_write<M> beside a non-template overload of the same signature.)
+    // Seal the staged send frame with round `cursor`'s seq and write it into the peer's ring (CUQR:
+    // send it by the session's verb). post_frame reads the frame mode from the ring. (A distinct
+    // name: GCC rejects explicitly instantiating post_write<M> beside a non-template overload of the
+    // same signature.)
     template <frame::Mode M>
     void post_write(ibv_qp *qp, std::uint64_t cursor, bool inline_data, bool signaled);
     void post_frame(ibv_qp *qp, std::uint64_t cursor, bool inline_data, bool signaled);
     void reap(ibv_cq *cq, int &outstanding, bool drain);
     // Wait for round `cursor`'s frame in the local ring and decode it into `out`. Returns false if
-    // `st` is stopped first.
+    // `st` is stopped first. For CUQR, a message that is not a valid frame comes back with
+    // out.data == nullptr, to be dropped.
     template <frame::Mode M>
     bool poll_message_arrival(std::uint64_t cursor, std::stop_token st, frame::FrameView &out);
+    // CUQR frames carry no word written last, so arrival is read from the receive completion
+    // queue: one receive request per slot, reposted as each message arrives. Returns once round
+    // `cursor`'s message is in its slot, or false if `st` is stopped first. A controller talking to
+    // a cudaq-realtime peer, whose UC queue pair drops a lost message silently, gives up after 5 s,
+    // as cudaq-realtime's own tests do.
+    bool wait_recv(std::uint64_t cursor, std::stop_token st);
+    void post_recv(std::uint64_t slot);
+    void post_recvs(const MemRegion &local); // one receive request per slot of `local`
+    // The coprocessor receives on the fwd queue pair and the controller on the bwd one; with a
+    // cudaq-realtime peer, each receives on the one it sends on.
+    ibv_qp *recv_qp() {
+        return oob_listens() != cuqr_.cudaq_peer ? fwd_qp_->get() : bwd_qp_->get();
+    }
+    PeerRef exchange_keys_with_cudaq(const MemRegion &local);
+    ibv_cq *recv_cq() { return oob_listens() ? fwd_cq_->get() : bwd_cq_->get(); }
+    bool cuqr() const { return ring_.mode == frame::Mode::CUQR; }
     // The frame the next post_write sends; stage it with frame::stage first.
     void *send_frame() { return send_buf_->addr(); }
     void *ring_slot(std::uint64_t cursor) {
@@ -109,6 +128,7 @@ template <class Role> class VerbsSessionBase : public Role {
     std::vector<common::MemoryRegion> caller_memory_regions_;
     std::optional<common::MemoryRegion> send_buf_; // local send source (one frame)
     frame::RingGeometry ring_;                     // both rings, local and the peer's
+    CuqrConfig cuqr_;                              // how CUQR frames complete, and to whom
     MemRegion local_{};
     PeerRef peer_{};
     ChannelDesc desc_{};
