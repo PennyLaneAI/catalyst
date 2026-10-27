@@ -346,7 +346,7 @@ def _require_decompose_gate_set(tkwargs):
         )
 
 
-def _require_resource_analysis_args(tkwargs):
+def _require_resource_estimate_args(tkwargs):
     """Reject a qp.estimate without a gate set, which the resource-analysis pass needs."""
     if tkwargs.get("output_json") is None:
         raise ValueError(
@@ -361,7 +361,7 @@ def _require_resource_analysis_args(tkwargs):
 
 # pylint: disable=too-many-positional-arguments
 def _handle_decompose_transform(
-    self, inner_jaxpr, consts, non_const_args, tkwargs, resource_analysis_for_estimate=False
+    self, inner_jaxpr, consts, non_const_args, tkwargs, is_resource_estimate=False
 ):
     """Route a captured ``qp.decompose`` onto the ``graph-decomposition`` pass.
 
@@ -370,12 +370,12 @@ def _handle_decompose_transform(
     # Local imports avoid an import cycle (catalyst.passes imports from_plxpr indirectly).
     from pennylane.decomposition import DecompositionRule, add_decomps, list_decomps, local_decomps
 
-    from catalyst.passes.builtin_passes import graph_decomposition, resource_analysis
+    from catalyst.passes.builtin_passes import graph_decomposition, resource_estimate
 
     _require_decompose_gate_set(tkwargs)
 
-    if resource_analysis_for_estimate:
-        _require_resource_analysis_args(tkwargs)
+    if is_resource_estimate:
+        _require_resource_estimate_args(tkwargs)
 
     fixed_decomps = tkwargs.get("fixed_decomps") or {}
     alt_decomps = tkwargs.get("alt_decomps") or {}
@@ -398,7 +398,7 @@ def _handle_decompose_transform(
 
         # Reusing graph_decomposition pass options setup for resource analysis estimation.
         bound_transform = (
-            resource_analysis if resource_analysis_for_estimate else graph_decomposition
+            resource_estimate if is_resource_estimate else graph_decomposition
         )
         bound_transform_params = {
             "gate_set": tkwargs["gate_set"],
@@ -408,7 +408,7 @@ def _handle_decompose_transform(
         bound_pass = bound_transform(**bound_transform_params)
 
         # Set resource analysis estimation options after graph_decomposition_setup_inputs.
-        if resource_analysis_for_estimate:
+        if is_resource_estimate:
             bound_pass.kwargs["output_json"] = tkwargs["output_json"]
             bound_pass.kwargs["output_fname"] = tkwargs["output_fname"]
         next_eval._pass_pipeline.insert(0, bound_pass)
@@ -450,7 +450,7 @@ def handle_transform(
     targs = args[_tuple_to_slice(targs_slice)]
     pl_tkwargs = _tuple_to_dict(tkwargs)
     resource_analysis_for_estimate = (
-        transform.pass_name == "resource-analysis" and pl_tkwargs.get("gate_set") is not None
+        transform.pass_name == "resource-estimate" and pl_tkwargs.get("gate_set") is not None
     )
 
     # qp.decompose is routed to the graph-decomposition pass (see _handle_decompose_transform).
