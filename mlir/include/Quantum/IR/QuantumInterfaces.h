@@ -41,6 +41,8 @@ using DynamicShape = llvm::SmallVector<std::pair<std::string, llvm::SmallVector<
 using WireLens = llvm::SmallVector<std::pair<std::string, size_t>>;
 
 std::string defaultGetGraphOpId(mlir::Operation *op);
+std::string defaultGetGraphOpIdExplicitModifiers(mlir::Operation *op, bool isAdjoint,
+                                                 unsigned numControlQubits);
 
 } // namespace quantum
 } // namespace catalyst
