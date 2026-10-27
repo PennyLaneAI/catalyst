@@ -957,7 +957,7 @@ class QJIT(CatalystCallable):
 
         return mlir_module
 
-    @instrument(size_from=1, has_finegrained=True)
+    @instrument(has_finegrained=True)
     @debug_logger
     def compile(self):
         """Compile an MLIR module to LLVMIR and shared library code.

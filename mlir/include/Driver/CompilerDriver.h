@@ -113,9 +113,6 @@ struct CompilerOptions {
     bool dumpPassPipeline;
     /// If true, the compiler will write bytecode rather than text.
     bool shouldEmitBytecode;
-
-    /// Get the destination of the object file at the end of compilation.
-    std::string getObjectFile() const;
 };
 
 /**

@@ -217,6 +217,80 @@ class TestCompilerOutput:
         )
         assert "module" in _catalyst(("--tool", "opt"), str(output))
 
+    @pytest.mark.parametrize("destination", [None, "-", "output.o"])
+    @pytest.mark.parametrize(
+        "tool,source",
+        [
+            (None, "func.func @foo() { return }"),
+            ("all", "func.func @foo() { return }"),
+            ("llc", "define void @foo() { ret void }"),
+        ],
+    )
+    def test_object_output(self, tool, source, destination, tmp_path, monkeypatch):
+        """Object-generating tools use file destinations and reject stdout."""
+        monkeypatch.chdir(tmp_path)
+        flags = [("--tool", tool)] if tool is not None else []
+        if destination is not None:
+            flags.append(("-o", destination))
+        if destination == "-":
+            with pytest.raises(CompileError, match="Object code cannot be written to stdout"):
+                _catalyst(*flags, stdin=source)
+            assert not list(tmp_path.iterdir())
+            return
+
+        assert _catalyst(*flags, stdin=source) == ""
+        output = tmp_path / (destination or "catalyst_module.o")
+        # ELF and Mach-O object headers on the supported Linux and macOS hosts.
+        assert output.read_bytes().startswith(
+            (b"\x7fELF", b"\xcf\xfa\xed\xfe", b"\xce\xfa\xed\xfe")
+        )
+
+    def test_default_object_filename(self, tmp_path, monkeypatch):
+        """File inputs use the default object name in the current directory."""
+        monkeypatch.chdir(tmp_path)
+        input_dir = tmp_path / "input"
+        input_dir.mkdir()
+        source = input_dir / "program.mlir"
+        source.write_text("func.func @foo() { return }")
+
+        assert _catalyst(str(source)) == ""
+        assert (tmp_path / "catalyst_module.o").stat().st_size > 0
+        assert not (input_dir / "catalyst_module.o").exists()
+
+    @pytest.mark.parametrize("destination", [None, "output.o"])
+    def test_module_name_object_output(self, destination, tmp_path, monkeypatch):
+        """The module name supplies the object filename unless an output path is given."""
+        monkeypatch.chdir(tmp_path)
+        flags = [("--module-name", "custom")]
+        if destination is not None:
+            flags.append(("-o", destination))
+
+        assert _catalyst(*flags, stdin="func.func @foo() { return }") == ""
+        output = tmp_path / (destination or "custom.o")
+        assert output.stat().st_size > 0
+        assert list(tmp_path.iterdir()) == [output]
+
+    def test_verbose_object_output(self, tmp_path, capsys):
+        """Verbose object compilation reports progress on stderr."""
+        output = tmp_path / "output.o"
+        assert (
+            _catalyst(
+                "--verbose", ("-o", output), stdin="func.func @foo() { return }", stderr_return=True
+            )
+            == ""
+        )
+        assert output.stat().st_size > 0
+        captured = capsys.readouterr()
+        assert captured.out == ""
+        assert "LLC object code generation successful" in captured.err
+
+    def test_frontend_object_output(self, tmp_path):
+        """Unlinked frontend compilation produces an object in its workspace."""
+        compiler = Compiler(CompileOptions(link=False))
+        compiler.run_from_ir("func.func @foo() { return }", "foo", Directory(tmp_path))
+
+        assert (tmp_path / "foo.o").stat().st_size > 0
+
 
 class TestCompilerDiagnostics:
     """Unit tests for diagnostics emitted by the Catalyst subprocess."""
