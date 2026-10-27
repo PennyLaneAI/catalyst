@@ -767,9 +767,7 @@ class QJIT(CatalystCallable):
             return
 
         with _target_compile_options(self.compile_options):
-            self.compiled_function, llvm_ir = self.compile()
-        # With target="mlir_opt", the IR returned by the compiler is MLIR instead of LLVM IR.
-        self.llvm_ir = None if self.compile_options.target == "mlir_opt" else llvm_ir
+            self.compiled_function = self.compile()
         if target != "binary":
             return
 
@@ -822,7 +820,7 @@ class QJIT(CatalystCallable):
 
             self._configure_backline()
             self.mlir_module = self.generate_ir()
-            self.compiled_function, self.llvm_ir = self.compile()
+            self.compiled_function, self.llvm_ir = self.compile(), None
 
             self.fn_cache.insert(self.compiled_function, args, self.out_treedef, self.workspace)
 
@@ -967,10 +965,10 @@ class QJIT(CatalystCallable):
     @instrument(has_finegrained=True)
     @debug_logger
     def compile(self):
-        """Compile an MLIR module to LLVMIR and shared library code.
+        """Compile the MLIR module into a shared library.
 
         Returns:
-            Tuple[CompiledFunction, str]: the compilation result and LLVMIR
+            CompiledFunction|None: The compiled user function, or nothing on partial compilation.
         """
         # WARNING: assumption is that the first function is the entry point to the compiled program.
         entry_point_func = self.mlir_module.body.operations[0]
@@ -988,21 +986,21 @@ class QJIT(CatalystCallable):
         # `replace` method, so we need to get a regular Python string out of it.
         func_name = str(self.mlir_module.body.operations[0].name).replace('"', "")
         if self.overwrite_ir:
-            shared_object, llvm_ir = self.compiler.run_from_ir(
+            output_file = self.compiler.run_from_ir(
                 self.overwrite_ir,
                 str(self.mlir_module.operation.attributes["sym_name"]).replace('"', ""),
                 self.workspace,
             )
         else:
-            shared_object, llvm_ir = self.compiler.run(self.mlir_module, self.workspace)
+            output_file = self.compiler.run(self.mlir_module, self.workspace)
 
         if not self.compile_options.link:
-            return None, llvm_ir
+            return None
 
         compiled_fn = CompiledFunction(
-            shared_object, func_name, restype, self.out_type, self.compile_options
+            output_file, func_name, restype, self.out_type, self.compile_options
         )
-        return compiled_fn, llvm_ir
+        return compiled_fn
 
     @instrument(has_finegrained=True)
     @debug_logger

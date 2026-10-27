@@ -489,14 +489,12 @@ class Compiler:
         """Compile a shared object from a textual IR (MLIR or LLVM).
 
         Args:
-            ir (str): Textual MLIR to be compiled
+            ir (str): Textual IR to be compiled
             module_name (str): Module name to use for naming
             workspace (Directory): directory that holds output files and/or debug dumps.
 
         Returns:
-            output_filename (str): Output file name. For the default pipeline this would be the
-                                   shared object library path.
-            out_IR (None): Deprecated.
+            str: Absolute path to shared library (or IR / object file depending on compile options).
         """
         assert isinstance(
             workspace, Directory
@@ -540,15 +538,12 @@ class Compiler:
             raise CompileError(f"catalyst failed with error code {e.returncode}: {e.stderr}") from e
 
         if self.options.link:
-            output = LinkerDriver.run(output_filename, options=self.options)
-            output = str(pathlib.Path(output).absolute())
-        else:
-            output = None
+            output_filename = LinkerDriver.run(output_filename, options=self.options)
 
         # Clean up temporary files
         if os.path.exists(tmp_infile_name):
             os.remove(tmp_infile_name)
-        return output, None
+        return str(pathlib.Path(output_filename).absolute())
 
     def has_xdsl_passes_in_transform_modules(self, mlir_module):
         """Check if the MLIR module contains xDSL passes in transform dialect.
@@ -703,7 +698,7 @@ class Compiler:
             mlir_module: The MLIR module to be compiled
 
         Returns:
-            (str): filename of shared object
+            str: Absolute path to shared library (or IR / object file depending on compile options).
         """
         using_python_compiler = self.is_using_python_compiler(mlir_module)
         workspace = args[0] if args else kwargs.get("workspace")

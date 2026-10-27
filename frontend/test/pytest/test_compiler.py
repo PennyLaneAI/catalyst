@@ -285,12 +285,22 @@ class TestCompilerOutput:
         assert captured.out == ""
         assert "LLC object code generation successful" in captured.err
 
-    def test_frontend_object_output(self, tmp_path):
-        """Unlinked frontend compilation produces an object in its workspace."""
-        compiler = Compiler(CompileOptions(link=False))
-        compiler.run_from_ir("func.func @foo() { return }", "foo", Directory(tmp_path))
+    @pytest.mark.parametrize(
+        "tool,link,suffix",
+        [
+            ("opt", False, ".mlir"),
+            ("opt-translate", False, ".ll"),
+            ("all", False, ".o"),
+            ("all", True, ".so"),
+        ],
+    )
+    def test_frontend_output_path(self, tool, link, suffix, tmp_path):
+        """The compiler returns the path of its generated file."""
+        compiler = Compiler(CompileOptions(compiler_tool=tool, link=link))
+        output = compiler.run_from_ir("func.func @foo() { return }", "foo", Directory(tmp_path))
 
-        assert (tmp_path / "foo.o").stat().st_size > 0
+        assert output == str(tmp_path / f"foo{suffix}")
+        assert pathlib.Path(output).stat().st_size > 0
 
 
 class TestCompilerDiagnostics:
@@ -469,10 +479,7 @@ void _catalyst_pyface_jit_cpp_exception_test(void*, void*) {
                     )
                     output = LinkerDriver.run(object_file, options=self.options)
                     filename = str(pathlib.Path(output).absolute())
-                    return (
-                        filename,
-                        "<FAKE_IR>",
-                    )
+                    return filename
 
         @qjit(target="mlir")
         @qp.qnode(qp.device(backend, wires=1))
@@ -480,7 +487,7 @@ void _catalyst_pyface_jit_cpp_exception_test(void*, void*) {
             return None
 
         cpp_exception_test.compiler = MockCompiler(cpp_exception_test.compiler.options)
-        compiled_function, _ = cpp_exception_test.compile()
+        compiled_function = cpp_exception_test.compile()
 
         with pytest.raises(RuntimeError, match="Hello world"):
             compiled_function()
