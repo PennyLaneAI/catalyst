@@ -29,6 +29,7 @@
   again, at the cost of one temporary ancilla qubit and a mid-circuit measurement per rotation.
   [(#3314)](https://github.com/PennyLaneAI/catalyst/pull/3314)
   [(#3327)](https://github.com/PennyLaneAI/catalyst/pull/3327)
+  [(#3400)](https://github.com/PennyLaneAI/catalyst/pull/3400)
 
   ```python
   from catalyst.passes import gridsynth
@@ -1001,11 +1002,6 @@
   [(#3242)](https://github.com/PennyLaneAI/catalyst/pull/3242)
 
 <h3>Internal changes ⚙️</h3>
-
-* The gridsynth integration tests compile each circuit once and run it for all angles, instead of
-  compiling once per angle. This reduces the runtime of `test_gridsynth.py` from about 140 s to
-  40 s.
-  [(#3400)](https://github.com/PennyLaneAI/catalyst/pull/3400)
 
 * Backline transport backends are chosen from a registry instead of a fixed table. Out-of-tree
   backends register through the `catalyst.transport_backends` entry point or a
