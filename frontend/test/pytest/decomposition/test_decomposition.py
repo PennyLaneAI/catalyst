@@ -1794,6 +1794,22 @@ class TestVerboseSolution:
         assert "Decomposition Solution:" not in capture.out + capture.err
 
 
+@pytest.mark.parametrize("weight", [-1.0, np.nan, -np.inf])
+def test_invalid_gateset_weight(weight):
+    """Invalid weights supplied through MLIR float attributes fail during gateset parsing."""
+
+    @qjit(capture=True, target="mlir")
+    @graph_decomposition(gate_set={NoParams: weight})
+    @qnode(qp.device("null.qubit", wires=1))
+    def circuit():
+        NoParams(reg=[0])
+
+    with pytest.raises(
+        CompileError, match="Invalid cost .* for gate 'NoParams'.*non-negative number"
+    ):
+        qp.specs(circuit, level="all")()
+
+
 def test_gate_already_in_gateset():
     """
     Test that decomposing a gate that's already in the gateset works.
@@ -1809,6 +1825,60 @@ def test_gate_already_in_gateset():
     result = circuit()
     assert np.allclose(result, 1.0)
     assert "llvm.call @__catalyst__qis__Hadamard" in circuit.mlir_opt
+
+
+@pytest.mark.parametrize("reverse", [False, True])
+def test_cyclic_decompositions_find_cheapest_solution(reverse):
+    """A <-> B has exits A -> Target and B -> Target Target.
+
+    Both root orders should use the cheaper exit through A.
+    """
+
+    class A(qp.core.Operator2):
+        def __init__(self, wires):
+            super().__init__(wires=wires)
+
+    class B(qp.core.Operator2):
+        def __init__(self, wires):
+            super().__init__(wires=wires)
+
+    class Target(qp.core.Operator2):
+        def __init__(self, wires):
+            super().__init__(wires=wires)
+
+    @register_resources({B(Wire[1]): 1})
+    def a_to_b(wires):
+        B(wires)
+
+    @register_resources({A(Wire[1]): 1})
+    def b_to_a(wires):
+        A(wires)
+
+    @register_resources({Target(Wire[1]): 1})
+    def a_to_target(wires):
+        Target(wires)
+
+    @register_resources({Target(Wire[1]): 2})
+    def b_to_targets(wires):
+        Target(wires)
+        Target(wires)
+
+    with local_decomps():
+        add_decomps(A, a_to_target, a_to_b)
+        add_decomps(B, b_to_a, b_to_targets)
+        gates = (B, A) if reverse else (A, B)
+
+        @qjit(capture=True, target="mlir")
+        @graph_decomposition(gate_set={Target: 1})
+        @qnode(qp.device("null.qubit", wires=1))
+        def circuit():
+            for gate in gates:
+                gate(wires=0)
+
+        resources = qp.specs(circuit, level="all")().resources
+
+    assert resources["Before MLIR Passes"].counts == {"A": 1, "B": 1}
+    assert resources["graph-decomposition"].counts == {"Target": 2}
 
 
 class TestCustomRuleApplication:
