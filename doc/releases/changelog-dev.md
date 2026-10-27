@@ -83,6 +83,7 @@
   [(#3127)](https://github.com/PennyLaneAI/catalyst/pull/3127)
   [(#3131)](https://github.com/PennyLaneAI/catalyst/pull/3131)
   [(#3227)](https://github.com/PennyLaneAI/catalyst/pull/3227)
+  [(#3401)](https://github.com/PennyLaneAI/catalyst/pull/3401)
 
 * The graph-based decomposition system now supports **adjoint operators** for `Operator2`.
   [(#3120)](https://github.com/PennyLaneAI/catalyst/pull/3120)
@@ -193,7 +194,7 @@
   [(#3391)](https://github.com/PennyLaneAI/catalyst/pull/3391)
 
 * A new `user-transform-stage` pipeline runs the quantum compilation stage only up to and including
-  `apply-transform-sequence`, where the user transforms are applied. 
+  `apply-transform-sequence`, where the user transforms are applied.
   [(#3345)](https://github.com/PennyLaneAI/catalyst/pull/3345)
 
 * The :func:`~catalyst.qjit` function now accepts an ``enable_aot_compilation`` argument, which can be
