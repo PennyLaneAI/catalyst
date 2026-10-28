@@ -72,6 +72,7 @@ void ResourceResult::mergeWith(const ResourceResult &other, MergeMethod method) 
     mergeStringMap(detailedOperations, other.detailedOperations, method);
     mergeStringMap(classicalInstructions, other.classicalInstructions, method);
     mergeStringMap(functionCalls, other.functionCalls, method);
+    mergeStringMap(customInstructions, other.customInstructions, method);
 
     // varFunctionCalls hold identifiers for unknown dynamic counts. If the
     // same key appears twice, the merge result represents a new unknown value
@@ -115,6 +116,10 @@ void ResourceResult::multiplyBy(double scalar) {
         entry.getValue() *= scalar;
     }
 
+    for (auto &instruction : customInstructions) {
+        instruction.getValue() *= scalar;
+    }
+
     for (auto &entry : functionCalls) {
         entry.getValue() *= scalar;
     }
@@ -135,11 +140,11 @@ void ResourceResult::multiplyBy(double scalar) {
 //   metadata: { qnode, auto_qubit_management?, has_branches, device_name? }
 //   num_qubits: { alloc, arg, total }
 //   classical_instructions: { "dialect.op": count, ... }
+//   custom_instructions: { "op_name": count, ... }
 //   quantum_operations: { "<wires>": { "op_name": count, ... }, ... }  // optional
 //   function_calls: { static: { "fxn": count, ... }, dynamic: { "fxn": id, ... } }
 //   measurement_processes: { "meas_type": count, ... }
-//   extended_fields: { "<extension>": { ... }, ... }  // e.g. pbc_depth: { any_commuting_depth,
-//   qubit_disjoint_depth }
+//   extended_fields: { "<metric_name>": value, ... }  // e.g. pbc_any_commuting_depth
 static llvm::json::Value countToJson(double count) {
     double rounded = std::round(count);
     if (std::abs(count - rounded) < 1e-9) {
@@ -214,14 +219,21 @@ llvm::json::Object ResourceResult::toJson() const {
     }
     funcObj["measurement_processes"] = std::move(measurementObject);
 
-    // Extention fields
-    // Emit registered extensions under their own keys (e.g. "depth").
-    // Stage 4 will nest these under "extended_fields".
+    // Custom instructions
+    json::Object customInstructionsObject;
+    for (const auto &instruction : customInstructions) {
+        customInstructionsObject[instruction.getKey()] = countToJson(instruction.getValue());
+    }
+    funcObj["custom_instructions"] = std::move(customInstructionsObject);
+
+    // Extension fields
     json::Object extendedFieldObject;
     for (const auto &ext : extensions) {
         auto json = ext->toJson();
-        if (json != nullptr) {
-            extendedFieldObject[ext->name()] = json;
+        if (auto *fields = json.getAsObject()) {
+            for (auto &[name, value] : *fields) {
+                extendedFieldObject[name] = std::move(value);
+            }
         }
     }
     funcObj["extended_fields"] = std::move(extendedFieldObject);

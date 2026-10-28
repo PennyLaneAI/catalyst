@@ -48,6 +48,9 @@ struct ResourceResult {
 
     llvm::StringMap<double> classicalInstructions;
 
+    // Custom instructions keyed by qualified name (e.g. "visa.compute").
+    llvm::StringMap<double> customInstructions;
+
     llvm::StringMap<double> functionCalls;
 
     // `dyn_for_loop_<N>` -> stable hash id for that loop op (not a trip count).

@@ -57,7 +57,8 @@ static bool isSkippedOp(Operation *op) {
                quantum::DeviceReleaseOp, quantum::ExtractOp, quantum::FinalizeOp, qref::GetOp,
                quantum::HamiltonianOp, quantum::HermitianOp, qref::HermitianOp,
                quantum::InitializeOp, quantum::InsertOp, quantum::NamedObsOp, qref::NamedObsOp,
-               quantum::NumQubitsOp, quantum::TensorOp, quantum::YieldOp, pbc::YieldOp>(op);
+               quantum::NumQubitsOp, quantum::TensorOp, quantum::YieldOp, pbc::YieldOp,
+               ResourceSkipOpInterface>(op);
 }
 
 /// Check if the operation belongs to one of the tracked quantum dialects.
@@ -420,7 +421,8 @@ void ResourceAnalysis::analyzeRegion(Region &region, ResourceResult &result, boo
  * @brief Collect a single operation into the ResourceResult.
  *
  * This categorizes the operation into gates, measurements, classical instructions,
- * or function calls, and updates the corresponding counts in the ResourceResult.
+ * function calls, or custom instructions, and updates the corresponding counts in the
+ * ResourceResult.
  *
  * @param op The operation to collect.
  * @param result The ResourceResult to update with the operation's resource usage.
@@ -498,6 +500,12 @@ void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result, b
         return;
     }
 
+    // Custom instructions
+    if (auto inst = dyn_cast<ResourceInstructionOpInterface>(op)) {
+        result.customInstructions[inst.getResourceName()] += 1;
+        return;
+    }
+
     // Other ops from custom dialects: emit a warning so users are aware
     if (isCustomDialectOp(op)) {
         op->emitWarning() << "ResourceAnalysis encountered an unknown operation '" << op->getName()
@@ -510,6 +518,11 @@ void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result, b
 
 void ResourceAnalysis::collectDetailedOperation(Operation *op, ResourceResult &result,
                                                 bool isAdjoint) const {
+    // Skipped ops
+    if (isSkippedOp(op)) {
+        return;
+    }
+
     if (auto inst = dyn_cast<quantum::DecomposableGate>(op)) {
         // Keep the canonical graph ID unchanged so it matches decomposition rules.
         // Adjoint and control details will appear here once getGraphOpId() encodes them.
@@ -548,6 +561,9 @@ static void accumulateScaled(ResourceResult &dest, const ResourceResult &source,
     }
     for (const auto &ci : source.classicalInstructions) {
         dest.classicalInstructions[ci.getKey()] += ci.getValue() * count;
+    }
+    for (const auto &ci : source.customInstructions) {
+        dest.customInstructions[ci.getKey()] += ci.getValue() * count;
     }
     for (const auto &fc : source.functionCalls) {
         dest.functionCalls[fc.getKey()] += fc.getValue() * count;
