@@ -19,7 +19,7 @@ include "mlir/IR/OpBase.td"
 
 // Dialect-agnostic interfaces used by ResourceAnalysis. Dialects opt in by
 // implementing these interfaces so the analysis does not hard-code op names.
-// Counting interfaces map to ResourceResult fields:
+// Each interface maps to one ResourceResult field:
 //   ResourceInstructionOpInterface  -> customInstructions[name]
 //   ResourceQuantumOpInterface      -> operations[name][{numQubits, numParams}]
 //   ResourceAllocQubitOpInterface   -> num_alloc_qubits
