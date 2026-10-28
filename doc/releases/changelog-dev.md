@@ -311,6 +311,9 @@
 
   In previous versions, graph-based decomposition was occurring during the conversion from PennyLane
   PLXPR to catalyst JAXPR in a JAX-based interpreter, namely `DecompRuleInterpreter`.
+  This `DecompRuleInterpreter` has been removed.
+  [(#3290)](https://github.com/PennyLaneAI/catalyst/pull/3290)
+  [(#3408)](https://github.com/PennyLaneAI/catalyst/pull/3408)
 
   In Catalyst v0.15, the high-performance `--graph-decomposition` MLIR pass was developed to mirror PennyLane's graph solving in Python.
 
@@ -989,10 +992,6 @@
   the top-level module. Functions inside nested modules, such as kernels called through
   `catalyst.launch_kernel`, are now included in the output.
   [(#2961)](https://github.com/PennyLaneAI/catalyst/pull/2961)
-
-* Fixed a bug in `DecompRuleInterpreter.cleanup` by replacing fragile string-based operator
-  checks with strict type-based checking.
-  [(#2873)](https://github.com/PennyLaneAI/catalyst/pull/2873)
 
 * Fixed support of region-based adjoint (`qp.adjoint(qfunc)()`) when used in conjunction with
   dynamic qubit allocation.
