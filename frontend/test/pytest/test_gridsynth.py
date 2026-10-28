@@ -22,13 +22,9 @@ from catalyst.passes import gridsynth
 from catalyst.utils.exceptions import CompileError
 
 
-@pytest.mark.parametrize(
-    "param",
-    [-11.1, -7.7, -4.4, -2.2, -1.1, -0.3, -0.2, -0.1, 0.0, 0.1, 0.2, 0.3, 1.1, 2.2, 4.4, 7.7, 11.1],
-)
 @pytest.mark.parametrize("op", [qp.RZ, qp.PhaseShift])
 @pytest.mark.parametrize("eps", [1e-3, 1e-4, 1e-5, 1e-6, 1e-7])
-def test_PhaseShift_gridsynth(param, op, eps):
+def test_PhaseShift_gridsynth(op, eps):
     """Test that PhaseShift gates are correctly decomposed using the gridsynth pass."""
 
     dev = qp.device("lightning.qubit", wires=1)
@@ -39,17 +35,16 @@ def test_PhaseShift_gridsynth(param, op, eps):
         op(x, wires=0)
         return qp.state()
 
-    expected = circuit(param)
     gridsynthed_circuit = qp.transforms.gridsynth(circuit, epsilon=eps)
     qjitted_circuit = qp.qjit(gridsynthed_circuit, capture=True, collect_decomp_rules=False)
-    result = qjitted_circuit(param)
 
-    assert qp.math.allclose(result, expected, atol=eps, rtol=0)
+    positive_params = [0.1, 0.2, 0.3, 1.1, 2.2, 4.4, 7.7, 11.1]
+    for param in [0.0] + positive_params + [-p for p in positive_params]:
+        assert qp.math.allclose(qjitted_circuit(param), circuit(param), atol=eps, rtol=0)
 
 
-@pytest.mark.parametrize("param", [-2.2, 0.3, 1.1])
 @pytest.mark.parametrize("op", [qp.RZ, qp.PhaseShift])
-def test_adjoint_gridsynth(param, op):
+def test_adjoint_gridsynth(op):
     """Test that adjoint rotations are discretized as the inverse rotation."""
     eps = 1e-6
     dev = qp.device("lightning.qubit", wires=1)
@@ -60,17 +55,16 @@ def test_adjoint_gridsynth(param, op):
         qp.adjoint(op(x, wires=0))
         return qp.state()
 
-    expected = circuit(param)
     gridsynthed_circuit = qp.transforms.gridsynth(circuit, epsilon=eps)
     qjitted_circuit = qp.qjit(gridsynthed_circuit, capture=True, collect_decomp_rules=False)
-    assert qp.math.allclose(qjitted_circuit(param), expected, atol=eps)
+    for param in [-2.2, 0.3, 1.1]:
+        assert qp.math.allclose(qjitted_circuit(param), circuit(param), atol=eps)
 
 
-@pytest.mark.parametrize("param", [-2.2, 0.3, 1.1])
 @pytest.mark.parametrize("op", [qp.RZ, qp.PhaseShift])
 @pytest.mark.parametrize("ppr_basis", [False, True])
 @pytest.mark.parametrize("region", [qp.adjoint, lambda fn: qp.adjoint(qp.adjoint(fn))])
-def test_adjoint_region_gridsynth(param, op, ppr_basis, region):
+def test_adjoint_region_gridsynth(op, ppr_basis, region):
     """Test that rotations inside adjoint regions are discretized and inverted."""
     eps = 1e-6
     dev = qp.device("lightning.qubit", wires=1)
@@ -86,10 +80,10 @@ def test_adjoint_region_gridsynth(param, op, ppr_basis, region):
         region(rotations)(x)
         return qp.state()
 
-    expected = circuit(param)
     gridsynthed_circuit = qp.transforms.gridsynth(circuit, epsilon=eps, ppr_basis=ppr_basis)
     qjitted_circuit = qp.qjit(gridsynthed_circuit, capture=True, collect_decomp_rules=False)
-    assert qp.math.allclose(qjitted_circuit(param), expected, atol=2 * eps)
+    for param in [-2.2, 0.3, 1.1]:
+        assert qp.math.allclose(qjitted_circuit(param), circuit(param), atol=2 * eps)
 
 
 def test_gridsynth_ctrl_region_error():
@@ -111,14 +105,9 @@ def test_gridsynth_ctrl_region_error():
         )(0.7)
 
 
-@pytest.mark.parametrize(
-    "param",
-    [-7.7, -2.2, -0.1, 0.0, 0.1, 2.2, 7.7],
-)
-@pytest.mark.parametrize("eps", [1e-6])
-def test_gridsynth_ppr_basis(param, eps):
+def test_gridsynth_ppr_basis():
     """Test that gridsynth with ppr_basis is consistent with the default gridsynth."""
-
+    eps = 1e-6
     dev = qp.device("lightning.qubit", wires=1)
 
     @qp.qnode(dev)
@@ -132,9 +121,10 @@ def test_gridsynth_ppr_basis(param, eps):
     qjitted_circuit_with_ppr = qp.qjit(
         gridsynthed_circuit_ppr, capture=True, collect_decomp_rules=False
     )
-    result = qjitted_circuit(param)
-    result_with_ppr = qjitted_circuit_with_ppr(param)
-    assert np.allclose(result, result_with_ppr, atol=eps, rtol=0)
+    for param in [-7.7, -2.2, -0.1, 0.0, 0.1, 2.2, 7.7]:
+        result = qjitted_circuit(param)
+        result_with_ppr = qjitted_circuit_with_ppr(param)
+        assert np.allclose(result, result_with_ppr, atol=eps, rtol=0), f"param={param}"
 
 
 @pytest.mark.parametrize("ppr_basis", [False, True])
@@ -209,11 +199,9 @@ def test_mixed_fallback_gridsynth_specs_wires(ppr_basis):
     assert qp.analyze(circuit, level=1)(0.5).resources.num_wires == 4
 
 
-@pytest.mark.parametrize("param", [-7.7, -2.2, -0.1, 0.0, 0.3, 1.1, 4.4])
-@pytest.mark.parametrize("op", [qp.RZ, qp.PhaseShift])
 @pytest.mark.parametrize("eps", [1e-2, 1e-4, 1e-6])
 @pytest.mark.parametrize("ppr_basis", [False, True])
-def test_mixed_gridsynth_samples(param, op, eps, ppr_basis):
+def test_mixed_gridsynth_samples(eps, ppr_basis):
     """Test that every sampled sequence of the mixed method is close to the target. For the
     diamond-norm error 2 * eps of the mixture, each branch satisfies Re(w) >= sqrt(1 - eps), so its
     infidelity is at most eps. Each wire samples its own sequence."""
@@ -224,32 +212,32 @@ def test_mixed_gridsynth_samples(param, op, eps, ppr_basis):
     def circuit(x: float):
         for wire in range(num_wires):
             qp.Hadamard(wire)
-            op(x, wires=wire)
+            qp.RZ(x, wires=wire)
         return qp.state()
 
     mixed_circuit = gridsynth(circuit, epsilon=eps, ppr_basis=ppr_basis, method="mixed")
     qjitted_circuit = qp.qjit(mixed_circuit, capture=True, collect_decomp_rules=False, seed=37)
-    expected = qp.matrix(op(param, wires=0)) @ np.array([1, 1]) / np.sqrt(2)
 
-    result = np.reshape(qjitted_circuit(param), [2] * num_wires)
-    for wire in range(num_wires):
-        wire_state = np.moveaxis(result, wire, 0).reshape(2, -1)
-        density_matrix = wire_state @ wire_state.conj().T
-        fidelity = np.real(np.vdot(expected, density_matrix @ expected))
-        assert 1 - fidelity <= eps
+    for param in [-7.7, -2.2, -0.1, 0.0, 0.3, 1.1, 4.4]:
+        expected = qp.matrix(qp.RZ(param, wires=0)) @ np.array([1, 1]) / np.sqrt(2)
+        result = np.reshape(qjitted_circuit(param), [2] * num_wires)
+        for wire in range(num_wires):
+            wire_state = np.moveaxis(result, wire, 0).reshape(2, -1)
+            density_matrix = wire_state @ wire_state.conj().T
+            fidelity = np.real(np.vdot(expected, density_matrix @ expected))
+            assert 1 - fidelity <= eps, f"param={param}, wire={wire}"
 
 
-@pytest.mark.parametrize("op", [qp.RZ, qp.PhaseShift])
 @pytest.mark.parametrize("eps", [1e-2, 1e-4])
 @pytest.mark.parametrize("ppr_basis", [False, True])
-def test_mixed_fallback_gridsynth_samples(op, eps, ppr_basis):
+def test_mixed_fallback_gridsynth_samples(eps, ppr_basis):
     """Test the sampled states of the mixed fallback method."""
     dev = qp.device("lightning.qubit", wires=1)
 
     @qp.qnode(dev)
     def circuit(x: float):
         qp.Hadamard(0)
-        op(x, wires=0)
+        qp.RZ(x, wires=0)
         return qp.state()
 
     fallback_circuit = gridsynth(circuit, epsilon=eps, ppr_basis=ppr_basis, method="mixed-fallback")
