@@ -25,6 +25,7 @@ namespace catalyst::transport::coproc {
 // alignas(16) makes that single 16 B store well-defined. If the slot ever grows
 // past 16 B the kernel falls back to the write-correction / fence / release-seq
 // / fence trailer protocol instead.
+// TODO: replace with a frame-codec reply frame, so a GPU reply carries its fn_id like every other.
 struct alignas(16) HandoffSlot {
     std::int64_t correction; // error qubit index the decoder produced; -1 for no error
     std::uint32_t seq;

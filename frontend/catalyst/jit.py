@@ -32,6 +32,7 @@ import pennylane as qp
 from jax.api_util import debug_info
 from jax.interpreters import mlir
 from jax.tree_util import tree_flatten, tree_unflatten
+from pennylane.core.transforms import Transform
 from pennylane.logging import debug_logger, debug_logger_init
 
 import catalyst
@@ -1211,3 +1212,10 @@ def _target_compile_options(options: CompileOptions):
         yield
     finally:
         options.lower_to_llvm, options.link = original_values
+
+
+@Transform.generic_register
+def _apply_to_transform(obj: QJIT, transform: Transform, *targs, **tkwargs) -> QJIT:
+    new_workflow = transform(obj.original_function, *targs, **tkwargs)
+    new_options = copy.deepcopy(obj.compile_options)
+    return QJIT(new_workflow, new_options)

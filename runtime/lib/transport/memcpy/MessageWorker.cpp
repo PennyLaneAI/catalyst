@@ -16,46 +16,24 @@
 
 #include <algorithm>
 #include <cstring>
-#include <new>
 
 #include "Error.hpp"
 
 namespace catalyst::transport::memcpy {
+namespace frame = common::frame;
 
 namespace {
 
-std::size_t echo_fn(const void *in, std::size_t in_len, void *out, std::size_t out_cap, void *) {
-    const std::size_t n = std::min(in_len, out_cap);
-    if (n != 0 && in && out) {
-        std::memcpy(out, in, n);
+std::size_t echo_fn(const void *payload, std::size_t len, std::uint32_t, void *out,
+                    std::size_t out_cap, void *) {
+    const std::size_t n = std::min(len, out_cap);
+    if (n != 0 && payload && out) {
+        std::memcpy(out, payload, n);
     }
     return n;
 }
 
-constexpr std::size_t SLOT_ALIGN = 64;
-
-constexpr std::size_t round_up(std::size_t n, std::size_t to) { return (n + to - 1) / to * to; }
-
 } // namespace
-
-void MessageWorker::Ring::allocate(std::size_t capacity) {
-    static_assert(sizeof(Header) == SLOT_ALIGN, "a slot header fills one 64 B line");
-    stride_ = sizeof(Header) + round_up(std::max<std::size_t>(capacity, 1), SLOT_ALIGN);
-    storage_.assign(common::K_RING_SLOTS * stride_ + SLOT_ALIGN, std::byte{0});
-    const auto addr = reinterpret_cast<std::uintptr_t>(storage_.data());
-    base_ = storage_.data() + (SLOT_ALIGN - addr % SLOT_ALIGN) % SLOT_ALIGN;
-    capacity_ = capacity;
-    for (std::size_t i = 0; i < common::K_RING_SLOTS; ++i) {
-        new (slot(i)) Header{};
-    }
-}
-
-void MessageWorker::Ring::release() {
-    std::vector<std::byte>().swap(storage_);
-    base_ = nullptr;
-    stride_ = 0;
-    capacity_ = 0;
-}
 
 MessageWorker::~MessageWorker() {
     try {
@@ -73,13 +51,29 @@ void MessageWorker::bind(CoprocessorFn fn, void *ctx) {
 
 void MessageWorker::start(ThreadInit init) {
     stop();
-    request_ring_.release();
-    reply_ring_.release();
+    const std::size_t region = ring_.region_bytes();
+    storage_.assign(2 * region + ring_.stride, 0);
+    const auto addr = reinterpret_cast<std::uintptr_t>(storage_.data());
+    request_ring_ = storage_.data() + (ring_.stride - addr % ring_.stride) % ring_.stride;
+    reply_ring_ = request_ring_ + region;
+    failed_slot_.assign(ring_.slots, 0);
     process_cursor_ = 0;
     failed_.store(false, std::memory_order_relaxed);
     error_ = nullptr;
-    init_ = std::move(init);
     started_ = true;
+    // Exceptions are captured into error_ so process_message surfaces the real error instead of
+    // the thread terminating the process.
+    engine_ = std::jthread([this, init = std::move(init)](std::stop_token st) {
+        try {
+            if (init) {
+                init();
+            }
+            run(st);
+        } catch (...) {
+            error_ = std::current_exception();
+            failed_.store(true, std::memory_order_release);
+        }
+    });
 }
 
 void MessageWorker::stop() {
@@ -90,43 +84,15 @@ void MessageWorker::stop() {
     started_ = false;
 }
 
-void MessageWorker::launch(std::size_t frame_bytes, std::size_t reply_bytes) {
-    const std::size_t reply_capacity =
-        std::max<std::size_t>(reply_bytes, common::PAYLOAD_DATA_BYTES);
-    try {
-        request_ring_.allocate(frame_bytes);
-        reply_ring_.allocate(reply_capacity);
-    } catch (const std::bad_alloc &) {
-        request_ring_.release();
-        reply_ring_.release();
-        TP_CHECK(false, "Cannot allocate the message rings for %zu B frames and %zu B replies",
-                 frame_bytes, reply_capacity);
-    }
-    // Exceptions are captured into error_ so process_message surfaces the real error instead of
-    // the thread terminating the process.
-    engine_ = std::jthread([this](std::stop_token st) {
-        try {
-            if (init_) {
-                init_();
-            }
-            run(st);
-        } catch (...) {
-            error_ = std::current_exception();
-            failed_.store(true, std::memory_order_release);
-        }
-    });
-}
-
 void MessageWorker::run(std::stop_token st) {
     constexpr std::uint32_t STOP_CHECK_SPINS = 4096;
+    const std::size_t cap = frame::data_capacity(ring_);
     for (std::uint64_t c = 0; !st.stop_requested(); ++c) {
-        const std::size_t idx = c & (common::K_RING_SLOTS - 1);
-        const std::uint32_t expect = static_cast<std::uint32_t>(c + 1);
-        const Ring::Header &req = request_ring_.header(idx);
-        volatile const std::uint32_t *rseq = &req.seq;
+        const auto expect = static_cast<std::uint32_t>(c + 1);
         // Check for stop periodically, so a request that never arrives cannot hang teardown.
+        frame::FrameView request;
         std::uint32_t spins = 0;
-        while (*rseq != expect) {
+        while (!frame::poll(ring_, request_slot(c), expect, request)) {
             if (++spins == STOP_CHECK_SPINS) {
                 spins = 0;
                 if (st.stop_requested()) {
@@ -134,68 +100,49 @@ void MessageWorker::run(std::stop_token st) {
                 }
             }
         }
-        std::atomic_thread_fence(std::memory_order_acquire);
-
-        Ring::Header &out = reply_ring_.header(idx);
-        std::byte *out_data = reply_ring_.data(idx);
-        const std::size_t cap =
-            std::max<std::size_t>(static_cast<std::size_t>(req.cap), common::PAYLOAD_DATA_BYTES);
-        std::memset(out_data, 0, cap);
+        std::uint8_t *reply = reply_slot(c);
+        std::uint8_t *reply_data = frame::data(ring_, reply);
+        std::memset(reply_data, 0, cap);
         CoprocessorFn fn = fn_ ? fn_ : &echo_fn;
-        const std::size_t nb =
-            fn(request_ring_.data(idx), static_cast<std::size_t>(req.bytes), out_data, cap, ctx_);
-        if (nb == COPROCESSOR_FN_ERROR) {
-            out.bytes = FAILED_REPLY;
-        } else {
-            TP_CHECK(nb <= cap, "Coprocessor fn overran reply");
-            out.bytes = nb;
+        const std::size_t nb = fn(request.data, request.len, request.fn_id, reply_data, cap, ctx_);
+        const std::size_t idx = c & (ring_.slots - 1);
+        failed_slot_[idx] = nb == COPROCESSOR_FN_ERROR;
+        if (!failed_slot_[idx]) {
+            TP_CHECK(nb <= cap, "Coprocessor fn wrote %zu B, more than the %zu B reply holds", nb,
+                     cap);
         }
-        std::atomic_thread_fence(std::memory_order_release);
-        out.seq = expect; // publish
+        frame::stage(ring_, reply, request.fn_id, reply_data, failed_slot_[idx] ? 0 : nb);
+        frame::seal(ring_, reply, expect);
     }
 }
 
-std::size_t MessageWorker::process_message(const void *in, std::size_t in_len, void *out,
-                                           std::size_t out_cap) {
+std::size_t MessageWorker::process_message(const void *payload, std::size_t len,
+                                           std::uint32_t fn_id, void *out, std::size_t out_cap) {
     TP_CHECK(running(), "Call start() before process_message");
-    if (!engine_.joinable()) {
-        launch(in_len, out_cap);
-    }
-    TP_CHECK(in_len <= request_ring_.capacity(),
-             "Request frame of %zu B exceeds the %zu B frame this session started with", in_len,
-             request_ring_.capacity());
-    TP_CHECK(out_cap <= reply_ring_.capacity(),
-             "Reply of %zu B exceeds the %zu B reply this session started with", out_cap,
-             reply_ring_.capacity());
+    // Checked before the cursor advances: a slot that is never sealed would stall the worker.
+    TP_CHECK(len <= frame::data_capacity(ring_) && out_cap <= frame::data_capacity(ring_),
+             "A %zu B request or %zu B reply exceeds the %zu B a frame of this session carries",
+             len, out_cap, frame::data_capacity(ring_));
     if (failed_.load(std::memory_order_acquire)) {
         std::rethrow_exception(error_);
     }
-    // Write the frame, then release-fence, then seq, so the worker never sees a matching seq
-    // before the frame it covers.
     const std::uint64_t c = process_cursor_++;
-    const std::size_t idx = c & (common::K_RING_SLOTS - 1);
-    const std::uint32_t expect = static_cast<std::uint32_t>(c + 1);
-    Ring::Header &req = request_ring_.header(idx);
-    if (in_len != 0) {
-        std::memcpy(request_ring_.data(idx), in, in_len);
-    }
-    req.bytes = in_len;
-    req.cap = out_cap;
-    std::atomic_thread_fence(std::memory_order_release);
-    req.seq = expect;
+    const auto expect = static_cast<std::uint32_t>(c + 1);
+    // Staging checks the payload fits; sealing writes the polled word last.
+    frame::stage(ring_, request_slot(c), fn_id, payload, len);
+    frame::seal(ring_, request_slot(c), expect);
 
-    const Ring::Header &rep = reply_ring_.header(idx);
-    volatile const std::uint32_t *sseq = &rep.seq;
-    while (*sseq != expect) {
+    frame::FrameView reply;
+    while (!frame::poll(ring_, reply_slot(c), expect, reply)) {
         if (failed_.load(std::memory_order_acquire)) {
             std::rethrow_exception(error_);
         }
     }
-    std::atomic_thread_fence(std::memory_order_acquire);
-    TP_CHECK(rep.bytes != FAILED_REPLY, "The coprocessor function failed to process message %llu",
+    TP_CHECK(!failed_slot_[c & (ring_.slots - 1)],
+             "The coprocessor function failed to process message %llu",
              static_cast<unsigned long long>(c));
     if (out_cap != 0 && out) {
-        std::memcpy(out, reply_ring_.data(idx), out_cap);
+        std::memcpy(out, reply.data, out_cap);
     }
     return out_cap;
 }

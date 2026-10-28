@@ -45,11 +45,12 @@ from pennylane.measurements import CountsMP
 from pennylane.pytrees import flatten, unflatten
 from pennylane.wires import AbstractQubit, Wires, is_abstract_qubit
 
-from catalyst.decomposition.capture_session import ModifierState, OpDecompRequest, TracedRule
+from catalyst.decomposition.capture_session import OpDecompRequest, TracedRule
 from catalyst.decomposition.decomposition_rules import (
     rule_call_operands,
     walk_reachable_decomp_rule_sets,
 )
+from catalyst.decomposition.modifier_state import ModifierState
 from catalyst.decomposition.rule_lowering_warning import RuleLoweringWarning
 from catalyst.from_plxpr.qref_jax_primitives import (
     MeasurementPlane,
@@ -131,7 +132,7 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
         """Any control wires used for a subroutine."""
         self.control_values = control_values
         """Any control values for executing a subroutine."""
-        self.modifier_context: ModifierState = (False, 0)
+        self.modifier_context = ModifierState()
         """Modifier context surrounding decomposition requests."""
         self.has_dynamic_allocation = False
         self.decomposition_scope = decomposition_scope
@@ -876,8 +877,7 @@ def handle_adjoint_transform(self, *invals, jaxpr, n_consts):
     consts = invals[:n_consts]
     args = invals[n_consts:]
     body_interpreter = copy(self)
-    adjoint, control_count = self.modifier_context
-    body_interpreter.modifier_context = (not adjoint, control_count)
+    body_interpreter.modifier_context = self.modifier_context.compose(ModifierState(adjoint=True))
     body = jaxpr_to_jaxpr(body_interpreter, jaxpr, consts, *args)
 
     return plxpr_adjoint_transform_prim.bind(
@@ -905,8 +905,9 @@ def handle_ctrl_transform(
         w if is_abstract_qubit(w) else qref_get_p.bind(self.init_qreg, w) for w in control_wires
     ]
     body_interpreter = copy(self)
-    adjoint, control_count = self.modifier_context
-    body_interpreter.modifier_context = (adjoint, control_count + n_control)
+    body_interpreter.modifier_context = self.modifier_context.compose(
+        ModifierState(control_count=n_control)
+    )
     body = jaxpr_to_jaxpr(body_interpreter, jaxpr, consts, *args)
 
     return plxpr_ctrl_transform_prim.bind(

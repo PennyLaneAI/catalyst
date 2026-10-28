@@ -27,9 +27,9 @@
 #include <vector>
 
 #include "Exception.hpp"
+#include "Frame.hpp"
 #include "HwhsAbi.h"
 #include "TransportCAPI.h" // CATALYST_TRANSPORT_* status codes
-#include "WireProtocol.hpp"
 
 #include <fcntl.h>
 #include <infiniband/verbs.h>
@@ -126,8 +126,10 @@ HwhsControllerSession::HwhsControllerSession(std::string dev, int gid_idx, std::
     rtt_samples_.reserve(kRttSamplesReserve);
     RT_FAIL_IF(stride_log2 >= 32, "stride_log2 out of range (must be < 32)");
     RT_FAIL_IF(stride_ < 16, "stride_log2 too small: a ring slot must be >= 16 bytes");
-    RT_FAIL_IF(ring_slots_ != common::K_RING_SLOTS,
-               "ring must equal the wire protocol's K_RING_SLOTS");
+    // TODO: lift this once the engine is tested with other ring lengths.
+    RT_FAIL_IF(
+        ring_slots_ != common::frame::BL16_RING.slots,
+        "hwhs is only tested with a ring of 256 slots; set frame_slots=256 or leave it unset");
     RT_FAIL_IF(stride_ != sizeof(common::PayloadSlot),
                "stride_log2 must give the wire protocol's slot size (sizeof(PayloadSlot))");
 }
@@ -318,10 +320,16 @@ PeerRef HwhsControllerSession::exchange_keys(const MemRegion & /*local*/) {
     my.mr_vaddr = reply_.adv_va;
     my.mr_rkey = reply_.mr->rkey;
     my.mtu_enum = active_mtu_;
+    my.frame_mode = static_cast<std::uint32_t>(common::frame::Mode::BL16);
+    my.frame_stride = stride_;
+    my.frame_slots = ring_slots_;
 
     common::recv_exact(oob_.get(), &peer, sizeof(peer));
     common::send_exact(oob_.get(), &my, sizeof(my));
     oob_.reset();
+    RT_FAIL_IF(peer.frame_mode != my.frame_mode || peer.frame_stride != my.frame_stride ||
+                   peer.frame_slots != my.frame_slots,
+               "hwhs: the peer's frames differ from this end's (BL16, 256 slots of 64 B)");
 
     peer_rkey_ = peer.mr_rkey;
     peer_addr_ = peer.mr_vaddr;
@@ -804,6 +812,7 @@ int HwhsControllerSession::collect(void *const *replies, const std::uint64_t * /
     volatile std::uint8_t *slot = static_cast<volatile std::uint8_t *>(replies[0]);
 
     if (sw_poll_) {
+        // TODO: read the reply through the frame codec (Frame.hpp), as cpu_verbs does.
         volatile std::uint32_t *seq =
             reinterpret_cast<volatile std::uint32_t *>(slot + offsetof(common::Payload, seq_num));
         const std::uint32_t expected = static_cast<std::uint32_t>(collected_ + 1);

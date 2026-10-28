@@ -83,6 +83,7 @@
   [(#3127)](https://github.com/PennyLaneAI/catalyst/pull/3127)
   [(#3131)](https://github.com/PennyLaneAI/catalyst/pull/3131)
   [(#3227)](https://github.com/PennyLaneAI/catalyst/pull/3227)
+  [(#3401)](https://github.com/PennyLaneAI/catalyst/pull/3401)
 
 * The graph-based decomposition system now supports **adjoint operators** for `Operator2`.
   [(#3120)](https://github.com/PennyLaneAI/catalyst/pull/3120)
@@ -114,6 +115,7 @@
   [(#3248)](https://github.com/PennyLaneAI/catalyst/pull/3248)
   [(#3307)](https://github.com/PennyLaneAI/catalyst/pull/3307)
   [(#3365)](https://github.com/PennyLaneAI/catalyst/pull/3365)
+  [(#3382)](https://github.com/PennyLaneAI/catalyst/pull/3382)
 
   Control is folded into the operator identity *control-outermost* (e.g. `C(Adjoint(Op))`), so
   `ctrl(adjoint(Op))` and `adjoint(ctrl(Op))` collapse to a single node, while a distinct control
@@ -177,14 +179,28 @@
 
 <h3>Improvements 🛠</h3>
 
+* Transforms can now be directly applied to a `QJIT`'d workflow. A new `QJIT` will be produced with
+  the transform applied to the `QJIT`'s body.
+  [(#3397)](https://github.com/PennyLaneAI/catalyst/pull/3397)
+
 * The ``target`` argument of :func:`~catalyst.qjit` now accepts ``"mlir_opt"``, which stops the
   ahead-of-time compilation after running the MLIR passes, without translating the program to
   LLVM IR. Calling the function still compiles it to a shared library.
   [(#3391)](https://github.com/PennyLaneAI/catalyst/pull/3391)
 
 * A new `user-transform-stage` pipeline runs the quantum compilation stage only up to and including
-  `apply-transform-sequence`, where the user transforms are applied. 
+  `apply-transform-sequence`, where the user transforms are applied.
   [(#3345)](https://github.com/PennyLaneAI/catalyst/pull/3345)
+
+* Backline messages larger than 8 bytes now travel over every transport in a variable-length frame
+  (BLV): a 32 B header, the payload and a completion word written last. The compiler picks the
+  16 B frame when requests and replies fit in 8 B, so such programs compile as before, and the
+  variable-length one otherwise, writing it into both ends' backend configs. The `cpu_verbs`
+  and `memcpy` backends carry any size. A GPU coprocessor running a persistent kernel still
+  carries at most 8 B. Each ring has 256 slots unless a node's backend config sets
+  `frame_slots=<n>`, a power of two, which the compiler passes to every node; FPGA controllers
+  keep 256. Over RDMA, ends with different frame configs fail to connect.
+  [(#3379)](https://github.com/PennyLaneAI/catalyst/pull/3379)
 
 * The :func:`~catalyst.qjit` function now accepts an ``enable_aot_compilation`` argument, which can be
   used to toggle whether or not to use ahead-of-time compilation.
@@ -226,8 +242,8 @@
   [(#3316)](https://github.com/PennyLaneAI/catalyst/pull/3316)
 
 * The memcpy transport now carries messages of any size in each direction, as set by a PennyLane
-  `qp.Controller`'s `in_bytes` and `out_bytes`. The RDMA transports, and the memcpy GPU
-  coprocessor's persistent kernel, still carry 8 bytes.
+  `qp.Controller`'s `in_bytes` and `out_bytes`. The memcpy GPU coprocessor's persistent kernel
+  still carries 8 bytes.
 
   ```python
   ctrl = qp.Controller(in_bytes=120, out_bytes=121)
@@ -332,6 +348,9 @@
     and
         PauliRot{angle:[f64]}{wires:2}{pauli_word = "XX"}
     will have different decomposition rules.
+
+  - The solver now uses Knuth's generalization of Dijkstra's algorithm for hypergraphs, which provides improved cycle handling.
+    [(#3334)](https://github.com/PennyLaneAI/catalyst/pull/3334)
 
   - A decomposition rule function can arrive in a piece of MLIR in one of three ways:
     1. As a precompiled rule shipped with the Catalyst package directly.
@@ -808,6 +827,35 @@
   :class:`~pennylane.transforms.core.CompilePipeline` on individual QNodes instead.
   [(#3324)](https://github.com/PennyLaneAI/catalyst/pull/3324)
 
+* A Backline per-message coprocessor function (`CoprocessorFn`, `CatalystCoprocessorFn` in
+  `TransportABI.h`) is now called with the message's payload, its length and its fn_id,
+  `fn(payload, len, fn_id, out, out_cap, ctx)`, on every transport, instead of with the raw
+  frame. A function written for the previous signature reads its payload at the same pointer but
+  must take the extra `fn_id` argument, and no longer subtracts a frame trailer from the length.
+  [(#3379)](https://github.com/PennyLaneAI/catalyst/pull/3379)
+
+* A `memcpy` transport session whose backend config has no `frame` keys now uses the 16 B frame, and
+  refuses messages over 8 bytes. Programs compiled with Catalyst are unaffected, since the compiler
+  writes the keys; code that creates such sessions directly adds `frame=blv;frame_payload=<bytes>`.
+  [(#3379)](https://github.com/PennyLaneAI/catalyst/pull/3379)
+
+* The FPGA transport backends no longer read the `ring` and `stride_log2` config keys. Their ring
+  comes from the frame keys every backend reads, so a config sets its slot count with
+  `frame_slots`.
+  [(#3379)](https://github.com/PennyLaneAI/catalyst/pull/3379)
+
+* The Backline transport backend ABI is now version 3. A coprocessor backend built against an
+  earlier version is refused when its session is created, since it would call coprocessor
+  functions with the previous signature; rebuild it against this Catalyst. Controller backends of
+  earlier versions keep working.
+  [(#3379)](https://github.com/PennyLaneAI/catalyst/pull/3379)
+
+* A Backline transport backend registered with `register_backend`, an entry point or a manifest,
+  whose `max_payload_bytes` or `max_reply_bytes` is above 8 or unlimited, must now list `"blv"` in
+  its `frame_modes`, since such messages travel in BLV frames. Registering one without it raises a
+  `ValueError`.
+  [(#3379)](https://github.com/PennyLaneAI/catalyst/pull/3379)
+
 * `catalyst.logging` has been removed. `pennylane.logging` should be used instead.
   [(#3283)](https://github.com/PennyLaneAI/catalyst/pull/3283)
 
@@ -1004,6 +1052,16 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* Backline transport frames are built and read through a shared frame codec, which the `cpu_verbs`
+  backends now use instead of laying out the 16 B frame themselves. The bytes on the wire are
+  unchanged, and other frame layouts can now be added in one place.
+  [(#3378)](https://github.com/PennyLaneAI/catalyst/pull/3378)
+
+* The `cpu_verbs` and `gpu_verbs` transport backends share one session base for RDMA bring-up and
+  the reply path, instead of `gpu_verbs` keeping its own copy. Behaviour and library names are
+  unchanged.
+  [(#3375)](https://github.com/PennyLaneAI/catalyst/pull/3375)
+
 * Backline transport backends are chosen from a registry instead of a fixed table. Out-of-tree
   backends register through the `catalyst.transport_backends` entry point or a
   `catalyst_transport_backends.json` manifest on `CATALYST_TRANSPORT_PATH`, with no Catalyst
@@ -1012,7 +1070,7 @@
   [(#3362)](https://github.com/PennyLaneAI/catalyst/pull/3362)
 
 * The FPGA transport backends share one config parser. The VPK120 backend now reads `dev`, `gid`,
-  `ring`, `stride_log2`, `data_mem` and `reply_mem` exactly as `fpga_verbs` does, and reports a
+  `data_mem`, `reply_mem` and the frame keys exactly as `fpga_verbs` does, and reports a
   malformed value by naming its key. The frontend builds the entries it adds to a coprocessor's
   config from a dict.
   [(#3359)](https://github.com/PennyLaneAI/catalyst/pull/3359)
