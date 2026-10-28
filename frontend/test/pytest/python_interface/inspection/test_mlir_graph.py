@@ -68,14 +68,7 @@ class TestMLIRGraph:
         "capture_mode, skip_preprocess",
         [
             pytest.param(True, True, marks=pytest.mark.capture),
-            pytest.param(
-                True,
-                False,
-                marks=[
-                    pytest.mark.capture,
-                    pytest.mark.xfail(reason="decompose does not work with mlir graph drawer"),
-                ],
-            ),
+            pytest.param(True, False, marks=pytest.mark.capture),
             pytest.param(False, False, marks=pytest.mark.old_frontend),
         ],
         indirect=["capture_mode"],
@@ -105,14 +98,7 @@ class TestMLIRGraph:
         "capture_mode, skip_preprocess",
         [
             pytest.param(True, True, marks=pytest.mark.capture),
-            pytest.param(
-                True,
-                False,
-                marks=[
-                    pytest.mark.capture,
-                    pytest.mark.xfail(reason="decompose does not work with mlir graph drawer"),
-                ],
-            ),
+            pytest.param(True, False, marks=pytest.mark.capture),
             pytest.param(False, False, marks=pytest.mark.old_frontend),
         ],
         indirect=["capture_mode"],
@@ -149,14 +135,7 @@ class TestMLIRGraph:
         "capture_mode, skip_preprocess",
         [
             pytest.param(True, True, marks=pytest.mark.capture),
-            pytest.param(
-                True,
-                False,
-                marks=[
-                    pytest.mark.capture,
-                    pytest.mark.xfail(reason="decompose does not work with mlir graph drawer"),
-                ],
-            ),
+            pytest.param(True, False, marks=pytest.mark.capture),
             pytest.param(False, False, marks=pytest.mark.old_frontend),
         ],
         indirect=["capture_mode"],
@@ -191,14 +170,7 @@ class TestMLIRGraph:
         "capture_mode, skip_preprocess",
         [
             pytest.param(True, True, marks=pytest.mark.capture),
-            pytest.param(
-                True,
-                False,
-                marks=[
-                    pytest.mark.capture,
-                    pytest.mark.xfail(reason="decompose does not work with mlir graph drawer"),
-                ],
-            ),
+            pytest.param(True, False, marks=pytest.mark.capture),
             pytest.param(False, False, marks=pytest.mark.old_frontend),
         ],
         indirect=["capture_mode"],
@@ -233,14 +205,7 @@ class TestMLIRGraph:
         "capture_mode, skip_preprocess",
         [
             pytest.param(True, True, marks=pytest.mark.capture),
-            pytest.param(
-                True,
-                False,
-                marks=[
-                    pytest.mark.capture,
-                    pytest.mark.xfail(reason="decompose does not work with mlir graph drawer"),
-                ],
-            ),
+            pytest.param(True, False, marks=pytest.mark.capture),
             pytest.param(False, False, marks=pytest.mark.old_frontend),
         ],
         indirect=["capture_mode"],
@@ -276,14 +241,7 @@ class TestMLIRGraph:
         "capture_mode, skip_preprocess",
         [
             pytest.param(True, True, marks=pytest.mark.capture),
-            pytest.param(
-                True,
-                False,
-                marks=[
-                    pytest.mark.capture,
-                    pytest.mark.xfail(reason="decompose does not work with mlir graph drawer"),
-                ],
-            ),
+            pytest.param(True, False, marks=pytest.mark.capture),
             pytest.param(False, False, marks=pytest.mark.old_frontend),
         ],
         indirect=["capture_mode"],
@@ -329,14 +287,7 @@ class TestMLIRGraph:
         "capture_mode, skip_preprocess",
         [
             pytest.param(True, True, marks=pytest.mark.capture),
-            pytest.param(
-                True,
-                False,
-                marks=[
-                    pytest.mark.capture,
-                    pytest.mark.xfail(reason="decompose does not work with mlir graph drawer"),
-                ],
-            ),
+            pytest.param(True, False, marks=pytest.mark.capture),
             pytest.param(False, False, marks=pytest.mark.old_frontend),
         ],
         indirect=["capture_mode"],
@@ -379,14 +330,7 @@ class TestMLIRGraph:
         "capture_mode, skip_preprocess",
         [
             pytest.param(True, True, marks=pytest.mark.capture),
-            pytest.param(
-                True,
-                False,
-                marks=[
-                    pytest.mark.capture,
-                    pytest.mark.xfail(reason="decompose does not work with mlir graph drawer"),
-                ],
-            ),
+            pytest.param(True, False, marks=pytest.mark.capture),
             pytest.param(False, False, marks=pytest.mark.old_frontend),
         ],
         indirect=["capture_mode"],
@@ -424,14 +368,7 @@ class TestMLIRGraph:
         "capture_mode, skip_preprocess",
         [
             pytest.param(True, True, marks=pytest.mark.capture),
-            pytest.param(
-                True,
-                False,
-                marks=[
-                    pytest.mark.capture,
-                    pytest.mark.xfail(reason="decompose does not work with mlir graph drawer"),
-                ],
-            ),
+            pytest.param(True, False, marks=pytest.mark.capture),
             pytest.param(False, False, marks=pytest.mark.old_frontend),
         ],
         indirect=["capture_mode"],
