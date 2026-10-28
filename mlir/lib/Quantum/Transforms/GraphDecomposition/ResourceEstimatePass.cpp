@@ -76,8 +76,6 @@ struct ResourceEstimatePass : public impl::ResourceEstimatePassBase<ResourceEsti
             showSolution(solution);
         }
 
-        // Must run after prepareGraph, which lowers modifier regions in place, so that the graph
-        // op ids collected here carry the same op-level modifiers as the graph's operators.
         ResourceAnalysis analysis(module, {}, /*collectDetailedOperations=*/true);
         const auto &results = analysis.getResults();
 
@@ -117,19 +115,21 @@ struct ResourceEstimatePass : public impl::ResourceEstimatePassBase<ResourceEsti
         // Decomposable gates are keyed by their graph op id (GOID).
         for (const auto &opEntry : result.detailedOperations) {
             OperatorNode operatorNode;
-            operatorNode.id = opEntry.getKey().str();
+            std::string goid = opEntry.getKey().str();
+            int scale = opEntry.getValue();
+            operatorNode.id = goid;
 
             auto graphOp = solution.find(operatorNode);
             if (graphOp == solution.end()) {
                 // this case should not happen, because the graph should be complete
                 // Not a graph operator (e.g. a mid-circuit measurement): count the op itself.
-                estimate.operations[opEntry.getKey()][{-1, -1}] += opEntry.getValue();
+                estimate.operations[goid][{-1, -1}] += scale;
                 continue;
             }
             for (const auto &[basisOp, count] : graphOp->second.basisCounts) {
                 // Getting wires and params from GOID is unreliable. The JSON is flattened anyways,
                 // so for qp.estimate this will be enough.
-                estimate.operations[basisOp.name][{-1, -1}] += count * opEntry.getValue();
+                estimate.operations[basisOp.name][{-1, -1}] += count * scale;
             }
         }
         return estimate;

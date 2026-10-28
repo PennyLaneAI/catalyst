@@ -447,14 +447,14 @@ def handle_transform(
     non_const_args = args[_tuple_to_slice(args_slice)]
     targs = args[_tuple_to_slice(targs_slice)]
     pl_tkwargs = _tuple_to_dict(tkwargs)
-    resource_analysis_for_estimate = (
+    is_resource_estimate = (
         transform.pass_name == "resource-estimate" and pl_tkwargs.get("gate_set") is not None
     )
 
     # qp.decompose is routed to the graph-decomposition pass (see _handle_decompose_transform).
-    if transform == pl_decompose or resource_analysis_for_estimate:
+    if transform == pl_decompose or is_resource_estimate:
         return _handle_decompose_transform(
-            self, inner_jaxpr, consts, non_const_args, pl_tkwargs, resource_analysis_for_estimate
+            self, inner_jaxpr, consts, non_const_args, pl_tkwargs, is_resource_estimate
         )
 
     if transform.pass_name is None:
