@@ -342,6 +342,10 @@ def test_with_cycles():
 # CHECK-SAME:   resources = {operations = {
 # CHECK-SAME:   "SingleParam{x:[tensor<f64>]}{reg:1}{}" = 1 : i64
 # CHECK-SAME:   target_gate = "NoParams{}{reg:2}{}"
+# CHECK: func.func private @"__builtin_ruleAB_NoParams{}{reg:3}{}"
+# CHECK-SAME:   resources = {operations = {
+# CHECK-SAME:   "SingleParam{x:[tensor<f64>]}{reg:1}{}" = 1 : i64
+# CHECK-SAME:   target_gate = "NoParams{}{reg:3}{}"
 # CHECK: func.func private @"__builtin_ruleBC_SingleParam{x:[tensor<f64>]}{reg:1}{}"
 # CHECK-SAME:   resources = {operations = {
 # CHECK-SAME:   "CompilableData{}{wires:1}{a = \22a\22, b = \22b\22, thing = \22thing\22}" = 1 : i64
@@ -350,10 +354,6 @@ def test_with_cycles():
 # CHECK-SAME:   resources = {operations = {
 # CHECK-SAME:   "NoParams{}{reg:2}{}" = 1 : i64
 # CHECK-SAME:   target_gate = "CompilableData{}{wires:1}{a = \22a\22, b = \22b\22, thing = \22thing\22}"
-# CHECK: func.func private @"__builtin_ruleAB_NoParams{}{reg:3}{}"
-# CHECK-SAME:   resources = {operations = {
-# CHECK-SAME:   "SingleParam{x:[tensor<f64>]}{reg:1}{}" = 1 : i64
-# CHECK-SAME:   target_gate = "NoParams{}{reg:3}{}"
 test_with_cycles()
 
 
@@ -552,53 +552,6 @@ def test_from_custom_op():
 test_from_custom_op()
 
 
-def test_rule_with_helper_function():
-    """
-    Test that decomposing a rule with a helper function correctly inlines the helper.
-    """
-
-    @qp.capture.subroutine
-    def my_helper():
-        return 4.2
-
-    @qp.register_resources({MultiParams(reg=Wire[1], a=Float, b=Float, c=Float): 1})
-    def rule(reg):
-        MultiParams(reg=reg, a=my_helper(), b=0.2, c=0.3)
-
-    with qp.decomposition.local_decomps():
-        qp.add_decomps(NoParams, rule)
-
-        @qp.qjit(capture=True, target="mlir")
-        @qp.qnode(qp.device("lightning.qubit", wires=2))
-        def with_helper():
-            NoParams(reg=0)
-            NoParams(reg=[0, 1])
-            return qp.probs()
-
-        print(with_helper.mlir)
-
-
-# CHECK-LABEL: func.func public @with_helper()
-# CHECK: qref.operator "NoParams"
-# CHECK: qref.operator "NoParams"
-# CHECK: func.func private @"__builtin_rule_NoParams{}{reg:1}{}"
-# CHECK-SAME:   resources = {operations = {
-# CHECK-SAME:   "MultiParams{a:[tensor<f64>],b:[tensor<f64>],c:[tensor<f64>]}{reg:1}{}" = 1 : i64
-# CHECK-SAME:   target_gate = "NoParams{}{reg:1}{}"
-# CHECK: stablehlo.constant dense<4.200000e+00> : tensor<f64>
-# CHECK-NOT: call
-# CHECK-NOT: my_helper
-#
-# CHECK: func.func private @"__builtin_rule_NoParams{}{reg:2}{}"
-# CHECK-SAME:   resources = {operations = {
-# CHECK-SAME:   "MultiParams{a:[tensor<f64>],b:[tensor<f64>],c:[tensor<f64>]}{reg:1}{}" = 1 : i64
-# CHECK-SAME:   target_gate = "NoParams{}{reg:2}{}"
-# CHECK: stablehlo.constant dense<4.200000e+00> : tensor<f64>
-# CHECK-NOT: call
-# CHECK-NOT: my_helper
-test_rule_with_helper_function()
-
-
 def test_phaseshift_to_rz():
     """Test that PhaseShift decomposes to a quantum.custom "RZ" & quantum.gphase correctly."""
 
@@ -742,11 +695,10 @@ test_basis_rotation_decomposition()
 
 def test_ctrl_rule_is_traversed():
     """
-    Test that rules from a controlled version of a base gate are compiled and traversed from when
-    the circuit just has the base gate.
+    Test that rules from a controlled gate are compiled and traversed contextually.
 
     In this test, a C(NoParams) decomposes to a CompilableData, and a CompilableData decomposes to
-    a SingleParam. We test that just from the base NoParams, both rules are present.
+    a SingleParam. Both rules must be present from the controlled NoParams root.
     """
 
     @qp.register_resources({CompilableData(a="a", b="b", thing="thing", wires=Wire[1]): 1})
@@ -764,7 +716,7 @@ def test_ctrl_rule_is_traversed():
         @qp.qjit(capture=True, target="mlir")
         @qp.qnode(qp.device("null.qubit", wires=3))
         def ctrl_is_traversed():
-            NoParams(reg=0)
+            qp.ctrl(NoParams(reg=0), control=1)
             return qp.probs()
 
         print(ctrl_is_traversed.mlir)

@@ -23,9 +23,10 @@ import re
 import shutil
 import subprocess
 
+from pennylane.logging import debug_logger
+
 import catalyst
 from catalyst.compiler import LinkerDriver
-from catalyst.logging import debug_logger
 from catalyst.tracing.contexts import EvaluationContext
 from catalyst.tracing.type_signatures import filter_static_args, promote_arguments
 

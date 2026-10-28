@@ -69,8 +69,6 @@ struct DecompositionGraph::Impl {
     std::vector<OperatorNode> operators;
     WeightedGateset gateset;
     std::vector<RuleNode> rules;
-    FixedDecomps fixedDecomps;
-    AltDecomps altDecomps;
 
     std::unordered_map<OperatorNode, OperatorId, OperatorNodeHash> opToId;
     std::vector<OperatorNode> idToOp;
@@ -94,19 +92,9 @@ struct DecompositionGraph::Impl {
         return newId;
     }
 
-    static RuleNode markRuleOrigin(RuleNode rule, RuleOrigin origin, const OperatorNode &op) {
-        if (rule.output != op) {
-            throw RuleInvalidOverrideError(origin == RuleOrigin::Fixed ? "fixed" : "alternative",
-                                           op, rule);
-        }
-        rule.origin = origin;
-        return rule;
-    }
-
     Impl(std::vector<OperatorNode> _operators, WeightedGateset _gateset,
-         std::vector<RuleNode> _rules, FixedDecomps _fixedDecomps = {}, AltDecomps _altDecomps = {})
-        : operators(std::move(_operators)), gateset(std::move(_gateset)), rules(std::move(_rules)),
-          fixedDecomps(std::move(_fixedDecomps)), altDecomps(std::move(_altDecomps)) {
+         std::vector<RuleNode> _rules)
+        : operators(std::move(_operators)), gateset(std::move(_gateset)), rules(std::move(_rules)) {
         materializeRules();
     }
 
@@ -114,7 +102,6 @@ struct DecompositionGraph::Impl {
         std::unordered_map<OperatorNode, std::vector<RuleNode>, OperatorNodeHash> baseByOutput;
         baseByOutput.reserve(rules.size());
         for (auto &rule : rules) {
-            rule.origin = RuleOrigin::Default;
             baseByOutput[rule.output].push_back(rule);
         }
 
@@ -127,35 +114,16 @@ struct DecompositionGraph::Impl {
                 return;
             }
 
-            const auto fixedIt = fixedDecomps.find(op);
-            if (fixedIt != fixedDecomps.end()) {
-                effectiveRules.push_back(markRuleOrigin(fixedIt->second, RuleOrigin::Fixed, op));
-            } else {
-                const auto baseIt = baseByOutput.find(op);
-                if (baseIt != baseByOutput.end()) {
-                    for (const auto &rule : baseIt->second) {
-                        effectiveRules.push_back(rule);
-                    }
-                }
-
-                const auto altIt = altDecomps.find(op);
-                if (altIt != altDecomps.end()) {
-                    for (const auto &altRule : altIt->second) {
-                        effectiveRules.push_back(
-                            markRuleOrigin(altRule, RuleOrigin::Alternative, op));
-                    }
+            const auto baseIt = baseByOutput.find(op);
+            if (baseIt != baseByOutput.end()) {
+                for (const auto &rule : baseIt->second) {
+                    effectiveRules.push_back(rule);
                 }
             }
         };
 
         for (const auto &rule : rules) {
             appendRulesForOutput(rule.output);
-        }
-        for (const auto &[op, _] : fixedDecomps) {
-            appendRulesForOutput(op);
-        }
-        for (const auto &[op, _] : altDecomps) {
-            appendRulesForOutput(op);
         }
 
         rules = std::move(effectiveRules);
@@ -199,10 +167,8 @@ struct DecompositionGraph::Impl {
 };
 
 DecompositionGraph::DecompositionGraph(std::vector<OperatorNode> operators, WeightedGateset gateset,
-                                       std::vector<RuleNode> rules, FixedDecomps fixedDecomps,
-                                       AltDecomps altDecomps)
-    : impl(std::make_unique<Impl>(std::move(operators), std::move(gateset), std::move(rules),
-                                  std::move(fixedDecomps), std::move(altDecomps))) {
+                                       std::vector<RuleNode> rules)
+    : impl(std::make_unique<Impl>(std::move(operators), std::move(gateset), std::move(rules))) {
     impl->buildGraph();
 }
 
@@ -232,14 +198,6 @@ DecompositionGraph &DecompositionGraph::operator=(DecompositionGraph &&other) no
 
 [[nodiscard]] const std::vector<RuleNode> &DecompositionGraph::getRules() const noexcept {
     return impl->rules;
-}
-
-[[nodiscard]] const FixedDecomps &DecompositionGraph::getFixedDecomps() const noexcept {
-    return impl->fixedDecomps;
-}
-
-[[nodiscard]] const AltDecomps &DecompositionGraph::getAltDecomps() const noexcept {
-    return impl->altDecomps;
 }
 
 std::size_t DecompositionGraph::getNumRules() const { return impl->rules.size(); }
@@ -283,13 +241,6 @@ void showGraph(const Solver::DecompositionGraph &graph, std::ostream &os) {
     for (const auto &[ruleId, _] : impl->ruleIdToVertex) {
         const auto &rule = impl->rules[ruleId];
         os << "  Rule ID " << ruleId << ": " << rule.name;
-        if (rule.origin == RuleOrigin::Fixed) {
-            os << " [fixed]";
-        } else if (rule.origin == RuleOrigin::Alternative) {
-            os << " [alt]";
-        } else {
-            os << " [default]";
-        }
         os << "\n";
         os << "    Output: " << print_op(rule.output) << "\n";
         os << "    Inputs:\n";

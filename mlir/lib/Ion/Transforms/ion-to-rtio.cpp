@@ -248,6 +248,7 @@ struct IonToRTIOPass : public impl::IonToRTIOPassBase<IonToRTIOPass> {
         // create new function type with empty results
         auto newFuncType = FunctionType::get(ctx, oldFuncType.getInputs(), {});
         newQnodeFunc.setFunctionType(newFuncType);
+        newQnodeFunc->removeAttr("res_attrs");
 
         // set public visibility and remove internal linkage for kernel function
         newQnodeFunc.setPublic();

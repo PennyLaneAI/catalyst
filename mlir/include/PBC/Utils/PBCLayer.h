@@ -14,9 +14,12 @@
 
 #pragma once
 
+#include <cstdint>
 #include <optional>
 #include <utility>
+#include <vector>
 
+#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SetVector.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 
@@ -41,7 +44,8 @@ class PBCLayerContext {
     // Clear all per-pass cached layer objects.
     void clear() { layers.clear(); }
 
-    PBCLayerContext() = default;
+    explicit PBCLayerContext(size_t minOpsForCommutationBasis = 4)
+        : minOpsForCommutationBasis_(minOpsForCommutationBasis) {}
     ~PBCLayerContext() = default;
 
     // Disable copy to prevent accidental sharing
@@ -68,7 +72,11 @@ class PBCLayerContext {
     // Falls back to skip-dynamic on strict failure.
     PBCDepths computePBCDepth(mlir::Block *block);
 
+    size_t getMinOpsForCommutationBasis() const { return minOpsForCommutationBasis_; }
+
   private:
+    size_t minOpsForCommutationBasis_;
+
     // Recursive worker for computeBlockWorstCaseDepth.
     mlir::FailureOr<int64_t> worstCaseDepthOfBlock(mlir::Block *block, bool liftForLoops);
 
@@ -85,6 +93,11 @@ class PBCLayerContext {
 
 class PBCLayer {
   private:
+    struct PackedPauli {
+        std::vector<uint64_t> x;
+        std::vector<uint64_t> z;
+    };
+
     llvm::DenseMap<mlir::Value, mlir::Value> resultToOperand;
     PBCLayerContext *context; // Reference to thread-local context
 
@@ -104,11 +117,27 @@ class PBCLayer {
     llvm::SetVector<mlir::Value> operands;
     llvm::SetVector<mlir::Value> results;
 
+    // A row-echelon basis for the GF(2) span of Pauli operators in this layer.
+    // Commutation is bilinear, so testing a candidate against these rows is
+    // equivalent to testing it against every op. A commuting layer has rank
+    // at most the number of qubits, independent of its number of operations.
+    std::vector<mlir::Value> commutationQubits;
+    llvm::DenseMap<mlir::Value, size_t> commutationQubitIndices;
+    std::vector<PackedPauli> commutationBasis;
+    std::vector<int64_t> xPivotRows;
+    std::vector<int64_t> zPivotRows;
+    bool commutationBasisValid = false;
+
     // Resolve the canonical entry for a given qubit value by chasing
     // local and result->operand mappings deterministically.
     mlir::Value resolveEntry(mlir::Value v) const;
 
     void updateResultAndOperand(PBCOpInterface op);
+    PackedPauli packPauli(PBCOpInterface op, llvm::ArrayRef<mlir::Value> entryQubits) const;
+    bool commutesWithBasis(const PackedPauli &candidate) const;
+    void insertIntoCommutationBasis(PackedPauli candidate);
+    void addToCommutationBasis(PBCOpInterface op, llvm::ArrayRef<mlir::Value> entryQubits);
+    void buildCommutationBasis();
 
     // True if following value's SSA producers backward reaches any result from an op in this layer.
     bool dependsOnLayerOps(mlir::Value value) const;

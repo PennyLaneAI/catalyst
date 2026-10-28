@@ -24,13 +24,16 @@
 #include <iostream>
 #include <memory>
 #include <mutex>
+#include <stdexcept>
 #include <string>
+#include <string_view>
 #include <type_traits>
 #include <unordered_map>
 #include <vector>
 
 #include "ConfigParser.hpp"
 #include "DynamicLibraryLoader.hpp"
+#include "Exception.hpp"
 #include "Transport.hpp"
 #include "TransportBackend.h"
 #include "WireProtocol.hpp"
@@ -39,7 +42,9 @@ using catalyst::transport::ChannelDesc;
 using catalyst::transport::ConnectInfo;
 using catalyst::transport::ControllerSession;
 using catalyst::transport::CoprocConvention;
+using catalyst::transport::COPROCESSOR_FN_ERROR;
 using catalyst::transport::CoprocessorFn;
+using catalyst::transport::CoprocessorFnInfo;
 using catalyst::transport::CoprocessorLauncherFn;
 using catalyst::transport::CoprocessorSession;
 using catalyst::transport::MemKind;
@@ -63,6 +68,18 @@ struct CatalystTransportSession {
     std::uint64_t in_bytes = 0;
     std::uint64_t out_bytes = 0;
     bool work_item_ready = false;
+    // Set from start() to stop(), while the session's coprocessor function may be running.
+    bool started = false;
+
+    std::string config; // the backend config, as passed to the factory
+    // What the backend library reports it provides; null for a version-1 backend, which reports
+    // nothing.
+    const CatalystTransportCaps *caps = nullptr;
+
+    // The context a bound coprocessor function's CoprocessorFnInfo::init returned, and the fini
+    // that releases it once the session has stopped.
+    void *coprocessor_fn_ctx = nullptr;
+    void (*coprocessor_fn_fini)(void *) = nullptr;
 };
 
 namespace {
@@ -77,6 +94,34 @@ std::uint64_t now_ns() {
 // (role, key) -> live session registry. Populated at create, read by get_session so a session
 // brought up in one function can be resolved in another.
 std::unordered_map<std::string, CatalystTransportSession *> g_registry;
+
+// Why the last create() on this thread returned null, appended to check_session's message.
+thread_local std::string g_create_error;
+
+// The capabilities a backend library reports, or null if it predates versioning (version 1).
+// Throws if the library was built for a newer ABI than this runtime's.
+const CatalystTransportCaps *load_caps(void *handle, const char *lib) {
+    auto *version_fn = reinterpret_cast<CatalystTransportAbiVersionFn *>(
+        dlsym(handle, CATALYST_TRANSPORT_ABI_VERSION_SYMBOL));
+    if (version_fn == nullptr) {
+        return nullptr;
+    }
+    const std::uint32_t version = version_fn();
+    if (version > CATALYST_TRANSPORT_ABI_VERSION) {
+        throw std::runtime_error(std::string{lib} + ": backend built for transport ABI version " +
+                                 std::to_string(version) + ", this runtime supports up to " +
+                                 std::to_string(CATALYST_TRANSPORT_ABI_VERSION));
+    }
+    auto *caps_fn = reinterpret_cast<CatalystTransportQueryCapsFn *>(
+        dlsym(handle, CATALYST_TRANSPORT_QUERY_CAPS_SYMBOL));
+    const CatalystTransportCaps *caps = caps_fn != nullptr ? caps_fn() : nullptr;
+    if (caps == nullptr) {
+        throw std::runtime_error(std::string{lib} + ": backend exports " +
+                                 CATALYST_TRANSPORT_ABI_VERSION_SYMBOL + " but no " +
+                                 CATALYST_TRANSPORT_QUERY_CAPS_SYMBOL);
+    }
+    return caps;
+}
 
 std::string registry_key(std::int32_t role, const char *key) {
     return std::to_string(role) + "/" + (key ? key : "");
@@ -150,6 +195,15 @@ std::size_t echo_fn(const void *in, std::size_t in_len, void *out, std::size_t o
     }
     return n;
 }
+
+// Bound in place of a coprocessor function that could not be configured: fails every message.
+std::size_t failing_fn(const void *, std::size_t, void *, std::size_t, void *) {
+    return COPROCESSOR_FN_ERROR;
+}
+
+// Bound in place of a launcher that could not be configured: fails to launch, so the session does
+// not start and its messages fail.
+int failing_launcher(const catalyst::transport::CoprocLaunchDesc *, void *) { return 1; }
 
 // Async task registry: connect_async / exchange_keys_async run on a worker thread and return a
 // token; barrier awaits it. Tokens start at 1 so a 0 return can signal a dispatch failure.
@@ -251,21 +305,104 @@ void *resolve_coprocessor_fn_symbol(CatalystTransportSession *s, const char *sym
     return dlsym(RTLD_DEFAULT, symbol);
 }
 
+// The `<symbol>_info` exported by the shared object that defines `fn`, or null if that object
+// exports none. Another library's `<symbol>_info` is never returned.
+void *resolve_own_fn_info(void *fn, const std::string &info_name) {
+    Dl_info fn_where{};
+    if (!dladdr(fn, &fn_where) || !fn_where.dli_fbase) {
+        return nullptr;
+    }
+    // A shared object is searched through its own handle. The main program has none under its
+    // path, and comes first in the global scope instead.
+    void *object =
+        fn_where.dli_fname ? dlopen(fn_where.dli_fname, RTLD_LAZY | RTLD_NOLOAD) : nullptr;
+    dlerror();
+    void *info = dlsym(object ? object : RTLD_DEFAULT, info_name.c_str());
+    if (object) {
+        dlclose(object);
+    }
+    Dl_info info_where{};
+    if (!info || !dladdr(info, &info_where) || info_where.dli_fbase != fn_where.dli_fbase) {
+        return nullptr;
+    }
+    return info;
+}
+
+// The keys of `config` addressed to the coprocessor function, `fn.<key>=<value>`, with the prefix
+// removed and joined as `<key>=<value>;...`.
+std::string coprocessor_fn_config(std::string_view config) {
+    constexpr std::string_view prefix = "fn.";
+    std::string out;
+    catalyst::transport::common::configparser::for_each_kv(
+        config, [&](std::string_view key, std::string_view value) {
+            if (key.substr(0, prefix.size()) != prefix) {
+                return;
+            }
+            if (!out.empty()) {
+                out += ';';
+            }
+            out.append(key.substr(prefix.size()));
+            out += '=';
+            out.append(value);
+        });
+    return out;
+}
+
+// Release the context of the session's coprocessor function, if it has one.
+void release_coprocessor_fn_ctx(CatalystTransportSession *s) {
+    if (s->coprocessor_fn_fini && s->coprocessor_fn_ctx) {
+        s->coprocessor_fn_fini(s->coprocessor_fn_ctx);
+    }
+    s->coprocessor_fn_ctx = nullptr;
+    s->coprocessor_fn_fini = nullptr;
+}
+
 } // namespace
 
 extern "C" {
 
+void __catalyst__transport__check(int rc, const char *what) {
+    if (rc == ::CATALYST_TRANSPORT_OK) {
+        return;
+    }
+    const std::string msg = std::string{"[transport] "} + ((what != nullptr) ? what : "call") +
+                            " failed (" + collect_error_name(rc) + ")";
+    RT_FAIL(msg.c_str());
+}
+
+void __catalyst__transport__check_session(CatalystTransportSession *s, const char *what) {
+    if (s != nullptr) {
+        return;
+    }
+    std::string msg =
+        std::string{"[transport] "} + ((what != nullptr) ? what : "session") + ": null session";
+    if (!g_create_error.empty()) {
+        msg += " (" + g_create_error + ")";
+    }
+    RT_FAIL(msg.c_str());
+}
+
 CatalystTransportSession *__catalyst__transport__create(const char *backend_lib, const char *config,
                                                         std::int32_t role, const char *key) {
+    g_create_error.clear();
     try {
         if (!backend_lib || !*backend_lib) {
-            std::cerr << "[transport] no backend library given\n";
-            return nullptr;
+            throw std::runtime_error("no backend library given");
         }
         auto h = std::make_unique<CatalystTransportSession>();
         h->backend = std::make_unique<DynamicLibraryLoader>(backend_lib);
         const std::string cfg = fold_pair_key(config, key);
-        if (role == CATALYST_TRANSPORT_ROLE_COPROCESSOR) {
+        h->config = cfg;
+        h->caps = load_caps(h->backend->handle, backend_lib);
+        const bool coprocessor = role == CATALYST_TRANSPORT_ROLE_COPROCESSOR;
+        if (h->caps != nullptr &&
+            !(h->caps->roles & (coprocessor ? CATALYST_TRANSPORT_ROLE_BIT_COPROCESSOR
+                                            : CATALYST_TRANSPORT_ROLE_BIT_CONTROLLER))) {
+            throw std::runtime_error(
+                std::string{backend_lib} + ": backend '" + (h->caps->name ? h->caps->name : "?") +
+                "' does not provide the " + (coprocessor ? "coprocessor" : "controller") + " role");
+        }
+        if (coprocessor) {
             auto *factory = h->backend->getSymbol<CatalystTransportCoprocessorFactoryFn *>(
                 CATALYST_TRANSPORT_COPROCESSOR_FACTORY_SYMBOL);
             h->sess = factory(cfg.c_str());
@@ -275,8 +412,7 @@ CatalystTransportSession *__catalyst__transport__create(const char *backend_lib,
             h->sess = factory(cfg.c_str());
         }
         if (!h->sess) {
-            std::cerr << "[transport] backend factory returned null for config: " << cfg << "\n";
-            return nullptr;
+            throw std::runtime_error("backend factory returned null for config: " + cfg);
         }
         auto *raw = h.release();
         if (key && *key) {
@@ -294,9 +430,11 @@ CatalystTransportSession *__catalyst__transport__create(const char *backend_lib,
         }
         return raw;
     } catch (const std::exception &e) {
+        g_create_error = e.what();
         std::cerr << "[transport] create: " << e.what() << "\n";
         return nullptr;
     } catch (...) {
+        g_create_error = "unknown error";
         return nullptr;
     }
 }
@@ -356,26 +494,91 @@ int __catalyst__transport__set_coprocessor_fn(CatalystTransportSession *s, const
             std::cerr << "[transport] set_coprocessor_fn on a non-coprocessor session\n";
             return CATALYST_TRANSPORT_ERR;
         }
+        // The bound function and its ctx stay in use until the session stops.
+        if (s->started) {
+            std::cerr << "[transport] set_coprocessor_fn after start(): stop the session first\n";
+            return CATALYST_TRANSPORT_ERR;
+        }
+        using FiniFn = void (*)(void *);
+        using InfoFn = const CoprocessorFnInfo *(*)();
+        // A session whose function could not be configured fails its messages, instead of running
+        // the backend's default echo function or launcher.
+        const auto fail_unconfigured = [&] {
+            if (co->coprocessor_fn_convention() == CoprocConvention::PerMessage) {
+                co->set_coprocessor_fn(&failing_fn, nullptr);
+            } else {
+                co->set_coprocessor_launcher(&failing_launcher, nullptr);
+            }
+            return CATALYST_TRANSPORT_ERR;
+        };
         void *resolved_fn = nullptr;
+        void *ctx = nullptr;
+        FiniFn fini = nullptr;
         if (symbol && *symbol) {
             resolved_fn = resolve_coprocessor_fn_symbol(s, symbol);
             if (!resolved_fn) {
                 std::cerr << "[transport] set_coprocessor_fn: symbol not found: " << symbol << "\n";
                 return CATALYST_TRANSPORT_ERR;
             }
+            // A function whose library exports `<symbol>_info` is configured through its hooks
+            // before it is bound (see CatalystCoprocessorFnInfo). Fields of versions above
+            // COPROCESSOR_FN_ABI_VERSION are optional by contract, so they are left unread.
+            const std::string name(symbol);
+            if (auto info_fn =
+                    reinterpret_cast<InfoFn>(resolve_own_fn_info(resolved_fn, name + "_info"))) {
+                const CoprocessorFnInfo *info = info_fn();
+                if (!info || info->abi_version < 1) {
+                    std::cerr << "[transport] set_coprocessor_fn: " << name
+                              << "_info has no ABI version (expected at least 1)\n";
+                    return fail_unconfigured();
+                }
+                if (info->init) {
+                    ctx = info->init(coprocessor_fn_config(s->config).c_str());
+                    if (!ctx) {
+                        std::cerr << "[transport] set_coprocessor_fn: " << name
+                                  << " could not be configured\n";
+                        return fail_unconfigured();
+                    }
+                }
+                fini = info->fini;
+            }
         }
-        switch (co->coprocessor_fn_convention()) {
-        case CoprocConvention::PerMessage:
-            // No symbol -> the core's built-in echo.
-            co->set_coprocessor_fn(
-                resolved_fn ? reinterpret_cast<CoprocessorFn>(resolved_fn) : &echo_fn, nullptr);
+        // Bind first, and release the previous function's ctx only once the new binding holds: a
+        // rejected bind, which the backend throws or reports with an unknown convention, leaves the
+        // bound function and its ctx untouched.
+        const auto bind = [&] {
+            switch (co->coprocessor_fn_convention()) {
+            case CoprocConvention::PerMessage:
+                // No symbol -> the core's built-in echo.
+                co->set_coprocessor_fn(
+                    resolved_fn ? reinterpret_cast<CoprocessorFn>(resolved_fn) : &echo_fn, ctx);
+                return true;
+            case CoprocConvention::LaunchOnce:
+                // No symbol -> null, letting the backend pick its own default
+                // launcher; the core holds no device launcher of its own.
+                co->set_coprocessor_launcher(reinterpret_cast<CoprocessorLauncherFn>(resolved_fn),
+                                             ctx);
+                return true;
+            }
+            return false;
+        };
+        bool bound = false;
+        try {
+            bound = bind();
+        } catch (...) {
+            if (fini && ctx) {
+                fini(ctx);
+            }
+            throw;
+        }
+        if (bound) {
+            release_coprocessor_fn_ctx(s);
+            s->coprocessor_fn_ctx = ctx;
+            s->coprocessor_fn_fini = fini;
             return CATALYST_TRANSPORT_OK;
-        case CoprocConvention::LaunchOnce:
-            // No symbol -> null, letting the backend pick its own default
-            // launcher; the core holds no device launcher of its own.
-            co->set_coprocessor_launcher(reinterpret_cast<CoprocessorLauncherFn>(resolved_fn),
-                                         nullptr);
-            return CATALYST_TRANSPORT_OK;
+        }
+        if (fini && ctx) {
+            fini(ctx);
         }
         std::cerr << "[transport] set_coprocessor_fn: backend reported an unknown convention "
                   << static_cast<std::int32_t>(co->coprocessor_fn_convention()) << "\n";
@@ -391,11 +594,6 @@ int __catalyst__transport__set_message_sizes(CatalystTransportSession *s,
         return CATALYST_TRANSPORT_ERR;
     }
     return guard([&] {
-        if (s->reply_ready && out_bytes > s->reply.size) {
-            std::cerr << "[transport] commit_work_item: out_bytes (" << out_bytes
-                      << ") exceeds the reply region (" << s->reply.size << ")\n";
-            return CATALYST_TRANSPORT_ERR;
-        }
         c->commit_work_item(work_item_idx, in_bytes, out_bytes);
         s->work_item = work_item_idx;
         s->in_bytes = in_bytes;
@@ -457,8 +655,8 @@ int __catalyst__transport__collect(CatalystTransportSession *s, void *reply,
         return s->sess->collect(replies, replies_bytes, 1);
     });
     if (rc != CATALYST_TRANSPORT_OK) {
-        // The generated code discards this return value, so a failed round is otherwise silent:
-        // `reply` keeps whatever it held, and the caller consumes that as a valid result.
+        // C callers see the return code. Compiled adapters call __catalyst__transport__check so a
+        // failed round cannot be consumed as a valid reply. Log here so the C path is not silent.
         std::cerr << "[transport] collect failed (rc=" << rc << ": " << collect_error_name(rc)
                   << "); the reply buffer was not written\n";
     }
@@ -569,13 +767,17 @@ int __catalyst__transport__start_benchmark(CatalystTransportSession *s, std::uin
 
 void __catalyst__transport__start(CatalystTransportSession *s) {
     if (s && s->sess) {
-        guard([&] { s->sess->start(); });
+        guard([&] {
+            s->sess->start();
+            s->started = true;
+        });
     }
 }
 
 void __catalyst__transport__stop(CatalystTransportSession *s) {
     if (s && s->sess) {
         guard([&] { s->sess->stop(); });
+        s->started = false;
     }
 }
 
@@ -601,7 +803,13 @@ void __catalyst__transport__destroy(CatalystTransportSession *s) {
     if (s->sess) {
         guard([&] { s->sess->stop(); });
     }
-    delete s->sess; // owned by the backend factory
+    // Owned by the backend factory; a versioned backend deletes its own sessions.
+    if (s->caps != nullptr && s->caps->destroy_session != nullptr) {
+        s->caps->destroy_session(s->sess);
+    } else {
+        delete s->sess;
+    }
+    release_coprocessor_fn_ctx(s); // after the session, whose worker may still hold the ctx
     s->backend.reset();
     delete s;
 }

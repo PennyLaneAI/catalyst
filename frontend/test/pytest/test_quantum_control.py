@@ -1464,10 +1464,17 @@ class TestDecomposition:
             ),
             (
                 qp.IsingXX(0.123, wires=[0, 1]),
+                # IsingXX decomposes via change_op_basis, so the control applies only to the
+                # inner RX once this op is decomposed further: CNOT, CRX, CNOT.
                 [
-                    qp.Toffoli(wires=[2, 0, 1]),
-                    qp.CRX(0.123, wires=[2, 0]),
-                    qp.Toffoli(wires=[2, 0, 1]),
+                    qp.ctrl(
+                        qp.change_op_basis(
+                            qp.CNOT(wires=[0, 1]),
+                            qp.RX(0.123, wires=[0]),
+                            qp.CNOT(wires=[0, 1]),
+                        ),
+                        2,
+                    ),
                 ],
             ),
         ],

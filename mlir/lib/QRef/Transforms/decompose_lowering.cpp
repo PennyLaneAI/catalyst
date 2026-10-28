@@ -28,6 +28,7 @@
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/DialectRegistry.h"
 #include "mlir/IR/PatternMatch.h"
+#include "mlir/IR/SymbolTable.h"
 #include "mlir/IR/Value.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
@@ -38,6 +39,7 @@
 #include "mlir/Transforms/Passes.h"
 #include "stablehlo/dialect/StablehloOps.h" // When we read the decomposition rules module from file, StablehloDialect may not be registered from start.
 
+#include "Catalyst/IR/CatalystDialect.h"
 #include "QRef/IR/QRefDialect.h"
 #include "QRef/Transforms/Passes.h"
 #include "QRef/Transforms/Patterns.h"
@@ -64,6 +66,7 @@ struct DecomposeLoweringPass : impl::DecomposeLoweringPassBase<DecomposeLowering
 
     void getDependentDialects(DialectRegistry &registry) const override {
         registry.insert<arith::ArithDialect>();
+        registry.insert<catalyst::CatalystDialect>();
         registry.insert<func::FuncDialect>();
         registry.insert<quantum::QuantumDialect>();
         registry.insert<qref::QRefDialect>();
@@ -129,7 +132,7 @@ struct DecomposeLoweringPass : impl::DecomposeLoweringPassBase<DecomposeLowering
     void runOnOperation() final {
         ModuleOp module = cast<ModuleOp>(getOperation());
 
-        // Step 1 (Preprocessing): Discover and register all decomposition functions in the module
+        // Step 1: Discover and register all decomposition functions in the module
         llvm::StringSet<> targetRules;
         for (auto rule : targetRulesOption) {
             targetRules.insert(rule);
@@ -142,7 +145,6 @@ struct DecomposeLoweringPass : impl::DecomposeLoweringPassBase<DecomposeLowering
         // 1. The core DL pattern is on qref
         // 2. DL expects no adj and ctrl regions
         // Hence the preprocessing passes
-        // Only run if there are decomposition functions to apply
         OpPassManager pm_preprocess("builtin.module");
         pm_preprocess.addPass(createModifiersLoweringPass());
         pm_preprocess.addPass(createReferenceSemanticsConversionPass());
@@ -155,8 +157,9 @@ struct DecomposeLoweringPass : impl::DecomposeLoweringPassBase<DecomposeLowering
 
         // Step 3: Apply the decomposition patterns
         RewritePatternSet decompositionPatterns(&getContext());
+        SymbolTable moduleSymbolTable(module);
         populateDecomposeLoweringPatterns(decompositionPatterns, decompositionRegistry,
-                                          targetGateSet);
+                                          inlineRuleBody, targetGateSet, moduleSymbolTable);
         if (failed(applyPatternsGreedily(module, std::move(decompositionPatterns)))) {
             return signalPassFailure();
         }

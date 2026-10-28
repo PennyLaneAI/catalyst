@@ -25,7 +25,7 @@ from unittest.mock import patch
 import pytest
 
 from catalyst.executor.ssh import SCP, RemoteLauncher, RemoteOps, SSHArgv
-from catalyst.executor.utils import ExecutorFlags, ExecutorPaths, set_verbose
+from catalyst.executor.utils import ExecutorFlags, ExecutorPaths, Secret, set_verbose
 
 # ---------------------------------------------------------------------------
 # SSHArgv — control socket, argv construction
@@ -235,7 +235,7 @@ class TestSSHPkill:
     def test_sudo_with_password_uses_stdin(self):
         """``sudo=True`` with a password uses ``sudo -S`` and pipes the password on stdin."""
         with patch("subprocess.run", return_value=SimpleNamespace(returncode=0)) as m:
-            RemoteOps.pkill("me", "h", "x", sudo=True, sudo_password="pw")
+            RemoteOps.pkill("me", "h", "x", sudo=True, sudo_password=Secret("pw"))
         assert m.call_args.kwargs.get("input") == "pw\n"
         assert "sudo -S" in m.call_args.args[0][-1]
 
@@ -281,17 +281,30 @@ class TestSSHResolveSudo:
         with patch("catalyst.executor.ssh.RemoteOps.needs_sudo_password", return_value=False):
             assert RemoteOps.resolve_sudo("me", "h") is None
 
-    def test_explicit_password_used_when_needed(self):
-        """An attached password is returned verbatim when a password is required."""
+    def test_env_password_used_when_needed(self, monkeypatch):
+        """The named environment variable's value is returned when a password is required."""
+        monkeypatch.setenv("CAT_TEST_SUDO_PW", "secret")
         with patch("catalyst.executor.ssh.RemoteOps.needs_sudo_password", return_value=True):
-            assert RemoteOps.resolve_sudo("me", "h", "secret") == "secret"
+            assert (
+                RemoteOps.resolve_sudo("me", "h", "CAT_TEST_SUDO_PW").get_secret_value() == "secret"
+            )
+
+    def test_unset_env_falls_back_to_prompt(self, monkeypatch):
+        """A named but unset variable falls back to the :func:`getpass` prompt."""
+        monkeypatch.delenv("CAT_TEST_SUDO_PW", raising=False)
+        with patch("catalyst.executor.ssh.RemoteOps.needs_sudo_password", return_value=True), patch(
+            "catalyst.executor.ssh.getpass.getpass", return_value="typed"
+        ):
+            assert (
+                RemoteOps.resolve_sudo("me", "h", "CAT_TEST_SUDO_PW").get_secret_value() == "typed"
+            )
 
     def test_interactive_prompt_when_no_password(self):
         """Prompts via :func:`getpass` when a password is required but none is attached."""
         with patch("catalyst.executor.ssh.RemoteOps.needs_sudo_password", return_value=True), patch(
             "catalyst.executor.ssh.getpass.getpass", return_value="typed"
         ):
-            assert RemoteOps.resolve_sudo("me", "h") == "typed"
+            assert RemoteOps.resolve_sudo("me", "h").get_secret_value() == "typed"
 
     def test_aborted_prompt_raises(self):
         """A ``KeyboardInterrupt`` at the prompt is converted to :class:`RuntimeError`."""

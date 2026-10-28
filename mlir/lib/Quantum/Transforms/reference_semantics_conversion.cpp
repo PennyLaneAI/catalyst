@@ -14,7 +14,8 @@
 
 #define DEBUG_TYPE "reference-semantics-conversion"
 #define VALUE_SEMANTICS_GATE_OPS                                                                   \
-    quantum::QuantumOperation, quantum::MeasureOp, pbc::PPMeasurementOp, mbqc::MeasureInBasisOp
+    quantum::QuantumOperation, quantum::MeasureOp, pbc::PPMeasurementOp, pbc::PPRotationOp,        \
+        pbc::SelectPPMeasurementOp, mbqc::MeasureInBasisOp
 #define VALUE_SEMANTICS_OBSERVABLE_OPS                                                             \
     quantum::ComputationalBasisOp, quantum::HermitianOp, quantum::NamedObsOp
 
@@ -29,6 +30,8 @@
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/TypeSwitch.h"
+#include "llvm/Support/Debug.h"
+#include "llvm/Support/DebugLog.h"
 #include "mlir/Analysis/CallGraph.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
@@ -60,6 +63,60 @@ LogicalResult ensureNoValueSemanticsOps(Operation *op) {
             return WalkResult::interrupt();
         }
         return WalkResult::advance();
+    });
+
+    if (walkResult.wasInterrupted()) {
+        return failure();
+    } else {
+        return success();
+    }
+}
+
+// Only scf.if, scf.for, scf.while and scf.index_switch have conversion rules. Any other
+// region-bearing scf op must be rejected before conversion starts: converting the gates nested in
+// its region erases values that the region's own terminator still refers to.
+LogicalResult ensureNoScfUnsupportedOps(Operation *op) {
+    auto hasQrefType = [](TypeRange types) {
+        return llvm::any_of(types, llvm::IsaPred<qref::QubitType, qref::QuregType>);
+    };
+
+    auto isClassicalOp = [&](Operation *op) {
+        // Yielding/using qref values is not classical, even for scf.yield / func.call.
+        if (hasQrefType(op->getOperandTypes()) || hasQrefType(op->getResultTypes())) {
+            return false;
+        }
+        // Ops from quantum-related dialects are not classical.
+        return !isa<qref::QRefDialect>(op->getDialect()) &&
+               !isa<VALUE_SEMANTICS_GATE_OPS, VALUE_SEMANTICS_OBSERVABLE_OPS,
+                    mbqc::RefGraphStatePrepOp>(op);
+    };
+
+    auto isUnsupportedScfRegionOp = [](Operation *o) {
+        return isa<scf::SCFDialect>(o->getDialect()) &&
+               !isa<scf::IfOp, scf::WhileOp, scf::ForOp, scf::IndexSwitchOp>(o) &&
+               o->getNumRegions() > 0;
+    };
+
+    auto containsNonClassicalOp = [&](Operation *o) {
+        return o
+            ->walk([&](Operation *inner) {
+                return isClassicalOp(inner) ? WalkResult::advance() : WalkResult::interrupt();
+            })
+            .wasInterrupted();
+    };
+
+    WalkResult walkResult = op->walk([&](Operation *o) {
+        if (!(isUnsupportedScfRegionOp(o) && containsNonClassicalOp(o))) {
+            return WalkResult::advance();
+        }
+
+        StringRef name = o->getName().getStringRef();
+
+        o->emitError(
+            "Reference semantics conversion only supports the following scf operations: scf.if, "
+            "scf.for, scf.while, and scf.index_switch, got: ")
+            << name;
+        return WalkResult::interrupt();
     });
 
     if (walkResult.wasInterrupted()) {
@@ -374,6 +431,45 @@ void handlePPM(IRRewriter &builder, pbc::PPMeasurementOp vPPMOp, QubitValueTrack
     erasureWorklist.push_back(vPPMOp);
 }
 
+void handlePPR(IRRewriter &builder, pbc::PPRotationOp vPPROp, QubitValueTracker &tracker,
+               SmallVector<Operation *> &erasureWorklist) {
+    OpBuilder::InsertionGuard guard(builder);
+
+    migrateOpToReferenceSemantics<pbc::RefPPRotationOp>(builder, vPPROp, tracker);
+
+    erasureWorklist.push_back(vPPROp);
+}
+
+void handleSelectPPM(IRRewriter &builder, pbc::SelectPPMeasurementOp vSelPPMOp,
+                     QubitValueTracker &tracker, SmallVector<Operation *> &erasureWorklist) {
+    OpBuilder::InsertionGuard guard(builder);
+
+    auto rSelPPMOp =
+        migrateOpToReferenceSemantics<pbc::RefSelectPPMeasurementOp>(builder, vSelPPMOp, tracker);
+
+    builder.replaceAllUsesWith(vSelPPMOp.getMres(), rSelPPMOp.getMres());
+    erasureWorklist.push_back(vSelPPMOp);
+}
+
+// Shared handler for pbc.fabricate / pbc.prepare. VOpTy is deduced from the producer argument.
+template <typename ROpTy, typename VOpTy>
+void handlePBCQubitProducer(IRRewriter &builder, VOpTy vProducerOp, QubitValueTracker &tracker,
+                            SmallVector<Operation *> &erasureWorklist) {
+    OpBuilder::InsertionGuard guard(builder);
+    builder.setInsertionPoint(vProducerOp);
+    Location loc = vProducerOp.getLoc();
+    MLIRContext *ctx = vProducerOp.getContext();
+
+    SmallVector<Type> rQubitTypes(vProducerOp.getOutQubits().size(), qref::QubitType::get(ctx));
+    auto rProducerOp = ROpTy::create(builder, loc, rQubitTypes, vProducerOp.getInitState());
+
+    for (auto [vQubit, rQubit] :
+         llvm::zip_equal(vProducerOp.getOutQubits(), rProducerOp.getOutQubits())) {
+        tracker.setRQubit(vQubit, rQubit);
+    }
+    erasureWorklist.push_back(vProducerOp);
+}
+
 void handleCall(IRRewriter &builder, func::CallOp callOp, QubitValueTracker &tracker,
                 SmallVector<Operation *> &erasureWorklist) {
     OpBuilder::InsertionGuard guard(builder);
@@ -554,6 +650,8 @@ void handleIf(IRRewriter &builder, scf::IfOp ifOp, QubitValueTracker &tracker,
     }
     auto newIfOp = scf::IfOp::create(builder, loc, classicalReturnTypes, ifOp.getCondition(),
                                      /*withElseRegion=*/hasElseRegion);
+    newIfOp->setDiscardableAttrs(ifOp->getDiscardableAttrDictionary());
+
     builder.eraseBlock(newIfOp.thenBlock());
     builder.inlineRegionBefore(ifOp.getThenRegion(), newIfOp.getThenRegion(),
                                newIfOp.getThenRegion().end());
@@ -589,6 +687,7 @@ void handleSwitch(IRRewriter &builder, scf::IndexSwitchOp switchOp, QubitValueTr
     auto newSwitchOp =
         scf::IndexSwitchOp::create(builder, loc, classicalReturnTypes, switchOp.getArg(),
                                    switchOp.getCases(), switchOp.getNumCases());
+    newSwitchOp->setDiscardableAttrs(switchOp->getDiscardableAttrDictionary());
 
     // Handle the default region
     // Cannot just use `cascadeMapAhead` util to update the outside flow, since switch op does not
@@ -661,6 +760,8 @@ void handleFor(IRRewriter &builder, scf::ForOp forOp, QubitValueTracker &tracker
     // Create the new for op and handle
     auto newLoop = scf::ForOp::create(builder, loc, forOp.getLowerBound(), forOp.getUpperBound(),
                                       forOp.getStep(), newIterArgs);
+    newLoop->setDiscardableAttrs(forOp->getDiscardableAttrDictionary());
+
     builder.eraseBlock(newLoop.getBody());
 
     builder.inlineRegionBefore(forOp.getRegion(), newLoop.getRegion(), newLoop.getRegion().end());
@@ -716,6 +817,7 @@ void handleWhile(IRRewriter &builder, scf::WhileOp whileOp, QubitValueTracker &t
 
     // Create the new while op
     auto newLoop = scf::WhileOp::create(builder, loc, newResultTypes, newBeforeArgs);
+    newLoop->setDiscardableAttrs(whileOp->getDiscardableAttrDictionary());
     builder.inlineRegionBefore(whileOp.getBefore(), newLoop.getBefore(), newLoop.getBefore().end());
     builder.inlineRegionBefore(whileOp.getAfter(), newLoop.getAfter(), newLoop.getAfter().end());
 
@@ -801,6 +903,17 @@ std::optional<SmallVector<Operation *>> handleRegion(IRRewriter &builder, Region
                 [&](auto o) { handleMeasureInBasis(builder, o, tracker, erasureWorklist); })
             .Case<pbc::PPMeasurementOp>(
                 [&](auto o) { handlePPM(builder, o, tracker, erasureWorklist); })
+            .Case<pbc::PPRotationOp>(
+                [&](auto o) { handlePPR(builder, o, tracker, erasureWorklist); })
+            .Case<pbc::SelectPPMeasurementOp>(
+                [&](auto o) { handleSelectPPM(builder, o, tracker, erasureWorklist); })
+            .Case<pbc::FabricateOp>([&](auto o) {
+                handlePBCQubitProducer<pbc::RefFabricateOp>(builder, o, tracker, erasureWorklist);
+            })
+            .Case<pbc::PrepareStateOp>([&](auto o) {
+                handlePBCQubitProducer<pbc::RefPrepareStateOp>(builder, o, tracker,
+                                                               erasureWorklist);
+            })
             .Case<quantum::AdjointOp>(
                 [&](auto o) { handleAdjoint(builder, o, tracker, erasureWorklist); })
             .Case<quantum::CtrlOp>(
@@ -930,22 +1043,22 @@ void handleSubroutine(IRRewriter &builder, func::FuncOp f,
     assert(succeeded(f.eraseArguments(eraseArgsIndices)));
 }
 
-SmallVector<IntegerAttr> collectQregSizesAtCallsite(func::FuncOp subroutine, Operation *mod) {
+SmallVector<IntegerAttr> collectQregSizesAtCallsite(func::FuncOp subroutine, func::FuncOp caller) {
     SmallVector<IntegerAttr> qregSizesAtCallsite;
-    auto uses = SymbolTable::getSymbolUses(subroutine, mod);
-    if (uses) {
-        for (auto use : *uses) {
-            Operation *user = use.getUser();
-            if (auto callOp = dyn_cast<func::CallOp>(user)) {
-                for (Type t : callOp.getOperandTypes()) {
-                    if (auto qrefQuregType = dyn_cast<qref::QuregType>(t)) {
-                        qregSizesAtCallsite.push_back(qrefQuregType.getSize());
-                    }
-                }
-                break;
+    if (!caller) {
+        return qregSizesAtCallsite;
+    }
+    caller.walk([&](func::CallOp callOp) {
+        if (callOp.getCallee() != subroutine.getSymName()) {
+            return WalkResult::advance();
+        }
+        for (Type t : callOp.getOperandTypes()) {
+            if (auto qrefQuregType = dyn_cast<qref::QuregType>(t)) {
+                qregSizesAtCallsite.push_back(qrefQuregType.getSize());
             }
         }
-    }
+        return WalkResult::interrupt();
+    });
     return qregSizesAtCallsite;
 }
 
@@ -978,6 +1091,9 @@ struct ReferenceSemanticsConversionPass
         // Convert the main quantum.mode functions
         for (auto targetFunc : targetFuncs) {
             QubitValueTracker tracker;
+            if (failed(ensureNoScfUnsupportedOps(targetFunc))) {
+                return signalPassFailure();
+            }
             handleRegion(builder, targetFunc.getBody(), tracker);
             if (failed(ensureNoValueSemanticsOps(targetFunc))) {
                 targetFunc.emitOpError(
@@ -1011,13 +1127,33 @@ struct ReferenceSemanticsConversionPass
             subroutinesPostOrder.push_back(subroutine);
         }
 
+        // Collect the first caller of each subroutine once: a per-subroutine
+        // `SymbolTable::getSymbolUses` walks the whole module, which is quadratic in the number of
+        // subroutines. Callers are recorded instead of call ops (e.g. with a `SymbolUserMap`)
+        // because callers are converted before their callees, which replaces their call ops.
+        SymbolTableCollection symbolTables;
+        llvm::DenseMap<func::FuncOp, func::FuncOp> firstCallerOf;
+        mod->walk([&](func::CallOp callOp) {
+            auto callee =
+                symbolTables.lookupNearestSymbolFrom<func::FuncOp>(callOp, callOp.getCalleeAttr());
+            auto caller = callOp->getParentOfType<func::FuncOp>();
+            if (callee && caller) {
+                firstCallerOf.try_emplace(callee, caller);
+            }
+        });
+
         // We want to handle the calls before the subroutines, so we know the register sizes on the
         // subroutine qreg arg type
         // By default, scc iterates call graph in post order (callee before caller), so we reverse
         // the visit order.
         for (func::FuncOp subroutine : llvm::reverse(subroutinesPostOrder)) {
+            if (failed(ensureNoScfUnsupportedOps(subroutine))) {
+                return signalPassFailure();
+            }
             QubitValueTracker tracker;
-            handleSubroutine(builder, subroutine, collectQregSizesAtCallsite(subroutine, mod));
+            handleSubroutine(
+                builder, subroutine,
+                collectQregSizesAtCallsite(subroutine, firstCallerOf.lookup(subroutine)));
             if (failed(ensureNoValueSemanticsOps(subroutine))) {
                 subroutine.emitOpError(
                     "Detected remaining value semantics operations after conversion");

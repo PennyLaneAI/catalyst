@@ -112,21 +112,22 @@ void cnotDecomp(catalyst::quantum::CustomOp op, mlir::PatternRewriter &rewriter)
 
     TypedAttr minusPiOver2Attr = rewriter.getF64FloatAttr(-PI / 2);
     mlir::Value minusPiOver2 = arith::ConstantOp::create(rewriter, op.getLoc(), minusPiOver2Attr);
-    auto rxMinusPiOver2 =
+    auto rxMinusPiOver2Control =
         CustomOp::create(rewriter, op.getLoc(), outQubitsTypes.front(), TypeRange{}, minusPiOver2,
                          qubit0AfterMs, "RX", false, ValueRange{}, ValueRange{});
-    auto firstRyMinusPiOver2 =
+    auto rxMinusPiOver2Target =
         CustomOp::create(rewriter, op.getLoc(), outQubitsTypes.front(), TypeRange{}, minusPiOver2,
-                         qubit1AfterMs, "RY", false, ValueRange{}, ValueRange{});
+                         qubit1AfterMs, "RX", false, ValueRange{}, ValueRange{});
 
-    mlir::Value qubit0AfterRY = rxMinusPiOver2.getOutQubits().front();
-    auto secondRyMinusPiOver2 =
+    mlir::Value qubit0AfterRx = rxMinusPiOver2Control.getOutQubits().front();
+    auto ryMinusPiOver2Control =
         CustomOp::create(rewriter, op.getLoc(), outQubitsTypes.front(), TypeRange{}, minusPiOver2,
-                         qubit0AfterRY, "RY", false, ValueRange{}, ValueRange{});
+                         qubit0AfterRx, "RY", false, ValueRange{}, ValueRange{});
 
+    // The results keep the operand order: control first, then target.
     SmallVector<mlir::Value> qubitsEnd;
-    qubitsEnd.push_back(firstRyMinusPiOver2.getOutQubits().front());
-    qubitsEnd.push_back(secondRyMinusPiOver2.getOutQubits().front());
+    qubitsEnd.push_back(ryMinusPiOver2Control.getOutQubits().front());
+    qubitsEnd.push_back(rxMinusPiOver2Target.getOutQubits().front());
     op.replaceAllUsesWith(qubitsEnd);
 }
 

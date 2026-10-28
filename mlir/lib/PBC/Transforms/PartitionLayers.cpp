@@ -106,7 +106,7 @@ struct PartitionLayersPass : public impl::PartitionLayersPassBase<PartitionLayer
         MLIRContext *context = &getContext();
         mlir::IRRewriter writer(context);
 
-        PBCLayerContext layerContext;
+        PBCLayerContext layerContext(minOpsForCommutationBasis);
         auto groupLayers = layerContext.groupLayers(getOperation(), onlyDisjointQubit);
 
         for (const auto &layer : groupLayers) {

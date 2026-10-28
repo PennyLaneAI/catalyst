@@ -12,26 +12,32 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{gate-set=C(Hadamard)=1.0 alt-decomps=C(U){}{wires:1}{}=ctrl_u})' %s | FileCheck %s
+// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{gate-set=C(TestHadamard)=1.0 alt-decomps=C(U){}{wires:1}{}=ctrl_u})' %s | FileCheck %s --check-prefixes=ALL,CALL
 
-// CHECK-LABEL: func.func @controlled_basis(
-// CHECK-SAME:  %[[Q:.*]]: !quantum.bit, %[[C:.*]]: !quantum.bit
+// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{inline-rule-body gate-set=C(TestHadamard)=1.0 alt-decomps=C(U){}{wires:1}{}=ctrl_u})' %s | FileCheck %s --check-prefixes=ALL,INLINE
+
+// ALL-LABEL: func.func @controlled_basis(
+// ALL-SAME:  %[[Q:.*]]: !quantum.bit, %[[C:.*]]: !quantum.bit
 func.func @controlled_basis(%ctrl: !quantum.bit, %q: !quantum.bit) -> (!quantum.bit, !quantum.bit) {
   %true = arith.constant true
-  // CHECK: %[[O:.*]], %[[OC:.*]] = quantum.custom "Hadamard"() %[[Q]] ctrls(%[[C]]) ctrlvals(%{{.*}}) : !quantum.bit ctrls !quantum.bit
-  // CHECK: return %[[O]], %[[OC]]
-  %out, %outc = quantum.custom "Hadamard"() %q ctrls(%ctrl) ctrlvals(%true) : !quantum.bit ctrls !quantum.bit
+  // ALL: %[[O:.*]], %[[OC:.*]] = quantum.custom "TestHadamard"() %[[Q]] ctrls(%[[C]]) ctrlvals(%{{.*}}) : !quantum.bit ctrls !quantum.bit
+  // ALL: return %[[O]], %[[OC]]
+  %out, %outc = quantum.custom "TestHadamard"() %q ctrls(%ctrl) ctrlvals(%true) : !quantum.bit ctrls !quantum.bit
   return %out, %outc : !quantum.bit, !quantum.bit
 }
 
-// CHECK-LABEL: func.func @distribution(
-// CHECK-SAME:  %[[Q:.*]]: !quantum.bit, %[[C:.*]]: !quantum.bit
+// ALL-LABEL: func.func @distribution(
+// ALL-SAME:  %[[Q:.*]]: !quantum.bit, %[[C:.*]]: !quantum.bit
 func.func @distribution(%ctrl: !quantum.bit, %q: !quantum.bit) -> (!quantum.bit, !quantum.bit) {
   %true = arith.constant true
-  // CHECK-NOT: "U"
-  // CHECK: %[[A:.*]], %[[AC:.*]] = quantum.custom "Hadamard"() %[[Q]] ctrls(%[[C]]) ctrlvals(%{{.*}}) : !quantum.bit ctrls !quantum.bit
-  // CHECK: %[[B:.*]], %[[BC:.*]] = quantum.custom "Hadamard"() %[[A]] ctrls(%[[AC]]) ctrlvals(%{{.*}}) : !quantum.bit ctrls !quantum.bit
-  // CHECK: return %[[B]], %[[BC]]
+  // ALL-NOT: "U"
+
+  // CALL: %[[OQ:.*]]:2 = call @ctrl_u_0(%[[Q]], %[[C]])
+  // CALL: return %[[OQ]]#0, %[[OQ]]#1
+
+  // INLINE: %[[A:.*]], %[[AC:.*]] = quantum.custom "TestHadamard"() %[[Q]] ctrls(%[[C]]) ctrlvals(%{{.*}}) : !quantum.bit ctrls !quantum.bit
+  // INLINE: %[[B:.*]], %[[BC:.*]] = quantum.custom "TestHadamard"() %[[A]] ctrls(%[[AC]]) ctrlvals(%{{.*}}) : !quantum.bit ctrls !quantum.bit
+  // INLINE: return %[[B]], %[[BC]]
   %out, %outc = quantum.custom "U"() %q ctrls(%ctrl) ctrlvals(%true) : !quantum.bit ctrls !quantum.bit
   return %out, %outc : !quantum.bit, !quantum.bit
 }
@@ -39,9 +45,11 @@ func.func @distribution(%ctrl: !quantum.bit, %q: !quantum.bit) -> (!quantum.bit,
 // C(U) distributed to two controlled Hadamards (value-agnostic: controls on all-ones).
 func.func private @ctrl_u(%q: !quantum.bit, %ctrl: !quantum.bit) -> (!quantum.bit, !quantum.bit) attributes {
     target_gate = "C(U){}{wires:1}{}",
-    resources = {operations = {"C(Hadamard){}{wires:1}{}" = 2 : i64}} } {
+    resources = {operations = {"C(TestHadamard){}{wires:1}{}" = 2 : i64}} } {
   %true = arith.constant true
-  %a, %ac = quantum.custom "Hadamard"() %q ctrls(%ctrl) ctrlvals(%true) : !quantum.bit ctrls !quantum.bit
-  %b, %bc = quantum.custom "Hadamard"() %a ctrls(%ac) ctrlvals(%true) : !quantum.bit ctrls !quantum.bit
+  %a, %ac = quantum.custom "TestHadamard"() %q ctrls(%ctrl) ctrlvals(%true) : !quantum.bit ctrls !quantum.bit
+  %b, %bc = quantum.custom "TestHadamard"() %a ctrls(%ac) ctrlvals(%true) : !quantum.bit ctrls !quantum.bit
   return %b, %bc : !quantum.bit, !quantum.bit
 }
+
+// CALL: func.func private @ctrl_u_0

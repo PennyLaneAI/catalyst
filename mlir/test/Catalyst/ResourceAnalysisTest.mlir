@@ -399,6 +399,87 @@ func.func @depth_caller(%arg0: !quantum.bit) -> !quantum.bit {
 
 // -----
 
+// Declaration-only functions (e.g. runtime library functions) get an empty entry, so that calls
+// to them are counted as function calls that can be resolved.
+
+// CHECK-LABEL: "external_angle": {
+// CHECK: "classical_instructions": {}
+// CHECK: "function_calls"
+// CHECK:   "dynamic": {}
+// CHECK:   "static": {}
+// CHECK: "quantum_operations": {}
+
+// CHECK-LABEL: "external_caller": {
+// CHECK: "function_calls"
+// CHECK:   "dynamic": {}
+// CHECK:   "static":
+// CHECK:     "external_angle": 1
+// CHECK: "quantum_operations"
+// CHECK:     "RZ": 1
+func.func private @external_angle(f64) -> f64
+
+func.func @external_caller(%arg0: !quantum.bit, %x: f64) -> !quantum.bit {
+    %y = func.call @external_angle(%x) : (f64) -> f64
+    %out = quantum.custom "RZ"(%y) %arg0 : !quantum.bit
+    return %out : !quantum.bit
+}
+
+// -----
+
+// Without an `llvm.emit_c_interface` function, the first public definition is the entry
+// function, so the argument qubits of a private helper defined before it are not counted.
+
+// CHECK-LABEL: "private_helper": {
+// CHECK: "num_qubits"
+// CHECK:   "alloc": 0
+// CHECK:   "arg": 0
+// CHECK:   "total": 0
+
+// CHECK-LABEL: "public_entry": {
+// CHECK: "num_qubits"
+// CHECK:   "alloc": 0
+// CHECK:   "arg": 1
+// CHECK:   "total": 1
+func.func private @private_helper(%arg0: !quantum.bit) -> !quantum.bit {
+    %out = quantum.custom "Hadamard"() %arg0 : !quantum.bit
+    return %out : !quantum.bit
+}
+
+func.func @public_entry(%arg0: !quantum.bit) -> !quantum.bit {
+    %out = func.call @private_helper(%arg0) : (!quantum.bit) -> !quantum.bit
+    return %out : !quantum.bit
+}
+
+// -----
+
+// In a quantum kernel, the function tagged with `quantum.kernel_entry_point` is the entry
+// function, even if another public function is defined before it.
+
+// CHECK-LABEL: "kernel_entry": {
+// CHECK: "num_qubits"
+// CHECK:   "alloc": 0
+// CHECK:   "arg": 1
+// CHECK:   "total": 1
+
+// CHECK-LABEL: "other_public": {
+// CHECK: "num_qubits"
+// CHECK:   "alloc": 0
+// CHECK:   "arg": 0
+// CHECK:   "total": 0
+module @kernel {
+    func.func @other_public(%arg0: !quantum.bit) -> !quantum.bit {
+        %out = quantum.custom "Hadamard"() %arg0 : !quantum.bit
+        return %out : !quantum.bit
+    }
+
+    func.func @kernel_entry(%arg0: !quantum.bit) -> !quantum.bit attributes {quantum.kernel_entry_point} {
+        %out = func.call @other_public(%arg0) : (!quantum.bit) -> !quantum.bit
+        return %out : !quantum.bit
+    }
+}
+
+// -----
+
 // Dynamic for loop with catalyst.estimated_iterations: treated as static for the
 // purposes of counting, so it lifts into "for_loop_1" with the
 // attribute's iteration count as the call multiplier.
@@ -607,6 +688,8 @@ func.func @outer_dyn_loop_calls_nested_helper(%arg0: !quantum.bit, %c4 : index) 
 // If-else branching (take max per op)
 
 // CHECK-LABEL: "if_else_branching"
+// CHECK: metadata
+// CHECK:       "has_branches": true
 // CHECK: "quantum_operations"
 // CHECK:   "Hadamard": 3
 // CHECK:   "PauliX": 2
@@ -1179,6 +1262,8 @@ func.func @static_trip_count_large_signed_span(%arg0: !quantum.bit) -> !quantum.
 // CHECK: "function_calls"
 // CHECK:   "dynamic":
 // CHECK:       "dyn_for_loop_1"
+// CHECK: metadata
+// CHECK:       "has_branches": true
 // CHECK-LABEL: "intervening_if_nested_for_loop": {
 // CHECK: "function_calls"
 // CHECK:   "static":
@@ -2059,7 +2144,7 @@ func.func @qref(%arg0: !qref.bit, %arg1: !qref.reg<2>) {
 
 // CHECK-LABEL: "if_estimated_probability"
 // CHECK: metadata
-// CHECK:       "has_branches": true
+// CHECK:       "has_branches": false
 // CHECK: quantum_operations
 // CHECK:       "Hadamard": 5
 func.func @if_estimated_probability(%arg0: !quantum.bit, %cond: i1) -> !quantum.bit {
@@ -2087,12 +2172,11 @@ func.func @if_estimated_probability(%arg0: !quantum.bit, %cond: i1) -> !quantum.
 
 // scf.if with only a then-branch and `estimated_probability` = 0.5: the (empty)
 // else-branch contributes nothing, so the expected Hadamard count is
-// 0.5 * 3 = 1.5. Counts are tracked as doubles internally, but the JSON output
-// rounds each count to the nearest integer, so 1.5 is reported as 2.
+// 0.5 * 3 = 1.5. Fractional counts are reported as is in the JSON output.
 
 // CHECK-LABEL: "if_estimated_probability_then_only"
 // CHECK: quantum_operations
-// CHECK:   "Hadamard": 2
+// CHECK:   "Hadamard": 1.5
 func.func @if_estimated_probability_then_only(%arg0: !quantum.bit, %cond: i1) {
     scf.if %cond {
         %t1 = quantum.custom "Hadamard"() %arg0 : !quantum.bit
@@ -2107,13 +2191,12 @@ func.func @if_estimated_probability_then_only(%arg0: !quantum.bit, %cond: i1) {
 
 // Qubit allocations are probability-weighted like every other count. Here the
 // then-branch allocates 1 qubit and the (empty) else-branch allocates none,
-// with p(then) = 0.5, so the expected allocation count is 0.5. The JSON output
-// rounds each count to the nearest integer, so 0.5 is reported as 1.
+// with p(then) = 0.5, so the expected allocation count is 0.5.
 
 // CHECK-LABEL: "if_estimated_probability_qubits"
 // CHECK: "num_qubits"
-// CHECK:   "alloc": 1
-// CHECK:   "total": 1
+// CHECK:   "alloc": 0.5
+// CHECK:   "total": 0.5
 func.func @if_estimated_probability_qubits(%cond: i1) {
     scf.if %cond {
         %r = quantum.alloc(1) : !quantum.reg
@@ -2129,13 +2212,12 @@ func.func @if_estimated_probability_qubits(%cond: i1) {
 // A probabilistic conditional inside a loop body: the fractional expected count
 // (0.5 Hadamard per iteration, p(then) = 0.5) is carried as a double internally so
 // it survives lifting into the for_loop_1 body and can be combined with the trip
-// count downstream (0.5 * 10 = 5, see the STATS check). The per-function JSON output
-// rounds counts to the nearest integer, so the lifted body reports 1, and the parent
-// records function_calls = { for_loop_1: 10 }.
+// count downstream (0.5 * 10 = 5, see the STATS check). The lifted body reports the
+// fractional count 0.5, and the parent records function_calls = { for_loop_1: 10 }.
 
 // CHECK-LABEL: "for_loop_1": {
 // CHECK: "quantum_operations"
-// CHECK:   "Hadamard": 1
+// CHECK:   "Hadamard": 0.5
 
 // CHECK-LABEL: "prob_if_in_loop": {
 // CHECK: "function_calls"
@@ -2164,7 +2246,7 @@ func.func @prob_if_in_loop(%arg0: !quantum.bit, %cond: i1) -> !quantum.bit {
 // 0.2*5 + 0.3*10 + 0.5*2 = 5.
 
 // CHECK-LABEL: "switch_estimated_probabilities"
-// CHECK: "has_branches": true
+// CHECK: "has_branches": false
 // CHECK: "quantum_operations"
 // CHECK:       "PauliX": 5
 func.func @switch_estimated_probabilities(%arg0: !quantum.bit, %sel: index) -> !quantum.bit {
@@ -2267,6 +2349,55 @@ func.func public @test_ops_with_ctrl() -> tensor<8xf64> {
 
 // -----
 
+// Test operations with ctrl region.
+
+// CHECK-LABEL: "test_ops_with_ctrl_region"
+// CHECK: "1"
+// CHECK:   "Adjoint(T)": 1
+// CHECK:   "PauliX": 1
+// CHECK: "2"
+// CHECK:   "C(Adjoint(S))": 1
+// CHECK:   "C(PauliY)": 1
+// CHECK: "3"
+// CHECK:   "2C(S)": 1
+
+func.func public @test_ops_with_ctrl_region() -> tensor<8xf64> {
+    %false = arith.constant false
+    %true = arith.constant true
+    %c0_i64 = arith.constant 0 : i64
+    %0 = quantum.alloc( 3) : !quantum.reg
+    %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+    %out_qubits = quantum.custom "PauliX"() %1 : !quantum.bit
+    %out_qubits_0 = quantum.custom "T"() %out_qubits adj : !quantum.bit
+    %2 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
+    %out_ctrl_qubits, %out_qubits_1 = quantum.ctrl(%2) ctrlvals(%true) (%out_qubits_0) : !quantum.bit -> !quantum.bit {
+    ^bb0(%arg0: !quantum.bit):
+        %s_1 = quantum.custom "S"() %arg0 adj : !quantum.bit
+        quantum.yield %s_1 : !quantum.bit
+    }
+    %3 = quantum.extract %0[ 2] : !quantum.reg -> !quantum.bit
+    %out_ctrl_qubits_3:2, %out_qubits_2 = quantum.ctrl(%out_ctrl_qubits, %3) ctrlvals(%true, %false) (%out_qubits_1) : !quantum.bit, !quantum.bit -> !quantum.bit {
+    ^bb0(%arg0: !quantum.bit):
+        %s_2 = quantum.custom "S"() %arg0 : !quantum.bit
+        quantum.yield %s_2 : !quantum.bit
+    }
+    %out_qubits_4_0, %out_qubits_4_1 = quantum.ctrl(%out_ctrl_qubits_3#1) ctrlvals(%true) (%out_qubits_2) : !quantum.bit -> !quantum.bit {
+    ^bb0(%arg0: !quantum.bit):
+        %y = quantum.custom "PauliY"() %arg0 : !quantum.bit
+        quantum.yield %y : !quantum.bit
+    }
+    %4 = quantum.insert %0[ 0], %out_qubits_4_1 : !quantum.reg, !quantum.bit
+    %5 = quantum.insert %4[ 1], %out_ctrl_qubits_3#0 : !quantum.reg, !quantum.bit
+    %6 = quantum.insert %5[ 2], %out_qubits_4_0 : !quantum.reg, !quantum.bit
+    %7 = quantum.compbasis qreg %6 : !quantum.obs
+    %8 = quantum.probs %7 : tensor<8xf64>
+    quantum.dealloc %6 : !quantum.reg
+    quantum.device_release
+    return %8 : tensor<8xf64>
+}
+
+// -----
+
 // Test operations with control qubits in reference semantics.
 
 // CHECK-LABEL: "test_ops_with_ctrl_ref"
@@ -2294,6 +2425,33 @@ func.func public @test_ops_with_ctrl_ref() {
     qref.dealloc %0 : !qref.reg<3>
     return
 }
+
+// -----
+
+// Test nested Ctrl
+
+// CHECK-LABEL: "test_nested_ctrl"
+// CHECK: "4"
+// CHECK:   "3C(S)": 1
+
+func.func public @test_nested_ctrl(){
+    %false = arith.constant false
+    %true = arith.constant true
+    %ctrls = qref.alloc( 3) : !qref.reg<3>
+    %ctrl_0 = qref.get %ctrls[ 0] : !qref.reg<3> -> !qref.bit
+    %ctrl_1 = qref.get %ctrls[ 1] : !qref.reg<3> -> !qref.bit
+    %ctrl_2 = qref.get %ctrls[ 2] : !qref.reg<3> -> !qref.bit
+    %input = qref.alloc_qb : !qref.bit
+
+    qref.ctrl (%ctrl_0) ctrlvals (%true){
+        qref.ctrl (%ctrl_1) ctrlvals (%false){
+            qref.custom "S"() %input ctrls(%ctrl_2) ctrlvals(%true) : !qref.bit ctrls !qref.bit
+        }
+    }
+
+    return
+}
+
 
 // -----
 

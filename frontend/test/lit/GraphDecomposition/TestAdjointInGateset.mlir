@@ -12,22 +12,25 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{gate-set=Adjoint(testT)=1.0 alt-decomps=testS{}{wires:1}{}=s_to_adjt})' %s | FileCheck %s
+// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{gate-set=Adjoint(testT)=1.0 alt-decomps=testS{}{wires:1}{}=s_to_adjt})' %s | FileCheck %s --check-prefixes=ALL,CALL
 
-// CHECK-LABEL: func.func @adjoint_in_gateset(
-// CHECK-SAME:  [[Q:%.+]]: !quantum.bit
+// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{inline-rule-body gate-set=Adjoint(testT)=1.0 alt-decomps=testS{}{wires:1}{}=s_to_adjt})' %s | FileCheck %s --check-prefixes=ALL,INLINE
+
+// ALL-LABEL: func.func @adjoint_in_gateset(
+// ALL-SAME:  [[Q:%.+]]: !quantum.bit
 func.func @adjoint_in_gateset(%q: !quantum.bit) -> !quantum.bit {
-  // CHECK: [[O:%.+]] = quantum.custom "testT"() [[Q]] adj : !quantum.bit
-  // CHECK: return [[O]]
+  // ALL: [[O:%.+]] = quantum.custom "testT"() [[Q]] adj : !quantum.bit
+  // ALL: return [[O]]
   %out = quantum.custom "testT"() %q adj : !quantum.bit
   return %out: !quantum.bit
 }
 
-// CHECK-LABEL: func.func @decompose_to_adjoint(
-// CHECK-SAME:  [[Q:%.+]]: !quantum.bit
+// ALL-LABEL: func.func @decompose_to_adjoint(
+// ALL-SAME:  [[Q:%.+]]: !quantum.bit
 func.func @decompose_to_adjoint(%q: !quantum.bit) -> !quantum.bit {
-  // CHECK: [[O:%.+]] = quantum.custom "testT"() [[Q]] adj : !quantum.bit
-  // CHECK: return [[O]]
+  // CALL: [[O:%.+]] = call @s_to_adjt_0([[Q]])
+  // INLINE: [[O:%.+]] = quantum.custom "testT"() [[Q]] adj : !quantum.bit
+  // ALL: return [[O]]
   %out = quantum.custom "testS"() %q : !quantum.bit
   return %out: !quantum.bit
 }
@@ -38,3 +41,5 @@ func.func private @s_to_adjt(%q: !quantum.bit) -> !quantum.bit attributes {
   %o = quantum.custom "testT"() %q adj : !quantum.bit
   return %o : !quantum.bit
 }
+
+// CALL: func.func private @s_to_adjt_0

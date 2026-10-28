@@ -24,7 +24,7 @@ jobs:
     name: Determine runner type to use
     uses: ./.github/workflows/determine-workflow-runner.yml
     with:
-      default_runner: blacksmith-32vcpu-ubuntu-2404
+      default_runner: blacksmith-8vcpu-ubuntu-2404
 
   constants:
     name: "Set build matrix"
@@ -610,8 +610,9 @@ jobs:
 
     - name: Run Python Pytest Tests (backend=lightning.kokkos)
       run: |
-        # Don't run xDSL tests
-        make pytest TEST_BACKEND="lightning.kokkos" XDSL_TESTS=OFF
+        # Select tests parametrized by the backend fixture.
+        python3 -m pytest frontend/test/pytest --tb=native --backend="lightning.kokkos" -n auto -m "not xdsl" -k "lightning.kokkos"
+        python3 -m pytest frontend/test/async_tests --tb=native --backend="lightning.kokkos" -k "lightning.kokkos"
 
   frontend-tests-openqasm-device:
     name: Frontend Tests (backend="openqasm3")

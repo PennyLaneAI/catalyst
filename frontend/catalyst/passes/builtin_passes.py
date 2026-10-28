@@ -660,13 +660,13 @@ def ions_decomposition_setup_inputs():  # pragma: nocover
         %out_qubits_5 = quantum.custom "RY"(%cst_0) %out_qubits_4 : !quantum.bit
         %out_qubits_6:2 = quantum.custom "MS"(%cst_0) %out_qubits_5, %2 : !quantum.bit, !quantum.bit
         %out_qubits_7 = quantum.custom "RX"(%cst_2) %out_qubits_6#0 : !quantum.bit
-        %out_qubits_8 = quantum.custom "RY"(%cst_2) %out_qubits_6#1 : !quantum.bit
+        %out_qubits_8 = quantum.custom "RX"(%cst_2) %out_qubits_6#1 : !quantum.bit
         %out_qubits_9 = quantum.custom "RY"(%cst_2) %out_qubits_7 : !quantum.bit
-        %3 = quantum.namedobs %out_qubits_8[ PauliY] : !quantum.obs
+        %3 = quantum.namedobs %out_qubits_9[ PauliY] : !quantum.obs
         %4 = quantum.expval %3 : f64
         %from_elements = tensor.from_elements %4 : tensor<f64>
-        %5 = quantum.insert %0[ 0], %out_qubits_8 : !quantum.reg, !quantum.bit
-        %6 = quantum.insert %5[ 1], %out_qubits_9 : !quantum.reg, !quantum.bit
+        %5 = quantum.insert %0[ 0], %out_qubits_9 : !quantum.reg, !quantum.bit
+        %6 = quantum.insert %5[ 1], %out_qubits_8 : !quantum.reg, !quantum.bit
         quantum.dealloc %6 : !quantum.reg
         quantum.device_release
         return %from_elements : tensor<f64>
@@ -704,7 +704,7 @@ def ions_decomposition_setup_inputs():  # pragma: nocover
         %out_qubits_5 = quantum.custom "RY"(%cst_0) %out_qubits_4 : !quantum.bit
         %out_qubits_6:2 = quantum.custom "MS"(%cst_0) %out_qubits_5, %2 : !quantum.bit, !quantum.bit
         %out_qubits_7 = quantum.custom "RX"(%cst_2) %out_qubits_6#0 : !quantum.bit
-        %out_qubits_8 = quantum.custom "RY"(%cst_2) %out_qubits_6#1 : !quantum.bit
+        %out_qubits_8 = quantum.custom "RX"(%cst_2) %out_qubits_6#1 : !quantum.bit
         %out_qubits_9 = quantum.custom "RY"(%cst_2) %out_qubits_7 : !quantum.bit
     """
     return (), {}
@@ -819,7 +819,7 @@ combine_global_phases = qp.transform(
 )
 
 
-def gridsynth_setup_inputs(epsilon=1e-4, ppr_basis=False):
+def gridsynth_setup_inputs(epsilon=1e-4, ppr_basis=False, method="deterministic"):
     r"""A quantum compilation pass to discretize
     single-qubit RZ and PhaseShift gates into the Clifford+T basis or the PPR basis using the Ross-Selinger Gridsynth algorithm.
     Reference: https://arxiv.org/abs/1403.2975
@@ -829,10 +829,28 @@ def gridsynth_setup_inputs(epsilon=1e-4, ppr_basis=False):
 
         The actual discretization is only performed during execution time.
 
+    .. note::
+
+        Controlled ``RZ`` and ``PhaseShift`` gates are not supported, and the pass raises an error
+        if it encounters them. Decompose them into single-qubit rotations first, for example with
+        :func:`~.passes.graph_decomposition`.
+
     Args:
         qnode (QNode): the QNode to apply the gridsynth compiler pass to
-        epsilon (float): The maximum permissible operator norm error per rotation gate. Defaults to ``1e-4``.
+        epsilon (float): The accuracy per rotation gate. Defaults to ``1e-4``. Values down to
+            ``1e-15`` are supported. With ``"deterministic"``, each rotation has operator norm
+            error at most ``epsilon``, and therefore diamond norm error at most ``2 * epsilon``.
+            With ``"mixed"`` and ``"mixed-fallback"``, the channel averaged over samples has
+            diamond norm error at most ``2 * epsilon``.
         ppr_basis (bool): If true, decompose directly to Pauli Product Rotations (PPRs) in PBC dialect. Defaults to ``False``
+        method (str): The synthesis method. ``"deterministic"`` (default) applies a single
+            Ross-Selinger gate sequence per rotation. ``"mixed"`` applies, per execution, one of
+            two twirled sequences that under- and over-rotate the target, which roughly
+            halves the T-count at the same accuracy. This is the mixed diagonal approximation of
+            Kliuchnikov et al., Section 3.4 (Proposition 3.13), in
+            `arXiv:2203.10064 <https://arxiv.org/abs/2203.10064>`__. ``"mixed-fallback"`` is the
+            mixed fallback approximation of Section 3.5 (Proposition 3.18), which roughly halves
+            the T-count of ``"mixed"`` at the cost of one temporary ancilla qubit per rotation.
 
     Returns:
         :class:`QNode <pennylane.QNode>`
@@ -841,6 +859,29 @@ def gridsynth_setup_inputs(epsilon=1e-4, ppr_basis=False):
 
         The circuit generated from this pass with ``ppr_basis=True`` are currently only executable on the
         ``lightning.qubit`` device with program  enabled.
+
+    .. note::
+
+        With ``method="mixed"``, each rotation applies the under- or the over-rotating sequence,
+        conjugated as :math:`\sigma U \sigma^\dagger` with :math:`\sigma` drawn uniformly from
+        :math:`\{I, S, Z, S^\dagger\}`. This gives eight possible sequences
+        per rotation. The twirl leaves the target rotation unchanged, since it commutes with
+        :math:`\sigma`.
+
+        With ``method="mixed"`` or ``method="mixed-fallback"``, the accuracy guarantee holds on
+        average over samples, and each sampled sequence has an error of order
+        :math:`\sqrt{\epsilon}`. By default, and with ``mcm_method="single-branch-statistics"``,
+        a call samples one sequence per rotation, and one ancilla measurement outcome for
+        ``"mixed-fallback"``, shared by all its shots. With ``mcm_method="one-shot"``, every shot
+        samples its own. Samples are drawn from the runtime random number generator seeded by the
+        ``seed`` argument of :func:`~.qjit`, so with a fixed seed every call uses the same gate
+        sequences.
+
+    .. note::
+
+        With ``method="mixed-fallback"``, each rotation uses a temporary ancilla qubit and a
+        mid-circuit measurement, as :func:`pennylane.transforms.ppr_to_ppm` does. Resource
+        estimates count every allocation, so they report one additional wire per rotation.
 
     **Example**
 
@@ -872,7 +913,7 @@ def gridsynth_setup_inputs(epsilon=1e-4, ppr_basis=False):
         func.func private @rs_decomposition_get_phase(f64, f64, i1) -> f64
         func.func private @rs_decomposition_get_gates(memref<?xindex>, f64, f64, i1)
         func.func private @rs_decomposition_get_size(f64, f64, i1) -> index
-        func.func private @__catalyst_decompose_RZ_0(%arg0: !quantum.bit, %arg1: f64) -> (!quantum.bit, f64) {
+        func.func private @__catalyst_decompose_RZ_0(%arg0: !quantum.bit, %arg1: f64) -> !quantum.bit {
             . . .
             %2 = scf.for %arg2 = %c0 to %0 step %c1 iter_args(%arg3 = %arg0) -> (!quantum.bit) {
                 %3 = memref.load %alloc[%arg2] : memref<?xindex>
@@ -898,14 +939,18 @@ def gridsynth_setup_inputs(epsilon=1e-4, ppr_basis=False):
 
         func.func public @circuit_0(%arg0: tensor<f64>) -> tensor<f64> attributes {diff_method = "adjoint", llvm.linkage = #llvm.linkage<internal>, qnode} {
             . . .
-            %2:2 = call @__catalyst_decompose_RZ_0(%1, %extracted) : (!quantum.bit, f64) -> (!quantum.bit, f64)
+            %2 = call @__catalyst_decompose_RZ_0(%1, %extracted) : (!quantum.bit, f64) -> !quantum.bit
             . . .
         }
 
 
 
     """
-    return (), {"epsilon": epsilon, "ppr_basis": ppr_basis}
+    if method not in ("deterministic", "mixed", "mixed-fallback"):
+        raise ValueError(
+            f"method must be 'deterministic', 'mixed' or 'mixed-fallback'. Got {method!r}."
+        )
+    return (), {"epsilon": epsilon, "ppr_basis": ppr_basis, "method": method}
 
 
 gridsynth = qp.transform(pass_name="gridsynth", setup_inputs=gridsynth_setup_inputs)
@@ -945,7 +990,9 @@ def to_ppr_setup_inputs():
     ``qp.IsingZZ``,
     ``qp.MultiRZ``,
     ``qp.PauliRot``,
-    ``qp.PPR``,
+    ``qp.PPR_2``,
+    ``qp.PPR_4``,
+    ``qp.PPR_8``,
     and adjoint versions thereof, as well as
     ``qp.measure`` and
     ``qp.pauli_measure``.
@@ -967,7 +1014,8 @@ def to_ppr_setup_inputs():
         capture is enabled with ``@qjit(capture=True)``.
 
         Note that the angle convention of ``qp.PauliRot`` differs from Catalyst's angle convention
-        for PPRs by a factor of two, whereas ``qp.PPR`` follows Catalyst's convention.
+        for PPRs by a factor of two, whereas ``qp.PPR_2``, ``qp.PPR_4`` and ``qp.PPR_8`` follow
+        Catalyst's convention.
 
     **Example**
 
@@ -1072,17 +1120,17 @@ def commute_ppr_setup_inputs(max_pauli_size=0):
         def circuit():
 
             # equivalent to a Hadamard gate
-            qp.PPR(4, pauli_word="Z", wires=0)
-            qp.PPR(4, pauli_word="X", wires=0)
-            qp.PPR(4, pauli_word="Z", wires=0)
+            qp.PPR_4(1, pauli_word="Z", wires=0)
+            qp.PPR_4(1, pauli_word="X", wires=0)
+            qp.PPR_4(1, pauli_word="Z", wires=0)
 
             # equivalent to a CNOT gate
-            qp.PPR(4, pauli_word="ZX", wires=[0, 1])
-            qp.PPR(-4, pauli_word="Z", wires=0)
-            qp.PPR(-4, pauli_word="X", wires=1)
+            qp.PPR_4(1, pauli_word="ZX", wires=[0, 1])
+            qp.PPR_4(-1, pauli_word="Z", wires=0)
+            qp.PPR_4(-1, pauli_word="X", wires=1)
 
             # equivalent to a T gate
-            qp.PPR(8, pauli_word="Z", wires=0)
+            qp.PPR_8(1, pauli_word="Z", wires=0)
 
             return qp.expval(qp.Z(0))
 
@@ -1104,9 +1152,8 @@ def commute_ppr_setup_inputs(max_pauli_size=0):
     - expval(PauliZ): 1
     Depth: Not computed
 
-    In the example above, the Clifford PPRs (:class:`~.PPR` instances with an angle denominator
-    of :math:`\pm 4`) will be commuted past the non-Clifford PPR (:class:`~.PPR`
-    instances with an angle denominator :math:`\pm 8`). In the above output,
+    In the example above, the Clifford PPRs (:class:`~.PPR_4` instances) will be commuted past the
+    non-Clifford PPR (:class:`~.PPR_8` instance). In the above output,
     ``PPR-theta-w<int>`` denotes the type of PPR present in the circuit, where ``theta`` is the PPR
     angle (:math:`\theta`) and ``w<int>`` denotes the PPR weight (the number of qubits it acts on,
     or the length of the Pauli word).
@@ -1174,8 +1221,8 @@ def merge_ppr_ppm_setup_inputs(max_pauli_size=0):
         @qp.transforms.to_ppr
         @qp.qnode(qp.device("lightning.qubit", wires=2))
         def circuit():
-            qp.PPR(4, pauli_word="Z", wires=0)
-            qp.PPR(4, pauli_word="X", wires=1)
+            qp.PPR_4(1, pauli_word="Z", wires=0)
+            qp.PPR_4(1, pauli_word="X", wires=1)
 
             ppm = qp.pauli_measure(pauli_word="ZX", wires=[0, 1])
 
@@ -1274,17 +1321,17 @@ def ppr_to_ppm_setup_inputs(decompose_method="pauli-corrected", avoid_y_measure=
         @qp.qnode(qp.device("null.qubit", wires=2))
         def circuit():
             # equivalent to a Hadamard gate
-            qp.PPR(4, pauli_word="Z", wires=0)
-            qp.PPR(4, pauli_word="X", wires=0)
-            qp.PPR(4, pauli_word="Z", wires=0)
+            qp.PPR_4(1, pauli_word="Z", wires=0)
+            qp.PPR_4(1, pauli_word="X", wires=0)
+            qp.PPR_4(1, pauli_word="Z", wires=0)
 
             # equivalent to a CNOT gate
-            qp.PPR(4, pauli_word="ZX", wires=[0, 1])
-            qp.PPR(-4, pauli_word="Z", wires=[0])
-            qp.PPR(-4, pauli_word="X", wires=[1])
+            qp.PPR_4(1, pauli_word="ZX", wires=[0, 1])
+            qp.PPR_4(-1, pauli_word="Z", wires=[0])
+            qp.PPR_4(-1, pauli_word="X", wires=[1])
 
             # equivalent to a T gate
-            qp.PPR(8, pauli_word="Z", wires=0)
+            qp.PPR_8(1, pauli_word="Z", wires=0)
 
             return qp.expval(qp.Z(0))
 
@@ -1494,11 +1541,11 @@ def reduce_t_depth_setup_inputs():
         @qp.transforms.to_ppr
         @qp.qnode(qp.device("null.qubit", wires=4))
         def circuit():
-            qp.PPR(8, pauli_word="Z", wires=1)
-            qp.PPR(-8, pauli_word="XYZ", wires=[0, 2, 3])
-            qp.PPR(-4, pauli_word="XYZY", wires=[0, 1, 2, 3])
-            qp.PPR(8, pauli_word="XZX", wires=[0, 1, 3])
-            qp.PPR(-8, pauli_word="XZY", wires=[0, 1, 2])
+            qp.PPR_8(1, pauli_word="Z", wires=1)
+            qp.PPR_8(-1, pauli_word="XYZ", wires=[0, 2, 3])
+            qp.PPR_4(-1, pauli_word="XYZY", wires=[0, 1, 2, 3])
+            qp.PPR_8(1, pauli_word="XZX", wires=[0, 1, 3])
+            qp.PPR_8(-1, pauli_word="XZY", wires=[0, 1, 2])
 
             return qp.expval(qp.Z(0))
 

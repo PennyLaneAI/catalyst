@@ -15,6 +15,8 @@
 This submodule defines utilities for device preprocessing for from_plxpr.
 """
 
+import copy
+
 # pylint: disable=too-many-arguments, too-many-positional-arguments
 import warnings
 
@@ -35,9 +37,11 @@ from catalyst.device.decomposition import (
 
 # pylint: disable=protected-access
 from catalyst.device.qjit_device import (
+    RUNTIME_OPERATIONS,
     _load_device_capabilities,
     filter_device_capabilities_with_shots,
     get_qjit_device_capabilities,
+    intersect_operations,
 )
 from catalyst.device.verification import (
     validate_measurements,
@@ -63,7 +67,7 @@ def create_device_preprocessing_pipeline(
     device: qp.devices.Device, execution_config: ExecutionConfig, shots: int, warn: bool = True
 ) -> list[BoundTransform]:
     """Create a pipeline of device preprocessing transforms for lowering QNodes."""
-    shots_present = qp.math.is_abstract(shots) or shots != 0
+    shots_present = qp.math.is_tracer(shots) or shots != 0
     raw_capabilities: DeviceCapabilities = get_qjit_device_capabilities(
         _load_device_capabilities(device)
     )
@@ -137,7 +141,7 @@ def _mcm_preprocessing(
         )
 
     if mcm_config.mcm_method == MCM_METHOD.ONE_SHOT:
-        shots_present = qp.math.is_abstract(shots) or shots != 0
+        shots_present = qp.math.is_tracer(shots) or shots != 0
         if not shots_present:
             raise CompileError("Cannot use mcm_method='one-shot' with analytic mode.")
         pipeline.append(
@@ -266,7 +270,7 @@ def _gradient_preprocessing(
             )
         )
     if execution_config.gradient_method == "adjoint":
-        shots_present = qp.math.is_abstract(shots) or shots != 0
+        shots_present = qp.math.is_tracer(shots) or shots != 0
         if shots_present:
             raise CompileError("Cannot use diff_method='adjoint' with finite shots.")
         # qjit_device should technically be an instance of QJITDevice,
@@ -299,7 +303,15 @@ def _gateset_preprocessing(
     """Insert a `graph-decomposition` pass targetting the gateset
     specified by the specific `device`
     """
-    gate_set = capabilities.gate_set()
+
+    copied_capabilities = copy.deepcopy(capabilities)
+
+    # Intersection of gates and observables supported by the device and by Catalyst runtime.
+    copied_capabilities.operations = intersect_operations(
+        capabilities.operations, RUNTIME_OPERATIONS
+    )
+
+    gate_set = copied_capabilities.gate_set()
 
     # Get the default args/kwargs with the above gate_set
     targs, tkwargs = graph_decomposition_setup_inputs(gate_set=gate_set)

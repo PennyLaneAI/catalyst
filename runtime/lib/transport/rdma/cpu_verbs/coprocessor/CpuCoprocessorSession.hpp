@@ -21,7 +21,7 @@
 #include <stop_token>
 #include <thread>
 
-#include "CpuSessionBase.hpp"
+#include "VerbsSessionBase.hpp"
 
 namespace catalyst::transport::cpu_verbs {
 
@@ -29,11 +29,12 @@ namespace catalyst::transport::cpu_verbs {
 // the result. The function is bound via set_coprocessor_fn; nullptr selects the
 // built-in echo. Each message's decoder_id is handed to the function, which may
 // serve several codes and dispatch on it, or ignore it if it serves only one.
-class CpuCoprocessorSession : public CpuSessionBase<CoprocessorSession> {
-    using Base = CpuSessionBase<CoprocessorSession>;
+class CpuCoprocessorSession : public common::VerbsSessionBase<CoprocessorSession> {
+    using Base = common::VerbsSessionBase<CoprocessorSession>;
 
   public:
-    explicit CpuCoprocessorSession(std::string dev, int gid_idx) : Base(std::move(dev), gid_idx) {}
+    explicit CpuCoprocessorSession(std::string dev, int gid_idx)
+        : Base(std::move(dev), gid_idx, "cpu_verbs") {}
     ~CpuCoprocessorSession() override { stop(); }
 
     void start() override;

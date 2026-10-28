@@ -864,3 +864,230 @@ func.func @adjoint_integer_tensor_param(%arg0: !quantum.reg) -> !quantum.reg {
   }
   return %out : !quantum.reg
 }
+
+// -----
+
+// Repeated calls to the same function in an adjoint region share one adjoint function.
+
+func.func private @rotate(%q: !quantum.bit, %x: f64) -> !quantum.bit {
+  %out = quantum.custom "RX"(%x) %q : !quantum.bit
+  return %out : !quantum.bit
+}
+
+// CHECK:       func.func private @rotate.adjoint(
+// CHECK-NOT:   func.func private @rotate.adjoint(
+// CHECK-LABEL: func.func @repeated_call
+// CHECK-SAME:  ([[Q:%.+]]: !quantum.bit, [[X:%.+]]: f64, [[Y:%.+]]: f64)
+// CHECK:       [[Q1:%.+]] = call @rotate.adjoint([[Q]], [[Y]])
+// CHECK:       [[Q2:%.+]] = call @rotate.adjoint([[Q1]], [[X]])
+// CHECK:       return [[Q2]]
+func.func @repeated_call(%q: !quantum.bit, %x: f64, %y: f64) -> !quantum.bit {
+  %out = quantum.adjoint(%q) : !quantum.bit {
+  ^bb0(%arg0: !quantum.bit):
+    %q1 = func.call @rotate(%arg0, %x) : (!quantum.bit, f64) -> !quantum.bit
+    %q2 = func.call @rotate(%q1, %y) : (!quantum.bit, f64) -> !quantum.bit
+    quantum.yield %q2 : !quantum.bit
+  }
+  return %out : !quantum.bit
+}
+
+// -----
+
+// Resource hints on SCF ops must survive adjoint-lowering recreation.
+
+// CHECK-LABEL: @adjoint_preserves_scf_hints
+func.func public @adjoint_preserves_scf_hints(%cond: i1, %stop: index, %idx: index) {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %0 = quantum.alloc( 1) : !quantum.reg
+  %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+
+  // CHECK-NOT: quantum.adjoint
+  // CHECK-DAG: catalyst.estimated_iterations = 1.000000e+01 : f64
+  // CHECK-DAG: catalyst.estimated_iterations = 2.500000e+00 : f64
+  // CHECK-DAG: catalyst.estimated_probability = 7.500000e-01 : f64
+  // CHECK-DAG: catalyst.estimated_probabilities = [2.000000e-01, 3.000000e-01]
+  %2 = quantum.adjoint(%1) : !quantum.bit {
+  ^bb0(%arg0: !quantum.bit):
+    %for_out = scf.for %i = %c0 to %stop step %c1 iter_args(%qi = %arg0) -> !quantum.bit {
+      %h = quantum.custom "Hadamard"() %qi : !quantum.bit
+      scf.yield %h : !quantum.bit
+    } {catalyst.estimated_iterations = 1.000000e+01 : f64}
+    %while_out = scf.while (%qi = %for_out) : (!quantum.bit) -> !quantum.bit {
+      scf.condition(%cond) %qi : !quantum.bit
+    } do {
+    ^bb1(%q2: !quantum.bit):
+      %x = quantum.custom "PauliX"() %q2 : !quantum.bit
+      scf.yield %x : !quantum.bit
+    } attributes {catalyst.estimated_iterations = 2.500000e+00 : f64}
+    %if_out = scf.if %cond -> !quantum.bit {
+      %y = quantum.custom "PauliY"() %while_out : !quantum.bit
+      scf.yield %y : !quantum.bit
+    } else {
+      scf.yield %while_out : !quantum.bit
+    } {catalyst.estimated_probability = 7.500000e-01 : f64}
+    %sw = scf.index_switch %idx {catalyst.estimated_probabilities = [2.000000e-01, 3.000000e-01]} -> !quantum.bit
+    case 0 {
+      %z = quantum.custom "PauliZ"() %if_out : !quantum.bit
+      scf.yield %z : !quantum.bit
+    }
+    case 1 {
+      scf.yield %if_out : !quantum.bit
+    }
+    default {
+      scf.yield %if_out : !quantum.bit
+    }
+    quantum.yield %sw : !quantum.bit
+  }
+
+  %3 = quantum.insert %0[ 0], %2 : !quantum.reg, !quantum.bit
+  quantum.dealloc %3 : !quantum.reg
+  return
+}
+
+// -----
+
+// Every QuantumGate implementation must replay controls computed inside the reversed loop,
+// including gates with no ordinary parameters.
+// CHECK-LABEL: @adjoint_dynamic_controls
+func.func @adjoint_dynamic_controls(%target: !quantum.bit, %control: !quantum.bit,
+                                   %theta: f64, %matrix: tensor<2x2xcomplex<f64>>)
+    -> (!quantum.bit, !quantum.bit) {
+  %zero = arith.constant 0 : index
+  %one = arith.constant 1 : index
+  %two = arith.constant 2 : index
+  %out:2 = quantum.adjoint(%target, %control) : !quantum.bit, !quantum.bit {
+  ^bb0(%t: !quantum.bit, %c: !quantum.bit):
+    // CHECK: [[controls:%.+]] = catalyst.list_init : <i1>
+    // CHECK: scf.for
+    // CHECK: [[cv:%.+]] = arith.cmpi eq,
+    // CHECK-COUNT-8: catalyst.list_push [[cv]], [[controls]] : <i1>
+    // CHECK: scf.for
+    // CHECK: [[cv7:%.+]] = catalyst.list_pop [[controls]] : <i1>
+    // CHECK: quantum.gphase({{%.+}}) adj ctrls({{%.+}}) ctrlvals([[cv7]])
+    // CHECK: [[cv6:%.+]] = catalyst.list_pop [[controls]] : <i1>
+    // CHECK: quantum.unitary({{%.+}} : tensor<2x2xcomplex<f64>>) {{%.+}} adj ctrls({{%.+}}) ctrlvals([[cv6]])
+    // CHECK: [[cv5:%.+]] = catalyst.list_pop [[controls]] : <i1>
+    // CHECK: quantum.pcphase({{%.+}}, dim : 1) {{%.+}} adj ctrls({{%.+}}) ctrlvals([[cv5]])
+    // CHECK: [[cv4:%.+]] = catalyst.list_pop [[controls]] : <i1>
+    // CHECK: quantum.multirz({{%.+}}) {{%.+}} adj ctrls({{%.+}}) ctrlvals([[cv4]])
+    // CHECK: [[cv3:%.+]] = catalyst.list_pop [[controls]] : <i1>
+    // CHECK: quantum.paulirot ["Z"]({{%.+}}) {{%.+}} adj ctrls({{%.+}}) ctrlvals([[cv3]])
+    // CHECK: [[cv2:%.+]] = catalyst.list_pop [[controls]] : <i1>
+    // CHECK: quantum.operator "Probe"({{%.+}}: f64) adj qubits({{%.+}})
+    // CHECK: ctrls({{%.+}}) ctrl_vals([[cv2]])
+    // CHECK: [[cv1:%.+]] = catalyst.list_pop [[controls]] : <i1>
+    // CHECK: quantum.custom "PauliX"() {{%.+}} adj ctrls({{%.+}}) ctrlvals([[cv1]])
+    // CHECK: [[cv0:%.+]] = catalyst.list_pop [[controls]] : <i1>
+    // CHECK: quantum.custom "RX"({{%.+}}) {{%.+}} adj ctrls({{%.+}}) ctrlvals([[cv0]])
+    %loop:2 = scf.for %i = %zero to %two step %one
+        iter_args(%qt = %t, %qc = %c) -> (!quantum.bit, !quantum.bit) {
+      %cv = arith.cmpi eq, %i, %zero : index
+      %g0:2 = quantum.custom "RX"(%theta) %qt ctrls(%qc) ctrlvals(%cv) : !quantum.bit ctrls !quantum.bit
+      %g1:2 = quantum.custom "PauliX"() %g0#0 ctrls(%g0#1) ctrlvals(%cv) : !quantum.bit ctrls !quantum.bit
+      %g2:2 = quantum.operator "Probe"(%theta: f64) qubits(%g1#0) ctrls(%g1#1) ctrl_vals(%cv)
+      %g3:2 = quantum.paulirot ["Z"](%theta) %g2#0 ctrls(%g2#1) ctrlvals(%cv) : !quantum.bit ctrls !quantum.bit
+      %g4:2 = quantum.multirz(%theta) %g3#0 ctrls(%g3#1) ctrlvals(%cv) : !quantum.bit ctrls !quantum.bit
+      %g5:2 = quantum.pcphase(%theta, dim : 1) %g4#0 ctrls(%g4#1) ctrlvals(%cv) : !quantum.bit ctrls !quantum.bit
+      %g6:2 = quantum.unitary(%matrix : tensor<2x2xcomplex<f64>>) %g5#0 ctrls(%g5#1) ctrlvals(%cv) : !quantum.bit ctrls !quantum.bit
+      %g7 = quantum.gphase(%theta) ctrls(%g6#1) ctrlvals(%cv) : ctrls !quantum.bit
+      scf.yield %g6#0, %g7 : !quantum.bit, !quantum.bit
+    }
+    quantum.yield %loop#0, %loop#1 : !quantum.bit, !quantum.bit
+  }
+  // CHECK: catalyst.list_dealloc [[controls]] : <i1>
+  return %out#0, %out#1 : !quantum.bit, !quantum.bit
+}
+
+// -----
+
+// Parameters and control values use independent typed stacks.
+// External and constant controls must remain in their original positions without being cached.
+// CHECK-LABEL: @adjoint_mixed_controls
+// CHECK-SAME: [[external:%[^:, ]+]]: i1)
+func.func @adjoint_mixed_controls(%qreg: !quantum.reg, %external: i1) -> !quantum.reg {
+  %zero = arith.constant 0 : index
+  %one = arith.constant 1 : index
+  %two = arith.constant 2 : index
+  // CHECK: [[true:%.+]] = arith.constant true
+  %true = arith.constant true
+  %out = quantum.adjoint(%qreg) : !quantum.reg {
+  ^bb0(%r: !quantum.reg):
+    // CHECK: [[params:%.+]] = catalyst.list_init : <f64>
+    // CHECK: [[integers:%.+]] = catalyst.list_init : <i64>
+    // CHECK: [[controls:%.+]] = catalyst.list_init : <i1>
+    // CHECK: scf.for
+    // CHECK: [[forward:%.+]] = arith.index_cast
+    // CHECK: [[theta:%.+]] = arith.sitofp [[forward]] : i64 to f64
+    // CHECK: [[first:%.+]] = arith.cmpi eq,
+    // CHECK: [[last:%.+]] = arith.cmpi ne,
+    // CHECK: catalyst.list_push [[theta]], [[params]] : <f64>
+    // CHECK: catalyst.list_push [[forward]], [[integers]] : <i64>
+    // CHECK: catalyst.list_push [[first]], [[controls]] : <i1>
+    // CHECK: catalyst.list_push [[last]], [[controls]] : <i1>
+    // CHECK-NOT: catalyst.list_push {{%.+}}, [[controls]]
+    // CHECK: scf.for
+    // CHECK: [[last:%.+]] = catalyst.list_pop [[controls]] : <i1>
+    // CHECK: [[first:%.+]] = catalyst.list_pop [[controls]] : <i1>
+    // CHECK: [[forward:%.+]] = catalyst.list_pop [[integers]] : <i64>
+    // CHECK: [[theta:%.+]] = catalyst.list_pop [[params]] : <f64>
+    // CHECK-NOT: catalyst.list_pop
+    // CHECK: quantum.operator "Probe"([[theta]]: f64) adj qubits({{%.+}})
+    // CHECK: UID(1) forward([[forward]]: i64)
+    // CHECK: ctrls({{%.+}}) ctrl_vals([[first]], [[external]], [[last]], [[true]])
+    %loop = scf.for %i = %zero to %two step %one iter_args(%reg = %r) -> (!quantum.reg) {
+      %forward = arith.index_cast %i : index to i64
+      %theta = arith.sitofp %forward : i64 to f64
+      %first = arith.cmpi eq, %i, %zero : index
+      %last = arith.cmpi ne, %i, %zero : index
+      %target = quantum.extract %reg[0] : !quantum.reg -> !quantum.bit
+      %c0 = quantum.extract %reg[1] : !quantum.reg -> !quantum.bit
+      %c1 = quantum.extract %reg[2] : !quantum.reg -> !quantum.bit
+      %c2 = quantum.extract %reg[3] : !quantum.reg -> !quantum.bit
+      %c3 = quantum.extract %reg[4] : !quantum.reg -> !quantum.bit
+      %gate:5 = quantum.operator "Probe"(%theta: f64) qubits(%target)
+          UID(1) forward(%forward: i64)
+          ctrls(%c0, %c1, %c2, %c3) ctrl_vals(%first, %external, %last, %true)
+      %r0 = quantum.insert %reg[0], %gate#0 : !quantum.reg, !quantum.bit
+      %r1 = quantum.insert %r0[1], %gate#1 : !quantum.reg, !quantum.bit
+      %r2 = quantum.insert %r1[2], %gate#2 : !quantum.reg, !quantum.bit
+      %r3 = quantum.insert %r2[3], %gate#3 : !quantum.reg, !quantum.bit
+      %r4 = quantum.insert %r3[4], %gate#4 : !quantum.reg, !quantum.bit
+      scf.yield %r4 : !quantum.reg
+    }
+    quantum.yield %loop : !quantum.reg
+  }
+  return %out : !quantum.reg
+}
+
+// -----
+
+// Controls defined outside the adjoint or at its immediate top level remain visible to the
+// reverse pass. Reuse them without pushing or popping the control-value stack.
+// CHECK-LABEL: @adjoint_available_controls
+// CHECK-SAME: [[external:%[^:, ]+]]: i1,
+func.func @adjoint_available_controls(%target: !quantum.bit, %c0: !quantum.bit,
+                                     %c1: !quantum.bit, %c2: !quantum.bit,
+                                     %external: i1, %n: index)
+    -> (!quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit) {
+  %zero = arith.constant 0 : index
+  // CHECK: [[true:%.+]] = arith.constant true
+  %true = arith.constant true
+  %out:4 = quantum.adjoint(%target, %c0, %c1, %c2)
+      : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit {
+  ^bb0(%t: !quantum.bit, %a: !quantum.bit, %b: !quantum.bit, %c: !quantum.bit):
+    // CHECK: [[controls:%.+]] = catalyst.list_init : <i1>
+    // CHECK-NOT: catalyst.list_push
+    // CHECK: [[local:%.+]] = arith.cmpi sgt,
+    // CHECK-NOT: catalyst.list_pop
+    // CHECK: quantum.custom "PauliX"() {{%.+}} adj ctrls({{%.+}}) ctrlvals([[external]], [[local]], [[true]])
+    %local = arith.cmpi sgt, %n, %zero : index
+    %g:4 = quantum.custom "PauliX"() %t ctrls(%a, %b, %c)
+        ctrlvals(%external, %local, %true) : !quantum.bit ctrls !quantum.bit, !quantum.bit, !quantum.bit
+    quantum.yield %g#0, %g#1, %g#2, %g#3
+        : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
+  }
+  // CHECK: catalyst.list_dealloc [[controls]] : <i1>
+  return %out#0, %out#1, %out#2, %out#3
+      : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
+}
