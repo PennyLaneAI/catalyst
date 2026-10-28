@@ -514,7 +514,7 @@ class Compiler:
                 suffix = ".ll"
             case "llc" | "all":
                 suffix = ".o"
-            case _:
+            case _:  # pragma: no cover
                 assert False, "unknown compiler tool"
         output_filename = os.path.join(str(workspace), f"{module_name}{suffix}")
 
