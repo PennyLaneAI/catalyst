@@ -45,7 +45,7 @@ from catalyst.backline import (
     settle_executors,
 )
 from catalyst.compiled_functions import CompilationCache, CompiledFunction
-from catalyst.compiler import CompileOptions, Compiler, canonicalize, to_llvm_opt, to_mlir_opt
+from catalyst.compiler import CompileOptions, Compiler, canonicalize, to_llvm, to_mlir_opt
 from catalyst.debug.instruments import instrument
 from catalyst.from_plxpr import trace_from_pennylane
 from catalyst.jax_tracer import lower_jaxpr_to_mlir, trace_to_jaxpr
@@ -127,12 +127,14 @@ def qjit(
         autograph_include: A list of (sub)modules to be allow-listed for autograph conversion.
         async_qnodes (bool): Experimental support for automatically executing
             QNodes asynchronously, if supported by the device runtime.
-        target (str): The compilation target.
+        target (str): The ahead-of-time compilation target.
 
             - ``"jaxpr"``: The function is traced to a JAXPR.
             - ``"mlir"``: The function is lowered to MLIR, without running the MLIR passes.
             - ``"mlir_opt"``: The MLIR passes are run, without translating the result to LLVM IR.
-            - ``"llvmir"``: The function is compiled to LLVM IR and object code, without linking.
+            - ``"llvmir"``: The function is lowered and translated to LLVM IR.
+            - ``"llvmir_opt"``: The LLVM passes are run, without generating object code.
+            - ``"object"``: The function is compiled to object code, without linking.
             - ``"binary"`` (default): The function is compiled to a shared library.
 
             Regardless of the target, the function is compiled to a shared library when it is
@@ -148,7 +150,7 @@ def qjit(
             - :attr:`~.QJIT.jaxpr`: JAX program representation
             - :attr:`~.QJIT.mlir`: MLIR representation after canonicalization
             - :attr:`~.QJIT.mlir_opt`: MLIR representation after optimization
-            - :attr:`~.QJIT.llvmir`: LLVM IR representation
+            - :attr:`~.QJIT.llvmir`: LLVM IR after translation from MLIR, before LLVM optimization
         use_nameloc (bool): If ``True``, function parameter names are added to the IR as name
             locations.
         verbose (bool): If ``True``, the tools and flags used by Catalyst behind the scenes are
@@ -589,7 +591,6 @@ class QJIT(CatalystCallable):
         # ``(jaxpr, placement)`` once searched; see ``_placement``.
         self._placement_cache = None
         self.mlir_module = None
-        self.llvm_ir = None
         self.out_type = None
         self.overwrite_ir = None
         self.use_cwd_for_workspace = self.compile_options.keep_intermediate
@@ -714,6 +715,15 @@ class QJIT(CatalystCallable):
             workspace=self.workspace,
         )
 
+    @property
+    def llvmir(self):
+        """LLVM IR after MLIR lowering and translation, before LLVM optimization."""
+        if not self.mlir_module:
+            return None
+
+        _mlir = str(self.mlir_module)
+        return to_llvm(stdin=_mlir, options=self.compile_options)
+
     @debug_logger
     def __call__(self, *args, **kwargs):
         # Transparantly call Python function in case of nested QJIT calls.
@@ -751,35 +761,24 @@ class QJIT(CatalystCallable):
 
         self.workspace = self._get_workspace()
 
-        # TODO: awkward, refactor or redesign the target feature
-        if self.compile_options.target in ("jaxpr", "mlir", "mlir_opt", "llvmir", "binary"):
-            self.jaxpr, self.out_type, self.out_treedef, self.c_sig = self.capture(args, **kwargs)
+        target = self.compile_options.target
+        assert target in ("jaxpr", "mlir", "mlir_opt", "llvmir", "llvmir_opt", "object", "binary")
 
-        if self.compile_options.target in ("mlir", "mlir_opt", "llvmir", "binary"):
-            self._configure_backline()
-            self.mlir_module = self.generate_ir()
+        self.jaxpr, self.out_type, self.out_treedef, self.c_sig = self.capture(args, **kwargs)
+        if target == "jaxpr":
+            return
 
-        if self.compile_options.target in ("mlir_opt", "llvmir", "binary"):
-            with _target_compile_options(self.compile_options):
-                self.compiled_function, llvm_ir = self.compile()
-            # With target="mlir_opt", the IR returned by the compiler is MLIR instead of LLVM IR.
-            self.llvm_ir = None if self.compile_options.target == "mlir_opt" else llvm_ir
+        self._configure_backline()
+        self.mlir_module = self.generate_ir()
+        if target == "mlir":
+            return
 
-        if self.compile_options.target in ("binary",) and self.compile_options.link:
-            self.fn_cache.insert(self.compiled_function, args, self.out_treedef, self.workspace)
+        with _target_compile_options(self.compile_options):
+            self.compiled_function = self.compile()
+        if target != "binary":
+            return
 
-    @property
-    def llvmir(self):
-        """LLVMIR textual representation."""
-        if self.llvm_ir is not None:
-            return self.llvm_ir
-
-        if not self.mlir_module:
-            return None
-
-        _mlir = str(self.mlir_module)
-        self.llvm_ir = to_llvm_opt(stdin=_mlir, options=self.compile_options)
-        return self.llvm_ir
+        self.fn_cache.insert(self.compiled_function, args, self.out_treedef, self.workspace)
 
     @debug_logger
     def jit_compile(self, args, **kwargs):
@@ -793,7 +792,7 @@ class QJIT(CatalystCallable):
                   function
         """
         opts = self.compile_options
-        assert opts.lower_to_llvm and opts.link, "invalid options for jit_compile"
+        assert opts.compiler_tool == "all" and opts.link, "invalid options for jit_compile"
 
         cached_fn, requires_promotion = self.fn_cache.lookup(args)
 
@@ -815,7 +814,7 @@ class QJIT(CatalystCallable):
 
             self._configure_backline()
             self.mlir_module = self.generate_ir()
-            self.compiled_function, self.llvm_ir = self.compile()
+            self.compiled_function = self.compile()
 
             self.fn_cache.insert(self.compiled_function, args, self.out_treedef, self.workspace)
 
@@ -960,10 +959,10 @@ class QJIT(CatalystCallable):
     @instrument(has_finegrained=True)
     @debug_logger
     def compile(self):
-        """Compile an MLIR module to LLVMIR and shared library code.
+        """Compile the MLIR module into a shared library.
 
         Returns:
-            Tuple[CompiledFunction, str]: the compilation result and LLVMIR
+            CompiledFunction|None: The compiled user function, or nothing on partial compilation.
         """
         # WARNING: assumption is that the first function is the entry point to the compiled program.
         entry_point_func = self.mlir_module.body.operations[0]
@@ -981,21 +980,21 @@ class QJIT(CatalystCallable):
         # `replace` method, so we need to get a regular Python string out of it.
         func_name = str(self.mlir_module.body.operations[0].name).replace('"', "")
         if self.overwrite_ir:
-            shared_object, llvm_ir = self.compiler.run_from_ir(
+            output_file = self.compiler.run_from_ir(
                 self.overwrite_ir,
                 str(self.mlir_module.operation.attributes["sym_name"]).replace('"', ""),
                 self.workspace,
             )
         else:
-            shared_object, llvm_ir = self.compiler.run(self.mlir_module, self.workspace)
+            output_file = self.compiler.run(self.mlir_module, self.workspace)
 
         if not self.compile_options.link:
-            return None, llvm_ir
+            return None
 
         compiled_fn = CompiledFunction(
-            shared_object, func_name, restype, self.out_type, self.compile_options
+            output_file, func_name, restype, self.out_type, self.compile_options
         )
-        return compiled_fn, llvm_ir
+        return compiled_fn
 
     @instrument(has_finegrained=True)
     @debug_logger
@@ -1192,7 +1191,7 @@ def _ensure_capture_mode(enable_capture: bool):
 
 @contextmanager
 def _target_compile_options(options: CompileOptions):
-    """Set the ``lower_to_llvm`` and ``link`` compile options for the compilation target, for the
+    """Set the ``compiler_tool`` and ``link`` compile options for the compilation target, for the
     duration of the context.
 
     The original values are restored on exit, since the function must still be compiled to a
@@ -1201,17 +1200,22 @@ def _target_compile_options(options: CompileOptions):
     Args:
         options (CompileOptions): The compile options to set for their target.
     """
-    original_values = options.lower_to_llvm, options.link
+    original_values = options.compiler_tool, options.link
 
-    if options.target == "mlir_opt":
-        options.lower_to_llvm, options.link = False, False
-    elif options.target == "llvmir":
-        options.lower_to_llvm, options.link = True, False
+    tools = {
+        "mlir_opt": "opt",
+        "llvmir": "opt-translate",
+        "llvmir_opt": "opt-translate-llvm",
+        "object": "all",
+        "binary": "all",
+    }
+    assert options.target in tools
+    options.compiler_tool, options.link = tools[options.target], options.target == "binary"
 
     try:
         yield
     finally:
-        options.lower_to_llvm, options.link = original_values
+        options.compiler_tool, options.link = original_values
 
 
 @Transform.generic_register
