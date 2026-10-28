@@ -45,7 +45,7 @@ from catalyst.backline import (
     settle_executors,
 )
 from catalyst.compiled_functions import CompilationCache, CompiledFunction
-from catalyst.compiler import CompileOptions, Compiler, canonicalize, to_llvm_opt, to_mlir_opt
+from catalyst.compiler import CompileOptions, Compiler, canonicalize, to_llvm, to_mlir_opt
 from catalyst.debug.instruments import instrument
 from catalyst.from_plxpr import trace_from_pennylane
 from catalyst.jax_tracer import lower_jaxpr_to_mlir, trace_to_jaxpr
@@ -150,7 +150,7 @@ def qjit(
             - :attr:`~.QJIT.jaxpr`: JAX program representation
             - :attr:`~.QJIT.mlir`: MLIR representation after canonicalization
             - :attr:`~.QJIT.mlir_opt`: MLIR representation after optimization
-            - :attr:`~.QJIT.llvmir`: LLVM IR representation
+            - :attr:`~.QJIT.llvmir`: LLVM IR after translation from MLIR, before LLVM optimization
         use_nameloc (bool): If ``True``, function parameter names are added to the IR as name
             locations.
         verbose (bool): If ``True``, the tools and flags used by Catalyst behind the scenes are
@@ -715,6 +715,15 @@ class QJIT(CatalystCallable):
             workspace=self.workspace,
         )
 
+    @property
+    def llvmir(self):
+        """LLVM IR after MLIR lowering and translation, before LLVM optimization."""
+        if not self.mlir_module:
+            return None
+
+        _mlir = str(self.mlir_module)
+        return to_llvm(stdin=_mlir, options=self.compile_options)
+
     @debug_logger
     def __call__(self, *args, **kwargs):
         # Transparantly call Python function in case of nested QJIT calls.
@@ -770,15 +779,6 @@ class QJIT(CatalystCallable):
             return
 
         self.fn_cache.insert(self.compiled_function, args, self.out_treedef, self.workspace)
-
-    @property
-    def llvmir(self):
-        """LLVMIR textual representation."""
-        if not self.mlir_module:
-            return None
-
-        _mlir = str(self.mlir_module)
-        return to_llvm_opt(stdin=_mlir, options=self.compile_options)
 
     @debug_logger
     def jit_compile(self, args, **kwargs):
