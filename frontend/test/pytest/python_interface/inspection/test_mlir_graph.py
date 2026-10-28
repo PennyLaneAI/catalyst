@@ -64,11 +64,24 @@ class TestMLIRGraph:
         with pytest.raises(TypeError, match="Cannot generate MLIR module"):
             gen()
 
-    @pytest.mark.parametrize("skip_preprocess", [True, pytest.mark.xfail(False)])
+    @pytest.mark.parametrize(
+        "capture_mode, skip_preprocess",
+        [
+            pytest.param(True, True, marks=pytest.mark.capture),
+            pytest.param(
+                True,
+                False,
+                marks=[
+                    pytest.mark.capture,
+                    pytest.mark.xfail(reason="decompose does not work with mlir graph drawer"),
+                ],
+            ),
+            pytest.param(False, False, marks=pytest.mark.old_frontend),
+        ],
+        indirect=["capture_mode"],
+    )
     def test_no_transforms(self, tmp_path: Path, skip_preprocess, capture_mode):
         """Test the MLIR graph is still generated when no transforms are applied"""
-        if not capture_mode and skip_preprocess:
-            pytest.skip("skip_preprocess only used when program capture is enabled.")
 
         @qp.qjit(skip_preprocess=skip_preprocess, capture=capture_mode)
         @qp.qnode(qp.device("lightning.qubit", wires=3))
@@ -89,13 +102,23 @@ class TestMLIRGraph:
             assert len(collected_files) > 1
 
     @pytest.mark.parametrize(
-        "skip_preprocess",
-        [True, pytest.param(False, marks=pytest.mark.graph_todo)],
+        "capture_mode, skip_preprocess",
+        [
+            pytest.param(True, True, marks=pytest.mark.capture),
+            pytest.param(
+                True,
+                False,
+                marks=[
+                    pytest.mark.capture,
+                    pytest.mark.xfail(reason="decompose does not work with mlir graph drawer"),
+                ],
+            ),
+            pytest.param(False, False, marks=pytest.mark.old_frontend),
+        ],
+        indirect=["capture_mode"],
     )
     def test_xdsl_transforms_no_args(self, tmp_path: Path, skip_preprocess, capture_mode):
         """Test the MLIR graph generation with no arguments to the QNode with and without qjit"""
-        if not capture_mode and skip_preprocess:
-            pytest.skip("skip_preprocess only used when program capture is enabled.")
 
         @qp.qjit(skip_preprocess=skip_preprocess, capture=capture_mode)
         @merge_rotations_pass
@@ -123,13 +146,23 @@ class TestMLIRGraph:
             assert len(collected_files) > len(expected_user)
 
     @pytest.mark.parametrize(
-        "skip_preprocess",
-        [True, pytest.param(False, marks=pytest.mark.graph_todo)],
+        "capture_mode, skip_preprocess",
+        [
+            pytest.param(True, True, marks=pytest.mark.capture),
+            pytest.param(
+                True,
+                False,
+                marks=[
+                    pytest.mark.capture,
+                    pytest.mark.xfail(reason="decompose does not work with mlir graph drawer"),
+                ],
+            ),
+            pytest.param(False, False, marks=pytest.mark.old_frontend),
+        ],
+        indirect=["capture_mode"],
     )
     def test_xdsl_transforms_args(self, tmp_path: Path, skip_preprocess, capture_mode):
         """Test the MLIR graph generation with arguments to the QNode for xDSL transforms"""
-        if not capture_mode and skip_preprocess:
-            pytest.skip("skip_preprocess only used when program capture is enabled.")
 
         @qp.qjit(skip_preprocess=skip_preprocess, capture=capture_mode)
         @merge_rotations_pass
@@ -155,13 +188,23 @@ class TestMLIRGraph:
             assert len(collected_files) > len(expected_user)
 
     @pytest.mark.parametrize(
-        "skip_preprocess",
-        [True, pytest.param(False, marks=pytest.mark.graph_todo)],
+        "capture_mode, skip_preprocess",
+        [
+            pytest.param(True, True, marks=pytest.mark.capture),
+            pytest.param(
+                True,
+                False,
+                marks=[
+                    pytest.mark.capture,
+                    pytest.mark.xfail(reason="decompose does not work with mlir graph drawer"),
+                ],
+            ),
+            pytest.param(False, False, marks=pytest.mark.old_frontend),
+        ],
+        indirect=["capture_mode"],
     )
     def test_catalyst_transforms_args(self, tmp_path: Path, skip_preprocess, capture_mode):
         """Test the MLIR graph generation with arguments to the QNode for catalyst transforms"""
-        if not capture_mode and skip_preprocess:
-            pytest.skip("skip_preprocess only used when program capture is enabled.")
 
         @qp.qjit(skip_preprocess=skip_preprocess, capture=capture_mode)
         @qp.transforms.merge_rotations
@@ -187,14 +230,24 @@ class TestMLIRGraph:
             assert len(collected_files) > len(expected_user)
 
     @pytest.mark.parametrize(
-        "skip_preprocess",
-        [True, pytest.param(False, marks=pytest.mark.graph_todo)],
+        "capture_mode, skip_preprocess",
+        [
+            pytest.param(True, True, marks=pytest.mark.capture),
+            pytest.param(
+                True,
+                False,
+                marks=[
+                    pytest.mark.capture,
+                    pytest.mark.xfail(reason="decompose does not work with mlir graph drawer"),
+                ],
+            ),
+            pytest.param(False, False, marks=pytest.mark.old_frontend),
+        ],
+        indirect=["capture_mode"],
     )
     def test_catalyst_xdsl_transforms_args(self, tmp_path: Path, skip_preprocess, capture_mode):
         """Test the MLIR graph generation with arguments to the QNode for catalyst and xDSL
         transforms"""
-        if not capture_mode and skip_preprocess:
-            pytest.skip("skip_preprocess only used when program capture is enabled.")
 
         @qp.qjit(skip_preprocess=skip_preprocess, capture=capture_mode)
         @qp.transforms.merge_rotations
@@ -220,13 +273,23 @@ class TestMLIRGraph:
             assert len(collected_files) > len(expected_user)
 
     @pytest.mark.parametrize(
-        "skip_preprocess",
-        [True, pytest.param(False, marks=pytest.mark.graph_todo)],
+        "capture_mode, skip_preprocess",
+        [
+            pytest.param(True, True, marks=pytest.mark.capture),
+            pytest.param(
+                True,
+                False,
+                marks=[
+                    pytest.mark.capture,
+                    pytest.mark.xfail(reason="decompose does not work with mlir graph drawer"),
+                ],
+            ),
+            pytest.param(False, False, marks=pytest.mark.old_frontend),
+        ],
+        indirect=["capture_mode"],
     )
     def test_cond(self, tmp_path: Path, skip_preprocess, capture_mode):
         """Test the MLIR graph generation for a conditional"""
-        if not capture_mode and skip_preprocess:
-            pytest.skip("skip_preprocess only used when program capture is enabled.")
 
         @qp.qjit(skip_preprocess=skip_preprocess, capture=capture_mode)
         @merge_rotations_pass
@@ -263,13 +326,23 @@ class TestMLIRGraph:
             assert len(collected_files) > len(expected_user)
 
     @pytest.mark.parametrize(
-        "skip_preprocess",
-        [True, pytest.param(False, marks=pytest.mark.graph_todo)],
+        "capture_mode, skip_preprocess",
+        [
+            pytest.param(True, True, marks=pytest.mark.capture),
+            pytest.param(
+                True,
+                False,
+                marks=[
+                    pytest.mark.capture,
+                    pytest.mark.xfail(reason="decompose does not work with mlir graph drawer"),
+                ],
+            ),
+            pytest.param(False, False, marks=pytest.mark.old_frontend),
+        ],
+        indirect=["capture_mode"],
     )
     def test_cond_with_mcm(self, tmp_path: Path, skip_preprocess, capture_mode):
         """Test the MLIR graph generation for a conditional with MCM"""
-        if not capture_mode and skip_preprocess:
-            pytest.skip("skip_preprocess only used when program capture is enabled.")
 
         def true_fn(arg):
             qp.RX(arg, 0)
@@ -303,13 +376,23 @@ class TestMLIRGraph:
             assert len(collected_files) > len(expected_user)
 
     @pytest.mark.parametrize(
-        "skip_preprocess",
-        [True, pytest.param(False, marks=pytest.mark.graph_todo)],
+        "capture_mode, skip_preprocess",
+        [
+            pytest.param(True, True, marks=pytest.mark.capture),
+            pytest.param(
+                True,
+                False,
+                marks=[
+                    pytest.mark.capture,
+                    pytest.mark.xfail(reason="decompose does not work with mlir graph drawer"),
+                ],
+            ),
+            pytest.param(False, False, marks=pytest.mark.old_frontend),
+        ],
+        indirect=["capture_mode"],
     )
     def test_for_loop(self, tmp_path: Path, skip_preprocess, capture_mode):
         """Test the MLIR graph generation for a for loop"""
-        if not capture_mode and skip_preprocess:
-            pytest.skip("skip_preprocess only used when program capture is enabled.")
 
         @qp.qjit(skip_preprocess=skip_preprocess, capture=capture_mode)
         @merge_rotations_pass
@@ -338,13 +421,23 @@ class TestMLIRGraph:
             assert len(collected_files) > len(expected_user)
 
     @pytest.mark.parametrize(
-        "skip_preprocess",
-        [True, pytest.param(False, marks=pytest.mark.graph_todo)],
+        "capture_mode, skip_preprocess",
+        [
+            pytest.param(True, True, marks=pytest.mark.capture),
+            pytest.param(
+                True,
+                False,
+                marks=[
+                    pytest.mark.capture,
+                    pytest.mark.xfail(reason="decompose does not work with mlir graph drawer"),
+                ],
+            ),
+            pytest.param(False, False, marks=pytest.mark.old_frontend),
+        ],
+        indirect=["capture_mode"],
     )
     def test_while_loop(self, tmp_path: Path, skip_preprocess, capture_mode):
         """Test the MLIR graph generation for a while loop"""
-        if not capture_mode and skip_preprocess:
-            pytest.skip("skip_preprocess only used when program capture is enabled.")
 
         @qp.qjit(skip_preprocess=skip_preprocess, capture=capture_mode)
         @merge_rotations_pass
