@@ -534,11 +534,13 @@ llvm::LogicalResult catalyst::driver::verifyInputType(const CompilerOptions &opt
         CO_MSG(options, Verbosity::Urgent, "Wrong or unsupported input\n");
         return failure();
     }
-    if (options.loweringAction == Action::LLC && inType != InputType::LLVMIR) {
+    bool requiresLLVM =
+        options.loweringAction == Action::LLC || options.loweringAction == Action::LLVMOpt;
+    if (requiresLLVM && inType != InputType::LLVMIR) {
         CO_MSG(options, Verbosity::Urgent, "Expected LLVM IR input but received MLIR input.\n");
         return failure();
     }
-    if (options.loweringAction < Action::LLC && inType != InputType::MLIR) {
+    if (!requiresLLVM && options.loweringAction != Action::All && inType != InputType::MLIR) {
         CO_MSG(options, Verbosity::Urgent, "Expected MLIR input but received LLVM IR input.\n");
         return failure();
     }

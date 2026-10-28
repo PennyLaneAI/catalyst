@@ -163,6 +163,20 @@ class TestCompilerOptions:
 class TestCompilerDiagnostics:
     """Unit tests for diagnostics emitted by the Catalyst subprocess."""
 
+    def test_verbose_logging_preserves_ir(self, capsys):
+        """Verbose progress goes to stderr without contaminating the returned LLVM IR."""
+        tool = "opt-translate-llvm"
+        source = "func.func @foo() { return }"
+        quiet_ir = _catalyst(("--tool", tool), stdin=source)
+        verbose_ir = _catalyst(("--tool", tool), "--verbose", stdin=source, stderr_return=True)
+
+        assert "define void @foo" in quiet_ir
+        assert verbose_ir == quiet_ir
+        captured = capsys.readouterr()
+        assert captured.out == ""
+        assert "MLIR parsing successful" in captured.err
+        assert "Compilation successful:" in captured.err
+
     @pytest.mark.parametrize(
         "text,stdout,stderr",
         [

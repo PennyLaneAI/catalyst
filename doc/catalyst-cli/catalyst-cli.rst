@@ -5,30 +5,45 @@ Catalyst includes a standalone command-line tool, ``catalyst``, that
 compiles quantum programs written in our MLIR dialects into an object file,
 independent of the Catalyst Python frontend.
 
-This compiler tool combines three stages of compilation:
+This compiler tool combines four stages of compilation:
 
 #. ``quantum-opt``: Performs the MLIR-level optimizations, including quantum optimizations, and
    translates the input dialect to the `LLVM dialect <https://mlir.llvm.org/docs/Dialects/LLVM/>`_.
 #. ``mlir-translate``: Translates the input LLVM dialect into
    `LLVM IR <https://llvm.org/docs/LangRef.html>`_.
-#. ``llc``: Performs lower-level optimizations on the LLVM IR input and creates the object file.
+#. ``llvm-opt``: Performs lower-level optimization and compilation on the LLVM IR needed for certain
+   features.
+#. ``llc``: Runs LLVM backend code generation and creates the object file.
 
-The ``catalyst`` tool will run all three stages under the hood by default, but it also has the
+The ``catalyst`` tool will run all stages under the hood by default, but it also has the
 ability to run each stage individually. For example:
 
 .. code-block:: console
 
-    # Creates both the optimized IR and an object file
-    catalyst input.mlir -o output.o
+    # Run MLIR passes, returning LLVM-dialect MLIR
+    catalyst --tool=opt input.mlir > llvm-dialect.mlir
 
-    # Only performs MLIR optimizations and translates to LLVM dialect
-    catalyst --tool=opt input.mlir -o llvm-dialect.mlir
+    # Translate LLVM-dialect MLIR to LLVM IR
+    catalyst --tool=translate llvm-dialect.mlir > llvm-ir.ll
 
-    # Only lowers LLVM dialect input to LLVM IR
-    catalyst --tool=translate llvm-dialect.mlir -o llvm-ir.ll
+    # Run Catalyst's LLVM transformations
+    catalyst --tool=llvm-opt llvm-ir.ll > optimized.ll
 
-    # Only performs lower-level optimizations and creates object file (object.o)
-    catalyst --tool=llc llvm-ir.ll -o output.ll --module-name object
+    # Generate object.o from backend-ready LLVM IR
+    catalyst --tool=llc optimized.ll --module-name object
+
+Stages can be combined for a partial or full execution of the pipeline:
+
+.. code-block:: console
+
+    # Run MLIR passes and translation in one invocation, without LLVM transformations
+    catalyst --tool=opt-translate input.mlir > llvm-ir.ll
+
+    # Run through LLVM transformations in one invocation, without object generation
+    catalyst --tool=opt-translate-llvm input.mlir > optimized.ll
+
+    # Full compilation from mlir to object code
+    catalyst input.mlir
 
 .. note::
 
@@ -45,10 +60,10 @@ Usage
 
     catalyst [options] <input file>
 
-Calling ``catalyst`` without any options runs the three compilation stages (``quantum-opt``,
-``mlir-translate`` and ``llc``) using all default configurations, and outputs by default an object
-file named ``catalyst_module.o``. The name of the output file can be set by changing the output
-module name using the ``--module-name`` option (the default module name is ``catalyst_module``).
+Calling ``catalyst`` without any options runs the full compilation pipeline using all default
+configurations, and outputs by default an object file named ``catalyst_module.o``.
+The name of the output file can be set by changing the output module name using the
+``--module-name`` option.
 
 Command line options
 ^^^^^^^^^^^^^^^^^^^^
@@ -65,22 +80,28 @@ Show available command-line options and exit.
 ``--verbose``
 """""""""""""
 
-Emit verbose messages.
+Emit verbose progress messages to stderr.
 
 ``-o <filename>``
 """""""""""""""""
 
 Output IR filename. If no output filename is provided, the resulting IR is output to stdout.
 
-``--tool=<opt|translate|llc|all>``
-""""""""""""""""""""""""""""""""""
+``--tool=<opt|translate|llvm-opt|llc>``
+"""""""""""""""""""""""""""""""""""""""
 
-Select the tool to run individually. The default is ``all``.
+Select the tool to run individually. Each stage requires appropriate IR as input.
 
-* ``opt``: Run ``quantum-opt`` on the MLIR input.
-* ``translate``: Run ``mlir-translate`` on the LLVM dialect input.
-* ``llc``: Run ``llc`` on the LLVM IR input.
-* ``all``: Run all of ``opt``, ``translate`` and ``llc`` on the MLIR input.
+* ``opt``: Run MLIR passes on MLIR input.
+* ``translate``: Translate LLVM-dialect MLIR to LLVM IR.
+* ``llvm-opt``: Run Catalyst's applicable LLVM transformations on LLVM IR input.
+* ``llc``: Run backend code generation on backend-ready LLVM IR input.
+
+A combination of stages (starting from MLIR) can also be run. ``all`` is the default.
+
+* ``opt-translate``: Run ``opt`` and ``translate`` on MLIR input.
+* ``opt-translate-llvm``: Run ``opt``, ``translate``, and ``llvm-opt`` on MLIR input.
+* ``all``: Run all stages. LLVM IR input is also accepted, skipping the MLIR stages.
 
 ``--save-ir-after-each=<pass|pipeline|changed>``
 """""""""""""""""""""""""""""""""""""""""""""""

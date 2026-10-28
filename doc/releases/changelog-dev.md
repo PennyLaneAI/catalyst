@@ -824,6 +824,13 @@
   :class:`~pennylane.transforms.core.CompilePipeline` on individual QNodes instead.
   [(#3324)](https://github.com/PennyLaneAI/catalyst/pull/3324)
 
+* The Catalyst CLI now exposes LLVM transformations separately from object code generation, via
+  the `--tool=llvm-opt` option. Originally this was part of the same tool that is responsible
+  for object code generation (`--tool=llc`).
+  Combined "tools" are now also exposed via `--tool=opt-translate` and `--tool=opt-translate-llvm`
+  for compilation from MLIR to a stage before object code generation.
+  [(#3402)](https://github.com/PennyLaneAI/catalyst/pull/3402)
+
 * A Backline per-message coprocessor function (`CoprocessorFn`, `CatalystCoprocessorFn` in
   `TransportABI.h`) is now called with the message's payload, its length and its fn_id,
   `fn(payload, len, fn_id, out, out_cap, ctx)`, on every transport, instead of with the raw
@@ -897,6 +904,10 @@
 * Adjoint lowering now correctly handles gate control values computed inside loops or
   conditional branches.
   [(#3342)](https://github.com/PennyLaneAI/catalyst/pull/3342)
+
+* In the Catalyst CLI, verbose compiler messages are now written to stderr instead of stdout, so
+  `--verbose` no longer contaminates IR returned through stdout.
+  [(#3402)](https://github.com/PennyLaneAI/catalyst/pull/3402)
 
 * Ahead-of-time compilation with ``target="llvmir"`` no longer links the program into a shared
   library. Calling the function still compiles it to a shared library.

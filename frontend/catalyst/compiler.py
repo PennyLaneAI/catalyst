@@ -382,9 +382,6 @@ def _options_to_cli_flags(options):
     if options.checkpoint_stage:
         extra_args += [("--checkpoint-stage", options.checkpoint_stage)]
 
-    if not options.lower_to_llvm:
-        extra_args += [("--tool", "opt")]
-
     if options.keep_intermediate:
         extra_args += ["--keep-intermediate"]
 
@@ -408,14 +405,25 @@ def _options_to_cli_flags(options):
     return extra_args
 
 
-def to_llvmir(*args, stdin=None, options: Optional[CompileOptions] = None):
-    """echo ${input} | catalyst *args -"""
-    # These are the options that may affect compilation
-    if not options:
-        return _catalyst(*args, stdin=stdin)
+def to_llvm(*args, stdin=None, options: Optional[CompileOptions] = None):
+    """Return LLVM IR after MLIR lowering and translation, before LLVM transformations.
 
-    opts = _options_to_cli_flags(options)
-    return _catalyst(*opts, *args, stdin=stdin)
+    Runs one CLI invocation with ``--tool=opt-translate``. Final IR is returned
+    independently of ``keep_intermediate``; no object file is generated.
+    """
+    opts = _options_to_cli_flags(options) if options is not None else []
+    return _catalyst(("--tool", "opt-translate"), *opts, *args, stdin=stdin)
+
+
+def to_llvm_opt(*args, stdin=None, options: Optional[CompileOptions] = None):
+    """Return LLVM IR after lowering, translation, and Catalyst's LLVM transformations.
+
+    Runs one CLI invocation with ``--tool=opt-translate-llvm``, including the
+    applicable coroutine, O2, and Enzyme passes. No object file is generated.
+    Final IR is returned independently of ``keep_intermediate``.
+    """
+    opts = _options_to_cli_flags(options) if options is not None else []
+    return _catalyst(("--tool", "opt-translate-llvm"), *opts, *args, stdin=stdin)
 
 
 def to_mlir_opt(
@@ -464,6 +472,8 @@ class Compiler:
             cmd (str): The command to be executed.
         """
         opts = _options_to_cli_flags(self.options)
+        if not self.options.lower_to_llvm:
+            opts += [("--tool", "opt")]
         cmd = _get_catalyst_cli_cmd(
             ("-o", output_ir_name),
             ("--module-name", module_name),
