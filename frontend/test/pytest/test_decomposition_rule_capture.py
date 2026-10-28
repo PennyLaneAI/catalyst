@@ -15,14 +15,19 @@
 """Tests for trace-embedded decomposition-rule definitions."""
 
 import pennylane as qp
+import pytest
 from pennylane.testing import find_eqns
-from pennylane.typing import Wire
+from pennylane.typing import Float, Wire
 
 from catalyst import qjit
 from catalyst.decomposition.capture_session import OpDecompRequest
 from catalyst.decomposition.decomposition_rules import walk_reachable_decomp_rule_sets
 from catalyst.decomposition.modifier_state import ModifierState
 from catalyst.jax_primitives import decomp_definition_p, decomprule_p
+
+# MLIR prints the quotes inside a string attribute as `\22`.
+ZEROED = "{ctrl_work_wire_type = \\22zeroed\\22}"
+BORROWED = "{ctrl_work_wire_type = \\22borrowed\\22}"
 
 
 class RepeatedGate(qp.core.Operator2):
@@ -402,6 +407,197 @@ def test_same_base_modifier_transition_reopens_closure():
     targets = {target_spec.target_id for target_spec in target_specs}
     assert "Adjoint(TransitionGate){}{wires:1}{}" in targets
     assert "TransitionGate{}{wires:1}{}" in targets
+
+
+@pytest.mark.parametrize(
+    "ambient, expected",
+    [
+        (ModifierState(), ModifierState(False, 1, 1, "zeroed")),
+        (ModifierState(True, 2), ModifierState(True, 3, 1, "zeroed")),
+        (ModifierState(False, 2, 1, "zeroed"), ModifierState(False, 3, 2, "zeroed")),
+        (ModifierState(False, 2, 2, "borrowed"), ModifierState(False, 3, 3, "borrowed")),
+    ],
+)
+def test_request_composes_ambient_work_wires(ambient, expected):
+    """An operator's own control work wires add to the ambient ones and merge their types."""
+
+    op = qp.ctrl(RepeatedGate(Wire[1]), Wire[1], work_wires=Wire[1], work_wire_type="zeroed")
+    request = OpDecompRequest.from_operation(op, ambient)
+
+    assert request.base_id == "RepeatedGate{}{wires:1}{}"
+    assert request.modifier_state == expected
+
+
+def test_operator_work_wires_reach_captured_rules():
+    """The work wires of a controlled operator reach the rule discovered for it, and through it the
+    operators that rule produces.
+
+    ``C(PauliZ)`` with three controls decomposes into a ``MultiControlledX``, whose rules depend on
+    how many work wires it may use and whether they are zeroed.
+    """
+
+    @qjit(capture=True, target="mlir")
+    @qp.qnode(qp.device("null.qubit", wires=5))
+    def circuit():
+        qp.ctrl(qp.PauliZ(0), control=[1, 2, 3], work_wires=[4], work_wire_type="zeroed")
+        return qp.probs(wires=[0])
+
+    mlir = circuit.mlir
+
+    assert f'target_gate = "3C(PauliZ){{}}{{ctrl_work_wires:1,wires:1}}{ZEROED}"' in mlir
+    assert 'target_gate = "3C(PauliZ){}{wires:1}{}"' not in mlir
+
+    mcx_id = "MultiControlledX{control_values:[tensor<3xi1>]}{wires:4,work_wires:%d}"
+    assert mcx_id % 1 + "{work_wire_type = \\22zeroed\\22}" in mlir
+    assert mcx_id % 0 not in mlir
+
+
+def test_work_wire_variants_are_captured_independently():
+    """The same controls with and without work wires, or with work wires of another type, are
+    distinct graph nodes."""
+
+    @qp.register_resources({})
+    def empty_rule(wires):
+        del wires
+
+    with qp.decomposition.local_decomps():
+        qp.add_decomps(RepeatedGate, empty_rule)
+
+        @qjit(capture=True, target="mlir")
+        @qp.qnode(qp.device("null.qubit", wires=4))
+        def circuit():
+            qp.ctrl(RepeatedGate(0), control=[1, 2])
+            qp.ctrl(RepeatedGate(0), control=[1, 2], work_wires=[3])
+            qp.ctrl(RepeatedGate(0), control=[1, 2], work_wires=[3], work_wire_type="zeroed")
+            qp.ctrl(RepeatedGate(0), control=[1, 2], work_wires=[3], work_wire_type="zeroed")
+            return qp.state()
+
+        mlir = str(circuit.mlir_module)
+
+    work_wire_id = "2C(RepeatedGate){}{ctrl_work_wires:1,wires:1}"
+    assert mlir.count('target_gate = "2C(RepeatedGate){}{wires:1}{}"') == 1
+    assert mlir.count(f'target_gate = "{work_wire_id}{BORROWED}"') == 1
+    assert mlir.count(f'target_gate = "{work_wire_id}{ZEROED}"') == 1
+
+
+def test_region_work_wires_are_ambient():
+    """The work wires of a control region reach the operators inside it.
+
+    PennyLane's control transform does not record a work wire type, so they are borrowed.
+    """
+
+    @qp.register_resources({})
+    def empty_rule(wires):
+        del wires
+
+    with qp.decomposition.local_decomps():
+        qp.add_decomps(RepeatedGate, empty_rule)
+
+        @qjit(capture=True, target="mlir")
+        @qp.qnode(qp.device("null.qubit", wires=6))
+        def circuit():
+            def gate():
+                RepeatedGate(0)
+                qp.ctrl(RepeatedGate(0), control=4, work_wires=[5], work_wire_type="zeroed")
+
+            qp.ctrl(gate, control=[1, 2], work_wires=[3])()
+            return qp.state()
+
+        mlir = str(circuit.mlir_module)
+
+    assert f'target_gate = "2C(RepeatedGate){{}}{{ctrl_work_wires:1,wires:1}}{BORROWED}"' in mlir
+    assert f'target_gate = "3C(RepeatedGate){{}}{{ctrl_work_wires:2,wires:1}}{BORROWED}"' in mlir
+    assert 'target_gate = "2C(RepeatedGate){}{wires:1}{}"' not in mlir
+
+
+def test_distributed_control_carries_work_wires():
+    """A distributed control rule takes the work wires in its grouped wire operand, and its
+    resources keep the work wires of the target."""
+
+    class ContextRoot(qp.core.Operator2):
+        def __init__(self, wires):
+            super().__init__(wires=wires)
+
+    class ContextLeaf(qp.core.Operator2):
+        def __init__(self, wires):
+            super().__init__(wires=wires)
+
+    @qp.register_resources({ContextLeaf(wires=Wire[1]): 1})
+    def root_rule(wires):
+        ContextLeaf(wires)
+
+    @qp.register_resources({})
+    def leaf_rule(wires):
+        del wires
+
+    with qp.decomposition.local_decomps():
+        qp.add_decomps(ContextRoot, root_rule)
+        qp.add_decomps(ContextLeaf, leaf_rule)
+
+        @qjit(capture=True, target="mlir")
+        @qp.qnode(qp.device("null.qubit", wires=4))
+        def circuit():
+            qp.ctrl(ContextRoot(0), control=[1, 2], work_wires=[3], work_wire_type="zeroed")
+            return qp.state()
+
+        mlir = str(circuit.mlir_module)
+
+    root_id = f"2C(ContextRoot){{}}{{ctrl_work_wires:1,wires:1}}{ZEROED}"
+    leaf_id = f"2C(ContextLeaf){{}}{{ctrl_work_wires:1,wires:1}}{ZEROED}"
+    (root_rule_line,) = [line for line in mlir.splitlines() if f'target_gate = "{root_id}"' in line]
+
+    assert (
+        "(%arg0: !qref.reg<?>, %arg1: tensor<2xi64>, %arg2: tensor<2xi64>, "
+        "%arg3: tensor<2xi1>)" in root_rule_line
+    )
+    assert f'"{leaf_id}" = 1' in root_rule_line
+    assert f'target_gate = "{leaf_id}"' in mlir
+
+
+@pytest.mark.parametrize("work_wire_type", ["zeroed", "borrowed"])
+def test_registered_callable_captures_work_wire_operands(work_wire_type):
+    """Callable controls in registered rules keep work wires in the rule's JAXPR inputs."""
+    from pennylane.capture.primitives import ctrl_transform_prim
+
+    @qp.register_resources(
+        {
+            qp.ctrl(
+                qp.RX(Float, Wire[1]),
+                Wire[2],
+                work_wires=Wire[1],
+                work_wire_type=work_wire_type,
+            ): 1
+        }
+    )
+    def callable_ctrl_rule(base, control_wires, control_values, work_wires, work_wire_type):
+        qp.ctrl(
+            qp.RX,
+            control=control_wires,
+            control_values=control_values,
+            work_wires=work_wires,
+            work_wire_type=work_wire_type,
+        )(0.37, wires=base.wires)
+
+    with qp.decomposition.local_decomps():
+        qp.add_decomps("C(RepeatedGate)", callable_ctrl_rule)
+
+        @qjit(capture=True, target="mlir")
+        @qp.qnode(qp.device("null.qubit", wires=4))
+        def circuit():
+            qp.ctrl(RepeatedGate(0), [1, 2], work_wires=[3], work_wire_type=work_wire_type)
+            return qp.state()
+
+    kernel_jaxpr = circuit.jaxpr.eqns[0].params["call_jaxpr"]
+    (rule,) = [
+        eqn
+        for eqn in find_eqns(kernel_jaxpr, decomp_definition_p)
+        if eqn.params["frontend_name"] == "callable_ctrl_rule"
+    ]
+    (control,) = find_eqns(rule.params["func_jaxpr"], ctrl_transform_prim)
+    assert control.params["work_wires"] is None
+    assert control.params["n_work"] == 1
+    assert control.params["work_wire_type"] == work_wire_type
+    assert "callable_ctrl_rule" in circuit.mlir
 
 
 def test_registry_lookup_uses_operator_class():

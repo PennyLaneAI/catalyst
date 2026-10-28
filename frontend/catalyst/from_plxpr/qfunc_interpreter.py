@@ -371,10 +371,10 @@ def _apply_operator2_gate(
     """Apply an Operator2 as a gate instruction using qref_operator_p."""
     n_wires = sum(wire_lens)
     wire_inputs = args[len(op_cls.dynamic_argnames) : len(op_cls.dynamic_argnames) + n_wires]
+    work_wire_inputs = ()
     if n_ctrls:
         if n_ctrl_work_wires:
-            # MLIR operations do not currently handle work wires for controlled operators,
-            # so they are ignored.
+            work_wire_inputs = args[-n_ctrl_work_wires:]
             args = args[:-n_ctrl_work_wires]
 
         control_wire_inputs = args[-2 * n_ctrls : -n_ctrls]
@@ -393,6 +393,14 @@ def _apply_operator2_gate(
         w if is_abstract_qubit(w) else qref_get_p.bind(self.init_qreg, w)
         for w in control_wire_inputs
     ]
+    new_work_wires = [
+        w if is_abstract_qubit(w) else qref_get_p.bind(self.init_qreg, w) for w in work_wire_inputs
+    ]
+    work_wire_params = (
+        {"n_ctrl_work_wires": len(new_work_wires), "ctrl_work_wire_type": ctrl_work_wire_type}
+        if new_work_wires
+        else {}
+    )
 
     # Hybrid wire arguments: this contains wires that are in both wire_argnames and hybrid_argnames,
     # and also the wires of any operators that are part of the hybrid arguments.
@@ -410,6 +418,7 @@ def _apply_operator2_gate(
         *new_hybrid_args,
         *new_control_wires,
         *control_values,
+        *new_work_wires,
         op_cls=op_cls,
         wire_lens=wire_lens,
         hybrid_lens=hybrid_lens,
@@ -417,6 +426,7 @@ def _apply_operator2_gate(
         forward_mask=forward_mask,
         adjoint=adjoint,
         n_ctrls=n_ctrls,
+        **work_wire_params,
         **kwargs,
     )
 
@@ -891,22 +901,39 @@ def handle_adjoint_transform(self, *invals, jaxpr, lazy, n_consts):
 # pylint: disable=unused-argument,too-many-arguments
 @PLxPRToQuantumJaxprInterpreter.register_primitive(plxpr_ctrl_transform_prim)
 def handle_ctrl_transform(
-    self, *invals, jaxpr, n_control, work_wires, n_consts, work_wire_type="borrowed"
+    self,
+    *invals,
+    jaxpr,
+    n_control,
+    work_wires,
+    n_consts,
+    n_work=0,
+    work_wire_type="borrowed",
 ):
     """Interpret a control transform, then re-bind it for lowering to a `qref.ctrl` region op."""
-    values_start = len(invals) - n_control
+    work_start = len(invals) - n_work
+    values_start = work_start - n_control
     controls_start = values_start - n_control
     consts = invals[:n_consts]
     args = invals[n_consts:controls_start]
     control_wires = invals[controls_start:values_start]
-    control_values = invals[values_start:]
+    control_values = invals[values_start:work_start]
+    dynamic_work_wires = invals[work_start:]
 
     control_qubits = [
         w if is_abstract_qubit(w) else qref_get_p.bind(self.init_qreg, w) for w in control_wires
     ]
+    work_qubits = [
+        w if is_abstract_qubit(w) else qref_get_p.bind(self.init_qreg, w)
+        for w in (dynamic_work_wires or work_wires or ())
+    ]
     body_interpreter = copy(self)
     body_interpreter.modifier_context = self.modifier_context.compose(
-        ModifierState(control_count=n_control)
+        ModifierState(
+            control_count=n_control,
+            num_work_wires=len(work_qubits),
+            work_wire_type=work_wire_type,
+        )
     )
     body = jaxpr_to_jaxpr(body_interpreter, jaxpr, consts, *args)
 
@@ -915,9 +942,11 @@ def handle_ctrl_transform(
         *args,
         *control_qubits,
         *control_values,
+        *work_qubits,
         n_control=n_control,
+        n_work=len(work_qubits),
         jaxpr=body.jaxpr,
-        work_wires=work_wires,
+        work_wires=None,
         work_wire_type=work_wire_type,
         n_consts=len(body.consts),
     )

@@ -14,10 +14,12 @@
 
 """Python implementation of Graph Operator ID."""
 
+import re
 from collections.abc import Mapping, Sequence
 from typing import Any
 
 import pennylane as qp
+from jax._src.lib.mlir import ir
 from pennylane.pytrees import flatten
 
 from catalyst.decomposition.modifier_state import ModifierState
@@ -30,6 +32,18 @@ from catalyst.from_plxpr.uid import generate_uid
 from catalyst.jax_extras.lowering import get_mlir_attribute_from_pyval, mlir_build_context
 
 _SPECIAL_LOWERINGS = {}
+
+# The work wires available to an operator's controls are spelled in its wire and static-data
+# groups under these names. They are namespaced so that they cannot collide with an operator's own
+# ``work_wires``/``work_wire_type`` arguments, e.g. on ``C(MultiControlledX)``.
+CTRL_WORK_WIRES = "ctrl_work_wires"
+CTRL_WORK_WIRE_TYPE = "ctrl_work_wire_type"
+
+_ID_GROUPS = re.compile(
+    r"(?P<name>[^{]*)(?P<dynamic>\{[^{}]*\})\{(?P<wires>[^{}]*)\}(?P<static>\{.*\})"
+    r"(?P<uid>\[-?\d+\])?",
+    re.DOTALL,
+)
 
 
 def _is_custom_op(op_cls, avals_in):
@@ -93,7 +107,16 @@ def build_graph_op_id(
     modifiers: ModifierState = ModifierState(),
     uid: int | None = None,
 ) -> str:
-    """Build a canonical frontend GraphOpID from its identity components."""
+    """Build a canonical frontend GraphOpID from its identity components.
+
+    Work wires available to the controls are spelled as a ``ctrl_work_wires`` wire-group entry
+    together with a ``ctrl_work_wire_type`` static-data entry. Without work wires neither appears,
+    so such an id is unchanged.
+    """
+    if modifiers.num_work_wires:
+        wire_lens = {**wire_lens, CTRL_WORK_WIRES: modifiers.num_work_wires}
+        static_data = {**static_data, CTRL_WORK_WIRE_TYPE: modifiers.work_wire_type}
+
     name = modifiers.wrap_name(operator_name)
 
     dynamic_id = format_dynamic_params_for_id(dict(sorted(dynamic_shape.items())))
@@ -101,6 +124,73 @@ def build_graph_op_id(
     static_id = format_static_data_dict_for_id(dict(sorted(static_data.items())))
     uid_id = f"[{uid}]" if uid is not None else ""
     return name + dynamic_id + wire_id + static_id + uid_id
+
+
+def add_ctrl_work_wires_to_id(op_id: str, num_work_wires: int, work_wire_type: str) -> str:
+    """Spell control work wires into a finished, controlled GraphOpID string.
+
+    This is :func:`build_graph_op_id`'s work-wire spelling for callers that only hold an id string.
+    The static-data group is re-printed through MLIR so that its entries stay in the attribute
+    printer's sorted order.
+
+    Args:
+        op_id (str): a controlled GraphOpID carrying no control work wires yet
+        num_work_wires (int): the number of work wires available to the controls
+        work_wire_type (str): their type, ``"zeroed"`` or ``"borrowed"``
+
+    Returns:
+        str: the GraphOpID with the work wires spelled, or ``op_id`` itself without work wires
+
+    Raises:
+        ValueError: if ``op_id`` is malformed or already spells control work wires
+    """
+    if not num_work_wires:
+        return op_id
+
+    match = _ID_GROUPS.fullmatch(op_id)
+    if match is None:
+        raise ValueError(f"Malformed op id for graph decomposition, got {op_id}")
+
+    wire_lens = dict(entry.split(":") for entry in match["wires"].split(",") if entry)
+    if CTRL_WORK_WIRES in wire_lens:
+        raise ValueError(f"{op_id!r} already spells control work wires")
+    wire_lens[CTRL_WORK_WIRES] = str(num_work_wires)
+    wire_id = "{" + ",".join(f"{key}:{value}" for key, value in sorted(wire_lens.items())) + "}"
+
+    with mlir_build_context():
+        static = ir.DictAttr(ir.Attribute.parse(match["static"]))
+        entries = {static[i].name: static[i].attr for i in range(len(static))}
+        entries[CTRL_WORK_WIRE_TYPE] = ir.StringAttr.get(work_wire_type)
+        static_id = str(ir.DictAttr.get(entries))
+
+    return match["name"] + match["dynamic"] + wire_id + static_id + (match["uid"] or "")
+
+
+def remove_ctrl_work_wires_from_id(op_id: str) -> tuple[str, int, str]:
+    """Remove control work-wire metadata, returning the base id, count and type.
+
+    Preserve the operator's own wire groups, static attributes and UID. The compiler's on-demand
+    loader passes a finished id, so parse its static attributes with the same MLIR printer used
+    when adding control work wires.
+    """
+    match = _ID_GROUPS.fullmatch(op_id)
+    if match is None:
+        raise ValueError(f"Malformed op id for graph decomposition, got {op_id}")
+
+    wire_lens = dict(entry.split(":") for entry in match["wires"].split(",") if entry)
+    if CTRL_WORK_WIRES not in wire_lens:
+        return op_id, 0, "borrowed"
+    num_work_wires = int(wire_lens.pop(CTRL_WORK_WIRES))
+    wire_id = "{" + ",".join(f"{key}:{value}" for key, value in sorted(wire_lens.items())) + "}"
+
+    with mlir_build_context():
+        static = ir.DictAttr(ir.Attribute.parse(match["static"]))
+        entries = {static[i].name: static[i].attr for i in range(len(static))}
+        work_wire_type = ir.StringAttr(entries.pop(CTRL_WORK_WIRE_TYPE)).value
+        static_id = str(ir.DictAttr.get(entries))
+
+    base_id = match["name"] + match["dynamic"] + wire_id + static_id + (match["uid"] or "")
+    return base_id, num_work_wires, work_wire_type
 
 
 class GraphOpID:
