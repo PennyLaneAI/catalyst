@@ -462,7 +462,7 @@ class Compiler:
         self.options = options if options is not None else CompileOptions()
 
     @debug_logger
-    def get_cli_command(self, tmp_infile_name, output_ir_name, module_name, workspace):
+    def get_cli_command(self, tmp_infile_name, output_filename, module_name, workspace):
         """Prepare the command to run the Catalyst CLI to compile the file.
 
         Args:
@@ -475,7 +475,7 @@ class Compiler:
         if not self.options.lower_to_llvm:
             opts += [("--tool", "opt")]
         cmd = _get_catalyst_cli_cmd(
-            ("-o", output_ir_name),
+            ("-o", output_filename),
             ("--module-name", module_name),
             ("--workspace", str(workspace)),
             "-verify-each=false",
@@ -497,8 +497,7 @@ class Compiler:
         Returns:
             output_filename (str): Output file name. For the default pipeline this would be the
                                    shared object library path.
-            out_IR (str): Output IR in textual form. For the default pipeline this would be the
-                          LLVM IR.
+            out_IR (None): Deprecated.
         """
         assert isinstance(
             workspace, Directory
@@ -515,9 +514,9 @@ class Compiler:
             tmp_infile.write(ir)
 
         output_object_name = os.path.join(str(workspace), f"{module_name}.o")
-        output_ir_name = os.path.join(str(workspace), f"{module_name}.ll")
+        output_filename = output_object_name if self.options.lower_to_llvm else os.devnull
 
-        cmd = self.get_cli_command(tmp_infile_name, output_ir_name, module_name, workspace)
+        cmd = self.get_cli_command(tmp_infile_name, output_filename, module_name, workspace)
         try:
             if self.options.verbose:
                 print(f"[SYSTEM] {' '.join(cmd)}", file=self.options.logfile)
@@ -530,12 +529,6 @@ class Compiler:
         except subprocess.CalledProcessError as e:  # pragma: nocover
             raise CompileError(f"catalyst failed with error code {e.returncode}: {e.stderr}") from e
 
-        if os.path.exists(output_ir_name):
-            with open(output_ir_name, "r", encoding="utf-8") as f:
-                out_IR = f.read()
-        else:
-            out_IR = None
-
         if self.options.link:
             output = LinkerDriver.run(output_object_name, options=self.options)
             output = str(pathlib.Path(output).absolute())
@@ -545,10 +538,7 @@ class Compiler:
         # Clean up temporary files
         if os.path.exists(tmp_infile_name):
             os.remove(tmp_infile_name)
-        if os.path.exists(output_ir_name):
-            os.remove(output_ir_name)
-
-        return output, out_IR
+        return output, None
 
     def has_xdsl_passes_in_transform_modules(self, mlir_module):
         """Check if the MLIR module contains xDSL passes in transform dialect.
