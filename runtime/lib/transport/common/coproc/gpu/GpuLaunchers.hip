@@ -41,24 +41,25 @@ constexpr std::uint32_t STOP_POLL_INTERVAL = 1024;
  * are done or the host raises `*stop`.
  *
  * @tparam DECODE Per-shot __device__ decode: syndrome word in, error qubit index out.
- * @param ring Request ring in local HBM, K_RING_SLOTS slots, written by the
- *             peer's RDMA_WRITEs. Slot `cursor % K_RING_SLOTS` carries shot
+ * @param ring Request ring in local HBM, `slots` slots, written by the
+ *             peer's RDMA_WRITEs. Slot `cursor % slots` carries shot
  *             `cursor`, published via its `seq_num` trailer.
  * @param handoff Host-mapped reply ring, same slot count; this kernel writes
  *                {correction, seq} and the CPU reads it.
  * @param stop Host-mapped teardown flag; nonzero means exit. Sampled only every
  *             STOP_POLL_INTERVAL spins (host-coherent read over PCIe).
  * @param total Number of shots to process, or 0 to run until stopped.
+ * @param slots Slot count of both rings, a power of two.
  */
 template <std::int64_t (*DECODE)(std::uint64_t)>
 __global__ void fused(volatile PayloadSlot *ring, volatile HandoffSlot *handoff,
-                      volatile std::uint32_t *stop, std::uint64_t total) {
+                      volatile std::uint32_t *stop, std::uint64_t total, std::uint32_t slots) {
     if (threadIdx.x != 0 || blockIdx.x != 0) {
         return;
     }
     for (std::uint64_t cursor = 0; total == 0 || cursor < total; ++cursor) {
         const std::uint32_t expect = static_cast<std::uint32_t>(cursor + 1);
-        const std::size_t index = cursor & (K_RING_SLOTS - 1);
+        const std::size_t index = cursor & (slots - 1);
         volatile std::uint32_t *sptr = &ring[index].p.seq_num;
         // Poll the request ring on local HBM. The stop flag is a host-coherent
         // read over PCIe, so sample it only every STOP_POLL_INTERVAL spins to
@@ -69,6 +70,7 @@ __global__ void fused(volatile PayloadSlot *ring, volatile HandoffSlot *handoff,
             }
         }
         __threadfence_system(); // seq observed -> ensure value read isn't hoisted/stale
+        // TODO: read the frame through the frame codec, so the kernel takes BLV frames too.
         const std::uint64_t syndrome = ring[index].p.value;
         volatile HandoffSlot *slot = &handoff[index];
         HandoffSlot reply{
@@ -100,10 +102,10 @@ __global__ void fused(volatile PayloadSlot *ring, volatile HandoffSlot *handoff,
 // Launch fused<DECODE> on the session-owned stream, wired to the datapath in
 // `desc`.
 template <std::int64_t (*DECODE)(std::uint64_t)> static void launch(const CoprocLaunchDesc *desc) {
-    hipLaunchKernelGGL((fused<DECODE>), dim3(1), dim3(1), 0, static_cast<hipStream_t>(desc->stream),
-                       reinterpret_cast<PayloadSlot *>(desc->ring),
-                       reinterpret_cast<HandoffSlot *>(desc->handoff),
-                       reinterpret_cast<std::uint32_t *>(desc->stop), desc->total);
+    hipLaunchKernelGGL(
+        (fused<DECODE>), dim3(1), dim3(1), 0, static_cast<hipStream_t>(desc->stream),
+        reinterpret_cast<PayloadSlot *>(desc->ring), reinterpret_cast<HandoffSlot *>(desc->handoff),
+        reinterpret_cast<std::uint32_t *>(desc->stop), desc->total, desc->ring_slots);
     HIP_CHECK(hipGetLastError(), "kernel launch");
 }
 

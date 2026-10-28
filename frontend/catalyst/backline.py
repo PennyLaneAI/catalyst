@@ -51,6 +51,10 @@ from catalyst.utils.runtime_environment import get_lib_path
 _INIT_KEYS = ("backend_lib", "config")
 
 
+# The largest message the 16 B frame (BL16) carries; anything larger travels in BLV frames.
+_BL16_PAYLOAD_BYTES = 8
+
+
 @dataclasses.dataclass(frozen=True)
 class TransportBackend:
     """A transport backend Catalyst can place a node on, and what it supports.
@@ -63,7 +67,8 @@ class TransportBackend:
         transport: The placement transport it implements, e.g. ``"rdma"``.
         hardware: The node hardware it runs on: ``"cpu"``, ``"gpu"`` or ``"fpga"``.
         roles: The roles it provides, ``"controller"`` and/or ``"coprocessor"``.
-        frame_modes: The frame layouts it speaks; ``"bl16"`` is original 16 B frame.
+        frame_modes: The frame layouts it speaks: ``"bl16"``, the 16 B frame, carries messages of up
+            to 8 B, and ``"blv"`` larger ones, so a backend with a larger limit must list ``"blv"``.
         max_payload_bytes: The largest request it carries per message, ``None`` for no limit.
         max_reply_bytes: The largest reply it carries per message, ``None`` for no limit.
         default: Whether it is picked for its transport and hardware without being named. A node
@@ -79,9 +84,27 @@ class TransportBackend:
     max_reply_bytes: int | None = 8
     default: bool = True
 
+    def __post_init__(self):
+        limits = (self.max_payload_bytes, self.max_reply_bytes)
+        if "blv" not in self.frame_modes and any(
+            limit is None or limit > _BL16_PAYLOAD_BYTES for limit in limits
+        ):
+            raise ValueError(
+                f"transport backend {self.name!r} carries messages over {_BL16_PAYLOAD_BYTES} B, "
+                f"which travel in 'blv' frames, but its frame_modes are {list(self.frame_modes)}"
+            )
+
 
 _REGISTRY: list[TransportBackend] = [
-    TransportBackend("cpu_verbs", "rdma", "cpu", ("controller", "coprocessor")),
+    TransportBackend(
+        "cpu_verbs",
+        "rdma",
+        "cpu",
+        ("controller", "coprocessor"),
+        frame_modes=("bl16", "blv"),
+        max_payload_bytes=None,
+        max_reply_bytes=None,
+    ),
     TransportBackend("gpu_verbs", "rdma", "gpu", ("coprocessor",)),
     TransportBackend("hwhs", "rdma", "fpga", ("controller",)),
     TransportBackend("fpga_verbs", "rdma", "fpga", ("controller",), default=False),
@@ -90,10 +113,20 @@ _REGISTRY: list[TransportBackend] = [
         "memcpy",
         "cpu",
         ("controller", "coprocessor"),
+        frame_modes=("bl16", "blv"),
         max_payload_bytes=None,
         max_reply_bytes=None,
     ),
-    TransportBackend("memcpy_gpu", "memcpy", "gpu", ("coprocessor",)),
+    # Its persistent kernels read BL16 frames only; _frame_config holds them to 8 B.
+    TransportBackend(
+        "memcpy_gpu",
+        "memcpy",
+        "gpu",
+        ("coprocessor",),
+        frame_modes=("bl16", "blv"),
+        max_payload_bytes=None,
+        max_reply_bytes=None,
+    ),
 ]
 
 # Out-of-tree backends register through this entry-point group, or a manifest of this name in a
@@ -417,6 +450,15 @@ def _config_text(config: dict[str, str]) -> str:
     return ";".join(f"{key}={value}" for key, value in config.items())
 
 
+def _fn_runs_per_message(fn) -> bool:
+    """Whether a coprocessor function is a host function called once per message: one marked
+    ``per_message``, or one Catalyst ships. Otherwise a GPU coprocessor runs it as a persistent
+    kernel."""
+    return getattr(fn, "per_message", False) or (
+        getattr(fn, "symbol_name", None) in _BUILTIN_COPROCESSOR_FN_LIBS
+    )
+
+
 def _runs_per_message_on_gpu(coproc, transport: str) -> bool:
     """Whether a GPU coprocessor's config must select the per-message mode for its function.
 
@@ -437,10 +479,7 @@ def _runs_per_message_on_gpu(coproc, transport: str) -> bool:
             than ``"memcpy"``, or the config selects another mode.
     """
     fn = coproc.coprocessor_fn
-    per_message = getattr(fn, "per_message", False) or (
-        getattr(fn, "symbol_name", None) in _BUILTIN_COPROCESSOR_FN_LIBS
-    )
-    if not per_message or getattr(coproc, "hardware", None) != "gpu":
+    if not _fn_runs_per_message(fn) or getattr(coproc, "hardware", None) != "gpu":
         return False
     if transport != "memcpy":
         raise CompileError(
@@ -518,31 +557,90 @@ def _coprocessor_fn_config(fn, placement: Placement) -> dict[str, str]:
     return entries
 
 
-def _check_frame_modes(placement: Placement, transport: str, in_bytes: int, out_bytes: int) -> None:
-    """Fail unless the controller and each coprocessor can share a frame layout.
+# The config keys through which the compiler gives both ends of every session their frame layout
+# (read by geometry_from_config in the runtime's Frame.hpp). A node's own config must not set them.
+_FRAME_CONFIG_KEYS = ("frame", "frame_payload")
+# The ring's slot count unless a node's config sets ``frame_slots``. The FPGA controllers are only
+# tested with this count.
+_DEFAULT_FRAME_SLOTS = 256
 
-    Nodes given an explicit ``backend_lib`` are taken at their word; the runtime checks them.
+
+def _frame_config(placement: Placement, transport: str, in_bytes: int, out_bytes: int) -> dict:
+    """The frame layout every session of the placement uses, as config entries for both ends.
+
+    Messages of up to 8 B travel in the 16 B frame (BL16), which needs no entries, so such programs
+    compile as before. Larger ones travel in BLV frames sized for the larger message, written as
+    ``frame=blv;frame_payload=<bytes>``. Each ring has 256 slots unless a node's config sets
+    ``frame_slots=<n>``, a power of two, which is then passed to every node. Nodes given an
+    explicit ``backend_lib`` are taken at their word; the runtime checks them.
+
+    Raises:
+        CompileError: If a node's config sets a frame key, nodes ask for different slot counts, a
+            selected backend cannot carry the layout, an FPGA node would need a slot count other
+            than 256, or a GPU coprocessor running a persistent kernel would need BLV frames.
     """
-
-    def backend(node, role):
-        init = node.init_args or {}
-        if init.get("backend_lib") or getattr(node, "hardware", None) is None:
-            return None
-        return _select_backend(
+    slots = set()
+    for node in (placement.controller, *placement.coprocessors):
+        given = _parse_config((node.init_args or {}).get("config", ""))
+        if reserved := sorted(set(given) & set(_FRAME_CONFIG_KEYS)):
+            raise CompileError(
+                f"backline node config key {reserved[0]!r} is reserved: the compiler sets the "
+                f"frame layout from the placement's message sizes"
+            )
+        if "frame_slots" in given:
+            value = given["frame_slots"]
+            count = int(value) if value.isdigit() else 0
+            if count == 0 or count & (count - 1):
+                raise CompileError(f"frame_slots must be a power of two, not {value!r}")
+            slots.add(count)
+    if len(slots) > 1:
+        raise CompileError(f"backline nodes ask for different frame_slots: {sorted(slots)}")
+    if not placement.coprocessors:
+        return {}  # a controller alone exchanges no frames
+    # One layout serves both rings, so its slots hold the larger of the request and the reply.
+    largest = max(in_bytes, out_bytes)
+    mode = "bl16" if largest <= _BL16_PAYLOAD_BYTES else "blv"
+    # Nodes whose backend the compiler picks; one with its own backend_lib is checked at runtime.
+    nodes = [
+        (node, role)
+        for node, role in [(placement.controller, "controller")]
+        + [(coproc, "coprocessor") for coproc in placement.coprocessors]
+        if not (node.init_args or {}).get("backend_lib")
+        and getattr(node, "hardware", None) is not None
+    ]
+    for node, role in nodes:
+        backend = _select_backend(
             transport, node.hardware, role, in_bytes, out_bytes, getattr(node, "backend", None)
         )
-
-    if not placement.coprocessors:
-        return  # a controller alone exchanges no frames
-    ctrl = backend(placement.controller, "controller")
-    for coproc in placement.coprocessors:
-        cop = backend(coproc, "coprocessor")
-        if ctrl and cop and not set(ctrl.frame_modes) & set(cop.frame_modes):
+        if mode not in backend.frame_modes:
             raise CompileError(
-                f"backline controller backend {ctrl.name!r} (frames {list(ctrl.frame_modes)}) and "
-                f"coprocessor backend {cop.name!r} (frames {list(cop.frame_modes)}) share no frame "
-                f"layout"
+                f"backline {role} backend {backend.name!r} carries {list(backend.frame_modes)} "
+                f"frames, but {largest} B messages need {mode!r} frames"
             )
+    config = {}
+    if slots and (count := slots.pop()) != _DEFAULT_FRAME_SLOTS:
+        for node, role in nodes:
+            if node.hardware == "fpga":
+                raise CompileError(
+                    f"backline {role} on 'fpga' hardware is only tested with a ring of "
+                    f"{_DEFAULT_FRAME_SLOTS} slots, so the placement cannot set frame_slots={count}"
+                )
+        config["frame_slots"] = str(count)
+    if mode == "bl16":
+        return config
+    # TODO: drop this once the persistent GPU kernels read frames through the frame codec.
+    for node, role in nodes:
+        if (
+            role == "coprocessor"
+            and node.hardware == "gpu"
+            and not _fn_runs_per_message(node.coprocessor_fn)
+        ):
+            raise CompileError(
+                f"coprocessor function {node.coprocessor_fn.symbol_name!r} runs as a persistent "
+                f"GPU kernel, which reads 16 B frames, so it carries messages of at most "
+                f"{_BL16_PAYLOAD_BYTES} B, not {largest} B"
+            )
+    return {"frame": "blv", "frame_payload": str(largest), **config}
 
 
 def serialize_backline(placement: Placement) -> dict:
@@ -552,16 +650,17 @@ def serialize_backline(placement: Placement) -> dict:
     controller_transport = transport if placement.coprocessors else None
     in_bytes = _message_size(placement, "in_bytes")
     out_bytes = _message_size(placement, "out_bytes")
-    _check_frame_modes(placement, transport, in_bytes, out_bytes)
+    frame = _frame_config(placement, transport, in_bytes, out_bytes)
+    controller = _node_dict(
+        placement.controller, "controller", controller_transport, in_bytes, out_bytes
+    )
+    if frame:
+        controller["config"] = ";".join(
+            filter(None, [controller.get("config", ""), _config_text(frame)])
+        )
     result = {
         "transport": transport,
-        "controller": {
-            **_node_dict(
-                placement.controller, "controller", controller_transport, in_bytes, out_bytes
-            ),
-            "in_bytes": in_bytes,
-            "out_bytes": out_bytes,
-        },
+        "controller": {**controller, "in_bytes": in_bytes, "out_bytes": out_bytes},
     }
     nodes = []
     for coproc in placement.coprocessors:
@@ -580,7 +679,7 @@ def serialize_backline(placement: Placement) -> dict:
             _check_builtin_fn_lib(coproc, _installed_builtin_fn_lib_dirs())
         # The node's own config is passed on as given, since a backend may read it whole; the
         # compiler's entries follow it.
-        added = _coprocessor_fn_config(coproc.coprocessor_fn, placement)
+        added = {**frame, **_coprocessor_fn_config(coproc.coprocessor_fn, placement)}
         if _runs_per_message_on_gpu(coproc, transport):
             added = {"coproc_fn": "per_message", **added}
         node["config"] = ";".join(filter(None, [node.get("config", ""), _config_text(added)]))
