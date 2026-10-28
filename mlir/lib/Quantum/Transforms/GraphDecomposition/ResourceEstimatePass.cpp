@@ -56,15 +56,18 @@ struct ResourceEstimatePass : public impl::ResourceEstimatePassBase<ResourceEsti
     void runOnOperation() final {
         ModuleOp module = getOperation();
 
-        std::unique_ptr<DecompositionGraph> graph = GraphDecompositionPrep::prepareGraph(
-            module, {
-                        .targetGateSetOption = targetGateSetOption,
-                        .fixedDecompsOption = fixedDecompsOption,
-                        .altDecompsOption = altDecompsOption,
-                        .bytecodeRulesFile = bytecodeRulesFile,
-                        .libQPDPath = libQPDPath,
-                        .libpythonPath = libpythonPath,
-                    });
+        std::unique_ptr<DecompositionGraph> graph;
+        {
+            graph = GraphDecompositionPrep::prepareGraph(
+                module, {
+                            .targetGateSetOption = targetGateSetOption,
+                            .fixedDecompsOption = fixedDecompsOption,
+                            .altDecompsOption = altDecompsOption,
+                            .bytecodeRulesFile = bytecodeRulesFile,
+                            .libQPDPath = libQPDPath,
+                            .libpythonPath = libpythonPath,
+                        });
+        }
         if (!graph) {
             return signalPassFailure();
         }
