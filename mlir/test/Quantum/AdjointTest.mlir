@@ -1091,3 +1091,56 @@ func.func @adjoint_available_controls(%target: !quantum.bit, %c0: !quantum.bit,
   return %out#0, %out#1, %out#2, %out#3
       : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
 }
+
+// -----
+
+// An extract can read the register from before an insert at another index.
+
+// CHECK-LABEL: @adjoint_extract_before_distinct_insert
+// CHECK-SAME:    ([[R:%.+]]: !quantum.reg)
+func.func @adjoint_extract_before_distinct_insert(%r: !quantum.reg) -> !quantum.reg {
+  // CHECK: [[Q1:%.+]] = quantum.extract [[R]][ 1]
+  // CHECK: [[Z:%.+]] = quantum.custom "PauliZ"() [[Q1]] adj
+  // CHECK: [[R1:%.+]] = quantum.insert [[R]][ 1], [[Z]]
+  // CHECK: [[Q0:%.+]] = quantum.extract [[R1]][ 0]
+  // CHECK: [[X:%.+]] = quantum.custom "PauliX"() [[Q0]] adj
+  // CHECK: [[R2:%.+]] = quantum.insert [[R1]][ 0], [[X]]
+  // CHECK: return [[R2]]
+  %out = quantum.adjoint(%r) : !quantum.reg {
+  ^bb0(%arg0: !quantum.reg):
+    %q0 = quantum.extract %arg0[0] : !quantum.reg -> !quantum.bit
+    %x = quantum.custom "PauliX"() %q0 : !quantum.bit
+    %r1 = quantum.insert %arg0[0], %x : !quantum.reg, !quantum.bit
+    %q1 = quantum.extract %arg0[1] : !quantum.reg -> !quantum.bit
+    %z = quantum.custom "PauliZ"() %q1 : !quantum.bit
+    %r2 = quantum.insert %r1[1], %z : !quantum.reg, !quantum.bit
+    quantum.yield %r2 : !quantum.reg
+  }
+  return %out : !quantum.reg
+}
+
+// -----
+
+// The extract reads the register from before a loop that replaced it. The reverse walk only
+// follows inserts to a newer register version, so this reports an error instead of aborting.
+
+func.func @adjoint_extract_before_loop(%r: !quantum.reg) -> !quantum.reg {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c2 = arith.constant 2 : index
+  %out = quantum.adjoint(%r) : !quantum.reg {
+  ^bb0(%arg0: !quantum.reg):
+    %r1 = scf.for %i = %c0 to %c2 step %c1 iter_args(%a = %arg0) -> !quantum.reg {
+      %q = quantum.extract %a[0] : !quantum.reg -> !quantum.bit
+      %x = quantum.custom "PauliX"() %q : !quantum.bit
+      %a1 = quantum.insert %a[0], %x : !quantum.reg, !quantum.bit
+      scf.yield %a1 : !quantum.reg
+    }
+    // expected-error @below {{Unable to reverse extract in the adjoint region}}
+    %q1 = quantum.extract %arg0[1] : !quantum.reg -> !quantum.bit
+    %z = quantum.custom "PauliZ"() %q1 : !quantum.bit
+    %r2 = quantum.insert %r1[1], %z : !quantum.reg, !quantum.bit
+    quantum.yield %r2 : !quantum.reg
+  }
+  return %out : !quantum.reg
+}

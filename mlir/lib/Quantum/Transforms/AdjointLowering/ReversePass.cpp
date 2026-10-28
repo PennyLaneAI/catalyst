@@ -143,12 +143,19 @@ class AdjointGenerator {
                 remappedValues.map(insertOp.getInQreg(),
                                    remappedValues.lookup(insertOp.getOutQreg()));
             } else if (auto extractOp = dyn_cast<quantum::ExtractOp>(op)) {
+                Value qreg = findReversedQregVersion(extractOp.getQreg());
+                if (!qreg) {
+                    extractOp.emitError("Unable to reverse extract in the adjoint region: its "
+                                        "register is not followed by a single insert");
+                    generationFailed = true;
+                    return;
+                }
                 Value dynamicWire = getDynamicWire(extractOp, builder);
                 auto insertOp = quantum::InsertOp::create(
                     builder, extractOp.getLoc(), extractOp.getQreg().getType(),
-                    remappedValues.lookup(extractOp.getQreg()), dynamicWire,
-                    extractOp.getIdxAttrAttr(), remappedValues.lookup(extractOp.getQubit()));
-                remappedValues.map(extractOp.getQreg(), insertOp.getResult());
+                    remappedValues.lookup(qreg), dynamicWire, extractOp.getIdxAttrAttr(),
+                    remappedValues.lookup(extractOp.getQubit()));
+                remappedValues.map(qreg, insertOp.getResult());
             } else if (auto allocOp = dyn_cast<quantum::AllocOp>(op)) {
                 quantum::DeallocOp::create(builder, allocOp.getLoc(),
                                            remappedValues.lookup(allocOp.getQreg()));
@@ -195,6 +202,27 @@ class AdjointGenerator {
                 return;
             }
         }
+    }
+
+    /// Return the version of `qreg` that already has a value in the reverse pass. An extract may
+    /// read a register version that an insert at another index has replaced, since extract and
+    /// insert have no memory effects. The reverse walk then reaches the extract before that
+    /// version is mapped, so follow the inserts that replace it until a mapped version is found.
+    /// Returns a null value if a version on the way is not replaced by exactly one insert.
+    Value findReversedQregVersion(Value qreg) {
+        size_t maxSteps = qreg.getParentBlock()->getOperations().size();
+        for (size_t step = 0; step <= maxSteps; ++step) {
+            if (remappedValues.contains(qreg)) {
+                return qreg;
+            }
+            auto inserts = llvm::make_filter_range(
+                qreg.getUsers(), [](Operation *user) { return isa<quantum::InsertOp>(user); });
+            if (!llvm::hasSingleElement(inserts)) {
+                return Value();
+            }
+            qreg = cast<quantum::InsertOp>(*inserts.begin()).getOutQreg();
+        }
+        return Value();
     }
 
     template <typename IndexingOp> Value getDynamicWire(IndexingOp op, OpBuilder &builder) {
