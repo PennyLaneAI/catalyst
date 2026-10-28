@@ -31,6 +31,7 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/DebugLog.h"
 #include "llvm/Support/LogicalResult.h"
+#include "mlir/AsmParser/AsmParser.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinOps.h"
@@ -113,7 +114,7 @@ void parseAltDecomps(ArrayRef<std::string> altDecompsOption,
 }
 
 LogicalResult parseGateset(ArrayRef<std::string> targetGateSetOption,
-                           WeightedGateset &targetGateSet) {
+                           WeightedGateset &targetGateSet, ModuleOp module) {
     for (const std::string &opCostPair : targetGateSetOption) {
         llvm::StringRef pairRef(opCostPair);
 
@@ -128,14 +129,32 @@ LogicalResult parseGateset(ArrayRef<std::string> targetGateSetOption,
         opName.consume_front("\"");
         opName.consume_back("\"");
 
-        cost.consume_back(": f64");
-        cost = cost.trim();
+        double weight = 0.0;
+        bool parsed = false;
 
-        bool success = to_float(cost, targetGateSet.ops[opName.str()]);
+        if (cost.ends_with(": f64")) {
+            // Float attributes encode NaN and infinity as hexadecimal bit patterns.
+            // Parsing these with strtod would instead produce finite, positive costs.
+            if (auto attr =
+                    dyn_cast_or_null<FloatAttr>(mlir::parseAttribute(cost, module.getContext()))) {
+                weight = attr.getValueAsDouble();
+                parsed = true;
+            }
 
-        if (!success) {
-            return failure();
+        } else { // fallback string parsing
+            parsed = !cost.empty() && to_float(cost, weight);
         }
+
+        // validation
+        if (!parsed || std::isnan(weight) || weight < 0.0) {
+            // return getOperation().emitError()
+            //         << "Invalid cost '" << cost << "' for gate '" << opName
+            //         << "' in the target gateset: expected a non-negative number (not NaN).";
+            return module.emitError()
+                   << "Invalid cost '" << cost << "' for gate '" << opName
+                   << "' in the target gateset: expected a non-negative number (not NaN).";
+        }
+        targetGateSet.ops[opName.str()] = weight;
     }
     return success();
 }
@@ -520,7 +539,7 @@ std::unique_ptr<DecompositionGraph> prepareGraph(ModuleOp module, const PrepOpti
     // get names for fixed and alt decomps
     parseFixedDecomps(opts.fixedDecompsOption, opToFixedDecompName, userRuleNames);
     parseAltDecomps(opts.altDecompsOption, opToAltDecompNames, userRuleNames);
-    if (failed(parseGateset(opts.targetGateSetOption, targetGateSet))) {
+    if (failed(parseGateset(opts.targetGateSetOption, targetGateSet, module))) {
         return nullptr;
     }
 
