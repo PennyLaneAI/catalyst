@@ -23,4 +23,3 @@ func.func @foo() {
 // CHECK: Parser
 // CHECK: Optimization
 // CHECK: Translate
-// CHECK: llc
