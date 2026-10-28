@@ -842,9 +842,8 @@ def gridsynth_setup_inputs(epsilon=1e-4, ppr_basis=False, method="deterministic"
             error at most ``epsilon``, and therefore diamond norm error at most ``2 * epsilon``.
             With ``"mixed"`` and ``"mixed-fallback"``, the channel averaged over samples has
             diamond norm error at most ``2 * epsilon``.
-        ppr_basis (bool): If true, decompose directly to Pauli Product Rotations (PPRs) in PBC
-            dialect, with one :math:`\pi/8` PPR per T gate and, for short sequences only, up to
-            two Clifford PPRs at the end. Defaults to ``False``
+        ppr_basis (bool): If true, decompose directly to Pauli Product Rotations (PPRs) in the PBC
+            dialect, with one :math:`\pi/8` PPR per T gate.
         method (str): The synthesis method. ``"deterministic"`` (default) applies a single
             Ross-Selinger gate sequence per rotation. ``"mixed"`` applies, per execution, one of
             two twirled sequences that under- and over-rotate the target, which roughly
