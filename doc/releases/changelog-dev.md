@@ -887,6 +887,10 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* The `--convert-to-value-semantics` pass now correctly handles aliasing qubit references that are
+  used by multiple regions and/or operand lists on the same operation.
+  [(#3404)](https://github.com/PennyLaneAI/catalyst/pull/3404)
+
 * Adjoint lowering now correctly handles gate control values computed inside loops or
   conditional branches.
   [(#3342)](https://github.com/PennyLaneAI/catalyst/pull/3342)
