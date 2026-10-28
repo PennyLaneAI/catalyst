@@ -234,6 +234,20 @@ func.func @test_ctrl_op_no_MP(%q0: !qref.bit, %q1: !qref.bit, %r: !qref.reg<2>)
 
 // -----
 
+func.func @ctrl_overlapping_ctrl_qubits(%q0: !qref.bit, %q1: !qref.bit)
+{
+    %true = llvm.mlir.constant (1 : i1) :i1
+
+    // expected-error@+1 {{Ctrl op ctrl qubits must not reappear as the individual gates' ctrl qubits inside the ctrl region}}
+    qref.ctrl (%q0) ctrlvals (%true){
+    ^bb0():
+        qref.custom "Hadamard"() %q1 ctrls(%q0) ctrlvals(%true) : !qref.bit ctrls !qref.bit
+    }
+    return
+}
+
+// -----
+
 func.func @test_ctrl_with_args(%q0: !qref.bit, %q1: !qref.bit)
 {
     %true = llvm.mlir.constant (1 : i1) :i1

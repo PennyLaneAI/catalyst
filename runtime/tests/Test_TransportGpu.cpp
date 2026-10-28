@@ -33,8 +33,6 @@ TEST_CASE("Wire Payload is the 16 B frame") {
 TEST_CASE("PayloadSlot is a 64 B aligned ring slot") {
     STATIC_REQUIRE(sizeof(PayloadSlot) == 64);
     STATIC_REQUIRE(alignof(PayloadSlot) == 64);
-    STATIC_REQUIRE(K_RING_SLOTS == 256);
-    STATIC_REQUIRE(REGION_BYTES == K_RING_SLOTS * sizeof(PayloadSlot));
 }
 
 TEST_CASE("HandoffSlot carries correction + trailing seq, fits one 16 B store") {

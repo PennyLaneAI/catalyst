@@ -14,6 +14,7 @@
 
 #include "GpuCoprocessorSession.hpp"
 
+#include <algorithm>
 #include <atomic>
 #include <cstring>
 #include <memory>
@@ -37,12 +38,15 @@ namespace {
 constexpr QpShape FWD_QP_SHAPE{.sq_depth = 16, .cq_depth = 256, .inline_max = 0};
 } // namespace
 
-GpuCoprocessorSession::GpuCoprocessorSession(std::string dev, int gid_idx, int gpu_device)
-    : Base(std::move(dev), gid_idx, "gpu_verbs", FWD_QP_SHAPE), gpu_(gpu_device) {}
+GpuCoprocessorSession::GpuCoprocessorSession(std::string dev, int gid_idx, int gpu_device,
+                                             frame::RingGeometry ring)
+    : Base(std::move(dev), gid_idx, "gpu_verbs", FWD_QP_SHAPE, ring), gpu_(gpu_device) {}
 
 MemRegion GpuCoprocessorSession::alloc_memory(std::size_t size, MemKind kind) {
     TP_CHECK(kind == MemKind::GpuHbm, "gpu_verbs: only MemKind::GpuHbm supported");
-    hbm_ = gpu_.alloc_hbm_ring(size);
+    // The peer writes a ring of frames into the region, which may be larger than asked for; a small
+    // ring still takes a whole page, as the dma-buf export needs.
+    hbm_ = gpu_.alloc_hbm_ring(std::max({size, ring_.region_bytes(), std::size_t{4096}}));
     hbm_ring_.emplace(pd_, /*offset=*/static_cast<std::uint64_t>(0), hbm_.size,
                       /*iova=*/reinterpret_cast<std::uint64_t>(hbm_.ptr), hbm_.dmabuf_fd,
                       MemAccess::REMOTE_WRITE);
@@ -74,7 +78,7 @@ bool GpuCoprocessorSession::post_inline(std::uint64_t cursor) {
     const auto value = static_cast<std::uint64_t>(last_word_.load(std::memory_order_relaxed));
     // TODO: echo the request's id by forwarding it through.
     // Currently not sent (fn_id 0) to reduce Handoff size.
-    frame::stage(ring_.mode, send_frame(), /*fn_id=*/0, &value, sizeof(value));
+    frame::stage(ring_, send_frame(), /*fn_id=*/0, &value, sizeof(value));
     const bool signaled = (cursor % SIGNAL_EVERY == 0);
     post_write(bwd_qp_->get(), cursor, /*inline_data=*/true, signaled);
     return signaled;
