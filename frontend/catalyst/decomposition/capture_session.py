@@ -22,8 +22,7 @@ from jax.extend.core import ClosedJaxpr
 from pennylane.core.operator import abstractify
 
 from catalyst.decomposition.graph_op_id import GraphOpID
-
-ModifierState = tuple[bool, int]
+from catalyst.decomposition.modifier_state import ModifierState
 
 
 @dataclass(frozen=True)
@@ -45,9 +44,8 @@ class OpDecompRequest:
         extra_data: Abstract hybrid-argument pytrees used to reconstruct rule arguments without
             retaining values or tracers from a specific program instance.
         is_custom_op: Whether the operator uses the positional, scalar-f64 signature of qref.custom.
-        adjoint: Whether the encountered operation is adjointed, including from region contexts.
-        control_count: Controls carried by the encountered operation, including ambient control
-            transform context.
+        modifier_state: Modifiers carried by the encountered operation, including those of the
+            adjoint and control transform regions around it.
     """
 
     base_id: str
@@ -58,14 +56,13 @@ class OpDecompRequest:
     static_data: dict
     extra_data: dict
     is_custom_op: bool
-    adjoint: bool = False
-    control_count: int = 0
+    modifier_state: ModifierState = ModifierState()
 
     @classmethod
     def from_operation(
         cls,
         op,
-        modifier_context: ModifierState = (False, 0),
+        modifier_context: ModifierState = ModifierState(),
     ) -> "OpDecompRequest":
         """Build a request from a settled captured Operator2 instance.
 
@@ -79,7 +76,6 @@ class OpDecompRequest:
         with qp.capture.pause():
             op = abstractify(op)
 
-        ambient_adjoint, ambient_control_count = modifier_context
         graph_op_id = GraphOpID(op)
         base = graph_op_id.op
         static_data = {
@@ -98,15 +94,8 @@ class OpDecompRequest:
             static_data=static_data,
             extra_data=base.hybrid_args,
             is_custom_op=graph_op_id.is_custom_op,
-            adjoint=graph_op_id.adjoint != ambient_adjoint,
-            control_count=graph_op_id.num_controls + ambient_control_count,
+            modifier_state=modifier_context.compose(graph_op_id.modifiers),
         )
-
-    @property
-    def modifier_state(self) -> ModifierState:
-        """Return the modifier state represented by this request."""
-
-        return self.adjoint, self.control_count
 
 
 @dataclass

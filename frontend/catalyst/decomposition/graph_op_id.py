@@ -18,10 +18,9 @@ from collections.abc import Mapping, Sequence
 from typing import Any
 
 import pennylane as qp
-from pennylane.ops.op_math.adjoint2 import Adjoint2
-from pennylane.ops.op_math.controlled2 import ControlledOp2
 from pennylane.pytrees import flatten
 
+from catalyst.decomposition.modifier_state import ModifierState
 from catalyst.decomposition.type_utils import (
     convert_item_to_mlir_type,
     post_process_concretize_leaves,
@@ -91,18 +90,11 @@ def build_graph_op_id(
     wire_lens: Mapping[str, int],
     static_data: Mapping[str, Any],
     *,
-    adjoint: bool = False,
-    num_controls: int = 0,
+    modifiers: ModifierState = ModifierState(),
     uid: int | None = None,
 ) -> str:
     """Build a canonical frontend GraphOpID from its identity components."""
-    if num_controls < 0:
-        raise ValueError("GraphOpID control count cannot be negative")
-
-    name = f"Adjoint({operator_name})" if adjoint else operator_name
-    if num_controls:
-        prefix = "C" if num_controls == 1 else f"{num_controls}C"
-        name = f"{prefix}({name})"
+    name = modifiers.wrap_name(operator_name)
 
     dynamic_id = format_dynamic_params_for_id(dict(sorted(dynamic_shape.items())))
     wire_id = "{" + ",".join(f"{key}:{value}" for key, value in sorted(wire_lens.items())) + "}"
@@ -149,7 +141,7 @@ class GraphOpID:
         assert isinstance(
             op, qp.core.Operator2
         ), f"Graph-based decomposition expects an Operator2 instance, got {op} of type {type(op)}"
-        op, self.adjoint, self.num_controls = self.peel_modifiers(op)
+        op, self.modifiers = ModifierState.peel_modifiers(op)
         self.op = op
         self.is_custom_op = self.parse_is_custom_op()
 
@@ -158,38 +150,6 @@ class GraphOpID:
         self.wire_lens = self.parse_wire_lens()
         self.static_data = self.parse_static_data()
         self.extra_data, self.uid = self.parse_extra_data()
-
-    @staticmethod
-    def peel_modifiers(op: qp.core.Operator2):
-        """Return the innermost base of ``op`` together with the modifiers wrapping it.
-
-        A *generic* symbolic operator (``Adjoint2``/``ControlledOp2``, as opposed to a concrete
-        class such as ``CH``) reports its wrapper's own arguments, e.g.
-        ``Adjoint(S){}{}{}[1141126509488406748]``. That is not how the compiler spells a modified
-        operator: ``wrapModifiers`` folds the modifier into the *base* operator's id. So the
-        wrappers are peeled off here and counted, and :meth:`getGraphOpId` puts them back in
-        canonical position (control outermost) rather than splicing them into a finished id.
-
-        The walk terminates structurally: each step moves to ``op.base``, one wrapper shallower,
-        and the chain ends at the first non-symbolic operator.
-
-        Args:
-            op (Operator2): the operator to unwrap
-
-        Returns:
-            Operator2: the innermost base operator
-            bool: whether the base is adjointed
-            int: how many controls wrap the base
-        """
-        adjoint, num_controls = False, 0
-        while True:
-            if isinstance(op, Adjoint2):
-                adjoint = not adjoint
-            elif isinstance(op, ControlledOp2):
-                num_controls += len(op.control_wires)
-            else:
-                return op, adjoint, num_controls
-            op = op.base
 
     def parse_dynamic_shape(self) -> dict:
         """Return a dictionary of dynamic arg names to list of dtypes."""
@@ -300,7 +260,7 @@ class GraphOpID:
         """Return the name of the operator."""
         return self.operator_name
 
-    def _build_id(self, adjoint: bool, num_controls: int) -> str:
+    def _build_id(self, modifiers: ModifierState) -> str:
         """Return the GraphOpId of the base operator under the given modifiers."""
         uid = None
         if self.extra_data:
@@ -311,27 +271,26 @@ class GraphOpID:
             self.dynamic_shape,
             self.wire_lens,
             self.static_data,
-            adjoint=adjoint,
-            num_controls=num_controls,
+            modifiers=modifiers,
             uid=uid,
         )
 
-    def getGraphOpId(self, adjoint: bool = False, num_controls: int = 0) -> str:
+    def getGraphOpId(self, modifiers: ModifierState = ModifierState()) -> str:
         """
         Return the GraphOpId as a string.
 
-        The arguments are the modifiers the *caller* applies on top of the operator, e.g. a rule
-        being distributed over adjoint. They compose with the modifiers the operator carries
-        itself, so an already-symbolic operator spells canonically instead of being wrapped twice.
+        ``modifiers`` are the ones the *caller* applies on top of the operator, e.g. a rule being
+        distributed over adjoint. They compose with the modifiers the operator carries itself, so
+        an already-symbolic operator spells canonically instead of being wrapped twice.
 
         NOTE: do not modify this method without also modifying the corresponding DecomposableGate
         interface in MLIR.
         """
-        return self._build_id(adjoint != self.adjoint, num_controls + self.num_controls)
+        return self._build_id(modifiers.compose(self.modifiers))
 
     def getBaseGraphOpId(self) -> str:
         """Return the GraphOpId of the base operator alone, leaving off the modifiers wrapping it.
 
         The base is what owns the decomposition rules, so this is the id to look them up under.
         """
-        return self._build_id(False, 0)
+        return self._build_id(ModifierState())

@@ -33,8 +33,9 @@ class CpuCoprocessorSession : public common::VerbsSessionBase<CoprocessorSession
     using Base = common::VerbsSessionBase<CoprocessorSession>;
 
   public:
-    explicit CpuCoprocessorSession(std::string dev, int gid_idx)
-        : Base(std::move(dev), gid_idx, "cpu_verbs") {}
+    explicit CpuCoprocessorSession(std::string dev, int gid_idx,
+                                   common::frame::RingGeometry ring = common::frame::BL16_RING)
+        : Base(std::move(dev), gid_idx, "cpu_verbs", common::DEFAULT_QP_SHAPE, ring) {}
     ~CpuCoprocessorSession() override { stop(); }
 
     void start() override;
@@ -54,6 +55,7 @@ class CpuCoprocessorSession : public common::VerbsSessionBase<CoprocessorSession
   private:
     // The engine loop; runs on engine_.
     void run(std::stop_token st);
+    template <common::frame::Mode M> void serve(std::stop_token st);
 
     int pin_cpu_ = -1; // -1 -> leave affinity alone
     bool pin_realtime_ = false;

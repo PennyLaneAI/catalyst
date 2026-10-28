@@ -40,9 +40,9 @@ int CpuCoprocessorSession::connect(const ConnectInfo & /*info*/) {
     std::lock_guard<std::mutex> lock(candidate->mu);
     TP_CHECK(!candidate->process_message, "Coprocessor already bound to pair '%s'",
              pair_key_.c_str());
-    candidate->process_message = [this](const void *in, std::size_t in_len, void *out,
-                                        std::size_t out_cap) {
-        return this->process_message(in, in_len, out, out_cap);
+    candidate->process_message = [this](const void *payload, std::size_t len, std::uint32_t fn_id,
+                                        void *out, std::size_t out_cap) {
+        return worker_.process_message(payload, len, fn_id, out, out_cap);
     };
     link_ = std::move(candidate);
     return 0;
@@ -80,11 +80,6 @@ void CpuCoprocessorSession::stop() { worker_.stop(); }
 
 void CpuCoprocessorSession::set_coprocessor_fn(CoprocessorFn fn, void *ctx) {
     worker_.bind(fn, ctx);
-}
-
-std::size_t CpuCoprocessorSession::process_message(const void *in, std::size_t in_len, void *out,
-                                                   std::size_t out_cap) {
-    return worker_.process_message(in, in_len, out, out_cap);
 }
 
 } // namespace catalyst::transport::memcpy

@@ -39,6 +39,18 @@ typedef struct {
 #define CATALYST_COPROCESSOR_FN_ABI_VERSION 1
 
 /**
+ * A per-message coprocessor function, called once per received message with its decoded fields,
+ * whatever the transport and frame layout. `payload` points at the `len` payload bytes the
+ * message carries, and `fn_id` is the id the controller staged them with, so one function can
+ * serve several decoders. It writes its reply into `out` and returns the bytes written, or
+ * SIZE_MAX (COPROCESSOR_FN_ERROR) if it cannot process the message. `out_cap` is the frame's
+ * payload capacity, which can exceed the reply size the controller committed; the controller
+ * reads the committed size, and `out` is zero-filled past what the function writes.
+ */
+typedef size_t (*CatalystCoprocessorFn)(const void *payload, size_t len, uint32_t fn_id, void *out,
+                                        size_t out_cap, void *ctx);
+
+/**
  * The lifecycle hooks of a coprocessor function or launcher. The library defining the function
  * may export them as `const CatalystCoprocessorFnInfo *<symbol>_info(void)`, where `<symbol>` is
  * the function's name. The runtime looks `<symbol>_info` up only in the library that defines
