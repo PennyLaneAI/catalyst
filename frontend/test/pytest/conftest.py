@@ -108,15 +108,12 @@ def capture_mode(request):
     Markers:
         @pytest.mark.old_frontend - Skip when capture_mode=True
         @pytest.mark.capture_todo - xfail when capture_mode=True
-        @pytest.mark.graph_todo - xfail when capture_mode=True
     """
     if request.param:  # capture=True
         if "old_frontend" in request.keywords:
             pytest.skip("Test is specific to the old frontend and should not run with capture.")
         if "capture_todo" in request.keywords:
             pytest.xfail("Not expected to work yet with program capture.")
-        if "graph_todo" in request.keywords:
-            pytest.xfail("Graph decomposition is not expected to work yet with program capture.")
     return request.param
 
 

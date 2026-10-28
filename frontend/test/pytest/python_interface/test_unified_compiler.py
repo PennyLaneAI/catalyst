@@ -449,7 +449,7 @@ class TestCallbackIntegration:
 
         assert printed_modules[0] != printed_modules[1], "IR should differ between passes"
 
-    @pytest.mark.parametrize("skip_preprocess", [True, pytest.mark.graph_todo(False)])
+    @pytest.mark.parametrize("skip_preprocess", (True, False))
     @pytest.mark.usefixtures("use_capture")
     def test_callback_run_integration(self, capsys, skip_preprocess):
         """Test that the callback is integrated into the pass pipeline with the Compiler.run() method"""
@@ -461,7 +461,7 @@ class TestCallbackIntegration:
             print("=== Between Pass ===")
             print(module)
 
-        @qp.qjit(skip_preprocess=skip_preprocess, capture=True, collect_decomp_rules=False)
+        @qp.qjit(skip_preprocess=skip_preprocess, capture=True)
         @iterative_cancel_inverses_pass
         @merge_rotations_pass
         @qp.qnode(qp.device("null.qubit", wires=2))
@@ -481,7 +481,7 @@ class TestCallbackIntegration:
                 len(printed_modules) == 2
             ), "Callback should have been called twice (after each pass)."
         else:
-            assert len(printed_modules) == 5, (
+            assert len(printed_modules) == 6, (
                 "Callback should have been called five times (after each pass, "
                 "including device preprocessing)."
             )
