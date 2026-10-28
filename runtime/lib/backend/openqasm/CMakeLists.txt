@@ -57,3 +57,6 @@ if(NOT APPLE)
 else()
     set_property(TARGET rtd_openqasm APPEND PROPERTY BUILD_RPATH @loader_path)
 endif()
+
+# The Python module is shipped alongside: rtd_openqasm dlopen()s it by name.
+catalyst_runtime_install(rtd_openqasm openqasm_python_module)

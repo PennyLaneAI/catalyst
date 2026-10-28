@@ -324,6 +324,9 @@ def handle_qnode(
         )
         pipelines += (("device", device_preprocessing_pipeline),)
 
+    # Add the post-device pipeline, which contains optional Resource Analysis passes used through `qp.analyze`
+    pipelines += (("post-device", tuple(qnode.post_device_pipeline)),)
+
     # no idea what deduce_avals is doing, but this seems to make dynamic shapes work
     flattened_fn = deduce_avals(
         calling_convention, non_const_args, {}, [], debug_info=qfunc_jaxpr.debug_info
@@ -582,7 +585,7 @@ def trace_from_pennylane(
             )(*inner_args, **inner_kwargs)
 
             flat_inputs = jax.tree.flatten((inner_args, inner_kwargs))[0]
-            flat_inputs = [a for a in flat_inputs if qp.math.is_abstract(a)]
+            flat_inputs = [a for a in flat_inputs if qp.math.is_tracer(a)]
             abstract_shapes = _extract_abstract_shapes(flat_inputs)
             jaxpr = from_plxpr(
                 plxpr,

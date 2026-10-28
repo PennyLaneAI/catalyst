@@ -24,6 +24,7 @@
 #include <iostream>
 #include <memory>
 #include <mutex>
+#include <stdexcept>
 #include <string>
 #include <string_view>
 #include <type_traits>
@@ -71,6 +72,9 @@ struct CatalystTransportSession {
     bool started = false;
 
     std::string config; // the backend config, as passed to the factory
+    // What the backend library reports it provides; null for a version-1 backend, which reports
+    // nothing.
+    const CatalystTransportCaps *caps = nullptr;
 
     // The context a bound coprocessor function's CoprocessorFnInfo::init returned, and the fini
     // that releases it once the session has stopped.
@@ -90,6 +94,34 @@ std::uint64_t now_ns() {
 // (role, key) -> live session registry. Populated at create, read by get_session so a session
 // brought up in one function can be resolved in another.
 std::unordered_map<std::string, CatalystTransportSession *> g_registry;
+
+// Why the last create() on this thread returned null, appended to check_session's message.
+thread_local std::string g_create_error;
+
+// The capabilities a backend library reports, or null if it predates versioning (version 1).
+// Throws if the library was built for a newer ABI than this runtime's.
+const CatalystTransportCaps *load_caps(void *handle, const char *lib) {
+    auto *version_fn = reinterpret_cast<CatalystTransportAbiVersionFn *>(
+        dlsym(handle, CATALYST_TRANSPORT_ABI_VERSION_SYMBOL));
+    if (version_fn == nullptr) {
+        return nullptr;
+    }
+    const std::uint32_t version = version_fn();
+    if (version > CATALYST_TRANSPORT_ABI_VERSION) {
+        throw std::runtime_error(std::string{lib} + ": backend built for transport ABI version " +
+                                 std::to_string(version) + ", this runtime supports up to " +
+                                 std::to_string(CATALYST_TRANSPORT_ABI_VERSION));
+    }
+    auto *caps_fn = reinterpret_cast<CatalystTransportQueryCapsFn *>(
+        dlsym(handle, CATALYST_TRANSPORT_QUERY_CAPS_SYMBOL));
+    const CatalystTransportCaps *caps = caps_fn != nullptr ? caps_fn() : nullptr;
+    if (caps == nullptr) {
+        throw std::runtime_error(std::string{lib} + ": backend exports " +
+                                 CATALYST_TRANSPORT_ABI_VERSION_SYMBOL + " but no " +
+                                 CATALYST_TRANSPORT_QUERY_CAPS_SYMBOL);
+    }
+    return caps;
+}
 
 std::string registry_key(std::int32_t role, const char *key) {
     return std::to_string(role) + "/" + (key ? key : "");
@@ -131,6 +163,7 @@ const char *collect_error_name(int rc) {
 // Provision the local reply region on first use (idempotent).
 void ensure_reply(CatalystTransportSession *s) {
     if (!s->reply_ready) {
+        // A backend whose peer writes a ring of frames into this region enlarges it to fit.
         s->reply = s->sess->alloc_memory(kReplyBytes, s->sess->preferred_mem_kind());
         s->reply_ready = true;
     }
@@ -155,17 +188,18 @@ int do_exchange_keys(CatalystTransportSession *s) {
     return CATALYST_TRANSPORT_OK;
 }
 
-// Built-in fallback coprocessor function: echo the input back.
-std::size_t echo_fn(const void *in, std::size_t in_len, void *out, std::size_t out_cap, void *) {
-    std::size_t n = std::min(in_len, out_cap);
-    if (n && in && out) {
-        std::memcpy(out, in, n);
+// Built-in fallback coprocessor function: echo the payload back.
+std::size_t echo_fn(const void *payload, std::size_t len, std::uint32_t, void *out,
+                    std::size_t out_cap, void *) {
+    std::size_t n = std::min(len, out_cap);
+    if (n && payload && out) {
+        std::memcpy(out, payload, n);
     }
     return n;
 }
 
 // Bound in place of a coprocessor function that could not be configured: fails every message.
-std::size_t failing_fn(const void *, std::size_t, void *, std::size_t, void *) {
+std::size_t failing_fn(const void *, std::size_t, std::uint32_t, void *, std::size_t, void *) {
     return COPROCESSOR_FN_ERROR;
 }
 
@@ -342,23 +376,44 @@ void __catalyst__transport__check_session(CatalystTransportSession *s, const cha
     if (s != nullptr) {
         return;
     }
-    const std::string msg =
+    std::string msg =
         std::string{"[transport] "} + ((what != nullptr) ? what : "session") + ": null session";
+    if (!g_create_error.empty()) {
+        msg += " (" + g_create_error + ")";
+    }
     RT_FAIL(msg.c_str());
 }
 
 CatalystTransportSession *__catalyst__transport__create(const char *backend_lib, const char *config,
                                                         std::int32_t role, const char *key) {
+    g_create_error.clear();
     try {
         if (!backend_lib || !*backend_lib) {
-            std::cerr << "[transport] no backend library given\n";
-            return nullptr;
+            throw std::runtime_error("no backend library given");
         }
         auto h = std::make_unique<CatalystTransportSession>();
         h->backend = std::make_unique<DynamicLibraryLoader>(backend_lib);
         const std::string cfg = fold_pair_key(config, key);
         h->config = cfg;
-        if (role == CATALYST_TRANSPORT_ROLE_COPROCESSOR) {
+        h->caps = load_caps(h->backend->handle, backend_lib);
+        const bool coprocessor = role == CATALYST_TRANSPORT_ROLE_COPROCESSOR;
+        if (h->caps != nullptr &&
+            !(h->caps->roles & (coprocessor ? CATALYST_TRANSPORT_ROLE_BIT_COPROCESSOR
+                                            : CATALYST_TRANSPORT_ROLE_BIT_CONTROLLER))) {
+            throw std::runtime_error(
+                std::string{backend_lib} + ": backend '" + (h->caps->name ? h->caps->name : "?") +
+                "' does not provide the " + (coprocessor ? "coprocessor" : "controller") + " role");
+        }
+        // Version 3 changed the CoprocessorFn signature; an older coprocessor would call it wrong.
+        const std::uint32_t version = h->caps != nullptr ? h->caps->abi_version : 1;
+        if (coprocessor && version < 3) {
+            throw std::runtime_error(std::string{backend_lib} +
+                                     ": coprocessor backend built for transport ABI version " +
+                                     std::to_string(version) +
+                                     ", which calls coprocessor functions with the old signature; "
+                                     "rebuild it against this runtime");
+        }
+        if (coprocessor) {
             auto *factory = h->backend->getSymbol<CatalystTransportCoprocessorFactoryFn *>(
                 CATALYST_TRANSPORT_COPROCESSOR_FACTORY_SYMBOL);
             h->sess = factory(cfg.c_str());
@@ -368,8 +423,7 @@ CatalystTransportSession *__catalyst__transport__create(const char *backend_lib,
             h->sess = factory(cfg.c_str());
         }
         if (!h->sess) {
-            std::cerr << "[transport] backend factory returned null for config: " << cfg << "\n";
-            return nullptr;
+            throw std::runtime_error("backend factory returned null for config: " + cfg);
         }
         auto *raw = h.release();
         if (key && *key) {
@@ -387,9 +441,11 @@ CatalystTransportSession *__catalyst__transport__create(const char *backend_lib,
         }
         return raw;
     } catch (const std::exception &e) {
+        g_create_error = e.what();
         std::cerr << "[transport] create: " << e.what() << "\n";
         return nullptr;
     } catch (...) {
+        g_create_error = "unknown error";
         return nullptr;
     }
 }
@@ -688,15 +744,10 @@ int __catalyst__transport__start_benchmark(CatalystTransportSession *s, std::uin
 
             if (rc != CATALYST_TRANSPORT_OK) {
                 std::uint64_t reply_value = 0;
-                std::uint32_t reply_seq = 0;
                 std::memcpy(&reply_value, rslot, sizeof(reply_value));
-                std::memcpy(&reply_seq,
-                            static_cast<const std::uint8_t *>(rslot) +
-                                offsetof(catalyst::transport::common::Payload, seq_num),
-                            sizeof(reply_seq));
                 std::cerr << "[transport] start_benchmark: round " << i << " failed rc=" << rc
                           << " [sent 0x" << std::hex << value << ", reply slot 0x" << reply_value
-                          << std::dec << " seq=" << reply_seq << "; work_item=" << work_item_idx
+                          << std::dec << "; work_item=" << work_item_idx
                           << " in=" << outgoing_message_bytes << "B out=" << reply_bytes << "B]\n";
                 break;
             }
@@ -758,7 +809,12 @@ void __catalyst__transport__destroy(CatalystTransportSession *s) {
     if (s->sess) {
         guard([&] { s->sess->stop(); });
     }
-    delete s->sess;                // owned by the backend factory
+    // Owned by the backend factory; a versioned backend deletes its own sessions.
+    if (s->caps != nullptr && s->caps->destroy_session != nullptr) {
+        s->caps->destroy_session(s->sess);
+    } else {
+        delete s->sess;
+    }
     release_coprocessor_fn_ctx(s); // after the session, whose worker may still hold the ctx
     s->backend.reset();
     delete s;

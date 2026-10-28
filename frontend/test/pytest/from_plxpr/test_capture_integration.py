@@ -1503,6 +1503,40 @@ def test_adjoint_transform_integration():
     assert qp.math.allclose(res, expected)
 
 
+def test_mixed_control_values_operator(backend):
+    """Test both orders of mixed static and dynamic controls on RX instances."""
+
+    @qjit(capture=True, skip_preprocess=True)
+    @qp.qnode(qp.device(backend, wires=4))
+    def circuit(x, val):
+        qp.X(0)
+        qp.X(1)
+        qp.ctrl(qp.RX(x, 2), (0, 1), [True, val])
+        qp.ctrl(qp.RX(x, 3), (0, 1), [val, True])
+        return qp.expval(qp.Z(2)), qp.expval(qp.Z(3))
+
+    x = jnp.array(0.5)
+    assert qp.math.allclose(circuit(x, False), (1.0, 1.0))
+    assert qp.math.allclose(circuit(x, True), (jnp.cos(x), jnp.cos(x)))
+
+
+def test_mixed_control_values_callable(backend):
+    """Test tuple and list controls mixing static and dynamic values on the RX callable."""
+
+    @qjit(capture=True, skip_preprocess=True)
+    @qp.qnode(qp.device(backend, wires=4))
+    def circuit(x, val):
+        qp.X(0)
+        qp.X(1)
+        qp.ctrl(qp.RX, (0, 1), (val, True))(x, 2)
+        qp.ctrl(qp.RX, (0, 1), [val, True])(x, 3)
+        return qp.expval(qp.Z(2)), qp.expval(qp.Z(3))
+
+    x = jnp.array(0.5)
+    assert qp.math.allclose(circuit(x, False), (1.0, 1.0))
+    assert qp.math.allclose(circuit(x, True), (jnp.cos(x), jnp.cos(x)))
+
+
 @pytest.mark.parametrize("separate_funcs", (True, False))
 def test_ctrl_transform_integration(separate_funcs):
     """Test that the ctrl transform can be applied."""

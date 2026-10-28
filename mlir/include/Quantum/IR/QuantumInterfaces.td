@@ -194,12 +194,12 @@ def DecomposableGate : OpInterface<"DecomposableGate", [QuantumGate]> {
             "Return the name of the corresponding frontend operator (i.e. the rule supplier).", "std::string", "getOperatorName"
         >,
         InterfaceMethod<
-            "Return a map of frontend parameter name to shape and dtype of dynamic data.",
-            "llvm::StringMap<llvm::SmallVector<mlir::Type>>", "getDynamicShape"
+            "Return the frontend parameter names with the types of their dynamic data, in operand order.",
+            "::catalyst::quantum::DynamicShape", "getDynamicShape"
         >,
         InterfaceMethod<
-            "Return a map of frontend parameter name to number of wires (excluding control wires).",
-            "llvm::StringMap<size_t>", "getWireLens"
+            "Return the frontend wire argument names with their number of wires (excluding control wires), in operand order.",
+            "::catalyst::quantum::WireLens", "getWireLens"
         >,
         InterfaceMethod<
             "Return a map of frontend parameter name to static data values.",

@@ -15,7 +15,6 @@
 #include "GpuCoprocessorSession.hpp"
 
 #include <algorithm>
-#include <array>
 #include <atomic>
 #include <cstring>
 #include <memory>
@@ -24,7 +23,6 @@
 
 #include "Error.hpp"
 #include "GpuLaunchers.hpp"
-#include "Handshake.hpp"
 #include "RealtimeThread.hpp"
 
 #include <unistd.h>
@@ -35,44 +33,20 @@ using namespace catalyst::transport::common;
 using namespace catalyst::transport::coproc; // GpuRuntime, HandoffSlot, launchers
 
 namespace {
-// RDMA device port (single-port NIC -> 1).
-constexpr std::uint8_t PORT = 1;
-// Max CQEs taken per non-blocking batch reap.
-constexpr int REAP_BATCH = 16;
-constexpr int SQ_DEPTH = 4096;
-constexpr int CQ_DEPTH = 4096;
-// QP inline capacity for inline sends (>= sizeof(Payload), 16 B).
-constexpr int INLINE_MAX = 256;
-
-// fwd qp is for one-sided RDMA_WRITE from controller to coprocessor,
-// so the CQ/SQ depth does not matter here for the coprocessor session.
-constexpr int FWD_SQ_DEPTH = 16;
-constexpr int FWD_CQ_DEPTH = 256;
-constexpr int FWD_INLINE_MAX = 0;
+// The coprocessor only receives on the fwd queue pair (the controller writes into its ring), so
+// that queue pair needs almost no send queue and no inline capacity.
+constexpr QpShape FWD_QP_SHAPE{.sq_depth = 16, .cq_depth = 256, .inline_max = 0};
 } // namespace
 
-GpuCoprocessorSession::GpuCoprocessorSession(std::string dev, int gid_idx, int gpu_device)
-    : dev_name_(std::move(dev)), gid_idx_(gid_idx), gpu_(gpu_device) {}
-
-int GpuCoprocessorSession::connect(const ConnectInfo &info) {
-    ctx_ = std::make_shared<Context>(dev_name_);
-    pd_ = std::make_shared<ProtectionDomain>(ctx_);
-    fwd_cq_ = std::make_shared<CompletionQueue>(ctx_, FWD_CQ_DEPTH);
-    bwd_cq_ = std::make_shared<CompletionQueue>(ctx_, CQ_DEPTH);
-    fwd_qp_ = std::make_shared<QueuePair>(pd_, fwd_cq_, fwd_cq_, FWD_SQ_DEPTH, FWD_INLINE_MAX);
-    bwd_qp_ = std::make_shared<QueuePair>(pd_, bwd_cq_, bwd_cq_, SQ_DEPTH, INLINE_MAX);
-    fwd_qp_->to_init(PORT);
-    bwd_qp_->to_init(PORT);
-    // Cache local device attrs; QP+MR handshake is deferred to exchange_keys.
-    active_mtu_ = static_cast<std::uint32_t>(ctx_->port_attr(PORT).active_mtu);
-    mygid_ = ctx_->gid(PORT, gid_idx_);
-    oob_fd_ = tcp_listen_accept(info.oob_port); // coprocessor listens
-    return 0;
-}
+GpuCoprocessorSession::GpuCoprocessorSession(std::string dev, int gid_idx, int gpu_device,
+                                             frame::RingGeometry ring)
+    : Base(std::move(dev), gid_idx, "gpu_verbs", FWD_QP_SHAPE, ring), gpu_(gpu_device) {}
 
 MemRegion GpuCoprocessorSession::alloc_memory(std::size_t size, MemKind kind) {
     TP_CHECK(kind == MemKind::GpuHbm, "gpu_verbs: only MemKind::GpuHbm supported");
-    hbm_ = gpu_.alloc_hbm_ring(size);
+    // The peer writes a ring of frames into the region, which may be larger than asked for; a small
+    // ring still takes a whole page, as the dma-buf export needs.
+    hbm_ = gpu_.alloc_hbm_ring(std::max({size, ring_.region_bytes(), std::size_t{4096}}));
     hbm_ring_.emplace(pd_, /*offset=*/static_cast<std::uint64_t>(0), hbm_.size,
                       /*iova=*/reinterpret_cast<std::uint64_t>(hbm_.ptr), hbm_.dmabuf_fd,
                       MemAccess::REMOTE_WRITE);
@@ -87,45 +61,10 @@ MemRegion GpuCoprocessorSession::alloc_memory(std::size_t size, MemKind kind) {
     };
 }
 
-PeerRef GpuCoprocessorSession::exchange_keys(const MemRegion &local) {
-    HandshakeMsg my{
-        .fwd = {.qpn = fwd_qp_->qpn(), .psn = 0},
-        .bwd = {.qpn = bwd_qp_->qpn(), .psn = 0},
-        .mr_vaddr = reinterpret_cast<std::uint64_t>(local.addr),
-        .mr_rkey = local.rkey,
-        .mtu_enum = active_mtu_,
-    };
-    // gid is a 16-byte array copied from the local GID after the aggregate
-    // init.
-    std::memcpy(my.fwd.gid, &mygid_, sizeof(mygid_));
-    std::memcpy(my.bwd.gid, &mygid_, sizeof(mygid_));
-    HandshakeMsg peer{};
-    const int fd = oob_fd_.get();
-    send_exact(fd, &my, sizeof(my)); // coprocessor listens -> sends first
-    recv_exact(fd, &peer, sizeof(peer));
-    const std::uint32_t mtu = std::min(my.mtu_enum, peer.mtu_enum);
-    fwd_qp_->to_rtr(peer.fwd.qpn, peer.fwd.psn, peer.fwd.gid, gid_idx_, PORT, mtu);
-    bwd_qp_->to_rtr(peer.bwd.qpn, peer.bwd.psn, peer.bwd.gid, gid_idx_, PORT, mtu);
-    fwd_qp_->to_rts(my.fwd.psn);
-    bwd_qp_->to_rts(my.bwd.psn);
-    return PeerRef{
-        .rkey = peer.mr_rkey,
-        .remote_addr = peer.mr_vaddr,
-        .size = REGION_BYTES,
-    };
-}
-
 void GpuCoprocessorSession::establish_channel(const ChannelDesc &desc, const MemRegion &local,
                                               const PeerRef &peer) {
-    TP_CHECK(desc.transport == "rdma", "gpu_verbs: only transport \"rdma\" supported");
-    TP_CHECK(local.size >= REGION_BYTES, "region too small for ring: %zu < %zu",
-             static_cast<std::size_t>(local.size), REGION_BYTES);
-    desc_ = desc;
-    local_ = local;
-    peer_ = peer;
-    handoff_ = gpu_.alloc_handoff(K_RING_SLOTS);
-    reply_buf_ = common::MemoryRegion::alloc_host(pd_, sizeof(Payload), alignof(PayloadSlot),
-                                                  common::MemAccess::LOCAL_WRITE);
+    Base::establish_channel(desc, local, peer);
+    handoff_ = gpu_.alloc_handoff(ring_.slots);
 }
 
 void GpuCoprocessorSession::set_coprocessor_launcher(CoprocessorLauncherFn fn, void *ctx) {
@@ -136,58 +75,13 @@ void GpuCoprocessorSession::set_coprocessor_launcher(CoprocessorLauncherFn fn, v
 }
 
 bool GpuCoprocessorSession::post_inline(std::uint64_t cursor) {
-    auto *reply = reinterpret_cast<Payload *>(reply_buf_->addr());
-    reply->value = static_cast<std::uint64_t>(last_word_.load(std::memory_order_relaxed));
+    const auto value = static_cast<std::uint64_t>(last_word_.load(std::memory_order_relaxed));
     // TODO: echo the request's id by forwarding it through.
-    // Currently not sent to reduce Handoff size.
-    reply->decoder_id = 0;
-    reply->seq_num = static_cast<std::uint32_t>(cursor + 1);
-    ibv_sge sge{
-        .addr = reinterpret_cast<std::uint64_t>(reply),
-        .length = sizeof(Payload),
-        .lkey = reply_buf_->lkey(),
-    };
+    // Currently not sent (fn_id 0) to reduce Handoff size.
+    frame::stage(ring_, send_frame(), /*fn_id=*/0, &value, sizeof(value));
     const bool signaled = (cursor % SIGNAL_EVERY == 0);
-    ibv_send_wr wr{
-        .sg_list = &sge,
-        .num_sge = 1,
-        .opcode = IBV_WR_RDMA_WRITE,
-        .send_flags = static_cast<unsigned>(IBV_SEND_INLINE | (signaled ? IBV_SEND_SIGNALED : 0)),
-    };
-    wr.wr.rdma.remote_addr =
-        peer_.remote_addr + (cursor & (K_RING_SLOTS - 1)) * sizeof(PayloadSlot);
-    wr.wr.rdma.rkey = peer_.rkey;
-    ibv_send_wr *bad = nullptr;
-    const int rc = ibv_post_send(bwd_qp_->get(), &wr, &bad);
-    TP_CHECK(rc == 0, "ibv_post_send rc=%d (%s)", rc, std::strerror(rc));
+    post_write(bwd_qp_->get(), cursor, /*inline_data=*/true, signaled);
     return signaled;
-}
-
-// Non-blocking batch reap of the bwd CQ: take whatever completions are ready
-// (up to REAP_BATCH at a time) and decrement `outstanding`. With drain=true,
-// keep polling until every signaled send has completed (teardown), guarded so a
-// lost completion can't hang the join forever.
-void GpuCoprocessorSession::reap_bwd(int &outstanding, bool drain) {
-    std::array<ibv_wc, REAP_BATCH> wc;
-    int empty = 0;
-    constexpr int DRAIN_MAX_EMPTY = 1000000;
-    do {
-        int n = ibv_poll_cq(bwd_cq_->get(), static_cast<int>(wc.size()), wc.data());
-        if (n == 0) {
-            if (!drain) {
-                return;
-            }
-            if (++empty >= DRAIN_MAX_EMPTY) {
-                return;
-            }
-            continue;
-        }
-        empty = 0;
-        for (int k = 0; k < n; ++k) {
-            TP_CHECK(wc[k].status == IBV_WC_SUCCESS, "bwd CQE status=%d", wc[k].status);
-            --outstanding;
-        }
-    } while (drain && outstanding > 0);
 }
 
 // Coprocessor: wait for the fused kernel to publish each shot's correction into
@@ -199,14 +93,14 @@ void GpuCoprocessorSession::run_coprocessor(std::stop_token st) {
     int signaled_outstanding = 0;
     for (std::uint64_t c = 0; !st.stop_requested(); ++c) {
         const std::uint32_t expect = static_cast<std::uint32_t>(c + 1);
-        std::uint32_t index = c & (K_RING_SLOTS - 1);
+        std::uint32_t index = c & (ring_.slots - 1);
         volatile std::uint32_t *sptr = &handoff_.host[index].seq;
         std::uint32_t spins = 0;
         while (*sptr != expect) {
             if (++spins == STOP_CHECK_SPINS) {
                 spins = 0;
                 if (st.stop_requested()) {
-                    reap_bwd(signaled_outstanding, /*drain=*/true);
+                    reap(bwd_cq_->get(), signaled_outstanding, /*drain=*/true);
                     return;
                 }
             }
@@ -219,11 +113,11 @@ void GpuCoprocessorSession::run_coprocessor(std::stop_token st) {
         last_word_.store(handoff_.host[index].correction, std::memory_order_relaxed);
         if (post_inline(c)) {
             ++signaled_outstanding;
-            reap_bwd(signaled_outstanding, /*drain=*/false); // lazy batch reap
+            reap(bwd_cq_->get(), signaled_outstanding, /*drain=*/false); // lazy batch reap
         }
         completed_.fetch_add(1, std::memory_order_release);
     }
-    reap_bwd(signaled_outstanding, /*drain=*/true);
+    reap(bwd_cq_->get(), signaled_outstanding, /*drain=*/true);
 }
 
 void GpuCoprocessorSession::start() {
@@ -241,7 +135,7 @@ void GpuCoprocessorSession::start() {
     // CoprocLaunchDesc is the HIP-free bridge to the launcher.
     CoprocLaunchDesc L{
         .ring = hbm_.ptr,
-        .ring_slots = K_RING_SLOTS,
+        .ring_slots = ring_.slots,
         .handoff = handoff_.dev,
         .stop = handoff_.stop_dev,
         .total = 0,

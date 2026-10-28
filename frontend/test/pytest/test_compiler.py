@@ -160,8 +160,154 @@ class TestCompilerOptions:
         assert "--save-ir-after-each=pass" in flags
 
 
+class TestCompilerOutput:
+    """Tools write their final artifacts to the requested destination."""
+
+    @pytest.mark.parametrize("destination", [None, "-", "output"])
+    @pytest.mark.parametrize(
+        "tool,source,expected",
+        [
+            ("opt", "func.func @foo() { return }", b"llvm.func @foo"),
+            ("translate", "module { llvm.func @foo() { llvm.return } }", b"define void @foo"),
+            ("llvm-opt", "define void @foo() { ret void }", b"define void @foo"),
+            ("opt-translate", "func.func @foo() { return }", b"define void @foo"),
+            ("opt-translate-llvm", "func.func @foo() { return }", b"define void @foo"),
+        ],
+    )
+    def test_final_output(self, tool, source, expected, destination, tmp_path):
+        workspace = tmp_path / "workspace"
+        workspace.mkdir()
+        flags = [("--tool", tool), ("--workspace", str(workspace)), ("--module-name", "foo")]
+        if destination is not None:
+            flags.append(("-o", str(tmp_path / destination) if destination != "-" else "-"))
+
+        stdout = _catalyst(*flags, stdin=source.encode(), text=False)
+        if destination == "output":
+            assert stdout == b""
+            result = (tmp_path / destination).read_bytes()
+        else:
+            result = stdout
+
+        assert expected in result
+        assert not list(workspace.glob("*.o"))
+        assert not list(workspace.iterdir())
+
+    def test_intermediate_files(self, tmp_path):
+        """Intermediate saving writes snapshots into the requested workspace."""
+        workspace = tmp_path / "workspace"
+        workspace.mkdir()
+        output = tmp_path / "output.ll"
+        _catalyst(
+            ("--tool", "opt-translate"),
+            ("--workspace", workspace),
+            "--keep-intermediate",
+            ("-o", output),
+            stdin="func.func @foo() { return }",
+        )
+
+        assert "define void @foo" in output.read_text()
+        assert list(workspace.rglob("*.mlir"))
+        assert list(workspace.rglob("*.ll"))
+
+    def test_bytecode_file(self, tmp_path):
+        """The compiler can read back MLIR bytecode written to a file."""
+        output = tmp_path / "output.mlirbc"
+        assert (
+            _catalyst(("--tool", "opt"), "--emit-bytecode", ("-o", output), stdin="module {}") == ""
+        )
+        assert "module" in _catalyst(("--tool", "opt"), str(output))
+
+    @pytest.mark.parametrize("destination", [None, "-", "output.o"])
+    @pytest.mark.parametrize(
+        "tool,source",
+        [
+            (None, "func.func @foo() { return }"),
+            ("all", "func.func @foo() { return }"),
+            ("llc", "define void @foo() { ret void }"),
+        ],
+    )
+    def test_object_output(self, tool, source, destination, tmp_path, monkeypatch):
+        """Object-generating tools use file destinations and reject stdout."""
+        monkeypatch.chdir(tmp_path)
+        flags = [("--tool", tool)] if tool is not None else []
+        if destination is not None:
+            flags.append(("-o", destination))
+        if destination == "-":
+            with pytest.raises(CompileError, match="Object code cannot be written to stdout"):
+                _catalyst(*flags, stdin=source)
+            assert not list(tmp_path.iterdir())
+            return
+
+        assert _catalyst(*flags, stdin=source) == ""
+        output = tmp_path / (destination or "catalyst_module.o")
+        # ELF and Mach-O object headers on the supported Linux and macOS hosts.
+        assert output.read_bytes().startswith(
+            (b"\x7fELF", b"\xcf\xfa\xed\xfe", b"\xce\xfa\xed\xfe")
+        )
+
+    def test_default_object_filename(self, tmp_path, monkeypatch):
+        """File inputs use the default object name in the current directory."""
+        monkeypatch.chdir(tmp_path)
+        input_dir = tmp_path / "input"
+        input_dir.mkdir()
+        source = input_dir / "program.mlir"
+        source.write_text("func.func @foo() { return }")
+
+        assert _catalyst(str(source)) == ""
+        assert (tmp_path / "catalyst_module.o").stat().st_size > 0
+        assert not (input_dir / "catalyst_module.o").exists()
+
+    @pytest.mark.parametrize("destination", [None, "output.o"])
+    def test_module_name_object_output(self, destination, tmp_path, monkeypatch):
+        """The module name supplies the object filename unless an output path is given."""
+        monkeypatch.chdir(tmp_path)
+        flags = [("--module-name", "custom")]
+        if destination is not None:
+            flags.append(("-o", destination))
+
+        assert _catalyst(*flags, stdin="func.func @foo() { return }") == ""
+        output = tmp_path / (destination or "custom.o")
+        assert output.stat().st_size > 0
+        assert list(tmp_path.iterdir()) == [output]
+
+    def test_verbose_object_output(self, tmp_path, capsys):
+        """Verbose object compilation reports progress on stderr."""
+        output = tmp_path / "output.o"
+        assert (
+            _catalyst(
+                "--verbose", ("-o", output), stdin="func.func @foo() { return }", stderr_return=True
+            )
+            == ""
+        )
+        assert output.stat().st_size > 0
+        captured = capsys.readouterr()
+        assert captured.out == ""
+        assert "LLC object code generation successful" in captured.err
+
+    def test_frontend_object_output(self, tmp_path):
+        """Unlinked frontend compilation produces an object in its workspace."""
+        compiler = Compiler(CompileOptions(link=False))
+        compiler.run_from_ir("func.func @foo() { return }", "foo", Directory(tmp_path))
+
+        assert (tmp_path / "foo.o").stat().st_size > 0
+
+
 class TestCompilerDiagnostics:
     """Unit tests for diagnostics emitted by the Catalyst subprocess."""
+
+    def test_verbose_logging_preserves_ir(self, capsys):
+        """Verbose progress goes to stderr without contaminating the returned LLVM IR."""
+        tool = "opt-translate-llvm"
+        source = "func.func @foo() { return }"
+        quiet_ir = _catalyst(("--tool", tool), stdin=source)
+        verbose_ir = _catalyst(("--tool", tool), "--verbose", stdin=source, stderr_return=True)
+
+        assert "define void @foo" in quiet_ir
+        assert verbose_ir == quiet_ir
+        captured = capsys.readouterr()
+        assert captured.out == ""
+        assert "MLIR parsing successful" in captured.err
+        assert "Compilation successful:" in captured.err
 
     @pytest.mark.parametrize(
         "text,stdout,stderr",
@@ -391,6 +537,64 @@ class TestCompilerState:
         # since these are not advertised options, an assertion should be okay
         with pytest.raises(AssertionError, match="invalid options for jit_compile"):
             compiled(0.5)
+
+    @pytest.mark.parametrize(
+        "target, num_stages_run", [("mlir_opt", 1), ("llvmir", 3), ("binary", 4)]
+    )
+    def test_aot_compile_up_to_target(self, target, num_stages_run):
+        """Test that ahead-of-time compilation stops at the target, and that a later call still
+        compiles the function to a shared library and runs it."""
+
+        stages = [
+            "opt transformations successful",
+            "LLVMIR translation successful",
+            "object code generation successful",
+            "object linking successful",
+        ]
+        log = io.StringIO()
+
+        @qjit(target=target, verbose=True, logfile=log)
+        def f(x):
+            return x + 1.0
+
+        f.aot_compile(0.5)
+
+        logtext = log.getvalue()
+        for stage in stages[:num_stages_run]:
+            assert stage in logtext
+        for stage in stages[num_stages_run:]:
+            assert stage not in logtext
+        assert f(0.5) == 1.5
+
+    def test_mlir_opt_target_without_llvmir(self):
+        """Test that the MLIR returned by the compiler for the ``mlir_opt`` target, when
+        intermediate files are kept, is not stored as LLVM IR."""
+
+        @qjit(target="mlir_opt", keep_intermediate=True)
+        def f(x):
+            return x + 1.0
+
+        # Create tmp workspaces for intermediates to avoid CI race conditions
+        f.use_cwd_for_workspace = False
+        f.aot_compile(0.5)
+
+        assert f.llvm_ir is None
+        f.workspace.cleanup()
+
+    @pytest.mark.parametrize("target", ["mlir_opt", "llvmir"])
+    def test_compile_options_restored_on_error(self, target):
+        """Test that the compile options set for the target are restored when the ahead-of-time
+        compilation fails."""
+
+        @qjit(target=target, pipelines=[("PipelineA", ["test"])])
+        def f(x):
+            return x + 1.0
+
+        with pytest.raises(CompileError, match="Failed to lower MLIR module"):
+            f.aot_compile(0.5)
+
+        assert f.compile_options.lower_to_llvm
+        assert f.compile_options.link
 
     def test_callable_without_name(self):
         """Test that a callable without __name__ property can be compiled, if it is otherwise

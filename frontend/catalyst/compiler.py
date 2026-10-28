@@ -382,9 +382,6 @@ def _options_to_cli_flags(options):
     if options.checkpoint_stage:
         extra_args += [("--checkpoint-stage", options.checkpoint_stage)]
 
-    if not options.lower_to_llvm:
-        extra_args += [("--tool", "opt")]
-
     if options.keep_intermediate:
         extra_args += ["--keep-intermediate"]
 
@@ -408,14 +405,25 @@ def _options_to_cli_flags(options):
     return extra_args
 
 
-def to_llvmir(*args, stdin=None, options: Optional[CompileOptions] = None):
-    """echo ${input} | catalyst *args -"""
-    # These are the options that may affect compilation
-    if not options:
-        return _catalyst(*args, stdin=stdin)
+def to_llvm(*args, stdin=None, options: Optional[CompileOptions] = None):
+    """Return LLVM IR after MLIR lowering and translation, before LLVM transformations.
 
-    opts = _options_to_cli_flags(options)
-    return _catalyst(*opts, *args, stdin=stdin)
+    Runs one CLI invocation with ``--tool=opt-translate``. Final IR is returned
+    independently of ``keep_intermediate``; no object file is generated.
+    """
+    opts = _options_to_cli_flags(options) if options is not None else []
+    return _catalyst(("--tool", "opt-translate"), *opts, *args, stdin=stdin)
+
+
+def to_llvm_opt(*args, stdin=None, options: Optional[CompileOptions] = None):
+    """Return LLVM IR after lowering, translation, and Catalyst's LLVM transformations.
+
+    Runs one CLI invocation with ``--tool=opt-translate-llvm``, including the
+    applicable coroutine, O2, and Enzyme passes. No object file is generated.
+    Final IR is returned independently of ``keep_intermediate``.
+    """
+    opts = _options_to_cli_flags(options) if options is not None else []
+    return _catalyst(("--tool", "opt-translate-llvm"), *opts, *args, stdin=stdin)
 
 
 def to_mlir_opt(
@@ -454,7 +462,7 @@ class Compiler:
         self.options = options if options is not None else CompileOptions()
 
     @debug_logger
-    def get_cli_command(self, tmp_infile_name, output_ir_name, module_name, workspace):
+    def get_cli_command(self, tmp_infile_name, output_filename, module_name, workspace):
         """Prepare the command to run the Catalyst CLI to compile the file.
 
         Args:
@@ -464,8 +472,10 @@ class Compiler:
             cmd (str): The command to be executed.
         """
         opts = _options_to_cli_flags(self.options)
+        if not self.options.lower_to_llvm:
+            opts += [("--tool", "opt")]
         cmd = _get_catalyst_cli_cmd(
-            ("-o", output_ir_name),
+            ("-o", output_filename),
             ("--module-name", module_name),
             ("--workspace", str(workspace)),
             "-verify-each=false",
@@ -487,8 +497,7 @@ class Compiler:
         Returns:
             output_filename (str): Output file name. For the default pipeline this would be the
                                    shared object library path.
-            out_IR (str): Output IR in textual form. For the default pipeline this would be the
-                          LLVM IR.
+            out_IR (None): Deprecated.
         """
         assert isinstance(
             workspace, Directory
@@ -505,9 +514,9 @@ class Compiler:
             tmp_infile.write(ir)
 
         output_object_name = os.path.join(str(workspace), f"{module_name}.o")
-        output_ir_name = os.path.join(str(workspace), f"{module_name}.ll")
+        output_filename = output_object_name if self.options.lower_to_llvm else os.devnull
 
-        cmd = self.get_cli_command(tmp_infile_name, output_ir_name, module_name, workspace)
+        cmd = self.get_cli_command(tmp_infile_name, output_filename, module_name, workspace)
         try:
             if self.options.verbose:
                 print(f"[SYSTEM] {' '.join(cmd)}", file=self.options.logfile)
@@ -520,12 +529,6 @@ class Compiler:
         except subprocess.CalledProcessError as e:  # pragma: nocover
             raise CompileError(f"catalyst failed with error code {e.returncode}: {e.stderr}") from e
 
-        if os.path.exists(output_ir_name):
-            with open(output_ir_name, "r", encoding="utf-8") as f:
-                out_IR = f.read()
-        else:
-            out_IR = None
-
         if self.options.link:
             output = LinkerDriver.run(output_object_name, options=self.options)
             output = str(pathlib.Path(output).absolute())
@@ -535,10 +538,7 @@ class Compiler:
         # Clean up temporary files
         if os.path.exists(tmp_infile_name):
             os.remove(tmp_infile_name)
-        if os.path.exists(output_ir_name):
-            os.remove(output_ir_name)
-
-        return output, out_IR
+        return output, None
 
     def has_xdsl_passes_in_transform_modules(self, mlir_module):
         """Check if the MLIR module contains xDSL passes in transform dialect.

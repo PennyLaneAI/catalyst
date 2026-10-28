@@ -31,13 +31,6 @@ StringRef getTargetGateName(func::FuncOp func) {
     return StringRef{};
 }
 
-uint64_t getNumWires(func::FuncOp func) {
-    if (auto num_wires_attr = func->getAttrOfType<IntegerAttr>("num_wires")) {
-        return num_wires_attr.getValue().getZExtValue();
-    }
-    return 0;
-}
-
 bool isInDecompRule(Operation *op) {
     while (auto parentOp = op->getParentOp()) {
         if (auto funcOp = dyn_cast<func::FuncOp>(parentOp)) {
