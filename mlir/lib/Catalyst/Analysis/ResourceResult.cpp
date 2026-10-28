@@ -144,8 +144,7 @@ void ResourceResult::multiplyBy(double scalar) {
 //   quantum_operations: { "<wires>": { "op_name": count, ... }, ... }  // optional
 //   function_calls: { static: { "fxn": count, ... }, dynamic: { "fxn": id, ... } }
 //   measurement_processes: { "meas_type": count, ... }
-//   extended_fields: { "<extension>": { display_name, "<metric_name>": value, ... }, ... }
-//     e.g. pbc_depth: { display_name: "PBC Depth", any_commuting_depth, qubit_disjoint_depth }
+//   extended_fields: { "<extension>": { "name": value, ... }, ... } // e.g. pbc_depth
 static llvm::json::Value countToJson(double count) {
     double rounded = std::round(count);
     if (std::abs(count - rounded) < 1e-9) {
