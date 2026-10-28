@@ -60,14 +60,6 @@ using namespace DecompGraph::Solver;
 
 namespace {
 
-bool hasModifierRegion(ModuleOp module) {
-    return module
-        .walk([&](Operation *op) {
-            return (isa<CtrlOp, AdjointOp>(op)) ? WalkResult::interrupt() : WalkResult::advance();
-        })
-        .wasInterrupted();
-}
-
 void parseFixedDecomps(ArrayRef<std::string> fixedDecompsOption,
                        llvm::StringMap<std::string> &opToFixedDecompName,
                        llvm::StringSet<> &userRuleNames) {
@@ -454,13 +446,28 @@ void getOperators(ModuleOp module, std::vector<OperatorNode> &operators) {
         if (DecompUtils::isInDecompRule(op)) {
             return;
         }
-        assert(!op->getParentOfType<AdjointOp>() && !op->getParentOfType<CtrlOp>() &&
-               "graph-decomposition requires op-level modifiers: ctrl/adjoint regions must be "
-               "lowered before the decomposition graph is built");
+
+        bool isAdjoint = op->hasAttr("adjoint");
+        unsigned numControlQubits = 0;
+        if (mlir::dyn_cast<catalyst::quantum::QuantumGate>(op.getOperation())) {
+            numControlQubits = mlir::dyn_cast<catalyst::quantum::QuantumGate>(op.getOperation())
+                                   .getCtrlQubitOperands()
+                                   .size();
+        }
+
+        for (Operation *parent = op->getParentOp(); parent; parent = parent->getParentOp()) {
+            if (isa<AdjointOp>(parent)) {
+                isAdjoint = !isAdjoint; // nested adjoint cancels
+            } else if (auto ctrl = mlir::dyn_cast<CtrlOp>(parent)) {
+                numControlQubits += ctrl.getInCtrlQubits().size();
+            }
+        }
+
+        std::string opID = op.getGraphOpIdExplicitModifiers(isAdjoint, numControlQubits);
 
         // Derive the id and modifier-wrapped name from the single parse path, so operator
         // nodes and rule nodes agree on the spelling of `C(...)`/`Adjoint(...)`.
-        OperatorNode node = parseOperator(op.getGraphOpId());
+        OperatorNode node = parseOperator(opID);
 
         // numWires/numParams are debug-only; parseOperator leaves them at defaults for the
         // graphOpId form, so we need to fill them accurately from the op here.
@@ -502,12 +509,6 @@ std::unique_ptr<DecompositionGraph> prepareGraph(ModuleOp module, const PrepOpti
         }
         llvm::dbgs() << "\n";
     });
-
-    // Strip away adjoint and control regions to match the graph, where modifiers are on
-    // the individual ops
-    if (hasModifierRegion(module) && failed(lowerModifiers(module))) {
-        return nullptr;
-    }
 
     std::vector<OperatorNode> setOfOps;
     std::vector<RuleNode> setOfRules;
