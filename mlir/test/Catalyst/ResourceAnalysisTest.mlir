@@ -116,8 +116,10 @@ func.func @mbqc_gates() {
 
 // CHECK-LABEL: "pbc_operations"
 // CHECK: "extended_fields"
-// CHECK:   "any_commuting_depth": 4
-// CHECK:   "qubit_disjoint_depth": 4
+// CHECK:   "pbc_depth": {
+// CHECK-NEXT:     "any_commuting_depth": 4,
+// CHECK:     "qubit_disjoint_depth": 4
+// CHECK-NEXT:   }
 // CHECK: "num_qubits"
 // CHECK:   "alloc": 2
 // CHECK:   "arg": 0
@@ -206,8 +208,10 @@ func.func @dynamic_for_loop(%arg0: !quantum.bit, %n: index) -> !quantum.bit {
 
 // CHECK-LABEL: "dyn_for_loop_1": {
 // CHECK: "extended_fields"
-// CHECK: "any_commuting_depth": 1
-// CHECK: "qubit_disjoint_depth": 1
+// CHECK: "pbc_depth": {
+// CHECK-NEXT:   "any_commuting_depth": 1,
+// CHECK:   "qubit_disjoint_depth": 1
+// CHECK-NEXT: }
 // CHECK: "quantum_operations"
 // CHECK:   "1"
 // CHECK:       "PPR-pi/4": 1
@@ -236,16 +240,20 @@ func.func @pbc_in_dyn_loop(%arg0: !quantum.bit, %n: index) -> !quantum.bit {
 
 // CHECK-LABEL: "dyn_for_loop_1": {
 // CHECK: "extended_fields"
-// CHECK:   "any_commuting_depth": 1
-// CHECK:   "qubit_disjoint_depth": 1
+// CHECK:   "pbc_depth": {
+// CHECK-NEXT:     "any_commuting_depth": 1,
+// CHECK:     "qubit_disjoint_depth": 1
+// CHECK-NEXT:   }
 // CHECK: quantum_operations
 // CHECK: "1
 // CHECK:       "PPR-pi/4": 1
 
 // CHECK-LABEL: "pbc_in_dyn_loop_post_ppr": {
 // CHECK: "extended_fields"
-// CHECK:   "any_commuting_depth": 1
-// CHECK:   "qubit_disjoint_depth": 1
+// CHECK:   "pbc_depth": {
+// CHECK-NEXT:     "any_commuting_depth": 1,
+// CHECK:     "qubit_disjoint_depth": 1
+// CHECK-NEXT:   }
 // CHECK: "function_calls"
 // CHECK:   "dynamic":
 // CHECK:       "dyn_for_loop_1": "{{0x[0-9a-f]+}}"
@@ -270,8 +278,10 @@ func.func @pbc_in_dyn_loop_post_ppr(%arg0: !quantum.bit, %n: index) -> !quantum.
 
 // CHECK-LABEL: "test_independent_extract_between_pprs": 
 // CHECK:   "extended_fields"
-// CHECK:       "any_commuting_depth": 1
-// CHECK:       "qubit_disjoint_depth": 2
+// CHECK:       "pbc_depth": {
+// CHECK-NEXT:         "any_commuting_depth": 1,
+// CHECK:         "qubit_disjoint_depth": 2
+// CHECK-NEXT:       }
 func.func public @test_independent_extract_between_pprs() {
     %0 = quantum.alloc(4) : !quantum.reg
     %1 = quantum.extract %0[0] : !quantum.reg -> !quantum.bit
@@ -292,16 +302,20 @@ func.func public @test_independent_extract_between_pprs() {
 
 // CHECK-LABEL: "for_loop_1"
 // CHECK:   "extended_fields"
-// CHECK:       "any_commuting_depth": 1
-// CHECK:       "qubit_disjoint_depth": 2
+// CHECK:       "pbc_depth": {
+// CHECK-NEXT:         "any_commuting_depth": 1,
+// CHECK:         "qubit_disjoint_depth": 2
+// CHECK-NEXT:       }
 // CHECK:   "quantum_operations":
 // CHECK:       "1":
 // CHECK:           "PPR-pi/8": 2
 
 // CHECK-LABEL: "for_loop_2":
 // CHECK:   "extended_fields"
-// CHECK:       "any_commuting_depth": 1
-// CHECK:       "qubit_disjoint_depth": 1
+// CHECK:       "pbc_depth": {
+// CHECK-NEXT:         "any_commuting_depth": 1,
+// CHECK:         "qubit_disjoint_depth": 1
+// CHECK-NEXT:       }
 // CHECK:   "function_calls":
 // CHECK:     "static":
 // CHECK:       "for_loop_1": 5
@@ -341,8 +355,10 @@ func.func public @static_for_loop_nested(%arg0: !quantum.bit) {
 
 // CHECK-LABEL: "for_loop_1":
 // CHECK: "extended_fields"
-// CHECK:   "any_commuting_depth": 1
-// CHECK:   "qubit_disjoint_depth": 1
+// CHECK:   "pbc_depth": {
+// CHECK-NEXT:     "any_commuting_depth": 1,
+// CHECK:     "qubit_disjoint_depth": 1
+// CHECK-NEXT:   }
 // CHECK:   "quantum_operations":
 // CHECK:     "PPR-pi/4": 1
 
@@ -376,8 +392,10 @@ func.func @pbc_estimated_iterations_loop(%arg0: !quantum.bit, %n: index) -> !qua
 
 // CHECK-LABEL: "depth_helper": {
 // CHECK: "extended_fields"
-// CHECK:   "any_commuting_depth": 1
-// CHECK:   "qubit_disjoint_depth": 1
+// CHECK:   "pbc_depth": {
+// CHECK-NEXT:     "any_commuting_depth": 1,
+// CHECK:     "qubit_disjoint_depth": 1
+// CHECK-NEXT:   }
 func.func private @depth_helper(%arg0: !quantum.bit) -> !quantum.bit {
     %out = pbc.ppr ["Z"](4) %arg0 : !quantum.bit
     return %out : !quantum.bit
@@ -1855,8 +1873,10 @@ func.func private @nested_helper_func(%arg0: !quantum.bit) -> !quantum.bit {
 
 // CHECK-LABEL: "mixed_ops"
 // CHECK: "extended_fields"
-// CHECK:   "any_commuting_depth": 1
-// CHECK:   "qubit_disjoint_depth": 2
+// CHECK:   "pbc_depth": {
+// CHECK-NEXT:     "any_commuting_depth": 1,
+// CHECK:     "qubit_disjoint_depth": 2
+// CHECK-NEXT:   }
 // CHECK: "num_qubits"
 // CHECK:    "alloc": 2
 // CHECK:    "arg": 0
