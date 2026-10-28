@@ -56,7 +56,6 @@ struct ResourceEstimatePass : public impl::ResourceEstimatePassBase<ResourceEsti
     void runOnOperation() final {
         ModuleOp module = getOperation();
 
-        // Field assignment: GCC 13 rejects untyped designated-init braces for PrepOptions.
         GraphDecompositionPrep::PrepOptions opts;
         opts.targetGateSetOption = targetGateSetOption;
         opts.fixedDecompsOption = fixedDecompsOption;
