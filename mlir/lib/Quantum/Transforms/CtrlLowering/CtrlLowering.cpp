@@ -17,6 +17,7 @@
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/IRMapping.h"
 #include "mlir/IR/PatternMatch.h"
+#include "mlir/Interfaces/CallInterfaces.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -555,6 +556,15 @@ static LogicalResult distributeControls(PatternRewriter &rewriter, Block &block,
         // which is not supported:
         if (isa<scf::SCFDialect>(op.getDialect()) && op.getNumRegions() > 0) {
             op.emitError("unsupported scf operation inside a quantum.ctrl region");
+            return failure();
+        }
+        // Cloning a call that acts on quantum values would drop the controls for its body.
+        auto isQuantum = [](Type type) { return isa<QubitType, QuregType>(type); };
+        if (isa<CallOpInterface>(op) && (llvm::any_of(op.getOperandTypes(), isQuantum) ||
+                                         llvm::any_of(op.getResultTypes(), isQuantum))) {
+            op.emitError("cannot control a function call inside a quantum.ctrl region; decompose "
+                         "the controlled operations before passes that introduce function calls, "
+                         "such as gridsynth");
             return failure();
         }
         // Classical op: clone it:

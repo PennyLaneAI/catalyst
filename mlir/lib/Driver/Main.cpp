@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <memory>
+
 #include "llvm/ADT/STLForwardCompat.h"
 #include "llvm/IR/LLVMContext.h" // llvm::LLVMContext
 #include "llvm/MC/TargetRegistry.h"
@@ -50,6 +52,7 @@
 
 #include "RegisterAllPasses.h"
 
+#include "Executor/Transforms/BufferizableOpInterfaceImpl.h"
 #include "Transport/Transforms/BufferizableOpInterfaceImpl.h"
 
 using namespace catalyst;
@@ -80,8 +83,6 @@ llvm::LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOu
     llvm::LLVMContext llvmContext;
     std::shared_ptr<llvm::Module> llvmModule;
 
-    llvm::raw_string_ostream outIRStream(output.outIR);
-
     auto moduleBuffer = llvm::MemoryBuffer::getMemBufferCopy(options.source, options.moduleName);
     auto sourceMgr = std::make_shared<llvm::SourceMgr>();
     sourceMgr->AddNewSourceBuffer(std::move(moduleBuffer), llvm::SMLoc());
@@ -106,7 +107,7 @@ llvm::LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOu
         output.isCheckpointFound = options.checkpointStage == "mlir";
 
         if (options.verbosity == Verbosity::All) {
-            llvm::outs() << "MLIR parsing successful" << "\n";
+            llvm::errs() << "MLIR parsing successful" << "\n";
         }
     } else {
         llvm::SMDiagnostic err;
@@ -122,7 +123,7 @@ llvm::LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOu
         output.isCheckpointFound = options.checkpointStage == "LLVMIRTranslation";
         catalyst::utils::LinesCount::call(*llvmModule);
         if (options.verbosity == Verbosity::All) {
-            llvm::outs() << "LLVMIR parsing successful" << "\n";
+            llvm::errs() << "LLVMIR parsing successful" << "\n";
         }
     }
     if (failed(verifyInputType(options, inType))) {
@@ -131,9 +132,19 @@ llvm::LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOu
     parserTiming.stop();
 
     bool runAll = (options.loweringAction == Action::All);
-    bool runOpt = (options.loweringAction == Action::OPT) || runAll;
-    bool runTranslate = (options.loweringAction == Action::Translate) || runAll;
+    bool runOptTranslate = options.loweringAction == Action::OptTranslate ||
+                           options.loweringAction == Action::OptTranslateLLVM;
+    bool runOpt = (options.loweringAction == Action::OPT) || runOptTranslate || runAll;
+    bool runTranslate = (options.loweringAction == Action::Translate) || runOptTranslate || runAll;
+    bool runLLVMOpt = options.loweringAction == Action::LLVMOpt ||
+                      options.loweringAction == Action::OptTranslateLLVM || runAll;
     bool runLLC = (options.loweringAction == Action::LLC) || runAll;
+
+    if (runLLC && output.outputFilename == "-") {
+        CO_MSG(options, Verbosity::Urgent,
+               "Object code cannot be written to stdout; use -o <filename>.\n");
+        return llvm::failure();
+    }
 
     if (runOpt && (inType == InputType::MLIR)) {
         mlir::TimingScope optTiming = timing.nest("Optimization");
@@ -141,13 +152,9 @@ llvm::LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOu
             CO_MSG(options, Verbosity::Urgent, "Failed to lower MLIR module\n");
             return llvm::failure();
         }
-        output.outIR.clear();
-        if (options.keepIntermediate) {
-            mlirModule->print(outIRStream, opPrintingFlags);
-        }
         optTiming.stop();
         if (options.verbosity == Verbosity::All) {
-            llvm::outs() << "quantum-opt transformations successful" << "\n";
+            llvm::errs() << "quantum-opt transformations successful" << "\n";
         }
     }
 
@@ -173,20 +180,19 @@ llvm::LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOu
             auto outFile = output.nextPipelineSummaryFilename("LLVMIRTranslation", ".ll");
             catalyst::driver::dumpToFile(options, outFile, tmp);
         }
-        output.outIR.clear();
-        if (options.keepIntermediate) {
-            outIRStream << *llvmModule;
-        }
         translateTiming.stop();
 
         if (options.verbosity == Verbosity::All) {
-            llvm::outs() << "MLIR->LLVMIR translation successful" << "\n";
+            llvm::errs() << "MLIR->LLVMIR translation successful" << "\n";
         }
     }
 
-    if (runLLC && (inType == InputType::LLVMIR)) {
-        mlir::TimingScope llcTiming = timing.nest("llc");
-        // Set data layout before LLVM passes or the default one is used.
+    runLLVMOpt = runLLVMOpt && inType == InputType::LLVMIR;
+    runLLC = runLLC && inType == InputType::LLVMIR;
+
+    std::unique_ptr<llvm::TargetMachine> targetMachine;
+    if (runLLVMOpt || runLLC) {
+        // Set the target before LLVM transformations, including for IR-only output.
         llvm::Triple targetTriple{llvm::sys::getDefaultTargetTriple()};
 
         llvm::InitializeAllTargetInfos();
@@ -197,70 +203,50 @@ llvm::LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOu
 
         std::string err;
         auto target = llvm::TargetRegistry::lookupTarget(targetTriple, err);
-        llvm::TargetOptions opt;
-        const char *cpu = "generic";
-        const char *features = "";
-        auto targetMachine =
-            target->createTargetMachine(targetTriple, cpu, features, opt, llvm::Reloc::Model::PIC_);
+        if (!target) {
+            CO_MSG(options, Verbosity::Urgent, "Failed to look up LLVM target: " << err << "\n");
+            return llvm::failure();
+        }
+
+        llvm::TargetOptions targetOptions;
+        targetMachine.reset(target->createTargetMachine(targetTriple, "generic", "", targetOptions,
+                                                        llvm::Reloc::Model::PIC_));
+        if (!targetMachine) {
+            CO_MSG(options, Verbosity::Urgent, "Failed to create LLVM target machine\n");
+            return llvm::failure();
+        }
         targetMachine->setOptLevel(llvm::CodeGenOptLevel::None);
         llvmModule->setDataLayout(targetMachine->createDataLayout());
         llvmModule->setTargetTriple(targetTriple);
+    }
 
+    if (runLLVMOpt) {
         if (options.asyncQnodes) {
-            mlir::TimingScope coroLLVMPassesTiming = llcTiming.nest("LLVM coroutine passes");
+            mlir::TimingScope coroLLVMPassesTiming = timing.nest("LLVM coroutine passes");
             if (failed(timer::timer(runCoroLLVMPasses, "runCoroLLVMPasses", /* add_endl */ false,
                                     options, llvmModule, output))) {
                 return llvm::failure();
             }
             coroLLVMPassesTiming.stop();
-            catalyst::utils::LinesCount::call(*llvmModule.get());
+            catalyst::utils::LinesCount::call(*llvmModule);
         }
 
-        bool enzymeRun = catalyst::driver::containsGradients(*llvmModule);
-        if (enzymeRun) {
-            mlir::TimingScope o2PassesTiming = llcTiming.nest("LLVM O2 passes");
+        if (containsGradients(*llvmModule)) {
+            mlir::TimingScope o2PassesTiming = timing.nest("LLVM O2 passes");
             if (failed(timer::timer(runO2LLVMPasses, "runO2LLVMPasses", /* add_endl */ false,
                                     options, llvmModule, output))) {
                 return llvm::failure();
             }
             o2PassesTiming.stop();
-            catalyst::utils::LinesCount::call(*llvmModule.get());
+            catalyst::utils::LinesCount::call(*llvmModule);
 
-            mlir::TimingScope enzymePassesTiming = llcTiming.nest("Enzyme passes");
+            mlir::TimingScope enzymePassesTiming = timing.nest("Enzyme passes");
             if (failed(timer::timer(runEnzymePasses, "runEnzymePasses", /* add_endl */ false,
                                     options, llvmModule, output))) {
                 return llvm::failure();
             }
             enzymePassesTiming.stop();
-            catalyst::utils::LinesCount::call(*llvmModule.get());
-        }
-
-        std::string errorMessage;
-        auto outfile = mlir::openOutputFile(output.outputFilename, &errorMessage);
-        if (output.outputFilename == "-" && llvmModule) {
-            // Do not generate file if outputting to stdout.
-            outfile->os() << *llvmModule;
-            outfile->keep();
-            // early exit
-            return llvm::success();
-        }
-
-        mlir::TimingScope outputTiming = llcTiming.nest("compileObject");
-        output.outIR.clear();
-        if (options.keepIntermediate) {
-            outIRStream << *llvmModule;
-        }
-
-        if (failed(timer::timer(catalyst::driver::compileObjectFile, "compileObjFile",
-                                /* add_endl */ true, options, llvmModule, targetMachine,
-                                options.getObjectFile()))) {
-            return llvm::failure();
-        }
-        outputTiming.stop();
-        llcTiming.stop();
-
-        if (options.verbosity == Verbosity::All) {
-            llvm::outs() << "LLC object code generation successful" << "\n";
+            catalyst::utils::LinesCount::call(*llvmModule);
         }
     }
 
@@ -269,21 +255,39 @@ llvm::LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOu
     if (!outfile) {
         llvm::errs() << errorMessage << "\n";
         return llvm::failure();
-    } else if (output.outputFilename == "-" && llvmModule) {
-        // already handled
-    } else if (output.outputFilename == "-" && mlirModule) {
+    }
+
+    if (runLLC) {
+        mlir::TimingScope outputTiming = timing.nest("compileObject");
+        if (failed(timer::timer(catalyst::driver::compileObjectFile, "compileObjFile",
+                                /* add_endl */ true, options, llvmModule, targetMachine.get(),
+                                outfile->os()))) {
+            return llvm::failure();
+        }
+        outputTiming.stop();
+
+        if (options.verbosity == Verbosity::All) {
+            llvm::errs() << "LLC object code generation successful" << "\n";
+        }
+    } else if (llvmModule) {
+        outfile->os() << *llvmModule;
+    } else if (mlirModule) {
         if (options.shouldEmitBytecode) {
-            return mlir::writeBytecodeToFile(mlirModule.get(), outfile->os());
+            if (failed(mlir::writeBytecodeToFile(mlirModule.get(), outfile->os()))) {
+                return llvm::failure();
+            }
         } else {
             mlirModule->print(outfile->os(), opPrintingFlags);
-            outfile->keep();
         }
     }
 
-    if (options.keepIntermediate and output.outputFilename != "-") {
-        outfile->os() << output.outIR;
-        outfile->keep();
+    outfile->os().flush();
+    if (outfile->os().has_error()) {
+        llvm::errs() << "Failed to write output: " << outfile->os().error().message() << "\n";
+        outfile->os().clear_error();
+        return llvm::failure();
     }
+    outfile->keep();
 
     return llvm::success();
 }
@@ -331,9 +335,15 @@ int QuantumDriverMainFromCL(int argc, char **argv) {
         cl::values(clEnumValN(Action::OPT, "opt", "run quantum-opt on the MLIR input")),
         cl::values(clEnumValN(Action::Translate, "translate",
                               "run mlir-translate on the MLIR LLVM dialect")),
-        cl::values(clEnumValN(Action::LLC, "llc", "run llc on the llvm IR input")),
+        cl::values(clEnumValN(Action::LLVMOpt, "llvm-opt",
+                              "run Catalyst's LLVM transformations on LLVM IR input")),
+        cl::values(clEnumValN(Action::LLC, "llc", "run backend code generation on LLVM IR input")),
+        cl::values(clEnumValN(Action::OptTranslate, "opt-translate",
+                              "run quantum-opt and mlir-translate on MLIR input")),
+        cl::values(clEnumValN(Action::OptTranslateLLVM, "opt-translate-llvm",
+                              "run quantum-opt, mlir-translate, and LLVM transformations")),
         cl::values(clEnumValN(Action::All, "all",
-                              "run quantum-opt, mlir-translate, and llc on the MLIR input")),
+                              "run quantum-opt, mlir-translate, LLVM transformations, and llc")),
         cl::init(Action::All), cl::cat(CatalystCat));
     cl::opt<bool> DumpPassPipeline("dump-catalyst-pipeline",
                                    cl::desc("Print the pipeline that will be run"), cl::init(false),
@@ -358,6 +368,7 @@ int QuantumDriverMainFromCL(int argc, char **argv) {
     catalyst::quantum::registerBufferizableOpInterfaceExternalModels(registry);
     catalyst::qecp::registerBufferizableOpInterfaceExternalModels(registry);
     catalyst::transport::registerBufferizableOpInterfaceExternalModels(registry);
+    catalyst::executor::registerBufferizableOpInterfaceExternalModels(registry);
 
     // Register and parse command line options.
     std::string inputFilename, outputFilename;
@@ -381,6 +392,11 @@ int QuantumDriverMainFromCL(int argc, char **argv) {
     if (config.shouldListPasses()) {
         mlir::printRegisteredPasses();
         return 0;
+    }
+
+    if ((LoweringAction == Action::All || LoweringAction == Action::LLC) &&
+        cl::getRegisteredOptions()["o"]->getNumOccurrences() == 0) {
+        outputFilename = ModuleName + ".o";
     }
 
     std::unique_ptr<CompilerOutput> output(new CompilerOutput());
@@ -420,7 +436,7 @@ int QuantumDriverMainFromCL(int argc, char **argv) {
     }
 
     if (Verbose) {
-        llvm::outs() << "Compilation successful:\n" << output->diagnosticMessages << "\n";
+        llvm::errs() << "Compilation successful:\n" << output->diagnosticMessages << "\n";
     }
     return llvm::to_underlying(ErrorCode::Success);
 }

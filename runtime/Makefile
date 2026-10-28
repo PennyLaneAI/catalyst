@@ -9,11 +9,13 @@ NPROC ?= $(shell python3 -c "import os; print(os.cpu_count())")
 MK_ABSPATH := $(abspath $(lastword $(MAKEFILE_LIST)))
 MK_DIR := $(dir $(MK_ABSPATH))
 RT_BUILD_DIR ?= $(MK_DIR)/build
+DIST_DIR ?= $(MK_DIR)/dist
 CODE_COVERAGE ?= OFF
 BUILD_TYPE ?= RelWithDebInfo
 ENABLE_OPENQASM ?= ON
 ENABLE_OQD ?= OFF
 ENABLE_TRANSPORT ?= OFF
+TRANSPORT_HIP ?= AUTO
 ENABLE_EXECUTOR ?= OFF
 ENABLE_ASAN ?= OFF
 STRICT_WARNINGS ?= ON
@@ -76,6 +78,7 @@ help:
 	@echo "  format [check=1]   to apply C++ formatter; use with 'check=1' to check instead of modify (requires clang-format)"
 	@echo "  format [version=?] to apply C++ formatter; use with 'version={version}' to run clang-format-{version} instead of clang-format"
 	@echo "  check-tidy         to build Catalyst Runtime with RUNTIME_CLANG_TIDY=ON (requires clang-tidy)"
+	@echo "  pack-catalyst-runtime-dev  to build the catalyst-runtime-dev package"
 
 .PHONY: configure
 configure:
@@ -93,6 +96,7 @@ configure:
 		-DENABLE_OPENQASM=$(ENABLE_OPENQASM) \
 		-DENABLE_OQD=$(ENABLE_OQD) \
 		-DENABLE_TRANSPORT=$(ENABLE_TRANSPORT) \
+		-DTRANSPORT_HIP=$(TRANSPORT_HIP) \
 		-DENABLE_EXECUTOR=$(ENABLE_EXECUTOR) \
 		-DENABLE_CODE_COVERAGE=$(CODE_COVERAGE) \
 		-DPython_EXECUTABLE=$(PYTHON) \
@@ -199,10 +203,18 @@ else
 		$(MK_DIR)/include $(MK_DIR)/lib $(MK_DIR)/tests
 endif
 
+.PHONY: pack-catalyst-runtime-dev
+pack-catalyst-runtime-dev: runtime
+
+	@echo "build the catalyst-runtime-dev package"
+	cd $(RT_BUILD_DIR) && cpack
+	mkdir -p $(DIST_DIR)
+	mv $(RT_BUILD_DIR)/catalyst-runtime-dev*.tar.gz $(DIST_DIR)
+
 .PHONY: clean
 clean:
 	@echo "clean build files"
-	rm -rf $(RT_BUILD_DIR) $(RT_BUILD_DIR)_cov cov coverage.info $(MK_DIR)/BuildTidy
+	rm -rf $(RT_BUILD_DIR) $(RT_BUILD_DIR)_cov cov coverage.info $(MK_DIR)/BuildTidy $(DIST_DIR)
 
 .PHONY: format
 format:

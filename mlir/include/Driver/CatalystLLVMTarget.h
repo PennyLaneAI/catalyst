@@ -30,7 +30,8 @@ void registerLLVMTranslations(mlir::DialectRegistry &registry);
 
 mlir::LogicalResult compileObjectFile(const CompilerOptions &options,
                                       std::shared_ptr<llvm::Module> module,
-                                      llvm::TargetMachine *targetMachine, llvm::StringRef filename);
+                                      llvm::TargetMachine *targetMachine,
+                                      llvm::raw_fd_ostream &dest);
 
 } // namespace driver
 } // namespace catalyst
