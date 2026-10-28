@@ -450,6 +450,11 @@ def handle_transform(
     is_resource_estimate = (
         transform.pass_name == "resource-estimate" and pl_tkwargs.get("gate_set") is not None
     )
+    if transform.pass_name == "resource-estimate" and pl_tkwargs.get("gate_set") is None:
+        raise ValueError(
+            "qp.estimate requires an explicit 'gate_set' under qjit; the resource-estimate "
+            "pass has no default gate set."
+        )
 
     # qp.decompose is routed to the graph-decomposition pass (see _handle_decompose_transform).
     if transform == pl_decompose or is_resource_estimate:
