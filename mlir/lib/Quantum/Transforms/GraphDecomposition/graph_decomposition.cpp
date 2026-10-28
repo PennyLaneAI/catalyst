@@ -90,15 +90,14 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         std::unique_ptr<DecompositionGraph> graph;
         {
             ScopedDiagnosticTimer prepareTimer("decomp:prepare");
-            graph = GraphDecompositionPrep::prepareGraph(
-                module, {
-                            .targetGateSetOption = targetGateSetOption,
-                            .fixedDecompsOption = fixedDecompsOption,
-                            .altDecompsOption = altDecompsOption,
-                            .bytecodeRulesFile = bytecodeRulesFile,
-                            .libQPDPath = libQPDPath,
-                            .libpythonPath = libpythonPath,
-                        });
+            GraphDecompositionPrep::PrepOptions opts;
+            opts.targetGateSetOption = targetGateSetOption;
+            opts.fixedDecompsOption = fixedDecompsOption;
+            opts.altDecompsOption = altDecompsOption;
+            opts.bytecodeRulesFile = bytecodeRulesFile;
+            opts.libQPDPath = libQPDPath;
+            opts.libpythonPath = libpythonPath;
+            graph = GraphDecompositionPrep::prepareGraph(module, opts);
         }
         if (!graph) {
             return signalPassFailure();

@@ -56,18 +56,17 @@ struct ResourceEstimatePass : public impl::ResourceEstimatePassBase<ResourceEsti
     void runOnOperation() final {
         ModuleOp module = getOperation();
 
-        std::unique_ptr<DecompositionGraph> graph;
-        {
-            graph = GraphDecompositionPrep::prepareGraph(
-                module, {
-                            .targetGateSetOption = targetGateSetOption,
-                            .fixedDecompsOption = fixedDecompsOption,
-                            .altDecompsOption = altDecompsOption,
-                            .bytecodeRulesFile = bytecodeRulesFile,
-                            .libQPDPath = libQPDPath,
-                            .libpythonPath = libpythonPath,
-                        });
-        }
+        // Field assignment: GCC 13 rejects untyped designated-init braces for PrepOptions.
+        GraphDecompositionPrep::PrepOptions opts;
+        opts.targetGateSetOption = targetGateSetOption;
+        opts.fixedDecompsOption = fixedDecompsOption;
+        opts.altDecompsOption = altDecompsOption;
+        opts.bytecodeRulesFile = bytecodeRulesFile;
+        opts.libQPDPath = libQPDPath;
+        opts.libpythonPath = libpythonPath;
+
+        std::unique_ptr<DecompositionGraph> graph =
+            GraphDecompositionPrep::prepareGraph(module, opts);
         if (!graph) {
             return signalPassFailure();
         }
