@@ -371,6 +371,7 @@
     [(#3243)](https://github.com/PennyLaneAI/catalyst/pull/3243)
     [(#3252)](https://github.com/PennyLaneAI/catalyst/pull/3252)
     [(#3261)](https://github.com/PennyLaneAI/catalyst/pull/3261)
+    [(#3393)](https://github.com/PennyLaneAI/catalyst/pull/3393)
 
     This pathway of rule injection can be opted-out via a new keyword argument on `qp.qjit` named `collect_decomp_rules`.
     This kwarg controls whether or not to compile the decomposition rules during lower-time. Default value is `True`.
