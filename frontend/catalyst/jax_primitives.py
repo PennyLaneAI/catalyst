@@ -754,17 +754,10 @@ def _decomposition_definition_lowering(
 
     func_op.attributes["target_gate"] = get_mlir_attribute_from_pyval(target_gate)
     func_op.attributes["sym_visibility"] = ir.StringAttr.get("private")
+    func_op.attributes["resources"] = get_mlir_attribute_from_pyval({"operations": dict(resources)})
 
-    # TODO: remove extra field/branch with DecompRuleInterpreter removal
-    if resources is not None:
-        func_op.attributes["resources"] = get_mlir_attribute_from_pyval(
-            {"operations": dict(resources)}
-        )
-        assert frontend_name is not None
-        func_op.attributes["frontend_name"] = get_mlir_attribute_from_pyval(frontend_name)
-    else:
-        assert num_wires is not None
-        func_op.attributes["num_wires"] = get_mlir_attribute_from_pyval(num_wires)
+    assert frontend_name is not None
+    func_op.attributes["frontend_name"] = get_mlir_attribute_from_pyval(frontend_name)
 
     return ()
 

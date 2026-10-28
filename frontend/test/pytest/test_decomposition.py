@@ -2817,5 +2817,29 @@ def test_custom_op_that_decomposes_to_basis_rotation():
         }
 
 
+def test_multirz():
+    """
+    Test that decomposing qp.multirz works correctly.
+    """
+
+    @qp.qnode(qp.device("lightning.qubit", wires=2))
+    def c():
+        qp.Hadamard(0)
+        qp.Hadamard(1)
+        qp.MultiRZ(1.3, wires=[0])
+        qp.MultiRZ(7.8, wires=[0, 1])
+        return qp.state()
+
+    reference = c()
+
+    @qp.qjit(capture=True)
+    @qp.decompose(gate_set={"PauliRot", "PhaseShift", "RX", "RZ", "Hadamard"})
+    def wrap():
+        return c()
+
+    decomposed = wrap()
+    assert np.allclose(np.asarray(decomposed), np.asarray(reference))
+
+
 if __name__ == "__main__":
     pytest.main(["-x", __file__])
