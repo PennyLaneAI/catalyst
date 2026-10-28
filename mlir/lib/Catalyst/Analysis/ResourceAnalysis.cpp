@@ -518,11 +518,6 @@ void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result, b
 
 void ResourceAnalysis::collectDetailedOperation(Operation *op, ResourceResult &result,
                                                 bool isAdjoint) const {
-    // Skipped ops
-    if (isSkippedOp(op)) {
-        return;
-    }
-
     if (auto inst = dyn_cast<quantum::DecomposableGate>(op)) {
         // Keep the canonical graph ID unchanged so it matches decomposition rules.
         // Adjoint and control details will appear here once getGraphOpId() encodes them.
