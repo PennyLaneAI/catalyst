@@ -249,14 +249,14 @@ def ResourceEstimatePass : Pass<"resource-estimate", "mlir::ModuleOp"> {
     let description = [{
         Solves the decomposition graph for the target gate set like `graph-decomposition`, but
         without applying the chosen rules. Then runs resource analysis and replaces each gate in
-        the entry function's flattened resources with the basis gates of its chosen rule, scaled
+        every function's flattened resources with the basis gates of its chosen rule, scaled
         by the gate's count.
 
         Basis gates are recorded with -1 wires and params, as these cannot be reliably recovered
         from a graph op id.
 
         Usage:
-            quantum-opt input.mlir -resource-estimate='output-json gate-set=RX=1.0,RZ=1.0'
+            quantum-opt input.mlir -resource-estimate='output-json=True gate-set=RX=1.0,RZ=1.0'
     }];
 
     let options = [
