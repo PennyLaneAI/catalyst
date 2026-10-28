@@ -13,17 +13,15 @@
 # limitations under the License.
 """This file contains the pass that applies all passes present in the program representation."""
 
-import re
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from functools import partial
 from io import StringIO
 from itertools import groupby
-from typing import Any, Callable
+from typing import Callable
 
 from xdsl.context import Context
 from xdsl.dialects import builtin, transform
-from xdsl.ir import Attribute
 from xdsl.parser import Parser
 from xdsl.passes import ModulePass, PassPipeline
 from xdsl.pattern_rewriter import (
@@ -36,9 +34,6 @@ from xdsl.printer import Printer
 
 from catalyst.compiler import _quantum_opt
 from catalyst.python_interface.utils import get_pyval_from_xdsl_attr
-
-# MLIR bare-id: (letter | [_]) (letter | digit | [_$.])*
-_MLIR_BARE_ID = re.compile(r"[A-Za-z_][A-Za-z0-9_$.]*")
 
 available_passes: dict[str, Callable[[], type[ModulePass]]] = {}
 
@@ -126,101 +121,50 @@ class ApplyTransformSequencePass(ModulePass):
             pattern.match_and_rewrite(transformer, rewriter)
 
 
-class ApplyTransformSequencePattern(RewritePattern):
-    """RewritePattern for applying transform sequences when a callback is provided."""
+class ApplyTransformSequenceBase(RewritePattern):
+    """Shared rewrite driver for applying transform sequences.
+
+    Manages running xDSL ``PassPipeline`` or MLIR ``--apply-transform-sequence``.
+    Subclasses must implement grouping and how each group is applied (e.g. with or without
+    callbacks).
+    """
 
     def __init__(
         self,
         ctx: Context,
         passes: dict[str, Callable[[], type[ModulePass]]],
-        callback: Callable,
     ):
         self.ctx = ctx
         self.passes = passes
-        self.callback = callback
-        self.pass_level = 0
 
-    @op_type_rewrite_pattern
-    def match_and_rewrite(self, transformer: builtin.ModuleOp, rewriter: PatternRewriter):
-        """Rewrite modules containing transform.named_sequences."""
-        payload: builtin.ModuleOp = transformer.parent_op()
-        # Erase the transformer from the payload module. Note that PatternRewriter.erase_op
-        # erases the operation from its parent block without destroying the object. Hence,
-        # we can keep interacting with the transformer after the erasure.
-        rewriter.erase_op(transformer)
+    def create_groups(
+        self, pass_ops: Sequence[transform.ApplyRegisteredPassOp]
+    ) -> Sequence[tuple[bool, tuple[transform.ApplyRegisteredPassOp, ...]]]:
+        """Partition ``pass_ops`` into ``(is_xdsl, group)`` runs."""
+        raise NotImplementedError
 
-        pass_ops = []
-        for ns in transformer.ops:
-            assert isinstance(ns, transform.NamedSequenceOp)
-            pass_ops.extend(
-                op for op in ns.body.ops if isinstance(op, transform.ApplyRegisteredPassOp)
-            )
+    def on_empty(self, payload: builtin.ModuleOp) -> None:
+        """Called when the transform sequence has no registered passes."""
+        raise NotImplementedError
 
-        if len(pass_ops) == 0:
-            self._pre_pass_callback(None, payload)
-            return
-
-        for pass_op in pass_ops:
-            payload = self.interpret_apply_registered_pass_op(pass_op, payload, rewriter)
-
-    def _pre_pass_callback(self, compilation_pass, module):
-        """Callback wrapper to run the callback function before a pass."""
-        if self.pass_level == 0:
-            # Since this is the first pass, there is no previous pass
-            self.callback(None, module, compilation_pass, pass_level=0)
-
-    def _post_pass_callback(self, compilation_pass, module):
-        """Increment level and run callback if defined."""
-        self.pass_level += 1
-        self.callback(compilation_pass, module, None, pass_level=self.pass_level)
-
-    def interpret_apply_registered_pass_op(
+    def apply_xdsl_pipeline(
         self,
-        op: transform.ApplyRegisteredPassOp,
-        module: builtin.ModuleOp,
+        payload: builtin.ModuleOp,
+        group: Sequence[transform.ApplyRegisteredPassOp],
+    ) -> builtin.ModuleOp:
+        """Apply an xDSL pass group to ``payload``; return the (possibly same) module."""
+        raise NotImplementedError
+
+    def apply_mlir_pipeline(
+        self,
+        payload: builtin.ModuleOp,
         rewriter: PatternRewriter,
-    ):
-        """Interpret the transform.apply_registered_pass."""
-
-        pass_name = op.pass_name.data
-
-        # ---- xDSL path ----
-        if pass_name in self.passes:
-            pass_class = self.passes[pass_name]()
-            options = {
-                k.replace("-", "_"): v for k, v in get_pyval_from_xdsl_attr(op.options).items()
-            }
-            pass_instance = pass_class(**options)
-            self._pre_pass_callback(pass_instance, module)
-            pass_instance.apply(self.ctx, module)
-            self._post_pass_callback(pass_instance, module)
-            return module
-
-        # ---- Catalyst path ----
-        buffer = StringIO()
-        Printer(stream=buffer, print_generic_format=True).print_op(module)
-        schedule = _create_mlir_cli_schedule([op])
-        self._pre_pass_callback(pass_name, module)
-        modified = _quantum_opt(*schedule, "-mlir-print-op-generic", stdin=buffer.getvalue())
-
-        data = Parser(self.ctx, modified).parse_module()
-        rewriter.replace_op(module, data)
-        self._post_pass_callback(pass_name, data)
-        return data
-
-
-class ApplyTransformSequenceNoCallbackPattern(RewritePattern):
-    """RewritePattern for applying transform sequences when no callback is provided.
-    This is functionally the same as the ``ApplyTransformSequencePattern``, but uses
-    a more optimized pathway, which is enabled by the lack of a callback."""
-
-    def __init__(
-        self,
-        ctx: Context,
-        passes: dict[str, Callable[[], type[ModulePass]]],
-    ):
-        self.ctx = ctx
-        self.passes = passes
+        transformer: builtin.ModuleOp,
+        group: Sequence[transform.ApplyRegisteredPassOp],
+        insertion_point: InsertPoint,
+    ) -> tuple[builtin.ModuleOp, InsertPoint]:
+        """Apply an MLIR pass group; return updated ``(payload, insertion_point)``."""
+        raise NotImplementedError
 
     @op_type_rewrite_pattern
     def match_and_rewrite(self, transformer: builtin.ModuleOp, rewriter: PatternRewriter):
@@ -242,20 +186,16 @@ class ApplyTransformSequenceNoCallbackPattern(RewritePattern):
             )
 
         if len(pass_ops) == 0:
+            self.on_empty(payload)
             return
 
-        pass_groups = groupby(pass_ops, key=self._is_xdsl_pass)
-
-        for is_xdsl_group, group in pass_groups:
-            group = tuple(group)
+        for is_xdsl_group, group in self.create_groups(pass_ops):
             if is_xdsl_group:
-                self._apply_xdsl_pipeline(payload, group)
+                payload = self.apply_xdsl_pipeline(payload, group)
             else:
-                clone = self._clone_transformer_for_mlir_group(transformer, group)
-                rewriter.insert_op(clone, insertion_point)
-                payload = self._apply_mlir_pipeline(payload, rewriter)
-
-                insertion_point = InsertPoint.at_start(payload.body.block)
+                payload, insertion_point = self.apply_mlir_pipeline(
+                    payload, rewriter, transformer, group, insertion_point
+                )
 
     def _is_xdsl_pass(self, op: transform.ApplyRegisteredPassOp) -> bool:
         """Check whether a registered pass op corresponds to an xDSL or MLIR pass."""
@@ -283,8 +223,8 @@ class ApplyTransformSequenceNoCallbackPattern(RewritePattern):
 
         return clone
 
-    def _apply_xdsl_pipeline(
-        self, payload: builtin.ModuleOp, pass_ops: list[transform.ApplyRegisteredPassOp]
+    def _run_xdsl_pipeline(
+        self, payload: builtin.ModuleOp, pass_ops: Sequence[transform.ApplyRegisteredPassOp]
     ) -> None:
         r"""Interpret a sequence of ``ApplyRegisteredPassOp``\ s corresponding to xDSL passes."""
         pipeline = []
@@ -298,7 +238,7 @@ class ApplyTransformSequenceNoCallbackPattern(RewritePattern):
         pipeline = PassPipeline(pipeline)
         pipeline.apply(self.ctx, payload)
 
-    def _apply_mlir_pipeline(
+    def _run_mlir_pipeline(
         self,
         payload: builtin.ModuleOp,
         rewriter: PatternRewriter,
@@ -316,104 +256,118 @@ class ApplyTransformSequenceNoCallbackPattern(RewritePattern):
         return data
 
 
-def _create_mlir_cli_schedule(pass_ops: Sequence[transform.ApplyRegisteredPassOp]) -> list[str]:
-    """Create a pass schedule for applying MLIR pass via CLI flags.
+class ApplyTransformSequenceNoCallbackPattern(ApplyTransformSequenceBase):
+    """RewritePattern for applying transform sequences when no callback is provided.
 
-    For a pass with options, the corresponding CLI flag will be the following:
-
-    .. code-block::
-
-        "--my-pass=arg1=val1 arg2=val2 ..."
-
-    Args:
-        pass_ops (Sequence[xdsl.dialects.transform.ApplyRegisteredPassOp]): The
-            passes to schedule
-
-    Returns:
-        list[str]: A list containing strings that correspond to the CLI flags
-        for the specified passes
+    Batches consecutive xDSL / MLIR passes and applies them without per-pass hooks.
     """
-    schedule: list[str] = []
 
-    for op in pass_ops:
-        pass_name = op.pass_name.data
-        pass_options = op.options.data
+    def create_groups(
+        self, pass_ops: Sequence[transform.ApplyRegisteredPassOp]
+    ) -> Sequence[tuple[bool, tuple[transform.ApplyRegisteredPassOp, ...]]]:
+        """Group consecutive xDSL vs MLIR registered passes."""
+        return [
+            (is_xdsl, tuple(group)) for is_xdsl, group in groupby(pass_ops, key=self._is_xdsl_pass)
+        ]
 
-        if not pass_options:
-            schedule.append(f"--{pass_name}")
-            continue
+    def on_empty(self, payload: builtin.ModuleOp) -> None:
+        """No-op when there are no registered passes."""
+        return
 
-        cli_options = []
-        for opt, val in pass_options.items():
-            cli_options.append(f"{opt}={_get_cli_option_from_attr(val)}")
-        cli_options = " ".join(cli_options)
+    def apply_xdsl_pipeline(
+        self,
+        payload: builtin.ModuleOp,
+        group: Sequence[transform.ApplyRegisteredPassOp],
+    ) -> builtin.ModuleOp:
+        """Apply ``group`` in-process via an xDSL ``PassPipeline``."""
+        self._run_xdsl_pipeline(payload, group)
+        return payload
 
-        cli_pass = f"--{pass_name}={cli_options}"
-        schedule.append(cli_pass)
+    def apply_mlir_pipeline(
+        self,
+        payload: builtin.ModuleOp,
+        rewriter: PatternRewriter,
+        transformer: builtin.ModuleOp,
+        group: Sequence[transform.ApplyRegisteredPassOp],
+        insertion_point: InsertPoint,
+    ) -> tuple[builtin.ModuleOp, InsertPoint]:
+        """Clone the transform module for ``group`` and run ``--apply-transform-sequence``."""
+        clone = self._clone_transformer_for_mlir_group(transformer, group)
+        rewriter.insert_op(clone, insertion_point)
+        payload = self._run_mlir_pipeline(payload, rewriter)
+        insertion_point = InsertPoint.at_start(payload.body.block)
+        return payload, insertion_point
 
-    return schedule
 
+class ApplyTransformSequencePattern(ApplyTransformSequenceBase):
+    """RewritePattern for applying transform sequences when a callback is provided.
 
-def _format_mlir_dict_key(key: str) -> str:
-    """Format a dictionary key the way MLIR prints DictionaryAttr keys.
-
-    Bare identifiers are printed unquoted; all other keys use a double-quoted
-    string literal (e.g. ``Adjoint(CNOT)`` becomes ``"Adjoint(CNOT)"``).
+    Applies one registered pass at a time so the callback can observe the module
+    before/after each pass. MLIR passes use the same detach/clone/
+    ``--apply-transform-sequence`` path as the no-callback pattern.
     """
-    if _MLIR_BARE_ID.fullmatch(key):
-        return key
-    # Escape embedded quotes/backslashes the same way MLIR string literals do.
-    escaped = key.replace("\\", "\\\\").replace('"', '\\"')
-    return f'"{escaped}"'
 
+    def __init__(
+        self,
+        ctx: Context,
+        passes: dict[str, Callable[[], type[ModulePass]]],
+        callback: Callable,
+    ):
+        super().__init__(ctx=ctx, passes=passes)
+        self.callback = callback
+        self.pass_level = 0
 
-def _get_cli_option_from_attr(attr: Attribute, *, nested: bool = False) -> Any:
-    """Convert an xDSL attribute corresponding to a pass option value into a valid
-    CLI option value.
+    def create_groups(
+        self, pass_ops: Sequence[transform.ApplyRegisteredPassOp]
+    ) -> Sequence[tuple[bool, tuple[transform.ApplyRegisteredPassOp, ...]]]:
+        """One registered pass per group so callbacks fire between each pass."""
+        return [(self._is_xdsl_pass(op), (op,)) for op in pass_ops]
 
-    Serialization mirrors MLIR's ``ApplyRegisteredPassOp`` option stringification:
-    top-level ``ArrayAttr`` values are comma-separated (``ListOption`` form), while
-    ``DictionaryAttr`` values follow MLIR's DictionaryAttr printer
-    (``{key = value, ...}`` with quoted non-bare keys). Nested ``ArrayAttr`` values
-    inside a dictionary are bracketed so commas do not break list/dict parsing.
-    """
-    cli_val = None
+    def on_empty(self, payload: builtin.ModuleOp) -> None:
+        """Fire the initial callback when there are no registered passes."""
+        self._pre_pass_callback(None, payload)
 
-    match attr:
-        case builtin.IntegerAttr():
-            # Booleans are represented as integer attributes with a bitwidth of 1
-            if isinstance(attr.type, builtin.IntegerType) and attr.type.width.data == 1:
-                # Python boolean's repr is capitalized so we use strings
-                cli_val = "true" if attr.value.data else "false"
-            else:
-                cli_val = attr.value.data
+    def apply_xdsl_pipeline(
+        self,
+        payload: builtin.ModuleOp,
+        group: Sequence[transform.ApplyRegisteredPassOp],
+    ) -> builtin.ModuleOp:
+        """Apply ``group`` via ``_run_xdsl_pipeline`` with pre/post callbacks."""
+        # Groups are size-1; pass name is enough for the callback (same as MLIR).
+        pass_name = group[0].pass_name.data
+        self._pre_pass_callback(pass_name, payload)
+        self._run_xdsl_pipeline(payload, group)
+        self._post_pass_callback(pass_name, payload)
+        return payload
 
-        case builtin.FloatAttr():
-            cli_val = attr.value.data
+    def apply_mlir_pipeline(
+        self,
+        payload: builtin.ModuleOp,
+        rewriter: PatternRewriter,
+        transformer: builtin.ModuleOp,
+        group: Sequence[transform.ApplyRegisteredPassOp],
+        insertion_point: InsertPoint,
+    ) -> tuple[builtin.ModuleOp, InsertPoint]:
+        """Apply an MLIR pass group with pre/post callbacks around transform-sequence."""
+        # Groups are size-1; use the pass name for the callback (no ModulePass instance).
+        pass_name = group[0].pass_name.data
+        self._pre_pass_callback(pass_name, payload)
 
-        case builtin.StringAttr():
-            cli_val = f"'{attr.data}'"
+        clone = self._clone_transformer_for_mlir_group(transformer, group)
+        rewriter.insert_op(clone, insertion_point)
+        payload = self._run_mlir_pipeline(payload, rewriter)
+        insertion_point = InsertPoint.at_start(payload.body.block)
 
-        case builtin.ArrayAttr():
-            elements = [_get_cli_option_from_attr(elt, nested=True) for elt in attr.data]
-            if nested:
-                # Match MLIR ArrayAttr printing when nested inside a DictionaryAttr.
-                cli_val = f"[{', '.join(str(elt) for elt in elements)}]"
-            else:
-                # Top-level ListOption: comma-separated elements, no brackets.
-                cli_val = ",".join(str(elt) for elt in elements)
+        self._post_pass_callback(pass_name, payload)
+        return payload, insertion_point
 
-        case builtin.DictionaryAttr():
-            # Match MLIR DictionaryAttr printing (elideType): comma-separated
-            # entries, spaces around '=', and quoted keys when needed.
-            mapping = []
-            for k, v in attr.data.items():
-                mapping.append(
-                    f"{_format_mlir_dict_key(k)} = {_get_cli_option_from_attr(v, nested=True)}"
-                )
-            cli_val = f"{{{', '.join(mapping)}}}"
+    def _pre_pass_callback(self, compilation_pass, module):
+        """Callback wrapper to run the callback function before a pass."""
+        if self.pass_level == 0:
+            # Since this is the first pass, there is no previous pass
+            self.callback(None, module, compilation_pass, pass_level=0)
 
-        case _:  # pragma: no cover
-            raise ValueError(f"Unsupported option type {attr}.")
-
-    return cli_val
+    def _post_pass_callback(self, compilation_pass, module):
+        """Increment level and run callback if defined."""
+        self.pass_level += 1
+        self.callback(compilation_pass, module, None, pass_level=self.pass_level)

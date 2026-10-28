@@ -17,14 +17,12 @@
 
 import subprocess
 from io import StringIO
-from typing import Any
 from unittest.mock import MagicMock
 
 import pennylane as qp
 import pytest
 from xdsl.context import Context
-from xdsl.dialects import builtin, func, test, transform
-from xdsl.ir import Attribute, SSAValue
+from xdsl.dialects import builtin, func, transform
 from xdsl.passes import ModulePass
 from xdsl.printer import Printer
 
@@ -34,35 +32,11 @@ from catalyst.python_interface.conversion import parse_generic_to_xdsl_module, x
 from catalyst.python_interface.dialects import quantum
 from catalyst.python_interface.pass_api.apply_transform_sequence import (
     ApplyTransformSequencePass,
-    _create_mlir_cli_schedule,
 )
 from catalyst.python_interface.transforms import merge_rotations_pass
 from catalyst.python_interface.utils import get_pyval_from_xdsl_attr
 
 pytestmark = pytest.mark.xdsl
-
-
-def _get_xdsl_attr_from_pyval(val) -> Attribute:
-    """Get an xDSL attribute corresponding to a Python value."""
-    attr = None
-
-    match val:
-        case bool():
-            attr = builtin.IntegerAttr(int(val), 1)
-        case int():
-            attr = builtin.IntegerAttr(val, 64)
-        case float():
-            attr = builtin.FloatAttr(val, 64)
-        case str():
-            attr = builtin.StringAttr(val)
-        case list() | tuple():
-            attr = builtin.ArrayAttr(tuple(_get_xdsl_attr_from_pyval(elt) for elt in val))
-        case dict():
-            attr = builtin.DictionaryAttr({k: _get_xdsl_attr_from_pyval(v) for k, v in val.items()})
-        case _:
-            raise ValueError(f"Invalid type {val}")
-
-    return attr
 
 
 def _mock_and_get_active_passes(input: str, active_mlir_passes: list) -> str:
@@ -94,121 +68,6 @@ def _mock_and_get_active_passes(input: str, active_mlir_passes: list) -> str:
     buffer = StringIO()
     Printer(stream=buffer, print_generic_format=True).print_op(mod)
     return buffer.getvalue()
-
-
-def create_apply_registered_pass_op(
-    pass_name,
-    options: dict[str, Any] | None = None,
-    in_mod: SSAValue[transform.OperationType] | None = None,
-) -> transform.ApplyRegisteredPassOp:
-    """Create an ApplyRegisteredPassOp using the provided pass name and
-    pass options."""
-    options = options or {}
-    in_mod = (
-        in_mod or test.TestOp(result_types=(transform.OperationType("builtin.module"),)).results[0]
-    )
-
-    lowered_options = {}
-    for arg, value in options.items():
-        option_key = str(arg).replace("_", "-")
-        lowered_options[option_key] = _get_xdsl_attr_from_pyval(value)
-
-    pass_op = transform.ApplyRegisteredPassOp.create(
-        properties={
-            "pass_name": builtin.StringAttr(pass_name),
-            "options": builtin.DictionaryAttr(lowered_options),
-        },
-        operands=(in_mod,),
-        result_types=(transform.OperationType("builtin.module"),),
-    )
-    return pass_op
-
-
-class TestCreateMLIRSchedule:
-    """Unit tests for creating a schedule containing CL args for passes with options."""
-
-    def test_pass_no_options(self):
-        """Test that passes with no options are parsed correctly."""
-        pass_op = create_apply_registered_pass_op("test-pass")
-        schedule = _create_mlir_cli_schedule(pass_ops=[pass_op])
-        assert len(schedule) == 1
-        assert schedule[0] == "--test-pass"
-
-    def test_pass_basic_options(self):
-        """Test that passes with basic options (int, float, bool, string) are parsed correctly."""
-        pass_op = create_apply_registered_pass_op(
-            "test-pass",
-            options={
-                "int-opt": 1,
-                "float-opt": 1.5,
-                "bool-opt": False,
-                "str-opt": "test_string",
-                "str-opt-with-spaces": "foo bar",
-            },
-        )
-        schedule = _create_mlir_cli_schedule(pass_ops=[pass_op])
-        assert len(schedule) == 1
-        assert schedule[0] == (
-            "--test-pass=int-opt=1 float-opt=1.5 bool-opt=false str-opt='test_string' "
-            "str-opt-with-spaces='foo bar'"
-        )
-
-    def test_pass_array_options(self):
-        """Test that passes with array options are parsed correctly."""
-        pass_op = create_apply_registered_pass_op("test-pass", options={"list-opt": (1, 2, 3, 4)})
-        schedule = _create_mlir_cli_schedule(pass_ops=[pass_op])
-        assert len(schedule) == 1
-        assert schedule[0] == "--test-pass=list-opt=1,2,3,4"
-
-    def test_pass_dict_options(self):
-        """Test that passes with dict options are parsed correctly."""
-        pass_op = create_apply_registered_pass_op(
-            "test-pass", options={"dict-opt": {"a": 1, "b": 2, "c": 3, "d": 4}}
-        )
-        schedule = _create_mlir_cli_schedule(pass_ops=[pass_op])
-        assert len(schedule) == 1
-        assert schedule[0] == "--test-pass=dict-opt={a = 1, b = 2, c = 3, d = 4}"
-
-    def test_pass_dict_options_quotes_non_bare_keys(self):
-        """Non-bare DictionaryAttr keys are quoted like MLIR's DictAttr printer."""
-        pass_op = create_apply_registered_pass_op(
-            "test-pass",
-            options={"gate-set": {"CNOT": 1.0, "Adjoint(CNOT)": 1.0, "C(T)": 1.0}},
-        )
-        schedule = _create_mlir_cli_schedule(pass_ops=[pass_op])
-        assert len(schedule) == 1
-        assert schedule[0] == (
-            '--test-pass=gate-set={CNOT = 1.0, "Adjoint(CNOT)" = 1.0, "C(T)" = 1.0}'
-        )
-
-    def test_pass_nested_container_options(self):
-        """Test that passes with options that are nested containers are parsed correctly."""
-        pass_op = create_apply_registered_pass_op(
-            "test-pass",
-            options={
-                "list-opt": ({"a": 1, "b": 2}, {"c": 1.5}, {"d": False, "e": True}),
-                "dict-opt": {"f": (1, 2), "g": 1},
-            },
-        )
-        schedule = _create_mlir_cli_schedule(pass_ops=[pass_op])
-        assert len(schedule) == 1
-        assert (
-            schedule[0] == "--test-pass=list-opt={a = 1, b = 2},{c = 1.5},{d = false, e = true} "
-            "dict-opt={f = [1, 2], g = 1}"
-        )
-
-    def test_multiple_passes(self):
-        """Test that scheduling multiple passes works correctly."""
-        pass_op1 = create_apply_registered_pass_op("test-pass1")
-        pass_op2 = create_apply_registered_pass_op("test-pass2", options={"int-opt": 1})
-        pass_op3 = create_apply_registered_pass_op(
-            "test-pass3", options={"list-opt": (False, True, False)}
-        )
-        schedule = _create_mlir_cli_schedule(pass_ops=[pass_op1, pass_op2, pass_op3])
-        assert len(schedule) == 3
-        assert schedule[0] == "--test-pass1"
-        assert schedule[1] == "--test-pass2=int-opt=1"
-        assert schedule[2] == "--test-pass3=list-opt=false,true,false"
 
 
 class OptionsPass(ModulePass):
@@ -534,6 +393,58 @@ class TestApplyTransformSequencePass:
         # one RX remaining. We need to find the qnode module again because the original
         # can be replaced by the pass
         _pass.apply(ctx, mod)
+
+        qnode_mod = [op for op in mod.body.ops if isinstance(op, builtin.ModuleOp)][0]
+        qnode_fn = [op for op in qnode_mod.body.ops if isinstance(op, func.FuncOp)][0]
+        custom_ops = [op for op in qnode_fn.body.ops if isinstance(op, quantum.CustomOp)]
+        assert len(custom_ops) == 1
+        assert custom_ops[0].gate_name.data == "RX"
+
+    def test_qjit_with_passes_callback_names(self, capture_mode):
+        """Test that applying the ApplyTransformSequencePass to a qjitted qnode's
+        module correctly transforms it through callback path
+
+        Also ensure the callback is called as required.
+        """
+
+        seen_pass_names = []
+
+        def callback(
+            previous_pass, module, next_pass, pass_level=None
+        ):  # pylint: disable=unused-argument
+            """Record pass names reported to the callback."""
+            pass_obj = previous_pass if previous_pass is not None else next_pass
+            if pass_obj is None:
+                return
+            name = pass_obj.name if hasattr(pass_obj, "name") else pass_obj
+            if name not in seen_pass_names:
+                seen_pass_names.append(name)
+
+        dev = qp.device("null.qubit", wires=4)
+
+        @xdsl_from_qjit
+        @qjit(capture=capture_mode)
+        @merge_rotations_pass
+        @qp.transforms.cancel_inverses
+        @qp.qnode(dev)
+        def circuit():
+            qp.RX(1.5, 0)
+            qp.RX(1.5, 0)
+            qp.X(1)
+            qp.X(1)
+            return qp.state()
+
+        mod = circuit()
+        _pass = ApplyTransformSequencePass(callback=callback)
+        ctx = Context(allow_unregistered=True)
+        _ = QuantumParser(ctx, "")
+        _pass.apply(ctx, mod)
+
+        assert "cancel-inverses" in seen_pass_names
+        assert "xdsl-merge-rotations" in seen_pass_names
+
+        if capture_mode:
+            assert "graph-decomposition" in seen_pass_names
 
         qnode_mod = [op for op in mod.body.ops if isinstance(op, builtin.ModuleOp)][0]
         qnode_fn = [op for op in qnode_mod.body.ops if isinstance(op, func.FuncOp)][0]
