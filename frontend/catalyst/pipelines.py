@@ -177,6 +177,12 @@ class CompileOptions:
     enable_aot_compilation: bool = True
 
     def __post_init__(self):
+        valid_targets = ("jaxpr", "mlir", "mlir_opt", "llvmir", "llvmir_opt", "object", "binary")
+        if self.target not in valid_targets:
+            raise ValueError(
+                f"Invalid compilation target '{self.target}'. Expected one of {valid_targets}."
+            )
+
         # Convert keep_intermediate to Enum
         self.keep_intermediate = _parse_keep_intermediate(self.keep_intermediate)
 

@@ -753,8 +753,7 @@ class QJIT(CatalystCallable):
         self.workspace = self._get_workspace()
 
         target = self.compile_options.target
-        if target not in ("jaxpr", "mlir", "mlir_opt", "llvmir", "llvmir_opt", "object", "binary"):
-            raise ValueError(f"Invalid AOT compilation target '{target}'")
+        assert target in ("jaxpr", "mlir", "mlir_opt", "llvmir", "llvmir_opt", "object", "binary")
 
         self.jaxpr, self.out_type, self.out_treedef, self.c_sig = self.capture(args, **kwargs)
         if target == "jaxpr":
@@ -1210,8 +1209,8 @@ def _target_compile_options(options: CompileOptions):
         "object": "all",
         "binary": "all",
     }
-    if options.target in tools:
-        options.compiler_tool, options.link = tools[options.target], options.target == "binary"
+    assert options.target in tools
+    options.compiler_tool, options.link = tools[options.target], options.target == "binary"
 
     try:
         yield

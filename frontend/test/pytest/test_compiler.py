@@ -502,16 +502,16 @@ class TestCompilerState:
     """Test states that the compiler can reach."""
 
     def test_invalid_target(self):
-        """Test that nothing happens in AOT compilation when an invalid target is provided."""
+        """Invalid AOT compilation targets are rejected when qjit is applied."""
 
-        @qjit(target="hello")
-        def f():
-            return 0
+        with pytest.raises(ValueError, match="Invalid compilation target 'llvm_ir'"):
+            CompileOptions(target="llvm_ir")
 
-        assert f.jaxpr is None
-        assert f.mlir is None
-        assert f.llvmir is None
-        assert f.compiled_function is None
+        def f(x):
+            return x + 1
+
+        with pytest.raises(ValueError, match="Invalid compilation target 'llvm_ir'"):
+            qjit(f, target="llvm_ir")
 
     @pytest.mark.parametrize(
         "target, num_stages_run, suffix",
