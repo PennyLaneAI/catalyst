@@ -809,7 +809,7 @@
 
 * The Catalyst CLI now exposes LLVM transformations separately from object code generation, via
   the `--tool=llvm-opt` option. Originally this was part of the same tool that is responsible
-  for object code generation (`--tool=llvm-llc`).
+  for object code generation (`--tool=llc`).
   Combined "tools" are now also exposed via `--tool=opt-translate` and `--tool=opt-translate-llvm`
   for compilation from MLIR to a stage before object code generation.
   [(#3402)](https://github.com/PennyLaneAI/catalyst/pull/3402)
