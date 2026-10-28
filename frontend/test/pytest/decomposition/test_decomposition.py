@@ -1921,7 +1921,7 @@ def test_invalid_gateset_weight(weight):
     with pytest.raises(
         CompileError, match="Invalid cost .* for gate 'NoParams'.*non-negative number"
     ):
-        qp.specs(circuit, level="all")()
+        qp.analyze(circuit, level="all-user")()
 
 
 def test_gate_already_in_gateset():
@@ -1989,7 +1989,7 @@ def test_cyclic_decompositions_find_cheapest_solution(reverse):
             for gate in gates:
                 gate(wires=0)
 
-        resources = qp.specs(circuit, level="all")().resources
+        resources = qp.analyze(circuit, level="all-user")().resources
 
     assert resources["Before MLIR Passes"].counts == {"A": 1, "B": 1}
     assert resources["graph-decomposition"].counts == {"Target": 2}
@@ -2323,7 +2323,7 @@ class TestDecomposeAlias:
             qp.PhaseShift(0.1, wires=0)
             return qp.expval(qp.PauliZ(0))
 
-        resources = qp.specs(circuit, level="all")().resources
+        resources = qp.analyze(circuit, level="all-user")().resources
         # phaseshift is allowed by the inner pass
         assert resources["graph-decomposition"].counts == {"PhaseShift": 1}
         # phaseshift is decomposed by the outer pass
