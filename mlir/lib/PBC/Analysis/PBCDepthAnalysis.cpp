@@ -28,6 +28,7 @@ namespace pbc {
 llvm::json::Value PBCDepthExtension::toJson() const {
     llvm::json::Object depthObj;
     if (depth) {
+        depthObj["display_name"] = "PBC Depth";
         depthObj["any_commuting_depth"] = depth->first;
         depthObj["qubit_disjoint_depth"] = depth->second;
         return depthObj;

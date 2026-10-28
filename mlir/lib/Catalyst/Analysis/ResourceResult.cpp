@@ -144,7 +144,8 @@ void ResourceResult::multiplyBy(double scalar) {
 //   quantum_operations: { "<wires>": { "op_name": count, ... }, ... }  // optional
 //   function_calls: { static: { "fxn": count, ... }, dynamic: { "fxn": id, ... } }
 //   measurement_processes: { "meas_type": count, ... }
-//   extended_fields: { "<metric_name>": value, ... }  // e.g. pbc_any_commuting_depth
+//   extended_fields: { "<extension>": { display_name, "<metric_name>": value, ... }, ... }
+//     e.g. pbc_depth: { display_name: "PBC Depth", any_commuting_depth, qubit_disjoint_depth }
 static llvm::json::Value countToJson(double count) {
     double rounded = std::round(count);
     if (std::abs(count - rounded) < 1e-9) {
@@ -230,10 +231,8 @@ llvm::json::Object ResourceResult::toJson() const {
     json::Object extendedFieldObject;
     for (const auto &ext : extensions) {
         auto json = ext->toJson();
-        if (auto *fields = json.getAsObject()) {
-            for (auto &[name, value] : *fields) {
-                extendedFieldObject[name] = std::move(value);
-            }
+        if (json != nullptr) {
+            extendedFieldObject[ext->name()] = std::move(json);
         }
     }
     funcObj["extended_fields"] = std::move(extendedFieldObject);
