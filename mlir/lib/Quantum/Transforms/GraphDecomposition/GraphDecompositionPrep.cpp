@@ -114,8 +114,8 @@ void parseAltDecomps(ArrayRef<std::string> altDecompsOption,
     }
 }
 
-LogicalResult parseGateset(ModuleOp module, ArrayRef<std::string> targetGateSetOption,
-                           WeightedGateset &targetGateSet) {
+LogicalResult parseGateset(ArrayRef<std::string> targetGateSetOption,
+                           WeightedGateset &targetGateSet, ModuleOp module) {
     for (const std::string &opCostPair : targetGateSetOption) {
         llvm::StringRef pairRef(opCostPair);
 
@@ -132,16 +132,25 @@ LogicalResult parseGateset(ModuleOp module, ArrayRef<std::string> targetGateSetO
 
         double weight = 0.0;
         bool parsed = false;
+
         if (cost.ends_with(": f64")) {
+            // Float attributes encode NaN and infinity as hexadecimal bit patterns.
+            // Parsing these with strtod would instead produce finite, positive costs.
             if (auto attr =
-                    dyn_cast_or_null<FloatAttr>(parseAttribute(cost, module.getContext()))) {
+                    dyn_cast_or_null<FloatAttr>(mlir::parseAttribute(cost, module.getContext()))) {
                 weight = attr.getValueAsDouble();
                 parsed = true;
             }
-        } else {
+
+        } else { // fallback string parsing
             parsed = !cost.empty() && to_float(cost, weight);
         }
+
+        // validation
         if (!parsed || std::isnan(weight) || weight < 0.0) {
+            // return getOperation().emitError()
+            //         << "Invalid cost '" << cost << "' for gate '" << opName
+            //         << "' in the target gateset: expected a non-negative number (not NaN).";
             return module.emitError()
                    << "Invalid cost '" << cost << "' for gate '" << opName
                    << "' in the target gateset: expected a non-negative number (not NaN).";
@@ -513,7 +522,7 @@ std::unique_ptr<DecompositionGraph> prepareGraph(ModuleOp module, const PrepOpti
     // get names for fixed and alt decomps
     parseFixedDecomps(opts.fixedDecompsOption, opToFixedDecompName, userRuleNames);
     parseAltDecomps(opts.altDecompsOption, opToAltDecompNames, userRuleNames);
-    if (failed(parseGateset(module, opts.targetGateSetOption, targetGateSet))) {
+    if (failed(parseGateset(opts.targetGateSetOption, targetGateSet, module))) {
         return nullptr;
     }
 
