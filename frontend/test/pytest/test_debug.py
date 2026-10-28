@@ -24,7 +24,7 @@ from jax.tree_util import register_pytree_node_class
 from pennylane import for_loop
 
 from catalyst import debug, qjit, value_and_grad
-from catalyst.compiler import Compiler, _options_to_cli_flags, to_llvm_opt, to_mlir_opt
+from catalyst.compiler import Compiler, _options_to_cli_flags, to_llvm, to_llvm_opt, to_mlir_opt
 from catalyst.debug import compile_executable, get_cmain, get_compilation_stage, replace_ir
 from catalyst.pipelines import CompileOptions
 from catalyst.utils.exceptions import CompileError
@@ -587,7 +587,8 @@ class TestOptionsToCliFlags:
         assert "--tool" in command
         assert command[command.index("--tool") + 1] == "opt"
 
-    def test_no_options_to_llvmir(self):
+    @pytest.mark.parametrize("lower", [to_llvm, to_llvm_opt])
+    def test_no_options_to_llvmir(self, lower):
         """Test that we can lower to llvmir without needing any options"""
         mlir = """
         module {
@@ -596,7 +597,7 @@ class TestOptionsToCliFlags:
             }
         }
         """
-        observed = to_llvm_opt(stdin=mlir)
+        observed = lower(stdin=mlir)
         # pylint: disable=line-too-long
         expected = textwrap.dedent("""
         define void @foo() {
