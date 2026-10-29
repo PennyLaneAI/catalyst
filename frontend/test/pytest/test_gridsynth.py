@@ -172,9 +172,8 @@ def test_gridsynth_specs_matches_runtime(eps, ppr_basis, method):
     distance_to_pi_4 = np.abs(np.remainder(angles + np.pi / 8, np.pi / 4) - np.pi / 8)
     angles = angles[distance_to_pi_4 > 2 * eps]
 
-    # The seed fixes the sequences sampled by the mixed method.
-    @qp.qjit(capture=True, seed=37)
-    @gridsynth(epsilon=eps, ppr_basis=ppr_basis, method=method)
+    @qp.qjit(capture=True, skip_preprocess=True)
+    @qp.transforms.gridsynth(epsilon=eps, ppr_basis=ppr_basis)
     @qp.qnode(qp.device("null.qubit", wires=1))
     def circuit(angles):
         for theta in angles:
