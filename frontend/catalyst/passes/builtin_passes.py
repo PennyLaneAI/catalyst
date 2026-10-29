@@ -842,7 +842,8 @@ def gridsynth_setup_inputs(epsilon=1e-4, ppr_basis=False, method="deterministic"
             error at most ``epsilon``, and therefore diamond norm error at most ``2 * epsilon``.
             With ``"mixed"`` and ``"mixed-fallback"``, the channel averaged over samples has
             diamond norm error at most ``2 * epsilon``.
-        ppr_basis (bool): If true, decompose directly to Pauli Product Rotations (PPRs) in PBC dialect. Defaults to ``False``
+        ppr_basis (bool): If true, decompose directly to Pauli Product Rotations (PPRs) in the PBC
+            dialect, with one :math:`\pi/8` PPR per T gate.
         method (str): The synthesis method. ``"deterministic"`` (default) applies a single
             Ross-Selinger gate sequence per rotation. ``"mixed"`` applies, per execution, one of
             two twirled sequences that under- and over-rotate the target, which roughly
@@ -860,6 +861,17 @@ def gridsynth_setup_inputs(epsilon=1e-4, ppr_basis=False, method="deterministic"
         The circuits generated from this pass with ``ppr_basis=True`` are executable on devices
         that support ``PauliRot``, and ``PauliMeasure`` for ``method="mixed-fallback"``, such as
         ``lightning.qubit``, ``lightning.kokkos``, and ``lightning.gpu``.
+
+    .. note::
+
+        With ``ppr_basis=True``, the Clifford gates of each Clifford+T sequence are moved past its
+        T gates. Each T gate thereby becomes a :math:`\pi/8` PPR
+        :math:`\exp(\mp i\frac{\pi}{8}P)` about a Pauli :math:`P \in \{X, Y, Z\}`, so a sequence
+        has as many :math:`\pi/8` PPRs as its Clifford+T counterpart has T gates, and neighboring
+        :math:`\pi/8` PPRs rotate about different Paulis. The signs of the :math:`\pi/8` PPRs are
+        chosen such that no Clifford gates remain, except in short sequences with few T gates,
+        which may end with up to two :math:`\pi/4` or :math:`\pi/2` PPRs.
+        About a third of the :math:`\pi/8` PPRs become :math:`Y`-basis PPRs in this process.
 
     .. note::
 
