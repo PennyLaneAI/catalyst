@@ -244,6 +244,13 @@ class UnitaryGate_Op<string mnemonic, list<Trait> traits = []> :
             ctrlValues.assign(replacements);
         }
 
+        void addControls(mlir::ValueRange ctrlQubits, mlir::ValueRange ctrlValues) {
+            assert(ctrlQubits.size() == ctrlValues.size() &&
+                   "must provide one control value per control qubit");
+            getCtrlQubitsMutable().append(ctrlQubits);
+            getCtrlValuesMutable().append(ctrlValues);
+        }
+
         bool getAdjointFlag() {
             return getAdjoint();
         }

@@ -62,24 +62,14 @@ struct CtrlLoweringRewritePattern : public OpRewritePattern<CtrlOp> {
         // constant for the whole region.
         SmallVector<Value> currentCtrlQubits(ctrl.getCtrlQubits().begin(),
                                              ctrl.getCtrlQubits().end());
-        SmallVector<Value> ctrlValues = ctrl.getCtrlValues();
+        ValueRange ctrlValues = ctrl.getCtrlValues();
         SmallVector<Operation *> opsToErase;
 
         // Can now preform the lowering after the pre-scan to check for errors in the region.
         ctrl.getRegion().walk<WalkOrder::PreOrder>([&](Operation *op) -> WalkResult {
             if (auto gate = dyn_cast<QuantumGate>(op)) {
-                rewriter.modifyOpInPlace(gate, [&] {
-                    assert(currentCtrlQubits.size() == ctrlValues.size() &&
-                           "must provide one control value per control qubit");
-                    SmallVector<Value> gateCtrlQubits = gate.getCtrlQubitOperands();
-                    SmallVector<Value> gateCtrlValues = gate.getCtrlValueOperands();
-
-                    gateCtrlQubits.append(currentCtrlQubits);
-                    gateCtrlValues.append(ctrlValues);
-
-                    gate.setCtrlQubitOperands(gateCtrlQubits);
-                    gate.setCtrlValueOperands(gateCtrlValues);
-                });
+                rewriter.modifyOpInPlace(gate,
+                                         [&] { gate.addControls(currentCtrlQubits, ctrlValues); });
                 return WalkResult::advance();
             }
             if (auto inner = dyn_cast<CtrlOp>(op)) {
