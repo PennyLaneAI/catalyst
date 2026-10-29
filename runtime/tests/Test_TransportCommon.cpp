@@ -59,16 +59,17 @@ TEST_CASE("parse_fpga_config has defaults and reads the FPGA keys", "[common]") 
     const FpgaConfig d = parse_fpga_config("");
     CHECK(d.dev == "xib_0");
     CHECK(d.gid == 1);
-    CHECK(d.ring == K_RING_SLOTS);
+    CHECK(d.ring == 256);
     CHECK(d.stride_log2 == 6);
     CHECK_FALSE(d.data_mem.has_value());
 
+    // The ring comes from the frame keys every backend reads.
     const FpgaConfig c =
-        parse_fpga_config("dev=mlx5_1;gid=3;ring=128;stride_log2=7;data_mem=pl;reply_mem=bram");
+        parse_fpga_config("dev=mlx5_1;gid=3;frame_slots=128;data_mem=pl;reply_mem=bram");
     CHECK(c.dev == "mlx5_1");
     CHECK(c.gid == 3);
     CHECK(c.ring == 128);
-    CHECK(c.stride_log2 == 7);
+    CHECK(c.stride_log2 == 6);
     CHECK(c.data_mem == catalyst::transport::MemKind::Ddr);
     CHECK(c.reply_mem == catalyst::transport::MemKind::Other);
 

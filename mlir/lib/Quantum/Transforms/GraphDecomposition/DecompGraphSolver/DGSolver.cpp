@@ -19,8 +19,13 @@
 #include "DGSolver.hpp"
 
 #include <algorithm>
-#include <optional>
+#include <cmath>
+#include <cstddef>
+#include <format>
+#include <functional>
+#include <queue>
 #include <string>
+#include <unordered_map>
 #include <unordered_set>
 #include <utility>
 #include <vector>
@@ -32,11 +37,92 @@ using namespace DecompGraph::Core;
 
 namespace DecompGraph::Solver {
 
-ChosenDecompRule DecompositionSolver::basisRule(const OperatorNode &op) {
-    if (!graph.isTargetGate(op)) {
-        return invalidRule(op); // not a target gate, so no valid basis rule
-    }
+namespace {
 
+/**
+ * @brief The best rule offered so far for an operator that has not yet been fully explored.
+ */
+struct RuleCandidate {
+    ChosenDecompRule chosenRule;
+    bool isEmptyRule{false};
+    std::size_t ruleIdx{0}; // index in getAllRulesFor(op)
+};
+
+/**
+ * @brief Comparison function for competing rules.
+ *
+ * Prefers cost first, emptiness second, ordering last.
+ */
+bool isBetter(double cost, bool isEmptyRule, std::size_t ruleOrder, const RuleCandidate &current) {
+    if (cost != current.chosenRule.totalCost) {
+        return cost < current.chosenRule.totalCost;
+    }
+    if (isEmptyRule != current.isEmptyRule) {
+        return isEmptyRule;
+    }
+    return ruleOrder < current.ruleIdx;
+}
+
+/**
+ * @brief A rule whose inputs have not been fully explored.
+ *
+ * A rule cannot be applied unless all of its input operators are reachable from the gateset.
+ */
+struct PendingRule {
+    const RuleNode *rule;
+    std::size_t ruleOrder;
+    std::size_t remainingInputs;
+};
+
+struct QueueEntry {
+    double cost;
+    std::reference_wrapper<const OperatorNode> op;
+};
+
+/**
+ * @brief Queue entry comparison function, implementing a min-heap on the cost of entries.
+ *
+ * Ties are broken by operator ID.
+ */
+struct QueueEntryGreater {
+    bool operator()(const QueueEntry &lhs, const QueueEntry &rhs) const {
+        if (lhs.cost != rhs.cost) {
+            return lhs.cost > rhs.cost;
+        }
+        return lhs.op.get().id > rhs.op.get().id;
+    }
+};
+
+} // namespace
+
+std::vector<OperatorNode>
+DecompositionSolver::collectReachableOps(const std::vector<OperatorNode> &roots) const {
+    std::vector<OperatorNode> reachableOps;
+    std::unordered_set<OperatorNode, OperatorNodeHash> visited;
+    std::vector<OperatorNode> worklist(roots.rbegin(), roots.rend());
+
+    while (!worklist.empty()) {
+        OperatorNode op = std::move(worklist.back());
+        worklist.pop_back();
+        if (!visited.insert(op).second) {
+            continue;
+        }
+        reachableOps.push_back(op);
+        if (graph.isTargetGate(op)) {
+            continue;
+        }
+        for (const auto &rule : graph.getAllRulesFor(op)) {
+            for (const auto &input : rule.inputs) {
+                if (input.multiplicity != 0 && visited.find(input.op) == visited.end()) {
+                    worklist.push_back(input.op);
+                }
+            }
+        }
+    }
+    return reachableOps;
+}
+
+ChosenDecompRule DecompositionSolver::basisRule(const OperatorNode &op) const {
     ChosenDecompRule solution;
     solution.op = op;
     solution.isBasis = true;
@@ -46,7 +132,7 @@ ChosenDecompRule DecompositionSolver::basisRule(const OperatorNode &op) {
     return solution;
 }
 
-ChosenDecompRule DecompositionSolver::evalRule(const RuleNode &rule) {
+ChosenDecompRule DecompositionSolver::evalRule(const RuleNode &rule) const {
     ChosenDecompRule solution;
     solution.ruleName = rule.name;
     solution.isBasis = false;
@@ -55,13 +141,10 @@ ChosenDecompRule DecompositionSolver::evalRule(const RuleNode &rule) {
 
     double total_cost = 0.0;
     for (const auto &input : rule.inputs) {
-        ChosenDecompRule child;
-        child = solveOperator(input.op);
-        if (isInvalidRule(child)) {
-            // if any input cannot be solved, this rule is invalid
-            return invalidRule(solution.op);
+        if (input.multiplicity == 0) {
+            continue;
         }
-
+        const ChosenDecompRule &child = solvedMap.at(input.op);
         total_cost += child.totalCost * static_cast<double>(input.multiplicity);
         for (const auto &[basis_op, count] : child.basisCounts) {
             solution.basisCounts[basis_op] += count * input.multiplicity;
@@ -72,118 +155,144 @@ ChosenDecompRule DecompositionSolver::evalRule(const RuleNode &rule) {
     return solution;
 }
 
-ChosenDecompRule DecompositionSolver::bestRule(const OperatorNode &op) {
-    const auto &all_rules = graph.getAllRulesFor(op);
-    if (all_rules.empty()) {
-        unsolvableOps.insert(op);
-        return invalidRule(op); // no valid rules
-    }
-
-    // if there is an empty rule (with no inputs)
-    // for the given operator, pick this as the
-    // best rule with zero cost
-    for (const auto &rule : all_rules) {
-        if (rule.isEmpty()) {
-            return evalRule(rule);
-        }
-    }
-
-    std::optional<ChosenDecompRule> best_rule;
-
-    for (const auto &rule : all_rules) {
-        auto candidate = evalRule(rule);
-        if (!isInvalidRule(candidate) &&
-            (!best_rule.has_value() || candidate.totalCost < best_rule->totalCost)) {
-            best_rule = std::move(candidate);
-        }
-    }
-
-    if (!best_rule.has_value()) {
-        unsolvableOps.insert(op);
-        return invalidRule(op); // no valid rules
-    }
-
-    return best_rule.value();
-}
-
-ChosenDecompRule DecompositionSolver::solveOperator(const OperatorNode &op) {
-    // Check if the operator has already been solved
-    if (const auto it = solvedMap.find(op); it != solvedMap.end()) {
-        return it->second;
-    }
-
-    if (visited.find(op) != visited.end()) {
-        return invalidRule(op); // cycle detected, return invalid rule to prevent infinite recursion
-    }
-
-    // RAII guard for the visited set to check/solve the graph recursively
-    struct VisitGuard {
-        std::unordered_set<OperatorNode, OperatorNodeHash> &visited_;
-        std::vector<OperatorNode> &solvingStack_;
-        const OperatorNode &currentNode_;
-
-        explicit VisitGuard(std::unordered_set<OperatorNode, OperatorNodeHash> &visited,
-                            std::vector<OperatorNode> &solvingStack, const OperatorNode &node)
-            : visited_(visited), solvingStack_(solvingStack), currentNode_(node) {
-            visited_.insert(currentNode_);         // add to visited in case of exceptions
-            solvingStack_.push_back(currentNode_); // push to stack in case of exceptions
-        }
-        ~VisitGuard() {
-            visited_.erase(currentNode_);
-            if (!solvingStack_.empty()) {
-                solvingStack_.pop_back();
-            }
-        }
-
-        VisitGuard(const VisitGuard &) = delete;
-        VisitGuard &operator=(const VisitGuard &) = delete;
-    } visitGuard(visited, solvingStack, op);
-
-    auto chosen = graph.isTargetGate(op) ? basisRule(op) : bestRule(op);
-
-    if (!isInvalidRule(chosen)) {
-        solvedMap.emplace(op, chosen);
-    }
-    return chosen;
-}
-
+/**
+ * @brief Return an optimal solution to the decomposition graph.
+ *
+ * The solution is computed via a modified Dijkstra's algorithm.
+ */
 GraphResult DecompositionSolver::solve() {
-    // Return cached solution if already solved
-    if (!solvedMap.empty()) {
+    // Only reuse a result after every root has been solved successfully.
+    if (solveSucceeded) {
         return solvedMap;
     }
 
-    for (const auto &root : graph.getRootOps()) {
-        const auto chosen_rule = solveOperator(root);
-        if (isInvalidRule(chosen_rule)) {
-            // Debugging output:
-            showGraph(graph);
-            showSolution(solvedMap);
+    // A failed attempt may have finalized some operators. Start fresh on retry.
+    solvedMap.clear();
 
-            // Prepare error msg:
-            std::vector<std::string> rules_error;
-            for (const auto &rule : graph.getAllRulesFor(root)) {
-                rules_error.push_back(rule.name);
-            }
-
-            // List of ops where the chain could not reach the gateset:
-            std::vector<OperatorNode> unsolvable;
-            for (const auto &u : unsolvableOps) {
-                if (u != root) {
-                    unsolvable.push_back(u);
-                }
-            }
-            std::sort(unsolvable.begin(), unsolvable.end(),
-                      [](const OperatorNode &a, const OperatorNode &b) {
-                          return print_op(a) < print_op(b);
-                      });
-
-            throw GraphSolverFailedError(root, rules_error,
-                                         unsolvable); // all rules failed for this root operator
+    // validate gateset costs
+    for (const auto &[name, cost] : graph.getGateset().ops) {
+        if (std::isnan(cost) || cost < 0.0) {
+            throw GraphError(std::format(
+                "Invalid cost {} for gate '{}' in the target gateset: costs must be non-negative.",
+                cost, name));
         }
     }
 
+    const std::vector<OperatorNode> reachableOps = collectReachableOps(graph.getRootOps());
+
+    std::unordered_map<OperatorNode, RuleCandidate, OperatorNodeHash> opsToRuleCandidates;
+    std::priority_queue<QueueEntry, std::vector<QueueEntry>, QueueEntryGreater> opQueue;
+
+    // Referenced operators belong to reachableOps or the graph, which outlive opQueue.
+    auto offerRule = [&](const OperatorNode &op, ChosenDecompRule chosen, bool isEmptyRule,
+                         std::size_t ruleOrder) {
+        if (solvedMap.find(op) != solvedMap.end()) {
+            return;
+        }
+        const auto it = opsToRuleCandidates.find(op);
+        if (it != opsToRuleCandidates.end() &&
+            !isBetter(chosen.totalCost, isEmptyRule, ruleOrder, it->second)) {
+            return;
+        }
+        opQueue.push({chosen.totalCost, std::cref(op)});
+        opsToRuleCandidates.insert_or_assign(
+            op, RuleCandidate{std::move(chosen), isEmptyRule, ruleOrder});
+    };
+
+    /*
+     * opsToConsumingRules maps ops to the rules that consume them. Rules are stored here as indices
+     * in the pendingRules vector. Pending rules keeps a counter of the unresolved op costs, and
+     * once the counter reaches 0 the rule can be explored. This is how we implement the fact that a
+     * rule cannot be explored unless all of its inputs have been explored.
+     */
+    std::unordered_map<OperatorNode, std::vector<std::size_t>, OperatorNodeHash>
+        opsToConsumingRules;
+    std::vector<PendingRule> pendingRules;
+
+    for (const auto &op : reachableOps) {
+        if (graph.isTargetGate(op)) {
+            offerRule(op, basisRule(op), false, 0);
+            continue;
+        }
+
+        const auto &rules = graph.getAllRulesFor(op);
+        for (std::size_t order = 0; order < rules.size(); ++order) {
+            const RuleNode &rule = rules[order];
+            std::size_t numInputs = 0;
+            for (const auto &input : rule.inputs) {
+                if (input.multiplicity != 0) {
+                    opsToConsumingRules[input.op].push_back(pendingRules.size());
+                    ++numInputs;
+                }
+            }
+            if (numInputs == 0) {
+                offerRule(op, evalRule(rule), rule.isEmpty(), order);
+            } else {
+                pendingRules.push_back({&rule, order, numInputs});
+            }
+        }
+    }
+
+    while (!opQueue.empty()) {
+        const QueueEntry currentOp = opQueue.top();
+        opQueue.pop();
+        const OperatorNode &op = currentOp.op.get();
+        if (solvedMap.find(op) != solvedMap.end()) {
+            continue;
+        }
+        auto ruleCandidate = opsToRuleCandidates.find(op);
+        if (currentOp.cost != ruleCandidate->second.chosenRule.totalCost) {
+            continue; // superseded by a cheaper candidate
+        }
+        solvedMap.emplace(op, std::move(ruleCandidate->second.chosenRule));
+        opsToRuleCandidates.erase(ruleCandidate);
+
+        const auto consumingRules = opsToConsumingRules.find(op);
+        if (consumingRules == opsToConsumingRules.end()) {
+            continue;
+        }
+        for (const std::size_t ruleIndex : consumingRules->second) {
+            PendingRule &pendingRule = pendingRules[ruleIndex];
+            if (--pendingRule.remainingInputs == 0) {
+                const RuleNode &rule = *pendingRule.rule;
+                offerRule(rule.output, evalRule(rule), false, pendingRule.ruleOrder);
+            }
+        }
+    }
+
+    for (const auto &root : graph.getRootOps()) {
+        if (solvedMap.find(root) == solvedMap.end()) {
+            throwUnsolved(root);
+        }
+    }
+
+    solveSucceeded = true;
     return solvedMap;
+}
+
+void DecompositionSolver::throwUnsolved(const OperatorNode &root) const {
+    // Debugging output:
+    showGraph(graph);
+    showSolution(solvedMap);
+
+    // Prepare error msg:
+    std::vector<std::string> rules_error;
+    for (const auto &rule : graph.getAllRulesFor(root)) {
+        rules_error.push_back(rule.name);
+    }
+
+    // List of ops where the chain could not reach the gateset:
+    std::vector<OperatorNode> unsolvable;
+    for (const auto &op : collectReachableOps({root})) {
+        if (op != root && solvedMap.find(op) == solvedMap.end()) {
+            unsolvable.push_back(op);
+        }
+    }
+    std::sort(
+        unsolvable.begin(), unsolvable.end(),
+        [](const OperatorNode &a, const OperatorNode &b) { return print_op(a) < print_op(b); });
+
+    throw GraphSolverFailedError(root, rules_error, unsolvable);
 }
 
 } // namespace DecompGraph::Solver
