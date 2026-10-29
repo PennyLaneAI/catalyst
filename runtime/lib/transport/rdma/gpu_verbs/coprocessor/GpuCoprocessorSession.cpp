@@ -84,7 +84,7 @@ bool GpuCoprocessorSession::post_reply(std::uint64_t cursor, const frame::FrameV
     // coprocessor's reply is.
     std::memset(frame::data(ring_, send) + reply.len, 0, frame::data_capacity(ring_) - reply.len);
     const bool signaled = (cursor % SIGNAL_EVERY == 0);
-    post_write(bwd_qp_->get(), cursor, /*inline_data=*/true, signaled);
+    post_frame(bwd_qp_->get(), cursor, /*inline_data=*/true, signaled);
     return signaled;
 }
 
