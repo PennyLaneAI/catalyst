@@ -19,7 +19,7 @@ func.func @circuit(%q0: !quantum.bit) {
     %out = quantum.custom "failure"() %q0 : !quantum.bit
 
     // CHECK: GraphSolverFailedError
-    // CHECK: Decomposition rule not found for operator 'id: failure{}{wires:1}{}'
+    // CHECK: Decomposition rule not found for operator 'failure{}{wires:1}{}'
     return
 }
 

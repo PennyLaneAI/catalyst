@@ -28,6 +28,7 @@
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/DialectRegistry.h"
 #include "mlir/IR/PatternMatch.h"
+#include "mlir/IR/SymbolTable.h"
 #include "mlir/IR/Value.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
@@ -38,6 +39,7 @@
 #include "mlir/Transforms/Passes.h"
 #include "stablehlo/dialect/StablehloOps.h" // When we read the decomposition rules module from file, StablehloDialect may not be registered from start.
 
+#include "Catalyst/IR/CatalystDialect.h"
 #include "QRef/IR/QRefDialect.h"
 #include "QRef/Transforms/Passes.h"
 #include "QRef/Transforms/Patterns.h"
@@ -64,6 +66,7 @@ struct DecomposeLoweringPass : impl::DecomposeLoweringPassBase<DecomposeLowering
 
     void getDependentDialects(DialectRegistry &registry) const override {
         registry.insert<arith::ArithDialect>();
+        registry.insert<catalyst::CatalystDialect>();
         registry.insert<func::FuncDialect>();
         registry.insert<quantum::QuantumDialect>();
         registry.insert<qref::QRefDialect>();
@@ -88,17 +91,7 @@ struct DecomposeLoweringPass : impl::DecomposeLoweringPassBase<DecomposeLowering
             }
 
             if (StringRef targetOp = DecompUtils::getTargetGateName(func); !targetOp.empty()) {
-                if (targetOp == "MultiRZ") {
-                    // Create a new target op name with the number of wires
-                    // for MultiRZ, since it has multiple decomposition functions
-                    // based on the number of target qubits
-                    std::string newTargetOpStr =
-                        targetOp.str() + "_" + std::to_string(DecompUtils::getNumWires(func));
-
-                    decompositionRegistry[newTargetOpStr] = func;
-                } else {
-                    decompositionRegistry[targetOp] = func;
-                }
+                decompositionRegistry[targetOp] = func;
             }
             // No need to walk into the function body
             return WalkResult::skip();
@@ -129,12 +122,6 @@ struct DecomposeLoweringPass : impl::DecomposeLoweringPassBase<DecomposeLowering
     void runOnOperation() final {
         ModuleOp module = cast<ModuleOp>(getOperation());
 
-        OpPassManager pm_to_ref("builtin.module");
-        pm_to_ref.addPass(createReferenceSemanticsConversionPass());
-        if (failed(runPipeline(pm_to_ref, module))) {
-            return signalPassFailure();
-        }
-
         // Step 1: Discover and register all decomposition functions in the module
         llvm::StringSet<> targetRules;
         for (auto rule : targetRulesOption) {
@@ -145,13 +132,24 @@ struct DecomposeLoweringPass : impl::DecomposeLoweringPassBase<DecomposeLowering
             return;
         }
 
+        // 1. The core DL pattern is on qref
+        // 2. DL expects no adj and ctrl regions
+        // Hence the preprocessing passes
+        OpPassManager pm_preprocess("builtin.module");
+        pm_preprocess.addPass(createModifiersLoweringPass());
+        pm_preprocess.addPass(createReferenceSemanticsConversionPass());
+        if (failed(runPipeline(pm_preprocess, module))) {
+            return signalPassFailure();
+        }
+
         // Step 2: Find the target gate set
         findTargetGateSet(module, targetGateSet);
 
         // Step 3: Apply the decomposition patterns
         RewritePatternSet decompositionPatterns(&getContext());
+        SymbolTable moduleSymbolTable(module);
         populateDecomposeLoweringPatterns(decompositionPatterns, decompositionRegistry,
-                                          targetGateSet);
+                                          inlineRuleBody, targetGateSet, moduleSymbolTable);
         if (failed(applyPatternsGreedily(module, std::move(decompositionPatterns)))) {
             return signalPassFailure();
         }

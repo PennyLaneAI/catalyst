@@ -16,7 +16,7 @@
 
 // RUN: catalyst --tool=opt --split-input-file --pass-pipeline='builtin.module(graph-decomposition{gate-set=testHadamard=1.0,testCNOT=1.0 alt-decomps=testHadamard=false_decomp bytecode-rules="%BYTECODE_PATH"})' %s | FileCheck %s
 
-func.func @circuit() -> !quantum.bit {
+func.func @circuit() {
     %0 = quantum.alloc(2) : !quantum.reg
     %q0 = quantum.extract %0[0] : !quantum.reg -> !quantum.bit
     %q1 = quantum.extract %0[1] : !quantum.reg -> !quantum.bit
@@ -26,13 +26,16 @@ func.func @circuit() -> !quantum.bit {
     %q0out = quantum.custom "testHadamard"() %q0 : !quantum.bit
     %q1out = quantum.custom "testHadamard"() %q1 : !quantum.bit
     %q:2 = quantum.custom "testCNOT"() %q0out, %q1out : !quantum.bit, !quantum.bit
-    return %q1 : !quantum.bit
+    %1 = quantum.insert %0[ 0], %q#0 : !quantum.reg, !quantum.bit
+    %2 = quantum.insert %1[ 1], %q#1 : !quantum.reg, !quantum.bit
+    quantum.dealloc %2 : !quantum.reg
+    return
 }
 
 // -----
 
 module @test_module {
-    func.func public @circuit() -> !quantum.bit {
+    func.func public @circuit() {
         %0 = quantum.alloc(2) : !quantum.reg
         %q0 = quantum.extract %0[0] : !quantum.reg -> !quantum.bit
         %q1 = quantum.extract %0[1] : !quantum.reg -> !quantum.bit
@@ -42,7 +45,10 @@ module @test_module {
         %q0out = quantum.custom "testHadamard"() %q0 : !quantum.bit
         %q1out = quantum.custom "testHadamard"() %q1 : !quantum.bit
         %q:2 = quantum.custom "testCNOT"() %q0out, %q1out : !quantum.bit, !quantum.bit
-        return %q1 : !quantum.bit
+        %1 = quantum.insert %0[ 0], %q#0 : !quantum.reg, !quantum.bit
+        %2 = quantum.insert %1[ 1], %q#1 : !quantum.reg, !quantum.bit
+        quantum.dealloc %2 : !quantum.reg
+        return
     }
 
     func.func private @false_decomp(%q : !quantum.bit) -> !quantum.bit attributes {target_gate="testHadamard{}{wires:1}{}", frontend_name = "false_decomp"} {

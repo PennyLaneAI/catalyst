@@ -12,11 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <cassert>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <numeric>
+#include <sstream>
 #include <string>
 #include <tuple>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -28,7 +32,9 @@
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/DebugLog.h"
+#include "llvm/Support/LogicalResult.h"
 #include "llvm/Support/raw_ostream.h"
+#include "mlir/AsmParser/AsmParser.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
@@ -104,6 +110,28 @@ namespace quantum {
 
 struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDecompositionPass> {
     using GraphDecompositionPassBase::GraphDecompositionPassBase;
+
+    LogicalResult runModifiersLowering(Operation *module) {
+        // Distribute any `quantum.ctrl`/`quantum.adjoint` regions the rules emitted, lazily.
+        // `modifiers-lowering` reduces both (including nested `ctrl(adjoint(...))`) to a
+        // fixpoint in one greedy pass.
+        bool hasModifierRegion = module
+                                     ->walk([&](mlir::Operation *op) {
+                                         return (isa<CtrlOp, AdjointOp>(op))
+                                                    ? mlir::WalkResult::interrupt()
+                                                    : mlir::WalkResult::advance();
+                                     })
+                                     .wasInterrupted();
+        if (hasModifierRegion) {
+            OpPassManager modifierPm("builtin.module");
+            modifierPm.addPass(createModifiersLoweringPass());
+            if (failed(runPipeline(modifierPm, module))) {
+                return failure();
+            }
+        }
+        return success();
+    }
+
     void runOnOperation() final {
         ScopedDiagnosticTimer totalTimer("decomp:total");
 
@@ -129,20 +157,22 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
             llvm::dbgs() << "\n";
         });
 
+        // Strip away adjoint and control regions to match the graph, where modifiers are on
+        // the individual ops
+        // Note that both adj lowering and ctrl lowering are still in value semantics now
+        if (failed(runModifiersLowering(getOperation()))) {
+            return signalPassFailure();
+        }
+
         ///////////////////////////
         // Step 1: Gather inputs for graph
+        ModuleOp module = getOperation();
         std::vector<OperatorNode> setOfOps;
         std::vector<RuleNode> setOfRules;
         llvm::StringSet<> userRuleNames;
         llvm::StringMap<std::string> opToFixedDecompName;
-        llvm::StringMap<llvm::SmallVector<std::string>> opToAltDecompNames;
+        llvm::StringMap<llvm::StringSet<>> opToAltDecompNames;
         WeightedGateset targetGateSet;
-
-        // NOTE: this is unused
-        llvm::StringMap<const RuleNode *> rulesByName(setOfRules.size());
-        for (const auto &rule : setOfRules) {
-            rulesByName[rule.name] = &rule;
-        }
 
         // get names for fixed and alt decomps
         parseFixedDecomps(opToFixedDecompName, userRuleNames);
@@ -164,98 +194,81 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
             ScopedDiagnosticTimer t("decomp:solver");
             // NOTE: fixed and alt-decomps are handled by filtering during rule collection. This is
             // dead code that should be removed
-            FixedDecomps fixedDecomps = buildFixedDecomps(opToFixedDecompName, rulesByName);
-            AltDecomps altDecomps = buildAltDecomps(opToAltDecompNames, rulesByName);
-            DecompositionGraph graph(setOfOps, targetGateSet, setOfRules, std::move(fixedDecomps),
-                                     std::move(altDecomps));
+            DecompositionGraph graph(setOfOps, targetGateSet, setOfRules);
             DecompositionSolver solver(graph);
             solution = solver.solve();
         }
-        LLVM_DEBUG(showSolution(solution));
-
-        ///////////////////////////
-        // Step 3: Convert python-decompositions from reference to value semantics and run
-        // decompose-lowering to apply the chosen decomposition rules.
-
-        ///////////////////////////
-        // CQRs:
-        //  - Adjoint: A chosen rule for an adjoint operator may re-emit its base decomposition
-        //             wrapped in a `quantum.adjoint` region. Such a region is only reduced to
-        //             op-level modified gates by `adjoint-lowering`. We therefore iterate
-        //             `(decompose-lowering -> adjoint-lowering)` to a fixpoint.
-        // The solver has already chosen every rule up front; this loop only applies them.
-        ModuleOp module = getOperation();
-
-        qref::DecomposeLoweringPassOptions dlOptions;
-        for (auto &[op, chosenRule] : solution) {
-            dlOptions.targetRulesOption.push_back(chosenRule.ruleName);
+        // Dump the solver's choices when asked for (`graph_decomposition(..., verbose=True)`), or
+        // whenever the pass runs under `-debug-only=graph-decomposition` on a debug build. The
+        // debug build routes the dump through `llvm::dbgs()` like the rest of this pass's debug
+        // output, so it honours `-debug-output=...` rather than going straight to stderr.
+        if (verboseOption) {
+            showSolution(solution);
+        } else {
+            LLVM_DEBUG({
+                std::ostringstream dump;
+                showSolution(solution, dump);
+                llvm::dbgs() << dump.str();
+            });
         }
 
-        // Convert reference-semantics python decompositions to value semantics.
+        ///////////////////////////
+        // Step 3: use decompose-lowering to apply the chosen decomposition rules.
+        // Note that on-demand rules may have introduced mixed semantics at this point, but
+        // decompose-lowering runs conversion and will ensure consistency
         {
-            ScopedDiagnosticTimer t("decomp:ref-to-value");
-            OpPassManager valueSemanticsPm("builtin.module");
-            valueSemanticsPm.addPass(qref::createValueSemanticsConversionPass());
-            if (failed(runPipeline(valueSemanticsPm, module))) {
+            ScopedDiagnosticTimer fixpointTimer("decomp:decompose-lowering");
+
+            ///////////////////////////
+            // CQRs:
+            //  - Adjoint: A chosen rule for an adjoint operator may re-emit its base decomposition
+            //             wrapped in a `quantum.adjoint` region. Such a region is only reduced to
+            //             op-level modified gates by `adjoint-lowering`. We therefore iterate
+            //             `(decompose-lowering -> adjoint-lowering)` to a fixpoint.
+            // The solver has already chosen every rule up front; this loop only applies them.
+
+            // Collect only the rules on the chosen decomp tree, reachable from the circuit
+            // root operators by following each op's chosen rule inputs.
+            //
+            // Note `solution` is the solver's map to target gateset, so it also holds ops explored
+            // while costing rejected candidate rules (their inputs are solved to compute costs).
+            // Feeding every one of those rules to the greedy decompose-lowering rewriter would
+            // let stray rules fire on ops the chosen plan never routes through,
+            // emitting gates beyond the planned resource counts.
+            //
+            // Basis rule names are collected too. `decompose-lowering` treats an empty
+            // target-rules list as "apply every rule", so a circuit already in the target gateset
+            // must still produce a non-empty list, or its terminals would be
+            // decomposed by whatever rules happen to be loaded.
+            qref::DecomposeLoweringPassOptions dlOptions;
+            dlOptions.inlineRuleBody = inlineRuleBody;
+            std::unordered_set<OperatorNode, OperatorNodeHash> visited;
+            llvm::StringSet<> seenRules;
+            std::vector<OperatorNode> worklist = setOfOps;
+            while (!worklist.empty()) {
+                OperatorNode op = worklist.back();
+                worklist.pop_back();
+                if (!visited.insert(op).second) {
+                    continue;
+                }
+                auto it = solution.find(op);
+                if (it == solution.end()) {
+                    continue;
+                }
+                const ChosenDecompRule &chosenRule = it->second;
+                if (seenRules.insert(chosenRule.ruleName).second) {
+                    dlOptions.targetRulesOption.push_back(chosenRule.ruleName);
+                }
+                for (const RuleTerm &input : chosenRule.inputs) {
+                    worklist.push_back(input.op);
+                }
+            }
+            OpPassManager decomposePm("builtin.module");
+            decomposePm.addPass(createDecomposeLoweringPass(dlOptions));
+            if (failed(runPipeline(decomposePm, module))) {
                 return signalPassFailure();
             }
         }
-
-        auto countOps = [](ModuleOp m) {
-            size_t count = 0;
-            m->walk([&](mlir::Operation *) { count++; });
-            return count;
-        };
-
-        // Fixpoint: apply the chosen rules and distribute any `quantum.adjoint` regions they emit,
-        // until the module stops changing.
-        constexpr unsigned maxIterations = 64;
-        size_t previousOpCount = countOps(module);
-        ScopedDiagnosticTimer fixpointTimer("decomp:lowering-fixpoint");
-        unsigned iterationsRun = 0;
-        for (unsigned iter = 0; iter < maxIterations; ++iter) {
-            iterationsRun = iter + 1;
-            {
-                OpPassManager decomposePm("builtin.module");
-                decomposePm.addPass(createDecomposeLoweringPass(dlOptions));
-                if (failed(runPipeline(decomposePm, module))) {
-                    return signalPassFailure();
-                }
-            }
-
-            // Distribute a `quantum.ctrl` region lazily.
-            bool hasCtrlRegion = module->walk([&](CtrlOp) { return mlir::WalkResult::interrupt(); })
-                                     .wasInterrupted();
-            if (hasCtrlRegion) {
-                OpPassManager ctrlPm("builtin.module");
-                ctrlPm.addPass(createCtrlLoweringPass());
-                if (failed(runPipeline(ctrlPm, module))) {
-                    return signalPassFailure();
-                }
-            }
-
-            // Distribute a `quantum.adjoint` region lazily.
-            // It uses a greedy rewriter that would otherwise DCE gates in circuits that
-            // never needed adjoint handling.
-            bool hasAdjointRegion =
-                module->walk([&](AdjointOp) { return mlir::WalkResult::interrupt(); })
-                    .wasInterrupted();
-            if (hasAdjointRegion) {
-                OpPassManager adjointPm("builtin.module");
-                adjointPm.addPass(createAdjointLoweringPass());
-                if (failed(runPipeline(adjointPm, module))) {
-                    return signalPassFailure();
-                }
-            }
-
-            size_t currentOpCount = countOps(module);
-            if (currentOpCount == previousOpCount) {
-                break;
-            }
-            previousOpCount = currentOpCount;
-        }
-        LDBG() << "lowering fixpoint reached after " << iterationsRun << " iteration(s), "
-               << previousOpCount << " ops";
     }
 
   private:
@@ -266,6 +279,8 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
 
             auto [opName, ruleName] = pairRef.split("=");
             opName = opName.trim();
+            opName.consume_front("\"");
+            opName.consume_back("\"");
             ruleName = ruleName.trim();
             ruleName.consume_front("\"");
             ruleName.consume_back("\"");
@@ -278,13 +293,15 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         }
     }
 
-    void parseAltDecomps(llvm::StringMap<llvm::SmallVector<std::string>> &opToAltDecompNames,
+    void parseAltDecomps(llvm::StringMap<llvm::StringSet<>> &opToAltDecompNames,
                          llvm::StringSet<> &userRuleNames) {
         for (const std::string &opRulesPair : altDecompsOption) {
             llvm::StringRef pairRef(opRulesPair);
 
             auto [opName, rulesRef] = pairRef.split("=");
             opName = opName.trim();
+            opName.consume_front("\"");
+            opName.consume_back("\"");
             llvm::SmallVector<llvm::StringRef> splitRulesRef;
 
             rulesRef = rulesRef.trim();
@@ -298,7 +315,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
                 ruleNameRef.consume_front("\"");
                 ruleNameRef.consume_back("\"");
                 if (!ruleNameRef.empty()) {
-                    opRulesList.push_back(ruleNameRef.str());
+                    opRulesList.insert(ruleNameRef.str());
                     userRuleNames.insert(ruleNameRef.str());
                 }
             }
@@ -320,14 +337,28 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
             opName.consume_front("\"");
             opName.consume_back("\"");
 
-            cost.consume_back(": f64");
-            cost = cost.trim();
+            double weight = 0.0;
+            bool parsed = false;
 
-            bool success = to_float(cost, targetGateSet.ops[opName.str()]);
+            if (cost.ends_with(": f64")) {
+                // Float attributes encode NaN and infinity as hexadecimal bit patterns.
+                // Parsing these with strtod would instead produce finite, positive costs.
+                if (auto attr = dyn_cast_or_null<FloatAttr>(parseAttribute(cost, &getContext()))) {
+                    weight = attr.getValueAsDouble();
+                    parsed = true;
+                }
 
-            if (!success) {
-                return failure();
+            } else { // fallback string parsing
+                parsed = !cost.empty() && to_float(cost, weight);
             }
+
+            // validation
+            if (!parsed || std::isnan(weight) || weight < 0.0) {
+                return getOperation().emitError()
+                       << "Invalid cost '" << cost << "' for gate '" << opName
+                       << "' in the target gateset: expected a non-negative number (not NaN).";
+            }
+            targetGateSet.ops[opName.str()] = weight;
         }
         return success();
     }
@@ -406,11 +437,17 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         // add to module
         for (auto rule :
              llvm::make_early_inc_range(builtinModule.get().getOps<mlir::func::FuncOp>())) {
-            // avoid double-insertion
-            if (!symbolTable.lookup<mlir::func::FuncOp>(rule.getName())) {
-                rule->remove();
-                module.push_back(std::move(rule));
+            // Independently compiled rule libraries can reuse the same name for a
+            // different target. Only skip the same rule; otherwise let the symbol table
+            // resolve the collision.
+            auto existing = symbolTable.lookup<mlir::func::FuncOp>(rule.getName());
+            if (existing && existing->getAttr("target_gate") == rule->getAttr("target_gate") &&
+                existing->getAttr("frontend_name") == rule->getAttr("frontend_name") &&
+                existing->getAttr("resources") == rule->getAttr("resources")) {
+                continue;
             }
+            rule->remove();
+            symbolTable.insert(rule);
         }
         return success();
     }
@@ -418,10 +455,9 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
     /**
      * @brief Load the listed user rules into the set of RuleNodes for the graph.
      */
-    LogicalResult
-    loadDecompositionRules(llvm::StringMap<std::string> &opToFixedDecompName,
-                           llvm::StringMap<llvm::SmallVector<std::string>> &opToAltDecompNames,
-                           std::vector<RuleNode> &ruleNodes) {
+    LogicalResult loadDecompositionRules(llvm::StringMap<std::string> &opToFixedDecompName,
+                                         llvm::StringMap<llvm::StringSet<>> &opToAltDecompNames,
+                                         std::vector<RuleNode> &ruleNodes) {
         mlir::ModuleOp module = getOperation();
 
         WalkResult walkResult = module.walk([&](mlir::func::FuncOp func) {
@@ -433,7 +469,8 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
                         .take_until([](char c) { return c == '{'; }) // remove GOID data
                         .drop_while(llvm::isDigit);                  // remove <n>C numeric prefix
 
-                // if this op has alt or fixed decomps then we are we only take the specified rules
+                // if this op has alt or fixed decomps then we are we only take the specified
+                // rules
                 if (opToFixedDecompName.contains(targetGate) ||
                     opToAltDecompNames.contains(targetGate)) {
 
@@ -491,6 +528,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
     mlir::LogicalResult loadPythonDecomps() {
         mlir::ModuleOp module = getOperation();
         MLIRContext *context = &getContext();
+        SymbolTable symbolTable(module);
 
         llvm::StringSet<> handledOpIds;
         // Add IDs from existing decomposable ops with decomposition rules
@@ -560,7 +598,8 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
                 outOp = mlir::OwningOpRef<mlir::func::FuncOp>(func);
                 LDBG() << "materializing rule " << outOp.get().getName();
                 newlyHandled.push_back(targetGate.getValue());
-                module.push_back(std::move(outOp.release()));
+                // Resolve name collisions with rules already embedded in the module.
+                symbolTable.insert(outOp.release());
                 return mlir::WalkResult::advance();
             });
             for (llvm::StringRef target : newlyHandled) {
@@ -604,8 +643,8 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
     /**
      * @brief Parse a graphOpId string into an OperatorNode.
      *
-     * The graphOpId format is "<name>{params}{wires}{static}[uid]", where <name> already carries
-     * any name-wrapped op-level modifiers produced by `defaultGetGraphOpId`, e.g.
+     * The graphOpId format is "<name>{params}{wires}{static}[uid]", where <name> already
+     * carries any name-wrapped op-level modifiers produced by `defaultGetGraphOpId`, e.g.
      * "C(Adjoint(RX)){0:[f64]}{wires:1}{}".
      */
     OperatorNode parseOperator(llvm::StringRef raw) {
@@ -646,95 +685,26 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
     /**
      * @brief Create RuleNodes for each rule available to be used in graph decomposition.
      */
-    LogicalResult
-    getRuleNodes(llvm::StringRef filename, std::vector<RuleNode> &rules,
-                 llvm::StringMap<std::string> &opToFixedDecompName,
-                 llvm::StringMap<llvm::SmallVector<std::string>> &opToAltDecompNames) {
+    LogicalResult getRuleNodes(llvm::StringRef filename, std::vector<RuleNode> &rules,
+                               llvm::StringMap<std::string> &opToFixedDecompName,
+                               llvm::StringMap<llvm::StringSet<>> &opToAltDecompNames) {
         ScopedDiagnosticTimer t("decomp:rules");
         // Load pre-compiled rules (ignore failure, we can try to solve without) into the module
-        std::ignore = loadBuiltInDecompositionRules(filename);
+        if (!filename.empty()) {
+            std::ignore = loadBuiltInDecompositionRules(filename);
+        }
 
         // Lower compile-time rules into the module
         if (failed(loadPythonDecomps())) {
             return failure();
         }
 
-        // Load rules from the module into the set of rules used by the graph, filtering by fixed-
-        // and alt-decomps
+        // Load rules from the module into the set of rules used by the graph, filtering by
+        // fixed- and alt-decomps
         if (failed(loadDecompositionRules(opToFixedDecompName, opToAltDecompNames, rules))) {
             return failure();
         }
         return success();
-    }
-
-    /**
-     * @brief Convert the parsed fixed-decomposition mapping (op name → rule name)
-     * into the Core::FixedDecomps type expected by the DecompositionGraph.
-     *
-     * For each entry, looks up the corresponding RuleNode in setOfRules by name.
-     * Rules not found in setOfRules are skipped with a diagnostic.
-     *
-     * @param opToFixedDecompName  Parsed mapping from operator name to fixed-rule name.
-     * @param setOfRules           The full list of available decomposition rules.
-     * @return Core::FixedDecomps  Mapping from OperatorNode to its fixed RuleNode.
-     */
-    FixedDecomps buildFixedDecomps(const llvm::StringMap<std::string> &opToFixedDecompName,
-                                   const llvm::StringMap<const RuleNode *> &rulesByName) {
-        FixedDecomps fixedDecomps;
-        fixedDecomps.reserve(opToFixedDecompName.size());
-
-        for (const auto &[opName, ruleName] : opToFixedDecompName) {
-            auto it = rulesByName.find(ruleName);
-            if (it == rulesByName.end()) {
-                continue;
-            }
-
-            OperatorNode opNode;
-            opNode.name = opName.str();
-            fixedDecomps.emplace(std::move(opNode), *(it->second));
-        }
-        return fixedDecomps;
-    }
-
-    /**
-     * @brief Convert the parsed alternative-decomposition mapping
-     * (op name → list of rule names) into the Core::AltDecomps type
-     * expected by the DecompositionGraph.
-     *
-     * For each entry, looks up the corresponding RuleNodes in setOfRules by name.
-     * Individual rules not found are skipped with a diagnostic.
-     *
-     * @param opToAltDecompNames  Parsed mapping from operator name to alternative-rule
-     * names.
-     * @param setOfRules          The full list of available decomposition rules.
-     * @return Core::AltDecomps   Mapping from OperatorNode to its alternative RuleNodes.
-     */
-    AltDecomps
-    buildAltDecomps(const llvm::StringMap<llvm::SmallVector<std::string>> &opToAltDecompNames,
-                    const llvm::StringMap<const RuleNode *> &rulesByName) {
-        AltDecomps altDecomps;
-        altDecomps.reserve(opToAltDecompNames.size());
-
-        for (const auto &[opName, ruleNames] : opToAltDecompNames) {
-            OperatorNode opNode;
-            opNode.name = opName.str();
-
-            std::vector<RuleNode> altRules;
-            altRules.reserve(ruleNames.size());
-
-            for (const auto &ruleName : ruleNames) {
-                auto it = rulesByName.find(ruleName);
-                if (it == rulesByName.end()) {
-                    continue;
-                }
-                altRules.push_back(*(it->second));
-            }
-
-            if (!altRules.empty()) {
-                altDecomps.emplace(std::move(opNode), std::move(altRules));
-            }
-        }
-        return altDecomps;
     }
 };
 

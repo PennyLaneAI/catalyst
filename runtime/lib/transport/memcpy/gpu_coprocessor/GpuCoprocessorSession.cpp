@@ -28,8 +28,16 @@
 
 namespace catalyst::transport::memcpy {
 
-GpuCoprocessorSession::GpuCoprocessorSession(const std::string &config, int gpu_device)
-    : pair_key_(parse_pair_key(config)), gpu_device_(gpu_device) {}
+GpuCoprocessorSession::GpuCoprocessorSession(const std::string &config, int gpu_device,
+                                             bool per_message)
+    : pair_key_(parse_pair_key(config)), gpu_device_(gpu_device), per_message_(per_message),
+      ring_(common::frame::geometry_from_config(config)), worker_(ring_), reply_ring_(ring_.slots) {
+    // The persistent kernels read 16 B frames, so a launch-once session carries 8 B messages.
+    // TODO: lift this once the persistent kernels read frames through the frame codec.
+    TP_CHECK(per_message_ || ring_.mode == common::frame::Mode::BL16,
+             "A launch-once GPU coprocessor reads 16 B frames, but its config asks for another "
+             "frame layout; set coproc_fn=per_message in its config for larger messages");
+}
 
 GpuCoprocessorSession::~GpuCoprocessorSession() {
     try {
@@ -52,17 +60,17 @@ void GpuCoprocessorSession::ensure_gpu_state() {
     }
     if (!ring_host_) {
         HIP_CHECK(hipHostMalloc(reinterpret_cast<void **>(&ring_host_),
-                                common::K_RING_SLOTS * sizeof(common::PayloadSlot),
+                                ring_.slots * sizeof(common::PayloadSlot),
                                 hipHostMallocMapped | hipHostMallocCoherent),
                   "hipHostMalloc(local gpu request ring)");
-        std::memset(ring_host_, 0, common::K_RING_SLOTS * sizeof(common::PayloadSlot));
+        std::memset(ring_host_, 0, ring_.slots * sizeof(common::PayloadSlot));
         void *ring_dev = nullptr;
         HIP_CHECK(hipHostGetDevicePointer(&ring_dev, ring_host_, 0),
                   "hipHostGetDevicePointer(local gpu request ring)");
         ring_dev_ = static_cast<common::PayloadSlot *>(ring_dev);
     }
     if (!handoff_.host) {
-        handoff_ = gpu_->alloc_handoff(common::K_RING_SLOTS);
+        handoff_ = gpu_->alloc_handoff(ring_.slots);
     }
 }
 
@@ -73,9 +81,9 @@ int GpuCoprocessorSession::connect(const ConnectInfo & /*info*/) {
     std::lock_guard<std::mutex> lock(candidate->mu);
     TP_CHECK(!candidate->process_message, "Coprocessor already bound to pair '%s'",
              pair_key_.c_str());
-    candidate->process_message = [this](const void *in, std::size_t in_len, void *out,
-                                        std::size_t out_cap) {
-        return this->process_message(in, in_len, out, out_cap);
+    candidate->process_message = [this](const void *payload, std::size_t len, std::uint32_t fn_id,
+                                        void *out, std::size_t out_cap) {
+        return this->process_message(payload, len, fn_id, out, out_cap);
     };
     link_ = std::move(candidate);
     return 0;
@@ -103,12 +111,17 @@ void GpuCoprocessorSession::establish_channel(const ChannelDesc &desc, const Mem
 
 void GpuCoprocessorSession::start() {
     stop();
+    if (per_message_) {
+        const int device = gpu_device_;
+        worker_.start([device] { HIP_CHECK(hipSetDevice(device), "hipSetDevice(coprocessor)"); });
+        return;
+    }
     ensure_gpu_state();
     // Reset per-session state: cursors, ring slots, handoff slots, stop flag, error.
     process_cursor_ = 0;
-    std::memset(ring_host_, 0, common::K_RING_SLOTS * sizeof(common::PayloadSlot));
-    std::fill_n(handoff_.host, common::K_RING_SLOTS, coproc::HandoffSlot{});
-    reply_ring_.fill(common::PayloadSlot{});
+    std::memset(ring_host_, 0, ring_.slots * sizeof(common::PayloadSlot));
+    std::fill_n(handoff_.host, ring_.slots, coproc::HandoffSlot{});
+    std::fill(reply_ring_.begin(), reply_ring_.end(), common::PayloadSlot{});
     if (handoff_.stop_host) {
         *handoff_.stop_host = 0;
     }
@@ -118,7 +131,7 @@ void GpuCoprocessorSession::start() {
     // handoff slots until stop_dev flips (total=0 -> run until stop).
     CoprocLaunchDesc desc{
         .ring = ring_dev_,
-        .ring_slots = common::K_RING_SLOTS,
+        .ring_slots = ring_.slots,
         .handoff = handoff_.dev,
         .stop = handoff_.stop_dev,
         .total = 0,
@@ -144,6 +157,7 @@ int GpuCoprocessorSession::collect(void *const * /*replies*/,
 }
 
 void GpuCoprocessorSession::stop() {
+    worker_.stop();
     if (kernel_running_ && handoff_.stop_host) {
         *handoff_.stop_host = 1; // let the persistent kernel exit its poll loop
     }
@@ -157,13 +171,13 @@ void GpuCoprocessorSession::stop() {
     kernel_running_ = false;
 }
 
-// Engine loop: for each cursor c, wait for the kernel to publish handoff[c % K].seq == c+1,
-// then republish into reply_ring[c % K] with the same seq. HandoffSlot is 16-B aligned so the
+// Engine loop: for each cursor c, wait for the kernel to publish handoff[c % slots].seq == c+1,
+// then republish into reply_ring[c % slots] with the same seq. HandoffSlot is 16-B aligned so the
 // kernel's single-store makes correction+seq visible together.
 void GpuCoprocessorSession::run(std::stop_token st) {
     constexpr std::uint32_t STOP_CHECK_SPINS = 4096;
     for (std::uint64_t c = 0; !st.stop_requested(); ++c) {
-        const std::size_t idx = c & (common::K_RING_SLOTS - 1);
+        const std::size_t idx = c & (ring_.slots - 1);
         const std::uint32_t expect = static_cast<std::uint32_t>(c + 1);
         volatile std::uint32_t *hseq = &handoff_.host[idx].seq;
         std::uint32_t spins = 0;
@@ -181,6 +195,7 @@ void GpuCoprocessorSession::run(std::stop_token st) {
         common::PayloadSlot &out = reply_ring_[idx];
         out.p.value = 0;
         std::memcpy(&out.p.value, &correction, sizeof(correction));
+        // TODO: echo the request's fn_id once the kernel hands it back with the correction.
         out.p.decoder_id = 0;
         std::atomic_thread_fence(std::memory_order_release);
         out.p.seq_num = expect; // publish
@@ -188,27 +203,44 @@ void GpuCoprocessorSession::run(std::stop_token st) {
 }
 
 void GpuCoprocessorSession::set_coprocessor_launcher(CoprocessorLauncherFn fn, void *ctx) {
+    TP_CHECK(!per_message_, "A per-message GPU coprocessor takes a CoprocessorFn, not a launcher");
     launcher_ = fn;
     launcher_ctx_ = ctx;
 }
 
-std::size_t GpuCoprocessorSession::process_message(const void *in, std::size_t in_len, void *out,
+void GpuCoprocessorSession::set_coprocessor_fn(CoprocessorFn fn, void *ctx) {
+    TP_CHECK(per_message_,
+             "A launch-once GPU coprocessor takes a launcher; set coproc_fn=per_message "
+             "in its config to bind a CoprocessorFn");
+    worker_.bind(fn, ctx);
+}
+
+std::size_t GpuCoprocessorSession::process_message(const void *payload, std::size_t len,
+                                                   std::uint32_t fn_id, void *out,
                                                    std::size_t out_cap) {
-    TP_CHECK(in_len == sizeof(common::Payload), "Expected one wire-shaped Payload");
-    TP_CHECK(out_cap >= sizeof(std::int64_t), "Reply buffer too small for GPU correction");
+    if (per_message_) {
+        return worker_.process_message(payload, len, fn_id, out, out_cap);
+    }
+    TP_CHECK(len <= common::PAYLOAD_DATA_BYTES,
+             "A launch-once GPU coprocessor carries 8 B messages, got %zu B; set "
+             "coproc_fn=per_message in its config for larger ones",
+             len);
     TP_CHECK(kernel_running_, "Call start() before process_message");
+    TP_CHECK(out_cap <= sizeof(std::int64_t),
+             "A launch-once GPU coprocessor carries 8 B messages, got a %zu B reply; set "
+             "coproc_fn=per_message in its config for larger ones",
+             out_cap);
     if (failed_.load(std::memory_order_acquire)) {
         std::rethrow_exception(error_);
     }
 
-    // Publish the request into ring[cursor % K]. Copy payload first, then release-fence, then
-    // seq_num, so the kernel never observes a matching seq before the payload is visible.
+    // Frame the request in ring[cursor % slots]; sealing writes seq_num last, so the kernel never
+    // observes a matching seq before the payload is visible.
     const std::uint64_t c = process_cursor_++;
-    const std::size_t idx = c & (common::K_RING_SLOTS - 1);
+    const std::size_t idx = c & (ring_.slots - 1);
     const std::uint32_t expect = static_cast<std::uint32_t>(c + 1);
-    std::memcpy(&ring_host_[idx].p, in, sizeof(common::Payload));
-    std::atomic_thread_fence(std::memory_order_release);
-    ring_host_[idx].p.seq_num = expect;
+    common::frame::stage(common::frame::BL16_RING, &ring_host_[idx].p, fn_id, payload, len);
+    common::frame::seal(common::frame::BL16_RING, &ring_host_[idx].p, expect);
 
     // Spin-wait for the engine thread to publish reply_ring_[idx]. The engine bridges the
     // kernel's handoff into this ring so the controller never touches HIP memory directly.
@@ -222,8 +254,11 @@ std::size_t GpuCoprocessorSession::process_message(const void *in, std::size_t i
 
     std::int64_t correction = 0;
     std::memcpy(&correction, &reply_ring_[idx].p.value, sizeof(correction));
-    std::memcpy(out, &correction, sizeof(correction));
-    return sizeof(correction);
+    const std::size_t n = std::min(out_cap, sizeof(correction));
+    if (n != 0 && out) {
+        std::memcpy(out, &correction, n);
+    }
+    return n;
 }
 
 } // namespace catalyst::transport::memcpy

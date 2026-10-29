@@ -17,13 +17,10 @@
 from collections.abc import Mapping, Sequence
 from typing import Any
 
-import jax.numpy as jnp
 import pennylane as qp
-from jax._src.lib.mlir import ir
-from pennylane.ops.op_math.adjoint2 import Adjoint2
-from pennylane.ops.op_math.controlled2 import ControlledOp2
 from pennylane.pytrees import flatten
 
+from catalyst.decomposition.modifier_state import ModifierState
 from catalyst.decomposition.type_utils import (
     convert_item_to_mlir_type,
     post_process_concretize_leaves,
@@ -33,6 +30,32 @@ from catalyst.from_plxpr.uid import generate_uid
 from catalyst.jax_extras.lowering import get_mlir_attribute_from_pyval, mlir_build_context
 
 _SPECIAL_LOWERINGS = {}
+
+
+def _is_custom_op(op_cls, avals_in):
+    """Return whether an operator lowers to ``qref.custom`` rather than ``qref.operator``.
+
+    Callers reached through a special lowering are handled before this is consulted, so it does
+    not exclude ``_SPECIAL_LOWERINGS``; :meth:`GraphOpID.parse_is_custom_op` adds that itself.
+    """
+    if op_cls.static_argnames or op_cls.hybrid_argnames or op_cls.compilable_argnames:
+        return False
+    if op_cls.wire_argnames != ("wires",):
+        return False
+    if list(op_cls._sig.parameters.keys())[-1] != "wires":
+        return False
+    # Params are widened to f64 by `safe_cast_to_f64`; complex cannot be cast safely.
+    return all(p.shape == () and p.dtype.kind in "ifu" for p in avals_in)
+
+
+def _is_wires(item) -> bool:
+    """Return whether a pytree leaf is a group of wires."""
+    return isinstance(item, (qp.typing.AbstractWires, qp.wires.Wires))
+
+
+def _is_op_or_wires(item) -> bool:
+    """Return whether a pytree leaf is a nested operator or a group of wires."""
+    return isinstance(item, qp.core.Operator2) or _is_wires(item)
 
 
 def format_static_data_dict_for_id(static_data):
@@ -67,22 +90,15 @@ def build_graph_op_id(
     wire_lens: Mapping[str, int],
     static_data: Mapping[str, Any],
     *,
-    adjoint: bool = False,
-    num_controls: int = 0,
+    modifiers: ModifierState = ModifierState(),
     uid: int | None = None,
 ) -> str:
     """Build a canonical frontend GraphOpID from its identity components."""
-    if num_controls < 0:
-        raise ValueError("GraphOpID control count cannot be negative")
-
-    name = f"Adjoint({operator_name})" if adjoint else operator_name
-    if num_controls:
-        prefix = "C" if num_controls == 1 else f"{num_controls}C"
-        name = f"{prefix}({name})"
+    name = modifiers.wrap_name(operator_name)
 
     dynamic_id = format_dynamic_params_for_id(dict(sorted(dynamic_shape.items())))
     wire_id = "{" + ",".join(f"{key}:{value}" for key, value in sorted(wire_lens.items())) + "}"
-    static_id = format_static_data_dict_for_id(dict(static_data))
+    static_id = format_static_data_dict_for_id(dict(sorted(static_data.items())))
     uid_id = f"[{uid}]" if uid is not None else ""
     return name + dynamic_id + wire_id + static_id + uid_id
 
@@ -125,7 +141,7 @@ class GraphOpID:
         assert isinstance(
             op, qp.core.Operator2
         ), f"Graph-based decomposition expects an Operator2 instance, got {op} of type {type(op)}"
-        op, self.adjoint, self.num_controls = self.peel_modifiers(op)
+        op, self.modifiers = ModifierState.peel_modifiers(op)
         self.op = op
         self.is_custom_op = self.parse_is_custom_op()
 
@@ -135,67 +151,64 @@ class GraphOpID:
         self.static_data = self.parse_static_data()
         self.extra_data, self.uid = self.parse_extra_data()
 
-    @staticmethod
-    def peel_modifiers(op: qp.core.Operator2):
-        """Return the innermost base of ``op`` together with the modifiers wrapping it.
-
-        A *generic* symbolic operator (``Adjoint2``/``ControlledOp2``, as opposed to a concrete
-        class such as ``CH``) reports its wrapper's own arguments, e.g.
-        ``Adjoint(S){}{}{}[1141126509488406748]``. That is not how the compiler spells a modified
-        operator: ``wrapModifiers`` folds the modifier into the *base* operator's id. So the
-        wrappers are peeled off here and counted, and :meth:`getGraphOpId` puts them back in
-        canonical position (control outermost) rather than splicing them into a finished id.
-
-        The walk terminates structurally: each step moves to ``op.base``, one wrapper shallower,
-        and the chain ends at the first non-symbolic operator.
-
-        Args:
-            op (Operator2): the operator to unwrap
-
-        Returns:
-            Operator2: the innermost base operator
-            bool: whether the base is adjointed
-            int: how many controls wrap the base
-        """
-        adjoint, num_controls = False, 0
-        while True:
-            if isinstance(op, Adjoint2):
-                adjoint = not adjoint
-            elif isinstance(op, ControlledOp2):
-                num_controls += len(op.control_wires)
-            else:
-                return op, adjoint, num_controls
-            op = op.base
-
     def parse_dynamic_shape(self) -> dict:
         """Return a dictionary of dynamic arg names to list of dtypes."""
         # enters as {name: dtype}, we want the format {name: list[dtype]}
         if self.is_custom_op:
             return {str(i): ["f64"] for i in range(len(self.op.dynamic_args))}
+        elif isinstance(self.op, qp.QubitUnitary):
+            # `qref.unitary` always takes a complex matrix, so a real one is converted on the way
+            # in and the id must spell the converted type, not the one the user passed.
+            name, matrix = next(iter(self.op.dynamic_args.items()))
+            spec = qp.typing.AbstractArray(qp.math.shape(matrix), complex)
+            return {name: [convert_item_to_mlir_type(spec, is_special_lowering=True)]}
         elif issubclass(type(self.op), tuple(_SPECIAL_LOWERINGS.keys())):  # special cases
             return {
                 argname: [convert_item_to_mlir_type(argtype, is_special_lowering=True)]
-                for argname, argtype in sorted(self.op.dynamic_args.items())
+                for argname, argtype in self.op.dynamic_args.items()
             }
         else:
-            return {
+            # Same traversal as ``_process_params``: dynamic args, then the numeric leaves of
+            # non-wire hybrid args, in declaration order (i.e. operand order). Do not sort.
+            dynamic_shape = {
                 argname: [convert_item_to_mlir_type(argtype)]
-                for argname, argtype in sorted(self.op.dynamic_args.items())
+                for argname, argtype in self.op.dynamic_args.items()
             }
+            for argname, value in self.op.hybrid_args.items():
+                if argname in self.op.wire_argnames:  # do not include wires
+                    continue
+                # skip operators
+                leaves, _ = flatten(value, is_leaf=_is_op_or_wires)
+                params = [leaf for leaf in leaves if not _is_op_or_wires(leaf)]
+                if params:
+                    dynamic_shape[argname] = [convert_item_to_mlir_type(param) for param in params]
+            return dynamic_shape
 
     def parse_wire_lens(self) -> dict[str, int]:
-        """Return a dictionary of wire arg names to lengths."""
-        wire_lens = {}
-        for wire_name, wire_arg in sorted(self.op.wire_args.items()):
-            if wire_name not in self.op.hybrid_argnames:
-                wire_lens[wire_name] = len(wire_arg)
+        """Return a dictionary of wire arg names to lengths, in operand order."""
+        # Same traversal as ``_process_qubits``: pure wire args (empty ones included), then the
+        # hybrid args that carry qubits, in declaration order (i.e. operand order). Do not sort.
+        wire_lens = {
+            wire_name: len(wire_arg)
+            for wire_name, wire_arg in self.op.wire_args.items()
+            if wire_name not in self.op.hybrid_argnames
+        }
+        for argname, value in self.op.hybrid_args.items():
+            # Descend through nested operators: their wires are qubit operands of this operator.
+            leaves, _ = flatten(value, is_leaf=_is_wires)
+            count = sum(len(leaf) for leaf in leaves if _is_wires(leaf))
+            if count:
+                wire_lens[argname] = count
         return wire_lens
 
     def parse_static_data(self) -> dict[str, Any]:
         """Return a dictionary of (compiler-)static data names to values."""
+        if isinstance(self.op, qp.QubitUnitary):
+            # `unitary_check` is a validation-only flag, the lowering drops it so we must too
+            return {}
         return {
             static_argname: getattr(self.op, static_argname)
-            for static_argname in sorted(self.op.compilable_argnames)
+            for static_argname in self.op.compilable_argnames
         }
 
     def parse_extra_data(self):
@@ -204,6 +217,12 @@ class GraphOpID:
             hybrid_lens = []
             hybrid_trees = []
             hybrid_args = []
+            # Must be the ``wire_lens`` tuple the lowering hashes: pure wire args in operand order
+            filtered_wire_lens = tuple(
+                length
+                for name, length in self.wire_lens.items()
+                if name not in self.op.hybrid_argnames
+            )
             for _, hybrid_argval in self.op.hybrid_args.items():
                 leaves, tree = flatten(replace_wires_with_placeholder_wires(hybrid_argval))
                 leaves = post_process_concretize_leaves(leaves)
@@ -212,17 +231,13 @@ class GraphOpID:
                 hybrid_args.extend(leaves)
             uid = generate_uid(
                 *tuple(self.op.dynamic_args.values()),  # dynamic args
-                *(None,)
-                * sum(
-                    self.wire_lens.values()
-                ),  # non hybrid wires, unused during uid generation, so just give empty values
+                *(None,) * sum(filtered_wire_lens),
+                # non hybrid wires, unused during uid generation, so just give empty values
                 *hybrid_args,
                 op_cls=type(self.op),
-                wire_lens=tuple(self.wire_lens.values()),
+                wire_lens=filtered_wire_lens,
                 hybrid_lens=tuple(hybrid_lens),
                 hybrid_trees=tuple(hybrid_trees),
-                adjoint=False,
-                n_ctrls=0,
                 static_args=self.op.static_args,
             )
             return self.op.static_args | self.op.hybrid_args, uid
@@ -233,26 +248,19 @@ class GraphOpID:
         """
         Return whether the Operator2 instance is considered a custom op in MLIR.
 
-        The source of truth for the criteria is in qref_operator2_primitives.py,
-        in the _is_custom_op() helper function. However, that function cannot be directly used here
-        as that is a lowering time util, and only works with JAX-MLIR types.
+        Defers to the same :func:`_is_custom_op` the lowering uses, so the two cannot drift. The
+        lowering dispatches a special-lowered operator before reaching that check, so the extra
+        ``_SPECIAL_LOWERINGS`` exclusion is applied here instead.
         """
-        if self.op.static_argnames or self.op.hybrid_argnames or self.op.compilable_argnames:
-            return False
-        if self.op.wire_argnames != ("wires",):
-            return False
-        if list(self.op._sig.parameters.keys())[-1] != "wires":
-            return False
-        return all(
-            arg.shape == () and arg.dtype.type == jnp.float64
-            for arg in self.op.dynamic_args.values()
+        return _is_custom_op(
+            type(self.op), tuple(self.op.dynamic_args.values())
         ) and not issubclass(type(self.op), tuple(_SPECIAL_LOWERINGS.keys()))
 
     def get_operator_name(self) -> str:
         """Return the name of the operator."""
         return self.operator_name
 
-    def _build_id(self, adjoint: bool, num_controls: int) -> str:
+    def _build_id(self, modifiers: ModifierState) -> str:
         """Return the GraphOpId of the base operator under the given modifiers."""
         uid = None
         if self.extra_data:
@@ -263,27 +271,26 @@ class GraphOpID:
             self.dynamic_shape,
             self.wire_lens,
             self.static_data,
-            adjoint=adjoint,
-            num_controls=num_controls,
+            modifiers=modifiers,
             uid=uid,
         )
 
-    def getGraphOpId(self, adjoint: bool = False, num_controls: int = 0) -> str:
+    def getGraphOpId(self, modifiers: ModifierState = ModifierState()) -> str:
         """
         Return the GraphOpId as a string.
 
-        The arguments are the modifiers the *caller* applies on top of the operator, e.g. a rule
-        being distributed over adjoint. They compose with the modifiers the operator carries
-        itself, so an already-symbolic operator spells canonically instead of being wrapped twice.
+        ``modifiers`` are the ones the *caller* applies on top of the operator, e.g. a rule being
+        distributed over adjoint. They compose with the modifiers the operator carries itself, so
+        an already-symbolic operator spells canonically instead of being wrapped twice.
 
         NOTE: do not modify this method without also modifying the corresponding DecomposableGate
         interface in MLIR.
         """
-        return self._build_id(adjoint != self.adjoint, num_controls + self.num_controls)
+        return self._build_id(modifiers.compose(self.modifiers))
 
     def getBaseGraphOpId(self) -> str:
         """Return the GraphOpId of the base operator alone, leaving off the modifiers wrapping it.
 
         The base is what owns the decomposition rules, so this is the id to look them up under.
         """
-        return self._build_id(False, 0)
+        return self._build_id(ModifierState())

@@ -16,3 +16,4 @@ jobs:
       catalyst: latest
       pennylane: latest
       lightning: latest
+      runner: blacksmith-8vcpu-ubuntu-2404

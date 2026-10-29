@@ -23,6 +23,8 @@
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Transforms/DialectConversion.h"
 
+#include "Quantum/Transforms/PassesEnums.h"
+
 namespace catalyst {
 namespace quantum {
 
@@ -32,7 +34,10 @@ mlir::Value getGlobalString(mlir::Location loc, mlir::OpBuilder &rewriter, mlir:
                             mlir::StringRef value, mlir::ModuleOp mod);
 
 void populateResolveGateLevelAdjointPatterns(mlir::RewritePatternSet &);
-void populateGridsynthPatterns(mlir::RewritePatternSet &patterns, double epsilon, bool pprBasis);
+void populateAdjointLoweringPatterns(mlir::RewritePatternSet &);
+void populateCtrlLoweringPatterns(mlir::RewritePatternSet &);
+void populateGridsynthPatterns(mlir::RewritePatternSet &patterns, double epsilon, bool pprBasis,
+                               GridsynthMethod method);
 void populateQIRConversionPatterns(mlir::TypeConverter &, mlir::RewritePatternSet &, bool);
 void populateCancelInversesPatterns(mlir::RewritePatternSet &);
 void populateMergeRotationsPatterns(mlir::RewritePatternSet &);

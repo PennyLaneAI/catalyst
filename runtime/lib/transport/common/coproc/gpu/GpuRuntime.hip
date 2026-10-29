@@ -51,7 +51,7 @@ GpuRuntime::~GpuRuntime() {
 }
 
 GpuRuntime::HbmRing GpuRuntime::alloc_hbm_ring(std::size_t bytes) {
-    // Allocate exactly `bytes` (caller passes a page-aligned REGION_BYTES).
+    // Allocate exactly `bytes` (caller passes a page-aligned size).
     HbmRing r{.size = bytes};
 #if defined(__HIP_PLATFORM_AMD__)
     // NOTE: fine grained coherence is AMD specific and does not have

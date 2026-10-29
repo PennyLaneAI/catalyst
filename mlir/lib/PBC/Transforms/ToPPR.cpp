@@ -12,15 +12,35 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <cassert>
+#include <cmath>
 #include <cstdint>
+#include <cstdlib>
+#include <optional>
 
+#include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/STLForwardCompat.h"
+#include "llvm/ADT/StringSwitch.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/IR/Attributes.h"
+#include "mlir/IR/BuiltinAttributes.h"
+#include "mlir/IR/Location.h"
+#include "mlir/IR/Operation.h"
+#include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/TypeRange.h"
+#include "mlir/IR/Types.h"
+#include "mlir/IR/Value.h"
+#include "mlir/IR/ValueRange.h"
+#include "mlir/Support/LLVM.h"
+#include "mlir/Support/LogicalResult.h"
+#include "mlir/Transforms/DialectConversion.h"
 
 #include "Catalyst/Utils/ConstantResolve.h"
 #include "PBC/IR/PBCOps.h"
 #include "PBC/Transforms/Patterns.h"
+#include "Quantum/IR/QuantumInterfaces.h"
 #include "Quantum/IR/QuantumOps.h"
+#include "Quantum/IR/QuantumTypes.h"
 
 using namespace mlir;
 using namespace catalyst;
@@ -38,6 +58,7 @@ enum class GateEnum {
     S,
     T,
     CNOT,
+    CY,
     CZ,
     X,
     Y,
@@ -63,6 +84,8 @@ GateEnum hashGate(CustomOp op) {
         return GateEnum::T;
     } else if (gateName == "CNOT") {
         return GateEnum::CNOT;
+    } else if (gateName == "CY") {
+        return GateEnum::CY;
     } else if (gateName == "CZ") {
         return GateEnum::CZ;
     } else if (gateName == "PauliX" || gateName == "X") {
@@ -255,6 +278,11 @@ LogicalResult convertCNOTGate(CustomOp op, ConversionPatternRewriter &rewriter) 
     return controlledConversion(op, "Z", "X", rewriter);
 }
 
+LogicalResult convertCYGate(CustomOp op, ConversionPatternRewriter &rewriter) {
+    applyGlobalPhase(op->getLoc(), llvm::numbers::pi / 4, rewriter);
+    return controlledConversion(op, "Z", "Y", rewriter);
+}
+
 LogicalResult convertCZGate(CustomOp op, ConversionPatternRewriter &rewriter) {
     applyGlobalPhase(op->getLoc(), llvm::numbers::pi / 4, rewriter);
     return controlledConversion(op, "Z", "Z", rewriter);
@@ -411,11 +439,35 @@ LogicalResult convertPauliRotGate(PauliRotOp op, ConversionPatternRewriter &rewr
                                    op.getAdjoint(), rewriter);
 }
 
-LogicalResult convertPPROperator(OperatorOp op, ConversionPatternRewriter &rewriter) {
-    assert(op.getAllParams().empty() && "PPR operator does not support dynamic parameters");
+// The PPR_k operators (k = 2, 4, 8) carry their angle denominator in the op name.
+std::optional<int8_t> getPPROperatorDenominator(OperatorOp op) {
+    return llvm::StringSwitch<std::optional<int8_t>>(op.getOpName())
+        .Case("PPR_2", 2)
+        .Case("PPR_4", 4)
+        .Case("PPR_8", 8)
+        .Default(std::nullopt);
+}
+
+LogicalResult convertPPROperator(OperatorOp op, int8_t denominator,
+                                 ConversionPatternRewriter &rewriter) {
+    if (!op.getAllParams().empty()) {
+        return op.emitError("PPR operators do not support dynamic parameters");
+    }
 
     DictionaryAttr staticData = op.getStaticData();
-    auto pauliWordAttr = staticData.getAs<StringAttr>("pauli_word");
+    StringAttr pauliWordAttr = staticData ? staticData.getAs<StringAttr>("pauli_word") : nullptr;
+    IntegerAttr signAttr = staticData ? staticData.getAs<IntegerAttr>("sign") : nullptr;
+    // A boolean sign is stored as an i1 attribute, which must not be read as +-1.
+    if (!pauliWordAttr || !signAttr || signAttr.getType().isInteger(1)) {
+        return op.emitError("PPR operators require static_data with a string 'pauli_word' and an "
+                            "integer 'sign'");
+    }
+    // don't use getInt, since it asserts signless (cannot handle signed data)
+    int64_t sign = signAttr.getValue().getSExtValue();
+    if (sign != 1 && sign != -1) {
+        return op.emitError("PPR operators require a sign of 1 or -1, but got ") << sign;
+    }
+
     StringRef pauliWord = pauliWordAttr.getValue();
     SmallVector<Attribute> pauliCharacters;
     pauliCharacters.reserve(pauliWord.size());
@@ -424,8 +476,7 @@ LogicalResult convertPPROperator(OperatorOp op, ConversionPatternRewriter &rewri
     }
     ArrayAttr pauliProduct = rewriter.getArrayAttr(pauliCharacters);
 
-    auto denominatorAttr = staticData.getAs<IntegerAttr>("angle_denominator");
-    int8_t rotationKind = static_cast<int8_t>(denominatorAttr.getInt());
+    int8_t rotationKind = static_cast<int8_t>(sign * denominator);
     if (op.getAdjoint()) {
         rotationKind = -rotationKind;
     }
@@ -445,8 +496,9 @@ struct PBCGateLowering : public OpInterfaceConversionPattern<QuantumOperation> {
 
     LogicalResult matchAndRewrite(QuantumOperation operation, ArrayRef<Value> operands,
                                   ConversionPatternRewriter &rewriter) const final {
-        StringRef supportedGates = "Supported gates: H, S, T, X, Y, Z, S†, T†, I, CNOT, CZ, PPR,"
-                                   "RX, RY, RZ, IsingXX, IsingYY, IsingZZ, MultiRZ, and PauliRot.";
+        StringRef supportedGates =
+            "Supported gates: H, S, T, X, Y, Z, S†, T†, I, CNOT, CY, CZ, PPR_2, PPR_4, PPR_8, "
+            "RX, RY, RZ, IsingXX, IsingYY, IsingZZ, MultiRZ, and PauliRot.";
         Operation *op = operation.getOperation();
 
         if (auto gateLikeOp = dyn_cast<QuantumGate>(op)) {
@@ -471,6 +523,8 @@ struct PBCGateLowering : public OpInterfaceConversionPattern<QuantumOperation> {
                 return convertZGate(originOp, rewriter);
             case GateEnum::CNOT:
                 return convertCNOTGate(originOp, rewriter);
+            case GateEnum::CY:
+                return convertCYGate(originOp, rewriter);
             case GateEnum::CZ:
                 return convertCZGate(originOp, rewriter);
             case GateEnum::I:
@@ -495,8 +549,8 @@ struct PBCGateLowering : public OpInterfaceConversionPattern<QuantumOperation> {
         } else if (auto originOp = dyn_cast<PauliRotOp>(op)) {
             return convertPauliRotGate(originOp, rewriter);
         } else if (auto originOp = dyn_cast<OperatorOp>(op)) {
-            if (originOp.getOpName() == "PPR") {
-                return convertPPROperator(originOp, rewriter);
+            if (auto denominator = getPPROperatorDenominator(originOp)) {
+                return convertPPROperator(originOp, *denominator, rewriter);
             }
         }
 

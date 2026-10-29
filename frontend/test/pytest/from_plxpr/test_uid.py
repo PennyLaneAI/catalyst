@@ -19,6 +19,7 @@ from pennylane.pytrees import flatten
 from pennylane.typing import AbstractArray
 from pennylane.wires import AbstractQubit
 
+from catalyst.decomposition.graph_op_id import GraphOpID
 from catalyst.from_plxpr.uid import _serialize_static, generate_uid
 
 
@@ -95,8 +96,6 @@ class TestGenerateUID:
             wire_lens=(1,),
             hybrid_lens=(),
             hybrid_trees=(),
-            adjoint=False,
-            n_ctrls=0,
             static_args=_static_kwargs("hello"),
         )
         uid_b = generate_uid(
@@ -104,8 +103,6 @@ class TestGenerateUID:
             wire_lens=(1,),
             hybrid_lens=(),
             hybrid_trees=(),
-            adjoint=False,
-            n_ctrls=0,
             static_args=_static_kwargs("hello"),
         )
         assert uid_a == uid_b
@@ -117,8 +114,6 @@ class TestGenerateUID:
             wire_lens=(1,),
             hybrid_lens=(),
             hybrid_trees=(),
-            adjoint=False,
-            n_ctrls=0,
             static_args=_static_kwargs("hello"),
         )
         uid_b = generate_uid(
@@ -126,8 +121,6 @@ class TestGenerateUID:
             wire_lens=(1,),
             hybrid_lens=(),
             hybrid_trees=(),
-            adjoint=False,
-            n_ctrls=0,
             static_args=_static_kwargs("world"),
         )
         assert uid_a != uid_b
@@ -143,8 +136,6 @@ class TestGenerateUID:
             wire_lens=(),
             hybrid_lens=(2,),
             hybrid_trees=hybrid_trees,
-            adjoint=False,
-            n_ctrls=0,
             static_args={},
         )
         uid_b = generate_uid(
@@ -152,8 +143,6 @@ class TestGenerateUID:
             wire_lens=(),
             hybrid_lens=(2,),
             hybrid_trees=hybrid_trees,
-            adjoint=False,
-            n_ctrls=0,
             static_args={},
         )
         assert uid_a == uid_b
@@ -169,8 +158,6 @@ class TestGenerateUID:
             wire_lens=(),
             hybrid_lens=(2,),
             hybrid_trees=(hybrid_tree1,),
-            adjoint=False,
-            n_ctrls=0,
             static_args={},
         )
         uid_three = generate_uid(
@@ -178,8 +165,6 @@ class TestGenerateUID:
             wire_lens=(),
             hybrid_lens=(2,),
             hybrid_trees=(hybrid_tree2,),
-            adjoint=False,
-            n_ctrls=0,
             static_args={},
         )
         assert uid_two != uid_three
@@ -192,8 +177,6 @@ class TestGenerateUID:
             "wire_lens": (1,),
             "hybrid_lens": (),
             "hybrid_trees": (),
-            "adjoint": False,
-            "n_ctrls": 0,
             "static_args": _static_kwargs("hello"),
         }
 
@@ -208,8 +191,6 @@ class TestGenerateUID:
             "wire_lens": (1,),
             "hybrid_lens": (),
             "hybrid_trees": (),
-            "adjoint": False,
-            "n_ctrls": 0,
             "static_args": _static_kwargs("hello"),
         }
 
@@ -224,8 +205,6 @@ class TestGenerateUID:
             "wire_lens": (1,),
             "hybrid_lens": (),
             "hybrid_trees": (),
-            "adjoint": False,
-            "n_ctrls": 0,
             "static_args": _static_kwargs("hello"),
         }
 
@@ -262,8 +241,6 @@ class TestGenerateUID:
         kwargs = {
             "op_cls": HybridOp,
             "wire_lens": (),
-            "adjoint": False,
-            "n_ctrls": 0,
             "static_args": _static_kwargs("hello"),
         }
 
@@ -283,3 +260,27 @@ class TestGenerateUID:
             **kwargs,
         )
         assert uid_three_wires != uid_two_wires
+
+    def test_modifiers_do_not_change_uid(self):
+        """Test that op-level modifiers are spelled in the graphOpId name, not in the UID.
+
+        A modified operator reached as a rule's resource must land on the same graph node as the
+        same operator applied directly, so the UID has to ignore adjoint and control.
+        """
+        with qp.capture.pause():
+            base = StaticOp("hello", wires=[0])
+            variants = {
+                "StaticOp{}{wires:1}{}": base,
+                "Adjoint(StaticOp){}{wires:1}{}": qp.adjoint(base),
+                "C(StaticOp){}{wires:1}{}": qp.ctrl(base, control=[1]),
+                "2C(Adjoint(StaticOp)){}{wires:1}{}": qp.ctrl(qp.adjoint(base), control=[1, 2]),
+            }
+
+        graph_op_ids = {name: GraphOpID(op) for name, op in variants.items()}
+        base_uid = graph_op_ids["StaticOp{}{wires:1}{}"].uid
+
+        for name, graph_op_id in graph_op_ids.items():
+            assert graph_op_id.uid == base_uid
+            assert graph_op_id.getGraphOpId() == f"{name}[{base_uid}]"
+            # The modifiers peel away to leave one shared base identity.
+            assert graph_op_id.getBaseGraphOpId() == f"StaticOp{{}}{{wires:1}}{{}}[{base_uid}]"

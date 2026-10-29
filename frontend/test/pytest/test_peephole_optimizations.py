@@ -19,7 +19,7 @@ import pennylane as qp
 import pytest
 from pennylane.transforms import to_ppr as qp_to_ppr
 
-from catalyst import measure, pipeline, qjit
+from catalyst import measure, qjit
 from catalyst.passes import (
     cancel_inverses,
     commute_ppr,
@@ -115,36 +115,6 @@ def test_cancel_inverses_functionality_outside_qjit(theta, backend):
     assert np.allclose(workflow()[0], workflow()[1])
 
 
-@pytest.mark.parametrize("theta", [42.42])
-def test_pipeline_functionality(theta, backend):
-    """
-    Test that the @pipeline decorator does not change functionality
-    when all the passes in the pipeline does not change functionality.
-    """
-    my_pipeline = {
-        "cancel_inverses": {},
-        "merge_rotations": {},
-    }
-
-    @qjit
-    def workflow():
-        @qp.qnode(qp.device(backend, wires=2))
-        def f(x):
-            qp.RX(0.1, wires=[0])
-            qp.RX(x, wires=[0])
-            qp.Hadamard(wires=[1])
-            qp.Hadamard(wires=[1])
-            return qp.expval(qp.PauliY(wires=0))
-
-        no_pipeline_result = f(theta)
-        pipeline_result = pipeline(my_pipeline)(f)(theta)
-
-        return no_pipeline_result, pipeline_result
-
-    res = workflow()
-    assert np.allclose(res[0], res[1])
-
-
 def test_chained_passes():
     """
     Test that chained passes are present in the transform passes.
@@ -224,7 +194,7 @@ def test_convert_clifford_to_ppr():
     assert 'transform.apply_registered_pass "to-ppr"' not in optimized_ir
     assert "pbc.ppr" in optimized_ir
 
-    ppm_specs_output = qp.specs(test_convert_clifford_to_ppr_workflow, level=1)().resources
+    ppm_specs_output = qp.analyze(test_convert_clifford_to_ppr_workflow, level=1)().resources
 
     gate_types = ppm_specs_output.quantum_operations
     assert gate_types.get("PPR-pi/4-w1", 0) == 6
@@ -277,7 +247,7 @@ def test_commute_ppr():
     assert "pbc.ppr" in optimized_ir
     assert "pbc.ppm" in optimized_ir
 
-    ppm_specs_output = qp.specs(test_commute_ppr_workflow, level=2)().resources
+    ppm_specs_output = qp.analyze(test_commute_ppr_workflow, level=2)().resources
 
     gate_types = ppm_specs_output.quantum_operations
 
@@ -309,7 +279,7 @@ def test_merge_ppr_ppm():
     assert 'pbc.ppm ["Z", "X"]' in optimized_ir
     assert 'pbc.ppm ["X"]' in optimized_ir
 
-    ppm_specs_output = qp.specs(test_merge_ppr_ppm_workflow, level=2)().resources
+    ppm_specs_output = qp.analyze(test_merge_ppr_ppm_workflow, level=2)().resources
 
     gate_types = ppm_specs_output.quantum_operations
     assert gate_types.get("PPM-w1", 0) == 1
@@ -337,7 +307,7 @@ def test_ppr_to_ppm_auto_corrected():
     optimized_ir = test_ppr_to_ppm_workflow.mlir_opt
     assert 'transform.apply_registered_pass "ppr-to-ppm"' not in optimized_ir
 
-    specs_output = qp.specs(test_ppr_to_ppm_workflow, level=1)()
+    specs_output = qp.analyze(test_ppr_to_ppm_workflow, level=1)()
     gate_types = specs_output.resources.quantum_operations
 
     assert gate_types["GlobalPhase"] == 4
@@ -365,7 +335,7 @@ def test_ppr_to_ppm_inject_magic_state():
     optimized_ir = test_ppr_to_ppm_workflow.mlir_opt
     assert 'transform.apply_registered_pass "ppr-to-ppm"' not in optimized_ir
 
-    specs_output = qp.specs(test_ppr_to_ppm_workflow, level=1)()
+    specs_output = qp.analyze(test_ppr_to_ppm_workflow, level=1)()
     gate_types = specs_output.resources.quantum_operations
 
     assert gate_types["PPR-pi/4-w1"] == 6
@@ -393,7 +363,7 @@ def test_ppr_to_ppm_pauli_corrected():
     optimized_ir = test_ppr_to_ppm_workflow.mlir_opt
     assert 'transform.apply_registered_pass "ppr-to-ppm"' not in optimized_ir
 
-    specs_output = qp.specs(test_ppr_to_ppm_workflow, level=1)()
+    specs_output = qp.analyze(test_ppr_to_ppm_workflow, level=1)()
     gate_types = specs_output.resources.quantum_operations
     assert gate_types["PPR-pi/4-w1"] == 6
     assert gate_types["PPR-pi/4-w2"] == 1
@@ -436,13 +406,13 @@ def test_commute_ppr_and_merge_ppr_ppm_with_max_pauli_size():
         assert 'transform.apply_registered_pass "commute-ppr"' not in optimized_ir
         assert 'transform.apply_registered_pass "merge-ppr-ppm"' not in optimized_ir
 
-    f_specs = qp.specs(f_workflow, level=3)().resources
+    f_specs = qp.analyze(f_workflow, level=3)().resources
     assert f_specs.quantum_operations.get("PPM-w1", 0) == 2
     assert f_specs.quantum_operations.get("PPR-pi/8-w1", 0) == 1
     assert f_specs.any_commuting_depth == 1
     assert f_specs.qubit_disjoint_depth == 2
 
-    g_specs = qp.specs(g_workflow, level=3)().resources
+    g_specs = qp.analyze(g_workflow, level=3)().resources
     gate_types = g_specs.quantum_operations
     assert gate_types.get("PPM-w1", 0) == 2
     assert gate_types.get("PPR-pi/4-w1", 0) == 1
@@ -576,8 +546,8 @@ class TestLowerPBCInitOps:
             (lambda: qp.H(0)),
             (lambda: (qp.H(0), qp.T(0))),
             (lambda: (qp.H(0), qp.S(0))),
-            (lambda: (qp.H(0), qp.adjoint(qp.T(0), lazy=False))),
-            (lambda: (qp.H(0), qp.adjoint(qp.S(0), lazy=False))),
+            (lambda: (qp.H(0), qp.adjoint(qp.T(0)))),
+            (lambda: (qp.H(0), qp.adjoint(qp.S(0)))),
         ],
     )
     def test_lower_pbc_init_ops_preserves_states(self, gates):

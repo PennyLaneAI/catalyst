@@ -17,6 +17,7 @@
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/IRMapping.h"
 #include "mlir/IR/PatternMatch.h"
+#include "mlir/Interfaces/CallInterfaces.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -24,6 +25,7 @@
 #include "QRef/IR/QRefDialect.h"
 #include "QRef/IR/QRefOps.h"
 #include "Quantum/Transforms/Passes.h"
+#include "Quantum/Transforms/Patterns.h"
 
 using namespace mlir;
 
@@ -37,10 +39,11 @@ struct CtrlLoweringRewritePattern : public OpRewritePattern<CtrlOp> {
     LogicalResult matchAndRewrite(CtrlOp ctrl, PatternRewriter &rewriter) const override {
         // Defer (not an error) if the region still contains a nested quantum.adjoint region.
         // Distributing controls needs an op-level body, so the inner region must be reduced first.
-        // The pipeline runs (ctrl-lowering, adjoint-lowering) to a fixpoint: adjoint-lowering
-        // reduces the inner region to op-level gates, then this ctrl op lowers on a later
-        // iteration. A pre-scan avoids a partial rewrite (creating ops, then bailing out
-        // mid-region).
+        // Returning failure() drives the greedy fixpoint: adjoint-lowering reduces the inner region
+        // to op-level gates, then the greedy driver re-tries this ctrl op and it lowers. This works
+        // whether the two patterns run in separate alternating passes or together in the combined
+        // modifiers-lowering pass. A pre-scan avoids a partial rewrite (creating ops, then bailing
+        // out mid-region).
         if (ctrl.getRegion()
                 .walk([](Operation *op) {
                     if (isa<AdjointOp>(op)) {
@@ -78,7 +81,7 @@ struct CtrlLoweringRewritePattern : public OpRewritePattern<CtrlOp> {
             }
             return WalkResult::advance();
         });
-        
+
         Block &block = ctrl.getRegion().front();
         rewriter.inlineBlockBefore(&block, ctrl);
         // Assemble the ctrl op results: out_ctrl_qubits followed by the target results.
@@ -88,6 +91,10 @@ struct CtrlLoweringRewritePattern : public OpRewritePattern<CtrlOp> {
 };
 
 } // namespace catalyst::qref
+
+void catalyst::quantum::populateCtrlLoweringPatterns(RewritePatternSet &patterns) {
+    patterns.add<catalyst::qref::CtrlLoweringRewritePattern>(patterns.getContext(), 1);
+}
 
 namespace catalyst {
 namespace quantum {

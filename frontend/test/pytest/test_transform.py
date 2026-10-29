@@ -35,17 +35,13 @@ import scipy
 from jax import numpy as jnp
 from numpy.testing import assert_allclose
 from pennylane import numpy as pnp
-
-try:
-    from pennylane import qcut
-except:  # pylint: disable=bare-except
-    from pennylane.transforms import qcut
-
-from pennylane.transforms import merge_rotations
+from pennylane.transforms import _tape_decompose, merge_rotations
 
 from catalyst import measure, qjit
 from catalyst.device import QJITDevice
 from catalyst.device.decomposition import measurements_from_counts, measurements_from_samples
+from catalyst.passes import graph_decomposition
+from catalyst.qfunc import _extract_passes
 from catalyst.utils.exceptions import CompileError
 
 # pylint: disable=too-many-lines,line-too-long
@@ -308,7 +304,6 @@ def test_decompose(backend):
     def qnode_builder(device_name):
         """Builder"""
 
-        @qp.transforms.decompose
         @qp.qnode(qp.device(device_name, wires=3), interface="jax")
         def qfunc():
             qp.Hadamard(wires=[0])
@@ -318,7 +313,9 @@ def test_decompose(backend):
         return qfunc
 
     qnode_control = qnode_builder("default.qubit")
-    qnode_backend = qnode_builder(backend)
+    qnode_backend = qp.transforms.decompose(
+        qnode_builder(backend), gate_set={"Hadamard", "T", "Adjoint(T)", "CNOT"}
+    )
 
     jax_jit = jax.jit(qnode_control)
     compiled = qjit(qnode_backend)
@@ -330,6 +327,60 @@ def test_decompose(backend):
 
     assert np.allclose(expected, observed)
     assert expected_shape == observed_shape
+    assert "Toffoli" not in compiled.mlir
+
+
+def test_decompose_keeps_markers():
+    """Running qp.decompose as a tape transform."""
+
+    @qp.transforms.decompose(gate_set={"RX", "RZ"})
+    @qp.marker("before-decompose")
+    @qp.transforms.convert_to_numpy_parameters
+    @qp.marker("start")
+    @qp.qnode(qp.device("null.qubit", wires=1))
+    def circuit():
+        return qp.expval(qp.Z(0))
+
+    tape_transforms, pass_pipeline = _extract_passes(circuit.compile_pipeline)
+
+    assert tape_transforms[1].tape_transform is _tape_decompose.tape_transform
+    assert tape_transforms.get_marker_level("start") == 0
+    assert tape_transforms.get_marker_level("before-decompose") == 1
+    assert not pass_pipeline
+
+
+def test_decompose_before_passes(backend):
+    """Without capture, qp.decompose runs as a tape transform."""
+
+    @qjit
+    @qp.transforms.cancel_inverses
+    @qp.transforms.decompose(gate_set={"Hadamard", "T", "Adjoint(T)", "CNOT"})
+    @qp.qnode(qp.device(backend, wires=3))
+    def circuit():
+        qp.Hadamard(wires=0)
+        qp.Toffoli(wires=[0, 1, 2])
+        qp.Hadamard(wires=1)
+        qp.Hadamard(wires=1)
+        return qp.expval(qp.Z(0))
+
+    assert np.allclose(circuit(), 0.0)
+    assert 'apply_registered_pass "cancel-inverses"' in circuit.mlir
+    assert "graph-decomposition" not in circuit.mlir
+    assert "Toffoli" not in circuit.mlir
+
+
+def test_graph_decomposition_stays_a_pass():
+    """Without capture, catalyst.passes.graph_decomposition is lowered as a pass."""
+
+    @graph_decomposition(gate_set={"RX", "RZ"})
+    @qp.qnode(qp.device("null.qubit", wires=1))
+    def circuit():
+        return qp.expval(qp.Z(0))
+
+    tape_transforms, pass_pipeline = _extract_passes(circuit.compile_pipeline)
+
+    assert not tape_transforms
+    assert [t.pass_name for t in pass_pipeline] == ["graph-decomposition"]
 
 
 def test_diagonalize_measurements(backend):
@@ -895,47 +946,6 @@ class TestBroadcastExpand:
         # TODO: See https://github.com/PennyLaneAI/catalyst/issues/1099
         # assert expected_shape == observed_shape
         assert expected_shape.num_leaves == observed_shape.num_leaves
-
-
-class TestCutCircuitMCTransform:
-    """Test Cut Circuit MC Transform"""
-
-    def test_cut_circuit_mc_sample(self, backend):
-        """
-        Tests that a circuit containing sampling measurements can be cut and
-        postprocessed to return bitstrings of the original circuit size.
-        """
-
-        def qnode_builder(device_name):
-            """Builder"""
-
-            @qp.qnode(qp.device(device_name, wires=2))
-            def qfunc(x):
-                """Example taken from PL tests."""
-                qp.RX(x, wires=0)
-                qp.RY(0.543, wires=1)
-                qp.WireCut(wires=0)
-                qp.CNOT(wires=[0, 1])
-                qp.RZ(0.240, wires=0)
-                qp.RZ(0.133, wires=1)
-                return qp.expval(qp.PauliZ(wires=[0]))
-
-            return qfunc
-
-        qnode_default = qnode_builder("default.qubit")
-        qnode_backend = qnode_builder(backend)
-
-        x = jnp.array(0.531)
-        cut_circuit_jit = jax.jit(qcut.cut_circuit(qnode_default, use_opt_einsum=False))
-        cut_circuit_qjit = qjit(qcut.cut_circuit(qnode_backend, use_opt_einsum=False))
-
-        expected = cut_circuit_jit(x)
-        observed = cut_circuit_qjit(x)
-
-        assert_allclose(expected, observed)
-        _, expected_shape = jax.tree_util.tree_flatten(expected)
-        _, observed_shape = jax.tree_util.tree_flatten(observed)
-        assert expected_shape == observed_shape
 
 
 class TestSplitNonCommuting:

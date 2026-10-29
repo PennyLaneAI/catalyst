@@ -16,17 +16,42 @@
 // this .so and resolves CatalystTransportCoprocessorFactory (see TransportBackend.h).
 
 #include <string>
+#include <string_view>
 
 #include "ConfigParser.hpp"
+#include "Error.hpp"
 #include "GpuCoprocessorSession.hpp"
 #include "TransportBackend.h"
 
 namespace {
+// `coproc_fn=per_message` selects a host CoprocessorFn run once per message, and
+// `coproc_fn=launch_once` (the default) a launcher that starts a persistent kernel.
+bool parse_per_message(const std::string &config) {
+    bool per_message = false;
+    catalyst::transport::common::configparser::for_each_kv(
+        config, [&](std::string_view key, std::string_view value) {
+            if (key != "coproc_fn") {
+                return;
+            }
+            TP_CHECK(value == "per_message" || value == "launch_once",
+                     "coproc_fn must be 'per_message' or 'launch_once'");
+            per_message = value == "per_message";
+        });
+    return per_message;
+}
+
 catalyst::transport::CoprocessorSession *make_local_gpu_coprocessor(const std::string &config) {
     const int gpu_device = catalyst::transport::common::configparser::parse_optional_index(
         config, "gpu", /*fallback=*/0);
-    return new catalyst::transport::memcpy::GpuCoprocessorSession(config, gpu_device);
+    return new catalyst::transport::memcpy::GpuCoprocessorSession(config, gpu_device,
+                                                                  parse_per_message(config));
 }
 } // namespace
 
 GENERATE_TRANSPORT_COPROCESSOR_FACTORY(CatalystTransportCoprocessor, make_local_gpu_coprocessor)
+CATALYST_TRANSPORT_BACKEND_CAPS("memcpy_gpu", CATALYST_TRANSPORT_ROLE_BIT_COPROCESSOR,
+                                CATALYST_TRANSPORT_MEM_BIT(GpuHbm),
+                                CATALYST_TRANSPORT_FRAME_BL16 | CATALYST_TRANSPORT_FRAME_BLV,
+                                CATALYST_TRANSPORT_CONV_BIT(PerMessage) |
+                                    CATALYST_TRANSPORT_CONV_BIT(LaunchOnce),
+                                UINT32_MAX, UINT32_MAX, 1)

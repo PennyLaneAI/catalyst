@@ -37,6 +37,7 @@ from jax.api_util import debug_info as jdb
 from jax.core import Tracer, get_aval
 from pennylane import QubitUnitary, QueuingManager
 from pennylane.devices import QubitDevice
+from pennylane.logging import debug_logger, debug_logger_init
 from pennylane.measurements import (
     CountsMP,
     ExpectationMP,
@@ -113,7 +114,6 @@ from catalyst.jax_primitives import (
     unitary_p,
     var_p,
 )
-from catalyst.logging import debug_logger, debug_logger_init
 from catalyst.tracing.contexts import EvaluationContext, EvaluationMode
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.patching import DictPatchWrapper, Patcher
