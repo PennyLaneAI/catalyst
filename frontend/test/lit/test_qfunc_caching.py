@@ -17,7 +17,7 @@
 import jax.numpy as jnp
 import pennylane as qp
 
-from catalyst import measure, qjit
+from catalyst import qjit
 
 
 @qjit(target="mlir")
@@ -27,7 +27,7 @@ def workflow(n: int):
     # CHECK-NOT: public @f
     def f(x: float):
         qp.RX(x, wires=n)
-        return measure(wires=n)
+        return qp.expval(qp.Z(wires=n))
 
     return f(jnp.pi) + f(jnp.pi)
 

@@ -31,11 +31,11 @@ dev = qp.device("lightning.qubit", wires=num_wires)
 
 @qp.qnode(dev)
 def circuit(weights):
-    qp.StronglyEntanglingLayers(weights=weights, wires=range(num_wires))
+    qp.Rot(*weights[0, 0], wires=0)
     return qp.expval(qp.PauliZ(0))
 
 
-shape = qp.StronglyEntanglingLayers.shape(num_layers, num_wires)
+shape = (num_layers, num_wires, 3)
 weights = np.random.random(size=shape)
 
 # -----
@@ -111,7 +111,7 @@ with open(filename, mode="r", encoding="UTF-8") as f:
 # CHECK-NEXT:             walltime: {{[0-9\.]+}}
 # CHECK-NEXT:             cputime: {{[0-9\.]+}}
 # CHECK-NEXT:             programsize: {{[0-9\]+}}
-# CHECK-NEXT:         - {{[a-zA-Z]+}}Stage:
+# CHECK:              - {{[a-zA-Z]+}}Stage:
 # CHECK-NEXT:             walltime: {{[0-9\.]+}}
 # CHECK-NEXT:             cputime: {{[0-9\.]+}}
 # CHECK-NEXT:             programsize: {{[0-9\]+}}

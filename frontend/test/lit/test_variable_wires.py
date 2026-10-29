@@ -17,29 +17,25 @@
 import numpy as np
 import pennylane as qp
 
-from catalyst import measure, qjit
+from catalyst import qjit
 
 
 @qjit(target="mlir")
 @qp.qnode(qp.device("lightning.qubit", wires=2))
-# CHECK-LABEL @f.jit
+# CHECK-LABEL: public @f(
 def f(arg0: float, arg1: int, arg2: int):
-    # CHECK:   [[reg0:%.+]] = quantum.alloc( 2)
-    # CHECK:   [[w0_0:%.+]] = tensor.extract %arg1
-    # CHECK:   [[q_w0_0:%.+]] = quantum.extract [[reg0]][[[w0_0]]]
-    # CHECK:   [[q_w0_1:%.+]] = quantum.custom "RZ"({{%.+}}) [[q_w0_0]]
+    # CHECK: [[reg:%.+]] = qref.alloc( 2) : !qref.reg<2>
+    # CHECK: [[wire0:%.+]] = tensor.extract %arg1
+    # CHECK: [[qubit0:%.+]] = qref.get [[reg]][[[wire0]]]
+    # CHECK: qref.custom "RZ"({{%.+}}) [[qubit0]]
+    # CHECK: [[wire1:%.+]] = tensor.extract %arg2
+    # CHECK: [[qubit1:%.+]] = qref.get [[reg]][[[wire1]]]
+    # CHECK: [[m:%.+]] = qref.measure [[qubit1]] : i1
+    # CHECK: qref.dealloc [[reg]]
+    # CHECK: return
     qp.RZ(arg0, wires=[arg1])
-    # CHECK:   [[w0_1:%.+]] = tensor.extract %arg1
-    # CHECK:   [[reg1:%.+]] = quantum.insert [[reg0]][[[w0_1]]], [[q_w0_1]]
-    # CHECK:   [[w1_0:%.+]] = tensor.extract %arg2
-    # CHECK:   [[q_w1_0:%.+]] = quantum.extract [[reg1]][[[w1_0]]]
-    # CHECK:   [[mres:%.+]], [[out_qubit:%.+]] = quantum.measure [[q_w1_0]]
-    m = measure(wires=[arg2])
-    # CHECK:   [[w2:%.+]] = tensor.extract %arg2
-    # CHECK:   [[reg2:%.+]] = quantum.insert [[reg1]][[[w2]]], [[out_qubit]] : !quantum.reg, !quantum.bit
-    # CHECK:   quantum.dealloc [[reg2]]
-    # CHECK:   return
-    return m
+    qp.measure(wires=arg2)
+    return qp.expval(qp.Z(arg2))
 
 
 print(f.mlir)
@@ -47,7 +43,8 @@ print(f.mlir)
 # -----
 
 
-@qjit(target="mlir")
+# old_frontend: tests elimination of redundant quantum.insert operations.
+@qjit(target="mlir", capture=False)
 @qp.qnode(qp.device("null.qubit", wires=2))
 # CHECK-LABEL: public @g()
 def g():

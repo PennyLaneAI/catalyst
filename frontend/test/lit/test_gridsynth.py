@@ -48,7 +48,7 @@ def test_rz_registration():
     # CHECK: transform.named_sequence @__transform_main
     # CHECK: transform.apply_registered_pass "gridsynth" with options = {"epsilon" = 1.000000e-02 : f64, "method" = "deterministic", "ppr-basis" = false}
     # CHECK-LABEL: func.func public @circuit
-    # CHECK: quantum.custom "RZ"
+    # CHECK: qref.custom "RZ"
     print(circuit.mlir)
 
 
@@ -104,7 +104,7 @@ def test_phaseshift_registration():
 
     # CHECK:       transform.apply_registered_pass "gridsynth"
     # CHECK-LABEL: func.func public @circuit
-    # CHECK:       quantum.custom "PhaseShift"
+    # CHECK:       qref.custom "PhaseShift"
     print(circuit.mlir)
 
 
