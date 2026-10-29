@@ -260,6 +260,7 @@ def GraphDecompositionPass : Pass<"graph-decomposition", "mlir::ModuleOp"> {
     ];
 
     let dependentDialects = [
+        "arith::ArithDialect",
         "memref::MemRefDialect",
         "func::FuncDialect",
         "scf::SCFDialect",
