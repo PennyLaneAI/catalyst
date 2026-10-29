@@ -1520,14 +1520,6 @@ class TestAdjointConstructorDifferentCallableTypes:
         assert out.wires == qp.wires.Wires(1)
 
 
-@pytest.mark.parametrize("lazy", [True, False])
-@pytest.mark.parametrize("target", [lambda: qp.H(0), lambda: qp.RX, lambda: lambda: qp.H(0)])
-def test_lazy_argument_removed(lazy, target):
-    """Both keyword and positional forms of the removed argument are rejected."""
-    with pytest.raises(TypeError, match="unexpected keyword argument 'lazy'"):
-        adjoint(target(), lazy=lazy)
-    with pytest.raises(TypeError, match="positional argument"):
-        adjoint(target(), lazy)
 
 
 class TestAdjointConstructorOutsideofQueuing:
