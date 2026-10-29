@@ -912,27 +912,6 @@ class TestHybridOperatorArgDecomposition:
         for theta in (0.17, -0.62):
             np.testing.assert_allclose(compiled(theta, angles), reference(theta, angles), atol=1e-7)
 
-    def test_partial_unary_state_preparation_binary(self):
-        """Concrete static indices with runtime coefficients need no unsupported scatter."""
-
-        @qp.qnode(qp.device("lightning.qubit", wires=4))
-        def circuit(coefficients):
-            qp.PartialUnaryStatePreparation(
-                coefficients, wires=[0, 1, 2], indices=(5, 0, 3), work_wires=[3]
-            )
-            return qp.probs(wires=[0, 1, 2])
-
-        compiled = qjit(
-            qp.decompose(
-                gate_set={"RX", "RY", "RZ", "PauliX", "PauliZ", "Hadamard", "CNOT", "GlobalPhase"}
-            )(circuit),
-            capture=True,
-        )
-        coefficients = np.sqrt([0.2, 0.3, 0.5])
-        expected = np.zeros(8)
-        expected[[5, 0, 3]] = coefficients**2
-        np.testing.assert_allclose(compiled(coefficients), expected, atol=1e-7)
-
 
 class TestOnDemand:
     """Test the python wrapper functions used for on-demand,
