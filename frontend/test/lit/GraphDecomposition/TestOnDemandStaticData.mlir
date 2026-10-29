@@ -39,9 +39,3 @@ func.func @circuit(%theta: f64) attributes {quantum.node} {
 
 // The rule came back keyed on the id the compiler prints for the op, `dim` included.
 // ALL: target_gate = "PCPhase{phi:[f64]}{wires:2}{dim = 2 : i64}"
-
-// An independently generated function may already occupy the first enumerated name.
-// Importing the on-demand rule must rename it rather than create a duplicate symbol.
-func.func private @__builtin__decompose_pcphase_0() {
-    return
-}
