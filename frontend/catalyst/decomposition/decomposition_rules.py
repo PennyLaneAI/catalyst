@@ -31,7 +31,7 @@ from pennylane.decomposition.utils import to_name
 from pennylane.wires import Wires
 
 from catalyst.compiler import _quantum_opt
-from catalyst.decomposition.capture_session import OpDecompRequest
+from catalyst.decomposition.capture_session import DecompositionScope, OpDecompRequest
 from catalyst.decomposition.graph_op_id import GraphOpID
 from catalyst.decomposition.modifier_state import ModifierState
 from catalyst.decomposition.rule_lowering_warning import RuleLoweringWarning
@@ -48,11 +48,6 @@ _NON_INVERTIBLE_MARKERS = (
 )
 
 _NON_INVERTIBLE_RESOURCE_TYPES = (qp.ops.MidMeasure, qp.ops.PauliMeasure)
-
-# A counter to rename rule names to unique symbols
-# Must not use GOID in rule name directly: large compilable args can lead to long function names,
-# which can be rejected by some OS
-_rule_name_counter = itertools.count()
 
 
 @dataclass
@@ -662,7 +657,7 @@ def build_decomp_target_spec(
             _kwargs |= static_data | closed_hybrid
             modifiers.wrap_callable(rule._impl, _ctrl_wires, _ctrl_values)(*_args, **_kwargs)
 
-        decomp_rule.__name__ = f"{rule.name}_{next(_rule_name_counter)}"
+        decomp_rule.__name__ = rule.name
 
         return decomp_rule
 
@@ -710,8 +705,17 @@ def build_decomp_target_spec(
     )
 
 
-def materialize_decomp_target_spec(target_spec: DecompTargetSpec) -> ir.Operation:
-    """Materialize one target specification through the legacy standalone qjit path."""
+def materialize_decomp_target_spec(
+    target_spec: DecompTargetSpec, *, scope: DecompositionScope | None = None
+) -> ir.Operation:
+    """Materialize one target specification through the legacy standalone qjit path.
+
+    Share ``scope`` when combining several targets into one rule library.
+    """
+    if scope is None:
+        scope = DecompositionScope()
+    for rule in target_spec.rules:
+        rule.pyfun.__name__ = scope.next_rule_name(rule.frontend_name)
 
     return build_rule_module(
         [qp.capture.subroutine(rule.pyfun) for rule in target_spec.rules],
@@ -737,8 +741,10 @@ def compile_decomposition_rules(
     extra_data=None,
     is_custom_op=False,
     modifiers=ModifierState(),
+    *,
+    scope: DecompositionScope | None = None,
 ) -> ir.Operation:
-    """Compile decomposition rules into the legacy standalone MLIR module."""
+    """Compile a standalone rule module, optionally sharing a library's naming scope."""
 
     target_spec = build_decomp_target_spec(
         op_name,
@@ -750,7 +756,7 @@ def compile_decomposition_rules(
         is_custom_op=is_custom_op,
         modifiers=modifiers,
     )
-    return materialize_decomp_target_spec(target_spec)
+    return materialize_decomp_target_spec(target_spec, scope=scope)
 
 
 def build_rule_module(
@@ -1064,7 +1070,7 @@ def build_registered_decomp_target_spec(
             else:
                 rule._impl(**symbolic_arguments(base, kind, _ctrl_wires, _ctrl_values))
 
-        decomp_rule.__name__ = f"{rule.name}_{next(_rule_name_counter)}"
+        decomp_rule.__name__ = rule.name
         return decomp_rule
 
     rule_specs = []
@@ -1126,6 +1132,7 @@ def compile_registered_symbolic_rules(
     op_cls=None,
     *,
     modifiers,
+    scope: DecompositionScope | None = None,
 ) -> ir.Operation | None:
     """Compile registered symbolic rules into the legacy standalone MLIR module."""
 
@@ -1142,7 +1149,7 @@ def compile_registered_symbolic_rules(
     )
     if target_spec is None:
         return None
-    return materialize_decomp_target_spec(target_spec)
+    return materialize_decomp_target_spec(target_spec, scope=scope)
 
 
 def _append_decomp_target_spec(out, description, factory):
@@ -1404,12 +1411,15 @@ def materialize_reachable_rule_strings(
     )
     target_specs = walk_reachable_decomp_rule_sets([(request, {request.modifier_state})])
 
+    scope = DecompositionScope()
     rules = []
     for target_spec in target_specs:
         if not target_spec.rules:
             continue
         try:
-            rule_strings = get_rule_strings_from_module(materialize_decomp_target_spec(target_spec))
+            rule_strings = get_rule_strings_from_module(
+                materialize_decomp_target_spec(target_spec, scope=scope)
+            )
             if target_spec.reject_noninvertible:
                 rule_strings = [
                     rule

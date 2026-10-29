@@ -488,6 +488,8 @@ def _capture_scope_rules(interpreter, scope):
     """Populate one decomposition scope outside the active program trace."""
 
     for target_spec in walk_reachable_decomp_rule_sets(list(scope.roots.values())):
+        for rule in target_spec.rules:
+            rule.pyfun.__name__ = scope.next_rule_name(rule.frontend_name)
         for traced_rule in _convert_decomp_target_spec(interpreter, target_spec):
             scope.record_definition(traced_rule)
 
