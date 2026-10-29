@@ -27,6 +27,15 @@
 namespace catalyst {
 namespace qref {
 
+/// Inspect quantum effects in nested regions and callees. Reference-semantics operations need
+/// not return quantum values, and global-phase callees need not take quantum arguments either.
+bool hasQuantumOperations(mlir::Operation *);
+
+/// The failure flag distinguishes unsupported operations from deferred nested modifiers.
+void populateAdjointLoweringPatterns(mlir::RewritePatternSet &, bool &failed);
+
+void populateCtrlLoweringPatterns(mlir::RewritePatternSet &, bool &failed);
+
 void populateDecomposeLoweringPatterns(mlir::RewritePatternSet &,
                                        const llvm::StringMap<mlir::func::FuncOp> &, bool,
                                        const llvm::StringSet<llvm::MallocAllocator> &,
