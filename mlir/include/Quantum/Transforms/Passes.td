@@ -353,8 +353,6 @@ def ResourceEstimatePass : Pass<"resource-estimate", "mlir::ModuleOp"> {
         "LLVM::LLVMDialect",
         "stablehlo::StablehloDialect",
         "tensor::TensorDialect",
-        "index::IndexDialect",
-        "complex::ComplexDialect",
         "catalyst::CatalystDialect",
         "catalyst::qref::QRefDialect",
         "catalyst::pbc::PBCDialect",
