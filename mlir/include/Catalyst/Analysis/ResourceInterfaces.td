@@ -21,7 +21,7 @@ include "mlir/IR/OpBase.td"
 // implementing these interfaces so the analysis does not hard-code op names.
 // Each interface maps to one ResourceResult field:
 //   ResourceQuantumOpInterface      -> operations[name][{numQubits, numParams}]
-//   ResourceAllocQubitOpInterface    -> num_alloc_qubits
+//   ResourceAllocQubitOpInterface   -> num_alloc_qubits
 //   ResourceMeasurementOpInterface  -> measurements[name]
 
 // ResourceSkipOpInterface is used to mark ops that should be skipped in the resource counts.

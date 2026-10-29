@@ -420,9 +420,8 @@ void ResourceAnalysis::analyzeRegion(Region &region, ResourceResult &result, boo
 /**
  * @brief Collect a single operation into the ResourceResult.
  *
- * This collects plugin extension data, then categorizes the operation into gates,
- * measurements, qubit allocations, classical instructions, or function calls and
- * updates the corresponding counts in the ResourceResult.
+ * This categorizes the operation into gates, measurements, classical instructions,
+ * or function calls, and updates the corresponding counts in the ResourceResult.
  *
  * @param op The operation to collect.
  * @param result The ResourceResult to update with the operation's resource usage.
