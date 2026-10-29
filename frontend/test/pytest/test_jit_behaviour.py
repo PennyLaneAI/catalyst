@@ -26,7 +26,8 @@ import pytest
 from jax import numpy as jnp
 from numpy import pi
 
-from catalyst import QJIT, for_loop, grad, measure, qjit
+from catalyst import QJIT, for_loop, grad, qjit
+from catalyst.decomposition import RuleLoweringWarning
 from catalyst.jax_primitives import _scalar_abstractify
 from catalyst.tracing.type_signatures import (
     TypeCompatibility,
@@ -45,9 +46,9 @@ def f_aot_builder(backend, wires=1, shots=1000):
     @qjit
     @qp.set_shots(shots)
     @qp.qnode(qp.device(backend, wires=wires))
-    def f(x: float) -> bool:
+    def f(x: float):
         qp.RY(x, wires=0)
-        return measure(wires=0)
+        return qp.probs(wires=0)
 
     return f
 
@@ -60,7 +61,7 @@ def f_jit_builder(backend, wires=1, shots=1000):
     @qp.qnode(qp.device(backend, wires=wires))
     def f(x):
         qp.RY(x, wires=0)
-        return measure(wires=0)
+        return qp.probs(wires=0)
 
     return f
 
@@ -147,6 +148,7 @@ class TestJittedWithOneTypeRunWithAnother:
         with warnings.catch_warnings():
             # Treat warnings as an error.
             warnings.simplefilter("error")
+            warnings.simplefilter("ignore", RuleLoweringWarning)
 
             @qjit
             @qp.qnode(qp.device(backend, wires=1))
@@ -246,6 +248,7 @@ class TestJittedWithOneTypeRunWithAnother:
         id_from = id(f.compiled_function)
         with warnings.catch_warnings():
             warnings.simplefilter("error")
+            warnings.simplefilter("ignore", RuleLoweringWarning)
             res_to = f(to_type(1))
         id_to = id(f.compiled_function)
         assert id_from != id_to
@@ -416,15 +419,15 @@ class TestDecorator:
         @qp.qnode(qp.device(backend, wires=1))
         def f_no_parenthesis(x):
             qp.RY(x, wires=0)
-            return measure(wires=0)
+            return qp.probs(wires=0)
 
         @qjit
         @qp.qnode(qp.device(backend, wires=1))
         def f_parenthesis(x):
             qp.RY(x, wires=0)
-            return measure(wires=0)
+            return qp.probs(wires=0)
 
-        assert f_no_parenthesis(pi) == f_parenthesis(pi)
+        assert jnp.allclose(f_no_parenthesis(pi), f_parenthesis(pi))
 
 
 class TestQJITTransforms:
@@ -632,7 +635,7 @@ class TestCaching:
         @qp.qnode(qp.device(backend, wires=1))
         def f_jit(x):
             qp.RY(x, wires=0)
-            return measure(wires=0)
+            return qp.probs(wires=0)
 
         compile_and_run_start = timer()
         f_jit = f_jit_builder(backend)
@@ -995,26 +998,31 @@ class TestTracingQJITAnnotatedFunctions:
 
         assert g2.mlir
 
+    @pytest.mark.old_frontend
     @pytest.mark.parametrize("phi", [(0.0), (1.0), (2.0)])
     def test_gradient_of_qjit_equivalence(self, phi, backend):
         """Test gradient of qjit equivalence."""
 
         # Issue 376
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(device=qp.device(backend, wires=1))
         def circuit(phi):
             qp.RX(phi, wires=0)
             return qp.expval(qp.PauliZ(0))
 
-        @qjit
+        @qjit(capture=False)
         def workflow(phi):
             g = grad(circuit)
             return g(phi)
 
-        assert np.allclose(qjit(grad(qjit(circuit)))(phi), qjit(grad(circuit))(phi))
-        assert np.allclose(qjit(grad(circuit))(phi), workflow(phi))
-        assert np.allclose(workflow(phi), qjit(grad(circuit))(phi))
+        assert np.allclose(
+            qjit(grad(qjit(circuit, capture=False)), capture=False)(phi),
+            qjit(grad(circuit), capture=False)(phi),
+        )
+        assert np.allclose(qjit(grad(circuit), capture=False)(phi), workflow(phi))
+        assert np.allclose(workflow(phi), qjit(grad(circuit), capture=False)(phi))
 
+    @pytest.mark.old_frontend
     @pytest.mark.parametrize("phi", [(0.0), (1.0), (2.0)])
     def test_gradient_of_qjit_correctness(self, phi, backend):
         """Test gradient of qjit correctness."""
@@ -1024,14 +1032,14 @@ class TestTracingQJITAnnotatedFunctions:
             qp.RX(phi, wires=0)
             return qp.expval(qp.PauliZ(0))
 
-        @qjit
+        @qjit(capture=False)
         def workflow1(phi):
             g = grad(circuit)
             return g(phi)
 
-        @qjit
+        @qjit(capture=False)
         def workflow2(phi):
-            g = grad(qjit(circuit))
+            g = grad(qjit(circuit, capture=False))
             return g(phi)
 
         assert np.allclose(workflow1(phi), workflow2(phi))
@@ -1288,6 +1296,7 @@ class TestParamsAnnotations:
         assert not params_are_annotated(foo)
 
 
+@pytest.mark.old_frontend
 class TestErrorNestedQNode:
     """Test error is raised with nested qnodes"""
 
@@ -1305,7 +1314,7 @@ class TestErrorNestedQNode:
             inner()
             return qp.state()
 
-        @qjit
+        @qjit(capture=False)
         def fn():
             return outer()
 
