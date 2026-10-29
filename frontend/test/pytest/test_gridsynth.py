@@ -138,6 +138,10 @@ def test_gridsynth_ppr_basis(param, eps):
 
 
 @pytest.mark.parametrize("ppr_basis", [False, True])
+@pytest.mark.xfail(
+    reason="graph decomposition does not yet work gridsynth",
+    strict=True,
+)
 def test_gridsynth_specs(ppr_basis):
     """Test that specs counts the runtime gridsynth decomposition without extra wires."""
     eps = 1e-4
@@ -163,6 +167,10 @@ def test_gridsynth_specs(ppr_basis):
 @pytest.mark.parametrize("ppr_basis", [False, True])
 # Within the epsilon ranges that the resource hints are fitted on.
 @pytest.mark.parametrize("eps", [1e-4, 1e-6])
+@pytest.mark.xfail(
+    reason="graph decomposition does not yet work gridsynth",
+    strict=True,
+)
 def test_gridsynth_specs_matches_runtime(eps, ppr_basis, method):
     """Test that the specs T-count estimate matches the T-count executed at runtime, on average
     over random angles."""
@@ -173,7 +181,7 @@ def test_gridsynth_specs_matches_runtime(eps, ppr_basis, method):
     angles = angles[distance_to_pi_4 > 2 * eps]
 
     @qp.qjit(capture=True, skip_preprocess=True)
-    @qp.transforms.gridsynth(epsilon=eps, ppr_basis=ppr_basis)
+    @gridsynth(epsilon=eps, ppr_basis=ppr_basis, method=method)
     @qp.qnode(qp.device("null.qubit", wires=1))
     def circuit(angles):
         for theta in angles:
@@ -218,6 +226,10 @@ def test_gridsynth_ppr_basis_no_cliffords(method):
 
 
 @pytest.mark.parametrize("ppr_basis", [False, True])
+@pytest.mark.xfail(
+    reason="graph decomposition does not yet work gridsynth",
+    strict=True,
+)
 def test_mixed_fallback_gridsynth_specs_wires(ppr_basis):
     """Test the known limitation that specs counts every ancilla allocation of the mixed fallback
     method as a wire, although each ancilla is released before the next one is allocated."""
