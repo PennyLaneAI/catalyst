@@ -19,12 +19,10 @@
 #include "Frame.hpp"
 #include "GpuLaunchers.hpp"
 #include "GpuRuntime.hpp"
-#include "HipCheck.hpp"
 #include "SteaneLut.hpp"
 #include "TransportABI.h"
 
 #include <catch2/catch_test_macros.hpp>
-#include <hip/hip_runtime.h>
 
 using namespace catalyst::transport;
 using namespace catalyst::transport::common;
@@ -40,13 +38,13 @@ struct Reply {
 std::vector<Reply> run_kernel(CoprocessorLauncherFn launcher, frame::RingGeometry ring,
                               const std::vector<std::vector<std::uint8_t>> &requests) {
     GpuRuntime gpu(0);
-    std::uint8_t *req_host = nullptr;
-    HIP_CHECK(hipHostMalloc(reinterpret_cast<void **>(&req_host), ring.region_bytes(),
-                            hipHostMallocMapped | hipHostMallocCoherent),
-              "hipHostMalloc(requests)");
+    // The request ring is host-mapped like the reply ring; a second runtime owns it, so this file
+    // calls no HIP API and builds as plain C++ on either HIP platform.
+    GpuRuntime req_mem(0);
+    const GpuRuntime::Handoff requests_ring = req_mem.alloc_handoff(ring.region_bytes());
+    std::uint8_t *req_host = requests_ring.host;
     std::memset(req_host, 0, ring.region_bytes());
-    void *req_dev = nullptr;
-    HIP_CHECK(hipHostGetDevicePointer(&req_dev, req_host, 0), "hipHostGetDevicePointer");
+    void *req_dev = requests_ring.dev;
     GpuRuntime::Handoff replies = gpu.alloc_handoff(ring.region_bytes());
 
     CoprocLaunchDesc desc{
@@ -73,7 +71,6 @@ std::vector<Reply> run_kernel(CoprocessorLauncherFn launcher, frame::RingGeometr
         out.push_back({std::vector<std::uint8_t>(view.data, view.data + view.len), view.fn_id});
     }
     gpu.sync();
-    (void)hipHostFree(req_host);
     return out;
 }
 } // namespace
