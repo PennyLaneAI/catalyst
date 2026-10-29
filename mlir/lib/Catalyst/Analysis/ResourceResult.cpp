@@ -72,7 +72,6 @@ void ResourceResult::mergeWith(const ResourceResult &other, MergeMethod method) 
     mergeStringMap(detailedOperations, other.detailedOperations, method);
     mergeStringMap(classicalInstructions, other.classicalInstructions, method);
     mergeStringMap(functionCalls, other.functionCalls, method);
-    mergeStringMap(customInstructions, other.customInstructions, method);
 
     // varFunctionCalls hold identifiers for unknown dynamic counts. If the
     // same key appears twice, the merge result represents a new unknown value
@@ -116,10 +115,6 @@ void ResourceResult::multiplyBy(double scalar) {
         entry.getValue() *= scalar;
     }
 
-    for (auto &instruction : customInstructions) {
-        instruction.getValue() *= scalar;
-    }
-
     for (auto &entry : functionCalls) {
         entry.getValue() *= scalar;
     }
@@ -140,7 +135,6 @@ void ResourceResult::multiplyBy(double scalar) {
 //   metadata: { qnode, auto_qubit_management?, has_branches, device_name? }
 //   num_qubits: { alloc, arg, total }
 //   classical_instructions: { "dialect.op": count, ... }
-//   custom_instructions: { "op_name": count, ... }
 //   quantum_operations: { "<wires>": { "op_name": count, ... }, ... }  // optional
 //   function_calls: { static: { "fxn": count, ... }, dynamic: { "fxn": id, ... } }
 //   measurement_processes: { "meas_type": count, ... }
@@ -218,13 +212,6 @@ llvm::json::Object ResourceResult::toJson() const {
         measurementObject[entry.getKey()] = countToJson(entry.getValue());
     }
     funcObj["measurement_processes"] = std::move(measurementObject);
-
-    // Custom instructions
-    json::Object customInstructionsObject;
-    for (const auto &instruction : customInstructions) {
-        customInstructionsObject[instruction.getKey()] = countToJson(instruction.getValue());
-    }
-    funcObj["custom_instructions"] = std::move(customInstructionsObject);
 
     // Extension fields
     json::Object extendedFieldObject;

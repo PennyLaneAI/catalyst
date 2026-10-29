@@ -20,34 +20,18 @@ include "mlir/IR/OpBase.td"
 // Dialect-agnostic interfaces used by ResourceAnalysis. Dialects opt in by
 // implementing these interfaces so the analysis does not hard-code op names.
 // Each interface maps to one ResourceResult field:
-//   ResourceInstructionOpInterface  -> customInstructions[name]
 //   ResourceQuantumOpInterface      -> operations[name][{numQubits, numParams}]
-//   ResourceAllocQubitOpInterface   -> num_alloc_qubits
+//   ResourceAllocQubitOpInterface    -> num_alloc_qubits
 //   ResourceMeasurementOpInterface  -> measurements[name]
 
 // ResourceSkipOpInterface is used to mark ops that should be skipped in the resource counts.
 def ResourceSkipOpInterface : OpInterface<"ResourceSkipOpInterface"> {
   let description = [{
-    Marks operations excluded from standard resource counts. Extension analyses
-    may use this interface to skip ops in the resource counts.
+    Marks operations excluded from standard resource counts. Registered extension
+    analyses still receive these operations through their collect method.
   }];
 
   let cppNamespace = "::catalyst";
-}
-
-def ResourceInstructionOpInterface : OpInterface<"ResourceInstructionOpInterface"> {
-  let description = [{
-    Describes a generic instruction that does not fit into the other OpInterfaces.
-    Counts are keyed by instruction name in ResourceResult::customInstructions.
-  }];
-
-  let cppNamespace = "::catalyst";
-  let methods = [
-    InterfaceMethod<
-        "Return a qualified instruction name, for example \"visa.compute\".",
-        "llvm::StringRef", "getResourceName", (ins), /*methodBody*/[{}]
-    >,
-  ];
 }
 
 def ResourceQuantumOpInterface : OpInterface<"ResourceQuantumOpInterface"> {
