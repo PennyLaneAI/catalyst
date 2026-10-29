@@ -14,7 +14,6 @@
 
 """Managed state for the decomposition rule discovery and capture mechanism."""
 
-import itertools
 from dataclasses import dataclass, field
 from typing import Callable
 
@@ -138,18 +137,10 @@ class DecompositionScope:
     Attributes:
         roots: Map of (base) GraphOpID to a request object and observed modifier states.
         definitions: Map of rule identifiers to traced rules, in first-seen order.
-        rule_name_counter: Counter shared by all targets compiled in this scope.
     """
 
     roots: dict[str, tuple[OpDecompRequest, set[ModifierState]]] = field(default_factory=dict)
     definitions: dict[tuple, TracedRule] = field(default_factory=dict)
-    rule_name_counter: itertools.count = field(
-        default_factory=itertools.count, init=False, repr=False
-    )
-
-    def next_rule_name(self, frontend_name: str) -> str:
-        """Allocate a short rule symbol without including potentially large target IDs."""
-        return f"{frontend_name}_{next(self.rule_name_counter)}"
 
     def record_root(self, request: OpDecompRequest) -> None:
         """Record root nodes for later decomp rule capture, which are explored recursively."""

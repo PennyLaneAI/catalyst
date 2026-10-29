@@ -71,7 +71,7 @@ def test_on_demand_adjoint_id_routes_to_adjoint_rules():
 
     # CHECK: module {
     # CHECK-NOT: __builtin_adj_rule_
-    # CHECK-DAG: func.func private @__builtin_base_rule_{{[0-9]+}}{{.*}}"Adjoint(SingleParam{{.*}}target_gate = "Adjoint(NoParams){}{reg:2}{}"
+    # CHECK-DAG: func.func private @__builtin_base_rule{{(_[0-9]+)?}}{{.*}}"Adjoint(SingleParam{{.*}}target_gate = "Adjoint(NoParams){}{reg:2}{}"
     # CHECK: qref.adjoint
 
 

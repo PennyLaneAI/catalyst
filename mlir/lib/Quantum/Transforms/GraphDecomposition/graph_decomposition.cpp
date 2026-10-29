@@ -437,7 +437,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         // add to module
         for (auto rule :
              llvm::make_early_inc_range(builtinModule.get().getOps<mlir::func::FuncOp>())) {
-            // Independently compiled rule libraries can reuse an enumerated name for a
+            // Independently compiled rule libraries can reuse the same name for a
             // different target. Only skip the same rule; otherwise let the symbol table
             // resolve the collision.
             auto existing = symbolTable.lookup<mlir::func::FuncOp>(rule.getName());
@@ -598,8 +598,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
                 outOp = mlir::OwningOpRef<mlir::func::FuncOp>(func);
                 LDBG() << "materializing rule " << outOp.get().getName();
                 newlyHandled.push_back(targetGate.getValue());
-                // The embedded Python interpreter and the frontend may have independent
-                // rule-name counters. Resolve collisions with already embedded rules.
+                // Resolve name collisions with rules already embedded in the module.
                 symbolTable.insert(outOp.release());
                 return mlir::WalkResult::advance();
             });

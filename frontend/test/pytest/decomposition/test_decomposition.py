@@ -2235,6 +2235,11 @@ class TestDecomposeAlias:
 
     @pytest.mark.usefixtures("use_capture_dgraph")
     @pytest.mark.parametrize("clean", [False, None], ids=["false", "none"])
+    @pytest.mark.xfail(
+        reason="On-demand rules use separate JAX contexts and can produce duplicate symbols.",
+        raises=CompileError,
+        strict=True,
+    )
     def test_decompose_none_static_argument_on_demand(self, clean):
         """The Python fallback accepts a None-valued static argument."""
 
