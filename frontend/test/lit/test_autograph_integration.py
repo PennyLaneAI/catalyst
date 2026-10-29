@@ -14,6 +14,7 @@
 
 """Integration tests for AutoGraph and Catalyst transformations."""
 
+# old_frontend: AutoGraph conversion through legacy wrappers.
 # RUN: %PYTHON %s | FileCheck %s
 
 import inspect
@@ -29,8 +30,8 @@ from catalyst import jacobian, mitigate_with_zne, qjit, vmap
 # Test autograph on nested QJIT object.
 
 
-@qjit(autograph=True, target="mlir")
-@qjit(enable_aot_compilation=False)
+@qjit(capture=False, autograph=True, target="mlir")
+@qjit(capture=False, target="")
 @qp.qnode(qp.device("lightning.qubit", wires=1))
 def test_qjit(c: bool, data: float):
     if c:
@@ -63,7 +64,7 @@ annotated_params = [
 ]
 test_vmap.__signature__ = inspect.Signature(annotated_params)
 
-test_vmap = qjit(test_vmap, autograph=True, target="mlir")
+test_vmap = qjit(test_vmap, autograph=True, target="mlir", capture=False)
 
 # CHECK-LABEL: @test_vmap
 # CHECK:         scf.if
@@ -74,7 +75,7 @@ print(test_vmap.mlir)
 # Test autograph on nested Grad object.
 
 
-@qjit(autograph=True, target="mlir")
+@qjit(capture=False, autograph=True, target="mlir")
 @jacobian(argnums=1)
 @qp.qnode(qp.device("lightning.qubit", wires=1))
 def test_grad(c: bool, data: float):
@@ -92,7 +93,7 @@ print(test_grad.mlir)
 # Test autograph on nested ZNE object.
 
 
-@qjit(autograph=True, target="mlir")
+@qjit(capture=False, autograph=True, target="mlir")
 @mitigate_with_zne(scale_factors=[1, 3, 5])
 @qp.qnode(qp.device("lightning.qubit", wires=1))
 def test_zne(c: bool, data: float):

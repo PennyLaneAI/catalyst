@@ -17,7 +17,7 @@
 import pennylane as qp
 from jax import numpy as jnp
 
-from catalyst import measure, qjit
+from catalyst import qjit
 from catalyst.debug import get_compilation_stage
 
 # Test methodology:
@@ -39,7 +39,7 @@ def test_ewise_arctan2(x, y):
     # CHECK-SAME: f64
     val = jnp.arctan2(x, y)
     qp.RZ(val, wires=0)
-    return measure(wires=0)
+    return qp.expval(qp.Z(wires=0))
 
 
 test_ewise_arctan2(jnp.array(1.0), jnp.array(2.0))
@@ -72,7 +72,7 @@ def test_ewise_add(x, y):
     # CHECK-SAME: f64
     val = jnp.add(x, y)
     qp.RZ(val, wires=0)
-    return measure(wires=0)
+    return qp.expval(qp.Z(wires=0))
 
 
 test_ewise_add(jnp.array(1.0), jnp.array(2.0))
@@ -87,7 +87,7 @@ def test_ewise_mult(x, y):
     # CHECK-SAME: f64
     val = jnp.multiply(x, y)
     qp.RZ(val, wires=0)
-    return measure(wires=0)
+    return qp.expval(qp.Z(wires=0))
 
 
 test_ewise_mult(jnp.array(1.0), jnp.array(2.0))
@@ -102,7 +102,7 @@ def test_ewise_div(x, y):
     # CHECK-SAME: f64
     val = jnp.divide(x, y)
     qp.RZ(val, wires=0)
-    return measure(wires=0)
+    return qp.expval(qp.Z(wires=0))
 
 
 test_ewise_div(jnp.array(1.0), jnp.array(2.0))
@@ -117,7 +117,7 @@ def test_ewise_power(x, y):
     # CHECK-SAME: f64
     val = jnp.power(x, y.astype(int))
     qp.RZ(val, wires=0)
-    return measure(wires=0)
+    return qp.expval(qp.Z(wires=0))
 
 
 test_ewise_power(jnp.array(1.0), jnp.array(2.0))
@@ -132,7 +132,7 @@ def test_ewise_sub(x, y):
     # CHECK-SAME: f64
     val = jnp.subtract(x, y)
     qp.RZ(val, wires=0)
-    return measure(wires=0)
+    return qp.expval(qp.Z(wires=0))
 
 
 test_ewise_sub(jnp.array(1.0), jnp.array(2.0))
@@ -147,7 +147,7 @@ def test_ewise_true_div(x, y):
     # CHECK-SAME: f64
     val = jnp.true_divide(x, y)
     qp.RZ(val, wires=0)
-    return measure(wires=0)
+    return qp.expval(qp.Z(wires=0))
 
 
 test_ewise_true_div(jnp.array(1.0), jnp.array(2.0))
@@ -166,7 +166,7 @@ def test_ewise_float_power(x, y):
     # CHECK-SAME: f64
     val = jnp.float_power(x, y)
     qp.RZ(val, wires=0)
-    return measure(wires=0)
+    return qp.expval(qp.Z(wires=0))
 
 
 test_ewise_float_power(jnp.array(1.0), jnp.array(2.0))
@@ -191,7 +191,7 @@ def test_ewise_maximum(x, y):
     # CHECK-SAME: f64
     val = jnp.maximum(x, y)
     qp.RZ(val, wires=0)
-    return measure(wires=0)
+    return qp.expval(qp.Z(wires=0))
 
 
 test_ewise_maximum(jnp.array(1.0), jnp.array(2.0))
@@ -209,7 +209,7 @@ def test_ewise_minimum(x, y):
     # CHECK-SAME: f64
     val = jnp.minimum(x, y)
     qp.RZ(val, wires=0)
-    return measure(wires=0)
+    return qp.expval(qp.Z(wires=0))
 
 
 test_ewise_minimum(jnp.array(1.0), jnp.array(2.0))

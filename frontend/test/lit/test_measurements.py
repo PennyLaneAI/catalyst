@@ -78,18 +78,15 @@ except CompileError:
 # CHECK: [[shots:%.+]] = arith.constant 1000 : i64
 # CHECK: quantum.device shots([[shots]]) [{{.+}}]
 def sample3(x: float, y: float):
-    # CHECK: [[reg:%.+]] = quantum.alloc( 2) : !quantum.reg
+    # CHECK: [[reg:%.+]] = qref.alloc( 2) : !qref.reg<2>
 
     qp.RX(x, wires=0)
-    # CHECK: [[q1:%.+]] = quantum.custom "RY"
+    # CHECK: qref.custom "RY"
     qp.RY(y, wires=1)
-    # CHECK: [[q0:%.+]] = quantum.custom "RZ"
+    # CHECK: qref.custom "RZ"
     qp.RZ(0.1, wires=0)
 
-    # CHECK: [[reg0:%.+]] = quantum.insert [[reg]][ 0], [[q0]] : !quantum.reg, !quantum.bit
-    # CHECK: [[regObs:%.+]] = quantum.insert [[reg0]][ 1], [[q1]] : !quantum.reg, !quantum.bit
-
-    # CHECK: [[obs:%.+]] = quantum.compbasis qreg [[regObs]]
+    # CHECK: [[obs:%.+]] = qref.compbasis(qreg [[reg]]
     # CHECK: quantum.sample [[obs]] : tensor<1000x2xf64>
     return qp.sample()
 
@@ -98,7 +95,8 @@ print(sample3.mlir)
 
 
 # CHECK-LABEL: public @test_sample_static(
-@qjit
+# old_frontend: tests legacy primitives or dynamically sized device registers.
+@qjit(capture=False)
 @qp.qnode(
     qp.device("null.qubit", wires=1)
 )  # SampleOp is only legal if there is a device in the same scope
@@ -114,7 +112,8 @@ def test_sample_static():
 print(test_sample_static.mlir)
 
 
-@qjit
+# old_frontend: tests legacy primitives or dynamically sized device registers.
+@qjit(capture=False)
 def test_sample_dynamic(shots: int):
     """Test that the sample primitive with dynamic shape can be correctly compiled to mlir."""
 
@@ -141,7 +140,8 @@ print(test_sample_dynamic.mlir)
 
 
 # CHECK-LABEL: @sample_dynamic_qubits
-@qjit(target="mlir")
+# old_frontend: tests legacy primitives or dynamically sized device registers.
+@qjit(capture=False, target="mlir")
 def sample_dynamic_qubits(num_qubits):
     @qp.set_shots(37)
     @qp.qnode(qp.device("lightning.qubit", wires=num_qubits))
@@ -212,18 +212,15 @@ except:
 # CHECK: [[shots:%.+]] = arith.constant 1000 : i64
 # CHECK: quantum.device shots([[shots]]) [{{.+}}]
 def counts3(x: float, y: float):
-    # CHECK: [[reg:%.+]] = quantum.alloc( 2) : !quantum.reg
+    # CHECK: [[reg:%.+]] = qref.alloc( 2) : !qref.reg<2>
 
     qp.RX(x, wires=0)
-    # CHECK: [[q1:%.+]] = quantum.custom "RY"
+    # CHECK: qref.custom "RY"
     qp.RY(y, wires=1)
-    # CHECK: [[q0:%.+]] = quantum.custom "RZ"
+    # CHECK: qref.custom "RZ"
     qp.RZ(0.1, wires=0)
 
-    # CHECK: [[reg0:%.+]] = quantum.insert [[reg]][ 0], [[q0]] : !quantum.reg, !quantum.bit
-    # CHECK: [[regObs:%.+]] = quantum.insert [[reg0]][ 1], [[q1]] : !quantum.reg, !quantum.bit
-
-    # CHECK: [[obs:%.+]] = quantum.compbasis qreg [[regObs]]
+    # CHECK: [[obs:%.+]] = qref.compbasis(qreg [[reg]]
     # CHECK: quantum.counts [[obs]] : tensor<4xf64>, tensor<4xi64>
     return qp.counts()
 
@@ -232,7 +229,8 @@ print(counts3.mlir)
 
 
 # CHECK-LABEL: public @jit_test_counts_static(
-@qjit(target="mlir")
+# old_frontend: tests legacy primitives or dynamically sized device registers.
+@qjit(capture=False, target="mlir")
 @qp.qnode(qp.device("null.qubit", wires=0))
 def test_counts_static():
     """Test that the counts primitive can be correctly compiled to mlir."""
@@ -247,7 +245,8 @@ print(test_counts_static.mlir)
 
 
 # CHECK-LABEL: @counts_dynamic_qubits
-@qjit(target="mlir")
+# old_frontend: tests legacy primitives or dynamically sized device registers.
+@qjit(capture=False, target="mlir")
 def counts_dynamic_qubits(num_qubits):
     @qp.set_shots(37)
     @qp.qnode(qp.device("lightning.qubit", wires=num_qubits))
@@ -273,10 +272,11 @@ print(counts_dynamic_qubits.mlir)
 def expval1(x: float, y: float):
     qp.RX(x, wires=0)
     qp.RY(y, wires=1)
-    # CHECK: [[q0:%.+]] = quantum.custom "RZ"
+    # CHECK: qref.custom "RZ"
     qp.RZ(0.1, wires=0)
 
-    # CHECK: [[obs:%.+]] = quantum.namedobs [[q0]][ PauliX]
+    # CHECK: [[q0:%.+]] = qref.get {{%.+}}[ 0]
+    # CHECK: [[obs:%.+]] = qref.namedobs [[q0]][ PauliX]
     # CHECK: quantum.expval [[obs]] : f64
     return qp.expval(qp.PauliX(0))
 
@@ -288,16 +288,19 @@ print(expval1.mlir)
 @qjit(target="mlir")
 @qp.qnode(qp.device("lightning.qubit", wires=3))
 def expval2(x: float, y: float):
-    # CHECK: [[q0:%.+]] = quantum.custom "RX"
+    # CHECK: qref.custom "RX"
     qp.RX(x, wires=0)
-    # CHECK: [[q1:%.+]] = quantum.custom "RY"
+    # CHECK: qref.custom "RY"
     qp.RY(y, wires=1)
-    # CHECK: [[q2:%.+]] = quantum.custom "RZ"
+    # CHECK: qref.custom "RZ"
     qp.RZ(0.1, wires=2)
 
-    # CHECK: [[p1:%.+]] = quantum.namedobs [[q0]][ PauliX]
-    # CHECK: [[p2:%.+]] = quantum.namedobs [[q1]][ PauliZ]
-    # CHECK: [[p3:%.+]] = quantum.namedobs [[q2]][ Hadamard]
+    # CHECK: [[q0:%.+]] = qref.get {{%.+}}[ 0]
+    # CHECK: [[p1:%.+]] = qref.namedobs [[q0]][ PauliX]
+    # CHECK: [[q1:%.+]] = qref.get {{%.+}}[ 1]
+    # CHECK: [[p2:%.+]] = qref.namedobs [[q1]][ PauliZ]
+    # CHECK: [[q2:%.+]] = qref.get {{%.+}}[ 2]
+    # CHECK: [[p3:%.+]] = qref.namedobs [[q2]][ Hadamard]
     # CHECK: [[t0:%.+]] = quantum.tensor [[p1]], [[p2]], [[p3]]
     # CHECK: quantum.expval [[t0]] : f64
     return qp.expval(qp.PauliX(0) @ qp.PauliZ(1) @ qp.Hadamard(2))
@@ -312,7 +315,7 @@ print(expval2.mlir)
 def expval3():
     A = np.array([[complex(1.0, 0.0), complex(2.0, 0.0)], [complex(2.0, 0.0), complex(1.0, 0.0)]])
 
-    # CHECK: [[obs:%.+]] = quantum.hermitian
+    # CHECK: [[obs:%.+]] = qref.hermitian
     # CHECK: quantum.expval [[obs]] : f64
     return qp.expval(qp.Hermitian(A, wires=0))
 
@@ -333,7 +336,7 @@ def expval4():
         ]
     )
 
-    # CHECK: [[obs:%.+]] = quantum.hermitian
+    # CHECK: [[obs:%.+]] = qref.hermitian
     # CHECK: quantum.expval [[obs]] : f64
     return qp.expval(qp.Hermitian(B, wires=[0, 1]))
 
@@ -345,11 +348,11 @@ print(expval4.mlir)
 @qjit(target="mlir")
 @qp.qnode(qp.device("lightning.qubit", wires=3))
 def expval5(x: float, y: float):
-    # CHECK: [[q0:%.+]] = quantum.custom "RX"
+    # CHECK: qref.custom "RX"
     qp.RX(x, wires=0)
-    # CHECK: [[q1:%.+]] = quantum.custom "RY"
+    # CHECK: qref.custom "RY"
     qp.RY(y, wires=1)
-    # CHECK: [[q2:%.+]] = quantum.custom "RZ"
+    # CHECK: qref.custom "RZ"
     qp.RZ(0.1, wires=2)
 
     B = np.array(
@@ -361,8 +364,11 @@ def expval5(x: float, y: float):
         ]
     )
 
-    # CHECK: [[p0:%.+]] = quantum.namedobs [[q1]][ PauliX]
-    # CHECK: [[h0:%.+]] = quantum.hermitian({{%.+}} : tensor<4x4xcomplex<f64>>) [[q0]], [[q2]]
+    # CHECK: [[q1:%.+]] = qref.get {{%.+}}[ 1]
+    # CHECK: [[p0:%.+]] = qref.namedobs [[q1]][ PauliX]
+    # CHECK: [[q0:%.+]] = qref.get {{%.+}}[ 0]
+    # CHECK: [[q2:%.+]] = qref.get {{%.+}}[ 2]
+    # CHECK: [[h0:%.+]] = qref.hermitian({{%.+}} : tensor<4x4xcomplex<f64>>) [[q0]], [[q2]]
     # CHECK: [[obs:%.+]] = quantum.tensor [[p0]], [[h0]]
     # CHECK: quantum.expval [[obs]] : f64
     return qp.expval(qp.PauliX(1) @ qp.Hermitian(B, wires=[0, 2]))
@@ -375,21 +381,25 @@ print(expval5.mlir)
 @qjit(target="mlir")
 @qp.qnode(qp.device("lightning.qubit", wires=3))
 def expval6(x: float, y: float):
-    # CHECK: [[q0:%.+]] = quantum.custom "RX"
+    # CHECK: qref.custom "RX"
     qp.RX(x, wires=0)
-    # CHECK: [[q1:%.+]] = quantum.custom "RY"
+    # CHECK: qref.custom "RY"
     qp.RY(y, wires=1)
-    # CHECK: [[q2:%.+]] = quantum.custom "RZ"
+    # CHECK: qref.custom "RZ"
     qp.RZ(0.1, wires=2)
 
     coeffs = np.array([0.2, -0.543])
     obs = [qp.PauliX(0) @ qp.PauliZ(1), qp.PauliZ(0) @ qp.Hadamard(2)]
 
-    # CHECK: [[n0:%.+]] = quantum.namedobs [[q0]][ PauliX]
-    # CHECK: [[n1:%.+]] = quantum.namedobs [[q1]][ PauliZ]
+    # CHECK: [[q0:%.+]] = qref.get {{%.+}}[ 0]
+    # CHECK: [[n0:%.+]] = qref.namedobs [[q0]][ PauliX]
+    # CHECK: [[q1:%.+]] = qref.get {{%.+}}[ 1]
+    # CHECK: [[n1:%.+]] = qref.namedobs [[q1]][ PauliZ]
     # CHECK: [[t0:%.+]] = quantum.tensor [[n0]], [[n1]]
-    # CHECK: [[n2:%.+]] = quantum.namedobs [[q0]][ PauliZ]
-    # CHECK: [[n3:%.+]] = quantum.namedobs [[q2]][ Hadamard]
+    # CHECK: [[q0:%.+]] = qref.get {{%.+}}[ 0]
+    # CHECK: [[n2:%.+]] = qref.namedobs [[q0]][ PauliZ]
+    # CHECK: [[q2:%.+]] = qref.get {{%.+}}[ 2]
+    # CHECK: [[n3:%.+]] = qref.namedobs [[q2]][ Hadamard]
     # CHECK: [[t1:%.+]] = quantum.tensor [[n2]], [[n3]]
     # CHECK: [[obs:%.+]] = quantum.hamiltonian({{%.+}} : tensor<2xf64>) [[t0]], [[t1]]
     # CHECK: quantum.expval [[obs]] : f64
@@ -403,7 +413,7 @@ print(expval6.mlir)
 @qjit(target="mlir")
 @qp.qnode(qp.device("lightning.qubit", wires=2))
 def expval7(x: float):
-    # CHECK: [[q0:%.+]] = quantum.custom "RX"
+    # CHECK: qref.custom "RX"
     qp.RX(x, wires=0)
 
     coeff = np.array([0.8, 0.2])
@@ -416,10 +426,11 @@ def expval7(x: float):
         ]
     )
 
-    # CHECK: [[h0:%.+]] = quantum.hermitian
+    # CHECK: [[h0:%.+]] = qref.hermitian
     obs = qp.Hermitian(obs_matrix, wires=[0, 1])
 
-    # CHECK: [[n0:%.+]] = quantum.namedobs [[q0]][ PauliX]
+    # CHECK: [[q0:%.+]] = qref.get {{%.+}}[ 0]
+    # CHECK: [[n0:%.+]] = qref.namedobs [[q0]][ PauliX]
     # CHECK: [[obs:%.+]] = quantum.hamiltonian({{%.+}} : tensor<2xf64>) [[h0]], [[n0]]
     # CHECK: quantum.expval [[obs]] : f64
     return qp.expval(qp.Hamiltonian(coeff, [obs, qp.PauliX(0)]))
@@ -434,7 +445,7 @@ print(expval7.mlir)
 def expval8():
     A = np.array([[complex(1.0, 0.0), complex(2.0, 0.0)], [complex(2.0, 0.0), complex(1.0, 0.0)]])
 
-    # CHECK: [[obs:%.+]] = quantum.hermitian
+    # CHECK: [[obs:%.+]] = qref.hermitian
     # CHECK: quantum.expval [[obs]] : f64
     return qp.expval(qp.Hermitian(A, wires=0))
 
@@ -455,7 +466,7 @@ def expval9():
         ]
     )
 
-    # CHECK: [[obs:%.+]] = quantum.hermitian
+    # CHECK: [[obs:%.+]] = qref.hermitian
     # CHECK: quantum.expval [[obs]] : f64
     return qp.expval(qp.Hermitian(B, wires=[0, 1]))
 
@@ -467,16 +478,19 @@ print(expval9.mlir)
 @qjit(target="mlir")
 @qp.qnode(qp.device("lightning.qubit", wires=3))
 def expval10(x: float, y: float):
-    # CHECK: [[q0:%.+]] = quantum.custom "RX"
+    # CHECK: qref.custom "RX"
     qp.RX(x, wires=0)
-    # CHECK: [[q1:%.+]] = quantum.custom "RY"
+    # CHECK: qref.custom "RY"
     qp.RY(y, wires=1)
-    # CHECK: [[q2:%.+]] = quantum.custom "RZ"
+    # CHECK: qref.custom "RZ"
     qp.RZ(0.1, wires=2)
 
-    # CHECK: [[p1:%.+]] = quantum.namedobs [[q0]][ PauliX]
-    # CHECK: [[p2:%.+]] = quantum.namedobs [[q1]][ PauliZ]
-    # CHECK: [[p3:%.+]] = quantum.namedobs [[q2]][ Hadamard]
+    # CHECK: [[q0:%.+]] = qref.get {{%.+}}[ 0]
+    # CHECK: [[p1:%.+]] = qref.namedobs [[q0]][ PauliX]
+    # CHECK: [[q1:%.+]] = qref.get {{%.+}}[ 1]
+    # CHECK: [[p2:%.+]] = qref.namedobs [[q1]][ PauliZ]
+    # CHECK: [[q2:%.+]] = qref.get {{%.+}}[ 2]
+    # CHECK: [[p3:%.+]] = qref.namedobs [[q2]][ Hadamard]
     # CHECK: [[obs:%.+]] = quantum.tensor [[p1]], [[p2]], [[p3]]
     # CHECK: quantum.expval [[obs]] : f64
     return qp.expval(qp.PauliX(0) @ qp.PauliZ(1) @ qp.Hadamard(2))
@@ -489,11 +503,11 @@ print(expval10.mlir)
 @qjit(target="mlir")
 @qp.qnode(qp.device("lightning.qubit", wires=3))
 def expval11(x: float, y: float):
-    # CHECK: [[q0:%.+]] = quantum.custom "RX"
+    # CHECK: qref.custom "RX"
     qp.RX(x, wires=0)
-    # CHECK: [[q1:%.+]] = quantum.custom "RY"
+    # CHECK: qref.custom "RY"
     qp.RY(y, wires=1)
-    # CHECK: [[q2:%.+]] = quantum.custom "RZ"
+    # CHECK: qref.custom "RZ"
     qp.RZ(0.1, wires=2)
 
     B = np.array(
@@ -505,8 +519,11 @@ def expval11(x: float, y: float):
         ]
     )
 
-    # CHECK: [[p0:%.+]] = quantum.namedobs [[q1]][ PauliX]
-    # CHECK: [[h0:%.+]] = quantum.hermitian({{%.+}} : tensor<4x4xcomplex<f64>>) [[q0]], [[q2]]
+    # CHECK: [[q1:%.+]] = qref.get {{%.+}}[ 1]
+    # CHECK: [[p0:%.+]] = qref.namedobs [[q1]][ PauliX]
+    # CHECK: [[q0:%.+]] = qref.get {{%.+}}[ 0]
+    # CHECK: [[q2:%.+]] = qref.get {{%.+}}[ 2]
+    # CHECK: [[h0:%.+]] = qref.hermitian({{%.+}} : tensor<4x4xcomplex<f64>>) [[q0]], [[q2]]
     # CHECK: [[obs:%.+]] = quantum.tensor [[p0]], [[h0]]
     # CHECK: quantum.expval [[obs]] : f64
     return qp.expval(qp.PauliX(1) @ qp.Hermitian(B, wires=[0, 2]))
@@ -516,7 +533,8 @@ print(expval11.mlir)
 
 
 # CHECK-LABEL: @expval12
-@qjit(target="mlir")
+# old_frontend: tests legacy primitives or dynamically sized device registers.
+@qjit(capture=False, target="mlir")
 def expval12(num_qubits):
     # CHECK: func.func public @circ(%arg0: tensor<i64>) -> tensor<f64>
     @qp.qnode(qp.device("lightning.qubit", wires=num_qubits))
@@ -548,7 +566,8 @@ print(expval12.mlir)
 
 
 # CHECK-LABEL: @expval13
-@qjit(target="mlir")
+# old_frontend: checks the legacy measurement qubit cache and quantum.insert.
+@qjit(capture=False, target="mlir")
 def expval13():
     # CHECK: func.func public @circ() -> (tensor<f64>, tensor<f64>)
     @qp.qnode(qp.device("null.qubit", wires=1))
@@ -566,7 +585,8 @@ print(expval13.mlir)
 
 
 # CHECK-LABEL: @expval14
-@qjit(target="mlir")
+# old_frontend: checks the legacy measurement qubit cache and quantum.insert.
+@qjit(capture=False, target="mlir")
 def expval14():
     A = np.zeros((4, 4), dtype=complex)
     B = np.zeros((2, 2), dtype=complex)
@@ -601,10 +621,11 @@ print(expval14.mlir)
 def var1(x: float, y: float):
     qp.RX(x, wires=0)
     qp.RY(y, wires=1)
-    # CHECK: [[q0:%.+]] = quantum.custom "RZ"
+    # CHECK: qref.custom "RZ"
     qp.RZ(0.1, wires=0)
 
-    # CHECK: [[obs:%.+]] = quantum.namedobs [[q0]][ PauliX]
+    # CHECK: [[q0:%.+]] = qref.get {{%.+}}[ 0]
+    # CHECK: [[obs:%.+]] = qref.namedobs [[q0]][ PauliX]
     # CHECK: quantum.var [[obs]] : f64
     return qp.var(qp.PauliX(0))
 
@@ -642,15 +663,17 @@ print(var2.mlir)
 @qp.qnode(qp.device("lightning.qubit", wires=2))
 def probs1(x: float, y: float):
     qp.RX(x, wires=0)
-    # CHECK: [[q1:%.+]] = quantum.custom "RY"
+    # CHECK: qref.custom "RY"
     qp.RY(y, wires=1)
-    # CHECK: [[q0:%.+]] = quantum.custom "RZ"
+    # CHECK: qref.custom "RZ"
     qp.RZ(0.1, wires=0)
 
     # qp.probs()  # unsupported by PennyLane
     # qp.probs(op=qp.PauliX(0))  # unsupported by the compiler
 
-    # CHECK: [[obs:%.+]] = quantum.compbasis qubits [[q0]], [[q1]]
+    # CHECK: [[q0:%.+]] = qref.get {{%.+}}[ 0]
+    # CHECK: [[q1:%.+]] = qref.get {{%.+}}[ 1]
+    # CHECK: [[obs:%.+]] = qref.compbasis qubits [[q0]], [[q1]]
     # CHECK: quantum.probs [[obs]] : tensor<4xf64>
     return qp.probs(wires=[0, 1])
 
@@ -659,7 +682,8 @@ print(probs1.mlir)
 
 
 # CHECK-LABEL: @probs_dynamic_with_wires
-@qjit(target="mlir")
+# old_frontend: tests legacy primitives or dynamically sized device registers.
+@qjit(capture=False, target="mlir")
 def probs_dynamic_with_wires(num_qubits):
     @qp.qnode(qp.device("lightning.qubit", wires=num_qubits))
     def circ():
@@ -674,7 +698,8 @@ print(probs_dynamic_with_wires.mlir)
 
 
 # CHECK-LABEL: @probs_dynamic_without_wires
-@qjit(target="mlir")
+# old_frontend: tests legacy primitives or dynamically sized device registers.
+@qjit(capture=False, target="mlir")
 def probs_dynamic_without_wires(num_qubits):
     @qp.qnode(qp.device("lightning.qubit", wires=num_qubits))
     def circ():
@@ -697,20 +722,17 @@ print(probs_dynamic_without_wires.mlir)
 @qjit(target="mlir")
 @qp.qnode(qp.device("lightning.qubit", wires=2))
 def state1(x: float, y: float):
-    # CHECK: [[reg:%.+]] = quantum.alloc( 2) : !quantum.reg
+    # CHECK: [[reg:%.+]] = qref.alloc( 2) : !qref.reg<2>
 
     qp.RX(x, wires=0)
-    # CHECK: [[q1:%.+]] = quantum.custom "RY"
+    # CHECK: qref.custom "RY"
     qp.RY(y, wires=1)
-    # CHECK: [[q0:%.+]] = quantum.custom "RZ"
+    # CHECK: qref.custom "RZ"
     qp.RZ(0.1, wires=0)
 
     # qp.state(wires=[0])  # unsupported by PennyLane
 
-    # CHECK: [[reg0:%.+]] = quantum.insert [[reg]][ 0], [[q0]] : !quantum.reg, !quantum.bit
-    # CHECK: [[regObs:%.+]] = quantum.insert [[reg0]][ 1], [[q1]] : !quantum.reg, !quantum.bit
-
-    # CHECK: [[obs:%.+]] = quantum.compbasis qreg [[regObs]]
+    # CHECK: [[obs:%.+]] = qref.compbasis(qreg [[reg]]
     # CHECK: quantum.state [[obs]] : tensor<4xcomplex<f64>>
     return qp.state()
 
@@ -719,7 +741,8 @@ print(state1.mlir)
 
 
 # CHECK-LABEL: @state_dynamic
-@qjit(target="mlir")
+# old_frontend: tests legacy primitives or dynamically sized device registers.
+@qjit(capture=False, target="mlir")
 def state_dynamic(num_qubits):
     @qp.qnode(qp.device("lightning.qubit", wires=num_qubits))
     def circ():
@@ -739,7 +762,8 @@ print(state_dynamic.mlir)
 
 
 # CHECK-LABEL: @automatic_qubit_management
-@qjit(target="mlir")
+# old_frontend: tests legacy primitives or dynamically sized device registers.
+@qjit(capture=False, target="mlir")
 def automatic_qubit_management():
     @qp.qnode(qp.device("lightning.qubit"))
     def circ():
@@ -765,12 +789,14 @@ print(automatic_qubit_management.mlir)
 @qjit(target="mlir")
 @qp.qnode(qp.device("null.qubit", wires=2), shots=1000)
 def test_multiple_terminal_measurements():
-    # CHECK: [[q0:%.+]] = quantum.extract {{%.+}}[ 0] : !quantum.reg -> !quantum.bit
-    # CHECK: [[compbasis:%.+]] = quantum.compbasis qubits [[q0]] : !quantum.obs
+    # CHECK: [[q0:%.+]] = qref.get {{%.+}}[ 0] : !qref.reg<2> -> !qref.bit
+    # CHECK: [[compbasis:%.+]] = qref.compbasis qubits [[q0]] : !quantum.obs
     # CHECK: {{%.+}} = quantum.probs [[compbasis]] : tensor<2xf64>
-    # CHECK: [[compbasis:%.+]] = quantum.compbasis qubits [[q0]] : !quantum.obs
+    # CHECK: [[q0:%.+]] = qref.get {{%.+}}[ 0]
+    # CHECK: [[compbasis:%.+]] = qref.compbasis qubits [[q0]] : !quantum.obs
     # CHECK: {{%.+}} = quantum.sample [[compbasis]] : tensor<1000x1xf64>
-    # CHECK: [[namedobs:%.+]] = quantum.namedobs [[q0]][ PauliX] : !quantum.obs
+    # CHECK: [[q0:%.+]] = qref.get {{%.+}}[ 0]
+    # CHECK: [[namedobs:%.+]] = qref.namedobs [[q0]][ PauliX] : !quantum.obs
     # CHECK: {{%.+}} = quantum.expval [[namedobs]] : f64
     return qp.probs(wires=[0]), qp.sample(wires=[0]), qp.expval(qp.X(0))
 

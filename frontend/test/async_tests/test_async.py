@@ -19,7 +19,7 @@ import pennylane as qp
 import pytest
 from jax import numpy as jnp
 
-from catalyst import adjoint, cond, for_loop, grad, measure, qjit, while_loop
+from catalyst import adjoint, grad, qjit
 
 # We are explicitly testing that when something is not assigned
 # the use is awaited.
@@ -68,6 +68,7 @@ def test_qnode_execution(backend):
 # ("parameter-shift", "auto"), ("adjoint", "auto")]
 @pytest.mark.parametrize("diff_methods", [("finite-diff", "fd")])
 @pytest.mark.parametrize("inp", [(1.0), (2.0), (3.0), (4.0)])
+@pytest.mark.old_frontend
 def test_gradient(inp, diff_methods, backend):
     """Parameter shift and finite diff generate multiple QNode that are run async."""
 
@@ -75,7 +76,7 @@ def test_gradient(inp, diff_methods, backend):
         qp.RX(x * 2, wires=0)
         return qp.expval(qp.PauliY(0))
 
-    @qjit(async_qnodes=True)
+    @qjit(async_qnodes=True, capture=False)
     def compiled(x: float):
         g = qp.qnode(qp.device(backend, wires=1), diff_method=diff_methods[0])(f)
         h = grad(g, method=diff_methods[1])
@@ -171,6 +172,7 @@ def test_exception4(backend):
         wrapper()
 
 
+@pytest.mark.old_frontend
 def test_exception_adjoint(backend):
     "Test exception happening on two different circuits both adjointed."
 
@@ -188,7 +190,7 @@ def test_exception_adjoint(backend):
         adjoint(bad_cnot)(x)
         return qp.probs()
 
-    @qjit(async_qnodes=True)
+    @qjit(async_qnodes=True, capture=False)
     def wrapper():
         circuit(0) + circuit2(0)
         return None
@@ -207,7 +209,7 @@ def test_exception_conditional(backend):
 
     @qjit(async_qnodes=True)
     def wrapper(x: int):
-        @cond(x == 1)
+        @qp.cond(x == 1)
         def cond_fn():
             return circuit(1)
 
@@ -235,7 +237,7 @@ def test_exception_conditional_1(backend):
     def wrapper(x: int):
         y = circuit(1)
 
-        @cond(x == 1)
+        @qp.cond(x == 1)
         def cond_fn():
             return circuit(1)
 
@@ -263,7 +265,7 @@ def test_exception_conditional_2(backend):
     def wrapper(x: int):
         y = circuit(0)
 
-        @cond(x == 1)
+        @qp.cond(x == 1)
         def cond_fn():
             return circuit(1)
 
@@ -324,6 +326,7 @@ def test_qnode_exception_dependency(order, backend):
 # ("parameter-shift", "auto"), ("adjoint", "auto")]
 @pytest.mark.parametrize("diff_methods", [("finite-diff", "fd")])
 @pytest.mark.parametrize("inp", [1.0])
+@pytest.mark.old_frontend
 def test_gradient_exception(inp, diff_methods, backend):
     """Parameter shift and finite diff generate multiple QNode that are run async."""
 
@@ -332,7 +335,7 @@ def test_gradient_exception(inp, diff_methods, backend):
         qp.CNOT(wires=[0, y])
         return qp.expval(qp.PauliY(0))
 
-    @qjit(async_qnodes=True)
+    @qjit(async_qnodes=True, capture=False)
     def compiled(x: float):
         g = qp.qnode(qp.device(backend, wires=1), diff_method=diff_methods[0])(f)
         h = grad(g, method=diff_methods[1], argnums=[0])
@@ -349,13 +352,13 @@ def test_exception_in_loop(backend):
     @qjit(async_qnodes=True)
     @qp.qnode(qp.device(backend, wires=3))
     def circuit(n):
-        @while_loop(lambda v: v[0] < v[1])
+        @qp.while_loop(lambda v: v[0] < v[1])
         def loop(v):
             qp.CNOT(wires=[n, v[0]])
             return v[0] + 1, v[1]
 
         loop((0, 3))
-        return measure(wires=0)
+        return qp.expval(qp.Z(wires=0))
 
     msg = "Unrecoverable error"
     # Exception in beginning
@@ -375,11 +378,10 @@ def test_exception_in_for_loop(backend):
     @qjit(async_qnodes=True)
     @qp.qnode(qp.device(backend, wires=1))
     def circuit(n):
-        @for_loop(0, 1, n)
         def loop(i):
             qp.CNOT(wires=[0, i])
 
-        return loop()
+        return qp.for_loop(0, 1, n)(loop)()
 
     msg = "Unrecoverable error"
     # Exception in beginning
@@ -392,13 +394,13 @@ def test_exception_in_loop2(backend):
 
     @qp.qnode(qp.device(backend, wires=3))
     def bad(n):
-        @while_loop(lambda v: v[0] < v[1])
+        @qp.while_loop(lambda v: v[0] < v[1])
         def loop(v):
             qp.CNOT(wires=[n, v[0]])
             return v[0] + 1, v[1]
 
         loop((0, 3))
-        return measure(wires=0)
+        return qp.expval(qp.Z(wires=0))
 
     @qp.qnode(qp.device(backend, wires=3))
     def good():
