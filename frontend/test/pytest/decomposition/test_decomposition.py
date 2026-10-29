@@ -14,8 +14,6 @@
 
 """Unit tests for the python decompositions module."""
 
-import re
-
 import jax.numpy as jnp
 import numpy as np
 import pennylane as qp
@@ -58,7 +56,6 @@ from catalyst.decomposition.decomposition_rules import (
     _rule_is_applicable,
     collect_resources_for_op,
     collect_symbolic_resources,
-    compile_decomposition_rules,
     compile_decomposition_rules_wrapper,
     compile_reachable_decomposition_rules_wrapper,
     compile_registered_symbolic_rules,
@@ -80,49 +77,6 @@ from catalyst.decomposition.type_utils import (
 )
 from catalyst.passes import graph_decomposition
 from catalyst.utils.exceptions import CompileError
-
-
-@pytest.mark.parametrize("standalone", [False, True])
-def test_rule_function_names_do_not_contain_large_target_ids(standalone):
-    """Tensor-valued specializations get short, distinct names and retain their metadata."""
-
-    @register_resources(lambda angles, wires: {qp.RX(Float, wires=Wire[1]): 1})
-    def rule_123(angles, wires):
-        qp.RX(angles[0], wires=wires)
-
-    arrays = [np.arange(1024, dtype=float) + offset for offset in range(3)]
-    with local_decomps():
-        add_decomps(ArrayData, rule_123)
-        if standalone:
-            rules = []
-            for angles in arrays:
-                op_id = GraphOpID(ArrayData(angles, wires=Wire[1])).getGraphOpId()
-                module = compile_decomposition_rules(
-                    "ArrayData", op_id, {}, {"wires": 1}, {"angles": angles}
-                )
-                rules.extend(get_rule_strings_from_module(module))
-            mlir = "\n".join(rules)
-        else:
-
-            @qjit(capture=True, target="mlir")
-            @qnode(qp.device("null.qubit", wires=1))
-            def circuit():
-                for angles in arrays:
-                    ArrayData(angles, wires=0)
-                return qp.state()
-
-            mlir = circuit.mlir
-
-    names = re.findall(r"func.func private @(__builtin_rule_123_[0-9]+)\(", mlir)
-    assert len(names) == len(set(names)) == 3
-    assert mlir.count('frontend_name = "rule_123"') == 3
-    assert mlir.count('"RX{0:[f64]}{wires:1}{}" = 1 : i64') >= 3
-    for angles in arrays:
-        op_id = GraphOpID(ArrayData(angles, wires=Wire[1])).getGraphOpId()
-        assert len(op_id) > 1024
-        # Large dense tensors use quoted hexadecimal data inside the string attribute.
-        escaped_id = op_id.replace('"', r"\22")
-        assert f'target_gate = "{escaped_id}"' in mlir
 
 
 class TestGenericUtilities:
@@ -2279,19 +2233,6 @@ class TestCustomRuleApplication:
 class TestDecomposeAlias:
     """``qp.decompose`` under capture is an alias for ``graph_decomposition`` (same C++ pass)."""
 
-    @staticmethod
-    def normalize_rule_names(mlir):
-        """Compare independently compiled modules modulo enumerated rule symbols."""
-        names = {}
-
-        def replace(match):
-            name = match.group()
-            if name not in names:
-                names[name] = f"@__builtin_rule_{len(names)}"
-            return names[name]
-
-        return re.sub(r"@__builtin_[\w]+", replace, mlir)
-
     @pytest.mark.usefixtures("use_capture_dgraph")
     @pytest.mark.parametrize("clean", [False, None], ids=["false", "none"])
     def test_decompose_none_static_argument_on_demand(self, clean):
@@ -2326,9 +2267,7 @@ class TestDecomposeAlias:
         via_graph = build(graph_decomposition(gate_set=gate_set))
 
         assert 'apply_registered_pass "graph-decomposition"' in via_decompose.mlir
-        assert self.normalize_rule_names(via_decompose.mlir) == self.normalize_rule_names(
-            via_graph.mlir
-        )
+        assert via_decompose.mlir == via_graph.mlir
 
     def test_decompose_requires_gate_set(self):
         """qp.decompose without a gate set is rejected with a clear error."""
@@ -2365,9 +2304,7 @@ class TestDecomposeAlias:
         # Two graph-decomposition passes are inserted, and the result is identical to the
         # explicit graph_decomposition stacking (alias, not a fork).
         assert via_decompose.mlir.count('apply_registered_pass "graph-decomposition"') == 2
-        assert self.normalize_rule_names(via_decompose.mlir) == self.normalize_rule_names(
-            via_graph.mlir
-        )
+        assert via_decompose.mlir == via_graph.mlir
 
     def test_decompose_multiple_ordering(self):
         """Stacked ``qp.decompose`` apply innermost-first: a gate retained by the inner pass and
