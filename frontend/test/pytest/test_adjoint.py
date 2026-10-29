@@ -1520,8 +1520,6 @@ class TestAdjointConstructorDifferentCallableTypes:
         assert out.wires == qp.wires.Wires(1)
 
 
-
-
 class TestAdjointConstructorOutsideofQueuing:
     """Test the behaviour of the adjoint transform when not called in a queueing context."""
 
