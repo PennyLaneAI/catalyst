@@ -442,7 +442,8 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
             // resolve the collision.
             auto existing = symbolTable.lookup<mlir::func::FuncOp>(rule.getName());
             if (existing && existing->getAttr("target_gate") == rule->getAttr("target_gate") &&
-                existing->getAttr("frontend_name") == rule->getAttr("frontend_name")) {
+                existing->getAttr("frontend_name") == rule->getAttr("frontend_name") &&
+                existing->getAttr("resources") == rule->getAttr("resources")) {
                 continue;
             }
             rule->remove();
