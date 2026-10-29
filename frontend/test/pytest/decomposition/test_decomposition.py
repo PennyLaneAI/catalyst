@@ -106,7 +106,7 @@ class TestGenericUtilities:
         assert ordered_kwarg_names(call_kwargs, dynamic_shape) == expected
 
     def test_rule_call_operands_groups_wire_kwargs(self):
-        """Rule calls use one base-wire operand after all sorted parameter operands."""
+        """Rule calls use one base-wire operand after all parameter operands, in operand order."""
         call_args = (jnp.array(10.0),)
         call_kwargs = {
             "reg2": jnp.array([3, 4]),
@@ -124,8 +124,8 @@ class TestGenericUtilities:
 
         assert len(operands) == 5
         np.testing.assert_array_equal(operands[0], 10.0)
-        np.testing.assert_array_equal(operands[1], 11.0)
-        np.testing.assert_array_equal(operands[2], 12.0)
+        np.testing.assert_array_equal(operands[1], 12.0)
+        np.testing.assert_array_equal(operands[2], 11.0)
         np.testing.assert_array_equal(operands[3], [3, 4, 0, 1, 2])
         np.testing.assert_array_equal(operands[4], [5, 6])
 

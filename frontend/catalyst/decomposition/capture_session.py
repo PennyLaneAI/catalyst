@@ -35,8 +35,10 @@ class OpDecompRequest:
         op_name: Frontend operator name used to query PennyLane's decomposition registry.
         op_cls: Concrete Operator2 class used to rebuild the base for registered symbolic rules.
             It is unavailable for the on-demand pathway.
-        dynamic_shape: Non-hybrid dynamic argument names mapped to MLIR-style type spellings.
-        wire_lens: Non-hybrid wire argument names mapped to their lengths.
+        dynamic_shape: Non-hybrid dynamic argument names mapped to MLIR-style type spellings, in
+            operand order.
+        wire_lens: Qubit argument names (wire arguments and qubit-carrying hybrid arguments)
+            mapped to their lengths, in operand order.
         static_data: Compiler-known static/compilable arguments used by applicability, resource
             computation, and rule bodies.
         extra_data: Abstract hybrid-argument pytrees used to reconstruct rule arguments without
