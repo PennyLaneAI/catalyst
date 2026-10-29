@@ -61,7 +61,7 @@ class TestOQDARTIQLLVMIR:
             return qp.counts(all_outcomes=True)
 
         # Get the LLVM IR
-        compiled_circuit = QJIT(circuit, CompileOptions(link=False, pipelines=oqd_pipelines))
+        compiled_circuit = QJIT(circuit, CompileOptions(target="llvmir", pipelines=oqd_pipelines))
         llvm_ir = compiled_circuit.llvmir
 
         # Verify required ARTIQ symbols and structure

@@ -765,7 +765,6 @@ def handle_decomposition_rule(self, *, pyfun, func_jaxpr, is_qreg, num_params):
         target_gate=getattr(pyfun, "target_gate", None),
         resources=None,
         frontend_name=getattr(pyfun, "frontend_name", None),
-        num_wires=getattr(pyfun, "num_wires", None),
     )
 
     return ()

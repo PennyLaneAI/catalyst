@@ -107,7 +107,7 @@ Will print out something close to the following:
 
 .. code-block:: bash
 
-        [SYSTEM] catalyst -o circuit.ll --module-name circuit --workspace ./ -verify-each=false \
+        [SYSTEM] catalyst -o circuit.o --module-name circuit --workspace ./ -verify-each=false \
             --catalyst-pipeline \
             QuantumCompilationStage(split-multiple-tapes;builtin.module(apply-transform-sequence);inline-nested-module;lower-mitigation;adjoint-lowering), \
             HLOLoweringStage(canonicalize;func.func(chlo-legalize-to-stablehlo);func.func(stablehlo-legalize-control-flow);func.func(stablehlo-aggressive-simplification);stablehlo-legalize-to-linalg;func.func(stablehlo-legalize-to-std);func.func(stablehlo-legalize-sort);stablehlo-convert-to-signless;canonicalize;scatter-lowering;hlo-custom-call-lowering;cse;func.func(linalg-detensorize{aggressive-mode});detensorize-scf;detensorize-function-boundary;canonicalize;symbol-dce), \
@@ -198,7 +198,7 @@ context manager:
 ...     expensive_function(1, 2)
 [DIAGNOSTICS] Running capture                   walltime: 3.299 ms      cputime: 3.294 ms       programsize: 0 lines
 [DIAGNOSTICS] Running generate_ir               walltime: 4.228 ms      cputime: 4.225 ms       programsize: 14 lines
-[DIAGNOSTICS] Running compile                   walltime: 57.182 ms     cputime: 12.109 ms      programsize: 121 lines
+[DIAGNOSTICS] Running compile                   walltime: 57.182 ms     cputime: 12.109 ms
 [DIAGNOSTICS] Running run                       walltime: 1.075 ms      cputime: 1.072 ms
 
 Measurements currently include wall time, CPU time, and (intermediate) program size;

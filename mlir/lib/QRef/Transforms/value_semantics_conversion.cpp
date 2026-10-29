@@ -159,6 +159,35 @@ struct rQubitGetOpInfo {
     }
 };
 
+} // anonymous namespace
+
+namespace llvm {
+
+// Boilerplate to enable using `rQubitGetOpInfo` as DenseMap keys.
+// Must be visible before the first DenseMap/DenseSet keyed by `rQubitGetOpInfo` is used.
+template <> struct DenseMapInfo<rQubitGetOpInfo> {
+    static inline rQubitGetOpInfo getEmptyKey() {
+        return rQubitGetOpInfo(DenseMapInfo<Value>::getEmptyKey(), -1);
+    }
+
+    static inline rQubitGetOpInfo getTombstoneKey() {
+        return rQubitGetOpInfo(DenseMapInfo<Value>::getTombstoneKey(), -2);
+    }
+
+    static unsigned getHashValue(const rQubitGetOpInfo &val) {
+        return hash_combine(hash_value(val.reg.getAsOpaquePointer()), val.idxAttr,
+                            val.idx ? static_cast<size_t>(hash_value(val.idx.getAsOpaquePointer()))
+                                    : 0);
+    }
+
+    static bool isEqual(const rQubitGetOpInfo &lhs, const rQubitGetOpInfo &rhs) {
+        return lhs == rhs;
+    }
+};
+} // namespace llvm
+
+namespace {
+
 std::optional<rQubitGetOpInfo> getGetOpInfo(Value rQubit) {
     bool isGetOp = rQubit.getDefiningOp() && isa<qref::GetOp>(rQubit.getDefiningOp());
     if (!isGetOp) {
@@ -172,6 +201,73 @@ std::optional<rQubitGetOpInfo> getGetOpInfo(Value rQubit) {
     } else {
         return rQubitGetOpInfo(reg, getOp.getIdx());
     }
+}
+
+/**
+ * @brief A set of rQubit Values that detects when two of them refer to the same wire.
+ *
+ * Two rQubits refer to the same wire if they are the same SSA Value, or if they come from qref.get
+ * operations with equal `rQubitGetOpInfo` (same register and same static index, or same register
+ * and same dynamic index SSA Value). The frontend emits a separate qref.get for every use of a
+ * wire, so SSA identity alone misses most aliases.
+ *
+ * A static and a dynamic index on the same register are not compared: whether they alias is only
+ * known at runtime.
+ */
+struct RQubitAliasSet {
+  public:
+    /**
+     * @brief Insert an rQubit Value.
+     *
+     * @return The previously inserted rQubit Value that refers to the same wire, or a null Value
+     * if there is none.
+     */
+    Value insert(Value rQubit) {
+        assert(isa<qref::QubitType>(rQubit.getType()) && "Expected qref.bit type");
+        if (std::optional<rQubitGetOpInfo> info = getGetOpInfo(rQubit)) {
+            auto [it, inserted] = this->getOpInfoToRQubit.try_emplace(info.value(), rQubit);
+            return inserted ? Value() : it->second;
+        }
+        return this->rQubits.insert(rQubit).second ? Value() : rQubit;
+    }
+
+  private:
+    llvm::DenseMap<rQubitGetOpInfo, Value> getOpInfoToRQubit;
+    llvm::DenseSet<Value> rQubits;
+}; // struct RQubitAliasSet
+
+/**
+ * @brief Emit an error on `op` if two of the qref.bit Values in `rValues` refer to the same wire.
+ * Values of other types are ignored.
+ *
+ * @param op The operation to attach the error to
+ * @param rValues The Values that `op` will hand to the value semantics operation
+ * @param what A description of `rValues` for the error message
+ */
+LogicalResult verifyDistinctWires(Operation *op, ArrayRef<Value> rValues, StringRef what) {
+    RQubitAliasSet seen;
+    for (Value rValue : rValues) {
+        if (!isa<qref::QubitType>(rValue.getType())) {
+            continue;
+        }
+        if (Value aliased = seen.insert(rValue)) {
+            InFlightDiagnostic diag = op->emitOpError() << what << " must refer to distinct qubits";
+            diag.attachNote(aliased.getLoc()) << "first use of the qubit";
+            diag.attachNote(rValue.getLoc()) << "aliasing use of the same qubit";
+            return failure();
+        }
+    }
+    return success();
+}
+
+/**
+ * @brief Return true if two of the qref.bit Values in `rValues` refer to the same wire.
+ */
+bool hasAliasingRQubits(ArrayRef<Value> rValues) {
+    RQubitAliasSet seen;
+    return llvm::any_of(rValues, [&](Value rValue) {
+        return isa<qref::QubitType>(rValue.getType()) && seen.insert(rValue);
+    });
 }
 
 /**
@@ -490,6 +586,14 @@ struct TransientQubitExtractor {
         ValueRange rOpOperands = this->rOp->getOperands();
         ValueRange operands =
             explicit_operands.has_value() ? explicit_operands.value() : rOpOperands;
+
+        // Every quantum.extract is created here, so this is the last point where two operands for
+        // the same wire can be caught before they become two live vQubits for one wire.
+        // verifyDistinctWireOperands, checkNoAliasingQubitsInCallOp and
+        // collectNecessaryRegionRValues are responsible for never letting this happen.
+        assert(!hasAliasingRQubits(SmallVector<Value>(operands.begin(), operands.end())) &&
+               "Two operands of the same operation refer to the same qubit");
+
         for (auto [i, operand] : llvm::enumerate(operands)) {
             if (!isa<qref::QubitType>(operand.getType()) || this->tracker.isRootRQubit(operand)) {
                 continue;
@@ -785,7 +889,16 @@ void _getNecessaryRegionRValuesImpl(Region &r, SetVector<Value> &necessaryRegion
         }
     });
 
-    // If any rQregs are taken in, any rQubits belonging to them must not be taken in separately
+    // If any rQregs are taken in, any rQubits belonging to them must not be taken in separately.
+    // Callers such as handleIf, handleSwitch and handleWhile collect several regions into the same
+    // set, so the rQregs must be taken from the whole set, not only from this call. Otherwise a
+    // static qref.get collected from a later region survives next to its register collected from
+    // an earlier region, and the wire is extracted outside while the register is used inside.
+    for (Value v : necessaryRegionRValues) {
+        if (isa<qref::QuregType>(v.getType())) {
+            rQregsTakenIn.insert(v);
+        }
+    }
     necessaryRegionRValues.remove_if([&](const Value &v) {
         if (isa<BlockArgument>(v)) {
             return false;
@@ -859,6 +972,42 @@ void collectNecessarySubroutineRValues(func::FuncOp f,
     _getNecessaryRegionRValuesImpl(
         f.getBody(), necessarySubroutineRValues,
         [&](Region &r, Value v) { return llvm::is_contained(r.getArguments(), v); });
+}
+
+/**
+ * @brief Check, before any conversion, that no operation is handed two qref.bit Values for the
+ * same wire.
+ *
+ * - Gates, measurements and observables: their qubit operands.
+ * - qref.ctrl: its ctrl qubits together with the qubits its region captures from above. In value
+ *   semantics the ctrl qubits are operands of quantum.ctrl and the captured qubits become region
+ *   arguments, so a ctrl qubit that is also used inside the region would be extracted twice.
+ *
+ * The captured Values of the other region operations (scf.if, scf.index_switch, scf.for,
+ * scf.while, qref.adjoint) are made alias free by collectNecessaryRegionRValues. Subroutine calls
+ * are checked after staging, in checkNoAliasingQubitsInCallOp.
+ *
+ * A static and a dynamic index on the same register cannot be compared at compile time and are
+ * not rejected here.
+ */
+LogicalResult verifyDistinctWireOperands(Operation *root) {
+    WalkResult walkResult = root->walk([&](Operation *op) {
+        LogicalResult result = success();
+        if (auto rCtrlOp = dyn_cast<qref::CtrlOp>(op)) {
+            SetVector<Value> rCapturedValues;
+            collectNecessaryRegionRValues(rCtrlOp.getRegion(), rCapturedValues);
+            SmallVector<Value> rValues(rCtrlOp.getCtrlQubits().begin(),
+                                       rCtrlOp.getCtrlQubits().end());
+            rValues.append(rCapturedValues.begin(), rCapturedValues.end());
+            result = verifyDistinctWires(op, rValues,
+                                         "ctrl qubits and the qubits used inside the ctrl region");
+        } else if (isa<REFERENCE_SEMANTICS_GATE_OPS, REFERENCE_SEMANTICS_OBSERVABLE_OPS>(op)) {
+            SmallVector<Value> rValues(op->getOperands().begin(), op->getOperands().end());
+            result = verifyDistinctWires(op, rValues, "qubit operands");
+        }
+        return failed(result) ? WalkResult::interrupt() : WalkResult::advance();
+    });
+    return failure(walkResult.wasInterrupted());
 }
 
 /**
@@ -954,9 +1103,26 @@ struct SubroutineInfo {
     SmallVector<std::variant<unsigned, std::pair<unsigned, uint64_t>>> newArgsInfo;
 }; // struct SubroutineInfo
 
-void checkNoAliasingQubitsInCallOp(IRRewriter &builder, func::CallOp callOp) {
-    // Only potentially aliasing case is where both rQubits come from qref.get ops
-    // This is because those coming from single qubit allocations are guaranteed to be not aliasing
+/**
+ * @brief Check that the qubit arguments of a staged subroutine call refer to distinct wires.
+ *
+ * Must be called on the call produced by stageCallOpForConversion, not the original call: staging
+ * replaces register arguments with qref.get ops for the static indices the subroutine uses, and
+ * those can alias qubit arguments that were passed in explicitly. A subroutine cannot take two
+ * arguments for the same wire in value semantics, and its signature is shared by every call
+ * site, so aliasing arguments are rejected rather than merged.
+ *
+ * Aliases that are known at compile time (same SSA Value, same static index, same dynamic index
+ * Value) are reported as errors. Dynamic indices are checked with a runtime assertion.
+ */
+LogicalResult checkNoAliasingQubitsInCallOp(IRRewriter &builder, func::CallOp callOp) {
+    SmallVector<Value> callArgs(callOp.getArgOperands().begin(), callOp.getArgOperands().end());
+    if (failed(verifyDistinctWires(callOp, callArgs, "qubit arguments of a subroutine call"))) {
+        return failure();
+    }
+
+    // The remaining potentially aliasing case is where both rQubits come from qref.get ops on the
+    // same register, and at least one index is dynamic.
     OpBuilder::InsertionGuard guard(builder);
     builder.setInsertionPoint(callOp);
     Location loc = callOp.getLoc();
@@ -977,13 +1143,9 @@ void checkNoAliasingQubitsInCallOp(IRRewriter &builder, func::CallOp callOp) {
             Value dynamicIndex = getOp.getIdx();
             bool isStatic = staticIndex.has_value();
 
-            auto [_, inserted] = reg_to_indices.try_emplace(qreg);
+            reg_to_indices.try_emplace(qreg);
             if (isStatic) {
-                if (!inserted) {
-                    // qreg already exists, static index must be new
-                    assert(!reg_to_indices[qreg].first.contains(staticIndex.value()) &&
-                           "Can only call subroutines with non aliasing qubits");
-                }
+                // Duplicate static indices were already rejected by verifyDistinctWires
                 reg_to_indices[qreg].first.insert(staticIndex.value());
             } else {
                 reg_to_indices[qreg].second.insert(dynamicIndex);
@@ -995,8 +1157,8 @@ void checkNoAliasingQubitsInCallOp(IRRewriter &builder, func::CallOp callOp) {
     for (auto [qreg, indexSets] : reg_to_indices) {
         if (indexSets.second.empty()) {
             // All indices are static, already checked above in the pass
-            // No need to assert in runtime
-            return;
+            // No need to assert in runtime for this register, but the others still need checking
+            continue;
         }
 
         uint64_t num_qubit_operands = indexSets.first.size() + indexSets.second.size();
@@ -1033,10 +1195,11 @@ void checkNoAliasingQubitsInCallOp(IRRewriter &builder, func::CallOp callOp) {
         catalyst::AssertionOp::create(builder, loc, compOp.getResult(),
                                       "Can only call subroutines with non aliasing qubits");
     }
+    return success();
 }
 
-void stageCallOpForConversion(IRRewriter &builder, func::CallOp callOp,
-                              SubroutineInfo &subroutineInfo) {
+func::CallOp stageCallOpForConversion(IRRewriter &builder, func::CallOp callOp,
+                                      SubroutineInfo &subroutineInfo) {
     OpBuilder::InsertionGuard guard(builder);
     MLIRContext *ctx = callOp->getContext();
     Location loc = callOp->getLoc();
@@ -1064,6 +1227,7 @@ void stageCallOpForConversion(IRRewriter &builder, func::CallOp callOp,
     auto newCallOp = func::CallOp::create(builder, loc, callOp->getResultTypes(),
                                           callOp.getCallee(), newCallArgs);
     builder.replaceOp(callOp, newCallOp);
+    return newCallOp;
 }
 
 void handleAlloc(IRRewriter &builder, qref::AllocOp rAllocOp, QubitValueTracker &tracker) {
@@ -2008,30 +2172,6 @@ void handleRegion(IRRewriter &builder, Region &r, QubitValueTracker &tracker) {
 
 } // anonymous namespace
 
-namespace llvm {
-
-// Boilerplate to enable using `rQubitGetOpInfo` as DenseMap keys.
-template <> struct DenseMapInfo<rQubitGetOpInfo> {
-    static inline rQubitGetOpInfo getEmptyKey() {
-        return rQubitGetOpInfo(DenseMapInfo<Value>::getEmptyKey(), -1);
-    }
-
-    static inline rQubitGetOpInfo getTombstoneKey() {
-        return rQubitGetOpInfo(DenseMapInfo<Value>::getTombstoneKey(), -2);
-    }
-
-    static unsigned getHashValue(const rQubitGetOpInfo &val) {
-        return hash_combine(hash_value(val.reg.getAsOpaquePointer()), val.idxAttr,
-                            val.idx ? static_cast<size_t>(hash_value(val.idx.getAsOpaquePointer()))
-                                    : 0);
-    }
-
-    static bool isEqual(const rQubitGetOpInfo &lhs, const rQubitGetOpInfo &rhs) {
-        return lhs == rhs;
-    }
-};
-} // namespace llvm
-
 namespace catalyst {
 namespace qref {
 
@@ -2059,6 +2199,10 @@ struct ValueSemanticsConversionPass
             return WalkResult::advance();
         });
         if (getOpVerification.wasInterrupted()) {
+            return signalPassFailure();
+        }
+
+        if (failed(verifyDistinctWireOperands(mod))) {
             return signalPassFailure();
         }
 
@@ -2116,8 +2260,10 @@ struct ValueSemanticsConversionPass
 
             for (Operation *user : symbolUsers.getUsers(subroutine)) {
                 if (auto callOp = dyn_cast<func::CallOp>(user)) {
-                    checkNoAliasingQubitsInCallOp(builder, callOp);
-                    stageCallOpForConversion(builder, callOp, info);
+                    func::CallOp stagedCallOp = stageCallOpForConversion(builder, callOp, info);
+                    if (failed(checkNoAliasingQubitsInCallOp(builder, stagedCallOp))) {
+                        return signalPassFailure();
+                    }
                 }
             }
         }
