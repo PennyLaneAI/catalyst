@@ -105,9 +105,9 @@ class ApplyTransformSequencePass(ModulePass):
                 nested_modules.append(_op)
 
         pattern_cls = (
-            partial(ApplyTransformSequencePattern, callback=self.callback)
+            partial(ApplyTransformSequenceCallbackPattern, callback=self.callback)
             if self.callback
-            else ApplyTransformSequenceNoCallbackPattern
+            else ApplyTransformSequencePattern
         )
 
         for mod in nested_modules:
@@ -256,7 +256,7 @@ class ApplyTransformSequenceBase(RewritePattern):
         return data
 
 
-class ApplyTransformSequenceNoCallbackPattern(ApplyTransformSequenceBase):
+class ApplyTransformSequencePattern(ApplyTransformSequenceBase):
     """RewritePattern for applying transform sequences when no callback is provided.
 
     Batches consecutive xDSL / MLIR passes and applies them without per-pass hooks.
@@ -299,7 +299,7 @@ class ApplyTransformSequenceNoCallbackPattern(ApplyTransformSequenceBase):
         return payload, insertion_point
 
 
-class ApplyTransformSequencePattern(ApplyTransformSequenceBase):
+class ApplyTransformSequenceCallbackPattern(ApplyTransformSequenceBase):
     """RewritePattern for applying transform sequences when a callback is provided.
 
     Applies one registered pass at a time so the callback can observe the module
