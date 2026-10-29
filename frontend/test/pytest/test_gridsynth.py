@@ -41,7 +41,7 @@ def test_PhaseShift_gridsynth(param, op, eps):
 
     expected = circuit(param)
     gridsynthed_circuit = qp.transforms.gridsynth(circuit, epsilon=eps)
-    qjitted_circuit = qp.qjit(gridsynthed_circuit, capture=True, collect_decomp_rules=False)
+    qjitted_circuit = qp.qjit(gridsynthed_circuit, capture=True)
     result = qjitted_circuit(param)
 
     assert qp.math.allclose(result, expected, atol=eps, rtol=0)
@@ -62,7 +62,7 @@ def test_adjoint_gridsynth(param, op):
 
     expected = circuit(param)
     gridsynthed_circuit = qp.transforms.gridsynth(circuit, epsilon=eps)
-    qjitted_circuit = qp.qjit(gridsynthed_circuit, capture=True, collect_decomp_rules=False)
+    qjitted_circuit = qp.qjit(gridsynthed_circuit, capture=True)
     assert qp.math.allclose(qjitted_circuit(param), expected, atol=eps)
 
 
@@ -88,7 +88,7 @@ def test_adjoint_region_gridsynth(param, op, ppr_basis, region):
 
     expected = circuit(param)
     gridsynthed_circuit = qp.transforms.gridsynth(circuit, epsilon=eps, ppr_basis=ppr_basis)
-    qjitted_circuit = qp.qjit(gridsynthed_circuit, capture=True, collect_decomp_rules=False)
+    qjitted_circuit = qp.qjit(gridsynthed_circuit, capture=True)
     assert qp.math.allclose(qjitted_circuit(param), expected, atol=2 * eps)
 
 
@@ -128,10 +128,8 @@ def test_gridsynth_ppr_basis(param, eps):
 
     gridsynthed_circuit = qp.transforms.gridsynth(circuit, epsilon=eps)
     gridsynthed_circuit_ppr = qp.transforms.gridsynth(circuit, epsilon=eps, ppr_basis=True)
-    qjitted_circuit = qp.qjit(gridsynthed_circuit, capture=True, collect_decomp_rules=False)
-    qjitted_circuit_with_ppr = qp.qjit(
-        gridsynthed_circuit_ppr, capture=True, collect_decomp_rules=False
-    )
+    qjitted_circuit = qp.qjit(gridsynthed_circuit, capture=True)
+    qjitted_circuit_with_ppr = qp.qjit(gridsynthed_circuit_ppr, capture=True)
     result = qjitted_circuit(param)
     result_with_ppr = qjitted_circuit_with_ppr(param)
     assert np.allclose(result, result_with_ppr, atol=eps, rtol=0)
@@ -252,7 +250,7 @@ def test_mixed_gridsynth_samples(param, op, eps, ppr_basis):
         return qp.state()
 
     mixed_circuit = gridsynth(circuit, epsilon=eps, ppr_basis=ppr_basis, method="mixed")
-    qjitted_circuit = qp.qjit(mixed_circuit, capture=True, collect_decomp_rules=False, seed=37)
+    qjitted_circuit = qp.qjit(mixed_circuit, capture=True, seed=37)
     expected = qp.matrix(op(param, wires=0)) @ np.array([1, 1]) / np.sqrt(2)
 
     result = np.reshape(qjitted_circuit(param), [2] * num_wires)

@@ -382,7 +382,6 @@ class TestConvertToMBQCFormalismPass:
 
         @qp.qjit(
             capture=True,
-            collect_decomp_rules=False,
             target="mlir",
             pipelines=mbqc_pipeline(),
             autograph=True,
@@ -434,7 +433,6 @@ class TestConvertToMBQCFormalismPass:
 
         @qp.qjit(
             capture=True,
-            collect_decomp_rules=False,
             target="mlir",
             pipelines=mbqc_pipeline(),
             autograph=True,
@@ -480,7 +478,6 @@ class TestConvertToMBQCFormalismPass:
 
         @qp.qjit(
             capture=True,
-            collect_decomp_rules=False,
             target="mlir",
             pipelines=mbqc_pipeline(),
             autograph=True,
@@ -525,7 +522,6 @@ class TestConvertToMBQCFormalismPass:
 
         @qp.qjit(
             capture=True,
-            collect_decomp_rules=False,
             target="mlir",
             autograph=True,
         )
@@ -557,7 +553,6 @@ class TestConvertToMBQCFormalismPass:
 
         @qp.qjit(
             capture=True,
-            collect_decomp_rules=False,
             target="mlir",
             pipelines=mbqc_pipeline(),
             autograph=True,

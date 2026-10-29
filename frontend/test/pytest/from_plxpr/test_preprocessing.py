@@ -742,7 +742,7 @@ class TestIntegration:
         )
 
         # Device Preprocessing should perform split to single terms
-        @qp.qjit(capture=True, collect_decomp_rules=False)
+        @qp.qjit(capture=True)
         @qp.qnode(dev)
         def circuit(x):
             qp.Hadamard(wires=0)

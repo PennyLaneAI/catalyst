@@ -565,9 +565,9 @@ class TestLowerPBCInitOps:
         to_ppr_circuit = qp.transform(pass_name="to-ppr")(baseline_circuit)
         lowered_circuit = qp.transform(pass_name="ppr-to-ppm")(to_ppr_circuit)
 
-        baseline_circuit = qp.qjit(baseline_circuit, capture=True, collect_decomp_rules=False)
-        to_ppr_circuit = qp.qjit(to_ppr_circuit, capture=True, collect_decomp_rules=False)
-        lowered_circuit = qp.qjit(lowered_circuit, capture=True, collect_decomp_rules=False)
+        baseline_circuit = qp.qjit(baseline_circuit, capture=True)
+        to_ppr_circuit = qp.qjit(to_ppr_circuit, capture=True)
+        lowered_circuit = qp.qjit(lowered_circuit, capture=True)
 
         baseline_result = baseline_circuit()
         to_ppr_result = to_ppr_circuit()
