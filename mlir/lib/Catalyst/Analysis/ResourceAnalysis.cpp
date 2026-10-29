@@ -403,7 +403,7 @@ void ResourceAnalysis::analyzeRegion(Region &region, ResourceResult &result, boo
                 collectOperation(&op, result, isAdjoint, numControlQubits);
                 if (collectDetailedOperations) {
                     result.collectDetailedOperations = true;
-                    collectDetailedOperation(&op, result, isAdjoint);
+                    collectDetailedOperation(&op, result, isAdjoint, numControlQubits);
                 }
             }
         }
@@ -509,11 +509,18 @@ void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result, b
 }
 
 void ResourceAnalysis::collectDetailedOperation(Operation *op, ResourceResult &result,
-                                                bool isAdjoint) const {
+                                                bool isAdjoint, unsigned numControlQubits) const {
     if (auto inst = dyn_cast<quantum::DecomposableGate>(op)) {
-        // Keep the canonical graph ID unchanged so it matches decomposition rules.
-        // Adjoint and control details will appear here once getGraphOpId() encodes them.
-        result.detailedOperations[inst.getGraphOpId()] += 1;
+
+        isAdjoint = isAdjoint ^ op->hasAttr("adjoint");
+
+        if (auto gate = mlir::dyn_cast<catalyst::quantum::QuantumGate>(op)) {
+            numControlQubits += gate.getCtrlQubitOperands().size();
+        }
+
+        std::string opID = inst.getGraphOpIdExplicitModifiers(isAdjoint, numControlQubits);
+        result.detailedOperations[opID] += 1;
+
         return;
     }
 

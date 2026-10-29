@@ -97,17 +97,15 @@ namespace quantum {
 // Always emitting the control-outermost form keeps such ops on a single node. The
 // caller appends the param/wire/static/uid groups. Extend this helper to support future op-level
 // modifiers, preserving the canonical order (mirror the Python side in decomposition_rules.py).
-static std::string wrapModifiers(std::string name, Operation *op) {
-    if (op->hasAttr("adjoint")) {
+static std::string wrapModifiers(std::string name, Operation *op, bool isAdjoint,
+                                 unsigned numControlQubits) {
+    if (isAdjoint) {
         name = "Adjoint(" + name + ")";
     }
-    if (auto gate = mlir::dyn_cast<QuantumGate>(op)) {
-        size_t numCtrl = gate.getCtrlQubitOperands().size();
-        if (numCtrl == 1) {
-            name = "C(" + name + ")";
-        } else if (numCtrl > 1) {
-            name = std::to_string(numCtrl) + "C(" + name + ")";
-        }
+    if (numControlQubits == 1) {
+        name = "C(" + name + ")";
+    } else if (numControlQubits > 1) {
+        name = std::to_string(numControlQubits) + "C(" + name + ")";
     }
     return name;
 }
@@ -121,7 +119,15 @@ std::string defaultGetGraphOpId(Operation *op) {
     // Fold op-level modifiers into the operator name so that `Op`, `Adjoint(Op)`, `C(Op)`, and
     // nested combinations are distinct in the graphOpId. Modifiers wrap only the name; the
     // param/wire/static/uid groups follow, e.g. `C(Adjoint(Rot)){...}{wires...}`.
-    ss << wrapModifiers(gate.getOperatorName(), op);
+
+    bool isAdjoint = op->hasAttr("adjoint");
+    size_t numCtrlQubits = 0;
+
+    if (auto gate = mlir::dyn_cast<QuantumGate>(op)) {
+        numCtrlQubits = gate.getCtrlQubitOperands().size();
+    }
+
+    ss << wrapModifiers(gate.getOperatorName(), op, isAdjoint, numCtrlQubits);
     printDynamicShape(gate.getDynamicShape(), ss);
     printWireLens(gate.getWireLens(), ss);
     gate.getStaticData().print(ss);
@@ -133,5 +139,26 @@ std::string defaultGetGraphOpId(Operation *op) {
     return out;
 }
 
+std::string defaultGetGraphOpIdExplicitModifiers(Operation *op, bool isAdjoint,
+                                                 unsigned numControlQubits) {
+    std::string out;
+    llvm::raw_string_ostream ss(out);
+
+    DecomposableGate gate = cast<DecomposableGate>(op);
+
+    // Fold op-level modifiers into the operator name so that `Op`, `Adjoint(Op)`, `C(Op)`, and
+    // nested combinations are distinct in the graphOpId. Modifiers wrap only the name; the
+    // param/wire/static/uid groups follow, e.g. `C(Adjoint(Rot)){...}{wires...}`.
+    ss << wrapModifiers(gate.getOperatorName(), op, isAdjoint, numControlQubits);
+    printDynamicShape(gate.getDynamicShape(), ss);
+    printWireLens(gate.getWireLens(), ss);
+    gate.getStaticData().print(ss);
+    if (gate.getExtraData() != "") {
+        ss << '[' << gate.getExtraData() << ']';
+    }
+    ss.flush();
+
+    return out;
+}
 } // namespace quantum
 } // namespace catalyst
