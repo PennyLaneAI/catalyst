@@ -2414,6 +2414,57 @@ class TestResourceEstimate:
         assert '"output-json" = true' in mlir
         assert f'"output-fname" = "{out}"' in mlir
 
+    def test_resource_estimate_requires_gate_set(self, tmp_path):
+        """resource-estimate without a gate set is rejected with a clear error."""
+        out = tmp_path / "resources.json"
+        with pytest.raises(ValueError, match="requires an explicit 'gate_set'"):
+
+            @qjit(capture=True, target="mlir")
+            @self._resource_estimate(
+                gate_set=None,
+                output_json=True,
+                output_fname=str(out),
+            )
+            @qnode(qp.device("null.qubit", wires=1))
+            def circuit():
+                qp.Rot(0.1, 0.2, 0.3, wires=0)
+                return qp.probs()
+
+            circuit()
+
+    def test_resource_estimate_requires_output_json(self, tmp_path):
+        """resource-estimate without output_json is rejected with a clear error."""
+        out = tmp_path / "resources.json"
+        with pytest.raises(ValueError, match="requires an explicit 'output_json'"):
+
+            @qjit(capture=True, target="mlir")
+            @self._resource_estimate(
+                gate_set={"RX", "RY", "RZ"},
+                output_fname=str(out),
+            )
+            @qnode(qp.device("null.qubit", wires=1))
+            def circuit():
+                qp.Rot(0.1, 0.2, 0.3, wires=0)
+                return qp.probs()
+
+            circuit()
+
+    def test_resource_estimate_requires_output_fname(self):
+        """resource-estimate without output_fname is rejected with a clear error."""
+        with pytest.raises(ValueError, match="requires an explicit 'output_fname'"):
+
+            @qjit(capture=True, target="mlir")
+            @self._resource_estimate(
+                gate_set={"RX", "RY", "RZ"},
+                output_json=True,
+            )
+            @qnode(qp.device("null.qubit", wires=1))
+            def circuit():
+                qp.Rot(0.1, 0.2, 0.3, wires=0)
+                return qp.probs()
+
+            circuit()
+
 
 class TestNumericHamiltonianDecomposition:
     """Tests decomposing Trotter operators that carry a numeric Hamiltonian as a
