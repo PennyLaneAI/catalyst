@@ -213,26 +213,27 @@ static nb::object getPyvalFromMlirAttribute(mlir::Attribute attr) {
 
 } // namespace
 
-std::string pythonRuleLowering(catalyst::quantum::DecomposableGate op) {
+std::string pythonRuleLowering(catalyst::quantum::DecomposableGate op, bool isAdjoint,
+                               unsigned numControlQubits) {
     QuantumPythonDecompositions::PyInterpreterGuard guard;
     std::string mlirText = guard.withGil([&] -> std::string {
         const char *moduleName = "catalyst.decomposition.decomposition_rules";
         const char *functionName = "compile_reachable_decomposition_rules_wrapper";
+        std::string opId = op.getGraphOpIdExplicitModifiers(isAdjoint, numControlQubits);
 
         try {
             nb::module_ wrapperModule = nb::module_::import_(moduleName);
             nb::object wrapperFunction = wrapperModule.attr(functionName);
 
             nb::object pythonResult = wrapperFunction(
-                op.getOperatorName(), op.getGraphOpId(),
-                getPyvalFromDynamicShape(op.getDynamicShape()),
+                op.getOperatorName(), opId, getPyvalFromDynamicShape(op.getDynamicShape()),
                 getPyvalFromWireLens(op.getWireLens()),
                 getPyvalFromMlirAttribute(op.getStaticData()), nb::arg("extra_data") = nb::none(),
                 nb::arg("is_custom_op") = isa<catalyst::quantum::CustomOp>(op));
             return nb::borrow<nb::str>(pythonResult).c_str();
         } catch (const nb::python_error &error) {
-            throw QuantumPythonDecompositions::TracingError(moduleName, functionName,
-                                                            op.getGraphOpId(), error.what());
+            throw QuantumPythonDecompositions::TracingError(moduleName, functionName, opId,
+                                                            error.what());
         } catch (const std::exception &error) {
             throw;
         }

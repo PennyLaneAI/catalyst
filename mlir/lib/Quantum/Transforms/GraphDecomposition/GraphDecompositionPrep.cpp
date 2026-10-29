@@ -62,6 +62,24 @@ using namespace DecompGraph::Solver;
 
 namespace {
 
+/// Op-level `adj`/`ctrls` plus enclosing `quantum.adjoint` / `quantum.ctrl` regions.
+std::pair<bool, unsigned> getExplicitModifiers(DecomposableGate op) {
+    bool isAdjoint = op->hasAttr("adjoint");
+    unsigned numControlQubits = 0;
+    if (auto gate = dyn_cast<QuantumGate>(op.getOperation())) {
+        numControlQubits = gate.getCtrlQubitOperands().size();
+    }
+
+    for (Operation *parent = op->getParentOp(); parent; parent = parent->getParentOp()) {
+        if (isa<AdjointOp>(parent)) {
+            isAdjoint = !isAdjoint; // nested adjoint cancels
+        } else if (auto ctrl = dyn_cast<CtrlOp>(parent)) {
+            numControlQubits += ctrl.getInCtrlQubits().size();
+        }
+    }
+    return {isAdjoint, numControlQubits};
+}
+
 void parseFixedDecomps(ArrayRef<std::string> fixedDecompsOption,
                        llvm::StringMap<std::string> &opToFixedDecompName,
                        llvm::StringSet<> &userRuleNames) {
@@ -359,13 +377,14 @@ LogicalResult loadDecompositionRules(ModuleOp module,
     }
 
     for (catalyst::quantum::DecomposableGate op : decomposableOps) {
-        std::string opId = op.getGraphOpId();
+        auto [isAdjoint, numControlQubits] = getExplicitModifiers(op);
+        std::string opId = op.getGraphOpIdExplicitModifiers(isAdjoint, numControlQubits);
 
         if (handledOpIds.contains(opId)) {
             continue;
         }
 
-        std::string mlirText = pythonRuleLowering(op);
+        std::string mlirText = pythonRuleLowering(op, isAdjoint, numControlQubits);
 
         mlir::ParserConfig config(context);
         auto moduleOp = mlir::parseSourceString(llvm::StringRef(mlirText), config);
@@ -449,22 +468,7 @@ void getOperators(ModuleOp module, std::vector<OperatorNode> &operators) {
             return;
         }
 
-        bool isAdjoint = op->hasAttr("adjoint");
-        unsigned numControlQubits = 0;
-        if (mlir::dyn_cast<catalyst::quantum::QuantumGate>(op.getOperation())) {
-            numControlQubits = mlir::dyn_cast<catalyst::quantum::QuantumGate>(op.getOperation())
-                                   .getCtrlQubitOperands()
-                                   .size();
-        }
-
-        for (Operation *parent = op->getParentOp(); parent; parent = parent->getParentOp()) {
-            if (isa<AdjointOp>(parent)) {
-                isAdjoint = !isAdjoint; // nested adjoint cancels
-            } else if (auto ctrl = mlir::dyn_cast<CtrlOp>(parent)) {
-                numControlQubits += ctrl.getInCtrlQubits().size();
-            }
-        }
-
+        auto [isAdjoint, numControlQubits] = getExplicitModifiers(op);
         std::string opID = op.getGraphOpIdExplicitModifiers(isAdjoint, numControlQubits);
 
         // Derive the id and modifier-wrapped name from the single parse path, so operator
