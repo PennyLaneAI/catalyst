@@ -24,24 +24,28 @@ from catalyst import qjit, while_loop
 @qjit(target="mlir")
 @qp.qnode(qp.device("lightning.qubit", wires=1))
 def circuit(n: int):
-    # CHECK:   scf.while ([[v0:%.+]] = {{%.+}}, [[array0:%.+]] = {{%.+}})
-    # CHECK:       [[ct:%.+]] = stablehlo.compare LT, [[v0]], %arg0, SIGNED
-    # CHECK:       [[cond:%.+]] = tensor.extract [[ct]]
-    # CHECK:       scf.condition([[cond]]) [[v0]], [[array0]]
-
-    # CHECK:   ^bb0([[v0:%.+]]: tensor<i64>, [[array0:%.+]]: !quantum.reg):
-    # CHECK:       [[v0p:%.+]] = stablehlo.add [[v0]]
-    # CHECK:       [[q0:%.+]] = quantum.extract [[array0]][{{.+}}]
-    # CHECK:       [[q1:%.+]] = quantum.custom "PauliX"() [[q0]]
-    # CHECK:       [[array1:%.+]] = quantum.insert [[array0]][{{.+}}], [[q1]]
-    # CHECK:       scf.yield [[v0p]], [[array1]]
-    @while_loop(lambda v: v[0] < v[1])
+    # CHECK-LABEL: public @circuit(
+    # CHECK-DAG: [[one:%.+]] = stablehlo.constant dense<1> : tensor<i64>
+    # CHECK-DAG: [[zero:%.+]] = stablehlo.constant dense<0> : tensor<i64>
+    # CHECK: [[reg:%.+]] = qref.alloc( 1) : !qref.reg<1>
+    # CHECK: scf.while ([[value:%.+]] = [[zero]]) : (tensor<i64>) -> tensor<i64>
+    # CHECK: [[comparison:%.+]] = stablehlo.compare LT, [[value]], %arg0, SIGNED
+    # CHECK: [[condition:%.+]] = tensor.extract [[comparison]]
+    # CHECK: scf.condition([[condition]]) [[value]] : tensor<i64>
+    # CHECK: ^bb0([[value:%.+]]: tensor<i64>):
+    # CHECK: [[qubit:%.+]] = qref.get [[reg]][ 0]
+    # CHECK: qref.custom "PauliX"() [[qubit]]
+    # CHECK: [[next:%.+]] = stablehlo.add [[value]], [[one]]
+    # CHECK: scf.yield [[next]] : tensor<i64>
+    # CHECK: qref.dealloc [[reg]]
+    # CHECK: return
+    @qp.while_loop(lambda v: v[0] < v[1])
     def loop(v):
         qp.PauliX(wires=0)
         return v[0] + 1, v[1]
 
-    out = loop((0, n))
-    return out[0]
+    loop((0, n))
+    return qp.expval(qp.Z(0))
 
 
 print(circuit.mlir)
@@ -52,27 +56,28 @@ print(circuit.mlir)
 @qjit(target="mlir")
 @qp.qnode(qp.device("lightning.qubit", wires=1))
 def circuit_outer_scope_reference(n: int):
-    # CHECK:   [[array0:%.+]] = quantum.alloc
-
-    # CHECK:   [[newqreg:%.+]]:2 = scf.while ([[v0:%.+]] = {{%.+}}, [[array_inner:%.+]] = {{%.+}})
-    # CHECK:       [[ct:%.+]] = stablehlo.compare LT, [[v0]], %arg0, SIGNED
-    # CHECK:       [[cond:%.+]] = tensor.extract [[ct]]
-    # CHECK:       scf.condition([[cond]]) [[v0]], [[array_inner]]
-
-    # CHECK:   ^bb0([[v0:%.+]]: tensor<i64>, [[array_inner:%.+]]: !quantum.reg):
-    # CHECK:       [[v0p:%[a-zA-Z0-9_]]] = stablehlo.add [[v0]]
-    # CHECK:       [[q0:%.+]] = quantum.extract [[array_inner]][ 0]
-    # CHECK:       [[q1:%.+]] = quantum.custom "PauliX"() [[q0]]
-    # CHECK:       [[array_inner_2:%.+]] = quantum.insert [[array_inner]][ 0], [[q1]]
-    # CHECK:       scf.yield [[v0p]], [[array_inner_2]]
-    @while_loop(lambda i: i < n)
+    # CHECK-LABEL: public @circuit_outer_scope_reference(
+    # CHECK-DAG: [[one:%.+]] = stablehlo.constant dense<1> : tensor<i64>
+    # CHECK-DAG: [[zero:%.+]] = stablehlo.constant dense<0> : tensor<i64>
+    # CHECK: [[reg:%.+]] = qref.alloc( 1) : !qref.reg<1>
+    # CHECK: scf.while ([[value:%.+]] = [[zero]]) : (tensor<i64>) -> tensor<i64>
+    # CHECK: [[comparison:%.+]] = stablehlo.compare LT, [[value]], %arg0, SIGNED
+    # CHECK: [[condition:%.+]] = tensor.extract [[comparison]]
+    # CHECK: scf.condition([[condition]]) [[value]] : tensor<i64>
+    # CHECK: ^bb0([[value:%.+]]: tensor<i64>):
+    # CHECK: [[qubit:%.+]] = qref.get [[reg]][ 0]
+    # CHECK: qref.custom "PauliX"() [[qubit]]
+    # CHECK: [[next:%.+]] = stablehlo.add [[value]], [[one]]
+    # CHECK: scf.yield [[next]] : tensor<i64>
+    # CHECK: qref.dealloc [[reg]]
+    # CHECK: return
+    @qp.while_loop(lambda i: i < n)
     def loop(i):
         qp.PauliX(wires=0)
         return i + 1
 
-    # CHECK:   quantum.dealloc [[newqreg]]#1
-    # CHECK:   return
-    return loop(0)
+    loop(0)
+    return qp.expval(qp.Z(0))
 
 
 print(circuit_outer_scope_reference.mlir)
@@ -83,30 +88,28 @@ print(circuit_outer_scope_reference.mlir)
 @qjit(target="mlir")
 @qp.qnode(qp.device("lightning.qubit", wires=1))
 def circuit_multiple_args(n: int):
-    # CHECK-DAG:   [[R0:%.+]] = quantum.alloc({{.+}})
-    # CHECK-DAG:   [[C0:%.+]] = stablehlo.constant dense<0> : tensor<i64>
-    # CHECK-DAG:   [[C1:%.+]] = stablehlo.constant dense<1> : tensor<i64>
-
-    # CHECK:   [[newqreg:%.+]]:2 = scf.while ([[w0:%.+]] = [[C0]], [[w3:%.+]] = [[R0]])
-    # CHECK:       [[LT:%.+]] = stablehlo.compare LT, [[w0]], %arg0, SIGNED
-    # CHECK:       [[COND:%.+]] = tensor.extract [[LT]]
-    # CHECK:       scf.condition([[COND]]) [[w0]], [[w3]]
-
-    # CHECK:   ^bb0([[w0:%.+]]: tensor<i64>, [[w3:%.+]]: !quantum.reg):
-    # CHECK:       [[V0p:%.+]] = stablehlo.add [[w0]], [[C1]]
-    # CHECK:       [[Q0:%.+]] = quantum.extract [[w3]][{{.+}}]
-    # CHECK:       [[Q1:%.+]] = quantum.custom "PauliX"() [[Q0]]
-    # CHECK:       [[QREGp:%.+]] = quantum.insert [[w3]][{{.+}}], [[Q1]]
-    # CHECK:       scf.yield [[V0p]], [[QREGp]]
-    @while_loop(lambda v, _: v[0] < v[1])
+    # CHECK-LABEL: public @circuit_multiple_args(
+    # CHECK-DAG: [[one:%.+]] = stablehlo.constant dense<1> : tensor<i64>
+    # CHECK-DAG: [[zero:%.+]] = stablehlo.constant dense<0> : tensor<i64>
+    # CHECK: [[reg:%.+]] = qref.alloc( 1) : !qref.reg<1>
+    # CHECK: scf.while ([[value:%.+]] = [[zero]]) : (tensor<i64>) -> tensor<i64>
+    # CHECK: [[comparison:%.+]] = stablehlo.compare LT, [[value]], %arg0, SIGNED
+    # CHECK: [[condition:%.+]] = tensor.extract [[comparison]]
+    # CHECK: scf.condition([[condition]]) [[value]] : tensor<i64>
+    # CHECK: ^bb0([[value:%.+]]: tensor<i64>):
+    # CHECK: [[qubit:%.+]] = qref.get [[reg]][ 0]
+    # CHECK: qref.custom "PauliX"() [[qubit]]
+    # CHECK: [[next:%.+]] = stablehlo.add [[value]], [[one]]
+    # CHECK: scf.yield [[next]] : tensor<i64>
+    # CHECK: qref.dealloc [[reg]]
+    # CHECK: return
+    @qp.while_loop(lambda v, _: v[0] < v[1])
     def loop(v, inc):
         qp.PauliX(wires=0)
         return (v[0] + inc, v[1]), inc
 
-    out = loop((0, n), 1)
-    # CHECK:   quantum.dealloc [[newqreg]]#1
-    # CHECK:   return
-    return out[0]
+    loop((0, n), 1)
+    return qp.expval(qp.Z(0))
 
 
 print(circuit_multiple_args.mlir)
@@ -116,7 +119,8 @@ print(circuit_multiple_args.mlir)
 # `catalyst.estimated_iterations` attribute on the emitted `scf.while`.
 # CHECK-NOT: Verification failed
 # CHECK-LABEL: public @jit_circuit_estimated_iterations
-@qjit(target="mlir")
+# old_frontend: control-flow hints are specific to the Catalyst API.
+@qjit(capture=False, target="mlir")
 @qp.qnode(qp.device("lightning.qubit", wires=1))
 def circuit_estimated_iterations(n: int):
     # CHECK:   scf.while
@@ -126,7 +130,8 @@ def circuit_estimated_iterations(n: int):
         qp.PauliX(wires=0)
         return i + 1
 
-    return loop(0)
+    loop(0)
+    return qp.expval(qp.Z(0))
 
 
 print(circuit_estimated_iterations.mlir)
