@@ -59,6 +59,7 @@ from catalyst.decomposition.decomposition_rules import (
     compile_decomposition_rules_wrapper,
     compile_reachable_decomposition_rules_wrapper,
     compile_registered_symbolic_rules,
+    flatten_hybrid_args,
     get_rule_strings_from_module,
     materialize_reachable_rule_strings,
     ordered_kwarg_names,
@@ -153,6 +154,29 @@ class TestGenericUtilities:
         np.testing.assert_array_equal(kwargs["reg1"], [0, 1, 2])
         np.testing.assert_array_equal(ctrl_wires, [5, 6])
         np.testing.assert_array_equal(ctrl_values, [True, False])
+
+    def test_hybrid_operands_preserve_parameters_and_wires(self):
+        """Nested parameters follow ordinary hybrid parameters; wires retain their mapping."""
+        extra = {
+            "unitary": abstractify(qp.RX(0.1, 0) @ qp.RY(0.2, 1)),
+            "data": Float[2],
+        }
+        specs, dummies, closed = flatten_hybrid_args(extra)
+        assert not closed
+        assert [dummy.shape for dummy in dummies] == [(2,), (), ()]
+        _, kwargs, _, _ = unpack_rule_operands(
+            (jnp.array([4.0, 5.0]), jnp.array(0.7), jnp.array(-0.2), jnp.array([3, 1])),
+            n_params=0,
+            kwarg_names=["unitary"],
+            wire_lens={"unitary": 2},
+            has_ctrl_wires=False,
+            hybrid_specs=specs,
+        )
+        np.testing.assert_array_equal(kwargs["data"], [4.0, 5.0])
+        np.testing.assert_allclose(
+            qp.matrix(kwargs["unitary"], wire_order=[3, 1]),
+            qp.matrix(qp.RX(0.7, 3) @ qp.RY(-0.2, 1), wire_order=[3, 1]),
+        )
 
     def test_probe_wires_dont_overlap(self):
         """Test that the helper for generating probe arguments doesnt create
@@ -859,6 +883,55 @@ class TestHybridOperatorArgDecomposition:
             return self._gqsp_circuit(dev)()
 
         assert np.allclose(np.asarray(decomposed()), np.asarray(reference()))
+
+    @pytest.mark.parametrize("kind", ["x", "rx", "ising"])
+    @pytest.mark.parametrize("shift", [0, -1])
+    def test_gqsp_nested_unitary_operands(self, kind, shift):
+        """The controlled unitary in a GQSP loop uses the invocation's wires and parameters."""
+
+        def circuit(theta, angles):
+            qp.Hadamard(2)
+            if kind == "x":
+                unitary = qp.X(2)
+            elif kind == "rx":
+                unitary = qp.RX(theta, 2)
+            else:
+                unitary = qp.IsingXX(theta, wires=[2, 1])
+            qp.GQSP(unitary, angles, control=0, shift=shift)
+            return qp.probs(wires=[0, 1, 2])
+
+        reference = qp.QNode(circuit, qp.device("default.qubit", wires=3))
+        quantum_function = qp.QNode(circuit, qp.device("lightning.qubit", wires=3))
+        compiled = qjit(
+            qp.decompose(
+                gate_set={"RX", "RY", "RZ", "PauliX", "PauliZ", "Hadamard", "CNOT", "GlobalPhase"}
+            )(quantum_function),
+            capture=True,
+        )
+        angles = np.array([[0.1, -0.2, 0.4], [0.3, 0.5, -0.1], [-0.7, 0.2, 0.6]])
+        for theta in (0.17, -0.62):
+            np.testing.assert_allclose(compiled(theta, angles), reference(theta, angles), atol=1e-7)
+
+    def test_partial_unary_state_preparation_binary(self):
+        """Concrete static indices with runtime coefficients need no unsupported scatter."""
+
+        @qp.qnode(qp.device("lightning.qubit", wires=4))
+        def circuit(coefficients):
+            qp.PartialUnaryStatePreparation(
+                coefficients, wires=[0, 1, 2], indices=(5, 0, 3), work_wires=[3]
+            )
+            return qp.probs(wires=[0, 1, 2])
+
+        compiled = qjit(
+            qp.decompose(
+                gate_set={"RX", "RY", "RZ", "PauliX", "PauliZ", "Hadamard", "CNOT", "GlobalPhase"}
+            )(circuit),
+            capture=True,
+        )
+        coefficients = np.sqrt([0.2, 0.3, 0.5])
+        expected = np.zeros(8)
+        expected[[5, 0, 3]] = coefficients**2
+        np.testing.assert_allclose(compiled(coefficients), expected, atol=1e-7)
 
 
 class TestOnDemand:

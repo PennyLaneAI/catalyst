@@ -25,7 +25,6 @@ import jax.numpy as jnp
 import numpy as np
 import pennylane as qp
 from jax._src.lib.mlir import ir
-from jax.tree_util import tree_flatten, tree_unflatten
 from pennylane.core.operator import Operator2, abstractify
 from pennylane.decomposition.utils import to_name
 from pennylane.wires import Wires
@@ -218,44 +217,64 @@ def ordered_kwarg_names(call_kwargs, dynamic_shape) -> list:
     return params + wires
 
 
+@dataclass
+class HybridArgSpec:
+    """Rebuild a hybrid pytree from parameter operands and its grouped wire slice."""
+
+    name: str
+    tree: object
+    leaves: tuple
+    operand_indices: tuple
+
+
+def _is_wire_leaf(value):
+    return isinstance(value, (Wires, qp.typing.AbstractWires))
+
+
 def flatten_hybrid_args(extra_data) -> tuple:
-    """Split hybrid arguments into numeric ones (passed as operands) and the rest (closed over).
+    """Describe hybrid arguments using the operator lowering's operand order.
 
-    A hybrid argument whose pytree is entirely numeric arrays (e.g. a ``CDFHamiltonian``) is
-    flattened so its leaves can be passed into the rule call as operands, keeping the concrete
-    values out of the rule body (where they would otherwise bake in as constants).
-
-    Args:
-        extra_data (dict): the operator's hybrid arguments, keyed by name
-
-    Returns:
-        list[tuple]: ``(name, treedef, num_leaves)`` per operand-passed hybrid argument
-        list: the flat leaf dummies (shape/dtype of the concrete leaves), to pass as operands
-        dict: the hybrid arguments to close over rather than pass as operands, keyed by name
+    Ordinary numeric leaves are parameters; numeric leaves inside operators are
+    forwarded after those parameters. Wire containers are reconstructed from the
+    grouped wire operand, never from the abstract rule descriptor.
     """
-    specs, leaf_dummies, closed_over = [], [], {}
+    specs, params, forwarded, closed_over = [], [], [], {}
+    numeric_types = (np.ndarray, np.generic, jnp.ndarray, qp.typing.AbstractArray)
     for name, value in extra_data.items():
-        leaves, treedef = tree_flatten(value)
-        # TODO: this "all leaves are numeric arrays" test is a second source of truth for which
-        # hybrid leaves become rule-function inputs, and it must agree with the operator lowering's
-        # own partition (`_process_params` in from_plxpr/qref_operator2_primitives.py), which uses a
-        # per-leaf `forward_mask` to split leaves into `param_map` vs `forward_args` (excluding
-        # qubits).
-        #
-        # Note right now the two agree for all-numeric args (numeric hamiltonians) and for args
-        # with a non-array leaf (an operator carrying Wires), but a mixed hybrid arg would diverge
-        # causing the lowered op's params to outnumber the rule's inputs.
-        # Drive this off `_process_params`/`forward_mask` instead, once the operator's mask is
-        # passed through to rule compilation.
-        if leaves and all(
-            isinstance(leaf, (np.ndarray, np.generic, jnp.ndarray, qp.typing.AbstractArray))
-            for leaf in leaves
-        ):
-            specs.append((name, treedef, len(leaves)))
-            leaf_dummies.extend(jnp.zeros(leaf.shape, dtype=leaf.dtype) for leaf in leaves)
+        leaves, tree = qp.pytrees.flatten(value, is_leaf=_is_wire_leaf)
+        # Match _process_params: all non-wire leaves inside an operator are forwarded.
+        nodes, _ = qp.pytrees.flatten(
+            value, is_leaf=lambda node: isinstance(node, Operator2) or _is_wire_leaf(node)
+        )
+        forward_mask = []
+        for node in nodes:
+            if isinstance(node, Operator2):
+                nested, _ = qp.pytrees.flatten(node, is_leaf=_is_wire_leaf)
+                forward_mask.extend([True] * len(nested))
+            else:
+                forward_mask.append(False)
+
+        sources = []
+        for leaf, is_forward in zip(leaves, forward_mask, strict=True):
+            if isinstance(leaf, numeric_types):
+                bucket = forwarded if is_forward else params
+                sources.append((is_forward, len(bucket)))
+                bucket.append(jnp.zeros(leaf.shape, dtype=leaf.dtype))
+            else:
+                sources.append(None)
+
+        if any(source is not None for source in sources) or any(map(_is_wire_leaf, leaves)):
+            specs.append(HybridArgSpec(name, tree, tuple(leaves), tuple(sources)))
         else:
             closed_over[name] = value
-    return specs, leaf_dummies, closed_over
+
+    # qref.operator passes all parameters before its forwarded arguments.
+    for spec in specs:
+        spec.operand_indices = tuple(
+            None if source is None else source[1] + (len(params) if source[0] else 0)
+            for source in spec.operand_indices
+        )
+    return specs, params + forwarded, closed_over
 
 
 def rule_call_operands(
@@ -315,7 +334,7 @@ def unpack_rule_operands(
 ):
     """Recover ``(params, kwargs, control wires)`` from :func:`rule_call_operands`' flattening.
 
-    Reconstructs each hybrid argument from its traced leaves (via its ``treedef``) so the rule body
+    Reconstructs each hybrid argument from its traced leaves and wires so the rule body
     receives the same object the user passed, but built from the traced operands.
 
     Args:
@@ -324,7 +343,7 @@ def unpack_rule_operands(
         kwarg_names (list[str]): parameter names first, followed by wire names
         wire_lens (dict[str, int]): wire names in declaration order and their lengths
         has_ctrl_wires (bool): whether a trailing control-wire operand is present
-        hybrid_specs (list[tuple]): ``(name, treedef, num_leaves)`` per hybrid argument, sitting
+        hybrid_specs (list[HybridArgSpec]): reconstruction plans for the hybrid operands
             between the parameter kwargs and the grouped wire operand
 
     Returns:
@@ -337,9 +356,11 @@ def unpack_rule_operands(
     n_kwarg_params = len(param_names)
     named = dict(zip(param_names, operands[n_params : n_params + n_kwarg_params], strict=True))
     idx = n_params + n_kwarg_params
-    for name, treedef, num_leaves in hybrid_specs:
-        named[name] = tree_unflatten(treedef, operands[idx : idx + num_leaves])
-        idx += num_leaves
+    num_hybrid_operands = sum(
+        index is not None for spec in hybrid_specs for index in spec.operand_indices
+    )
+    hybrid_operands = operands[idx : idx + num_hybrid_operands]
+    idx += num_hybrid_operands
 
     grouped_wires = operands[idx]
     idx += 1
@@ -347,6 +368,22 @@ def unpack_rule_operands(
     for name, length in wire_lens.items():
         named[name] = grouped_wires[offset : offset + length]
         offset += length
+
+    for spec in hybrid_specs:
+        wire_offset = 0
+        leaves = []
+        for leaf, operand_index in zip(spec.leaves, spec.operand_indices, strict=True):
+            if operand_index is not None:
+                leaves.append(hybrid_operands[operand_index])
+            elif _is_wire_leaf(leaf):
+                wire_slice = named[spec.name][wire_offset : wire_offset + len(leaf)]
+                leaves.append(Wires(wire_slice))
+                wire_offset += len(leaf)
+            else:
+                leaves.append(leaf)
+        # Rebuilding an operator is not an instruction to apply it to the circuit.
+        with qp.capture.pause():
+            named[spec.name] = qp.pytrees.unflatten(leaves, spec.tree)
 
     ctrl_wires = operands[idx] if has_ctrl_wires else None
     ctrl_values = operands[idx + 1] if has_ctrl_wires and len(operands) > idx + 1 else None
