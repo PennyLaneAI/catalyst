@@ -765,6 +765,14 @@ def _decomposition_definition_lowering(
 #
 # grad
 #
+
+
+def _diff_method_attribute(ctx, method: str):
+    return ir.OpaqueAttr.get(
+        "gradient", ("diff_method " + method).encode("utf-8"), ir.NoneType.get(ctx), ctx
+    )
+
+
 @dataclass
 class GradParams:
     """Common gradient parameters. The parameters are expected to be checked before the creation of
@@ -846,7 +854,7 @@ def _grad_lowering(ctx, *args, jaxpr, fn, grad_params):
 
     return GradOp(
         flat_output_types,
-        ir.StringAttr.get(method),
+        _diff_method_attribute(mlir_ctx, method),
         symbol_ref,
         mlir.flatten_ir_values(args_and_consts),
         diffArgIndices=diffArgIndices,
@@ -870,7 +878,7 @@ def _capture_grad_lowering(ctx, *args, argnums, jaxpr, n_consts, method, h, fn, 
 
     return GradOp(
         flat_output_types,
-        ir.StringAttr.get(method),
+        _diff_method_attribute(mlir_ctx, method),
         symbol_ref,
         mlir.flatten_ir_values(args),
         diffArgIndices=diffArgIndices,
@@ -947,7 +955,7 @@ def _value_and_grad_lowering(ctx, *args, jaxpr, fn, grad_params):
     return ValueAndGradOp(
         val_result_types,
         gradient_result_types,
-        ir.StringAttr.get(method),
+        _diff_method_attribute(mlir_ctx, method),
         symbol_ref,
         mlir.flatten_ir_values(func_args),
         diffArgIndices=ir.DenseIntElementsAttr.get(new_argnums),
@@ -975,7 +983,7 @@ def _capture_value_and_grad_lowering(ctx, *args, jaxpr, fn, h, method, argnums):
     return ValueAndGradOp(
         val_result_types,
         gradient_result_types,
-        ir.StringAttr.get(method),
+        _diff_method_attribute(mlir_ctx, method),
         symbol_ref,
         mlir.flatten_ir_values(args),
         diffArgIndices=ir.DenseIntElementsAttr.get(new_argnums),
@@ -1028,7 +1036,7 @@ def _jvp_lowering(ctx, *args, jaxpr, fn, grad_params):
     return JVPOp(
         flat_output_types[: len(flat_output_types) // 2],
         flat_output_types[len(flat_output_types) // 2 :],
-        ir.StringAttr.get(method),
+        _diff_method_attribute(mlir_ctx, method),
         symbol_ref,
         mlir.flatten_ir_values(func_args),
         mlir.flatten_ir_values(tang_args),
@@ -1062,7 +1070,7 @@ def _capture_jvp_lowering(ctx, *args, jaxpr, fn, method, argnums, h):
     return JVPOp(
         func_result_types,
         jvp_result_types,
-        ir.StringAttr.get(method),
+        _diff_method_attribute(mlir_ctx, method),
         symbol_ref,
         mlir.flatten_ir_values(func_args),
         mlir.flatten_ir_values(d_args),
@@ -1112,7 +1120,7 @@ def _vjp_lowering(ctx, *args, jaxpr, fn, grad_params):
     return VJPOp(
         func_result_types,
         vjp_result_types,
-        ir.StringAttr.get(method),
+        _diff_method_attribute(mlir_ctx, method),
         symbol_ref,
         mlir.flatten_ir_values(func_args),
         mlir.flatten_ir_values(cotang_args),
@@ -1144,7 +1152,7 @@ def _capture_vjp_lowering(ctx, *args, jaxpr, fn, method, argnums, h):
     return VJPOp(
         func_result_types,
         vjp_result_types,
-        ir.StringAttr.get(method),
+        _diff_method_attribute(mlir_ctx, method),
         symbol_ref,
         mlir.flatten_ir_values(func_args),
         mlir.flatten_ir_values(cotang_args),
