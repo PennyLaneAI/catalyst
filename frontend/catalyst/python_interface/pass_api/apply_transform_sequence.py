@@ -141,11 +141,11 @@ class ApplyTransformSequenceBase(RewritePattern):
         self, pass_ops: Sequence[transform.ApplyRegisteredPassOp]
     ) -> Sequence[tuple[bool, tuple[transform.ApplyRegisteredPassOp, ...]]]:
         """Partition ``pass_ops`` into ``(is_xdsl, group)`` runs."""
-        raise NotImplementedError
+        raise NotImplementedError  # pragma: no cover
 
     def on_empty(self, payload: builtin.ModuleOp) -> None:
         """Called when the transform sequence has no registered passes."""
-        raise NotImplementedError
+        raise NotImplementedError  # pragma: no cover
 
     def apply_xdsl_pipeline(
         self,
@@ -153,7 +153,7 @@ class ApplyTransformSequenceBase(RewritePattern):
         group: Sequence[transform.ApplyRegisteredPassOp],
     ) -> builtin.ModuleOp:
         """Apply an xDSL pass group to ``payload``; return the (possibly same) module."""
-        raise NotImplementedError
+        raise NotImplementedError  # pragma: no cover
 
     def apply_mlir_pipeline(
         self,
@@ -164,7 +164,7 @@ class ApplyTransformSequenceBase(RewritePattern):
         insertion_point: InsertPoint,
     ) -> tuple[builtin.ModuleOp, InsertPoint]:
         """Apply an MLIR pass group; return updated ``(payload, insertion_point)``."""
-        raise NotImplementedError
+        raise NotImplementedError  # pragma: no cover
 
     @op_type_rewrite_pattern
     def match_and_rewrite(self, transformer: builtin.ModuleOp, rewriter: PatternRewriter):
