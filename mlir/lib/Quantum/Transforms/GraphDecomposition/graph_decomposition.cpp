@@ -437,11 +437,16 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         // add to module
         for (auto rule :
              llvm::make_early_inc_range(builtinModule.get().getOps<mlir::func::FuncOp>())) {
-            // avoid double-insertion
-            if (!symbolTable.lookup<mlir::func::FuncOp>(rule.getName())) {
-                rule->remove();
-                module.push_back(std::move(rule));
+            // Independently compiled rule libraries can reuse an enumerated name for a
+            // different target. Only skip the same rule; otherwise let the symbol table
+            // resolve the collision.
+            auto existing = symbolTable.lookup<mlir::func::FuncOp>(rule.getName());
+            if (existing && existing->getAttr("target_gate") == rule->getAttr("target_gate") &&
+                existing->getAttr("frontend_name") == rule->getAttr("frontend_name")) {
+                continue;
             }
+            rule->remove();
+            symbolTable.insert(rule);
         }
         return success();
     }
@@ -522,6 +527,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
     mlir::LogicalResult loadPythonDecomps() {
         mlir::ModuleOp module = getOperation();
         MLIRContext *context = &getContext();
+        SymbolTable symbolTable(module);
 
         llvm::StringSet<> handledOpIds;
         // Add IDs from existing decomposable ops with decomposition rules
@@ -591,7 +597,9 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
                 outOp = mlir::OwningOpRef<mlir::func::FuncOp>(func);
                 LDBG() << "materializing rule " << outOp.get().getName();
                 newlyHandled.push_back(targetGate.getValue());
-                module.push_back(std::move(outOp.release()));
+                // The embedded Python interpreter and the frontend may have independent
+                // rule-name counters. Resolve collisions with already embedded rules.
+                symbolTable.insert(outOp.release());
                 return mlir::WalkResult::advance();
             });
             for (llvm::StringRef target : newlyHandled) {

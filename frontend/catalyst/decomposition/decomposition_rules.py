@@ -49,6 +49,11 @@ _NON_INVERTIBLE_MARKERS = (
 
 _NON_INVERTIBLE_RESOURCE_TYPES = (qp.ops.MidMeasure, qp.ops.PauliMeasure)
 
+# A counter to rename rule names to unique symbols
+# Must not use GOID in rule name directly: large compilable args can lead to long function names,
+# which can be rejected by some OS
+_rule_name_counter = itertools.count()
+
 
 @dataclass
 class DecompRuleSpec:
@@ -657,8 +662,7 @@ def build_decomp_target_spec(
             _kwargs |= static_data | closed_hybrid
             modifiers.wrap_callable(rule._impl, _ctrl_wires, _ctrl_values)(*_args, **_kwargs)
 
-        # keep the frontend name for readability, append target op_id for symbol uniqueness
-        decomp_rule.__name__ = rule.name + "_" + target_id
+        decomp_rule.__name__ = f"{rule.name}_{next(_rule_name_counter)}"
 
         return decomp_rule
 
@@ -718,7 +722,7 @@ def materialize_decomp_target_spec(target_spec: DecompTargetSpec) -> ir.Operatio
         target_spec.wire_lens,
         target_spec.ctrl_wires,
         target_spec.ctrl_values,
-        {rule.frontend_name: rule.resources for rule in target_spec.rules},
+        {rule.pyfun.__name__: rule for rule in target_spec.rules},
         target_spec.target_id,
         target_spec.hybrid_leaves,
     )
@@ -758,7 +762,7 @@ def build_rule_module(
     wire_lens,
     ctrl_wires,
     ctrl_values,
-    name_to_resource_ids,
+    name_to_rule_specs,
     target_id,
     hybrid_leaves=(),
 ) -> ir.Operation:
@@ -774,7 +778,7 @@ def build_rule_module(
         ctrl_wires: the control wires to append, or None when the rules are not controlled
         ctrl_values: the control wires to append, or None when the rules are not controlled
         hybrid_leaves (list): flattened hybrid-argument leaves passed to :func:`rule_call_operands`
-        name_to_resource_ids (dict): rule name to the graphOpId of each resource
+        name_to_rule_specs (dict): generated function name to its rule specification
         target_id (str): the graphOpId of the gate the rules decompose
 
     Returns:
@@ -811,14 +815,14 @@ def build_rule_module(
             - Sets the visibility to public (so the inliner does not remove them)
         """
         if op.name == "func.func":
-            rule_name = ir.StringAttr(op.attributes["sym_name"]).value.removesuffix("_" + target_id)
-            if rule_name in name_to_resource_ids:
+            func_name = ir.StringAttr(op.attributes["sym_name"]).value
+            if rule := name_to_rule_specs.get(func_name):
                 op.attributes["resources"] = get_mlir_attribute_from_pyval(
-                    {"operations": name_to_resource_ids[rule_name]}
+                    {"operations": rule.resources}
                 )
                 op.attributes["target_gate"] = ir.StringAttr.get(target_id)
                 op.attributes["sym_visibility"] = ir.StringAttr.get("public")
-                op.attributes["frontend_name"] = ir.StringAttr.get(rule_name)
+                op.attributes["frontend_name"] = ir.StringAttr.get(rule.frontend_name)
 
         return ir.WalkResult.ADVANCE
 
@@ -856,10 +860,8 @@ def build_rule_module(
     inlined_module = ir.Operation.parse(inlined, context=module.context)
 
     def re_privatize_rules(op):
-        if op.name == "func.func":
-            rule_name = ir.StringAttr(op.attributes["sym_name"]).value.removesuffix("_" + target_id)
-            if rule_name in name_to_resource_ids:
-                op.attributes["sym_visibility"] = ir.StringAttr.get("private")
+        if op.name == "func.func" and "target_gate" in op.attributes:
+            op.attributes["sym_visibility"] = ir.StringAttr.get("private")
         return ir.WalkResult.ADVANCE
 
     with inlined_module.context, ir.Location.unknown():
@@ -1062,7 +1064,7 @@ def build_registered_decomp_target_spec(
             else:
                 rule._impl(**symbolic_arguments(base, kind, _ctrl_wires, _ctrl_values))
 
-        decomp_rule.__name__ = rule.name + "_" + target_id
+        decomp_rule.__name__ = f"{rule.name}_{next(_rule_name_counter)}"
         return decomp_rule
 
     rule_specs = []

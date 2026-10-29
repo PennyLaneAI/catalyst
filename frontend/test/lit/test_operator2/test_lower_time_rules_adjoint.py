@@ -63,7 +63,7 @@ def test_plain_gate_captures_only_base():
         print(c.mlir)
 
     # CHECK: qref.operator "NoParams"()
-    # CHECK-DAG: func.func private @"__builtin_base_rule_NoParams{}{reg:2}{}"{{.*}}"SingleParam{{.*}}target_gate = "NoParams{}{reg:2}{}"
+    # CHECK-DAG: func.func private @__builtin_base_rule_{{[0-9]+}}{{.*}}"SingleParam{{.*}}target_gate = "NoParams{}{reg:2}{}"
 
 
 test_plain_gate_captures_only_base()
@@ -86,8 +86,8 @@ def test_adjoint_gate_captures_adjoint_rule():
     # Both alternatives for the requested adjoint target are retained: the directly registered
     # symbolic rule and the rule synthesized by distributing adjoint over the base rule.
     # CHECK: qref.operator "NoParams"() adj
-    # CHECK-DAG: func.func private @"__builtin_adj_rule_Adjoint(NoParams){}{reg:2}{}"{{.*}}"SingleParam{{.*}} = 2 : i64{{.*}}target_gate = "Adjoint(NoParams){}{reg:2}{}"
-    # CHECK-DAG: func.func private @"__builtin_base_rule_Adjoint(NoParams){}{reg:2}{}"{{.*}}"Adjoint(SingleParam{{.*}}target_gate = "Adjoint(NoParams){}{reg:2}{}"
+    # CHECK-DAG: func.func private @__builtin_adj_rule_{{[0-9]+}}{{.*}}"SingleParam{{.*}} = 2 : i64{{.*}}target_gate = "Adjoint(NoParams){}{reg:2}{}"
+    # CHECK-DAG: func.func private @__builtin_base_rule_{{[0-9]+}}{{.*}}"Adjoint(SingleParam{{.*}}target_gate = "Adjoint(NoParams){}{reg:2}{}"
 
 
 test_adjoint_gate_captures_adjoint_rule()

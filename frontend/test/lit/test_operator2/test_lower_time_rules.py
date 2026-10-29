@@ -71,7 +71,7 @@ def test_one_rule():
 
         # CHECK-LABEL: func.func public @one_gate()
         # CHECK: qref.operator "NoParams"
-        # CHECK: func.func private @"__builtin_rule_NoParams{}{reg:2}{}"
+        # CHECK: func.func private @__builtin_rule_{{[0-9]+}}
         # CHECK-SAME:   resources = {operations = {
         # CHECK-SAME:   "SingleParam{x:[tensor<2xf64>]}{reg:2}{}" = 1 : i64,
         # CHECK-SAME:   "SingleParam{x:[tensor<f64>]}{reg:2}{}" = 2 : i64
@@ -96,12 +96,12 @@ def test_one_rule():
         # CHECK-LABEL: func.func public @same_id()
         # CHECK: qref.operator "NoParams"
         # CHECK: qref.operator "NoParams"
-        # CHECK: func.func private @"__builtin_rule_NoParams{}{reg:2}{}"
+        # CHECK: func.func private @__builtin_rule_{{[0-9]+}}
         # CHECK-SAME:   resources = {operations = {
         # CHECK-SAME:   "SingleParam{x:[tensor<2xf64>]}{reg:2}{}" = 1 : i64,
         # CHECK-SAME:   "SingleParam{x:[tensor<f64>]}{reg:2}{}" = 2 : i64
         # CHECK-SAME:   target_gate = "NoParams{}{reg:2}{}"
-        # CHECK-NOT: func.func private @"__builtin_rule_NoParams{}{reg:2}{}"
+        # CHECK-NOT: func.func private @__builtin_rule_{{[0-9]+}}
         test_multiple_gates_same_id()
 
         def test_multiple_gates_different_ids():
@@ -122,12 +122,12 @@ def test_one_rule():
         # CHECK-LABEL: func.func public @different_id()
         # CHECK: qref.operator "NoParams"
         # CHECK: qref.operator "NoParams"
-        # CHECK: func.func private @"__builtin_rule_NoParams{}{reg:2}{}"
+        # CHECK: func.func private @__builtin_rule_{{[0-9]+}}
         # CHECK-SAME:   resources = {operations = {
         # CHECK-SAME:   "SingleParam{x:[tensor<2xf64>]}{reg:2}{}" = 1 : i64,
         # CHECK-SAME:   "SingleParam{x:[tensor<f64>]}{reg:2}{}" = 2 : i64
         # CHECK-SAME:   target_gate = "NoParams{}{reg:2}{}"
-        # CHECK: func.func private @"__builtin_rule_NoParams{}{reg:3}{}"
+        # CHECK: func.func private @__builtin_rule_{{[0-9]+}}
         # CHECK-SAME:   resources = {operations = {
         # CHECK-SAME:   "SingleParam{x:[tensor<2xf64>]}{reg:2}{}" = 1 : i64,
         # CHECK-SAME:   "SingleParam{x:[tensor<f64>]}{reg:2}{}" = 2 : i64
@@ -175,22 +175,22 @@ def test_multiple_rules_same_gate():
 # CHECK: qref.operator "NoParams"
 # CHECK: qref.operator "NoParams"
 # CHECK: qref.operator "NoParams"
-# CHECK: func.func private @"__builtin_rule1_NoParams{}{reg:2}{}"
+# CHECK: func.func private @__builtin_rule1_{{[0-9]+}}
 # CHECK-SAME:   resources = {operations = {
 # CHECK-SAME:   "SingleParam{x:[tensor<f64>]}{reg:2}{}" = 1 : i64
 # CHECK-SAME:   target_gate = "NoParams{}{reg:2}{}"
-# CHECK: func.func private @"__builtin_rule2_NoParams{}{reg:2}{}"
+# CHECK: func.func private @__builtin_rule2_{{[0-9]+}}
 # CHECK-SAME:   resources = {operations = {
 # CHECK-SAME:   "SingleParam{x:[tensor<2xf64>]}{reg:1}{}" = 1 : i64
 # CHECK-SAME:   target_gate = "NoParams{}{reg:2}{}"
 #
-# CHECK-NOT: func.func private @"__builtin_rule1_NoParams{}{reg:2}{}"
+# CHECK-NOT: func.func private @__builtin_rule1_{{[0-9]+}}
 #
-# CHECK: func.func private @"__builtin_rule1_NoParams{}{reg:3}{}"
+# CHECK: func.func private @__builtin_rule1_{{[0-9]+}}
 # CHECK-SAME:   resources = {operations = {
 # CHECK-SAME:   "SingleParam{x:[tensor<f64>]}{reg:2}{}" = 1 : i64
 # CHECK-SAME:   target_gate = "NoParams{}{reg:3}{}"
-# CHECK: func.func private @"__builtin_rule2_NoParams{}{reg:3}{}"
+# CHECK: func.func private @__builtin_rule2_{{[0-9]+}}
 # CHECK-SAME:   resources = {operations = {
 # CHECK-SAME:   "SingleParam{x:[tensor<2xf64>]}{reg:1}{}" = 1 : i64
 # CHECK-SAME:   target_gate = "NoParams{}{reg:3}{}"
@@ -228,11 +228,11 @@ def test_multiple_rules_chained():
 
 # CHECK-LABEL: func.func public @chained_rule()
 # CHECK: qref.operator "NoParams"
-# CHECK: func.func private @"__builtin_rule1_NoParams{}{reg:2}{}"
+# CHECK: func.func private @__builtin_rule1_{{[0-9]+}}
 # CHECK-SAME:   resources = {operations = {
 # CHECK-SAME:   "SingleParam{x:[tensor<f64>]}{reg:1}{}" = 1 : i64
 # CHECK-SAME:   target_gate = "NoParams{}{reg:2}{}"
-# CHECK: func.func private @"__builtin_rule2_SingleParam{x:[tensor<f64>]}{reg:1}{}"
+# CHECK: func.func private @__builtin_rule2_{{[0-9]+}}
 # CHECK-SAME:   resources = {operations = {
 # CHECK-SAME:   "CompilableData{}{wires:1}{a = \22a\22, b = \22b\22, thing = \22thing\22}" = 1 : i64
 # CHECK-SAME:   target_gate = "SingleParam{x:[tensor<f64>]}{reg:1}{}"
@@ -281,15 +281,15 @@ def test_multiple_rules_chained_and_branch():
 
 # CHECK-LABEL: func.func public @chained_branched()
 # CHECK: qref.operator "NoParams"
-# CHECK: func.func private @"__builtin_ruleAB_NoParams{}{reg:2}{}"
+# CHECK: func.func private @__builtin_ruleAB_{{[0-9]+}}
 # CHECK-SAME:   resources = {operations = {
 # CHECK-SAME:   "SingleParam{x:[tensor<f64>]}{reg:1}{}" = 1 : i64
 # CHECK-SAME:   target_gate = "NoParams{}{reg:2}{}"
-# CHECK: func.func private @"__builtin_ruleBC_SingleParam{x:[tensor<f64>]}{reg:1}{}"
+# CHECK: func.func private @__builtin_ruleBC_{{[0-9]+}}
 # CHECK-SAME:   resources = {operations = {
 # CHECK-SAME:   "CompilableData{}{wires:1}{a = \22a\22, b = \22b\22, thing = \22thing\22}" = 1 : i64
 # CHECK-SAME:   target_gate = "SingleParam{x:[tensor<f64>]}{reg:1}{}"
-# CHECK: func.func private @"__builtin_ruleBD_SingleParam{x:[tensor<f64>]}{reg:1}{}"
+# CHECK: func.func private @__builtin_ruleBD_{{[0-9]+}}
 # CHECK-SAME:   resources = {operations = {
 # CHECK-SAME:   "CompilableData{}{wires:1}{a = \22alpha\22, b = \22beta\22, thing = \22stuff\22}" = 1 : i64
 # CHECK-SAME:   target_gate = "SingleParam{x:[tensor<f64>]}{reg:1}{}"
@@ -338,19 +338,19 @@ def test_with_cycles():
 
 # CHECK-LABEL: func.func public @cycle()
 # CHECK: qref.operator "NoParams"
-# CHECK: func.func private @"__builtin_ruleAB_NoParams{}{reg:2}{}"
+# CHECK: func.func private @__builtin_ruleAB_{{[0-9]+}}
 # CHECK-SAME:   resources = {operations = {
 # CHECK-SAME:   "SingleParam{x:[tensor<f64>]}{reg:1}{}" = 1 : i64
 # CHECK-SAME:   target_gate = "NoParams{}{reg:2}{}"
-# CHECK: func.func private @"__builtin_ruleAB_NoParams{}{reg:3}{}"
+# CHECK: func.func private @__builtin_ruleAB_{{[0-9]+}}
 # CHECK-SAME:   resources = {operations = {
 # CHECK-SAME:   "SingleParam{x:[tensor<f64>]}{reg:1}{}" = 1 : i64
 # CHECK-SAME:   target_gate = "NoParams{}{reg:3}{}"
-# CHECK: func.func private @"__builtin_ruleBC_SingleParam{x:[tensor<f64>]}{reg:1}{}"
+# CHECK: func.func private @__builtin_ruleBC_{{[0-9]+}}
 # CHECK-SAME:   resources = {operations = {
 # CHECK-SAME:   "CompilableData{}{wires:1}{a = \22a\22, b = \22b\22, thing = \22thing\22}" = 1 : i64
 # CHECK-SAME:   target_gate = "SingleParam{x:[tensor<f64>]}{reg:1}{}"
-# CHECK: func.func private @"__builtin_ruleCA_CompilableData{}{wires:1}{a = \22a\22, b = \22b\22, thing = \22thing\22}"
+# CHECK: func.func private @__builtin_ruleCA_{{[0-9]+}}
 # CHECK-SAME:   resources = {operations = {
 # CHECK-SAME:   "NoParams{}{reg:2}{}" = 1 : i64
 # CHECK-SAME:   target_gate = "CompilableData{}{wires:1}{a = \22a\22, b = \22b\22, thing = \22thing\22}"
@@ -419,7 +419,7 @@ def test_to_multiple_full_args_op():
 
 # CHECK-LABEL: func.func public @to_full_args()
 # CHECK: qref.operator "NoParams"
-# CHECK: func.func private @"__builtin_rule_NoParams{}{reg:3}{}"
+# CHECK: func.func private @__builtin_rule_{{[0-9]+}}
 # CHECK-SAME:   resources = {operations = {
 # CHECK-SAME:   "MultipleFullArgs{angles1:[tensor<f64>],angles2:[tensor<2xf64>]}{hwires1:2,hwires2:1,op1:1,op2:1,reg1:1,reg2:2}{}[[[uid:[0-9]+]]]" = 2 : i64
 # CHECK-SAME:   target_gate = "NoParams{}{reg:3}{}"
@@ -477,7 +477,7 @@ def test_from_multiple_full_args_op():
 # CHECK:   param_map = {angles1 = [0], angles2 = [1]}
 # CHECK-SAME:  qubit_map = {hwires1 = [4, 5], hwires2 = [6], op1 = [2], op2 = [3], reg1 = [0], reg2 = [1]}
 #
-# CHECK: func.func private @"__builtin_rule_MultipleFullArgs{angles1:[tensor<f64>],angles2:[tensor<f64>]}{hwires1:2,hwires2:1,op1:1,op2:1,reg1:1,reg2:1}{}[[[uid]]]"
+# CHECK: func.func private @__builtin_rule_{{[0-9]+}}
 # CHECK-SAME:   resources = {operations = {
 # CHECK-SAME:   "NoParams{}{reg:1}{}" = 2 : i64
 # CHECK-SAME:   target_gate = "MultipleFullArgs{angles1:[tensor<f64>],angles2:[tensor<f64>]}{hwires1:2,hwires2:1,op1:1,op2:1,reg1:1,reg2:1}{}[[[uid]]]"
@@ -510,7 +510,7 @@ def test_to_custom_op():
 
 # CHECK-LABEL: func.func public @to_custom()
 # CHECK: qref.operator "NoParams"
-# CHECK: func.func private @"__builtin_rule_NoParams{}{reg:3}{}"
+# CHECK: func.func private @__builtin_rule_{{[0-9]+}}
 # CHECK-SAME:   resources = {operations = {
 # CHECK-SAME:   "SingleParamCustomOp{0:[f64]}{wires:1}{}" = 1 : i64
 # CHECK-SAME:   target_gate = "NoParams{}{reg:3}{}"
@@ -544,7 +544,7 @@ def test_from_custom_op():
 
 # CHECK-LABEL: func.func public @from_custom()
 # CHECK: qref.custom "SingleParamCustomOp"
-# CHECK: func.func private @"__builtin_rule_SingleParamCustomOp{0:[f64]}{wires:2}{}"
+# CHECK: func.func private @__builtin_rule_{{[0-9]+}}
 # CHECK-SAME:   resources = {operations = {
 # CHECK-SAME:   "NoParams{}{reg:1}{}" = 1 : i64
 # CHECK-SAME:   target_gate = "SingleParamCustomOp{0:[f64]}{wires:2}{}"
@@ -564,7 +564,7 @@ def test_phaseshift_to_rz():
 
 
 # CHECK-LABEL: test_phaseshift
-# CHECK: func.func private @"__builtin__phaseshift_to_rz_gp
+# CHECK: func.func private @__builtin__phaseshift_to_rz_gp_{{[0-9]+}}
 # CHECK-SAME: resources = {operations = {
 # CHECK-SAME: GlobalPhase{phi:[f64]}{}{}
 # CHECK-SAME: RZ{0:[f64]}{wires:1}{}
@@ -594,7 +594,7 @@ def test_basis_rotation_decomposition():
         print(test_basis_rotation_complex_valued.mlir)
 
     # CHECK-LABEL: test_basis_rotation_complex_valued
-    # CHECK: func.func private @"__builtin__complex_basis_rotation_decomp_BasisRotation{unitary_matrix:[tensor<2x2xcomplex<f64>>]}{wires:2}{check = false}"
+    # CHECK: func.func private @__builtin__complex_basis_rotation_decomp_{{[0-9]+}}
     # CHECK-SAME: resources = {operations = {
     # CHECK-SAME: "PhaseShift{0:[f64]}{wires:1}{}" = 3 : i64
     # CHECK-SAME: "SingleExcitation{0:[f64]}{wires:2}{}" = 1 : i64
@@ -617,7 +617,7 @@ def test_basis_rotation_decomposition():
         print(test_basis_rotation_real_valued.mlir)
 
     # CHECK-LABEL: test_basis_rotation_real_valued
-    # CHECK: func.func private @"__builtin__real_basis_rotation_decomp_BasisRotation{unitary_matrix:[tensor<2x2xf64>]}{wires:2}{check = false}"
+    # CHECK: func.func private @__builtin__real_basis_rotation_decomp_{{[0-9]+}}
     # CHECK-SAME: resources = {operations = {
     # CHECK-SAME: "PhaseShift{0:[f64]}{wires:1}{}" = 1 : i64
     # CHECK-SAME: "SingleExcitation{0:[f64]}{wires:2}{}" = 1 : i64
@@ -654,13 +654,13 @@ def test_basis_rotation_decomposition():
         # A real orthogonal matrix with determinant -1, so the determinant-fixing PhaseShift runs.
         print(_compile_parent(jnp.array([[0.76484219, 0.64421769], [0.64421769, -0.76484219]])))
 
-    # CHECK: func.func private @"__builtin_rule_TestQubitUnitary{matrix:[tensor<2x2xf64>]}{wires:2}{}"
+    # CHECK: func.func private @__builtin_rule_{{[0-9]+}}
     # CHECK-SAME: resources = {operations = {
     # CHECK-SAME: "BasisRotation{unitary_matrix:[tensor<2x2xf64>]}{wires:2}{check = false}" = 1 : i64
     # CHECK-SAME: target_gate = "TestQubitUnitary{matrix:[tensor<2x2xf64>]}{wires:2}{}"
     # CHECK: qref.operator "BasisRotation"(
     # CHECK-SAME: tensor<2x2xf64>
-    # CHECK: func.func private @"__builtin__real_basis_rotation_decomp_BasisRotation{unitary_matrix:[tensor<2x2xf64>]}{wires:2}{check = false}"
+    # CHECK: func.func private @__builtin__real_basis_rotation_decomp_{{[0-9]+}}
     # CHECK-SAME: "PhaseShift{0:[f64]}{wires:1}{}" = 1 : i64
     # CHECK-SAME: "SingleExcitation{0:[f64]}{wires:2}{}" = 1 : i64
     # CHECK-SAME: target_gate = "BasisRotation{unitary_matrix:[tensor<2x2xf64>]}{wires:2}{check = false}"
@@ -680,11 +680,11 @@ def test_basis_rotation_decomposition():
             )
         )
 
-    # CHECK: func.func private @"__builtin_rule_TestQubitUnitary{matrix:[tensor<2x2xcomplex<f64>>]}{wires:2}{}"
+    # CHECK: func.func private @__builtin_rule_{{[0-9]+}}
     # CHECK-SAME: resources = {operations = {
     # CHECK-SAME: "BasisRotation{unitary_matrix:[tensor<2x2xcomplex<f64>>]}{wires:2}{check = false}" = 1 : i64
     #
-    # CHECK: func.func private @"__builtin__complex_basis_rotation_decomp_BasisRotation{unitary_matrix:[tensor<2x2xcomplex<f64>>]}{wires:2}{check = false}"
+    # CHECK: func.func private @__builtin__complex_basis_rotation_decomp_{{[0-9]+}}
     # CHECK-SAME: "PhaseShift{0:[f64]}{wires:1}{}" = 3 : i64
     # CHECK-SAME: "SingleExcitation{0:[f64]}{wires:2}{}" = 1 : i64
     test_complex_op_that_decomposes_to_basis_rotation()
@@ -725,13 +725,13 @@ def test_ctrl_rule_is_traversed():
 # CHECK-LABEL: func.func public @ctrl_is_traversed()
 # CHECK: qref.operator "NoParams"
 #
-# CHECK: func.func private @"__builtin_ctrl_rule_C(NoParams){}{reg:1}{}"
+# CHECK: func.func private @__builtin_ctrl_rule_{{[0-9]+}}
 # CHECK-SAME:   resources = {operations = {
 # CHECK-SAME:   "CompilableData{}{wires:1}{a = \22a\22, b = \22b\22, thing = \22thing\22}" = 1 : i64
 # CHECK-SAME:   target_gate = "C(NoParams){}{reg:1}{}"
 # CHECK: qref.operator "CompilableData"
 #
-# CHECK: func.func private @"__builtin_rule_CompilableData{}{wires:1}{a = \22a\22, b = \22b\22, thing = \22thing\22}"
+# CHECK: func.func private @__builtin_rule_{{[0-9]+}}
 # CHECK-SAME:   resources = {operations = {
 # CHECK-SAME:   "SingleParam{x:[tensor<f64>]}{reg:1}{}" = 1 : i64
 # CHECK-SAME:   target_gate = "CompilableData{}{wires:1}{a = \22a\22, b = \22b\22, thing = \22thing\22}"
@@ -762,6 +762,6 @@ def test_rule_uniqueness():
         print(circuit.mlir)
 
 
-# CHECK-LABEL: func.func private @"__builtin_one_rule
-# CHECK-LABEL: func.func private @"__builtin_two_rule
+# CHECK-LABEL: func.func private @__builtin_one_rule_{{[0-9]+}}
+# CHECK-LABEL: func.func private @__builtin_two_rule_{{[0-9]+}}
 test_rule_uniqueness()
