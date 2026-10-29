@@ -163,7 +163,7 @@ def test_gridsynth_specs(ppr_basis):
 @pytest.mark.parametrize("ppr_basis", [False, True])
 # Within the epsilon ranges that the resource hints are fitted on.
 @pytest.mark.parametrize("eps", [1e-4, 1e-6])
-def test_gridsynth_specs_matches_runtime(eps, ppr_basis, method):
+def test_gridsynth_analyze_matches_runtime(eps, ppr_basis, method):
     """Test that the specs T-count estimate matches the T-count executed at runtime, on average
     over random angles."""
     angles = np.random.default_rng(42).uniform(0, 4 * np.pi, 50)
@@ -172,7 +172,7 @@ def test_gridsynth_specs_matches_runtime(eps, ppr_basis, method):
     distance_to_pi_4 = np.abs(np.remainder(angles + np.pi / 8, np.pi / 4) - np.pi / 8)
     angles = angles[distance_to_pi_4 > 2 * eps]
 
-    @qp.qjit(capture=True, skip_preprocess=True)
+    @qp.qjit(capture=True, skip_preprocess=True, seed=37)
     @gridsynth(epsilon=eps, ppr_basis=ppr_basis, method=method)
     @qp.qnode(qp.device("null.qubit", wires=1))
     def circuit(angles):
@@ -181,7 +181,7 @@ def test_gridsynth_specs_matches_runtime(eps, ppr_basis, method):
         return qp.expval(qp.Z(0))
 
     estimated = qp.analyze(circuit, level=1)(angles).resources
-    executed = qp.track(circuit)(angles)[1].resources
+    executed = qp.track(circuit, level="device")(angles)[1].resources
 
     estimated_t = estimated.quantum_operations["PPR-pi/8-w1" if ppr_basis else "T"]
     # The device reports the PPR exp(-i pi/8 P) as PauliRot(pi/4).
@@ -218,10 +218,6 @@ def test_gridsynth_ppr_basis_no_cliffords(method):
 
 
 @pytest.mark.parametrize("ppr_basis", [False, True])
-@pytest.mark.xfail(
-    reason="graph decomposition does not yet work gridsynth",
-    strict=True,
-)
 def test_mixed_fallback_gridsynth_specs_wires(ppr_basis):
     """Test the known limitation that specs counts every ancilla allocation of the mixed fallback
     method as a wire, although each ancilla is released before the next one is allocated."""
@@ -271,7 +267,7 @@ def test_mixed_gridsynth_samples(param, op, eps, ppr_basis):
 @pytest.mark.parametrize("eps", [1e-2, 1e-4])
 @pytest.mark.parametrize("ppr_basis", [False, True])
 @pytest.mark.xfail(
-    reason="graph decomposition does not yet work gridsynth",
+    reason="mixed-fallback introduces quantum.measure",
     strict=True,
 )
 def test_mixed_fallback_gridsynth_samples(op, eps, ppr_basis):
@@ -285,7 +281,7 @@ def test_mixed_fallback_gridsynth_samples(op, eps, ppr_basis):
         return qp.state()
 
     fallback_circuit = gridsynth(circuit, epsilon=eps, ppr_basis=ppr_basis, method="mixed-fallback")
-    qjitted_circuit = qp.qjit(fallback_circuit, capture=True, collect_decomp_rules=False)
+    qjitted_circuit = qp.qjit(fallback_circuit, capture=True)
 
     infidelities = []
     for param in [-2.2, 0.3, 1.1, 4.4]:
@@ -304,10 +300,17 @@ def test_mixed_fallback_gridsynth_samples(op, eps, ppr_basis):
     assert np.mean(infidelities <= eps) >= 0.85
 
 
-@pytest.mark.parametrize("method", ["mixed", "mixed-fallback"])
-@pytest.mark.xfail(
-    reason="graph decomposition does not yet work gridsynth",
-    strict=True,
+@pytest.mark.parametrize(
+    "method",
+    [
+        "mixed",
+        pytest.param(
+            "mixed-fallback",
+            marks=pytest.mark.xfail(
+                reason="mixed-fallback introduces quantum.measure", strict=True
+            ),
+        ),
+    ],
 )
 def test_mixed_gridsynth_seed(method):
     """Test that the runtime samples are reproducible with a qjit seed and differ across seeds."""
@@ -321,20 +324,24 @@ def test_mixed_gridsynth_seed(method):
         return qp.state()
 
     mixed_circuit = gridsynth(circuit, epsilon=1e-2, method=method)
-    results = [
-        qp.qjit(mixed_circuit, capture=True, collect_decomp_rules=False, seed=seed)(1.1)
-        for seed in (37, 37, 38)
-    ]
+    results = [qp.qjit(mixed_circuit, capture=True, seed=seed)(1.1) for seed in (37, 37, 38)]
     assert np.allclose(results[0], results[1])
     assert not np.allclose(results[0], results[2])
 
 
-@pytest.mark.parametrize("method", ["mixed", "mixed-fallback"])
-@pytest.mark.parametrize("mcm_method", ["single-branch-statistics", "one-shot"])
-@pytest.mark.xfail(
-    reason="graph decomposition does not yet work gridsynth",
-    strict=True,
+@pytest.mark.parametrize(
+    "method",
+    [
+        "mixed",
+        pytest.param(
+            "mixed-fallback",
+            marks=pytest.mark.xfail(
+                reason="mixed-fallback introduces quantum.measure", strict=True
+            ),
+        ),
+    ],
 )
+@pytest.mark.parametrize("mcm_method", ["single-branch-statistics", "one-shot"])
 def test_mixed_gridsynth_samples_per_shot(method, mcm_method):
     """Test that the shots of a call share one sample with single-branch statistics, and that
     every shot draws its own with one-shot. With a coarse epsilon, samples differ visibly, so the
@@ -349,9 +356,7 @@ def test_mixed_gridsynth_samples_per_shot(method, mcm_method):
         qp.RZ(x, wires=0)
         return qp.expval(qp.X(0))
 
-    qjitted_circuit = qp.qjit(
-        gridsynth(circuit, epsilon=0.05, method=method), capture=True, collect_decomp_rules=False
-    )
+    qjitted_circuit = qp.qjit(gridsynth(circuit, epsilon=0.05, method=method), capture=True)
     spread = np.std([qjitted_circuit(x) for _ in range(20)])
     shot_noise = np.sqrt((1 - np.cos(x) ** 2) / shots)
 
@@ -379,7 +384,7 @@ def test_gridsynth_high_precision(eps):
         return qp.state()
 
     gridsynthed_circuit = qp.transforms.gridsynth(circuit, epsilon=eps)
-    qjitted_circuit = qp.qjit(gridsynthed_circuit, capture=True, collect_decomp_rules=False)
+    qjitted_circuit = qp.qjit(gridsynthed_circuit, capture=True)
 
     for param in [-4.4, -0.3, 0.1, 2.2]:
         # Simulating the ~150 gates at eps=1e-15 in double precision adds an error of about 1e-14.
@@ -388,12 +393,19 @@ def test_gridsynth_high_precision(eps):
         )
 
 
-@pytest.mark.parametrize("method", ["mixed", "mixed-fallback"])
-@pytest.mark.parametrize("eps", [1e-10, 1e-15])
-@pytest.mark.xfail(
-    reason="graph decomposition does not yet work gridsynth",
-    strict=True,
+@pytest.mark.parametrize(
+    "method",
+    [
+        "mixed",
+        pytest.param(
+            "mixed-fallback",
+            marks=pytest.mark.xfail(
+                reason="mixed-fallback introduces quantum.measure", strict=True
+            ),
+        ),
+    ],
 )
+@pytest.mark.parametrize("eps", [1e-10, 1e-15])
 def test_mixed_gridsynth_high_precision(eps, method):
     """Test that the mixed methods reach the precisions of the deterministic method."""
     dev = qp.device("lightning.qubit", wires=1)
@@ -405,7 +417,7 @@ def test_mixed_gridsynth_high_precision(eps, method):
         return qp.state()
 
     mixed_circuit = gridsynth(circuit, epsilon=eps, method=method)
-    qjitted_circuit = qp.qjit(mixed_circuit, capture=True, collect_decomp_rules=False, seed=37)
+    qjitted_circuit = qp.qjit(mixed_circuit, capture=True, seed=37)
 
     infidelities = []
     for param in [-4.4, -0.3, 0.1, 2.2]:
@@ -425,10 +437,18 @@ def test_mixed_gridsynth_high_precision(eps, method):
         assert np.mean(accurate) >= 0.75
 
 
-@pytest.mark.parametrize("method", ["deterministic", "mixed", "mixed-fallback"])
-@pytest.mark.xfail(
-    reason="graph decomposition does not yet work gridsynth",
-    strict=True,
+@pytest.mark.parametrize(
+    "method",
+    [
+        "deterministic",
+        "mixed",
+        pytest.param(
+            "mixed-fallback",
+            marks=pytest.mark.xfail(
+                reason="mixed-fallback introduces quantum.measure", strict=True
+            ),
+        ),
+    ],
 )
 def test_error_for_unsupported_epsilon(method):
     """Test that an epsilon below the supported precision raises an error at runtime."""
@@ -439,8 +459,6 @@ def test_error_for_unsupported_epsilon(method):
         qp.RZ(x, wires=0)
         return qp.state()
 
-    qjitted_circuit = qp.qjit(
-        gridsynth(circuit, epsilon=1e-16, method=method), capture=True, collect_decomp_rules=False
-    )
+    qjitted_circuit = qp.qjit(gridsynth(circuit, epsilon=1e-16, method=method), capture=True)
     with pytest.raises(RuntimeError, match="the smallest supported epsilon is 1e-15"):
         qjitted_circuit(0.5)
