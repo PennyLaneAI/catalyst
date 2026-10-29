@@ -473,7 +473,7 @@ static LogicalResult distributeControls(PatternRewriter &rewriter, Block &block,
                                         SmallVector<Value> &currentCtrlQubits,
                                         ValueRange ctrlValues) {
     for (Operation &op : block.without_terminator()) {
-        if (isa<MeasurementProcess, MeasureOp>(op)) {
+        if (isa<MeasurementProcess, MeasureOp, MeasurementOp>(op)) {
             op.emitError("cannot control a measurement inside a quantum.ctrl region");
             return failure();
         }

@@ -26,6 +26,7 @@
 #include "MBQC/IR/MBQCOps.h"
 #include "PBC/IR/PBCOps.h"
 #include "QRef/IR/QRefDialect.h"
+#include "Quantum/IR/MeasurementOpUtils.h"
 #include "Quantum/IR/QuantumInterfaces.h"
 
 using namespace mlir;
@@ -278,9 +279,16 @@ LogicalResult QubitUnitaryOp::verify() {
     return success();
 }
 
+LogicalResult MeasurementOp::verify() {
+    return catalyst::detail::verifyMeasurementInputs(getOperation(), getParams(), getQubits(),
+                                                     getQreg(), getArrQubitIndices(), getMres());
+}
+
 LogicalResult AdjointOp::verify() {
-    auto res = this->getRegion().walk(
-        [](catalyst::quantum::MeasurementProcess op) { return WalkResult::interrupt(); });
+    auto res = this->getRegion().walk([](Operation *op) {
+        return isa<quantum::MeasurementProcess, MeasurementOp>(op) ? WalkResult::interrupt()
+                                                                   : WalkResult::advance();
+    });
 
     if (res.wasInterrupted()) {
         return emitOpError("quantum measurements are not allowed in the adjoint regions");
@@ -296,7 +304,7 @@ LogicalResult AdjointOp::verify() {
 
 LogicalResult CtrlOp::verify() {
     auto res = this->getRegion().walk([](Operation *op) {
-        return isa<quantum::MeasurementProcess, MeasureOp, pbc::RefPPMeasurementOp,
+        return isa<quantum::MeasurementProcess, MeasureOp, MeasurementOp, pbc::RefPPMeasurementOp,
                    mbqc::RefMeasureInBasisOp>(op)
                    ? WalkResult::interrupt()
                    : WalkResult::advance();
@@ -340,6 +348,19 @@ LogicalResult HermitianOp::verify() {
 //===----------------------------------------------------------------------===//
 // Quantum op builders.
 //===----------------------------------------------------------------------===//
+
+void MeasurementOp::build(OpBuilder &builder, OperationState &state, TypeRange mres,
+                          llvm::StringRef op_name, ValueRange params, ValueRange qubits,
+                          DictionaryAttr static_data) {
+    build(builder, state, mres, op_name, params, qubits, Value(), ValueRange(), static_data);
+}
+
+void MeasurementOp::build(OpBuilder &builder, OperationState &state, TypeRange mres,
+                          llvm::StringRef op_name, ValueRange params, Value qreg,
+                          ValueRange arr_qubit_indices, DictionaryAttr static_data) {
+    build(builder, state, mres, op_name, params, ValueRange(), qreg, arr_qubit_indices,
+          static_data);
+}
 
 void OperatorOp::build(OpBuilder &odsBuilder, OperationState &odsState, llvm::StringRef op_name,
                        ValueRange params, ValueRange qubits, ValueRange ctrl_qubits,
@@ -394,6 +415,16 @@ void OperatorOp::build(OpBuilder &odsBuilder, OperationState &odsState, llvm::St
 //===----------------------------------------------------------------------===//
 // Quantum op printers/parsers.
 //===----------------------------------------------------------------------===//
+
+void MeasurementOp::print(OpAsmPrinter &p) {
+    catalyst::detail::printMeasurement(p, getOperation(), getOpNameAttr(), getParams(), getQubits(),
+                                       getQreg(), getArrQubitIndices(), getStaticDataAttr(),
+                                       /*valueSemantics=*/false);
+}
+
+ParseResult MeasurementOp::parse(OpAsmParser &parser, OperationState &result) {
+    return catalyst::detail::parseMeasurement(parser, result, /*valueSemantics=*/false);
+}
 
 static void printDenseI64ArrayAsList(OpAsmPrinter &p, DenseI64ArrayAttr attr) {
     p << "[";
@@ -946,6 +977,11 @@ llvm::StringRef GlobalPhaseOp::getResourceName() { return "GlobalPhase"; }
 llvm::StringRef MultiRZOp::getResourceName() { return "MultiRZ"; }
 llvm::StringRef PCPhaseOp::getResourceName() { return "PCPhase"; }
 llvm::StringRef QubitUnitaryOp::getResourceName() { return "QubitUnitary"; }
+
+llvm::StringRef MeasurementOp::getResourceName() { return getOpName(); }
+uint64_t MeasurementOp::getResourceNumQubits() { return getQubits().size(); }
+uint64_t MeasurementOp::getResourceNumCtrlQubits() { return 0; }
+uint64_t MeasurementOp::getResourceNumParams() { return getParams().size(); }
 
 llvm::StringRef MeasureOp::getResourceName() { return "MidCircuitMeasure"; }
 uint64_t MeasureOp::getResourceNumQubits() { return 1; }

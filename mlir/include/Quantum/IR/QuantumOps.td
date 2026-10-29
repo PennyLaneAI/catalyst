@@ -1242,6 +1242,72 @@ class Measurement_Op<string mnemonic, list<Trait> traits = []> :
         Quantum_Op<mnemonic, traits # [MeasurementProcess,
                                         DeclareOpInterfaceMethods<ResourceMeasurementOpInterface>]>;
 
+def MeasurementOp : Quantum_Op<"measurement", [
+        AttrSizedOperandSegments, AttrSizedResultSegments,
+        DeclareOpInterfaceMethods<ResourceQuantumOpInterface>]> {
+    let summary = "A generic mid-circuit measurement with classical results.";
+    let description = [{
+        Represents a named measurement with arbitrary classical parameters and
+        compilable static inputs in `static_data`. Parameters and classical
+        results may have any non-quantum type, and either list may be empty.
+
+        Like `quantum.operator`, this operation supports explicit qubits or a
+        register with index tensors selecting the measured wires. These modes
+        cannot be mixed. Classical results precede the updated qubits (in input
+        order) or the updated register. Their types are supplied by the caller.
+        The operation has measurement effects even when its results are unused.
+
+        ```mlir
+        %m, %out = quantum.measurement "MeasureInBasis"(%angle: f64)
+            qubits(%q) static_data = {plane = "XY"} : i1, !quantum.bit
+
+        %bits, %out_reg = quantum.measurement "MeasureMany"()
+            quregs(%reg) indices(%wires: tensor<?xi64>)
+            : tensor<?xi1>, !quantum.reg
+        ```
+
+        An empty result list is written `: ()`. Measurement names and static
+        data are interpreted by downstream lowering passes. This operation
+        does not implement the observable-based `MeasurementProcess` interface.
+    }];
+
+    let arguments = (ins
+        StrAttr:$op_name,
+        Variadic<AnyType>:$params,
+        Variadic<QubitType>:$in_qubits,
+        Optional<QuregType>:$in_qreg,
+        Variadic<1DTensorOf<[I64]>>:$arr_qubit_indices,
+        DefaultValuedOptionalAttr<DictionaryAttr, "{}">:$static_data
+    );
+
+    let results = (outs
+        Variadic<AnyType>:$mres,
+        Variadic<QubitType>:$out_qubits,
+        Optional<QuregType>:$out_qreg
+    );
+
+    let builders = [
+        OpBuilder<(ins
+            "mlir::TypeRange":$mres,
+            "llvm::StringRef":$op_name,
+            "mlir::ValueRange":$params,
+            "mlir::ValueRange":$in_qubits,
+            CArg<"mlir::DictionaryAttr", "nullptr">:$static_data
+        )>,
+        OpBuilder<(ins
+            "mlir::TypeRange":$mres,
+            "llvm::StringRef":$op_name,
+            "mlir::ValueRange":$params,
+            "mlir::Value":$in_qreg,
+            "mlir::ValueRange":$arr_qubit_indices,
+            CArg<"mlir::DictionaryAttr", "nullptr">:$static_data
+        )>
+    ];
+
+    let hasVerifier = 1;
+    let hasCustomAssemblyFormat = 1;
+}
+
 def MeasureOp : Quantum_Op<"measure", [DeclareOpInterfaceMethods<ResourceQuantumOpInterface>]> {
     let summary = "A single-qubit projective measurement in the computational basis.";
     let description = [{

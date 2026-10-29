@@ -55,6 +55,7 @@
 #include "MBQC/IR/MBQCOps.h"
 #include "PBC/IR/PBCOps.h"
 #include "QRef/IR/QRefOps.h"
+#include "Quantum/IR/MeasurementOpUtils.h"
 #include "Quantum/IR/QuantumAttrDefs.h"
 #include "Quantum/IR/QuantumDialect.h"
 #include "Quantum/IR/QuantumInterfaces.h"
@@ -651,9 +652,26 @@ LogicalResult VarianceOp::verify() {
     return success();
 }
 
+LogicalResult MeasurementOp::verify() {
+    if (failed(catalyst::detail::verifyMeasurementInputs(getOperation(), getParams(), getInQubits(),
+                                                         getInQreg(), getArrQubitIndices(),
+                                                         getMres()))) {
+        return failure();
+    }
+    if (getInQubits().size() != getOutQubits().size()) {
+        return emitOpError("number of input and output qubits must be the same");
+    }
+    if (static_cast<bool>(getInQreg()) != static_cast<bool>(getOutQreg())) {
+        return emitOpError("in_qreg and out_qreg must either both be present or absent");
+    }
+    return success();
+}
+
 LogicalResult AdjointOp::verify() {
-    auto res =
-        this->getRegion().walk([](MeasurementProcess op) { return WalkResult::interrupt(); });
+    auto res = this->getRegion().walk([](Operation *op) {
+        return isa<MeasurementProcess, MeasurementOp>(op) ? WalkResult::interrupt()
+                                                          : WalkResult::advance();
+    });
 
     if (res.wasInterrupted()) {
         return emitOpError("quantum measurements are not allowed in the adjoint regions");
@@ -677,7 +695,8 @@ LogicalResult AdjointOp::verify() {
 
 LogicalResult CtrlOp::verify() {
     auto res = this->getRegion().walk([](Operation *op) {
-        return isa<MeasurementProcess, MeasureOp, pbc::PPMeasurementOp, mbqc::MeasureInBasisOp>(op)
+        return isa<MeasurementProcess, MeasureOp, MeasurementOp, pbc::PPMeasurementOp,
+                   mbqc::MeasureInBasisOp>(op)
                    ? WalkResult::interrupt()
                    : WalkResult::advance();
     });
@@ -710,6 +729,20 @@ LogicalResult CtrlOp::verify() {
 //===----------------------------------------------------------------------===//
 // Quantum op builders.
 //===----------------------------------------------------------------------===//
+
+void MeasurementOp::build(OpBuilder &builder, OperationState &state, TypeRange mres,
+                          llvm::StringRef op_name, ValueRange params, ValueRange in_qubits,
+                          DictionaryAttr static_data) {
+    build(builder, state, mres, TypeRange(in_qubits), Type(), op_name, params, in_qubits, Value(),
+          ValueRange(), static_data);
+}
+
+void MeasurementOp::build(OpBuilder &builder, OperationState &state, TypeRange mres,
+                          llvm::StringRef op_name, ValueRange params, Value in_qreg,
+                          ValueRange arr_qubit_indices, DictionaryAttr static_data) {
+    build(builder, state, mres, TypeRange(), in_qreg.getType(), op_name, params, ValueRange(),
+          in_qreg, arr_qubit_indices, static_data);
+}
 
 void OperatorOp::build(OpBuilder &odsBuilder, OperationState &odsState, llvm::StringRef op_name,
                        ValueRange params, ValueRange in_qubits, ValueRange in_ctrl_qubits,
@@ -774,6 +807,17 @@ void OperatorOp::build(OpBuilder &odsBuilder, OperationState &odsState, llvm::St
 //===----------------------------------------------------------------------===//
 // Quantum op printers/parsers.
 //===----------------------------------------------------------------------===//
+
+void MeasurementOp::print(OpAsmPrinter &p) {
+    catalyst::detail::printMeasurement(p, getOperation(), getOpNameAttr(), getParams(),
+                                       getInQubits(), getInQreg(), getArrQubitIndices(),
+                                       getStaticDataAttr(),
+                                       /*valueSemantics=*/true);
+}
+
+ParseResult MeasurementOp::parse(OpAsmParser &parser, OperationState &result) {
+    return catalyst::detail::parseMeasurement(parser, result, /*valueSemantics=*/true);
+}
 
 static void printDenseI64ArrayAsList(OpAsmPrinter &p, DenseI64ArrayAttr attr) {
     p << "[";
@@ -1363,6 +1407,11 @@ static llvm::StringRef getObservableName(MLIRContext *ctx, llvm::StringRef baseN
 
     return StringAttr::get(ctx, (baseName + "(" + obs + ")").str()).getValue();
 }
+
+llvm::StringRef MeasurementOp::getResourceName() { return getOpName(); }
+uint64_t MeasurementOp::getResourceNumQubits() { return getInQubits().size(); }
+uint64_t MeasurementOp::getResourceNumCtrlQubits() { return 0; }
+uint64_t MeasurementOp::getResourceNumParams() { return getParams().size(); }
 
 llvm::StringRef MeasureOp::getResourceName() { return "MidCircuitMeasure"; }
 uint64_t MeasureOp::getResourceNumQubits() { return 1; }
