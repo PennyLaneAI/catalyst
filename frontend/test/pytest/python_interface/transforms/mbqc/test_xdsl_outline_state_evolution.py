@@ -207,7 +207,7 @@ class TestOutlineStateEvolutionPass:
         on lightning.qubit."""
         dev = qp.device("lightning.qubit", wires=1000)
 
-        @qp.qjit(capture=True, collect_decomp_rules=False, target="mlir", pipelines=mbqc_pipeline())
+        @qp.qjit(capture=True, target="mlir", pipelines=mbqc_pipeline())
         @decompose_graph_state_pass
         @convert_to_mbqc_formalism_pass
         @outline_state_evolution_pass
@@ -252,7 +252,7 @@ class TestOutlineStateEvolutionPass:
         null.qubit."""
         dev = qp.device("null.qubit", wires=1000)
 
-        @qp.qjit(capture=True, collect_decomp_rules=False, target="mlir", pipelines=mbqc_pipeline())
+        @qp.qjit(capture=True, target="mlir", pipelines=mbqc_pipeline())
         @decompose_graph_state_pass
         @convert_to_mbqc_formalism_pass
         @measurements_from_samples_pass
@@ -297,7 +297,7 @@ class TestOutlineStateEvolutionPass:
         transform pipeline can be executed on null.qubit."""
         dev = qp.device("null.qubit", wires=1000)
 
-        @qp.qjit(capture=True, collect_decomp_rules=False, target="mlir", pipelines=mbqc_pipeline())
+        @qp.qjit(capture=True, target="mlir", pipelines=mbqc_pipeline())
         @decompose_graph_state_pass
         @convert_to_mbqc_formalism_pass
         @measurements_from_samples_pass
@@ -336,7 +336,7 @@ class TestOutlineStateEvolutionPass:
             i = i + 1
             return i
 
-        @qp.qjit(capture=True, collect_decomp_rules=False, target="mlir")
+        @qp.qjit(capture=True, target="mlir")
         @outline_state_evolution_pass
         @qp.qnode(dev)
         def circuit():
@@ -349,7 +349,6 @@ class TestOutlineStateEvolutionPass:
 
         @qp.qjit(
             capture=True,
-            collect_decomp_rules=False,
             target="mlir",
         )
         @qp.qnode(dev)

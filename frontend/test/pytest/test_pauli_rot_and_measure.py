@@ -27,7 +27,7 @@ def test_pauli_rot_lowering():
     """Test that Pauli rotation is lowered to quantum.paulirot."""
     pipe = [("pipe", ["quantum-compilation-stage"])]
 
-    @qjit(pipelines=pipe, target="mlir", capture=True, collect_decomp_rules=False)
+    @qjit(pipelines=pipe, target="mlir", capture=True)
     def test_pauli_rot_lowering_workflow():
 
         @qp.qnode(qp.device("null.qubit", wires=1))
@@ -46,7 +46,7 @@ def test_pauli_rot_lowering_with_ctrl_qubits():
     """
     pipe = [("pipe", ["quantum-compilation-stage"])]
 
-    @qjit(pipelines=pipe, target="mlir", capture=True, collect_decomp_rules=False)
+    @qjit(pipelines=pipe, target="mlir", capture=True)
     def test_pauli_rot_lowering_with_ctrl_qubits_workflow():
 
         @qp.qnode(qp.device("null.qubit", wires=2))
