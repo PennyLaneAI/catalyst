@@ -34,5 +34,4 @@ lxml_html_clean
 --extra-index-url https://test.pypi.org/simple/
 pennylane-lightning-kokkos==0.46.0-dev34
 pennylane-lightning==0.46.0-dev34
-# TODO [sc-134032]: Restore the dev pin once PennyLane's adjoint companion is available.
-pennylane @ git+https://github.com/PennyLaneAI/pennylane.git@codex/remove-adjoint-lazy
+pennylane==0.46.0-dev140
