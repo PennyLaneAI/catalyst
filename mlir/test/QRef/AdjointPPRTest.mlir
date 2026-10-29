@@ -14,20 +14,17 @@
 
 // RUN: quantum-opt --adjoint-lowering --split-input-file -verify-diagnostics %s | FileCheck %s
 
-// CHECK-LABEL:      @workflow
-func.func private @workflow(%r: !quantum.reg) -> !quantum.reg attributes {} {
-  // CHECK-NOT: quantum.adjoint
-  %r_out = quantum.adjoint(%r) : !quantum.reg {
-  ^bb0(%arg0: !quantum.reg):
-    %0 = quantum.extract %arg0[0] : !quantum.reg -> !quantum.bit
-
-    // CHECK: pbc.ppr ["Y"](4)
-    // CHECK: pbc.ppr ["X"](-2)
-    %1 = pbc.ppr ["X"](2) %0 : !quantum.bit
-    %2 = pbc.ppr ["Y"](-4) %1 : !quantum.bit
-
-    %3 = quantum.insert %arg0[0], %2 : !quantum.reg, !quantum.bit
-    quantum.yield %3 : !quantum.reg
+// CHECK-LABEL: @workflow
+// CHECK-NOT: qref.adjoint
+// CHECK: [[Q:%.+]] = qref.get %{{.*}}[ 0]
+// CHECK: pbc.ref.ppr ["Y"](4) [[Q]]
+// CHECK: [[Q2:%.+]] = qref.get %{{.*}}[ 0]
+// CHECK: pbc.ref.ppr ["X"](-2) [[Q2]]
+func.func private @workflow(%r: !qref.reg<?>) {
+  qref.adjoint {
+    %q = qref.get %r[0] : !qref.reg<?> -> !qref.bit
+    pbc.ref.ppr ["X"](2) %q
+    pbc.ref.ppr ["Y"](-4) %q
   }
-  return %r_out : !quantum.reg
+  return
 }

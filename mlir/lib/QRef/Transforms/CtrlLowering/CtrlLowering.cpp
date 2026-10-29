@@ -19,25 +19,29 @@
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Interfaces/CallInterfaces.h"
 #include "mlir/Pass/Pass.h"
-#include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #include "QRef/IR/QRefDialect.h"
 #include "QRef/IR/QRefOps.h"
-#include "Quantum/Transforms/Passes.h"
-#include "Quantum/Transforms/Patterns.h"
+#include "QRef/Transforms/Passes.h"
+#include "QRef/Transforms/Patterns.h"
 
 using namespace mlir;
 
 namespace catalyst::qref {
 
-// match and rewrite a qref.ctrl op with reference semantics
-// this needs to take in a qref.ctrl op and output qref.custum op
+// Distribute region controls onto the enclosed reference-semantics gates.
 struct CtrlLoweringRewritePattern : public OpRewritePattern<CtrlOp> {
-    using OpRewritePattern<CtrlOp>::OpRewritePattern;
+    CtrlLoweringRewritePattern(MLIRContext *context, bool &loweringFailed)
+        : OpRewritePattern<CtrlOp>(context), loweringFailed(loweringFailed) {}
+
+    bool &loweringFailed;
 
     LogicalResult matchAndRewrite(CtrlOp ctrl, PatternRewriter &rewriter) const override {
-        // Defer (not an error) if the region still contains a nested quantum.adjoint region.
+        if (loweringFailed) {
+            return failure();
+        }
+        // Defer (not an error) if the region still contains a nested qref.adjoint region.
         // Distributing controls needs an op-level body, so the inner region must be reduced first.
         // Returning failure() drives the greedy fixpoint: adjoint-lowering reduces the inner region
         // to op-level gates, then the greedy driver re-tries this ctrl op and it lowers. This works
@@ -45,7 +49,12 @@ struct CtrlLoweringRewritePattern : public OpRewritePattern<CtrlOp> {
         // modifiers-lowering pass. A pre-scan avoids a partial rewrite (creating ops, then bailing
         // out mid-region).
         if (ctrl.getRegion()
-                .walk([](Operation *op) {
+                .walk([&](Operation *op) {
+                    if (isa<CallOpInterface>(op) && hasQuantumOperations(op)) {
+                        op->emitError("cannot control a function call inside a qref.ctrl region");
+                        loweringFailed = true;
+                        return WalkResult::interrupt();
+                    }
                     if (isa<AdjointOp>(op)) {
                         return WalkResult::interrupt();
                     }
@@ -58,23 +67,17 @@ struct CtrlLoweringRewritePattern : public OpRewritePattern<CtrlOp> {
             return failure();
         }
 
-        // The control qubits are threaded through every enclosed gate; the control values are
-        // constant for the whole region.
-        SmallVector<Value> currentCtrlQubits(ctrl.getCtrlQubits().begin(),
-                                             ctrl.getCtrlQubits().end());
+        ValueRange ctrlQubits = ctrl.getCtrlQubits();
         ValueRange ctrlValues = ctrl.getCtrlValues();
-        SmallVector<Operation *> opsToErase;
 
-        // Can now preform the lowering after the pre-scan to check for errors in the region.
         ctrl.getRegion().walk<WalkOrder::PreOrder>([&](Operation *op) -> WalkResult {
             if (auto gate = dyn_cast<QuantumGate>(op)) {
-                rewriter.modifyOpInPlace(gate,
-                                         [&] { gate.addControls(currentCtrlQubits, ctrlValues); });
+                rewriter.modifyOpInPlace(gate, [&] { gate.addControls(ctrlQubits, ctrlValues); });
                 return WalkResult::advance();
             }
             if (auto inner = dyn_cast<CtrlOp>(op)) {
                 rewriter.modifyOpInPlace(inner, [&] {
-                    inner.getCtrlQubitsMutable().append(currentCtrlQubits);
+                    inner.getCtrlQubitsMutable().append(ctrlQubits);
                     inner.getCtrlValuesMutable().append(ctrlValues);
                 });
                 return WalkResult::skip();
@@ -84,7 +87,6 @@ struct CtrlLoweringRewritePattern : public OpRewritePattern<CtrlOp> {
 
         Block &block = ctrl.getRegion().front();
         rewriter.inlineBlockBefore(&block, ctrl);
-        // Assemble the ctrl op results: out_ctrl_qubits followed by the target results.
         rewriter.eraseOp(ctrl);
         return success();
     }
@@ -92,38 +94,29 @@ struct CtrlLoweringRewritePattern : public OpRewritePattern<CtrlOp> {
 
 } // namespace catalyst::qref
 
-void catalyst::quantum::populateCtrlLoweringPatterns(RewritePatternSet &patterns) {
-    patterns.add<catalyst::qref::CtrlLoweringRewritePattern>(patterns.getContext(), 1);
+void catalyst::qref::populateCtrlLoweringPatterns(RewritePatternSet &patterns, bool &failed) {
+    patterns.add<catalyst::qref::CtrlLoweringRewritePattern>(patterns.getContext(), failed);
 }
 
 namespace catalyst {
-namespace quantum {
+namespace qref {
 
 #define GEN_PASS_DEF_CTRLLOWERINGPASS
-#include "Quantum/Transforms/Passes.h.inc"
+#include "QRef/Transforms/Passes.h.inc"
 
 struct CtrlLoweringPass : impl::CtrlLoweringPassBase<CtrlLoweringPass> {
     using CtrlLoweringPassBase::CtrlLoweringPassBase;
 
     void runOnOperation() final {
-        Operation *op = getOperation();
-        // Convert to reference-semantics
-        {
-            OpPassManager ReferenceSemanticsPm(op->getName());
-            ReferenceSemanticsPm.addPass(createReferenceSemanticsConversionPass());
-            if (failed(runPipeline(ReferenceSemanticsPm, op))) {
-                return signalPassFailure();
-            }
-        }
-
         RewritePatternSet patterns(&getContext());
-        patterns.add<qref::CtrlLoweringRewritePattern>(patterns.getContext(), 1);
+        bool loweringFailed = false;
+        populateCtrlLoweringPatterns(patterns, loweringFailed);
 
-        if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
+        if (failed(applyPatternsGreedily(getOperation(), std::move(patterns))) || loweringFailed) {
             return signalPassFailure();
         }
     }
 };
 
-} // namespace quantum
+} // namespace qref
 } // namespace catalyst

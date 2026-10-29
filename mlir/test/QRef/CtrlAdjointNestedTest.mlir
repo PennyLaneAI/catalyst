@@ -16,7 +16,7 @@
 // pass, which runs both lowering patterns under one greedy driver. Each pattern defers (fails to
 // match) while its region still holds the other modifier, so the greedy worklist interleaves them
 // to a fixpoint in a single pass, regardless of nesting depth or order.
-// RUN: quantum-opt --modifiers-lowering --split-input-file %s | FileCheck %s
+// RUN: quantum-opt --modifiers-lowering --split-input-file %s | FileCheck %s --implicit-check-not="qref." --implicit-check-not="quantum.ctrl" --implicit-check-not="quantum.adjoint"
 
 // CHECK-LABEL: @nested_ctrl_of_ctrl
 func.func @nested_ctrl_of_ctrl(%c1: !quantum.bit, %c2: !quantum.bit, %q: !quantum.bit)

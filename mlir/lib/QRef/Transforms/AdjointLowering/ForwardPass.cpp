@@ -27,17 +27,18 @@
 
 #include "Catalyst/IR/CatalystOps.h"
 #include "PBC/IR/PBCOps.h"
-#include "Quantum/IR/QuantumOps.h"
+#include "QRef/IR/QRefOps.h"
+#include "QRef/Transforms/Patterns.h"
 
 #include "AdjointLowering.hpp"
 #include "QuantumCache.hpp"
 
 using namespace mlir;
 using namespace catalyst;
-using namespace catalyst::quantum;
+using namespace catalyst::qref;
 
 namespace {
-bool isQuantumType(Type type) { return isa<quantum::QuantumDialect>(type.getDialect()); }
+bool isQuantumType(Type type) { return isa<qref::QRefDialect>(type.getDialect()); }
 
 void populateArgIdxMapping(TypeRange types, DenseMap<unsigned, unsigned> &argIdxMapping) {
     unsigned newIdx = 0;
@@ -102,22 +103,14 @@ class AugmentedCircuitGenerator {
     void mapResults(Operation *oldOp, Operation *clonedOp,
                     const DenseMap<unsigned, unsigned> &argIdxMapping);
 
-    // Emit an operation to cache a dynamic wire for quantum.insert/extract ops.
-    template <typename IndexingOp> void cacheDynamicWire(IndexingOp op, OpBuilder &builder) {
-        if (!op.getIdxAttr().has_value()) {
-            ListPushOp::create(builder, op.getLoc(), oldToCloned.lookupOrDefault(op.getIdx()),
-                               cache.wireVector);
-        }
-    }
-
-    void cacheGate(quantum::ParametrizedGate gate, OpBuilder &builder);
+    void cacheParameters(ValueRange params, Operation *op, OpBuilder &builder);
+    void cacheReferences(ValueRange operands, OpBuilder &builder);
 };
 
-void AugmentedCircuitGenerator::cacheGate(quantum::ParametrizedGate gate, OpBuilder &builder) {
-    ValueRange params = gate.getAllParams();
-
+void AugmentedCircuitGenerator::cacheParameters(ValueRange params, Operation *op,
+                                                OpBuilder &builder) {
     for (Value param : params) {
-        Location loc = gate.getLoc();
+        Location loc = op->getLoc();
 
         // Params that the reverse pass can already see do not need to be recorded.
         if (isAvailableToReversePass(param, adjointRegion)) {
@@ -126,7 +119,6 @@ void AugmentedCircuitGenerator::cacheGate(quantum::ParametrizedGate gate, OpBuil
 
         Value clonedParam = oldToCloned.lookupOrDefault(param);
         Type paramType = clonedParam.getType();
-        Operation *op = gate;
         if (mlir::failed(verifyTypeIsCacheable(paramType, op))) {
             generationFailed = true;
             return;
@@ -155,7 +147,7 @@ void AugmentedCircuitGenerator::cacheGate(quantum::ParametrizedGate gate, OpBuil
         auto aTensor = cast<RankedTensorType>(paramType);
         Type elemType = aTensor.getElementType();
 
-        // Real-valued tensor params (e.g. the `tensor<Nxf64>` angle carried by `quantum.operator`
+        // Real-valued tensor params (e.g. the `tensor<Nxf64>` angle carried by `qref.operator`
         // gates such as RZ, or the `tensor<NxNxf64>` matrix of a BasisRotation) are cached
         // element-by-element as plain f64 values in row-major order in `paramVector`.
         // Integer/boolean tensors (e.g. a MultiX `tensor<Nxi1>` bitstring or a QROM `tensor<Nxi64>`
@@ -242,22 +234,33 @@ void AugmentedCircuitGenerator::cacheGate(quantum::ParametrizedGate gate, OpBuil
     }
 }
 
+// Record wire indices at each use, rather than at qref.get definitions. A reference can be
+// shared by several gates or captured by a nested loop, so the reverse use order need not match
+// the reverse definition order. Allocation sizes use the same tape at deallocation sites.
+void AugmentedCircuitGenerator::cacheReferences(ValueRange operands, OpBuilder &builder) {
+    for (Value operand : operands) {
+        auto get = operand.getDefiningOp<GetOp>();
+        if (!get || !adjointRegion.isAncestor(get->getParentRegion()) || !get.getIdx() ||
+            isAvailableToReversePass(get.getIdx(), adjointRegion)) {
+            continue;
+        }
+        ListPushOp::create(builder, get.getLoc(), oldToCloned.lookupOrDefault(get.getIdx()),
+                           cache.wireVector);
+    }
+}
+
 void AugmentedCircuitGenerator::generate(Region &region, OpBuilder &builder) {
     assert(region.hasOneBlock() &&
            "Expected only structured control flow (each region should have a single block)");
-    auto isClassicalSCFOp = [](Operation &op) {
-        return isa<scf::SCFDialect>(op.getDialect()) &&
-               llvm::none_of(op.getResultTypes(), isQuantumType);
-    };
 
-    for (Operation &op : region.front().without_terminator()) {
-        if (auto insertOp = dyn_cast<quantum::InsertOp>(op)) {
-            cacheDynamicWire(insertOp, builder);
-        } else if (auto extractOp = dyn_cast<quantum::ExtractOp>(op)) {
-            cacheDynamicWire(extractOp, builder);
-        } else if (auto gate = dyn_cast<quantum::QuantumGate>(op)) {
-            if (auto parametrizedGate = dyn_cast<quantum::ParametrizedGate>(op)) {
-                cacheGate(parametrizedGate, builder);
+    for (Operation &op : region.front()) {
+        if (op.hasTrait<OpTrait::IsTerminator>()) {
+            continue;
+        }
+        if (auto gate = dyn_cast<qref::QuantumGate>(op)) {
+            cacheReferences(op.getOperands(), builder);
+            if (auto parametrizedGate = dyn_cast<qref::ParametrizedGate>(op)) {
+                cacheParameters(parametrizedGate.getAllParams(), &op, builder);
             }
             for (Value controlValue : gate.getCtrlValueOperands()) {
                 if (!isAvailableToReversePass(controlValue, adjointRegion)) {
@@ -266,35 +269,44 @@ void AugmentedCircuitGenerator::generate(Region &region, OpBuilder &builder) {
                                        cache.controlValueVector);
                 }
             }
-        } else if (isa<QuantumDialect>(op.getDialect())) {
-            // Any quantum op other than a gate/insert/extract is ignored.
-        } else if (isa<pbc::PPRotationOp>(op)) {
-            // PPRs are ignored
-        } else if (isClassicalSCFOp(op)) {
-            // Purely classical SCF ops should be treated as any other purely classical op, but
-            // quantum SCF ops need to be recursively visited.
+        } else if (auto dealloc = dyn_cast<DeallocOp>(op)) {
+            auto alloc = dealloc.getQreg().getDefiningOp<AllocOp>();
+            if (alloc && alloc.getNqubits() &&
+                !isAvailableToReversePass(alloc.getNqubits(), adjointRegion)) {
+                ListPushOp::create(builder, dealloc.getLoc(),
+                                   oldToCloned.lookupOrDefault(alloc.getNqubits()),
+                                   cache.wireVector);
+            }
+        } else if (isa<QRefDialect>(op.getDialect())) {
+            // Gates and allocation lifetimes are emitted only by the reverse pass. Qubit
+            // references are rematerialized at their uses, after the reversed allocation.
+        } else if (isa<pbc::RefPPRotationOp>(op)) {
+            cacheReferences(op.getOperands(), builder);
+        } else if (!hasQuantumOperations(&op)) {
             builder.clone(op, oldToCloned);
         } else if (auto forOp = dyn_cast<scf::ForOp>(op)) {
             visitOperation(forOp, builder);
         } else if (auto ifOp = dyn_cast<scf::IfOp>(op)) {
             visitOperation(ifOp, builder);
-        } else if (auto whileOp = dyn_cast<scf::WhileOp>(&op)) {
+        } else if (auto whileOp = dyn_cast<scf::WhileOp>(op)) {
             visitOperation(whileOp, builder);
         } else if (auto switchOp = dyn_cast<scf::IndexSwitchOp>(op)) {
             visitOperation(switchOp, builder);
         } else if (auto callOp = dyn_cast<func::CallOp>(op)) {
-            auto results = callOp.getResultTypes();
-            bool quantum = std::any_of(results.begin(), results.end(), [](const auto &value) {
-                return isa<QuregType, QubitType>(value);
-            });
-
-            // Classical call operations are cloned for the backward pass
-            if (!quantum) {
-                builder.clone(op, oldToCloned);
+            cacheReferences(callOp.getOperands(), builder);
+            SmallVector<Value> params;
+            for (Value arg : callOp.getOperands()) {
+                if (!isQuantumType(arg.getType())) {
+                    params.push_back(arg);
+                }
             }
+            cacheParameters(params, &op, builder);
         } else {
-            // Purely classical ops are deeply cloned as-is.
-            builder.clone(op, oldToCloned);
+            op.emitError("Unhandled operation in adjoint region");
+            generationFailed = true;
+        }
+        if (generationFailed) {
+            return;
         }
     }
 }
@@ -376,17 +388,19 @@ void AugmentedCircuitGenerator::visitOperation(scf::WhileOp whileOp, OpBuilder &
             }
 
             // Recursively clone the region
+            if (oldRegion.empty()) {
+                scf::YieldOp::create(builder, loc);
+                return;
+            }
             generate(oldRegion, builder);
             cloneTerminatorClassicalOperands(oldRegion.front().getTerminator(), builder);
         };
     };
 
+    // The before region executes once more than the after region, including the final condition.
     auto newWhileOp =
         scf::WhileOp::create(builder, whileOp.getLoc(), classicalResultTypes, classicalInits,
                              getRegionBuilder(whileOp.getBefore(), /*incrementCounter=*/false),
-                             // We only care about the number of times the "After" region executes.
-                             // The frontend does not support putting quantum operations in the
-                             // "Before" region, which only computes the iteration condition.
                              getRegionBuilder(whileOp.getAfter(), /*incrementCounter=*/true));
     // Carry over hints such as `catalyst.estimated_iterations`.
     newWhileOp->setDiscardableAttrs(whileOp->getDiscardableAttrDictionary());
@@ -401,6 +415,10 @@ void AugmentedCircuitGenerator::visitOperation(scf::WhileOp whileOp, OpBuilder &
 void AugmentedCircuitGenerator::visitOperation(scf::IndexSwitchOp switchOp, OpBuilder &builder) {
     auto getRegionBuilder = [&](Region &oldRegion) {
         return [&](OpBuilder &builder, Location loc) {
+            if (oldRegion.empty()) {
+                scf::YieldOp::create(builder, loc);
+                return;
+            }
             generate(oldRegion, builder);
             cloneTerminatorClassicalOperands(oldRegion.front().getTerminator(), builder);
         };
@@ -452,6 +470,10 @@ void AugmentedCircuitGenerator::visitOperation(scf::IndexSwitchOp switchOp, OpBu
 void AugmentedCircuitGenerator::visitOperation(scf::IfOp ifOp, OpBuilder &builder) {
     auto getRegionBuilder = [&](Region &oldRegion) {
         return [&](OpBuilder &builder, Location loc) {
+            if (oldRegion.empty()) {
+                scf::YieldOp::create(builder, loc);
+                return;
+            }
             generate(oldRegion, builder);
             cloneTerminatorClassicalOperands(oldRegion.front().getTerminator(), builder);
         };
@@ -500,7 +522,7 @@ void AugmentedCircuitGenerator::mapResults(Operation *oldOp, Operation *clonedOp
 } // namespace
 
 namespace catalyst {
-namespace quantum {
+namespace qref {
 
 LogicalResult generateAdjointForwardPass(Region &region, OpBuilder &builder, IRMapping &oldToCloned,
                                          QuantumCache &cache) {
@@ -509,5 +531,5 @@ LogicalResult generateAdjointForwardPass(Region &region, OpBuilder &builder, IRM
     return failure(generator.hasFailed());
 }
 
-} // namespace quantum
+} // namespace qref
 } // namespace catalyst

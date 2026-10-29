@@ -19,7 +19,7 @@
 #include "QuantumCache.hpp"
 
 namespace catalyst {
-namespace quantum {
+namespace qref {
 
 /// Generate the forward pass of the adjoint region, i.e. the classical portion (forwards).
 ///
@@ -36,11 +36,11 @@ mlir::LogicalResult generateAdjointForwardPass(mlir::Region &region, mlir::OpBui
 /// This generates the reverse computation: the quantum operations are cloned in reverse order
 /// with the adjoint attribute applied, with any control flow reversed, and using recorded
 /// values from the cache.
-/// The `IRMapping` helps associating values in the original program to their counterpart in the
-/// reversed program. It must be seeded with the adjoint operands before calling.
+/// The `IRMapping` associates classical values with their forward-pass clones and references
+/// with allocations and qubit lookups emitted during the reverse pass.
 mlir::LogicalResult generateAdjointReversePass(mlir::Region &region, mlir::OpBuilder &builder,
                                                mlir::IRMapping &remappedValues,
                                                QuantumCache &cache);
 
-} // namespace quantum
+} // namespace qref
 } // namespace catalyst
