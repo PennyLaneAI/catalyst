@@ -178,6 +178,30 @@ class TestGenericUtilities:
             qp.matrix(qp.RX(0.7, 3) @ qp.RY(-0.2, 1), wire_order=[3, 1]),
         )
 
+    def test_hybrid_operands_preserve_static_leaves(self):
+        """Rebuilding a mixed hybrid argument preserves its static data and runtime values."""
+        extra = {
+            "mixed": {"angle": Float, "label": "rotation", "wires": Wire[2]},
+            "static": ("unchanged", 7),
+        }
+        specs, dummies, closed = flatten_hybrid_args(extra)
+        assert closed == {"static": ("unchanged", 7)}
+        assert len(dummies) == 1
+        assert dummies[0].shape == ()
+
+        for angle, wires in ((0.7, [3, 1]), (-0.2, [1, 4])):
+            _, kwargs, _, _ = unpack_rule_operands(
+                (jnp.array(angle), jnp.array(wires)),
+                n_params=0,
+                kwarg_names=["mixed"],
+                wire_lens={"mixed": 2},
+                has_ctrl_wires=False,
+                hybrid_specs=specs,
+            )
+            assert kwargs["mixed"]["label"] == "rotation"
+            np.testing.assert_allclose(kwargs["mixed"]["angle"], angle)
+            assert list(kwargs["mixed"]["wires"]) == wires
+
     def test_probe_wires_dont_overlap(self):
         """Test that the helper for generating probe arguments doesnt create
         overlapping wires.
