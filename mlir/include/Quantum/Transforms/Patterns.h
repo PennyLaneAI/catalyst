@@ -34,9 +34,6 @@ namespace quantum {
 mlir::Value getGlobalString(mlir::Location loc, mlir::OpBuilder &rewriter, mlir::StringRef key,
                             mlir::StringRef value, mlir::ModuleOp mod);
 
-/// Lower `quantum.ctrl` / `quantum.adjoint` regions to op-level modifiers via a greedy fixpoint.
-mlir::LogicalResult lowerModifiers(mlir::Operation *op);
-
 void populateResolveGateLevelAdjointPatterns(mlir::RewritePatternSet &);
 void populateAdjointLoweringPatterns(mlir::RewritePatternSet &);
 void populateCtrlLoweringPatterns(mlir::RewritePatternSet &);
