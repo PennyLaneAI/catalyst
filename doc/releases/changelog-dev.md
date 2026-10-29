@@ -861,6 +861,12 @@
   when an explicit inverse representation is required.
   [(#3394)](https://github.com/PennyLaneAI/catalyst/pull/3394)
 
+* Decomposition to the device's gateset is now applied by default with `capture=True`.
+  This may introduce performance slowdowns or failures with cases that are not yet supported by the
+  decomposition pass. In the event of issues, this can be turned off with `skip_preprocess=True` being
+  passed to `qjit`.
+  [(#3275)](https://github.com/PennyLaneAI/catalyst/pull/3275)
+
 * Instrumentation no longer reports `programsize` for the high-level `compile` stage,
   since the compiler no longer returns an IR string to Python in addition to producing
   compiled object code.
