@@ -68,6 +68,22 @@ ops = [
     qp.PCPhase(0.6, dim=2, wires=[0, 1, 2, 3]),
 ]
 
+controlled_ops = [
+    (
+        pytest.param(
+            op,
+            marks=pytest.mark.xfail(
+                reason="automatic simplification of ctrl(CNOT) in resources issue", strict=True
+            ),
+        )
+        if isinstance(op, qp.QubitUnitary) and len(op.wires) == 2
+        else op
+    )
+    for op in ops
+]
+# just need to xfail the one case for test_control and test_control_variable wires. Should be fixed soon
+# when ctrl(CNOT) no longer automatically simplifies in the resources function
+
 
 @pytest.mark.parametrize("g", ops)
 def test_adjoint(g):
@@ -82,7 +98,7 @@ def test_adjoint(g):
     assert jnp.allclose(result, expected)
 
 
-@pytest.mark.parametrize("g", ops)
+@pytest.mark.parametrize("g", controlled_ops)
 @pytest.mark.parametrize("ctrls", [[4], [4, 5, 6]])
 def test_control(g, ctrls):
     def circuit():
@@ -96,7 +112,7 @@ def test_control(g, ctrls):
     assert jnp.allclose(result, expected)
 
 
-@pytest.mark.parametrize("g", ops)
+@pytest.mark.parametrize("g", controlled_ops)
 @pytest.mark.parametrize("ctrls", [[4], [4, 5, 6]])
 def test_control_variable_wires(g, ctrls):
     def circuit(ctrls):
