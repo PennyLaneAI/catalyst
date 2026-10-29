@@ -33,6 +33,7 @@ from pennylane.capture.primitives import cond_prim as pl_cond_prim
 from pennylane.capture.primitives import ctrl_transform_prim as plxpr_ctrl_transform_prim
 from pennylane.capture.primitives import measure_prim as plxpr_measure_prim
 from pennylane.capture.primitives import (
+    barrier_p,
     operator_p,
 )
 from pennylane.capture.primitives import pauli_measure_prim as plxpr_pauli_measure_prim
@@ -139,15 +140,16 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
         super().__init__()
 
     def interpret_operation_eqn(self, eqn):
-        """Override to handle Operator2 (operator_p) equations.
+        """Override to handle Operator2 equations, including the dedicated Barrier primitive.
 
         For Operator2 ops used as observables (output is not DropVar),
         return the operator instance without applying it as a gate.
         For Operator2 ops used as gates (output is DropVar), apply the gate
         using the Operator2-specific lowering.
+        Barrier uses the same operands and metadata as operator_p.
         For legacy ops, delegate to the parent implementation.
         """
-        if eqn.primitive is operator_p:
+        if eqn.primitive in (operator_p, barrier_p):
             invals = [self.read(invar) for invar in eqn.invars]
             with qp.QueuingManager.stop_recording():
                 op = eqn.primitive.impl(*invals, **eqn.params)
