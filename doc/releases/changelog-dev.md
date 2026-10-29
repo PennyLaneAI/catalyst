@@ -844,6 +844,12 @@
 
 <h3>Breaking changes 💔</h3>
 
+* The `lazy` argument has been removed from `catalyst.adjoint`, matching
+  `qp.adjoint`. Adjoint construction is always symbolic, and captured adjoint
+  regions no longer carry `lazy` metadata. Construct known inverse gates directly
+  when an explicit inverse representation is required.
+  [(#3394)](https://github.com/PennyLaneAI/catalyst/pull/3394)
+
 * Instrumentation no longer reports `programsize` for the high-level `compile` stage,
   since the compiler no longer returns an IR string to Python in addition to producing
   compiled object code.
