@@ -819,7 +819,7 @@ combine_global_phases = qp.transform(
 )
 
 
-def gridsynth_setup_inputs(epsilon=1e-4, ppr_basis=False):
+def gridsynth_setup_inputs(epsilon=1e-4, ppr_basis=False, method="deterministic"):
     r"""A quantum compilation pass to discretize
     single-qubit RZ and PhaseShift gates into the Clifford+T basis or the PPR basis using the Ross-Selinger Gridsynth algorithm.
     Reference: https://arxiv.org/abs/1403.2975
@@ -837,16 +837,63 @@ def gridsynth_setup_inputs(epsilon=1e-4, ppr_basis=False):
 
     Args:
         qnode (QNode): the QNode to apply the gridsynth compiler pass to
-        epsilon (float): The maximum permissible operator norm error per rotation gate. Defaults to ``1e-4``.
-        ppr_basis (bool): If true, decompose directly to Pauli Product Rotations (PPRs) in PBC dialect. Defaults to ``False``
+        epsilon (float): The accuracy per rotation gate. Defaults to ``1e-4``. Values down to
+            ``1e-15`` are supported. With ``"deterministic"``, each rotation has operator norm
+            error at most ``epsilon``, and therefore diamond norm error at most ``2 * epsilon``.
+            With ``"mixed"`` and ``"mixed-fallback"``, the channel averaged over samples has
+            diamond norm error at most ``2 * epsilon``.
+        ppr_basis (bool): If true, decompose directly to Pauli Product Rotations (PPRs) in the PBC
+            dialect, with one :math:`\pi/8` PPR per T gate.
+        method (str): The synthesis method. ``"deterministic"`` (default) applies a single
+            Ross-Selinger gate sequence per rotation. ``"mixed"`` applies, per execution, one of
+            two twirled sequences that under- and over-rotate the target, which roughly
+            halves the T-count at the same accuracy. This is the mixed diagonal approximation of
+            Kliuchnikov et al., Section 3.4 (Proposition 3.13), in
+            `arXiv:2203.10064 <https://arxiv.org/abs/2203.10064>`__. ``"mixed-fallback"`` is the
+            mixed fallback approximation of Section 3.5 (Proposition 3.18), which roughly halves
+            the T-count of ``"mixed"`` at the cost of one temporary ancilla qubit per rotation.
 
     Returns:
         :class:`QNode <pennylane.QNode>`
 
     .. note::
 
-        The circuit generated from this pass with ``ppr_basis=True`` are currently only executable on the
-        ``lightning.qubit`` device with program  enabled.
+        The circuits generated from this pass with ``ppr_basis=True`` are currently only
+        executable on the ``lightning.qubit`` device with program capture enabled.
+
+    .. note::
+
+        With ``ppr_basis=True``, the Clifford gates of each Clifford+T sequence are moved past its
+        T gates. Each T gate thereby becomes a :math:`\pi/8` PPR
+        :math:`\exp(\mp i\frac{\pi}{8}P)` about a Pauli :math:`P \in \{X, Y, Z\}`, so a sequence
+        has as many :math:`\pi/8` PPRs as its Clifford+T counterpart has T gates, and neighboring
+        :math:`\pi/8` PPRs rotate about different Paulis. The signs of the :math:`\pi/8` PPRs are
+        chosen such that no Clifford gates remain, except in short sequences with few T gates,
+        which may end with up to two :math:`\pi/4` or :math:`\pi/2` PPRs.
+        About a third of the :math:`\pi/8` PPRs become :math:`Y`-basis PPRs in this process.
+
+    .. note::
+
+        With ``method="mixed"``, each rotation applies the under- or the over-rotating sequence,
+        conjugated as :math:`\sigma U \sigma^\dagger` with :math:`\sigma` drawn uniformly from
+        :math:`\{I, S, Z, S^\dagger\}`. This gives eight possible sequences
+        per rotation. The twirl leaves the target rotation unchanged, since it commutes with
+        :math:`\sigma`.
+
+        With ``method="mixed"`` or ``method="mixed-fallback"``, the accuracy guarantee holds on
+        average over samples, and each sampled sequence has an error of order
+        :math:`\sqrt{\epsilon}`. By default, and with ``mcm_method="single-branch-statistics"``,
+        a call samples one sequence per rotation, and one ancilla measurement outcome for
+        ``"mixed-fallback"``, shared by all its shots. With ``mcm_method="one-shot"``, every shot
+        samples its own. Samples are drawn from the runtime random number generator seeded by the
+        ``seed`` argument of :func:`~.qjit`, so with a fixed seed every call uses the same gate
+        sequences.
+
+    .. note::
+
+        With ``method="mixed-fallback"``, each rotation uses a temporary ancilla qubit and a
+        mid-circuit measurement, as :func:`pennylane.transforms.ppr_to_ppm` does. Resource
+        estimates count every allocation, so they report one additional wire per rotation.
 
     **Example**
 
@@ -878,7 +925,7 @@ def gridsynth_setup_inputs(epsilon=1e-4, ppr_basis=False):
         func.func private @rs_decomposition_get_phase(f64, f64, i1) -> f64
         func.func private @rs_decomposition_get_gates(memref<?xindex>, f64, f64, i1)
         func.func private @rs_decomposition_get_size(f64, f64, i1) -> index
-        func.func private @__catalyst_decompose_RZ_0(%arg0: !quantum.bit, %arg1: f64) -> (!quantum.bit, f64) {
+        func.func private @__catalyst_decompose_RZ_0(%arg0: !quantum.bit, %arg1: f64) -> !quantum.bit {
             . . .
             %2 = scf.for %arg2 = %c0 to %0 step %c1 iter_args(%arg3 = %arg0) -> (!quantum.bit) {
                 %3 = memref.load %alloc[%arg2] : memref<?xindex>
@@ -904,14 +951,18 @@ def gridsynth_setup_inputs(epsilon=1e-4, ppr_basis=False):
 
         func.func public @circuit_0(%arg0: tensor<f64>) -> tensor<f64> attributes {diff_method = "adjoint", llvm.linkage = #llvm.linkage<internal>, qnode} {
             . . .
-            %2:2 = call @__catalyst_decompose_RZ_0(%1, %extracted) : (!quantum.bit, f64) -> (!quantum.bit, f64)
+            %2 = call @__catalyst_decompose_RZ_0(%1, %extracted) : (!quantum.bit, f64) -> !quantum.bit
             . . .
         }
 
 
 
     """
-    return (), {"epsilon": epsilon, "ppr_basis": ppr_basis}
+    if method not in ("deterministic", "mixed", "mixed-fallback"):
+        raise ValueError(
+            f"method must be 'deterministic', 'mixed' or 'mixed-fallback'. Got {method!r}."
+        )
+    return (), {"epsilon": epsilon, "ppr_basis": ppr_basis, "method": method}
 
 
 gridsynth = qp.transform(pass_name="gridsynth", setup_inputs=gridsynth_setup_inputs)

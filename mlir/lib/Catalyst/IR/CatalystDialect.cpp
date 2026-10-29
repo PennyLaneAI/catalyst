@@ -46,7 +46,7 @@ void CatalystDialect::initialize() {
         >();
 
     declarePromisedInterfaces<bufferization::BufferizableOpInterface, PrintOp, CustomCallOp,
-                              CallbackCallOp, CallbackOp>();
+                              RuntimeCallOp, CallbackCallOp, CallbackOp>();
 }
 
 //===----------------------------------------------------------------------===//

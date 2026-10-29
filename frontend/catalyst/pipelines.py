@@ -119,8 +119,7 @@ class CompileOptions:
             for autograph conversion.
         async_qnodes (Optional[bool]): Flag indicating whether experimental asynchronous execution
             of QNodes support is to be enabled.
-        lower_to_llvm (Optional[bool]): Flag indicating whether to attempt the LLVM lowering after
-            the main compilation pipeline is complete. Default is ``True``.
+        compiler_tool (str): Internal compiler driver tool selection. Defaults to ``"all"``.
         static_argnums (Optional[Union[int, Iterable[int]]]): Indices of static arguments.
             Default is ``None``.
         static_argnames (Optional[Union[str, Iterable[str]]]): Names of static arguments.
@@ -128,10 +127,6 @@ class CompileOptions:
         abstracted_axes (Optional[Any]): Store the abstracted_axes value. Default is ``None``.
         disable_assertions (Optional[bool]): Disable all assertions. Default is ``False``.
         seed (Optional[int]) : the seed for random operations in a qjit call.
-            Default is ``None``.
-        circuit_transform_pipeline (Optional[dict[str, dict[str, str]]]):
-            A dictionary that specifies the quantum circuit transformation pass pipeline order,
-            and optionally arguments for each pass in the pipeline.
             Default is ``None``.
         pass_plugins (Optional[Iterable[Path]]): List of paths to pass plugins.
         dialect_plugins (Optional[Iterable[Path]]): List of paths to dialect plugins.
@@ -151,6 +146,9 @@ class CompileOptions:
             decomposition rules reachable from all gates in the circuit will be compiled. If
             ``capture=False``, or ``capture="global"`` and ``qp.capture.enabled() == False``, this
             argument will be ignored. ``True`` by default.
+        enable_aot_compilation (bool): Controls whether or not to enable ahead-of-time compilation.
+            If ``True``, the QJIT object will attempt AOT compilation during object initialization.
+            ``True`` by default.
     """
 
     verbose: Optional[bool] = False
@@ -166,19 +164,25 @@ class CompileOptions:
     static_argnums: Optional[Union[int, Iterable[int]]] = None
     static_argnames: Optional[Union[str, Iterable[str]]] = None
     abstracted_axes: Optional[Union[Iterable[Iterable[str]], Dict[int, str]]] = None
-    lower_to_llvm: Optional[bool] = True
+    compiler_tool: str = "all"
     checkpoint_stage: Optional[str] = ""
     disable_assertions: Optional[bool] = False
     seed: Optional[int] = None
-    circuit_transform_pipeline: Optional[dict[str, dict[str, str]]] = None
     pass_plugins: Optional[Set[Path]] = None
     dialect_plugins: Optional[Set[Path]] = None
     capture: bool | Literal["global"] = "global"
     skip_preprocess: bool = False
     runtime_artifacts: tuple[str, ...] = ()
     collect_decomp_rules: bool = True
+    enable_aot_compilation: bool = True
 
     def __post_init__(self):
+        valid_targets = ("jaxpr", "mlir", "mlir_opt", "llvmir", "llvmir_opt", "object", "binary")
+        if self.target not in valid_targets:
+            raise ValueError(
+                f"Invalid compilation target '{self.target}'. Expected one of {valid_targets}."
+            )
+
         # Convert keep_intermediate to Enum
         self.keep_intermediate = _parse_keep_intermediate(self.keep_intermediate)
 

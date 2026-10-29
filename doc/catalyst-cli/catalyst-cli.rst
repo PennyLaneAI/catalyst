@@ -5,30 +5,45 @@ Catalyst includes a standalone command-line tool, ``catalyst``, that
 compiles quantum programs written in our MLIR dialects into an object file,
 independent of the Catalyst Python frontend.
 
-This compiler tool combines three stages of compilation:
+This compiler tool combines four stages of compilation:
 
 #. ``quantum-opt``: Performs the MLIR-level optimizations, including quantum optimizations, and
    translates the input dialect to the `LLVM dialect <https://mlir.llvm.org/docs/Dialects/LLVM/>`_.
 #. ``mlir-translate``: Translates the input LLVM dialect into
    `LLVM IR <https://llvm.org/docs/LangRef.html>`_.
-#. ``llc``: Performs lower-level optimizations on the LLVM IR input and creates the object file.
+#. ``llvm-opt``: Performs lower-level optimization and compilation on the LLVM IR needed for certain
+   features.
+#. ``llc``: Runs LLVM backend code generation and creates the object file.
 
-The ``catalyst`` tool will run all three stages under the hood by default, but it also has the
+The ``catalyst`` tool will run all stages under the hood by default, but it also has the
 ability to run each stage individually. For example:
 
 .. code-block:: console
 
-    # Creates both the optimized IR and an object file
-    catalyst input.mlir -o output.o
-
-    # Only performs MLIR optimizations and translates to LLVM dialect
+    # Run MLIR passes, returning LLVM-dialect MLIR
     catalyst --tool=opt input.mlir -o llvm-dialect.mlir
 
-    # Only lowers LLVM dialect input to LLVM IR
+    # Translate LLVM-dialect MLIR to LLVM IR
     catalyst --tool=translate llvm-dialect.mlir -o llvm-ir.ll
 
-    # Only performs lower-level optimizations and creates object file (object.o)
-    catalyst --tool=llc llvm-ir.ll -o output.ll --module-name object
+    # Run Catalyst's LLVM transformations
+    catalyst --tool=llvm-opt llvm-ir.ll -o optimized.ll
+
+    # Generate object.o from backend-ready LLVM IR
+    catalyst --tool=llc optimized.ll -o object.o
+
+Stages can be combined for a partial or full execution of the pipeline:
+
+.. code-block:: console
+
+    # Run MLIR passes and translation in one invocation, without LLVM transformations
+    catalyst --tool=opt-translate input.mlir -o llvm-ir.ll
+
+    # Run through LLVM transformations in one invocation, without object generation
+    catalyst --tool=opt-translate-llvm input.mlir -o optimized.ll
+
+    # Full compilation from mlir to object code
+    catalyst input.mlir
 
 .. note::
 
@@ -45,10 +60,9 @@ Usage
 
     catalyst [options] <input file>
 
-Calling ``catalyst`` without any options runs the three compilation stages (``quantum-opt``,
-``mlir-translate`` and ``llc``) using all default configurations, and outputs by default an object
-file named ``catalyst_module.o``. The name of the output file can be set by changing the output
-module name using the ``--module-name`` option (the default module name is ``catalyst_module``).
+Calling ``catalyst`` without any options runs the full compilation pipeline using all default
+configurations, and outputs by default an object file named ``catalyst_module.o``. Use
+``-o object.o`` to choose another output path.
 
 Command line options
 ^^^^^^^^^^^^^^^^^^^^
@@ -65,22 +79,35 @@ Show available command-line options and exit.
 ``--verbose``
 """""""""""""
 
-Emit verbose messages.
+Emit verbose progress messages to stderr.
 
 ``-o <filename>``
 """""""""""""""""
 
-Output IR filename. If no output filename is provided, the resulting IR is output to stdout.
+Destination for the selected tool's final output. ``opt`` produces MLIR. ``translate``,
+``llvm-opt``, ``opt-translate``, and ``opt-translate-llvm`` produce LLVM IR. ``all`` and
+``llc`` produce object code. With ``--emit-bytecode``, ``opt`` produces MLIR bytecode.
 
-``--tool=<opt|translate|llc|all>``
-""""""""""""""""""""""""""""""""""
+IR output can also be written to stdout with ``-o -``, which is the default value. However,
+object code requires a file destination. The default when ``-o`` is omitted in that case is
+``<module-name>.o`` in the current directory, using ``catalyst_module`` as the default
+module name.
 
-Select the tool to run individually. The default is ``all``.
+``--tool=<opt|translate|llvm-opt|llc>``
+"""""""""""""""""""""""""""""""""""""""
 
-* ``opt``: Run ``quantum-opt`` on the MLIR input.
-* ``translate``: Run ``mlir-translate`` on the LLVM dialect input.
-* ``llc``: Run ``llc`` on the LLVM IR input.
-* ``all``: Run all of ``opt``, ``translate`` and ``llc`` on the MLIR input.
+Select the tool to run individually. Each stage requires appropriate IR as input.
+
+* ``opt``: Run MLIR passes on MLIR input.
+* ``translate``: Translate LLVM-dialect MLIR to LLVM IR.
+* ``llvm-opt``: Run Catalyst's applicable LLVM transformations on LLVM IR input.
+* ``llc``: Run backend code generation on backend-ready LLVM IR input.
+
+A combination of stages (starting from MLIR) can also be run. ``all`` is the default.
+
+* ``opt-translate``: Run ``opt`` and ``translate`` on MLIR input.
+* ``opt-translate-llvm``: Run ``opt``, ``translate``, and ``llvm-opt`` on MLIR input.
+* ``all``: Run all stages. LLVM IR input is also accepted, skipping the MLIR stages.
 
 ``--save-ir-after-each=<pass|pipeline|changed>``
 """""""""""""""""""""""""""""""""""""""""""""""
@@ -123,6 +150,11 @@ name. Currently, the following pipelines are available:
 ``default-catalyst-pipeline`` which encompasses all the above as the default pipeline used by the
 Catalyst CLI tool if no pass option is specified.
 
+There is also ``user-transform-stage``, a shorter version of ``quantum-compilation-stage`` that
+stops right after ``apply-transform-sequence``, the pass that applies the user transforms. It is
+useful when only the program after the user transforms is needed, for example for resource
+analysis. It is not meant to be followed by the remaining stages.
+
 ``--catalyst-pipeline=<pipeline1(pass1[;pass2[;...]])[,pipeline2(...)]>``
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 
@@ -151,8 +183,9 @@ Note that the workspace directory must exist before running ``catalyst`` with th
 ``--module-name=<name>``
 """"""""""""""""""""""""
 
-The module name used in naming the output file(s). The default is ``"catalyst_module"``. Using the
-``-o`` option to specify the output filename overrides this option.
+The module name used for diagnostics, auxiliary compiler artifacts, and the default object
+filename ``<module-name>.o``. The default is ``"catalyst_module"``. An explicit ``-o`` path
+takes precedence over the default object filename.
 
 ``--async-qnodes[=<true|false>]``
 """""""""""""""""""""""""""""""""

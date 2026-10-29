@@ -29,6 +29,7 @@
 #include "catch2/matchers/catch_matchers_string.hpp"
 
 #include "Transport.hpp"
+#include "TransportBackend.h"
 #include "TransportCAPI.h"
 #include "TransportTestUtils.hpp"
 
@@ -67,6 +68,61 @@ TEST_CASE("check aborts on a non-OK status and a null session", "[transport]") {
                         ContainsSubstring("memory"));
     REQUIRE_THROWS_WITH(__catalyst__transport__check_session(nullptr, "get_session"),
                         ContainsSubstring("get_session: null session"));
+}
+
+TEST_CASE("a backend without a version symbol loads as version 1", "[transport]") {
+    auto *s = __catalyst__transport__create(STUB_V1_BACKEND_PATH, "cfg",
+                                            CATALYST_TRANSPORT_ROLE_CONTROLLER, "abi_v1");
+    REQUIRE(s != nullptr);
+    __catalyst__transport__destroy(s);
+}
+
+TEST_CASE("a coprocessor from a backend before version 3 is refused", "[transport]") {
+    CHECK(__catalyst__transport__create(STUB_V1_BACKEND_PATH, "cfg",
+                                        CATALYST_TRANSPORT_ROLE_COPROCESSOR,
+                                        "abi_v1_coproc") == nullptr);
+    REQUIRE_THROWS_WITH(__catalyst__transport__check_session(nullptr, "create"),
+                        ContainsSubstring("transport ABI version 1") &&
+                            ContainsSubstring("rebuild it against this runtime"));
+}
+
+TEST_CASE("a versioned backend is loaded only for the roles it reports", "[transport]") {
+    auto *s = __catalyst__transport__create(STUB_V2_BACKEND_PATH, "cfg",
+                                            CATALYST_TRANSPORT_ROLE_CONTROLLER, "abi_v2_ctrl");
+    REQUIRE(s != nullptr);
+    __catalyst__transport__destroy(s); // through the backend's own destroy hook
+
+    CHECK(__catalyst__transport__create(STUB_V2_BACKEND_PATH, "cfg",
+                                        CATALYST_TRANSPORT_ROLE_COPROCESSOR,
+                                        "abi_v2_coproc") == nullptr);
+    REQUIRE_THROWS_WITH(__catalyst__transport__check_session(nullptr, "create"),
+                        ContainsSubstring("backend 'stub' does not provide the coprocessor role"));
+}
+
+TEST_CASE("a backend built for a newer ABI is refused, naming both versions", "[transport]") {
+    CHECK(__catalyst__transport__create(STUB_V99_BACKEND_PATH, "cfg",
+                                        CATALYST_TRANSPORT_ROLE_CONTROLLER, "abi_v99") == nullptr);
+    REQUIRE_THROWS_WITH(__catalyst__transport__check_session(nullptr, "create"),
+                        ContainsSubstring("transport ABI version 99") &&
+                            ContainsSubstring("supports up to 3"));
+}
+
+TEST_CASE("in-tree backends report their capabilities", "[transport]") {
+    for (const char *path : {MEMCPY_CONTROLLER_BACKEND_PATH, MEMCPY_COPROCESSOR_BACKEND_PATH}) {
+        void *lib = dlopen(path, RTLD_LAZY | RTLD_NODELETE);
+        REQUIRE(lib != nullptr);
+        auto *version = reinterpret_cast<CatalystTransportAbiVersionFn *>(
+            dlsym(lib, CATALYST_TRANSPORT_ABI_VERSION_SYMBOL));
+        auto *query = reinterpret_cast<CatalystTransportQueryCapsFn *>(
+            dlsym(lib, CATALYST_TRANSPORT_QUERY_CAPS_SYMBOL));
+        REQUIRE(version != nullptr);
+        REQUIRE(query != nullptr);
+        CHECK(version() == CATALYST_TRANSPORT_ABI_VERSION);
+        const CatalystTransportCaps *caps = query();
+        CHECK(std::string_view{caps->name} == "memcpy");
+        CHECK(caps->frame_modes == (CATALYST_TRANSPORT_FRAME_BL16 | CATALYST_TRANSPORT_FRAME_BLV));
+        CHECK(caps->destroy_session != nullptr);
+    }
 }
 
 TEST_CASE("create registers a session resolvable by (role, key)", "[transport]") {
@@ -152,6 +208,36 @@ TEST_CASE("set_coprocessor_fn binds through the setter the backend implements", 
     __catalyst__transport__destroy(s);
 }
 
+TEST_CASE("the __call variants raise an error when the call fails", "[transport]") {
+    std::uint8_t buf[8] = {};
+    std::uint64_t samples[1] = {};
+    std::uint64_t rounds = 0;
+    REQUIRE_THROWS_WITH(__catalyst__transport__create__call("/no/such/backend.so", "", 0, ""),
+                        ContainsSubstring("create: null session"));
+    REQUIRE_THROWS_WITH(__catalyst__transport__get_session__call(0, "no_such_key"),
+                        ContainsSubstring("get_session: null session"));
+    REQUIRE_THROWS_WITH(__catalyst__transport__connect__call(nullptr, "127.0.0.1", 0),
+                        ContainsSubstring("connect failed"));
+    REQUIRE_THROWS_WITH(__catalyst__transport__exchange_keys__call(nullptr),
+                        ContainsSubstring("exchange_keys failed"));
+    REQUIRE_THROWS_WITH(__catalyst__transport__await__call(-1), ContainsSubstring("await failed"));
+    REQUIRE_THROWS_WITH(__catalyst__transport__establish_channel__call(nullptr, "rdma"),
+                        ContainsSubstring("establish_channel failed"));
+    REQUIRE_THROWS_WITH(__catalyst__transport__set_coprocessor_fn__call(nullptr, ""),
+                        ContainsSubstring("set_coprocessor_fn failed"));
+    REQUIRE_THROWS_WITH(__catalyst__transport__set_message_sizes__call(nullptr, 0, 8, 8),
+                        ContainsSubstring("set_message_sizes failed"));
+    REQUIRE_THROWS_WITH(__catalyst__transport__stage_payload__call(nullptr, buf, sizeof(buf), 0),
+                        ContainsSubstring("stage_payload failed"));
+    REQUIRE_THROWS_WITH(__catalyst__transport__post__call(nullptr, 0),
+                        ContainsSubstring("post failed"));
+    REQUIRE_THROWS_WITH(__catalyst__transport__collect__call(nullptr, buf, sizeof(buf)),
+                        ContainsSubstring("collect failed"));
+    REQUIRE_THROWS_WITH(__catalyst__transport__start_benchmark__call(nullptr, 1, 0, 0, samples,
+                                                                     sizeof(samples), &rounds),
+                        ContainsSubstring("start_benchmark failed"));
+}
+
 TEST_CASE("null session arguments are rejected without crashing", "[transport]") {
     CHECK(__catalyst__transport__connect(nullptr, "127.0.0.1", 0) == CATALYST_TRANSPORT_ERR);
     CHECK(__catalyst__transport__exchange_keys(nullptr) == CATALYST_TRANSPORT_ERR);
@@ -234,11 +320,11 @@ extern "C" const catalyst::transport::CoprocessorFnInfo *capi_test_scale_fn_info
 }
 
 // The scaling function again, with an info from an ABI version newer than this runtime knows.
-extern "C" std::size_t capi_test_scale_fn(const void *in, std::size_t in_len, void *out,
-                                          std::size_t out_cap, void *ctx);
-extern "C" std::size_t capi_test_future_fn(const void *in, std::size_t in_len, void *out,
-                                           std::size_t out_cap, void *ctx) {
-    return capi_test_scale_fn(in, in_len, out, out_cap, ctx);
+extern "C" std::size_t capi_test_scale_fn(const void *in, std::size_t in_len, std::uint32_t fn_id,
+                                          void *out, std::size_t out_cap, void *ctx);
+extern "C" std::size_t capi_test_future_fn(const void *in, std::size_t in_len, std::uint32_t fn_id,
+                                           void *out, std::size_t out_cap, void *ctx) {
+    return capi_test_scale_fn(in, in_len, fn_id, out, out_cap, ctx);
 }
 
 extern "C" const catalyst::transport::CoprocessorFnInfo *capi_test_future_fn_info() {
@@ -251,8 +337,8 @@ extern "C" const catalyst::transport::CoprocessorFnInfo *capi_test_future_fn_inf
 }
 
 // A function whose info has no version.
-extern "C" std::size_t capi_test_unversioned_fn(const void *, std::size_t, void *, std::size_t,
-                                                void *) {
+extern "C" std::size_t capi_test_unversioned_fn(const void *, std::size_t, std::uint32_t, void *,
+                                                std::size_t, void *) {
     return 0;
 }
 
@@ -281,7 +367,7 @@ extern "C" const catalyst::transport::CoprocessorFnInfo *steane_coprocessor_info
     return &info;
 }
 
-extern "C" std::size_t capi_test_scale_fn(const void *in, std::size_t, void *out,
+extern "C" std::size_t capi_test_scale_fn(const void *in, std::size_t, std::uint32_t, void *out,
                                           std::size_t out_cap, void *ctx) {
     std::uint64_t value = 0;
     std::memcpy(&value, in, sizeof(value));
@@ -427,6 +513,44 @@ TEST_CASE("set_coprocessor_fn rejects an info without an ABI version", "[transpo
     __catalyst__transport__destroy(co);
 }
 
+// Replies with the payload's first word times ten plus the fn_id, and records the payload length
+// it was handed.
+static std::size_t g_frame_fn_len = 0;
+extern "C" std::size_t capi_test_fields_fn(const void *payload, std::size_t len,
+                                           std::uint32_t fn_id, void *out, std::size_t out_cap,
+                                           void *) {
+    g_frame_fn_len = len;
+    std::uint64_t word = 0;
+    std::memcpy(&word, payload, std::min(len, sizeof(word)));
+    const std::uint64_t reply = word * 10 + fn_id;
+    const std::size_t n = std::min(out_cap, sizeof(reply));
+    std::memcpy(out, &reply, n);
+    return n;
+}
+
+TEST_CASE("a coprocessor function gets the payload, its length and the fn_id", "[transport]") {
+    g_frame_fn_len = 0;
+    auto *ct = make_memcpy_controller("fn_fields");
+    auto *co = make_memcpy_coprocessor("fn_fields");
+    REQUIRE(ct != nullptr);
+    REQUIRE(co != nullptr);
+    establish_memcpy_pair(ct, co, 19035);
+    REQUIRE(__catalyst__transport__set_coprocessor_fn(co, "capi_test_fields_fn") ==
+            CATALYST_TRANSPORT_OK);
+    __catalyst__transport__start(ct);
+    __catalyst__transport__start(co);
+    const std::uint64_t request = 4;
+    REQUIRE(__catalyst__transport__stage_payload(ct, &request, sizeof(request), /*fn_id=*/7) ==
+            CATALYST_TRANSPORT_OK);
+    REQUIRE(__catalyst__transport__post(ct, 0) == CATALYST_TRANSPORT_OK);
+    std::uint64_t reply = 0;
+    REQUIRE(__catalyst__transport__collect(ct, &reply, sizeof(reply)) == CATALYST_TRANSPORT_OK);
+    CHECK(reply == 47);
+    CHECK(g_frame_fn_len == sizeof(std::uint64_t)); // the payload alone, not the frame
+    __catalyst__transport__destroy(ct);
+    __catalyst__transport__destroy(co);
+}
+
 TEST_CASE("set_coprocessor_fn uses only the info of the library defining the function",
           "[transport]") {
     // The Steane decoder's library exports no info, but this executable exports one under the
@@ -490,13 +614,55 @@ TEST_CASE("memcpy backend plugins round-trip through the transport CAPI", "[tran
     __catalyst__transport__destroy(co);
 }
 
+TEST_CASE("memcpy backend plugins round-trip through the checked __call variants", "[transport]") {
+    auto *ct = make_memcpy_controller("memcpy_checked_roundtrip");
+    auto *co = make_memcpy_coprocessor("memcpy_checked_roundtrip");
+    REQUIRE(ct != nullptr);
+    REQUIRE(co != nullptr);
+
+    REQUIRE(__catalyst__transport__connect__call(ct, "loopback", 19012) == CATALYST_TRANSPORT_OK);
+    REQUIRE(__catalyst__transport__connect__call(co, "loopback", 19012) == CATALYST_TRANSPORT_OK);
+    REQUIRE(__catalyst__transport__exchange_keys__call(ct) == CATALYST_TRANSPORT_OK);
+    REQUIRE(__catalyst__transport__exchange_keys__call(co) == CATALYST_TRANSPORT_OK);
+    REQUIRE(__catalyst__transport__establish_channel__call(ct, "memcpy") == CATALYST_TRANSPORT_OK);
+    REQUIRE(__catalyst__transport__establish_channel__call(co, "memcpy") == CATALYST_TRANSPORT_OK);
+    REQUIRE(__catalyst__transport__set_message_sizes__call(
+                ct, 0, sizeof(std::uint64_t), sizeof(std::uint64_t)) == CATALYST_TRANSPORT_OK);
+    REQUIRE(__catalyst__transport__set_coprocessor_fn__call(co, "") == CATALYST_TRANSPORT_OK);
+
+    __catalyst__transport__start(ct);
+    __catalyst__transport__start(co);
+
+    auto *session = __catalyst__transport__get_session__call(CATALYST_TRANSPORT_ROLE_CONTROLLER,
+                                                             "memcpy_checked_roundtrip");
+    REQUIRE(session == ct);
+
+    const std::uint64_t request = 0x0123456789ABCDEFull;
+    REQUIRE(__catalyst__transport__stage_payload__call(session, &request, sizeof(request), 0) ==
+            CATALYST_TRANSPORT_OK);
+    REQUIRE(__catalyst__transport__post__call(session, 0) == CATALYST_TRANSPORT_OK);
+
+    std::uint64_t reply = 0;
+    REQUIRE(__catalyst__transport__collect__call(session, &reply, sizeof(reply)) ==
+            CATALYST_TRANSPORT_OK);
+    CHECK(reply == request);
+
+    __catalyst__transport__destroy(ct);
+    __catalyst__transport__destroy(co);
+}
+
 TEST_CASE("memcpy carries a reply larger than the provisioned reply region through the CAPI",
           "[transport]") {
     // exchange_keys provisions a 16 KiB reply region. The memcpy controller sizes its own reply
     // buffer from the committed out_bytes instead.
     constexpr std::size_t bytes = 40000;
-    auto *ct = make_memcpy_controller("memcpy_wide_reply");
-    auto *co = make_memcpy_coprocessor("memcpy_wide_reply");
+    const char *config = "frame=blv;frame_payload=40000";
+    auto *ct =
+        __catalyst__transport__create(MEMCPY_CONTROLLER_BACKEND_PATH, config,
+                                      CATALYST_TRANSPORT_ROLE_CONTROLLER, "memcpy_wide_reply");
+    auto *co =
+        __catalyst__transport__create(MEMCPY_COPROCESSOR_BACKEND_PATH, config,
+                                      CATALYST_TRANSPORT_ROLE_COPROCESSOR, "memcpy_wide_reply");
     REQUIRE(ct != nullptr);
     REQUIRE(co != nullptr);
 

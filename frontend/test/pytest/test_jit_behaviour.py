@@ -15,6 +15,7 @@
 import os
 import random
 import warnings
+from copy import deepcopy
 from functools import partial
 from timeit import default_timer as timer
 
@@ -25,7 +26,7 @@ import pytest
 from jax import numpy as jnp
 from numpy import pi
 
-from catalyst import for_loop, grad, measure, qjit
+from catalyst import QJIT, for_loop, grad, measure, qjit
 from catalyst.jax_primitives import _scalar_abstractify
 from catalyst.tracing.type_signatures import (
     TypeCompatibility,
@@ -424,6 +425,203 @@ class TestDecorator:
             return measure(wires=0)
 
         assert f_no_parenthesis(pi) == f_parenthesis(pi)
+
+
+class TestQJITTransforms:
+    """Test transforms applied directly to captured QJIT workflows."""
+
+    def test_transform_qjit_qnode(self, backend: str) -> None:
+        """A transform applied after qjit is scheduled on the wrapped QNode."""
+
+        @qjit(capture=True, collect_decomp_rules=False)
+        @qp.qnode(qp.device(backend, wires=1))
+        def circuit(theta):
+            qp.RX(theta, wires=0)
+            qp.Hadamard(0)
+            qp.Hadamard(0)
+            return qp.expval(qp.Z(0))
+
+        transformed: QJIT = qp.transforms.cancel_inverses(circuit)
+
+        assert isinstance(transformed, QJIT)
+        assert transformed is not circuit
+        assert qp.math.allclose(transformed(0.4), qp.math.cos(0.4))
+        assert qp.math.allclose(circuit(0.4), qp.math.cos(0.4))
+        assert transformed.mlir.count('transform.apply_registered_pass "cancel-inverses"') == 1
+        assert 'transform.apply_registered_pass "cancel-inverses"' not in circuit.mlir
+        assert qp.transforms.cancel_inverses in transformed.original_function.compile_pipeline
+
+        ops = qp.analyze(transformed, level=1)(0.5).resources.quantum_operations
+        assert ops.get("Hadamard", 0) == 0
+
+    def test_transform_qjit_classical_processing(self, backend: str) -> None:
+        """Transforming a QJIT preserves classical processing around its QNode."""
+
+        @qp.qnode(qp.device(backend, wires=1))
+        def circuit(theta):
+            qp.RX(theta, wires=0)
+            qp.Hadamard(0)
+            qp.Hadamard(0)
+            return qp.expval(qp.Z(0))
+
+        @qjit(capture=True, collect_decomp_rules=False)
+        def workflow(theta):
+            return 3 * circuit(2 * theta) + theta
+
+        transformed: QJIT = qp.transforms.cancel_inverses(workflow)
+        expected = 3 * qp.math.cos(0.8) + 0.4
+
+        assert isinstance(transformed, QJIT)
+        assert qp.math.allclose(transformed(0.4), expected)
+        assert qp.math.allclose(workflow(0.4), expected)
+        assert transformed.mlir.count('transform.apply_registered_pass "cancel-inverses"') == 1
+        assert 'transform.apply_registered_pass "cancel-inverses"' not in workflow.mlir
+        assert not circuit.compile_pipeline
+
+    def test_transform_qjit_multiple_qnodes(self, backend: str) -> None:
+        """A transform applied to a QJIT reaches every QNode in the workflow."""
+        device = qp.device(backend, wires=1)
+
+        @qp.qnode(device)
+        def first_circuit(theta):
+            qp.RX(theta, wires=0)
+            qp.Hadamard(0)
+            qp.Hadamard(0)
+            return qp.expval(qp.Z(0))
+
+        @qp.qnode(device)
+        def second_circuit(theta):
+            qp.RY(theta, wires=0)
+            qp.X(0)
+            qp.X(0)
+            return qp.expval(qp.Z(0))
+
+        @qjit(capture=True, collect_decomp_rules=False)
+        def workflow(theta):
+            return first_circuit(theta), 2 * second_circuit(3 * theta)
+
+        transformed: QJIT = qp.transforms.cancel_inverses(workflow)
+        expected = (qp.math.cos(0.4), 2 * qp.math.cos(1.2))
+
+        assert isinstance(transformed, QJIT)
+        assert qp.math.allclose(transformed(0.4), expected)
+        assert qp.math.allclose(workflow(0.4), expected)
+        assert transformed.mlir.count('transform.apply_registered_pass "cancel-inverses"') == 2
+        assert 'transform.apply_registered_pass "cancel-inverses"' not in workflow.mlir
+        assert not first_circuit.compile_pipeline
+        assert not second_circuit.compile_pipeline
+
+    @pytest.mark.parametrize("as_keyword", [False, True], ids=["positional", "keyword"])
+    def test_decompose_qjit_arguments(self, backend: str, as_keyword: bool) -> None:
+        """Decomposition accepts positional and keyword arguments after qjit."""
+
+        @qjit(capture=True)
+        @qp.qnode(qp.device(backend, wires=1))
+        def circuit(theta):
+            qp.Rot(theta, 2 * theta, 3 * theta, wires=0)
+            return qp.expval(qp.Z(0))
+
+        gate_set = [qp.RZ, qp.RY]
+        if as_keyword:
+            transformed = qp.decompose(circuit, gate_set=gate_set)
+        else:
+            transformed = qp.decompose(circuit, gate_set)
+
+        assert qp.math.allclose(transformed(0.4), qp.math.cos(0.8))
+        assert 'transform.apply_registered_pass "graph-decomposition"' in transformed.mlir
+        ops = qp.analyze(transformed, level=1)(0.4).resources.quantum_operations
+        assert ops == {"RZ": 2, "RY": 1}
+        original_ops = qp.analyze(circuit, level=1)(0.4).resources.quantum_operations
+        assert original_ops == {"Rot": 1}
+
+    def test_transform_executed_qjit_does_not_copy_cache(self, backend: str) -> None:
+        """Transforming an executed workflow starts with independent compilation state."""
+
+        @qp.qnode(qp.device(backend, wires=1))
+        def circuit(theta):
+            qp.RX(theta, wires=0)
+            qp.Hadamard(0)
+            qp.Hadamard(0)
+            return qp.expval(qp.Z(0))
+
+        @qjit(capture=True, collect_decomp_rules=False)
+        def workflow(theta):
+            return 2 * circuit(theta)
+
+        expected = 2 * qp.math.cos(0.4)
+        assert qp.math.allclose(workflow(0.4), expected)
+        assert workflow.llvmir is not None
+        original_artifacts = {
+            name: getattr(workflow, name)
+            for name in ("jaxpr", "mlir_module", "compiled_function", "workspace")
+        }
+        for name, artifact in original_artifacts.items():
+            assert artifact is not None, name
+        original_cache = workflow.fn_cache.cache.copy()
+        assert original_cache
+
+        transformed = qp.transforms.cancel_inverses(workflow)
+
+        assert transformed.fn_cache is not workflow.fn_cache
+        assert not transformed.fn_cache.cache
+        assert transformed.mlir is None
+        assert transformed.llvmir is None
+        for name, artifact in original_artifacts.items():
+            assert getattr(transformed, name) is None
+            assert getattr(workflow, name) is artifact
+
+        assert qp.math.allclose(transformed(0.4), expected)
+        assert transformed.llvmir is not None
+        assert transformed.fn_cache.cache
+        assert 'transform.apply_registered_pass "cancel-inverses"' in transformed.mlir
+        assert 'transform.apply_registered_pass "cancel-inverses"' not in workflow.mlir
+        for name, artifact in original_artifacts.items():
+            assert getattr(transformed, name) is not None
+            assert getattr(transformed, name) is not artifact
+            assert getattr(workflow, name) is artifact
+        assert workflow.fn_cache.cache.keys() == original_cache.keys()
+        for key, entry in original_cache.items():
+            assert workflow.fn_cache.cache[key] is entry
+        assert qp.math.allclose(workflow(0.4), expected)
+
+    def test_transform_qjit_copies_compile_options(self, backend: str) -> None:
+        """The transformed QJIT owns independent options, including nested mutable values."""
+
+        @qp.qnode(qp.device(backend, wires=1))
+        def circuit(theta):
+            qp.RX(theta, wires=0)
+            return qp.expval(qp.Z(0))
+
+        original = qjit(
+            circuit,
+            capture=True,
+            collect_decomp_rules=False,
+            target="mlir",
+            pipelines=[("custom", ["canonicalize"])],
+            seed=42,
+        )
+        original_options = original.compile_options
+        expected_options = deepcopy(vars(original_options))
+
+        transformed: QJIT = qp.transforms.cancel_inverses(original)
+
+        assert original.compile_options is original_options
+        assert vars(original.compile_options) == expected_options
+        assert transformed.compile_options is not original_options
+        assert transformed.compile_options.capture is True
+        assert transformed.compile_options.collect_decomp_rules is False
+        assert transformed.compile_options.target == "mlir"
+        assert transformed.compile_options.seed == 42
+        assert transformed.compile_options.pipelines == expected_options["pipelines"]
+
+        transformed.compile_options.seed = 123
+        transformed.compile_options.pipelines[0][1].append("cse")
+        transformed.compile_options.pipelines.append(("extra", ["canonicalize"]))
+
+        assert vars(original.compile_options) == expected_options
+        assert original.original_function is circuit
+        assert not circuit.compile_pipeline
+        assert len(transformed.original_function.compile_pipeline) == 1
 
 
 class TestCaching:
@@ -1157,6 +1355,92 @@ class TestAOTFailures:
 
         assert c.mlir
         assert "RX" in c.mlir
+
+
+class TestAOTCompileWithArguments:
+    """Test ahead-of-time compilation for given arguments."""
+
+    def test_compile_up_to_target(self):
+        """Test that compilation for the given arguments stops at the target, and that a later
+        call still compiles and runs the function."""
+
+        @qjit(target="mlir")
+        def f(x, y=1.0):
+            return x + y
+
+        f.aot_compile(0.5, y=2.0)
+
+        assert f.mlir_module is not None
+        assert f.compiled_function is None
+        assert not f.fn_cache.cache
+        assert f(0.5, y=2.0) == 2.5
+
+    def test_call_reuses_compiled_function(self):
+        """Test that a call with arguments matching those of the ahead-of-time compilation reuses
+        the compiled function."""
+
+        @qjit
+        def f(x):
+            return x * 2
+
+        f.aot_compile(jax.ShapeDtypeStruct((3,), jnp.float64))
+        compiled_function = f.compiled_function
+
+        assert compiled_function is not None
+        assert jnp.allclose(f(jnp.array([1.0, 2.0, 3.0])), jnp.array([2.0, 4.0, 6.0]))
+        assert f.compiled_function is compiled_function
+
+    def test_call_after_aot_compile_with_other_arguments(self):
+        """Test that a function compiled for some arguments can still be called with them after
+        compiling it ahead of time, up to MLIR, for arguments with another structure."""
+
+        @qjit(target="mlir")
+        def f(x):
+            return x
+
+        assert f(1.0) == 1.0
+        f.aot_compile((1.0, 2.0))
+        assert f(1.0) == 1.0
+
+
+class TestAOTCompileErrors:
+    """Test the handling of errors during ahead-of-time compilation."""
+
+    def test_errors_are_raised(self):
+        """Test that the errors of an ahead-of-time compilation requested explicitly are raised."""
+
+        @qjit
+        def f(x):
+            raise ValueError("Cannot compile")
+
+        with pytest.raises(ValueError, match="Cannot compile"):
+            f.aot_compile(0.5)
+
+    def test_errors_on_creation_are_logged(self, caplog):
+        """Test that the errors of the ahead-of-time compilation from the type hints, when the QJIT
+        object is created, are logged instead of raised, and raised when the function is called."""
+
+        @qjit
+        def f(x: float):
+            raise ValueError("Cannot compile")
+
+        assert "Cannot compile" in caplog.text
+        with pytest.raises(ValueError, match="Cannot compile"):
+            f(0.5)
+
+
+@pytest.mark.parametrize("enable_aot", [True, False])
+def test_toggle_aot_compilation(enable_aot):
+    @qp.qjit(capture=True, enable_aot_compilation=enable_aot)
+    @qp.qnode(qp.device("null.qubit", wires=2))
+    def circ():
+        qp.RX(0.5, wires=0)
+        return qp.expval(qp.PauliZ(0))
+
+    if enable_aot:
+        assert circ.mlir is not None
+    else:
+        assert circ.mlir is None
 
 
 if __name__ == "__main__":

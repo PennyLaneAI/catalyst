@@ -45,11 +45,12 @@ from pennylane.measurements import CountsMP
 from pennylane.pytrees import flatten, unflatten
 from pennylane.wires import AbstractQubit, Wires, is_abstract_qubit
 
-from catalyst.decomposition.capture_session import ModifierState, OpDecompRequest, TracedRule
+from catalyst.decomposition.capture_session import OpDecompRequest, TracedRule
 from catalyst.decomposition.decomposition_rules import (
     rule_call_operands,
     walk_reachable_decomp_rule_sets,
 )
+from catalyst.decomposition.modifier_state import ModifierState
 from catalyst.decomposition.rule_lowering_warning import RuleLoweringWarning
 from catalyst.from_plxpr.qref_jax_primitives import (
     MeasurementPlane,
@@ -131,7 +132,7 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
         """Any control wires used for a subroutine."""
         self.control_values = control_values
         """Any control values for executing a subroutine."""
-        self.modifier_context: ModifierState = (False, 0)
+        self.modifier_context = ModifierState()
         """Modifier context surrounding decomposition requests."""
         self.has_dynamic_allocation = False
         self.decomposition_scope = decomposition_scope
@@ -430,6 +431,7 @@ def _convert_decomp_target_spec(interpreter, target_spec):
             target_spec.kwarg_names,
             target_spec.wire_lens,
             target_spec.ctrl_wires,
+            target_spec.ctrl_values,
             target_spec.hybrid_leaves,
         )
         operands = [jax.ShapeDtypeStruct(operand.shape, operand.dtype) for operand in operands]
@@ -763,7 +765,6 @@ def handle_decomposition_rule(self, *, pyfun, func_jaxpr, is_qreg, num_params):
         target_gate=getattr(pyfun, "target_gate", None),
         resources=None,
         frontend_name=getattr(pyfun, "frontend_name", None),
-        num_wires=getattr(pyfun, "num_wires", None),
     )
 
     return ()
@@ -875,8 +876,7 @@ def handle_adjoint_transform(self, *invals, jaxpr, lazy, n_consts):
     consts = invals[:n_consts]
     args = invals[n_consts:]
     body_interpreter = copy(self)
-    adjoint, control_count = self.modifier_context
-    body_interpreter.modifier_context = (not adjoint, control_count)
+    body_interpreter.modifier_context = self.modifier_context.compose(ModifierState(adjoint=True))
     body = jaxpr_to_jaxpr(body_interpreter, jaxpr, consts, *args)
 
     return plxpr_adjoint_transform_prim.bind(
@@ -888,30 +888,37 @@ def handle_adjoint_transform(self, *invals, jaxpr, lazy, n_consts):
     )
 
 
-# pylint: disable=unused-argument
+# pylint: disable=unused-argument,too-many-arguments
 @PLxPRToQuantumJaxprInterpreter.register_primitive(plxpr_ctrl_transform_prim)
-def handle_ctrl_transform(self, *invals, jaxpr, n_control, control_values, work_wires, n_consts):
+def handle_ctrl_transform(
+    self, *invals, jaxpr, n_control, work_wires, n_consts, work_wire_type="borrowed"
+):
     """Interpret a control transform, then re-bind it for lowering to a `qref.ctrl` region op."""
+    values_start = len(invals) - n_control
+    controls_start = values_start - n_control
     consts = invals[:n_consts]
-    args = invals[n_consts:-n_control]
-    control_wires = invals[-n_control:]
+    args = invals[n_consts:controls_start]
+    control_wires = invals[controls_start:values_start]
+    control_values = invals[values_start:]
 
     control_qubits = [
         w if is_abstract_qubit(w) else qref_get_p.bind(self.init_qreg, w) for w in control_wires
     ]
     body_interpreter = copy(self)
-    adjoint, control_count = self.modifier_context
-    body_interpreter.modifier_context = (adjoint, control_count + n_control)
+    body_interpreter.modifier_context = self.modifier_context.compose(
+        ModifierState(control_count=n_control)
+    )
     body = jaxpr_to_jaxpr(body_interpreter, jaxpr, consts, *args)
 
     return plxpr_ctrl_transform_prim.bind(
         *body.consts,
         *args,
         *control_qubits,
+        *control_values,
         n_control=n_control,
         jaxpr=body.jaxpr,
-        control_values=control_values,
         work_wires=work_wires,
+        work_wire_type=work_wire_type,
         n_consts=len(body.consts),
     )
 

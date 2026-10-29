@@ -32,6 +32,8 @@ from jax.tree_util import tree_flatten, tree_unflatten
 from pennylane import exceptions
 from pennylane.logging import debug_logger
 from pennylane.measurements import CountsMP, ExpectationMP, ProbabilityMP, SampleMP, VarianceMP
+from pennylane.transforms import _tape_decompose
+from pennylane.transforms import decompose as pl_decompose
 from pennylane.transforms.dynamic_one_shot import (
     gather_non_mcm,
     init_auxiliary_tape,
@@ -46,7 +48,6 @@ from catalyst.jax_extras import deduce_avals, get_implicit_and_explicit_flat_arg
 from catalyst.jax_extras.tracing import uses_transform
 from catalyst.jax_primitives import quantum_kernel_p
 from catalyst.jax_tracer import Function, trace_quantum_function
-from catalyst.passes.pass_api import dict_to_compile_pipeline
 from catalyst.tracing.contexts import EvaluationContext
 from catalyst.tracing.type_signatures import filter_static_args
 from catalyst.utils.exceptions import CompileError
@@ -244,14 +245,13 @@ class QFunc:
             raise CompileError("Can't nest qnodes under qjit")
 
         assert isinstance(self, qp.QNode)
-        new_compile_pipeline, new_pass_pipeline = _extract_passes(self.compile_pipeline)
+        new_compile_pipeline, pass_pipeline = _extract_passes(self.compile_pipeline)
 
-        # Update the qnode with peephole pipeline
-        old_pass_pipeline = kwargs.pop("pass_pipeline", None)
-        processed_old_pass_pipeline = tuple(dict_to_compile_pipeline(old_pass_pipeline))
-
-        # Local pass pipelines should override global ones
-        pass_pipeline = new_pass_pipeline if new_pass_pipeline else processed_old_pass_pipeline
+        # One-shot / autograph may re-enter with already-extracted MLIR passes forwarded
+        # via kwargs (compile_pipeline on the QNode only keeps tape transforms).
+        forwarded_pass_pipeline = kwargs.pop("pass_pipeline", None)
+        if not pass_pipeline and forwarded_pass_pipeline is not None:
+            pass_pipeline = tuple(forwarded_pass_pipeline)
 
         # Update the QNode's original compile_pipeline
         new_qnode = copy(self)
@@ -631,22 +631,40 @@ def dynamic_one_shot(qnode, **kwargs):
     return one_shot_wrapper
 
 
+def _decompose_as_tape_transform(transform_program):
+    """Replace each ``qp.decompose`` with its tape-based implementation.
+
+    Without capture, this qp.decompose runs as the tape transform it used to be.
+    ``catalyst.passes.graph_decomposition`` is a separate transform, so it is still lowered as a
+    pass.
+    """
+    # pylint: disable=protected-access
+    if not any(t._transform is pl_decompose for t in transform_program):
+        return transform_program
+    pipeline = qp.CompilePipeline(
+        [
+            (
+                qp.core.transforms.BoundTransform(_tape_decompose, t.args, t.kwargs)
+                if t._transform is pl_decompose
+                else t
+            )
+            for t in transform_program
+        ]
+    )
+    for marker in transform_program.markers:
+        pipeline.add_marker(marker, transform_program.get_marker_level(marker))
+    return pipeline
+
+
 def _extract_passes(transform_program):
     """Extract transforms with pass names from the end of the CompilePipeline."""
+    transform_program = _decompose_as_tape_transform(transform_program)
     tape_transforms = []
     pass_pipeline = []
 
     i = len(transform_program)
     for t in reversed(transform_program):
-        # ``qp.decompose`` carries ``pass_name="graph-decomposition"`` so that, under program
-        # capture, it routes to the C++ ``graph-decomposition`` pass. That pass relies on
-        # capture-time rule embedding, which the legacy (non-capture) frontend does not provide.
-        # ``qp.decompose`` always has a tape definition, so here we fall back to running it as an
-        # ordinary tape transform (its pre-migration behavior). The explicit
-        # ``catalyst.passes.graph_decomposition`` entry point is pass-only (no tape definition) and
-        # continues to be lowered as a pass.
-        is_capture_only_pass = t.pass_name == "graph-decomposition" and t.tape_transform is not None
-        if t.pass_name is None or is_capture_only_pass:
+        if t.pass_name is None:
             break
         i -= 1
 

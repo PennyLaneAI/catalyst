@@ -14,36 +14,236 @@
 
 #include "RSDecomp.hpp"
 
+#include <algorithm>
+#include <array>
+#include <bit>
 #include <cassert>
 #include <cmath>
-#include <cstring>
+#include <complex>
+#include <cstdint>
+#include <optional>
+#include <sstream>
 #include <string>
+#include <tuple>
 #include <vector>
 
 #include "DataView.hpp"
 #include "GridProblems.hpp"
 #include "NormSolver.hpp"
 #include "NormalForms.hpp"
+#include "Real.hpp"
 #include "Rings.hpp"
 
-#define MAX_SEARCH_TRIALS 10000
 #define ROSS_CACHE_SIZE 10000
-
-namespace {
-bool is_odd_multiple_of_pi_4(double angle) {
-    const double pi_over_4 = M_PI / 4.0;
-    double multiple = angle / pi_over_4;
-    int rounded_multiple = static_cast<int>(std::round(multiple));
-    return (rounded_multiple % 2 != 0) && (std::abs(multiple - rounded_multiple) < 1e-10);
-}
-} // namespace
+// Factoring attempts per candidate. Candidates whose norm is hard to factor are skipped, since the
+// next levels of the grid problem provide plenty of further candidates.
+#define CANDIDATE_FACTORING_TRIALS 2
+#define MAX_CANDIDATES 100000
+#define MAX_MIXED_CANDIDATES 64
+// Minimum success probability |u|^2 of a fallback projective rotation, and the share of the
+// diamond-norm error budget given to the projective rotations (fallbacks are rare, so they can use
+// the remainder at a much looser accuracy). These minimize the expected T-count; with 0.99 and 0.5
+// it is about 2 T gates higher. The resource hints in
+// mlir/lib/Quantum/Transforms/GridsynthPatterns.cpp, e.g. `fallbackFailureProbability`, are fitted
+// for these values.
+#define FALLBACK_SUCCESS_PROBABILITY 0.95
+#define FALLBACK_PROJECTIVE_SHARE 0.9
+#define MAX_FALLBACK_EPSILON 0.25
+#define MAX_FALLBACK_LEVELS 200
 
 namespace RSDecomp::RossSelinger {
 
 using namespace RSDecomp::Rings;
+using namespace RSDecomp::Reals;
 using namespace RSDecomp::Utils;
 using namespace RSDecomp::CliffordData;
 using namespace RSDecomp::NormalForms;
+
+namespace {
+
+/**
+ * @brief The unitary [[u, -t^†], [t, u^†]] / √2^k approximating RZ(angle).
+ */
+struct RzSolution {
+    ZOmega u;
+    ZOmega t;
+    int k;
+};
+
+/**
+ * @brief Find the integer number of units of π/4 that the angle is equal to, within an error
+ * that keeps the decomposition within epsilon.
+ * @param angle The target rotation angle.
+ * @param epsilon The desired approximation precision.
+ * @return The number of units of π/4, or std::nullopt if the angle is not close enough to one.
+ */
+std::optional<INT_TYPE> as_multiple_of_pi_4(double angle, double epsilon) {
+    Real pi_4 = pi() / 4;
+    INT_TYPE units = round_int(Real(angle / pi_4));
+    // ||RZ(a) - RZ(b)|| <= |a - b| / 2
+    if (abs(Real(angle - Real(units) * pi_4)) <= 2 * Real(epsilon)) {
+        return units;
+    }
+    return std::nullopt;
+}
+
+/**
+ * @brief Solve the Diophantine equation |t|^2 = 2^k - |u|^2 that completes u to a unitary.
+ * @param u A solution of the grid problem at level k.
+ * @param k The level.
+ * @return t, or std::nullopt if no solution was found.
+ */
+std::optional<ZOmega> solve_norm_equation(const ZOmega &u, int k) {
+    ZSqrtTwo xi = ZSqrtTwo(INT_TYPE(1) << k, 0) - u.norm2().to_sqrt_two();
+    auto t = NormSolver::solve_diophantine(xi, CANDIDATE_FACTORING_TRIALS);
+    if (t && t->norm2() == xi.to_omega()) {
+        return t;
+    }
+    return std::nullopt;
+}
+
+/**
+ * @brief The Clifford+T normal form and global phase of an RzSolution.
+ */
+std::pair<std::vector<GateType>, double> normal_form(const RzSolution &solution) {
+    const auto &[u, t, k] = solution;
+    SO3Matrix so3_mat(DyadicMatrix(u, -t.conj(), t, u.conj(), INT_TYPE(k)));
+    return ma_normal_form(so3_mat);
+}
+
+/**
+ * @brief Solve the grid problem and Diophantine equation for RZ(angle) at level k = 0, 1, 2, ....
+ * @param angle The target rotation angle.
+ * @param epsilon The desired approximation precision.
+ * @return The solution at the smallest level, or std::nullopt if none was found up to the
+ * maximum level.
+ */
+std::optional<RzSolution> solve_rz(double angle, double epsilon) {
+    // RZ(angle)[0, 0] = e^{-i angle / 2}
+    GridProblem::RzGridSearch search(-Real(angle) / 2, Real(epsilon));
+
+    // Solutions are expected from level ~1.5 * log2(1/ε), and the number of candidates grows
+    // fourfold with every further level.
+    int max_k = static_cast<int>(1.5 * std::log2(std::max(1.0 / epsilon, 2.0))) + 40;
+    size_t num_candidates = 0;
+    std::optional<RzSolution> solution;
+
+    for (int k = 0; k <= max_k && !solution; k++) {
+        search.visit_level(k, [&](const ZOmega &u) {
+            if (auto t = solve_norm_equation(u, k)) {
+                solution = RzSolution{u, *t, k};
+                return false;
+            }
+            RT_FAIL_IF(++num_candidates > MAX_CANDIDATES,
+                       "Gridsynth exceeded the maximum number of candidate solutions.");
+            return true;
+        });
+    }
+    return solution;
+}
+
+/**
+ * @brief Fail for inputs that have no decomposition. This must happen before the cache lookups,
+ * as NaN keys compare equal to any cached key.
+ * @param angle The target rotation angle.
+ * @param epsilon The desired approximation precision.
+ */
+void validate_inputs(double angle, double epsilon) {
+    RT_FAIL_IF(!std::isfinite(angle), "Gridsynth requires a finite angle.");
+    RT_FAIL_IF(!(epsilon > 0) || !std::isfinite(epsilon),
+               "Gridsynth requires a positive, finite epsilon.");
+    if (epsilon < MIN_EPSILON) {
+        std::ostringstream oss;
+        oss << "Gridsynth received epsilon=" << std::scientific << epsilon
+            << ", but the smallest supported epsilon is " << std::defaultfloat << MIN_EPSILON
+            << ".";
+        RT_FAIL(oss.str().c_str());
+    }
+}
+
+// Grid-search accuracy for which every candidate satisfies 1 - Re(w)^2 <= epsilon / 2 (written to
+// avoid cancellation).
+double mixed_search_epsilon(double epsilon) {
+    return std::sqrt(epsilon / (1.0 + std::sqrt(1.0 - epsilon / 2.0)));
+}
+
+/**
+ * @brief Power k of diag(1, i^k) for the diagonal Cliffords I, S, Z, S^dagger, or -1 otherwise.
+ */
+int diagonal_clifford_power(GateType gate) {
+    switch (gate) {
+    case GateType::I:
+        return 0;
+    case GateType::S:
+        return 1;
+    case GateType::Z:
+        return 2;
+    case GateType::Sd:
+        return 3;
+    default:
+        return -1;
+    }
+}
+
+/**
+ * @brief Append `gate` to `gates`, merging it into the last gate when the product is exactly
+ * (including global phase) a single gate.
+ */
+void append_merged(std::vector<GateType> &gates, GateType gate) {
+    if (gates.empty()) {
+        gates.push_back(gate);
+        return;
+    }
+    GateType &last = gates.back();
+    int last_power = diagonal_clifford_power(last);
+    int power = diagonal_clifford_power(gate);
+    if (last_power >= 0 && power >= 0) {
+        static constexpr std::array<GateType, 4> powers = {GateType::I, GateType::S, GateType::Z,
+                                                           GateType::Sd};
+        last = powers[(last_power + power) % 4];
+        if (last == GateType::I) {
+            gates.pop_back();
+        }
+    } else if (last == GateType::S && gate == GateType::HT) {
+        last = GateType::SHT;
+    } else if (last == GateType::Sd && gate == GateType::SHT) {
+        last = GateType::HT;
+    } else {
+        gates.push_back(gate);
+    }
+}
+
+/**
+ * @brief Write a gate sequence into a memref passed as its unpacked descriptor fields.
+ */
+template <typename Gate>
+void fill_gates(size_t *data_aligned, size_t offset, size_t size0, size_t stride0,
+                const std::vector<Gate> &gates) {
+    const size_t sizes[1] = {size0};
+    const size_t strides[1] = {stride0};
+    DataView<size_t, 1> gates_view(data_aligned, offset, sizes, strides);
+    RT_FAIL_IF(gates_view.size() < gates.size(), "Error: memref allocated too small for gates.\n")
+    for (size_t i = 0; i < gates.size(); ++i) {
+        gates_view(i) = static_cast<size_t>(gates[i]);
+    }
+}
+
+/**
+ * @brief Select the branch and twirl of `mixed` from a uniform sample and return its sequence.
+ */
+std::pair<std::vector<GateType>, double> sample_twirled_sequence(const MixedDecomposition &mixed,
+                                                                 double uniform_sample) {
+    auto [branch, twirl] = sample_mixed_decomposition(mixed.probability, uniform_sample);
+    return {twirl_sequence(mixed.gates[branch], twirl), mixed.phases[branch]};
+}
+
+std::pair<std::vector<PPRGateType>, double>
+sequence_to_ppr(const std::pair<std::vector<GateType>, double> &sequence) {
+    auto [ppr_gates, ppr_phase_update] = HST_to_PPR(sequence.first);
+    return {std::move(ppr_gates), sequence.second + ppr_phase_update};
+}
+
+} // namespace
 
 /**
  * @brief Core function to compute the Clifford+T decomposition using the Ross-Selinger algorithm.
@@ -54,20 +254,9 @@ using namespace RSDecomp::NormalForms;
  */
 std::pair<std::vector<GateType>, double> compute_clifford_T_decomposition(double angle,
                                                                           double epsilon) {
-    ZOmega scale(0, 0, 0, 1);
-    double phase = 0.0;
-
-    ZOmega u(0, 0, 0, 1);
-    ZOmega t(0, 0, 0, 0);
-    INT_TYPE k = 0;
-
-    std::vector<GateType> decomposition;
-    DyadicMatrix dyd_mat(ZOmega(0), ZOmega(0), ZOmega(0), ZOmega(0), INT_TYPE(0));
-
-    if (is_odd_multiple_of_pi_4(angle)) {
-        const double pi_over_4 = M_PI / 4.0;
-        long units = std::lround(angle / pi_over_4);
-        int normalized = ((units % 8) + 8) % 8;
+    if (auto units = as_multiple_of_pi_4(angle, epsilon)) {
+        std::vector<GateType> decomposition;
+        int normalized = (((*units % 8) + 8) % 8).convert_to<int>();
 
         if (normalized & 4) {
             decomposition.emplace_back(GateType::Z);
@@ -83,48 +272,17 @@ std::pair<std::vector<GateType>, double> compute_clifford_T_decomposition(double
             decomposition.emplace_back(GateType::I);
         }
 
-        phase = static_cast<double>(units) * (M_PI / 8.0);
-    } else {
-        double modified_angle = -angle / 2.0;
-        long k = std::lround(modified_angle / M_PI_2);
-        double shift = -static_cast<double>(k) * M_PI_2;
-        int idx = ((k % 4) + 4) % 4;
-
-        switch (idx) {
-        case 0:                         // 0 shift (Identity)
-            scale = ZOmega(0, 0, 0, 1); // d=1
-            break;
-        case 1:                         // pi/2 shift
-            scale = ZOmega(0, 1, 0, 0); // b=1
-            break;
-        case 2:                          // pi shift
-            scale = ZOmega(0, 0, 0, -1); // d=-1
-            break;
-        case 3:                          // 3pi/2 (or -pi/2) shift
-            scale = ZOmega(0, -1, 0, 0); // b=-1
-            break;
-        }
-        GridProblem::GridIterator u_solutions(modified_angle + shift, epsilon, MAX_SEARCH_TRIALS);
-
-        for (const auto &[u_sol, k_val] : u_solutions) {
-            // Calculate 2^k_val as an INT_TYPE
-            INT_TYPE two_pow_k = INT_TYPE(1) << k_val;
-            auto xi = ZSqrtTwo(two_pow_k, 0) - u_sol.norm2().to_sqrt_two();
-            auto t_sol = NormSolver::solve_diophantine(xi, MAX_FACTORING_TRIALS);
-
-            if (t_sol) {
-                u = u_sol * scale;
-                t = *t_sol * scale;
-                k = k_val;
-                break;
-            }
-        }
-
-        dyd_mat = DyadicMatrix(u, -t.conj(), t, u.conj(), INT_TYPE(k));
-        SO3Matrix so3_mat(dyd_mat);
-        std::tie(decomposition, phase) = ma_normal_form(so3_mat);
+        return {std::move(decomposition), units->convert_to<double>() * (M_PI / 8.0)};
     }
-    return {std::move(decomposition), phase};
+
+    auto solution = solve_rz(angle, epsilon);
+    if (!solution) {
+        std::ostringstream oss;
+        oss << "Gridsynth failed to find a decomposition for angle=" << angle
+            << " and epsilon=" << std::scientific << epsilon << ".";
+        RT_FAIL(oss.str().c_str());
+    }
+    return normal_form(*solution);
 }
 
 // Cache for Standard Basis
@@ -133,6 +291,7 @@ using StdCacheValue = std::pair<std::vector<GateType>, double>;
 static lru_cache<StdCacheKey, StdCacheValue, ROSS_CACHE_SIZE> ross_cache_std;
 
 std::pair<std::vector<GateType>, double> eval_ross_algorithm(double angle, double epsilon) {
+    validate_inputs(angle, epsilon);
     StdCacheKey key = {angle, epsilon};
 
     if (auto val_opt = ross_cache_std.get(key); val_opt) {
@@ -150,6 +309,7 @@ using PPRCacheValue = std::pair<std::vector<PPRGateType>, double>;
 static lru_cache<PPRCacheKey, PPRCacheValue, ROSS_CACHE_SIZE> ross_cache_ppr;
 
 std::pair<std::vector<PPRGateType>, double> eval_ross_algorithm_ppr(double angle, double epsilon) {
+    validate_inputs(angle, epsilon);
     PPRCacheKey key = {angle, epsilon};
 
     if (auto val_opt = ross_cache_ppr.get(key); val_opt) {
@@ -166,133 +326,664 @@ std::pair<std::vector<PPRGateType>, double> eval_ross_algorithm_ppr(double angle
     return result;
 }
 
+namespace {
+
+// A 2x2 complex matrix in row-major order.
+using Matrix2 = std::array<std::complex<double>, 4>;
+
+Matrix2 multiply(const Matrix2 &a, const Matrix2 &b) {
+    return {a[0] * b[0] + a[1] * b[2], a[0] * b[1] + a[1] * b[3], a[2] * b[0] + a[3] * b[2],
+            a[2] * b[1] + a[3] * b[3]};
+}
+
+Matrix2 dagger(const Matrix2 &a) {
+    return {std::conj(a[0]), std::conj(a[2]), std::conj(a[1]), std::conj(a[3])};
+}
+
+const Matrix2 IDENTITY_MATRIX = {1.0, 0.0, 0.0, 1.0};
+// X, Y and Z, indexed by the Pauli axis of the PPRs.
+const std::array<Matrix2, 3> PAULI_MATRICES = {Matrix2{0.0, 1.0, 1.0, 0.0},
+                                               Matrix2{0.0, {0.0, -1.0}, {0.0, 1.0}, 0.0},
+                                               Matrix2{1.0, 0.0, 0.0, -1.0}};
+constexpr int AXIS_Z = 2;
+constexpr size_t NUM_GATE_TYPES = 10;
+
+// The following helpers rely on the order of `PPRGateType`: after I, each Pauli axis has the
+// cases P2, P4, P8, adjP2, adjP4, adjP8.
+
+PPRGateType pi_8_ppr(int axis, bool adjoint) {
+    return static_cast<PPRGateType>(1 + 6 * axis + (adjoint ? 3 : 0) + 2);
+}
+
+PPRGateType ppr_adjoint(PPRGateType gate) {
+    int index = static_cast<int>(gate) - 1;
+    return static_cast<PPRGateType>(1 + index / 6 * 6 + (index % 6 + 3) % 6);
+}
+
+bool is_pi_4_ppr(PPRGateType gate) { return (static_cast<int>(gate) - 1) % 3 == 1; }
+
 /**
- * @brief Try to convert a pair of gates for HST_to_PPR
- * @return std::pair<bool, double> true if a pair rule matched and was appended; false otherwise.
- * and the global phase update.
+ * @brief The matrix of the PPR `gate`, which must not be `PPRGateType::I`.
  */
-std::pair<bool, double> try_append_pair_expansion(std::vector<PPRGateType> &out, GateType current,
-                                                  GateType next) {
-    // We only care if the first gate is HT or SHT
-    if (current != GateType::HT && current != GateType::SHT) {
-        return {false, 0.0};
-    }
+Matrix2 ppr_matrix(PPRGateType gate) {
+    static constexpr std::array<int, 6> kinds = {2, 4, 8, -2, -4, -8};
+    int index = static_cast<int>(gate) - 1;
+    const Matrix2 &pauli = PAULI_MATRICES[index / 6];
+    double angle = M_PI / kinds[index % 6];
+    std::complex<double> c = std::cos(angle);
+    std::complex<double> s = {0.0, -std::sin(angle)};
+    return {c + s * pauli[0], s * pauli[1], s * pauli[2], c + s * pauli[3]};
+}
 
-    // Rule: HT, HT -> X8, Z8
-    if (current == GateType::HT && next == GateType::HT) {
-        out.insert(out.end(), {PPRGateType::X8, PPRGateType::Z8});
-        return {true, -M_PI / 4.0};
-    }
-
-    // Rule: HT, SHT -> X4, X8, Z8
-    if (current == GateType::HT && next == GateType::SHT) {
-        out.insert(out.end(), {PPRGateType::X4, PPRGateType::X8, PPRGateType::Z8});
-        return {true, -M_PI / 2.0};
-    }
-
-    // Rule: SHT, HT -> Z4, X8, Z8
-    if (current == GateType::SHT && next == GateType::HT) {
-        out.insert(out.end(), {PPRGateType::Z4, PPRGateType::X8, PPRGateType::Z8});
-        return {true, -M_PI / 2.0};
-    }
-
-    // Rule: SHT, SHT -> Z4, X4, X8, Z8
-    if (current == GateType::SHT && next == GateType::SHT) {
-        out.insert(out.end(), {PPRGateType::Z4, PPRGateType::X4, PPRGateType::X8, PPRGateType::Z8});
-        return {true, -3 * M_PI / 4.0};
-    }
-
-    return {false, 0.0};
+bool contains_t(GateType gate) {
+    return gate == GateType::T || gate == GateType::HT || gate == GateType::SHT;
 }
 
 /**
- * @brief Convert single gate for HST_to_PPR and return the global phase update.
+ * @brief The Clifford that `gate` applies before its T gate (I for T, H for HT and H S for SHT),
+ * or the gate itself if it is a Clifford gate.
  */
-double append_single_gate_expansion(std::vector<PPRGateType> &out, GateType gate) {
-    switch (gate) {
-    case GateType::T:
-        out.emplace_back(PPRGateType::Z8);
-        return -M_PI / 8.0;
-    case GateType::I:
-        out.emplace_back(PPRGateType::I);
-        return 0.0;
-    case GateType::X:
-        out.emplace_back(PPRGateType::X2);
-        return -M_PI / 2.0;
-    case GateType::Y:
-        out.emplace_back(PPRGateType::Y2);
-        return -M_PI / 2.0;
-    case GateType::Z:
-        out.emplace_back(PPRGateType::Z2);
-        return -M_PI / 2.0;
-    case GateType::H:
-        out.insert(out.end(), {PPRGateType::Z4, PPRGateType::X4, PPRGateType::Z4});
-        return -M_PI / 2.0;
-    case GateType::S:
-        out.emplace_back(PPRGateType::Z4);
-        return -M_PI / 4.0;
-    case GateType::Sd:
-        out.emplace_back(PPRGateType::adjZ4);
-        return M_PI / 4.0;
-    case GateType::HT:
-        // Applied commutation rules via PPR playground
-        out.insert(out.end(), {PPRGateType::X8, PPRGateType::Z4, PPRGateType::X4, PPRGateType::Z4});
-        return -5 * M_PI / 8.0;
-    case GateType::SHT:
-        // Applied commutation rules via PPR playground
-        out.insert(out.end(),
-                   {PPRGateType::adjY8, PPRGateType::adjX4, PPRGateType::Z4, PPRGateType::Z2});
-        return -7 * M_PI / 8.0;
-    default:
-        RT_FAIL("Unknown GateType encountered.");
-    }
+Matrix2 clifford_part(GateType gate) {
+    const Matrix2 h = {M_SQRT1_2, M_SQRT1_2, M_SQRT1_2, -M_SQRT1_2};
+    const Matrix2 s = {1.0, 0.0, 0.0, {0.0, 1.0}};
+    // In the order of `GateType`: T, HT, SHT, I, X, Y, Z, H, S, Sd.
+    const std::array<Matrix2, NUM_GATE_TYPES> parts = {IDENTITY_MATRIX,
+                                                       h,
+                                                       multiply(h, s),
+                                                       IDENTITY_MATRIX,
+                                                       PAULI_MATRICES[0],
+                                                       PAULI_MATRICES[1],
+                                                       PAULI_MATRICES[2],
+                                                       h,
+                                                       s,
+                                                       dagger(s)};
+    return parts[static_cast<size_t>(gate)];
 }
 
 /**
- * @brief Converts a sequence of GateType in Clifford+T basis to PPR basis
- * using predefined conversion rules.
- * @param input_gates The input vector of GateType representing the Clifford+T sequence.
- * @return std::pair<std::vector<PPRGateType>, double> The converted vector of PPRGateType and
- * the global phase update.
+ * @brief Find the index j and the phase d with `matrix` = e^{iπ d/4} `representatives[j]`.
  */
-std::pair<std::vector<PPRGateType>, double> HST_to_PPR(const std::vector<GateType> &input_gates) {
-    std::vector<PPRGateType> output_gates;
-    output_gates.reserve(input_gates.size() * 2);
-    double phase_update = 0;
+std::optional<std::pair<uint8_t, int>>
+identify_clifford(const std::vector<Matrix2> &representatives, const Matrix2 &matrix) {
+    for (size_t j = 0; j < representatives.size(); j++) {
+        Matrix2 quotient = multiply(dagger(representatives[j]), matrix);
+        // The unitary `quotient` is a multiple of the identity if and only if |tr(quotient)| = 2.
+        std::complex<double> half_trace = (quotient[0] + quotient[3]) / 2.0;
+        if (std::abs(std::abs(half_trace) - 1.0) < 1e-9) {
+            int d = static_cast<int>(std::lround(std::arg(half_trace) / (M_PI / 4.0)));
+            return std::pair<uint8_t, int>{j, (d % 8 + 8) % 8};
+        }
+    }
+    return std::nullopt;
+}
 
-    size_t i = 0;
-    while (i < input_gates.size()) {
-        // Try to consume a pair
-        if (i + 1 < input_gates.size()) {
-            if (auto [success, phase] =
-                    try_append_pair_expansion(output_gates, input_gates[i], input_gates[i + 1]);
-                success) {
-                phase_update += phase;
-                i += 2; // Consumed two gates
-                continue;
+constexpr size_t NUM_CLIFFORDS = 24;
+constexpr uint8_t IDENTITY_CLIFFORD = 0;
+// Sets of Cliffords are bit masks over their indices.
+constexpr uint32_t ALL_CLIFFORDS = (uint32_t{1} << NUM_CLIFFORDS) - 1;
+
+/**
+ * @brief Transition tables of the 24 single-qubit Cliffords up to global phase.
+ *
+ * The Clifford with index i is represented by the product C_i in SU(2) of its PPR sequence
+ * `tail[i]`, a shortest sequence of π/4 and π/2 PPRs (C_0 = I). Phases are counted in steps of
+ * π/8. For a gate g, `next`, `phase` and `rotation` describe
+ *   g C_i = e^{iπ phase/8} C_next             if g is a Clifford gate,
+ *   g C_i = e^{iπ phase/8} C_next R_P(π/8)    if g contains a T gate,
+ * where R_P(π/8) = exp(-iπ/8 P) is the PPR `rotation` about the signed Pauli P = C_next^† Z C_next.
+ * Using T = S T^† instead of T, the gates containing a T gate may alternatively be written as
+ *   g C_i = e^{iπ (phase + flip_phase)/8} C_flip_next R_P(-π/8)
+ * with `flip_next` and `flip_phase` taken at index `next`.
+ */
+struct CliffordTables {
+    std::array<std::array<uint8_t, NUM_GATE_TYPES>, NUM_CLIFFORDS> next;
+    std::array<std::array<int, NUM_GATE_TYPES>, NUM_CLIFFORDS> phase;
+    std::array<std::array<PPRGateType, NUM_GATE_TYPES>, NUM_CLIFFORDS> rotation;
+    std::array<uint8_t, NUM_CLIFFORDS> flip_next;
+    std::array<int, NUM_CLIFFORDS> flip_phase;
+    // The inverses of the permutations `next[.][g]` and `flip_next`.
+    std::array<std::array<uint8_t, NUM_GATE_TYPES>, NUM_CLIFFORDS> previous;
+    std::array<uint8_t, NUM_CLIFFORDS> flip_previous;
+    std::array<std::vector<PPRGateType>, NUM_CLIFFORDS> tail;
+    // The number of π/4 PPRs and the total number of PPRs of `tail`, to be minimized in this order.
+    std::array<std::pair<int, int>, NUM_CLIFFORDS> tail_cost;
+};
+
+CliffordTables build_clifford_tables() {
+    CliffordTables tables;
+
+    // Breadth-first search over the π/4 and π/2 PPRs, so every Clifford takes at most two PPRs.
+    // Among the shortest sequences, the search keeps the first one in the generator order below,
+    // which prefers Z and X rotations over Y rotations.
+    const std::array<PPRGateType, 9> generators = {
+        PPRGateType::Z4,    PPRGateType::adjZ4, PPRGateType::X4,
+        PPRGateType::adjX4, PPRGateType::Z2,    PPRGateType::X2,
+        PPRGateType::Y4,    PPRGateType::adjY4, PPRGateType::Y2};
+    std::vector<Matrix2> representatives = {IDENTITY_MATRIX};
+    std::vector<std::vector<PPRGateType>> tails = {{}};
+    for (size_t i = 0; i < representatives.size(); i++) {
+        for (PPRGateType generator : generators) {
+            Matrix2 product = multiply(ppr_matrix(generator), representatives[i]);
+            if (!identify_clifford(representatives, product)) {
+                representatives.push_back(product);
+                tails.push_back(tails[i]);
+                tails.back().push_back(generator);
+            }
+        }
+    }
+    RT_FAIL_IF(representatives.size() != NUM_CLIFFORDS,
+               "There are 24 single-qubit Cliffords up to global phase.");
+
+    auto identify = [&](const Matrix2 &matrix) {
+        auto found = identify_clifford(representatives, matrix);
+        RT_FAIL_IF(!found, "Expected a Clifford.");
+        return *found;
+    };
+    const Matrix2 s = clifford_part(GateType::S);
+    for (size_t i = 0; i < NUM_CLIFFORDS; i++) {
+        tables.tail[i] = tails[i];
+        int num_pi_4 = std::count_if(tails[i].begin(), tails[i].end(), is_pi_4_ppr);
+        tables.tail_cost[i] = {num_pi_4, static_cast<int>(tails[i].size())};
+
+        for (size_t g = 0; g < NUM_GATE_TYPES; g++) {
+            GateType gate = static_cast<GateType>(g);
+            auto [j, d] = identify(multiply(clifford_part(gate), representatives[i]));
+            tables.next[i][g] = j;
+            tables.previous[j][g] = i;
+            tables.phase[i][g] = 2 * d;
+            tables.rotation[i][g] = PPRGateType::I;
+            if (contains_t(gate)) {
+                // T = e^{iπ/8} R_Z(π/8) and R_Z(π/8) C_j = C_j R_P(π/8) with P = C_j^† Z C_j.
+                tables.phase[i][g] += 1;
+                const Matrix2 &frame = representatives[j];
+                Matrix2 image = multiply(dagger(frame), multiply(PAULI_MATRICES[AXIS_Z], frame));
+                for (int axis = 0; axis < 3; axis++) {
+                    Matrix2 overlap = multiply(PAULI_MATRICES[axis], image);
+                    double coefficient = (overlap[0] + overlap[3]).real() / 2.0;
+                    if (std::abs(coefficient) > 0.5) {
+                        tables.rotation[i][g] = pi_8_ppr(axis, coefficient < 0);
+                    }
+                }
             }
         }
 
-        // Fallback to consuming a single gate
-        phase_update += append_single_gate_expansion(output_gates, input_gates[i]);
-        i += 1; // Consumed one gate
+        // T = S T^† = e^{-iπ/8} S R_Z(-π/8), which changes the phase by -2 steps besides that of S.
+        auto [k, d] = identify(multiply(s, representatives[i]));
+        tables.flip_next[i] = k;
+        tables.flip_previous[k] = i;
+        tables.flip_phase[i] = 2 * d - 2;
+    }
+    return tables;
+}
+
+const CliffordTables &clifford_tables() {
+    static const CliffordTables tables = build_clifford_tables();
+    return tables;
+}
+
+/**
+ * @brief The image of the set of Cliffords `cliffords` under the index map `map`.
+ */
+template <typename Map> uint32_t map_cliffords(uint32_t cliffords, Map map) {
+    uint32_t image = 0;
+    for (; cliffords != 0; cliffords &= cliffords - 1) {
+        image |= uint32_t{1} << map(std::countr_zero(cliffords));
+    }
+    return image;
+}
+
+} // namespace
+
+/**
+ * @brief Convert a Clifford+T sequence into π/8 PPRs followed by at most two Clifford PPRs.
+ *
+ * Each T gate is moved past the Clifford K applied before it, using
+ * T K = e^{iπ/8} K exp(-iπ/8 K^† Z K), so that it becomes a π/8 rotation about the signed Pauli
+ * K^† Z K. The accumulated Clifford is applied at the end of the sequence, as its shortest PPR
+ * sequence. The π/8 rotations are not merged, so there is one per T gate. For the T-optimal normal
+ * forms of the Ross-Selinger algorithm, neighboring π/8 rotations therefore have different axes, as
+ * they would otherwise merge into a Clifford.
+ *
+ * The sign of each π/8 rotation is free: with T = S T^†, a T gate may instead become the rotation
+ * exp(iπ/8 K^† Z K) with the Clifford S K accumulated. The signs are chosen such that the
+ * accumulated Clifford has the cheapest PPR sequence that can be reached, with the fewest π/4 PPRs
+ * and then the fewest PPRs. Except for sequences with very few T gates, this is the identity, so
+ * that no Clifford PPRs remain. A forward pass finds the Cliffords reachable before each T gate, a
+ * backward pass picks the signs leading to the cheapest final Clifford, and a last forward pass
+ * emits the PPRs. Each pass takes a few table lookups per gate.
+ *
+ * @param input_gates The Clifford+T sequence, applied first to last.
+ * @return The PPR sequence, applied first to last, and the global phase update in [-π, π).
+ */
+std::pair<std::vector<PPRGateType>, double> HST_to_PPR(const std::vector<GateType> &input_gates) {
+    const CliffordTables &tables = clifford_tables();
+
+    std::vector<uint32_t> reachable_before_t;
+    uint32_t reachable = uint32_t{1} << IDENTITY_CLIFFORD;
+    for (GateType gate : input_gates) {
+        size_t g = static_cast<size_t>(gate);
+        if (contains_t(gate)) {
+            reachable_before_t.push_back(reachable);
+        }
+        if (reachable == ALL_CLIFFORDS) {
+            // Every gate permutes the Cliffords, so all of them stay reachable.
+            continue;
+        }
+        reachable = map_cliffords(reachable, [&](size_t i) { return tables.next[i][g]; });
+        if (contains_t(gate)) {
+            reachable |= map_cliffords(reachable, [&](size_t j) { return tables.flip_next[j]; });
+        }
     }
 
-    return {output_gates, phase_update};
+    uint8_t frame = std::countr_zero(reachable);
+    for (uint32_t remaining = reachable; remaining != 0; remaining &= remaining - 1) {
+        uint8_t candidate = std::countr_zero(remaining);
+        if (tables.tail_cost[candidate] < tables.tail_cost[frame]) {
+            frame = candidate;
+        }
+    }
+
+    std::vector<bool> flipped(reachable_before_t.size(), false);
+    size_t t_index = reachable_before_t.size();
+    for (auto gate = input_gates.rbegin(); gate != input_gates.rend(); ++gate) {
+        size_t g = static_cast<size_t>(*gate);
+        if (!contains_t(*gate)) {
+            frame = tables.previous[frame][g];
+            continue;
+        }
+        t_index--;
+        uint8_t unflipped = tables.previous[frame][g];
+        if (reachable_before_t[t_index] >> unflipped & 1) {
+            frame = unflipped;
+        } else {
+            flipped[t_index] = true;
+            frame = tables.previous[tables.flip_previous[frame]][g];
+        }
+    }
+    assert(frame == IDENTITY_CLIFFORD && t_index == 0);
+
+    std::vector<PPRGateType> output_gates;
+    output_gates.reserve(reachable_before_t.size() + 2);
+    // The gates converted so far equal e^{iπ phase_steps/8} C_frame R, for the product R of the π/8
+    // rotations in `output_gates`.
+    int phase_steps = 0;
+    for (GateType gate : input_gates) {
+        size_t g = static_cast<size_t>(gate);
+        phase_steps += tables.phase[frame][g];
+        PPRGateType rotation = tables.rotation[frame][g];
+        frame = tables.next[frame][g];
+        if (!contains_t(gate)) {
+            continue;
+        }
+        if (flipped[t_index++]) {
+            rotation = ppr_adjoint(rotation);
+            phase_steps += tables.flip_phase[frame];
+            frame = tables.flip_next[frame];
+        }
+        output_gates.push_back(rotation);
+    }
+    output_gates.insert(output_gates.end(), tables.tail[frame].begin(), tables.tail[frame].end());
+    phase_steps = ((phase_steps + 7) % 16 + 16) % 16 - 7;
+    return {output_gates, -phase_steps * M_PI / 8.0};
+}
+
+size_t count_t_gates(const std::vector<GateType> &gates) {
+    return std::count_if(gates.begin(), gates.end(), [](GateType gate) {
+        return gate == GateType::T || gate == GateType::HT || gate == GateType::SHT;
+    });
+}
+
+namespace {
+/**
+ * @brief Search for the cheapest mixture of an under-rotating and an over-rotating candidate.
+ *
+ * Writing a candidate's top-left entry as `w * exp(-i angle/2)`, it under-rotates the target if
+ * Im(w) <= 0 and over-rotates it if Im(w) >= 0. A pair is mixed with the probability p of
+ * Equation (33) of arXiv:2203.10064, and admissible if the diamond-norm error
+ * 2 (p e_under + (1 - p) e_over) of the mixture is at most `epsilon`, where e is the error of a
+ * candidate. Of the admissible pairs found, the one with the lowest expected T-count is kept.
+ */
+class MixedPairSearch {
+  public:
+    struct Candidate {
+        std::vector<GateType> gates;
+        double phase;
+        std::complex<double> w;
+        // Bottom-left entry of the unitary the gate sequence implements.
+        std::complex<double> v;
+        // Computed in multiprecision, since it is of order epsilon.
+        double error;
+        size_t t_count;
+    };
+
+    explicit MixedPairSearch(double epsilon) : epsilon(epsilon) {}
+
+    /**
+     * @brief Consider the grid solution `u / sqrt(2)^k` with relative top-left entry `w`.
+     * @return false if the search should stop.
+     */
+    bool offer(const ZOmega &u, int k, std::complex<double> w, double error) {
+        bool is_under = w.imag() <= 0.0;
+        bool is_over = w.imag() >= 0.0;
+        // Until the other side has a candidate, more candidates on a filled side cannot form a
+        // pair, so skip their (expensive) norm equation.
+        bool same_side_filled = is_under ? !unders.empty() : !overs.empty();
+        bool other_side_empty = is_under ? overs.empty() : unders.empty();
+        if (!best && !(is_under && is_over) && same_side_filled && other_side_empty) {
+            return true;
+        }
+        if (unders.size() + overs.size() >= MAX_MIXED_CANDIDATES) {
+            return false;
+        }
+        auto t = solve_norm_equation(u, k);
+        if (!t) {
+            return true;
+        }
+        auto [gates, phase] = normal_form(RzSolution{u, *t, k});
+        size_t t_count = count_t_gates(gates);
+        // Heuristic stop: T-counts mostly, but not strictly, grow along the search.
+        if (best && t_count > best->cost) {
+            return false;
+        }
+
+        // The normal form of [[u, -t*], [t, u*]] implements its transpose, [[u, t], [-t*, u*]].
+        std::complex<double> v = -std::conj(t->to_complex()) / std::pow(M_SQRT2, k);
+        Candidate candidate{std::move(gates), phase, w, v, error, t_count};
+        if (is_under) {
+            unders.push_back(candidate);
+            for (size_t j = 0; j < overs.size(); j++) {
+                evaluate(unders.size() - 1, j);
+            }
+        }
+        if (is_over) {
+            overs.push_back(std::move(candidate));
+            for (size_t i = 0; i < unders.size(); i++) {
+                evaluate(i, overs.size() - 1);
+            }
+        }
+        return true;
+    }
+
+    bool found() const { return best.has_value(); }
+    const Candidate &under() const { return unders[best->under]; }
+    const Candidate &over() const { return overs[best->over]; }
+    double probability() const { return best->probability; }
+    double diamond() const { return best->diamond; }
+
+  private:
+    struct Pair {
+        size_t under;
+        size_t over;
+        double probability;
+        double diamond;
+        double cost;
+    };
+
+    void evaluate(size_t i, size_t j) {
+        const Candidate &under = unders[i];
+        const Candidate &over = overs[j];
+        // p = r2^2 sin(2 delta2) / (r2^2 sin(2 delta2) - r1^2 sin(2 delta1)), with
+        // r^2 sin(2 delta) = 2 Re(w) Im(w).
+        double under_weight = under.w.real() * under.w.imag();
+        double over_weight = over.w.real() * over.w.imag();
+        double denominator = over_weight - under_weight;
+        double p = denominator > 0.0 ? over_weight / denominator : 1.0;
+        double diamond = 2.0 * (p * under.error + (1.0 - p) * over.error);
+        // Tolerate rounding for candidates on the bound.
+        if (diamond > epsilon * (1.0 + 1e-12)) {
+            return;
+        }
+        double cost = p * under.t_count + (1.0 - p) * over.t_count;
+        if (!best || cost < best->cost) {
+            best = Pair{i, j, p, diamond, cost};
+        }
+    }
+
+    double epsilon;
+    std::vector<Candidate> unders;
+    std::vector<Candidate> overs;
+    std::optional<Pair> best;
+};
+
+/**
+ * @brief Visit the solutions u of `grid_search` at the levels k = 0, ..., max_k, together with
+ * w = u * conj(z) / sqrt(2)^k for z = e^{i theta}, until `visit(u, k, Re(w), Im(w))` returns false
+ * or MAX_CANDIDATES solutions were visited.
+ */
+template <typename Visit>
+void visit_grid_solutions(const GridProblem::RzGridSearch &grid_search, const Real &theta,
+                          int max_k, Visit &&visit) {
+    Real zx = cos(theta);
+    Real zy = sin(theta);
+    size_t num_candidates = 0;
+    bool searching = true;
+    for (int k = 0; k <= max_k && searching; k++) {
+        Real scale = pow(sqrt2(), k);
+        searching = grid_search.visit_level(k, [&](const ZOmega &u) {
+            if (++num_candidates > MAX_CANDIDATES) {
+                return false;
+            }
+            Real re = (zx * real_part(u) + zy * imag_part(u)) / scale;
+            Real im = (zx * imag_part(u) - zy * real_part(u)) / scale;
+            return visit(u, k, re, im);
+        });
+    }
+}
+} // namespace
+
+/**
+ * @brief Compute a mixed diagonal approximation of RZ(angle) with diamond-norm accuracy epsilon.
+ *
+ * Implements the mixed diagonal approximation of Kliuchnikov et al., "Shorter quantum circuits via
+ * single-qubit gate approximation", Quantum 7, 1208 (2023), arXiv:2203.10064, Section 3.4
+ * (Proposition 3.13, with the diamond-norm bound of Theorem 3.12). Writing each
+ * candidate's top-left entry as `w * exp(-i angle/2)`, an under-rotation (Im(w) <= 0) and an
+ * over-rotation (Im(w) >= 0) are mixed with probabilities p and 1 - p, and each is
+ * twirled over {I, S, Z, S^dagger} when applied. Of the candidate pairs found, the one with the
+ * lowest expected T-count whose mixture meets the diamond-norm bound of Theorem 3.12 is kept.
+ */
+MixedDecomposition compute_mixed_diagonal_decomposition(double angle, double epsilon) {
+    // A unitary with operator-norm error epsilon/2 has diamond-norm error at most epsilon.
+    if (as_multiple_of_pi_4(angle, epsilon / 2.0)) {
+        auto exact = compute_clifford_T_decomposition(angle, epsilon / 2.0);
+        return {{exact.first, exact.first}, {exact.second, exact.second}, 1.0};
+    }
+
+    // RZ(angle)[0, 0] = e^{-i angle / 2}. Every candidate of the search satisfies the even split
+    // 1 - Re(w)^2 <= epsilon/2 of Proposition 3.13.
+    double search_epsilon = mixed_search_epsilon(epsilon);
+    Real theta = -Real(angle) / 2;
+    GridProblem::RzGridSearch grid_search(theta, Real(search_epsilon));
+    MixedPairSearch search(epsilon);
+
+    // Theorem 3.12: the error of a candidate is 1 - Re(w)^2.
+    int max_k = static_cast<int>(1.5 * std::log2(1.0 / search_epsilon)) + 40;
+    visit_grid_solutions(
+        grid_search, theta, max_k, [&](const ZOmega &u, int k, const Real &re, const Real &im) {
+            Real error = 1 - re * re;
+            return search.offer(u, k, {re.convert_to<double>(), im.convert_to<double>()},
+                                error.convert_to<double>());
+        });
+
+    if (!search.found()) {
+        auto fallback = compute_clifford_T_decomposition(angle, epsilon / 2.0);
+        return {{fallback.first, fallback.first}, {fallback.second, fallback.second}, 1.0};
+    }
+
+    return {{search.under().gates, search.over().gates},
+            {search.under().phase, search.over().phase},
+            search.probability()};
+}
+
+/**
+ * @brief Select the branch and twirl of a mixed decomposition from a uniform sample in [0, 1).
+ * @return The pair (branch, twirl).
+ */
+std::pair<size_t, size_t> sample_mixed_decomposition(double probability, double uniform_sample) {
+    double u = std::clamp(uniform_sample, 0.0, std::nextafter(1.0, 0.0));
+    size_t branch = u < probability ? 0 : 1;
+    double fraction = branch == 0 ? u / probability : (u - probability) / (1.0 - probability);
+    size_t twirl = std::min<size_t>(3, static_cast<size_t>(4.0 * fraction));
+    return {branch, twirl};
+}
+
+/**
+ * @brief Apply the twirl sigma U sigma^dagger, sigma in {I, S, Z, S^dagger}, to a gate sequence
+ * (applied first to last), merging the twirl gates into adjacent gates where possible.
+ */
+std::vector<GateType> twirl_sequence(const std::vector<GateType> &gates, size_t twirl) {
+    // (sigma^dagger, sigma) for sigma in {I, S, Z, S^dagger}.
+    static constexpr std::array<std::pair<GateType, GateType>, 4> twirls = {{
+        {GateType::I, GateType::I},
+        {GateType::Sd, GateType::S},
+        {GateType::Z, GateType::Z},
+        {GateType::S, GateType::Sd},
+    }};
+    assert(twirl < twirls.size() && "twirl index must select one of {I, S, Z, S^dagger}");
+    if (twirl == 0) {
+        return gates;
+    }
+    std::vector<GateType> twirled;
+    twirled.reserve(gates.size() + 2);
+    twirled.push_back(twirls[twirl].first);
+    for (GateType gate : gates) {
+        append_merged(twirled, gate);
+    }
+    append_merged(twirled, twirls[twirl].second);
+    if (twirled.empty()) {
+        twirled.push_back(GateType::I);
+    }
+    return twirled;
+}
+
+// Cache for mixed decompositions
+using MixedCacheKey = std::tuple<double, double>;
+static lru_cache<MixedCacheKey, MixedDecomposition, ROSS_CACHE_SIZE> mixed_cache;
+
+/**
+ * @brief Sample a twirled sequence of the mixed decomposition of RZ(angle).
+ *
+ * `epsilon` has the meaning of `eval_ross_algorithm`: the mixed channel has diamond-norm error at
+ * most 2 * epsilon, the guarantee of a single sequence with operator-norm error epsilon.
+ */
+std::pair<std::vector<GateType>, double> eval_mixed_ross_algorithm(double angle, double epsilon,
+                                                                   double uniform_sample) {
+    validate_inputs(angle, epsilon);
+    MixedCacheKey key = {angle, epsilon};
+    auto mixed = mixed_cache.get(key);
+    if (!mixed) {
+        mixed = compute_mixed_diagonal_decomposition(angle, 2.0 * epsilon);
+        mixed_cache.put(key, *mixed);
+    }
+    return sample_twirled_sequence(*mixed, uniform_sample);
+}
+
+std::pair<std::vector<PPRGateType>, double>
+eval_mixed_ross_algorithm_ppr(double angle, double epsilon, double uniform_sample) {
+    return sequence_to_ppr(eval_mixed_ross_algorithm(angle, epsilon, uniform_sample));
+}
+
+/**
+ * @brief Compute a mixed fallback approximation of RZ(angle) with diamond-norm accuracy epsilon.
+ *
+ * Implements the mixed fallback protocol of Kliuchnikov et al., arXiv:2203.10064, Section 3.5
+ * (Proposition 3.18 and Theorem 3.17). Each projective rotation V = [[u, -v*], [v, u*]] acts on an
+ * ancilla between two CY gates controlled by the target. Measuring the ancilla in the Z basis
+ * applies exp(i Arg(u) Z) to the target with probability |u|^2 and exp(i Arg(v) Z) otherwise
+ * (Section 3.3), in which case a mixed diagonal fallback B ~ exp(i (-angle/2 - Arg(v)) Z) follows.
+ * An under-rotating and an over-rotating projective rotation are mixed with probabilities p and
+ * 1 - p. Of the candidate pairs found, the one with the lowest expected T-count of the projective
+ * rotations is kept, as the fallbacks only add (1 - |u|^2) times their T-count.
+ */
+MixedFallbackDecomposition compute_mixed_fallback_decomposition(double angle, double epsilon) {
+    // A unitary with operator-norm error epsilon/2 has diamond-norm error at most epsilon.
+    if (as_multiple_of_pi_4(angle, epsilon / 2.0)) {
+        // The diagonal V never fails.
+        auto [gates, phase] = compute_clifford_T_decomposition(angle, epsilon / 2.0);
+        FallbackBranch exact{gates, phase, 1.0, 0.0, epsilon};
+        return {{exact, exact}, 1.0};
+    }
+
+    // Each candidate satisfies sin|Arg(u) - target|^2 <= epsilon_1 / 2 of Proposition 3.18, and
+    // succeeds with probability |u|^2 >= FALLBACK_SUCCESS_PROBABILITY.
+    const double projective_epsilon = FALLBACK_PROJECTIVE_SHARE * epsilon;
+    const Real max_sin = sqrt(Real(projective_epsilon / 2.0));
+    const Real min_overlap = sqrt(Real(FALLBACK_SUCCESS_PROBABILITY));
+    Real theta = -Real(angle) / 2;
+    auto grid_search = GridProblem::RzGridSearch::sector(theta, asin(max_sin), min_overlap);
+    MixedPairSearch search(projective_epsilon);
+
+    // Equation (34): the error of a candidate is q sin(delta)^2 = Im(w)^2.
+    visit_grid_solutions(
+        grid_search, theta, MAX_FALLBACK_LEVELS,
+        [&](const ZOmega &u, int k, const Real &re, const Real &im) {
+            Real magnitude = sqrt(re * re + im * im);
+            if (magnitude < min_overlap || re <= 0 || abs(im) > magnitude * max_sin) {
+                return true;
+            }
+            Real error = im * im;
+            return search.offer(u, k, {re.convert_to<double>(), im.convert_to<double>()},
+                                error.convert_to<double>());
+        });
+
+    if (!search.found()) {
+        // V = -iY = [[0, -1], [1, 0]] always fails, which leaves the full accuracy to the fallback
+        // of RZ(angle).
+        FallbackBranch always_fail{{GateType::Y}, M_PI / 2, 0.0, 0.0, epsilon};
+        return {{always_fail, always_fail}, 1.0};
+    }
+
+    // Equation (36): split the remaining accuracy evenly between the two fallback terms
+    // p_k (1 - q_k) ||B_k - Z_theta||.
+    const double fallback_budget = (epsilon - search.diamond()) / 2.0;
+    auto make_branch = [&](const MixedPairSearch::Candidate &candidate, double weight) {
+        double success = std::norm(candidate.w);
+        double failure_weight = weight * (1.0 - success);
+        double fallback_epsilon =
+            failure_weight > 0.0 ? std::min(fallback_budget / failure_weight, MAX_FALLBACK_EPSILON)
+                                 : MAX_FALLBACK_EPSILON;
+        return FallbackBranch{candidate.gates, candidate.phase, success, std::arg(candidate.v),
+                              fallback_epsilon};
+    };
+    return {{make_branch(search.under(), search.probability()),
+             make_branch(search.over(), 1.0 - search.probability())},
+            search.probability()};
+}
+
+// Cache for mixed fallback decompositions
+static lru_cache<MixedCacheKey, MixedFallbackDecomposition, ROSS_CACHE_SIZE> fallback_cache;
+
+/**
+ * @brief The branch of the mixed fallback decomposition of RZ(angle) selected by `uniform_sample`,
+ * with `epsilon` as in `eval_mixed_ross_algorithm`.
+ */
+static FallbackBranch eval_fallback_branch(double angle, double epsilon, double uniform_sample) {
+    validate_inputs(angle, epsilon);
+    MixedCacheKey key = {angle, epsilon};
+    auto fallback = fallback_cache.get(key);
+    if (!fallback) {
+        fallback = compute_mixed_fallback_decomposition(angle, 2.0 * epsilon);
+        fallback_cache.put(key, *fallback);
+    }
+    size_t branch = sample_mixed_decomposition(fallback->probability, uniform_sample).first;
+    return fallback->branches[branch];
+}
+
+std::pair<std::vector<GateType>, double> eval_fallback_projective(double angle, double epsilon,
+                                                                  double uniform_sample) {
+    FallbackBranch branch = eval_fallback_branch(angle, epsilon, uniform_sample);
+    return {std::move(branch.projective_gates), branch.projective_phase};
+}
+
+std::pair<std::vector<PPRGateType>, double>
+eval_fallback_projective_ppr(double angle, double epsilon, double uniform_sample) {
+    return sequence_to_ppr(eval_fallback_projective(angle, epsilon, uniform_sample));
 }
 
 // Extern C implementation
 extern "C" {
 
 size_t rs_decomposition_get_size(double theta, double epsilon, bool ppr_basis) {
-    if (epsilon < 1e-6) {
-        std::ostringstream oss;
-        oss << std::scientific << epsilon;
-        RT_WARN("Gridsynth received epsilon=" + oss.str() +
-                ". For epsilon smaller than 1e-6, results may be inaccurate, or errors may"
-                " occur during decomposition. To guarantee correctness, please provide a larger "
-                "epsilon value.");
-    }
     if (ppr_basis) {
         auto result = eval_ross_algorithm_ppr(theta, epsilon);
         return result.first.size();
@@ -323,31 +1014,11 @@ size_t rs_decomposition_get_size(double theta, double epsilon, bool ppr_basis) {
 void rs_decomposition_get_gates([[maybe_unused]] size_t *data_allocated, size_t *data_aligned,
                                 size_t offset, size_t size0, size_t stride0, double theta,
                                 double epsilon, bool ppr_basis) {
-    (void)data_allocated;
-
-    const size_t sizes[1] = {size0};
-    const size_t strides[1] = {stride0};
-
-    // Wrap the memref descriptor in a DataView for access
-    DataView<size_t, 1> gates_view(data_aligned, offset, sizes, strides);
-
     if (ppr_basis) {
-        const auto &[gates, phase] = eval_ross_algorithm_ppr(theta, epsilon);
-        size_t s = gates.size();
-        RT_FAIL_IF(gates_view.size() < s, "Error: memref allocated too small for PPR gates.\n")
-
-        for (size_t i = 0; i < s; ++i) {
-            gates_view(i) = static_cast<size_t>(gates[i]);
-        }
+        fill_gates(data_aligned, offset, size0, stride0,
+                   eval_ross_algorithm_ppr(theta, epsilon).first);
     } else {
-        const auto &[gates, phase] = eval_ross_algorithm(theta, epsilon);
-
-        size_t s = gates.size();
-        RT_FAIL_IF(gates_view.size() < s, "Error: memref allocated too small for PPR gates.\n")
-
-        for (size_t i = 0; i < s; ++i) {
-            gates_view(i) = static_cast<size_t>(gates[i]);
-        }
+        fill_gates(data_aligned, offset, size0, stride0, eval_ross_algorithm(theta, epsilon).first);
     }
 }
 
@@ -365,6 +1036,140 @@ double rs_decomposition_get_phase(double theta, double epsilon, bool ppr_basis) 
     } else {
         return eval_ross_algorithm(theta, epsilon).second;
     }
+}
+
+/**
+ * @brief Returns the length of the sampled mixed decomposition.
+ *
+ * The three `rs_mixed_decomposition_*` functions are deterministic in `uniform_sample`, so calling
+ * them with the same sample returns the size, gates, and phase of the same sequence.
+ *
+ * @param theta Angle
+ * @param epsilon Error, as in `rs_decomposition_get_size`
+ * @param ppr_basis Whether to use PPR basis
+ * @param uniform_sample Uniform random number in [0, 1) selecting the branch and twirl
+ */
+size_t rs_mixed_decomposition_get_size(double theta, double epsilon, bool ppr_basis,
+                                       double uniform_sample) {
+    if (ppr_basis) {
+        return eval_mixed_ross_algorithm_ppr(theta, epsilon, uniform_sample).first.size();
+    }
+    return eval_mixed_ross_algorithm(theta, epsilon, uniform_sample).first.size();
+}
+
+/**
+ * @brief Fills a pre-allocated memref with the sampled mixed gate sequence.
+ *
+ * The memref is unpacked into individual arguments, as in `rs_decomposition_get_gates`.
+ *
+ * @param data_allocated Pointer to allocated data
+ * @param data_aligned Pointer to aligned data
+ * @param offset Data offset
+ * @param size0 Size of dimension 0
+ * @param stride0 Stride of dimension 0
+ * @param theta Angle
+ * @param epsilon Error, as in `rs_decomposition_get_size`
+ * @param ppr_basis Whether to use PPR basis
+ * @param uniform_sample Uniform random number in [0, 1) selecting the branch and twirl
+ */
+void rs_mixed_decomposition_get_gates([[maybe_unused]] size_t *data_allocated, size_t *data_aligned,
+                                      size_t offset, size_t size0, size_t stride0, double theta,
+                                      double epsilon, bool ppr_basis, double uniform_sample) {
+    if (ppr_basis) {
+        fill_gates(data_aligned, offset, size0, stride0,
+                   eval_mixed_ross_algorithm_ppr(theta, epsilon, uniform_sample).first);
+    } else {
+        fill_gates(data_aligned, offset, size0, stride0,
+                   eval_mixed_ross_algorithm(theta, epsilon, uniform_sample).first);
+    }
+}
+
+/**
+ * @brief Returns the global phase of the sampled mixed decomposition.
+ *
+ * @param theta Angle
+ * @param epsilon Error, as in `rs_decomposition_get_size`
+ * @param ppr_basis Whether to use PPR basis
+ * @param uniform_sample Uniform random number in [0, 1) selecting the branch and twirl
+ * @return double The global phase
+ */
+double rs_mixed_decomposition_get_phase(double theta, double epsilon, bool ppr_basis,
+                                        double uniform_sample) {
+    if (ppr_basis) {
+        return eval_mixed_ross_algorithm_ppr(theta, epsilon, uniform_sample).second;
+    }
+    return eval_mixed_ross_algorithm(theta, epsilon, uniform_sample).second;
+}
+
+/**
+ * @brief Returns the length of the sampled projective rotation of a mixed fallback decomposition.
+ *
+ * The `rs_fallback_*` functions are deterministic in `uniform_sample`, so calling them with the
+ * same sample refers to the same projective rotation.
+ *
+ * @param theta Angle
+ * @param epsilon Error, as in `rs_decomposition_get_size`
+ * @param ppr_basis Whether to use PPR basis
+ * @param uniform_sample Uniform random number in [0, 1) selecting the projective rotation
+ */
+size_t rs_fallback_projective_get_size(double theta, double epsilon, bool ppr_basis,
+                                       double uniform_sample) {
+    if (ppr_basis) {
+        return eval_fallback_projective_ppr(theta, epsilon, uniform_sample).first.size();
+    }
+    return eval_fallback_projective(theta, epsilon, uniform_sample).first.size();
+}
+
+/**
+ * @brief Fills a pre-allocated memref with the sampled projective rotation sequence.
+ *
+ * The memref is unpacked into individual arguments, as in `rs_decomposition_get_gates`.
+ */
+void rs_fallback_projective_get_gates([[maybe_unused]] size_t *data_allocated, size_t *data_aligned,
+                                      size_t offset, size_t size0, size_t stride0, double theta,
+                                      double epsilon, bool ppr_basis, double uniform_sample) {
+    if (ppr_basis) {
+        fill_gates(data_aligned, offset, size0, stride0,
+                   eval_fallback_projective_ppr(theta, epsilon, uniform_sample).first);
+    } else {
+        fill_gates(data_aligned, offset, size0, stride0,
+                   eval_fallback_projective(theta, epsilon, uniform_sample).first);
+    }
+}
+
+/**
+ * @brief Returns the global phase of the sampled projective rotation sequence.
+ */
+double rs_fallback_projective_get_phase(double theta, double epsilon, bool ppr_basis,
+                                        double uniform_sample) {
+    if (ppr_basis) {
+        return eval_fallback_projective_ppr(theta, epsilon, uniform_sample).second;
+    }
+    return eval_fallback_projective(theta, epsilon, uniform_sample).second;
+}
+
+/**
+ * @brief Returns the angle of the RZ rotation that the fallback approximates when the projective
+ * rotation selected by `uniform_sample` fails.
+ *
+ * The fallback is the mixed decomposition of the `rs_mixed_decomposition_*` functions for this
+ * angle and the epsilon of `rs_fallback_recovery_epsilon`.
+ *
+ * @param theta Angle
+ * @param epsilon Error, as in `rs_decomposition_get_size`
+ * @param uniform_sample Uniform random number in [0, 1) selecting the projective rotation
+ */
+double rs_fallback_recovery_angle(double theta, double epsilon, double uniform_sample) {
+    // B ~ exp(i (-theta/2 - Arg(v)) Z) = RZ(theta + 2 Arg(v)).
+    return theta + 2.0 * eval_fallback_branch(theta, epsilon, uniform_sample).failure_angle;
+}
+
+/**
+ * @brief Returns the epsilon of the fallback for `rs_fallback_recovery_angle`, in the convention of
+ * `rs_mixed_decomposition_get_size`.
+ */
+double rs_fallback_recovery_epsilon(double theta, double epsilon, double uniform_sample) {
+    return eval_fallback_branch(theta, epsilon, uniform_sample).fallback_epsilon / 2.0;
 }
 
 } // extern "C"

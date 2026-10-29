@@ -57,7 +57,7 @@ enum SaveTemps { None, AfterPipeline, AfterPassChanged, AfterPass };
  * @brief Defines the different functional stages of the driver.
  *
  */
-enum Action { OPT, Translate, LLC, All };
+enum Action { OPT, Translate, LLVMOpt, LLC, OptTranslate, OptTranslateLLVM, All };
 
 /**
  * @brief Defines the format of the input data.
@@ -113,9 +113,6 @@ struct CompilerOptions {
     bool dumpPassPipeline;
     /// If true, the compiler will write bytecode rather than text.
     bool shouldEmitBytecode;
-
-    /// Get the destination of the object file at the end of compilation.
-    std::string getObjectFile() const;
 };
 
 /**
@@ -126,7 +123,6 @@ struct CompilerOptions {
 struct CompilerOutput {
     using PipelineOutputs = std::unordered_map<std::string, std::string>;
     std::string outputFilename;
-    std::string outIR;
     std::string diagnosticMessages;
     PipelineOutputs pipelineOutputs;
     size_t globalPipelineCounter = 0; // Counter for root-level pipeline summary files

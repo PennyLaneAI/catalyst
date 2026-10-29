@@ -71,9 +71,6 @@ constexpr const char *kDefaultOrtLib = "libonnxruntime.dylib";
 constexpr const char *kDefaultOrtLib = "libonnxruntime.so";
 #endif
 
-// The u32 decoder_id and u32 seq_num that end every request frame (see WireProtocol.hpp).
-constexpr std::size_t kFrameTrailerBytes = 8;
-
 // A GPU provider: its config name and the name onnxruntime exports its attach function under.
 struct GpuProvider {
     const char *key;
@@ -503,14 +500,14 @@ catalyst_onnx_coprocessor_info() {
     return &kInfo;
 }
 
-// The model runs on the frame's payload, which ends where the frame's decoder_id and seq_num begin.
+// The model runs on the message's payload; one model serves every fn_id.
 CATALYST_ONNX_EXPORT std::size_t catalyst_onnx_coprocessor(const void *in, std::size_t in_len,
-                                                           void *out, std::size_t out_cap,
-                                                           void *ctx) {
-    if (!ctx || !in || !out || in_len < kFrameTrailerBytes) {
+                                                           std::uint32_t /*fn_id*/, void *out,
+                                                           std::size_t out_cap, void *ctx) {
+    if (!ctx || !in || !out) {
         return catalyst::transport::COPROCESSOR_FN_ERROR;
     }
-    return static_cast<OnnxCoprocessor *>(ctx)->run(in, in_len - kFrameTrailerBytes, out, out_cap);
+    return static_cast<OnnxCoprocessor *>(ctx)->run(in, in_len, out, out_cap);
 }
 
 } // extern "C"
