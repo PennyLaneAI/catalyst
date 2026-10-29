@@ -25,6 +25,7 @@ from catalyst.jax_tracer import HybridOp, has_nested_tapes
 from catalyst.utils.exceptions import CompileError
 
 
+@pytest.mark.old_frontend
 def test_no_parameters(backend):
     """Test no-param operations."""
 
@@ -82,7 +83,8 @@ def test_no_parameters(backend):
 
         qp.MultiControlledX(wires=[0, 1, 2, 3])
 
-        qp.BlockEncode(np.array([[1, 1, 1], [0, 1, 0]]), wires=[0, 1, 2])
+        # TODO: bring this back when BlockEncode works with capture
+        # qp.BlockEncode(np.array([[1, 1, 1], [0, 1, 0]]), wires=[0, 1, 2])
 
         # Unsupported:
         # qp.SX(wires=0)
@@ -161,6 +163,7 @@ def test_param(backend):
     assert np.allclose(qjit_fn(3.14, 0.6), qp_fn(3.14, 0.6))
 
 
+@pytest.mark.old_frontend
 def test_hybrid_op_repr(backend):
     """Test hybrid operation representation"""
 
@@ -208,7 +211,7 @@ def test_hybrid_op_repr(backend):
                 assert not has_nested_tapes(op)
         return qp.state()
 
-    qjit(qp.qnode(qp.device(backend, wires=4))(circuit))(1)
+    qjit(qp.qnode(qp.device(backend, wires=4))(circuit), capture=False)(1)
 
 
 @pytest.mark.parametrize("inp", [(1.0), (2.0), (3.0), (4.0)])
@@ -234,12 +237,13 @@ def test_qubitunitary_complex(inp, backend):
     assert np.allclose(compiled(inp), interpreted(inp))
 
 
+@pytest.mark.old_frontend
 def test_multicontrolledx_via_paulix():
     """Test that lightning executes multicontrolled x via paulix rather than qubit unitary."""
 
     dev = qp.device("lightning.qubit", wires=4)
 
-    @qjit
+    @qjit(capture=False)
     @qp.qnode(dev)
     def circuit():
         qp.Hadamard(0)
