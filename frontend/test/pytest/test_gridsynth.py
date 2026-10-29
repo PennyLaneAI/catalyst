@@ -216,10 +216,6 @@ def test_gridsynth_ppr_basis_no_cliffords(method):
 
 
 @pytest.mark.parametrize("ppr_basis", [False, True])
-@pytest.mark.xfail(
-    reason="graph decomposition does not yet work gridsynth",
-    strict=True,
-)
 def test_mixed_fallback_gridsynth_specs_wires(ppr_basis):
     """Test the known limitation that specs counts every ancilla allocation of the mixed fallback
     method as a wire, although each ancilla is released before the next one is allocated."""
