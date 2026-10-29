@@ -870,6 +870,7 @@ def gridsynth_setup_inputs(epsilon=1e-4, ppr_basis=False, method="deterministic"
         :math:`\pi/8` PPRs rotate about different Paulis. The signs of the :math:`\pi/8` PPRs are
         chosen such that no Clifford gates remain, except in short sequences with few T gates,
         which may end with up to two :math:`\pi/4` or :math:`\pi/2` PPRs.
+        About a third of the :math:`\pi/8` PPRs become :math:`Y`-basis PPRs in this process.
 
     .. note::
 
