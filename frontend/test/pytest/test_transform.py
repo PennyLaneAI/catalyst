@@ -47,6 +47,7 @@ from catalyst.utils.exceptions import CompileError
 # pylint: disable=too-many-lines,line-too-long
 
 
+@pytest.mark.old_frontend
 def test_add_noise(backend):
     """Test the add_noise transform on a simple circuit"""
 
@@ -79,7 +80,7 @@ def test_add_noise(backend):
     qnode_backend = qnode_builder(backend)
 
     expected = jax.jit(qnode_control)(0.9, 0.4, 0.5, 0.6)
-    observed = qjit(qnode_backend)(0.9, 0.4, 0.5, 0.6)
+    observed = qjit(qnode_backend, capture=False)(0.9, 0.4, 0.5, 0.6)
     assert np.allclose(expected, observed)
 
     _, expected_shape = jax.tree_util.tree_flatten(expected)
@@ -120,6 +121,7 @@ def test_batch_input(backend):
     assert expected_shape == observed_shape
 
 
+@pytest.mark.old_frontend
 def test_batch_params(backend):
     """Test batch param"""
 
@@ -149,7 +151,7 @@ def test_batch_params(backend):
     qnode_backend = qnode_builder(backend)
 
     jax_jit = jax.jit(qnode_control)
-    compiled = qjit(qnode_backend)
+    compiled = qjit(qnode_backend, capture=False)
     expected = jax_jit(data, x, weights)
     observed = compiled(data, x, weights)
     assert np.allclose(expected, observed)
@@ -159,6 +161,7 @@ def test_batch_params(backend):
     assert expected_shape == observed_shape
 
 
+@pytest.mark.old_frontend
 def test_batch_partial(backend):
     """Test batch_partial"""
 
@@ -181,7 +184,7 @@ def test_batch_partial(backend):
     qnode_backend = qp.batch_partial(qnode_builder(backend), all_operations=True, y=y)
 
     jax_jit = jax.jit(qnode_control)
-    compiled = qjit(qnode_backend)
+    compiled = qjit(qnode_backend, capture=False)
     expected = jax_jit(x)
     observed = compiled(x)
     assert np.allclose(expected, observed)
@@ -230,6 +233,7 @@ def test_cancel_inverses(backend):
     assert expected_shape == observed_shape
 
 
+@pytest.mark.old_frontend
 def test_commute_controlled(backend):
     """Test commute_controlled"""
 
@@ -257,7 +261,7 @@ def test_commute_controlled(backend):
     qnode_backend = qnode_builder(backend)
 
     jax_jit = jax.jit(qnode_control)
-    compiled = qjit(qnode_backend)
+    compiled = qjit(qnode_backend, capture=False)
 
     expected = jax_jit(0.5)
     observed = compiled(0.5)
@@ -268,6 +272,7 @@ def test_commute_controlled(backend):
     assert expected_shape == observed_shape
 
 
+@pytest.mark.old_frontend
 def test_convert_to_numpy_parameters(backend):
     """Test convert_to_numpy_parameters"""
 
@@ -287,7 +292,7 @@ def test_convert_to_numpy_parameters(backend):
     qnode_backend = qnode_builder(backend)
 
     jax_jit = jax.jit(qnode_control)
-    compiled = qjit(qnode_backend)
+    compiled = qjit(qnode_backend, capture=False)
 
     expected = jax_jit()
     observed = compiled()
@@ -298,6 +303,7 @@ def test_convert_to_numpy_parameters(backend):
     assert expected_shape == observed_shape
 
 
+@pytest.mark.old_frontend
 def test_decompose(backend):
     """Test decompose"""
 
@@ -318,7 +324,7 @@ def test_decompose(backend):
     )
 
     jax_jit = jax.jit(qnode_control)
-    compiled = qjit(qnode_backend)
+    compiled = qjit(qnode_backend, capture=False)
 
     expected = jax_jit()
     observed = compiled()
@@ -349,10 +355,11 @@ def test_decompose_keeps_markers():
     assert not pass_pipeline
 
 
+@pytest.mark.old_frontend
 def test_decompose_before_passes(backend):
     """Without capture, qp.decompose runs as a tape transform."""
 
-    @qjit
+    @qjit(capture=False)
     @qp.transforms.cancel_inverses
     @qp.transforms.decompose(gate_set={"Hadamard", "T", "Adjoint(T)", "CNOT"})
     @qp.qnode(qp.device(backend, wires=3))
@@ -383,6 +390,7 @@ def test_graph_decomposition_stays_a_pass():
     assert [t.pass_name for t in pass_pipeline] == ["graph-decomposition"]
 
 
+@pytest.mark.old_frontend
 def test_diagonalize_measurements(backend):
     """Test diagonalize_measurements"""
 
@@ -402,7 +410,7 @@ def test_diagonalize_measurements(backend):
     qnode_backend = qnode_builder(backend)
 
     jax_jit = jax.jit(qnode_control)
-    compiled = qjit(qnode_backend)
+    compiled = qjit(qnode_backend, capture=False)
 
     x = [np.pi / 4, np.pi / 4]
     expected = jax_jit(x)
@@ -414,6 +422,7 @@ def test_diagonalize_measurements(backend):
     assert expected_shape == observed_shape
 
 
+@pytest.mark.old_frontend
 def test_insert(backend):
     """Test insert"""
 
@@ -436,7 +445,7 @@ def test_insert(backend):
     qnode_backend = qnode_builder(backend)
 
     jax_jit = jax.jit(qnode_control)
-    compiled = qjit(qnode_backend)
+    compiled = qjit(qnode_backend, capture=False)
 
     expected = jax_jit(0.9, 0.4, 0.5, 0.6)
     observed = compiled(0.9, 0.4, 0.5, 0.6)
@@ -447,6 +456,7 @@ def test_insert(backend):
     assert expected_shape == observed_shape
 
 
+@pytest.mark.old_frontend
 def test_merge_amplitude_embedding(backend):
     """Test merge_amplitude_embedding"""
 
@@ -467,7 +477,7 @@ def test_merge_amplitude_embedding(backend):
     qnode_backend = qnode_builder(backend)
 
     jax_jit = jax.jit(qnode_control)
-    compiled = qjit(qnode_backend)
+    compiled = qjit(qnode_backend, capture=False)
 
     expected = jax_jit()
     observed = compiled()
@@ -478,6 +488,7 @@ def test_merge_amplitude_embedding(backend):
     assert expected_shape == observed_shape
 
 
+@pytest.mark.old_frontend
 def test_remove_barrier(backend):
     """Test remove_barrier"""
 
@@ -499,7 +510,7 @@ def test_remove_barrier(backend):
     qnode_backend = qnode_builder(backend)
 
     jax_jit = jax.jit(qnode_control)
-    compiled = qjit(qnode_backend)
+    compiled = qjit(qnode_backend, capture=False)
 
     expected = jax_jit()
     observed = compiled()
@@ -510,6 +521,7 @@ def test_remove_barrier(backend):
     assert expected_shape == observed_shape
 
 
+@pytest.mark.old_frontend
 def test_single_qubit_fusion(backend):
     """Test single_qubit_fusion"""
 
@@ -535,7 +547,7 @@ def test_single_qubit_fusion(backend):
     qnode_backend = qnode_builder(backend)
 
     jax_jit = jax.jit(qnode_control)
-    compiled = qjit(qnode_backend)
+    compiled = qjit(qnode_backend, capture=False)
 
     expected = jax_jit(r1, r2)
     observed = compiled(r1, r2)
@@ -546,6 +558,7 @@ def test_single_qubit_fusion(backend):
     assert expected_shape == observed_shape
 
 
+@pytest.mark.old_frontend
 def test_split_non_commuting(backend):
     """Test split non commuting"""
 
@@ -576,7 +589,7 @@ def test_split_non_commuting(backend):
     qnode_control = qnode_builder("default.qubit")
     qnode_backend = qnode_builder(backend)
     expected = jax.jit(qnode_control)()
-    observed = qjit(qnode_backend)()
+    observed = qjit(qnode_backend, capture=False)()
     assert np.allclose(expected, observed)
 
     _, expected_shape = jax.tree_util.tree_flatten(expected)
@@ -584,6 +597,7 @@ def test_split_non_commuting(backend):
     assert expected_shape == observed_shape
 
 
+@pytest.mark.old_frontend
 def test_transpile(backend):
     """Test transpile"""
 
@@ -607,7 +621,7 @@ def test_transpile(backend):
     qnode_backend = qnode_builder(backend)
 
     jax_jit = jax.jit(qnode_control)
-    compiled = qjit(qnode_backend)
+    compiled = qjit(qnode_backend, capture=False)
 
     expected = jax_jit()
     observed = compiled()
@@ -618,6 +632,7 @@ def test_transpile(backend):
     assert expected_shape == observed_shape
 
 
+@pytest.mark.old_frontend
 def test_undo_swaps(backend):
     """Test undo_swaps"""
 
@@ -640,7 +655,7 @@ def test_undo_swaps(backend):
     qnode_backend = qnode_builder(backend)
 
     jax_jit = jax.jit(qnode_control)
-    compiled = qjit(qnode_backend)
+    compiled = qjit(qnode_backend, capture=False)
 
     expected = jax_jit()
     observed = compiled()
@@ -651,6 +666,7 @@ def test_undo_swaps(backend):
     assert expected_shape == observed_shape
 
 
+@pytest.mark.old_frontend
 class TestMitigate:
     """Test error mitigation transforms"""
 
@@ -679,7 +695,7 @@ class TestMitigate:
         qnode_backend = qnode_builder(backend)
         x = np.arange(6)
 
-        compiled = qjit(qnode_backend)
+        compiled = qjit(qnode_backend, capture=False)
         observed = compiled(x)
         expected = qnode_control(x)
         assert np.allclose(expected, observed)
@@ -721,7 +737,7 @@ class TestMitigate:
         qnode_control = qnode_builder("default.qubit")
         qnode_backend = qnode_builder(backend)
 
-        compiled = qjit(qnode_backend)
+        compiled = qjit(qnode_backend, capture=False)
         observed = compiled(w1, w2)
         expected = qnode_control(w1, w2)
         assert np.allclose(expected, observed)
@@ -735,6 +751,7 @@ class TestMitigate:
         assert expected_shape == observed_shape
 
 
+@pytest.mark.old_frontend
 class TestQuantumMonteCarlo:
     """Test quantum Monte Carlo transforms"""
 
@@ -768,7 +785,7 @@ class TestQuantumMonteCarlo:
         qnode_backend = qnode_builder(backend)
 
         jax_jit = jax.jit(qnode_control)
-        compiled = qjit(qnode_backend)
+        compiled = qjit(qnode_backend, capture=False)
 
         expected = jax_jit()
         observed = compiled()
@@ -807,7 +824,7 @@ class TestQuantumMonteCarlo:
         qnode_backend = qnode_builder(backend)
 
         jax_jit = jax.jit(qnode_control)
-        compiled = qjit(qnode_backend)
+        compiled = qjit(qnode_backend, capture=False)
 
         expected = jax_jit()
         observed = compiled()
@@ -948,6 +965,7 @@ class TestBroadcastExpand:
         assert expected_shape.num_leaves == observed_shape.num_leaves
 
 
+@pytest.mark.old_frontend
 class TestSplitNonCommuting:
     """Test split_non_commuting"""
 
@@ -982,7 +1000,7 @@ class TestSplitNonCommuting:
         qnode_backend = qnode_builder(backend)
         qnode_control = qnode_builder("default.qubit")
         expected = jax.jit(qnode_control)()
-        observed = qjit(qnode_backend)()
+        observed = qjit(qnode_backend, capture=False)()
 
         assert np.allclose(expected, observed)
         _, expected_shape = jax.tree_util.tree_flatten(expected)
@@ -1009,7 +1027,7 @@ class TestSplitNonCommuting:
         qnode_backend = qnode_builder(backend)
         qnode_control = qnode_builder("default.qubit")
         expected = jax.jit(qnode_control)()
-        observed = qjit(qnode_backend)()
+        observed = qjit(qnode_backend, capture=False)()
         assert np.allclose(expected, observed)
         _, expected_shape = jax.tree_util.tree_flatten(expected)
         _, observed_shape = jax.tree_util.tree_flatten(observed)
@@ -1021,6 +1039,7 @@ class TestSplitNonCommuting:
 class TestQFuncTransforms:
     """Test QFunc Transforms"""
 
+    @pytest.mark.old_frontend
     @pytest.mark.parametrize(("theta_1", "theta_2"), [(0.3, -0.2)])
     def test_merge_rotations(self, backend, theta_1, theta_2):
         """Merge rotations"""
@@ -1040,7 +1059,7 @@ class TestQFuncTransforms:
         qnode_backend = qnode_builder(backend)
         qnode_control = qnode_builder("default.qubit")
         expected = jax.jit(qnode_control)(theta_1, theta_2)
-        compiled_function = qjit(qnode_backend)
+        compiled_function = qjit(qnode_backend, capture=False)
         observed = compiled_function(theta_1, theta_2)
         assert np.allclose(expected, observed)
         _, expected_shape = jax.tree_util.tree_flatten(expected)
@@ -1100,6 +1119,7 @@ class TestQFuncTransforms:
         assert expected_shape == observed_shape
 
 
+@pytest.mark.old_frontend
 class TestTransformValidity:
     """Test validity of transforms."""
 
@@ -1130,7 +1150,7 @@ class TestTransformValidity:
             measurements = [measure(i) for i in range(2)]
             return measurements, qp.expval(qp.PauliZ(0))
 
-        compiled_qfunc = qjit(qfunc)
+        compiled_qfunc = qjit(qfunc, capture=False)
 
         with pytest.raises(
             CompileError,
@@ -1157,7 +1177,7 @@ class TestTransformValidity:
 
         dev = qp.device(backend, wires=2)
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(dev)
         def qfunc():
             qp.X(0)
@@ -1190,7 +1210,7 @@ class TestTransformValidity:
             qp.PauliX(2)
             return [1, qp.expval(H4)]
 
-        compiled_qfunc = qjit(qfunc)
+        compiled_qfunc = qjit(qfunc, capture=False)
 
         with pytest.raises(
             CompileError,
@@ -1227,7 +1247,7 @@ class TestTransformValidity:
 
             return qfunc
 
-        compiled_qfunc = qjit(qnode_builder(backend))
+        compiled_qfunc = qjit(qnode_builder(backend), capture=False)
 
         with pytest.raises(
             CompileError,
@@ -1256,7 +1276,7 @@ class TestTransformValidity:
             return qfunc
 
         qnode_backend = qnode_builder(backend)
-        compiled_function = qjit(qnode_backend)
+        compiled_function = qjit(qnode_backend, capture=False)
         compiled_function(theta_1, theta_2)
 
         # Here we are asserting that there is only one RZ operation
@@ -1275,7 +1295,7 @@ class TestTransformValidity:
         def f():
             return qp.state()
 
-        compiled_f = qjit(f)
+        compiled_f = qjit(f, capture=False)
 
         with pytest.raises(CompileError, match="Catalyst does not support informative transforms."):
             compiled_f()
@@ -1421,6 +1441,7 @@ def test_dynamic_one_shot(backend):
     assert expected_shape == observed_shape
 
 
+@pytest.mark.old_frontend
 def test_pattern_matching_optimization(backend):
     """Test pattern_matching_optimization"""
 
@@ -1449,7 +1470,7 @@ def test_pattern_matching_optimization(backend):
     qnode_backend = qnode_builder(backend)
 
     jax_jit = jax.jit(qnode_control)
-    compiled = qjit(qnode_backend)
+    compiled = qjit(qnode_backend, capture=False)
 
     expected = jax_jit()
     observed = compiled()

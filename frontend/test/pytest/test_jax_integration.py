@@ -25,7 +25,7 @@ import pennylane as qp
 import pytest
 from jax.interpreters.mlir import ir
 
-from catalyst import for_loop, measure, qjit
+from catalyst import for_loop, qjit
 from catalyst.jax_extras.lowering import get_mlir_attribute_from_pyval
 from catalyst.jit import JAX_QJIT
 from catalyst.utils.exceptions import CompileError
@@ -171,13 +171,13 @@ class TestJAXJIT:
         @qp.qnode(qp.device(backend, wires=1))
         def circuit(x):
             qp.RY(x, wires=0)
-            return measure(0)
+            return qp.probs(wires=0)
 
         @jax.jit
         def cost_fn(x, y):
             m1 = circuit(x)
             m2 = circuit(y)
-            return m1 == m2
+            return jnp.allclose(m1, m2)
 
         result1 = cost_fn(0.0, 0.0)
         result2 = cost_fn(0.0, jnp.pi)
@@ -185,13 +185,14 @@ class TestJAXJIT:
         assert result2 == False
 
 
+@pytest.mark.old_frontend
 class TestJAXAD:
     """Test QJIT compatibility with JAX differentiation."""
 
     def test_simple_circuit(self, backend):
         """Test a basic use case of jax.grad on top of qjit."""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=2))
         def circuit(x: jax.core.ShapedArray((3,), dtype=float)):
             qp.RX(jnp.pi * x[0], wires=0)
@@ -214,7 +215,7 @@ class TestJAXAD:
     def test_multiple_arguments(self, backend, argnums):
         """Test a circuit with multiple arguments using jax.grad on top of qjit."""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=2))
         def circuit(
             x: jax.core.ShapedArray((3,), dtype=float), y: jax.core.ShapedArray((2,), dtype=float)
@@ -240,7 +241,7 @@ class TestJAXAD:
     def test_multiple_results(self, backend):
         """Test a circuit with multiple results using jax.grad on top of qjit."""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=2))
         def circuit(
             x: jax.core.ShapedArray((3,), dtype=float), y: jax.core.ShapedArray((2,), dtype=float)
@@ -266,7 +267,7 @@ class TestJAXAD:
     def test_jacobian(self, backend):
         """Test a circuit with vector return type using jax.jacobian on top of qjit."""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=2))
         def circuit(
             x: jax.core.ShapedArray((3,), dtype=float), y: jax.core.ShapedArray((2,), dtype=float)
@@ -292,7 +293,7 @@ class TestJAXAD:
     def test_without_precompilation(self, backend):
         """Test a function without type hints (pre-compilation) using jax.grad on top of qjit."""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=2))
         def circuit(x, y):
             qp.RX(jnp.pi * x[0], wires=0)
@@ -316,7 +317,7 @@ class TestJAXAD:
     def test_non_differentiable_arguments(self, backend):
         """Test a circuit with non-differentiable arguments using jax.grad on top of qjit."""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=2))
         def circuit(x: jax.core.ShapedArray((3,), dtype=float), y: int):
             qp.RX(jnp.pi * x[0], wires=0)
@@ -338,7 +339,7 @@ class TestJAXAD:
     def test_multiple_calls(self, backend):
         """Test a jax.grad function which repeatedly calls a qjit function."""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=1))
         def circuit(x):
             qp.RY(x, wires=0)
@@ -362,7 +363,7 @@ class TestJAXAD:
         def func(p1, p2):
             return jnp.reshape(p1, shape) + 2 * jnp.reshape(p2, shape)
 
-        C_func = qjit(func)
+        C_func = qjit(func, capture=False)
         PL_func = func
 
         def cost_fn(p1, p2, f):
@@ -382,7 +383,7 @@ class TestJAXAD:
     def test_efficient_Jacobian(self, backend):
         """Test a jax.grad function does not compute Jacobians for arguments not in argnums."""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=2))
         def circuit(x: float, y: float):
             qp.RX(x, wires=0)
@@ -403,7 +404,7 @@ class TestJAXAD:
         """Test that argnums determination works correctly when combining jax.jit with jax.grad.
         This was fixed by the introduction of symbolic zero detection for tangent vectors."""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=2))
         def circuit(params: jax.core.ShapedArray((2,), dtype=float), n: int):
             qp.RX(n * params[0], wires=0)
@@ -424,7 +425,7 @@ class TestJAXAD:
         """Test that when combining jax.jit and jax.grad, the internal argnums are correctly
         passed to the custom quantum JVP"""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=2))
         def circuit(p1, n, p2):
             def ansatz(_):
@@ -448,6 +449,7 @@ class TestJAXAD:
         jax.grad(jax.jit(circuit), argnums=(0, 2))(-4.5, 3, 4.3)
 
 
+@pytest.mark.old_frontend
 class TestJAXRecompilation:
     """
     Test obtained from ticket: https://github.com/PennyLaneAI/catalyst/issues/149
@@ -458,7 +460,7 @@ class TestJAXRecompilation:
     def test_jax_function_has_not_been_jit_compiled(self, backend):
         """Test if function can be used by jax.grad even if it has not been JIT compiled"""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=2))
         def circuit(params, n):
             def ansatz(i, x):
@@ -477,7 +479,7 @@ class TestJAXRecompilation:
     def test_jax_function_needs_recompilation(self, backend):
         """Test if function can be used by jax.grad but it needs recompilation"""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=2))
         def circuit(params, n):
             def ansatz(i, x):

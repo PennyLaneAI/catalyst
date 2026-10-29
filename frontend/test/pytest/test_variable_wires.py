@@ -17,7 +17,7 @@ import numpy as np
 import pennylane as qp
 import pytest
 
-from catalyst import cond, measure, qjit, while_loop
+from catalyst import qjit
 
 
 class TestWireTypes:
@@ -31,9 +31,9 @@ class TestWireTypes:
         @qp.qnode(qp.device(backend, wires=1))
         def circuit(w):
             qp.PauliX(0)
-            return measure(w)
+            return qp.probs(wires=w)
 
-        assert circuit(jnp.array(0, dtype=dtype)) == 1
+        assert np.allclose(circuit(jnp.array(0, dtype=dtype)), [0.0, 1.0])
 
 
 class TestBasicCircuits:
@@ -154,7 +154,7 @@ class TestControlFlow:
     """Test if-else, while, and for control flow operations with variable wires."""
 
     @pytest.mark.parametrize(
-        "args,expected", [([0, 0], True), ([0, 1], False), ([1, 0], False), ([1, 1], True)]
+        "args,expected", [([0, 0], -1.0), ([0, 1], 1.0), ([1, 0], 1.0), ([1, 1], -1.0)]
     )
     def test_conditional(self, args, expected, backend):
         """Test conditional."""
@@ -162,7 +162,7 @@ class TestControlFlow:
         @qjit
         @qp.qnode(qp.device(backend, wires=2))
         def circuit(x: int, y: int):
-            @cond(x > 4)
+            @qp.cond(x > 4)
             def cond_fn():
                 pass
 
@@ -171,12 +171,12 @@ class TestControlFlow:
                 qp.RX(jnp.pi, wires=y)
 
             cond_fn()
-            return measure(wires=x)
+            return qp.expval(qp.Z(wires=x))
 
-        assert circuit(*args) == expected
+        assert np.allclose(circuit(*args), expected)
 
     @pytest.mark.parametrize(
-        "args,expected", [([0, 0], False), ([0, 1], False), ([1, 0], True), ([1, 1], True)]
+        "args,expected", [([0, 0], 1.0), ([0, 1], 1.0), ([1, 0], -1.0), ([1, 1], -1.0)]
     )
     def test_while_loop_with_func_arg_wires(self, args, expected, backend):
         """Test while loop with func arg wires."""
@@ -184,25 +184,25 @@ class TestControlFlow:
         @qjit
         @qp.qnode(qp.device(backend, wires=2))
         def circuit(n: int, m: int):
-            @while_loop(lambda v: v[0] < v[1])
+            @qp.while_loop(lambda v: v[0] < v[1])
             def loop(v):
                 qp.RX(jnp.pi, wires=m)
                 return v[0] + 1, v[1]
 
             loop((0, n))
-            return measure(wires=m)
+            return qp.expval(qp.Z(wires=m))
 
-        assert circuit(*args) == expected
+        assert np.allclose(circuit(*args), expected)
 
     @pytest.mark.parametrize(
         "args,expected",
         [
-            ([1, 0], True),
-            ([1, 1], False),
-            ([2, 1], True),
-            ([2, 2], False),
-            ([2, 3], False),
-            ([3, 1], True),
+            ([1, 0], -1.0),
+            ([1, 1], 1.0),
+            ([2, 1], -1.0),
+            ([2, 2], 1.0),
+            ([2, 3], 1.0),
+            ([3, 1], -1.0),
         ],
     )
     def test_while_loop_with_loop_arg_wires(self, args, expected, backend):
@@ -213,15 +213,15 @@ class TestControlFlow:
         def circuit(n: int, m: int):
             qp.RX(jnp.pi, wires=0)
 
-            @while_loop(lambda v: v[0] < v[1])
+            @qp.while_loop(lambda v: v[0] < v[1])
             def loop(v):
                 qp.CNOT(wires=[0, v[0]])
                 return v[0] + 1, v[1]
 
             loop((1, n))
-            return measure(wires=m)
+            return qp.expval(qp.Z(wires=m))
 
-        assert circuit(*args) == expected
+        assert np.allclose(circuit(*args), expected)
 
 
 if __name__ == "__main__":

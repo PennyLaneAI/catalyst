@@ -149,6 +149,7 @@ class TestGradContextIntegration:
             identity(1.2)
 
 
+@pytest.mark.old_frontend
 class TestEvaluationModes:
     """Test evaluation modes checking and reporting."""
 
@@ -178,15 +179,19 @@ class TestEvaluationModes:
         wrapper(EvaluationMode.INTERPRETATION)()
         with EvaluationContext(EvaluationMode.INTERPRETATION):
             wrapper(EvaluationMode.INTERPRETATION)()
-        qjit(wrapper(EvaluationMode.CLASSICAL_COMPILATION))()
-        qjit(qp.qnode(qp.device(backend, wires=1))(wrapper(EvaluationMode.QUANTUM_COMPILATION)))()
+        qjit(wrapper(EvaluationMode.CLASSICAL_COMPILATION), capture=False)()
+        qjit(
+            qp.qnode(qp.device(backend, wires=1))(wrapper(EvaluationMode.QUANTUM_COMPILATION)),
+            capture=False,
+        )()
 
 
 class TestTracing:
+    @pytest.mark.old_frontend
     def test_fixed_tracing(self, backend):
         """Test fixed tracing."""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=1))
         def circuit():
             m = measure(wires=0)
@@ -203,9 +208,9 @@ class TestTracing:
             measure a wire and then reset it back to the |0> state
             """
 
-            m = measure(wires)
+            m = qp.measure(wires)
 
-            @cond(m)
+            @qp.cond(m)
             def cond_fn():
                 qp.PauliX(wires=wires)
 
@@ -216,7 +221,7 @@ class TestTracing:
         @qjit
         @qp.qnode(qp.device(backend, wires=3))
         def circuit(n):
-            @while_loop(lambda i: i < n)
+            @qp.while_loop(lambda i: i < n)
             def loop(i):
                 qp.Hadamard(wires=0)
                 qp.Hadamard(wires=1)
@@ -228,7 +233,7 @@ class TestTracing:
 
                 return i + 1 + m0 + m1 + m2
 
-            return loop(0)
+            loop(0)
 
         circuit(5)
 
@@ -243,10 +248,11 @@ class TestTracing:
 
         assert circuit() is None
 
+    @pytest.mark.old_frontend
     def test_mixed_result_types(self, backend):
         """Test mixed result types."""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=1))
         def circuit():
             @while_loop(lambda _, repeat: repeat)

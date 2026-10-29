@@ -164,11 +164,12 @@ class TestStaticArguments:
         captured = capsys.readouterr()
         assert captured.out.strip() == "Inside QNode: 0.5"
 
+    @pytest.mark.old_frontend
     def test_qnode_nested_with_static_arguments(self, capsys):
         """Test if QJIT static arguments pass through QNode correctly."""
         dev = qp.device("lightning.qubit", wires=1)
 
-        @qjit(static_argnums=(1,))
+        @qjit(static_argnums=(1,), capture=False)
         @qp.qnode(dev)
         def circuit(x, c):
             print("Inside QNode:", c)
@@ -176,7 +177,7 @@ class TestStaticArguments:
             qp.RX(x, 0)
             return qp.expval(qp.PauliZ(0))
 
-        @qjit(static_argnums=(1,))
+        @qjit(static_argnums=(1,), capture=False)
         def wrapper(x, c):
             return circuit(x, c)
 
@@ -184,11 +185,12 @@ class TestStaticArguments:
         captured = capsys.readouterr()
         assert captured.out.strip() == "Inside QNode: 0.5"
 
+    @pytest.mark.old_frontend
     def test_qnode_switch_params(self, capsys):
         """Test if QJIT static arguments pass through QNode correctly when params are switched."""
         dev = qp.device("lightning.qubit", wires=1)
 
-        @qjit(static_argnums=(0,))
+        @qjit(static_argnums=(0,), capture=False)
         @qp.qnode(dev)
         def circuit(c, x):
             print("Inside QNode:", c)
@@ -196,7 +198,7 @@ class TestStaticArguments:
             qp.RX(x, 0)
             return qp.expval(qp.PauliZ(0))
 
-        @qjit(static_argnums=(1,))
+        @qjit(static_argnums=(1,), capture=False)
         def wrapper(x, c):
             return circuit(c, x)
 
@@ -204,16 +206,17 @@ class TestStaticArguments:
         captured = capsys.readouterr()
         assert captured.out.strip() == "Inside QNode: 0.5"
 
+    @pytest.mark.old_frontend
     def test_qnode_nested_not_qnode(self, capsys):
         """Test if QJIT static arguments pass through nested Qjit calls with no QNodes."""
         dev = qp.device("lightning.qubit", wires=1)
 
-        @qjit(static_argnums=(0,))
+        @qjit(static_argnums=(0,), capture=False)
         def circuit(c, x):
             print("Inside QNode:", c)
             return x * c
 
-        @qjit(static_argnums=(1,))
+        @qjit(static_argnums=(1,), capture=False)
         def wrapper(x, c):
             return circuit(c, x)
 

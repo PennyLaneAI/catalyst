@@ -49,6 +49,7 @@ class TestMidCircuitMeasurement:
         with pytest.raises(CompileError, match="can only be used from within @qjit"):
             circuit()
 
+    @pytest.mark.old_frontend
     def test_measure_outside_qnode(self):
         """Test measure outside qnode."""
 
@@ -56,8 +57,9 @@ class TestMidCircuitMeasurement:
             return measure(0)
 
         with pytest.raises(CompileError, match=r"can only be used from within a .*\.qnode"):
-            qjit(circuit)()
+            qjit(circuit, capture=False)()
 
+    @pytest.mark.old_frontend
     def test_invalid_arguments(self, backend):
         """Test too many arguments to the wires parameter."""
 
@@ -70,8 +72,9 @@ class TestMidCircuitMeasurement:
         with pytest.raises(
             TypeError, match="Only one element is supported for the 'wires' parameter"
         ):
-            qjit(circuit)()
+            qjit(circuit, capture=False)()
 
+    @pytest.mark.old_frontend
     def test_invalid_arguments2(self, backend):
         """Test too large array for the wires parameter."""
 
@@ -82,12 +85,13 @@ class TestMidCircuitMeasurement:
             return m
 
         with pytest.raises(TypeError, match="Measure is only supported on 1 qubit"):
-            qjit(circuit)()
+            qjit(circuit, capture=False)()
 
+    @pytest.mark.old_frontend
     def test_basic(self, backend):
         """Test measure (basic)."""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=1))
         def circuit(x: float):
             qp.RX(x, wires=0)
@@ -96,10 +100,11 @@ class TestMidCircuitMeasurement:
 
         assert circuit(jnp.pi)  # m will be equal to True if wire 0 is measured in 1 state
 
+    @pytest.mark.old_frontend
     def test_scalar_array_wire(self, backend):
         """Test a scalar array wire."""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=2))
         def circuit(w):
             qp.PauliX(0)
@@ -108,10 +113,11 @@ class TestMidCircuitMeasurement:
 
         assert circuit(jnp.array(0)) == 1
 
+    @pytest.mark.old_frontend
     def test_1element_array_wire(self, backend):
         """Test a 1D single-element array wire."""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=2))
         def circuit(w):
             qp.PauliX(0)
@@ -120,10 +126,11 @@ class TestMidCircuitMeasurement:
 
         assert circuit(jnp.array([0])) == 1
 
+    @pytest.mark.old_frontend
     def test_more_complex(self, backend):
         """Test measure (more complex)."""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=2))
         def circuit(x: float):
             qp.RX(x, wires=0)
@@ -136,10 +143,11 @@ class TestMidCircuitMeasurement:
         assert circuit(jnp.pi)  # m will be equal to True if wire 0 is measured in 1 state
         assert not circuit(0.0)
 
+    @pytest.mark.old_frontend
     def test_with_postselect_zero(self, backend):
         """Test measure (postselect = 0)."""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=1))
         def circuit(x: float):
             qp.RX(x, wires=0)
@@ -148,10 +156,11 @@ class TestMidCircuitMeasurement:
 
         assert not circuit(0.0)  # m will be equal to False
 
+    @pytest.mark.old_frontend
     def test_with_postselect_one(self, backend):
         """Test measure (postselect = 1)."""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=1))
         def circuit(x: float):
             qp.RX(x, wires=0)
@@ -160,10 +169,11 @@ class TestMidCircuitMeasurement:
 
         assert circuit(jnp.pi)  # m will be equal to True
 
+    @pytest.mark.old_frontend
     def test_with_reset_false(self, backend):
         """Test measure (reset = False)."""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=1))
         def circuit():
             qp.Hadamard(wires=0)
@@ -173,10 +183,11 @@ class TestMidCircuitMeasurement:
 
         assert circuit()  # both measures are the same
 
+    @pytest.mark.old_frontend
     def test_with_reset_true(self, backend):
         """Test measure (reset = True)."""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=1))
         def circuit():
             qp.Hadamard(wires=0)
@@ -186,12 +197,13 @@ class TestMidCircuitMeasurement:
 
         assert circuit()  # measures are different
 
+    @pytest.mark.old_frontend
     def test_return_mcm_with_sample_single(self, backend):
         """Test that a measurement result can be returned with qp.sample and shots."""
 
         dev = qp.device(backend, wires=1)
 
-        @qjit
+        @qjit(capture=False)
         @qp.set_shots(1)
         @qp.qnode(dev)
         def circuit(x):
@@ -203,12 +215,13 @@ class TestMidCircuitMeasurement:
         assert circuit(0.0) == 0
         assert circuit(jnp.pi) == 1
 
+    @pytest.mark.old_frontend
     def test_return_mcm_with_sample_multiple(self, backend):
         """Test that a measurement result can be returned with qp.sample and shots."""
 
         dev = qp.device(backend, wires=1)
 
-        @qjit
+        @qjit(capture=False)
         @qp.set_shots(10)
         @qp.qnode(dev)
         def circuit(x):
@@ -220,11 +233,12 @@ class TestMidCircuitMeasurement:
         assert jnp.allclose(circuit(0.0), 0)
         assert jnp.allclose(circuit(jnp.pi), 1)
 
+    @pytest.mark.old_frontend
     def test_mcm_method_deferred_error(self, backend):
         """Test that an error is raised if trying to execute with mcm_method="deferred"."""
         dev = qp.device(backend, wires=1)
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(dev, mcm_method="deferred")
         def circuit(x):
             qp.RX(x, 0)
@@ -236,11 +250,12 @@ class TestMidCircuitMeasurement:
         ):
             _ = circuit(1.8)
 
+    @pytest.mark.old_frontend
     def test_mcm_method_one_shot_analytic_error(self, backend):
         """Test that an error is raised if using mcm_method="one-shot" without shots."""
         dev = qp.device(backend, wires=1)
 
-        @qjit
+        @qjit(capture=False)
         @qp.set_shots(None)
         @qp.qnode(dev, mcm_method="one-shot")
         def circuit(x):
@@ -253,12 +268,13 @@ class TestMidCircuitMeasurement:
         ):
             _ = circuit(1.8)
 
+    @pytest.mark.old_frontend
     def test_single_branch_statistics_hw_like_error(self, backend):
         """Test that an error is raised if using `mcm_method="single-branch-statistics"` and
         `postselect_mode="hw-like"`"""
         dev = qp.device(backend, wires=1)
 
-        @qjit
+        @qjit(capture=False)
         @qp.set_shots(10)
         @qp.qnode(dev, mcm_method="single-branch-statistics", postselect_mode="hw-like")
         def circuit(x):
@@ -272,6 +288,7 @@ class TestMidCircuitMeasurement:
         ):
             _ = circuit(1.8)
 
+    @pytest.mark.old_frontend
     @pytest.mark.parametrize("postselect_mode", [None, "fill-shots", "hw-like"])
     @pytest.mark.parametrize("mcm_method", [None, "one-shot", "single-branch-statistics"])
     def test_mcm_config_not_mutated(self, backend, postselect_mode, mcm_method):
@@ -286,7 +303,7 @@ class TestMidCircuitMeasurement:
             postselect_mode=postselect_mode, mcm_method=mcm_method
         )
 
-        @qjit
+        @qjit(capture=False)
         @qp.set_shots(10)
         @qp.qnode(dev, **asdict(original_config))
         def circuit(x):
@@ -298,12 +315,13 @@ class TestMidCircuitMeasurement:
         assert circuit.execute_kwargs["postselect_mode"] == original_config.postselect_mode
         assert circuit.execute_kwargs["mcm_method"] == original_config.mcm_method
 
+    @pytest.mark.old_frontend
     @pytest.mark.parametrize("postselect_mode", [None, "fill-shots", "hw-like"])
     def test_default_mcm_method(self, backend, postselect_mode, mocker):
         """Test that the correct default mcm_method is chosen based on postselect_mode"""
         dev = qp.device(backend, wires=1)
 
-        @qjit
+        @qjit(capture=False)
         @qp.set_shots(10)
         @qp.qnode(dev, mcm_method=None, postselect_mode=postselect_mode)
         def circuit(x):
@@ -337,13 +355,14 @@ class TestMidCircuitMeasurement:
         expected = {"hi": jnp.array(-1.0, dtype=jnp.float64)}
         assert np.allclose(expected["hi"], observed["hi"])
 
+    @pytest.mark.old_frontend
     @pytest.mark.parametrize("postselect_mode", [None, "fill-shots", "hw-like"])
     @pytest.mark.parametrize("mcm_method", ["one-shot"])
     def test_mcm_method_with_count_mesurement(self, backend, postselect_mode, mcm_method):
         """Test that the correct default mcm_method is chosen based on postselect_mode"""
         dev = qp.device(backend, wires=1)
 
-        @qjit
+        @qjit(capture=False)
         @qp.set_shots(20)
         @qp.qnode(dev, mcm_method=mcm_method, postselect_mode=postselect_mode)
         def circuit(x):
@@ -361,6 +380,7 @@ class TestMidCircuitMeasurement:
         _, observed_shape = tree_flatten(observed)
         assert expected_shape == observed_shape
 
+    @pytest.mark.old_frontend
     @pytest.mark.parametrize("postselect_mode", [None, "fill-shots", "hw-like"])
     @pytest.mark.parametrize("mcm_method", [None, "one-shot"])
     def test_mcm_method_with_dict_output_used_measurements(
@@ -369,7 +389,7 @@ class TestMidCircuitMeasurement:
         """Test that the correct default mcm_method is chosen based on postselect_mode"""
         dev = qp.device(backend, wires=1)
 
-        @qjit
+        @qjit(capture=False)
         @qp.set_shots(5)
         @qp.qnode(dev, mcm_method=mcm_method, postselect_mode=postselect_mode)
         def circuit(x):
@@ -397,12 +417,13 @@ class TestMidCircuitMeasurement:
         _, observed_shape = tree_flatten(observed)
         assert expected_shape == observed_shape
 
+    @pytest.mark.old_frontend
     @pytest.mark.parametrize("mcm_method", [None, "single-branch-statistics", "one-shot"])
     def test_invalid_postselect_error(self, backend, mcm_method):
         """Test that an error is raised if postselecting on an invalid value"""
         dev = qp.device(backend, wires=1)
 
-        @qjit
+        @qjit(capture=False)
         @qp.set_shots(10)
         @qp.qnode(dev, mcm_method=mcm_method)
         def circuit(x):
@@ -413,6 +434,7 @@ class TestMidCircuitMeasurement:
         with pytest.raises(TypeError, match="postselect must be '0' or '1'"):
             _ = circuit(1.8)
 
+    @pytest.mark.old_frontend
     @pytest.mark.parametrize("measurement_process", [qp.counts, qp.var, qp.expval, qp.probs])
     def test_single_branch_statistics_not_implemented_error(self, backend, measurement_process):
         """
@@ -423,7 +445,7 @@ class TestMidCircuitMeasurement:
         err = "single-branch-statistics does not support measurement processes"
         with pytest.raises(NotImplementedError, match=err):
 
-            @qjit
+            @qjit(capture=False)
             @qp.set_shots(5)
             @qp.qnode(qp.device(backend, wires=2), mcm_method="single-branch-statistics")
             def measurement():
@@ -433,11 +455,12 @@ class TestMidCircuitMeasurement:
 
             measurement()
 
+    @pytest.mark.old_frontend
     @pytest.mark.parametrize("postselect_method", ["hw-like", "fill-shots"])
     def test_mcm_config_propagation_cond(self, postselect_method):
         """Test that the mcm_config is propagated when tracing nested ops."""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(
             qp.device("lightning.qubit", wires=1),
             shots=10,
@@ -455,11 +478,12 @@ class TestMidCircuitMeasurement:
 
         assert ("postselect" in circuit.mlir) == (postselect_method == "fill-shots")
 
+    @pytest.mark.old_frontend
     @pytest.mark.parametrize("postselect_method", ["hw-like", "fill-shots"])
     def test_mcm_config_propagation_for_loop(self, postselect_method):
         """Test that the mcm_config is propagated when tracing nested ops."""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(
             qp.device("lightning.qubit", wires=1),
             shots=10,
@@ -500,6 +524,7 @@ class TestDynamicOneShotIntegration:
         assert np.allclose(workflow(shots), [1 if i == 0 else 0 for i in range(2**shots)])
 
     # pylint: disable=too-many-arguments
+    @pytest.mark.old_frontend
     @pytest.mark.parametrize(
         "postselect, reset, expected",
         [
@@ -533,7 +558,7 @@ class TestDynamicOneShotIntegration:
 
         dev = qp.device(backend, wires=1)
 
-        @qjit
+        @qjit(capture=False)
         @qp.set_shots(1)
         @qp.qnode(dev, mcm_method="one-shot", postselect_mode=postselect_mode)
         def circuit(x):
@@ -549,6 +574,7 @@ class TestDynamicOneShotIntegration:
         else:
             assert qp.math.allclose(res, expected)
 
+    @pytest.mark.old_frontend
     @pytest.mark.parametrize("shots", [1, 10])
     def test_dynamic_one_shot_only_called_once(self, backend, shots, mocker):
         """Test that when using mcm_method="one-shot", dynamic_one_shot does not get
@@ -556,7 +582,7 @@ class TestDynamicOneShotIntegration:
         dev = qp.device(backend, wires=1)
         spy = mocker.spy(catalyst.qfunc, "dynamic_one_shot")
 
-        @qjit
+        @qjit(capture=False)
         @qp.set_shots(shots)
         @qp.qnode(dev, mcm_method="one-shot")
         def circuit(x):
@@ -569,13 +595,14 @@ class TestDynamicOneShotIntegration:
 
         assert spy.call_count == 1
 
+    @pytest.mark.old_frontend
     def test_dynamic_one_shot_unsupported_measurement(self, backend):
         """Test that circuits with unsupported measurements raise an error."""
         shots = 10
         dev = qp.device(backend, wires=1)
         param = np.pi / 4
 
-        @qjit
+        @qjit(capture=False)
         @qp.set_shots(shots)
         @qp.qnode(dev, mcm_method="one-shot")
         def func(x):
@@ -608,13 +635,14 @@ class TestDynamicOneShotIntegration:
                 qp.RX(y, wires=0)
                 return qp.probs(wires=0)
 
+    @pytest.mark.old_frontend
     def test_dynamic_one_shot_unsupported_broadcast(self, backend):
         """Test that `dynamic_one_shot` raises when used with parameter broadcasting."""
         shots = 10
         dev = qp.device(backend, wires=1)
         param = np.pi / 4 * jnp.ones(2)
 
-        @qjit
+        @qjit(capture=False)
         @qp.set_shots(shots)
         @qp.qnode(dev, mcm_method="one-shot")
         def func(x, y):
@@ -629,13 +657,14 @@ class TestDynamicOneShotIntegration:
         ):
             func(param, param)
 
+    @pytest.mark.old_frontend
     @pytest.mark.parametrize("param, expected", [(0.0, 0.0), (jnp.pi, 1.0)])
     def test_dynamic_one_shot_with_sample_single(self, backend, param, expected):
         """Test that a measurement result can be returned with qp.sample and shots."""
         shots = 10
         dev = qp.device(backend, wires=1)
 
-        @qjit
+        @qjit(capture=False)
         @qp.set_shots(shots)
         @qp.qnode(dev, mcm_method="one-shot")
         def circuit(x):
@@ -648,6 +677,7 @@ class TestDynamicOneShotIntegration:
         assert result.shape == (shots,)
         assert jnp.allclose(result, expected)
 
+    @pytest.mark.old_frontend
     @pytest.mark.parametrize("shots", [10000])
     @pytest.mark.parametrize("postselect", [None, 0, 1])
     @pytest.mark.parametrize("measure_f", [qp.counts, qp.expval, qp.probs, qp.sample, qp.var])
@@ -690,7 +720,7 @@ class TestDynamicOneShotIntegration:
 
         dev = qp.device(backend, wires=2)
 
-        @qjit(seed=123456)
+        @qjit(seed=123456, capture=False)
         @partial(qp.set_shots, shots=shots)
         @qp.qnode(dev, postselect_mode=postselect_mode, mcm_method="one-shot")
         def func(x, y):
@@ -740,6 +770,7 @@ class TestDynamicOneShotIntegration:
         validate_measurements(measure_f, shots, results1, results0)
 
     # pylint: disable=too-many-arguments
+    @pytest.mark.old_frontend
     @pytest.mark.parametrize("shots", [10000])
     @pytest.mark.parametrize("postselect", [None, 0, 1])
     @pytest.mark.parametrize("reset", [False, True])
@@ -779,7 +810,7 @@ class TestDynamicOneShotIntegration:
 
         dev = qp.device(backend, wires=2)
 
-        @qjit(seed=37)
+        @qjit(seed=37, capture=False)
         @qp.set_shots(shots)
         @qp.qnode(dev, mcm_method="one-shot", postselect_mode=postselect_mode)
         def func(x, y):
@@ -855,11 +886,12 @@ class TestDynamicOneShotIntegration:
         result = cost()
         assert jnp.array(result).shape == (qubits,)
 
+    @pytest.mark.old_frontend
     def test_dynamic_one_shot_mcm_result(self):
         """Test mcm result with one-shot"""
         dev = qp.device("lightning.qubit", wires=1)
 
-        @qjit
+        @qjit(capture=False)
         @qp.set_shots(10)
         @qp.qnode(dev, mcm_method="one-shot")
         def circuit():
@@ -869,10 +901,11 @@ class TestDynamicOneShotIntegration:
         result = circuit()
         assert result.shape == (10,)
 
+    @pytest.mark.old_frontend
     def test_dynamic_one_shot_classical_return_values_with_mcm(self):
         """Test classical return value with one-shot"""
 
-        @qjit(autograph=True)
+        @qjit(autograph=True, capture=False)
         @qp.set_shots(10)
         @qp.qnode(qp.device("lightning.qubit", wires=1), mcm_method="one-shot")
         def circuit():
@@ -885,11 +918,12 @@ class TestDynamicOneShotIntegration:
         result = circuit()
         assert result.shape == (10,)  # pylint: disable=no-member
 
+    @pytest.mark.old_frontend
     def test_dynamic_one_shot_with_classical_return_values(self):
         """Test classical return values with one-shot"""
         dev = qp.device("lightning.qubit", wires=1)
 
-        @qjit
+        @qjit(capture=False)
         @qp.set_shots(12)
         @qp.qnode(dev, mcm_method="one-shot")
         def circuit():

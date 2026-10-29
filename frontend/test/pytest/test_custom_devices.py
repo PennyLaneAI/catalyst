@@ -19,7 +19,7 @@ import pennylane as qp
 import pytest
 from utils import CONFIG_CUSTOM_DEVICE
 
-from catalyst import measure, qjit
+from catalyst import qjit
 from catalyst.compiler import get_lib_path
 from catalyst.device import QJITDevice, extract_backend_info
 from catalyst.tracing.contexts import EvaluationContext, EvaluationMode
@@ -71,10 +71,10 @@ def test_custom_device_load():
     @qjit
     @qp.qnode(device)
     def f():
-        """Measurements on a NullQubit device always return false (i.e. 0)"""
-        return measure(0)
+        """Return probabilities for the null device's all-zero state."""
+        return qp.probs(wires=0)
 
-    assert f() == False
+    assert qp.math.allclose(f(), [1.0, 0.0])
 
 
 def test_custom_device_bad_directory():
@@ -107,7 +107,7 @@ def test_custom_device_bad_directory():
     @qjit
     @qp.qnode(CustomDevice(wires=1))
     def f():
-        return measure(0)
+        return qp.probs(wires=0)
 
     with pytest.raises(
         CompileError, match="Device at this-file-does-not-exist.so cannot be found!"
@@ -138,7 +138,7 @@ def test_custom_device_no_c_interface():
     @qjit
     @qp.qnode(CustomDevice(wires=1))
     def f():
-        return measure(0)
+        return qp.probs(wires=0)
 
     with pytest.raises(
         CompileError, match="The custom.device device does not provide C interface for compilation."

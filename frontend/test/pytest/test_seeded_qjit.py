@@ -17,7 +17,7 @@ import numpy as np
 import pennylane as qp
 import pytest
 
-from catalyst import CompileError, cond, measure, qjit
+from catalyst import CompileError, qjit
 
 
 def test_seeded_async():
@@ -61,9 +61,9 @@ def test_seeded_measurement(seed, backend):
         @qp.qnode(dev)
         def circuit():
             qp.Hadamard(0)
-            m = measure(0)
+            m = qp.measure(0)
 
-            @cond(m)
+            @qp.cond(m)
             def cfun0():
                 qp.Hadamard(0)
 
@@ -77,9 +77,9 @@ def test_seeded_measurement(seed, backend):
         @qp.qnode(dev)
         def circuit():
             qp.Hadamard(0)
-            m = measure(0)
+            m = qp.measure(0)
 
-            @cond(m)
+            @qp.cond(m)
             def cfun0():
                 qp.Hadamard(0)
 
