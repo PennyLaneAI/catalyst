@@ -541,7 +541,7 @@ def test_adjoint(backend):
     ("state", "prep"),
     (
         ("magic-T", lambda w: (qp.H(w), qp.T(w))),
-        ("magic-T-adj", lambda w: (qp.H(w), qp.adjoint(qp.T(w), lazy=False))),
+        ("magic-T-adj", lambda w: (qp.H(w), qp.adjoint(qp.T(w)))),
     ),
 )
 def test_magic_state_allocation(backend, state, prep):
