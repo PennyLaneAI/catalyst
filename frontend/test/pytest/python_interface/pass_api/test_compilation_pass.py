@@ -390,7 +390,7 @@ class TestCompilationPassIntegration:
 
         dev = qp.device("lightning.qubit", wires=1)
 
-        @qp.qjit(capture=capture_mode, skip_preprocess=True, collect_decomp_rules=False)
+        @qp.qjit(capture=capture_mode_mode, skip_preprocess=True, collect_decomp_rules=False)
         @integration_pass
         @qp.qnode(dev)
         def circuit():
