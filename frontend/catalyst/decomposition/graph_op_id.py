@@ -98,7 +98,7 @@ def build_graph_op_id(
 
     dynamic_id = format_dynamic_params_for_id(dict(sorted(dynamic_shape.items())))
     wire_id = "{" + ",".join(f"{key}:{value}" for key, value in sorted(wire_lens.items())) + "}"
-    static_id = format_static_data_dict_for_id(dict(static_data))
+    static_id = format_static_data_dict_for_id(dict(sorted(static_data.items())))
     uid_id = f"[{uid}]" if uid is not None else ""
     return name + dynamic_id + wire_id + static_id + uid_id
 
@@ -165,15 +165,16 @@ class GraphOpID:
         elif issubclass(type(self.op), tuple(_SPECIAL_LOWERINGS.keys())):  # special cases
             return {
                 argname: [convert_item_to_mlir_type(argtype, is_special_lowering=True)]
-                for argname, argtype in sorted(self.op.dynamic_args.items())
+                for argname, argtype in self.op.dynamic_args.items()
             }
         else:
+            # Same traversal as ``_process_params``: dynamic args, then the numeric leaves of
+            # non-wire hybrid args, in declaration order (i.e. operand order). Do not sort.
             dynamic_shape = {
                 argname: [convert_item_to_mlir_type(argtype)]
-                for argname, argtype in sorted(self.op.dynamic_args.items())
+                for argname, argtype in self.op.dynamic_args.items()
             }
-            # Collect additional dynamic params from hybrid args (have to match _process_params).
-            for argname, value in sorted(self.op.hybrid_args.items()):
+            for argname, value in self.op.hybrid_args.items():
                 if argname in self.op.wire_argnames:  # do not include wires
                     continue
                 # skip operators
@@ -184,13 +185,15 @@ class GraphOpID:
             return dynamic_shape
 
     def parse_wire_lens(self) -> dict[str, int]:
-        """Return a dictionary of wire arg names to lengths."""
-        wire_lens = {}
-        for wire_name, wire_arg in sorted(self.op.wire_args.items()):
-            if wire_name not in self.op.hybrid_argnames:
-                wire_lens[wire_name] = len(wire_arg)
-        # match hybrid arg wires collection from _process_qubits (have to match generated IR op)
-        for argname, value in sorted(self.op.hybrid_args.items()):
+        """Return a dictionary of wire arg names to lengths, in operand order."""
+        # Same traversal as ``_process_qubits``: pure wire args (empty ones included), then the
+        # hybrid args that carry qubits, in declaration order (i.e. operand order). Do not sort.
+        wire_lens = {
+            wire_name: len(wire_arg)
+            for wire_name, wire_arg in self.op.wire_args.items()
+            if wire_name not in self.op.hybrid_argnames
+        }
+        for argname, value in self.op.hybrid_args.items():
             # Descend through nested operators: their wires are qubit operands of this operator.
             leaves, _ = flatten(value, is_leaf=_is_wires)
             count = sum(len(leaf) for leaf in leaves if _is_wires(leaf))
@@ -205,7 +208,7 @@ class GraphOpID:
             return {}
         return {
             static_argname: getattr(self.op, static_argname)
-            for static_argname in sorted(self.op.compilable_argnames)
+            for static_argname in self.op.compilable_argnames
         }
 
     def parse_extra_data(self):
@@ -214,6 +217,7 @@ class GraphOpID:
             hybrid_lens = []
             hybrid_trees = []
             hybrid_args = []
+            # Must be the ``wire_lens`` tuple the lowering hashes: pure wire args in operand order
             filtered_wire_lens = tuple(
                 length
                 for name, length in self.wire_lens.items()
