@@ -420,9 +420,9 @@ void ResourceAnalysis::analyzeRegion(Region &region, ResourceResult &result, boo
 /**
  * @brief Collect a single operation into the ResourceResult.
  *
- * This categorizes the operation into gates, measurements, classical instructions,
- * function calls, or custom instructions, and updates the corresponding counts in the
- * ResourceResult.
+ * This collects plugin extension data, then categorizes the operation into gates,
+ * measurements, qubit allocations, classical instructions, or function calls and
+ * updates the corresponding counts in the ResourceResult.
  *
  * @param op The operation to collect.
  * @param result The ResourceResult to update with the operation's resource usage.
@@ -500,12 +500,6 @@ void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result, b
         return;
     }
 
-    // Custom instructions
-    if (auto inst = dyn_cast<ResourceInstructionOpInterface>(op)) {
-        result.customInstructions[inst.getResourceName()] += 1;
-        return;
-    }
-
     // Other ops from custom dialects: emit a warning so users are aware
     if (isCustomDialectOp(op)) {
         op->emitWarning() << "ResourceAnalysis encountered an unknown operation '" << op->getName()
@@ -556,9 +550,6 @@ static void accumulateScaled(ResourceResult &dest, const ResourceResult &source,
     }
     for (const auto &ci : source.classicalInstructions) {
         dest.classicalInstructions[ci.getKey()] += ci.getValue() * count;
-    }
-    for (const auto &ci : source.customInstructions) {
-        dest.customInstructions[ci.getKey()] += ci.getValue() * count;
     }
     for (const auto &fc : source.functionCalls) {
         dest.functionCalls[fc.getKey()] += fc.getValue() * count;
