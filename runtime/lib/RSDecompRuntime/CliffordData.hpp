@@ -22,6 +22,8 @@ namespace RSDecomp::CliffordData {
 using namespace RSDecomp::Rings;
 
 enum class GateType { T = 0, HT, SHT, I, X, Y, Z, H, S, Sd };
+// Pk is the PPR exp(-iπ/k P) and adjPk its inverse exp(iπ/k P). The order of the cases is that of
+// the scf.index_switch built by the gridsynth pass.
 enum class PPRGateType {
     I = 0,
     X2,

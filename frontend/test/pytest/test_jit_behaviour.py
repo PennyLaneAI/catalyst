@@ -553,7 +553,7 @@ class TestQJITTransforms:
         assert workflow.llvmir is not None
         original_artifacts = {
             name: getattr(workflow, name)
-            for name in ("jaxpr", "mlir_module", "llvm_ir", "compiled_function", "workspace")
+            for name in ("jaxpr", "mlir_module", "compiled_function", "workspace")
         }
         for name, artifact in original_artifacts.items():
             assert artifact is not None, name
