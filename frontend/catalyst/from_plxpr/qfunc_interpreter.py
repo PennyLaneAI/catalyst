@@ -871,7 +871,7 @@ def handle_measure_in_basis(self, angle, wire, plane, reset, postselect):
 
 # pylint: disable=unused-argument
 @PLxPRToQuantumJaxprInterpreter.register_primitive(plxpr_adjoint_transform_prim)
-def handle_adjoint_transform(self, *invals, jaxpr, lazy, n_consts):
+def handle_adjoint_transform(self, *invals, jaxpr, n_consts):
     """Interpret an adjoint region while retaining its context for rule discovery."""
     consts = invals[:n_consts]
     args = invals[n_consts:]
@@ -883,7 +883,6 @@ def handle_adjoint_transform(self, *invals, jaxpr, lazy, n_consts):
         *body.consts,
         *args,
         jaxpr=body.jaxpr,
-        lazy=lazy,
         n_consts=len(body.consts),
     )
 
