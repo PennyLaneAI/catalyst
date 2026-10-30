@@ -1115,7 +1115,7 @@
 * The `method` attribute of the Gradient dialect operations (`grad`, `value_and_grad`, `jvp`,
   `vjp`) is now an enum attribute (`#gradient<diff_method auto>`) instead of a string attribute.
   [(#3318)](https://github.com/PennyLaneAI/catalyst/pull/3318)
-  
+
 * Backline transport frames are built and read through a shared frame codec, which the `cpu_verbs`
   backends now use instead of laying out the 16 B frame themselves. The bytes on the wire are
   unchanged, and other frame layouts can now be added in one place.
