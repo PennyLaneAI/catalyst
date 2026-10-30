@@ -788,7 +788,7 @@ class TestControlFlow:
         """
         dev = qp.device("null.qubit", wires=1)
 
-        @qp.qjit(capture=True, target="mlir")
+        @qp.qjit(capture=True, target="mlir", skip_preprocess=True, collect_decomp_rules=False)
         @convert_qecp_to_quantum_pass
         @qp.transform(pass_name="symbol-dce")
         @convert_qecl_to_qecp_pass(qec_code="Steane")
@@ -833,7 +833,7 @@ class TestControlFlow:
         """
         dev = qp.device("null.qubit", wires=2)
 
-        @qp.qjit(capture=True, target="mlir")
+        @qp.qjit(capture=True, target="mlir", skip_preprocess=True, collect_decomp_rules=False)
         @convert_qecp_to_quantum_pass
         @qp.transform(pass_name="symbol-dce")
         @convert_qecl_to_qecp_pass(qec_code="Steane")
@@ -887,7 +887,7 @@ class TestControlFlow:
         """
         dev = qp.device("null.qubit", wires=1)
 
-        @qp.qjit(capture=True, target="mlir")
+        @qp.qjit(capture=True, target="mlir", skip_preprocess=True, collect_decomp_rules=False)
         @convert_qecp_to_quantum_pass
         @qp.transform(pass_name="symbol-dce")
         @convert_qecl_to_qecp_pass(qec_code="Steane")
@@ -923,7 +923,7 @@ class TestControlFlow:
         """
         dev = qp.device("null.qubit", wires=1)
 
-        @qp.qjit(capture=True, target="mlir")
+        @qp.qjit(capture=True, target="mlir", skip_preprocess=True, collect_decomp_rules=False)
         @convert_qecp_to_quantum_pass
         @qp.transform(pass_name="symbol-dce")
         @convert_qecl_to_qecp_pass(qec_code="Steane")
@@ -1000,7 +1000,10 @@ class TestQECPassIntegration:
         """Integration tests for lowering a 3-logical qubit GHZ circuit on lightning.qubit."""
         dev = qp.device("lightning.qubit", wires=3)
 
-        @qp.qjit(capture=True, pipelines=qec_pipeline())
+        @qp.qjit(
+            capture=True, pipelines=qec_pipeline(), skip_preprocess=True, collect_decomp_rules=False
+        )
+        @qp.transform(pass_name="dynamic-one-shot")
         @convert_qecp_to_quantum_pass
         @convert_qecl_to_qecp_pass(qec_code="Steane", number_errors=1)
         @inject_noise_to_qecl_pass
@@ -1050,7 +1053,10 @@ class TestQECPassIntegration:
         """Integration tests for lowering a 3-logical qubit GHZ circuit on null.qubit."""
         dev = qp.device("null.qubit", wires=3)
 
-        @qp.qjit(capture=True, pipelines=qec_pipeline())
+        @qp.qjit(
+            capture=True, pipelines=qec_pipeline(), skip_preprocess=True, collect_decomp_rules=False
+        )
+        @qp.transform(pass_name="dynamic-one-shot")
         @convert_qecp_to_quantum_pass
         @convert_qecl_to_qecp_pass(qec_code="Steane", number_errors=1)
         @inject_noise_to_qecl_pass
@@ -1096,9 +1102,16 @@ class TestQECPassIntegration:
             inject_noise_to_qecl_pass,
             convert_qecl_to_qecp_pass(qec_code="Steane", number_errors=1),
             convert_qecp_to_quantum_pass,
+            qp.transform(pass_name="dynamic-one-shot"),
         )
 
-        @qp.qjit(capture=True, pipelines=qec_pipeline(), seed=123)
+        @qp.qjit(
+            capture=True,
+            pipelines=qec_pipeline(),
+            seed=123,
+            skip_preprocess=True,
+            collect_decomp_rules=False,
+        )
         @qec_conversion_and_noise_passes
         @qp.set_shots(700)
         @qp.qnode(dev, mcm_method="one-shot")
@@ -1108,7 +1121,13 @@ class TestQECPassIntegration:
             qp.H(0)
             return qp.sample(wires=[0])
 
-        @qp.qjit(capture=True, pipelines=qec_pipeline(), seed=456)
+        @qp.qjit(
+            capture=True,
+            pipelines=qec_pipeline(),
+            seed=456,
+            skip_preprocess=True,
+            collect_decomp_rules=False,
+        )
         @qec_conversion_and_noise_passes
         @qp.set_shots(700)
         @qp.qnode(dev, mcm_method="one-shot")
@@ -1120,7 +1139,13 @@ class TestQECPassIntegration:
             qp.H(0)
             return qp.sample(wires=[0])
 
-        @qp.qjit(capture=True, pipelines=qec_pipeline(), seed=789)
+        @qp.qjit(
+            capture=True,
+            pipelines=qec_pipeline(),
+            seed=789,
+            skip_preprocess=True,
+            collect_decomp_rules=False,
+        )
         @qec_conversion_and_noise_passes
         @qp.set_shots(700)
         @qp.qnode(dev, mcm_method="one-shot")
@@ -1140,7 +1165,14 @@ class TestQECPassIntegration:
         """Test that sampling on MCMs returns correct results."""
         dev = qp.device("lightning.qubit", wires=2)
 
-        @qp.qjit(capture=True, pipelines=qec_pipeline(), seed=42)
+        @qp.qjit(
+            capture=True,
+            pipelines=qec_pipeline(),
+            seed=42,
+            skip_preprocess=True,
+            collect_decomp_rules=False,
+        )
+        @qp.transform(pass_name="dynamic-one-shot")
         @convert_qecp_to_quantum_pass
         @convert_qecl_to_qecp_pass(qec_code="Steane", number_errors=1)
         @inject_noise_to_qecl_pass
@@ -1162,7 +1194,14 @@ class TestQECPassIntegration:
         """Test that sampling on MCMs returns correct results."""
         dev = qp.device("lightning.qubit", wires=2)
 
-        @qp.qjit(capture=True, pipelines=qec_pipeline(), seed=42)
+        @qp.qjit(
+            capture=True,
+            pipelines=qec_pipeline(),
+            seed=42,
+            skip_preprocess=True,
+            collect_decomp_rules=False,
+        )
+        @qp.transform(pass_name="dynamic-one-shot")
         @convert_qecp_to_quantum_pass
         @convert_qecl_to_qecp_pass(qec_code="Steane", number_errors=1)
         @inject_noise_to_qecl_pass
@@ -1182,7 +1221,10 @@ class TestQECPassIntegration:
         """Test that expectation-value terminal measurements return correct results."""
         dev = qp.device("lightning.qubit", wires=2)
 
-        @qp.qjit(capture=True, pipelines=qec_pipeline())
+        @qp.qjit(
+            capture=True, pipelines=qec_pipeline(), skip_preprocess=True, collect_decomp_rules=False
+        )
+        @qp.transform(pass_name="dynamic-one-shot")
         @convert_qecp_to_quantum_pass
         @convert_qecl_to_qecp_pass(qec_code="Steane", number_errors=1)
         @inject_noise_to_qecl_pass
@@ -1202,7 +1244,10 @@ class TestQECPassIntegration:
         """Test that variance terminal measurements return correct results."""
         dev = qp.device("lightning.qubit", wires=2)
 
-        @qp.qjit(capture=True, pipelines=qec_pipeline())
+        @qp.qjit(
+            capture=True, pipelines=qec_pipeline(), skip_preprocess=True, collect_decomp_rules=False
+        )
+        @qp.transform(pass_name="dynamic-one-shot")
         @convert_qecp_to_quantum_pass
         @convert_qecl_to_qecp_pass(qec_code="Steane", number_errors=1)
         @inject_noise_to_qecl_pass
@@ -1231,7 +1276,10 @@ class TestQECPassIntegration:
         """Test that probability terminal measurements return correct results."""
         dev = qp.device("lightning.qubit", wires=2)
 
-        @qp.qjit(capture=True, pipelines=qec_pipeline())
+        @qp.qjit(
+            capture=True, pipelines=qec_pipeline(), skip_preprocess=True, collect_decomp_rules=False
+        )
+        @qp.transform(pass_name="dynamic-one-shot")
         @convert_qecp_to_quantum_pass
         @convert_qecl_to_qecp_pass(qec_code="Steane", number_errors=1)
         @inject_noise_to_qecl_pass
@@ -1266,7 +1314,14 @@ class TestQECPassIntegration:
 
         dev = qp.device("lightning.qubit", wires=1)
 
-        @qp.qjit(capture=True, pipelines=qec_pipeline(), seed=6)
+        @qp.qjit(
+            capture=True,
+            pipelines=qec_pipeline(),
+            seed=6,
+            skip_preprocess=True,
+            collect_decomp_rules=False,
+        )
+        @qp.transform(pass_name="dynamic-one-shot")
         @convert_qecp_to_quantum_pass
         @convert_qecl_to_qecp_pass(qec_code="Steane", number_errors=1)
         @inject_noise_to_qecl_pass
@@ -1329,7 +1384,14 @@ class TestQECPassIntegration:
 
         dev = qp.device("lightning.qubit", wires=1)
 
-        @qp.qjit(capture=True, pipelines=qec_pipeline(), seed=6)
+        @qp.qjit(
+            capture=True,
+            pipelines=qec_pipeline(),
+            seed=6,
+            skip_preprocess=True,
+            collect_decomp_rules=False,
+        )
+        @qp.transform(pass_name="dynamic-one-shot")
         @convert_qecp_to_quantum_pass
         @convert_qecl_to_qecp_pass(qec_code="Steane", number_errors=1)
         @inject_noise_to_qecl_pass

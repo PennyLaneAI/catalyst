@@ -217,7 +217,7 @@ def test_gridsynth_ppr_basis_no_cliffords(method):
     their pi/8 PPRs are chosen to absorb the Clifford gates, and that the analyze result agrees."""
     angles = np.random.default_rng(42).uniform(0, 4 * np.pi, 50)
 
-    @qp.qjit(capture=True, seed=37)
+    @qp.qjit(capture=True, seed=37, skip_preprocess=True, collect_decomp_rules=False)
     @gridsynth(epsilon=1e-4, ppr_basis=True, method=method)
     @qp.qnode(qp.device("null.qubit", wires=1))
     def circuit(angles):

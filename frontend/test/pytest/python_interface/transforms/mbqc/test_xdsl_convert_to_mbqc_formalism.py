@@ -385,6 +385,8 @@ class TestConvertToMBQCFormalismPass:
             target="mlir",
             pipelines=mbqc_pipeline(),
             autograph=True,
+            skip_preprocess=True,
+            collect_decomp_rules=False,
         )
         @convert_to_mbqc_formalism_pass
         @qp.set_shots(1000)
@@ -436,6 +438,8 @@ class TestConvertToMBQCFormalismPass:
             target="mlir",
             pipelines=mbqc_pipeline(),
             autograph=True,
+            skip_preprocess=True,
+            collect_decomp_rules=False,
         )
         @convert_to_mbqc_formalism_pass
         @qp.set_shots(1000)
@@ -481,6 +485,8 @@ class TestConvertToMBQCFormalismPass:
             target="mlir",
             pipelines=mbqc_pipeline(),
             autograph=True,
+            skip_preprocess=True,
+            collect_decomp_rules=False,
         )
         @decompose_graph_state_pass
         @convert_to_mbqc_formalism_pass
@@ -524,6 +530,8 @@ class TestConvertToMBQCFormalismPass:
             capture=True,
             target="mlir",
             autograph=True,
+            skip_preprocess=True,
+            collect_decomp_rules=False,
         )
         @convert_to_mbqc_formalism_pass
         @qp.set_shots(1000)
@@ -556,6 +564,8 @@ class TestConvertToMBQCFormalismPass:
             target="mlir",
             pipelines=mbqc_pipeline(),
             autograph=True,
+            skip_preprocess=True,
+            collect_decomp_rules=False,
         )
         @decompose_graph_state_pass
         @convert_to_mbqc_formalism_pass
