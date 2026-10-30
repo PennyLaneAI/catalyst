@@ -242,19 +242,17 @@ def flatten_hybrid_args(extra_data) -> tuple:
         nodes, _ = qp.pytrees.flatten(
             value, is_leaf=lambda node: isinstance(node, Operator2) or _is_wire_leaf(node)
         )
-        forward_mask = []
+        sources = []
         for node in nodes:
             nested, _ = qp.pytrees.flatten(node, is_leaf=_is_wire_leaf)
-            forward_mask.extend([isinstance(node, Operator2)] * len(nested))
-
-        sources = []
-        for leaf, is_forward in zip(leaves, forward_mask, strict=True):
-            if isinstance(leaf, numeric_types):
-                sources.append(is_forward)
-                bucket = forwarded if is_forward else params
-                bucket.append(jnp.zeros(leaf.shape, dtype=leaf.dtype))
-            else:
-                sources.append(None)
+            for leaf in nested:
+                if isinstance(leaf, numeric_types):
+                    is_forward = isinstance(node, Operator2)
+                    sources.append(is_forward)
+                    bucket = forwarded if is_forward else params
+                    bucket.append(jnp.zeros(leaf.shape, dtype=leaf.dtype))
+                else:
+                    sources.append(None)
 
         if any(source is not None for source in sources) or any(map(_is_wire_leaf, leaves)):
             specs.append((name, tree, leaves, sources))
