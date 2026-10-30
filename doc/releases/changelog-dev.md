@@ -1112,6 +1112,9 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* FuncOp's with quantum dialect instructions can now always be inlined.
+  [(#3420)](https://github.com/PennyLaneAI/catalyst/pull/3420)
+
 * The `method` attribute of the Gradient dialect operations (`grad`, `value_and_grad`, `jvp`,
   `vjp`) is now an enum attribute (`#gradient<diff_method auto>`) instead of a string attribute.
   [(#3318)](https://github.com/PennyLaneAI/catalyst/pull/3318)
