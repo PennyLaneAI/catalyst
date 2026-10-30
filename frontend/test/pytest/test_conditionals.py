@@ -98,6 +98,7 @@ class TestCondToJaxpr:
         result = circuit.jaxpr
         assert asline(expected) == asline(result)
 
+    @pytest.mark.old_frontend
     @pytest.mark.usefixtures("disable_capture")
     def test_single_estimated_probability(self):
         """Check the JAXPR of a simple conditional function that uses the
@@ -116,7 +117,7 @@ class TestCondToJaxpr:
             in (c,) }
             """)
 
-        @qjit()
+        @qjit(capture=False)
         def circuit(n: int):
             @catalyst_cond(n == 5, estimated_probability=0.2)
             def cond_fn():
@@ -137,6 +138,7 @@ class TestCondToJaxpr:
         result = circuit.jaxpr
         assert asline(expected) == asline(result)
 
+    @pytest.mark.old_frontend
     @pytest.mark.usefixtures("disable_capture")
     def test_estimated_probability_with_else_ifs(self):
         """Check the JAXPR of a conditional function with else_ifs that uses the
@@ -159,7 +161,7 @@ class TestCondToJaxpr:
             in (e,) }
             """)
 
-        @qjit()
+        @qjit(capture=False)
         def circuit(n: int):
             @catalyst_cond(n == 5, estimated_probability=0.2)
             def cond_fn():
@@ -217,12 +219,13 @@ class TestEstimatedProbabilityValidation:
         with pytest.raises(ValueError, match="must sum to at most 1"):
             collect_estimated_probabilities([0.6, 0.6])
 
+    @pytest.mark.old_frontend
     @pytest.mark.usefixtures("disable_capture")
     def test_partial_probabilities_raise_through_cond(self):
         """The partial-probability error propagates through the ``cond`` API when only some
         branches specify ``estimated_probability``."""
 
-        @qjit
+        @qjit(capture=False)
         def circuit(n):
             @catalyst_cond(n == 5, estimated_probability=0.2)
             def cond_fn():
@@ -241,11 +244,12 @@ class TestEstimatedProbabilityValidation:
         with pytest.raises(ValueError, match="must be provided for every non-default branch"):
             circuit(5)
 
+    @pytest.mark.old_frontend
     @pytest.mark.usefixtures("disable_capture")
     def test_probabilities_summing_above_one_raise_through_cond(self):
         """The sum-to-one error propagates through the ``cond`` API."""
 
-        @qjit
+        @qjit(capture=False)
         def circuit(n):
             @catalyst_cond(n == 5, estimated_probability=0.7)
             def cond_fn():
@@ -1379,7 +1383,7 @@ class TestStaticConditionalFolding:
 
         @qjit(target="mlir")
         def circuit():
-            @catalyst_cond(predicate)
+            @qp.cond(predicate)
             def branch():
                 return 1
 
@@ -1391,11 +1395,12 @@ class TestStaticConditionalFolding:
 
         assert "cond" not in [eqn.primitive.name for eqn in circuit.jaxpr.eqns]
 
+    @pytest.mark.old_frontend
     def test_static_conditional_not_folded_when_disabled(self):
         """Disabling the toggle keeps the cond primitive even for a constant predicate."""
         catalyst.compile_without_static_conditionals = False
 
-        @qjit(target="mlir")
+        @qjit(target="mlir", capture=False)
         def circuit():
             @catalyst_cond(True)
             def branch():
@@ -1414,7 +1419,7 @@ class TestStaticConditionalFolding:
 
         @qjit(target="mlir")
         def circuit(n: int):
-            @catalyst_cond(n == 5)
+            @qp.cond(n == 5)
             def branch():
                 return n**2
 

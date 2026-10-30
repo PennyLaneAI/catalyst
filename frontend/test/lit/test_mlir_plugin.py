@@ -103,7 +103,7 @@ def test_pass_options():
 
     @qjit(target="mlir")
     # CHECK: options = {"an-option" = true, "maxValue" = 1 : i64, "multi-word-option" = 1 : i64}
-    @qp.transform(pass_name="some-pass")("an-option", maxValue=1, multi_word_option=1)
+    @qp.transform(pass_name="some-pass")(an_option=True, maxValue=1, multi_word_option=1)
     @qp.qnode(qp.device("null.qubit", wires=1))
     def example():
         return qp.state()

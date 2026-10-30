@@ -224,6 +224,7 @@ def test_pass_plugin_not_installed(mocker, backend):
         qp.qjit(circuit, capture=False)()
 
 
+@pytest.mark.old_frontend
 def test_pass_before_tape_transform(backend):
     """Test that provided an mlir-only transform prior to a tape transform raises an error."""
 
@@ -233,7 +234,7 @@ def test_pass_before_tape_transform(backend):
     def tape_transform(tape):
         return (tape,), lambda x: x[0]
 
-    @qp.qjit
+    @qp.qjit(capture=False)
     @tape_transform
     @my_pass
     @qp.qnode(qp.device(backend, wires=1))
@@ -244,6 +245,7 @@ def test_pass_before_tape_transform(backend):
         f(0.5)
 
 
+@pytest.mark.old_frontend
 def test_pass_after_tape_transform(backend):
     """Test that passes can be applied after tape transforms."""
 
@@ -253,7 +255,7 @@ def test_pass_after_tape_transform(backend):
 
     my_pass = qp.transform(pass_name="my-pass")
 
-    @qp.qjit(target="mlir")
+    @qp.qjit(target="mlir", capture=False)
     @my_pass
     @tape_only_cancel_inverses
     @qp.qnode(qp.device(backend, wires=1))

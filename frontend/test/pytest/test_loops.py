@@ -20,12 +20,13 @@ import pennylane as qp
 import pytest
 
 import catalyst
-from catalyst import api_extensions, for_loop, measure, qjit, while_loop
+from catalyst import api_extensions, for_loop, qjit, while_loop
 from catalyst.utils.exceptions import PlxprCaptureCFCompatibilityError
 
 # pylint: disable=no-value-for-parameter,unused-argument
 
 
+@pytest.mark.old_frontend
 class TestLoopToJaxpr:
     """Collection of tests that examine the generated JAXPR of loops."""
 
@@ -51,7 +52,7 @@ class TestLoopToJaxpr:
               in (b, c) }}
             """)
 
-        @qjit
+        @qjit(capture=False)
         def circuit(x: float):
             @while_loop(lambda v: v[0] < 10, estimated_iterations=estimated_iterations)
             def loop(v):
@@ -82,7 +83,7 @@ class TestLoopToJaxpr:
               in (c, d) }}
         """)
 
-        @qjit
+        @qjit(capture=False)
         def circuit(x: float, n: int):
             @for_loop(0, n, 1, estimated_iterations=estimated_iterations)
             def loop(_, v):
@@ -126,33 +127,34 @@ class TestWhileLoops:
         @qjit
         @qp.qnode(qp.device(backend, wires=1))
         def circuit(n):
-            @while_loop(lambda v: v[0] < v[1])
+            @qp.while_loop(lambda v: v[0] < v[1])
             def loop(v):
                 qp.PauliX(wires=0)
                 return v[0] + 1, v[1]
 
             loop((0, n))
-            return measure(wires=0)
+            return qp.expval(qp.Z(0))
 
-        assert circuit(1)
-        assert not circuit(2)
-        assert circuit(3)
-        assert not circuit(4)
+        assert np.allclose(circuit(1), -1.0)
+        assert np.allclose(circuit(2), 1.0)
+        assert np.allclose(circuit(3), -1.0)
+        assert np.allclose(circuit(4), 1.0)
 
+    @pytest.mark.old_frontend
     def test_non_bool_condition_error(self, backend):
         """Test error messages issues when the non-bool conditions are provided."""
 
         def workflow(R):
-            @qjit
+            @qjit(capture=False)
             @qp.qnode(qp.device(backend, wires=1))
             def circuit():
-                @while_loop(lambda i: R)
+                @qp.while_loop(lambda i: R)
                 def loop(i):
                     qp.PauliX(wires=0)
                     return i + 1
 
                 loop(0)
-                return measure(wires=0)
+                return qp.expval(qp.Z(0))
 
             return circuit()
 
@@ -167,18 +169,18 @@ class TestWhileLoops:
         @qjit
         @qp.qnode(qp.device(backend, wires=1))
         def circuit(n):
-            @while_loop(lambda i: i < n)
+            @qp.while_loop(lambda i: i < n)
             def loop(i):
                 qp.PauliX(wires=0)
                 return i + 1
 
             loop(0)
-            return measure(wires=0)
+            return qp.expval(qp.Z(0))
 
-        assert circuit(1)
-        assert not circuit(2)
-        assert circuit(3)
-        assert not circuit(4)
+        assert np.allclose(circuit(1), -1.0)
+        assert np.allclose(circuit(2), 1.0)
+        assert np.allclose(circuit(3), -1.0)
+        assert np.allclose(circuit(4), 1.0)
 
     def test_closure_body_fn(self, backend):
         """Test while loop with captured values (closures) in the body function."""
@@ -188,18 +190,18 @@ class TestWhileLoops:
         def circuit(n):
             my_const = 1
 
-            @while_loop(lambda v: v[0] < v[1])
+            @qp.while_loop(lambda v: v[0] < v[1])
             def loop(v):
                 qp.PauliX(wires=0)
                 return v[0] + my_const, v[1]
 
             loop((0, n))
-            return measure(wires=0)
+            return qp.expval(qp.Z(0))
 
-        assert circuit(1)
-        assert not circuit(2)
-        assert circuit(3)
-        assert not circuit(4)
+        assert np.allclose(circuit(1), -1.0)
+        assert np.allclose(circuit(2), 1.0)
+        assert np.allclose(circuit(3), -1.0)
+        assert np.allclose(circuit(4), 1.0)
 
     def test_assert_joint_closure(self, backend):
         """Test while loop with captured values (closures) in both body and condition functions."""
@@ -209,18 +211,18 @@ class TestWhileLoops:
         def circuit(n):
             my_const = 1
 
-            @while_loop(lambda i: i < n)
+            @qp.while_loop(lambda i: i < n)
             def loop(i):
                 qp.PauliX(wires=0)
                 return i + my_const
 
             loop(0)
-            return measure(wires=0)
+            return qp.expval(qp.Z(0))
 
-        assert circuit(1)
-        assert not circuit(2)
-        assert circuit(3)
-        assert not circuit(4)
+        assert np.allclose(circuit(1), -1.0)
+        assert np.allclose(circuit(2), 1.0)
+        assert np.allclose(circuit(3), -1.0)
+        assert np.allclose(circuit(4), 1.0)
 
     def test_assert_reference_outside_measure(self, backend):
         """Test while loop in conjunction with the measure op."""
@@ -228,20 +230,20 @@ class TestWhileLoops:
         @qjit
         @qp.qnode(qp.device(backend, wires=1))
         def circuit(n):
-            m = measure(wires=0)
+            m = qp.measure(wires=0)
 
-            @while_loop(lambda i: i < n)
+            @qp.while_loop(lambda i: i < n)
             def loop(i):
                 qp.PauliX(wires=0)
                 return i + 1 + m
 
             loop(0)
-            return measure(wires=0)
+            return qp.expval(qp.Z(0))
 
-        assert circuit(1)
-        assert not circuit(2)
-        assert circuit(3)
-        assert not circuit(4)
+        assert np.allclose(circuit(1), -1.0)
+        assert np.allclose(circuit(2), 1.0)
+        assert np.allclose(circuit(3), -1.0)
+        assert np.allclose(circuit(4), 1.0)
 
     def test_multiple_loop_arguments(self, backend):
         """Test while loop with multiple (loop-carried) arguments."""
@@ -249,18 +251,18 @@ class TestWhileLoops:
         @qjit
         @qp.qnode(qp.device(backend, wires=1))
         def circuit(n: int):
-            @while_loop(lambda v, _: v[0] < v[1])
+            @qp.while_loop(lambda v, _: v[0] < v[1])
             def loop(v, inc):
                 qp.PauliX(wires=0)
                 return (v[0] + inc, v[1]), inc
 
             loop((0, n), 1)
-            return measure(wires=0)
+            return qp.expval(qp.Z(0))
 
-        assert circuit(1)
-        assert not circuit(2)
-        assert circuit(3)
-        assert not circuit(4)
+        assert np.allclose(circuit(1), -1.0)
+        assert np.allclose(circuit(2), 1.0)
+        assert np.allclose(circuit(3), -1.0)
+        assert np.allclose(circuit(4), 1.0)
 
     def test_nested_loops(self, backend):
         """Test nested while loops."""
@@ -268,18 +270,19 @@ class TestWhileLoops:
         @qjit
         @qp.qnode(qp.device(backend, wires=1))
         def circuit(n, m):
-            @while_loop(lambda i, _: i < n)
+            @qp.while_loop(lambda i, _: i < n)
             def outer(i, accum):
-                @while_loop(lambda j: j < m)
+                @qp.while_loop(lambda j: j < m)
                 def inner(j):
                     return j + 1
 
                 return i + 1, accum + inner(0)
 
-            return outer(0, 0)[1]
+            qp.RX(outer(0, 0)[1], wires=0)
+            return qp.expval(qp.Z(0))
 
-        assert circuit(5, 6) == 30  # 5 * 6
-        assert circuit(4, 7) == 28  # 4 * 7
+        assert np.allclose(circuit(5, 6), np.cos(30))  # 5 * 6
+        assert np.allclose(circuit(4, 7), np.cos(28))  # 4 * 7
 
     @pytest.mark.usefixtures("disable_capture")
     def test_while_loop_raises_compatibility_error_with_capture(self):
@@ -327,13 +330,14 @@ class TestWhileLoops:
 class TestForLoops:
     """Test the Catalyst for_loop operation."""
 
+    @pytest.mark.old_frontend
     def test_required_index(self, backend):
         """Check for loop error message when the iteration index is missing."""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=1))
         def circuit(n):
-            @for_loop(0, n, 1)
+            @qp.for_loop(0, n, 1)
             def loop_fn():
                 pass
 
@@ -349,15 +353,15 @@ class TestForLoops:
         @qjit
         @qp.qnode(qp.device(backend, wires=1))
         def circuit(n):
-            @for_loop(0, n, 1)
+            @qp.for_loop(0, n, 1)
             def loop_fn(_):
                 qp.PauliX(0)
 
             loop_fn()
-            return measure(0)
+            return qp.expval(qp.Z(0))
 
-        assert circuit(1)
-        assert not circuit(2)
+        assert np.allclose(circuit(1), -1.0)
+        assert np.allclose(circuit(2), 1.0)
 
     def test_loop_carried_values(self, backend):
         """Test for loop with updating loop carried values."""
@@ -365,7 +369,7 @@ class TestForLoops:
         @qjit
         @qp.qnode(qp.device(backend, wires=1))
         def circuit(n):
-            @for_loop(0, n, 1)
+            @qp.for_loop(0, n, 1)
             def loop_fn(_, x):
                 qp.RY(x, wires=0)
                 return x + np.pi / 4
@@ -386,7 +390,7 @@ class TestForLoops:
         def circuit(n: int):
             qp.Hadamard(wires=0)
 
-            @for_loop(0, n - 1, 1)
+            @qp.for_loop(0, n - 1, 1)
             def loop_fn(i):
                 qp.CNOT(wires=[i, i + 1])
 
@@ -406,7 +410,7 @@ class TestForLoops:
         def circuit(x):
             y = 2 * x
 
-            @for_loop(0, 1, 1)
+            @qp.for_loop(0, 1, 1)
             def loop_fn(_):
                 qp.RY(y, wires=0)
 
@@ -422,16 +426,16 @@ class TestForLoops:
         @qp.qnode(qp.device(backend, wires=4))
         def circuit(n):
             # Input state: equal superposition
-            @for_loop(0, n, 1)
+            @qp.for_loop(0, n, 1)
             def init(i):
                 qp.Hadamard(wires=i)
 
             # QFT
-            @for_loop(0, n, 1)
+            @qp.for_loop(0, n, 1)
             def qft(i):
                 qp.Hadamard(wires=i)
 
-                @for_loop(i + 1, n, 1)
+                @qp.for_loop(i + 1, n, 1)
                 def inner(j):
                     qp.ControlledPhaseShift(np.pi / 2 ** (n - j + 1), [i, j])
 
@@ -451,15 +455,15 @@ class TestForLoops:
         @qjit
         @qp.qnode(qp.device(backend, wires=1))
         def circuit(n):
-            @for_loop(n, 0, -1)
+            @qp.for_loop(n, 0, -1)
             def loop_fn(_):
                 qp.PauliX(0)
 
             loop_fn()
-            return measure(0)
+            return qp.expval(qp.Z(0))
 
-        assert circuit(1)
-        assert not circuit(0)
+        assert np.allclose(circuit(1), -1.0)
+        assert np.allclose(circuit(0), 1.0)
 
     @pytest.mark.usefixtures("disable_capture")
     def test_for_loop_raises_compatibility_error_with_capture(self):
@@ -508,7 +512,7 @@ class TestClassicalCompilation:
 
         @qjit
         def mulc(x: int, n: int):
-            @while_loop(lambda v, _: v < n)
+            @qp.while_loop(lambda v, _: v < n)
             def loop(v, i):
                 return v + 1, i + x
 
@@ -524,9 +528,9 @@ class TestClassicalCompilation:
 
         @qjit
         def mulc(x: int, n: int):
-            @while_loop(lambda i, _: i < x)
+            @qp.while_loop(lambda i, _: i < x)
             def loop(i, accum):
-                @while_loop(lambda j: j < n)
+                @qp.while_loop(lambda j: j < n)
                 def loop2(j):
                     return j + 1
 
@@ -543,7 +547,7 @@ class TestClassicalCompilation:
 
         @qjit
         def mulc(x: int, n: int):
-            @for_loop(0, n, 1)
+            @qp.for_loop(0, n, 1)
             def loop(_, agg):
                 return agg + x
 
@@ -559,9 +563,9 @@ class TestClassicalCompilation:
 
         @qjit
         def mulc(x: int, n: int):
-            @for_loop(0, x, 1)
+            @qp.for_loop(0, x, 1)
             def loop(_, counter):
-                @for_loop(0, n, 1)
+                @qp.for_loop(0, n, 1)
                 def loop2(j, _):
                     return j + 1
 
@@ -579,7 +583,7 @@ class TestClassicalCompilation:
 
         @qjit
         def mulc(x: int, n: int):
-            @for_loop(0, n, 2)
+            @qp.for_loop(0, n, 2)
             def loop(_, agg):
                 return agg + x
 
@@ -603,7 +607,7 @@ class TestClassicalCompilation:
 
         @qjit
         def revc():
-            @for_loop(5, 10, -1)
+            @qp.for_loop(5, 10, -1)
             def loop(i, agg):
                 return agg + i
 
@@ -623,7 +627,7 @@ class TestClassicalCompilation:
             y = 7
             x = y * 7
 
-            @for_loop(m, -3, x - 51 + (y - y))
+            @qp.for_loop(m, -3, x - 51 + (y - y))
             def loop(i, agg):
                 return agg + i
 
@@ -640,7 +644,7 @@ class TestInterpretationControlFlow:
         """Test simple while loop."""
 
         def muli(x: int, n: int):
-            @while_loop(lambda v, _: v < n)
+            @qp.while_loop(lambda v, _: v < n)
             def loop(v, i):
                 return v + 1, i + x
 
@@ -654,7 +658,7 @@ class TestInterpretationControlFlow:
         """Test simple for loop."""
 
         def muli(x: int, n: int):
-            @for_loop(0, n, 1)
+            @qp.for_loop(0, n, 1)
             def loop(_, agg):
                 return agg + x
 
@@ -671,7 +675,7 @@ class TestInterpretationControlFlow:
 
         @qp.qnode(device)
         def interpreted_circuit(n):
-            @while_loop(lambda i: i < n)
+            @qp.while_loop(lambda i: i < n)
             def loop(i):
                 qp.RX(np.pi, wires=i)
                 return i + 1
@@ -689,7 +693,7 @@ class TestInterpretationControlFlow:
 
         @qp.qnode(device)
         def interpreted_circuit(n):
-            @for_loop(0, n, 1)
+            @qp.for_loop(0, n, 1)
             def loop(i):
                 qp.RX(np.pi, wires=i)
                 return ()
@@ -715,9 +719,9 @@ class TestResultStructureInterpreted:
         def loop(_):
             pass
 
-        assert for_loop(0, 0, 1)(loop)() is None
-        assert for_loop(0, 1, 1)(loop)() is None
-        assert for_loop(0, 2, 1)(loop)() is None
+        assert qp.for_loop(0, 0, 1)(loop)() is None
+        assert qp.for_loop(0, 1, 1)(loop)() is None
+        assert qp.for_loop(0, 2, 1)(loop)() is None
 
     @pytest.mark.parametrize("x", [1, (), (1,), (1, 1)])
     def test_for_loop_one_arg(self, x):
@@ -726,9 +730,9 @@ class TestResultStructureInterpreted:
         def loop(_, x):
             return x
 
-        assert for_loop(0, 0, 1)(loop)(x) == x
-        assert for_loop(0, 1, 1)(loop)(x) == x
-        assert for_loop(0, 2, 1)(loop)(x) == x
+        assert qp.for_loop(0, 0, 1)(loop)(x) == x
+        assert qp.for_loop(0, 1, 1)(loop)(x) == x
+        assert qp.for_loop(0, 2, 1)(loop)(x) == x
 
     @pytest.mark.parametrize("x", [1, (), (1,), (1, 1)])
     @pytest.mark.parametrize("y", [1, (), (1,), (1, 1)])
@@ -738,9 +742,9 @@ class TestResultStructureInterpreted:
         def loop(_, x, y):
             return x, y
 
-        assert for_loop(0, 0, 1)(loop)(x, y) == (x, y)
-        assert for_loop(0, 1, 1)(loop)(x, y) == (x, y)
-        assert for_loop(0, 2, 1)(loop)(x, y) == (x, y)
+        assert qp.for_loop(0, 0, 1)(loop)(x, y) == (x, y)
+        assert qp.for_loop(0, 1, 1)(loop)(x, y) == (x, y)
+        assert qp.for_loop(0, 2, 1)(loop)(x, y) == (x, y)
 
     def test_while_loop_no_args(self):
         """Test while loop result structure with no arguments."""
@@ -748,7 +752,7 @@ class TestResultStructureInterpreted:
         def loop():
             pass
 
-        assert while_loop(lambda: False)(loop)() is None
+        assert qp.while_loop(lambda: False)(loop)() is None
 
     def test_while_loop_one_scalar(self):
         """Test while loop result structure with one scalar."""
@@ -756,9 +760,9 @@ class TestResultStructureInterpreted:
         def loop(x):
             return x + 1
 
-        assert while_loop(lambda x: x < 1)(loop)(1) == 1
-        assert while_loop(lambda x: x < 2)(loop)(1) == 2
-        assert while_loop(lambda x: x < 3)(loop)(1) == 3
+        assert qp.while_loop(lambda x: x < 1)(loop)(1) == 1
+        assert qp.while_loop(lambda x: x < 2)(loop)(1) == 2
+        assert qp.while_loop(lambda x: x < 3)(loop)(1) == 3
 
     def test_while_loop_two_scalars(self):
         """Test while loop result structure with two scalars."""
@@ -766,9 +770,9 @@ class TestResultStructureInterpreted:
         def loop(x, y):
             return x, y + 1
 
-        assert while_loop(lambda _, y: y < 1)(loop)(1, 1) == (1, 1)
-        assert while_loop(lambda _, y: y < 2)(loop)(1, 1) == (1, 2)
-        assert while_loop(lambda _, y: y < 3)(loop)(1, 1) == (1, 3)
+        assert qp.while_loop(lambda _, y: y < 1)(loop)(1, 1) == (1, 1)
+        assert qp.while_loop(lambda _, y: y < 2)(loop)(1, 1) == (1, 2)
+        assert qp.while_loop(lambda _, y: y < 3)(loop)(1, 1) == (1, 3)
 
     def test_while_loop_one_empty_tuple(self):
         """Test while loop result structure with one empty tuple."""
@@ -776,7 +780,7 @@ class TestResultStructureInterpreted:
         def loop(x):
             return x
 
-        assert while_loop(lambda _: False)(loop)(()) == ()
+        assert qp.while_loop(lambda _: False)(loop)(()) == ()
 
     def test_while_loop_two_empty_tuples(self):
         """Test while loop result structure with two empty tuples."""
@@ -784,7 +788,7 @@ class TestResultStructureInterpreted:
         def loop(x, y):
             return x, y
 
-        assert while_loop(lambda *_: False)(loop)((), ()) == ((), ())
+        assert qp.while_loop(lambda *_: False)(loop)((), ()) == ((), ())
 
     @pytest.mark.parametrize("x", [(1,), (1, 1)])
     def test_while_loop_one_tuple(self, x):
@@ -793,9 +797,9 @@ class TestResultStructureInterpreted:
         def loop(x):
             return (x[0] + 1,) + x[1:]
 
-        assert while_loop(lambda x: x[0] < 1)(loop)(x) == (x[0] + 0,) + x[1:]
-        assert while_loop(lambda x: x[0] < 2)(loop)(x) == (x[0] + 1,) + x[1:]
-        assert while_loop(lambda x: x[0] < 3)(loop)(x) == (x[0] + 2,) + x[1:]
+        assert qp.while_loop(lambda x: x[0] < 1)(loop)(x) == (x[0] + 0,) + x[1:]
+        assert qp.while_loop(lambda x: x[0] < 2)(loop)(x) == (x[0] + 1,) + x[1:]
+        assert qp.while_loop(lambda x: x[0] < 3)(loop)(x) == (x[0] + 2,) + x[1:]
 
     @pytest.mark.parametrize("x", [(1,), (1, 1)])
     @pytest.mark.parametrize("y", [(1,), (1, 1)])
@@ -805,18 +809,19 @@ class TestResultStructureInterpreted:
         def loop(x, y):
             return x, (y[0] + 1,) + y[1:]
 
-        assert while_loop(lambda _, y: y[0] < 1)(loop)(x, y) == (x, (y[0] + 0,) + y[1:])
-        assert while_loop(lambda _, y: y[0] < 2)(loop)(x, y) == (x, (y[0] + 1,) + y[1:])
-        assert while_loop(lambda _, y: y[0] < 3)(loop)(x, y) == (x, (y[0] + 2,) + y[1:])
+        assert qp.while_loop(lambda _, y: y[0] < 1)(loop)(x, y) == (x, (y[0] + 0,) + y[1:])
+        assert qp.while_loop(lambda _, y: y[0] < 2)(loop)(x, y) == (x, (y[0] + 1,) + y[1:])
+        assert qp.while_loop(lambda _, y: y[0] < 3)(loop)(x, y) == (x, (y[0] + 2,) + y[1:])
 
 
 class TestForLoopOperatorAccess:
     """Test suite for accessing the ForLoop operation in quantum contexts in Catalyst."""
 
+    @pytest.mark.old_frontend
     def test_for_loop_access_quantum(self, backend):
         """Test ForLoop operation access in quantum context."""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=1))
         def circuit():
             @for_loop(0, 4, 1)
@@ -831,10 +836,11 @@ class TestForLoopOperatorAccess:
 
         assert np.allclose(circuit(), [1, 0])
 
+    @pytest.mark.old_frontend
     def test_for_loop_access_classical(self):
         """Test ForLoop operation access in classical context."""
 
-        @qjit
+        @qjit(capture=False)
         def circuit(x):
             @for_loop(0, 10, 1)
             def body(i, accum):
@@ -883,10 +889,11 @@ class TestForLoopOperatorAccess:
 class TestWhileLoopOperatorAccess:
     """Test suite for accessing the WhileLoop operation in quantum contexts in Catalyst."""
 
+    @pytest.mark.old_frontend
     def test_while_loop_access_quantum(self, backend):
         """Test WhileLoop operation access in quantum context."""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=1))
         def circuit():
             @while_loop(lambda i: i < 5)
@@ -901,10 +908,11 @@ class TestWhileLoopOperatorAccess:
 
         assert np.allclose(circuit(), [0, 1])
 
+    @pytest.mark.old_frontend
     def test_while_loop_access_classical(self):
         """Test WhileLoop operation access in classical context."""
 
-        @qjit
+        @qjit(capture=False)
         def circuit(x):
             @while_loop(lambda i, _: i < 10)
             def body(i, accum):
@@ -970,7 +978,7 @@ class TestStaticLoopFolding:
 
         @qjit(target="mlir")
         def circuit():
-            @for_loop(0, 3, 1)
+            @qp.for_loop(0, 3, 1)
             def loop(i, acc):
                 return acc + i
 
@@ -978,13 +986,14 @@ class TestStaticLoopFolding:
 
         assert "for_loop" in [eqn.primitive.name for eqn in circuit.jaxpr.eqns]
 
+    @pytest.mark.old_frontend
     def test_static_loop_folded_when_enabled(self):
         """Enabling the toggle unrolls a constant iteration range at trace time."""
         catalyst.compile_without_static_loops = True
 
-        @qjit(target="mlir")
+        @qjit(target="mlir", capture=False)
         def circuit():
-            @for_loop(0, 3, 1)
+            @qp.for_loop(0, 3, 1)
             def loop(i, acc):
                 return acc + i
 
@@ -998,7 +1007,7 @@ class TestStaticLoopFolding:
 
         @qjit(target="mlir")
         def circuit(n: int):
-            @for_loop(0, n, 1)
+            @qp.for_loop(0, n, 1)
             def loop(i, acc):
                 return acc + i
 

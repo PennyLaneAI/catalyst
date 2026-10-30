@@ -21,7 +21,7 @@ import jax.numpy as jnp
 import numpy as np
 import pennylane as qp
 
-from catalyst import grad, jacobian, qjit
+from catalyst import grad, qjit
 
 
 # CHECK-LABEL: public @jit_grad_default
@@ -32,8 +32,8 @@ def grad_default(x: float):
         qp.RX(x, wires=0)
         return qp.expval(qp.PauliY(0))
 
-    # CHECK: gradient.grad fd @module_f::@f({{%[a-zA-Z0-9_]+}}) {diffArgIndices = dense<0> : tensor<1xi64>, finiteDiffParam = 9.9999999999999995E-8 : f64} : (tensor<f64>) -> tensor<f64>
-    g = grad(f, method="fd")
+    # CHECK: gradient.grad "fd" @module_f::@f({{%[a-zA-Z0-9_]+}}) {diffArgIndices = dense<0> : tensor<1xi64>, finiteDiffParam = 9.9999999999999995E-7 : f64} : (tensor<f64>) -> tensor<f64>
+    g = qp.grad(f, method="fd")
     return g(jax.numpy.pi)
 
 
@@ -48,8 +48,8 @@ def override_method(x: float):
         qp.RX(x, wires=0)
         return qp.expval(qp.PauliY(0))
 
-    # CHECK: gradient.grad auto @module_f::@f({{%[a-zA-Z0-9_]+}}) {diffArgIndices = dense<0> : tensor<1xi64>} : (tensor<f64>) -> tensor<f64>
-    g = grad(f, method="auto")
+    # CHECK: gradient.grad "auto" @module_f::@f({{%[a-zA-Z0-9_]+}}) {diffArgIndices = dense<0> : tensor<1xi64>, finiteDiffParam = 9.9999999999999995E-7 : f64} : (tensor<f64>) -> tensor<f64>
+    g = qp.grad(f, method="auto")
     return g(jax.numpy.pi)
 
 
@@ -64,8 +64,8 @@ def override_h(x: float):
         qp.RX(x, wires=0)
         return qp.expval(qp.PauliY(0))
 
-    # CHECK: gradient.grad fd @module_f::@f({{%[a-zA-Z0-9_]+}}) {diffArgIndices = dense<0> : tensor<1xi64>, finiteDiffParam = 2.000000e+00 : f64} : (tensor<f64>) -> tensor<f64>
-    g = grad(f, method="fd", h=2.0)
+    # CHECK: gradient.grad "fd" @module_f::@f({{%[a-zA-Z0-9_]+}}) {diffArgIndices = dense<0> : tensor<1xi64>, finiteDiffParam = 2.000000e+00 : f64} : (tensor<f64>) -> tensor<f64>
+    g = qp.grad(f, method="fd", h=2.0)
     return g(jax.numpy.pi)
 
 
@@ -80,8 +80,8 @@ def override_diff_arg(x: float):
         qp.RX(x**y, wires=0)
         return qp.expval(qp.PauliY(0))
 
-    # CHECK: gradient.grad auto @module_f::@f({{%[a-zA-Z0-9_]+}}, {{%[a-zA-Z0-9_]+}}_0) {diffArgIndices = dense<1> : tensor<1xi64>} : (tensor<f64>, tensor<f64>) -> tensor<f64>
-    g = grad(f, argnums=1)
+    # CHECK: gradient.grad "auto" @module_f::@f({{%[a-zA-Z0-9_]+}}, {{%[a-zA-Z0-9_]+}}_0) {diffArgIndices = dense<1> : tensor<1xi64>, finiteDiffParam = 9.9999999999999995E-7 : f64} : (tensor<f64>, tensor<f64>) -> tensor<f64>
+    g = qp.grad(f, argnums=1)
     return g(jax.numpy.pi, 2.0)
 
 
@@ -96,10 +96,10 @@ def second_grad(x: float):
         qp.RX(x, wires=0)
         return qp.expval(qp.PauliY(0))
 
-    # CHECK: gradient.grad fd @grad.f({{%[a-zA-Z0-9_]+}}) {diffArgIndices = dense<0> : tensor<1xi64>, finiteDiffParam = 9.9999999999999995E-8 : f64} : (tensor<f64>) -> tensor<f64>
-    g = grad(f)
-    # CHECK-LABEL: private @grad.f
-    h = grad(g, method="fd")
+    # CHECK: gradient.grad "fd" @"<grad: f>"({{%[a-zA-Z0-9_]+}}) {diffArgIndices = dense<0> : tensor<1xi64>, finiteDiffParam = 9.9999999999999995E-7 : f64} : (tensor<f64>) -> tensor<f64>
+    g = qp.grad(f)
+    # CHECK-LABEL: private @"<grad: f>"
+    h = qp.grad(g, method="fd")
     return h(jax.numpy.pi)
 
 
@@ -115,8 +115,8 @@ def grad_range_change():
         qp.RY(y, wires=1)
         return qp.expval(qp.PauliX(0)), qp.expval(qp.PauliY(1))
 
-    # CHECK: gradient.grad auto @module_f::@f({{%[a-zA-Z0-9_]+}}, {{%[a-zA-Z0-9_]+}}) {diffArgIndices = dense<[0, 1]> : tensor<2xi64>} : (tensor<f64>, tensor<f64>) -> (tensor<f64>, tensor<f64>, tensor<f64>, tensor<f64>)
-    g = jacobian(f, argnums=[0, 1])
+    # CHECK: gradient.grad "auto" @module_f::@f({{%[a-zA-Z0-9_]+}}, {{%[a-zA-Z0-9_]+}}) {diffArgIndices = dense<[0, 1]> : tensor<2xi64>, finiteDiffParam = 9.9999999999999995E-7 : f64} : (tensor<f64>, tensor<f64>) -> (tensor<f64>, tensor<f64>, tensor<f64>, tensor<f64>)
+    g = qp.jacobian(f, argnums=[0, 1])
     return g(jax.numpy.pi, jax.numpy.pi)
 
 
@@ -124,7 +124,8 @@ print(grad_range_change.mlir)
 
 
 # CHECK-LABEL: public @jit_grad_hoist_constant(%arg0
-@qjit(target="mlir")
+# old_frontend: checks hoisting observable constants into gradient arguments.
+@qjit(capture=False, target="mlir")
 def grad_hoist_constant(params: jax.core.ShapedArray([2], float)):
     @qp.qnode(qp.device("lightning.qubit", wires=3))
     def circuit(params):
@@ -156,7 +157,7 @@ def test_gradient_used_twice(x: float):
     def identity(x):
         return x
 
-    diff_identity = grad(identity)
+    diff_identity = qp.grad(identity)
     return diff_identity(x) + diff_identity(x)
 
 
@@ -176,8 +177,8 @@ def test_gradient_taken_twice(x: float):
     def identity(x):
         return x
 
-    diff_identity0 = grad(identity)
-    diff_identity1 = grad(identity)
+    diff_identity0 = qp.grad(identity)
+    diff_identity1 = qp.grad(identity)
     return diff_identity0(x) + diff_identity1(x)
 
 
@@ -195,8 +196,8 @@ def test_higher_order_used_twice(x: float):
     def identity(x):
         return x
 
-    dydx_identity = grad(identity, method="fd")
-    dy2dx2_identity = grad(dydx_identity, method="fd")
+    dydx_identity = qp.grad(identity, method="fd")
+    dy2dx2_identity = qp.grad(dydx_identity, method="fd")
     return dy2dx2_identity(x) + dy2dx2_identity(x)
 
 
@@ -246,7 +247,7 @@ def test_diff_const_paramshift(params: jax.core.ShapedArray([2], float)):
     # CHECK: set_state
     # CHECK: "Rot"
     # CHECK: unitary
-    return grad(cost)(params)
+    return qp.grad(cost)(params)
 
 
 print(test_diff_const_paramshift.mlir)
@@ -255,7 +256,8 @@ print(test_diff_const_paramshift.mlir)
 
 
 # CHECK-LABEL: @test_diff_const_adjoint
-@qjit(target="mlir")
+# old_frontend: checks tape-based differentiation preprocessing before IR lowering.
+@qjit(capture=False, target="mlir")
 def test_diff_const_adjoint(params: jax.core.ShapedArray([2], float)):
     """Test non-differentiable operations *are* decomposed even when constant with adjoint.
     State preparations & unitaries are exempted from this and can be skipped if constant.
@@ -272,7 +274,7 @@ def test_diff_const_adjoint(params: jax.core.ShapedArray([2], float)):
     # CHECK: set_state
     # CHECK-NOT: "Rot"
     # CHECK: unitary
-    return grad(cost)(params)
+    return qp.grad(cost)(params)
 
 
 print(test_diff_const_adjoint.mlir)
@@ -281,7 +283,8 @@ print(test_diff_const_adjoint.mlir)
 
 
 # CHECK-LABEL: @test_diff_dynamic_paramshift
-@qjit(target="mlir")
+# old_frontend: checks tape-based differentiation preprocessing before IR lowering.
+@qjit(capture=False, target="mlir")
 def test_diff_dynamic_paramshift(params: jax.core.ShapedArray([2], float)):
     """Test non-differentiable operations are decomposed when active with param-shift."""
 
@@ -297,7 +300,7 @@ def test_diff_dynamic_paramshift(params: jax.core.ShapedArray([2], float)):
     # COM: Rot is supported by the two-term shift rule
     # CHECK: "Rot"
     # CHECK-NOT: unitary
-    return grad(cost)(params)
+    return qp.grad(cost)(params)
 
 
 print(test_diff_dynamic_paramshift.mlir)
@@ -306,7 +309,8 @@ print(test_diff_dynamic_paramshift.mlir)
 
 
 # CHECK-LABEL: @test_diff_dynamic_adjoint
-@qjit(target="mlir")
+# old_frontend: checks tape-based differentiation preprocessing before IR lowering.
+@qjit(capture=False, target="mlir")
 def test_diff_dynamic_adjoint(params: jax.core.ShapedArray([2], float)):
     """Test non-differentiable operations are decomposed when active with adjoint."""
 
@@ -321,7 +325,7 @@ def test_diff_dynamic_adjoint(params: jax.core.ShapedArray([2], float)):
     # CHECK-NOT: set_state
     # CHECK-NOT: "Rot"
     # CHECK-NOT: unitary
-    return grad(cost)(params)
+    return qp.grad(cost)(params)
 
 
 print(test_diff_dynamic_adjoint.mlir)
@@ -330,7 +334,8 @@ print(test_diff_dynamic_adjoint.mlir)
 
 
 # CHECK-LABEL: @test_non_diff_ops_in_cost_and_grad
-@qjit(target="mlir")
+# old_frontend: checks tape-based differentiation preprocessing before IR lowering.
+@qjit(capture=False, target="mlir")
 def test_non_diff_ops_in_cost_and_grad(params: jax.core.ShapedArray([2], float)):
     """Test decomposition when invoking both the function and its derivative."""
 
@@ -351,7 +356,7 @@ def test_non_diff_ops_in_cost_and_grad(params: jax.core.ShapedArray([2], float))
     # CHECK-NOT: set_state
     # CHECK-NOT: "Rot"
     # CHECK-NOT: unitary
-    return cost(params), grad(cost)(params)
+    return cost(params), qp.grad(cost)(params)
 
 
 print(test_non_diff_ops_in_cost_and_grad.mlir)
@@ -372,7 +377,7 @@ def best_diff_method_single_probs(phi: float, psi: float):
 
     # CHECK: diff_method = "parameter-shift"
     # CHECK-NOT: diff_method = "adjoint"
-    return jacobian(circuit, argnums=[0, 1])(phi, psi)
+    return qp.jacobian(circuit, argnums=[0, 1])(phi, psi)
 
 
 print(best_diff_method_single_probs.mlir)
@@ -393,7 +398,7 @@ def best_diff_method_mixed_return(phi: float, psi: float):
 
     # CHECK: diff_method = "parameter-shift"
     # CHECK-NOT: diff_method = "adjoint"
-    return jacobian(circuit, argnums=[0, 1])(phi, psi)
+    return qp.jacobian(circuit, argnums=[0, 1])(phi, psi)
 
 
 print(best_diff_method_mixed_return.mlir)

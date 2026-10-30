@@ -33,11 +33,11 @@ dev = qp.device("lightning.qubit", wires=num_wires)
 
 @qp.qnode(dev)
 def circuit(weights):
-    qp.StronglyEntanglingLayers(weights=weights, wires=range(num_wires))
+    qp.Rot(*weights[0, 0], wires=0)
     return qp.expval(qp.PauliZ(0))
 
 
-shape = qp.StronglyEntanglingLayers.shape(num_layers, num_wires)
+shape = (num_layers, num_wires, 3)
 weights = np.random.random(size=shape)
 
 # -----
@@ -48,8 +48,9 @@ weights = np.random.random(size=shape)
 # CHECK-SAME:   walltime: {{[0-9\.]+}} ms{{\s*}} cputime: {{[0-9\.]+}} ms{{\s*}} programsize: {{[0-9]+}} lines
 # CHECK-NEXT: [DIAGNOSTICS] Running generate_ir
 # CHECK-SAME:   walltime: {{[0-9\.]+}} ms{{\s*}} cputime: {{[0-9\.]+}} ms{{\s*}} programsize: {{[0-9]+}} lines
-# CHECK-NEXT: [DIAGNOSTICS] Running compile
-# CHECK-SAME:   walltime: {{[0-9\.]+}} ms{{\s*}} cputime: {{[0-9\.]+}} ms{{[ \t]*$}}
+# Compiler diagnostics can appear between stage records.
+# CHECK:      [DIAGNOSTICS] Running compile
+# CHECK-SAME:   walltime: {{[0-9\.]+}} ms{{\s*}} cputime: {{[0-9\.]+}} ms{{\s*}} programsize: {{[0-9]+}} lines
 # CHECK-NEXT: [DIAGNOSTICS] Running run
 # CHECK-SAME:   walltime: {{[0-9\.]+}} ms{{\s*}} cputime: {{[0-9\.]+}} ms
 

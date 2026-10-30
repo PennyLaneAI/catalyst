@@ -14,6 +14,7 @@
 
 """IR tests for ZNE feature."""
 
+# old_frontend: tests ZNE targeting the legacy one-shot wrapper.
 # RUN: %PYTHON %s | FileCheck %s
 
 import pennylane as qp
@@ -23,7 +24,7 @@ from catalyst import mitigate_with_zne, qjit
 # pylint: disable=line-too-long
 
 
-@qjit(target="mlir")
+@qjit(target="mlir", capture=False)
 def mcm_method_with_zne():
     """Test that the dynamic_one_shot works with ZNE."""
     dev = qp.device("lightning.qubit", wires=1)

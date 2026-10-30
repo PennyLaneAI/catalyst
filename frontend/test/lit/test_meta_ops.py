@@ -27,7 +27,7 @@ def adjoint_adjoint():
     return qp.probs()
 
 
-# CHECK:   quantum.custom "S"() %{{[^\s]+}} : !quantum.bit
+# CHECK:   qref.custom "S"() %{{[^\s]+}} : !qref.bit
 print(adjoint_adjoint.mlir)
 
 

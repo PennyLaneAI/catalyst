@@ -31,11 +31,11 @@ def test_named_controlled():
     @qp.qnode(dev)
     # CHECK-LABEL: public @jit_named_controlled
     def named_controlled():
-        # CHECK: quantum.custom "CNOT"
+        # CHECK: qref.custom "CNOT"
         qp.CNOT(wires=[0, 1])
-        # CHECK: quantum.custom "CY"
+        # CHECK: qref.custom "CY"
         qp.CY(wires=[0, 1])
-        # CHECK: quantum.custom "CZ"
+        # CHECK: qref.custom "CZ"
         qp.CZ(wires=[0, 1])
         return qp.state()
 
@@ -53,7 +53,7 @@ def test_native_controlled_custom():
     @qp.qnode(dev)
     # CHECK-LABEL: public @jit_native_controlled
     def native_controlled():
-        # CHECK: [[out:%.+]], [[out_ctrl:%.+]]:2 = quantum.custom "Rot"
+        # CHECK: qref.custom "Rot"
         # CHECK-SAME: ctrls
         # CHECK-SAME: ctrlvals(%true, %true)
         qp.ctrl(qp.Rot(0.3, 0.4, 0.5, wires=[0]), control=[1, 2])
@@ -73,7 +73,7 @@ def test_native_controlled_unitary():
     @qp.qnode(dev)
     # CHECK-LABEL: public @jit_native_controlled_unitary
     def native_controlled_unitary():
-        # CHECK: [[out:%.+]] = quantum.unitary
+        # CHECK: qref.unitary
         qp.ctrl(
             qp.QubitUnitary(
                 jnp.array(
@@ -103,7 +103,7 @@ def test_native_controlled_multirz():
     @qp.qnode(dev)
     # CHECK-LABEL: public @jit_native_controlled_multirz
     def native_controlled_multirz():
-        # CHECK: [[out:%.+]]:2, [[out_ctrl:%.+]] = quantum.multirz
+        # CHECK: qref.multirz
         # CHECK-SAME: ctrls
         # CHECK-SAME: ctrlvals(%true)
         qp.ctrl(qp.MultiRZ(0.6, wires=[0, 2]), control=[1])
@@ -123,7 +123,7 @@ def test_native_controlled_pcphase():
     @qp.qnode(dev)
     # CHECK-LABEL: public @jit_native_controlled_pcphase
     def native_controlled_pcphase():
-        # CHECK: [[out:%.+]]:2, [[out_ctrl:%.+]] = quantum.pcphase
+        # CHECK: qref.pcphase
         # CHECK-SAME: ctrls
         # CHECK-SAME: ctrlvals(%true)
         qp.ctrl(qp.PCPhase(0.5, dim=2, wires=[0, 2]), control=[1])

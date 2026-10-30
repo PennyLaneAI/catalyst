@@ -104,9 +104,8 @@ class TestCapture:
         result = circuit(theta)
         assert jnp.allclose(captured_result, result), [captured_result, result]
 
-    @pytest.mark.parametrize("capture", (True, False))
     @pytest.mark.parametrize("theta", (jnp.pi, 0.1, 0.0))
-    def test_simple_circuit(self, backend, theta, capture):
+    def test_simple_circuit(self, backend, theta, capture_mode):
         """Test the integration for a simple circuit."""
 
         dev = qp.device(backend, wires=2)
@@ -127,7 +126,7 @@ class TestCapture:
 
         qp.capture.disable()
 
-        if capture:
+        if capture_mode:
             qp.capture.enable()
 
         @qp.qnode(device=dev)
@@ -139,7 +138,7 @@ class TestCapture:
             qp.Hadamard(wires=1)
             return qp.expval(qp.PauliY(wires=0))
 
-        if capture:
+        if capture_mode:
             assert qp.capture.enabled()
         else:
             assert not qp.capture.enabled()
@@ -1305,7 +1304,7 @@ class TestCapture:
         # non-capture pathway is not actively developed and raises unnecessary warnings (wontfix)
         with pytest.warns(UserWarning, match="MidCircuitMeasure does not define a decomposition"):
             with pytest.warns(UserWarning, match="Cond does not define a decomposition"):
-                non_capture_result = qjit(circuit)(1.5, 2.5, 3.5)
+                non_capture_result = qjit(circuit, capture=False)(1.5, 2.5, 3.5)
 
         assert jnp.allclose(non_capture_result, capture_result)
 

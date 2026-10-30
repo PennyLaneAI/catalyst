@@ -24,34 +24,29 @@ from catalyst import for_loop, qjit
 @qjit(target="mlir")
 @qp.qnode(qp.device("lightning.qubit", wires=3))
 def loop_circuit(n: int, inc: float):
-    # CHECK-DAG:   [[qreg:%.+]] = quantum.alloc
-    # CHECK-DAG:   [[c0:%.+]] = arith.constant 0 : index
-    # CHECK-DAG:   [[c1:%.+]] = arith.constant 1 : index
-    # CHECK-DAG:   [[init:%.+]] = stablehlo.constant dense<0.0{{.+}}>
-
-    # CHECK-DAG:   [[c1_t:%.+]] = stablehlo.constant dense<1>
-    # CHECK-DAG:   [[n_1_t:%.+]] = stablehlo.subtract %arg0, [[c1_t]]
-    # CHECK-DAG:   [[n_1:%.+]] = tensor.extract [[n_1_t]]
-    # CHECK-DAG:   [[ub:%.+]] = arith.index_cast [[n_1]]
-
-    # CHECK:       [[newqreg:%.+]]:2 = scf.for [[i:%.+]] = [[c0]] to [[ub]] step [[c1]] iter_args([[phi0:%.+]] = [[init]], [[r0:%.+]] = [[qreg]])
-    @for_loop(0, n - 1, 1)
+    # CHECK-LABEL: public @loop_circuit(
+    # CHECK-DAG: [[c0:%.+]] = arith.constant 0 : index
+    # CHECK-DAG: [[c1:%.+]] = arith.constant 1 : index
+    # CHECK-DAG: [[init:%.+]] = stablehlo.constant dense<0.0{{.+}}>
+    # CHECK-DAG: [[one:%.+]] = stablehlo.constant dense<1> : tensor<i64>
+    # CHECK: [[qreg:%.+]] = qref.alloc( 3) : !qref.reg<3>
+    # CHECK: [[limit:%.+]] = stablehlo.subtract %arg0, [[one]]
+    # CHECK: [[limit_scalar:%.+]] = tensor.extract [[limit]]
+    # CHECK: [[ub:%.+]] = arith.index_cast [[limit_scalar]]
+    # CHECK: scf.for [[i:%.+]] = [[c0]] to [[ub]] step [[c1]] iter_args([[phi:%.+]] = [[init]])
+    # CHECK: [[wire:%.+]] = arith.index_cast [[i]]
+    # CHECK: [[qubit:%.+]] = qref.get [[qreg]][[[wire]]]
+    # CHECK: [[angle:%.+]] = tensor.extract [[phi]]
+    # CHECK: qref.custom "RY"([[angle]]) [[qubit]]
+    # CHECK: [[next:%.+]] = stablehlo.add [[phi]], %arg1
+    # CHECK: scf.yield [[next]]
+    # CHECK: qref.dealloc [[qreg]]
+    # CHECK: return
     def loop_fn(i, phi):
-        # CHECK:       [[i_cast:%.+]] = arith.index_cast [[i]]
-        # CHECK:       [[phi1:%.+]] = stablehlo.add %arg3, %arg1
-
-        # CHECK:       [[q0:%.+]] = quantum.extract [[r0]][[[i_cast]]]
-        # CHECK:       [[phi_e:%.+]] = tensor.extract [[phi0]]
-        # CHECK:       [[q1:%.+]] = quantum.custom "RY"([[phi_e]]) [[q0]]
-        # CHECK:       [[r1:%.+]] = quantum.insert [[r0]][[[i_cast]]], [[q1]]
         qp.RY(phi, wires=i)
-
-        # CHECK:       scf.yield [[phi1]], [[r1]]
         return phi + inc
 
-    loop_fn(0.0)
-    # CHECK:       quantum.dealloc [[newqreg]]#1
-    # CHECK:       return
+    qp.for_loop(0, n - 1, 1)(loop_fn)(0.0)
     return qp.state()
 
 
@@ -61,7 +56,8 @@ print(loop_circuit.mlir)
 # The `estimated_iterations` hint is attached as an f64 `catalyst.estimated_iterations`
 # attribute on the emitted `scf.for`.
 # CHECK-LABEL: @jit_loop_estimated_iterations
-@qjit(target="mlir")
+# old_frontend: control-flow hints are specific to the Catalyst API.
+@qjit(capture=False, target="mlir")
 @qp.qnode(qp.device("lightning.qubit", wires=1))
 def loop_estimated_iterations(n: int):
     # CHECK:       scf.for
