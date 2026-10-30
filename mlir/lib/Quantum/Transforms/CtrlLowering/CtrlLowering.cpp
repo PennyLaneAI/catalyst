@@ -12,16 +12,38 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <cassert>
+#include <cstdint>
+#include <optional>
+#include <utility>
+
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/IR/Attributes.h"
+#include "mlir/IR/Block.h"
+#include "mlir/IR/Builders.h"
+#include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/IRMapping.h"
+#include "mlir/IR/Location.h"
+#include "mlir/IR/Operation.h"
+#include "mlir/IR/OperationSupport.h"
 #include "mlir/IR/PatternMatch.h"
+#include "mlir/IR/Region.h"
+#include "mlir/IR/Types.h"
+#include "mlir/IR/Value.h"
+#include "mlir/IR/ValueRange.h"
 #include "mlir/Interfaces/CallInterfaces.h"
 #include "mlir/Pass/Pass.h"
+#include "mlir/Support/LLVM.h"
+#include "mlir/Support/LogicalResult.h"
+#include "mlir/Support/WalkResult.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
+#include "Quantum/IR/QuantumDialect.h"
+#include "Quantum/IR/QuantumInterfaces.h"
 #include "Quantum/IR/QuantumOps.h"
+#include "Quantum/IR/QuantumTypes.h"
 #include "Quantum/Transforms/Patterns.h"
 
 using namespace mlir;
@@ -37,14 +59,163 @@ static SmallVector<int32_t> readSegmentSizes(Operation *op, StringRef name) {
     return SmallVector<int32_t>(seg.asArrayRef().begin(), seg.asArrayRef().end());
 }
 
-/// Rebuild a quantum gate with additional control qubits/values appended to whatever controls it
-/// already carries. The new op is inserted at the rewriter's insertion point.
+static StringRef mergeWorkWireTypes(StringRef lhs, StringRef rhs) {
+    // borrowed takes precedence
+    return lhs == "borrowed" || rhs == "borrowed" ? "borrowed" : "zeroed";
+}
+
+static DictionaryAttr appendStaticData(OpBuilder &builder, DictionaryAttr staticData,
+                                       StringRef workWireType) {
+    NamedAttrList entries(staticData);
+    entries.set("ctrl_work_wire_type", builder.getStringAttr(workWireType));
+    return entries.getDictionary(builder.getContext());
+}
+
+static DictionaryAttr appendCtrlWorkQubitMap(OpBuilder &builder, DictionaryAttr qubitMap,
+                                             unsigned oldNumQubits, unsigned numWorkQubits) {
+    NamedAttrList entries(qubitMap);
+    SmallVector<int64_t> workIndices;
+    if (auto existing = dyn_cast_or_null<DenseI64ArrayAttr>(entries.get("ctrl_work_wires"))) {
+        workIndices.append(existing.asArrayRef().begin(), existing.asArrayRef().end());
+    }
+    for (unsigned i = 0; i < numWorkQubits; ++i) {
+        workIndices.push_back(oldNumQubits + i);
+    }
+    entries.set("ctrl_work_wires", builder.getDenseI64ArrayAttr(workIndices));
+    return entries.getDictionary(builder.getContext());
+}
+
+static DictionaryAttr buildParamMap(OpBuilder &builder, DecomposableGate gate) {
+    SmallVector<NamedAttribute> entries;
+    unsigned offset = 0;
+    for (const auto &[name, types] : gate.getDynamicShape()) {
+        SmallVector<int64_t> indices;
+        for (unsigned i = 0; i < types.size(); ++i) {
+            indices.push_back(offset++);
+        }
+        entries.emplace_back(builder.getStringAttr(name), builder.getDenseI64ArrayAttr(indices));
+    }
+    return builder.getDictionaryAttr(entries);
+}
+
+static DictionaryAttr buildQubitMap(OpBuilder &builder, DecomposableGate gate) {
+    SmallVector<NamedAttribute> entries;
+    unsigned offset = 0;
+    for (const auto &[name, numWires] : gate.getWireLens()) {
+        SmallVector<int64_t> indices;
+        for (unsigned i = 0; i < numWires; ++i) {
+            indices.push_back(offset++);
+        }
+        entries.emplace_back(builder.getStringAttr(name), builder.getDenseI64ArrayAttr(indices));
+    }
+    assert(offset == gate.getNonCtrlQubitOperands().size() &&
+           "wire lengths must cover every non-control qubit");
+    return builder.getDictionaryAttr(entries);
+}
+
+/// Rebuild a gate with additional controls. Work wires require quantum.operator's named wire
+/// groups; without them, preserve the original gate operation.
 static Operation *createControlledGate(PatternRewriter &rewriter, QuantumGate gate, IRMapping &map,
-                                       ValueRange addCtrlQubits, ValueRange addCtrlValues) {
+                                       ValueRange addCtrlQubits, ValueRange addCtrlValues,
+                                       ValueRange addWorkQubits, StringRef workWireType) {
     Operation *op = gate.getOperation();
+    auto operatorOp = dyn_cast<OperatorOp>(op);
+
+    // Register addressing cannot absorb the individual control/work qubits threaded here.
+    if (operatorOp && operatorOp.getInQreg()) {
+        op->emitError("cannot control a register-mode quantum operation inside a quantum.ctrl "
+                      "region");
+        return nullptr;
+    }
+
     ValueRange nonCtrlQubits = gate.getNonCtrlQubitOperands();
     ValueRange oldCtrlQubits = gate.getCtrlQubitOperands();
     ValueRange oldCtrlValues = gate.getCtrlValueOperands();
+
+    SmallVector<Value> qubits;
+    for (Value value : nonCtrlQubits) {
+        qubits.push_back(map.lookupOrDefault(value));
+    }
+
+    SmallVector<Value> ctrlQubits;
+    for (Value value : oldCtrlQubits) {
+        ctrlQubits.push_back(map.lookupOrDefault(value));
+    }
+    ctrlQubits.append(addCtrlQubits.begin(), addCtrlQubits.end());
+
+    SmallVector<Value> ctrlValues;
+    for (Value value : oldCtrlValues) {
+        ctrlValues.push_back(map.lookupOrDefault(value));
+    }
+    ctrlValues.append(addCtrlValues.begin(), addCtrlValues.end());
+
+    if (!addWorkQubits.empty()) {
+        auto decomposable = dyn_cast<DecomposableGate>(op);
+        if (!decomposable) {
+            op->emitError(
+                "a gate controlled with work wires must implement the DecomposableGate interface.");
+            return nullptr;
+        }
+
+        SmallVector<Value> params;
+        if (operatorOp) {
+            for (Value value : operatorOp.getParams()) {
+                params.push_back(map.lookupOrDefault(value));
+            }
+        } else if (auto parametrized = dyn_cast<ParametrizedGate>(op)) {
+            for (Value value : parametrized.getAllParams()) {
+                params.push_back(map.lookupOrDefault(value));
+            }
+        }
+
+        unsigned oldNumQubits = qubits.size();
+        qubits.append(addWorkQubits.begin(), addWorkQubits.end());
+
+        SmallVector<Value> forwardArgs;
+        DictionaryAttr paramMap;
+        DictionaryAttr qubitMap;
+        std::optional<int64_t> uid;
+        if (operatorOp) {
+            for (Value value : operatorOp.getForwardArgs()) {
+                forwardArgs.push_back(map.lookupOrDefault(value));
+            }
+            paramMap = operatorOp.getParamMapAttr();
+            qubitMap = operatorOp.getQubitMap();
+            if (!operatorOp.getQubitMapAttr()) {
+                SmallVector<int64_t> indices;
+                for (unsigned i = 0; i < oldNumQubits; ++i) {
+                    indices.push_back(i);
+                }
+                qubitMap = rewriter.getDictionaryAttr(
+                    {rewriter.getNamedAttr("wires", rewriter.getDenseI64ArrayAttr(indices))});
+            }
+            uid = operatorOp.getUID();
+            if (auto existing = dyn_cast_or_null<DenseI64ArrayAttr>(
+                    operatorOp.getQubitMap().get("ctrl_work_wires"));
+                existing && !existing.empty()) {
+                // An operator may carry a ctrl_work_wires group without a ctrl_work_wire_type
+                // entry (hand-written IR, or a producer that has not set it). "borrowed" is the
+                // conservative reading: it forbids assuming the qubit starts in |0>.
+                auto oldWorkWireType = dyn_cast_or_null<StringAttr>(
+                    operatorOp.getStaticData().get("ctrl_work_wire_type"));
+                workWireType = mergeWorkWireTypes(oldWorkWireType ? oldWorkWireType.getValue()
+                                                                  : StringRef("borrowed"),
+                                                  workWireType);
+            }
+        } else {
+            paramMap = buildParamMap(rewriter, decomposable);
+            qubitMap = buildQubitMap(rewriter, decomposable);
+        }
+
+        // Generic work-wire groups stay separate; extend only the control work-wire group.
+        DictionaryAttr staticData =
+            appendStaticData(rewriter, decomposable.getStaticData(), workWireType);
+        qubitMap = appendCtrlWorkQubitMap(rewriter, qubitMap, oldNumQubits, addWorkQubits.size());
+
+        return OperatorOp::create(rewriter, op->getLoc(), decomposable.getOperatorName(), params,
+                                  qubits, ctrlQubits, ctrlValues, forwardArgs,
+                                  gate.getAdjointFlag(), uid, staticData, paramMap, qubitMap);
+    }
 
     // Everything before the (non-ctrl) qubit operands is classical data (params, matrices, angles).
     unsigned numLeading =
@@ -55,31 +226,9 @@ static Operation *createControlledGate(PatternRewriter &rewriter, QuantumGate ga
     for (unsigned i = 0; i < numLeading; ++i) {
         operands.push_back(map.lookupOrDefault(op->getOperand(i)));
     }
-    for (Value q : nonCtrlQubits) {
-        operands.push_back(map.lookupOrDefault(q));
-    }
-    for (Value q : oldCtrlQubits) {
-        operands.push_back(map.lookupOrDefault(q));
-    }
-    operands.append(addCtrlQubits.begin(), addCtrlQubits.end());
-    for (Value v : oldCtrlValues) {
-        operands.push_back(map.lookupOrDefault(v));
-    }
-    operands.append(addCtrlValues.begin(), addCtrlValues.end());
-
-    // The control operands/results are NOT necessarily the trailing segments: `quantum.operator`
-    // declares `in_qreg`/`arr_*` operand segments and an `out_qreg` result segment *after* the
-    // control segments. Assembling the operand vector above (leading, non-ctrl qubits, controls)
-    // and appending the new control results at the end is only correct when those trailing
-    // segments are empty (i.e. qubit-mode gates). Bail out cleanly on register-mode gates rather
-    // than silently miscompiling.
-    unsigned numTrailing = op->getNumOperands() - numLeading - nonCtrlQubits.size() -
-                           oldCtrlQubits.size() - oldCtrlValues.size();
-    if (numTrailing != 0) {
-        op->emitError("cannot control a register-mode quantum operation inside a quantum.ctrl "
-                      "region");
-        return nullptr;
-    }
+    operands.append(qubits.begin(), qubits.end());
+    operands.append(ctrlQubits.begin(), ctrlQubits.end());
+    operands.append(ctrlValues.begin(), ctrlValues.end());
 
     Type qubitType = QubitType::get(rewriter.getContext());
     SmallVector<Type> resultTypes(op->getResultTypes().begin(), op->getResultTypes().end());
@@ -136,9 +285,9 @@ static Operation *createControlledGate(PatternRewriter &rewriter, QuantumGate ga
 
 /// Rebuild a nested `quantum.ctrl` op with the enclosing controls merged in.
 static CtrlOp mergeNestedCtrl(PatternRewriter &rewriter, CtrlOp inner, IRMapping &map,
-                              ValueRange addCtrlQubits, ValueRange addCtrlValues) {
+                              ValueRange addCtrlQubits, ValueRange addCtrlValues,
+                              ValueRange addWorkQubits, StringRef addWorkWireType) {
     Location loc = inner.getLoc();
-    Type qubitType = QubitType::get(rewriter.getContext());
 
     SmallVector<Value> mergedCtrlQubits;
     for (Value q : inner.getInCtrlQubits()) {
@@ -152,65 +301,56 @@ static CtrlOp mergeNestedCtrl(PatternRewriter &rewriter, CtrlOp inner, IRMapping
     }
     mergedCtrlValues.append(addCtrlValues.begin(), addCtrlValues.end());
 
+    // A plain concatenation is correct because quantum.ctrl's verifier forbids an enclosing work
+    // qubit from being used inside the region, including as a nested region's work qubit. The two
+    // work sets are therefore disjoint and no deduplication (which in value semantics would mean
+    // walking SSA chains back to a register and an index) is needed.
+    SmallVector<Value> mergedWorkQubits;
+    for (Value q : inner.getInWorkQubits()) {
+        mergedWorkQubits.push_back(map.lookupOrDefault(q));
+    }
+    mergedWorkQubits.append(addWorkQubits.begin(), addWorkQubits.end());
+
     SmallVector<Value> innerArgs;
     for (Value a : inner.getArgs()) {
         innerArgs.push_back(map.lookupOrDefault(a));
     }
 
-    SmallVector<Value> operands;
-    operands.append(mergedCtrlQubits.begin(), mergedCtrlQubits.end());
-    operands.append(mergedCtrlValues.begin(), mergedCtrlValues.end());
-    operands.append(innerArgs.begin(), innerArgs.end());
-
-    // The target-results group is everything after the (leading) out_ctrl_qubits results.
-    ResultRange innerResults = inner->getResults();
-    unsigned numInnerCtrl = inner.getInCtrlQubits().size();
-    unsigned numInnerTargets = innerResults.size() - numInnerCtrl;
-
-    SmallVector<Type> resultTypes(mergedCtrlQubits.size(), qubitType);
-    for (unsigned i = 0; i < numInnerTargets; ++i) {
-        resultTypes.push_back(innerResults[numInnerCtrl + i].getType());
-    }
-
-    OperationState state(loc, CtrlOp::getOperationName());
-    state.addOperands(operands);
-    state.addTypes(resultTypes);
-    state.addAttribute("operandSegmentSizes",
-                       rewriter.getDenseI32ArrayAttr({static_cast<int32_t>(mergedCtrlQubits.size()),
-                                                      static_cast<int32_t>(mergedCtrlValues.size()),
-                                                      static_cast<int32_t>(innerArgs.size())}));
-    state.addAttribute("resultSegmentSizes",
-                       rewriter.getDenseI32ArrayAttr({static_cast<int32_t>(mergedCtrlQubits.size()),
-                                                      static_cast<int32_t>(numInnerTargets)}));
-    state.addRegion();
-
-    Operation *merged = rewriter.create(state);
+    StringRef mergedWorkWireType =
+        inner.getInWorkQubits().empty()
+            ? addWorkWireType
+            : (addWorkQubits.empty()
+                   ? inner.getWorkWireType()
+                   : mergeWorkWireTypes(inner.getWorkWireType(), addWorkWireType));
+    auto merged =
+        CtrlOp::create(rewriter, loc, TypeRange(mergedCtrlQubits), TypeRange(mergedWorkQubits),
+                       inner.getResults().getTypes(), mergedCtrlQubits, mergedCtrlValues,
+                       mergedWorkQubits, mergedWorkWireType, innerArgs);
 
     // Move the nested region body into the freshly created op (its block arguments, the target
     // qubits, are unaffected by adding controls).
-    rewriter.inlineRegionBefore(inner.getRegion(), merged->getRegion(0),
-                                merged->getRegion(0).end());
-    return cast<CtrlOp>(merged);
+    rewriter.inlineRegionBefore(inner.getRegion(), merged.getRegion(), merged.getRegion().end());
+    return merged;
 }
 
-/// Control every op in `block` (excluding its terminator) on `currentCtrlQubits`, threading the
-/// control qubits through and recording result mappings in `map`. On return, `currentCtrlQubits`
-/// holds the control-qubit values after the last op. New ops are created at the rewriter's current
-/// insertion point.
+/// Control every op in `block` (excluding its terminator), threading controls and work qubits
+/// through `currentQubits` and recording result mappings in `map`. The first ctrlValues.size()
+/// entries are controls; the remaining entries are work qubits. New ops are created at the
+/// rewriter's insertion point.
 static LogicalResult distributeControls(PatternRewriter &rewriter, Block &block, IRMapping &map,
-                                        SmallVector<Value> &currentCtrlQubits,
-                                        ValueRange ctrlValues);
+                                        SmallVector<Value> &currentQubits, ValueRange ctrlValues,
+                                        StringRef workWireType);
 
-/// Control an `scf.if` by turning the control qubits into extra results: each branch tracks the
-/// controls through its body and yields them alongside the original results.
+/// Thread controls and work qubits through each `scf.if` branch as extra results.
 static LogicalResult controlScfIf(PatternRewriter &rewriter, scf::IfOp ifOp, IRMapping &map,
-                                  SmallVector<Value> &currentCtrlQubits, ValueRange ctrlValues) {
+                                  SmallVector<Value> &currentQubits, ValueRange ctrlValues,
+                                  StringRef workWireType) {
     Type qubitType = QubitType::get(rewriter.getContext());
-    unsigned numCtrl = currentCtrlQubits.size();
+    unsigned numThreadedQubits = currentQubits.size();
 
-    // New results = the if's original results, plus one qubit per threaded control.
+    // New results = the if's original results, plus the threaded controls and work qubits.
     SmallVector<Type> resultTypes(ifOp.getResultTypes().begin(), ifOp.getResultTypes().end());
-    resultTypes.append(numCtrl, qubitType);
+    resultTypes.append(numThreadedQubits, qubitType);
 
     Value cond = map.lookupOrDefault(ifOp.getCondition());
     auto newIf = scf::IfOp::create(rewriter, ifOp.getLoc(), resultTypes, cond,
@@ -219,17 +359,17 @@ static LogicalResult controlScfIf(PatternRewriter &rewriter, scf::IfOp ifOp, IRM
     newIf->setDiscardableAttrs(ifOp->getDiscardableAttrDictionary());
 
     // Control one branch: `oldBlock` may be null (a missing else), in which case the branch just
-    // threads the incoming controls through unchanged.
+    // threads the incoming controls and work qubits through unchanged.
     auto controlBranch = [&](Block *oldBlock, Block *newBlock) -> LogicalResult {
         IRMapping branchMap = map; // copy: branch-local mappings must not leak across branches
-        SmallVector<Value> branchCtrl(currentCtrlQubits.begin(), currentCtrlQubits.end());
+        SmallVector<Value> branchQubits(currentQubits.begin(), currentQubits.end());
         rewriter.setInsertionPointToStart(newBlock);
 
         SmallVector<Value> yielded;
         Location yieldLoc = ifOp.getLoc();
         if (oldBlock) {
-            if (failed(
-                    distributeControls(rewriter, *oldBlock, branchMap, branchCtrl, ctrlValues))) {
+            if (failed(distributeControls(rewriter, *oldBlock, branchMap, branchQubits, ctrlValues,
+                                          workWireType))) {
                 return failure();
             }
             auto oldYield = cast<scf::YieldOp>(oldBlock->getTerminator());
@@ -238,7 +378,7 @@ static LogicalResult controlScfIf(PatternRewriter &rewriter, scf::IfOp ifOp, IRM
                 yielded.push_back(branchMap.lookupOrDefault(v));
             }
         }
-        yielded.append(branchCtrl.begin(), branchCtrl.end());
+        yielded.append(branchQubits.begin(), branchQubits.end());
         rewriter.setInsertionPointToEnd(newBlock);
         scf::YieldOp::create(rewriter, yieldLoc, yielded);
         return success();
@@ -251,12 +391,13 @@ static LogicalResult controlScfIf(PatternRewriter &rewriter, scf::IfOp ifOp, IRM
         return failure();
     }
 
-    // Map the original results one-to-one; the trailing results are the threaded control qubits.
+    // Map the original results one-to-one; the trailing results are the threaded controls and work
+    // qubits.
     unsigned numOrig = ifOp.getNumResults();
     for (unsigned i = 0; i < numOrig; ++i) {
         map.map(ifOp.getResult(i), newIf.getResult(i));
     }
-    currentCtrlQubits.assign(newIf.getResults().begin() + numOrig, newIf.getResults().end());
+    currentQubits.assign(newIf.getResults().begin() + numOrig, newIf.getResults().end());
 
     // Restore the insertion point to after the new op so the enclosing walk keeps appending there
     // (controlBranch left it inside the else block).
@@ -264,19 +405,18 @@ static LogicalResult controlScfIf(PatternRewriter &rewriter, scf::IfOp ifOp, IRM
     return success();
 }
 
-/// Control an `scf.for` by adding the control qubits as extra loop-carried `iter_args`: the loop
-/// structure (bounds, iteration) stays classical, the control qubits are tracked through the body
-/// each iteration, and the final controls come out as the loop's trailing results.
+/// Thread controls and work qubits through `scf.for` as extra loop-carried `iter_args`.
 static LogicalResult controlScfFor(PatternRewriter &rewriter, scf::ForOp forOp, IRMapping &map,
-                                   SmallVector<Value> &currentCtrlQubits, ValueRange ctrlValues) {
+                                   SmallVector<Value> &currentQubits, ValueRange ctrlValues,
+                                   StringRef workWireType) {
     unsigned numOrig = forOp.getInitArgs().size();
 
-    // New init args = the loop's original init args, plus the incoming control qubits.
+    // New init args = the loop's original init args, plus the incoming controls and work qubits.
     SmallVector<Value> newInits;
     for (Value init : forOp.getInitArgs()) {
         newInits.push_back(map.lookupOrDefault(init));
     }
-    newInits.append(currentCtrlQubits.begin(), currentCtrlQubits.end());
+    newInits.append(currentQubits.begin(), currentQubits.end());
 
     Value lb = map.lookupOrDefault(forOp.getLowerBound());
     Value ub = map.lookupOrDefault(forOp.getUpperBound());
@@ -290,17 +430,19 @@ static LogicalResult controlScfFor(PatternRewriter &rewriter, scf::ForOp forOp, 
     Block *newBody = newFor.getBody();
     ValueRange newIterArgs = newFor.getRegionIterArgs();
 
-    // Seed a body-local mapping; the trailing iter args are this iteration's threaded controls.
+    // Seed a body-local mapping; the trailing iter args are this iteration's controls and work
+    // qubits.
     IRMapping bodyMap = map;
     bodyMap.map(forOp.getInductionVar(), newFor.getInductionVar());
     for (unsigned i = 0; i < numOrig; ++i) {
         bodyMap.map(forOp.getRegionIterArg(i), newIterArgs[i]);
     }
-    SmallVector<Value> bodyCtrl(newIterArgs.begin() + numOrig, newIterArgs.end());
+    SmallVector<Value> bodyQubits(newIterArgs.begin() + numOrig, newIterArgs.end());
 
     rewriter.setInsertionPointToStart(newBody);
     Block &oldBody = forOp.getRegion().front();
-    if (failed(distributeControls(rewriter, oldBody, bodyMap, bodyCtrl, ctrlValues))) {
+    if (failed(
+            distributeControls(rewriter, oldBody, bodyMap, bodyQubits, ctrlValues, workWireType))) {
         return failure();
     }
 
@@ -309,39 +451,40 @@ static LogicalResult controlScfFor(PatternRewriter &rewriter, scf::ForOp forOp, 
     for (Value v : oldYield.getOperands()) {
         yielded.push_back(bodyMap.lookupOrDefault(v));
     }
-    yielded.append(bodyCtrl.begin(), bodyCtrl.end());
+    yielded.append(bodyQubits.begin(), bodyQubits.end());
     rewriter.setInsertionPointToEnd(newBody);
     scf::YieldOp::create(rewriter, oldYield.getLoc(), yielded);
 
-    // Map the original results one-to-one; the trailing results are the threaded control qubits.
+    // Map the original results one-to-one; the trailing results are the threaded controls and work
+    // qubits.
     for (unsigned i = 0; i < numOrig; ++i) {
         map.map(forOp.getResult(i), newFor.getResult(i));
     }
-    currentCtrlQubits.assign(newFor.getResults().begin() + numOrig, newFor.getResults().end());
+    currentQubits.assign(newFor.getResults().begin() + numOrig, newFor.getResults().end());
 
     // Restore the insertion point to after the new op so the enclosing walk keeps appending there.
     rewriter.setInsertionPointAfter(newFor);
     return success();
 }
 
-/// Control an `scf.while` by adding the control qubits as extra loop-carried values.
+/// Thread controls and work qubits through `scf.while` as extra loop-carried values.
 static LogicalResult controlScfWhile(PatternRewriter &rewriter, scf::WhileOp whileOp,
-                                     IRMapping &map, SmallVector<Value> &currentCtrlQubits,
-                                     ValueRange ctrlValues) {
+                                     IRMapping &map, SmallVector<Value> &currentQubits,
+                                     ValueRange ctrlValues, StringRef workWireType) {
     Type qubitType = QubitType::get(rewriter.getContext());
-    unsigned numCtrl = currentCtrlQubits.size();
+    unsigned numThreadedQubits = currentQubits.size();
     unsigned numInit = whileOp.getInits().size();
 
-    // New inits = original inits, plus the incoming control qubits.
+    // New inits = original inits, plus the incoming controls and work qubits.
     SmallVector<Value> newInits;
     for (Value init : whileOp.getInits()) {
         newInits.push_back(map.lookupOrDefault(init));
     }
-    newInits.append(currentCtrlQubits.begin(), currentCtrlQubits.end());
+    newInits.append(currentQubits.begin(), currentQubits.end());
 
     SmallVector<Type> newResultTypes(whileOp.getResultTypes().begin(),
                                      whileOp.getResultTypes().end());
-    newResultTypes.append(numCtrl, qubitType);
+    newResultTypes.append(numThreadedQubits, qubitType);
 
     Block &oldBefore = whileOp.getBefore().front();
     Block &oldAfter = whileOp.getAfter().front();
@@ -353,9 +496,9 @@ static LogicalResult controlScfWhile(PatternRewriter &rewriter, scf::WhileOp whi
     unsigned numFwd = oldCond.getArgs().size();
 
     LogicalResult status = success();
-    // The before/after builder overload creates the before block args (init types + controls)
-    // and after block args (result types + controls);
-    // the callbacks fill each region.
+    // The before/after builder overload creates the before block args (init types + threaded
+    // qubits) and after block args (result types + threaded qubits); the callbacks fill each
+    // region.
     auto newWhile = scf::WhileOp::create(
         rewriter, whileOp.getLoc(), newResultTypes, newInits,
         [&](OpBuilder & /*builder*/, Location /*loc*/, ValueRange beforeArgs) {
@@ -363,9 +506,9 @@ static LogicalResult controlScfWhile(PatternRewriter &rewriter, scf::WhileOp whi
             for (unsigned i = 0; i < numInit; ++i) {
                 beforeMap.map(oldBefore.getArgument(i), beforeArgs[i]);
             }
-            SmallVector<Value> beforeCtrl(beforeArgs.begin() + numInit, beforeArgs.end());
-            if (failed(
-                    distributeControls(rewriter, oldBefore, beforeMap, beforeCtrl, ctrlValues))) {
+            SmallVector<Value> beforeQubits(beforeArgs.begin() + numInit, beforeArgs.end());
+            if (failed(distributeControls(rewriter, oldBefore, beforeMap, beforeQubits, ctrlValues,
+                                          workWireType))) {
                 status = failure();
                 return;
             }
@@ -374,7 +517,7 @@ static LogicalResult controlScfWhile(PatternRewriter &rewriter, scf::WhileOp whi
             for (Value v : oldCond.getArgs()) {
                 fwd.push_back(beforeMap.lookupOrDefault(v));
             }
-            fwd.append(beforeCtrl.begin(), beforeCtrl.end());
+            fwd.append(beforeQubits.begin(), beforeQubits.end());
             scf::ConditionOp::create(rewriter, oldCond.getLoc(), cond, fwd);
         },
         [&](OpBuilder & /*builder*/, Location /*loc*/, ValueRange afterArgs) {
@@ -382,8 +525,9 @@ static LogicalResult controlScfWhile(PatternRewriter &rewriter, scf::WhileOp whi
             for (unsigned i = 0; i < numFwd; ++i) {
                 afterMap.map(oldAfter.getArgument(i), afterArgs[i]);
             }
-            SmallVector<Value> afterCtrl(afterArgs.begin() + numFwd, afterArgs.end());
-            if (failed(distributeControls(rewriter, oldAfter, afterMap, afterCtrl, ctrlValues))) {
+            SmallVector<Value> afterQubits(afterArgs.begin() + numFwd, afterArgs.end());
+            if (failed(distributeControls(rewriter, oldAfter, afterMap, afterQubits, ctrlValues,
+                                          workWireType))) {
                 status = failure();
                 return;
             }
@@ -391,7 +535,7 @@ static LogicalResult controlScfWhile(PatternRewriter &rewriter, scf::WhileOp whi
             for (Value v : oldYield.getOperands()) {
                 yielded.push_back(afterMap.lookupOrDefault(v));
             }
-            yielded.append(afterCtrl.begin(), afterCtrl.end());
+            yielded.append(afterQubits.begin(), afterQubits.end());
             scf::YieldOp::create(rewriter, oldYield.getLoc(), yielded);
         });
     // Carry over hints such as `catalyst.estimated_iterations`.
@@ -401,26 +545,27 @@ static LogicalResult controlScfWhile(PatternRewriter &rewriter, scf::WhileOp whi
         return failure();
     }
 
-    // Map the original results one-to-one; the trailing results are the threaded control qubits.
+    // Map the original results one-to-one; the trailing results are the threaded controls and work
+    // qubits.
     unsigned numOrig = whileOp.getNumResults();
     for (unsigned i = 0; i < numOrig; ++i) {
         map.map(whileOp.getResult(i), newWhile.getResult(i));
     }
-    currentCtrlQubits.assign(newWhile.getResults().begin() + numOrig, newWhile.getResults().end());
+    currentQubits.assign(newWhile.getResults().begin() + numOrig, newWhile.getResults().end());
     rewriter.setInsertionPointAfter(newWhile);
     return success();
 }
 
-/// Control an `scf.index_switch` by turning the control qubits into extra results
+/// Thread controls and work qubits through `scf.index_switch` as extra results.
 static LogicalResult controlScfIndexSwitch(PatternRewriter &rewriter, scf::IndexSwitchOp switchOp,
-                                           IRMapping &map, SmallVector<Value> &currentCtrlQubits,
-                                           ValueRange ctrlValues) {
+                                           IRMapping &map, SmallVector<Value> &currentQubits,
+                                           ValueRange ctrlValues, StringRef workWireType) {
     Type qubitType = QubitType::get(rewriter.getContext());
-    unsigned numCtrl = currentCtrlQubits.size();
+    unsigned numThreadedQubits = currentQubits.size();
 
     SmallVector<Type> resultTypes(switchOp.getResultTypes().begin(),
                                   switchOp.getResultTypes().end());
-    resultTypes.append(numCtrl, qubitType);
+    resultTypes.append(numThreadedQubits, qubitType);
 
     Value arg = map.lookupOrDefault(switchOp.getArg());
     SmallVector<int64_t> cases(switchOp.getCases().begin(), switchOp.getCases().end());
@@ -434,9 +579,10 @@ static LogicalResult controlScfIndexSwitch(PatternRewriter &rewriter, scf::Index
     // values via `map`, as with scf.if branches.
     auto controlCase = [&](Block &oldBlock, Region &newRegion) -> LogicalResult {
         IRMapping caseMap = map;
-        SmallVector<Value> caseCtrl(currentCtrlQubits.begin(), currentCtrlQubits.end());
+        SmallVector<Value> caseQubits(currentQubits.begin(), currentQubits.end());
         Block *newBlock = rewriter.createBlock(&newRegion);
-        if (failed(distributeControls(rewriter, oldBlock, caseMap, caseCtrl, ctrlValues))) {
+        if (failed(distributeControls(rewriter, oldBlock, caseMap, caseQubits, ctrlValues,
+                                      workWireType))) {
             return failure();
         }
         auto oldYield = cast<scf::YieldOp>(oldBlock.getTerminator());
@@ -444,7 +590,7 @@ static LogicalResult controlScfIndexSwitch(PatternRewriter &rewriter, scf::Index
         for (Value v : oldYield.getOperands()) {
             yielded.push_back(caseMap.lookupOrDefault(v));
         }
-        yielded.append(caseCtrl.begin(), caseCtrl.end());
+        yielded.append(caseQubits.begin(), caseQubits.end());
         rewriter.setInsertionPointToEnd(newBlock);
         scf::YieldOp::create(rewriter, oldYield.getLoc(), yielded);
         return success();
@@ -463,15 +609,15 @@ static LogicalResult controlScfIndexSwitch(PatternRewriter &rewriter, scf::Index
     for (unsigned i = 0; i < numOrig; ++i) {
         map.map(switchOp.getResult(i), newSwitch.getResult(i));
     }
-    currentCtrlQubits.assign(newSwitch.getResults().begin() + numOrig,
-                             newSwitch.getResults().end());
+    currentQubits.assign(newSwitch.getResults().begin() + numOrig, newSwitch.getResults().end());
     rewriter.setInsertionPointAfter(newSwitch);
     return success();
 }
 
 static LogicalResult distributeControls(PatternRewriter &rewriter, Block &block, IRMapping &map,
-                                        SmallVector<Value> &currentCtrlQubits,
-                                        ValueRange ctrlValues) {
+                                        SmallVector<Value> &currentQubits, ValueRange ctrlValues,
+                                        StringRef workWireType) {
+    unsigned numCtrlQubits = ctrlValues.size();
     for (Operation &op : block.without_terminator()) {
         if (isa<MeasurementProcess, MeasureOp>(op)) {
             op.emitError("cannot control a measurement inside a quantum.ctrl region");
@@ -479,66 +625,82 @@ static LogicalResult distributeControls(PatternRewriter &rewriter, Block &block,
         }
         if (auto gate = dyn_cast<QuantumGate>(op)) {
             unsigned numOldControls = gate.getCtrlQubitOperands().size();
-            Operation *newOp =
-                createControlledGate(rewriter, gate, map, currentCtrlQubits, ctrlValues);
+            unsigned numOldQubits = gate.getNonCtrlQubitOperands().size();
+            ValueRange addCtrlQubits = ValueRange(currentQubits).take_front(numCtrlQubits);
+            ValueRange addWorkQubits = ValueRange(currentQubits).drop_front(numCtrlQubits);
+            Operation *newOp = createControlledGate(rewriter, gate, map, addCtrlQubits, ctrlValues,
+                                                    addWorkQubits, workWireType);
             if (!newOp) {
                 return failure();
             }
             auto newGate = cast<QuantumGate>(newOp);
 
-            for (auto [oldResult, newResult] :
-                 llvm::zip_equal(gate.getNonCtrlQubitResults(), newGate.getNonCtrlQubitResults())) {
-                map.map(oldResult, newResult);
+            ResultRange newNonCtrlResults = newGate.getNonCtrlQubitResults();
+            ResultRange oldNonCtrlResults = gate.getNonCtrlQubitResults();
+            assert(oldNonCtrlResults.size() == numOldQubits &&
+                   newNonCtrlResults.size() >= numOldQubits &&
+                   "unexpected non-control result count");
+            for (unsigned i = 0; i < numOldQubits; ++i) {
+                map.map(oldNonCtrlResults[i], newNonCtrlResults[i]);
             }
             // The new control results are [old controls ..., threaded region controls ...].
             ResultRange newCtrlResults = newGate.getCtrlQubitResults();
             for (unsigned i = 0; i < numOldControls; ++i) {
                 map.map(gate.getCtrlQubitResults()[i], newCtrlResults[i]);
             }
-            currentCtrlQubits.assign(newCtrlResults.begin() + numOldControls, newCtrlResults.end());
+            currentQubits.assign(newCtrlResults.begin() + numOldControls, newCtrlResults.end());
+            currentQubits.append(newNonCtrlResults.begin() + numOldQubits, newNonCtrlResults.end());
             continue;
         }
         if (auto inner = dyn_cast<CtrlOp>(op)) {
             unsigned numInnerControls = inner.getInCtrlQubits().size();
-            CtrlOp merged = mergeNestedCtrl(rewriter, inner, map, currentCtrlQubits, ctrlValues);
+            unsigned numInnerWork = inner.getInWorkQubits().size();
+            ValueRange addCtrlQubits = ValueRange(currentQubits).take_front(numCtrlQubits);
+            ValueRange addWorkQubits = ValueRange(currentQubits).drop_front(numCtrlQubits);
+            CtrlOp merged = mergeNestedCtrl(rewriter, inner, map, addCtrlQubits, ctrlValues,
+                                            addWorkQubits, workWireType);
 
             ResultRange mergedCtrlResults = merged.getOutCtrlQubits();
             for (unsigned i = 0; i < numInnerControls; ++i) {
                 map.map(inner.getOutCtrlQubits()[i], mergedCtrlResults[i]);
             }
-            // Map the target results (everything after the out_ctrl_qubits group) one-to-one.
-            ResultRange innerAll = inner->getResults();
-            ResultRange mergedAll = merged->getResults();
-            unsigned numMergedControls = merged.getInCtrlQubits().size();
-            unsigned numTargets = innerAll.size() - numInnerControls;
-            for (unsigned i = 0; i < numTargets; ++i) {
-                map.map(innerAll[numInnerControls + i], mergedAll[numMergedControls + i]);
+            ResultRange mergedWorkResults = merged.getOutWorkQubits();
+            for (unsigned i = 0; i < numInnerWork; ++i) {
+                map.map(inner.getOutWorkQubits()[i], mergedWorkResults[i]);
             }
-            currentCtrlQubits.assign(mergedCtrlResults.begin() + numInnerControls,
-                                     mergedCtrlResults.end());
+            for (auto [oldResult, newResult] :
+                 llvm::zip_equal(inner.getResults(), merged.getResults())) {
+                map.map(oldResult, newResult);
+            }
+            currentQubits.assign(mergedCtrlResults.begin() + numInnerControls,
+                                 mergedCtrlResults.end());
+            currentQubits.append(mergedWorkResults.begin() + numInnerWork, mergedWorkResults.end());
             continue;
         }
         if (auto ifOp = dyn_cast<scf::IfOp>(op)) {
-            if (failed(controlScfIf(rewriter, ifOp, map, currentCtrlQubits, ctrlValues))) {
+            if (failed(
+                    controlScfIf(rewriter, ifOp, map, currentQubits, ctrlValues, workWireType))) {
                 return failure();
             }
             continue;
         }
         if (auto forOp = dyn_cast<scf::ForOp>(op)) {
-            if (failed(controlScfFor(rewriter, forOp, map, currentCtrlQubits, ctrlValues))) {
+            if (failed(
+                    controlScfFor(rewriter, forOp, map, currentQubits, ctrlValues, workWireType))) {
                 return failure();
             }
             continue;
         }
         if (auto whileOp = dyn_cast<scf::WhileOp>(op)) {
-            if (failed(controlScfWhile(rewriter, whileOp, map, currentCtrlQubits, ctrlValues))) {
+            if (failed(controlScfWhile(rewriter, whileOp, map, currentQubits, ctrlValues,
+                                       workWireType))) {
                 return failure();
             }
             continue;
         }
         if (auto switchOp = dyn_cast<scf::IndexSwitchOp>(op)) {
-            if (failed(controlScfIndexSwitch(rewriter, switchOp, map, currentCtrlQubits,
-                                             ctrlValues))) {
+            if (failed(controlScfIndexSwitch(rewriter, switchOp, map, currentQubits, ctrlValues,
+                                             workWireType))) {
                 return failure();
             }
             continue;
@@ -599,22 +761,25 @@ struct CtrlLoweringRewritePattern : public OpRewritePattern<CtrlOp> {
             map.map(blockArg, operand);
         }
 
-        // The control qubits are threaded through every enclosed gate; the control values are
-        // constant for the whole region.
-        SmallVector<Value> currentCtrlQubits(ctrl.getInCtrlQubits().begin(),
-                                             ctrl.getInCtrlQubits().end());
+        // Controls and control work qubits are threaded through every enclosed gate. They share
+        // one vector for structural control flow, with controls first so they can still be split
+        // from work qubits when rebuilding a gate.
+        SmallVector<Value> currentQubits(ctrl.getInCtrlQubits().begin(),
+                                         ctrl.getInCtrlQubits().end());
+        currentQubits.append(ctrl.getInWorkQubits().begin(), ctrl.getInWorkQubits().end());
         ValueRange ctrlValues = ctrl.getInCtrlValues();
 
         rewriter.setInsertionPoint(ctrl);
 
-        if (failed(distributeControls(rewriter, block, map, currentCtrlQubits, ctrlValues))) {
+        if (failed(distributeControls(rewriter, block, map, currentQubits, ctrlValues,
+                                      ctrl.getWorkWireType()))) {
             return failure();
         }
 
-        // Assemble the ctrl op results: out_ctrl_qubits followed by the target results.
+        // Assemble the ctrl op results: controls, work qubits, then target results.
         auto yield = cast<YieldOp>(block.getTerminator());
         SmallVector<Value> results;
-        results.append(currentCtrlQubits.begin(), currentCtrlQubits.end());
+        results.append(currentQubits.begin(), currentQubits.end());
         for (Value retval : yield.getRetvals()) {
             results.push_back(map.lookupOrDefault(retval));
         }

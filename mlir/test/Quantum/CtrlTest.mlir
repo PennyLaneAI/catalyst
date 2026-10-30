@@ -292,3 +292,198 @@ func.func @ctrl_with_region_op_non_scf(%ctrl: !quantum.bit, %q: !quantum.bit, %a
   }
   return %outc : !quantum.bit
 }
+
+// -----
+
+// Work wires turn the controlled gate into quantum.operator. The reserved ctrl_work_wires group
+// is distinct from the target wires and the work-wire type becomes static identity data.
+
+// CHECK-LABEL: @ctrl_with_work_wire(
+// CHECK-SAME: %[[CTRL:[^:]+]]: !quantum.bit, %[[WORK:[^:]+]]: !quantum.bit, %[[TARGET:[^:]+]]: !quantum.bit
+func.func @ctrl_with_work_wire(%ctrl: !quantum.bit, %work: !quantum.bit, %q: !quantum.bit)
+    -> (!quantum.bit, !quantum.bit, !quantum.bit) {
+  %true = arith.constant true
+  // CHECK-NOT: quantum.ctrl
+  // CHECK: %[[Q:.*]]:2, %[[C:.*]] = quantum.operator "PauliX"() qubits(%[[TARGET]], %[[WORK]])
+  // CHECK-NEXT: ctrls(%[[CTRL]]) ctrl_vals(%{{.*}})
+  // CHECK: static_data = {ctrl_work_wire_type = "zeroed"}
+  // CHECK: qubit_map = {ctrl_work_wires = [1], wires = [0]}
+  // CHECK: return %[[C]], %[[Q]]#1, %[[Q]]#0
+  %out_ctrl, %out_work, %out_q = quantum.ctrl(%ctrl) ctrlvals(%true)
+      work_wires(%work) (%q) {work_wire_type = "zeroed"}
+      : !quantum.bit work_wires !quantum.bit -> !quantum.bit {
+  ^bb0(%arg: !quantum.bit):
+    %x = quantum.custom "PauliX"() %arg : !quantum.bit
+    quantum.yield %x : !quantum.bit
+  }
+  return %out_ctrl, %out_work, %out_q : !quantum.bit, !quantum.bit, !quantum.bit
+}
+
+// -----
+
+// An operator's generic work_wires register remains separate when control work wires are added.
+
+// CHECK-LABEL: @ctrl_preserves_generic_work_register
+func.func @ctrl_preserves_generic_work_register(
+    %ctrl: !quantum.bit, %ctrl_work: !quantum.bit, %q: !quantum.bit,
+    %generic_work: !quantum.bit) -> (!quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit) {
+  %true = arith.constant true
+  // CHECK: %[[Q:.*]]:3, %[[C:.*]] = quantum.operator "MultiControlledX"()
+  // CHECK-SAME: qubits(%{{.*}}, %{{.*}}, %{{.*}})
+  // CHECK-NEXT: ctrls(%{{.*}}) ctrl_vals(%{{.*}})
+  // CHECK: static_data = {ctrl_work_wire_type = "borrowed", work_wire_type = "zeroed"}
+  // CHECK: qubit_map = {ctrl_work_wires = [2], wires = [0], work_wires = [1]}
+  %out_ctrl, %out_ctrl_work, %out_q:2 = quantum.ctrl(%ctrl) ctrlvals(%true)
+      work_wires(%ctrl_work) (%q, %generic_work)
+      : !quantum.bit work_wires !quantum.bit -> !quantum.bit, !quantum.bit {
+  ^bb0(%arg_q: !quantum.bit, %arg_work: !quantum.bit):
+    %r:2 = quantum.operator "MultiControlledX"() qubits(%arg_q, %arg_work)
+        static_data = {work_wire_type = "zeroed"}
+        param_map = {} qubit_map = {wires = [0], work_wires = [1]}
+    quantum.yield %r#0, %r#1 : !quantum.bit, !quantum.bit
+  }
+  return %out_ctrl, %out_ctrl_work, %out_q#0, %out_q#1
+      : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
+}
+
+// -----
+
+// Register-mode operators cannot be controlled: index arrays into a shared register cannot absorb
+// the individually-valued control/work qubits a quantum.ctrl region threads through.
+
+func.func @ctrl_register_mode_operator_with_work_wire(
+    %ctrl: !quantum.bit, %work: !quantum.bit, %reg: !quantum.reg, %idx: tensor<1xi64>)
+    -> (!quantum.bit, !quantum.bit, !quantum.reg) {
+  %true = arith.constant true
+  %out_ctrl, %out_work, %out_reg = quantum.ctrl(%ctrl) ctrlvals(%true)
+      work_wires(%work) (%reg) {work_wire_type = "zeroed"}
+      : !quantum.bit work_wires !quantum.bit -> !quantum.reg {
+  ^bb0(%arg: !quantum.reg):
+    // expected-error @+1 {{cannot control a register-mode quantum operation inside a quantum.ctrl region}}
+    %r = quantum.operator "MyOp"() quregs(%arg) indices(%idx : tensor<1xi64>)
+        qubit_map = {wires = [0]}
+    quantum.yield %r : !quantum.reg
+  }
+  return %out_ctrl, %out_work, %out_reg : !quantum.bit, !quantum.bit, !quantum.reg
+}
+
+// -----
+
+// The same register-mode restriction applies when the region has no work wires.
+
+func.func @ctrl_register_mode_operator_without_work_wire(
+    %ctrl: !quantum.bit, %reg: !quantum.reg, %idx: tensor<1xi64>)
+    -> (!quantum.bit, !quantum.reg) {
+  %true = arith.constant true
+  %out_ctrl, %out_reg = quantum.ctrl(%ctrl) ctrlvals(%true) (%reg)
+      : !quantum.bit -> !quantum.reg {
+  ^bb0(%arg: !quantum.reg):
+    // expected-error @+1 {{cannot control a register-mode quantum operation inside a quantum.ctrl region}}
+    %r = quantum.operator "MyOp"() quregs(%arg) indices(%idx : tensor<1xi64>)
+        qubit_map = {wires = [0]}
+    quantum.yield %r : !quantum.reg
+  }
+  return %out_ctrl, %out_reg : !quantum.bit, !quantum.reg
+}
+
+// -----
+
+// Nested control regions merge both work registers.
+
+// CHECK-LABEL: @nested_ctrl_work_wires(
+// CHECK-SAME: %[[OUTER:[^:]+]]: !quantum.bit, %[[OUTER_WORK:[^:]+]]: !quantum.bit, %[[INNER:[^:]+]]: !quantum.bit, %[[INNER_WORK:[^:]+]]: !quantum.bit, %[[TARGET:[^:]+]]: !quantum.bit
+func.func @nested_ctrl_work_wires(
+    %outer: !quantum.bit, %outer_work: !quantum.bit, %inner: !quantum.bit,
+    %inner_work: !quantum.bit, %q: !quantum.bit)
+    -> (!quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit) {
+  %true = arith.constant true
+  // CHECK-NOT: quantum.ctrl
+  // CHECK: %[[Q:.*]]:3, %[[C:.*]]:2 = quantum.operator "PauliZ"()
+  // CHECK-SAME: qubits(%[[TARGET]], %[[INNER_WORK]], %[[OUTER_WORK]])
+  // CHECK-NEXT: ctrls(%[[INNER]], %[[OUTER]]) ctrl_vals(%{{.*}}, %{{.*}})
+  // CHECK: static_data = {ctrl_work_wire_type = "borrowed"}
+  // CHECK: qubit_map = {ctrl_work_wires = [1, 2], wires = [0]}
+  // CHECK-NOT: quantum.ctrl
+  // CHECK: return %[[C]]#1, %[[Q]]#2, %[[C]]#0, %[[Q]]#1, %[[Q]]#0
+  %oc, %ow, %or:3 = quantum.ctrl(%outer) ctrlvals(%true) work_wires(%outer_work)
+      (%inner, %inner_work, %q) {work_wire_type = "zeroed"}
+      : !quantum.bit work_wires !quantum.bit -> !quantum.bit, !quantum.bit, !quantum.bit {
+  ^bb0(%ic: !quantum.bit, %iw: !quantum.bit, %iq: !quantum.bit):
+    %nic, %niw, %nq = quantum.ctrl(%ic) ctrlvals(%true) work_wires(%iw) (%iq)
+        : !quantum.bit work_wires !quantum.bit -> !quantum.bit {
+    ^bb1(%arg: !quantum.bit):
+      %z = quantum.custom "PauliZ"() %arg : !quantum.bit
+      quantum.yield %z : !quantum.bit
+    }
+    quantum.yield %nic, %niw, %nq : !quantum.bit, !quantum.bit, !quantum.bit
+  }
+  return %oc, %ow, %or#0, %or#1, %or#2
+      : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
+}
+
+// -----
+
+// Forwarded arguments must stay separate from params when adding work wires.
+
+// CHECK-LABEL: @ctrl_work_wires_forward_args(
+// CHECK-SAME: %[[CTRL:[^:]+]]: !quantum.bit, %[[WORK:[^:]+]]: !quantum.bit, %[[Q:[^:]+]]: !quantum.bit, %[[P:[^:]+]]: f64, %[[F:[^:]+]]: f64
+func.func @ctrl_work_wires_forward_args(
+    %ctrl: !quantum.bit, %work: !quantum.bit, %q: !quantum.bit, %p: f64, %f: f64)
+    -> (!quantum.bit, !quantum.bit, !quantum.bit) {
+  %true = arith.constant true
+  // CHECK: %[[OQ:.*]]:2, %[[OC:.*]] = quantum.operator "MyOp"(%[[P]]: f64) qubits(%[[Q]], %[[WORK]])
+  // CHECK-NEXT: UID(123) forward(%[[F]]: f64)
+  // CHECK-NEXT: ctrls(%[[CTRL]]) ctrl_vals(%{{.*}})
+  // CHECK: param_map = {theta = [0]} qubit_map = {ctrl_work_wires = [1], wires = [0]}
+  // CHECK: return %[[OC]], %[[OQ]]#1, %[[OQ]]#0
+  %oc, %ow, %oq = quantum.ctrl(%ctrl) ctrlvals(%true) work_wires(%work) (%q)
+      : !quantum.bit work_wires !quantum.bit -> !quantum.bit {
+  ^bb0(%arg: !quantum.bit):
+    %r = quantum.operator "MyOp"(%p: f64) qubits(%arg) UID(123) forward(%f: f64)
+        param_map = {theta = [0]} qubit_map = {wires = [0]}
+    quantum.yield %r : !quantum.bit
+  }
+  return %oc, %ow, %oq : !quantum.bit, !quantum.bit, !quantum.bit
+}
+
+// -----
+
+// Omitted maps are valid; adding work wires must also account for the original targets.
+
+// CHECK-LABEL: @ctrl_work_wires_without_maps
+func.func @ctrl_work_wires_without_maps(
+    %ctrl: !quantum.bit, %work: !quantum.bit, %q: !quantum.bit)
+    -> (!quantum.bit, !quantum.bit, !quantum.bit) {
+  %true = arith.constant true
+  // CHECK: quantum.operator "MyOp"() qubits(%{{.*}}, %{{.*}})
+  // CHECK-NOT: param_map
+  // CHECK: qubit_map = {ctrl_work_wires = [1], wires = [0]}
+  %oc, %ow, %oq = quantum.ctrl(%ctrl) ctrlvals(%true) work_wires(%work) (%q)
+      : !quantum.bit work_wires !quantum.bit -> !quantum.bit {
+  ^bb0(%arg: !quantum.bit):
+    %r = quantum.operator "MyOp"() qubits(%arg)
+    quantum.yield %r : !quantum.bit
+  }
+  return %oc, %ow, %oq : !quantum.bit, !quantum.bit, !quantum.bit
+}
+
+// -----
+
+// An absent param_map must not become an explicitly empty map for a parameterized operator.
+
+// CHECK-LABEL: @ctrl_work_wires_without_param_map
+func.func @ctrl_work_wires_without_param_map(
+    %ctrl: !quantum.bit, %work: !quantum.bit, %q: !quantum.bit, %p: f64)
+    -> (!quantum.bit, !quantum.bit, !quantum.bit) {
+  %true = arith.constant true
+  // CHECK: quantum.operator "MyOp"(%{{.*}}: f64) qubits(%{{.*}}, %{{.*}})
+  // CHECK-NOT: param_map
+  // CHECK: qubit_map = {ctrl_work_wires = [1], wires = [0]}
+  %oc, %ow, %oq = quantum.ctrl(%ctrl) ctrlvals(%true) work_wires(%work) (%q)
+      : !quantum.bit work_wires !quantum.bit -> !quantum.bit {
+  ^bb0(%arg: !quantum.bit):
+    %r = quantum.operator "MyOp"(%p: f64) qubits(%arg) qubit_map = {wires = [0]}
+    quantum.yield %r : !quantum.bit
+  }
+  return %oc, %ow, %oq : !quantum.bit, !quantum.bit, !quantum.bit
+}

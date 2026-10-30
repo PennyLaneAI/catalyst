@@ -986,6 +986,7 @@
 
 * Controlled quantum regions now keeps track of the `work_wire_type` passed from `qp.ctrl`.
   [(#3366)](https://github.com/PennyLaneAI/catalyst/pull/3366)
+  [(#3376)](https://github.com/PennyLaneAI/catalyst/pull/3376)
 
 * MLIR passes that recreate `scf.for`, `scf.while`, `scf.if`, and `scf.index_switch` ops
   (`ctrl-lowering`, `adjoint-lowering`, `--convert-to-value-semantics`) now preserve discardable
@@ -1117,7 +1118,7 @@
 * The `method` attribute of the Gradient dialect operations (`grad`, `value_and_grad`, `jvp`,
   `vjp`) is now an enum attribute (`#gradient<diff_method auto>`) instead of a string attribute.
   [(#3318)](https://github.com/PennyLaneAI/catalyst/pull/3318)
-  
+
 * Backline transport frames are built and read through a shared frame codec, which the `cpu_verbs`
   backends now use instead of laying out the 16 B frame themselves. The bytes on the wire are
   unchanged, and other frame layouts can now be added in one place.
