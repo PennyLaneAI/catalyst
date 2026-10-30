@@ -222,7 +222,7 @@ class TestIterativeCancelInversesIntegration:
         there are no operations that can be cancelled."""
         dev = qp.device("lightning.qubit", wires=2)
 
-        @qp.qjit(capture=True, collect_decomp_rules=False, target="mlir")
+        @qp.qjit(capture=True, target="mlir")
         @iterative_cancel_inverses_pass
         @qp.qnode(dev)
         def circuit():

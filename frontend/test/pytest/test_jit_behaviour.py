@@ -433,7 +433,7 @@ class TestQJITTransforms:
     def test_transform_qjit_qnode(self, backend: str) -> None:
         """A transform applied after qjit is scheduled on the wrapped QNode."""
 
-        @qjit(capture=True, collect_decomp_rules=False)
+        @qjit(capture=True)
         @qp.qnode(qp.device(backend, wires=1))
         def circuit(theta):
             qp.RX(theta, wires=0)
@@ -464,7 +464,7 @@ class TestQJITTransforms:
             qp.Hadamard(0)
             return qp.expval(qp.Z(0))
 
-        @qjit(capture=True, collect_decomp_rules=False)
+        @qjit(capture=True)
         def workflow(theta):
             return 3 * circuit(2 * theta) + theta
 
@@ -496,7 +496,7 @@ class TestQJITTransforms:
             qp.X(0)
             return qp.expval(qp.Z(0))
 
-        @qjit(capture=True, collect_decomp_rules=False)
+        @qjit(capture=True)
         def workflow(theta):
             return first_circuit(theta), 2 * second_circuit(3 * theta)
 
@@ -544,7 +544,7 @@ class TestQJITTransforms:
             qp.Hadamard(0)
             return qp.expval(qp.Z(0))
 
-        @qjit(capture=True, collect_decomp_rules=False)
+        @qjit(capture=True)
         def workflow(theta):
             return 2 * circuit(theta)
 

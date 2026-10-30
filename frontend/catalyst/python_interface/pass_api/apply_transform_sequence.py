@@ -13,6 +13,7 @@
 # limitations under the License.
 """This file contains the pass that applies all passes present in the program representation."""
 
+import re
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from functools import partial
@@ -25,11 +26,19 @@ from xdsl.dialects import builtin, transform
 from xdsl.ir import Attribute
 from xdsl.parser import Parser
 from xdsl.passes import ModulePass, PassPipeline
-from xdsl.pattern_rewriter import PatternRewriter, RewritePattern, op_type_rewrite_pattern
+from xdsl.pattern_rewriter import (
+    InsertPoint,
+    PatternRewriter,
+    RewritePattern,
+    op_type_rewrite_pattern,
+)
 from xdsl.printer import Printer
 
 from catalyst.compiler import _quantum_opt
 from catalyst.python_interface.utils import get_pyval_from_xdsl_attr
+
+# MLIR bare-id: (letter | [_]) (letter | digit | [_$.])*
+_MLIR_BARE_ID = re.compile(r"[A-Za-z_][A-Za-z0-9_$.]*")
 
 available_passes: dict[str, Callable[[], type[ModulePass]]] = {}
 
@@ -217,10 +226,13 @@ class ApplyTransformSequenceNoCallbackPattern(RewritePattern):
     def match_and_rewrite(self, transformer: builtin.ModuleOp, rewriter: PatternRewriter):
         """Rewrite modules containing transform.named_sequences."""
         payload: builtin.ModuleOp = transformer.parent_op()
-        # Erase the transformer from the payload module. Note that PatternRewriter.erase_op
-        # erases the operation from its parent block without destroying the object. Hence,
-        # we can keep interacting with the transformer after the erasure.
-        rewriter.erase_op(transformer)
+        # Detach (do not erase) so we can clone the transformer for MLIR groups.
+        if transformer.next_op is not None:
+            insertion_point = InsertPoint.before(transformer.next_op)
+        else:
+            insertion_point = InsertPoint.at_end(payload.body.block)
+
+        transformer.detach()
 
         pass_ops = []
         for ns in transformer.ops:
@@ -239,13 +251,37 @@ class ApplyTransformSequenceNoCallbackPattern(RewritePattern):
             if is_xdsl_group:
                 self._apply_xdsl_pipeline(payload, group)
             else:
-                payload = self._apply_mlir_pipeline(payload, group, rewriter)
+                clone = self._clone_transformer_for_mlir_group(transformer, group)
+                rewriter.insert_op(clone, insertion_point)
+                payload = self._apply_mlir_pipeline(payload, rewriter)
+
+                insertion_point = InsertPoint.at_start(payload.body.block)
 
     def _is_xdsl_pass(self, op: transform.ApplyRegisteredPassOp) -> bool:
         """Check whether a registered pass op corresponds to an xDSL or MLIR pass."""
         # self.passes maps pass names to xDSL passes. If the pass name is in self.passes, we know
         # that it is an xDSL pass. Otherwise, we assume that the name corresponds to an MLIR pass.
         return op.pass_name.data in self.passes
+
+    @staticmethod
+    def _clone_transformer_for_mlir_group(
+        transformer: builtin.ModuleOp,
+        group: Sequence[transform.ApplyRegisteredPassOp],
+    ) -> builtin.ModuleOp:
+        """Clone ``transformer``, rewriting passes outside ``group`` to no-ops."""
+        group_set = set(group)
+        clone = transformer.clone()
+
+        for orig_ns, clone_ns in zip(transformer.ops, clone.ops, strict=True):
+
+            for orig_op, clone_op in zip(orig_ns.body.ops, clone_ns.body.ops, strict=True):
+                if orig_op not in group_set and isinstance(
+                    orig_op, transform.ApplyRegisteredPassOp
+                ):
+                    clone_op.pass_name = builtin.StringAttr("empty")
+                    clone_op.options = builtin.DictionaryAttr({})
+
+        return clone
 
     def _apply_xdsl_pipeline(
         self, payload: builtin.ModuleOp, pass_ops: list[transform.ApplyRegisteredPassOp]
@@ -265,15 +301,15 @@ class ApplyTransformSequenceNoCallbackPattern(RewritePattern):
     def _apply_mlir_pipeline(
         self,
         payload: builtin.ModuleOp,
-        pass_ops: list[transform.ApplyRegisteredPassOp],
         rewriter: PatternRewriter,
     ) -> builtin.ModuleOp:
-        r"""Interpret a sequence of ``ApplyRegisteredPassOp``\ s corresponding to MLIR passes."""
+        r"""Apply MLIR passes embedded in ``transformer_clone`` via apply-transform-sequence."""
         buffer = StringIO()
         Printer(stream=buffer, print_generic_format=True).print_op(payload)
 
-        pipeline = _create_mlir_cli_schedule(pass_ops)
-        modified = _quantum_opt(*pipeline, "-mlir-print-op-generic", stdin=buffer.getvalue())
+        modified = _quantum_opt(
+            "--apply-transform-sequence", "-mlir-print-op-generic", stdin=buffer.getvalue()
+        )
 
         data = Parser(self.ctx, modified).parse_module()
         rewriter.replace_op(payload, data)
@@ -318,9 +354,29 @@ def _create_mlir_cli_schedule(pass_ops: Sequence[transform.ApplyRegisteredPassOp
     return schedule
 
 
-def _get_cli_option_from_attr(attr: Attribute) -> Any:
+def _format_mlir_dict_key(key: str) -> str:
+    """Format a dictionary key the way MLIR prints DictionaryAttr keys.
+
+    Bare identifiers are printed unquoted; all other keys use a double-quoted
+    string literal (e.g. ``Adjoint(CNOT)`` becomes ``"Adjoint(CNOT)"``).
+    """
+    if _MLIR_BARE_ID.fullmatch(key):
+        return key
+    # Escape embedded quotes/backslashes the same way MLIR string literals do.
+    escaped = key.replace("\\", "\\\\").replace('"', '\\"')
+    return f'"{escaped}"'
+
+
+def _get_cli_option_from_attr(attr: Attribute, *, nested: bool = False) -> Any:
     """Convert an xDSL attribute corresponding to a pass option value into a valid
-    CLI option value."""
+    CLI option value.
+
+    Serialization mirrors MLIR's ``ApplyRegisteredPassOp`` option stringification:
+    top-level ``ArrayAttr`` values are comma-separated (``ListOption`` form), while
+    ``DictionaryAttr`` values follow MLIR's DictionaryAttr printer
+    (``{key = value, ...}`` with quoted non-bare keys). Nested ``ArrayAttr`` values
+    inside a dictionary are bracketed so commas do not break list/dict parsing.
+    """
     cli_val = None
 
     match attr:
@@ -339,13 +395,23 @@ def _get_cli_option_from_attr(attr: Attribute) -> Any:
             cli_val = f"'{attr.data}'"
 
         case builtin.ArrayAttr():
-            cli_val = ",".join([str(_get_cli_option_from_attr(attr)) for attr in attr.data])
+            elements = [_get_cli_option_from_attr(elt, nested=True) for elt in attr.data]
+            if nested:
+                # Match MLIR ArrayAttr printing when nested inside a DictionaryAttr.
+                cli_val = f"[{', '.join(str(elt) for elt in elements)}]"
+            else:
+                # Top-level ListOption: comma-separated elements, no brackets.
+                cli_val = ",".join(str(elt) for elt in elements)
 
         case builtin.DictionaryAttr():
+            # Match MLIR DictionaryAttr printing (elideType): comma-separated
+            # entries, spaces around '=', and quoted keys when needed.
             mapping = []
             for k, v in attr.data.items():
-                mapping.append(f"{k}={_get_cli_option_from_attr(v)}")
-            cli_val = f"{{{' '.join(mapping)}}}"
+                mapping.append(
+                    f"{_format_mlir_dict_key(k)} = {_get_cli_option_from_attr(v, nested=True)}"
+                )
+            cli_val = f"{{{', '.join(mapping)}}}"
 
         case _:  # pragma: no cover
             raise ValueError(f"Unsupported option type {attr}.")

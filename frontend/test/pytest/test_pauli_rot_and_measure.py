@@ -27,7 +27,7 @@ def test_pauli_rot_lowering():
     """Test that Pauli rotation is lowered to quantum.paulirot."""
     pipe = [("pipe", ["quantum-compilation-stage"])]
 
-    @qjit(pipelines=pipe, target="mlir", capture=True, collect_decomp_rules=False)
+    @qjit(pipelines=pipe, target="mlir", capture=True)
     def test_pauli_rot_lowering_workflow():
 
         @qp.qnode(qp.device("null.qubit", wires=1))
@@ -46,7 +46,7 @@ def test_pauli_rot_lowering_with_ctrl_qubits():
     """
     pipe = [("pipe", ["quantum-compilation-stage"])]
 
-    @qjit(pipelines=pipe, target="mlir", capture=True, collect_decomp_rules=False)
+    @qjit(pipelines=pipe, target="mlir", capture=True)
     def test_pauli_rot_lowering_with_ctrl_qubits_workflow():
 
         @qp.qnode(qp.device("null.qubit", wires=2))
@@ -86,7 +86,7 @@ def test_ppr_operator_capture(op_cls, _):
     """Test that PPR operators remain generic operators before applying to_ppr."""
     pipe = [("pipe", ["quantum-compilation-stage"])]
 
-    @qjit(pipelines=pipe, target="mlir", capture=True)
+    @qjit(pipelines=pipe, target="mlir", capture=True, skip_preprocess=True)
     def test_ppr_operator_capture_workflow():
 
         @qp.qnode(qp.device("null.qubit", wires=2))
@@ -219,19 +219,20 @@ def test_pauli_measure_to_ppr_pauli_word_error():
         test_pauli_measure_to_ppr_pauli_word_error_workflow()
 
 
-def test_controlled_pauli_rot_failure():
+def test_controlled_pauli_rot_works():
     """
     Test that controlled PauliRot fails at runtime.
     """
 
-    @qjit(capture=True, collect_decomp_rules=False)
+    @qjit(capture=True)
     @qp.qnode(qp.device("lightning.qubit", wires=2))
     def workflow():
+        qp.X(1)
         qp.ctrl(qp.PauliRot(np.pi / 4, "X", wires=0), control=1)
-        return qp.probs()
+        return qp.expval(qp.Z(0))
 
-    with pytest.raises(RuntimeError, match="Controlled PauliRot is not supported"):
-        workflow()
+    res = workflow()
+    assert qp.math.allclose(res, np.cos(np.pi / 4))
 
 
 def test_legacy_pauli_rot_lowering():

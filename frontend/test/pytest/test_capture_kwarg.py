@@ -156,7 +156,7 @@ class TestCaptureKwargIntegration:
 
         dev = qp.device(backend, wires=2)
 
-        @qjit(capture=True, collect_decomp_rules=False)
+        @qjit(capture=True)
         @qp.qnode(dev)
         def circuit(theta):
             assert qp.capture.enabled()
@@ -223,7 +223,7 @@ class TestCaptureKwargIntegration:
         dev = qp.device(backend, wires=1)
         qp.capture.disable()
 
-        @qjit(capture=True, collect_decomp_rules=False)
+        @qjit(capture=True)
         @qp.qnode(dev)
         def circuit_capture(theta):
             assert qp.capture.enabled()
@@ -345,7 +345,7 @@ class TestCaptureCompileOptionsIdentity:
         def make_circuit_capture():
             compilation_count["capture"] += 1
 
-            @qjit(capture=True, collect_decomp_rules=False)
+            @qjit(capture=True)
             @qp.qnode(dev)
             def circuit(x):
                 qp.RX(x, wires=0)
