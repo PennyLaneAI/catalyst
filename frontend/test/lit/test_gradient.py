@@ -32,7 +32,7 @@ def grad_default(x: float):
         qp.RX(x, wires=0)
         return qp.expval(qp.PauliY(0))
 
-    # CHECK: gradient.grad "fd" @module_f::@f({{%[a-zA-Z0-9_]+}}) {diffArgIndices = dense<0> : tensor<1xi64>, finiteDiffParam = 9.9999999999999995E-8 : f64} : (tensor<f64>) -> tensor<f64>
+    # CHECK: gradient.grad fd @module_f::@f({{%[a-zA-Z0-9_]+}}) {diffArgIndices = dense<0> : tensor<1xi64>, finiteDiffParam = 9.9999999999999995E-8 : f64} : (tensor<f64>) -> tensor<f64>
     g = grad(f, method="fd")
     return g(jax.numpy.pi)
 
@@ -48,7 +48,7 @@ def override_method(x: float):
         qp.RX(x, wires=0)
         return qp.expval(qp.PauliY(0))
 
-    # CHECK: gradient.grad "auto" @module_f::@f({{%[a-zA-Z0-9_]+}}) {diffArgIndices = dense<0> : tensor<1xi64>} : (tensor<f64>) -> tensor<f64>
+    # CHECK: gradient.grad auto @module_f::@f({{%[a-zA-Z0-9_]+}}) {diffArgIndices = dense<0> : tensor<1xi64>} : (tensor<f64>) -> tensor<f64>
     g = grad(f, method="auto")
     return g(jax.numpy.pi)
 
@@ -64,7 +64,7 @@ def override_h(x: float):
         qp.RX(x, wires=0)
         return qp.expval(qp.PauliY(0))
 
-    # CHECK: gradient.grad "fd" @module_f::@f({{%[a-zA-Z0-9_]+}}) {diffArgIndices = dense<0> : tensor<1xi64>, finiteDiffParam = 2.000000e+00 : f64} : (tensor<f64>) -> tensor<f64>
+    # CHECK: gradient.grad fd @module_f::@f({{%[a-zA-Z0-9_]+}}) {diffArgIndices = dense<0> : tensor<1xi64>, finiteDiffParam = 2.000000e+00 : f64} : (tensor<f64>) -> tensor<f64>
     g = grad(f, method="fd", h=2.0)
     return g(jax.numpy.pi)
 
@@ -80,7 +80,7 @@ def override_diff_arg(x: float):
         qp.RX(x**y, wires=0)
         return qp.expval(qp.PauliY(0))
 
-    # CHECK: gradient.grad "auto" @module_f::@f({{%[a-zA-Z0-9_]+}}, {{%[a-zA-Z0-9_]+}}_0) {diffArgIndices = dense<1> : tensor<1xi64>} : (tensor<f64>, tensor<f64>) -> tensor<f64>
+    # CHECK: gradient.grad auto @module_f::@f({{%[a-zA-Z0-9_]+}}, {{%[a-zA-Z0-9_]+}}_0) {diffArgIndices = dense<1> : tensor<1xi64>} : (tensor<f64>, tensor<f64>) -> tensor<f64>
     g = grad(f, argnums=1)
     return g(jax.numpy.pi, 2.0)
 
@@ -96,7 +96,7 @@ def second_grad(x: float):
         qp.RX(x, wires=0)
         return qp.expval(qp.PauliY(0))
 
-    # CHECK: gradient.grad "fd" @grad.f({{%[a-zA-Z0-9_]+}}) {diffArgIndices = dense<0> : tensor<1xi64>, finiteDiffParam = 9.9999999999999995E-8 : f64} : (tensor<f64>) -> tensor<f64>
+    # CHECK: gradient.grad fd @grad.f({{%[a-zA-Z0-9_]+}}) {diffArgIndices = dense<0> : tensor<1xi64>, finiteDiffParam = 9.9999999999999995E-8 : f64} : (tensor<f64>) -> tensor<f64>
     g = grad(f)
     # CHECK-LABEL: private @grad.f
     h = grad(g, method="fd")
@@ -115,7 +115,7 @@ def grad_range_change():
         qp.RY(y, wires=1)
         return qp.expval(qp.PauliX(0)), qp.expval(qp.PauliY(1))
 
-    # CHECK: gradient.grad "auto" @module_f::@f({{%[a-zA-Z0-9_]+}}, {{%[a-zA-Z0-9_]+}}) {diffArgIndices = dense<[0, 1]> : tensor<2xi64>} : (tensor<f64>, tensor<f64>) -> (tensor<f64>, tensor<f64>, tensor<f64>, tensor<f64>)
+    # CHECK: gradient.grad auto @module_f::@f({{%[a-zA-Z0-9_]+}}, {{%[a-zA-Z0-9_]+}}) {diffArgIndices = dense<[0, 1]> : tensor<2xi64>} : (tensor<f64>, tensor<f64>) -> (tensor<f64>, tensor<f64>, tensor<f64>, tensor<f64>)
     g = jacobian(f, argnums=[0, 1])
     return g(jax.numpy.pi, jax.numpy.pi)
 
@@ -135,7 +135,7 @@ def grad_hoist_constant(params: jax.core.ShapedArray([2], float)):
         h_obs = [qp.PauliX(0) @ qp.PauliZ(1), qp.PauliZ(0) @ qp.Hadamard(2)]
         return qp.expval(qp.Hamiltonian(h_coeffs, h_obs))
 
-    # CHECK-NEXT {{%.+}} = gradient.grad "fd" @module_circuit::@circuit([[const]], %arg0)
+    # CHECK-NEXT {{%.+}} = gradient.grad fd @module_circuit::@circuit([[const]], %arg0)
     h = grad(circuit, method="fd", argnums=[0])
     return h(params)
 

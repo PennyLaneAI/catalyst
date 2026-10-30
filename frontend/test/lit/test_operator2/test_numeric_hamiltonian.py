@@ -195,7 +195,7 @@ def cdf_with_rules(t: float):
     return qp.state()
 
 
-# CHECK: func.func private @"__builtin__trotter_cdf_decomposition_TrotterCDF{
+# CHECK: func.func private @__builtin__trotter_cdf_decomposition{{(_[0-9]+)?}}
 # CHECK-SAME: evolution_time:[tensor<f64>]
 # CHECK-SAME: hamiltonian:[tensor<2x2x2xf64>,tensor<2x2x2xf64>,tensor<f64>]
 # CHECK-SAME: {wires:4}
