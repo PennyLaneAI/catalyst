@@ -17,19 +17,25 @@
 // RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{inline-rule-body gate-set=C(V)=1.0 alt-decomps=C(U){}{wires:1}{}=[dedicated,distribute]})' %s | FileCheck %s --check-prefixes=ALL,INLINE
 
 // ALL-LABEL: func.func @competing(
-// ALL-SAME:  %[[Q:.*]]: !quantum.bit, %[[C:.*]]: !quantum.bit
-func.func @competing(%ctrl: !quantum.bit, %q: !quantum.bit) -> (!quantum.bit, !quantum.bit) {
+func.func @competing() attributes {quantum.node} {
+  %r = quantum.alloc(2) : !quantum.reg
+  %ctrl = quantum.extract %r[0] : !quantum.reg -> !quantum.bit
+  %q = quantum.extract %r[1] : !quantum.reg -> !quantum.bit
   %true = arith.constant true
 
-  // CALL: %[[OQ:.*]]:2 = call @dedicated_0(%[[Q]], %[[C]])
-  // CALL: return %[[OQ]]#0, %[[OQ]]#1
+  // CALL: call @dedicated_0
 
-  // INLINE: %[[O:.*]], %[[OC:.*]] = quantum.custom "V"() %[[Q]] ctrls(%[[C]]) ctrlvals(%{{.*}}) : !quantum.bit ctrls !quantum.bit
+  // INLINE: quantum.custom "V"
   // INLINE-NOT: quantum.custom "V"
-  // INLINE: return %[[O]], %[[OC]]
+  // ALL-NOT: quantum.custom "U"
+
+  // ALL: return
 
   %out, %outc = quantum.custom "U"() %q ctrls(%ctrl) ctrlvals(%true) : !quantum.bit ctrls !quantum.bit
-  return %out, %outc : !quantum.bit, !quantum.bit
+  %r1 = quantum.insert %r[0], %outc : !quantum.reg, !quantum.bit
+  %r2 = quantum.insert %r1[1], %out : !quantum.reg, !quantum.bit
+  quantum.dealloc %r2 : !quantum.reg
+  return
 }
 
 // Pathway 1: C(U) -> C(V) (cost 1).

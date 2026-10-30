@@ -14,12 +14,16 @@
 
 // RUN: not --crash catalyst --tool=opt --split-input-file --pass-pipeline='builtin.module( graph-decomposition{gate-set=testPauliX=1.0 alt-decomps=[failure=fail_decomp] bytecode-rules="%BYTECODE_PATH"})' %s 2>&1 | FileCheck %s
 
-func.func @circuit(%q0: !quantum.bit) {
+func.func @circuit() attributes {quantum.node} {
+    %r = quantum.alloc(1) : !quantum.reg
+    %q0 = quantum.extract %r[0] : !quantum.reg -> !quantum.bit
     %pi = arith.constant 3.14 : f64
     %out = quantum.custom "failure"() %q0 : !quantum.bit
 
     // CHECK: GraphSolverFailedError
     // CHECK: Decomposition rule not found for operator 'failure{}{wires:1}{}'
+    %r1 = quantum.insert %r[0], %out : !quantum.reg, !quantum.bit
+    quantum.dealloc %r1 : !quantum.reg
     return
 }
 
