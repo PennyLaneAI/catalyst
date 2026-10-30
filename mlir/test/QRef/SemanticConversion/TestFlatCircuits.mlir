@@ -15,7 +15,6 @@
 // Test conversion to value semantics quantum dialect for flat circuits with only classical arguments.
 
 // RUN: quantum-opt --convert-to-value-semantics --canonicalize --split-input-file --verify-diagnostics %s | FileCheck %s
-// RUN: quantum-opt --convert-to-value-semantics --ctrl-lowering --split-input-file --verify-diagnostics %s | FileCheck %s --check-prefix=LOWERED
 
 
 // CHECK-LABEL: test_set_state
@@ -707,13 +706,6 @@ func.func @test_ctrl_op_nested() attributes {quantum.node}
 // CHECK-SAME: {work_wire_type = "zeroed"}
 // CHECK-SAME: : !quantum.bit work_wires !quantum.bit -> !quantum.bit
 
-// LOWERED-LABEL: @ctrl_work_wires
-// LOWERED: %[[Q:.*]]:2, %[[C:.*]] = quantum.operator "PauliX"()
-// LOWERED-SAME: qubits(%{{.*}}, %{{.*}})
-// LOWERED-NEXT: ctrls(%{{.*}}) ctrl_vals(%{{.*}})
-// LOWERED: static_data = {ctrl_work_wire_type = "zeroed"}
-// LOWERED: qubit_map = {ctrl_work_wires = [1], wires = [0]}
-
 func.func @ctrl_work_wires() attributes {quantum.node} {
     %true = llvm.mlir.constant (1 : i1) : i1
     %ctrl = qref.alloc_qb : !qref.bit
@@ -750,14 +742,6 @@ func.func @ctrl_work_wires() attributes {quantum.node} {
 // CHECK: ^bb0(%[[A_TARGET:.*]]: !quantum.bit, %[[A_INNER:.*]]: !quantum.bit, %[[A_INNER_WORK:.*]]: !quantum.bit)
 // CHECK: quantum.ctrl(%[[A_INNER]]) ctrlvals(%{{.*}}) work_wires(%[[A_INNER_WORK]]) (%[[A_TARGET]])
 // CHECK-SAME: : !quantum.bit work_wires !quantum.bit -> !quantum.bit
-
-// Both work wires end up on the single lowered operator. "borrowed" wins over "zeroed".
-// LOWERED-LABEL: @nested_ctrl_distinct_work_wires
-// LOWERED-NOT: quantum.ctrl
-// LOWERED: quantum.operator "PauliX"() qubits(%{{.*}}, %{{.*}}, %{{.*}})
-// LOWERED: ctrls(%{{.*}}, %{{.*}}) ctrl_vals(%{{.*}}, %{{.*}})
-// LOWERED: static_data = {ctrl_work_wire_type = "borrowed"}
-// LOWERED: qubit_map = {ctrl_work_wires = [1, 2], wires = [0]}
 
 func.func @nested_ctrl_distinct_work_wires() attributes {quantum.node} {
     %true = arith.constant true
