@@ -57,7 +57,8 @@ static bool isSkippedOp(Operation *op) {
                quantum::DeviceReleaseOp, quantum::ExtractOp, quantum::FinalizeOp, qref::GetOp,
                quantum::HamiltonianOp, quantum::HermitianOp, qref::HermitianOp,
                quantum::InitializeOp, quantum::InsertOp, quantum::NamedObsOp, qref::NamedObsOp,
-               quantum::NumQubitsOp, quantum::TensorOp, quantum::YieldOp, pbc::YieldOp>(op);
+               quantum::NumQubitsOp, quantum::TensorOp, quantum::YieldOp, pbc::YieldOp,
+               ResourceSkipOpInterface>(op);
 }
 
 /// Check if the operation belongs to one of the tracked quantum dialects.

@@ -135,11 +135,11 @@ void ResourceResult::multiplyBy(double scalar) {
 //   metadata: { qnode, auto_qubit_management?, has_branches, device_name? }
 //   num_qubits: { alloc, arg, total }
 //   classical_instructions: { "dialect.op": count, ... }
-//   quantum_operations: { "<wires>": { "op_name": count, ... }, ... }  // optional
+//   quantum_operations: { "wires": { "op_name": count, ... }, ... }  // optional
 //   function_calls: { static: { "fxn": count, ... }, dynamic: { "fxn": id, ... } }
 //   measurement_processes: { "meas_type": count, ... }
-//   extended_fields: { "<extension>": { ... }, ... }  // e.g. pbc_depth: { any_commuting_depth,
-//   qubit_disjoint_depth }
+//   extended_fields: { "extension": { "display name": name, "metric": value, ... }, ... }
+//   (e.g. for pbc_depth {"display name": "pbc_depth", "qubit disjoint depth": 5.0})
 static llvm::json::Value countToJson(double count) {
     double rounded = std::round(count);
     if (std::abs(count - rounded) < 1e-9) {
@@ -214,14 +214,12 @@ llvm::json::Object ResourceResult::toJson() const {
     }
     funcObj["measurement_processes"] = std::move(measurementObject);
 
-    // Extention fields
-    // Emit registered extensions under their own keys (e.g. "depth").
-    // Stage 4 will nest these under "extended_fields".
+    // Extension fields
     json::Object extendedFieldObject;
     for (const auto &ext : extensions) {
         auto json = ext->toJson();
         if (json != nullptr) {
-            extendedFieldObject[ext->name()] = json;
+            extendedFieldObject[ext->name()] = std::move(json);
         }
     }
     funcObj["extended_fields"] = std::move(extendedFieldObject);
