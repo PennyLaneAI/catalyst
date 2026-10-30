@@ -16,7 +16,7 @@
 
 // RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{inline-rule-body gate-set=testRX=2.0,testRY=1.0,testRZ=1.0 fixed-decomps=testHadamard=fixed_decomp})' %s | FileCheck %s --check-prefixes=ALL,INLINE
 
-func.func @circuit() {
+func.func @circuit() attributes {quantum.node} {
     %q = quantum.alloc_qb : !quantum.bit
     // ALL-NOT: testHadamard"
     // CALL: call @fixed_decomp_0

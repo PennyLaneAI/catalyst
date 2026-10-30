@@ -16,7 +16,7 @@
 
 // RUN: catalyst --tool=opt --split-input-file --pass-pipeline='builtin.module(graph-decomposition{gate-set=testHadamard=1.0,testCNOT=1.0 alt-decomps=testHadamard=false_decomp bytecode-rules="%BYTECODE_PATH"})' %s | FileCheck %s
 
-func.func @circuit() {
+func.func @circuit() attributes {quantum.node} {
     %0 = quantum.alloc(2) : !quantum.reg
     %q0 = quantum.extract %0[0] : !quantum.reg -> !quantum.bit
     %q1 = quantum.extract %0[1] : !quantum.reg -> !quantum.bit
@@ -35,7 +35,7 @@ func.func @circuit() {
 // -----
 
 module @test_module {
-    func.func public @circuit() {
+    func.func public @circuit() attributes {quantum.node} {
         %0 = quantum.alloc(2) : !quantum.reg
         %q0 = quantum.extract %0[0] : !quantum.reg -> !quantum.bit
         %q1 = quantum.extract %0[1] : !quantum.reg -> !quantum.bit

@@ -18,15 +18,18 @@
 
 
 // ALL-LABEL: func.func @competing(
-// ALL-SAME:  [[Q:%.+]]: !quantum.bit
-func.func @competing(%q: !quantum.bit) -> !quantum.bit {
+func.func @competing() attributes {quantum.node} {
+  %0 = quantum.alloc(1) : !quantum.reg
+  %q = quantum.extract %0[0] : !quantum.reg -> !quantum.bit
   // CALL: call @dedicated_0
   // INLINE-COUNT-1: quantum.custom "testRZ"()
   // ALL-NOT: quantum.custom "testRot"
   // ALL-NOT: quantum.custom "testRZ"
   // ALL: return
   %out = quantum.custom "testRot"() %q adj : !quantum.bit
-  return %out: !quantum.bit
+  %1 = quantum.insert %0[0], %out : !quantum.reg, !quantum.bit
+  quantum.dealloc %1 : !quantum.reg
+  return
 }
 
 // CALL: func.func private @dedicated_0

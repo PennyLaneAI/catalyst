@@ -18,7 +18,7 @@
 // RUN:   graph-decomposition{inline-rule-body gate-set=testHadamard=1.0 fixed-decomps=testPauliX=x_to_h bytecode-rules="%BYTECODE_PATH"})' \
 // RUN:   %s | FileCheck %s
 
-func.func @circuit() {
+func.func @circuit() attributes {quantum.node} {
     %0 = quantum.alloc(2) : !quantum.reg
     %q = quantum.extract %0[0] : !quantum.reg -> !quantum.bit
     // CHECK-NOT testPauliX

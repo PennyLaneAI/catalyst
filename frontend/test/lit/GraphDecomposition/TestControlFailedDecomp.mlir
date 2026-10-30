@@ -15,10 +15,16 @@
 // RUN: not --crash catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{gate-set=Foo=1.0})' %s 2>&1 | FileCheck %s
 
 // CHECK: Decomposition rule not found for operator 'C(Bar){}{wires:1}{}'
-func.func @circuit(%ctrl: !quantum.bit, %q: !quantum.bit) -> (!quantum.bit, !quantum.bit) {
+func.func @circuit() attributes {quantum.node} {
+  %r = quantum.alloc(2) : !quantum.reg
+  %ctrl = quantum.extract %r[0] : !quantum.reg -> !quantum.bit
+  %q = quantum.extract %r[1] : !quantum.reg -> !quantum.bit
   %true = arith.constant true
   %out, %outc = quantum.custom "Bar"() %q ctrls(%ctrl) ctrlvals(%true) : !quantum.bit ctrls !quantum.bit
-  return %out, %outc : !quantum.bit, !quantum.bit
+  %r1 = quantum.insert %r[0], %outc : !quantum.reg, !quantum.bit
+  %r2 = quantum.insert %r1[1], %out : !quantum.reg, !quantum.bit
+  quantum.dealloc %r2 : !quantum.reg
+  return
 }
 
 // A decomposition for the base Bar op. It is never applicable to the controlled
