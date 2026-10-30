@@ -349,8 +349,23 @@ def _require_decompose_gate_set(tkwargs):
         )
 
 
+def _require_resource_estimate_args(tkwargs):
+    """Reject a qp.estimate without a gate set, which the resource-analysis pass needs."""
+    if tkwargs.get("output_json") is None:
+        raise ValueError(
+            "qp.estimate requires an explicit 'output_json' under qjit; the resource-analysis "
+        )
+    if tkwargs.get("output_fname") is None:
+        raise ValueError(
+            "qp.estimate requires an explicit 'output_fname' under qjit; the resource-analysis "
+            "has no default output file."
+        )
+
+
 # pylint: disable=too-many-positional-arguments
-def _handle_decompose_transform(self, inner_jaxpr, consts, non_const_args, tkwargs):
+def _handle_decompose_transform(
+    self, inner_jaxpr, consts, non_const_args, tkwargs, is_resource_estimate=False
+):
     """Route a captured ``qp.decompose`` onto the ``graph-decomposition`` pass.
 
     ``qp.decompose`` is an alias for :func:`catalyst.passes.graph_decomposition`.
@@ -358,9 +373,12 @@ def _handle_decompose_transform(self, inner_jaxpr, consts, non_const_args, tkwar
     # Local imports avoid an import cycle (catalyst.passes imports from_plxpr indirectly).
     from pennylane.decomposition import DecompositionRule, add_decomps, list_decomps, local_decomps
 
-    from catalyst.passes.builtin_passes import graph_decomposition
+    from catalyst.passes.builtin_passes import graph_decomposition, resource_estimate
 
     _require_decompose_gate_set(tkwargs)
+
+    if is_resource_estimate:
+        _require_resource_estimate_args(tkwargs)
 
     fixed_decomps = tkwargs.get("fixed_decomps") or {}
     alt_decomps = tkwargs.get("alt_decomps") or {}
@@ -381,13 +399,19 @@ def _handle_decompose_transform(self, inner_jaxpr, consts, non_const_args, tkwar
         for op, rules in alt_decomps.items():
             add_decomps(op, *rules)
 
-        # Reusing the graph_decomposition transform (not a fork) guarantees identical pass options
-        # to the explicit catalyst.passes.graph_decomposition entry point.
-        bound_pass = graph_decomposition(
-            gate_set=tkwargs["gate_set"],
-            fixed_decomps=fixed_decomps or None,
-            alt_decomps=alt_decomps or None,
-        )
+        # Reusing graph_decomposition pass options setup for resource analysis estimation.
+        bound_transform = resource_estimate if is_resource_estimate else graph_decomposition
+        bound_transform_params = {
+            "gate_set": tkwargs["gate_set"],
+            "fixed_decomps": fixed_decomps or None,
+            "alt_decomps": alt_decomps or None,
+        }
+        bound_pass = bound_transform(**bound_transform_params)
+
+        # Set resource analysis estimation options after graph_decomposition_setup_inputs.
+        if is_resource_estimate:
+            bound_pass.kwargs["output_json"] = tkwargs["output_json"]
+            bound_pass.kwargs["output_fname"] = tkwargs["output_fname"]
         next_eval._pass_pipeline.insert(0, bound_pass)
 
         return next_eval.eval(inner_jaxpr, consts, *non_const_args)
@@ -426,10 +450,20 @@ def handle_transform(
     non_const_args = args[_tuple_to_slice(args_slice)]
     targs = args[_tuple_to_slice(targs_slice)]
     pl_tkwargs = _tuple_to_dict(tkwargs)
+    is_resource_estimate = (
+        transform.pass_name == "resource-estimate" and pl_tkwargs.get("gate_set") is not None
+    )
+    if transform.pass_name == "resource-estimate" and pl_tkwargs.get("gate_set") is None:
+        raise ValueError(
+            "qp.estimate requires an explicit 'gate_set' under qjit; the resource-estimate "
+            "pass has no default gate set."
+        )
 
     # qp.decompose is routed to the graph-decomposition pass (see _handle_decompose_transform).
-    if transform == pl_decompose:
-        return _handle_decompose_transform(self, inner_jaxpr, consts, non_const_args, pl_tkwargs)
+    if transform == pl_decompose or is_resource_estimate:
+        return _handle_decompose_transform(
+            self, inner_jaxpr, consts, non_const_args, pl_tkwargs, is_resource_estimate
+        )
 
     if transform.pass_name is None:
         raise ValueError(

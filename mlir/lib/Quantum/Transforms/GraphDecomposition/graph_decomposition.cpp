@@ -105,16 +105,14 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
                 }
             }
 
-            graph =
-                GraphDecompositionPrep::prepareGraph(module, opIDs,
-                                                     {
-                                                         .targetGateSetOption = targetGateSetOption,
-                                                         .fixedDecompsOption = fixedDecompsOption,
-                                                         .altDecompsOption = altDecompsOption,
-                                                         .bytecodeRulesFile = bytecodeRulesFile,
-                                                         .libQPDPath = libQPDPath,
-                                                         .libpythonPath = libpythonPath,
-                                                     });
+            GraphDecompositionPrep::PrepOptions opts;
+            opts.targetGateSetOption = targetGateSetOption;
+            opts.fixedDecompsOption = fixedDecompsOption;
+            opts.altDecompsOption = altDecompsOption;
+            opts.bytecodeRulesFile = bytecodeRulesFile;
+            opts.libQPDPath = libQPDPath;
+            opts.libpythonPath = libpythonPath;
+            graph = GraphDecompositionPrep::prepareGraph(module, opIDs, opts);
         }
         if (!graph) {
             return signalPassFailure();

@@ -2379,6 +2379,93 @@ class TestDecomposeAlias:
             qp.decomposition.disable_graph()
 
 
+class TestResourceEstimate:
+    """Tests for ``resource-estimate`` using the ``qp.estimate`` path.
+
+    ``qp.estimate`` builds ``transform(pass_name="resource-estimate")(gate_set=...)``; under
+    capture that must go through ``_handle_decompose_transform`` and emit the
+    ``resource-estimate`` pass.
+    """
+
+    _resource_estimate = qp.transform(pass_name="resource-estimate")
+
+    def test_resource_estimate(self, tmp_path):
+        """With a gate set, capture inserts ``resource-estimate`` and forwards output kwargs."""
+        out = tmp_path / "resources.json"
+
+        @qjit(capture=True, target="mlir")
+        @self._resource_estimate(
+            gate_set={"RX", "RY", "RZ"},
+            output_json=True,
+            output_fname=str(out),
+        )
+        @qnode(qp.device("null.qubit", wires=1))
+        def circuit():
+            qp.Rot(0.1, 0.2, 0.3, wires=0)
+            return qp.probs()
+
+        mlir = circuit.mlir
+        assert 'apply_registered_pass "resource-estimate"' in mlir
+        assert 'apply_registered_pass "graph-decomposition"' not in mlir
+        assert "gate-set" in mlir
+        assert "bytecode-rules" in mlir
+        assert "libQPD-path" in mlir
+        assert "libpython-path" in mlir
+        assert '"output-json" = true' in mlir
+        assert f'"output-fname" = "{out}"' in mlir
+
+    def test_resource_estimate_requires_gate_set(self, tmp_path):
+        """resource-estimate without a gate set is rejected with a clear error."""
+        out = tmp_path / "resources.json"
+        with pytest.raises(ValueError, match="requires an explicit 'gate_set'"):
+
+            @qjit(capture=True, target="mlir")
+            @self._resource_estimate(
+                gate_set=None,
+                output_json=True,
+                output_fname=str(out),
+            )
+            @qnode(qp.device("null.qubit", wires=1))
+            def circuit():
+                qp.Rot(0.1, 0.2, 0.3, wires=0)
+                return qp.probs()
+
+            circuit()
+
+    def test_resource_estimate_requires_output_json(self, tmp_path):
+        """resource-estimate without output_json is rejected with a clear error."""
+        out = tmp_path / "resources.json"
+        with pytest.raises(ValueError, match="requires an explicit 'output_json'"):
+
+            @qjit(capture=True, target="mlir")
+            @self._resource_estimate(
+                gate_set={"RX", "RY", "RZ"},
+                output_fname=str(out),
+            )
+            @qnode(qp.device("null.qubit", wires=1))
+            def circuit():
+                qp.Rot(0.1, 0.2, 0.3, wires=0)
+                return qp.probs()
+
+            circuit()
+
+    def test_resource_estimate_requires_output_fname(self):
+        """resource-estimate without output_fname is rejected with a clear error."""
+        with pytest.raises(ValueError, match="requires an explicit 'output_fname'"):
+
+            @qjit(capture=True, target="mlir")
+            @self._resource_estimate(
+                gate_set={"RX", "RY", "RZ"},
+                output_json=True,
+            )
+            @qnode(qp.device("null.qubit", wires=1))
+            def circuit():
+                qp.Rot(0.1, 0.2, 0.3, wires=0)
+                return qp.probs()
+
+            circuit()
+
+
 class TestNumericHamiltonianDecomposition:
     """Tests decomposing Trotter operators that carry a numeric Hamiltonian as a
     hybrid argument, in both their plain and ``qp.adjoint`` forms.
