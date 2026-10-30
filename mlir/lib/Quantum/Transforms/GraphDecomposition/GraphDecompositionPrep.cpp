@@ -61,6 +61,8 @@ using namespace DecompGraph::Solver;
 
 namespace {
 
+constexpr llvm::StringRef qnodeAttrName = "quantum.node";
+
 /// Op-level `adj`/`ctrls` plus enclosing `quantum.adjoint` / `quantum.ctrl` regions.
 std::pair<bool, unsigned> getExplicitModifiers(DecomposableGate op) {
     bool isAdjoint = op->hasAttr("adjoint");
@@ -479,39 +481,26 @@ LogicalResult getRuleNodes(ModuleOp module, llvm::StringRef filename,
     return success();
 }
 
-void getOperators(ModuleOp module, std::vector<OperatorNode> &operators) {
-    module.walk([&](DecomposableGate op) {
-        if (DecompUtils::isInDecompRule(op)) {
-            return;
-        }
-
-        auto [isAdjoint, numControlQubits] = getExplicitModifiers(op);
-        std::string opID = op.getGraphOpIdExplicitModifiers(isAdjoint, numControlQubits);
-
-        // Derive the id and modifier-wrapped name from the single parse path, so operator
-        // nodes and rule nodes agree on the spelling of `C(...)`/`Adjoint(...)`.
-        OperatorNode node = parseOperator(opID);
-
-        // numWires/numParams are debug-only; parseOperator leaves them at defaults for the
-        // graphOpId form, so we need to fill them accurately from the op here.
-        node.numWires = op.getNonCtrlQubitOperands().size();
-        if (auto paramOp = llvm::dyn_cast<catalyst::quantum::ParametrizedGate>(op.getOperation())) {
-            node.numParams = paramOp.getAllParams().size();
-        } else {
-            node.numParams = 0;
-        }
-
-        operators.push_back(node);
-    });
-}
-
 } // namespace
 
 namespace catalyst {
 namespace quantum {
 namespace GraphDecompositionPrep {
 
-std::unique_ptr<DecompositionGraph> prepareGraph(ModuleOp module, const PrepOptions &opts) {
+func::FuncOp findQNodeFunc(ModuleOp module) {
+    func::FuncOp found;
+    module.walk([&](func::FuncOp func) {
+        if (func->hasAttrOfType<UnitAttr>(qnodeAttrName)) {
+            found = func;
+            return WalkResult::interrupt();
+        }
+        return WalkResult::advance();
+    });
+    return found;
+}
+
+std::unique_ptr<DecompositionGraph> prepareGraph(ModuleOp module, ArrayRef<std::string> opIDs,
+                                                 const PrepOptions &opts) {
     LLVM_DEBUG(llvm::dbgs() << "Running GraphDecompositionPrep with options:\n");
     LLVM_DEBUG({
         llvm::dbgs() << "targetGateSetOption\n";
@@ -534,6 +523,10 @@ std::unique_ptr<DecompositionGraph> prepareGraph(ModuleOp module, const PrepOpti
     });
 
     std::vector<OperatorNode> setOfOps;
+    for (const std::string &opID : opIDs) {
+        setOfOps.push_back(parseOperator(opID));
+    }
+
     std::vector<RuleNode> setOfRules;
     llvm::StringSet<> userRuleNames;
     llvm::StringMap<std::string> opToFixedDecompName;
@@ -551,7 +544,6 @@ std::unique_ptr<DecompositionGraph> prepareGraph(ModuleOp module, const PrepOpti
                             opts.libQPDPath, opts.libpythonPath, setOfRules))) {
         return nullptr;
     }
-    getOperators(module, setOfOps);
 
     // NOTE: fixed and alt-decomps are handled by filtering during rule collection.
     return std::make_unique<DecompositionGraph>(std::move(setOfOps), std::move(targetGateSet),
