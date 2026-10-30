@@ -19,8 +19,11 @@
 
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/ADT/StringSet.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/BuiltinOps.h"
+
+#include "Catalyst/Analysis/ResourceAnalysis.h"
 
 #include "DGBuilder.hpp"
 
@@ -42,6 +45,15 @@ struct PrepOptions {
     llvm::StringRef libQPDPath;
     llvm::StringRef libpythonPath;
 };
+
+/**
+ * @brief Gather the op IDs used by `funcName` into `opIDs`.
+ *
+ * Flattening does not merge loop bodies with a dynamic trip count, which the analysis only records
+ * as `varFunctionCalls`, so those bodies are visited explicitly.
+ */
+void collectOpIDs(const catalyst::ResourceAnalysis &analysis, llvm::StringRef funcName,
+                  llvm::StringSet<> &visitedFuncs, llvm::StringSet<> &opIDs);
 
 /**
  * @brief Find the quantum.node function in the module.

@@ -487,6 +487,23 @@ namespace catalyst {
 namespace quantum {
 namespace GraphDecompositionPrep {
 
+void collectOpIDs(const catalyst::ResourceAnalysis &analysis, StringRef funcName,
+                  llvm::StringSet<> &visitedFuncs, llvm::StringSet<> &opIDs) {
+    if (!visitedFuncs.insert(funcName).second) {
+        return;
+    }
+    const catalyst::ResourceResult *flat = analysis.getFlattenedResource(funcName);
+    if (!flat) {
+        return;
+    }
+    for (const auto &entry : flat->detailedOperations) {
+        opIDs.insert(entry.getKey());
+    }
+    for (const auto &entry : flat->varFunctionCalls) {
+        collectOpIDs(analysis, entry.getKey(), visitedFuncs, opIDs);
+    }
+}
+
 func::FuncOp findQNodeFunc(ModuleOp module) {
     func::FuncOp found;
     module.walk([&](func::FuncOp func) {
