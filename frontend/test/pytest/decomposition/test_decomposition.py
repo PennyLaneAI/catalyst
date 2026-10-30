@@ -1941,6 +1941,18 @@ def test_gate_already_in_gateset():
     assert "llvm.call @__catalyst__qis__Hadamard" in circuit.mlir_opt
 
 
+def test_modifiers_in_gateset():
+    """Test that modifiers are correctly interpreted by decomposition gatesets."""
+
+    @qjit(capture=True, collect_decomp_rules=False)
+    @qp.decompose(gate_set={"C(T)"})
+    @qnode(qp.device("null.qubit", wires=3))
+    def circuit():
+        qp.ctrl(qp.T(0), (1, 2))
+
+    circuit()
+
+
 @pytest.mark.parametrize("reverse", [False, True])
 def test_cyclic_decompositions_find_cheapest_solution(reverse):
     """A <-> B has exits A -> Target and B -> Target Target.
