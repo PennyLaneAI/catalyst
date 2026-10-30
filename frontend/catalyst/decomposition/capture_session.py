@@ -71,7 +71,7 @@ class OpDecompRequest:
         properties by removing tracers (no leaks) and giving shapes/dtypes to Python constants.
 
         Ambient modifiers compose with symbolic wrappers already carried by ``op``: adjoints
-        cancel pairwise and control counts add.
+        cancel pairwise, while control counts and work wires add.
         """
         with qp.capture.pause():
             op = abstractify(op)

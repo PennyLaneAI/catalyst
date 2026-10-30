@@ -19,11 +19,16 @@ from __future__ import annotations
 import re
 from collections.abc import Callable
 from dataclasses import dataclass, replace
+from functools import wraps
 from typing import ClassVar
 
 import pennylane as qp
+from pennylane.capture.primitives import ctrl_transform_prim
+from pennylane.decomposition.resources import resolve_work_wire_type
 from pennylane.ops.op_math.adjoint2 import Adjoint2
 from pennylane.ops.op_math.controlled2 import ControlledOp2
+
+from catalyst.utils.patching import Patcher
 
 
 @dataclass(frozen=True)
@@ -32,17 +37,23 @@ class ModifierState:
 
     Current modifiers are adjoints and controls.
     Default values are False for `adjoint` and 0 for `control_count`.
+    Controls may be accompanied by work wires and a work wire type. These control work wires
+    are distinct from standard operator work wires.
 
     Attributes:
         adjoint: Whether the operator is adjointed.
         control_count: How many controls are applied to the operator.
+        num_work_wires: How many work wires are available to the controls.
+        work_wire_type: The type of those work wires, ``"zeroed"`` or ``"borrowed"``.
 
     Raises:
-        ValueError: If `control_count` is negative.
+        ValueError: If `control_count` is negative, or there are work wires without any controls.
     """
 
     adjoint: bool = False
     control_count: int = 0
+    num_work_wires: int = 0
+    work_wire_type: str = "borrowed"
 
     def __post_init__(self):
         """Performs validation of the modifier state."""
@@ -51,12 +62,26 @@ class ModifierState:
 
         if not isinstance(self.adjoint, bool):
             raise ValueError(f"Adjoint can be True or False, got {self.adjoint}")
+        if not isinstance(self.num_work_wires, int) or self.num_work_wires < 0:
+            raise ValueError(f"Modifier counts cannot be negative, got {self.num_work_wires}")
+        if self.num_work_wires and not self.control_count:
+            raise ValueError(f"Control work wires require at least one control, got {self}")
+        if not self.num_work_wires:
+            object.__setattr__(self, "work_wire_type", "borrowed")
 
     def compose(self, inner: ModifierState) -> ModifierState:
         """Return the result of composing the current modifiers with `inner`."""
+        work_wire_type = resolve_work_wire_type(
+            range(self.num_work_wires),
+            self.work_wire_type,
+            range(inner.num_work_wires),
+            inner.work_wire_type,
+        )
         return ModifierState(
             self.adjoint != inner.adjoint,
             self.control_count + inner.control_count,
+            self.num_work_wires + inner.num_work_wires,
+            work_wire_type,
         )
 
     @property
@@ -92,18 +117,37 @@ class ModifierState:
             return op_id
         assert "{" in op_id, f"Malformed op id for graph decomposition, got {op_id}"
         split = op_id.find("{")
-        return self.wrap_name(op_id[:split]) + op_id[split:]
+        wrapped_id = self.wrap_name(op_id[:split]) + op_id[split:]
+        if self.num_work_wires:
+            # Imported lazily because GraphOpID also uses ModifierState.
+            from catalyst.decomposition.graph_op_id import add_ctrl_work_wires_to_id
 
-    def wrap_callable(self, body: Callable, ctrl_wires=None, ctrl_values=None) -> Callable:
+            wrapped_id = add_ctrl_work_wires_to_id(
+                wrapped_id, self.num_work_wires, self.work_wire_type
+            )
+        return wrapped_id
+
+    def wrap_callable(
+        self, body: Callable, ctrl_wires=None, ctrl_values=None, work_wires=None
+    ) -> Callable:
         """Apply adjoint and control regions to a rule body in canonical nesting order.
 
         ``ctrl_wires`` supplies the rule's control-wire operand when the state is controlled.
         ``ctrl_values`` supplies its control-value operand, defaulting to all ones.
+        ``work_wires`` supplies the dynamic control work-wire operand.
         """
         if self.adjoint:
             body = qp.adjoint(body)
         if self.is_controlled:
-            body = qp.ctrl(body, control=list(ctrl_wires), control_values=ctrl_values)
+            body = qp.ctrl(
+                body,
+                control=list(ctrl_wires),
+                control_values=ctrl_values,
+                work_wires=work_wires,
+                work_wire_type=self.work_wire_type,
+            )
+            if self.num_work_wires:
+                body = capture_control_work_wires(body)
         return body
 
     # Canonical nesting order for op-level modifiers, listed OUTERMOST first. The compiler's
@@ -222,7 +266,8 @@ class ModifierState:
 
         The walk terminates structurally: each step moves to ``op.base``, one wrapper shallower,
         and the chain ends at the first non-symbolic operator. The layers compose as
-        :meth:`ModifierState.compose` does, so adjoints cancel pairwise and control counts add.
+        :meth:`ModifierState.compose` does, so adjoints cancel pairwise, control and work-wire
+        counts add, and work-wire types merge as they do in PennyLane.
 
         Args:
             op (Operator2): the operator to unwrap
@@ -236,7 +281,11 @@ class ModifierState:
             if isinstance(op, Adjoint2):
                 layer = ModifierState(adjoint=True)
             elif isinstance(op, ControlledOp2):
-                layer = ModifierState(control_count=len(op.control_wires))
+                layer = ModifierState(
+                    control_count=len(op.control_wires),
+                    num_work_wires=len(op.work_wires),
+                    work_wire_type=op.work_wire_type,
+                )
             else:
                 return op, modifiers
             modifiers = modifiers.compose(layer)
@@ -247,13 +296,50 @@ class ModifierState:
         """Recover the base id and modifiers supplied by the compiler's on-demand loader."""
         base_id = op_id
         modifiers = cls()
-        if op_id.startswith("Adjoint(") and not op_name.startswith("Adjoint("):
-            base_id = cls.name_unwrap_adjoint(op_name, op_id)
-            modifiers = cls(adjoint=True)
-        elif cls._leading_modifier_kind(op_id) == "C" and not op_name.startswith("Adjoint("):
-            # A controlled op-id (`C(op)` / `<n>C(op)`): recover the base id and control count so the
-            # closure synthesizes the matching `<n>C(...)` rules.
-            base_id, n_ctrls = cls.name_unwrap_control(op_name, op_id)
-            modifiers = cls(control_count=n_ctrls)
+        if cls._leading_modifier_kind(op_id) == "C" and not op_name.startswith("Adjoint("):
+            # Controls are outermost, including on a controlled adjoint.
+            name = op_id.split("{", 1)[0]
+            inner_name = (
+                f"Adjoint({op_name})" if name.endswith(f"(Adjoint({op_name}))") else op_name
+            )
+            base_id, n_ctrls = cls.name_unwrap_control(inner_name, op_id)
+
+            # Imported lazily because GraphOpID also uses ModifierState.
+            from catalyst.decomposition.graph_op_id import remove_ctrl_work_wires_from_id
+
+            base_id, n_work, work_wire_type = remove_ctrl_work_wires_from_id(base_id)
+            modifiers = cls(
+                control_count=n_ctrls, num_work_wires=n_work, work_wire_type=work_wire_type
+            )
+
+        if base_id.startswith("Adjoint(") and not op_name.startswith("Adjoint("):
+            base_id = cls.name_unwrap_adjoint(op_name, base_id)
+            modifiers = replace(modifiers, adjoint=True)
 
         return base_id, modifiers
+
+
+def capture_control_work_wires(body: Callable) -> Callable:
+    """Capture callable control work wires as operands while tracing a decomposition rule.
+
+    PennyLane stores these wires in static primitive metadata. Rule bodies instead receive traced
+    wire labels, including those forwarded by registered rules to nested callable controls.
+    Move the labels into operands before binding, so JAX tracks them in the enclosing rule.
+    The patch is scoped to rule tracing and also accepts already converted control primitives.
+    """
+
+    @wraps(body)
+    def wrapper(*args, **kwargs):
+        original_bind = ctrl_transform_prim.bind
+
+        def bind(*invals, work_wires, **params):
+            if work_wires:
+                return original_bind(
+                    *invals, *work_wires, work_wires=None, **(params | {"n_work": len(work_wires)})
+                )
+            return original_bind(*invals, work_wires=work_wires, **params)
+
+        with Patcher((ctrl_transform_prim, "bind", bind)):
+            return body(*args, **kwargs)
+
+    return wrapper
