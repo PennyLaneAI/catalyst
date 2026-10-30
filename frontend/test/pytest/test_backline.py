@@ -722,6 +722,20 @@ def _transport_backends_built():
     return any((lib_dir / name).exists() for name in names)
 
 
+def _executor_built():
+    """Whether the runtime was built with ENABLE_EXECUTOR=ON, which builds rt_executor -- the
+    library a program that launches a ``catalyst-executor`` subprocess links against."""
+    lib_dir = Path(get_lib_path("runtime", "RUNTIME_LIB_DIR"))
+    return any((lib_dir / f"librt_executor.{ext}").exists() for ext in ("so", "dylib"))
+
+
+needs_executor = pytest.mark.skipif(
+    not _executor_built(),
+    reason="launches a catalyst-executor subprocess, which needs the runtime built with "
+    "ENABLE_EXECUTOR=ON",
+)
+
+
 @pytest.mark.skipif(
     not (_transport_backends_built() or "CATALYST_TRANSPORT_PATH" in os.environ),
     reason=(
@@ -738,7 +752,7 @@ class TestBacklineDemoIntegration:
     decoder library reachable to the dynamic loader.
     """
 
-    @pytest.mark.parametrize("transport", ["memcpy", "rdma"])
+    @pytest.mark.parametrize("transport", ["memcpy", pytest.param("rdma", marks=needs_executor)])
     def test_messages_larger_than_8_bytes_round_trip(
         self, use_capture, stop_node_executors, transport
     ):
@@ -890,7 +904,7 @@ class TestBacklineDemoIntegration:
         "executor_options, oob_port",
         [
             pytest.param(None, 18590, id="in_process"),
-            pytest.param({}, 18591, id="out_of_process"),
+            pytest.param({}, 18591, id="out_of_process", marks=needs_executor),
         ],
     )
     def test_local_cpu_to_local_cpu_rdma_loopback(
