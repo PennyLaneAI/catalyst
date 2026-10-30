@@ -1349,6 +1349,7 @@ std::string OperatorOp::getExtraData() {
 llvm::StringRef CustomOp::getResourceName() { return getGateName(); }
 llvm::StringRef SetStateOp::getResourceName() { return "SetState"; }
 llvm::StringRef SetBasisStateOp::getResourceName() { return "SetBasisState"; }
+llvm::StringRef BarrierOp::getResourceName() { return "Barrier"; }
 llvm::StringRef PauliRotOp::getResourceName() { return "PauliRot"; }
 llvm::StringRef GlobalPhaseOp::getResourceName() { return "GlobalPhase"; }
 llvm::StringRef MultiRZOp::getResourceName() { return "MultiRZ"; }

@@ -1125,6 +1125,17 @@ template <typename T> struct StateBasedPattern : public OpConversionPattern<T> {
     }
 };
 
+struct BarrierOpPattern : public OpConversionPattern<BarrierOp> {
+    using OpConversionPattern::OpConversionPattern;
+
+    LogicalResult matchAndRewrite(BarrierOp op, BarrierOpAdaptor adaptor,
+                                  ConversionPatternRewriter &rewriter) const override {
+        // Barriers are compiler metadata and have no runtime effect.
+        rewriter.replaceOp(op, adaptor.getInQubits());
+        return success();
+    }
+};
+
 struct SetStateOpPattern : public OpConversionPattern<SetStateOp> {
     using OpConversionPattern::OpConversionPattern;
 
@@ -1244,6 +1255,7 @@ void populateQIRConversionPatterns(TypeConverter &typeConverter, RewritePatternS
     patterns.add<StatsBasedPattern<VarianceOp>>(typeConverter, patterns.getContext());
     patterns.add<StateBasedPattern<ProbsOp>>(typeConverter, patterns.getContext());
     patterns.add<StateBasedPattern<StateOp>>(typeConverter, patterns.getContext());
+    patterns.add<BarrierOpPattern>(typeConverter, patterns.getContext());
     patterns.add<SetStateOpPattern>(typeConverter, patterns.getContext());
     patterns.add<SetBasisStateOpPattern>(typeConverter, patterns.getContext());
 }

@@ -20,6 +20,7 @@ lower to their own operations:
 - GlobalPhase
 - PCPhase
 - QubitUnitary
+- Barrier (see also test_barrier.py)
 
 On top of the above, we also explicitly test the lowering of some operations in PennyLane:
 - BasisState
