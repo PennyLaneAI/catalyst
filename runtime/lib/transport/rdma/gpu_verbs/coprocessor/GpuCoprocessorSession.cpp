@@ -39,8 +39,14 @@ constexpr QpShape FWD_QP_SHAPE{.sq_depth = 16, .cq_depth = 256, .inline_max = 0}
 } // namespace
 
 GpuCoprocessorSession::GpuCoprocessorSession(std::string dev, int gid_idx, int gpu_device,
-                                             frame::RingGeometry ring)
-    : Base(std::move(dev), gid_idx, "gpu_verbs", FWD_QP_SHAPE, ring), gpu_(gpu_device) {}
+                                             frame::RingGeometry ring, common::CuqrConfig cuqr)
+    : Base(std::move(dev), gid_idx, "gpu_verbs", FWD_QP_SHAPE, ring, cuqr), gpu_(gpu_device) {
+    // mlx5 hands a small SEND to the CPU to copy into its receive buffer, which in GPU memory it
+    // cannot, so requests must be writes with immediate (a cudaq-realtime client picks its own).
+    TP_CHECK(ring.mode != frame::Mode::CUQR || cuqr.write_imm || cuqr.cudaq_peer,
+             "gpu_verbs: CUQR requests reach GPU memory only by write with immediate; set "
+             "cuqr_tx=write_imm");
+}
 
 MemRegion GpuCoprocessorSession::alloc_memory(std::size_t size, MemKind kind) {
     TP_CHECK(kind == MemKind::GpuHbm, "gpu_verbs: only MemKind::GpuHbm supported");
@@ -48,8 +54,9 @@ MemRegion GpuCoprocessorSession::alloc_memory(std::size_t size, MemKind kind) {
     // ring still takes a whole page, as the dma-buf export needs.
     hbm_ = gpu_.alloc_hbm_ring(std::max({size, ring_.region_bytes(), std::size_t{4096}}));
     hbm_ring_.emplace(pd_, /*offset=*/static_cast<std::uint64_t>(0), hbm_.size,
-                      /*iova=*/reinterpret_cast<std::uint64_t>(hbm_.ptr), hbm_.dmabuf_fd,
-                      MemAccess::REMOTE_WRITE);
+                      // a cudaq-realtime peer addresses the ring from 0
+                      /*iova=*/cuqr_.cudaq_peer ? 0 : reinterpret_cast<std::uint64_t>(hbm_.ptr),
+                      hbm_.dmabuf_fd, MemAccess::REMOTE_WRITE);
     ::close(hbm_.dmabuf_fd); // MR holds its own reference
     hbm_.dmabuf_fd = -1;
     return MemRegion{
@@ -64,7 +71,8 @@ MemRegion GpuCoprocessorSession::alloc_memory(std::size_t size, MemKind kind) {
 void GpuCoprocessorSession::establish_channel(const ChannelDesc &desc, const MemRegion &local,
                                               const PeerRef &peer) {
     Base::establish_channel(desc, local, peer);
-    handoff_ = gpu_.alloc_handoff(ring_.region_bytes());
+    const std::size_t flags = cuqr() ? 2 * ring_.slots * sizeof(std::uint32_t) : 0;
+    handoff_ = gpu_.alloc_handoff(ring_.region_bytes() + flags);
 }
 
 void GpuCoprocessorSession::set_coprocessor_launcher(CoprocessorLauncherFn fn, void *ctx) {
@@ -79,7 +87,7 @@ bool GpuCoprocessorSession::post_reply(std::uint64_t cursor, const frame::FrameV
     std::memcpy(&first, reply.data, std::min<std::size_t>(reply.len, sizeof(first)));
     last_word_.store(first, std::memory_order_relaxed);
     void *send = send_frame();
-    frame::stage(ring_, send, reply.fn_id, reply.data, reply.len);
+    frame::stage(ring_, send, reply.fn_id, reply.data, reply.len, &reply); // CUQR echoes `reply`
     // The kernel writes only the reply's bytes; zero the rest of the payload area, as every other
     // coprocessor's reply is.
     std::memset(frame::data(ring_, send) + reply.len, 0, frame::data_capacity(ring_) - reply.len);
@@ -94,12 +102,30 @@ bool GpuCoprocessorSession::post_reply(std::uint64_t cursor, const frame::FrameV
 // at those points, so completions stay off the per-message critical path.
 void GpuCoprocessorSession::run_coprocessor(std::stop_token st) {
     pin_thread(pin_cpu_, pin_realtime_);
+    cuqr() ? serve<true>(st) : serve<false>(st);
+}
+
+// CUQR frames carry no word written last, so this thread also relays each arrival from the receive
+// completion queue to the kernel (rx_flags) and waits for its reply flag (tx_flags). This hop is
+// not optimized; doc/dev/backline.rst lists ways to remove it.
+template <bool CUQR> void GpuCoprocessorSession::serve(std::stop_token st) {
     int signaled_outstanding = 0;
     for (std::uint64_t c = 0; !st.stop_requested(); ++c) {
-        const std::uint32_t expect = static_cast<std::uint32_t>(c + 1);
+        const auto expect = static_cast<std::uint32_t>(c + 1);
+        const std::uint64_t slot = c & (ring_.slots - 1);
+        if constexpr (CUQR) {
+            if (!wait_recv(c, st)) {
+                break;
+            }
+            std::atomic_ref<std::uint32_t>(rx_flags_host()[slot])
+                .store(expect, std::memory_order_release);
+        }
+        void *frame = handoff_.host + ring_.slot_offset(c);
         frame::FrameView reply;
         std::uint32_t spins = 0;
-        while (!frame::poll(ring_, handoff_.host + ring_.slot_offset(c), expect, reply)) {
+        while (CUQR ? std::atomic_ref<std::uint32_t>(tx_flags_host()[slot])
+                              .load(std::memory_order_acquire) != expect
+                    : !frame::poll(ring_, frame, expect, reply)) {
             if (++spins == STOP_CHECK_SPINS) {
                 spins = 0;
                 if (st.stop_requested()) {
@@ -108,6 +134,9 @@ void GpuCoprocessorSession::run_coprocessor(std::stop_token st) {
                 }
             }
             cpu_relax();
+        }
+        if (CUQR && !frame::poll(ring_, frame, expect, reply)) {
+            continue; // the kernel found no CUQR frame: dropped unanswered
         }
         if (post_reply(c, reply)) {
             ++signaled_outstanding;
@@ -127,6 +156,9 @@ void GpuCoprocessorSession::start() {
     if (handoff_.stop_host) {
         *handoff_.stop_host = 0;
     }
+    if (cuqr()) { // a restarted session counts from message 0 again
+        std::memset(rx_flags_host(), 0, 2 * ring_.slots * sizeof(std::uint32_t));
+    }
     // Launch the persistent kernel once via the bound launcher (nullptr selects
     // the built-in echo launcher). The kernel runs until the stop flag is set
     // (total = 0); the session keeps owning the stream/stop/sync + reply thread.
@@ -140,6 +172,10 @@ void GpuCoprocessorSession::start() {
         .stream = gpu_.stream(),
         .frame_mode = static_cast<std::uint32_t>(ring_.mode),
         .slot_stride = ring_.stride,
+        .rx_flags = cuqr() ? handoff_.dev + ring_.region_bytes() : nullptr,
+        .tx_flags = cuqr()
+                        ? handoff_.dev + ring_.region_bytes() + ring_.slots * sizeof(std::uint32_t)
+                        : nullptr,
     };
     CoprocessorLauncherFn launch = coproc_launcher_ ? coproc_launcher_ : &default_echo_launcher;
     const int lrc = launch(&L, coproc_ctx_);

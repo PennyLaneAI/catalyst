@@ -19,6 +19,7 @@
 #include <string>
 #include <thread>
 
+#include "BackendConfig.hpp"
 #include "Frame.hpp"
 #include "GpuCoprocessorSession.hpp"
 
@@ -36,6 +37,9 @@ int main(int argc, char **argv) {
     std::uint16_t port = 18560;
     std::uint32_t bytes = sizeof(std::uint64_t);
     std::uint32_t slots = 0;
+    // --config sets the rdma config keys for CUQR frames, e.g.
+    // "frame=cuqr;frame_payload=232;cuqr_tx=write_imm;peer=cudaq;frame_slots=8;frame_slot_bytes=256".
+    std::string config;
     for (int i = 1; i + 1 < argc; i += 2) {
         std::string k = argv[i], v = argv[i + 1];
         if (k == "--dev") {
@@ -52,6 +56,8 @@ int main(int argc, char **argv) {
             bytes = static_cast<std::uint32_t>(std::strtoul(v.c_str(), nullptr, 0));
         } else if (k == "--slots") {
             slots = static_cast<std::uint32_t>(std::strtoul(v.c_str(), nullptr, 0));
+        } else if (k == "--config") {
+            config = v;
         }
     }
     if (dev.empty() || gid < 0) {
@@ -60,13 +66,16 @@ int main(int argc, char **argv) {
                      " [--gpu <index>] [--peer <ip>] [--port <n>] [--bytes <n>] [--slots <n>]\n"
                      "  --dev and --gid are required; the device needs dma-buf MR support\n"
                      "  --bytes is the message size each way (default 8), and must match the\n"
-                     "  controller's; over 8 B the frames are BLV\n",
+                     "  controller's; over 8 B the frames are BLV\n"
+                     "  --config <keys> sets frame keys, e.g. frame=cuqr;cuqr_tx=write_imm\n",
                      argv[0]);
         return 2;
     }
     // The same layout cpu_verbs_selftest picks for these message sizes and slot count.
-    auto ring = frame::geometry_for(
-        bytes <= PAYLOAD_DATA_BYTES ? frame::Mode::BL16 : frame::Mode::BLV, bytes);
+    auto ring = config.empty()
+                    ? frame::geometry_for(
+                          bytes <= PAYLOAD_DATA_BYTES ? frame::Mode::BL16 : frame::Mode::BLV, bytes)
+                    : frame::geometry_from_config(config);
     if (slots != 0) {
         if (!std::has_single_bit(slots)) {
             std::fprintf(stderr, "--slots must be a power of two, got %u\n", slots);
@@ -74,7 +83,8 @@ int main(int argc, char **argv) {
         }
         ring.slots = slots;
     }
-    GpuCoprocessorSession s(dev, gid, gpu_device, ring);
+    const auto cuqr_cfg = common::parse_backend_config("dev=" + dev + ";gid=0;" + config).cuqr;
+    GpuCoprocessorSession s(dev, gid, gpu_device, ring, cuqr_cfg);
     ConnectInfo ci{
         .peer = peer,
         .oob_port = port,

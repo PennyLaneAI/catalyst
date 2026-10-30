@@ -53,7 +53,10 @@ class MessageWorker {
     using ThreadInit = std::function<void()>;
 
     explicit MessageWorker(common::frame::RingGeometry ring = common::frame::BL16_RING)
-        : ring_(ring) {}
+        : ring_(ring) {
+        TP_CHECK(ring.mode != common::frame::Mode::CUQR,
+                 "memcpy: CUQR frames are carried only by cpu_verbs and gpu_verbs");
+    }
     ~MessageWorker();
     MessageWorker(const MessageWorker &) = delete;
     MessageWorker &operator=(const MessageWorker &) = delete;

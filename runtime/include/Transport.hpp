@@ -196,7 +196,8 @@ class ControllerSession : public TransportSession {
  * Returning COPROCESSOR_FN_ERROR reports that the message could not be processed. A memcpy
  * backend fails that round instead of delivering the reply. The cpu_verbs coprocessor treats it,
  * like any return outside 1..out_cap, as an error that stops its engine, so the controller
- * receives no reply.
+ * receives no reply; with CUQR frames it answers it (or any return over out_cap) with status 1
+ * instead and keeps serving, and 0 is an empty result.
  */
 using CoprocessorFn = CatalystCoprocessorFn;
 
@@ -216,11 +217,12 @@ inline constexpr std::uint32_t COPROCESSOR_FN_ABI_VERSION = CATALYST_COPROCESSOR
  *
  * Both rings hold `ring_slots` frames, `slot_stride` bytes apart, in the frame layout
  * `frame_mode` names (the CATALYST_TRANSPORT_FRAME_* bit index: 0 for the 16 B frame, 1 for
- * BLV; see doc/dev/backline.rst). Message n arrives in request slot n mod ring_slots, complete
- * once its polled word holds n + 1, and the engine answers it with a frame in the same slot of the
- * handoff ring: the reply's payload, the request's fn_id and, written last, n + 1. A launcher
- * built for this layout reports CATALYST_COPROCESSOR_LAUNCHER_MIN_ABI_VERSION in its `_info`, and
- * returns nonzero for a `frame_mode` or message size its engine cannot handle.
+ * BLV, 2 for CUQR; see doc/dev/backline.rst). Message n arrives in request slot n mod ring_slots,
+ * complete once its polled word holds n + 1, and the engine answers it with a frame in the same
+ * slot of the handoff ring: the reply's payload, the request's fn_id and, written last, n + 1.
+ * CUQR frames have no polled word: `rx_flags` and `tx_flags` carry n + 1 instead (see below). A
+ * launcher built for this layout reports CATALYST_COPROCESSOR_LAUNCHER_MIN_ABI_VERSION in its
+ * `_info`, and returns nonzero for a `frame_mode` or message size its engine cannot handle.
  *
  * The session owns the buffers and keeps it valid until the engine has stopped
  * (set `*stop` nonzero, then synchronize) or has processed `total` messages.
@@ -234,6 +236,11 @@ struct CoprocLaunchDesc {
     void *stream;              // device queue to launch on (e.g. hipStream_t); null for host
     std::uint32_t frame_mode;  // layout of the frames in both rings
     std::uint32_t slot_stride; // bytes from one slot to the next, a power of two
+    // CUQR only, else null: one host-mapped uint32 per slot each. The session sets
+    // rx_flags[slot] = n + 1 once message n has arrived (shown only on the receive completion
+    // queue), and the engine sets tx_flags[slot] = n + 1 once its reply frame is complete.
+    void *rx_flags;
+    void *tx_flags;
 };
 
 /**

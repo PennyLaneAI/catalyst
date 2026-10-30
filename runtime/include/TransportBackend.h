@@ -57,6 +57,7 @@
 // CatalystTransportCaps::frame_modes
 #define CATALYST_TRANSPORT_FRAME_BL16 (1u << 0) // 16 B frame: 8 B payload, fn_id, seq
 #define CATALYST_TRANSPORT_FRAME_BLV (1u << 1)  // variable length: 32 B header, payload, completion
+#define CATALYST_TRANSPORT_FRAME_CUQR (1u << 2) // cudaq-realtime's RPCHeader/RPCResponse
 // CatalystTransportCaps::ordering
 #define CATALYST_TRANSPORT_ORDER_IN_ORDER 0u // a payload lands before the word written after it
 // CatalystTransportCaps::mem_kinds and ::conventions, e.g. CATALYST_TRANSPORT_MEM_BIT(CpuRam).

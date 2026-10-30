@@ -27,8 +27,9 @@ class CpuControllerSession : public common::VerbsSessionBase<ControllerSession> 
 
   public:
     explicit CpuControllerSession(std::string dev, int gid_idx,
-                                  common::frame::RingGeometry ring = common::frame::BL16_RING)
-        : Base(std::move(dev), gid_idx, "cpu_verbs", common::DEFAULT_QP_SHAPE, ring) {}
+                                  common::frame::RingGeometry ring = common::frame::BL16_RING,
+                                  common::CuqrConfig cuqr = {})
+        : Base(std::move(dev), gid_idx, "cpu_verbs", common::DEFAULT_QP_SHAPE, ring, cuqr) {}
     // Drains the fwd CQ before the base's verbs objects go away. stop() is
     // idempotent, so calling it here and from start() is harmless.
     ~CpuControllerSession() override { stop(); }
@@ -50,6 +51,10 @@ class CpuControllerSession : public common::VerbsSessionBase<ControllerSession> 
     bool oob_listens() const override { return false; }
 
   private:
+    // collect() for one frame layout; the mode is a template parameter so BL16 and BLV pay
+    // nothing for CUQR.
+    template <common::frame::Mode M>
+    int collect_frame(void *const *replies, const std::uint64_t *replies_bytes, std::size_t n);
     // Sizes from commit_work_item are fixed in CPU controller.
     std::uint64_t in_bytes_ = sizeof(common::Payload::value);
     std::uint64_t out_bytes_ = sizeof(common::Payload::value);
