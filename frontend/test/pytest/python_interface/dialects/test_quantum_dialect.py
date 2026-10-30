@@ -48,6 +48,7 @@ expected_ops_names = {
     "AllocQubitOp": "quantum.alloc_qb",
     "ComputationalBasisOp": "quantum.compbasis",
     "CountsOp": "quantum.counts",
+    "CtrlOp": "quantum.ctrl",
     "CustomOp": "quantum.custom",
     "DeallocOp": "quantum.dealloc",
     "DeallocQubitOp": "quantum.dealloc_qb",
@@ -131,6 +132,14 @@ expected_ops_init_kwargs = {
         {
             "operands": (obs, int_ssa, None, None),
             "result_types": (TensorType(Float64Type(), shape=(1,)), TensorType(i64, shape=(1,))),
+        }
+    ],
+    "CtrlOp": [
+        {
+            "in_ctrl_qubits": (q0,),
+            "in_ctrl_values": (bool_ssa,),
+            "args": (q1, q2),
+            "region": Region(Block((CustomOp(gate_name="CNOT", in_qubits=(q1, q2)),))),
         }
     ],
     "CustomOp": [
@@ -486,16 +495,16 @@ class TestAssemblyFormat:
 
         ////////////////// **PCPhaseOp tests** //////////////////
         // No control wires
-        // CHECK: {{%.+}}, {{%.+}}, {{%.+}} = quantum.pcphase([[PARAM1]], [[PARAM2]]) [[Q0]], [[Q1]], [[Q2]] : !quantum.bit, !quantum.bit, !quantum.bit
-        %qp1, %qp2, %qp3 = quantum.pcphase(%param1, %param2) %q0, %q1, %q2 : !quantum.bit, !quantum.bit, !quantum.bit
+        // CHECK: {{%.+}}, {{%.+}}, {{%.+}} = quantum.pcphase([[PARAM1]], dim : 1) [[Q0]], [[Q1]], [[Q2]] : !quantum.bit, !quantum.bit, !quantum.bit
+        %qp1, %qp2, %qp3 = quantum.pcphase(%param1, dim : 1) %q0, %q1, %q2 : !quantum.bit, !quantum.bit, !quantum.bit
 
         // Control wires and values
-        // CHECK: {{%.+}}, {{%.+}}, {{%.+}} = quantum.pcphase([[PARAM1]], [[PARAM2]]) [[Q0]], [[Q1]] ctrls([[Q2]]) ctrlvals([[TRUE_CST]]) : !quantum.bit, !quantum.bit ctrls !quantum.bit
-        %qp4, %qp5, %qp6 = quantum.pcphase(%param1, %param2) %q0, %q1 ctrls(%q2) ctrlvals(%true_cst) : !quantum.bit, !quantum.bit ctrls !quantum.bit
+        // CHECK: {{%.+}}, {{%.+}}, {{%.+}} = quantum.pcphase([[PARAM1]], dim : 0) [[Q0]], [[Q1]] ctrls([[Q2]]) ctrlvals([[TRUE_CST]]) : !quantum.bit, !quantum.bit ctrls !quantum.bit
+        %qp4, %qp5, %qp6 = quantum.pcphase(%param1, dim : 0) %q0, %q1 ctrls(%q2) ctrlvals(%true_cst) : !quantum.bit, !quantum.bit ctrls !quantum.bit
 
         // Adjoint
-        // CHECK: {{%.+}}, {{%.+}} = quantum.pcphase([[PARAM1]], [[PARAM2]]) [[Q0]], [[Q1]] adj : !quantum.bit, !quantum.bit
-        %qp7, %qp8 = quantum.pcphase(%param1, %param2) %q0, %q1 adj : !quantum.bit, !quantum.bit
+        // CHECK: {{%.+}}, {{%.+}} = quantum.pcphase([[PARAM1]], dim : 2) [[Q0]], [[Q1]] adj : !quantum.bit, !quantum.bit
+        %qp7, %qp8 = quantum.pcphase(%param1, dim : 2) %q0, %q1 adj : !quantum.bit, !quantum.bit
 
         ////////////////// **QubitUnitaryOp tests** //////////////////
         // No control wires

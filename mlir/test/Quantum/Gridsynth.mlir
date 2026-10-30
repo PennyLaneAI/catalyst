@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: quantum-opt --pass-pipeline="builtin.module(gridsynth{epsilon=0.01 ppr-basis=False})" --split-input-file %s | FileCheck %s --check-prefixes=CHECK,CLIFFORD
-// RUN: quantum-opt --pass-pipeline="builtin.module(gridsynth{epsilon=0.01 ppr-basis=True})" --split-input-file %s | FileCheck %s --check-prefixes=CHECK,PPR
+// RUN: quantum-opt --pass-pipeline="builtin.module(gridsynth{epsilon=0.01 ppr-basis=False})" --split-input-file -verify-diagnostics %s | FileCheck %s --check-prefixes=CHECK,CLIFFORD
+// RUN: quantum-opt --pass-pipeline="builtin.module(gridsynth{epsilon=0.01 ppr-basis=True})" --split-input-file -verify-diagnostics %s | FileCheck %s --check-prefixes=CHECK,PPR
 
 
 
@@ -35,7 +35,7 @@
 // CLIFFORD:      [[PHASE:%.+]] = call @rs_decomposition_get_phase
 // CLIFFORD:      [[LOOP_RES:%.+]] = scf.for [[IV:%.+]] = [[C0]] to [[NUM_GATES]] step [[C1]] iter_args([[L_QBIT:%.+]] = [[ARG_QBIT]])
 // CLIFFORD:        [[CASE_ID:%.+]] = memref.load [[MEM]]{{\[}}[[IV]]{{\]}}
-// CLIFFORD:        [[SWITCH_RES:%.+]] = scf.index_switch [[CASE_ID]]
+// CLIFFORD:        [[SWITCH_RES:%.+]] = scf.index_switch [[CASE_ID]] {catalyst.estimated_probabilities = [{{.*}}]}
 // CLIFFORD:        case 0 {
 // CLIFFORD:          [[RES:%.+]] = quantum.custom "T"() [[L_QBIT]]
 // CLIFFORD:          scf.yield [[RES]]
@@ -81,16 +81,18 @@
 // CLIFFORD:        }
 // CLIFFORD:      }
 // CLIFFORD:      scf.yield [[SWITCH_RES]]
-// CLIFFORD:      }
+// COM: expected T and other entries (3.0590 - 0.0074) * log2(1/0.01) + 1.1278 + 1.9849
+// CLIFFORD:      } {catalyst.estimated_iterations = 23.3{{[0-9]+}} : f64}
 // CLIFFORD:      memref.dealloc [[MEM]]
-// CLIFFORD:      return [[LOOP_RES]], [[PHASE]] : !quantum.bit, f64
+// CLIFFORD:      quantum.gphase([[PHASE]])
+// CLIFFORD:      return [[LOOP_RES]] : !quantum.bit
 
 // PPR-LABEL: func.func private @__catalyst_decompose_RZ_ppr_basis
 // PPR-SAME:  [[ARG_QBIT:%.+]]: !quantum.bit
 // PPR:       [[MEM:%.+]] = memref.alloc
 // PPR:       [[PHASE:%.+]] = call @rs_decomposition_get_phase
 // PPR:       [[LOOP_RES:%.+]] = scf.for {{.*}} iter_args([[LOOP_QBIT:%.+]] = [[ARG_QBIT]])
-// PPR:       scf.index_switch
+// PPR:       scf.index_switch {{.*}} {catalyst.estimated_probabilities = [{{.*}}]}
 // PPR:       case 0 {
 // PPR:         scf.yield [[LOOP_QBIT]]
 // PPR:       }
@@ -166,21 +168,21 @@
 // PPR:         [[RES:%.+]] = pbc.ppr ["Z"](-8) [[LOOP_QBIT]]
 // PPR:         scf.yield [[RES]]
 // PPR:       }
+// COM: expected T and other entries 3.0590 * log2(1/0.01) + 1.1278 + 0.0
+// PPR:       } {catalyst.estimated_iterations = 21.4{{[0-9]+}} : f64}
 // PPR:       memref.dealloc [[MEM]]
-// PPR:       return [[LOOP_RES]], [[PHASE]]
+// PPR:       quantum.gphase([[PHASE]])
+// PPR:       return [[LOOP_RES]] : !quantum.bit
 
 // CHECK-LABEL: @test_rz_decomposition
 // CHECK-SAME: ([[Q_IN:%.+]]: !quantum.bit)
 func.func @test_rz_decomposition(%arg0: !quantum.bit) -> !quantum.bit {
     %theta = arith.constant 0.4 : f64
 
-    // CLIFFORD: [[RES:%.+]]:2 = call @__catalyst_decompose_RZ([[Q_IN]], [[THETA:%.+]])
-    // PPR:      [[RES:%.+]]:2 = call @__catalyst_decompose_RZ_ppr_basis([[Q_IN]], [[THETA:%.+]])
-    
-    // COM: check the phase from RZ is used directly
-    // CHECK: quantum.gphase([[RES]]#1)
-    
-    // CHECK: return [[RES]]#0 : !quantum.bit
+    // CLIFFORD: [[RES:%.+]] = call @__catalyst_decompose_RZ([[Q_IN]], [[THETA:%.+]])
+    // PPR:      [[RES:%.+]] = call @__catalyst_decompose_RZ_ppr_basis([[Q_IN]], [[THETA:%.+]])
+    // CHECK-NOT: quantum.gphase
+    // CHECK: return [[RES]] : !quantum.bit
 
     %q_out = quantum.custom "RZ"(%theta) %arg0 : !quantum.bit
     return %q_out : !quantum.bit
@@ -200,13 +202,13 @@ func.func @test_phaseshift_decomposition(%arg0: !quantum.bit, %phi: f64) -> !qua
     
     // CHECK: [[C2:%.+]] = arith.constant 2.0{{.*}} : f64
     
-    // CLIFFORD: [[RES:%.+]]:2 = call @__catalyst_decompose_RZ([[Q_IN]], [[PHI]])
-    // PPR:      [[RES:%.+]]:2 = call @__catalyst_decompose_RZ_ppr_basis([[Q_IN]], [[PHI]])
+    // CLIFFORD: [[RES:%.+]] = call @__catalyst_decompose_RZ([[Q_IN]], [[PHI]])
+    // PPR:      [[RES:%.+]] = call @__catalyst_decompose_RZ_ppr_basis([[Q_IN]], [[PHI]])
     
     // CHECK: [[HALF_ANGLE:%.+]] = arith.divf [[PHI]], [[C2]]
-    // CHECK: [[TOTAL_PHASE:%.+]] = arith.subf [[RES]]#1, [[HALF_ANGLE]]
-    // CHECK: quantum.gphase([[TOTAL_PHASE]])
-    // CHECK: return [[RES]]#0 : !quantum.bit
+    // CHECK: [[NEG_HALF_ANGLE:%.+]] = arith.negf [[HALF_ANGLE]]
+    // CHECK: quantum.gphase([[NEG_HALF_ANGLE]])
+    // CHECK: return [[RES]] : !quantum.bit
 
     %q_out = quantum.custom "PhaseShift"(%phi) %arg0 : !quantum.bit
     return %q_out : !quantum.bit
@@ -251,12 +253,10 @@ func.func @test_ppr_arbitrary_z_decomposition(%arg0: !quantum.bit, %theta: f64) 
     
     // CHECK: [[PHI:%.+]] = arith.mulf [[THETA]], [[C_MINUS_2]]
 
-    // CLIFFORD: [[RES:%.+]]:2 = call @__catalyst_decompose_RZ([[Q_IN]], [[PHI]])
-    // PPR:      [[RES:%.+]]:2 = call @__catalyst_decompose_RZ_ppr_basis([[Q_IN]], [[PHI]])
-    
-    // CHECK: quantum.gphase([[RES]]#1)
-    
-    // CHECK: return [[RES]]#0 : !quantum.bit
+    // CLIFFORD: [[RES:%.+]] = call @__catalyst_decompose_RZ([[Q_IN]], [[PHI]])
+    // PPR:      [[RES:%.+]] = call @__catalyst_decompose_RZ_ppr_basis([[Q_IN]], [[PHI]])
+    // CHECK-NOT: quantum.gphase
+    // CHECK: return [[RES]] : !quantum.bit
 
     %q_out = pbc.ppr.arbitrary ["Z"](%theta) %arg0 : !quantum.bit
     return %q_out : !quantum.bit
@@ -283,4 +283,89 @@ func.func @test_ppr_arbitrary_ignored(%arg0: !quantum.bit, %theta: f64) -> (!qua
     %q4 = pbc.ppr.arbitrary ["Z"](%theta) %q3#0 cond(%c_true) : !quantum.bit
 
     return %q1, %q3#1, %q4 : !quantum.bit, !quantum.bit, !quantum.bit
+}
+
+// -----
+
+// Controlled rotations are not supported.
+
+func.func @test_controlled_rz_error(%q: !quantum.bit, %c: !quantum.bit, %x: f64) -> (!quantum.bit, !quantum.bit) {
+    %true = arith.constant true
+
+    // expected-error @+1 {{Unsupported controlled gate for gridsynth}}
+    %out, %cout = quantum.custom "RZ"(%x) %q ctrls(%c) ctrlvals(%true) : !quantum.bit ctrls !quantum.bit
+    return %out, %cout : !quantum.bit, !quantum.bit
+}
+
+// -----
+
+// Adjoint rotations are discretized with the negated angle.
+
+// CHECK-LABEL: @test_adjoint_rz_decomposition
+// CHECK-SAME: ([[Q_IN:%.+]]: !quantum.bit, [[THETA:%.+]]: f64)
+func.func @test_adjoint_rz_decomposition(%arg0: !quantum.bit, %theta: f64) -> !quantum.bit {
+    // CHECK: [[NEG:%.+]] = arith.negf [[THETA]]
+    // CLIFFORD: [[RES:%.+]] = call @__catalyst_decompose_RZ([[Q_IN]], [[NEG]])
+    // PPR:      [[RES:%.+]] = call @__catalyst_decompose_RZ_ppr_basis([[Q_IN]], [[NEG]])
+    // CHECK: return [[RES]] : !quantum.bit
+    %q_out = quantum.custom "RZ"(%theta) %arg0 adj : !quantum.bit
+    return %q_out : !quantum.bit
+}
+
+// -----
+
+// CHECK-LABEL: @test_adjoint_phaseshift_decomposition
+// CHECK-SAME: ([[Q_IN:%.+]]: !quantum.bit, [[THETA:%.+]]: f64)
+func.func @test_adjoint_phaseshift_decomposition(%arg0: !quantum.bit, %theta: f64) -> !quantum.bit {
+    // CHECK: [[NEG:%.+]] = arith.negf [[THETA]]
+    // CLIFFORD: [[RES:%.+]] = call @__catalyst_decompose_RZ([[Q_IN]], [[NEG]])
+    // PPR:      [[RES:%.+]] = call @__catalyst_decompose_RZ_ppr_basis([[Q_IN]], [[NEG]])
+    // CHECK: [[HALF:%.+]] = arith.divf [[NEG]]
+    // CHECK: [[NEG_HALF:%.+]] = arith.negf [[HALF]]
+    // CHECK: quantum.gphase([[NEG_HALF]])
+    %q_out = quantum.custom "PhaseShift"(%theta) %arg0 adj : !quantum.bit
+    return %q_out : !quantum.bit
+}
+
+// -----
+
+// Rotations inside adjoint regions are discretized; the adjoint lowering inverts the sequence.
+
+// CHECK-LABEL: @test_adjoint_region
+// CHECK-SAME: ([[R_IN:%.+]]: !quantum.reg, [[THETA:%.+]]: f64)
+func.func @test_adjoint_region(%r: !quantum.reg, %x: f64) -> !quantum.reg {
+    // CHECK: quantum.adjoint([[R_IN]])
+    // CHECK: [[Q:%.+]] = quantum.extract
+    // CLIFFORD: [[RES:%.+]] = func.call @__catalyst_decompose_RZ([[Q]], [[THETA]])
+    // PPR:      [[RES:%.+]] = func.call @__catalyst_decompose_RZ_ppr_basis([[Q]], [[THETA]])
+    // CHECK: quantum.insert {{.*}}, [[RES]]
+    %out = quantum.adjoint(%r) : !quantum.reg {
+    ^bb0(%arg0: !quantum.reg):
+        %q = quantum.extract %arg0[0] : !quantum.reg -> !quantum.bit
+        %q1 = quantum.custom "RZ"(%x) %q : !quantum.bit
+        %r1 = quantum.insert %arg0[0], %q1 : !quantum.reg, !quantum.bit
+        quantum.yield %r1 : !quantum.reg
+    }
+    return %out : !quantum.reg
+}
+
+// -----
+
+// Rotations inside control regions are discretized; the region is left as is.
+
+// CHECK-LABEL: @test_ctrl_region
+// CHECK-SAME: ({{%.+}}: !quantum.bit, {{%.+}}: !quantum.bit, [[THETA:%.+]]: f64)
+func.func @test_ctrl_region(%c: !quantum.bit, %q: !quantum.bit, %x: f64) -> (!quantum.bit, !quantum.bit) {
+    %true = arith.constant true
+    // CHECK: quantum.ctrl
+    // CHECK: ^bb0([[ARG:%.+]]: !quantum.bit):
+    // CLIFFORD: [[RES:%.+]] = func.call @__catalyst_decompose_RZ([[ARG]], [[THETA]])
+    // PPR:      [[RES:%.+]] = func.call @__catalyst_decompose_RZ_ppr_basis([[ARG]], [[THETA]])
+    // CHECK: quantum.yield [[RES]]
+    %outc, %outq = quantum.ctrl(%c) ctrlvals(%true) (%q) : !quantum.bit -> !quantum.bit {
+    ^bb0(%arg0: !quantum.bit):
+        %q1 = quantum.custom "RZ"(%x) %arg0 : !quantum.bit
+        quantum.yield %q1 : !quantum.bit
+    }
+    return %outc, %outq : !quantum.bit, !quantum.bit
 }

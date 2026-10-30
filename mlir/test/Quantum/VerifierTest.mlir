@@ -673,6 +673,14 @@ func.func @operator_custom_with_uid_and_forward(%fwd : i64, %q0 : !quantum.bit, 
 
 // -----
 
+func.func @operator_no_mode() {
+    // CHECK: quantum.operator "no_qubits_or_qreg"() qubits()
+    "quantum.operator"() <{op_name = "no_qubits_or_qreg", operandSegmentSizes = array<i32: 0, 0, 0, 0, 0, 0, 0, 0, 0>, resultSegmentSizes = array<i32: 0, 0, 0>}> : () -> ()
+    return
+}
+
+// -----
+
 func.func @operator_invalid_param_map_coverage(%p0 : f64, %p1 : i64, %q0 : !quantum.bit, %q1 : !quantum.bit) {
     // expected-error@+1 {{param_map must cover all params when provided: expected 2, got 1}}
     %o0, %o1 = "quantum.operator"(%p0, %p1, %q0, %q1) <{op_name = "bad_param_map", param_map = {p0 = array<i64: 0>}, qubit_map = {}, operandSegmentSizes = array<i32: 2, 0, 2, 0, 0, 0, 0, 0, 0>, resultSegmentSizes = array<i32: 2, 0, 0>}> : (f64, i64, !quantum.bit, !quantum.bit) -> (!quantum.bit, !quantum.bit)
@@ -777,14 +785,6 @@ func.func @operator_invalid_both_modes(%q : !quantum.bit, %r : !quantum.reg, %id
 
 // -----
 
-func.func @operator_invalid_no_mode() {
-    // expected-error@+1 {{must use either qubits or registers, but not both}}
-    "quantum.operator"() <{op_name = "bad_none", operandSegmentSizes = array<i32: 0, 0, 0, 0, 0, 0, 0, 0, 0>, resultSegmentSizes = array<i32: 0, 0, 0>}> : () -> ()
-    return
-}
-
-// -----
-
 func.func @operator_invalid_qubit_io_mismatch(%q0 : !quantum.bit, %q1 : !quantum.bit) {
     // expected-error@+1 {{number of qubits in input (2) and output (1) must be the same}}
     %out = "quantum.operator"(%q0, %q1) <{op_name = "bad_qio", operandSegmentSizes = array<i32: 0, 0, 2, 0, 0, 0, 0, 0, 0>, resultSegmentSizes = array<i32: 1, 0, 0>}> : (!quantum.bit, !quantum.bit) -> !quantum.bit
@@ -850,3 +850,24 @@ func.func @operator_custom_invalid_ctrl_static_length(%r : !quantum.reg, %idx : 
 }
 
 // -----
+
+module @outer {
+    func.func private @kernel_entry() attributes {quantum.kernel_entry_point}
+}
+
+// -----
+
+// expected-error @+1 {{'quantum.kernel_entry_point' is only valid on 'func.func'}}
+%c0 = arith.constant {quantum.kernel_entry_point} 0 : i64
+
+// -----
+
+// expected-error @+2 {{'quantum.kernel_entry_point' must be a unit attribute}}
+module @outer {
+    func.func private @kernel_entry() attributes {quantum.kernel_entry_point = "wrong"}
+}
+
+// -----
+
+// Tools may process a quantum kernel module on its own, so the attribute is also valid there.
+func.func private @kernel_entry() attributes {quantum.kernel_entry_point}

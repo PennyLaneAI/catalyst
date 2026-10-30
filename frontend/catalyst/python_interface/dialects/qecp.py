@@ -32,6 +32,7 @@ from xdsl.dialects.builtin import (
     IndexType,
     IntegerAttr,
     IntegerType,
+    StringAttr,
     TensorType,
     UnitAttr,
     i1,
@@ -52,6 +53,7 @@ from xdsl.irdl import (
     AtLeast,
     BaseAttr,
     IRDLOperation,
+    ParsePropInAttrDict,
     TypeAttributeInvT,
     VarConstraint,
     base,
@@ -858,6 +860,10 @@ class DecodeEsmCssOp(IRDLOperation):
     err_idx_in = opt_operand_def(MemRefConstraint(element_type=IndexType(), rank=1))
 
     err_idx = opt_result_def(TensorConstraint(element_type=IndexType(), rank=1))
+
+    check_type = opt_prop_def(StringAttr)
+
+    irdl_options = (ParsePropInAttrDict(),)
 
     def __init__(
         self,

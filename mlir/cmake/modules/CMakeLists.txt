@@ -26,9 +26,9 @@ set(llvm_cmake_builddir "${LLVM_BINARY_DIR}/${LLVM_INSTALL_PACKAGE_DIR}")
 
 # Targets with third party dependencies are not exported.
 get_property(MLIR_EXPORTS GLOBAL PROPERTY MLIR_EXPORTS)
-set(TARGETS_TO_REMOVE nlohmann_json tomlplusplus_tomlplusplus ion-transforms CatalystCompilerDriver PBCUtils QuantumCAPI pbc-transforms)
+set(TARGETS_TO_REMOVE nlohmann_json tomlplusplus_tomlplusplus ion-transforms CatalystCompilerDriver PBCUtils PBCAnalysis QuantumCAPI pbc-transforms)
 list(REMOVE_ITEM MLIR_EXPORTS ${TARGETS_TO_REMOVE})
-export(TARGETS ${MLIR_EXPORTS} ExternalStablehloLib FILE ${catalyst_cmake_builddir}/CatalystTargets.cmake)
+export(TARGETS ${MLIR_EXPORTS} FILE ${catalyst_cmake_builddir}/CatalystTargets.cmake)
 
 # Generate MlirConfig.cmake for the build tree.
 set(CATALYST_CONFIG_CMAKE_DIR "${catalyst_cmake_builddir}")
@@ -48,3 +48,36 @@ configure_file(
 set(CATALYST_CONFIG_CMAKE_DIR)
 set(CATALYST_CONFIG_LLVM_CMAKE_DIR)
 set(CATALYST_CONFIG_INCLUDE_DIRS)
+
+include(GNUInstallDirs)
+include(CMakePackageConfigHelpers)
+
+# --- version string, reused from frontend/catalyst/_version.py ---
+# CATALYST_PACKAGE_VERSION is read in the top-level mlir/CMakeLists.txt and
+# inherited here; it must live there so the CPack configuration can see it.
+string(REGEX MATCH "^[0-9]+\\.[0-9]+\\.[0-9]+" CATALYST_NUMERIC_VERSION "${CATALYST_PACKAGE_VERSION}")
+
+write_basic_package_version_file(
+    "${catalyst_cmake_builddir}/CatalystConfigVersion.cmake"
+    VERSION ${CATALYST_NUMERIC_VERSION}
+    COMPATIBILITY SameMajorVersion)
+
+# --- install-tree config, generated from a *separate* template ---
+set(CATALYST_INSTALL_TARGETS_LIST "${MLIR_EXPORTS}")   # same list, minus removals
+configure_package_config_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/CatalystConfig.install.cmake.in
+    "${catalyst_cmake_builddir}/install/CatalystConfig.cmake"
+    INSTALL_DESTINATION ${CATALYST_INSTALL_PACKAGE_DIR}
+    PATH_VARS CMAKE_INSTALL_INCLUDEDIR CMAKE_INSTALL_LIBDIR)
+
+# --- install the export set + configs ---
+install(EXPORT CatalystTargets
+    FILE CatalystTargets.cmake
+    DESTINATION ${CATALYST_INSTALL_PACKAGE_DIR}
+    COMPONENT catalyst-dev)
+
+install(FILES
+    "${catalyst_cmake_builddir}/install/CatalystConfig.cmake"
+    "${catalyst_cmake_builddir}/CatalystConfigVersion.cmake"
+    DESTINATION ${CATALYST_INSTALL_PACKAGE_DIR}
+    COMPONENT catalyst-dev)

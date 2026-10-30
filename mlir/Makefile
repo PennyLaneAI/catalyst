@@ -7,15 +7,24 @@ MK_ABSPATH := $(abspath $(lastword $(MAKEFILE_LIST)))
 MK_DIR := $(dir $(MK_ABSPATH))
 DIALECTS_BUILD_DIR ?= $(MK_DIR)/build
 DIALECTS_DOCS_BUILD_DIR ?= $(MK_DIR)/build-docs
-LLVM_BUILD_DIR ?= $(MK_DIR)/llvm-project/build
-STABLEHLO_BUILD_DIR ?= $(MK_DIR)/stablehlo/build
-ENZYME_BUILD_DIR ?= $(MK_DIR)/Enzyme/build
+LLVM_SRC_DIR ?= $(MK_DIR)/llvm-project
+LLVM_BUILD_DIR ?= $(LLVM_SRC_DIR)/build
+STABLEHLO_SRC_DIR ?= $(MK_DIR)/stablehlo
+STABLEHLO_BUILD_DIR ?= $(STABLEHLO_SRC_DIR)/build
+ENZYME_SRC_DIR ?= $(MK_DIR)/Enzyme
+ENZYME_BUILD_DIR ?= $(ENZYME_SRC_DIR)/build
 RT_BUILD_DIR ?= $(MK_DIR)/../runtime/build
+DIST_DIR ?= $(MK_DIR)/dist
 ENABLE_ASAN ?= OFF
 STRICT_WARNINGS ?= ON
 BUILD_TYPE ?= Release
 LLVM_EXTERNAL_LIT ?= $(LLVM_BUILD_DIR)/bin/llvm-lit
 LLVM_TARGETS_TO_BUILD ?= host
+LLVM_INSTALL_STAGING_DIR ?= $(LLVM_BUILD_DIR)/install
+LLVM_DISTRIBUTION_COMPONENTS ?= $\
+	"cmake-exports;llvm-headers;llvm-libraries;$\
+	mlir-cmake-exports;mlir-headers;mlir-libraries;mlir-python-sources;$\
+	FileCheck;llvm-tblgen;llvm-config;mlir-tblgen;not;count"
 
 ifeq ($(shell uname), Darwin)
 DEFAULT_ENABLE_LLD := OFF
@@ -49,6 +58,8 @@ help:
 	@echo "  enzyme             to build Enzyme"
 	@echo "  dialects           to build custom Catalyst MLIR dialects"
 	@echo "  dialect-docs       to build custom Catalyst MLIR dialect documentation"
+	@echo "  pack-catalyst-dev  to build the catalyst-dev package"
+	@echo "  pack-llvm-dev      to package an already-built LLVM/MLIR as catalyst-llvm-dev"
 	@echo "  test               to run the Catalyst MLIR dialects test suite"
 	@echo "  clean              to delete all temporary, cache, and build files"
 	@echo "  format [check=1]   to apply C++ formatter; use with 'check=1' to check instead of modify (requires clang-format)"
@@ -72,14 +83,23 @@ llvm:
 	@if cd llvm-project; git apply --check $(MK_DIR)/patches/llvm-python-bindinggen-annotations.patch; then \
 		git apply $(MK_DIR)/patches/llvm-python-bindinggen-annotations.patch; \
 	fi
+	# Patch scf canonicalization patterns to preserve discardable attributes
+	# (e.g. catalyst.estimated_iterations) on rebuilt scf.if/scf.while ops
+	# https://github.com/PennyLaneAI/catalyst/issues/3361
+	@if cd llvm-project; git apply --check $(MK_DIR)/patches/llvm-scf-canonicalize-preserve-discardable-attrs.patch; then \
+		git apply $(MK_DIR)/patches/llvm-scf-canonicalize-preserve-discardable-attrs.patch; \
+	fi
 
 	cmake -G Ninja -S llvm-project/llvm -B $(LLVM_BUILD_DIR) \
 		-DCMAKE_BUILD_TYPE=$(BUILD_TYPE) \
 		-DLLVM_BUILD_EXAMPLES=OFF \
-		-DLLVM_TARGETS_TO_BUILD=${LLVM_TARGETS_TO_BUILD} \
+		-DLLVM_TARGETS_TO_BUILD="${LLVM_TARGETS_TO_BUILD}" \
 		-DLLVM_ENABLE_PROJECTS="$(LLVM_PROJECTS)" \
 		-DLLVM_ENABLE_ASSERTIONS=ON \
 		-DMLIR_ENABLE_BINDINGS_PYTHON=ON \
+		-DLLVM_INSTALL_UTILS=ON \
+		-DLLVM_DISTRIBUTION_COMPONENTS=$(LLVM_DISTRIBUTION_COMPONENTS) \
+		-DCMAKE_INSTALL_PREFIX=$(LLVM_INSTALL_STAGING_DIR) \
 		-DPython_EXECUTABLE=$(PYTHON) \
 		-DPython3_EXECUTABLE=$(PYTHON) \
 		-DPython3_NumPy_INCLUDE_DIRS=$$($(PYTHON) -c "import numpy as np; print(np.get_include())") \
@@ -149,7 +169,7 @@ enzyme:
 
 .PHONY: plugin
 plugin:
-	[ -f $(MK_DIR)/standalone ] || cp -r $(MK_DIR)/llvm-project/mlir/examples/standalone .
+	[ -d $(MK_DIR)/standalone ] || cp -r $(LLVM_SRC_DIR)/mlir/examples/standalone $(MK_DIR)
 	@if patch -p0 --dry-run -N < $(MK_DIR)/patches/test-plugin-with-catalyst.patch > /dev/null 2>&1; then \
 		patch -p0 < $(MK_DIR)/patches/test-plugin-with-catalyst.patch; \
 	fi
@@ -181,9 +201,9 @@ dialects:
 		-DPython3_EXECUTABLE=$(PYTHON) \
 		-DPython3_NumPy_INCLUDE_DIRS=$(shell $(PYTHON) -c "import numpy as np; print(np.get_include())") \
 		-DEnzyme_DIR=$(ENZYME_BUILD_DIR) \
-		-DENZYME_SRC_DIR=$(MK_DIR)/Enzyme \
+		-DENZYME_SRC_DIR=$(ENZYME_SRC_DIR) \
 		-DMLIR_DIR=$(LLVM_BUILD_DIR)/lib/cmake/mlir \
-		-DSTABLEHLO_DIR=$(MK_DIR)/stablehlo \
+		-DSTABLEHLO_DIR=$(STABLEHLO_SRC_DIR) \
 		-DSTABLEHLO_BUILD_DIR=$(STABLEHLO_BUILD_DIR) \
 		-DRUNTIME_LIB_DIR=$(RT_BUILD_DIR)/lib \
 		-DMLIR_LIB_DIR=$(LLVM_BUILD_DIR)/lib \
@@ -219,6 +239,83 @@ dialect-docs:
 		-DCATALYST_DOCS_ONLY=ON
 
 	cmake --build $(DIALECTS_DOCS_BUILD_DIR) --target mlir-doc
+
+.PHONY: pack-catalyst-dev
+pack-catalyst-dev: dialects
+
+	@echo "build the catalyst-dev package"
+	cd $(DIALECTS_BUILD_DIR) && cpack
+	mkdir -p $(DIST_DIR)
+	mv $(DIALECTS_BUILD_DIR)/catalyst-dev*.tar.gz $(DIST_DIR)
+
+# Package an already-built LLVM/MLIR tree as catalyst-llvm-dev.
+# Deliberately *not* dependent on the llvm target: that would force a rebuild and a full check-mlir
+# run even when LLVM_BUILD_DIR already holds a complete build, as it does in CI where the build is
+# restored from cache. The guards below check for that build directly instead.
+.PHONY: pack-llvm-dev
+pack-llvm-dev:
+
+	@echo "build the catalyst-llvm-dev package"
+	@if [ ! -f "$(LLVM_BUILD_DIR)/CMakeCache.txt" ]; then \
+		echo "error: no LLVM build found in $(LLVM_BUILD_DIR)." >&2; \
+		echo "       Run 'make llvm' first, or set LLVM_BUILD_DIR to an existing build tree." >&2; \
+		exit 1; \
+	fi
+	@if [ ! -f "$(LLVM_SRC_DIR)/LICENSE.TXT" ]; then \
+		echo "error: no LLVM checkout found in $(LLVM_SRC_DIR); its LICENSE.TXT goes in the package." >&2; \
+		echo "       Set LLVM_SRC_DIR to the checkout $(LLVM_BUILD_DIR) was built from." >&2; \
+		exit 1; \
+	fi
+	# install-distribution is generated at configure time, so a tree configured with a different
+	# LLVM_DISTRIBUTION_COMPONENTS silently packages different contents. Say so rather than let it
+	# pass unnoticed.
+	@cached=$$(sed -n 's/^LLVM_DISTRIBUTION_COMPONENTS:[^=]*=//p' "$(LLVM_BUILD_DIR)/CMakeCache.txt"); \
+	wanted='$(subst ",,$(LLVM_DISTRIBUTION_COMPONENTS))'; \
+	if [ -z "$$cached" ]; then \
+		echo "error: $(LLVM_BUILD_DIR) was configured without LLVM_DISTRIBUTION_COMPONENTS," >&2; \
+		echo "       so it has no install-distribution target to package." >&2; \
+		exit 1; \
+	elif [ "$$cached" != "$$wanted" ]; then \
+		echo "warning: $(LLVM_BUILD_DIR) was configured with"; \
+		echo "warning:   $$cached"; \
+		echo "warning: but LLVM_DISTRIBUTION_COMPONENTS is now"; \
+		echo "warning:   $$wanted"; \
+		echo "warning: the package will follow the former; re-run 'make llvm' to update it."; \
+	fi
+	# Install from scratch: the staging dir is a plain install prefix, so files left by an earlier
+	# run with a different LLVM_DISTRIBUTION_COMPONENTS would otherwise linger and end up in the
+	# archive.
+	rm -rf $(LLVM_INSTALL_STAGING_DIR)
+	cmake --build $(LLVM_BUILD_DIR) --target install-distribution
+	cp $(LLVM_SRC_DIR)/LICENSE.TXT $(LLVM_INSTALL_STAGING_DIR)/
+	# Assemble the package version, e.g. 22.0.0git-8f264586, out of what the staged llvm-config
+	# reports and the commit pinned in .dep-versions. Done in the shell, as part of the cpack call,
+	# rather than in make variables: llvm-config is staged by install-distribution above, and make
+	# expands a whole recipe before executing its first line, so a $$(shell ...) variable would read
+	# the staging directory as it was before the rm -rf -- empty on a first run, stale afterwards.
+	@llvm_config="$(LLVM_INSTALL_STAGING_DIR)/bin/llvm-config"; \
+	if [ ! -x "$$llvm_config" ]; then \
+		echo "error: install-distribution staged no $$llvm_config," >&2; \
+		echo "       but the package is named after the LLVM version it reports." >&2; \
+		echo "       Keep llvm-config in LLVM_DISTRIBUTION_COMPONENTS." >&2; \
+		exit 1; \
+	fi; \
+	llvm_version=$$("$$llvm_config" --version); \
+	if [ -z "$$llvm_version" ]; then \
+		echo "error: $$llvm_config reported no version." >&2; \
+		exit 1; \
+	fi; \
+	llvm_commit=$$(grep '^llvm=' $(MK_DIR)/../.dep-versions | awk -F '=' '{ print $$2 }' | cut -c1-8); \
+	if [ -z "$$llvm_commit" ]; then \
+		echo "error: no 'llvm=<commit>' line in $(MK_DIR)/../.dep-versions," >&2; \
+		echo "       which is where the commit the package is named after comes from." >&2; \
+		exit 1; \
+	fi; \
+	echo "packaging LLVM $$llvm_version-$$llvm_commit"; \
+	CATALYST_LLVM_STAGING_DIR=$(LLVM_INSTALL_STAGING_DIR) \
+	CATALYST_LLVM_VERSION="$$llvm_version-$$llvm_commit" \
+		cpack --config $(MK_DIR)/cmake/LLVMDevCPackConfig.cmake -B $(DIST_DIR)
+	rm -rf $(DIST_DIR)/_CPack_Packages
 
 .PHONY: test
 test:

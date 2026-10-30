@@ -14,6 +14,9 @@
 
 #include "QRef/IR/QRefOps.h"
 
+#include <cstdint>
+#include <limits>
+
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/LogicalResult.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -21,6 +24,8 @@
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/OpImplementation.h"
 
+#include "MBQC/IR/MBQCOps.h"
+#include "PBC/IR/PBCOps.h"
 #include "QRef/IR/QRefDialect.h"
 #include "Quantum/IR/QuantumInterfaces.h"
 
@@ -37,8 +42,7 @@ using namespace catalyst::qref;
 namespace catalyst::qref {
 
 // Utils
-static LogicalResult verifyTensorResult(Type ty, int64_t length0, int64_t length1)
-{
+static LogicalResult verifyTensorResult(Type ty, int64_t length0, int64_t length1) {
     ShapedType tensor = cast<ShapedType>(ty);
     if (!tensor.hasStaticShape() || tensor.getShape().size() != 2 ||
         tensor.getShape()[0] != length0 || tensor.getShape()[1] != length1) {
@@ -51,66 +55,7 @@ static LogicalResult verifyTensorResult(Type ty, int64_t length0, int64_t length
 //===----------------------------------------------------------------------===//
 // QRef op canonicalizers.
 //===----------------------------------------------------------------------===//
-
-static const mlir::StringSet<> hermitianOps = {"Hadamard", "PauliX", "PauliY", "PauliZ", "CNOT",
-                                               "CY",       "CZ",     "SWAP",   "Toffoli"};
-static const mlir::StringSet<> rotationsOps = {"RX",  "RY",  "RZ",  "PhaseShift",
-                                               "CRX", "CRY", "CRZ", "ControlledPhaseShift"};
-
-LogicalResult CustomOp::canonicalize(CustomOp op, mlir::PatternRewriter &rewriter)
-{
-    if (op.getAdjoint()) {
-        auto name = op.getGateName();
-        if (hermitianOps.contains(name)) {
-            op.setAdjoint(false);
-            return success();
-        }
-        else if (rotationsOps.contains(name)) {
-            auto params = op.getParams();
-            SmallVector<Value> paramsNeg;
-            for (auto param : params) {
-                auto paramNeg = mlir::arith::NegFOp::create(rewriter, op.getLoc(), param);
-                paramsNeg.push_back(paramNeg);
-            }
-
-            rewriter.replaceOpWithNewOp<CustomOp>(op, paramsNeg, op.getQubits(), name, false,
-                                                  op.getCtrlQubits(), op.getCtrlValues());
-
-            return success();
-        }
-        return failure();
-    }
-    return failure();
-}
-
-LogicalResult MultiRZOp::canonicalize(MultiRZOp op, mlir::PatternRewriter &rewriter)
-{
-    if (op.getAdjoint()) {
-        auto paramNeg = mlir::arith::NegFOp::create(rewriter, op.getLoc(), op.getTheta());
-
-        rewriter.replaceOpWithNewOp<MultiRZOp>(op, paramNeg, op.getQubits(), nullptr,
-                                               op.getCtrlQubits(), op.getCtrlValues());
-
-        return success();
-    };
-    return failure();
-}
-
-LogicalResult PCPhaseOp::canonicalize(PCPhaseOp op, mlir::PatternRewriter &rewriter)
-{
-    if (op.getAdjoint()) {
-        auto paramNeg = mlir::arith::NegFOp::create(rewriter, op.getLoc(), op.getTheta());
-
-        rewriter.replaceOpWithNewOp<PCPhaseOp>(op, paramNeg, op.getDim(), op.getQubits(), nullptr,
-                                               op.getCtrlQubits(), op.getCtrlValues());
-
-        return success();
-    };
-    return failure();
-}
-
-LogicalResult AllocOp::canonicalize(AllocOp alloc, mlir::PatternRewriter &rewriter)
-{
+LogicalResult AllocOp::canonicalize(AllocOp alloc, mlir::PatternRewriter &rewriter) {
     if (alloc->use_empty()) {
         rewriter.eraseOp(alloc);
         return success();
@@ -119,8 +64,7 @@ LogicalResult AllocOp::canonicalize(AllocOp alloc, mlir::PatternRewriter &rewrit
     return failure();
 }
 
-LogicalResult AllocQubitOp::canonicalize(AllocQubitOp allocQb, mlir::PatternRewriter &rewriter)
-{
+LogicalResult AllocQubitOp::canonicalize(AllocQubitOp allocQb, mlir::PatternRewriter &rewriter) {
     if (allocQb->use_empty()) {
         rewriter.eraseOp(allocQb);
         return success();
@@ -129,8 +73,7 @@ LogicalResult AllocQubitOp::canonicalize(AllocQubitOp allocQb, mlir::PatternRewr
     return failure();
 }
 
-LogicalResult DeallocOp::canonicalize(DeallocOp dealloc, mlir::PatternRewriter &rewriter)
-{
+LogicalResult DeallocOp::canonicalize(DeallocOp dealloc, mlir::PatternRewriter &rewriter) {
     if (auto alloc = dyn_cast_if_present<AllocOp>(dealloc.getQreg().getDefiningOp())) {
         if (dealloc.getQreg().hasOneUse()) {
             rewriter.eraseOp(dealloc);
@@ -143,8 +86,7 @@ LogicalResult DeallocOp::canonicalize(DeallocOp dealloc, mlir::PatternRewriter &
 }
 
 LogicalResult DeallocQubitOp::canonicalize(DeallocQubitOp deallocQb,
-                                           mlir::PatternRewriter &rewriter)
-{
+                                           mlir::PatternRewriter &rewriter) {
     if (auto allocQb = dyn_cast_if_present<AllocQubitOp>(deallocQb.getQubit().getDefiningOp())) {
         if (allocQb.getQubit().hasOneUse()) {
             rewriter.eraseOp(deallocQb);
@@ -156,8 +98,7 @@ LogicalResult DeallocQubitOp::canonicalize(DeallocQubitOp deallocQb,
     return failure();
 }
 
-template <typename IndexingOp> LogicalResult foldConstantIndexingOp(IndexingOp op, Attribute idx)
-{
+template <typename IndexingOp> LogicalResult foldConstantIndexingOp(IndexingOp op, Attribute idx) {
     // Prefer using an attribute when the index is constant.
     bool hasNoIdxAttr = !op.getIdxAttr().has_value();
     bool isConstantIdx = isa_and_nonnull<IntegerAttr>(idx);
@@ -172,8 +113,7 @@ template <typename IndexingOp> LogicalResult foldConstantIndexingOp(IndexingOp o
     return failure();
 }
 
-OpFoldResult GetOp::fold(FoldAdaptor adaptor)
-{
+OpFoldResult GetOp::fold(FoldAdaptor adaptor) {
     if (succeeded(foldConstantIndexingOp(*this, adaptor.getIdx()))) {
         return getResult();
     }
@@ -187,8 +127,7 @@ OpFoldResult GetOp::fold(FoldAdaptor adaptor)
 
 static const mlir::StringSet<> validPauliWords = {"X", "Y", "Z", "I"};
 
-LogicalResult AllocOp::verify()
-{
+LogicalResult AllocOp::verify() {
     if (!(getNqubits() || getNqubitsAttr().has_value())) {
         return emitOpError() << "expected op to have a non-null allocation size";
     }
@@ -216,8 +155,7 @@ LogicalResult AllocOp::verify()
     return success();
 }
 
-LogicalResult CustomOp::verify()
-{
+LogicalResult CustomOp::verify() {
     if (getQubits().size() == 0) {
         return emitOpError("expected op to have at least one qubit");
     }
@@ -225,13 +163,12 @@ LogicalResult CustomOp::verify()
     return success();
 }
 
-LogicalResult OperatorOp::verify()
-{
+LogicalResult OperatorOp::verify() {
     const bool hasQregMode = static_cast<bool>(getQreg());
     const bool hasQubitMode = !getQubits().empty();
 
-    // Exactly one mode must be used: explicit qubits or qreg-based addressing.
-    if (hasQregMode == hasQubitMode) {
+    // At most one mode must be used: explicit qubits or qreg-based addressing.
+    if (hasQregMode && hasQubitMode) {
         return emitOpError() << "must use either qubits or registers, but not both";
     }
 
@@ -315,8 +252,7 @@ LogicalResult OperatorOp::verify()
     return success();
 }
 
-LogicalResult PauliRotOp::verify()
-{
+LogicalResult PauliRotOp::verify() {
     size_t pauliWordLength = getPauliProduct().size();
     size_t numQubits = getQubits().size();
     if (pauliWordLength != numQubits) {
@@ -334,8 +270,7 @@ LogicalResult PauliRotOp::verify()
     return success();
 }
 
-LogicalResult QubitUnitaryOp::verify()
-{
+LogicalResult QubitUnitaryOp::verify() {
     size_t dim = 1 << getQubits().size();
     if (failed(verifyTensorResult(cast<ShapedType>(getMatrix().getType()), dim, dim))) {
         return emitOpError("The Unitary matrix must be of size 2^(num_qubits) * 2^(num_qubits)");
@@ -344,8 +279,7 @@ LogicalResult QubitUnitaryOp::verify()
     return success();
 }
 
-LogicalResult AdjointOp::verify()
-{
+LogicalResult AdjointOp::verify() {
     auto res = this->getRegion().walk(
         [](catalyst::quantum::MeasurementProcess op) { return WalkResult::interrupt(); });
 
@@ -361,8 +295,47 @@ LogicalResult AdjointOp::verify()
     return success();
 }
 
-LogicalResult ComputationalBasisOp::verify()
-{
+LogicalResult CtrlOp::verify() {
+    auto noMeasureWalkRes = this->getRegion().walk([](Operation *op) {
+        return isa<quantum::MeasurementProcess, MeasureOp, pbc::RefPPMeasurementOp,
+                   mbqc::RefMeasureInBasisOp>(op)
+                   ? WalkResult::interrupt()
+                   : WalkResult::advance();
+    });
+
+    if (noMeasureWalkRes.wasInterrupted()) {
+        return emitOpError("quantum measurements are not allowed in the ctrl regions");
+    }
+
+    Block &b = this->getRegion().front();
+    if (b.getNumArguments() != 0) {
+        return emitOpError("qref.ctrl op must have no arguments on its block");
+    }
+
+    if (this->getCtrlValues().size() != this->getCtrlQubits().size()) {
+        return emitOpError("Ctrl op number of control values must be the same as the number of "
+                           "control qubits");
+    }
+
+    llvm::SmallDenseSet<Value> regionCtrlQubits(getCtrlQubits().begin(), getCtrlQubits().end());
+    auto noOverlappingCtrlQubitWalkRes = this->getRegion().walk([regionCtrlQubits](QuantumGate op) {
+        for (Value opCtrlQubit : op.getCtrlQubitOperands()) {
+            if (regionCtrlQubits.contains(opCtrlQubit)) {
+                return WalkResult::interrupt();
+            }
+        }
+        return WalkResult::advance();
+    });
+
+    if (noOverlappingCtrlQubitWalkRes.wasInterrupted()) {
+        return emitOpError("Ctrl op ctrl qubits must not reappear as the individual gates' ctrl "
+                           "qubits inside the ctrl region");
+    }
+
+    return success();
+}
+
+LogicalResult ComputationalBasisOp::verify() {
     if ((getQubits().size() != 0) && (getQreg() != nullptr)) {
         return emitOpError()
                << "computational basis op cannot simultaneously take in both qubits and quregs";
@@ -371,8 +344,7 @@ LogicalResult ComputationalBasisOp::verify()
     return success();
 }
 
-LogicalResult HermitianOp::verify()
-{
+LogicalResult HermitianOp::verify() {
     size_t dim = std::pow(2, getQubits().size());
     if (failed(verifyTensorResult(cast<ShapedType>(getMatrix().getType()), dim, dim))) {
         return emitOpError("The Hermitian matrix must be of size 2^(num_qubits) * 2^(num_qubits)");
@@ -389,8 +361,9 @@ void OperatorOp::build(OpBuilder &odsBuilder, OperationState &odsState, llvm::St
                        ValueRange params, ValueRange qubits, ValueRange ctrl_qubits,
                        ValueRange ctrl_values, ValueRange forward_args, bool adjoint,
                        std::optional<int64_t> UID, DictionaryAttr static_data,
-                       DictionaryAttr param_map, DictionaryAttr qubit_map)
-{
+                       DictionaryAttr param_map, DictionaryAttr qubit_map) {
+    IntegerAttr uidAttr = UID ? odsBuilder.getI64IntegerAttr(*UID) : IntegerAttr();
+
     build(odsBuilder, odsState,
           /*op_name=*/op_name,
           /*params=*/params,
@@ -403,7 +376,7 @@ void OperatorOp::build(OpBuilder &odsBuilder, OperationState &odsState, llvm::St
           /*arr_ctrl_indices=*/Value(),
           /*arr_ctrl_values=*/Value(),
           /*adjoint=*/adjoint,
-          /*UID=*/UID,
+          /*UID=*/uidAttr,
           /*static_data=*/static_data,
           /*param_map=*/param_map,
           /*qubit_map=*/qubit_map);
@@ -413,8 +386,9 @@ void OperatorOp::build(OpBuilder &odsBuilder, OperationState &odsState, llvm::St
                        ValueRange params, Value qreg, ValueRange arr_qubit_indices,
                        Value arr_ctrl_indices, Value arr_ctrl_values, ValueRange forward_args,
                        bool adjoint, std::optional<int64_t> UID, DictionaryAttr static_data,
-                       DictionaryAttr param_map, DictionaryAttr qubit_map)
-{
+                       DictionaryAttr param_map, DictionaryAttr qubit_map) {
+    IntegerAttr uidAttr = UID ? odsBuilder.getI64IntegerAttr(*UID) : IntegerAttr();
+
     build(odsBuilder, odsState,
           /*op_name=*/op_name,
           /*params=*/params,
@@ -427,7 +401,7 @@ void OperatorOp::build(OpBuilder &odsBuilder, OperationState &odsState, llvm::St
           /*arr_ctrl_indices=*/arr_ctrl_indices,
           /*arr_ctrl_values=*/arr_ctrl_values,
           /*adjoint=*/adjoint,
-          /*UID=*/UID,
+          /*UID=*/uidAttr,
           /*static_data=*/static_data,
           /*param_map=*/param_map,
           /*qubit_map=*/qubit_map);
@@ -437,31 +411,27 @@ void OperatorOp::build(OpBuilder &odsBuilder, OperationState &odsState, llvm::St
 // Quantum op printers/parsers.
 //===----------------------------------------------------------------------===//
 
-static void printDenseI64ArrayAsList(OpAsmPrinter &p, DenseI64ArrayAttr attr)
-{
+static void printDenseI64ArrayAsList(OpAsmPrinter &p, DenseI64ArrayAttr attr) {
     p << "[";
     llvm::interleaveComma(attr.asArrayRef(), p, [&](int64_t value) { p << value; });
     p << "]";
 }
 
-static void printDictionaryWithDenseI64Lists(OpAsmPrinter &p, DictionaryAttr dict)
-{
+static void printDictionaryWithDenseI64Lists(OpAsmPrinter &p, DictionaryAttr dict) {
     p << "{";
     llvm::interleaveComma(dict, p, [&](NamedAttribute namedAttr) {
         p.printKeywordOrString(namedAttr.getName().strref());
         p << " = ";
         if (auto denseArray = dyn_cast<DenseI64ArrayAttr>(namedAttr.getValue())) {
             printDenseI64ArrayAsList(p, denseArray);
-        }
-        else {
+        } else {
             p << namedAttr.getValue();
         }
     });
     p << "}";
 }
 
-void OperatorOp::print(OpAsmPrinter &p)
-{
+void OperatorOp::print(OpAsmPrinter &p) {
     // 1. Template Name
     p << " \"" << getOpName() << "\"";
 
@@ -477,13 +447,14 @@ void OperatorOp::print(OpAsmPrinter &p)
     }
 
     // 4. Qubits
-    if (!getQubits().empty()) {
+    if (!getQreg()) {
         p << " qubits(" << getQubits() << ")";
     }
 
     // 5. Attribute Dictionary
-    SmallVector<StringRef> elidedAttrs = {"static_data",         "param_map", "qubit_map",
-                                          "operandSegmentSizes", "op_name",   "adjoint"};
+    SmallVector<StringRef> elidedAttrs = {
+        "static_data", "param_map", "qubit_map", "operandSegmentSizes",
+        "op_name",     "adjoint",   "UID"};
     p.printOptionalAttrDict(getOperation()->getAttrs(), elidedAttrs);
 
     p.increaseIndent();
@@ -516,8 +487,7 @@ void OperatorOp::print(OpAsmPrinter &p)
         p.printNewline();
         p << "ctrls(" << getCtrlQubits() << ") ";
         p << "ctrl_vals(" << getCtrlValues() << ")";
-    }
-    else if (getArrCtrlIndices()) {
+    } else if (getArrCtrlIndices()) {
         p.printNewline();
         p << "ctrls(" << getArrCtrlIndices() << ": " << getArrCtrlIndices().getType() << ") ";
         p << "ctrl_vals(" << getArrCtrlValues() << ": " << getArrCtrlValues().getType() << ")";
@@ -549,14 +519,12 @@ void OperatorOp::print(OpAsmPrinter &p)
 }
 
 static ParseResult parseOperandTypePair(OpAsmParser &parser,
-                                        OpAsmParser::UnresolvedOperand &operand, Type &type)
-{
+                                        OpAsmParser::UnresolvedOperand &operand, Type &type) {
     return failure(parser.parseOperand(operand) || parser.parseColon() || parser.parseType(type));
 }
 
 static ParseResult parseDenseI64ArrayDictionary(OpAsmParser &parser, Builder &builder,
-                                                DictionaryAttr &dict)
-{
+                                                DictionaryAttr &dict) {
     NamedAttrList attrs;
     auto parseDictEntry = [&]() -> ParseResult {
         StringRef key;
@@ -585,8 +553,7 @@ static ParseResult parseDenseI64ArrayDictionary(OpAsmParser &parser, Builder &bu
     return success();
 }
 
-ParseResult OperatorOp::parse(OpAsmParser &parser, OperationState &result)
-{
+ParseResult OperatorOp::parse(OpAsmParser &parser, OperationState &result) {
     Builder &builder = parser.getBuilder();
     MLIRContext *ctx = parser.getContext();
 
@@ -596,7 +563,6 @@ ParseResult OperatorOp::parse(OpAsmParser &parser, OperationState &result)
         return failure();
     }
     result.addAttribute("op_name", builder.getStringAttr(opName));
-    auto &opProperties = result.getOrAddProperties<OperatorOp::Properties>();
 
     // 2. Parse variadic params: (%arg0: type, ...)
     SmallVector<OpAsmParser::UnresolvedOperand> params;
@@ -662,7 +628,7 @@ ParseResult OperatorOp::parse(OpAsmParser &parser, OperationState &result)
         if (parser.parseLParen() || parser.parseInteger(uid) || parser.parseRParen()) {
             return failure();
         }
-        opProperties.setUID(uid);
+        result.addAttribute("UID", builder.getI64IntegerAttr(uid));
 
         if (succeeded(parser.parseOptionalKeyword("forward"))) {
             auto parseForwardArgAndType = [&]() -> ParseResult {
@@ -729,8 +695,7 @@ ParseResult OperatorOp::parse(OpAsmParser &parser, OperationState &result)
             }
             arrCtrlValues = ctrlValues;
             arrCtrlValuesType = ctrlValuesTy;
-        }
-        else {
+        } else {
             auto parseCtrlQubit = [&]() -> ParseResult {
                 OpAsmParser::UnresolvedOperand operand;
                 if (parser.parseOperand(operand)) {
@@ -826,5 +791,194 @@ ParseResult OperatorOp::parse(OpAsmParser &parser, OperationState &result)
 
     return success();
 }
+
+//===----------------------------------------------------------------------===//
+// DecomposableGate op interface methods.
+//===----------------------------------------------------------------------===//
+
+// CustomOp
+
+std::string CustomOp::getOperatorName() { return getGateName().str(); }
+
+DynamicShape CustomOp::getDynamicShape() {
+    DynamicShape ret;
+    for (auto [i, param] : llvm::enumerate(getParams())) {
+        ret.emplace_back(std::to_string(i), llvm::SmallVector<mlir::Type>({param.getType()}));
+    }
+    return ret;
+}
+
+WireLens CustomOp::getWireLens() { return {{"wires", getNonCtrlQubitOperands().size()}}; }
+
+mlir::DictionaryAttr CustomOp::getStaticData() {
+    return mlir::DictionaryAttr::get(getContext(), {});
+}
+
+// MultiRZOp
+
+std::string MultiRZOp::getOperatorName() { return "MultiRZ"; }
+
+DynamicShape MultiRZOp::getDynamicShape() {
+    return {{"theta", {mlir::Float64Type::get(getContext())}}};
+}
+
+WireLens MultiRZOp::getWireLens() { return {{"wires", getNonCtrlQubitOperands().size()}}; }
+
+mlir::DictionaryAttr MultiRZOp::getStaticData() {
+    return mlir::DictionaryAttr::get(getContext(), {});
+}
+
+// PauliRotOp
+
+std::string PauliRotOp::getOperatorName() { return "PauliRot"; }
+
+DynamicShape PauliRotOp::getDynamicShape() {
+    return {{"theta", {mlir::Float64Type::get(getContext())}}};
+}
+
+WireLens PauliRotOp::getWireLens() { return {{"wires", getNonCtrlQubitOperands().size()}}; }
+
+mlir::DictionaryAttr PauliRotOp::getStaticData() {
+    mlir::MLIRContext *ctx = getContext();
+    mlir::NamedAttribute pauliWordEntry = mlir::NamedAttribute(
+        mlir::StringAttr::get(ctx, "pauli_word"), mlir::StringAttr::get(ctx, getPauliWord()));
+    return mlir::DictionaryAttr::get(ctx, {pauliWordEntry});
+}
+
+// PCPhaseOp
+
+std::string PCPhaseOp::getOperatorName() { return "PCPhase"; }
+
+DynamicShape PCPhaseOp::getDynamicShape() {
+    return {{"phi", {mlir::Float64Type::get(getContext())}}};
+}
+
+WireLens PCPhaseOp::getWireLens() { return {{"wires", getNonCtrlQubitOperands().size()}}; }
+
+mlir::DictionaryAttr PCPhaseOp::getStaticData() {
+    mlir::MLIRContext *ctx = getContext();
+    mlir::NamedAttribute dimEntry =
+        mlir::NamedAttribute(mlir::StringAttr::get(ctx, "dim"), getDimAttr());
+    return mlir::DictionaryAttr::get(ctx, {dimEntry});
+}
+
+// GlobalPhaseOp
+
+std::string GlobalPhaseOp::getOperatorName() { return "GlobalPhase"; }
+
+DynamicShape GlobalPhaseOp::getDynamicShape() {
+    return {{"phi", {mlir::Float64Type::get(getContext())}}};
+}
+
+WireLens GlobalPhaseOp::getWireLens() { return {}; }
+
+mlir::DictionaryAttr GlobalPhaseOp::getStaticData() {
+    return mlir::DictionaryAttr::get(getContext(), {});
+}
+
+// QubitUnitaryOp
+
+std::string QubitUnitaryOp::getOperatorName() { return "QubitUnitary"; }
+
+DynamicShape QubitUnitaryOp::getDynamicShape() { return {{"U", {getMatrix().getType()}}}; }
+
+WireLens QubitUnitaryOp::getWireLens() { return {{"wires", getNonCtrlQubitOperands().size()}}; }
+
+mlir::DictionaryAttr QubitUnitaryOp::getStaticData() {
+    return mlir::DictionaryAttr::get(getContext(), {});
+}
+
+// Return the entries of a name -> operand-indices map (`param_map`/`qubit_map`) in operand order.
+// The dictionary attribute itself is sorted by name, which is not an operand order. Entries
+// without operands (e.g. an empty wire argument) have no position and go last, in name order.
+static llvm::SmallVector<std::pair<llvm::StringRef, llvm::ArrayRef<int64_t>>>
+getEntriesInOperandOrder(mlir::DictionaryAttr map) {
+    llvm::SmallVector<std::pair<llvm::StringRef, llvm::ArrayRef<int64_t>>> entries;
+    if (!map) {
+        return entries;
+    }
+    for (mlir::NamedAttribute entry : map) {
+        entries.emplace_back(entry.getName().getValue(),
+                             cast<mlir::DenseI64ArrayAttr>(entry.getValue()).asArrayRef());
+    }
+    auto position = [](llvm::ArrayRef<int64_t> indices) {
+        return indices.empty() ? std::numeric_limits<int64_t>::max() : indices.front();
+    };
+    llvm::stable_sort(entries, [&](const auto &lhs, const auto &rhs) {
+        return position(lhs.second) < position(rhs.second);
+    });
+    return entries;
+}
+
+// OperatorOp
+
+std::string OperatorOp::getOperatorName() { return getOpName().str(); }
+
+DynamicShape OperatorOp::getDynamicShape() {
+    DynamicShape dynamicShape;
+    auto params = getParams();
+
+    for (auto [name, indices] : getEntriesInOperandOrder(getParamMap())) {
+        llvm::SmallVector<mlir::Type> types;
+        for (int64_t index : indices) {
+            types.push_back(params[index].getType());
+        }
+        dynamicShape.emplace_back(name.str(), std::move(types));
+    }
+
+    return dynamicShape;
+}
+
+WireLens OperatorOp::getWireLens() {
+    WireLens wireLens;
+
+    for (auto [name, indices] : getEntriesInOperandOrder(getQubitMap())) {
+        size_t numQubits;
+        if (getQreg()) {
+            numQubits = 0;
+            for (int64_t index : indices) {
+                auto indexTensorType =
+                    cast<mlir::RankedTensorType>(getArrQubitIndices()[index].getType());
+                numQubits += indexTensorType.getDimSize(0);
+            }
+        } else {
+            numQubits = indices.size();
+        }
+
+        wireLens.emplace_back(name.str(), numQubits);
+    }
+
+    return wireLens;
+}
+
+std::string OperatorOp::getExtraData() {
+    return getUID().has_value() ? std::to_string(getUID().value()) : "";
+}
+
+//===----------------------------------------------------------------------===//
+// Implement ResourceQuantumOpInterface interface methods.
+//===----------------------------------------------------------------------===//
+
+llvm::StringRef CustomOp::getResourceName() { return getGateName(); }
+llvm::StringRef SetStateOp::getResourceName() { return "SetState"; }
+llvm::StringRef SetBasisStateOp::getResourceName() { return "SetBasisState"; }
+llvm::StringRef OperatorOp::getResourceName() { return getOpName(); }
+llvm::StringRef PauliRotOp::getResourceName() { return "PauliRot"; }
+llvm::StringRef GlobalPhaseOp::getResourceName() { return "GlobalPhase"; }
+llvm::StringRef MultiRZOp::getResourceName() { return "MultiRZ"; }
+llvm::StringRef PCPhaseOp::getResourceName() { return "PCPhase"; }
+llvm::StringRef QubitUnitaryOp::getResourceName() { return "QubitUnitary"; }
+
+llvm::StringRef MeasureOp::getResourceName() { return "MidCircuitMeasure"; }
+uint64_t MeasureOp::getResourceNumQubits() { return 1; }
+uint64_t MeasureOp::getResourceNumCtrlQubits() { return 0; }
+uint64_t MeasureOp::getResourceNumParams() { return 0; }
+
+//===----------------------------------------------------------------------===//
+// Implement ResourceAllocQubitOpInterface interface methods.
+//===----------------------------------------------------------------------===//
+
+uint64_t AllocOp::getResourceNumAllocQubits() { return getNqubitsAttr().value_or(0); }
+uint64_t AllocQubitOp::getResourceNumAllocQubits() { return 1; }
 
 } // namespace catalyst::qref

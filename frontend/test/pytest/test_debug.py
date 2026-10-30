@@ -24,7 +24,7 @@ from jax.tree_util import register_pytree_node_class
 from pennylane import for_loop
 
 from catalyst import debug, qjit, value_and_grad
-from catalyst.compiler import _options_to_cli_flags, to_llvmir, to_mlir_opt
+from catalyst.compiler import _options_to_cli_flags, to_llvm, to_llvm_opt, to_mlir_opt
 from catalyst.debug import compile_executable, get_cmain, get_compilation_stage, replace_ir
 from catalyst.pipelines import CompileOptions
 from catalyst.utils.exceptions import CompileError
@@ -324,12 +324,13 @@ class TestCProgramGeneration:
             """Identity function."""
             return x
 
-        with pytest.raises(CompileError, match="C interface cannot be generated"):
+        @qjit
+        def error_fn(x: float):
+            """Should raise an error as we try to generate the C template during tracing."""
+            return get_cmain(f, x)
 
-            @qjit
-            def error_fn(x: float):
-                """Should raise an error as we try to generate the C template during tracing."""
-                return get_cmain(f, x)
+        with pytest.raises(CompileError, match="C interface cannot be generated"):
+            error_fn(1.5)
 
     def test_error_non_qjit_object(self):
         """An error should be raised if the object supplied to the debug function is not a QJIT."""
@@ -579,13 +580,8 @@ class TestOptionsToCliFlags:
         flags = _options_to_cli_flags(options)
         assert "--use-nameloc-as-prefix" in flags
 
-    def test_option_not_lower_to_llvm(self):
-        """Test not lower to llvm"""
-        options = CompileOptions(lower_to_llvm=False)
-        flags = _options_to_cli_flags(options)
-        assert ("--tool", "opt") in flags
-
-    def test_no_options_to_llvmir(self):
+    @pytest.mark.parametrize("lower", [to_llvm, to_llvm_opt])
+    def test_no_options_to_llvmir(self, lower):
         """Test that we can lower to llvmir without needing any options"""
         mlir = """
         module {
@@ -594,7 +590,7 @@ class TestOptionsToCliFlags:
             }
         }
         """
-        observed = to_llvmir(stdin=mlir)
+        observed = lower(stdin=mlir)
         # pylint: disable=line-too-long
         expected = textwrap.dedent("""
         define void @foo() {

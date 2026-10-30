@@ -241,7 +241,7 @@ class TestMergeRotationsIntegration:
         """Test that the MergeRotationsPass works correctly with qjit."""
         dev = qp.device("lightning.qubit", wires=1)
 
-        @qp.qjit(capture=True, target="mlir")
+        @qp.qjit(capture=True, collect_decomp_rules=False, target="mlir")
         @merge_rotations_pass
         @qp.qnode(dev)
         def circuit(x: float, y: float):

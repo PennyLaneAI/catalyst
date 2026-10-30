@@ -100,8 +100,7 @@ static std::map<QubitState, std::map<StringRef, QubitState>> QubitTransitions = 
 
 class PropagateSimpleStatesAnalysis {
   public:
-    PropagateSimpleStatesAnalysis(Operation *target)
-    {
+    PropagateSimpleStatesAnalysis(Operation *target) {
         // `target` is a qnode function
         // We restrict the analysis to gates at the top-level body of the function
         // This is so that gates inside nested regions, like control flows, are not valid targets
@@ -190,8 +189,7 @@ class PropagateSimpleStatesAnalysis {
     llvm::DenseMap<Value, QubitState> getQubitValues() { return qubitValues; }
 
     // Function to convert enum values to strings
-    static std::string QubitState2String(QubitState state)
-    {
+    static std::string QubitState2String(QubitState state) {
         switch (state) {
         case QubitState::ZERO:
             return "ZERO";
@@ -232,8 +230,7 @@ class PropagateSimpleStatesAnalysis {
     // <mlir Value representing a qubit, its abstract QubitState>
     llvm::DenseMap<Value, QubitState> qubitValues;
 
-    bool isImmediateChild(Operation *op, Operation *ancestor)
-    {
+    bool isImmediateChild(Operation *op, Operation *ancestor) {
         // returns true if op is an immediate child of ancestor,
         // with no extra operations in between
         return op->getParentOp() == ancestor;

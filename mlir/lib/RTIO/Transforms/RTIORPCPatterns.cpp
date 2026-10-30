@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <cstdint>
+
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
@@ -40,19 +42,20 @@ namespace {
 ///   f32 / f64       -> 'f'
 ///   memref<...xi8>  -> 's'
 ///   everything else -> 'O'
-static char tagCodeForType(Type ty)
-{
+static char tagCodeForType(Type ty) {
     if (auto intTy = dyn_cast<IntegerType>(ty)) {
         if (intTy.getWidth() <= 32) {
             return 'i';
         }
         return 'I';
     }
-    if (isa<Float64Type>(ty) || isa<Float32Type>(ty))
+    if (isa<Float64Type>(ty) || isa<Float32Type>(ty)) {
         return 'f';
+    }
     if (auto memrefTy = dyn_cast<MemRefType>(ty)) {
-        if (memrefTy.getElementType().isInteger(8))
+        if (memrefTy.getElementType().isInteger(8)) {
             return 's';
+        }
     }
     return 'O';
 }
@@ -64,8 +67,7 @@ static char tagCodeForType(Type ty)
 /// Example:
 ///   positional (ptr) + keywords (str, i32, i32) -> "Okskiki:n"
 static std::string buildTagFromTypes(TypeRange argTypes, TypeRange resultTypes,
-                                     size_t numKeywordArgs = 0)
-{
+                                     size_t numKeywordArgs = 0) {
     std::string tag;
     size_t numPositional = argTypes.size() - numKeywordArgs;
     for (size_t i = 0; i < argTypes.size(); i++) {
@@ -77,8 +79,7 @@ static std::string buildTagFromTypes(TypeRange argTypes, TypeRange resultTypes,
     tag += ':';
     if (resultTypes.empty()) {
         tag += 'n';
-    }
-    else {
+    } else {
         tag += tagCodeForType(resultTypes[0]);
     }
     return tag;
@@ -86,8 +87,7 @@ static std::string buildTagFromTypes(TypeRange argTypes, TypeRange resultTypes,
 
 /// Ensure an LLVM global constant for the given byte string exists in the module.
 static Value getOrCreateStringGlobal(ConversionPatternRewriter &rewriter, ModuleOp module,
-                                     Location loc, StringRef str)
-{
+                                     Location loc, StringRef str) {
     MLIRContext *ctx = rewriter.getContext();
 
     std::string globalName = "__rtio_str_" + str.str();
@@ -103,8 +103,7 @@ static Value getOrCreateStringGlobal(ConversionPatternRewriter &rewriter, Module
     LLVM::GlobalOp globalOp;
     if (auto existing = module.lookupSymbol<LLVM::GlobalOp>(globalName)) {
         globalOp = existing;
-    }
-    else {
+    } else {
         SmallVector<uint8_t> bytes(str.begin(), str.end());
 
         auto arrayTy = LLVM::LLVMArrayType::get(i8Ty, bytes.size());
@@ -125,8 +124,7 @@ static Value getOrCreateStringGlobal(ConversionPatternRewriter &rewriter, Module
 
 /// Alloca a `{ptr, i32}` fat-pointer and fill it with {ptr, (value)len}.
 static Value buildFatPointer(ConversionPatternRewriter &rewriter, Location loc, MLIRContext *ctx,
-                             Value dataPtr, Value len)
-{
+                             Value dataPtr, Value len) {
     Type ptrTy = LLVM::LLVMPointerType::get(ctx);
     Type i32Ty = IntegerType::get(ctx, 32);
     auto fatPtrTy = LLVM::LLVMStructType::getLiteral(ctx, {ptrTy, i32Ty});
@@ -144,15 +142,13 @@ static Value buildFatPointer(ConversionPatternRewriter &rewriter, Location loc, 
 
 /// Helper to get a fat-pointer from {ptr, (int)len}.
 static Value buildTagStruct(ConversionPatternRewriter &rewriter, Location loc, MLIRContext *ctx,
-                            Value tagDataPtr, int32_t tagLen)
-{
+                            Value tagDataPtr, int32_t tagLen) {
     Value lenVal = arith::ConstantOp::create(rewriter, loc, rewriter.getI32IntegerAttr(tagLen));
     return buildFatPointer(rewriter, loc, ctx, tagDataPtr, lenVal);
 }
 
 /// Return the LLVM type for a given tag code.
-static Type llvmTypeForTagCode(char code, MLIRContext *ctx)
-{
+static Type llvmTypeForTagCode(char code, MLIRContext *ctx) {
     Type ptrTy = LLVM::LLVMPointerType::get(ctx);
     Type i32Ty = IntegerType::get(ctx, 32);
     switch (code) {
@@ -173,8 +169,7 @@ static Type llvmTypeForTagCode(char code, MLIRContext *ctx)
 /// Extract {aligned_ptr, length_i32} from a converted `memref<?xi8>`.
 /// Layout: `{allocPtr, alignPtr, offset, sizes[1], strides[1]}`.
 static std::pair<Value, Value> extractStringFromMemref(ConversionPatternRewriter &rewriter,
-                                                       Location loc, Value memrefDesc)
-{
+                                                       Location loc, Value memrefDesc) {
     Type ptrTy = LLVM::LLVMPointerType::get(rewriter.getContext());
     Type i64Ty = IntegerType::get(rewriter.getContext(), 64);
     Type i32Ty = IntegerType::get(rewriter.getContext(), 32);
@@ -188,8 +183,7 @@ static std::pair<Value, Value> extractStringFromMemref(ConversionPatternRewriter
 }
 
 /// Box a normal argument into a stack slot.
-static Value boxNormalArg(ConversionPatternRewriter &rewriter, Location loc, Value arg, Value one)
-{
+static Value boxNormalArg(ConversionPatternRewriter &rewriter, Location loc, Value arg, Value one) {
     Type ptrTy = LLVM::LLVMPointerType::get(rewriter.getContext());
     Type argTy = arg.getType();
     Value slot = isa<LLVM::LLVMPointerType>(argTy)
@@ -201,8 +195,7 @@ static Value boxNormalArg(ConversionPatternRewriter &rewriter, Location loc, Val
 
 /// Box a string argument (tag 's').
 static Value boxStringArg(ConversionPatternRewriter &rewriter, Location loc, MLIRContext *ctx,
-                          Value convertedArg)
-{
+                          Value convertedArg) {
     auto [dataPtr, len] = extractStringFromMemref(rewriter, loc, convertedArg);
     return buildFatPointer(rewriter, loc, ctx, dataPtr, len);
 }
@@ -213,8 +206,7 @@ static Value boxStringArg(ConversionPatternRewriter &rewriter, Location loc, MLI
 /// Layout for `ks`:  `{ {ptr,i32}, {ptr,i32} }` (keyword name + string value)
 static Value boxKeywordArg(ConversionPatternRewriter &rewriter, Location loc, MLIRContext *ctx,
                            ModuleOp module, StringRef kwName, Value convertedArg, char valueCode,
-                           Value one)
-{
+                           Value one) {
     Type ptrTy = LLVM::LLVMPointerType::get(ctx);
     Type i32Ty = IntegerType::get(ctx, 32);
     auto fatPtrTy = LLVM::LLVMStructType::getLiteral(ctx, {ptrTy, i32Ty});
@@ -243,8 +235,7 @@ static Value boxKeywordArg(ConversionPatternRewriter &rewriter, Location loc, ML
         Value strLenField =
             LLVM::GEPOp::create(rewriter, loc, ptrTy, kwStructTy, kwSlot, strLenIdx);
         LLVM::StoreOp::create(rewriter, loc, strLen, strLenField);
-    }
-    else {
+    } else {
         LLVM::StoreOp::create(rewriter, loc, convertedArg, valField);
     }
 
@@ -252,8 +243,7 @@ static Value boxKeywordArg(ConversionPatternRewriter &rewriter, Location loc, ML
 }
 
 /// Get slot size in bytes for ARTIQ RPC return type code.
-static int getSlotSizeForReturnCode(char code)
-{
+static int getSlotSizeForReturnCode(char code) {
     switch (code) {
     case 'i':
         return 4;
@@ -288,8 +278,7 @@ struct RPCOpLowering : public OpConversionPattern<RTIORPCOp> {
     using OpConversionPattern::OpConversionPattern;
 
     LogicalResult matchAndRewrite(RTIORPCOp op, OpAdaptor adaptor,
-                                  ConversionPatternRewriter &rewriter) const override
-    {
+                                  ConversionPatternRewriter &rewriter) const override {
         auto rpcIdAttr = op->getAttrOfType<IntegerAttr>("rpc_id");
 
         // It should be assigned by the RPC ID assignment sub-pass.
@@ -333,11 +322,9 @@ struct RPCOpLowering : public OpConversionPattern<RTIORPCOp> {
             if (i >= numPositional) {
                 StringRef kwName = cast<StringAttr>(kwNamesAttr[i - numPositional]).getValue();
                 argSlot = boxKeywordArg(rewriter, loc, ctx, module, kwName, arg, code, one);
-            }
-            else if (code == 's') {
+            } else if (code == 's') {
                 argSlot = boxStringArg(rewriter, loc, ctx, arg);
-            }
-            else {
+            } else {
                 argSlot = boxNormalArg(rewriter, loc, arg, one);
             }
 
@@ -354,8 +341,7 @@ struct RPCOpLowering : public OpConversionPattern<RTIORPCOp> {
 
         if (op.getIsAsync()) {
             artiq.rpcSendAsync(serviceId, tagStruct, argsArray);
-        }
-        else {
+        } else {
             artiq.rpcSend(serviceId, tagStruct, argsArray);
 
             // 4. recv loop: drain chunks until rpc_recv returns 0
@@ -410,8 +396,7 @@ namespace catalyst {
 namespace rtio {
 
 void populateRTIORPCConversionPatterns(LLVMTypeConverter &typeConverter,
-                                       RewritePatternSet &patterns)
-{
+                                       RewritePatternSet &patterns) {
     patterns.add<RPCOpLowering>(typeConverter, patterns.getContext());
 }
 

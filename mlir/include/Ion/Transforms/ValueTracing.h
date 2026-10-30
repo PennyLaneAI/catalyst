@@ -50,8 +50,7 @@ enum class TraceMode {
 ///   - quantum.extract
 ///   - quantum.insert
 template <TraceMode ModeT, typename CallbackT>
-auto traceValueWithCallback(mlir::Value value, CallbackT &&callback)
-{
+auto traceValueWithCallback(mlir::Value value, CallbackT &&callback) {
     using namespace mlir;
     static_assert(std::is_same_v<std::invoke_result_t<CallbackT, Value>, WalkResult>,
                   "Callback must return WalkResult");
@@ -78,8 +77,7 @@ auto traceValueWithCallback(mlir::Value value, CallbackT &&callback)
                 Value iterArg = forOp.getInitArgs()[argIndex - 1];
                 worklist.push(iterArg);
                 continue;
-            }
-            else if (auto parallelProtocolOp = dyn_cast<ion::ParallelProtocolOp>(parentOp)) {
+            } else if (auto parallelProtocolOp = dyn_cast<ion::ParallelProtocolOp>(parentOp)) {
                 unsigned argIndex = arg.getArgNumber();
                 Value inQubit = parallelProtocolOp.getInQubits()[argIndex];
                 worklist.push(inQubit);
@@ -97,35 +95,28 @@ auto traceValueWithCallback(mlir::Value value, CallbackT &&callback)
             unsigned resultIdx = llvm::cast<OpResult>(value).getResultNumber();
             BlockArgument iterArg = forOp.getRegionIterArg(resultIdx);
             worklist.push(iterArg);
-        }
-        else if (auto ifOp = dyn_cast<scf::IfOp>(defOp)) {
+        } else if (auto ifOp = dyn_cast<scf::IfOp>(defOp)) {
             unsigned resultIdx = llvm::cast<OpResult>(value).getResultNumber();
             Value thenValue = ifOp.thenYield().getOperand(resultIdx);
             Value elseValue = ifOp.elseYield().getOperand(resultIdx);
             worklist.push(thenValue);
             worklist.push(elseValue);
-        }
-        else if (auto parallelProtocolOp = dyn_cast<ion::ParallelProtocolOp>(defOp)) {
+        } else if (auto parallelProtocolOp = dyn_cast<ion::ParallelProtocolOp>(defOp)) {
             unsigned resultIdx = llvm::cast<OpResult>(value).getResultNumber();
             Value inQubit = parallelProtocolOp.getInQubits()[resultIdx];
             worklist.push(inQubit);
-        }
-        else if (auto op = dyn_cast<mlir::UnrealizedConversionCastOp>(defOp)) {
+        } else if (auto op = dyn_cast<mlir::UnrealizedConversionCastOp>(defOp)) {
             worklist.push(op.getInputs().front());
-        }
-        else if (auto op = dyn_cast<quantum::ExtractOp>(defOp)) {
+        } else if (auto op = dyn_cast<quantum::ExtractOp>(defOp)) {
             worklist.push(op.getQreg());
-        }
-        else if (auto op = dyn_cast<rtio::RTIOQubitToChannelOp>(defOp)) {
+        } else if (auto op = dyn_cast<rtio::RTIOQubitToChannelOp>(defOp)) {
             worklist.push(op.getQubit());
-        }
-        else if (auto op = dyn_cast<quantum::InsertOp>(defOp)) {
+        } else if (auto op = dyn_cast<quantum::InsertOp>(defOp)) {
             Value inQreg = op.getInQreg();
             Value qubit = op.getQubit();
             if constexpr (ModeT == TraceMode::Qreg) {
                 worklist.push(inQreg);
-            }
-            else if constexpr (ModeT == TraceMode::Event) {
+            } else if constexpr (ModeT == TraceMode::Event) {
                 worklist.push(qubit);
                 // only trace qreg if it defined op is also come from insert op
                 if (llvm::isa_and_present<quantum::InsertOp>(inQreg.getDefiningOp())) {

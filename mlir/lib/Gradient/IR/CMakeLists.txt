@@ -9,6 +9,7 @@ add_mlir_library(MLIRGradient
     DEPENDS
     MLIRGradientOpsIncGen
     MLIRGradientInterfacesIncGen
+    MLIRGradientAttrDefsIncGen
 
     LINK_LIBS PRIVATE
     GradientUtils

@@ -35,8 +35,7 @@ namespace ion {
 struct GatesToPulsesPass : impl::GatesToPulsesPassBase<GatesToPulsesPass> {
     using GatesToPulsesPassBase::GatesToPulsesPassBase;
 
-    LevelAttr getLevelAttr(MLIRContext *ctx, IRRewriter &builder, Level level)
-    {
+    LevelAttr getLevelAttr(MLIRContext *ctx, IRRewriter &builder, Level level) {
         return LevelAttr::get(
             ctx, builder.getStringAttr(level.label), builder.getI64IntegerAttr(level.principal),
             builder.getF64FloatAttr(level.spin), builder.getF64FloatAttr(level.orbital),
@@ -46,27 +45,23 @@ struct GatesToPulsesPass : impl::GatesToPulsesPassBase<GatesToPulsesPass> {
             builder.getF64FloatAttr(level.energy));
     }
 
-    TransitionAttr getTransitionAttr(MLIRContext *ctx, IRRewriter &builder, Transition transition)
-    {
+    TransitionAttr getTransitionAttr(MLIRContext *ctx, IRRewriter &builder, Transition transition) {
         return TransitionAttr::get(ctx, builder.getStringAttr(transition.level_0),
                                    builder.getStringAttr(transition.level_1),
                                    builder.getF64FloatAttr(transition.einstein_a),
                                    builder.getStringAttr(transition.multipole));
     }
 
-    PhononAttr getPhononAttr(MLIRContext *ctx, IRRewriter &builder, Phonon phonon)
-    {
+    PhononAttr getPhononAttr(MLIRContext *ctx, IRRewriter &builder, Phonon phonon) {
         return PhononAttr::get(ctx, builder.getF64FloatAttr(phonon.energy),
                                builder.getDenseF64ArrayAttr(phonon.eigenvector));
     }
 
-    bool canScheduleOn(RegisteredOperationName opInfo) const override
-    {
+    bool canScheduleOn(RegisteredOperationName opInfo) const override {
         return opInfo.hasInterface<FunctionOpInterface>();
     }
 
-    void runOnOperation() final
-    {
+    void runOnOperation() final {
         func::FuncOp op = cast<func::FuncOp>(getOperation());
         if (!op->hasAttr("qnode")) {
             return;

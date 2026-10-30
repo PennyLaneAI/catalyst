@@ -512,8 +512,10 @@ class TestParitySynthIntegration:
             qp.CNOT((1, 0))
             return qp.state()
 
-        raw_circuit = qp.qjit(circuit, capture=True)
-        compiled_circuit = qp.qjit(parity_synth_pass(circuit), capture=True)
+        raw_circuit = qp.qjit(circuit, capture=True, collect_decomp_rules=False)
+        compiled_circuit = qp.qjit(
+            parity_synth_pass(circuit), capture=True, collect_decomp_rules=False
+        )
 
         run_filecheck_qjit(compiled_circuit)
         args = (0.6, 0.2, -1.8)
@@ -546,20 +548,24 @@ class TestParitySynthIntegration:
             qp.RZ(z, w1)
             qp.CNOT((w1, 0))
 
-            # Purely static wire section
+            # Purely static wire section. The distinct-index extract/insert
+            # canonicalization (#2965) groups the extracts above the gate run, and the
+            # reshaped run synthesizes to one extra CNOT here (parity synthesis is not
+            # monotone in how the gates are grouped).
             # CHECK: [[phi_1:%.+]] = tensor.extract %arg0
             # CHECK: [[phi_2:%.+]] = tensor.extract %arg0
+            # CHECK: [[phi_3:%.+]] = tensor.extract %arg0
             # CHECK: quantum.custom "RZ"([[phi_1]])
             # CHECK: quantum.custom "RZ"([[phi_2]])
             # CHECK: quantum.custom "CNOT"()
-            # CHECK: [[phi_3:%.+]] = tensor.extract %arg0
             # CHECK: quantum.custom "CNOT"()
             # CHECK: quantum.custom "RZ"([[phi_3]])
             # CHECK: quantum.custom "CNOT"()
             # CHECK: quantum.custom "CNOT"()
+            # CHECK: quantum.custom "CNOT"()
             # CHECK: [[omega_1:%.+]] = tensor.extract %arg1
-            # CHECK: quantum.custom "RZ"([[omega_1]])
             # CHECK: [[omega_2:%.+]] = tensor.extract %arg1
+            # CHECK: quantum.custom "RZ"([[omega_1]])
             # CHECK: quantum.custom "RZ"([[omega_2]])
             qp.RZ(x, 0)
             qp.RZ(x, 1)
@@ -595,8 +601,10 @@ class TestParitySynthIntegration:
 
             return qp.state()
 
-        raw_circuit = qp.qjit(circuit, capture=True)
-        compiled_circuit = qp.qjit(parity_synth_pass(circuit), capture=True)
+        raw_circuit = qp.qjit(circuit, capture=True, collect_decomp_rules=False)
+        compiled_circuit = qp.qjit(
+            parity_synth_pass(circuit), capture=True, collect_decomp_rules=False
+        )
 
         run_filecheck_qjit(compiled_circuit)
         args = (0.6, 0.2, -1.8)
@@ -666,8 +674,10 @@ class TestParitySynthIntegration:
 
             return qp.state()
 
-        raw_circuit = qp.qjit(circuit, capture=True)
-        compiled_circuit = qp.qjit(parity_synth_pass(circuit), capture=True)
+        raw_circuit = qp.qjit(circuit, capture=True, collect_decomp_rules=False)
+        compiled_circuit = qp.qjit(
+            parity_synth_pass(circuit), capture=True, collect_decomp_rules=False
+        )
 
         run_filecheck_qjit(compiled_circuit)
         for x in [0.5, 1.5, 2.5, 3.5]:

@@ -28,7 +28,6 @@ from xdsl.dialects import builtin, transform
 from xdsl.passes import PassPipeline
 
 from catalyst import CompileError, qjit
-from catalyst.passes import apply_pass
 from catalyst.passes import cancel_inverses as catalyst_cancel_inverses
 from catalyst.passes.xdsl_plugin import getXDSLPluginAbsolutePath
 from catalyst.python_interface import Compiler
@@ -107,7 +106,7 @@ def test_generic_catalyst_program(as_mod):
             }) {transform.with_named_sequence} : () -> ()
             "func.func"() <{function_type = () -> tensor<2xcomplex<f64>>, sym_name = "circuit", sym_visibility = "public"}> ({
               %0 = "arith.constant"() <{value = 0 : i64}> : () -> i64
-              "quantum.device"(%0) <{kwargs = "{'shots': 0, 'mcmc': False, 'num_burnin': 0, 'kernel_name': None}", lib = "/usr/local/lib/python3.11/dist-packages/pennylane_lightning/liblightning_qubit_catalyst.so", device_name = "LightningSimulator"}> : (i64) -> ()
+              "quantum.device"(%0) <{kwargs = "{'shots': 0, 'mcmc': False, 'num_burnin': 0, 'kernel_name': None}", lib = "/usr/local/lib/python3.12/dist-packages/pennylane_lightning/liblightning_qubit_catalyst.so", device_name = "LightningSimulator"}> : (i64) -> ()
               %1 = "quantum.alloc"() <{nqubits_attr = 1 : i64}> : () -> !quantum.reg
               %2 = "quantum.extract"(%1) <{idx_attr = 0 : i64}> : (!quantum.reg) -> !quantum.bit
               %3 = "quantum.custom"(%2) <{gate_name = "Hadamard", operandSegmentSizes = array<i32: 0, 1, 0, 0>, resultSegmentSizes = array<i32: 1, 0>}> : (!quantum.bit) -> !quantum.bit
@@ -233,7 +232,7 @@ class TestCatalystIntegration:
 
         assert capture_enabled()
 
-        @qjit(pass_plugins=[getXDSLPluginAbsolutePath()], capture=True)
+        @qjit(pass_plugins=[getXDSLPluginAbsolutePath()], capture=True, collect_decomp_rules=False)
         @qp.qnode(qp.device("lightning.qubit", wires=2))
         def f(x):
             qp.RX(x, 0)
@@ -264,7 +263,7 @@ class TestCatalystIntegration:
 
         assert capture_enabled()
 
-        @qjit(capture=True)
+        @qjit(capture=True, collect_decomp_rules=False)
         @hello_world_pass
         @qp.qnode(qp.device("lightning.qubit", wires=2))
         def f(x):
@@ -283,7 +282,7 @@ class TestCatalystIntegration:
         assert not capture_enabled()
 
         @qjit
-        @apply_pass("hello-world")
+        @qp.transform(pass_name="hello-world")
         @qp.qnode(qp.device("lightning.qubit", wires=2))
         def f(x):
             qp.RX(x, 0)
@@ -301,7 +300,7 @@ class TestCatalystIntegration:
 
         assert capture_enabled()
 
-        @qjit(capture=True)
+        @qjit(capture=True, collect_decomp_rules=False)
         @hello_world_pass
         @qp.transforms.cancel_inverses
         @qp.qnode(qp.device("lightning.qubit", wires=2))
@@ -323,7 +322,7 @@ class TestCatalystIntegration:
         assert not capture_enabled()
 
         @qjit
-        @apply_pass("hello-world")
+        @qp.transform(pass_name="hello-world")
         @catalyst_cancel_inverses
         @qp.qnode(qp.device("lightning.qubit", wires=2))
         def f(x):
@@ -462,7 +461,7 @@ class TestCallbackIntegration:
             print("=== Between Pass ===")
             print(module)
 
-        @qp.qjit(skip_preprocess=skip_preprocess, capture=True)
+        @qp.qjit(skip_preprocess=skip_preprocess, capture=True, collect_decomp_rules=False)
         @iterative_cancel_inverses_pass
         @merge_rotations_pass
         @qp.qnode(qp.device("null.qubit", wires=2))

@@ -20,9 +20,11 @@ from collections.abc import Sequence
 from typing import ClassVar
 
 from xdsl.dialects.builtin import (
+    I64,
     ArrayAttr,
     ComplexType,
     Float64Type,
+    IntegerAttr,
     IntegerType,
     MemRefType,
     StringAttr,
@@ -32,6 +34,7 @@ from xdsl.dialects.builtin import (
 )
 from xdsl.ir import Operation, SSAValue
 from xdsl.irdl import (
+    AtLeast,
     AttrSizedOperandSegments,
     AttrSizedResultSegments,
     IRDLOperation,
@@ -388,7 +391,7 @@ class PCPhaseOp(UnitaryGateOp):
     name = "quantum.pcphase"
 
     assembly_format = """
-        `(` $theta `,` $dim `)` $in_qubits
+        `(` $theta `,` `dim` `:` $dim `)` $in_qubits
         (`adj` $adjoint^)?
         attr-dict
         ( `ctrls` `(` $in_ctrl_qubits^ `)` )?
@@ -403,7 +406,7 @@ class PCPhaseOp(UnitaryGateOp):
 
     theta = operand_def(Float64Type())
 
-    dim = operand_def(Float64Type())
+    dim = opt_prop_def(IntegerAttr.constr(type=I64, value=AtLeast(0)))
 
     in_qubits = var_operand_def(QubitType)
 
@@ -424,7 +427,7 @@ class PCPhaseOp(UnitaryGateOp):
         self,
         *,
         theta: SSAValue[Float64Type],
-        dim: SSAValue[Float64Type],
+        dim: IntegerAttr | int,
         in_qubits: QubitSSAValue | Operation | Sequence[QubitSSAValue | Operation],
         in_ctrl_qubits: (
             QubitSSAValue | Operation | Sequence[QubitSSAValue | Operation] | None
@@ -450,10 +453,14 @@ class PCPhaseOp(UnitaryGateOp):
 
         out_qubits = tuple(QubitType() for _ in in_qubits)
         out_ctrl_qubits = tuple(QubitType() for _ in in_ctrl_qubits)
-        properties = {"adjoint": UnitAttr()} if adjoint else {}
+
+        dim_attr = IntegerAttr(dim, 64) if isinstance(dim, int) else dim
+        properties = {"dim": dim_attr}
+        if adjoint:
+            properties["adjoint"] = UnitAttr()
 
         super().__init__(
-            operands=(theta, dim, in_qubits, in_ctrl_qubits, in_ctrl_values),
+            operands=(theta, in_qubits, in_ctrl_qubits, in_ctrl_values),
             result_types=(out_qubits, out_ctrl_qubits),
             properties=properties,
         )

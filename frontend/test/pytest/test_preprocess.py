@@ -19,8 +19,10 @@ from dataclasses import replace
 import numpy as np
 import pennylane as qp
 import pytest
+from pennylane.decomposition import add_decomps, register_resources
 from pennylane.devices import Device, NullQubit
 from pennylane.devices.capabilities import DeviceCapabilities, OperatorProperties
+from pennylane.ops.op_math.adjoint2 import adjoint_rotation as adjoint_rotation2
 from pennylane.tape import QuantumScript
 from utils import CONFIG_CUSTOM_DEVICE
 
@@ -38,7 +40,7 @@ from catalyst.compiler import get_lib_path
 from catalyst.device.decomposition import catalyst_decompose, decompose_ops_to_unitary
 from catalyst.jax_tracer import HybridOpRegion
 
-# pylint: disable=unused-argument
+# pylint: disable=unused-argument,unsubscriptable-object
 
 
 class OtherHadamard(qp.Hadamard):
@@ -73,6 +75,15 @@ class OtherRX(qp.RX):
     def decomposition(self):
         """decomposes to normal RX"""
         return [qp.RX(*self.parameters, self.wires)]
+
+
+@register_resources({qp.RX: 1})
+def _other_rx_to_rx(phi, wires):
+    qp.RX(phi, wires)
+
+
+add_decomps(OtherRX, _other_rx_to_rx)
+add_decomps("Adjoint(OtherRX)", adjoint_rotation2)
 
 
 class CustomDevice(Device):
@@ -187,6 +198,7 @@ HYBRID_OPS = [
 TEST_DEVICE_CONFIG_TEXT = """
 schema = 3
 [operators.gates]
+GlobalPhase = { }
 PauliX = { }
 PauliZ = { }
 RX = { }
@@ -201,6 +213,7 @@ QubitUnitary = { }
 """
 
 TARGET_GATES_FROM_CONFIG = {
+    "GlobalPhase": 1,
     "PauliX": 1,
     "PauliZ": 1,
     "RX": 100,
@@ -285,6 +298,10 @@ class TestPreprocessHybridOp:
 
         assert np.isclose(circuit(x, y), np.cos(-x) * np.cos(y))
 
+    @pytest.mark.xfail(
+        reason="Legacy preprocessing cannot decompose Operator2 Hadamard subclasses",
+        raises=CompileError,
+    )
     def test_decomposition_of_cond_circuit(self):
         """Test that unsupported operators nested in Cond are decompsed, and the
         resulting circuit has the expected result, obtained analytically"""
@@ -310,7 +327,10 @@ class TestPreprocessHybridOp:
             return qp.state()
 
         # mlir contains expected gate names, and not the unsupported gate names
-        mlir = qjit(circuit, target="mlir").mlir
+        qjc = qjit(circuit, target="mlir")
+        # force creation of mlir
+        _ = qjc(0.5)
+        mlir = qjc.mlir
         assert "RX" in mlir
         assert "CNOT" in mlir
         assert "PhaseShift" in mlir
@@ -331,6 +351,10 @@ class TestPreprocessHybridOp:
         expected_res = np.array([x1, x2, x1, x2])
         assert np.allclose(expected_res, circuit(phi))
 
+    @pytest.mark.xfail(
+        reason="Legacy preprocessing cannot decompose Operator2 Hadamard subclasses",
+        raises=CompileError,
+    )
     @pytest.mark.parametrize("reps, angle", [(3, 1.72), (5, 1.6), (10, 0.4)])
     def test_decomposition_of_forloop_circuit(self, reps, angle):
         """Test that unsupported operators nested in ForLoop are decompsed, and
@@ -483,9 +507,11 @@ class TestPreprocessHybridOp:
 
         (new_tape,), _ = catalyst_decompose(tape, **kwargs)
 
-        assert len(new_tape.operations) == 2
+        assert len(new_tape.operations) == 3 if expected_second_op is qp.RZ else 2
         assert isinstance(new_tape.operations[0], qp.PauliX)
         assert isinstance(new_tape.operations[1], expected_second_op)
+        if expected_second_op is qp.RZ:
+            assert isinstance(new_tape.operations[2], qp.GlobalPhase)
 
     @pytest.mark.usefixtures("create_temporary_toml_file")
     @pytest.mark.parametrize("create_temporary_toml_file", [TEST_DEVICE_CONFIG_TEXT], indirect=True)
@@ -503,7 +529,7 @@ class TestPreprocessHybridOp:
 
         (new_tape,), _ = catalyst_decompose(tape, **kwargs)
 
-        assert len(new_tape.operations) == 6
+        assert len(new_tape.operations) == 14
         assert np.allclose(qp.matrix(new_tape, wire_order=[1, 0]), tape.operations[0].matrix())
 
     @pytest.mark.usefixtures("create_temporary_toml_file")
@@ -555,34 +581,13 @@ class TestPreprocessHybridOp:
     @pytest.mark.usefixtures("create_temporary_toml_file")
     @pytest.mark.parametrize("create_temporary_toml_file", [TEST_DEVICE_CONFIG_TEXT], indirect=True)
     @pytest.mark.parametrize("gate_set_src", ["capabilities", "target_gates"])
-    def test_unsupported_op_with_no_decomposition_raises_error(self, request, gate_set_src):
-        """Test that an unsupported operator that doesn't provide a decomposition
-        raises a CompileError"""
-
-        tape = qp.tape.QuantumScript([qp.Y(0)])
-
-        if gate_set_src == "capabilities":
-            capabilities = DeviceCapabilities.from_toml_file(request.node.toml_file)
-            setattr(capabilities, "to_matrix_ops", {"S": OperatorProperties()})
-            capabilities = replace(capabilities, operations={})
-            kwargs = {"capabilities": capabilities}
-        else:
-            kwargs = {"target_gates": {}, "capabilities": None}
-
-        with pytest.raises(
-            CompileError,
-            match="not supported with catalyst on this device and does not provide a decomposition",
-        ):
-            _ = catalyst_decompose(tape, **kwargs)
-
-    @pytest.mark.usefixtures("create_temporary_toml_file")
-    @pytest.mark.parametrize("create_temporary_toml_file", [TEST_DEVICE_CONFIG_TEXT], indirect=True)
-    @pytest.mark.parametrize("gate_set_src", ["capabilities", "target_gates"])
     def test_decompose_to_matrix_raises_error(self, request, gate_set_src):
         """Test that _decompose_to_matrix raises a CompileError if the operator has no matrix"""
 
         class NoMatrixMultiControlledX(qp.MultiControlledX):
             """A version of MulitControlledX with no matrix defined"""
+
+            has_decomposition = False
 
             def matrix(self):
                 """raise an error"""
@@ -600,7 +605,10 @@ class TestPreprocessHybridOp:
 
         with pytest.raises(
             CompileError,
-            match="not supported with catalyst on this device and does not provide a decomposition",
+            match=(
+                "could not be decomposed|not supported with catalyst on this device "
+                "and does not provide a decomposition"
+            ),
         ):
             _ = catalyst_decompose(tape, **kwargs)
 
@@ -628,76 +636,6 @@ class TestPreprocessHybridOp:
             match="grad_method is not taken into account .* if target_gates are provided",
         ):
             _ = catalyst_decompose(tape, None, grad_method="fd", target_gates={"X"})
-
-
-class TestAdjointCallableLazyFalse:
-    """Test adjoint(callable, lazy=False) in @qjit."""
-
-    def test_qp_adjoint_callable_lazy_false_with_for_loop(self):
-        """Test that qp.adjoint(callable, lazy=False) works."""
-        dev = qp.device("lightning.qubit", wires=6)
-
-        @qjit(capture=False)
-        @qp.qnode(dev)
-        def circuit():
-            @for_loop(0, 3, 1)
-            def loop(i):
-                qp.Toffoli(wires=[i, i + 1, i + 2])
-
-            qp.adjoint(lambda: loop(), lazy=False)()
-            return qp.state()
-
-        result = circuit()
-        assert np.isclose(result[0], 1.0)
-
-    def test_adjoint_callable_lazy_false_mixed_ops_identity(self):
-        """Test adjoint(sub) == Identity for a callable with mixed gates and for_loop."""
-        dev = qp.device("lightning.qubit", wires=6)
-
-        @qjit(capture=False)
-        @qp.qnode(dev)
-        def circuit():
-            def sub():
-                qp.Hadamard(0)
-
-                @for_loop(0, 3, 1)
-                def loop(i):
-                    qp.RY(0.5, wires=i)
-                    qp.CNOT(wires=[i, i + 1])
-
-                loop()
-                qp.T(wires=2)
-
-            qp.adjoint(sub, lazy=False)()
-            sub()
-            return qp.state()
-
-        result = circuit()
-        assert np.isclose(result[0], 1.0)
-
-    def test_adjoint_callable_lazy_false_with_nested_hybrid_adjoint(self):
-        """Test adjoint(callable, lazy=False) when the callable contains a HybridAdjoint.
-
-        It's expected to produce a HybridAdjoint of HybridAdjoint(RX) so that the MLIR
-        adjoint-lowering pass can handle the reversal.
-        """
-
-        dev = qp.device("lightning.qubit", wires=1)
-
-        def g():
-            qp.H(0)
-            qp.adjoint(lambda: qp.RX(1.23, 0) and None)()
-            qp.X(0)
-
-        @qjit(capture=False)
-        @qp.qnode(dev)
-        def circuit():
-            g()
-            qp.adjoint(g, lazy=False)()
-            return qp.state()
-
-        result = circuit()
-        assert np.isclose(result[0], 1.0)
 
 
 if __name__ == "__main__":

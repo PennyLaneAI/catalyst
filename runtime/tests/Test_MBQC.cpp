@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <cstdint>
+
 #include "catch2/catch_test_macros.hpp"
 
 #include "RuntimeCAPI.h"
@@ -20,8 +22,7 @@
 // MBQC Runtime Tests
 // -------------------------------------------------------------------------- //
 
-TEST_CASE("Test __catalyst__mbqc__measure_in_basis, device=null.qubit", "[MBQC]")
-{
+TEST_CASE("Test __catalyst__mbqc__measure_in_basis, device=null.qubit", "[MBQC]") {
     __catalyst__rt__initialize(nullptr);
 
     const std::string rtd_name{"null.qubit"};

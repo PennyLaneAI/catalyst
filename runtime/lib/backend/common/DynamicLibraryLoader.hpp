@@ -26,8 +26,7 @@
 struct DynamicLibraryLoader {
     void *handle;
 
-    DynamicLibraryLoader(std::string_view library_name, int mode = RTLD_LAZY | RTLD_NODELETE)
-    {
+    DynamicLibraryLoader(std::string_view library_name, int mode = RTLD_LAZY | RTLD_NODELETE) {
         // Load the shared library
         handle = dlopen(library_name.data(), mode);
         if (!handle) {
@@ -36,8 +35,7 @@ struct DynamicLibraryLoader {
         }
     }
 
-    ~DynamicLibraryLoader()
-    {
+    ~DynamicLibraryLoader() {
         if (handle) {
             // TODO: This is non-sensical.
             // We are using RTLD_NODELETE, why would calling dlclose have a side-effect?
@@ -63,8 +61,7 @@ struct DynamicLibraryLoader {
     }
 
     // Get symbol from library
-    template <typename T> T getSymbol(std::string_view symbol_name)
-    {
+    template <typename T> T getSymbol(std::string_view symbol_name) {
         // Clear any existing errors
         dlerror();
 

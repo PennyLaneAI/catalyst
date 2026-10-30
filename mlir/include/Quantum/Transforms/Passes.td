@@ -16,6 +16,17 @@
 #define QUANTUM_PASSES
 
 include "mlir/Pass/PassBase.td"
+include "mlir/IR/EnumAttr.td"
+
+def GridsynthMethod : I32EnumAttr<"GridsynthMethod", "Synthesis method of the gridsynth pass",
+    [
+        I32EnumAttrCase<"Deterministic", 0, "deterministic">,
+        I32EnumAttrCase<"Mixed", 1, "mixed">,
+        I32EnumAttrCase<"MixedFallback", 2, "mixed-fallback">,
+    ]> {
+    let cppNamespace = "catalyst::quantum";
+    let genSpecializedAttr = 0;
+}
 
 def QuantumConversionPass : Pass<"convert-quantum-to-llvm"> {
     let summary = "Perform a dialect conversion from Quantum to LLVM (QIR).";
@@ -70,6 +81,42 @@ def AdjointLoweringPass : Pass<"adjoint-lowering"> {
     ];
 }
 
+def ResolveGateLevelAdjoint : Pass<"resolve-gate-level-adjoint"> {
+    let summary = "Applies canonicalization patterns for adjoint quantum operations.";
+}
+
+def CtrlLoweringPass : Pass<"ctrl-lowering"> {
+    let summary = "Lower ctrl regions by distributing the controls over the enclosed operations.";
+
+    let dependentDialects = ["scf::SCFDialect"];
+}
+
+def ModifiersLoweringPass : Pass<"modifiers-lowering"> {
+    let summary = "Lower quantum.ctrl and quantum.adjoint regions to op-level modifiers.";
+
+    let description = [{
+        Runs the ctrl-lowering and adjoint-lowering rewrite patterns together under a single greedy
+        driver until a fixed point. This allows arbitrarily nested control and adjoint regions to be
+        resolved. Each pattern defers (returns a match failure) while its region still contains the
+        other modifier, so the greedy worklist naturally interleaves them: an inner adjoint region is
+        reduced, then the enclosing control lowers on a re-try, and vice versa. This reaches the same
+        fixed point as manually alternating the standalone ctrl-lowering and adjoint-lowering passes,
+        in a single pass and regardless of nesting depth or order.
+    }];
+
+    let dependentDialects = [
+        "catalyst::CatalystDialect",
+        "index::IndexDialect",
+        "tensor::TensorDialect",
+        "complex::ComplexDialect",
+        "scf::SCFDialect"
+    ];
+}
+
+def RemoveGlobalPhasesPass : Pass<"remove-global-phases"> {
+    let summary = "Remove global phases by deleting phase operations without control wires.";
+}
+
 def SplitMultipleTapesPass : Pass<"split-multiple-tapes"> {
     let summary = "Given a qnode containing multiple tapes, split each tape into its own function.";
 }
@@ -109,6 +156,15 @@ def CancelInversesPass : Pass<"cancel-inverses"> {
 
 def GridsynthPass : Pass<"gridsynth"> {
     let summary = "Perform Ross-Selinger/Gridsynth decomposition.";
+    let description = [{
+        Discretizes single-qubit RZ and PhaseShift gates, and PPR-Z rotations with an arbitrary
+        angle, at execution time. The pass fails on controlled RZ and PhaseShift gates, which need
+        to be decomposed into single-qubit rotations first.
+
+        With `method=mixed-fallback`, each rotation allocates an ancilla qubit, measures it and
+        releases it, and applies the fallback sequence inside an `scf.if` on the measurement
+        result.
+    }];
 
     let options = [Option<
         /*C++ var name=*/"epsilon",
@@ -121,7 +177,21 @@ def GridsynthPass : Pass<"gridsynth"> {
         /*CLI name=*/"ppr-basis",
         /*Type=*/"bool",
         /*Default=*/"false",
-        /*Description=*/desc="Whether to decompose into the PPR basis set instead of the standard Clifford+T basis set.">,];
+        /*Description=*/desc="Whether to decompose into the PPR basis set instead of the standard Clifford+T basis set.">,
+        Option<
+        /*C++ var name=*/"method",
+        /*CLI name=*/"method",
+        /*Type=*/"::catalyst::quantum::GridsynthMethod",
+        /*Default=*/"::catalyst::quantum::GridsynthMethod::Deterministic",
+        /*Description=*/desc="Synthesis method. 'mixed' and 'mixed-fallback' are cheaper but match the accuracy of 'deterministic' only on average over samples.",
+        /*Additional flags=*/additionalFlags=[{::llvm::cl::values(
+            clEnumValN(::catalyst::quantum::GridsynthMethod::Deterministic, "deterministic",
+                       "A single Ross-Selinger sequence per rotation."),
+            clEnumValN(::catalyst::quantum::GridsynthMethod::Mixed, "mixed",
+                       "A probabilistic mixture of Ross-Selinger sequences for under- and over-rotations."),
+            clEnumValN(::catalyst::quantum::GridsynthMethod::MixedFallback, "mixed-fallback",
+                       "A probabilistic mixture of projective rotations on an ancilla, with a mixed fallback on failure.")
+        )}]>,];
 
         let dependentDialects = [
         "memref::MemRefDialect",
@@ -174,7 +244,19 @@ def GraphDecompositionPass : Pass<"graph-decomposition", "mlir::ModuleOp"> {
             /*CLI name*/"libpython-path",
             /*Type*/"std::string",
             /*Default*/[{ "" }],
-            /*Description*/"A path to the python shared library.">
+            /*Description*/"A path to the python shared library.">,
+        Option<
+            /*C++ name*/"verboseOption",
+            /*CLI name*/"verbose",
+            /*Type*/"bool",
+            /*Default*/[{ false }],
+            /*Description*/"Print the decomposition rule chosen for each operator to stderr.">,
+        Option<
+            /*C++ name*/"inlineRuleBody",
+            /*CLI name*/"inline-rule-body",
+            /*Type*/"bool",
+            /*Default*/[{ false }],
+            /*Description*/"Whether to inline the rule body. Defaults to false.">
     ];
 
     let dependentDialects = [
@@ -184,19 +266,15 @@ def GraphDecompositionPass : Pass<"graph-decomposition", "mlir::ModuleOp"> {
         "LLVM::LLVMDialect",
         "stablehlo::StablehloDialect",
         "tensor::TensorDialect",
+        "catalyst::CatalystDialect",
+        "catalyst::qref::QRefDialect",
+        "catalyst::pbc::PBCDialect",
+        "catalyst::mbqc::MBQCDialect",
     ];
 }
 
-def DecomposeLoweringPass : Pass<"decompose-lowering"> {
-    let summary = "Replace quantum operations with compiled decomposition rules.";
-
-    let options = [
-        ListOption<
-            /*C++ name*/"targetRulesOption",
-            /*CLI name*/"target-rules",
-            /*Type*/"std::string",
-            /*Description*/"The set of decomposition rules to apply. If empty, applies all rules.">
-    ];
+def ResolveStatePrepOperatorPass : Pass<"resolve-state-prep-operator"> {
+    let summary = "Replace all quantum.operator ops of StatePrep/BasisState to equivalent quantum.set_state/set_basis_state operations ";
 }
 
 def DisentangleCNOTPass : Pass<"disentangle-cnot"> {

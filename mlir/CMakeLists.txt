@@ -41,6 +41,7 @@ set(MLIR_BINARY_DIR ${CMAKE_BINARY_DIR})
 list(APPEND CMAKE_MODULE_PATH "${MLIR_CMAKE_DIR}")
 list(APPEND CMAKE_MODULE_PATH "${LLVM_CMAKE_DIR}")
 list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake/modules")
+list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/../cmake")  # shared with runtime/
 
 
 # Discover stablehlo libraries and bundle them into a cmake target for catalyst to link to
@@ -75,7 +76,7 @@ foreach(STABLEHLO_LIB IN LISTS STABLEHLO_LIBS)
     )
 endforeach()
 
-add_library(ExternalStablehloLib INTERFACE)
+add_library(ExternalStablehloLib INTERFACE IMPORTED GLOBAL)
 
 foreach(STABLEHLO_LIB IN LISTS STABLEHLO_LIBS)
     target_link_libraries(ExternalStablehloLib INTERFACE ${STABLEHLO_LIB})
@@ -142,22 +143,23 @@ FetchContent_Declare(tomlplusplus
 )
 FetchContent_MakeAvailable(tomlplusplus)
 
+######################
+## Catalyst Version ##
+######################
+
+include(ReadCatalystVersion)
+
+# Read here, in the top-level scope, rather than in a subdirectory: variables set
+# inside an add_subdirectory() scope do not propagate back up, and the CPack
+# configuration at the bottom of this file needs the version.
+require_catalyst_version(CATALYST_PACKAGE_VERSION)
+
 ################################################################################
 ## Generate frontend_catalyst_version_py.h from frontend/catalyst/_version.py ##
 ################################################################################
 
 function(make_version_header_file input_file output_file)
-    set(version_number "unknown")
-    if (NOT EXISTS ${input_file})
-        message(WARNING "Could not find ${input_file}")
-    else()
-        file(READ ${input_file} input_content)
-        if (NOT input_content MATCHES "__version__ = \"([^\"]+)\"")
-            message(WARNING "Could not find Catalyst version in ${input_file}")
-        else()
-            set(version_number "${CMAKE_MATCH_1}")
-        endif()
-    endif()
+    read_catalyst_version(${input_file} version_number)
     set(header_content "#pragma once\n\nstatic constexpr const char *CATALYST_VERSION = \"${version_number}\";\n")
     # Avoid touching the output when content is unchanged. This prevents
     # unnecessary recompilation of translation units that include this header.
@@ -174,7 +176,7 @@ function(make_version_header_file input_file output_file)
 endfunction(make_version_header_file)
 
 make_version_header_file(
-    "${PROJECT_SOURCE_DIR}/../frontend/catalyst/_version.py"
+    "${CATALYST_VERSION_PY_FILE}"
     "${PROJECT_BINARY_DIR}/include/Catalyst/Utils/frontend_catalyst_version_py.h"
 )
 
@@ -280,3 +282,93 @@ endif()
 if(NOT CATALYST_DOCS_ONLY)
   add_subdirectory(test)
 endif()
+
+
+###################################################################
+## Generate a Catalyst Development Package for External Projects ##
+###################################################################
+
+include(GNUInstallDirs)
+
+# Re-fetch the exported targets and strip the same third-party ones the
+# build-tree export already excludes (see cmake/modules/CMakeLists.txt).
+get_property(CATALYST_INSTALL_TARGETS GLOBAL PROPERTY MLIR_EXPORTS)
+set(TARGETS_TO_REMOVE
+    nlohmann_json
+    tomlplusplus_tomlplusplus
+    ion-transforms
+    CatalystCompilerDriver
+    PBCUtils
+    QuantumCAPI
+    pbc-transforms
+    quantum-transforms  # depends on decompsolver; exclude
+    decompsolver        # its public include dir is a source-tree path; exclude
+    )
+list(REMOVE_ITEM CATALYST_INSTALL_TARGETS ${TARGETS_TO_REMOVE})
+
+# Static archives, shared libs, and any runtime artifacts from the dialects,
+# transforms and utils. INCLUDES DESTINATION records the include path in the
+# exported targets so consumers get it transitively.
+# We use `COMPONENT catalyst-dev` since `add_mlir_public_c_api_library(QuantumCAPI ...)
+# auto-generates its own install rule that we want to bypass.
+install(TARGETS ${CATALYST_INSTALL_TARGETS}
+    EXPORT CatalystTargets
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT catalyst-dev
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT catalyst-dev
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT catalyst-dev
+    INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+
+# Install license to share/doc/Catalyst/LICENSE
+install(FILES "${PROJECT_SOURCE_DIR}/../LICENSE"
+    DESTINATION "${CMAKE_INSTALL_DOCDIR}"
+    COMPONENT catalyst-dev)
+
+# Tools (binaries). These are usually not in MLIR_EXPORTS, so install by name.
+# NOTE: We use the catalyst-bin component for tools to exclude from catalyst-dev.
+if(NOT CATALYST_DOCS_ONLY)
+    # Need to wrap in `if(NOT CATALYST_DOCS_ONLY)` since `add_subdirectory(tools)`
+    # is also conditional on this predicate
+    install(TARGETS catalyst-cli quantum-opt quantum-lsp-server
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT catalyst-bin)
+endif()
+
+# Hand-written headers (*.h and the *.td that TableGen consumers may want).
+install(DIRECTORY ${CATALYST_MAIN_INCLUDE_DIR}/
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+    COMPONENT catalyst-dev
+    FILES_MATCHING
+      PATTERN "*.h"
+      PATTERN "*.td"
+      PATTERN "*.capi.h.inc")
+
+# TableGen-generated headers (*.h.inc, *.cpp.inc) AND the generated
+# frontend_catalyst_version_py.h all live under the build-tree include dir.
+install(DIRECTORY ${CATALYST_GEN_INCLUDE_DIR}/
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+    COMPONENT catalyst-dev
+    FILES_MATCHING
+      PATTERN "*.h"
+      PATTERN "*.h.inc"
+      PATTERN "*.cpp.inc"
+    PATTERN "CMakeFiles" EXCLUDE)
+
+# Bundle the StableHLO static archives that Catalyst links against.
+install(DIRECTORY "${STABLEHLO_BUILD_DIR}/lib/"
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    COMPONENT catalyst-dev
+    FILES_MATCHING PATTERN "lib*.a")
+
+set(CPACK_PACKAGE_NAME "catalyst-dev")
+set(CPACK_PACKAGE_VERSION "${CATALYST_PACKAGE_VERSION}")
+set(CPACK_PACKAGE_VENDOR "Xanadu Quantum Technologies Inc.")
+set(CPACK_RESOURCE_FILE_LICENSE "${PROJECT_SOURCE_DIR}/../LICENSE")
+set(CPACK_GENERATOR "TGZ")
+set(CPACK_PACKAGE_FILE_NAME "${CPACK_PACKAGE_NAME}-${CMAKE_SYSTEM_NAME}-${CMAKE_SYSTEM_PROCESSOR}-${CATALYST_PACKAGE_VERSION}")
+set(CPACK_ARCHIVE_COMPONENT_INSTALL ON)
+set(CPACK_INCLUDE_TOPLEVEL_DIRECTORY ON)             # extracts into catalyst-dev-<ver>
+set(CPACK_COMPONENT_INCLUDE_TOPLEVEL_DIRECTORY ON)   # as above
+set(CPACK_COMPONENTS_ALL catalyst-dev)               # only catalyst-dev component
+set(CPACK_COMPONENTS_GROUPING ALL_COMPONENTS_IN_ONE) # single archive, no per-component split
+
+message(STATUS "Preparing CPack package ${CPACK_PACKAGE_FILE_NAME}")
+include(CPack)

@@ -31,4 +31,27 @@ def VerifyNoQuantumUseAfterFreePass : Pass<"verify-no-quantum-use-after-free"> {
     let summary = "Verify that the quantum program has no uses of qubits or registers after they have been deallocated";
 }
 
+def DecomposeLoweringPass : Pass<"decompose-lowering"> {
+    let summary = "Replace quantum operations with compiled decomposition rules.";
+
+    let options = [
+        ListOption<
+            /*C++ name*/"targetRulesOption",
+            /*CLI name*/"target-rules",
+            /*Type*/"std::string",
+            /*Description*/"The set of decomposition rules to apply. If empty, applies all rules.">,
+            Option<
+            /*C++ name*/"inlineRuleBody",
+            /*CLI name*/"inline-rule-body",
+            /*Type*/"bool",
+            /*Default*/[{ false }],
+            /*Description*/"Whether to inline the rule body. Defaults to false.">
+    ];
+
+    let dependentDialects = [
+       "catalyst::quantum::QuantumDialect",
+       "catalyst::CatalystDialect"
+    ];
+}
+
 #endif // QREF_PASSES

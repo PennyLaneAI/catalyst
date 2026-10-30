@@ -68,15 +68,15 @@ if not INSTALLED:
 sys.modules["mlir_quantum.ir"] = __import__("jaxlib.mlir.ir").mlir.ir
 sys.modules["mlir_quantum._mlir_libs"] = __import__("jaxlib.mlir._mlir_libs").mlir._mlir_libs
 
-from catalyst import debug, logging, passes
+from catalyst import debug, passes
 from catalyst.api_extensions import *
 from catalyst.api_extensions import __all__ as _api_extension_list
 from catalyst.autograph import *
 from catalyst.autograph import __all__ as _autograph_functions
 from catalyst.compiler import CompileOptions
 from catalyst.debug.assertion import debug_assert
+from catalyst.executor import Executor
 from catalyst.jit import QJIT, qjit
-from catalyst.passes.pass_api import pipeline
 from catalyst.python_interface.inspection.draw import draw_graph
 from catalyst.utils.exceptions import (
     AutoGraphError,
@@ -194,10 +194,10 @@ __all__ = (
     "DifferentiableCompileError",
     "debug_assert",
     "CompileOptions",
+    "Executor",
     "debug",
     "draw_graph",
     "passes",
-    "pipeline",
     "compile_without_static_conditionals",
     "compile_without_static_loops",
     *_api_extension_list,

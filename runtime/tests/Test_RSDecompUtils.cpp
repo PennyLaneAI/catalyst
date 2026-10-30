@@ -22,10 +22,8 @@ using namespace Catch::Matchers;
 using namespace RSDecomp::Rings;
 using namespace RSDecomp::Utils;
 
-TEST_CASE("Test Math helper", "[RSDecomp][Utils]")
-{
-    SECTION("Min/Max/Abs_val")
-    {
+TEST_CASE("Test Math helper", "[RSDecomp][Utils]") {
+    SECTION("Min/Max/Abs_val") {
         CHECK(min(INT_TYPE(3), INT_TYPE(-5)) == INT_TYPE(-5));
         CHECK(max(INT_TYPE(3), INT_TYPE(-5)) == INT_TYPE(3));
 
@@ -33,8 +31,7 @@ TEST_CASE("Test Math helper", "[RSDecomp][Utils]")
         CHECK(abs_val(INT_TYPE(7)) == INT_TYPE(7));
     }
 
-    SECTION("floor_div")
-    {
+    SECTION("floor_div") {
         CHECK(floor_div(INT_TYPE(10), INT_TYPE(3)) == INT_TYPE(3));
         CHECK(floor_div(INT_TYPE(1), INT_TYPE(2)) == INT_TYPE(0));
         CHECK(floor_div(INT_TYPE(-10), INT_TYPE(3)) == INT_TYPE(-4));
@@ -49,26 +46,22 @@ TEST_CASE("Test Math helper", "[RSDecomp][Utils]")
                             ContainsSubstring("Division by zero"));
     }
 
-    SECTION("GCD")
-    {
+    SECTION("GCD") {
         CHECK(gcd(INT_TYPE(48), INT_TYPE(18)) == INT_TYPE(6));
         CHECK(gcd(ZSqrtTwo(31, 13), ZSqrtTwo(65, 33)) == ZSqrtTwo(-3, -7));
         CHECK(gcd(ZOmega(31, 32, 32, -11), ZOmega(96, 106, 74, -44)) == ZOmega(-3, 5, 2, 2));
     }
 }
 
-TEST_CASE("LRU Cache Basic Operations", "[LRUCache]")
-{
+TEST_CASE("LRU Cache Basic Operations", "[LRUCache]") {
     lru_cache<int, std::string, 3> cache;
 
-    SECTION("Starts empty")
-    {
+    SECTION("Starts empty") {
         CHECK(cache.size() == 0);
         CHECK(cache.get(1) == std::nullopt);
     }
 
-    SECTION("Put and Get")
-    {
+    SECTION("Put and Get") {
         cache.put(1, "one");
         cache.put(2, "two");
 
@@ -78,8 +71,7 @@ TEST_CASE("LRU Cache Basic Operations", "[LRUCache]")
         CHECK(cache.get(3) == std::nullopt);
     }
 
-    SECTION("Update existing key")
-    {
+    SECTION("Update existing key") {
         cache.put(1, "one");
         cache.put(1, "ONE_UPDATED");
 
@@ -88,8 +80,7 @@ TEST_CASE("LRU Cache Basic Operations", "[LRUCache]")
     }
 }
 
-TEST_CASE("LRU Eviction Logic", "[LRUCache]")
-{
+TEST_CASE("LRU Eviction Logic", "[LRUCache]") {
     lru_cache<int, int, 3> cache;
 
     cache.put(1, 100);
@@ -98,8 +89,7 @@ TEST_CASE("LRU Eviction Logic", "[LRUCache]")
 
     CHECK(cache.size() == 3);
 
-    SECTION("Evicts oldest inserted when no access happens")
-    {
+    SECTION("Evicts oldest inserted when no access happens") {
         // Cache is [3, 2, 1] (Most Recent -> Least Recent)
 
         // Add 4th item. 1 should be evicted.
@@ -112,8 +102,7 @@ TEST_CASE("LRU Eviction Logic", "[LRUCache]")
         CHECK(cache.get(1) == std::nullopt); // 1 is gone
     }
 
-    SECTION("Accessing an item prevents its eviction")
-    {
+    SECTION("Accessing an item prevents its eviction") {
         // Cache is [3, 2, 1]
 
         // Access 1. It moves to the front.
@@ -128,8 +117,7 @@ TEST_CASE("LRU Eviction Logic", "[LRUCache]")
         CHECK(cache.get(4) == 400);
     }
 
-    SECTION("Updating an item prevents its eviction")
-    {
+    SECTION("Updating an item prevents its eviction") {
         // Cache is [3, 2, 1]
 
         // Update 1. It moves to front.
@@ -144,10 +132,8 @@ TEST_CASE("LRU Eviction Logic", "[LRUCache]")
     }
 }
 
-TEST_CASE("LRU Cache Edge Cases", "[LRUCache]")
-{
-    SECTION("Cache with MaxSize 1")
-    {
+TEST_CASE("LRU Cache Edge Cases", "[LRUCache]") {
+    SECTION("Cache with MaxSize 1") {
         lru_cache<int, int, 1> tiny_cache;
 
         tiny_cache.put(1, 10);
@@ -158,8 +144,7 @@ TEST_CASE("LRU Cache Edge Cases", "[LRUCache]")
         CHECK(tiny_cache.get(1) == std::nullopt);
     }
 
-    SECTION("Clearing the cache")
-    {
+    SECTION("Clearing the cache") {
         lru_cache<int, int, 3> cache;
         cache.put(1, 10);
         cache.put(2, 20);
@@ -177,8 +162,7 @@ TEST_CASE("LRU Cache Edge Cases", "[LRUCache]")
     }
 }
 
-TEST_CASE("LRU Cache Complex Types", "[LRUCache]")
-{
+TEST_CASE("LRU Cache Complex Types", "[LRUCache]") {
     using KeyType = std::pair<int, int>;
     lru_cache<KeyType, int, 2> pair_cache;
 

@@ -12,8 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <cstdint>
+#include <string>
 #include <unordered_map>
 
+#include "llvm/Support/xxhash.h"
 #include "mlir/Conversion/LLVMCommon/ConversionTarget.h"
 #include "mlir/Conversion/LLVMCommon/MemRefBuilder.h"
 #include "mlir/Conversion/LLVMCommon/TypeConverter.h"
@@ -25,6 +28,7 @@
 #include "mlir/Transforms/DialectConversion.h"
 
 #include "Catalyst/IR/CatalystOps.h"
+#include "Catalyst/IR/RuntimeCABI.h"
 #include "Catalyst/Transforms/Patterns.h"
 #include "Catalyst/Utils/EnsureFunctionDeclaration.h"
 #include "Catalyst/Utils/StaticAllocas.h"
@@ -38,8 +42,7 @@ using namespace catalyst;
 namespace {
 
 Value getGlobalString(Location loc, OpBuilder &rewriter, StringRef key, StringRef value,
-                      ModuleOp mod)
-{
+                      ModuleOp mod) {
     auto type = LLVM::LLVMArrayType::get(IntegerType::get(rewriter.getContext(), 8), value.size());
     LLVM::GlobalOp glb = mod.lookupSymbol<LLVM::GlobalOp>(key);
     if (!glb) {
@@ -66,13 +69,11 @@ enum NumericType : int8_t {
     c128,
 };
 
-std::optional<int8_t> encodeNumericType(Type elemType)
-{
+std::optional<int8_t> encodeNumericType(Type elemType) {
     int8_t typeEncoding;
     if (isa<IndexType>(elemType)) {
         typeEncoding = NumericType::index;
-    }
-    else if (auto intType = dyn_cast<IntegerType>(elemType)) {
+    } else if (auto intType = dyn_cast<IntegerType>(elemType)) {
         switch (intType.getWidth()) {
         case 1:
             typeEncoding = NumericType::i1;
@@ -92,8 +93,7 @@ std::optional<int8_t> encodeNumericType(Type elemType)
         default:
             return std::nullopt;
         }
-    }
-    else if (auto floatType = dyn_cast<FloatType>(elemType)) {
+    } else if (auto floatType = dyn_cast<FloatType>(elemType)) {
         switch (floatType.getWidth()) {
         case 32:
             typeEncoding = NumericType::f32;
@@ -104,11 +104,11 @@ std::optional<int8_t> encodeNumericType(Type elemType)
         default:
             return std::nullopt;
         }
-    }
-    else if (auto cmplxType = dyn_cast<ComplexType>(elemType)) {
+    } else if (auto cmplxType = dyn_cast<ComplexType>(elemType)) {
         auto floatType = dyn_cast<FloatType>(cmplxType.getElementType());
-        if (!floatType)
+        if (!floatType) {
             return std::nullopt;
+        }
 
         switch (floatType.getWidth()) {
         case 32:
@@ -120,8 +120,7 @@ std::optional<int8_t> encodeNumericType(Type elemType)
         default:
             return std::nullopt;
         }
-    }
-    else {
+    } else {
         return std::nullopt;
     }
     return typeEncoding;
@@ -135,8 +134,7 @@ std::optional<int8_t> encodeNumericType(Type elemType)
 //    i8 type_encoding
 // }
 Value EncodeOpaqueMemRef(Location loc, PatternRewriter &rewriter, MemRefType memrefType,
-                         Type llvmMemrefType, Value memrefLlvm)
-{
+                         Type llvmMemrefType, Value memrefLlvm) {
     auto ctx = rewriter.getContext();
 
     // Encoded memref type: !llvm.struct<(i64, ptr<i8>, i8)>.
@@ -173,8 +171,7 @@ struct PrintOpPattern : public OpConversionPattern<PrintOp> {
     using OpConversionPattern::OpConversionPattern;
 
     LogicalResult matchAndRewrite(PrintOp op, PrintOpAdaptor adaptor,
-                                  ConversionPatternRewriter &rewriter) const override
-    {
+                                  ConversionPatternRewriter &rewriter) const override {
 
         Location loc = op.getLoc();
         MLIRContext *ctx = this->getContext();
@@ -197,8 +194,7 @@ struct PrintOpPattern : public OpConversionPattern<PrintOp> {
             Value global = getGlobalString(loc, rewriter, symbolName, stringValue, mod);
             LLVM::CallOp::create(rewriter, loc, fnDecl, global);
             rewriter.eraseOp(op);
-        }
-        else {
+        } else {
             StringRef qirName = "__catalyst__rt__print_tensor";
 
             // C interface for the print function is an unranked & opaque memref descriptor:
@@ -241,8 +237,7 @@ struct AssertionOpPattern : public OpConversionPattern<AssertionOp> {
     using OpConversionPattern::OpConversionPattern;
 
     LogicalResult matchAndRewrite(AssertionOp op, AssertionOpAdaptor adaptor,
-                                  ConversionPatternRewriter &rewriter) const override
-    {
+                                  ConversionPatternRewriter &rewriter) const override {
         Location loc = op.getLoc();
         MLIRContext *ctx = this->getContext();
         StringRef qirName = "__catalyst__rt__assert_bool";
@@ -281,8 +276,7 @@ struct AssertionOpPattern : public OpConversionPattern<AssertionOp> {
 //    i8 type_encoding
 // }
 Value EncodeDataMemRef(Location loc, PatternRewriter &rewriter, MemRefType memrefType,
-                       Type llvmMemrefType, Value memrefLlvm)
-{
+                       Type llvmMemrefType, Value memrefLlvm) {
     auto ctx = rewriter.getContext();
 
     // Encoded memref type: !llvm.struct<(i64, ptr<i8>, i8)>.
@@ -318,12 +312,185 @@ Value EncodeDataMemRef(Location loc, PatternRewriter &rewriter, MemRefType memre
     return memref;
 }
 
+// Get the LLVM type for a C ABI type name.
+FailureOr<Type> runtimeCABIType(StringRef name, MLIRContext *ctx) {
+    std::optional<RuntimeCABIType> abi = classifyRuntimeCABIType(name);
+    if (!abi) {
+        return failure();
+    }
+    switch (abi->kind) {
+    case RuntimeCABIKind::Void:
+        return Type(LLVM::LLVMVoidType::get(ctx));
+    case RuntimeCABIKind::Pointer:
+        return Type(LLVM::LLVMPointerType::get(ctx));
+    case RuntimeCABIKind::Float:
+        return abi->width == 32 ? Type(Float32Type::get(ctx)) : Type(Float64Type::get(ctx));
+    case RuntimeCABIKind::Integer:
+        return Type(IntegerType::get(ctx, abi->width));
+    }
+    llvm_unreachable("unhandled runtime C ABI kind");
+}
+
+// Get the sext or zext attribute for a C ABI integer parameter or result.
+DictionaryAttr runtimeCABIAttrs(StringRef name, MLIRContext *ctx) {
+    std::optional<RuntimeCABIType> abi = classifyRuntimeCABIType(name);
+    if (!abi || abi->kind != RuntimeCABIKind::Integer || abi->width >= 32) {
+        return DictionaryAttr::get(ctx);
+    }
+    bool isUnsigned = (name == "i1") || (name.starts_with("u"));
+    StringRef ext =
+        isUnsigned ? LLVM::LLVMDialect::getZExtAttrName() : LLVM::LLVMDialect::getSExtAttrName();
+    return DictionaryAttr::get(ctx, {NamedAttribute(ext, UnitAttr::get(ctx))});
+}
+
+// Materialize `text` as a NUL-terminated constant and return a pointer to its first byte.
+Value getRuntimeCallString(Location loc, OpBuilder &rewriter, StringRef text, ModuleOp mod) {
+    std::string key = ("runtime_call_cstr_" + Twine(llvm::xxh3_64bits(text))).str();
+    std::string value = text.str();
+    value.push_back('\0');
+    return getGlobalString(loc, rewriter, key, value, mod);
+}
+
+struct RuntimeCallOpPattern : public OpConversionPattern<RuntimeCallOp> {
+    using OpConversionPattern::OpConversionPattern;
+
+    LogicalResult matchAndRewrite(RuntimeCallOp op, RuntimeCallOpAdaptor adaptor,
+                                  ConversionPatternRewriter &rewriter) const override {
+        if (op.isDispatched()) {
+            // Dispatching runtime calls should be handled by `lower-runtime-dispatch`.
+            return failure();
+        }
+        if (!op.getOutTensors().empty()) {
+            return op.emitOpError("out tensors must be bufferized before LLVM conversion");
+        }
+
+        MLIRContext *ctx = op.getContext();
+        Location loc = op.getLoc();
+        ModuleOp mod = op->getParentOfType<ModuleOp>();
+        StringRef resultKind = op.getCResult();
+        bool hasResult = resultKind != "void";
+
+        auto dataPointer = [&](Value original, Value converted) -> FailureOr<Value> {
+            auto memrefType = dyn_cast<MemRefType>(original.getType());
+            if (!memrefType) {
+                return op.emitOpError("expected a memref for buf/out parameter extraction");
+            }
+            MemRefDescriptor descriptor(converted);
+            const auto &converter = static_cast<const LLVMTypeConverter &>(*getTypeConverter());
+            return descriptor.bufferPtr(rewriter, loc, converter, memrefType);
+        };
+
+        // Handle each C parameter in order.
+        SmallVector<Type> paramTypes;
+        SmallVector<Attribute> paramAttrs;
+        SmallVector<Value> callArgs;
+        unsigned inputIndex = 0;
+        unsigned destIndex = 0;
+        unsigned stringIndex = 0;
+        ArrayAttr strings = op.getCStringsAttr();
+
+        for (Attribute attr : op.getCParams()) {
+            StringRef param = cast<StringAttr>(attr).getValue();
+            FailureOr<Type> type = runtimeCABIType(param, ctx);
+            if (failed(type) || param == "void") {
+                return op.emitOpError("unsupported native C ABI parameter type '") << param << "'";
+            }
+            paramTypes.push_back(*type);
+            paramAttrs.push_back(runtimeCABIAttrs(param, ctx));
+
+            if (param == "str") {
+                assert(strings && stringIndex < strings.size() && "verified compile-time strings");
+                StringRef text = cast<StringAttr>(strings[stringIndex++]).getValue();
+                callArgs.push_back(getRuntimeCallString(loc, rewriter, text, mod));
+                continue;
+            }
+
+            if (param == "out") {
+                assert(destIndex < op.getDestBuffers().size() && "verified destination buffers");
+                FailureOr<Value> ptr = dataPointer(op.getDestBuffers()[destIndex],
+                                                   adaptor.getDestBuffers()[destIndex]);
+                if (failed(ptr)) {
+                    return failure();
+                }
+                callArgs.push_back(*ptr);
+                ++destIndex;
+                continue;
+            }
+
+            assert(inputIndex < op.getInputs().size() && "verified input operands");
+            Value original = op.getInputs()[inputIndex];
+            Value converted = adaptor.getInputs()[inputIndex];
+            ++inputIndex;
+
+            if (param == "buf") {
+                FailureOr<Value> ptr = dataPointer(original, converted);
+                if (failed(ptr)) {
+                    return failure();
+                }
+                callArgs.push_back(*ptr);
+                continue;
+            }
+
+            if (param == "ptr") {
+                callArgs.push_back(LLVM::IntToPtrOp::create(
+                    rewriter, loc, LLVM::LLVMPointerType::get(ctx), converted));
+                continue;
+            }
+
+            callArgs.push_back(converted);
+        }
+
+        FailureOr<Type> resultType = runtimeCABIType(resultKind, ctx);
+        if (failed(resultType)) {
+            return op.emitOpError("unsupported native C ABI result type '") << resultKind << "'";
+        }
+
+        auto point = rewriter.saveInsertionPoint();
+        rewriter.setInsertionPointToStart(mod.getBody());
+        FailureOr<LLVM::LLVMFuncOp> function =
+            LLVM::lookupOrCreateFn(rewriter, mod, op.getCallee(), paramTypes, *resultType);
+        if (failed(function)) {
+            return failure();
+        }
+        function->setPrivate();
+        rewriter.restoreInsertionPoint(point);
+
+        LLVM::CallOp call = LLVM::CallOp::create(rewriter, loc, *function, callArgs);
+
+        // Set the sext or zext attribute to the call.
+        DictionaryAttr resultAttrs = runtimeCABIAttrs(resultKind, ctx);
+        auto isEmpty = [](Attribute attrs) { return cast<DictionaryAttr>(attrs).empty(); };
+        if (!llvm::all_of(paramAttrs, isEmpty)) {
+            for (auto [index, attrs] : llvm::enumerate(paramAttrs)) {
+                function->setArgAttrs(index, cast<DictionaryAttr>(attrs));
+            }
+            call.setArgAttrsAttr(rewriter.getArrayAttr(paramAttrs));
+        }
+        if (!resultAttrs.empty()) {
+            function->setResultAttrs(0, resultAttrs);
+            call.setResAttrsAttr(rewriter.getArrayAttr({resultAttrs}));
+        }
+
+        if (!hasResult) {
+            rewriter.eraseOp(op);
+            return success();
+        }
+
+        Value value = call.getResult();
+        if (resultKind == "ptr") {
+            value =
+                LLVM::PtrToIntOp::create(rewriter, loc, rewriter.getI64Type(), value).getResult();
+        }
+        rewriter.replaceOp(op, value);
+        return success();
+    }
+};
+
 struct CustomCallOpPattern : public OpConversionPattern<CustomCallOp> {
     using OpConversionPattern::OpConversionPattern;
 
     LogicalResult matchAndRewrite(CustomCallOp op, CustomCallOpAdaptor adaptor,
-                                  ConversionPatternRewriter &rewriter) const override
-    {
+                                  ConversionPatternRewriter &rewriter) const override {
         MLIRContext *ctx = op.getContext();
         Location loc = op.getLoc();
         // Create function
@@ -439,8 +606,7 @@ struct DefineCallbackOpPattern : public OpConversionPattern<CallbackOp> {
     using OpConversionPattern::OpConversionPattern;
 
     LogicalResult matchAndRewrite(CallbackOp op, CallbackOpAdaptor adaptor,
-                                  ConversionPatternRewriter &rewriter) const override
-    {
+                                  ConversionPatternRewriter &rewriter) const override {
         // Only match with ops without an entry block
         if (!op.empty()) {
             return failure();
@@ -495,8 +661,7 @@ struct ReplaceCallbackOpWithFuncOp : public OpConversionPattern<CallbackOp> {
     using OpConversionPattern::OpConversionPattern;
 
     LogicalResult matchAndRewrite(CallbackOp op, CallbackOpAdaptor adaptor,
-                                  ConversionPatternRewriter &rewriter) const override
-    {
+                                  ConversionPatternRewriter &rewriter) const override {
         // Only match with ops with an entry block
         if (op.empty()) {
             return failure();
@@ -524,8 +689,7 @@ struct CallbackCallOpPattern : public OpConversionPattern<CallbackCallOp> {
     using OpConversionPattern::OpConversionPattern;
 
     LogicalResult matchAndRewrite(CallbackCallOp op, CallbackCallOpAdaptor adaptor,
-                                  ConversionPatternRewriter &rewriter) const override
-    {
+                                  ConversionPatternRewriter &rewriter) const override {
         // Just change the calling convention from scalar replacement of aggregates
         // to pointer to struct.
         auto loc = op.getLoc();
@@ -548,8 +712,7 @@ struct CustomGradOpPattern : public OpConversionPattern<gradient::CustomGradOp> 
     using OpConversionPattern::OpConversionPattern;
 
     LogicalResult matchAndRewrite(gradient::CustomGradOp op, gradient::CustomGradOpAdaptor adaptor,
-                                  ConversionPatternRewriter &rewriter) const override
-    {
+                                  ConversionPatternRewriter &rewriter) const override {
         // only match after all three are func.func
         auto callee = op.getCalleeAttr();
         auto forward = op.getForwardAttr();
@@ -580,12 +743,12 @@ namespace catalyst {
 struct CatalystConversionPass : impl::CatalystConversionPassBase<CatalystConversionPass> {
     using CatalystConversionPassBase::CatalystConversionPassBase;
 
-    void runOnOperation() final
-    {
+    void runOnOperation() final {
         MLIRContext *context = &getContext();
         LLVMTypeConverter typeConverter(context);
 
         RewritePatternSet patterns(context);
+        patterns.add<RuntimeCallOpPattern>(typeConverter, context);
         patterns.add<CustomCallOpPattern>(typeConverter, context);
         patterns.add<PrintOpPattern>(typeConverter, context);
         patterns.add<AssertionOpPattern>(typeConverter, context);

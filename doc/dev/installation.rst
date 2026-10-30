@@ -4,7 +4,7 @@ Installation
 
 Catalyst is officially supported on Linux (x86_64, aarch64) and macOS (arm64)
 platforms, and pre-built binaries are being distributed via the Python Package Index (PyPI) for
-Python versions 3.11 and higher. To install it, simply run the following ``pip`` command:
+Python versions 3.12 and higher. To install it, simply run the following ``pip`` command:
 
 .. code-block:: console
 
@@ -129,7 +129,7 @@ installed and available on the path (depending on the platform):
 - The `Ninja <https://ninja-build.org/>`_, `Make <https://www.gnu.org/software/make/>`_, and
   `CMake <https://cmake.org/download/>`_ (v3.26 or greater, less than v4) build tools.
 
-- `Python <https://www.python.org/>`_ 3.11 or higher for the Python frontend.
+- `Python <https://www.python.org/>`_ 3.12 or higher for the Python frontend.
 
 - The Python package manager ``pip`` must be version 22.3 or higher.
 
@@ -239,8 +239,8 @@ MLIR Dialects
 """""""""""""
 
 To build the Catalyst MLIR component, along with the necessary `core MLIR
-<https://mlir.llvm.org/>`_ and `MLIR-HLO
-<https://github.com/tensorflow/mlir-hlo>`_ dependencies, run:
+<https://mlir.llvm.org/>`_ and `StableHLO
+<https://github.com/openxla/stablehlo>`_ dependencies, run:
 
 .. code-block:: console
 

@@ -22,6 +22,7 @@
 #include "mlir/Interfaces/ControlFlowInterfaces.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
 
+#include "Catalyst/Analysis/ResourceInterfaces.h"
 #include "PBC/IR/PBCOpInterfaces.h"
 
 //===----------------------------------------------------------------------===//
@@ -29,5 +30,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "PBC/IR/PBCDialect.h"
+#include "QRef/IR/QRefTypes.h"
 #define GET_OP_CLASSES
 #include "PBC/IR/PBCOps.h.inc"

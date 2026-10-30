@@ -35,8 +35,7 @@ template <typename T, size_t R> struct MemRefT {
 };
 
 template <typename T>
-inline void printMemref(const UnrankedMemRefType<T> &memref, bool printDescriptor = false)
-{
+inline void printMemref(const UnrankedMemRefType<T> &memref, bool printDescriptor = false) {
     auto m = DynamicMemRefType<T>(memref);
     if (printDescriptor) {
         std::cout << "MemRef: ";

@@ -38,8 +38,7 @@ namespace test {
 struct TestPass : impl::TestPassBase<TestPass> {
     using TestPassBase::TestPassBase;
 
-    void runOnOperation() final
-    {
+    void runOnOperation() final {
         LLVM_DEBUG(dbgs() << "test pass"
                           << "\n");
 

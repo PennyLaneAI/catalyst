@@ -22,6 +22,7 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #include "PBC/IR/PBCDialect.h"
+#include "Quantum/IR/QuantumOps.h"
 #include "Quantum/Transforms/Patterns.h"
 
 using namespace llvm;
@@ -37,14 +38,26 @@ namespace quantum {
 struct GridsynthPass : impl::GridsynthPassBase<GridsynthPass> {
     using GridsynthPassBase::GridsynthPassBase;
 
-    void runOnOperation() final
-    {
+    void runOnOperation() final {
         LLVM_DEBUG(llvm::dbgs() << "Running GridsynthPass\n");
         mlir::Operation *module = getOperation();
         mlir::MLIRContext *context = &getContext();
         RewritePatternSet patterns(context);
 
-        populateGridsynthPatterns(patterns, epsilon, pprBasis);
+        WalkResult controlledRotation = module->walk([](CustomOp op) {
+            StringRef gateName = op.getGateName();
+            if ((gateName == "RZ" || gateName == "PhaseShift") && !op.getInCtrlQubits().empty()) {
+                op.emitError("Unsupported controlled gate for gridsynth. Only single-qubit RZ and "
+                             "PhaseShift gates can be discretized.");
+                return WalkResult::interrupt();
+            }
+            return WalkResult::advance();
+        });
+        if (controlledRotation.wasInterrupted()) {
+            return signalPassFailure();
+        }
+
+        populateGridsynthPatterns(patterns, epsilon, pprBasis, method);
 
         if (failed(applyPatternsGreedily(module, std::move(patterns)))) {
             signalPassFailure();

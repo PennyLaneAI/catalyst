@@ -42,8 +42,7 @@ class Pipeline {
 
     void addPass(std::string &pass) { passes.push_back(pass); }
 
-    mlir::LogicalResult addPipeline(mlir::OpPassManager &pm)
-    {
+    mlir::LogicalResult addPipeline(mlir::OpPassManager &pm) {
         if (registerFunc) {
             registerFunc(pm);
             return mlir::success();

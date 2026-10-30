@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: quantum-opt --split-input-file \
+// RUN: quantum-opt --split-input-file --verify-diagnostics \
 // RUN:   --pass-pipeline="builtin.module( \
 // RUN:     one-shot-bufferize{unknown-type-conversion=identity-layout-map} \
 // RUN:   )" %s | FileCheck %s
@@ -53,6 +53,15 @@ func.func @dbprint_str() {
 
 // -----
 
+func.func public @symbolic_array_error() attributes {llvm.emit_c_interface} {
+    // expected-error @below {{catalyst::symbolic_array is a placeholder op}}
+    // expected-error @below {{failed to bufferize op}}
+    %0 = catalyst.symbolic_array : tensor<i64>
+    return
+}
+
+// -----
+
 func.func @custom_call(%arg0: tensor<3x3xf64>) -> tensor<3x3xf64> {
     // CHECK: [[sourceAlloc:%.+]] = bufferization.to_buffer %arg0
     // CHECK: [[destAlloc:%.+]] = memref.alloc() {{.*}}: memref<3x3xf64>
@@ -87,6 +96,50 @@ func.func @custom_call_copy(%arg0: tensor<2x3xf64>) -> tensor<2x2xf64> {
     %0 = catalyst.custom_call fn("lapack_dgesdd") (%extract) : (tensor<2x2xf64>) -> (tensor<2x2xf64>)
 
     return %0 : tensor<2x2xf64>
+}
+
+// -----
+
+// `backend_config` attribute survives bufferization.
+// CHECK-LABEL: func.func @custom_call_backend_config
+// CHECK: catalyst.custom_call fn("lapack_dgesdd") (%{{.*}}, %{{.*}}) {backend_config = {foo = "bar"}, number_original_arg = 1 : i32} :
+// CHECK-SAME: (memref<3x3xf64>, memref<3x3xf64>) -> ()
+func.func @custom_call_backend_config(%arg0: tensor<3x3xf64>) -> tensor<3x3xf64> {
+    %0 = catalyst.custom_call fn("lapack_dgesdd") (%arg0) {backend_config = {foo = "bar"}} : (tensor<3x3xf64>) -> (tensor<3x3xf64>)
+    return %0 : tensor<3x3xf64>
+}
+
+// -----
+
+// CHECK-LABEL: func.func @runtime_call_buf
+// CHECK: [[source:%.+]] = bufferization.to_buffer %arg0
+// CHECK: [[status:%.+]] = catalyst.runtime_call fn("native_sum") ([[source]], %arg1)
+// CHECK-SAME: {c_params = ["buf", "u64"], c_result = "i32"}
+// CHECK-SAME: (memref<4xi8>, i64) -> (i32)
+// CHECK: return [[status]]
+func.func @runtime_call_buf(%arg0: tensor<4xi8>, %arg1: i64) -> i32 {
+    %0 = catalyst.runtime_call fn("native_sum") (%arg0, %arg1) {
+        c_params = ["buf", "u64"],
+        c_result = "i32"
+    } : (tensor<4xi8>, i64) -> (i32)
+    return %0 : i32
+}
+
+// -----
+
+// CHECK-LABEL: func.func @runtime_call_out
+// CHECK: [[dest:%.+]] = memref.alloc() {{.*}}: memref<4xi8>
+// CHECK: [[status:%.+]] = catalyst.runtime_call fn("native_fill") (%arg0, %arg1) in([[dest]] : memref<4xi8>)
+// CHECK-SAME: {c_params = ["out", "u64", "u8"], c_result = "i32"}
+// CHECK-SAME: (i64, i8) -> (i32)
+// CHECK: [[tensor:%.+]] = bufferization.to_tensor [[dest]]
+// CHECK: return [[status]], [[tensor]]
+func.func @runtime_call_out(%arg0: i64, %arg1: i8) -> (i32, tensor<4xi8>) {
+    %status, %out = catalyst.runtime_call fn("native_fill") (%arg0, %arg1) {
+        c_params = ["out", "u64", "u8"],
+        c_result = "i32"
+    } : (i64, i8) -> (i32) outs(tensor<4xi8>)
+    return %status, %out : i32, tensor<4xi8>
 }
 
 // -----

@@ -470,6 +470,24 @@ func.func @test_while_loop_nested(%arg0: i1) attributes {quantum.node} {
 //
 
 
+// CHECK-LABEL: test_if_classical
+func.func @test_if_classical(%arg0: i1, %arg1: memref<1xf64>) attributes {quantum.node} {
+
+    // CHECK: scf.if %arg0 {
+    // CHECK:     memref.store
+    // CHECK: }
+    scf.if %arg0 {
+        %c0 = arith.constant 0 : index
+        %0 = arith.constant 0.1 : f64
+        memref.store %0, %arg1[%c0] : memref<1xf64>
+    }
+    return
+}
+
+
+// -----
+
+
 // CHECK-LABEL: test_if_non_root_no_else
 func.func @test_if_non_root_no_else(%arg0: i1) attributes {quantum.node} {
 
@@ -686,6 +704,58 @@ func.func @test_if_nested_for(%arg0: i1) attributes {quantum.node} {
 // -----
 
 
+// CHECK-LABEL: test_if_with_ctrl_op
+func.func @test_if_with_ctrl_op(%arg0: i1) attributes {quantum.node} {
+    // CHECK: [[true:%.+]] = llvm.mlir.constant(true) : i1
+    // CHECK: [[ctrl:%.+]] = qref.alloc_qb : !qref.bit
+    // CHECK: [[target:%.+]] = qref.alloc_qb : !qref.bit
+    %0 = llvm.mlir.constant(true) : i1
+    %1 = quantum.alloc_qb : !quantum.bit
+    %2 = quantum.alloc_qb : !quantum.bit
+
+    // CHECK: scf.if %arg0 {
+    // CHECK:   qref.ctrl([[ctrl]]) ctrlvals([[true]]) {
+    // CHECK:     qref.custom "Hadamard"() [[target]] : !qref.bit
+    // CHECK:   }
+    // CHECK: }
+    %3:2 = scf.if %arg0 -> (!quantum.bit, !quantum.bit) {
+      %out_ctrl_qubits_0, %results_1 = quantum.ctrl(%1) ctrlvals(%0) (%2) : !quantum.bit -> !quantum.bit {
+      ^bb0(%arg1: !quantum.bit):
+        %out_qubits = quantum.custom "Hadamard"() %arg1 : !quantum.bit
+        quantum.yield %out_qubits : !quantum.bit
+      }
+      scf.yield %results_1, %out_ctrl_qubits_0 : !quantum.bit, !quantum.bit
+    } else {
+      scf.yield %2, %1 : !quantum.bit, !quantum.bit
+    }
+
+    // CHECK: qref.ctrl([[ctrl]]) ctrlvals([[true]]) {
+    // CHECK:   scf.if %arg0 {
+    // CHECK:     qref.custom "Hadamard"() [[target]] : !qref.bit
+    // CHECK:   }
+    // CHECK: }
+    %out_ctrl_qubits, %results = quantum.ctrl(%3#1) ctrlvals(%0) (%3#0) : !quantum.bit -> !quantum.bit {
+    ^bb0(%arg1: !quantum.bit):
+      %4 = scf.if %arg0 -> (!quantum.bit) {
+        %out_qubits = quantum.custom "Hadamard"() %arg1 : !quantum.bit
+        scf.yield %out_qubits : !quantum.bit
+      } else {
+        scf.yield %arg1 : !quantum.bit
+      }
+      quantum.yield %4 : !quantum.bit
+    }
+
+    // CHECK: qref.dealloc_qb [[ctrl]] : !qref.bit
+    // CHECK: qref.dealloc_qb [[target]] : !qref.bit
+    quantum.dealloc_qb %out_ctrl_qubits : !quantum.bit
+    quantum.dealloc_qb %results : !quantum.bit
+    return
+}
+
+
+// -----
+
+
 //
 // switch
 //
@@ -742,4 +812,101 @@ func.func @test_switch(%arg0: index, %arg1: f64) -> f64 attributes {quantum.node
     quantum.dealloc_qb %4#0 : !quantum.bit
     quantum.dealloc %6 : !quantum.reg
     return %4#3 : f64
+}
+
+
+// -----
+
+
+// Resource hints on SCF ops must survive convert-to-reference-semantics recreation.
+// CHECK-LABEL: test_preserves_scf_hints
+func.func @test_preserves_scf_hints(%arg0: i1, %arg1: index) attributes {quantum.node} {
+    %c0 = arith.constant 0 : index
+    %c1 = arith.constant 1 : index
+    %c37 = arith.constant 37 : index
+    %c0_i64 = arith.constant 0 : i64
+    %c1_i64 = arith.constant 1 : i64
+    %c5_i64 = arith.constant 5 : i64
+
+    %0 = quantum.alloc( 1) : !quantum.reg
+    %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+
+    // CHECK: scf.for
+    // CHECK: } {catalyst.estimated_iterations = 1.000000e+01 : f64}
+    %2 = scf.for %arg2 = %c0 to %c37 step %c1 iter_args(%arg3 = %1) -> (!quantum.bit) {
+        %out_qubits = quantum.custom "Hadamard"() %arg3 : !quantum.bit
+        scf.yield %out_qubits : !quantum.bit
+    } {catalyst.estimated_iterations = 1.000000e+01 : f64}
+    %3 = quantum.insert %0[ 0], %2 : !quantum.reg, !quantum.bit
+
+    // CHECK: scf.while
+    // CHECK: } attributes {catalyst.estimated_iterations = 2.500000e+00 : f64}
+    %4 = quantum.extract %3[ 0] : !quantum.reg -> !quantum.bit
+    %5 = scf.while (%arg2 = %4) : (!quantum.bit) -> !quantum.bit {
+        %13 = arith.cmpi slt, %c0_i64, %c5_i64 : i64
+        scf.condition(%13) %arg2 : !quantum.bit
+    } do {
+    ^bb0(%arg2: !quantum.bit):
+        %out_qubits = quantum.custom "PauliX"() %arg2 : !quantum.bit
+        scf.yield %out_qubits : !quantum.bit
+    } attributes {catalyst.estimated_iterations = 2.500000e+00 : f64}
+    %6 = quantum.insert %3[ 0], %5 : !quantum.reg, !quantum.bit
+
+    // CHECK: scf.if
+    // CHECK: } {catalyst.estimated_probability = 7.500000e-01 : f64}
+    %7 = quantum.extract %6[ 0] : !quantum.reg -> !quantum.bit
+    %8 = scf.if %arg0 -> (!quantum.bit) {
+        %out_qubits = quantum.custom "PauliY"() %7 : !quantum.bit
+        scf.yield %out_qubits : !quantum.bit
+    } else {
+        scf.yield %7 : !quantum.bit
+    } {catalyst.estimated_probability = 7.500000e-01 : f64}
+    %9 = quantum.insert %6[ 0], %8 : !quantum.reg, !quantum.bit
+
+    // CHECK: scf.index_switch {{.+}} {catalyst.estimated_probabilities = [2.000000e-01, 3.000000e-01]}
+    %10 = quantum.extract %9[ 0] : !quantum.reg -> !quantum.bit
+    %11 = scf.index_switch %arg1 {catalyst.estimated_probabilities = [2.000000e-01, 3.000000e-01]} -> !quantum.bit
+    case 0 {
+        %out_qubits = quantum.custom "PauliZ"() %10 : !quantum.bit
+        scf.yield %out_qubits : !quantum.bit
+    }
+    case 1 {
+        scf.yield %10 : !quantum.bit
+    }
+    default {
+        scf.yield %10 : !quantum.bit
+    }
+    %12 = quantum.insert %9[ 0], %11 : !quantum.reg, !quantum.bit
+
+    quantum.dealloc %12 : !quantum.reg
+    return
+}
+
+
+// -----
+
+// Region-bearing control flow outside the supported set (scf.if / scf.for / scf.while /
+// scf.index_switch) has no rule for controlling its body, so it is rejected rather than silently
+// left uncontrolled. scf.execute_region stands in for any such op here.
+func.func @execute_region_in_body(%q: !quantum.bit) -> !quantum.bit {
+  // expected-error @+1 {{Reference semantics conversion only supports the following scf operations: scf.if, scf.for, scf.while, and scf.index_switch, got: scf.execute_region}}
+  %r = scf.execute_region -> !quantum.bit {
+    %h = quantum.custom "Hadamard"() %q : !quantum.bit
+    scf.yield %h : !quantum.bit
+  }
+  return %r : !quantum.bit
+}
+
+// -----
+
+// Purely classical scf.execute_region ops do not need a conversion rule and must be allowed.
+// CHECK-LABEL: func.func @classical_execute_region
+func.func @classical_execute_region() -> i32 attributes {quantum.node} {
+  %c = arith.constant 1 : i32
+  // CHECK: scf.execute_region
+  %y = scf.execute_region -> i32 {
+    %x = arith.addi %c, %c : i32
+    scf.yield %x : i32
+  }
+  return %y : i32
 }

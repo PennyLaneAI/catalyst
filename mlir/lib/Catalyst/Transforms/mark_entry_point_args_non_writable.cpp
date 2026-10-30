@@ -30,8 +30,7 @@ struct MarkEntryPointArgsNonWritablePass
     : impl::MarkEntryPointArgsNonWritablePassBase<MarkEntryPointArgsNonWritablePass> {
     using MarkEntryPointArgsNonWritablePassBase::MarkEntryPointArgsNonWritablePassBase;
 
-    void runOnOperation() final
-    {
+    void runOnOperation() final {
         auto mod = getOperation();
         auto nonWritable = BoolAttr::get(&getContext(), false);
 

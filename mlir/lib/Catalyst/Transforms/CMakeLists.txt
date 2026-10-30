@@ -7,6 +7,7 @@ file(GLOB SRC
     BufferDeallocation.cpp
     BufferizableOpInterfaceImpl.cpp
     catalyst_to_llvm.cpp
+    CrossCompileTargets.cpp
     DetectQNodes.cpp
     DetensorizeFunctionBoundaryPass.cpp
     DetensorizeSCFPass.cpp
@@ -22,6 +23,7 @@ file(GLOB SRC
     qnode_to_async_lowering.cpp
     QnodeToAsyncPatterns.cpp
     RegisterInactiveCallbackPass.cpp
+    ResolveRuntimeSymbols.cpp
     ResourceAnalysisPass.cpp
     RegisterDecompRuleResourcePass.cpp
     SplitMultipleTapes.cpp
@@ -29,11 +31,24 @@ file(GLOB SRC
     TBAATagsPass.cpp
 )
 
+# Required by the cross-compile-targets pass: object emission for arbitrary target
+# triples (AllTargets*) and MLIR->LLVM-IR translation registration
+# (registerLLVMDialectTranslation / registerBuiltinDialectTranslation,
+# translateModuleToLLVMIR).
+set(LLVM_LINK_COMPONENTS
+    AllTargetsAsmParsers
+    AllTargetsCodeGens
+    Demangle
+    Object
+)
+
 get_property(dialect_libs GLOBAL PROPERTY MLIR_DIALECT_LIBS)
 get_property(conversion_libs GLOBAL PROPERTY MLIR_CONVERSION_LIBS)
+get_property(translation_libs GLOBAL PROPERTY MLIR_TRANSLATION_LIBS)
 set(LIBS
     ${dialect_libs}
     ${conversion_libs}
+    ${translation_libs}
     catalyst-analysis
 )
 
@@ -43,6 +58,8 @@ set(DEPENDS
 add_mlir_library(${LIBRARY_NAME} STATIC ${SRC} LINK_LIBS PRIVATE ${LIBS} DEPENDS ${DEPENDS})
 target_compile_features(${LIBRARY_NAME} PUBLIC cxx_std_20)
 target_include_directories(${LIBRARY_NAME} PUBLIC
-                           .
-                           ${PROJECT_SOURCE_DIR}/include
-                           ${CMAKE_BINARY_DIR}/include)
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
+    $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
+    $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/include>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+)

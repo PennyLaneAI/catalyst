@@ -25,6 +25,9 @@
 #include "QRef/IR/QRefDialect.h"
 #include "Quantum/IR/QuantumDialect.h"
 
+#include <llvm/ADT/StringRef.h>
+#include <mlir/IR/Attributes.h>
+
 using namespace mlir;
 using namespace catalyst::pbc;
 
@@ -39,8 +42,7 @@ using namespace catalyst::pbc;
 // PBC op canonicalizers/verifiers helper methods.
 //===----------------------------------------------------------------------===//
 
-template <typename OpType> LogicalResult canonicalizePPROp(OpType op, PatternRewriter &rewriter)
-{
+template <typename OpType> LogicalResult canonicalizePPROp(OpType op, PatternRewriter &rewriter) {
     bool allIdentity = llvm::all_of(op.getPauliProduct(), [](mlir::Attribute attr) {
         auto pauliStr = llvm::cast<mlir::StringAttr>(attr);
         return pauliStr.getValue() == "I";
@@ -53,15 +55,29 @@ template <typename OpType> LogicalResult canonicalizePPROp(OpType op, PatternRew
     return mlir::failure();
 }
 
-template <typename OpType> LogicalResult verifyPPROp(OpType op)
-{
+template <typename OpType> LogicalResult verifyPPROp(OpType op) {
     size_t numPauliProduct = op.getPauliProduct().size();
 
     if (numPauliProduct == 0) {
         return op.emitOpError("Pauli string must be non-empty");
     }
 
-    if (numPauliProduct != op.getInQubits().size()) {
+    if (numPauliProduct != op.getQubitOperands().size()) {
+        return op.emitOpError("Number of qubits must match number of pauli operators");
+    }
+    return mlir::success();
+}
+
+template <typename OpType> LogicalResult verifyPPMOp(OpType op) {
+    if (op.getQubitOperands().size() != op.getPauliProduct().size()) {
+        return op.emitOpError("Number of qubits must match number of pauli operators");
+    }
+    return mlir::success();
+}
+
+template <typename OpType> LogicalResult verifySelectPPMOp(OpType op) {
+    if (op.getQubitOperands().size() != op.getPauliProduct_0().size() ||
+        op.getQubitOperands().size() != op.getPauliProduct_1().size()) {
         return op.emitOpError("Number of qubits must match number of pauli operators");
     }
     return mlir::success();
@@ -75,33 +91,11 @@ LogicalResult PPRotationOp::verify() { return verifyPPROp(*this); }
 
 LogicalResult PPRotationArbitraryOp::verify() { return verifyPPROp(*this); }
 
-LogicalResult PPMeasurementOp::verify()
-{
-    if (getInQubits().size() != getPauliProduct().size()) {
-        return emitOpError("Number of qubits must match number of pauli operators");
-    }
-    return mlir::success();
-}
+LogicalResult PPMeasurementOp::verify() { return verifyPPMOp(*this); }
 
-LogicalResult RefPPMeasurementOp::verify()
-{
-    if (getQubits().size() != getPauliProduct().size()) {
-        return emitOpError("Number of qubits must match number of pauli operators");
-    }
-    return success();
-}
+LogicalResult SelectPPMeasurementOp::verify() { return verifySelectPPMOp(*this); }
 
-LogicalResult SelectPPMeasurementOp::verify()
-{
-    if (getInQubits().size() != getPauliProduct_0().size() ||
-        getInQubits().size() != getPauliProduct_1().size()) {
-        return emitOpError("Number of qubits must match number of pauli operators");
-    }
-    return mlir::success();
-}
-
-LogicalResult PrepareStateOp::verify()
-{
+LogicalResult PrepareStateOp::verify() {
     auto initState = getInitState();
     if (initState == LogicalInitKind::magic || initState == LogicalInitKind::magic_conj) {
         return emitOpError(
@@ -110,8 +104,7 @@ LogicalResult PrepareStateOp::verify()
     return mlir::success();
 }
 
-LogicalResult FabricateOp::verify()
-{
+LogicalResult FabricateOp::verify() {
     auto initState = getInitState();
     if (initState == LogicalInitKind::zero || initState == LogicalInitKind::one ||
         initState == LogicalInitKind::plus || initState == LogicalInitKind::minus) {
@@ -120,20 +113,55 @@ LogicalResult FabricateOp::verify()
     return mlir::success();
 }
 
-LogicalResult PPRotationOp::canonicalize(PPRotationOp op, PatternRewriter &rewriter)
-{
+LogicalResult RefPPRotationOp::verify() { return verifyPPROp(*this); }
+
+LogicalResult RefPPMeasurementOp::verify() { return verifyPPMOp(*this); }
+
+LogicalResult RefSelectPPMeasurementOp::verify() { return verifySelectPPMOp(*this); }
+
+LogicalResult RefFabricateOp::verify() {
+    auto initState = getInitState();
+    if (initState == LogicalInitKind::zero || initState == LogicalInitKind::one ||
+        initState == LogicalInitKind::plus || initState == LogicalInitKind::minus) {
+        return emitOpError(
+            "Logical state should not be fabricated, use `RefPrepareStateOp` instead.");
+    }
+    return success();
+}
+
+LogicalResult RefPrepareStateOp::verify() {
+    auto initState = getInitState();
+    if (initState == LogicalInitKind::magic || initState == LogicalInitKind::magic_conj) {
+        return emitOpError(
+            "Magic state cannot be prepared by this operation, use `RefFabricateOp` instead.");
+    }
+    return success();
+}
+
+LogicalResult PPRotationOp::canonicalize(PPRotationOp op, PatternRewriter &rewriter) {
     return canonicalizePPROp(op, rewriter);
 }
 
 LogicalResult PPRotationArbitraryOp::canonicalize(PPRotationArbitraryOp op,
-                                                  PatternRewriter &rewriter)
-{
+                                                  PatternRewriter &rewriter) {
     return canonicalizePPROp(op, rewriter);
 }
 
+LogicalResult RefPPRotationOp::canonicalize(RefPPRotationOp op, PatternRewriter &rewriter) {
+    bool allIdentity = llvm::all_of(op.getPauliProduct(), [](mlir::Attribute attr) {
+        auto pauliStr = llvm::cast<mlir::StringAttr>(attr);
+        return pauliStr.getValue() == "I";
+    });
+
+    if (allIdentity) {
+        rewriter.eraseOp(op);
+        return mlir::success();
+    }
+    return mlir::failure();
+}
+
 void LayerOp::build(OpBuilder &builder, OperationState &result, ValueRange inValues,
-                    ValueRange outValues, BodyBuilderFn bodyBuilder)
-{
+                    ValueRange outValues, BodyBuilderFn bodyBuilder) {
     OpBuilder::InsertionGuard guard(builder);
     Location loc = result.location;
 
@@ -154,8 +182,7 @@ void LayerOp::build(OpBuilder &builder, OperationState &result, ValueRange inVal
     bodyBuilder(builder, loc, bodyBlock->getArguments(), outValues);
 }
 
-ParseResult LayerOp::parse(OpAsmParser &parser, OperationState &result)
-{
+ParseResult LayerOp::parse(OpAsmParser &parser, OperationState &result) {
     auto &builder = parser.getBuilder();
 
     // Parse the optional initial iteration arguments.
@@ -214,8 +241,7 @@ ParseResult LayerOp::parse(OpAsmParser &parser, OperationState &result)
     return success();
 }
 
-void LayerOp::print(OpAsmPrinter &p)
-{
+void LayerOp::print(OpAsmPrinter &p) {
     // Prints the initialization list in the form of
     // (%inner = %outer, %inner2 = %outer2, <...>)
     // where 'inner' values are assumed to be region arguments and 'outer' values
@@ -229,8 +255,9 @@ void LayerOp::print(OpAsmPrinter &p)
     p << ')';
 
     // Print type(s) that corresponds to the initialization list
-    if (!getInitArgs().empty())
+    if (!getInitArgs().empty()) {
         p << " : " << getInitArgs().getTypes();
+    }
     p << ' ';
 
     // Print the regions
@@ -238,3 +265,173 @@ void LayerOp::print(OpAsmPrinter &p)
                   /*printEntryBlockArgs=*/false,
                   /*printBlockTerminators=*/!getInitArgs().empty());
 }
+
+//===----------------------------------------------------------------------===//
+// Implement ResourceQuantumOpInterface methods.
+//===----------------------------------------------------------------------===//
+template <typename OpType> static llvm::StringRef getPPRResourceName(OpType op) {
+    switch (std::abs(op.getRotationKind())) {
+    case 1:
+        return "PPR-identity";
+    case 2:
+        return "PPR-pi/2";
+    case 4:
+        return "PPR-pi/4";
+    case 8:
+        return "PPR-pi/8";
+    }
+    assert(false && "getPPRResourceName: invalid rotation kind");
+    return "PPR-invalid";
+}
+
+llvm::StringRef PrepareStateOp::getResourceName() { return "pbc.prepare"; }
+llvm::StringRef FabricateOp::getResourceName() { return "pbc.fabricate"; }
+llvm::StringRef PPRotationOp::getResourceName() { return getPPRResourceName(*this); }
+llvm::StringRef PPRotationArbitraryOp::getResourceName() { return "PPR-Phi"; }
+llvm::StringRef PPMeasurementOp::getResourceName() { return "PPM"; }
+llvm::StringRef SelectPPMeasurementOp::getResourceName() { return "PPM"; }
+llvm::StringRef RefPrepareStateOp::getResourceName() { return "pbc.prepare"; }
+llvm::StringRef RefFabricateOp::getResourceName() { return "pbc.fabricate"; }
+llvm::StringRef RefPPRotationOp::getResourceName() { return getPPRResourceName(*this); }
+llvm::StringRef RefPPMeasurementOp::getResourceName() { return "PPM"; }
+llvm::StringRef RefSelectPPMeasurementOp::getResourceName() { return "PPM"; }
+
+std::string getDetailedStateName(LogicalInitKind initState) {
+    switch (initState) {
+    case LogicalInitKind::zero:
+        return "|0)";
+    case LogicalInitKind::one:
+        return "|1)";
+    case LogicalInitKind::plus:
+        return "|+)";
+    case LogicalInitKind::minus:
+        return "|-)";
+    case LogicalInitKind::plus_i:
+        return "|+i)";
+    case LogicalInitKind::minus_i:
+        return "|-i)";
+    case LogicalInitKind::magic:
+        return "|M)";
+    case LogicalInitKind::magic_conj:
+        return "|M†)";
+    }
+    return "";
+}
+
+static std::string getPauliProductString(ArrayAttr pauliProduct) {
+    std::string result;
+    for (Attribute attr : pauliProduct) {
+        if (!result.empty()) {
+            result += ',';
+        }
+        result += cast<StringAttr>(attr).getValue();
+    }
+    return result;
+}
+
+static llvm::StringRef getInitStateResourceDetailedName(MLIRContext *ctx, llvm::StringRef baseName,
+                                                        LogicalInitKind initState) {
+    return StringAttr::get(ctx, std::string(baseName) + "[" + getDetailedStateName(initState) + "]")
+        .getValue();
+}
+
+static llvm::StringRef getPauliProductResourceDetailedName(MLIRContext *ctx,
+                                                           llvm::StringRef baseName,
+                                                           ArrayAttr pauliProduct) {
+    return StringAttr::get(ctx,
+                           std::string(baseName) + "[" + getPauliProductString(pauliProduct) + "]")
+        .getValue();
+}
+
+static llvm::StringRef getSelectPauliProductResourceDetailedName(MLIRContext *ctx,
+                                                                 llvm::StringRef baseName,
+                                                                 ArrayAttr pauliProduct0,
+                                                                 ArrayAttr pauliProduct1) {
+    return StringAttr::get(ctx, std::string(baseName) + "[" + getPauliProductString(pauliProduct0) +
+                                    ":" + getPauliProductString(pauliProduct1) + "]")
+        .getValue();
+}
+
+llvm::StringRef PrepareStateOp::getResourceDetailedName() {
+    return getInitStateResourceDetailedName(getContext(), getResourceName(), getInitState());
+}
+llvm::StringRef FabricateOp::getResourceDetailedName() {
+    return getInitStateResourceDetailedName(getContext(), getResourceName(), getInitState());
+}
+llvm::StringRef PPRotationOp::getResourceDetailedName() {
+    return getPauliProductResourceDetailedName(getContext(), getResourceName(), getPauliProduct());
+}
+llvm::StringRef PPRotationArbitraryOp::getResourceDetailedName() {
+    return getPauliProductResourceDetailedName(getContext(), getResourceName(), getPauliProduct());
+}
+llvm::StringRef PPMeasurementOp::getResourceDetailedName() {
+    return getPauliProductResourceDetailedName(getContext(), getResourceName(), getPauliProduct());
+}
+llvm::StringRef SelectPPMeasurementOp::getResourceDetailedName() {
+    return getSelectPauliProductResourceDetailedName(getContext(), getResourceName(),
+                                                     getPauliProduct_0(), getPauliProduct_1());
+}
+
+llvm::StringRef RefPrepareStateOp::getResourceDetailedName() {
+    return getInitStateResourceDetailedName(getContext(), getResourceName(), getInitState());
+}
+llvm::StringRef RefFabricateOp::getResourceDetailedName() {
+    return getInitStateResourceDetailedName(getContext(), getResourceName(), getInitState());
+}
+llvm::StringRef RefPPRotationOp::getResourceDetailedName() {
+    return getPauliProductResourceDetailedName(getContext(), getResourceName(), getPauliProduct());
+}
+llvm::StringRef RefPPMeasurementOp::getResourceDetailedName() {
+    return getPauliProductResourceDetailedName(getContext(), getResourceName(), getPauliProduct());
+}
+llvm::StringRef RefSelectPPMeasurementOp::getResourceDetailedName() {
+    return getSelectPauliProductResourceDetailedName(getContext(), getResourceName(),
+                                                     getPauliProduct_0(), getPauliProduct_1());
+}
+
+// TODO: Once PBC's interface is improved, we can remove these implementation
+// and only implement one in the interface definition.
+uint64_t PrepareStateOp::getResourceNumQubits() { return 0; }
+uint64_t FabricateOp::getResourceNumQubits() { return 0; }
+uint64_t PPRotationOp::getResourceNumQubits() { return getInQubits().size(); }
+uint64_t PPRotationArbitraryOp::getResourceNumQubits() { return getInQubits().size(); }
+uint64_t PPMeasurementOp::getResourceNumQubits() { return getInQubits().size(); }
+uint64_t SelectPPMeasurementOp::getResourceNumQubits() { return getInQubits().size(); }
+uint64_t RefPPRotationOp::getResourceNumQubits() { return getQubits().size(); }
+uint64_t RefPPMeasurementOp::getResourceNumQubits() { return getQubits().size(); }
+uint64_t RefSelectPPMeasurementOp::getResourceNumQubits() { return getQubits().size(); }
+uint64_t RefPrepareStateOp::getResourceNumQubits() { return 0; }
+uint64_t RefFabricateOp::getResourceNumQubits() { return 0; }
+
+uint64_t PrepareStateOp::getResourceNumCtrlQubits() { return 0; }
+uint64_t FabricateOp::getResourceNumCtrlQubits() { return 0; }
+uint64_t PPRotationOp::getResourceNumCtrlQubits() { return 0; }
+uint64_t PPRotationArbitraryOp::getResourceNumCtrlQubits() { return 0; }
+uint64_t PPMeasurementOp::getResourceNumCtrlQubits() { return 0; }
+uint64_t SelectPPMeasurementOp::getResourceNumCtrlQubits() { return 0; }
+uint64_t RefPPRotationOp::getResourceNumCtrlQubits() { return 0; }
+uint64_t RefPPMeasurementOp::getResourceNumCtrlQubits() { return 0; }
+uint64_t RefSelectPPMeasurementOp::getResourceNumCtrlQubits() { return 0; }
+uint64_t RefPrepareStateOp::getResourceNumCtrlQubits() { return 0; }
+uint64_t RefFabricateOp::getResourceNumCtrlQubits() { return 0; }
+
+uint64_t PrepareStateOp::getResourceNumParams() { return 0; }
+uint64_t FabricateOp::getResourceNumParams() { return 0; }
+uint64_t PPRotationOp::getResourceNumParams() { return 0; }
+uint64_t PPRotationArbitraryOp::getResourceNumParams() { return 0; }
+uint64_t PPMeasurementOp::getResourceNumParams() { return 0; }
+uint64_t SelectPPMeasurementOp::getResourceNumParams() { return 0; }
+uint64_t RefPPRotationOp::getResourceNumParams() { return 0; }
+uint64_t RefPPMeasurementOp::getResourceNumParams() { return 0; }
+uint64_t RefSelectPPMeasurementOp::getResourceNumParams() { return 0; }
+uint64_t RefPrepareStateOp::getResourceNumParams() { return 0; }
+uint64_t RefFabricateOp::getResourceNumParams() { return 0; }
+
+//===----------------------------------------------------------------------===//
+// Implement ResourceAllocQubitOpInterface methods.
+//===----------------------------------------------------------------------===//
+
+uint64_t PrepareStateOp::getResourceNumAllocQubits() { return getOutQubits().size(); }
+uint64_t FabricateOp::getResourceNumAllocQubits() { return getOutQubits().size(); }
+uint64_t RefPrepareStateOp::getResourceNumAllocQubits() { return getOutQubits().size(); }
+uint64_t RefFabricateOp::getResourceNumAllocQubits() { return getOutQubits().size(); }

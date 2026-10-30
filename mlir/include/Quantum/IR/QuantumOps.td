@@ -111,7 +111,7 @@ def NumQubitsOp : Quantum_Op<"num_qubits", [MemoryEffects<[MemRead]>]> {
 
 class Memory_Op<string mnemonic, list<Trait> traits = []> : Quantum_Op<mnemonic, traits>;
 
-def AllocOp : Memory_Op<"alloc"> {
+def AllocOp : Memory_Op<"alloc", [DeclareOpInterfaceMethods<ResourceAllocQubitOpInterface>]> {
     let summary = "Allocate n qubits into a quantum register.";
     let description = [{
     }];
@@ -132,7 +132,7 @@ def AllocOp : Memory_Op<"alloc"> {
     let hasCanonicalizeMethod = 1;
 }
 
-def AllocQubitOp : Memory_Op<"alloc_qb"> {
+def AllocQubitOp : Memory_Op<"alloc_qb", [DeclareOpInterfaceMethods<ResourceAllocQubitOpInterface>]> {
     let summary = "Allocate a single qubit.";
     let description = [{
     }];
@@ -211,7 +211,7 @@ def ExtractOp : Memory_Op<"extract", [NoMemoryEffect]> {
         $qreg `[` ($idx^):($idx_attr)? `]` attr-dict `:` type($qreg) `->` type(results)
     }];
 
-    let hasCanonicalizeMethod = 1;
+    let hasCanonicalizer = 1;
     let hasVerifier = 1;
     let hasFolder = 1;
 }
@@ -236,7 +236,6 @@ def InsertOp : Memory_Op<"insert", [NoMemoryEffect]> {
         $in_qreg `[` ($idx^):($idx_attr)? `]` `,` $qubit attr-dict `:` type($in_qreg) `,` type($qubit)
     }];
 
-    let hasCanonicalizeMethod = 1;
     let hasVerifier = 1;
     let hasFolder = 1;
 }
@@ -264,6 +263,18 @@ class Gate_Op<string mnemonic, list<Trait> traits = []> :
             values.insert(values.end(), getOutQubits().begin(), getOutQubits().end());
             return values;
         }
+
+        // Override: ResourceQuantumOpInterface
+        llvm::StringRef getResourceName();
+
+        uint64_t getResourceNumQubits() {
+            return getInQubits().size();
+        }
+
+        uint64_t getResourceNumCtrlQubits() { return 0; }
+
+        uint64_t getResourceNumParams() { return 0; }
+
     }];
 
     let extraClassDeclaration = extraBaseClassDeclaration;
@@ -341,6 +352,29 @@ class UnitaryGate_Op<string mnemonic, list<Trait> traits = []> :
         mlir::ResultRange getCtrlQubitResults() {
             return getOutCtrlQubits();
         }
+
+        // Override: ResourceQuantumOpInterface
+        llvm::StringRef getResourceName();
+
+        uint64_t getResourceNumQubits() {
+            return getInQubits().size();
+        }
+
+        uint64_t getResourceNumCtrlQubits() {
+            return getInCtrlQubits().size();
+        }
+
+        uint64_t getResourceNumParams() {
+            if (auto gate = mlir::dyn_cast<quantum::ParametrizedGate>(getOperation())){
+                return gate.getAllParams().size();
+            }
+            return 0;
+        }
+
+        bool getResourceAdjointFlag() {
+            return getAdjointFlag();
+        }
+
     }];
 
     let extraClassDeclaration = extraBaseClassDeclaration;
@@ -410,7 +444,8 @@ def SetBasisStateOp : Gate_Op<"set_basis_state"> {
 }
 
 def CustomOp : UnitaryGate_Op<"custom", [DifferentiableGate, NoMemoryEffect,
-                                         AttrSizedOperandSegments, AttrSizedResultSegments]> {
+                                         AttrSizedOperandSegments, AttrSizedResultSegments,
+                                         DeclareOpInterfaceMethods<DecomposableGate>]> {
     let summary = "A generic quantum gate on n qubits with m floating point parameters.";
     let description = [{
     }];
@@ -530,12 +565,12 @@ def CustomOp : UnitaryGate_Op<"custom", [DifferentiableGate, NoMemoryEffect,
             return staticValues;
         }
     }];
-    let hasCanonicalizeMethod = 1;
     let hasVerifier = 1;
 }
 
 def OperatorOp : UnitaryGate_Op<"operator", [ParametrizedGate, NoMemoryEffect,
-                                             AttrSizedOperandSegments, AttrSizedResultSegments]> {
+                                             AttrSizedOperandSegments, AttrSizedResultSegments,
+                                             DeclareOpInterfaceMethods<DecomposableGate, ["getExtraData"]>]> {
     let summary = "A generalized quantum operation with arbitrary input signature.";
     let description = [{
         The `quantum.operator` is a generic representation for arbitrary quantum operations
@@ -631,7 +666,7 @@ def OperatorOp : UnitaryGate_Op<"operator", [ParametrizedGate, NoMemoryEffect,
         // additional functionality provided by quantum.operator, being last allows the builder
         // to use default values in the signature, so that these args are truly optional
         UnitAttr:$adjoint,
-        OptionalProp<I64Prop>:$UID,
+        OptionalAttr<I64Attr>:$UID,
         DefaultValuedOptionalAttr<DictionaryAttr, "{}">:$static_data,
         DefaultValuedOptionalAttr<I64ArrayDictAttr, "{}">:$param_map,
         DefaultValuedOptionalAttr<I64ArrayDictAttr, "{}">:$qubit_map
@@ -689,7 +724,8 @@ def OperatorOp : UnitaryGate_Op<"operator", [ParametrizedGate, NoMemoryEffect,
 }
 
 def PauliRotOp : UnitaryGate_Op<"paulirot", [DifferentiableGate, NoMemoryEffect,
-                                         AttrSizedOperandSegments, AttrSizedResultSegments]> {
+                                         AttrSizedOperandSegments, AttrSizedResultSegments,
+                                         DeclareOpInterfaceMethods<DecomposableGate>]> {
     let summary = "Apply a Pauli Product Rotation";
     let description = [{
         The `quantum.paulirot` operation applies a rotation around a Pauli product
@@ -721,7 +757,8 @@ def PauliRotOp : UnitaryGate_Op<"paulirot", [DifferentiableGate, NoMemoryEffect,
             return getODSOperands(getParamOperandIdx());
         }
 
-        std::string getPauliWord() {
+        std::string getPauliWord()
+        {
             std::string pauliWord;
 
             for (mlir::Attribute pauliChar : getPauliProduct()) {
@@ -734,7 +771,8 @@ def PauliRotOp : UnitaryGate_Op<"paulirot", [DifferentiableGate, NoMemoryEffect,
     let hasVerifier = 1;
 }
 
-def GlobalPhaseOp : UnitaryGate_Op<"gphase", [DifferentiableGate, AttrSizedOperandSegments]> {
+def GlobalPhaseOp : UnitaryGate_Op<"gphase", [DifferentiableGate, AttrSizedOperandSegments,
+                                              DeclareOpInterfaceMethods<DecomposableGate>]> {
     let summary = "Global Phase.";
 
     let description = [{
@@ -751,6 +789,20 @@ def GlobalPhaseOp : UnitaryGate_Op<"gphase", [DifferentiableGate, AttrSizedOpera
     let results = (outs
         Variadic<QubitType>:$out_ctrl_qubits
     );
+
+    let builders = [
+        // convenience builder with no controls or adjoint
+        OpBuilder<(ins
+             "mlir::Value":$angle,
+             CArg<"mlir::ValueRange", "{}">:$in_ctrl_qubits,
+             CArg<"mlir::ValueRange", "{}">:$in_ctrl_values,
+             CArg<"bool", "false">:$adjoint
+        ),[{
+            GlobalPhaseOp::build($_builder, $_state, 
+               mlir::TypeRange(in_ctrl_qubits), angle, adjoint, in_ctrl_qubits, in_ctrl_values
+            );
+        }]>
+    ];
 
     let assemblyFormat = [{
         `(` $angle `)` (`adj` $adjoint^)? attr-dict ( `ctrls` `(` $in_ctrl_qubits^ `)` )?  ( `ctrlvals` `(` $in_ctrl_values^ `)` )? ( `:` `ctrls` type($out_ctrl_qubits)^ )?
@@ -775,7 +827,8 @@ def GlobalPhaseOp : UnitaryGate_Op<"gphase", [DifferentiableGate, AttrSizedOpera
 }
 
 def MultiRZOp : UnitaryGate_Op<"multirz", [DifferentiableGate, NoMemoryEffect,
-                                           AttrSizedOperandSegments, AttrSizedResultSegments]> {
+                                           AttrSizedOperandSegments, AttrSizedResultSegments,
+                                           DeclareOpInterfaceMethods<DecomposableGate>]> {
     let summary = "Apply an arbitrary multi Z rotation";
     let description = [{
         The `quantum.multirz` operation applies an arbitrary multi Z rotation to the state-vector.
@@ -810,11 +863,11 @@ def MultiRZOp : UnitaryGate_Op<"multirz", [DifferentiableGate, NoMemoryEffect,
         }
     }];
 
-    let hasCanonicalizeMethod = 1;
 }
 
 def PCPhaseOp : UnitaryGate_Op<"pcphase", [DifferentiableGate, NoMemoryEffect,
-                                           AttrSizedOperandSegments, AttrSizedResultSegments]> {
+                                           AttrSizedOperandSegments, AttrSizedResultSegments,
+                                           DeclareOpInterfaceMethods<DecomposableGate>]> {
     let summary = "Apply a projector-controlled phase gate";
     let description = [{
         This gate is built from simpler gates like `PhaseShift` and `PauliX` and acts on a group
@@ -829,15 +882,11 @@ def PCPhaseOp : UnitaryGate_Op<"pcphase", [DifferentiableGate, NoMemoryEffect,
             ``quantum.custom``. The reason for this is that it needs to be handled in a special
             way during the lowering due to its C function being variadic on the number of qubits.
 
-        .. note::
-            `dim` is currently captured as a float number for compatibility with
-            runtime and device integration.
-
     }];
 
     let arguments = (ins
         F64:$theta,
-        F64:$dim,
+        I64Attr:$dim,
         Variadic<QubitType>:$in_qubits,
         UnitAttr:$adjoint,
         Variadic<QubitType>:$in_ctrl_qubits,
@@ -850,7 +899,10 @@ def PCPhaseOp : UnitaryGate_Op<"pcphase", [DifferentiableGate, NoMemoryEffect,
     );
 
     let assemblyFormat = [{
-        `(` $theta `,` $dim `)` $in_qubits (`adj` $adjoint^)? attr-dict ( `ctrls` `(` $in_ctrl_qubits^ `)` )?  ( `ctrlvals` `(` $in_ctrl_values^ `)` )? `:` type($out_qubits) (`ctrls` type($out_ctrl_qubits)^ )?
+        `(` $theta `,` `dim` `:` $dim `)` $in_qubits (`adj` $adjoint^)? attr-dict
+        ( `ctrls` `(` $in_ctrl_qubits^ `)` )?
+        ( `ctrlvals` `(` $in_ctrl_values^ `)` )?
+        `:` type($out_qubits) (`ctrls` type($out_ctrl_qubits)^ )?
     }];
 
     let extraClassDeclaration = extraBaseClassDeclaration # [{
@@ -859,12 +911,12 @@ def PCPhaseOp : UnitaryGate_Op<"pcphase", [DifferentiableGate, NoMemoryEffect,
         }
     }];
 
-    let hasCanonicalizeMethod = 1;
 }
 
 
 def QubitUnitaryOp : UnitaryGate_Op<"unitary", [ParametrizedGate, NoMemoryEffect,
-                                                AttrSizedOperandSegments, AttrSizedResultSegments]> {
+                                                AttrSizedOperandSegments, AttrSizedResultSegments,
+                                                DeclareOpInterfaceMethods<DecomposableGate>]> {
     let summary = "Apply an arbitrary fixed unitary matrix";
     let description = [{
         The `quantum.unitary` operation applies an arbitrary fixed unitary matrix to the
@@ -925,7 +977,45 @@ def AdjointOp : Region_Op<"adjoint", [SingleBlockImplicitTerminator<"YieldOp">, 
     let hasVerifier = 1;
 }
 
-def YieldOp : Quantum_Op<"yield", [Pure, ReturnLike, Terminator, ParentOneOf<["AdjointOp"]>]> {
+def CtrlOp : Region_Op<"ctrl", [SingleBlockImplicitTerminator<"YieldOp">,
+                                AttrSizedOperandSegments, AttrSizedResultSegments,
+                                AllTypesMatch<["in_ctrl_qubits", "out_ctrl_qubits"]>,
+                                AllTypesMatch<["args", "results"]>]> {
+    let summary = "Apply the enclosed operations controlled on the given control qubits.";
+    let description = [{
+        The `quantum.ctrl` operation applies the quantum operations in its single-block region
+        conditioned on a set of control qubits. Each `in_ctrl_values` entry selects whether the
+        matching control qubit activates on the |1> (true) or |0> (false) state.
+
+        The `ctrl-lowering` pass distributes the controls over the region: every gate in the
+        region gains the control qubits/values (appended to any controls it already carries),
+        and the control qubits are threaded through the region. Structural ops (extract, insert,
+        alloc, dealloc) are passed through unchanged, and a nested `quantum.ctrl` region has its
+        controls merged. Measurements inside a `quantum.ctrl` region are rejected.
+    }];
+
+    let regions = (region SizedRegion<1>:$region);
+
+    let arguments = (ins
+        Variadic<QubitType>:$in_ctrl_qubits,
+        Variadic<I1>:$in_ctrl_values,
+        Variadic<AnyTypeOf<[QuregType, QubitType]>>:$args
+    );
+
+    let results = (outs
+        Variadic<QubitType>:$out_ctrl_qubits,
+        Variadic<AnyTypeOf<[QuregType, QubitType]>>:$results
+    );
+
+    let assemblyFormat = [{
+        `(` $in_ctrl_qubits `)` `ctrlvals` `(` $in_ctrl_values `)` `(` $args `)`
+        attr-dict `:` type($out_ctrl_qubits) `->` type($results) $region
+    }];
+
+    let hasVerifier = 1;
+}
+
+def YieldOp : Quantum_Op<"yield", [Pure, ReturnLike, Terminator, ParentOneOf<["AdjointOp", "CtrlOp"]>]> {
     let summary = "Return results from quantum program regions";
 
     let arguments = (ins
@@ -1149,9 +1239,10 @@ def HamiltonianOp : Observable_Op<"hamiltonian"> {
 // -----
 
 class Measurement_Op<string mnemonic, list<Trait> traits = []> :
-        Quantum_Op<mnemonic, traits # [MeasurementProcess]>;
+        Quantum_Op<mnemonic, traits # [MeasurementProcess,
+                                        DeclareOpInterfaceMethods<ResourceMeasurementOpInterface>]>;
 
-def MeasureOp : Quantum_Op<"measure"> {
+def MeasureOp : Quantum_Op<"measure", [DeclareOpInterfaceMethods<ResourceQuantumOpInterface>]> {
     let summary = "A single-qubit projective measurement in the computational basis.";
     let description = [{
     }];

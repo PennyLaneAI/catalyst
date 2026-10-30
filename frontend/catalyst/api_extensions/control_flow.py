@@ -19,6 +19,7 @@ with control flow, including conditionals, for loops, and while loops.
 
 # pylint: disable=too-many-lines
 
+from collections.abc import Sequence
 from functools import partial
 from typing import Any, Callable, List
 
@@ -72,7 +73,7 @@ from catalyst.utils.patching import Patcher
 
 
 ## API ##
-def cond(pred: DynamicJaxprTracer):
+def cond(pred: DynamicJaxprTracer, *, estimated_probability: float | None = None):
     """A :func:`~.qjit` compatible decorator for if-else conditionals in PennyLane/Catalyst.
 
     .. note::
@@ -98,6 +99,8 @@ def cond(pred: DynamicJaxprTracer):
 
     Args:
         pred (bool): the first predicate with which to control the branch to execute
+        estimated_probability (float | None): resource hint for the estimated probability with
+            which the predicate will trigger.
 
     Returns:
         A callable decorator that wraps the first 'if' branch of the conditional.
@@ -256,12 +259,19 @@ def cond(pred: DynamicJaxprTracer):
         raise PlxprCaptureCFCompatibilityError("cond")
 
     def _decorator(true_fn: Callable):
-        return CondCallable(pred, true_fn)
+        return CondCallable(pred, true_fn, estimated_probability=estimated_probability)
 
     return _decorator
 
 
-def for_loop(lower_bound, upper_bound, step, allow_array_resizing=False):
+def for_loop(
+    lower_bound,
+    upper_bound,
+    step,
+    allow_array_resizing=False,
+    *,
+    estimated_iterations: int | float | None = None,
+):
     """A :func:`~.qjit` compatible for-loop decorator for PennyLane/Catalyst.
 
     .. note::
@@ -309,6 +319,8 @@ def for_loop(lower_bound, upper_bound, step, allow_array_resizing=False):
             to modify dimension sizes within the for loop, however outer-scope
             dynamically-shaped arrays will no longer be captured, and arrays of the same shape
             cannot be used in binary operations.
+        estimated_iterations (int | float | None): resource hint for the estimated trip-count of
+            the loop. This may be a ``float`` to allow for averaging or other statistical estimates.
 
     Returns:
         Callable[[int, ...], ...]: A wrapper around the loop body function.
@@ -421,12 +433,24 @@ def for_loop(lower_bound, upper_bound, step, allow_array_resizing=False):
         raise PlxprCaptureCFCompatibilityError("for_loop")
 
     def _decorator(body_fn):
-        return ForLoopCallable(lower_bound, upper_bound, step, body_fn, not allow_array_resizing)
+        return ForLoopCallable(
+            lower_bound,
+            upper_bound,
+            step,
+            body_fn,
+            not allow_array_resizing,
+            estimated_iterations=estimated_iterations,
+        )
 
     return _decorator
 
 
-def while_loop(cond_fn, allow_array_resizing: bool = False):
+def while_loop(
+    cond_fn,
+    allow_array_resizing: bool = False,
+    *,
+    estimated_iterations: int | float | None = None,
+):
     """A :func:`~.qjit` compatible while-loop decorator for PennyLane/Catalyst.
 
     This decorator provides a functional version of the traditional while
@@ -464,6 +488,8 @@ def while_loop(cond_fn, allow_array_resizing: bool = False):
             to modify dimension sizes within the loop, however outer-scope
             dynamically-shaped arrays will no longer be captured, and arrays of the same shape
             cannot be used in binary operations.
+        estimated_iterations (int | float | None): resource hint for the estimated trip-count of
+            the loop. This may be a ``float`` to allow for averaging or other statistical estimates.
 
     Returns:
         Callable: A wrapper around the while-loop function.
@@ -563,7 +589,12 @@ def while_loop(cond_fn, allow_array_resizing: bool = False):
         raise PlxprCaptureCFCompatibilityError("while_loop")
 
     def _decorator(body_fn):
-        return WhileLoopCallable(cond_fn, body_fn, not allow_array_resizing)
+        return WhileLoopCallable(
+            cond_fn,
+            body_fn,
+            not allow_array_resizing,
+            estimated_iterations=estimated_iterations,
+        )
 
     return _decorator
 
@@ -752,12 +783,13 @@ class CondCallable:
     (Array([0.25, 0.25, 0.25, 0.25], dtype=float64),)
     """
 
-    def __init__(self, pred, true_fn):
+    def __init__(self, pred, true_fn, estimated_probability=None):
         self.preds = [self._convert_predicate_to_bool(pred)]
         self.branch_fns = [true_fn]
         self.otherwise_fn = lambda *args, **kwargs: None
         self._operation = None
         self.expansion_strategy = cond_expansion_strategy()
+        self.branch_probabilities = [estimated_probability]
 
     @property
     def operation(self):
@@ -771,13 +803,16 @@ class CondCallable:
                 """)
         return self._operation
 
-    def else_if(self, pred):
+    def else_if(self, pred, *, estimated_probability=None):
         """
         Block of code to be run if this predicate evaluates to true, skipping all subsequent
         conditional blocks.
 
         Args:
             pred (bool): The predicate that will determine if this branch is executed.
+            estimated_probability (float): Optional hint for resource estimation giving the
+                expected probability of this branch. Must be provided for every non-default
+                branch when using resource-estimation hints.
 
         Returns:
             A callable decorator that wraps this 'else if' branch of the conditional and returns
@@ -787,6 +822,7 @@ class CondCallable:
         def decorator(branch_fn):
             self.preds.append(self._convert_predicate_to_bool(pred))
             self.branch_fns.append(branch_fn)
+            self.branch_probabilities.append(estimated_probability)
             return self
 
         return decorator
@@ -901,6 +937,7 @@ class CondCallable:
             out_classical_tracers,
             regions,
             expansion_strategy=self.expansion_strategy,
+            estimated_probabilities=collect_estimated_probabilities(self.branch_probabilities),
         )
         return tree_unflatten(out_tree, out_classical_tracers)
 
@@ -932,6 +969,7 @@ class CondCallable:
             *(in_classical_tracers + sum(all_consts, [])),
             branch_jaxprs=branch_jaxprs,
             num_implicit_outputs=out_sigs[0].num_implicit_outputs(),
+            estimated_probabilities=collect_estimated_probabilities(self.branch_probabilities),
         )
         return tree_unflatten(out_sigs[0].out_tree(), collapse(out_sigs[0].out_type(), out_tracers))
 
@@ -1003,7 +1041,13 @@ class ForLoopCallable:
     """
 
     def __init__(
-        self, lower_bound, upper_bound, step, body_fn, experimental_preserve_dimensions
+        self,
+        lower_bound,
+        upper_bound,
+        step,
+        body_fn,
+        experimental_preserve_dimensions,
+        estimated_iterations=None,
     ):  # pylint:disable=too-many-arguments
         self.lower_bound = lower_bound
         self.upper_bound = upper_bound
@@ -1012,6 +1056,13 @@ class ForLoopCallable:
         self._operation = None
         self.expansion_strategy = for_loop_expansion_strategy(experimental_preserve_dimensions)
         self.apply_reverse_transform = isinstance(self.step, int) and self.step < 0
+
+        if estimated_iterations is not None and estimated_iterations < 0:
+            raise ValueError(
+                "`estimated_iterations` must be a non-negative int or float. "
+                f"Got {estimated_iterations} of type {type(estimated_iterations).__name__}."
+            )
+        self.estimated_iterations = estimated_iterations
 
     @property
     def operation(self):
@@ -1088,6 +1139,7 @@ class ForLoopCallable:
             ],
             apply_reverse_transform=self.apply_reverse_transform,
             expansion_strategy=self.expansion_strategy,
+            estimated_iterations=self.estimated_iterations,
         )
         return tree_unflatten(out_tree, collapse(out_type, out_expanded_classical_tracers))
 
@@ -1122,6 +1174,7 @@ class ForLoopCallable:
             apply_reverse_transform=self.apply_reverse_transform,
             num_implicit_inputs=in_sig.num_implicit_inputs(),
             preserve_dimensions=not self.expansion_strategy.input_unshare_variables,
+            estimated_iterations=self.estimated_iterations,
         )
 
         return tree_unflatten(
@@ -1191,14 +1244,30 @@ class SwitchCallable:
     """
 
     def __init__(
-        self, case: int, default_branch: Callable, cases: list = None, branches: list = None
+        self,
+        case: int,
+        default_branch: Callable,
+        cases: list = None,
+        branches: list = None,
+        estimated_probabilities: list = None,
     ):
         if default_branch == None:
             raise ValueError("Switch requires a default branch.")
 
+        # Default case and branch
         self.case = case
-        self.case_to_branch = dict(zip(cases, branches)) if cases and branches else {}
         self.default_branch = default_branch
+
+        # Additional cases and branches
+        if cases and branches:
+            self.case_to_branch = dict(zip(cases, branches))
+            if estimated_probabilities is None:
+                estimated_probabilities = [None] * len(cases)
+            self.case_to_prob = dict(zip(cases, estimated_probabilities, strict=True))
+        else:
+            self.case_to_branch = {}
+            self.case_to_prob = {}
+
         self._operation = None
         self.expansion_strategy = switch_expansion_strategy()
 
@@ -1214,12 +1283,14 @@ class SwitchCallable:
             )
         return self._operation
 
-    def branch(self, case: int):
+    def branch(self, case: int, *, estimated_probability: float | None = None):
         """
         Branch to be run if the switch's case is equivalent to the case provided here.
 
         Args:
             case (int): the case index of this branch.
+            estimated_probability (float | None): resource hint for the estimated probability
+                with which this branch will be triggered.
 
         Returns:
             A callable decorator that wraps this case of the switch.
@@ -1227,6 +1298,7 @@ class SwitchCallable:
 
         def decorator(branch: Callable):
             self.case_to_branch[case] = branch
+            self.case_to_prob[case] = estimated_probability
             return self
 
         return decorator
@@ -1238,6 +1310,10 @@ class SwitchCallable:
             else ([], [])
         )
         branches.append(self.default_branch)
+        # Extract estimated probabilities in the ordering of the cases
+        estimated_probabilities = collect_estimated_probabilities(
+            [self.case_to_prob[case] for case in cases]
+        )
 
         outer_trace = EvaluationContext.get_current_trace()
         in_classical_tracers = [self.case] + cases
@@ -1307,6 +1383,7 @@ class SwitchCallable:
             out_classical_tracers,
             regions,
             expansion_strategy=self.expansion_strategy,
+            estimated_probabilities=estimated_probabilities,
         )
         return tree_unflatten(out_tree, out_classical_tracers)
 
@@ -1318,6 +1395,10 @@ class SwitchCallable:
             else ([], [])
         )
         branches.append(self.default_branch)
+        # Extract estimated probabilities in the ordering of the cases
+        estimated_probabilities = collect_estimated_probabilities(
+            [self.case_to_prob[case] for case in cases]
+        )
 
         # wraps trace to allow simple unzipping
         def _trace(branch_fn: Callable):
@@ -1350,6 +1431,7 @@ class SwitchCallable:
             *([self.case] + cases + sum(all_consts, [])),
             branch_jaxprs=branch_jaxprs,
             num_implicit_outputs=out_sigs[0].num_implicit_outputs(),
+            estimated_probabilities=estimated_probabilities,
         )
 
         return tree_unflatten(out_sigs[0].out_tree(), collapse(out_sigs[0].out_type(), out_tracers))
@@ -1422,11 +1504,19 @@ class WhileLoopCallable:
     (Array([0., 0., 1., 0.], dtype=float64),)
     """
 
-    def __init__(self, cond_fn, body_fn, experimental_preserve_dimensions):
+    def __init__(
+        self, cond_fn, body_fn, experimental_preserve_dimensions, estimated_iterations=None
+    ):
         self.cond_fn = cond_fn
         self.body_fn = body_fn
         self._operation = None
         self.expansion_strategy = while_loop_expansion_strategy(experimental_preserve_dimensions)
+        if estimated_iterations is not None and estimated_iterations < 0:
+            raise ValueError(
+                "`estimated_iterations` must be a non-negative int or float. "
+                f"Got {estimated_iterations} of type {type(estimated_iterations).__name__}."
+            )
+        self.estimated_iterations = estimated_iterations
 
     @property
     def operation(self):
@@ -1534,6 +1624,7 @@ class WhileLoopCallable:
             collapse(out_type, out_expanded_classical_tracers),
             [cond_region, body_region],
             expansion_strategy=self.expansion_strategy,
+            estimated_iterations=self.estimated_iterations,
         )
         return tree_unflatten(out_tree, collapse(out_type, out_expanded_classical_tracers))
 
@@ -1567,6 +1658,7 @@ class WhileLoopCallable:
             body_nconsts=len(out_body_sig.out_consts()),
             num_implicit_inputs=in_body_sig.num_implicit_inputs(),
             preserve_dimensions=not self.expansion_strategy.input_unshare_variables,
+            estimated_iterations=self.estimated_iterations,
         )
         return tree_unflatten(
             out_body_sig.out_tree(), collapse(out_body_sig.out_type(), out_expanded_tracers)
@@ -1597,6 +1689,26 @@ class Cond(HybridOp):
     binder = cond_p.bind
     has_adjoint = True
 
+    def __init__(
+        self,
+        in_classical_tracers,
+        out_classical_tracers,
+        regions: List[HybridOpRegion],
+        apply_reverse_transform=False,
+        expansion_strategy=None,
+        debug_info=None,
+        estimated_probabilities=None,
+    ):  # pylint: disable=too-many-arguments
+        self.estimated_probabilities = estimated_probabilities
+        super().__init__(
+            in_classical_tracers,
+            out_classical_tracers,
+            regions,
+            apply_reverse_transform,
+            expansion_strategy,
+            debug_info,
+        )
+
     def adjoint(self):
         """Produce an adjoint version of this operator. Here, we simply regenerate a HybridAdjoint
         version of the operation, which is generally supported by Catalyst."""
@@ -1612,6 +1724,26 @@ class ForLoop(HybridOp):
 
     binder = for_p.bind
     has_adjoint = True
+
+    def __init__(
+        self,
+        in_classical_tracers,
+        out_classical_tracers,
+        regions: List[HybridOpRegion],
+        apply_reverse_transform=False,
+        expansion_strategy=None,
+        debug_info=None,
+        estimated_iterations=None,
+    ):  # pylint: disable=too-many-arguments
+        self.estimated_iterations = estimated_iterations
+        super().__init__(
+            in_classical_tracers,
+            out_classical_tracers,
+            regions,
+            apply_reverse_transform,
+            expansion_strategy,
+            debug_info,
+        )
 
     def adjoint(self):
         """Produce an adjoint version of this operator. Here, we simply regenerate a HybridAdjoint
@@ -1683,6 +1815,7 @@ class ForLoop(HybridOp):
                 apply_reverse_transform=self.apply_reverse_transform,
                 num_implicit_inputs=num_implicit_inputs,
                 preserve_dimensions=not expansion_strategy.input_unshare_variables,
+                estimated_iterations=self.estimated_iterations,
             )
         )
         return qrp2
@@ -1693,6 +1826,26 @@ class Switch(HybridOp):
 
     binder = switch_p.bind
     has_adjoint = True
+
+    def __init__(
+        self,
+        in_classical_tracers,
+        out_classical_tracers,
+        regions: List[HybridOpRegion],
+        apply_reverse_transform=False,
+        expansion_strategy=None,
+        debug_info=None,
+        estimated_probabilities=None,
+    ):  # pylint: disable=too-many-arguments
+        self.estimated_probabilities = estimated_probabilities
+        super().__init__(
+            in_classical_tracers,
+            out_classical_tracers,
+            regions,
+            apply_reverse_transform,
+            expansion_strategy,
+            debug_info,
+        )
 
     def adjoint(self):
         """Produce an adjoint version of this operator. Here, we simply regenerate a HybridAdjoint
@@ -1709,6 +1862,26 @@ class WhileLoop(HybridOp):
 
     binder = while_p.bind
     has_adjoint = True
+
+    def __init__(
+        self,
+        in_classical_tracers,
+        out_classical_tracers,
+        regions: List[HybridOpRegion],
+        apply_reverse_transform=False,
+        expansion_strategy=None,
+        debug_info=None,
+        estimated_iterations=None,
+    ):  # pylint: disable=too-many-arguments
+        self.estimated_iterations = estimated_iterations
+        super().__init__(
+            in_classical_tracers,
+            out_classical_tracers,
+            regions,
+            apply_reverse_transform,
+            expansion_strategy,
+            debug_info,
+        )
 
     def adjoint(self):
         """Produce an adjoint version of this operator. Here, we simply regenerate a HybridAdjoint
@@ -1804,6 +1977,7 @@ class WhileLoop(HybridOp):
                 body_nconsts=len(body_consts),
                 num_implicit_inputs=num_implicit_inputs,
                 preserve_dimensions=not expansion_strategy.input_unshare_variables,
+                estimated_iterations=self.estimated_iterations,
             )
         )
         return qrp2
@@ -1928,6 +2102,30 @@ def trace_quantum_branches(op, ctx, device, trace, qrp, **kwargs) -> QRegPromise
             out_expanded_tracers=out_expanded_classical_tracers,
             branch_jaxprs=branch_jaxprs,
             num_implicit_outputs=num_implicit_outputs[0],
+            estimated_probabilities=op.estimated_probabilities,
         )
     )
     return qrp2
+
+
+def collect_estimated_probabilities(
+    branch_probs: Sequence[float | None],
+) -> tuple[float, ...] | None:
+    """Collect and validate per-branch probability hints for ``cond`` and ``switch``."""
+    if all(p is None for p in branch_probs):
+        return None
+    if any(p is None for p in branch_probs):
+        raise ValueError(
+            "'estimated_probability' must be provided for every non-default branch when "
+            "it is provided for any non-default branch."
+        )
+
+    probs = tuple(float(p) for p in branch_probs)
+    for p in probs:
+        if not 0.0 <= p <= 1.0:
+            raise ValueError(f"'estimated_probability' must be in [0, 1], but got {p}.")
+    if sum(probs) > 1.0 + 1e-10:
+        raise ValueError(
+            f"'estimated_probability' entries must sum to at most 1, but got {sum(probs)}."
+        )
+    return probs

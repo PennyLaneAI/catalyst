@@ -1,5 +1,6 @@
 add_catalyst_unittest(CatalystQRefUnitTests
   InterfaceTest.cpp
+  TestDecomposableGateInterface.cpp
 )
 
 target_link_libraries(CatalystQRefUnitTests PRIVATE
@@ -7,7 +8,10 @@ target_link_libraries(CatalystQRefUnitTests PRIVATE
   MLIRFuncDialect
   MLIRMBQC
   MLIRQRef
+  MLIRTestDialect
   MLIRQuantum
   MLIRIR
   MLIRParser
+  MLIRPBC
+  MLIRMBQC
 )

@@ -18,6 +18,7 @@
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#include "mlir/Transforms/Passes.h"
 
 #include "PBC/IR/PBCDialect.h"
 #include "PBC/IR/PBCOps.h"
@@ -37,10 +38,16 @@ namespace pbc {
 struct ToPPRPass : impl::ToPPRPassBase<ToPPRPass> {
     using ToPPRPassBase::ToPPRPassBase;
 
-    void runOnOperation() final
-    {
+    void runOnOperation() final {
         auto ctx = &getContext();
         ConversionTarget target(*ctx);
+
+        // Remove all decomposition rules, they might involve gates we don't care about
+        OpPassManager pm("builtin.module");
+        pm.addPass(mlir::createSymbolDCEPass());
+        if (failed(runPipeline(pm, getOperation()))) {
+            return signalPassFailure();
+        }
 
         // Any Quantum "gate-like" operation must be converted
         target.addDynamicallyLegalDialect<quantum::QuantumDialect>(

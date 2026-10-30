@@ -37,16 +37,13 @@ def test_subroutine_classical():
     def add_one(x):
         return x + 1
 
-    qp.capture.enable()
-
-    @qp.qjit
+    @qp.qjit(capture=True)
     # CHECK: module @main
     def main():
         # CHECK: %{{.*}} = call @add_one(%{{.*}}) : (tensor<i64>) -> tensor<i64>
         return add_one(0)
 
     print(main.mlir)
-    qp.capture.disable()
 
 
 test_subroutine_classical()
@@ -58,9 +55,7 @@ def test_quantum_subroutine_identity_restore_wires():
     @subroutine
     def identity(): ...
 
-    qp.capture.enable()
-
-    @qp.qjit
+    @qp.qjit(capture=True, collect_decomp_rules=False)
     @qp.qnode(qp.device("lightning.qubit", wires=1))
     # CHECK: module @main
     def main():
@@ -80,7 +75,6 @@ def test_quantum_subroutine_identity_restore_wires():
     # CHECK-NEXT: return
 
     print(main.mlir)
-    qp.capture.disable()
 
 
 test_quantum_subroutine_identity_restore_wires()
@@ -92,9 +86,7 @@ def test_quantum_subroutine_identity():
     @subroutine
     def identity(): ...
 
-    qp.capture.enable()
-
-    @qp.qjit
+    @qp.qjit(capture=True, collect_decomp_rules=False)
     @qp.qnode(qp.device("lightning.qubit", wires=1))
     # CHECK: module @main
     def main():
@@ -108,7 +100,6 @@ def test_quantum_subroutine_identity():
     # CHECK-NEXT: return
 
     print(main.mlir)
-    qp.capture.disable()
 
 
 test_quantum_subroutine_identity()
@@ -121,9 +112,7 @@ def test_quantum_subroutine_wire_param():
     def Hadamard0(wire):
         qp.Hadamard(wire)
 
-    qp.capture.enable()
-
-    @qp.qjit
+    @qp.qjit(capture=True, collect_decomp_rules=False)
     @qp.qnode(qp.device("lightning.qubit", wires=1))
     # CHECK: module @subroutine_test
     def subroutine_test(c: int):
@@ -142,8 +131,6 @@ def test_quantum_subroutine_wire_param():
 
     print(subroutine_test.mlir)
 
-    qp.capture.disable()
-
 
 test_quantum_subroutine_wire_param()
 
@@ -155,9 +142,7 @@ def test_quantum_subroutine_gate_param_param():
     def RX_on_wire_0(param):
         qp.RX(param, wires=[0])
 
-    qp.capture.enable()
-
-    @qp.qjit
+    @qp.qjit(capture=True, collect_decomp_rules=False)
     @qp.qnode(qp.device("lightning.qubit", wires=1))
     # CHECK: module @subroutine_test_2
     def subroutine_test_2():
@@ -175,16 +160,12 @@ def test_quantum_subroutine_gate_param_param():
     # CHECK-NEXT: return
     print(subroutine_test_2.mlir)
 
-    qp.capture.disable()
-
 
 test_quantum_subroutine_gate_param_param()
 
 
 def test_quantum_subroutine_with_control_flow():
     """Test control flow inside the subroutine"""
-
-    qp.capture.enable()
 
     @subroutine
     def conditional_RX(param: float):
@@ -196,7 +177,7 @@ def test_quantum_subroutine_with_control_flow():
 
         qp.cond(param != 0.0, true_path, false_path)()
 
-    @qp.qjit(autograph=False)
+    @qp.qjit(capture=True, autograph=False, collect_decomp_rules=False)
     @qp.qnode(qp.device("lightning.qubit", wires=1))
     # CHECK: module @subroutine_test_3
     def subroutine_test_3():
@@ -217,7 +198,6 @@ def test_quantum_subroutine_with_control_flow():
     # CHECK:        qref.custom "RX"([[PARAM]]) [[QUBIT]] : !qref.bit
     # CHECK:      return
     print(subroutine_test_3.mlir)
-    qp.capture.disable()
 
 
 test_quantum_subroutine_with_control_flow()
@@ -225,8 +205,6 @@ test_quantum_subroutine_with_control_flow()
 
 def test_nested_subroutine_call():
     """Test nested subroutine call"""
-
-    qp.capture.enable()
 
     @subroutine
     def Hadamard_subroutine():
@@ -236,7 +214,7 @@ def test_nested_subroutine_call():
     def Hadamard_caller():
         Hadamard_subroutine()
 
-    @qp.qjit(autograph=False)
+    @qp.qjit(capture=True, autograph=False, collect_decomp_rules=False)
     @qp.qnode(qp.device("lightning.qubit", wires=1))
     # CHECK: module @subroutine_test_4
     def subroutine_test_4():
@@ -255,7 +233,6 @@ def test_nested_subroutine_call():
     # CHECK-NEXT: qref.custom "Hadamard"() [[QUBIT]] : !qref.bit
     # CHECK-NEXT: return
     print(subroutine_test_4.mlir)
-    qp.capture.disable()
 
 
 test_nested_subroutine_call()
@@ -265,12 +242,10 @@ def test_two_callsites():
     """Test that two calls won't give multiple definitions
     in the classical setting"""
 
-    qp.capture.enable()
-
     @subroutine
     def identity(): ...
 
-    @qp.qjit(autograph=False)
+    @qp.qjit(capture=True, autograph=False, collect_decomp_rules=False)
     # CHECK: module @subroutine_test_5
     def subroutine_test_5():
         identity()
@@ -278,7 +253,6 @@ def test_two_callsites():
 
     # CHECK-NOT: func.func private @identity_0()
     print(subroutine_test_5.mlir)
-    qp.capture.disable()
 
 
 test_two_callsites()
@@ -288,12 +262,10 @@ def test_two_callsites_quantum():
     """Test that two calls won't give multiple definitions
     int the quantum setting"""
 
-    qp.capture.enable()
-
     @subroutine
     def identity(): ...
 
-    @qp.qjit(autograph=False)
+    @qp.qjit(capture=True, autograph=False, collect_decomp_rules=False)
     @qp.qnode(qp.device("lightning.qubit", wires=1))
     # CHECK: module @subroutine_test_6
     def subroutine_test_6():
@@ -307,7 +279,6 @@ def test_two_callsites_quantum():
 
     # CHECK-NOT: func.func private @identity_0
     print(subroutine_test_6.mlir)
-    qp.capture.disable()
 
 
 test_two_callsites_quantum()
@@ -342,15 +313,11 @@ def test_two_qnodes_one_subroutine():
 
         # CHECK: func.func private @identity_0
 
-    qp.capture.enable()
-
-    @qp.qjit(autograph=False)
+    @qp.qjit(capture=True, autograph=False, collect_decomp_rules=False)
     def main():
         return subroutine_test_7() + subroutine_test_8()
 
     print(main.mlir)
-
-    qp.capture.disable()
 
 
 test_two_qnodes_one_subroutine()
@@ -366,17 +333,13 @@ def test_with_constant():
         one = jax.numpy.array(1)
         qp.Hadamard(c + one)
 
-    qp.capture.enable()
-
-    @qp.qjit(autograph=False)
+    @qp.qjit(capture=True, autograph=False, collect_decomp_rules=False)
     @qp.qnode(qp.device("null.qubit", wires=2))
     def circ():
         Hadamard_plus_1(0)
         return qp.probs()
 
     print(circ.mlir)
-
-    qp.capture.disable()
 
 
 test_with_constant()
@@ -389,7 +352,7 @@ def test_basic_subroutine():
     def f(x, wires):
         qp.RX(x, wires)
 
-    @qp.qjit(capture=True, target="mlir")
+    @qp.qjit(capture=True, collect_decomp_rules=False, target="mlir")
     @qp.qnode(qp.device("null.qubit", wires=1))
     # CHECK: module @circuit
     def circuit(x):
@@ -431,7 +394,7 @@ def test_multiple_metadata():
         else:
             qp.Z(wires)
 
-    @qp.qjit(capture=True, target="mlir")
+    @qp.qjit(capture=True, collect_decomp_rules=False, target="mlir")
     @qp.qnode(qp.device("null.qubit", wires=1))
     # CHECK: module @circuit
     def circuit():
@@ -475,7 +438,7 @@ def test_different_shapes():
 
         loop()  # pylint: disable=no-value-for-parameter
 
-    @qp.qjit(capture=True, target="mlir")
+    @qp.qjit(capture=True, collect_decomp_rules=False, target="mlir")
     @qp.qnode(qp.device("null.qubit", wires=1))
     # CHECK: module @circuit
     def circuit():

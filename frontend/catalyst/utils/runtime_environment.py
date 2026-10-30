@@ -17,6 +17,7 @@
 import importlib.util
 import os
 import os.path
+import sys
 import sysconfig
 
 package_root = os.path.join(os.path.dirname(__file__), "..")
@@ -63,7 +64,7 @@ BYTECODE_FILE_PATH = os.path.join(
 )
 
 
-def get_libpython_path() -> str:   # pragma: no cover
+def get_libpython_path() -> str:  # pragma: no cover
     """Return the path to the python *shared* library, or empty string if failed to find.
 
     The QPD plugin uses dlopen by the standalone ``catalyst`` compiler process, which does
@@ -72,7 +73,6 @@ def get_libpython_path() -> str:   # pragma: no cover
     """
     ldlibrary = sysconfig.get_config_var("LDLIBRARY")
     framework_prefix = sysconfig.get_config_var("PYTHONFRAMEWORKPREFIX")
-    shlib_suffix = sysconfig.get_config_var("SHLIB_SUFFIX") or ".so"
 
     # macOS framework-style installations
     if framework_prefix and ldlibrary:
@@ -85,7 +85,7 @@ def get_libpython_path() -> str:   # pragma: no cover
         return ""
 
     # Default: the library sysconfig reports, but only if it is a shared object.
-    if ldlibrary and shlib_suffix in ldlibrary:
+    if ldlibrary and not ldlibrary.endswith(".a"):
         ldlibrary_path = os.path.join(libdir, ldlibrary)
         if os.path.exists(ldlibrary_path):
             return ldlibrary_path
@@ -98,6 +98,7 @@ def get_libpython_path() -> str:   # pragma: no cover
     # is present alongside it. We accept ``LDLIBRARY`` only when it is a shared object
     # that exists, and otherwise fall back to locating the shared library in ``LIBDIR``.
     ldversion = sysconfig.get_config_var("LDVERSION") or sysconfig.get_config_var("VERSION") or ""
+    shlib_suffix = ".dylib" if sys.platform == "darwin" else ".so"
     conventional_path = os.path.join(libdir, f"libpython{ldversion}{shlib_suffix}")
     if os.path.exists(conventional_path):
         return conventional_path

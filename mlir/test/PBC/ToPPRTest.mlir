@@ -60,6 +60,21 @@ func.func @test_cz_to_ppr(%q1 : !quantum.bit, %q2 : !quantum.bit){
 
 // -----
 
+func.func @test_cy_to_ppr(%q1 : !quantum.bit, %q2 : !quantum.bit){
+    // CHECK-NOT: quantum.custom
+    // CHECK: [[PHASE:%.+]] = arith.constant 0.785
+    // CHECK: quantum.gphase([[PHASE]])
+    // CHECK: [[q1_3:%.+]]:2 = pbc.ppr ["Z", "Y"](4) [[q1:%.+]], [[q2:%.+]]
+    %q1_3:2 = quantum.custom "CY"() %q1, %q2 : !quantum.bit, !quantum.bit
+    // CHECK: [[q1_4:%.+]] = pbc.ppr ["Z"](-4) [[q1_3]]#0
+    // CHECK: [[q1_5:%.+]] = pbc.ppr ["Y"](-4) [[q1_3]]#1
+    // CHECK-NOT: quantum.custom
+    // CHECK: return
+    func.return
+}
+
+// -----
+
 func.func public @test_clifford_t_to_ppr_1() -> (tensor<i1>, tensor<i1>) {
     // CHECK: [[C2:%.+]] = arith.constant 0.785
     // CHECK: [[C:%.+]] = arith.constant -0.392
@@ -267,4 +282,137 @@ func.func @test_parametrized_gate_identity_angle_elision_to_ppr(%q0 : !quantum.b
     // CHECK-NOT: quantum.multirz
     // CHECK-NOT: pbc.ppr
     // CHECK: return
+}
+
+// -----
+
+func.func @test_dce_rules(%q1 : !quantum.bit) -> !quantum.bit {
+    // CHECK-NOT: quantum.custom
+    // CHECK: quantum.gphase
+    // CHECK: pbc.ppr ["Z"](4)
+    // CHECK: pbc.ppr ["X"](4)
+    // CHECK: pbc.ppr ["Z"](4)
+    %q1_0 = quantum.custom "H"() %q1 : !quantum.bit
+    func.return %q1_0 : !quantum.bit
+}
+
+// CHECK-NOT: func.func private @"some_decomp_rule"
+func.func private @"some_decomp_rule"(%arg0: tensor<1xf64>, %arg1: tensor<1xi64>, %arg2: !quantum.reg) -> !quantum.reg attributes {resources = {operations = {"some_gate" = 1 : i64}}, target_gate = "Hadamard{}{wires:1}{}"} {
+    %0 = stablehlo.slice %arg1 [0:1] : (tensor<1xi64>) -> tensor<1xi64>
+    %1 = stablehlo.reshape %0 : (tensor<1xi64>) -> tensor<i64>
+    %extracted = tensor.extract %1[] : tensor<i64>
+    %2 = quantum.extract %arg2[%extracted] : !quantum.reg -> !quantum.bit
+    %out_qubits = quantum.operator "some_gate"(%arg0: tensor<1xf64>) qubits(%2)
+      static_data = {}
+      param_map = {phi = [0]} qubit_map = {wires = [0]}
+    %3 = quantum.insert %arg2[%extracted], %out_qubits : !quantum.reg, !quantum.bit
+    return %3 : !quantum.reg
+}
+
+// -----
+
+// CHECK-LABEL: func.func @test_ppr_operators_to_ppr
+func.func @test_ppr_operators_to_ppr(%q0 : !quantum.bit, %q1 : !quantum.bit) {
+    // CHECK-NOT: quantum.operator
+    // CHECK: [[q_0:%.+]]:2 = pbc.ppr ["X", "Y"](2) [[q0:%.+]], [[q1:%.+]]
+    %0:2 = quantum.operator "PPR_2"() qubits(%q0, %q1)
+        static_data = {sign = 1 : i64, pauli_word = "XY"}
+    // CHECK: [[q_1:%.+]]:2 = pbc.ppr ["Z", "X"](4) [[q_0]]#0, [[q_0]]#1
+    %1:2 = quantum.operator "PPR_4"() qubits(%0#0, %0#1)
+        static_data = {sign = 1 : i64, pauli_word = "ZX"}
+    // CHECK: pbc.ppr ["Y", "Z"](8) [[q_1]]#0, [[q_1]]#1
+    %2:2 = quantum.operator "PPR_8"() qubits(%1#0, %1#1)
+        static_data = {sign = 1 : i64, pauli_word = "YZ"}
+    // CHECK-NOT: quantum.operator
+    // CHECK: return
+    func.return
+}
+
+// -----
+
+// CHECK-LABEL: func.func @test_negative_and_adjoint_ppr_operators
+func.func @test_negative_and_adjoint_ppr_operators(%q0 : !quantum.bit) {
+    // CHECK-NOT: quantum.operator
+    // CHECK: [[q0_0:%.+]] = pbc.ppr ["Z"](-2) [[q0:%.+]]
+    %0 = quantum.operator "PPR_2"() qubits(%q0)
+        static_data = {sign = -1 : si64, pauli_word = "Z"} // use si64 to verify signed cast
+    // The second PPR consumes the first PPR's output, not the original input qubit.
+    // CHECK: [[q0_1:%.+]] = pbc.ppr ["X"](-8) [[q0_0]]
+    %1 = quantum.operator "PPR_8"() adj qubits(%0)
+        static_data = {sign = 1 : i64, pauli_word = "X"}
+    // A negative sign and an adjoint cancel out.
+    // CHECK: pbc.ppr ["Y"](4) [[q0_1]]
+    %2 = quantum.operator "PPR_4"() adj qubits(%1)
+        static_data = {sign = -1 : si64, pauli_word = "Y"}
+    // CHECK-NOT: quantum.operator
+    // CHECK: return
+    func.return
+}
+
+// -----
+
+func.func @test_ppr_operator_missing_sign(%q0 : !quantum.bit) {
+    // expected-error @+2 {{failed to legalize operation 'quantum.operator' that was explicitly marked illegal}}
+    // expected-error @+1 {{PPR operators require static_data with a string 'pauli_word' and an integer 'sign'}}
+    %0 = quantum.operator "PPR_4"() qubits(%q0)
+        static_data = {pauli_word = "Z"}
+    func.return
+}
+
+// -----
+
+func.func @test_ppr_operator_bool_sign(%q0 : !quantum.bit) {
+    // expected-error @+2 {{failed to legalize operation 'quantum.operator' that was explicitly marked illegal}}
+    // expected-error @+1 {{PPR operators require static_data with a string 'pauli_word' and an integer 'sign'}}
+    %0 = quantum.operator "PPR_4"() qubits(%q0)
+        static_data = {sign = true, pauli_word = "Z"}
+    func.return
+}
+
+// -----
+
+func.func @test_ppr_operator_float_sign(%q0 : !quantum.bit) {
+    // expected-error @+2 {{failed to legalize operation 'quantum.operator' that was explicitly marked illegal}}
+    // expected-error @+1 {{PPR operators require static_data with a string 'pauli_word' and an integer 'sign'}}
+    %0 = quantum.operator "PPR_8"() qubits(%q0)
+        static_data = {sign = 1.0 : f64, pauli_word = "Z"}
+    func.return
+}
+
+// -----
+
+func.func @test_ppr_operator_invalid_sign(%q0 : !quantum.bit) {
+    // expected-error @+2 {{failed to legalize operation 'quantum.operator' that was explicitly marked illegal}}
+    // expected-error @+1 {{PPR operators require a sign of 1 or -1, but got 2}}
+    %0 = quantum.operator "PPR_2"() qubits(%q0)
+        static_data = {sign = 2 : i64, pauli_word = "Z"}
+    func.return
+}
+
+// -----
+
+func.func @test_ppr_operator_dynamic_params(%q0 : !quantum.bit, %p : f64) {
+    // expected-error @+2 {{failed to legalize operation 'quantum.operator' that was explicitly marked illegal}}
+    // expected-error @+1 {{PPR operators do not support dynamic parameters}}
+    %0 = quantum.operator "PPR_4"(%p: f64) qubits(%q0)
+        static_data = {sign = 1 : i64, pauli_word = "Z"}
+    func.return
+}
+
+// -----
+
+func.func @test_ppr_operator_missing_pauli_word(%q0 : !quantum.bit) {
+    // expected-error @+2 {{failed to legalize operation 'quantum.operator' that was explicitly marked illegal}}
+    // expected-error @+1 {{PPR operators require static_data with a string 'pauli_word' and an integer 'sign'}}
+    %0 = quantum.operator "PPR_4"() qubits(%q0)
+        static_data = {sign = 1 : i64}
+    func.return
+}
+
+// -----
+
+func.func @test_ppr_operator_missing_static_data(%q0 : !quantum.bit) {
+    // expected-error @+1 {{failed to legalize operation 'quantum.operator' that was explicitly marked illegal}}
+    %0 = quantum.operator "PPR_8"() qubits(%q0) // expected-error @+0 {{PPR operators require static_data with a string 'pauli_word' and an integer 'sign'}}
+    func.return
 }

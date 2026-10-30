@@ -12,13 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "pybind11/eval.h"
+#include "pybind11/pybind11.h"
+
 #include <algorithm>
 #include <cstring>
 #include <string>
 #include <vector>
-
-#include "pybind11/eval.h"
-#include "pybind11/pybind11.h"
 
 std::string program = R"(
 
@@ -54,8 +54,7 @@ except Exception as e:
 extern "C" {
 [[gnu::visibility("default")]] int counts(const char *_circuit, const char *_qpu_id, size_t shots,
                                           size_t num_qubits, const char *_kwargs, void *_vector,
-                                          char *error_msg, size_t error_msg_size)
-{
+                                          char *error_msg, size_t error_msg_size) {
     namespace py = pybind11;
     using namespace py::literals;
 

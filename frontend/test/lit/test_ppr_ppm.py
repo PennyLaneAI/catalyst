@@ -435,12 +435,10 @@ def test_decompose_arbitrary_ppr():
     Test the `decompose_arbitrary_ppr` pass.
     """
 
-    qp.capture.enable()
-
     pipe = [("pipe", ["quantum-compilation-stage"])]
 
     # CHECK-LABEL: public @test_decompose_arbitrary_ppr_workflow
-    @qjit(pipelines=pipe, target="mlir")
+    @qjit(capture=True, pipelines=pipe, target="mlir", collect_decomp_rules=False)
     @qp.transform(pass_name="decompose-arbitrary-ppr")
     @qp.transform(pass_name="to-ppr")
     @qp.qnode(qp.device("null.qubit", wires=3))
@@ -458,7 +456,6 @@ def test_decompose_arbitrary_ppr():
         qp.PauliRot(0.123, pauli_word="XYZ", wires=[0, 1, 2])
 
     print(test_decompose_arbitrary_ppr_workflow.mlir_opt)
-    qp.capture.disable()
 
 
 test_decompose_arbitrary_ppr()

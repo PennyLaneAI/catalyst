@@ -9,13 +9,18 @@ NPROC ?= $(shell python3 -c "import os; print(os.cpu_count())")
 MK_ABSPATH := $(abspath $(lastword $(MAKEFILE_LIST)))
 MK_DIR := $(dir $(MK_ABSPATH))
 RT_BUILD_DIR ?= $(MK_DIR)/build
+DIST_DIR ?= $(MK_DIR)/dist
 CODE_COVERAGE ?= OFF
 BUILD_TYPE ?= RelWithDebInfo
 ENABLE_OPENQASM ?= ON
 ENABLE_OQD ?= OFF
+ENABLE_TRANSPORT ?= OFF
+TRANSPORT_HIP ?= AUTO
+ENABLE_EXECUTOR ?= OFF
 ENABLE_ASAN ?= OFF
 STRICT_WARNINGS ?= ON
-LLVM_DIR ?= $(MK_DIR)/../mlir/llvm-project/
+LLVM_SRC_DIR ?= $(MK_DIR)/../mlir/llvm-project/
+LLVM_BUILD_DIR ?= $(LLVM_SRC_DIR)/build
 
 PLATFORM := $(shell uname -s)
 
@@ -53,6 +58,16 @@ ifeq ($(ENABLE_OQD), ON)
 	TEST_TARGETS += runner_tests_oqd
 endif
 
+ifeq ($(ENABLE_TRANSPORT), ON)
+	BUILD_TARGETS += transport_all
+	TEST_TARGETS += transport_tests_all
+endif
+
+ifeq ($(ENABLE_EXECUTOR), ON)
+	BUILD_TARGETS += rt_executor catalyst-executor
+	TEST_TARGETS += runner_tests_executor
+endif
+
 .PHONY: help
 help:
 	@echo "Please use \`make <target>' where <target> is one of"
@@ -63,6 +78,7 @@ help:
 	@echo "  format [check=1]   to apply C++ formatter; use with 'check=1' to check instead of modify (requires clang-format)"
 	@echo "  format [version=?] to apply C++ formatter; use with 'version={version}' to run clang-format-{version} instead of clang-format"
 	@echo "  check-tidy         to build Catalyst Runtime with RUNTIME_CLANG_TIDY=ON (requires clang-tidy)"
+	@echo "  pack-catalyst-runtime-dev  to build the catalyst-runtime-dev package"
 
 .PHONY: configure
 configure:
@@ -72,12 +88,16 @@ configure:
 		-DCMAKE_BUILD_TYPE=$(BUILD_TYPE) \
 		-DCMAKE_LIBRARY_OUTPUT_DIRECTORY=$(RT_BUILD_DIR)/lib \
 		-DCMAKE_C_COMPILER=$(C_COMPILER) \
-		-DMLIR_INCLUDE_DIRS=$(LLVM_DIR)/mlir/include \
+		-DMLIR_INCLUDE_DIRS=$(LLVM_SRC_DIR)/mlir/include \
+		-DLLVM_DIR=$(LLVM_BUILD_DIR)/lib/cmake/llvm \
 		-DCMAKE_CXX_COMPILER=$(CXX_COMPILER) \
 		-DCMAKE_C_COMPILER_LAUNCHER=$(COMPILER_LAUNCHER) \
 		-DCMAKE_CXX_COMPILER_LAUNCHER=$(COMPILER_LAUNCHER) \
 		-DENABLE_OPENQASM=$(ENABLE_OPENQASM) \
 		-DENABLE_OQD=$(ENABLE_OQD) \
+		-DENABLE_TRANSPORT=$(ENABLE_TRANSPORT) \
+		-DTRANSPORT_HIP=$(TRANSPORT_HIP) \
+		-DENABLE_EXECUTOR=$(ENABLE_EXECUTOR) \
 		-DENABLE_CODE_COVERAGE=$(CODE_COVERAGE) \
 		-DPython_EXECUTABLE=$(PYTHON) \
 		-DENABLE_ADDRESS_SANITIZER=$(ENABLE_ASAN) \
@@ -111,6 +131,31 @@ ifeq ($(ENABLE_OQD), ON)
 	# Test the OQD devices C++ tests
 	$(ASAN_COMMAND) $(RT_BUILD_DIR)/tests/runner_tests_oqd
 endif
+ifeq ($(ENABLE_TRANSPORT), ON)
+	# Transport suites; which binaries exist depends on the toolchain (libibverbs, HIP).
+	# -f/-x skips the _tests.cmake files catch_discover_tests writes beside each binary, and
+	# --allow-running-no-tests passes a suite whose tests all skip rather than exiting 4.
+	@set -e; for t in $(RT_BUILD_DIR)/tests/runner_tests_transport*; do \
+		[ -f "$$t" ] && [ -x "$$t" ] || continue; \
+		echo "Catalyst runtime test suite - $${t##*/}"; \
+		$(ASAN_COMMAND) $$t --allow-running-no-tests; \
+	done
+endif
+ifeq ($(ENABLE_EXECUTOR), ON)
+	# Test the catalyst-executor server over a loopback connection
+	$(ASAN_COMMAND) $(RT_BUILD_DIR)/tests/runner_tests_executor
+endif
+
+.PHONY: test-transport
+test-transport: BUILD_TYPE?=RelWithDebInfo
+test-transport: configure
+	cmake --build $(RT_BUILD_DIR) --target transport_tests_all -j$(NPROC)
+	@echo "Catalyst runtime transport test suites"
+	@set -e; for t in $(RT_BUILD_DIR)/tests/runner_tests_transport*; do \
+		[ -f "$$t" ] && [ -x "$$t" ] || continue; \
+		echo "Catalyst runtime test suite - $${t##*/}"; \
+		$(ASAN_COMMAND) $$t --allow-running-no-tests; \
+	done
 
 .PHONY: coverage
 coverage: RT_BUILD_DIR := $(RT_BUILD_DIR)_cov
@@ -131,6 +176,17 @@ endif
 ifeq ($(ENABLE_OQD), ON)
 	$(ASAN_COMMAND) $(RT_BUILD_DIR)/tests/runner_tests_oqd
 endif
+ifeq ($(ENABLE_TRANSPORT), ON)
+	# Transport suites; which binaries exist depends on the toolchain (libibverbs, HIP).
+	@set -e; for t in $(RT_BUILD_DIR)/tests/runner_tests_transport*; do \
+		[ -f "$$t" ] && [ -x "$$t" ] || continue; \
+		echo "Catalyst runtime test suite - $${t##*/}"; \
+		$(ASAN_COMMAND) $$t --allow-running-no-tests; \
+	done
+endif
+ifeq ($(ENABLE_EXECUTOR), ON)
+	$(ASAN_COMMAND) $(RT_BUILD_DIR)/tests/runner_tests_executor
+endif
 ifeq ($(PLATFORM),Linux)
 	lcov --directory $(RT_BUILD_DIR) -b $(MK_DIR)/lib --capture --output-file $(RT_BUILD_DIR)/coverage.info
 	lcov --remove $(RT_BUILD_DIR)/coverage.info '/usr/*' '*/_deps/*' '*/envs/*' '*/mlir/*' --output-file $(RT_BUILD_DIR)/coverage.info -q
@@ -147,10 +203,18 @@ else
 		$(MK_DIR)/include $(MK_DIR)/lib $(MK_DIR)/tests
 endif
 
+.PHONY: pack-catalyst-runtime-dev
+pack-catalyst-runtime-dev: runtime
+
+	@echo "build the catalyst-runtime-dev package"
+	cd $(RT_BUILD_DIR) && cpack
+	mkdir -p $(DIST_DIR)
+	mv $(RT_BUILD_DIR)/catalyst-runtime-dev*.tar.gz $(DIST_DIR)
+
 .PHONY: clean
 clean:
 	@echo "clean build files"
-	rm -rf $(RT_BUILD_DIR) $(RT_BUILD_DIR)_cov cov coverage.info $(MK_DIR)/BuildTidy
+	rm -rf $(RT_BUILD_DIR) $(RT_BUILD_DIR)_cov cov coverage.info $(MK_DIR)/BuildTidy $(DIST_DIR)
 
 .PHONY: format
 format:
@@ -167,7 +231,8 @@ check-tidy:
 		-DCMAKE_BUILD_TYPE=$(BUILD_TYPE) \
 		-DCMAKE_C_COMPILER=$(C_COMPILER) \
 		-DCMAKE_CXX_COMPILER=$(CXX_COMPILER) \
-		-DMLIR_INCLUDE_DIRS="$(abspath $(LLVM_DIR))/mlir/include" \
+		-DMLIR_INCLUDE_DIRS="$(abspath $(LLVM_SRC_DIR))/mlir/include" \
+		-DLLVM_DIR=$(LLVM_BUILD_DIR)/lib/cmake/llvm \
 		-DRUNTIME_CLANG_TIDY=ON
 
 	cmake --build $(MK_DIR)/BuildTidy --target rt_capi -j$(NPROC)

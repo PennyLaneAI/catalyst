@@ -122,3 +122,30 @@ def quantum_circuit(i: int):
 
 
 print(quantum_circuit.mlir)
+
+# ----------------------------------------------------------------------------------------------- #
+
+
+# The per-case `estimated_probability` hints are attached as a `catalyst.estimated_probabilities`
+# array (one entry per non-default case, in case order) on the emitted `scf.index_switch`.
+# CHECK-LABEL: public @jit_estimated_probabilities
+@qjit(target="mlir")
+def estimated_probabilities(i: int):
+
+    # CHECK:    scf.index_switch {{.*}} {catalyst.estimated_probabilities = [3.000000e-01, 5.000000e-01]}
+    @switch(i)
+    def my_switch():
+        return 5
+
+    @my_switch.branch(0, estimated_probability=0.3)
+    def my_branch():
+        return 9
+
+    @my_switch.branch(3, estimated_probability=0.5)
+    def my_branch():
+        return 4
+
+    return my_switch()
+
+
+print(estimated_probabilities.mlir)

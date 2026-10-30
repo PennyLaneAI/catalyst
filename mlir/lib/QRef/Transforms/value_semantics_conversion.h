@@ -57,6 +57,9 @@ void handleMeasure(IRRewriter &builder, qref::MeasureOp rMeasureOp, QubitValueTr
 void handleMeasureInBasis(IRRewriter &builder, mbqc::RefMeasureInBasisOp rMeasureInBasisOp,
                           QubitValueTracker &tracker);
 void handlePPM(IRRewriter &builder, pbc::RefPPMeasurementOp rPPMOp, QubitValueTracker &tracker);
+void handlePPR(IRRewriter &builder, pbc::RefPPRotationOp rPPROp, QubitValueTracker &tracker);
+void handleSelectPPM(IRRewriter &builder, pbc::RefSelectPPMeasurementOp rSelPPMOp,
+                     QubitValueTracker &tracker);
 void handleCall(IRRewriter &builder, func::CallOp callOp, QubitValueTracker &tracker);
 void handleCompbasis(IRRewriter &builder, qref::ComputationalBasisOp rCompbasisOp,
                      QubitValueTracker &tracker);
@@ -66,6 +69,7 @@ void handleHermitian(IRRewriter &builder, qref::HermitianOp rHermitianOp,
 void handleGraphStatePrep(IRRewriter &builder, mbqc::RefGraphStatePrepOp rGraphStatePrepOp,
                           QubitValueTracker &tracker);
 void handleAdjoint(IRRewriter &builder, qref::AdjointOp rAdjointOp, QubitValueTracker &tracker);
+void handleCtrl(IRRewriter &builder, qref::CtrlOp rCtrlOp, QubitValueTracker &tracker);
 void handleIf(IRRewriter &builder, scf::IfOp ifOp, QubitValueTracker &tracker);
 void handleSwitch(IRRewriter &builder, scf::IndexSwitchOp switchOp, QubitValueTracker &tracker);
 void handleFor(IRRewriter &builder, scf::ForOp forOp, QubitValueTracker &tracker);

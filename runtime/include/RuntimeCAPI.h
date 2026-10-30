@@ -85,7 +85,7 @@ void __catalyst__qis__CSWAP(QUBIT *, QUBIT *, QUBIT *, const Modifiers *);
 void __catalyst__qis__Toffoli(QUBIT *, QUBIT *, QUBIT *, const Modifiers *);
 void __catalyst__qis__MultiRZ(double, const Modifiers *, int64_t, /*qubits*/...);
 void __catalyst__qis__GlobalPhase(double, const Modifiers *);
-void __catalyst__qis__PCPhase(double, double, const Modifiers *, int64_t, /*qubits*/...);
+void __catalyst__qis__PCPhase(double, int64_t, const Modifiers *, int64_t, /*qubits*/...);
 void __catalyst__qis__ISWAP(QUBIT *, QUBIT *, const Modifiers *);
 void __catalyst__qis__PSWAP(double, QUBIT *, QUBIT *, const Modifiers *);
 void __catalyst__qis__PauliRot(const char *, double, const Modifiers *, bool, int64_t,
@@ -119,6 +119,9 @@ RESULT *__catalyst__mbqc__measure_in_basis(QUBIT *, uint32_t, double, int32_t);
 
 // Async runtime error
 void __catalyst__host__rt__unrecoverable_error();
+
+// Allocate a host buffer of `size` bytes and register it with the runtime's memory manager
+void *__catalyst__rt__alloc_managed(size_t size);
 
 #ifdef __cplusplus
 } // extern "C"

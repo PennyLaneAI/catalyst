@@ -23,7 +23,7 @@ import pennylane as qp
 from catalyst import qjit
 
 
-@qjit(target="mlir", capture=True)
+@qjit(target="mlir", capture=True, collect_decomp_rules=False)
 @qp.qnode(qp.device("lightning.qubit", wires=3))
 def test_basic_dynalloc():
     """
@@ -65,7 +65,7 @@ def test_basic_dynalloc():
 print(test_basic_dynalloc.mlir)
 
 
-@qjit(autograph=True, target="mlir", capture=True)
+@qjit(autograph=True, target="mlir", capture=True, collect_decomp_rules=False)
 @qp.qnode(qp.device("lightning.qubit", wires=3))
 def test_measure_with_reset():
     """
@@ -91,7 +91,7 @@ def test_measure_with_reset():
 print(test_measure_with_reset.mlir)
 
 
-@qjit(autograph=True, target="mlir", capture=True)
+@qjit(autograph=True, target="mlir", capture=True, collect_decomp_rules=False)
 @qp.qnode(qp.device("lightning.qubit", wires=2))
 def test_pass_reg_into_forloop():
     """
@@ -122,7 +122,7 @@ def test_pass_reg_into_forloop():
 print(test_pass_reg_into_forloop.mlir)
 
 
-@qjit(autograph=True, target="mlir", capture=True)
+@qjit(autograph=True, target="mlir", capture=True, collect_decomp_rules=False)
 @qp.qnode(qp.device("lightning.qubit", wires=3))
 def test_pass_multiple_regs_into_forloop():
     """
@@ -154,7 +154,7 @@ def test_pass_multiple_regs_into_forloop():
 print(test_pass_multiple_regs_into_forloop.mlir)
 
 
-@qjit(autograph=True, target="mlir", capture=True)
+@qjit(autograph=True, target="mlir", capture=True, collect_decomp_rules=False)
 @qp.qnode(qp.device("lightning.qubit", wires=2))
 def test_pass_multiple_regs_into_whileloop(N: int):
     """
@@ -195,6 +195,49 @@ def test_pass_multiple_regs_into_whileloop(N: int):
 print(test_pass_multiple_regs_into_whileloop.mlir)
 
 
+@qjit(target="mlir", capture=True)
+@qp.qnode(qp.device("lightning.qubit", wires=2))
+def test_magic_state_fabricate():
+    """
+    Test that magic state allocation lowers to pbc.ref.fabricate.
+    """
+
+    # CHECK: [[magic:%.+]] = pbc.ref.fabricate magic : !qref.bit
+    # CHECK: qref.custom "PauliX"() [[magic]]
+    # CHECK: qref.dealloc_qb [[magic]]
+
+    with qp.allocate(1, state="magic-T") as q:
+        qp.X(q[0])
+
+    return qp.probs(wires=[0])
+
+
+print(test_magic_state_fabricate.mlir)
+
+
+@qjit(target="mlir", capture=True)
+@qp.qnode(qp.device("lightning.qubit", wires=2))
+def test_magic_state_fabricate_multiple():
+    """
+    Test that allocating several magic states lowers to a single multi-result pbc.ref.fabricate.
+    """
+
+    # CHECK: [[magic:%.+]]:2 = pbc.ref.fabricate magic : !qref.bit, !qref.bit
+    # CHECK: qref.custom "PauliX"() [[magic]]#0
+    # CHECK: qref.custom "PauliZ"() [[magic]]#1
+    # CHECK: qref.dealloc_qb [[magic]]#0
+    # CHECK: qref.dealloc_qb [[magic]]#1
+
+    with qp.allocate(2, state="magic-T") as q:
+        qp.X(q[0])
+        qp.Z(q[1])
+
+    return qp.probs(wires=[0])
+
+
+print(test_magic_state_fabricate_multiple.mlir)
+
+
 # pylint: disable=line-too-long
 def test_quantum_subroutine():
     """
@@ -218,7 +261,7 @@ def test_quantum_subroutine():
     # CHECK:  call @flip([[global_qreg]], [[q1_0]], [[q1_1]], [[q2_2]], [[angle]])
     # CHECK-SAME: (!qref.reg<1>, !qref.bit, !qref.bit, !qref.bit, tensor<f64>) -> ()
 
-    @qjit(target="mlir", capture=True)
+    @qjit(target="mlir", capture=True, collect_decomp_rules=False)
     @qp.qnode(qp.device("lightning.qubit", wires=1))
     def circuit():
         with qp.allocate(2) as q1:
@@ -231,9 +274,11 @@ def test_quantum_subroutine():
     # CHECK:   qref.custom "PauliX"() %arg1 : !qref.bit
     # CHECK:   qref.custom "PauliY"() %arg2 : !qref.bit
     # CHECK:   qref.custom "PauliZ"() %arg3 : !qref.bit
+    # CHECK:   qref.ctrl(%arg1, %arg2) ctrlvals([[true]], [[true]]) {
     # CHECK:   [[glob_0:%.+]] = qref.get %arg0[ 0] : !qref.reg<1> -> !qref.bit
     # CHECK:   [[angle:%.+]] = tensor.extract %arg4[] : tensor<f64>
-    # CHECK:   qref.custom "RX"([[angle]]) [[glob_0]] ctrls(%arg1, %arg2) ctrlvals([[true]], [[true]]) : !qref.bit ctrls !qref.bit, !qref.bit
+    # CHECK:   qref.custom "RX"([[angle]]) [[glob_0]] : !qref.bit
+    # CHECK:   }
     # CHECK:   return
 
     print(circuit.mlir)

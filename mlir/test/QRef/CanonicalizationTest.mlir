@@ -152,40 +152,40 @@ func.func @test_get_cse(%r: !qref.reg<3>, %i: i64) {
 
 // -----
 
-// CHECK-LABEL: test_hermitian_adjoint_canonicalize
-func.func @test_hermitian_adjoint_canonicalize(%q0: !qref.bit) {
-    // CHECK:  qref.custom "Hadamard"() %arg0 : !qref.bit
+// CHECK-LABEL: test_hermitian_adjoint_not_canonicalized
+func.func @test_hermitian_adjoint_not_canonicalized(%q0: !qref.bit) {
+    // CHECK: qref.custom "Hadamard"() %arg0 adj : !qref.bit
     qref.custom "Hadamard"() %q0 adj: !qref.bit
     return
 }
 
 // -----
 
-// CHECK-LABEL: test_rotation_adjoint_canonicalize
-func.func @test_rotation_adjoint_canonicalize(%arg0: f64, %q0: !qref.bit) {
-    // CHECK: [[arg0neg:%.+]] = arith.negf %arg0 : f64
-    // CHECK:  qref.custom "RX"([[arg0neg]]) %arg1 : !qref.bit
+// CHECK-LABEL: test_rotation_adjoint_not_canonicalized
+func.func @test_rotation_adjoint_not_canonicalized(%arg0: f64, %q0: !qref.bit) {
+    // CHECK-NOT: arith.negf
+    // CHECK: qref.custom "RX"(%arg0) %arg1 adj : !qref.bit
     qref.custom "RX"(%arg0) %q0 adj: !qref.bit
     return
 }
 
 // -----
 
-// CHECK-LABEL: test_multirz_adjoint_canonicalize
-func.func @test_multirz_adjoint_canonicalize(%arg0: f64, %q0: !qref.bit, %q1: !qref.bit) {
-    // CHECK: [[arg0neg:%.+]] = arith.negf %arg0 : f64
-    // CHECK: qref.multirz([[arg0neg]]) %arg1, %arg2 : !qref.bit, !qref.bit
+// CHECK-LABEL: test_multirz_adjoint_not_canonicalized
+func.func @test_multirz_adjoint_not_canonicalized(%arg0: f64, %q0: !qref.bit, %q1: !qref.bit) {
+    // CHECK-NOT: arith.negf
+    // CHECK: qref.multirz(%arg0) %arg1, %arg2 adj : !qref.bit, !qref.bit
     qref.multirz (%arg0) %q0, %q1 adj : !qref.bit, !qref.bit
     return
 }
 
 // -----
 
-// CHECK-LABEL: test_pcphase_adjoint_canonicalize
-func.func @test_pcphase_adjoint_canonicalize(%arg0: f64, %dim: f64, %q0: !qref.bit, %q1: !qref.bit) {
-    // CHECK: [[arg0neg:%.+]] = arith.negf %arg0 : f64
-    // CHECK: qref.pcphase([[arg0neg]], %arg1) %arg2, %arg3 : !qref.bit, !qref.bit
-    qref.pcphase (%arg0, %dim) %q0, %q1 adj : !qref.bit, !qref.bit
+// CHECK-LABEL: test_pcphase_adjoint_not_canonicalized
+func.func @test_pcphase_adjoint_not_canonicalized(%arg0: f64, %q0: !qref.bit, %q1: !qref.bit) {
+    // CHECK-NOT: arith.negf
+    // CHECK: qref.pcphase(%arg0, dim : 2) %arg1, %arg2 adj : !qref.bit, !qref.bit
+    qref.pcphase (%arg0, dim : 2) %q0, %q1 adj : !qref.bit, !qref.bit
     return
 }
 
@@ -218,7 +218,7 @@ func.func @test_canonicalize_no_dce(%arg0: tensor<2xcomplex<f64>>, %arg1 : tenso
     qref.multirz (%arg2) %q0, %q1 : !qref.bit, !qref.bit
 
     // CHECK: qref.pcphase
-    qref.pcphase (%arg2, %arg2) %q0 : !qref.bit
+    qref.pcphase (%arg2, dim : 0) %q0 : !qref.bit
 
     // CHECK: qref.unitary
     qref.unitary (%arg3 : tensor<2x2xcomplex<f64>>) %q0 : !qref.bit

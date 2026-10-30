@@ -62,8 +62,8 @@ class TestBasicAbstractedAxes:
         @qjit(abstracted_axes={0: "a", 1: "b"}, capture=capture_mode)
         def identity(a):
             assert a.shape[0] is not a.shape[1]
-            assert qp.math.is_abstract(a.shape[0])
-            assert qp.math.is_abstract(a.shape[1])
+            assert qp.math.is_tracer(a.shape[0])
+            assert qp.math.is_tracer(a.shape[1])
             return a
 
         param = jnp.eye(2)
@@ -79,9 +79,9 @@ class TestBasicAbstractedAxes:
             assert a.shape[0] is b.shape[0]
             assert a.shape[0] is not a.shape[1]
             assert b.shape[1] == 2
-            assert qp.math.is_abstract(a.shape[0])
-            assert qp.math.is_abstract(a.shape[1])
-            assert qp.math.is_abstract(b.shape[0])
+            assert qp.math.is_tracer(a.shape[0])
+            assert qp.math.is_tracer(a.shape[1])
+            assert qp.math.is_tracer(b.shape[0])
             return a, b
 
         param0 = jnp.ones((4, 3))
@@ -96,8 +96,8 @@ class TestBasicAbstractedAxes:
         @qjit(abstracted_axes={0: "n", 2: "m"}, capture=capture_mode)
         def aot(a: jax.core.ShapedArray([1, 3, 1], dtype=float)):
             assert a.shape[0] is not a.shape[2]
-            assert qp.math.is_abstract(a.shape[0])
-            assert qp.math.is_abstract(a.shape[2])
+            assert qp.math.is_tracer(a.shape[0])
+            assert qp.math.is_tracer(a.shape[2])
             assert a.shape[1] == 3
             return a
 
@@ -108,7 +108,7 @@ class TestBasicAbstractedAxes:
 
         @qp.qnode(qp.device("lightning.qubit", wires=1))
         def circuit(a):
-            assert qp.math.is_abstract(a.shape[0])
+            assert qp.math.is_tracer(a.shape[0])
             s = jnp.sum(a)
             qp.RX(s, 0)
             return qp.expval(qp.Z(0))
@@ -130,7 +130,7 @@ class TestBasicAbstractedAxes:
         @qp.qnode(qp.device("lightning.qubit", wires=1))
         def circuit(a_b):
             x = a_b[0] + a_b[1]
-            assert qp.math.is_abstract(x.shape[0])
+            assert qp.math.is_tracer(x.shape[0])
             phi = jnp.sum(x)
             qp.RX(phi, 0)
             return qp.expval(qp.Z(0))
@@ -361,8 +361,10 @@ class TestBasicArrayCreation:
         def f():
             return jnp.empty(shape=bad_shape, dtype=int)
 
+        f = qjit(f, capture=capture_mode)
+
         with pytest.raises(TypeError, match="Shapes must be 1D sequences of integer scalars"):
-            qjit(f, capture=capture_mode)
+            f()
 
     def test_accessing_shapes(self, capture_mode):
         """Test that dynamic tensor shapes are available for calculations"""

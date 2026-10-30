@@ -18,6 +18,7 @@ of quantum operations, measurements, and observables to reference semantics JAXP
 
 from enum import Enum
 
+import pennylane as qp
 from jax._src import source_info_util
 from jax._src.lib.mlir import ir
 from jax.core import AbstractValue, ShapedArray
@@ -25,10 +26,12 @@ from jax.extend.core import Primitive
 from jax.interpreters import mlir
 from jaxlib.mlir._mlir_libs import _mlir as _ods_cext
 from jaxlib.mlir.dialects.arith import (
+    ConstantOp,
     ExtUIOp,
 )
 from jaxlib.mlir.dialects.stablehlo import ConvertOp as StableHLOConvertOp
 from pennylane.capture.primitives import adjoint_transform_prim as plxpr_adjoint_transform_prim
+from pennylane.capture.primitives import ctrl_transform_prim as plxpr_ctrl_transform_prim
 from pennylane.wires import AbstractQubit
 
 # TODO: remove after jax v0.7.2 upgrade
@@ -61,13 +64,15 @@ with Patcher(
     ),
 ):
     from mlir_quantum.dialects.mbqc import RefMeasureInBasisOp
-    from mlir_quantum.dialects.pbc import RefPPMeasurementOp
+    from mlir_quantum.dialects.pbc import RefFabricateOp, RefPPMeasurementOp
     from mlir_quantum.dialects.qref import (
         AdjointOp,
         AllocOp,
         ComputationalBasisOp,
+        CtrlOp,
         CustomOp,
         DeallocOp,
+        DeallocQubitOp,
         GetOp,
         GlobalPhaseOp,
         HermitianOp,
@@ -225,6 +230,79 @@ def _qref_get_abstract_eval(qreg, qubit_idx):
     return AbstractQubit()
 
 
+def _pbc_logical_init_attr(ctx, init_state: str):
+    """Create a PBC LogicalInit enum attribute from its string value."""
+    return ir.OpaqueAttr.get("pbc", f"enum {init_state}".encode("utf-8"), ir.NoneType.get(ctx), ctx)
+
+
+_MLIR_MAGIC_STATES = {
+    "magic-T": "magic",
+    "magic-T-adj": "magic_conj",
+}
+
+
+def _normalize_allocate_state(state):
+    if hasattr(state, "value"):
+        state_val = state.value
+    else:
+        state_val = state
+    return _MLIR_MAGIC_STATES.get(state_val, state_val)
+
+
+def _allocate_prim_lowering(jax_ctx: mlir.LoweringRuleContext, *, num_wires, state, restored=False):
+    del restored
+    ctx = jax_ctx.module_context.context
+    ctx.allow_unregistered_dialects = True
+    state_val = _normalize_allocate_state(state)
+
+    if state_val in ("magic", "magic_conj"):
+        qubit_type = ir.OpaqueType.get("qref", "bit", ctx)
+        init_state_attr = _pbc_logical_init_attr(ctx, state_val)
+        return list(RefFabricateOp([qubit_type] * num_wires, init_state_attr).results)
+
+    # PL allocate_prim passes a static num_wires (capture cannot produce a dynamic wire count).
+    size_attr = ir.IntegerAttr.get(ir.IntegerType.get_signless(64, ctx), num_wires)
+    qreg_type = ir.OpaqueType.get("qref", f"reg<{num_wires}>", ctx)
+    qreg = AllocOp(qreg_type, nqubits_attr=size_attr).results[0]
+
+    qubit_type = ir.OpaqueType.get("qref", "bit", ctx)
+    i64_type = ir.IntegerType.get_signless(64, ctx)
+    qubits = []
+    for idx in range(num_wires):
+        idx_attr = ir.IntegerAttr.get(i64_type, idx)
+        idx_val = ConstantOp(i64_type, idx_attr).result
+        qubits.append(GetOp(qubit_type, qreg, idx=idx_val).results[0])
+    return qubits
+
+
+def _deallocate_prim_lowering(jax_ctx: mlir.LoweringRuleContext, *qubits):
+    del jax_ctx
+    fabricated_qubits = []
+    qregs = set()
+    for qubit in qubits:
+        defining_op = qubit.owner
+        if defining_op.name == "pbc.ref.fabricate":
+            fabricated_qubits.append(qubit)
+        elif defining_op.name == "qref.get":
+            qregs.add(defining_op.operands[0])
+        else:
+            raise TypeError(
+                f"Manual deallocation is only supported for wires produced by allocate, "
+                f"got {defining_op.name}"
+            )
+
+    if (fabricated_qubits and qregs) or len(qregs) > 1:
+        raise ValueError(
+            "Expected all wires to deallocate to come from the same allocation instruction"
+        )
+
+    for qubit in fabricated_qubits:
+        DeallocQubitOp(qubit)
+    for qreg in qregs:
+        DeallocOp(qreg)
+    return ()
+
+
 def _qref_get_lowering(jax_ctx: mlir.LoweringRuleContext, qreg: ir.Value, qubit_idx: ir.Value):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
@@ -285,9 +363,16 @@ def _qref_set_basis_state_lowering(jax_ctx: mlir.LoweringRuleContext, *qubits_or
 #
 # qref_qinst_p
 #
+# pylint: disable=too-many-arguments
 @qref_qinst_p.def_abstract_eval
 def _qref_qinst_abstract_eval(
-    *qubits_or_params, op=None, qubits_len=0, params_len=0, ctrl_len=0, adjoint=False
+    *qubits_or_params,
+    op=None,
+    qubits_len=0,
+    params_len=0,
+    ctrl_len=0,
+    adjoint=False,
+    pcphase_dim=None,
 ):
     # The signature here is: (using * to denote zero or more)
     # qubits*, params*, ctrl_qubits*, ctrl_values*
@@ -295,6 +380,14 @@ def _qref_qinst_abstract_eval(
     ctrl_qubits = qubits_or_params[-2 * ctrl_len : -ctrl_len]
     all_qubits = qubits + ctrl_qubits
     assert all(isinstance(qubit, AbstractQubit) for qubit in all_qubits[: qubits_len + ctrl_len])
+
+    # TODO: make a specialized primitive for PCPhase so that the main qinst primitive's kwarg
+    # does not need to carry the PCPhase around
+    # Or as an alternative, expand the kwarg so that it can be an arbitrary kwarg list for a general
+    # primitive's attributes
+    assert (pcphase_dim is not None) == (
+        op == "PCPhase"
+    ), "pcphase_dim must be provided exactly for PCPhase ops"
     return ()
 
 
@@ -307,6 +400,7 @@ def _qref_qinst_lowering(
     params_len=0,
     ctrl_len=0,
     adjoint=False,
+    pcphase_dim=None,
 ):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
@@ -354,12 +448,11 @@ def _qref_qinst_lowering(
         return ()
 
     if name_str == "PCPhase":
-        assert len(float_params) == 2, "PCPhase takes two float parameters"
-        float_param = float_params[0]
-        dim_param = float_params[1]
+        assert len(float_params) == 1, "PCPhase takes one float parameter (theta)"
+        theta = float_params[0]
         PCPhaseOp(
-            theta=float_param,
-            dim=dim_param,
+            theta=theta,
+            dim=ir.IntegerAttr.get(ir.IntegerType.get_signless(64, ctx), pcphase_dim),
             qubits=qubits,
             ctrl_qubits=ctrl_qubits,
             ctrl_values=ctrl_values_i1,
@@ -617,7 +710,6 @@ def _pl_adjoint_lowering(
     jax_ctx,
     *plxpr_invals,
     jaxpr,
-    lazy,
     n_consts,
 ):
     new_jaxpr = jaxpr.replace(constvars=(), invars=jaxpr.constvars + jaxpr.invars)
@@ -633,6 +725,49 @@ def _pl_adjoint_lowering(
             mlir.TokenSet(),
             [],
             *plxpr_invals,
+            dim_var_values=jax_ctx.dim_var_values,
+            const_lowering=jax_ctx.const_lowering,
+        )
+
+    return ()
+
+
+#
+# qref ctrl region
+#
+# pylint: disable=unused-argument
+def _pl_ctrl_lowering(
+    jax_ctx,
+    *plxpr_invals,
+    jaxpr,
+    n_control,
+    work_wires,
+    n_consts,
+    work_wire_type="borrowed",
+):
+    """Lower a `qp.ctrl` transform to a `qref.ctrl` region op."""
+    values_start = len(plxpr_invals) - n_control
+    controls_start = values_start - n_control
+    body_invals = plxpr_invals[:controls_start]
+    control_qubits = list(plxpr_invals[controls_start:values_start])
+
+    i1 = ir.IntegerType.get_signless(1)
+    control_values_i1 = [
+        TensorExtractOp(i1, value, []).result for value in plxpr_invals[values_start:]
+    ]
+
+    op = CtrlOp(ctrl_qubits=control_qubits, ctrl_values=control_values_i1)
+    ctrl_block = op.regions[0].blocks.append()
+    with ir.InsertionPoint(ctrl_block):
+        source_info_util.extend_name_stack("ctrl")
+        body_jaxpr = jaxpr.replace(constvars=(), invars=jaxpr.constvars + jaxpr.invars)
+        mlir.jaxpr_subcomp(
+            jax_ctx.module_context,
+            body_jaxpr,
+            jax_ctx.name_stack.extend("ctrl"),
+            mlir.TokenSet(),
+            [],
+            *body_invals,
             dim_var_values=jax_ctx.dim_var_values,
             const_lowering=jax_ctx.const_lowering,
         )
@@ -823,6 +958,8 @@ def _qref_hermitian_lowering(jax_ctx: mlir.LoweringRuleContext, matrix: ir.Value
 
 
 CUSTOM_LOWERING_RULES = (
+    (qp.allocation.allocate_prim, _allocate_prim_lowering),
+    (qp.allocation.deallocate_prim, _deallocate_prim_lowering),
     (qref_operator_p, _qref_operator_p_lowering),
     (qref_alloc_p, _qref_alloc_lowering),
     (qref_dealloc_p, _qref_dealloc_lowering),
@@ -840,4 +977,5 @@ CUSTOM_LOWERING_RULES = (
     (qref_namedobs_p, _qref_named_obs_lowering),
     (qref_hermitian_p, _qref_hermitian_lowering),
     (plxpr_adjoint_transform_prim, _pl_adjoint_lowering),
+    (plxpr_ctrl_transform_prim, _pl_ctrl_lowering),
 )

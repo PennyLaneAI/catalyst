@@ -27,8 +27,7 @@ using namespace catalyst::gradient;
 namespace catalyst {
 namespace gradient {
 
-void populateLoweringPatterns(RewritePatternSet &patterns)
-{
+void populateLoweringPatterns(RewritePatternSet &patterns) {
     patterns.add<HybridGradientLowering>(patterns.getContext());
     patterns.add<HybridValueAndGradientLowering>(patterns.getContext());
     patterns.add<FiniteDiffLowering>(patterns.getContext(), 1);

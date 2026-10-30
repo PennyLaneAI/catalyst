@@ -71,15 +71,14 @@ func.func @test_extract_insert_fold(%r1: !quantum.reg, %i: i64) -> !quantum.reg 
     return %r3 : !quantum.reg
 }
 
-// CHECK-LABEL: test_extract_insert_no_fold_static
-func.func @test_extract_insert_no_fold_static(%r1: !quantum.reg, %i1: i64, %i2: i64) -> !quantum.reg {
-    // CHECK: quantum.extract
-    // CHECK: quantum.insert
+// CHECK-LABEL: test_extract_insert_distinct_static_folds
+func.func @test_extract_insert_distinct_static_folds(%r1: !quantum.reg, %i1: i64, %i2: i64) -> !quantum.reg {
+    // CHECK: [[Q:%.+]] = quantum.extract %arg0[ 0]
+    // CHECK: [[R2:%.+]] = quantum.insert %arg0[ 1], [[Q]]
+    // CHECK: quantum.insert [[R2]][%arg2], [[Q]]
     %q1 = quantum.extract %r1[0] : !quantum.reg -> !quantum.bit
     %r2 = quantum.insert %r1[1], %q1 : !quantum.reg, !quantum.bit
 
-    // CHECK: quantum.extract
-    // CHECK: quantum.insert
     %q2 = quantum.extract %r2[0] : !quantum.reg -> !quantum.bit
     %r3 = quantum.insert %r2[%i1], %q2 : !quantum.reg, !quantum.bit
 
@@ -88,6 +87,36 @@ func.func @test_extract_insert_no_fold_static(%r1: !quantum.reg, %i1: i64, %i2: 
     %r4 = quantum.insert %r3[%i2], %q3 : !quantum.reg, !quantum.bit
 
     return %r4 : !quantum.reg
+}
+
+// CHECK-LABEL: test_extract_through_insert_distinct_index
+func.func @test_extract_through_insert_distinct_index(%r0: !quantum.reg) -> !quantum.reg {
+    // CHECK: [[Q0:%.+]] = quantum.extract %arg0[ 0]
+    // CHECK: [[X:%.+]] = quantum.custom "PauliX"() [[Q0]]
+    // CHECK: [[Q1:%.+]] = quantum.extract %arg0[ 1]
+    // CHECK: [[Z:%.+]] = quantum.custom "PauliZ"() [[Q1]]
+    // CHECK: [[INS0:%.+]] = quantum.insert %arg0[ 0], [[X]]
+    // CHECK: [[INS1:%.+]] = quantum.insert [[INS0]][ 1], [[Z]]
+    // CHECK: return [[INS1]]
+    %q0 = quantum.extract %r0[0] : !quantum.reg -> !quantum.bit
+    %x = quantum.custom "PauliX"() %q0 : !quantum.bit
+    %r1 = quantum.insert %r0[0], %x : !quantum.reg, !quantum.bit
+    %q1 = quantum.extract %r1[1] : !quantum.reg -> !quantum.bit
+    %z = quantum.custom "PauliZ"() %q1 : !quantum.bit
+    %r2 = quantum.insert %r1[1], %z : !quantum.reg, !quantum.bit
+    return %r2 : !quantum.reg
+}
+
+// A same-index extract/insert round-trip cancels; the distinct-index redirect does not fire.
+// CHECK-LABEL: test_extract_through_insert_prefers_cancellation
+func.func @test_extract_through_insert_prefers_cancellation(%r0: !quantum.reg, %q: !quantum.bit) -> !quantum.reg {
+    // CHECK-NOT: quantum.extract
+    // CHECK: [[INS:%.+]] = quantum.insert %arg0[ 0], %arg1
+    // CHECK-NEXT: return [[INS]]
+    %r1 = quantum.insert %r0[0], %q : !quantum.reg, !quantum.bit
+    %q1 = quantum.extract %r1[1] : !quantum.reg -> !quantum.bit
+    %r2 = quantum.insert %r1[1], %q1 : !quantum.reg, !quantum.bit
+    return %r2 : !quantum.reg
 }
 
 // CHECK-LABEL: test_extract_insert_constant
@@ -136,31 +165,34 @@ func.func @test_num_qubits_no_cse() -> (i64, i64, !quantum.reg) {
     return %n1, %n2, %r  : i64, i64, !quantum.reg
 }
 
-// CHECK-LABEL: test_hermitian_adjoint_canonicalize
-func.func @test_hermitian_adjoint_canonicalize() -> !quantum.bit {
+// -----
+
+// CHECK-LABEL: test_hermitian_adjoint_not_canonicalized
+func.func @test_hermitian_adjoint_not_canonicalized() -> !quantum.bit {
+    %0 = quantum.alloc( 1) : !quantum.reg
+    %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+
+    // CHECK: [[reg:%.+]] = quantum.alloc( 1) : !quantum.reg
+    // CHECK: [[qubit:%.+]] = quantum.extract [[reg]][ 0] : !quantum.reg -> !quantum.bit
+
+    %2 = quantum.custom "Hadamard"() %1 adj: !quantum.bit
+    // CHECK:  quantum.custom "Hadamard"() [[qubit]] adj : !quantum.bit
+    return %2 : !quantum.bit
+}
+
+// CHECK-LABEL: test_rotation_adjoint_not_canonicalize
+func.func @test_rotation_adjoint_not_canonicalize(%arg0: f64) -> !quantum.bit {
     %0 = quantum.alloc( 1) : !quantum.reg
     %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
     // CHECK: [[reg:%.+]] = quantum.alloc( 1) : !quantum.reg
     // CHECK: [[qubit:%.+]] = quantum.extract [[reg]][ 0] : !quantum.reg -> !quantum.bit
-    %2 = quantum.custom "Hadamard"() %1 {adjoint}: !quantum.bit
-    // CHECK:  quantum.custom "Hadamard"() [[qubit]] : !quantum.bit
+    %2 = quantum.custom "RX"(%arg0) %1 adj: !quantum.bit
+    // CHECK:  quantum.custom "RX"(%arg0) [[qubit]] adj : !quantum.bit
     return %2 : !quantum.bit
 }
 
-// CHECK-LABEL: test_rotation_adjoint_canonicalize
-func.func @test_rotation_adjoint_canonicalize(%arg0: f64) -> !quantum.bit {
-    %0 = quantum.alloc( 1) : !quantum.reg
-    %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
-    // CHECK: [[reg:%.+]] = quantum.alloc( 1) : !quantum.reg
-    // CHECK: [[qubit:%.+]] = quantum.extract [[reg]][ 0] : !quantum.reg -> !quantum.bit
-    %2 = quantum.custom "RX"(%arg0) %1 {adjoint}: !quantum.bit
-    // CHECK: [[arg0neg:%.+]] = arith.negf %arg0 : f64
-    // CHECK:  quantum.custom "RX"([[arg0neg]]) [[qubit]] : !quantum.bit
-    return %2 : !quantum.bit
-}
-
-// CHECK-LABEL: test_multirz_adjoint_canonicalize
-func.func @test_multirz_adjoint_canonicalize(%arg0: f64) -> (!quantum.bit, !quantum.bit) {
+// CHECK-LABEL: test_multirz_adjoint_not_canonicalize
+func.func @test_multirz_adjoint_not_canonicalize(%arg0: f64) -> (!quantum.bit, !quantum.bit) {
     // CHECK: [[reg:%.+]] = quantum.alloc( 2) : !quantum.reg
     // CHECK: [[qubit1:%.+]] = quantum.extract [[reg]][ 0] : !quantum.reg -> !quantum.bit
     // CHECK: [[qubit2:%.+]] = quantum.extract [[reg]][ 1] : !quantum.reg -> !quantum.bit
@@ -168,12 +200,24 @@ func.func @test_multirz_adjoint_canonicalize(%arg0: f64) -> (!quantum.bit, !quan
     %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
     %2 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
 
-    // CHECK: [[arg0neg:%.+]] = arith.negf %arg0 : f64
-    // CHECK: [[ret:%.+]]:2 = quantum.multirz([[arg0neg]]) [[qubit1]], [[qubit2]] : !quantum.bit, !quantum.bit
-    %3:2 = quantum.multirz (%arg0) %1, %2 {adjoint} : !quantum.bit, !quantum.bit
+    // CHECK: [[ret:%.+]]:2 = quantum.multirz(%arg0) [[qubit1]], [[qubit2]] adj : !quantum.bit, !quantum.bit
+    %3:2 = quantum.multirz (%arg0) %1, %2 adj : !quantum.bit, !quantum.bit
     return %3#0, %3#1 : !quantum.bit, !quantum.bit
 }
 
+// CHECK-LABEL: test_pcphase_adjoint_not_canonicalized
+func.func @test_pcphase_adjoint_not_canonicalized(%arg0: f64) -> (!quantum.bit, !quantum.bit) {
+    // CHECK: [[reg:%.+]] = quantum.alloc( 2) : !quantum.reg
+    // CHECK: [[qubit1:%.+]] = quantum.extract [[reg]][ 0] : !quantum.reg -> !quantum.bit
+    // CHECK: [[qubit2:%.+]] = quantum.extract [[reg]][ 1] : !quantum.reg -> !quantum.bit
+    %0 = quantum.alloc( 2) : !quantum.reg
+    %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+    %2 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
+
+    // CHECK: [[ret:%.+]]:2 = quantum.pcphase(%arg0, dim : 2) [[qubit1]], [[qubit2]] adj : !quantum.bit, !quantum.bit
+    %3:2 = quantum.pcphase(%arg0, dim : 2) %1, %2 adj : !quantum.bit, !quantum.bit
+    return %3#0, %3#1 : !quantum.bit, !quantum.bit
+}
 
 // CHECK-LABEL: test_interleaved_extract_insert
 func.func @test_interleaved_extract_insert() -> tensor<4xf64> {
@@ -197,4 +241,29 @@ func.func @test_interleaved_extract_insert() -> tensor<4xf64> {
   quantum.dealloc %4 : !quantum.reg
   quantum.device_release
   return %6 : tensor<4xf64>
+}
+
+// CHECK-LABEL: test_extract_before_insert
+func.func @test_extract_before_insert() {
+  // CHECK: [[r0:%.+]] = quantum.alloc
+  %r0 = quantum.alloc( 2) : !quantum.reg
+
+  // CHECK: [[q0:%.+]] = quantum.extract [[r0]][ 0]
+  // CHECK: [[q0b:%.+]] = quantum.custom "PauliX"() [[q0]]
+  // CHECK: [[q1:%.+]] = quantum.extract [[r0]][ 1]
+  // CHECK: [[q1b:%.+]] = quantum.custom "PauliY"() [[q1]]
+  // CHECK: [[r1:%.+]] = quantum.insert [[r0]][ 0], [[q0b]]
+  // CHECK: [[r2:%.+]] = quantum.insert [[r1]][ 1], [[q1b]]
+
+  %q0  = quantum.extract %r0[ 0] : !quantum.reg -> !quantum.bit
+  %q0b = quantum.custom "PauliX"() %q0 : !quantum.bit
+  %r1  = quantum.insert %r0[ 0], %q0b : !quantum.reg, !quantum.bit
+
+  %q1  = quantum.extract %r1[ 1] : !quantum.reg -> !quantum.bit
+  %q1b = quantum.custom "PauliY"() %q1 : !quantum.bit
+  %r2  = quantum.insert %r1[ 1], %q1b : !quantum.reg, !quantum.bit
+
+  // CHECK: quantum.dealloc [[r2]]
+  quantum.dealloc %r2 : !quantum.reg
+  return
 }

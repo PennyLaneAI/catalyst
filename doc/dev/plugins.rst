@@ -369,34 +369,13 @@ From here, you can change the name of the pass, change the name of the shared ob
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Now that you have your ``StandalonePlugin.so``, you can ship it in a Python wheel.
-To allow users to run your pass, we have provided a class called :class:`~.passes.Pass` and :class:`~.passes.PassPlugin`.
-You can extend these classes and allow the user to import your derived classes and run passes as a decorator.
-We provide the :func:`~.passes.apply_pass_plugin` decorator to allow pass plugins to be loaded and executed.
-For example:
 
-.. code-block:: python
-
-    from standalone import getStandalonePluginAbsolutePath
-
-    @apply_pass_plugin(getStandalonePluginAbsolutePath(), "standalone-switch-bar-foo")
-    @qp.qnode(qp.device("lightning.qubit", wires=1))
-    def qnode():
-        return qp.state()
-
-    @qp.qjit(target="mlir")
-    def module():
-        return qnode()
-
-    print(module.mlir)
-
-
-If you have followed all the steps in this tutorial and inspect the MLIR sources, you'll find that the number of qubits allocated will be 42.
-Take a look into the ``standalone_plugin_wheel`` Makefile rule to see how we test shipping a plugin.
-For more information, please consult our :doc:`dialect guide <dialects>`, our :doc:`compiler passes guide <transforms>`, and the `MLIR documentation <https://mlir.llvm.org/>`_.
-
-You can also register your pass with Catalyst via Python's `entry_points <https://packaging.python.org/en/latest/specifications/entry-points/>`_ (for reference, we have an `example in the Catalyst Github repository <https://github.com/PennyLaneAI/catalyst/tree/main/standalone_plugin_wheel/standalone_plugin>`_
-that implements the standalone plugin as a Python package).
-To do this, you only need to define a function named ``name2pass``—it must be named ``name2pass``—that takes a string with the name of the pass (from the user perspective) and returns the absolute path to the plugin stored in your package and the name of the MLIR pass.
+You will need to register your pass with Catalyst via Python's `entry_points <https://packaging.python.org/en/latest/specifications/entry-points/>`_.
+For reference, we have an `example in the Catalyst Github repository <https://github.com/PennyLaneAI/catalyst/tree/main/standalone_plugin_wheel/standalone_plugin>`_
+that implements the standalone plugin as a Python package.
+To do this, you only need to define a function named ``name2pass``—it must be named ``name2pass``—that
+takes a string with the name of the pass (from the user perspective) and returns the absolute path
+to the plugin stored in your package and the name of the MLIR pass.
 For the `standalone plugin python <https://github.com/PennyLaneAI/catalyst/tree/main/standalone_plugin_wheel/standalone_plugin>`_ package we defined:
 
 .. code-block:: python
@@ -425,11 +404,11 @@ See our ``setup.py`` `file in the standalone plugin python package <https://gith
         # ...
     )
 
-After this, the user will be able to use your pass with the :func:`~.passes.apply_pass` function.
+After this, the user will be able to use your pass with the :func:`pennylane.transform` function.
 
 .. code-block:: python
 
-    @apply_pass("standalone.standalone-switch-bar-foo")
+    @qp.transform(pass_name="standalone.standalone-switch-bar-foo")
     @qp.qnode(qp.device("lightning.qubit", wires=1))
     def qnode():
         return qp.state()
@@ -440,9 +419,11 @@ After this, the user will be able to use your pass with the :func:`~.passes.appl
 
     print(module.mlir)
 
-Of course, you can also define your own decorators similar to :func:`~.passes.apply_pass` to check parameters, do some other validation or perhaps just to improve the user interface.
-For example:
+Of course, you can also define your own instances of :func:`pennylane.transform`
+to check parameters, do some other validation or perhaps just to improve the user interface.
+See the documentation on :func:`pennylane.transform` for more information.
 
+For example:
 
 .. code-block:: python
 
@@ -458,3 +439,7 @@ For example:
         return qnode()
 
     print(module.mlir)
+
+If you have followed all the steps in this tutorial and inspect the MLIR sources, you'll find that the number of qubits allocated will be 42.
+Take a look into the ``standalone_plugin_wheel`` Makefile rule to see how we test shipping a plugin.
+For more information, please consult our :doc:`dialect guide <dialects>`, our :doc:`compiler passes guide <transforms>`, and the `MLIR documentation <https://mlir.llvm.org/>`_.

@@ -48,13 +48,11 @@ from catalyst.passes.builtin_passes import (
     merge_rotations,
     parity_synth,
     ppm_compilation,
-    ppm_specs,
     ppr_to_mbqc,
     ppr_to_ppm,
     reduce_t_depth,
     to_ppr,
 )
-from catalyst.passes.pass_api import Pass, PassPlugin, apply_pass, apply_pass_plugin
 
 __all__ = (
     "graph_decomposition",
@@ -64,7 +62,6 @@ __all__ = (
     "ppr_to_ppm",
     "merge_ppr_ppm",
     "ppm_compilation",
-    "ppm_specs",
     "reduce_t_depth",
     "decompose_arbitrary_ppr",
     "combine_global_phases",
@@ -76,8 +73,4 @@ __all__ = (
     "disentangle_swap",
     "ions_decomposition",
     "ppr_to_mbqc",
-    "apply_pass",
-    "apply_pass_plugin",
-    "Pass",
-    "PassPlugin",
 )

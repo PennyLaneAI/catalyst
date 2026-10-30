@@ -37,6 +37,7 @@ from .measurement_ops import (
 )
 from .miscellaneous_ops import (
     AdjointOp,
+    CtrlOp,
     DeviceInitOp,
     DeviceReleaseOp,
     FinalizeOp,
@@ -95,6 +96,7 @@ __all__ = [
     "InsertOp",
     # Miscellaneous
     "AdjointOp",
+    "CtrlOp",
     "DeviceInitOp",
     "DeviceReleaseOp",
     "FinalizeOp",

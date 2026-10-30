@@ -585,11 +585,13 @@ def test_non_jax_jittable(capture_mode):
         return 1
 
     msg = "Function impossible must be jax.jit-able"
-    with pytest.raises(ValueError, match=msg):
 
-        @qjit(capture=capture_mode)
-        def func(x: bool):
-            return impossible(x)
+    @qjit(capture=capture_mode)
+    def func(x: bool):
+        return impossible(x)
+
+    with pytest.raises(ValueError, match=msg):
+        func(True)
 
 
 def test_that_jax_jit_is_called(capture_mode):
@@ -1532,8 +1534,10 @@ def test_error_incomplete_grad_only_forward():
     def wrapper(x: float):
         return identity(x)
 
+    wrapper = qjit(wrapper)
+
     with pytest.raises(DifferentiableCompileError, match="missing reverse pass"):
-        qjit(wrapper)
+        wrapper(1.2)
 
 
 def test_error_incomplete_grad_only_reverse():
@@ -1551,8 +1555,10 @@ def test_error_incomplete_grad_only_reverse():
     def wrapper(x: float):
         return identity(x)
 
+    wrapper = qjit(wrapper)
+
     with pytest.raises(DifferentiableCompileError, match="missing forward pass"):
-        qjit(wrapper)
+        wrapper(1.2)
 
 
 def test_nested_accelerate_grad():

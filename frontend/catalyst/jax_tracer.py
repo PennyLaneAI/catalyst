@@ -37,6 +37,7 @@ from jax.api_util import debug_info as jdb
 from jax.core import Tracer, get_aval
 from pennylane import QubitUnitary, QueuingManager
 from pennylane.devices import QubitDevice
+from pennylane.logging import debug_logger, debug_logger_init
 from pennylane.measurements import (
     CountsMP,
     ExpectationMP,
@@ -47,7 +48,7 @@ from pennylane.measurements import (
     VarianceMP,
 )
 from pennylane.operation import Operation, Operator, Wires
-from pennylane.ops import Adjoint, Controlled, ControlledOp
+from pennylane.ops import Adjoint, Controlled, ControlledOp, ControlledOp2
 from pennylane.tape import QuantumTape
 
 import catalyst
@@ -113,7 +114,6 @@ from catalyst.jax_primitives import (
     unitary_p,
     var_p,
 )
-from catalyst.logging import debug_logger, debug_logger_init
 from catalyst.tracing.contexts import EvaluationContext, EvaluationMode
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.patching import DictPatchWrapper, Patcher
@@ -849,12 +849,12 @@ def trace_quantum_operations(
     def bind_native_operation(qrp, op, controlled_wires, controlled_values, adjoint=False):
         # For named-controlled operations (e.g. CNOT, CY, CZ) - bind directly by name. For
         # Controlled(OP) bind OP with native quantum control syntax, and similarly for Adjoint(OP).
-        if type(op) in (Controlled, ControlledOp):
+        if type(op) in (Controlled, ControlledOp, ControlledOp2):
             return bind_native_operation(
                 qrp,
                 op.base,
-                controlled_wires + op.control_wires,
-                controlled_values + op.control_values,
+                tuple(controlled_wires) + tuple(op.control_wires),
+                tuple(controlled_values) + tuple(op.control_values),
                 adjoint,
             )
         elif isinstance(op, Adjoint):
@@ -910,11 +910,8 @@ def trace_quantum_operations(
             # which does not follow the same pattern as `qinst_p`.
             # We will revisit this once we have a better solution for
             # supporting general PL operations in Catalyst.
-            params = (
-                op.parameters + [op.hyperparameters["dimension"][0]]
-                if isinstance(op, qp.PCPhase)
-                else op.parameters
-            )
+            params = op.parameters
+            pcphase_dim = op.compilable_args["dim"] if isinstance(op, qp.PCPhase) else None
 
             qubits2 = qinst_p.bind(
                 *[*qubits, *params, *controlled_qubits, *controlled_values],
@@ -923,6 +920,7 @@ def trace_quantum_operations(
                 params_len=len(params),
                 ctrl_len=len(controlled_qubits),
                 adjoint=adjoint,
+                pcphase_dim=pcphase_dim,
             )
             qrp.insert(op.wires, qubits2[: len(qubits)])
             qrp.insert(controlled_wires, qubits2[len(qubits) :])

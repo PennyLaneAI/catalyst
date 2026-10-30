@@ -26,8 +26,7 @@ struct GEPOpRewritePattern : public mlir::OpRewritePattern<LLVM::GEPOp> {
     using mlir::OpRewritePattern<LLVM::GEPOp>::OpRewritePattern;
 
     mlir::LogicalResult matchAndRewrite(LLVM::GEPOp op,
-                                        mlir::PatternRewriter &rewriter) const override
-    {
+                                        mlir::PatternRewriter &rewriter) const override {
         auto defOp = op.getBase().getDefiningOp();
         if (op.getNoWrapFlags() == LLVM::GEPNoWrapFlags::inbounds ||
             (defOp && isa<LLVM::ZeroOp>(defOp))) {
@@ -44,8 +43,7 @@ struct GEPOpRewritePattern : public mlir::OpRewritePattern<LLVM::GEPOp> {
 
 namespace catalyst {
 
-void populateGEPInboundsPatterns(RewritePatternSet &patterns)
-{
+void populateGEPInboundsPatterns(RewritePatternSet &patterns) {
     patterns.add<GEPOpRewritePattern>(patterns.getContext());
 }
 

@@ -75,6 +75,13 @@ def OnlyDisjointQubitOption : Option<
     "Group ops into the same layer only when they act on disjoint qubits. "
     "By default, commuting ops on overlapping qubits may also be merged into one layer.">;
 
+def MinOpsForCommutationBasisOption : Option<
+    /*C++ var name=*/"minOpsForCommutationBasis",
+    /*CLI arg name=*/"min-ops-for-commutation-basis",
+    /*type=*/"size_t",
+    /*default=*/"4",
+    "Minimum number of operations in a layer before using the packed commutation basis.">;
+
 //===----------------------------------------------------------------------===//
 //                               Passes
 //===----------------------------------------------------------------------===//
@@ -151,16 +158,10 @@ def PPMCompilationPass : Pass<"ppm-compilation"> {
     let options = [MaxPauliSizeOption, DecomposeMethodOption, AvoidYMeasureOption];
 }
 
-def CountPPMSpecsPass : Pass<"ppm-specs"> {
-    let summary = "Count specs in Pauli Product Measurement operations.";
-
-    let options = [OnlyDisjointQubitOption];
-}
-
 def PartitionLayersPass : Pass<"partition-layers"> {
     let summary = "Partition layers of Pauli Product Measurement operations.";
 
-    let options = [OnlyDisjointQubitOption];
+    let options = [OnlyDisjointQubitOption, MinOpsForCommutationBasisOption];
 }
 
 def TLayerReductionPass : Pass<"reduce-t-depth"> {

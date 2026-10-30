@@ -9,4 +9,6 @@ target_link_libraries(CatalystExampleTests PRIVATE
   MLIRQuantum
   MLIRIR
   MLIRParser
+  MLIRPBC
+  MLIRMBQC
 )

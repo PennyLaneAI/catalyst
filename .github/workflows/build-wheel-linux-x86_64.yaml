@@ -26,6 +26,11 @@ on:
           - 'false'
         required: false
         default: 'false'
+      build_dev_packages:
+        description: 'Build and upload the catalyst-dev and catalyst-runtime-dev archives'
+        type: boolean
+        required: false
+        default: false
   workflow_call:
     inputs:
       build_standalone_plugin:
@@ -38,6 +43,11 @@ on:
         required: false
         default: 'main'
         type: string
+      build_dev_packages:
+        description: 'Build and upload the catalyst-dev and catalyst-runtime-dev archives'
+        required: false
+        default: false
+        type: boolean
 
 concurrency:
   group: Build Catalyst Wheel on Linux (x86_64)-${{ github.ref }}
@@ -55,7 +65,7 @@ jobs:
     name: Determine runner type to use
     uses: ./.github/workflows/determine-workflow-runner.yml
     with:
-      default_runner: ubuntu-24.04
+      default_runner: blacksmith-8vcpu-ubuntu-2404
 
   check_if_wheel_build_required:
     if: github.event.pull_request.draft == false
@@ -136,6 +146,7 @@ jobs:
         cd $GITHUB_WORKSPACE/mlir/llvm-project
         git apply $GITHUB_WORKSPACE/mlir/patches/llvm-bufferization-segfault.patch
         git apply $GITHUB_WORKSPACE/mlir/patches/llvm-python-bindinggen-annotations.patch
+        git apply $GITHUB_WORKSPACE/mlir/patches/llvm-scf-canonicalize-preserve-discardable-attrs.patch
 
     - name: Clone Stablehlo Submodule
       if: steps.cache-stablehlo-source.outputs.cache-hit != 'true'
@@ -314,7 +325,7 @@ jobs:
       uses: actions/cache/restore@v4
       with:
         path: ${{ github.workspace }}/llvm-build
-        key: ${{ matrix.container_img }}-llvm-${{ needs.constants.outputs.llvm_version }}-3.11-wheel-build
+        key: ${{ matrix.container_img }}-llvm-${{ needs.constants.outputs.llvm_version }}-${{ matrix.python_version }}-wheel-build
         fail-on-cache-miss: True
 
     - name: Get Cached Stablehlo Source
@@ -396,6 +407,45 @@ jobs:
               -DLLVM_ENABLE_LLD=ON
 
         cmake --build $GITHUB_WORKSPACE/quantum-build --target check-dialects catalyst-cli
+
+    # Package the Catalyst development subsystems for downstream projects that build against
+    # Catalyst:
+    #   catalyst-dev          MLIR dialect headers, static libs and CMake config
+    #   catalyst-runtime-dev  runtime headers, shared libs and device configs
+    # Both are produced by CPack from the build trees above (see the CPack blocks at the end of
+    # mlir/CMakeLists.txt and runtime/CMakeLists.txt), and both are Python-agnostic, so only build
+    # them once per platform, on the primary Python version.
+    # The third development package, `catalyst-llvm-dev`, which contains the LLVM and MLIR headers
+    # and libraries, is packaged in a separate workflow.
+    - name: Package catalyst-dev (CPack)
+      if: inputs.build_dev_packages && matrix.python_version == needs.constants.outputs.primary_python_version
+      run: |
+        cd $GITHUB_WORKSPACE/quantum-build
+        cpack
+
+    - name: Upload catalyst-dev Archive
+      if: inputs.build_dev_packages && matrix.python_version == needs.constants.outputs.primary_python_version
+      uses: actions/upload-artifact@v4
+      with:
+        name: catalyst-dev-Linux-x86_64
+        path: ${{ github.workspace }}/quantum-build/catalyst-dev-*.tar.gz
+        retention-days: 14
+        if-no-files-found: error
+
+    - name: Package catalyst-runtime-dev (CPack)
+      if: inputs.build_dev_packages && matrix.python_version == needs.constants.outputs.primary_python_version
+      run: |
+        cd $GITHUB_WORKSPACE/runtime-build
+        cpack
+
+    - name: Upload catalyst-runtime-dev Archive
+      if: inputs.build_dev_packages && matrix.python_version == needs.constants.outputs.primary_python_version
+      uses: actions/upload-artifact@v4
+      with:
+        name: catalyst-runtime-dev-Linux-x86_64
+        path: ${{ github.workspace }}/runtime-build/catalyst-runtime-dev-*.tar.gz
+        retention-days: 14
+        if-no-files-found: error
 
     - name: Build Plugin wheel
       # Run only on Thursday at the given time
@@ -520,7 +570,7 @@ jobs:
     - name: Run Python Pytest Tests
       run: |
         python${{ matrix.python_version }} -m pytest frontend/test/pytest -n auto
-        python${{ matrix.python_version }} -m pytest frontend/test/pytest --backend="lightning.kokkos" -n auto -m "not xdsl"
+        python${{ matrix.python_version }} -m pytest frontend/test/pytest --backend="lightning.kokkos" -n auto -m "not xdsl" -k "lightning.kokkos"
         python${{ matrix.python_version }} -m pytest frontend/test/async_tests
         python${{ matrix.python_version }} -m pytest frontend/test/pytest --runbraket=LOCAL -n auto -m "not xdsl" || true
         python${{ matrix.python_version }} -m pytest frontend/test/test_oqc/oqc -n auto

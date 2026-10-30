@@ -104,14 +104,15 @@ def test_custom_device_bad_directory():
             """Execution."""
             raise NotImplementedError
 
+    @qjit
+    @qp.qnode(CustomDevice(wires=1))
+    def f():
+        return measure(0)
+
     with pytest.raises(
         CompileError, match="Device at this-file-does-not-exist.so cannot be found!"
     ):
-
-        @qjit
-        @qp.qnode(CustomDevice(wires=1))
-        def f():
-            return measure(0)
+        f()
 
 
 def test_custom_device_no_c_interface():
@@ -134,14 +135,15 @@ def test_custom_device_no_c_interface():
             """Execution."""
             raise NotImplementedError
 
+    @qjit
+    @qp.qnode(CustomDevice(wires=1))
+    def f():
+        return measure(0)
+
     with pytest.raises(
         CompileError, match="The custom.device device does not provide C interface for compilation."
     ):
-
-        @qjit
-        @qp.qnode(CustomDevice(wires=1))
-        def f():
-            return measure(0)
+        f()
 
 
 def test_error_raised_no_unitary_support_for_matrix_ops():

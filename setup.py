@@ -111,12 +111,20 @@ pl_min_release = "0.45.0"
 lq_min_release = pl_min_release
 
 if pl_version is not None:
-    pennylane_dep = f"pennylane=={pl_version}"  # use TestPyPI wheels, git is not allowed on PyPI
+    pennylane_dep = (
+        f"pennylane @ {pl_version}" if pl_version.startswith("git+") else f"pennylane=={pl_version}"
+    )
 else:
     pennylane_dep = f"pennylane>={pl_min_release}"
 if lq_version is not None:
-    lightning_dep = f"pennylane-lightning=={lq_version}"  # use TestPyPI wheels to avoid rebuild
-    kokkos_dep = f"pennylane-lightning-kokkos=={lq_version}"
+    lightning_dep = (
+        f"pennylane-lightning @ {lq_version}"
+        if lq_version.startswith("git+")
+        else f"pennylane-lightning=={lq_version}"
+    )
+    kokkos_dep = (
+        "" if lq_version.startswith("git+") else f"pennylane-lightning-kokkos=={lq_version}"
+    )
 else:
     lightning_dep = f"pennylane-lightning>={lq_min_release}"
     kokkos_dep = ""
@@ -174,7 +182,6 @@ classifiers = [
     "Operating System :: POSIX",
     "Operating System :: POSIX :: Linux",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
     "Programming Language :: Python :: 3.14",
@@ -392,12 +399,17 @@ setup(
     classifiers=classifiers,
     name="pennylane_catalyst",
     version=version,
-    python_requires=">=3.11",
+    python_requires=">=3.12",
     entry_points=entry_points,
     install_requires=requirements,
     packages=find_namespace_packages(
         where="frontend",
-        include=["catalyst", "catalyst.*", "mlir_quantum"],
+        include=[
+            "catalyst",
+            "catalyst.*",
+            "mlir_quantum",
+            "mlir_quantum.*",
+        ],
         exclude=[
             "catalyst.third_party.oqc.*",
             "catalyst.third_party.oqd.*",

@@ -65,8 +65,7 @@ concept OpWithObservable = requires(T obj) {
 enum class GateEnum { I, X, Y, Z, H, S, T, CNOT, Unknown };
 
 // Hash gate name to GateEnum
-GateEnum hashGate(CustomOp op)
-{
+GateEnum hashGate(CustomOp op) {
     return llvm::StringSwitch<GateEnum>(op.getGateName())
         .Cases({"Identity", "I"}, GateEnum::I)
         .Cases({"PauliX", "X"}, GateEnum::X)
@@ -81,8 +80,7 @@ GateEnum hashGate(CustomOp op)
 
 // Insert the ops that physically apply the Pauli X and Z gates and a flush op.
 // Applies the gates in the order X -> Z and returns the output qubit of the Z gate.
-OpResult insertPauliOpsAfterFlush(PatternRewriter &rewriter, Location loc, FlushOp flushOp)
-{
+OpResult insertPauliOpsAfterFlush(PatternRewriter &rewriter, Location loc, FlushOp flushOp) {
     auto pauliXIfOp = scf::IfOp::create(
         rewriter, loc, flushOp.getXParity(),
         [&](OpBuilder &builder, Location loc) { // then
@@ -127,8 +125,8 @@ OpResult insertPauliOpsAfterFlush(PatternRewriter &rewriter, Location loc, Flush
  *   %1 = pauli_frame.update[true, false] %0 : !quantum.bit  // and similar for other Pauli gates
  *   %2 = <op_that_consumes_qubit> %1 : ...
  */
-LogicalResult convertPauliGate(CustomOp op, PatternRewriter &rewriter, bool x_parity, bool z_parity)
-{
+LogicalResult convertPauliGate(CustomOp op, PatternRewriter &rewriter, bool x_parity,
+                               bool z_parity) {
     LLVM_DEBUG(llvm::dbgs() << "Applying Pauli frame protocol to Pauli gate: " << op.getGateName()
                             << "\n");
     auto loc = op->getLoc();
@@ -162,8 +160,7 @@ LogicalResult convertPauliGate(CustomOp op, PatternRewriter &rewriter, bool x_pa
  * Note that since H = H†, CNOT = CNOT†, and since the Pauli conjugation relations for S and S† are
  * equivalent up to a global phase, we need not consider the adjoint parameter of the quantum gate.
  */
-LogicalResult convertCliffordGate(CustomOp op, PatternRewriter &rewriter, CliffordGate gate)
-{
+LogicalResult convertCliffordGate(CustomOp op, PatternRewriter &rewriter, CliffordGate gate) {
     LLVM_DEBUG(llvm::dbgs() << "Applying Pauli frame protocol to Clifford gate: "
                             << op.getGateName() << "\n");
     auto loc = op->getLoc();
@@ -205,8 +202,7 @@ LogicalResult convertCliffordGate(CustomOp op, PatternRewriter &rewriter, Cliffo
  *   %3 = quantum.custom "T"() %2 : !quantum.bit
  *   %4 = <op_that_consumes_qubit> %3 : ...
  */
-LogicalResult convertNonCliffordGate(CustomOp op, PatternRewriter &rewriter)
-{
+LogicalResult convertNonCliffordGate(CustomOp op, PatternRewriter &rewriter) {
     LLVM_DEBUG(llvm::dbgs() << "Applying Pauli frame protocol to non-Clifford gate: "
                             << op.getGateName() << "\n");
     auto loc = op->getLoc();
@@ -238,8 +234,7 @@ LogicalResult convertNonCliffordGate(CustomOp op, PatternRewriter &rewriter)
 struct CliffordTToPauliFramePattern : public OpRewritePattern<CustomOp> {
     using OpRewritePattern::OpRewritePattern;
 
-    LogicalResult matchAndRewrite(CustomOp op, PatternRewriter &rewriter) const override
-    {
+    LogicalResult matchAndRewrite(CustomOp op, PatternRewriter &rewriter) const override {
         auto op_enum = hashGate(op);
         switch (op_enum) {
         case GateEnum::I:
@@ -289,8 +284,7 @@ struct CliffordTToPauliFramePattern : public OpRewritePattern<CustomOp> {
 struct InitPauliRecordQbitPattern : public OpRewritePattern<AllocQubitOp> {
     using OpRewritePattern::OpRewritePattern;
 
-    LogicalResult matchAndRewrite(AllocQubitOp op, PatternRewriter &rewriter) const override
-    {
+    LogicalResult matchAndRewrite(AllocQubitOp op, PatternRewriter &rewriter) const override {
         auto loc = op->getLoc();
         auto qubit = op.getQubit();
         LLVM_DEBUG(llvm::dbgs() << "Initializing Pauli record of qubit: " << qubit << "\n");
@@ -321,8 +315,7 @@ struct InitPauliRecordQbitPattern : public OpRewritePattern<AllocQubitOp> {
 struct InitPauliRecordQregPattern : public OpRewritePattern<AllocOp> {
     using OpRewritePattern::OpRewritePattern;
 
-    LogicalResult matchAndRewrite(AllocOp op, PatternRewriter &rewriter) const override
-    {
+    LogicalResult matchAndRewrite(AllocOp op, PatternRewriter &rewriter) const override {
         auto loc = op->getLoc();
         auto qreg = op.getQreg();
         LLVM_DEBUG(llvm::dbgs() << "Initializing Pauli records of qubits in register: " << qreg
@@ -354,8 +347,7 @@ struct InitPauliRecordQregPattern : public OpRewritePattern<AllocOp> {
 struct CorrectMeasurementPattern : public OpRewritePattern<MeasureOp> {
     using OpRewritePattern::OpRewritePattern;
 
-    LogicalResult matchAndRewrite(MeasureOp op, PatternRewriter &rewriter) const override
-    {
+    LogicalResult matchAndRewrite(MeasureOp op, PatternRewriter &rewriter) const override {
         auto loc = op->getLoc();
         auto mres = op.getMres();
         auto outQubit = op.getOutQubit();
@@ -382,8 +374,7 @@ struct FlushBeforeMeasurementProcessPattern : public OpRewritePattern<Measuremen
     // multiple flush ops have been applied to a qubit value; it only returns the first one found.
     // By construction, a flush op should generally NOT be applied multiple times to the same qubit
     // value.
-    std::optional<FlushOp> getFlushOpAppliedToQubit(const Value qubit) const
-    {
+    std::optional<FlushOp> getFlushOpAppliedToQubit(const Value qubit) const {
         LLVM_DEBUG(llvm::dbgs() << "Attempting to retrieve pauli_frame.flush op applied to qubit: "
                                 << qubit << "\n");
 
@@ -403,8 +394,7 @@ struct FlushBeforeMeasurementProcessPattern : public OpRewritePattern<Measuremen
     // order, conditional on the x- and z-parity bits returns by the flush op. This is a helper
     // function that returns the output qubit of the Pauli Z op, which constitutes the final return
     // value of the flush "block".
-    Value getOutputQubitOfPauliZAfterFlush(FlushOp flushOp) const
-    {
+    Value getOutputQubitOfPauliZAfterFlush(FlushOp flushOp) const {
         LLVM_DEBUG(llvm::dbgs()
                    << "Attempting to retrieve output qubit of Pauli Z after pauli_frame.flush op: "
                    << flushOp << "\n");
@@ -430,8 +420,8 @@ struct FlushBeforeMeasurementProcessPattern : public OpRewritePattern<Measuremen
         llvm_unreachable("failed to find output qubit of Pauli Z op after pauli_frame.flush op");
     }
 
-    LogicalResult matchAndRewrite(MeasurementProcessOp op, PatternRewriter &rewriter) const override
-    {
+    LogicalResult matchAndRewrite(MeasurementProcessOp op,
+                                  PatternRewriter &rewriter) const override {
         LLVM_DEBUG(llvm::dbgs() << "Applying Pauli frame protocol to flush Pauli record before "
                                    "terminal measurement process: "
                                 << op << "\n");
@@ -455,8 +445,7 @@ struct FlushBeforeMeasurementProcessPattern : public OpRewritePattern<Measuremen
                                                rewriter.getI1Type(), qubit.getType(), qubit);
                 auto pauliZOutQubit = insertPauliOpsAfterFlush(rewriter, loc, flushOp);
                 rewriter.modifyOpInPlace(obsOp, [&] { obsOp->setOperand(idx, pauliZOutQubit); });
-            }
-            else {
+            } else {
                 // Get output qubit of Pauli Z op after the flush
                 auto pauliZOutQubit = getOutputQubitOfPauliZAfterFlush(flushOp.value());
                 rewriter.modifyOpInPlace(obsOp, [&] { obsOp->setOperand(idx, pauliZOutQubit); });
@@ -468,11 +457,9 @@ struct FlushBeforeMeasurementProcessPattern : public OpRewritePattern<Measuremen
             for (const auto &[idx, qubit] : llvm::enumerate(qubits)) {
                 insertFlushOpPerQubitOrSkip(idx, qubit);
             }
-        }
-        else if (auto namedObsOp = dyn_cast<NamedObsOp>(obsOp)) {
+        } else if (auto namedObsOp = dyn_cast<NamedObsOp>(obsOp)) {
             insertFlushOpPerQubitOrSkip(0, namedObsOp.getQubit());
-        }
-        else {
+        } else {
             obsOp->emitError() << "Unsupported observable op: " << obsOp->getName();
             std::string msg = llvm::formatv(
                 "failed to apply Pauli frame tracking protocols: unsupported observable: {0}",
@@ -489,8 +476,7 @@ struct FlushBeforeMeasurementProcessPattern : public OpRewritePattern<Measuremen
 namespace catalyst {
 namespace pauli_frame {
 
-void populateCliffordTToPauliFramePatterns(RewritePatternSet &patterns)
-{
+void populateCliffordTToPauliFramePatterns(RewritePatternSet &patterns) {
     patterns.add<CliffordTToPauliFramePattern>(patterns.getContext());
     patterns.add<InitPauliRecordQbitPattern>(patterns.getContext());
     patterns.add<InitPauliRecordQregPattern>(patterns.getContext());

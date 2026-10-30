@@ -10,4 +10,5 @@ add_mlir_library(MLIRPBC
     MLIRPBCOpInterfacesIncGen
     MLIRPBCOpsIncGen
     MLIRPBCEnumsIncGen
+    MLIRResourceInterfacesIncGen
 )

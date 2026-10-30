@@ -60,6 +60,10 @@ void handleMeasureInBasis(IRRewriter &builder, mbqc::MeasureInBasisOp vMeasureIn
                           QubitValueTracker &tracker, SmallVector<Operation *> &erasureWorklist);
 void handlePPM(IRRewriter &builder, pbc::PPMeasurementOp vPPMOp, QubitValueTracker &tracker,
                SmallVector<Operation *> &erasureWorklist);
+void handlePPR(IRRewriter &builder, pbc::PPRotationOp vPPROp, QubitValueTracker &tracker,
+               SmallVector<Operation *> &erasureWorklist);
+void handleSelectPPM(IRRewriter &builder, pbc::SelectPPMeasurementOp vSelPPMOp,
+                     QubitValueTracker &tracker, SmallVector<Operation *> &erasureWorklist);
 void handleCall(IRRewriter &builder, func::CallOp callOp, QubitValueTracker &tracker,
                 SmallVector<Operation *> &erasureWorklist);
 void handleCompbasis(IRRewriter &builder, quantum::ComputationalBasisOp vCompbasisOp,
@@ -72,6 +76,8 @@ void handleGraphStatePrep(IRRewriter &builder, mbqc::GraphStatePrepOp vGraphStat
                           QubitValueTracker &tracker, SmallVector<Operation *> &erasureWorklist);
 void handleAdjoint(IRRewriter &builder, quantum::AdjointOp vAdjointOp, QubitValueTracker &tracker,
                    SmallVector<Operation *> &erasureWorklist);
+void handleCtrl(IRRewriter &builder, quantum::CtrlOp vCtrlOp, QubitValueTracker &tracker,
+                SmallVector<Operation *> &erasureWorklist);
 void handleIf(IRRewriter &builder, scf::IfOp ifOp, QubitValueTracker &tracker,
               SmallVector<Operation *> &erasureWorklist);
 void handleSwitch(IRRewriter &builder, scf::IndexSwitchOp switchOp, QubitValueTracker &tracker,

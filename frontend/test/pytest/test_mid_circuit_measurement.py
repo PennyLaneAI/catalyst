@@ -31,7 +31,6 @@ from catalyst import jvp as C_jvp
 from catalyst import qjit, value_and_grad
 from catalyst import vjp as C_vjp
 from catalyst.device.decomposition import measurements_from_counts, measurements_from_samples
-from catalyst.passes import apply_pass
 
 # TODO: add tests with other measurement processes (e.g. qp.sample, qp.probs, ...)
 
@@ -1058,7 +1057,7 @@ class TestDynamicOneShotMLIRPass:
         with expval
         """
 
-        @qjit(capture=True, seed=38)
+        @qjit(capture=True, collect_decomp_rules=False, seed=38)
         @qp.transform(pass_name="dynamic-one-shot")
         @qp.qnode(qp.device(backend, wires=2), shots=1000)
         def circuit():
@@ -1076,7 +1075,7 @@ class TestDynamicOneShotMLIRPass:
         with expval on a mid circuit measurement
         """
 
-        @qjit(capture=True, seed=38)
+        @qjit(capture=True, collect_decomp_rules=False, seed=38)
         @qp.transform(pass_name="dynamic-one-shot")
         @qp.qnode(qp.device(backend, wires=2), shots=1000)
         def circuit():
@@ -1095,7 +1094,7 @@ class TestDynamicOneShotMLIRPass:
         with probs
         """
 
-        @qjit(capture=True, seed=12345)
+        @qjit(capture=True, collect_decomp_rules=False, seed=12345)
         @qp.transform(pass_name="dynamic-one-shot")
         @qp.qnode(qp.device(backend, wires=2), shots=1000)
         def circuit():
@@ -1113,7 +1112,7 @@ class TestDynamicOneShotMLIRPass:
         with probs on a mid circuit measurement
         """
 
-        @qjit(capture=True, seed=12345)
+        @qjit(capture=True, collect_decomp_rules=False, seed=12345)
         @qp.transform(pass_name="dynamic-one-shot")
         @qp.qnode(qp.device(backend, wires=2), shots=1000)
         def circuit():
@@ -1133,7 +1132,7 @@ class TestDynamicOneShotMLIRPass:
         with variance on a mid circuit measurement
         """
 
-        @qjit(capture=True, seed=38)
+        @qjit(capture=True, collect_decomp_rules=False, seed=38)
         @qp.transform(pass_name="dynamic-one-shot")
         @qp.qnode(qp.device(backend, wires=2), shots=1000)
         def circuit():
@@ -1152,7 +1151,7 @@ class TestDynamicOneShotMLIRPass:
         with sample
         """
 
-        @qjit(capture=True, seed=12345)
+        @qjit(capture=True, collect_decomp_rules=False, seed=12345)
         @qp.transform(pass_name="dynamic-one-shot")
         @qp.qnode(qp.device(backend, wires=2), shots=1000)
         def circuit():
@@ -1173,7 +1172,7 @@ class TestDynamicOneShotMLIRPass:
         with sample on a mid circuit measurement
         """
 
-        @qjit(capture=True, seed=12345)
+        @qjit(capture=True, collect_decomp_rules=False, seed=12345)
         @qp.transform(pass_name="dynamic-one-shot")
         @qp.qnode(qp.device(backend, wires=2), shots=1000)
         def circuit():
@@ -1196,7 +1195,7 @@ class TestDynamicOneShotMLIRPass:
         with counts
         """
 
-        @qjit(capture=True, seed=12345)
+        @qjit(capture=True, collect_decomp_rules=False, seed=12345)
         @qp.transform(pass_name="dynamic-one-shot")
         @qp.qnode(qp.device(backend, wires=2), shots=1000)
         def circuit():
@@ -1216,7 +1215,7 @@ class TestDynamicOneShotMLIRPass:
         with counts on MCMs.
         """
 
-        @qjit(capture=True, seed=12345)
+        @qjit(capture=True, collect_decomp_rules=False, seed=12345)
         @qp.transform(pass_name="dynamic-one-shot")
         @qp.qnode(qp.device(backend, wires=2), shots=1000)
         def circuit():
@@ -1238,7 +1237,7 @@ class TestDynamicOneShotMLIRPass:
         multiple MPs
         """
 
-        @qjit(capture=True, seed=123456)
+        @qjit(capture=True, collect_decomp_rules=False, seed=123456)
         @qp.transform(pass_name="dynamic-one-shot")
         @qp.qnode(qp.device(backend, wires=2), shots=1000)
         def circuit():
@@ -1268,7 +1267,7 @@ class TestDynamicOneShotMLIRPass:
         multiple MPs on MCMs
         """
 
-        @qjit(capture=True, seed=12345)
+        @qjit(capture=True, collect_decomp_rules=False, seed=12345)
         @qp.transform(pass_name="dynamic-one-shot")
         @qp.qnode(qp.device(backend, wires=2), shots=1000)
         def circuit():
@@ -1305,7 +1304,7 @@ class TestDynamicOneShotMLIRPass:
         a dynamic number of shots with sample terminal MP.
         """
 
-        @qjit(capture=True, seed=12345)
+        @qjit(capture=True, collect_decomp_rules=False, seed=12345)
         def workflow(shots):
             @qp.transform(pass_name="dynamic-one-shot")
             @qp.set_shots(shots)
@@ -1329,7 +1328,7 @@ class TestDynamicOneShotMLIRPass:
         a dynamic number of shots with counts terminal MP.
         """
 
-        @qjit(capture=True, seed=12345)
+        @qjit(capture=True, collect_decomp_rules=False, seed=12345)
         def workflow(shots):
             @qp.transform(pass_name="dynamic-one-shot")
             @qp.set_shots(shots)
@@ -1360,7 +1359,7 @@ class TestDynamicOneShotMLIRPass:
         with some classical post processing
         """
 
-        @qjit(capture=True, seed=38)
+        @qjit(capture=True, collect_decomp_rules=False, seed=38)
         @qp.transform(pass_name="dynamic-one-shot")
         @qp.qnode(qp.device(backend, wires=2), shots=1000)
         def circuit():
@@ -1388,7 +1387,7 @@ class TestDynamicOneShotMLIRPass:
         dev = qp.device(backend, wires=3)
 
         @qjit(capture=False)
-        @apply_pass("dynamic-one-shot")
+        @qp.transform(pass_name="dynamic-one-shot")
         @partial(tape_transform, device_wires=dev.wires)
         @qp.qnode(dev, shots=1000)
         def circuit():

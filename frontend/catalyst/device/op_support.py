@@ -31,7 +31,12 @@ EMPTY_PROPERTIES = OperatorProperties()
 
 def get_base_operation_name(op: Operator) -> str:
     """Get the base operation name, handling controlled and adjoint operations."""
-    if type(op) in (qp.ops.Controlled, qp.ops.ControlledOp) or isinstance(op, qp.ops.Adjoint):
+    if type(op) in (
+        qp.ops.Controlled,
+        qp.ops.ControlledOp,
+        qp.ops.Controlled2,
+        qp.ops.ControlledOp2,
+    ) or isinstance(op, qp.ops.Adjoint):
         return op.base.name
     return op.name
 
@@ -91,8 +96,7 @@ def _has_grad_recipe(op):
 
 def _has_parameter_frequencies(op):
     try:
-        if not hasattr(op, "parameter_frequencies"):
-            return False
+        _ = qp.gradients.parameter_frequencies(op)
     except qp.operation.ParameterFrequenciesUndefinedError:
         return False
     return True
@@ -100,12 +104,15 @@ def _has_parameter_frequencies(op):
 
 def _are_param_frequencies_same_as_catalyst(op):
     """Check if the parameter frequencies are all close to 1."""
-    freqs = op.parameter_frequencies
-    if len(freqs) != len(op.data):
+    op_parameter_frequencies = qp.gradients.parameter_frequencies(op)
+    if len(op_parameter_frequencies) != len(op.data):
         return False
 
     valid = True
-    for freqs in op.parameter_frequencies:
+    for freqs in op_parameter_frequencies:
+        if len(freqs) == 0:
+            # NOTE: Empty frequencies (i.e. GlobalPhase) yield zero derivatives not affecting results
+            continue
         if len(freqs) != 1:
             return False
         valid &= np.allclose(freqs[0], 1.0)
@@ -114,12 +121,20 @@ def _are_param_frequencies_same_as_catalyst(op):
 
 
 def _paramshift_op_checker(op):
+    #  sc-127798: otherwise test_ps_qft[capture=False-lightning.qubit-1.0] failed with TracerBoolConversionError
+    if isinstance(op, qp.ControlledPhaseShift):
+        return True
 
     if isinstance(op, qp.QubitUnitary):
         # Cannot take param shift of qubit unitary.
         return False
 
-    if type(op) in (qp.ops.Controlled, qp.ops.ControlledOp):
+    if type(op) in (
+        qp.ops.Controlled,
+        qp.ops.ControlledOp,
+        qp.ops.Controlled2,
+        qp.ops.ControlledOp2,
+    ):
         # Cannot take param shift of controlled ops.
         # It will always be at least a four term shift rule.
         return False

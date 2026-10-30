@@ -30,7 +30,8 @@ import warnings
 from os import path
 from typing import List, Optional
 
-from catalyst.logging import debug_logger, debug_logger_init
+from pennylane.logging import debug_logger, debug_logger_init
+
 from catalyst.pipelines import CompileOptions, KeepIntermediateLevel
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.filesystem import Directory
@@ -176,10 +177,27 @@ class LinkerDriver:
             "-lrt_decoder",
         ]
 
-        # If OQD runtime capi is built, link to it as well
-        # TODO: This is not ideal and should be replaced when the compiler is device aware
-        if os.path.isfile(os.path.join(rt_lib_path, "librt_OQD_capi" + file_extension)):
-            default_flags.append("-lrt_OQD_capi")
+        rt_transport_so = "librt_transport" + file_extension
+        if os.path.isfile(os.path.join(rt_lib_path, rt_transport_so)):
+            default_flags.append("-lrt_transport")
+
+        rt_executor_so = "librt_executor" + file_extension
+        if os.path.isfile(os.path.join(rt_lib_path, rt_executor_so)):
+            default_flags.append("-lrt_executor")
+
+        # Link shared libraries from local `runtime_call`s and from device's
+        # `get_runtime_artifacts()` method, which have been recorded on the module
+        # via `catalyst.runtime_artifacts` and collected into the options.
+        for artifact_path in options.runtime_artifacts:
+            artifact_path = os.path.abspath(artifact_path)
+            if not os.path.isfile(artifact_path):
+                raise CompileError(f"could not locate runtime library {artifact_path}")
+            dir_name = os.path.dirname(artifact_path)
+            default_flags += [
+                f"-Wl,-rpath,{dir_name}",
+                f"-L{dir_name}",
+                artifact_path,
+            ]
 
         return default_flags
 
@@ -294,27 +312,37 @@ def _get_catalyst_cli_cmd(*args, stdin=None):
     return cmd
 
 
-def _catalyst(*args, stdin=None, text=True):
+def _catalyst(*args, stdin=None, text=True, stderr_return=False):
     """Raw interface to catalyst
 
     echo ${stdin} | catalyst *args -
     catalyst *args
     """
     cmd = _get_catalyst_cli_cmd(*args, stdin=stdin)
+
+    if sys.stderr.isatty():
+        cmd.insert(1, "--color")
+
     try:
         result = subprocess.run(cmd, input=stdin, check=True, capture_output=True, text=text)
+
+        # Capture the diagnostic output from the compiler
+        if stderr_return and result.stderr:
+            stderr = result.stderr.decode() if isinstance(result.stderr, bytes) else result.stderr
+            print(stderr, end="", file=sys.stderr)
+
         return result.stdout
     except subprocess.CalledProcessError as e:
         raise CompileError(f"catalyst failed with error code {e.returncode}: {e.stderr}") from e
 
 
-def _quantum_opt(*args, stdin=None, text=True):
+def _quantum_opt(*args, stdin=None, text=True, stderr_return=False):
     """Raw interface to quantum-opt
 
     echo ${stdin} | catalyst --tool=opt *args -
     catalyst --tool=opt *args
     """
-    return _catalyst(("--tool", "opt"), *args, stdin=stdin, text=text)
+    return _catalyst(("--tool", "opt"), *args, stdin=stdin, text=text, stderr_return=stderr_return)
 
 
 def canonicalize(*args, stdin=None, options: Optional[CompileOptions] = None):
@@ -354,9 +382,6 @@ def _options_to_cli_flags(options):
     if options.checkpoint_stage:
         extra_args += [("--checkpoint-stage", options.checkpoint_stage)]
 
-    if not options.lower_to_llvm:
-        extra_args += [("--tool", "opt")]
-
     if options.keep_intermediate:
         extra_args += ["--keep-intermediate"]
 
@@ -380,14 +405,25 @@ def _options_to_cli_flags(options):
     return extra_args
 
 
-def to_llvmir(*args, stdin=None, options: Optional[CompileOptions] = None):
-    """echo ${input} | catalyst *args -"""
-    # These are the options that may affect compilation
-    if not options:
-        return _catalyst(*args, stdin=stdin)
+def to_llvm(*args, stdin=None, options: Optional[CompileOptions] = None):
+    """Return LLVM IR after MLIR lowering and translation, before LLVM transformations.
 
-    opts = _options_to_cli_flags(options)
-    return _catalyst(*opts, *args, stdin=stdin)
+    Runs one CLI invocation with ``--tool=opt-translate``. Final IR is returned
+    independently of ``keep_intermediate``; no object file is generated.
+    """
+    opts = _options_to_cli_flags(options) if options is not None else []
+    return _catalyst(("--tool", "opt-translate"), *opts, *args, stdin=stdin)
+
+
+def to_llvm_opt(*args, stdin=None, options: Optional[CompileOptions] = None):
+    """Return LLVM IR after lowering, translation, and Catalyst's LLVM transformations.
+
+    Runs one CLI invocation with ``--tool=opt-translate-llvm``, including the
+    applicable coroutine, O2, and Enzyme passes. No object file is generated.
+    Final IR is returned independently of ``keep_intermediate``.
+    """
+    opts = _options_to_cli_flags(options) if options is not None else []
+    return _catalyst(("--tool", "opt-translate-llvm"), *opts, *args, stdin=stdin)
 
 
 def to_mlir_opt(
@@ -396,6 +432,7 @@ def to_mlir_opt(
     options: Optional[CompileOptions] = None,
     using_python_compiler=False,
     workspace=None,
+    stderr_return=True,
 ):
     """echo ${input} | catalyst --tool=opt *args *opts -"""
     # Check if we need to use the Python interface for xDSL passes
@@ -409,12 +446,12 @@ def to_mlir_opt(
 
     # These are the options that may affect compilation
     if not options:
-        return _quantum_opt(*args, stdin=stdin)
+        return _quantum_opt(*args, stdin=stdin, stderr_return=stderr_return)
 
     opts = _options_to_cli_flags(options)
     if workspace is not None:
         opts += [("--workspace", str(workspace))]
-    return _quantum_opt(*opts, *args, stdin=stdin)
+    return _quantum_opt(*opts, *args, stdin=stdin, stderr_return=stderr_return)
 
 
 class Compiler:
@@ -425,7 +462,7 @@ class Compiler:
         self.options = options if options is not None else CompileOptions()
 
     @debug_logger
-    def get_cli_command(self, tmp_infile_name, output_ir_name, module_name, workspace):
+    def get_cli_command(self, tmp_infile_name, output_filename, module_name, workspace):
         """Prepare the command to run the Catalyst CLI to compile the file.
 
         Args:
@@ -435,8 +472,9 @@ class Compiler:
             cmd (str): The command to be executed.
         """
         opts = _options_to_cli_flags(self.options)
+        opts += [("--tool", self.options.compiler_tool)]
         cmd = _get_catalyst_cli_cmd(
-            ("-o", output_ir_name),
+            ("-o", output_filename),
             ("--module-name", module_name),
             ("--workspace", str(workspace)),
             "-verify-each=false",
@@ -451,65 +489,60 @@ class Compiler:
         """Compile a shared object from a textual IR (MLIR or LLVM).
 
         Args:
-            ir (str): Textual MLIR to be compiled
+            ir (str): Textual IR to be compiled
             module_name (str): Module name to use for naming
             workspace (Directory): directory that holds output files and/or debug dumps.
 
         Returns:
-            output_filename (str): Output file name. For the default pipeline this would be the
-                                   shared object library path.
-            out_IR (str): Output IR in textual form. For the default pipeline this would be the
-                          LLVM IR.
+            str: Absolute path to shared library (or IR / object file depending on compile options).
         """
         assert isinstance(
             workspace, Directory
         ), f"Compiler expects a Directory type, got {type(workspace)}."
         assert workspace.is_dir(), f"Compiler expects an existing directory, got {workspace}."
 
+        if self.options.link:
+            assert self.options.compiler_tool in ("all", "llc"), "linking requires an object file"
+
         if self.options.verbose:
             print(f"[LIB] Running compiler driver in {workspace}", file=self.options.logfile)
 
+        match self.options.compiler_tool:
+            case "opt":
+                suffix = ".mlir"
+            case "translate" | "opt-translate" | "llvm-opt" | "opt-translate-llvm":
+                suffix = ".ll"
+            case "llc" | "all":
+                suffix = ".o"
+            case _:  # pragma: no cover
+                assert False, "unknown compiler tool"
+        output_filename = os.path.join(str(workspace), f"{module_name}{suffix}")
+
         with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".mlir", dir=str(workspace), delete=False
+            mode="w", suffix=".mlir", dir=str(workspace)
         ) as tmp_infile:
-            tmp_infile_name = tmp_infile.name
             tmp_infile.write(ir)
+            tmp_infile.flush()
 
-        output_object_name = os.path.join(str(workspace), f"{module_name}.o")
-        output_ir_name = os.path.join(str(workspace), f"{module_name}.ll")
-
-        cmd = self.get_cli_command(tmp_infile_name, output_ir_name, module_name, workspace)
-        try:
-            if self.options.verbose:
-                print(f"[SYSTEM] {' '.join(cmd)}", file=self.options.logfile)
-            result = subprocess.run(cmd, check=True, capture_output=True, text=True)
-            if self.options.verbose or os.getenv("ENABLE_DIAGNOSTICS"):
-                if result.stdout:
-                    print(result.stdout.strip(), file=self.options.logfile)
-                if result.stderr:
-                    print(result.stderr.strip(), file=self.options.logfile)
-        except subprocess.CalledProcessError as e:  # pragma: nocover
-            raise CompileError(f"catalyst failed with error code {e.returncode}: {e.stderr}") from e
-
-        if os.path.exists(output_ir_name):
-            with open(output_ir_name, "r", encoding="utf-8") as f:
-                out_IR = f.read()
-        else:
-            out_IR = None
+            cmd = self.get_cli_command(tmp_infile.name, output_filename, module_name, workspace)
+            try:
+                if self.options.verbose:
+                    print(f"[SYSTEM] {' '.join(cmd)}", file=self.options.logfile)
+                result = subprocess.run(cmd, check=True, capture_output=True, text=True)
+                if self.options.verbose or os.getenv("ENABLE_DIAGNOSTICS"):
+                    if result.stdout:
+                        print(result.stdout.strip(), file=self.options.logfile)
+                    if result.stderr:
+                        print(result.stderr.strip(), file=self.options.logfile)
+            except subprocess.CalledProcessError as e:  # pragma: nocover
+                raise CompileError(
+                    f"catalyst failed with error code {e.returncode}: {e.stderr}"
+                ) from e
 
         if self.options.link:
-            output = LinkerDriver.run(output_object_name, options=self.options)
-            output = str(pathlib.Path(output).absolute())
-        else:
-            output = None
+            output_filename = LinkerDriver.run(output_filename, options=self.options)
 
-        # Clean up temporary files
-        if os.path.exists(tmp_infile_name):
-            os.remove(tmp_infile_name)
-        if os.path.exists(output_ir_name):
-            os.remove(output_ir_name)
-
-        return output, out_IR
+        return str(pathlib.Path(output_filename).absolute())
 
     def has_xdsl_passes_in_transform_modules(self, mlir_module):
         """Check if the MLIR module contains xDSL passes in transform dialect.
@@ -664,7 +697,7 @@ class Compiler:
             mlir_module: The MLIR module to be compiled
 
         Returns:
-            (str): filename of shared object
+            str: Absolute path to shared library (or IR / object file depending on compile options).
         """
         using_python_compiler = self.is_using_python_compiler(mlir_module)
         workspace = args[0] if args else kwargs.get("workspace")

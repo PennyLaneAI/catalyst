@@ -42,8 +42,7 @@ namespace gradient {
 /// quantum function for the parameter-shift method. However, if this is inefficient in certain
 /// use-cases, other approaches can be employed.
 ///
-func::FuncOp genParamCountFunction(PatternRewriter &rewriter, Location loc, func::FuncOp callee)
-{
+func::FuncOp genParamCountFunction(PatternRewriter &rewriter, Location loc, func::FuncOp callee) {
     // Define the properties of the gate parameter counting version of the function to be
     // differentiated.
     std::string fnName = callee.getSymName().str() + ".pcount";
@@ -91,17 +90,13 @@ func::FuncOp genParamCountFunction(PatternRewriter &rewriter, Location loc, func
             // Measurements are handled separately.
             else if (isa<quantum::DeviceInitOp>(op)) {
                 rewriter.eraseOp(op);
-            }
-            else if (auto gate = dyn_cast<quantum::QuantumOperation>(op)) {
+            } else if (auto gate = dyn_cast<quantum::QuantumOperation>(op)) {
                 rewriter.replaceOp(op, gate.getQubitOperands());
-            }
-            else if (auto adjointOp = dyn_cast<quantum::AdjointOp>(op)) {
+            } else if (auto adjointOp = dyn_cast<quantum::AdjointOp>(op)) {
                 rewriter.replaceOp(op, adjointOp.getArgs());
-            }
-            else if (isa<quantum::DeallocOp>(op)) {
+            } else if (isa<quantum::DeallocOp>(op)) {
                 rewriter.eraseOp(op);
-            }
-            else if (isa<quantum::DeviceReleaseOp>(op)) {
+            } else if (isa<quantum::DeviceReleaseOp>(op)) {
                 rewriter.eraseOp(op);
             }
 
@@ -123,8 +118,7 @@ func::FuncOp genParamCountFunction(PatternRewriter &rewriter, Location loc, func
 }
 
 func::FuncOp genSplitPreprocessed(PatternRewriter &rewriter, Location loc, func::FuncOp qnode,
-                                  func::FuncOp qnodeQuantum)
-{
+                                  func::FuncOp qnodeQuantum) {
     // Define the properties of the split-out preprocessing-only QNode.
     std::string fnName = qnode.getSymName().str() + ".preprocess";
     SmallVector<Type> fnArgTypes(qnode.getArgumentTypes());
@@ -181,17 +175,13 @@ func::FuncOp genSplitPreprocessed(PatternRewriter &rewriter, Location loc, func:
             // Measurements are handled separately.
             else if (isa<quantum::DeviceInitOp>(op)) {
                 rewriter.eraseOp(op);
-            }
-            else if (auto gate = dyn_cast<quantum::QuantumOperation>(op)) {
+            } else if (auto gate = dyn_cast<quantum::QuantumOperation>(op)) {
                 rewriter.replaceOp(op, gate.getQubitOperands());
-            }
-            else if (auto adjointOp = dyn_cast<quantum::AdjointOp>(op)) {
+            } else if (auto adjointOp = dyn_cast<quantum::AdjointOp>(op)) {
                 rewriter.replaceOp(op, adjointOp.getArgs());
-            }
-            else if (isa<quantum::DeallocOp>(op)) {
+            } else if (isa<quantum::DeallocOp>(op)) {
                 rewriter.eraseOp(op);
-            }
-            else if (isa<quantum::DeviceReleaseOp>(op)) {
+            } else if (isa<quantum::DeviceReleaseOp>(op)) {
                 rewriter.eraseOp(op);
             }
 

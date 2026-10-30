@@ -29,7 +29,7 @@ import pennylane as qp
 
 
 # CHECK: func.func public @test_state0() -> tensor<8xcomplex<f64>>
-@qp.qjit(capture=True, target="mlir")
+@qp.qjit(capture=True, collect_decomp_rules=False, target="mlir")
 @qp.qnode(qp.device("null.qubit", wires=3))
 def test_state0():
     """
@@ -49,7 +49,7 @@ print(test_state0.mlir)
 
 
 # CHECK: func.func public @test_probs0() -> tensor<8xf64>
-@qp.qjit(capture=True, target="mlir")
+@qp.qjit(capture=True, collect_decomp_rules=False, target="mlir")
 @qp.qnode(qp.device("null.qubit", wires=3))
 def test_probs0():
     """
@@ -69,7 +69,7 @@ print(test_probs0.mlir)
 
 
 # CHECK: func.func public @test_probs1() -> tensor<4xf64>
-@qp.qjit(capture=True, target="mlir")
+@qp.qjit(capture=True, collect_decomp_rules=False, target="mlir")
 @qp.qnode(qp.device("null.qubit", wires=3))
 def test_probs1():
     """
@@ -91,7 +91,7 @@ print(test_probs1.mlir)
 
 
 # CHECK: func.func public @test_probs2(%arg0: tensor<i64>) -> tensor<4xf64>
-@qp.qjit(capture=True, target="mlir")
+@qp.qjit(capture=True, collect_decomp_rules=False, target="mlir")
 @qp.qnode(qp.device("null.qubit", wires=3))
 def test_probs2(i: int):
     """
@@ -114,7 +114,7 @@ print(test_probs2.mlir)
 
 
 # CHECK: func.func public @test_sample0() -> tensor<1x3xi64>
-@qp.qjit(capture=True, target="mlir")
+@qp.qjit(capture=True, collect_decomp_rules=False, target="mlir")
 @qp.qnode(qp.device("null.qubit", wires=3), shots=1)
 def test_sample0():
     """
@@ -133,7 +133,7 @@ print(test_sample0.mlir)
 
 
 # CHECK: func.func public @test_sample1() -> tensor<1x2xi64>
-@qp.qjit(capture=True, target="mlir")
+@qp.qjit(capture=True, collect_decomp_rules=False, target="mlir")
 @qp.qnode(qp.device("null.qubit", wires=3), shots=1)
 def test_sample1():
     """
@@ -154,7 +154,7 @@ print(test_sample1.mlir)
 
 
 # CHECK: func.func public @test_sample2(%arg0: tensor<i64>) -> tensor<1x2xi64>
-@qp.qjit(capture=True, target="mlir")
+@qp.qjit(capture=True, collect_decomp_rules=False, target="mlir")
 @qp.qnode(qp.device("null.qubit", wires=3), shots=1)
 def test_sample2(i: int):
     """
@@ -176,7 +176,7 @@ print(test_sample2.mlir)
 
 
 # CHECK: func.func public @test_counts0() -> (tensor<8xi64>, tensor<8xi64>)
-@qp.qjit(capture=True, target="mlir")
+@qp.qjit(capture=True, collect_decomp_rules=False, target="mlir")
 @qp.qnode(qp.device("null.qubit", wires=3), shots=1)
 def test_counts0():
     """
@@ -195,7 +195,7 @@ print(test_counts0.mlir)
 
 
 # CHECK: func.func public @test_counts1() -> (tensor<4xi64>, tensor<4xi64>)
-@qp.qjit(capture=True, target="mlir")
+@qp.qjit(capture=True, collect_decomp_rules=False, target="mlir")
 @qp.qnode(qp.device("null.qubit", wires=3), shots=1)
 def test_counts1():
     """
@@ -216,7 +216,7 @@ print(test_counts1.mlir)
 
 
 # CHECK: func.func public @test_counts2(%arg0: tensor<i64>) -> (tensor<4xi64>, tensor<4xi64>)
-@qp.qjit(capture=True, target="mlir")
+@qp.qjit(capture=True, collect_decomp_rules=False, target="mlir")
 @qp.qnode(qp.device("null.qubit", wires=3), shots=1)
 def test_counts2(i: int):
     """
@@ -238,7 +238,7 @@ print(test_counts2.mlir)
 
 
 # CHECK: func.func public @expval1() -> tensor<f64>
-@qp.qjit(capture=True, target="mlir")
+@qp.qjit(capture=True, collect_decomp_rules=False, target="mlir")
 @qp.qnode(qp.device("null.qubit", wires=2))
 def expval1():
     """
@@ -256,7 +256,7 @@ print(expval1.mlir)
 
 
 # CHECK: func.func public @expval2() -> tensor<f64>
-@qp.qjit(capture=True, target="mlir")
+@qp.qjit(capture=True, collect_decomp_rules=False, target="mlir")
 @qp.qnode(qp.device("null.qubit", wires=3))
 def expval2():
     """
@@ -279,7 +279,7 @@ print(expval2.mlir)
 
 
 # CHECK: func.func public @expval3(%arg0: tensor<2x2xcomplex<f64>>) -> tensor<f64>
-@qp.qjit(capture=True, target="mlir")
+@qp.qjit(capture=True, collect_decomp_rules=False, target="mlir")
 @qp.qnode(qp.device("null.qubit", wires=2))
 def expval3():
     """
@@ -299,7 +299,7 @@ print(expval3.mlir)
 
 
 # CHECK: func.func public @expval4(%arg0: tensor<4x4xcomplex<f64>>) -> tensor<f64>
-@qp.qjit(capture=True, target="mlir")
+@qp.qjit(capture=True, collect_decomp_rules=False, target="mlir")
 @qp.qnode(qp.device("null.qubit", wires=2))
 def expval4():
     """
@@ -328,7 +328,7 @@ print(expval4.mlir)
 
 
 # CHECK: func.func public @expval5(%arg0: tensor<4x4xcomplex<f64>>) -> tensor<f64>
-@qp.qjit(capture=True, target="mlir")
+@qp.qjit(capture=True, collect_decomp_rules=False, target="mlir")
 @qp.qnode(qp.device("null.qubit", wires=3))
 def expval5():
     """
@@ -360,7 +360,7 @@ print(expval5.mlir)
 
 
 # CHECK: func.func public @expval6() -> tensor<f64>
-@qp.qjit(capture=True, target="mlir")
+@qp.qjit(capture=True, collect_decomp_rules=False, target="mlir")
 @qp.qnode(qp.device("null.qubit", wires=3))
 def expval6():
     """
@@ -391,7 +391,7 @@ print(expval6.mlir)
 
 
 # CHECK: func.func public @expval7(%arg0: tensor<4x4xcomplex<f64>>) -> tensor<f64>
-@qp.qjit(capture=True, target="mlir")
+@qp.qjit(capture=True, collect_decomp_rules=False, target="mlir")
 @qp.qnode(qp.device("null.qubit", wires=2))
 def expval7():
     """
@@ -426,7 +426,7 @@ print(expval7.mlir)
 
 
 # CHECK: func.func public @var1(%arg0: tensor<i64>) -> tensor<f64>
-@qp.qjit(capture=True, target="mlir")
+@qp.qjit(capture=True, collect_decomp_rules=False, target="mlir")
 @qp.qnode(qp.device("null.qubit", wires=2))
 def var1(i: int):
     """
@@ -445,7 +445,7 @@ print(var1.mlir)
 
 
 # CHECK: func.func public @var2(%arg0: tensor<4x4xcomplex<f64>>, %arg1: tensor<i64>, %arg2: tensor<i64>) -> tensor<f64>
-@qp.qjit(capture=True, target="mlir")
+@qp.qjit(capture=True, collect_decomp_rules=False, target="mlir")
 @qp.qnode(qp.device("null.qubit", wires=3))
 def var2(i: int, j: int):
     """
@@ -479,7 +479,7 @@ print(var2.mlir)
 
 
 # CHECK: func.func public @test_multiple_terminal_measurements() -> (tensor<8xf64>, tensor<1000x1xi64>, tensor<f64>, tensor<f64>)
-@qp.qjit(capture=True, target="mlir")
+@qp.qjit(capture=True, collect_decomp_rules=False, target="mlir")
 @qp.qnode(qp.device("null.qubit", wires=3), shots=1000)
 def test_multiple_terminal_measurements():
     """
@@ -513,7 +513,7 @@ print(test_multiple_terminal_measurements.mlir)
 
 
 # CHECK: func.func public @jit_test_pre_post_processing(%arg0: tensor<i64>)
-@qp.qjit(capture=True, target="mlir")
+@qp.qjit(capture=True, collect_decomp_rules=False, target="mlir")
 def test_pre_post_processing(i: int):
     """
     Test converting a workflow with pre and post processing.
