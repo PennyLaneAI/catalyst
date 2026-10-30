@@ -695,9 +695,9 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         }
 
         // Lower compile-time rules into the module
-        if (failed(loadPythonDecomps())) {
-            return failure();
-        }
+        // if (failed(loadPythonDecomps())) {
+        //     return failure();
+        // }
 
         // Load rules from the module into the set of rules used by the graph, filtering by
         // fixed- and alt-decomps
