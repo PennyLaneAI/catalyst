@@ -29,6 +29,7 @@
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/LogicalResult.h"
 #include "stablehlo/dialect/StablehloOps.h"
+#include "Catalyst/Analysis/ResourceAnalysis.h"
 
 #include "Driver/Timer.h"
 #include "QRef/Transforms/Passes.h"
@@ -90,15 +91,28 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         std::unique_ptr<DecompositionGraph> graph;
         {
             ScopedDiagnosticTimer prepareTimer("decomp:prepare");
+
+            // Collect op IDs via ResourceAnalysis from the quantum.node entry (flattened).
+            catalyst::ResourceAnalysis analysis(module, {}, /*collectDetailedOperations=*/true);
+            std::vector<std::string> opIDs;
+            if (func::FuncOp qnode = GraphDecompositionPrep::findQNodeFunc(module)) {
+                const catalyst::ResourceResult *result =
+                    analysis.getFlattenedResource(qnode.getName());
+                for (const auto &opID : result->detailedOperations) {
+                    opIDs.push_back(opID.getKey().str());
+                }
+            }
+
             graph = GraphDecompositionPrep::prepareGraph(
-                module, {
-                            .targetGateSetOption = targetGateSetOption,
-                            .fixedDecompsOption = fixedDecompsOption,
-                            .altDecompsOption = altDecompsOption,
-                            .bytecodeRulesFile = bytecodeRulesFile,
-                            .libQPDPath = libQPDPath,
-                            .libpythonPath = libpythonPath,
-                        });
+                module, opIDs,
+                {
+                    .targetGateSetOption = targetGateSetOption,
+                    .fixedDecompsOption = fixedDecompsOption,
+                    .altDecompsOption = altDecompsOption,
+                    .bytecodeRulesFile = bytecodeRulesFile,
+                    .libQPDPath = libQPDPath,
+                    .libpythonPath = libpythonPath,
+                });
         }
         if (!graph) {
             return signalPassFailure();
