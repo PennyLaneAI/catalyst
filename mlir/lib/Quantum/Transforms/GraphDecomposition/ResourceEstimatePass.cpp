@@ -56,6 +56,18 @@ struct ResourceEstimatePass : public impl::ResourceEstimatePassBase<ResourceEsti
     void runOnOperation() final {
         ModuleOp module = getOperation();
 
+        ResourceAnalysis analysis(module, {}, /*collectDetailedOperations=*/true);
+        std::vector<std::string> opIDs;
+        if (func::FuncOp qnode = GraphDecompositionPrep::findQNodeFunc(module)) {
+            llvm::StringSet<> visitedFuncs;
+            llvm::StringSet<> qnodeOpIDs;
+            GraphDecompositionPrep::collectOpIDs(analysis, qnode.getName(), visitedFuncs,
+                                                 qnodeOpIDs);
+            for (const auto &opID : qnodeOpIDs) {
+                opIDs.push_back(opID.getKey().str());
+            }
+        }
+
         GraphDecompositionPrep::PrepOptions opts;
         opts.targetGateSetOption = targetGateSetOption;
         opts.fixedDecompsOption = fixedDecompsOption;
@@ -63,9 +75,9 @@ struct ResourceEstimatePass : public impl::ResourceEstimatePassBase<ResourceEsti
         opts.bytecodeRulesFile = bytecodeRulesFile;
         opts.libQPDPath = libQPDPath;
         opts.libpythonPath = libpythonPath;
-
         std::unique_ptr<DecompositionGraph> graph =
-            GraphDecompositionPrep::prepareGraph(module, opts);
+            GraphDecompositionPrep::prepareGraph(module, opIDs, opts);
+
         if (!graph) {
             return signalPassFailure();
         }
@@ -76,7 +88,6 @@ struct ResourceEstimatePass : public impl::ResourceEstimatePassBase<ResourceEsti
             showSolution(solution);
         }
 
-        ResourceAnalysis analysis(module, {}, /*collectDetailedOperations=*/true);
         const auto &results = analysis.getResults();
 
         llvm::StringMap<ResourceResult> estimates;
