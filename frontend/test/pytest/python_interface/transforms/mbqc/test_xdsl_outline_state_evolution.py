@@ -207,7 +207,13 @@ class TestOutlineStateEvolutionPass:
         on lightning.qubit."""
         dev = qp.device("lightning.qubit", wires=1000)
 
-        @qp.qjit(capture=True, target="mlir", pipelines=mbqc_pipeline())
+        @qp.qjit(
+            capture=True,
+            target="mlir",
+            pipelines=mbqc_pipeline(),
+            skip_preprocess=True,
+            collect_decomp_rules=False,
+        )
         @decompose_graph_state_pass
         @convert_to_mbqc_formalism_pass
         @outline_state_evolution_pass
@@ -252,7 +258,13 @@ class TestOutlineStateEvolutionPass:
         null.qubit."""
         dev = qp.device("null.qubit", wires=1000)
 
-        @qp.qjit(capture=True, target="mlir", pipelines=mbqc_pipeline())
+        @qp.qjit(
+            capture=True,
+            target="mlir",
+            pipelines=mbqc_pipeline(),
+            skip_preprocess=True,
+            collect_decomp_rules=False,
+        )
         @decompose_graph_state_pass
         @convert_to_mbqc_formalism_pass
         @measurements_from_samples_pass
@@ -297,7 +309,13 @@ class TestOutlineStateEvolutionPass:
         transform pipeline can be executed on null.qubit."""
         dev = qp.device("null.qubit", wires=1000)
 
-        @qp.qjit(capture=True, target="mlir", pipelines=mbqc_pipeline())
+        @qp.qjit(
+            capture=True,
+            target="mlir",
+            pipelines=mbqc_pipeline(),
+            skip_preprocess=True,
+            collect_decomp_rules=False,
+        )
         @decompose_graph_state_pass
         @convert_to_mbqc_formalism_pass
         @measurements_from_samples_pass
