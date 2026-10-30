@@ -29,8 +29,8 @@
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/LogicalResult.h"
 #include "stablehlo/dialect/StablehloOps.h"
-#include "Catalyst/Analysis/ResourceAnalysis.h"
 
+#include "Catalyst/Analysis/ResourceAnalysis.h"
 #include "Driver/Timer.h"
 #include "QRef/Transforms/Passes.h"
 #include "Quantum/Transforms/Passes.h"
@@ -70,29 +70,6 @@ class ScopedDiagnosticTimer {
     std::string name;
 };
 
-/**
- * @brief Gather the op IDs used by `funcName` into `opIDs`.
- *
- * Flattening does not merge loop bodies with a dynamic trip count, which the analysis only records
- * as `varFunctionCalls`, so those bodies are visited explicitly.
- */
-void collectOpIDs(const catalyst::ResourceAnalysis &analysis, StringRef funcName,
-                  llvm::StringSet<> &visitedFuncs, llvm::StringSet<> &opIDs) {
-    if (!visitedFuncs.insert(funcName).second) {
-        return;
-    }
-    const catalyst::ResourceResult *flat = analysis.getFlattenedResource(funcName);
-    if (!flat) {
-        return;
-    }
-    for (const auto &entry : flat->detailedOperations) {
-        opIDs.insert(entry.getKey());
-    }
-    for (const auto &entry : flat->varFunctionCalls) {
-        collectOpIDs(analysis, entry.getKey(), visitedFuncs, opIDs);
-    }
-}
-
 } // namespace
 
 namespace catalyst {
@@ -121,22 +98,23 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
             if (func::FuncOp qnode = GraphDecompositionPrep::findQNodeFunc(module)) {
                 llvm::StringSet<> visitedFuncs;
                 llvm::StringSet<> qnodeOpIDs;
-                collectOpIDs(analysis, qnode.getName(), visitedFuncs, qnodeOpIDs);
+                GraphDecompositionPrep::collectOpIDs(analysis, qnode.getName(), visitedFuncs,
+                                                     qnodeOpIDs);
                 for (const auto &opID : qnodeOpIDs) {
                     opIDs.push_back(opID.getKey().str());
                 }
             }
 
-            graph = GraphDecompositionPrep::prepareGraph(
-                module, opIDs,
-                {
-                    .targetGateSetOption = targetGateSetOption,
-                    .fixedDecompsOption = fixedDecompsOption,
-                    .altDecompsOption = altDecompsOption,
-                    .bytecodeRulesFile = bytecodeRulesFile,
-                    .libQPDPath = libQPDPath,
-                    .libpythonPath = libpythonPath,
-                });
+            graph =
+                GraphDecompositionPrep::prepareGraph(module, opIDs,
+                                                     {
+                                                         .targetGateSetOption = targetGateSetOption,
+                                                         .fixedDecompsOption = fixedDecompsOption,
+                                                         .altDecompsOption = altDecompsOption,
+                                                         .bytecodeRulesFile = bytecodeRulesFile,
+                                                         .libQPDPath = libQPDPath,
+                                                         .libpythonPath = libpythonPath,
+                                                     });
         }
         if (!graph) {
             return signalPassFailure();
