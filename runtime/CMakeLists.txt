@@ -17,6 +17,8 @@ option(ENABLE_OPENQASM "Build OpenQasm backend device" OFF)
 option(ENABLE_OQD "Build OQD backend device" OFF)
 option(ENABLE_TRANSPORT "Build the backend-agnostic transport loader (rt_transport)" OFF)
 option(ENABLE_TRANSPORT_FPGA "Build the FPGA controller backends" OFF)
+set(LIGHTNING_CLIFFISH_LIB "" CACHE FILEPATH
+    "lightning.cliffish device library built in pennylane-lightning; when set, its runtime tests are built")
 if(ENABLE_TRANSPORT_FPGA AND NOT ENABLE_TRANSPORT)
     message(FATAL_ERROR
         "ENABLE_TRANSPORT_FPGA requires ENABLE_TRANSPORT=ON.")
@@ -61,6 +63,7 @@ find_package(Python REQUIRED
 
 message(STATUS "ENABLE_OPENQASM is ${ENABLE_OPENQASM}.")
 message(STATUS "ENABLE_OQD is ${ENABLE_OQD}.")
+message(STATUS "LIGHTNING_CLIFFISH_LIB is '${LIGHTNING_CLIFFISH_LIB}'.")
 
 message(STATUS "ENABLE_CODE_COVERAGE is ${ENABLE_CODE_COVERAGE}.")
 message(STATUS "ENABLE_ADDRESS_SANITIZER is ${ENABLE_ADDRESS_SANITIZER}.")
