@@ -68,10 +68,12 @@ class ResourceAnalysis {
     // name of the entry function
     std::string entryFuncName;
 
-    // Counters for lifted-loop names (`for_loop_<N>` vs `dyn_for_loop_<N>`),
-    // so each prefix gets its own numbering sequence.
+    // Counters for lifted-loop names (`for_loop_<N>` / `dyn_for_loop_<N>` / `while_loop_<N>` /
+    // `dyn_while_loop_<N>`), so each prefix gets its own numbering sequence.
     int64_t forLoopCounter = 0;
     int64_t dynForLoopCounter = 0;
+    int64_t whileLoopCounter = 0;
+    int64_t dynWhileLoopCounter = 0;
 
     // Collect the extension analyses logic
     llvm::SmallVector<std::unique_ptr<ResourceAnalysisExtension>> extensionAnalyses;
