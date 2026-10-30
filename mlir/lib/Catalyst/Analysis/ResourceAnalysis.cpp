@@ -520,12 +520,15 @@ void ResourceAnalysis::collectDetailedOperation(Operation *op, ResourceResult &r
 
         std::string opID = inst.getGraphOpIdExplicitModifiers(isAdjoint, numControlQubits);
         result.detailedOperations[opID] += 1;
+        result.observedGraphOpIds.insert(opID);
 
         return;
     }
 
     if (auto inst = dyn_cast<ResourceQuantumOpInterface>(op)) {
-        result.detailedOperations[inst.getResourceDetailedName()] += 1;
+        std::string opID = inst.getResourceDetailedName().str();
+        result.detailedOperations[opID] += 1;
+        result.observedGraphOpIds.insert(opID);
         return;
     }
 }
@@ -549,6 +552,9 @@ static void accumulateScaled(ResourceResult &dest, const ResourceResult &source,
     }
     for (const auto &opEntry : source.detailedOperations) {
         dest.detailedOperations[opEntry.getKey()] += opEntry.getValue() * count;
+    }
+    for (const auto &opId : source.observedGraphOpIds) {
+        dest.observedGraphOpIds.insert(opId.getKey());
     }
     for (const auto &m : source.measurements) {
         dest.measurements[m.getKey()] += m.getValue() * count;
@@ -612,6 +618,17 @@ const ResourceResult *ResourceAnalysis::getFlattenedResource(StringRef funcName)
             continue;
         }
         accumulateScaled(flat, *child, fc.getValue());
+    }
+    // Dynamic-trip loops are only linked via `varFunctionCalls` (id, not count).
+    // They should be counted as observed GraphOpIds.
+    for (const auto &fc : r.varFunctionCalls) {
+        const ResourceResult *child = getFlattenedResource(fc.getKey());
+        if (!child || child == &flat) {
+            continue;
+        }
+        for (const auto &opId : child->observedGraphOpIds) {
+            flat.observedGraphOpIds.insert(opId.getKey());
+        }
     }
     return &flat;
 }
