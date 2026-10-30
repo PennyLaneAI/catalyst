@@ -81,8 +81,8 @@ template <class Role> class VerbsSessionBase : public Role {
 
     // Seal the staged send frame with round `cursor`'s seq and write it into the peer's ring (CUQR:
     // send it by the session's verb). post_frame reads the frame mode from the ring. (A distinct
-    // name: GCC rejects explicitly instantiating post_write<M> beside a non-template overload of the
-    // same signature.)
+    // name: GCC rejects explicitly instantiating post_write<M> beside a non-template overload of
+    // the same signature.)
     template <frame::Mode M>
     void post_write(ibv_qp *qp, std::uint64_t cursor, bool inline_data, bool signaled);
     void post_frame(ibv_qp *qp, std::uint64_t cursor, bool inline_data, bool signaled);
