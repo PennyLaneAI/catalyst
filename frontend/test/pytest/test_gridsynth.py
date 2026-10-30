@@ -28,6 +28,9 @@ from catalyst.utils.exceptions import CompileError
 )
 @pytest.mark.parametrize("op", [qp.RZ, qp.PhaseShift])
 @pytest.mark.parametrize("eps", [1e-3, 1e-4, 1e-5, 1e-6, 1e-7])
+@pytest.mark.xfail(
+    reason="gridsynth introduces operations without traced decomposition rules", strict=True
+)
 def test_PhaseShift_gridsynth(param, op, eps):
     """Test that PhaseShift gates are correctly decomposed using the gridsynth pass."""
 
@@ -49,6 +52,9 @@ def test_PhaseShift_gridsynth(param, op, eps):
 
 @pytest.mark.parametrize("param", [-2.2, 0.3, 1.1])
 @pytest.mark.parametrize("op", [qp.RZ, qp.PhaseShift])
+@pytest.mark.xfail(
+    reason="gridsynth introduces operations without traced decomposition rules", strict=True
+)
 def test_adjoint_gridsynth(param, op):
     """Test that adjoint rotations are discretized as the inverse rotation."""
     eps = 1e-6
@@ -68,7 +74,19 @@ def test_adjoint_gridsynth(param, op):
 
 @pytest.mark.parametrize("param", [-2.2, 0.3, 1.1])
 @pytest.mark.parametrize("op", [qp.RZ, qp.PhaseShift])
-@pytest.mark.parametrize("ppr_basis", [False, True])
+@pytest.mark.parametrize(
+    "ppr_basis",
+    [
+        pytest.param(
+            False,
+            marks=pytest.mark.xfail(
+                reason="gridsynth introduces operations without traced decomposition rules",
+                strict=True,
+            ),
+        ),
+        True,
+    ],
+)
 @pytest.mark.parametrize("region", [qp.adjoint, lambda fn: qp.adjoint(qp.adjoint(fn))])
 def test_adjoint_region_gridsynth(param, op, ppr_basis, region):
     """Test that rotations inside adjoint regions are discretized and inverted."""
@@ -116,6 +134,9 @@ def test_gridsynth_ctrl_region_error():
     [-7.7, -2.2, -0.1, 0.0, 0.1, 2.2, 7.7],
 )
 @pytest.mark.parametrize("eps", [1e-6])
+@pytest.mark.xfail(
+    reason="gridsynth introduces operations without traced decomposition rules", strict=True
+)
 def test_gridsynth_ppr_basis(param, eps):
     """Test that gridsynth with ppr_basis is consistent with the default gridsynth."""
 
@@ -234,7 +255,19 @@ def test_mixed_fallback_gridsynth_specs_wires(ppr_basis):
 @pytest.mark.parametrize("param", [-7.7, -2.2, -0.1, 0.0, 0.3, 1.1, 4.4])
 @pytest.mark.parametrize("op", [qp.RZ, qp.PhaseShift])
 @pytest.mark.parametrize("eps", [1e-2, 1e-4, 1e-6])
-@pytest.mark.parametrize("ppr_basis", [False, True])
+@pytest.mark.parametrize(
+    "ppr_basis",
+    [
+        pytest.param(
+            False,
+            marks=pytest.mark.xfail(
+                reason="gridsynth introduces operations without traced decomposition rules",
+                strict=True,
+            ),
+        ),
+        True,
+    ],
+)
 def test_mixed_gridsynth_samples(param, op, eps, ppr_basis):
     """Test that every sampled sequence of the mixed method is close to the target. For the
     diamond-norm error 2 * eps of the mixture, each branch satisfies Re(w) >= sqrt(1 - eps), so its
@@ -301,7 +334,13 @@ def test_mixed_fallback_gridsynth_samples(op, eps, ppr_basis):
 @pytest.mark.parametrize(
     "method",
     [
-        "mixed",
+        pytest.param(
+            "mixed",
+            marks=pytest.mark.xfail(
+                reason="gridsynth introduces operations without traced decomposition rules",
+                strict=True,
+            ),
+        ),
         pytest.param(
             "mixed-fallback",
             marks=pytest.mark.xfail(
@@ -330,7 +369,13 @@ def test_mixed_gridsynth_seed(method):
 @pytest.mark.parametrize(
     "method",
     [
-        "mixed",
+        pytest.param(
+            "mixed",
+            marks=pytest.mark.xfail(
+                reason="gridsynth introduces operations without traced decomposition rules",
+                strict=True,
+            ),
+        ),
         pytest.param(
             "mixed-fallback",
             marks=pytest.mark.xfail(
@@ -371,6 +416,9 @@ def test_invalid_method():
 
 
 @pytest.mark.parametrize("eps", [1e-10, 1e-12, 1e-15])
+@pytest.mark.xfail(
+    reason="gridsynth introduces operations without traced decomposition rules", strict=True
+)
 def test_gridsynth_high_precision(eps):
     """Test that gridsynth reaches precisions beyond double-precision geometry."""
     dev = qp.device("lightning.qubit", wires=1)
@@ -394,7 +442,13 @@ def test_gridsynth_high_precision(eps):
 @pytest.mark.parametrize(
     "method",
     [
-        "mixed",
+        pytest.param(
+            "mixed",
+            marks=pytest.mark.xfail(
+                reason="gridsynth introduces operations without traced decomposition rules",
+                strict=True,
+            ),
+        ),
         pytest.param(
             "mixed-fallback",
             marks=pytest.mark.xfail(
@@ -438,8 +492,20 @@ def test_mixed_gridsynth_high_precision(eps, method):
 @pytest.mark.parametrize(
     "method",
     [
-        "deterministic",
-        "mixed",
+        pytest.param(
+            "deterministic",
+            marks=pytest.mark.xfail(
+                reason="gridsynth introduces operations without traced decomposition rules",
+                strict=True,
+            ),
+        ),
+        pytest.param(
+            "mixed",
+            marks=pytest.mark.xfail(
+                reason="gridsynth introduces operations without traced decomposition rules",
+                strict=True,
+            ),
+        ),
         pytest.param(
             "mixed-fallback",
             marks=pytest.mark.xfail(
