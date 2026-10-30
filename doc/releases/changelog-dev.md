@@ -179,6 +179,24 @@
 
 <h3>Improvements 🛠</h3>
 
+* Ahead-of-time compilation with `qjit` can now stop at any of the main internal compiler stages,
+  in addition to the frontend-controlled stages (`target="jaxpr"|"mlir"|"binary"`).
+  The `"llvmir"` target now correctly stops after LLVM IR is first generated from the MLIR, and
+  two new targets (`"llvmir_opt"` and `"object"`) provide additional control over the LLVM-based
+  stages.
+  [(#3406)](https://github.com/PennyLaneAI/catalyst/pull/3406)
+
+* The Catalyst CLI interface is reworked for consistency and flexibility.
+  [(#3403)](https://github.com/PennyLaneAI/catalyst/pull/3403)
+
+  - The `--keep-intermediate` flag no longer affects whether IR is produced in the final output
+    (it continues to affect intermediate outputs). This means it is no longer required in order
+    to use `-o` flag for IR.
+  - Exactly one 'final' output is produced per invocation, either object code or IR, but not both.
+  - `-o` is the unified way to set the location of the final output, regardless of whether its
+    object code or IR. The default is stdout for IR and `<module-name>.o` for object code.
+    Stdout (i.e. `-o -`) is rejected when the output is object code.
+
 * Transforms can now be directly applied to a `QJIT`'d workflow. A new `QJIT` will be produced with
   the transform applied to the `QJIT`'s body.
   [(#3397)](https://github.com/PennyLaneAI/catalyst/pull/3397)
@@ -196,11 +214,17 @@
   (BLV): a 32 B header, the payload and a completion word written last. The compiler picks the
   16 B frame when requests and replies fit in 8 B, so such programs compile as before, and the
   variable-length one otherwise, writing it into both ends' backend configs. The `cpu_verbs`
-  and `memcpy` backends carry any size. A GPU coprocessor running a persistent kernel still
-  carries at most 8 B. Each ring has 256 slots unless a node's backend config sets
-  `frame_slots=<n>`, a power of two, which the compiler passes to every node; FPGA controllers
-  keep 256. Over RDMA, ends with different frame configs fail to connect.
+  and `memcpy` backends carry any size. Each ring has 256 slots unless a node's backend config sets
+  `frame_slots=<n>`, a power of two, which the compiler passes to every node; FPGA controllers keep
+  256. Over RDMA, ends with different frame configs fail to connect.
   [(#3379)](https://github.com/PennyLaneAI/catalyst/pull/3379)
+
+* Backline's persistent GPU kernels now read requests and write replies through the shared frame
+  codec, so a GPU coprocessor's replies carry the request's fn_id like every other transport's, and
+  Catalyst's own GPU kernels (`gpu_echo_launcher`, `gpu_steane_launcher`) carry messages of any
+  size over `memcpy` and `gpu_verbs`. Other persistent kernels, such as PennyLane's Triton
+  decoders, still carry at most 8 B.
+  [(#3383)](https://github.com/PennyLaneAI/catalyst/pull/3383)
 
 * The :func:`~catalyst.qjit` function now accepts an ``enable_aot_compilation`` argument, which can be
   used to toggle whether or not to use ahead-of-time compilation.
@@ -228,6 +252,14 @@
   any `epsilon` down to `1e-15`, and invalid angles or `epsilon` values raise an error.
   [(#3333)](https://github.com/PennyLaneAI/catalyst/pull/3333)
 
+* With `ppr_basis=True`, :func:`pennylane.transforms.gridsynth` now moves all Clifford gates of a
+  sequence past its T gates. Each sequence consists of one :math:`\pi/8` Pauli product rotation
+  per T gate, about :math:`\pm X`, :math:`\pm Y` or :math:`\pm Z`, with signs chosen such that no
+  Clifford gates remain. Only short sequences with few T gates may end with up to two Clifford
+  Pauli product rotations. Previously, there was about one Clifford rotation for every two
+  :math:`\pi/8` rotations. The number of :math:`\pi/8` rotations is unchanged.
+  [(#3398)](https://github.com/PennyLaneAI/catalyst/pull/3398)
+
 * Controlled :class:`~pennylane.GlobalPhase` operations now decompose to
   :class:`~pennylane.PhaseShift` on the control wire when possible (or
   :class:`~pennylane.ControlledPhaseShift` for multiple controls), via an updated
@@ -242,8 +274,7 @@
   [(#3316)](https://github.com/PennyLaneAI/catalyst/pull/3316)
 
 * The memcpy transport now carries messages of any size in each direction, as set by a PennyLane
-  `qp.Controller`'s `in_bytes` and `out_bytes`. The memcpy GPU coprocessor's persistent kernel
-  still carries 8 bytes.
+  `qp.Controller`'s `in_bytes` and `out_bytes`.
 
   ```python
   ctrl = qp.Controller(in_bytes=120, out_bytes=121)
@@ -818,6 +849,17 @@
 
 <h3>Breaking changes 💔</h3>
 
+* The `lazy` argument has been removed from `catalyst.adjoint`, matching
+  `qp.adjoint`. Adjoint construction is always symbolic, and captured adjoint
+  regions no longer carry `lazy` metadata. Construct known inverse gates directly
+  when an explicit inverse representation is required.
+  [(#3394)](https://github.com/PennyLaneAI/catalyst/pull/3394)
+
+* Instrumentation no longer reports `programsize` for the high-level `compile` stage,
+  since the compiler no longer returns an IR string to Python in addition to producing
+  compiled object code.
+  [(#3403)](https://github.com/PennyLaneAI/catalyst/pull/3403)
+
 * Removed ``catalyst.pipeline``, ``catalyst.passes.apply_pass``,
   ``catalyst.passes.apply_pass_plugin``, ``catalyst.passes.Pass``,
   ``catalyst.passes.PassPlugin``, and the ``circuit_transform_pipeline`` argument of
@@ -838,6 +880,14 @@
   frame. A function written for the previous signature reads its payload at the same pointer but
   must take the extra `fn_id` argument, and no longer subtracts a frame trailer from the length.
   [(#3379)](https://github.com/PennyLaneAI/catalyst/pull/3379)
+
+* A Backline launcher, the function a GPU coprocessor calls once to start its persistent kernel,
+  must now export `<symbol>_info` reporting `abi_version` 2 or later, and its kernel must answer
+  each request with a frame laid out as `CoprocLaunchDesc` describes, in the slot stride and
+  frame mode it now carries. The runtime refuses a launcher without it, rather than letting the
+  session wait for replies the old layout never produces. PennyLane's Triton decoders need the
+  matching PennyLane release.
+  [(#3383)](https://github.com/PennyLaneAI/catalyst/pull/3383)
 
 * A `memcpy` transport session whose backend config has no `frame` keys now uses the 16 B frame, and
   refuses messages over 8 bytes. Programs compiled with Catalyst are unaffected, since the compiler
@@ -1062,6 +1112,10 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* The `method` attribute of the Gradient dialect operations (`grad`, `value_and_grad`, `jvp`,
+  `vjp`) is now an enum attribute (`#gradient<diff_method auto>`) instead of a string attribute.
+  [(#3318)](https://github.com/PennyLaneAI/catalyst/pull/3318)
+  
 * Backline transport frames are built and read through a shared frame codec, which the `cpu_verbs`
   backends now use instead of laying out the 16 B frame themselves. The bytes on the wire are
   unchanged, and other frame layouts can now be added in one place.
@@ -1354,6 +1408,11 @@
   dialects, the compilation pipeline, and the runtime.
   [(#3208)](https://github.com/PennyLaneAI/catalyst/pull/3208)
 
+* The notes on which devices can execute the circuits generated by the Pauli-based computation
+  passes and by `gridsynth` with `ppr_basis=True` are updated: they run on `lightning.qubit`,
+  `lightning.kokkos` and `lightning.gpu` or `null.qubit` (for mock-execution).
+  [(#3413)](https://github.com/PennyLaneAI/catalyst/pull/3413)
+
 <h3>Contributors ✍️</h3>
 
 This release contains contributions from (in alphabetical order):
@@ -1384,6 +1443,7 @@ Kalman Szenes,
 Jaume Villasante,
 Paul Haochen Wang,
 David Wierichs,
+Johannes Wittmann,
 Jake Zaia,
 Haider Sajjad,
 Hongsheng Zheng.

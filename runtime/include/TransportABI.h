@@ -35,8 +35,11 @@ typedef struct {
     size_t size;
 } CatalystWrapperResult;
 
-/// The highest CatalystCoprocessorFnInfo version this runtime knows the fields of.
-#define CATALYST_COPROCESSOR_FN_ABI_VERSION 1
+/// The highest CatalystCoprocessorFnInfo version this runtime knows.
+#define CATALYST_COPROCESSOR_FN_ABI_VERSION 2
+
+/// The lowest CatalystCoprocessorFnInfo version a launcher must report.
+#define CATALYST_COPROCESSOR_LAUNCHER_MIN_ABI_VERSION 2
 
 /**
  * A per-message coprocessor function, called once per received message with its decoded fields,
@@ -54,11 +57,16 @@ typedef size_t (*CatalystCoprocessorFn)(const void *payload, size_t len, uint32_
  * The lifecycle hooks of a coprocessor function or launcher. The library defining the function
  * may export them as `const CatalystCoprocessorFnInfo *<symbol>_info(void)`, where `<symbol>` is
  * the function's name. The runtime looks `<symbol>_info` up only in the library that defines
- * `<symbol>`. A function without it is bound with a null ctx.
+ * `<symbol>`. A per-message function without it is bound with a null ctx.
  *
- * - `abi_version`: the version whose fields the library fills, at least 1. The struct only grows
+ * - `abi_version`: the version the library is written against, at least 1. The struct only grows
  *   at its end, and the runtime reads only the fields of the versions it knows. A field added by
  *   a later version must be optional: null or zero keeps the behaviour of the earlier versions.
+ *   Version 2 adds no fields: it changes what a launcher's persistent engine reads and writes,
+ *   which is codec frames laid out as CoprocLaunchDesc (Transport.hpp) describes, replies
+ *   included. A launcher must export `<symbol>_info` reporting at least version 2, and the runtime
+ *   refuses one that does not, since an engine built for version 1 would never publish a reply
+ *   the runtime recognises. A per-message function may report 1 or 2.
  * - `reserved`: zero. It fills the 4 bytes before `init`, which would otherwise be padding, and
  *   the runtime ignores it. A later version may give it a meaning, for which zero keeps the
  *   behaviour of this one.

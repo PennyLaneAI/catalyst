@@ -535,9 +535,23 @@ int __catalyst__transport__set_coprocessor_fn(CatalystTransportSession *s, const
             // before it is bound (see CatalystCoprocessorFnInfo). Fields of versions above
             // COPROCESSOR_FN_ABI_VERSION are optional by contract, so they are left unread.
             const std::string name(symbol);
-            if (auto info_fn =
-                    reinterpret_cast<InfoFn>(resolve_own_fn_info(resolved_fn, name + "_info"))) {
-                const CoprocessorFnInfo *info = info_fn();
+            const auto info_fn =
+                reinterpret_cast<InfoFn>(resolve_own_fn_info(resolved_fn, name + "_info"));
+            const CoprocessorFnInfo *info = info_fn ? info_fn() : nullptr;
+            // A launcher's engine writes reply frames in the layout of its ABI version; one built
+            // for an older layout would never publish a reply the backend recognises.
+            if (co->coprocessor_fn_convention() == CoprocConvention::LaunchOnce &&
+                (!info || info->abi_version < CATALYST_COPROCESSOR_LAUNCHER_MIN_ABI_VERSION)) {
+                std::cerr << "[transport] set_coprocessor_fn: launcher " << name
+                          << " is built for an older frame layout (" << name << "_info reports "
+                          << (info ? std::to_string(info->abi_version) : std::string("nothing"))
+                          << ", this runtime needs at least "
+                          << CATALYST_COPROCESSOR_LAUNCHER_MIN_ABI_VERSION
+                          << "); rebuild it against this Catalyst, or for a Triton decoder use the "
+                             "PennyLane release that matches it\n";
+                return fail_unconfigured();
+            }
+            if (info_fn) {
                 if (!info || info->abi_version < 1) {
                     std::cerr << "[transport] set_coprocessor_fn: " << name
                               << "_info has no ABI version (expected at least 1)\n";

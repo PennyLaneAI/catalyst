@@ -710,7 +710,6 @@ def _pl_adjoint_lowering(
     jax_ctx,
     *plxpr_invals,
     jaxpr,
-    lazy,
     n_consts,
 ):
     new_jaxpr = jaxpr.replace(constvars=(), invars=jaxpr.constvars + jaxpr.invars)

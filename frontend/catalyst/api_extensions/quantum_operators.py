@@ -243,7 +243,7 @@ def pauli_measure(
     return m
 
 
-def adjoint(f: Union[Callable, Operator], lazy=True) -> Union[Callable, Operator]:
+def adjoint(f: Union[Callable, Operator]) -> Union[Callable, Operator]:
     """A :func:`~.qjit` compatible adjoint transformer for PennyLane/Catalyst.
 
     Returns a quantum function or operator that applies the adjoint of the
@@ -257,11 +257,6 @@ def adjoint(f: Union[Callable, Operator], lazy=True) -> Union[Callable, Operator
     Args:
         f (Callable or Operator): A PennyLane operation or a Python function
                                   containing PennyLane quantum operations.
-        lazy (bool): Whether to delay the computation of the Hermitian conjugate until a later time
-                     (typically during decomposition or compilation). The default is ``True``,
-                     whereas ``False`` will immediately produce a new operator implementing the
-                     adjoint. Note that ``False`` is only supported when the adjoint is applied to
-                     a single Operator, rather than a quantum function.
 
     Returns:
         If an Operator is provided, returns an Operator that is the adjoint. If
@@ -312,7 +307,7 @@ def adjoint(f: Union[Callable, Operator], lazy=True) -> Union[Callable, Operator
     [1.00000000e+00 7.39557099e-32]
     """
 
-    adj = AdjointCallable(f, lazy=lazy)
+    adj = AdjointCallable(f)
 
     # Return an instantiated version of the Adjoint class if we receive an operator instance.
     return adj() if isinstance(f, Operator) else adj
@@ -482,9 +477,8 @@ class MidCircuitPauliMeasure(HybridOp):
 class AdjointCallable:
     """Callable wrapper to produce an adjoint instance."""
 
-    def __init__(self, target, lazy):
+    def __init__(self, target):
         self.target = target
-        self.lazy = lazy
 
         if isinstance(target, Operator):
             # Case 1: User passed an already instantiated operation, e.g. adjoint(qp.Hadamard(0))
@@ -507,27 +501,11 @@ class AdjointCallable:
     def __call__(self, *args, **kwargs):
         if self.single_op:
             base_op = self.target if self.instantiated else self.target(*args, **kwargs)
-            return create_adjoint_op(base_op, self.lazy)
-
-        if not self.lazy:
-            return self._expand_adjoint_callable(args, kwargs)
+            return create_adjoint_op(base_op)
 
         tracing_artifacts = self.trace_body(args, kwargs)
         dbg = tracing_artifacts[3]
         return HybridAdjoint(*tracing_artifacts[0:3], debug_info=dbg)
-
-    def _expand_adjoint_callable(self, args, kwargs):
-        """Expand a callable into individual ops, then reverse and adjoint each one."""
-        with QueuingManager.stop_recording(), QuantumTape() as tape:
-            self.target(*args, **kwargs)
-
-        for op in reversed(tape.operations):
-            # For Adjoint of HybridAdjoint, we still create the HybridAdjoint of HybridAdjoint, so
-            # that the MLIR adjoint-lowering pass can handle the reversal.
-            if isinstance(op, HybridOp):
-                AdjointCallable(lambda bound_op=op: qp.apply(bound_op) and None, lazy=True)()
-            else:
-                create_adjoint_op(op, lazy=False)
 
     def trace_body(self, args, kwargs):
         """Generate a HybridOpRegion for use by Catalyst."""
@@ -629,10 +607,7 @@ class HybridAdjoint(HybridOp):
             for op in self.regions[0].quantum_tape.operations
         ), "Cannot decompose Adjoint(HybridOp) in PennyLane"
 
-        return [
-            create_adjoint_op(op, lazy=True)
-            for op in reversed(self.regions[0].quantum_tape.operations)
-        ]
+        return [create_adjoint_op(op) for op in reversed(self.regions[0].quantum_tape.operations)]
 
 
 class CtrlCallable:
@@ -874,7 +849,7 @@ def ctrl_distribute(
                 work_wires=work_wires,
                 work_wire_type=work_wire_type,
             )
-            new_ops.append(create_adjoint_op(ctrl_op, lazy=True))
+            new_ops.append(create_adjoint_op(ctrl_op))
         else:
             if isinstance(op, Operator2):
                 ctrl_op = create_controlled_op2(

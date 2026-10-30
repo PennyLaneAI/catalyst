@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: catalyst %s --dump-catalyst-pipeline --verify-diagnostics 2>&1 | FileCheck %s
+// RUN: catalyst --tool=opt %s --dump-catalyst-pipeline --verify-diagnostics 2>&1 | FileCheck %s
 // RUN: catalyst --tool=opt %s --catalyst-pipeline="pipe1(split-multiple-tapes;apply-transform-sequence),pipe2(inline-nested-module)" --dump-catalyst-pipeline --verify-diagnostics 2>&1 | FileCheck %s --check-prefix=CHECK-CUSTOM
 // RUN: catalyst --tool=opt %s -cse --dump-catalyst-pipeline --verify-diagnostics 2>&1 | FileCheck %s --check-prefix=CHECK-ONE-PASS
 // RUN: not catalyst --tool=opt %s -cse --catalyst-pipeline="pipe1(split-multiple-tapes;apply-transform-sequence),pipe2(inline-nested-module)" --dump-catalyst-pipeline --verify-diagnostics 2>&1 | FileCheck %s --check-prefix=CHECK-FAIL
