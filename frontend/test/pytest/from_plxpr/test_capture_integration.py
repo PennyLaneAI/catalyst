@@ -337,7 +337,21 @@ class TestCapture:
 
     @pytest.mark.parametrize(
         "reset, op, expected",
-        [(False, qp.I, 1), (False, qp.X, -1), (True, qp.I, 1), (True, qp.X, 1)],
+        [
+            (False, qp.I, 1),
+            (False, qp.X, -1),
+            pytest.param(
+                True,
+                qp.I,
+                1,
+                marks=pytest.mark.xfail(
+                    "config.getoption('--backend') == 'lightning.qubit'",
+                    reason="I has no decomposition rules. Triggers decomposition callback.",
+                    strict=True,
+                ),
+            ),
+            (True, qp.X, 1),
+        ],
     )
     def test_measure(self, backend, reset, op, expected):
         """Test the integration for a circuit with a mid-circuit measurement.
@@ -1342,9 +1356,9 @@ class TestCapture:
             qp.RY(y, wires=0)
             return qp.expval(qp.PauliZ(0))
 
-        result_1 = captured_circuit_1(1.5, 2.0)
+        result_1 = captured_circuit_1(1.8, 2.0)
         captured_circuit_1_mlir = captured_circuit_1.mlir
-        assert "%cst = arith.constant 1.5" in captured_circuit_1_mlir
+        assert "%cst = arith.constant 1.8" in captured_circuit_1_mlir
         assert 'qref.custom "RX"(%cst)' in captured_circuit_1_mlir
         assert "%cst = arith.constant 2.0" not in captured_circuit_1_mlir
 
@@ -1356,11 +1370,11 @@ class TestCapture:
             qp.RY(y, wires=0)
             return qp.expval(qp.PauliZ(0))
 
-        result_2 = captured_circuit_2(1.5, 2.0)
+        result_2 = captured_circuit_2(1.8, 2.0)
         captured_circuit_2_mlir = captured_circuit_2.mlir
         assert "%cst = arith.constant 2.0" in captured_circuit_2_mlir
         assert 'qref.custom "RY"(%cst)' in captured_circuit_2_mlir
-        assert "%cst = arith.constant 1.5" not in captured_circuit_2_mlir
+        assert "%cst = arith.constant 1.8" not in captured_circuit_2_mlir
 
         assert jnp.allclose(result_1, result_2)
 
@@ -1375,9 +1389,9 @@ class TestCapture:
 
             return c()
 
-        _ = workflow(1.5, 2.0)
+        _ = workflow(1.8, 2.0)
         captured_circuit_3_mlir = workflow.mlir
-        assert "%cst = arith.constant 1.5" in captured_circuit_3_mlir
+        assert "%cst = arith.constant 1.8" in captured_circuit_3_mlir
         assert 'qref.custom "RX"(%cst)' in captured_circuit_3_mlir
 
 

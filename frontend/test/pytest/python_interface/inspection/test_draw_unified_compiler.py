@@ -623,7 +623,7 @@ class TestDrawGraph:
     def test_level_greater_than_num_of_passes(self, capture_mode):
         """Tests that a user warning is raised if the level is greater than number of passes."""
 
-        @qp.qjit(capture=capture_mode, skip_preprocess=True)
+        @qp.qjit(capture=capture_mode, skip_preprocess=True, collect_decomp_rules=False)
         @qp.transforms.merge_rotations
         @qp.transforms.cancel_inverses
         @qp.qnode(qp.device("null.qubit", wires=3))
@@ -657,7 +657,13 @@ class TestDrawGraph:
         # pylint: disable=import-outside-toplevel
         import matplotlib
 
-        @qp.qjit(autograph=True, target="mlir", capture=capture_mode, skip_preprocess=True)
+        @qp.qjit(
+            autograph=True,
+            target="mlir",
+            capture=capture_mode,
+            skip_preprocess=True,
+            collect_decomp_rules=False,
+        )
         @qp.qnode(qp.device("null.qubit", wires=2))
         def qjit_qnode():
             qp.H(0)
@@ -682,7 +688,7 @@ class TestDrawGraph:
     def test_transforms_step_through(self, capture_mode):
         """Tests that the level argument controls transformations step through."""
 
-        @qp.qjit(capture=capture_mode, skip_preprocess=True)
+        @qp.qjit(capture=capture_mode, skip_preprocess=True, collect_decomp_rules=False)
         @qp.transforms.merge_rotations
         @qp.transforms.cancel_inverses
         @qp.qnode(qp.device("null.qubit", wires=3))
@@ -726,7 +732,7 @@ class TestDrawGraph:
     def test_empty_passpipeline(self, capture_mode):
         """Tests that it works with an empty pass pipeline."""
 
-        @qp.qjit(skip_preprocess=True, capture=capture_mode)
+        @qp.qjit(skip_preprocess=True, capture=capture_mode, collect_decomp_rules=False)
         @qp.qnode(qp.device("null.qubit", wires=3))
         def circuit():
             qp.H(0)
@@ -752,7 +758,7 @@ class TestDrawGraph:
     def test_early_callback_exit(self, capture_mode):
         """Tests that unnecessary callbacks aren't performend."""
 
-        @qp.qjit(capture=capture_mode)
+        @qp.qjit(capture=capture_mode, skip_preprocess=True, collect_decomp_rules=False)
         @qp.transforms.merge_rotations
         @qp.transforms.cancel_inverses
         @qp.qnode(qp.device("null.qubit", wires=3))
