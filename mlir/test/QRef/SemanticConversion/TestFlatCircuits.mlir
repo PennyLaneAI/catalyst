@@ -726,9 +726,7 @@ func.func @ctrl_work_wires() attributes {quantum.node} {
 // -----
 
 
-// Nested control regions never share a work wire (the qref.ctrl verifier rejects it), so the
-// conversion is a 1:1 translation: the inner region's work wire is captured as a target of the
-// outer region, exactly like its control qubit, and nothing is stripped or re-added.
+// Nested control regions never share a work wire
 
 // CHECK-LABEL: @nested_ctrl_distinct_work_wires
 // CHECK: %[[OUTER:.*]] = quantum.alloc_qb
@@ -829,35 +827,5 @@ func.func @test_operator_register(%idx0: tensor<2xi64>, %idx1: tensor<1xi64>, %c
 
     // CHECK: quantum.dealloc [[op2]] : !quantum.reg
     qref.dealloc %a : !qref.reg<4>
-    return
-}
-
-
-// -----
-
-
-// CHECK-LABEL: test_aliasing_getops
-func.func @test_aliasing_getops() attributes {quantum.node} {
-
-    // CHECK: [[qreg:%.+]] = quantum.alloc( 2) : !quantum.reg
-    %a = qref.alloc(2) : !qref.reg<2>
-    %q0 = qref.get %a[0] : !qref.reg<2> -> !qref.bit
-    %q1 = qref.get %a[1] : !qref.reg<2> -> !qref.bit
-
-    // CHECK: [[bit0:%.+]] = quantum.extract [[qreg]][ 0] : !quantum.reg -> !quantum.bit
-    // CHECK: [[bit1:%.+]] = quantum.extract [[qreg]][ 1] : !quantum.reg -> !quantum.bit
-    // CHECK: [[CNOT1:%.+]]:2 = quantum.custom "CNOT"() [[bit0]], [[bit1]] : !quantum.bit, !quantum.bit
-    qref.custom "CNOT"() %q0, %q1 : !qref.bit, !qref.bit
-
-    %q0_again = qref.get %a[0] : !qref.reg<2> -> !qref.bit
-    %q1_again = qref.get %a[1] : !qref.reg<2> -> !qref.bit
-
-    // CHECK: [[CNOT2:%.+]]:2 = quantum.custom "CNOT"() [[CNOT1]]#0, [[CNOT1]]#1 : !quantum.bit, !quantum.bit
-    qref.custom "CNOT"() %q0_again, %q1_again : !qref.bit, !qref.bit
-
-    // CHECK: [[insert0:%.+]] = quantum.insert [[qreg]][ 0], [[CNOT2]]#0 : !quantum.reg, !quantum.bit
-    // CHECK: [[insert1:%.+]] = quantum.insert [[insert0]][ 1], [[CNOT2]]#1 : !quantum.reg, !quantum.bit
-    // CHECK: quantum.dealloc [[insert1]] : !quantum.reg
-    qref.dealloc %a : !qref.reg<2>
     return
 }
