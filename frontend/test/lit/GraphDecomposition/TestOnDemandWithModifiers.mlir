@@ -1,0 +1,42 @@
+// Copyright 2026 Xanadu Quantum Technologies Inc.
+
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+
+//     http://www.apache.org/licenses/LICENSE-2.0
+
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{gate-set=PhaseShift=1.0,GlobalPhase=1.0})' %s | FileCheck %s --check-prefixes=ALL,CALL
+
+// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{inline-rule-body gate-set=PhaseShift=1.0,GlobalPhase=1.0})' %s | FileCheck %s --check-prefixes=ALL,INLINE
+
+// on-demand loading must be able to handle modifiers when obtaining unresolved 
+// gates in the module, when passing to the solver.
+
+// ALL-LABEL: func.func @circuit
+// ALL-NOT: quantum.pcphase
+// CALL: call @"__builtin__decompose_pcphase_Adjoint(PCPhase){phi:[f64]}{wires:2}{dim = 2 : i64}_0"
+// INLINE: quantum.custom "PhaseShift"
+// INLINE: quantum.gphase
+func.func @circuit(%theta: f64) attributes {quantum.node} {
+    %r = quantum.alloc(2) : !quantum.reg
+    %q0 = quantum.extract %r[0] : !quantum.reg -> !quantum.bit
+    %q1 = quantum.extract %r[1] : !quantum.reg -> !quantum.bit
+    %out:2 = quantum.adjoint(%q0, %q1) : !quantum.bit, !quantum.bit {
+    ^bb0(%arg0: !quantum.bit, %arg1: !quantum.bit):
+      %0:2 = quantum.pcphase(%theta, dim : 2) %arg0, %arg1 : !quantum.bit, !quantum.bit
+      quantum.yield %0#0, %0#1 : !quantum.bit, !quantum.bit
+    }
+    %r0 = quantum.insert %r[0], %out#0 : !quantum.reg, !quantum.bit
+    %r1 = quantum.insert %r0[1], %out#1 : !quantum.reg, !quantum.bit
+    quantum.dealloc %r1 : !quantum.reg
+    return
+}
+
+// ALL: target_gate = "Adjoint(PCPhase){phi:[f64]}{wires:2}{dim = 2 : i64}"

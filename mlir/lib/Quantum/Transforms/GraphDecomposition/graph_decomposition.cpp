@@ -30,6 +30,7 @@
 #include "mlir/Support/LogicalResult.h"
 #include "stablehlo/dialect/StablehloOps.h"
 
+#include "Catalyst/Analysis/ResourceAnalysis.h"
 #include "Driver/Timer.h"
 #include "QRef/Transforms/Passes.h"
 #include "Quantum/Transforms/Passes.h"
@@ -90,6 +91,20 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         std::unique_ptr<DecompositionGraph> graph;
         {
             ScopedDiagnosticTimer prepareTimer("decomp:prepare");
+
+            // Collect op IDs via ResourceAnalysis from the quantum.node entry (flattened).
+            catalyst::ResourceAnalysis analysis(module, {}, /*collectDetailedOperations=*/true);
+            std::vector<std::string> opIDs;
+            if (func::FuncOp qnode = GraphDecompositionPrep::findQNodeFunc(module)) {
+                llvm::StringSet<> visitedFuncs;
+                llvm::StringSet<> qnodeOpIDs;
+                GraphDecompositionPrep::collectOpIDs(analysis, qnode.getName(), visitedFuncs,
+                                                     qnodeOpIDs);
+                for (const auto &opID : qnodeOpIDs) {
+                    opIDs.push_back(opID.getKey().str());
+                }
+            }
+
             GraphDecompositionPrep::PrepOptions opts;
             opts.targetGateSetOption = targetGateSetOption;
             opts.fixedDecompsOption = fixedDecompsOption;
@@ -97,7 +112,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
             opts.bytecodeRulesFile = bytecodeRulesFile;
             opts.libQPDPath = libQPDPath;
             opts.libpythonPath = libpythonPath;
-            graph = GraphDecompositionPrep::prepareGraph(module, opts);
+            graph = GraphDecompositionPrep::prepareGraph(module, opIDs, opts);
         }
         if (!graph) {
             return signalPassFailure();
