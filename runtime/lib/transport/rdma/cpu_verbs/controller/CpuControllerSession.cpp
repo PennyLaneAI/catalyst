@@ -84,7 +84,7 @@ int CpuControllerSession::kick(std::uint32_t /*work_item_idx*/) {
     staged_ = false;
     kick_ns_ = now_ns();
     const bool sig = (next_send_ % SIGNAL_EVERY == 0);
-    post_write(fwd_qp_->get(), next_send_, /*inline_data=*/true, sig);
+    post_frame(fwd_qp_->get(), next_send_, /*inline_data=*/true, sig);
     if (sig) {
         ++signaled_outstanding_;
         reap(fwd_cq_->get(), signaled_outstanding_, /*drain=*/false); // lazy: free the SQ
