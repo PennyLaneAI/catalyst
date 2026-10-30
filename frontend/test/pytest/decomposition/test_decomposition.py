@@ -1950,7 +1950,8 @@ def test_modifiers_in_gateset():
     def circuit():
         qp.ctrl(qp.T(0), (1, 2))
 
-    circuit()
+    results = qp.analyze(circuit, level=1)()
+    assert results.resources.counts["2C(T)"] == 1
 
 
 @pytest.mark.parametrize("reverse", [False, True])
