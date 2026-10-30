@@ -70,6 +70,29 @@ class ScopedDiagnosticTimer {
     std::string name;
 };
 
+/**
+ * @brief Gather the op IDs used by `funcName` into `opIDs`.
+ *
+ * Flattening does not merge loop bodies with a dynamic trip count, which the analysis only records
+ * as `varFunctionCalls`, so those bodies are visited explicitly.
+ */
+void collectOpIDs(const catalyst::ResourceAnalysis &analysis, StringRef funcName,
+                  llvm::StringSet<> &visitedFuncs, llvm::StringSet<> &opIDs) {
+    if (!visitedFuncs.insert(funcName).second) {
+        return;
+    }
+    const catalyst::ResourceResult *flat = analysis.getFlattenedResource(funcName);
+    if (!flat) {
+        return;
+    }
+    for (const auto &entry : flat->detailedOperations) {
+        opIDs.insert(entry.getKey());
+    }
+    for (const auto &entry : flat->varFunctionCalls) {
+        collectOpIDs(analysis, entry.getKey(), visitedFuncs, opIDs);
+    }
+}
+
 } // namespace
 
 namespace catalyst {
@@ -96,9 +119,10 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
             catalyst::ResourceAnalysis analysis(module, {}, /*collectDetailedOperations=*/true);
             std::vector<std::string> opIDs;
             if (func::FuncOp qnode = GraphDecompositionPrep::findQNodeFunc(module)) {
-                const catalyst::ResourceResult *result =
-                    analysis.getFlattenedResource(qnode.getName());
-                for (const auto &opID : result->detailedOperations) {
+                llvm::StringSet<> visitedFuncs;
+                llvm::StringSet<> qnodeOpIDs;
+                collectOpIDs(analysis, qnode.getName(), visitedFuncs, qnodeOpIDs);
+                for (const auto &opID : qnodeOpIDs) {
                     opIDs.push_back(opID.getKey().str());
                 }
             }
