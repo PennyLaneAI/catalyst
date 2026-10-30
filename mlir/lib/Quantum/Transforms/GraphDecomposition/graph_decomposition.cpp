@@ -647,37 +647,13 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
      * carries any name-wrapped op-level modifiers produced by `defaultGetGraphOpId`, e.g.
      * "C(Adjoint(RX)){0:[f64]}{wires:1}{}".
      */
-    OperatorNode parseOperator(llvm::StringRef raw) {
+    OperatorNode parseOperator(llvm::StringRef id) {
         OperatorNode node;
 
-        // Base op: either the graphOpId "Name{...}..." form or the legacy "Name(w,p)" form.
-        if (raw.contains('[') || raw.contains('{')) {
-            node.id = raw.str();
-            node.name = raw.take_until([](char c) { return c == '[' || c == '{'; });
-        } else {
-            auto openIdx = raw.find('(');
-            if (openIdx == llvm::StringRef::npos) {
-                node.name = raw.trim().str();
-                return node;
-            }
-            node.name = raw.take_front(openIdx).trim().str();
-            raw = raw.drop_front(openIdx); // leftover: "(w,p)" or "(w)"
-        }
-
-        // Parse "(w,p)" (new) or "(w)" (legacy) suffix.
-        if (raw.consume_front("(") && raw.consume_back(")")) {
-            llvm::StringRef wStr, pStr;
-            std::tie(wStr, pStr) = raw.split(',');
-            int w = -1, p = -1;
-            if (!wStr.getAsInteger(10, w)) {
-                node.numWires = w;
-            }
-            if (!pStr.empty() && !pStr.getAsInteger(10, p)) {
-                node.numParams = p;
-            }
-            // If pStr is empty we were given the legacy "(w)" format; leave
-            // numParams at the wildcard default so old bytecode keeps working.
-        }
+        node.id = id.str();
+        node.name = id.take_until([](char c) {
+                          return c == '[' || c == '{';
+                      }).drop_until([](char c) { return !llvm::isDigit(c); });
 
         return node;
     }
