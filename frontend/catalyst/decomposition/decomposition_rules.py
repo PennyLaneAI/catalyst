@@ -223,16 +223,6 @@ def ordered_kwarg_names(call_kwargs, dynamic_shape) -> list:
     return params + wires
 
 
-@dataclass
-class HybridArgSpec:
-    """Rebuild a hybrid pytree from parameter operands and its grouped wire slice."""
-
-    name: str
-    tree: object
-    leaves: tuple
-    operand_indices: tuple
-
-
 def _is_wire_leaf(value):
     return isinstance(value, (Wires, qp.typing.AbstractWires))
 
@@ -254,32 +244,23 @@ def flatten_hybrid_args(extra_data) -> tuple:
         )
         forward_mask = []
         for node in nodes:
-            if isinstance(node, Operator2):
-                nested, _ = qp.pytrees.flatten(node, is_leaf=_is_wire_leaf)
-                forward_mask.extend([True] * len(nested))
-            else:
-                forward_mask.append(False)
+            nested, _ = qp.pytrees.flatten(node, is_leaf=_is_wire_leaf)
+            forward_mask.extend([isinstance(node, Operator2)] * len(nested))
 
         sources = []
         for leaf, is_forward in zip(leaves, forward_mask, strict=True):
             if isinstance(leaf, numeric_types):
+                sources.append(is_forward)
                 bucket = forwarded if is_forward else params
-                sources.append((is_forward, len(bucket)))
                 bucket.append(jnp.zeros(leaf.shape, dtype=leaf.dtype))
             else:
                 sources.append(None)
 
         if any(source is not None for source in sources) or any(map(_is_wire_leaf, leaves)):
-            specs.append(HybridArgSpec(name, tree, tuple(leaves), tuple(sources)))
+            specs.append((name, tree, leaves, sources))
         else:
             closed_over[name] = value
 
-    # qref.operator passes all parameters before its forwarded arguments.
-    for spec in specs:
-        spec.operand_indices = tuple(
-            None if source is None else source[1] + (len(params) if source[0] else 0)
-            for source in spec.operand_indices
-        )
     return specs, params + forwarded, closed_over
 
 
@@ -349,8 +330,9 @@ def unpack_rule_operands(
         kwarg_names (list[str]): parameter names first, followed by wire names
         wire_lens (dict[str, int]): wire names in operand order and their lengths
         has_ctrl_wires (bool): whether a trailing control-wire operand is present
-        hybrid_specs (list[HybridArgSpec]): reconstruction plans for the hybrid operands
-            between the parameter kwargs and the grouped wire operand
+        hybrid_specs (list[tuple]): ``(name, tree, leaves, sources)`` reconstruction plans;
+            each source is False for a parameter, True for a forwarded parameter, or None
+            for a wire or static leaf
 
     Returns:
         tuple: the rule's positional arguments
@@ -362,10 +344,11 @@ def unpack_rule_operands(
     n_kwarg_params = len(param_names)
     named = dict(zip(param_names, operands[n_params : n_params + n_kwarg_params], strict=True))
     idx = n_params + n_kwarg_params
-    num_hybrid_operands = sum(
-        index is not None for spec in hybrid_specs for index in spec.operand_indices
-    )
-    hybrid_operands = operands[idx : idx + num_hybrid_operands]
+    operand_sources = [source for _, _, _, sources in hybrid_specs for source in sources]
+    num_hybrid_params = operand_sources.count(False)
+    num_hybrid_operands = sum(source is not None for source in operand_sources)
+    hybrid_params = iter(operands[idx : idx + num_hybrid_params])
+    forwarded = iter(operands[idx + num_hybrid_params : idx + num_hybrid_operands])
     idx += num_hybrid_operands
 
     grouped_wires = operands[idx]
@@ -375,21 +358,21 @@ def unpack_rule_operands(
         named[name] = grouped_wires[offset : offset + length]
         offset += length
 
-    for spec in hybrid_specs:
+    for name, tree, original_leaves, sources in hybrid_specs:
         wire_offset = 0
         leaves = []
-        for leaf, operand_index in zip(spec.leaves, spec.operand_indices, strict=True):
-            if operand_index is not None:
-                leaves.append(hybrid_operands[operand_index])
+        for leaf, source in zip(original_leaves, sources, strict=True):
+            if source is not None:
+                leaves.append(next(forwarded if source else hybrid_params))
             elif _is_wire_leaf(leaf):
-                wire_slice = named[spec.name][wire_offset : wire_offset + len(leaf)]
+                wire_slice = named[name][wire_offset : wire_offset + len(leaf)]
                 leaves.append(Wires(wire_slice))
                 wire_offset += len(leaf)
             else:
                 leaves.append(leaf)
         # Rebuilding an operator is not an instruction to apply it to the circuit.
         with qp.capture.pause():
-            named[spec.name] = qp.pytrees.unflatten(leaves, spec.tree)
+            named[name] = qp.pytrees.unflatten(leaves, tree)
 
     ctrl_wires = operands[idx] if has_ctrl_wires else None
     ctrl_values = operands[idx + 1] if has_ctrl_wires and len(operands) > idx + 1 else None
