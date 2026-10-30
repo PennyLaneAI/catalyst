@@ -948,6 +948,9 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* Decomposition rules now reconstruct nested operators from their input parameters and wires.
+  This fixes symbolic wire placeholders when compiling GQSP with a nonzero polynomial degree.
+
 * The `--convert-to-value-semantics` pass now correctly handles aliasing qubit references that are
   used by multiple regions and/or operand lists on the same operation.
   [(#3404)](https://github.com/PennyLaneAI/catalyst/pull/3404)
