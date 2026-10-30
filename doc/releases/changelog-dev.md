@@ -1111,11 +1111,6 @@
 
 <h3>Internal changes ⚙️</h3>
 
-* The runtime test suite can test `lightning.cliffish`, a device built in pennylane-lightning,
-  through the runtime C-API. Pass the path of its library to
-  `make -C runtime test LIGHTNING_CLIFFISH_LIB=<path>`; without it, nothing changes.
-  [(#XXXX)](https://github.com/PennyLaneAI/catalyst/pull/XXXX)
-
 * The `method` attribute of the Gradient dialect operations (`grad`, `value_and_grad`, `jvp`,
   `vjp`) is now an enum attribute (`#gradient<diff_method auto>`) instead of a string attribute.
   [(#3318)](https://github.com/PennyLaneAI/catalyst/pull/3318)
