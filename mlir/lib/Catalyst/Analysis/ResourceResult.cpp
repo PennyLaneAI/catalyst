@@ -138,8 +138,8 @@ void ResourceResult::multiplyBy(double scalar) {
 //   quantum_operations: { "wires": { "op_name": count, ... }, ... }  // optional
 //   function_calls: { static: { "fxn": count, ... }, dynamic: { "fxn": id, ... } }
 //   measurement_processes: { "meas_type": count, ... }
-//   extended_fields: { "extension": { "display name": name, "metric": value, ... }, ... }
-//   (e.g. for pbc_depth {"display name": "pbc_depth", "qubit disjoint depth": 5.0})
+//   extended_fields: { "<extension>": { "metric": value, ... }, ... }
+//   (e.g. pbc_depth: { any_commuting_depth, qubit_disjoint_depth })
 static llvm::json::Value countToJson(double count) {
     double rounded = std::round(count);
     if (std::abs(count - rounded) < 1e-9) {
