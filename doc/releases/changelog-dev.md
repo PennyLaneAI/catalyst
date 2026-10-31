@@ -951,6 +951,11 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* The `ppr-to-ppm` pass now supports PPRotation operations inside `quantum.adjoint` regions by
+  invoking `adjoint-lowering` before converting the reversed rotations to Pauli product
+  measurements.
+  [(#2934)](https://github.com/PennyLaneAI/catalyst/pull/2934)
+
 * The `--convert-to-value-semantics` pass now correctly handles aliasing qubit references that are
   used by multiple regions and/or operand lists on the same operation.
   [(#3404)](https://github.com/PennyLaneAI/catalyst/pull/3404)

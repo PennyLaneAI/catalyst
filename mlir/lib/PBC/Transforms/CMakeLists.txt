@@ -37,6 +37,7 @@ set(LIBS
     MLIRPBC
     PBCUtils
     PBCAnalysis
+    quantum-transforms
 )
 
 set(DEPENDS
