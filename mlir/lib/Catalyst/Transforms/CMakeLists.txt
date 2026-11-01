@@ -50,6 +50,7 @@ set(LIBS
     ${conversion_libs}
     ${translation_libs}
     catalyst-analysis
+    PBCAnalysis
 )
 
 set(DEPENDS

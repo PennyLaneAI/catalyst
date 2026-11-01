@@ -298,13 +298,13 @@ set(TARGETS_TO_REMOVE
     tomlplusplus_tomlplusplus
     ion-transforms
     CatalystCompilerDriver
-    PBCUtils
     QuantumCAPI
     pbc-transforms
     quantum-transforms  # depends on decompsolver; exclude
     decompsolver        # its public include dir is a source-tree path; exclude
     )
 list(REMOVE_ITEM CATALYST_INSTALL_TARGETS ${TARGETS_TO_REMOVE})
+list(APPEND CATALYST_INSTALL_TARGETS PBCAnalysis PBCUtils libstim)
 
 # Static archives, shared libs, and any runtime artifacts from the dialects,
 # transforms and utils. INCLUDES DESTINATION records the include path in the
