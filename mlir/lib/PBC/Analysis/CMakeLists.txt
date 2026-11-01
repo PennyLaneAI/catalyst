@@ -7,9 +7,8 @@ set(SRC
 add_library(${LIBRARY_NAME} STATIC ${SRC})
 target_compile_features(${LIBRARY_NAME} PUBLIC cxx_std_20)
 target_include_directories(${LIBRARY_NAME} PUBLIC
-    $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
-    $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/include>
-    $<INSTALL_INTERFACE:include>)
+                           ${PROJECT_SOURCE_DIR}/include
+                           ${CMAKE_BINARY_DIR}/include)
 
 # PBCUtils: PBCLayer depth computation.
 # catalyst-analysis: ResourceAnalysisRegistry for self-registration.

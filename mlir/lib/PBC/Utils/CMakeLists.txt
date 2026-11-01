@@ -20,10 +20,6 @@ endblock()
 # Ignore all warnings from Stim library sources.
 target_compile_options(libstim PRIVATE -w)
 
-# Stim headers are only needed when building the PBC utilities.
-set_property(TARGET libstim PROPERTY INTERFACE_INCLUDE_DIRECTORIES
-    "$<BUILD_INTERFACE:${stim_SOURCE_DIR}/src>")
-
 add_library(PBCUtils STATIC
     PauliStringWrapper.cpp
     PBCLayer.cpp

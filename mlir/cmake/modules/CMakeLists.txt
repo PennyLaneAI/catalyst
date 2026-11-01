@@ -24,12 +24,10 @@ set(catalyst_cmake_builddir "${CMAKE_BINARY_DIR}/${CATALYST_INSTALL_PACKAGE_DIR}
 set(LLVM_INSTALL_PACKAGE_DIR lib${LLVM_LIBDIR_SUFFIX}/cmake/llvm)
 set(llvm_cmake_builddir "${LLVM_BINARY_DIR}/${LLVM_INSTALL_PACKAGE_DIR}")
 
-# Exclude unrelated targets with unbundled third-party dependencies.
+# Targets with third party dependencies are not exported.
 get_property(MLIR_EXPORTS GLOBAL PROPERTY MLIR_EXPORTS)
-set(TARGETS_TO_REMOVE nlohmann_json tomlplusplus_tomlplusplus ion-transforms CatalystCompilerDriver QuantumCAPI pbc-transforms)
+set(TARGETS_TO_REMOVE nlohmann_json tomlplusplus_tomlplusplus ion-transforms CatalystCompilerDriver PBCUtils PBCAnalysis QuantumCAPI pbc-transforms)
 list(REMOVE_ITEM MLIR_EXPORTS ${TARGETS_TO_REMOVE})
-# External tools need the resource pass's built-in PBC extension and its dependencies.
-list(APPEND MLIR_EXPORTS PBCAnalysis PBCUtils libstim)
 export(TARGETS ${MLIR_EXPORTS} FILE ${catalyst_cmake_builddir}/CatalystTargets.cmake)
 
 # Generate MlirConfig.cmake for the build tree.
