@@ -955,6 +955,8 @@
   accounting for parallel operations and synthesis loops on independent qubits. This
   inclusive estimate preserves dependencies through measurements, register updates, and
   function calls, while retaining the existing local depth fields for compatibility.
+  It follows constant wire tensors through helpers, reuses compatible call summaries,
+  and handles lowered magic-state preparations without adding spurious PBC layers.
   [(#3426)](https://github.com/PennyLaneAI/catalyst/pull/3426)
 
 * The `--convert-to-value-semantics` pass now correctly handles aliasing qubit references that are

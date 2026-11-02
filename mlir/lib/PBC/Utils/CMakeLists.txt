@@ -23,6 +23,7 @@ target_compile_options(libstim PRIVATE -w)
 add_library(PBCUtils STATIC
     PauliStringWrapper.cpp
     PBCDepth.cpp
+    PBCWireIndex.cpp
     PBCLayer.cpp
     PBCOpUtils.cpp
 )

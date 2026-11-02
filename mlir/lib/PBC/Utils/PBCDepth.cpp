@@ -17,21 +17,26 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <map>
 #include <utility>
+#include <variant>
+#include <vector>
 
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/SmallVector.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
-#include "mlir/IR/Matchers.h"
 #include "mlir/IR/SymbolTable.h"
+#include "mlir/Interfaces/CallInterfaces.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
 
 #include "Catalyst/Analysis/ResourceInterfaces.h"
 #include "Catalyst/Utils/SCFUtils.h"
 #include "PBC/IR/PBCOpInterfaces.h"
 #include "PBC/IR/PBCOps.h"
+#include "PBC/Utils/PBCWireIndex.h"
 #include "Quantum/IR/QuantumOps.h"
 
 using namespace mlir;
@@ -41,49 +46,137 @@ namespace {
 
 bool isQuantum(Type type) { return isa<quantum::QubitType, quantum::QuregType>(type); }
 
-std::optional<int64_t> constantIndex(std::optional<int64_t> attr, Value value) {
-    if (attr) {
-        return attr;
+bool isQuantumOperation(Operation *op) {
+    return llvm::any_of(op->getOperandTypes(), isQuantum) ||
+           llvm::any_of(op->getResultTypes(), isQuantum) ||
+           (op->getDialect() && (op->getDialect()->getNamespace() == "quantum" ||
+                                 op->getDialect()->getNamespace() == "pbc" ||
+                                 op->getDialect()->getNamespace() == "qref" ||
+                                 op->getDialect()->getNamespace() == "mbqc"));
+}
+
+// LowerPBCInitOps represents prepare/fabricate as fresh allocations followed by
+// these gates. They retain the zero PBC-layer cost of the original initialization.
+// Do not extend this exemption to gates acting on computational qubits.
+bool isPBCInitializationGate(quantum::CustomOp gate) {
+    auto isSingleQubit = [](quantum::CustomOp op) {
+        return op.getInQubits().size() == 1 && op.getOutQubits().size() == 1 &&
+               op.getInCtrlQubits().empty() && op.getParams().empty() &&
+               op.getInQubits().front().hasOneUse();
+    };
+    if (!isSingleQubit(gate)) {
+        return false;
     }
-    llvm::APInt index;
-    if (value && matchPattern(value, m_ConstantInt(&index)) && index.isSignedIntN(64)) {
-        return index.getSExtValue();
+    Value input = gate.getInQubits().front();
+    StringRef name = gate.getGateName();
+    if (input.getDefiningOp<quantum::AllocQubitOp>()) {
+        return !gate.getAdjoint() && (name == "Hadamard" || name == "PauliX");
     }
-    return std::nullopt;
+    auto hadamard = input.getDefiningOp<quantum::CustomOp>();
+    if (!hadamard || !isSingleQubit(hadamard) || hadamard.getGateName() != "Hadamard" ||
+        hadamard.getAdjoint() ||
+        !hadamard.getInQubits().front().getDefiningOp<quantum::AllocQubitOp>()) {
+        return false;
+    }
+    return name == "S" || name == "T" || (name == "PauliZ" && !gate.getAdjoint());
 }
 
 struct Register {
     Value root;
     llvm::DenseMap<int64_t, unsigned> slots;
+    std::optional<int64_t> size;
 };
 
-struct Context {
-    // Call DAGs can expand exponentially. This optional estimate must not make
-    // resource analysis unbounded; exceeding either limit omits the total.
-    static constexpr unsigned maxOperations = 100000;
-    static constexpr unsigned maxCallDepth = 256;
-    unsigned operations = 0;
-    unsigned nextQubit = 0;
-    llvm::DenseMap<std::pair<Value, int64_t>, unsigned> registerQubits;
-    llvm::DenseSet<Operation *> activeCalls;
+struct Qubit {
+    // A dynamic extraction may refer to any slot in a fixed-size register.
+    // Keep the slot order so that insertion can detect register permutations.
+    llvm::SmallVector<unsigned, 1> aliases;
+    Value registerRoot;
+    Value index;
 };
 
-// Qubit identity is distinct from SSA identity: insert/extract and region boundaries
-// must not turn successive versions of the same physical qubit into parallel wires.
-class Schedule {
-    Context &context;
-    llvm::DenseMap<Value, unsigned> qubits;
-    llvm::DenseMap<Value, Register> registers;
-    llvm::DenseMap<Value, double> classical;
-    llvm::DenseMap<unsigned, double> clocks;
+struct Footprint {
     llvm::DenseSet<unsigned> touched;
     double memoryClock = 0;
     bool accessesMemory = false;
     double depth = 0;
     bool hasPBC = false;
+};
 
-    unsigned qubit(Value value) {
-        auto [it, inserted] = qubits.try_emplace(value, context.nextQubit);
+struct CallOutput {
+    std::variant<std::monostate, Qubit, Register> identity;
+    Attribute constant;
+};
+
+struct CallSummary : Footprint {
+    llvm::SmallVector<CallOutput> outputs;
+};
+
+using CallKey = std::vector<uintptr_t>;
+
+struct Context {
+    // Call DAGs can expand exponentially. This optional estimate must not make
+    // resource analysis unbounded; exceeding these limits omits the total.
+    // Application workflows can exceed 100000 distinct visits even with caching.
+    static constexpr unsigned maxOperations = 1000000;
+    static constexpr unsigned maxCallDepth = 256;
+    static constexpr unsigned maxRegisterSize = 100000;
+    unsigned operations = 0;
+    unsigned nextQubit = 0;
+    llvm::DenseMap<std::pair<Value, int64_t>, unsigned> registerQubits;
+    llvm::DenseSet<Operation *> activeCalls;
+    std::map<CallKey, CallSummary> calls;
+    llvm::DenseMap<Operation *, bool> classicalFunctions;
+    llvm::DenseSet<Operation *> activeClassicalCalls;
+};
+
+bool isClassicalRegion(Operation &op, Context &context) {
+    return !op.walk([&](Operation *nested) {
+                  if (++context.operations > Context::maxOperations || isQuantumOperation(nested)) {
+                      return WalkResult::interrupt();
+                  }
+                  if (!isa<CallOpInterface>(nested)) {
+                      return WalkResult::advance();
+                  }
+                  auto call = dyn_cast<func::CallOp>(nested);
+                  auto callee = call ? SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(
+                                           call, call.getCalleeAttr())
+                                     : func::FuncOp{};
+                  if (!callee || callee.isDeclaration()) {
+                      return WalkResult::interrupt();
+                  }
+                  if (auto it = context.classicalFunctions.find(callee);
+                      it != context.classicalFunctions.end()) {
+                      return it->second ? WalkResult::advance() : WalkResult::interrupt();
+                  }
+                  if (context.activeClassicalCalls.size() >= Context::maxCallDepth ||
+                      !context.activeClassicalCalls.insert(callee).second) {
+                      return WalkResult::interrupt();
+                  }
+                  bool classical = isClassicalRegion(*callee, context);
+                  context.activeClassicalCalls.erase(callee);
+                  context.classicalFunctions[callee] = classical;
+                  return classical ? WalkResult::advance() : WalkResult::interrupt();
+              }).wasInterrupted();
+}
+
+// Qubit identity is distinct from SSA identity: insert/extract and region boundaries
+// must not turn successive versions of the same physical qubit into parallel wires.
+class Schedule : Footprint {
+    Context &context;
+    llvm::DenseMap<Value, Qubit> qubits;
+    llvm::DenseMap<Value, Register> registers;
+    llvm::DenseMap<Value, double> classical;
+    llvm::DenseMap<unsigned, double> clocks;
+    WireIndexResolver wireIndices;
+
+    std::optional<int64_t> index(std::optional<int64_t> attr, Value value) const {
+        return attr ? attr : wireIndices.resolveIndex(value);
+    }
+
+    const Qubit &qubit(Value value) {
+        auto [it, inserted] =
+            qubits.try_emplace(value, Qubit{{context.nextQubit}, Value{}, Value{}});
         if (inserted) {
             ++context.nextQubit;
         }
@@ -91,7 +184,8 @@ class Schedule {
     }
 
     Register &reg(Value value) {
-        return registers.try_emplace(value, Register{value, llvm::DenseMap<int64_t, unsigned>{}})
+        return registers
+            .try_emplace(value, Register{value, llvm::DenseMap<int64_t, unsigned>{}, std::nullopt})
             .first->second;
     }
 
@@ -107,11 +201,26 @@ class Schedule {
         return it->second;
     }
 
+    std::optional<llvm::SmallVector<unsigned, 1>> allSlots(Register &value) {
+        if (!value.size || *value.size <= 0 || *value.size > Context::maxRegisterSize) {
+            return std::nullopt;
+        }
+        llvm::SmallVector<unsigned, 1> result;
+        result.reserve(*value.size);
+        for (int64_t index = 0; index < *value.size; ++index) {
+            result.push_back(slot(value, index));
+        }
+        return result;
+    }
+
     double time(Value value) {
         if (isa<quantum::QubitType>(value.getType())) {
-            unsigned id = qubit(value);
-            touched.insert(id);
-            return clocks.lookup(id);
+            double result = 0;
+            for (unsigned id : qubit(value).aliases) {
+                touched.insert(id);
+                result = std::max(result, clocks.lookup(id));
+            }
+            return result;
         }
         if (isa<quantum::QuregType>(value.getType())) {
             Register &valueReg = reg(value);
@@ -146,23 +255,31 @@ class Schedule {
         Schedule result(context);
         result.qubits = qubits;
         result.registers = registers;
+        result.wireIndices = wireIndices;
         return result;
     }
 
-    void bind(Value target, Value source, Schedule &from) {
+    void bind(Value target, Value source, Schedule &from, bool bindConstants = true) {
         if (isa<quantum::QubitType>(target.getType())) {
-            qubits[target] = from.qubit(source);
+            Qubit value = from.qubit(source);
+            qubits[target] = std::move(value);
         } else if (isa<quantum::QuregType>(target.getType())) {
             // Source and destination can share this map (e.g. a zero-trip loop).
             // Copy before insertion, which may invalidate references on rehash.
             Register value = from.reg(source);
             registers[target] = std::move(value);
+        } else if (bindConstants) {
+            wireIndices.bind(target, source, from.wireIndices);
+        } else {
+            wireIndices.bindConstant(target, {});
         }
     }
 
     bool sameIdentity(Value left, Schedule &other, Value right) {
         if (isa<quantum::QubitType>(left.getType())) {
-            return qubit(left) == other.qubit(right);
+            Qubit a = qubit(left);
+            const Qubit &b = other.qubit(right);
+            return a.aliases == b.aliases && a.registerRoot == b.registerRoot && a.index == b.index;
         }
         if (isa<quantum::QuregType>(left.getType())) {
             Register &a = reg(left);
@@ -198,7 +315,7 @@ class Schedule {
         return result;
     }
 
-    double place(Schedule &body, double dependency, double count = 1) {
+    double place(const Footprint &body, double dependency, double count = 1) {
         double start = dependency;
         for (unsigned id : body.touched) {
             start = std::max(start, clocks.lookup(id));
@@ -238,7 +355,8 @@ class Schedule {
         }
         Schedule body = child();
         for (auto [arg, input] : llvm::zip(op.getRegionIterArgs(), op.getInitArgs())) {
-            body.bind(arg, input, *this);
+            // A loop-carried classical value may change after the first iteration.
+            body.bind(arg, input, *this, false);
         }
         if (!body.run(op.getBody())) {
             return false;
@@ -276,7 +394,8 @@ class Schedule {
                 if (!first && !sameIdentity(result, branch, output)) {
                     return false;
                 }
-                bind(result, output, branch);
+                // A result need not have the same constant value in both branches.
+                bind(result, output, branch, false);
             }
             combined.depth = std::max(combined.depth, branch.depth);
             combined.memoryClock = std::max(combined.memoryClock, branch.memoryClock);
@@ -290,6 +409,70 @@ class Schedule {
             classical[result] = end;
         }
         return true;
+    }
+
+    Attribute callConstant(Value value) const { return wireIndices.resolveConstant(value); }
+
+    CallKey callKey(func::CallOp op, func::FuncOp callee) {
+        CallKey key{reinterpret_cast<uintptr_t>(callee.getOperation())};
+        for (Value input : op.getOperands()) {
+            if (isa<quantum::QubitType>(input.getType())) {
+                const Qubit &value = qubit(input);
+                key.push_back(value.aliases.size());
+                key.insert(key.end(), value.aliases.begin(), value.aliases.end());
+                key.push_back(reinterpret_cast<uintptr_t>(value.registerRoot.getAsOpaquePointer()));
+                key.push_back(reinterpret_cast<uintptr_t>(value.index.getAsOpaquePointer()));
+            } else if (isa<quantum::QuregType>(input.getType())) {
+                const Register &value = reg(input);
+                key.push_back(reinterpret_cast<uintptr_t>(value.root.getAsOpaquePointer()));
+                key.push_back(value.size.has_value());
+                key.push_back(value.size.value_or(0));
+                llvm::SmallVector<std::pair<int64_t, unsigned>> slots(value.slots.begin(),
+                                                                      value.slots.end());
+                llvm::sort(slots);
+                key.push_back(slots.size());
+                for (auto [index, id] : slots) {
+                    key.push_back(index);
+                    key.push_back(id);
+                }
+            } else {
+                // Attributes are uniqued in the MLIR context. Unknown arguments
+                // retain the conservative branch and alias behavior of the analysis.
+                key.push_back(
+                    reinterpret_cast<uintptr_t>(callConstant(input).getAsOpaquePointer()));
+            }
+        }
+        return key;
+    }
+
+    CallSummary summarize(ValueRange outputs) {
+        CallSummary summary;
+        static_cast<Footprint &>(summary) = *this;
+        for (Value output : outputs) {
+            CallOutput result;
+            if (isa<quantum::QubitType>(output.getType())) {
+                result.identity = qubit(output);
+            } else if (isa<quantum::QuregType>(output.getType())) {
+                result.identity = reg(output);
+            } else {
+                result.constant = callConstant(output);
+            }
+            summary.outputs.push_back(std::move(result));
+        }
+        return summary;
+    }
+
+    void bindCallOutputs(ValueRange results, const CallSummary &summary, double end) {
+        for (auto [result, output] : llvm::zip(results, summary.outputs)) {
+            if (const auto *value = std::get_if<Qubit>(&output.identity)) {
+                qubits[result] = *value;
+            } else if (const auto *value = std::get_if<Register>(&output.identity)) {
+                registers[result] = *value;
+            } else {
+                wireIndices.bindConstant(result, output.constant);
+            }
+            classical[result] = end;
+        }
     }
 
     bool call(func::CallOp op) {
@@ -309,6 +492,13 @@ class Schedule {
             !context.activeCalls.insert(callee).second) {
             return false;
         }
+        CallKey key = callKey(op, callee);
+        if (auto it = context.calls.find(key); it != context.calls.end()) {
+            context.activeCalls.erase(callee);
+            double end = place(it->second, dependencies(*op));
+            bindCallOutputs(op.getResults(), it->second, end);
+            return true;
+        }
         Schedule body = child();
         for (auto [arg, input] : llvm::zip(callee.getArguments(), op.getOperands())) {
             body.bind(arg, input, *this);
@@ -318,17 +508,17 @@ class Schedule {
         if (!supported) {
             return false;
         }
-        double end = place(body, dependencies(*op));
         auto outputs = callee.getBody().front().getTerminator()->getOperands();
-        for (auto [result, output] : llvm::zip(op.getResults(), outputs)) {
-            bind(result, output, body);
-            classical[result] = end;
-        }
+        // Reusing internal ancilla identities reserves them across calls. This
+        // may overestimate depth but cannot introduce unsupported parallelism.
+        auto [it, inserted] = context.calls.emplace(std::move(key), body.summarize(outputs));
+        double end = place(it->second, dependencies(*op));
+        bindCallOutputs(op.getResults(), it->second, end);
         return true;
     }
 
     bool plain(Operation &op) {
-        double ready = operandTime(op.getOperands());
+        double ready = std::max(operandTime(op.getOperands()), dependencies(op));
         if (!isMemoryEffectFree(&op)) {
             accessesMemory = true;
             memoryClock = std::max(memoryClock, ready);
@@ -357,20 +547,48 @@ class Schedule {
             return call(callOp);
         }
         if (auto extract = dyn_cast<quantum::ExtractOp>(op)) {
-            auto index = constantIndex(extract.getIdxAttr(), extract.getIdx());
-            if (!index) {
+            auto index = this->index(extract.getIdxAttr(), extract.getIdx());
+            Register &value = reg(extract.getQreg());
+            if (index) {
+                if (*index < 0 || (value.size && *index >= *value.size)) {
+                    return false;
+                }
+                qubits[extract.getQubit()] = Qubit{{slot(value, *index)}, Value{}, Value{}};
+                return true;
+            }
+            auto aliases = allSlots(value);
+            if (!aliases) {
                 return false;
             }
-            qubits[extract.getQubit()] = slot(reg(extract.getQreg()), *index);
+            // The selected qubit is unavailable until the dynamic index is ready.
+            // Reserving every possible slot is conservative, including across calls.
+            double ready = time(extract.getIdx());
+            for (unsigned id : *aliases) {
+                clocks[id] = std::max(clocks.lookup(id), ready);
+                touched.insert(id);
+            }
+            qubits[extract.getQubit()] = Qubit{std::move(*aliases), value.root, extract.getIdx()};
             return true;
         }
         if (auto insert = dyn_cast<quantum::InsertOp>(op)) {
-            auto index = constantIndex(insert.getIdxAttr(), insert.getIdx());
-            if (!index) {
-                return false;
-            }
+            auto index = this->index(insert.getIdxAttr(), insert.getIdx());
             Register value = reg(insert.getInQreg());
-            value.slots[*index] = qubit(insert.getQubit());
+            const Qubit &input = qubit(insert.getQubit());
+            if (index) {
+                if (*index < 0 || (value.size && *index >= *value.size) ||
+                    input.aliases.size() != 1) {
+                    return false;
+                }
+                value.slots[*index] = input.aliases.front();
+            } else {
+                // Only a matching extract/insert pair preserves every slot's
+                // physical identity. A different index or replacement is unresolved.
+                auto aliases = allSlots(value);
+                if (!aliases || input.registerRoot != value.root ||
+                    input.index != insert.getIdx() || input.aliases != *aliases) {
+                    return false;
+                }
+            }
             registers[insert.getOutQreg()] = std::move(value);
             return true;
         }
@@ -384,9 +602,19 @@ class Schedule {
                 if (isa<quantum::QubitType>(result.getType())) {
                     qubit(result);
                 } else {
-                    reg(result);
+                    Register &value = reg(result);
+                    if (auto alloc = dyn_cast<quantum::AllocOp>(op)) {
+                        value.size = index(alloc.getNqubitsAttr(), alloc.getNqubits());
+                    }
                 }
             }
+            return true;
+        }
+        if (auto gate = dyn_cast<quantum::CustomOp>(op)) {
+            if (!isPBCInitializationGate(gate)) {
+                return false;
+            }
+            bind(gate.getOutQubits().front(), gate.getInQubits().front(), *this);
             return true;
         }
         ValueRange inputs, outputs;
@@ -400,9 +628,11 @@ class Schedule {
         if (!inputs.empty()) {
             double end = operandTime(op.getOperands()) + 1;
             for (auto [input, output] : llvm::zip(inputs, outputs)) {
-                unsigned id = qubit(input);
-                qubits[output] = id;
-                clocks[id] = end;
+                Qubit value = qubit(input);
+                for (unsigned id : value.aliases) {
+                    clocks[id] = end;
+                }
+                qubits[output] = std::move(value);
             }
             for (Value result : op.getResults()) {
                 classical[result] = end;
@@ -412,6 +642,15 @@ class Schedule {
             return true;
         }
         if (op.getNumRegions() != 0) {
+            // Classical reductions/scatters can contain regions. Their results
+            // wait for operands and captures, but add no quantum layers. Reject
+            // nested quantum work and unresolved calls instead of discarding it.
+            return isClassicalRegion(op, context) && plain(op);
+        }
+        if (auto device = dyn_cast<quantum::DeviceInitOp>(op);
+            device && device.getAutoQubitManagement()) {
+            // Automatic management can grow a register after allocation. Its
+            // initial size does not bound the aliases of a dynamic extraction.
             return false;
         }
         // These operations contribute no PBC layers. Terminal measurement results

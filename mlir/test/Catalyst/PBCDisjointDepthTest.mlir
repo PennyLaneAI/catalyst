@@ -288,13 +288,13 @@ func.func @unknown_iteration_count(%q0: !quantum.bit, %n: index) {
 
 // -----
 
-// Unknown register slots could alias, so no total is claimed.
+// An unknown register size prevents enumerating the possible aliases.
 // CHECK-LABEL: "unknown_register_index": {
 // CHECK: "qubit_disjoint_depth": 1
 // CHECK-NOT: "qubit_disjoint_depth_total"
 // CHECK: "num_qubits"
-func.func @unknown_register_index(%index: i64) {
-    %reg = quantum.alloc(2) : !quantum.reg
+func.func @unknown_register_index(%index: i64, %size: i64) {
+    %reg = quantum.alloc(%size) : !quantum.reg
     %q = quantum.extract %reg[%index] : !quantum.reg -> !quantum.bit
     %out = pbc.ppr ["X"](8) %q : !quantum.bit
     %rout = quantum.insert %reg[%index], %out : !quantum.reg, !quantum.bit
@@ -385,12 +385,10 @@ func.func @unsupported_quantum_operation(%q0: !quantum.bit) {
 
 // -----
 
-// A compact call DAG represents exponentially many operations. Exhausting the
-// traversal budget omits the total instead of making resource analysis expand
-// the entire circuit.
+// A compact call DAG represents exponentially many operations. Reuse summaries
+// instead of expanding all 131072 rotations or exhausting the traversal budget.
 // CHECK-LABEL: "bounded_call_dag": {
-// CHECK-NOT: "qubit_disjoint_depth_total"
-// CHECK: "num_qubits"
+// CHECK: "qubit_disjoint_depth_total": 131072
 func.func @bounded_call_dag(%q: !quantum.bit) -> !quantum.bit {
     %a = func.call @repeat_16(%q) : (!quantum.bit) -> !quantum.bit
     %b = func.call @repeat_16(%a) : (!quantum.bit) -> !quantum.bit
