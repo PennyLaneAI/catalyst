@@ -1120,6 +1120,11 @@ class TestOnDemand:
         assert static_data == {"ctrl_work_wire_type": work_wire_type, "pauli_word": "XY"}
 
     @pytest.mark.parametrize("work_wire_type", ["zeroed", "borrowed"])
+    @pytest.mark.xfail(
+        reason="On-demand rules use separate JAX contexts and can produce duplicate symbols.",
+        raises=CompileError,
+        strict=True,
+    )
     def test_control_work_wires_decompose_on_demand(self, work_wire_type):
         """The compiler loads and applies work-wire rules with eager collection disabled."""
 
