@@ -954,6 +954,7 @@
 * Updated callable control capture to consume work-wire operands and the static
   `n_work_wires` count from PennyLane. Work wires are preserved when lowering to
   `qref.ctrl`, including traced labels in nested controls.
+    [(#3428)](https://github.com/PennyLaneAI/catalyst/pull/3428)
 
 * The `--convert-to-value-semantics` pass now correctly handles aliasing qubit references that are
   used by multiple regions and/or operand lists on the same operation.
