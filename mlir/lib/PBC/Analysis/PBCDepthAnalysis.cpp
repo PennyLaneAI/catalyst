@@ -18,6 +18,9 @@
 
 #include "Catalyst/Analysis/ResourceAnalysisRegistry.h"
 #include "Catalyst/Analysis/ResourceResult.h"
+#include "PBC/IR/PBCOpInterfaces.h"
+#include "PBC/IR/PBCOps.h"
+#include "PBC/Utils/PBCDepth.h"
 #include "PBC/Utils/PBCLayer.h"
 
 using namespace mlir;
@@ -27,16 +30,24 @@ namespace pbc {
 
 llvm::json::Value PBCDepthExtension::toJson() const {
     llvm::json::Object depthObj;
-    if (depth) {
-        depthObj["any_commuting_depth"] = depth->first;
-        depthObj["qubit_disjoint_depth"] = depth->second;
+    if (depth || hasQubitDisjointDepthAnalysis) {
+        // Preserve the exclusive fields consumed by existing clients. A region containing
+        // only calls/loops has no local depth, but can still have an inclusive total.
+        depthObj["any_commuting_depth"] = depth ? depth->first : 0;
+        depthObj["qubit_disjoint_depth"] = depth ? depth->second : 0;
+        depthObj["qubit_disjoint_depth_status"] = qubitDisjointDepthTotal ? "exact" : "unavailable";
+        if (qubitDisjointDepthTotal) {
+            depthObj["qubit_disjoint_depth_total"] = *qubitDisjointDepthTotal;
+        }
         return depthObj;
     }
     return nullptr;
 }
 
 void PBCDepthExtension::mergeWith(const ResourceResultExtension &other, MergeMethod mergeMethod) {
+    qubitDisjointDepthTotal.reset();
     const auto &o = static_cast<const PBCDepthExtension &>(other);
+    hasQubitDisjointDepthAnalysis |= o.hasQubitDisjointDepthAnalysis;
     if (!o.depth) {
         return;
     }
@@ -60,6 +71,7 @@ void PBCDepthExtension::mergeWith(const ResourceResultExtension &other, MergeMet
 }
 
 void PBCDepthExtension::multiplyBy(double factor) {
+    qubitDisjointDepthTotal.reset();
     if (depth) {
         depth->first *= factor;
         depth->second *= factor;
@@ -81,6 +93,10 @@ void PBCDepthAnalysis::analyze(Region &region, PBCDepthExtension &ext, bool /*is
 
     PBCLayerContext layerContext;
     ext.setDepth(layerContext.computePBCDepth(block));
+    bool hasLocalPBC = false;
+    block->walk(
+        [&](Operation *op) { hasLocalPBC |= isa<PBCOpInterface, SelectPPMeasurementOp>(op); });
+    ext.setQubitDisjointDepthTotal(computeQubitDisjointDepthTotal(block), hasLocalPBC);
 }
 
 void registerPBCResourceAnalysisExtensions() {

@@ -305,6 +305,25 @@ def ResourceAnalysisPass : Pass<"resource-analysis"> {
         Optionally, it can output the results as JSON to stdout or a file for
         consumption by the PennyLane frontend.
 
+        For supported PBC circuits, `extended_fields.pbc_depth.qubit_disjoint_depth_total`
+        reports the exact logical depth of the emitted PBC graph and
+        `qubit_disjoint_depth_status` is `"exact"`.
+        It includes called functions and loop iterations; consumers must not add callee
+        depths to this total. The existing `any_commuting_depth` and
+        `qubit_disjoint_depth` fields retain their legacy local, additive semantics
+        for compatibility and must not be mistaken for an exact inclusive result.
+        Each PBC instruction, including a conditional instruction, occupies one layer.
+        Initialization and classical operations add no PBC layers. This is not a
+        hardware runtime or classical feed-forward latency model.
+
+        Calls compose dependencies between individual qubits, and supported static
+        loops compose the same dependencies across iterations. The analysis never
+        substitutes an estimated iteration count or reserves a whole subroutine as
+        a single block. Unresolved wire indices or control flow, unsupported quantum
+        operations, arithmetic overflow, or exhausted analysis limits omit the total
+        and mark the status `"unavailable"` where PBC work is present. Consumers must
+        preserve that uncertainty instead of falling back to a smaller legacy value.
+
         Usage:
             quantum-opt input.mlir -resource-analysis -mlir-pass-statistics
             quantum-opt input.mlir -resource-analysis -resource-analysis-output-json=true

@@ -215,7 +215,9 @@ func.func @dynamic_for_loop(%arg0: !quantum.bit, %n: index) -> !quantum.bit {
 // CHECK:       "PPR-pi/4": 1
 
 // CHECK-LABEL: "pbc_in_dyn_loop"
-// CHECK: "extended_fields": {}
+// CHECK: "extended_fields": {
+// CHECK: "qubit_disjoint_depth_status": "unavailable"
+// CHECK-NOT: "qubit_disjoint_depth_total"
 // CHECK: function_calls
 // CHECK:   "dynamic"
 // CHECK:       "dyn_for_loop_1": "{{0x[0-9a-f]+}}"
@@ -373,11 +375,14 @@ func.func @pbc_estimated_iterations_loop(%arg0: !quantum.bit, %n: index) -> !qua
 
 // -----
 
-// PBC depth is per-function only; callers without inline PBC ops report no depth
-// even when they call a helper that contains PBC ops.
+// Callers retain zero local depth while the inclusive total includes helper calls.
 
 // CHECK-LABEL: "depth_caller": {
-// CHECK: "extended_fields": {}
+// CHECK: "extended_fields"
+// CHECK:   "pbc_depth":
+// CHECK:       "any_commuting_depth": 0
+// CHECK:       "qubit_disjoint_depth": 0
+// CHECK:       "qubit_disjoint_depth_total": 1
 // CHECK: "function_calls"
 // CHECK:   "static":
 // CHECK:       "depth_helper": 1
