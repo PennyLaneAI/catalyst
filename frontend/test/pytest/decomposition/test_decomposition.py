@@ -172,10 +172,12 @@ class TestGenericUtilities:
             has_ctrl_wires=False,
             hybrid_specs=specs,
         )
-        np.testing.assert_array_equal(kwargs["data"], [4.0, 5.0])
-        np.testing.assert_allclose(
+        assert qp.math.allclose(kwargs["data"], [4.0, 5.0], rtol=0, atol=0)
+        assert qp.math.allclose(
             qp.matrix(kwargs["unitary"], wire_order=[3, 1]),
             qp.matrix(qp.RX(0.7, 3) @ qp.RY(-0.2, 1), wire_order=[3, 1]),
+            rtol=1e-7,
+            atol=0,
         )
 
     def test_hybrid_operands_preserve_static_leaves(self):
@@ -199,7 +201,7 @@ class TestGenericUtilities:
                 hybrid_specs=specs,
             )
             assert kwargs["mixed"]["label"] == "rotation"
-            np.testing.assert_allclose(kwargs["mixed"]["angle"], angle)
+            assert qp.math.allclose(kwargs["mixed"]["angle"], angle, rtol=1e-7, atol=0)
             assert list(kwargs["mixed"]["wires"]) == wires
 
     def test_probe_wires_dont_overlap(self):
@@ -934,7 +936,9 @@ class TestHybridOperatorArgDecomposition:
         )
         angles = np.array([[0.1, -0.2, 0.4], [0.3, 0.5, -0.1], [-0.7, 0.2, 0.6]])
         for theta in (0.17, -0.62):
-            np.testing.assert_allclose(compiled(theta, angles), reference(theta, angles), atol=1e-7)
+            assert qp.math.allclose(
+                compiled(theta, angles), reference(theta, angles), rtol=1e-7, atol=1e-7
+            )
 
 
 class TestOnDemand:
