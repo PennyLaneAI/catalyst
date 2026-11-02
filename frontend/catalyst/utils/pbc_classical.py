@@ -129,9 +129,15 @@ def _compile_module(module_text):
     backend = xla_bridge.get_backend("cpu")
     # Register the CPU LAPACK custom calls used by JAX's linear algebra lowering.
     lapack.prepare_lapack_call("getrf_ffi", np.float64)
-    executable = backend.compile_and_load(
-        module_text, backend.local_devices(), xla_client.CompileOptions()
-    )
+    options = xla_client.CompileOptions()
+    # Algebraic simplification and fusion can change rounding or overflow, and
+    # therefore the concrete branch that determines the logical PBC graph.
+    options.env_option_overrides = [
+        ("xla_disable_hlo_passes", "fusion,algsimp"),
+        ("xla_cpu_enable_fast_math", False),
+        ("xla_enable_fast_math", False),
+    ]
+    executable = backend.compile_and_load(module_text, backend.local_devices(), options)
     return backend, executable, input_types, output_types, output_size_bound
 
 

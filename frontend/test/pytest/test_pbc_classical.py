@@ -338,3 +338,47 @@ def test_long_classical_chain_rebinds_on_loop_iteration(monkeypatch):
     assert resources.extra["qubit_disjoint_depth_status"] == "exact"
     assert resources.num_wires == 3
     assert resources.quantum_operations["PPR-pi/2-w1"] == 4
+
+
+@pytest.mark.parametrize("use_helper", [False, True])
+@pytest.mark.parametrize("expression", ["multiply_add", "log_exp"])
+def test_float_predicate_matches_catalyst_runtime(use_helper, expression):
+    """Inlining a helper must not change rounding and select a different PBC graph."""
+    if expression == "multiply_add":
+        values = (np.float64(1 + 2**-27), np.float64(1 - 2**-27), np.float64(-1))
+
+        def operation(x, y, z):
+            return jnp.add(jnp.multiply(x, y), z)
+
+        def predicate(value):
+            return value < 0
+
+    else:
+        values = (np.float64(1000),)
+
+        def operation(x):
+            return jnp.log(jnp.exp(x))
+
+        predicate = jnp.isinf
+
+    runtime_result = qp.qjit(operation)(*values)
+    expected_depth = 2 if predicate(runtime_result) else 1
+    evaluate = jax.jit(operation) if use_helper else operation
+
+    @qp.qjit(capture=True, target="mlir")
+    @qp.transforms.to_ppr
+    @qp.decompose(gate_set={qp.X, qp.Z})
+    @qp.qnode(qp.device("null.qubit", wires=2))
+    def circuit():
+        def first_wire():
+            qp.X(0)
+
+        def second_wire():
+            qp.X(1)
+
+        qp.cond(predicate(evaluate(*values)), first_wire, second_wire)()
+        qp.Z(0)
+
+    resources = qp.analyze(circuit, level=2)().resources
+    assert resources.extra["qubit_disjoint_depth_status"] == "exact"
+    assert resources.qubit_disjoint_depth == expected_depth
