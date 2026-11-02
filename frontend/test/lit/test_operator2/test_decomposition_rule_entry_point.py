@@ -470,7 +470,7 @@ def test_from_hybrid_wires():
         print(result)
 
 
-# CHECK: func.func private @"rule_HybridWires{}{cwires:3}{}[3742]"
+# CHECK: func.func private @rule{{(_[0-9]+)?}}
 # CHECK-SAME:   resources = {operations = {"NoParams{}{reg:1}{}" = 3 : i64}}
 # CHECK-SAME:   target_gate = "HybridWires{}{cwires:3}{}[3742]"
 # CHECK: stablehlo.slice %arg1 [0:1]
@@ -574,7 +574,7 @@ def test_from_hybrid_op():
         print(result)
 
 
-# CHECK: func.func private @"rule_HybridOpArg{angle:[tensor<f64>]}{cwires:1,op:3}{}[5678]"
+# CHECK: func.func private @rule{{(_[0-9]+)?}}
 # CHECK-SAME:   resources = {operations = {
 # CHECK-SAME:   "NoParams{}{reg:1}{}" = 1 : i64,
 # CHECK-SAME:   "StaticDataMultiReg{theta:[tensor<f64>]}{reg:1,reg2:2}{}[[[uid:[0-9]+]]]" = 1 : i64
@@ -670,7 +670,7 @@ def test_from_hybrid_op_nested():
         print(result)
 
 
-# CHECK: func.func private @"rule_HybridOpArg{angle:[tensor<f64>]}{cwires:1,op:4}{}[7654]"
+# CHECK: func.func private @rule{{(_[0-9]+)?}}
 # CHECK-SAME:   resources = {operations = {
 # CHECK-SAME:   "HybridOpArg{angle:[tensor<f64>]}{cwires:1,op:3}{}[[[uid_outer:[0-9]+]]]" = 1 : i64,
 # CHECK-SAME:   "NoParams{}{reg:1}{}" = 1 : i64,
@@ -788,7 +788,7 @@ def test_from_multiple_full_args_op():
         print(result)
 
 
-# CHECK: func.func private @"rule_MultipleFullArgs{angles1:[tensor<f64>],angles2:[tensor<2xf64>]}{hwires1:2,hwires2:1,op1:1,op2:1,reg1:1,reg2:2}{}[4444]"
+# CHECK: func.func private @rule{{(_[0-9]+)?}}
 # CHECK-SAME:   resources = {operations = {
 # CHECK-SAME:   "NoParams{}{reg:1}{}" = 1 : i64
 # CHECK-SAME:   "SingleParam{x:[tensor<f64>]}{reg:1}{}" = 1 : i64
