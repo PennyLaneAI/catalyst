@@ -955,7 +955,7 @@
   accounting for parallel operations and synthesis loops on independent qubits. This
   inclusive estimate preserves dependencies through measurements, register updates, and
   function calls, while retaining the existing local depth fields for compatibility.
-  [(#XXXX)](https://github.com/PennyLaneAI/catalyst/pull/XXXX)
+  [(#3426)](https://github.com/PennyLaneAI/catalyst/pull/3426)
 
 * The `--convert-to-value-semantics` pass now correctly handles aliasing qubit references that are
   used by multiple regions and/or operand lists on the same operation.
