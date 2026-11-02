@@ -364,6 +364,53 @@ class TestCompilerDiagnostics:
         assert command[1] == "--color"
 
 
+class TestCompilerEnvironment:
+    """Native callbacks use the kernel's environment without changing the parent."""
+
+    @pytest.mark.parametrize("interface", ["raw", "compiler"])
+    @pytest.mark.parametrize(
+        "prefix,base_prefix,inherited,expected",
+        [
+            ("/kernel-env", "/python", None, "/kernel-env"),
+            ("/kernel-env", "/python", "/other-env", "/kernel-env"),
+            ("/python", "/python", None, None),
+            ("/python", "/python", "/explicit-env", "/explicit-env"),
+        ],
+    )
+    def test_embedded_python_environment(
+        self, monkeypatch, tmp_path, interface, prefix, base_prefix, inherited, expected
+    ):
+        monkeypatch.setattr(sys, "prefix", prefix)
+        monkeypatch.setattr(sys, "base_prefix", base_prefix)
+        if inherited is None:
+            monkeypatch.delenv("VIRTUAL_ENV", raising=False)
+        else:
+            monkeypatch.setenv("VIRTUAL_ENV", inherited)
+        monkeypatch.setenv("CATALYST_ENV_SENTINEL", "preserved")
+        parent_env = dict(os.environ)
+        child_envs = []
+
+        def run(cmd, **kwargs):
+            child_envs.append(kwargs["env"])
+            return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
+
+        monkeypatch.setattr(subprocess, "run", run)
+        if interface == "raw":
+            _catalyst(stdin="module {}")
+        else:
+            compiler = Compiler(CompileOptions(compiler_tool="opt", link=False))
+            compiler.run_from_ir("module {}", "environment", Directory(tmp_path))
+
+        assert dict(os.environ) == parent_env
+        assert len(child_envs) == 1
+        child_env = child_envs[0]
+        assert child_env is not os.environ
+        assert child_env.get("VIRTUAL_ENV") == expected
+        assert child_env["CATALYST_ENV_SENTINEL"] == "preserved"
+        expected_env = parent_env | ({"VIRTUAL_ENV": expected} if expected is not None else {})
+        assert child_env == expected_env
+
+
 class TestDefaultFlags:
     """Unit tests for optional libraries discovered in LinkerDriver.get_default_flags."""
 

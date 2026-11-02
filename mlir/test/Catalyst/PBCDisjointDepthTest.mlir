@@ -112,11 +112,10 @@ func.func @entangling_synchronization(%q0: !quantum.bit, %q1: !quantum.bit) {
 
 // -----
 
-// The measurement-dependent branch has an unresolved quantum graph.
+// A measurement-controlled correction has the same slots as a predicated PPR.
 // CHECK-LABEL: "measurement_control_dependency": {
-// CHECK: "qubit_disjoint_depth_status": "unavailable"
-// CHECK-NOT: "qubit_disjoint_depth_total"
-// CHECK: "num_qubits"
+// CHECK: "qubit_disjoint_depth_status": "exact"
+// CHECK: "qubit_disjoint_depth_total": 4
 func.func @measurement_control_dependency(%q0: !quantum.bit, %q1: !quantum.bit) {
     %false = arith.constant false
     %a0 = pbc.ppr ["X"](8) %q0 : !quantum.bit

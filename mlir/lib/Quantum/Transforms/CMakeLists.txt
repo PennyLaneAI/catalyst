@@ -2,6 +2,13 @@ set(LIBRARY_NAME quantum-transforms)
 
 add_subdirectory(GraphDecomposition/DecompGraphSolver)
 
+add_mlir_library(quantum-python-loader STATIC
+    PARTIAL_SOURCES_INTENDED
+    QPDLoader.cpp
+    LINK_LIBS PRIVATE MLIRQuantum ${CMAKE_DL_LIBS}
+)
+target_compile_features(quantum-python-loader PUBLIC cxx_std_20)
+
 file(GLOB SRC
     AdjointLowering/AdjointLowering.cpp
     AdjointLowering/ForwardPass.cpp
@@ -22,7 +29,6 @@ file(GLOB SRC
     LoopBoundaryOptimizationPatterns.cpp
     ModifiersLowering.cpp
     MergeRotationsPatterns.cpp
-    QPDLoader.cpp
     SplitMultipleTapes.cpp
     cancel_inverses.cpp
     cp_global_buffers.cpp
@@ -47,6 +53,7 @@ set(LIBS
     ${conversion_libs}
     MLIRQuantum
     ExternalStablehloLib
+    quantum-python-loader
 )
 
 set(DEPENDS
@@ -54,6 +61,7 @@ set(DEPENDS
 )
 
 add_mlir_library(${LIBRARY_NAME} STATIC
+    PARTIAL_SOURCES_INTENDED
     ${SRC}
     LINK_LIBS
     PRIVATE

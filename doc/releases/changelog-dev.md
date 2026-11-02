@@ -956,7 +956,15 @@
   through calls and loops. `qubit_disjoint_depth_status` distinguishes exact results
   from unavailable results; unresolved dependencies and estimated iteration counts
   are not silently replaced with approximate totals. Legacy local depth fields remain
-  available for compatibility.
+  available for compatibility. Captured QNode constants, temporary adjoint wire stacks,
+  and multidimensional wire tensors are preserved. When the Python compilation plugin
+  is available, pure classical tensor calculations use the JAX CPU backend to resolve
+  data-dependent branches with their actual inputs. Measurement-controlled corrections
+  with an identity alternative reserve conditional instruction slots, as explicitly
+  predicated PBC operations do; the result is compiled circuit depth rather than the
+  length of a sampled measurement trajectory. Long classical dependency chains are
+  evaluated iteratively, and compiler subprocesses inherit the current interpreter's
+  virtual environment, including notebook kernels started without shell activation.
   [(#3426)](https://github.com/PennyLaneAI/catalyst/pull/3426)
 
 * The `--convert-to-value-semantics` pass now correctly handles aliasing qubit references that are

@@ -14,11 +14,13 @@
 
 #include "nanobind/nanobind.h"
 #include "nanobind/stl/string.h" // for type conversion
+#include "nanobind/stl/vector.h"
 
 #include <cstddef>
 #include <exception>
 #include <iostream>
 #include <string>
+#include <vector>
 
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallString.h"
@@ -243,4 +245,25 @@ std::string pythonRuleLowering(catalyst::quantum::DecomposableGate op) {
 
 extern "C" __attribute__((visibility("default"))) void *getPythonRuleLoweringFunction() {
     return reinterpret_cast<void *>(pythonRuleLowering);
+}
+
+std::vector<std::string>
+pythonPBCClassicalEvaluation(const std::string &module,
+                             const std::vector<std::string> &inputAttributes) {
+    try {
+        static QuantumPythonDecompositions::PyInterpreterGuard guard;
+        return guard.withGil([&] {
+            nb::module_ evaluator = nb::module_::import_("catalyst.utils.pbc_classical");
+            return nb::cast<std::vector<std::string>>(
+                evaluator.attr("evaluate_pbc_classical")(module, inputAttributes));
+        });
+    } catch (...) {
+        // A failed classical evaluation leaves depth unavailable. Never propagate
+        // Python or native exceptions across the dynamically loaded callback.
+        return {};
+    }
+}
+
+extern "C" __attribute__((visibility("default"))) void *getPythonPBCClassicalEvaluationFunction() {
+    return reinterpret_cast<void *>(pythonPBCClassicalEvaluation);
 }

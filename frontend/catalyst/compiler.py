@@ -312,6 +312,14 @@ def _get_catalyst_cli_cmd(*args, stdin=None):
     return cmd
 
 
+def _get_compiler_env():
+    """Expose the current virtual environment to the compiler's embedded Python."""
+    env = os.environ.copy()
+    if sys.prefix != sys.base_prefix:
+        env["VIRTUAL_ENV"] = sys.prefix
+    return env
+
+
 def _catalyst(*args, stdin=None, text=True, stderr_return=False):
     """Raw interface to catalyst
 
@@ -324,7 +332,9 @@ def _catalyst(*args, stdin=None, text=True, stderr_return=False):
         cmd.insert(1, "--color")
 
     try:
-        result = subprocess.run(cmd, input=stdin, check=True, capture_output=True, text=text)
+        result = subprocess.run(
+            cmd, input=stdin, check=True, capture_output=True, text=text, env=_get_compiler_env()
+        )
 
         # Capture the diagnostic output from the compiler
         if stderr_return and result.stderr:
@@ -528,7 +538,9 @@ class Compiler:
             try:
                 if self.options.verbose:
                     print(f"[SYSTEM] {' '.join(cmd)}", file=self.options.logfile)
-                result = subprocess.run(cmd, check=True, capture_output=True, text=True)
+                result = subprocess.run(
+                    cmd, check=True, capture_output=True, text=True, env=_get_compiler_env()
+                )
                 if self.options.verbose or os.getenv("ENABLE_DIAGNOSTICS"):
                     if result.stdout:
                         print(result.stdout.strip(), file=self.options.logfile)

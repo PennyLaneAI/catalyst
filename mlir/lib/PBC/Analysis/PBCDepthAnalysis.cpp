@@ -14,7 +14,12 @@
 
 #include "PBC/Analysis/PBCDepthAnalysis.h"
 
+#include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/SmallVector.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Diagnostics.h"
+#include "mlir/IR/SymbolTable.h"
+#include "mlir/Interfaces/CallInterfaces.h"
 
 #include "Catalyst/Analysis/ResourceAnalysisRegistry.h"
 #include "Catalyst/Analysis/ResourceResult.h"
@@ -22,11 +27,56 @@
 #include "PBC/IR/PBCOps.h"
 #include "PBC/Utils/PBCDepth.h"
 #include "PBC/Utils/PBCLayer.h"
+#include "PBC/Utils/PBCWireIndex.h"
 
 using namespace mlir;
 
 namespace catalyst {
 namespace pbc {
+
+namespace {
+
+// Captured QNode parameters live in the calling wrapper. Retain constants shared
+// by every visible call site rather than analyzing those captures as unknowns.
+llvm::SmallVector<Attribute> capturedArguments(Block *block) {
+    auto function = dyn_cast<func::FuncOp>(block->getParentOp());
+    if (!function || !function->hasAttr("quantum.node")) {
+        return {};
+    }
+    Operation *root = function;
+    while (root->getParentOp()) {
+        root = root->getParentOp();
+    }
+    llvm::SmallVector<Attribute> result;
+    bool invalid = false;
+    root->walk([&](CallOpInterface call) {
+        if (call.resolveCallable() != function) {
+            return;
+        }
+        auto operands = call.getArgOperands();
+        if (operands.size() != block->getNumArguments()) {
+            invalid = true;
+            return;
+        }
+        WireIndexResolver resolver;
+        llvm::SmallVector<Attribute> arguments;
+        for (Value operand : operands) {
+            arguments.push_back(resolver.resolveConstant(operand));
+        }
+        if (result.empty()) {
+            result = std::move(arguments);
+        } else {
+            for (auto [known, argument] : llvm::zip(result, arguments)) {
+                if (known != argument) {
+                    known = {};
+                }
+            }
+        }
+    });
+    return invalid ? llvm::SmallVector<Attribute>{} : result;
+}
+
+} // namespace
 
 llvm::json::Value PBCDepthExtension::toJson() const {
     llvm::json::Object depthObj;
@@ -96,7 +146,8 @@ void PBCDepthAnalysis::analyze(Region &region, PBCDepthExtension &ext, bool /*is
     bool hasLocalPBC = false;
     block->walk(
         [&](Operation *op) { hasLocalPBC |= isa<PBCOpInterface, SelectPPMeasurementOp>(op); });
-    ext.setQubitDisjointDepthTotal(computeQubitDisjointDepthTotal(block), hasLocalPBC);
+    ext.setQubitDisjointDepthTotal(computeQubitDisjointDepthTotal(block, capturedArguments(block)),
+                                   hasLocalPBC);
 }
 
 void registerPBCResourceAnalysisExtensions() {

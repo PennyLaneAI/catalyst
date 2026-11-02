@@ -26,6 +26,7 @@
 #include "Catalyst/Analysis/ResourceAnalysisRegistry.h"
 #include "Catalyst/Analysis/ResourceResult.h"
 #include "PBC/Analysis/PBCDepthAnalysis.h"
+#include "Quantum/Transforms/QPDLoader.h"
 
 using namespace mlir;
 using namespace llvm;
@@ -58,6 +59,13 @@ struct ResourceAnalysisPass : public impl::ResourceAnalysisPassBase<ResourceAnal
 
     void runOnOperation() final {
         pbc::registerPBCResourceAnalysisExtensions();
+
+        if (!libQPDPath.empty()) {
+            // The resource pass may run without a graph-decomposition pass. Load
+            // the optional evaluator explicitly rather than depending on a prior
+            // decomposition having happened to initialize Python.
+            quantum::loadQPD(libQPDPath, libpythonPath);
+        }
 
         auto moduleOp = cast<ModuleOp>(getOperation());
         ResourceAnalysis analysis(moduleOp, ResourceAnalysisRegistry::get().all());

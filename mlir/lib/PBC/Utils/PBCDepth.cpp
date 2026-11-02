@@ -30,6 +30,7 @@
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/SymbolTable.h"
 #include "mlir/Interfaces/CallInterfaces.h"
+#include "mlir/Interfaces/SideEffectInterfaces.h"
 
 #include "Catalyst/Analysis/ResourceInterfaces.h"
 #include "PBC/IR/PBCOpInterfaces.h"
@@ -102,6 +103,7 @@ struct Transfer {
 struct Binding {
     std::variant<std::monostate, unsigned, Register> identity;
     Attribute constant;
+    bool measurementDerived = false;
 };
 
 struct CallSummary : Transfer {
@@ -111,7 +113,7 @@ struct CallSummary : Transfer {
 using CallKey = std::vector<uintptr_t>;
 
 struct Context {
-    static constexpr unsigned maxOperations = 1000000;
+    static constexpr unsigned maxOperations = 200000000;
     static constexpr unsigned maxCallDepth = 256;
     static constexpr uint64_t maxUnrolledIterations = 1024;
     unsigned operations = 0;
@@ -183,11 +185,20 @@ Clock substitute(const Clock &value, const llvm::DenseMap<unsigned, Clock> &inpu
             return {};
         }
         if (auto it = inputs.find(input); it != inputs.end()) {
-            mergeClock(result, shifted(it->second, offset, context));
+            result.constant = std::max(result.constant, context.add(it->second.constant, offset));
+            for (auto [source, sourceOffset] : it->second.offsets) {
+                int64_t shiftedOffset = context.add(sourceOffset, offset);
+                auto [position, inserted] = result.offsets.try_emplace(source, shiftedOffset);
+                if (!inserted) {
+                    position->second = std::max(position->second, shiftedOffset);
+                }
+            }
         } else {
-            Clock identity;
-            identity.offsets[input] = 0;
-            mergeClock(result, shifted(std::move(identity), offset, context));
+            result.constant = std::max(result.constant, offset);
+            auto [position, inserted] = result.offsets.try_emplace(input, offset);
+            if (!inserted) {
+                position->second = std::max(position->second, offset);
+            }
         }
     }
     return result;
@@ -207,7 +218,8 @@ Transfer compose(const Transfer &first, const Transfer &second, Context &context
 
 bool isClassicalRegion(Operation &op, Context &context) {
     return !op.walk([&](Operation *nested) {
-                  if (++context.operations > Context::maxOperations || isQuantumOperation(nested)) {
+                  if (++context.operations > Context::maxOperations || isQuantumOperation(nested) ||
+                      nested->getName().getStringRef().starts_with("catalyst.list_")) {
                       return WalkResult::interrupt();
                   }
                   if (!isa<CallOpInterface>(nested)) {
@@ -263,9 +275,44 @@ class Schedule : Transfer {
     Context &context;
     llvm::DenseMap<Value, unsigned> qubits;
     llvm::DenseMap<Value, Register> registers;
+    llvm::DenseMap<Value, llvm::SmallVector<Attribute>> lists;
     llvm::DenseSet<unsigned> inputQubits;
     llvm::DenseSet<unsigned> inputRegisters;
     WireIndexResolver wireIndices;
+    llvm::DenseMap<Value, bool> measurementBindings;
+
+    bool measurementDerived(Value value, unsigned recursion = 0) const {
+        if (recursion >= Context::maxCallDepth) {
+            return false;
+        }
+        if (auto it = measurementBindings.find(value); it != measurementBindings.end()) {
+            return it->second;
+        }
+        Operation *op = value.getDefiningOp();
+        if (!op) {
+            return false;
+        }
+        if (isa<PPMeasurementOp, SelectPPMeasurementOp>(op) && value.getType().isInteger(1)) {
+            return true;
+        }
+        StringRef name = op->getName().getStringRef();
+        if ((!name.starts_with("arith.") && !name.starts_with("tensor.") &&
+             !name.starts_with("stablehlo.")) ||
+            op->getNumRegions() != 0 || !isMemoryEffectFree(op)) {
+            return false;
+        }
+        bool measured = false;
+        for (Value input : op->getOperands()) {
+            if (wireIndices.resolveConstant(input)) {
+                continue;
+            }
+            if (!measurementDerived(input, recursion + 1)) {
+                return false;
+            }
+            measured = true;
+        }
+        return measured;
+    }
 
     std::optional<int64_t> index(std::optional<int64_t> attr, Value value) const {
         return attr ? attr : wireIndices.resolveIndex(value);
@@ -321,7 +368,9 @@ class Schedule : Transfer {
         Schedule result(context);
         result.qubits = qubits;
         result.registers = registers;
+        result.lists = lists;
         result.wireIndices = wireIndices;
+        result.measurementBindings = measurementBindings;
         for (auto [value, id] : qubits) {
             result.inputQubits.insert(id);
         }
@@ -342,6 +391,7 @@ class Schedule : Transfer {
             result.identity = reg(value);
         } else {
             result.constant = wireIndices.resolveConstant(value);
+            result.measurementDerived = !result.constant && measurementDerived(value);
         }
         return result;
     }
@@ -353,6 +403,7 @@ class Schedule : Transfer {
             registers[target] = *reg;
         } else {
             wireIndices.bindConstant(target, value.constant);
+            measurementBindings[target] = value.measurementDerived;
         }
     }
 
@@ -402,6 +453,13 @@ class Schedule : Transfer {
             }
         }
         return result;
+    }
+
+    bool sameCapturedLists(const Schedule &other) const {
+        return llvm::all_of(lists, [&](const auto &entry) {
+            auto it = other.lists.find(entry.first);
+            return it != other.lists.end() && it->second == entry.second;
+        });
     }
 
     void markSkippedPBC(Operation &op) {
@@ -474,9 +532,10 @@ class Schedule : Transfer {
                 // A changing classical value must not be assumed constant while
                 // proving the repeated quantum graph independent of iteration.
                 body.wireIndices.bindConstant(arg, {});
+                body.measurementBindings[arg] = false;
             }
         }
-        if (!body.run(op.getBody())) {
+        if (!body.run(op.getBody()) || !sameCapturedLists(body)) {
             return false;
         }
         for (auto [input, output] : llvm::zip(op.getInitArgs(), outputs)) {
@@ -503,6 +562,42 @@ class Schedule : Transfer {
         return !context.overflow;
     }
 
+    bool predicatedCorrection(scf::IfOp op) {
+        if (!measurementDerived(op.getCondition()) ||
+            !llvm::all_of(op.getResultTypes(), isQuantum)) {
+            return false;
+        }
+        Region &otherwise = op.getElseRegion();
+        if (!otherwise.empty() &&
+            (!otherwise.hasOneBlock() || !llvm::hasSingleElement(otherwise.front()))) {
+            return false;
+        }
+        if (!op.getThenRegion().hasOneBlock()) {
+            return false;
+        }
+        Schedule correction = child();
+        if (!correction.run(op.thenBlock()) || !sameCapturedLists(correction)) {
+            return false;
+        }
+        ValueRange outputs = op.thenBlock()->getTerminator()->getOperands();
+        ValueRange identities =
+            otherwise.empty() ? ValueRange{} : otherwise.front().getTerminator()->getOperands();
+        if (outputs.size() != identities.size()) {
+            return false;
+        }
+        for (auto [output, identity] : llvm::zip(outputs, identities)) {
+            if (!correction.sameIdentity(output, *this, identity)) {
+                return false;
+            }
+        }
+        // A feed-forward correction has the same logical instruction slots as
+        // explicitly predicated PBC operations. Its internal ancillas may be
+        // prepared and measured, but no new identity or classical result escapes.
+        apply(correction.inputTransfer());
+        bindAll(op.getResults(), outputs, correction);
+        return true;
+    }
+
     bool branches(Operation &op) {
         Region *selected = nullptr;
         if (auto conditional = dyn_cast<scf::IfOp>(op)) {
@@ -521,6 +616,10 @@ class Schedule : Transfer {
             }
         }
         if (!selected) {
+            if (auto conditional = dyn_cast<scf::IfOp>(op);
+                conditional && predicatedCorrection(conditional)) {
+                return true;
+            }
             std::optional<Schedule> first;
             Transfer common;
             llvm::SmallVector<Value> firstOutputs;
@@ -529,7 +628,8 @@ class Schedule : Transfer {
                 Schedule branch = child();
                 llvm::SmallVector<Value> outputs;
                 if (!region.empty()) {
-                    if (!region.hasOneBlock() || !branch.run(&region.front())) {
+                    if (!region.hasOneBlock() || !branch.run(&region.front()) ||
+                        !sameCapturedLists(branch)) {
                         return false;
                     }
                     outputs.append(region.front().getTerminator()->operand_begin(),
@@ -556,6 +656,8 @@ class Schedule : Transfer {
                     if (commonOutputs[i].constant != branch.binding(output).constant) {
                         commonOutputs[i].constant = {};
                     }
+                    commonOutputs[i].measurementDerived &=
+                        branch.binding(output).measurementDerived;
                 }
             }
             apply(common);
@@ -585,8 +687,15 @@ class Schedule : Transfer {
                 key.push_back(value.root);
                 key.push_back(value.size.has_value());
                 key.push_back(value.size.value_or(0));
-                llvm::SmallVector<std::pair<int64_t, unsigned>> slots(value.slots.begin(),
-                                                                      value.slots.end());
+                llvm::SmallVector<std::pair<int64_t, unsigned>> slots;
+                // Materializing an implicit register slot does not change its
+                // physical identity. Only explicit aliases distinguish calls.
+                for (auto [index, id] : value.slots) {
+                    auto canonical = context.registerQubits.find({value.root, index});
+                    if (canonical == context.registerQubits.end() || canonical->second != id) {
+                        slots.emplace_back(index, id);
+                    }
+                }
                 llvm::sort(slots);
                 key.push_back(slots.size());
                 for (auto [index, id] : slots) {
@@ -596,6 +705,7 @@ class Schedule : Transfer {
             } else {
                 key.push_back(reinterpret_cast<uintptr_t>(
                     wireIndices.resolveConstant(input).getAsOpaquePointer()));
+                key.push_back(measurementDerived(input));
             }
         }
         return key;
@@ -610,6 +720,35 @@ class Schedule : Transfer {
 
     bool call(func::CallOp op) {
         auto callee = SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, op.getCalleeAttr());
+        if (callee && !callee.isDeclaration() && op.getNumResults() &&
+            !llvm::any_of(op.getOperandTypes(), isQuantum) &&
+            !llvm::any_of(op.getResultTypes(), isQuantum)) {
+            auto it = context.classicalFunctions.find(callee);
+            bool classical = it != context.classicalFunctions.end()
+                                 ? it->second
+                                 : isClassicalRegion(*callee, context);
+            context.classicalFunctions[callee] = classical;
+            if (classical) {
+                for (Value output : op.getResults()) {
+                    wireIndices.forget(output);
+                    measurementBindings.erase(output);
+                }
+                llvm::SmallVector<Attribute> values;
+                for (Value output : op.getResults()) {
+                    Attribute value = wireIndices.resolveConstant(output);
+                    if (!value) {
+                        break;
+                    }
+                    values.push_back(value);
+                }
+                if (values.size() == op.getNumResults()) {
+                    for (auto [output, value] : llvm::zip(op.getResults(), values)) {
+                        wireIndices.bindConstant(output, value);
+                    }
+                    return true;
+                }
+            }
+        }
         if (!callee || callee.isDeclaration() || !callee.getBody().hasOneBlock() ||
             context.activeCalls.size() >= Context::maxCallDepth ||
             !context.activeCalls.insert(callee).second) {
@@ -645,6 +784,11 @@ class Schedule : Transfer {
         }
         // Internal ancillas begin at zero in every invocation. Escaping fresh
         // identities must be allocated afresh, so those calls are not cached.
+        if (cacheable) {
+            // Internal paths already contribute to depth and the input-qubit
+            // clocks. Their local clocks cannot be observed by a later caller.
+            summary.clocks = body.inputTransfer().clocks;
+        }
         applyCall(op.getResults(), summary);
         if (cacheable) {
             context.calls.emplace(std::move(key), std::move(summary));
@@ -658,6 +802,30 @@ class Schedule : Transfer {
         }
         if (op.hasTrait<OpTrait::IsTerminator>()) {
             return true;
+        }
+        StringRef name = op.getName().getStringRef();
+        if (name == "catalyst.list_init") {
+            lists[op.getResult(0)].clear();
+            return true;
+        }
+        if (name == "catalyst.list_push") {
+            auto it = lists.find(op.getOperand(1));
+            if (it == lists.end()) {
+                return false;
+            }
+            it->second.push_back(wireIndices.resolveConstant(op.getOperand(0)));
+            return true;
+        }
+        if (name == "catalyst.list_pop") {
+            auto it = lists.find(op.getOperand(0));
+            if (it == lists.end() || it->second.empty()) {
+                return false;
+            }
+            wireIndices.bindConstant(op.getResult(0), it->second.pop_back_val());
+            return true;
+        }
+        if (name == "catalyst.list_dealloc") {
+            return lists.erase(op.getOperand(0));
         }
         if (auto loopOp = dyn_cast<scf::ForOp>(op)) {
             return loop(loopOp);
@@ -757,6 +925,12 @@ class Schedule : Transfer {
   public:
     explicit Schedule(Context &context) : context(context) {}
 
+    void bindConstants(Block *block, ArrayRef<Attribute> arguments) {
+        for (auto [argument, value] : llvm::zip(block->getArguments(), arguments)) {
+            wireIndices.bindConstant(argument, value);
+        }
+    }
+
     bool run(Block *block) {
         for (BlockArgument arg : block->getArguments()) {
             if (isa<quantum::QubitType>(arg.getType())) {
@@ -787,12 +961,13 @@ class Schedule : Transfer {
 
 } // namespace
 
-std::optional<int64_t> computeQubitDisjointDepthTotal(Block *block) {
+std::optional<int64_t> computeQubitDisjointDepthTotal(Block *block, ArrayRef<Attribute> arguments) {
     if (!block->getParent()->hasOneBlock()) {
         return std::nullopt;
     }
     Context context;
     Schedule schedule(context);
+    schedule.bindConstants(block, arguments);
     return schedule.run(block) ? schedule.result() : std::nullopt;
 }
 

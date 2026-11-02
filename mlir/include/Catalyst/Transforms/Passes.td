@@ -313,6 +313,10 @@ def ResourceAnalysisPass : Pass<"resource-analysis"> {
         `qubit_disjoint_depth` fields retain their legacy local, additive semantics
         for compatibility and must not be mistaken for an exact inclusive result.
         Each PBC instruction, including a conditional instruction, occupies one layer.
+        Measurement-controlled correction blocks with an identity alternative are
+        scheduled as predicated PBC instructions, including their internal ancillas.
+        Their instruction slots remain in the compiled circuit regardless of the
+        measurement outcome; this is not the length of an individual sampled trace.
         Initialization and classical operations add no PBC layers. This is not a
         hardware runtime or classical feed-forward latency model.
 
@@ -343,6 +347,14 @@ def ResourceAnalysisPass : Pass<"resource-analysis"> {
             /*type=*/"std::string",
             /*default=*/"",
             /*description=*/"The filename to save the output JSON to (only when output-json is true)"
+        >,
+        Option<
+            "libQPDPath", "libQPD-path", "std::string", "\"\"",
+            "Optional Python compilation plugin for evaluating classical PBC dependencies"
+        >,
+        Option<
+            "libpythonPath", "libpython-path", "std::string", "\"\"",
+            "Python shared library used by the classical PBC evaluator"
         >
     ];
 }
