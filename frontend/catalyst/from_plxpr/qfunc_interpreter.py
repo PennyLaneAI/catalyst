@@ -890,18 +890,23 @@ def handle_adjoint_transform(self, *invals, jaxpr, n_consts):
 # pylint: disable=unused-argument,too-many-arguments
 @PLxPRToQuantumJaxprInterpreter.register_primitive(plxpr_ctrl_transform_prim)
 def handle_ctrl_transform(
-    self, *invals, jaxpr, n_control, work_wires, n_consts, work_wire_type="borrowed"
+    self, *invals, jaxpr, n_control, n_work_wires, n_consts, work_wire_type="borrowed"
 ):
     """Interpret a control transform, then re-bind it for lowering to a `qref.ctrl` region op."""
-    values_start = len(invals) - n_control
+    work_start = len(invals) - n_work_wires
+    values_start = work_start - n_control
     controls_start = values_start - n_control
     consts = invals[:n_consts]
     args = invals[n_consts:controls_start]
     control_wires = invals[controls_start:values_start]
-    control_values = invals[values_start:]
+    control_values = invals[values_start:work_start]
+    work_wires = invals[work_start:]
 
     control_qubits = [
         w if is_abstract_qubit(w) else qref_get_p.bind(self.init_qreg, w) for w in control_wires
+    ]
+    work_qubits = [
+        w if is_abstract_qubit(w) else qref_get_p.bind(self.init_qreg, w) for w in work_wires
     ]
     body_interpreter = copy(self)
     body_interpreter.modifier_context = self.modifier_context.compose(
@@ -914,9 +919,10 @@ def handle_ctrl_transform(
         *args,
         *control_qubits,
         *control_values,
+        *work_qubits,
         n_control=n_control,
         jaxpr=body.jaxpr,
-        work_wires=work_wires,
+        n_work_wires=n_work_wires,
         work_wire_type=work_wire_type,
         n_consts=len(body.consts),
     )
