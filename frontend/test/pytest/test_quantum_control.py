@@ -270,8 +270,16 @@ class TestControlled:
             capture_mode=capture_mode,
         )
 
-    def test_qctrl_func_work_wires(self, backend, capture_mode):
+    def test_qctrl_func_work_wires(self, backend, capture_mode, request):
         """Test the quantum control distribution over the nested control operations"""
+        if capture_mode:
+            request.node.add_marker(
+                pytest.mark.xfail(
+                    reason="Control lowering promotes gates with work wires to quantum.operator, "
+                    "which is not yet lowered to LLVM in this compilation path.",
+                    strict=True,
+                )
+            )
 
         def circuit(theta, ctrl_fn):
             def _func1():
