@@ -705,6 +705,13 @@ func.func @test_ctrl_op_nested() attributes {quantum.node}
 // CHECK-SAME: ctrlvals(%{{.*}}) work_wires(%[[WORK]]) (%[[TARGET]])
 // CHECK-SAME: {work_wire_type = "zeroed"}
 // CHECK-SAME: : !quantum.bit work_wires !quantum.bit -> !quantum.bit
+// CHECK:     ^bb0(%arg0: !quantum.bit):
+// CHECK:      %[[X:.*]] = quantum.custom "PauliX"() %arg0 : !quantum.bit
+// CHECK:      quantum.yield %[[X]] : !quantum.bit
+// CHECK:  quantum.dealloc_qb %[[OC]] : !quantum.bit
+// CHECK:  quantum.dealloc_qb %[[OW]] : !quantum.bit
+// CHECK:  quantum.dealloc_qb %[[OQ]] : !quantum.bit
+
 
 func.func @ctrl_work_wires() attributes {quantum.node} {
     %true = llvm.mlir.constant (1 : i1) : i1
@@ -740,6 +747,9 @@ func.func @ctrl_work_wires() attributes {quantum.node} {
 // CHECK: ^bb0(%[[A_TARGET:.*]]: !quantum.bit, %[[A_INNER:.*]]: !quantum.bit, %[[A_INNER_WORK:.*]]: !quantum.bit)
 // CHECK: quantum.ctrl(%[[A_INNER]]) ctrlvals(%{{.*}}) work_wires(%[[A_INNER_WORK]]) (%[[A_TARGET]])
 // CHECK-SAME: : !quantum.bit work_wires !quantum.bit -> !quantum.bit
+// CHECK:    ^bb0(%[[A_INNER_TARGET:.*]]: !quantum.bit):
+// CHECK:    %[[X:.*]] = quantum.custom "PauliX"() %[[A_INNER_TARGET]] : !quantum.bit
+// CHECK:    quantum.yield %[[X]] : !quantum.bit
 
 func.func @nested_ctrl_distinct_work_wires() attributes {quantum.node} {
     %true = arith.constant true
