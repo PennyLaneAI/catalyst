@@ -2518,7 +2518,9 @@ class TestNumericHamiltonianDecomposition:
         hamiltonian = self._cdf_hamiltonian()
 
         @register_resources({qp.RZ(Float, wires=Wire[1]): 1, qp.GlobalPhase(Float): 1})
-        def dummy_cdf_decomp(evolution_time, num_trotter_steps, hamiltonian, wires, double_phase):
+        def dummy_cdf_decomp(
+            evolution_time, num_trotter_steps, hamiltonian, wires, double_phase, work_wires=()
+        ):
             # pylint: disable=redefined-outer-name,unused-argument
             qp.RZ(hamiltonian.nuc_constant * evolution_time, wires=wires[0])
             qp.GlobalPhase(hamiltonian.nuc_constant)
