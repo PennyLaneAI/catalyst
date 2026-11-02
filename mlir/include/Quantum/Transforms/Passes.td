@@ -88,7 +88,10 @@ def ResolveGateLevelAdjoint : Pass<"resolve-gate-level-adjoint"> {
 def CtrlLoweringPass : Pass<"ctrl-lowering"> {
     let summary = "Lower ctrl regions by distributing the controls over the enclosed operations.";
 
-    let dependentDialects = ["scf::SCFDialect"];
+    let dependentDialects = [
+        "scf::SCFDialect",
+        "catalyst::qref::QRefDialect"
+    ];
 }
 
 def ModifiersLoweringPass : Pass<"modifiers-lowering"> {
