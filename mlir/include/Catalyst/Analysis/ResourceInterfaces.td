@@ -24,6 +24,16 @@ include "mlir/IR/OpBase.td"
 //   ResourceAllocQubitOpInterface   -> num_alloc_qubits
 //   ResourceMeasurementOpInterface  -> measurements[name]
 
+// ResourceSkipOpInterface is used to mark ops that should be skipped in the resource counts.
+def ResourceSkipOpInterface : OpInterface<"ResourceSkipOpInterface"> {
+  let description = [{
+    Marks operations excluded from standard resource counts. Registered extension
+    analyses still receive these operations through their collect method.
+  }];
+
+  let cppNamespace = "::catalyst";
+}
+
 def ResourceQuantumOpInterface : OpInterface<"ResourceQuantumOpInterface"> {
   let description = [{
     This interface marks operations that ResourceAnalysis should count as
