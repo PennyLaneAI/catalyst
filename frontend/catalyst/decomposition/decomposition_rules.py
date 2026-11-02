@@ -268,7 +268,36 @@ def _is_wire_leaf(value):
 
 
 def flatten_hybrid_args(extra_data) -> tuple:
-    """Prepare hybrid arguments for reconstruction from rule inputs."""
+    """Record how to rebuild hybrid arguments from a decomposition rule's inputs.
+
+    Track each argument's parameters, wires, and fixed values so nested operators can be
+    rebuilt with the supplied inputs. Create dummy numeric arrays for tracing; dummy wires
+    are created separately by ``prepare_dynamic_op_kwargs``.
+
+    Args:
+        extra_data (dict): Argument names and values.
+
+    Returns:
+        tuple: Reconstruction specs, dummy numeric arrays, and fully static arguments.
+        Ordinary parameters come before nested-operator parameters in the dummy arrays.
+
+    Example:
+        Here, ``dummies`` contains the data array followed by the RX angle. The RX wire
+        is recorded in ``specs`` and supplied separately when rebuilding the operator.
+
+        >>> extra_data = {
+        ...     "unitary": abstractify(qp.RX(0.7, wires=2)),
+        ...     "data": qp.typing.Float[2],
+        ...     "label": "rotation",
+        ... }
+        >>> specs, dummies, static = flatten_hybrid_args(extra_data)
+        >>> {spec.name: [source.name for source in spec.leaf_sources] for spec in specs}
+        {'unitary': ['OPERATOR_PARAMETER', 'WIRE'], 'data': ['ORDINARY_PARAMETER']}
+        >>> [dummy.shape for dummy in dummies]
+        [(2,), ()]
+        >>> static
+        {'label': 'rotation'}
+    """
     argument_specs = []
     ordinary_parameter_dummies = []
     operator_parameter_dummies = []
