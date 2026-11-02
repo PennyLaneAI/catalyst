@@ -116,6 +116,7 @@
   [(#3307)](https://github.com/PennyLaneAI/catalyst/pull/3307)
   [(#3365)](https://github.com/PennyLaneAI/catalyst/pull/3365)
   [(#3382)](https://github.com/PennyLaneAI/catalyst/pull/3382)
+  [(#3421)](https://github.com/PennyLaneAI/catalyst/pull/3421)
 
   Control is folded into the operator identity *control-outermost* (e.g. `C(Adjoint(Op))`), so
   `ctrl(adjoint(Op))` and `adjoint(ctrl(Op))` collapse to a single node, while a distinct control
@@ -124,6 +125,8 @@
        its control count), and
     2. Rules *synthesized by distribution* (`decompose(C(Op)) = ctrl(decompose(Op))`), controlling
        each produced gate with the same control count.
+
+  Controls can be specified in the `gate_set` argument of decomposition with `C(Op)`, which matches any number of controls.
 
   A rule may re-emit its base decomposition inside a `quantum.ctrl` region; the apply pipeline
   reduces it to op-level controls with `ctrl-lowering`, iterating
@@ -1113,6 +1116,9 @@
   [(#3242)](https://github.com/PennyLaneAI/catalyst/pull/3242)
 
 <h3>Internal changes ⚙️</h3>
+
+* FuncOp's with quantum dialect instructions can now always be inlined.
+  [(#3420)](https://github.com/PennyLaneAI/catalyst/pull/3420)
 
 * The `method` attribute of the Gradient dialect operations (`grad`, `value_and_grad`, `jvp`,
   `vjp`) is now an enum attribute (`#gradient<diff_method auto>`) instead of a string attribute.
