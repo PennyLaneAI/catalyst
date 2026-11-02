@@ -906,6 +906,42 @@ def test_ps_probs(backend, capture_mode):
     assert np.allclose(result, reference)
 
 
+@pytest.mark.parametrize("diff_method", ["best", "parameter-shift", "adjoint"])
+@pytest.mark.parametrize("scale", [1, 2])
+def test_gradient_after_decomposition(diff_method: str, scale: int):
+    """Differentiate decomposition function calls with classical preprocessing."""
+
+    @qp.qjit(capture=True)
+    @qp.grad
+    @qp.decompose(gate_set={qp.RX, qp.CNOT})
+    @qp.qnode(qp.device("lightning.qubit", wires=2), diff_method=diff_method)
+    def circuit(angle: float):
+        qp.IsingXX(scale * angle, (0, 1))
+        return qp.expval(qp.Z(0))
+
+    for angle in [0.5, -0.3, 0.0]:
+        assert np.allclose(circuit(angle), -scale * np.sin(scale * angle))
+
+
+@pytest.mark.parametrize("diff_method", ["parameter-shift", "adjoint"])
+def test_gradient_after_decomposition_in_hybrid_function(diff_method: str):
+    """Preserve calls to decomposed QNodes inside a captured workflow."""
+
+    @qp.decompose(gate_set={qp.RX, qp.CNOT})
+    @qp.qnode(qp.device("lightning.qubit", wires=2), diff_method=diff_method)
+    def circuit(angle: float):
+        qp.IsingXX(angle, (0, 1))
+        return qp.expval(qp.Z(0))
+
+    @qp.qjit(capture=True)
+    @qp.grad
+    def workflow(angle: float):
+        return circuit(angle)
+
+    for angle in [0.5, -0.3, 0.0]:
+        assert np.allclose(workflow(angle), -np.sin(angle))
+
+
 @pytest.mark.parametrize("gate_n_inputs", [(qp.CRX, [1]), (qp.CRot, [1, 2, 3])])
 def test_ps_four_term_rule(backend, gate_n_inputs):
     """Operations with the 4-term shift rule need to be decomposed to be differentiated."""
