@@ -37,10 +37,17 @@ class PBCDepthExtension : public ResourceResultExtension {
     void multiplyBy(double factor) override;
 
     void setDepth(std::optional<std::pair<int64_t, int64_t>> value) { depth = std::move(value); }
+    void setQubitDisjointDepthTotal(std::optional<double> value) {
+        qubitDisjointDepthTotal = value;
+    }
 
   private:
     // (any_commuting_depth, qubit_disjoint_depth), or nullopt if unavailable.
     std::optional<std::pair<int64_t, int64_t>> depth;
+
+    // Includes nested loops and calls. This cannot be composed by summing resource counts;
+    // it is recomputed from the region's qubit and classical dependencies.
+    std::optional<double> qubitDisjointDepthTotal;
 };
 
 // Computes PBC depth for a region into a PBCDepthExtension.

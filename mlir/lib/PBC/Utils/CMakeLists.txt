@@ -22,6 +22,7 @@ target_compile_options(libstim PRIVATE -w)
 
 add_library(PBCUtils STATIC
     PauliStringWrapper.cpp
+    PBCDepth.cpp
     PBCLayer.cpp
     PBCOpUtils.cpp
 )
@@ -33,4 +34,4 @@ target_compile_options(PBCUtils PRIVATE
     -fexceptions     # Enable exceptions
 )
 
-target_link_libraries(PBCUtils PRIVATE libstim ExternalStablehloLib MLIRSCFDialect)
+target_link_libraries(PBCUtils PRIVATE libstim ExternalStablehloLib MLIRSCFDialect MLIRFuncDialect)

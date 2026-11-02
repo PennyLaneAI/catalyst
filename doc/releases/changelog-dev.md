@@ -951,6 +951,12 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* Resource analysis now reports an optional `qubit_disjoint_depth_total` for PBC circuits,
+  accounting for parallel operations and synthesis loops on independent qubits. This
+  inclusive estimate preserves dependencies through measurements, register updates, and
+  function calls, while retaining the existing local depth fields for compatibility.
+  [(#XXXX)](https://github.com/PennyLaneAI/catalyst/pull/XXXX)
+
 * The `--convert-to-value-semantics` pass now correctly handles aliasing qubit references that are
   used by multiple regions and/or operand lists on the same operation.
   [(#3404)](https://github.com/PennyLaneAI/catalyst/pull/3404)

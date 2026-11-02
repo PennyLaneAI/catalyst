@@ -305,6 +305,16 @@ def ResourceAnalysisPass : Pass<"resource-analysis"> {
         Optionally, it can output the results as JSON to stdout or a file for
         consumption by the PennyLane frontend.
 
+        For supported PBC circuits, `extended_fields.pbc_depth.qubit_disjoint_depth_total`
+        reports an inclusive depth estimate that schedules independent qubits in parallel.
+        It includes called functions and loop iterations; consumers must not add callee
+        depths to this total. The existing `any_commuting_depth` and
+        `qubit_disjoint_depth` fields retain their local, additive semantics.
+        Loops and branches use conservative block summaries, with estimated iteration
+        counts when available. The total is omitted when dependencies or iteration
+        counts cannot be resolved, the circuit contains unsupported quantum operations,
+        or analysis exceeds 100,000 operation visits or 256 nested function calls.
+
         Usage:
             quantum-opt input.mlir -resource-analysis -mlir-pass-statistics
             quantum-opt input.mlir -resource-analysis -resource-analysis-output-json=true
