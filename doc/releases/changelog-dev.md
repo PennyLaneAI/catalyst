@@ -29,6 +29,7 @@
   again, at the cost of one temporary ancilla qubit and a mid-circuit measurement per rotation.
   [(#3314)](https://github.com/PennyLaneAI/catalyst/pull/3314)
   [(#3327)](https://github.com/PennyLaneAI/catalyst/pull/3327)
+  [(#3400)](https://github.com/PennyLaneAI/catalyst/pull/3400)
 
   ```python
   from catalyst.passes import gridsynth
