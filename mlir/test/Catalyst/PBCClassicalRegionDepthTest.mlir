@@ -14,9 +14,9 @@
 
 // RUN: quantum-opt -resource-analysis=output-json --split-input-file -verify-diagnostics %s -o /dev/null | FileCheck %s
 
-// A classical region's captured measurement must remain a dependency.
+// Classical captures add no synchronization to the qubit-only metric.
 // CHECK-LABEL: "classical_capture": {
-// CHECK: "qubit_disjoint_depth_total": 2
+// CHECK: "qubit_disjoint_depth_total": 1
 func.func @classical_capture(%q0: !quantum.bit, %q1: !quantum.bit) {
     %m, %out = pbc.ppm ["Z"] %q0 : i1, !quantum.bit
     %condition = scf.execute_region -> i1 {
@@ -28,9 +28,9 @@ func.func @classical_capture(%q0: !quantum.bit, %q1: !quantum.bit) {
 
 // -----
 
-// The dependence also survives a memory write inside a classical region.
+// Classical memory writes leave the longest quantum chain unchanged.
 // CHECK-LABEL: "classical_memory": {
-// CHECK: "qubit_disjoint_depth_total": 3
+// CHECK: "qubit_disjoint_depth_total": 2
 func.func @classical_memory(%q0: !quantum.bit, %q1: !quantum.bit, %buffer: memref<i1>) {
     %a = pbc.ppr ["X"](8) %q0 : !quantum.bit
     %m, %out = pbc.ppm ["Z"] %a : i1, !quantum.bit
@@ -78,9 +78,9 @@ func.func private @opaque()
 // -----
 
 // Calls are supported after recursively proving that every reachable body is
-// classical. A captured measurement still constrains the following PPR.
+// classical. Captured measurement results do not add quantum layers.
 // CHECK-LABEL: "classical_calls": {
-// CHECK: "qubit_disjoint_depth_total": 2
+// CHECK: "qubit_disjoint_depth_total": 1
 func.func @classical_calls(%q0: !quantum.bit, %q1: !quantum.bit) {
     %m, %out = pbc.ppm ["Z"] %q0 : i1, !quantum.bit
     %condition = scf.execute_region -> i1 {

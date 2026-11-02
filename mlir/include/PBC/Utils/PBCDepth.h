@@ -23,6 +23,8 @@ class Block;
 namespace catalyst::pbc {
 
 // Estimate PBC depth including calls and loops, scheduling disjoint qubits independently.
+// Preserve the qubit-only PBCLayer metric: classical conditions and memory operations
+// do not introduce synchronization or contribute additional layers.
 // Structured regions are conservative atomic reservations of their touched qubits.
 // Small constant wire tensors are propagated through calls, whose summaries are reused
 // only for matching physical bindings and known classical constants.

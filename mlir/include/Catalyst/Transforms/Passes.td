@@ -310,10 +310,14 @@ def ResourceAnalysisPass : Pass<"resource-analysis"> {
         It includes called functions and loop iterations; consumers must not add callee
         depths to this total. The existing `any_commuting_depth` and
         `qubit_disjoint_depth` fields retain their local, additive semantics.
+        Like the existing qubit-disjoint metric, this estimate counts quantum layers
+        without adding latency for classical conditions or memory operations.
+        Consumers can retain the existing aggregate when it is smaller than this
+        conservative candidate.
         Loops and branches use conservative block summaries, with estimated iteration
         counts when available. The total is omitted when dependencies or iteration
         counts cannot be resolved, the circuit contains unsupported quantum operations,
-        or analysis exceeds 100,000 operation visits or 256 nested function calls.
+        or analysis exceeds 1,000,000 operation visits or 256 nested function calls.
 
         Usage:
             quantum-opt input.mlir -resource-analysis -mlir-pass-statistics

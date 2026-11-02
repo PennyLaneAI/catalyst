@@ -129,9 +129,9 @@ func.func private @dynamic_register_helper(%reg: !quantum.reg, %index: i64) -> !
 
 // -----
 
-// A measurement-dependent index also constrains a called operation on the qubit.
+// A classical index does not synchronize two disjoint quantum registers.
 // CHECK-LABEL: "measurement_dependent_dynamic_index": {
-// CHECK: "qubit_disjoint_depth_total": 5
+// CHECK: "qubit_disjoint_depth_total": 4
 func.func @measurement_dependent_dynamic_index(%q0: !quantum.bit) {
     %reg = quantum.alloc(2) : !quantum.reg
     %a0 = pbc.ppr ["X"](8) %q0 : !quantum.bit

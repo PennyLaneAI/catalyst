@@ -38,10 +38,10 @@ func.func @initialization_states() {
 
 // -----
 
-// The magic ancilla initialization does not add layers, but its measurements and
-// the correction's classical dependency must remain on the critical path.
+// The ancilla measurement and correction act on disjoint qubits and can share
+// a layer under the qubit-only metric, as with ordinary PPMs.
 // CHECK-LABEL: "magic_feedforward": {
-// CHECK: "qubit_disjoint_depth_total": 4
+// CHECK: "qubit_disjoint_depth_total": 3
 func.func @magic_feedforward(%data: !quantum.bit) {
     %a = pbc.ppr ["X"](8) %data : !quantum.bit
     %magic = pbc.fabricate magic : !quantum.bit
@@ -49,6 +49,26 @@ func.func @magic_feedforward(%data: !quantum.bit) {
     %m2, %ancilla = pbc.select.ppm (%m ? ["Y"] : ["X"]) %out#1 : i1, !quantum.bit
     %corrected = pbc.ppr ["Z"](2) %out#0 cond(%m2) : !quantum.bit
     quantum.dealloc_qb %ancilla : !quantum.bit
+    return
+}
+
+// -----
+
+// Preserve the existing leaf cost of an S-gate injection: its final measurement
+// and conditional correction act on disjoint qubits, even though the correction
+// uses the measurement result through classical arithmetic.
+// CHECK-LABEL: "s_injection_leaf_cost": {
+// CHECK: "any_commuting_depth": 2
+// CHECK: "qubit_disjoint_depth": 2
+// CHECK: "qubit_disjoint_depth_total": 2
+func.func @s_injection_leaf_cost(%data: !quantum.bit) {
+    %ancilla = pbc.prepare plus_i : !quantum.bit
+    %m, %out:2 = pbc.ppm ["Z", "Y"] %data, %ancilla
+        : i1, !quantum.bit, !quantum.bit
+    %m2, %ancilla_out = pbc.ppm ["X"] %out#1 : i1, !quantum.bit
+    %condition = arith.xori %m, %m2 : i1
+    %corrected = pbc.ppr ["Z"](2) %out#0 cond(%condition) : !quantum.bit
+    quantum.dealloc_qb %ancilla_out : !quantum.bit
     return
 }
 

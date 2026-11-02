@@ -46,7 +46,7 @@ class PBCDepthExtension : public ResourceResultExtension {
     std::optional<std::pair<int64_t, int64_t>> depth;
 
     // Includes nested loops and calls. This cannot be composed by summing resource counts;
-    // it is recomputed from the region's qubit and classical dependencies.
+    // it is recomputed from the region's qubit dependencies.
     std::optional<double> qubitDisjointDepthTotal;
 };
 

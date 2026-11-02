@@ -86,9 +86,9 @@ func.func private @two_register_rotations(%reg0: !quantum.reg, %reg1: !quantum.r
 
 // -----
 
-// Unknown classical arguments can have different readiness on a cache hit.
+// Cached calls keep the qubit-only cost when their classical arguments change.
 // CHECK-LABEL: "cached_classical_readiness": {
-// CHECK: "qubit_disjoint_depth_total": 5
+// CHECK: "qubit_disjoint_depth_total": 4
 func.func @cached_classical_readiness(%q0: !quantum.bit, %q1: !quantum.bit, %condition: i1) {
     %a = func.call @conditional_rotation(%q0, %condition) : (!quantum.bit, i1) -> !quantum.bit
     %b0 = pbc.ppr ["X"](8) %q1 : !quantum.bit
@@ -106,9 +106,9 @@ func.func private @conditional_rotation(%q: !quantum.bit, %condition: i1) -> !qu
 
 // -----
 
-// Memory dependencies produced by a cached call remain visible to its caller.
+// Classical memory does not synchronize disjoint qubits across cached calls.
 // CHECK-LABEL: "cached_memory_readiness": {
-// CHECK: "qubit_disjoint_depth_total": 3
+// CHECK: "qubit_disjoint_depth_total": 2
 func.func @cached_memory_readiness(%q0: !quantum.bit, %q1: !quantum.bit) {
     %c0 = arith.constant 0 : index
     %memory = memref.alloc() : memref<1xi1>

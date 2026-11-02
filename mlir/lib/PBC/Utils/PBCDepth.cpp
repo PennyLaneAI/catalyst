@@ -30,7 +30,6 @@
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/SymbolTable.h"
 #include "mlir/Interfaces/CallInterfaces.h"
-#include "mlir/Interfaces/SideEffectInterfaces.h"
 
 #include "Catalyst/Analysis/ResourceInterfaces.h"
 #include "Catalyst/Utils/SCFUtils.h"
@@ -97,8 +96,6 @@ struct Qubit {
 
 struct Footprint {
     llvm::DenseSet<unsigned> touched;
-    double memoryClock = 0;
-    bool accessesMemory = false;
     double depth = 0;
     bool hasPBC = false;
 };
@@ -166,7 +163,6 @@ class Schedule : Footprint {
     Context &context;
     llvm::DenseMap<Value, Qubit> qubits;
     llvm::DenseMap<Value, Register> registers;
-    llvm::DenseMap<Value, double> classical;
     llvm::DenseMap<unsigned, double> clocks;
     WireIndexResolver wireIndices;
 
@@ -213,38 +209,13 @@ class Schedule : Footprint {
         return result;
     }
 
-    double time(Value value) {
-        if (isa<quantum::QubitType>(value.getType())) {
-            double result = 0;
+    double qubitTime(ValueRange values) {
+        double result = 0;
+        for (Value value : values) {
             for (unsigned id : qubit(value).aliases) {
                 touched.insert(id);
                 result = std::max(result, clocks.lookup(id));
             }
-            return result;
-        }
-        if (isa<quantum::QuregType>(value.getType())) {
-            Register &valueReg = reg(value);
-            double result = 0;
-            for (auto [key, id] : context.registerQubits) {
-                if (key.first == valueReg.root) {
-                    unsigned current = slot(valueReg, key.second);
-                    touched.insert(current);
-                    result = std::max(result, clocks.lookup(current));
-                }
-            }
-            for (auto [index, id] : valueReg.slots) {
-                touched.insert(id);
-                result = std::max(result, clocks.lookup(id));
-            }
-            return result;
-        }
-        return classical.lookup(value);
-    }
-
-    double operandTime(ValueRange values) {
-        double result = 0;
-        for (Value value : values) {
-            result = std::max(result, time(value));
         }
         return result;
     }
@@ -301,38 +272,15 @@ class Schedule : Footprint {
         return true;
     }
 
-    double dependencies(Operation &op) {
-        double result = 0;
-        auto read = [&](Operation *nested) {
-            for (Value value : nested->getOperands()) {
-                // Quantum captures are accounted for by the child's actual footprint.
-                if (!isQuantum(value.getType())) {
-                    result = std::max(result, classical.lookup(value));
-                }
-            }
-        };
-        op.walk(read);
-        return result;
-    }
-
-    double place(const Footprint &body, double dependency, double count = 1) {
-        double start = dependency;
+    double place(const Footprint &body, double count = 1) {
+        double start = 0;
         for (unsigned id : body.touched) {
             start = std::max(start, clocks.lookup(id));
-        }
-        if (body.accessesMemory) {
-            start = std::max(start, memoryClock);
-            accessesMemory = true;
         }
         double end = start + count * body.depth;
         for (unsigned id : body.touched) {
             clocks[id] = end;
             touched.insert(id);
-        }
-        if (body.accessesMemory) {
-            // A memory dependence created within a repeated region may occur in
-            // its final iteration. Reserving until the region ends is conservative.
-            memoryClock = std::max(memoryClock, body.memoryClock > 0 ? end : start);
         }
         hasPBC |= body.hasPBC;
         if (body.hasPBC) {
@@ -349,7 +297,6 @@ class Schedule : Footprint {
         if (*count == 0) {
             for (auto [result, input] : llvm::zip(op.getResults(), op.getInitArgs())) {
                 bind(result, input, *this);
-                classical[result] = time(input);
             }
             return true;
         }
@@ -367,10 +314,9 @@ class Schedule : Footprint {
                 return false;
             }
         }
-        double end = place(body, dependencies(*op), *count);
+        double end = place(body, *count);
         for (auto [result, output] : llvm::zip(op.getResults(), outputs)) {
             bind(result, output, body);
-            classical[result] = end;
         }
         return std::isfinite(end);
     }
@@ -398,16 +344,11 @@ class Schedule : Footprint {
                 bind(result, output, branch, false);
             }
             combined.depth = std::max(combined.depth, branch.depth);
-            combined.memoryClock = std::max(combined.memoryClock, branch.memoryClock);
-            combined.accessesMemory |= branch.accessesMemory;
             combined.hasPBC |= branch.hasPBC;
             combined.touched.insert(branch.touched.begin(), branch.touched.end());
             first = false;
         }
-        double end = place(combined, dependencies(op));
-        for (Value result : op.getResults()) {
-            classical[result] = end;
-        }
+        place(combined);
         return true;
     }
 
@@ -462,7 +403,7 @@ class Schedule : Footprint {
         return summary;
     }
 
-    void bindCallOutputs(ValueRange results, const CallSummary &summary, double end) {
+    void bindCallOutputs(ValueRange results, const CallSummary &summary) {
         for (auto [result, output] : llvm::zip(results, summary.outputs)) {
             if (const auto *value = std::get_if<Qubit>(&output.identity)) {
                 qubits[result] = *value;
@@ -471,7 +412,6 @@ class Schedule : Footprint {
             } else {
                 wireIndices.bindConstant(result, output.constant);
             }
-            classical[result] = end;
         }
     }
 
@@ -485,7 +425,7 @@ class Schedule : Footprint {
                 llvm::any_of(op.getResultTypes(), isQuantum)) {
                 return false;
             }
-            return plain(*op);
+            return true;
         }
         if (!callee.getBody().hasOneBlock() ||
             context.activeCalls.size() >= Context::maxCallDepth ||
@@ -495,8 +435,8 @@ class Schedule : Footprint {
         CallKey key = callKey(op, callee);
         if (auto it = context.calls.find(key); it != context.calls.end()) {
             context.activeCalls.erase(callee);
-            double end = place(it->second, dependencies(*op));
-            bindCallOutputs(op.getResults(), it->second, end);
+            place(it->second);
+            bindCallOutputs(op.getResults(), it->second);
             return true;
         }
         Schedule body = child();
@@ -512,21 +452,8 @@ class Schedule : Footprint {
         // Reusing internal ancilla identities reserves them across calls. This
         // may overestimate depth but cannot introduce unsupported parallelism.
         auto [it, inserted] = context.calls.emplace(std::move(key), body.summarize(outputs));
-        double end = place(it->second, dependencies(*op));
-        bindCallOutputs(op.getResults(), it->second, end);
-        return true;
-    }
-
-    bool plain(Operation &op) {
-        double ready = std::max(operandTime(op.getOperands()), dependencies(op));
-        if (!isMemoryEffectFree(&op)) {
-            accessesMemory = true;
-            memoryClock = std::max(memoryClock, ready);
-            ready = memoryClock;
-        }
-        for (Value result : op.getResults()) {
-            classical[result] = ready;
-        }
+        place(it->second);
+        bindCallOutputs(op.getResults(), it->second);
         return true;
     }
 
@@ -560,13 +487,6 @@ class Schedule : Footprint {
             if (!aliases) {
                 return false;
             }
-            // The selected qubit is unavailable until the dynamic index is ready.
-            // Reserving every possible slot is conservative, including across calls.
-            double ready = time(extract.getIdx());
-            for (unsigned id : *aliases) {
-                clocks[id] = std::max(clocks.lookup(id), ready);
-                touched.insert(id);
-            }
             qubits[extract.getQubit()] = Qubit{std::move(*aliases), value.root, extract.getIdx()};
             return true;
         }
@@ -593,11 +513,6 @@ class Schedule : Footprint {
             return true;
         }
         if (isa<quantum::AllocOp, quantum::AllocQubitOp, PrepareStateOp, FabricateOp>(op)) {
-            // A measurement-dependent register size needs allocation readiness
-            // for not-yet-materialized slots, which this fixed-wire analysis omits.
-            if (operandTime(op.getOperands()) != 0) {
-                return false;
-            }
             for (Value result : op.getResults()) {
                 if (isa<quantum::QubitType>(result.getType())) {
                     qubit(result);
@@ -626,7 +541,9 @@ class Schedule : Footprint {
             outputs = select.getOutQubits();
         }
         if (!inputs.empty()) {
-            double end = operandTime(op.getOperands()) + 1;
+            // Match PBCLayer's qubit-disjoint metric: classical conditions and
+            // memory operations do not add quantum layers or synchronization.
+            double end = qubitTime(inputs) + 1;
             for (auto [input, output] : llvm::zip(inputs, outputs)) {
                 Qubit value = qubit(input);
                 for (unsigned id : value.aliases) {
@@ -634,18 +551,15 @@ class Schedule : Footprint {
                 }
                 qubits[output] = std::move(value);
             }
-            for (Value result : op.getResults()) {
-                classical[result] = end;
-            }
             depth = std::max(depth, end);
             hasPBC = true;
             return true;
         }
         if (op.getNumRegions() != 0) {
-            // Classical reductions/scatters can contain regions. Their results
-            // wait for operands and captures, but add no quantum layers. Reject
-            // nested quantum work and unresolved calls instead of discarding it.
-            return isClassicalRegion(op, context) && plain(op);
+            // Classical reductions/scatters can contain regions. They add no
+            // quantum layers, but nested quantum work and unresolved calls must
+            // not be discarded.
+            return isClassicalRegion(op, context);
         }
         if (auto device = dyn_cast<quantum::DeviceInitOp>(op);
             device && device.getAutoQubitManagement()) {
@@ -653,17 +567,12 @@ class Schedule : Footprint {
             // initial size does not bound the aliases of a dynamic extraction.
             return false;
         }
-        // These operations contribute no PBC layers. Terminal measurement results
-        // nevertheless carry the readiness of the observed quantum state.
+        // These operations contribute no PBC layers.
         if (isa<quantum::DeallocOp, quantum::DeallocQubitOp, quantum::DeviceInitOp,
                 quantum::DeviceReleaseOp, quantum::InitializeOp, quantum::FinalizeOp,
                 quantum::NumQubitsOp, quantum::ComputationalBasisOp, quantum::NamedObsOp,
                 quantum::HermitianOp, quantum::TensorOp, quantum::HamiltonianOp,
                 ResourceMeasurementOpInterface>(op)) {
-            double ready = operandTime(op.getOperands());
-            for (Value result : op.getResults()) {
-                classical[result] = ready;
-            }
             return true;
         }
         if (auto phase = dyn_cast<quantum::GlobalPhaseOp>(op)) {
@@ -679,7 +588,7 @@ class Schedule : Footprint {
             llvm::any_of(op.getResultTypes(), isQuantum)) {
             return false;
         }
-        return plain(op);
+        return true;
     }
 
   public:

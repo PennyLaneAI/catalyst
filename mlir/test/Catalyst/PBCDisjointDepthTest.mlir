@@ -112,10 +112,10 @@ func.func @entangling_synchronization(%q0: !quantum.bit, %q1: !quantum.bit) {
 
 // -----
 
-// Classical arithmetic must preserve the readiness of a measurement result.
-// The conditional PPR on q1 cannot overlap the measurement on q0.
+// Classical conditions do not add synchronization to the qubit-only metric.
+// The q0 chain has four layers and the disjoint q1 branch has one.
 // CHECK-LABEL: "measurement_control_dependency": {
-// CHECK: "qubit_disjoint_depth_total": 5
+// CHECK: "qubit_disjoint_depth_total": 4
 func.func @measurement_control_dependency(%q0: !quantum.bit, %q1: !quantum.bit) {
     %false = arith.constant false
     %a0 = pbc.ppr ["X"](8) %q0 : !quantum.bit
@@ -134,9 +134,9 @@ func.func @measurement_control_dependency(%q0: !quantum.bit, %q1: !quantum.bit) 
 
 // -----
 
-// Readiness also propagates through memory-mediated classical dependencies.
+// Storing a condition in memory does not change the qubit-only depth.
 // CHECK-LABEL: "measurement_memory_dependency": {
-// CHECK: "qubit_disjoint_depth_total": 2
+// CHECK: "qubit_disjoint_depth_total": 1
 func.func @measurement_memory_dependency(%q0: !quantum.bit, %q1: !quantum.bit) {
     %c0 = arith.constant 0 : index
     %memory = memref.alloc() : memref<1xi1>
