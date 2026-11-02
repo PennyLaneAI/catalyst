@@ -979,9 +979,10 @@ void collectNecessarySubroutineRValues(func::FuncOp f,
  * same wire.
  *
  * - Gates, measurements and observables: their qubit operands.
- * - qref.ctrl: its ctrl qubits together with the qubits its region captures from above. In value
- *   semantics the ctrl qubits are operands of quantum.ctrl and the captured qubits become region
- *   arguments, so a ctrl qubit that is also used inside the region would be extracted twice.
+ * - qref.ctrl: its ctrl qubits and its work qubits, together with the qubits its region captures
+ *   from above. In value semantics the ctrl and work qubits are operands of quantum.ctrl and the
+ *   captured qubits become region arguments, so a ctrl or work qubit that is also used inside the
+ *   region would be extracted twice.
  *
  * The captured Values of the other region operations (scf.if, scf.index_switch, scf.for,
  * scf.while, qref.adjoint) are made alias free by collectNecessaryRegionRValues. Subroutine calls
@@ -998,9 +999,10 @@ LogicalResult verifyDistinctWireOperands(Operation *root) {
             collectNecessaryRegionRValues(rCtrlOp.getRegion(), rCapturedValues);
             SmallVector<Value> rValues(rCtrlOp.getCtrlQubits().begin(),
                                        rCtrlOp.getCtrlQubits().end());
+            rValues.append(rCtrlOp.getWorkQubits().begin(), rCtrlOp.getWorkQubits().end());
             rValues.append(rCapturedValues.begin(), rCapturedValues.end());
-            result = verifyDistinctWires(op, rValues,
-                                         "ctrl qubits and the qubits used inside the ctrl region");
+            result = verifyDistinctWires(
+                op, rValues, "ctrl qubits, work qubits and the qubits used inside the ctrl region");
         } else if (isa<REFERENCE_SEMANTICS_GATE_OPS, REFERENCE_SEMANTICS_OBSERVABLE_OPS>(op)) {
             SmallVector<Value> rValues(op->getOperands().begin(), op->getOperands().end());
             result = verifyDistinctWires(op, rValues, "qubit operands");
@@ -1638,37 +1640,31 @@ void handleCtrl(IRRewriter &builder, qref::CtrlOp rCtrlOp, QubitValueTracker &tr
     builder.setInsertionPoint(rCtrlOp);
     Location loc = rCtrlOp->getLoc();
 
-    // Enclosing control work wires are supplied again during control lowering. Remove shared
-    // wires from nested controls so they are neither captured as targets nor passed twice.
-    rCtrlOp.getRegion().walk([&](qref::CtrlOp inner) {
-        SmallVector<Value> workQubits;
-        for (Value work : inner.getWorkQubits()) {
-            if (!llvm::is_contained(rCtrlOp.getWorkQubits(), work)) {
-                workQubits.push_back(work);
-            }
-        }
-        inner.getWorkQubitsMutable().assign(workQubits);
-    });
-
     SetVector<Value> rTargetValues;
     collectNecessaryRegionRValues(rCtrlOp.getRegion(), rTargetValues);
 
     // Control and work qubits are passed explicitly instead of through the region closure. Keep
     // them before the region targets so the value-semantics op has the segment order
-    // [controls, work, targets]. The counts must be the numbers of distinct values after SetVector
-    // deduplication; raw operand counts could make the slices below land on the wrong values.
+    // [controls, work, targets].
     SetVector<Value> rValuesUsedByRegion;
     for (Value rCtrlQubit : rCtrlOp.getCtrlQubits()) {
         rValuesUsedByRegion.insert(rCtrlQubit);
     }
     size_t numCtrlQubits = rValuesUsedByRegion.size();
+    assert(numCtrlQubits == rCtrlOp.getCtrlQubits().size() &&
+           "ctrl qubits must be distinct from each other");
+
     for (Value rWorkQubit : rCtrlOp.getWorkQubits()) {
         rValuesUsedByRegion.insert(rWorkQubit);
     }
     size_t numWorkQubits = rValuesUsedByRegion.size() - numCtrlQubits;
+    assert(numWorkQubits == rCtrlOp.getWorkQubits().size() &&
+           "work qubits must be distinct from each other and from the ctrl qubits");
+
     rValuesUsedByRegion.insert(rTargetValues.begin(), rTargetValues.end());
-    assert(rValuesUsedByRegion.size() >= numCtrlQubits + numWorkQubits);
     size_t numTargetQubits = rValuesUsedByRegion.size() - numCtrlQubits - numWorkQubits;
+    assert(numTargetQubits == rTargetValues.size() &&
+           "region targets must be distinct from the ctrl and work qubits");
 
     quantum::CtrlOp vCtrlOp;
     {

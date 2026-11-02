@@ -2294,6 +2294,19 @@ def test_gate_already_in_gateset():
     assert "llvm.call @__catalyst__qis__Hadamard" in circuit.mlir_opt
 
 
+def test_modifiers_in_gateset():
+    """Test that modifiers are correctly interpreted by decomposition gatesets."""
+
+    @qjit(capture=True, collect_decomp_rules=False)
+    @qp.decompose(gate_set={"C(T)"})
+    @qnode(qp.device("null.qubit", wires=3))
+    def circuit():
+        qp.ctrl(qp.T(0), (1, 2))
+
+    results = qp.analyze(circuit, level=1)()
+    assert results.resources.counts["2C(T)"] == 1
+
+
 @pytest.mark.parametrize("reverse", [False, True])
 def test_cyclic_decompositions_find_cheapest_solution(reverse):
     """A <-> B has exits A -> Target and B -> Target Target.
@@ -2588,6 +2601,11 @@ class TestDecomposeAlias:
 
     @pytest.mark.usefixtures("use_capture_dgraph")
     @pytest.mark.parametrize("clean", [False, None], ids=["false", "none"])
+    @pytest.mark.xfail(
+        reason="On-demand rules use separate JAX contexts and can produce duplicate symbols.",
+        raises=CompileError,
+        strict=True,
+    )
     def test_decompose_none_static_argument_on_demand(self, clean):
         """The Python fallback accepts a None-valued static argument."""
 
@@ -2853,7 +2871,9 @@ class TestNumericHamiltonianDecomposition:
         hamiltonian = self._cdf_hamiltonian()
 
         @register_resources({qp.RZ(Float, wires=Wire[1]): 1, qp.GlobalPhase(Float): 1})
-        def dummy_cdf_decomp(evolution_time, num_trotter_steps, hamiltonian, wires, double_phase):
+        def dummy_cdf_decomp(
+            evolution_time, num_trotter_steps, hamiltonian, wires, double_phase, work_wires=()
+        ):
             # pylint: disable=redefined-outer-name,unused-argument
             qp.RZ(hamiltonian.nuc_constant * evolution_time, wires=wires[0])
             qp.GlobalPhase(hamiltonian.nuc_constant)

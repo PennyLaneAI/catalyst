@@ -223,7 +223,7 @@ bool VerbsSessionBase<Role>::poll_message_arrival(std::uint64_t cursor, std::sto
 }
 
 template <class Role>
-void VerbsSessionBase<Role>::post_write(ibv_qp *qp, std::uint64_t cursor, bool inline_data,
+void VerbsSessionBase<Role>::post_frame(ibv_qp *qp, std::uint64_t cursor, bool inline_data,
                                         bool signaled) {
     ring_.mode == frame::Mode::BL16
         ? post_write<frame::Mode::BL16>(qp, cursor, inline_data, signaled)

@@ -298,12 +298,14 @@ func.func @ctrl_with_region_op_non_scf(%ctrl: !quantum.bit, %q: !quantum.bit, %a
 // Work wires turn the controlled gate into quantum.operator. The reserved ctrl_work_wires group
 // is distinct from the target wires and the work-wire type becomes static identity data.
 
-// CHECK-LABEL: @ctrl_with_work_wire
+// CHECK-LABEL: @ctrl_with_work_wire(
+// CHECK-SAME: %[[CTRL:[^:]+]]: !quantum.bit, %[[WORK:[^:]+]]: !quantum.bit, %[[TARGET:[^:]+]]: !quantum.bit
 func.func @ctrl_with_work_wire(%ctrl: !quantum.bit, %work: !quantum.bit, %q: !quantum.bit)
     -> (!quantum.bit, !quantum.bit, !quantum.bit) {
   %true = arith.constant true
-  // CHECK: %[[Q:.*]]:2, %[[C:.*]] = quantum.operator "PauliX"() qubits(%{{.*}}, %{{.*}})
-  // CHECK-NEXT: ctrls(%{{.*}}) ctrl_vals(%[[TRUE:.*]])
+  // CHECK-NOT: quantum.ctrl
+  // CHECK: %[[Q:.*]]:2, %[[C:.*]] = quantum.operator "PauliX"() qubits(%[[TARGET]], %[[WORK]])
+  // CHECK-NEXT: ctrls(%[[CTRL]]) ctrl_vals(%{{.*}})
   // CHECK: static_data = {ctrl_work_wire_type = "zeroed"}
   // CHECK: qubit_map = {ctrl_work_wires = [1], wires = [0]}
   // CHECK: return %[[C]], %[[Q]]#1, %[[Q]]#0
@@ -386,18 +388,23 @@ func.func @ctrl_register_mode_operator_without_work_wire(
 
 // -----
 
-// Nested control regions merge both work registers. Borrowed wins when the types differ.
+// Nested control regions merge both work registers.
 
-// CHECK-LABEL: @nested_ctrl_work_wires
+// CHECK-LABEL: @nested_ctrl_work_wires(
+// CHECK-SAME: %[[OUTER:[^:]+]]: !quantum.bit, %[[OUTER_WORK:[^:]+]]: !quantum.bit, %[[INNER:[^:]+]]: !quantum.bit, %[[INNER_WORK:[^:]+]]: !quantum.bit, %[[TARGET:[^:]+]]: !quantum.bit
 func.func @nested_ctrl_work_wires(
     %outer: !quantum.bit, %outer_work: !quantum.bit, %inner: !quantum.bit,
     %inner_work: !quantum.bit, %q: !quantum.bit)
     -> (!quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit) {
   %true = arith.constant true
-  // CHECK: quantum.operator "PauliZ"() qubits(%{{.*}}, %{{.*}}, %{{.*}})
-  // CHECK-NEXT: ctrls(%{{.*}}, %{{.*}}) ctrl_vals(%{{.*}}, %{{.*}})
+  // CHECK-NOT: quantum.ctrl
+  // CHECK: %[[Q:.*]]:3, %[[C:.*]]:2 = quantum.operator "PauliZ"()
+  // CHECK-SAME: qubits(%[[TARGET]], %[[INNER_WORK]], %[[OUTER_WORK]])
+  // CHECK-NEXT: ctrls(%[[INNER]], %[[OUTER]]) ctrl_vals(%{{.*}}, %{{.*}})
   // CHECK: static_data = {ctrl_work_wire_type = "borrowed"}
   // CHECK: qubit_map = {ctrl_work_wires = [1, 2], wires = [0]}
+  // CHECK-NOT: quantum.ctrl
+  // CHECK: return %[[C]]#1, %[[Q]]#2, %[[C]]#0, %[[Q]]#1, %[[Q]]#0
   %oc, %ow, %or:3 = quantum.ctrl(%outer) ctrlvals(%true) work_wires(%outer_work)
       (%inner, %inner_work, %q) {work_wire_type = "zeroed"}
       : !quantum.bit work_wires !quantum.bit -> !quantum.bit, !quantum.bit, !quantum.bit {

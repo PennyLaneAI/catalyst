@@ -546,8 +546,8 @@ class TestLowerPBCInitOps:
             (lambda: qp.H(0)),
             (lambda: (qp.H(0), qp.T(0))),
             (lambda: (qp.H(0), qp.S(0))),
-            (lambda: (qp.H(0), qp.adjoint(qp.T(0), lazy=False))),
-            (lambda: (qp.H(0), qp.adjoint(qp.S(0), lazy=False))),
+            (lambda: (qp.H(0), qp.adjoint(qp.T(0)))),
+            (lambda: (qp.H(0), qp.adjoint(qp.S(0)))),
         ],
     )
     def test_lower_pbc_init_ops_preserves_states(self, gates):

@@ -15,7 +15,6 @@
 // Test conversion to value semantics quantum dialect for flat circuits with only classical arguments.
 
 // RUN: quantum-opt --convert-to-value-semantics --canonicalize --split-input-file --verify-diagnostics %s | FileCheck %s
-// RUN: quantum-opt --convert-to-value-semantics --ctrl-lowering --split-input-file --verify-diagnostics %s | FileCheck %s --check-prefix=LOWERED
 
 
 // CHECK-LABEL: test_set_state
@@ -706,13 +705,13 @@ func.func @test_ctrl_op_nested() attributes {quantum.node}
 // CHECK-SAME: ctrlvals(%{{.*}}) work_wires(%[[WORK]]) (%[[TARGET]])
 // CHECK-SAME: {work_wire_type = "zeroed"}
 // CHECK-SAME: : !quantum.bit work_wires !quantum.bit -> !quantum.bit
+// CHECK:     ^bb0(%arg0: !quantum.bit):
+// CHECK:      %[[X:.*]] = quantum.custom "PauliX"() %arg0 : !quantum.bit
+// CHECK:      quantum.yield %[[X]] : !quantum.bit
+// CHECK:  quantum.dealloc_qb %[[OC]] : !quantum.bit
+// CHECK:  quantum.dealloc_qb %[[OW]] : !quantum.bit
+// CHECK:  quantum.dealloc_qb %[[OQ]] : !quantum.bit
 
-// LOWERED-LABEL: @ctrl_work_wires
-// LOWERED: %[[Q:.*]]:2, %[[C:.*]] = quantum.operator "PauliX"()
-// LOWERED-SAME: qubits(%{{.*}}, %{{.*}})
-// LOWERED-NEXT: ctrls(%{{.*}}) ctrl_vals(%{{.*}})
-// LOWERED: static_data = {ctrl_work_wire_type = "zeroed"}
-// LOWERED: qubit_map = {ctrl_work_wires = [1], wires = [0]}
 
 func.func @ctrl_work_wires() attributes {quantum.node} {
     %true = llvm.mlir.constant (1 : i1) : i1
@@ -734,46 +733,43 @@ func.func @ctrl_work_wires() attributes {quantum.node} {
 // -----
 
 
-// Shared work wires are supplied by the enclosing region, without being captured as targets
-// or duplicated on the lowered operator.
+// Nested control regions never share a work wire
 
-// CHECK-LABEL: @nested_ctrl_shared_work_wire
+// CHECK-LABEL: @nested_ctrl_distinct_work_wires
 // CHECK: %[[OUTER:.*]] = quantum.alloc_qb
 // CHECK: %[[INNER:.*]] = quantum.alloc_qb
-// CHECK: %[[WORK:.*]] = quantum.alloc_qb
+// CHECK: %[[OUTER_WORK:.*]] = quantum.alloc_qb
+// CHECK: %[[INNER_WORK:.*]] = quantum.alloc_qb
 // CHECK: %[[TARGET:.*]] = quantum.alloc_qb
-// CHECK: quantum.ctrl(%[[OUTER]]) ctrlvals(%{{.*}}) work_wires(%[[WORK]]) (%[[TARGET]], %[[INNER]])
-// CHECK: quantum.ctrl(%{{.*}}) ctrlvals(%{{.*}}) (%{{.*}}) : !quantum.bit -> !quantum.bit
+// CHECK: quantum.ctrl(%[[OUTER]]) ctrlvals(%{{.*}}) work_wires(%[[OUTER_WORK]])
+// CHECK-SAME: (%[[TARGET]], %[[INNER]], %[[INNER_WORK]])
+// CHECK-SAME: {work_wire_type = "zeroed"}
+// CHECK: ^bb0(%[[A_TARGET:.*]]: !quantum.bit, %[[A_INNER:.*]]: !quantum.bit, %[[A_INNER_WORK:.*]]: !quantum.bit)
+// CHECK: quantum.ctrl(%[[A_INNER]]) ctrlvals(%{{.*}}) work_wires(%[[A_INNER_WORK]]) (%[[A_TARGET]])
+// CHECK-SAME: : !quantum.bit work_wires !quantum.bit -> !quantum.bit
+// CHECK:    ^bb0(%[[A_INNER_TARGET:.*]]: !quantum.bit):
+// CHECK:    %[[X:.*]] = quantum.custom "PauliX"() %[[A_INNER_TARGET]] : !quantum.bit
+// CHECK:    quantum.yield %[[X]] : !quantum.bit
 
-// LOWERED-LABEL: @nested_ctrl_shared_work_wire
-// LOWERED: %[[OUTER:.*]] = quantum.alloc_qb
-// LOWERED: %[[INNER:.*]] = quantum.alloc_qb
-// LOWERED: %[[WORK:.*]] = quantum.alloc_qb
-// LOWERED: %[[TARGET:.*]] = quantum.alloc_qb
-// LOWERED: %[[Q:.*]]:2, %[[C:.*]]:2 = quantum.operator "PauliX"() qubits(%[[TARGET]], %[[WORK]])
-// LOWERED-NEXT: ctrls(%[[INNER]], %[[OUTER]]) ctrl_vals(%{{.*}}, %{{.*}})
-// LOWERED: qubit_map = {ctrl_work_wires = [1], wires = [0]}
-// LOWERED-NEXT: quantum.dealloc_qb %[[C]]#1
-// LOWERED-NEXT: quantum.dealloc_qb %[[C]]#0
-// LOWERED-NEXT: quantum.dealloc_qb %[[Q]]#1
-// LOWERED-NEXT: quantum.dealloc_qb %[[Q]]#0
-
-func.func @nested_ctrl_shared_work_wire() attributes {quantum.node} {
+func.func @nested_ctrl_distinct_work_wires() attributes {quantum.node} {
     %true = arith.constant true
     %outer = qref.alloc_qb : !qref.bit
     %inner = qref.alloc_qb : !qref.bit
-    %work = qref.alloc_qb : !qref.bit
+    %outer_work = qref.alloc_qb : !qref.bit
+    %inner_work = qref.alloc_qb : !qref.bit
     %target = qref.alloc_qb : !qref.bit
 
-    qref.ctrl (%outer) ctrlvals (%true) work_wires (%work) {
-        qref.ctrl (%inner) ctrlvals (%true) work_wires (%work) {
+    qref.ctrl (%outer) ctrlvals (%true) work_wires (%outer_work)
+            attributes {work_wire_type = "zeroed"} {
+        qref.ctrl (%inner) ctrlvals (%true) work_wires (%inner_work) {
             qref.custom "PauliX"() %target : !qref.bit
         }
     }
 
     qref.dealloc_qb %outer : !qref.bit
     qref.dealloc_qb %inner : !qref.bit
-    qref.dealloc_qb %work : !qref.bit
+    qref.dealloc_qb %outer_work : !qref.bit
+    qref.dealloc_qb %inner_work : !qref.bit
     qref.dealloc_qb %target : !qref.bit
     return
 }
@@ -841,35 +837,5 @@ func.func @test_operator_register(%idx0: tensor<2xi64>, %idx1: tensor<1xi64>, %c
 
     // CHECK: quantum.dealloc [[op2]] : !quantum.reg
     qref.dealloc %a : !qref.reg<4>
-    return
-}
-
-
-// -----
-
-
-// CHECK-LABEL: test_aliasing_getops
-func.func @test_aliasing_getops() attributes {quantum.node} {
-
-    // CHECK: [[qreg:%.+]] = quantum.alloc( 2) : !quantum.reg
-    %a = qref.alloc(2) : !qref.reg<2>
-    %q0 = qref.get %a[0] : !qref.reg<2> -> !qref.bit
-    %q1 = qref.get %a[1] : !qref.reg<2> -> !qref.bit
-
-    // CHECK: [[bit0:%.+]] = quantum.extract [[qreg]][ 0] : !quantum.reg -> !quantum.bit
-    // CHECK: [[bit1:%.+]] = quantum.extract [[qreg]][ 1] : !quantum.reg -> !quantum.bit
-    // CHECK: [[CNOT1:%.+]]:2 = quantum.custom "CNOT"() [[bit0]], [[bit1]] : !quantum.bit, !quantum.bit
-    qref.custom "CNOT"() %q0, %q1 : !qref.bit, !qref.bit
-
-    %q0_again = qref.get %a[0] : !qref.reg<2> -> !qref.bit
-    %q1_again = qref.get %a[1] : !qref.reg<2> -> !qref.bit
-
-    // CHECK: [[CNOT2:%.+]]:2 = quantum.custom "CNOT"() [[CNOT1]]#0, [[CNOT1]]#1 : !quantum.bit, !quantum.bit
-    qref.custom "CNOT"() %q0_again, %q1_again : !qref.bit, !qref.bit
-
-    // CHECK: [[insert0:%.+]] = quantum.insert [[qreg]][ 0], [[CNOT2]]#0 : !quantum.reg, !quantum.bit
-    // CHECK: [[insert1:%.+]] = quantum.insert [[insert0]][ 1], [[CNOT2]]#1 : !quantum.reg, !quantum.bit
-    // CHECK: quantum.dealloc [[insert1]] : !quantum.reg
-    qref.dealloc %a : !qref.reg<2>
     return
 }

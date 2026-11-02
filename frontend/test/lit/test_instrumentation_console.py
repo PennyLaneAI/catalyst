@@ -49,7 +49,7 @@ weights = np.random.random(size=shape)
 # CHECK-NEXT: [DIAGNOSTICS] Running generate_ir
 # CHECK-SAME:   walltime: {{[0-9\.]+}} ms{{\s*}} cputime: {{[0-9\.]+}} ms{{\s*}} programsize: {{[0-9]+}} lines
 # CHECK-NEXT: [DIAGNOSTICS] Running compile
-# CHECK-SAME:   walltime: {{[0-9\.]+}} ms{{\s*}} cputime: {{[0-9\.]+}} ms{{\s*}} programsize: {{[0-9]+}} lines
+# CHECK-SAME:   walltime: {{[0-9\.]+}} ms{{\s*}} cputime: {{[0-9\.]+}} ms{{[ \t]*$}}
 # CHECK-NEXT: [DIAGNOSTICS] Running run
 # CHECK-SAME:   walltime: {{[0-9\.]+}} ms{{\s*}} cputime: {{[0-9\.]+}} ms
 
@@ -66,6 +66,7 @@ with instrumentation(circuit.__name__, filename=None, detailed=False):
 # CHECK:      [DIAGNOSTICS] > Total generate_ir
 # COM: Check for "compile" exactly, otherwise we could match things like "compileObjFile".
 # CHECK:      [DIAGNOSTICS] > Total compile{{ }}
+# CHECK-SAME:   walltime: {{[0-9\.]+}} ms{{\s*}} cputime: {{[0-9\.]+}} ms{{[ \t]*$}}
 # CHECK-NEXT: [DIAGNOSTICS] Running device_init
 # CHECK-SAME:   walltime: {{[0-9\.]+}} ms{{\s*}} cputime: {{[0-9\.]+}} ms
 # CHECK-NEXT: [DIAGNOSTICS] Running qubit_allocate_array

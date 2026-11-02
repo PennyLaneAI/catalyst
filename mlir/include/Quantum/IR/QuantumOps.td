@@ -799,7 +799,7 @@ def GlobalPhaseOp : UnitaryGate_Op<"gphase", [DifferentiableGate, AttrSizedOpera
              CArg<"mlir::ValueRange", "{}">:$in_ctrl_values,
              CArg<"bool", "false">:$adjoint
         ),[{
-            GlobalPhaseOp::build($_builder, $_state, 
+            GlobalPhaseOp::build($_builder, $_state,
                mlir::TypeRange(in_ctrl_qubits), angle, adjoint, in_ctrl_qubits, in_ctrl_values
             );
         }]>
@@ -1018,7 +1018,7 @@ def CtrlOp : Region_Op<"ctrl", [SingleBlockImplicitTerminator<"YieldOp">,
         `(` $in_ctrl_qubits `)` `ctrlvals` `(` $in_ctrl_values `)`
         (`work_wires` `(` $in_work_qubits^ `)`)? `(` $args `)`
         attr-dict `:` type($out_ctrl_qubits)
-        (`work_wires` type($out_work_qubits)^)? `->` type($results) $region
+        (`work_wires` type($out_work_qubits)^)? (`->` type($results)^)? $region
     }];
 
     let hasVerifier = 1;

@@ -600,11 +600,6 @@ catalyst::driver::parsePipelines(const cl::list<std::string> &catalystPipeline) 
     return allPipelines;
 }
 
-std::string CompilerOptions::getObjectFile() const {
-    using path = std::filesystem::path;
-    return path(workspace.str()) / path(moduleName.str() + ".o");
-}
-
 std::string CompilerOutput::nextPassDumpFilename(const std::string &pipelineName,
                                                  const std::string &ext) {
     return std::filesystem::path(currentStage) /

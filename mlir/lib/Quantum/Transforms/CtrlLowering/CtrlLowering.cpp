@@ -193,9 +193,14 @@ static Operation *createControlledGate(PatternRewriter &rewriter, QuantumGate ga
             if (auto existing = dyn_cast_or_null<DenseI64ArrayAttr>(
                     operatorOp.getQubitMap().get("ctrl_work_wires"));
                 existing && !existing.empty()) {
-                auto oldWorkWireType =
-                    cast<StringAttr>(operatorOp.getStaticData().get("ctrl_work_wire_type"));
-                workWireType = mergeWorkWireTypes(oldWorkWireType.getValue(), workWireType);
+                // An operator may carry a ctrl_work_wires group without a ctrl_work_wire_type
+                // entry (hand-written IR, or a producer that has not set it). "borrowed" is the
+                // conservative reading: it forbids assuming the qubit starts in |0>.
+                auto oldWorkWireType = dyn_cast_or_null<StringAttr>(
+                    operatorOp.getStaticData().get("ctrl_work_wire_type"));
+                workWireType = mergeWorkWireTypes(oldWorkWireType ? oldWorkWireType.getValue()
+                                                                  : StringRef("borrowed"),
+                                                  workWireType);
             }
         } else {
             paramMap = buildParamMap(rewriter, decomposable);
@@ -296,6 +301,10 @@ static CtrlOp mergeNestedCtrl(PatternRewriter &rewriter, CtrlOp inner, IRMapping
     }
     mergedCtrlValues.append(addCtrlValues.begin(), addCtrlValues.end());
 
+    // A plain concatenation is correct because quantum.ctrl's verifier forbids an enclosing work
+    // qubit from being used inside the region, including as a nested region's work qubit. The two
+    // work sets are therefore disjoint and no deduplication (which in value semantics would mean
+    // walking SSA chains back to a register and an index) is needed.
     SmallVector<Value> mergedWorkQubits;
     for (Value q : inner.getInWorkQubits()) {
         mergedWorkQubits.push_back(map.lookupOrDefault(q));

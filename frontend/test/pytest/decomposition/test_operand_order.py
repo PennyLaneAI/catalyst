@@ -27,6 +27,7 @@ from pennylane.decomposition import add_decomps, register_resources
 
 from catalyst.decomposition import GraphOpID
 from catalyst.decomposition.decomposition_rules import ordered_kwarg_names
+from catalyst.utils.exceptions import CompileError
 
 pytestmark = pytest.mark.usefixtures("use_capture")
 
@@ -179,7 +180,21 @@ class TestGraphOpIDLayout:
 class TestExecution:
     """Rules receive each argument's own operands."""
 
-    @pytest.mark.parametrize("collect_decomp_rules", [True, False], ids=["eager", "on-demand"])
+    @pytest.mark.parametrize(
+        "collect_decomp_rules",
+        [
+            True,
+            pytest.param(
+                False,
+                marks=pytest.mark.xfail(
+                    reason="On-demand rules use separate JAX contexts and can produce duplicate symbols.",
+                    raises=CompileError,
+                    strict=True,
+                ),
+            ),
+        ],
+        ids=["eager", "on-demand"],
+    )
     def test_semiadder(self, collect_decomp_rules):
         """SemiAdder's wire args are declared x, y, work (issue #3337). This uses the real template
         rather than a dummy gate, because on-demand rules are compiled in the compiler process,

@@ -83,8 +83,6 @@ llvm::LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOu
     llvm::LLVMContext llvmContext;
     std::shared_ptr<llvm::Module> llvmModule;
 
-    llvm::raw_string_ostream outIRStream(output.outIR);
-
     auto moduleBuffer = llvm::MemoryBuffer::getMemBufferCopy(options.source, options.moduleName);
     auto sourceMgr = std::make_shared<llvm::SourceMgr>();
     sourceMgr->AddNewSourceBuffer(std::move(moduleBuffer), llvm::SMLoc());
@@ -142,15 +140,17 @@ llvm::LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOu
                       options.loweringAction == Action::OptTranslateLLVM || runAll;
     bool runLLC = (options.loweringAction == Action::LLC) || runAll;
 
+    if (runLLC && output.outputFilename == "-") {
+        CO_MSG(options, Verbosity::Urgent,
+               "Object code cannot be written to stdout; use -o <filename>.\n");
+        return llvm::failure();
+    }
+
     if (runOpt && (inType == InputType::MLIR)) {
         mlir::TimingScope optTiming = timing.nest("Optimization");
         if (failed(runLowering(options, &ctx, *mlirModule, output, optTiming))) {
             CO_MSG(options, Verbosity::Urgent, "Failed to lower MLIR module\n");
             return llvm::failure();
-        }
-        output.outIR.clear();
-        if (options.keepIntermediate) {
-            mlirModule->print(outIRStream, opPrintingFlags);
         }
         optTiming.stop();
         if (options.verbosity == Verbosity::All) {
@@ -179,10 +179,6 @@ llvm::LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOu
             llvmModule->print(rawStringOstream, nullptr);
             auto outFile = output.nextPipelineSummaryFilename("LLVMIRTranslation", ".ll");
             catalyst::driver::dumpToFile(options, outFile, tmp);
-        }
-        output.outIR.clear();
-        if (options.keepIntermediate) {
-            outIRStream << *llvmModule;
         }
         translateTiming.stop();
 
@@ -254,16 +250,18 @@ llvm::LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOu
         }
     }
 
-    if (llvmModule && options.keepIntermediate && output.outputFilename != "-") {
-        output.outIR.clear();
-        outIRStream << *llvmModule;
+    std::string errorMessage;
+    auto outfile = mlir::openOutputFile(output.outputFilename, &errorMessage);
+    if (!outfile) {
+        llvm::errs() << errorMessage << "\n";
+        return llvm::failure();
     }
 
     if (runLLC) {
         mlir::TimingScope outputTiming = timing.nest("compileObject");
         if (failed(timer::timer(catalyst::driver::compileObjectFile, "compileObjFile",
                                 /* add_endl */ true, options, llvmModule, targetMachine.get(),
-                                options.getObjectFile()))) {
+                                outfile->os()))) {
             return llvm::failure();
         }
         outputTiming.stop();
@@ -271,29 +269,25 @@ llvm::LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOu
         if (options.verbosity == Verbosity::All) {
             llvm::errs() << "LLC object code generation successful" << "\n";
         }
-    }
-
-    std::string errorMessage;
-    auto outfile = mlir::openOutputFile(output.outputFilename, &errorMessage);
-    if (!outfile) {
-        llvm::errs() << errorMessage << "\n";
-        return llvm::failure();
-    } else if (output.outputFilename == "-" && llvmModule) {
+    } else if (llvmModule) {
         outfile->os() << *llvmModule;
-        outfile->keep();
-    } else if (output.outputFilename == "-" && mlirModule) {
+    } else if (mlirModule) {
         if (options.shouldEmitBytecode) {
-            return mlir::writeBytecodeToFile(mlirModule.get(), outfile->os());
+            if (failed(mlir::writeBytecodeToFile(mlirModule.get(), outfile->os()))) {
+                return llvm::failure();
+            }
         } else {
             mlirModule->print(outfile->os(), opPrintingFlags);
-            outfile->keep();
         }
     }
 
-    if (options.keepIntermediate and output.outputFilename != "-") {
-        outfile->os() << output.outIR;
-        outfile->keep();
+    outfile->os().flush();
+    if (outfile->os().has_error()) {
+        llvm::errs() << "Failed to write output: " << outfile->os().error().message() << "\n";
+        outfile->os().clear_error();
+        return llvm::failure();
     }
+    outfile->keep();
 
     return llvm::success();
 }
@@ -398,6 +392,11 @@ int QuantumDriverMainFromCL(int argc, char **argv) {
     if (config.shouldListPasses()) {
         mlir::printRegisteredPasses();
         return 0;
+    }
+
+    if ((LoweringAction == Action::All || LoweringAction == Action::LLC) &&
+        cl::getRegisteredOptions()["o"]->getNumOccurrences() == 0) {
+        outputFilename = ModuleName + ".o";
     }
 
     std::unique_ptr<CompilerOutput> output(new CompilerOutput());
