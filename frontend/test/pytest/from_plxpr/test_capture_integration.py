@@ -340,16 +340,7 @@ class TestCapture:
         [
             (False, qp.I, 1),
             (False, qp.X, -1),
-            pytest.param(
-                True,
-                qp.I,
-                1,
-                marks=pytest.mark.xfail(
-                    "config.getoption('--backend') == 'lightning.qubit'",
-                    reason="I has no decomposition rules. Triggers decomposition callback.",
-                    strict=True,
-                ),
-            ),
+            (True, qp.I, 1),
             (True, qp.X, 1),
         ],
     )
