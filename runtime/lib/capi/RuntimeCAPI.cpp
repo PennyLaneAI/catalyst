@@ -217,7 +217,7 @@ void __catalyst__rt__print_tensor(OpaqueMemRefT *c_memref, bool printDescriptor)
     } else if (c_memref->datatype == NumericType::c128) {
         printMemref<impl::complex64>({c_memref->rank, c_memref->descriptor}, printDescriptor);
     } else {
-        RT_FAIL("Unkown numeric type encoding for array printing.");
+        RT_FAIL("Unknown numeric type encoding for array printing.");
     }
 
     std::cout << std::endl;
