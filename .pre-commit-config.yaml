@@ -26,21 +26,21 @@ repos:
           "./pyproject.toml",
         ]
 
-# - repo: local
-#   hooks:
-#     - id: pylint
-#       name: "🐍 pylint · Lint frontend"
-#       entry: pylint
-#       language: system
-#       types: [python]
-#       args:
-#         [
-#           "--errors-only",       # match CI: pylint --errors-only frontend
-#           "-rn",                 # only display messages
-#           "-sn",                 # don't display the score
-#           "--rcfile=.pylintrc",  # link to the repo config
-#         ]
-#       files: ^frontend/
+- repo: local
+  hooks:
+    - id: pylint
+      name: "🐍 pylint · Lint frontend"
+      entry: pylint
+      language: system
+      types: [python]
+      args:
+        [
+          "--errors-only",       # match CI: pylint --errors-only frontend
+          "-rn",                 # only display messages
+          "-sn",                 # don't display the score
+          "--rcfile=.pylintrc",  # link to the repo config
+        ]
+      files: ^frontend/
 
 - repo: https://github.com/pre-commit/mirrors-clang-format
   rev: v20.1.8
