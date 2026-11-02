@@ -112,10 +112,11 @@ func.func @entangling_synchronization(%q0: !quantum.bit, %q1: !quantum.bit) {
 
 // -----
 
-// Classical conditions do not add synchronization to the qubit-only metric.
-// The q0 chain has four layers and the disjoint q1 branch has one.
+// The measurement-dependent branch has an unresolved quantum graph.
 // CHECK-LABEL: "measurement_control_dependency": {
-// CHECK: "qubit_disjoint_depth_total": 4
+// CHECK: "qubit_disjoint_depth_status": "unavailable"
+// CHECK-NOT: "qubit_disjoint_depth_total"
+// CHECK: "num_qubits"
 func.func @measurement_control_dependency(%q0: !quantum.bit, %q1: !quantum.bit) {
     %false = arith.constant false
     %a0 = pbc.ppr ["X"](8) %q0 : !quantum.bit
@@ -134,9 +135,11 @@ func.func @measurement_control_dependency(%q0: !quantum.bit, %q1: !quantum.bit) 
 
 // -----
 
-// Storing a condition in memory does not change the qubit-only depth.
+// Loading an unknown branch choice from memory leaves depth unavailable.
 // CHECK-LABEL: "measurement_memory_dependency": {
-// CHECK: "qubit_disjoint_depth_total": 1
+// CHECK: "qubit_disjoint_depth_status": "unavailable"
+// CHECK-NOT: "qubit_disjoint_depth_total"
+// CHECK: "num_qubits"
 func.func @measurement_memory_dependency(%q0: !quantum.bit, %q1: !quantum.bit) {
     %c0 = arith.constant 0 : index
     %memory = memref.alloc() : memref<1xi1>
@@ -235,9 +238,11 @@ func.func private @nested_loop_helper(%q0: !quantum.bit) -> !quantum.bit {
 
 // -----
 
-// Fractional iteration hints must not be truncated to an integer.
+// Fractional iteration hints cannot establish an exact executed graph.
 // CHECK-LABEL: "fractional_iteration_hint": {
-// CHECK: "qubit_disjoint_depth_total": 2.5
+// CHECK: "qubit_disjoint_depth_status": "unavailable"
+// CHECK-NOT: "qubit_disjoint_depth_total"
+// CHECK: "num_qubits"
 func.func @fractional_iteration_hint(%q0: !quantum.bit, %n: index) {
     %c0 = arith.constant 0 : index
     %c1 = arith.constant 1 : index
@@ -250,9 +255,11 @@ func.func @fractional_iteration_hint(%q0: !quantum.bit, %n: index) {
 
 // -----
 
-// The worst branch depth is used, and a following operation respects its output.
+// Unequal switch branches cannot establish one exact dependency graph.
 // CHECK-LABEL: "index_switch_depth": {
-// CHECK: "qubit_disjoint_depth_total": 3
+// CHECK: "qubit_disjoint_depth_status": "unavailable"
+// CHECK-NOT: "qubit_disjoint_depth_total"
+// CHECK: "num_qubits"
 func.func @index_switch_depth(%q0: !quantum.bit, %selector: index) {
     %out = scf.index_switch %selector -> !quantum.bit
     case 0 {
@@ -304,11 +311,9 @@ func.func @unknown_register_index(%index: i64, %size: i64) {
 
 // -----
 
-// A loop that permutes physical wires cannot reuse one iteration's footprint.
-// The conservative analysis must omit its total instead of assuming that each
-// iteration operates on the same physical qubit.
+// A bounded loop follows each physical-wire permutation exactly.
 // CHECK-LABEL: "loop_carried_permutation": {
-// CHECK-NOT: "qubit_disjoint_depth_total"
+// CHECK: "qubit_disjoint_depth_total": 2
 // CHECK: "num_qubits"
 func.func @loop_carried_permutation(%q0: !quantum.bit, %q1: !quantum.bit) {
     %c0 = arith.constant 0 : index

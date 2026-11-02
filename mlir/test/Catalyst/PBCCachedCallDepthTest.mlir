@@ -129,10 +129,9 @@ func.func private @store_measurement(%q: !quantum.bit, %memory: memref<1xi1>) ->
 
 // -----
 
-// A callee may return a locally allocated qubit. Cached allocations are shared
-// conservatively, retaining dependencies instead of inventing parallel wires.
+// Fresh allocations returned by separate calls have distinct physical identities.
 // CHECK-LABEL: "cached_allocated_outputs": {
-// CHECK: "qubit_disjoint_depth_total": 2
+// CHECK: "qubit_disjoint_depth_total": 1
 func.func @cached_allocated_outputs() {
     %a = func.call @allocate_rotated_qubit() : () -> !quantum.bit
     %b = func.call @allocate_rotated_qubit() : () -> !quantum.bit

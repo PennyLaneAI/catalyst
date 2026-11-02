@@ -951,12 +951,12 @@
 
 <h3>Bug fixes 🐛</h3>
 
-* Resource analysis now reports an optional `qubit_disjoint_depth_total` for PBC circuits,
-  accounting for parallel operations and synthesis loops on independent qubits. It
-  retains the existing qubit-only layer metric and local depth fields, allowing consumers
-  to select the inclusive candidate when it improves the existing aggregate.
-  It follows constant wire tensors through helpers, reuses compatible call summaries,
-  and handles lowered magic-state preparations without adding spurious PBC layers.
+* Resource analysis now reports exact logical PBC depth for supported static circuits
+  in `qubit_disjoint_depth_total`, composing dependencies between individual qubits
+  through calls and loops. `qubit_disjoint_depth_status` distinguishes exact results
+  from unavailable results; unresolved dependencies and estimated iteration counts
+  are not silently replaced with approximate totals. Legacy local depth fields remain
+  available for compatibility.
   [(#3426)](https://github.com/PennyLaneAI/catalyst/pull/3426)
 
 * The `--convert-to-value-semantics` pass now correctly handles aliasing qubit references that are

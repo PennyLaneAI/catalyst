@@ -14,9 +14,10 @@
 
 // RUN: quantum-opt -resource-analysis=output-json --split-input-file -verify-diagnostics %s -o /dev/null | FileCheck %s
 
-// An unknown slot can overlap both static slots, so all three sequences serialize.
+// An unresolved slot leaves the exact overlap graph unknown.
 // CHECK-LABEL: "dynamic_serializes_static_slots": {
-// CHECK: "qubit_disjoint_depth_total": 5
+// CHECK-NOT: "qubit_disjoint_depth_total"
+// CHECK: "num_qubits"
 func.func @dynamic_serializes_static_slots(%index: i64) {
     %reg = quantum.alloc(2) : !quantum.reg
     %q0 = quantum.extract %reg[0] : !quantum.reg -> !quantum.bit
@@ -36,9 +37,10 @@ func.func @dynamic_serializes_static_slots(%index: i64) {
 
 // -----
 
-// The uncertainty belongs to the selected register, not every qubit in the circuit.
+// Even separate registers require a resolved graph for this exact analysis.
 // CHECK-LABEL: "independent_dynamic_registers": {
-// CHECK: "qubit_disjoint_depth_total": 2
+// CHECK-NOT: "qubit_disjoint_depth_total"
+// CHECK: "num_qubits"
 func.func @independent_dynamic_registers(%index: i64) {
     %reg0 = quantum.alloc(2) : !quantum.reg
     %reg1 = quantum.alloc(2) : !quantum.reg
@@ -57,9 +59,9 @@ func.func @independent_dynamic_registers(%index: i64) {
 
 // -----
 
-// Repeated dynamic accesses reserve the whole register without expanding the loop.
+// A bounded static loop resolves each induction-dependent slot independently.
 // CHECK-LABEL: "dynamic_register_loop": {
-// CHECK: "qubit_disjoint_depth_total": 5
+// CHECK: "qubit_disjoint_depth_total": 2
 func.func @dynamic_register_loop() {
     %c0 = arith.constant 0 : index
     %c1 = arith.constant 1 : index
@@ -81,9 +83,10 @@ func.func @dynamic_register_loop() {
 
 // -----
 
-// An extracted dynamic qubit can be carried through a synthesis loop unchanged.
+// Carrying an unresolved extraction through a loop does not resolve its identity.
 // CHECK-LABEL: "dynamic_qubit_loop": {
-// CHECK: "qubit_disjoint_depth_total": 3
+// CHECK-NOT: "qubit_disjoint_depth_total"
+// CHECK: "num_qubits"
 func.func @dynamic_qubit_loop(%index: i64) {
     %c0 = arith.constant 0 : index
     %c1 = arith.constant 1 : index
@@ -101,10 +104,10 @@ func.func @dynamic_qubit_loop(%index: i64) {
 
 // -----
 
-// The caller supplies the size and physical slots for a register argument.
-// Repeated calls alias, while a second register can execute independently.
+// Register sizes supplied by a caller do not determine unresolved indices.
 // CHECK-LABEL: "dynamic_register_calls": {
-// CHECK: "qubit_disjoint_depth_total": 4
+// CHECK-NOT: "qubit_disjoint_depth_total"
+// CHECK: "num_qubits"
 // CHECK-LABEL: "dynamic_register_helper": {
 // CHECK-NOT: "qubit_disjoint_depth_total"
 // CHECK: "num_qubits"
@@ -129,9 +132,10 @@ func.func private @dynamic_register_helper(%reg: !quantum.reg, %index: i64) -> !
 
 // -----
 
-// A classical index does not synchronize two disjoint quantum registers.
+// Measurement-dependent indices leave the exact overlap graph unavailable.
 // CHECK-LABEL: "measurement_dependent_dynamic_index": {
-// CHECK: "qubit_disjoint_depth_total": 4
+// CHECK-NOT: "qubit_disjoint_depth_total"
+// CHECK: "num_qubits"
 func.func @measurement_dependent_dynamic_index(%q0: !quantum.bit) {
     %reg = quantum.alloc(2) : !quantum.reg
     %a0 = pbc.ppr ["X"](8) %q0 : !quantum.bit
@@ -153,7 +157,7 @@ func.func private @dynamic_qubit_helper(%q: !quantum.bit) -> !quantum.bit {
 
 // -----
 
-// Equal alias sets do not prove that two dynamic indices select the same qubit.
+// Two unresolved indices cannot be treated as known physical identities.
 // CHECK-LABEL: "different_dynamic_insert_index": {
 // CHECK-NOT: "qubit_disjoint_depth_total"
 // CHECK: "num_qubits"
@@ -201,7 +205,7 @@ func.func @dynamic_insert_after_permutation(%index: i64) {
 
 // -----
 
-// Swapping possible-qubit sets across loop iterations still requires fallback.
+// Loop-carried permutations do not resolve unknown initial qubit identities.
 // CHECK-LABEL: "dynamic_loop_carried_permutation": {
 // CHECK-NOT: "qubit_disjoint_depth_total"
 // CHECK: "num_qubits"

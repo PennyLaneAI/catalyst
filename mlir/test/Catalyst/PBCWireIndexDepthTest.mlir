@@ -125,7 +125,7 @@ func.func private @rotate_second(%wires: tensor<2xi64>, %reg: !quantum.reg) -> !
 
 // A loop-carried tensor can change: the first iteration's constant is not invariant.
 // CHECK-LABEL: "changing_loop_wires": {
-// CHECK: "qubit_disjoint_depth_total": 3
+// CHECK: "qubit_disjoint_depth_total": 2
 func.func @changing_loop_wires() {
     %a = arith.constant dense<[1, 0]> : tensor<2xi64>
     %b = arith.constant dense<[0, 1]> : tensor<2xi64>
@@ -156,7 +156,8 @@ func.func private @rotate_second(%wires: tensor<2xi64>, %reg: !quantum.reg) -> !
 
 // Distinct branch constants cannot be propagated as one known wire tensor.
 // CHECK-LABEL: "changing_branch_wires": {
-// CHECK: "qubit_disjoint_depth_total": 2
+// CHECK-NOT: "qubit_disjoint_depth_total"
+// CHECK: "num_qubits"
 func.func @changing_branch_wires(%condition: i1) {
     %a = arith.constant dense<[1, 0]> : tensor<2xi64>
     %b = arith.constant dense<[0, 1]> : tensor<2xi64>

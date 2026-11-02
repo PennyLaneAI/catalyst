@@ -215,7 +215,9 @@ func.func @dynamic_for_loop(%arg0: !quantum.bit, %n: index) -> !quantum.bit {
 // CHECK:       "PPR-pi/4": 1
 
 // CHECK-LABEL: "pbc_in_dyn_loop"
-// CHECK: "extended_fields": {}
+// CHECK: "extended_fields": {
+// CHECK: "qubit_disjoint_depth_status": "unavailable"
+// CHECK-NOT: "qubit_disjoint_depth_total"
 // CHECK: function_calls
 // CHECK:   "dynamic"
 // CHECK:       "dyn_for_loop_1": "{{0x[0-9a-f]+}}"

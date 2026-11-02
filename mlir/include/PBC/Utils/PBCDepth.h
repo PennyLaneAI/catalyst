@@ -14,6 +14,7 @@
 
 #pragma once
 
+#include <cstdint>
 #include <optional>
 
 namespace mlir {
@@ -22,17 +23,13 @@ class Block;
 
 namespace catalyst::pbc {
 
-// Estimate PBC depth including calls and loops, scheduling disjoint qubits independently.
+// Compute the exact PBC depth of the statically resolved quantum dependency graph.
 // Preserve the qubit-only PBCLayer metric: classical conditions and memory operations
 // do not introduce synchronization or contribute additional layers.
-// Structured regions are conservative atomic reservations of their touched qubits.
-// Small constant wire tensors are propagated through calls, whose summaries are reused
-// only for matching physical bindings and known classical constants.
-// Dynamic indices reserve every slot of a known-size register; matching insertions
-// preserve its identity, while unresolved replacements or permutations omit the total.
-// Automatically growing registers are unsupported.
-// Returns nullopt for unsupported IR, unresolved trip counts, no reachable PBC operations,
-// or exhaustion of the bounded traversal of called functions.
-std::optional<double> computeQubitDisjointDepthTotal(mlir::Block *block);
+// Calls compose per-qubit max-plus transfers. Large loops with invariant quantum
+// graphs use exponentiation; bounded loops may resolve iteration-dependent wires.
+// Returns nullopt for unresolved quantum indices, branch choices or iteration counts,
+// unsupported IR, integer overflow, exhausted analysis budget, or no reachable PBC.
+std::optional<int64_t> computeQubitDisjointDepthTotal(mlir::Block *block);
 
 } // namespace catalyst::pbc

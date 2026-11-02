@@ -306,18 +306,23 @@ def ResourceAnalysisPass : Pass<"resource-analysis"> {
         consumption by the PennyLane frontend.
 
         For supported PBC circuits, `extended_fields.pbc_depth.qubit_disjoint_depth_total`
-        reports an inclusive depth estimate that schedules independent qubits in parallel.
+        reports the exact logical depth of the emitted PBC graph and
+        `qubit_disjoint_depth_status` is `"exact"`.
         It includes called functions and loop iterations; consumers must not add callee
         depths to this total. The existing `any_commuting_depth` and
-        `qubit_disjoint_depth` fields retain their local, additive semantics.
-        Like the existing qubit-disjoint metric, this estimate counts quantum layers
-        without adding latency for classical conditions or memory operations.
-        Consumers can retain the existing aggregate when it is smaller than this
-        conservative candidate.
-        Loops and branches use conservative block summaries, with estimated iteration
-        counts when available. The total is omitted when dependencies or iteration
-        counts cannot be resolved, the circuit contains unsupported quantum operations,
-        or analysis exceeds 1,000,000 operation visits or 256 nested function calls.
+        `qubit_disjoint_depth` fields retain their legacy local, additive semantics
+        for compatibility and must not be mistaken for an exact inclusive result.
+        Each PBC instruction, including a conditional instruction, occupies one layer.
+        Initialization and classical operations add no PBC layers. This is not a
+        hardware runtime or classical feed-forward latency model.
+
+        Calls compose dependencies between individual qubits, and supported static
+        loops compose the same dependencies across iterations. The analysis never
+        substitutes an estimated iteration count or reserves a whole subroutine as
+        a single block. Unresolved wire indices or control flow, unsupported quantum
+        operations, arithmetic overflow, or exhausted analysis limits omit the total
+        and mark the status `"unavailable"` where PBC work is present. Consumers must
+        preserve that uncertainty instead of falling back to a smaller legacy value.
 
         Usage:
             quantum-opt input.mlir -resource-analysis -mlir-pass-statistics
