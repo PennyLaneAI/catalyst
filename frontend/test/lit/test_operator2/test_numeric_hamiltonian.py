@@ -71,7 +71,7 @@ def cdf_concrete(t: float):
     # CHECK-SAME: qubits({{.+}})
     # CHECK: UID
     # CHECK: param_map = {evolution_time = [0], hamiltonian = [1, 2, 3]}
-    # CHECK: qubit_map = {wires = [0, 1, 2, 3]}
+    # CHECK: qubit_map = {wires = [0, 1, 2, 3], work_wires = []}
     qp.TrotterCDF(evolution_time=t, num_trotter_steps=2, hamiltonian=CDF, wires=range(2 * N))
     return qp.state()
 
@@ -158,7 +158,7 @@ def cdf_controlled(t: float):
     # CHECK: UID([[SINGLE_PHASE_UID:[0-9]+]])
     # CHECK: ctrls({{%.+}}) ctrl_vals({{%.+}})
     # CHECK: param_map = {evolution_time = [0], hamiltonian = [1, 2, 3]}
-    # CHECK: qubit_map = {wires = [0, 1, 2, 3]}
+    # CHECK: qubit_map = {wires = [0, 1, 2, 3], work_wires = []}
     qp.ctrl(
         qp.TrotterCDF(evolution_time=t, num_trotter_steps=2, hamiltonian=CDF, wires=range(2 * N)),
         control=[2 * N],
@@ -198,5 +198,5 @@ def cdf_with_rules(t: float):
 # CHECK: func.func private @__builtin__trotter_cdf_decomposition{{(_[0-9]+)?}}
 # CHECK-SAME: evolution_time:[tensor<f64>]
 # CHECK-SAME: hamiltonian:[tensor<2x2x2xf64>,tensor<2x2x2xf64>,tensor<f64>]
-# CHECK-SAME: {wires:4}
+# CHECK-SAME: {wires:4,work_wires:0}
 print(cdf_with_rules.mlir)
