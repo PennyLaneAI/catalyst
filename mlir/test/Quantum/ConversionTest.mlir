@@ -12,9 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: quantum-opt --one-shot-bufferize="bufferize-function-boundaries" \
-// RUN:   --finalize-memref-to-llvm --convert-index-to-llvm --convert-arith-to-llvm \
-// RUN:   --convert-quantum-to-llvm --split-input-file --verify-diagnostics %s | FileCheck %s
+// RUN: quantum-opt --finalize-memref-to-llvm --convert-index-to-llvm --convert-quantum-to-llvm --split-input-file --verify-diagnostics %s | FileCheck %s
 
 ////////////////////////
 // Runtime Management //
@@ -968,10 +966,10 @@ func.func @global_phase(%theta: f64) {
 
 // -----
 
-// Tensor parameters reach the runtime as pointers to descriptors.
+// Memref parameters reach the runtime as pointers to descriptors.
 // CHECK: llvm.func @__catalyst__qis__QubitUnitary(!llvm.ptr, !llvm.ptr, i64, ...)
-// CHECK-LABEL: llvm.func @tensor_unitary
-func.func @tensor_unitary(%q: !quantum.bit, %ctrl: !quantum.bit, %cv: i1, %matrix: tensor<2x2xcomplex<f64>>) -> (!quantum.bit, !quantum.bit) {
+// CHECK-LABEL: llvm.func @memref_unitary
+func.func @memref_unitary(%q: !quantum.bit, %ctrl: !quantum.bit, %cv: i1, %matrix: memref<2x2xcomplex<f64>>) -> (!quantum.bit, !quantum.bit) {
     // CHECK-DAG: [[BUFFER:%.+]] = llvm.alloca {{.*}} x !llvm.struct<(ptr, ptr, i64, array<2 x i64>, array<2 x i64>)>
     // CHECK-DAG: [[MOD:%.+]] = llvm.alloca {{.*}} x !llvm.struct<(i1, i64, ptr, ptr)>
     // CHECK: llvm.store %arg1,
@@ -979,7 +977,7 @@ func.func @tensor_unitary(%q: !quantum.bit, %ctrl: !quantum.bit, %cv: i1, %matri
     // CHECK: llvm.store {{.*}}, [[BUFFER]] : !llvm.struct<(ptr, ptr, i64, array<2 x i64>, array<2 x i64>)>, !llvm.ptr
     // CHECK: [[COUNT:%.+]] = llvm.mlir.constant(1 : i64)
     // CHECK: llvm.call @__catalyst__qis__QubitUnitary([[BUFFER]], [[MOD]], [[COUNT]], %arg0)
-    %out, %out_ctrl = quantum.operator "QubitUnitary"(%matrix: tensor<2x2xcomplex<f64>>)
+    %out, %out_ctrl = quantum.operator "QubitUnitary"(%matrix: memref<2x2xcomplex<f64>>)
         adj qubits(%q) ctrls(%ctrl) ctrl_vals(%cv)
     // CHECK: llvm.insertvalue %arg0, {{.*}}[0]
     // CHECK: llvm.insertvalue %arg1, {{.*}}[1]
@@ -988,16 +986,16 @@ func.func @tensor_unitary(%q: !quantum.bit, %ctrl: !quantum.bit, %cv: i1, %matri
 
 // -----
 
-// Multiple tensor parameters can be interleaved with scalars.
+// Multiple memref parameters can be interleaved with scalars.
 // CHECK: llvm.func @__catalyst__qis__Mixed(!llvm.ptr, f64, !llvm.ptr, !llvm.ptr, !llvm.ptr)
 // CHECK-LABEL: llvm.func @mixed_params
-func.func @mixed_params(%q: !quantum.bit, %theta: f64, %data: tensor<?xf64>, %scalar: tensor<f64>) -> !quantum.bit {
+func.func @mixed_params(%q: !quantum.bit, %theta: f64, %data: memref<?xf64>, %scalar: memref<f64>) -> !quantum.bit {
     // CHECK-DAG: [[DATA:%.+]] = llvm.alloca {{.*}} x !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
     // CHECK-DAG: [[SCALAR:%.+]] = llvm.alloca {{.*}} x !llvm.struct<(ptr, ptr, i64)>
     // CHECK: llvm.store {{.*}}, [[DATA]] : !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>, !llvm.ptr
     // CHECK: llvm.store {{.*}}, [[SCALAR]] : !llvm.struct<(ptr, ptr, i64)>, !llvm.ptr
     // CHECK: llvm.call @__catalyst__qis__Mixed([[DATA]], %arg1, [[SCALAR]], %arg0, {{%.+}})
-    %out = quantum.operator "Mixed"(%data: tensor<?xf64>, %theta: f64, %scalar: tensor<f64>) qubits(%q)
+    %out = quantum.operator "Mixed"(%data: memref<?xf64>, %theta: f64, %scalar: memref<f64>) qubits(%q)
     // CHECK: llvm.return %arg0 : !llvm.ptr
     return %out : !quantum.bit
 }
