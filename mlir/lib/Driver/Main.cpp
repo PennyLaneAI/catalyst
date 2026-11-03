@@ -47,6 +47,7 @@
 #include "Driver/Support.h"
 #include "Driver/Timer.h"
 #include "Gradient/Transforms/BufferizableOpInterfaceImpl.h"
+#include "PBC/Analysis/PBCDepthAnalysis.h"
 #include "QecPhysical/Transforms/BufferizableOpInterfaceImpl.h"
 #include "Quantum/Transforms/BufferizableOpInterfaceImpl.h"
 
@@ -356,6 +357,7 @@ int QuantumDriverMainFromCL(int argc, char **argv) {
     mlir::DialectRegistry registry;
     mlir::registerAllPasses();
     catalyst::registerAllPasses();
+    catalyst::pbc::registerPBCResourceAnalysisExtensions();
     registerAllCatalystPipelines();
     mlirRegisterAllStablehloPasses();
     mlir::stablehlo::registerOptimizationPasses();
