@@ -15,7 +15,9 @@
 #pragma once
 #include <charconv>
 #include <cstddef>
+#include <cstdint>
 #include <cstdio>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -61,6 +63,36 @@ inline int parse_index(std::string_view val, const char *key) {
         char buf[192];
         std::snprintf(buf, sizeof(buf), "config: '%s' must be a non-negative integer, got '%.*s'",
                       key, static_cast<int>(val.size()), val.data());
+        throw TransportError(buf);
+    }
+    return out;
+}
+
+/// The value of the last `key` entry in a `key=value;...` config string, if there is one.
+inline std::optional<std::string_view> find(std::string_view config, std::string_view key) {
+    std::optional<std::string_view> out;
+    for_each_kv(config, [&](std::string_view k, std::string_view val) {
+        if (k == key) {
+            out = val;
+        }
+    });
+    return out;
+}
+
+/// Parse an unsigned integer, decimal or `0x`-prefixed hex. Throws TransportError, naming `key`.
+inline std::uint64_t parse_u64(std::string_view val, const char *key) {
+    int base = 10;
+    if (val.size() > 2 && val[0] == '0' && (val[1] == 'x' || val[1] == 'X')) {
+        base = 16;
+        val.remove_prefix(2);
+    }
+    std::uint64_t out = 0;
+    const char *last = val.data() + val.size();
+    const auto res = std::from_chars(val.data(), last, out, base);
+    if (val.empty() || res.ec != std::errc{} || res.ptr != last) {
+        char buf[192];
+        std::snprintf(buf, sizeof(buf), "config: '%s' must be an unsigned integer, got '%.*s'", key,
+                      static_cast<int>(val.size()), val.data());
         throw TransportError(buf);
     }
     return out;

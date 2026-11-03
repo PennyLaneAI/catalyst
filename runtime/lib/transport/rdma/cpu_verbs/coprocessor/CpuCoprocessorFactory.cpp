@@ -28,7 +28,8 @@ namespace {
 catalyst::transport::CoprocessorSession *make_cpu_coprocessor(const std::string &config) {
     namespace common = catalyst::transport::common;
     const auto cfg = common::parse_backend_config(config);
-    auto *session = new catalyst::transport::cpu_verbs::CpuCoprocessorSession(cfg.dev, cfg.gid);
+    auto *session = new catalyst::transport::cpu_verbs::CpuCoprocessorSession(
+        cfg.dev, cfg.gid, common::frame::geometry_from_config(config));
     session->set_thread_affinity(common::configparser::parse_optional_index(config, "cpu_pin", -1),
                                  common::configparser::parse_optional_index(config, "rt", 0) != 0);
     return session;
@@ -36,3 +37,7 @@ catalyst::transport::CoprocessorSession *make_cpu_coprocessor(const std::string 
 } // namespace
 
 GENERATE_TRANSPORT_COPROCESSOR_FACTORY(CatalystTransportCoprocessor, make_cpu_coprocessor)
+CATALYST_TRANSPORT_BACKEND_CAPS("cpu_verbs", CATALYST_TRANSPORT_ROLE_BIT_COPROCESSOR,
+                                CATALYST_TRANSPORT_MEM_BIT(CpuRam),
+                                CATALYST_TRANSPORT_FRAME_BL16 | CATALYST_TRANSPORT_FRAME_BLV,
+                                CATALYST_TRANSPORT_CONV_BIT(PerMessage), UINT32_MAX, UINT32_MAX, 1)

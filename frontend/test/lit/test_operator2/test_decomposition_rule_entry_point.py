@@ -72,7 +72,7 @@ def test_to_dynamic_argnames():
         print(result)
 
 
-# CHECK: func.func private @"rule_NoParams{}{reg:2}{}"
+# CHECK: func.func private @rule{{(_[0-9]+)?}}
 # CHECK-SAME:   resources = {operations = {
 # CHECK-SAME:   "SingleParam{x:[tensor<2xf64>]}{reg:2}{}" = 1 : i64,
 # CHECK-SAME:   "SingleParam{x:[tensor<f64>]}{reg:2}{}" = 2 : i64
@@ -104,7 +104,7 @@ def test_from_dynamic_argnames():
         print(result)
 
 
-# CHECK: func.func private @"rule_SingleParam{x:[tensor<2xf64>]}{reg:2}{}"
+# CHECK: func.func private @rule{{(_[0-9]+)?}}
 # CHECK-SAME:   resources = {operations = {"NoParams{}{reg:1}{}" = 1 : i64}}
 # CHECK-SAME:   target_gate = "SingleParam{x:[tensor<2xf64>]}{reg:2}{}"
 test_from_dynamic_argnames()
@@ -132,7 +132,7 @@ def test_to_multiple_dynamic_argnames():
         print(result)
 
 
-# CHECK: func.func private @"rule_NoParams{}{reg:1}{}"
+# CHECK: func.func private @rule{{(_[0-9]+)?}}
 # CHECK-SAME:   resources = {operations =
 # CHECK-SAME:   "MultiParams{a:[tensor<f64>],b:[tensor<2x2xi64>],c:[tensor<complex<f64>>]}{reg:1}{}" = 1 : i64
 # CHECK-SAME:   target_gate = "NoParams{}{reg:1}{}"
@@ -163,7 +163,7 @@ def test_from_multiple_dynamic_argnames():
         print(result)
 
 
-# CHECK: func.func private @"rule_MultiParams{a:[tensor<f64>],b:[tensor<i32>,tensor<i32>],c:[tensor<f64>,tensor<f64>]}{reg:2}{}"
+# CHECK: func.func private @rule{{(_[0-9]+)?}}
 # CHECK-SAME:   resources = {operations = {"NoParamsCustomOp{}{wires:2}{}" = 1 : i64}
 # CHECK-SAME:   target_gate = "MultiParams{a:[tensor<f64>],b:[tensor<i32>,tensor<i32>],c:[tensor<f64>,tensor<f64>]}{reg:2}{}"
 test_from_multiple_dynamic_argnames()
@@ -191,7 +191,7 @@ def test_to_multiple_wire_argnames():
         print(result)
 
 
-# CHECK: func.func private @"rule_NoParams{}{reg:1}{}"
+# CHECK: func.func private @rule{{(_[0-9]+)?}}
 # CHECK-SAME:   resources = {operations =
 # CHECK-SAME:   "MultipleRegisters{}{reg1:1,reg2:2}{}" = 1 : i64
 # CHECK-SAME:   target_gate = "NoParams{}{reg:1}{}"
@@ -223,7 +223,7 @@ def test_from_multiple_wire_argnames():
         print(result)
 
 
-# CHECK: func.func private @"rule_MultipleRegisters{}{reg1:2,reg2:3}{}"
+# CHECK: func.func private @rule{{(_[0-9]+)?}}
 # CHECK-SAME: (%[[QREG:arg[0-9]+]]: !qref.reg<5>, %[[WIRES:arg[0-9]+]]: tensor<5xi64>)
 # CHECK-SAME:   resources = {operations = {
 # CHECK-SAME:   "NoParamsCustomOp{}{wires:2}{}" = 1 : i64
@@ -259,7 +259,7 @@ def test_to_compilable_data():
         print(result)
 
 
-# CHECK: func.func private @"rule_NoParams{}{reg:2}{}"
+# CHECK: func.func private @rule{{(_[0-9]+)?}}
 # CHECK-SAME:   resources = {operations = {
 # CHECK-SAME:     "CompilableData{}{wires:1}{a = \22a\22, b = \22b\22, thing = \22thing\22}" = 1 : i64,
 # CHECK-SAME:     "CompilableData{}{wires:1}{a = \22aa\22, b = \22bb\22, thing = \22stuff\22}" = 2 : i64
@@ -303,13 +303,13 @@ def test_from_compilable_data():
         print(result_a10)
 
 
-# CHECK: func.func private @"rule_CompilableData{}{wires:1}{a = 1 : i64, b = 2 : i64, thing = 3 : i64}"
+# CHECK: func.func private @rule{{(_[0-9]+)?}}
 # CHECK-SAME:   resources = {operations = {"SingleParam{x:[tensor<f64>]}{reg:1}{}" = 1 : i64}
 # CHECK-SAME:   target_gate = "CompilableData{}{wires:1}{a = 1 : i64, b = 2 : i64, thing = 3 : i64}"
 # CHECK: stablehlo.constant dense<1.000000e-01> : tensor<f64>
 # CHECK-NOT: stablehlo.constant dense<1.100000e+00> : tensor<f64>
 #
-# CHECK: func.func private @"rule_CompilableData{}{wires:1}{a = 10 : i64, b = 2 : i64, thing = 3 : i64}"
+# CHECK: func.func private @rule{{(_[0-9]+)?}}
 # CHECK-SAME:   resources = {operations = {"SingleParam{x:[tensor<f64>]}{reg:1}{}" = 1 : i64}
 # CHECK-SAME:   target_gate = "CompilableData{}{wires:1}{a = 10 : i64, b = 2 : i64, thing = 3 : i64}"
 # CHECK: stablehlo.constant dense<1.100000e+00> : tensor<f64>
@@ -342,7 +342,7 @@ def test_to_static_data():
         print(result)
 
 
-# CHECK: func.func private @"rule_NoParams{}{reg:2}{}"
+# CHECK: func.func private @rule{{(_[0-9]+)?}}
 # CHECK-DAG: "StaticData{}{reg:1}{}[[[uid_1:[0-9]+]]]" = 1
 # CHECK-DAG: "StaticData{}{reg:1}{}[[[uid_2:[0-9]+]]]" = 2
 # CHECK-DAG:   target_gate = "NoParams{}{reg:2}{}"
@@ -387,12 +387,12 @@ def test_from_static_data():
         print(result_4321)
 
 
-# CHECK: func.func private @"rule_StaticData{}{reg:1}{}[1234]"
+# CHECK: func.func private @rule{{(_[0-9]+)?}}
 # CHECK-SAME:   resources = {operations = {"SingleParam{x:[tensor<f64>]}{reg:1}{}" = 1 : i64}
 # CHECK-SAME:   target_gate = "StaticData{}{reg:1}{}[1234]"
 # CHECK: stablehlo.constant dense<1.000000e-01> : tensor<f64>
 #
-# CHECK: func.func private @"rule_StaticData{}{reg:1}{}[4321]"
+# CHECK: func.func private @rule{{(_[0-9]+)?}}
 # CHECK-SAME:   resources = {operations = {"SingleParam{x:[tensor<f64>]}{reg:1}{}" = 2 : i64}
 # CHECK-SAME:   target_gate = "StaticData{}{reg:1}{}[4321]"
 # CHECK-DAG: stablehlo.constant dense<1.100000e+00> : tensor<f64>
@@ -427,7 +427,7 @@ def test_to_hybrid_wires():
         print(result)
 
 
-# CHECK: func.func private @"rule_NoParams{}{reg:3}{}"
+# CHECK: func.func private @rule{{(_[0-9]+)?}}
 # CHECK-DAG: "HybridWires{}{cwires:3}{}[[[uid_1:[0-9]+]]]" = 1
 # CHECK-DAG: "HybridWires{}{cwires:1}{}[[[uid_2:[0-9]+]]]" = 2
 # CHECK-DAG:   target_gate = "NoParams{}{reg:3}{}"
@@ -470,7 +470,7 @@ def test_from_hybrid_wires():
         print(result)
 
 
-# CHECK: func.func private @"rule_HybridWires{}{}{}[3742]"
+# CHECK: func.func private @rule{{(_[0-9]+)?}}
 # CHECK-SAME:   resources = {operations = {"NoParams{}{reg:1}{}" = 3 : i64}}
 # CHECK-SAME:   target_gate = "HybridWires{}{}{}[3742]"
 # CHECK: idx_attr = 1
@@ -529,7 +529,7 @@ def test_to_hybrid_op():
         print(result)
 
 
-# CHECK: func.func private @"rule_NoParams{}{reg:3}{}"
+# CHECK: func.func private @rule{{(_[0-9]+)?}}
 # CHECK-DAG: "HybridOpArg{angle:[tensor<f64>]}{cwires:1,op:3}{}[[[uid_1:[0-9]+]]]" = 1
 # CHECK-DAG: "HybridOpArg{angle:[tensor<f64>]}{cwires:1,op:3}{}[[[uid_2:[0-9]+]]]" = 2
 # CHECK-DAG:   target_gate = "NoParams{}{reg:3}{}"
@@ -574,7 +574,7 @@ def test_from_hybrid_op():
         print(result)
 
 
-# CHECK: func.func private @"rule_HybridOpArg{angle:[tensor<f64>]}{cwires:1}{}[5678]"
+# CHECK: func.func private @rule{{(_[0-9]+)?}}
 # CHECK-SAME:   resources = {operations = {
 # CHECK-SAME:   "NoParams{}{reg:1}{}" = 1 : i64,
 # CHECK-SAME:   "StaticDataMultiReg{theta:[tensor<f64>]}{reg:1,reg2:2}{}[[[uid:[0-9]+]]]" = 1 : i64
@@ -626,7 +626,7 @@ def test_to_hybrid_op_nested():
         print(result)
 
 
-# CHECK: func.func private @"rule_NoParams{}{reg:3}{}"
+# CHECK: func.func private @rule{{(_[0-9]+)?}}
 # CHECK-SAME: "HybridOpArg{angle:[tensor<f64>]}{cwires:1,op:6}{}[[[uid:[0-9]+]]]" = 1
 # CHECK-SAME:   target_gate = "NoParams{}{reg:3}{}"
 # CHECK: "qref.operator"
@@ -670,7 +670,7 @@ def test_from_hybrid_op_nested():
         print(result)
 
 
-# CHECK: func.func private @"rule_HybridOpArg{angle:[tensor<f64>]}{cwires:1}{}[7654]"
+# CHECK: func.func private @rule{{(_[0-9]+)?}}
 # CHECK-SAME:   resources = {operations = {
 # CHECK-SAME:   "HybridOpArg{angle:[tensor<f64>]}{cwires:1,op:3}{}[[[uid_outer:[0-9]+]]]" = 1 : i64,
 # CHECK-SAME:   "NoParams{}{reg:1}{}" = 1 : i64,
@@ -740,7 +740,7 @@ def test_to_multiple_full_args_op():
         print(result)
 
 
-# CHECK: func.func private @"rule_NoParams{}{reg:3}{}"
+# CHECK: func.func private @rule{{(_[0-9]+)?}}
 # CHECK-DAG: "MultipleFullArgs{angles1:[tensor<f64>],angles2:[tensor<2xf64>]}{hwires1:2,hwires2:1,op1:1,op2:1,reg1:1,reg2:2}{}[[[uid:[0-9]+]]]" = 2
 # CHECK-DAG:   target_gate = "NoParams{}{reg:3}{}"
 # CHECK: "qref.operator"
@@ -788,7 +788,7 @@ def test_from_multiple_full_args_op():
         print(result)
 
 
-# CHECK: func.func private @"rule_MultipleFullArgs{angles1:[tensor<f64>],angles2:[tensor<2xf64>]}{reg1:1,reg2:2}{}[4444]"
+# CHECK: func.func private @rule{{(_[0-9]+)?}}
 # CHECK-SAME:   resources = {operations = {
 # CHECK-SAME:   "NoParams{}{reg:1}{}" = 1 : i64
 # CHECK-SAME:   "SingleParam{x:[tensor<f64>]}{reg:1}{}" = 1 : i64
@@ -835,10 +835,10 @@ def test_multiple_rules():
         print(result)
 
 
-# CHECK: func.func private @"rule1_NoParams{}{reg:1}{}"
+# CHECK: func.func private @rule1{{(_[0-9]+)?}}
 # CHECK-SAME:   resources = {operations = {"SingleParam{x:[tensor<f64>]}{reg:1}{}" = 1 : i64}}
 # CHECK-SAME:   target_gate = "NoParams{}{reg:1}{}"
-# CHECK: func.func private @"rule2_NoParams{}{reg:1}{}"
+# CHECK: func.func private @rule2{{(_[0-9]+)?}}
 # CHECK-SAME:   resources = {operations = {"CompilableData{}{wires:3}{a = \22a\22, b = \22b\22, thing = \22thing\22}" = 1 : i64}}
 # CHECK-SAME:   target_gate = "NoParams{}{reg:1}{}"
 test_multiple_rules()
@@ -878,7 +878,7 @@ def test_for_loop():
         print(result)
 
 
-# CHECK: func.func private @test_rule_TestID
+# CHECK: func.func private @test_rule{{(_[0-9]+)?}}
 # CHECK-SAME:   resources = {operations = {"TestRX{0:[f64]}{wires:1}{}" = 3 : i64}}
 # CHECK-SAME:   target_gate = "TestID"
 # CHECK-DAG: arith.constant 0 : index
@@ -990,7 +990,7 @@ def test_rule_with_helper_functions():
         print(result)
 
 
-# CHECK: func.func private @"rule_NoParams{}{reg:1}{}"
+# CHECK: func.func private @rule{{(_[0-9]+)?}}
 # CHECK-SAME:   resources = {operations = {
 # CHECK-SAME:   "MultiParams{a:[tensor<f64>],b:[tensor<f64>],c:[tensor<f64>]}{reg:1}{}" = 1 : i64
 # CHECK-SAME:   target_gate = "NoParams{}{reg:1}{}"
@@ -1021,7 +1021,7 @@ def test_frontend_name_attr():
         )
 
 
-# CHECK-LABEL: func.func private @"frontend_rule_NoParams{}{reg:2}{}"
+# CHECK-LABEL: func.func private @frontend_rule{{(_[0-9]+)?}}
 # CHECK-SAME: frontend_name = "frontend_rule"
 # CHECK-SAME: target_gate = "NoParams{}{reg:2}{}"
 test_frontend_name_attr()

@@ -23,10 +23,15 @@
 
 namespace {
 catalyst::transport::ControllerSession *make_fpga_controller(const std::string &config) {
-    const auto cfg = rdma::devices::fpga_verbs::parse_fpga_config(config);
+    const auto cfg = catalyst::transport::common::parse_fpga_config(config);
     return new rdma::devices::fpga_verbs::FpgaControllerSession(
         cfg.dev, cfg.gid, cfg.ring, cfg.stride_log2, cfg.data_mem, cfg.reply_mem);
 }
 } // namespace
 
 GENERATE_TRANSPORT_CONTROLLER_FACTORY(CatalystTransportController, make_fpga_controller)
+CATALYST_TRANSPORT_BACKEND_CAPS("fpga_verbs", CATALYST_TRANSPORT_ROLE_BIT_CONTROLLER,
+                                CATALYST_TRANSPORT_MEM_BIT(CpuRam) |
+                                    CATALYST_TRANSPORT_MEM_BIT(Ddr) |
+                                    CATALYST_TRANSPORT_MEM_BIT(Other),
+                                CATALYST_TRANSPORT_FRAME_BL16, 0, 8, 8, 16)

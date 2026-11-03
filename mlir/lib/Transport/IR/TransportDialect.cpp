@@ -73,9 +73,9 @@ LogicalResult BacklineAttr::verify(function_ref<InFlightDiagnostic()> emitError,
     if (!controller) {
         return emitError() << "backline requires a controller";
     }
-    if (!transport || (transport.getValue() != "rdma" && transport.getValue() != "memcpy" &&
-                       transport.getValue() != "none")) {
-        return emitError() << "backline transport must be 'rdma', 'memcpy' or 'none'";
+    // Any transport a registered backend implements; the frontend resolves the name.
+    if (!transport || transport.getValue().empty()) {
+        return emitError() << "backline requires a transport";
     }
 
     if (transport.getValue() == "none" && !coprocessors.empty()) {

@@ -28,6 +28,7 @@ from pennylane.typing import Float, Wire
 from catalyst.decomposition.decomposition_rules import (
     materialize_reachable_rule_strings,
 )
+from catalyst.decomposition.modifier_state import ModifierState
 
 
 def _base_rule():
@@ -68,12 +69,12 @@ def test_registered_self_adjoint_rule_targets_the_adjoint_op():
                     wire_lens={"reg": 2},
                     static_data={},
                     op_cls=NoParams,
-                    adjoint=True,
+                    modifiers=ModifierState(adjoint=True),
                 )
             )
         )
 
-    # CHECK-DAG: func.func private @"__builtin_self_adjoint_Adjoint(NoParams){}{reg:2}{}"(%arg0: !qref.reg<2>, %arg1: tensor<2xi64>){{.*}}"NoParams{}{reg:2}{}" = 1 : i64{{.*}}target_gate = "Adjoint(NoParams){}{reg:2}{}"
+    # CHECK-DAG: func.func private @__builtin_self_adjoint{{(_[0-9]+)?}}(%arg0: !qref.reg<2>, %arg1: tensor<2xi64>){{.*}}"NoParams{}{reg:2}{}" = 1 : i64{{.*}}target_gate = "Adjoint(NoParams){}{reg:2}{}"
 
 
 test_registered_self_adjoint_rule_targets_the_adjoint_op()
@@ -100,12 +101,12 @@ def test_registered_symbolic_rule_accepts_mcm():
                     wire_lens={"reg": 1},
                     static_data={},
                     op_cls=NoParams,
-                    adjoint=True,
+                    modifiers=ModifierState(adjoint=True),
                 )
             )
         )
 
-    # CHECK-LABEL: func.func private @"__builtin_rule_with_mcm_Adjoint(NoParams){}{reg:1}{}"
+    # CHECK-LABEL: func.func private @__builtin_rule_with_mcm{{(_[0-9]+)?}}
     # CHECK-SAME: target_gate = "Adjoint(NoParams){}{reg:1}{}"
 
 
@@ -139,13 +140,13 @@ def test_registered_control_rule_targets_the_controlled_op():
                     wire_lens={"reg": 2},
                     static_data={},
                     op_cls=NoParams,
-                    n_ctrls=2,
+                    modifiers=ModifierState(control_count=2),
                 )
             )
         )
 
-    # CHECK-DAG: func.func private @"__builtin_controlled_2C(NoParams){}{reg:2}{}"(%arg0: !qref.reg<4>, %arg1: tensor<2xi64>, %arg2: tensor<2xi64>){{.*}}target_gate = "2C(NoParams){}{reg:2}{}"
-    # CHECK-DAG: func.func private @"__builtin_base_rule_2C(NoParams){}{reg:2}{}"{{.*}}"2C(SingleParam){x:[tensor<f64>]}{reg:2}{}" = 1 : i64{{.*}}target_gate = "2C(NoParams){}{reg:2}{}"
+    # CHECK-DAG: func.func private @__builtin_controlled{{(_[0-9]+)?}}(%arg0: !qref.reg<4>, %arg1: tensor<2xi64>, %arg2: tensor<2xi64>, %arg3: tensor<2xi1>){{.*}}target_gate = "2C(NoParams){}{reg:2}{}"
+    # CHECK-DAG: func.func private @__builtin_base_rule{{(_[0-9]+)?}}{{.*}}"2C(SingleParam){x:[tensor<f64>]}{reg:2}{}" = 1 : i64{{.*}}target_gate = "2C(NoParams){}{reg:2}{}"
 
 
 test_registered_control_rule_targets_the_controlled_op()

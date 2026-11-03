@@ -16,7 +16,7 @@
 
 # RUN: %PYTHON %s | FileCheck %s
 
-from catalyst.compiler import _quantum_opt, canonicalize, to_llvmir
+from catalyst.compiler import _quantum_opt, canonicalize, to_llvm_opt
 
 
 def test_opt_happy_path():
@@ -66,7 +66,7 @@ def test_to_llvmir():
         }
     }
     """
-    output = to_llvmir(stdin=mlir)
+    output = to_llvm_opt(stdin=mlir)
     print(output)
 
 

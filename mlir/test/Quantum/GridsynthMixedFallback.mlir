@@ -47,9 +47,10 @@
 // CHECK:       } else {
 // CHECK:       } {catalyst.estimated_probability = 2.440000e-02 : f64}
 // CHECK:       [[TOTAL_PHASE:%.+]] = arith.addf [[PHASE]], [[IF]]#1
-// CLIFFORD:    return [[IF]]#0, [[TOTAL_PHASE]]
+// CLIFFORD:    quantum.gphase([[TOTAL_PHASE]])
 // PPR:         [[CY_TOTAL_PHASE:%.+]] = arith.addf [[TOTAL_PHASE]], [[CY_PHASES]]
-// PPR:         return [[IF]]#0, [[CY_TOTAL_PHASE]]
+// PPR:         quantum.gphase([[CY_TOTAL_PHASE]])
+// CHECK:       return [[IF]]#0 : !quantum.bit
 
 // CHECK-LABEL: @test_rz_mixed_fallback_decomposition
 func.func @test_rz_mixed_fallback_decomposition(%arg0: !quantum.bit, %theta: f64) -> !quantum.bit {

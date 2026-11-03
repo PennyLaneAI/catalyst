@@ -110,14 +110,8 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<stablehlo::Scatte
         // (C17) size(input_batching_dims) == size(scatter_indices_batching_dims)
         // Implies:
         // If there is no input_batching_dims and no scatter_indices_batching
-        // TODO: This will always be success until we update our version of mlir-hlo.
-        // It looks we are using an old version where getInputBatchingDims was not yet available.
-        // See here:
-        // https://github.com/tensorflow/mlir-hlo/commit/5ac7c579c52ef02b13c29886a98672c2ade7c9b0
-        return success();
-        // Until then, keep this code commented:
-        //   auto scatterDimNumbers = op.getScatterDimensionNumbers();
-        //   return scatterDimNumbers.getInputBatchingDims().empty() ? success() : failure();
+        auto scatterDimNumbers = op.getScatterDimensionNumbers();
+        return scatterDimNumbers.getInputBatchingDims().empty() ? success() : failure();
     }
 
     mlir::LogicalResult singleFullSlices(stablehlo::ScatterOp op) const {
@@ -234,9 +228,13 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<stablehlo::Scatte
         Location loc = op.getLoc();
 
         // TODO: upstream to mlir-hlo and stablehlo
-        for (size_t i = 0, inputDim = 0, updateDim = 0; i < inputShape.size(); i++) {
-            if (llvm::is_contained(insertedWindowDims, i)) {
-                int scatterDimIndex = scatterDimsToOperandDims[inputDim];
+        // scatter_dims_to_operand_dims[k] is the input dim whose start offset is
+        // scatter_indices[k]; input dims it does not name start at 0. Inserted window dims have
+        // size 1, the others take the size of the next update window dim.
+        for (size_t inputDim = 0, updateDim = 0; inputDim < inputShape.size(); inputDim++) {
+            auto it = llvm::find(scatterDimsToOperandDims, static_cast<int64_t>(inputDim));
+            if (it != scatterDimsToOperandDims.end()) {
+                int64_t scatterDimIndex = std::distance(scatterDimsToOperandDims.begin(), it);
                 Value scatterDimVal = index::ConstantOp::create(rewriter, loc, scatterDimIndex);
                 auto extractOp =
                     tensor::ExtractOp::create(rewriter, loc, scatterIndices, scatterDimVal)
@@ -246,26 +244,14 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<stablehlo::Scatte
                         .getResult();
                 dynOffsets.push_back(indexCastOp);
                 staticOffsets.push_back(ShapedType::kDynamic);
-                staticSizes.push_back(1);
-            } else if (updateDim == inputDim) {
-                int scatterDimIndex = scatterDimsToOperandDims[inputDim];
-                Value scatterDimVal = index::ConstantOp::create(rewriter, loc, scatterDimIndex);
-                auto extractOp =
-                    tensor::ExtractOp::create(rewriter, loc, scatterIndices, scatterDimVal)
-                        .getResult();
-                auto indexCastOp =
-                    arith::IndexCastOp::create(rewriter, loc, rewriter.getIndexType(), extractOp)
-                        .getResult();
-                dynOffsets.push_back(indexCastOp);
-                staticOffsets.push_back(ShapedType::kDynamic);
-                staticSizes.push_back(updateShape[updateDim]);
-                updateDim++;
             } else {
                 staticOffsets.push_back(0);
-                staticSizes.push_back(updateShape[updateDim]);
-                updateDim++;
             }
-            inputDim++;
+            if (llvm::is_contained(insertedWindowDims, inputDim)) {
+                staticSizes.push_back(1);
+            } else {
+                staticSizes.push_back(updateShape[updateDim++]);
+            }
             staticStrides.push_back(1);
         }
 
@@ -288,6 +274,14 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<stablehlo::Scatte
             op.emitError() << "Only one input, update, and result";
             return failure();
         }
+
+        // The index computation below has no batching dims; stablehlo-compatibility-expander
+        // rewrites them away beforehand.
+        if (failed(noBatching(op))) {
+            op.emitError() << "Scatter with batching dims is not supported";
+            return failure();
+        }
+
         // Compute operation hash in case they are more than one scatter and they have different
         // update function
         auto opHash = OperationEquivalence::computeHash(op);

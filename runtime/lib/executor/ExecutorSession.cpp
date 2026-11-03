@@ -220,10 +220,14 @@ createSimpleRemoteMemoryManager(SimpleRemoteEPC &SREPC) {
              {SAs.Release, rt::SimpleExecutorMemoryManagerReleaseWrapperName}})) {
         return std::move(Err);
     }
-    // 1 GB for object's sections (e.g .text, .rodata, ...)
-    // It will be released once the Session is destroyed.
-    // TODO: we might want to make this configurable.
+    // Room for the objects' sections (e.g .text, .rodata, ...), released once the Session is
+    // destroyed. Overridable via CATALYST_REMOTE_SLAB_BYTES; defaults to 1 GB.
     size_t SlabSize = 1024 * 1024 * 1024;
+    if (const char *env = std::getenv("CATALYST_REMOTE_SLAB_BYTES")) {
+        if (auto bytes = std::strtoull(env, nullptr, 10)) { // 0 on garbage: keep the default
+            SlabSize = static_cast<size_t>(bytes);
+        }
+    }
     return MapperJITLinkMemoryManager::CreateWithMapper<SimpleRemoteMemoryMapper>(SlabSize, SREPC,
                                                                                   SAs);
 }

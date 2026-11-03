@@ -37,6 +37,8 @@ void createQuantumCompilationStage(OpPassManager &pm) {
     parsePassPipeline(getQuantumCompilationStage(), pm);
 }
 
+void createUserTransformStage(OpPassManager &pm) { parsePassPipeline(getUserTransformStage(), pm); }
+
 void createHLOLoweringStage(OpPassManager &pm) { parsePassPipeline(getHLOLoweringStage(), pm); }
 
 void createGradientLoweringStage(OpPassManager &pm) {
@@ -61,6 +63,11 @@ void registerQuantumCompilationStage() {
     PassPipelineRegistration<>("quantum-compilation-stage",
                                "Register quantum compilation stage as a pass.",
                                createQuantumCompilationStage);
+}
+
+void registerUserTransformStage() {
+    PassPipelineRegistration<>("user-transform-stage", "Register user transform stage as a pass.",
+                               createUserTransformStage);
 }
 
 void registerHLOLoweringStage() {
@@ -93,6 +100,7 @@ void registerDefaultCatalystPipeline() {
 
 void registerAllCatalystPipelines() {
     registerQuantumCompilationStage();
+    registerUserTransformStage();
     registerHLOLoweringStage();
     registerGradientLoweringStage();
     registerBufferizationStage();

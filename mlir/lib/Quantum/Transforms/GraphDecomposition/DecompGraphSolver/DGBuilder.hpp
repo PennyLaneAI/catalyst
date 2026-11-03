@@ -15,11 +15,11 @@
 /**
  * @file DGBuilder.hpp
  *
- * @brief This file implements the DecompositionGraph class, which constructs a graph
- * representation of the decomposition problem based on the provided operators, gateset,
- * and rules. The graph is built using the Boost Graph Library, where vertices represent
- * operators and rules, and edges represent the relationships between them according to
- * the decomposition rules.
+ * @brief This file implements the DecompositionGraph class, which holds the decomposition problem
+ * defined by the provided operators, gateset, and rules. Operators are the graph's nodes and each
+ * rule is a hyperedge from its input operators to its output operator; the graph is stored as a
+ * map from each operator to the rules that decompose it, which is all the solver needs to traverse
+ * it.
  */
 
 #pragma once
@@ -49,10 +49,9 @@ class DecompositionGraph {
     /**
      * @brief Constructs the decomposition graph from the given operators, gateset, and rules.
      *
-     * The constructor initializes the graph by registering all operators and rules, creating
-     * vertices for them, and adding edges according to the decomposition rules. The graph is
-     * built in such a way that it can be efficiently traversed by the decomposition solver
-     * to find optimal decompositions of the target gates.
+     * The constructor registers every operator (the given ones and those appearing in rules) and
+     * indexes the rules by the operator they decompose, so the solver can look up an operator's
+     * rules directly.
      *
      * @param operators The list of operators that are used in the decomposition rules and gateset.
      * @param gateset The target gateset that we want to decompose into, along with their

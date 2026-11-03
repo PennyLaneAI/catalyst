@@ -24,7 +24,7 @@
 #include <vector>
 
 #include "FpgaControllerSession.hpp"
-#include "WireProtocol.hpp"
+#include "Frame.hpp"
 
 #include <execinfo.h>
 #include <fcntl.h>
@@ -47,7 +47,7 @@ struct Args {
     std::uint16_t port    = 18560;
     std::uint64_t iters   = 1000;
     std::uint64_t warmup  = 0;
-    std::uint32_t ring    = static_cast<std::uint32_t>(K_RING_SLOTS);
+    std::uint32_t ring    = frame::BL16_RING.slots;
     std::uint32_t stride_log2      = 6;
     std::uint32_t syndrome_bytes   = sizeof(std::uint64_t);
     std::uint32_t correction_bytes = sizeof(std::uint64_t);
@@ -226,7 +226,7 @@ int main(int argc, char **argv) {
             .oob_port = a.port,
         };
         s.connect(ci);
-        MemRegion m = s.alloc_memory(REGION_BYTES, MemKind::CpuRam);
+        MemRegion m = s.alloc_memory(frame::BL16_RING.region_bytes(), MemKind::CpuRam);
         PeerRef p = s.exchange_keys(m);
         ChannelDesc desc{
             .transport = "rdma",

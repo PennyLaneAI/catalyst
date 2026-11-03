@@ -16,9 +16,11 @@
 
 #include <algorithm>
 #include <array>
+#include <bit>
 #include <cassert>
 #include <cmath>
 #include <complex>
+#include <cstdint>
 #include <optional>
 #include <sstream>
 #include <string>
@@ -324,119 +326,305 @@ std::pair<std::vector<PPRGateType>, double> eval_ross_algorithm_ppr(double angle
     return result;
 }
 
+namespace {
+
+// A 2x2 complex matrix in row-major order.
+using Matrix2 = std::array<std::complex<double>, 4>;
+
+Matrix2 multiply(const Matrix2 &a, const Matrix2 &b) {
+    return {a[0] * b[0] + a[1] * b[2], a[0] * b[1] + a[1] * b[3], a[2] * b[0] + a[3] * b[2],
+            a[2] * b[1] + a[3] * b[3]};
+}
+
+Matrix2 dagger(const Matrix2 &a) {
+    return {std::conj(a[0]), std::conj(a[2]), std::conj(a[1]), std::conj(a[3])};
+}
+
+const Matrix2 IDENTITY_MATRIX = {1.0, 0.0, 0.0, 1.0};
+// X, Y and Z, indexed by the Pauli axis of the PPRs.
+const std::array<Matrix2, 3> PAULI_MATRICES = {Matrix2{0.0, 1.0, 1.0, 0.0},
+                                               Matrix2{0.0, {0.0, -1.0}, {0.0, 1.0}, 0.0},
+                                               Matrix2{1.0, 0.0, 0.0, -1.0}};
+constexpr int AXIS_Z = 2;
+constexpr size_t NUM_GATE_TYPES = 10;
+
+// The following helpers rely on the order of `PPRGateType`: after I, each Pauli axis has the
+// cases P2, P4, P8, adjP2, adjP4, adjP8.
+
+PPRGateType pi_8_ppr(int axis, bool adjoint) {
+    return static_cast<PPRGateType>(1 + 6 * axis + (adjoint ? 3 : 0) + 2);
+}
+
+PPRGateType ppr_adjoint(PPRGateType gate) {
+    int index = static_cast<int>(gate) - 1;
+    return static_cast<PPRGateType>(1 + index / 6 * 6 + (index % 6 + 3) % 6);
+}
+
+bool is_pi_4_ppr(PPRGateType gate) { return (static_cast<int>(gate) - 1) % 3 == 1; }
+
 /**
- * @brief Try to convert a pair of gates for HST_to_PPR
- * @return std::pair<bool, double> true if a pair rule matched and was appended; false otherwise.
- * and the global phase update.
+ * @brief The matrix of the PPR `gate`, which must not be `PPRGateType::I`.
  */
-std::pair<bool, double> try_append_pair_expansion(std::vector<PPRGateType> &out, GateType current,
-                                                  GateType next) {
-    // We only care if the first gate is HT or SHT
-    if (current != GateType::HT && current != GateType::SHT) {
-        return {false, 0.0};
-    }
+Matrix2 ppr_matrix(PPRGateType gate) {
+    static constexpr std::array<int, 6> kinds = {2, 4, 8, -2, -4, -8};
+    int index = static_cast<int>(gate) - 1;
+    const Matrix2 &pauli = PAULI_MATRICES[index / 6];
+    double angle = M_PI / kinds[index % 6];
+    std::complex<double> c = std::cos(angle);
+    std::complex<double> s = {0.0, -std::sin(angle)};
+    return {c + s * pauli[0], s * pauli[1], s * pauli[2], c + s * pauli[3]};
+}
 
-    // Rule: HT, HT -> X8, Z8
-    if (current == GateType::HT && next == GateType::HT) {
-        out.insert(out.end(), {PPRGateType::X8, PPRGateType::Z8});
-        return {true, -M_PI / 4.0};
-    }
-
-    // Rule: HT, SHT -> X4, X8, Z8
-    if (current == GateType::HT && next == GateType::SHT) {
-        out.insert(out.end(), {PPRGateType::X4, PPRGateType::X8, PPRGateType::Z8});
-        return {true, -M_PI / 2.0};
-    }
-
-    // Rule: SHT, HT -> Z4, X8, Z8
-    if (current == GateType::SHT && next == GateType::HT) {
-        out.insert(out.end(), {PPRGateType::Z4, PPRGateType::X8, PPRGateType::Z8});
-        return {true, -M_PI / 2.0};
-    }
-
-    // Rule: SHT, SHT -> Z4, X4, X8, Z8
-    if (current == GateType::SHT && next == GateType::SHT) {
-        out.insert(out.end(), {PPRGateType::Z4, PPRGateType::X4, PPRGateType::X8, PPRGateType::Z8});
-        return {true, -3 * M_PI / 4.0};
-    }
-
-    return {false, 0.0};
+bool contains_t(GateType gate) {
+    return gate == GateType::T || gate == GateType::HT || gate == GateType::SHT;
 }
 
 /**
- * @brief Convert single gate for HST_to_PPR and return the global phase update.
+ * @brief The Clifford that `gate` applies before its T gate (I for T, H for HT and H S for SHT),
+ * or the gate itself if it is a Clifford gate.
  */
-double append_single_gate_expansion(std::vector<PPRGateType> &out, GateType gate) {
-    switch (gate) {
-    case GateType::T:
-        out.emplace_back(PPRGateType::Z8);
-        return -M_PI / 8.0;
-    case GateType::I:
-        out.emplace_back(PPRGateType::I);
-        return 0.0;
-    case GateType::X:
-        out.emplace_back(PPRGateType::X2);
-        return -M_PI / 2.0;
-    case GateType::Y:
-        out.emplace_back(PPRGateType::Y2);
-        return -M_PI / 2.0;
-    case GateType::Z:
-        out.emplace_back(PPRGateType::Z2);
-        return -M_PI / 2.0;
-    case GateType::H:
-        out.insert(out.end(), {PPRGateType::Z4, PPRGateType::X4, PPRGateType::Z4});
-        return -M_PI / 2.0;
-    case GateType::S:
-        out.emplace_back(PPRGateType::Z4);
-        return -M_PI / 4.0;
-    case GateType::Sd:
-        out.emplace_back(PPRGateType::adjZ4);
-        return M_PI / 4.0;
-    case GateType::HT:
-        // Applied commutation rules via PPR playground
-        out.insert(out.end(), {PPRGateType::X8, PPRGateType::Z4, PPRGateType::X4, PPRGateType::Z4});
-        return -5 * M_PI / 8.0;
-    case GateType::SHT:
-        // Applied commutation rules via PPR playground
-        out.insert(out.end(),
-                   {PPRGateType::adjY8, PPRGateType::adjX4, PPRGateType::Z4, PPRGateType::Z2});
-        return -7 * M_PI / 8.0;
-    default:
-        RT_FAIL("Unknown GateType encountered.");
-    }
+Matrix2 clifford_part(GateType gate) {
+    const Matrix2 h = {M_SQRT1_2, M_SQRT1_2, M_SQRT1_2, -M_SQRT1_2};
+    const Matrix2 s = {1.0, 0.0, 0.0, {0.0, 1.0}};
+    // In the order of `GateType`: T, HT, SHT, I, X, Y, Z, H, S, Sd.
+    const std::array<Matrix2, NUM_GATE_TYPES> parts = {IDENTITY_MATRIX,
+                                                       h,
+                                                       multiply(h, s),
+                                                       IDENTITY_MATRIX,
+                                                       PAULI_MATRICES[0],
+                                                       PAULI_MATRICES[1],
+                                                       PAULI_MATRICES[2],
+                                                       h,
+                                                       s,
+                                                       dagger(s)};
+    return parts[static_cast<size_t>(gate)];
 }
 
 /**
- * @brief Converts a sequence of GateType in Clifford+T basis to PPR basis
- * using predefined conversion rules.
- * @param input_gates The input vector of GateType representing the Clifford+T sequence.
- * @return std::pair<std::vector<PPRGateType>, double> The converted vector of PPRGateType and
- * the global phase update.
+ * @brief Find the index j and the phase d with `matrix` = e^{iπ d/4} `representatives[j]`.
  */
-std::pair<std::vector<PPRGateType>, double> HST_to_PPR(const std::vector<GateType> &input_gates) {
-    std::vector<PPRGateType> output_gates;
-    output_gates.reserve(input_gates.size() * 2);
-    double phase_update = 0;
+std::optional<std::pair<uint8_t, int>>
+identify_clifford(const std::vector<Matrix2> &representatives, const Matrix2 &matrix) {
+    for (size_t j = 0; j < representatives.size(); j++) {
+        Matrix2 quotient = multiply(dagger(representatives[j]), matrix);
+        // The unitary `quotient` is a multiple of the identity if and only if |tr(quotient)| = 2.
+        std::complex<double> half_trace = (quotient[0] + quotient[3]) / 2.0;
+        if (std::abs(std::abs(half_trace) - 1.0) < 1e-9) {
+            int d = static_cast<int>(std::lround(std::arg(half_trace) / (M_PI / 4.0)));
+            return std::pair<uint8_t, int>{j, (d % 8 + 8) % 8};
+        }
+    }
+    return std::nullopt;
+}
 
-    size_t i = 0;
-    while (i < input_gates.size()) {
-        // Try to consume a pair
-        if (i + 1 < input_gates.size()) {
-            if (auto [success, phase] =
-                    try_append_pair_expansion(output_gates, input_gates[i], input_gates[i + 1]);
-                success) {
-                phase_update += phase;
-                i += 2; // Consumed two gates
-                continue;
+constexpr size_t NUM_CLIFFORDS = 24;
+constexpr uint8_t IDENTITY_CLIFFORD = 0;
+// Sets of Cliffords are bit masks over their indices.
+constexpr uint32_t ALL_CLIFFORDS = (uint32_t{1} << NUM_CLIFFORDS) - 1;
+
+/**
+ * @brief Transition tables of the 24 single-qubit Cliffords up to global phase.
+ *
+ * The Clifford with index i is represented by the product C_i in SU(2) of its PPR sequence
+ * `tail[i]`, a shortest sequence of π/4 and π/2 PPRs (C_0 = I). Phases are counted in steps of
+ * π/8. For a gate g, `next`, `phase` and `rotation` describe
+ *   g C_i = e^{iπ phase/8} C_next             if g is a Clifford gate,
+ *   g C_i = e^{iπ phase/8} C_next R_P(π/8)    if g contains a T gate,
+ * where R_P(π/8) = exp(-iπ/8 P) is the PPR `rotation` about the signed Pauli P = C_next^† Z C_next.
+ * Using T = S T^† instead of T, the gates containing a T gate may alternatively be written as
+ *   g C_i = e^{iπ (phase + flip_phase)/8} C_flip_next R_P(-π/8)
+ * with `flip_next` and `flip_phase` taken at index `next`.
+ */
+struct CliffordTables {
+    std::array<std::array<uint8_t, NUM_GATE_TYPES>, NUM_CLIFFORDS> next;
+    std::array<std::array<int, NUM_GATE_TYPES>, NUM_CLIFFORDS> phase;
+    std::array<std::array<PPRGateType, NUM_GATE_TYPES>, NUM_CLIFFORDS> rotation;
+    std::array<uint8_t, NUM_CLIFFORDS> flip_next;
+    std::array<int, NUM_CLIFFORDS> flip_phase;
+    // The inverses of the permutations `next[.][g]` and `flip_next`.
+    std::array<std::array<uint8_t, NUM_GATE_TYPES>, NUM_CLIFFORDS> previous;
+    std::array<uint8_t, NUM_CLIFFORDS> flip_previous;
+    std::array<std::vector<PPRGateType>, NUM_CLIFFORDS> tail;
+    // The number of π/4 PPRs and the total number of PPRs of `tail`, to be minimized in this order.
+    std::array<std::pair<int, int>, NUM_CLIFFORDS> tail_cost;
+};
+
+CliffordTables build_clifford_tables() {
+    CliffordTables tables;
+
+    // Breadth-first search over the π/4 and π/2 PPRs, so every Clifford takes at most two PPRs.
+    // Among the shortest sequences, the search keeps the first one in the generator order below,
+    // which prefers Z and X rotations over Y rotations.
+    const std::array<PPRGateType, 9> generators = {
+        PPRGateType::Z4,    PPRGateType::adjZ4, PPRGateType::X4,
+        PPRGateType::adjX4, PPRGateType::Z2,    PPRGateType::X2,
+        PPRGateType::Y4,    PPRGateType::adjY4, PPRGateType::Y2};
+    std::vector<Matrix2> representatives = {IDENTITY_MATRIX};
+    std::vector<std::vector<PPRGateType>> tails = {{}};
+    for (size_t i = 0; i < representatives.size(); i++) {
+        for (PPRGateType generator : generators) {
+            Matrix2 product = multiply(ppr_matrix(generator), representatives[i]);
+            if (!identify_clifford(representatives, product)) {
+                representatives.push_back(product);
+                tails.push_back(tails[i]);
+                tails.back().push_back(generator);
+            }
+        }
+    }
+    RT_FAIL_IF(representatives.size() != NUM_CLIFFORDS,
+               "There are 24 single-qubit Cliffords up to global phase.");
+
+    auto identify = [&](const Matrix2 &matrix) {
+        auto found = identify_clifford(representatives, matrix);
+        RT_FAIL_IF(!found, "Expected a Clifford.");
+        return *found;
+    };
+    const Matrix2 s = clifford_part(GateType::S);
+    for (size_t i = 0; i < NUM_CLIFFORDS; i++) {
+        tables.tail[i] = tails[i];
+        int num_pi_4 = std::count_if(tails[i].begin(), tails[i].end(), is_pi_4_ppr);
+        tables.tail_cost[i] = {num_pi_4, static_cast<int>(tails[i].size())};
+
+        for (size_t g = 0; g < NUM_GATE_TYPES; g++) {
+            GateType gate = static_cast<GateType>(g);
+            auto [j, d] = identify(multiply(clifford_part(gate), representatives[i]));
+            tables.next[i][g] = j;
+            tables.previous[j][g] = i;
+            tables.phase[i][g] = 2 * d;
+            tables.rotation[i][g] = PPRGateType::I;
+            if (contains_t(gate)) {
+                // T = e^{iπ/8} R_Z(π/8) and R_Z(π/8) C_j = C_j R_P(π/8) with P = C_j^† Z C_j.
+                tables.phase[i][g] += 1;
+                const Matrix2 &frame = representatives[j];
+                Matrix2 image = multiply(dagger(frame), multiply(PAULI_MATRICES[AXIS_Z], frame));
+                for (int axis = 0; axis < 3; axis++) {
+                    Matrix2 overlap = multiply(PAULI_MATRICES[axis], image);
+                    double coefficient = (overlap[0] + overlap[3]).real() / 2.0;
+                    if (std::abs(coefficient) > 0.5) {
+                        tables.rotation[i][g] = pi_8_ppr(axis, coefficient < 0);
+                    }
+                }
             }
         }
 
-        // Fallback to consuming a single gate
-        phase_update += append_single_gate_expansion(output_gates, input_gates[i]);
-        i += 1; // Consumed one gate
+        // T = S T^† = e^{-iπ/8} S R_Z(-π/8), which changes the phase by -2 steps besides that of S.
+        auto [k, d] = identify(multiply(s, representatives[i]));
+        tables.flip_next[i] = k;
+        tables.flip_previous[k] = i;
+        tables.flip_phase[i] = 2 * d - 2;
+    }
+    return tables;
+}
+
+const CliffordTables &clifford_tables() {
+    static const CliffordTables tables = build_clifford_tables();
+    return tables;
+}
+
+/**
+ * @brief The image of the set of Cliffords `cliffords` under the index map `map`.
+ */
+template <typename Map> uint32_t map_cliffords(uint32_t cliffords, Map map) {
+    uint32_t image = 0;
+    for (; cliffords != 0; cliffords &= cliffords - 1) {
+        image |= uint32_t{1} << map(std::countr_zero(cliffords));
+    }
+    return image;
+}
+
+} // namespace
+
+/**
+ * @brief Convert a Clifford+T sequence into π/8 PPRs followed by at most two Clifford PPRs.
+ *
+ * Each T gate is moved past the Clifford K applied before it, using
+ * T K = e^{iπ/8} K exp(-iπ/8 K^† Z K), so that it becomes a π/8 rotation about the signed Pauli
+ * K^† Z K. The accumulated Clifford is applied at the end of the sequence, as its shortest PPR
+ * sequence. The π/8 rotations are not merged, so there is one per T gate. For the T-optimal normal
+ * forms of the Ross-Selinger algorithm, neighboring π/8 rotations therefore have different axes, as
+ * they would otherwise merge into a Clifford.
+ *
+ * The sign of each π/8 rotation is free: with T = S T^†, a T gate may instead become the rotation
+ * exp(iπ/8 K^† Z K) with the Clifford S K accumulated. The signs are chosen such that the
+ * accumulated Clifford has the cheapest PPR sequence that can be reached, with the fewest π/4 PPRs
+ * and then the fewest PPRs. Except for sequences with very few T gates, this is the identity, so
+ * that no Clifford PPRs remain. A forward pass finds the Cliffords reachable before each T gate, a
+ * backward pass picks the signs leading to the cheapest final Clifford, and a last forward pass
+ * emits the PPRs. Each pass takes a few table lookups per gate.
+ *
+ * @param input_gates The Clifford+T sequence, applied first to last.
+ * @return The PPR sequence, applied first to last, and the global phase update in [-π, π).
+ */
+std::pair<std::vector<PPRGateType>, double> HST_to_PPR(const std::vector<GateType> &input_gates) {
+    const CliffordTables &tables = clifford_tables();
+
+    std::vector<uint32_t> reachable_before_t;
+    uint32_t reachable = uint32_t{1} << IDENTITY_CLIFFORD;
+    for (GateType gate : input_gates) {
+        size_t g = static_cast<size_t>(gate);
+        if (contains_t(gate)) {
+            reachable_before_t.push_back(reachable);
+        }
+        if (reachable == ALL_CLIFFORDS) {
+            // Every gate permutes the Cliffords, so all of them stay reachable.
+            continue;
+        }
+        reachable = map_cliffords(reachable, [&](size_t i) { return tables.next[i][g]; });
+        if (contains_t(gate)) {
+            reachable |= map_cliffords(reachable, [&](size_t j) { return tables.flip_next[j]; });
+        }
     }
 
-    return {output_gates, phase_update};
+    uint8_t frame = std::countr_zero(reachable);
+    for (uint32_t remaining = reachable; remaining != 0; remaining &= remaining - 1) {
+        uint8_t candidate = std::countr_zero(remaining);
+        if (tables.tail_cost[candidate] < tables.tail_cost[frame]) {
+            frame = candidate;
+        }
+    }
+
+    std::vector<bool> flipped(reachable_before_t.size(), false);
+    size_t t_index = reachable_before_t.size();
+    for (auto gate = input_gates.rbegin(); gate != input_gates.rend(); ++gate) {
+        size_t g = static_cast<size_t>(*gate);
+        if (!contains_t(*gate)) {
+            frame = tables.previous[frame][g];
+            continue;
+        }
+        t_index--;
+        uint8_t unflipped = tables.previous[frame][g];
+        if (reachable_before_t[t_index] >> unflipped & 1) {
+            frame = unflipped;
+        } else {
+            flipped[t_index] = true;
+            frame = tables.previous[tables.flip_previous[frame]][g];
+        }
+    }
+    assert(frame == IDENTITY_CLIFFORD && t_index == 0);
+
+    std::vector<PPRGateType> output_gates;
+    output_gates.reserve(reachable_before_t.size() + 2);
+    // The gates converted so far equal e^{iπ phase_steps/8} C_frame R, for the product R of the π/8
+    // rotations in `output_gates`.
+    int phase_steps = 0;
+    for (GateType gate : input_gates) {
+        size_t g = static_cast<size_t>(gate);
+        phase_steps += tables.phase[frame][g];
+        PPRGateType rotation = tables.rotation[frame][g];
+        frame = tables.next[frame][g];
+        if (!contains_t(gate)) {
+            continue;
+        }
+        if (flipped[t_index++]) {
+            rotation = ppr_adjoint(rotation);
+            phase_steps += tables.flip_phase[frame];
+            frame = tables.flip_next[frame];
+        }
+        output_gates.push_back(rotation);
+    }
+    output_gates.insert(output_gates.end(), tables.tail[frame].begin(), tables.tail[frame].end());
+    phase_steps = ((phase_steps + 7) % 16 + 16) % 16 - 7;
+    return {output_gates, -phase_steps * M_PI / 8.0};
 }
 
 size_t count_t_gates(const std::vector<GateType> &gates) {

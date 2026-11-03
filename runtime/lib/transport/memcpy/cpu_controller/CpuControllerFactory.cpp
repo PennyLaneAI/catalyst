@@ -27,3 +27,7 @@ catalyst::transport::ControllerSession *make_local_controller(const std::string 
 } // namespace
 
 GENERATE_TRANSPORT_CONTROLLER_FACTORY(CatalystTransportController, make_local_controller)
+CATALYST_TRANSPORT_BACKEND_CAPS("memcpy", CATALYST_TRANSPORT_ROLE_BIT_CONTROLLER,
+                                CATALYST_TRANSPORT_MEM_BIT(CpuRam),
+                                CATALYST_TRANSPORT_FRAME_BL16 | CATALYST_TRANSPORT_FRAME_BLV, 0,
+                                UINT32_MAX, UINT32_MAX, 1)

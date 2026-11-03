@@ -224,6 +224,22 @@ class AdjointGenerator {
         auto clone = cast<QuantumGate>(builder.clone(*gate, remappedValues));
         clone.setAdjointFlag(!gate.getAdjointFlag());
 
+        // Replay control values independently of ordinary gate parameters.
+        {
+            OpBuilder::InsertionGuard insertionGuard(builder);
+            builder.setInsertionPoint(clone);
+            auto controlValues = llvm::to_vector(gate.getCtrlValueOperands());
+            for (Value &controlValue : llvm::reverse(controlValues)) {
+                if (isAvailableToReversePass(controlValue, adjointRegion)) {
+                    controlValue = remappedValues.lookupOrDefault(controlValue);
+                } else {
+                    controlValue =
+                        ListPopOp::create(builder, gate.getLoc(), cache.controlValueVector);
+                }
+            }
+            clone.setCtrlValueOperands(controlValues);
+        }
+
         // Read cached parameters from the recorded parameter vector.
         Operation *operation = gate;
         if (auto parametrizedGate = dyn_cast<quantum::ParametrizedGate>(operation)) {
@@ -489,12 +505,39 @@ class AdjointGenerator {
             return;
         }
 
+        func::FuncOp adjointFnOp = getOrCreateAdjointFunction(funcOp, builder);
+
+        std::vector<Value> args;
+        getAdjointCallOpArgs(callOp, args);
+
+        // Call the adjoint func op
+        auto adjointCallOp = func::CallOp::create(builder, callOp.getLoc(), adjointFnOp, args);
+        std::queue<Value> adjointCallOpResults;
+        for (Value adjointCallResult : adjointCallOp->getResults()) {
+            adjointCallOpResults.push(adjointCallResult);
+        }
+        for (auto callOperand : callOp.getArgOperands()) {
+            if (!isa<QuregType, QubitType>(callOperand.getType())) {
+                continue;
+            }
+            remappedValues.map(callOperand, adjointCallOpResults.front());
+            adjointCallOpResults.pop();
+        }
+    }
+
+    /// Return the adjoint of `funcOp`, creating it at the module level if it does not exist yet.
+    func::FuncOp getOrCreateAdjointFunction(func::FuncOp funcOp, OpBuilder &builder) {
+        ModuleOp moduleOp = funcOp->getParentOfType<ModuleOp>();
+        std::string adjointName = funcOp.getName().str() + ".adjoint";
+        if (auto existing = moduleOp.lookupSymbol<func::FuncOp>(adjointName)) {
+            return existing;
+        }
+
         // Save the insertion point to come back to it after creating the adjoint of the function
-        auto insertionSaved = builder.saveInsertionPoint();
+        OpBuilder::InsertionGuard insertionGuard(builder);
         MLIRContext *ctx = builder.getContext();
 
         // Create the adjoint of the original function at the module level
-        ModuleOp moduleOp = funcOp->getParentOfType<ModuleOp>();
         builder.setInsertionPointToStart(moduleOp.getBody());
 
         Block *originalBlock = &funcOp.front();
@@ -506,7 +549,6 @@ class AdjointGenerator {
             FunctionType::get(ctx, /*inputs=*/
                               originalArguments.getTypes(),
                               /*outputs=*/originalTerminator->getOperandTypes());
-        std::string adjointName = funcOp.getName().str() + ".adjoint";
         Location loc = funcOp.getLoc();
         func::FuncOp adjointFnOp = func::FuncOp::create(builder, loc, adjointName, adjointFnType);
         adjointFnOp.setPrivate();
@@ -554,25 +596,7 @@ class AdjointGenerator {
         builder.setInsertionPointAfter(adjointOp);
         func::ReturnOp::create(builder, loc, adjointOp.getResults());
 
-        // Leave the adjoint func op to go back at the saved insertion
-        builder.restoreInsertionPoint(insertionSaved);
-
-        std::vector<Value> args;
-        getAdjointCallOpArgs(callOp, args);
-
-        // Call the adjoint func op
-        auto adjointCallOp = func::CallOp::create(builder, loc, adjointFnOp, args);
-        std::queue<Value> adjointCallOpResults;
-        for (Value adjointCallResult : adjointCallOp->getResults()) {
-            adjointCallOpResults.push(adjointCallResult);
-        }
-        for (auto callOperand : callOp.getArgOperands()) {
-            if (!isa<QuregType, QubitType>(callOperand.getType())) {
-                continue;
-            }
-            remappedValues.map(callOperand, adjointCallOpResults.front());
-            adjointCallOpResults.pop();
-        }
+        return adjointFnOp;
     }
 
     void visitOperation(scf::ForOp forOp, OpBuilder &builder) {

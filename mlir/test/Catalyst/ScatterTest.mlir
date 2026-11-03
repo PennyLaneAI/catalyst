@@ -432,3 +432,59 @@ module @two_dyn_indices_reverted {
       // CHECK: tensor.insert_slice [[updates]] into [[inputs]][[[idx__1]], [[idx__0]], 0] [1, 1, [[dim0]]] [1, 1, 1] : tensor<[[dim0]]xf64> into tensor<9x7x5xf64>
 }
 
+// -----
+
+// x.at[:, k].set(column): the scattered dim is not the leading one.
+// CHECK-LABEL: @insert_column
+module @insert_column {
+
+      %inputs = "test.op"() : () -> (tensor<13x6xi32>)
+      %scatter_indices = "test.op"() : () -> (tensor<1xi32>)
+      %updates = "test.op"() : () -> (tensor<13xi32>)
+
+      // CHECK-DAG: [[idx_0:%.+]] = index.constant 0
+      // CHECK-DAG: [[inputs:%.+]] = "test.op"() : () -> tensor<13x6xi32>
+      // CHECK-DAG: [[scatter_indices:%.+]] = "test.op"() : () -> tensor<1xi32>
+      // CHECK-DAG: [[updates:%.+]] = "test.op"() : () -> tensor<13xi32>
+      // CHECK: [[scatter_idx:%.+]] = tensor.extract [[scatter_indices]][[[idx_0]]] : tensor<1xi32>
+      // CHECK: [[idx:%.+]] = arith.index_cast [[scatter_idx]] : i32 to index
+      // CHECK: tensor.insert_slice [[updates]] into [[inputs]][0, [[idx]]] [13, 1] [1, 1] : tensor<13xi32> into tensor<13x6xi32>
+
+      %results = "stablehlo.scatter"(%inputs, %scatter_indices, %updates) <{
+          indices_are_sorted = true,
+          unique_indices = true,
+          scatter_dimension_numbers = #stablehlo.scatter<
+              update_window_dims = [0],
+              inserted_window_dims = [1],
+              scatter_dims_to_operand_dims = [1]
+          >
+      }> ({
+      ^bb0(%arg3: tensor<i32>, %arg4: tensor<i32>):
+        stablehlo.return %arg4 : tensor<i32>
+      }) : (tensor<13x6xi32>, tensor<1xi32>, tensor<13xi32>) -> tensor<13x6xi32>
+      "test.op"(%results) : (tensor<13x6xi32>) -> ()
+}
+
+// -----
+
+module @batching_dims {
+      %inputs = "test.op"() : () -> (tensor<13x6xi32>)
+      %scatter_indices = "test.op"() : () -> (tensor<13x1xi32>)
+      %updates = "test.op"() : () -> (tensor<13xi32>)
+      // expected-error@+1 {{Scatter with batching dims is not supported}}
+      %results = "stablehlo.scatter"(%inputs, %scatter_indices, %updates) <{
+          indices_are_sorted = true,
+          unique_indices = true,
+          scatter_dimension_numbers = #stablehlo.scatter<
+              inserted_window_dims = [1],
+              input_batching_dims = [0],
+              scatter_indices_batching_dims = [0],
+              scatter_dims_to_operand_dims = [1],
+              index_vector_dim = 1
+          >
+      }> ({
+      ^bb0(%arg3: tensor<i32>, %arg4: tensor<i32>):
+        stablehlo.return %arg4 : tensor<i32>
+      }) : (tensor<13x6xi32>, tensor<13x1xi32>, tensor<13xi32>) -> tensor<13x6xi32>
+      "test.op"(%results) : (tensor<13x6xi32>) -> ()
+}

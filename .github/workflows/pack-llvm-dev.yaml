@@ -96,7 +96,6 @@ jobs:
     # the build restored above.
     - name: Package catalyst-llvm-dev (CPack)
       run: |
-        export PATH=$GITHUB_WORKSPACE/llvm-build/bin:$PATH
         make -C $GITHUB_WORKSPACE/mlir pack-llvm-dev \
           LLVM_BUILD_DIR="$GITHUB_WORKSPACE/llvm-build"
         ls -lh $GITHUB_WORKSPACE/mlir/dist

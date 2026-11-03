@@ -38,7 +38,8 @@ catalyst_runtime_install(rt_transport)
 #   common/coproc/gpu  HIP plumbing + device decoders               ::coproc
 #
 # "HIP" above is the HIP language: headers plus a compiler. On AMD both come from an installed
-# ROCm; on NVIDIA the compiler is nvcc and only the headers come from ROCm.
+# ROCm; on NVIDIA the compiler is nvcc and only the headers come from ROCm. TRANSPORT_HIP
+# overrides the detection: OFF skips the GPU backends, ON requires them.
 
 find_package(Threads REQUIRED)
 find_library(IBVERBS_LIB ibverbs)
@@ -70,7 +71,7 @@ elseif(DEFINED ENV{VIRTUAL_ENV} AND EXISTS "$ENV{VIRTUAL_ENV}/bin/rocm-sdk")
         set(ENV{HIP_PATH} "${ROCM_SDK_ROOT_DIR}")
         set(ENV{ROCM_PATH} "${ROCM_SDK_ROOT_DIR}")
         set(ENV{HIPCXX} "${ROCM_SDK_ROOT_DIR}/llvm/bin/clang++")
-        
+
         # Also seed the standard cache variables just in case
         set(CMAKE_HIP_COMPILER "${ROCM_SDK_ROOT_DIR}/llvm/bin/clang++" CACHE FILEPATH "HIP Compiler" FORCE)
         set(CMAKE_HIP_COMPILER_ROCM_ROOT "${ROCM_SDK_ROOT_DIR}" CACHE PATH "ROCm SDK root" FORCE)
@@ -85,8 +86,8 @@ elseif(NOT ROCM_ROOT AND EXISTS "/opt/rocm")
     set(ROCM_ROOT "/opt/rocm")
 endif()
 
-if(ROCM_ROOT) 
-  list(PREPEND CMAKE_PREFIX_PATH "${ROCM_ROOT}") 
+if(ROCM_ROOT)
+  list(PREPEND CMAKE_PREFIX_PATH "${ROCM_ROOT}")
 endif()
 
 # On NVIDIA the compiler is nvcc and ROCm supplies only the headers, so point CMake at both
@@ -117,9 +118,21 @@ if(ROCM_ROOT AND NOT CMAKE_HIP_COMPILER)
     endif()
 endif()
 
+# Whether to build the GPU backends once detection has run. AUTO keeps the detected result.
+set(TRANSPORT_HIP AUTO CACHE STRING
+    "Build the GPU (HIP) transport backends: AUTO if a HIP toolchain is found, ON to require one, OFF to skip them")
+set_property(CACHE TRANSPORT_HIP PROPERTY STRINGS AUTO ON OFF)
+string(TOUPPER "${TRANSPORT_HIP}" TRANSPORT_HIP)
+if(NOT TRANSPORT_HIP MATCHES "^(AUTO|ON|OFF)$")
+    message(FATAL_ERROR "TRANSPORT_HIP must be AUTO, ON or OFF, got '${TRANSPORT_HIP}'")
+endif()
+
 include(CheckLanguage)
 check_language(HIP)
-if(CMAKE_HIP_COMPILER)
+set(TRANSPORT_HAS_HIP FALSE CACHE INTERNAL "transport: HIP toolchain available")
+if(TRANSPORT_HIP STREQUAL "OFF")
+    message(STATUS "transport: TRANSPORT_HIP=OFF -> GPU backends skipped")
+elseif(CMAKE_HIP_COMPILER)
     message(STATUS "transport: HIP found (${CMAKE_HIP_COMPILER}) -> GPU backends enabled")
     enable_language(HIP)
     if(DEFINED CMAKE_HIP_PLATFORM)
@@ -130,6 +143,9 @@ if(CMAKE_HIP_COMPILER)
         find_package(CUDAToolkit REQUIRED)
     endif()
     set(TRANSPORT_HAS_HIP TRUE CACHE INTERNAL "transport: HIP toolchain available")
+elseif(TRANSPORT_HIP STREQUAL "ON")
+    message(FATAL_ERROR "transport: TRANSPORT_HIP=ON but no HIP compiler was found "
+                        "(no installed ROCm, or no nvcc)")
 else()
     message(STATUS "transport: no HIP compiler -> GPU backends skipped "
                    "(no installed ROCm, or no nvcc)")
