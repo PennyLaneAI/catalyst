@@ -379,8 +379,7 @@ LogicalResult loadDecompositionRules(ModuleOp module,
     }
 
     for (catalyst::quantum::DecomposableGate op : decomposableOps) {
-        auto [isAdjoint, numControlQubits] = getExplicitModifiers(op);
-        std::string opId = op.getGraphOpIdExplicitModifiers(isAdjoint, numControlQubits);
+        std::string opId = op.getGraphOpId();
 
         if (handledOpIds.contains(opId)) {
             continue;
