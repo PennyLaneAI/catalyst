@@ -210,6 +210,11 @@ ResourceAnalysis::ResourceAnalysis(ModuleOp moduleOp,
         ResourceResult &result = funcResults[funcOp.getName()];
         result.isQnode = funcOp->hasAttrOfType<UnitAttr>("quantum.node");
 
+        // Entry / qnode functions start with no modifiers.
+        if (result.isQnode || funcOp.getName() == entryFunc) {
+            result.modifierContexts.insert({false, 0});
+        }
+
         for (auto &region : funcOp->getRegions()) {
             analyzeRegion(region, result, /*isAdjoint=*/false, /*numControlQubits=*/0);
         }
@@ -241,7 +246,7 @@ ResourceAnalysis::ResourceAnalysis(func::FuncOp funcOp,
         extensionAnalyses.push_back(std::move(extension));
     }
 
-    funcResults[funcOp.getName()] = makeEmptyResult();
+    funcResults[funcOp.getName()] = makeEmptyResult({{false, 0}});
     ResourceResult &result = funcResults[funcOp.getName()];
     result.isQnode = funcOp->hasAttrOfType<UnitAttr>("quantum.node");
 
