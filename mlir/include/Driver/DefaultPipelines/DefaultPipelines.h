@@ -63,6 +63,7 @@ const PipelineList pipelineList{
       // Reduce any remaining quantum.ctrl/quantum.adjoint regions to op-level modifiers,
       // including nested regions (e.g. ctrl(adjoint(...))) and the quantum.adjoint/ctrl
       // regions that lower-mitigation (ZNE) emits.
+      // This wrapper uses reference semantics internally and restores value semantics on exit.
       "modifiers-lowering",
       "resolve-gate-level-adjoint",
       // TODO: we can remove the following 2 passes once PBC has its own pipeline.

@@ -3,14 +3,9 @@ set(LIBRARY_NAME quantum-transforms)
 add_subdirectory(GraphDecomposition/DecompGraphSolver)
 
 file(GLOB SRC
-    AdjointLowering/AdjointLowering.cpp
-    AdjointLowering/ForwardPass.cpp
-    AdjointLowering/QuantumCache.cpp
-    AdjointLowering/ReversePass.cpp
-    AdjointLowering/ResolveGateLevelAdjoint.cpp
+    ResolveGateLevelAdjoint.cpp
     BufferizableOpInterfaceImpl.cpp
     CancelInversesPatterns.cpp
-    CtrlLowering/CtrlLowering.cpp
     RemoveGlobalPhasesPass.cpp
     ConversionPatterns.cpp
     GraphDecomposition/DecompUtils.cpp
@@ -20,7 +15,6 @@ file(GLOB SRC
     GridsynthPatterns.cpp
     IonsDecompositionPatterns.cpp
     LoopBoundaryOptimizationPatterns.cpp
-    ModifiersLowering.cpp
     MergeRotationsPatterns.cpp
     QPDLoader.cpp
     SplitMultipleTapes.cpp
@@ -67,7 +61,6 @@ target_include_directories(${LIBRARY_NAME} PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
     $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
     $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/include>
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/AdjointLowering/>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/GraphDecomposition/>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/GraphDecomposition/DecompGraphSolver/>
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>

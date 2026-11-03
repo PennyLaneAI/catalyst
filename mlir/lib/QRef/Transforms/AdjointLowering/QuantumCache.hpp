@@ -22,18 +22,19 @@
 #include "Catalyst/IR/CatalystDialect.h"
 
 namespace catalyst {
-namespace quantum {
+namespace qref {
 
 /// A collection of the data required to reconstruct a deterministic hybrid quantum program with
 /// classical preprocessing and arbitrary classical control flow.
 ///
-/// The forward pass populates these tapes (see ForwardPass.hpp) and the reverse pass consumes them
-/// (see ReversePass.hpp). The push/pop order is a shared contract between the two passes: values
+/// The forward pass populates these tapes and the reverse pass consumes them.
+/// The push/pop order is a shared contract between the two passes: values
 /// are pushed in program order during the forward pass and popped in reverse during the backward
 /// pass.
 struct QuantumCache {
     mlir::TypedValue<ArrayListType> paramVector;
     mlir::TypedValue<ArrayListType> intVector;
+    /// Dynamic wire indices at gate/call uses and dynamic register sizes at deallocations.
     mlir::TypedValue<ArrayListType> wireVector;
     mlir::TypedValue<ArrayListType> controlValueVector;
     /// For every structured control flow op, store the values required for it to execute.
@@ -70,5 +71,5 @@ mlir::LogicalResult verifyTypeIsCacheable(mlir::Type ty, mlir::Operation *op);
 /// those regions and their values are neither visible nor loop-invariant: they must be recorded.
 bool isAvailableToReversePass(mlir::Value param, mlir::Region &adjointRegion);
 
-} // namespace quantum
+} // namespace qref
 } // namespace catalyst

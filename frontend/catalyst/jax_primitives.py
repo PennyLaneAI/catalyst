@@ -3145,7 +3145,7 @@ def _adjoint_lowering(
                     ApplyRegisteredPassOp(
                         result=ir.OpaqueType.get("transform", 'op<"builtin.module">'),
                         target=_op.regions[0].blocks[0].arguments[0],  # just insert at beginning
-                        pass_name="adjoint-lowering",
+                        pass_name="modifiers-lowering",
                         options={},
                         dynamic_options={},
                     )

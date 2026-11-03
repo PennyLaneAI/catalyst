@@ -1,6 +1,12 @@
 set(LIBRARY_NAME qref-transforms)
 
 file(GLOB SRC
+    AdjointLowering/AdjointLowering.cpp
+    AdjointLowering/ForwardPass.cpp
+    AdjointLowering/QuantumCache.cpp
+    AdjointLowering/ReversePass.cpp
+    CtrlLowering/CtrlLowering.cpp
+    ModifiersLowering.cpp
     DecomposeLoweringPatterns.cpp
     DecompUtils.cpp
     decompose_lowering.cpp
@@ -19,6 +25,7 @@ set(LIBS
 
 set(DEPENDS
     MLIRQRefPassIncGen
+    MLIRQuantumPassIncGen
 )
 
 add_mlir_library(${LIBRARY_NAME} STATIC

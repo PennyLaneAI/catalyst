@@ -20,7 +20,11 @@
 #include "llvm/Support/AllocatorBase.h"
 #include "llvm/Support/DebugLog.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Complex/IR/Complex.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/Index/IR/IndexDialect.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/UB/IR/UBOps.h"
 #include "mlir/IR/BuiltinAttributes.h"
@@ -66,10 +70,14 @@ struct DecomposeLoweringPass : impl::DecomposeLoweringPassBase<DecomposeLowering
 
     void getDependentDialects(DialectRegistry &registry) const override {
         registry.insert<arith::ArithDialect>();
+        registry.insert<complex::ComplexDialect>();
         registry.insert<catalyst::CatalystDialect>();
         registry.insert<func::FuncDialect>();
+        registry.insert<index::IndexDialect>();
+        registry.insert<memref::MemRefDialect>();
         registry.insert<quantum::QuantumDialect>();
         registry.insert<qref::QRefDialect>();
+        registry.insert<scf::SCFDialect>();
         registry.insert<mlir::stablehlo::StablehloDialect>();
         registry.insert<tensor::TensorDialect>();
         registry.insert<ub::UBDialect>();
@@ -132,13 +140,20 @@ struct DecomposeLoweringPass : impl::DecomposeLoweringPassBase<DecomposeLowering
             return;
         }
 
-        // 1. The core DL pattern is on qref
-        // 2. DL expects no adj and ctrl regions
-        // Hence the preprocessing passes
+        // Decomposition and modifier patterns both operate on references. Convert once before
+        // preprocessing and keep reference semantics until decomposition has finished.
         OpPassManager pm_preprocess("builtin.module");
-        pm_preprocess.addPass(createModifiersLoweringPass());
         pm_preprocess.addPass(createReferenceSemanticsConversionPass());
         if (failed(runPipeline(pm_preprocess, module))) {
+            return signalPassFailure();
+        }
+
+        RewritePatternSet modifierPatterns(&getContext());
+        bool modifierLoweringFailed = false;
+        populateAdjointLoweringPatterns(modifierPatterns, modifierLoweringFailed);
+        populateCtrlLoweringPatterns(modifierPatterns, modifierLoweringFailed);
+        if (failed(applyPatternsGreedily(module, std::move(modifierPatterns))) ||
+            modifierLoweringFailed) {
             return signalPassFailure();
         }
 

@@ -987,11 +987,13 @@ def CtrlOp : Region_Op<"ctrl", [SingleBlockImplicitTerminator<"YieldOp">,
         conditioned on a set of control qubits. Each `in_ctrl_values` entry selects whether the
         matching control qubit activates on the |1> (true) or |0> (false) state.
 
-        The `ctrl-lowering` pass distributes the controls over the region: every gate in the
+        The `modifiers-lowering` pass converts this region to reference semantics and distributes
+        the controls over it: every gate in the
         region gains the control qubits/values (appended to any controls it already carries),
         and the control qubits are threaded through the region. Structural ops (extract, insert,
         alloc, dealloc) are passed through unchanged, and a nested `quantum.ctrl` region has its
-        controls merged. Measurements inside a `quantum.ctrl` region are rejected.
+        controls merged. The pass restores value semantics on exit.
+        Measurements inside a `quantum.ctrl` region are rejected.
     }];
 
     let regions = (region SizedRegion<1>:$region);

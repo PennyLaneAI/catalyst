@@ -124,7 +124,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
                                      .wasInterrupted();
         if (hasModifierRegion) {
             OpPassManager modifierPm("builtin.module");
-            modifierPm.addPass(createModifiersLoweringPass());
+            modifierPm.addPass(qref::createModifiersLoweringPass());
             if (failed(runPipeline(modifierPm, module))) {
                 return failure();
             }
@@ -223,8 +223,8 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
             // CQRs:
             //  - Adjoint: A chosen rule for an adjoint operator may re-emit its base decomposition
             //             wrapped in a `quantum.adjoint` region. Such a region is only reduced to
-            //             op-level modified gates by `adjoint-lowering`. We therefore iterate
-            //             `(decompose-lowering -> adjoint-lowering)` to a fixpoint.
+            //             op-level modified gates by `modifiers-lowering`. We therefore iterate
+            //             `(decompose-lowering -> modifiers-lowering)` to a fixpoint.
             // The solver has already chosen every rule up front; this loop only applies them.
 
             // Collect only the rules on the chosen decomp tree, reachable from the circuit

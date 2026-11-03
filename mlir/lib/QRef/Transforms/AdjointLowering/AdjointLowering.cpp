@@ -23,41 +23,40 @@
 #include "mlir/IR/IRMapping.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
-#include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-#include "Catalyst/Transforms/Passes.h"
+#include "Catalyst/IR/CatalystDialect.h"
 #include "QRef/IR/QRefDialect.h"
 #include "QRef/IR/QRefOps.h"
 #include "QRef/Transforms/Passes.h"
-#include "Quantum/IR/QuantumOps.h"
-#include "Quantum/Transforms/Patterns.h"
+#include "QRef/Transforms/Patterns.h"
 
 #include "QuantumCache.hpp"
 
 using namespace mlir;
-using namespace catalyst::quantum;
+using namespace catalyst::qref;
 
 namespace {
 
-/// Orchestrates the adjoint lowering of a single `quantum.adjoint` op by running the forward pass
+/// Orchestrates the adjoint lowering of a single `qref.adjoint` op by running the forward pass
 /// (recording the augmented circuit) followed by the reverse pass (emitting the adjoint circuit).
 struct AdjointSingleOpRewritePattern : public OpRewritePattern<AdjointOp> {
-    using OpRewritePattern<AdjointOp>::OpRewritePattern;
+    AdjointSingleOpRewritePattern(MLIRContext *context, bool &loweringFailed)
+        : OpRewritePattern<AdjointOp>(context), loweringFailed(loweringFailed) {}
 
-    /// We build a map from values mentioned in the source data flow to the values of
-    /// the program where quantum control flow is reversed. Most of the time, there is a 1-to-1
-    /// correspondence with a notable exception caused by `insert`/`extract` API asymmetry.
+    bool &loweringFailed;
+
     LogicalResult matchAndRewrite(AdjointOp adjoint, PatternRewriter &rewriter) const override {
-        // Defer (not an error) if the region still contains a nested quantum.ctrl region.
-        // ctrl-lowering must reduce it to op-level controlled gates first; reversing and adjointing
-        // those gates is then trivial ((C(g))^dagger = C(g^dagger)). Returning failure() drives the
-        // greedy fixpoint: ctrl-lowering reduces the inner region, then the greedy driver re-tries
-        // this adjoint op and it lowers. This works whether the two patterns run in separate
-        // alternating passes or together in the combined modifiers-lowering pass. Pre-scanning here
-        // avoids the ReversePass "Unhandled operation" error path.
+        if (loweringFailed) {
+            return failure();
+        }
+        // Lower nested modifiers first. The greedy driver retries this region once its body
+        // contains gates with op-level modifiers, including in the combined modifiers pass.
         if (adjoint.getRegion()
-                .walk([](CtrlOp) { return WalkResult::interrupt(); })
+                .walk([](Operation *op) {
+                    return isa<CtrlOp, AdjointOp>(op) ? WalkResult::interrupt()
+                                                      : WalkResult::advance();
+                })
                 .wasInterrupted()) {
             return failure();
         }
@@ -69,68 +68,49 @@ struct AdjointSingleOpRewritePattern : public OpRewritePattern<AdjointOp> {
         // the values needed to replay the circuit in reverse.
         IRMapping oldToCloned;
         if (failed(generateAdjointForwardPass(adjoint.getRegion(), rewriter, oldToCloned, cache))) {
+            loweringFailed = true;
             return failure();
-        }
-
-        // Seed the reverse pass with the operands of the quantum.yield.
-        auto yieldOp = cast<YieldOp>(adjoint.getRegion().front().getTerminator());
-        for (auto [yieldVal, adjointOperand] :
-             llvm::zip_equal(yieldOp.getOperands(), adjoint.getArgs())) {
-            oldToCloned.map(yieldVal, adjointOperand);
         }
 
         // Reverse pass: emit the adjoint quantum operations and reversed control flow, using the
         // cached values.
         if (failed(generateAdjointReversePass(adjoint.getRegion(), rewriter, oldToCloned, cache))) {
+            loweringFailed = true;
             return failure();
         }
 
         // Explicitly free the memory of the caches.
         cache.emitDealloc(rewriter, adjoint.getLoc());
-        // The final quantum values are the re-mapped region arguments of the original adjoint op.
-        SmallVector<Value> reversedOutputs;
-        for (BlockArgument arg : adjoint.getRegion().getArguments()) {
-            reversedOutputs.push_back(oldToCloned.lookup(arg));
-        }
-        rewriter.replaceOp(adjoint, reversedOutputs);
+        rewriter.eraseOp(adjoint);
         return success();
     }
 };
 
 } // namespace
 
-void catalyst::quantum::populateAdjointLoweringPatterns(RewritePatternSet &patterns) {
-    patterns.add<AdjointSingleOpRewritePattern>(patterns.getContext(), 1);
+void catalyst::qref::populateAdjointLoweringPatterns(RewritePatternSet &patterns, bool &failed) {
+    patterns.add<AdjointSingleOpRewritePattern>(patterns.getContext(), failed);
 }
 
 namespace catalyst {
-namespace quantum {
+namespace qref {
 
 #define GEN_PASS_DEF_ADJOINTLOWERINGPASS
-#include "Quantum/Transforms/Passes.h.inc"
+#include "QRef/Transforms/Passes.h.inc"
 
 struct AdjointLoweringPass : impl::AdjointLoweringPassBase<AdjointLoweringPass> {
     using AdjointLoweringPassBase::AdjointLoweringPassBase;
 
     void runOnOperation() final {
-        Operation *op = getOperation();
-        // Ensure the IR is in value semantics
-        {
-            OpPassManager ValueSemanticsPm(op->getName());
-            ValueSemanticsPm.addPass(qref::createValueSemanticsConversionPass());
-            if (failed(runPipeline(ValueSemanticsPm, op))) {
-                return signalPassFailure();
-            }
-        }
-
         RewritePatternSet patterns(&getContext());
-        populateAdjointLoweringPatterns(patterns);
+        bool loweringFailed = false;
+        populateAdjointLoweringPatterns(patterns, loweringFailed);
 
-        if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
+        if (failed(applyPatternsGreedily(getOperation(), std::move(patterns))) || loweringFailed) {
             return signalPassFailure();
         }
     }
 };
 
-} // namespace quantum
+} // namespace qref
 } // namespace catalyst
