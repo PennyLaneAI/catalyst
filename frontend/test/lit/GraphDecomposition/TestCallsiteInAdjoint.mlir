@@ -16,15 +16,25 @@
 
 // RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{inline-rule-body gate-set=testRZ=1.0 alt-decomps=Adjoint(testRot){}{wires:1}{}=[dedicated,distribute],Adjoint(testRZ){}{wires:1}{}=adj_rz})' %s | FileCheck %s --check-prefixes=ALL,INLINE
 
+// ALL-LABEL: func.func private @test_func.adjoint(
+// ALL-SAME:  [[Q:%.+]]: !quantum.bit
+// CALL: [[O:%.+]] = call @adj_rz_0([[Q]])
+// INLINE: [[O:%.+]] = quantum.custom "testRZ"() [[Q]]
+// ALL: return [[O]]
+
 func.func @test_func(%q: !quantum.bit) -> !quantum.bit {
     %out = quantum.custom "testRZ"() %q : !quantum.bit
     return %out: !quantum.bit
 }
 
+// ALL-LABEL: func.func @circuit(
 func.func @circuit() attributes {quantum.node} {
     %0 = quantum.alloc(1) : !quantum.reg
     %q = quantum.extract %0[0] : !quantum.reg -> !quantum.bit
 
+    // ALL-NOT: quantum.adjoint
+    // ALL: call @test_func.adjoint
+    // ALL: return
     %out = quantum.adjoint(%q) : !quantum.bit {
     ^bb0(%arg0: !quantum.bit):
         %a = func.call @test_func(%arg0) : (!quantum.bit) -> !quantum.bit
@@ -42,3 +52,5 @@ func.func private @adj_rz(%q: !quantum.bit) -> !quantum.bit attributes {
   %o = quantum.custom "testRZ"() %q : !quantum.bit
   return %o : !quantum.bit
 }
+
+// CALL: func.func private @adj_rz_0
