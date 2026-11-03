@@ -70,6 +70,14 @@ void ResourceResult::mergeWith(const ResourceResult &other, MergeMethod method) 
 
     mergeStringMap(measurements, other.measurements, method);
     mergeStringMap(detailedOperations, other.detailedOperations, method);
+
+    for (const auto &opId : other.observedGraphOpIds) {
+        observedGraphOpIds.insert(opId.getKey());
+    }
+    for (const auto &ctx : other.modifierContexts) {
+        modifierContexts.insert(ctx);
+    }
+
     mergeStringMap(classicalInstructions, other.classicalInstructions, method);
     mergeStringMap(functionCalls, other.functionCalls, method);
 

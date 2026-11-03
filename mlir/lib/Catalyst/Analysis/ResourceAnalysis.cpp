@@ -20,9 +20,11 @@
 #include <cmath>
 #include <cstdint>
 
-#include "llvm/ADT/DenseSet.h"
+#include "llvm/ADT/SCCIterator.h"
+#include <set>
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Debug.h"
+#include "mlir/Analysis/CallGraph.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
@@ -70,16 +72,73 @@ static bool isCustomDialectOp(Operation *op) {
         dialect);
 }
 
+/// Compose nested adjoint/ctrl contexts: outer XOR inner adjoint, add ctrl counts.
+static std::pair<bool, unsigned> composeModifiers(std::pair<bool, unsigned> outer,
+                                                  std::pair<bool, unsigned> inner) {
+    return {outer.first ^ inner.first, outer.second + inner.second};
+}
+
+/// Returns the function in a caller-before callee order so that
+/// when callees are analyzed, information on the modifiers on their callsites
+/// is available.
+static SmallVector<func::FuncOp> orderFuncsByCallGraph(ModuleOp moduleOp) {
+    const CallGraph callGraph(moduleOp);
+
+    // Flatten SCCs bottom-up (callee SCCs first), then reverse for caller-before-callee.
+    // Order within a cyclic SCC is arbitrary either way.
+    SmallVector<func::FuncOp> ordered;
+    for (auto sccIt = llvm::scc_begin(&callGraph); !sccIt.isAtEnd(); ++sccIt) {
+        SmallVector<func::FuncOp> sccFuncs;
+        bool hasSelfRecursiveCall = false;
+
+        for (CallGraphNode *node : *sccIt) {
+            if (node->isExternal()) {
+                continue;
+            }
+
+            auto funcOp = dyn_cast<func::FuncOp>(node->getCallableRegion()->getParentOp());
+            if (!funcOp || funcOp.isDeclaration()) {
+                continue;
+            }
+            sccFuncs.push_back(funcOp);
+
+            for (const CallGraphNode::Edge &edge : *node) {
+                if (edge.isCall() && edge.getTarget() == node) {
+                    hasSelfRecursiveCall = true;
+                    break;
+                }
+            }
+        }
+
+        if (sccFuncs.empty()) {
+            continue;
+        }
+
+        // Size > 1 ⇒ mutual recursion; size 1 with a self-call ⇒ direct recursion.
+        if (sccFuncs.size() > 1 || hasSelfRecursiveCall) {
+            sccFuncs.front().emitWarning()
+                << "ResourceAnalysis encountered recursive call to '" << sccFuncs.front().getName()
+                << "'. Recursive calls are not flattened, so resource counts may be incomplete.";
+        }
+        ordered.append(sccFuncs.begin(), sccFuncs.end());
+    }
+
+    std::reverse(ordered.begin(), ordered.end());
+    return ordered;
+}
+
 //===----------------------------------------------------------------------===//
 // ResourceAnalysis implementation
 //===----------------------------------------------------------------------===//
 
-ResourceResult ResourceAnalysis::makeEmptyResult() const {
+ResourceResult ResourceAnalysis::makeEmptyResult(
+    std::set<std::pair<bool, unsigned>> modifierContexts) const {
     ResourceResult result;
     result.extensions.reserve(extensionAnalyses.size());
     for (const auto &analysis : extensionAnalyses) {
         result.extensions.push_back(analysis->makeEmpty());
     }
+    result.modifierContexts = std::move(modifierContexts);
     return result;
 }
 
@@ -94,22 +153,19 @@ ResourceAnalysis::ResourceAnalysis(ModuleOp moduleOp,
 
     LLVM_DEBUG(dbgs() << "ResourceAnalysis: analyzing operation " << moduleOp->getName() << "\n");
 
-    SmallVector<func::FuncOp> definedFuncOps;
+    // Declaration-only functions (e.g. runtime library functions) have no resources of
+    // their own, but get an empty entry so that calls to them can be resolved.
     moduleOp.walk([&](func::FuncOp funcOp) {
-        if (!funcOp.isDeclaration()) {
-            definedFuncOps.push_back(funcOp);
-        } else {
-            // Declaration-only functions (e.g. runtime library functions) have no resources of
-            // their own, but get an empty entry so that calls to them can be resolved.
+        if (funcOp.isDeclaration()) {
             funcResults.try_emplace(funcOp.getName(), makeEmptyResult());
         }
     });
 
-    // Reserve every user function's name in `funcResults`. This
-    // ensures `makeUniqueSyntheticName` will skip past names like
-    // `for_loop_3` that the user already chose, regardless of walk order.
+    SmallVector<func::FuncOp> definedFuncOps = orderFuncsByCallGraph(moduleOp);
+
+    // Reserve every user function with an empty result.
     for (auto funcOp : definedFuncOps) {
-        funcResults.try_emplace(funcOp.getName());
+        funcResults[funcOp.getName()] = makeEmptyResult();
     }
 
     // An entry function is tagged with `llvm.emit_c_interface`.
@@ -146,7 +202,9 @@ ResourceAnalysis::ResourceAnalysis(ModuleOp moduleOp,
     entryFuncName = entryFunc.str();
 
     for (auto funcOp : definedFuncOps) {
-        ResourceResult result = makeEmptyResult();
+        ResourceResult &result = funcResults[funcOp.getName()];
+        result.isQnode = funcOp->hasAttrOfType<UnitAttr>("quantum.node");
+
         for (auto &region : funcOp->getRegions()) {
             analyzeRegion(region, result, /*isAdjoint=*/false, /*numControlQubits=*/0);
         }
@@ -163,9 +221,6 @@ ResourceAnalysis::ResourceAnalysis(ModuleOp moduleOp,
                 }
             }
         }
-
-        result.isQnode = funcOp->hasAttrOfType<UnitAttr>("quantum.node");
-        funcResults[funcOp.getName()] = std::move(result);
     }
 }
 
@@ -178,16 +233,15 @@ ResourceAnalysis::ResourceAnalysis(func::FuncOp funcOp,
         extensionAnalyses.push_back(provider());
     }
 
-    ResourceResult result = makeEmptyResult();
+    funcResults[funcOp.getName()] = makeEmptyResult();
+    ResourceResult &result = funcResults[funcOp.getName()];
+    result.isQnode = funcOp->hasAttrOfType<UnitAttr>("quantum.node");
+
+    // TODO: Additional handling for entrypoint functions
 
     for (auto &region : funcOp->getRegions()) {
         analyzeRegion(region, result, /*isAdjoint=*/false, /*numControlQubits=*/0);
     }
-
-    // TODO: Additional handling for entrypoint functions
-
-    result.isQnode = funcOp->hasAttrOfType<UnitAttr>("quantum.node");
-    funcResults[funcOp.getName()] = std::move(result);
 }
 
 std::string ResourceAnalysis::makeUniqueSyntheticName(StringRef prefix, int64_t &counter) {
@@ -204,7 +258,7 @@ std::string ResourceAnalysis::makeUniqueSyntheticName(StringRef prefix, int64_t 
 
 void ResourceAnalysis::analyzeForLoop(scf::ForOp forOp, ResourceResult &result, bool isAdjoint,
                                       unsigned numControlQubits) {
-    ResourceResult bodyResult = makeEmptyResult();
+    ResourceResult bodyResult = makeEmptyResult(result.modifierContexts);
     analyzeRegion(forOp.getBodyRegion(), bodyResult, isAdjoint, numControlQubits);
 
     // Try to resolve a static trip count.
@@ -233,7 +287,7 @@ void ResourceAnalysis::analyzeForLoop(scf::ForOp forOp, ResourceResult &result, 
 
 void ResourceAnalysis::analyzeWhileLoop(scf::WhileOp whileOp, ResourceResult &result,
                                         bool isAdjoint, unsigned numControlQubits) {
-    ResourceResult bodyResult = makeEmptyResult();
+    ResourceResult bodyResult = makeEmptyResult(result.modifierContexts);
     analyzeRegion(whileOp.getAfter(), bodyResult, isAdjoint, numControlQubits);
 
     if (auto iters = getEstimatedIterationsHint(whileOp)) {
@@ -248,7 +302,7 @@ void ResourceAnalysis::analyzeWhileLoop(scf::WhileOp whileOp, ResourceResult &re
 void ResourceAnalysis::analyzeIfOp(scf::IfOp ifOp, ResourceResult &result, bool isAdjoint,
                                    unsigned numControlQubits) {
 
-    ResourceResult thenResult = makeEmptyResult();
+    ResourceResult thenResult = makeEmptyResult(result.modifierContexts);
     analyzeRegion(ifOp.getThenRegion(), thenResult, isAdjoint, numControlQubits);
 
     // If a branch probability hint is present, compute the expected (average) resource counts
@@ -258,7 +312,7 @@ void ResourceAnalysis::analyzeIfOp(scf::IfOp ifOp, ResourceResult &result, bool 
         double pThen = probAttr.getValueAsDouble();
         double pElse = 1.0 - pThen;
 
-        ResourceResult elseResult = makeEmptyResult();
+        ResourceResult elseResult = makeEmptyResult(result.modifierContexts);
         if (!ifOp.getElseRegion().empty()) {
             analyzeRegion(ifOp.getElseRegion(), elseResult, isAdjoint, numControlQubits);
         }
@@ -275,7 +329,7 @@ void ResourceAnalysis::analyzeIfOp(scf::IfOp ifOp, ResourceResult &result, bool 
     result.hasBranches = true;
 
     if (!ifOp.getElseRegion().empty()) {
-        ResourceResult elseResult = makeEmptyResult();
+        ResourceResult elseResult = makeEmptyResult(result.modifierContexts);
         analyzeRegion(ifOp.getElseRegion(), elseResult, isAdjoint, numControlQubits);
         thenResult.mergeWith(elseResult, ResourceResult::MergeMethod::Max);
     }
@@ -294,7 +348,7 @@ void ResourceAnalysis::analyzeIndexSwitchOp(scf::IndexSwitchOp switchOp, Resourc
         double sumProb = 0.0;
 
         for (auto &&[idx, caseRegion] : llvm::enumerate(caseRegions)) {
-            ResourceResult caseResult = makeEmptyResult();
+            ResourceResult caseResult = makeEmptyResult(result.modifierContexts);
             analyzeRegion(caseRegion, caseResult, isAdjoint, numControlQubits);
 
             double p = cast<FloatAttr>(probsAttr[idx]).getValueAsDouble();
@@ -308,7 +362,7 @@ void ResourceAnalysis::analyzeIndexSwitchOp(scf::IndexSwitchOp switchOp, Resourc
         // of floating-point error.
         double pDefault = std::min(std::max(0.0, 1.0 - sumProb), 1.0);
 
-        ResourceResult defaultResult = makeEmptyResult();
+        ResourceResult defaultResult = makeEmptyResult(result.modifierContexts);
         analyzeRegion(switchOp.getDefaultRegion(), defaultResult, isAdjoint, numControlQubits);
         defaultResult.multiplyBy(pDefault);
         expected.mergeWith(defaultResult, ResourceResult::MergeMethod::Sum);
@@ -324,7 +378,7 @@ void ResourceAnalysis::analyzeIndexSwitchOp(scf::IndexSwitchOp switchOp, Resourc
     bool first = true;
 
     for (auto &caseRegion : caseRegions) {
-        ResourceResult caseResult = makeEmptyResult();
+        ResourceResult caseResult = makeEmptyResult(result.modifierContexts);
         analyzeRegion(caseRegion, caseResult, isAdjoint, numControlQubits);
         if (first) {
             maxResult = std::move(caseResult);
@@ -335,7 +389,7 @@ void ResourceAnalysis::analyzeIndexSwitchOp(scf::IndexSwitchOp switchOp, Resourc
     }
 
     // default region
-    ResourceResult defaultResult = makeEmptyResult();
+    ResourceResult defaultResult = makeEmptyResult(result.modifierContexts);
     analyzeRegion(switchOp.getDefaultRegion(), defaultResult, isAdjoint, numControlQubits);
     maxResult.mergeWith(defaultResult, ResourceResult::MergeMethod::Max);
 
@@ -428,7 +482,7 @@ void ResourceAnalysis::analyzeRegion(Region &region, ResourceResult &result, boo
  * @param numControlQubits The number of control qubits added by the current region.
  */
 void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result, bool isAdjoint,
-                                        unsigned numControlQubits) const {
+                                        unsigned numControlQubits) {
     // Collect extensions for the operation
     assert(result.extensions.size() == extensionAnalyses.size() &&
            "extension data/collector size mismatch");
@@ -488,13 +542,18 @@ void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result, b
     // Function calls
     if (auto callOp = dyn_cast<func::CallOp>(op)) {
         result.functionCalls[callOp.getCallee()] += 1;
-        if (auto parentFunc = op->getParentOfType<func::FuncOp>();
-            parentFunc && callOp.getCallee() == parentFunc.getName()) {
-            callOp.emitWarning() << "ResourceAnalysis encountered recursive call to '"
-                                 << callOp.getCallee()
-                                 << "'. Recursive calls are not flattened, so resource counts may "
-                                    "be incomplete.";
+
+        // Propagate modifier region to the callee and consider region of the callsite.
+        if (collectDetailedOperations) {
+            if (auto calleeResult = funcResults.find(callOp.getCallee());
+                calleeResult != funcResults.end()) {
+                for (const auto &ctx : result.modifierContexts) {
+                    calleeResult->second.modifierContexts.insert(
+                        composeModifiers(ctx, {isAdjoint, numControlQubits}));
+                }
+            }
         }
+
         return;
     }
 
@@ -511,21 +570,29 @@ void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result, b
 void ResourceAnalysis::collectDetailedOperation(Operation *op, ResourceResult &result,
                                                 bool isAdjoint, unsigned numControlQubits) const {
     if (auto inst = dyn_cast<quantum::DecomposableGate>(op)) {
-
-        isAdjoint = isAdjoint ^ op->hasAttr("adjoint");
-
-        if (auto gate = mlir::dyn_cast<catalyst::quantum::QuantumGate>(op)) {
-            numControlQubits += gate.getCtrlQubitOperands().size();
+        unsigned opCtrl = 0;
+        if (auto gate = dyn_cast<quantum::QuantumGate>(op)) {
+            opCtrl = gate.getCtrlQubitOperands().size();
         }
 
-        std::string opID = inst.getGraphOpIdExplicitModifiers(isAdjoint, numControlQubits);
-        result.detailedOperations[opID] += 1;
+        // Current modifier is the composition of the operation's modifiers and the current region's modifiers
+        auto current =
+            composeModifiers({isAdjoint, numControlQubits}, {op->hasAttr("adjoint"), opCtrl});
 
+        // Apply the current modifiers to all possible modifier regions (based on call trace)
+        for (const auto &ctx : result.modifierContexts) {
+            auto [adj, nCtrl] = composeModifiers(ctx, current);
+            std::string opID = inst.getGraphOpIdExplicitModifiers(adj, nCtrl);
+            result.detailedOperations[opID] += 1;
+            result.observedGraphOpIds.insert(opID);
+        }
         return;
     }
 
     if (auto inst = dyn_cast<ResourceQuantumOpInterface>(op)) {
-        result.detailedOperations[inst.getResourceDetailedName()] += 1;
+        std::string opID = inst.getResourceDetailedName().str();
+        result.detailedOperations[opID] += 1;
+        result.observedGraphOpIds.insert(opID);
         return;
     }
 }
@@ -549,6 +616,9 @@ static void accumulateScaled(ResourceResult &dest, const ResourceResult &source,
     }
     for (const auto &opEntry : source.detailedOperations) {
         dest.detailedOperations[opEntry.getKey()] += opEntry.getValue() * count;
+    }
+    for (const auto &opId : source.observedGraphOpIds) {
+        dest.observedGraphOpIds.insert(opId.getKey());
     }
     for (const auto &m : source.measurements) {
         dest.measurements[m.getKey()] += m.getValue() * count;
@@ -612,6 +682,17 @@ const ResourceResult *ResourceAnalysis::getFlattenedResource(StringRef funcName)
             continue;
         }
         accumulateScaled(flat, *child, fc.getValue());
+    }
+    // Dynamic-trip loops are only linked via `varFunctionCalls` (id, not count).
+    // They should be counted as observed GraphOpIds.
+    for (const auto &fc : r.varFunctionCalls) {
+        const ResourceResult *child = getFlattenedResource(fc.getKey());
+        if (!child || child == &flat) {
+            continue;
+        }
+        for (const auto &opId : child->observedGraphOpIds) {
+            flat.observedGraphOpIds.insert(opId.getKey());
+        }
     }
     return &flat;
 }

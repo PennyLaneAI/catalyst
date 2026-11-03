@@ -15,10 +15,12 @@
 #pragma once
 
 #include <optional>
+#include <set>
 #include <utility>
 
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/StringMap.h"
+#include "llvm/ADT/StringSet.h"
 #include "llvm/Support/JSON.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/MLIRContext.h"
@@ -42,7 +44,16 @@ struct ResourceResult {
     // name -> ((numWires, numParams) -> count)
     llvm::StringMap<llvm::DenseMap<std::pair<int, int>, double>> operations;
 
+    // Per-GOID resource counts
     llvm::StringMap<double> detailedOperations;
+
+    // Set of GOIDs observed under this result when `collectDetailedOperations` is
+    // enabled. Accounts for dynamic-trip loops.
+    llvm::StringSet<> observedGraphOpIds;
+
+    // Modifier region contexts under which this function is executed when
+    // `collectDetailedOperations` is enabled.
+    std::set<std::pair<bool, unsigned>> modifierContexts;
 
     llvm::StringMap<double> measurements;
 
