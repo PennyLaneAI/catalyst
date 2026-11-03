@@ -495,14 +495,12 @@ template <typename OpTy> struct CustomOpPattern : public OpConversionPattern<OpT
     LogicalResult matchAndRewrite(OpTy op, typename OpTy::Adaptor adaptor,
                                   ConversionPatternRewriter &rewriter) const override {
         if (auto operatorOp = dyn_cast<OperatorOp>(op.getOperation())) {
+            // param_map, qubit_map, and static_data do not affect the runtime call.
             if (operatorOp.getInQreg() || !operatorOp.getArrQubitIndices().empty() ||
                 operatorOp.getArrCtrlIndices() || operatorOp.getArrCtrlValues() ||
-                operatorOp.getUID() || !operatorOp.getForwardArgs().empty() ||
-                !operatorOp.getStaticData().empty() || !operatorOp.getParamMap().empty() ||
-                !operatorOp.getQubitMap().empty()) {
+                operatorOp.getUID() || !operatorOp.getForwardArgs().empty()) {
                 return rewriter.notifyMatchFailure(
-                    op, "expected an operator with only parameters, target/control qubits, "
-                        "a name, and an optional adjoint");
+                    op, "register operands, UID, and forwarded arguments are not supported");
             }
         }
 

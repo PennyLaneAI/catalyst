@@ -987,6 +987,7 @@ func.func @memref_unitary(%q: !quantum.bit, %ctrl: !quantum.bit, %cv: i1, %matri
 // -----
 
 // Multiple memref parameters can be interleaved with scalars.
+// Maps and static data do not alter the runtime signature or argument order.
 // CHECK: llvm.func @__catalyst__qis__Mixed(!llvm.ptr, f64, !llvm.ptr, !llvm.ptr, !llvm.ptr)
 // CHECK-LABEL: llvm.func @mixed_params
 func.func @mixed_params(%q: !quantum.bit, %theta: f64, %data: memref<?xf64>, %scalar: memref<f64>) -> !quantum.bit {
@@ -996,21 +997,54 @@ func.func @mixed_params(%q: !quantum.bit, %theta: f64, %data: memref<?xf64>, %sc
     // CHECK: llvm.store {{.*}}, [[SCALAR]] : !llvm.struct<(ptr, ptr, i64)>, !llvm.ptr
     // CHECK: llvm.call @__catalyst__qis__Mixed([[DATA]], %arg1, [[SCALAR]], %arg0, {{%.+}})
     %out = quantum.operator "Mixed"(%data: memref<?xf64>, %theta: f64, %scalar: memref<f64>) qubits(%q)
+        static_data = {extra = 1 : i64}
+        param_map = {data = [0], scalar = [2], theta = [1]} qubit_map = {wires = [0]}
     // CHECK: llvm.return %arg0 : !llvm.ptr
     return %out : !quantum.bit
 }
 
 // -----
 
-// Operators outside the supported runtime signature must fail conversion.
-
+// CHECK: llvm.func @__catalyst__qis__RX(f64, !llvm.ptr, !llvm.ptr)
+// CHECK-LABEL: llvm.func @static_data
 func.func @static_data(%q: !quantum.bit, %theta: f64) -> !quantum.bit {
-    // expected-error@+1 {{failed to legalize operation 'quantum.operator'}}
+    // CHECK: [[NULL:%.+]] = llvm.mlir.zero : !llvm.ptr
+    // CHECK: llvm.call @__catalyst__qis__RX(%arg1, %arg0, [[NULL]])
     %out = quantum.operator "RX"(%theta: f64) qubits(%q) static_data = {extra = 1 : i64}
+    // CHECK: llvm.return %arg0 : !llvm.ptr
     return %out : !quantum.bit
 }
 
 // -----
+
+// CHECK: llvm.func @__catalyst__qis__Rot(f64, f64, f64, !llvm.ptr, !llvm.ptr)
+// CHECK-LABEL: llvm.func @param_map
+func.func @param_map(%q: !quantum.bit, %theta: f64, %phi: f64, %omega: f64) -> !quantum.bit {
+    // CHECK: [[NULL:%.+]] = llvm.mlir.zero : !llvm.ptr
+    // CHECK: llvm.call @__catalyst__qis__Rot(%arg1, %arg2, %arg3, %arg0, [[NULL]])
+    %out = quantum.operator "Rot"(%theta: f64, %phi: f64, %omega: f64) qubits(%q)
+        param_map = {first = [2], rest = [0, 1]}
+    // CHECK: llvm.return %arg0 : !llvm.ptr
+    return %out : !quantum.bit
+}
+
+// -----
+
+// CHECK: llvm.func @__catalyst__qis__SWAP(!llvm.ptr, !llvm.ptr, !llvm.ptr)
+// CHECK-LABEL: llvm.func @qubit_map
+func.func @qubit_map(%q0: !quantum.bit, %q1: !quantum.bit) -> (!quantum.bit, !quantum.bit) {
+    // CHECK: [[NULL:%.+]] = llvm.mlir.zero : !llvm.ptr
+    // CHECK: llvm.call @__catalyst__qis__SWAP(%arg0, %arg1, [[NULL]])
+    %out:2 = quantum.operator "SWAP"() qubits(%q0, %q1)
+        qubit_map = {first = [1], second = [0]}
+    // CHECK: llvm.insertvalue %arg0, {{.*}}[0]
+    // CHECK: llvm.insertvalue %arg1, {{.*}}[1]
+    return %out#0, %out#1 : !quantum.bit, !quantum.bit
+}
+
+// -----
+
+// Operators outside the supported runtime signature must fail conversion.
 
 func.func @uid(%q: !quantum.bit, %theta: f64) -> !quantum.bit {
     // expected-error@+1 {{failed to legalize operation 'quantum.operator'}}
@@ -1023,22 +1057,6 @@ func.func @uid(%q: !quantum.bit, %theta: f64) -> !quantum.bit {
 func.func @forwarded_args(%q: !quantum.bit, %theta: f64, %forward: f64) -> !quantum.bit {
     // expected-error@+1 {{failed to legalize operation 'quantum.operator'}}
     %out = quantum.operator "RX"(%theta: f64) qubits(%q) UID(1) forward(%forward: f64)
-    return %out : !quantum.bit
-}
-
-// -----
-
-func.func @param_map(%q: !quantum.bit, %theta: f64) -> !quantum.bit {
-    // expected-error@+1 {{failed to legalize operation 'quantum.operator'}}
-    %out = quantum.operator "RX"(%theta: f64) qubits(%q) param_map = {theta = [0]}
-    return %out : !quantum.bit
-}
-
-// -----
-
-func.func @qubit_map(%q: !quantum.bit, %theta: f64) -> !quantum.bit {
-    // expected-error@+1 {{failed to legalize operation 'quantum.operator'}}
-    %out = quantum.operator "RX"(%theta: f64) qubits(%q) qubit_map = {work_wires = [0]}
     return %out : !quantum.bit
 }
 
