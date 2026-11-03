@@ -77,8 +77,8 @@ class ResourceAnalysis {
     llvm::SmallVector<std::unique_ptr<ResourceAnalysisExtension>> extensionAnalyses;
 
     // Blank ResourceResult with empty data objects from each collector.
-    ResourceResult makeEmptyResult(
-        std::set<std::pair<bool, unsigned>> modifierContexts = {{false, 0}}) const;
+    ResourceResult makeEmptyResult(std::set<std::pair<bool, unsigned>> modifierContexts = {
+                                       {false, 0}}) const;
 
     // `prefix` + counter; advance counter until the name is free in `funcResults`
     std::string makeUniqueSyntheticName(llvm::StringRef prefix, int64_t &counter);

@@ -19,9 +19,9 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <set>
 
 #include "llvm/ADT/SCCIterator.h"
-#include <set>
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Analysis/CallGraph.h"
@@ -131,8 +131,8 @@ static SmallVector<func::FuncOp> orderFuncsByCallGraph(ModuleOp moduleOp) {
 // ResourceAnalysis implementation
 //===----------------------------------------------------------------------===//
 
-ResourceResult ResourceAnalysis::makeEmptyResult(
-    std::set<std::pair<bool, unsigned>> modifierContexts) const {
+ResourceResult
+ResourceAnalysis::makeEmptyResult(std::set<std::pair<bool, unsigned>> modifierContexts) const {
     ResourceResult result;
     result.extensions.reserve(extensionAnalyses.size());
     for (const auto &analysis : extensionAnalyses) {
@@ -575,7 +575,8 @@ void ResourceAnalysis::collectDetailedOperation(Operation *op, ResourceResult &r
             opCtrl = gate.getCtrlQubitOperands().size();
         }
 
-        // Current modifier is the composition of the operation's modifiers and the current region's modifiers
+        // Current modifier is the composition of the operation's modifiers and the current region's
+        // modifiers
         auto current =
             composeModifiers({isAdjoint, numControlQubits}, {op->hasAttr("adjoint"), opCtrl});
 
