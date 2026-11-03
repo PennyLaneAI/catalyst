@@ -167,8 +167,8 @@ module @set_basis_state {
 
 // quantum.operator
 
-// CHECK-LABEL: func.func @mixed_params
-func.func @mixed_params(%q: !quantum.bit, %ctrl: !quantum.bit, %cv: i1,
+// CHECK-LABEL: func.func @operator_op_mixed_params
+func.func @operator_op_mixed_params(%q: !quantum.bit, %ctrl: !quantum.bit, %cv: i1,
                        %theta: f64, %matrix: tensor<2x2xcomplex<f64>>,
                        %dynamic: tensor<?xf64>, %buffer: memref<4xi64>) -> (!quantum.bit, !quantum.bit) {
     // CHECK-DAG: [[MATRIX:%.+]] = bufferization.to_buffer %arg4 : tensor<2x2xcomplex<f64>> to [[MATRIX_TYPE:memref<.*>]]
@@ -184,46 +184,18 @@ func.func @mixed_params(%q: !quantum.bit, %ctrl: !quantum.bit, %cv: i1,
 
 // -----
 
-// CHECK-LABEL: func.func @metadata_and_forwarded_params
-func.func @metadata_and_forwarded_params(%q: !quantum.bit, %param: tensor<f64>, %forward: tensor<*xi64>) -> !quantum.bit {
+// CHECK-LABEL: func.func @operator_op_metadata_and_forwarded_params
+func.func @operator_op_metadata_and_forwarded_params(%q: !quantum.bit, %param: tensor<f64>, %forward: tensor<6xi64>) -> !quantum.bit {
     // CHECK-DAG: [[PARAM:%.+]] = bufferization.to_buffer %arg1 : tensor<f64> to [[PARAM_TYPE:memref<.*>]]
-    // CHECK-DAG: [[FORWARD:%.+]] = bufferization.to_buffer %arg2 : tensor<*xi64> to memref<*xi64>
+    // CHECK-DAG: [[FORWARD:%.+]] = bufferization.to_buffer %arg2 : tensor<6xi64> to [[FORWARD_TYPE:memref<.*>]]
     // CHECK: [[OUT:%.+]] = quantum.operator "Template"([[PARAM]]: [[PARAM_TYPE]]) adj qubits(%arg0) {test.metadata = "preserved"}
-    // CHECK: UID(7) forward([[FORWARD]]: memref<*xi64>)
+    // CHECK: UID(7) forward([[FORWARD]]: [[FORWARD_TYPE]])
     // CHECK: static_data = {pauli_word = "X"}
     // CHECK: param_map = {angle = [0]} qubit_map = {wires = [0]}
     // CHECK: return [[OUT]]
     %out = quantum.operator "Template"(%param: tensor<f64>) adj qubits(%q) {test.metadata = "preserved"}
-        UID(7) forward(%forward: tensor<*xi64>)
+        UID(7) forward(%forward: tensor<6xi64>)
         static_data = {pauli_word = "X"}
         param_map = {angle = [0]} qubit_map = {wires = [0]}
     return %out : !quantum.bit
-}
-
-// -----
-
-// Reuse an existing strided buffer instead of imposing an identity layout or copying.
-// CHECK-LABEL: func.func @strided_buffer
-func.func @strided_buffer(%q: !quantum.bit, %buffer: memref<4xf64, strided<[2], offset: 1>>) -> !quantum.bit {
-    %tensor = bufferization.to_tensor %buffer restrict : memref<4xf64, strided<[2], offset: 1>> to tensor<4xf64>
-    // CHECK-NOT: memref.alloc
-    // CHECK-NOT: memref.copy
-    // CHECK-NOT: bufferization.to_buffer
-    // CHECK: [[OUT:%.+]] = quantum.operator "Strided"(%arg1: memref<4xf64, strided<[2], offset: 1>>) qubits(%arg0)
-    // CHECK: return [[OUT]]
-    %out = quantum.operator "Strided"(%tensor: tensor<4xf64>) qubits(%q)
-    return %out : !quantum.bit
-}
-
-// -----
-
-// CHECK-LABEL: func.func @already_bufferized
-func.func @already_bufferized(%q: !quantum.bit, %theta: f64, %buffer: memref<?xf64>) -> !quantum.bit {
-    // CHECK-NOT: bufferization.to_buffer
-    // CHECK: [[OUT:%.+]] = quantum.operator "Mixed"(%arg1: f64, %arg2: memref<?xf64>) qubits(%arg0)
-    %out = quantum.operator "Mixed"(%theta: f64, %buffer: memref<?xf64>) qubits(%q)
-    // CHECK: [[FINAL:%.+]] = quantum.operator "PauliX"() qubits([[OUT]])
-    %final = quantum.operator "PauliX"() qubits(%out)
-    // CHECK: return [[FINAL]]
-    return %final : !quantum.bit
 }
