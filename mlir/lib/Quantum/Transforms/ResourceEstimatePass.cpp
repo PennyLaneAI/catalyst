@@ -59,12 +59,11 @@ struct ResourceEstimatePass : public impl::ResourceEstimatePassBase<ResourceEsti
         ResourceAnalysis analysis(module, {}, /*collectDetailedOperations=*/true);
         std::vector<std::string> opIDs;
         if (func::FuncOp qnode = GraphDecompositionPrep::findQNodeFunc(module)) {
-            llvm::StringSet<> visitedFuncs;
-            llvm::StringSet<> qnodeOpIDs;
-            GraphDecompositionPrep::collectOpIDs(analysis, qnode.getName(), visitedFuncs,
-                                                 qnodeOpIDs);
-            for (const auto &opID : qnodeOpIDs) {
-                opIDs.push_back(opID.getKey().str());
+            if (const catalyst::ResourceResult *flat =
+                    analysis.getFlattenedResource(qnode.getName())) {
+                for (const auto &opID : flat->observedGraphOpIds) {
+                    opIDs.push_back(opID.getKey().str());
+                }
             }
         }
 
