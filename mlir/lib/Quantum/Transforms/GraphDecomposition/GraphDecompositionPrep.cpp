@@ -346,8 +346,8 @@ LogicalResult loadDecompositionRules(ModuleOp module,
         }
     });
 
-    llvm::SmallVector<quantum::DecomposableGate> decomposableOps;
-    module.walk([&](quantum::DecomposableGate op) {
+    llvm::SmallVector<catalyst::quantum::DecomposableGate> decomposableOps;
+    module.walk([&](catalyst::quantum::DecomposableGate op) {
         if (!DecompUtils::isInDecompRule(op)) {
             decomposableOps.push_back(op);
         }
@@ -360,7 +360,7 @@ LogicalResult loadDecompositionRules(ModuleOp module,
         }
     }
 
-    for (quantum::DecomposableGate op : decomposableOps) {
+    for (catalyst::quantum::DecomposableGate op : decomposableOps) {
         std::string opId = op.getGraphOpId();
 
         if (handledOpIds.contains(opId)) {
