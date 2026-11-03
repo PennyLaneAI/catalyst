@@ -15,6 +15,7 @@
 #pragma once
 
 #include <optional>
+#include <set>
 #include <utility>
 
 #include "llvm/ADT/DenseMap.h"
@@ -49,6 +50,10 @@ struct ResourceResult {
     // Set of GOIDs observed under this result when `collectDetailedOperations` is
     // enabled. Accounts for dynamic-trip loops.
     llvm::StringSet<> observedGraphOpIds;
+
+    // Modifier region contexts under which this function is executed when
+    // `collectDetailedOperations` is enabled.
+    std::set<std::pair<bool, unsigned>> modifierContexts;
 
     llvm::StringMap<double> measurements;
 
