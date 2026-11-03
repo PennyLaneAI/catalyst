@@ -489,26 +489,52 @@ struct InsertOpArrayBackedPattern : public OpConversionPattern<InsertOp> {
 // Quantum Gates //
 ///////////////////
 
-struct CustomOpPattern : public OpConversionPattern<CustomOp> {
-    using OpConversionPattern::OpConversionPattern;
+template <typename OpTy> struct CustomOpPattern : public OpConversionPattern<OpTy> {
+    using OpConversionPattern<OpTy>::OpConversionPattern;
 
-    LogicalResult matchAndRewrite(CustomOp op, CustomOpAdaptor adaptor,
+    LogicalResult matchAndRewrite(OpTy op, typename OpTy::Adaptor adaptor,
                                   ConversionPatternRewriter &rewriter) const override {
-        Location loc = op.getLoc();
-        MLIRContext *ctx = getContext();
+        if (auto operatorOp = dyn_cast<OperatorOp>(op.getOperation())) {
+            if (operatorOp.getInQreg() || !operatorOp.getArrQubitIndices().empty() ||
+                operatorOp.getArrCtrlIndices() || operatorOp.getArrCtrlValues() ||
+                operatorOp.getUID() || !operatorOp.getForwardArgs().empty() ||
+                !operatorOp.getStaticData().empty() || !operatorOp.getParamMap().empty() ||
+                !operatorOp.getQubitMap().empty()) {
+                return rewriter.notifyMatchFailure(
+                    op, "expected an operator with only parameters, target/control qubits, "
+                        "a name, and an optional adjoint");
+            }
+        }
 
-        const TypeConverter *conv = getTypeConverter();
+        Location loc = op.getLoc();
+        MLIRContext *ctx = this->getContext();
+
+        const TypeConverter *conv = this->getTypeConverter();
         auto modifiersPtr = getModifiersPtr(loc, rewriter, conv, op.getAdjointFlag(),
                                             adaptor.getInCtrlQubits(), adaptor.getInCtrlValues());
 
-        // TODO: Might be better to have corresponding attribute for those custom op with variadic
-        // input qubits, so we don't need to explicity check any op gate name here
-        const auto hasVariadicInputQbits = (op.getGateName() == "Identity");
+        SmallVector<Value> params;
+        for (auto [param, convertedParam] : llvm::zip(op.getParams(), adaptor.getParams())) {
+            if (isa<BaseMemRefType>(param.getType())) {
+                // Runtime functions take pointers to memref descriptors.
+                Value descriptor =
+                    catalyst::getStaticAlloca(loc, rewriter, convertedParam.getType(), 1);
+                LLVM::StoreOp::create(rewriter, loc, convertedParam, descriptor);
+                params.push_back(descriptor);
+            } else {
+                params.push_back(convertedParam);
+            }
+        }
 
-        std::string qirName = "__catalyst__qis__" + op.getGateName().str();
+        const std::string gateName = op.getOperatorName();
+        const bool hasVariadicInputQbits = gateName == "Identity" || gateName == "MultiRZ" ||
+                                           gateName == "PCPhase" || gateName == "QubitUnitary";
+
+        std::string qirName = "__catalyst__qis__" + gateName;
         SmallVector<Type> argTypes;
-        argTypes.insert(argTypes.end(), adaptor.getParams().getTypes().begin(),
-                        adaptor.getParams().getTypes().end());
+        for (Value param : params) {
+            argTypes.push_back(param.getType());
+        }
         if (hasVariadicInputQbits) {
             // Since input qubits would be extracted through va_list in C,
             // thus we should add an additional information for number of qubits
@@ -525,8 +551,7 @@ struct CustomOpPattern : public OpConversionPattern<CustomOp> {
         LLVM::LLVMFuncOp fnDecl = catalyst::ensureFunctionDeclaration<LLVM::LLVMFuncOp>(
             rewriter, op, qirName, qirSignature);
 
-        SmallVector<Value> args;
-        args.insert(args.end(), adaptor.getParams().begin(), adaptor.getParams().end());
+        SmallVector<Value> args(params);
         if (hasVariadicInputQbits) {
             // get the number of qbuits and place the input qubits at the end of the arguments.
             int64_t numQubits = op.getOutQubits().size();
@@ -1226,7 +1251,8 @@ void populateQIRConversionPatterns(TypeConverter &typeConverter, RewritePatternS
     } else {
         patterns.add<InsertOpDefaultPattern>(typeConverter, patterns.getContext());
     }
-    patterns.add<CustomOpPattern>(typeConverter, patterns.getContext());
+    patterns.add<CustomOpPattern<CustomOp>, CustomOpPattern<OperatorOp>>(typeConverter,
+                                                                         patterns.getContext());
     patterns.add<MultiRZOpPattern>(typeConverter, patterns.getContext());
     patterns.add<PauliRotOpPattern>(typeConverter, patterns.getContext());
     patterns.add<PCPhaseOpPattern>(typeConverter, patterns.getContext());

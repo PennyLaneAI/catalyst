@@ -12,7 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: quantum-opt --finalize-memref-to-llvm --convert-index-to-llvm --convert-quantum-to-llvm --split-input-file %s | FileCheck %s
+// RUN: quantum-opt --one-shot-bufferize="bufferize-function-boundaries" \
+// RUN:   --finalize-memref-to-llvm --convert-index-to-llvm --convert-arith-to-llvm \
+// RUN:   --convert-quantum-to-llvm --split-input-file --verify-diagnostics %s | FileCheck %s
 
 ////////////////////////
 // Runtime Management //
@@ -861,4 +863,191 @@ module @test_set_basis_state {
         %2 = quantum.set_basis_state(%arg0) %1 : (memref<1xi1>, !quantum.bit) -> !quantum.bit
         return
     }
+}
+
+// -----
+
+// quantum.operator
+
+// CHECK: llvm.func @__catalyst__qis__RX(f64, !llvm.ptr, !llvm.ptr)
+// CHECK-LABEL: llvm.func @scalar
+func.func @scalar(%q: !quantum.bit, %theta: f64) -> !quantum.bit {
+    // CHECK: [[NULL:%.+]] = llvm.mlir.zero : !llvm.ptr
+    // CHECK: llvm.call @__catalyst__qis__RX(%arg1, %arg0, [[NULL]])
+    %out = quantum.operator "RX"(%theta: f64) qubits(%q)
+    // CHECK: llvm.return %arg0 : !llvm.ptr
+    return %out : !quantum.bit
+}
+
+// -----
+
+// CHECK: llvm.func @__catalyst__qis__SWAP(!llvm.ptr, !llvm.ptr, !llvm.ptr)
+// CHECK-LABEL: llvm.func @no_params
+func.func @no_params(%q0: !quantum.bit, %q1: !quantum.bit) -> (!quantum.bit, !quantum.bit) {
+    // CHECK: [[NULL:%.+]] = llvm.mlir.zero : !llvm.ptr
+    // CHECK: llvm.call @__catalyst__qis__SWAP(%arg0, %arg1, [[NULL]])
+    %out:2 = quantum.operator "SWAP"() qubits(%q0, %q1)
+    // CHECK: llvm.insertvalue %arg0, {{.*}}[0]
+    // CHECK: llvm.insertvalue %arg1, {{.*}}[1]
+    return %out#0, %out#1 : !quantum.bit, !quantum.bit
+}
+
+// -----
+
+// CHECK: llvm.func @__catalyst__qis__Rot(f64, f64, f64, !llvm.ptr, !llvm.ptr)
+// CHECK-LABEL: llvm.func @controlled_adjoint
+func.func @controlled_adjoint(%q: !quantum.bit, %ctrl0: !quantum.bit, %ctrl1: !quantum.bit,
+                             %cv0: i1, %cv1: i1, %theta: f64, %phi: f64, %omega: f64)
+    -> (!quantum.bit, !quantum.bit, !quantum.bit) {
+    // CHECK: [[MOD:%.+]] = llvm.alloca {{.*}} x !llvm.struct<(i1, i64, ptr, ptr)>
+    // CHECK: [[ADJOINT:%.+]] = llvm.mlir.constant(true)
+    // CHECK: [[ADJOINT_PTR:%.+]] = llvm.getelementptr inbounds [[MOD]][0, 0]
+    // CHECK: [[COUNT_PTR:%.+]] = llvm.getelementptr inbounds [[MOD]][0, 1]
+    // CHECK: llvm.store %arg1,
+    // CHECK: llvm.store %arg3,
+    // CHECK: llvm.store %arg2,
+    // CHECK: llvm.store %arg4,
+    // CHECK: llvm.store [[ADJOINT]], [[ADJOINT_PTR]]
+    // CHECK: [[COUNT:%.+]] = llvm.mlir.constant(2 : i64)
+    // CHECK: llvm.store [[COUNT]], [[COUNT_PTR]]
+    // CHECK: llvm.call @__catalyst__qis__Rot(%arg5, %arg6, %arg7, %arg0, [[MOD]])
+    %out, %ctrls:2 = quantum.operator "Rot"(%theta: f64, %phi: f64, %omega: f64)
+        adj qubits(%q) ctrls(%ctrl0, %ctrl1) ctrl_vals(%cv0, %cv1)
+    // CHECK: llvm.insertvalue %arg0, {{.*}}[0]
+    // CHECK: llvm.insertvalue %arg1, {{.*}}[1]
+    // CHECK: llvm.insertvalue %arg2, {{.*}}[2]
+    return %out, %ctrls#0, %ctrls#1 : !quantum.bit, !quantum.bit, !quantum.bit
+}
+
+// -----
+
+// CHECK: llvm.func @__catalyst__qis__Identity(!llvm.ptr, i64, ...)
+// CHECK-LABEL: llvm.func @identity
+func.func @identity(%q0: !quantum.bit, %q1: !quantum.bit) -> !quantum.bit {
+    // CHECK: [[NULL:%.+]] = llvm.mlir.zero : !llvm.ptr
+    // CHECK: [[COUNT:%.+]] = llvm.mlir.constant(2 : i64)
+    // CHECK: llvm.call @__catalyst__qis__Identity([[NULL]], [[COUNT]], %arg0, %arg1)
+    %out:2 = quantum.operator "Identity"() qubits(%q0, %q1)
+    return %out#0 : !quantum.bit
+}
+
+// -----
+
+// CHECK: llvm.func @__catalyst__qis__MultiRZ(f64, !llvm.ptr, i64, ...)
+// CHECK-LABEL: llvm.func @multirz
+func.func @multirz(%q0: !quantum.bit, %q1: !quantum.bit, %theta: f64) -> !quantum.bit {
+    // CHECK: [[NULL:%.+]] = llvm.mlir.zero : !llvm.ptr
+    // CHECK: [[COUNT:%.+]] = llvm.mlir.constant(2 : i64)
+    // CHECK: llvm.call @__catalyst__qis__MultiRZ(%arg2, [[NULL]], [[COUNT]], %arg0, %arg1)
+    %out:2 = quantum.operator "MultiRZ"(%theta: f64) qubits(%q0, %q1)
+    return %out#0 : !quantum.bit
+}
+
+// -----
+
+// CHECK: llvm.func @__catalyst__qis__PCPhase(f64, i64, !llvm.ptr, i64, ...)
+// CHECK-LABEL: llvm.func @pcphase
+func.func @pcphase(%q0: !quantum.bit, %q1: !quantum.bit, %theta: f64, %dim: i64) -> !quantum.bit {
+    // CHECK: [[NULL:%.+]] = llvm.mlir.zero : !llvm.ptr
+    // CHECK: [[COUNT:%.+]] = llvm.mlir.constant(2 : i64)
+    // CHECK: llvm.call @__catalyst__qis__PCPhase(%arg2, %arg3, [[NULL]], [[COUNT]], %arg0, %arg1)
+    %out:2 = quantum.operator "PCPhase"(%theta: f64, %dim: i64) qubits(%q0, %q1)
+    return %out#0 : !quantum.bit
+}
+
+// -----
+
+// CHECK: llvm.func @__catalyst__qis__GlobalPhase(f64, !llvm.ptr)
+// CHECK-LABEL: llvm.func @global_phase
+func.func @global_phase(%theta: f64) {
+    // CHECK: [[NULL:%.+]] = llvm.mlir.zero : !llvm.ptr
+    // CHECK: llvm.call @__catalyst__qis__GlobalPhase(%arg0, [[NULL]])
+    quantum.operator "GlobalPhase"(%theta: f64) qubits()
+    return
+}
+
+// -----
+
+// Tensor parameters reach the runtime as pointers to descriptors.
+// CHECK: llvm.func @__catalyst__qis__QubitUnitary(!llvm.ptr, !llvm.ptr, i64, ...)
+// CHECK-LABEL: llvm.func @tensor_unitary
+func.func @tensor_unitary(%q: !quantum.bit, %ctrl: !quantum.bit, %cv: i1, %matrix: tensor<2x2xcomplex<f64>>) -> (!quantum.bit, !quantum.bit) {
+    // CHECK-DAG: [[BUFFER:%.+]] = llvm.alloca {{.*}} x !llvm.struct<(ptr, ptr, i64, array<2 x i64>, array<2 x i64>)>
+    // CHECK-DAG: [[MOD:%.+]] = llvm.alloca {{.*}} x !llvm.struct<(i1, i64, ptr, ptr)>
+    // CHECK: llvm.store %arg1,
+    // CHECK: llvm.store %arg2,
+    // CHECK: llvm.store {{.*}}, [[BUFFER]] : !llvm.struct<(ptr, ptr, i64, array<2 x i64>, array<2 x i64>)>, !llvm.ptr
+    // CHECK: [[COUNT:%.+]] = llvm.mlir.constant(1 : i64)
+    // CHECK: llvm.call @__catalyst__qis__QubitUnitary([[BUFFER]], [[MOD]], [[COUNT]], %arg0)
+    %out, %out_ctrl = quantum.operator "QubitUnitary"(%matrix: tensor<2x2xcomplex<f64>>)
+        adj qubits(%q) ctrls(%ctrl) ctrl_vals(%cv)
+    // CHECK: llvm.insertvalue %arg0, {{.*}}[0]
+    // CHECK: llvm.insertvalue %arg1, {{.*}}[1]
+    return %out, %out_ctrl : !quantum.bit, !quantum.bit
+}
+
+// -----
+
+// Multiple tensor parameters can be interleaved with scalars.
+// CHECK: llvm.func @__catalyst__qis__Mixed(!llvm.ptr, f64, !llvm.ptr, !llvm.ptr, !llvm.ptr)
+// CHECK-LABEL: llvm.func @mixed_params
+func.func @mixed_params(%q: !quantum.bit, %theta: f64, %data: tensor<?xf64>, %scalar: tensor<f64>) -> !quantum.bit {
+    // CHECK-DAG: [[DATA:%.+]] = llvm.alloca {{.*}} x !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
+    // CHECK-DAG: [[SCALAR:%.+]] = llvm.alloca {{.*}} x !llvm.struct<(ptr, ptr, i64)>
+    // CHECK: llvm.store {{.*}}, [[DATA]] : !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>, !llvm.ptr
+    // CHECK: llvm.store {{.*}}, [[SCALAR]] : !llvm.struct<(ptr, ptr, i64)>, !llvm.ptr
+    // CHECK: llvm.call @__catalyst__qis__Mixed([[DATA]], %arg1, [[SCALAR]], %arg0, {{%.+}})
+    %out = quantum.operator "Mixed"(%data: tensor<?xf64>, %theta: f64, %scalar: tensor<f64>) qubits(%q)
+    // CHECK: llvm.return %arg0 : !llvm.ptr
+    return %out : !quantum.bit
+}
+
+// -----
+
+// Operators outside the supported runtime signature must fail conversion.
+
+func.func @static_data(%q: !quantum.bit, %theta: f64) -> !quantum.bit {
+    // expected-error@+1 {{failed to legalize operation 'quantum.operator'}}
+    %out = quantum.operator "RX"(%theta: f64) qubits(%q) static_data = {extra = 1 : i64}
+    return %out : !quantum.bit
+}
+
+// -----
+
+func.func @uid(%q: !quantum.bit, %theta: f64) -> !quantum.bit {
+    // expected-error@+1 {{failed to legalize operation 'quantum.operator'}}
+    %out = quantum.operator "RX"(%theta: f64) qubits(%q) UID(0)
+    return %out : !quantum.bit
+}
+
+// -----
+
+func.func @forwarded_args(%q: !quantum.bit, %theta: f64, %forward: f64) -> !quantum.bit {
+    // expected-error@+1 {{failed to legalize operation 'quantum.operator'}}
+    %out = quantum.operator "RX"(%theta: f64) qubits(%q) UID(1) forward(%forward: f64)
+    return %out : !quantum.bit
+}
+
+// -----
+
+func.func @param_map(%q: !quantum.bit, %theta: f64) -> !quantum.bit {
+    // expected-error@+1 {{failed to legalize operation 'quantum.operator'}}
+    %out = quantum.operator "RX"(%theta: f64) qubits(%q) param_map = {theta = [0]}
+    return %out : !quantum.bit
+}
+
+// -----
+
+func.func @qubit_map(%q: !quantum.bit, %theta: f64) -> !quantum.bit {
+    // expected-error@+1 {{failed to legalize operation 'quantum.operator'}}
+    %out = quantum.operator "RX"(%theta: f64) qubits(%q) qubit_map = {work_wires = [0]}
+    return %out : !quantum.bit
+}
+
+// -----
+
+func.func @register(%qreg: !quantum.reg, %theta: f64) -> !quantum.reg {
+    // expected-error@+1 {{failed to legalize operation 'quantum.operator'}}
+    %out = quantum.operator "RX"(%theta: f64) quregs(%qreg) indices()
+    return %out : !quantum.reg
 }

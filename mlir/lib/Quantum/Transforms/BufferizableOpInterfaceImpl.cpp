@@ -34,6 +34,54 @@ using namespace catalyst::quantum;
 
 namespace {
 
+// Bufferization of quantum.operator parameters, including forwarded parameters.
+struct OperatorOpInterface
+    : public bufferization::BufferizableOpInterface::ExternalModel<OperatorOpInterface,
+                                                                   OperatorOp> {
+    bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
+                                const bufferization::AnalysisState &state) const {
+        return true;
+    }
+
+    bool bufferizesToMemoryWrite(Operation *op, OpOperand &opOperand,
+                                 const bufferization::AnalysisState &state) const {
+        return false;
+    }
+
+    bufferization::AliasingValueList
+    getAliasingValues(Operation *op, OpOperand &opOperand,
+                      const bufferization::AnalysisState &state) const {
+        return {};
+    }
+
+    LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
+                            const bufferization::BufferizationOptions &options,
+                            bufferization::BufferizationState &state) const {
+        auto operatorOp = cast<OperatorOp>(op);
+        if (!operatorOp.getArrQubitIndices().empty() || operatorOp.getArrCtrlIndices() ||
+            operatorOp.getArrCtrlValues()) {
+            return op->emitOpError(
+                "bufferization of register index and control tensors is not supported");
+        }
+
+        SmallVector<Value> operands(op->getOperands());
+        for (auto [index, param] : llvm::enumerate(operatorOp.getAllParams())) {
+            if (!isa<TensorType>(param.getType())) {
+                continue;
+            }
+            FailureOr<Value> buffer = bufferization::getBuffer(rewriter, param, options, state);
+            if (failed(buffer)) {
+                return failure();
+            }
+            operands[index] = *buffer;
+        }
+
+        // Keep all attributes, operand segments, and quantum results intact.
+        rewriter.modifyOpInPlace(op, [&] { op->setOperands(operands); });
+        return success();
+    }
+};
+
 // Bufferization of quantum.unitary.
 // Convert Matrix into memref.
 struct QubitUnitaryOpInterface
@@ -436,6 +484,7 @@ struct SetBasisStateOpInterface
 
 void catalyst::quantum::registerBufferizableOpInterfaceExternalModels(DialectRegistry &registry) {
     registry.addExtension(+[](MLIRContext *ctx, catalyst::quantum::QuantumDialect *dialect) {
+        OperatorOp::attachInterface<OperatorOpInterface>(*ctx);
         QubitUnitaryOp::attachInterface<QubitUnitaryOpInterface>(*ctx);
         HermitianOp::attachInterface<HermitianOpInterface>(*ctx);
         HamiltonianOp::attachInterface<HamiltonianOpInterface>(*ctx);
