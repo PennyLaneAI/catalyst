@@ -812,7 +812,8 @@ int HwhsControllerSession::collect(void *const *replies, const std::uint64_t * /
     volatile std::uint8_t *slot = static_cast<volatile std::uint8_t *>(replies[0]);
 
     if (sw_poll_) {
-        // TODO: read the reply through the frame codec (Frame.hpp), as cpu_verbs does.
+        // The codec's 16 B layout, read through a volatile pointer rather than the codec's
+        // functions: the reply ring is device-mapped FPGA memory.
         volatile std::uint32_t *seq =
             reinterpret_cast<volatile std::uint32_t *>(slot + offsetof(common::Payload, seq_num));
         const std::uint32_t expected = static_cast<std::uint32_t>(collected_ + 1);

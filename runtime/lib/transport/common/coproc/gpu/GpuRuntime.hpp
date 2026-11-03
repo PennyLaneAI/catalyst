@@ -18,20 +18,6 @@
 
 namespace catalyst::transport::coproc {
 
-// Per-slot GPU->CPU handoff, written by the fused kernel and read by the CPU
-// engine. `seq` is the trailer (== cursor + 1). When the slot is <= 16 B the
-// kernel publishes it in one aligned vector store, so the CPU can never observe
-// seq updated before correction (no intra-slot ordering fence needed);
-// alignas(16) makes that single 16 B store well-defined. If the slot ever grows
-// past 16 B the kernel falls back to the write-correction / fence / release-seq
-// / fence trailer protocol instead.
-// TODO: replace with a frame-codec reply frame, so a GPU reply carries its fn_id like every other.
-struct alignas(16) HandoffSlot {
-    std::int64_t correction; // error qubit index the decoder produced; -1 for no error
-    std::uint32_t seq;
-    std::uint32_t pad;
-};
-
 class GpuRuntime {
   public:
     explicit GpuRuntime(int device);
@@ -47,14 +33,15 @@ class GpuRuntime {
     };
     HbmRing alloc_hbm_ring(std::size_t bytes);
 
+    // The host-mapped GPU->CPU reply ring: the persistent kernel writes a reply frame per message
+    // into it, laid out like the request ring, and a CPU thread polls it.
     struct Handoff {
-        HandoffSlot *host = nullptr;        // CPU-side view of the ring
-        HandoffSlot *dev = nullptr;         // device-side view of the same pages
+        std::uint8_t *host = nullptr;       // CPU-side view of the ring
+        std::uint8_t *dev = nullptr;        // device-side view of the same pages
         std::uint32_t *stop_host = nullptr; // CPU-side teardown flag
         std::uint32_t *stop_dev = nullptr;  // device-side view of the same flag
-        std::size_t num_slots = 0;          // number of slots in the ring
     };
-    Handoff alloc_handoff(std::size_t num_slots);
+    Handoff alloc_handoff(std::size_t bytes);
 
     void sync(); // hipStreamSynchronize
 
@@ -63,10 +50,10 @@ class GpuRuntime {
     void *stream() const { return stream_; }
 
   private:
-    void *stream_ = nullptr;              // hipStream_t
-    void *hbm_ptr_ = nullptr;             // owned; hipFree in dtor
-    HandoffSlot *handoff_host_ = nullptr; // owned; hipHostFree in dtor
-    std::uint32_t *stop_host_ = nullptr;  // owned; hipHostFree in dtor
+    void *stream_ = nullptr;               // hipStream_t
+    void *hbm_ptr_ = nullptr;              // owned; hipFree in dtor
+    std::uint8_t *handoff_host_ = nullptr; // owned; hipHostFree in dtor
+    std::uint32_t *stop_host_ = nullptr;   // owned; hipHostFree in dtor
 };
 
 } // namespace catalyst::transport::coproc

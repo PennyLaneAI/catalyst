@@ -481,9 +481,9 @@ void *onnx_init(const char *config) {
 
 void onnx_fini(void *ctx) { delete static_cast<OnnxCoprocessor *>(ctx); }
 
-// Version 1: the fields this library fills.
+// The runtime's current version, as every in-tree coprocessor function reports.
 constexpr catalyst::transport::CoprocessorFnInfo kInfo{
-    .abi_version = 1,
+    .abi_version = CATALYST_COPROCESSOR_FN_ABI_VERSION,
     .init = &onnx_init,
     .fini = &onnx_fini,
 };

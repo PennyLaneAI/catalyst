@@ -39,6 +39,56 @@ func.func @test_ctrl_op(%q: !qref.bit, %r: !qref.reg<1>)
 
 // -----
 
+// CHECK-LABEL: @test_unannotated
+// CHECK-SAME: ([[Q:%.*]]: !qref.bit)
+// CHECK-NEXT: qref.custom "PauliX"() [[Q]]
+// CHECK-NEXT: return
+func.func @test_unannotated(%q: !qref.bit) {
+    func.call @helper(%q) : (!qref.bit) -> ()
+    return
+}
+
+func.func private @helper(%q: !qref.bit) {
+    qref.custom "PauliX"() %q : !qref.bit
+    return
+}
+
+// -----
+
+// CHECK-LABEL: @test_qnode_attribute
+// CHECK-SAME: ([[Q:%.*]]: !qref.bit)
+// CHECK-NEXT: qref.custom "PauliX"() [[Q]]
+// CHECK-NEXT: return
+func.func @test_qnode_attribute(%q: !qref.bit) {
+    func.call @helper(%q) : (!qref.bit) -> ()
+    return
+}
+
+func.func private @helper(%q: !qref.bit) attributes {quantum.node} {
+    qref.custom "PauliX"() %q : !qref.bit
+    return
+}
+
+// -----
+
+// CHECK-LABEL: @test_mixed_dialects
+// CHECK-SAME: ([[Q:%.*]]: !qref.bit)
+// CHECK-NEXT: qref.custom "PauliX"() [[Q]]
+// CHECK-NEXT: [[SIZE:%.*]] = quantum.num_qubits : i64
+// CHECK-NEXT: return [[SIZE]]
+func.func @test_mixed_dialects(%q: !qref.bit) -> i64 {
+    %size = func.call @helper(%q) : (!qref.bit) -> i64
+    return %size : i64
+}
+
+func.func private @helper(%q: !qref.bit) -> i64 {
+    qref.custom "PauliX"() %q : !qref.bit
+    %size = quantum.num_qubits : i64
+    return %size : i64
+}
+
+// -----
+
 
 func.func @my_helper() -> f64 {
     %0 = arith.constant 4.2 : f64
