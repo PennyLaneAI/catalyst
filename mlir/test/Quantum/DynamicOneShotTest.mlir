@@ -115,6 +115,42 @@ func.func public @test_expval_mcm(%arg0: f64) -> tensor<f64> attributes {quantum
 // -----
 
 
+// Generic mid-circuit measurements remain in the quantum kernel. Only terminal
+// measurements are collected and aggregated across shots.
+// CHECK-LABEL: func.func @generic_mcm.quantum.one_shot_kernel
+// CHECK-SAME: (%[[ANGLE:.*]]: f64) -> f64 attributes {quantum.node}
+// CHECK: %[[BIT:.*]], %[[Q:.*]] = quantum.measurement "MeasureInBasis"(%[[ANGLE]]: f64) qubits(%{{.*}}) static_data = {plane = "XY"} : i1, !quantum.bit
+// CHECK-NOT: quantum.mcmobs
+// CHECK-NOT: quantum.expval
+// CHECK: %[[EXT:.*]] = arith.extui %[[BIT]] : i1 to i64
+// CHECK: %[[RESULT:.*]] = arith.sitofp %[[EXT]] : i64 to f64
+// CHECK: return %[[RESULT]] : f64
+
+// CHECK-LABEL: func.func @generic_mcm.quantum(
+// CHECK: scf.for
+// CHECK: call @generic_mcm.quantum.one_shot_kernel
+// CHECK: arith.addf
+// CHECK: arith.divf
+
+func.func @generic_mcm(%angle: f64) -> tensor<f64> attributes {quantum.node} {
+  %shots = arith.constant 100 : i64
+  quantum.device shots(%shots) ["", "", ""]
+  %reg = quantum.alloc(1) : !quantum.reg
+  %q = quantum.extract %reg[0] : !quantum.reg -> !quantum.bit
+  %bit, %out = quantum.measurement "MeasureInBasis"(%angle: f64)
+      qubits(%q) static_data = {plane = "XY"} : i1, !quantum.bit
+  %obs = quantum.mcmobs %bit : !quantum.obs
+  %expval = quantum.expval %obs : f64
+  %result = tensor.from_elements %expval : tensor<f64>
+  %out_reg = quantum.insert %reg[0], %out : !quantum.reg, !quantum.bit
+  quantum.dealloc %out_reg : !quantum.reg
+  quantum.device_release
+  return %result : tensor<f64>
+}
+
+// -----
+
+
 func.func public @test_var_mcm(%arg0: f64) -> tensor<f64> attributes {quantum.node} {
   %1000 = arith.constant 1000 : i64
   quantum.device shots(%1000) ["", "", ""]
