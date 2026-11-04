@@ -96,7 +96,6 @@ def _mock_and_get_active_passes(input: str, active_mlir_passes: list) -> str:
     return buffer.getvalue()
 
 
-
 def create_apply_registered_pass_op(
     pass_name,
     options: dict[str, Any] | None = None,
