@@ -94,3 +94,22 @@ jobs:
         repository-url: https://test.pypi.org/legacy/
         packages-dir: dist
         verbose: true
+
+  # Publishes the catalyst-dev and catalyst-runtime-dev archives the two jobs above built (they only
+  # exist because of `build_dev_packages: true`) to the nightly channel of the dev-package bucket.
+  # Independent of the TestPyPI upload job, so a failure on either side does not hold back the
+  # other. We skip linux-aarch until we know that it's needed.
+  upload-dev-packages:
+    name: Upload dev packages to S3
+    needs: [linux-x86, macos-arm]
+    permissions:
+      id-token: write   # OIDC: required for the called workflow to assume the AWS role
+      contents: read
+      actions: read
+    uses: ./.github/workflows/upload-dev-packages.yaml
+    with:
+      channel: nightly
+      platforms: Linux-x86_64,Darwin-arm64
+    secrets:
+      AWS_ASSUME_S3_ROLE_ARN: ${{ secrets.AWS_ASSUME_S3_ROLE_ARN }}
+      AWS_REGION: ${{ secrets.AWS_REGION }}
