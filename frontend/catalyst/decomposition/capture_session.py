@@ -107,14 +107,14 @@ class TracedRule:
     more than once while preserving distinct alternatives with identical resource counts.
 
     Attributes:
-        pyfun: Python callable retained for naming and lowering the function.
+        prepared_rule_fn: Adapted rule callable retained for naming and lowering the function.
         closed_jaxpr: Converted Catalyst JAXPR containing the rule body.
         target_gate: Full GraphOpID of the operation decomposed by the rule.
         resources: GraphOpID-to-multiplicity mapping produced by the rule.
         frontend_name: PennyLane rule name used for fixed and alternative rule selection.
     """
 
-    pyfun: Callable
+    prepared_rule_fn: Callable[..., None]
     closed_jaxpr: ClosedJaxpr
     target_gate: SerializedGraphOpID
     resources: dict[SerializedGraphOpID, int]

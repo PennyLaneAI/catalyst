@@ -474,7 +474,7 @@ def _convert_decomp_target_spec(interpreter, target_spec):
                 continue
         out.append(
             TracedRule(
-                pyfun=prepared_rule_fn,
+                prepared_rule_fn=prepared_rule_fn,
                 closed_jaxpr=converted,
                 target_gate=target_spec.target_id,
                 resources=rule.resource_counts_by_id,
@@ -504,7 +504,7 @@ def capture_and_bind_kernel_rules(interpreter):
 
     for traced_rule in scope.definitions.values():
         decomp_definition_p.bind(
-            pyfun=traced_rule.pyfun,
+            pyfun=traced_rule.prepared_rule_fn,
             func_jaxpr=traced_rule.closed_jaxpr,
             target_gate=traced_rule.target_gate,
             resources=tuple(sorted(traced_rule.resources.items())),
