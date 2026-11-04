@@ -50,7 +50,7 @@ weights = np.random.random(size=shape)
 # CHECK-SAME:   walltime: {{[0-9\.]+}} ms{{\s*}} cputime: {{[0-9\.]+}} ms{{\s*}} programsize: {{[0-9]+}} lines
 # Compiler diagnostics can appear between stage records.
 # CHECK:      [DIAGNOSTICS] Running compile
-# CHECK-SAME:   walltime: {{[0-9\.]+}} ms{{\s*}} cputime: {{[0-9\.]+}} ms{{\s*}} programsize: {{[0-9]+}} lines
+# CHECK-SAME:   walltime: {{[0-9\.]+}} ms{{\s*}} cputime: {{[0-9\.]+}} ms{{[ \t]*$}}
 # CHECK-NEXT: [DIAGNOSTICS] Running run
 # CHECK-SAME:   walltime: {{[0-9\.]+}} ms{{\s*}} cputime: {{[0-9\.]+}} ms
 
