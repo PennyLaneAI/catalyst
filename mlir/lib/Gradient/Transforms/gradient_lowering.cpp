@@ -16,8 +16,10 @@
 #include <utility> // std::move
 #include <vector>
 
+#include "mlir/Analysis/CallGraph.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Index/IR/IndexDialect.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
@@ -26,11 +28,14 @@
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/SymbolTable.h"
 #include "mlir/Pass/Pass.h"
+#include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#include "mlir/Transforms/Inliner.h"
 
 #include "Catalyst/IR/CatalystDialect.h"
 #include "Gradient/IR/GradientOps.h"
 #include "Gradient/Transforms/Patterns.h"
+#include "Gradient/Utils/DifferentialQNode.h"
 #include "Quantum/IR/QuantumOps.h"
 #include "Quantum/Utils/RemoveQuantum.h"
 
@@ -47,6 +52,34 @@ struct GradientLoweringPass : impl::GradientLoweringPassBase<GradientLoweringPas
     using GradientLoweringPassBase::GradientLoweringPassBase;
 
     void runOnOperation() final {
+        auto shouldInlineCall = [](const Inliner::ResolvedCall &call) {
+            auto callOp = call.call;
+            if (!isa<func::CallOp>(callOp.getOperation())) {
+                return false;
+            }
+            auto caller = callOp->getParentOfType<func::FuncOp>();
+            auto callee =
+                dyn_cast<func::FuncOp>(call.targetNode->getCallableRegion()->getParentOp());
+            if (!caller || !callee || isQNode(callee)) {
+                return false;
+            }
+            StringRef method = getQNodeDiffMethod(caller);
+            return method == "parameter-shift" || method == "adjoint";
+        };
+
+        // Expose decomposition gates before splitting QNodes into classical and quantum parts.
+        // Keep calls to QNodes intact so their differentiation method is preserved.
+        InlinerConfig config;
+        Inliner inliner(
+            getOperation(), getAnalysis<CallGraph>(), *this, getAnalysisManager(),
+            [this](Pass &, OpPassManager &pipeline, Operation *op) {
+                return runPipeline(pipeline, op);
+            },
+            config, shouldInlineCall);
+        if (failed(inliner.doInlining())) {
+            return signalPassFailure();
+        }
+
         RewritePatternSet gradientPatterns(&getContext());
         populateLoweringPatterns(gradientPatterns);
 
