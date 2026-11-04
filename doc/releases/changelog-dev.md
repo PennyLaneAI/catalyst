@@ -412,6 +412,7 @@
     [(#3252)](https://github.com/PennyLaneAI/catalyst/pull/3252)
     [(#3261)](https://github.com/PennyLaneAI/catalyst/pull/3261)
     [(#3393)](https://github.com/PennyLaneAI/catalyst/pull/3393)
+    [(#3416)](https://github.com/PennyLaneAI/catalyst/pull/3416)
 
     This pathway of rule injection can be opted-out via a new keyword argument on `qp.qjit` named `collect_decomp_rules`.
     This kwarg controls whether or not to compile the decomposition rules during lower-time. Default value is `True`.
@@ -962,10 +963,6 @@
 <h3>Deprecations 👋</h3>
 
 <h3>Bug fixes 🐛</h3>
-
-* Decomposition rules now reconstruct nested operators from their input parameters and wires.
-  This fixes symbolic wire placeholders when compiling GQSP with a nonzero polynomial degree.
-  [(#3416)](https://github.com/PennyLaneAI/catalyst/pull/3416)
 
 * The `--convert-to-value-semantics` pass now correctly handles aliasing qubit references that are
   used by multiple regions and/or operand lists on the same operation.
