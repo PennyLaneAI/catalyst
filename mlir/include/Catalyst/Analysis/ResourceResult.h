@@ -14,8 +14,9 @@
 
 #pragma once
 
+#include <map>
 #include <optional>
-#include <set>
+#include <string>
 #include <utility>
 
 #include "llvm/ADT/DenseMap.h"
@@ -51,9 +52,10 @@ struct ResourceResult {
     // enabled. Accounts for dynamic-trip loops.
     llvm::StringSet<> observedGraphOpIds;
 
-    // Modifier region contexts under which this function is executed when
-    // `collectDetailedOperations` is enabled.
-    std::set<std::pair<bool, unsigned>> modifierContexts;
+    // Modifier region contexts under which this (real) function should be
+    // analyzed when `collectDetailedOperations` is enabled, mapped to the
+    // deterministic modifier-context func name (`foo`, `A_foo`, `2C_A_foo`, …).
+    std::map<std::pair<bool, unsigned>, std::string> modifierContexts;
 
     llvm::StringMap<double> measurements;
 

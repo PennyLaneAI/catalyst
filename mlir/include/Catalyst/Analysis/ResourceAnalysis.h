@@ -77,11 +77,15 @@ class ResourceAnalysis {
     llvm::SmallVector<std::unique_ptr<ResourceAnalysisExtension>> extensionAnalyses;
 
     // Blank ResourceResult with empty data objects from each collector.
-    ResourceResult makeEmptyResult(
-        std::set<std::pair<bool, unsigned>> modifierContexts = {}) const;
+    ResourceResult makeEmptyResult() const;
 
     // `prefix` + counter; advance counter until the name is free in `funcResults`
     std::string makeUniqueSyntheticName(llvm::StringRef prefix, int64_t &counter);
+
+    // Deterministic name for analyzing `funcName` under a modifier context:
+    // `foo`, `A_foo`, `2C_foo`, `2C_A_foo`.
+    std::string modifierContextFuncName(llvm::StringRef funcName, bool isAdjoint,
+                                        unsigned numControlQubits);
 
     // analyze a region and accumulate results
     void analyzeRegion(Region &region, ResourceResult &result, bool isAdjoint,
