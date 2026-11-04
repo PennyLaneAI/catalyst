@@ -68,6 +68,22 @@ _NON_INVERTIBLE_RESOURCE_TYPES = (qp.ops.MidMeasure, qp.ops.PauliMeasure)
 
 
 @dataclass
+class CollectedRule:
+    """A source rule whose resource counts were successfully collected.
+
+    Attributes:
+        source_rule: PennyLane rule, including its implementation and frontend name.
+        resource_counts_by_op: Raw resource operations and their counts, used for graph traversal.
+        resource_counts_by_id: Serialized resource IDs and their counts, adjusted for the
+            target's modifiers during collection or preparation.
+    """
+
+    source_rule: DecompositionRule
+    resource_counts_by_op: dict[Operator2, int]
+    resource_counts_by_id: dict[SerializedGraphOpID, int]
+
+
+@dataclass
 class DecompRuleSpec:
     """A decomposition rule adapted for tracing, with resource counts for its consumers.
 
@@ -629,8 +645,8 @@ def collect_resources_for_op(
     is_custom_op=False,
     op_cls=None,
     modifiers=ModifierState(),
-):
-    """Return resource data for all decomposition rules associated to op_name.
+) -> list[CollectedRule]:
+    """Collect resources for eligible rules, omitting rules whose resource collection fails.
 
     Args:
         op_name (str): the operator's name, as PennyLane registers its rules
@@ -640,42 +656,42 @@ def collect_resources_for_op(
         modifiers (ModifierState): the modifiers to spell on each produced id
 
     Returns:
-        dict: rule name to the resources it produces
-        dict: rule name to the graphOpId of each resource
-        list: the rules that apply to the probed operator
+        list[CollectedRule]: source rules and their resource counts, in registry order
     """
     decomp_rules = list(qp.decomposition.list_decomps(op_cls or op_name))
     args, kwargs = prepare_dummy_rule_arguments(kwargs, is_custom_op)
 
-    # map each rule to its resources, in a more generic format
-    name_to_resource_ids: dict[str, dict[SerializedGraphOpID, int]] = {}
-    name_to_resources = {}
-    applicable_rules = []
+    collected_rules = []
     for rule in decomp_rules:
         if not _rule_is_compatible(op_name, rule, *args, **kwargs):
             continue
 
-        applicable_rules.append(rule)
         try:
             # The `compute_resources` function's signature is the same as the Operator2 signature
             # for the original op of the rule
             with qp.capture.toggle_ctx(True):
                 resources = rule.compute_resources(*args, **kwargs)
-            name_to_resources[rule.name] = resources.gate_counts
             # A distributed rule produces modified gates, so each id is *generated* in its
             # modified form straight from the resource op instance -- the modifiers are placed
             # canonically by `build_graph_op_id`, never spliced into a finished id string.
-            name_to_resource_ids[rule.name] = {
+            resource_counts_by_id = {
                 GraphOpID(op).getGraphOpId(modifiers): count
                 for op, count in resources.gate_counts.items()
             }
+            collected_rules.append(
+                CollectedRule(
+                    source_rule=rule,
+                    resource_counts_by_op=resources.gate_counts,
+                    resource_counts_by_id=resource_counts_by_id,
+                )
+            )
         except Exception as e:
             warnings.warn(
                 f"Failed to get resources for the {rule.name} decomposition rule: {e}",
                 category=RuleLoweringWarning,
             )
 
-    return name_to_resources, name_to_resource_ids, applicable_rules
+    return collected_rules
 
 
 def prepare_dynamic_op_kwargs(dynamic_shape, wire_lens) -> dict[str, Array]:
@@ -750,7 +766,7 @@ def build_decomp_target_spec(
     n_base_wires = sum(wire_lens.values())
     n_ctrl = modifiers.control_count
 
-    name_to_resources, name_to_resource_ids, decomp_rules = collect_resources_for_op(
+    collected_rules = collect_resources_for_op(
         op_name,
         kwargs | static_data | extra_data,
         is_custom_op,
@@ -794,10 +810,9 @@ def build_decomp_target_spec(
         return decomp_rule
 
     rule_specs = []
-    for rule in decomp_rules:
-        if rule.name not in name_to_resource_ids:
-            continue
-        if modifiers.is_modified and _resources_have_measurement(name_to_resources[rule.name]):
+    for collected in collected_rules:
+        rule = collected.source_rule
+        if modifiers.is_modified and _resources_have_measurement(collected.resource_counts_by_op):
             warnings.warn(
                 f"Skipped the {rule.name} decomposition rule for {target_id}: it contains a "
                 "mid-circuit measurement, which is not supported with adjoint or control regions.",
@@ -808,8 +823,8 @@ def build_decomp_target_spec(
             DecompRuleSpec(
                 prepared_rule_fn=rule_to_callable(rule),
                 frontend_name=rule.name,
-                resource_counts_by_id=name_to_resource_ids[rule.name],
-                resource_counts_by_op=name_to_resources[rule.name],
+                resource_counts_by_id=collected.resource_counts_by_id,
+                resource_counts_by_op=collected.resource_counts_by_op,
             )
         )
 
@@ -981,11 +996,12 @@ def build_rule_module(
 
 def collect_symbolic_resources(
     op_cls, op_name, kwargs, is_custom_op, *, kind, ctrl_wires=(), ctrl_values=()
-):
-    """Return resource data for the rules registered against ``Adjoint(op_name)``/``C(op_name)``.
+) -> tuple[list[CollectedRule], dict]:
+    """Collect resources for eligible rules registered against ``Adjoint(op_name)``/``C(op_name)``.
 
     PennyLane names a controlled operator ``C(Op)`` whatever its control count, so the registry is
     always queried under that single name; ``ctrl_wires`` carries the count.
+    Rules whose resource collection fails are omitted.
 
     Args:
         op_cls (type): the base operator's class
@@ -997,15 +1013,13 @@ def collect_symbolic_resources(
         ctrl_values: the control values, for ``kind="control"``
 
     Returns:
-        list: the rules that apply to the probed operator
-        dict: the arguments the rules were probed with
-        dict: rule name to the resources it produces
-        dict: rule name to the graphOpId of each resource
+        list[CollectedRule]: source rules and their resource counts, in registry order
+        dict: the probe arguments, or an empty dictionary if no rules are registered
     """
     lookup_name = symbolic_op_name(to_name(op_cls), kind)
     rules = list(qp.decomposition.list_decomps(lookup_name))
     if not rules:
-        return [], {}, {}, {}
+        return [], {}
 
     # The base op is only a carrier of the dummy parameters and wires: the graph reasons about
     # resources in terms of abstract operators, matching `_get_kwargs` in PennyLane's graph.
@@ -1013,30 +1027,33 @@ def collect_symbolic_resources(
         base_op = abstractify(build_base_op(op_cls, kwargs, is_custom_op))
     probe_args = symbolic_arguments(base_op, kind, ctrl_wires, ctrl_values)
 
-    name_to_resources = {}
-    name_to_resource_ids: dict[str, dict[SerializedGraphOpID, int]] = {}
-    applicable_rules = []
+    collected_rules = []
     for rule in rules:
         if not _rule_is_compatible(op_name, rule, **probe_args):
             continue
 
-        applicable_rules.append(rule)
         try:
             with qp.capture.toggle_ctx(True):
                 resources = rule.compute_resources(**probe_args)
-            name_to_resources[rule.name] = resources.gate_counts
             # The rule body names the ops it produces itself, so unlike the distribution pathway
             # these ids carry no added modifier; a resource that is itself symbolic is spelled the
             # way the compiler spells it (see :meth:`ModifierState.peel_modifiers`).
-            name_to_resource_ids[rule.name] = {
+            resource_counts_by_id = {
                 GraphOpID(op).getGraphOpId(): count for op, count in resources.gate_counts.items()
             }
+            collected_rules.append(
+                CollectedRule(
+                    source_rule=rule,
+                    resource_counts_by_op=resources.gate_counts,
+                    resource_counts_by_id=resource_counts_by_id,
+                )
+            )
         except Exception as e:  # pylint: disable=broad-except
             warnings.warn(
                 f"Failed to get resources for the {rule.name} decomposition rule: {e}",
                 category=RuleLoweringWarning,
             )
-    return applicable_rules, probe_args, name_to_resources, name_to_resource_ids
+    return collected_rules, probe_args
 
 
 # pylint: disable=too-many-arguments
@@ -1105,7 +1122,7 @@ def build_registered_decomp_target_spec(
     # rule instead has the control applied around its body so it is probed without control wires.
     collect_ctrl_wires = range(n_base_wires, n_wires) if kind == "control" else ()
     collect_ctrl_values = [True] * len(collect_ctrl_wires)
-    rules, probe_args, name_to_resources, name_to_resource_ids = collect_symbolic_resources(
+    collected_rules, probe_args = collect_symbolic_resources(
         op_cls,
         op_name,
         kwargs | static_and_extra,
@@ -1114,7 +1131,7 @@ def build_registered_decomp_target_spec(
         ctrl_wires=collect_ctrl_wires,
         ctrl_values=collect_ctrl_values,
     )
-    if not rules:
+    if not collected_rules:
         return None
 
     # Rewrite the ids for an adjoint target:
@@ -1125,15 +1142,14 @@ def build_registered_decomp_target_spec(
     #  - Under ctrl, every other produced op additionally gains the control modifier.
     if kind == "adjoint":
         base_id = GraphOpID(probe_args["base"]).getGraphOpId()
-        rewritten = {}
-        for rule_name, ids in name_to_resource_ids.items():
+        for collected in collected_rules:
+            ids = collected.resource_counts_by_id
             if _adjoint_folds_to_base(ids, base_id):
-                rewritten[rule_name] = {controls.wrap_id(op_id): 1}
+                collected.resource_counts_by_id = {controls.wrap_id(op_id): 1}
             elif wrap_control:
-                rewritten[rule_name] = {controls.wrap_id(rid): count for rid, count in ids.items()}
-            else:
-                rewritten[rule_name] = ids
-        name_to_resource_ids = rewritten
+                collected.resource_counts_by_id = {
+                    controls.wrap_id(rid): count for rid, count in ids.items()
+                }
 
     call_args, call_kwargs = prepare_dummy_rule_arguments(kwargs, is_custom_op)
     kwarg_names = ordered_kwarg_names(call_kwargs, dynamic_shape)
@@ -1175,14 +1191,13 @@ def build_registered_decomp_target_spec(
         return decomp_rule
 
     rule_specs = []
-    for rule in rules:
-        if rule.name not in name_to_resource_ids:
-            continue
+    for collected in collected_rules:
+        rule = collected.source_rule
 
         # A rule whose body is not region-wrapped (plain adjoint/control) may legitimately
         # contain a measurement and will be kept. Otherwise, the rule is skipped because
         # the compiler cannot place a mid-circuit measurement in a control or adjoint region.
-        if wrap_control and _resources_have_measurement(name_to_resources[rule.name]):
+        if wrap_control and _resources_have_measurement(collected.resource_counts_by_op):
             warnings.warn(
                 f"Skipped the {rule.name} decomposition rule for {target_id}: it contains a "
                 "mid-circuit measurement, which cannot be placed in a control region.",
@@ -1193,8 +1208,8 @@ def build_registered_decomp_target_spec(
             DecompRuleSpec(
                 prepared_rule_fn=rule_to_callable(rule),
                 frontend_name=rule.name,
-                resource_counts_by_id=name_to_resource_ids[rule.name],
-                resource_counts_by_op=name_to_resources[rule.name],
+                resource_counts_by_id=collected.resource_counts_by_id,
+                resource_counts_by_op=collected.resource_counts_by_op,
             )
         )
 
