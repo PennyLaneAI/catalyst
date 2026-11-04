@@ -88,6 +88,10 @@ class ResourceAnalysis {
     void analyzeRegion(Region &region, ResourceResult &result, bool isAdjoint,
                        unsigned numControlQubits);
 
+    void recordLoopBody(Operation *loopOp, ResourceResult bodyResult,
+                        std::optional<double> tripCount, StringRef prefix,
+                        int64_t &counter, int64_t &dynCounter, ResourceResult &result);
+
     void analyzeForLoop(scf::ForOp forOp, ResourceResult &result, bool isAdjoint,
                         unsigned numControlQubits);
     void analyzeWhileLoop(scf::WhileOp whileOp, ResourceResult &result, bool isAdjoint,
