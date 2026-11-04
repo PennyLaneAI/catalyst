@@ -12,14 +12,30 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <cassert>
+#include <cstddef>
+
+#include "llvm/Support/Casting.h"
+#include "mlir/IR/Builders.h"
+#include "mlir/IR/BuiltinAttributes.h"
+#include "mlir/IR/Location.h"
+#include "mlir/IR/OperationSupport.h"
+#include "mlir/IR/PatternMatch.h"
+#include "mlir/IR/SymbolTable.h"
+#include "mlir/IR/TypeRange.h"
+#include "mlir/IR/Types.h"
+#include "mlir/IR/Visitors.h"
+#include "mlir/Support/LLVM.h"
+#include "mlir/Support/LogicalResult.h"
+#include "mlir/Support/WalkResult.h"
+
+#include "QRef/IR/QRefDialect.h"
 #define DEBUG_TYPE "reference-semantics-conversion"
 #define VALUE_SEMANTICS_GATE_OPS                                                                   \
-    quantum::QuantumOperation, quantum::MeasureOp, pbc::PPMeasurementOp, pbc::PPRotationOp,        \
-        pbc::SelectPPMeasurementOp, mbqc::MeasureInBasisOp
+    quantum::QuantumOperation, quantum::MeasureOp, quantum::MeasurementOp, pbc::PPMeasurementOp,   \
+        pbc::PPRotationOp, pbc::SelectPPMeasurementOp, mbqc::MeasureInBasisOp
 #define VALUE_SEMANTICS_OBSERVABLE_OPS                                                             \
     quantum::ComputationalBasisOp, quantum::HermitianOp, quantum::NamedObsOp
-
-#include "reference_semantics_conversion.h"
 
 #include <cstdint>
 #include <optional>
@@ -48,6 +64,8 @@
 #include "Quantum/IR/QuantumInterfaces.h"
 #include "Quantum/IR/QuantumOps.h"
 #include "Quantum/IR/QuantumTypes.h"
+
+#include "reference_semantics_conversion.h"
 
 using namespace mlir;
 using namespace catalyst;
@@ -409,6 +427,14 @@ void handleMeasure(IRRewriter &builder, quantum::MeasureOp vMeasureOp, QubitValu
     auto rMeasureOp = migrateOpToReferenceSemantics<qref::MeasureOp>(builder, vMeasureOp, tracker);
     builder.replaceAllUsesWith(vMeasureOp.getMres(), rMeasureOp.getMres());
     erasureWorklist.push_back(vMeasureOp);
+}
+
+void handleMeasurement(IRRewriter &builder, quantum::MeasurementOp op, QubitValueTracker &tracker,
+                       SmallVector<Operation *> &erasureWorklist) {
+    auto refOp = migrateOpToReferenceSemantics<qref::MeasurementOp>(builder, op, tracker);
+    refOp->removeAttr("resultSegmentSizes");
+    builder.replaceAllUsesWith(op.getMres(), refOp.getMres());
+    erasureWorklist.push_back(op);
 }
 
 void handleMeasureInBasis(IRRewriter &builder, mbqc::MeasureInBasisOp vMeasureInBasisOp,
@@ -904,6 +930,8 @@ std::optional<SmallVector<Operation *>> handleRegion(IRRewriter &builder, Region
             .Case<quantum::HermitianOp>([&](auto o) { handleHermitian(builder, o, tracker); })
             .Case<quantum::MeasureOp>(
                 [&](auto o) { handleMeasure(builder, o, tracker, erasureWorklist); })
+            .Case<quantum::MeasurementOp>(
+                [&](auto o) { handleMeasurement(builder, o, tracker, erasureWorklist); })
             .Case<mbqc::MeasureInBasisOp>(
                 [&](auto o) { handleMeasureInBasis(builder, o, tracker, erasureWorklist); })
             .Case<pbc::PPMeasurementOp>(
