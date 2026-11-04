@@ -566,17 +566,37 @@ void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result, b
 
     // Function calls
     if (auto callOp = dyn_cast<func::CallOp>(op)) {
-        // Record a function call under its modifier-context name.
-        std::string modCtxName =
-            modifierContextFuncName(callOp.getCallee(), isAdjoint, numControlQubits);
-        result.functionCalls[modCtxName] += 1;
+        std::string modCtxName = callOp.getCallee().str();
 
-        // Register this modifier context on the real callee.
+        // No modifiers: just count the function call
+        if (!isAdjoint && numControlQubits == 0) {
+            result.functionCalls[modCtxName] += 1;
+            return;
+        }
+
+        // With modifiers: count the function call under the modifier context name, and register the
+        // modifier context
         if (auto calleeIt = funcResults.find(callOp.getCallee()); calleeIt != funcResults.end()) {
             ResourceResult &calleeResult = calleeIt->second;
-            funcResults.try_emplace(modCtxName, makeEmptyResult());
-            calleeResult.modifierContexts.emplace(std::pair{isAdjoint, numControlQubits},
-                                                  modCtxName);
+            auto ctx = std::pair{isAdjoint, numControlQubits};
+
+            if (auto it = calleeResult.modifierContexts.find(ctx);
+                it != calleeResult.modifierContexts.end()) { // modifier context already exists
+                modCtxName = it->second;
+            } else { // modifier context does not exist, create a new one
+                std::string baseName =
+                    modifierContextFuncName(callOp.getCallee(), isAdjoint, numControlQubits);
+                if (!funcResults.contains(baseName)) { // No need to uniquify the name
+                    modCtxName = baseName;
+                } else { // Need to uniquify the name
+                    modCtxName = makeUniqueSyntheticName(baseName, modifierContextCounter);
+                }
+
+                calleeResult.modifierContexts.try_emplace(ctx, modCtxName);
+                funcResults.try_emplace(modCtxName, makeEmptyResult());
+            }
+
+            result.functionCalls[modCtxName] += 1;
         }
 
         return;
