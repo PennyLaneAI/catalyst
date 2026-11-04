@@ -165,9 +165,12 @@ ResourceAnalysis::ResourceAnalysis(ModuleOp moduleOp,
 
     SmallVector<func::FuncOp> definedFuncOps = orderFuncsByCallGraph(moduleOp);
 
-    // Reserve every user function with an empty result.
+    // Reserve every user function with an empty result
+    // Add the original context so resource counts are always done for original function
     for (auto funcOp : definedFuncOps) {
-        funcResults[funcOp.getName()] = makeEmptyResult();
+        ResourceResult &result = funcResults[funcOp.getName()];
+        result = makeEmptyResult();
+        result.modifierContexts[{false, 0}] = funcOp.getName().str();
     }
 
     // An entry function is tagged with `llvm.emit_c_interface`.
@@ -207,15 +210,7 @@ ResourceAnalysis::ResourceAnalysis(ModuleOp moduleOp,
         ResourceResult &result = funcResults[funcOp.getName()];
         result.isQnode = funcOp->hasAttrOfType<UnitAttr>("quantum.node");
 
-        // Entry / qnode functions start with no modifiers.
-        if (result.isQnode || funcOp.getName() == entryFunc) {
-            result.modifierContexts[{false, 0}] =
-                modifierContextFuncName(funcOp.getName(), /*isAdjoint=*/false,
-                                        /*numControlQubits=*/0);
-        }
-
-        // Caller-before-callee: contexts for this FuncOp were registered by
-        // earlier callers.
+        // Modifier contexts for this function were registered by earlier callers.
         for (const auto &[ctx, modCtxName] : result.modifierContexts) {
             for (auto &region : funcOp->getRegions()) {
                 analyzeRegion(region, funcResults[modCtxName], ctx.first, ctx.second);
@@ -249,12 +244,10 @@ ResourceAnalysis::ResourceAnalysis(func::FuncOp funcOp,
         extensionAnalyses.push_back(std::move(extension));
     }
 
-    funcResults[funcOp.getName()] = makeEmptyResult();
     ResourceResult &result = funcResults[funcOp.getName()];
+    result = makeEmptyResult();
+    result.modifierContexts[{false, 0}] = funcOp.getName().str();
     result.isQnode = funcOp->hasAttrOfType<UnitAttr>("quantum.node");
-    result.modifierContexts[{false, 0}] =
-        modifierContextFuncName(funcOp.getName(), /*isAdjoint=*/false,
-                                /*numControlQubits=*/0);
 
     // TODO: Additional handling for entrypoint functions
 
@@ -584,8 +577,7 @@ void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result, b
         result.functionCalls[modCtxName] += 1;
 
         // Register this modifier context on the real callee.
-        if (auto calleeIt = funcResults.find(callOp.getCallee());
-            calleeIt != funcResults.end()) {
+        if (auto calleeIt = funcResults.find(callOp.getCallee()); calleeIt != funcResults.end()) {
             ResourceResult &calleeResult = calleeIt->second;
             funcResults.try_emplace(modCtxName, makeEmptyResult());
             calleeResult.modifierContexts.emplace(std::pair{isAdjoint, numControlQubits},

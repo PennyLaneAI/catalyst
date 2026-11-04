@@ -349,7 +349,7 @@ LogicalResult loadDecompositionRules(ModuleOp module,
  * RuleNodes. It therefore takes no `ruleNodes` output.
  */
 [[maybe_unused]] LogicalResult loadPythonDecomps(ModuleOp module, llvm::StringRef libQPDPath,
-                                llvm::StringRef libpythonPath) {
+                                                 llvm::StringRef libpythonPath) {
     MLIRContext *context = module.getContext();
     SymbolTable symbolTable(module);
 
