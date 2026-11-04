@@ -107,8 +107,9 @@ class DecompTargetSpec:
         hybrid_leaves: Numeric hybrid leaves passed as rule operands instead of being closed over.
         target_id: Full GraphOpID that every rule in the set decomposes.
         num_qreg_qubits: Register size required by the legacy standalone materializer.
-        resource_modifier_context: Modifiers to distribute over raw resources during graph traversal.
-            Registered rules may already include target modifiers in their resource operations.
+        modifier_context: Additional modifiers propagated to resource operations when
+            discovering child rules. May differ from the target's modifiers because
+            registered rules can already account for them in their resource operations.
         reject_noninvertible: Whether modifier distribution requires filtering noninvertible bodies.
     """
 
@@ -122,7 +123,7 @@ class DecompTargetSpec:
     hybrid_leaves: tuple[Array, ...]
     target_id: SerializedGraphOpID
     num_qreg_qubits: int
-    resource_modifier_context: ModifierState
+    modifier_context: ModifierState
     reject_noninvertible: bool = False
 
 
@@ -728,7 +729,7 @@ def build_decomp_target_spec(
         hybrid_leaves=tuple(hybrid_leaves),
         target_id=target_id,
         num_qreg_qubits=n_base_wires + n_ctrl,
-        resource_modifier_context=modifiers,
+        modifier_context=modifiers,
         reject_noninvertible=modifiers.is_modified,
     )
 
@@ -1133,7 +1134,7 @@ def build_registered_decomp_target_spec(
         hybrid_leaves=tuple(hybrid_leaves),
         target_id=target_id,
         num_qreg_qubits=n_wires,
-        resource_modifier_context=controls if wrap_control else ModifierState(),
+        modifier_context=controls if wrap_control else ModifierState(),
         reject_noninvertible=wrap_control,
     )
 
@@ -1256,7 +1257,7 @@ def walk_reachable_decomp_rule_sets(
     def child_requests(rule_sets):
         children = []
         for target_spec in rule_sets:
-            context = target_spec.resource_modifier_context
+            context = target_spec.modifier_context
             for rule in target_spec.rules:
                 for op in rule.resource_counts_by_op:
                     if isinstance(op, Operator2):
