@@ -17,6 +17,7 @@
 import copy
 import itertools
 import re
+from typing import NewType
 
 import jax.numpy as jnp
 import numpy as np
@@ -27,6 +28,9 @@ from jax.core import ShapedArray
 from pennylane.pytrees import flatten, unflatten
 
 from catalyst.jax_extras.lowering import mlir_build_context
+
+# Distinguish graph IDs from names for static checking; this does not validate the string.
+SerializedGraphOpID = NewType("SerializedGraphOpID", str)
 
 _MLIR_DTYPES_TO_PY_DTYPES = {
     "i1": jnp.bool_,

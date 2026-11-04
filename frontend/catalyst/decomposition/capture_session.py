@@ -23,6 +23,7 @@ from pennylane.core.operator import abstractify
 
 from catalyst.decomposition.graph_op_id import GraphOpID
 from catalyst.decomposition.modifier_state import ModifierState
+from catalyst.decomposition.type_utils import SerializedGraphOpID
 
 
 @dataclass(frozen=True)
@@ -48,7 +49,7 @@ class OpDecompRequest:
             adjoint and control transform regions around it.
     """
 
-    base_id: str
+    base_id: SerializedGraphOpID
     op_name: str
     op_cls: type | None
     dynamic_shape: dict
@@ -115,8 +116,8 @@ class TracedRule:
 
     pyfun: Callable
     closed_jaxpr: ClosedJaxpr
-    target_gate: str
-    resources: dict[str, int]
+    target_gate: SerializedGraphOpID
+    resources: dict[SerializedGraphOpID, int]
     frontend_name: str
 
     @property
@@ -139,7 +140,9 @@ class DecompositionScope:
         definitions: Map of rule identifiers to traced rules, in first-seen order.
     """
 
-    roots: dict[str, tuple[OpDecompRequest, set[ModifierState]]] = field(default_factory=dict)
+    roots: dict[SerializedGraphOpID, tuple[OpDecompRequest, set[ModifierState]]] = field(
+        default_factory=dict
+    )
     definitions: dict[tuple, TracedRule] = field(default_factory=dict)
 
     def record_root(self, request: OpDecompRequest) -> None:
