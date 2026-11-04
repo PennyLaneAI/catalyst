@@ -22,7 +22,6 @@
 #include <cstdint>
 
 #include "llvm/ADT/SCCIterator.h"
-#include <set>
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Analysis/CallGraph.h"
@@ -133,14 +132,12 @@ static SmallVector<func::FuncOp> orderFuncsByCallGraph(ModuleOp moduleOp) {
 // ResourceAnalysis implementation
 //===----------------------------------------------------------------------===//
 
-ResourceResult ResourceAnalysis::makeEmptyResult(
-    std::set<std::pair<bool, unsigned>> modifierContexts) const {
+ResourceResult ResourceAnalysis::makeEmptyResult() const {
     ResourceResult result;
     result.extensions.reserve(extensionAnalyses.size());
     for (const auto &analysis : extensionAnalyses) {
         result.extensions.push_back(analysis->makeEmpty());
     }
-    result.modifierContexts = std::move(modifierContexts);
     return result;
 }
 
@@ -212,11 +209,17 @@ ResourceAnalysis::ResourceAnalysis(ModuleOp moduleOp,
 
         // Entry / qnode functions start with no modifiers.
         if (result.isQnode || funcOp.getName() == entryFunc) {
-            result.modifierContexts.insert({false, 0});
+            result.modifierContexts[{false, 0}] =
+                modifierContextFuncName(funcOp.getName(), /*isAdjoint=*/false,
+                                        /*numControlQubits=*/0);
         }
 
-        for (auto &region : funcOp->getRegions()) {
-            analyzeRegion(region, result, /*isAdjoint=*/false, /*numControlQubits=*/0);
+        // Caller-before-callee: contexts for this FuncOp were registered by
+        // earlier callers.
+        for (const auto &[ctx, modCtxName] : result.modifierContexts) {
+            for (auto &region : funcOp->getRegions()) {
+                analyzeRegion(region, funcResults[modCtxName], ctx.first, ctx.second);
+            }
         }
 
         if (funcOp.getName() == entryFunc) {
@@ -246,14 +249,19 @@ ResourceAnalysis::ResourceAnalysis(func::FuncOp funcOp,
         extensionAnalyses.push_back(std::move(extension));
     }
 
-    funcResults[funcOp.getName()] = makeEmptyResult({{false, 0}});
+    funcResults[funcOp.getName()] = makeEmptyResult();
     ResourceResult &result = funcResults[funcOp.getName()];
     result.isQnode = funcOp->hasAttrOfType<UnitAttr>("quantum.node");
+    result.modifierContexts[{false, 0}] =
+        modifierContextFuncName(funcOp.getName(), /*isAdjoint=*/false,
+                                /*numControlQubits=*/0);
 
     // TODO: Additional handling for entrypoint functions
 
-    for (auto &region : funcOp->getRegions()) {
-        analyzeRegion(region, result, /*isAdjoint=*/false, /*numControlQubits=*/0);
+    for (const auto &[ctx, modCtxName] : result.modifierContexts) {
+        for (auto &region : funcOp->getRegions()) {
+            analyzeRegion(region, funcResults[modCtxName], ctx.first, ctx.second);
+        }
     }
 }
 
@@ -267,6 +275,24 @@ std::string ResourceAnalysis::makeUniqueSyntheticName(StringRef prefix, int64_t 
     } while (funcResults.contains(candidate));
 
     return candidate;
+}
+
+std::string ResourceAnalysis::modifierContextFuncName(StringRef funcName, bool isAdjoint,
+                                                      unsigned numControlQubits) {
+    if (!isAdjoint && numControlQubits == 0) {
+        return funcName.str();
+    }
+
+    std::string name;
+    if (numControlQubits > 0) {
+        name += std::to_string(numControlQubits);
+        name += "C_";
+    }
+    if (isAdjoint) {
+        name += "A_";
+    }
+    name += funcName;
+    return name;
 }
 
 void ResourceAnalysis::recordLoopBody(Operation *loopOp, ResourceResult bodyResult,
@@ -287,7 +313,7 @@ void ResourceAnalysis::recordLoopBody(Operation *loopOp, ResourceResult bodyResu
 
 void ResourceAnalysis::analyzeForLoop(scf::ForOp forOp, ResourceResult &result, bool isAdjoint,
                                       unsigned numControlQubits) {
-    ResourceResult bodyResult = makeEmptyResult(result.modifierContexts);
+    ResourceResult bodyResult = makeEmptyResult();
     analyzeRegion(forOp.getBodyRegion(), bodyResult, isAdjoint, numControlQubits);
 
     // Try to resolve a static trip count.
@@ -302,7 +328,7 @@ void ResourceAnalysis::analyzeForLoop(scf::ForOp forOp, ResourceResult &result, 
 
 void ResourceAnalysis::analyzeWhileLoop(scf::WhileOp whileOp, ResourceResult &result,
                                         bool isAdjoint, unsigned numControlQubits) {
-    ResourceResult bodyResult = makeEmptyResult(result.modifierContexts);
+    ResourceResult bodyResult = makeEmptyResult();
     analyzeRegion(whileOp.getAfter(), bodyResult, isAdjoint, numControlQubits);
 
     auto tripCount = getEstimatedIterationsHint(whileOp);
@@ -313,7 +339,7 @@ void ResourceAnalysis::analyzeWhileLoop(scf::WhileOp whileOp, ResourceResult &re
 void ResourceAnalysis::analyzeIfOp(scf::IfOp ifOp, ResourceResult &result, bool isAdjoint,
                                    unsigned numControlQubits) {
 
-    ResourceResult thenResult = makeEmptyResult(result.modifierContexts);
+    ResourceResult thenResult = makeEmptyResult();
     analyzeRegion(ifOp.getThenRegion(), thenResult, isAdjoint, numControlQubits);
 
     // If a branch probability hint is present, compute the expected (average) resource counts
@@ -323,7 +349,7 @@ void ResourceAnalysis::analyzeIfOp(scf::IfOp ifOp, ResourceResult &result, bool 
         double pThen = probAttr.getValueAsDouble();
         double pElse = 1.0 - pThen;
 
-        ResourceResult elseResult = makeEmptyResult(result.modifierContexts);
+        ResourceResult elseResult = makeEmptyResult();
         if (!ifOp.getElseRegion().empty()) {
             analyzeRegion(ifOp.getElseRegion(), elseResult, isAdjoint, numControlQubits);
         }
@@ -340,7 +366,7 @@ void ResourceAnalysis::analyzeIfOp(scf::IfOp ifOp, ResourceResult &result, bool 
     result.hasBranches = true;
 
     if (!ifOp.getElseRegion().empty()) {
-        ResourceResult elseResult = makeEmptyResult(result.modifierContexts);
+        ResourceResult elseResult = makeEmptyResult();
         analyzeRegion(ifOp.getElseRegion(), elseResult, isAdjoint, numControlQubits);
         thenResult.mergeWith(elseResult, ResourceResult::MergeMethod::Max);
     }
@@ -359,7 +385,7 @@ void ResourceAnalysis::analyzeIndexSwitchOp(scf::IndexSwitchOp switchOp, Resourc
         double sumProb = 0.0;
 
         for (auto &&[idx, caseRegion] : llvm::enumerate(caseRegions)) {
-            ResourceResult caseResult = makeEmptyResult(result.modifierContexts);
+            ResourceResult caseResult = makeEmptyResult();
             analyzeRegion(caseRegion, caseResult, isAdjoint, numControlQubits);
 
             double p = cast<FloatAttr>(probsAttr[idx]).getValueAsDouble();
@@ -373,7 +399,7 @@ void ResourceAnalysis::analyzeIndexSwitchOp(scf::IndexSwitchOp switchOp, Resourc
         // of floating-point error.
         double pDefault = std::min(std::max(0.0, 1.0 - sumProb), 1.0);
 
-        ResourceResult defaultResult = makeEmptyResult(result.modifierContexts);
+        ResourceResult defaultResult = makeEmptyResult();
         analyzeRegion(switchOp.getDefaultRegion(), defaultResult, isAdjoint, numControlQubits);
         defaultResult.multiplyBy(pDefault);
         expected.mergeWith(defaultResult, ResourceResult::MergeMethod::Sum);
@@ -389,7 +415,7 @@ void ResourceAnalysis::analyzeIndexSwitchOp(scf::IndexSwitchOp switchOp, Resourc
     bool first = true;
 
     for (auto &caseRegion : caseRegions) {
-        ResourceResult caseResult = makeEmptyResult(result.modifierContexts);
+        ResourceResult caseResult = makeEmptyResult();
         analyzeRegion(caseRegion, caseResult, isAdjoint, numControlQubits);
         if (first) {
             maxResult = std::move(caseResult);
@@ -400,7 +426,7 @@ void ResourceAnalysis::analyzeIndexSwitchOp(scf::IndexSwitchOp switchOp, Resourc
     }
 
     // default region
-    ResourceResult defaultResult = makeEmptyResult(result.modifierContexts);
+    ResourceResult defaultResult = makeEmptyResult();
     analyzeRegion(switchOp.getDefaultRegion(), defaultResult, isAdjoint, numControlQubits);
     maxResult.mergeWith(defaultResult, ResourceResult::MergeMethod::Max);
 
@@ -552,17 +578,18 @@ void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result, b
 
     // Function calls
     if (auto callOp = dyn_cast<func::CallOp>(op)) {
-        result.functionCalls[callOp.getCallee()] += 1;
+        // Record a function call under its modifier-context name.
+        std::string modCtxName =
+            modifierContextFuncName(callOp.getCallee(), isAdjoint, numControlQubits);
+        result.functionCalls[modCtxName] += 1;
 
-        // Propagate modifier region to the callee and consider region of the callsite.
-        if (collectDetailedOperations) {
-            if (auto calleeResult = funcResults.find(callOp.getCallee());
-                calleeResult != funcResults.end()) {
-                for (const auto &ctx : result.modifierContexts) {
-                    calleeResult->second.modifierContexts.insert(
-                        composeModifiers(ctx, {isAdjoint, numControlQubits}));
-                }
-            }
+        // Register this modifier context on the real callee.
+        if (auto calleeIt = funcResults.find(callOp.getCallee());
+            calleeIt != funcResults.end()) {
+            ResourceResult &calleeResult = calleeIt->second;
+            funcResults.try_emplace(modCtxName, makeEmptyResult());
+            calleeResult.modifierContexts.emplace(std::pair{isAdjoint, numControlQubits},
+                                                  modCtxName);
         }
 
         return;
@@ -586,17 +613,12 @@ void ResourceAnalysis::collectDetailedOperation(Operation *op, ResourceResult &r
             opCtrl = gate.getCtrlQubitOperands().size();
         }
 
-        // Current modifier is the composition of the operation's modifiers and the current region's modifiers
-        auto current =
+        // Combine context based modifier context with the operation's modifier.
+        auto [adj, nCtrl] =
             composeModifiers({isAdjoint, numControlQubits}, {op->hasAttr("adjoint"), opCtrl});
-
-        // Apply the current modifiers to all possible modifier regions (based on call trace)
-        for (const auto &ctx : result.modifierContexts) {
-            auto [adj, nCtrl] = composeModifiers(ctx, current);
-            std::string opID = inst.getGraphOpIdExplicitModifiers(adj, nCtrl);
-            result.detailedOperations[opID] += 1;
-            result.observedGraphOpIds.insert(opID);
-        }
+        std::string opID = inst.getGraphOpIdExplicitModifiers(adj, nCtrl);
+        result.detailedOperations[opID] += 1;
+        result.observedGraphOpIds.insert(opID);
         return;
     }
 
