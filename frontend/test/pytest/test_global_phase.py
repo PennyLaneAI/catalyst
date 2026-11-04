@@ -75,5 +75,22 @@ def test_global_phase_control(backend, capture_mode):
     assert np.allclose(expected, observed)
 
 
+# pylint: disable=no-value-for-parameter
+def test_remove_global_phase():
+    """Test that global phases are properly removed"""
+
+    @qp.qjit(capture=True, target="mlir")
+    @qp.transform(pass_name="remove-global-phases")
+    @qp.decompose(gate_set={"RZ", "GlobalPhase"})
+    @qp.qnode(qp.device("null.qubit", wires=1))
+    def example_circuit():
+        qp.PhaseShift(0.2, 0)
+        return qp.probs(wires=[0])
+
+    specs = qp.specs(example_circuit, level="all")()["resources"]
+    assert "GlobalPhase" in specs["graph-decomposition"].counts
+    assert "GlobalPhase" not in specs["remove-global-phases"].counts
+
+
 if __name__ == "__main__":
     pytest.main(["-x", __file__])
