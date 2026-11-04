@@ -61,9 +61,11 @@ class Compiler:
         else:
             gentxtmod = module
 
-        # convert qref to value semantics
-        value_semantics_mlir = catalyst.python_interface.inspection.xdsl_conversion._quantum_opt_stderr(
-            '--catalyst-pipeline="pipe(canonicalize;symbol-dce;convert-to-value-semantics;canonicalize;resolve-state-prep-operator)"',
+        # Convert qref to value semantics, preserving private rules until decomposition runs.
+        conversion = catalyst.python_interface.inspection.xdsl_conversion
+        value_semantics_mlir = conversion._quantum_opt_stderr(
+            '--catalyst-pipeline="pipe(canonicalize;convert-to-value-semantics;'
+            'canonicalize;resolve-state-prep-operator)"',
             "--mlir-print-op-generic",
             stdin=str(gentxtmod),
         )
@@ -89,12 +91,19 @@ class Compiler:
         buffer = io.StringIO()
         Printer(stream=buffer, print_generic_format=True).print_op(xmod)
 
+        # Remove unused symbols after the user and device transform sequences have consumed rules.
+        transformed_mlir = conversion._quantum_opt_stderr(
+            "--symbol-dce",
+            "--mlir-print-op-generic",
+            stdin=buffer.getvalue(),
+        )
+
         # Convert back to jaxModule if input was jaxModule
         if is_jax_module:
             with jaxContext() as jctx:
                 jctx.allow_unregistered_dialects = True
                 jctx.append_dialect_registry(mlir.upstream_dialects)
                 stablehlo.register_dialect(jctx)  # pylint: disable=no-member
-                newmod: jaxModule = jaxModule.parse(buffer.getvalue())
+                newmod: jaxModule = jaxModule.parse(transformed_mlir)
             return newmod
-        return buffer.getvalue()
+        return transformed_mlir
