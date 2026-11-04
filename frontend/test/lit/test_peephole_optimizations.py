@@ -159,12 +159,12 @@ def test_multi_transform_lowering_keep_original():
 
     # CHECK: func.func public @jit_test_pipeline_lowering_keep_original_workflow
     # CHECK: {{%.+}} = call @f_0(
-    # CHECK: {{%.+}} = call @f_1_0(
+    # CHECK: {{%.+}} = call @[[PIPELINE_F:f_[0-9]+_0]](
     # CHECK: func.func public @f_0(
     # CHECK: {{%.+}} = quantum.custom "RX"({{%.+}}) {{%.+}} : !quantum.bit
     # CHECK: {{%.+}} = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit
     # CHECK: {{%.+}} = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit
-    # CHECK: func.func public @f_1_0(
+    # CHECK: func.func public @[[PIPELINE_F]](
     # CHECK: {{%.+}} = quantum.custom "RX"({{%.+}}) {{%.+}} : !quantum.bit
     # CHECK-NOT: {{%.+}} = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit
     # CHECK-NOT: {{%.+}} = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit
@@ -673,12 +673,12 @@ def test_cancel_inverses_keep_original():
 
     # CHECK-LABEL: public @jit_test_cancel_inverses_keep_original_workflow2
     # CHECK: {{%.+}} = call @f_0({{%.+}})
-    # CHECK: {{%.+}} = call @f_1_0({{%.+}})
+    # CHECK: {{%.+}} = call @[[CANCELLED_F:f_[0-9]+_0]]({{%.+}})
     # CHECK-LABEL: public @f_0({{%.+}})
     # CHECK: {{%.+}} = quantum.custom "RX"({{%.+}}) {{%.+}} : !quantum.bit
     # CHECK-NEXT: {{%.+}} = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit
     # CHECK-NEXT: {{%.+}} = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit
-    # CHECK-LABEL: public @f_1_0({{%.+}})
+    # CHECK: public @[[CANCELLED_F]]({{%.+}})
     # CHECK: {{%.+}} = quantum.custom "RX"({{%.+}}) {{%.+}} : !quantum.bit
     # CHECK-NOT: {{%.+}} = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit
     # CHECK-NOT: {{%.+}} = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit

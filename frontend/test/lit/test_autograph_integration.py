@@ -31,7 +31,7 @@ from catalyst import jacobian, mitigate_with_zne, qjit, vmap
 
 
 @qjit(capture=False, autograph=True, target="mlir")
-@qjit(capture=False, target="")
+@qjit(capture=False, enable_aot_compilation=False)
 @qp.qnode(qp.device("lightning.qubit", wires=1))
 def test_qjit(c: bool, data: float):
     if c:
