@@ -200,7 +200,11 @@
     object code or IR. The default is stdout for IR and `<module-name>.o` for object code.
     Stdout (i.e. `-o -`) is rejected when the output is object code.
 
+<<<<<<< HEAD
 * Decomposition to the device's gateset is now applied by default with `capture=True`.
+=======
+* Decomposition to the device's gate set is now applied by default with `capture=True`.
+>>>>>>> e5c0a995e578e33843f8eb23f224ef4845aaf7c2
   This may introduce performance slowdowns or failures with cases that are not yet supported by the
   decomposition pass. In the event of issues, this can be turned off with `skip_preprocess=True` being
   passed to `qjit`.
