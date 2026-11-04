@@ -146,6 +146,25 @@ class TestGeneralPreprocessing:
 class TestMCMPreprocessing:
     """Tests for preprocessing related to mid-circuit measurements."""
 
+    @pytest.mark.parametrize("supported_mcm_methods", [[], ["device"]])
+    def test_unsupported_one_shot_device(self, supported_mcm_methods):
+        """Reject one-shot when the device does not declare support for it."""
+        dev = CapabilitiesDevice(wires=1)
+        dev.capabilities = DeviceCapabilities(
+            measurement_processes={"SampleMP": [ExecutionCondition.FINITE_SHOTS_ONLY]},
+            supported_mcm_methods=supported_mcm_methods,
+        )
+
+        @qp.qnode(dev, shots=10, mcm_method="one-shot")
+        def circuit():
+            return qp.sample()
+
+        jaxpr = jax.make_jaxpr(circuit)()
+        interpreter = from_plxpr_no_warn(jaxpr, skip_preprocess=False)
+
+        with pytest.raises(ValueError, match="'one-shot' is not supported in the chosen device"):
+            interpreter()
+
     def test_one_shot_analytic_error(self):
         """Test than an error is raised if trying to use mcm_method="one-shot"
         with shots=None."""
