@@ -14,11 +14,9 @@
 
 #include "GraphDecompositionPrep.hpp"
 
-#include <cassert>
 #include <cstdint>
 #include <memory>
 #include <string>
-#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -43,10 +41,7 @@
 
 #include "Catalyst/Analysis/ResourceAnalysis.h"
 #include "Catalyst/Analysis/ResourceResult.h"
-#include "Driver/Timer.h"
 #include "Quantum/IR/QuantumInterfaces.h"
-#include "Quantum/IR/QuantumOps.h"
-#include "Quantum/Transforms/Patterns.h"
 #include "Quantum/Transforms/QPDLoader.h"
 
 #include "DGTypes.hpp"
@@ -62,24 +57,6 @@ using namespace DecompGraph::Solver;
 namespace {
 
 constexpr llvm::StringRef qnodeAttrName = "quantum.node";
-
-/// Op-level `adj`/`ctrls` plus enclosing `quantum.adjoint` / `quantum.ctrl` regions.
-std::pair<bool, unsigned> getExplicitModifiers(DecomposableGate op) {
-    bool isAdjoint = op->hasAttr("adjoint");
-    unsigned numControlQubits = 0;
-    if (auto gate = dyn_cast<QuantumGate>(op.getOperation())) {
-        numControlQubits = gate.getCtrlQubitOperands().size();
-    }
-
-    for (Operation *parent = op->getParentOp(); parent; parent = parent->getParentOp()) {
-        if (isa<AdjointOp>(parent)) {
-            isAdjoint = !isAdjoint; // nested adjoint cancels
-        } else if (auto ctrl = dyn_cast<CtrlOp>(parent)) {
-            numControlQubits += ctrl.getInCtrlQubits().size();
-        }
-    }
-    return {isAdjoint, numControlQubits};
-}
 
 void parseFixedDecomps(ArrayRef<std::string> fixedDecompsOption,
                        llvm::StringMap<std::string> &opToFixedDecompName,
@@ -167,9 +144,6 @@ LogicalResult parseGateset(ArrayRef<std::string> targetGateSetOption,
 
         // validation
         if (!parsed || std::isnan(weight) || weight < 0.0) {
-            // return getOperation().emitError()
-            //         << "Invalid cost '" << cost << "' for gate '" << opName
-            //         << "' in the target gateset: expected a non-negative number (not NaN).";
             return module.emitError()
                    << "Invalid cost '" << cost << "' for gate '" << opName
                    << "' in the target gateset: expected a non-negative number (not NaN).";
@@ -179,37 +153,20 @@ LogicalResult parseGateset(ArrayRef<std::string> targetGateSetOption,
     return success();
 }
 
-OperatorNode parseOperator(llvm::StringRef raw) {
+/**
+ * @brief Parse a graphOpId string into an OperatorNode.
+ *
+ * The graphOpId format is "<name>{params}{wires}{static}[uid]", where <name> already
+ * carries any name-wrapped op-level modifiers produced by `defaultGetGraphOpId`, e.g.
+ * "C(Adjoint(RX)){0:[f64]}{wires:1}{}".
+ */
+OperatorNode parseOperator(llvm::StringRef id) {
     OperatorNode node;
 
-    // Base op: either the graphOpId "Name{...}..." form or the legacy "Name(w,p)" form.
-    if (raw.contains('[') || raw.contains('{')) {
-        node.id = raw.str();
-        node.name = raw.take_until([](char c) { return c == '[' || c == '{'; });
-    } else {
-        auto openIdx = raw.find('(');
-        if (openIdx == llvm::StringRef::npos) {
-            node.name = raw.trim().str();
-            return node;
-        }
-        node.name = raw.take_front(openIdx).trim().str();
-        raw = raw.drop_front(openIdx); // leftover: "(w,p)" or "(w)"
-    }
-
-    // Parse "(w,p)" (new) or "(w)" (legacy) suffix.
-    if (raw.consume_front("(") && raw.consume_back(")")) {
-        llvm::StringRef wStr, pStr;
-        std::tie(wStr, pStr) = raw.split(',');
-        int w = -1, p = -1;
-        if (!wStr.getAsInteger(10, w)) {
-            node.numWires = w;
-        }
-        if (!pStr.empty() && !pStr.getAsInteger(10, p)) {
-            node.numParams = p;
-        }
-        // If pStr is empty we were given the legacy "(w)" format; leave
-        // numParams at the wildcard default so old bytecode keeps working.
-    }
+    node.id = id.str();
+    node.name = id.take_until([](char c) {
+                      return c == '[' || c == '{';
+                  }).drop_until([](char c) { return !llvm::isDigit(c); });
 
     return node;
 }
@@ -284,11 +241,17 @@ LogicalResult loadBuiltInDecompositionRules(ModuleOp module, llvm::StringRef fil
 
     // add to module
     for (auto rule : llvm::make_early_inc_range(builtinModule.get().getOps<func::FuncOp>())) {
-        // avoid double-insertion
-        if (!symbolTable.lookup<func::FuncOp>(rule.getName())) {
-            rule->remove();
-            module.push_back(std::move(rule));
+        // Independently compiled rule libraries can reuse the same name for a
+        // different target. Only skip the same rule; otherwise let the symbol table
+        // resolve the collision.
+        auto existing = symbolTable.lookup<func::FuncOp>(rule.getName());
+        if (existing && existing->getAttr("target_gate") == rule->getAttr("target_gate") &&
+            existing->getAttr("frontend_name") == rule->getAttr("frontend_name") &&
+            existing->getAttr("resources") == rule->getAttr("resources")) {
+            continue;
         }
+        rule->remove();
+        symbolTable.insert(rule);
     }
     return success();
 }
@@ -367,9 +330,10 @@ LogicalResult loadDecompositionRules(ModuleOp module,
  * module; `loadUserDecompositionRules`, which runs afterwards, is what registers them as
  * RuleNodes. It therefore takes no `ruleNodes` output.
  */
-LogicalResult loadPythonDecomps(ModuleOp module, llvm::StringRef libQPDPath,
-                                llvm::StringRef libpythonPath) {
+[[maybe_unused]] LogicalResult loadPythonDecomps(ModuleOp module, llvm::StringRef libQPDPath,
+                                                  llvm::StringRef libpythonPath) {
     MLIRContext *context = module.getContext();
+    SymbolTable symbolTable(module);
 
     llvm::StringSet<> handledOpIds;
     // Add IDs from existing decomposable ops with decomposition rules
@@ -390,21 +354,20 @@ LogicalResult loadPythonDecomps(ModuleOp module, llvm::StringRef libQPDPath,
     });
 
     if (!decomposableOps.empty()) {
-        if (!catalyst::quantum::loadQPD(libQPDPath.str(), libpythonPath.str())) {
+        if (!loadQPD(libQPDPath.str(), libpythonPath.str())) {
             llvm::errs() << "failed to load libQuantumPythonCallbacks\n";
             return failure();
         }
     }
 
     for (catalyst::quantum::DecomposableGate op : decomposableOps) {
-        auto [isAdjoint, numControlQubits] = getExplicitModifiers(op);
-        std::string opId = op.getGraphOpIdExplicitModifiers(isAdjoint, numControlQubits);
+        std::string opId = op.getGraphOpId();
 
         if (handledOpIds.contains(opId)) {
             continue;
         }
 
-        std::string mlirText = pythonRuleLowering(op, isAdjoint, numControlQubits);
+        std::string mlirText = pythonRuleLowering(op);
 
         mlir::ParserConfig config(context);
         auto moduleOp = mlir::parseSourceString(llvm::StringRef(mlirText), config);
@@ -440,7 +403,8 @@ LogicalResult loadPythonDecomps(ModuleOp module, llvm::StringRef libQPDPath,
             outOp = mlir::OwningOpRef<mlir::func::FuncOp>(func);
             LDBG() << "materializing rule " << outOp.get().getName();
             newlyHandled.push_back(targetGate.getValue());
-            module.push_back(std::move(outOp.release()));
+            // Resolve name collisions with rules already embedded in the module.
+            symbolTable.insert(outOp.release());
             return mlir::WalkResult::advance();
         });
         for (llvm::StringRef target : newlyHandled) {
@@ -460,7 +424,8 @@ LogicalResult loadPythonDecomps(ModuleOp module, llvm::StringRef libQPDPath,
 LogicalResult getRuleNodes(ModuleOp module, llvm::StringRef filename,
                            llvm::StringMap<std::string> &opToFixedDecompName,
                            llvm::StringMap<llvm::StringSet<>> &opToAltDecompNames,
-                           llvm::StringRef libQPDPath, llvm::StringRef libpythonPath,
+                           [[maybe_unused]] llvm::StringRef libQPDPath,
+                           [[maybe_unused]] llvm::StringRef libpythonPath,
                            std::vector<RuleNode> &rules) {
 
     // Load pre-compiled rules (ignore failure, we can try to solve without) into the module
@@ -469,9 +434,12 @@ LogicalResult getRuleNodes(ModuleOp module, llvm::StringRef filename,
     }
 
     // Lower compile-time rules into the module
-    if (failed(loadPythonDecomps(module, libQPDPath, libpythonPath))) {
-        return failure();
-    }
+    // TODO: re-enable once the frontend for this has been updated
+    // These need to be removed for now since they result in symbol conflicts and we have no
+    // simple way of fixing this.
+    // if (failed(loadPythonDecomps(module, libQPDPath, libpythonPath))) {
+    //     return failure();
+    // }
 
     // Load rules from the module into the set of rules used by the graph, filtering by
     // fixed- and alt-decomps

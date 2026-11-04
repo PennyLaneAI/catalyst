@@ -16,6 +16,8 @@
 
 #include "mlir/IR/OpDefinition.h"
 
+#include "Gradient/IR/GradientAttrDefs.h"
+
 //===----------------------------------------------------------------------===//
 // Gradient interface declarations.
 //===----------------------------------------------------------------------===//

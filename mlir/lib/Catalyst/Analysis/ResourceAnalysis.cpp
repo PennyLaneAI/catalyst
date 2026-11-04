@@ -59,7 +59,8 @@ static bool isSkippedOp(Operation *op) {
                quantum::DeviceReleaseOp, quantum::ExtractOp, quantum::FinalizeOp, qref::GetOp,
                quantum::HamiltonianOp, quantum::HermitianOp, qref::HermitianOp,
                quantum::InitializeOp, quantum::InsertOp, quantum::NamedObsOp, qref::NamedObsOp,
-               quantum::NumQubitsOp, quantum::TensorOp, quantum::YieldOp, pbc::YieldOp>(op);
+               quantum::NumQubitsOp, quantum::TensorOp, quantum::YieldOp, pbc::YieldOp,
+               ResourceSkipOpInterface>(op);
 }
 
 /// Check if the operation belongs to one of the tracked quantum dialects.
@@ -205,6 +206,11 @@ ResourceAnalysis::ResourceAnalysis(ModuleOp moduleOp,
         ResourceResult &result = funcResults[funcOp.getName()];
         result.isQnode = funcOp->hasAttrOfType<UnitAttr>("quantum.node");
 
+        // Entry / qnode functions start with no modifiers.
+        if (result.isQnode || funcOp.getName() == entryFunc) {
+            result.modifierContexts.insert({false, 0});
+        }
+
         for (auto &region : funcOp->getRegions()) {
             analyzeRegion(region, result, /*isAdjoint=*/false, /*numControlQubits=*/0);
         }
@@ -233,7 +239,7 @@ ResourceAnalysis::ResourceAnalysis(func::FuncOp funcOp,
         extensionAnalyses.push_back(provider());
     }
 
-    funcResults[funcOp.getName()] = makeEmptyResult();
+    funcResults[funcOp.getName()] = makeEmptyResult({{false, 0}});
     ResourceResult &result = funcResults[funcOp.getName()];
     result.isQnode = funcOp->hasAttrOfType<UnitAttr>("quantum.node");
 
