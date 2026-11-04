@@ -23,6 +23,12 @@ target_link_libraries(transport_common
 
 set_property(TARGET transport_common PROPERTY POSITION_INDEPENDENT_CODE ON)
 
+# Session bring-up and data path shared by the libibverbs backends (cpu_verbs, gpu_verbs).
+add_library(verbs_session_base STATIC VerbsSessionBase.cpp)
+target_include_directories(verbs_session_base PUBLIC ${runtime_includes})
+target_link_libraries(verbs_session_base PUBLIC transport_common)
+set_property(TARGET verbs_session_base PROPERTY POSITION_INDEPENDENT_CODE ON)
+
 if(ENABLE_TRANSPORT_FPGA)
     add_library(transport_common_fpga STATIC ${TRANSPORT_COMMON_SOURCES}
         ${CMAKE_CURRENT_SOURCE_DIR}/../vendor/VendorVerbsCheck.cpp)

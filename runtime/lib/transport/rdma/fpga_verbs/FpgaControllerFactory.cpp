@@ -34,4 +34,4 @@ CATALYST_TRANSPORT_BACKEND_CAPS("fpga_verbs", CATALYST_TRANSPORT_ROLE_BIT_CONTRO
                                 CATALYST_TRANSPORT_MEM_BIT(CpuRam) |
                                     CATALYST_TRANSPORT_MEM_BIT(Ddr) |
                                     CATALYST_TRANSPORT_MEM_BIT(Other),
-                                0, 8, 8, 16)
+                                CATALYST_TRANSPORT_FRAME_BL16, 0, 8, 8, 16)

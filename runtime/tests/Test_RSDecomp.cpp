@@ -13,10 +13,13 @@
 // limitations under the License.
 
 #include <algorithm>
+#include <array>
 #include <complex>
 #include <cstdio>
 #include <limits>
 #include <map>
+#include <random>
+#include <set>
 
 #include "boost/multiprecision/cpp_bin_float.hpp"
 #include "catch2/catch_test_macros.hpp"
@@ -319,60 +322,6 @@ TEST_CASE("Test Zero Angle (Identity)", "[RSDecomp][Ross Selinger]") {
     CHECK(std::abs(mat[2] - zero) < 1e-9);
 }
 
-TEST_CASE("Test HST_to_PPR Conversion Rules", "[RSDecomp][Ross Selinger]") {
-    // Rule: HT, HT -> X8, Z8
-    CHECK(HST_to_PPR({GateType::HT, GateType::HT}).first ==
-          std::vector<PPRGateType>{PPRGateType::X8, PPRGateType::Z8});
-    CHECK(HST_to_PPR({GateType::HT, GateType::HT}).second == -M_PI / 4.0);
-
-    // Rule: HT, SHT -> X4, X8, Z8
-    CHECK(HST_to_PPR({GateType::HT, GateType::SHT}).first ==
-          std::vector<PPRGateType>{PPRGateType::X4, PPRGateType::X8, PPRGateType::Z8});
-    CHECK(HST_to_PPR({GateType::HT, GateType::SHT}).second == -M_PI / 2.0);
-
-    // Rule: SHT, HT -> Z4, X8, Z8
-    CHECK(HST_to_PPR({GateType::SHT, GateType::HT}).first ==
-          std::vector<PPRGateType>{PPRGateType::Z4, PPRGateType::X8, PPRGateType::Z8});
-    CHECK(HST_to_PPR({GateType::SHT, GateType::HT}).second == -M_PI / 2.0);
-
-    // Rule: SHT, SHT -> Z4, X4, X8, Z8
-    CHECK(HST_to_PPR({GateType::SHT, GateType::SHT}).first ==
-          std::vector<PPRGateType>{PPRGateType::Z4, PPRGateType::X4, PPRGateType::X8,
-                                   PPRGateType::Z8});
-    CHECK(HST_to_PPR({GateType::SHT, GateType::SHT}).second == -3 * M_PI / 4.0);
-
-    // Test Single Gate Mappings (Standard)
-    CHECK(HST_to_PPR({GateType::T}).first == std::vector<PPRGateType>{PPRGateType::Z8});
-    CHECK(HST_to_PPR({GateType::S}).first == std::vector<PPRGateType>{PPRGateType::Z4});
-    CHECK(HST_to_PPR({GateType::Z}).first == std::vector<PPRGateType>{PPRGateType::Z2});
-
-    CHECK(HST_to_PPR({GateType::T}).second == -M_PI / 8.0);
-    CHECK(HST_to_PPR({GateType::S}).second == -M_PI / 4.0);
-    CHECK(HST_to_PPR({GateType::Z}).second == -M_PI / 2.0);
-
-    // H -> Z4, X4, Z4
-    CHECK(HST_to_PPR({GateType::H}).first ==
-          std::vector<PPRGateType>{PPRGateType::Z4, PPRGateType::X4, PPRGateType::Z4});
-    CHECK(HST_to_PPR({GateType::H}).second == -M_PI / 2.0);
-
-    // Test Edge Cases for Pair Lookahead
-    // Case: HT at the very end of the vector (no next gate to pair with)
-    // Should fallback to single HT expansion: X8, Z4, X4, Z4
-    CHECK(HST_to_PPR({GateType::HT}).first ==
-          std::vector<PPRGateType>{PPRGateType::X8, PPRGateType::Z4, PPRGateType::X4,
-                                   PPRGateType::Z4});
-    CHECK(HST_to_PPR({GateType::HT}).second == -5 * M_PI / 8.0);
-
-    // Case: HT followed by a gate that doesn't form a pair (e.g. T)
-    std::vector<GateType> input_mixed = {GateType::HT, GateType::T};
-    std::vector<PPRGateType> expected_mixed = {
-        PPRGateType::X8, PPRGateType::Z4, PPRGateType::X4, PPRGateType::Z4, // HT
-        PPRGateType::Z8                                                     // T
-    };
-    CHECK(HST_to_PPR(input_mixed).first == expected_mixed);
-    CHECK(HST_to_PPR(input_mixed).second == -3 * M_PI / 4.0);
-}
-
 TEST_CASE("Test C-API Wrapper (Memref Interface)", "[RSDecomp][Ross Selinger]") {
     double angle = M_PI / 4.0; // Decomposes to exactly T
     double epsilon = 1e-5;
@@ -414,6 +363,158 @@ Matrix2 sequence_unitary(const std::vector<GateType> &gates, double phase) {
         entry *= phase_factor;
     }
     return U;
+}
+
+/**
+ * The Pauli (0 = X, 1 = Y, 2 = Z) and signed rotation kind k of the PPR exp(-i π/k P), following
+ * the order of `PPRGateType`. Fails for `PPRGateType::I`, which the PPR conversion never emits.
+ */
+std::pair<int, int> ppr_axis_and_kind(PPRGateType gate) {
+    int index = static_cast<int>(gate) - 1;
+    REQUIRE(index >= 0);
+    static constexpr std::array<int, 6> kinds = {2, 4, 8, -2, -4, -8};
+    return {index / 6, kinds[index % 6]};
+}
+
+bool is_pi_8_ppr(PPRGateType gate) { return std::abs(ppr_axis_and_kind(gate).second) == 8; }
+
+Matrix2 ppr_sequence_unitary(const std::vector<PPRGateType> &gates, double phase) {
+    const std::array<Matrix2, 3> paulis = {Matrix2{0.0, 1.0, 1.0, 0.0},
+                                           Matrix2{0.0, {0.0, -1.0}, {0.0, 1.0}, 0.0},
+                                           Matrix2{1.0, 0.0, 0.0, -1.0}};
+    std::complex<double> phase_factor = {std::cos(phase), -std::sin(phase)};
+    Matrix2 U = {phase_factor, 0.0, 0.0, phase_factor};
+    for (PPRGateType gate : gates) {
+        auto [axis, kind] = ppr_axis_and_kind(gate);
+        const Matrix2 &P = paulis[axis];
+        std::complex<double> c = std::cos(M_PI / kind);
+        std::complex<double> s = {0.0, -std::sin(M_PI / kind)};
+        U = multiply_matrices({c + s * P[0], s * P[1], s * P[2], c + s * P[3]}, U);
+    }
+    return U;
+}
+
+/**
+ * Check that `ppr` implements the Clifford+T `sequence`, including the global phase, with one
+ * π/8 rotation per T gate followed by at most two Clifford rotations.
+ */
+void check_ppr_conversion(const std::pair<std::vector<GateType>, double> &sequence,
+                          const std::pair<std::vector<PPRGateType>, double> &ppr) {
+    Matrix2 expected = sequence_unitary(sequence.first, sequence.second);
+    Matrix2 actual = ppr_sequence_unitary(ppr.first, ppr.second);
+    for (size_t i = 0; i < expected.size(); i++) {
+        CHECK(std::abs(actual[i] - expected[i]) <= 1e-9);
+    }
+
+    const auto &gates = ppr.first;
+    auto first_clifford = std::find_if_not(gates.begin(), gates.end(), is_pi_8_ppr);
+    CHECK(static_cast<size_t>(first_clifford - gates.begin()) == t_count(sequence.first));
+    CHECK(std::none_of(first_clifford, gates.end(), is_pi_8_ppr));
+    CHECK(gates.end() - first_clifford <= 2);
+}
+
+/**
+ * Check that no Clifford rotations are left. Used for sequences with many T gates, for which the
+ * signs of the π/8 rotations can be chosen such that the accumulated Clifford is the identity.
+ */
+void check_no_clifford_pprs(const std::vector<PPRGateType> &gates) {
+    CHECK(std::all_of(gates.begin(), gates.end(), is_pi_8_ppr));
+}
+
+/**
+ * Check that neighboring π/8 rotations have different axes. Equal axes would merge into a Clifford,
+ * which contradicts the T-optimality of the normal forms.
+ */
+void check_distinct_neighbor_axes(const std::vector<PPRGateType> &gates) {
+    for (size_t i = 0; i + 1 < gates.size(); i++) {
+        if (is_pi_8_ppr(gates[i]) && is_pi_8_ppr(gates[i + 1])) {
+            CHECK(ppr_axis_and_kind(gates[i]).first != ppr_axis_and_kind(gates[i + 1]).first);
+        }
+    }
+}
+
+void check_ppr_sequence(const std::pair<std::vector<PPRGateType>, double> &actual,
+                        const std::vector<PPRGateType> &expected_gates, double expected_phase) {
+    CHECK(actual.first == expected_gates);
+    CHECK_THAT(actual.second, WithinAbs(expected_phase, 1e-12));
+}
+
+TEST_CASE("Test HST_to_PPR examples", "[RSDecomp][PPR]") {
+    check_ppr_sequence(HST_to_PPR({GateType::T}), {PPRGateType::Z8}, -M_PI / 8.0);
+    check_ppr_sequence(HST_to_PPR({GateType::S}), {PPRGateType::Z4}, -M_PI / 4.0);
+    check_ppr_sequence(HST_to_PPR({GateType::Sd}), {PPRGateType::adjZ4}, M_PI / 4.0);
+    check_ppr_sequence(HST_to_PPR({GateType::Z}), {PPRGateType::Z2}, -M_PI / 2.0);
+    check_ppr_sequence(HST_to_PPR({GateType::I}), {}, 0.0);
+    // H X H = Z, so the Hadamards cancel up to a global phase of π.
+    check_ppr_sequence(HST_to_PPR({GateType::HT, GateType::HT}), {PPRGateType::X8, PPRGateType::Z8},
+                       -M_PI / 4.0);
+    // Sd T = T^dagger, so flipping the sign of the π/8 rotation leaves no Clifford.
+    check_ppr_sequence(HST_to_PPR({GateType::T, GateType::Sd}), {PPRGateType::adjZ8}, M_PI / 8.0);
+    // S T = Z T^dagger, and the Pauli Z is cheaper than the Clifford S of the unflipped sign.
+    check_ppr_sequence(HST_to_PPR({GateType::T, GateType::S}),
+                       {PPRGateType::adjZ8, PPRGateType::Z2}, -3 * M_PI / 8.0);
+    // (S H)^dagger Z (S H) = -Y. With the sign flipped, the remaining Clifford is
+    // S H S = e^{iπ/4} exp(iπ/4 X), which takes one PPR instead of the two of H S.
+    check_ppr_sequence(HST_to_PPR({GateType::SHT}), {PPRGateType::Y8, PPRGateType::adjX4},
+                       M_PI / 8.0);
+}
+
+TEST_CASE("Test HST_to_PPR of arbitrary Clifford+T sequences", "[RSDecomp][PPR]") {
+    unsigned seed = GENERATE(range(0u, 100u));
+    CAPTURE(seed);
+    std::mt19937 rng(seed);
+    std::uniform_int_distribution<int> gate_index(0, 9);
+    std::vector<GateType> gates(std::uniform_int_distribution<size_t>(0, 40)(rng));
+    for (GateType &gate : gates) {
+        gate = static_cast<GateType>(gate_index(rng));
+    }
+    check_ppr_conversion({gates, 0.0}, HST_to_PPR(gates));
+}
+
+TEST_CASE("Test HST_to_PPR reaches every Clifford in at most two PPRs", "[RSDecomp][PPR]") {
+    // Words of up to 6 gates in H and S generate all 24 single-qubit Cliffords up to phase.
+    std::set<std::vector<PPRGateType>> tails;
+    for (size_t length = 0; length <= 6; length++) {
+        for (size_t word = 0; word < (size_t{1} << length); word++) {
+            std::vector<GateType> gates;
+            for (size_t i = 0; i < length; i++) {
+                gates.push_back((word >> i) & 1 ? GateType::H : GateType::S);
+            }
+            auto ppr = HST_to_PPR(gates);
+            check_ppr_conversion({gates, 0.0}, ppr);
+            tails.insert(ppr.first);
+        }
+    }
+    CHECK(tails.size() == 24);
+}
+
+TEST_CASE("Test PPR form of Ross-Selinger sequences", "[RSDecomp][PPR]") {
+    double epsilon = GENERATE(1e-3, 1e-6, 1e-10);
+    for (int angle_int = -70; angle_int <= 70; angle_int++) {
+        double angle = angle_int / 10.0;
+        CAPTURE(epsilon, angle);
+        auto ppr = eval_ross_algorithm_ppr(angle, epsilon);
+        check_ppr_conversion(eval_ross_algorithm(angle, epsilon), ppr);
+        check_distinct_neighbor_axes(ppr.first);
+        check_no_clifford_pprs(ppr.first);
+    }
+}
+
+TEST_CASE("Test PPR form of mixed sequences", "[RSDecomp][PPR]") {
+    double epsilon = GENERATE(1e-4, 1e-8);
+    double uniform_sample = GENERATE(0.05, 0.3, 0.55, 0.8, 0.99);
+    for (int angle_int = -70; angle_int <= 70; angle_int += 7) {
+        double angle = angle_int / 10.0 + 0.01;
+        CAPTURE(epsilon, uniform_sample, angle);
+        auto mixed = eval_mixed_ross_algorithm_ppr(angle, epsilon, uniform_sample);
+        check_ppr_conversion(eval_mixed_ross_algorithm(angle, epsilon, uniform_sample), mixed);
+        check_distinct_neighbor_axes(mixed.first);
+        check_no_clifford_pprs(mixed.first);
+        auto projective = eval_fallback_projective_ppr(angle, epsilon, uniform_sample);
+        check_ppr_conversion(eval_fallback_projective(angle, epsilon, uniform_sample), projective);
+        check_distinct_neighbor_axes(projective.first);
+        check_no_clifford_pprs(projective.first);
+    }
 }
 
 /**

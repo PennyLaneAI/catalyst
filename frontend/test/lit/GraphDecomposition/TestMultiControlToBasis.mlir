@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{gate-set=2C(H)=1.0,3C(H)=1.0 alt-decomps=2C(U){}{wires:1}{}=cc_u,3C(U){}{wires:1}{}=ccc_u})' %s | FileCheck %s --check-prefixes=ALL,CALL
+// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{gate-set=C(H)=1.0,C(H)=1.0 alt-decomps=2C(U){}{wires:1}{}=cc_u,3C(U){}{wires:1}{}=ccc_u})' %s | FileCheck %s --check-prefixes=ALL,CALL
 
-// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{inline-rule-body gate-set=2C(H)=1.0,3C(H)=1.0 alt-decomps=2C(U){}{wires:1}{}=cc_u,3C(U){}{wires:1}{}=ccc_u})' %s | FileCheck %s --check-prefixes=ALL,INLINE
+// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{inline-rule-body gate-set=C(H)=1.0,C(H)=1.0 alt-decomps=2C(U){}{wires:1}{}=cc_u,3C(U){}{wires:1}{}=ccc_u})' %s | FileCheck %s --check-prefixes=ALL,INLINE
 
 // ALL-LABEL: func.func @two_controls(
 func.func @two_controls(%c1: !quantum.bit, %c2: !quantum.bit, %q: !quantum.bit)

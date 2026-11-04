@@ -163,6 +163,7 @@ const char *collect_error_name(int rc) {
 // Provision the local reply region on first use (idempotent).
 void ensure_reply(CatalystTransportSession *s) {
     if (!s->reply_ready) {
+        // A backend whose peer writes a ring of frames into this region enlarges it to fit.
         s->reply = s->sess->alloc_memory(kReplyBytes, s->sess->preferred_mem_kind());
         s->reply_ready = true;
     }
@@ -187,17 +188,18 @@ int do_exchange_keys(CatalystTransportSession *s) {
     return CATALYST_TRANSPORT_OK;
 }
 
-// Built-in fallback coprocessor function: echo the input back.
-std::size_t echo_fn(const void *in, std::size_t in_len, void *out, std::size_t out_cap, void *) {
-    std::size_t n = std::min(in_len, out_cap);
-    if (n && in && out) {
-        std::memcpy(out, in, n);
+// Built-in fallback coprocessor function: echo the payload back.
+std::size_t echo_fn(const void *payload, std::size_t len, std::uint32_t, void *out,
+                    std::size_t out_cap, void *) {
+    std::size_t n = std::min(len, out_cap);
+    if (n && payload && out) {
+        std::memcpy(out, payload, n);
     }
     return n;
 }
 
 // Bound in place of a coprocessor function that could not be configured: fails every message.
-std::size_t failing_fn(const void *, std::size_t, void *, std::size_t, void *) {
+std::size_t failing_fn(const void *, std::size_t, std::uint32_t, void *, std::size_t, void *) {
     return COPROCESSOR_FN_ERROR;
 }
 
@@ -402,6 +404,15 @@ CatalystTransportSession *__catalyst__transport__create(const char *backend_lib,
                 std::string{backend_lib} + ": backend '" + (h->caps->name ? h->caps->name : "?") +
                 "' does not provide the " + (coprocessor ? "coprocessor" : "controller") + " role");
         }
+        // Version 3 changed the CoprocessorFn signature; an older coprocessor would call it wrong.
+        const std::uint32_t version = h->caps != nullptr ? h->caps->abi_version : 1;
+        if (coprocessor && version < 3) {
+            throw std::runtime_error(std::string{backend_lib} +
+                                     ": coprocessor backend built for transport ABI version " +
+                                     std::to_string(version) +
+                                     ", which calls coprocessor functions with the old signature; "
+                                     "rebuild it against this runtime");
+        }
         if (coprocessor) {
             auto *factory = h->backend->getSymbol<CatalystTransportCoprocessorFactoryFn *>(
                 CATALYST_TRANSPORT_COPROCESSOR_FACTORY_SYMBOL);
@@ -524,9 +535,23 @@ int __catalyst__transport__set_coprocessor_fn(CatalystTransportSession *s, const
             // before it is bound (see CatalystCoprocessorFnInfo). Fields of versions above
             // COPROCESSOR_FN_ABI_VERSION are optional by contract, so they are left unread.
             const std::string name(symbol);
-            if (auto info_fn =
-                    reinterpret_cast<InfoFn>(resolve_own_fn_info(resolved_fn, name + "_info"))) {
-                const CoprocessorFnInfo *info = info_fn();
+            const auto info_fn =
+                reinterpret_cast<InfoFn>(resolve_own_fn_info(resolved_fn, name + "_info"));
+            const CoprocessorFnInfo *info = info_fn ? info_fn() : nullptr;
+            // A launcher's engine writes reply frames in the layout of its ABI version; one built
+            // for an older layout would never publish a reply the backend recognises.
+            if (co->coprocessor_fn_convention() == CoprocConvention::LaunchOnce &&
+                (!info || info->abi_version < CATALYST_COPROCESSOR_LAUNCHER_MIN_ABI_VERSION)) {
+                std::cerr << "[transport] set_coprocessor_fn: launcher " << name
+                          << " is built for an older frame layout (" << name << "_info reports "
+                          << (info ? std::to_string(info->abi_version) : std::string("nothing"))
+                          << ", this runtime needs at least "
+                          << CATALYST_COPROCESSOR_LAUNCHER_MIN_ABI_VERSION
+                          << "); rebuild it against this Catalyst, or for a Triton decoder use the "
+                             "PennyLane release that matches it\n";
+                return fail_unconfigured();
+            }
+            if (info_fn) {
                 if (!info || info->abi_version < 1) {
                     std::cerr << "[transport] set_coprocessor_fn: " << name
                               << "_info has no ABI version (expected at least 1)\n";
@@ -733,15 +758,10 @@ int __catalyst__transport__start_benchmark(CatalystTransportSession *s, std::uin
 
             if (rc != CATALYST_TRANSPORT_OK) {
                 std::uint64_t reply_value = 0;
-                std::uint32_t reply_seq = 0;
                 std::memcpy(&reply_value, rslot, sizeof(reply_value));
-                std::memcpy(&reply_seq,
-                            static_cast<const std::uint8_t *>(rslot) +
-                                offsetof(catalyst::transport::common::Payload, seq_num),
-                            sizeof(reply_seq));
                 std::cerr << "[transport] start_benchmark: round " << i << " failed rc=" << rc
                           << " [sent 0x" << std::hex << value << ", reply slot 0x" << reply_value
-                          << std::dec << " seq=" << reply_seq << "; work_item=" << work_item_idx
+                          << std::dec << "; work_item=" << work_item_idx
                           << " in=" << outgoing_message_bytes << "B out=" << reply_bytes << "B]\n";
                 break;
             }

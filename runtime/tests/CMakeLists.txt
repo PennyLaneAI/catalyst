@@ -184,12 +184,15 @@ catch_discover_tests(runner_tests_rsdecomp_runtime)
 # Transport test suites
 if(ENABLE_TRANSPORT)
     # CAPI + loader, exercised against a stub backend plugin.
-    # Built three ways: unversioned (version 1), version 2 (controller only), and a future ABI.
-    foreach(stub IN ITEMS stub_transport_backend stub_transport_backend_v2 stub_transport_backend_v99)
+    # Built four ways: this runtime's ABI, unversioned (version 1), version 2 (controller only),
+    # and a future ABI.
+    foreach(stub IN ITEMS stub_transport_backend stub_transport_backend_v1 stub_transport_backend_v2
+                      stub_transport_backend_v99)
         add_library(${stub} SHARED stubs/stub_transport_backend.cpp)
         target_include_directories(${stub} PRIVATE ${runtime_includes})
         set_property(TARGET ${stub} PROPERTY POSITION_INDEPENDENT_CODE ON)
     endforeach()
+    target_compile_definitions(stub_transport_backend_v1 PRIVATE STUB_ABI_VERSION=1)
     target_compile_definitions(stub_transport_backend_v2 PRIVATE STUB_ABI_VERSION=2)
     target_compile_definitions(stub_transport_backend_v99 PRIVATE STUB_ABI_VERSION=99)
 
@@ -201,6 +204,7 @@ if(ENABLE_TRANSPORT)
     )
     target_compile_definitions(runner_tests_transport PRIVATE
         STUB_BACKEND_PATH="$<TARGET_FILE:stub_transport_backend>"
+        STUB_V1_BACKEND_PATH="$<TARGET_FILE:stub_transport_backend_v1>"
         STUB_V2_BACKEND_PATH="$<TARGET_FILE:stub_transport_backend_v2>"
         STUB_V99_BACKEND_PATH="$<TARGET_FILE:stub_transport_backend_v99>"
         MEMCPY_CONTROLLER_BACKEND_PATH="$<TARGET_FILE:catalyst_transport_memcpy_controller>"
@@ -208,6 +212,7 @@ if(ENABLE_TRANSPORT)
         STEANE_CPU_LIB_PATH="$<TARGET_FILE:steane_coprocessor_cpu>")
     add_dependencies(runner_tests_transport
         stub_transport_backend
+        stub_transport_backend_v1
         stub_transport_backend_v2
         stub_transport_backend_v99
         catalyst_transport_memcpy_controller

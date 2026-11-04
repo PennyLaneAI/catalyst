@@ -39,13 +39,15 @@
 //   - no CatalystTransportAbiVersion: a backend built before versioning, loaded as version 1, which
 //     reports no capabilities and whose sessions the runtime deletes;
 //   - a version newer than CATALYST_TRANSPORT_ABI_VERSION: refused, naming both versions;
-//   - a role missing from `roles`: refused.
-// A backend built against an older version keeps working, because the session interface in
-// Transport.hpp follows these rules:
+//   - a role missing from `roles`: refused;
+//   - a coprocessor from a backend older than version 3: refused, since version 3 changed the
+//     CoprocessorFn signature the coprocessor calls.
+// Otherwise a backend built against an older version keeps working, because the session interface
+// in Transport.hpp follows these rules:
 //   - virtual methods are only appended, never removed or reordered;
 //   - the session base classes gain no data members;
 //   - the runtime never calls a method added in version N on a backend reporting a lower version.
-#define CATALYST_TRANSPORT_ABI_VERSION 2u
+#define CATALYST_TRANSPORT_ABI_VERSION 3u
 #define CATALYST_TRANSPORT_ABI_VERSION_SYMBOL "CatalystTransportAbiVersion"
 #define CATALYST_TRANSPORT_QUERY_CAPS_SYMBOL "CatalystTransportQueryCaps"
 
@@ -53,7 +55,8 @@
 #define CATALYST_TRANSPORT_ROLE_BIT_CONTROLLER (1u << 0)
 #define CATALYST_TRANSPORT_ROLE_BIT_COPROCESSOR (1u << 1)
 // CatalystTransportCaps::frame_modes
-#define CATALYST_TRANSPORT_FRAME_BL16 (1u << 0) // existing 16 B frame layout
+#define CATALYST_TRANSPORT_FRAME_BL16 (1u << 0) // 16 B frame: 8 B payload, fn_id, seq
+#define CATALYST_TRANSPORT_FRAME_BLV (1u << 1)  // variable length: 32 B header, payload, completion
 // CatalystTransportCaps::ordering
 #define CATALYST_TRANSPORT_ORDER_IN_ORDER 0u // a payload lands before the word written after it
 // CatalystTransportCaps::mem_kinds and ::conventions, e.g. CATALYST_TRANSPORT_MEM_BIT(CpuRam).
@@ -86,16 +89,17 @@ using CatalystTransportQueryCapsFn = const CatalystTransportCaps *();
 
 // Defines CatalystTransportAbiVersion and CatalystTransportQueryCaps for an in-tree backend.
 // e.g. CATALYST_TRANSPORT_BACKEND_CAPS("cpu_verbs", CATALYST_TRANSPORT_ROLE_BIT_CONTROLLER,
-//          CATALYST_TRANSPORT_MEM_BIT(CpuRam), 0, 8, 8, 1)
-#define CATALYST_TRANSPORT_BACKEND_CAPS(NAME, ROLES, MEM_KINDS, CONVENTIONS, MAX_PAYLOAD,          \
-                                        MAX_REPLY, WORK_ITEMS)                                     \
+//          CATALYST_TRANSPORT_MEM_BIT(CpuRam),
+//          CATALYST_TRANSPORT_FRAME_BL16 | CATALYST_TRANSPORT_FRAME_BLV, 0, 1024, 1024, 1)
+#define CATALYST_TRANSPORT_BACKEND_CAPS(NAME, ROLES, MEM_KINDS, FRAME_MODES, CONVENTIONS,          \
+                                        MAX_PAYLOAD, MAX_REPLY, WORK_ITEMS)                        \
     extern "C" uint32_t CatalystTransportAbiVersion() { return CATALYST_TRANSPORT_ABI_VERSION; }   \
     extern "C" const CatalystTransportCaps *CatalystTransportQueryCaps() {                         \
         static const CatalystTransportCaps caps = {                                                \
             CATALYST_TRANSPORT_ABI_VERSION,                                                        \
             (ROLES),                                                                               \
             (MEM_KINDS),                                                                           \
-            CATALYST_TRANSPORT_FRAME_BL16,                                                         \
+            (FRAME_MODES),                                                                         \
             (MAX_PAYLOAD),                                                                         \
             CATALYST_TRANSPORT_ORDER_IN_ORDER,                                                     \
             (NAME),                                                                                \

@@ -63,6 +63,7 @@ set(LIBS
     MLIRQuantum
     quantum-transforms
     MLIRPBC
+    PBCAnalysis
     pbc-transforms
     MLIRGradient
     gradient-transforms

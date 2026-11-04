@@ -23,7 +23,6 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/SmallVector.h"
-#include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Casting.h"
@@ -47,29 +46,30 @@ namespace nb = nanobind;
 
 namespace {
 
-static nb::dict
-getPyvalFromDynamicShape(const llvm::StringMap<llvm::SmallVector<mlir::Type>> &map) {
+// The dicts below are built in operand order (Python dicts keep insertion order), which the
+// frontend uses as the operand layout of the rules it compiles. Do not reorder them.
+static nb::dict getPyvalFromDynamicShape(const catalyst::quantum::DynamicShape &dynamicShape) {
     nb::dict name_to_shape;
-    for (const auto &entry : map) {
-        nb::list types;
-        for (auto type : entry.getValue()) {
+    for (const auto &[name, types] : dynamicShape) {
+        nb::list pyTypes;
+        for (auto type : types) {
             if (!type) {
                 continue;
             }
             std::string typestr;
             llvm::raw_string_ostream ss(typestr);
             type.print(ss);
-            types.append(typestr);
+            pyTypes.append(typestr);
         }
-        name_to_shape[nb::str(entry.getKey().str().c_str())] = types;
+        name_to_shape[nb::str(name.c_str())] = pyTypes;
     }
     return name_to_shape;
 }
 
-static nb::dict getPyvalFromWireLens(const llvm::StringMap<size_t> map) {
+static nb::dict getPyvalFromWireLens(const catalyst::quantum::WireLens &wireLens) {
     nb::dict dict;
-    for (const auto &entry : map) {
-        dict[nb::str(entry.getKey().str().c_str())] = entry.getValue();
+    for (const auto &[name, len] : wireLens) {
+        dict[nb::str(name.c_str())] = len;
     }
     return dict;
 }
@@ -220,7 +220,6 @@ std::string pythonRuleLowering(catalyst::quantum::DecomposableGate op) {
         const char *functionName = "compile_reachable_decomposition_rules_wrapper";
 
         try {
-            auto tmp = op.getDynamicShape();
             nb::module_ wrapperModule = nb::module_::import_(moduleName);
             nb::object wrapperFunction = wrapperModule.attr(functionName);
 

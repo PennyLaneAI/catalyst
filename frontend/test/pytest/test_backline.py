@@ -23,6 +23,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest import mock
 
+import jax.numpy as jnp
 import numpy as np
 import pennylane as qp
 import pytest
@@ -33,6 +34,7 @@ from catalyst.backline import (
     _EXECUTOR_RUNTIME_PLUGINS,
     _REGISTRY,
     _TRANSPORT_PASSES,
+    COPROCESSOR_LAUNCHER_ABI_VERSION,
     _builtin_fn_lib_dirs,
     _check_builtin_fn_lib,
     _config_text,
@@ -216,12 +218,15 @@ def test_coprocessor_fn_config_without_a_node_config():
     reason="the installed PennyLane's CoprocessorFunction declares no message sizes",
 )
 def test_coprocessor_fn_config_carries_the_placement_message_sizes():
-    """A function's init receives the sizes the placement commits, after its own keys."""
+    """A function's init receives the sizes the placement commits, after its own keys. Messages
+    above 8 B also give the session BLV frames, written ahead of the function's keys."""
     fn = qp.CoprocessorFunction("coproc_fn", config="model=/m.onnx", message_bytes=(120, 121))
     coproc = _coproc("cop0", fn=fn, init_args={"backend_lib": "backend.so"})
     dev = qp.Backline(controller=_controller(), coprocessors=[coproc], transport="memcpy")
     d = serialize_backline(dev.placement)
-    assert d["coprocessors"][0]["config"] == "fn.model=/m.onnx;fn.in_bytes=120;fn.out_bytes=121"
+    assert d["coprocessors"][0]["config"] == (
+        "frame=blv;frame_payload=121;fn.model=/m.onnx;fn.in_bytes=120;fn.out_bytes=121"
+    )
     assert (d["controller"]["in_bytes"], d["controller"]["out_bytes"]) == (120, 121)
 
 
@@ -717,6 +722,20 @@ def _transport_backends_built():
     return any((lib_dir / name).exists() for name in names)
 
 
+def _executor_built():
+    """Whether the runtime was built with ENABLE_EXECUTOR=ON, which builds rt_executor -- the
+    library a program that launches a ``catalyst-executor`` subprocess links against."""
+    lib_dir = Path(get_lib_path("runtime", "RUNTIME_LIB_DIR"))
+    return any((lib_dir / f"librt_executor.{ext}").exists() for ext in ("so", "dylib"))
+
+
+needs_executor = pytest.mark.skipif(
+    not _executor_built(),
+    reason="launches a catalyst-executor subprocess, which needs the runtime built with "
+    "ENABLE_EXECUTOR=ON",
+)
+
+
 @pytest.mark.skipif(
     not (_transport_backends_built() or "CATALYST_TRANSPORT_PATH" in os.environ),
     reason=(
@@ -732,6 +751,53 @@ class TestBacklineDemoIntegration:
     that call the QNode also execute it, so they need the transport backend libraries and the
     decoder library reachable to the dynamic loader.
     """
+
+    @pytest.mark.parametrize("transport", ["memcpy", pytest.param("rdma", marks=needs_executor)])
+    def test_messages_larger_than_8_bytes_round_trip(
+        self, use_capture, stop_node_executors, transport
+    ):
+        """BLV frames carry 64 B each way through a compiled program: over memcpy, and over RDMA on
+        the ``rxe0`` soft-RoCE device to a coprocessor in an executor subprocess, as the roles
+        deploy."""
+        echo_lib = str(
+            Path(get_lib_path("runtime", "RUNTIME_LIB_DIR")) / "libecho_coprocessor_cpu.so"
+        )
+        rdma = transport == "rdma"
+        init_args = {"config": "dev=rxe0;gid=1"} if rdma else {}
+        ctrl = qp.Controller(
+            name="cpu-controller",
+            device=qp.device("lightning.qubit", wires=1),
+            in_bytes=64,
+            out_bytes=64,
+            init_args=init_args,
+        )
+        coproc = qp.Coprocessor(
+            name="cpu-coproc",
+            coprocessor_fn=qp.CoprocessorFunction("echo_coprocessor", lib_path=echo_lib),
+            endpoint=qp.Endpoint("127.0.0.1", 18733) if rdma else None,
+            executor_options={} if rdma else None,
+            init_args=init_args,
+        )
+        stop_node_executors(coproc)
+        try:
+            dev = qp.Backline(controller=ctrl, coprocessors=[coproc], transport=transport)
+        except ValueError as e:
+            if "carries at most" in str(e):
+                pytest.skip("this PennyLane limits RDMA messages to 8 B")
+            raise
+
+        # A QNode returns measurements, so the reply is checked inside it: the qubit is flipped
+        # only if all 64 bytes came back.
+        @qjit(capture=True)
+        @qp.qnode(dev)
+        def echo():
+            payload = jnp.arange(64, dtype=jnp.uint8)
+            reply = qp.backline.decode(payload, bitpack=False)
+            qp.cond(jnp.all(reply == payload), qp.X)(wires=0)
+            return qp.expval(qp.Z(0))
+
+        assert "frame=blv;frame_payload=64" in echo.mlir
+        assert echo() == pytest.approx(-1.0)
 
     def test_an_out_of_tree_backend_from_a_manifest_runs_demo_1(
         self, use_capture, isolated_registry, tmp_path, monkeypatch
@@ -749,8 +815,8 @@ class TestBacklineDemoIntegration:
             )
         (tmp_path / "catalyst_transport_backends.json").write_text(
             '[{"name": "toy", "transport": "memcpy", "hardware": "cpu",'
-            ' "roles": ["controller", "coprocessor"], "max_payload_bytes": null,'
-            ' "max_reply_bytes": null, "default": false}]'
+            ' "roles": ["controller", "coprocessor"], "frame_modes": ["bl16", "blv"],'
+            ' "max_payload_bytes": null, "max_reply_bytes": null, "default": false}]'
         )
         monkeypatch.setenv("CATALYST_TRANSPORT_PATH", str(tmp_path))
         ctrl = qp.Controller(
@@ -838,7 +904,7 @@ class TestBacklineDemoIntegration:
         "executor_options, oob_port",
         [
             pytest.param(None, 18590, id="in_process"),
-            pytest.param({}, 18591, id="out_of_process"),
+            pytest.param({}, 18591, id="out_of_process", marks=needs_executor),
         ],
     )
     def test_local_cpu_to_local_cpu_rdma_loopback(
@@ -1339,11 +1405,12 @@ def test_two_placements_in_one_program_are_rejected(use_capture):
         qp.Hadamard(0)
         return qp.probs()
 
-    with pytest.raises(CompileError, match="2 different backline placements"):
+    @qjit(target="mlir", capture=True)
+    def workflow():
+        return circuit_a() + circuit_b()
 
-        @qjit(target="mlir", capture=True)
-        def workflow():
-            return circuit_a() + circuit_b()
+    with pytest.raises(CompileError, match="2 different backline placements"):
+        workflow.aot_compile()
 
 
 @pytest.fixture
@@ -1941,10 +2008,17 @@ class TestBackendRegistry:
 
     def test_selection_respects_message_sizes(self, isolated_registry):
         """A backend that cannot carry the placement's messages is not picked."""
-        with pytest.raises(ValueError, match="carrying 16 B requests"):
-            _select_backend("rdma", "cpu", "controller", in_bytes=16, out_bytes=8)
-        register_backend("wide_verbs", "rdma", "cpu", ["controller"], max_payload_bytes=1024)
-        assert _select_backend("rdma", "cpu", "controller", 16, 8).name == "wide_verbs"
+        with pytest.raises(ValueError, match="carrying 2048 B requests"):
+            _select_backend("rdma", "fpga", "controller", in_bytes=2048, out_bytes=8)
+        register_backend(
+            "wide_verbs",
+            "rdma",
+            "fpga",
+            ["controller"],
+            frame_modes=("bl16", "blv"),
+            max_payload_bytes=4096,
+        )
+        assert _select_backend("rdma", "fpga", "controller", 2048, 8).name == "wide_verbs"
         assert _select_backend("memcpy", "cpu", "controller", 4096, 4096).name == "memcpy"
 
     def test_manifest_on_the_search_path_registers_backends(
@@ -1972,7 +2046,7 @@ class TestBackendRegistry:
         assert _resolve_backend("pkg", "gpu") == "pkg_verbs"
 
     def test_controller_and_coprocessor_must_share_a_frame_layout(self, isolated_registry):
-        """Two backends that speak no common frame cannot exchange messages."""
+        """A backend that does not speak the placement's frame layout cannot exchange messages."""
         register_backend("net_ctrl", "net", "cpu", ["controller"], frame_modes=("bl16",))
         register_backend("net_cop", "net", "gpu", ["coprocessor"], frame_modes=("other",))
         dev = qp.Backline(
@@ -1980,7 +2054,7 @@ class TestBackendRegistry:
             coprocessors=[_coproc("cop0", hardware="gpu", init_args={})],
             transport="net",
         )
-        with pytest.raises(CompileError, match="share no frame layout"):
+        with pytest.raises(CompileError, match="'net_cop' carries \\['other'\\] frames"):
             serialize_backline(dev.placement)
 
     def test_a_backend_name_is_read_but_not_forwarded(self, isolated_registry, flat_lib_dir):
@@ -1991,6 +2065,132 @@ class TestBackendRegistry:
         node = serialize_backline(dev.placement)["controller"]
         assert node["backend_lib"].endswith("libcatalyst_transport_fpga_verbs_controller.so")
         assert "backend" not in node
+
+    def test_messages_of_up_to_8_bytes_keep_the_16_byte_frame(self, flat_lib_dir):
+        """Such placements get no frame entries, so they compile exactly as before."""
+        flat_lib_dir(
+            "libcatalyst_transport_memcpy_controller.so",
+            "libcatalyst_transport_memcpy_coprocessor.so",
+        )
+        dev = qp.Backline(
+            controller=_controller(init_args={}),
+            coprocessors=[_coproc("cop0", init_args={})],
+            transport="memcpy",
+        )
+        d = serialize_backline(dev.placement)
+        assert "frame" not in d["controller"].get("config", "")
+        assert "frame=" not in d["coprocessors"][0]["config"]
+
+    @pytest.mark.parametrize("in_bytes, out_bytes", [(64, 16), (4, 9)])
+    def test_larger_messages_select_blv_frames_on_both_ends(
+        self, in_bytes, out_bytes, flat_lib_dir
+    ):
+        """Both ends of a session get the same layout, sized for the larger message."""
+        flat_lib_dir(
+            "libcatalyst_transport_memcpy_controller.so",
+            "libcatalyst_transport_memcpy_coprocessor.so",
+        )
+        dev = qp.Backline(
+            controller=_controller(init_args={}, in_bytes=in_bytes, out_bytes=out_bytes),
+            coprocessors=[_coproc("cop0", init_args={})],
+            transport="memcpy",
+        )
+        d = serialize_backline(dev.placement)
+        largest = max(in_bytes, out_bytes)
+        assert d["controller"]["config"] == f"frame=blv;frame_payload={largest}"
+        assert d["coprocessors"][0]["config"].startswith(f"frame=blv;frame_payload={largest};fn.")
+
+    def test_a_backend_carrying_more_than_8_bytes_must_speak_blv(self, isolated_registry):
+        """Messages above 8 B travel in BLV frames, so such a backend is refused when registered."""
+        with pytest.raises(ValueError, match="'bl16_only' carries messages over 8 B"):
+            register_backend("bl16_only", "net", "cpu", ["controller"], max_payload_bytes=None)
+
+    @pytest.mark.parametrize("transport", ["memcpy", "rdma"])
+    def test_persistent_gpu_kernels_get_blv_frames(self, transport, flat_lib_dir):
+        """A launcher is handed the session's frame layout and refuses one it cannot read at
+        launch, so the compiler holds no launcher to 8 B, over memcpy or gpu_verbs."""
+        ctrl, cop = (
+            ("memcpy", "memcpy_gpu") if transport == "memcpy" else ("cpu_verbs", "gpu_verbs")
+        )
+        flat_lib_dir(
+            f"libcatalyst_transport_{ctrl}_controller.so",
+            f"libcatalyst_transport_{cop}_coprocessor.so",
+        )
+        dev = qp.Backline(
+            controller=_controller(init_args={}, in_bytes=64),
+            coprocessors=[_coproc("gpu0", fn="gpu_steane_launcher", hardware="gpu")],
+            transport=transport,
+        )
+        d = serialize_backline(dev.placement)
+        assert "frame=blv;frame_payload=64" in d["coprocessors"][0]["config"]
+
+    def test_the_launcher_abi_version_matches_the_runtime(self):
+        """PennyLane reads the Python constant; the runtime enforces the C one."""
+        header = Path(__file__).parents[3] / "runtime" / "include" / "TransportABI.h"
+        define = "#define CATALYST_COPROCESSOR_LAUNCHER_MIN_ABI_VERSION "
+        line = next(l for l in header.read_text().splitlines() if l.startswith(define))
+        assert int(line[len(define) :]) == COPROCESSOR_LAUNCHER_ABI_VERSION
+
+    def test_frame_slots_set_on_one_node_reaches_every_node(self, flat_lib_dir):
+        """Both ends of a session need the same ring, so the compiler passes the count on."""
+        flat_lib_dir(
+            "libcatalyst_transport_memcpy_controller.so",
+            "libcatalyst_transport_memcpy_coprocessor.so",
+        )
+        dev = qp.Backline(
+            controller=_controller(init_args={}),
+            coprocessors=[_coproc("cop0", init_args={"config": "frame_slots=8"})],
+            transport="memcpy",
+        )
+        d = serialize_backline(dev.placement)
+        assert d["controller"]["config"] == "frame_slots=8"
+        assert "frame_slots=8" in d["coprocessors"][0]["config"]
+
+    @pytest.mark.parametrize(
+        "ctrl_config, cop_config, match",
+        [
+            ("frame_slots=8", "frame_slots=16", "different frame_slots: \\[8, 16\\]"),
+            ("frame_slots=12", "", "power of two, not '12'"),
+            ("frame_slots=0", "", "power of two, not '0'"),
+        ],
+    )
+    def test_frame_slots_must_be_one_power_of_two(self, ctrl_config, cop_config, match):
+        """Every node reads the same ring, whose slot index is the round masked by the count."""
+        dev = qp.Backline(
+            controller=_controller(init_args={"config": ctrl_config}),
+            coprocessors=[_coproc("cop0", init_args={"config": cop_config})],
+            transport="memcpy",
+        )
+        with pytest.raises(CompileError, match=match):
+            serialize_backline(dev.placement)
+
+    @pytest.mark.parametrize("slots, ok", [(256, True), (8, False)])
+    def test_an_fpga_controller_keeps_256_frame_slots(self, slots, ok, flat_lib_dir):
+        """The FPGA controllers are only tested with a ring of 256 slots."""
+        flat_lib_dir(
+            "libcatalyst_transport_hwhs_controller.so",
+            "libcatalyst_transport_cpu_verbs_coprocessor.so",
+        )
+        dev = qp.Backline(
+            controller=_controller(hardware="fpga", init_args={}),
+            coprocessors=[_coproc("cop0", init_args={"config": f"frame_slots={slots}"})],
+            transport="rdma",
+        )
+        if ok:
+            serialize_backline(dev.placement)
+        else:
+            with pytest.raises(CompileError, match="'fpga' hardware is only tested with a ring"):
+                serialize_backline(dev.placement)
+
+    def test_a_node_config_cannot_set_the_frame_layout(self):
+        """The frame layout is the compiler's to choose, from the placement's message sizes."""
+        dev = qp.Backline(
+            controller=_controller(init_args={"config": "frame=blv"}),
+            coprocessors=[_coproc("cop0", init_args={})],
+            transport="memcpy",
+        )
+        with pytest.raises(CompileError, match="'frame' is reserved"):
+            serialize_backline(dev.placement)
 
     def test_built_in_rows_match_what_the_built_libraries_report(self):
         """The registry and CatalystTransportQueryCaps describe each in-tree backend alike."""

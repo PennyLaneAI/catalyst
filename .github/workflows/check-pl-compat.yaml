@@ -224,7 +224,9 @@ jobs:
 
     - name: Run Frontend Tests (Kokkos)
       run: |
-        make pytest TEST_BACKEND="lightning.kokkos" XDSL_TESTS=OFF
+        # Select tests parametrized by the backend fixture.
+        python3 -m pytest frontend/test/pytest --tb=native --backend="lightning.kokkos" -n auto -m "not xdsl" -k "lightning.kokkos"
+        python3 -m pytest frontend/test/async_tests --tb=native --backend="lightning.kokkos" -k "lightning.kokkos"
 
     - name: Run Frontend Tests (Braket)
       run: |

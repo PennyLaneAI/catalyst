@@ -31,7 +31,6 @@ from catalyst import jvp as C_jvp
 from catalyst import qjit, value_and_grad
 from catalyst import vjp as C_vjp
 from catalyst.device.decomposition import measurements_from_counts, measurements_from_samples
-from catalyst.passes import apply_pass
 
 # TODO: add tests with other measurement processes (e.g. qp.sample, qp.probs, ...)
 
@@ -1388,7 +1387,7 @@ class TestDynamicOneShotMLIRPass:
         dev = qp.device(backend, wires=3)
 
         @qjit(capture=False)
-        @apply_pass("dynamic-one-shot")
+        @qp.transform(pass_name="dynamic-one-shot")
         @partial(tape_transform, device_wires=dev.wires)
         @qp.qnode(dev, shots=1000)
         def circuit():

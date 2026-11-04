@@ -19,19 +19,12 @@
 #include "DGBuilder.hpp"
 
 #include <cstddef>
-#include <cstdint>
 #include <iostream>
 #include <memory>
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
-#include <variant>
 #include <vector>
-
-#include "boost/graph/adjacency_list.hpp"
-#include "boost/graph/detail/adjacency_list.hpp"
-#include "boost/graph/graph_selectors.hpp"
-#include "boost/graph/graph_traits.hpp"
 
 #include "DGTypes.hpp"
 #include "DGUtils.hpp"
@@ -41,56 +34,16 @@ using namespace DecompGraph::Core;
 namespace DecompGraph::Solver {
 
 struct DecompositionGraph::Impl {
-    using RuleId = DecompositionGraph::RuleId;
     using OperatorId = std::size_t;
 
-    struct OperatorVertex {
-        OperatorId op_id;
-    };
-
-    struct RuleVertex {
-        RuleId rule_id;
-    };
-
-    enum class VertexType : std::uint8_t { Operator = 0, Rule = 1 };
-
-    struct GraphVertex {
-        VertexType type;
-        std::variant<OperatorVertex, RuleVertex> payload;
-    };
-
-    struct GraphWeightedEdge {}; // placeholder used in the boost graph as a type
-
-    using BbGraph = boost::adjacency_list<boost::vecS, boost::vecS, boost::bidirectionalS,
-                                          GraphVertex, GraphWeightedEdge>;
-    using Vertex = boost::graph_traits<BbGraph>::vertex_descriptor;
-
-    BbGraph graph;
     std::vector<OperatorNode> operators;
     WeightedGateset gateset;
     std::vector<RuleNode> rules;
 
     std::unordered_map<OperatorNode, OperatorId, OperatorNodeHash> opToId;
-    std::vector<OperatorNode> idToOp;
-    std::unordered_map<OperatorId, Vertex> opIdToVertex;
-
-    std::unordered_map<RuleId, Vertex> ruleIdToVertex;
     std::unordered_map<OperatorNode, std::vector<RuleNode>, OperatorNodeHash> opToRules;
 
-    OperatorId registerOp(const OperatorNode &op) {
-        const auto it = opToId.find(op);
-        if (it != opToId.end()) {
-            return it->second;
-        }
-
-        OperatorId newId = opToId.size();
-        opToId.emplace(op, newId);
-        idToOp.push_back(op);
-        const auto vertex =
-            boost::add_vertex(GraphVertex{VertexType::Operator, OperatorVertex{newId}}, graph);
-        opIdToVertex.emplace(newId, vertex);
-        return newId;
-    }
+    void registerOp(const OperatorNode &op) { opToId.emplace(op, opToId.size()); }
 
     Impl(std::vector<OperatorNode> _operators, WeightedGateset _gateset,
          std::vector<RuleNode> _rules)
@@ -130,37 +83,15 @@ struct DecompositionGraph::Impl {
     }
 
     void buildGraph() {
-        // Register all operators
         for (const auto &op : operators) {
             registerOp(op);
         }
 
-        // Register all rules
-        for (RuleId ruleId = 0; ruleId < rules.size(); ruleId++) {
-            const auto &rule = rules[ruleId];
-            const auto id = registerOp(rule.output);
-            const auto output_vertex = opIdToVertex[id];
-
-            // Create a vertex for the rule and connect it to its output operator vertex
-            const auto rule_vertex =
-                boost::add_vertex(GraphVertex{VertexType::Rule, RuleVertex{ruleId}}, graph);
-            ruleIdToVertex.emplace(ruleId, rule_vertex);
+        for (const auto &rule : rules) {
+            registerOp(rule.output);
             opToRules[rule.output].push_back(rule);
-
-            // Connect rule vertex to output operator vertex
-            boost::add_edge(rule_vertex, output_vertex, GraphWeightedEdge{}, graph);
-
-            // Empty rules (with no inputs) are effectively just target gates
-            // and don't need to be connected to input operator vertices
-            if (rule.isEmpty()) {
-                continue;
-            }
-
-            // Connect rule vertex to input operator vertices
             for (const auto &input : rule.inputs) {
-                const auto input_id = registerOp(input.op);
-                const auto input_vertex = opIdToVertex[input_id];
-                boost::add_edge(input_vertex, rule_vertex, GraphWeightedEdge{}, graph);
+                registerOp(input.op);
             }
         }
     }
@@ -238,7 +169,7 @@ void showGraph(const Solver::DecompositionGraph &graph, std::ostream &os) {
 
     // Show all rules by their names and their input/output operators
     os << "Rules:\n";
-    for (const auto &[ruleId, _] : impl->ruleIdToVertex) {
+    for (std::size_t ruleId = 0; ruleId < impl->rules.size(); ++ruleId) {
         const auto &rule = impl->rules[ruleId];
         os << "  Rule ID " << ruleId << ": " << rule.name;
         os << "\n";
