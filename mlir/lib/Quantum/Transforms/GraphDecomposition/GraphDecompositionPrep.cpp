@@ -164,9 +164,9 @@ OperatorNode parseOperator(llvm::StringRef id) {
     OperatorNode node;
 
     node.id = id.str();
-    node.name = id.take_until([](char c) {
-                      return c == '[' || c == '{';
-                  }).drop_until([](char c) { return !llvm::isDigit(c); });
+    node.name = id.take_until([](char c) { return c == '[' || c == '{'; }).drop_until([](char c) {
+        return !llvm::isDigit(c);
+    });
 
     return node;
 }
@@ -331,7 +331,7 @@ LogicalResult loadDecompositionRules(ModuleOp module,
  * RuleNodes. It therefore takes no `ruleNodes` output.
  */
 [[maybe_unused]] LogicalResult loadPythonDecomps(ModuleOp module, llvm::StringRef libQPDPath,
-                                                  llvm::StringRef libpythonPath) {
+                                                 llvm::StringRef libpythonPath) {
     MLIRContext *context = module.getContext();
     SymbolTable symbolTable(module);
 
