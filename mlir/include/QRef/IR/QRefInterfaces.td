@@ -181,4 +181,10 @@ def DecomposableGate : OpInterface<"DecomposableGate", [QuantumGate]> {
     ];
 }
 
+// re-used from quantum dialect
+def MeasurementProcess : Interface<"MeasurementProcess">,
+                         OpInterfaceTrait<"MeasurementProcess"> {
+    let cppNamespace = "::catalyst::quantum";
+}
+
 #endif // QREF_INTERFACES
