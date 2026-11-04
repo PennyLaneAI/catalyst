@@ -42,6 +42,8 @@ func.func @basic_gates() {
     return
 }
 
+// -----
+
 // Operator2 gates
 
 // CHECK-LABEL: "operator2_gates"
