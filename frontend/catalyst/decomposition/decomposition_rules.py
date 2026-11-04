@@ -275,7 +275,7 @@ def flatten_hybrid_args(extra_data) -> tuple:
     are created separately by ``prepare_dynamic_op_kwargs``.
 
     Args:
-        extra_data (dict): Argument names and values.
+        extra_data (dict): Hybrid arguments with dynamic values already abstractified.
 
     Returns:
         tuple: Reconstruction specs, dummy numeric arrays, and fully static arguments.
@@ -1126,10 +1126,8 @@ def build_registered_decomp_target_spec(
     call_args, call_kwargs = split_call_args(kwargs, is_custom_op)
     kwarg_names = ordered_kwarg_names(call_kwargs, dynamic_shape)
 
-    # Numeric hybrid args (e.g. a CDFHamiltonian) are passed as operands so their concrete values
-    # do not bake into the rule body; the rest are closed over. The modified base op still carries
-    # every hybrid arg, so a baked one would also make the gate op's params outnumber the rule's
-    # inputs (crashing the signature analyzer during decompose-lowering).
+    # Rebuild hybrid arguments containing parameters or wires from operands.
+    # Fully static arguments are closed over.
     hybrid_specs, hybrid_leaves, closed_hybrid = flatten_hybrid_args(extra_data)
 
     def rule_to_callable(rule):
