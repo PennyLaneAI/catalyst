@@ -87,8 +87,23 @@ class SharedLibraryManager final {
         constexpr const char *dl_ext = ".so";
 #endif
 
-        // Normalize to the platform-native extension up front.
+        // Load the supplied library first.
+        _handler = dlopen(filename.c_str(), rtld_flags);
+        if (_handler) {
+            return;
+        }
+
+        // dlopen() is destructive: capture before any further use.
+        const char *primary_dlerror = dlerror();
+        const std::string primary_error =
+            primary_dlerror ? primary_dlerror : "unknown dlopen error";
+        const std::string err = "dlopen failed to load " + filename + ": " + primary_error;
+
         std::filesystem::path path(filename);
+        std::error_code ec;
+        RT_FAIL_IF(path.has_parent_path() && std::filesystem::exists(path, ec), err.c_str());
+
+        // Normalize to the platform-native extension.
         auto name = path.filename().string();
         if (!name.ends_with(dl_ext)) {
             auto dot = name.find_last_of('.');
@@ -97,24 +112,14 @@ class SharedLibraryManager final {
             }
             name += dl_ext;
             path = path.has_parent_path() ? path.parent_path() / name : std::filesystem::path(name);
+            _handler = dlopen(path.c_str(), rtld_flags);
         }
 
-        const std::string candidate = path.string();
-        _handler = dlopen(candidate.c_str(), rtld_flags);
-        if (_handler) {
-            return;
-        }
-
-        // dlerror() is destructive: capture before any further use.
-        const char *primary_dlerror = dlerror();
-        std::string primary_error = primary_dlerror ? primary_dlerror : "unknown dlopen error";
-
-        // retry with basename via the loader search path.
-        if (path.has_parent_path()) {
+        // Retry with basename via the loader search path.
+        if (!_handler && path.has_parent_path()) {
             _handler = dlopen(name.c_str(), rtld_flags);
         }
 
-        const std::string err = "dlopen failed to load " + filename + ": " + primary_error;
         RT_FAIL_IF(!_handler, err.c_str());
     }
 
