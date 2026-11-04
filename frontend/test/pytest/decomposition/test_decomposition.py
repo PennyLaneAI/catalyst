@@ -608,9 +608,12 @@ class TestGenericUtilities:
         kwargs = prepare_dynamic_op_kwargs({"0": ShapedArray((), float)}, {"wires": 1})
 
         with qp.capture.toggle_ctx(False):
-            _, resource_ids, _ = collect_resources_for_op("RZ", kwargs, is_custom_op=True)
+            collected_rules = collect_resources_for_op("RZ", kwargs, is_custom_op=True)
 
-        assert resource_ids["_rz_to_rx_cliff"] == {
+        collected = next(
+            rule for rule in collected_rules if rule.source_rule.name == "_rz_to_rx_cliff"
+        )
+        assert collected.resource_counts_by_id == {
             "Hadamard{}{wires:1}{}": 2,
             "RX{0:[f64]}{wires:1}{}": 1,
         }
@@ -625,7 +628,7 @@ class TestGenericUtilities:
         with local_decomps():
             add_decomps("Adjoint(NoParams)", symbolic_rule)
             with qp.capture.toggle_ctx(False):
-                _, _, _, resource_ids = collect_symbolic_resources(
+                collected_rules, _ = collect_symbolic_resources(
                     NoParams,
                     "NoParams",
                     prepare_dynamic_op_kwargs({}, {"reg": 1}),
@@ -633,10 +636,82 @@ class TestGenericUtilities:
                     kind="adjoint",
                 )
 
-        assert resource_ids["symbolic_rule"] == {
+        (collected,) = collected_rules
+        assert collected.source_rule is symbolic_rule
+        assert collected.resource_counts_by_id == {
             "Hadamard{}{wires:1}{}": 2,
             "PauliX{}{wires:1}{}": 1,
         }
+
+
+class TestCollectedResources:
+    """Resource collection returns complete records in registry order."""
+
+    @pytest.mark.parametrize("kind", ["distributed", "adjoint", "control"])
+    @pytest.mark.parametrize("failure_stage", ["compute_resources", "graph_op_id"])
+    def test_failed_collection_keeps_successful_rules(self, kind, failure_stage, mocker):
+        """A failed rule is omitted without losing populated or empty resource results."""
+
+        @register_resources({qp.X(Wire[1]): 2})
+        def populated_rule(**_):
+            pass
+
+        @register_resources({qp.Z(Wire[1]): 1})
+        def failing_rule(**_):
+            pass
+
+        @register_resources({})
+        def empty_rule(**_):
+            pass
+
+        if failure_stage == "compute_resources":
+            mocker.patch.object(
+                failing_rule, "compute_resources", side_effect=ValueError("resource failure")
+            )
+        else:
+            original_get_id = GraphOpID.getGraphOpId
+
+            def get_id(op_id, *args, **kwargs):
+                if op_id.operator_name == "PauliZ":
+                    raise ValueError("resource failure")
+                return original_get_id(op_id, *args, **kwargs)
+
+            mocker.patch.object(GraphOpID, "getGraphOpId", autospec=True, side_effect=get_id)
+
+        kwargs = prepare_dynamic_op_kwargs({}, {"reg": 2})
+        lookup_name = "NoParams" if kind == "distributed" else symbolic_op_name("NoParams", kind)
+        with local_decomps():
+            add_decomps(lookup_name, populated_rule, failing_rule, empty_rule)
+            with pytest.warns(
+                RuleLoweringWarning,
+                match="Failed to get resources for the failing_rule decomposition rule: resource failure",
+            ) as recorded:
+                if kind == "distributed":
+                    collected_rules = collect_resources_for_op(
+                        "NoParams", kwargs, op_cls=NoParams, modifiers=ModifierState(True, 1)
+                    )
+                else:
+                    collected_rules, _ = collect_symbolic_resources(
+                        NoParams,
+                        "NoParams",
+                        kwargs,
+                        False,
+                        kind=kind,
+                        ctrl_wires=(2,) if kind == "control" else (),
+                        ctrl_values=(True,) if kind == "control" else (),
+                    )
+
+        assert len(recorded) == 1
+        populated, empty = collected_rules
+        assert populated.source_rule is populated_rule
+        assert populated.resource_counts_by_op == {qp.X(Wire[1]): 2}
+        resource_id = (
+            "C(Adjoint(PauliX)){}{wires:1}{}" if kind == "distributed" else "PauliX{}{wires:1}{}"
+        )
+        assert populated.resource_counts_by_id == {resource_id: 2}
+        assert empty.source_rule is empty_rule
+        assert empty.resource_counts_by_op == {}
+        assert empty.resource_counts_by_id == {}
 
 
 class TestPrecompiled:
@@ -1050,7 +1125,7 @@ class TestOnDemand:
 
         from catalyst.decomposition import decomposition_rules as dr
 
-        mocker.patch.object(dr, "collect_resources_for_op", return_value=({}, {}, []))
+        mocker.patch.object(dr, "collect_resources_for_op", return_value=[])
         failed_qjit = mocker.MagicMock(mlir_module=None)
         mocker.patch.object(dr.qp, "qjit", return_value=lambda _circuit: failed_qjit)
 
@@ -1893,14 +1968,10 @@ class TestApplicabilityFilterOrdering:
         rule = self._symbolic_rule(
             "inapplicable_sym_rule", applicable=False, resources_explode=True
         )
-        rules, _, name_to_resources, name_to_resource_ids = self._collect_symbolic(
-            rule, lookup_name, kind, ctrl_wires
-        )
+        collected_rules, _ = self._collect_symbolic(rule, lookup_name, kind, ctrl_wires)
 
         assert self._lowering_warnings(recwarn) == []
-        assert [r.name for r in rules] == []
-        assert name_to_resources == {}
-        assert name_to_resource_ids == {}
+        assert collected_rules == []
 
     @pytest.mark.parametrize("kind, lookup_name, ctrl_wires", SYMBOLIC_KINDS)
     def test_symbolic_raising_condition_is_reported(self, kind, lookup_name, ctrl_wires, recwarn):
@@ -1908,15 +1979,14 @@ class TestApplicabilityFilterOrdering:
         skipped, for both symbolic kinds."""
 
         rule = self._symbolic_rule("exploding_sym_rule", condition_explodes=True)
-        rules, _, name_to_resources, _ = self._collect_symbolic(rule, lookup_name, kind, ctrl_wires)
+        collected_rules, _ = self._collect_symbolic(rule, lookup_name, kind, ctrl_wires)
 
         # NOTE: the message names the base operator, which is what `collect_symbolic_resources`
         # hands down; the rule itself is registered against `lookup_name`.
         assert self._lowering_warnings(recwarn) == [
             "Excluded the exploding_sym_rule decomposition rule for NoParams; raised 'some error'"
         ]
-        assert [r.name for r in rules] == []
-        assert name_to_resources == {}
+        assert collected_rules == []
 
     def test_control_rule_needing_work_wires_is_skipped(self, recwarn):
         """Test that a ``C(Op)`` rule requiring a work wire is filtered out on this path.
@@ -1939,14 +2009,11 @@ class TestApplicabilityFilterOrdering:
         impl.__name__ = "ctrl_work_wire_rule"
         rule = register_condition(condition)(register_resources(resources)(impl))
 
-        rules, probe_args, name_to_resources, _ = self._collect_symbolic(
-            rule, "C(NoParams)", "control", (2,)
-        )
+        collected_rules, probe_args = self._collect_symbolic(rule, "C(NoParams)", "control", (2,))
 
         assert probe_args["work_wires"] == Wires([])
         assert self._lowering_warnings(recwarn) == []
-        assert [r.name for r in rules] == []
-        assert name_to_resources == {}
+        assert collected_rules == []
 
 
 class TestVerboseSolution:
