@@ -46,7 +46,7 @@
 #include "Quantum/IR/QuantumTypes.h"
 #include "Quantum/Transforms/Patterns.h"
 
-#include "MagicStrings.h"
+#include "StringConstants.h"
 
 using namespace mlir;
 using namespace catalyst::quantum;

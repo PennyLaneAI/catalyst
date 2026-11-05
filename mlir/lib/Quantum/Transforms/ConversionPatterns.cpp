@@ -28,7 +28,7 @@
 #include "Quantum/Transforms/Patterns.h"
 #include "Quantum/Utils/QIRPauliRot.h"
 
-#include "MagicStrings.h"
+#include "StringConstants.h"
 
 using namespace mlir;
 using namespace catalyst::quantum;
