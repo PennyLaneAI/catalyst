@@ -372,7 +372,7 @@ class TestCatalyst:
         the loop.
         """
 
-        @qjit(capture=True, collect_decomp_rules=False)
+        @qjit(capture=True)
         @qp.qnode(qp.device("lightning.qubit", wires=2))
         def circuit(theta):
             @for_loop(2)

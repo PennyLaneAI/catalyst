@@ -19,6 +19,7 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/Operation.h"
+#include "mlir/Pass/AnalysisManager.h"
 
 #include "Catalyst/Analysis/ResourceResult.h"
 #include "Catalyst/Analysis/ResourceResultExtension.h"
@@ -77,6 +78,8 @@ class ResourceAnalysis {
     // TODO: the counter will ensure uniqueness, but may not be sequential for a specific function,
     // if multiple modifier functions have name conflicts with module functions. Fix if possible.
     int64_t modifierContextCounter = 0;
+    // Shared analysis manager.
+    mlir::ModuleAnalysisManager analysisManager;
 
     // Collect the extension analyses logic
     llvm::SmallVector<std::unique_ptr<ResourceAnalysisExtension>> extensionAnalyses;
