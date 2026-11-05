@@ -25,6 +25,7 @@
 #include "stablehlo/dialect/StablehloOps.h"
 
 #include "PBC/Utils/PBCClassicalEvaluation.h"
+#include "PBC/Utils/PBCSynthesisEvaluation.h"
 
 using namespace mlir;
 
@@ -426,6 +427,10 @@ Attribute WireIndexResolver::evaluate(Value value, PendingValues &pending) const
         return {};
     }
     llvm::StringRef name = op->getName().getStringRef();
+    if (name == "func.call" || name == "memref.load") {
+        return evaluatePBCSynthesisValue(value,
+                                         [&](Value operand) { return resolve(operand, pending); });
+    }
     if (name == "arith.constant" || name == "stablehlo.constant") {
         Attribute attr = op->getAttr("value");
         return elements(attr) ? attr : Attribute{};

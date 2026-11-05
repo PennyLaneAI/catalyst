@@ -967,6 +967,10 @@
   virtual environment, including notebook kernels started without shell activation.
   The evaluator disables floating-point fusion and algebraic simplification so that
   inlining a classical helper does not change a branch through rounding or overflow.
+  Deterministic PPR-basis `gridsynth` sequences are resolved with the installed synthesis
+  runtime, including reads from their immutable gate buffers. Analysis reuses dependency
+  expressions that differ only by a common layer offset, and unused classical arguments
+  no longer create redundant call summaries.
   [(#3426)](https://github.com/PennyLaneAI/catalyst/pull/3426)
 
 * The `--convert-to-value-semantics` pass now correctly handles aliasing qubit references that are

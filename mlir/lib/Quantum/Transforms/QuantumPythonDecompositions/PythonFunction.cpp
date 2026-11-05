@@ -267,3 +267,23 @@ pythonPBCClassicalEvaluation(const std::string &module,
 extern "C" __attribute__((visibility("default"))) void *getPythonPBCClassicalEvaluationFunction() {
     return reinterpret_cast<void *>(pythonPBCClassicalEvaluation);
 }
+
+std::string pythonPBCRuntimeLibrary() {
+    try {
+        static QuantumPythonDecompositions::PyInterpreterGuard guard;
+        return guard.withGil([&] {
+            nb::module_ environment = nb::module_::import_("catalyst.utils.runtime_environment");
+            std::string directory = nb::cast<std::string>(
+                environment.attr("get_lib_path")("runtime", "RUNTIME_LIB_DIR"));
+            std::string platform =
+                nb::cast<std::string>(nb::module_::import_("sys").attr("platform"));
+            return directory + "/librt_rsdecomp" + (platform == "darwin" ? ".dylib" : ".so");
+        });
+    } catch (...) {
+        return {};
+    }
+}
+
+extern "C" __attribute__((visibility("default"))) void *getPythonPBCRuntimeLibraryFunction() {
+    return reinterpret_cast<void *>(pythonPBCRuntimeLibrary);
+}

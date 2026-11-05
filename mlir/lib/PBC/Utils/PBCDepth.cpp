@@ -24,6 +24,7 @@
 
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"
+#include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -35,6 +36,7 @@
 #include "Catalyst/Analysis/ResourceInterfaces.h"
 #include "PBC/IR/PBCOpInterfaces.h"
 #include "PBC/IR/PBCOps.h"
+#include "PBC/Utils/PBCSynthesisEvaluation.h"
 #include "PBC/Utils/PBCWireIndex.h"
 #include "Quantum/IR/QuantumOps.h"
 
@@ -204,14 +206,90 @@ Clock substitute(const Clock &value, const llvm::DenseMap<unsigned, Clock> &inpu
     return result;
 }
 
+// Composition often has many output clocks with the same dependencies, differing
+// only by an overall layer offset. Substitute that common expression once. This
+// retains every dependency while avoiding repeated dense max-plus products.
+class SubstitutionCache {
+    struct Entry {
+        const Clock *value;
+        int64_t shift;
+        Clock result;
+    };
+
+    const llvm::DenseMap<unsigned, Clock> &inputs;
+    Context &context;
+    bool hasDenseInputs;
+    std::map<uint64_t, llvm::SmallVector<unsigned>> buckets;
+    std::vector<Entry> entries;
+
+    static bool equalNormalized(const Clock &value, int64_t shift, const Entry &entry) {
+        const Clock &other = *entry.value;
+        if (value.constant - shift != other.constant - entry.shift ||
+            value.offsets.size() != other.offsets.size()) {
+            return false;
+        }
+        return llvm::all_of(value.offsets, [&](const auto &offset) {
+            auto it = other.offsets.find(offset.first);
+            return it != other.offsets.end() && offset.second - shift == it->second - entry.shift;
+        });
+    }
+
+  public:
+    SubstitutionCache(const llvm::DenseMap<unsigned, Clock> &inputs, Context &context)
+        : inputs(inputs), context(context),
+          hasDenseInputs(llvm::any_of(
+              inputs, [](const auto &entry) { return entry.second.offsets.size() > 2; })) {}
+
+    Clock apply(const Clock &value) {
+        // Constants and small independent components are already cheap to
+        // substitute; hashing and storing their expressions costs more than it saves.
+        if (!hasDenseInputs || value.offsets.size() <= 2) {
+            return substitute(value, inputs, context);
+        }
+        if (!context.work()) {
+            return {};
+        }
+        // Subtract a nonnegative common shift so normalization and the existing
+        // checked addition never introduce negative coefficients.
+        int64_t shift = value.constant;
+        for (auto [input, offset] : value.offsets) {
+            shift = std::min(shift, offset);
+        }
+        uint64_t hash =
+            static_cast<size_t>(llvm::hash_combine(value.constant - shift, value.offsets.size()));
+        for (auto [input, offset] : value.offsets) {
+            // DenseMap iteration order need not match for equivalent clocks.
+            hash ^= static_cast<size_t>(llvm::hash_combine(input, offset - shift));
+        }
+        auto &bucket = buckets[hash];
+        for (unsigned index : bucket) {
+            const Entry &entry = entries[index];
+            // Hashes only select candidates; equality must establish reuse.
+            if (equalNormalized(value, shift, entry)) {
+                return shifted(entry.result, shift, context);
+            }
+        }
+        Clock normalized = value;
+        normalized.constant -= shift;
+        for (auto &entry : normalized.offsets) {
+            entry.second -= shift;
+        }
+        Clock result = substitute(normalized, inputs, context);
+        bucket.push_back(static_cast<unsigned>(entries.size()));
+        entries.push_back({&value, shift, std::move(result)});
+        return shifted(entries.back().result, shift, context);
+    }
+};
+
 // Compose two circuits in program order, including completed internal-ancilla
 // paths. Qubit clocks absent from a transfer have the identity transformation.
 Transfer compose(const Transfer &first, const Transfer &second, Context &context) {
     Transfer result = first;
+    SubstitutionCache substitutions(first.clocks, context);
     for (const auto &entry : second.clocks) {
-        result.clocks[entry.first] = substitute(entry.second, first.clocks, context);
+        result.clocks[entry.first] = substitutions.apply(entry.second);
     }
-    mergeClock(result.depth, substitute(second.depth, first.clocks, context));
+    mergeClock(result.depth, substitutions.apply(second.depth));
     result.hasPBC |= second.hasPBC;
     return result;
 }
@@ -478,9 +556,10 @@ class Schedule : Transfer {
         for (const auto &entry : body.clocks) {
             gather(entry.second);
         }
-        mergeClock(depth, substitute(body.depth, inputs, context));
+        SubstitutionCache substitutions(inputs, context);
+        mergeClock(depth, substitutions.apply(body.depth));
         for (const auto &entry : body.clocks) {
-            clocks[entry.first] = substitute(entry.second, inputs, context);
+            clocks[entry.first] = substitutions.apply(entry.second);
         }
         hasPBC |= body.hasPBC;
     }
@@ -679,7 +758,7 @@ class Schedule : Transfer {
 
     CallKey callKey(func::CallOp op, func::FuncOp callee) {
         CallKey key{reinterpret_cast<uintptr_t>(callee.getOperation())};
-        for (Value input : op.getOperands()) {
+        for (auto [input, argument] : llvm::zip(op.getOperands(), callee.getArguments())) {
             if (isa<quantum::QubitType>(input.getType())) {
                 key.push_back(qubit(input));
             } else if (isa<quantum::QuregType>(input.getType())) {
@@ -702,7 +781,9 @@ class Schedule : Transfer {
                     key.push_back(index);
                     key.push_back(id);
                 }
-            } else {
+            } else if (!argument.use_empty()) {
+                // An unused classical formal cannot affect the graph or outputs.
+                // Keep used constants and every quantum identity in the key.
                 key.push_back(reinterpret_cast<uintptr_t>(
                     wireIndices.resolveConstant(input).getAsOpaquePointer()));
                 key.push_back(measurementDerived(input));
@@ -719,6 +800,9 @@ class Schedule : Transfer {
     }
 
     bool call(func::CallOp op) {
+        if (isPBCSynthesisCall(op)) {
+            return true;
+        }
         auto callee = SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, op.getCalleeAttr());
         if (callee && !callee.isDeclaration() && op.getNumResults() &&
             !llvm::any_of(op.getOperandTypes(), isQuantum) &&

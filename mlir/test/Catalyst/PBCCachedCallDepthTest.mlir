@@ -145,3 +145,74 @@ func.func private @allocate_rotated_qubit() -> !quantum.bit {
     %out = pbc.ppr ["X"](8) %q : !quantum.bit
     return %out : !quantum.bit
 }
+
+// -----
+
+// Changing an unused classical argument does not change a helper's transfer.
+// Even an unknown value can reuse it; all six gates still share the same wire.
+// CHECK-LABEL: "unused_classical_arguments": {
+// CHECK: "qubit_disjoint_depth_status": "exact"
+// CHECK: "qubit_disjoint_depth_total": 6
+func.func @unused_classical_arguments(%q: !quantum.bit, %unknown: i64) {
+    %zero = arith.constant 0 : i64
+    %one = arith.constant 1 : i64
+    %a = func.call @ignored_classical_argument(%q, %zero) : (!quantum.bit, i64) -> !quantum.bit
+    %b = func.call @ignored_classical_argument(%a, %one) : (!quantum.bit, i64) -> !quantum.bit
+    %c = func.call @ignored_classical_argument(%b, %unknown) : (!quantum.bit, i64) -> !quantum.bit
+    return
+}
+
+func.func private @ignored_classical_argument(%q: !quantum.bit, %unused: i64) -> !quantum.bit {
+    %a = pbc.ppr ["X"](8) %q : !quantum.bit
+    %b = pbc.ppr ["Z"](8) %a : !quantum.bit
+    return %b : !quantum.bit
+}
+
+// -----
+
+// A classical argument used as a wire index must still distinguish summaries.
+// Reusing the first call's summary would incorrectly serialize both rotations.
+// CHECK-LABEL: "used_classical_wire_arguments": {
+// CHECK: "qubit_disjoint_depth_status": "exact"
+// CHECK: "qubit_disjoint_depth_total": 1
+func.func @used_classical_wire_arguments() {
+    %zero = arith.constant 0 : i64
+    %one = arith.constant 1 : i64
+    %reg = quantum.alloc(2) : !quantum.reg
+    %a = func.call @indexed_rotation(%reg, %zero) : (!quantum.reg, i64) -> !quantum.reg
+    %b = func.call @indexed_rotation(%a, %one) : (!quantum.reg, i64) -> !quantum.reg
+    quantum.dealloc %b : !quantum.reg
+    return
+}
+
+func.func private @indexed_rotation(%reg: !quantum.reg, %index: i64) -> !quantum.reg {
+    %q = quantum.extract %reg[%index] : !quantum.reg -> !quantum.bit
+    %rotated = pbc.ppr ["X"](8) %q : !quantum.bit
+    %out = quantum.insert %reg[%index], %rotated : !quantum.reg, !quantum.bit
+    return %out : !quantum.reg
+}
+
+// -----
+
+// A classical loop bound also remains part of the key. The same physical wire
+// receives two gates in the first call and three in the second, for five layers.
+// CHECK-LABEL: "used_classical_depth_arguments": {
+// CHECK: "qubit_disjoint_depth_status": "exact"
+// CHECK: "qubit_disjoint_depth_total": 5
+func.func @used_classical_depth_arguments(%q: !quantum.bit) {
+    %two = arith.constant 2 : index
+    %three = arith.constant 3 : index
+    %a = func.call @repeated_rotation(%q, %two) : (!quantum.bit, index) -> !quantum.bit
+    %b = func.call @repeated_rotation(%a, %three) : (!quantum.bit, index) -> !quantum.bit
+    return
+}
+
+func.func private @repeated_rotation(%q: !quantum.bit, %count: index) -> !quantum.bit {
+    %zero = arith.constant 0 : index
+    %one = arith.constant 1 : index
+    %out = scf.for %i = %zero to %count step %one iter_args(%a = %q) -> (!quantum.bit) {
+        %b = pbc.ppr ["X"](8) %a : !quantum.bit
+        scf.yield %b : !quantum.bit
+    }
+    return %out : !quantum.bit
+}
