@@ -25,6 +25,7 @@
 
 #include "Catalyst/IR/CatalystOps.h"
 #include "Gradient/IR/GradientOps.h"
+#include "Quantum/IR/QuantumInterfaces.h"
 #include "Quantum/IR/QuantumOps.h"
 
 using namespace mlir;
@@ -39,7 +40,9 @@ bool isAnnotated(FunctionOpInterface op, const char *attr) {
 bool invalidGradientOperation(FunctionOpInterface op) {
     ModuleOp mod = op->getParentOfType<ModuleOp>();
     auto res = op.walk([&](Operation *o) {
-        if (isa<catalyst::quantum::MeasureOp>(o) || isa<catalyst::CustomCallOp>(o)) {
+        if (isa<catalyst::quantum::MeasureOp, catalyst::CustomCallOp>(o) ||
+            (isa<catalyst::quantum::MeasurementProcess>(o) &&
+             !isa<catalyst::quantum::TerminalMeasurement>(o))) {
             return WalkResult::interrupt();
         } else if (auto callbackCall = dyn_cast<catalyst::CallbackCallOp>(o)) {
             bool hasCustomDerivative = false;
