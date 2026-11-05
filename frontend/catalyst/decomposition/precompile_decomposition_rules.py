@@ -21,11 +21,9 @@ from jax._src.lib.mlir import ir
 from pennylane.operation import Operator, Operator2
 
 from catalyst.compiler import _quantum_opt
-from catalyst.decomposition.decomposition_rules import (
-    GraphOpID,
-    compile_decomposition_rules,
-    get_rules_from_module,
-)
+from catalyst.decomposition.decomposition_rules import compile_decomposition_rules
+from catalyst.decomposition.graph_op_id import GraphOpID
+from catalyst.decomposition.rule_compilation import get_rules_from_module
 from catalyst.utils.runtime_environment import BYTECODE_FILE_PATH
 
 # TODO: Uncomment dynamic size wires ops once they are supported

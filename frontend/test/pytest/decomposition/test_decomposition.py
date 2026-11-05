@@ -52,17 +52,25 @@ from pennylane.wires import Wires
 from catalyst import qjit
 from catalyst.decomposition import GraphOpID, RuleLoweringWarning
 from catalyst.decomposition.decomposition_rules import (
+    compile_decomposition_rules_wrapper,
+    compile_reachable_decomposition_rules_wrapper,
+    compile_registered_symbolic_rules,
+    materialize_reachable_rule_strings,
+)
+from catalyst.decomposition.graph_op_id import GraphOpID, build_graph_op_id
+from catalyst.decomposition.modifier_state import ModifierState
+from catalyst.decomposition.rule_compilation import (
+    get_rule_strings_from_module,
+    materialize_rule_strings,
+)
+from catalyst.decomposition.rule_preparation import (
     RuleTraceInputs,
     _adjoint_folds_to_base,
     _rule_allocates_work_wires,
     _rule_is_eligible,
+    build_decomp_target_spec,
     collect_resources_for_op,
     collect_symbolic_resources,
-    compile_decomposition_rules_wrapper,
-    compile_reachable_decomposition_rules_wrapper,
-    compile_registered_symbolic_rules,
-    get_rule_strings_from_module,
-    materialize_reachable_rule_strings,
     ordered_kwarg_names,
     prepare_dynamic_op_kwargs,
     rule_call_operands,
@@ -70,9 +78,8 @@ from catalyst.decomposition.decomposition_rules import (
     symbolic_op_name,
     unpack_rule_operands,
 )
-from catalyst.decomposition.graph_op_id import GraphOpID, build_graph_op_id
-from catalyst.decomposition.modifier_state import ModifierState
 from catalyst.decomposition.type_utils import (
+    SerializedGraphOpID,
     convert_item_to_mlir_type,
     get_dummy_values_for_dynamic_shape,
     replace_wires_with_placeholder_wires,
@@ -718,6 +725,38 @@ class TestPrecompiled:
     """Tests for precompiled decomposition rules."""
 
 
+class TestStandaloneCompilation:
+    """Standalone compilation consumes prepared batches independently of the registry."""
+
+    def test_compiles_prepared_rules_without_registry_lookup(self, mocker):
+        """Prepared callables and resource counts remain usable after their registry scope ends."""
+
+        @register_resources({qp.X(Wire[1]): 1})
+        def prepared_rule(reg):
+            qp.X(reg)
+
+        with local_decomps():
+            add_decomps(NoParams, prepared_rule)
+            target_spec = build_decomp_target_spec(
+                "NoParams",
+                SerializedGraphOpID("NoParams{}{reg:1}{}"),
+                {},
+                {"reg": 1},
+                {},
+                op_cls=NoParams,
+            )
+
+        mocker.patch(
+            "pennylane.decomposition.list_decomps",
+            side_effect=AssertionError("Compilation must consume the prepared rules"),
+        )
+        (rule_string,) = materialize_rule_strings([target_spec])
+
+        assert 'frontend_name = "prepared_rule"' in rule_string
+        assert 'target_gate = "NoParams{}{reg:1}{}"' in rule_string
+        assert '"PauliX{}{wires:1}{}" = 1 : i64' in rule_string
+
+
 class TestTraceTime:
     """Tests of trace-time decomposition rule lowering."""
 
@@ -1124,10 +1163,11 @@ class TestOnDemand:
         """A failed qjit compilation should not cause a secondary NoneType error."""
 
         from catalyst.decomposition import decomposition_rules as dr
+        from catalyst.decomposition import rule_compilation, rule_preparation
 
-        mocker.patch.object(dr, "collect_resources_for_op", return_value=[])
+        mocker.patch.object(rule_preparation, "collect_resources_for_op", return_value=[])
         failed_qjit = mocker.MagicMock(mlir_module=None)
-        mocker.patch.object(dr.qp, "qjit", return_value=lambda _circuit: failed_qjit)
+        mocker.patch.object(rule_compilation.qp, "qjit", return_value=lambda _circuit: failed_qjit)
 
         with pytest.raises(
             CompileError,

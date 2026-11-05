@@ -20,8 +20,8 @@ from pennylane.typing import Wire
 
 from catalyst import qjit
 from catalyst.decomposition.capture_session import OpDecompRequest
-from catalyst.decomposition.decomposition_rules import walk_reachable_decomp_rule_sets
 from catalyst.decomposition.modifier_state import ModifierState
+from catalyst.decomposition.rule_preparation import walk_reachable_decomp_rule_sets
 from catalyst.jax_primitives import decomp_definition_p, decomprule_p
 
 
@@ -422,7 +422,7 @@ def test_registry_lookup_uses_operator_class():
 def test_shared_descendant_resources_are_collected_once(mocker):
     """Preparation drives traversal without a second resource-discovery probe."""
 
-    import catalyst.decomposition.decomposition_rules as decomposition_rules
+    import catalyst.decomposition.rule_preparation as rule_preparation
 
     class RootA(qp.core.Operator2):
         def __init__(self, wires):
@@ -444,7 +444,7 @@ def test_shared_descendant_resources_are_collected_once(mocker):
     def leaf_rule(wires):
         del wires
 
-    spy = mocker.spy(decomposition_rules, "collect_resources_for_op")
+    spy = mocker.spy(rule_preparation, "collect_resources_for_op")
     with qp.decomposition.local_decomps():
         qp.add_decomps(RootA, root_rule)
         qp.add_decomps(RootB, root_rule)
