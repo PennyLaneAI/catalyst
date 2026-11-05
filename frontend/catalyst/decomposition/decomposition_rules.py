@@ -89,13 +89,16 @@ class DecompRuleSpec:
     resource_counts_by_op: dict[Operator2, int]
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RuleTraceInputs:
     """Dummy arguments and operand layout shared by a target's prepared rules.
 
     :func:`rule_call_operands` packs these inputs as positional and named parameters, numeric
     hybrid leaves, one grouped base-wire operand, then optional control wires and values.
-    The caller packs the inputs in its tracing context.
+    Packing creates JAX arrays, so it must happen in the caller's tracing context.
+
+    ``ctrl_wires`` and ``ctrl_values`` must be supplied together with matching lengths,
+    or both be ``None``.
 
     Attributes:
         call_args: Positional dummy arguments used to trace custom-operation rules.
@@ -392,17 +395,22 @@ def flatten_hybrid_args(extra_data) -> tuple:
 
 
 def rule_call_operands(trace_inputs: RuleTraceInputs) -> list[Array | np.float64]:
-    """Flatten a rule call as params, operand-passed hybrid-arg leaves, one grouped base-wire
-    operand, then optional control wires and control values.
+    """Pack dummy inputs into the positional operand layout used to trace a rule.
 
-    Everything is passed positionally because ``qp.capture.subroutine`` traces through ``jax.jit``,
-    which would otherwise flatten keyword arguments in sorted-name order.
+    The order is positional parameters, named parameters, numeric hybrid leaves, one grouped
+    base-wire array, then optional control wires and values. Named parameters follow
+    ``trace_inputs.kwarg_names``; wire groups follow ``trace_inputs.wire_lens`` insertion order.
+    The base-wire array is present even when empty.
+
+    Packing creates JAX arrays and must run in the caller's tracing context. All operands are
+    positional so ``jax.jit`` (used by ``qp.capture.subroutine``) cannot reorder keyword arguments
+    alphabetically.
 
     Args:
         trace_inputs (RuleTraceInputs): the rule's dummy arguments and operand layout
 
     Returns:
-        list: the operands to call the traced rule with
+        list: positional operands in the layout consumed by :func:`unpack_rule_operands`
     """
     param_names = [name for name in trace_inputs.kwarg_names if name not in trace_inputs.wire_lens]
     wire_names = list(trace_inputs.wire_lens)
