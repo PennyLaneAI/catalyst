@@ -171,9 +171,9 @@ module @set_basis_state {
 func.func @operator_op_mixed_params(%q: !quantum.bit, %ctrl: !quantum.bit, %cv: i1,
                        %theta: f64, %matrix: tensor<2x2xcomplex<f64>>,
                        %dynamic: tensor<?xf64>, %buffer: memref<4xi64>) -> (!quantum.bit, !quantum.bit) {
-    // CHECK-DAG: [[MATRIX:%.+]] = bufferization.to_buffer %arg4 : tensor<2x2xcomplex<f64>> to [[MATRIX_TYPE:memref<.*>]]
-    // CHECK-DAG: [[DYNAMIC:%.+]] = bufferization.to_buffer %arg5 : tensor<?xf64> to [[DYNAMIC_TYPE:memref<.*>]]
-    // CHECK: [[OUT:%.+]], [[CTRL:%.+]] = quantum.operator "Mixed"(%arg3: f64, [[MATRIX]]: [[MATRIX_TYPE]], [[DYNAMIC]]: [[DYNAMIC_TYPE]], %arg6: memref<4xi64>) adj qubits(%arg0)
+    // CHECK-DAG: [[MATRIX:%.+]] = bufferization.to_buffer %arg4 : tensor<2x2xcomplex<f64>> to memref<2x2xcomplex<f64>>
+    // CHECK-DAG: [[DYNAMIC:%.+]] = bufferization.to_buffer %arg5 : tensor<?xf64> to memref<?xf64>
+    // CHECK: [[OUT:%.+]], [[CTRL:%.+]] = quantum.operator "Mixed"(%arg3: f64, [[MATRIX]]: memref<2x2xcomplex<f64>>, [[DYNAMIC]]: memref<?xf64>, %arg6: memref<4xi64>) adj qubits(%arg0)
     // CHECK: ctrls(%arg1) ctrl_vals(%arg2)
     // CHECK: return [[OUT]], [[CTRL]]
     %out, %out_ctrl = quantum.operator "Mixed"(%theta: f64, %matrix: tensor<2x2xcomplex<f64>>,
@@ -186,10 +186,10 @@ func.func @operator_op_mixed_params(%q: !quantum.bit, %ctrl: !quantum.bit, %cv: 
 
 // CHECK-LABEL: func.func @operator_op_metadata_and_forwarded_params
 func.func @operator_op_metadata_and_forwarded_params(%q: !quantum.bit, %param: tensor<f64>, %forward: tensor<6xi64>) -> !quantum.bit {
-    // CHECK-DAG: [[PARAM:%.+]] = bufferization.to_buffer %arg1 : tensor<f64> to [[PARAM_TYPE:memref<.*>]]
-    // CHECK-DAG: [[FORWARD:%.+]] = bufferization.to_buffer %arg2 : tensor<6xi64> to [[FORWARD_TYPE:memref<.*>]]
-    // CHECK: [[OUT:%.+]] = quantum.operator "Template"([[PARAM]]: [[PARAM_TYPE]]) adj qubits(%arg0) {test.metadata = "preserved"}
-    // CHECK: UID(7) forward([[FORWARD]]: [[FORWARD_TYPE]])
+    // CHECK-DAG: [[PARAM:%.+]] = bufferization.to_buffer %arg1 : tensor<f64> to memref<f64>
+    // CHECK-DAG: [[FORWARD:%.+]] = bufferization.to_buffer %arg2 : tensor<6xi64> to memref<6xi64>
+    // CHECK: [[OUT:%.+]] = quantum.operator "Template"([[PARAM]]: memref<f64>) adj qubits(%arg0) {test.metadata = "preserved"}
+    // CHECK: UID(7) forward([[FORWARD]]: memref<6xi64>)
     // CHECK: static_data = {pauli_word = "X"}
     // CHECK: param_map = {angle = [0]} qubit_map = {wires = [0]}
     // CHECK: return [[OUT]]
@@ -198,4 +198,34 @@ func.func @operator_op_metadata_and_forwarded_params(%q: !quantum.bit, %param: t
         static_data = {pauli_word = "X"}
         param_map = {angle = [0]} qubit_map = {wires = [0]}
     return %out : !quantum.bit
+}
+
+// -----
+
+// Strided tensor parameters must be copied into contiguous buffers with zero offsets.
+// CHECK-LABEL: func.func @operator_op_strided_param
+func.func @operator_op_strided_param(%q: !quantum.bit, %base: memref<4x4xcomplex<f64>>) {
+    // CHECK: [[SLICE:%.+]] = memref.subview %arg1[1, 0] [2, 2] [2, 2]
+    // CHECK-SAME: to memref<2x2xcomplex<f64>, strided<[8, 2], offset: 4>>
+    // CHECK: [[BUFFER:%.+]] = memref.alloc() {{.*}} : memref<2x2xcomplex<f64>>
+    // CHECK: memref.copy [[SLICE]], [[BUFFER]] : memref<2x2xcomplex<f64>, strided<[8, 2], offset: 4>> to memref<2x2xcomplex<f64>>
+    // CHECK: quantum.operator "QubitUnitary"([[BUFFER]]: memref<2x2xcomplex<f64>>) qubits(%arg0)
+    %tensor = bufferization.to_tensor %base restrict : memref<4x4xcomplex<f64>> to tensor<4x4xcomplex<f64>>
+    %slice = tensor.extract_slice %tensor[1, 0] [2, 2] [2, 2] : tensor<4x4xcomplex<f64>> to tensor<2x2xcomplex<f64>>
+    %out = quantum.operator "QubitUnitary"(%slice: tensor<2x2xcomplex<f64>>) qubits(%q)
+    return
+}
+
+// -----
+
+// Forwarded tensor parameters also require a copy when their layout is dynamic.
+// CHECK-LABEL: func.func @operator_op_strided_forwarded_param
+func.func @operator_op_strided_forwarded_param(%q: !quantum.bit, %base: memref<6xi64, strided<[?], offset: ?>>) {
+    // CHECK: [[BUFFER:%.+]] = memref.alloc() {{.*}} : memref<6xi64>
+    // CHECK: memref.copy %arg1, [[BUFFER]] : memref<6xi64, strided<[?], offset: ?>> to memref<6xi64>
+    // CHECK: quantum.operator "Template"() qubits(%arg0)
+    // CHECK: UID(7) forward([[BUFFER]]: memref<6xi64>)
+    %tensor = bufferization.to_tensor %base restrict : memref<6xi64, strided<[?], offset: ?>> to tensor<6xi64>
+    %out = quantum.operator "Template"() qubits(%q) UID(7) forward(%tensor: tensor<6xi64>)
+    return
 }

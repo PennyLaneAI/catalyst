@@ -66,14 +66,14 @@ struct OperatorOpInterface
 
         SmallVector<Value> operands(op->getOperands());
         for (auto [index, param] : llvm::enumerate(operatorOp.getAllParams())) {
-            if (!isa<TensorType>(param.getType())) {
+            auto tensorType = dyn_cast<TensorType>(param.getType());
+            if (!tensorType) {
                 continue;
             }
-            FailureOr<Value> buffer = bufferization::getBuffer(rewriter, param, options, state);
-            if (failed(buffer)) {
-                return failure();
-            }
-            operands[index] = *buffer;
+            MemRefType memrefType =
+                MemRefType::get(tensorType.getShape(), tensorType.getElementType());
+            operands[index] =
+                bufferization::ToBufferOp::create(rewriter, op->getLoc(), memrefType, param);
         }
 
         // Keep all attributes, operand segments, and quantum results intact.
