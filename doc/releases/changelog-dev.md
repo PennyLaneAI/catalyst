@@ -964,6 +964,12 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* Runtime functions that take a boolean argument are now declared with `zeroext` on it. Before, a
+  computed `i1`, such as a negated measurement result in the condition of a conditional Pauli
+  rotation or in a `debug_assert`, could reach the runtime with undefined upper bits and be read
+  as true.
+  [(#3445)](https://github.com/PennyLaneAI/catalyst/pull/3445)
+
 * The `--convert-to-value-semantics` pass now correctly handles aliasing qubit references that are
   used by multiple regions and/or operand lists on the same operation.
   [(#3404)](https://github.com/PennyLaneAI/catalyst/pull/3404)
