@@ -893,17 +893,27 @@ func.func @no_params(%q0: !quantum.bit, %q1: !quantum.bit) {
 // CHECK-LABEL: llvm.func @controlled_adjoint
 func.func @controlled_adjoint(%q: !quantum.bit, %ctrl0: !quantum.bit, %ctrl1: !quantum.bit,
                              %cv0: i1, %cv1: i1, %theta: f64, %phi: f64, %omega: f64) {
-    // CHECK: [[MOD:%.+]] = llvm.alloca {{.*}} x !llvm.struct<(i1, i64, ptr, ptr)>
+    // CHECK-DAG: [[CTRL_QUBITS:%.+]] = llvm.alloca {{.*}} x !llvm.ptr
+    // CHECK-DAG: [[CTRL_VALUES:%.+]] = llvm.alloca {{.*}} x i1
+    // CHECK-DAG: [[MOD:%.+]] = llvm.alloca {{.*}} x !llvm.struct<(i1, i64, ptr, ptr)>
     // CHECK: [[ADJOINT:%.+]] = llvm.mlir.constant(true)
     // CHECK: [[ADJOINT_PTR:%.+]] = llvm.getelementptr inbounds [[MOD]][0, 0]
     // CHECK: [[COUNT_PTR:%.+]] = llvm.getelementptr inbounds [[MOD]][0, 1]
-    // CHECK: llvm.store %arg1,
-    // CHECK: llvm.store %arg3,
-    // CHECK: llvm.store %arg2,
-    // CHECK: llvm.store %arg4,
-    // CHECK: llvm.store [[ADJOINT]], [[ADJOINT_PTR]]
+    // CHECK: [[CTRL_QUBITS_PTR:%.+]] = llvm.getelementptr inbounds [[MOD]][0, 2]
+    // CHECK: [[CTRL_VALUES_PTR:%.+]] = llvm.getelementptr inbounds [[MOD]][0, 3]
+    // CHECK: [[CTRL0_PTR:%.+]] = llvm.getelementptr inbounds [[CTRL_QUBITS]][0] : (!llvm.ptr) -> !llvm.ptr, !llvm.ptr
+    // CHECK: llvm.store %arg1, [[CTRL0_PTR]] : !llvm.ptr, !llvm.ptr
+    // CHECK: [[CV0_PTR:%.+]] = llvm.getelementptr inbounds [[CTRL_VALUES]][0] : (!llvm.ptr) -> !llvm.ptr, i1
+    // CHECK: llvm.store %arg3, [[CV0_PTR]] : i1, !llvm.ptr
+    // CHECK: [[CTRL1_PTR:%.+]] = llvm.getelementptr inbounds [[CTRL_QUBITS]][1] : (!llvm.ptr) -> !llvm.ptr, !llvm.ptr
+    // CHECK: llvm.store %arg2, [[CTRL1_PTR]] : !llvm.ptr, !llvm.ptr
+    // CHECK: [[CV1_PTR:%.+]] = llvm.getelementptr inbounds [[CTRL_VALUES]][1] : (!llvm.ptr) -> !llvm.ptr, i1
+    // CHECK: llvm.store %arg4, [[CV1_PTR]] : i1, !llvm.ptr
+    // CHECK: llvm.store [[ADJOINT]], [[ADJOINT_PTR]] : i1, !llvm.ptr
     // CHECK: [[COUNT:%.+]] = llvm.mlir.constant(2 : i64)
-    // CHECK: llvm.store [[COUNT]], [[COUNT_PTR]]
+    // CHECK: llvm.store [[COUNT]], [[COUNT_PTR]] : i64, !llvm.ptr
+    // CHECK: llvm.store [[CTRL_QUBITS]], [[CTRL_QUBITS_PTR]] : !llvm.ptr, !llvm.ptr
+    // CHECK: llvm.store [[CTRL_VALUES]], [[CTRL_VALUES_PTR]] : !llvm.ptr, !llvm.ptr
     // CHECK: llvm.call @__catalyst__qis__Rot(%arg5, %arg6, %arg7, %arg0, [[MOD]])
     %out, %ctrls:2 = quantum.operator "Rot"(%theta: f64, %phi: f64, %omega: f64)
         adj qubits(%q) ctrls(%ctrl0, %ctrl1) ctrl_vals(%cv0, %cv1)
