@@ -94,13 +94,13 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
 
             // Collect op IDs via ResourceAnalysis from the quantum.node entry (flattened).
             catalyst::ResourceAnalysis analysis(module, {}, /*collectDetailedOperations=*/true);
+            llvm::StringRef entryFuncName = analysis.getEntryFunc();
+
             std::vector<std::string> opIDs;
-            if (func::FuncOp qnode = GraphDecompositionPrep::findQNodeFunc(module)) {
-                if (const catalyst::ResourceResult *flat =
-                        analysis.getFlattenedResource(qnode.getName())) {
-                    for (const auto &opID : flat->observedGraphOpIds) {
-                        opIDs.push_back(opID.getKey().str());
-                    }
+            if (const catalyst::ResourceResult *flat =
+                    analysis.getFlattenedResource(entryFuncName)) {
+                for (const auto &opID : flat->observedGraphOpIds) {
+                    opIDs.push_back(opID.getKey().str());
                 }
             }
 

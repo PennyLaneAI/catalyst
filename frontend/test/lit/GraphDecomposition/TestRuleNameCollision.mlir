@@ -24,9 +24,9 @@ func.func @circuit(%q: !quantum.bit) -> !quantum.bit {
     return %out : !quantum.bit
 }
 
-// CHECK-LABEL: func.func @__builtin_h_to_rz_ry()
+// CHECK-LABEL: func.func private @__builtin_h_to_rz_ry()
 // CHECK-SAME: target_gate = "Unrelated{}{wires:1}{}"
-func.func @__builtin_h_to_rz_ry() attributes {
+func.func private @__builtin_h_to_rz_ry() attributes {
     frontend_name = "h_to_rz_ry",
     resources = {operations = {}},
     target_gate = "Unrelated{}{wires:1}{}"
@@ -34,6 +34,6 @@ func.func @__builtin_h_to_rz_ry() attributes {
     return
 }
 
-// CHECK-LABEL: func.func @__builtin_h_to_rz_ry_0(
+// CHECK-LABEL: func.func private @__builtin_h_to_rz_ry_0(
 // CHECK-SAME: frontend_name = "h_to_rz_ry"
 // CHECK-SAME: target_gate = "testHadamard{}{wires:1}{}"

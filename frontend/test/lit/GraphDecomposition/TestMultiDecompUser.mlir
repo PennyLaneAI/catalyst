@@ -18,7 +18,7 @@
 // RUN:   graph-decomposition{inline-rule-body gate-set=testHadamard=1.0 fixed-decomps=testPauliX=x_to_h bytecode-rules="%BYTECODE_PATH"})' \
 // RUN:   %s | FileCheck %s
 
-func.func @circuit() attributes {quantum.node} {
+func.func @circuit() {
     %0 = quantum.alloc(2) : !quantum.reg
     %q = quantum.extract %0[0] : !quantum.reg -> !quantum.bit
     // CHECK-NOT testPauliX
@@ -30,12 +30,12 @@ func.func @circuit() attributes {quantum.node} {
 }
 
 // CHECK-LABEL: h_to_x
-func.func @h_to_x(%q : !quantum.bit) -> !quantum.bit attributes {target_gate="testHadamard{}{wires:1}{}", frontend_name = "h_to_x"} {
+func.func private @h_to_x(%q : !quantum.bit) -> !quantum.bit attributes {target_gate="testHadamard{}{wires:1}{}", frontend_name = "h_to_x"} {
     %q1 = quantum.custom "testPauliX"() %q : !quantum.bit
     return %q1 : !quantum.bit
 }
 
-func.func @x_to_h(%q : !quantum.bit) -> !quantum.bit attributes {target_gate="testPauliX{}{wires:1}{}", frontend_name = "x_to_h"} {
+func.func private @x_to_h(%q : !quantum.bit) -> !quantum.bit attributes {target_gate="testPauliX{}{wires:1}{}", frontend_name = "x_to_h"} {
     %q1 = quantum.custom "testHadamard"() %q : !quantum.bit
     return %q1 : !quantum.bit
 }

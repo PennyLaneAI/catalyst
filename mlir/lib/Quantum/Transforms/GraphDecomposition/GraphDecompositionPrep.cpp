@@ -56,8 +56,6 @@ using namespace DecompGraph::Solver;
 
 namespace {
 
-constexpr llvm::StringRef qnodeAttrName = "quantum.node";
-
 void parseFixedDecomps(ArrayRef<std::string> fixedDecompsOption,
                        llvm::StringMap<std::string> &opToFixedDecompName,
                        llvm::StringSet<> &userRuleNames) {
@@ -454,18 +452,6 @@ LogicalResult getRuleNodes(ModuleOp module, llvm::StringRef filename,
 namespace catalyst {
 namespace quantum {
 namespace GraphDecompositionPrep {
-
-func::FuncOp findQNodeFunc(ModuleOp module) {
-    func::FuncOp found;
-    module.walk([&](func::FuncOp func) {
-        if (func->hasAttrOfType<UnitAttr>(qnodeAttrName)) {
-            found = func;
-            return WalkResult::interrupt();
-        }
-        return WalkResult::advance();
-    });
-    return found;
-}
 
 std::unique_ptr<DecompositionGraph> prepareGraph(ModuleOp module, ArrayRef<std::string> opIDs,
                                                  const PrepOptions &opts) {
