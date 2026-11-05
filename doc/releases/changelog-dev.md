@@ -346,6 +346,9 @@
   [(#3075)](https://github.com/PennyLaneAI/catalyst/pull/3075)
   [(#3162)](https://github.com/PennyLaneAI/catalyst/pull/3162)
   [(#3245)](https://github.com/PennyLaneAI/catalyst/pull/3245)
+
+* A simple runtime lowering for `quantum::OperatorOp` was added. The simple lowering ignores all
+  static data, work wires, and parameters forwarded to decomposition rules.
   [(#3430)](https://github.com/PennyLaneAI/catalyst/pull/3430)
 
 * The graph-based decomposition system has been greatly improved.
