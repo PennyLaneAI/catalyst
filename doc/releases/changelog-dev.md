@@ -1126,6 +1126,10 @@
   rule body so each rule is self-contained, instead of leaving a dangling call.
   [(#3242)](https://github.com/PennyLaneAI/catalyst/pull/3242)
 
+* Fixed linking of runtime artifacts under `catalyst.debug.instrumentation`, which dropped the
+  libraries recorded by `runtime_call`s and devices before linking.
+  [(#3438)](https://github.com/PennyLaneAI/catalyst/pull/3438)
+
 <h3>Internal changes ⚙️</h3>
 
 * The runtime test suite can test `lightning.cliffish`, a device built in pennylane-lightning,
