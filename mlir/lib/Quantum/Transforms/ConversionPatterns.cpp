@@ -490,7 +490,7 @@ struct InsertOpArrayBackedPattern : public OpConversionPattern<InsertOp> {
 // Quantum Gates //
 ///////////////////
 
-template <typename OpTy> struct CustomOpPattern : public OpConversionPattern<OpTy> {
+template <typename OpTy> struct QuantumOpPattern : public OpConversionPattern<OpTy> {
     using OpConversionPattern<OpTy>::OpConversionPattern;
 
     LogicalResult matchAndRewrite(OpTy op, typename OpTy::Adaptor adaptor,
@@ -1265,8 +1265,8 @@ void populateQIRConversionPatterns(TypeConverter &typeConverter, RewritePatternS
     } else {
         patterns.add<InsertOpDefaultPattern>(typeConverter, patterns.getContext());
     }
-    patterns.add<CustomOpPattern<CustomOp>, CustomOpPattern<OperatorOp>>(typeConverter,
-                                                                         patterns.getContext());
+    patterns.add<QuantumOpPattern<CustomOp>, QuantumOpPattern<OperatorOp>>(typeConverter,
+                                                                           patterns.getContext());
     patterns.add<MultiRZOpPattern>(typeConverter, patterns.getContext());
     patterns.add<PauliRotOpPattern>(typeConverter, patterns.getContext());
     patterns.add<PCPhaseOpPattern>(typeConverter, patterns.getContext());
