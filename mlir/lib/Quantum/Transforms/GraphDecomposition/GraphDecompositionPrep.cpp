@@ -62,26 +62,6 @@ using namespace DecompGraph::Solver;
 
 namespace {
 
-constexpr llvm::StringRef qnodeAttrName = "quantum.node";
-
-/// Op-level `adj`/`ctrls` plus enclosing `quantum.adjoint` / `quantum.ctrl` regions.
-std::pair<bool, unsigned> getExplicitModifiers(DecomposableGate op) {
-    bool isAdjoint = op->hasAttr("adjoint");
-    unsigned numControlQubits = 0;
-    if (auto gate = dyn_cast<QuantumGate>(op.getOperation())) {
-        numControlQubits = gate.getCtrlQubitOperands().size();
-    }
-
-    for (Operation *parent = op->getParentOp(); parent; parent = parent->getParentOp()) {
-        if (isa<AdjointOp>(parent)) {
-            isAdjoint = !isAdjoint; // nested adjoint cancels
-        } else if (auto ctrl = dyn_cast<CtrlOp>(parent)) {
-            numControlQubits += ctrl.getInCtrlQubits().size();
-        }
-    }
-    return {isAdjoint, numControlQubits};
-}
-
 void parseFixedDecomps(ArrayRef<std::string> fixedDecompsOption,
                        llvm::StringMap<std::string> &opToFixedDecompName,
                        llvm::StringSet<> &userRuleNames) {
@@ -468,18 +448,6 @@ LogicalResult getRuleNodes(ModuleOp module, llvm::StringRef filename,
 namespace catalyst {
 namespace quantum {
 namespace GraphDecompositionPrep {
-
-func::FuncOp findQNodeFunc(ModuleOp module) {
-    func::FuncOp found;
-    module.walk([&](func::FuncOp func) {
-        if (func->hasAttrOfType<UnitAttr>(qnodeAttrName)) {
-            found = func;
-            return WalkResult::interrupt();
-        }
-        return WalkResult::advance();
-    });
-    return found;
-}
 
 std::unique_ptr<DecompositionGraph> prepareGraph(ModuleOp module, ArrayRef<std::string> opIDs,
                                                  const PrepOptions &opts) {

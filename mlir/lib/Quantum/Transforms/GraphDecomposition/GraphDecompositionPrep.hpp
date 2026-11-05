@@ -46,13 +46,6 @@ struct PrepOptions {
 };
 
 /**
- * @brief Find the quantum.node function in the module.
- *
- * Returns the first `func.func` with the `quantum.node` attribute, or null if none exists.
- */
-mlir::func::FuncOp findQNodeFunc(mlir::ModuleOp module);
-
-/**
  * @brief Prepare a decomposition graph from a module.
  *
  * Gathers rules for the target gateset in addition to the passed in opIDs and builds a
