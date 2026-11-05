@@ -1286,7 +1286,7 @@ def _append_decomp_target_spec(out, description, factory):
 class _RuleBuilderArgs(TypedDict):
     """Shared builder arguments.
 
-    Typed keys keep operator names and serialized IDs distinct when unpacking ``**common``.
+    Typed keys keep operator names and serialized IDs distinct when unpacking ``**common`` in `build_decomp_rule_variants`.
     """
 
     op_name: str
