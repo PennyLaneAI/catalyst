@@ -19,6 +19,7 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/Operation.h"
+#include "mlir/Pass/AnalysisManager.h"
 
 #include "Catalyst/Analysis/ResourceResult.h"
 #include "Catalyst/Analysis/ResourceResultExtension.h"
@@ -74,6 +75,9 @@ class ResourceAnalysis {
     int64_t dynForLoopCounter = 0;
     int64_t whileLoopCounter = 0;
     int64_t dynWhileLoopCounter = 0;
+
+    // Shared analysis manager.
+    mlir::ModuleAnalysisManager analysisManager;
 
     // Collect the extension analyses logic
     llvm::SmallVector<std::unique_ptr<ResourceAnalysisExtension>> extensionAnalyses;
