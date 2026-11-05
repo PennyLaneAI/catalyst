@@ -39,7 +39,7 @@
 #include "DGSolver.hpp"
 #include "DGTypes.hpp"
 #include "DGUtils.hpp"
-#include "GraphDecompositionPrep.hpp"
+#include "GraphPrep.hpp"
 
 #define DEBUG_TYPE "graph-decomposition"
 
@@ -104,16 +104,15 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
                 }
             }
 
-            graph =
-                GraphDecompositionPrep::prepareGraph(module, opIDs,
-                                                     {
-                                                         .targetGateSetOption = targetGateSetOption,
-                                                         .fixedDecompsOption = fixedDecompsOption,
-                                                         .altDecompsOption = altDecompsOption,
-                                                         .bytecodeRulesFile = bytecodeRulesFile,
-                                                         .libQPDPath = libQPDPath,
-                                                         .libpythonPath = libpythonPath,
-                                                     });
+            graph = GraphPrep::prepareGraph(module, opIDs,
+                                            {
+                                                .targetGateSetOption = targetGateSetOption,
+                                                .fixedDecompsOption = fixedDecompsOption,
+                                                .altDecompsOption = altDecompsOption,
+                                                .bytecodeRulesFile = bytecodeRulesFile,
+                                                .libQPDPath = libQPDPath,
+                                                .libpythonPath = libpythonPath,
+                                            });
         }
         if (!graph) {
             return signalPassFailure();

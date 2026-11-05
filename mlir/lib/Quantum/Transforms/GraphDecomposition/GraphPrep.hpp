@@ -29,7 +29,7 @@
 namespace catalyst {
 namespace quantum {
 
-namespace GraphDecompositionPrep {
+namespace GraphPrep {
 
 /**
  * @brief Options shared by passes that build a decomposition graph.
@@ -56,6 +56,6 @@ struct PrepOptions {
 std::unique_ptr<DecompGraph::Solver::DecompositionGraph>
 prepareGraph(mlir::ModuleOp module, llvm::ArrayRef<std::string> opIDs, const PrepOptions &opts);
 
-} // namespace GraphDecompositionPrep
+} // namespace GraphPrep
 } // namespace quantum
 } // namespace catalyst

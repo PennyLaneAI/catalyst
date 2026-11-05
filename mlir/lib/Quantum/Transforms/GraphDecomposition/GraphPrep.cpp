@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "GraphDecompositionPrep.hpp"
+#include "GraphPrep.hpp"
 
 #include <cassert>
 #include <cmath>
@@ -447,11 +447,11 @@ LogicalResult getRuleNodes(ModuleOp module, llvm::StringRef filename,
 
 namespace catalyst {
 namespace quantum {
-namespace GraphDecompositionPrep {
+namespace GraphPrep {
 
 std::unique_ptr<DecompositionGraph> prepareGraph(ModuleOp module, ArrayRef<std::string> opIDs,
                                                  const PrepOptions &opts) {
-    LLVM_DEBUG(llvm::dbgs() << "Running GraphDecompositionPrep with options:\n");
+    LLVM_DEBUG(llvm::dbgs() << "Running GraphPrep with options:\n");
     LLVM_DEBUG({
         llvm::dbgs() << "targetGateSetOption\n";
         for (auto item : opts.targetGateSetOption) {
@@ -500,6 +500,6 @@ std::unique_ptr<DecompositionGraph> prepareGraph(ModuleOp module, ArrayRef<std::
                                                 std::move(setOfRules));
 }
 
-} // namespace GraphDecompositionPrep
+} // namespace GraphPrep
 } // namespace quantum
 } // namespace catalyst
