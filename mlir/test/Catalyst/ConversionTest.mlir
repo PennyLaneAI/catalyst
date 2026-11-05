@@ -19,7 +19,7 @@
 //////////////////////////
 
 // CHECK-DAG: llvm.mlir.global internal constant @[[hash:["0-9]+]]("Test Message")
-// CHECK-DAG: llvm.func @__catalyst__rt__assert_bool(i1, !llvm.ptr)
+// CHECK-DAG: llvm.func @__catalyst__rt__assert_bool(i1 {llvm.zeroext}, !llvm.ptr)
 
 func.func @assert_constant(%arg0: i1, %arg1: !llvm.ptr) {
     // CHECK: [[array_ptr:%.+]] = llvm.mlir.addressof @[[hash]] : !llvm.ptr
@@ -36,7 +36,7 @@ func.func @assert_constant(%arg0: i1, %arg1: !llvm.ptr) {
 // Catalyst PrintOp //
 //////////////////////
 
-// CHECK-DAG: llvm.func @__catalyst__rt__print_tensor(!llvm.ptr, i1)
+// CHECK-DAG: llvm.func @__catalyst__rt__print_tensor(!llvm.ptr, i1 {llvm.zeroext})
 
 // CHECK-LABEL: @dbprint_val
 func.func @dbprint_val(%arg0 : memref<1xi64>) {

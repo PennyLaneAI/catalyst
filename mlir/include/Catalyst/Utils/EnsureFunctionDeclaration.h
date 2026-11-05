@@ -15,7 +15,6 @@
 #pragma once
 
 #include "llvm/ADT/STLExtras.h"
-
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/IR/PatternMatch.h"
