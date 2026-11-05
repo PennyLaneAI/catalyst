@@ -752,7 +752,7 @@ def CtrlOp : Region_Op<"ctrl", [NoTerminator, AttrSizedOperandSegments]> {
         Variadic<QubitRefType>:$ctrl_qubits,
         Variadic<I1>:$ctrl_values,
         Variadic<QubitRefType>:$work_qubits,
-        DefaultValuedAttr<StrAttr, "\"borrowed\"">:$work_wire_type
+        DefaultValuedAttr<StrAttr, "::catalyst::CTRL_WORK_WIRE_TYPE_BORROWED">:$work_wire_type
     );
 
     let assemblyFormat = [{

@@ -63,7 +63,10 @@ static SmallVector<int32_t> readSegmentSizes(Operation *op, StringRef name) {
 
 static StringRef mergeWorkWireTypes(StringRef lhs, StringRef rhs) {
     // borrowed takes precedence
-    return lhs == "borrowed" || rhs == "borrowed" ? "borrowed" : "zeroed";
+    return lhs == catalyst::CTRL_WORK_WIRE_TYPE_BORROWED ||
+                   rhs == catalyst::CTRL_WORK_WIRE_TYPE_BORROWED
+               ? catalyst::CTRL_WORK_WIRE_TYPE_BORROWED
+               : catalyst::CTRL_WORK_WIRE_TYPE_ZEROED;
 }
 
 static DictionaryAttr appendStaticData(OpBuilder &builder, DictionaryAttr staticData,
@@ -201,9 +204,10 @@ static Operation *createControlledGate(PatternRewriter &rewriter, QuantumGate ga
                 // conservative reading: it forbids assuming the qubit starts in |0>.
                 auto oldWorkWireType = dyn_cast_or_null<StringAttr>(
                     operatorOp.getStaticData().get(catalyst::CTRL_WORK_WIRE_TYPE));
-                workWireType = mergeWorkWireTypes(oldWorkWireType ? oldWorkWireType.getValue()
-                                                                  : StringRef("borrowed"),
-                                                  workWireType);
+                workWireType = mergeWorkWireTypes(
+                    oldWorkWireType ? oldWorkWireType.getValue()
+                                    : StringRef(catalyst::CTRL_WORK_WIRE_TYPE_BORROWED),
+                    workWireType);
             }
         } else {
             paramMap = buildParamMap(rewriter, decomposable);

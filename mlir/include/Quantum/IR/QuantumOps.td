@@ -1004,7 +1004,7 @@ def CtrlOp : Region_Op<"ctrl", [SingleBlockImplicitTerminator<"YieldOp">,
         Variadic<QubitType>:$in_ctrl_qubits,
         Variadic<I1>:$in_ctrl_values,
         Variadic<QubitType>:$in_work_qubits,
-        DefaultValuedAttr<StrAttr, "\"borrowed\"">:$work_wire_type,
+        DefaultValuedAttr<StrAttr, "::catalyst::CTRL_WORK_WIRE_TYPE_BORROWED">:$work_wire_type,
         Variadic<AnyTypeOf<[QuregType, QubitType]>>:$args
     );
 

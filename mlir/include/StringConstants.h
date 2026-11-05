@@ -17,4 +17,6 @@
 namespace catalyst {
 inline constexpr char CTRL_WORK_WIRES[] = "ctrl_work_wires";
 inline constexpr char CTRL_WORK_WIRE_TYPE[] = "ctrl_work_wire_type";
+inline constexpr char CTRL_WORK_WIRE_TYPE_BORROWED[] = "borrowed";
+inline constexpr char CTRL_WORK_WIRE_TYPE_ZEROED[] = "zeroed";
 } // namespace catalyst
