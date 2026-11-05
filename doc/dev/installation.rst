@@ -213,6 +213,25 @@ directory:
 
   make all
 
+To reuse LLVM, StableHLO and Enzyme already built in another Catalyst checkout, pass
+that checkout's root directory:
+
+.. code-block:: console
+
+  make all MAIN_CHECKOUT_DIR="$HOME/Github/catalyst"
+
+This builds the runtime, OQC backend, Catalyst dialects, documentation and plugin in
+the current worktree and installs its frontend, without initializing or rebuilding
+the three dependency submodules locally. The main checkout must already have
+compatible dependency revisions, patches and build configuration, with builds in
+their usual ``mlir/<submodule>/build`` directories. Relative paths are also accepted.
+
+``MAIN_CHECKOUT_DIR`` applies to ``make all``; standalone build and clean targets
+retain their normal paths. The build exports ``MLIR_LIB_DIR`` and ``ENZYME_LIB_DIR``
+for its Python commands. For Python sessions outside Make, set these existing
+environment overrides to the shared ``mlir/llvm-project/build/lib`` and
+``mlir/Enzyme/build/Enzyme`` directories respectively.
+
 To build each component one by one starting from the runtime, or to build additional backend devices
 beyond ``lightning.qubit``, please follow the instructions below.
 
@@ -251,6 +270,47 @@ You can also choose to build the custom Catalyst dialects only, with:
 .. code-block:: console
 
   make dialects
+
+Compiler caching across worktrees
+"""""""""""""""""""""""""""""""""
+
+When ``ccache`` is installed, the MLIR Makefile uses it as the compiler launcher
+and defaults ``CCACHE_BASEDIR`` to the Catalyst checkout root. This makes absolute
+source and include paths relative to the build directory, allowing matching
+compilations in different worktrees to share cached results.
+
+Use the same cache directory, relative build layout, compiler, flags and dependency
+configuration in each worktree. Builds that populate the cache must also use this
+path normalization; existing cache entries may miss until the normalized
+configuration has compiled each source once. Size the shared cache with
+``ccache --max-size`` to retain the builds you need.
+
+The setting applies to builds launched through ``mlir/Makefile``, including
+``make llvm`` and ``make dialects`` from the repository root. It respects an
+existing environment or Make command-line value. To disable path rewriting, use
+``make llvm CCACHE_BASEDIR=``. When invoking CMake or Ninja directly, export the
+setting yourself from the Catalyst checkout root:
+
+.. code-block:: console
+
+  export CCACHE_BASEDIR="$PWD"
+  cmake --build mlir/llvm-project/build
+
+To measure one Make build with a fresh statistics log:
+
+.. code-block:: console
+
+  mkdir -p .cache
+  export CCACHE_STATSLOG="$PWD/.cache/ccache-$(date +%Y%m%d-%H%M%S).log"
+  make llvm
+  ccache --show-log-stats
+
+Cache hits reduce compilation time, not Ninja's step count. Linking, code
+generation and tests remain outside ccache; ``make llvm`` includes upstream MLIR
+tests by default. Differences in generated headers can require preprocessing
+before a cache hit. This setting alone does not normalize the compilation
+directory stored by builds using debug information (``-g``); the default LLVM
+build uses ``Release``.
 
 Frontend
 """"""""
