@@ -32,7 +32,6 @@ from collections import deque
 from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum, auto
-from typing import TypedDict
 
 import jax.numpy as jnp
 import numpy as np
@@ -51,6 +50,7 @@ from catalyst.decomposition.modifier_state import ModifierState
 from catalyst.decomposition.rule_lowering_warning import RuleLoweringWarning
 from catalyst.decomposition.type_utils import (
     SerializedGraphOpID,
+    _RuleBuilderArgs,
     get_dummy_values_for_dynamic_shape,
 )
 from catalyst.jax_extras.lowering import get_mlir_attribute_from_pyval
@@ -1281,22 +1281,6 @@ def _append_decomp_target_spec(out, description, factory):
             f"Failed to {description}: {exc}",
             category=RuleLoweringWarning,
         )
-
-
-class _RuleBuilderArgs(TypedDict):
-    """Shared builder arguments.
-
-    Typed keys keep operator names and serialized IDs distinct when unpacking ``**common`` in `build_decomp_rule_variants`.
-    """
-
-    op_name: str
-    op_id: SerializedGraphOpID
-    dynamic_shape: dict
-    wire_lens: dict
-    static_data: dict
-    extra_data: dict
-    is_custom_op: bool
-    op_cls: type | None
 
 
 def build_decomp_rule_variants(
