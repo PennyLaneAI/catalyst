@@ -413,6 +413,121 @@ func.func @pbc_while_loop_depth(%q0: !quantum.bit, %q1: !quantum.bit, %n: index)
 
 // -----
 
+// A while loop inside an if/else is still lifted into while_loop_<N>, so the then branch adds no
+// gates or layers to the parent: the parent counts X plus the else branch's Y (2 gates, depth 2).
+// The loop body's two gates (Z then X) form two layers in while_loop_1.
+
+// CHECK-LABEL: "pbc_while_loop_in_if_depth": {
+// CHECK: "extended_fields"
+// CHECK:   "pbc_depth":
+// CHECK:       "any_commuting_depth": 2
+// CHECK:       "qubit_disjoint_depth": 2
+// CHECK: "function_calls"
+// CHECK:   "static":
+// CHECK:       "while_loop_1": 3
+// CHECK: "quantum_operations"
+// CHECK:   "1"
+// CHECK:       "PPR-pi/4": 2
+
+// CHECK-LABEL: "while_loop_1": {
+// CHECK: "extended_fields"
+// CHECK:   "pbc_depth":
+// CHECK:       "any_commuting_depth": 2
+// CHECK:       "qubit_disjoint_depth": 2
+// CHECK: "quantum_operations"
+// CHECK:   "1"
+// CHECK:       "PPR-pi/4": 2
+func.func @pbc_while_loop_in_if_depth(%q0: !quantum.bit, %cond: i1, %n: index) -> !quantum.bit {
+    %c0 = arith.constant 0 : index
+    %c1 = arith.constant 1 : index
+
+    %x = pbc.ppr ["X"](4) %q0 : !quantum.bit
+    %r = scf.if %cond -> !quantum.bit {
+        %w:2 = scf.while (%i = %c0, %q = %x) : (index, !quantum.bit) -> (index, !quantum.bit) {
+            %c = arith.cmpi slt, %i, %n : index
+            scf.condition(%c) %i, %q : index, !quantum.bit
+        } do {
+        ^bb0(%i: index, %q: !quantum.bit):
+            %z = pbc.ppr ["Z"](4) %q : !quantum.bit
+            %zx = pbc.ppr ["X"](4) %z : !quantum.bit
+            %inext = arith.addi %i, %c1 : index
+            scf.yield %inext, %zx : index, !quantum.bit
+        } attributes {catalyst.estimated_iterations = 3 : i64}
+        scf.yield %w#1 : !quantum.bit
+    } else {
+        %y = pbc.ppr ["Y"](4) %x : !quantum.bit
+        scf.yield %y : !quantum.bit
+    }
+
+    return %r : !quantum.bit
+}
+
+// -----
+
+// Nested while loops: each body is lifted into its own entry (inner while_loop_1, outer
+// while_loop_2), and each entry's gate count and depth cover only the ops directly in that body.
+
+// CHECK-LABEL: "pbc_nested_while_loop_depth": {
+// CHECK: "extended_fields"
+// CHECK:   "pbc_depth":
+// CHECK:       "any_commuting_depth": 1
+// CHECK:       "qubit_disjoint_depth": 1
+// CHECK: "function_calls"
+// CHECK:   "static":
+// CHECK:       "while_loop_2": 2
+// CHECK: "quantum_operations"
+// CHECK:   "1"
+// CHECK:       "PPR-pi/4": 1
+
+// CHECK-LABEL: "while_loop_1": {
+// CHECK: "extended_fields"
+// CHECK:   "pbc_depth":
+// CHECK:       "any_commuting_depth": 1
+// CHECK:       "qubit_disjoint_depth": 1
+// CHECK: "quantum_operations"
+// CHECK:   "1"
+// CHECK:       "PPR-pi/4": 1
+
+// CHECK-LABEL: "while_loop_2": {
+// CHECK: "extended_fields"
+// CHECK:   "pbc_depth":
+// CHECK:       "any_commuting_depth": 1
+// CHECK:       "qubit_disjoint_depth": 1
+// CHECK: "function_calls"
+// CHECK:   "static":
+// CHECK:       "while_loop_1": 3
+// CHECK: "quantum_operations"
+// CHECK:   "1"
+// CHECK:       "PPR-pi/4": 1
+func.func @pbc_nested_while_loop_depth(%q0: !quantum.bit, %n: index, %m: index) -> !quantum.bit {
+    %c0 = arith.constant 0 : index
+    %c1 = arith.constant 1 : index
+
+    %x = pbc.ppr ["X"](4) %q0 : !quantum.bit
+    %outer:2 = scf.while (%i = %c0, %q = %x) : (index, !quantum.bit) -> (index, !quantum.bit) {
+        %ci = arith.cmpi slt, %i, %n : index
+        scf.condition(%ci) %i, %q : index, !quantum.bit
+    } do {
+    ^bb0(%i: index, %q: !quantum.bit):
+        %z = pbc.ppr ["Z"](4) %q : !quantum.bit
+        %inner:2 = scf.while (%j = %c0, %p = %z) : (index, !quantum.bit) -> (index, !quantum.bit) {
+            %cj = arith.cmpi slt, %j, %m : index
+            scf.condition(%cj) %j, %p : index, !quantum.bit
+        } do {
+        ^bb0(%j: index, %p: !quantum.bit):
+            %y = pbc.ppr ["Y"](4) %p : !quantum.bit
+            %jnext = arith.addi %j, %c1 : index
+            scf.yield %jnext, %y : index, !quantum.bit
+        } attributes {catalyst.estimated_iterations = 3 : i64}
+        %inext = arith.addi %i, %c1 : index
+        scf.yield %inext, %inner#1 : index, !quantum.bit
+    } attributes {catalyst.estimated_iterations = 2 : i64}
+
+    return %outer#1 : !quantum.bit
+}
+
+// -----
+
 // PBC depth is per-function only; callers without inline PBC ops report no depth
 // even when they call a helper that contains PBC ops.
 
