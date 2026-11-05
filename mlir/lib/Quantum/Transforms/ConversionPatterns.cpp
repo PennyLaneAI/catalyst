@@ -492,6 +492,10 @@ struct InsertOpArrayBackedPattern : public OpConversionPattern<InsertOp> {
 // Quantum Gates //
 ///////////////////
 
+// Lowering pattern for CustomOp and OperatorOp
+// Note that param_map and static_data on OperatorOp are currently ignored
+// Work wires on operator op inherited from control regions (i.e. those named after
+// catalyst::CTRL_WORK_WIRES in qubit_map) are also ignored.
 template <typename OpTy> struct QuantumOpPattern : public OpConversionPattern<OpTy> {
     using OpConversionPattern<OpTy>::OpConversionPattern;
 
@@ -499,7 +503,6 @@ template <typename OpTy> struct QuantumOpPattern : public OpConversionPattern<Op
                                   ConversionPatternRewriter &rewriter) const override {
         ArrayRef<int64_t> ctrlWorkWireIndices;
         if (auto operatorOp = dyn_cast<OperatorOp>(op.getOperation())) {
-            // param_map and static_data do not affect the runtime call.
             if (operatorOp.getInQreg() || !operatorOp.getArrQubitIndices().empty() ||
                 operatorOp.getArrCtrlIndices() || operatorOp.getArrCtrlValues() ||
                 operatorOp.getUID() || !operatorOp.getForwardArgs().empty()) {
