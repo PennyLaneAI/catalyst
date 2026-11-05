@@ -73,6 +73,11 @@ class ResourceAnalysis {
     int64_t forLoopCounter = 0;
     int64_t dynForLoopCounter = 0;
 
+    // Counters for modifier context names
+    // TODO: the counter will ensure uniqueness, but may not be sequential for a specific function,
+    // if multiple modifier functions have name conflicts with module functions. Fix if possible.
+    int64_t modifierContextCounter = 0;
+
     // Collect the extension analyses logic
     llvm::SmallVector<std::unique_ptr<ResourceAnalysisExtension>> extensionAnalyses;
 
