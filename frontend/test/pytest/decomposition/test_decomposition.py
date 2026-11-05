@@ -53,12 +53,13 @@ from catalyst.decomposition import GraphOpID, RuleLoweringWarning
 from catalyst.decomposition.decomposition_rules import (
     _adjoint_folds_to_base,
     _rule_allocates_work_wires,
-    _rule_is_applicable,
+    _rule_is_compatible,
     collect_resources_for_op,
     collect_symbolic_resources,
     compile_decomposition_rules_wrapper,
     compile_reachable_decomposition_rules_wrapper,
     compile_registered_symbolic_rules,
+    flatten_hybrid_args,
     get_rule_strings_from_module,
     materialize_reachable_rule_strings,
     ordered_kwarg_names,
@@ -153,6 +154,55 @@ class TestGenericUtilities:
         np.testing.assert_array_equal(kwargs["reg1"], [0, 1, 2])
         np.testing.assert_array_equal(ctrl_wires, [5, 6])
         np.testing.assert_array_equal(ctrl_values, [True, False])
+
+    def test_hybrid_operands_preserve_parameters_and_wires(self):
+        """Nested parameters follow ordinary hybrid parameters; wires retain their mapping."""
+        extra = {
+            "unitary": abstractify(qp.RX(0.1, 0) @ qp.RY(0.2, 1)),
+            "data": Float[2],
+        }
+        specs, dummies, closed = flatten_hybrid_args(extra)
+        assert not closed
+        assert [dummy.shape for dummy in dummies] == [(2,), (), ()]
+        _, kwargs, _, _ = unpack_rule_operands(
+            (jnp.array([4.0, 5.0]), jnp.array(0.7), jnp.array(-0.2), jnp.array([3, 1])),
+            n_params=0,
+            kwarg_names=["unitary"],
+            wire_lens={"unitary": 2},
+            has_ctrl_wires=False,
+            hybrid_specs=specs,
+        )
+        assert qp.math.allclose(kwargs["data"], [4.0, 5.0], rtol=0, atol=0)
+        assert qp.math.allclose(
+            qp.matrix(kwargs["unitary"], wire_order=[3, 1]),
+            qp.matrix(qp.RX(0.7, 3) @ qp.RY(-0.2, 1), wire_order=[3, 1]),
+            rtol=1e-7,
+            atol=0,
+        )
+
+    def test_hybrid_operands_preserve_static_leaves(self):
+        """Rebuilding a mixed hybrid argument preserves its static data and runtime values."""
+        extra = {
+            "mixed": {"angle": Float, "label": "rotation", "wires": Wire[2]},
+            "static": ("unchanged", 7),
+        }
+        specs, dummies, closed = flatten_hybrid_args(extra)
+        assert closed == {"static": ("unchanged", 7)}
+        assert len(dummies) == 1
+        assert dummies[0].shape == ()
+
+        for angle, wires in ((0.7, [3, 1]), (-0.2, [1, 4])):
+            _, kwargs, _, _ = unpack_rule_operands(
+                (jnp.array(angle), jnp.array(wires)),
+                n_params=0,
+                kwarg_names=["mixed"],
+                wire_lens={"mixed": 2},
+                has_ctrl_wires=False,
+                hybrid_specs=specs,
+            )
+            assert kwargs["mixed"]["label"] == "rotation"
+            assert qp.math.allclose(kwargs["mixed"]["angle"], angle, rtol=1e-7, atol=0)
+            assert list(kwargs["mixed"]["wires"]) == wires
 
     def test_probe_wires_dont_overlap(self):
         """Test that the helper for generating probe arguments doesnt create
@@ -388,7 +438,8 @@ class TestGenericUtilities:
     def test_GraphOpId(self, op, id):
         """Test that GraphOpIds are generated correctly by the frontend."""
         # NOTE: use startswith to match ops with uids/extra_data
-        assert GraphOpID(op).getGraphOpId().startswith(id)
+        # Pylint does not infer str methods on NewType values.
+        assert str.startswith(GraphOpID(op).getGraphOpId(), id)
 
     @pytest.mark.parametrize(
         "op, expected_adjoint, expected_controls",
@@ -511,7 +562,7 @@ class TestGenericUtilities:
             _rule_allocates_work_wires(raises_on_spec, wires=Wires([0]))
 
         with pytest.warns(RuleLoweringWarning, match="could not read its work-wire spec"):
-            assert not _rule_is_applicable("MockOp", raises_on_spec, wires=Wires([0]))
+            assert not _rule_is_compatible("MockOp", raises_on_spec, wires=Wires([0]))
 
     def test_collect_resources_unrolls_change_op_basis_for_capture(self):
         """Resources match the rule body that capture produces, even when resource collection
@@ -859,6 +910,36 @@ class TestHybridOperatorArgDecomposition:
             return self._gqsp_circuit(dev)()
 
         assert np.allclose(np.asarray(decomposed()), np.asarray(reference()))
+
+    @pytest.mark.parametrize("kind", ["x", "rx", "ising"])
+    @pytest.mark.parametrize("shift", [0, -1])
+    def test_gqsp_nested_unitary_operands(self, kind, shift):
+        """The controlled unitary in a GQSP loop uses the invocation's wires and parameters."""
+
+        def circuit(theta, angles):
+            qp.Hadamard(2)
+            if kind == "x":
+                unitary = qp.X(2)
+            elif kind == "rx":
+                unitary = qp.RX(theta, 2)
+            else:
+                unitary = qp.IsingXX(theta, wires=[2, 1])
+            qp.GQSP(unitary, angles, control=0, shift=shift)
+            return qp.probs(wires=[0, 1, 2])
+
+        reference = qp.QNode(circuit, qp.device("default.qubit", wires=3))
+        quantum_function = qp.QNode(circuit, qp.device("lightning.qubit", wires=3))
+        compiled = qjit(
+            qp.decompose(
+                gate_set={"RX", "RY", "RZ", "PauliX", "PauliZ", "Hadamard", "CNOT", "GlobalPhase"}
+            )(quantum_function),
+            capture=True,
+        )
+        angles = np.array([[0.1, -0.2, 0.4], [0.3, 0.5, -0.1], [-0.7, 0.2, 0.6]])
+        for theta in (0.17, -0.62):
+            assert qp.math.allclose(
+                compiled(theta, angles), reference(theta, angles), rtol=1e-7, atol=1e-7
+            )
 
 
 class TestOnDemand:
@@ -1921,7 +2002,7 @@ def test_invalid_gateset_weight(weight):
     with pytest.raises(
         CompileError, match="Invalid cost .* for gate 'NoParams'.*non-negative number"
     ):
-        qp.specs(circuit, level="all")()
+        qp.analyze(circuit, level="all-user")()
 
 
 def test_gate_already_in_gateset():
@@ -1939,6 +2020,19 @@ def test_gate_already_in_gateset():
     result = circuit()
     assert np.allclose(result, 1.0)
     assert "llvm.call @__catalyst__qis__Hadamard" in circuit.mlir_opt
+
+
+def test_modifiers_in_gateset():
+    """Test that modifiers are correctly interpreted by decomposition gatesets."""
+
+    @qjit(capture=True, collect_decomp_rules=False)
+    @qp.decompose(gate_set={"C(T)"})
+    @qnode(qp.device("null.qubit", wires=3))
+    def circuit():
+        qp.ctrl(qp.T(0), (1, 2))
+
+    results = qp.analyze(circuit, level=1)()
+    assert results.resources.counts["2C(T)"] == 1
 
 
 @pytest.mark.parametrize("reverse", [False, True])
@@ -1989,7 +2083,7 @@ def test_cyclic_decompositions_find_cheapest_solution(reverse):
             for gate in gates:
                 gate(wires=0)
 
-        resources = qp.specs(circuit, level="all")().resources
+        resources = qp.analyze(circuit, level="all-user")().resources
 
     assert resources["Before MLIR Passes"].counts == {"A": 1, "B": 1}
     assert resources["graph-decomposition"].counts == {"Target": 2}
@@ -2308,7 +2402,7 @@ class TestDecomposeAlias:
 
         # Two graph-decomposition passes are inserted, and the result is identical to the
         # explicit graph_decomposition stacking (alias, not a fork).
-        assert via_decompose.mlir.count('apply_registered_pass "graph-decomposition"') == 2
+        assert via_decompose.mlir.count('apply_registered_pass "graph-decomposition"') == 3
         assert via_decompose.mlir == via_graph.mlir
 
     def test_decompose_multiple_ordering(self):
@@ -2323,7 +2417,7 @@ class TestDecomposeAlias:
             qp.PhaseShift(0.1, wires=0)
             return qp.expval(qp.PauliZ(0))
 
-        resources = qp.specs(circuit, level="all")().resources
+        resources = qp.analyze(circuit, level="all-user")().resources
         # phaseshift is allowed by the inner pass
         assert resources["graph-decomposition"].counts == {"PhaseShift": 1}
         # phaseshift is decomposed by the outer pass
@@ -2505,7 +2599,9 @@ class TestNumericHamiltonianDecomposition:
         hamiltonian = self._cdf_hamiltonian()
 
         @register_resources({qp.RZ(Float, wires=Wire[1]): 1, qp.GlobalPhase(Float): 1})
-        def dummy_cdf_decomp(evolution_time, num_trotter_steps, hamiltonian, wires, double_phase):
+        def dummy_cdf_decomp(
+            evolution_time, num_trotter_steps, hamiltonian, wires, double_phase, work_wires=()
+        ):
             # pylint: disable=redefined-outer-name,unused-argument
             qp.RZ(hamiltonian.nuc_constant * evolution_time, wires=wires[0])
             qp.GlobalPhase(hamiltonian.nuc_constant)

@@ -19,6 +19,7 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/Operation.h"
+#include "mlir/Pass/AnalysisManager.h"
 
 #include "Catalyst/Analysis/ResourceResult.h"
 #include "Catalyst/Analysis/ResourceResultExtension.h"
@@ -72,6 +73,9 @@ class ResourceAnalysis {
     // so each prefix gets its own numbering sequence.
     int64_t forLoopCounter = 0;
     int64_t dynForLoopCounter = 0;
+
+    // Shared analysis manager.
+    mlir::ModuleAnalysisManager analysisManager;
 
     // Collect the extension analyses logic
     llvm::SmallVector<std::unique_ptr<ResourceAnalysisExtension>> extensionAnalyses;

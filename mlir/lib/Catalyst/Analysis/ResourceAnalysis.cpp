@@ -57,7 +57,8 @@ static bool isSkippedOp(Operation *op) {
                quantum::DeviceReleaseOp, quantum::ExtractOp, quantum::FinalizeOp, qref::GetOp,
                quantum::HamiltonianOp, quantum::HermitianOp, qref::HermitianOp,
                quantum::InitializeOp, quantum::InsertOp, quantum::NamedObsOp, qref::NamedObsOp,
-               quantum::NumQubitsOp, quantum::TensorOp, quantum::YieldOp, pbc::YieldOp>(op);
+               quantum::NumQubitsOp, quantum::TensorOp, quantum::YieldOp, pbc::YieldOp,
+               ResourceSkipOpInterface>(op);
 }
 
 /// Check if the operation belongs to one of the tracked quantum dialects.
@@ -86,10 +87,13 @@ ResourceResult ResourceAnalysis::makeEmptyResult() const {
 ResourceAnalysis::ResourceAnalysis(ModuleOp moduleOp,
                                    ArrayRef<ExtensionProvider> extensionProviders,
                                    bool collectDetailedOperations)
-    : collectDetailedOperations(collectDetailedOperations) {
+    : collectDetailedOperations(collectDetailedOperations),
+      analysisManager(moduleOp, /*passInstrumentor=*/nullptr) {
     extensionAnalyses.reserve(extensionProviders.size());
     for (const auto &provider : extensionProviders) {
-        extensionAnalyses.push_back(provider());
+        auto extension = provider();
+        extension->initialize(analysisManager);
+        extensionAnalyses.push_back(std::move(extension));
     }
 
     LLVM_DEBUG(dbgs() << "ResourceAnalysis: analyzing operation " << moduleOp->getName() << "\n");
@@ -172,10 +176,13 @@ ResourceAnalysis::ResourceAnalysis(ModuleOp moduleOp,
 ResourceAnalysis::ResourceAnalysis(func::FuncOp funcOp,
                                    ArrayRef<ExtensionProvider> extensionProviders,
                                    bool collectDetailedOperations)
-    : collectDetailedOperations(collectDetailedOperations) {
+    : collectDetailedOperations(collectDetailedOperations),
+      analysisManager(funcOp, /*passInstrumentor=*/nullptr) {
     extensionAnalyses.reserve(extensionProviders.size());
     for (const auto &provider : extensionProviders) {
-        extensionAnalyses.push_back(provider());
+        auto extension = provider();
+        extension->initialize(analysisManager);
+        extensionAnalyses.push_back(std::move(extension));
     }
 
     ResourceResult result = makeEmptyResult();

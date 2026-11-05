@@ -79,9 +79,11 @@ template <class Role> class VerbsSessionBase : public Role {
     virtual bool oob_listens() const = 0;
 
     // Seal the staged send frame with round `cursor`'s seq and write it into the peer's ring.
+    // post_frame reads the frame mode from the ring. (A distinct name: GCC rejects explicitly
+    // instantiating post_write<M> beside a non-template overload of the same signature.)
     template <frame::Mode M>
     void post_write(ibv_qp *qp, std::uint64_t cursor, bool inline_data, bool signaled);
-    void post_write(ibv_qp *qp, std::uint64_t cursor, bool inline_data, bool signaled);
+    void post_frame(ibv_qp *qp, std::uint64_t cursor, bool inline_data, bool signaled);
     void reap(ibv_cq *cq, int &outstanding, bool drain);
     // Wait for round `cursor`'s frame in the local ring and decode it into `out`. Returns false if
     // `st` is stopped first.

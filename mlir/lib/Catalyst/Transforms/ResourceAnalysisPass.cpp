@@ -25,7 +25,6 @@
 #include "Catalyst/Analysis/ResourceAnalysis.h"
 #include "Catalyst/Analysis/ResourceAnalysisRegistry.h"
 #include "Catalyst/Analysis/ResourceResult.h"
-#include "PBC/Analysis/PBCDepthAnalysis.h"
 
 using namespace mlir;
 using namespace llvm;
@@ -57,8 +56,6 @@ struct ResourceAnalysisPass : public impl::ResourceAnalysisPassBase<ResourceAnal
     Statistic totalFunctionCalls{this, "total-function-calls", "Total number of function calls"};
 
     void runOnOperation() final {
-        pbc::registerPBCResourceAnalysisExtensions();
-
         auto moduleOp = cast<ModuleOp>(getOperation());
         ResourceAnalysis analysis(moduleOp, ResourceAnalysisRegistry::get().all());
         const auto &results = analysis.getResults();

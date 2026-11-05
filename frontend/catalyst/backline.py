@@ -105,7 +105,15 @@ _REGISTRY: list[TransportBackend] = [
         max_payload_bytes=None,
         max_reply_bytes=None,
     ),
-    TransportBackend("gpu_verbs", "rdma", "gpu", ("coprocessor",)),
+    TransportBackend(
+        "gpu_verbs",
+        "rdma",
+        "gpu",
+        ("coprocessor",),
+        frame_modes=("bl16", "blv"),
+        max_payload_bytes=None,
+        max_reply_bytes=None,
+    ),
     TransportBackend("hwhs", "rdma", "fpga", ("controller",)),
     TransportBackend("fpga_verbs", "rdma", "fpga", ("controller",), default=False),
     TransportBackend(
@@ -117,7 +125,6 @@ _REGISTRY: list[TransportBackend] = [
         max_payload_bytes=None,
         max_reply_bytes=None,
     ),
-    # Its persistent kernels read BL16 frames only; _frame_config holds them to 8 B.
     TransportBackend(
         "memcpy_gpu",
         "memcpy",
@@ -203,6 +210,12 @@ _DEFAULT_MESSAGE_BYTES = 8
 
 # The keys a coprocessor function's ``init`` receives the placement's message sizes under.
 _FN_MESSAGE_SIZE_KEYS = ("in_bytes", "out_bytes")
+
+# The launch contract this Catalyst's GPU coprocessors follow, the lowest launcher ABI version the
+# runtime accepts (CATALYST_COPROCESSOR_LAUNCHER_MIN_ABI_VERSION in TransportABI.h): frames in both
+# rings, replies carrying the request's fn_id. PennyLane checks it before building a Triton decoder,
+# whose kernel must write replies in the same layout.
+COPROCESSOR_LAUNCHER_ABI_VERSION = 2
 
 # Coprocessor functions whose configuration names files on the compiling machine (a model, a
 # runtime library), so they do not yet run on a coprocessor dispatched to an executor.
@@ -576,8 +589,9 @@ def _frame_config(placement: Placement, transport: str, in_bytes: int, out_bytes
 
     Raises:
         CompileError: If a node's config sets a frame key, nodes ask for different slot counts, a
-            selected backend cannot carry the layout, an FPGA node would need a slot count other
-            than 256, or a GPU coprocessor running a persistent kernel would need BLV frames.
+            selected backend cannot carry the layout, or an FPGA node would need a slot count
+            other than 256. A persistent GPU kernel that cannot read the layout refuses it at
+            launch.
     """
     slots = set()
     for node in (placement.controller, *placement.coprocessors):
@@ -628,18 +642,6 @@ def _frame_config(placement: Placement, transport: str, in_bytes: int, out_bytes
         config["frame_slots"] = str(count)
     if mode == "bl16":
         return config
-    # TODO: drop this once the persistent GPU kernels read frames through the frame codec.
-    for node, role in nodes:
-        if (
-            role == "coprocessor"
-            and node.hardware == "gpu"
-            and not _fn_runs_per_message(node.coprocessor_fn)
-        ):
-            raise CompileError(
-                f"coprocessor function {node.coprocessor_fn.symbol_name!r} runs as a persistent "
-                f"GPU kernel, which reads 16 B frames, so it carries messages of at most "
-                f"{_BL16_PAYLOAD_BYTES} B, not {largest} B"
-            )
     return {"frame": "blv", "frame_payload": str(largest), **config}
 
 

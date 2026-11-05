@@ -44,7 +44,7 @@ func.func @finalize() {
 
 // -----
 
-// CHECK: llvm.func @__catalyst__rt__device_init(!llvm.ptr, !llvm.ptr, !llvm.ptr, i64, i1)
+// CHECK: llvm.func @__catalyst__rt__device_init(!llvm.ptr, !llvm.ptr, !llvm.ptr, i64, i1 {llvm.zeroext})
 
 // CHECK-LABEL: @device
 func.func @device() {
@@ -331,7 +331,7 @@ func.func @multirz(%q0 : !quantum.bit, %p : f64) -> (!quantum.bit, !quantum.bit,
 
 // -----
 
-// CHECK: llvm.func @__catalyst__qis__PauliRot(!llvm.ptr, f64, !llvm.ptr, i1, i64, ...)
+// CHECK: llvm.func @__catalyst__qis__PauliRot(!llvm.ptr, f64, !llvm.ptr, i1 {llvm.zeroext}, i64, ...)
 
 // CHECK-LABEL: @paulirot
 func.func @paulirot(%q0 : !quantum.bit, %angle : f64) -> (!quantum.bit) {
@@ -346,7 +346,7 @@ func.func @paulirot(%q0 : !quantum.bit, %angle : f64) -> (!quantum.bit) {
 
 // -----
 
-// CHECK: llvm.func @__catalyst__qis__PauliRot(!llvm.ptr, f64, !llvm.ptr, i1, i64, ...)
+// CHECK: llvm.func @__catalyst__qis__PauliRot(!llvm.ptr, f64, !llvm.ptr, i1 {llvm.zeroext}, i64, ...)
 
 // CHECK-LABEL: @controlled_paulirot
 func.func @controlled_paulirot(%q0 : !quantum.bit, %q1 : !quantum.bit, %angle : f64) -> (!quantum.bit) {

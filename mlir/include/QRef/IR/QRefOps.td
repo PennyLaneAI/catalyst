@@ -368,7 +368,8 @@ def CustomOp : UnitaryGate_Op<"custom", [ParametrizedGate, AttrSizedOperandSegme
 }
 
 def OperatorOp : UnitaryGate_Op<"operator", [ParametrizedGate, AttrSizedOperandSegments,
-                                             DeclareOpInterfaceMethods<DecomposableGate, ["getExtraData"]>]> {
+                                             DeclareOpInterfaceMethods<DecomposableGate,
+                                                ["getExtraData"]>]> {
     let summary = "A generalized quantum operation with arbitrary input signature.";
     let description = [{
         The `qref.operator` is a generic representation for arbitrary quantum operations
@@ -739,6 +740,9 @@ def CtrlOp : Region_Op<"ctrl", [NoTerminator, AttrSizedOperandSegments]> {
         conditioned on a set of control qubits. Each `ctrl_values` entry selects whether the
         matching control qubit activates on the |1> (true) or |0> (false) state.
 
+        Work qubits are optional operands available to controlled operators produced when the
+        region is lowered. They are not controls and do not enter the region body.
+
         Measurements inside a `qref.ctrl` region are rejected.
     }];
 
@@ -746,11 +750,15 @@ def CtrlOp : Region_Op<"ctrl", [NoTerminator, AttrSizedOperandSegments]> {
 
     let arguments = (ins
         Variadic<QubitRefType>:$ctrl_qubits,
-        Variadic<I1>:$ctrl_values
+        Variadic<I1>:$ctrl_values,
+        Variadic<QubitRefType>:$work_qubits,
+        DefaultValuedAttr<StrAttr, "\"borrowed\"">:$work_wire_type
     );
 
     let assemblyFormat = [{
-        `(` $ctrl_qubits `)` `ctrlvals` `(` $ctrl_values `)` attr-dict-with-keyword $region
+        `(` $ctrl_qubits `)` `ctrlvals` `(` $ctrl_values `)`
+        (`work_wires` `(` $work_qubits^ `)`)?
+        attr-dict-with-keyword $region
     }];
 
     let hasVerifier = 1;

@@ -116,6 +116,7 @@
   [(#3307)](https://github.com/PennyLaneAI/catalyst/pull/3307)
   [(#3365)](https://github.com/PennyLaneAI/catalyst/pull/3365)
   [(#3382)](https://github.com/PennyLaneAI/catalyst/pull/3382)
+  [(#3421)](https://github.com/PennyLaneAI/catalyst/pull/3421)
 
   Control is folded into the operator identity *control-outermost* (e.g. `C(Adjoint(Op))`), so
   `ctrl(adjoint(Op))` and `adjoint(ctrl(Op))` collapse to a single node, while a distinct control
@@ -124,6 +125,8 @@
        its control count), and
     2. Rules *synthesized by distribution* (`decompose(C(Op)) = ctrl(decompose(Op))`), controlling
        each produced gate with the same control count.
+
+  Controls can be specified in the `gate_set` argument of decomposition with `C(Op)`, which matches any number of controls.
 
   A rule may re-emit its base decomposition inside a `quantum.ctrl` region; the apply pipeline
   reduces it to op-level controls with `ctrl-lowering`, iterating
@@ -197,6 +200,12 @@
     object code or IR. The default is stdout for IR and `<module-name>.o` for object code.
     Stdout (i.e. `-o -`) is rejected when the output is object code.
 
+* Decomposition to the device's gate set is now applied by default with `capture=True`.
+  This may introduce performance slowdowns or failures with cases that are not yet supported by the
+  decomposition pass. In the event of issues, this can be turned off with `skip_preprocess=True` being
+  passed to `qjit`.
+  [(#3275)](https://github.com/PennyLaneAI/catalyst/pull/3275)
+
 * Transforms can now be directly applied to a `QJIT`'d workflow. A new `QJIT` will be produced with
   the transform applied to the `QJIT`'s body.
   [(#3397)](https://github.com/PennyLaneAI/catalyst/pull/3397)
@@ -214,11 +223,17 @@
   (BLV): a 32 B header, the payload and a completion word written last. The compiler picks the
   16 B frame when requests and replies fit in 8 B, so such programs compile as before, and the
   variable-length one otherwise, writing it into both ends' backend configs. The `cpu_verbs`
-  and `memcpy` backends carry any size. A GPU coprocessor running a persistent kernel still
-  carries at most 8 B. Each ring has 256 slots unless a node's backend config sets
-  `frame_slots=<n>`, a power of two, which the compiler passes to every node; FPGA controllers
-  keep 256. Over RDMA, ends with different frame configs fail to connect.
+  and `memcpy` backends carry any size. Each ring has 256 slots unless a node's backend config sets
+  `frame_slots=<n>`, a power of two, which the compiler passes to every node; FPGA controllers keep
+  256. Over RDMA, ends with different frame configs fail to connect.
   [(#3379)](https://github.com/PennyLaneAI/catalyst/pull/3379)
+
+* Backline's persistent GPU kernels now read requests and write replies through the shared frame
+  codec, so a GPU coprocessor's replies carry the request's fn_id like every other transport's, and
+  Catalyst's own GPU kernels (`gpu_echo_launcher`, `gpu_steane_launcher`) carry messages of any
+  size over `memcpy` and `gpu_verbs`. Other persistent kernels, such as PennyLane's Triton
+  decoders, still carry at most 8 B.
+  [(#3383)](https://github.com/PennyLaneAI/catalyst/pull/3383)
 
 * The :func:`~catalyst.qjit` function now accepts an ``enable_aot_compilation`` argument, which can be
   used to toggle whether or not to use ahead-of-time compilation.
@@ -268,8 +283,7 @@
   [(#3316)](https://github.com/PennyLaneAI/catalyst/pull/3316)
 
 * The memcpy transport now carries messages of any size in each direction, as set by a PennyLane
-  `qp.Controller`'s `in_bytes` and `out_bytes`. The memcpy GPU coprocessor's persistent kernel
-  still carries 8 bytes.
+  `qp.Controller`'s `in_bytes` and `out_bytes`.
 
   ```python
   ctrl = qp.Controller(in_bytes=120, out_bytes=121)
@@ -398,6 +412,7 @@
     [(#3252)](https://github.com/PennyLaneAI/catalyst/pull/3252)
     [(#3261)](https://github.com/PennyLaneAI/catalyst/pull/3261)
     [(#3393)](https://github.com/PennyLaneAI/catalyst/pull/3393)
+    [(#3416)](https://github.com/PennyLaneAI/catalyst/pull/3416)
 
     This pathway of rule injection can be opted-out via a new keyword argument on `qp.qjit` named `collect_decomp_rules`.
     This kwarg controls whether or not to compile the decomposition rules during lower-time. Default value is `True`.
@@ -850,6 +865,12 @@
   when an explicit inverse representation is required.
   [(#3394)](https://github.com/PennyLaneAI/catalyst/pull/3394)
 
+* Decomposition to the device's gateset is now applied by default with `capture=True`.
+  This may introduce performance slowdowns or failures with cases that are not yet supported by the
+  decomposition pass. In the event of issues, this can be turned off with `skip_preprocess=True` being
+  passed to `qjit`.
+  [(#3275)](https://github.com/PennyLaneAI/catalyst/pull/3275)
+
 * Instrumentation no longer reports `programsize` for the high-level `compile` stage,
   since the compiler no longer returns an IR string to Python in addition to producing
   compiled object code.
@@ -875,6 +896,14 @@
   frame. A function written for the previous signature reads its payload at the same pointer but
   must take the extra `fn_id` argument, and no longer subtracts a frame trailer from the length.
   [(#3379)](https://github.com/PennyLaneAI/catalyst/pull/3379)
+
+* A Backline launcher, the function a GPU coprocessor calls once to start its persistent kernel,
+  must now export `<symbol>_info` reporting `abi_version` 2 or later, and its kernel must answer
+  each request with a frame laid out as `CoprocLaunchDesc` describes, in the slot stride and
+  frame mode it now carries. The runtime refuses a launcher without it, rather than letting the
+  session wait for replies the old layout never produces. PennyLane's Triton decoders need the
+  matching PennyLane release.
+  [(#3383)](https://github.com/PennyLaneAI/catalyst/pull/3383)
 
 * A `memcpy` transport session whose backend config has no `frame` keys now uses the 16 B frame, and
   refuses messages over 8 bytes. Programs compiled with Catalyst are unaffected, since the compiler
@@ -940,6 +969,12 @@
   measurements.
   [(#2934)](https://github.com/PennyLaneAI/catalyst/pull/2934)
 
+* Runtime functions that take a boolean argument are now declared with `zeroext` on it. Before, a
+  computed `i1`, such as a negated measurement result in the condition of a conditional Pauli
+  rotation or in a `debug_assert`, could reach the runtime with undefined upper bits and be read
+  as true.
+  [(#3445)](https://github.com/PennyLaneAI/catalyst/pull/3445)
+
 * The `--convert-to-value-semantics` pass now correctly handles aliasing qubit references that are
   used by multiple regions and/or operand lists on the same operation.
   [(#3404)](https://github.com/PennyLaneAI/catalyst/pull/3404)
@@ -978,6 +1013,7 @@
 
 * Controlled quantum regions now keeps track of the `work_wire_type` passed from `qp.ctrl`.
   [(#3366)](https://github.com/PennyLaneAI/catalyst/pull/3366)
+  [(#3376)](https://github.com/PennyLaneAI/catalyst/pull/3376)
 
 * MLIR passes that recreate `scf.for`, `scf.while`, `scf.if`, and `scf.index_switch` ops
   (`ctrl-lowering`, `adjoint-lowering`, `--convert-to-value-semantics`) now preserve discardable
@@ -1101,12 +1137,19 @@
   rule body so each rule is self-contained, instead of leaving a dangling call.
   [(#3242)](https://github.com/PennyLaneAI/catalyst/pull/3242)
 
+* Fixed linking of runtime artifacts under `catalyst.debug.instrumentation`, which dropped the
+  libraries recorded by `runtime_call`s and devices before linking.
+  [(#3438)](https://github.com/PennyLaneAI/catalyst/pull/3438)
+
 <h3>Internal changes ⚙️</h3>
+
+* FuncOp's with quantum dialect instructions can now always be inlined.
+  [(#3420)](https://github.com/PennyLaneAI/catalyst/pull/3420)
 
 * The `method` attribute of the Gradient dialect operations (`grad`, `value_and_grad`, `jvp`,
   `vjp`) is now an enum attribute (`#gradient<diff_method auto>`) instead of a string attribute.
   [(#3318)](https://github.com/PennyLaneAI/catalyst/pull/3318)
-  
+
 * Backline transport frames are built and read through a shared frame codec, which the `cpu_verbs`
   backends now use instead of laying out the 16 B frame themselves. The bytes on the wire are
   unchanged, and other frame layouts can now be added in one place.
