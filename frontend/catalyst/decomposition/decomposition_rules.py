@@ -32,6 +32,7 @@ from collections import deque
 from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum, auto
+from typing import TypedDict
 
 import jax.numpy as jnp
 import numpy as np
@@ -583,7 +584,7 @@ def _rule_allocates_work_wires(rule, *args, **kwargs) -> bool:
     return rule.get_work_wire_spec(*args, **kwargs).total > 0
 
 
-def _rule_is_eligible(op_name: str, rule: DecompositionRule, *args, **kwargs) -> bool:
+def _rule_is_compatible(op_name: str, rule: DecompositionRule, *args, **kwargs) -> bool:
     """Return whether a rule applies and passes the work-wire support check.
 
     Rules requiring work-wire allocation are excluded until decomposition lowering supports
@@ -650,7 +651,7 @@ def collect_resources_for_op(
     name_to_resources = {}
     applicable_rules = []
     for rule in decomp_rules:
-        if not _rule_is_eligible(op_name, rule, *args, **kwargs):
+        if not _rule_is_compatible(op_name, rule, *args, **kwargs):
             continue
 
         applicable_rules.append(rule)
@@ -1033,7 +1034,7 @@ def collect_symbolic_resources(
     name_to_resource_ids: dict[str, dict[SerializedGraphOpID, int]] = {}
     applicable_rules = []
     for rule in rules:
-        if not _rule_is_eligible(op_name, rule, **probe_args):
+        if not _rule_is_compatible(op_name, rule, **probe_args):
             continue
 
         applicable_rules.append(rule)
@@ -1282,6 +1283,22 @@ def _append_decomp_target_spec(out, description, factory):
         )
 
 
+class _RuleBuilderArgs(TypedDict):
+    """Shared builder arguments.
+
+    Typed keys keep operator names and serialized IDs distinct when unpacking ``**common``.
+    """
+
+    op_name: str
+    op_id: SerializedGraphOpID
+    dynamic_shape: dict
+    wire_lens: dict
+    static_data: dict
+    extra_data: dict
+    is_custom_op: bool
+    op_cls: type | None
+
+
 def build_decomp_rule_variants(
     request: OpDecompRequest, modifier_states: set[ModifierState]
 ) -> list[DecompTargetSpec]:
@@ -1292,7 +1309,9 @@ def build_decomp_rule_variants(
     resulting target specification for use by the reachability walk.
     """
 
-    common = {
+    common: _RuleBuilderArgs = {
+        "op_name": request.op_name,
+        "op_id": request.base_id,
         "dynamic_shape": request.dynamic_shape,
         "wire_lens": request.wire_lens,
         "static_data": request.static_data,
@@ -1311,22 +1330,12 @@ def build_decomp_rule_variants(
             _append_decomp_target_spec(
                 target_specs,
                 f"lower the registered decomposition rules for {target_id}",
-                lambda: build_registered_decomp_target_spec(
-                    op_name=request.op_name,
-                    op_id=request.base_id,
-                    **common,
-                    modifiers=state,
-                ),
+                lambda: build_registered_decomp_target_spec(**common, modifiers=state),
             )
         _append_decomp_target_spec(
             target_specs,
             f"synthesize the distributed decomposition rules for {target_id}",
-            lambda: build_decomp_target_spec(
-                op_name=request.op_name,
-                op_id=request.base_id,
-                **common,
-                modifiers=state,
-            ),
+            lambda: build_decomp_target_spec(**common, modifiers=state),
         )
 
     return target_specs

@@ -53,7 +53,7 @@ from catalyst.decomposition import GraphOpID, RuleLoweringWarning
 from catalyst.decomposition.decomposition_rules import (
     _adjoint_folds_to_base,
     _rule_allocates_work_wires,
-    _rule_is_eligible,
+    _rule_is_compatible,
     collect_resources_for_op,
     collect_symbolic_resources,
     compile_decomposition_rules_wrapper,
@@ -562,7 +562,7 @@ class TestGenericUtilities:
             _rule_allocates_work_wires(raises_on_spec, wires=Wires([0]))
 
         with pytest.warns(RuleLoweringWarning, match="could not read its work-wire spec"):
-            assert not _rule_is_eligible("MockOp", raises_on_spec, wires=Wires([0]))
+            assert not _rule_is_compatible("MockOp", raises_on_spec, wires=Wires([0]))
 
     def test_collect_resources_unrolls_change_op_basis_for_capture(self):
         """Resources match the rule body that capture produces, even when resource collection
