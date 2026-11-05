@@ -1715,6 +1715,30 @@ func.func @measurement_ops() {
 
 // -----
 
+// Generic measurements count as quantum operations.
+
+// CHECK-LABEL: "reference_measurement"
+// CHECK: "measurement_processes": {}
+// CHECK: "quantum_operations"
+// CHECK: "1"
+// CHECK: "MeasureInBasis": 1
+func.func @reference_measurement(%q: !qref.bit, %angle: f64) -> i1 {
+  %m = qref.measurement "MeasureInBasis"(%angle: f64) qubits(%q) static_data = {plane = "XY"} : i1
+  return %m : i1
+}
+
+// CHECK-LABEL: "value_measurement"
+// CHECK: "measurement_processes": {}
+// CHECK: "quantum_operations"
+// CHECK: "2"
+// CHECK: "MeasurePair": 1
+func.func @value_measurement(%q0: !quantum.bit, %q1: !quantum.bit) -> (i1, !quantum.bit, !quantum.bit) {
+  %m, %out:2 = quantum.measurement "MeasurePair"() qubits(%q0, %q1) : i1, !quantum.bit, !quantum.bit
+  return %m, %out#0, %out#1 : i1, !quantum.bit, !quantum.bit
+}
+
+// -----
+
 // Observable-based measurements
 
 // CHECK-LABEL: "observable_measurements"

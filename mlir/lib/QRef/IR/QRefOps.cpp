@@ -14,20 +14,48 @@
 
 #include "QRef/IR/QRefOps.h"
 
+#include <cmath>
+#include <cstddef>
 #include <cstdint>
 #include <limits>
+#include <optional>
+#include <string>
+#include <utility>
+#include <vector>
 
+#include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSet.h"
+#include "llvm/Support/Casting.h"
 #include "llvm/Support/LogicalResult.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/IR/Attributes.h"
+#include "mlir/IR/Block.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinAttributes.h"
+#include "mlir/IR/BuiltinTypeInterfaces.h"
+#include "mlir/IR/BuiltinTypes.h"
+#include "mlir/IR/MLIRContext.h"
+#include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/OpImplementation.h"
+#include "mlir/IR/OperationSupport.h"
+#include "mlir/IR/PatternMatch.h"
+#include "mlir/IR/TypeRange.h"
+#include "mlir/IR/Value.h"
+#include "mlir/IR/ValueRange.h"
+#include "mlir/Support/LLVM.h"
+#include "mlir/Support/LogicalResult.h"
+#include "mlir/Support/WalkResult.h"
 
 #include "MBQC/IR/MBQCOps.h"
 #include "PBC/IR/PBCOps.h"
 #include "QRef/IR/QRefDialect.h"
+#include "QRef/IR/QRefInterfaces.h"
+#include "QRef/IR/QRefTypes.h"
+#include "Quantum/IR/MeasurementOpUtils.h"
 #include "Quantum/IR/QuantumInterfaces.h"
 
 using namespace mlir;
@@ -280,6 +308,11 @@ LogicalResult QubitUnitaryOp::verify() {
     return success();
 }
 
+LogicalResult MeasurementOp::verify() {
+    return catalyst::detail::verifyMeasurementInputs(getOperation(), getParams(), getQubits(),
+                                                     getQreg(), getArrQubitIndices(), getMres());
+}
+
 LogicalResult AdjointOp::verify() {
     auto res = this->getRegion().walk(
         [](catalyst::quantum::MeasurementProcess op) { return WalkResult::interrupt(); });
@@ -361,6 +394,19 @@ LogicalResult HermitianOp::verify() {
 // Quantum op builders.
 //===----------------------------------------------------------------------===//
 
+void MeasurementOp::build(OpBuilder &builder, OperationState &state, TypeRange mres,
+                          llvm::StringRef op_name, ValueRange params, ValueRange qubits,
+                          DictionaryAttr static_data) {
+    build(builder, state, mres, op_name, params, qubits, Value(), ValueRange(), static_data);
+}
+
+void MeasurementOp::build(OpBuilder &builder, OperationState &state, TypeRange mres,
+                          llvm::StringRef op_name, ValueRange params, Value qreg,
+                          ValueRange arr_qubit_indices, DictionaryAttr static_data) {
+    build(builder, state, mres, op_name, params, ValueRange(), qreg, arr_qubit_indices,
+          static_data);
+}
+
 void OperatorOp::build(OpBuilder &odsBuilder, OperationState &odsState, llvm::StringRef op_name,
                        ValueRange params, ValueRange qubits, ValueRange ctrl_qubits,
                        ValueRange ctrl_values, ValueRange forward_args, bool adjoint,
@@ -414,6 +460,16 @@ void OperatorOp::build(OpBuilder &odsBuilder, OperationState &odsState, llvm::St
 //===----------------------------------------------------------------------===//
 // Quantum op printers/parsers.
 //===----------------------------------------------------------------------===//
+
+void MeasurementOp::print(OpAsmPrinter &p) {
+    catalyst::detail::printMeasurement(p, getOperation(), getOpNameAttr(), getParams(), getQubits(),
+                                       getQreg(), getArrQubitIndices(), getStaticDataAttr(),
+                                       /*valueSemantics=*/false);
+}
+
+ParseResult MeasurementOp::parse(OpAsmParser &parser, OperationState &result) {
+    return catalyst::detail::parseMeasurement(parser, result, /*valueSemantics=*/false);
+}
 
 static void printDenseI64ArrayAsList(OpAsmPrinter &p, DenseI64ArrayAttr attr) {
     p << "[";
@@ -972,6 +1028,11 @@ llvm::StringRef GlobalPhaseOp::getResourceName() { return "GlobalPhase"; }
 llvm::StringRef MultiRZOp::getResourceName() { return "MultiRZ"; }
 llvm::StringRef PCPhaseOp::getResourceName() { return "PCPhase"; }
 llvm::StringRef QubitUnitaryOp::getResourceName() { return "QubitUnitary"; }
+
+llvm::StringRef MeasurementOp::getResourceName() { return getOpName(); }
+uint64_t MeasurementOp::getResourceNumQubits() { return getQubits().size(); }
+uint64_t MeasurementOp::getResourceNumCtrlQubits() { return 0; }
+uint64_t MeasurementOp::getResourceNumParams() { return getParams().size(); }
 
 llvm::StringRef MeasureOp::getResourceName() { return "MidCircuitMeasure"; }
 uint64_t MeasureOp::getResourceNumQubits() { return 1; }

@@ -341,3 +341,32 @@ func.func @test_circuit_with_loop(%nqubits: i64) -> tensor<?xf64> {
     qref.dealloc %a : !qref.reg<?>
     return %probs : tensor<?xf64>
 }
+
+// -----
+
+func.func @qubits(%angle: f64, %data: tensor<?xf64>, %q0: !qref.bit, %q1: !qref.bit)
+    -> (i1, tensor<2xf64>) {
+  %m, %data_out = qref.measurement "MeasurePair"(%angle: f64, %data: tensor<?xf64>)
+      qubits(%q0, %q1) static_data = {plane = "XY", reset = true} {tag = "preserved"}
+      : i1, tensor<2xf64>
+  return %m, %data_out : i1, tensor<2xf64>
+}
+
+func.func @register(%reg: !qref.reg<4>, %wires: tensor<?xi64>, %other: tensor<1xi64>)
+    -> tensor<?xi1> {
+  %m = qref.measurement "MeasureMany"()
+      quregs(%reg: !qref.reg<4>) indices(%wires: tensor<?xi64>, %other: tensor<1xi64>)
+      : tensor<?xi1>
+  return %m : tensor<?xi1>
+}
+
+func.func @dynamic_register(%reg: !qref.reg<?>, %wires: tensor<?xi64>) {
+  qref.measurement "Discard"() quregs(%reg: !qref.reg<?>) indices(%wires: tensor<?xi64>) : ()
+  return
+}
+
+func.func @unused_results(%q: !qref.bit) {
+  %m = qref.measurement "Unused"() qubits(%q) : i1
+  qref.measurement "NoResults"() qubits() static_data = {} : ()
+  return
+}
