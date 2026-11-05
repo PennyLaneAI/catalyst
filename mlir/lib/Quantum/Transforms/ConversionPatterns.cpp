@@ -15,6 +15,7 @@
 #include <cstdint>
 #include <string>
 
+#include "llvm/ADT/STLExtras.h"
 #include "mlir/Dialect/LLVMIR/FunctionCallUtils.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/IR/BuiltinAttributes.h"
@@ -494,13 +495,19 @@ template <typename OpTy> struct CustomOpPattern : public OpConversionPattern<OpT
 
     LogicalResult matchAndRewrite(OpTy op, typename OpTy::Adaptor adaptor,
                                   ConversionPatternRewriter &rewriter) const override {
+        ArrayRef<int64_t> ctrlWorkWireIndices;
         if (auto operatorOp = dyn_cast<OperatorOp>(op.getOperation())) {
-            // param_map, qubit_map, and static_data do not affect the runtime call.
+            // param_map and static_data do not affect the runtime call.
             if (operatorOp.getInQreg() || !operatorOp.getArrQubitIndices().empty() ||
                 operatorOp.getArrCtrlIndices() || operatorOp.getArrCtrlValues() ||
                 operatorOp.getUID() || !operatorOp.getForwardArgs().empty()) {
                 return rewriter.notifyMatchFailure(
                     op, "register operands, UID, and forwarded arguments are not supported");
+            }
+            if (DictionaryAttr qubitMap = operatorOp.getQubitMap()) {
+                if (auto workWires = qubitMap.getAs<DenseI64ArrayAttr>("ctrl_work_wires")) {
+                    ctrlWorkWireIndices = workWires.asArrayRef();
+                }
             }
         }
 
@@ -524,6 +531,14 @@ template <typename OpTy> struct CustomOpPattern : public OpConversionPattern<OpT
             }
         }
 
+        // Control work wires are only needed for decomposition, not runtime calls.
+        SmallVector<Value> runtimeQubits;
+        for (auto [index, qubit] : llvm::enumerate(adaptor.getInQubits())) {
+            if (!llvm::is_contained(ctrlWorkWireIndices, index)) {
+                runtimeQubits.push_back(qubit);
+            }
+        }
+
         const std::string gateName = op.getOperatorName();
         const bool hasVariadicInputQbits = gateName == "Identity" || gateName == "MultiRZ" ||
                                            gateName == "PCPhase" || gateName == "QubitUnitary";
@@ -539,8 +554,9 @@ template <typename OpTy> struct CustomOpPattern : public OpConversionPattern<OpT
             argTypes.insert(argTypes.end(), modifiersPtr.getType());
             argTypes.insert(argTypes.end(), IntegerType::get(ctx, 64));
         } else {
-            argTypes.insert(argTypes.end(), adaptor.getInQubits().getTypes().begin(),
-                            adaptor.getInQubits().getTypes().end());
+            for (Value qubit : runtimeQubits) {
+                argTypes.push_back(qubit.getType());
+            }
             argTypes.insert(argTypes.end(), modifiersPtr.getType());
         }
 
@@ -551,14 +567,14 @@ template <typename OpTy> struct CustomOpPattern : public OpConversionPattern<OpT
 
         SmallVector<Value> args(params);
         if (hasVariadicInputQbits) {
-            // get the number of qbuits and place the input qubits at the end of the arguments.
-            int64_t numQubits = op.getOutQubits().size();
+            // Get the number of runtime qubits and place them at the end of the arguments.
+            int64_t numQubits = runtimeQubits.size();
             args.insert(args.end(), modifiersPtr);
             args.insert(args.end(), LLVM::ConstantOp::create(
                                         rewriter, loc, rewriter.getI64IntegerAttr(numQubits)));
-            args.insert(args.end(), adaptor.getInQubits().begin(), adaptor.getInQubits().end());
+            args.insert(args.end(), runtimeQubits.begin(), runtimeQubits.end());
         } else {
-            args.insert(args.end(), adaptor.getInQubits().begin(), adaptor.getInQubits().end());
+            args.insert(args.end(), runtimeQubits.begin(), runtimeQubits.end());
             args.insert(args.end(), modifiersPtr);
         }
 

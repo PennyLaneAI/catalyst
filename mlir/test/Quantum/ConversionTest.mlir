@@ -1044,6 +1044,46 @@ func.func @qubit_map(%q0: !quantum.bit, %q1: !quantum.bit) -> (!quantum.bit, !qu
 
 // -----
 
+// Control work wires are omitted from fixed-arity runtime calls, regardless of their positions.
+// Other qubit groups keep their operand order, and all qubit results are forwarded.
+// CHECK: llvm.func @__catalyst__qis__SWAP(!llvm.ptr, !llvm.ptr, !llvm.ptr)
+// CHECK-LABEL: llvm.func @ctrl_work_wires_fixed
+func.func @ctrl_work_wires_fixed(%work0: !quantum.bit, %q: !quantum.bit, %work1: !quantum.bit, %other: !quantum.bit) -> (!quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit) {
+    // CHECK: [[NULL:%.+]] = llvm.mlir.zero : !llvm.ptr
+    // CHECK: llvm.call @__catalyst__qis__SWAP(%arg1, %arg3, [[NULL]])
+    %out:4 = quantum.operator "SWAP"() qubits(%work0, %q, %work1, %other)
+        qubit_map = {ctrl_work_wires = [2, 0], wires = [1], work_wires = [3]}
+    // CHECK: llvm.insertvalue %arg0, {{.*}}[0]
+    // CHECK: llvm.insertvalue %arg1, {{.*}}[1]
+    // CHECK: llvm.insertvalue %arg2, {{.*}}[2]
+    // CHECK: llvm.insertvalue %arg3, {{.*}}[3]
+    return %out#0, %out#1, %out#2, %out#3 : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
+}
+
+// -----
+
+// Variadic calls count only runtime qubits; controls still reach the modifier structure.
+// CHECK: llvm.func @__catalyst__qis__MultiRZ(f64, !llvm.ptr, i64, ...)
+// CHECK-LABEL: llvm.func @ctrl_work_wires_variadic
+func.func @ctrl_work_wires_variadic(%q0: !quantum.bit, %work0: !quantum.bit, %q1: !quantum.bit, %work1: !quantum.bit, %ctrl: !quantum.bit, %cv: i1, %theta: f64) -> (!quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit) {
+    // CHECK: [[MOD:%.+]] = llvm.alloca {{.*}} x !llvm.struct<(i1, i64, ptr, ptr)>
+    // CHECK: llvm.store %arg4,
+    // CHECK: llvm.store %arg5,
+    // CHECK: [[COUNT:%.+]] = llvm.mlir.constant(2 : i64)
+    // CHECK: llvm.call @__catalyst__qis__MultiRZ(%arg6, [[MOD]], [[COUNT]], %arg0, %arg2)
+    %out:4, %out_ctrl = quantum.operator "MultiRZ"(%theta: f64)
+        qubits(%q0, %work0, %q1, %work1) ctrls(%ctrl) ctrl_vals(%cv)
+        qubit_map = {ctrl_work_wires = [3, 1], wires = [2, 0]}
+    // CHECK: llvm.insertvalue %arg0, {{.*}}[0]
+    // CHECK: llvm.insertvalue %arg1, {{.*}}[1]
+    // CHECK: llvm.insertvalue %arg2, {{.*}}[2]
+    // CHECK: llvm.insertvalue %arg3, {{.*}}[3]
+    // CHECK: llvm.insertvalue %arg4, {{.*}}[4]
+    return %out#0, %out#1, %out#2, %out#3, %out_ctrl : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
+}
+
+// -----
+
 // Operators outside the supported runtime signature must fail conversion.
 
 func.func @uid(%q: !quantum.bit, %theta: f64) -> !quantum.bit {
