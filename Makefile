@@ -7,6 +7,7 @@ BLACKVERSIONMINOR := $(shell black --version 2> /dev/null | head -n1 | awk '{ pr
 BLACKVERSIONMINOR := $(if $(BLACKVERSIONMINOR),$(BLACKVERSIONMINOR),0)
 MK_ABSPATH := $(abspath $(lastword $(MAKEFILE_LIST)))
 MK_DIR := $(dir $(MK_ABSPATH))
+MAIN_CHECKOUT_DIR ?=
 LLVM_BUILD_DIR ?= $(MK_DIR)/mlir/llvm-project/build
 STABLEHLO_BUILD_DIR ?= $(MK_DIR)/mlir/stablehlo/build
 DIALECTS_SRC_DIR ?= $(MK_DIR)/mlir
@@ -92,6 +93,7 @@ endif
 help:
 	@echo "Please use \`make <target>' where <target> is one of"
 	@echo "  all                to build and install all Catalyst modules and its MLIR dependencies"
+	@echo "                     MAIN_CHECKOUT_DIR=<checkout root> reuses its built LLVM, StableHLO and Enzyme"
 	@echo "  frontend           to install Catalyst Frontend"
 	@echo "  mlir               to build MLIR and custom Catalyst dialects"
 	@echo "  runtime            to build Catalyst Runtime"
@@ -112,7 +114,21 @@ help:
 
 
 .PHONY: all catalyst
+ifneq ($(strip $(MAIN_CHECKOUT_DIR)),)
+# Scope shared paths to all and its prerequisites, leaving standalone clean/build targets local.
+MAIN_MLIR_DIR := $(abspath $(MAIN_CHECKOUT_DIR))/mlir
+all: export LLVM_SRC_DIR := $(MAIN_MLIR_DIR)/llvm-project
+all: export LLVM_BUILD_DIR := $(MAIN_MLIR_DIR)/llvm-project/build
+all: export STABLEHLO_SRC_DIR := $(MAIN_MLIR_DIR)/stablehlo
+all: export STABLEHLO_BUILD_DIR := $(MAIN_MLIR_DIR)/stablehlo/build
+all: export ENZYME_SRC_DIR := $(MAIN_MLIR_DIR)/Enzyme
+all: export ENZYME_BUILD_DIR := $(MAIN_MLIR_DIR)/Enzyme/build
+all: export MLIR_LIB_DIR = $(LLVM_BUILD_DIR)/lib
+all: export ENZYME_LIB_DIR = $(ENZYME_BUILD_DIR)/Enzyme
+all: runtime oqc dialects dialect-docs plugin frontend
+else
 all: runtime oqc mlir frontend
+endif
 catalyst: runtime dialects plugin frontend oqc
 
 .PHONY: frontend
@@ -153,7 +169,9 @@ dialect-docs:
 # LLVM. For now we can run LLVM once in the begining if ENABLE_EXECUTOR is specified. The better
 # solution is perhaps to detactch the executor from runtime into its own target.
 ifeq ($(ENABLE_EXECUTOR), ON)
+ifeq ($(and $(strip $(MAIN_CHECKOUT_DIR)),$(filter all,$(MAKECMDGOALS))),)
 runtime: mlir
+endif
 endif
 
 runtime:
