@@ -23,7 +23,7 @@ import pennylane as qp
 import pytest
 from jax._src.lib.mlir import ir
 
-from catalyst import qjit
+from catalyst import debug, qjit
 from catalyst.pipelines import CompileOptions
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.runtime_artifacts import collect_runtime_artifacts
@@ -144,6 +144,24 @@ def test_compile_error_if_library_not_found():
 
     with pytest.raises(CompileError, match=f"could not locate runtime library .*{LIB_A}"):
         circuit()
+
+
+def test_libraries_reach_the_linker_under_instrumentation():
+    """Instrumenting the compile stages neither drops the collected libraries before linking, nor
+    leaves the options it toggles changed when a stage fails."""
+
+    @qp.qjit
+    @qp.qnode(device_with_artifacts(LIB_A))
+    def circuit():
+        return qp.expval(qp.PauliZ(0))
+
+    keep_intermediate = circuit.compile_options.keep_intermediate
+    with debug.instrumentation("runtime_artifacts", filename=None):
+        with pytest.raises(CompileError, match=f"could not locate runtime library .*{LIB_A}"):
+            circuit()
+
+    assert circuit.compile_options is circuit.compiler.options
+    assert circuit.compile_options.keep_intermediate == keep_intermediate
 
 
 @pytest.mark.parametrize("path", [LIB_A, LIB_A.encode(), Path(LIB_A)])

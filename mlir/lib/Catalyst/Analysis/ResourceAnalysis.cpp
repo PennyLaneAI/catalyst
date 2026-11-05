@@ -87,10 +87,13 @@ ResourceResult ResourceAnalysis::makeEmptyResult() const {
 ResourceAnalysis::ResourceAnalysis(ModuleOp moduleOp,
                                    ArrayRef<ExtensionProvider> extensionProviders,
                                    bool collectDetailedOperations)
-    : collectDetailedOperations(collectDetailedOperations) {
+    : collectDetailedOperations(collectDetailedOperations),
+      analysisManager(moduleOp, /*passInstrumentor=*/nullptr) {
     extensionAnalyses.reserve(extensionProviders.size());
     for (const auto &provider : extensionProviders) {
-        extensionAnalyses.push_back(provider());
+        auto extension = provider();
+        extension->initialize(analysisManager);
+        extensionAnalyses.push_back(std::move(extension));
     }
 
     LLVM_DEBUG(dbgs() << "ResourceAnalysis: analyzing operation " << moduleOp->getName() << "\n");
@@ -173,10 +176,13 @@ ResourceAnalysis::ResourceAnalysis(ModuleOp moduleOp,
 ResourceAnalysis::ResourceAnalysis(func::FuncOp funcOp,
                                    ArrayRef<ExtensionProvider> extensionProviders,
                                    bool collectDetailedOperations)
-    : collectDetailedOperations(collectDetailedOperations) {
+    : collectDetailedOperations(collectDetailedOperations),
+      analysisManager(funcOp, /*passInstrumentor=*/nullptr) {
     extensionAnalyses.reserve(extensionProviders.size());
     for (const auto &provider : extensionProviders) {
-        extensionAnalyses.push_back(provider());
+        auto extension = provider();
+        extension->initialize(analysisManager);
+        extensionAnalyses.push_back(std::move(extension));
     }
 
     ResourceResult result = makeEmptyResult();
