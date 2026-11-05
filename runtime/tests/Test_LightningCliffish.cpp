@@ -15,6 +15,7 @@
 // Tests for lightning.cliffish, a device built in pennylane-lightning. The runner is built only
 // when LIGHTNING_CLIFFISH_LIB names its library; see runtime/Makefile.
 
+#include <cmath>
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -77,15 +78,56 @@ TEST_CASE_METHOD(LightningCliffishRuntimeFixture, "Test qubit allocation through
     CHECK(__catalyst__rt__num_qubits() == 0);
 }
 
-TEST_CASE_METHOD(LightningCliffishRuntimeFixture,
-                 "Test that operations fail loudly through the C-API", "[LightningCliffish]") {
+TEST_CASE_METHOD(LightningCliffishRuntimeFixture, "Test a Bell state through the C-API",
+                 "[LightningCliffish]") {
     QirArray *qs = __catalyst__rt__qubit_allocate_array(2);
-    QUBIT **target = (QUBIT **)__catalyst__rt__array_get_element_ptr_1d(qs, 0);
+    QUBIT *q0 = *(QUBIT **)__catalyst__rt__array_get_element_ptr_1d(qs, 0);
+    QUBIT *q1 = *(QUBIT **)__catalyst__rt__array_get_element_ptr_1d(qs, 1);
 
-    REQUIRE_THROWS_WITH(__catalyst__qis__Hadamard(*target, nullptr),
-                        ContainsSubstring("lightning.cliffish cannot apply 'Hadamard' yet"));
-    REQUIRE_THROWS_WITH(__catalyst__qis__Measure(*target, -1),
-                        ContainsSubstring("lightning.cliffish cannot measure yet"));
+    __catalyst__qis__Hadamard(q0, nullptr);
+    __catalyst__qis__CNOT(q0, q1, nullptr);
+
+    // ZZ is +1 on every shot, so its estimate from samples is exact.
+    const ObsIdType z0 = __catalyst__qis__NamedObs(ObsId::PauliZ, q0);
+    const ObsIdType z1 = __catalyst__qis__NamedObs(ObsId::PauliZ, q1);
+    CHECK(__catalyst__qis__Expval(__catalyst__qis__TensorObs(2, z0, z1)) == 1.0);
+
+    const bool first = *__catalyst__qis__Measure(q0, -1);
+    CHECK(*__catalyst__qis__Measure(q1, -1) == first);
+
+    __catalyst__rt__qubit_release_array(qs);
+}
+
+TEST_CASE_METHOD(LightningCliffishRuntimeFixture,
+                 "Test PauliRot and PauliMeasure through the C-API", "[LightningCliffish]") {
+    QirArray *qs = __catalyst__rt__qubit_allocate_array(2);
+    QUBIT *q0 = *(QUBIT **)__catalyst__rt__array_get_element_ptr_1d(qs, 0);
+    QUBIT *q1 = *(QUBIT **)__catalyst__rt__array_get_element_ptr_1d(qs, 1);
+
+    // A conditional rotation whose condition is false never reaches the device.
+    __catalyst__qis__PauliRot("XX", M_PI, nullptr, false, 2, q0, q1);
+    CHECK_FALSE(*__catalyst__qis__PauliMeasure("ZI", false, nullptr, false, true, 2, q0, q1));
+
+    // exp(-i pi/2 XX) is XX up to a phase, taking |00> to |11>.
+    __catalyst__qis__PauliRot("XX", M_PI, nullptr, true, 2, q0, q1);
+    CHECK(*__catalyst__qis__Measure(q0, -1));
+    CHECK_FALSE(*__catalyst__qis__PauliMeasure("ZZ", false, nullptr, false, true, 2, q0, q1));
+    // The runtime flips a negated measurement's outcome.
+    CHECK(*__catalyst__qis__PauliMeasure("ZZ", true, nullptr, false, true, 2, q0, q1));
+
+    __catalyst__rt__qubit_release_array(qs);
+}
+
+TEST_CASE_METHOD(LightningCliffishRuntimeFixture,
+                 "Test that non-Clifford gates fail loudly through the C-API",
+                 "[LightningCliffish]") {
+    QirArray *qs = __catalyst__rt__qubit_allocate_array(1);
+    QUBIT *q0 = *(QUBIT **)__catalyst__rt__array_get_element_ptr_1d(qs, 0);
+
+    // The device buffers ops, so the error surfaces when a value is demanded.
+    __catalyst__qis__T(q0, nullptr);
+    REQUIRE_THROWS_WITH(__catalyst__qis__Measure(q0, -1),
+                        ContainsSubstring("lightning.cliffish cannot apply 'T'"));
 
     __catalyst__rt__qubit_release_array(qs);
 }
