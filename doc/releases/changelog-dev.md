@@ -116,6 +116,7 @@
   [(#3307)](https://github.com/PennyLaneAI/catalyst/pull/3307)
   [(#3365)](https://github.com/PennyLaneAI/catalyst/pull/3365)
   [(#3382)](https://github.com/PennyLaneAI/catalyst/pull/3382)
+  [(#3421)](https://github.com/PennyLaneAI/catalyst/pull/3421)
 
   Control is folded into the operator identity *control-outermost* (e.g. `C(Adjoint(Op))`), so
   `ctrl(adjoint(Op))` and `adjoint(ctrl(Op))` collapse to a single node, while a distinct control
@@ -124,6 +125,8 @@
        its control count), and
     2. Rules *synthesized by distribution* (`decompose(C(Op)) = ctrl(decompose(Op))`), controlling
        each produced gate with the same control count.
+
+  Controls can be specified in the `gate_set` argument of decomposition with `C(Op)`, which matches any number of controls.
 
   A rule may re-emit its base decomposition inside a `quantum.ctrl` region; the apply pipeline
   reduces it to op-level controls with `ctrl-lowering`, iterating
@@ -196,6 +199,12 @@
   - `-o` is the unified way to set the location of the final output, regardless of whether its
     object code or IR. The default is stdout for IR and `<module-name>.o` for object code.
     Stdout (i.e. `-o -`) is rejected when the output is object code.
+
+* Decomposition to the device's gate set is now applied by default with `capture=True`.
+  This may introduce performance slowdowns or failures with cases that are not yet supported by the
+  decomposition pass. In the event of issues, this can be turned off with `skip_preprocess=True` being
+  passed to `qjit`.
+  [(#3275)](https://github.com/PennyLaneAI/catalyst/pull/3275)
 
 * Transforms can now be directly applied to a `QJIT`'d workflow. A new `QJIT` will be produced with
   the transform applied to the `QJIT`'s body.
@@ -403,6 +412,7 @@
     [(#3252)](https://github.com/PennyLaneAI/catalyst/pull/3252)
     [(#3261)](https://github.com/PennyLaneAI/catalyst/pull/3261)
     [(#3393)](https://github.com/PennyLaneAI/catalyst/pull/3393)
+    [(#3416)](https://github.com/PennyLaneAI/catalyst/pull/3416)
 
     This pathway of rule injection can be opted-out via a new keyword argument on `qp.qjit` named `collect_decomp_rules`.
     This kwarg controls whether or not to compile the decomposition rules during lower-time. Default value is `True`.
@@ -855,6 +865,12 @@
   when an explicit inverse representation is required.
   [(#3394)](https://github.com/PennyLaneAI/catalyst/pull/3394)
 
+* Decomposition to the device's gateset is now applied by default with `capture=True`.
+  This may introduce performance slowdowns or failures with cases that are not yet supported by the
+  decomposition pass. In the event of issues, this can be turned off with `skip_preprocess=True` being
+  passed to `qjit`.
+  [(#3275)](https://github.com/PennyLaneAI/catalyst/pull/3275)
+
 * Instrumentation no longer reports `programsize` for the high-level `compile` stage,
   since the compiler no longer returns an IR string to Python in addition to producing
   compiled object code.
@@ -986,6 +1002,7 @@
 
 * Controlled quantum regions now keeps track of the `work_wire_type` passed from `qp.ctrl`.
   [(#3366)](https://github.com/PennyLaneAI/catalyst/pull/3366)
+  [(#3376)](https://github.com/PennyLaneAI/catalyst/pull/3376)
 
 * MLIR passes that recreate `scf.for`, `scf.while`, `scf.if`, and `scf.index_switch` ops
   (`ctrl-lowering`, `adjoint-lowering`, `--convert-to-value-semantics`) now preserve discardable
@@ -1111,10 +1128,13 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* FuncOp's with quantum dialect instructions can now always be inlined.
+  [(#3420)](https://github.com/PennyLaneAI/catalyst/pull/3420)
+
 * The `method` attribute of the Gradient dialect operations (`grad`, `value_and_grad`, `jvp`,
   `vjp`) is now an enum attribute (`#gradient<diff_method auto>`) instead of a string attribute.
   [(#3318)](https://github.com/PennyLaneAI/catalyst/pull/3318)
-  
+
 * Backline transport frames are built and read through a shared frame codec, which the `cpu_verbs`
   backends now use instead of laying out the 16 B frame themselves. The bytes on the wire are
   unchanged, and other frame layouts can now be added in one place.

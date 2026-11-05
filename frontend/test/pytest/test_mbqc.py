@@ -216,7 +216,7 @@ def test_explicit_rz_in_mbqc(rz_angle, mbqc_pipeline):
     lattice = plft.generate_lattice([4], "chain")
 
     # RZ circuit in the MBQC representation
-    @qjit(capture=True, collect_decomp_rules=False, pipelines=mbqc_pipeline)
+    @qjit(capture=True, pipelines=mbqc_pipeline)
     @qp.qnode(dev)
     def circuit_mbqc(start_state, angle):
         # prep input node
@@ -307,7 +307,7 @@ def test_cnot_in_mbqc_representation(mbqc_pipeline):
         return reduce(lambda a, b: a ^ b, args)
 
     # Equivalent CNOT circuit in the MBQC representation
-    @qjit(capture=True, collect_decomp_rules=False, pipelines=mbqc_pipeline)
+    @qjit(capture=True, pipelines=mbqc_pipeline)
     @qp.qnode(dev)
     def circuit_mbqc(start_state):
         # prep input nodes
