@@ -28,6 +28,8 @@
 #include "Quantum/Transforms/Patterns.h"
 #include "Quantum/Utils/QIRPauliRot.h"
 
+#include "MagicStrings.h"
+
 using namespace mlir;
 using namespace catalyst::quantum;
 
@@ -505,7 +507,7 @@ template <typename OpTy> struct QuantumOpPattern : public OpConversionPattern<Op
                     op, "register operands, UID, and forwarded arguments are not supported");
             }
             if (DictionaryAttr qubitMap = operatorOp.getQubitMap()) {
-                if (auto workWires = qubitMap.getAs<DenseI64ArrayAttr>("ctrl_work_wires")) {
+                if (auto workWires = qubitMap.getAs<DenseI64ArrayAttr>(catalyst::CTRL_WORK_WIRES)) {
                     ctrlWorkWireIndices = workWires.asArrayRef();
                 }
             }
