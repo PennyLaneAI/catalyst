@@ -19,7 +19,6 @@ import numpy as np
 import pennylane as qp
 import pytest
 from jax.core import ShapedArray
-from jax.tree_util import tree_structure
 from operator2_dummy_gates import (
     ArrayData,
     CompilableData,
@@ -216,7 +215,7 @@ class TestGenericUtilities:
 
     def test_unpack_rule_operands_restores_hybrid_arguments(self):
         """Hybrid leaves reconstruct their nested argument without consuming wire or control inputs."""
-        hybrid_specs = [("data", tree_structure((0, {"matrix": 0})), 2)]
+        hybrid_specs, _, _ = flatten_hybrid_args({"data": (Float[2], {"matrix": Float[2, 2]})})
         operands = (
             jnp.array(0.25),
             jnp.array([3.0, 4.0]),
