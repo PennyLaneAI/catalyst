@@ -231,16 +231,18 @@ void ResourceAnalysis::analyzeForLoop(scf::ForOp forOp, ResourceResult &result, 
         tripCount = resolveDirectNestedForLoopAverageTripCount(forOp);
     }
 
-    recordLoopBody(forOp.getOperation(), std::move(bodyResult), tripCount, "for_loop_", forLoopCounter, dynForLoopCounter, result);
+    recordLoopBody(forOp.getOperation(), std::move(bodyResult), tripCount, "for_loop_",
+                   forLoopCounter, dynForLoopCounter, result);
 }
 
 void ResourceAnalysis::analyzeWhileLoop(scf::WhileOp whileOp, ResourceResult &result,
                                         bool isAdjoint, unsigned numControlQubits) {
     ResourceResult bodyResult = makeEmptyResult();
     analyzeRegion(whileOp.getAfter(), bodyResult, isAdjoint, numControlQubits);
-    
+
     auto tripCount = getEstimatedIterationsHint(whileOp);
-    recordLoopBody(whileOp.getOperation(), std::move(bodyResult), tripCount, "while_loop_", whileLoopCounter, dynWhileLoopCounter, result);
+    recordLoopBody(whileOp.getOperation(), std::move(bodyResult), tripCount, "while_loop_",
+                   whileLoopCounter, dynWhileLoopCounter, result);
 }
 
 void ResourceAnalysis::analyzeIfOp(scf::IfOp ifOp, ResourceResult &result, bool isAdjoint,
