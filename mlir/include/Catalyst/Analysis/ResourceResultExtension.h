@@ -20,6 +20,7 @@
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/JSON.h"
 #include "mlir/IR/Operation.h" // Operation, Region
+#include "mlir/Pass/AnalysisManager.h"
 
 namespace catalyst {
 
@@ -57,6 +58,10 @@ class ResourceAnalysisExtension {
 
     virtual llvm::StringRef name() const = 0; // must be matched to ResourceResultExtension::name()
 
+    // Optional initialization function to be called once before any analysis is performed
+    // to allow the extension to cache any data needed for the analysis.
+    virtual void initialize(mlir::AnalysisManager analysisManager) {}
+
     // Mint an empty data object for a new ResourceResult.
     virtual std::unique_ptr<ResourceResultExtension> makeEmpty() const = 0;
 
@@ -73,7 +78,7 @@ template <typename Ext> class ResourceAnalysisExtensionOf : public ResourceAnaly
     static_assert(std::is_base_of_v<ResourceResultExtension, Ext>,
                   "Ext must derive from ResourceResultExtension");
 
-    std::unique_ptr<ResourceResultExtension> makeEmpty() const final {
+    std::unique_ptr<ResourceResultExtension> makeEmpty() const override {
         return std::make_unique<Ext>();
     }
 
