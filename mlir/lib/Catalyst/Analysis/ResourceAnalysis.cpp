@@ -637,7 +637,6 @@ void ResourceAnalysis::collectDetailedOperation(Operation *op, ResourceResult &r
     if (auto inst = dyn_cast<ResourceQuantumOpInterface>(op)) {
         std::string opID = inst.getResourceDetailedName().str();
         result.detailedOperations[opID] += 1;
-        result.observedGraphOpIds.insert(opID);
         return;
     }
 }
