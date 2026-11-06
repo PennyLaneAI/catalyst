@@ -1773,7 +1773,7 @@ decompose_arbitrary_ppr = qp.transform(
 def graph_decomposition_setup_inputs(
     gate_set: Iterable[type | str] | dict[type | str, float],
     fixed_decomps: dict | None = None,
-    alt_decomps: dict | None = None,
+    exclude_decomps: dict | None = None,
     bytecode_rules: str | None = None,
     _builtin_rule_path: str = BYTECODE_FILE_PATH,
     libQPD_path: Path | None = None,
@@ -1808,7 +1808,10 @@ def graph_decomposition_setup_inputs(
         fixed_decomps (dict | None): map operators to specific decomposition rules that will be applied if the
                                      operators need to be decomposed (i.e. when they're not
                                      in the target gate set).
-       alt_decomps (dict | None): map operators to lists of decomposition rules that the graph system will consider as alternative rules for operators.
+        exclude_decomps (dict | None): map operators to lists of decomposition rules to exclude
+            from this pass's graph. Rules may be given as names or callables. Excluded rules are
+            still lowered by the frontend and remain available to subsequent passes. Exclusions
+            also apply to rules selected by ``fixed_decomps``.
         verbose (bool): if ``True``, the pass prints the decomposition rule the solver chose for
             each operator, along with its cost and the resulting gate counts, to stderr. ``False`` by default.
 
@@ -1848,8 +1851,7 @@ def graph_decomposition_setup_inputs(
         @merge_rotations
         @graph_decomposition(
             gate_set={qp.RX, qp.RY},
-            fixed_decomps={qp.PauliX: x_to_rx, qp.PauliY: y_to_ry},
-            alt_decomps={qp.H: [h_to_rx_ry]},
+            fixed_decomps={qp.PauliX: x_to_rx, qp.PauliY: y_to_ry, qp.H: h_to_rx_ry},
         )
         @cancel_inverses
         @qp.qnode(qp.device("lightning.qubit", wires=2))
@@ -1902,11 +1904,11 @@ def graph_decomposition_setup_inputs(
             }
         }
 
-    if alt_decomps:
+    if exclude_decomps:
         options |= {
-            "alt_decomps": {
+            "exclude_decomps": {
                 to_name(op): tuple(rule_ref_name(rule) for rule in rules)
-                for op, rules in alt_decomps.items()
+                for op, rules in exclude_decomps.items()
             }
         }
 

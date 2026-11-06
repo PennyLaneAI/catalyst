@@ -150,8 +150,8 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
             }
             llvm::dbgs() << "\n";
 
-            llvm::dbgs() << "altDecompsOption\n";
-            for (auto item : altDecompsOption) {
+            llvm::dbgs() << "excludeDecompsOption\n";
+            for (auto item : excludeDecompsOption) {
                 llvm::dbgs() << "\t" << item << ",\n";
             }
             llvm::dbgs() << "\n";
@@ -169,20 +169,19 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         ModuleOp module = getOperation();
         std::vector<OperatorNode> setOfOps;
         std::vector<RuleNode> setOfRules;
-        llvm::StringSet<> userRuleNames;
         llvm::StringMap<std::string> opToFixedDecompName;
-        llvm::StringMap<llvm::StringSet<>> opToAltDecompNames;
+        llvm::StringMap<llvm::StringSet<>> opToExcludedDecompNames;
         WeightedGateset targetGateSet;
 
-        // get names for fixed and alt decomps
-        parseFixedDecomps(opToFixedDecompName, userRuleNames);
-        parseAltDecomps(opToAltDecompNames, userRuleNames);
+        // Get names for fixed and excluded decompositions.
+        parseFixedDecomps(opToFixedDecompName);
+        parseExcludedDecomps(opToExcludedDecompNames);
         if (failed(parseGateset(targetGateSet))) {
             return signalPassFailure();
         }
 
         if (failed(getRuleNodes(bytecodeRulesFile, setOfRules, opToFixedDecompName,
-                                opToAltDecompNames))) {
+                                opToExcludedDecompNames))) {
             return signalPassFailure();
         }
         getOperators(setOfOps);
@@ -192,8 +191,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         GraphResult solution;
         {
             ScopedDiagnosticTimer t("decomp:solver");
-            // NOTE: fixed and alt-decomps are handled by filtering during rule collection. This is
-            // dead code that should be removed
+            // Fixed and excluded decompositions are handled by filtering during rule collection.
             DecompositionGraph graph(setOfOps, targetGateSet, setOfRules);
             DecompositionSolver solver(graph);
             solution = solver.solve();
@@ -272,8 +270,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
     }
 
   private:
-    void parseFixedDecomps(llvm::StringMap<std::string> &opToFixedDecompName,
-                           llvm::StringSet<> &userRuleNames) {
+    void parseFixedDecomps(llvm::StringMap<std::string> &opToFixedDecompName) {
         for (const std::string &opRulePair : fixedDecompsOption) {
             llvm::StringRef pairRef(opRulePair);
 
@@ -289,13 +286,11 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
                 continue;
             }
             opToFixedDecompName[opName.str()] = ruleName.str();
-            userRuleNames.insert(ruleName.str());
         }
     }
 
-    void parseAltDecomps(llvm::StringMap<llvm::StringSet<>> &opToAltDecompNames,
-                         llvm::StringSet<> &userRuleNames) {
-        for (const std::string &opRulesPair : altDecompsOption) {
+    void parseExcludedDecomps(llvm::StringMap<llvm::StringSet<>> &opToExcludedDecompNames) {
+        for (const std::string &opRulesPair : excludeDecompsOption) {
             llvm::StringRef pairRef(opRulesPair);
 
             auto [opName, rulesRef] = pairRef.split("=");
@@ -308,7 +303,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
             rulesRef.consume_front("[");
             rulesRef.consume_back("]");
             rulesRef.split(splitRulesRef, ",");
-            auto &opRulesList = opToAltDecompNames[opName.str()];
+            auto &opRulesList = opToExcludedDecompNames[opName.str()];
 
             for (llvm::StringRef ruleNameRef : splitRulesRef) {
                 ruleNameRef = ruleNameRef.trim();
@@ -316,7 +311,6 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
                 ruleNameRef.consume_back("\"");
                 if (!ruleNameRef.empty()) {
                     opRulesList.insert(ruleNameRef.str());
-                    userRuleNames.insert(ruleNameRef.str());
                 }
             }
         }
@@ -333,7 +327,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
             // Note gate_set is now a DictionaryAttr which quotes any key that is
             // not an MLIR op (e.g. "Adjoint(TemporaryAND)").
             // As the result, we need to strip the surrounding quotes so the stored name
-            // matches the op's graphOpId name following parseFixedDecomps / parseAltDecomps.
+            // matches the op's graphOpId name following parseFixedDecomps / parseExcludedDecomps.
             opName.consume_front("\"");
             opName.consume_back("\"");
 
@@ -455,9 +449,10 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
     /**
      * @brief Load the listed user rules into the set of RuleNodes for the graph.
      */
-    LogicalResult loadDecompositionRules(llvm::StringMap<std::string> &opToFixedDecompName,
-                                         llvm::StringMap<llvm::StringSet<>> &opToAltDecompNames,
-                                         std::vector<RuleNode> &ruleNodes) {
+    LogicalResult
+    loadDecompositionRules(llvm::StringMap<std::string> &opToFixedDecompName,
+                           llvm::StringMap<llvm::StringSet<>> &opToExcludedDecompNames,
+                           std::vector<RuleNode> &ruleNodes) {
         mlir::ModuleOp module = getOperation();
 
         WalkResult walkResult = module.walk([&](mlir::func::FuncOp func) {
@@ -469,36 +464,27 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
                         .take_until([](char c) { return c == '{'; }) // remove GOID data
                         .drop_while(llvm::isDigit);                  // remove <n>C numeric prefix
 
-                // if this op has alt or fixed decomps then we are we only take the specified
-                // rules
-                if (opToFixedDecompName.contains(targetGate) ||
-                    opToAltDecompNames.contains(targetGate)) {
-
-                    // frontend name of the decomp rule for matching with fixed/alt-decomps
-                    if (!func->hasAttr("frontend_name")) {
-                        llvm::errs()
-                            << "The " << func.getName()
-                            << " decomposition rule targets a gate with fixed/alt-decomps, but "
+                auto fixed = opToFixedDecompName.find(targetGate);
+                auto excluded = opToExcludedDecompNames.find(targetGate);
+                bool hasExclusions =
+                    excluded != opToExcludedDecompNames.end() && !excluded->second.empty();
+                if (fixed != opToFixedDecompName.end() || hasExclusions) {
+                    // Match frontend names, since lowering may rename the function symbol.
+                    auto nameAttr = func->getAttrOfType<mlir::StringAttr>("frontend_name");
+                    if (!nameAttr) {
+                        func.emitError()
+                            << "decomposition rule targets a gate with fixed/exclude-decomps, but "
                                "doesn't have the `frontend_name` attribute.";
+                        return WalkResult::interrupt();
                     }
-                    llvm::StringRef funcName =
-                        func->getAttrOfType<mlir::StringAttr>("frontend_name");
-
-                    if (opToFixedDecompName[targetGate] == funcName) {
-                        if (failed(addRuleNode(func, ruleNodes))) {
-                            return WalkResult::interrupt();
-                        }
-                        return WalkResult::skip();
-                    } else if (llvm::is_contained(opToAltDecompNames[targetGate], funcName)) {
-                        if (failed(addRuleNode(func, ruleNodes))) {
-                            return WalkResult::interrupt();
-                        }
+                    llvm::StringRef funcName = nameAttr.getValue();
+                    if ((hasExclusions && excluded->second.contains(funcName)) ||
+                        (fixed != opToFixedDecompName.end() && fixed->second != funcName)) {
+                        LDBG() << "Skipping decomposition rule " << func.getName()
+                               << " due to fixed/exclude-decomps";
+                        // Keep the function in the module for subsequent passes.
                         return WalkResult::skip();
                     }
-                    LDBG() << "Decomposition rule " << func.getName()
-                           << " was registered to an op with fixed or alt decomps, and wasn't in "
-                              "the list - skipping";
-                    return WalkResult::advance();
                 }
 
                 // standard case - targets an op with no restrictions
@@ -663,7 +649,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
      */
     LogicalResult getRuleNodes(llvm::StringRef filename, std::vector<RuleNode> &rules,
                                llvm::StringMap<std::string> &opToFixedDecompName,
-                               llvm::StringMap<llvm::StringSet<>> &opToAltDecompNames) {
+                               llvm::StringMap<llvm::StringSet<>> &opToExcludedDecompNames) {
         ScopedDiagnosticTimer t("decomp:rules");
         // Load pre-compiled rules (ignore failure, we can try to solve without) into the module
         if (!filename.empty()) {
@@ -679,8 +665,8 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         // }
 
         // Load rules from the module into the set of rules used by the graph, filtering by
-        // fixed- and alt-decomps
-        if (failed(loadDecompositionRules(opToFixedDecompName, opToAltDecompNames, rules))) {
+        // fixed- and exclude-decomps
+        if (failed(loadDecompositionRules(opToFixedDecompName, opToExcludedDecompNames, rules))) {
             return failure();
         }
         return success();
