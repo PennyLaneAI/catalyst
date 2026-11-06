@@ -609,7 +609,7 @@ def test_basis_rotation_decomposition():
         @qp.qjit(target="mlir", capture=True)
         @qp.qnode(qp.device("null.qubit", wires=2))
         def test_basis_rotation_real_valued():
-            # A real orthogonal matrix with determinant -1, so the determinant-fixing PauliZ runs.
+            # A real orthogonal matrix with determinant -1, so the PauliZ correction runs.
             U = jnp.array([[0.76484219, 0.64421769], [0.64421769, -0.76484219]])
             qp.BasisRotation(unitary_matrix=U, wires=[0, 1])
             return qp.probs()
@@ -651,7 +651,7 @@ def test_basis_rotation_decomposition():
     def test_real_op_that_decomposes_to_basis_rotation():
         """A parent holding a real matrix must declare, emit and find a real ``BasisRotation``."""
 
-        # A real orthogonal matrix with determinant -1, so the determinant-fixing PauliZ runs.
+        # A real orthogonal matrix with determinant -1, so the PauliZ correction runs.
         print(_compile_parent(jnp.array([[0.76484219, 0.64421769], [0.64421769, -0.76484219]])))
 
     # CHECK: func.func private @__builtin_rule{{(_[0-9]+)?}}

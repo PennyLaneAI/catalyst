@@ -1179,7 +1179,9 @@ class TestOnDemand:
 
         assert f'target_gate = "{op_id}"' in module_str
         if op_id.startswith("2C("):
-            assert 'target_gate = "C(S){}{wires:1}{}"' not in module_str
+            # Reachable controlled rotation rules use singly controlled S.
+            assert '"C(S){}{wires:1}{}" = 1 : i64' in module_str
+            assert 'target_gate = "C(S){}{wires:1}{}"' in module_str
 
     @pytest.mark.parametrize("work_wire_type", ["zeroed", "borrowed"])
     @pytest.mark.parametrize("adjoint", [False, True])
@@ -1548,7 +1550,8 @@ class TestSymbolicRules:
                 2,
                 "2C(Hadamard){}{wires:1}{}",
                 "(%arg0: !qref.reg<3>, %arg1: tensor<1xi64>, %arg2: tensor<2xi64>, %arg3: tensor<2xi1>)",
-                '"Toffoli{}{wires:3}{}" = 1 : i64',
+                '"MultiControlledX{control_values:[tensor<2xi1>]}{wires:3,work_wires:0}'
+                r'{work_wire_type = \22borrowed\22}" = 1 : i64',
             ),
         ],
     )
@@ -1701,7 +1704,7 @@ class TestSymbolicRules:
             "(%arg0: !qref.reg<4>, %arg1: tensor<1xi64>, %arg2: tensor<3xi64>, %arg3: tensor<3xi1>)"
             in rule
         )
-        assert "MultiControlledX{control_values:[tensor<3xi1>]}{wires:4,work_wires:0}" in rule
+        assert '"3C(PauliX){}{wires:1}{}" = 1 : i64' in rule
 
     @pytest.mark.parametrize("work_wire_type", ["zeroed", "borrowed"])
     def test_control_work_wires_reach_the_rule(self, work_wire_type):
