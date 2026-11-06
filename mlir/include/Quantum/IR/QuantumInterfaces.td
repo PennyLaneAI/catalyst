@@ -231,6 +231,10 @@ def DecomposableGate : OpInterface<"DecomposableGate", [QuantumGate]> {
     ];
 }
 
+def Observable : OpInterface<"Observable"> {
+    let cppNamespace = "::catalyst::quantum";
+}
+
 def MeasurementProcess : OpInterface<"MeasurementProcess"> {
     let description = [{
         This interface provides a generic way to interact with quantum measurement processes.

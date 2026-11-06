@@ -46,6 +46,8 @@
 #include "Quantum/IR/QuantumTypes.h"
 #include "Quantum/Transforms/Patterns.h"
 
+#include "StringConstants.h"
+
 using namespace mlir;
 using namespace catalyst::quantum;
 
@@ -61,13 +63,16 @@ static SmallVector<int32_t> readSegmentSizes(Operation *op, StringRef name) {
 
 static StringRef mergeWorkWireTypes(StringRef lhs, StringRef rhs) {
     // borrowed takes precedence
-    return lhs == "borrowed" || rhs == "borrowed" ? "borrowed" : "zeroed";
+    return lhs == catalyst::CTRL_WORK_WIRE_TYPE_BORROWED ||
+                   rhs == catalyst::CTRL_WORK_WIRE_TYPE_BORROWED
+               ? catalyst::CTRL_WORK_WIRE_TYPE_BORROWED
+               : catalyst::CTRL_WORK_WIRE_TYPE_ZEROED;
 }
 
 static DictionaryAttr appendStaticData(OpBuilder &builder, DictionaryAttr staticData,
                                        StringRef workWireType) {
     NamedAttrList entries(staticData);
-    entries.set("ctrl_work_wire_type", builder.getStringAttr(workWireType));
+    entries.set(catalyst::CTRL_WORK_WIRE_TYPE, builder.getStringAttr(workWireType));
     return entries.getDictionary(builder.getContext());
 }
 
@@ -75,13 +80,14 @@ static DictionaryAttr appendCtrlWorkQubitMap(OpBuilder &builder, DictionaryAttr 
                                              unsigned oldNumQubits, unsigned numWorkQubits) {
     NamedAttrList entries(qubitMap);
     SmallVector<int64_t> workIndices;
-    if (auto existing = dyn_cast_or_null<DenseI64ArrayAttr>(entries.get("ctrl_work_wires"))) {
+    if (auto existing =
+            dyn_cast_or_null<DenseI64ArrayAttr>(entries.get(catalyst::CTRL_WORK_WIRES))) {
         workIndices.append(existing.asArrayRef().begin(), existing.asArrayRef().end());
     }
     for (unsigned i = 0; i < numWorkQubits; ++i) {
         workIndices.push_back(oldNumQubits + i);
     }
-    entries.set("ctrl_work_wires", builder.getDenseI64ArrayAttr(workIndices));
+    entries.set(catalyst::CTRL_WORK_WIRES, builder.getDenseI64ArrayAttr(workIndices));
     return entries.getDictionary(builder.getContext());
 }
 
@@ -191,16 +197,17 @@ static Operation *createControlledGate(PatternRewriter &rewriter, QuantumGate ga
             }
             uid = operatorOp.getUID();
             if (auto existing = dyn_cast_or_null<DenseI64ArrayAttr>(
-                    operatorOp.getQubitMap().get("ctrl_work_wires"));
+                    operatorOp.getQubitMap().get(catalyst::CTRL_WORK_WIRES));
                 existing && !existing.empty()) {
                 // An operator may carry a ctrl_work_wires group without a ctrl_work_wire_type
                 // entry (hand-written IR, or a producer that has not set it). "borrowed" is the
                 // conservative reading: it forbids assuming the qubit starts in |0>.
                 auto oldWorkWireType = dyn_cast_or_null<StringAttr>(
-                    operatorOp.getStaticData().get("ctrl_work_wire_type"));
-                workWireType = mergeWorkWireTypes(oldWorkWireType ? oldWorkWireType.getValue()
-                                                                  : StringRef("borrowed"),
-                                                  workWireType);
+                    operatorOp.getStaticData().get(catalyst::CTRL_WORK_WIRE_TYPE));
+                workWireType = mergeWorkWireTypes(
+                    oldWorkWireType ? oldWorkWireType.getValue()
+                                    : StringRef(catalyst::CTRL_WORK_WIRE_TYPE_BORROWED),
+                    workWireType);
             }
         } else {
             paramMap = buildParamMap(rewriter, decomposable);

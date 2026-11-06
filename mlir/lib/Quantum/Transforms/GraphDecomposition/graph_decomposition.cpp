@@ -39,7 +39,7 @@
 #include "DGSolver.hpp"
 #include "DGTypes.hpp"
 #include "DGUtils.hpp"
-#include "GraphDecompositionPrep.hpp"
+#include "GraphPrep.hpp"
 
 #define DEBUG_TYPE "graph-decomposition"
 
@@ -94,24 +94,25 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
 
             // Collect op IDs via ResourceAnalysis from the quantum.node entry (flattened).
             catalyst::ResourceAnalysis analysis(module, {}, /*collectDetailedOperations=*/true);
+            llvm::StringRef entryFuncName = analysis.getEntryFunc();
+
             std::vector<std::string> opIDs;
-            if (func::FuncOp qnode = GraphDecompositionPrep::findQNodeFunc(module)) {
-                if (const catalyst::ResourceResult *flat =
-                        analysis.getFlattenedResource(qnode.getName())) {
-                    for (const auto &opID : flat->observedGraphOpIds) {
-                        opIDs.push_back(opID.getKey().str());
-                    }
+            if (const catalyst::ResourceResult *flat =
+                    analysis.getFlattenedResource(entryFuncName)) {
+                for (const auto &opID : flat->observedGraphOpIds) {
+                    opIDs.push_back(opID.getKey().str());
                 }
             }
 
-            GraphDecompositionPrep::PrepOptions opts;
-            opts.targetGateSetOption = targetGateSetOption;
-            opts.fixedDecompsOption = fixedDecompsOption;
-            opts.altDecompsOption = altDecompsOption;
-            opts.bytecodeRulesFile = bytecodeRulesFile;
-            opts.libQPDPath = libQPDPath;
-            opts.libpythonPath = libpythonPath;
-            graph = GraphDecompositionPrep::prepareGraph(module, opIDs, opts);
+            graph = GraphPrep::prepareGraph(module, opIDs,
+                                            {
+                                                .targetGateSetOption = targetGateSetOption,
+                                                .fixedDecompsOption = fixedDecompsOption,
+                                                .altDecompsOption = altDecompsOption,
+                                                .bytecodeRulesFile = bytecodeRulesFile,
+                                                .libQPDPath = libQPDPath,
+                                                .libpythonPath = libpythonPath,
+                                            });
         }
         if (!graph) {
             return signalPassFailure();

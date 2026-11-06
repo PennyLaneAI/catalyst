@@ -29,7 +29,7 @@
 namespace catalyst {
 namespace quantum {
 
-namespace GraphDecompositionPrep {
+namespace GraphPrep {
 
 /**
  * @brief Options shared by passes that build a decomposition graph.
@@ -46,13 +46,6 @@ struct PrepOptions {
 };
 
 /**
- * @brief Find the quantum.node function in the module.
- *
- * Returns the first `func.func` with the `quantum.node` attribute, or null if none exists.
- */
-mlir::func::FuncOp findQNodeFunc(mlir::ModuleOp module);
-
-/**
  * @brief Prepare a decomposition graph from a module.
  *
  * Gathers rules for the target gateset in addition to the passed in opIDs and builds a
@@ -63,6 +56,6 @@ mlir::func::FuncOp findQNodeFunc(mlir::ModuleOp module);
 std::unique_ptr<DecompGraph::Solver::DecompositionGraph>
 prepareGraph(mlir::ModuleOp module, llvm::ArrayRef<std::string> opIDs, const PrepOptions &opts);
 
-} // namespace GraphDecompositionPrep
+} // namespace GraphPrep
 } // namespace quantum
 } // namespace catalyst

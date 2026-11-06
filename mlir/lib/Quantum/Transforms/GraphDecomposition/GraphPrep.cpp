@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "GraphDecompositionPrep.hpp"
+#include "GraphPrep.hpp"
 
 #include <cstdint>
 #include <memory>
@@ -55,8 +55,6 @@ using namespace DecompGraph::Core;
 using namespace DecompGraph::Solver;
 
 namespace {
-
-constexpr llvm::StringRef qnodeAttrName = "quantum.node";
 
 void parseFixedDecomps(ArrayRef<std::string> fixedDecompsOption,
                        llvm::StringMap<std::string> &opToFixedDecompName,
@@ -453,23 +451,11 @@ LogicalResult getRuleNodes(ModuleOp module, llvm::StringRef filename,
 
 namespace catalyst {
 namespace quantum {
-namespace GraphDecompositionPrep {
-
-func::FuncOp findQNodeFunc(ModuleOp module) {
-    func::FuncOp found;
-    module.walk([&](func::FuncOp func) {
-        if (func->hasAttrOfType<UnitAttr>(qnodeAttrName)) {
-            found = func;
-            return WalkResult::interrupt();
-        }
-        return WalkResult::advance();
-    });
-    return found;
-}
+namespace GraphPrep {
 
 std::unique_ptr<DecompositionGraph> prepareGraph(ModuleOp module, ArrayRef<std::string> opIDs,
                                                  const PrepOptions &opts) {
-    LLVM_DEBUG(llvm::dbgs() << "Running GraphDecompositionPrep with options:\n");
+    LLVM_DEBUG(llvm::dbgs() << "Running GraphPrep with options:\n");
     LLVM_DEBUG({
         llvm::dbgs() << "targetGateSetOption\n";
         for (auto item : opts.targetGateSetOption) {
@@ -518,6 +504,6 @@ std::unique_ptr<DecompositionGraph> prepareGraph(ModuleOp module, ArrayRef<std::
                                                 std::move(setOfRules));
 }
 
-} // namespace GraphDecompositionPrep
+} // namespace GraphPrep
 } // namespace quantum
 } // namespace catalyst

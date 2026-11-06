@@ -16,6 +16,13 @@
 
 // RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{inline-rule-body gate-set=Adjoint(testT)=1.0 alt-decomps=testS{}{wires:1}{}=s_to_adjt})' %s | FileCheck %s --check-prefixes=ALL,INLINE
 
+// GraphDecomposition only solves GOIDs reachable from an entry function.
+func.func @entry(%q: !quantum.bit) attributes {llvm.emit_c_interface} {
+  %0 = call @adjoint_in_gateset(%q) : (!quantum.bit) -> !quantum.bit
+  %1 = call @decompose_to_adjoint(%q) : (!quantum.bit) -> !quantum.bit
+  return
+}
+
 // ALL-LABEL: func.func @adjoint_in_gateset(
 // ALL-SAME:  [[Q:%.+]]: !quantum.bit
 func.func @adjoint_in_gateset(%q: !quantum.bit) -> !quantum.bit {

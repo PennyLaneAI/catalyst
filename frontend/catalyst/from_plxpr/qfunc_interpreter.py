@@ -437,13 +437,13 @@ def _convert_decomp_target_spec(interpreter, target_spec):
         operands = [jax.ShapeDtypeStruct(operand.shape, operand.dtype) for operand in operands]
     out = []
     for rule in target_spec.rules:
-        pyfun = rule.pyfun
-        if not pyfun.__name__.startswith("__builtin_"):
-            pyfun.__name__ = "__builtin_" + pyfun.__name__
+        prepared_rule_fn = rule.prepared_rule_fn
+        if not prepared_rule_fn.__name__.startswith("__builtin_"):
+            prepared_rule_fn.__name__ = "__builtin_" + prepared_rule_fn.__name__
 
         with take_current_trace():
             try:
-                plxpr = jax.make_jaxpr(pyfun)(*operands)
+                plxpr = jax.make_jaxpr(prepared_rule_fn)(*operands)
             except Exception as exc:  # pylint: disable=broad-except
                 warnings.warn(
                     f"Failed to capture the {rule.frontend_name} decomposition rule for "
@@ -474,10 +474,10 @@ def _convert_decomp_target_spec(interpreter, target_spec):
                 continue
         out.append(
             TracedRule(
-                pyfun=pyfun,
+                prepared_rule_fn=prepared_rule_fn,
                 closed_jaxpr=converted,
                 target_gate=target_spec.target_id,
-                resources=rule.resources,
+                resources=rule.resource_counts_by_id,
                 frontend_name=rule.frontend_name,
             )
         )
@@ -504,7 +504,7 @@ def capture_and_bind_kernel_rules(interpreter):
 
     for traced_rule in scope.definitions.values():
         decomp_definition_p.bind(
-            pyfun=traced_rule.pyfun,
+            pyfun=traced_rule.prepared_rule_fn,
             func_jaxpr=traced_rule.closed_jaxpr,
             target_gate=traced_rule.target_gate,
             resources=tuple(sorted(traced_rule.resources.items())),

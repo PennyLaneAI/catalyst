@@ -38,7 +38,7 @@
 #include "DGSolver.hpp"
 #include "DGTypes.hpp"
 #include "DGUtils.hpp"
-#include "GraphDecompositionPrep.hpp"
+#include "GraphPrep.hpp"
 
 using namespace mlir;
 using namespace DecompGraph::Core;
@@ -57,25 +57,25 @@ struct ResourceEstimatePass : public impl::ResourceEstimatePassBase<ResourceEsti
         ModuleOp module = getOperation();
 
         ResourceAnalysis analysis(module, {}, /*collectDetailedOperations=*/true);
+        llvm::StringRef entryFuncName = analysis.getEntryFunc();
+
         std::vector<std::string> opIDs;
-        if (func::FuncOp qnode = GraphDecompositionPrep::findQNodeFunc(module)) {
-            if (const catalyst::ResourceResult *flat =
-                    analysis.getFlattenedResource(qnode.getName())) {
-                for (const auto &opID : flat->observedGraphOpIds) {
-                    opIDs.push_back(opID.getKey().str());
-                }
+        if (const catalyst::ResourceResult *flat = analysis.getFlattenedResource(entryFuncName)) {
+            for (const auto &opID : flat->observedGraphOpIds) {
+                opIDs.push_back(opID.getKey().str());
             }
         }
 
-        GraphDecompositionPrep::PrepOptions opts;
-        opts.targetGateSetOption = targetGateSetOption;
-        opts.fixedDecompsOption = fixedDecompsOption;
-        opts.altDecompsOption = altDecompsOption;
-        opts.bytecodeRulesFile = bytecodeRulesFile;
-        opts.libQPDPath = libQPDPath;
-        opts.libpythonPath = libpythonPath;
         std::unique_ptr<DecompositionGraph> graph =
-            GraphDecompositionPrep::prepareGraph(module, opIDs, opts);
+            GraphPrep::prepareGraph(module, opIDs,
+                                    {
+                                        .targetGateSetOption = targetGateSetOption,
+                                        .fixedDecompsOption = fixedDecompsOption,
+                                        .altDecompsOption = altDecompsOption,
+                                        .bytecodeRulesFile = bytecodeRulesFile,
+                                        .libQPDPath = libQPDPath,
+                                        .libpythonPath = libpythonPath,
+                                    });
 
         if (!graph) {
             return signalPassFailure();

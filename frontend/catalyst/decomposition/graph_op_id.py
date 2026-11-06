@@ -22,6 +22,7 @@ from pennylane.pytrees import flatten
 
 from catalyst.decomposition.modifier_state import ModifierState
 from catalyst.decomposition.type_utils import (
+    SerializedGraphOpID,
     convert_item_to_mlir_type,
     post_process_concretize_leaves,
     replace_wires_with_placeholder_wires,
@@ -92,7 +93,7 @@ def build_graph_op_id(
     *,
     modifiers: ModifierState = ModifierState(),
     uid: int | None = None,
-) -> str:
+) -> SerializedGraphOpID:
     """Build a canonical frontend GraphOpID from its identity components."""
     name = modifiers.wrap_name(operator_name)
 
@@ -100,7 +101,7 @@ def build_graph_op_id(
     wire_id = "{" + ",".join(f"{key}:{value}" for key, value in sorted(wire_lens.items())) + "}"
     static_id = format_static_data_dict_for_id(dict(sorted(static_data.items())))
     uid_id = f"[{uid}]" if uid is not None else ""
-    return name + dynamic_id + wire_id + static_id + uid_id
+    return SerializedGraphOpID(name + dynamic_id + wire_id + static_id + uid_id)
 
 
 class GraphOpID:
@@ -260,7 +261,7 @@ class GraphOpID:
         """Return the name of the operator."""
         return self.operator_name
 
-    def _build_id(self, modifiers: ModifierState) -> str:
+    def _build_id(self, modifiers: ModifierState) -> SerializedGraphOpID:
         """Return the GraphOpId of the base operator under the given modifiers."""
         uid = None
         if self.extra_data:
@@ -275,7 +276,7 @@ class GraphOpID:
             uid=uid,
         )
 
-    def getGraphOpId(self, modifiers: ModifierState = ModifierState()) -> str:
+    def getGraphOpId(self, modifiers: ModifierState = ModifierState()) -> SerializedGraphOpID:
         """
         Return the GraphOpId as a string.
 
@@ -288,7 +289,7 @@ class GraphOpID:
         """
         return self._build_id(modifiers.compose(self.modifiers))
 
-    def getBaseGraphOpId(self) -> str:
+    def getBaseGraphOpId(self) -> SerializedGraphOpID:
         """Return the GraphOpId of the base operator alone, leaving off the modifiers wrapping it.
 
         The base is what owns the decomposition rules, so this is the id to look them up under.
