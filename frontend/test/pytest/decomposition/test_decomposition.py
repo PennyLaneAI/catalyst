@@ -51,6 +51,7 @@ from pennylane.wires import Wires
 from catalyst import qjit
 from catalyst.decomposition import GraphOpID, RuleLoweringWarning
 from catalyst.decomposition.decomposition_rules import (
+    RuleTraceInputs,
     _adjoint_folds_to_base,
     _rule_allocates_work_wires,
     _rule_is_compatible,
@@ -91,18 +92,18 @@ class TestGenericUtilities:
             ({"reg": 0, "x": 0}, {"x": None}, ["x", "reg"]),
             # Custom ops carry their params positionally, so only wires remain here (unchanged).
             ({"wires": 0}, {"0": None}, ["wires"]),
-            # Params are sorted, while wire registers retain declaration order for grouping.
+            # Parameters and wire registers retain their respective declaration orders.
             (
-                {"reg2": 0, "reg1": 0, "b": 0, "a": 0},
-                {"a": None, "b": None},
-                ["a", "b", "reg2", "reg1"],
+                {"reg2": 0, "reg1": 0, "a": 0, "b": 0},
+                {"b": None, "a": None},
+                ["b", "a", "reg2", "reg1"],
             ),
         ],
     )
     def test_ordered_kwarg_names_groups_params_before_wires(
         self, call_kwargs, dynamic_shape, expected
     ):
-        """Keyword parameters are sorted before declaration-ordered wire registers."""
+        """Parameters precede wire registers, preserving their respective declaration orders."""
         assert ordered_kwarg_names(call_kwargs, dynamic_shape) == expected
 
     def test_rule_call_operands_groups_wire_kwargs(self):
@@ -119,15 +120,72 @@ class TestGenericUtilities:
         wire_lens = {"reg2": 2, "empty_reg": 0, "reg1": 3}
         kwarg_names = ordered_kwarg_names(call_kwargs, dynamic_shape)
         ctrl_wires = jnp.array([5, 6])
+        ctrl_values = jnp.array([True, False])
 
-        operands = rule_call_operands(call_args, call_kwargs, kwarg_names, wire_lens, ctrl_wires)
+        trace_inputs = RuleTraceInputs(
+            call_args=call_args,
+            call_kwargs=call_kwargs,
+            kwarg_names=kwarg_names,
+            wire_lens=wire_lens,
+            ctrl_wires=ctrl_wires,
+            ctrl_values=ctrl_values,
+        )
+        operands = rule_call_operands(trace_inputs)
 
-        assert len(operands) == 5
+        assert len(operands) == 6
         np.testing.assert_array_equal(operands[0], 10.0)
         np.testing.assert_array_equal(operands[1], 12.0)
         np.testing.assert_array_equal(operands[2], 11.0)
         np.testing.assert_array_equal(operands[3], [3, 4, 0, 1, 2])
         np.testing.assert_array_equal(operands[4], [5, 6])
+        np.testing.assert_array_equal(operands[5], [True, False])
+
+    def test_rule_call_operands_preserves_hybrid_leaf_order(self):
+        """Hybrid leaves follow parameters and precede the base wires and control operands."""
+        trace_inputs = RuleTraceInputs(
+            call_args=(),
+            call_kwargs={"theta": jnp.array(0.25), "wires": jnp.array([0, 1])},
+            kwarg_names=["theta", "wires"],
+            wire_lens={"wires": 2},
+            ctrl_wires=jnp.array([2]),
+            ctrl_values=jnp.array([False]),
+            hybrid_leaves=(jnp.array([3.0, 4.0]), jnp.array([[5.0, 6.0], [7.0, 8.0]])),
+        )
+
+        operands = rule_call_operands(trace_inputs)
+
+        assert len(operands) == 6
+        np.testing.assert_array_equal(operands[0], 0.25)
+        np.testing.assert_array_equal(operands[1], [3.0, 4.0])
+        np.testing.assert_array_equal(operands[2], [[5.0, 6.0], [7.0, 8.0]])
+        np.testing.assert_array_equal(operands[3], [0, 1])
+        np.testing.assert_array_equal(operands[4], [2])
+        np.testing.assert_array_equal(operands[5], [False])
+
+    def test_rule_operands_without_wires_or_controls(self):
+        """A parameter-only rule retains an empty wire operand and reconstructs without controls."""
+        trace_inputs = RuleTraceInputs(
+            call_args=(np.float64(0.5),),
+            call_kwargs={},
+            kwarg_names=[],
+            wire_lens={},
+        )
+
+        operands = rule_call_operands(trace_inputs)
+
+        assert len(operands) == 2
+        np.testing.assert_array_equal(operands[0], 0.5)
+        assert operands[1].shape == (0,)
+
+        args, kwargs, ctrl_wires, ctrl_values = unpack_rule_operands(
+            operands, n_params=1, kwarg_names=[], wire_lens={}, has_ctrl_wires=False
+        )
+
+        assert len(args) == 1
+        np.testing.assert_array_equal(args[0], 0.5)
+        assert kwargs == {}
+        assert ctrl_wires is None
+        assert ctrl_values is None
 
     def test_unpack_rule_operands_restores_wire_kwargs(self):
         """Grouped base wires unpack into distinct registers, including an empty register."""
@@ -154,6 +212,35 @@ class TestGenericUtilities:
         np.testing.assert_array_equal(kwargs["reg1"], [0, 1, 2])
         np.testing.assert_array_equal(ctrl_wires, [5, 6])
         np.testing.assert_array_equal(ctrl_values, [True, False])
+
+    def test_unpack_rule_operands_restores_hybrid_arguments(self):
+        """Hybrid leaves reconstruct their nested argument without consuming wire or control inputs."""
+        hybrid_specs, _, _ = flatten_hybrid_args({"data": (Float[2], {"matrix": Float[2, 2]})})
+        operands = (
+            jnp.array(0.25),
+            jnp.array([3.0, 4.0]),
+            jnp.array([[5.0, 6.0], [7.0, 8.0]]),
+            jnp.array([0, 1]),
+            jnp.array([2]),
+            jnp.array([False]),
+        )
+
+        args, kwargs, ctrl_wires, ctrl_values = unpack_rule_operands(
+            operands,
+            n_params=0,
+            kwarg_names=["theta", "wires"],
+            wire_lens={"wires": 2},
+            has_ctrl_wires=True,
+            hybrid_specs=hybrid_specs,
+        )
+
+        assert args == ()
+        np.testing.assert_array_equal(kwargs["theta"], 0.25)
+        np.testing.assert_array_equal(kwargs["data"][0], [3.0, 4.0])
+        np.testing.assert_array_equal(kwargs["data"][1]["matrix"], [[5.0, 6.0], [7.0, 8.0]])
+        np.testing.assert_array_equal(kwargs["wires"], [0, 1])
+        np.testing.assert_array_equal(ctrl_wires, [2])
+        np.testing.assert_array_equal(ctrl_values, [False])
 
     def test_hybrid_operands_preserve_parameters_and_wires(self):
         """Nested parameters follow ordinary hybrid parameters; wires retain their mapping."""
