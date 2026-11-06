@@ -68,6 +68,7 @@ with Patcher(
     from mlir_quantum.dialects.qref import (
         AdjointOp,
         AllocOp,
+        BarrierOp,
         ComputationalBasisOp,
         CtrlOp,
         CustomOp,
@@ -458,6 +459,13 @@ def _qref_qinst_lowering(
             ctrl_values=ctrl_values_i1,
             adjoint=adjoint,
         )
+        return ()
+
+    if name_str == "Barrier":
+        assert len(float_params) == 0, "Barrier takes no parameters"
+        assert ctrl_len == 0, "Barrier does not support control wires"
+        assert not adjoint, "Barrier does not support adjoint"
+        BarrierOp(qubits=qubits)
         return ()
 
     CustomOp(
