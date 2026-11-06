@@ -114,6 +114,7 @@ class NoUnitaryDevice(qp.devices.Device):
 NoUnitaryDevice.capabilities.operations.pop("QubitUnitary")
 
 
+@pytest.mark.old_frontend
 class TestControlledDecomposition:
     """Test behaviour around the decomposition of the `Controlled` class."""
 
@@ -130,7 +131,7 @@ class TestControlledDecomposition:
             ctrl(OpWithNoMatrix(wires=[0, 1]), control=[2, 3])
             return qp.probs()
 
-        circuit = qjit(f, target="jaxpr")
+        circuit = qjit(f, target="jaxpr", capture=False)
 
         with pytest.raises(CompileError, match="not supported with catalyst on this device"):
             circuit()
@@ -161,7 +162,7 @@ class TestControlledDecomposition:
             ctrl(UnknownOp(wires=[0, 1]), control=[2, 3])
             return qp.probs()
 
-        circuit = qjit(f, target="jaxpr")
+        circuit = qjit(f, target="jaxpr", capture=False)
 
         with pytest.raises(CompileError, match="not supported with catalyst on this device"):
             circuit()

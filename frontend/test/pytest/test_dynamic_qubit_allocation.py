@@ -564,10 +564,11 @@ def test_magic_state_allocation(backend, state, prep):
     assert np.allclose(baseline(), circuit())
 
 
+@pytest.mark.old_frontend
 def test_no_capture(backend):
     """Test error message when allocate is used without program capture."""
 
-    @qjit
+    @qjit(capture=False)
     @qp.qnode(qp.device(backend, wires=1))
     def circuit():
         with qp.allocate(1) as _:

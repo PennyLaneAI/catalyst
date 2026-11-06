@@ -102,7 +102,7 @@ def qjit(
     seed=None,
     pass_plugins=None,
     dialect_plugins=None,
-    capture="global",
+    capture=True,
     skip_preprocess=False,
     collect_decomp_rules=True,
     enable_aot_compilation=True,

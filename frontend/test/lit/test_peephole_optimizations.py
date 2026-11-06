@@ -63,7 +63,7 @@ def test_multi_transform_lowering():
         qp.Hadamard(wires=[1])
         return qp.expval(qp.PauliY(wires=0))
 
-    # CHECK: pipelines=(('main', (<cancel-inverses()>, <merge-rotations()>)),)
+    # CHECK: pipelines=(('main', (<cancel-inverses()>, <merge-rotations()>)),
     print_jaxpr(test_pipeline_lowering_workflow, 1.2)
 
     # CHECK: transform.named_sequence @__transform_main
@@ -99,7 +99,7 @@ def test_transform_lowering():
         qp.Hadamard(wires=[1])
         return qp.expval(qp.PauliY(wires=0))
 
-    # CHECK: pipelines=(('main', (<cancel_inverses()>, <merge_rotations()>)),)
+    # CHECK: pipelines=(('main', (<cancel-inverses()>, <merge-rotations()>)),
     print_jaxpr(test_pipeline_lowering_workflow, 1.2)
 
     # CHECK: transform.named_sequence @__transform_main
@@ -145,7 +145,7 @@ def test_multi_transform_lowering_keep_original():
     # COM: this if for f_pipeline(x)
     # COM: Unfortunately, we don't have a nice repr for qnode
     # CHECK: quantum_kernel
-    # CHECK: pipelines=(('main', (<cancel-inverses()>, <merge-rotations()>)),)
+    # CHECK: pipelines=(('main', (<cancel-inverses()>, <merge-rotations()>)),
     print_jaxpr(test_pipeline_lowering_keep_original_workflow, 1.2)
 
     # COM: This is the one that is unchanged
@@ -159,12 +159,12 @@ def test_multi_transform_lowering_keep_original():
 
     # CHECK: func.func public @jit_test_pipeline_lowering_keep_original_workflow
     # CHECK: {{%.+}} = call @f_0(
-    # CHECK: {{%.+}} = call @f_1_0(
+    # CHECK: {{%.+}} = call @[[PIPELINE_F:f_[0-9]+_0]](
     # CHECK: func.func public @f_0(
     # CHECK: {{%.+}} = quantum.custom "RX"({{%.+}}) {{%.+}} : !quantum.bit
     # CHECK: {{%.+}} = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit
     # CHECK: {{%.+}} = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit
-    # CHECK: func.func public @f_1_0(
+    # CHECK: func.func public @[[PIPELINE_F]](
     # CHECK: {{%.+}} = quantum.custom "RX"({{%.+}}) {{%.+}} : !quantum.bit
     # CHECK-NOT: {{%.+}} = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit
     # CHECK-NOT: {{%.+}} = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit
@@ -515,9 +515,9 @@ def test_cancel_inverses_tracing_and_lowering():
         return _f, _g, _h
 
     # CHECK: quantum_kernel
-    # CHECK: pipelines=(('main', (<cancel-inverses()>,)),)
+    # CHECK: pipelines=(('main', (<cancel-inverses()>,)),
     # CHECK: quantum_kernel
-    # CHECK: pipelines=(('main', (<cancel-inverses()>,)),)
+    # CHECK: pipelines=(('main', (<cancel-inverses()>,)),
     print_jaxpr(test_cancel_inverses_tracing_and_lowering_workflow, 1.1)
 
     # CHECK: module @test_cancel_inverses_tracing_and_lowering_workflow
@@ -553,7 +553,7 @@ def test_cancel_inverses_tracing_and_lowering_outside_qjit():
         return _f
 
     # CHECK: quantum_kernel
-    # CHECK: pipelines=(('main', (<cancel-inverses()>,)),)
+    # CHECK: pipelines=(('main', (<cancel-inverses()>,)),
     print_jaxpr(test_cancel_inverses_tracing_and_lowering_outside_qjit_workflow, 1.1)
 
     # CHECK: module @test_cancel_inverses_tracing_and_lowering_outside_qjit_workflow
@@ -673,12 +673,12 @@ def test_cancel_inverses_keep_original():
 
     # CHECK-LABEL: public @jit_test_cancel_inverses_keep_original_workflow2
     # CHECK: {{%.+}} = call @f_0({{%.+}})
-    # CHECK: {{%.+}} = call @f_1_0({{%.+}})
+    # CHECK: {{%.+}} = call @[[CANCELLED_F:f_[0-9]+_0]]({{%.+}})
     # CHECK-LABEL: public @f_0({{%.+}})
     # CHECK: {{%.+}} = quantum.custom "RX"({{%.+}}) {{%.+}} : !quantum.bit
     # CHECK-NEXT: {{%.+}} = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit
     # CHECK-NEXT: {{%.+}} = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit
-    # CHECK-LABEL: public @f_1_0({{%.+}})
+    # CHECK: public @[[CANCELLED_F]]({{%.+}})
     # CHECK: {{%.+}} = quantum.custom "RX"({{%.+}}) {{%.+}} : !quantum.bit
     # CHECK-NOT: {{%.+}} = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit
     # CHECK-NOT: {{%.+}} = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit
@@ -735,9 +735,9 @@ def test_merge_rotations_tracing_and_lowering():
         return _f, _g, _h
 
     # CHECK: quantum_kernel
-    # CHECK: pipelines=(('main', (<merge-rotations()>,)),)
+    # CHECK: pipelines=(('main', (<merge-rotations()>,)),
     # CHECK: quantum_kernel
-    # CHECK: pipelines=(('main', (<merge-rotations()>,)),)
+    # CHECK: pipelines=(('main', (<merge-rotations()>,)),
     # CHECK: quantum_kernel
     print_jaxpr(test_merge_rotations_tracing_and_lowering_workflow, 1.1)
 

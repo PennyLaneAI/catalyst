@@ -863,6 +863,9 @@
 
 <h3>Breaking changes 💔</h3>
 
+* We now have `capture=True` as the default mode for Catalyst `qjit`.
+  [(#3414)](https://github.com/PennyLaneAI/catalyst/pull/3414)
+
 * The `lazy` argument has been removed from `catalyst.adjoint`, matching
   `qp.adjoint`. Adjoint construction is always symbolic, and captured adjoint
   regions no longer carry `lazy` metadata. Construct known inverse gates directly
