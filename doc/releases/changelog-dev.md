@@ -1140,8 +1140,7 @@
   libraries recorded by `runtime_call`s and devices before linking.
   [(#3438)](https://github.com/PennyLaneAI/catalyst/pull/3438)
 
-* Fixed hinted while loops to be counted symbolically in 
-  `ResourceAnalysis`.
+* Fixed hinted while loops to be counted symbolically in `ResourceAnalysis`.
   [(#3370)](https://github.com/PennyLaneAI/catalyst/pull/3370)
 
 <h3>Internal changes ⚙️</h3>
