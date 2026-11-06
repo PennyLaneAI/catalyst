@@ -6,8 +6,10 @@
 # Transport-agnostic bits (WireProtocol, ConfigParser) live in ../../common/.
 
 set(TRANSPORT_COMMON_SOURCES
+    BalboaLink.cpp
     CompletionQueue.cpp
     Context.cpp
+    HsbLink.cpp
     MemoryRegion.cpp
     OobSocket.cpp
     ProtectionDomain.cpp

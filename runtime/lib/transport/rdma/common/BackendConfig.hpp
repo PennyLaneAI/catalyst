@@ -61,4 +61,25 @@ inline BackendConfig parse_backend_config(const std::string &config) {
     return BackendConfig{std::move(dev), gid};
 }
 
+/// What a coprocessor speaks to its controller.
+enum class Wire {
+    RC,     // the RC wire every catalyst controller speaks; `wire=rc` or no `wire` key
+    HSB,    // `wire=hsb`: a controller behind NVIDIA's Holoscan Sensor Bridge (HsbWire.hpp)
+    BALBOA, // `wire=balboa`: a controller behind ETH Zurich's BALBOA (BalboaWire.hpp)
+};
+
+/// The wire a coprocessor's `config` selects.
+inline Wire wire_from_config(const std::string &config) {
+    const auto wire = configparser::find(config, "wire");
+    if (!wire || *wire == "rc") {
+        return Wire::RC;
+    }
+    if (*wire == "hsb") {
+        return Wire::HSB;
+    }
+    TP_CHECK(*wire == "balboa", "config: unknown wire '%.*s' (want rc|hsb|balboa)",
+             static_cast<int>(wire->size()), wire->data());
+    return Wire::BALBOA;
+}
+
 } // namespace catalyst::transport::common

@@ -211,7 +211,7 @@ layout. The backend's library is named ``libcatalyst_transport_<backend>_<role>.
 The built-in backends are:
 
 * ``rdma``: ``cpu_verbs`` on ``cpu``, ``gpu_verbs`` on ``gpu``, and ``hwhs`` on ``fpga``.
-  ``fpga_verbs`` is also available on ``fpga`` when named.
+  ``fpga_verbs``, ``hsb_hwhs`` and ``balboa_hwhs`` are also available on ``fpga`` when named.
 * ``memcpy``: ``memcpy`` on ``cpu`` and ``memcpy_gpu`` on ``gpu``.
 
 A backend is a shared library implementing ``ControllerSession`` or ``CoprocessorSession`` from

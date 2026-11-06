@@ -73,11 +73,10 @@ constexpr int kErrMemory = CATALYST_TRANSPORT_ERR_MEMORY;
 constexpr int kErrTimeout = CATALYST_TRANSPORT_ERR_TIMEOUT;
 constexpr int kErrStuck = CATALYST_TRANSPORT_ERR_STUCK;
 
-// Demo mode only, and deliberately outside the CAPI set: the pacer reached demo_cnt and
-// stopped, which ends a bounded demo run. Callers must not read it as an error -- and must not
-// read it as success either, since nothing upstream translates it. Completion is answered by
-// HH_DEMO_STATUS.done (see demo_report) and by the trace header's entries/full counters.
-constexpr int kDemoComplete = -5;
+// Demo mode only: the pacer reached demo_cnt and stopped, which ends a bounded demo run. How the
+// run went is in HH_DEMO_STATUS.done (see demo_report) and the trace header's entries/full
+// counters.
+constexpr int kDemoComplete = CATALYST_TRANSPORT_RUN_COMPLETE;
 constexpr std::uint64_t kCollectTimeoutNs = 5'000'000'000ULL;
 constexpr std::size_t kRttSamplesReserve = 3'000'000; // 24 MB
 
