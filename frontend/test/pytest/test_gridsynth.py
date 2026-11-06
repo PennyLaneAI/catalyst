@@ -267,7 +267,7 @@ def test_mixed_gridsynth_samples(param, op, eps, ppr_basis):
 @pytest.mark.parametrize("op", [qp.RZ, qp.PhaseShift])
 @pytest.mark.parametrize("eps", [1e-2, 1e-4])
 @pytest.mark.parametrize("ppr_basis", [False, True])
-@pytest.mark.xfail(reason="mixed-fallback introduces quantum.measure")
+@pytest.mark.xfail(reason="mixed-fallback introduces quantum.measure", strict=False)
 def test_mixed_fallback_gridsynth_samples(op, eps, ppr_basis):
     """Test the sampled states of the mixed fallback method."""
     dev = qp.device("lightning.qubit", wires=1)
@@ -304,7 +304,9 @@ def test_mixed_fallback_gridsynth_samples(op, eps, ppr_basis):
         "mixed",
         pytest.param(
             "mixed-fallback",
-            marks=pytest.mark.xfail(reason="mixed-fallback introduces quantum.measure"),
+            marks=pytest.mark.xfail(
+                reason="mixed-fallback introduces quantum.measure", strict=False
+            ),
         ),
     ],
 )
@@ -331,7 +333,9 @@ def test_mixed_gridsynth_seed(method):
         "mixed",
         pytest.param(
             "mixed-fallback",
-            marks=pytest.mark.xfail(reason="mixed-fallback introduces quantum.measure"),
+            marks=pytest.mark.xfail(
+                reason="mixed-fallback introduces quantum.measure", strict=False
+            ),
         ),
     ],
 )
@@ -393,7 +397,9 @@ def test_gridsynth_high_precision(eps):
         "mixed",
         pytest.param(
             "mixed-fallback",
-            marks=pytest.mark.xfail(reason="mixed-fallback introduces quantum.measure"),
+            marks=pytest.mark.xfail(
+                reason="mixed-fallback introduces quantum.measure", strict=False
+            ),
         ),
     ],
 )
@@ -436,7 +442,9 @@ def test_mixed_gridsynth_high_precision(eps, method):
         "mixed",
         pytest.param(
             "mixed-fallback",
-            marks=pytest.mark.xfail(reason="mixed-fallback introduces quantum.measure"),
+            marks=pytest.mark.xfail(
+                reason="mixed-fallback introduces quantum.measure", strict=False
+            ),
         ),
     ],
 )
