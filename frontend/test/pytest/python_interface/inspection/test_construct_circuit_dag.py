@@ -852,7 +852,9 @@ class TestGetLabel:
     def test_global_phase_operator(self):
         """Tests against a GlobalPhase operator instance."""
         assert get_label(qp.GlobalPhase(0.5)) == "GlobalPhase"
-        assert get_label(qp.ctrl(qp.GlobalPhase(0.0), control=0)) == "<name> PhaseShift|<wire> [0]"
+        assert (
+            get_label(qp.ctrl(qp.GlobalPhase(0.0), control=0)) == "<name> C(GlobalPhase)|<wire> [0]"
+        )
         assert get_label(qp.adjoint(qp.GlobalPhase(0.0))) == "Adjoint(GlobalPhase)"
 
     @pytest.mark.parametrize(
@@ -1735,8 +1737,8 @@ class TestOperatorConnectivity:
         else:
             expected_edges = (
                 ("NullQubit", "PauliX"),
-                ("PauliX", "PhaseShift"),
-                ("PhaseShift", "PauliY"),
+                ("PauliX", "C(GlobalPhase)"),
+                ("C(GlobalPhase)", "PauliY"),
             )
         assert_dag_structure(nodes, edges, expected_edges)
 
@@ -3054,7 +3056,7 @@ class TestCtrl:
             assert "Hadamard" in nodes["node1"]["label"]
             assert nodes["node1"]["parent_cluster_uid"] == "cluster2"
         else:
-            assert "CH" in nodes["node1"]["label"]
+            assert "C(Hadamard)" in nodes["node1"]["label"]
             assert "[1, 0]" in nodes["node1"]["label"]
             assert nodes["node1"]["parent_cluster_uid"] == "cluster1"
 
@@ -3085,7 +3087,7 @@ class TestCtrl:
 
         # cluster0 -> qjit
         # cluster1 -> my_workflow
-        assert "CH" in nodes["node1"]["label"]
+        assert "C(Hadamard)" in nodes["node1"]["label"]
         assert "[1, 0]" in nodes["node1"]["label"]
         assert nodes["node1"]["parent_cluster_uid"] == "cluster1"
 
@@ -3122,7 +3124,7 @@ class TestCtrl:
             assert "Hadamard" in nodes["node1"]["label"]
             assert nodes["node1"]["parent_cluster_uid"] == "cluster2"
         else:
-            assert "CH" in nodes["node1"]["label"]
+            assert "C(Hadamard)" in nodes["node1"]["label"]
             assert "[1, 0]" in nodes["node1"]["label"]
             assert nodes["node1"]["parent_cluster_uid"] == "cluster1"
 
