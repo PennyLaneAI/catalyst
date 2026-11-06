@@ -53,6 +53,10 @@ class MemoryRegion {
     // register caller-provided memory and keep a shared_ptr for lifetime.
     MemoryRegion(std::shared_ptr<ProtectionDomain> pd, void *addr, std::size_t length,
                  MemAccess access, std::shared_ptr<void> backing);
+    // register caller-provided memory under a chosen I/O virtual address, which is what a peer
+    // writes to (the HSB wire puts its ring at IOVA 0); `backing` as above.
+    MemoryRegion(std::shared_ptr<ProtectionDomain> pd, void *addr, std::size_t length,
+                 std::uint64_t iova, MemAccess access, std::shared_ptr<void> backing);
     // register a dma-buf (does not own the buffer).
     MemoryRegion(std::shared_ptr<ProtectionDomain> pd, std::uint64_t offset, std::size_t length,
                  std::uint64_t iova, int fd, MemAccess access);

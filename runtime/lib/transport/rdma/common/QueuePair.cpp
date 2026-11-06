@@ -31,25 +31,25 @@ constexpr std::uint8_t QP_TIMEOUT = 14;    // ACK timeout code
 constexpr std::uint8_t RETRY_CNT = 7;      // transport retry count
 constexpr std::uint8_t RNR_RETRY = 7;      // RNR retry count (7 = infinite)
 constexpr std::uint8_t MAX_RD_ATOMIC = 1;  // outstanding RDMA read/atomic ops
-constexpr std::uint32_t MAX_RECV_WR = 4;
-constexpr std::uint32_t MAX_SGE = 1; // single-SGE descriptors on both queues
+constexpr std::uint32_t MAX_SGE = 1;       // single-SGE descriptors on both queues
 } // namespace
 
 QueuePair::QueuePair(std::shared_ptr<ProtectionDomain> pd, std::shared_ptr<CompletionQueue> send_cq,
-                     std::shared_ptr<CompletionQueue> recv_cq, int max_send_wr, int max_inline)
-    : pd_(std::move(pd)), send_cq_(std::move(send_cq)), recv_cq_(std::move(recv_cq)) {
+                     std::shared_ptr<CompletionQueue> recv_cq, int max_send_wr, int max_inline,
+                     QpType type, int max_recv_wr)
+    : pd_(std::move(pd)), send_cq_(std::move(send_cq)), recv_cq_(std::move(recv_cq)), type_(type) {
     ibv_qp_init_attr a{
         .send_cq = send_cq_->get(),
         .recv_cq = recv_cq_->get(),
         .cap =
             {
                 .max_send_wr = static_cast<std::uint32_t>(max_send_wr),
-                .max_recv_wr = MAX_RECV_WR,
+                .max_recv_wr = static_cast<std::uint32_t>(max_recv_wr),
                 .max_send_sge = MAX_SGE,
                 .max_recv_sge = MAX_SGE,
                 .max_inline_data = static_cast<std::uint32_t>(max_inline),
             },
-        .qp_type = IBV_QPT_RC,
+        .qp_type = type == QpType::UC ? IBV_QPT_UC : IBV_QPT_RC,
         .sq_sig_all = 0,
     };
     qp_ = ibv_create_qp(pd_->get(), &a);
@@ -83,10 +83,10 @@ void QueuePair::modify(QpState to, ibv_qp_attr &attr, int mask, const char *what
 }
 
 void QueuePair::to_init(std::uint8_t port) {
+    const unsigned remote_read = type_ == QpType::RC ? IBV_ACCESS_REMOTE_READ : 0;
     ibv_qp_attr a{
         .qp_state = IBV_QPS_INIT,
-        .qp_access_flags =
-            IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE | IBV_ACCESS_REMOTE_READ,
+        .qp_access_flags = IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE | remote_read,
         .pkey_index = 0,
         .port_num = port,
     };
@@ -112,9 +112,9 @@ void QueuePair::to_rtr(std::uint32_t dest_qpn, std::uint32_t dest_psn,
         .min_rnr_timer = MIN_RNR_TIMER,
     };
     std::memcpy(&a.ah_attr.grh.dgid, dest_gid, 16);
+    const int rc_only = type_ == QpType::RC ? IBV_QP_MAX_DEST_RD_ATOMIC | IBV_QP_MIN_RNR_TIMER : 0;
     modify(QpState::RTR, a,
-           IBV_QP_STATE | IBV_QP_AV | IBV_QP_PATH_MTU | IBV_QP_DEST_QPN | IBV_QP_RQ_PSN |
-               IBV_QP_MAX_DEST_RD_ATOMIC | IBV_QP_MIN_RNR_TIMER,
+           IBV_QP_STATE | IBV_QP_AV | IBV_QP_PATH_MTU | IBV_QP_DEST_QPN | IBV_QP_RQ_PSN | rc_only,
            "modify_to_rtr");
 }
 
@@ -127,10 +127,10 @@ void QueuePair::to_rts(std::uint32_t sq_psn) {
         .retry_cnt = RETRY_CNT,
         .rnr_retry = RNR_RETRY,
     };
-    modify(QpState::RTS, a,
-           IBV_QP_STATE | IBV_QP_TIMEOUT | IBV_QP_RETRY_CNT | IBV_QP_RNR_RETRY | IBV_QP_SQ_PSN |
-               IBV_QP_MAX_QP_RD_ATOMIC,
-           "modify_to_rts");
+    const int rc_only = type_ == QpType::RC ? IBV_QP_TIMEOUT | IBV_QP_RETRY_CNT | IBV_QP_RNR_RETRY |
+                                                  IBV_QP_MAX_QP_RD_ATOMIC
+                                            : 0;
+    modify(QpState::RTS, a, IBV_QP_STATE | IBV_QP_SQ_PSN | rc_only, "modify_to_rts");
 }
 
 } // namespace catalyst::transport::common

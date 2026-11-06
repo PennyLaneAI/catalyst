@@ -756,6 +756,10 @@ int __catalyst__transport__start_benchmark(CatalystTransportSession *s, std::uin
             }
             std::uint64_t sw_rtt = now_ns() - t0;
 
+            if (rc == CATALYST_TRANSPORT_RUN_COMPLETE) { // the backend paced the rounds itself
+                rc = CATALYST_TRANSPORT_OK;
+                break;
+            }
             if (rc != CATALYST_TRANSPORT_OK) {
                 std::uint64_t reply_value = 0;
                 std::memcpy(&reply_value, rslot, sizeof(reply_value));

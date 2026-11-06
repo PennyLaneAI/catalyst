@@ -5,11 +5,15 @@
 add_library(catalyst_transport_gpu_verbs_coprocessor SHARED
     coprocessor/GpuCoprocessorSession.cpp
     coprocessor/GpuCoprocessorFactory.cpp
+    hsb/GpuHsbCoprocessorSession.cpp
+    balboa/GpuBalboaCoprocessorSession.cpp
 )
 
 target_include_directories(catalyst_transport_gpu_verbs_coprocessor
     PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/coprocessor
+    ${CMAKE_CURRENT_SOURCE_DIR}/hsb
+    ${CMAKE_CURRENT_SOURCE_DIR}/balboa
     ${runtime_includes})
 
 target_link_libraries(catalyst_transport_gpu_verbs_coprocessor
