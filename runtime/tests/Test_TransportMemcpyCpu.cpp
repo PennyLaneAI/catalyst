@@ -214,6 +214,13 @@ TEST_CASE("memcpy round-trip drives the steane decoder plugin", "[transport_memc
 
 // ---- Pairing invariants ------------------------------------------------------
 
+TEST_CASE("memcpy refuses CUQR frames", "[transport_memcpy]") {
+    using Catch::Matchers::ContainsSubstring;
+    const std::string cfg = pair_cfg(19009) + ";frame=cuqr";
+    REQUIRE_THROWS_WITH(CpuControllerSession(cfg), ContainsSubstring("CUQR"));
+    REQUIRE_THROWS_WITH(CpuCoprocessorSession(cfg), ContainsSubstring("CUQR"));
+}
+
 TEST_CASE("memcpy rejects a second controller on the same pair", "[transport_memcpy]") {
     ConnectInfo ci{.peer = "loopback", .oob_port = 19010};
     CpuControllerSession first(pair_cfg(ci.oob_port));

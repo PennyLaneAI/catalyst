@@ -2,6 +2,12 @@
 
 <h3>New features since last release</h3>
 
+* Backline's `cpu_verbs` and `gpu_verbs` backends speak cudaq-realtime's RPC format (CUQR), so a
+  Backline program can exchange messages with a cudaq-realtime peer over RDMA. `frame="cuqr"`
+  selects it, `cuqr_tx` the RDMA verb, and `peer=cudaq` the peer's connection conventions; tested
+  against cudaq-realtime's own server and client on a ConnectX-7.
+  [(#3392)](https://github.com/PennyLaneAI/catalyst/pull/3392)
+
 * A new coprocessor function called `catalyst_onnx_coprocessor` has been added, which runs an
   ONNX model on the CPU or a GPU through onnxruntime, and is built with the transport runtime.
   PennyLane's

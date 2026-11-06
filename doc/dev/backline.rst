@@ -245,8 +245,11 @@ receiving side: over RDMA in the receiver's registered memory, over ``memcpy`` i
 coprocessor's own memory. A ring has ``frame_slots`` slots, 256 unless a node's backend config sets
 ``frame_slots=<n>``, a power of two, which the compiler then passes to every node; FPGA controllers
 are only tested with 256. Round ``n`` uses slot ``n mod frame_slots``. Over RDMA, ends whose frame
-configs differ fail to connect. Every transport uses the same two frame layouts, and the compiler picks one per placement from its
+configs differ fail to connect. Every transport carries the same two frame layouts, and the compiler picks one per placement from its
 message sizes: the 16 B frame, BL16, when requests and replies fit in 8 B, and BLV otherwise.
+``qp.Backline(..., frame=...)`` overrides that choice with ``"bl16"``, ``"blv"`` or ``"cuqr"``,
+cudaq-realtime's format (see `CUQR frames`_), which only ``cpu_verbs`` and ``gpu_verbs`` carry; the
+compiler checks that the selected backends carry it.
 
 .. list-table:: BL16, in 64 B slots
     :header-rows: 1
@@ -314,6 +317,55 @@ its completion word landing last then relies on the NIC placing an RDMA write's 
 which common NICs do but the RDMA specification does not guarantee. The slot count does not change
 with the stride, so memory grows with message size: a 1 MiB message makes each ring 512 MiB at the
 default 256 slots.
+
+CUQR frames
+-----------
+
+``cpu_verbs`` and ``gpu_verbs`` also speak cudaq-realtime's RPC format, for exchanging messages
+with a cudaq-realtime (NVQLink) peer. A request is its 24 B ``RPCHeader`` (magic ``"CUQR"``,
+``function_id`` = the ``fn_id``, ``arg_len``, ``request_id``, ``ptp_timestamp``) and then the
+payload; a reply is its ``RPCResponse`` (magic ``"CUQS"``, ``status``, ``result_len``, and the
+request's ``request_id`` and ``ptp_timestamp`` echoed) and then the result. A coprocessor function
+that returns ``COPROCESSOR_FN_ERROR``, or more bytes than the reply holds, is answered with
+``status`` 1 and no result, and the
+controller reports the status; a message that is not a CUQR frame is dropped unanswered, as
+cudaq-realtime does.
+
+A CUQR frame has no word written last, so the receiver posts one receive request per slot and reads
+arrivals from its receive completion queue; the sender's RDMA verb, SEND or write with immediate,
+signals each one. ``peer=cudaq`` follows a cudaq-realtime peer's conventions: one unreliable
+connected (UC) queue pair, its 12 B handshake, rings addressed from 0, MTU 4096 and replies by SEND.
+UC drops a lost message silently, so a controller reports a reply missing after 5 s.
+
+**Setting up CUQR.** Apart from ``frame``, these go in each rdma node's config, e.g.
+``"dev=mlx5_0;gid=3;cuqr_tx=write_imm"``, and none is set for you:
+
+* ``qp.Backline(..., frame="cuqr")`` selects the format; the default ``"auto"`` never picks it.
+* A ``gpu_verbs`` coprocessor needs ``cuqr_tx=write_imm`` on both nodes. The default ``send``
+  is refused when the session is created.
+* Between two Backline nodes, ``cuqr_tx`` must match on both ends, which the session checks.
+* For a cudaq-realtime peer:
+
+  * Set ``peer=cudaq``.
+  * Set ``frame_slots`` and ``frame_slot_bytes`` to the server's ``--num-slots`` and
+    ``--slot-size``. Nothing checks these against the peer: a mismatch shows up only as wrong
+    replies or a missing one.
+  * Use a ``gid`` that is the port's RoCEv2 IPv4 GID, since the handshake carries an IPv4
+    address.
+  * Raise the port's netdev MTU to 4200 or more, for the active MTU of 4096 cudaq-realtime
+    expects. The session refuses a smaller one.
+  * A ``gpu_verbs`` coprocessor in this mode accepts only requests the peer sends by write with
+    immediate.
+
+This has been tested against cudaq-realtime's own server and client on a ConnectX-7. One
+difference: a cudaq-realtime server drops a request whose ``function_id`` it has no function for,
+but a Backline coprocessor has one function, which receives every request with its ``function_id``
+and decides; returning ``COPROCESSOR_FN_ERROR`` gives a ``status`` 1 reply. A GPU-resident
+cudaq-realtime peer has not been tested.
+
+**Not optimized on gpu_verbs.** A GPU kernel cannot read a completion queue, so a host thread relays
+each arrival to the kernel through a flag in host memory, adding about 1 µs per round trip on an
+MI210. Letting the GPU poll the completion queue itself (GPUDirect Async) would remove the hop.
 
 The transport dialect
 =====================

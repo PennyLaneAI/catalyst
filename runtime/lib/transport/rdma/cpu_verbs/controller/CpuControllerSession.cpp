@@ -97,23 +97,43 @@ void *CpuControllerSession::reply_slot() { return frame::data(ring_, ring_slot(n
 
 int CpuControllerSession::collect(void *const *replies, const std::uint64_t *replies_bytes,
                                   std::size_t n) {
+    CATALYST_FRAME_DISPATCH(ring_.mode, collect_frame, replies, replies_bytes, n);
+}
+
+template <frame::Mode M>
+int CpuControllerSession::collect_frame(void *const *replies, const std::uint64_t *replies_bytes,
+                                        std::size_t n) {
+    constexpr bool CUQR = M == frame::Mode::CUQR;
     std::stop_token none; // blocking wait for this round's reply
     frame::FrameView r;
-    const bool arrived = ring_.mode == frame::Mode::BL16
-                             ? poll_message_arrival<frame::Mode::BL16>(next_recv_, none, r)
-                             : poll_message_arrival<frame::Mode::BLV>(next_recv_, none, r);
-    if (!arrived) {
+    if (!poll_message_arrival<M>(next_recv_, none, r)) {
         return -1;
     }
     rtt_ns_ = now_ns() - kick_ns_;
     ++next_recv_;
-    if (n > 0 && replies && replies[0] && replies[0] != r.data) {
+    if constexpr (CUQR) { // next_recv_ is now this round's seq, the request_id the request carried
+        TP_CHECK(r.data != nullptr, "cpu_verbs: the coprocessor's reply is not a CUQR frame");
+        TP_CHECK(r.request_id == static_cast<std::uint32_t>(next_recv_),
+                 "cpu_verbs: a CUQR reply answers request %u, expected %u", r.request_id,
+                 static_cast<std::uint32_t>(next_recv_));
+        TP_CHECK(r.status == 0, "cpu_verbs: the coprocessor answered with status %d", r.status);
+    }
+    // A CUQR reply collected in place (into reply_slot()) still has its tail zeroed.
+    if (n > 0 && replies && replies[0] && (CUQR || replies[0] != r.data)) {
         // The coprocessor zero-fills the reply's payload area, so all of `cap` is defined.
         const std::size_t cap = replies_bytes ? replies_bytes[0] : out_bytes_;
         TP_CHECK(cap <= frame::data_capacity(ring_),
                  "reply capacity (%zu) exceeds the %zu B a frame of this session carries", cap,
                  frame::data_capacity(ring_));
-        std::memcpy(replies[0], r.data, cap);
+        if constexpr (CUQR) { // a CUQR frame carries only the reply's own bytes
+            const std::size_t len = std::min<std::size_t>(r.len, cap);
+            if (replies[0] != r.data) {
+                std::memcpy(replies[0], r.data, len);
+            }
+            std::memset(static_cast<std::uint8_t *>(replies[0]) + len, 0, cap - len);
+        } else {
+            std::memcpy(replies[0], r.data, cap);
+        }
     }
     return 0;
 }
