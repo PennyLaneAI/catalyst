@@ -741,13 +741,12 @@ def _pl_ctrl_lowering(
     *plxpr_invals,
     jaxpr,
     n_control,
-    work_wires,
     n_consts,
-    n_work=0,
+    n_work_wires,
     work_wire_type="borrowed",
 ):
     """Lower a `qp.ctrl` transform to a `qref.ctrl` region op."""
-    work_start = len(plxpr_invals) - n_work
+    work_start = len(plxpr_invals) - n_work_wires
     values_start = work_start - n_control
     controls_start = values_start - n_control
     body_invals = plxpr_invals[:controls_start]

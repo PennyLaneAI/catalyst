@@ -19,17 +19,14 @@ from __future__ import annotations
 import re
 from collections.abc import Callable
 from dataclasses import dataclass, replace
-from functools import wraps
 from typing import ClassVar
 
 import pennylane as qp
-from pennylane.capture.primitives import ctrl_transform_prim
 from pennylane.decomposition.resources import resolve_work_wire_type
 from pennylane.ops.op_math.adjoint2 import Adjoint2
 from pennylane.ops.op_math.controlled2 import ControlledOp2
 
 from catalyst.decomposition.type_utils import SerializedGraphOpID
-from catalyst.utils.patching import Patcher
 
 
 @dataclass(frozen=True)
@@ -147,8 +144,6 @@ class ModifierState:
                 work_wires=work_wires,
                 work_wire_type=self.work_wire_type,
             )
-            if self.num_work_wires:
-                body = capture_control_work_wires(body)
         return body
 
     # Canonical nesting order for op-level modifiers, listed OUTERMOST first. The compiler's
@@ -322,29 +317,3 @@ class ModifierState:
             modifiers = replace(modifiers, adjoint=True)
 
         return base_id, modifiers
-
-
-def capture_control_work_wires(body: Callable) -> Callable:
-    """Capture callable control work wires as operands while tracing a decomposition rule.
-
-    PennyLane stores these wires in static primitive metadata. Rule bodies instead receive traced
-    wire labels, including those forwarded by registered rules to nested callable controls.
-    Move the labels into operands before binding, so JAX tracks them in the enclosing rule.
-    The patch is scoped to rule tracing and also accepts already converted control primitives.
-    """
-
-    @wraps(body)
-    def wrapper(*args, **kwargs):
-        original_bind = ctrl_transform_prim.bind
-
-        def bind(*invals, work_wires, **params):
-            if work_wires:
-                return original_bind(
-                    *invals, *work_wires, work_wires=None, **(params | {"n_work": len(work_wires)})
-                )
-            return original_bind(*invals, work_wires=work_wires, **params)
-
-        with Patcher((ctrl_transform_prim, "bind", bind)):
-            return body(*args, **kwargs)
-
-    return wrapper

@@ -50,7 +50,7 @@ from catalyst.decomposition.graph_op_id import (
     CTRL_WORK_WIRES,
     GraphOpID,
 )
-from catalyst.decomposition.modifier_state import ModifierState, capture_control_work_wires
+from catalyst.decomposition.modifier_state import ModifierState
 from catalyst.decomposition.rule_lowering_warning import RuleLoweringWarning
 from catalyst.decomposition.type_utils import (
     SerializedGraphOpID,
@@ -800,7 +800,6 @@ def build_decomp_target_spec(
     # The static_data was only needed to instantiate the correct decomp rule
     # Once we have the correct rules, don't send them into qjit: they are closed over instead.
     def rule_to_callable(rule: DecompositionRule) -> Callable[..., None]:
-        @capture_control_work_wires
         def decomp_rule(*_operands) -> None:
             _args, _kwargs, _ctrl_wires, _ctrl_values, _work_wires = unpack_rule_operands(
                 _operands,
@@ -1216,7 +1215,6 @@ def build_registered_decomp_target_spec(
     hybrid_specs, hybrid_leaves, closed_hybrid = flatten_hybrid_args(extra_data)
 
     def rule_to_callable(rule: DecompositionRule) -> Callable[..., None]:
-        @capture_control_work_wires
         def decomp_rule(*_operands) -> None:
             _args, _kwargs, _ctrl_wires, _ctrl_values, _work_wires = unpack_rule_operands(
                 _operands,

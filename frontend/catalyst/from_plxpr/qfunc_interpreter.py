@@ -904,27 +904,28 @@ def handle_ctrl_transform(
     *invals,
     jaxpr,
     n_control,
-    work_wires,
     n_consts,
-    n_work=0,
+    n_work_wires,
     work_wire_type="borrowed",
 ):
-    """Interpret a control transform, then re-bind it for lowering to a `qref.ctrl` region op."""
-    work_start = len(invals) - n_work
+    """Interpret a control transform, then re-bind it for lowering to a `qref.ctrl` region op.
+
+    Operands are constants, body arguments, control wires, control values, then work wires.
+    """
+    work_start = len(invals) - n_work_wires
     values_start = work_start - n_control
     controls_start = values_start - n_control
     consts = invals[:n_consts]
     args = invals[n_consts:controls_start]
     control_wires = invals[controls_start:values_start]
     control_values = invals[values_start:work_start]
-    dynamic_work_wires = invals[work_start:]
+    work_wires = invals[work_start:]
 
     control_qubits = [
         w if is_abstract_qubit(w) else qref_get_p.bind(self.init_qreg, w) for w in control_wires
     ]
     work_qubits = [
-        w if is_abstract_qubit(w) else qref_get_p.bind(self.init_qreg, w)
-        for w in (dynamic_work_wires or work_wires or ())
+        w if is_abstract_qubit(w) else qref_get_p.bind(self.init_qreg, w) for w in work_wires
     ]
     body_interpreter = copy(self)
     body_interpreter.modifier_context = self.modifier_context.compose(
@@ -943,9 +944,8 @@ def handle_ctrl_transform(
         *control_values,
         *work_qubits,
         n_control=n_control,
-        n_work=len(work_qubits),
         jaxpr=body.jaxpr,
-        work_wires=None,
+        n_work_wires=n_work_wires,
         work_wire_type=work_wire_type,
         n_consts=len(body.consts),
     )

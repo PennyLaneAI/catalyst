@@ -594,8 +594,8 @@ def test_registered_callable_captures_work_wire_operands(work_wire_type):
         if eqn.params["frontend_name"] == "callable_ctrl_rule"
     ]
     (control,) = find_eqns(rule.params["func_jaxpr"], ctrl_transform_prim)
-    assert control.params["work_wires"] is None
-    assert control.params["n_work"] == 1
+    assert "work_wires" not in control.params
+    assert control.params["n_work_wires"] == 1
     assert control.params["work_wire_type"] == work_wire_type
     assert "callable_ctrl_rule" in circuit.mlir
 

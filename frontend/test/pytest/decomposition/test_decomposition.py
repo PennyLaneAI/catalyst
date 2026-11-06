@@ -191,7 +191,7 @@ class TestGenericUtilities:
         specs, dummies, closed = flatten_hybrid_args(extra)
         assert not closed
         assert [dummy.shape for dummy in dummies] == [(2,), (), ()]
-        _, kwargs, _, _ = unpack_rule_operands(
+        _, kwargs, _, _, _ = unpack_rule_operands(
             (jnp.array([4.0, 5.0]), jnp.array(0.7), jnp.array(-0.2), jnp.array([3, 1])),
             n_params=0,
             kwarg_names=["unitary"],
@@ -219,7 +219,7 @@ class TestGenericUtilities:
         assert dummies[0].shape == ()
 
         for angle, wires in ((0.7, [3, 1]), (-0.2, [1, 4])):
-            _, kwargs, _, _ = unpack_rule_operands(
+            _, kwargs, _, _, _ = unpack_rule_operands(
                 (jnp.array(angle), jnp.array(wires)),
                 n_params=0,
                 kwarg_names=["mixed"],
