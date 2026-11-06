@@ -286,7 +286,6 @@ std::string ResourceAnalysis::modifierContextFuncName(StringRef funcName, bool i
     }
     name += funcName;
     return name;
-
 }
 
 void ResourceAnalysis::recordLoopBody(Operation *loopOp, ResourceResult bodyResult,
