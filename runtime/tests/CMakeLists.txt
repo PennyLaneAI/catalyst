@@ -108,6 +108,33 @@ if(ENABLE_OPENQASM)
     catch_discover_tests(runner_tests_openqasm)
 endif()
 
+if(LIGHTNING_CLIFFISH_LIB)
+    add_executable(runner_tests_lightning_cliffish)
+    target_sources(runner_tests_lightning_cliffish PRIVATE
+        Test_LightningCliffish.cpp
+    )
+
+    if(NOT APPLE)
+        set_property(TARGET runner_tests_lightning_cliffish APPEND PROPERTY BUILD_RPATH $ORIGIN)
+        set_property(TARGET runner_tests_lightning_cliffish APPEND PROPERTY BUILD_RPATH $ORIGIN/../lib)
+    else()
+        set_property(TARGET runner_tests_lightning_cliffish APPEND PROPERTY BUILD_RPATH @loader_path)
+        set_property(TARGET runner_tests_lightning_cliffish APPEND PROPERTY BUILD_RPATH @loader_path/../lib)
+    endif()
+
+    target_link_libraries(runner_tests_lightning_cliffish PRIVATE
+        Catch2WithMain
+        pybind11::embed
+        catalyst_runtime_testing
+    )
+
+    target_compile_definitions(runner_tests_lightning_cliffish PRIVATE
+        LIGHTNING_CLIFFISH_LIB="${LIGHTNING_CLIFFISH_LIB}"
+    )
+
+    catch_discover_tests(runner_tests_lightning_cliffish)
+endif()
+
 if(ENABLE_OQD)
     add_executable(runner_tests_oqd)
     target_sources(runner_tests_oqd PRIVATE
