@@ -45,7 +45,7 @@ _GATE_SET = {qp.PhaseShift, qp.GlobalPhase, qp.RZ, qp.CNOT}
 
 # CHECK-LABEL: func.func public @controlled_op
 @qjit(capture=True, target="mlir")
-@graph_decomposition(gate_set=_GATE_SET, alt_decomps={qp.S: [_s_to_phaseshift()]})
+@graph_decomposition(gate_set=_GATE_SET, exclude_decomps={qp.S: [_s_to_phaseshift()]})
 @qp.qnode(qp.device("null.qubit", wires=2))
 def controlled_op():
     # CHECK: qref.custom "S"() %{{.*}} ctrls(%{{.*}}) ctrlvals(%{{.*}}) : !qref.bit ctrls !qref.bit
@@ -59,7 +59,7 @@ print(controlled_op.mlir)
 
 # CHECK-LABEL: func.func public @controlled_adjoint_op
 @qjit(capture=True, target="mlir")
-@graph_decomposition(gate_set=_GATE_SET, alt_decomps={qp.S: [_s_to_phaseshift()]})
+@graph_decomposition(gate_set=_GATE_SET, exclude_decomps={qp.S: [_s_to_phaseshift()]})
 @qp.qnode(qp.device("null.qubit", wires=2))
 def controlled_adjoint_op():
     # CHECK: qref.custom "S"() %{{.*}} adj ctrls(%{{.*}}) ctrlvals(%{{.*}}) : !qref.bit ctrls !qref.bit
