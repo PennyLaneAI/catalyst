@@ -1760,9 +1760,13 @@ class TestSymbolicRules:
             "%arg3: tensor<3xi1>)" in rule
         )
         assert (
-            "MultiControlledX{control_values:[tensor<3xi1>]}{wires:4,work_wires:1}"
-            f"{{work_wire_type = {escaped_type}}}" in rule
+            '"3C(PauliX){}{ctrl_work_wires:1,wires:1}'
+            f'{{ctrl_work_wire_type = {escaped_type}}}" = 1 : i64' in rule
         )
+        (control_region,) = [line for line in rule.splitlines() if '"qref.ctrl"' in line]
+        # Three control qubits, three control values, and one work qubit.
+        assert "operandSegmentSizes = array<i32: 3, 3, 1>" in control_region
+        assert f'work_wire_type = "{work_wire_type}"' in control_region
 
     @pytest.mark.parametrize("work_wire_type", ["zeroed", "borrowed"])
     def test_registered_callable_control_work_wires(self, work_wire_type):
