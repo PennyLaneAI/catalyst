@@ -115,25 +115,44 @@ class TestFixedDecompsOption:
             "Hadamard": "h_to_rz",
             "T": "custom_t_rule",
         }
-        assert "alt_decomps" not in options
+        assert "exclude_decomps" not in options
 
 
-class TestAltDecompsOption:
-    """Cover the ``if alt_decomps:`` block."""
+class TestExcludeDecompsOption:
+    """Cover the ``exclude_decomps`` option."""
 
     def test_absent_when_not_provided(self):
-        """No ``alt_decomps`` key is emitted when the argument is omitted (falsy branch)."""
-        assert "alt_decomps" not in _setup()
-        assert "alt_decomps" not in _setup(alt_decomps={})
+        """No ``exclude_decomps`` key is emitted when the argument is omitted or empty."""
+        assert "exclude_decomps" not in _setup()
+        assert "exclude_decomps" not in _setup(exclude_decomps={})
 
     def test_maps_op_to_tuple_of_rule_names(self):
-        """An operator maps to a tuple of name-resolved alternative rules, mixing all three
+        """An operator maps to a tuple of name-resolved excluded rules, mixing all three
         rule-reference kinds."""
         options = _setup(
-            alt_decomps={qp.Hadamard: [_plain_rule(), _registered_rule(), "custom_rule"]}
+            exclude_decomps={qp.Hadamard: [_plain_rule(), _registered_rule(), "custom_rule"]}
         )
-        assert options["alt_decomps"] == {"Hadamard": ("x_to_rx", "h_to_rz", "custom_rule")}
+        assert options["exclude_decomps"] == {"Hadamard": ("x_to_rx", "h_to_rz", "custom_rule")}
         assert "fixed_decomps" not in options
+
+    def test_modifier_wrapped_name_is_preserved(self):
+        """Symbolic operator names are preserved for the MLIR pass."""
+        options = _setup(exclude_decomps={"Adjoint(Hadamard)": ["custom_rule"]})
+        assert options["exclude_decomps"] == {"Adjoint(Hadamard)": ("custom_rule",)}
+
+    def test_coexists_with_fixed_decomps(self):
+        """Exclusions and fixed rule selections are separate pass options."""
+        options = _setup(
+            fixed_decomps={qp.Hadamard: "h_to_rz"},
+            exclude_decomps={qp.Hadamard: ["custom_rule"]},
+        )
+        assert options["fixed_decomps"] == {"Hadamard": "h_to_rz"}
+        assert options["exclude_decomps"] == {"Hadamard": ("custom_rule",)}
+
+    def test_alt_decomps_is_removed(self):
+        """The removed option is rejected by the graph decomposition entry point."""
+        with pytest.raises(TypeError, match="alt_decomps"):
+            _setup(alt_decomps={qp.Hadamard: ["custom_rule"]})
 
 
 class TestVerboseOption:

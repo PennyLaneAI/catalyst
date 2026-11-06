@@ -2573,9 +2573,9 @@ class TestCustomRuleApplication:
         assert decomposed.get("PauliX", 0) == 0  # assert that the second rule got used
         assert decomposed.get("PauliY", 0) == 2  # assert that the second rule got used
 
-    @pytest.mark.parametrize("option", ["fixed_decomps", "alt_decomps"])
-    def test_fixed_and_alt_decomps_for_modifier_wrapped_op(self, option):
-        """Tests that fixed and alt decomps keyed by a modifier-wrapped operator name,
+    @pytest.mark.parametrize("option", ["fixed_decomps", "exclude_decomps"])
+    def test_fixed_and_exclude_decomps_for_modifier_wrapped_op(self, option):
+        """Tests that fixed and excluded decomps keyed by a modifier-wrapped operator name,
         which is quoted in the pass options, are respected."""
 
         @qp.register_resources({qp.X: 1})
@@ -2587,7 +2587,7 @@ class TestCustomRuleApplication:
             qp.Y(base.wires)
             qp.Y(base.wires)
 
-        rules = {"fixed_decomps": rule2, "alt_decomps": [rule2]}[option]
+        rules = {"fixed_decomps": rule2, "exclude_decomps": [rule1]}[option]
 
         with local_decomps():
 
@@ -2607,6 +2607,49 @@ class TestCustomRuleApplication:
         assert decomposed.get("Adjoint(NoParamsCustomOp)", 0) == 0
         assert decomposed.get("PauliX", 0) == 0
         assert decomposed.get("PauliY", 0) == 2
+
+    @pytest.mark.parametrize("use_name", [False, True])
+    @pytest.mark.parametrize(
+        "decompose",
+        [graph_decomposition, qp.decompose],
+        ids=["graph_decomposition", "qp.decompose"],
+    )
+    def test_excluded_rule_is_lowered_and_reused_by_later_pass(self, use_name, decompose):
+        """Excluded rules remain in the module and can be chosen by a later graph pass."""
+
+        @qp.register_resources({qp.X: 1})
+        def custom_to_x(wires):
+            qp.X(wires)
+
+        @qp.register_resources({qp.Y: 2})
+        def custom_to_y(wires):
+            qp.Y(wires)
+            qp.Y(wires)
+
+        @qp.register_resources({NoParamsCustomOp(Wire[1]): 1})
+        def y_to_custom(wires):
+            NoParamsCustomOp(wires)
+
+        excluded = custom_to_x.name if use_name else custom_to_x
+        with local_decomps():
+            add_decomps(NoParamsCustomOp, custom_to_x, custom_to_y)
+            add_decomps(qp.Y, y_to_custom)
+
+            @qjit(capture=True, target="mlir")
+            @decompose(gate_set={qp.X, qp.Y})
+            @decompose(gate_set={NoParamsCustomOp}, fixed_decomps={qp.Y: y_to_custom.name})
+            @decompose(gate_set={qp.X, qp.Y}, exclude_decomps={NoParamsCustomOp: [excluded]})
+            @qnode(qp.device("null.qubit", wires=1))
+            def circuit():
+                NoParamsCustomOp(0)
+
+            # Rule collection happens before the pass pipeline runs, including excluded rules.
+            assert 'frontend_name = "custom_to_x"' in circuit.mlir
+            resources = qp.analyze(circuit, level="all-user")().resources
+
+        assert resources["graph-decomposition"].counts == {"PauliY": 2}
+        assert resources["graph-decomposition-2"].counts == {"NoParamsCustomOp": 2}
+        assert resources["graph-decomposition-3"].counts == {"PauliX": 2}
 
     def test_fix_decomp_invalid_name(self):
         """Tests that an error is raised by referring to an inexistant rule name."""
@@ -2788,8 +2831,9 @@ class TestDecomposeAlias:
         # phaseshift is decomposed by the outer pass
         assert resources["graph-decomposition-2"].counts == {"RZ": 1, "GlobalPhase": 1}
 
-    def test_decompose_inline_fixed_decomps(self):
-        """Inline ``fixed_decomps`` rule bodies are registered for the graph pass."""
+    @pytest.mark.parametrize("exclude_builtin_rules", [False, True])
+    def test_decompose_inline_fixed_decomps(self, exclude_builtin_rules):
+        """Inline fixed rules are registered alongside exclusions for the graph pass."""
 
         @register_resources({NoParams(Wire[1]): 1})
         def rot_to_noparams(phi, theta, omega, wires):  # pylint: disable=unused-argument
@@ -2797,11 +2841,13 @@ class TestDecomposeAlias:
 
         qp.decomposition.enable_graph()
         try:
+            excluded = list(qp.list_decomps(qp.Rot)) if exclude_builtin_rules else None
 
             @qjit(capture=True, target="mlir")
             @qp.decompose(
                 gate_set={"NoParams"},
                 fixed_decomps={qp.Rot: rot_to_noparams},
+                exclude_decomps={qp.Rot: excluded} if excluded else None,
             )
             @qnode(qp.device("null.qubit", wires=1))
             def circuit():
@@ -2809,6 +2855,7 @@ class TestDecomposeAlias:
                 return qp.probs()
 
             mlir = circuit.mlir
+            resources = qp.analyze(circuit, level="all-user")().resources
         finally:
             qp.decomposition.disable_graph()
 
@@ -2816,6 +2863,25 @@ class TestDecomposeAlias:
         # the module by the trace-time rule closure, and the circuit routes to graph-decomposition.
         assert 'apply_registered_pass "graph-decomposition"' in mlir
         assert "NoParams" in mlir
+        assert resources["graph-decomposition"].counts == {"NoParams": 1}
+
+    def test_decompose_exclusions_without_rule_collection(self):
+        """Exclusions can be forwarded when frontend rule collection is disabled."""
+
+        @qjit(capture=True, target="mlir", collect_decomp_rules=False)
+        @qp.decompose(gate_set={qp.RX}, exclude_decomps={qp.RX: list(qp.list_decomps(qp.RX))})
+        @qnode(qp.device("null.qubit", wires=1))
+        def circuit():
+            qp.RX(0.1, wires=0)
+
+        assert "exclude-decomps" in circuit.mlir
+        resources = qp.analyze(circuit, level="all-user")().resources
+        assert resources["graph-decomposition"].counts == {"RX": 1}
+
+    def test_decompose_rejects_alt_decomps(self):
+        """The public PennyLane entry point rejects the removed option."""
+        with pytest.raises(TypeError, match="alt_decomps"):
+            qp.decompose(gate_set={qp.RX}, alt_decomps={qp.RX: []})
 
     def test_decompose_inline_rules_require_rule_collection(self):
         """Inline rules with ``collect_decomp_rules=False`` raise a clear error."""
