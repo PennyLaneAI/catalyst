@@ -1009,7 +1009,9 @@ class TestOnDemand:
 
         assert f'target_gate = "{op_id}"' in module_str
         if op_id.startswith("2C("):
-            assert 'target_gate = "C(S){}{wires:1}{}"' not in module_str
+            # Reachable controlled rotation rules use singly controlled S.
+            assert '"C(S){}{wires:1}{}" = 1 : i64' in module_str
+            assert 'target_gate = "C(S){}{wires:1}{}"' in module_str
 
     def test_multi_controlled_resource_gets_its_rules(self):
         """A rule whose resource is a multi-controlled op pulls the rules for that ``<n>C(...)``
@@ -1302,7 +1304,8 @@ class TestSymbolicRules:
                 2,
                 "2C(Hadamard){}{wires:1}{}",
                 "(%arg0: !qref.reg<3>, %arg1: tensor<1xi64>, %arg2: tensor<2xi64>, %arg3: tensor<2xi1>)",
-                '"Toffoli{}{wires:3}{}" = 1 : i64',
+                '"MultiControlledX{control_values:[tensor<2xi1>]}{wires:3,work_wires:0}'
+                r'{work_wire_type = \22borrowed\22}" = 1 : i64',
             ),
         ],
     )
@@ -1442,7 +1445,7 @@ class TestSymbolicRules:
             "(%arg0: !qref.reg<4>, %arg1: tensor<1xi64>, %arg2: tensor<3xi64>, %arg3: tensor<3xi1>)"
             in rule
         )
-        assert "MultiControlledX{control_values:[tensor<3xi1>]}{wires:4,work_wires:0}" in rule
+        assert '"3C(PauliX){}{wires:1}{}" = 1 : i64' in rule
 
     def test_multi_controlled_rule_is_wired_up_correctly(self):
         """Test a rule registered on ``C(op)`` and lowered for several controls is given all of
