@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include <llvm/Support/raw_ostream.h>
+#include <llvm/TableGen/Record.h>
 #include <mlir/IR/MLIRContext.h>
 #define DEBUG_TYPE "resource-analysis"
 
@@ -87,10 +88,13 @@ ResourceResult ResourceAnalysis::makeEmptyResult() const {
 ResourceAnalysis::ResourceAnalysis(ModuleOp moduleOp,
                                    ArrayRef<ExtensionProvider> extensionProviders,
                                    bool collectDetailedOperations)
-    : collectDetailedOperations(collectDetailedOperations) {
+    : collectDetailedOperations(collectDetailedOperations),
+      analysisManager(moduleOp, /*passInstrumentor=*/nullptr) {
     extensionAnalyses.reserve(extensionProviders.size());
     for (const auto &provider : extensionProviders) {
-        extensionAnalyses.push_back(provider());
+        auto extension = provider();
+        extension->initialize(analysisManager);
+        extensionAnalyses.push_back(std::move(extension));
     }
 
     LLVM_DEBUG(dbgs() << "ResourceAnalysis: analyzing operation " << moduleOp->getName() << "\n");
@@ -173,10 +177,13 @@ ResourceAnalysis::ResourceAnalysis(ModuleOp moduleOp,
 ResourceAnalysis::ResourceAnalysis(func::FuncOp funcOp,
                                    ArrayRef<ExtensionProvider> extensionProviders,
                                    bool collectDetailedOperations)
-    : collectDetailedOperations(collectDetailedOperations) {
+    : collectDetailedOperations(collectDetailedOperations),
+      analysisManager(funcOp, /*passInstrumentor=*/nullptr) {
     extensionAnalyses.reserve(extensionProviders.size());
     for (const auto &provider : extensionProviders) {
-        extensionAnalyses.push_back(provider());
+        auto extension = provider();
+        extension->initialize(analysisManager);
+        extensionAnalyses.push_back(std::move(extension));
     }
 
     ResourceResult result = makeEmptyResult();
@@ -203,6 +210,22 @@ std::string ResourceAnalysis::makeUniqueSyntheticName(StringRef prefix, int64_t 
     return candidate;
 }
 
+void ResourceAnalysis::recordLoopBody(Operation *loopOp, ResourceResult bodyResult,
+                                      std::optional<double> tripCount, StringRef prefix,
+                                      int64_t &counter, int64_t &dynCounter,
+                                      ResourceResult &result) {
+    if (tripCount) {
+        std::string name = makeUniqueSyntheticName(prefix, counter);
+        funcResults[name] = std::move(bodyResult);
+        result.functionCalls[name] = *tripCount;
+        return;
+    }
+    std::string name = makeUniqueSyntheticName(("dyn_" + prefix).str(), dynCounter);
+    funcResults[name] = std::move(bodyResult);
+    result.varFunctionCalls[name] = static_cast<uint64_t>(llvm::hash_value(loopOp));
+    result.hasDynLoop = true;
+}
+
 void ResourceAnalysis::analyzeForLoop(scf::ForOp forOp, ResourceResult &result, bool isAdjoint,
                                       unsigned numControlQubits) {
     ResourceResult bodyResult = makeEmptyResult();
@@ -213,23 +236,9 @@ void ResourceAnalysis::analyzeForLoop(scf::ForOp forOp, ResourceResult &result, 
     if (!tripCount) {
         tripCount = resolveDirectNestedForLoopAverageTripCount(forOp);
     }
-    if (tripCount) {
-        // Record the loop body under a new name (for_loop_1, …).
-        // The parent stores how many times the loop runs.
-        // Later, classical ops from that body are added into the parent, multiplied by that count.
-        // The name is always new, so we don't overwrite an old entry.
-        std::string name = makeUniqueSyntheticName("for_loop_", forLoopCounter);
-        funcResults[name] = std::move(bodyResult);
-        result.functionCalls[name] = *tripCount;
-        return;
-    }
 
-    // Loop trip count is dynamic. Record the body under dyn_for_loop_<N>
-    // and store a fixed number (hash) so each such loop has its own id in the output.
-    std::string name = makeUniqueSyntheticName("dyn_for_loop_", dynForLoopCounter);
-    funcResults[name] = std::move(bodyResult);
-    result.varFunctionCalls[name] = static_cast<uint64_t>(llvm::hash_value(forOp.getOperation()));
-    result.hasDynLoop = true;
+    recordLoopBody(forOp.getOperation(), std::move(bodyResult), tripCount, "for_loop_",
+                   forLoopCounter, dynForLoopCounter, result);
 }
 
 void ResourceAnalysis::analyzeWhileLoop(scf::WhileOp whileOp, ResourceResult &result,
@@ -237,13 +246,9 @@ void ResourceAnalysis::analyzeWhileLoop(scf::WhileOp whileOp, ResourceResult &re
     ResourceResult bodyResult = makeEmptyResult();
     analyzeRegion(whileOp.getAfter(), bodyResult, isAdjoint, numControlQubits);
 
-    if (auto iters = getEstimatedIterationsHint(whileOp)) {
-        bodyResult.multiplyBy(*iters);
-    } else {
-        result.hasDynLoop = true;
-    }
-
-    result.mergeWith(bodyResult);
+    auto tripCount = getEstimatedIterationsHint(whileOp);
+    recordLoopBody(whileOp.getOperation(), std::move(bodyResult), tripCount, "while_loop_",
+                   whileLoopCounter, dynWhileLoopCounter, result);
 }
 
 void ResourceAnalysis::analyzeIfOp(scf::IfOp ifOp, ResourceResult &result, bool isAdjoint,

@@ -25,6 +25,8 @@ import pennylane as qp
 from pennylane.ops.op_math.adjoint2 import Adjoint2
 from pennylane.ops.op_math.controlled2 import ControlledOp2
 
+from catalyst.decomposition.type_utils import SerializedGraphOpID
+
 
 @dataclass(frozen=True)
 class ModifierState:
@@ -86,13 +88,13 @@ class ModifierState:
             op_name = self._wrap_modifier_name(op_name, self._control_modifier(self.control_count))
         return op_name
 
-    def wrap_id(self, op_id: str) -> str:
+    def wrap_id(self, op_id: SerializedGraphOpID) -> SerializedGraphOpID:
         """Wrap a graphOpId's name, preserving its parameter, wire, static-data and UID suffix."""
         if not self.is_modified:
             return op_id
         assert "{" in op_id, f"Malformed op id for graph decomposition, got {op_id}"
         split = op_id.find("{")
-        return self.wrap_name(op_id[:split]) + op_id[split:]
+        return SerializedGraphOpID(self.wrap_name(op_id[:split]) + op_id[split:])
 
     def wrap_callable(self, body: Callable, ctrl_wires=None, ctrl_values=None) -> Callable:
         """Apply adjoint and control regions to a rule body in canonical nesting order.
@@ -164,15 +166,15 @@ class ModifierState:
         return None
 
     @staticmethod
-    def name_unwrap_adjoint(op_name: str, op_id: str) -> str:
+    def name_unwrap_adjoint(op_name: str, op_id: SerializedGraphOpID) -> SerializedGraphOpID:
         """Inverse of :meth:`wrap_id` with an adjoint state given the base ``op_name``.
 
         Args:
             op_name (str): the base operator's name
-            op_id (str): the adjoint graphOpId to unwrap
+            op_id (SerializedGraphOpID): the adjoint graphOpId to unwrap
 
         Returns:
-            str: the base operator's graphOpId
+            SerializedGraphOpID: the base operator's graphOpId
 
         Raises:
             ValueError: if ``op_id`` is not an adjoint id for ``op_name``
@@ -180,20 +182,22 @@ class ModifierState:
         prefix = f"Adjoint({op_name})"
         if not op_id.startswith(prefix):
             raise ValueError(f"{op_id!r} is not an adjoint id for base op {op_name!r}")
-        return op_name + op_id[len(prefix) :]
+        return SerializedGraphOpID(op_name + op_id[len(prefix) :])
 
     @staticmethod
-    def name_unwrap_control(op_name: str, op_id: str):
+    def name_unwrap_control(
+        op_name: str, op_id: SerializedGraphOpID
+    ) -> tuple[SerializedGraphOpID, int]:
         """Inverse of control name-wrapping given the base ``op_name``.
 
         ``("RX", "2C(RX){...}")`` -> ``("RX{...}", 2)`` and ``("RX", "C(RX){...}")`` -> ``("RX{...}", 1)``.
 
         Args:
             op_name (str): the base operator's name
-            op_id (str): the controlled graphOpId to unwrap
+            op_id (SerializedGraphOpID): the controlled graphOpId to unwrap
 
         Returns:
-            str: the base operator's graphOpId
+            SerializedGraphOpID: the base operator's graphOpId
             int: the number of controls
 
         Raises:
@@ -207,7 +211,7 @@ class ModifierState:
         prefix = f"{digits}C({op_name})"
         if not op_id.startswith(prefix):
             raise ValueError(f"{op_id!r} is not a control id for base op {op_name!r}")
-        return op_name + op_id[len(prefix) :], n_ctrl
+        return SerializedGraphOpID(op_name + op_id[len(prefix) :]), n_ctrl
 
     @staticmethod
     def peel_modifiers(op: qp.core.Operator2) -> tuple[qp.core.Operator2, ModifierState]:
@@ -243,7 +247,9 @@ class ModifierState:
             op = op.base
 
     @classmethod
-    def from_graph_op_id(cls, op_name: str, op_id: str) -> tuple[str, ModifierState]:
+    def from_graph_op_id(
+        cls, op_name: str, op_id: SerializedGraphOpID
+    ) -> tuple[SerializedGraphOpID, ModifierState]:
         """Recover the base id and modifiers supplied by the compiler's on-demand loader."""
         base_id = op_id
         modifiers = cls()
