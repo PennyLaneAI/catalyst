@@ -1140,6 +1140,9 @@
   libraries recorded by `runtime_call`s and devices before linking.
   [(#3438)](https://github.com/PennyLaneAI/catalyst/pull/3438)
 
+* Fixed hinted while loops to be counted symbolically in `ResourceAnalysis`.
+  [(#3370)](https://github.com/PennyLaneAI/catalyst/pull/3370)
+
 <h3>Internal changes ⚙️</h3>
 
 * FuncOp's with quantum dialect instructions can now always be inlined.
