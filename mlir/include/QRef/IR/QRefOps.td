@@ -770,7 +770,7 @@ def CtrlOp : Region_Op<"ctrl", [NoTerminator, AttrSizedOperandSegments]> {
 // Hence they are Pure, i.e. removable if no users
 
 class Observable_Op<string mnemonic, list<Trait> traits = []> :
-        QRef_Op<mnemonic, traits # [Pure]>;
+        QRef_Op<mnemonic, traits # [Pure, Observable]>;
 
 def ComputationalBasisOp : Observable_Op<"compbasis", [AttrSizedOperandSegments]> {
     let summary = "Define a pseudo-observable of the computational basis for use in measurements";
