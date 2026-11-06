@@ -356,21 +356,22 @@ def _handle_decompose_transform(self, inner_jaxpr, consts, non_const_args, tkwar
     ``qp.decompose`` is an alias for :func:`catalyst.passes.graph_decomposition`.
     """
     # Local imports avoid an import cycle (catalyst.passes imports from_plxpr indirectly).
-    from pennylane.decomposition import DecompositionRule, add_decomps, list_decomps, local_decomps
+    from pennylane.decomposition import local_decomps
 
     from catalyst.passes.builtin_passes import graph_decomposition
 
     _require_decompose_gate_set(tkwargs)
 
     fixed_decomps = tkwargs.get("fixed_decomps") or {}
-    alt_decomps = tkwargs.get("alt_decomps") or {}
+    exclude_decomps = tkwargs.get("exclude_decomps") or {}
 
     # FIXME: The graph_decomposition pass currently requires rule collection to be enabled, but this
     # is not strictly necessary. We should remove this restriction once the pass is updated to not
-    # require rule collection when we automate this part.
-    if (fixed_decomps or alt_decomps) and not self._collect_decomp_rules:
+    # require rule collection when we automate this part. Particularly once precompiled/on-demand
+    # rules are re-enabled
+    if fixed_decomps and not self._collect_decomp_rules:
         raise NotImplementedError(
-            "Inline fixed_decomps/alt_decomps with qp.decompose require rule collection "
+            "Inline fixed_decomps with qp.decompose require rule collection "
             "(collect_decomp_rules=True)."
         )
 
@@ -378,15 +379,12 @@ def _handle_decompose_transform(self, inner_jaxpr, consts, non_const_args, tkwar
     with local_decomps():
         for op, rule in fixed_decomps.items():
             _add_decomp_or_verify_name_exists(op, rule)
-        for op, rules in alt_decomps.items():
-            add_decomps(op, *rules)
-
         # Reusing the graph_decomposition transform (not a fork) guarantees identical pass options
         # to the explicit catalyst.passes.graph_decomposition entry point.
         bound_pass = graph_decomposition(
             gate_set=tkwargs["gate_set"],
             fixed_decomps=fixed_decomps or None,
-            alt_decomps=alt_decomps or None,
+            exclude_decomps=exclude_decomps or None,
         )
         next_eval._pass_pipeline.insert(0, bound_pass)
 
