@@ -1013,12 +1013,7 @@
 * Controlled quantum regions now keeps track of the `work_wire_type` passed from `qp.ctrl`.
   [(#3366)](https://github.com/PennyLaneAI/catalyst/pull/3366)
   [(#3376)](https://github.com/PennyLaneAI/catalyst/pull/3376)
-
-* Callable `qp.ctrl` capture now consumes work-wire operands and the static `n_work_wires` count
-  from PennyLane. Work wires, including traced labels in nested controls and in decomposition
-  rules, are preserved when lowering to `qref.ctrl`.
   [(#3412)](https://github.com/PennyLaneAI/catalyst/pull/3412)
-  [(#3428)](https://github.com/PennyLaneAI/catalyst/pull/3428)
 
 * MLIR passes that recreate `scf.for`, `scf.while`, `scf.if`, and `scf.index_switch` ops
   (`ctrl-lowering`, `adjoint-lowering`, `--convert-to-value-semantics`) now preserve discardable
