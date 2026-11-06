@@ -12,21 +12,34 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""This module provides infrastructure for lowering decomposition rules via python."""
+"""Discover decomposition rules and prepare them for tracing and lowering.
+
+:func:`walk_reachable_decomp_rule_sets` builds batches of prepared callables, dummy inputs,
+and resource counts.
+The QNode capture path consumes these batches before lowering the rules with the program.
+The compiler's on-demand loader instead uses the standalone compilation helpers in this
+module to obtain MLIR rule functions.
+
+Argument preparation and packing preserve the operator's operand order so each rule's
+signature matches the operation it decomposes.
+"""
 
 # pylint: disable=protected-access,bare-except
 
 import itertools
 import warnings
 from collections import deque
+from collections.abc import Callable
 from dataclasses import dataclass
+from enum import Enum, auto
 
 import jax.numpy as jnp
 import numpy as np
 import pennylane as qp
+from jax import Array
 from jax._src.lib.mlir import ir
-from jax.tree_util import tree_flatten, tree_unflatten
 from pennylane.core.operator import Operator2, abstractify
+from pennylane.decomposition import DecompositionRule
 from pennylane.decomposition.utils import to_name
 from pennylane.wires import Wires
 
@@ -39,7 +52,11 @@ from catalyst.decomposition.graph_op_id import (
 )
 from catalyst.decomposition.modifier_state import ModifierState, capture_control_work_wires
 from catalyst.decomposition.rule_lowering_warning import RuleLoweringWarning
-from catalyst.decomposition.type_utils import get_dummy_values_for_dynamic_shape
+from catalyst.decomposition.type_utils import (
+    SerializedGraphOpID,
+    _RuleBuilderArgs,
+    get_dummy_values_for_dynamic_shape,
+)
 from catalyst.jax_extras.lowering import get_mlir_attribute_from_pyval
 from catalyst.utils.exceptions import CompileError
 
@@ -56,29 +73,32 @@ _NON_INVERTIBLE_RESOURCE_TYPES = (qp.ops.MidMeasure, qp.ops.PauliMeasure)
 
 @dataclass
 class DecompRuleSpec:
-    """Wrapper around a single decomposition rule and associated metadata.
+    """A decomposition rule adapted for tracing, with resource counts for its consumers.
 
-    Used to collect rules for subsequent tracing.
+    The prepared callable unpacks flat operands, supplies closed-over arguments, and applies
+    any distributed modifiers before invoking the source rule.
 
     Attributes:
-        pyfun: Callable rule body accepting the flattened operands described by its
+        prepared_rule_fn: Adapted rule body accepting the flattened operands described by its
             :class:`DecompTargetSpec`.
         frontend_name: Name of the PennyLane decomposition rule, retained for fixed and alternative
             rule selection.
-        resources: Serialized GraphOpID-to-multiplicity mapping attached to the lowered function.
-        resource_ops: Raw Operator2-to-multiplicity mapping used as outgoing traversal edges.
+        resource_counts_by_id: GraphOpID-to-count mapping attached to the lowered function.
+        resource_counts_by_op: Operator2-to-count mapping used to traverse outgoing resource edges.
     """
 
-    pyfun: object
+    prepared_rule_fn: Callable[..., None]
     frontend_name: str
-    resources: dict[str, int]
-    resource_ops: dict[Operator2, int]
+    resource_counts_by_id: dict[SerializedGraphOpID, int]
+    resource_counts_by_op: dict[Operator2, int]
 
 
 @dataclass
 class DecompTargetSpec:
-    """Collection of all decomposition rules (`DecompRuleSpec`) that match a single graph op ID, as
-    well as the necessary data to trace them.
+    """A batch of prepared rules sharing a target graph op ID and tracing inputs.
+
+    Registered symbolic rules and rules synthesized by distributing modifiers can form
+    separate batches for the same target.
 
     Attributes:
         rules: Applicable rule alternatives for this target.
@@ -92,20 +112,21 @@ class DecompTargetSpec:
         hybrid_leaves: Numeric hybrid leaves passed as rule operands instead of being closed over.
         target_id: Full GraphOpID that every rule in the set decomposes.
         num_qreg_qubits: Register size required by the legacy standalone materializer.
-        modifier_context: Modifiers to distribute over each raw resource while descending into the
-            graph.
+        modifier_context: Additional modifiers propagated to resource operations when
+            discovering child rules. May differ from the target's modifiers because
+            registered rules can already account for them in their resource operations.
         reject_noninvertible: Whether modifier distribution requires filtering noninvertible bodies.
     """
 
     rules: list[DecompRuleSpec]
-    call_args: tuple
-    call_kwargs: dict
+    call_args: tuple[Array | np.float64, ...]
+    call_kwargs: dict[str, Array]
     kwarg_names: list[str]
     wire_lens: dict[str, int]
-    ctrl_wires: object
-    ctrl_values: object
-    hybrid_leaves: tuple
-    target_id: str
+    ctrl_wires: Array | None
+    ctrl_values: Array | None
+    hybrid_leaves: tuple[Array, ...]
+    target_id: SerializedGraphOpID
     num_qreg_qubits: int
     modifier_context: ModifierState
     reject_noninvertible: bool = False
@@ -116,7 +137,9 @@ def _resources_have_measurement(gate_counts) -> bool:
     return any(isinstance(op, _NON_INVERTIBLE_RESOURCE_TYPES) for op in gate_counts)
 
 
-def _adjoint_folds_to_base(resource_ids, base_id) -> bool:
+def _adjoint_folds_to_base(
+    resource_ids: dict[SerializedGraphOpID, int], base_id: SerializedGraphOpID
+) -> bool:
     """Whether an ``Adjoint(op)`` rule's resources are a single unmodified copy of the base op.
 
     This holds for ``adjoint_rotation`` and ``self_adjoint`` to simplify the rule registry
@@ -126,7 +149,7 @@ def _adjoint_folds_to_base(resource_ids, base_id) -> bool:
 
     Args:
         resource_ids (dict): the rule's resources as ``{resource graphOpId: count}``
-        base_id (str): the graphOpId of the base operator the rule was probed with
+        base_id (SerializedGraphOpID): the graphOpId of the base operator the rule was probed with
 
     Returns:
         bool: whether the rule folds ``Adjoint(op)`` to a single unmodified ``op``
@@ -152,7 +175,7 @@ def build_base_op(op_cls, kwargs, is_custom_op):
     Returns:
         Operator2: the base operator, built without binding its primitive
     """
-    args, kwargs = split_call_args(kwargs, is_custom_op)
+    args, kwargs = prepare_dummy_rule_arguments(kwargs, is_custom_op)
     with qp.capture.pause():
         return op_cls(*args, **kwargs)
 
@@ -221,7 +244,7 @@ def symbolic_arguments(
     raise CompileError(f"Unknown symbolic kind: {kind}")  # pragma: no cover
 
 
-def ordered_kwarg_names(call_kwargs, dynamic_shape) -> list:
+def ordered_kwarg_names(call_kwargs, dynamic_shape) -> list[str]:
     """Order a rule's keyword operands params-first, followed by wires.
 
     The params keep the order of ``dynamic_shape``, which is the operand order of the operator, so
@@ -233,44 +256,133 @@ def ordered_kwarg_names(call_kwargs, dynamic_shape) -> list:
     return params + wires
 
 
-def flatten_hybrid_args(extra_data) -> tuple:
-    """Split hybrid arguments into numeric ones (passed as operands) and the rest (closed over).
+class HybridLeafSource(Enum):
+    """Where a reconstructed hybrid argument gets each leaf."""
 
-    A hybrid argument whose pytree is entirely numeric arrays (e.g. a ``CDFHamiltonian``) is
-    flattened so its leaves can be passed into the rule call as operands, keeping the concrete
-    values out of the rule body (where they would otherwise bake in as constants).
+    ORDINARY_PARAMETER = auto()
+    OPERATOR_PARAMETER = auto()
+    WIRE = auto()
+    STATIC = auto()
+
+
+@dataclass
+class HybridArgumentSpec:
+    """Describe how to rebuild a hybrid argument from rule inputs."""
+
+    name: str
+    argument_tree: object
+    original_leaves: list
+    leaf_sources: list[HybridLeafSource]
+
+    def rebuild(self, ordinary_parameters, operator_parameters, wires):
+        """Replace abstract leaves with the rule's parameter and wire inputs."""
+        reconstructed_leaves = []
+        wire_offset = 0
+        for leaf, source in zip(self.original_leaves, self.leaf_sources, strict=True):
+            if source == HybridLeafSource.ORDINARY_PARAMETER:
+                reconstructed_leaves.append(next(ordinary_parameters))
+            elif source == HybridLeafSource.OPERATOR_PARAMETER:
+                reconstructed_leaves.append(next(operator_parameters))
+            elif source == HybridLeafSource.WIRE:
+                wire_slice = wires[wire_offset : wire_offset + len(leaf)]
+                reconstructed_leaves.append(Wires(wire_slice))
+                wire_offset += len(leaf)
+            else:
+                reconstructed_leaves.append(leaf)
+
+        # Constructing the carrier object must not apply another gate.
+        with qp.capture.pause():
+            return qp.pytrees.unflatten(reconstructed_leaves, self.argument_tree)
+
+
+def _is_wire_leaf(value):
+    return isinstance(value, (Wires, qp.typing.AbstractWires))
+
+
+def flatten_hybrid_args(extra_data) -> tuple:
+    """Record how to rebuild hybrid arguments from a decomposition rule's inputs.
+
+    Track each argument's parameters, wires, and fixed values so nested operators can be
+    rebuilt with the supplied inputs. Create dummy numeric arrays for tracing; dummy wires
+    are created separately by ``prepare_dynamic_op_kwargs``.
 
     Args:
-        extra_data (dict): the operator's hybrid arguments, keyed by name
+        extra_data (dict): Hybrid arguments with dynamic values already abstractified.
 
     Returns:
-        list[tuple]: ``(name, treedef, num_leaves)`` per operand-passed hybrid argument
-        list: the flat leaf dummies (shape/dtype of the concrete leaves), to pass as operands
-        dict: the hybrid arguments to close over rather than pass as operands, keyed by name
+        tuple: Reconstruction specs, dummy numeric arrays, and fully static arguments.
+        Ordinary parameters come before nested-operator parameters in the dummy arrays.
+
+    Example:
+        Here, ``dummies`` contains the data array followed by the RX angle. The RX wire
+        is recorded in ``specs`` and supplied separately when rebuilding the operator.
+
+        >>> extra_data = {
+        ...     "unitary": abstractify(qp.RX(0.7, wires=2)),
+        ...     "data": qp.typing.Float[2],
+        ...     "label": "rotation",
+        ... }
+        >>> specs, dummies, static = flatten_hybrid_args(extra_data)
+        >>> {spec.name: [source.name for source in spec.leaf_sources] for spec in specs}
+        {'unitary': ['OPERATOR_PARAMETER', 'WIRE'], 'data': ['ORDINARY_PARAMETER']}
+        >>> [dummy.shape for dummy in dummies]
+        [(2,), ()]
+        >>> static
+        {'label': 'rotation'}
     """
-    specs, leaf_dummies, closed_over = [], [], {}
-    for name, value in extra_data.items():
-        leaves, treedef = tree_flatten(value)
-        # TODO: this "all leaves are numeric arrays" test is a second source of truth for which
-        # hybrid leaves become rule-function inputs, and it must agree with the operator lowering's
-        # own partition (`_process_params` in from_plxpr/qref_operator2_primitives.py), which uses a
-        # per-leaf `forward_mask` to split leaves into `param_map` vs `forward_args` (excluding
-        # qubits).
-        #
-        # Note right now the two agree for all-numeric args (numeric hamiltonians) and for args
-        # with a non-array leaf (an operator carrying Wires), but a mixed hybrid arg would diverge
-        # causing the lowered op's params to outnumber the rule's inputs.
-        # Drive this off `_process_params`/`forward_mask` instead, once the operator's mask is
-        # passed through to rule compilation.
-        if leaves and all(
-            isinstance(leaf, (np.ndarray, np.generic, jnp.ndarray, qp.typing.AbstractArray))
-            for leaf in leaves
-        ):
-            specs.append((name, treedef, len(leaves)))
-            leaf_dummies.extend(jnp.zeros(leaf.shape, dtype=leaf.dtype) for leaf in leaves)
+    argument_specs = []
+    ordinary_parameter_dummies = []
+    operator_parameter_dummies = []
+    static_arguments = {}
+
+    numeric_types = (np.ndarray, np.generic, jnp.ndarray, qp.typing.AbstractArray)
+
+    for argument_name, argument in extra_data.items():
+        # Keep the complete structure so we can rebuild the argument.
+        original_leaves, argument_tree = qp.pytrees.flatten(argument, is_leaf=_is_wire_leaf)
+
+        # Stop at operators to identify which parameters belong to them.
+        argument_parts, _ = qp.pytrees.flatten(
+            argument,
+            is_leaf=lambda value: isinstance(value, Operator2) or _is_wire_leaf(value),
+        )
+
+        leaf_sources = []
+        for argument_part in argument_parts:
+            is_operator = isinstance(argument_part, Operator2)
+            part_leaves, _ = qp.pytrees.flatten(argument_part, is_leaf=_is_wire_leaf)
+
+            for leaf in part_leaves:
+                if isinstance(leaf, numeric_types):
+                    dummy_parameter = jnp.zeros(leaf.shape, dtype=leaf.dtype)
+                    if is_operator:
+                        source = HybridLeafSource.OPERATOR_PARAMETER
+                        operator_parameter_dummies.append(dummy_parameter)
+                    else:
+                        source = HybridLeafSource.ORDINARY_PARAMETER
+                        ordinary_parameter_dummies.append(dummy_parameter)
+                elif _is_wire_leaf(leaf):
+                    source = HybridLeafSource.WIRE
+                else:
+                    source = HybridLeafSource.STATIC
+
+                leaf_sources.append(source)
+
+        if any(source != HybridLeafSource.STATIC for source in leaf_sources):
+            argument_specs.append(
+                HybridArgumentSpec(
+                    name=argument_name,
+                    argument_tree=argument_tree,
+                    original_leaves=original_leaves,
+                    leaf_sources=leaf_sources,
+                )
+            )
         else:
-            closed_over[name] = value
-    return specs, leaf_dummies, closed_over
+            static_arguments[argument_name] = argument
+
+    # Match gate lowering: ordinary parameters precede operator parameters.
+    dummy_parameters = ordinary_parameter_dummies + operator_parameter_dummies
+    return argument_specs, dummy_parameters, static_arguments
 
 
 def rule_call_operands(
@@ -283,7 +395,7 @@ def rule_call_operands(
     hybrid_leaves=(),
 ) -> list:
     """Flatten a rule call as params, operand-passed hybrid-arg leaves, one grouped wire operand,
-    then control wires.
+    then optional control wires and control values.
 
     Control work wires are a ``ctrl_work_wires`` entry of ``wire_lens``, so they are concatenated
     into the grouped wire operand with every other register. Everything is passed positionally
@@ -333,7 +445,7 @@ def unpack_rule_operands(
     """Recover params, kwargs, control wires, control values, and work wires from
     :func:`rule_call_operands`' flattening.
 
-    Reconstructs each hybrid argument from its traced leaves (via its ``treedef``) so the rule body
+    Reconstructs each hybrid argument from its traced parameters and wires so the rule body
     receives the same object the user passed, but built from the traced operands. A
     ``ctrl_work_wires`` group is taken back out of the grouped wires: it belongs to the control
     modifier, not to the base operator the rule body rebuilds.
@@ -343,9 +455,9 @@ def unpack_rule_operands(
         n_params (int): how many of them are positional parameters
         kwarg_names (list[str]): parameter names first, followed by wire names
         wire_lens (dict[str, int]): wire names in operand order and their lengths
-        has_ctrl_wires (bool): whether a trailing control-wire operand is present
-        hybrid_specs (list[tuple]): ``(name, treedef, num_leaves)`` per hybrid argument, sitting
-            between the parameter kwargs and the grouped wire operand
+        has_ctrl_wires (bool): whether trailing control-wire and control-value operands are present
+        hybrid_specs (list[HybridArgumentSpec]): reconstruction specs for hybrid arguments whose
+            numeric leaves sit between the parameter kwargs and the grouped wire operand
 
     Returns:
         tuple: the rule's positional arguments
@@ -359,9 +471,16 @@ def unpack_rule_operands(
     n_kwarg_params = len(param_names)
     named = dict(zip(param_names, operands[n_params : n_params + n_kwarg_params], strict=True))
     idx = n_params + n_kwarg_params
-    for name, treedef, num_leaves in hybrid_specs:
-        named[name] = tree_unflatten(treedef, operands[idx : idx + num_leaves])
-        idx += num_leaves
+    num_ordinary_parameters = sum(
+        spec.leaf_sources.count(HybridLeafSource.ORDINARY_PARAMETER) for spec in hybrid_specs
+    )
+    num_operator_parameters = sum(
+        spec.leaf_sources.count(HybridLeafSource.OPERATOR_PARAMETER) for spec in hybrid_specs
+    )
+    ordinary_parameters = iter(operands[idx : idx + num_ordinary_parameters])
+    idx += num_ordinary_parameters
+    operator_parameters = iter(operands[idx : idx + num_operator_parameters])
+    idx += num_operator_parameters
 
     grouped_wires = operands[idx]
     idx += 1
@@ -369,6 +488,11 @@ def unpack_rule_operands(
     for name, length in wire_lens.items():
         named[name] = grouped_wires[offset : offset + length]
         offset += length
+
+    for spec in hybrid_specs:
+        named[spec.name] = spec.rebuild(
+            ordinary_parameters, operator_parameters, wires=named.get(spec.name, ())
+        )
 
     work_wires = named.pop(CTRL_WORK_WIRES, None)
     ctrl_wires = operands[idx] if has_ctrl_wires else None
@@ -444,8 +568,8 @@ def get_rules_from_module(module: ir.Module) -> str:
     return "\n".join(str(funcOp) for funcOp in funcOps) if funcOps else ""
 
 
-def split_call_args(kwargs, is_custom_op):
-    """Split prepared kwargs into (args, kwargs) for calling a rule or resource function.
+def prepare_dummy_rule_arguments(kwargs, is_custom_op: bool):
+    """Prepare dummy positional and keyword arguments for a rule or resource function.
 
     Custom-op dynamic params are keyed positionally ("0", "1", ...) but the rule callables expect
     them by their real argnames, so they are passed positionally with only "wires" kept as keyword.
@@ -475,8 +599,12 @@ def _rule_allocates_work_wires(rule, *args, **kwargs) -> bool:
     return rule.get_work_wire_spec(*args, **kwargs).total > 0
 
 
-def _rule_is_applicable(op_name, rule, *args, **kwargs) -> bool:
-    """Return resource data for the decomposition rules that apply to ``op_name``."""
+def _rule_is_compatible(op_name: str, rule: DecompositionRule, *args, **kwargs) -> bool:
+    """Return whether a rule applies and passes the work-wire support check.
+
+    Rules requiring work-wire allocation are excluded until decomposition lowering supports
+    multiple registers. Exceptions during either check emit a warning and exclude the rule.
+    """
     try:
         if not bool(rule.is_applicable(*args, **kwargs)):
             return False
@@ -531,14 +659,14 @@ def collect_resources_for_op(
         list: the rules that apply to the probed operator
     """
     decomp_rules = list(qp.decomposition.list_decomps(op_cls or op_name))
-    args, kwargs = split_call_args(kwargs, is_custom_op)
+    args, kwargs = prepare_dummy_rule_arguments(kwargs, is_custom_op)
 
     # map each rule to its resources, in a more generic format
-    name_to_resource_ids = {}
+    name_to_resource_ids: dict[str, dict[SerializedGraphOpID, int]] = {}
     name_to_resources = {}
     applicable_rules = []
     for rule in decomp_rules:
-        if not _rule_is_applicable(op_name, rule, *args, **kwargs):
+        if not _rule_is_compatible(op_name, rule, *args, **kwargs):
             continue
 
         applicable_rules.append(rule)
@@ -564,7 +692,7 @@ def collect_resources_for_op(
     return name_to_resources, name_to_resource_ids, applicable_rules
 
 
-def prepare_dynamic_op_kwargs(dynamic_shape, wire_lens) -> dict:
+def prepare_dynamic_op_kwargs(dynamic_shape, wire_lens) -> dict[str, Array]:
     """Build the dummy arguments an operator's decomposition rules are called with.
 
     Args:
@@ -595,8 +723,8 @@ def _dummy_work_wires(offset, num_work_wires):
 
 
 def build_decomp_target_spec(
-    op_name,
-    op_id,
+    op_name: str,
+    op_id: SerializedGraphOpID,
     dynamic_shape,
     wire_lens,
     static_data,
@@ -626,7 +754,7 @@ def build_decomp_target_spec(
 
     Args:
         op_name (str): the operator's GraphOpID name and fallback registry name
-        op_id (str): the operator's graphOpId
+        op_id (SerializedGraphOpID): the operator's graphOpId
         dynamic_shape (dict): dynamic argument names to their MLIR types
         wire_lens (dict): wire argument names to their lengths
         static_data (dict): compiler-static argument names to their values
@@ -664,16 +792,16 @@ def build_decomp_target_spec(
     # instead of a pre-wrapped id.
     target_id = modifiers.wrap_id(op_id)
 
-    call_args, call_kwargs = split_call_args(kwargs, is_custom_op)
+    call_args, call_kwargs = prepare_dummy_rule_arguments(kwargs, is_custom_op)
     kwarg_names = ordered_kwarg_names(call_kwargs, dynamic_shape)
 
     hybrid_specs, hybrid_leaves, closed_hybrid = flatten_hybrid_args(extra_data)
 
     # The static_data was only needed to instantiate the correct decomp rule
     # Once we have the correct rules, don't send them into qjit: they are closed over instead.
-    def rule_to_callable(rule):
+    def rule_to_callable(rule: DecompositionRule) -> Callable[..., None]:
         @capture_control_work_wires
-        def decomp_rule(*_operands):
+        def decomp_rule(*_operands) -> None:
             _args, _kwargs, _ctrl_wires, _ctrl_values, _work_wires = unpack_rule_operands(
                 _operands,
                 len(call_args),
@@ -707,10 +835,10 @@ def build_decomp_target_spec(
             continue
         rule_specs.append(
             DecompRuleSpec(
-                rule_to_callable(rule),
-                rule.name,
-                name_to_resource_ids[rule.name],
-                name_to_resources[rule.name],
+                prepared_rule_fn=rule_to_callable(rule),
+                frontend_name=rule.name,
+                resource_counts_by_id=name_to_resource_ids[rule.name],
+                resource_counts_by_op=name_to_resources[rule.name],
             )
         )
 
@@ -747,7 +875,7 @@ def materialize_decomp_target_spec(target_spec: DecompTargetSpec) -> ir.Operatio
     """Materialize one target specification through the legacy standalone qjit path."""
 
     return build_rule_module(
-        [qp.capture.subroutine(rule.pyfun) for rule in target_spec.rules],
+        [qp.capture.subroutine(rule.prepared_rule_fn) for rule in target_spec.rules],
         qp.device("null.qubit", wires=target_spec.num_qreg_qubits),
         target_spec.call_args,
         target_spec.call_kwargs,
@@ -755,15 +883,15 @@ def materialize_decomp_target_spec(target_spec: DecompTargetSpec) -> ir.Operatio
         target_spec.wire_lens,
         target_spec.ctrl_wires,
         target_spec.ctrl_values,
-        {rule.pyfun.__name__: rule for rule in target_spec.rules},
+        {rule.prepared_rule_fn.__name__: rule for rule in target_spec.rules},
         target_spec.target_id,
         target_spec.hybrid_leaves,
     )
 
 
 def compile_decomposition_rules(
-    op_name,
-    op_id,
+    op_name: str,
+    op_id: SerializedGraphOpID,
     dynamic_shape,
     wire_lens,
     static_data,
@@ -796,7 +924,7 @@ def build_rule_module(
     ctrl_wires,
     ctrl_values,
     name_to_rule_specs,
-    target_id,
+    target_id: SerializedGraphOpID,
     hybrid_leaves=(),
 ) -> ir.Operation:
     """Trace ``subroutines`` into a module of standalone decomposition-rule functions.
@@ -809,10 +937,10 @@ def build_rule_module(
         kwarg_names (list[str]): the keyword argument names, in the order to flatten them
         wire_lens (dict[str, int]): wire names in operand order and their lengths
         ctrl_wires: the control wires to append, or None when the rules are not controlled
-        ctrl_values: the control wires to append, or None when the rules are not controlled
+        ctrl_values: the control values to append, or None when the rules are not controlled
         hybrid_leaves (list): flattened hybrid-argument leaves passed to :func:`rule_call_operands`
         name_to_rule_specs (dict): generated function name to its rule specification
-        target_id (str): the graphOpId of the gate the rules decompose
+        target_id (SerializedGraphOpID): the graphOpId of the gate the rules decompose
 
     Returns:
         ir.Operation: the module holding the rules
@@ -851,7 +979,7 @@ def build_rule_module(
             func_name = ir.StringAttr(op.attributes["sym_name"]).value
             if rule := name_to_rule_specs.get(func_name):
                 op.attributes["resources"] = get_mlir_attribute_from_pyval(
-                    {"operations": rule.resources}
+                    {"operations": rule.resource_counts_by_id}
                 )
                 op.attributes["target_gate"] = ir.StringAttr.get(target_id)
                 op.attributes["sym_visibility"] = ir.StringAttr.get("public")
@@ -951,10 +1079,10 @@ def collect_symbolic_resources(
     )
 
     name_to_resources = {}
-    name_to_resource_ids = {}
+    name_to_resource_ids: dict[str, dict[SerializedGraphOpID, int]] = {}
     applicable_rules = []
     for rule in rules:
-        if not _rule_is_applicable(op_name, rule, **probe_args):
+        if not _rule_is_compatible(op_name, rule, **probe_args):
             continue
 
         applicable_rules.append(rule)
@@ -978,8 +1106,8 @@ def collect_symbolic_resources(
 
 # pylint: disable=too-many-arguments
 def build_registered_decomp_target_spec(
-    op_name,
-    op_id,
+    op_name: str,
+    op_id: SerializedGraphOpID,
     dynamic_shape,
     wire_lens,
     static_data,
@@ -1004,7 +1132,7 @@ def build_registered_decomp_target_spec(
 
     Args:
         op_name (str): the base operator's name
-        op_id (str): the base operator's graphOpId
+        op_id (SerializedGraphOpID): the base operator's graphOpId
         dynamic_shape (dict): dynamic argument names to their MLIR types
         wire_lens (dict): wire argument names to their lengths
         static_data (dict): compiler-static argument names to their values
@@ -1080,18 +1208,16 @@ def build_registered_decomp_target_spec(
                 rewritten[rule_name] = ids
         name_to_resource_ids = rewritten
 
-    call_args, call_kwargs = split_call_args(kwargs, is_custom_op)
+    call_args, call_kwargs = prepare_dummy_rule_arguments(kwargs, is_custom_op)
     kwarg_names = ordered_kwarg_names(call_kwargs, dynamic_shape)
 
-    # Numeric hybrid args (e.g. a CDFHamiltonian) are passed as operands so their concrete values
-    # do not bake into the rule body; the rest are closed over. The modified base op still carries
-    # every hybrid arg, so a baked one would also make the gate op's params outnumber the rule's
-    # inputs (crashing the signature analyzer during decompose-lowering).
+    # Rebuild hybrid arguments containing parameters or wires from operands.
+    # Fully static arguments are closed over.
     hybrid_specs, hybrid_leaves, closed_hybrid = flatten_hybrid_args(extra_data)
 
-    def rule_to_callable(rule):
+    def rule_to_callable(rule: DecompositionRule) -> Callable[..., None]:
         @capture_control_work_wires
-        def decomp_rule(*_operands):
+        def decomp_rule(*_operands) -> None:
             _args, _kwargs, _ctrl_wires, _ctrl_values, _work_wires = unpack_rule_operands(
                 _operands,
                 len(call_args),
@@ -1144,10 +1270,10 @@ def build_registered_decomp_target_spec(
             continue
         rule_specs.append(
             DecompRuleSpec(
-                rule_to_callable(rule),
-                rule.name,
-                name_to_resource_ids[rule.name],
-                name_to_resources[rule.name],
+                prepared_rule_fn=rule_to_callable(rule),
+                frontend_name=rule.name,
+                resource_counts_by_id=name_to_resource_ids[rule.name],
+                resource_counts_by_op=name_to_resources[rule.name],
             )
         )
 
@@ -1181,8 +1307,8 @@ def build_registered_decomp_target_spec(
 
 
 def compile_registered_symbolic_rules(
-    op_name,
-    op_id,
+    op_name: str,
+    op_id: SerializedGraphOpID,
     dynamic_shape,
     wire_lens,
     static_data,
@@ -1234,7 +1360,7 @@ def build_decomp_rule_variants(
     resulting target specification for use by the reachability walk.
     """
 
-    common = {
+    common: _RuleBuilderArgs = {
         "op_name": request.op_name,
         "op_id": request.base_id,
         "dynamic_shape": request.dynamic_shape,
@@ -1284,7 +1410,7 @@ def walk_reachable_decomp_rule_sets(
         for request, required_states in initial_requests
     )
 
-    processed_states: dict[str, set[ModifierState]] = {}
+    processed_states: dict[SerializedGraphOpID, set[ModifierState]] = {}
     target_specs = []
 
     def child_requests(rule_sets):
@@ -1292,7 +1418,7 @@ def walk_reachable_decomp_rule_sets(
         for target_spec in rule_sets:
             context = target_spec.modifier_context
             for rule in target_spec.rules:
-                for op in rule.resource_ops:
+                for op in rule.resource_counts_by_op:
                     if isinstance(op, Operator2):
                         children.append(OpDecompRequest.from_operation(op, context))
         return children
@@ -1334,8 +1460,8 @@ def walk_reachable_decomp_rule_sets(
 
 
 def compile_decomposition_rules_wrapper(
-    op_name,
-    op_id,
+    op_name: str,
+    op_id: str,
     dynamic_shape,
     wire_lens,
     static_data,
@@ -1359,7 +1485,7 @@ def compile_decomposition_rules_wrapper(
     return str(
         compile_decomposition_rules(
             op_name,
-            op_id,
+            SerializedGraphOpID(op_id),
             dynamic_shape,
             wire_lens,
             static_data,
@@ -1370,8 +1496,8 @@ def compile_decomposition_rules_wrapper(
 
 
 def compile_reachable_decomposition_rules_wrapper(
-    op_name,
-    op_id,
+    op_name: str,
+    op_id: str,
     dynamic_shape,
     wire_lens,
     static_data,
@@ -1409,7 +1535,7 @@ def compile_reachable_decomposition_rules_wrapper(
     Returns:
         str: a module holding the whole reachable rule closure
     """
-    base_id, modifiers = ModifierState.from_graph_op_id(op_name, op_id)
+    base_id, modifiers = ModifierState.from_graph_op_id(op_name, SerializedGraphOpID(op_id))
     if modifiers.is_controlled:
         wire_lens = {name: size for name, size in wire_lens.items() if name != CTRL_WORK_WIRES}
         static_data = {
@@ -1432,8 +1558,8 @@ def compile_reachable_decomposition_rules_wrapper(
 
 
 def materialize_reachable_rule_strings(
-    op_name,
-    op_id,
+    op_name: str,
+    op_id: SerializedGraphOpID,
     dynamic_shape,
     wire_lens,
     static_data,
@@ -1449,7 +1575,7 @@ def materialize_reachable_rule_strings(
 
     Args:
         op_name (str): the operator's name, as PennyLane registers its rules
-        op_id (str): the operator's graphOpId
+        op_id (SerializedGraphOpID): the operator's graphOpId
         dynamic_shape (dict): dynamic argument names to their MLIR types
         wire_lens (dict): wire argument names to their lengths
         static_data (dict): compiler-static argument names to their values

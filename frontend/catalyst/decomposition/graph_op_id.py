@@ -24,6 +24,7 @@ from pennylane.pytrees import flatten
 
 from catalyst.decomposition.modifier_state import ModifierState
 from catalyst.decomposition.type_utils import (
+    SerializedGraphOpID,
     convert_item_to_mlir_type,
     post_process_concretize_leaves,
     replace_wires_with_placeholder_wires,
@@ -106,7 +107,7 @@ def build_graph_op_id(
     *,
     modifiers: ModifierState = ModifierState(),
     uid: int | None = None,
-) -> str:
+) -> SerializedGraphOpID:
     """Build a canonical frontend GraphOpID from its identity components.
 
     Work wires available to the controls are spelled as a ``ctrl_work_wires`` wire-group entry
@@ -123,10 +124,12 @@ def build_graph_op_id(
     wire_id = "{" + ",".join(f"{key}:{value}" for key, value in sorted(wire_lens.items())) + "}"
     static_id = format_static_data_dict_for_id(dict(sorted(static_data.items())))
     uid_id = f"[{uid}]" if uid is not None else ""
-    return name + dynamic_id + wire_id + static_id + uid_id
+    return SerializedGraphOpID(name + dynamic_id + wire_id + static_id + uid_id)
 
 
-def add_ctrl_work_wires_to_id(op_id: str, num_work_wires: int, work_wire_type: str) -> str:
+def add_ctrl_work_wires_to_id(
+    op_id: SerializedGraphOpID, num_work_wires: int, work_wire_type: str
+) -> SerializedGraphOpID:
     """Spell control work wires into a finished, controlled GraphOpID string.
 
     This is :func:`build_graph_op_id`'s work-wire spelling for callers that only hold an id string.
@@ -134,12 +137,12 @@ def add_ctrl_work_wires_to_id(op_id: str, num_work_wires: int, work_wire_type: s
     printer's sorted order.
 
     Args:
-        op_id (str): a controlled GraphOpID carrying no control work wires yet
+        op_id (SerializedGraphOpID): a controlled GraphOpID carrying no control work wires yet
         num_work_wires (int): the number of work wires available to the controls
         work_wire_type (str): their type, ``"zeroed"`` or ``"borrowed"``
 
     Returns:
-        str: the GraphOpID with the work wires spelled, or ``op_id`` itself without work wires
+        SerializedGraphOpID: the GraphOpID with work wires spelled, or ``op_id`` without work wires
 
     Raises:
         ValueError: if ``op_id`` is malformed or already spells control work wires
@@ -163,10 +166,14 @@ def add_ctrl_work_wires_to_id(op_id: str, num_work_wires: int, work_wire_type: s
         entries[CTRL_WORK_WIRE_TYPE] = ir.StringAttr.get(work_wire_type)
         static_id = str(ir.DictAttr.get(entries))
 
-    return match["name"] + match["dynamic"] + wire_id + static_id + (match["uid"] or "")
+    return SerializedGraphOpID(
+        match["name"] + match["dynamic"] + wire_id + static_id + (match["uid"] or "")
+    )
 
 
-def remove_ctrl_work_wires_from_id(op_id: str) -> tuple[str, int, str]:
+def remove_ctrl_work_wires_from_id(
+    op_id: SerializedGraphOpID,
+) -> tuple[SerializedGraphOpID, int, str]:
     """Remove control work-wire metadata, returning the base id, count and type.
 
     Preserve the operator's own wire groups, static attributes and UID. The compiler's on-demand
@@ -189,7 +196,9 @@ def remove_ctrl_work_wires_from_id(op_id: str) -> tuple[str, int, str]:
         work_wire_type = ir.StringAttr(entries.pop(CTRL_WORK_WIRE_TYPE)).value
         static_id = str(ir.DictAttr.get(entries))
 
-    base_id = match["name"] + match["dynamic"] + wire_id + static_id + (match["uid"] or "")
+    base_id = SerializedGraphOpID(
+        match["name"] + match["dynamic"] + wire_id + static_id + (match["uid"] or "")
+    )
     return base_id, num_work_wires, work_wire_type
 
 
@@ -350,7 +359,7 @@ class GraphOpID:
         """Return the name of the operator."""
         return self.operator_name
 
-    def _build_id(self, modifiers: ModifierState) -> str:
+    def _build_id(self, modifiers: ModifierState) -> SerializedGraphOpID:
         """Return the GraphOpId of the base operator under the given modifiers."""
         uid = None
         if self.extra_data:
@@ -365,7 +374,7 @@ class GraphOpID:
             uid=uid,
         )
 
-    def getGraphOpId(self, modifiers: ModifierState = ModifierState()) -> str:
+    def getGraphOpId(self, modifiers: ModifierState = ModifierState()) -> SerializedGraphOpID:
         """
         Return the GraphOpId as a string.
 
@@ -378,7 +387,7 @@ class GraphOpID:
         """
         return self._build_id(modifiers.compose(self.modifiers))
 
-    def getBaseGraphOpId(self) -> str:
+    def getBaseGraphOpId(self) -> SerializedGraphOpID:
         """Return the GraphOpId of the base operator alone, leaving off the modifiers wrapping it.
 
         The base is what owns the decomposition rules, so this is the id to look them up under.
