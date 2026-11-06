@@ -1034,7 +1034,7 @@ class TestCreateStaticOperatorNodes:
         nodes = utility.dag_builder.nodes
         assert len(nodes) == 2  # Device node + operator
 
-        assert nodes["node1"]["label"] == "<name> MidMeasureMP|<wire> [0]"
+        assert nodes["node1"]["label"] == get_label(qp.ops.MidMeasure(0))
 
     def test_ppm(self):
         """Test that PPMs can be captured as nodes."""
