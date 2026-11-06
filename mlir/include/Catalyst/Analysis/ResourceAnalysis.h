@@ -63,6 +63,9 @@ class ResourceAnalysis {
     // per-function resource counts
     llvm::StringMap<ResourceResult> funcResults;
 
+    // Functions in the same recursive call-graph component share a group ID.
+    llvm::StringMap<unsigned> recursiveFunctionGroups;
+
     // Flattened totals per function; filled on first `getFlattenedResource` call.
     mutable llvm::StringMap<ResourceResult> flattenedCache;
 

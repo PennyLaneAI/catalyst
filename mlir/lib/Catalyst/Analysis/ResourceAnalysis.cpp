@@ -82,8 +82,10 @@ static std::pair<bool, unsigned> composeModifiers(std::pair<bool, unsigned> oute
 /// Returns the function in a caller-before callee order so that
 /// when callees are analyzed, information on the modifiers on their callsites
 /// is available.
-static SmallVector<func::FuncOp> orderFuncsByCallGraph(ModuleOp moduleOp) {
+static SmallVector<func::FuncOp>
+orderFuncsByCallGraph(ModuleOp moduleOp, llvm::StringMap<unsigned> &recursiveFunctionGroups) {
     const CallGraph callGraph(moduleOp);
+    unsigned recursiveGroup = 0;
 
     // Flatten SCCs bottom-up (callee SCCs first), then reverse for caller-before-callee.
     // Order within a cyclic SCC is arbitrary either way.
@@ -117,6 +119,10 @@ static SmallVector<func::FuncOp> orderFuncsByCallGraph(ModuleOp moduleOp) {
 
         // Size > 1 ⇒ mutual recursion; size 1 with a self-call ⇒ direct recursion.
         if (sccFuncs.size() > 1 || hasSelfRecursiveCall) {
+            for (auto funcOp : sccFuncs) {
+                recursiveFunctionGroups[funcOp.getName()] = recursiveGroup;
+            }
+            ++recursiveGroup;
             sccFuncs.front().emitWarning()
                 << "ResourceAnalysis encountered recursive call to '" << sccFuncs.front().getName()
                 << "'. Recursive calls are not flattened, so resource counts may be incomplete.";
@@ -163,7 +169,8 @@ ResourceAnalysis::ResourceAnalysis(ModuleOp moduleOp,
         }
     });
 
-    SmallVector<func::FuncOp> definedFuncOps = orderFuncsByCallGraph(moduleOp);
+    SmallVector<func::FuncOp> definedFuncOps =
+        orderFuncsByCallGraph(moduleOp, recursiveFunctionGroups);
 
     // Reserve every user function with an empty result
     // Add the original context so resource counts are always done for original function
@@ -248,6 +255,19 @@ ResourceAnalysis::ResourceAnalysis(func::FuncOp funcOp,
     result = makeEmptyResult();
     result.modifierContexts[{false, 0}] = funcOp.getName().str();
     result.isQnode = funcOp->hasAttrOfType<UnitAttr>("quantum.node");
+
+    // Single-function analysis has no module call graph, but must still stop
+    // self-recursive modifier contexts from growing without bound.
+    funcOp.walk([&](func::CallOp callOp) {
+        if (callOp.getCallee() == funcOp.getName()) {
+            recursiveFunctionGroups.try_emplace(funcOp.getName(), 0);
+        }
+    });
+    if (!recursiveFunctionGroups.empty()) {
+        funcOp.emitWarning()
+            << "ResourceAnalysis encountered recursive call to '" << funcOp.getName()
+            << "'. Recursive calls are not flattened, so resource counts may be incomplete.";
+    }
 
     // TODO: Additional handling for entrypoint functions
 
@@ -573,6 +593,21 @@ void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result, b
     if (auto callOp = dyn_cast<func::CallOp>(op)) {
         std::string modCtxName = callOp.getCallee().str();
 
+        // Calls within a recursive component remain visible in the counts, but
+        // neither propagate modifiers nor expand callee resources. In particular,
+        // a controlled self-call must not create 1C_foo, 2C_foo, ... indefinitely.
+        if (auto caller = callOp->getParentOfType<func::FuncOp>()) {
+            auto callerGroup = recursiveFunctionGroups.find(caller.getName());
+            auto calleeGroup = recursiveFunctionGroups.find(callOp.getCallee());
+            if (callerGroup != recursiveFunctionGroups.end() &&
+                calleeGroup != recursiveFunctionGroups.end() &&
+                callerGroup->second == calleeGroup->second) {
+                result.functionCalls[modCtxName] += 1;
+                result.unexpandedFunctionCalls.insert(modCtxName);
+                return;
+            }
+        }
+
         // No modifiers: just count the function call
         if (!isAdjoint && numControlQubits == 0) {
             result.functionCalls[modCtxName] += 1;
@@ -721,6 +756,9 @@ const ResourceResult *ResourceAnalysis::getFlattenedResource(StringRef funcName)
 
     // Pull in each direct callee's flattened counts, × how often we call it.
     for (const auto &fc : r.functionCalls) {
+        if (r.unexpandedFunctionCalls.contains(fc.getKey())) {
+            continue;
+        }
         const ResourceResult *child = getFlattenedResource(fc.getKey());
         if (!child || child == &flat) {
             continue;
