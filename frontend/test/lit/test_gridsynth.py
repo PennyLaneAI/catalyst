@@ -69,9 +69,9 @@ def test_rz_lowering():
         qp.RZ(x, wires=0)
         return qp.probs()
 
-    # CHECK-DAG:   func.func private @rs_decomposition_get_gates(memref<?xindex>, f64, f64, i1)
-    # CHECK-DAG:   func.func private @rs_decomposition_get_phase(f64, f64, i1) -> f64
-    # CHECK-DAG:   func.func private @rs_decomposition_get_size(f64, f64, i1) -> index
+    # CHECK-DAG:   func.func private @rs_decomposition_get_gates(memref<?xindex>, f64, f64, i1 {llvm.zeroext})
+    # CHECK-DAG:   func.func private @rs_decomposition_get_phase(f64, f64, i1 {llvm.zeroext}) -> f64
+    # CHECK-DAG:   func.func private @rs_decomposition_get_size(f64, f64, i1 {llvm.zeroext}) -> index
 
     # CHECK-LABEL: func.func private @__catalyst_decompose_RZ{{.*}}
     # CHECK:       scf.index_switch
@@ -125,9 +125,9 @@ def test_phaseshift_lowering():
         qp.PhaseShift(x, wires=0)
         return qp.probs()
 
-    # CHECK-DAG:   func.func private @rs_decomposition_get_gates(memref<?xindex>, f64, f64, i1)
-    # CHECK-DAG:   func.func private @rs_decomposition_get_phase(f64, f64, i1) -> f64
-    # CHECK-DAG:   func.func private @rs_decomposition_get_size(f64, f64, i1) -> index
+    # CHECK-DAG:   func.func private @rs_decomposition_get_gates(memref<?xindex>, f64, f64, i1 {llvm.zeroext})
+    # CHECK-DAG:   func.func private @rs_decomposition_get_phase(f64, f64, i1 {llvm.zeroext}) -> f64
+    # CHECK-DAG:   func.func private @rs_decomposition_get_size(f64, f64, i1 {llvm.zeroext}) -> index
 
     # CHECK-LABEL: func.func private @__catalyst_decompose_RZ{{.*}}
 
@@ -175,9 +175,9 @@ def test_ppr_lowering():
         qp.RZ(x, wires=0)
         return qp.probs()
 
-    # CHECK-DAG:   func.func private @rs_decomposition_get_gates(memref<?xindex>, f64, f64, i1)
-    # CHECK-DAG:   func.func private @rs_decomposition_get_phase(f64, f64, i1) -> f64
-    # CHECK-DAG:   func.func private @rs_decomposition_get_size(f64, f64, i1) -> index
+    # CHECK-DAG:   func.func private @rs_decomposition_get_gates(memref<?xindex>, f64, f64, i1 {llvm.zeroext})
+    # CHECK-DAG:   func.func private @rs_decomposition_get_phase(f64, f64, i1 {llvm.zeroext}) -> f64
+    # CHECK-DAG:   func.func private @rs_decomposition_get_size(f64, f64, i1 {llvm.zeroext}) -> index
 
     # CHECK-LABEL: func.func private @__catalyst_decompose_RZ_ppr_basis{{.*}}
     # CHECK:       scf.index_switch
@@ -209,9 +209,9 @@ def test_capture_workflow_clifford():
         qp.RZ(x, wires=0)
         return qp.probs()
 
-    # CHECK-DAG:   func.func private @rs_decomposition_get_gates(memref<?xindex>, f64, f64, i1)
-    # CHECK-DAG:   func.func private @rs_decomposition_get_phase(f64, f64, i1) -> f64
-    # CHECK-DAG:   func.func private @rs_decomposition_get_size(f64, f64, i1) -> index
+    # CHECK-DAG:   func.func private @rs_decomposition_get_gates(memref<?xindex>, f64, f64, i1 {llvm.zeroext})
+    # CHECK-DAG:   func.func private @rs_decomposition_get_phase(f64, f64, i1 {llvm.zeroext}) -> f64
+    # CHECK-DAG:   func.func private @rs_decomposition_get_size(f64, f64, i1 {llvm.zeroext}) -> index
 
     # CHECK-LABEL: func.func private @__catalyst_decompose_RZ{{.*}}
     # CHECK:       scf.index_switch
@@ -245,9 +245,9 @@ def test_capture_workflow_ppr():
         qp.RZ(x, wires=0)
         return qp.probs()
 
-    # CHECK-DAG:   func.func private @rs_decomposition_get_gates(memref<?xindex>, f64, f64, i1)
-    # CHECK-DAG:   func.func private @rs_decomposition_get_phase(f64, f64, i1) -> f64
-    # CHECK-DAG:   func.func private @rs_decomposition_get_size(f64, f64, i1) -> index
+    # CHECK-DAG:   func.func private @rs_decomposition_get_gates(memref<?xindex>, f64, f64, i1 {llvm.zeroext})
+    # CHECK-DAG:   func.func private @rs_decomposition_get_phase(f64, f64, i1 {llvm.zeroext}) -> f64
+    # CHECK-DAG:   func.func private @rs_decomposition_get_size(f64, f64, i1 {llvm.zeroext}) -> index
 
     # CHECK-LABEL: func.func private @__catalyst_decompose_RZ_ppr_basis{{.*}}
     # CHECK:       scf.index_switch

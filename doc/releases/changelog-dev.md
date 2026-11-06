@@ -347,6 +347,10 @@
   [(#3162)](https://github.com/PennyLaneAI/catalyst/pull/3162)
   [(#3245)](https://github.com/PennyLaneAI/catalyst/pull/3245)
 
+* A simple runtime lowering for `quantum::OperatorOp` was added. The simple lowering ignores all
+  static data, work wires, and parameters forwarded to decomposition rules.
+  [(#3430)](https://github.com/PennyLaneAI/catalyst/pull/3430)
+
 * The graph-based decomposition system has been greatly improved.
 
   In previous versions, graph-based decomposition was occurring during the conversion from PennyLane
@@ -964,6 +968,12 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* Runtime functions that take a boolean argument are now declared with `zeroext` on it. Before, a
+  computed `i1`, such as a negated measurement result in the condition of a conditional Pauli
+  rotation or in a `debug_assert`, could reach the runtime with undefined upper bits and be read
+  as true.
+  [(#3445)](https://github.com/PennyLaneAI/catalyst/pull/3445)
+
 * The `--convert-to-value-semantics` pass now correctly handles aliasing qubit references that are
   used by multiple regions and/or operand lists on the same operation.
   [(#3404)](https://github.com/PennyLaneAI/catalyst/pull/3404)
@@ -1129,6 +1139,9 @@
 * Fixed linking of runtime artifacts under `catalyst.debug.instrumentation`, which dropped the
   libraries recorded by `runtime_call`s and devices before linking.
   [(#3438)](https://github.com/PennyLaneAI/catalyst/pull/3438)
+
+* Fixed hinted while loops to be counted symbolically in `ResourceAnalysis`.
+  [(#3370)](https://github.com/PennyLaneAI/catalyst/pull/3370)
 
 <h3>Internal changes ⚙️</h3>
 
