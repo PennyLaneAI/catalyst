@@ -80,6 +80,9 @@ void ResourceResult::mergeWith(const ResourceResult &other, MergeMethod method) 
 
     mergeStringMap(classicalInstructions, other.classicalInstructions, method);
     mergeStringMap(functionCalls, other.functionCalls, method);
+    for (const auto &entry : other.unexpandedFunctionCalls) {
+        unexpandedFunctionCalls.insert(entry.getKey());
+    }
 
     // varFunctionCalls hold identifiers for unknown dynamic counts. If the
     // same key appears twice, the merge result represents a new unknown value

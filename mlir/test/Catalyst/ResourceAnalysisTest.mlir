@@ -2240,6 +2240,29 @@ func.func @recursive(%arg0: !quantum.bit) -> !quantum.bit {
 
 // -----
 
+// A controlled self-call must warn and complete without creating an unbounded
+// sequence of modifier contexts.
+
+// CHECK-NOT: C_recursive_controlled
+// CHECK-LABEL: "recursive_controlled": {
+// CHECK: "function_calls"
+// CHECK:   "static":
+// CHECK:     "recursive_controlled": 1
+// CHECK: "quantum_operations": {}
+
+// expected-warning@+1 {{ResourceAnalysis encountered recursive call to 'recursive_controlled'. Recursive calls are not flattened, so resource counts may be incomplete.}}
+func.func @recursive_controlled(%q: !quantum.bit, %c: !quantum.bit) -> (!quantum.bit, !quantum.bit) {
+    %true = arith.constant true
+    %oc, %oq = quantum.ctrl(%c) ctrlvals(%true) (%q) : !quantum.bit -> !quantum.bit {
+    ^bb0(%a: !quantum.bit):
+        %r:2 = func.call @recursive_controlled(%a, %c) : (!quantum.bit, !quantum.bit) -> (!quantum.bit, !quantum.bit)
+        quantum.yield %r#0 : !quantum.bit
+    }
+    return %oq, %oc : !quantum.bit, !quantum.bit
+}
+
+// -----
+
 // auto_qubit_management flag is reported in the result.
 // The function uses {auto_qubit_management} on the device, so the flag is true.
 

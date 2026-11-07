@@ -863,6 +863,9 @@
 
 <h3>Breaking changes 💔</h3>
 
+* The `register-decomp-rule-resource` pass is being removed, since rules are now attributed on-demand via `ResourceAnalysis`.
+  [(#3432)](https://github.com/PennyLaneAI/catalyst/pull/3432)
+
 * The `lazy` argument has been removed from `catalyst.adjoint`, matching
   `qp.adjoint`. Adjoint construction is always symbolic, and captured adjoint
   regions no longer carry `lazy` metadata. Construct known inverse gates directly

@@ -63,6 +63,9 @@ class ResourceAnalysis {
     // per-function resource counts
     llvm::StringMap<ResourceResult> funcResults;
 
+    // Functions in the same recursive call-graph component share a group ID.
+    llvm::StringMap<unsigned> recursiveFunctionGroups;
+
     // Flattened totals per function; filled on first `getFlattenedResource` call.
     mutable llvm::StringMap<ResourceResult> flattenedCache;
 
@@ -76,12 +79,13 @@ class ResourceAnalysis {
     int64_t whileLoopCounter = 0;
     int64_t dynWhileLoopCounter = 0;
 
+    // Shared analysis manager.
+    mlir::ModuleAnalysisManager analysisManager;
+
     // Counters for modifier context names
     // TODO: the counter will ensure uniqueness, but may not be sequential for a specific function,
     // if multiple modifier functions have name conflicts with module functions. Fix if possible.
     int64_t modifierContextCounter = 0;
-    // Shared analysis manager.
-    mlir::ModuleAnalysisManager analysisManager;
 
     // Collect the extension analyses logic
     llvm::SmallVector<std::unique_ptr<ResourceAnalysisExtension>> extensionAnalyses;

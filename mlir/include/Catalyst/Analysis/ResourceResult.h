@@ -63,6 +63,9 @@ struct ResourceResult {
 
     llvm::StringMap<double> functionCalls;
 
+    // Recursive calls are counted, but their callee resources must not be expanded.
+    llvm::StringSet<> unexpandedFunctionCalls;
+
     // `dyn_for_loop_<N>` / `dyn_while_loop_<N>` -> stable hash id for that loop op (not a trip
     // count). Ignored by `multiplyBy`; `mergeWith` mints a fresh id on key conflicts.
     llvm::StringMap<uint64_t> varFunctionCalls;
