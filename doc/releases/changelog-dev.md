@@ -968,6 +968,11 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* The `ppr-to-ppm` pass now supports PPRotation operations inside `quantum.adjoint` regions by
+  invoking `adjoint-lowering` before converting the reversed rotations to Pauli product
+  measurements.
+  [(#2934)](https://github.com/PennyLaneAI/catalyst/pull/2934)
+
 * Runtime functions that take a boolean argument are now declared with `zeroext` on it. Before, a
   computed `i1`, such as a negated measurement result in the condition of a conditional Pauli
   rotation or in a `debug_assert`, could reach the runtime with undefined upper bits and be read
