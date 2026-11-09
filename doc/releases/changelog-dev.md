@@ -1426,6 +1426,17 @@
   link it if present.
   [(#3303)](https://github.com/PennyLaneAI/catalyst/pull/3303)
 
+* The preparation of the graph solver is moved to a shared algorithm used by passes that need to use it.
+  - The `resource-analysis` pass and `graph-decomposition` pass use the same shared logic owned 
+by `ResourceAnalysis` object to forward walk through the module, and collect all operators
+encountered, and their resource counts, accounting for modifier regions (across function call
+sites as well) accurately. [(#3349)](https://github.com/PennyLaneAI/catalyst/pull/3349)
+
+  - The preparation of inputs to the graph solver, including parsing the fixed/alt decomps, gateset, and collecting rule nodes
+are refactored into their own file, 'GraphPrep.hpp/cpp`. This is to expose the shared logic of graph solver preparation
+among passes that need to use it. [(#3349)](https://github.com/PennyLaneAI/catalyst/pull/3349)
+
+
 <h3>Documentation 📝</h3>
 
 * A broken link was removed in the [Compiler Core](https://docs.pennylane.ai/projects/catalyst/en/stable/modules/mlir.html) documentation page. The link referred to where precompiled decomposition rules were implemented, which has since been refactored.
