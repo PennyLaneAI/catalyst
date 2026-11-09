@@ -44,6 +44,10 @@ struct ResourceTracker final {
     std::size_t total_allocd_wires_;
     std::size_t
         max_deallocd_depth_; // The maximum depth of any qubit which has already been released
+    std::size_t last_measurement_depth_; // The depth of the most recent mid-circuit measurement
+    // The depths of the measurements controlling the currently executing classically controlled
+    // regions (e.g. branches of a conditional), innermost last
+    std::vector<std::size_t> classical_control_depths_;
     bool static_filename_;
     bool compute_depth_;
     std::string resources_filename_;
@@ -51,16 +55,22 @@ struct ResourceTracker final {
     /**
      * @brief Update the depth of the circuit given by the wires and controlled wires.
      *
+     * Operations inside a classically controlled region are placed after the measurements that
+     * control the region.
+     *
      * @param wires The wires the operation is being applied to
      * @param controlled_wires The control wires the operation is being applied to
+     * @return The depth of the layer the operation was placed in, or 0 if depth tracking is
+     * disabled
      */
-    void UpdateDepth(const std::vector<QubitIdType> &wires,
-                     const std::vector<QubitIdType> &controlled_wires = {}) {
+    auto UpdateDepth(const std::vector<QubitIdType> &wires,
+                     const std::vector<QubitIdType> &controlled_wires = {}) -> std::size_t {
         if (!compute_depth_) {
-            return;
+            return 0;
         }
 
-        std::size_t max_depth = 0;
+        std::size_t max_depth =
+            classical_control_depths_.empty() ? 0 : classical_control_depths_.back();
         for (const auto &i : wires) {
             auto curr_depth = wire_depths_.find(i);
             RT_FAIL_IF(curr_depth == wire_depths_.end(),
@@ -82,6 +92,7 @@ struct ResourceTracker final {
         for (const auto &i : controlled_wires) {
             wire_depths_[i] = max_depth;
         }
+        return max_depth;
     }
 
     /**
@@ -94,13 +105,14 @@ struct ResourceTracker final {
      * @param wires The wires the operation is being applied to
      * @param controlled_wires The control wires the operation is being applied to
      */
-    void RecordOperation(const std::string &name, const std::vector<QubitIdType> &wires,
-                         const std::vector<QubitIdType> &controlled_wires) {
-        UpdateDepth(wires, controlled_wires);
+    auto RecordOperation(const std::string &name, const std::vector<QubitIdType> &wires,
+                         const std::vector<QubitIdType> &controlled_wires) -> std::size_t {
+        std::size_t depth = UpdateDepth(wires, controlled_wires);
         std::size_t total_wires = wires.size() + controlled_wires.size();
 
         gate_types_[name]++;
         gate_sizes_[total_wires]++;
+        return depth;
     }
 
   public:
@@ -127,6 +139,8 @@ struct ResourceTracker final {
         curr_num_wires_ = 0;
         max_deallocd_depth_ = 0;
         total_allocd_wires_ = 0;
+        last_measurement_depth_ = 0;
+        classical_control_depths_.clear();
     }
 
     /**
@@ -448,15 +462,66 @@ struct ResourceTracker final {
      * @param wires The qubits being measured
      */
     void PauliMeasure(const std::string &name, const std::vector<QubitIdType> &wires) {
-        RecordOperation(name, wires, {});
+        last_measurement_depth_ = RecordOperation(name, wires, {});
     }
 
     /**
      * @brief Records a mid-circuit measurement for resource tracking
      *
-     * Increments the count of mid-circuit measurements performed.
+     * Increments the count of mid-circuit measurements performed. If depth tracking is enabled,
+     * the measurement also occupies a layer on the measured wire.
+     *
+     * @param wire The qubit being measured
      */
-    void MidMeasurement() { measurements_["MidMeasure"]++; }
+    void MidMeasurement(QubitIdType wire) {
+        last_measurement_depth_ = UpdateDepth({wire});
+        measurements_["MidMeasure"]++;
+    }
+
+    /**
+     * @brief Returns the depth of the most recent mid-circuit measurement
+     *
+     * Only tracked if depth computation is enabled, otherwise always returns 0
+     *
+     * @return The depth of the layer of the most recent mid-circuit or Pauli measurement
+     */
+    auto GetLastMeasurementDepth() const -> std::size_t { return last_measurement_depth_; }
+
+    /**
+     * @brief Enters a region of operations that are classically controlled by measurements
+     *
+     * Until the matching EndClassicalControl call, operations are placed after the measurements
+     * that control the region, even if they act on different wires. Regions can be nested.
+     *
+     * @note Current limitations, to be addressed in the future:
+     * - Only the regions that are executed are tracked. Since the null device returns 0 for every
+     *   measurement that is not postselected, regions taken on an outcome of 1, including nested
+     *   conditionals within them, are never executed, and their gates and depth are not counted.
+     * - The controlling measurements are identified by the depth of the most recent measurement
+     *   at the time it is taken. When the compiler cannot trace the dependency of a condition on
+     *   its measurements (e.g. through loop-carried values, function results or memory), a nested
+     *   region may be placed after the wrong measurement. Giving each measurement result its own
+     *   token, threaded through the program alongside the result, would make this exact.
+     *
+     * @param measurement_depth The maximum depth of the measurements controlling the region
+     */
+    void BeginClassicalControl(std::size_t measurement_depth) {
+        if (!classical_control_depths_.empty()) {
+            measurement_depth = std::max(measurement_depth, classical_control_depths_.back());
+        }
+        classical_control_depths_.push_back(measurement_depth);
+    }
+
+    /**
+     * @brief Exits the innermost region of classically controlled operations
+     *
+     * @throws Runtime error if there is no classically controlled region to exit
+     */
+    void EndClassicalControl() {
+        RT_FAIL_IF(classical_control_depths_.empty(),
+                   "Cannot end a classically controlled region that was never started.");
+        classical_control_depths_.pop_back();
+    }
 
     /**
      * @brief Prints resource usage statistics in JSON format to the specified file

@@ -62,3 +62,23 @@ TEST_CASE("SharedLibraryManager resolves a known symbol", "[shared_lib]") {
     SharedLibraryManager mgr{kNullQubitAbs};
     REQUIRE(mgr.getSymbol("NullQubitFactory") != nullptr);
 }
+
+TEST_CASE("SharedLibraryManager tries to resolve an optional symbol", "[shared_lib]") {
+    SharedLibraryManager mgr{kNullQubitAbs};
+    REQUIRE(mgr.tryGetSymbol("NullQubitBeginClassicalControl") != nullptr);
+    REQUIRE(mgr.tryGetSymbol("NullQubitNotARealExtension") == nullptr);
+
+    // A failed optional lookup does not affect later lookups
+    REQUIRE(mgr.getSymbol("NullQubitFactory") != nullptr);
+}
+
+TEST_CASE("RTDevice resolves optional device extensions", "[shared_lib]") {
+    RTDevice device{kNullQubitAbs, "NullQubit", "{}", false};
+    REQUIRE(device.getDeviceExtension("MeasurementToken") != nullptr);
+    REQUIRE(device.getDeviceExtension("BeginClassicalControl") != nullptr);
+    REQUIRE(device.getDeviceExtension("EndClassicalControl") != nullptr);
+
+    // Extensions the device library does not export are not found, also when cached
+    REQUIRE(device.getDeviceExtension("NotARealExtension") == nullptr);
+    REQUIRE(device.getDeviceExtension("NotARealExtension") == nullptr);
+}

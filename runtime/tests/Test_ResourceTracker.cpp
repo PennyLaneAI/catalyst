@@ -258,6 +258,91 @@ TEST_CASE("Test Resource Tracker Depth", "[resourcetracking]") {
     CHECK(tracker.GetDepth() == 0); // Should not change if depth tracking disabled
 }
 
+TEST_CASE("Test Resource Tracker Mid-Circuit Measurement Depth", "[resourcetracking]") {
+    ResourceTracker tracker;
+    tracker.SetComputeDepth(true);
+    for (size_t i = 0; i < 3; i++) {
+        tracker.AllocateQubit(i);
+    }
+
+    // A mid-circuit measurement occupies a layer on its wire, but is not counted as a gate
+    tracker.NamedOperation("Hadamard", false, {0});
+    tracker.MidMeasurement(0);
+    CHECK(tracker.GetDepth() == 2);
+    CHECK(tracker.GetLastMeasurementDepth() == 2);
+    CHECK(tracker.GetNumGates() == 1);
+    CHECK(tracker.GetNumMeasurements("MidMeasure") == 1);
+
+    // A Pauli measurement also updates the depth of the most recent measurement
+    tracker.PauliMeasure("PauliMeasure-w2", {1, 2});
+    CHECK(tracker.GetLastMeasurementDepth() == 1);
+    CHECK(tracker.GetDepth() == 2);
+}
+
+TEST_CASE("Test Resource Tracker Classical Control Depth", "[resourcetracking]") {
+    ResourceTracker tracker;
+    tracker.SetComputeDepth(true);
+    for (size_t i = 0; i < 3; i++) {
+        tracker.AllocateQubit(i);
+    }
+
+    // m0 = measure(0); cond(m0, Z)(1)
+    tracker.MidMeasurement(0);
+    tracker.BeginClassicalControl(tracker.GetLastMeasurementDepth());
+    tracker.NamedOperation("PauliZ", false, {1});
+    tracker.EndClassicalControl();
+    CHECK(tracker.GetDepth() == 2);
+
+    // Operations outside the controlled region are not affected by the measurement
+    tracker.NamedOperation("PauliX", false, {2});
+    CHECK(tracker.GetDepth() == 2);
+
+    // Nested regions are placed after the deepest controlling measurement
+    tracker.NamedOperation("Hadamard", false, {0});
+    tracker.MidMeasurement(0);
+    std::size_t m1_depth = tracker.GetLastMeasurementDepth();
+    CHECK(m1_depth == 3);
+
+    tracker.BeginClassicalControl(m1_depth);
+    tracker.BeginClassicalControl(1);
+    tracker.NamedOperation("PauliX", false, {2});
+    CHECK(tracker.GetDepth() == 4);
+    tracker.EndClassicalControl();
+
+    tracker.NamedOperation("CNOT", false, {1, 2});
+    CHECK(tracker.GetDepth() == 5);
+    tracker.EndClassicalControl();
+
+    tracker.NamedOperation("PauliX", false, {1});
+    CHECK(tracker.GetDepth() == 6);
+
+    // Ending a region that was never started fails
+    CHECK_THROWS(tracker.EndClassicalControl());
+
+    // Reset exits all controlled regions
+    tracker.BeginClassicalControl(m1_depth);
+    tracker.Reset();
+    CHECK(tracker.GetLastMeasurementDepth() == 0);
+    CHECK_THROWS(tracker.EndClassicalControl());
+}
+
+TEST_CASE("Test Resource Tracker Classical Control Without Depth", "[resourcetracking]") {
+    ResourceTracker tracker;
+    for (size_t i = 0; i < 2; i++) {
+        tracker.AllocateQubit(i);
+    }
+
+    tracker.MidMeasurement(0);
+    CHECK(tracker.GetLastMeasurementDepth() == 0);
+    CHECK(tracker.GetNumMeasurements("MidMeasure") == 1);
+
+    tracker.BeginClassicalControl(tracker.GetLastMeasurementDepth());
+    tracker.NamedOperation("PauliZ", false, {1});
+    tracker.EndClassicalControl();
+    CHECK(tracker.GetNumGates("PauliZ") == 1);
+    CHECK(tracker.GetDepth() == 0);
+}
+
 TEST_CASE("Test Resource Tracker Runtime Checks", "[resourcetracking]") {
     ResourceTracker tracker;
     tracker.SetComputeDepth(true);
