@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{gate-set=testRX=2.0,testRY=1.0,testRZ=1.0 fixed-decomps=testHadamard=fixed_decomp})' %s | FileCheck %s --check-prefixes=ALL,CALL
+// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{gate-set=testRX=2.0,testRZ=1.0 fixed-decomps=testHadamard=fixed_decomp})' %s | FileCheck %s --check-prefixes=ALL,CALL
 
-// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{inline-rule-body gate-set=testRX=2.0,testRY=1.0,testRZ=1.0 fixed-decomps=testHadamard=fixed_decomp})' %s | FileCheck %s --check-prefixes=ALL,INLINE
+// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{inline-rule-body gate-set=testRX=2.0,testRZ=1.0 fixed-decomps=testHadamard=fixed_decomp})' %s | FileCheck %s --check-prefixes=ALL,INLINE
 
 // Exclusions apply to both rules already in the module and imported bytecode rules.
 // RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{inline-rule-body gate-set=testRX=2.0,testRY=1.0,testRZ=1.0 exclude-decomps=testHadamard=[cheaper_decomp,h_to_rz_ry,h_to_rz_rx] bytecode-rules="%BYTECODE_PATH"})' %s | FileCheck %s --check-prefixes=ALL,INLINE

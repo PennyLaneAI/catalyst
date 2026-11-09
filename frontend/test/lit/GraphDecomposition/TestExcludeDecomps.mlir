@@ -13,9 +13,9 @@
 // limitations under the License.
 
 // Excluding the cheaper rule forces the solver to choose the more expensive one.
-// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{inline-rule-body gate-set=testRY=3.0,testX=1.0,testZ=1.0 exclude-decomps=testY=[y_to_x_z] bytecode-rules="%BYTECODE_PATH"})' %s | FileCheck %s --check-prefixes RY,KEEP
+// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{inline-rule-body gate-set=testRY=3.0,testX=1.0,testZ=1.0 exclude-decomps=testY=[y_to_x_z]})' %s | FileCheck %s --check-prefixes RY,KEEP
 
-// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{inline-rule-body gate-set=testRY=1.0,testX=3.0,testZ=3.0 exclude-decomps=testY=y_to_ry bytecode-rules="%BYTECODE_PATH"})' %s | FileCheck %s --check-prefixes XZ,KEEP
+// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{inline-rule-body gate-set=testRY=1.0,testX=3.0,testZ=3.0 exclude-decomps=testY=y_to_ry})' %s | FileCheck %s --check-prefixes XZ,KEEP
 
 // An empty exclusion list allows all rules.
 // RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{inline-rule-body gate-set=testRY=1.0,testX=3.0,testZ=3.0 exclude-decomps=testY=[]})' %s | FileCheck %s --check-prefixes RY,KEEP
