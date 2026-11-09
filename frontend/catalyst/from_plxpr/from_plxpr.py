@@ -341,8 +341,7 @@ def handle_qnode(
 
 
 def _require_decompose_gate_set(tkwargs, is_resource_estimate=False):
-    """Reject a qp.decompose or qp.estimate without a gate set, which the graph-decomposition 
-    or resource-estimate pass needs.
+    """Reject a qp.decompose or qp.estimate without a gate set, which the pass needs.
     """
     function_name = "qp.estimate" if is_resource_estimate else "qp.decompose"
     if tkwargs.get("gate_set") is None:
