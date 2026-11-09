@@ -188,9 +188,9 @@ def qjit(
             This allows enabling capture locally for this QJIT without affecting the global
             ``qp.capture.enabled()`` state.
 
-            - ``"global"`` (default): Defer to ``qp.capture.enabled()`` to decide whether
+            - ``"global"`` : Defer to ``qp.capture.enabled()`` to decide whether
               to use program capture.
-            - ``True``: Force program capture on for this QJIT, regardless of the global setting.
+            - ``True`` (default): Force program capture on for this QJIT, regardless of the global setting.
               This allows using the new capture-based frontend without calling
               ``qp.capture.enable()`` globally.
             - ``False``: Force program capture off for this QJIT, using the old frontend,
