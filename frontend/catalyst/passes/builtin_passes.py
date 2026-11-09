@@ -1891,19 +1891,22 @@ def graph_decomposition_setup_inputs(
     }
 
     def rule_ref_name(rule):
-        # A rule reference may be a name string, a plain decomposition function, or a PennyLane
-        # ``DecompositionRule`` (returned by ``@register_resources``, which has no ``__name__``).
+        # A rule reference may be a name string, or a PennyLane ``DecompositionRule``
+        # (returned by ``@register_resources``, which has no ``__name__``).
         if isinstance(rule, str):
             return rule
-        if isinstance(rule, qp.decomposition.DecompositionRule):
+        if isinstance(rule, DecompositionRule):
             return rule.name
         return rule.__name__
 
     if fixed_decomps is not None:
-        for val in fixed_decomps.values():
+        for op, rule in fixed_decomps.items():
             assert isinstance(
-                val, (str, DecompositionRule)
-            ), f"fixed_decomps must be names (strings) or DecompositionRules, got {type(val)}"
+                rule, (str, DecompositionRule)
+            ), f"Fixed decomposition rules must be names (strings) or DecompositionRules, got {type(rule)}"
+
+            if rule_ref_name(rule) not in qp.list_decomps(op):
+                raise ValueError(f"Rule {rule_ref_name(rule)} not found for operator {op}")
 
         options |= {
             "fixed_decomps": {

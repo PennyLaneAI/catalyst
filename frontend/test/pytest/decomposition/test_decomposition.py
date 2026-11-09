@@ -2636,7 +2636,7 @@ class TestCustomRuleApplication:
         assert resources["graph-decomposition"].counts == expected
 
     def test_fix_decomp_invalid_name(self):
-        """Tests that an error is raised by referring to an inexistant rule name."""
+        """Tests that an error is raised by referring to a non-existent rule name."""
 
         @qjit(capture=True, target="mlir")
         @qp.decompose(gate_set={qp.X}, fixed_decomps={NoParamsCustomOp: "custom_rule"})
@@ -2644,8 +2644,8 @@ class TestCustomRuleApplication:
         def circuit():
             NoParamsCustomOp(0)
 
-        with pytest.raises(ValueError, match="Unknown decomposition rule"):
-            resources = qp.analyze(circuit, level="all-user")().resources
+        with pytest.raises(ValueError, match="Rule (.*) not found for operator"):
+            qp.analyze(circuit, level="all-user")().resources
 
     def test_fix_decomp_invalid_type(self):
         """Tests that an error is raised by referring to an invalid object."""
@@ -2659,7 +2659,7 @@ class TestCustomRuleApplication:
         def circuit():
             NoParamsCustomOp(0)
 
-        with pytest.raises(TypeError, match="fixed_decomps accepts rules or the names"):
+        with pytest.raises(AssertionError, match="Fixed decomposition rules must be"):
             qp.analyze(circuit, level="all-user")().resources
 
     def test_functional_adjoint_region_is_lowered(self):
