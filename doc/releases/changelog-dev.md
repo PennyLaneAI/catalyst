@@ -971,6 +971,16 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* The circuit depth tracked by `null.qubit` now accounts for mid-circuit measurements and the
+  operations they classically control, matching the depth reported by PennyLane for tapes.
+  A mid-circuit measurement now occupies a layer on its wire, and operations in a conditional
+  branch, `while` loop body, or measurement-bounded `for` loop are placed after the measurements
+  the branch or loop depends on. The new `--instrument-classical-control` pass informs the device
+  of these dependencies, and is only added to the pipeline for QNodes executing on `null.qubit`
+  with both `track_resources` and `compute_depth` enabled, e.g. through `qp.track`. In addition,
+  `null.qubit` now returns the postselected outcome of a postselected mid-circuit measurement.
+  [(#3454)](https://github.com/PennyLaneAI/catalyst/pull/3454)
+
 * Runtime functions that take a boolean argument are now declared with `zeroext` on it. Before, a
   computed `i1`, such as a negated measurement result in the condition of a conditional Pauli
   rotation or in a `debug_assert`, could reach the runtime with undefined upper bits and be read
