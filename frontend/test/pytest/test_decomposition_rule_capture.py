@@ -492,6 +492,42 @@ class TestControlWorkWireCycles:
             self._borrowed_ctrl_id("WorkWireBridge", 2, 2),
         }
 
+    def test_control_traded_for_work_wire_does_not_hide_growth(self):
+        """A rule that trades a control for a work wire, followed by a cycle that only grows work wires,
+        is closed against every earlier state of the base, not only the one with most controls."""
+
+        class TradeGate(qp.core.Operator2):
+            def __init__(self, wires):
+                super().__init__(wires=wires)
+
+        def trade_resources(base, control_wires, control_values, work_wires, work_wire_type):
+            num_work_wires = len(work_wires) + 1
+            if num_work_wires > self._MAX_CYCLE_WORK_WIRES:
+                return {}
+            # 2C(TradeGate) with w work wires emits C(TradeGate) with w + 1, and so does C(TradeGate)
+            one_control = qp.ctrl(
+                TradeGate(Wire[1]),
+                Wire[1],
+                work_wires=Wire[num_work_wires],
+                work_wire_type=work_wire_type,
+            )
+            return {one_control: 1}
+
+        @qp.register_resources(trade_resources)
+        def trade_rule(base, control_wires, control_values, work_wires, work_wire_type):
+            return
+
+        with qp.decomposition.local_decomps():
+            qp.add_decomps("C(TradeGate)", trade_rule)
+            request = OpDecompRequest.from_operation(TradeGate(Wire[1]), ModifierState(False, 2, 1))
+            target_specs = walk_reachable_decomp_rule_sets([(request, {request.modifier_state})])
+
+        targets = {target_spec.target_id for target_spec in target_specs}
+        assert targets == {
+            self._borrowed_ctrl_id("TradeGate", 2, 1),
+            self._borrowed_ctrl_id("TradeGate", 1, 2),
+        }
+
 
 def test_same_base_modifier_transition_reopens_closure():
     """A symbolic rule may transition back to another state of the same base identity."""

@@ -1405,8 +1405,10 @@ def walk_reachable_decomp_rule_sets(
             set(required_states),
             {
                 request.base_id: (
-                    request.modifier_state.control_count,
-                    request.modifier_state.num_work_wires,
+                    (
+                        request.modifier_state.control_count,
+                        request.modifier_state.num_work_wires,
+                    ),
                 )
             },
         )
@@ -1439,27 +1441,28 @@ def walk_reachable_decomp_rule_sets(
         target_specs.extend(new_specs)
 
         for child in child_requests(new_specs):
-            # A control-changing cycle can otherwise manufacture an unbounded sequence of modifier
-            # counts. Compare with the same base identity earlier on this path, rather than the
-            # direct parent: intermediate operators may absorb their controls into their identity.
-            # The first uncontrolled-to-controlled revisit remains valid.
-            # Control work wires grow the same way: a rule may hand extra work wires to the controls
-            # it emits (e.g. C(SemiAdder) passes its spare work wires on to ctrl(CNOT)), so a cycle
-            # through it manufactures an unbounded sequence of work-wire counts. Prune a revisit
-            # with more controls, or with as many controls and more work wires.
-            state = child.modifier_state
-            child_counts = (state.control_count, state.num_work_wires)
-            previous_counts = path_control_counts.get(child.base_id)
-            increases_modifier_cycle = (
-                previous_counts is not None
-                and previous_counts[0] > 0
-                and child_counts > previous_counts
-            )
-            if increases_modifier_cycle:
+            # A modifier-changing cycle can otherwise manufacture an unbounded sequence of control
+            # and control work-wire counts, e.g. C(SemiAdder) passes its spare work wires on to
+            # ctrl(CNOT). Compare with every state of the same base identity earlier on this path,
+            # rather than the direct parent: intermediate operators may absorb their controls into
+            # their identity, or trade a control for a work wire. Prune a revisit whose counts are
+            # all at least those of an earlier controlled state and differ from it; any infinite
+            # sequence of count pairs contains such a revisit, so every path is finite. The first
+            # uncontrolled-to-controlled revisit remains valid, and an equal revisit is left to
+            # ``processed_states``.
+            child_counts = (child.modifier_state.control_count, child.modifier_state.num_work_wires)
+            earlier_counts = path_control_counts.get(child.base_id, ())
+            if any(
+                controls > 0
+                and child_counts != (controls, work_wires)
+                and child_counts[0] >= controls
+                and child_counts[1] >= work_wires
+                for controls, work_wires in earlier_counts
+            ):
                 continue
 
             child_path_control_counts = path_control_counts.copy()
-            child_path_control_counts[child.base_id] = max(previous_counts or (0, 0), child_counts)
+            child_path_control_counts[child.base_id] = (*earlier_counts, child_counts)
             queue.append((child, {child.modifier_state}, child_path_control_counts))
 
     return target_specs
