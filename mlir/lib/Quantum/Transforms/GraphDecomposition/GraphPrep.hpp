@@ -39,7 +39,7 @@ namespace GraphPrep {
 struct PrepOptions {
     llvm::ArrayRef<std::string> targetGateSetOption;
     llvm::ArrayRef<std::string> fixedDecompsOption;
-    llvm::ArrayRef<std::string> altDecompsOption;
+    llvm::ArrayRef<std::string> excludeDecompsOption;
     llvm::StringRef bytecodeRulesFile;
     llvm::StringRef libQPDPath;
     llvm::StringRef libpythonPath;
