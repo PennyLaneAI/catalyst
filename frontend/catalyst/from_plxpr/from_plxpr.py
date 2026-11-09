@@ -340,11 +340,14 @@ def handle_qnode(
     )
 
 
-def _require_decompose_gate_set(tkwargs):
-    """Reject a qp.decompose without a gate set, which the graph-decomposition pass needs."""
+def _require_decompose_gate_set(tkwargs, is_resource_estimate=False):
+    """Reject a qp.decompose or qp.estimate without a gate set, which the graph-decomposition 
+    or resource-estimate pass needs.
+    """
+    function_name = "qp.estimate" if is_resource_estimate else "qp.decompose"
     if tkwargs.get("gate_set") is None:
         raise ValueError(
-            "qp.decompose requires an explicit 'gate_set' under qjit; the graph-based decomposition "
+            f"{function_name} requires an explicit 'gate_set' under qjit; the graph-based decomposition "
             "has no default target gate set."
         )
 
@@ -364,16 +367,18 @@ def _require_resource_estimate_args(output_json, output_fname):
 def _handle_decompose_transform(
     self, inner_jaxpr, consts, non_const_args, tkwargs, is_resource_estimate=False
 ):
-    """Route a captured ``qp.decompose`` onto the ``graph-decomposition`` pass.
+    """Route a captured ``qp.decompose`` or ``qp.estimate`` onto the ``graph-decomposition`` 
+    or ``resource-estimate`` pass.
 
     ``qp.decompose`` is an alias for :func:`catalyst.passes.graph_decomposition`.
+    ``qp.estimate`` is an alias for :func:`catalyst.passes.resource-estimate`.
     """
     # Local imports avoid an import cycle (catalyst.passes imports from_plxpr indirectly).
     from pennylane.decomposition import DecompositionRule, add_decomps, list_decomps, local_decomps
 
     from catalyst.passes.builtin_passes import graph_decomposition, resource_estimate
 
-    _require_decompose_gate_set(tkwargs)
+    _require_decompose_gate_set(tkwargs, is_resource_estimate)
 
     if is_resource_estimate:
         _require_resource_estimate_args(tkwargs.get("output_json"), tkwargs.get("output_fname"))
@@ -449,13 +454,8 @@ def handle_transform(
     targs = args[_tuple_to_slice(targs_slice)]
     pl_tkwargs = _tuple_to_dict(tkwargs)
     is_resource_estimate = (
-        transform.pass_name == "resource-estimate" and pl_tkwargs.get("gate_set") is not None
+        transform.pass_name == "resource-estimate"
     )
-    if transform.pass_name == "resource-estimate" and pl_tkwargs.get("gate_set") is None:
-        raise ValueError(
-            "qp.estimate requires an explicit 'gate_set' under qjit; the resource-estimate "
-            "pass has no default gate set."
-        )
 
     # qp.decompose is routed to the graph-decomposition pass (see _handle_decompose_transform).
     if transform == pl_decompose or is_resource_estimate:
