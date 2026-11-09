@@ -341,8 +341,7 @@ def handle_qnode(
 
 
 def _require_decompose_gate_set(tkwargs, is_resource_estimate=False):
-    """Reject a qp.decompose or qp.estimate without a gate set, which the pass needs.
-    """
+    """Reject a qp.decompose or qp.estimate without a gate set, which the pass needs."""
     function_name = "qp.estimate" if is_resource_estimate else "qp.decompose"
     if tkwargs.get("gate_set") is None:
         raise ValueError(
@@ -366,7 +365,7 @@ def _require_resource_estimate_args(output_json, output_fname):
 def _handle_decompose_transform(
     self, inner_jaxpr, consts, non_const_args, tkwargs, is_resource_estimate=False
 ):
-    """Route a captured ``qp.decompose`` or ``qp.estimate`` onto the ``graph-decomposition`` 
+    """Route a captured ``qp.decompose`` or ``qp.estimate`` onto the ``graph-decomposition``
     or ``resource-estimate`` pass.
 
     ``qp.decompose`` is an alias for :func:`catalyst.passes.graph_decomposition`.
@@ -452,9 +451,7 @@ def handle_transform(
     non_const_args = args[_tuple_to_slice(args_slice)]
     targs = args[_tuple_to_slice(targs_slice)]
     pl_tkwargs = _tuple_to_dict(tkwargs)
-    is_resource_estimate = (
-        transform.pass_name == "resource-estimate"
-    )
+    is_resource_estimate = transform.pass_name == "resource-estimate"
 
     # qp.decompose is routed to the graph-decomposition pass (see _handle_decompose_transform).
     if transform == pl_decompose or is_resource_estimate:
