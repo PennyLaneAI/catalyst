@@ -131,6 +131,7 @@ void moveCliffordPastPPM(const PauliStringWrapper &lhsPauli, const PauliStringWr
 
     auto newPPM = PPMeasurementOp::create(rewriter, rhs->getLoc(), pauliProduct, newRHSOperands,
                                           rhs.getNegated());
+    newPPM.setPostselectAttr(rhs.getPostselectAttr());
     rewriter.moveOpBefore(newPPM, rhs);
 
     // Update the use of value in newRHSOperands

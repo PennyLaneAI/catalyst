@@ -21,16 +21,20 @@
 #include <vector>
 
 #include "DataView.hpp"
+#include "DeviceExtensions.h"
 #include "Exception.hpp"
 #include "Types.h"
 
 // A helper template macro to generate the <IDENTIFIER>Factory function by
-// calling <CONSTRUCTOR>(kwargs). Check the Custom Devices guideline for details:
+// calling <CONSTRUCTOR>(kwargs), and the <IDENTIFIER>DeviceAbiVersion function
+// that tells the runtime which device ABI the library was built against.
+// Check the Custom Devices guideline for details:
 // https://docs.pennylane.ai/projects/catalyst/en/stable/dev/custom_devices.html
 #define GENERATE_DEVICE_FACTORY(IDENTIFIER, CONSTRUCTOR)                                           \
     extern "C" Catalyst::Runtime::QuantumDevice *IDENTIFIER##Factory(const char *kwargs) {         \
         return new CONSTRUCTOR(std::string(kwargs));                                               \
-    }
+    }                                                                                              \
+    extern "C" uint32_t IDENTIFIER##DeviceAbiVersion() { return CATALYST_DEVICE_ABI_VERSION; }
 
 namespace Catalyst::Runtime {
 
@@ -579,6 +583,26 @@ struct QuantumDevice {
      * See `Gradient` for additional information.
      */
     virtual void StopTapeRecording() { RT_FAIL("Differentiation is unsupported by device"); }
+
+    // ----------------------------------------
+    //  EXTENSIONS (device ABI 1)
+    // ----------------------------------------
+
+    /**
+     * @brief (Optional) Look up an extension table by name.
+     *
+     * Added in device ABI version 1, and kept as the last virtual: the runtime
+     * never calls it on a device library without `<Name>DeviceAbiVersion`.
+     * The tables and their rules are in `DeviceExtensions.h`.
+     *
+     * @param name The table's name, such as "Delegated".
+     * @param min_version The lowest table version the caller accepts.
+     * @return A table whose header's `abi_version` is at least `min_version`,
+     * or null. The table stays valid for the device's lifetime.
+     */
+    virtual auto QueryInterface(const char *name, uint32_t min_version) -> const void * {
+        return nullptr;
+    }
 };
 
 } // namespace Catalyst::Runtime

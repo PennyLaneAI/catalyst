@@ -56,6 +56,8 @@ struct PBCConversionPass : impl::PBCConversionPassBase<PBCConversionPass> {
         MLIRContext *context = &getContext();
         PBCTypeConverter typeConverter(context);
 
+        pbc::flattenGadgets(getOperation());
+
         RewritePatternSet patterns(context);
 
         // Add infrastructure patterns for func.func, control flow, etc.

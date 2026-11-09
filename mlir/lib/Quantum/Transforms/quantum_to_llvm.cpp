@@ -71,6 +71,8 @@ struct QuantumConversionPass : impl::QuantumConversionPassBase<QuantumConversion
         MLIRContext *context = &getContext();
         QIRTypeConverter typeConverter(context);
 
+        flattenPredicatedOps(getOperation());
+
         RewritePatternSet patterns(context);
         cf::populateControlFlowToLLVMConversionPatterns(typeConverter, patterns);
         populateFuncToLLVMConversionPatterns(typeConverter, patterns);

@@ -160,6 +160,7 @@ entry_points = {
         "commute_ppr = catalyst.passes:commute_ppr",
         "ppm_compilation = catalyst.passes:ppm_compilation",
         "ppr_to_ppm = catalyst.passes:ppr_to_ppm",
+        "verify_pbc_gadgets = catalyst.passes:verify_pbc_gadgets",
         "reduce_t_depth = catalyst.passes:reduce_t_depth",
         "decompose_arbitrary_ppr = catalyst.passes:decompose_arbitrary_ppr",
         "disentangle_swap = catalyst.passes:disentangle_swap",

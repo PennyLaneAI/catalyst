@@ -30,12 +30,18 @@ void populateCommutePPRPatterns(mlir::RewritePatternSet &, unsigned int maxPauli
 void populateMergePPRPatterns(mlir::RewritePatternSet &, unsigned int maxPauliSize);
 void populateMergePPRIntoPPMPatterns(mlir::RewritePatternSet &, unsigned int maxPauliSize);
 void populateDecomposeNonCliffordPPRPatterns(mlir::RewritePatternSet &,
-                                             DecomposeMethod decomposeMethod, bool avoidYMeasure);
-void populateDecomposeCliffordPPRPatterns(mlir::RewritePatternSet &, bool avoidYMeasure);
+                                             DecomposeMethod decomposeMethod, bool avoidYMeasure,
+                                             bool emitGadgets = false);
+void populateDecomposeCliffordPPRPatterns(mlir::RewritePatternSet &, bool avoidYMeasure,
+                                          bool emitGadgets = false);
 void populatePPRToMBQCPatterns(mlir::RewritePatternSet &);
 void populateDecomposeArbitraryPPRPatterns(mlir::RewritePatternSet &);
 void populateUnrollConditionalPPRPPMPatterns(mlir::RewritePatternSet &);
 void populateLowerPBCInitOpsPatterns(mlir::RewritePatternSet &);
+/// Flatten every pbc.gadget under `root` into its region's ops, between pbc.gadget_begin and
+/// pbc.gadget_end. Run before the LLVM conversion, so that the conversion never maps values across
+/// regions.
+void flattenGadgets(mlir::Operation *root);
 void populateConversionPatterns(mlir::LLVMTypeConverter &typeConverter,
                                 mlir::RewritePatternSet &patterns);
 } // namespace pbc

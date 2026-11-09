@@ -1024,11 +1024,12 @@ def CtrlOp : Region_Op<"ctrl", [SingleBlockImplicitTerminator<"YieldOp">,
     let hasVerifier = 1;
 }
 
-def YieldOp : Quantum_Op<"yield", [Pure, ReturnLike, Terminator, ParentOneOf<["AdjointOp", "CtrlOp"]>]> {
+def YieldOp : Quantum_Op<"yield", [Pure, ReturnLike, Terminator,
+                                    ParentOneOf<["AdjointOp", "CtrlOp", "PredicatedOp"]>]> {
     let summary = "Return results from quantum program regions";
 
     let arguments = (ins
-        Variadic<AnyTypeOf<[QuregType, QubitType]>>:$retvals
+        Variadic<AnyTypeOf<[QuregType, QubitType, ResultType]>>:$retvals
     );
 
     let assemblyFormat = [{
@@ -1262,12 +1263,189 @@ def MeasureOp : Quantum_Op<"measure", [DeclareOpInterfaceMethods<ResourceQuantum
     );
 
     let results = (outs
-        I1:$mres,
+        // An i1 bit, or a result handle on a delegated program.
+        AnyTypeOf<[I1, ResultType]>:$mres,
         QubitType:$out_qubit
     );
 
     let assemblyFormat = [{
         $in_qubit (`postselect` $postselect^)? attr-dict `:` type(results)
+    }];
+}
+
+// -----
+
+//===----------------------------------------------------------------------===//
+// Delegated feed-forward
+//===----------------------------------------------------------------------===//
+
+def DelegateOp : Quantum_Op<"delegate"> {
+    let summary = "Hand the program's feed-forward to the device as data.";
+    let description = [{
+        Marks the start of a delegated program, right after the device is initialized. From here
+        on, measurements return `!quantum.res` result handles: device-owned references to an
+        outcome in every shot, which compiled code never reads as a bit. Conditions travel as
+        handles too, through `quantum.predicated` and the `quantum.result.*` ops, so the program
+        runs once for all shots. The device may defer simulation until an output is requested.
+
+        Emitted by the `delegate-feedforward` pass. The program needs the device's "Delegated"
+        extension, and fails at load on a device without it.
+
+        Example:
+        ```mlir
+        quantum.device shots(%shots) ["librtd_null_qubit.so", "NullQubit", "{}"]
+        quantum.delegate fill_shots
+        ```
+    }];
+
+    let arguments = (ins
+        PostselectModeAttr:$postselect_mode
+    );
+
+    let assemblyFormat = [{
+        $postselect_mode attr-dict
+    }];
+}
+
+class Result_Op<string mnemonic, list<Trait> traits = []> :
+        Quantum_Op<"result." # mnemonic, traits # [Pure]>;
+
+def ResultConstantOp : Result_Op<"constant"> {
+    let summary = "A result handle that holds the same value in every shot.";
+
+    let arguments = (ins BoolAttr:$value);
+    let results = (outs ResultType:$result);
+
+    let assemblyFormat = [{
+        $value attr-dict
+    }];
+}
+
+def ResultXorOp : Result_Op<"xor", [Commutative]> {
+    let summary = "The per-shot XOR of two result handles.";
+
+    let arguments = (ins ResultType:$lhs, ResultType:$rhs);
+    let results = (outs ResultType:$result);
+
+    let assemblyFormat = [{
+        $lhs `,` $rhs attr-dict
+    }];
+}
+
+def ResultNotOp : Result_Op<"not"> {
+    let summary = "The per-shot negation of a result handle.";
+
+    let arguments = (ins ResultType:$operand);
+    let results = (outs ResultType:$result);
+
+    let assemblyFormat = [{
+        $operand attr-dict
+    }];
+}
+
+def ResultSelectOp : Result_Op<"select"> {
+    let summary = "Per shot, `true_value` where `condition` holds and `false_value` elsewhere.";
+
+    let arguments = (ins ResultType:$condition, ResultType:$true_value, ResultType:$false_value);
+    let results = (outs ResultType:$result);
+
+    let assemblyFormat = [{
+        $condition `,` $true_value `,` $false_value attr-dict
+    }];
+}
+
+def ResultReleaseOp : Quantum_Op<"result.release"> {
+    let summary = "Tell the device that compiled code no longer holds a result handle.";
+    let description = [{
+        Lets a device free a measurement record once no reader is left. Emitted after the last
+        use of each handle.
+    }];
+
+    let arguments = (ins ResultType:$result);
+
+    let assemblyFormat = [{
+        $result attr-dict
+    }];
+}
+
+def PredicatePushOp : Quantum_Op<"predicate_push"> {
+    let summary = "Open a predicate scope (internal to the LLVM lowering).";
+    let description = [{
+        `convert-quantum-to-llvm` flattens each `quantum.predicated` into its regions' ops between
+        `quantum.predicate_push` and `quantum.predicate_pop`, then lowers both to runtime calls.
+        These ops do not appear outside that pass.
+    }];
+
+    let arguments = (ins ResultType:$condition);
+
+    let assemblyFormat = [{
+        $condition attr-dict
+    }];
+}
+
+def PredicatePopOp : Quantum_Op<"predicate_pop"> {
+    let summary = "Close the innermost predicate scope (internal to the LLVM lowering).";
+
+    let assemblyFormat = [{
+        attr-dict
+    }];
+}
+
+def PredicatedOp : Quantum_Op<"predicated", [RecursiveMemoryEffects,
+        DeclareOpInterfaceMethods<RegionBranchOpInterface, ["getEntrySuccessorOperands"]>]> {
+    let summary = "Apply quantum operations only on the shots where a result handle holds.";
+    let description = [{
+        The delegated form of `scf.if`. The ops of `then_region` apply on the shots where
+        `condition` is true, and the ops of `else_region` on the others. A measurement under a
+        false condition does not collapse the state and yields 0. Allocation and release ignore
+        the condition, so qubits are the same in every shot.
+
+        Qubits are threaded explicitly: each region's block arguments are the `qubits` operands,
+        and the region yields one qubit per operand, in order, followed by any result handles.
+        The op's results are the qubits, then `quantum.result.select` of the yielded handles. A
+        region may use values from above, but no qubit or register.
+
+        Example:
+        ```mlir
+        %q1, %r = quantum.predicated %m (%q0) : (!quantum.bit) -> (!quantum.bit, !quantum.res) {
+        ^bb0(%arg0: !quantum.bit):
+            %m1, %out = pbc.ppm ["X"] %arg0 : !quantum.res, !quantum.bit
+            quantum.yield %out, %m1 : !quantum.bit, !quantum.res
+        } else {
+        ^bb0(%arg0: !quantum.bit):
+            %false = quantum.result.constant false
+            quantum.yield %arg0, %false : !quantum.bit, !quantum.res
+        }
+        ```
+    }];
+
+    let arguments = (ins
+        ResultType:$condition,
+        Variadic<QubitType>:$qubits
+    );
+
+    let results = (outs
+        Variadic<AnyTypeOf<[QubitType, ResultType]>>:$results
+    );
+
+    let regions = (region SizedRegion<1>:$then_region, SizedRegion<1>:$else_region);
+
+    let assemblyFormat = [{
+        $condition `(` $qubits `)` attr-dict `:` `(` type($qubits) `)` `->` `(` type($results) `)`
+        $then_region `else` $else_region
+    }];
+
+    let hasVerifier = 1;
+
+    let extraClassDeclaration = [{
+        /// The result handles the regions yield after their qubits.
+        mlir::ResultRange getResultHandles() {
+            return getResults().drop_front(getQubits().size());
+        }
+        /// The qubits the op returns, one per qubit operand.
+        mlir::ResultRange getOutQubits() {
+            return getResults().take_front(getQubits().size());
+        }
     }];
 }
 

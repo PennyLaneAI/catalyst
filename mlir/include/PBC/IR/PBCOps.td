@@ -382,11 +382,14 @@ def PPMeasurementOp : PBC_Op<"ppm", [PBCOpInterface,
     let arguments = (ins
         PauliWord:$pauli_product,  // The Pauli product specifying the measurement basis
         UnitAttr:$negated,  // Pauli words can carry a negative sign, which flips the result
-        Variadic<QubitType>:$in_qubits  // The qubits to measure
+        Variadic<QubitType>:$in_qubits,  // The qubits to measure
+        // The outcome to keep, after the sign is applied.
+        OptionalAttr<ConfinedAttr<I32Attr, [IntMinValue<0>, IntMaxValue<1>]>>:$postselect
     );
 
     let results = (outs
-        I1:$mres,  // The measurement result (0 or 1)
+        // The measurement result (0 or 1), or a result handle on a delegated program
+        AnyTypeOf<[I1, ResultType]>:$mres,
         Variadic<QubitType>:$out_qubits  // The post-measurement state of the qubits
     );
 
@@ -402,7 +405,8 @@ def PPMeasurementOp : PBC_Op<"ppm", [PBCOpInterface,
                 /*out_qubits=*/ mlir::TypeRange(in_qubits),
                 /*pauli_product=*/ pauli_product,
                 /*negated=*/ negated,
-                /*in_qubits=*/ in_qubits
+                /*in_qubits=*/ in_qubits,
+                /*postselect=*/ nullptr
             );
         }]>,
         OpBuilder<  // allow arrays of strings as input
@@ -420,7 +424,8 @@ def PPMeasurementOp : PBC_Op<"ppm", [PBCOpInterface,
     ];
 
     let assemblyFormat = [{
-        $pauli_product (`(``-``)` $negated^)? $in_qubits attr-dict `:` type(results)
+        $pauli_product (`(``-``)` $negated^)? $in_qubits (`postselect` $postselect^)? attr-dict
+        `:` type(results)
     }];
 
     let hasVerifier = 1;
@@ -558,7 +563,82 @@ def LayerOp : PBC_Op<"layer", [SingleBlockImplicitTerminator<"YieldOp">]> {
     let hasCustomAssemblyFormat = 1;
 }
 
-def YieldOp : PBC_Op<"yield", [ Pure, ReturnLike, Terminator, ParentOneOf<["LayerOp"]> ]> {
+def GadgetOp : PBC_Op<"gadget", [RecursiveMemoryEffects, SingleBlockImplicitTerminator<"YieldOp">,
+        AllTypesMatch<["in_qubits", "out_qubits"]>,
+        DeclareOpInterfaceMethods<RegionBranchOpInterface, ["getEntrySuccessorOperands"]>]> {
+    let summary = "A span of PBC ops that implements one source rotation.";
+    let description = [{
+        Groups the ops a decomposition emits for one rotation exp(-i theta/2 P), so that the
+        rotation they stand for survives later passes. The region's block arguments are the data
+        qubits, in the order of `pauli_product`; auxiliary qubits are allocated and released
+        inside. The region yields the data qubits.
+
+        `verify-pbc-gadgets` checks the region against the source rotation and records the
+        verdict. The region is lowered in place. On a device with the "Gadget" extension it is
+        bracketed by calls that carry the source rotation and the verdict; other devices run the
+        ops as given.
+
+        Example:
+        ```mlir
+        %out = pbc.gadget ["Z"] theta(0.785398) verdict(verified) (%q) : !quantum.bit {
+        ^bb0(%arg0: !quantum.bit):
+            ...
+            pbc.yield %r : !quantum.bit
+        }
+        ```
+    }];
+
+    let arguments = (ins
+        PauliWord:$pauli_product,
+        F64Attr:$theta,
+        OptionalAttr<GadgetVerdict>:$verdict,
+        Variadic<QubitType>:$in_qubits
+    );
+
+    let results = (outs
+        Variadic<QubitType>:$out_qubits
+    );
+
+    let regions = (region SizedRegion<1>:$region);
+
+    let assemblyFormat = [{
+        $pauli_product `theta` `(` $theta `)` (`verdict` `(` $verdict^ `)`)? `(` $in_qubits `)`
+        attr-dict `:` type($out_qubits) $region
+    }];
+
+    let hasVerifier = 1;
+}
+
+def GadgetBeginOp : PBC_Op<"gadget_begin"> {
+    let summary = "Open a gadget bracket (internal to the LLVM lowering).";
+    let description = [{
+        `convert-pbc-to-llvm` flattens each `pbc.gadget` into its region's ops between
+        `pbc.gadget_begin` and `pbc.gadget_end`, then lowers both to runtime calls. These ops do not
+        appear outside that pass.
+    }];
+
+    let arguments = (ins
+        PauliWord:$pauli_product,
+        F64Attr:$theta,
+        OptionalAttr<GadgetVerdict>:$verdict,
+        Variadic<QubitType>:$in_qubits
+    );
+
+    let assemblyFormat = [{
+        $pauli_product `theta` `(` $theta `)` (`verdict` `(` $verdict^ `)`)? $in_qubits attr-dict
+        `:` type($in_qubits)
+    }];
+}
+
+def GadgetEndOp : PBC_Op<"gadget_end"> {
+    let summary = "Close the open gadget bracket (internal to the LLVM lowering).";
+
+    let assemblyFormat = [{
+        attr-dict
+    }];
+}
+
+def YieldOp : PBC_Op<"yield", [ Pure, ReturnLike, Terminator, ParentOneOf<["LayerOp", "GadgetOp"]> ]> {
     let summary = "Return results from a layer region";
 
     let arguments = (ins

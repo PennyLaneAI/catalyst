@@ -103,8 +103,21 @@ ObsIdType __catalyst__qis__HamiltonianObs(MemRefT_double_1d *, int64_t, /*obsKey
 
 // Struct pointers arguments here represent return values.
 RESULT *__catalyst__qis__Measure(QUBIT *, int32_t);
-RESULT *__catalyst__qis__PauliMeasure(const char *, bool, const char *, bool, bool, int64_t,
-                                      /*qubits*/...);
+RESULT *__catalyst__qis__PauliMeasure(const char *, bool, const char *, bool, bool, int32_t,
+                                      int64_t, /*qubits*/...);
+
+// Device extensions. See DeviceExtensions.h.
+void __catalyst__rt__device_require(int8_t *, int32_t);
+void __catalyst__qis__BeginDelegatedProgram(int32_t);
+void __catalyst__qis__PushPredicate(RESULT *);
+void __catalyst__qis__PopPredicate();
+RESULT *__catalyst__qis__ResultConstant(bool);
+RESULT *__catalyst__qis__ResultXor(RESULT *, RESULT *);
+RESULT *__catalyst__qis__ResultNot(RESULT *);
+RESULT *__catalyst__qis__ResultSelect(RESULT *, RESULT *, RESULT *);
+void __catalyst__qis__ReleaseResult(RESULT *);
+void __catalyst__qis__BeginGadget(const char *, double, int32_t, int64_t, /*qubits*/...);
+void __catalyst__qis__EndGadget();
 double __catalyst__qis__Expval(ObsIdType);
 double __catalyst__qis__Variance(ObsIdType);
 void __catalyst__qis__Probs(MemRefT_double_1d *, int64_t, /*qubits*/...);

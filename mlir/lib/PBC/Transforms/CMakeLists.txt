@@ -27,6 +27,8 @@ file(GLOB SRC
     LowerPBCInitOps.cpp
     ConversionPatterns.cpp
     pbc_to_llvm.cpp
+    delegate_feedforward.cpp
+    verify_pbc_gadgets.cpp
 )
 
 get_property(dialect_libs GLOBAL PROPERTY MLIR_DIALECT_LIBS)

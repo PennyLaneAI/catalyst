@@ -40,7 +40,7 @@ struct DecomposeCliffordPPRPass
     void runOnOperation() final {
         RewritePatternSet patterns(&getContext());
 
-        populateDecomposeCliffordPPRPatterns(patterns, avoidYMeasure);
+        populateDecomposeCliffordPPRPatterns(patterns, avoidYMeasure, emitGadgets);
 
         if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
             return signalPassFailure();

@@ -265,7 +265,7 @@ TEST_CASE_METHOD(NullQubitRuntimeFixture, "Test null qubit circuit with pauli me
 
     auto reg_vec = *reinterpret_cast<std::vector<QubitIdType> *>(reg);
 
-    RESULT *m = __catalyst__qis__PauliMeasure("XYZ", false, nullptr, false, true, 3, reg_vec[0],
+    RESULT *m = __catalyst__qis__PauliMeasure("XYZ", false, nullptr, false, true, -1, 3, reg_vec[0],
                                               reg_vec[1], reg_vec[2]);
     CHECK(*m == false);
 
@@ -1118,4 +1118,48 @@ TEST_CASE("Test __catalyst__rt__random_double before initialization", "[CoreQIS]
     REQUIRE_THROWS_WITH(
         __catalyst__rt__random_double(),
         ContainsSubstring("Invalid use of the global driver before initialization"));
+}
+
+TEST_CASE_METHOD(NullQubitRuntimeFixture, "Test null qubit provides the delegated extensions",
+                 "[NullQubit][DeviceExtensions]") {
+    std::string delegated{"Delegated"};
+    std::string gadget{"Gadget"};
+    std::string records{"Records"};
+    REQUIRE_NOTHROW(__catalyst__rt__device_require((int8_t *)delegated.c_str(), 1));
+    REQUIRE_NOTHROW(__catalyst__rt__device_require((int8_t *)gadget.c_str(), 1));
+    REQUIRE_THROWS_WITH(__catalyst__rt__device_require((int8_t *)delegated.c_str(), 2),
+                        ContainsSubstring("needs the device extension Delegated >= 2") &&
+                            ContainsSubstring("device NullQubit (device ABI 1)"));
+    REQUIRE_THROWS_WITH(__catalyst__rt__device_require((int8_t *)records.c_str(), 1),
+                        ContainsSubstring("needs the device extension Records >= 1"));
+
+    NullQubit device("{}");
+    CHECK(device.QueryInterface("Delegated", 1) != nullptr);
+    CHECK(device.QueryInterface("Delegated", 2) == nullptr);
+    CHECK(device.QueryInterface("Noise", 1) == nullptr);
+}
+
+TEST_CASE_METHOD(NullQubitRuntimeFixture, "Test null qubit runs a delegated program",
+                 "[NullQubit][DeviceExtensions]") {
+    QirArray *reg = __catalyst__rt__qubit_allocate_array(2);
+    auto reg_vec = *reinterpret_cast<std::vector<QubitIdType> *>(reg);
+
+    __catalyst__qis__BeginDelegatedProgram(CATALYST_POSTSELECT_FILL_SHOTS);
+    RESULT *m0 =
+        __catalyst__qis__PauliMeasure("ZZ", true, "ZZ", true, true, 1, 2, reg_vec[0], reg_vec[1]);
+    RESULT *m1 = __catalyst__qis__Measure(reinterpret_cast<QUBIT *>(reg_vec[0]), -1);
+    RESULT *c = __catalyst__qis__ResultXor(m0, __catalyst__qis__ResultNot(m1));
+    __catalyst__qis__PushPredicate(c);
+    __catalyst__qis__PauliRot("X", M_PI, nullptr, true, 1, reg_vec[1]);
+    __catalyst__qis__PopPredicate();
+    RESULT *s = __catalyst__qis__ResultSelect(c, m0, __catalyst__qis__ResultConstant(true));
+    __catalyst__qis__ReleaseResult(s);
+
+    __catalyst__qis__BeginGadget("XZ", M_PI / 4, CATALYST_GADGET_VERIFIED, 2, reg_vec[0],
+                                 reg_vec[1]);
+    __catalyst__qis__EndGadget();
+    REQUIRE_THROWS_WITH(__catalyst__qis__BeginGadget("XZ", M_PI / 4, 0, 1, reg_vec[0]),
+                        ContainsSubstring("length of the pauli string"));
+    REQUIRE_THROWS_WITH(__catalyst__qis__BeginDelegatedProgram(7),
+                        ContainsSubstring("Invalid postselection mode"));
 }

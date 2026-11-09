@@ -121,12 +121,22 @@ template <typename T> struct PPMeasurementOpPattern : public OpConversionPattern
             static_assert(!std::is_same_v<T, T>(), "unexpected type in templated rewrite");
         }
 
+        // Postselection on the outcome, after the sign; -1 means none.
+        int32_t postselect = -1;
+        if constexpr (std::is_same_v<T, PPMeasurementOp>) {
+            if (auto value = op.getPostselect()) {
+                postselect = static_cast<int32_t>(*value);
+            }
+        }
+        Value postselectValue =
+            LLVM::ConstantOp::create(rewriter, loc, rewriter.getI32IntegerAttr(postselect));
+
         StringRef qirName = "__catalyst__qis__PauliMeasure";
         Type ptrType = LLVM::LLVMPointerType::get(rewriter.getContext());
         Type qirSignature = LLVM::LLVMFunctionType::get(
             conv->convertType(ResultType::get(ctx)),
             {ptrType, IntegerType::get(ctx, 1), ptrType, IntegerType::get(ctx, 1),
-             IntegerType::get(ctx, 1), IntegerType::get(ctx, 64)},
+             IntegerType::get(ctx, 1), IntegerType::get(ctx, 32), IntegerType::get(ctx, 64)},
             /*isVarArg=*/true);
 
         LLVM::LLVMFuncOp fnDecl = catalyst::ensureFunctionDeclaration<LLVM::LLVMFuncOp>(
@@ -140,6 +150,7 @@ template <typename T> struct PPMeasurementOpPattern : public OpConversionPattern
         args.push_back(pauliWordAltPtr);
         args.push_back(negatedAlt);
         args.push_back(selectSwitch);
+        args.push_back(postselectValue);
         args.push_back(
             LLVM::ConstantOp::create(rewriter, loc, rewriter.getI64IntegerAttr(numQubits)));
         args.append(adaptor.getInQubits().begin(), adaptor.getInQubits().end());
@@ -147,8 +158,12 @@ template <typename T> struct PPMeasurementOpPattern : public OpConversionPattern
         // Call the function and get the result pointer
         Value resultPtr = LLVM::CallOp::create(rewriter, loc, fnDecl, args).getResult();
 
-        // Load the measurement result (i1) from the result pointer
-        Value mres = LLVM::LoadOp::create(rewriter, loc, IntegerType::get(ctx, 1), resultPtr);
+        // Load the measurement result (i1) from the result pointer. On a delegated program the
+        // result is a handle, and is not read.
+        Value mres = isa<ResultType>(op.getMres().getType())
+                         ? resultPtr
+                         : LLVM::LoadOp::create(rewriter, loc, IntegerType::get(ctx, 1), resultPtr)
+                               .getResult();
 
         // Replace the op with the measurement result and the input qubits
         SmallVector<Value> values;
@@ -160,10 +175,83 @@ template <typename T> struct PPMeasurementOpPattern : public OpConversionPattern
     }
 };
 
+/// Lower gadget brackets to calls that carry the source rotation and verdict. The calls are
+/// no-ops on a device without the Gadget extension.
+struct GadgetBeginOpPattern : public OpConversionPattern<GadgetBeginOp> {
+    using OpConversionPattern::OpConversionPattern;
+
+    LogicalResult matchAndRewrite(GadgetBeginOp op, GadgetBeginOpAdaptor adaptor,
+                                  ConversionPatternRewriter &rewriter) const override {
+        Location loc = op.getLoc();
+        MLIRContext *ctx = getContext();
+        ModuleOp mod = op->getParentOfType<ModuleOp>();
+        Type ptrType = LLVM::LLVMPointerType::get(ctx);
+
+        SmallVector<Value> args;
+        args.push_back(getPauliProductPtr(loc, rewriter, mod, op.getPauliProduct()));
+        args.push_back(LLVM::ConstantOp::create(rewriter, loc, op.getThetaAttr()));
+        const GadgetVerdict verdict = op.getVerdict().value_or(GadgetVerdict::unchecked);
+        args.push_back(LLVM::ConstantOp::create(
+            rewriter, loc, rewriter.getI32IntegerAttr(static_cast<int32_t>(verdict))));
+        args.push_back(LLVM::ConstantOp::create(
+            rewriter, loc, rewriter.getI64IntegerAttr(adaptor.getInQubits().size())));
+        args.append(adaptor.getInQubits().begin(), adaptor.getInQubits().end());
+
+        Type signature = LLVM::LLVMFunctionType::get(
+            LLVM::LLVMVoidType::get(ctx),
+            {ptrType, Float64Type::get(ctx), IntegerType::get(ctx, 32), IntegerType::get(ctx, 64)},
+            /*isVarArg=*/true);
+        auto begin = catalyst::ensureFunctionDeclaration<LLVM::LLVMFuncOp>(
+            rewriter, op, "__catalyst__qis__BeginGadget", signature);
+        LLVM::CallOp::create(rewriter, loc, begin, args);
+        rewriter.eraseOp(op);
+        return success();
+    }
+};
+
+struct GadgetEndOpPattern : public OpConversionPattern<GadgetEndOp> {
+    using OpConversionPattern::OpConversionPattern;
+
+    LogicalResult matchAndRewrite(GadgetEndOp op, GadgetEndOpAdaptor adaptor,
+                                  ConversionPatternRewriter &rewriter) const override {
+        MLIRContext *ctx = getContext();
+        Type signature = LLVM::LLVMFunctionType::get(LLVM::LLVMVoidType::get(ctx), {});
+        auto end = catalyst::ensureFunctionDeclaration<LLVM::LLVMFuncOp>(
+            rewriter, op, "__catalyst__qis__EndGadget", signature);
+        LLVM::CallOp::create(rewriter, op.getLoc(), end, ValueRange{});
+        rewriter.eraseOp(op);
+        return success();
+    }
+};
+
 } // namespace
 
 namespace catalyst {
 namespace pbc {
+
+void flattenGadgets(Operation *root) {
+    IRRewriter rewriter(root->getContext());
+    SmallVector<GadgetOp> worklist;
+    root->walk<WalkOrder::PostOrder>([&](GadgetOp op) { worklist.push_back(op); });
+    for (GadgetOp op : worklist) {
+        rewriter.setInsertionPoint(op);
+        GadgetBeginOp::create(rewriter, op.getLoc(), op.getPauliProduct(), op.getThetaAttr(),
+                              op.getVerdictAttr(), op.getInQubits());
+        Block *body = &op.getRegion().front();
+        auto yield = cast<YieldOp>(body->getTerminator());
+        SmallVector<Value> outQubits(yield.getResults());
+        for (Value &qubit : outQubits) {
+            // A yielded block argument is replaced by its qubit when the block is inlined.
+            if (auto arg = dyn_cast<BlockArgument>(qubit); arg && arg.getOwner() == body) {
+                qubit = op.getInQubits()[arg.getArgNumber()];
+            }
+        }
+        rewriter.eraseOp(yield);
+        rewriter.inlineBlockBefore(body, op, op.getInQubits());
+        GadgetEndOp::create(rewriter, op.getLoc());
+        rewriter.replaceOp(op, outQubits);
+    }
+}
 
 void populateConversionPatterns(LLVMTypeConverter &typeConverter, RewritePatternSet &patterns) {
     // Pauli-based Computational Operations
@@ -173,6 +261,8 @@ void populateConversionPatterns(LLVMTypeConverter &typeConverter, RewritePattern
     patterns.add<PPMeasurementOpPattern<PPMeasurementOp>>(typeConverter, patterns.getContext());
     patterns.add<PPMeasurementOpPattern<SelectPPMeasurementOp>>(typeConverter,
                                                                 patterns.getContext());
+    patterns.add<GadgetBeginOpPattern>(typeConverter, patterns.getContext());
+    patterns.add<GadgetEndOpPattern>(typeConverter, patterns.getContext());
 }
 
 } // namespace pbc

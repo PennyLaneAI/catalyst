@@ -18,6 +18,8 @@
 #include "mlir/IR/Location.h"
 #include "mlir/IR/PatternMatch.h"
 
+#include "PBC/IR/PBCOps.h"
+
 namespace catalyst {
 namespace pbc {
 
@@ -30,6 +32,15 @@ std::pair<mlir::StringRef, bool> determinePauliAndSignOfMeasurement(bool avoidPa
 /// Initialize |0⟩ or Fabricate|Y⟩ based on avoidPauliYMeasure
 mlir::OpResult initializeZeroOrPlusI(bool avoidPauliYMeasure, mlir::Location loc,
                                      mlir::PatternRewriter &rewriter);
+
+/// Replace `op` with a `pbc.gadget` that holds a copy of it, carrying `op` as the gadget's
+/// source rotation, and return the copy. The copy is then decomposed in place, inside the gadget.
+/// `op` must have no condition.
+PPRotationOp wrapInGadget(PPRotationOp op, mlir::PatternRewriter &rewriter);
+
+/// Whether a decomposition of `op` should go into its own gadget: gadgets are asked for, and `op`
+/// is not already part of one.
+bool needsGadget(PPRotationOp op, bool emitGadgets);
 
 } // namespace pbc
 } // namespace catalyst

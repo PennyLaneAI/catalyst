@@ -771,7 +771,7 @@ def handle_decomposition_rule(self, *, pyfun, func_jaxpr, is_qreg, num_params):
 
 
 @PLxPRToQuantumJaxprInterpreter.register_primitive(plxpr_pauli_measure_prim)
-def handle_pauli_measure(self, *wires_inval, pauli_word, **params):
+def handle_pauli_measure(self, *wires_inval, pauli_word, postselect=None, **params):
     """Handle the conversion from plxpr to Catalyst jaxpr for the PauliMeasure primitive"""
     in_qubits = []
     for w in wires_inval:
@@ -779,7 +779,9 @@ def handle_pauli_measure(self, *wires_inval, pauli_word, **params):
             in_qubits.append(w)
         else:
             in_qubits.append(qref_get_p.bind(self.init_qreg, w))
-    result = qref_pauli_measure_p.bind(*in_qubits, pauli_word=pauli_word, qubits_len=len(in_qubits))
+    result = qref_pauli_measure_p.bind(
+        *in_qubits, pauli_word=pauli_word, qubits_len=len(in_qubits), postselect=postselect
+    )
     result = jnp.astype(result, int)
     return result
 

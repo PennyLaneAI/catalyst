@@ -593,7 +593,9 @@ def _qref_pauli_rot_lowering(
 # pauli measure operation
 #
 @qref_pauli_measure_p.def_abstract_eval
-def _qref_pauli_measure_abstract_eval(*qubits, pauli_word=None, qubits_len=0, adjoint=False):
+def _qref_pauli_measure_abstract_eval(
+    *qubits, pauli_word=None, qubits_len=0, adjoint=False, postselect=None
+):
     qubits = qubits[:qubits_len]
     assert all(isinstance(qubit, AbstractQubit) for qubit in qubits)
     return ShapedArray((), bool)
@@ -604,6 +606,7 @@ def _qref_pauli_measure_lowering(
     *qubits: tuple,
     pauli_word=None,
     qubits_len=0,
+    postselect=None,
 ):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
@@ -623,10 +626,14 @@ def _qref_pauli_measure_lowering(
 
     result_type = ir.IntegerType.get_signless(1)
 
+    if postselect is not None:
+        postselect = ir.IntegerAttr.get(ir.IntegerType.get_signless(32, ctx), postselect)
+
     result = RefPPMeasurementOp(
         mres=result_type,
         pauli_product=pauli_word,
         qubits=qubits,
+        postselect=postselect,
     ).results[0]
 
     result_type = ir.RankedTensorType.get((), result.type)

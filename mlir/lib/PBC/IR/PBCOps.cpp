@@ -95,6 +95,34 @@ LogicalResult PPMeasurementOp::verify() { return verifyPPMOp(*this); }
 
 LogicalResult SelectPPMeasurementOp::verify() { return verifySelectPPMOp(*this); }
 
+void GadgetOp::getSuccessorRegions(RegionBranchPoint point,
+                                   SmallVectorImpl<RegionSuccessor> &regions) {
+    if (!point.isParent()) {
+        regions.push_back(RegionSuccessor(getOperation(), getOutQubits()));
+        return;
+    }
+    regions.push_back(RegionSuccessor(&getRegion(), getRegion().getArguments()));
+}
+
+OperandRange GadgetOp::getEntrySuccessorOperands(RegionSuccessor successor) {
+    return getInQubits();
+}
+
+LogicalResult GadgetOp::verify() {
+    if (getPauliProduct().size() != getInQubits().size()) {
+        return emitOpError("the Pauli product must have one Pauli per data qubit");
+    }
+    Block &block = getRegion().front();
+    if (block.getArgumentTypes() != getInQubits().getTypes()) {
+        return emitOpError("region arguments must match the data qubits");
+    }
+    auto yield = cast<YieldOp>(block.getTerminator());
+    if (yield.getResults().getTypes() != getOutQubits().getTypes()) {
+        return emitOpError("the region must yield the data qubits");
+    }
+    return success();
+}
+
 LogicalResult PrepareStateOp::verify() {
     auto initState = getInitState();
     if (initState == LogicalInitKind::magic || initState == LogicalInitKind::magic_conj) {

@@ -96,12 +96,15 @@ SmallVector<Value> emitPiOverFourDecomposition(bool avoidPauliYMeasure, PPRotati
     return SmallVector<Value>(pprPI2.getOutQubits());
 }
 
-void decompose_pi_over_four_flattening(bool avoidPauliYMeasure, PPRotationOp op,
+void decompose_pi_over_four_flattening(bool avoidPauliYMeasure, bool emitGadgets, PPRotationOp op,
                                        PatternRewriter &rewriter) {
     auto loc = op.getLoc();
     ValueRange inQubits = op.getInQubits();
 
     if (!op.getCondition()) {
+        if (needsGadget(op, emitGadgets)) {
+            op = wrapInGadget(op, rewriter);
+        }
         auto outQubits = emitPiOverFourDecomposition(avoidPauliYMeasure, op, rewriter);
         rewriter.replaceOp(op, outQubits);
         return;
@@ -117,9 +120,17 @@ void decompose_pi_over_four_flattening(bool avoidPauliYMeasure, PPRotationOp op,
         OpBuilder::InsertionGuard guard(rewriter);
         rewriter.setInsertionPointToStart(&ifOp.getThenRegion().front());
 
-        auto outQubits = emitPiOverFourDecomposition(avoidPauliYMeasure, op, rewriter);
-
-        scf::YieldOp::create(rewriter, loc, outQubits);
+        if (needsGadget(op, emitGadgets)) {
+            // The gadget implements the unconditional rotation; the scf.if conditions it.
+            auto inner = PPRotationOp::create(rewriter, loc, op.getPauliProduct(),
+                                              op.getRotationKind(), inQubits);
+            scf::YieldOp::create(rewriter, loc, inner.getOutQubits());
+            rewriter.setInsertionPoint(inner);
+            decompose_pi_over_four_flattening(avoidPauliYMeasure, emitGadgets, inner, rewriter);
+        } else {
+            auto outQubits = emitPiOverFourDecomposition(avoidPauliYMeasure, op, rewriter);
+            scf::YieldOp::create(rewriter, loc, outQubits);
+        }
     }
 
     {
@@ -135,13 +146,16 @@ struct DecomposeCliffordPPR : public OpRewritePattern<PPRotationOp> {
     using OpRewritePattern::OpRewritePattern;
 
     bool avoidPauliYMeasure;
+    bool emitGadgets;
 
-    DecomposeCliffordPPR(MLIRContext *context, bool avoidPauliYMeasure, PatternBenefit benefit = 1)
-        : OpRewritePattern(context, benefit), avoidPauliYMeasure(avoidPauliYMeasure) {}
+    DecomposeCliffordPPR(MLIRContext *context, bool avoidPauliYMeasure, bool emitGadgets,
+                         PatternBenefit benefit = 1)
+        : OpRewritePattern(context, benefit), avoidPauliYMeasure(avoidPauliYMeasure),
+          emitGadgets(emitGadgets) {}
 
     LogicalResult matchAndRewrite(PPRotationOp op, PatternRewriter &rewriter) const override {
         if (op.hasPiOverFourRotation()) {
-            decompose_pi_over_four_flattening(avoidPauliYMeasure, op, rewriter);
+            decompose_pi_over_four_flattening(avoidPauliYMeasure, emitGadgets, op, rewriter);
             return success();
         }
         return failure();
@@ -152,8 +166,9 @@ struct DecomposeCliffordPPR : public OpRewritePattern<PPRotationOp> {
 namespace catalyst {
 namespace pbc {
 
-void populateDecomposeCliffordPPRPatterns(RewritePatternSet &patterns, bool avoidPauliYMeasure) {
-    patterns.add<DecomposeCliffordPPR>(patterns.getContext(), avoidPauliYMeasure, 1);
+void populateDecomposeCliffordPPRPatterns(RewritePatternSet &patterns, bool avoidPauliYMeasure,
+                                          bool emitGadgets) {
+    patterns.add<DecomposeCliffordPPR>(patterns.getContext(), avoidPauliYMeasure, emitGadgets, 1);
 }
 
 } // namespace pbc

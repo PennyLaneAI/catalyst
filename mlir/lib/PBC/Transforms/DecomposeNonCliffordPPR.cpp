@@ -304,14 +304,18 @@ struct DecomposeNonCliffordPPR : public OpRewritePattern<PPRotationOp> {
 
     DecomposeMethod method;
     bool avoidPauliYMeasure;
+    bool emitGadgets;
 
     DecomposeNonCliffordPPR(MLIRContext *context, DecomposeMethod method, bool avoidPauliYMeasure,
-                            PatternBenefit benefit = 1)
+                            bool emitGadgets, PatternBenefit benefit = 1)
         : OpRewritePattern(context, benefit), method(method),
-          avoidPauliYMeasure(avoidPauliYMeasure) {}
+          avoidPauliYMeasure(avoidPauliYMeasure), emitGadgets(emitGadgets) {}
 
     LogicalResult matchAndRewrite(PPRotationOp op, PatternRewriter &rewriter) const override {
         if (op.isNonClifford() && !op.getCondition()) {
+            if (needsGadget(op, emitGadgets)) {
+                op = wrapInGadget(op, rewriter);
+            }
             switch (method) {
             case DecomposeMethod::AutoCorrected:
                 decomposeAutoCorrectedPiOverEight(avoidPauliYMeasure, op, rewriter);
@@ -335,9 +339,9 @@ namespace pbc {
 
 void populateDecomposeNonCliffordPPRPatterns(RewritePatternSet &patterns,
                                              DecomposeMethod decomposeMethod,
-                                             bool avoidPauliYMeasure) {
+                                             bool avoidPauliYMeasure, bool emitGadgets) {
     patterns.add<DecomposeNonCliffordPPR>(patterns.getContext(), decomposeMethod,
-                                          avoidPauliYMeasure, 1);
+                                          avoidPauliYMeasure, emitGadgets, 1);
 }
 
 } // namespace pbc

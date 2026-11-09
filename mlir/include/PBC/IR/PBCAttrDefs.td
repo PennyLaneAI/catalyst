@@ -41,6 +41,17 @@ def LogicalInitKind : I32EnumAttr<"LogicalInitKind",
 
 def LogicalInit : EnumAttr<PBCDialect, LogicalInitKind, "enum">;
 
+def GadgetVerdict : I32EnumAttr<"GadgetVerdict",
+    "The compiler's verdict on whether a gadget implements its source rotation.",
+    [
+        // Matches CATALYST_GADGET_* in the runtime's DeviceExtensions.h.
+        I32EnumAttrCase<"unchecked", 0>,
+        I32EnumAttrCase<"verified",  1>,
+        I32EnumAttrCase<"mismatch",  2>,
+    ]> {
+    let cppNamespace = "::catalyst::pbc";
+}
+
 
 // Constraint for rotation_kind: must be one of ±1, ±2, ±4, ±8
 // The power-of-2 check works because powers of 2 have exactly one bit set.
