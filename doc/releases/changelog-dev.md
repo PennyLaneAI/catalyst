@@ -971,6 +971,11 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* The circuit depth tracked by `null.qubit` now treats a global phase without control wires as
+  acting on all wires, matching the depth reported by PennyLane for tapes. Before, it did not
+  contribute to the depth at all. A controlled global phase still only acts on its control wires.
+  [(#3455)](https://github.com/PennyLaneAI/catalyst/pull/3455)
+
 * Runtime functions that take a boolean argument are now declared with `zeroext` on it. Before, a
   computed `i1`, such as a negated measurement result in the condition of a conditional Pauli
   rotation or in a `debug_assert`, could reach the runtime with undefined upper bits and be read
