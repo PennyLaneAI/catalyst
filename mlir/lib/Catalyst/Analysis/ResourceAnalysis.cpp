@@ -567,8 +567,7 @@ void ResourceAnalysis::analyzeRegion(Region &region, ResourceResult &result, boo
                 });
 
             if (needsCollection) {
-                collectOperation(&op, result, isAdjoint, numControlQubits, numWorkWires,
-                                 isBorrowed);
+                collectOperation(&op, result, isAdjoint, numControlQubits);
                 if (collectDetailedOperations) {
                     result.collectDetailedOperations = true;
                     collectDetailedOperation(&op, result, isAdjoint, numControlQubits, numWorkWires,
@@ -595,14 +594,9 @@ void ResourceAnalysis::analyzeRegion(Region &region, ResourceResult &result, boo
  * @param result The ResourceResult to update with the operation's resource usage.
  * @param isAdjoint Whether the current region is under an adjoint (quantum.adjoint) operation.
  * @param numControlQubits The number of control qubits added by the current region.
- * @param numWorkWires The number of work wires from enclosing ctrl regions.
- * @param isBorrowed Whether any enclosing ctrl work-wire type is borrowed.
  */
 void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result, bool isAdjoint,
-                                        unsigned numControlQubits, unsigned numWorkWires,
-                                        bool isBorrowed) {
-    (void)numWorkWires;
-    (void)isBorrowed;
+                                        unsigned numControlQubits) {
     // Collect extensions for the operation
     assert(result.extensions.size() == extensionAnalyses.size() &&
            "extension data/collector size mismatch");

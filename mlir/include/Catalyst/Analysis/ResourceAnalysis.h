@@ -127,8 +127,7 @@ class ResourceAnalysis {
 
     // categorize and count a single operation
     void collectOperation(Operation *op, ResourceResult &result, bool isAdjoint,
-                          unsigned numControlQubits, unsigned numWorkWires = 0,
-                          bool isBorrowed = false);
+                          unsigned numControlQubits);
     void collectDetailedOperation(Operation *op, ResourceResult &result, bool isAdjoint,
                                   unsigned numControlQubits, unsigned numWorkWires = 0,
                                   bool isBorrowed = false) const;
