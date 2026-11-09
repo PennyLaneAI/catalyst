@@ -399,7 +399,7 @@ def _handle_decompose_transform(
         for op, rules in alt_decomps.items():
             add_decomps(op, *rules)
 
-        # Reusing graph_decomposition pass options setup for resource analysis estimation.
+        # Reusing graph_decomposition pass options setup for resource-estimate.
         bound_transform = resource_estimate if is_resource_estimate else graph_decomposition
         bound_transform_params = {
             "gate_set": tkwargs["gate_set"],
@@ -408,7 +408,7 @@ def _handle_decompose_transform(
         }
         bound_pass = bound_transform(**bound_transform_params)
 
-        # Set resource analysis estimation options after graph_decomposition_setup_inputs.
+        # Set resource-estimate options after graph_decomposition_setup_inputs.
         if is_resource_estimate:
             bound_pass.kwargs["output_json"] = tkwargs["output_json"]
             bound_pass.kwargs["output_fname"] = tkwargs["output_fname"]
