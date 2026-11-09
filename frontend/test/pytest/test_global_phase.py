@@ -83,8 +83,8 @@ def test_global_phase_control(backend, capture_mode):
         (lambda: qp.GlobalPhase(0.1), 0),
         (lambda: (qp.RX(0.1, 0), qp.GlobalPhase(0.1), qp.RX(0.1, 1)), 1),
         (lambda: (qp.GlobalPhase(0.1), qp.X(0), qp.X(1)), 1),
-        (lambda: (qp.RX(0.1, 0), qp.ctrl(qp.GlobalPhase(0.1), control=0), qp.RX(0.1, 0)), 3),
-        (lambda: (qp.RX(0.1, 0), qp.ctrl(qp.GlobalPhase(0.1), control=1), qp.RX(0.1, 0)), 2),
+        (lambda: (qp.RX(0.1, 0), qp.ctrl(qp.GlobalPhase(0.1), control=0)), 2),
+        (lambda: (qp.RX(0.1, 0), qp.ctrl(qp.GlobalPhase(0.1), control=1)), 1),
     ],
 )
 def test_global_phase_tracked_depth(ops, expected_depth, capture_mode, tmp_path):
@@ -104,7 +104,7 @@ def test_global_phase_tracked_depth(ops, expected_depth, capture_mode, tmp_path)
     @qp.qnode(dev)
     def circuit():
         ops()
-        return qp.probs(wires=0)
+        return qp.state()
 
     circuit()
     with filename.open("r", encoding="utf-8") as f:
