@@ -71,8 +71,7 @@ def RemOp : Mitigation_Op<"rem", [DeclareOpInterfaceMethods<CallOpInterface>,
         sample/probs results are returned as the `zeros` and `ones` SSA values
         and consumed by the classical REM post-processing on the JAX side.
         When false the calibration is ommited, which lets the caller supply
-        cached confusion matrices and skip the calibration circuits without
-        changing the op's result signature.
+        cached confusion matrices and skip the calibration circuits.
     }];
 
     let arguments = (ins

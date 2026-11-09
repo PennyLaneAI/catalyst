@@ -171,15 +171,129 @@ def mitigate_with_zne(
 def mitigate_with_rem(
     fn=None, *, calibration_matrices=None, return_calibration_matrices: bool = False
 ):
-    """A qjit-compatible frontend that emits a `mitigation.rem` operation.
+    r"""A :func:`~.qjit` compatible readout error mitigation of an input circuit.
 
-    When ``calibration_matrices`` is ``None`` the lowering pass emits the
-    all-zeros and all-ones calibration circuits and this callable computes
-    the confusion matrices itself. When a precomputed ``(n_qubits, 2, 2)``
-    matrix stack is supplied, ``rem_calibrate_*`` is skipped and the matrices
-    are passed straight into ``rem_apply_to_*``. Pass
-    ``return_calibration_matrices=True`` to get the matrices back alongside
-    the mitigated result so they can be cached for subsequent calls.
+    Readout error mitigation (REM) reduces the impact of measurement errors, where the measured
+    bit value differs from the state of the qubit, as opposed to noise during gate execution.
+    Alongside the input circuit, two calibration circuits that prepare the all-zeros and the
+    all-ones state are executed on the same device. Their results give a :math:`2 \times 2`
+    confusion matrix per qubit, holding the probability of each measured bit value given the
+    prepared one. Assuming uncorrelated readout errors, the confusion matrix of all :math:`n`
+    device wires is the tensor product of the per-qubit matrices, and the mitigated result is
+    obtained by solving the linear system it defines.
+
+    For :func:`~pennylane.sample` measurements, when :math:`2^n` exceeds the number of shots, this
+    system is restricted to the sampled bitstrings, as proposed by
+    `Nation et al. <https://doi.org/10.1103/PRXQuantum.2.040326>`__. Its size is then bounded by
+    :math:`\text{shots} \times \text{shots}` instead of growing exponentially with :math:`n`.
+    :func:`~pennylane.probs` and :func:`~pennylane.counts` always use the full
+    :math:`2^n \times 2^n` system.
+
+    Args:
+        fn (qp.QNode): the circuit to be mitigated. It must return a single
+            :func:`~pennylane.probs`, :func:`~pennylane.counts` or :func:`~pennylane.sample`
+            measurement on all device wires. Expectation values and other observables are not
+            supported.
+        calibration_matrices (Array): confusion matrices of shape ``(n, 2, 2)``, returned by a
+            previous call with ``return_calibration_matrices=True`` on the same device. If
+            provided, the calibration circuits are omitted and these matrices are used instead.
+            Defaults to ``None``, in which case the calibration circuits are run on every call.
+        return_calibration_matrices (bool): if ``True``, the confusion matrices are returned
+            alongside the mitigated result, so that they can be reused via
+            ``calibration_matrices``. Defaults to ``False``.
+
+    Returns:
+        Callable: A callable object that computes the mitigated result of the wrapped
+        :class:`~.QNode`, depending on the measurement process:
+
+        * :func:`~pennylane.probs`: the :math:`2^n` mitigated probabilities.
+        * :func:`~pennylane.counts`: a tuple ``(basis_states, counts)`` over all :math:`2^n`
+          basis states.
+        * :func:`~pennylane.sample`: a tuple ``(bitstrings, counts)`` instead of the individual
+          samples. If :math:`2^n \leq \text{shots}`, it lists all :math:`2^n` bitstrings, with
+          zero counts for those that were not sampled. Otherwise, it has one row per shot: the
+          sorted samples, with the count of each unique bitstring at its first occurrence and
+          zeros at the repeated rows.
+
+        The mitigated values are floating point and may be negative. If
+        ``return_calibration_matrices=True``, the callable returns
+        ``(result, calibration_matrices)``.
+
+    **Example:**
+
+    For example, with readout noise simulated by ``qrack.simulator`` from
+    `PennyLane-Qrack <https://github.com/unitaryfoundation/pennylane-qrack>`__, which flips each
+    measured bit with probability ``readout_noise_prob``:
+
+    .. code-block:: python
+
+        import jax.numpy as jnp
+        import pennylane as qp
+        from catalyst import qjit, mitigate_with_rem
+
+        # qrack requires shots on the device when readout_noise_prob is set
+        dev = qp.device("qrack.simulator", wires=2, shots=1000, readout_noise_prob=0.1)
+
+        @qp.qnode(dev)
+        def circuit(x):
+            qp.RX(x, wires=0)
+            qp.CNOT(wires=[0, 1])
+            return qp.probs()
+
+        @qjit
+        def mitigated_circuit(x):
+            return mitigate_with_rem(circuit)(x)
+
+    The mitigated probabilities match the noiseless ``[0.939, 0, 0, 0.061]``:
+
+    >>> jnp.round(qjit(circuit)(0.5), 3)
+    Array([0.761, 0.09 , 0.09 , 0.059], dtype=float64)
+    >>> jnp.round(mitigated_circuit(0.5), 3)
+    Array([0.939, 0.   , 0.   , 0.061], dtype=float64)
+
+    To avoid running the calibration circuits on every call, the confusion matrices can be
+    computed once and cached, as long as the readout noise of the device does not change:
+
+    .. code-block:: python
+
+        @qjit
+        def calibrate(x):
+            return mitigate_with_rem(circuit, return_calibration_matrices=True)(x)
+
+        @qjit
+        def mitigated_circuit(x, calibration_matrices):
+            return mitigate_with_rem(circuit, calibration_matrices=calibration_matrices)(x)
+
+        probs, calibration_matrices = calibrate(0.5)
+        probs = mitigated_circuit(1.0, calibration_matrices)
+
+    For a :func:`~pennylane.sample` measurement on 20 qubits with 1000 shots, :math:`2^{20}`
+    exceeds the number of shots, so the system is restricted to the sampled bitstrings and the
+    result has one row per shot:
+
+    .. code-block:: python
+
+        dev = qp.device("qrack.simulator", wires=20, shots=1000, readout_noise_prob=0.01)
+
+        @qp.qnode(dev)
+        def circuit():
+            qp.Hadamard(wires=0)
+            for i in range(19):
+                qp.CNOT(wires=[i, i + 1])
+            return qp.sample()
+
+        @qjit
+        def workflow():
+            return mitigate_with_rem(circuit)()
+
+    >>> bitstrings, counts = workflow()
+    >>> bitstrings.shape, counts.shape
+    ((1000, 20), (1000,))
+    >>> bitstrings[counts > 100]
+    Array([[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+           [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]],      dtype=int32)
+    >>> counts[counts > 100]
+    Array([507.41843444, 470.81718049], dtype=float64)
     """
 
     kwargs = copy.copy(locals())

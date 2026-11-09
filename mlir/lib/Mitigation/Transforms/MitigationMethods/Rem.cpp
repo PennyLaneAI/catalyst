@@ -1,3 +1,17 @@
+// Copyright 2025-2026 Haiqu, Inc.
+
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+
+//     http://www.apache.org/licenses/LICENSE-2.0
+
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 #include "Rem.hpp"
 
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -186,7 +200,7 @@ LogicalResult RemLowering::matchAndRewrite(mitigation::RemOp op, PatternRewriter
     // Get the number of qubits from quantum.alloc operation inside callee function (FuncOp).
     const int64_t qubitCount =
         (*calleeOp.getOps<quantum::AllocOp>().begin()).getNqubitsAttr().value_or(0);
-    // Get the device using quantom.device opeartion  inside callee function (FuncOp)
+    // Get the device using quantom.device operation  inside callee function (FuncOp)
     quantum::DeviceInitOp deviceInitOp = *(calleeOp.getOps<quantum::DeviceInitOp>().begin());
     // shots value could be a result of some operation, and not just a literal value, which is why
     // pointer to the operation is stored
