@@ -21,6 +21,7 @@ from pathlib import Path
 from typing import Iterable
 
 import pennylane as qp
+from pennylane.decomposition import DecompositionRule
 from pennylane.decomposition.utils import to_name
 
 from catalyst.compiler import _options_to_cli_flags, _quantum_opt
@@ -1772,10 +1773,9 @@ decompose_arbitrary_ppr = qp.transform(
 
 def graph_decomposition_setup_inputs(
     gate_set: Iterable[type | str] | dict[type | str, float],
-    fixed_decomps: dict | None = None,
-    exclude_decomps: dict | None = None,
-    bytecode_rules: str | None = None,
-    _builtin_rule_path: str = BYTECODE_FILE_PATH,
+    fixed_decomps: dict[str, DecompositionRule | str] | None = None,
+    exclude_decomps: dict[str, list[str] | tuple[str, ...]] | None = None,
+    bytecode_rules: str = BYTECODE_FILE_PATH,
     libQPD_path: Path | None = None,
     libpython_path: Path | None = None,
     verbose: bool = False,
@@ -1812,6 +1812,8 @@ def graph_decomposition_setup_inputs(
             from this pass's graph. Rules may be given as names or callables. Excluded rules are
             still lowered by the frontend and remain available to subsequent passes. Exclusions
             also apply to rules selected by ``fixed_decomps``.
+        bytecode_rules (str): path to the bytecode file containing decomposition rules.
+            Defaults to the built-in decomposition rules.
         verbose (bool): if ``True``, the pass prints the decomposition rule the solver chose for
             each operator, along with its cost and the resulting gate counts, to stderr. ``False`` by default.
 
@@ -1879,9 +1881,9 @@ def graph_decomposition_setup_inputs(
     else:
         gate_set = {to_name(op): float(cost) for op, cost in gate_set.items()}
 
-    options: dict[str, dict | tuple | str] = {
+    options: dict[str, object] = {
         "gate_set": gate_set,
-        "bytecode_rules": _builtin_rule_path,
+        "bytecode_rules": bytecode_rules,
         "libQPD_path": str(
             libQPD_path if libQPD_path else get_lib_path("catalyst", "CATALYST_LIB_DIR")
         ),
@@ -1897,14 +1899,20 @@ def graph_decomposition_setup_inputs(
             return rule.name
         return rule.__name__
 
-    if fixed_decomps:
+    if fixed_decomps is not None:
+        for val in fixed_decomps.values():
+            assert isinstance(
+                val, (str, DecompositionRule)
+            ), f"fixed_decomps must be names (strings) or DecompositionRules, got {type(val)}"
+
         options |= {
             "fixed_decomps": {
                 to_name(op): rule_ref_name(rule) for op, rule in fixed_decomps.items()
             }
         }
 
-    if exclude_decomps:
+    if exclude_decomps is not None:
+        assert all(isinstance(val, (list, tuple)) for val in exclude_decomps.values())
         options |= {
             "exclude_decomps": {
                 to_name(op): tuple(rule_ref_name(rule) for rule in rules)
