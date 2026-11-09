@@ -36,6 +36,8 @@ def test_qjit_device():
     # Since shots are not used in the new API, we expect None
     assert device_qjit.shots == qp.measurements.Shots(None)
     assert device_qjit.wires == qp.wires.Wires(range(0, 10))
+    # Compiler barriers are removed during LLVM lowering, not executed by the device.
+    assert "Barrier" not in device_qjit.capabilities.operations
 
     # Check the preprocess of the new device
     with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION):
