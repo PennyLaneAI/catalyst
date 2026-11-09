@@ -14,6 +14,8 @@
 
 """Unit tests for Global Phase"""
 
+import json
+
 import numpy as np
 import pennylane as qp
 import pytest
@@ -73,6 +75,41 @@ def test_global_phase_control(backend, capture_mode):
     expected = qnn()
     observed = qjit(qnn, capture=capture_mode)()
     assert np.allclose(expected, observed)
+
+
+@pytest.mark.parametrize(
+    "ops, expected_depth",
+    [
+        (lambda: qp.GlobalPhase(0.1), 1),
+        (lambda: (qp.RX(0.1, 0), qp.GlobalPhase(0.1), qp.RX(0.1, 1)), 3),
+        (lambda: (qp.GlobalPhase(0.1), qp.X(0), qp.X(1)), 2),
+        (lambda: (qp.RX(0.1, 0), qp.ctrl(qp.GlobalPhase(0.1), control=1), qp.RX(0.1, 0)), 2),
+    ],
+)
+def test_global_phase_tracked_depth(ops, expected_depth, capture_mode, tmp_path):
+    """Test that the circuit depth tracked by null.qubit for global phases matches the depth
+    PennyLane computes for the tape, in which a global phase without control wires acts on all
+    wires."""
+    filename = tmp_path / "resources.json"
+    dev = qp.device(
+        "null.qubit",
+        wires=2,
+        track_resources=True,
+        resources_filename=str(filename),
+        compute_depth=True,
+    )
+
+    @qp.qnode(dev)
+    def circuit():
+        ops()
+        return qp.probs(wires=0)
+
+    tape = qp.workflow.construct_tape(circuit)()
+    assert qp.resource.resources_from_tape(tape, compute_depth=True).depth == expected_depth
+
+    qjit(circuit, capture=capture_mode)()
+    with filename.open("r", encoding="utf-8") as f:
+        assert json.load(f)["depth"] == expected_depth
 
 
 if __name__ == "__main__":
