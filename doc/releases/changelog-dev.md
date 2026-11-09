@@ -1433,8 +1433,12 @@ encountered, and their resource counts, accounting for modifier regions (across 
 sites as well) accurately. [(#3349)](https://github.com/PennyLaneAI/catalyst/pull/3349)
 
   - The preparation of inputs to the graph solver, including parsing the fixed/alt decomps, gateset, and collecting rule nodes
-are refactored into their own file, 'GraphPrep.hpp/cpp`. This is to expose the shared logic of graph solver preparation
+are refactored into their own file, `GraphPrep.hpp/cpp`. This is to expose the shared logic of graph solver preparation
 among passes that need to use it. [(#3349)](https://github.com/PennyLaneAI/catalyst/pull/3349)
+
+* A new pass `resource-estimate` was added, it is used by `qp.estimate`. This is an analysis pass, 
+it uses `ResourceAnalysis` to gather resource counts, and `GraphPrep` to build and solve the graph 
+to project those resource counts in the target gate-set for `qp.estimate(..., target=gate_set)`.
 
 
 <h3>Documentation 📝</h3>
