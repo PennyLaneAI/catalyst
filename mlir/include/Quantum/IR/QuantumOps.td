@@ -1585,7 +1585,7 @@ def StateOp : Measurement_Op<"state", [AttrSizedOperandSegments]> {
 
 // TODO: actually stop optimizations across barriers
 def BarrierOp : Gate_Op<"barrier", [
-    NoMemoryEffect, AllTypesMatch<["in_qubits", "out_qubits"]>
+    AllTypesMatch<["in_qubits", "out_qubits"]>
 ]> {
     let summary = "Apply a barrier";
     let description = [{
