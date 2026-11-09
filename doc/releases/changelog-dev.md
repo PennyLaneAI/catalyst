@@ -1150,11 +1150,6 @@
 
 <h3>Internal changes ⚙️</h3>
 
-* Added tests for the circuit depth tracked by `null.qubit` with global phases. A global phase
-  without control wires does not contribute to the depth, as it commutes with every other
-  operation. A controlled global phase is counted on its control wires.
-  [(#3455)](https://github.com/PennyLaneAI/catalyst/pull/3455)
-
 * FuncOp's with quantum dialect instructions can now always be inlined.
   [(#3420)](https://github.com/PennyLaneAI/catalyst/pull/3420)
 
