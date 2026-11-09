@@ -126,7 +126,7 @@ struct ResourceEstimatePass : public impl::ResourceEstimatePassBase<ResourceEsti
         for (const auto &opEntry : result.detailedOperations) {
             OperatorNode operatorNode;
             std::string goid = opEntry.getKey().str();
-            int scale = opEntry.getValue();
+            double scale = opEntry.getValue();
             operatorNode.id = goid;
 
             auto graphOp = solution.find(operatorNode);
