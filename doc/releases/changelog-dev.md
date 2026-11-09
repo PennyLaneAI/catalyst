@@ -971,6 +971,11 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* Fixed a bug where a decode whose syndrome or correction is larger than the backline controller's
+  `in_bytes` or `out_bytes` compiled without error. The `lower-decode-to-transport` pass now
+  rejects such a decode with an error.
+  [(#3456)](https://github.com/PennyLaneAI/catalyst/pull/3456)
+
 * Runtime functions that take a boolean argument are now declared with `zeroext` on it. Before, a
   computed `i1`, such as a negated measurement result in the condition of a conditional Pauli
   rotation or in a `debug_assert`, could reach the runtime with undefined upper bits and be read
