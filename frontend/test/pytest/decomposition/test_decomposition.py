@@ -2857,7 +2857,7 @@ class TestResourceEstimate:
         """With a gate set, capture inserts ``resource-estimate`` and forwards output kwargs."""
         out = tmp_path / "resources.json"
 
-        @qjit(capture=True, target="mlir")
+        @qjit(capture=True, skip_preprocess=True, target="mlir")
         @self._resource_estimate(
             gate_set={"RX", "RY", "RZ"},
             output_json=True,
@@ -2883,7 +2883,7 @@ class TestResourceEstimate:
         out = tmp_path / "resources.json"
         with pytest.raises(ValueError, match="requires an explicit 'gate_set'"):
 
-            @qjit(capture=True, target="mlir")
+            @qjit(capture=True, skip_preprocess=True, target="mlir")
             @self._resource_estimate(
                 gate_set=None,
                 output_json=True,
@@ -2901,7 +2901,7 @@ class TestResourceEstimate:
         out = tmp_path / "resources.json"
         with pytest.raises(ValueError, match="requires an explicit 'output_json'"):
 
-            @qjit(capture=True, target="mlir")
+            @qjit(capture=True, skip_preprocess=True, target="mlir")
             @self._resource_estimate(
                 gate_set={"RX", "RY", "RZ"},
                 output_fname=str(out),
@@ -2917,7 +2917,7 @@ class TestResourceEstimate:
         """resource-estimate without output_fname is rejected with a clear error."""
         with pytest.raises(ValueError, match="requires an explicit 'output_fname'"):
 
-            @qjit(capture=True, target="mlir")
+            @qjit(capture=True, skip_preprocess=True, target="mlir")
             @self._resource_estimate(
                 gate_set={"RX", "RY", "RZ"},
                 output_json=True,
