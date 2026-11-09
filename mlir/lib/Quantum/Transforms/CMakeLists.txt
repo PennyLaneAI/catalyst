@@ -30,6 +30,7 @@ file(GLOB SRC
     dynamic_one_shot.cpp
     emit_catalyst_pyface.cpp
     gridsynth.cpp
+    instrument_classical_control.cpp
     ions_decompositions.cpp
     loop_boundary_optimization.cpp
     merge_global_phase.cpp
