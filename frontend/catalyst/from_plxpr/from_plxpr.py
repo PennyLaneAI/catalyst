@@ -352,12 +352,10 @@ def _require_decompose_gate_set(tkwargs):
 def _require_resource_estimate_args(output_json, output_fname):
     """Reject a qp.estimate without output_json and output_fname, which the resource-estimate pass needs."""
     if output_json is None:
-        raise ValueError(
-            "resource-estimate pass requires an explicit 'output_json'."
-        )
+        raise ValueError("resource-estimate pass requires an explicit 'output_json'.")
     if output_fname is None:
         raise ValueError(
-            "resource-estimate pass requires an explicit 'output_fname'. " 
+            "resource-estimate pass requires an explicit 'output_fname'. "
             "The pass does not have a default output file."
         )
 

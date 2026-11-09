@@ -1790,7 +1790,7 @@ def graph_decomposition_setup_inputs(
     and the graph solver will determine the optimal decomposition rules to apply,
     minimizing the overall gate count or the cost according to user-specified weights.
 
-    The same options are also used by the ``-resource-estimate`` MLIR compiler analysis pass for 
+    The same options are also used by the ``-resource-estimate`` MLIR compiler analysis pass for
     the graph-based resource estimation.
 
     .. note::
