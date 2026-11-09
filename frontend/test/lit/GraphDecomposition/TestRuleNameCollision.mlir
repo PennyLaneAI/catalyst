@@ -25,7 +25,6 @@ func.func @circuit(%q: !quantum.bit) -> !quantum.bit {
 }
 
 // CHECK-LABEL: func.func {{.*}}@__builtin_h_to_rz_ry()
-func.func @__builtin_h_to_rz_ry() attributes {
 // CHECK-SAME: target_gate = "Unrelated{}{wires:1}{}"
 func.func private @__builtin_h_to_rz_ry() attributes {
     frontend_name = "h_to_rz_ry",
