@@ -143,7 +143,7 @@ func.func @nested_cond(%q0: !quantum.bit, %q1: !quantum.bit, %q2: !quantum.bit) 
     // CHECK: scf.if
     // CHECK-NEXT: call @__catalyst__rt__begin_classical_control([[T0]])
     // CHECK: quantum.measure
-    // CHECK-NEXT: [[T1:%.+]] = call @__catalyst__rt__measurement_token()
+    // CHECK-NEXT: [[T1:%.+]] = {{(func\.)?}}call @__catalyst__rt__measurement_token()
     // CHECK: scf.if
     // CHECK-NEXT: call @__catalyst__rt__begin_classical_control([[T1]])
     // CHECK-NEXT: quantum.custom "PauliZ"()
@@ -214,7 +214,7 @@ func.func @repeat_until_success(%q0: !quantum.bit, %q1: !quantum.bit) -> (!quant
     // CHECK: scf.condition
     // CHECK: } do {
     // CHECK-NEXT: ^bb0
-    // CHECK-NEXT: [[LATEST:%.+]] = call @__catalyst__rt__measurement_token()
+    // CHECK-NEXT: [[LATEST:%.+]] = {{(func\.)?}}call @__catalyst__rt__measurement_token()
     // CHECK-NEXT: [[TOKEN:%.+]] = arith.maxsi [[T0]], [[LATEST]] : i64
     // CHECK-NEXT: call @__catalyst__rt__begin_classical_control([[TOKEN]])
     // CHECK-NEXT: quantum.custom "Hadamard"()
