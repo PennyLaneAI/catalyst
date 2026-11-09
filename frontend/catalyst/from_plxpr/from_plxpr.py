@@ -349,16 +349,16 @@ def _require_decompose_gate_set(tkwargs):
         )
 
 
-def _require_resource_estimate_args(tkwargs):
-    """Reject a qp.estimate without a gate set, which the resource-analysis pass needs."""
-    if tkwargs.get("output_json") is None:
+def _require_resource_estimate_args(output_json, output_fname):
+    """Reject a qp.estimate without output_json and output_fname, which the resource-estimate pass needs."""
+    if output_json is None:
         raise ValueError(
-            "qp.estimate requires an explicit 'output_json' under qjit; the resource-analysis "
+            "resource-estimate pass requires an explicit 'output_json'."
         )
-    if tkwargs.get("output_fname") is None:
+    if output_fname is None:
         raise ValueError(
-            "qp.estimate requires an explicit 'output_fname' under qjit; the resource-analysis "
-            "has no default output file."
+            "resource-estimate pass requires an explicit 'output_fname'. " 
+            "The pass does not have a default output file."
         )
 
 
@@ -378,7 +378,7 @@ def _handle_decompose_transform(
     _require_decompose_gate_set(tkwargs)
 
     if is_resource_estimate:
-        _require_resource_estimate_args(tkwargs)
+        _require_resource_estimate_args(tkwargs.get("output_json"), tkwargs.get("output_fname"))
 
     fixed_decomps = tkwargs.get("fixed_decomps") or {}
     alt_decomps = tkwargs.get("alt_decomps") or {}
