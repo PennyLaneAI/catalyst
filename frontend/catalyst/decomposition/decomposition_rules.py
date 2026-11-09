@@ -1403,7 +1403,12 @@ def walk_reachable_decomp_rule_sets(
         (
             request,
             set(required_states),
-            {request.base_id: request.modifier_state.control_count},
+            {
+                request.base_id: (
+                    request.modifier_state.control_count,
+                    request.modifier_state.num_work_wires,
+                )
+            },
         )
         for request, required_states in initial_requests
     )
@@ -1438,20 +1443,23 @@ def walk_reachable_decomp_rule_sets(
             # counts. Compare with the same base identity earlier on this path, rather than the
             # direct parent: intermediate operators may absorb their controls into their identity.
             # The first uncontrolled-to-controlled revisit remains valid.
-            child_control_count = child.modifier_state.control_count
-            previous_control_count = path_control_counts.get(child.base_id)
-            increases_control_cycle = (
-                previous_control_count is not None
-                and previous_control_count > 0
-                and child_control_count > previous_control_count
+            # Control work wires grow the same way: a rule may hand extra work wires to the controls
+            # it emits (e.g. C(SemiAdder) passes its spare work wires on to ctrl(CNOT)), so a cycle
+            # through it manufactures an unbounded sequence of work-wire counts. Prune a revisit
+            # with more controls, or with as many controls and more work wires.
+            state = child.modifier_state
+            child_counts = (state.control_count, state.num_work_wires)
+            previous_counts = path_control_counts.get(child.base_id)
+            increases_modifier_cycle = (
+                previous_counts is not None
+                and previous_counts[0] > 0
+                and child_counts > previous_counts
             )
-            if increases_control_cycle:
+            if increases_modifier_cycle:
                 continue
 
             child_path_control_counts = path_control_counts.copy()
-            child_path_control_counts[child.base_id] = max(
-                previous_control_count or 0, child_control_count
-            )
+            child_path_control_counts[child.base_id] = max(previous_counts or (0, 0), child_counts)
             queue.append((child, {child.modifier_state}, child_path_control_counts))
 
     return target_specs
