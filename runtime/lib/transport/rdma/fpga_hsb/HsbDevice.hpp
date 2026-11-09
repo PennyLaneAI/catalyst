@@ -41,6 +41,7 @@ struct DataPlane {
     std::uint32_t host_ip; // host byte order
     std::uint8_t host_mac[6];
     std::uint32_t frame_bytes; // per request
+    bool imm;                  // WRITE_WITH_IMM (`imm=1`) or plain WRITE (`imm=0`)
 };
 
 class HsbDevice {

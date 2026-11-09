@@ -136,7 +136,8 @@ void GpuHsbCoprocessorSession::run(std::stop_token st) {
         }
 
         cpu_relax();
-        if (recvd < served) { // each request's receive completion is due by now
+        // only need to check if WRITE_WITH_IMM is enabled and there are requests in flight
+        if (link_.imm() && recvd < served) {
             recvd += static_cast<std::uint64_t>(link_.reap_recv(cq_slots));
         }
         if (link_.sends_inflight() >= HsbLink::SIGNAL_EVERY) {

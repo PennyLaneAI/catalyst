@@ -45,7 +45,8 @@ catalyst::transport::CoprocessorSession *make_gpu_coprocessor(const std::string 
     // `wire=hsb`: a controller behind NVIDIA's Holoscan Sensor Bridge (GpuHsbCoprocessorSession)
     if (wire == common::Wire::HSB) {
         auto *session = new gpu_verbs::GpuHsbCoprocessorSession(
-            cfg.dev, cfg.gid, gpu_device, common::hsb::ring_from_config(config));
+            cfg.dev, cfg.gid, gpu_device, common::hsb::ring_from_config(config),
+            common::hsb::imm_from_config(config));
         session->set_thread_affinity(cpu, rt);
         return session;
     }

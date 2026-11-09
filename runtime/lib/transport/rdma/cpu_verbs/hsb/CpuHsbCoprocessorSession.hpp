@@ -40,8 +40,9 @@ namespace catalyst::transport::cpu_verbs {
 
 class CpuHsbCoprocessorSession final : public CoprocessorSession {
   public:
-    CpuHsbCoprocessorSession(std::string dev, int gid_idx, common::frame::RingGeometry ring)
-        : link_(std::move(dev), gid_idx), ring_(ring) {}
+    CpuHsbCoprocessorSession(std::string dev, int gid_idx, common::frame::RingGeometry ring,
+                             bool imm)
+        : link_(std::move(dev), gid_idx, imm), ring_(ring) {}
     ~CpuHsbCoprocessorSession() override { stop(); }
 
     CpuHsbCoprocessorSession(const CpuHsbCoprocessorSession &) = delete;

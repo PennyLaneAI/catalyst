@@ -154,7 +154,7 @@ void CpuHsbCoprocessorSession::run(std::stop_token st) {
 
         // Idle. PAUSE leaves the spin faster when the line changes.
         cpu_relax();
-        if (recvd < served || (spin & RECV_CHECK_MASK) == 0) {
+        if (link_.imm() && (recvd < served || (spin & RECV_CHECK_MASK) == 0)) {
             const int n = link_.reap_recv(cq_slots);
             for (int i = 0; i < n; ++i) {
                 if (++recvd > served && seq_at(ring_buf_, ring_, slot) != expect) {

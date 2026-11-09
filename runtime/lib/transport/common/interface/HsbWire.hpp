@@ -33,8 +33,10 @@
 #pragma once
 #include <cstddef>
 #include <cstdint>
+#include <string>
 #include <string_view>
 
+#include "ConfigParser.hpp"
 #include "Error.hpp"
 #include "Frame.hpp"
 #include "WireProtocol.hpp"
@@ -104,6 +106,11 @@ inline frame::RingGeometry ring_from_config(std::string_view config) {
              ring.slots, MAX_SLOTS);
     ring.stride = SLOT_BYTES;
     return ring;
+}
+
+/// Whether HSB ends each request with WRITE_WITH_IMM (`imm=1`) or sends it a plain WRITE (`imm=0`)
+inline bool imm_from_config(const std::string &config) {
+    return configparser::parse_optional_index(config, "imm", 1) != 0;
 }
 
 } // namespace catalyst::transport::common::hsb

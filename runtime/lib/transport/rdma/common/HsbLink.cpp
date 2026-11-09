@@ -46,7 +46,8 @@ constexpr std::uint8_t V4_PREFIX[12] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xff, 0xff
 
 } // namespace
 
-HsbLink::HsbLink(std::string dev, int gid_idx) : dev_name_(std::move(dev)), gid_idx_(gid_idx) {}
+HsbLink::HsbLink(std::string dev, int gid_idx, bool imm)
+    : dev_name_(std::move(dev)), gid_idx_(gid_idx), imm_(imm) {}
 
 void HsbLink::connect(std::uint16_t oob_port) {
     ctx_ = std::make_shared<Context>(dev_name_);
@@ -56,7 +57,9 @@ void HsbLink::connect(std::uint16_t oob_port) {
     qp_ = std::make_shared<QueuePair>(pd_, scq_, rcq_, MAX_SEND, /*max_inline=*/64, QpType::UC,
                                       MAX_RECV);
     qp_->to_init(port_);
-    post_recvs(MAX_RECV);
+    if (imm_) {
+        post_recvs(MAX_RECV);
+    }
 
     active_mtu_ = static_cast<std::uint32_t>(ctx_->port_attr(port_).active_mtu);
 
@@ -102,7 +105,7 @@ void HsbLink::exchange(std::uint32_t rkey, const frame::RingGeometry &ring) {
     hi.ring_slots = ring.slots;
     hi.ip = ip_;
     std::memcpy(hi.mac, mac_, sizeof(mac_));
-    hi.imm = 1;
+    hi.imm = imm_ ? 1 : 0;
     send_exact(oob_.get(), &hi, sizeof(hi));
     recv_exact(oob_.get(), &fpga_, sizeof(fpga_));
 

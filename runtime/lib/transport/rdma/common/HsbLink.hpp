@@ -36,7 +36,7 @@ namespace catalyst::transport::common {
 
 class HsbLink {
   public:
-    // HSB's WRITE_WITH_IMM consumes a receive per request, so this many stay posted.
+    // With imm, HSB's WRITE_WITH_IMM consumes a receive per request, so this many stay posted.
     static constexpr unsigned MAX_RECV = 512;
     static constexpr unsigned MAX_SEND = 64;
     // Every SIGNAL_EVERY-th reply is signaled; its completion retires that many.
@@ -44,12 +44,13 @@ class HsbLink {
     // At most this many receive completions are taken per reap_recv().
     static constexpr int RECV_BATCH = 16;
 
-    HsbLink(std::string dev, int gid_idx);
+    /// `imm`: HSB sends WRITE_WITH_IMM (`imm=1`) or plain WRITE (`imm=0`)
+    HsbLink(std::string dev, int gid_idx, bool imm);
     HsbLink(const HsbLink &) = delete;
     HsbLink &operator=(const HsbLink &) = delete;
 
-    /// Open the device, bring a UC QP to INIT with its receives posted, and accept the controller
-    /// on `oob_port`.
+    /// Open the device, bring a UC QP to INIT (with its receives posted if imm), and accept the
+    /// controller on `oob_port`.
     void connect(std::uint16_t oob_port);
     std::shared_ptr<ProtectionDomain> pd() const { return pd_; }
 
@@ -63,6 +64,7 @@ class HsbLink {
     /// Idle path: retire one signaled send completion if one is ready.
     void reap_send();
     unsigned sends_inflight() const { return inflight_; }
+    bool imm() const { return imm_; }
     /// Idle path: take up to RECV_BATCH receive completions, each one request HSB delivered,
     /// repost their receives, and put the ring slot each request landed in into `slots`.
     int reap_recv(std::uint32_t slots[RECV_BATCH]);
@@ -72,6 +74,7 @@ class HsbLink {
 
     std::string dev_name_;
     int gid_idx_;
+    bool imm_;
     std::uint8_t port_ = 1;
     std::uint32_t active_mtu_ = 0;
     std::uint32_t ip_ = 0; // RoCE IPv4 of the GID, host byte order

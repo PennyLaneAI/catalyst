@@ -49,9 +49,10 @@
 #define HSB_DP_HOST_MAC_LOW       0x20u        /* MAC bytes 2..5 */
 #define HSB_DP_HOST_MAC_HIGH      0x24u        /* MAC bytes 0..1 */
 #define HSB_DP_HOST_IP            0x28u
-#define HSB_DP_HOST_UDP_PORT      0x2Cu        /* [15:0] port, [16] md_disable */
+#define HSB_DP_HOST_UDP_PORT      0x2Cu        /* [15:0] port, [16] md_disable, [17] imm_disable */
 #define HSB_DP_VLAN               0x34u
 #define HSB_MD_DISABLE            (1u << 16)   /* one packet per frame, no metadata packet */
+#define HSB_IMM_DISABLE           (1u << 17)   /* that packet a plain WRITE (backline-hsb patches/0001) */
 #define HSB_ROCE_UDP_PORT         4791u
 #define HSB_PAGE_SIZE             128u
 

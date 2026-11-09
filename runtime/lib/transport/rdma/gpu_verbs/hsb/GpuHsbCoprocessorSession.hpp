@@ -43,8 +43,8 @@ using namespace catalyst::transport::coproc; // GpuRuntime, launchers
 class GpuHsbCoprocessorSession final : public CoprocessorSession {
   public:
     GpuHsbCoprocessorSession(std::string dev, int gid_idx, int gpu_device,
-                             common::frame::RingGeometry ring)
-        : link_(std::move(dev), gid_idx), ring_(ring), gpu_(gpu_device) {}
+                             common::frame::RingGeometry ring, bool imm)
+        : link_(std::move(dev), gid_idx, imm), ring_(ring), gpu_(gpu_device) {}
     ~GpuHsbCoprocessorSession() override { stop(); }
 
     GpuHsbCoprocessorSession(const GpuHsbCoprocessorSession &) = delete;

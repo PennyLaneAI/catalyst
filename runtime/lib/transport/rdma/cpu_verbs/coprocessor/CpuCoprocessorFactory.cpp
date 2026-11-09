@@ -38,7 +38,8 @@ catalyst::transport::CoprocessorSession *make_cpu_coprocessor(const std::string 
     const common::Wire wire = common::wire_from_config(config);
     if (wire == common::Wire::HSB) {
         auto *session = new cpu_verbs::CpuHsbCoprocessorSession(
-            cfg.dev, cfg.gid, common::hsb::ring_from_config(config));
+            cfg.dev, cfg.gid, common::hsb::ring_from_config(config),
+            common::hsb::imm_from_config(config));
         session->set_thread_affinity(cpu, rt);
         return session;
     }

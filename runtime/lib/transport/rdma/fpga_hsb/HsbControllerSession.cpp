@@ -102,8 +102,6 @@ PeerRef HsbControllerSession::exchange_keys(const MemRegion & /*local*/) {
              "hsb: the coprocessor does not speak the HSB wire (magic 0x%08x version %u): give "
              "it wire=hsb",
              host_.magic, host_.version);
-    TP_CHECK(host_.imm == 1,
-             "hsb: the coprocessor wants plain WRITEs; stock HSB sends WRITE_WITH_IMM");
 
     wire::FpgaInfo fo{};
     fo.magic = wire::HS_MAGIC;
@@ -139,6 +137,7 @@ void HsbControllerSession::establish_channel(const ChannelDesc &desc, const MemR
     dp.host_ip = host_.ip;
     std::memcpy(dp.host_mac, host_.mac, sizeof(dp.host_mac));
     dp.frame_bytes = wire::FRAME_BYTES;
+    dp.imm = host_.imm != 0;
     dev_->hsb_configure(dp);
 
     // The engine: fresh counters, seq from 1, stamped into every request.
