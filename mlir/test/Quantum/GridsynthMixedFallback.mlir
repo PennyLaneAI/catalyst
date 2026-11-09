@@ -15,9 +15,9 @@
 // RUN: quantum-opt --pass-pipeline="builtin.module(gridsynth{epsilon=0.01 method=mixed-fallback})" %s | FileCheck %s --check-prefixes=CHECK,CLIFFORD
 // RUN: quantum-opt --pass-pipeline="builtin.module(gridsynth{epsilon=0.01 ppr-basis=True method=mixed-fallback})" %s | FileCheck %s --check-prefixes=CHECK,PPR
 
-// CHECK-DAG: func.func private @rs_fallback_projective_get_size(f64, f64, i1, f64) -> index
-// CHECK-DAG: func.func private @rs_fallback_projective_get_gates(memref<?xindex>, f64, f64, i1, f64)
-// CHECK-DAG: func.func private @rs_fallback_projective_get_phase(f64, f64, i1, f64) -> f64
+// CHECK-DAG: func.func private @rs_fallback_projective_get_size(f64, f64, i1 {llvm.zeroext}, f64) -> index
+// CHECK-DAG: func.func private @rs_fallback_projective_get_gates(memref<?xindex>, f64, f64, i1 {llvm.zeroext}, f64)
+// CHECK-DAG: func.func private @rs_fallback_projective_get_phase(f64, f64, i1 {llvm.zeroext}, f64) -> f64
 // CHECK-DAG: func.func private @rs_fallback_recovery_angle(f64, f64, f64) -> f64
 // CHECK-DAG: func.func private @rs_fallback_recovery_epsilon(f64, f64, f64) -> f64
 
