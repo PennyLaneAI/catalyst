@@ -25,6 +25,8 @@
 #include "mlir/IR/Types.h"
 #include "mlir/Support/LLVM.h"
 
+#include "StringConstants.h"
+
 using namespace mlir;
 using namespace catalyst::quantum;
 
@@ -140,19 +142,43 @@ std::string defaultGetGraphOpId(Operation *op) {
 }
 
 std::string defaultGetGraphOpIdExplicitModifiers(Operation *op, bool isAdjoint,
-                                                 unsigned numControlQubits) {
+                                                 unsigned numControlQubits, unsigned numWorkWires,
+                                                 bool isBorrowed) {
     std::string out;
     llvm::raw_string_ostream ss(out);
 
     DecomposableGate gate = cast<DecomposableGate>(op);
 
-    // Fold op-level modifiers into the operator name so that `Op`, `Adjoint(Op)`, `C(Op)`, and
+    // Fold op-level (Adjoint/Ctrl/WorkWire) modifiers into the operator name so that `Op`, `Adjoint(Op)`, `C(Op)`, `WorkWires(Op)`, and
     // nested combinations are distinct in the graphOpId. Modifiers wrap only the name; the
     // param/wire/static/uid groups follow, e.g. `C(Adjoint(Rot)){...}{wires...}`.
+
+    // Note: Currently WorkWire modifiers are supported as Ctrl modifiers with `work_wire` and `work_wire_type` attributes.
+    // Therefore, to "apply" WorkWire modifier, we need to over-write the wireLens and staticData with the explicit values.
     ss << wrapModifiers(gate.getOperatorName(), op, isAdjoint, numControlQubits);
     printDynamicShape(gate.getDynamicShape(), ss);
-    printWireLens(gate.getWireLens(), ss);
-    gate.getStaticData().print(ss);
+
+    // Get Operation's wireLens and staticData without the WorkWire modifiers.
+    WireLens wireLens;
+    for (const auto &entry : gate.getWireLens()) {
+        if (entry.first != catalyst::CTRL_WORK_WIRES) {
+            wireLens.push_back(entry);
+        }
+    }
+    NamedAttrList staticData(gate.getStaticData());
+    staticData.erase(catalyst::CTRL_WORK_WIRE_TYPE);
+
+    // Apply the WorkWire modifiers to the wireLens and staticData.
+    if (numWorkWires > 0) {
+        wireLens.emplace_back(catalyst::CTRL_WORK_WIRES, numWorkWires);
+        staticData.set(catalyst::CTRL_WORK_WIRE_TYPE,
+                       StringAttr::get(op->getContext(), isBorrowed
+                                                             ? catalyst::CTRL_WORK_WIRE_TYPE_BORROWED
+                                                             : catalyst::CTRL_WORK_WIRE_TYPE_ZEROED));
+    }
+
+    printWireLens(wireLens, ss);
+    staticData.getDictionary(op->getContext()).print(ss);
     if (gate.getExtraData() != "") {
         ss << '[' << gate.getExtraData() << ']';
     }

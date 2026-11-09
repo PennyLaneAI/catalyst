@@ -42,7 +42,9 @@ using WireLens = llvm::SmallVector<std::pair<std::string, size_t>>;
 
 std::string defaultGetGraphOpId(mlir::Operation *op);
 std::string defaultGetGraphOpIdExplicitModifiers(mlir::Operation *op, bool isAdjoint,
-                                                 unsigned numControlQubits);
+                                                 unsigned numControlQubits,
+                                                 unsigned numWorkWires = 0,
+                                                 bool isBorrowed = false);
 
 } // namespace quantum
 } // namespace catalyst

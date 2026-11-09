@@ -103,28 +103,36 @@ class ResourceAnalysis {
 
     // analyze a region and accumulate results
     void analyzeRegion(Region &region, ResourceResult &result, bool isAdjoint,
-                       unsigned numControlQubits);
+                       unsigned numControlQubits, unsigned numWorkWires = 0,
+                       bool isBorrowed = false);
 
     void recordLoopBody(Operation *loopOp, ResourceResult bodyResult,
                         std::optional<double> tripCount, StringRef prefix, int64_t &counter,
                         int64_t &dynCounter, ResourceResult &result);
 
     void analyzeForLoop(scf::ForOp forOp, ResourceResult &result, bool isAdjoint,
-                        unsigned numControlQubits);
+                        unsigned numControlQubits, unsigned numWorkWires = 0,
+                        bool isBorrowed = false);
     void analyzeWhileLoop(scf::WhileOp whileOp, ResourceResult &result, bool isAdjoint,
-                          unsigned numControlQubits);
+                          unsigned numControlQubits, unsigned numWorkWires = 0,
+                          bool isBorrowed = false);
     void analyzeIfOp(scf::IfOp ifOp, ResourceResult &result, bool isAdjoint,
-                     unsigned numControlQubits);
+                     unsigned numControlQubits, unsigned numWorkWires = 0,
+                     bool isBorrowed = false);
     void analyzeIndexSwitchOp(scf::IndexSwitchOp switchOp, ResourceResult &result, bool isAdjoint,
-                              unsigned numControlQubits);
+                              unsigned numControlQubits, unsigned numWorkWires = 0,
+                              bool isBorrowed = false);
     void analyzePBCLayer(pbc::LayerOp layerOp, ResourceResult &result, bool isAdjoint,
-                         unsigned numControlQubits);
+                         unsigned numControlQubits, unsigned numWorkWires = 0,
+                         bool isBorrowed = false);
 
     // categorize and count a single operation
     void collectOperation(Operation *op, ResourceResult &result, bool isAdjoint,
-                          unsigned numControlQubits);
+                          unsigned numControlQubits, unsigned numWorkWires = 0,
+                          bool isBorrowed = false);
     void collectDetailedOperation(Operation *op, ResourceResult &result, bool isAdjoint,
-                                  unsigned numControlQubits) const;
+                                  unsigned numControlQubits, unsigned numWorkWires = 0,
+                                  bool isBorrowed = false) const;
 };
 
 } // namespace catalyst
