@@ -117,8 +117,7 @@ class ResourceAnalysis {
                           unsigned numControlQubits, unsigned numWorkWires = 0,
                           bool isBorrowed = false);
     void analyzeIfOp(scf::IfOp ifOp, ResourceResult &result, bool isAdjoint,
-                     unsigned numControlQubits, unsigned numWorkWires = 0,
-                     bool isBorrowed = false);
+                     unsigned numControlQubits, unsigned numWorkWires = 0, bool isBorrowed = false);
     void analyzeIndexSwitchOp(scf::IndexSwitchOp switchOp, ResourceResult &result, bool isAdjoint,
                               unsigned numControlQubits, unsigned numWorkWires = 0,
                               bool isBorrowed = false);

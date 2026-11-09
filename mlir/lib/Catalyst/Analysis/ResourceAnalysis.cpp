@@ -43,6 +43,7 @@
 #include "QRef/IR/QRefOps.h"
 #include "Quantum/IR/QuantumInterfaces.h"
 #include "Quantum/IR/QuantumOps.h"
+
 #include "StringConstants.h"
 
 using namespace mlir;
@@ -737,12 +738,15 @@ void ResourceAnalysis::collectDetailedOperation(Operation *op, ResourceResult &r
         // Get the operation's own work wires and type (If any).
         auto [opWorkWires, opWorkType] = getOpCtrlWorkWires(inst);
 
-        // Combine the operation's own work wires and type with the enclosing region's work wires and type.
+        // Combine the operation's own work wires and type with the enclosing region's work wires
+        // and type.
         auto [finalWorkWires, finalBorrowed] =
             composeWorkWires(numWorkWires, isBorrowed, opWorkWires, opWorkType);
 
-        // getGraphOpIdExplicitModifiers applies Adjoint/Ctrl/WorkWire modifiers to the operation's base GOID.
-        std::string opID = inst.getGraphOpIdExplicitModifiers(adj, nCtrl, finalWorkWires, finalBorrowed);
+        // getGraphOpIdExplicitModifiers applies Adjoint/Ctrl/WorkWire modifiers to the operation's
+        // base GOID.
+        std::string opID =
+            inst.getGraphOpIdExplicitModifiers(adj, nCtrl, finalWorkWires, finalBorrowed);
         result.detailedOperations[opID] += 1;
         result.observedGraphOpIds.insert(opID);
         return;

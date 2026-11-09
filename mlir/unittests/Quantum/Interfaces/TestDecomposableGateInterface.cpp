@@ -125,7 +125,8 @@ module {
 
     // Modifiers fold control-outermost
     ASSERT_EQ(op.getGraphOpId(), "C(Adjoint(RX)){0:[f64]}{wires:1}{}");
-    ASSERT_EQ(op.getGraphOpIdExplicitModifiers(true, 1, 0, false), "C(Adjoint(RX)){0:[f64]}{wires:1}{}");
+    ASSERT_EQ(op.getGraphOpIdExplicitModifiers(true, 1, 0, false),
+              "C(Adjoint(RX)){0:[f64]}{wires:1}{}");
 }
 
 TEST(DecomposableGateInterfaceTests, MultiControlledAdjointCustomOp) {
@@ -150,7 +151,8 @@ module {
 
     // Controls + Adjoint folding
     ASSERT_EQ(op.getGraphOpId(), "2C(Adjoint(RX)){0:[f64]}{wires:1}{}");
-    ASSERT_EQ(op.getGraphOpIdExplicitModifiers(true, 2, 0, false), "2C(Adjoint(RX)){0:[f64]}{wires:1}{}");
+    ASSERT_EQ(op.getGraphOpIdExplicitModifiers(true, 2, 0, false),
+              "2C(Adjoint(RX)){0:[f64]}{wires:1}{}");
 }
 
 TEST(DecomposableGateInterfaceTests, MultiRZOp) {
@@ -185,7 +187,8 @@ module {
     ASSERT_EQ(multiRZ.getStaticData().size(), 0);
 
     ASSERT_EQ(multiRZ.getGraphOpId(), "MultiRZ{theta:[f64]}{wires:3}{}");
-    ASSERT_EQ(multiRZ.getGraphOpIdExplicitModifiers(false, 0, 0, false), "MultiRZ{theta:[f64]}{wires:3}{}");
+    ASSERT_EQ(multiRZ.getGraphOpIdExplicitModifiers(false, 0, 0, false),
+              "MultiRZ{theta:[f64]}{wires:3}{}");
 }
 
 TEST(DecomposableGateInterfaceTests, PauliRotOp) {
@@ -296,7 +299,8 @@ module {
     ASSERT_EQ(gphase.getStaticData().size(), 0);
 
     ASSERT_EQ(gphase.getGraphOpId(), "GlobalPhase{phi:[f64]}{}{}");
-    ASSERT_EQ(gphase.getGraphOpIdExplicitModifiers(false, 0, 0, false), "GlobalPhase{phi:[f64]}{}{}");
+    ASSERT_EQ(gphase.getGraphOpIdExplicitModifiers(false, 0, 0, false),
+              "GlobalPhase{phi:[f64]}{}{}");
 }
 
 TEST(DecomposableGateInterfaceTests, ControlledGlobalPhaseOp) {
@@ -332,7 +336,8 @@ module {
     // Controlled global phase: the control wire is folded into the id (this is the `C(GlobalPhase)`
     // operator, which a rule maps to `PhaseShift`/`ControlledPhaseShift`).
     ASSERT_EQ(gphase.getGraphOpId(), "C(GlobalPhase){phi:[f64]}{}{}");
-    ASSERT_EQ(gphase.getGraphOpIdExplicitModifiers(false, 1, 0, false), "C(GlobalPhase){phi:[f64]}{}{}");
+    ASSERT_EQ(gphase.getGraphOpIdExplicitModifiers(false, 1, 0, false),
+              "C(GlobalPhase){phi:[f64]}{}{}");
 }
 
 TEST(DecomposableGateInterfaceTests, QubitUnitaryOp) {
@@ -463,6 +468,10 @@ module {
     ASSERT_EQ(op.getWireLens(), expectedWires);
     ASSERT_EQ(op.getNonCtrlQubitOperands().size(), 3u);
     ASSERT_EQ(op.getGraphOpId(),
+              "C(MultiControlledX){}{ctrl_work_wires:1,wires:1,work_wires:1}{"
+              "ctrl_work_wire_type = \"zeroed\", work_wire_type = \"borrowed\"}");
+
+    ASSERT_EQ(op.getGraphOpIdExplicitModifiers(false, 1, 1, false),
               "C(MultiControlledX){}{ctrl_work_wires:1,wires:1,work_wires:1}{"
               "ctrl_work_wire_type = \"zeroed\", work_wire_type = \"borrowed\"}");
 }
