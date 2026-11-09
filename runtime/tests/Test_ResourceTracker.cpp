@@ -265,36 +265,25 @@ TEST_CASE("Test Resource Tracker Global Phase Depth", "[resourcetracking]") {
         tracker.AllocateQubit(i);
     }
 
-    // A global phase occupies a layer on all wires, even those not yet used
+    // A global phase commutes with every operation, so it does not occupy a layer
     tracker.NamedOperation("GlobalPhase", false, {});
-    CHECK(tracker.GetDepth() == 1);
+    CHECK(tracker.GetDepth() == 0);
     CHECK(tracker.GetNumGates("GlobalPhase") == 1);
     CHECK(tracker.GetNumGatesBySize(0) == 1);
 
-    // RX(0); GlobalPhase; RX(1): the global phase is applied after RX(0), and before RX(1)
+    // RX(0); GlobalPhase; RX(1): the RX gates are still applied in parallel
     tracker.NamedOperation("RX", false, {0});
     tracker.NamedOperation("GlobalPhase", false, {});
     tracker.NamedOperation("RX", false, {1});
-    CHECK(tracker.GetDepth() == 4);
+    CHECK(tracker.GetDepth() == 1);
 
-    // Operations after a global phase on different wires are still applied in parallel
-    tracker.NamedOperation("GlobalPhase", false, {});
-    tracker.NamedOperation("PauliX", false, {0});
-    tracker.NamedOperation("PauliX", false, {2});
-    CHECK(tracker.GetDepth() == 6);
-
-    // A controlled global phase only acts on its control wires
-    tracker.NamedOperation("GlobalPhase", false, {}, {1});
-    CHECK(tracker.GetDepth() == 6);
+    // A controlled global phase is a relative phase on its control wires
+    tracker.NamedOperation("GlobalPhase", false, {}, {0});
+    CHECK(tracker.GetDepth() == 2);
     CHECK(tracker.GetNumGates("C(GlobalPhase)") == 1);
     tracker.NamedOperation("PauliX", false, {0});
-    tracker.NamedOperation("PauliX", false, {1});
-    CHECK(tracker.GetDepth() == 7);
-
-    // Released wires are not affected by later global phases
-    tracker.ReleaseQubit(2);
-    tracker.NamedOperation("GlobalPhase", false, {});
-    CHECK(tracker.GetDepth() == 8);
+    tracker.NamedOperation("PauliX", false, {2});
+    CHECK(tracker.GetDepth() == 3);
 }
 
 TEST_CASE("Test Resource Tracker Global Phase Without Depth", "[resourcetracking]") {

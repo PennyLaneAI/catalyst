@@ -80,16 +80,17 @@ def test_global_phase_control(backend, capture_mode):
 @pytest.mark.parametrize(
     "ops, expected_depth",
     [
-        (lambda: qp.GlobalPhase(0.1), 1),
-        (lambda: (qp.RX(0.1, 0), qp.GlobalPhase(0.1), qp.RX(0.1, 1)), 3),
-        (lambda: (qp.GlobalPhase(0.1), qp.X(0), qp.X(1)), 2),
+        (lambda: qp.GlobalPhase(0.1), 0),
+        (lambda: (qp.RX(0.1, 0), qp.GlobalPhase(0.1), qp.RX(0.1, 1)), 1),
+        (lambda: (qp.GlobalPhase(0.1), qp.X(0), qp.X(1)), 1),
+        (lambda: (qp.RX(0.1, 0), qp.ctrl(qp.GlobalPhase(0.1), control=0), qp.RX(0.1, 0)), 3),
         (lambda: (qp.RX(0.1, 0), qp.ctrl(qp.GlobalPhase(0.1), control=1), qp.RX(0.1, 0)), 2),
     ],
 )
 def test_global_phase_tracked_depth(ops, expected_depth, capture_mode, tmp_path):
-    """Test that the circuit depth tracked by null.qubit for global phases matches the depth
-    PennyLane computes for the tape, in which a global phase without control wires acts on all
-    wires."""
+    """Test that a global phase without control wires does not contribute to the circuit depth
+    tracked by null.qubit, as it commutes with every other operation, and that a controlled global
+    phase is counted on its control wires."""
     filename = tmp_path / "resources.json"
     dev = qp.device(
         "null.qubit",
@@ -99,15 +100,13 @@ def test_global_phase_tracked_depth(ops, expected_depth, capture_mode, tmp_path)
         compute_depth=True,
     )
 
+    @qjit(capture=capture_mode)
     @qp.qnode(dev)
     def circuit():
         ops()
         return qp.probs(wires=0)
 
-    tape = qp.workflow.construct_tape(circuit)()
-    assert qp.resource.resources_from_tape(tape, compute_depth=True).depth == expected_depth
-
-    qjit(circuit, capture=capture_mode)()
+    circuit()
     with filename.open("r", encoding="utf-8") as f:
         assert json.load(f)["depth"] == expected_depth
 

@@ -85,25 +85,15 @@ struct ResourceTracker final {
     }
 
     /**
-     * @brief Returns the wires whose depth is tracked, i.e. all allocated wires if depth tracking
-     * is enabled, or no wires otherwise.
-     */
-    auto GetAllocatedWires() const -> std::vector<QubitIdType> {
-        std::vector<QubitIdType> wires;
-        wires.reserve(wire_depths_.size());
-        for (const auto &wire_depth : wire_depths_) {
-            wires.push_back(wire_depth.first);
-        }
-        return wires;
-    }
-
-    /**
      * @brief Internal method to record an operation being applied to the device
      *
      * Updates the gate type and size counts, and if depth tracking is enabled,
-     * updates the depth of the wires involved in the operation. As in PennyLane, an operation
-     * without any wires (e.g. a global phase without control wires) acts on all allocated wires
-     * when computing the depth.
+     * updates the depth of the wires involved in the operation.
+     *
+     * @note An operation without any wires, i.e. a global phase without control wires, does not
+     * contribute to the depth. A global phase commutes with every other operation and has no
+     * physical effect, so it does not occupy a layer. A controlled global phase is a relative
+     * phase on its control wires, and is counted on those wires.
      *
      * @param name The name of the operation
      * @param wires The wires the operation is being applied to
@@ -111,11 +101,7 @@ struct ResourceTracker final {
      */
     void RecordOperation(const std::string &name, const std::vector<QubitIdType> &wires,
                          const std::vector<QubitIdType> &controlled_wires) {
-        if (wires.empty() && controlled_wires.empty()) {
-            UpdateDepth(GetAllocatedWires());
-        } else {
-            UpdateDepth(wires, controlled_wires);
-        }
+        UpdateDepth(wires, controlled_wires);
         std::size_t total_wires = wires.size() + controlled_wires.size();
 
         gate_types_[name]++;
