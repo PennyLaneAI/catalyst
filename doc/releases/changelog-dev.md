@@ -1017,7 +1017,7 @@
   [(#3366)](https://github.com/PennyLaneAI/catalyst/pull/3366)
   [(#3376)](https://github.com/PennyLaneAI/catalyst/pull/3376)
   [(#3412)](https://github.com/PennyLaneAI/catalyst/pull/3412)
-  [(#????)](https://github.com/PennyLaneAI/catalyst/pull/????)
+  [(#3453)](https://github.com/PennyLaneAI/catalyst/pull/3453)
 
 * MLIR passes that recreate `scf.for`, `scf.while`, `scf.if`, and `scf.index_switch` ops
   (`ctrl-lowering`, `adjoint-lowering`, `--convert-to-value-semantics`) now preserve discardable
