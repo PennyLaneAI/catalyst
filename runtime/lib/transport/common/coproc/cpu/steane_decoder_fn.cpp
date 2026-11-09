@@ -33,6 +33,7 @@ using catalyst::transport::coproc::STEANE_SYNDROME_TO_QUBIT;
  * @param in Syndrome measurements, one byte per check, byte `i` holding check
  *           `i` in its low bit (a `memref<?xi1>` lowers to one byte per element).
  * @param in_len Length of the inbound syndrome, in bytes.
+ * @param fn_id Which decoder the message is for (unused, see below).
  * @param out Buffer for the outbound error qubit index.
  * @param out_cap Capacity of the outbound buffer, in bytes.
  * @param ctx Opaque context (unused).
@@ -43,12 +44,11 @@ using catalyst::transport::coproc::STEANE_SYNDROME_TO_QUBIT;
  * the wire does not carry; a decoder therefore has to know its own code's check
  * count.
  */
-// `in` is the request frame; its leading bytes are the syndrome. The frame's
-// decoder_id (a uint32 at byte offset 8) is not read: the [[7,1,3]] Steane code has
-// Hx == Hz, so one table serves both the X and Z checks. A code whose matrices differ
-// would read that field and switch on it here.
-extern "C" std::size_t steane_coprocessor(const void *in, std::size_t in_len, void *out,
-                                          std::size_t out_cap, void * /*ctx*/) {
+// `fn_id` is not read: the [[7,1,3]] Steane code has Hx == Hz, so one table serves
+// both the X and Z checks. A code whose matrices differ would switch on it here.
+extern "C" std::size_t steane_coprocessor(const void *in, std::size_t in_len,
+                                          std::uint32_t /*fn_id*/, void *out, std::size_t out_cap,
+                                          void * /*ctx*/) {
     if (in == nullptr || out == nullptr || in_len < STEANE_CHECKS ||
         out_cap < sizeof(std::int64_t)) {
         return 0;

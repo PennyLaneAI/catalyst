@@ -57,7 +57,7 @@ def instrumentation(session_name, filename=None, detailed=False):
     ...     expensive_function(1, 2)
     [DIAGNOSTICS] Running capture                   walltime: 3.299 ms      cputime: 3.294 ms       programsize: 0 lines
     [DIAGNOSTICS] Running generate_ir               walltime: 4.228 ms      cputime: 4.225 ms       programsize: 14 lines
-    [DIAGNOSTICS] Running compile                   walltime: 57.182 ms     cputime: 12.109 ms      programsize: 121 lines
+    [DIAGNOSTICS] Running compile                   walltime: 57.182 ms     cputime: 12.109 ms
     [DIAGNOSTICS] Running run                       walltime: 1.075 ms      cputime: 1.072 ms
 
     We can also write an instrumentation session to a YAML file:
@@ -84,7 +84,6 @@ def instrumentation(session_name, filename=None, detailed=False):
       - compile:
           walltime: 199.249725
           cputime: 38.820425
-          programsize: 121
       - run:
           walltime: 1.053613
           cputime: 1.019584
@@ -131,7 +130,7 @@ def instrument(fn=None, *, size_from=None, has_finegrained=False):
     [DIAGNOSTICS] Running expensive_function        walltime: 1.908 ms      cputime: 1.904 ms
     [DIAGNOSTICS] Running capture                   walltime: 6.691 ms      cputime: 6.686 ms       programsize: 5 lines
     [DIAGNOSTICS] Running generate_ir               walltime: 5.938 ms      cputime: 5.934 ms       programsize: 18 lines
-    [DIAGNOSTICS] Running compile                   walltime: 41.826 ms     cputime: 13.287 ms      programsize: 128 lines
+    [DIAGNOSTICS] Running compile                   walltime: 41.826 ms     cputime: 13.287 ms
     [DIAGNOSTICS] Running run                       walltime: 0.801 ms      cputime: 0.795 ms
     """
     if fn is None:

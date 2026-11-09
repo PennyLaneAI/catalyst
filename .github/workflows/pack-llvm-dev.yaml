@@ -96,7 +96,6 @@ jobs:
     # the build restored above.
     - name: Package catalyst-llvm-dev (CPack)
       run: |
-        export PATH=$GITHUB_WORKSPACE/llvm-build/bin:$PATH
         make -C $GITHUB_WORKSPACE/mlir pack-llvm-dev \
           LLVM_BUILD_DIR="$GITHUB_WORKSPACE/llvm-build"
         ls -lh $GITHUB_WORKSPACE/mlir/dist
@@ -123,7 +122,7 @@ jobs:
     name: Pack catalyst-llvm-dev (macOS arm64)
     # Must match the runner build-wheel-macos-arm64.yaml builds LLVM on, since
     # runner.os/runner.arch are part of the shared build cache key.
-    runs-on: macos-15
+    runs-on: blacksmith-6vcpu-macos-15
 
     steps:
     - name: Checkout Catalyst repo

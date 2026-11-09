@@ -91,4 +91,4 @@ CATALYST_TRANSPORT_BACKEND_CAPS("hwhs", CATALYST_TRANSPORT_ROLE_BIT_CONTROLLER,
                                 CATALYST_TRANSPORT_MEM_BIT(CpuRam) |
                                     CATALYST_TRANSPORT_MEM_BIT(Ddr) |
                                     CATALYST_TRANSPORT_MEM_BIT(Other),
-                                0, 8, 8, 1)
+                                CATALYST_TRANSPORT_FRAME_BL16, 0, 8, 8, 1)

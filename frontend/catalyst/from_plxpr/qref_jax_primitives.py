@@ -718,7 +718,6 @@ def _pl_adjoint_lowering(
     jax_ctx,
     *plxpr_invals,
     jaxpr,
-    lazy,
     n_consts,
 ):
     new_jaxpr = jaxpr.replace(constvars=(), invars=jaxpr.constvars + jaxpr.invars)
@@ -765,7 +764,12 @@ def _pl_ctrl_lowering(
         TensorExtractOp(i1, value, []).result for value in plxpr_invals[values_start:]
     ]
 
-    op = CtrlOp(ctrl_qubits=control_qubits, ctrl_values=control_values_i1)
+    op = CtrlOp(
+        ctrl_qubits=control_qubits,
+        ctrl_values=control_values_i1,
+        work_qubits=[],
+        work_wire_type=work_wire_type,
+    )
     ctrl_block = op.regions[0].blocks.append()
     with ir.InsertionPoint(ctrl_block):
         source_info_util.extend_name_stack("ctrl")

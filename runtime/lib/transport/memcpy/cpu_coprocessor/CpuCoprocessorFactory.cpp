@@ -29,4 +29,5 @@ catalyst::transport::CoprocessorSession *make_local_cpu_coprocessor(const std::s
 GENERATE_TRANSPORT_COPROCESSOR_FACTORY(CatalystTransportCoprocessor, make_local_cpu_coprocessor)
 CATALYST_TRANSPORT_BACKEND_CAPS("memcpy", CATALYST_TRANSPORT_ROLE_BIT_COPROCESSOR,
                                 CATALYST_TRANSPORT_MEM_BIT(CpuRam),
+                                CATALYST_TRANSPORT_FRAME_BL16 | CATALYST_TRANSPORT_FRAME_BLV,
                                 CATALYST_TRANSPORT_CONV_BIT(PerMessage), UINT32_MAX, UINT32_MAX, 1)

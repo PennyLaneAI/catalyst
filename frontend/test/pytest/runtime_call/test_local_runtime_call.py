@@ -45,6 +45,12 @@ def native(tmp_path_factory):
     return str(library)
 
 
+@pytest.fixture(autouse=True)
+def fresh_declarations(monkeypatch):
+    """Clear declarations at the start of each test, as reruns can rebuild ``native`` elsewhere."""
+    monkeypatch.setattr("pennylane.backline.runtime.signature._REGISTRY", {})
+
+
 @pytest.mark.parametrize(
     "symbol, spec, args, expected",
     [

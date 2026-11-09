@@ -83,6 +83,12 @@ llvm:
 	@if cd llvm-project; git apply --check $(MK_DIR)/patches/llvm-python-bindinggen-annotations.patch; then \
 		git apply $(MK_DIR)/patches/llvm-python-bindinggen-annotations.patch; \
 	fi
+	# Patch scf canonicalization patterns to preserve discardable attributes
+	# (e.g. catalyst.estimated_iterations) on rebuilt scf.if/scf.while ops
+	# https://github.com/PennyLaneAI/catalyst/issues/3361
+	@if cd llvm-project; git apply --check $(MK_DIR)/patches/llvm-scf-canonicalize-preserve-discardable-attrs.patch; then \
+		git apply $(MK_DIR)/patches/llvm-scf-canonicalize-preserve-discardable-attrs.patch; \
+	fi
 
 	cmake -G Ninja -S llvm-project/llvm -B $(LLVM_BUILD_DIR) \
 		-DCMAKE_BUILD_TYPE=$(BUILD_TYPE) \
@@ -242,15 +248,6 @@ pack-catalyst-dev: dialects
 	mkdir -p $(DIST_DIR)
 	mv $(DIALECTS_BUILD_DIR)/catalyst-dev*.tar.gz $(DIST_DIR)
 
-# Get the LLVM version as, e.g. 22.0.0git-8f264586.
-# Lazy assignment (=, not :=) on purpose: we want them to be evaluated only when referenced, i.e.
-# from pack-llvm-dev where we have already confirmed that an LLVM build tree exists. With := they
-# would run on every make invocation, including on a clean tree where llvm-config does not exist
-# yet.
-LLVM_VERSION = $(shell $(LLVM_BUILD_DIR)/bin/llvm-config --version 2>/dev/null)
-LLVM_COMMIT = $(shell grep '^llvm=' $(MK_DIR)/../.dep-versions | awk -F '=' '{ print $$2 }' | cut -c1-8)
-LLVM_VERSION_FULL = $(LLVM_VERSION)-$(LLVM_COMMIT)
-
 # Package an already-built LLVM/MLIR tree as catalyst-llvm-dev.
 # Deliberately *not* dependent on the llvm target: that would force a rebuild and a full check-mlir
 # run even when LLVM_BUILD_DIR already holds a complete build, as it does in CI where the build is
@@ -259,7 +256,7 @@ LLVM_VERSION_FULL = $(LLVM_VERSION)-$(LLVM_COMMIT)
 pack-llvm-dev:
 
 	@echo "build the catalyst-llvm-dev package"
-	@if [ ! -f "$(LLVM_BUILD_DIR)/CMakeCache.txt" ] || [ ! -x "$(LLVM_BUILD_DIR)/bin/llvm-config" ]; then \
+	@if [ ! -f "$(LLVM_BUILD_DIR)/CMakeCache.txt" ]; then \
 		echo "error: no LLVM build found in $(LLVM_BUILD_DIR)." >&2; \
 		echo "       Run 'make llvm' first, or set LLVM_BUILD_DIR to an existing build tree." >&2; \
 		exit 1; \
@@ -291,8 +288,32 @@ pack-llvm-dev:
 	rm -rf $(LLVM_INSTALL_STAGING_DIR)
 	cmake --build $(LLVM_BUILD_DIR) --target install-distribution
 	cp $(LLVM_SRC_DIR)/LICENSE.TXT $(LLVM_INSTALL_STAGING_DIR)/
+	# Assemble the package version, e.g. 22.0.0git-8f264586, out of what the staged llvm-config
+	# reports and the commit pinned in .dep-versions. Done in the shell, as part of the cpack call,
+	# rather than in make variables: llvm-config is staged by install-distribution above, and make
+	# expands a whole recipe before executing its first line, so a $$(shell ...) variable would read
+	# the staging directory as it was before the rm -rf -- empty on a first run, stale afterwards.
+	@llvm_config="$(LLVM_INSTALL_STAGING_DIR)/bin/llvm-config"; \
+	if [ ! -x "$$llvm_config" ]; then \
+		echo "error: install-distribution staged no $$llvm_config," >&2; \
+		echo "       but the package is named after the LLVM version it reports." >&2; \
+		echo "       Keep llvm-config in LLVM_DISTRIBUTION_COMPONENTS." >&2; \
+		exit 1; \
+	fi; \
+	llvm_version=$$("$$llvm_config" --version); \
+	if [ -z "$$llvm_version" ]; then \
+		echo "error: $$llvm_config reported no version." >&2; \
+		exit 1; \
+	fi; \
+	llvm_commit=$$(grep '^llvm=' $(MK_DIR)/../.dep-versions | awk -F '=' '{ print $$2 }' | cut -c1-8); \
+	if [ -z "$$llvm_commit" ]; then \
+		echo "error: no 'llvm=<commit>' line in $(MK_DIR)/../.dep-versions," >&2; \
+		echo "       which is where the commit the package is named after comes from." >&2; \
+		exit 1; \
+	fi; \
+	echo "packaging LLVM $$llvm_version-$$llvm_commit"; \
 	CATALYST_LLVM_STAGING_DIR=$(LLVM_INSTALL_STAGING_DIR) \
-	CATALYST_LLVM_VERSION=$(LLVM_VERSION_FULL) \
+	CATALYST_LLVM_VERSION="$$llvm_version-$$llvm_commit" \
 		cpack --config $(MK_DIR)/cmake/LLVMDevCPackConfig.cmake -B $(DIST_DIR)
 	rm -rf $(DIST_DIR)/_CPack_Packages
 

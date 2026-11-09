@@ -41,9 +41,6 @@ inline constexpr llvm::StringRef decomp_gateset_attr_name = "decomp_gateset";
 /// The target gate a decomposition rule decomposes, or an empty ref if @p func is not a rule.
 llvm::StringRef getTargetGateName(mlir::func::FuncOp func);
 
-/// The `num_wires` attribute of @p func, or 0 if absent.
-uint64_t getNumWires(mlir::func::FuncOp func);
-
 /// True if @p op is nested inside a decomposition rule function.
 bool isInDecompRule(mlir::Operation *op);
 
