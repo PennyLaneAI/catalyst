@@ -42,6 +42,8 @@ func.func @basic_gates() {
     return
 }
 
+// -----
+
 // Operator2 gates
 
 // CHECK-LABEL: "operator2_gates"
@@ -832,25 +834,25 @@ func.func @static_for_with_call_in_loop(%arg0: !quantum.bit) -> !quantum.bit {
 // -----
 
 // CHECK-LABEL: "dyn_for_loop_1": {
-// CHECK: "quantum_operations"
-// CHECK:   "PauliZ": 1
-
-// CHECK-LABEL: "dyn_for_loop_2": {
 // CHECK: "function_calls"
 // CHECK:   "static":
 // CHECK:       "nested_inner_loop_helper": 1
 // CHECK: "quantum_operations": {}
 
+// CHECK-LABEL: "dyn_for_loop_2": {
+// CHECK: "quantum_operations"
+// CHECK:   "PauliZ": 1
+
 // CHECK-LABEL: "nested_inner_loop_helper": {
 // CHECK: "function_calls"
 // CHECK:   "dynamic":
-// CHECK:       "dyn_for_loop_1": "{{0x[0-9a-f]+}}"
+// CHECK:       "dyn_for_loop_2": "{{0x[0-9a-f]+}}"
 // CHECK: "quantum_operations": {}
 
 // CHECK-LABEL: "outer_dyn_loop_calls_nested_helper": {
 // CHECK: "function_calls"
 // CHECK:   "dynamic":
-// CHECK:       "dyn_for_loop_2": "{{0x[0-9a-f]+}}"
+// CHECK:       "dyn_for_loop_1": "{{0x[0-9a-f]+}}"
 // CHECK: "quantum_operations": {}
 func.func private @nested_inner_loop_helper(%arg0: !quantum.bit, %c4 : index) -> !quantum.bit {
     %c0 = arith.constant 0 : index
@@ -2230,10 +2232,33 @@ func.func private @my_helper(%arg0: !quantum.bit) -> !quantum.bit {
 // Recursive calls are skipped when flattening resources, so the pass should
 // warn that resource counts may be incomplete.
 
+// expected-warning@+1 {{ResourceAnalysis encountered recursive call to 'recursive'. Recursive calls are not flattened, so resource counts may be incomplete.}}
 func.func @recursive(%arg0: !quantum.bit) -> !quantum.bit {
-    // expected-warning@below {{ResourceAnalysis encountered recursive call to 'recursive'. Recursive calls are not flattened, so resource counts may be incomplete.}}
     %out = func.call @recursive(%arg0) : (!quantum.bit) -> !quantum.bit
     return %out : !quantum.bit
+}
+
+// -----
+
+// A controlled self-call must warn and complete without creating an unbounded
+// sequence of modifier contexts.
+
+// CHECK-NOT: C_recursive_controlled
+// CHECK-LABEL: "recursive_controlled": {
+// CHECK: "function_calls"
+// CHECK:   "static":
+// CHECK:     "recursive_controlled": 1
+// CHECK: "quantum_operations": {}
+
+// expected-warning@+1 {{ResourceAnalysis encountered recursive call to 'recursive_controlled'. Recursive calls are not flattened, so resource counts may be incomplete.}}
+func.func @recursive_controlled(%q: !quantum.bit, %c: !quantum.bit) -> (!quantum.bit, !quantum.bit) {
+    %true = arith.constant true
+    %oc, %oq = quantum.ctrl(%c) ctrlvals(%true) (%q) : !quantum.bit -> !quantum.bit {
+    ^bb0(%a: !quantum.bit):
+        %r:2 = func.call @recursive_controlled(%a, %c) : (!quantum.bit, !quantum.bit) -> (!quantum.bit, !quantum.bit)
+        quantum.yield %r#0 : !quantum.bit
+    }
+    return %oq, %oc : !quantum.bit, !quantum.bit
 }
 
 // -----

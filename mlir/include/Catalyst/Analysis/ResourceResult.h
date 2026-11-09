@@ -14,11 +14,14 @@
 
 #pragma once
 
+#include <map>
 #include <optional>
+#include <string>
 #include <utility>
 
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/StringMap.h"
+#include "llvm/ADT/StringSet.h"
 #include "llvm/Support/JSON.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/MLIRContext.h"
@@ -42,13 +45,26 @@ struct ResourceResult {
     // name -> ((numWires, numParams) -> count)
     llvm::StringMap<llvm::DenseMap<std::pair<int, int>, double>> operations;
 
+    // Per-GOID resource counts
     llvm::StringMap<double> detailedOperations;
+
+    // Set of GOIDs observed under this result when `collectDetailedOperations` is
+    // enabled. Accounts for dynamic-trip loops.
+    llvm::StringSet<> observedGraphOpIds;
+
+    // Modifier region contexts under which this (real) function should be
+    // analyzed when `collectDetailedOperations` is enabled, mapped to the
+    // deterministic modifier-context func name (`foo`, `A_foo`, `2C_A_foo`, …).
+    std::map<std::pair<bool, unsigned>, std::string> modifierContexts;
 
     llvm::StringMap<double> measurements;
 
     llvm::StringMap<double> classicalInstructions;
 
     llvm::StringMap<double> functionCalls;
+
+    // Recursive calls are counted, but their callee resources must not be expanded.
+    llvm::StringSet<> unexpandedFunctionCalls;
 
     // `dyn_for_loop_<N>` / `dyn_while_loop_<N>` -> stable hash id for that loop op (not a trip
     // count). Ignored by `multiplyBy`; `mergeWith` mints a fresh id on key conflicts.

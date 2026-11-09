@@ -63,6 +63,9 @@ class ResourceAnalysis {
     // per-function resource counts
     llvm::StringMap<ResourceResult> funcResults;
 
+    // Functions in the same recursive call-graph component share a group ID.
+    llvm::StringMap<unsigned> recursiveFunctionGroups;
+
     // Flattened totals per function; filled on first `getFlattenedResource` call.
     mutable llvm::StringMap<ResourceResult> flattenedCache;
 
@@ -79,6 +82,11 @@ class ResourceAnalysis {
     // Shared analysis manager.
     mlir::ModuleAnalysisManager analysisManager;
 
+    // Counters for modifier context names
+    // TODO: the counter will ensure uniqueness, but may not be sequential for a specific function,
+    // if multiple modifier functions have name conflicts with module functions. Fix if possible.
+    int64_t modifierContextCounter = 0;
+
     // Collect the extension analyses logic
     llvm::SmallVector<std::unique_ptr<ResourceAnalysisExtension>> extensionAnalyses;
 
@@ -87,6 +95,11 @@ class ResourceAnalysis {
 
     // `prefix` + counter; advance counter until the name is free in `funcResults`
     std::string makeUniqueSyntheticName(llvm::StringRef prefix, int64_t &counter);
+
+    // Deterministic name for analyzing `funcName` under a modifier context:
+    // `foo`, `A_foo`, `2C_foo`, `2C_A_foo`.
+    std::string modifierContextFuncName(llvm::StringRef funcName, bool isAdjoint,
+                                        unsigned numControlQubits);
 
     // analyze a region and accumulate results
     void analyzeRegion(Region &region, ResourceResult &result, bool isAdjoint,
@@ -109,8 +122,9 @@ class ResourceAnalysis {
 
     // categorize and count a single operation
     void collectOperation(Operation *op, ResourceResult &result, bool isAdjoint,
-                          unsigned numControlQubits) const;
-    void collectDetailedOperation(Operation *op, ResourceResult &result, bool isAdjoint) const;
+                          unsigned numControlQubits);
+    void collectDetailedOperation(Operation *op, ResourceResult &result, bool isAdjoint,
+                                  unsigned numControlQubits) const;
 };
 
 } // namespace catalyst
