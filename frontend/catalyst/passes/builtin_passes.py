@@ -21,6 +21,7 @@ from pathlib import Path
 from typing import Iterable
 
 import pennylane as qp
+from pennylane.decomposition import DecompositionRule
 from pennylane.decomposition.utils import to_name
 
 from catalyst.compiler import _options_to_cli_flags, _quantum_opt
@@ -1772,10 +1773,9 @@ decompose_arbitrary_ppr = qp.transform(
 
 def graph_decomposition_setup_inputs(
     gate_set: Iterable[type | str] | dict[type | str, float],
-    fixed_decomps: dict | None = None,
-    alt_decomps: dict | None = None,
-    bytecode_rules: str | None = None,
-    _builtin_rule_path: str = BYTECODE_FILE_PATH,
+    fixed_decomps: dict[str, DecompositionRule | str] | None = None,
+    exclude_decomps: dict[str, list[str] | tuple[str, ...]] | None = None,
+    bytecode_rules: str = BYTECODE_FILE_PATH,
     libQPD_path: Path | None = None,
     libpython_path: Path | None = None,
     verbose: bool = False,
@@ -1811,7 +1811,12 @@ def graph_decomposition_setup_inputs(
         fixed_decomps (dict | None): map operators to specific decomposition rules that will be applied if the
                                      operators need to be decomposed (i.e. when they're not
                                      in the target gate set).
-       alt_decomps (dict | None): map operators to lists of decomposition rules that the graph system will consider as alternative rules for operators.
+        exclude_decomps (dict | None): map operators to lists of decomposition rules to exclude
+            from this pass's graph. Rules may be given as names or callables. Excluded rules are
+            still lowered by the frontend and remain available to subsequent passes. Exclusions
+            also apply to rules selected by ``fixed_decomps``.
+        bytecode_rules (str): path to the bytecode file containing decomposition rules.
+            Defaults to the built-in decomposition rules.
         verbose (bool): if ``True``, the pass prints the decomposition rule the solver chose for
             each operator, along with its cost and the resulting gate counts, to stderr. ``False`` by default.
 
@@ -1851,8 +1856,7 @@ def graph_decomposition_setup_inputs(
         @merge_rotations
         @graph_decomposition(
             gate_set={qp.RX, qp.RY},
-            fixed_decomps={qp.PauliX: x_to_rx, qp.PauliY: y_to_ry},
-            alt_decomps={qp.H: [h_to_rx_ry]},
+            fixed_decomps={qp.PauliX: x_to_rx, qp.PauliY: y_to_ry, qp.H: h_to_rx_ry},
         )
         @cancel_inverses
         @qp.qnode(qp.device("lightning.qubit", wires=2))
@@ -1880,9 +1884,9 @@ def graph_decomposition_setup_inputs(
     else:
         gate_set = {to_name(op): float(cost) for op, cost in gate_set.items()}
 
-    options: dict[str, dict | tuple | str] = {
+    options: dict[str, object] = {
         "gate_set": gate_set,
-        "bytecode_rules": _builtin_rule_path,
+        "bytecode_rules": bytecode_rules,
         "libQPD_path": str(
             libQPD_path if libQPD_path else get_lib_path("catalyst", "CATALYST_LIB_DIR")
         ),
@@ -1890,26 +1894,35 @@ def graph_decomposition_setup_inputs(
     }
 
     def rule_ref_name(rule):
-        # A rule reference may be a name string, a plain decomposition function, or a PennyLane
-        # ``DecompositionRule`` (returned by ``@register_resources``, which has no ``__name__``).
+        # A rule reference may be a name string, or a PennyLane ``DecompositionRule``
+        # (returned by ``@register_resources``, which has no ``__name__``).
         if isinstance(rule, str):
             return rule
-        if isinstance(rule, qp.decomposition.DecompositionRule):
+        if isinstance(rule, DecompositionRule):
             return rule.name
         return rule.__name__
 
-    if fixed_decomps:
+    if fixed_decomps is not None:
+        for op, rule in fixed_decomps.items():
+            assert isinstance(
+                rule, (str, DecompositionRule)
+            ), f"Fixed decomposition rules must be names (strings) or DecompositionRules, got {type(rule)}"
+
+            if rule_ref_name(rule) not in qp.list_decomps(op):
+                raise ValueError(f"Rule {rule_ref_name(rule)} not found for operator {op}")
+
         options |= {
             "fixed_decomps": {
                 to_name(op): rule_ref_name(rule) for op, rule in fixed_decomps.items()
             }
         }
 
-    if alt_decomps:
+    if exclude_decomps is not None:
+        assert all(isinstance(val, (list, tuple)) for val in exclude_decomps.values())
         options |= {
-            "alt_decomps": {
+            "exclude_decomps": {
                 to_name(op): tuple(rule_ref_name(rule) for rule in rules)
-                for op, rules in alt_decomps.items()
+                for op, rules in exclude_decomps.items()
             }
         }
 

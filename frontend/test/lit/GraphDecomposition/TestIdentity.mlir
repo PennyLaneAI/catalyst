@@ -14,7 +14,7 @@
 
 // Test that decomposition handles circuits that are already decomposed to the given gateset.
 
-// RUN: catalyst --tool=opt --split-input-file --pass-pipeline='builtin.module(graph-decomposition{gate-set=testHadamard=1.0,testCNOT=1.0 alt-decomps=testHadamard=false_decomp bytecode-rules="%BYTECODE_PATH"})' %s | FileCheck %s
+// RUN: catalyst --tool=opt --split-input-file --pass-pipeline='builtin.module(graph-decomposition{gate-set=testHadamard=1.0,testCNOT=1.0})' %s | FileCheck %s
 
 func.func @circuit() {
     %0 = quantum.alloc(2) : !quantum.reg

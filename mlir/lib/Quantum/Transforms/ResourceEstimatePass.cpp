@@ -71,7 +71,7 @@ struct ResourceEstimatePass : public impl::ResourceEstimatePassBase<ResourceEsti
                                     {
                                         .targetGateSetOption = targetGateSetOption,
                                         .fixedDecompsOption = fixedDecompsOption,
-                                        .altDecompsOption = altDecompsOption,
+                                        .excludeDecompsOption = excludeDecompsOption,
                                         .bytecodeRulesFile = bytecodeRulesFile,
                                         .libQPDPath = libQPDPath,
                                         .libpythonPath = libpythonPath,
