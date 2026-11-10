@@ -40,7 +40,7 @@ class QueuePair {
   public:
     QueuePair(std::shared_ptr<ProtectionDomain> pd, std::shared_ptr<CompletionQueue> send_cq,
               std::shared_ptr<CompletionQueue> recv_cq, int max_send_wr, int max_inline = 0,
-              QpType type = QpType::RC, int max_recv_wr = 4);
+              QpType type = QpType::RC);
     ~QueuePair();
     QueuePair(const QueuePair &) = delete;
     QueuePair &operator=(const QueuePair &) = delete;

@@ -29,10 +29,6 @@ std::unique_ptr<PeerLink> make_coprocessor_link(const std::string &config, const
         return std::make_unique<RcLink>(cfg.dev, cfg.gid, backend, RcLink::Side::Coprocessor,
                                         frame::geometry_from_config(config), fwd_shape);
     case Peer::HSB:
-        TP_CHECK(!hsb::imm_from_config(config),
-                 "%s (peer=hsb): imm=1 is not supported; this coprocessor posts no receives, so "
-                 "HSB must send plain WRITEs (imm=0, a bitstream with backline-hsb's patches/0001)",
-                 backend);
         return std::make_unique<HsbLink>(cfg.dev, cfg.gid, hsb::ring_from_config(config));
     }
     TP_FAIL("%s: unknown peer", backend);

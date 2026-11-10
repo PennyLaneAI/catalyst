@@ -16,7 +16,7 @@
  * @file
  * A coprocessor's end of the HSB protocol (HsbWire.hpp), `peer=hsb`: one UC QP, HSB's out-of-band
  * handshake, and the reply as an inline SEND to FPGA_RX_QPN. HSB writes each request into a ring of
- * BL16 frames at IOVA 0 as a plain RDMA WRITE (`imm=0`), so nothing is ever received.
+ * BL16 frames at IOVA 0 as a plain RDMA WRITE, so nothing is ever received.
  */
 
 #pragma once

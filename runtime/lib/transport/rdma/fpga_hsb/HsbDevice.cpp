@@ -331,8 +331,7 @@ void HsbDevice::hsb_configure(const DataPlane &dp) {
                                             (std::uint32_t{dp.host_mac[4]} << 8) | dp.host_mac[5]);
     ecb_write(vp + HSB_DP_HOST_MAC_HIGH, (std::uint32_t{dp.host_mac[0]} << 8) | dp.host_mac[1]);
     ecb_write(vp + HSB_DP_HOST_IP, dp.host_ip);
-    ecb_write(vp + HSB_DP_HOST_UDP_PORT,
-              HSB_ROCE_UDP_PORT | HSB_MD_DISABLE | (dp.imm ? 0u : HSB_IMM_DISABLE));
+    ecb_write(vp + HSB_DP_HOST_UDP_PORT, HSB_ROCE_UDP_PORT | HSB_MD_DISABLE | HSB_IMM_DISABLE);
     ecb_write(vp + HSB_DP_VLAN, 0);
     ecb_write(vp + HSB_DP_QP, dp.qpn & 0xFFFFFF);
     ecb_write(vp + HSB_DP_RKEY, dp.rkey);

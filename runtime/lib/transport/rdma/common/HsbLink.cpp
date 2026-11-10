@@ -29,8 +29,7 @@ void HsbLink::connect(const ConnectInfo &info) {
     pd_ = std::make_shared<ProtectionDomain>(ctx_);
     cq_ = std::make_shared<CompletionQueue>(ctx_, 2 * MAX_SEND);
     // Nothing is ever received: requests are plain WRITEs into the ring.
-    qp_ = std::make_shared<QueuePair>(pd_, cq_, cq_, MAX_SEND, /*max_inline=*/64, QpType::UC,
-                                      /*max_recv_wr=*/1);
+    qp_ = std::make_shared<QueuePair>(pd_, cq_, cq_, MAX_SEND, /*max_inline=*/64, QpType::UC);
     qp_->to_init(port_);
     active_mtu_ = static_cast<std::uint32_t>(ctx_->port_attr(port_).active_mtu);
     // HSB speaks RoCE v2 over IPv4 and is told the GID's address and netdev MAC to send to.

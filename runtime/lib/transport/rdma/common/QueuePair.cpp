@@ -31,12 +31,13 @@ constexpr std::uint8_t QP_TIMEOUT = 14;    // ACK timeout code
 constexpr std::uint8_t RETRY_CNT = 7;      // transport retry count
 constexpr std::uint8_t RNR_RETRY = 7;      // RNR retry count (7 = infinite)
 constexpr std::uint8_t MAX_RD_ATOMIC = 1;  // outstanding RDMA read/atomic ops
-constexpr std::uint32_t MAX_SGE = 1;       // single-SGE descriptors on both queues
+constexpr std::uint32_t MAX_RECV_WR = 4;
+constexpr std::uint32_t MAX_SGE = 1; // single-SGE descriptors on both queues
 } // namespace
 
 QueuePair::QueuePair(std::shared_ptr<ProtectionDomain> pd, std::shared_ptr<CompletionQueue> send_cq,
                      std::shared_ptr<CompletionQueue> recv_cq, int max_send_wr, int max_inline,
-                     QpType type, int max_recv_wr)
+                     QpType type)
     : pd_(std::move(pd)), send_cq_(std::move(send_cq)), recv_cq_(std::move(recv_cq)), type_(type) {
     ibv_qp_init_attr a{
         .send_cq = send_cq_->get(),
@@ -44,7 +45,7 @@ QueuePair::QueuePair(std::shared_ptr<ProtectionDomain> pd, std::shared_ptr<Compl
         .cap =
             {
                 .max_send_wr = static_cast<std::uint32_t>(max_send_wr),
-                .max_recv_wr = static_cast<std::uint32_t>(max_recv_wr),
+                .max_recv_wr = MAX_RECV_WR,
                 .max_send_sge = MAX_SGE,
                 .max_recv_sge = MAX_SGE,
                 .max_inline_data = static_cast<std::uint32_t>(max_inline),
