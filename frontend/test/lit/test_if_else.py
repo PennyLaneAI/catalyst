@@ -75,24 +75,29 @@ def circuit_single_gate(n: int):
     # CHECK-DAG: [[eight:%.+]] = stablehlo.constant dense<8> : tensor<i64>
     # CHECK-DAG: [[nine:%.+]] = stablehlo.constant dense<9> : tensor<i64>
     # CHECK: [[qreg:%.+]] = qref.alloc( 1)
-    # CHECK: stablehlo.compare LE, %arg0, [[five]], SIGNED
-    # CHECK: scf.if
+    # CHECK: [[condition_five:%.+]] = stablehlo.compare LE, %arg0, [[five]], SIGNED
+    # CHECK: [[flag_five:%.+]] = tensor.extract [[condition_five]][] : tensor<i1>
+    # CHECK: scf.if [[flag_five]] {
     # CHECK: qref.custom "PauliX"
     # CHECK: } else {
     # CHECK: qref.custom "Hadamard"
-    # CHECK: stablehlo.compare LE, %arg0, [[six]], SIGNED
-    # CHECK: scf.if
+    # CHECK: [[condition_six:%.+]] = stablehlo.compare LE, %arg0, [[six]], SIGNED
+    # CHECK: [[flag_six:%.+]] = tensor.extract [[condition_six]][] : tensor<i1>
+    # CHECK: scf.if [[flag_six]] {
     # CHECK: qref.custom "RX"
-    # CHECK: stablehlo.compare LE, %arg0, [[seven]], SIGNED
-    # CHECK: stablehlo.compare LE, %arg0, [[eight]], SIGNED
-    # CHECK: stablehlo.compare LE, %arg0, [[nine]], SIGNED
-    # CHECK: scf.if
+    # CHECK: [[condition_seven:%.+]] = stablehlo.compare LE, %arg0, [[seven]], SIGNED
+    # CHECK: [[condition_eight:%.+]] = stablehlo.compare LE, %arg0, [[eight]], SIGNED
+    # CHECK: [[condition_nine:%.+]] = stablehlo.compare LE, %arg0, [[nine]], SIGNED
+    # CHECK: [[flag_seven:%.+]] = tensor.extract [[condition_seven]][] : tensor<i1>
+    # CHECK: scf.if [[flag_seven]] {
     # CHECK: qref.custom "Hadamard"
     # CHECK: } else {
-    # CHECK: scf.if
+    # CHECK: [[flag_eight:%.+]] = tensor.extract [[condition_eight]][] : tensor<i1>
+    # CHECK: scf.if [[flag_eight]] {
     # CHECK: qref.custom "PauliY"
     # CHECK: } else {
-    # CHECK: scf.if
+    # CHECK: [[flag_nine:%.+]] = tensor.extract [[condition_nine]][] : tensor<i1>
+    # CHECK: scf.if [[flag_nine]] {
     # CHECK: qref.custom "PauliZ"
     # CHECK: } else {
     # CHECK: qref.custom "PauliX"
@@ -185,7 +190,10 @@ print(test_no_convert_element_type.jaxpr)
 # CHECK-LABEL: public @jit_cond_estimated_probability
 @qjit(target="mlir")
 def cond_estimated_probability(n: int):
-    # CHECK:       scf.if
+    # CHECK: [[five:%.+]] = stablehlo.constant dense<5> : tensor<i64>
+    # CHECK: [[condition:%.+]] = stablehlo.compare LE, %arg0, [[five]], SIGNED
+    # CHECK: [[flag:%.+]] = tensor.extract [[condition]][] : tensor<i1>
+    # CHECK: scf.if [[flag]] -> (tensor<i64>) {
     # CHECK:       catalyst.estimated_probability = 5.000000e-01
     @qp.cond(n <= 5)
     @qp.hint({"branch-prob": 0.5})
@@ -211,6 +219,15 @@ print(cond_estimated_probability.mlir)
 # CHECK-LABEL: public @jit_cond_estimated_probability_chain
 @qjit(target="mlir")
 def cond_estimated_probability_chain(n: int):
+    # CHECK-DAG: [[five:%.+]] = stablehlo.constant dense<5> : tensor<i64>
+    # CHECK-DAG: [[eight:%.+]] = stablehlo.constant dense<8> : tensor<i64>
+    # CHECK: [[condition_five:%.+]] = stablehlo.compare LE, %arg0, [[five]], SIGNED
+    # CHECK: [[condition_eight:%.+]] = stablehlo.compare LE, %arg0, [[eight]], SIGNED
+    # CHECK: [[flag_five:%.+]] = tensor.extract [[condition_five]][] : tensor<i1>
+    # CHECK: scf.if [[flag_five]] -> (tensor<i64>) {
+    # CHECK: } else {
+    # CHECK: [[flag_eight:%.+]] = tensor.extract [[condition_eight]][] : tensor<i1>
+    # CHECK: scf.if [[flag_eight]] -> (tensor<i64>) {
     # CHECK-DAG:   catalyst.estimated_probability = 5.000000e-01
     # CHECK-DAG:   catalyst.estimated_probability = 2.500000e-01
     @qp.cond(n <= 5)
