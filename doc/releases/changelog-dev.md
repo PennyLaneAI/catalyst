@@ -5,7 +5,7 @@
 * Mid-circuit feed-forward can now be handed to the device as data, with
   `mcm_method="device"` under `qjit(capture=True)`, on a device that lists `"device"` among its
   qjit `supported_mcm_methods`. The program runs once for all shots.
-  [(#XXXX)](https://github.com/PennyLaneAI/catalyst/pull/XXXX)
+  [(#3464)](https://github.com/PennyLaneAI/catalyst/pull/3464)
 
   - The new `delegate-feedforward` pass makes measurements return `!quantum.res` result handles,
     turns conditions on them into `quantum.predicated` regions and `quantum.result.*` ops, and
@@ -14,7 +14,7 @@
   - `null.qubit` provides it.
 
 * PBC decompositions can record the rotation each gadget implements, and the compiler can check it.
-  [(#XXXX)](https://github.com/PennyLaneAI/catalyst/pull/XXXX)
+  [(#3464)](https://github.com/PennyLaneAI/catalyst/pull/3464)
 
   - `ppr_to_ppm` and `ppm_compilation` take `emit_gadgets=True`, which wraps each decomposed
     rotation in a `pbc.gadget` region.
@@ -28,7 +28,7 @@
   `<Name>DeviceAbiVersion`, and a device can provide optional, append-only C function tables
   through the new `QuantumDevice::QueryInterface` (`DeviceExtensions.h`). Existing devices keep
   working unchanged.
-  [(#XXXX)](https://github.com/PennyLaneAI/catalyst/pull/XXXX)
+  [(#3464)](https://github.com/PennyLaneAI/catalyst/pull/3464)
 
 * A new coprocessor function called `catalyst_onnx_coprocessor` has been added, which runs an
   ONNX model on the CPU or a GPU through onnxruntime, and is built with the transport runtime.
@@ -995,7 +995,7 @@
 * The postselection of a Pauli product measurement is no longer dropped. Under capture,
   `qp.pauli_measure(postselect=...)` keeps it, as do `to-ppr` (from `quantum.measure`) and
   `merge-ppr-ppm`, and `pbc.ppm` carries it to the device.
-  [(#XXXX)](https://github.com/PennyLaneAI/catalyst/pull/XXXX)
+  [(#3464)](https://github.com/PennyLaneAI/catalyst/pull/3464)
 
 * Runtime functions that take a boolean argument are now declared with `zeroext` on it. Before, a
   computed `i1`, such as a negated measurement result in the condition of a conditional Pauli
