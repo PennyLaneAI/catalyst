@@ -186,6 +186,13 @@ class ControllerSession : public TransportSession {
 
     // Current round's reply slot in the transport-owned reply ring.
     virtual void *reply_slot() { return nullptr; }
+
+    // Whether the backend issues its own rounds (a hardware pacer) instead of one per kick().
+    virtual bool self_paced() const { return false; }
+
+    // Self-paced backends only: start the backend's rounds and wait until it has run them all.
+    // Returns 0 once the run completes; the backend keeps its own record of the rounds.
+    virtual int run_paced() { throw std::logic_error("this backend does not pace its own rounds"); }
 };
 
 /**
