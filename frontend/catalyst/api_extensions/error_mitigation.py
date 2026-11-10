@@ -97,7 +97,7 @@ def mitigate_with_zne(
         extrapolate (Callable): A qjit-compatible function taking two sequences as arguments (scale
             factors, and results), and returning a float by performing a fitting procedure.
             By default, perfect polynomial fitting :func:`~.polynomial_extrapolate` will be used,
-            the :func:`~.exponential_extrapolate` function from PennyLane may also be used.
+            the :func:`~.exponential_extrapolate` function may also be used.
         extrapolate_kwargs (dict[str, Any]): Keyword arguments to be passed to the extrapolation
             function.
         folding (str): Unitary folding technique to be used to scale the circuit. Possible values:
@@ -154,11 +154,11 @@ def mitigate_with_zne(
     :class:`~.QNode` individually.
 
     Exponential extrapolation can also be performed via the
-    :func:`~.exponential_extrapolate` function from PennyLane:
+    :func:`~.exponential_extrapolate` function:
 
     .. code-block:: python
 
-        from pennylane.noise import exponential_extrapolate
+        from catalyst import exponential_extrapolate
 
         dev = qp.device("lightning.qubit", wires=2)
 
@@ -276,7 +276,97 @@ class ZNECallable(CatalystCallable):
 
 def polynomial_extrapolation(degree):
     """utility to generate polynomial fitting functions of arbitrary degree"""
-    return functools.partial(qp.noise.poly_extrapolate, order=degree)
+    return functools.partial(polynomial_extrapolate, order=degree)
+
+
+def _polyfit(x, y, order):
+    """Brute force implementation of a polynomial fit, compatible with all interfaces
+    supported by PennyLane."""
+    x = qp.math.convert_like(x, y[0])
+    x = qp.math.cast_like(x, y[0])
+    X = qp.math.vander(x, order + 1)
+    y = qp.math.stack(y)
+
+    # scale X to improve condition number and solve
+    scale = qp.math.sum(qp.math.sqrt(X * X), axis=0)
+    X = X / scale
+
+    # Compute coeffs:
+    # This part is typically done using a lstq solver, do it with the penrose inverse by hand:
+    # i.e. coeffs = (X.T @ X)**-1 X.T @ y see https://en.wikipedia.org/wiki/Polynomial_regression
+    c = qp.math.linalg.pinv(qp.math.transpose(X) @ X)
+    c = c @ qp.math.transpose(X)
+    c = qp.math.tensordot(c, y, axes=1)
+    c = qp.math.transpose(qp.math.transpose(c) / scale)
+    return c
+
+
+def polynomial_extrapolate(x, y, order):
+    r"""Extrapolator to :math:`f(0)` for polynomial fit.
+
+    The polynomial is defined as ``f(x) = p[0] * x**deg + p[1] * x**(deg-1) + ... + p[deg]``
+    such that ``deg = order + 1``.
+
+    Args:
+        x (Array): Data in x
+        y (Array): Data in y = f(x)
+        order (int): Order of the polynomial fit
+
+    Returns:
+        float: Extrapolated value at f(0).
+
+    .. seealso:: :func:`~.exponential_extrapolate`, :func:`~.mitigate_with_zne`
+
+    **Example:**
+
+    >>> x = jnp.linspace(1, 10, 5)
+    >>> y = x**2 + x + 1
+    >>> polynomial_extrapolate(x, y, 2)
+    Array(1., dtype=float64)
+    """
+    coeff = _polyfit(x, y, order)
+    return coeff[-1]
+
+
+def exponential_extrapolate(x, y, asymptote=None, eps=1.0e-6):
+    r"""Extrapolate to the zero-noise limit using an exponential model (:math:`Ae^{Bx} + C`). This
+    is done by linearizing the data using a logarithm, whereupon a linear fit is performed. Once
+    the model parameters are found, they are transformed back to exponential parameters.
+
+    Args:
+        x (Array): Data in x axis.
+        y (Array): Data in y axis such that :math:`y = f(x)`.
+        asymptote (float): Infinite noise limit expected for your circuit of interest (:math:`C`
+            in the equation above). Defaults to 0 in the case an asymptote is not supplied.
+        eps (float): Epsilon to regularize :math:`\log(y - C)` when the argument is to close to
+            zero or negative.
+
+    Returns:
+        float: Extrapolated value at f(0).
+
+    .. seealso:: :func:`~.polynomial_extrapolate`, :func:`~.mitigate_with_zne`
+
+    **Example:**
+
+    >>> x = jnp.linspace(1, 10, 5)
+    >>> y = jnp.exp(-x)
+    >>> exponential_extrapolate(x, y)
+    Array(1., dtype=float64)
+    """
+    y = qp.math.stack(y)
+    slope, y_intercept = _polyfit(x, y, 1)
+    if asymptote is None:
+        sign = qp.math.sign(-slope)
+        asymptote = 0.0
+    else:
+        sign = qp.math.sign(-(asymptote - y_intercept))
+
+    y_shifted = sign * (y - asymptote)
+    y_shifted = qp.math.where(y_shifted < eps, eps, y_shifted)
+    y_scaled = qp.math.log(y_shifted)
+
+    zne_unscaled = polynomial_extrapolate(x, y_scaled, 1)
+    return sign * qp.math.exp(zne_unscaled) + asymptote
 
 
 ## PRIVATE ##

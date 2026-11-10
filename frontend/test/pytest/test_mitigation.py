@@ -19,11 +19,12 @@ import jax
 import numpy as np
 import pennylane as qp
 import pytest
-from pennylane.noise import exponential_extrapolate, poly_extrapolate
 
 import catalyst
 from catalyst.api_extensions.error_mitigation import (
     _check_is_odd_positive,
+    exponential_extrapolate,
+    polynomial_extrapolate,
     polynomial_extrapolation,
 )
 
@@ -439,7 +440,7 @@ def test_zne_with_extrap_kwargs():
         return catalyst.mitigate_with_zne(
             circuit,
             scale_factors=[1, 3, 5, 7],
-            extrapolate=poly_extrapolate,
+            extrapolate=polynomial_extrapolate,
             extrapolate_kwargs={"order": 2},
         )()
 
