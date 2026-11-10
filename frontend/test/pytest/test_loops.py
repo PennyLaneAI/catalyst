@@ -26,7 +26,6 @@ from catalyst.utils.exceptions import PlxprCaptureCFCompatibilityError
 # pylint: disable=no-value-for-parameter,unused-argument
 
 
-@pytest.mark.old_frontend
 class TestLoopToJaxpr:
     """Collection of tests that examine the generated JAXPR of loops."""
 
@@ -37,24 +36,24 @@ class TestLoopToJaxpr:
         expected = dedent(f"""
             {{ lambda ; a:f64[]. let
                 b:i64[] c:f64[] = while_loop[
-                  body_jaxpr={{ lambda ; d:i64[] e:f64[]. let
+                  args_slice=(0, None, None)
+                  body_slice=(0, 0, None)
+                  cond_slice=(0, 0, None)
+                  estimated_iterations={estimated_iterations}
+                  jaxpr_body_fn={{ lambda ; d:i64[] e:f64[]. let
                       f:i64[] = add d 1:i64[]
                     in (f, e) }}
-                  body_nconsts=0
-                  cond_jaxpr={{ lambda ; g:i64[] h:f64[]. let
+                  jaxpr_cond_fn={{ lambda ; g:i64[] h:f64[]. let
                       i:bool[] = lt g 10:i64[]
                     in (i,) }}
-                  cond_nconsts=0
-                  estimated_iterations={estimated_iterations}
-                  num_implicit_inputs=0
-                  preserve_dimensions=True
                 ] 0:i64[] a
               in (b, c) }}
             """)
 
-        @qjit(capture=False)
+        @qjit
         def circuit(x: float):
-            @while_loop(lambda v: v[0] < 10, estimated_iterations=estimated_iterations)
+            @qp.hint({"num-iters": estimated_iterations})
+            @qp.while_loop(lambda v: v[0] < 10)
             def loop(v):
                 return v[0] + 1, v[1]
 
@@ -71,21 +70,21 @@ class TestLoopToJaxpr:
         expected = dedent(f"""
             {{ lambda ; a:f64[] b:i64[]. let
                 c:i64[] d:f64[] = for_loop[
-                  apply_reverse_transform=False
-                  body_jaxpr={{ lambda ; e:i64[] f:i64[] g:f64[]. let
+                  abstract_shapes_slice=(0, 0, None)
+                  args_slice=(0, None, None)
+                  consts_slice=(0, 0, None)
+                  estimated_iterations={estimated_iterations}
+                  jaxpr_body_fn={{ lambda ; e:i64[] f:i64[] g:f64[]. let
                       h:i64[] = add f 1:i64[]
                     in (h, g) }}
-                  body_nconsts=0
-                  estimated_iterations={estimated_iterations}
-                  num_implicit_inputs=0
-                  preserve_dimensions=True
-                ] 0:i64[] b 1:i64[] 0:i64[] 0:i64[] a
+                ] 0:i64[] b 1:i64[] 0:i64[] a
               in (c, d) }}
         """)
 
-        @qjit(capture=False)
+        @qjit
         def circuit(x: float, n: int):
-            @for_loop(0, n, 1, estimated_iterations=estimated_iterations)
+            @qp.hint({"num-iters": estimated_iterations})
+            @qp.for_loop(0, n, 1)
             def loop(_, v):
                 return v[0] + 1, v[1]
 
@@ -97,25 +96,39 @@ class TestLoopToJaxpr:
 
 
 class TestEstimatedIterationsValidation:
-    """Validation of the ``estimated_iterations`` resource hint for loops."""
+    """Validation of the ``num-iters`` hint during loop lowering."""
 
     @pytest.mark.parametrize("bad", [-1, -0.5])
     def test_for_loop_negative_raises(self, bad):
-        """A negative ``estimated_iterations`` on a for loop is rejected at construction."""
-        with pytest.raises(ValueError, match="must be a non-negative int or float"):
+        """A negative ``num-iters`` hint on a for loop is rejected during lowering."""
+        with pytest.raises(ValueError, match="'estimated_iterations' must be non-negative"):
 
-            @for_loop(0, 10, 1, estimated_iterations=bad)
-            def loop(_, v):  # pylint: disable=unused-variable
-                return v
+            @qjit(target="mlir")
+            def circuit():
+                @qp.hint({"num-iters": bad})
+                @qp.for_loop(0, 10, 1)
+                def loop(_, value):
+                    return value + 1
+
+                return loop(0)
+
+            circuit()
 
     @pytest.mark.parametrize("bad", [-1, -0.5])
     def test_while_loop_negative_raises(self, bad):
-        """A negative ``estimated_iterations`` on a while loop is rejected at construction."""
-        with pytest.raises(ValueError, match="must be a non-negative int or float"):
+        """A negative ``num-iters`` hint on a while loop is rejected during lowering."""
+        with pytest.raises(ValueError, match="'estimated_iterations' must be non-negative"):
 
-            @while_loop(lambda v: v < 10, estimated_iterations=bad)
-            def loop(v):  # pylint: disable=unused-variable
-                return v + 1
+            @qjit(target="mlir")
+            def circuit():
+                @qp.hint({"num-iters": bad})
+                @qp.while_loop(lambda value: value < 10)
+                def loop(value):
+                    return value + 1
+
+                return loop(0)
+
+            circuit()
 
 
 class TestWhileLoops:

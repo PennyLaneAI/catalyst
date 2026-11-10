@@ -188,11 +188,11 @@ def qjit(
             This allows enabling capture locally for this QJIT without affecting the global
             ``qp.capture.enabled()`` state.
 
-            - ``"global"`` : Defer to ``qp.capture.enabled()`` to decide whether
-              to use program capture.
             - ``True`` (default): Force program capture on for this QJIT, regardless of the global setting.
               This allows using the new capture-based frontend without calling
               ``qp.capture.enable()`` globally.
+            - ``"global"`` : Defer to ``qp.capture.enabled()`` to decide whether
+              to use program capture.
             - ``False``: Force program capture off for this QJIT, using the old frontend,
               regardless of the global setting.
         skip_preprocess (bool): Controls whether or not to skip quantum device preprocessing.

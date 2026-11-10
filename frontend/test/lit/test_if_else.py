@@ -181,14 +181,14 @@ print(test_no_convert_element_type.jaxpr)
 # -----
 
 
-# A single `estimated_probability` hint is attached to the emitted `scf.if`.
+# A single `branch-prob` hint is attached to the emitted `scf.if`.
 # CHECK-LABEL: public @jit_cond_estimated_probability
-# old_frontend: control-flow hints are specific to the Catalyst API.
-@qjit(capture=False, target="mlir")
+@qjit(target="mlir")
 def cond_estimated_probability(n: int):
     # CHECK:       scf.if
     # CHECK:       catalyst.estimated_probability = 5.000000e-01
-    @cond(n <= 5, estimated_probability=0.5)
+    @qp.cond(n <= 5)
+    @qp.hint({"branch-prob": 0.5})
     def branch():
         return n
 
@@ -209,16 +209,17 @@ print(cond_estimated_probability.mlir)
 # that its branch is taken given no earlier branch was. The user-facing unconditional hints
 # (0.5, 0.125) therefore become (0.5, 0.125 / (1 - 0.5) = 0.25) on the two `scf.if`s.
 # CHECK-LABEL: public @jit_cond_estimated_probability_chain
-# old_frontend: control-flow hints are specific to the Catalyst API.
-@qjit(capture=False, target="mlir")
+@qjit(target="mlir")
 def cond_estimated_probability_chain(n: int):
     # CHECK-DAG:   catalyst.estimated_probability = 5.000000e-01
     # CHECK-DAG:   catalyst.estimated_probability = 2.500000e-01
-    @cond(n <= 5, estimated_probability=0.5)
+    @qp.cond(n <= 5)
+    @qp.hint({"branch-prob": 0.5})
     def branch():
         return n
 
-    @branch.else_if(n <= 8, estimated_probability=0.125)
+    @branch.else_if(n <= 8)
+    @qp.hint({"branch-prob": 0.125})
     def elif_branch():
         return n + 1
 
