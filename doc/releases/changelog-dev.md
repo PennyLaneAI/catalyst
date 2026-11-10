@@ -185,24 +185,6 @@
 * `catalyst.mitigate_with_zne` now supports `qjit(capture=True)` for QNodes and
   classical workflows that call QNodes, with all three folding methods.
   [(#3462)](https://github.com/PennyLaneAI/catalyst/pull/3462)
-
-  ```python
-  import pennylane as qp
-  from catalyst import mitigate_with_zne, qjit
-
-  @qjit(capture=True)
-  @mitigate_with_zne(scale_factors=[1, 3, 5])
-  @qp.qnode(qp.device("lightning.qubit", wires=1))
-  def circuit(angle):
-      qp.RX(angle, wires=0)
-      return qp.expval(qp.Z(0))
-  ```
-
-  ```pycon
-  >>> circuit(0.3)
-  Array(0.95533649, dtype=float64)
-  ```
-
 * Ahead-of-time compilation with `qjit` can now stop at any of the main internal compiler stages,
   in addition to the frontend-controlled stages (`target="jaxpr"|"mlir"|"binary"`).
   The `"llvmir"` target now correctly stops after LLVM IR is first generated from the MLIR, and
