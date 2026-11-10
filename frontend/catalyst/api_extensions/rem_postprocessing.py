@@ -20,10 +20,12 @@ can apply classical post-processing - per-qubit confusion-matrix
 calibration, reduced-confusion-matrix construction, and a linear solve -
 to the three sample arrays emitted by the ``mitigation.rem`` op after
 lowering.
+
+The public entry points are :func:`rem_calibrate` and :func:`rem_apply`.
 """
 
 from functools import partial, reduce
-from typing import Tuple
+from typing import Tuple, Union
 
 import jax
 import jax.numpy as jnp
@@ -49,7 +51,7 @@ def _count_shots_histogram(shot_result_array: jax.Array, n_qubits: int) -> jax.A
     Each shot is encoded as an integer code, one-hot encoded across the
     ``2**n_qubits`` possible bitstrings, then reduced with a sum.
     Uses ``O(n_shots * 2**n_qubits)`` memory; only invoked when
-    the dispatcher in :func:`rem_apply_to_samples` has confirmed that
+    the dispatcher in :func:`_rem_apply_to_samples` has confirmed that
     ``2**n_qubits <= n_shots``.
     """
     codes = _bitstring_codes(shot_result_array, n_qubits)
@@ -67,7 +69,7 @@ def _sort_based_unique(samples: jax.Array, n_qubits: int, n_shots: int):
     position ``i`` is the first occurrence of a unique bitstring after sorting,
     and the value equals that bitstring's total shot count. The remaining
     ``n_shots - n_unique`` positions are zero-padded to maintain fixed tensor
-    dimensions; :func:`rem_apply_to_samples` pins them to identity in the linear solve.
+    dimensions; :func:`_rem_apply_to_samples` pins them to identity in the linear solve.
     """
     powers = 1 << jnp.arange(n_qubits - 1, -1, -1, dtype=jnp.int32)
     codes = (samples * powers[None, :]).sum(axis=1).astype(jnp.int32)  # (n_shots,)
@@ -107,36 +109,32 @@ def _stretch_confusion_matrix(qubit_k_values: jax.Array, confusion_matrix: jax.A
     return one_hot @ confusion_matrix @ one_hot.T
 
 
-# ---------------------------------------------------------------------------
-# Top-level entry points. Each is `@jax.jit`'d so that catalyst emits it as
+# Per-measurement-process implementations, called by `rem_calibrate` and
+# `rem_apply` below. Each is `@jax.jit`'d so that catalyst emits it as
 # a single private `func.func` and the @qjit'd kernel ends up calling each
-# one exactly once. The end goal is a small top-level function whose body
-# is `<callee> -> rem_calibrate -> rem_apply_to_samples`. Each callable
-# here is the smallest such unit; helper math used inside lives in the
-# private functions above.
-# ---------------------------------------------------------------------------
-
-
+# one exactly once.
 @jax.jit
-def rem_calibrate_samples(zeros_samples: jax.Array, ones_samples: jax.Array) -> jax.Array:
+def _rem_calibrate_samples(zeros_samples: jax.Array, ones_samples: jax.Array) -> jax.Array:
     """Build per-qubit (n_qubits, 2, 2) confusion matrices from calibration samples.
 
     Step 1 of the REM pipeline: consume the all-zeros and all-ones
     calibration samples emitted by the lowered ``mitigation.rem`` op and
-    return the normalized confusion matrices.
+    return the normalized confusion matrices, laid out as described in
+    :func:`rem_calibrate`.
     """
-    rev_zeros = zeros_samples[:, ::-1].astype(jnp.float64)
-    rev_ones = ones_samples[:, ::-1].astype(jnp.float64)
+    # Column k of the samples is wire k, which is also the index of its confusion matrix.
+    zeros = zeros_samples.astype(jnp.float64)
+    ones = ones_samples.astype(jnp.float64)
     n_zeros_shots = zeros_samples.shape[0]
     n_ones_shots = ones_samples.shape[0]
 
     # Column 0: all-zeros calibration. ones_per_qubit[k] = count of '1' on qubit k.
-    ones_per_qubit_zerocal = rev_zeros.sum(axis=0)
+    ones_per_qubit_zerocal = zeros.sum(axis=0)
     zeros_per_qubit_zerocal = n_zeros_shots - ones_per_qubit_zerocal
     col_zero = jnp.stack([zeros_per_qubit_zerocal, ones_per_qubit_zerocal], axis=-1)
 
     # Column 1: all-ones calibration.
-    ones_per_qubit_onecal = rev_ones.sum(axis=0)
+    ones_per_qubit_onecal = ones.sum(axis=0)
     zeros_per_qubit_onecal = n_ones_shots - ones_per_qubit_onecal
     col_one = jnp.stack([zeros_per_qubit_onecal, ones_per_qubit_onecal], axis=-1)
 
@@ -146,12 +144,13 @@ def rem_calibrate_samples(zeros_samples: jax.Array, ones_samples: jax.Array) -> 
 
 
 @jax.jit
-def rem_calibrate_probs(zeros_probs: jax.Array, ones_probs: jax.Array) -> jax.Array:
+def _rem_calibrate_probs(zeros_probs: jax.Array, ones_probs: jax.Array) -> jax.Array:
     """Build per-qubit (n_qubits, 2, 2) confusion matrices from calibration probs.
 
     Step 1 of the REM pipeline: consume the all-zeros and all-ones
     calibration probs emitted by the lowered ``mitigation.rem`` op and
-    return the normalized confusion matrices.
+    return the normalized confusion matrices, laid out as described in
+    :func:`rem_calibrate`.
     """
     n = zeros_probs.shape[0]
     n_qubits = np.log2(n).astype(jnp.uint64)
@@ -169,35 +168,38 @@ def rem_calibrate_probs(zeros_probs: jax.Array, ones_probs: jax.Array) -> jax.Ar
 
         return carry, (bit_fp, bit_tp)
 
-    bit_positions = jnp.arange(n_qubits, dtype=jnp.uint32)
+    # Wire k is bit (n_qubits - 1 - k) of a bitstring index (wire 0 is the most
+    # significant bit), so the bit positions are scanned from the highest one down.
+    bit_positions = jnp.asarray(np.arange(n_qubits)[::-1], dtype=jnp.uint32)
     _, (fp, tp) = jax.lax.scan(_process_one_bit, None, bit_positions)
 
     tn = total_zeros - fp
     fn = total_ones - tp
 
+    # Rows are measured values, columns prepared values: [[tn, fn], [fp, tp]].
     confusion_matrices = jnp.stack(
-        [jnp.stack([tn, fp], axis=-1), jnp.stack([fn, tp], axis=-1)], axis=1
+        [jnp.stack([tn, fn], axis=-1), jnp.stack([fp, tp], axis=-1)], axis=1
     )
-    norm = jnp.sum(confusion_matrices, axis=-1, keepdims=True)
+    norm = jnp.sum(confusion_matrices, axis=1, keepdims=True)
     return confusion_matrices / norm
 
 
 @jax.jit
-def rem_calibrate_counts(zeros_counts: jax.Array, ones_counts: jax.Array) -> jax.Array:
+def _rem_calibrate_counts(zeros_counts: jax.Array, ones_counts: jax.Array) -> jax.Array:
     """Build per-qubit (n_qubits, 2, 2) confusion matrices from calibration counts.
 
-    Re-uses `rem_calibrate_probs`, normalizing counts into the [0, 1] range first.
+    Re-uses `_rem_calibrate_probs`, normalizing counts into the [0, 1] range first.
+    Counts are indexed like probs, so the result has the same layout.
     """
     zeros_probs = zeros_counts / zeros_counts.max()
     ones_probs = ones_counts / ones_counts.max()
-    return rem_calibrate_probs(zeros_probs, ones_probs)
+    return _rem_calibrate_probs(zeros_probs, ones_probs)
 
 
 @partial(jax.jit, static_argnames=("n_qubits",))
-def rem_apply_to_samples(
+def _rem_apply_to_samples(
     mitigatee_samples: jax.Array,
     confusion_matrices: jax.Array,
-    measured_qubits: jax.Array,
     n_qubits: int,
 ) -> Tuple[jax.Array, jax.Array]:
     """Apply per-qubit confusion matrices to mitigatee samples -> mitigated histogram.
@@ -240,10 +242,12 @@ def rem_apply_to_samples(
         unique_bitstrings, raw_counts = _sort_based_unique(mitigatee_samples, n_qubits, n_shots)
         user_counts = raw_counts.astype(jnp.float64)
 
-    selected = confusion_matrices[measured_qubits]  # (n_measured, 2, 2)
+    # Column k of the bitstrings is wire k, paired with confusion_matrices[k]. With rows
+    # measured and columns prepared, transition_probs[i, j] is the probability of measuring
+    # bitstring i when bitstring j was prepared.
     stretched = jax.vmap(_stretch_confusion_matrix, in_axes=(1, 0))(
-        unique_bitstrings, selected
-    )  # (n_measured, K, K)
+        unique_bitstrings, confusion_matrices
+    )  # (n_qubits, K, K)
     transition_probs = jnp.prod(stretched, axis=0)
 
     # Pin rows/cols for non-counted bitstrings to the identity, so the linear
@@ -259,10 +263,9 @@ def rem_apply_to_samples(
 
 
 @partial(jax.jit, static_argnames=("n_qubits",))
-def rem_apply_to_counts(
+def _rem_apply_to_counts(
     mitigatee_counts: jax.Array,
     confusion_matrices: jax.Array,
-    measured_qubits: jax.Array,
     n_qubits: int,
 ) -> jax.Array:
     """Apply per-qubit confusion matrices to user counts -> mitigated histogram.
@@ -282,9 +285,8 @@ def rem_apply_to_counts(
     """
     # List comprehension runs at JAX compile time, when `n_qubits` is static and already known.
     # this is then unrolled, just like `reduce`, no loop is present at runtime.
-    selected = [
-        jnp.linalg.inv(confusion_matrices[measured_qubits[i]]) for i in range(n_qubits)
-    ]  # (n_measured, 2, 2)
+    # Wire 0 is the first (most significant) Kronecker factor, matching the basis-state index.
+    selected = [jnp.linalg.inv(confusion_matrices[i]) for i in range(n_qubits)]  # (n_qubits, 2, 2)
     inv_transition_matrix = reduce(jnp.kron, selected)
 
     # transition_probs = transition_probs / jnp.sum(transition_probs, axis=0, keepdims=True)
@@ -294,10 +296,9 @@ def rem_apply_to_counts(
 
 
 @partial(jax.jit, static_argnames=("n_qubits",))
-def rem_apply_to_probs(
+def _rem_apply_to_probs(
     mitigatee_probs: jax.Array,
     confusion_matrices: jax.Array,
-    measured_qubits: jax.Array,
     n_qubits: int,
 ) -> jax.Array:
     """Apply per-qubit confusion matrices to user probs -> mitigated histogram.
@@ -313,12 +314,86 @@ def rem_apply_to_probs(
     """
     # List comprehension runs at JAX compile time, when `n_qubits` is static and already known.
     # this is then unrolled, just like `reduce`, no loop is present at runtime.
-    selected = [
-        jnp.linalg.inv(confusion_matrices[measured_qubits[i]]) for i in range(n_qubits)
-    ]  # (n_measured, 2, 2)
+    # Wire 0 is the first (most significant) Kronecker factor, matching the basis-state index.
+    selected = [jnp.linalg.inv(confusion_matrices[i]) for i in range(n_qubits)]  # (n_qubits, 2, 2)
     inv_transition_matrix = reduce(jnp.kron, selected)
 
     # transition_probs = transition_probs / jnp.sum(transition_probs, axis=0, keepdims=True)
     # Direct matrix-vector product to solve the system, since inverting 2x2 matrices is much faster
     mitigated_probs = jnp.dot(inv_transition_matrix, mitigatee_probs)
     return mitigated_probs
+
+
+# Public entrypoints. Not `@jax.jit`'d, because they do not add anything to the IR, and instead 
+# just decide which jited functions should be used.
+def rem_calibrate(mp_kind: str, zeros_result: jax.Array, ones_result: jax.Array) -> jax.Array:
+    """Build per-qubit confusion matrices from the results of the calibration circuits.
+
+    Step 1 of the REM pipeline: consume the all-zeros and all-ones calibration results
+    emitted by the lowered ``mitigation.rem`` op.
+
+    Conventions shared with :func:`rem_apply`:
+
+    - Wire order: wire ``k`` is column ``k`` of a samples array, and wire 0 is the most
+      significant bit of a probs or counts index. This is the ordering of ``qp.sample``,
+      ``qp.counts`` and ``qp.probs`` in PennyLane and Catalyst.
+    - Confusion matrices have shape ``(n_qubits, 2, 2)``. ``confusion_matrices[k]`` belongs to
+      wire ``k``, and ``confusion_matrices[k][i, j]`` is the probability of measuring ``i`` on
+      that wire when ``j`` was prepared: rows are measured values, columns are prepared values,
+      and each column sums to one.
+    - The transition matrix of all wires is
+      ``kron(confusion_matrices[0], ..., confusion_matrices[n_qubits - 1])``, so that
+      ``noisy = transition_matrix @ ideal``.
+
+    Args:
+        mp_kind (str): measurement process of the results: ``"sample"``, ``"counts"`` or
+            ``"probs"``.
+        zeros_result (jax.Array): result of the all-zeros calibration circuit: integer samples
+            of shape ``(n_shots, n_qubits)``, or counts or probs of shape ``(2**n_qubits,)``.
+        ones_result (jax.Array): result of the all-ones calibration circuit, same layout.
+
+    Returns:
+        jax.Array: the confusion matrices, of shape ``(n_qubits, 2, 2)``.
+    """
+    if mp_kind == "sample":
+        return _rem_calibrate_samples(zeros_result, ones_result)
+    if mp_kind == "counts":
+        return _rem_calibrate_counts(zeros_result, ones_result)
+    if mp_kind == "probs":
+        return _rem_calibrate_probs(zeros_result, ones_result)
+    raise ValueError(
+        f"Unsupported measurement process {mp_kind!r}: expected 'sample', 'counts' or 'probs'."
+    )
+
+
+def rem_apply(
+    mp_kind: str, mitigatee_result: jax.Array, confusion_matrices: jax.Array, n_qubits: int
+) -> Union[jax.Array, Tuple[jax.Array, jax.Array]]:
+    """Apply per-qubit confusion matrices to the result of the user circuit.
+
+    Step 2 of the REM pipeline. The wire order and the layout of ``confusion_matrices`` are
+    described in :func:`rem_calibrate`.
+
+    Args:
+        mp_kind (str): measurement process of ``mitigatee_result``: ``"sample"``, ``"counts"``
+            or ``"probs"``.
+        mitigatee_result (jax.Array): result of the user circuit: integer samples of shape
+            ``(n_shots, n_qubits)``, or counts or probs of shape ``(2**n_qubits,)``.
+        confusion_matrices (jax.Array): confusion matrices of shape ``(n_qubits, 2, 2)``, as
+            returned by :func:`rem_calibrate`.
+        n_qubits (int): number of wires; must be static.
+
+    Returns:
+        For ``"sample"``, the tuple ``(unique_bitstrings, mitigated_counts)`` described in
+        :func:`_rem_apply_to_samples`. For ``"counts"`` and ``"probs"``, the mitigated counts
+        or probs, of shape ``(2**n_qubits,)``.
+    """
+    if mp_kind == "sample":
+        return _rem_apply_to_samples(mitigatee_result, confusion_matrices, n_qubits)
+    if mp_kind == "counts":
+        return _rem_apply_to_counts(mitigatee_result, confusion_matrices, n_qubits)
+    if mp_kind == "probs":
+        return _rem_apply_to_probs(mitigatee_result, confusion_matrices, n_qubits)
+    raise ValueError(
+        f"Unsupported measurement process {mp_kind!r}: expected 'sample', 'counts' or 'probs'."
+    )

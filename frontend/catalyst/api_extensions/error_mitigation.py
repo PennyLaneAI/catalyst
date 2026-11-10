@@ -27,14 +27,7 @@ import jax.numpy as jnp
 import pennylane as qp
 from jax._src.tree_util import tree_flatten
 
-from catalyst.api_extensions.rem_postprocessing import (
-    rem_apply_to_counts,
-    rem_apply_to_probs,
-    rem_apply_to_samples,
-    rem_calibrate_counts,
-    rem_calibrate_probs,
-    rem_calibrate_samples,
-)
+from catalyst.api_extensions.rem_postprocessing import rem_apply, rem_calibrate
 from catalyst.jax_primitives import Folding, func_p, quantum_kernel_p, rem_p, zne_p
 from catalyst.jax_tracer import Function
 from catalyst.utils.callables import CatalystCallable
@@ -195,8 +188,10 @@ def mitigate_with_rem(
             measurement on all device wires. Expectation values and other observables are not
             supported.
         calibration_matrices (Array): confusion matrices of shape ``(n, 2, 2)``, returned by a
-            previous call with ``return_calibration_matrices=True`` on the same device. If
-            provided, the calibration circuits are omitted and these matrices are used instead.
+            previous call with ``return_calibration_matrices=True`` on the same device.
+            ``calibration_matrices[k][i, j]`` is the probability of measuring ``i`` on wire
+            ``k`` when ``j`` was prepared, so each column sums to one. If provided, the
+            calibration circuits are omitted and these matrices are used instead.
             Defaults to ``None``, in which case the calibration circuits are run on every call.
         return_calibration_matrices (bool): if ``True``, the confusion matrices are returned
             alongside the mitigated result, so that they can be reused via
@@ -390,12 +385,14 @@ class RemCallable(CatalystCallable):
     Args:
         fn (Callable): the circuit to be mitigated with REM.
         calibration_matrices: optional precomputed per-qubit confusion stack
-            of shape ``(n_qubits, 2, 2)``. When ``None`` the lowering pass
+            of shape ``(n_qubits, 2, 2)``, indexed as ``[wire, measured, prepared]``
+            (see :func:`~catalyst.api_extensions.rem_postprocessing.rem_calibrate`).
+            When ``None`` the lowering pass
             emits the all-zeros and all-ones calibration circuits and this
             callable computes the matrices from their outputs via
-            ``rem_calibrate_*``. When provided, ``rem_calibrate_*`` is not
+            ``rem_calibrate``. When provided, ``rem_calibrate`` is not
             traced and the supplied matrices are passed straight into
-            ``rem_apply_to_*``.
+            ``rem_apply``.
         return_calibration_matrices (bool): when ``True`` the callable
             returns ``(mitigated_result, calibration_matrices)`` instead of
             just the mitigated result.
@@ -449,62 +446,56 @@ class RemCallable(CatalystCallable):
 
         qnode_obj = jaxpr.eqns[0].params.get("qnode", None)
         assert qnode_obj is not None, "REM post-processing requires a QNode target"
+        # Catalyst requires device wires 0..n-1, so confusion_matrices[k] belongs to wire k.
         n_qubits = len(qnode_obj.device.wires)
-        measured_qubits = jnp.array(list(qnode_obj.device.wires))
 
         handler = {
             "sample": self._apply_sample,
             "counts": self._apply_counts,
             "probs": self._apply_probs,
         }[mp_kind]
-        mitigated_result, confusion_matrices = handler(
-            rem_results, run_calibration, measured_qubits, n_qubits
-        )
+        mitigated_result, confusion_matrices = handler(rem_results, run_calibration, n_qubits)
 
         if self.return_calibration_matrices:
             return mitigated_result, confusion_matrices
         return mitigated_result
 
-    def _apply_sample(self, rem_results, run_calibration, measured_qubits, n_qubits):
+    def _apply_sample(self, rem_results, run_calibration, n_qubits):
         # quantum.sample returns f64 in catalyst; the REM helpers index
         # confusion matrices by bit value and need an integer dtype.
         mitigatee_samples = rem_results[0].astype(jnp.int32)
         if run_calibration:
             zeros_samples = rem_results[1].astype(jnp.int32)
             ones_samples = rem_results[2].astype(jnp.int32)
-            confusion_matrices = rem_calibrate_samples(zeros_samples, ones_samples)
+            confusion_matrices = rem_calibrate("sample", zeros_samples, ones_samples)
         else:
             confusion_matrices = jnp.asarray(self.calibration_matrices)
-        unique_bitstrings, mitigated_counts = rem_apply_to_samples(
-            mitigatee_samples, confusion_matrices, measured_qubits, n_qubits
+        unique_bitstrings, mitigated_counts = rem_apply(
+            "sample", mitigatee_samples, confusion_matrices, n_qubits
         )
         return (unique_bitstrings, mitigated_counts), confusion_matrices
 
-    def _apply_counts(self, rem_results, run_calibration, measured_qubits, n_qubits):
+    def _apply_counts(self, rem_results, run_calibration, n_qubits):
         mitigatee_eigvals = rem_results[0]
         mitigatee_counts = rem_results[1]
         if run_calibration:
             zeros_counts = rem_results[2]
             ones_counts = rem_results[3]
-            confusion_matrices = rem_calibrate_counts(zeros_counts, ones_counts)
+            confusion_matrices = rem_calibrate("counts", zeros_counts, ones_counts)
         else:
             confusion_matrices = jnp.asarray(self.calibration_matrices)
-        mitigated_counts = rem_apply_to_counts(
-            mitigatee_counts, confusion_matrices, measured_qubits, n_qubits
-        )
+        mitigated_counts = rem_apply("counts", mitigatee_counts, confusion_matrices, n_qubits)
         return (mitigatee_eigvals, mitigated_counts), confusion_matrices
 
-    def _apply_probs(self, rem_results, run_calibration, measured_qubits, n_qubits):
+    def _apply_probs(self, rem_results, run_calibration, n_qubits):
         mitigatee_probs = rem_results[0]
         if run_calibration:
             zeros_probs = rem_results[1]
             ones_probs = rem_results[2]
-            confusion_matrices = rem_calibrate_probs(zeros_probs, ones_probs)
+            confusion_matrices = rem_calibrate("probs", zeros_probs, ones_probs)
         else:
             confusion_matrices = jnp.asarray(self.calibration_matrices)
-        mitigated_probs = rem_apply_to_probs(
-            mitigatee_probs, confusion_matrices, measured_qubits, n_qubits
-        )
+        mitigated_probs = rem_apply("probs", mitigatee_probs, confusion_matrices, n_qubits)
         return mitigated_probs, confusion_matrices
 
 

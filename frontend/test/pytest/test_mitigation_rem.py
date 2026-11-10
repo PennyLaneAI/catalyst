@@ -23,13 +23,15 @@ import pytest
 import catalyst
 from catalyst.api_extensions.error_mitigation import mitigate_with_rem
 from catalyst.api_extensions.rem_postprocessing import (
+    _rem_apply_to_counts,
+    _rem_apply_to_probs,
+    _rem_apply_to_samples,
+    _rem_calibrate_counts,
+    _rem_calibrate_probs,
+    _rem_calibrate_samples,
     _stretch_confusion_matrix,
-    rem_apply_to_counts,
-    rem_apply_to_probs,
-    rem_apply_to_samples,
-    rem_calibrate_counts,
-    rem_calibrate_probs,
-    rem_calibrate_samples,
+    rem_apply,
+    rem_calibrate,
 )
 
 
@@ -210,7 +212,7 @@ def test_caching_sample_roundtrip():
 
 
 def test_caching_skips_rem_calibrate_in_ir():
-    """Cached path must not emit rem_calibrate_* helpers in the traced MLIR."""
+    """Cached path must not emit _rem_calibrate_* helpers in the traced MLIR."""
     n_qubits, shots = 2, 200
     circuit = _ghz_qnode(n_qubits, shots, "probs")
     cm = jnp.broadcast_to(jnp.eye(2, dtype=jnp.float64), (n_qubits, 2, 2))
@@ -221,8 +223,8 @@ def test_caching_skips_rem_calibrate_in_ir():
 
     ir = cached.mlir
     assert "runCalibration(false)" in ir
-    assert "rem_apply_to_probs" in ir
-    assert "rem_calibrate_probs" not in ir
+    assert "_rem_apply_to_probs" in ir
+    assert "_rem_calibrate_probs" not in ir
 
 
 def _per_qubit_symmetric_confusion(n_qubits, p):
@@ -247,17 +249,16 @@ def test_sample_path_dispatch(n_qubits, n_shots, expected_k):
 
     With an identity noise channel, the linear solve reduces to the user
     histogram itself, so total mass must equal n_shots in either path and
-    the output K must follow the trace-time branch in rem_apply_to_samples.
+    the output K must follow the trace-time branch in _rem_apply_to_samples.
     """
     cm = _per_qubit_symmetric_confusion(n_qubits, 0.0)
 
     rng = np.random.default_rng(0)
     samples = rng.integers(0, 2, size=(n_shots, n_qubits)).astype(np.int32)
 
-    bitstrings, counts = rem_apply_to_samples(
+    bitstrings, counts = _rem_apply_to_samples(
         jnp.asarray(samples),
         cm,
-        jnp.arange(n_qubits),
         n_qubits,
     )
 
@@ -275,10 +276,9 @@ def test_sample_sort_rle_path():
     codes = rng.choice(2**n_qubits, size=n_shots, replace=False)
     bits_msb_first = ((codes[:, None] >> np.arange(n_qubits - 1, -1, -1)) & 1).astype(np.int32)
 
-    _, counts = rem_apply_to_samples(
+    _, counts = _rem_apply_to_samples(
         jnp.asarray(bits_msb_first),
         cm,
-        jnp.arange(n_qubits),
         n_qubits,
     )
     assert counts.shape == (n_shots,)
@@ -295,7 +295,7 @@ def test_inverse_recovers_probs():
     forward = reduce(np.kron, [flip] * n_qubits)
     noisy = jnp.asarray(forward @ np.asarray(clean))
 
-    recovered = rem_apply_to_probs(noisy, cm, jnp.arange(n_qubits), n_qubits)
+    recovered = _rem_apply_to_probs(noisy, cm, n_qubits)
     assert np.allclose(np.asarray(recovered), np.asarray(clean), atol=1e-8)
 
 
@@ -309,12 +309,12 @@ def test_inverse_recovers_counts():
     forward = reduce(np.kron, [flip] * n_qubits)
     noisy = jnp.asarray(forward @ np.asarray(clean))
 
-    recovered = rem_apply_to_counts(noisy, cm, jnp.arange(n_qubits), n_qubits)
+    recovered = _rem_apply_to_counts(noisy, cm, n_qubits)
     assert np.allclose(np.asarray(recovered), np.asarray(clean), atol=1e-6)
 
 
 def test_calibrate_paths_agree():
-    """rem_calibrate_{samples,counts,probs} on the same channel must produce matching matrices."""
+    """_rem_calibrate_{samples,counts,probs} on the same channel must produce matching matrices."""
     n_qubits, n_shots = 2, 4000
     p = 0.10
     rng = np.random.default_rng(0)
@@ -324,17 +324,18 @@ def test_calibrate_paths_agree():
     flips_one = rng.random((n_shots, n_qubits)) < p
     ones_samples = (1 - flips_one).astype(np.int32)
 
-    cm_from_samples = rem_calibrate_samples(jnp.asarray(zeros_samples), jnp.asarray(ones_samples))
+    cm_from_samples = _rem_calibrate_samples(jnp.asarray(zeros_samples), jnp.asarray(ones_samples))
 
     # Build counts/probs from the same samples so the three paths consume the same channel.
+    # Column k of the samples is wire k, and wire 0 is the most significant bit of the index.
     powers = (1 << np.arange(n_qubits - 1, -1, -1)).astype(np.int32)
-    z_codes = (zeros_samples[:, ::-1] * powers[None, :]).sum(axis=1)
-    o_codes = (ones_samples[:, ::-1] * powers[None, :]).sum(axis=1)
+    z_codes = (zeros_samples * powers[None, :]).sum(axis=1)
+    o_codes = (ones_samples * powers[None, :]).sum(axis=1)
     zeros_counts = np.bincount(z_codes, minlength=2**n_qubits).astype(np.int64)
     ones_counts = np.bincount(o_codes, minlength=2**n_qubits).astype(np.int64)
 
-    cm_from_counts = rem_calibrate_counts(jnp.asarray(zeros_counts), jnp.asarray(ones_counts))
-    cm_from_probs = rem_calibrate_probs(
+    cm_from_counts = _rem_calibrate_counts(jnp.asarray(zeros_counts), jnp.asarray(ones_counts))
+    cm_from_probs = _rem_calibrate_probs(
         jnp.asarray(zeros_counts / zeros_counts.sum()),
         jnp.asarray(ones_counts / ones_counts.sum()),
     )
@@ -361,6 +362,146 @@ def test_stretch_confusion_matrix(n_qubits):
     assert np.allclose(np.asarray(got), expected)
 
 
+# Per-wire, asymmetric readout errors: P(measure 1 | prepared 0) and P(measure 0 | prepared 1)
+# differ between wires and between directions, so a reversed wire order or a transposed
+# confusion matrix changes the results. A symmetric channel shared by all wires hides both.
+_P_1_GIVEN_0 = (0.02, 0.10, 0.25)
+_P_0_GIVEN_1 = (0.15, 0.05, 0.30)
+
+
+def _per_qubit_asymmetric_confusion(n_qubits):
+    """Stack of ``(n_qubits, 2, 2)`` confusion matrices indexed as ``[wire, measured, prepared]``."""
+    return np.stack(
+        [
+            np.array(
+                [
+                    [1.0 - _P_1_GIVEN_0[k], _P_0_GIVEN_1[k]],
+                    [_P_1_GIVEN_0[k], 1.0 - _P_0_GIVEN_1[k]],
+                ]
+            )
+            for k in range(n_qubits)
+        ]
+    )
+
+
+def _transition_matrix(cm):
+    """Full ``(2**n, 2**n)`` matrix ``A[measured, prepared]``; wire 0 is the most significant bit."""
+    return reduce(np.kron, list(cm))
+
+
+def test_calibrate_samples_wire_order_and_orientation():
+    """_rem_calibrate_samples returns confusion_matrices[k][measured, prepared] for wire k."""
+    n_qubits, n_shots = 3, 1000
+    cm = _per_qubit_asymmetric_confusion(n_qubits)
+
+    # Column k flips exactly round(p * n_shots) shots, so the estimate is exact.
+    zeros_samples = np.zeros((n_shots, n_qubits), dtype=np.int32)
+    ones_samples = np.ones((n_shots, n_qubits), dtype=np.int32)
+    for k in range(n_qubits):
+        zeros_samples[: round(_P_1_GIVEN_0[k] * n_shots), k] = 1
+        ones_samples[: round(_P_0_GIVEN_1[k] * n_shots), k] = 0
+
+    got = _rem_calibrate_samples(jnp.asarray(zeros_samples), jnp.asarray(ones_samples))
+    assert np.allclose(np.asarray(got), cm)
+
+
+@pytest.mark.parametrize("kind", ["probs", "counts"])
+def test_calibrate_probs_counts_wire_order_and_orientation(kind):
+    """_rem_calibrate_probs/counts return confusion_matrices[k][measured, prepared] for wire k."""
+    n_qubits = 3
+    cm = _per_qubit_asymmetric_confusion(n_qubits)
+    transition = _transition_matrix(cm)
+    # Columns 0 and -1 are the noisy distributions of the all-zeros and all-ones states.
+    zeros_probs, ones_probs = transition[:, 0], transition[:, -1]
+
+    if kind == "probs":
+        got = _rem_calibrate_probs(jnp.asarray(zeros_probs), jnp.asarray(ones_probs))
+    else:
+        n_shots = 10**6
+        got = _rem_calibrate_counts(
+            jnp.asarray(np.round(zeros_probs * n_shots).astype(np.int64)),
+            jnp.asarray(np.round(ones_probs * n_shots).astype(np.int64)),
+        )
+    assert np.allclose(np.asarray(got), cm, atol=1e-5)
+
+
+@pytest.mark.parametrize("kind", ["probs", "counts"])
+def test_apply_probs_counts_per_wire_asymmetric(kind):
+    """_rem_apply_to_probs/counts invert a per-wire, asymmetric readout channel exactly."""
+    n_qubits = 3
+    cm = _per_qubit_asymmetric_confusion(n_qubits)
+    # Unequal weights on |100> and |011>: not invariant under reversing the wire order.
+    clean = np.zeros(2**n_qubits)
+    clean[0b100], clean[0b011] = 0.7, 0.3
+    scale = 1.0 if kind == "probs" else 1000.0
+    noisy = _transition_matrix(cm) @ clean * scale
+
+    apply = _rem_apply_to_probs if kind == "probs" else _rem_apply_to_counts
+    recovered = apply(jnp.asarray(noisy), jnp.asarray(cm), n_qubits)
+    assert np.allclose(np.asarray(recovered), clean * scale, atol=1e-8 * scale)
+
+
+def _reference_mitigated_counts(samples, cm):
+    """Reference REM solve on the sampled bitstrings only (Nation et al.), keyed by bitstring."""
+    unique, counts = np.unique(samples, axis=0, return_counts=True)
+    n_qubits = samples.shape[1]
+    transition = np.array(
+        [[np.prod([cm[k][m[k], p[k]] for k in range(n_qubits)]) for p in unique] for m in unique]
+    )
+    transition /= transition.sum(axis=0, keepdims=True)
+    mitigated = np.linalg.solve(transition, counts.astype(np.float64))
+    return {tuple(b): c for b, c in zip(unique, mitigated)}
+
+
+@pytest.mark.parametrize(
+    "n_qubits,n_shots",
+    [
+        (3, 64),  # 2**n <= n_shots: histogram path
+        (3, 6),  # 2**n > n_shots: sort-based path
+    ],
+)
+def test_apply_samples_per_wire_asymmetric(n_qubits, n_shots):
+    """Both _rem_apply_to_samples paths match a reference solve with per-wire, asymmetric noise."""
+    cm = _per_qubit_asymmetric_confusion(n_qubits)
+    rng = np.random.default_rng(3)
+    samples = rng.integers(0, 2, size=(n_shots, n_qubits)).astype(np.int32)
+
+    bitstrings, counts = _rem_apply_to_samples(jnp.asarray(samples), jnp.asarray(cm), n_qubits)
+
+    # Sum over repeated rows: the sort-based path stores each count at the first occurrence.
+    got = {}
+    for b, c in zip(np.asarray(bitstrings), np.asarray(counts)):
+        got[tuple(b)] = got.get(tuple(b), 0.0) + c
+    expected = _reference_mitigated_counts(samples, cm)
+    for b, c in expected.items():
+        assert np.isclose(got[b], c)
+    assert np.allclose([c for b, c in got.items() if b not in expected], 0.0)
+
+
+@pytest.mark.parametrize("kind", ["probs", "counts"])
+def test_cached_matrices_wire_order(kind):
+    """mitigate_with_rem pairs calibration_matrices[k] with wire k of the device."""
+    n_qubits, shots = 3, 100
+    cm = _per_qubit_asymmetric_confusion(n_qubits)
+    dev = qp.device("lightning.qubit", wires=n_qubits)
+
+    @qp.qnode(dev, shots=shots)
+    def circuit():
+        qp.PauliX(wires=0)  # noiseless |100>
+        return qp.probs() if kind == "probs" else qp.counts()
+
+    @catalyst.qjit
+    def mitigated(cm_in):
+        return mitigate_with_rem(circuit, calibration_matrices=cm_in)()
+
+    out = mitigated(jnp.asarray(cm))
+    result = np.asarray(out if kind == "probs" else out[1])
+    measured = np.zeros(2**n_qubits)
+    measured[0b100] = 1.0 if kind == "probs" else shots
+    expected = np.linalg.solve(_transition_matrix(cm), measured)
+    assert np.allclose(result, expected)
+
+
 def test_unsupported_measurement():
     """REM rejects non-sample/counts/probs measurements with a clear trace-time error."""
     dev = qp.device("lightning.qubit", wires=2)
@@ -376,3 +517,12 @@ def test_unsupported_measurement():
 
     with pytest.raises(AssertionError, match="measurement process must be one of"):
         catalyst.qjit(mitigated)
+
+
+def test_rem_calibrate_apply_reject_unknown_mp_kind():
+    """The public dispatchers raise for measurement processes other than sample, counts, probs."""
+    cm = _per_qubit_symmetric_confusion(1, 0.0)
+    with pytest.raises(ValueError, match="Unsupported measurement process 'expval'"):
+        rem_calibrate("expval", cm, cm)
+    with pytest.raises(ValueError, match="Unsupported measurement process 'expval'"):
+        rem_apply("expval", cm, cm, 1)

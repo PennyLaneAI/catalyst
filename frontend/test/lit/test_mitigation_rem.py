@@ -48,10 +48,10 @@ def rem_with_probs():
 # Post-processing:
 #   calibration consumes the two f64 calibration tensors and yields the (n_qubits, 2, 2) confusion stack.
 #   apply consumes the f64 mitigatee probs and yields the mitigated 2^n probs vector.
-# CHECK: call @rem_calibrate_probs({{.*}}) : (tensor<4xf64>, tensor<4xf64>) -> tensor<2x2x2xf64>
-# CHECK: call @rem_apply_to_probs({{.*}}) : (tensor<4xf64>, tensor<2x2x2xf64>, tensor<2xi64>) -> tensor<4xf64>
-# CHECK: func.func private @rem_calibrate_probs(%{{.*}}: tensor<4xf64>, %{{.*}}: tensor<4xf64>) -> tensor<2x2x2xf64>
-# CHECK: func.func private @rem_apply_to_probs(%{{.*}}: tensor<4xf64>, %{{.*}}: tensor<2x2x2xf64>, %{{.*}}: tensor<2xi64>) -> tensor<4xf64>
+# CHECK: call @_rem_calibrate_probs({{.*}}) : (tensor<4xf64>, tensor<4xf64>) -> tensor<2x2x2xf64>
+# CHECK: call @_rem_apply_to_probs({{.*}}) : (tensor<4xf64>, tensor<2x2x2xf64>) -> tensor<4xf64>
+# CHECK: func.func private @_rem_calibrate_probs(%{{.*}}: tensor<4xf64>, %{{.*}}: tensor<4xf64>) -> tensor<2x2x2xf64>
+# CHECK: func.func private @_rem_apply_to_probs(%{{.*}}: tensor<4xf64>, %{{.*}}: tensor<2x2x2xf64>) -> tensor<4xf64>
 print(rem_with_probs.mlir)
 
 
@@ -74,16 +74,16 @@ def rem_with_counts():
 # CHECK-SAME: -> (tensor<4xi64>, tensor<4xi64>, tensor<4xi64>, tensor<4xi64>)
 # Post-processing: counts path reuses the probs calibration after normalization,
 # and apply returns f64 because the linear solve is float-valued.
-# CHECK: call @rem_calibrate_counts({{.*}}) : (tensor<4xi64>, tensor<4xi64>) -> tensor<2x2x2xf64>
-# CHECK: call @rem_apply_to_counts({{.*}}) : (tensor<4xi64>, tensor<2x2x2xf64>, tensor<2xi64>) -> tensor<4xf64>
-# CHECK: func.func private @rem_calibrate_counts(%{{.*}}: tensor<4xi64>, %{{.*}}: tensor<4xi64>) -> tensor<2x2x2xf64>
-# CHECK: func.func private @rem_apply_to_counts(%{{.*}}: tensor<4xi64>, %{{.*}}: tensor<2x2x2xf64>, %{{.*}}: tensor<2xi64>) -> tensor<4xf64>
+# CHECK: call @_rem_calibrate_counts({{.*}}) : (tensor<4xi64>, tensor<4xi64>) -> tensor<2x2x2xf64>
+# CHECK: call @_rem_apply_to_counts({{.*}}) : (tensor<4xi64>, tensor<2x2x2xf64>) -> tensor<4xf64>
+# CHECK: func.func private @_rem_calibrate_counts(%{{.*}}: tensor<4xi64>, %{{.*}}: tensor<4xi64>) -> tensor<2x2x2xf64>
+# CHECK: func.func private @_rem_apply_to_counts(%{{.*}}: tensor<4xi64>, %{{.*}}: tensor<2x2x2xf64>) -> tensor<4xf64>
 print(rem_with_counts.mlir)
 
 
 @qjit(target="mlir")
 def rem_with_sample_histogram():
-    """SampleMP, 2**n_qubits <= n_shots -> rem_apply_to_samples picks the full-histogram path (K = 2**n)."""
+    """SampleMP, 2**n_qubits <= n_shots -> _rem_apply_to_samples picks the full-histogram path (K = 2**n)."""
     dev = qp.device("lightning.qubit", wires=2)
 
     def circuit():
@@ -100,16 +100,16 @@ def rem_with_sample_histogram():
 # CHECK-SAME: -> (tensor<200x2xi64>, tensor<200x2xf64>, tensor<200x2xf64>)
 # Post-processing, histogram path: calibrate sees (shots, qubits) i32 samples,
 # apply returns ((K, n_qubits) bitstrings, (K,) counts) with K = 2**n_qubits = 4.
-# CHECK: call @rem_calibrate_samples({{.*}}) : (tensor<200x2xi32>, tensor<200x2xi32>) -> tensor<2x2x2xf64>
-# CHECK: call @rem_apply_to_samples({{.*}}) : (tensor<200x2xi32>, tensor<2x2x2xf64>, tensor<2xi64>) -> (tensor<4x2xi32>, tensor<4xf64>)
-# CHECK: func.func private @rem_calibrate_samples(%{{.*}}: tensor<200x2xi32>, %{{.*}}: tensor<200x2xi32>) -> tensor<2x2x2xf64>
-# CHECK: func.func private @rem_apply_to_samples(%{{.*}}: tensor<200x2xi32>, %{{.*}}: tensor<2x2x2xf64>, %{{.*}}: tensor<2xi64>) -> (tensor<4x2xi32>, tensor<4xf64>)
+# CHECK: call @_rem_calibrate_samples({{.*}}) : (tensor<200x2xi32>, tensor<200x2xi32>) -> tensor<2x2x2xf64>
+# CHECK: call @_rem_apply_to_samples({{.*}}) : (tensor<200x2xi32>, tensor<2x2x2xf64>) -> (tensor<4x2xi32>, tensor<4xf64>)
+# CHECK: func.func private @_rem_calibrate_samples(%{{.*}}: tensor<200x2xi32>, %{{.*}}: tensor<200x2xi32>) -> tensor<2x2x2xf64>
+# CHECK: func.func private @_rem_apply_to_samples(%{{.*}}: tensor<200x2xi32>, %{{.*}}: tensor<2x2x2xf64>) -> (tensor<4x2xi32>, tensor<4xf64>)
 print(rem_with_sample_histogram.mlir)
 
 
 @qjit(target="mlir")
 def rem_with_sample_sort_rle():
-    """SampleMP, 2**n_qubits > n_shots -> rem_apply_to_samples picks the sort-RLE path (K = n_shots)."""
+    """SampleMP, 2**n_qubits > n_shots -> _rem_apply_to_samples picks the sort-RLE path (K = n_shots)."""
     dev = qp.device("lightning.qubit", wires=4)
 
     def circuit():
@@ -126,17 +126,17 @@ def rem_with_sample_sort_rle():
 # CHECK: mitigation.rem @{{[^(]+}}() runCalibration(true)
 # CHECK-SAME: -> (tensor<4x4xi64>, tensor<4x4xf64>, tensor<4x4xf64>)
 # Post-processing, sort-RLE path: apply output is (K = n_shots = 4, n_qubits) and (K,).
-# CHECK: call @rem_calibrate_samples({{.*}}) : (tensor<4x4xi32>, tensor<4x4xi32>) -> tensor<4x2x2xf64>
-# CHECK: call @rem_apply_to_samples({{.*}}) : (tensor<4x4xi32>, tensor<4x2x2xf64>, tensor<4xi64>) -> (tensor<4x4xi32>, tensor<4xf64>)
-# CHECK: func.func private @rem_calibrate_samples(%{{.*}}: tensor<4x4xi32>, %{{.*}}: tensor<4x4xi32>) -> tensor<4x2x2xf64>
-# CHECK: func.func private @rem_apply_to_samples(%{{.*}}: tensor<4x4xi32>, %{{.*}}: tensor<4x2x2xf64>, %{{.*}}: tensor<4xi64>) -> (tensor<4x4xi32>, tensor<4xf64>)
+# CHECK: call @_rem_calibrate_samples({{.*}}) : (tensor<4x4xi32>, tensor<4x4xi32>) -> tensor<4x2x2xf64>
+# CHECK: call @_rem_apply_to_samples({{.*}}) : (tensor<4x4xi32>, tensor<4x2x2xf64>) -> (tensor<4x4xi32>, tensor<4xf64>)
+# CHECK: func.func private @_rem_calibrate_samples(%{{.*}}: tensor<4x4xi32>, %{{.*}}: tensor<4x4xi32>) -> tensor<4x2x2xf64>
+# CHECK: func.func private @_rem_apply_to_samples(%{{.*}}: tensor<4x4xi32>, %{{.*}}: tensor<4x2x2xf64>) -> (tensor<4x4xi32>, tensor<4xf64>)
 print(rem_with_sample_sort_rle.mlir)
 
 
 @qjit(target="mlir")
 def rem_cached():
     """Passing precomputed calibration matrices runs the op with runCalibration(false)
-    and emits rem_apply_to_probs but not rem_calibrate_probs."""
+    and emits _rem_apply_to_probs but not _rem_calibrate_probs."""
     dev = qp.device("lightning.qubit", wires=2)
 
     def circuit():
@@ -153,7 +153,7 @@ def rem_cached():
 # The op's result tuple must shrink to only the callee's return, no zeros/ones slots.
 # CHECK: mitigation.rem @{{[^(]+}}() runCalibration(false)
 # CHECK-SAME: -> tensor<4xf64>
-# CHECK: call @rem_apply_to_probs({{.*}}) : (tensor<4xf64>, tensor<2x2x2xf64>, tensor<2xi64>) -> tensor<4xf64>
-# CHECK-NOT: call @rem_calibrate
-# CHECK-NOT: func.func private @rem_calibrate
+# CHECK: call @_rem_apply_to_probs({{.*}}) : (tensor<4xf64>, tensor<2x2x2xf64>) -> tensor<4xf64>
+# CHECK-NOT: call @_rem_calibrate
+# CHECK-NOT: func.func private @_rem_calibrate
 print(rem_cached.mlir)
