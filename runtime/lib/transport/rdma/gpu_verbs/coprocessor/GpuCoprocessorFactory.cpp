@@ -29,19 +29,20 @@
 #include "BackendConfig.hpp"
 #include "GpuCoprocessorSession.hpp"
 #include "TransportBackend.h"
+#include "WireLink.hpp"
 
 namespace {
 catalyst::transport::CoprocessorSession *make_gpu_coprocessor(const std::string &config) {
-    const auto cfg = catalyst::transport::common::parse_backend_config(config);
+    namespace common = catalyst::transport::common;
+    namespace gpu_verbs = catalyst::transport::gpu_verbs;
     // `gpu` is optional and defaults to device 0
-    const int gpu_device = catalyst::transport::common::configparser::parse_optional_index(
-        config, "gpu", /*fallback=*/0);
-    auto *session = new catalyst::transport::gpu_verbs::GpuCoprocessorSession(
-        cfg.dev, cfg.gid, gpu_device,
-        catalyst::transport::common::frame::geometry_from_config(config));
-    session->set_thread_affinity(
-        catalyst::transport::common::configparser::parse_optional_index(config, "cpu_pin", -1),
-        catalyst::transport::common::configparser::parse_optional_index(config, "rt", 0) != 0);
+    const int gpu_device = common::configparser::parse_optional_index(config, "gpu", 0);
+    const int cpu = common::configparser::parse_optional_index(config, "cpu_pin", -1);
+    const bool rt = common::configparser::parse_optional_index(config, "rt", 0) != 0;
+    auto *session = new gpu_verbs::GpuCoprocessorSession(
+        gpu_device, common::make_coprocessor_link(config, "gpu_verbs",
+                                                  gpu_verbs::GpuCoprocessorSession::FWD_QP_SHAPE));
+    session->set_thread_affinity(cpu, rt);
     return session;
 }
 } // namespace

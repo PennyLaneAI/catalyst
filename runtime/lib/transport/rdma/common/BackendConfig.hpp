@@ -61,4 +61,17 @@ inline BackendConfig parse_backend_config(const std::string &config) {
     return BackendConfig{std::move(dev), gid};
 }
 
+/// What a coprocessor speaks to its controller.
+enum class Wire {
+    RC, // the RC wire every catalyst controller speaks; `wire=rc` or no `wire` key
+};
+
+/// The wire a coprocessor's `config` selects.
+inline Wire wire_from_config(const std::string &config) {
+    const auto wire = configparser::find(config, "wire");
+    TP_CHECK(!wire || *wire == "rc", "config: unknown wire '%.*s' (want rc)",
+             static_cast<int>(wire ? wire->size() : 0), wire ? wire->data() : "");
+    return Wire::RC;
+}
+
 } // namespace catalyst::transport::common
