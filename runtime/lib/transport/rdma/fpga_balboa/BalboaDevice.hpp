@@ -67,7 +67,7 @@ class BalboaDevice {
     volatile std::uint8_t *reply(std::uint32_t idx) {
         return reply_ + std::size_t{idx} * HWHS_SLOT_BYTES;
     }
-    volatile std::uint8_t *demo() { return demo_; }
+    volatile std::uint8_t *pacer() { return pacer_; }
     /// RTT trace entry `i`, in net clock cycles; 0xFFFF is saturated.
     std::uint16_t trace(std::uint32_t i) const {
         const std::uint32_t w = trace_[i / 2];
@@ -98,7 +98,7 @@ class BalboaDevice {
     volatile std::uint8_t *slot_ = nullptr;      // slot RAM: request payloads
     volatile std::uint8_t *reply_ = nullptr;     // reply RAM
     volatile std::uint32_t *trace_ = nullptr;    // RTT trace, two 16-bit entries per word
-    volatile std::uint8_t *demo_ = nullptr;      // transport_demo table
+    volatile std::uint8_t *pacer_ = nullptr;     // transport_demo table
     volatile std::uint32_t *gpio_id_ = nullptr;  // ch1 BUILD_ID, ch2 net clock Hz
     volatile std::uint32_t *gpio_ctl_ = nullptr; // ch1 [0] BALBOA reset, ch2 status
     std::uint32_t clk_hz_ = 0;

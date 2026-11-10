@@ -734,6 +734,10 @@ int __catalyst__transport__start_benchmark(CatalystTransportSession *s, std::uin
     const bool progress = (flags & CATALYST_BENCH_PROGRESS) != 0;
 
     return guard([&] {
+        if (c->self_paced()) { // the backend issues the rounds and keeps their record itself
+            return c->run_paced();
+        }
+
         std::vector<std::uint8_t> outgoing_message(
             std::max<std::size_t>(outgoing_message_bytes, sizeof(std::uint64_t)), 0);
         std::uint64_t written = 0;
@@ -756,10 +760,6 @@ int __catalyst__transport__start_benchmark(CatalystTransportSession *s, std::uin
             }
             std::uint64_t sw_rtt = now_ns() - t0;
 
-            if (rc == CATALYST_TRANSPORT_RUN_COMPLETE) { // the backend paced the rounds itself
-                rc = CATALYST_TRANSPORT_OK;
-                break;
-            }
             if (rc != CATALYST_TRANSPORT_OK) {
                 std::uint64_t reply_value = 0;
                 std::memcpy(&reply_value, rslot, sizeof(reply_value));

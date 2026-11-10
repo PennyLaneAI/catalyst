@@ -16,9 +16,9 @@
 //
 // Config keys, all optional:
 //   reply_to_us=<n>     the engine gives up on a reply after this long (default 1 s)
-//   demo=off|hw         hw: the PL pacer issues every round (HsbControllerSession.hpp)
-//   demo_freq, demo_cnt, demo_depth, demo_span, demo_seed, demo_trace, demo_trace_out, demo_table
-//                       as the hwhs backend's keys of the same name
+//   pacer=off|hw        hw: the PL pacer issues every round (HsbControllerSession.hpp)
+//   pacer_freq, pacer_cnt, pacer_depth, pacer_span, pacer_seed, pacer_trace, pacer_trace_out,
+//   pacer_table         as the hwhs backend's keys of the same name
 
 #include <cstdint>
 #include <stdexcept>
@@ -39,26 +39,26 @@ std::uint64_t number(const std::string &config, const char *key, std::uint64_t d
 }
 
 catalyst::transport::ControllerSession *make_hsb_controller(const std::string &config) {
-    const std::string demo_mode{cp::find(config, "demo").value_or("off")};
-    if (demo_mode != "off" && demo_mode != "hw") {
-        throw std::runtime_error("unknown demo '" + demo_mode + "' (want off|hw)");
+    const std::string pacer_mode{cp::find(config, "pacer").value_or("off")};
+    if (pacer_mode != "off" && pacer_mode != "hw") {
+        throw std::runtime_error("unknown pacer '" + pacer_mode + "' (want off|hw)");
     }
-    catalyst::transport::hsb::DemoCfg demo;
-    demo.enable = demo_mode == "hw";
-    demo.freq = number(config, "demo_freq", 0);
-    demo.cnt = static_cast<std::uint32_t>(number(config, "demo_cnt", 1));
-    demo.depth = static_cast<std::uint32_t>(number(config, "demo_depth", 256));
-    demo.span = static_cast<std::uint32_t>(number(config, "demo_span", 0));
-    demo.seed = static_cast<std::uint32_t>(number(config, "demo_seed", 0));
-    // The trace RAM is fixed on this board, so demo_trace can only confirm where it is.
-    if (number(config, "demo_trace", HWHS_PHYS_TRACE) != HWHS_PHYS_TRACE) {
-        throw std::runtime_error("demo_trace: the trace RAM is at 0x92000000 on this board");
+    catalyst::transport::hsb::PacerCfg pacer;
+    pacer.enable = pacer_mode == "hw";
+    pacer.freq = number(config, "pacer_freq", 0);
+    pacer.cnt = static_cast<std::uint32_t>(number(config, "pacer_cnt", 1));
+    pacer.depth = static_cast<std::uint32_t>(number(config, "pacer_depth", 256));
+    pacer.span = static_cast<std::uint32_t>(number(config, "pacer_span", 0));
+    pacer.seed = static_cast<std::uint32_t>(number(config, "pacer_seed", 0));
+    // The trace RAM is fixed on this board, so pacer_trace can only confirm where it is.
+    if (number(config, "pacer_trace", HWHS_PHYS_TRACE) != HWHS_PHYS_TRACE) {
+        throw std::runtime_error("pacer_trace: the trace RAM is at 0x92000000 on this board");
     }
-    demo.trace_out = std::string{cp::find(config, "demo_trace_out").value_or("")};
-    demo.table_path = std::string{cp::find(config, "demo_table").value_or("")};
+    pacer.trace_out = std::string{cp::find(config, "pacer_trace_out").value_or("")};
+    pacer.table_path = std::string{cp::find(config, "pacer_table").value_or("")};
 
     return new catalyst::transport::hsb::HsbControllerSession(
-        number(config, "reply_to_us", 1'000'000), demo);
+        number(config, "reply_to_us", 1'000'000), pacer);
 }
 
 } // namespace

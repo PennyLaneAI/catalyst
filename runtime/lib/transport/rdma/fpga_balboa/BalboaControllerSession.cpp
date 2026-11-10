@@ -37,9 +37,6 @@ namespace {
 constexpr int kOk = CATALYST_TRANSPORT_OK;
 constexpr int kErrTimeout = CATALYST_TRANSPORT_ERR_TIMEOUT;
 constexpr int kErrStuck = CATALYST_TRANSPORT_ERR_STUCK;
-// As the hwhs backend: the pacer reached demo_cnt and stopped, which ends a bounded run. The
-// trace header and the "[balboa demo]" lines say how the run went.
-constexpr int kDemoComplete = CATALYST_TRANSPORT_RUN_COMPLETE;
 
 constexpr std::uint64_t kCollectTimeoutNs = 5'000'000'000ULL;
 constexpr std::size_t kRttSamplesReserve = 3'000'000; // 24 MB
@@ -55,17 +52,17 @@ std::uint64_t now_ns() {
 
 } // namespace
 
-BalboaControllerSession::BalboaControllerSession(std::uint64_t reply_to_us, DemoCfg demo)
-    : reply_to_us_(reply_to_us), demo_(std::move(demo)),
+BalboaControllerSession::BalboaControllerSession(std::uint64_t reply_to_us, PacerCfg pacer)
+    : reply_to_us_(reply_to_us), pacer_(std::move(pacer)),
       replies_(std::size_t{HWHS_SLOTS} * HWHS_SLOT_BYTES, 0) {
-    if (demo_.enable) {
-        TP_CHECK(demo_.depth != 0 && demo_.depth % HWHS_SLOT_BYTES == 0 &&
-                     2ull * demo_.depth <= HWHS_SIZE_DEMO,
-                 "balboa: demo_depth must be a non-zero multiple of 64 and at most %u",
+    if (pacer_.enable) {
+        TP_CHECK(pacer_.depth != 0 && pacer_.depth % HWHS_SLOT_BYTES == 0 &&
+                     2ull * pacer_.depth <= HWHS_SIZE_DEMO,
+                 "balboa: pacer_depth must be a non-zero multiple of 64 and at most %u",
                  HWHS_SIZE_DEMO / 2);
-        TP_CHECK(demo_.cnt != 0, "balboa: demo_cnt must be non-zero");
-        TP_CHECK((demo_.span & (demo_.span + 1u)) == 0,
-                 "balboa: demo_span must be 2^N-1 (all ones), e.g. 0xFFFFF");
+        TP_CHECK(pacer_.cnt != 0, "balboa: pacer_cnt must be non-zero");
+        TP_CHECK((pacer_.span & (pacer_.span + 1u)) == 0,
+                 "balboa: pacer_span must be 2^N-1 (all ones), e.g. 0xFFFFF");
     }
     rtt_samples_.reserve(kRttSamplesReserve);
 }
@@ -187,14 +184,14 @@ void BalboaControllerSession::commit_work_item(std::uint32_t work_item_idx, std:
     submitted_ = 0;
     collected_ = 0;
     armed_ = true;
-    demo_program();
+    pacer_program();
 }
 
 void BalboaControllerSession::write_data_slot(const void *src, std::uint64_t bytes,
                                               std::uint32_t decoder_id) {
     TP_CHECK(bytes <= common::PAYLOAD_DATA_BYTES, "balboa: write_data_slot: %llu bytes exceed %zu",
              static_cast<unsigned long long>(bytes), common::PAYLOAD_DATA_BYTES);
-    if (demo_.enable) {
+    if (pacer_.enable) {
         return; // the pacer sends from its own table
     }
     std::memset(request_, 0, common::PAYLOAD_DATA_BYTES);
@@ -204,23 +201,15 @@ void BalboaControllerSession::write_data_slot(const void *src, std::uint64_t byt
 }
 
 void *BalboaControllerSession::reply_slot() {
-    return replies_.data() + (collected_ % ring_len_) * HWHS_SLOT_BYTES;
+    return replies_.data() + (collected_ % HWHS_SLOTS) * HWHS_SLOT_BYTES;
 }
 
 int BalboaControllerSession::kick(std::uint32_t work_item_idx) {
+    TP_CHECK(!pacer_.enable, "balboa: kick: pacer=hw issues its own rounds, use run_paced()");
     TP_CHECK(work_item_idx == 0, "balboa: only a single work item (idx 0) is supported");
     TP_CHECK(armed_, "balboa: kick before commit_work_item()");
     TP_CHECK(submitted_ == collected_,
              "balboa: kick: previous round still in flight, collect() first");
-
-    if (demo_.enable) {
-        if (!demo_armed_) {
-            demo_arm();
-            demo_armed_ = true;
-        }
-        ++submitted_;
-        return kOk;
-    }
 
     // As hwhs_round: the engine sends slot RAM[RING_IDX] and replies into reply RAM[RING_IDX].
     round_idx_ = dev_->rd(HWHS_RING_IDX);
@@ -237,33 +226,40 @@ int BalboaControllerSession::kick(std::uint32_t work_item_idx) {
     return kOk;
 }
 
+// The pacer issues every round from its table; the trace is the only record of them.
+int BalboaControllerSession::run_paced() {
+    TP_CHECK(pacer_.enable, "balboa: run_paced needs pacer=hw");
+    TP_CHECK(armed_, "balboa: run_paced before commit_work_item()");
+    TP_CHECK(!pacer_armed_, "balboa: run_paced: one run per commit_work_item()");
+    pacer_arm();
+    pacer_armed_ = true;
+
+    std::uint32_t last = dev_->rd(HWHS_ROUND_CNT);
+    std::uint64_t stall_deadline = now_ns() + kCollectTimeoutNs;
+    for (;;) {
+        // The pacer reached pacer_cnt and stopped; the trace header and the "[balboa pacer]"
+        // lines say how the run went.
+        if (dev_->rd(HWHS_DEMO_STS) & 1u) {
+            pacer_finished_ = true;
+            return kOk;
+        }
+        const std::uint32_t rounds = dev_->rd(HWHS_ROUND_CNT);
+        if (rounds != last) {
+            last = rounds;
+            stall_deadline = now_ns() + kCollectTimeoutNs;
+        } else if (now_ns() >= stall_deadline) {
+            std::fprintf(stderr, "[balboa pacer] run stalled: STATUS 0x%08x, %u round(s)\n",
+                         dev_->rd(HWHS_STATUS), rounds - rounds_base_);
+            return kErrStuck;
+        }
+        ::usleep(200); // nothing here is latency-critical
+    }
+}
+
 int BalboaControllerSession::collect(void *const *replies, const std::uint64_t *replies_bytes,
                                      std::size_t n) {
     TP_CHECK(armed_, "balboa: collect before commit_work_item()");
     TP_CHECK(submitted_ != collected_, "balboa: collect: nothing in flight");
-
-    if (demo_.enable) { // the trace is the only record of a paced run
-        std::uint32_t last = dev_->rd(HWHS_ROUND_CNT);
-        std::uint64_t stall_deadline = now_ns() + kCollectTimeoutNs;
-        for (;;) {
-            if (dev_->rd(HWHS_DEMO_STS) & 1u) {
-                demo_finished_ = true;
-                ++collected_;
-                return kDemoComplete;
-            }
-            const std::uint32_t rounds = dev_->rd(HWHS_ROUND_CNT);
-            if (rounds != last) {
-                last = rounds;
-                stall_deadline = now_ns() + kCollectTimeoutNs;
-            } else if (now_ns() >= stall_deadline) {
-                std::fprintf(stderr, "[balboa demo] run stalled: STATUS 0x%08x, %u round(s)\n",
-                             dev_->rd(HWHS_STATUS), rounds - rounds_base_);
-                ++collected_;
-                return kErrStuck;
-            }
-            ::usleep(200); // nothing here is latency-critical
-        }
-    }
 
     // DONE_CNT goes up when the engine finishes the round, with a reply or by timing out.
     const std::uint64_t deadline = now_ns() + reply_to_us_ * 1000ULL + kCollectTimeoutNs;
@@ -294,23 +290,23 @@ int BalboaControllerSession::collect(void *const *replies, const std::uint64_t *
     return kOk;
 }
 
-// Load the pacer's table and settings; it starts at the first kick().
-void BalboaControllerSession::demo_program() {
-    if (!demo_.enable) {
+// Load the pacer's table and settings; run_paced() starts it.
+void BalboaControllerSession::pacer_program() {
+    if (!pacer_.enable) {
         return;
     }
-    const std::uint32_t entries = demo_.depth / HWHS_SLOT_BYTES;
-    std::vector<std::uint8_t> img(2 * std::size_t{demo_.depth}, 0);
-    if (!demo_.table_path.empty()) {
-        // a byte image: the syndromes, then the expected replies, demo_depth bytes each
-        std::FILE *f = std::fopen(demo_.table_path.c_str(), "rb");
-        TP_CHECK(f != nullptr, "balboa: demo_table: cannot open %s", demo_.table_path.c_str());
+    const std::uint32_t entries = pacer_.depth / HWHS_SLOT_BYTES;
+    std::vector<std::uint8_t> img(2 * std::size_t{pacer_.depth}, 0);
+    if (!pacer_.table_path.empty()) {
+        // a byte image: the syndromes, then the expected replies, pacer_depth bytes each
+        std::FILE *f = std::fopen(pacer_.table_path.c_str(), "rb");
+        TP_CHECK(f != nullptr, "balboa: pacer_table: cannot open %s", pacer_.table_path.c_str());
         const std::size_t got = std::fread(img.data(), 1, img.size(), f);
         const bool too_long = std::fgetc(f) != EOF;
         std::fclose(f);
         TP_CHECK(got == img.size() && !too_long,
-                 "balboa: demo_table %s is %zu bytes%s; demo_depth=%u needs exactly %zu",
-                 demo_.table_path.c_str(), got, too_long ? "+" : "", demo_.depth, img.size());
+                 "balboa: pacer_table %s is %zu bytes%s; pacer_depth=%u needs exactly %zu",
+                 pacer_.table_path.c_str(), got, too_long ? "+" : "", pacer_.depth, img.size());
     } else {
         // Entry i: Payload{value = i + 1, decoder_id = 0, seq = i + 1}, which an echo returns.
         for (std::uint32_t half = 0; half < 2; ++half) {
@@ -318,7 +314,7 @@ void BalboaControllerSession::demo_program() {
                 common::Payload p{};
                 p.value = std::uint64_t{i} + 1;
                 p.seq_num = i + 1;
-                std::memcpy(img.data() + half * std::size_t{demo_.depth} +
+                std::memcpy(img.data() + half * std::size_t{pacer_.depth} +
                                 std::size_t{i} * HWHS_SLOT_BYTES,
                             &p, sizeof(p));
             }
@@ -327,27 +323,27 @@ void BalboaControllerSession::demo_program() {
 
     dev_->wr(HWHS_DEMO_CTRL, HWHS_DEMO_RESET);
     for (std::uint32_t i = 0; i < 2 * entries; ++i) {
-        BalboaDevice::copy_to_dev64(dev_->demo() + std::size_t{i} * HWHS_SLOT_BYTES,
+        BalboaDevice::copy_to_dev64(dev_->pacer() + std::size_t{i} * HWHS_SLOT_BYTES,
                                     img.data() + std::size_t{i} * HWHS_SLOT_BYTES);
     }
     BalboaDevice::io_barrier();
-    (void)reinterpret_cast<volatile std::uint64_t *>(dev_->demo())[0];
+    (void)reinterpret_cast<volatile std::uint64_t *>(dev_->pacer())[0];
 
-    dev_->wr(HWHS_SYN_DEPTH, demo_.depth);
-    dev_->wr(HWHS_CMD_CNT, demo_.cnt);
-    dev_->wr(HWHS_FREQ_LO, static_cast<std::uint32_t>(demo_.freq));
-    dev_->wr(HWHS_FREQ_HI, static_cast<std::uint32_t>(demo_.freq >> 32));
-    dev_->wr(HWHS_FREQ_SPAN, demo_.span);
-    if (demo_.seed != 0) {
-        dev_->wr(HWHS_LFSR_SEED, demo_.seed);
+    dev_->wr(HWHS_SYN_DEPTH, pacer_.depth);
+    dev_->wr(HWHS_CMD_CNT, pacer_.cnt);
+    dev_->wr(HWHS_FREQ_LO, static_cast<std::uint32_t>(pacer_.freq));
+    dev_->wr(HWHS_FREQ_HI, static_cast<std::uint32_t>(pacer_.freq >> 32));
+    dev_->wr(HWHS_FREQ_SPAN, pacer_.span);
+    if (pacer_.seed != 0) {
+        dev_->wr(HWHS_LFSR_SEED, pacer_.seed);
     }
-    demo_armed_ = false;
-    demo_finished_ = false;
+    pacer_armed_ = false;
+    pacer_finished_ = false;
 }
 
-void BalboaControllerSession::demo_arm() {
+void BalboaControllerSession::pacer_arm() {
     rounds_base_ = dev_->rd(HWHS_ROUND_CNT);
-    demo_timeouts_base_ = dev_->rd(HWHS_TIMEOUT_CNT);
+    pacer_timeouts_base_ = dev_->rd(HWHS_TIMEOUT_CNT);
     dev_->wr(HWHS_TRACE_CTRL, 1); // clear, then record
     dev_->wr(HWHS_TRACE_CTRL, 0);
     dev_->wr(HWHS_DEMO_CTRL, 0); // reset_demo off
@@ -355,19 +351,19 @@ void BalboaControllerSession::demo_arm() {
     dev_->wr(HWHS_DEMO_CTRL, HWHS_DEMO_START);
 }
 
-void BalboaControllerSession::demo_report() const {
+void BalboaControllerSession::pacer_report() const {
     const std::uint32_t rounds = dev_->rd(HWHS_ROUND_CNT) - rounds_base_;
-    const std::uint32_t timeouts = dev_->rd(HWHS_TIMEOUT_CNT) - demo_timeouts_base_;
+    const std::uint32_t timeouts = dev_->rd(HWHS_TIMEOUT_CNT) - pacer_timeouts_base_;
     const std::uint32_t errors = dev_->rd(HWHS_STS1);
-    std::fprintf(stderr, "[balboa demo] engine ran %u round(s)%s\n", rounds,
-                 demo_finished_ ? "  [run complete]" : "");
-    std::fprintf(stderr, "[balboa demo] demo_cnt=%u timeouts=%u compare_errors=%u%s\n", demo_.cnt,
-                 timeouts, errors, errors ? "   <-- DATA MISMATCH" : "");
+    std::fprintf(stderr, "[balboa pacer] engine ran %u round(s)%s\n", rounds,
+                 pacer_finished_ ? "  [run complete]" : "");
+    std::fprintf(stderr, "[balboa pacer] pacer_cnt=%u timeouts=%u compare_errors=%u%s\n",
+                 pacer_.cnt, timeouts, errors, errors ? "   <-- DATA MISMATCH" : "");
 }
 
 // The trace RAM, as `cycles,ns`, in the hwhs backend's format with the net clock.
-void BalboaControllerSession::demo_dump_trace() const {
-    if (demo_.trace_out.empty()) {
+void BalboaControllerSession::pacer_dump_trace() const {
+    if (pacer_.trace_out.empty()) {
         return;
     }
     const std::uint32_t cnt = std::min(dev_->rd(HWHS_TRACE_CNT), HWHS_TRACE_ENTRIES);
@@ -376,9 +372,9 @@ void BalboaControllerSession::demo_dump_trace() const {
         std::fprintf(stderr, "[balboa trace] nothing recorded\n");
         return;
     }
-    std::FILE *f = std::fopen(demo_.trace_out.c_str(), "w");
+    std::FILE *f = std::fopen(pacer_.trace_out.c_str(), "w");
     if (f == nullptr) {
-        std::fprintf(stderr, "[balboa trace] cannot write %s\n", demo_.trace_out.c_str());
+        std::fprintf(stderr, "[balboa trace] cannot write %s\n", pacer_.trace_out.c_str());
         return;
     }
     std::fprintf(f, "# rtt trace, one row per completed round, in order\n");
@@ -391,7 +387,7 @@ void BalboaControllerSession::demo_dump_trace() const {
     }
     std::fclose(f);
     std::fprintf(stderr, "[balboa trace] wrote %u round(s) to %s%s%s\n", cnt,
-                 demo_.trace_out.c_str(),
+                 pacer_.trace_out.c_str(),
                  (sts & 1u) ? "   <-- buffer filled: rounds after this were not recorded" : "",
                  (sts & 2u) ? "   <-- some entry clamped to 0xFFFF: a ceiling, not a value" : "");
 }
@@ -434,10 +430,10 @@ void BalboaControllerSession::stop() {
     stopped_ = true;
     report_rtt();
     if (dev_) {
-        if (demo_.enable && armed_) {
-            demo_report();
-            demo_dump_trace();
-            dev_->wr(HWHS_DEMO_CTRL, HWHS_DEMO_RESET); // the engine leaves demo mode
+        if (pacer_.enable && armed_) {
+            pacer_report();
+            pacer_dump_trace();
+            dev_->wr(HWHS_DEMO_CTRL, HWHS_DEMO_RESET); // the engine leaves pacer mode
         }
         dev_->wr(HWHS_CTRL, HWHS_CTRL_ABORT);
         dev_->wr(HWHS_CTRL, 0);

@@ -25,9 +25,9 @@
  *
  *   sw-loop: each kick() copies the request into slot RAM and starts one round; collect() waits
  *            for the engine to finish it and reads the reply and the RTT.
- *   demo:    (`demo=hw`) transport_demo, the PL pacer, issues every round from a table; the
- *            first kick() starts it, collect() waits for the run to end, and stop() writes the
- *            RTT trace, the only record of the rounds, to `demo_trace_out`.
+ *   pacer:   (`pacer=hw`) transport_demo, the PL pacer, issues every round from a table;
+ *            run_paced() starts it and waits for the run to end, and stop() writes the RTT
+ *            trace, the only record of the rounds, to `pacer_trace_out`.
  */
 
 #pragma once
@@ -44,8 +44,8 @@
 
 namespace catalyst::transport::balboa {
 
-/// The pacer's settings; the keys keep the spelling of the hwhs backend's `demo_*`.
-struct DemoCfg {
+/// The pacer's settings; the keys keep the spelling of the hwhs backend's `pacer_*`.
+struct PacerCfg {
     bool enable = false;
     std::uint64_t freq = 0;    // net clock cycles between sends; 0 = back to back
     std::uint32_t cnt = 1;     // rounds per run
@@ -58,7 +58,7 @@ struct DemoCfg {
 
 class BalboaControllerSession final : public ControllerSession {
   public:
-    BalboaControllerSession(std::uint64_t reply_to_us, DemoCfg demo);
+    BalboaControllerSession(std::uint64_t reply_to_us, PacerCfg pacer);
     ~BalboaControllerSession() override;
 
     BalboaControllerSession(const BalboaControllerSession &) = delete;
@@ -82,17 +82,19 @@ class BalboaControllerSession final : public ControllerSession {
     void write_data_slot(const void *src, std::uint64_t bytes, std::uint32_t decoder_id) override;
     void *reply_slot() override;
     int kick(std::uint32_t work_item_idx = 0) override;
+    bool self_paced() const override { return pacer_.enable; }
+    int run_paced() override;
 
   private:
-    void demo_program();
-    void demo_arm();
-    void demo_report() const;
-    void demo_dump_trace() const;
+    void pacer_program();
+    void pacer_arm();
+    void pacer_report() const;
+    void pacer_dump_trace() const;
     void report_rtt() const;
     std::uint64_t cycles_to_ns(std::uint64_t cycles) const;
 
     std::uint64_t reply_to_us_;
-    DemoCfg demo_;
+    PacerCfg pacer_;
 
     std::optional<BalboaDevice> dev_;
     common::FdGuard oob_;
@@ -118,11 +120,11 @@ class BalboaControllerSession final : public ControllerSession {
     std::uint64_t last_rtt_ns_ = 0;
     std::vector<std::uint64_t> rtt_samples_;
 
-    // demo
-    bool demo_armed_ = false;
-    bool demo_finished_ = false;
+    // pacer
+    bool pacer_armed_ = false;
+    bool pacer_finished_ = false;
     std::uint32_t rounds_base_ = 0;
-    std::uint32_t demo_timeouts_base_ = 0;
+    std::uint32_t pacer_timeouts_base_ = 0;
 };
 
 } // namespace catalyst::transport::balboa

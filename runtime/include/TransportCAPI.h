@@ -38,7 +38,6 @@ typedef enum {
     CATALYST_TRANSPORT_ERR_MEMORY = -2,  // Memory error
     CATALYST_TRANSPORT_ERR_TIMEOUT = -3, // Timeout error
     CATALYST_TRANSPORT_ERR_STUCK = -4,   // Something got stuck
-    CATALYST_TRANSPORT_RUN_COMPLETE = 1, // A backend pacing its own rounds has run them all
 } CatalystTransportStatus;
 
 // Session role (mirrors catalyst::transport::Role in the dialect).

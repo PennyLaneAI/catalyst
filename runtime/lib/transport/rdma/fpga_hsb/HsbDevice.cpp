@@ -192,7 +192,7 @@ HsbDevice::HsbDevice() {
         reply_ = static_cast<volatile std::uint8_t *>(map_window(HWHS_PHYS_REPLY, HWHS_SIZE_REPLY));
         trace_ =
             static_cast<volatile std::uint32_t *>(map_window(HWHS_PHYS_TRACE, HWHS_SIZE_TRACE));
-        demo_ = static_cast<volatile std::uint8_t *>(map_window(HWHS_PHYS_DEMO, HWHS_SIZE_DEMO));
+        pacer_ = static_cast<volatile std::uint8_t *>(map_window(HWHS_PHYS_DEMO, HWHS_SIZE_DEMO));
         gpio_id_ =
             static_cast<volatile std::uint32_t *>(map_window(HWHS_PHYS_GPIO_ID, HWHS_SIZE_GPIO));
         gpio_ctl_ =
@@ -221,11 +221,11 @@ void HsbDevice::release() noexcept {
     unmap(slot_, HWHS_SIZE_SLOT);
     unmap(reply_, HWHS_SIZE_REPLY);
     unmap(trace_, HWHS_SIZE_TRACE);
-    unmap(demo_, HWHS_SIZE_DEMO);
+    unmap(pacer_, HWHS_SIZE_DEMO);
     unmap(gpio_id_, HWHS_SIZE_GPIO);
     unmap(gpio_ctl_, HWHS_SIZE_GPIO);
     regs_ = nullptr;
-    slot_ = reply_ = demo_ = nullptr;
+    slot_ = reply_ = pacer_ = nullptr;
     trace_ = gpio_id_ = gpio_ctl_ = nullptr;
 }
 
