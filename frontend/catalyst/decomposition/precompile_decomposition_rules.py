@@ -148,7 +148,6 @@ def precompile_decomp_rules(decomp_file_path: str = BYTECODE_FILE_PATH):
         "--canonicalize",
         "--convert-to-value-semantics",
         "--canonicalize",
-        "--register-decomp-rule-resource",
         stdin=bytecode_lib.encode("utf-8"),
         text=None,
     )

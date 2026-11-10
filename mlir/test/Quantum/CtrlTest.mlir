@@ -303,18 +303,25 @@ func.func @ctrl_with_region_op_non_scf(%ctrl: !quantum.bit, %q: !quantum.bit, %a
 func.func @ctrl_with_work_wire(%ctrl: !quantum.bit, %work: !quantum.bit, %q: !quantum.bit)
     -> (!quantum.bit, !quantum.bit, !quantum.bit) {
   %true = arith.constant true
+  %angle = "test.op"() : () -> f64
   // CHECK-NOT: quantum.ctrl
   // CHECK: %[[Q:.*]]:2, %[[C:.*]] = quantum.operator "PauliX"() qubits(%[[TARGET]], %[[WORK]])
   // CHECK-NEXT: ctrls(%[[CTRL]]) ctrl_vals(%{{.*}})
   // CHECK: static_data = {ctrl_work_wire_type = "zeroed"}
   // CHECK: qubit_map = {ctrl_work_wires = [1], wires = [0]}
-  // CHECK: return %[[C]], %[[Q]]#1, %[[Q]]#0
+  // CHECK: %[[Q_MZ:.*]]:2, %[[C_MZ:.*]] = quantum.operator "MultiRZ"
+  // CHECK-SAME: qubits(%[[Q]]#0, %[[Q]]#1)
+  // CHECK-NEXT: ctrls(%[[C]]) ctrl_vals(%{{.*}})
+  // CHECK: static_data = {ctrl_work_wire_type = "zeroed"}
+  // CHECK: qubit_map = {ctrl_work_wires = [1], wires = [0]}
+  // CHECK: return %[[C_MZ]], %[[Q_MZ]]#1, %[[Q_MZ]]#0
   %out_ctrl, %out_work, %out_q = quantum.ctrl(%ctrl) ctrlvals(%true)
       work_wires(%work) (%q) {work_wire_type = "zeroed"}
       : !quantum.bit work_wires !quantum.bit -> !quantum.bit {
   ^bb0(%arg: !quantum.bit):
     %x = quantum.custom "PauliX"() %arg : !quantum.bit
-    quantum.yield %x : !quantum.bit
+    %multirz = quantum.multirz (%angle) %x  : !quantum.bit
+    quantum.yield %multirz : !quantum.bit
   }
   return %out_ctrl, %out_work, %out_q : !quantum.bit, !quantum.bit, !quantum.bit
 }

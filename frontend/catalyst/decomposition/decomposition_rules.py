@@ -24,7 +24,11 @@ loaded by the C++ compiler.
 from jax._src.lib.mlir import ir
 
 from catalyst.decomposition.capture_session import OpDecompRequest
-from catalyst.decomposition.graph_op_id import GraphOpID
+from catalyst.decomposition.graph_op_id import (
+    CTRL_WORK_WIRE_TYPE,
+    CTRL_WORK_WIRES,
+    GraphOpID,
+)
 from catalyst.decomposition.modifier_state import ModifierState
 from catalyst.decomposition.rule_compilation import (
     build_rule_module,
@@ -37,12 +41,14 @@ from catalyst.decomposition.rule_preparation import (
     CollectedRule,
     DecompRuleSpec,
     DecompTargetSpec,
+    HybridArgumentSpec,
+    HybridLeafSource,
     RuleTraceInputs,
     _adjoint_folds_to_base,
     _append_decomp_target_spec,
     _resources_have_measurement,
     _rule_allocates_work_wires,
-    _rule_is_eligible,
+    _rule_is_compatible,
     build_base_op,
     build_decomp_rule_variants,
     build_decomp_target_spec,
@@ -66,6 +72,8 @@ __all__ = (
     "DecompRuleSpec",
     "DecompTargetSpec",
     "GraphOpID",
+    "HybridArgumentSpec",
+    "HybridLeafSource",
     "RuleTraceInputs",
     "build_base_op",
     "build_decomp_rule_variants",
@@ -203,7 +211,8 @@ def compile_reachable_decomposition_rules_wrapper(
 
     * **Modifier ids.** For a plain op the name and id agree (``"S"`` / ``"S{...}"``). For an
       op-level modifier the graphOpId is name-wrapped while the name stays the base (``"S"``). We
-      recover the base id and modifier state so discovery starts from that variant.
+      recover the base id and modifier state so discovery starts from that variant. Control work
+      wires also appear in the wire/static dictionaries; remove them from the base arguments.
     * **The whole closure, not just this op's direct rules.** The loader does not recurse into a
       rule's resource ops, so it needs every rule reachable from this op down to the gate set in one
       shot. For ``Adjoint(S)`` that includes ``Adjoint(S) -> Adjoint(PhaseShift)`` *and*
@@ -225,6 +234,11 @@ def compile_reachable_decomposition_rules_wrapper(
         str: a module holding the whole reachable rule closure
     """
     base_id, modifiers = ModifierState.from_graph_op_id(op_name, SerializedGraphOpID(op_id))
+    if modifiers.is_controlled:
+        wire_lens = {name: size for name, size in wire_lens.items() if name != CTRL_WORK_WIRES}
+        static_data = {
+            name: value for name, value in static_data.items() if name != CTRL_WORK_WIRE_TYPE
+        }
 
     rule_strings = materialize_reachable_rule_strings(
         op_name=op_name,
