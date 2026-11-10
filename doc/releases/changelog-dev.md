@@ -5,7 +5,7 @@
 * Backline can drive a VPK120 whose FPGA carries NVIDIA's Holoscan Sensor Bridge (HSB), through
   the new `hsb_hwhs` controller backend. Its coprocessors stay `cpu_verbs` and `gpu_verbs`,
   set to face HSB with `peer=hsb`.
-  [(#3465)](https://github.com/PennyLaneAI/catalyst/pull/3465)
+  [(#3466)](https://github.com/PennyLaneAI/catalyst/pull/3466)
 
 * A new coprocessor function called `catalyst_onnx_coprocessor` has been added, which runs an
   ONNX model on the CPU or a GPU through onnxruntime, and is built with the transport runtime.
