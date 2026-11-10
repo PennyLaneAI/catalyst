@@ -45,7 +45,11 @@ from pennylane.wires import Wires
 
 from catalyst.compiler import _quantum_opt
 from catalyst.decomposition.capture_session import OpDecompRequest
-from catalyst.decomposition.graph_op_id import GraphOpID
+from catalyst.decomposition.graph_op_id import (
+    CTRL_WORK_WIRE_TYPE,
+    CTRL_WORK_WIRES,
+    GraphOpID,
+)
 from catalyst.decomposition.modifier_state import ModifierState
 from catalyst.decomposition.rule_lowering_warning import RuleLoweringWarning
 from catalyst.decomposition.type_utils import (
@@ -93,7 +97,7 @@ class DecompRuleSpec:
     Attributes:
         prepared_rule_fn: Adapted rule body accepting the flattened operands described by its
             :class:`RuleTraceInputs`.
-        frontend_name: Name of the PennyLane decomposition rule, retained for fixed and alternative
+        frontend_name: Name of the PennyLane decomposition rule, retained for fixed and excluded
             rule selection.
         resource_counts_by_id: GraphOpID-to-count mapping attached to the lowered function.
         resource_counts_by_op: Operator2-to-count mapping used to traverse outgoing resource edges.
@@ -105,13 +109,16 @@ class DecompRuleSpec:
     resource_counts_by_op: dict[Operator2, int]
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RuleTraceInputs:
     """Dummy arguments and operand layout shared by a target's prepared rules.
 
     :func:`rule_call_operands` packs these inputs as positional and named parameters, numeric
     hybrid leaves, one grouped base-wire operand, then optional control wires and values.
-    The caller packs the inputs in its tracing context.
+    Packing creates JAX arrays, so it must happen in the caller's tracing context.
+
+    ``ctrl_wires`` and ``ctrl_values`` must be supplied together with matching lengths,
+    or both be ``None``.
 
     Attributes:
         call_args: Positional dummy arguments used to trace custom-operation rules.
@@ -230,7 +237,9 @@ def symbolic_op_name(op_name, kind) -> str:
     raise CompileError(f"Unknown symbolic kind: {kind}")  # pragma: no cover
 
 
-def symbolic_arguments(base_op, kind, ctrl_wires=None, ctrl_values=None) -> dict:
+def symbolic_arguments(
+    base_op, kind, ctrl_wires=None, ctrl_values=None, work_wires=None, work_wire_type="borrowed"
+) -> dict:
     """Return the arguments a rule registered against a symbolic operator expects.
 
     PennyLane calls such a rule with the symbolic operator's own ``arguments``: ``base`` alone for
@@ -243,6 +252,8 @@ def symbolic_arguments(base_op, kind, ctrl_wires=None, ctrl_values=None) -> dict
         kind (str): ``"adjoint"`` or ``"control"``
         ctrl_wires: the control wires, for ``kind="control"``
         ctrl_values: the control values, for ``kind="control"``
+        work_wires: the work wires available to the controls, for ``kind="control"``
+        work_wire_type (str): the type of those work wires, ``"zeroed"`` or ``"borrowed"``
 
     Returns:
         dict: the arguments to call the rule with
@@ -256,12 +267,13 @@ def symbolic_arguments(base_op, kind, ctrl_wires=None, ctrl_values=None) -> dict
         assert ctrl_wires is not None
         assert ctrl_values is not None
         ctrl_wires = Wires(ctrl_wires)
+        work_wires = Wires([] if work_wires is None else work_wires)
         return {
             "base": base_op,
             "control_wires": ctrl_wires,
             "control_values": ctrl_values,
-            "work_wires": Wires([]),
-            "work_wire_type": "borrowed",
+            "work_wires": work_wires,
+            "work_wire_type": work_wire_type if work_wires else "borrowed",
         }
     raise CompileError(f"Unknown symbolic kind: {kind}")  # pragma: no cover
 
@@ -408,17 +420,23 @@ def flatten_hybrid_args(extra_data) -> tuple:
 
 
 def rule_call_operands(trace_inputs: RuleTraceInputs) -> list[Array | np.float64]:
-    """Flatten a rule call as params, operand-passed hybrid-arg leaves, one grouped base-wire
-    operand, then optional control wires and control values.
+    """Pack dummy inputs into the positional operand layout used to trace a rule.
 
-    Everything is passed positionally because ``qp.capture.subroutine`` traces through ``jax.jit``,
-    which would otherwise flatten keyword arguments in sorted-name order.
+    The order is positional parameters, named parameters, numeric hybrid leaves, one grouped
+    base-wire array, then optional control wires and values. Named parameters follow
+    ``trace_inputs.kwarg_names``; wire groups follow ``trace_inputs.wire_lens`` insertion order.
+    Control work wires are included as a ``ctrl_work_wires`` register in the grouped
+    wire array. The grouped wire array is present even when empty.
+
+    Packing creates JAX arrays and must run in the caller's tracing context. All operands are
+    positional so ``jax.jit`` (used by ``qp.capture.subroutine``) cannot reorder keyword arguments
+    alphabetically.
 
     Args:
         trace_inputs (RuleTraceInputs): the rule's dummy arguments and operand layout
 
     Returns:
-        list: the operands to call the traced rule with
+        list: positional operands in the layout consumed by :func:`unpack_rule_operands`
     """
     param_names = [name for name in trace_inputs.kwarg_names if name not in trace_inputs.wire_lens]
     wire_names = list(trace_inputs.wire_lens)
@@ -448,11 +466,13 @@ def unpack_rule_operands(
     has_ctrl_wires,
     hybrid_specs=(),
 ):
-    """Recover ``(params, kwargs, control wires, control values)`` from flat rule operands.
+    """Recover params, kwargs, control wires, control values, and work wires from
+    :func:`rule_call_operands`' flattening.
 
-    Uses the layout from :func:`rule_call_operands`. Reconstructs each hybrid argument from its
-    traced leaves (via its ``treedef``) so the rule body receives the same object the user passed,
-    but built from the traced operands.
+    Reconstructs each hybrid argument from its traced parameters and wires so the rule body
+    receives the same object the user passed, but built from the traced operands. A
+    ``ctrl_work_wires`` group is taken back out of the grouped wires: it belongs to the control
+    modifier, not to the base operator the rule body rebuilds.
 
     Args:
         operands (tuple): the traced operands the rule body received
@@ -460,14 +480,15 @@ def unpack_rule_operands(
         kwarg_names (list[str]): parameter names first, followed by wire names
         wire_lens (dict[str, int]): wire names in operand order and their lengths
         has_ctrl_wires (bool): whether trailing control-wire and control-value operands are present
-        hybrid_specs (list[tuple]): ``(name, treedef, num_leaves)`` per hybrid argument, sitting
-            between the parameter kwargs and the grouped wire operand
+        hybrid_specs (list[HybridArgumentSpec]): reconstruction specs for hybrid arguments whose
+            numeric leaves sit between the parameter kwargs and the grouped wire operand
 
     Returns:
         tuple: the rule's positional arguments
         dict: the rule's keyword arguments (including the rebuilt hybrid arguments)
         the control wires, or None
         the control values, or None
+        the control work wires, or None
     """
     params = tuple(operands[:n_params])
     param_names = [name for name in kwarg_names if name not in wire_lens]
@@ -497,13 +518,14 @@ def unpack_rule_operands(
             ordinary_parameters, operator_parameters, wires=named.get(spec.name, ())
         )
 
+    work_wires = named.pop(CTRL_WORK_WIRES, None)
     ctrl_wires = operands[idx] if has_ctrl_wires else None
     ctrl_values = operands[idx + 1] if has_ctrl_wires and len(operands) > idx + 1 else None
     if has_ctrl_wires:
         assert len(ctrl_values) == len(
             ctrl_wires
         ), "number of control wires and control values must be the same"
-    return params, named, ctrl_wires, ctrl_values
+    return params, named, ctrl_wires, ctrl_values, work_wires
 
 
 def get_rule_strings_from_module(module: ir.Module) -> list[str]:
@@ -717,6 +739,13 @@ def prepare_dynamic_op_kwargs(dynamic_shape, wire_lens) -> dict[str, Array]:
     return kwargs
 
 
+def _dummy_work_wires(offset, num_work_wires):
+    """Return the control work-wire operand trailing ``offset`` rule wires, or None without any."""
+    if not num_work_wires:
+        return None
+    return jnp.array(range(offset, offset + num_work_wires), dtype=int)
+
+
 def build_decomp_target_spec(
     op_name: str,
     op_id: SerializedGraphOpID,
@@ -740,7 +769,8 @@ def build_decomp_target_spec(
     control: each base rule body is wrapped in ``qp.ctrl(..., control=<n wires>)`` (reduced to
     op-level controlled gates by ``ctrl-lowering`` within the decomposition pass), the
     ``target_gate`` becomes ``<n>C(op_name)`` and each produced resource op is wrapped in the same
-    ``<n>C(...)`` modifier.
+    ``<n>C(...)`` modifier. The control work wires are handed to the region and spelled on the
+    target and resource ids alike.
 
     The two may be combined to synthesize the nested modifier ``<n>C(Adjoint(op_name))``: adjoint is
     applied innermost and control outermost (the canonical order matching the compiler's
@@ -765,6 +795,10 @@ def build_decomp_target_spec(
     extra_data = extra_data or {}
     n_base_wires = sum(wire_lens.values())
     n_ctrl = modifiers.control_count
+    num_work_wires = modifiers.num_work_wires
+    signature_wire_lens = (
+        {**wire_lens, CTRL_WORK_WIRES: num_work_wires} if num_work_wires else wire_lens
+    )
 
     collected_rules = collect_resources_for_op(
         op_name,
@@ -791,18 +825,20 @@ def build_decomp_target_spec(
     # Once we have the correct rules, don't send them into qjit: they are closed over instead.
     def rule_to_callable(rule: DecompositionRule) -> Callable[..., None]:
         def decomp_rule(*_operands) -> None:
-            _args, _kwargs, _ctrl_wires, _ctrl_values = unpack_rule_operands(
+            _args, _kwargs, _ctrl_wires, _ctrl_values, _work_wires = unpack_rule_operands(
                 _operands,
                 len(call_args),
                 kwarg_names,
-                wire_lens,
+                signature_wire_lens,
                 modifiers.is_controlled,
                 hybrid_specs,
             )
             # Operand-passed hybrid args are rebuilt from operands in unpack_rule_operands; static
             # data and closed-over hybrid args are supplied directly.
             _kwargs |= static_data | closed_hybrid
-            modifiers.wrap_callable(rule._impl, _ctrl_wires, _ctrl_values)(*_args, **_kwargs)
+            modifiers.wrap_callable(rule._impl, _ctrl_wires, _ctrl_values, _work_wires)(
+                *_args, **_kwargs
+            )
 
         # JAX's symbol table disambiguates rules with the same frontend name.
         decomp_rule.__name__ = rule.name
@@ -828,13 +864,18 @@ def build_decomp_target_spec(
             )
         )
 
-    # For control distribution, the extra control wires trail the base wires in the rule's operands.
+    # Control wires trail the grouped registers. Control work wires are one of those registers.
     ctrl_wires = (
         jnp.array(range(n_base_wires, n_base_wires + n_ctrl), dtype=int)
         if modifiers.is_controlled
         else None
     )
     ctrl_values = jnp.ones(n_ctrl, dtype=bool) if modifiers.is_controlled else None
+    if num_work_wires:
+        call_kwargs = {
+            **call_kwargs,
+            CTRL_WORK_WIRES: _dummy_work_wires(n_base_wires + n_ctrl, num_work_wires),
+        }
 
     return DecompTargetSpec(
         rules=rule_specs,
@@ -842,13 +883,13 @@ def build_decomp_target_spec(
             call_args=call_args,
             call_kwargs=call_kwargs,
             kwarg_names=kwarg_names,
-            wire_lens=wire_lens,
+            wire_lens=signature_wire_lens,
             ctrl_wires=ctrl_wires,
             ctrl_values=ctrl_values,
             hybrid_leaves=tuple(hybrid_leaves),
         ),
         target_id=target_id,
-        num_qreg_qubits=n_base_wires + n_ctrl,
+        num_qreg_qubits=n_base_wires + n_ctrl + num_work_wires,
         modifier_context=modifiers,
         reject_noninvertible=modifiers.is_modified,
     )
@@ -995,7 +1036,16 @@ def build_rule_module(
 
 
 def collect_symbolic_resources(
-    op_cls, op_name, kwargs, is_custom_op, *, kind, ctrl_wires=(), ctrl_values=()
+    op_cls,
+    op_name,
+    kwargs,
+    is_custom_op,
+    *,
+    kind,
+    ctrl_wires=(),
+    ctrl_values=(),
+    work_wires=(),
+    work_wire_type="borrowed",
 ) -> tuple[list[CollectedRule], dict]:
     """Collect resources for eligible rules registered against ``Adjoint(op_name)``/``C(op_name)``.
 
@@ -1011,6 +1061,8 @@ def collect_symbolic_resources(
         kind (str): ``"adjoint"`` or ``"control"``
         ctrl_wires: the control wires, for ``kind="control"``
         ctrl_values: the control values, for ``kind="control"``
+        work_wires: the work wires available to the controls, for ``kind="control"``
+        work_wire_type (str): the type of those work wires
 
     Returns:
         list[CollectedRule]: source rules and their resource counts, in registry order
@@ -1025,7 +1077,9 @@ def collect_symbolic_resources(
     # resources in terms of abstract operators, matching `_get_kwargs` in PennyLane's graph.
     with qp.capture.pause():  # do not bind more primitives from abstract instantiation
         base_op = abstractify(build_base_op(op_cls, kwargs, is_custom_op))
-    probe_args = symbolic_arguments(base_op, kind, ctrl_wires, ctrl_values)
+    probe_args = symbolic_arguments(
+        base_op, kind, ctrl_wires, ctrl_values, work_wires, work_wire_type
+    )
 
     collected_rules = []
     for rule in rules:
@@ -1117,10 +1171,16 @@ def build_registered_decomp_target_spec(
     controls = modifiers.without_adjoint()
     wrap_control = modifiers.adjoint and controls.is_controlled
     n_wires = n_base_wires + controls.control_count
+    signature_wire_lens = (
+        {**wire_lens, CTRL_WORK_WIRES: controls.num_work_wires}
+        if controls.num_work_wires
+        else wire_lens
+    )
 
-    # A kind="control" rule takes the control wires as its own arguments; a wrap_control adjoint
-    # rule instead has the control applied around its body so it is probed without control wires.
-    collect_ctrl_wires = range(n_base_wires, n_wires) if kind == "control" else ()
+    # A kind="control" rule takes the control and work wires as its own arguments; a wrap_control
+    # adjoint rule instead has the control applied around its body so it is probed without them.
+    is_control = kind == "control"
+    collect_ctrl_wires = range(n_base_wires, n_wires) if is_control else ()
     collect_ctrl_values = [True] * len(collect_ctrl_wires)
     collected_rules, probe_args = collect_symbolic_resources(
         op_cls,
@@ -1130,6 +1190,8 @@ def build_registered_decomp_target_spec(
         kind=kind,
         ctrl_wires=collect_ctrl_wires,
         ctrl_values=collect_ctrl_values,
+        work_wires=range(n_wires, n_wires + controls.num_work_wires) if is_control else (),
+        work_wire_type=controls.work_wire_type,
     )
     if not collected_rules:
         return None
@@ -1160,11 +1222,11 @@ def build_registered_decomp_target_spec(
 
     def rule_to_callable(rule: DecompositionRule) -> Callable[..., None]:
         def decomp_rule(*_operands) -> None:
-            _args, _kwargs, _ctrl_wires, _ctrl_values = unpack_rule_operands(
+            _args, _kwargs, _ctrl_wires, _ctrl_values, _work_wires = unpack_rule_operands(
                 _operands,
                 len(call_args),
                 kwarg_names,
-                wire_lens,
+                signature_wire_lens,
                 modifiers.is_controlled,
                 hybrid_specs,
             )
@@ -1183,9 +1245,14 @@ def build_registered_decomp_target_spec(
                     lambda: rule._impl(**symbolic_arguments(base, kind, None)),
                     _ctrl_wires,
                     _ctrl_values,
+                    _work_wires,
                 )()
             else:
-                rule._impl(**symbolic_arguments(base, kind, _ctrl_wires, _ctrl_values))
+                rule._impl(
+                    **symbolic_arguments(
+                        base, kind, _ctrl_wires, _ctrl_values, _work_wires, controls.work_wire_type
+                    )
+                )
 
         decomp_rule.__name__ = rule.name
         return decomp_rule
@@ -1220,6 +1287,11 @@ def build_registered_decomp_target_spec(
         jnp.array(range(n_base_wires, n_wires), dtype=int) if modifiers.is_controlled else None
     )
     ctrl_values = jnp.ones(controls.control_count, dtype=bool) if modifiers.is_controlled else None
+    if controls.num_work_wires:
+        call_kwargs = {
+            **call_kwargs,
+            CTRL_WORK_WIRES: _dummy_work_wires(n_wires, controls.num_work_wires),
+        }
 
     return DecompTargetSpec(
         rules=rule_specs,
@@ -1227,13 +1299,13 @@ def build_registered_decomp_target_spec(
             call_args=call_args,
             call_kwargs=call_kwargs,
             kwarg_names=kwarg_names,
-            wire_lens=wire_lens,
+            wire_lens=signature_wire_lens,
             ctrl_wires=ctrl_wires,
             ctrl_values=ctrl_values,
             hybrid_leaves=tuple(hybrid_leaves),
         ),
         target_id=target_id,
-        num_qreg_qubits=n_wires,
+        num_qreg_qubits=n_wires + controls.num_work_wires,
         modifier_context=controls if wrap_control else ModifierState(),
         reject_noninvertible=wrap_control,
     )
@@ -1306,7 +1378,7 @@ def build_decomp_rule_variants(
     target_specs = []
     ordered_states = sorted(
         modifier_states,
-        key=lambda s: (s.control_count, s.adjoint),
+        key=lambda s: (s.control_count, s.num_work_wires, s.work_wire_type, s.adjoint),
     )
     for state in ordered_states:
         target_id = state.wrap_id(request.base_id)
@@ -1338,7 +1410,14 @@ def walk_reachable_decomp_rule_sets(
         (
             request,
             set(required_states),
-            {request.base_id: request.modifier_state.control_count},
+            {
+                request.base_id: (
+                    (
+                        request.modifier_state.control_count,
+                        request.modifier_state.num_work_wires,
+                    ),
+                )
+            },
         )
         for request, required_states in initial_requests
     )
@@ -1369,24 +1448,28 @@ def walk_reachable_decomp_rule_sets(
         target_specs.extend(new_specs)
 
         for child in child_requests(new_specs):
-            # A control-changing cycle can otherwise manufacture an unbounded sequence of modifier
-            # counts. Compare with the same base identity earlier on this path, rather than the
-            # direct parent: intermediate operators may absorb their controls into their identity.
-            # The first uncontrolled-to-controlled revisit remains valid.
-            child_control_count = child.modifier_state.control_count
-            previous_control_count = path_control_counts.get(child.base_id)
-            increases_control_cycle = (
-                previous_control_count is not None
-                and previous_control_count > 0
-                and child_control_count > previous_control_count
-            )
-            if increases_control_cycle:
+            # A modifier-changing cycle can otherwise manufacture an unbounded sequence of control
+            # and control work-wire counts, e.g. C(SemiAdder) passes its spare work wires on to
+            # ctrl(CNOT). Compare with every state of the same base identity earlier on this path,
+            # rather than the direct parent: intermediate operators may absorb their controls into
+            # their identity, or trade a control for a work wire. Prune a revisit whose counts are
+            # all at least those of an earlier controlled state and differ from it; any infinite
+            # sequence of count pairs contains such a revisit, so every path is finite. The first
+            # uncontrolled-to-controlled revisit remains valid, and an equal revisit is left to
+            # ``processed_states``.
+            child_counts = (child.modifier_state.control_count, child.modifier_state.num_work_wires)
+            earlier_counts = path_control_counts.get(child.base_id, ())
+            if any(
+                controls > 0
+                and child_counts != (controls, work_wires)
+                and child_counts[0] >= controls
+                and child_counts[1] >= work_wires
+                for controls, work_wires in earlier_counts
+            ):
                 continue
 
             child_path_control_counts = path_control_counts.copy()
-            child_path_control_counts[child.base_id] = max(
-                previous_control_count or 0, child_control_count
-            )
+            child_path_control_counts[child.base_id] = (*earlier_counts, child_counts)
             queue.append((child, {child.modifier_state}, child_path_control_counts))
 
     return target_specs
@@ -1446,7 +1529,8 @@ def compile_reachable_decomposition_rules_wrapper(
 
     * **Modifier ids.** For a plain op the name and id agree (``"S"`` / ``"S{...}"``). For an
       op-level modifier the graphOpId is name-wrapped while the name stays the base (``"S"``). We
-      recover the base id and modifier state so discovery starts from that variant.
+      recover the base id and modifier state so discovery starts from that variant. Control work
+      wires also appear in the wire/static dictionaries; remove them from the base arguments.
     * **The whole closure, not just this op's direct rules.** The loader does not recurse into a
       rule's resource ops, so it needs every rule reachable from this op down to the gate set in one
       shot. For ``Adjoint(S)`` that includes ``Adjoint(S) -> Adjoint(PhaseShift)`` *and*
@@ -1468,6 +1552,11 @@ def compile_reachable_decomposition_rules_wrapper(
         str: a module holding the whole reachable rule closure
     """
     base_id, modifiers = ModifierState.from_graph_op_id(op_name, SerializedGraphOpID(op_id))
+    if modifiers.is_controlled:
+        wire_lens = {name: size for name, size in wire_lens.items() if name != CTRL_WORK_WIRES}
+        static_data = {
+            name: value for name, value in static_data.items() if name != CTRL_WORK_WIRE_TYPE
+        }
 
     rule_strings = materialize_reachable_rule_strings(
         op_name=op_name,

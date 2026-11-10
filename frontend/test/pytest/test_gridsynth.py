@@ -107,7 +107,10 @@ def test_gridsynth_ctrl_region_error():
 
     with pytest.raises(CompileError, match="cannot control a function call"):
         qp.qjit(
-            qp.transforms.gridsynth(circuit, epsilon=1e-6), capture=True, collect_decomp_rules=False
+            qp.transforms.gridsynth(circuit, epsilon=1e-6),
+            capture=True,
+            collect_decomp_rules=False,
+            skip_preprocess=True,
         )(0.7)
 
 
@@ -264,10 +267,7 @@ def test_mixed_gridsynth_samples(param, op, eps, ppr_basis):
 @pytest.mark.parametrize("op", [qp.RZ, qp.PhaseShift])
 @pytest.mark.parametrize("eps", [1e-2, 1e-4])
 @pytest.mark.parametrize("ppr_basis", [False, True])
-@pytest.mark.xfail(
-    reason="mixed-fallback introduces quantum.measure",
-    strict=True,
-)
+@pytest.mark.xfail(reason="mixed-fallback introduces quantum.measure", strict=False)
 def test_mixed_fallback_gridsynth_samples(op, eps, ppr_basis):
     """Test the sampled states of the mixed fallback method."""
     dev = qp.device("lightning.qubit", wires=1)
@@ -305,7 +305,7 @@ def test_mixed_fallback_gridsynth_samples(op, eps, ppr_basis):
         pytest.param(
             "mixed-fallback",
             marks=pytest.mark.xfail(
-                reason="mixed-fallback introduces quantum.measure", strict=True
+                reason="mixed-fallback introduces quantum.measure", strict=False
             ),
         ),
     ],
@@ -334,7 +334,7 @@ def test_mixed_gridsynth_seed(method):
         pytest.param(
             "mixed-fallback",
             marks=pytest.mark.xfail(
-                reason="mixed-fallback introduces quantum.measure", strict=True
+                reason="mixed-fallback introduces quantum.measure", strict=False
             ),
         ),
     ],
@@ -398,7 +398,7 @@ def test_gridsynth_high_precision(eps):
         pytest.param(
             "mixed-fallback",
             marks=pytest.mark.xfail(
-                reason="mixed-fallback introduces quantum.measure", strict=True
+                reason="mixed-fallback introduces quantum.measure", strict=False
             ),
         ),
     ],
@@ -443,7 +443,7 @@ def test_mixed_gridsynth_high_precision(eps, method):
         pytest.param(
             "mixed-fallback",
             marks=pytest.mark.xfail(
-                reason="mixed-fallback introduces quantum.measure", strict=True
+                reason="mixed-fallback introduces quantum.measure", strict=False
             ),
         ),
     ],

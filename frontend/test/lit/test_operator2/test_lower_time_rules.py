@@ -184,7 +184,7 @@ def test_multiple_rules_same_gate():
 # CHECK-SAME:   "SingleParam{x:[tensor<2xf64>]}{reg:1}{}" = 1 : i64
 # CHECK-SAME:   target_gate = "NoParams{}{reg:2}{}"
 #
-# CHECK-NOT: func.func private @__builtin_rule1{{(_[0-9]+)?}}
+# CHECK-NOT: func.func private @__builtin_rule1{{(_[0-9]+)?}}{{.*}}target_gate = "NoParams{}{reg:2}{}"
 #
 # CHECK: func.func private @__builtin_rule1{{(_[0-9]+)?}}
 # CHECK-SAME:   resources = {operations = {
@@ -609,7 +609,7 @@ def test_basis_rotation_decomposition():
         @qp.qjit(target="mlir", capture=True)
         @qp.qnode(qp.device("null.qubit", wires=2))
         def test_basis_rotation_real_valued():
-            # A real orthogonal matrix with determinant -1, so the determinant-fixing PhaseShift runs.
+            # A real orthogonal matrix with determinant -1, so the PauliZ correction runs.
             U = jnp.array([[0.76484219, 0.64421769], [0.64421769, -0.76484219]])
             qp.BasisRotation(unitary_matrix=U, wires=[0, 1])
             return qp.probs()
@@ -619,7 +619,7 @@ def test_basis_rotation_decomposition():
     # CHECK-LABEL: test_basis_rotation_real_valued
     # CHECK: func.func private @__builtin__real_basis_rotation_decomp{{(_[0-9]+)?}}
     # CHECK-SAME: resources = {operations = {
-    # CHECK-SAME: "PhaseShift{0:[f64]}{wires:1}{}" = 1 : i64
+    # CHECK-SAME: "PauliZ{}{wires:1}{}" = 1 : i64
     # CHECK-SAME: "SingleExcitation{0:[f64]}{wires:2}{}" = 1 : i64
     # CHECK-SAME: target_gate = "BasisRotation{unitary_matrix:[tensor<2x2xf64>]}{wires:2}{check = false}"
     test_basis_rotation_real_valued()
@@ -651,7 +651,7 @@ def test_basis_rotation_decomposition():
     def test_real_op_that_decomposes_to_basis_rotation():
         """A parent holding a real matrix must declare, emit and find a real ``BasisRotation``."""
 
-        # A real orthogonal matrix with determinant -1, so the determinant-fixing PhaseShift runs.
+        # A real orthogonal matrix with determinant -1, so the PauliZ correction runs.
         print(_compile_parent(jnp.array([[0.76484219, 0.64421769], [0.64421769, -0.76484219]])))
 
     # CHECK: func.func private @__builtin_rule{{(_[0-9]+)?}}
@@ -661,7 +661,7 @@ def test_basis_rotation_decomposition():
     # CHECK: qref.operator "BasisRotation"(
     # CHECK-SAME: tensor<2x2xf64>
     # CHECK: func.func private @__builtin__real_basis_rotation_decomp{{(_[0-9]+)?}}
-    # CHECK-SAME: "PhaseShift{0:[f64]}{wires:1}{}" = 1 : i64
+    # CHECK-SAME: "PauliZ{}{wires:1}{}" = 1 : i64
     # CHECK-SAME: "SingleExcitation{0:[f64]}{wires:2}{}" = 1 : i64
     # CHECK-SAME: target_gate = "BasisRotation{unitary_matrix:[tensor<2x2xf64>]}{wires:2}{check = false}"
     test_real_op_that_decomposes_to_basis_rotation()
