@@ -184,7 +184,7 @@
 
 * `catalyst.mitigate_with_zne` now supports `qjit(capture=True)` for QNodes and
   classical workflows that call QNodes, with all three folding methods.
-  [(#XXXX)](https://github.com/PennyLaneAI/catalyst/pull/XXXX)
+  [(#3462)](https://github.com/PennyLaneAI/catalyst/pull/3462)
 
   ```python
   import pennylane as qp
