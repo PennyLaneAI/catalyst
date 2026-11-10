@@ -1153,7 +1153,7 @@
 <h3>Internal changes ⚙️</h3>
 
 * Updated `pylint` to version 4.1.3 in the development requirements and CI formatting workflow.
-  [(#XXXX)](https://github.com/PennyLaneAI/catalyst/pull/XXXX)
+  [(#3459)](https://github.com/PennyLaneAI/catalyst/pull/3459)
 
 * FuncOp's with quantum dialect instructions can now always be inlined.
   [(#3420)](https://github.com/PennyLaneAI/catalyst/pull/3420)
