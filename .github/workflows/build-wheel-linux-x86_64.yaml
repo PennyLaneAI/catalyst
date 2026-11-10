@@ -542,6 +542,7 @@ jobs:
       run: |
         python${{ matrix.python_version }} -m pip install pytest pytest-xdist pytest-mock
         # Install graphviz for testing graph visualization
+        sudo apt update
         sudo apt-get install -y graphviz
         python${{ matrix.python_version }} -m pip install graphviz pydot matplotlib
 
