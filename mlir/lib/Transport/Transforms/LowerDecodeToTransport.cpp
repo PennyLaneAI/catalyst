@@ -25,6 +25,7 @@
 // Whether the reply is collected in the transport's ring slot, as above, or in the buffer the
 // program already had, depends on what the round can prove about that buffer; see emitRound.
 
+#include <optional>
 #include <string>
 
 #include "llvm/ADT/STLExtras.h"
@@ -53,6 +54,19 @@ namespace transport {
 namespace {
 
 constexpr llvm::StringRef kBacklineAttr = "catalyst.backline";
+
+// The bytes a buffer takes in a round, counted as the LLVM lowering of stage_payload and collect
+// counts them: one per i1, since the syndrome is not bit-packed, and eight per index. A buffer
+// with a dynamic shape has no size until run time.
+std::optional<int64_t> roundBytes(Type type) {
+    auto memTy = dyn_cast<MemRefType>(type);
+    if (!memTy || !memTy.hasStaticShape()) {
+        return std::nullopt;
+    }
+    Type elemTy = memTy.getElementType();
+    int64_t elemBytes = isa<IndexType>(elemTy) ? 8 : (elemTy.getIntOrFloatBitWidth() + 7) / 8;
+    return memTy.getNumElements() * elemBytes;
+}
 
 struct LowerDecodeToTransportPass
     : public impl::LowerDecodeToTransportPassBase<LowerDecodeToTransportPass> {
@@ -178,6 +192,33 @@ struct LowerDecodeToTransportPass
                 anchors.push_back(op);
             }
         });
+
+        // Every session commits the controller's in_bytes and out_bytes, and a round larger than
+        // them is caught only at run time: the backend rejects the syndrome, or writes only the
+        // committed bytes of the correction. Reject such a decode here. A dynamically shaped
+        // buffer is left to the runtime check.
+        NodeAttr controller = backline.getController();
+        auto fits = [](qecp::DecodeEsmCssOp anchor, Value buffer, StringRef what, StringRef field,
+                       int64_t committed) {
+            std::optional<int64_t> bytes = roundBytes(buffer.getType());
+            if (!bytes || *bytes <= committed) {
+                return true;
+            }
+            anchor.emitOpError() << what << " of " << *bytes
+                                 << " bytes exceeds the backline controller's " << field << " of "
+                                 << committed << " bytes";
+            return false;
+        };
+        bool allFit = true;
+        for (qecp::DecodeEsmCssOp anchor : anchors) {
+            allFit &= fits(anchor, anchor.getEsm(), "syndrome", "in_bytes", controller.inBytes());
+            allFit &= fits(anchor, anchor.getErrIdxIn(), "correction", "out_bytes",
+                           controller.outBytes());
+        }
+        if (!allFit) {
+            return signalPassFailure();
+        }
+
         // TODO: This is a naive approach. This strategy should be further analysed and refined.
         // Decodes are handed to the coprocessors round-robin.
         for (auto [k, anchor] : llvm::enumerate(anchors)) {
