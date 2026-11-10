@@ -23,6 +23,7 @@
 
 #include "Error.hpp"
 #include "GpuLaunchers.hpp"
+#include "HsbLink.hpp"
 #include "RcLink.hpp"
 #include "RealtimeThread.hpp"
 
@@ -95,6 +96,9 @@ void GpuCoprocessorSession::run(std::stop_token st) {
         } else {
             serve<frame::Mode::BLV>(static_cast<RcLink &>(*link_), st);
         }
+        break;
+    case Peer::HSB: // HSB carries only BL16 frames
+        serve<frame::Mode::BL16>(static_cast<HsbLink &>(*link_), st);
         break;
     }
 }

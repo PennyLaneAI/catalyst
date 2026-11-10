@@ -31,6 +31,8 @@ IGNORE_PATTERNS = [
     "stablehlo",
     "rdma/vendor/infiniband",
     "coproc/onnx/vendor",
+    "rdma/fpga_hsb/hsb_regs.h",
+    "rdma/fpga_hsb/hwhs_regs.h",
 ]
 
 DEFAULT_CLANG_FORMAT_VERSION = 20

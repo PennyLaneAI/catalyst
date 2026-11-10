@@ -23,6 +23,8 @@
 #include <infiniband/verbs.h>
 
 namespace catalyst::transport::common {
+enum class QpType { RC, UC };
+
 /// Sizes of one queue pair: send-queue depth, completion-queue depth and inline capacity.
 struct QpShape {
     int sq_depth;
@@ -37,7 +39,8 @@ inline constexpr QpShape DEFAULT_QP_SHAPE{.sq_depth = 4096, .cq_depth = 4096, .i
 class QueuePair {
   public:
     QueuePair(std::shared_ptr<ProtectionDomain> pd, std::shared_ptr<CompletionQueue> send_cq,
-              std::shared_ptr<CompletionQueue> recv_cq, int max_send_wr, int max_inline = 0);
+              std::shared_ptr<CompletionQueue> recv_cq, int max_send_wr, int max_inline = 0,
+              QpType type = QpType::RC, int max_recv_wr = 4);
     ~QueuePair();
     QueuePair(const QueuePair &) = delete;
     QueuePair &operator=(const QueuePair &) = delete;
@@ -59,5 +62,6 @@ class QueuePair {
     std::shared_ptr<CompletionQueue> recv_cq_;
     ibv_qp *qp_ = nullptr;
     QpState state_ = QpState::RESET;
+    QpType type_ = QpType::RC;
 };
 } // namespace catalyst::transport::common

@@ -31,6 +31,7 @@ catalyst_runtime_install(rt_transport)
 #   gpu_verbs (RDMA)   libibverbs + HIP
 #   fpga_verbs (RDMA)  libibverbs + ENABLE_TRANSPORT_FPGA
 #   fpga_hwhs (RDMA)   libibverbs + ENABLE_TRANSPORT_FPGA
+#   fpga_hsb (UIO)     ENABLE_TRANSPORT_FPGA, aarch64
 #
 # Shared libs under common/:
 #   common/interface   headers (WireProtocol, ConfigParser)         ::common
@@ -197,6 +198,13 @@ if(IBVERBS_LIB)
     endif()
 else()
     message(STATUS "transport: libibverbs not found -> RDMA backends skipped")
+endif()
+
+# --- HSB (NVIDIA Holoscan Sensor Bridge) --------------------------------------
+if(ENABLE_TRANSPORT_FPGA AND CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64")
+    add_subdirectory(rdma/fpga_hsb)
+    add_dependencies(transport_all catalyst_transport_hsb_hwhs_controller)
+    add_dependencies(transport_backends catalyst_transport_hsb_hwhs_controller)
 endif()
 
 # --- Memcpy (in-process shim) -------------------------------------------------
