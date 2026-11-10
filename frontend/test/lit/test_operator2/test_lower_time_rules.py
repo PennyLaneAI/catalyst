@@ -184,7 +184,7 @@ def test_multiple_rules_same_gate():
 # CHECK-SAME:   "SingleParam{x:[tensor<2xf64>]}{reg:1}{}" = 1 : i64
 # CHECK-SAME:   target_gate = "NoParams{}{reg:2}{}"
 #
-# CHECK-NOT: func.func private @__builtin_rule1{{(_[0-9]+)?}}
+# CHECK-NOT: func.func private @__builtin_rule1{{(_[0-9]+)?}}{{.*}}target_gate = "NoParams{}{reg:2}{}"
 #
 # CHECK: func.func private @__builtin_rule1{{(_[0-9]+)?}}
 # CHECK-SAME:   resources = {operations = {

@@ -1002,7 +1002,7 @@ test_rule_with_helper_functions()
 
 def test_frontend_name_attr():
     """Test that the frontend rule name is preserved via the `frontend_name` attr for use in fixed
-    and alt decomps."""
+    and excluded decomps."""
 
     @qp.register_resources(lambda reg: {SingleParam(x=Float, reg=Wire[1]): 1})
     def frontend_rule(reg):

@@ -67,10 +67,10 @@ _Decompose gates using an MLIR-native graph-based framework._
 #### Options
 
 ```
--gate-set       : The accepted gates to decompose to.
--fixed-decomps  : Maps an operator to a decomposition rule that will be applied.
--alt-decomps    : Maps an operator to a `|` separated list of alternative decomposition rules that will be considered alongside any built-in rules for the operator.
--bytecode-rules : A path to a bytecode file of compiled decomposition rules.
+-gate-set        : The accepted gates to decompose to.
+-fixed-decomps   : Maps an operator to a decomposition rule that will be applied.
+-exclude-decomps : Maps an operator to a list of decomposition rules to exclude from the graph. The rules remain available for subsequent passes.
+-bytecode-rules  : A path to a bytecode file of compiled decomposition rules.
 ```
 
 ### `-gridsynth`

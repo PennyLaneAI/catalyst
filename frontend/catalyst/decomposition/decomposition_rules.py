@@ -81,7 +81,7 @@ class DecompRuleSpec:
     Attributes:
         prepared_rule_fn: Adapted rule body accepting the flattened operands described by its
             :class:`RuleTraceInputs`.
-        frontend_name: Name of the PennyLane decomposition rule, retained for fixed and alternative
+        frontend_name: Name of the PennyLane decomposition rule, retained for fixed and excluded
             rule selection.
         resource_counts_by_id: GraphOpID-to-count mapping attached to the lowered function.
         resource_counts_by_op: Operator2-to-count mapping used to traverse outgoing resource edges.

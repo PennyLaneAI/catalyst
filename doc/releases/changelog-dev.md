@@ -483,8 +483,10 @@
     of raising an error.
     [(#3190)](https://github.com/PennyLaneAI/catalyst/pull/3190)
 
-  - The `graph-decomposition` pass now uses `alt-decomps` to denote the strict set of rules that are considered for an operator, i.e. it no longer considers builtin rules if `alt-decomps` is specified, unless the builtin rules are listed.
-    [(#3230)](https://github.com/PennyLaneAI/catalyst/pull/3230)
+  - The `graph-decomposition` pass replaces `alt-decomps` with `exclude-decomps`, mapping operators
+    to lists of rules to omit from the decomposition graph. Excluded rules are still lowered by
+    the frontend and remain available to subsequent passes.
+    [(#3450)](https://github.com/PennyLaneAI/catalyst/pull/3450)
 
 * Numeric molecular/vibrational Hamiltonians carried as hybrid arguments by Trotter operators can now
   be decomposed through the graph-based decomposition system, together with MLIR/lowering tests for
