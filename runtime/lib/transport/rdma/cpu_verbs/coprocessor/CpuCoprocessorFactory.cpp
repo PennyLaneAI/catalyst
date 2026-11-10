@@ -16,41 +16,23 @@
 // this .so and resolves CatalystTransportCoprocessorFactory (see TransportBackend.h).
 // The coprocessor function is bound after construction via set_coprocessor_fn()
 // (by the coprocessor-side harness); a freshly built session defaults to the
-// built-in echo. `wire=hsb` and `wire=balboa` select the session for a controller behind NVIDIA's
-// Holoscan Sensor Bridge (CpuHsbCoprocessorSession) or ETH Zurich's BALBOA
-// (CpuBalboaCoprocessorSession) instead.
+// built-in echo. The link speaks the wire the config names with `wire=` (WireLink.hpp).
 
 #include <string>
 
 #include "BackendConfig.hpp"
-#include "CpuBalboaCoprocessorSession.hpp"
 #include "CpuCoprocessorSession.hpp"
-#include "CpuHsbCoprocessorSession.hpp"
 #include "TransportBackend.h"
+#include "WireLink.hpp"
 
 namespace {
 catalyst::transport::CoprocessorSession *make_cpu_coprocessor(const std::string &config) {
     namespace common = catalyst::transport::common;
     namespace cpu_verbs = catalyst::transport::cpu_verbs;
-    const auto cfg = common::parse_backend_config(config);
     const int cpu = common::configparser::parse_optional_index(config, "cpu_pin", -1);
     const bool rt = common::configparser::parse_optional_index(config, "rt", 0) != 0;
-    const common::Wire wire = common::wire_from_config(config);
-    if (wire == common::Wire::HSB) {
-        auto *session = new cpu_verbs::CpuHsbCoprocessorSession(
-            cfg.dev, cfg.gid, common::hsb::ring_from_config(config),
-            common::hsb::imm_from_config(config));
-        session->set_thread_affinity(cpu, rt);
-        return session;
-    }
-    if (wire == common::Wire::BALBOA) {
-        auto *session = new cpu_verbs::CpuBalboaCoprocessorSession(
-            cfg.dev, cfg.gid, common::balboa::ring_from_config(config));
-        session->set_thread_affinity(cpu, rt);
-        return session;
-    }
-    auto *session = new cpu_verbs::CpuCoprocessorSession(
-        cfg.dev, cfg.gid, common::frame::geometry_from_config(config));
+    auto *session =
+        new cpu_verbs::CpuCoprocessorSession(common::make_coprocessor_link(config, "cpu_verbs"));
     session->set_thread_affinity(cpu, rt);
     return session;
 }

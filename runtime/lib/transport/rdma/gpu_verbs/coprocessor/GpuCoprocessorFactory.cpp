@@ -27,38 +27,21 @@
 #include <string>
 
 #include "BackendConfig.hpp"
-#include "GpuBalboaCoprocessorSession.hpp"
 #include "GpuCoprocessorSession.hpp"
-#include "GpuHsbCoprocessorSession.hpp"
 #include "TransportBackend.h"
+#include "WireLink.hpp"
 
 namespace {
 catalyst::transport::CoprocessorSession *make_gpu_coprocessor(const std::string &config) {
     namespace common = catalyst::transport::common;
     namespace gpu_verbs = catalyst::transport::gpu_verbs;
-    const auto cfg = common::parse_backend_config(config);
     // `gpu` is optional and defaults to device 0
     const int gpu_device = common::configparser::parse_optional_index(config, "gpu", 0);
     const int cpu = common::configparser::parse_optional_index(config, "cpu_pin", -1);
     const bool rt = common::configparser::parse_optional_index(config, "rt", 0) != 0;
-    const common::Wire wire = common::wire_from_config(config);
-    // `wire=hsb`: a controller behind NVIDIA's Holoscan Sensor Bridge (GpuHsbCoprocessorSession)
-    if (wire == common::Wire::HSB) {
-        auto *session = new gpu_verbs::GpuHsbCoprocessorSession(
-            cfg.dev, cfg.gid, gpu_device, common::hsb::ring_from_config(config),
-            common::hsb::imm_from_config(config));
-        session->set_thread_affinity(cpu, rt);
-        return session;
-    }
-    // `wire=balboa`: a controller behind ETH Zurich's BALBOA (GpuBalboaCoprocessorSession)
-    if (wire == common::Wire::BALBOA) {
-        auto *session = new gpu_verbs::GpuBalboaCoprocessorSession(
-            cfg.dev, cfg.gid, gpu_device, common::balboa::ring_from_config(config));
-        session->set_thread_affinity(cpu, rt);
-        return session;
-    }
     auto *session = new gpu_verbs::GpuCoprocessorSession(
-        cfg.dev, cfg.gid, gpu_device, common::frame::geometry_from_config(config));
+        gpu_device, common::make_coprocessor_link(config, "gpu_verbs",
+                                                  gpu_verbs::GpuCoprocessorSession::FWD_QP_SHAPE));
     session->set_thread_affinity(cpu, rt);
     return session;
 }

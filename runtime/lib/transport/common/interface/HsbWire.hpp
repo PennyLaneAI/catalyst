@@ -17,9 +17,10 @@
  * The HSB wire: a controller on an FPGA running NVIDIA's Holoscan Sensor Bridge (HSB) IP talking
  * to a coprocessor's ConnectX NIC.
  *
- * - Request: HSB writes each 64 B request into the coprocessor's ring with a UC RDMA
- *   WRITE_WITH_IMM (immediate = {psn[19:0], slot[11:0]}), slot n at n * SLOT_BYTES from IOVA 0.
- *   It starts with a BL16 frame (Frame.hpp); the controller stamps its seq, counting from 1.
+ * - Request: HSB writes each 64 B request into the coprocessor's ring, slot n at n * SLOT_BYTES
+ *   from IOVA 0, as a UC RDMA WRITE_WITH_IMM (immediate = {psn[19:0], slot[11:0]}), or as a plain
+ *   WRITE with `imm=0` (backline-hsb's patches/0001). It starts with a BL16 frame (Frame.hpp); the
+ *   controller stamps its seq, counting from 1.
  * - Reply: the coprocessor sends a Payload back as an inline UC SEND to FPGA_RX_QPN, echoing the
  *   request's seq_num, which is how the controller matches it.
  * - Session setup: the coprocessor listens on its out-of-band port; once the controller has
@@ -108,9 +109,10 @@ inline frame::RingGeometry ring_from_config(std::string_view config) {
     return ring;
 }
 
-/// Whether HSB ends each request with WRITE_WITH_IMM (`imm=1`) or sends it a plain WRITE (`imm=0`)
+/// Whether a coprocessor's config asks HSB for WRITE_WITH_IMM (`imm=1`, stock HSB) rather than
+/// plain WRITEs (`imm=0`, the default). catalyst's coprocessors take only `imm=0`.
 inline bool imm_from_config(const std::string &config) {
-    return configparser::parse_optional_index(config, "imm", 1) != 0;
+    return configparser::parse_optional_index(config, "imm", 0) != 0;
 }
 
 } // namespace catalyst::transport::common::hsb

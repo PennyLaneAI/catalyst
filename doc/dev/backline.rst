@@ -214,6 +214,23 @@ The built-in backends are:
   ``fpga_verbs``, ``hsb_hwhs`` and ``balboa_hwhs`` are also available on ``fpga`` when named.
 * ``memcpy``: ``memcpy`` on ``cpu`` and ``memcpy_gpu`` on ``gpu``.
 
+An RDMA coprocessor also speaks its controller's **wire**, which its backend config names with
+``wire=``. The coprocessor backends stay ``cpu_verbs`` and ``gpu_verbs``; the wire picks the link
+they speak through (``runtime/lib/transport/rdma/common/WireLink.hpp``):
+
+* ``rc``, the default: the protocol every catalyst controller speaks, ``hwhs`` and
+  ``fpga_verbs`` included. Two RC queue pairs, and each end WRITEs frames into the other's ring.
+* ``hsb``, for ``hsb_hwhs``: a controller behind NVIDIA's Holoscan Sensor Bridge. One UC queue
+  pair; HSB writes each request into the coprocessor's ring at IOVA 0, 128 B apart, and takes the
+  reply as a SEND. The requests must be plain WRITEs, ``imm=0``, the default, which needs a
+  bitstream with backline-hsb's ``patches/0001``. ``imm=1``, stock HSB's WRITE_WITH_IMM, is
+  refused, since the coprocessor posts no receives.
+* ``balboa``, for ``balboa_hwhs``: a controller behind ETH Zurich's BALBOA. One RC queue pair;
+  BALBOA writes each request into the ring at IOVA 0 and takes the reply as a WRITE.
+
+A node placed on ``hsb_hwhs`` needs ``wire=hsb`` in its coprocessors' configs, and one on
+``balboa_hwhs`` needs ``wire=balboa``; with any other wire the handshake fails.
+
 A backend is a shared library implementing ``ControllerSession`` or ``CoprocessorSession`` from
 ``runtime/include/Transport.hpp`` and exporting the matching factory symbol declared in
 ``runtime/include/TransportBackend.h``. It also reports the transport ABI version it was built for

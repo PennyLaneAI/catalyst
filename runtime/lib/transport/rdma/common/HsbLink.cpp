@@ -14,132 +14,74 @@
 
 #include "HsbLink.hpp"
 
-#include <cstdio>
 #include <cstring>
-#include <string>
+#include <utility>
 
 #include "Error.hpp"
 
-#include <arpa/inet.h>
-
 namespace catalyst::transport::common {
 
-namespace {
+HsbLink::HsbLink(std::string dev, int gid_idx, frame::RingGeometry ring)
+    : WireLink(Wire::HSB, std::move(dev), gid_idx, ring) {}
 
-// One line of a sysfs file, without its newline; empty if it cannot be read.
-std::string read_sysfs(const std::string &path) {
-    std::FILE *f = std::fopen(path.c_str(), "r");
-    if (f == nullptr) {
-        return {};
-    }
-    char buf[128] = {};
-    const bool ok = std::fgets(buf, sizeof(buf), f) != nullptr;
-    std::fclose(f);
-    if (!ok) {
-        return {};
-    }
-    buf[std::strcspn(buf, "\n")] = 0;
-    return buf;
-}
-
-constexpr std::uint8_t V4_PREFIX[12] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xff, 0xff};
-
-} // namespace
-
-HsbLink::HsbLink(std::string dev, int gid_idx, bool imm)
-    : dev_name_(std::move(dev)), gid_idx_(gid_idx), imm_(imm) {}
-
-void HsbLink::connect(std::uint16_t oob_port) {
+void HsbLink::connect(const ConnectInfo &info) {
     ctx_ = std::make_shared<Context>(dev_name_);
     pd_ = std::make_shared<ProtectionDomain>(ctx_);
-    rcq_ = std::make_shared<CompletionQueue>(ctx_, 2 * MAX_RECV);
-    scq_ = std::make_shared<CompletionQueue>(ctx_, 2 * MAX_SEND);
-    qp_ = std::make_shared<QueuePair>(pd_, scq_, rcq_, MAX_SEND, /*max_inline=*/64, QpType::UC,
-                                      MAX_RECV);
+    cq_ = std::make_shared<CompletionQueue>(ctx_, 2 * MAX_SEND);
+    // Nothing is ever received: requests are plain WRITEs into the ring.
+    qp_ = std::make_shared<QueuePair>(pd_, cq_, cq_, MAX_SEND, /*max_inline=*/64, QpType::UC,
+                                      /*max_recv_wr=*/1);
     qp_->to_init(port_);
-    if (imm_) {
-        post_recvs(MAX_RECV);
-    }
-
     active_mtu_ = static_cast<std::uint32_t>(ctx_->port_attr(port_).active_mtu);
-
-    // HSB speaks RoCE v2 over IPv4: the GID has to be an IPv4-mapped one, whose address and
-    // netdev MAC are what HSB is told to send to.
-    const ibv_gid gid = ctx_->gid(port_, gid_idx_);
-    TP_CHECK(std::memcmp(gid.raw, V4_PREFIX, sizeof(V4_PREFIX)) == 0,
-             "hsb: GID %d of %s is not an IPv4 GID; pick the RoCE v2 IPv4 one (gid=)", gid_idx_,
-             dev_name_.c_str());
-    ip_ = (static_cast<std::uint32_t>(gid.raw[12]) << 24) |
-          (static_cast<std::uint32_t>(gid.raw[13]) << 16) |
-          (static_cast<std::uint32_t>(gid.raw[14]) << 8) | gid.raw[15];
-    const std::string attrs =
-        "/sys/class/infiniband/" + dev_name_ + "/ports/" + std::to_string(port_) + "/gid_attrs/";
-    const std::string type = read_sysfs(attrs + "types/" + std::to_string(gid_idx_));
-    if (!type.empty() && type.find("v2") == std::string::npos) {
-        std::fprintf(stderr, "[hsb] warning: GID %d is \"%s\"; HSB speaks RoCE v2\n", gid_idx_,
-                     type.c_str());
-    }
-    const std::string netdev = read_sysfs(attrs + "ndevs/" + std::to_string(gid_idx_));
-    TP_CHECK(!netdev.empty(), "hsb: no netdev behind GID %d of %s", gid_idx_, dev_name_.c_str());
-    unsigned m[6] = {};
-    const std::string mac = read_sysfs("/sys/class/net/" + netdev + "/address");
-    TP_CHECK(std::sscanf(mac.c_str(), "%x:%x:%x:%x:%x:%x", &m[0], &m[1], &m[2], &m[3], &m[4],
-                         &m[5]) == 6,
-             "hsb: cannot read the MAC of %s", netdev.c_str());
-    for (int i = 0; i < 6; ++i) {
-        mac_[i] = static_cast<std::uint8_t>(m[i]);
-    }
-
-    oob_ = tcp_listen_accept(oob_port);
+    // HSB speaks RoCE v2 over IPv4 and is told the GID's address and netdev MAC to send to.
+    local_ = ctx_->ipv4_gid(port_, gid_idx_);
+    oob_ = tcp_listen_accept(info.oob_port);
 }
 
-void HsbLink::exchange(std::uint32_t rkey, const frame::RingGeometry &ring) {
+PeerRef HsbLink::exchange(const MemRegion &local) {
     TP_CHECK(oob_.valid(), "hsb: exchange before connect()");
     hsb::HostInfo hi{};
     hi.magic = hsb::HS_MAGIC;
     hi.version = hsb::HS_VERSION;
     hi.qpn = qp_->qpn();
-    hi.rkey = rkey;
+    hi.rkey = local.rkey;
     hi.ring_iova = 0;
-    hi.ring_pitch = ring.stride;
-    hi.ring_slots = ring.slots;
-    hi.ip = ip_;
-    std::memcpy(hi.mac, mac_, sizeof(mac_));
-    hi.imm = imm_ ? 1 : 0;
+    hi.ring_pitch = ring_.stride;
+    hi.ring_slots = ring_.slots;
+    hi.ip = local_.ip;
+    std::memcpy(hi.mac, local_.mac, sizeof(local_.mac));
+    hi.imm = 0; // plain WRITEs: no receive per request
     send_exact(oob_.get(), &hi, sizeof(hi));
     recv_exact(oob_.get(), &fpga_, sizeof(fpga_));
 
     TP_CHECK(fpga_.magic == hsb::HS_MAGIC && fpga_.version == hsb::HS_VERSION,
              "hsb: bad handshake from the controller (magic 0x%08x version %u)", fpga_.magic,
              fpga_.version);
-    // The sessions read and write a Payload: the request's seq is its seq_num, and the reply is
+    // The session reads and writes a Payload: the request's seq is its seq_num, and the reply is
     // one Payload long.
     TP_CHECK(fpga_.seq_off == offsetof(Payload, seq_num) && fpga_.reply_bytes == sizeof(Payload) &&
-                 fpga_.frame_bytes >= sizeof(Payload) && fpga_.frame_bytes <= ring.stride,
+                 fpga_.frame_bytes >= sizeof(Payload) && fpga_.frame_bytes <= ring_.stride,
              "hsb: the controller asks for %u-byte frames, %u-byte replies and the seq at %u; "
              "this coprocessor speaks %zu-byte Payloads with the seq at %zu",
              fpga_.frame_bytes, fpga_.reply_bytes, fpga_.seq_off, sizeof(Payload),
              offsetof(Payload, seq_num));
+    return PeerRef{};
 }
 
-void HsbLink::establish() {
-    std::uint8_t dgid[16] = {};
-    std::memcpy(dgid, V4_PREFIX, sizeof(V4_PREFIX));
-    dgid[12] = static_cast<std::uint8_t>(fpga_.ip >> 24);
-    dgid[13] = static_cast<std::uint8_t>(fpga_.ip >> 16);
-    dgid[14] = static_cast<std::uint8_t>(fpga_.ip >> 8);
-    dgid[15] = static_cast<std::uint8_t>(fpga_.ip);
-    qp_->to_rtr(fpga_.qpn, /*dest_psn=*/0, dgid, gid_idx_, port_, active_mtu_);
+void HsbLink::establish(const MemRegion & /*local*/, const PeerRef & /*peer*/) {
+    const ibv_gid dgid = ipv4_mapped_gid(fpga_.ip);
+    qp_->to_rtr(fpga_.qpn, /*dest_psn=*/0, dgid.raw, gid_idx_, port_, active_mtu_);
     qp_->to_rts(/*sq_psn=*/0);
 
     const hsb::Ready rd{hsb::HS_MAGIC, IBV_QPS_RTS};
     send_exact(oob_.get(), &rd, sizeof(rd));
 }
 
-void HsbLink::send(const void *reply) {
+void HsbLink::send(std::uint32_t seq) {
+    frame::seal<frame::Mode::BL16>(ring_, &send_frame_, seq);
     // The data is copied into the WQE (inline), so the lkey is never used.
     ibv_sge sge{
-        .addr = reinterpret_cast<std::uint64_t>(reply),
+        .addr = reinterpret_cast<std::uint64_t>(&send_frame_),
         .length = fpga_.reply_bytes,
         .lkey = 0,
     };
@@ -161,40 +103,13 @@ void HsbLink::send(const void *reply) {
 
 void HsbLink::reap_send() {
     ibv_wc wc{};
-    const int n = ibv_poll_cq(scq_->get(), 1, &wc);
+    const int n = ibv_poll_cq(cq_->get(), 1, &wc);
     TP_CHECK(n >= 0, "hsb: ibv_poll_cq (send) rc=%d", n);
     if (n == 0) {
         return;
     }
     TP_CHECK(wc.status == IBV_WC_SUCCESS, "hsb: send completion %s", ibv_wc_status_str(wc.status));
     inflight_ -= SIGNAL_EVERY;
-}
-
-int HsbLink::reap_recv(std::uint32_t slots[RECV_BATCH]) {
-    ibv_wc wc[RECV_BATCH];
-    const int n = ibv_poll_cq(rcq_->get(), RECV_BATCH, wc);
-    TP_CHECK(n >= 0, "hsb: ibv_poll_cq (recv) rc=%d", n);
-    for (int i = 0; i < n; ++i) {
-        TP_CHECK(wc[i].status == IBV_WC_SUCCESS && wc[i].opcode == IBV_WC_RECV_RDMA_WITH_IMM,
-                 "hsb: receive completion %s, opcode %d", ibv_wc_status_str(wc[i].status),
-                 static_cast<int>(wc[i].opcode));
-        // immediate = {psn[19:0], slot[11:0]}
-        slots[i] = ntohl(wc[i].imm_data) & 0xFFFu;
-    }
-    if (n > 0) {
-        post_recvs(static_cast<unsigned>(n));
-    }
-    return n;
-}
-
-void HsbLink::post_recvs(unsigned n) {
-    // WRITE_WITH_IMM consumes a receive but scatters nothing into it: zero-SGE receives.
-    for (unsigned i = 0; i < n; ++i) {
-        ibv_recv_wr wr{};
-        ibv_recv_wr *bad = nullptr;
-        const int rc = ibv_post_recv(qp_->get(), &wr, &bad);
-        TP_CHECK(rc == 0, "hsb: ibv_post_recv rc=%d (%s)", rc, std::strerror(rc));
-    }
 }
 
 } // namespace catalyst::transport::common

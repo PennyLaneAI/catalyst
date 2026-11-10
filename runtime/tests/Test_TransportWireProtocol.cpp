@@ -69,6 +69,16 @@ TEST_CASE("the BL16 frame codec writes exactly today's Payload bytes") {
     CHECK(view.seq == 42);
 }
 
+TEST_CASE("seq_reached takes the expected seq or a later one, across the 32-bit wrap") {
+    namespace frame = catalyst::transport::common::frame;
+    CHECK(frame::seq_reached(5, 5));
+    CHECK(frame::seq_reached(7, 5)); // the request after a lost one, in the same slot
+    CHECK_FALSE(frame::seq_reached(4, 5));
+    CHECK_FALSE(frame::seq_reached(0, 1)); // a slot never written
+    CHECK(frame::seq_reached(0x00000002u, 0xFFFFFFFEu));
+    CHECK_FALSE(frame::seq_reached(0xFFFFFFFEu, 0x00000002u));
+}
+
 TEST_CASE("the BL16 codec zero-pads a payload written in place") {
     namespace frame = catalyst::transport::common::frame;
     for (std::size_t len : {0, 3, 8}) {

@@ -53,6 +53,10 @@ using DeviceDecodeFn = std::uint32_t (*)(const std::uint8_t *in, std::uint32_t l
  * @brief Persistent kernel templated on a device decoder: polls the request ring, runs the
  * decoder on each message, and answers it with a reply frame in the handoff ring.
  *
+ * It takes the request in its slot once the seq there is the expected one or later, so in a
+ * one-slot ring the request after a lost one is taken too. The handoff ring holds the replies in
+ * the order they were made, each with its request's seq.
+ *
  * Launched once as one block of KERNEL_THREADS threads, and runs until `total` messages are done
  * or the host raises `*stop`. Both rings hold frames in the layout `ring` describes (see
  * CoprocLaunchDesc).
@@ -84,20 +88,23 @@ __global__ void fused(const std::uint8_t *requests, std::uint8_t *replies,
     }
     const auto cap = static_cast<std::uint32_t>(ring.stride - sizeof(frame::BlvHeader) -
                                                 frame::BLV_COMPLETION_BYTES);
-    __shared__ bool halted; // the lead's stop decision, one for the whole block
+    std::uint64_t slot = 0;         // the request slot polled next
+    std::uint32_t expect = 1;       // what the request there carries, or a later seq
+    __shared__ bool halted;         // the lead's stop decision, one for the whole block
+    __shared__ std::uint32_t taken; // and the seq of the request it took
     for (std::uint64_t cursor = 0; total == 0 || cursor < total; ++cursor) {
-        const std::uint32_t expect = static_cast<std::uint32_t>(cursor + 1);
-        const std::uint8_t *req = requests + ring.slot_offset(cursor);
+        const std::uint8_t *req = requests + ring.slot_offset(slot);
         std::uint8_t *rep = replies + ring.slot_offset(cursor);
         // The lead polls the request's completion word and, for BLV, the others wait at the
         // barrier, so the block makes one stop decision and never splits at a barrier. The stop
         // flag is a host-coherent read over PCIe, so it is sampled only every STOP_POLL_INTERVAL
         // spins to keep it off the request-detection hot path. Stop is a teardown flag.
         bool stopping = false;
+        std::uint32_t seq = 0; // the request's own seq
         if (lead) {
             const volatile std::uint32_t *done =
                 reinterpret_cast<const volatile std::uint32_t *>(req + ring.poll_offset());
-            for (std::uint32_t spins = 0; *done != expect; ++spins) {
+            for (std::uint32_t spins = 0; !frame::seq_reached(seq = *done, expect); ++spins) {
                 if ((spins & (STOP_POLL_INTERVAL - 1)) == 0u && stop && *stop != 0) {
                     stopping = true;
                     break;
@@ -107,13 +114,17 @@ __global__ void fused(const std::uint8_t *requests, std::uint8_t *replies,
         if (!bl16) { // share the lead's decision; a 16 B frame's lead is alone
             if (lead) {
                 halted = stopping;
+                taken = seq;
             }
             __syncthreads();
             stopping = halted;
+            seq = taken;
         }
         if (stopping) {
             return;
         }
+        ++slot;
+        expect = seq + 1;
         __threadfence_system(); // completion observed -> the payload read below is not stale
         if (bl16) {
             // One 16 B load brings the payload and fn_id together; the fence above keeps it after
@@ -124,8 +135,7 @@ __global__ void fused(const std::uint8_t *requests, std::uint8_t *replies,
             // The whole 16 B reply frame is built here and published in one aligned store, so
             // the CPU cannot see its seq without its payload and fn_id.
             // NOTE: only lowers to a single global_store_dwordx4 at -O2+, which the build sets.
-            alignas(16)
-                Payload reply{.value = 0, .decoder_id = request.decoder_id, .seq_num = expect};
+            alignas(16) Payload reply{.value = 0, .decoder_id = request.decoder_id, .seq_num = seq};
             // The lead decodes alone (a group of one), so the 8 B payload and reply stay in its
             // registers.
             DECODE(reinterpret_cast<const std::uint8_t *>(&request.value), PAYLOAD_DATA_BYTES,
@@ -148,14 +158,14 @@ __global__ void fused(const std::uint8_t *requests, std::uint8_t *replies,
         if (lead) {
             int4 *h = reinterpret_cast<int4 *>(rep);
             h[0] = int4{static_cast<int>(frame::BLV_MAGIC), static_cast<int>(frame::BLV_VERSION),
-                        static_cast<int>(fn_id), static_cast<int>(expect)}; // flags 0
-            h[1] = int4{0, static_cast<int>(written), 0, 0};                // round, len, t_ptp_ns
+                        static_cast<int>(fn_id), static_cast<int>(seq)}; // flags 0
+            h[1] = int4{0, static_cast<int>(written), 0, 0};             // round, len, t_ptp_ns
         }
         // Every thread's share of the frame is visible before the lead writes its completion.
         __threadfence_system();
         __syncthreads();
         if (lead) {
-            *reinterpret_cast<volatile std::uint32_t *>(rep + ring.poll_offset()) = expect;
+            *reinterpret_cast<volatile std::uint32_t *>(rep + ring.poll_offset()) = seq;
             __threadfence_system();
         }
     }
