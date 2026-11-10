@@ -61,7 +61,6 @@ weights = np.random.random(size=shape)
 # CHECK-NEXT:   - compile:
 # CHECK-NEXT:       walltime: {{[0-9\.]+}}
 # CHECK-NEXT:       cputime: {{[0-9\.]+}}
-# CHECK-NEXT:       programsize: {{[1-9][0-9]*}}
 # CHECK-NEXT:   - run:
 # CHECK-NEXT:       walltime: {{[0-9\.]+}}
 # CHECK-NEXT:       cputime: {{[0-9\.]+}}
@@ -103,7 +102,6 @@ with open(filename, mode="r", encoding="UTF-8") as f:
 # CHECK:        - compile:
 # CHECK-NEXT:       walltime:
 # CHECK-NEXT:       cputime:
-# CHECK-NEXT:       programsize:
 # CHECK-NEXT:       finegrained:
 # CHECK-NEXT:         - parseMLIRSource:
 # CHECK-NEXT:             walltime: {{[0-9\.]+}}

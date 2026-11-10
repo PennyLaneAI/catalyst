@@ -26,6 +26,7 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/BuiltinTypes.h"
+#include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/Location.h"
 #include "mlir/IR/Operation.h"
 #include "mlir/IR/PatternMatch.h"
@@ -208,10 +209,24 @@ class BaseSignatureAnalyzer {
         if (values.size() == 1 && values.front().getType() == type) {
             return values.front();
         }
-        if (isa<RankedTensorType>(type)) {
+        if (auto tensorType = dyn_cast<RankedTensorType>(type)) {
+            if (!tensorElementCountMatches(values.size(), tensorType, loc)) {
+                return values.empty() ? Value() : values.front();
+            }
             return tensor::FromElementsOp::create(rewriter, loc, type, values);
         }
         return values.front();
+    }
+
+    bool tensorElementCountMatches(size_t numValues, RankedTensorType tensorType, Location loc) {
+        if (static_cast<int64_t>(numValues) == tensorType.getNumElements()) {
+            return true;
+        }
+        emitError(loc) << "cannot build a " << tensorType << " operand for a decomposition rule "
+                       << "from " << numValues << " value(s): the rule signature is inconsistent "
+                       << "with the operator being decomposed.";
+        isValid = false;
+        return false;
     }
 
     static size_t getElementsCount(Type type) {
@@ -289,6 +304,9 @@ class BaseSignatureAnalyzer {
             if (values.empty()) {
                 return tensor::EmptyOp::create(rewriter, loc, tensorType.getShape(),
                                                tensorType.getElementType());
+            }
+            if (!tensorElementCountMatches(values.size(), tensorType, loc)) {
+                return values.front();
             }
             return tensor::FromElementsOp::create(rewriter, loc, type, values);
         }

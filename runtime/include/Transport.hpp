@@ -15,8 +15,11 @@
 #pragma once
 #include <cstddef>
 #include <cstdint>
+#include <limits>
 #include <stdexcept>
 #include <string>
+
+#include "TransportABI.h"
 
 namespace catalyst::transport {
 
@@ -186,28 +189,51 @@ class ControllerSession : public TransportSession {
 };
 
 /**
- * @brief Per-message coprocessor function (CPU-style). Invoked once per received
- * message: decode `in` (`in_len` bytes) into `out` (capacity `out_cap`) and
- * return the number of bytes written.
+ * @brief Per-message coprocessor function (CPU-style), invoked once per received message with
+ * its payload, the payload's length and its fn_id (see CatalystCoprocessorFn in TransportABI.h).
+ * Every transport and frame layout calls it the same way; the frame itself is never exposed.
+ *
+ * Returning COPROCESSOR_FN_ERROR reports that the message could not be processed. A memcpy
+ * backend fails that round instead of delivering the reply. The cpu_verbs coprocessor treats it,
+ * like any return outside 1..out_cap, as an error that stops its engine, so the controller
+ * receives no reply.
  */
-using CoprocessorFn = std::size_t (*)(const void *in, std::size_t in_len, void *out,
-                                      std::size_t out_cap, void *ctx);
+using CoprocessorFn = CatalystCoprocessorFn;
+
+/// The value a CoprocessorFn returns when it cannot process a message.
+inline constexpr std::size_t COPROCESSOR_FN_ERROR = std::numeric_limits<std::size_t>::max();
+
+/// The lifecycle hooks a coprocessor function's library may export as `<symbol>_info`. See
+/// CatalystCoprocessorFnInfo in TransportABI.h.
+using CoprocessorFnInfo = CatalystCoprocessorFnInfo;
+
+/// The highest CoprocessorFnInfo version this runtime knows.
+inline constexpr std::uint32_t COPROCESSOR_FN_ABI_VERSION = CATALYST_COPROCESSOR_FN_ABI_VERSION;
 
 /**
- * @brief Data description for a persistent engine to receive and consume
- * request messages, then autonomously return processed message to the handoff buffer,
- * which is then replied by a coprocessor host thread.
+ * @brief Data description for a persistent engine to receive and consume request messages, then
+ * autonomously write a reply frame per request into the handoff ring, which the session reads.
+ *
+ * Both rings hold `ring_slots` frames, `slot_stride` bytes apart, in the frame layout
+ * `frame_mode` names (the CATALYST_TRANSPORT_FRAME_* bit index: 0 for the 16 B frame, 1 for
+ * BLV; see doc/dev/backline.rst). Message n arrives in request slot n mod ring_slots, complete
+ * once its polled word holds n + 1, and the engine answers it with a frame in the same slot of the
+ * handoff ring: the reply's payload, the request's fn_id and, written last, n + 1. A launcher
+ * built for this layout reports CATALYST_COPROCESSOR_LAUNCHER_MIN_ABI_VERSION in its `_info`, and
+ * returns nonzero for a `frame_mode` or message size its engine cannot handle.
  *
  * The session owns the buffers and keeps it valid until the engine has stopped
  * (set `*stop` nonzero, then synchronize) or has processed `total` messages.
  */
 struct CoprocLaunchDesc {
-    void *ring;               // recv request-slot ring base (device HBM or host RAM)
-    std::uint32_t ring_slots; // slot count of both rings; must be a power of two
-    void *handoff;            // reply-slot ring base (engine -> session, e.g. gpu to cpu)
-    void *stop;               // uint32_t teardown flag the engine polls
-    std::uint64_t total;      // messages to process, or 0 = run until stopped
-    void *stream;             // device queue to launch on (e.g. hipStream_t); null for host
+    void *ring;                // recv request-slot ring base (device HBM or host RAM)
+    std::uint32_t ring_slots;  // slot count of both rings; must be a power of two
+    void *handoff;             // reply-slot ring base (engine -> session, e.g. gpu to cpu)
+    void *stop;                // uint32_t teardown flag the engine polls
+    std::uint64_t total;       // messages to process, or 0 = run until stopped
+    void *stream;              // device queue to launch on (e.g. hipStream_t); null for host
+    std::uint32_t frame_mode;  // layout of the frames in both rings
+    std::uint32_t slot_stride; // bytes from one slot to the next, a power of two
 };
 
 /**

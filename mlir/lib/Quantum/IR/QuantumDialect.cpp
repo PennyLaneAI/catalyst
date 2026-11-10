@@ -34,37 +34,15 @@ namespace {
 struct QuantumInlinerInterface : public DialectInlinerInterface {
     using DialectInlinerInterface::DialectInlinerInterface;
 
-    static constexpr StringRef decompAttr = "target_gate";
-
     /// Returns true if the given operation 'callable' can be inlined into the
-    /// position given by the 'call'. Currently, we always inline quantum
-    /// decomposition functions.
-    bool isLegalToInline(Operation *call, Operation *callable, bool wouldBeCloned) const final {
-        if (auto funcOp = dyn_cast<func::FuncOp>(callable)) {
-            return funcOp->hasAttr(decompAttr);
-        }
-        return false;
-    }
-
-    /// Returns whether the given func op is a decomposition rule.
-    static bool isDecompRuleFunc(func::FuncOp funcOp) {
-        return funcOp && funcOp->hasAttr(decompAttr);
-    }
+    /// position given by the 'call'. Quantum operations impose no restrictions.
+    bool isLegalToInline(Operation *, Operation *, bool) const final { return true; }
 
     /// Returns true if the given region 'src' can be inlined into the region 'dest'.
-    bool isLegalToInline(Region *dest, Region *src, bool wouldBeCloned,
-                         IRMapping &valueMapping) const final {
-        return isDecompRuleFunc(src->getParentOfType<func::FuncOp>()) ||
-               isDecompRuleFunc(dest->getParentOfType<func::FuncOp>());
-    }
+    bool isLegalToInline(Region *, Region *, bool, IRMapping &) const final { return true; }
 
-    // Allow inlining an operation into a decomposition function's regions, keyed on either side
-    // being a decomposition rule:
-    bool isLegalToInline(Operation *op, Region *dest, bool wouldBeCloned,
-                         IRMapping &valueMapping) const final {
-        return isDecompRuleFunc(op->getParentOfType<func::FuncOp>()) ||
-               isDecompRuleFunc(dest->getParentOfType<func::FuncOp>());
-    }
+    /// Operations in the quantum dialect are always legal to inline.
+    bool isLegalToInline(Operation *, Region *, bool, IRMapping &) const final { return true; }
 
     /// Handle the given inlined terminator by replacing it with a new operation
     /// as necessary. Required when the region has only one block.
@@ -105,15 +83,15 @@ void QuantumDialect::initialize() {
 
     addInterfaces<QuantumInlinerInterface>();
 
-    declarePromisedInterfaces<bufferization::BufferizableOpInterface, QubitUnitaryOp, HermitianOp,
-                              HamiltonianOp, SampleOp, CountsOp, ProbsOp, StateOp, SetStateOp,
-                              SetBasisStateOp>();
+    declarePromisedInterfaces<bufferization::BufferizableOpInterface, OperatorOp, QubitUnitaryOp,
+                              HermitianOp, HamiltonianOp, SampleOp, CountsOp, ProbsOp, StateOp,
+                              SetStateOp, SetBasisStateOp>();
 }
 
-/// Verify the QNode attribute invariants
+/// Verify the QNode and kernel entry point attribute invariants
 LogicalResult QuantumDialect::verifyOperationAttribute(Operation *op, NamedAttribute namedAttr) {
     StringRef attrName = namedAttr.getName().getValue();
-    if (attrName != "quantum.node") {
+    if (attrName != "quantum.node" && attrName != "quantum.kernel_entry_point") {
         return success();
     }
 

@@ -155,7 +155,7 @@ class TestCapture:
 
         # Capture enabled
 
-        @qjit(capture=True, collect_decomp_rules=False)
+        @qjit(capture=True)
         @qp.qnode(device=dev)
         def captured_circuit(x):
             qp.Hadamard(wires=0)
@@ -198,7 +198,7 @@ class TestCapture:
 
         # Capture enabled
 
-        @qjit(capture=True, collect_decomp_rules=False)
+        @qjit(capture=True)
         @qp.qnode(dev)
         def captured_circuit(_basis_state):
             qp.BasisState(_basis_state, wires=list(range(n_wires)))
@@ -264,7 +264,7 @@ class TestCapture:
 
         # Capture enabled
 
-        @qjit(capture=True, collect_decomp_rules=False)
+        @qjit(capture=True)
         @qp.qnode(device)
         def captured_circuit(theta, val):
             qp.adjoint(qp.RY)(jnp.pi, val)
@@ -291,7 +291,7 @@ class TestCapture:
 
         # Capture enabled
 
-        @qjit(capture=True, collect_decomp_rules=False)
+        @qjit(capture=True)
         @qp.qnode(device)
         def captured_circuit(theta):
             qp.ctrl(qp.RX(theta, wires=0), control=[1], control_values=[False])
@@ -337,7 +337,12 @@ class TestCapture:
 
     @pytest.mark.parametrize(
         "reset, op, expected",
-        [(False, qp.I, 1), (False, qp.X, -1), (True, qp.I, 1), (True, qp.X, 1)],
+        [
+            (False, qp.I, 1),
+            (False, qp.X, -1),
+            (True, qp.I, 1),
+            (True, qp.X, 1),
+        ],
     )
     def test_measure(self, backend, reset, op, expected):
         """Test the integration for a circuit with a mid-circuit measurement.
@@ -349,7 +354,7 @@ class TestCapture:
         """
         device = qp.device(backend, wires=1)
 
-        @qjit(capture=True, collect_decomp_rules=False)
+        @qjit(capture=True)
         @qp.qnode(device)
         def captured_circuit():
             op(wires=0)
@@ -367,7 +372,7 @@ class TestCapture:
         """
         device = qp.device(backend, wires=1)
 
-        @qjit(capture=True, collect_decomp_rules=False)
+        @qjit(capture=True)
         @qp.qnode(device)
         def captured_circuit():
             qp.H(wires=0)
@@ -387,7 +392,7 @@ class TestCapture:
         """
         device = qp.device(backend, wires=1)
 
-        @qjit(capture=True, collect_decomp_rules=False, autograph=True)
+        @qjit(capture=True, autograph=True)
         @qp.qnode(device)
         def captured_circuit():
             m = qp.measure(wires=0)
@@ -405,7 +410,7 @@ class TestCapture:
 
         # Capture enabled
 
-        @qjit(capture=True, collect_decomp_rules=False)
+        @qjit(capture=True)
         @qp.qnode(qp.device(backend, wires=4))
         def captured_circuit(x):
 
@@ -438,7 +443,7 @@ class TestCapture:
 
         # Capture enabled
 
-        @qjit(capture=True, collect_decomp_rules=False)
+        @qjit(capture=True)
         @qp.qnode(qp.device(backend, wires=1))
         def captured_circuit(n, x):
 
@@ -477,7 +482,7 @@ class TestCapture:
 
         # Capture enabled
 
-        @qjit(capture=True, collect_decomp_rules=False)
+        @qjit(capture=True)
         @qp.qnode(qp.device(backend, wires=4))
         def captured_circuit(n):
             # Input state: equal superposition
@@ -541,7 +546,7 @@ class TestCapture:
 
         # Capture enabled
 
-        @qjit(capture=True, collect_decomp_rules=False)
+        @qjit(capture=True)
         @qp.qnode(qp.device(backend, wires=1))
         def capturted_circuit(x: float):
 
@@ -593,7 +598,7 @@ class TestCapture:
 
         # Capture enabled
 
-        @qjit(capture=True, collect_decomp_rules=False)
+        @qjit(capture=True)
         @qp.qnode(qp.device(backend, wires=1))
         def captured_circuit(x: float, step: float):
 
@@ -640,7 +645,7 @@ class TestCapture:
 
         # Capture enabled
 
-        @qjit(capture=True, collect_decomp_rules=False)
+        @qjit(capture=True)
         @qp.qnode(qp.device(backend, wires=1))
         def captured_circuit(x: float, y: float):
 
@@ -701,7 +706,7 @@ class TestCapture:
 
         # Capture enabled
 
-        @qjit(capture=True, collect_decomp_rules=False)
+        @qjit(capture=True)
         @qp.qnode(qp.device(backend, wires=1))
         def captured_circuit(x: float):
 
@@ -742,7 +747,7 @@ class TestCapture:
 
         # Capture enabled
 
-        @qjit(capture=True, collect_decomp_rules=False)
+        @qjit(capture=True)
         @qp.qnode(qp.device(backend, wires=1))
         def captured_circuit(x: float):
 
@@ -778,7 +783,7 @@ class TestCapture:
 
         # Capture enabled
 
-        @qjit(capture=True, collect_decomp_rules=False)
+        @qjit(capture=True)
         @qp.qnode(qp.device(backend, wires=1))
         def captured_circuit(x: float):
 
@@ -824,7 +829,7 @@ class TestCapture:
 
         # Capture enabled
 
-        @qjit(capture=True, collect_decomp_rules=False)
+        @qjit(capture=True)
         @qp.qnode(qp.device(backend, wires=1))
         def captured_circuit(x: float):
 
@@ -870,7 +875,7 @@ class TestCapture:
 
         # Capture enabled
 
-        @qjit(capture=True, collect_decomp_rules=False)
+        @qjit(capture=True)
         @qp.qnode(qp.device(backend, wires=1))
         def captured_circuit(x: float):
 
@@ -915,7 +920,7 @@ class TestCapture:
 
         # Capture enabled
 
-        @qjit(capture=True, collect_decomp_rules=False)
+        @qjit(capture=True)
         @qp.qnode(qp.device(backend, wires=1))
         def captured_circuit(x: float, y: float):
 
@@ -971,7 +976,7 @@ class TestCapture:
 
         # Capture enabled
 
-        @qjit(capture=True, collect_decomp_rules=False)
+        @qjit(capture=True)
         @qp.qnode(qp.device(backend, wires=1))
         def captured_circuit(x: float):
 
@@ -1032,12 +1037,122 @@ class TestCapture:
             in capture_mlir
         )
 
+    def test_pass_plugin_transform(self, mocker, tmp_path, backend):
+        """Test that a transform from a pass plugin works with capture enabled."""
+
+        plugin_path = tmp_path / "FakePlugin.so"
+        plugin_path.touch()
+
+        mock_plugin_module = mocker.Mock()
+        mock_plugin_module.name2pass.return_value = (plugin_path, "my-custom-pass")
+
+        mock_entry_point = mocker.Mock()
+        mock_entry_point.load.return_value = mock_plugin_module
+        mocker.patch(
+            "catalyst.from_plxpr.from_plxpr.entry_points",
+            return_value={"fakeplugin.passes": mock_entry_point},
+        )
+
+        plugin_pass = qp.transform(pass_name="fakeplugin.my-custom-pass")
+
+        @qjit(target="mlir", capture=True, collect_decomp_rules=False)
+        @plugin_pass
+        @qp.qnode(qp.device(backend, wires=1))
+        def captured_circuit():
+            return qp.expval(qp.PauliZ(0))
+
+        assert captured_circuit.compile_options.pass_plugins == {plugin_path}
+        assert captured_circuit.compile_options.dialect_plugins == {plugin_path}
+        assert 'transform.apply_registered_pass "my-custom-pass"' in captured_circuit.mlir
+        mock_plugin_module.name2pass.assert_called_once_with("my-custom-pass")
+
+    def test_pass_plugin_transform_with_options(self, mocker, tmp_path, backend):
+        """Test that a pass plugin transform forwards options under capture."""
+
+        plugin_path = tmp_path / "FakePlugin.so"
+        plugin_path.touch()
+
+        mock_plugin_module = mocker.Mock()
+        mock_plugin_module.name2pass.return_value = (plugin_path, "my-custom-pass")
+
+        mock_entry_point = mocker.Mock()
+        mock_entry_point.load.return_value = mock_plugin_module
+        mocker.patch(
+            "catalyst.from_plxpr.from_plxpr.entry_points",
+            return_value={"fakeplugin.passes": mock_entry_point},
+        )
+
+        plugin_pass = qp.transform(pass_name="fakeplugin.my-custom-pass")
+
+        @qjit(target="mlir", capture=True, collect_decomp_rules=False)
+        @partial(plugin_pass, my_option="my_option_value", my_other_option=False)
+        @qp.qnode(qp.device(backend, wires=1))
+        def captured_circuit():
+            return qp.expval(qp.PauliZ(0))
+
+        capture_mlir = captured_circuit.mlir
+        assert captured_circuit.compile_options.pass_plugins == {plugin_path}
+        assert 'transform.apply_registered_pass "my-custom-pass"' in capture_mlir
+        assert (
+            'with options = {"my-option" = "my_option_value", "my-other-option" = false}'
+            in capture_mlir
+        )
+
+    def test_pass_plugin_transform_with_multiple_dots(self, mocker, tmp_path, backend):
+        """Test that a pass_name with more than one '.' splits only on the first '.'."""
+
+        plugin_path = tmp_path / "FakePlugin.so"
+        plugin_path.touch()
+
+        mock_plugin_module = mocker.Mock()
+        mock_plugin_module.name2pass.return_value = (plugin_path, "my.nested.pass")
+
+        mock_entry_point = mocker.Mock()
+        mock_entry_point.load.return_value = mock_plugin_module
+        mocker.patch(
+            "catalyst.from_plxpr.from_plxpr.entry_points",
+            return_value={"fakeplugin.passes": mock_entry_point},
+        )
+
+        plugin_pass = qp.transform(pass_name="fakeplugin.my.nested.pass")
+
+        @qjit(target="mlir", capture=True, collect_decomp_rules=False)
+        @plugin_pass
+        @qp.qnode(qp.device(backend, wires=1))
+        def captured_circuit():
+            return qp.expval(qp.PauliZ(0))
+
+        assert captured_circuit.compile_options.pass_plugins == {plugin_path}
+        assert 'transform.apply_registered_pass "my.nested.pass"' in captured_circuit.mlir
+        mock_plugin_module.name2pass.assert_called_once_with("my.nested.pass")
+
+    def test_pass_plugin_not_installed(self, mocker, backend):
+        """Test that a clear error is raised when the pass plugin is not installed."""
+
+        mocker.patch(
+            "catalyst.from_plxpr.from_plxpr.entry_points",
+            return_value={},
+        )
+
+        missing_plugin_pass = qp.transform(pass_name="missingplugin.my-custom-pass")
+
+        @missing_plugin_pass
+        @qp.qnode(qp.device(backend, wires=1))
+        def circuit():
+            return qp.expval(qp.PauliZ(0))
+
+        with pytest.raises(
+            ValueError,
+            match="No pass plugin registered under 'missingplugin'.*Is the plugin package installed",
+        ):
+            qjit(circuit, capture=True, collect_decomp_rules=False)()
+
     def test_transform_cancel_inverses_workflow(self, backend):
         """Test the integration for a circuit with a 'cancel_inverses' transform."""
 
         # Capture enabled
 
-        @qjit(capture=True, collect_decomp_rules=False)
+        @qjit(capture=True)
         @qp.transforms.cancel_inverses
         @qp.qnode(qp.device(backend, wires=1))
         def captured_circuit(x: float):
@@ -1067,7 +1182,7 @@ class TestCapture:
 
         # Capture enabled
 
-        @qjit(capture=True, collect_decomp_rules=False)
+        @qjit(capture=True)
         @qp.transforms.merge_rotations
         @qp.qnode(qp.device(backend, wires=1))
         def captured_circuit(x: float):
@@ -1109,7 +1224,6 @@ class TestCapture:
         captured_inverses_rotations = qjit(
             qp.transforms.cancel_inverses(qp.transforms.merge_rotations(captured_circuit)),
             capture=True,
-            collect_decomp_rules=False,
         )
         captured_inverses_rotations_result = captured_inverses_rotations(0.1)
         assert has_catalyst_transforms(captured_inverses_rotations.mlir)
@@ -1117,7 +1231,6 @@ class TestCapture:
         captured_rotations_inverses = qjit(
             qp.transforms.merge_rotations(qp.transforms.cancel_inverses(captured_circuit)),
             capture=True,
-            collect_decomp_rules=False,
         )
         captured_rotations_inverses_result = captured_rotations_inverses(0.1)
         assert has_catalyst_transforms(captured_rotations_inverses.mlir)
@@ -1146,12 +1259,14 @@ class TestCapture:
             == captured_rotations_inverses_result
         )
 
-    @pytest.mark.xfail(reason="qp.decompose doesn't use graph-decomposition yet.")
     def test_transform_graph_decompose_workflow(self, backend):
-        """Test the integration for a circuit with a 'decompose' graph transform."""
+        """Test the integration for a circuit with a 'decompose' graph transform.
 
-        @qjit(capture=True, collect_decomp_rules=False)
-        @partial(qp.transforms.decompose, gate_set=[qp.RX, qp.RY, qp.RZ])
+        ``qp.decompose`` under capture is an alias for the ``graph-decomposition`` pass.
+        """
+
+        @qjit(capture=True)
+        @qp.decompose(gate_set=[qp.RX, qp.RY, qp.RZ])
         @qp.qnode(qp.device(backend, wires=2))
         def captured_circuit(x: float, y: float, z: float):
             m = qp.measure(0)
@@ -1166,7 +1281,7 @@ class TestCapture:
         capture_result = captured_circuit(1.5, 2.5, 3.5)
 
         # Capture disabled
-        @partial(qp.transforms.decompose, gate_set=[qp.RX, qp.RY, qp.RZ])
+        @qp.decompose(gate_set=[qp.RX, qp.RY, qp.RZ])
         @qp.qnode(qp.device(backend, wires=2))
         def circuit(x: float, y: float, z: float):
             m = catalyst.measure(0)
@@ -1190,7 +1305,7 @@ class TestCapture:
 
         # Capture enabled
 
-        @qjit(capture=True, collect_decomp_rules=False)
+        @qjit(capture=True)
         @qp.set_shots(10)
         @qp.qnode(qp.device(backend, wires=2))
         def captured_circuit():
@@ -1225,37 +1340,37 @@ class TestCapture:
         """Test the integration for a circuit with a static variable."""
 
         # Basic test
-        @qjit(capture=True, collect_decomp_rules=False, static_argnums=(0,))
+        @qjit(capture=True, static_argnums=(0,))
         @qp.qnode(qp.device(backend, wires=1))
         def captured_circuit_1(x, y):
             qp.RX(x, wires=0)
             qp.RY(y, wires=0)
             return qp.expval(qp.PauliZ(0))
 
-        result_1 = captured_circuit_1(1.5, 2.0)
+        result_1 = captured_circuit_1(1.8, 2.0)
         captured_circuit_1_mlir = captured_circuit_1.mlir
-        assert "%cst = arith.constant 1.5" in captured_circuit_1_mlir
+        assert "%cst = arith.constant 1.8" in captured_circuit_1_mlir
         assert 'qref.custom "RX"(%cst)' in captured_circuit_1_mlir
         assert "%cst = arith.constant 2.0" not in captured_circuit_1_mlir
 
         # Test that qjit static_argnums takes precedence over the one on the qnode
-        @qjit(capture=True, collect_decomp_rules=False, static_argnums=1)
+        @qjit(capture=True, static_argnums=1)
         @qp.qnode(qp.device(backend, wires=1), static_argnums=0)  # should be ignored
         def captured_circuit_2(x, y):
             qp.RX(x, wires=0)
             qp.RY(y, wires=0)
             return qp.expval(qp.PauliZ(0))
 
-        result_2 = captured_circuit_2(1.5, 2.0)
+        result_2 = captured_circuit_2(1.8, 2.0)
         captured_circuit_2_mlir = captured_circuit_2.mlir
         assert "%cst = arith.constant 2.0" in captured_circuit_2_mlir
         assert 'qref.custom "RY"(%cst)' in captured_circuit_2_mlir
-        assert "%cst = arith.constant 1.5" not in captured_circuit_2_mlir
+        assert "%cst = arith.constant 1.8" not in captured_circuit_2_mlir
 
         assert jnp.allclose(result_1, result_2)
 
         # Test under a non qnode workflow function
-        @qjit(capture=True, collect_decomp_rules=False, static_argnums=(0,))
+        @qjit(capture=True, static_argnums=(0,))
         def workflow(x, y):
             @qp.qnode(qp.device(backend, wires=1))
             def c():
@@ -1265,9 +1380,9 @@ class TestCapture:
 
             return c()
 
-        _ = workflow(1.5, 2.0)
+        _ = workflow(1.8, 2.0)
         captured_circuit_3_mlir = workflow.mlir
-        assert "%cst = arith.constant 1.5" in captured_circuit_3_mlir
+        assert "%cst = arith.constant 1.8" in captured_circuit_3_mlir
         assert 'qref.custom "RX"(%cst)' in captured_circuit_3_mlir
 
 
@@ -1288,7 +1403,7 @@ class TestControlFlow:
             qp.RX(x, 0)
             return qp.expval(qp.Z(0))
 
-        @qjit(capture=True, collect_decomp_rules=False)
+        @qjit(capture=True)
         def f(i0):
             @qp.for_loop(start, stop, step)
             def g(i, x):
@@ -1307,7 +1422,7 @@ class TestControlFlow:
             qp.RX(x, 0)
             return qp.expval(qp.Z(0))
 
-        @qjit(capture=True, collect_decomp_rules=False)
+        @qjit(capture=True)
         def f(x):
 
             const = jnp.array([0, 1, 2])
@@ -1328,7 +1443,7 @@ class TestControlFlow:
         """This tests for kinda a weird edge case bug where the consts where getting
         reordered when translating the inner jaxpr."""
 
-        @qjit(capture=True, collect_decomp_rules=False)
+        @qjit(capture=True)
         @qp.qnode(qp.device("lightning.qubit", wires=3))
         def circuit(x, n):
             @qp.for_loop(3)
@@ -1379,7 +1494,7 @@ def test_adjoint_transform_integration():
         qp.IsingXX(2 * x, wires=(0, 1))
         qp.H(0)
 
-    @qjit(capture=True, collect_decomp_rules=False)
+    @qjit(capture=True)
     @qp.qnode(qp.device("lightning.qubit", wires=3))
     def c(x):
         qp.adjoint(f)(x)
@@ -1391,6 +1506,40 @@ def test_adjoint_transform_integration():
     assert qp.math.allclose(res, expected)
 
 
+def test_mixed_control_values_operator(backend):
+    """Test both orders of mixed static and dynamic controls on RX instances."""
+
+    @qjit(capture=True, skip_preprocess=True)
+    @qp.qnode(qp.device(backend, wires=4))
+    def circuit(x, val):
+        qp.X(0)
+        qp.X(1)
+        qp.ctrl(qp.RX(x, 2), (0, 1), [True, val])
+        qp.ctrl(qp.RX(x, 3), (0, 1), [val, True])
+        return qp.expval(qp.Z(2)), qp.expval(qp.Z(3))
+
+    x = jnp.array(0.5)
+    assert qp.math.allclose(circuit(x, False), (1.0, 1.0))
+    assert qp.math.allclose(circuit(x, True), (jnp.cos(x), jnp.cos(x)))
+
+
+def test_mixed_control_values_callable(backend):
+    """Test tuple and list controls mixing static and dynamic values on the RX callable."""
+
+    @qjit(capture=True, skip_preprocess=True)
+    @qp.qnode(qp.device(backend, wires=4))
+    def circuit(x, val):
+        qp.X(0)
+        qp.X(1)
+        qp.ctrl(qp.RX, (0, 1), (val, True))(x, 2)
+        qp.ctrl(qp.RX, (0, 1), [val, True])(x, 3)
+        return qp.expval(qp.Z(2)), qp.expval(qp.Z(3))
+
+    x = jnp.array(0.5)
+    assert qp.math.allclose(circuit(x, False), (1.0, 1.0))
+    assert qp.math.allclose(circuit(x, True), (jnp.cos(x), jnp.cos(x)))
+
+
 @pytest.mark.parametrize("separate_funcs", (True, False))
 def test_ctrl_transform_integration(separate_funcs):
     """Test that the ctrl transform can be applied."""
@@ -1399,7 +1548,7 @@ def test_ctrl_transform_integration(separate_funcs):
         qp.RY(3 * y, wires=3)
         qp.RX(2 * x, wires=3)
 
-    @qjit(capture=True, collect_decomp_rules=False)
+    @qjit(capture=True)
     @qp.qnode(qp.device("lightning.qubit", wires=4))
     def c(x, y):
         qp.X(1)
@@ -1429,7 +1578,7 @@ def test_different_static_argnums():
             qp.RZ(x, 0)
         return qp.state()
 
-    @qjit(capture=True, collect_decomp_rules=False)
+    @qjit(capture=True)
     def w(x):
         return c(x, "X"), c(x, "Y"), c(x, "Z")
 

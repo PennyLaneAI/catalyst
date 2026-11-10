@@ -88,6 +88,25 @@ Value globalStr(ConversionPatternRewriter &rewriter, Location loc, ModuleOp mod,
                                ArrayRef<LLVM::GEPArg>{0, 0}, LLVM::GEPNoWrapFlags::inbounds);
 }
 
+void emitCheckedStatus(ConversionPatternRewriter &rewriter, Location loc, ModuleOp mod,
+                       StringRef name, ArrayRef<Type> paramTys, ValueRange args, StringRef what) {
+    auto *ctx = rewriter.getContext();
+    Value rc = emitCall(rewriter, loc, mod, name, paramTys, i32Ty(ctx), args);
+    Value msg = globalStr(rewriter, loc, mod, "transport_check_", what);
+    emitCall(rewriter, loc, mod, "__catalyst__transport__check", {i32Ty(ctx), ptrTy(ctx)}, Type(),
+             {rc, msg});
+}
+
+Value emitCheckedSession(ConversionPatternRewriter &rewriter, Location loc, ModuleOp mod,
+                         StringRef name, ArrayRef<Type> paramTys, ValueRange args, StringRef what) {
+    auto *ctx = rewriter.getContext();
+    Value s = emitCall(rewriter, loc, mod, name, paramTys, ptrTy(ctx), args);
+    Value msg = globalStr(rewriter, loc, mod, "transport_session_", what);
+    emitCall(rewriter, loc, mod, "__catalyst__transport__check_session", {ptrTy(ctx), ptrTy(ctx)},
+             Type(), {s, msg});
+    return s;
+}
+
 Value constInt(ConversionPatternRewriter &rewriter, Location loc, Type ty, int64_t v) {
     return LLVM::ConstantOp::create(rewriter, loc, ty, rewriter.getIntegerAttr(ty, v));
 }
@@ -121,9 +140,9 @@ struct CreateLowering : public OpConversionPattern<CreateOp> {
         Value key = globalStr(rewriter, op.getLoc(), mod, "transport_key_", op.getKey());
         Value role =
             constInt(rewriter, op.getLoc(), i32Ty(ctx), static_cast<int64_t>(sessTy.getRole()));
-        Value s = emitCall(rewriter, op.getLoc(), mod, "__catalyst__transport__create",
-                           {ptrTy(ctx), ptrTy(ctx), i32Ty(ctx), ptrTy(ctx)}, ptrTy(ctx),
-                           {lib, cfg, role, key});
+        Value s = emitCheckedSession(rewriter, op.getLoc(), mod, "__catalyst__transport__create",
+                                     {ptrTy(ctx), ptrTy(ctx), i32Ty(ctx), ptrTy(ctx)},
+                                     {lib, cfg, role, key}, "create");
         rewriter.replaceOp(op, s);
         return success();
     }
@@ -150,9 +169,9 @@ template <typename OpT, bool Async> struct ConnectLoweringBase : public OpConver
                                {adaptor.getSession(), peer, port});
             rewriter.replaceOp(op, r);
         } else {
-            emitCall(rewriter, op.getLoc(), mod, "__catalyst__transport__connect",
-                     {ptrTy(ctx), ptrTy(ctx), IntegerType::get(ctx, 16)}, i32Ty(ctx),
-                     {adaptor.getSession(), peer, port});
+            emitCheckedStatus(rewriter, op.getLoc(), mod, "__catalyst__transport__connect",
+                              {ptrTy(ctx), ptrTy(ctx), IntegerType::get(ctx, 16)},
+                              {adaptor.getSession(), peer, port}, "connect");
             rewriter.eraseOp(op);
         }
         return success();
@@ -174,8 +193,8 @@ struct ExchangeKeysLoweringBase : public OpConversionPattern<OpT> {
                          {ptrTy(ctx)}, i64Ty(ctx), {adaptor.getSession()});
             rewriter.replaceOp(op, r);
         } else {
-            emitCall(rewriter, op.getLoc(), mod, "__catalyst__transport__exchange_keys",
-                     {ptrTy(ctx)}, i32Ty(ctx), {adaptor.getSession()});
+            emitCheckedStatus(rewriter, op.getLoc(), mod, "__catalyst__transport__exchange_keys",
+                              {ptrTy(ctx)}, {adaptor.getSession()}, "exchange_keys");
             rewriter.eraseOp(op);
         }
         return success();
@@ -189,8 +208,8 @@ struct AwaitLowering : public OpConversionPattern<AwaitOp> {
     LogicalResult matchAndRewrite(AwaitOp op, OpAdaptor adaptor,
                                   ConversionPatternRewriter &rewriter) const override {
         auto *ctx = op.getContext();
-        emitCall(rewriter, op.getLoc(), moduleOf(op), "__catalyst__transport__await", {i64Ty(ctx)},
-                 i32Ty(ctx), {adaptor.getToken()});
+        emitCheckedStatus(rewriter, op.getLoc(), moduleOf(op), "__catalyst__transport__await",
+                          {i64Ty(ctx)}, {adaptor.getToken()}, "await");
         rewriter.eraseOp(op);
         return success();
     }
@@ -203,8 +222,9 @@ struct EstablishChannelLowering : public OpConversionPattern<EstablishChannelOp>
         auto *ctx = op.getContext();
         Value transport =
             globalStr(rewriter, op.getLoc(), moduleOf(op), "transport_kind_", op.getTransport());
-        emitCall(rewriter, op.getLoc(), moduleOf(op), "__catalyst__transport__establish_channel",
-                 {ptrTy(ctx), ptrTy(ctx)}, i32Ty(ctx), {adaptor.getSession(), transport});
+        emitCheckedStatus(rewriter, op.getLoc(), moduleOf(op),
+                          "__catalyst__transport__establish_channel", {ptrTy(ctx), ptrTy(ctx)},
+                          {adaptor.getSession(), transport}, "establish_channel");
         rewriter.eraseOp(op);
         return success();
     }
@@ -217,8 +237,9 @@ struct SetCoprocessorFnLowering : public OpConversionPattern<SetCoprocessorFnOp>
         auto *ctx = op.getContext();
         ModuleOp mod = moduleOf(op);
         Value sym = globalStr(rewriter, op.getLoc(), mod, "transport_coproc_fn_", op.getSymbol());
-        emitCall(rewriter, op.getLoc(), mod, "__catalyst__transport__set_coprocessor_fn",
-                 {ptrTy(ctx), ptrTy(ctx)}, i32Ty(ctx), {adaptor.getSession(), sym});
+        emitCheckedStatus(rewriter, op.getLoc(), mod, "__catalyst__transport__set_coprocessor_fn",
+                          {ptrTy(ctx), ptrTy(ctx)}, {adaptor.getSession(), sym},
+                          "set_coprocessor_fn");
         rewriter.eraseOp(op);
         return success();
     }
@@ -232,9 +253,10 @@ struct SetMessageSizesLowering : public OpConversionPattern<SetMessageSizesOp> {
         Value idx = constInt(rewriter, op.getLoc(), i32Ty(ctx), op.getWorkItemIdx());
         Value inB = constInt(rewriter, op.getLoc(), i64Ty(ctx), op.getInBytes());
         Value outB = constInt(rewriter, op.getLoc(), i64Ty(ctx), op.getOutBytes());
-        emitCall(rewriter, op.getLoc(), moduleOf(op), "__catalyst__transport__set_message_sizes",
-                 {ptrTy(ctx), i32Ty(ctx), i64Ty(ctx), i64Ty(ctx)}, i32Ty(ctx),
-                 {adaptor.getSession(), idx, inB, outB});
+        emitCheckedStatus(rewriter, op.getLoc(), moduleOf(op),
+                          "__catalyst__transport__set_message_sizes",
+                          {ptrTy(ctx), i32Ty(ctx), i64Ty(ctx), i64Ty(ctx)},
+                          {adaptor.getSession(), idx, inB, outB}, "set_message_sizes");
         rewriter.eraseOp(op);
         return success();
     }
@@ -288,9 +310,10 @@ struct StagePayloadLowering : public OpConversionPattern<StagePayloadOp> {
         auto [srcPtr, bytes] =
             memrefPtrAndBytes(rewriter, op.getLoc(), adaptor.getPayload(), memTy);
         Value decoderId = constInt(rewriter, op.getLoc(), i32Ty(ctx), op.getDecoderId());
-        emitCall(rewriter, op.getLoc(), moduleOf(op), "__catalyst__transport__stage_payload",
-                 {ptrTy(ctx), ptrTy(ctx), i64Ty(ctx), i32Ty(ctx)}, i32Ty(ctx),
-                 {adaptor.getSession(), srcPtr, bytes, decoderId});
+        emitCheckedStatus(rewriter, op.getLoc(), moduleOf(op),
+                          "__catalyst__transport__stage_payload",
+                          {ptrTy(ctx), ptrTy(ctx), i64Ty(ctx), i32Ty(ctx)},
+                          {adaptor.getSession(), srcPtr, bytes, decoderId}, "stage_payload");
         rewriter.eraseOp(op);
         return success();
     }
@@ -302,8 +325,8 @@ struct PostLowering : public OpConversionPattern<PostOp> {
                                   ConversionPatternRewriter &rewriter) const override {
         auto *ctx = op.getContext();
         Value idx = constInt(rewriter, op.getLoc(), i32Ty(ctx), op.getWorkItemIdx());
-        emitCall(rewriter, op.getLoc(), moduleOf(op), "__catalyst__transport__post",
-                 {ptrTy(ctx), i32Ty(ctx)}, i32Ty(ctx), {adaptor.getSession(), idx});
+        emitCheckedStatus(rewriter, op.getLoc(), moduleOf(op), "__catalyst__transport__post",
+                          {ptrTy(ctx), i32Ty(ctx)}, {adaptor.getSession(), idx}, "post");
         rewriter.eraseOp(op);
         return success();
     }
@@ -326,9 +349,9 @@ struct CollectLowering : public OpConversionPattern<CollectOp> {
             return rewriter.notifyMatchFailure(op, "collect dest must have identity layout");
         }
         auto [dstPtr, bytes] = memrefPtrAndBytes(rewriter, op.getLoc(), adaptor.getDest(), memTy);
-        emitCall(rewriter, op.getLoc(), mod, "__catalyst__transport__collect",
-                 {ptrTy(ctx), ptrTy(ctx), i64Ty(ctx)}, i32Ty(ctx),
-                 {adaptor.getSession(), dstPtr, bytes});
+        emitCheckedStatus(rewriter, op.getLoc(), mod, "__catalyst__transport__collect",
+                          {ptrTy(ctx), ptrTy(ctx), i64Ty(ctx)},
+                          {adaptor.getSession(), dstPtr, bytes}, "collect");
         rewriter.eraseOp(op);
         return success();
     }
@@ -371,8 +394,9 @@ struct GetSessionLowering : public OpConversionPattern<GetSessionOp> {
         Value role =
             constInt(rewriter, op.getLoc(), i32Ty(ctx), static_cast<int64_t>(sessTy.getRole()));
         Value key = globalStr(rewriter, op.getLoc(), mod, "transport_key_", op.getKey());
-        Value s = emitCall(rewriter, op.getLoc(), mod, "__catalyst__transport__get_session",
-                           {i32Ty(ctx), ptrTy(ctx)}, ptrTy(ctx), {role, key});
+        Value s =
+            emitCheckedSession(rewriter, op.getLoc(), mod, "__catalyst__transport__get_session",
+                               {i32Ty(ctx), ptrTy(ctx)}, {role, key}, "get_session");
         rewriter.replaceOp(op, s);
         return success();
     }

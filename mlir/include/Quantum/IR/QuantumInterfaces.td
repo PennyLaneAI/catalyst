@@ -194,12 +194,12 @@ def DecomposableGate : OpInterface<"DecomposableGate", [QuantumGate]> {
             "Return the name of the corresponding frontend operator (i.e. the rule supplier).", "std::string", "getOperatorName"
         >,
         InterfaceMethod<
-            "Return a map of frontend parameter name to shape and dtype of dynamic data.",
-            "llvm::StringMap<llvm::SmallVector<mlir::Type>>", "getDynamicShape"
+            "Return the frontend parameter names with the types of their dynamic data, in operand order.",
+            "::catalyst::quantum::DynamicShape", "getDynamicShape"
         >,
         InterfaceMethod<
-            "Return a map of frontend parameter name to number of wires (excluding control wires).",
-            "llvm::StringMap<size_t>", "getWireLens"
+            "Return the frontend wire argument names with their number of wires (excluding control wires), in operand order.",
+            "::catalyst::quantum::WireLens", "getWireLens"
         >,
         InterfaceMethod<
             "Return a map of frontend parameter name to static data values.",
@@ -222,8 +222,17 @@ def DecomposableGate : OpInterface<"DecomposableGate", [QuantumGate]> {
             "depends on identical id generation."
             "In general, this should be computed by the default here and not overridden.",
             "std::string", "getGraphOpId", (ins), [{}], [{ return ::catalyst::quantum::defaultGetGraphOpId($_op.getOperation()); }]
+        >,
+        InterfaceMethod<
+            "Obtains the operation's ID in the same format as getGraphOpId, but with modifiers applied. "
+            "the actual modifiers attributes of the operation are disregarded, and the ID is computed based on the base operator id and explicit modifiers.",
+            "std::string", "getGraphOpIdExplicitModifiers", (ins "bool":$is_adjoint, "unsigned":$num_control_qubits), [{}], [{ return ::catalyst::quantum::defaultGetGraphOpIdExplicitModifiers($_op.getOperation(), is_adjoint, num_control_qubits); }]
         >
     ];
+}
+
+def Observable : OpInterface<"Observable"> {
+    let cppNamespace = "::catalyst::quantum";
 }
 
 def MeasurementProcess : OpInterface<"MeasurementProcess"> {

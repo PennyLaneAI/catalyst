@@ -162,7 +162,7 @@ runtime:
 oqc:
 	$(MAKE) -C frontend/catalyst/third_party/oqc/src oqc
 
-.PHONY: test test-runtime test-frontend lit pytest test-demos test-oqc test-toml-spec
+.PHONY: test test-runtime test-runtime-transport test-frontend lit pytest test-demos test-oqc test-toml-spec
 test: test-runtime test-frontend test-demos
 
 test-toml-spec:
@@ -170,6 +170,9 @@ test-toml-spec:
 
 test-runtime:
 	$(MAKE) -C runtime test
+
+test-runtime-transport:
+	$(MAKE) -C runtime test-transport ENABLE_TRANSPORT=ON
 
 test-mlir:
 	$(MAKE) -C mlir test
@@ -345,7 +348,7 @@ coverage: coverage-frontend coverage-runtime
 
 lit-coverage:
 	@echo "Running lit tests with coverage"
-	$(DIALECTS_BUILD_DIR)/bin/catalyst --tool=opt --emit-bytecode --register-decomp-rule-resource $(MK_DIR)/frontend/test/lit/GraphDecomposition/test_rules.mlir > $(MK_DIR)/frontend/test/lit/GraphDecomposition/test_rules.mlirbc
+	$(DIALECTS_BUILD_DIR)/bin/catalyst --tool=opt --catalyst-pipeline='empty_pipe()' --emit-bytecode $(MK_DIR)/frontend/test/lit/GraphDecomposition/test_rules.mlir > $(MK_DIR)/frontend/test/lit/GraphDecomposition/test_rules.mlirbc
 	CATALYST_LIBPYTHON=$$($(PYTHON) -c 'from catalyst.utils.runtime_environment import get_libpython_path; print(get_libpython_path())') ENABLE_LIT_COVERAGE=1 COVERAGE_FILE=$(MK_DIR)/.coverage.lit $(PYTHON) $(LLVM_BUILD_DIR)/bin/llvm-lit -sv frontend/test/lit -j$(shell nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 1)
 	# Each lit worker writes its own .coverage.lit.<host>.<pid>.<random>; merge them into
 	# .coverage.lit, which coverage-frontend then combines with the pytest data.

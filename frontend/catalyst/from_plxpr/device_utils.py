@@ -15,6 +15,8 @@
 This submodule defines utilities for device preprocessing for from_plxpr.
 """
 
+import copy
+
 # pylint: disable=too-many-arguments, too-many-positional-arguments
 import warnings
 
@@ -35,9 +37,11 @@ from catalyst.device.decomposition import (
 
 # pylint: disable=protected-access
 from catalyst.device.qjit_device import (
+    RUNTIME_OPERATIONS,
     _load_device_capabilities,
     filter_device_capabilities_with_shots,
     get_qjit_device_capabilities,
+    intersect_operations,
 )
 from catalyst.device.verification import (
     validate_measurements,
@@ -45,6 +49,9 @@ from catalyst.device.verification import (
     validate_observables_parameter_shift,
     verify_no_state_variance_returns,
     verify_operations,
+)
+from catalyst.passes.builtin_passes import (
+    graph_decomposition_setup_inputs,
 )
 from catalyst.utils.exceptions import CompileError
 
@@ -60,7 +67,7 @@ def create_device_preprocessing_pipeline(
     device: qp.devices.Device, execution_config: ExecutionConfig, shots: int, warn: bool = True
 ) -> list[BoundTransform]:
     """Create a pipeline of device preprocessing transforms for lowering QNodes."""
-    shots_present = qp.math.is_abstract(shots) or shots != 0
+    shots_present = qp.math.is_tracer(shots) or shots != 0
     raw_capabilities: DeviceCapabilities = get_qjit_device_capabilities(
         _load_device_capabilities(device)
     )
@@ -99,6 +106,9 @@ def create_device_preprocessing_pipeline(
     _gradient_preprocessing(
         pipeline, unsupported_transforms, device, execution_config, shots, capabilities
     )
+    _gateset_preprocessing(
+        pipeline, unsupported_transforms, device, execution_config, shots, capabilities
+    )
 
     if unsupported_transforms and warn:
         warnings.warn(
@@ -131,7 +141,7 @@ def _mcm_preprocessing(
         )
 
     if mcm_config.mcm_method == MCM_METHOD.ONE_SHOT:
-        shots_present = qp.math.is_abstract(shots) or shots != 0
+        shots_present = qp.math.is_tracer(shots) or shots != 0
         if not shots_present:
             raise CompileError("Cannot use mcm_method='one-shot' with analytic mode.")
         pipeline.append(
@@ -260,7 +270,7 @@ def _gradient_preprocessing(
             )
         )
     if execution_config.gradient_method == "adjoint":
-        shots_present = qp.math.is_abstract(shots) or shots != 0
+        shots_present = qp.math.is_tracer(shots) or shots != 0
         if shots_present:
             raise CompileError("Cannot use diff_method='adjoint' with finite shots.")
         # qjit_device should technically be an instance of QJITDevice,
@@ -279,6 +289,37 @@ def _gradient_preprocessing(
                 validate_observables_parameter_shift, unsupported_transforms
             )
         )
+
+
+# pylint: disable=unused-argument
+def _gateset_preprocessing(
+    pipeline: list[BoundTransform],
+    unsupported_transforms: list[str],
+    device: qp.devices.Device,
+    execution_config: ExecutionConfig,
+    shots: int,
+    capabilities: DeviceCapabilities,
+) -> None:
+    """Insert a `graph-decomposition` pass targetting the gateset
+    specified by the specific `device`
+    """
+
+    copied_capabilities = copy.deepcopy(capabilities)
+
+    # Intersection of gates and observables supported by the device and by Catalyst runtime.
+    copied_capabilities.operations = intersect_operations(
+        capabilities.operations, RUNTIME_OPERATIONS
+    )
+
+    gate_set = copied_capabilities.gate_set()
+
+    # Get the default args/kwargs with the above gate_set
+    targs, tkwargs = graph_decomposition_setup_inputs(gate_set=gate_set)
+    t = qp.transform(pass_name="graph-decomposition")
+
+    pipeline.append(
+        _safe_create_bound_transform(t, unsupported_transforms, args=targs, kwargs=tkwargs)
+    )
 
 
 def _safe_create_bound_transform(

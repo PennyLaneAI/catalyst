@@ -11,7 +11,7 @@ System(_so_sys_, "workflow.so", $tags="object")
 
 Boundary(c1, "Compiler", $link="https://github.com/plantuml-stdlib/C4-PlantUML") {
 
-  Component(_nohlo_mlir_, "HLO Lowering", "mlir-hlo-opt", "Lower HLO dialects to standard MLIR dialects")
+  Component(_nohlo_mlir_, "HLO Lowering", "quantum-opt", "Lower HLO dialects to standard MLIR dialects")
 
   Boundary(c2, "Core", $link="https://github.com/plantuml-stdlib/C4-PlantUML") {
 

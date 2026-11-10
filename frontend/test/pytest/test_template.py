@@ -116,7 +116,7 @@ def test_iqp_embedding(backend):
     device = qp.device(backend, wires=3)
     params = jnp.array([1.0, 2.0, 3.0])
     interpreted_fn = qp.QNode(iqp_embedding, device)
-    jitted_fn = qjit(interpreted_fn)
+    jitted_fn = qjit(interpreted_fn, capture=True)
 
     assert np.allclose(interpreted_fn(params), jitted_fn(params))
 
@@ -814,16 +814,13 @@ def test_quantum_phase_estimation(backend):
     """Test QuantumPhaseEstimation."""
 
     phase = 5
-    target_wires = [0]
-    unitary = qp.RX(phase, wires=0).matrix()
+    unitary = qp.RX(phase, wires=0)
     n_estimation_wires = 5
     estimation_wires = range(1, n_estimation_wires + 1)
 
     def quantum_phase_estimation():
-        qp.Hadamard(wires=target_wires)
-        qp.QuantumPhaseEstimation(
-            unitary, target_wires=target_wires, estimation_wires=estimation_wires
-        )
+        qp.Hadamard(0)
+        qp.QuantumPhaseEstimation(unitary, estimation_wires=estimation_wires)
         return qp.probs(estimation_wires)
 
     device = qp.device(backend, wires=6)

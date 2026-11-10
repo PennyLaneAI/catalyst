@@ -19,7 +19,7 @@
 #include <string>
 
 #include "llvm/ADT/STLExtras.h"
-#include "llvm/ADT/StringMap.h"
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/raw_ostream.h"
 #include "mlir/IR/Attributes.h"
@@ -39,42 +39,46 @@ using namespace catalyst::qref;
 
 namespace {
 
+// Print the entries of a dynamic shape or wire lens sorted by name. The graphOpId is an identity,
+// so it must not depend on the operand order of the entries; it is also never used as a positional
+// order (the entries themselves are in operand order).
 template <typename T, typename PrintFunc>
-void printSortedMap(const llvm::StringMap<T> &map, llvm::raw_string_ostream &ss,
+void printSortedMap(llvm::ArrayRef<std::pair<std::string, T>> entries, llvm::raw_string_ostream &ss,
                     PrintFunc printValue) {
-    llvm::SmallVector<llvm::StringRef> keys;
-    for (const llvm::StringRef key : map.keys()) {
-        keys.push_back(key);
+    llvm::SmallVector<const std::pair<std::string, T> *> sorted;
+    for (const auto &entry : entries) {
+        sorted.push_back(&entry);
     }
-    llvm::sort(keys);
+    llvm::sort(sorted, [](const auto *lhs, const auto *rhs) { return lhs->first < rhs->first; });
 
     ss << "{";
-    for (auto [i, key] : llvm::enumerate(keys)) {
+    for (auto [i, entry] : llvm::enumerate(sorted)) {
         if (i > 0) {
             ss << ",";
         }
-        ss << key << ":";
-        printValue(map.lookup(key), ss);
+        ss << entry->first << ":";
+        printValue(entry->second, ss);
     }
     ss << "}";
 }
 
-void printDynamicShape(const llvm::StringMap<llvm::SmallVector<mlir::Type>> &map,
-                       llvm::raw_string_ostream &ss) {
-    printSortedMap(map, ss, [](const auto &types, llvm::raw_string_ostream &stream) {
-        stream << "[";
-        for (auto [j, type] : llvm::enumerate(types)) {
-            if (j > 0) {
-                stream << ",";
+void printDynamicShape(const DynamicShape &dynamicShape, llvm::raw_string_ostream &ss) {
+    printSortedMap<llvm::SmallVector<mlir::Type>>(
+        dynamicShape, ss, [](const auto &types, llvm::raw_string_ostream &stream) {
+            stream << "[";
+            for (auto [j, type] : llvm::enumerate(types)) {
+                if (j > 0) {
+                    stream << ",";
+                }
+                stream << type;
             }
-            stream << type;
-        }
-        stream << "]";
-    });
+            stream << "]";
+        });
 }
 
-void printWireLens(const llvm::StringMap<size_t> &map, llvm::raw_string_ostream &ss) {
-    printSortedMap(map, ss, [](size_t len, llvm::raw_string_ostream &stream) { stream << len; });
+void printWireLens(const WireLens &wireLens, llvm::raw_string_ostream &ss) {
+    printSortedMap<size_t>(wireLens, ss,
+                           [](size_t len, llvm::raw_string_ostream &stream) { stream << len; });
 }
 
 } // namespace

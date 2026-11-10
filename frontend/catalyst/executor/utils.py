@@ -40,6 +40,26 @@ from catalyst.utils.runtime_environment import get_lib_path
 MAX_PORT_TRIES = 6
 
 
+class Secret:
+    """A string that prints as ``***``, so a repr, f-string, log line or traceback showing locals
+    cannot leak it. :meth:`get_secret_value` returns the real value, for the point of use."""
+
+    __slots__ = ("_value",)
+
+    def __init__(self, value: str):
+        self._value = value
+
+    def get_secret_value(self) -> str:
+        """The wrapped string."""
+        return self._value
+
+    def __repr__(self) -> str:
+        return "Secret('***')"
+
+    def __str__(self) -> str:
+        return "***"
+
+
 class OutputPatterns:
     """Regex classifiers for executor/ssh output lines. Use the ``is_*`` predicates."""
 

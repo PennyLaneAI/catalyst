@@ -23,3 +23,5 @@ target_include_directories(rt_rsdecomp
 )
 
 set_property(TARGET rt_rsdecomp PROPERTY POSITION_INDEPENDENT_CODE ON)
+
+catalyst_runtime_install(rt_rsdecomp)

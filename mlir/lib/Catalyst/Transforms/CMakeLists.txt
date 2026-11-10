@@ -23,8 +23,8 @@ file(GLOB SRC
     qnode_to_async_lowering.cpp
     QnodeToAsyncPatterns.cpp
     RegisterInactiveCallbackPass.cpp
+    ResolveRuntimeSymbols.cpp
     ResourceAnalysisPass.cpp
-    RegisterDecompRuleResourcePass.cpp
     SplitMultipleTapes.cpp
     TBAAPatterns.cpp
     TBAATagsPass.cpp
@@ -37,6 +37,8 @@ file(GLOB SRC
 set(LLVM_LINK_COMPONENTS
     AllTargetsAsmParsers
     AllTargetsCodeGens
+    Demangle
+    Object
 )
 
 get_property(dialect_libs GLOBAL PROPERTY MLIR_DIALECT_LIBS)

@@ -39,27 +39,8 @@ class DecompositionGraph;
 namespace DecompGraph::Core {
 
 static inline auto print_op(const OperatorNode &op) -> std::string {
-    // id override
-    if (!op.id.empty()) {
-        return "id: " + op.id;
-    }
-
-    std::ostringstream oss;
-    oss << op.name;
-    oss << "[w:" << op.numWires << "]";
-    oss << "[p:" << op.numParams << "]";
-    if (!op.staticNamedArgs.empty()) {
-        std::vector<std::string> keys;
-        keys.reserve(op.staticNamedArgs.size());
-        for (const auto &[k, _] : op.staticNamedArgs) {
-            keys.push_back(k);
-        }
-        std::sort(keys.begin(), keys.end());
-        for (const auto &k : keys) {
-            oss << "[" << k << ":" << op.staticNamedArgs.at(k) << "]";
-        }
-    }
-    return oss.str();
+    // id is now required
+    return op.id;
 }
 
 static inline auto graph_failed_message(const OperatorNode &op,
@@ -78,13 +59,7 @@ static inline auto graph_failed_message(const OperatorNode &op,
     }
     if (!unsolvable.empty()) {
         oss << "\nThe following required operators could not reach the target gateset:";
-        constexpr size_t maxToShow = 25;
-        size_t shown = 0;
         for (const auto &u : unsolvable) {
-            if (shown++ == maxToShow) {
-                oss << "\n  * ... and " << (unsolvable.size() - maxToShow) << " more";
-                break;
-            }
             oss << "\n  * " << print_op(u);
         }
         oss << "\nAdd one of these (or gates they can decompose into) to the target gateset.";

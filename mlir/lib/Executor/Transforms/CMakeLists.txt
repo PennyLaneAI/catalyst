@@ -6,8 +6,10 @@ set(LLVM_LINK_COMPONENTS
 )
 
 file(GLOB SRC
+    BufferizableOpInterfaceImpl.cpp
     DispatchExecutorTargets.cpp
     ExecutorToLLVM.cpp
+    LowerRuntimeDispatch.cpp
 )
 
 get_property(dialect_libs GLOBAL PROPERTY MLIR_DIALECT_LIBS)

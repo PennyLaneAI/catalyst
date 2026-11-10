@@ -29,7 +29,7 @@ from pennylane.transforms.core import BoundTransform
 
 from catalyst.backline import module_attributes
 from catalyst.jax_extras.lowering import get_mlir_attribute_from_pyval
-from catalyst.passes import PassPlugin
+from catalyst.utils.runtime_artifacts import record_device_runtime_artifacts
 
 
 def _all_expval(call_jaxpr: core.ClosedJaxpr) -> bool:
@@ -231,10 +231,13 @@ def lower_qnode_to_funcop(ctx, callable_, call_jaxpr, pipelines):
     with NestedModule(ctx, name) as module, ir.InsertionPoint(module.regions[0].blocks[0]) as ip:
         for attr_name, value in device_attrs.items():
             module.operation.attributes[attr_name] = get_mlir_attribute_from_pyval(value)
+        # record runtime artifacts regarding device-specific runtime libraries on the qnode module
+        record_device_runtime_artifacts(module.operation, callable_.device)
         transform_module_lowering(ctx, pipelines)
         ctx.module_context.ip = ip
         func_op = get_or_create_funcop(ctx, callable_, call_jaxpr, pipelines)
         func_op.sym_visibility = ir.StringAttr.get("public")
+        func_op.attributes["quantum.kernel_entry_point"] = ir.UnitAttr.get()
         func_op.attributes["quantum.node"] = ir.UnitAttr.get()
         diff_method = _calculate_diff_method(callable_, call_jaxpr)
         func_op.attributes["diff_method"] = ir.StringAttr.get(diff_method)
@@ -306,12 +309,10 @@ class NestedModule:
         self.ctx.module_context = self.old_module_context
 
 
-def _lowered_options(_pass: BoundTransform | PassPlugin):
-    args = _pass.args if isinstance(_pass, BoundTransform) else _pass.options
-    kwargs = _pass.kwargs if isinstance(_pass, BoundTransform) else _pass.valued_options
+def _lowered_options(_pass: BoundTransform):
     return get_mlir_attribute_from_pyval(
-        {str(arg).replace("_", "-"): True for arg in args}
-        | {k.replace("_", "-"): v for k, v in kwargs.items()}
+        {str(arg).replace("_", "-"): True for arg in _pass.args}
+        | {k.replace("_", "-"): v for k, v in _pass.kwargs.items()}
     )
 
 
@@ -378,8 +379,8 @@ def transform_named_sequence_lowering(pipeline, sym_name):
     with ir.InsertionPoint(bb_named_sequence):
         target = bb_named_sequence.arguments[0]
         for _pass in pipeline:
-            assert isinstance(_pass, (BoundTransform, PassPlugin))
-            name = _pass.pass_name if isinstance(_pass, BoundTransform) else _pass.name
+            assert isinstance(_pass, BoundTransform)
+            name = _pass.pass_name
             options = _lowered_options(_pass)
             apply_registered_pass_op = ApplyRegisteredPassOp(
                 result=transform_mod_type,
@@ -457,6 +458,6 @@ def unconditional_to_conditional_if_probs(
         if remaining <= 0.0:
             conditional.append(0.0)
         else:
-            conditional.append(p / remaining)
+            conditional.append(min(p / remaining, 1.0))
             remaining -= p
     return tuple(conditional)

@@ -22,7 +22,7 @@ from catalyst import qjit
 
 
 # Non-root nodes have internal linkage.
-# CHECK-DAG: func.func public @qnode{{.*}} {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>, quantum.node} {
+# CHECK-DAG: func.func public @qnode{{.*}} {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>, quantum.kernel_entry_point, quantum.node} {
 @qp.qnode(qp.device("lightning.qubit", wires=2), diff_method="parameter-shift")
 def qnode(x):
     qp.RX(x, wires=0)

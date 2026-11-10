@@ -128,6 +128,13 @@ class OQDDevice(Device):
 
         return "oqd", lib_path
 
+    @staticmethod
+    def get_runtime_artifacts():
+        """Returns the OQD runtime library exporting the calls emitted by the OQD passes."""
+        system_extension = ".dylib" if platform.system() == "Darwin" else ".so"
+        lib_path = get_lib_path("oqd_runtime", "OQD_LIB_DIR") + "/librt_OQD_capi" + system_extension
+        return (lib_path,)
+
     def __init__(
         self,
         wires,

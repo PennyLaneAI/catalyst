@@ -38,6 +38,7 @@
 #include "Ion/IR/IonDialect.h"
 #include "MBQC/IR/MBQCDialect.h"
 #include "Mitigation/IR/MitigationDialect.h"
+#include "PBC/Analysis/PBCDepthAnalysis.h"
 #include "PBC/IR/PBCDialect.h"
 #include "PauliFrame/IR/PauliFrameDialect.h"
 #include "QRef/IR/QRefDialect.h"
@@ -51,6 +52,7 @@
 #include "RegisterAllPasses.h"
 
 #include "Executor/IR/ExecutorDialect.h"
+#include "Executor/Transforms/BufferizableOpInterfaceImpl.h"
 #include "Transport/IR/TransportDialect.h"
 #include "Transport/Transforms/BufferizableOpInterfaceImpl.h"
 
@@ -62,6 +64,7 @@ int main(int argc, char **argv) {
     llvm::cl::AddExtraVersionPrinter(catalyst::printVersion);
     mlir::registerAllPasses();
     catalyst::registerAllPasses();
+    catalyst::pbc::registerPBCResourceAnalysisExtensions();
     mlirRegisterAllStablehloPasses();
     mlir::stablehlo::registerOptimizationPasses();
 
@@ -91,6 +94,7 @@ int main(int argc, char **argv) {
     catalyst::quantum::registerBufferizableOpInterfaceExternalModels(registry);
     catalyst::qecp::registerBufferizableOpInterfaceExternalModels(registry);
     catalyst::transport::registerBufferizableOpInterfaceExternalModels(registry);
+    catalyst::executor::registerBufferizableOpInterfaceExternalModels(registry);
 
     return mlir::asMainReturnCode(
         mlir::MlirOptMain(argc, argv, "Quantum optimizer driver\n", registry));

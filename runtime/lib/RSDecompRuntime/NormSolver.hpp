@@ -16,7 +16,6 @@
 
 #include <algorithm>
 #include <optional>
-#include <random>
 #include <tuple>
 #include <vector>
 
@@ -27,6 +26,7 @@
 #include "Rings.hpp"
 
 #define MAX_FACTORING_TRIALS 1000
+#define MAX_POLLARD_STEPS (1 << 10)
 #define FACTORING_CACHE_SIZE 100000
 
 namespace RSDecomp::NormSolver {
@@ -184,6 +184,10 @@ inline std::optional<INT_TYPE> sqrt_modulo_p(INT_TYPE n, INT_TYPE p) {
  * for integer factorization.
  * Ref: https://doi.org/10.1007/BF01933190
  *
+ * Each attempt is limited to about MAX_POLLARD_STEPS steps, so that numbers with only large
+ * prime factors are given up on quickly. The random parameters are seeded from n, so that the
+ * result is deterministic.
+ *
  * @param n The number to factor.
  * @param max_trials The maximum number of attempts to find a factor.
  * @return An integer factor of n, or std::nullopt if no factors are found.
@@ -205,7 +209,7 @@ inline std::optional<INT_TYPE> integer_factorize(INT_TYPE n, int max_trials) {
         return INT_TYPE(2);
     }
 
-    static boost::random::mt11213b gen(std::random_device{}());
+    boost::random::mt11213b gen((n % INT_TYPE(4294967291u)).convert_to<uint32_t>());
 
     // Main loop: retry with different parameters on failure
     while (max_trials-- > 0) {
@@ -239,6 +243,9 @@ inline std::optional<INT_TYPE> integer_factorize(INT_TYPE n, int max_trials) {
                 k += m;
             }
             r *= 2;
+            if (r > MAX_POLLARD_STEPS) {
+                break;
+            }
         }
 
         // Linear search for a factor if the above doesn't yield a result.

@@ -53,31 +53,8 @@ include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
 
 # --- version string, reused from frontend/catalyst/_version.py ---
-find_package(Python3 REQUIRED COMPONENTS Interpreter)
-
-execute_process(
-    COMMAND
-        ${Python3_EXECUTABLE} -c
-            "import sys; \
-            sys.path.append('${PROJECT_SOURCE_DIR}/../frontend/catalyst'); \
-            from _version import __version__; \
-            print(__version__)"
-    OUTPUT_VARIABLE CATALYST_PACKAGE_VERSION
-    ERROR_VARIABLE PARSE_CATALYST_VERSION_ERRORS
-    RESULT_VARIABLE PARSE_CATALYST_VERSION_RETURN_CODE
-    OUTPUT_STRIP_TRAILING_WHITESPACE
-)
-
-if(NOT PARSE_CATALYST_VERSION_RETURN_CODE EQUAL 0)
-    message(FATAL_ERROR
-        "Failed to read Catalyst package version from file \
-        ${PROJECT_SOURCE_DIR}/../frontend/catalyst/_version.py: \
-        ${PARSE_CATALYST_VERSION_ERRORS}"
-    )
-endif()
-
-message(STATUS "Found Catalyst package version: ${CATALYST_PACKAGE_VERSION}")
-
+# CATALYST_PACKAGE_VERSION is read in the top-level mlir/CMakeLists.txt and
+# inherited here; it must live there so the CPack configuration can see it.
 string(REGEX MATCH "^[0-9]+\\.[0-9]+\\.[0-9]+" CATALYST_NUMERIC_VERSION "${CATALYST_PACKAGE_VERSION}")
 
 write_basic_package_version_file(

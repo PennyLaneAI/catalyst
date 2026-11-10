@@ -44,8 +44,6 @@ namespace {
 //      `executor.launch` carrying the session value, the entry callee and the object path.
 //   3. Erases the nested module from the host after its `catalyst.launch_kernel`s are rewritten.
 //
-// A `catalyst.custom_call` carrying a `dispatch` entry in its `backend_config` is rewritten into an
-// `executor.call` reusing the same per-function session.
 struct DispatchExecutorTargetsPass
     : impl::DispatchExecutorTargetsPassBase<DispatchExecutorTargetsPass> {
     using DispatchExecutorTargetsPassBase::DispatchExecutorTargetsPassBase;
@@ -60,16 +58,7 @@ struct DispatchExecutorTargetsPass
             }
         }
 
-        // catalyst.custom_call ops whose backend_config carries a `dispatch` entry
-        // The call-target name is the executor-side symbol.
-        SmallVector<catalyst::CustomCallOp> libCalls;
-        host.walk([&](catalyst::CustomCallOp call) {
-            if (executorDispatchOf(call)) {
-                libCalls.push_back(call);
-            }
-        });
-
-        if (targetMods.empty() && libCalls.empty()) {
+        if (targetMods.empty()) {
             return;
         }
 
@@ -89,26 +78,6 @@ struct DispatchExecutorTargetsPass
                 return signalPassFailure();
             }
             nested.erase();
-        }
-
-        const size_t numQnodeExecutors = openedAddresses.size();
-
-        if (!libCalls.empty()) {
-            for (catalyst::CustomCallOp call : libCalls) {
-                StringAttr dispatch = executorDispatchOf(call);
-                if ((!dispatch || dispatch.getValue().empty()) && numQnodeExecutors > 1) {
-                    call.emitOpError("ambiguous executor");
-                    return signalPassFailure();
-                }
-                StringAttr addrAttr = libCallAddress(call, executorAddress);
-                if (!addrAttr) {
-                    call.emitOpError("custom_call dispatch has no executor address");
-                    return signalPassFailure();
-                }
-            }
-            if (failed(rewriteExecutorLibCalls(libCalls, executorAddress))) {
-                return signalPassFailure();
-            }
         }
 
         // A function that issued async launches must wait for them before it returns,
@@ -146,22 +115,6 @@ struct DispatchExecutorTargetsPass
         }
     }
 
-    static StringAttr executorDispatchOf(catalyst::CustomCallOp call) {
-        if (auto cfg = call.getBackendConfigAttr()) {
-            return cfg.getAs<StringAttr>("dispatch");
-        }
-        return nullptr;
-    }
-
-    static StringAttr libCallAddress(catalyst::CustomCallOp call, StringAttr fallbackAddress) {
-        if (StringAttr dispatch = executorDispatchOf(call)) {
-            if (!dispatch.getValue().empty()) {
-                return dispatch;
-            }
-        }
-        return fallbackAddress;
-    }
-
     bool backlineBringupMode = false;
 
     // Sessions opened per (function, address).
@@ -176,37 +129,19 @@ struct DispatchExecutorTargetsPass
             return cached;
         }
         Block &entry = func.getBody().front();
+        // Check if a session for this address is already in the entry block.
+        for (auto open : entry.getOps<executor::OpenOp>()) {
+            if (open.getAddressAttr() == addressAttr) {
+                sessionCache[key] = open.getSession();
+                return open.getSession();
+            }
+        }
         OpBuilder b(&entry, entry.begin());
         Value session =
             executor::OpenOp::create(b, func.getLoc(), SessionType::get(&getContext()), addressAttr)
                 .getSession();
         sessionCache[key] = session;
         return session;
-    }
-
-    LogicalResult rewriteExecutorLibCalls(ArrayRef<catalyst::CustomCallOp> libCalls,
-                                          StringAttr fallbackAddress) {
-        MLIRContext *ctx = &getContext();
-        for (catalyst::CustomCallOp call : libCalls) {
-            StringAttr addressAttr = libCallAddress(call, fallbackAddress);
-            if (!addressAttr) {
-                call.emitOpError("custom_call dispatch has no executor address");
-                return failure();
-            }
-            auto symAttr = StringAttr::get(ctx, call.getCallTargetName());
-            OpBuilder b(call);
-            IntegerAttr numInputAttr = nullptr;
-            if (auto n = call.getNumberOriginalArg()) {
-                numInputAttr = b.getI32IntegerAttr(*n);
-            }
-            Value session = getOrOpenSession(call, addressAttr);
-            auto executorCall = executor::CallOp::create(
-                b, call.getLoc(), call.getResultTypes(), session, call.getOperands(),
-                /*symbol=*/symAttr, /*num_input_args=*/numInputAttr);
-            call.replaceAllUsesWith(executorCall.getResults());
-            call.erase();
-        }
-        return success();
     }
 
     // Objects already shipped per (function, object), so `send_binary` is emitted once per host

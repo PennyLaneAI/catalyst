@@ -22,8 +22,8 @@ from jax.extend.core import ClosedJaxpr
 from pennylane.core.operator import abstractify
 
 from catalyst.decomposition.graph_op_id import GraphOpID
-
-ModifierState = tuple[bool, int]
+from catalyst.decomposition.modifier_state import ModifierState
+from catalyst.decomposition.type_utils import SerializedGraphOpID
 
 
 @dataclass(frozen=True)
@@ -36,19 +36,20 @@ class OpDecompRequest:
         op_name: Frontend operator name used to query PennyLane's decomposition registry.
         op_cls: Concrete Operator2 class used to rebuild the base for registered symbolic rules.
             It is unavailable for the on-demand pathway.
-        dynamic_shape: Non-hybrid dynamic argument names mapped to MLIR-style type spellings.
-        wire_lens: Non-hybrid wire argument names mapped to their lengths.
+        dynamic_shape: Non-hybrid dynamic argument names mapped to MLIR-style type spellings, in
+            operand order.
+        wire_lens: Qubit argument names (wire arguments and qubit-carrying hybrid arguments)
+            mapped to their lengths, in operand order.
         static_data: Compiler-known static/compilable arguments used by applicability, resource
             computation, and rule bodies.
         extra_data: Abstract hybrid-argument pytrees used to reconstruct rule arguments without
             retaining values or tracers from a specific program instance.
         is_custom_op: Whether the operator uses the positional, scalar-f64 signature of qref.custom.
-        adjoint: Whether the encountered operation is adjointed, including from region contexts.
-        control_count: Controls carried by the encountered operation, including ambient control
-            transform context.
+        modifier_state: Modifiers carried by the encountered operation, including those of the
+            adjoint and control transform regions around it.
     """
 
-    base_id: str
+    base_id: SerializedGraphOpID
     op_name: str
     op_cls: type | None
     dynamic_shape: dict
@@ -56,14 +57,13 @@ class OpDecompRequest:
     static_data: dict
     extra_data: dict
     is_custom_op: bool
-    adjoint: bool = False
-    control_count: int = 0
+    modifier_state: ModifierState = ModifierState()
 
     @classmethod
     def from_operation(
         cls,
         op,
-        modifier_context: ModifierState = (False, 0),
+        modifier_context: ModifierState = ModifierState(),
     ) -> "OpDecompRequest":
         """Build a request from a settled captured Operator2 instance.
 
@@ -72,12 +72,11 @@ class OpDecompRequest:
         properties by removing tracers (no leaks) and giving shapes/dtypes to Python constants.
 
         Ambient modifiers compose with symbolic wrappers already carried by ``op``: adjoints
-        cancel pairwise and control counts add.
+        cancel pairwise, while control counts and work wires add.
         """
         with qp.capture.pause():
             op = abstractify(op)
 
-        ambient_adjoint, ambient_control_count = modifier_context
         graph_op_id = GraphOpID(op)
         base = graph_op_id.op
         static_data = {
@@ -92,23 +91,12 @@ class OpDecompRequest:
                 for name, types in graph_op_id.dynamic_shape.items()
                 if name not in base.hybrid_argnames
             },
-            wire_lens={
-                name: length
-                for name, length in graph_op_id.wire_lens.items()
-                if name not in base.hybrid_argnames
-            },
+            wire_lens=dict(graph_op_id.wire_lens),
             static_data=static_data,
             extra_data=base.hybrid_args,
             is_custom_op=graph_op_id.is_custom_op,
-            adjoint=graph_op_id.adjoint != ambient_adjoint,
-            control_count=graph_op_id.num_controls + ambient_control_count,
+            modifier_state=modifier_context.compose(graph_op_id.modifiers),
         )
-
-    @property
-    def modifier_state(self) -> ModifierState:
-        """Return the modifier state represented by this request."""
-
-        return self.adjoint, self.control_count
 
 
 @dataclass
@@ -119,17 +107,17 @@ class TracedRule:
     more than once while preserving distinct alternatives with identical resource counts.
 
     Attributes:
-        pyfun: Python callable retained for naming and lowering the function.
+        prepared_rule_fn: Adapted rule callable retained for naming and lowering the function.
         closed_jaxpr: Converted Catalyst JAXPR containing the rule body.
         target_gate: Full GraphOpID of the operation decomposed by the rule.
         resources: GraphOpID-to-multiplicity mapping produced by the rule.
         frontend_name: PennyLane rule name used for fixed and alternative rule selection.
     """
 
-    pyfun: Callable
+    prepared_rule_fn: Callable[..., None]
     closed_jaxpr: ClosedJaxpr
-    target_gate: str
-    resources: dict[str, int]
+    target_gate: SerializedGraphOpID
+    resources: dict[SerializedGraphOpID, int]
     frontend_name: str
 
     @property
@@ -152,7 +140,9 @@ class DecompositionScope:
         definitions: Map of rule identifiers to traced rules, in first-seen order.
     """
 
-    roots: dict[str, tuple[OpDecompRequest, set[ModifierState]]] = field(default_factory=dict)
+    roots: dict[SerializedGraphOpID, tuple[OpDecompRequest, set[ModifierState]]] = field(
+        default_factory=dict
+    )
     definitions: dict[tuple, TracedRule] = field(default_factory=dict)
 
     def record_root(self, request: OpDecompRequest) -> None:

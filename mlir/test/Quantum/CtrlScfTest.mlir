@@ -226,3 +226,59 @@ func.func @ctrl_scf_index_switch(%ctrl: !quantum.bit, %q: !quantum.bit, %idx: in
   }
   return %outc, %outq : !quantum.bit, !quantum.bit
 }
+
+// -----
+
+// Resource hints on SCF ops must survive ctrl-lowering recreation.
+
+// CHECK-LABEL: @ctrl_scf_preserves_hints
+func.func @ctrl_scf_preserves_hints(%ctrl: !quantum.bit, %q: !quantum.bit, %lb: index,
+                                    %ub: index, %step: index, %cond: i1, %n: i64, %idx: index)
+    -> (!quantum.bit, !quantum.bit) {
+  %true = arith.constant true
+  %c0 = arith.constant 0 : i64
+  %c1 = arith.constant 1 : i64
+  // CHECK-NOT: quantum.ctrl
+  // CHECK: scf.for
+  // CHECK: } {catalyst.estimated_iterations = 1.000000e+01 : f64}
+  // CHECK: scf.while
+  // CHECK: } attributes {catalyst.estimated_iterations = 2.500000e+00 : f64}
+  // CHECK: scf.if
+  // CHECK: } {catalyst.estimated_probability = 7.500000e-01 : f64}
+  // CHECK: scf.index_switch {{.+}} {catalyst.estimated_probabilities = [2.000000e-01, 3.000000e-01]}
+  %outc, %outq = quantum.ctrl(%ctrl) ctrlvals(%true) (%q) : !quantum.bit -> !quantum.bit {
+  ^bb0(%arg0: !quantum.bit):
+    %r0 = scf.for %i = %lb to %ub step %step iter_args(%qi = %arg0) -> !quantum.bit {
+      %h = quantum.custom "Hadamard"() %qi : !quantum.bit
+      scf.yield %h : !quantum.bit
+    } {catalyst.estimated_iterations = 1.000000e+01 : f64}
+    %r1:2 = scf.while (%i = %c0, %qi = %r0) : (i64, !quantum.bit) -> (i64, !quantum.bit) {
+      %cmp = arith.cmpi slt, %i, %n : i64
+      scf.condition(%cmp) %i, %qi : i64, !quantum.bit
+    } do {
+    ^bb1(%i2: i64, %q2: !quantum.bit):
+      %x = quantum.custom "PauliX"() %q2 : !quantum.bit
+      %inext = arith.addi %i2, %c1 : i64
+      scf.yield %inext, %x : i64, !quantum.bit
+    } attributes {catalyst.estimated_iterations = 2.500000e+00 : f64}
+    %r2 = scf.if %cond -> !quantum.bit {
+      %y = quantum.custom "PauliY"() %r1#1 : !quantum.bit
+      scf.yield %y : !quantum.bit
+    } else {
+      scf.yield %r1#1 : !quantum.bit
+    } {catalyst.estimated_probability = 7.500000e-01 : f64}
+    %r3 = scf.index_switch %idx {catalyst.estimated_probabilities = [2.000000e-01, 3.000000e-01]} -> !quantum.bit
+    case 0 {
+      %z = quantum.custom "PauliZ"() %r2 : !quantum.bit
+      scf.yield %z : !quantum.bit
+    }
+    case 1 {
+      scf.yield %r2 : !quantum.bit
+    }
+    default {
+      scf.yield %r2 : !quantum.bit
+    }
+    quantum.yield %r3 : !quantum.bit
+  }
+  return %outc, %outq : !quantum.bit, !quantum.bit
+}

@@ -70,8 +70,19 @@ void ResourceResult::mergeWith(const ResourceResult &other, MergeMethod method) 
 
     mergeStringMap(measurements, other.measurements, method);
     mergeStringMap(detailedOperations, other.detailedOperations, method);
+
+    for (const auto &opId : other.observedGraphOpIds) {
+        observedGraphOpIds.insert(opId.getKey());
+    }
+    for (const auto &[ctx, name] : other.modifierContexts) {
+        modifierContexts.emplace(ctx, name);
+    }
+
     mergeStringMap(classicalInstructions, other.classicalInstructions, method);
     mergeStringMap(functionCalls, other.functionCalls, method);
+    for (const auto &entry : other.unexpandedFunctionCalls) {
+        unexpandedFunctionCalls.insert(entry.getKey());
+    }
 
     // varFunctionCalls hold identifiers for unknown dynamic counts. If the
     // same key appears twice, the merge result represents a new unknown value
@@ -127,19 +138,25 @@ void ResourceResult::multiplyBy(double scalar) {
 }
 
 // Emit a count as a JSON number. Counts are tracked as doubles to support probabilistic
-// (fractional) count values, but the JSON output always reports the nearest integer.
+// (fractional) count values. Integral counts are reported as integers; fractional counts are
+// kept as is, since a caller may still multiply them (e.g. a hinted loop body), and rounding
+// each body first would compound the error.
 //
 // JSON Schema (per function, keyed by name at the root):
 //   metadata: { qnode, auto_qubit_management?, has_branches, device_name? }
 //   num_qubits: { alloc, arg, total }
 //   classical_instructions: { "dialect.op": count, ... }
-//   quantum_operations: { "<wires>": { "op_name": count, ... }, ... }  // optional
+//   quantum_operations: { "wires": { "op_name": count, ... }, ... }  // optional
 //   function_calls: { static: { "fxn": count, ... }, dynamic: { "fxn": id, ... } }
 //   measurement_processes: { "meas_type": count, ... }
-//   extended_fields: { "<extension>": { ... }, ... }  // e.g. pbc_depth: { any_commuting_depth,
-//   qubit_disjoint_depth }
+//   extended_fields: { "<extension>": { "metric": value, ... }, ... }
+//   (e.g. pbc_depth: { any_commuting_depth, qubit_disjoint_depth })
 static llvm::json::Value countToJson(double count) {
-    return llvm::json::Value(static_cast<int64_t>(std::llround(count)));
+    double rounded = std::round(count);
+    if (std::abs(count - rounded) < 1e-9) {
+        return llvm::json::Value(static_cast<int64_t>(rounded));
+    }
+    return llvm::json::Value(count);
 }
 
 llvm::json::Object ResourceResult::toJson() const {
@@ -208,14 +225,12 @@ llvm::json::Object ResourceResult::toJson() const {
     }
     funcObj["measurement_processes"] = std::move(measurementObject);
 
-    // Extention fields
-    // Emit registered extensions under their own keys (e.g. "depth").
-    // Stage 4 will nest these under "extended_fields".
+    // Extension fields
     json::Object extendedFieldObject;
     for (const auto &ext : extensions) {
         auto json = ext->toJson();
         if (json != nullptr) {
-            extendedFieldObject[ext->name()] = json;
+            extendedFieldObject[ext->name()] = std::move(json);
         }
     }
     funcObj["extended_fields"] = std::move(extendedFieldObject);

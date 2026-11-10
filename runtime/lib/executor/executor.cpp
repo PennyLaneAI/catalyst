@@ -53,6 +53,13 @@
 #include <utility>
 #include <vector>
 
+// GCC false-positives -Wmaybe-uninitialized in llvm::unique_function, which -Werror makes fatal.
+// Around the includes, not the call site: GCC reports it against the header. Clang rejects the
+// name under -Werror, hence the guard.
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
+#endif
 #include "llvm/ExecutionEngine/Orc/Shared/SimpleRemoteEPCUtils.h"
 #include "llvm/ExecutionEngine/Orc/Shared/WrapperFunctionUtils.h"
 #include "llvm/ExecutionEngine/Orc/TargetProcess/DefaultHostBootstrapValues.h"
@@ -64,6 +71,9 @@
 #include "llvm/Support/Error.h"
 #include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/raw_ostream.h"
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic pop
+#endif
 
 #include <netdb.h>
 #include <netinet/in.h>

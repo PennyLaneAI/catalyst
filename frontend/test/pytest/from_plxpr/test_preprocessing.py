@@ -26,6 +26,7 @@ from pennylane.devices.capabilities import (
     ExecutionCondition,
     OperatorProperties,
 )
+from pennylane.testing import find_eqns
 
 from catalyst.device.decomposition import measurements_from_counts, measurements_from_samples
 from catalyst.from_plxpr import from_plxpr
@@ -65,12 +66,8 @@ def get_pipelines(f, skip_preprocess=False):
     """Utility to get the transform pipelines for a QNode from jaxpr."""
     jaxpr = jax.make_jaxpr(f)()
     cjaxpr = from_plxpr_no_warn(jaxpr, skip_preprocess=skip_preprocess)()
-    pipelines = None
-
-    for eqn in cjaxpr.eqns:
-        if eqn.primitive == quantum_kernel_p:
-            pipelines = eqn.params.get("pipelines", None)
-            break
+    kernel_eqn = find_eqns(cjaxpr, quantum_kernel_p)[0]
+    pipelines = kernel_eqn.params.get("pipelines", None)
 
     assert pipelines is not None
     return pipelines
@@ -94,12 +91,14 @@ class TestGeneralPreprocessing:
         pipelines = get_pipelines(f, skip_preprocess=skip_preprocess)
 
         if skip_preprocess:
-            assert len(pipelines) == 1
-            assert pipelines[0][0] == "main"
-        else:
             assert len(pipelines) == 2
             assert pipelines[0][0] == "main"
+            assert pipelines[1][0] == "post-device"
+        else:
+            assert len(pipelines) == 3
+            assert pipelines[0][0] == "main"
             assert pipelines[1][0] == "device"
+            assert pipelines[2][0] == "post-device"
 
     def test_finite_shots_only(self):
         """Test that an error is raised if trying to do an analytic execution with
@@ -585,6 +584,62 @@ class TestGradientPreprocessing:
             )
 
 
+class TestGatesetPreprocessing:
+    """Tests for preprocessing related to invoking `graph-decomposition` pass with target gateset
+    as described by dveice TOML file."""
+
+    def test_gateset_obs_validation(self):
+        """Tests that the transforms for graph decomposition are added to the pipeline"""
+        dev = qp.device("null.qubit", wires=4)
+
+        @qp.qnode(dev)
+        def f():
+            return qp.expval(qp.Z(0))
+
+        device_pipelines = get_pipelines(f, skip_preprocess=False)[1][1]
+
+        # `graph-decomposition` must exist in the device pipeline
+        assert any(t.pass_name == "graph-decomposition" for t in device_pipelines)
+
+    def test_gateset_matches_device_capabilities(self):
+        """Test that device operations and their C/Adjoint expansions are in the
+        graph-decomposition gate_set."""
+        dev = CapabilitiesDevice(wires=4)
+        dev.capabilities = DeviceCapabilities(
+            operations={
+                "PauliX": OperatorProperties(invertible=False, controllable=False),
+                "PauliY": OperatorProperties(invertible=False, controllable=True),
+                "PauliZ": OperatorProperties(invertible=True, controllable=False),
+                "Hadamard": OperatorProperties(invertible=True, controllable=True),
+            },
+            measurement_processes={"ExpectationMP": [], "SampleMP": [], "CountsMP": []},
+        )
+
+        @qp.qnode(dev, shots=1)
+        def f():
+            qp.expval(qp.Z(0))
+
+        device_pipelines = get_pipelines(f, skip_preprocess=False)[1][1]
+        gate_set = next(
+            t.kwargs["gate_set"] for t in device_pipelines if t.pass_name == "graph-decomposition"
+        )
+
+        assert (
+            "PauliX" in gate_set
+            and "Adjoint(PauliX)" not in gate_set
+            and "C(PauliX)" not in gate_set
+        )
+        assert (
+            "PauliY" in gate_set and "Adjoint(PauliY)" not in gate_set and "C(PauliY)" in gate_set
+        )
+        assert (
+            "PauliZ" in gate_set and "Adjoint(PauliZ)" in gate_set and "C(PauliZ)" not in gate_set
+        )
+        assert (
+            "Hadamard" in gate_set and "Adjoint(Hadamard)" in gate_set and "C(Hadamard)" in gate_set
+        )
+
+
 class TestIntegration:
     """Integration tests for device preprocessing with program capture."""
 
@@ -615,12 +670,11 @@ class TestIntegration:
         cjaxpr = workflow.jaxpr
         f1_pipelines = None
         f2_pipelines = None
-        for eqn in cjaxpr.eqns:
-            if eqn.primitive == quantum_kernel_p:
-                if eqn.params["qnode"].__name__ == "f1":
-                    f1_pipelines = eqn.params["pipelines"]
-                elif eqn.params["qnode"].__name__ == "f2":
-                    f2_pipelines = eqn.params["pipelines"]
+        for eqn in find_eqns(cjaxpr, quantum_kernel_p):
+            if eqn.params["qnode"].__name__ == "f1":
+                f1_pipelines = eqn.params["pipelines"]
+            elif eqn.params["qnode"].__name__ == "f2":
+                f2_pipelines = eqn.params["pipelines"]
 
         assert f1_pipelines
         assert f2_pipelines
@@ -629,8 +683,8 @@ class TestIntegration:
         assert f2_pipelines[0][1][0].pass_name == "cancel-inverses"
 
         if skip_preprocess:
-            assert len(f1_pipelines) == 1
-            assert len(f2_pipelines) == 1
+            assert len(f1_pipelines) == 2
+            assert len(f2_pipelines) == 2
             assert len(recwarn) == 0
         else:
             assert len(f1_pipelines) > 1
@@ -667,6 +721,49 @@ class TestIntegration:
                     "The following device-preprocessing transforms are currently not supported"
                     in str(w.message)
                 )
+
+    def test_insertion_of_device_and_post_device_transforms(self):
+        """
+        Integration test that checks for modification of the IR caused by
+        insertion of device and post-device transforms.
+        """
+
+        dev = CapabilitiesDevice(wires=2)
+        dev.capabilities = DeviceCapabilities(
+            operations={"Hadamard": OperatorProperties()},
+            non_commuting_observables=True,
+            observables={
+                "PauliX": OperatorProperties(),
+                "PauliY": OperatorProperties(),
+                "PauliZ": OperatorProperties(),
+                "Hadamard": OperatorProperties(),
+            },
+            measurement_processes={"ExpectationMP": [], "SampleMP": [], "CountsMP": []},
+        )
+
+        # Device Preprocessing should perform split to single terms
+        @qp.qjit(capture=True)
+        @qp.qnode(dev)
+        def circuit(x):
+            qp.Hadamard(wires=0)
+            qp.Hadamard(wires=0)
+            return qp.expval(qp.sum(qp.H(0), qp.Z(1)))
+
+        # This is the expected approach to insert a post-device transform into the pipeline
+        circuit.original_function._post_device_pipeline = qp.CompilePipeline(
+            qp.transforms.cancel_inverses
+        )
+
+        # JIT compile the circuit
+        _ = circuit(0.1)
+
+        # cancel_inverses (device)
+        assert "Hadamard" in circuit.mlir
+        assert "Hadamard" not in circuit.mlir_opt
+
+        # split_to_single_terms (post-device)
+        assert "hamiltonian" in circuit.mlir
+        assert "Hamiltonian" not in circuit.mlir_opt
 
 
 if __name__ == "__main__":

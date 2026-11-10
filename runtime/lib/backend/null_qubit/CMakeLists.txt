@@ -16,3 +16,5 @@ target_include_directories(rtd_null_qubit
 )
 
 set_property(TARGET rtd_null_qubit PROPERTY POSITION_INDEPENDENT_CODE ON)
+
+catalyst_runtime_install(rtd_null_qubit)

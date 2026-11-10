@@ -18,6 +18,8 @@
 #include "mlir/IR/Dialect.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 
+#include "Gradient/IR/GradientAttrDefs.h"
+
 //===----------------------------------------------------------------------===//
 // Gradient dialect declarations.
 //===----------------------------------------------------------------------===//

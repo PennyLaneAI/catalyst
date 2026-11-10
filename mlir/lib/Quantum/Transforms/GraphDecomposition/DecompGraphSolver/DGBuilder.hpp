@@ -15,11 +15,11 @@
 /**
  * @file DGBuilder.hpp
  *
- * @brief This file implements the DecompositionGraph class, which constructs a graph
- * representation of the decomposition problem based on the provided operators, gateset,
- * and rules. The graph is built using the Boost Graph Library, where vertices represent
- * operators and rules, and edges represent the relationships between them according to
- * the decomposition rules.
+ * @brief This file implements the DecompositionGraph class, which holds the decomposition problem
+ * defined by the provided operators, gateset, and rules. Operators are the graph's nodes and each
+ * rule is a hyperedge from its input operators to its output operator; the graph is stored as a
+ * map from each operator to the rules that decompose it, which is all the solver needs to traverse
+ * it.
  */
 
 #pragma once
@@ -49,24 +49,18 @@ class DecompositionGraph {
     /**
      * @brief Constructs the decomposition graph from the given operators, gateset, and rules.
      *
-     * The constructor initializes the graph by registering all operators and rules, creating
-     * vertices for them, and adding edges according to the decomposition rules. The graph is
-     * built in such a way that it can be efficiently traversed by the decomposition solver
-     * to find optimal decompositions of the target gates.
+     * The constructor registers every operator (the given ones and those appearing in rules) and
+     * indexes the rules by the operator they decompose, so the solver can look up an operator's
+     * rules directly.
      *
      * @param operators The list of operators that are used in the decomposition rules and gateset.
      * @param gateset The target gateset that we want to decompose into, along with their
      * associated costs.
      * @param rules The list of decomposition rules that define how operators can be decomposed
      * into other operators.
-     * @param fixedDecomps The mapping from operators to their fixed decomposition rules, which are
-     * rules that cannot be changed or overridden by the solver. Default is an empty map.
-     * @param altDecomps The mapping from operators to their alternative decomposition rules, which
-     * are rules that can be used in place of the default rule. Default is an empty map.
      */
     DecompositionGraph(std::vector<Core::OperatorNode> operators, Core::WeightedGateset gateset,
-                       std::vector<Core::RuleNode> rules, Core::FixedDecomps fixedDecomps = {},
-                       Core::AltDecomps altDecomps = {});
+                       std::vector<Core::RuleNode> rules);
     ~DecompositionGraph();
 
     // copy and move constructors and assignment operators
@@ -104,18 +98,6 @@ class DecompositionGraph {
      * @return The list of decomposition rules for the graph decomposition problem.
      */
     [[nodiscard]] const std::vector<Core::RuleNode> &getRules() const noexcept;
-
-    /**
-     * @brief Returns the mapping from operators to their fixed decomposition rules,
-     * which are rules that cannot be changed or overridden by the solver.
-     */
-    [[nodiscard]] const Core::FixedDecomps &getFixedDecomps() const noexcept;
-
-    /**
-     * @brief Returns the mapping from operators to their alternative decomposition rules,
-     * which are rules that can be used in place of the default rule.
-     */
-    [[nodiscard]] const Core::AltDecomps &getAltDecomps() const noexcept;
 
     /**
      * @brief Returns the number of decomposition rules in the graph.

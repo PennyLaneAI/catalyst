@@ -506,6 +506,10 @@ def SelectPPMeasurementOp : PBC_Op<"select.ppm", [DeclareOpInterfaceMethods<Reso
     }];
 
     let hasVerifier = 1;
+
+    let extraClassDeclaration = [{
+        mlir::ValueRange getQubitOperands() { return getInQubits(); }
+    }];
 }
 
 def LayerOp : PBC_Op<"layer", [SingleBlockImplicitTerminator<"YieldOp">]> {

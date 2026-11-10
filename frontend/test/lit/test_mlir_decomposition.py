@@ -29,6 +29,7 @@ import pathlib
 import platform
 import shutil
 
+import numpy as np
 import pennylane as qp
 from pennylane.devices import NullQubit
 from utils import print_jaxpr
@@ -100,3 +101,26 @@ def test_decomposition_lowering():
 
 
 test_decomposition_lowering()
+
+
+def test_graph_decomposition_hybrid_operator_arg():
+    """
+    Test the graph-based decomposition of an operator with a nested-operator ("hybrid") argument,
+    such as ``GQSP``.
+    """
+
+    @qjit(capture=True, target="mlir")
+    @catalyst.passes.graph_decomposition(
+        gate_set={"X", "Z", "Hadamard", "CNOT", "RZ", "RY", "GlobalPhase"}
+    )
+    @qp.qnode(qp.device("null.qubit", wires=2))
+    def circuit():
+        qp.GQSP(qp.X(1), angles=np.ones((3, 1)), control=0)
+        return qp.probs(wires=0)
+
+    # CHECK-NOT: tensor<1xi64>) attributes {frontend_name = "_GQSP_decomposition"
+    # CHECK: tensor<2xi64>) attributes {frontend_name = "_GQSP_decomposition"
+    print(circuit.mlir)
+
+
+test_graph_decomposition_hybrid_operator_arg()

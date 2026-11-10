@@ -151,7 +151,7 @@ See the graph below for an overview of the transformations applied to the user p
     program no longer contains any HLO operations. The term lowering here refers to converting one
     program representation into another "lower down" in the compilation pipeline. This is done using
     the transformation rules (or lowerings) provided by the
-    `mlir-hlo <https://github.com/tensorflow/mlir-hlo>`_ project.
+    `StableHLO <https://github.com/openxla/stablehlo>`_ project.
 
   - Quantum dialect operations present in the input are not affected by this transformation.
 
