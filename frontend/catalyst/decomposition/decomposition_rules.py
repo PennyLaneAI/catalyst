@@ -80,7 +80,7 @@ class DecompRuleSpec:
 
     Attributes:
         prepared_rule_fn: Adapted rule body accepting the flattened operands described by its
-            :class:`DecompTargetSpec`.
+            :class:`RuleTraceInputs`.
         frontend_name: Name of the PennyLane decomposition rule, retained for fixed and excluded
             rule selection.
         resource_counts_by_id: GraphOpID-to-count mapping attached to the lowered function.
@@ -93,6 +93,37 @@ class DecompRuleSpec:
     resource_counts_by_op: dict[Operator2, int]
 
 
+@dataclass(kw_only=True)
+class RuleTraceInputs:
+    """Dummy arguments and operand layout shared by a target's prepared rules.
+
+    :func:`rule_call_operands` packs these inputs as positional and named parameters, numeric
+    hybrid leaves, one grouped base-wire operand, then optional control wires and values.
+    Packing creates JAX arrays, so it must happen in the caller's tracing context.
+
+    ``ctrl_wires`` and ``ctrl_values`` must be supplied together with matching lengths,
+    or both be ``None``.
+
+    Attributes:
+        call_args: Positional dummy arguments used to trace custom-operation rules.
+        call_kwargs: Named dummy parameters and wires used to trace general rules.
+        kwarg_names: Stable parameter-first, wire-second ordering for flattened keyword operands.
+        wire_lens: Qubit argument lengths, in operand order, used to split the grouped wire
+            operand.
+        ctrl_wires: Optional dummy control-wire tensor for a controlled target.
+        ctrl_values: Optional dummy control-value tensor for a controlled target.
+        hybrid_leaves: Numeric hybrid leaves passed as rule operands instead of being closed over.
+    """
+
+    call_args: tuple[Array | np.float64, ...]
+    call_kwargs: dict[str, Array]
+    kwarg_names: list[str]
+    wire_lens: dict[str, int]
+    ctrl_wires: Array | None = None
+    ctrl_values: Array | None = None
+    hybrid_leaves: tuple[Array, ...] = ()
+
+
 @dataclass
 class DecompTargetSpec:
     """A batch of prepared rules sharing a target graph op ID and tracing inputs.
@@ -102,14 +133,7 @@ class DecompTargetSpec:
 
     Attributes:
         rules: Applicable rule alternatives for this target.
-        call_args: Positional dummy arguments used to trace custom-operation rules.
-        call_kwargs: Named dummy parameters and wires used to trace general rules.
-        kwarg_names: Stable parameter-first, wire-second ordering for flattened keyword operands.
-        wire_lens: Qubit argument lengths, in operand order, used to split the grouped wire
-            operand.
-        ctrl_wires: Optional dummy control-wire tensor for a controlled target.
-        ctrl_values: Optional dummy control-value tensor for a controlled target.
-        hybrid_leaves: Numeric hybrid leaves passed as rule operands instead of being closed over.
+        trace_inputs: Shared dummy arguments and operand layout used to trace the rules.
         target_id: Full GraphOpID that every rule in the set decomposes.
         num_qreg_qubits: Register size required by the legacy standalone materializer.
         modifier_context: Additional modifiers propagated to resource operations when
@@ -119,13 +143,7 @@ class DecompTargetSpec:
     """
 
     rules: list[DecompRuleSpec]
-    call_args: tuple[Array | np.float64, ...]
-    call_kwargs: dict[str, Array]
-    kwarg_names: list[str]
-    wire_lens: dict[str, int]
-    ctrl_wires: Array | None
-    ctrl_values: Array | None
-    hybrid_leaves: tuple[Array, ...]
+    trace_inputs: RuleTraceInputs
     target_id: SerializedGraphOpID
     num_qreg_qubits: int
     modifier_context: ModifierState
@@ -385,52 +403,42 @@ def flatten_hybrid_args(extra_data) -> tuple:
     return argument_specs, dummy_parameters, static_arguments
 
 
-def rule_call_operands(
-    call_args,
-    call_kwargs,
-    kwarg_names,
-    wire_lens,
-    ctrl_wires=None,
-    ctrl_values=None,
-    hybrid_leaves=(),
-) -> list:
-    """Flatten a rule call as params, operand-passed hybrid-arg leaves, one grouped wire operand,
-    then optional control wires and control values.
+def rule_call_operands(trace_inputs: RuleTraceInputs) -> list[Array | np.float64]:
+    """Pack dummy inputs into the positional operand layout used to trace a rule.
 
-    Control work wires are a ``ctrl_work_wires`` entry of ``wire_lens``, so they are concatenated
-    into the grouped wire operand with every other register. Everything is passed positionally
-    because ``qp.capture.subroutine`` traces through ``jax.jit``, which would otherwise flatten
-    keyword arguments in sorted-name order.
+    The order is positional parameters, named parameters, numeric hybrid leaves, one grouped
+    base-wire array, then optional control wires and values. Named parameters follow
+    ``trace_inputs.kwarg_names``; wire groups follow ``trace_inputs.wire_lens`` insertion order.
+    Control work wires are included as a ``ctrl_work_wires`` register in the grouped
+    wire array. The grouped wire array is present even when empty.
+
+    Packing creates JAX arrays and must run in the caller's tracing context. All operands are
+    positional so ``jax.jit`` (used by ``qp.capture.subroutine``) cannot reorder keyword arguments
+    alphabetically.
 
     Args:
-        call_args (tuple): the rule's positional arguments
-        call_kwargs (dict): the rule's keyword arguments
-        kwarg_names (list[str]): parameter names first, followed by wire names
-        wire_lens (dict[str, int]): wire names in operand order and their lengths
-        ctrl_wires: the control wires to append, or None when the rule is not controlled
-        ctrl_values: the control values to append, or None when the rule is not controlled
-        hybrid_leaves (list): flattened hybrid-argument leaves, inserted after the parameter kwargs
+        trace_inputs (RuleTraceInputs): the rule's dummy arguments and operand layout
 
     Returns:
-        list: the operands to call the traced rule with
+        list: positional operands in the layout consumed by :func:`unpack_rule_operands`
     """
-    param_names = [name for name in kwarg_names if name not in wire_lens]
-    wire_names = list(wire_lens)
+    param_names = [name for name in trace_inputs.kwarg_names if name not in trace_inputs.wire_lens]
+    wire_names = list(trace_inputs.wire_lens)
     grouped_wires = (
-        jnp.concatenate(tuple(call_kwargs[name] for name in wire_names))
+        jnp.concatenate(tuple(trace_inputs.call_kwargs[name] for name in wire_names))
         if wire_names
         else jnp.array([], dtype=int)
     )
     operands = [
-        *call_args,
-        *(call_kwargs[name] for name in param_names),
-        *hybrid_leaves,
+        *trace_inputs.call_args,
+        *(trace_inputs.call_kwargs[name] for name in param_names),
+        *trace_inputs.hybrid_leaves,
         grouped_wires,
     ]
-    if ctrl_wires is not None:
-        operands.append(ctrl_wires)
-    if ctrl_values is not None:
-        operands.append(ctrl_values)
+    if trace_inputs.ctrl_wires is not None:
+        operands.append(trace_inputs.ctrl_wires)
+    if trace_inputs.ctrl_values is not None:
+        operands.append(trace_inputs.ctrl_values)
     return operands
 
 
@@ -856,13 +864,15 @@ def build_decomp_target_spec(
 
     return DecompTargetSpec(
         rules=rule_specs,
-        call_args=call_args,
-        call_kwargs=call_kwargs,
-        kwarg_names=kwarg_names,
-        wire_lens=signature_wire_lens,
-        ctrl_wires=ctrl_wires,
-        ctrl_values=ctrl_values,
-        hybrid_leaves=tuple(hybrid_leaves),
+        trace_inputs=RuleTraceInputs(
+            call_args=call_args,
+            call_kwargs=call_kwargs,
+            kwarg_names=kwarg_names,
+            wire_lens=signature_wire_lens,
+            ctrl_wires=ctrl_wires,
+            ctrl_values=ctrl_values,
+            hybrid_leaves=tuple(hybrid_leaves),
+        ),
         target_id=target_id,
         num_qreg_qubits=n_base_wires + n_ctrl + num_work_wires,
         modifier_context=modifiers,
@@ -876,15 +886,9 @@ def materialize_decomp_target_spec(target_spec: DecompTargetSpec) -> ir.Operatio
     return build_rule_module(
         [qp.capture.subroutine(rule.prepared_rule_fn) for rule in target_spec.rules],
         qp.device("null.qubit", wires=target_spec.num_qreg_qubits),
-        target_spec.call_args,
-        target_spec.call_kwargs,
-        target_spec.kwarg_names,
-        target_spec.wire_lens,
-        target_spec.ctrl_wires,
-        target_spec.ctrl_values,
+        target_spec.trace_inputs,
         {rule.prepared_rule_fn.__name__: rule for rule in target_spec.rules},
         target_spec.target_id,
-        target_spec.hybrid_leaves,
     )
 
 
@@ -916,28 +920,16 @@ def compile_decomposition_rules(
 def build_rule_module(
     subroutines,
     device,
-    call_args,
-    call_kwargs,
-    kwarg_names,
-    wire_lens,
-    ctrl_wires,
-    ctrl_values,
+    trace_inputs: RuleTraceInputs,
     name_to_rule_specs,
     target_id: SerializedGraphOpID,
-    hybrid_leaves=(),
 ) -> ir.Operation:
     """Trace ``subroutines`` into a module of standalone decomposition-rule functions.
 
     Args:
         subroutines (list): the rule bodies, as captured subroutines
         device (Device): the device to trace them on, sized for the operator's wires
-        call_args (tuple): positional arguments to call each subroutine with
-        call_kwargs (dict): keyword arguments to call each subroutine with
-        kwarg_names (list[str]): the keyword argument names, in the order to flatten them
-        wire_lens (dict[str, int]): wire names in operand order and their lengths
-        ctrl_wires: the control wires to append, or None when the rules are not controlled
-        ctrl_values: the control values to append, or None when the rules are not controlled
-        hybrid_leaves (list): flattened hybrid-argument leaves passed to :func:`rule_call_operands`
+        trace_inputs (RuleTraceInputs): shared dummy arguments and operand layout for the subroutines
         name_to_rule_specs (dict): generated function name to its rule specification
         target_id (SerializedGraphOpID): the graphOpId of the gate the rules decompose
 
@@ -948,9 +940,7 @@ def build_rule_module(
         CompileError: if the rules could not be traced
     """
 
-    operands = rule_call_operands(
-        call_args, call_kwargs, kwarg_names, wire_lens, ctrl_wires, ctrl_values, hybrid_leaves
-    )
+    operands = rule_call_operands(trace_inputs)
 
     @qp.qjit(target="mlir", capture=True, collect_decomp_rules=False)
     @qp.qnode(device=device)
@@ -1290,13 +1280,15 @@ def build_registered_decomp_target_spec(
 
     return DecompTargetSpec(
         rules=rule_specs,
-        call_args=call_args,
-        call_kwargs=call_kwargs,
-        kwarg_names=kwarg_names,
-        wire_lens=signature_wire_lens,
-        ctrl_wires=ctrl_wires,
-        ctrl_values=ctrl_values,
-        hybrid_leaves=tuple(hybrid_leaves),
+        trace_inputs=RuleTraceInputs(
+            call_args=call_args,
+            call_kwargs=call_kwargs,
+            kwarg_names=kwarg_names,
+            wire_lens=signature_wire_lens,
+            ctrl_wires=ctrl_wires,
+            ctrl_values=ctrl_values,
+            hybrid_leaves=tuple(hybrid_leaves),
+        ),
         target_id=target_id,
         num_qreg_qubits=n_wires + controls.num_work_wires,
         modifier_context=controls if wrap_control else ModifierState(),
