@@ -1004,7 +1004,7 @@ def CtrlOp : Region_Op<"ctrl", [SingleBlockImplicitTerminator<"YieldOp">,
         Variadic<QubitType>:$in_ctrl_qubits,
         Variadic<I1>:$in_ctrl_values,
         Variadic<QubitType>:$in_work_qubits,
-        DefaultValuedAttr<StrAttr, "\"borrowed\"">:$work_wire_type,
+        DefaultValuedAttr<StrAttr, "::catalyst::CTRL_WORK_WIRE_TYPE_BORROWED">:$work_wire_type,
         Variadic<AnyTypeOf<[QuregType, QubitType]>>:$args
     );
 
@@ -1044,7 +1044,7 @@ def YieldOp : Quantum_Op<"yield", [Pure, ReturnLike, Terminator,
 // -----
 
 class Observable_Op<string mnemonic, list<Trait> traits = []> :
-        Quantum_Op<mnemonic, traits # [Pure]>;
+        Quantum_Op<mnemonic, traits # [Pure, Observable]>;
 
 def ComputationalBasisOp : Observable_Op<"compbasis", [AttrSizedOperandSegments]> {
     let summary = "Define a pseudo-observable of the computational basis for use in measurements";

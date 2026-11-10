@@ -323,14 +323,6 @@ class TestControlled:
         expected = native_controlled()
         assert_allclose(result, expected, atol=1e-5, rtol=1e-5)
 
-    @pytest.mark.xfail(reason="""
-        ControlledQubitUnitary's decomp rules are buggy and not jittable.
-        https://app.shortcut.com/xanaduai/story/128492/ctrl-decomp-bisect-rule-of-controlledqubitunitary-is-not-jittable,
-        https://app.shortcut.com/xanaduai/story/128494/controlled-two-qubit-unitary-rule-on-controlledqubitunitary-is-not-jittable
-
-        Since qp.ctrl(qp.Unitary) now lowers to `quantum.operator "ControlledUnitary"`, which does
-        not have a runtime lowering, the only way to execute it is through decomposition rules.
-    """)
     def test_native_controlled_unitary(self, capture_mode):
         """Test native control of a custom operation."""
         dev = qp.device("lightning.qubit", wires=4)
@@ -1021,10 +1013,8 @@ class TestControlledMiscMethods:
         base = qp.U1(1.23, wires=0)
         op = C_ctrl(base, "a")
 
-        # NOTE: As of https://github.com/PennyLaneAI/pennylane/pull/9981,
-        # ctrl(U1) eagerly dispatches to controlled phase shift.
-        assert op.label() == "Rϕ"
-        assert op.label(decimals=2) == "Rϕ\n(1.23)"
+        assert op.label() == "U1"
+        assert op.label(decimals=2) == "U1\n(1.23)"
         assert op.label(base_label="hi") == "hi"
 
     def test_label_matrix_param(self):
@@ -1419,31 +1409,31 @@ pauli_x_based_op_decomps = [
         qp.PauliX,
         [2],
         [0, 1],
-        [qp.Toffoli(wires=[0, 1, 2])],
+        [qp.MultiControlledX(wires=[0, 1, 2], work_wires=Wires("aux"))],
     ),
     (
         qp.CNOT,
         [1, 2],
         [0],
-        [qp.Toffoli(wires=[0, 1, 2])],
+        [qp.MultiControlledX(wires=[0, 1, 2], work_wires=Wires("aux"))],
     ),
     (
         qp.PauliX,
         [3],
         [0, 1, 2],
-        qp.MultiControlledX.compute_decomposition(wires=[0, 1, 2, 3], work_wires=Wires("aux")),
+        [qp.MultiControlledX(wires=[0, 1, 2, 3], work_wires=Wires("aux"))],
     ),
     (
         qp.CNOT,
         [2, 3],
         [0, 1],
-        qp.MultiControlledX.compute_decomposition(wires=[0, 1, 2, 3], work_wires=Wires("aux")),
+        [qp.MultiControlledX(wires=[0, 1, 2, 3], work_wires=Wires("aux"))],
     ),
     (
         qp.Toffoli,
         [1, 2, 3],
         [0],
-        qp.MultiControlledX.compute_decomposition(wires=[0, 1, 2, 3], work_wires=Wires("aux")),
+        [qp.MultiControlledX(wires=[0, 1, 2, 3], work_wires=Wires("aux"))],
     ),
 ]
 
@@ -1457,9 +1447,9 @@ class TestDecomposition:
             (
                 OpWithDecomposition(0.123, wires=[0, 1]),
                 [
-                    qp.CH(wires=[2, 0]),
+                    qp.ctrl(qp.H(0), 2),
                     qp.ctrl(qp.S(1), 2),
-                    qp.CRX(0.123, wires=[2, 0]),
+                    qp.ctrl(qp.RX(0.123, wires=0), 2),
                 ],
             ),
             (

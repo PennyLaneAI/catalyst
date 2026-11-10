@@ -752,7 +752,7 @@ def CtrlOp : Region_Op<"ctrl", [NoTerminator, AttrSizedOperandSegments]> {
         Variadic<QubitRefType>:$ctrl_qubits,
         Variadic<I1>:$ctrl_values,
         Variadic<QubitRefType>:$work_qubits,
-        DefaultValuedAttr<StrAttr, "\"borrowed\"">:$work_wire_type
+        DefaultValuedAttr<StrAttr, "::catalyst::CTRL_WORK_WIRE_TYPE_BORROWED">:$work_wire_type
     );
 
     let assemblyFormat = [{
@@ -770,7 +770,7 @@ def CtrlOp : Region_Op<"ctrl", [NoTerminator, AttrSizedOperandSegments]> {
 // Hence they are Pure, i.e. removable if no users
 
 class Observable_Op<string mnemonic, list<Trait> traits = []> :
-        QRef_Op<mnemonic, traits # [Pure]>;
+        QRef_Op<mnemonic, traits # [Pure, Observable]>;
 
 def ComputationalBasisOp : Observable_Op<"compbasis", [AttrSizedOperandSegments]> {
     let summary = "Define a pseudo-observable of the computational basis for use in measurements";
