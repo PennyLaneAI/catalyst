@@ -26,12 +26,9 @@ import pennylane as qp
 from jax._src.lib.mlir import ir
 
 from catalyst.compiler import _quantum_opt
+from catalyst.decomposition.rule_arguments import RuleTraceInputs, rule_call_operands
 from catalyst.decomposition.rule_lowering_warning import RuleLoweringWarning
-from catalyst.decomposition.rule_preparation import (
-    DecompTargetSpec,
-    RuleTraceInputs,
-    rule_call_operands,
-)
+from catalyst.decomposition.rule_preparation import DecompTargetSpec
 from catalyst.decomposition.type_utils import SerializedGraphOpID
 from catalyst.jax_extras.lowering import get_mlir_attribute_from_pyval
 from catalyst.utils.exceptions import CompileError

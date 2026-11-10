@@ -12,45 +12,43 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Look up decomposition rules, collect resources, and prepare callable batches.
 
-"""Discover decomposition rules and prepare batches for tracing.
-
-This module owns registry lookup, resource collection, argument preparation, and
-reachability traversal. Both QNode capture and standalone compilation consume its
-``DecompTargetSpec`` batches. Operand packing runs in the consumer's tracing context.
+Each batch describes one target and its tracing inputs. Argument handling lives in
+``rule_arguments``; ``rule_discovery`` follows the batches' outgoing resource edges.
 """
 
 # pylint: disable=protected-access,bare-except
 
-import itertools
 import warnings
-from collections import deque
 from collections.abc import Callable
 from dataclasses import dataclass
-from enum import Enum, auto
 
 import jax.numpy as jnp
-import numpy as np
 import pennylane as qp
-from jax import Array
 from pennylane.core.operator import Operator2, abstractify
 from pennylane.decomposition import DecompositionRule
 from pennylane.decomposition.utils import to_name
-from pennylane.wires import Wires
 
 from catalyst.decomposition.capture_session import OpDecompRequest
 from catalyst.decomposition.graph_op_id import (
-    CTRL_WORK_WIRE_TYPE,
     CTRL_WORK_WIRES,
     GraphOpID,
 )
 from catalyst.decomposition.modifier_state import ModifierState
-from catalyst.decomposition.rule_lowering_warning import RuleLoweringWarning
-from catalyst.decomposition.type_utils import (
-    SerializedGraphOpID,
-    _RuleBuilderArgs,
-    get_dummy_values_for_dynamic_shape,
+from catalyst.decomposition.rule_arguments import (
+    RuleTraceInputs,
+    _dummy_work_wires,
+    build_base_op,
+    flatten_hybrid_args,
+    ordered_kwarg_names,
+    prepare_dummy_rule_arguments,
+    prepare_dynamic_op_kwargs,
+    symbolic_arguments,
+    unpack_rule_operands,
 )
+from catalyst.decomposition.rule_lowering_warning import RuleLoweringWarning
+from catalyst.decomposition.type_utils import SerializedGraphOpID, _RuleBuilderArgs
 from catalyst.utils.exceptions import CompileError
 
 _NON_INVERTIBLE_RESOURCE_TYPES = (qp.ops.MidMeasure, qp.ops.PauliMeasure)
@@ -92,37 +90,6 @@ class DecompRuleSpec:
     frontend_name: str
     resource_counts_by_id: dict[SerializedGraphOpID, int]
     resource_counts_by_op: dict[Operator2, int]
-
-
-@dataclass(kw_only=True)
-class RuleTraceInputs:
-    """Dummy arguments and operand layout shared by a target's prepared rules.
-
-    :func:`rule_call_operands` packs these inputs as positional and named parameters, numeric
-    hybrid leaves, one grouped base-wire operand, then optional control wires and values.
-    Packing creates JAX arrays, so it must happen in the caller's tracing context.
-
-    ``ctrl_wires`` and ``ctrl_values`` must be supplied together with matching lengths,
-    or both be ``None``.
-
-    Attributes:
-        call_args: Positional dummy arguments used to trace custom-operation rules.
-        call_kwargs: Named dummy parameters and wires used to trace general rules.
-        kwarg_names: Stable parameter-first, wire-second ordering for flattened keyword operands.
-        wire_lens: Qubit argument lengths, in operand order, used to split the grouped wire
-            operand.
-        ctrl_wires: Optional dummy control-wire tensor for a controlled target.
-        ctrl_values: Optional dummy control-value tensor for a controlled target.
-        hybrid_leaves: Numeric hybrid leaves passed as rule operands instead of being closed over.
-    """
-
-    call_args: tuple[Array | np.float64, ...]
-    call_kwargs: dict[str, Array]
-    kwarg_names: list[str]
-    wire_lens: dict[str, int]
-    ctrl_wires: Array | None = None
-    ctrl_values: Array | None = None
-    hybrid_leaves: tuple[Array, ...] = ()
 
 
 @dataclass
@@ -179,26 +146,6 @@ def _adjoint_folds_to_base(
     return count == 1 and rid == base_id
 
 
-def build_base_op(op_cls, kwargs, is_custom_op):
-    """Instantiate the base operator of a PennyLane's symbolic rule from prepared rule kwargs.
-
-    Note that we have to pause capture here, because the base operator is only a carrier of
-    the traced parameters and wires, and the rule body is what decides whether (and how) it
-    gets applied.
-
-    Args:
-        op_cls (type): the base operator's class
-        kwargs (dict): the prepared rule kwargs
-        is_custom_op (bool): whether the operator lowers to ``qref.custom``
-
-    Returns:
-        Operator2: the base operator, built without binding its primitive
-    """
-    args, kwargs = prepare_dummy_rule_arguments(kwargs, is_custom_op)
-    with qp.capture.pause():
-        return op_cls(*args, **kwargs)
-
-
 def symbolic_op_name(op_name, kind) -> str:
     """Return the name PennyLane's registry holds ``op_name``'s symbolic rules under.
 
@@ -220,320 +167,6 @@ def symbolic_op_name(op_name, kind) -> str:
     if kind == "control":
         return f"C({op_name})"
     raise CompileError(f"Unknown symbolic kind: {kind}")  # pragma: no cover
-
-
-def symbolic_arguments(
-    base_op, kind, ctrl_wires=None, ctrl_values=None, work_wires=None, work_wire_type="borrowed"
-) -> dict:
-    """Return the arguments a rule registered against a symbolic operator expects.
-
-    PennyLane calls such a rule with the symbolic operator's own ``arguments``: ``base`` alone for
-    an adjoint, and the five entries below for a controlled operator. Control values are plain
-    Python booleans so that a rule wrapped in ``flip_zero_control`` statically resolves to no ``X``
-    flips, matching the all-ones ``ctrlvals`` a ``<n>C(...)`` graphOpId denotes.
-
-    Args:
-        base_op (Operator2): the base operator the rule acts on
-        kind (str): ``"adjoint"`` or ``"control"``
-        ctrl_wires: the control wires, for ``kind="control"``
-        ctrl_values: the control values, for ``kind="control"``
-        work_wires: the work wires available to the controls, for ``kind="control"``
-        work_wire_type (str): the type of those work wires, ``"zeroed"`` or ``"borrowed"``
-
-    Returns:
-        dict: the arguments to call the rule with
-
-    Raises:
-        CompileError: if ``kind`` is not a known symbolic kind
-    """
-    if kind == "adjoint":
-        return {"base": base_op}
-    if kind == "control":
-        assert ctrl_wires is not None
-        assert ctrl_values is not None
-        ctrl_wires = Wires(ctrl_wires)
-        work_wires = Wires([] if work_wires is None else work_wires)
-        return {
-            "base": base_op,
-            "control_wires": ctrl_wires,
-            "control_values": ctrl_values,
-            "work_wires": work_wires,
-            "work_wire_type": work_wire_type if work_wires else "borrowed",
-        }
-    raise CompileError(f"Unknown symbolic kind: {kind}")  # pragma: no cover
-
-
-def ordered_kwarg_names(call_kwargs, dynamic_shape) -> list[str]:
-    """Order a rule's keyword operands params-first, followed by wires.
-
-    The params keep the order of ``dynamic_shape``, which is the operand order of the operator, so
-    that the rule's inputs line up with the operands the compiler passes to it. They must not be
-    sorted.
-    """
-    params = [name for name in dynamic_shape if name in call_kwargs]
-    wires = [name for name in call_kwargs if name not in dynamic_shape]
-    return params + wires
-
-
-class HybridLeafSource(Enum):
-    """Where a reconstructed hybrid argument gets each leaf."""
-
-    ORDINARY_PARAMETER = auto()
-    OPERATOR_PARAMETER = auto()
-    WIRE = auto()
-    STATIC = auto()
-
-
-@dataclass
-class HybridArgumentSpec:
-    """Describe how to rebuild a hybrid argument from rule inputs."""
-
-    name: str
-    argument_tree: object
-    original_leaves: list
-    leaf_sources: list[HybridLeafSource]
-
-    def rebuild(self, ordinary_parameters, operator_parameters, wires):
-        """Replace abstract leaves with the rule's parameter and wire inputs."""
-        reconstructed_leaves = []
-        wire_offset = 0
-        for leaf, source in zip(self.original_leaves, self.leaf_sources, strict=True):
-            if source == HybridLeafSource.ORDINARY_PARAMETER:
-                reconstructed_leaves.append(next(ordinary_parameters))
-            elif source == HybridLeafSource.OPERATOR_PARAMETER:
-                reconstructed_leaves.append(next(operator_parameters))
-            elif source == HybridLeafSource.WIRE:
-                wire_slice = wires[wire_offset : wire_offset + len(leaf)]
-                reconstructed_leaves.append(Wires(wire_slice))
-                wire_offset += len(leaf)
-            else:
-                reconstructed_leaves.append(leaf)
-
-        # Constructing the carrier object must not apply another gate.
-        with qp.capture.pause():
-            return qp.pytrees.unflatten(reconstructed_leaves, self.argument_tree)
-
-
-def _is_wire_leaf(value):
-    return isinstance(value, (Wires, qp.typing.AbstractWires))
-
-
-def flatten_hybrid_args(extra_data) -> tuple:
-    """Record how to rebuild hybrid arguments from a decomposition rule's inputs.
-
-    Track each argument's parameters, wires, and fixed values so nested operators can be
-    rebuilt with the supplied inputs. Create dummy numeric arrays for tracing; dummy wires
-    are created separately by ``prepare_dynamic_op_kwargs``.
-
-    Args:
-        extra_data (dict): Hybrid arguments with dynamic values already abstractified.
-
-    Returns:
-        tuple: Reconstruction specs, dummy numeric arrays, and fully static arguments.
-        Ordinary parameters come before nested-operator parameters in the dummy arrays.
-
-    Example:
-        Here, ``dummies`` contains the data array followed by the RX angle. The RX wire
-        is recorded in ``specs`` and supplied separately when rebuilding the operator.
-
-        >>> extra_data = {
-        ...     "unitary": abstractify(qp.RX(0.7, wires=2)),
-        ...     "data": qp.typing.Float[2],
-        ...     "label": "rotation",
-        ... }
-        >>> specs, dummies, static = flatten_hybrid_args(extra_data)
-        >>> {spec.name: [source.name for source in spec.leaf_sources] for spec in specs}
-        {'unitary': ['OPERATOR_PARAMETER', 'WIRE'], 'data': ['ORDINARY_PARAMETER']}
-        >>> [dummy.shape for dummy in dummies]
-        [(2,), ()]
-        >>> static
-        {'label': 'rotation'}
-    """
-    argument_specs = []
-    ordinary_parameter_dummies = []
-    operator_parameter_dummies = []
-    static_arguments = {}
-
-    numeric_types = (np.ndarray, np.generic, jnp.ndarray, qp.typing.AbstractArray)
-
-    for argument_name, argument in extra_data.items():
-        # Keep the complete structure so we can rebuild the argument.
-        original_leaves, argument_tree = qp.pytrees.flatten(argument, is_leaf=_is_wire_leaf)
-
-        # Stop at operators to identify which parameters belong to them.
-        argument_parts, _ = qp.pytrees.flatten(
-            argument,
-            is_leaf=lambda value: isinstance(value, Operator2) or _is_wire_leaf(value),
-        )
-
-        leaf_sources = []
-        for argument_part in argument_parts:
-            is_operator = isinstance(argument_part, Operator2)
-            part_leaves, _ = qp.pytrees.flatten(argument_part, is_leaf=_is_wire_leaf)
-
-            for leaf in part_leaves:
-                if isinstance(leaf, numeric_types):
-                    dummy_parameter = jnp.zeros(leaf.shape, dtype=leaf.dtype)
-                    if is_operator:
-                        source = HybridLeafSource.OPERATOR_PARAMETER
-                        operator_parameter_dummies.append(dummy_parameter)
-                    else:
-                        source = HybridLeafSource.ORDINARY_PARAMETER
-                        ordinary_parameter_dummies.append(dummy_parameter)
-                elif _is_wire_leaf(leaf):
-                    source = HybridLeafSource.WIRE
-                else:
-                    source = HybridLeafSource.STATIC
-
-                leaf_sources.append(source)
-
-        if any(source != HybridLeafSource.STATIC for source in leaf_sources):
-            argument_specs.append(
-                HybridArgumentSpec(
-                    name=argument_name,
-                    argument_tree=argument_tree,
-                    original_leaves=original_leaves,
-                    leaf_sources=leaf_sources,
-                )
-            )
-        else:
-            static_arguments[argument_name] = argument
-
-    # Match gate lowering: ordinary parameters precede operator parameters.
-    dummy_parameters = ordinary_parameter_dummies + operator_parameter_dummies
-    return argument_specs, dummy_parameters, static_arguments
-
-
-def rule_call_operands(trace_inputs: RuleTraceInputs) -> list[Array | np.float64]:
-    """Pack dummy inputs into the positional operand layout used to trace a rule.
-
-    The order is positional parameters, named parameters, numeric hybrid leaves, one grouped
-    base-wire array, then optional control wires and values. Named parameters follow
-    ``trace_inputs.kwarg_names``; wire groups follow ``trace_inputs.wire_lens`` insertion order.
-    Control work wires are included as a ``ctrl_work_wires`` register in the grouped
-    wire array. The grouped wire array is present even when empty.
-
-    Packing creates JAX arrays and must run in the caller's tracing context. All operands are
-    positional so ``jax.jit`` (used by ``qp.capture.subroutine``) cannot reorder keyword arguments
-    alphabetically.
-
-    Args:
-        trace_inputs (RuleTraceInputs): the rule's dummy arguments and operand layout
-
-    Returns:
-        list: positional operands in the layout consumed by :func:`unpack_rule_operands`
-    """
-    param_names = [name for name in trace_inputs.kwarg_names if name not in trace_inputs.wire_lens]
-    wire_names = list(trace_inputs.wire_lens)
-    grouped_wires = (
-        jnp.concatenate(tuple(trace_inputs.call_kwargs[name] for name in wire_names))
-        if wire_names
-        else jnp.array([], dtype=int)
-    )
-    operands = [
-        *trace_inputs.call_args,
-        *(trace_inputs.call_kwargs[name] for name in param_names),
-        *trace_inputs.hybrid_leaves,
-        grouped_wires,
-    ]
-    if trace_inputs.ctrl_wires is not None:
-        operands.append(trace_inputs.ctrl_wires)
-    if trace_inputs.ctrl_values is not None:
-        operands.append(trace_inputs.ctrl_values)
-    return operands
-
-
-def unpack_rule_operands(
-    operands,
-    n_params,
-    kwarg_names,
-    wire_lens,
-    has_ctrl_wires,
-    hybrid_specs=(),
-):
-    """Recover params, kwargs, control wires, control values, and work wires from
-    :func:`rule_call_operands`' flattening.
-
-    Reconstructs each hybrid argument from its traced parameters and wires so the rule body
-    receives the same object the user passed, but built from the traced operands. A
-    ``ctrl_work_wires`` group is taken back out of the grouped wires: it belongs to the control
-    modifier, not to the base operator the rule body rebuilds.
-
-    Args:
-        operands (tuple): the traced operands the rule body received
-        n_params (int): how many of them are positional parameters
-        kwarg_names (list[str]): parameter names first, followed by wire names
-        wire_lens (dict[str, int]): wire names in operand order and their lengths
-        has_ctrl_wires (bool): whether trailing control-wire and control-value operands are present
-        hybrid_specs (list[HybridArgumentSpec]): reconstruction specs for hybrid arguments whose
-            numeric leaves sit between the parameter kwargs and the grouped wire operand
-
-    Returns:
-        tuple: the rule's positional arguments
-        dict: the rule's keyword arguments (including the rebuilt hybrid arguments)
-        the control wires, or None
-        the control values, or None
-        the control work wires, or None
-    """
-    params = tuple(operands[:n_params])
-    param_names = [name for name in kwarg_names if name not in wire_lens]
-    n_kwarg_params = len(param_names)
-    named = dict(zip(param_names, operands[n_params : n_params + n_kwarg_params], strict=True))
-    idx = n_params + n_kwarg_params
-    num_ordinary_parameters = sum(
-        spec.leaf_sources.count(HybridLeafSource.ORDINARY_PARAMETER) for spec in hybrid_specs
-    )
-    num_operator_parameters = sum(
-        spec.leaf_sources.count(HybridLeafSource.OPERATOR_PARAMETER) for spec in hybrid_specs
-    )
-    ordinary_parameters = iter(operands[idx : idx + num_ordinary_parameters])
-    idx += num_ordinary_parameters
-    operator_parameters = iter(operands[idx : idx + num_operator_parameters])
-    idx += num_operator_parameters
-
-    grouped_wires = operands[idx]
-    idx += 1
-    offset = 0
-    for name, length in wire_lens.items():
-        named[name] = grouped_wires[offset : offset + length]
-        offset += length
-
-    for spec in hybrid_specs:
-        named[spec.name] = spec.rebuild(
-            ordinary_parameters, operator_parameters, wires=named.get(spec.name, ())
-        )
-
-    work_wires = named.pop(CTRL_WORK_WIRES, None)
-    ctrl_wires = operands[idx] if has_ctrl_wires else None
-    ctrl_values = operands[idx + 1] if has_ctrl_wires and len(operands) > idx + 1 else None
-    if has_ctrl_wires:
-        assert len(ctrl_values) == len(
-            ctrl_wires
-        ), "number of control wires and control values must be the same"
-    return params, named, ctrl_wires, ctrl_values, work_wires
-
-
-def prepare_dummy_rule_arguments(kwargs, is_custom_op: bool):
-    """Prepare dummy positional and keyword arguments for a rule or resource function.
-
-    Custom-op dynamic params are keyed positionally ("0", "1", ...) but the rule callables expect
-    them by their real argnames, so they are passed positionally with only "wires" kept as keyword.
-    Custom-op params are always scalar f64, so scalar ``0.0`` dummies are used (a shape-(1,) array
-    would instead lower the gate through the general ``qref.operator`` path rather than ``qref.custom``).
-
-    Args:
-        kwargs (dict): the prepared rule kwargs
-        is_custom_op (bool): whether the operator lowers to ``qref.custom``
-
-    Returns:
-        tuple: the positional arguments to call the rule with
-        dict: the keyword arguments to call the rule with
-    """
-    if is_custom_op:
-        # stand-in values with shape & dtype information
-        args = tuple(np.float64(0.0) for key in kwargs if key != "wires")
-        return args, {"wires": kwargs["wires"]}
-    return (), kwargs
 
 
 def _rule_allocates_work_wires(rule, *args, **kwargs) -> bool:
@@ -635,36 +268,6 @@ def collect_resources_for_op(
             )
 
     return collected_rules
-
-
-def prepare_dynamic_op_kwargs(dynamic_shape, wire_lens) -> dict[str, Array]:
-    """Build the dummy arguments an operator's decomposition rules are called with.
-
-    Args:
-        dynamic_shape (dict): dynamic argument names to their MLIR types
-        wire_lens (dict): wire argument names to their lengths
-
-    Returns:
-        dict: argument names to dummy values
-    """
-    kwargs = {}
-
-    # NOTE: Run an accumulator to generate unique negative wire labels.
-    # Otherwise, operators with control and target wires as their arguments
-    # will receive overlapping wires.
-    wire_counter = itertools.count(-1, -1)
-    for wire_name, wire_len in wire_lens.items():
-        kwargs[wire_name] = jnp.array([next(wire_counter) for _ in range(wire_len)], dtype=int)
-    for arg_name, arg_shape in dynamic_shape.items():
-        kwargs[arg_name] = get_dummy_values_for_dynamic_shape(arg_shape)
-    return kwargs
-
-
-def _dummy_work_wires(offset, num_work_wires):
-    """Return the control work-wire operand trailing ``offset`` rule wires, or None without any."""
-    if not num_work_wires:
-        return None
-    return jnp.array(range(offset, offset + num_work_wires), dtype=int)
 
 
 def build_decomp_target_spec(
@@ -1143,83 +746,5 @@ def build_decomp_rule_variants(
             f"synthesize the distributed decomposition rules for {target_id}",
             lambda: build_decomp_target_spec(**common, modifiers=state),
         )
-
-    return target_specs
-
-
-def walk_reachable_decomp_rule_sets(
-    initial_requests: list[tuple[OpDecompRequest, set[ModifierState]]],
-) -> list[DecompTargetSpec]:
-    """Build every reachable decomposition rule set in one contextual worklist traversal.
-
-    Every modifier state is demand-driven and propagated through resource edges. Revisiting an
-    identity processes only states not handled by an earlier queue entry.
-    """
-
-    queue = deque(
-        (
-            request,
-            set(required_states),
-            {
-                request.base_id: (
-                    (
-                        request.modifier_state.control_count,
-                        request.modifier_state.num_work_wires,
-                    ),
-                )
-            },
-        )
-        for request, required_states in initial_requests
-    )
-
-    processed_states: dict[SerializedGraphOpID, set[ModifierState]] = {}
-    target_specs = []
-
-    def child_requests(rule_sets):
-        children = []
-        for target_spec in rule_sets:
-            context = target_spec.modifier_context
-            for rule in target_spec.rules:
-                for op in rule.resource_counts_by_op:
-                    if isinstance(op, Operator2):
-                        children.append(OpDecompRequest.from_operation(op, context))
-        return children
-
-    while queue:
-        request, demanded_states, path_control_counts = queue.popleft()
-        demanded_states = set(demanded_states)
-        previous_states = processed_states.setdefault(request.base_id, set())
-        missing_states = demanded_states - previous_states
-        if not missing_states:
-            continue
-
-        previous_states.update(missing_states)
-        new_specs = build_decomp_rule_variants(request, missing_states)
-        target_specs.extend(new_specs)
-
-        for child in child_requests(new_specs):
-            # A modifier-changing cycle can otherwise manufacture an unbounded sequence of control
-            # and control work-wire counts, e.g. C(SemiAdder) passes its spare work wires on to
-            # ctrl(CNOT). Compare with every state of the same base identity earlier on this path,
-            # rather than the direct parent: intermediate operators may absorb their controls into
-            # their identity, or trade a control for a work wire. Prune a revisit whose counts are
-            # all at least those of an earlier controlled state and differ from it; any infinite
-            # sequence of count pairs contains such a revisit, so every path is finite. The first
-            # uncontrolled-to-controlled revisit remains valid, and an equal revisit is left to
-            # ``processed_states``.
-            child_counts = (child.modifier_state.control_count, child.modifier_state.num_work_wires)
-            earlier_counts = path_control_counts.get(child.base_id, ())
-            if any(
-                controls > 0
-                and child_counts != (controls, work_wires)
-                and child_counts[0] >= controls
-                and child_counts[1] >= work_wires
-                for controls, work_wires in earlier_counts
-            ):
-                continue
-
-            child_path_control_counts = path_control_counts.copy()
-            child_path_control_counts[child.base_id] = (*earlier_counts, child_counts)
-            queue.append((child, {child.modifier_state}, child_path_control_counts))
 
     return target_specs

@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Utilities for AOT compiling PennyLane's decomposition rules to MLIR Bytecode."""
+"""Precompile PennyLane decomposition rules to an MLIR bytecode library."""
 
 from pathlib import Path
 
@@ -21,9 +21,12 @@ from jax._src.lib.mlir import ir
 from pennylane.operation import Operator, Operator2
 
 from catalyst.compiler import _quantum_opt
-from catalyst.decomposition.decomposition_rules import compile_decomposition_rules
 from catalyst.decomposition.graph_op_id import GraphOpID
-from catalyst.decomposition.rule_compilation import get_rules_from_module
+from catalyst.decomposition.rule_compilation import (
+    get_rules_from_module,
+    materialize_decomp_target_spec,
+)
+from catalyst.decomposition.rule_preparation import build_decomp_target_spec
 from catalyst.utils.runtime_environment import BYTECODE_FILE_PATH
 
 # TODO: Uncomment dynamic size wires ops once they are supported
@@ -137,9 +140,10 @@ def precompile_decomp_rules(decomp_file_path: str = BYTECODE_FILE_PATH):
                 # we cannot precompile if the rule takes static data
                 continue
 
-            mlir_rules = compile_decomposition_rules(
+            target_spec = build_decomp_target_spec(
                 op.__name__, GraphOpID(op).getGraphOpId(), dynamic_data, wire_lens, {}
             )
+            mlir_rules = materialize_decomp_target_spec(target_spec)
 
             bytecode_lib += get_rules_from_module(mlir_rules) + "\n"
 

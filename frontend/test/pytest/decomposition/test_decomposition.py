@@ -50,37 +50,39 @@ from pennylane.wires import Wires
 
 from catalyst import qjit
 from catalyst.decomposition import GraphOpID, RuleLoweringWarning
-from catalyst.decomposition.decomposition_rules import (
-    compile_decomposition_rules_wrapper,
-    compile_reachable_decomposition_rules_wrapper,
-    compile_registered_symbolic_rules,
-    materialize_reachable_rule_strings,
-)
 from catalyst.decomposition.graph_op_id import (
     GraphOpID,
     add_ctrl_work_wires_to_id,
     build_graph_op_id,
 )
 from catalyst.decomposition.modifier_state import ModifierState
+from catalyst.decomposition.on_demand_rules import (
+    compile_decomposition_rules_wrapper,
+    compile_reachable_decomposition_rules_wrapper,
+    compile_registered_symbolic_rules,
+    materialize_reachable_rule_strings,
+)
+from catalyst.decomposition.rule_arguments import (
+    RuleTraceInputs,
+    flatten_hybrid_args,
+    ordered_kwarg_names,
+    prepare_dynamic_op_kwargs,
+    rule_call_operands,
+    symbolic_arguments,
+    unpack_rule_operands,
+)
 from catalyst.decomposition.rule_compilation import (
     get_rule_strings_from_module,
     materialize_rule_strings,
 )
 from catalyst.decomposition.rule_preparation import (
-    RuleTraceInputs,
     _adjoint_folds_to_base,
     _rule_allocates_work_wires,
     _rule_is_compatible,
     build_decomp_target_spec,
     collect_resources_for_op,
     collect_symbolic_resources,
-    flatten_hybrid_args,
-    ordered_kwarg_names,
-    prepare_dynamic_op_kwargs,
-    rule_call_operands,
-    symbolic_arguments,
     symbolic_op_name,
-    unpack_rule_operands,
 )
 from catalyst.decomposition.type_utils import (
     SerializedGraphOpID,
@@ -1484,8 +1486,7 @@ class TestOnDemand:
     def test_compile_rules_reports_missing_mlir_module(self, mocker):
         """A failed qjit compilation should not cause a secondary NoneType error."""
 
-        from catalyst.decomposition import decomposition_rules as dr
-        from catalyst.decomposition import rule_compilation, rule_preparation
+        from catalyst.decomposition import on_demand_rules, rule_compilation, rule_preparation
 
         mocker.patch.object(rule_preparation, "collect_resources_for_op", return_value=[])
         failed_qjit = mocker.MagicMock(mlir_module=None)
@@ -1495,7 +1496,7 @@ class TestOnDemand:
             CompileError,
             match="Failed to generate an MLIR module while compiling decomposition rules for S",
         ):
-            dr.compile_decomposition_rules("S", "S{}{wires:1}{}", {}, {"wires": 1}, {})
+            on_demand_rules.compile_decomposition_rules("S", "S{}{wires:1}{}", {}, {"wires": 1}, {})
 
 
 class TestModifierState:

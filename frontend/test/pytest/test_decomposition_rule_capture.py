@@ -22,7 +22,7 @@ from pennylane.typing import Float, Wire
 from catalyst import qjit
 from catalyst.decomposition.capture_session import OpDecompRequest
 from catalyst.decomposition.modifier_state import ModifierState
-from catalyst.decomposition.rule_preparation import walk_reachable_decomp_rule_sets
+from catalyst.decomposition.rule_discovery import walk_reachable_decomp_rule_sets
 from catalyst.jax_primitives import decomp_definition_p, decomprule_p
 
 # MLIR prints the quotes inside a string attribute as `\22`.

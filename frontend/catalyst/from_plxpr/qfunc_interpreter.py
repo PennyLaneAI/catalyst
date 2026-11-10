@@ -47,11 +47,9 @@ from pennylane.wires import AbstractQubit, Wires, is_abstract_qubit
 
 from catalyst.decomposition.capture_session import OpDecompRequest, TracedRule
 from catalyst.decomposition.modifier_state import ModifierState
+from catalyst.decomposition.rule_arguments import rule_call_operands
+from catalyst.decomposition.rule_discovery import walk_reachable_decomp_rule_sets
 from catalyst.decomposition.rule_lowering_warning import RuleLoweringWarning
-from catalyst.decomposition.rule_preparation import (
-    rule_call_operands,
-    walk_reachable_decomp_rule_sets,
-)
 from catalyst.from_plxpr.qref_jax_primitives import (
     MeasurementPlane,
     QrefQreg,
