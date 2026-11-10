@@ -594,9 +594,10 @@ void ResourceAnalysis::analyzeRegion(Region &region, ResourceResult &result, boo
  * @param result The ResourceResult to update with the operation's resource usage.
  * @param isAdjoint Whether the current region is under an adjoint (quantum.adjoint) operation.
  * @param numControlQubits The number of control qubits added by the current region.
+ * @param numWorkWires The number of work wires from enclosing ctrl regions.
  */
 void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result, bool isAdjoint,
-                                        unsigned numControlQubits) {
+                                        unsigned numControlQubits, unsigned numWorkWires) {
     // Collect extensions for the operation
     assert(result.extensions.size() == extensionAnalyses.size() &&
            "extension data/collector size mismatch");
@@ -631,7 +632,7 @@ void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result, b
         }
 
         uint64_t nParams = inst.getResourceNumParams();
-        uint64_t nQubits = inst.getResourceNumQubits() + nCtrlQubits;
+        uint64_t nQubits = inst.getResourceNumQubits() + nCtrlQubits + numWorkWires;
         result.operations[name][{nQubits, nParams}] += 1;
 
         // Ops may also allocate (e.g. mbqc.graph_state_prep, pbc.prepare, pbc.fabricate).
