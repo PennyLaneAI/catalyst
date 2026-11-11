@@ -25,7 +25,6 @@ from catalyst import qjit
 # pylint: disable=too-many-lines
 
 
-@pytest.mark.xfail(strict=True, reason="Template needs to be ported to Operator2.")
 def test_adder(backend):
     """Test Adder."""
     x = 8
@@ -916,7 +915,7 @@ def test_qnn_ticket(backend):  # pylint: disable-next=line-too-long
     assert np.allclose(expected, observed)
 
 
-@pytest.mark.xfail(strict=True, reason="Template needs to be ported to Operator2.")
+@pytest.mark.xfail(strict=True, reason="Needs distinct qubits.")
 def test_select(backend):
     """Test Select"""
 
@@ -932,7 +931,6 @@ def test_select(backend):
     assert np.allclose(interpreted_fn(), jitted_fn())
 
 
-@pytest.mark.xfail(strict=True, reason="Template needs to be ported to Operator2.")
 def test_controlled_sequence(backend):
     """Test ControlledSequence."""
 
@@ -1101,7 +1099,6 @@ def test_out_adder(backend):
     assert np.allclose(interpreted_fn(), jitted_fn())
 
 
-@pytest.mark.xfail(strict=True, reason="Template needs to be ported to Operator2.")
 def test_out_multiplier(backend):
     """Test OutMultiplier."""
     mod = 12
@@ -1126,7 +1123,6 @@ def test_out_multiplier(backend):
     assert np.allclose(interpreted_fn(), jitted_fn())
 
 
-@pytest.mark.xfail(strict=True, reason="Template needs to be ported to Operator2.")
 def test_phase_adder(backend):
     """Test PhaseAdder."""
     x = 8
