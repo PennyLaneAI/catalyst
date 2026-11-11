@@ -52,8 +52,8 @@ class RcLink final : public WireLink {
     std::uint64_t ring_iova(const void *addr) const override {
         return reinterpret_cast<std::uint64_t>(addr);
     }
-    /// Swap HandshakeMsgs for `local`, the ring the peer writes into, and bring both queue pairs
-    /// to RTS. Returns the peer's ring.
+    /// Trade HandshakeMsgs with the peer, advertising `local` as the ring the peer writes into,
+    /// and bring both queue pairs to RTS. Returns the peer's ring.
     PeerRef exchange(const MemRegion &local) override;
     /// Keep `peer`, the ring this end writes into, and register the frame send() sends from.
     void establish(const MemRegion &local, const PeerRef &peer) override;
