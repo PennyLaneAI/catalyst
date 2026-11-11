@@ -95,7 +95,16 @@ def QuantumGate : OpInterface<"QuantumGate", [QuantumOperation]> {
         }
 
         llvm::SmallPtrSet<mlir::Value, 4> seenQubits;
-        for (mlir::Value qubit : gate.getQubitOperands()) {
+        for (mlir::Value qubit : gate.getNonCtrlQubitOperands()) {
+            // Generic composites may repeat targets in their logical wire layout.
+            // Value-semantics conversion compacts these into unique physical operands.
+            if (!seenQubits.insert(qubit).second &&
+                gate.getOperationName() != "qref.operator") {
+                return $_op->emitError() <<
+                    "all qubits on a quantum gate must be distinct (including controls)";
+            }
+        }
+        for (mlir::Value qubit : gate.getCtrlQubitOperands()) {
             if (!seenQubits.insert(qubit).second) {
                 return $_op->emitError() <<
                     "all qubits on a quantum gate must be distinct (including controls)";
