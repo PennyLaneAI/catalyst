@@ -1121,11 +1121,16 @@ class ConvertQuantumToQecLogicalPass(ModulePass):
         module_block = op.regions[0].blocks.first
         assert module_block is not None, "Module has no block"
 
+        # Decomposition rules are not part of the program
+        funcs = [
+            f for f in op.walk() if isinstance(f, func.FuncOp) and "target_gate" not in f.attributes
+        ]
+
         # only build and add the T-gate subroutines when the circuit contains a T gate
         has_t_gate = False
         has_adjoint_t_gate = False
 
-        for inner_op in op.walk():
+        for inner_op in (o for f in funcs for o in f.walk()):
             if isinstance(inner_op, quantum.CustomOp) and inner_op.gate_name.data == "T":
                 if inner_op.adjoint is None:
                     has_t_gate = True
@@ -1142,11 +1147,13 @@ class ConvertQuantumToQecLogicalPass(ModulePass):
         if has_t_gate:
             t_subroutine = self.create_t_subroutine()
             module_block.add_op(t_subroutine)
+            funcs.append(t_subroutine)
         if has_adjoint_t_gate:
             t_adj_subroutine = self.create_t_subroutine(adj=True)
             module_block.add_op(t_adj_subroutine)
+            funcs.append(t_adj_subroutine)
 
-        PatternRewriteWalker(
+        walker = PatternRewriteWalker(
             GreedyRewritePatternApplier(
                 [
                     AllocOpConversion(self.k),
@@ -1164,7 +1171,9 @@ class ConvertQuantumToQecLogicalPass(ModulePass):
                     ScfWhileConversion(),
                 ]
             )
-        ).rewrite_module(op)
+        )
+        for f in funcs:
+            walker.rewrite_region(f.body)
 
         # Certain patterns leave behind `builtin.unrealized_conversion_cast` ops;
         # this pass removes them
