@@ -981,6 +981,11 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* A `qp.Backline` device with a `qec_code` no longer fails to compile circuits whose gates are
+  `Operator2`. The unused decomposition rules captured with the circuit are now removed before
+  `convert-quantum-to-qecl`, which could not convert them.
+  [(#XXXX)](https://github.com/PennyLaneAI/catalyst/pull/XXXX)
+
 * Runtime functions that take a boolean argument are now declared with `zeroext` on it. Before, a
   computed `i1`, such as a negated measurement result in the condition of a conditional Pauli
   rotation or in a `debug_assert`, could reach the runtime with undefined upper bits and be read
