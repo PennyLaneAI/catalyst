@@ -1171,8 +1171,7 @@
 
 * The `cpu_verbs` and `gpu_verbs` transport backends reach their peer through a `WireLink`, the
   protocol a session speaks, instead of the shared `VerbsSessionBase`. Each coprocessor is one
-  session over its link, and picks the link with a new `wire=` config key whose only value so far
-  is `rc`, the default.
+  session over its link, and picks the link with a new `wire=` config key.
   [(#3461)](https://github.com/PennyLaneAI/catalyst/pull/3461)
 
 * FuncOp's with quantum dialect instructions can now always be inlined.
