@@ -879,9 +879,8 @@ void MeasurementOp::print(OpAsmPrinter &p) {
     }
 
     // 5. Optional metadata
-    p.printOptionalAttrDict(
-        (*this)->getAttrs(),
-        {"op_name", "static_data", "operandSegmentSizes", "resultSegmentSizes"});
+    p.printOptionalAttrDict((*this)->getAttrs(), {"op_name", "static_data", "operandSegmentSizes",
+                                                  "resultSegmentSizes"});
     p << " : ";
 
     // 6. Result types

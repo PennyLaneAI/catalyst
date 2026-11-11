@@ -319,8 +319,8 @@ LogicalResult MeasurementOp::verify() {
     auto isClassical = [](Type type) {
         bool classical = true;
         type.walk([&](Type nested) {
-            if (isa<QubitType, QuregType, catalyst::quantum::QubitType, catalyst::quantum::QuregType,
-                    catalyst::quantum::ObservableType>(nested)) {
+            if (isa<QubitType, QuregType, catalyst::quantum::QubitType,
+                    catalyst::quantum::QuregType, catalyst::quantum::ObservableType>(nested)) {
                 classical = false;
             }
         });
@@ -517,8 +517,8 @@ void MeasurementOp::print(OpAsmPrinter &p) {
     }
 
     // 5. Optional metadata
-    p.printOptionalAttrDict((*this)->getAttrs(),
-                            {"op_name", "static_data", "operandSegmentSizes", "resultSegmentSizes"});
+    p.printOptionalAttrDict((*this)->getAttrs(), {"op_name", "static_data", "operandSegmentSizes",
+                                                  "resultSegmentSizes"});
     p << " : ";
 
     // 6. Result types
