@@ -14,6 +14,8 @@
 
 #include "PeerLink.hpp"
 
+#include "BalboaLink.hpp"
+#include "BalboaWire.hpp"
 #include "Error.hpp"
 #include "HsbLink.hpp"
 #include "HsbWire.hpp"
@@ -30,6 +32,8 @@ std::unique_ptr<PeerLink> make_coprocessor_link(const std::string &config, const
                                         frame::geometry_from_config(config), fwd_shape);
     case Peer::HSB:
         return std::make_unique<HsbLink>(cfg.dev, cfg.gid, hsb::ring_from_config(config));
+    case Peer::BALBOA:
+        return std::make_unique<BalboaLink>(cfg.dev, cfg.gid, balboa::ring_from_config(config));
     }
     TP_FAIL("%s: unknown peer", backend);
 }

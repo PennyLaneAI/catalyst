@@ -21,6 +21,7 @@
 #include <thread>
 #include <utility>
 
+#include "BalboaLink.hpp"
 #include "Error.hpp"
 #include "HsbLink.hpp"
 #include "RcLink.hpp"
@@ -150,8 +151,12 @@ void CpuCoprocessorSession::run(std::stop_token st) {
             serve<frame::Mode::BLV>(static_cast<RcLink &>(*link_), st);
         }
         break;
-    case Peer::HSB: // HSB carries only BL16 frames
+    // HSB and BALBOA carry only BL16 frames.
+    case Peer::HSB:
         serve<frame::Mode::BL16>(static_cast<HsbLink &>(*link_), st);
+        break;
+    case Peer::BALBOA:
+        serve<frame::Mode::BL16>(static_cast<BalboaLink &>(*link_), st);
         break;
     }
 }

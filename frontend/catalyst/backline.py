@@ -117,6 +117,7 @@ _REGISTRY: list[TransportBackend] = [
     TransportBackend("hwhs", "rdma", "fpga", ("controller",)),
     TransportBackend("fpga_verbs", "rdma", "fpga", ("controller",), default=False),
     TransportBackend("hsb_hwhs", "rdma", "fpga", ("controller",), default=False),
+    TransportBackend("balboa_hwhs", "rdma", "fpga", ("controller",), default=False),
     TransportBackend(
         "memcpy",
         "memcpy",
