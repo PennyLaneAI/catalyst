@@ -258,6 +258,45 @@ TEST_CASE("Test Resource Tracker Depth", "[resourcetracking]") {
     CHECK(tracker.GetDepth() == 0); // Should not change if depth tracking disabled
 }
 
+TEST_CASE("Test Resource Tracker Global Phase Depth", "[resourcetracking]") {
+    ResourceTracker tracker;
+    tracker.SetComputeDepth(true);
+    for (size_t i = 0; i < 3; i++) {
+        tracker.AllocateQubit(i);
+    }
+
+    // A global phase commutes with every operation, so it does not occupy a layer
+    tracker.NamedOperation("GlobalPhase", false, {});
+    CHECK(tracker.GetDepth() == 0);
+    CHECK(tracker.GetNumGates("GlobalPhase") == 1);
+    CHECK(tracker.GetNumGatesBySize(0) == 1);
+
+    // RX(0); GlobalPhase; RX(1): the RX gates are still applied in parallel
+    tracker.NamedOperation("RX", false, {0});
+    tracker.NamedOperation("GlobalPhase", false, {});
+    tracker.NamedOperation("RX", false, {1});
+    CHECK(tracker.GetDepth() == 1);
+
+    // A controlled global phase is a relative phase on its control wires
+    tracker.NamedOperation("GlobalPhase", false, {}, {0});
+    CHECK(tracker.GetDepth() == 2);
+    CHECK(tracker.GetNumGates("C(GlobalPhase)") == 1);
+    tracker.NamedOperation("PauliX", false, {0});
+    tracker.NamedOperation("PauliX", false, {2});
+    CHECK(tracker.GetDepth() == 3);
+}
+
+TEST_CASE("Test Resource Tracker Global Phase Without Depth", "[resourcetracking]") {
+    ResourceTracker tracker;
+    for (size_t i = 0; i < 2; i++) {
+        tracker.AllocateQubit(i);
+    }
+
+    tracker.NamedOperation("GlobalPhase", false, {});
+    CHECK(tracker.GetNumGates("GlobalPhase") == 1);
+    CHECK(tracker.GetDepth() == 0);
+}
+
 TEST_CASE("Test Resource Tracker Runtime Checks", "[resourcetracking]") {
     ResourceTracker tracker;
     tracker.SetComputeDepth(true);

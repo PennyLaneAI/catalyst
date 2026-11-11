@@ -10,6 +10,7 @@ function(add_catalyst_unittest test_dirname)
 endfunction()
 
 if (CATALYST_GTEST_AVAILABLE)
+  add_subdirectory(Analysis)
   add_subdirectory(Example)
   add_subdirectory(QRef)
   add_subdirectory(Quantum)

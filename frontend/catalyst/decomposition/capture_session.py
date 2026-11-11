@@ -23,6 +23,7 @@ from pennylane.core.operator import abstractify
 
 from catalyst.decomposition.graph_op_id import GraphOpID
 from catalyst.decomposition.modifier_state import ModifierState
+from catalyst.decomposition.type_utils import SerializedGraphOpID
 
 
 @dataclass(frozen=True)
@@ -48,7 +49,7 @@ class OpDecompRequest:
             adjoint and control transform regions around it.
     """
 
-    base_id: str
+    base_id: SerializedGraphOpID
     op_name: str
     op_cls: type | None
     dynamic_shape: dict
@@ -71,7 +72,7 @@ class OpDecompRequest:
         properties by removing tracers (no leaks) and giving shapes/dtypes to Python constants.
 
         Ambient modifiers compose with symbolic wrappers already carried by ``op``: adjoints
-        cancel pairwise and control counts add.
+        cancel pairwise, while control counts and work wires add.
         """
         with qp.capture.pause():
             op = abstractify(op)
@@ -106,17 +107,17 @@ class TracedRule:
     more than once while preserving distinct alternatives with identical resource counts.
 
     Attributes:
-        pyfun: Python callable retained for naming and lowering the function.
+        prepared_rule_fn: Adapted rule callable retained for naming and lowering the function.
         closed_jaxpr: Converted Catalyst JAXPR containing the rule body.
         target_gate: Full GraphOpID of the operation decomposed by the rule.
         resources: GraphOpID-to-multiplicity mapping produced by the rule.
         frontend_name: PennyLane rule name used for fixed and alternative rule selection.
     """
 
-    pyfun: Callable
+    prepared_rule_fn: Callable[..., None]
     closed_jaxpr: ClosedJaxpr
-    target_gate: str
-    resources: dict[str, int]
+    target_gate: SerializedGraphOpID
+    resources: dict[SerializedGraphOpID, int]
     frontend_name: str
 
     @property
@@ -139,7 +140,9 @@ class DecompositionScope:
         definitions: Map of rule identifiers to traced rules, in first-seen order.
     """
 
-    roots: dict[str, tuple[OpDecompRequest, set[ModifierState]]] = field(default_factory=dict)
+    roots: dict[SerializedGraphOpID, tuple[OpDecompRequest, set[ModifierState]]] = field(
+        default_factory=dict
+    )
     definitions: dict[tuple, TracedRule] = field(default_factory=dict)
 
     def record_root(self, request: OpDecompRequest) -> None:

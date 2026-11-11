@@ -14,7 +14,7 @@
 
 // RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{gate-set=testRZ=1.0 fixed-decomps={"Adjoint(testRot)" = "distribute"}})' %s | FileCheck %s
 
-// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{gate-set=testRZ=1.0 alt-decomps={"Adjoint(testRot)" = ["distribute"]}})' %s | FileCheck %s
+// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{gate-set=testRZ=1.0 exclude-decomps={"Adjoint(testRot)" = ["dedicated"]}})' %s | FileCheck %s
 
 // The more expensive `distribute` rule must be chosen, as it is the only one allowed.
 

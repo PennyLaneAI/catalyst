@@ -16,7 +16,6 @@
 Instrumentation module to report Catalyst & program performance.
 """
 
-import copy
 import datetime
 import functools
 import os
@@ -145,12 +144,14 @@ def instrument(fn=None, *, size_from=None, has_finegrained=False):
 
         with ResultReporter(stage_name, has_finegrained) as reporter:
             self = args[0]
-            orig = copy.deepcopy(self.compile_options)
+            orig_keep_intermediate = self.compile_options.keep_intermediate
             self.compile_options.keep_intermediate = True
-            fn_results, wall_time, cpu_time = time_function(fn, args, kwargs)
+            try:
+                fn_results, wall_time, cpu_time = time_function(fn, args, kwargs)
+            finally:
+                self.compile_options.keep_intermediate = orig_keep_intermediate
             program_size = measure_program_size(fn_results, size_from)
             reporter.commit_results(wall_time, cpu_time, program_size)
-            self.compile_options = orig
 
         return fn_results
 

@@ -9,7 +9,7 @@ configure_lit_site_cfg(
 )
 
 add_custom_target(create_test_bytecode
-    quantum-opt --emit-bytecode --register-decomp-rule-resource ${FRONTEND_LIT_TEST_DIR}/GraphDecomposition/test_rules.mlir -o ${DECOMP_RULES_BYTECODE_PATH}
+    quantum-opt --emit-bytecode ${FRONTEND_LIT_TEST_DIR}/GraphDecomposition/test_rules.mlir -o ${DECOMP_RULES_BYTECODE_PATH}
     DEPENDS quantum-opt
     BYPRODUCTS ${DECOMP_RULES_BYTECODE_PATH}
 )
