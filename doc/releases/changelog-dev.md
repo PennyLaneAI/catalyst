@@ -347,6 +347,10 @@
   [(#3162)](https://github.com/PennyLaneAI/catalyst/pull/3162)
   [(#3245)](https://github.com/PennyLaneAI/catalyst/pull/3245)
 
+* A simple runtime lowering for `quantum::OperatorOp` was added. The simple lowering ignores all
+  static data, work wires, and parameters forwarded to decomposition rules.
+  [(#3430)](https://github.com/PennyLaneAI/catalyst/pull/3430)
+
 * The graph-based decomposition system has been greatly improved.
 
   In previous versions, graph-based decomposition was occurring during the conversion from PennyLane
@@ -479,8 +483,10 @@
     of raising an error.
     [(#3190)](https://github.com/PennyLaneAI/catalyst/pull/3190)
 
-  - The `graph-decomposition` pass now uses `alt-decomps` to denote the strict set of rules that are considered for an operator, i.e. it no longer considers builtin rules if `alt-decomps` is specified, unless the builtin rules are listed.
-    [(#3230)](https://github.com/PennyLaneAI/catalyst/pull/3230)
+  - The `graph-decomposition` pass replaces `alt-decomps` with `exclude-decomps`, mapping operators
+    to lists of rules to omit from the decomposition graph. Excluded rules are still lowered by
+    the frontend and remain available to subsequent passes.
+    [(#3450)](https://github.com/PennyLaneAI/catalyst/pull/3450)
 
 * Numeric molecular/vibrational Hamiltonians carried as hybrid arguments by Trotter operators can now
   be decomposed through the graph-based decomposition system, together with MLIR/lowering tests for
@@ -598,6 +604,11 @@
 * A `remove-global-phases` pass is added, which removes global phases by deleting `quantum.gphase`
   operations without control wires.
   [(#3143)](https://github.com/PennyLaneAI/catalyst/pull/3143)
+
+* A `pbc-ref-collapse-if-ppr` pass is added, which turns `scf.if` branches that only apply pi/2
+  `pbc.ref.ppr` operations into conditional `pbc.ref.ppr` operations, so that they no longer need
+  host control flow.
+  [(#3435)](https://github.com/PennyLaneAI/catalyst/pull/3435)
 
 * An X/Z syndrome decode can now be routed to its own decoder in a backline coprocessor.
   `qecp.decode_esm_css` carries an optional `check_type` attribute recording which check family a
@@ -859,6 +870,12 @@
 
 <h3>Breaking changes 💔</h3>
 
+* We now have `capture=True` as the default mode for Catalyst `qjit`.
+  [(#3414)](https://github.com/PennyLaneAI/catalyst/pull/3414)
+
+* The `register-decomp-rule-resource` pass is being removed, since rules are now attributed on-demand via `ResourceAnalysis`.
+  [(#3432)](https://github.com/PennyLaneAI/catalyst/pull/3432)
+
 * The `lazy` argument has been removed from `catalyst.adjoint`, matching
   `qp.adjoint`. Adjoint construction is always symbolic, and captured adjoint
   regions no longer carry `lazy` metadata. Construct known inverse gates directly
@@ -969,6 +986,11 @@
   measurements.
   [(#2934)](https://github.com/PennyLaneAI/catalyst/pull/2934)
 
+* A `qp.Backline` device with a `qec_code` no longer fails to compile circuits whose gates are
+  `Operator2`. The unused decomposition rules captured with the circuit are now removed before
+  `convert-quantum-to-qecl`, which could not convert them.
+  [(#3472)](https://github.com/PennyLaneAI/catalyst/pull/3472)
+
 * Runtime functions that take a boolean argument are now declared with `zeroext` on it. Before, a
   computed `i1`, such as a negated measurement result in the condition of a conditional Pauli
   rotation or in a `debug_assert`, could reach the runtime with undefined upper bits and be read
@@ -1014,6 +1036,8 @@
 * Controlled quantum regions now keeps track of the `work_wire_type` passed from `qp.ctrl`.
   [(#3366)](https://github.com/PennyLaneAI/catalyst/pull/3366)
   [(#3376)](https://github.com/PennyLaneAI/catalyst/pull/3376)
+  [(#3412)](https://github.com/PennyLaneAI/catalyst/pull/3412)
+  [(#3453)](https://github.com/PennyLaneAI/catalyst/pull/3453)
 
 * MLIR passes that recreate `scf.for`, `scf.while`, `scf.if`, and `scf.index_switch` ops
   (`ctrl-lowering`, `adjoint-lowering`, `--convert-to-value-semantics`) now preserve discardable
@@ -1140,6 +1164,9 @@
 * Fixed linking of runtime artifacts under `catalyst.debug.instrumentation`, which dropped the
   libraries recorded by `runtime_call`s and devices before linking.
   [(#3438)](https://github.com/PennyLaneAI/catalyst/pull/3438)
+
+* Fixed hinted while loops to be counted symbolically in `ResourceAnalysis`.
+  [(#3370)](https://github.com/PennyLaneAI/catalyst/pull/3370)
 
 <h3>Internal changes ⚙️</h3>
 
@@ -1418,6 +1445,17 @@
   `librt_OQD_capi`. This replaces the previous work-around that had the compiler check directly for the library and
   link it if present.
   [(#3303)](https://github.com/PennyLaneAI/catalyst/pull/3303)
+
+* The preparation of the graph solver is moved to a shared algorithm used by passes that need to use it.
+  - The `resource-analysis` pass and `graph-decomposition` pass use the same shared logic owned 
+by `ResourceAnalysis` object to forward walk through the module, and collect all operators
+encountered, and their resource counts, accounting for modifier regions (across function call
+sites as well) accurately. [(#3349)](https://github.com/PennyLaneAI/catalyst/pull/3349)
+
+  - The preparation of inputs to the graph solver, including parsing the fixed/alt decomps, gateset, and collecting rule nodes
+are refactored into their own file, 'GraphPrep.hpp/cpp`. This is to expose the shared logic of graph solver preparation
+among passes that need to use it. [(#3349)](https://github.com/PennyLaneAI/catalyst/pull/3349)
+
 
 <h3>Documentation 📝</h3>
 

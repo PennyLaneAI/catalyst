@@ -19,7 +19,7 @@ import pennylane as qp
 import pytest
 
 import catalyst
-from catalyst import CompileError, grad, measure, qjit
+from catalyst import CompileError, grad, qjit
 from catalyst.device.qjit_device import QJITDevice
 
 
@@ -32,14 +32,14 @@ def test_variable_capture(_in, _out):
         @qp.qnode(qp.device("lightning.qubit", wires=2))
         def f(x: float):
             qp.RX(n * x, wires=n)
-            return measure(wires=n)
+            return qp.probs(wires=n)
 
         @qp.qnode(qp.device("lightning.qubit", wires=2))
         def g(x: float):
             qp.RX(x, wires=1)
-            return measure(wires=1)
+            return qp.probs(wires=1)
 
-        return jnp.array_equal(f(jnp.pi), g(jnp.pi))
+        return jnp.allclose(f(jnp.pi), g(jnp.pi))
 
     assert workflow(_in) == _out
 
@@ -59,14 +59,14 @@ def test_variable_capture_multiple_devices(_in, _out, backend):
         @qp.qnode(qp.device("lightning.qubit", wires=2))
         def f(x: float):
             qp.RX(n * x, wires=n)
-            return measure(wires=n)
+            return qp.probs(wires=n)
 
         @qp.qnode(qp.device(backend, wires=2))
         def g(x: float):
             qp.RX(x, wires=1)
-            return measure(wires=1)
+            return qp.probs(wires=1)
 
-        return jnp.array_equal(f(jnp.pi), g(jnp.pi))
+        return jnp.allclose(f(jnp.pi), g(jnp.pi))
 
     assert workflow(_in) == _out
 
@@ -121,6 +121,7 @@ def test_qfunc_output_shape_list():
         return res[0] * 1j
 
 
+@pytest.mark.old_frontend
 @pytest.mark.parametrize("grad_method", ["adjoint", "parameter-shift"])
 def test_qnode_grad_method_stored_on_execution_config(grad_method, mocker):
     """Test that the grad_method specified on the qnode is updated on the ExecutionConfig
@@ -133,7 +134,7 @@ def test_qnode_grad_method_stored_on_execution_config(grad_method, mocker):
         qp.RX(x, wires=0)
         return qp.expval(qp.PauliX(0))
 
-    qjit(circ)(1.2)
+    qjit(circ, capture=False)(1.2)
 
     assert spy.call_count == 1
     _, config = spy.spy_return
@@ -142,7 +143,7 @@ def test_qnode_grad_method_stored_on_execution_config(grad_method, mocker):
     def grad_circ(x: float):
         return grad(circ)(x)
 
-    qjit(grad_circ)(1.2)
+    qjit(grad_circ, capture=False)(1.2)
 
     assert spy.call_count == 2
     _, config = spy.spy_return

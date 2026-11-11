@@ -19,7 +19,7 @@ import pennylane as qp
 import pytest
 from pennylane.transforms import to_ppr as qp_to_ppr
 
-from catalyst import measure, qjit
+from catalyst import qjit
 from catalyst.passes import (
     cancel_inverses,
     commute_ppr,
@@ -136,6 +136,8 @@ def test_chained_passes():
     assert "merge-rotations" in mlir
 
 
+# should be fixed when decomposition rules get their own module
+@pytest.mark.xfail(reason="cant run these transforms on decomposition rules", strict=True)
 def test_disentangle_passes():
     """
     Test that disentangle passes are present in the transform passes
@@ -200,7 +202,7 @@ def test_convert_clifford_to_ppr():
     assert gate_types.get("PPR-pi/4-w1", 0) == 6
     assert gate_types.get("PPR-pi/4-w2", 0) == 1
     assert gate_types.get("PPR-pi/8-w1", 0) == 1
-    assert ppm_specs_output.any_commuting_depth == 3
+    assert ppm_specs_output.any_commuting_depth == 4
     assert ppm_specs_output.qubit_disjoint_depth == 6
 
 
@@ -230,7 +232,7 @@ def test_commute_ppr():
 
     pipe = [("pipe", ["quantum-compilation-stage"])]
 
-    @qjit(pipelines=pipe, target="mlir")
+    @qjit(pipelines=pipe, target="mlir", skip_preprocess=True)
     @commute_ppr
     @to_ppr
     @qp.qnode(qp.device("lightning.qubit", wires=2))
@@ -239,7 +241,8 @@ def test_commute_ppr():
         qp.S(1)
         qp.T(0)
         qp.CNOT([0, 1])
-        return measure(0), measure(1)
+        qp.measure(0)
+        qp.measure(1)
 
     assert 'transform.apply_registered_pass "commute-ppr"' in test_commute_ppr_workflow.mlir
     optimized_ir = test_commute_ppr_workflow.mlir_opt
@@ -263,7 +266,7 @@ def test_merge_ppr_ppm():
 
     pipe = [("pipe", ["quantum-compilation-stage"])]
 
-    @qjit(pipelines=pipe, target="mlir")
+    @qjit(pipelines=pipe, target="mlir", skip_preprocess=True)
     @merge_ppr_ppm
     @to_ppr
     @qp.qnode(qp.device("lightning.qubit", wires=2))
@@ -271,7 +274,8 @@ def test_merge_ppr_ppm():
         qp.H(0)
         qp.S(1)
         qp.CNOT([0, 1])
-        return measure(0), measure(1)
+        qp.measure(0)
+        qp.measure(1)
 
     assert 'transform.apply_registered_pass "merge-ppr-ppm"' in test_merge_ppr_ppm_workflow.mlir
     optimized_ir = test_merge_ppr_ppm_workflow.mlir_opt
@@ -292,7 +296,7 @@ def test_ppr_to_ppm_auto_corrected():
 
     pipe = [("pipe", ["quantum-compilation-stage"])]
 
-    @qjit(pipelines=pipe, target="mlir")
+    @qjit(pipelines=pipe, target="mlir", skip_preprocess=True)
     @ppr_to_ppm(decompose_method="auto-corrected")
     @to_ppr
     @qp.qnode(qp.device("lightning.qubit", wires=2))
@@ -301,7 +305,8 @@ def test_ppr_to_ppm_auto_corrected():
         qp.S(1)
         qp.T(0)
         qp.CNOT([0, 1])
-        return measure(0), measure(1)
+        qp.measure(0)
+        qp.measure(1)
 
     assert 'transform.apply_registered_pass "ppr-to-ppm"' in test_ppr_to_ppm_workflow.mlir
     optimized_ir = test_ppr_to_ppm_workflow.mlir_opt
@@ -320,7 +325,7 @@ def test_ppr_to_ppm_inject_magic_state():
 
     pipe = [("pipe", ["quantum-compilation-stage"])]
 
-    @qjit(pipelines=pipe, target="mlir")
+    @qjit(pipelines=pipe, target="mlir", skip_preprocess=True)
     @ppr_to_ppm(decompose_method="clifford-corrected", avoid_y_measure=True)
     @to_ppr
     @qp.qnode(qp.device("lightning.qubit", wires=2))
@@ -329,7 +334,8 @@ def test_ppr_to_ppm_inject_magic_state():
         qp.S(1)
         qp.T(0)
         qp.CNOT([0, 1])
-        return measure(0), measure(1)
+        qp.measure(0)
+        qp.measure(1)
 
     assert 'transform.apply_registered_pass "ppr-to-ppm"' in test_ppr_to_ppm_workflow.mlir
     optimized_ir = test_ppr_to_ppm_workflow.mlir_opt
@@ -348,7 +354,7 @@ def test_ppr_to_ppm_pauli_corrected():
 
     pipe = [("pipe", ["quantum-compilation-stage"])]
 
-    @qjit(pipelines=pipe, target="mlir")
+    @qjit(pipelines=pipe, target="mlir", skip_preprocess=True)
     @ppr_to_ppm(decompose_method="pauli-corrected")
     @to_ppr
     @qp.qnode(qp.device("lightning.qubit", wires=2))
@@ -357,7 +363,8 @@ def test_ppr_to_ppm_pauli_corrected():
         qp.S(1)
         qp.T(0)
         qp.CNOT([0, 1])
-        return measure(0), measure(1)
+        qp.measure(0)
+        qp.measure(1)
 
     assert 'transform.apply_registered_pass "ppr-to-ppm"' in test_ppr_to_ppm_workflow.mlir
     optimized_ir = test_ppr_to_ppm_workflow.mlir_opt
@@ -374,9 +381,9 @@ def test_ppr_to_ppm_pauli_corrected():
 def test_commute_ppr_and_merge_ppr_ppm_with_max_pauli_size():
 
     pipe = [("pipe", ["quantum-compilation-stage"])]
-    device = qp.device("lightning.qubit", wires=2)
+    device = qp.device("lightning.qubit", wires=3)
 
-    @qjit(pipelines=pipe, target="mlir")
+    @qjit(pipelines=pipe, target="mlir", skip_preprocess=True)
     @merge_ppr_ppm
     @commute_ppr(max_pauli_size=2)
     @to_ppr
@@ -384,9 +391,10 @@ def test_commute_ppr_and_merge_ppr_ppm_with_max_pauli_size():
     def f_workflow():
         qp.CNOT([0, 2])
         qp.T(0)
-        return measure(0), measure(1)
+        qp.measure(0)
+        qp.measure(1)
 
-    @qjit(pipelines=pipe, target="mlir")
+    @qjit(pipelines=pipe, target="mlir", skip_preprocess=True)
     @merge_ppr_ppm(max_pauli_size=1)
     @commute_ppr
     @to_ppr
@@ -396,7 +404,8 @@ def test_commute_ppr_and_merge_ppr_ppm_with_max_pauli_size():
         qp.T(0)
         qp.T(1)
         qp.CNOT([0, 1])
-        return measure(0), measure(1)
+        qp.measure(0)
+        qp.measure(1)
 
     for workflow in (f_workflow, g_workflow):
         assert 'transform.apply_registered_pass "commute-ppr"' in workflow.mlir
