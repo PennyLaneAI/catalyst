@@ -865,6 +865,9 @@
 
 <h3>Breaking changes 💔</h3>
 
+* We now have `capture=True` as the default mode for Catalyst `qjit`.
+  [(#3414)](https://github.com/PennyLaneAI/catalyst/pull/3414)
+
 * The `register-decomp-rule-resource` pass is being removed, since rules are now attributed on-demand via `ResourceAnalysis`.
   [(#3432)](https://github.com/PennyLaneAI/catalyst/pull/3432)
 
