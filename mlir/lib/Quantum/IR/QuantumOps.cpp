@@ -59,7 +59,7 @@
 #include "PBC/IR/PBCOps.h"
 #include "QRef/IR/QRefInterfaces.h"
 #include "QRef/IR/QRefOps.h"
-#include "Quantum/IR/MeasurementOpUtils.h"
+#include "QRef/IR/QRefTypes.h"
 #include "Quantum/IR/QuantumAttrDefs.h"
 #include "Quantum/IR/QuantumDialect.h"
 #include "Quantum/IR/QuantumInterfaces.h"
@@ -657,11 +657,34 @@ LogicalResult VarianceOp::verify() {
 }
 
 LogicalResult MeasurementOp::verify() {
-    if (failed(catalyst::detail::verifyMeasurementInputs(getOperation(), getParams(), getInQubits(),
-                                                         getInQreg(), getArrQubitIndices(),
-                                                         getMres()))) {
-        return failure();
+    if (getInQreg() && !getInQubits().empty()) {
+        return emitOpError("must use either qubits or registers, but not both");
     }
+    if (!getInQreg() && !getArrQubitIndices().empty()) {
+        return emitOpError("index arrays require a register");
+    }
+
+    auto isClassical = [](Type type) {
+        bool classical = true;
+        type.walk([&](Type nested) {
+            if (isa<QubitType, QuregType, ObservableType, catalyst::qref::QubitType,
+                    catalyst::qref::QuregType>(nested)) {
+                classical = false;
+            }
+        });
+        return classical;
+    };
+    for (Type type : getParams().getTypes()) {
+        if (!isClassical(type)) {
+            return emitOpError("params must have classical types, got ") << type;
+        }
+    }
+    for (Type type : getMres().getTypes()) {
+        if (!isClassical(type)) {
+            return emitOpError("mres must have classical types, got ") << type;
+        }
+    }
+
     if (getInQubits().size() != getOutQubits().size()) {
         return emitOpError("number of input and output qubits must be the same");
     }
@@ -827,14 +850,155 @@ void OperatorOp::build(OpBuilder &odsBuilder, OperationState &odsState, llvm::St
 //===----------------------------------------------------------------------===//
 
 void MeasurementOp::print(OpAsmPrinter &p) {
-    catalyst::detail::printMeasurement(p, getOperation(), getOpNameAttr(), getParams(),
-                                       getInQubits(), getInQreg(), getArrQubitIndices(),
-                                       getStaticDataAttr(),
-                                       /*valueSemantics=*/true);
+    // 1. Measurement name
+    p << " ";
+    p.printAttributeWithoutType(getOpNameAttr());
+
+    auto printTypedOperands = [&](ValueRange operands) {
+        llvm::interleaveComma(operands, p,
+                              [&](Value value) { p << value << ": " << value.getType(); });
+    };
+
+    // 2. Variadic Inputs: (%arg0 : type, ...)
+    p << "(";
+    printTypedOperands(getParams());
+    p << ")";
+
+    // 3. Qubits or (Qreg and indices)
+    if (Value qreg = getInQreg()) {
+        p << " quregs(" << qreg << ") indices(";
+        printTypedOperands(getArrQubitIndices());
+        p << ")";
+    } else {
+        p << " qubits(" << getInQubits() << ")";
+    }
+
+    // 4. Optional static data
+    if (Attribute staticData = getStaticDataAttr()) {
+        p << " static_data = " << staticData;
+    }
+
+    // 5. Optional metadata
+    p.printOptionalAttrDict(
+        (*this)->getAttrs(),
+        {"op_name", "static_data", "operandSegmentSizes", "resultSegmentSizes"});
+    p << " : ";
+
+    // 6. Result types
+    if (getOperation()->getNumResults() == 0) {
+        p << "()";
+    } else {
+        p << getOperation()->getResultTypes();
+    }
 }
 
 ParseResult MeasurementOp::parse(OpAsmParser &parser, OperationState &result) {
-    return catalyst::detail::parseMeasurement(parser, result, /*valueSemantics=*/true);
+    Builder &builder = parser.getBuilder();
+    auto *ctx = parser.getContext();
+    auto loc = parser.getCurrentLocation();
+
+    // 1. Parse measurement name
+    std::string name;
+    if (parser.parseString(&name)) {
+        return failure();
+    }
+    result.addAttribute("op_name", builder.getStringAttr(name));
+
+    SmallVector<OpAsmParser::UnresolvedOperand> params, qubits, indices;
+    SmallVector<Type> paramTypes, indexTypes, resultTypes;
+    auto parseTypedOperands = [&](auto &operands, auto &types) {
+        return parser.parseCommaSeparatedList(OpAsmParser::Delimiter::Paren, [&]() -> ParseResult {
+            OpAsmParser::UnresolvedOperand operand;
+            Type type;
+            if (parser.parseOperand(operand) || parser.parseColonType(type)) {
+                return failure();
+            }
+            operands.push_back(operand);
+            types.push_back(type);
+            return success();
+        });
+    };
+
+    // 2. Parse variadic params: (%arg0: type, ...)
+    if (parseTypedOperands(params, paramTypes)) {
+        return failure();
+    }
+
+    // 3. Parse qubits or (qreg and indices)
+    SmallVector<OpAsmParser::UnresolvedOperand> qregs;
+    Type qregType = QuregType::get(ctx);
+    if (succeeded(parser.parseOptionalKeyword("qubits"))) {
+        if (parser.parseOperandList(qubits, OpAsmParser::Delimiter::Paren)) {
+            return failure();
+        }
+    } else {
+        OpAsmParser::UnresolvedOperand qreg;
+        if (parser.parseKeyword("quregs") || parser.parseLParen() || parser.parseOperand(qreg) ||
+            parser.parseRParen() || parser.parseKeyword("indices") ||
+            parseTypedOperands(indices, indexTypes)) {
+            return failure();
+        }
+        qregs.push_back(qreg);
+    }
+
+    // 4. Optional static data
+    if (succeeded(parser.parseOptionalKeyword("static_data"))) {
+        DictionaryAttr staticData;
+        if (parser.parseEqual() ||
+            parser.parseAttribute(staticData, "static_data", result.attributes)) {
+            return failure();
+        }
+    }
+
+    // 5. Optional metadata
+    if (parser.parseOptionalAttrDict(result.attributes) || parser.parseColon()) {
+        return failure();
+    }
+
+    // 6. Result types (optional parentheses)
+    if (succeeded(parser.parseOptionalLParen())) {
+        if (failed(parser.parseOptionalRParen()) &&
+            (parser.parseTypeList(resultTypes) || parser.parseRParen())) {
+            return failure();
+        }
+    } else if (parser.parseTypeList(resultTypes)) {
+        return failure();
+    }
+
+    // 7. Resolve operands and result segments
+    Type qubitType = QubitType::get(ctx);
+    if (parser.resolveOperands(params, paramTypes, loc, result.operands) ||
+        parser.resolveOperands(qubits, qubitType, result.operands) ||
+        parser.resolveOperands(qregs, qregType, result.operands) ||
+        parser.resolveOperands(indices, indexTypes, loc, result.operands)) {
+        return failure();
+    }
+    result.addAttribute("operandSegmentSizes",
+                        builder.getDenseI32ArrayAttr({static_cast<int32_t>(params.size()),
+                                                      static_cast<int32_t>(qubits.size()),
+                                                      static_cast<int32_t>(qregs.size()),
+                                                      static_cast<int32_t>(indices.size())}));
+    result.addTypes(resultTypes);
+
+    // Classical results, then qubits or a register.
+    unsigned numClassical = 0, numQubits = 0, numQregs = 0;
+    for (Type type : resultTypes) {
+        if (isa<QubitType>(type) && numQregs == 0) {
+            ++numQubits;
+        } else if (isa<QuregType>(type)) {
+            ++numQregs;
+        } else if (numQubits == 0 && numQregs == 0) {
+            ++numClassical;
+        } else {
+            return parser.emitError(loc,
+                                    "expected classical results followed by qubits or a register");
+        }
+    }
+    result.addAttribute("resultSegmentSizes",
+                        builder.getDenseI32ArrayAttr({static_cast<int32_t>(numClassical),
+                                                      static_cast<int32_t>(numQubits),
+                                                      static_cast<int32_t>(numQregs)}));
+    return success();
 }
 
 static void printDenseI64ArrayAsList(OpAsmPrinter &p, DenseI64ArrayAttr attr) {
