@@ -17,9 +17,11 @@
 
 // CHECK-LABEL: @dynamic_and_static_data
 func.func @dynamic_and_static_data(%angle: f64) -> (i1, f64) attributes {quantum.node} {
+  // CHECK: [[Q0:%.+]] = qref.alloc_qb : !qref.bit
+  // CHECK: [[Q1:%.+]] = qref.alloc_qb : !qref.bit
   %q0 = quantum.alloc_qb : !quantum.bit
   %q1 = quantum.alloc_qb : !quantum.bit
-  // CHECK: [[M:%.+]]:2 = qref.measurement "pair"(%{{.*}}: f64) qubits([[Q0:%.+]], [[Q1:%.+]]) static_data = {plane = "XY"} {tag = "keep"} : i1, f64
+  // CHECK: [[M:%.+]]:2 = qref.measurement "pair"(%arg0: f64) qubits([[Q0]], [[Q1]]) static_data = {plane = "XY"} {tag = "keep"} : i1, f64
   %m, %s, %out:2 = quantum.measurement "pair"(%angle: f64) qubits(%q0, %q1)
       static_data = {plane = "XY"} {tag = "keep"} : i1, f64, !quantum.bit, !quantum.bit
   // CHECK: qref.custom "PauliX"() [[Q0]]
@@ -34,12 +36,12 @@ func.func @dynamic_and_static_data(%angle: f64) -> (i1, f64) attributes {quantum
 
 // CHECK-LABEL: @register
 func.func @register(%wires: tensor<?xi64>) -> tensor<?xi1> attributes {quantum.node} {
-  // CHECK: [[R:%.+]] = qref.alloc
+  // CHECK: [[R:%.+]] = qref.alloc( 4) : !qref.reg<4>
   %reg = quantum.alloc(4) : !quantum.reg
-  // CHECK: [[M:%.+]] = qref.measurement "many"() quregs([[R]]: !qref.reg<4>) indices({{%.*}}: tensor<?xi64>) static_data = {reset = true} : tensor<?xi1>
+  // CHECK: [[M:%.+]] = qref.measurement "many"() quregs([[R]]: !qref.reg<4>) indices(%arg0: tensor<?xi64>) static_data = {reset = true} : tensor<?xi1>
   %m, %out = quantum.measurement "many"() quregs(%reg) indices(%wires: tensor<?xi64>)
       static_data = {reset = true} : tensor<?xi1>, !quantum.reg
-  // CHECK: qref.measurement "discard"() quregs([[R]]: !qref.reg<4>) indices({{%.*}}: tensor<?xi64>) : ()
+  // CHECK: qref.measurement "discard"() quregs([[R]]: !qref.reg<4>) indices(%arg0: tensor<?xi64>) : ()
   %out2 = quantum.measurement "discard"() quregs(%out) indices(%wires: tensor<?xi64>) : !quantum.reg
   // CHECK: qref.dealloc [[R]]
   quantum.dealloc %out2 : !quantum.reg
@@ -49,16 +51,16 @@ func.func @register(%wires: tensor<?xi64>) -> tensor<?xi1> attributes {quantum.n
 
 // CHECK-LABEL: @branch
 func.func @branch(%cond: i1, %wires: tensor<1xi64>) -> i1 attributes {quantum.node} {
-  // CHECK: [[R:%.+]] = qref.alloc
+  // CHECK: [[R:%.+]] = qref.alloc( 2) : !qref.reg<2>
   %reg = quantum.alloc(2) : !quantum.reg
-  // CHECK: [[BR:%.+]] = scf.if %{{.*}} -> (i1)
+  // CHECK: [[BR:%.+]] = scf.if %arg0 -> (i1)
   %m, %out = scf.if %cond -> (i1, !quantum.reg) {
-    // CHECK: [[A:%.+]] = qref.measurement "A"() quregs([[R]]: !qref.reg<2>)
+    // CHECK: [[A:%.+]] = qref.measurement "A"() quregs([[R]]: !qref.reg<2>) indices(%arg1: tensor<1xi64>) : i1
     %a, %ra = quantum.measurement "A"() quregs(%reg) indices(%wires: tensor<1xi64>) : i1, !quantum.reg
     // CHECK: scf.yield [[A]] : i1
     scf.yield %a, %ra : i1, !quantum.reg
   } else {
-    // CHECK: [[B:%.+]] = qref.measurement "B"() quregs([[R]]: !qref.reg<2>)
+    // CHECK: [[B:%.+]] = qref.measurement "B"() quregs([[R]]: !qref.reg<2>) indices(%arg1: tensor<1xi64>) : i1
     %b, %rb = quantum.measurement "B"() quregs(%reg) indices(%wires: tensor<1xi64>) : i1, !quantum.reg
     // CHECK: scf.yield [[B]] : i1
     scf.yield %b, %rb : i1, !quantum.reg
