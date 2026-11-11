@@ -5,6 +5,9 @@ COMPILER_LAUNCHER ?= $(shell which ccache)
 
 MK_ABSPATH := $(abspath $(lastword $(MAKEFILE_LIST)))
 MK_DIR := $(dir $(MK_ABSPATH))
+export CCACHE_BASEDIR ?= $(abspath $(MK_DIR)/..)
+CATALYST_CONFIG_ONLY := 1
+include $(MK_DIR)/../Makefile
 DIALECTS_BUILD_DIR ?= $(MK_DIR)/build
 DIALECTS_DOCS_BUILD_DIR ?= $(MK_DIR)/build-docs
 LLVM_SRC_DIR ?= $(MK_DIR)/llvm-project
@@ -66,7 +69,11 @@ help:
 	@echo "  format [version=?] to apply C++ formatter; use with 'version={version}' to run clang-format-{version} instead of clang-format"
 
 .PHONY: all
+ifeq ($(strip $(CATALYST_WORKTREE_CHECKOUT)),)
 all: llvm stablehlo enzyme dialects dialect-docs plugin
+else
+all: dialects dialect-docs plugin
+endif
 
 .PHONY: llvm
 llvm:
@@ -232,7 +239,7 @@ dialect-docs:
 		-DPython3_EXECUTABLE=$(PYTHON) \
 		-DPython3_NumPy_INCLUDE_DIRS=$(shell $(PYTHON) -c "import numpy as np; print(np.get_include())") \
 		-DEnzyme_DIR=$(ENZYME_BUILD_DIR) \
-		-DENZYME_SRC_DIR=$(MK_DIR)/Enzyme \
+		-DENZYME_SRC_DIR=$(ENZYME_SRC_DIR) \
 		-DMLIR_DIR=$(LLVM_BUILD_DIR)/lib/cmake/mlir \
 		-DRUNTIME_LIB_DIR=$(RT_BUILD_DIR)/lib \
 		-DMLIR_LIB_DIR=$(LLVM_BUILD_DIR)/lib \
@@ -323,7 +330,11 @@ test:
 	cmake --build $(DIALECTS_BUILD_DIR) --target check-dialects
 
 .PHONY: clean clean-dialects clean-enzyme clean-stablehlo clean-plugin clean-dialect-docs
+ifeq ($(strip $(CATALYST_WORKTREE_CHECKOUT)),)
 clean: clean-dialects clean-llvm clean-stablehlo clean-enzyme clean-plugin clean-dialect-docs
+else
+clean: clean-dialects clean-plugin clean-dialect-docs
+endif
 
 clean-dialects:
 	@echo "clean catalyst dialect build files"
