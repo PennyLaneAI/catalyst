@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// An adjoint applied to a subroutine also applies to the subroutines it calls.
+// Tests that the IR is unchanged after resource-estimate pass.
 
 // RUN: catalyst --tool=opt --pass-pipeline='builtin.module(resource-estimate{output-json gate-set=S=1.0,T=1.0,Adjoint(S)=1.0,Adjoint(T)=1.0 bytecode-rules="%BYTECODE_PATH"})' %s | FileCheck %s
 
