@@ -41,7 +41,7 @@ PRECOMPILATION_MODIFIERS = (
 )
 
 
-def _capture_rule_module(scope: DecompositionScope) -> ir.Operation:
+def _capture_rule_module(scope: DecompositionScope) -> ir.Module:
     """Capture every reachable rule in scope into one MLIR module."""
     interpreter = PLxPRToQuantumJaxprInterpreter(
         qp.device("null.qubit", wires=1),

@@ -25,6 +25,7 @@ from catalyst.decomposition.decomposition_cache import (
     get_rule_entry,
     load_precompiled_rule_identities,
 )
+from catalyst.decomposition.type_utils import SerializedGraphOpID
 from catalyst.utils.runtime_environment import get_bytecode_manifest_path
 
 BYTECODE = b"bytecode"
@@ -63,7 +64,15 @@ def test_load_valid_default_cache(monkeypatch, tmp_path):
     # load from the mocked cache
     identities = load_precompiled_rule_identities()
 
-    assert identities == frozenset({RuleIdentity("Target", "rule", {"A": 1, "Z": 2})})
+    assert identities == frozenset(
+        {
+            RuleIdentity(
+                SerializedGraphOpID("Target"),
+                "rule",
+                {SerializedGraphOpID("A"): 1, SerializedGraphOpID("Z"): 2},
+            )
+        }
+    )
 
 
 def test_load_empty_cache(tmp_path):
@@ -76,7 +85,11 @@ def test_load_empty_cache(tmp_path):
 
 def test_manifest_entry_canonicalizes_resources():
     """Manifest entries use the same canonical resource ordering as rule identities."""
-    identity = RuleIdentity("Target", "rule", {"Z": 2, "A": 1})
+    identity = RuleIdentity(
+        SerializedGraphOpID("Target"),
+        "rule",
+        {SerializedGraphOpID("Z"): 2, SerializedGraphOpID("A"): 1},
+    )
     entry = get_rule_entry(identity)
 
     assert identity.resources == (("A", 1), ("Z", 2))

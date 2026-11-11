@@ -17,9 +17,19 @@
 import hashlib
 import json
 from pathlib import Path
+from typing import TypedDict
 
 from catalyst.decomposition.capture_session import RuleIdentity
+from catalyst.decomposition.type_utils import SerializedGraphOpID
 from catalyst.utils.runtime_environment import BYTECODE_FILE_PATH, get_bytecode_manifest_path
+
+
+class _RuleEntry(TypedDict):
+    """A rule identity serialized in the precompilation manifest."""
+
+    target_gate: SerializedGraphOpID
+    frontend_name: str
+    resources: dict[SerializedGraphOpID, int]
 
 
 def get_bytecode_hash(bytecode: bytes) -> str:
@@ -27,7 +37,7 @@ def get_bytecode_hash(bytecode: bytes) -> str:
     return hashlib.sha256(bytecode).hexdigest()
 
 
-def get_rule_entry(identity: RuleIdentity) -> dict:
+def get_rule_entry(identity: RuleIdentity) -> _RuleEntry:
     """Serialize a rule identity for the precompilation manifest."""
     return {
         "target_gate": identity.target_gate,
@@ -36,7 +46,7 @@ def get_rule_entry(identity: RuleIdentity) -> dict:
     }
 
 
-def _validate_rule_entry(entry) -> RuleIdentity:
+def _validate_rule_entry(entry: dict) -> RuleIdentity:
     """Validate and canonicalize one rule manifest entry."""
     if not isinstance(entry, dict) or set(entry) != {
         "target_gate",
@@ -58,10 +68,14 @@ def _validate_rule_entry(entry) -> RuleIdentity:
     ):
         raise ValueError("Malformed precompiled rule resources.")
 
-    return RuleIdentity(target_gate, frontend_name, resources)
+    return RuleIdentity(
+        SerializedGraphOpID(target_gate),
+        frontend_name,
+        {SerializedGraphOpID(gate): count for gate, count in resources.items()},
+    )
 
 
-def _validate_manifest(manifest, bytecode: bytes) -> frozenset[RuleIdentity]:
+def _validate_manifest(manifest: dict, bytecode: bytes) -> frozenset[RuleIdentity]:
     """Validate a manifest and return its canonical rule identities."""
     if not isinstance(manifest, dict) or set(manifest) != {
         "bytecode_hash",

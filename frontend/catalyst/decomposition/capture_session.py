@@ -26,7 +26,7 @@ from catalyst.decomposition.graph_op_id import GraphOpID
 from catalyst.decomposition.modifier_state import ModifierState
 from catalyst.decomposition.type_utils import SerializedGraphOpID
 
-ResourceEntry = tuple[str, int]
+ResourceEntry = tuple[SerializedGraphOpID, int]
 
 
 @dataclass(frozen=True, init=False)
@@ -39,11 +39,16 @@ class RuleIdentity:
         resources: sorted pairs of GraphOpIDs and integer resource counts for the rule.
     """
 
-    target_gate: str
+    target_gate: SerializedGraphOpID
     frontend_name: str
     resources: tuple[ResourceEntry, ...]
 
-    def __init__(self, target_gate: str, frontend_name: str, resources: Mapping[str, int]):
+    def __init__(
+        self,
+        target_gate: SerializedGraphOpID,
+        frontend_name: str,
+        resources: Mapping[SerializedGraphOpID, int],
+    ) -> None:
         """Create an identity with a canonical resource ordering."""
         object.__setattr__(self, "target_gate", target_gate)
         object.__setattr__(self, "frontend_name", frontend_name)

@@ -23,6 +23,7 @@ from catalyst import qjit
 from catalyst.decomposition.capture_session import OpDecompRequest, RuleIdentity
 from catalyst.decomposition.decomposition_rules import walk_reachable_decomp_rule_sets
 from catalyst.decomposition.modifier_state import ModifierState
+from catalyst.decomposition.type_utils import SerializedGraphOpID
 from catalyst.jax_primitives import decomp_definition_p, decomprule_p
 
 # MLIR prints the quotes inside a string attribute as `\22`.
@@ -277,9 +278,9 @@ def test_precompilation_preserves_traversal(mocker):
         del wires
 
     cached_rule_identity = RuleIdentity(
-        "CacheRoot{}{wires:1}{}",
+        SerializedGraphOpID("CacheRoot{}{wires:1}{}"),
         "cacheroot_to_cacheleaf",
-        {"CacheLeaf{}{wires:1}{}": 1},
+        {SerializedGraphOpID("CacheLeaf{}{wires:1}{}"): 1},
     )
 
     # mock the cache to only include the test CacheRoot
@@ -325,9 +326,9 @@ def test_changed_resources_get_recaptured(mocker):
         del wires
 
     stale_identity = RuleIdentity(
-        "RepeatedGate{}{wires:1}{}",
+        SerializedGraphOpID("RepeatedGate{}{wires:1}{}"),
         "current_rule",
-        {"PauliX{}{wires:1}{}": 1},
+        {SerializedGraphOpID("PauliX{}{wires:1}{}"): 1},
     )
     load_cache = mocker.patch.object(
         capture_frontend,

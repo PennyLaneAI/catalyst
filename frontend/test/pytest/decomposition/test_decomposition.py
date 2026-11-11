@@ -88,6 +88,7 @@ from catalyst.decomposition.precompile_decomposition_rules import (
     precompile_decomp_rules,
 )
 from catalyst.decomposition.type_utils import (
+    SerializedGraphOpID,
     convert_item_to_mlir_type,
     get_dummy_values_for_dynamic_shape,
     replace_wires_with_placeholder_wires,
@@ -1115,9 +1116,9 @@ class TestPrecompiled:
             SingleParam(x=0.5, reg=reg)
 
         cached_root = RuleIdentity(
-            "NoParams{}{reg:1}{}",
+            SerializedGraphOpID("NoParams{}{reg:1}{}"),
             "root_to_single",
-            {"SingleParam{x:[tensor<f64>]}{reg:1}{}": 1},
+            {SerializedGraphOpID("SingleParam{x:[tensor<f64>]}{reg:1}{}"): 1},
         )
         mocker.patch(
             "pennylane.decomposition.signature_registry",
