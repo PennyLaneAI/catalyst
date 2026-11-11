@@ -49,6 +49,7 @@ from .operations import (
     InitializeOp,
     InsertOp,
     MCMObsOp,
+    MeasurementOp,
     MeasureOp,
     MultiRZOp,
     NamedObsOp,
@@ -91,6 +92,7 @@ Quantum = Dialect(
         InitializeOp,
         InsertOp,
         MCMObsOp,
+        MeasurementOp,
         MeasureOp,
         MultiRZOp,
         NamedObsOp,
@@ -147,6 +149,7 @@ __all__ = [
     "NamedObsOp",
     "TensorOp",
     # Mid-circuit measurements
+    "MeasurementOp",
     "MeasureOp",
     # Terminal measurements
     "CountsOp",

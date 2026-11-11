@@ -16,10 +16,20 @@ This file contains the definition of operations representing measurements
 in the Quantum dialect.
 """
 
-from xdsl.dialects.builtin import I32, ComplexType, Float64Type, IntegerAttr, i1, i64
+from xdsl.dialects.builtin import (
+    I32,
+    ComplexType,
+    DictionaryAttr,
+    Float64Type,
+    IntegerAttr,
+    StringAttr,
+    i1,
+    i64,
+)
 from xdsl.ir import Operation
 from xdsl.irdl import (
     AttrSizedOperandSegments,
+    AttrSizedResultSegments,
     IntSetConstraint,
     IRDLOperation,
     SameVariadicResultSize,
@@ -28,13 +38,16 @@ from xdsl.irdl import (
     opt_operand_def,
     opt_prop_def,
     opt_result_def,
+    prop_def,
     result_def,
     var_operand_def,
+    var_result_def,
 )
+from xdsl.parser import Parser
 
 from catalyst.python_interface.xdsl_extras import MemRefConstraint, TensorConstraint
 
-from ..attributes import ObservableSSAValue, ObservableType, QubitSSAValue, QubitType
+from ..attributes import ObservableSSAValue, ObservableType, QubitSSAValue, QubitType, QuregType
 
 ##############################################
 ################ Base classes ################
@@ -48,6 +61,83 @@ class TerminalMeasurementOp(IRDLOperation):
 ############################################
 ######### Mid-circuit measurements #########
 ############################################
+
+
+@irdl_op_definition
+class MeasurementOp(IRDLOperation):
+    """A named mid-circuit measurement with arbitrary classical parameters and results."""
+
+    name = "quantum.measurement"
+
+    irdl_options = (
+        AttrSizedOperandSegments(as_property=True),
+        AttrSizedResultSegments(as_property=True),
+    )
+
+    op_name = prop_def(StringAttr)
+    params = var_operand_def()
+    in_qubits = var_operand_def(QubitType)
+    in_qreg = opt_operand_def(QuregType)
+    arr_qubit_indices = var_operand_def(TensorConstraint(element_type=i64, rank=1))
+    static_data = opt_prop_def(DictionaryAttr)
+
+    mres = var_result_def()
+    out_qubits = var_result_def(QubitType)
+    out_qreg = opt_result_def(QuregType)
+
+    @classmethod
+    def parse(cls, parser: Parser):
+        op_name = StringAttr(parser.parse_str_literal())
+
+        def typed_operand():
+            operand = parser.parse_operand()
+            parser.parse_punctuation(":")
+            operand_type = parser.parse_type()
+            if operand.type != operand_type:
+                parser.raise_error("Measurement operand type does not match its annotation.")
+            return operand
+
+        params = parser.parse_comma_separated_list(Parser.Delimiter.PAREN, typed_operand)
+        qubits = []
+        qreg = None
+        indices = []
+        if parser.parse_optional_keyword("qubits"):
+            qubits = parser.parse_comma_separated_list(Parser.Delimiter.PAREN, parser.parse_operand)
+        if parser.parse_optional_keyword("quregs"):
+            parser.parse_punctuation("(")
+            qreg = parser.parse_operand()
+            parser.parse_punctuation(")")
+        if parser.parse_optional_keyword("indices"):
+            indices = parser.parse_comma_separated_list(Parser.Delimiter.PAREN, typed_operand)
+
+        properties = {"op_name": op_name}
+        if parser.parse_optional_keyword("static_data"):
+            parser.parse_punctuation("=")
+            static_data = parser.parse_attribute()
+            if not isinstance(static_data, DictionaryAttr):
+                parser.raise_error("Expected a dictionary for measurement static_data.")
+            properties["static_data"] = static_data
+        attributes = parser.parse_optional_attr_dict()
+        parser.parse_punctuation(":")
+        if parser.parse_optional_punctuation("("):
+            parser.parse_punctuation(")")
+            result_types = []
+        else:
+            result_types = parser.parse_comma_separated_list(
+                Parser.Delimiter.NONE, parser.parse_type
+            )
+        num_quantum_results = len(qubits) + (qreg is not None)
+        if len(result_types) < num_quantum_results:
+            parser.raise_error("Expected a result for each measurement qubit or register.")
+        classical_types = result_types[: len(result_types) - num_quantum_results]
+        qubit_types = result_types[len(classical_types) : len(classical_types) + len(qubits)]
+        qreg_type = result_types[-1] if qreg is not None else None
+        return cls.build(
+            operands=[params, qubits, qreg, indices],
+            result_types=[classical_types, qubit_types, qreg_type],
+            properties=properties,
+            attributes=attributes,
+        )
 
 
 @irdl_op_definition

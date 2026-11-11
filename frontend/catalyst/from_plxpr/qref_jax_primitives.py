@@ -25,14 +25,13 @@ from jax.core import AbstractValue, ShapedArray
 from jax.extend.core import Primitive
 from jax.interpreters import mlir
 from jaxlib.mlir._mlir_libs import _mlir as _ods_cext
-from jaxlib.mlir.dialects.arith import (
-    ConstantOp,
-    ExtUIOp,
-)
+from jaxlib.mlir.dialects.arith import ExtUIOp, constant
 from jaxlib.mlir.dialects.stablehlo import ConvertOp as StableHLOConvertOp
 from pennylane.capture.primitives import adjoint_transform_prim as plxpr_adjoint_transform_prim
 from pennylane.capture.primitives import ctrl_transform_prim as plxpr_ctrl_transform_prim
 from pennylane.wires import AbstractQubit
+
+from catalyst.jax_extras.lowering import get_mlir_attribute_from_pyval
 
 # TODO: remove after jax v0.7.2 upgrade
 # Mock _ods_cext.globals.register_traceback_file_exclusion due to API conflicts between
@@ -64,7 +63,7 @@ with Patcher(
     ),
 ):
     from mlir_quantum.dialects.mbqc import RefMeasureInBasisOp
-    from mlir_quantum.dialects.pbc import RefFabricateOp, RefPPMeasurementOp
+    from mlir_quantum.dialects.pbc import RefFabricateOp
     from mlir_quantum.dialects.qref import (
         AdjointOp,
         AllocOp,
@@ -76,6 +75,7 @@ with Patcher(
         GetOp,
         GlobalPhaseOp,
         HermitianOp,
+        MeasurementOp,
         MeasureOp,
         MultiRZOp,
         NamedObsOp,
@@ -269,8 +269,7 @@ def _allocate_prim_lowering(jax_ctx: mlir.LoweringRuleContext, *, num_wires, sta
     i64_type = ir.IntegerType.get_signless(64, ctx)
     qubits = []
     for idx in range(num_wires):
-        idx_attr = ir.IntegerAttr.get(i64_type, idx)
-        idx_val = ConstantOp(i64_type, idx_attr).result
+        idx_val = constant(i64_type, idx)
         qubits.append(GetOp(qubit_type, qreg, idx=idx_val).results[0])
     return qubits
 
@@ -593,7 +592,9 @@ def _qref_pauli_rot_lowering(
 # pauli measure operation
 #
 @qref_pauli_measure_p.def_abstract_eval
-def _qref_pauli_measure_abstract_eval(*qubits, pauli_word=None, qubits_len=0, adjoint=False):
+def _qref_pauli_measure_abstract_eval(
+    *qubits, pauli_word=None, qubits_len=0, adjoint=False, postselect=None
+):
     qubits = qubits[:qubits_len]
     assert all(isinstance(qubit, AbstractQubit) for qubit in qubits)
     return ShapedArray((), bool)
@@ -604,6 +605,7 @@ def _qref_pauli_measure_lowering(
     *qubits: tuple,
     pauli_word=None,
     qubits_len=0,
+    postselect=None,
 ):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
@@ -619,14 +621,17 @@ def _qref_pauli_measure_lowering(
     if not all(p in ["I", "X", "Y", "Z"] for p in pauli_word):
         raise ValueError("Only Pauli words consisting of 'I', 'X', 'Y', and 'Z' are allowed.")
 
-    pauli_word = ir.ArrayAttr.get([ir.StringAttr.get(p) for p in pauli_word])
-
     result_type = ir.IntegerType.get_signless(1)
 
-    result = RefPPMeasurementOp(
-        mres=result_type,
-        pauli_product=pauli_word,
+    result = MeasurementOp(
+        mres=[result_type],
+        op_name="PauliMeasure",
+        params=[],
         qubits=qubits,
+        arr_qubit_indices=[],
+        static_data=get_mlir_attribute_from_pyval(
+            {"pauli_word": pauli_word, "postselect": postselect}
+        ),
     ).results[0]
 
     result_type = ir.RankedTensorType.get((), result.type)

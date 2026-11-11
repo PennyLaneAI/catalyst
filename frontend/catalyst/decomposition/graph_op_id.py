@@ -32,12 +32,19 @@ from catalyst.jax_extras.lowering import get_mlir_attribute_from_pyval, mlir_bui
 _SPECIAL_LOWERINGS = {}
 
 
+def _is_measurement_op(op_cls):
+    """Return whether an operator is a mid-circuit measurement."""
+    return issubclass(op_cls, (qp.ops.MidMeasure, qp.ops.PauliMeasure))
+
+
 def _is_custom_op(op_cls, avals_in):
     """Return whether an operator lowers to ``qref.custom`` rather than ``qref.operator``.
 
     Callers reached through a special lowering are handled before this is consulted, so it does
     not exclude ``_SPECIAL_LOWERINGS``; :meth:`GraphOpID.parse_is_custom_op` adds that itself.
     """
+    if _is_measurement_op(op_cls):
+        return False
     if op_cls.static_argnames or op_cls.hybrid_argnames or op_cls.compilable_argnames:
         return False
     if op_cls.wire_argnames != ("wires",):

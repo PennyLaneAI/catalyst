@@ -900,6 +900,81 @@ struct HamiltonianOpPattern : public OpConversionPattern<HamiltonianOp> {
 // Measurements //
 //////////////////
 
+struct MeasurementOpPattern : public OpConversionPattern<MeasurementOp> {
+    using OpConversionPattern::OpConversionPattern;
+
+    LogicalResult matchAndRewrite(MeasurementOp op, OpAdaptor adaptor,
+                                  ConversionPatternRewriter &rewriter) const override {
+        if (op.getOpName() != "PauliMeasure") {
+            return failure();
+        }
+        if (!op.getParams().empty() || op.getInQreg() || !op.getArrQubitIndices().empty()) {
+            return rewriter.notifyMatchFailure(op, "expected explicit qubits and no parameters");
+        }
+        auto results = op.getMres();
+        if (results.size() > 1 || (!results.empty() && !results.front().getType().isInteger(1))) {
+            return rewriter.notifyMatchFailure(op, "expected at most one i1 measurement result");
+        }
+
+        auto staticData = op.getStaticData();
+        auto pauliWord = staticData.getAs<StringAttr>("pauli_word");
+        if (!pauliWord || pauliWord.getValue().size() != op.getInQubits().size()) {
+            return rewriter.notifyMatchFailure(op,
+                                               "expected a Pauli word matching the qubit count");
+        }
+        for (char pauli : pauliWord.getValue()) {
+            if (pauli != 'I' && pauli != 'X' && pauli != 'Y' && pauli != 'Z') {
+                return rewriter.notifyMatchFailure(op, "invalid Pauli word");
+            }
+        }
+        // PPM has no postselection. The frontend represents an unset value as
+        // either None or -1.
+        if (auto postselect = staticData.get("postselect")) {
+            auto none = dyn_cast<TypeAttr>(postselect);
+            auto integer = dyn_cast<IntegerAttr>(postselect);
+            bool noPostselect = integer && !integer.getType().isUnsignedInteger() &&
+                                integer.getValue().getBitWidth() > 1 &&
+                                integer.getValue().isAllOnes();
+            if (!(none && isa<NoneType>(none.getValue())) && !noPostselect) {
+                return rewriter.notifyMatchFailure(op, "postselection is not supported by PPM");
+            }
+        }
+
+        Location loc = op.getLoc();
+        MLIRContext *ctx = getContext();
+        ModuleOp mod = op->getParentOfType<ModuleOp>();
+        std::string word = pauliWord.getValue().str();
+        Value pauliWordPtr = getGlobalString(loc, rewriter, "pauli_word_" + word,
+                                             StringRef(word.c_str(), word.size() + 1), mod);
+        Value negated = LLVM::ConstantOp::create(rewriter, loc, rewriter.getBoolAttr(false));
+        Value selectSwitch = LLVM::ConstantOp::create(rewriter, loc, rewriter.getBoolAttr(true));
+
+        Type ptrType = LLVM::LLVMPointerType::get(ctx);
+        Type qirSignature = LLVM::LLVMFunctionType::get(
+            getTypeConverter()->convertType(ResultType::get(ctx)),
+            {ptrType, rewriter.getI1Type(), ptrType, rewriter.getI1Type(), rewriter.getI1Type(),
+             rewriter.getI64Type()},
+            /*isVarArg=*/true);
+        auto fnDecl = catalyst::ensureFunctionDeclaration<LLVM::LLVMFuncOp>(
+            rewriter, op, "__catalyst__qis__PauliMeasure", qirSignature);
+        Value numQubits = LLVM::ConstantOp::create(
+            rewriter, loc, rewriter.getI64IntegerAttr(adaptor.getInQubits().size()));
+        SmallVector<Value> args = {pauliWordPtr, negated,      pauliWordPtr,
+                                   negated,      selectSwitch, numQubits};
+        llvm::append_range(args, adaptor.getInQubits());
+        Value resultPtr = LLVM::CallOp::create(rewriter, loc, fnDecl, args).getResult();
+
+        SmallVector<Value> replacements;
+        if (!results.empty()) {
+            replacements.push_back(
+                LLVM::LoadOp::create(rewriter, loc, rewriter.getI1Type(), resultPtr));
+        }
+        llvm::append_range(replacements, adaptor.getInQubits());
+        rewriter.replaceOp(op, replacements);
+        return success();
+    }
+};
+
 struct MeasureOpPattern : public OpConversionPattern<MeasureOp> {
     using OpConversionPattern::OpConversionPattern;
 
@@ -1232,6 +1307,7 @@ void populateQIRConversionPatterns(TypeConverter &typeConverter, RewritePatternS
     patterns.add<PCPhaseOpPattern>(typeConverter, patterns.getContext());
     patterns.add<GlobalPhaseOpPattern>(typeConverter, patterns.getContext());
     patterns.add<QubitUnitaryOpPattern>(typeConverter, patterns.getContext());
+    patterns.add<MeasurementOpPattern>(typeConverter, patterns.getContext());
     patterns.add<MeasureOpPattern>(typeConverter, patterns.getContext());
     patterns.add<ComputationalBasisOpPattern>(typeConverter, patterns.getContext());
     patterns.add<NamedObsOpPattern>(typeConverter, patterns.getContext());

@@ -30,13 +30,18 @@ from pennylane.pytrees import unflatten
 # Catalyst's MLIR version and the MLIR version used by JAX. The current JAX version has not
 # yet updated to the latest MLIR, causing compatibility issues. This workaround will be removed
 # once JAX updates to a compatible MLIR version
-from catalyst.decomposition.graph_op_id import _SPECIAL_LOWERINGS, _is_custom_op
+from catalyst.decomposition.graph_op_id import (
+    _SPECIAL_LOWERINGS,
+    _is_custom_op,
+    _is_measurement_op,
+)
 from catalyst.jax_extras.lowering import get_mlir_attribute_from_pyval
 from catalyst.jax_extras.patches import mock_attributes
 from catalyst.jax_primitives import (
     extract_scalar,
     safe_cast_to_f64,
 )
+from catalyst.utils.exceptions import CompileError
 from catalyst.utils.extra_bindings import TensorExtractOp
 from catalyst.utils.patching import Patcher
 
@@ -56,6 +61,7 @@ with Patcher(
     from mlir_quantum.dialects.qref import (
         CustomOp,
         GlobalPhaseOp,
+        MeasurementOp,
         MultiRZOp,
         OperatorOp,
         PauliRotOp,
@@ -269,6 +275,23 @@ def _qref_operator_p_lowering(jax_ctx: mlir.LoweringRuleContext, *args, op_cls, 
     qubits, qubit_map = _process_qubits(
         *args, op_cls=op_cls, wire_lens=wire_lens, hybrid_lens=hybrid_lens
     )
+
+    if _is_measurement_op(op_cls):
+        if adjoint or n_ctrls:
+            raise CompileError(
+                f"Mid-circuit measurement {op_cls.__name__} cannot be adjointed or controlled."
+            )
+        # Operator2 equations applied directly have no classical outputs. Measurement
+        # primitives that return outcomes use their specialized lowerings instead.
+        MeasurementOp(
+            mres=[],
+            op_name=name_attr,
+            params=params + forward_args,
+            qubits=qubits,
+            arr_qubit_indices=[],
+            static_data=get_mlir_attribute_from_pyval(repack_static_data),
+        )
+        return []
 
     if op_cls.hybrid_argnames or op_cls.static_argnames:
         uid = generate_uid(
