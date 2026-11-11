@@ -605,6 +605,11 @@
   operations without control wires.
   [(#3143)](https://github.com/PennyLaneAI/catalyst/pull/3143)
 
+* A `pbc-ref-collapse-if-ppr` pass is added, which turns `scf.if` branches that only apply pi/2
+  `pbc.ref.ppr` operations into conditional `pbc.ref.ppr` operations, so that they no longer need
+  host control flow.
+  [(#3435)](https://github.com/PennyLaneAI/catalyst/pull/3435)
+
 * An X/Z syndrome decode can now be routed to its own decoder in a backline coprocessor.
   `qecp.decode_esm_css` carries an optional `check_type` attribute recording which check family a
   syndrome came from, which `lower-decode-to-transport` maps to a `decoder_id` on `transport.kick`.
