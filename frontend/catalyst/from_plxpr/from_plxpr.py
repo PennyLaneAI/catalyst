@@ -342,10 +342,10 @@ def handle_qnode(
 
 def _require_decompose_gate_set(tkwargs, is_resource_estimate=False):
     """Reject a qp.decompose or qp.estimate without a gate set, which the pass needs."""
-    function_name = "qp.estimate" if is_resource_estimate else "qp.decompose"
+    transform_name = "qp.estimate" if is_resource_estimate else "qp.decompose"
     if tkwargs.get("gate_set") is None:
         raise ValueError(
-            f"{function_name} requires an explicit 'gate_set' under qjit; the graph-based decomposition "
+            f"{transform_name} requires an explicit 'gate_set' under qjit; the graph-based decomposition "
             "has no default target gate set."
         )
 
