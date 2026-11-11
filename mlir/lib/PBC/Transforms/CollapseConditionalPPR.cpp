@@ -46,7 +46,10 @@ bool opIsLegalToCollapse(Operation &op) {
     if (auto phase = dyn_cast<qref::GlobalPhaseOp>(op)) {
         return phase.getCtrlQubits().empty();
     }
-    return op.getNumRegions() == 0 && isMemoryEffectFree(&op);
+    if (auto get = dyn_cast<qref::GetOp>(op)) {
+        return true;
+    }
+    return op.getNumRegions() == 0 && isPure(&op);
 }
 
 bool blockIsLegalToCollapse(Block *block) {
