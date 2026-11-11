@@ -105,6 +105,9 @@ struct DecomposeLoweringPass : impl::DecomposeLoweringPassBase<DecomposeLowering
     // function with the `decomp_gateset` attribute
     void findTargetGateSet(ModuleOp module, llvm::StringSet<llvm::MallocAllocator> &targetGateSet) {
         module.walk([&](func::FuncOp func) {
+            if (func->hasAttr(DecompUtils::target_gate_attr_name)) {
+                return WalkResult::skip();
+            }
             if (auto gate_set_attr =
                     func->getAttrOfType<ArrayAttr>(DecompUtils::decomp_gateset_attr_name)) {
                 for (auto gate : gate_set_attr.getValue()) {

@@ -26,6 +26,7 @@
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/BuiltinOps.h"
+#include "mlir/IR/OwningOpRef.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/LogicalResult.h"
 #include "stablehlo/dialect/StablehloOps.h"
@@ -89,6 +90,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         ///////////////////////////
         // Step 1–2: Prepare and solve the decomposition graph
         std::unique_ptr<DecompositionGraph> graph;
+        OwningOpRef<ModuleOp> ruleLibrary;
         {
             ScopedDiagnosticTimer prepareTimer("decomp:prepare");
 
@@ -112,7 +114,8 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
                                                 .bytecodeRulesFile = bytecodeRulesFile,
                                                 .libQPDPath = libQPDPath,
                                                 .libpythonPath = libpythonPath,
-                                            });
+                                            },
+                                            ruleLibrary);
         }
         if (!graph) {
             return signalPassFailure();
@@ -188,6 +191,14 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
                 for (const RuleTerm &input : chosenRule.inputs) {
                     worklist.push_back(input.op);
                 }
+            }
+            // An empty target-rules option means "apply all" to decompose-lowering. An empty
+            // circuit plan instead means that no decomposition is needed.
+            if (seenRules.empty()) {
+                return;
+            }
+            if (failed(GraphPrep::materializeSelectedRules(module, ruleLibrary.get(), seenRules))) {
+                return signalPassFailure();
             }
             OpPassManager decomposePm("builtin.module");
             decomposePm.addPass(createDecomposeLoweringPass(dlOptions));
