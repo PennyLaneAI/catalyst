@@ -369,7 +369,7 @@ def _handle_decompose_transform(
     or ``resource-estimate`` pass.
 
     ``qp.decompose`` is an alias for :func:`catalyst.passes.graph_decomposition`.
-    ``qp.estimate`` is an alias for :func:`catalyst.passes.resource-estimate`.
+    ``qp.estimate`` is an alias for ``catalyst.passes.builtin_passes.resource_estimate``.
     """
     # Local imports avoid an import cycle (catalyst.passes imports from_plxpr indirectly).
     from catalyst.passes.builtin_passes import graph_decomposition, resource_estimate
