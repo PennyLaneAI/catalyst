@@ -25,9 +25,9 @@
 #include "Frame.hpp"
 #include "GpuRuntime.hpp"
 #include "MemoryRegion.hpp"
+#include "PeerLink.hpp"
 #include "QueuePair.hpp"
 #include "Transport.hpp"
-#include "WireLink.hpp"
 
 namespace catalyst::transport::gpu_verbs {
 using namespace catalyst::transport;
@@ -35,18 +35,18 @@ using namespace catalyst::transport::coproc; // GpuRuntime, launchers
 
 // The controller writes each request into a ring in GPU memory, a persistent kernel decodes it
 // and writes the reply frame into a ring the host maps, and a pinned CPU thread sends the reply.
-// The link speaks the wire to the controller (WireLink.hpp).
+// The link connects the session to its controller (PeerLink.hpp).
 class GpuCoprocessorSession final : public CoprocessorSession {
   public:
     // The coprocessor only receives on an RC link's fwd queue pair (the controller writes into its
     // ring), so that queue pair needs almost no send queue and no inline capacity.
     static constexpr common::QpShape FWD_QP_SHAPE{.sq_depth = 16, .cq_depth = 256, .inline_max = 0};
 
-    /// On the RC wire, with `ring` the frames both ends agree on.
+    /// Facing a catalyst controller over RC, with `ring` the frames both ends agree on.
     GpuCoprocessorSession(std::string dev, int gid_idx, int gpu_device,
                           common::frame::RingGeometry ring = common::frame::BL16_RING);
-    /// On the wire `link` speaks (common::make_coprocessor_link, with FWD_QP_SHAPE).
-    GpuCoprocessorSession(int gpu_device, std::unique_ptr<common::WireLink> link);
+    /// Facing the peer `link` connects to (common::make_coprocessor_link, with FWD_QP_SHAPE).
+    GpuCoprocessorSession(int gpu_device, std::unique_ptr<common::PeerLink> link);
     ~GpuCoprocessorSession() override { stop(); }
 
     GpuCoprocessorSession(const GpuCoprocessorSession &) = delete;
@@ -79,7 +79,7 @@ class GpuCoprocessorSession final : public CoprocessorSession {
     void run(std::stop_token st);
     template <common::frame::Mode M, class Link> void serve(Link &link, std::stop_token st);
 
-    std::unique_ptr<common::WireLink> link_;
+    std::unique_ptr<common::PeerLink> link_;
     common::frame::RingGeometry ring_; // both rings, the request ring and the handoff
     GpuRuntime gpu_;                   // HIP wrapper: owns GPU mem/stream/sync; the decode
                                        // kernel itself is launched by the bound CoprocessorFn

@@ -12,22 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "WireLink.hpp"
+#include "PeerLink.hpp"
 
 #include "Error.hpp"
 #include "RcLink.hpp"
 
 namespace catalyst::transport::common {
 
-std::unique_ptr<WireLink> make_coprocessor_link(const std::string &config, const char *backend,
+std::unique_ptr<PeerLink> make_coprocessor_link(const std::string &config, const char *backend,
                                                 QpShape fwd_shape) {
     const BackendConfig cfg = parse_backend_config(config);
-    switch (wire_from_config(config)) {
-    case Wire::RC:
+    switch (peer_from_config(config)) {
+    case Peer::CATALYST:
         return std::make_unique<RcLink>(cfg.dev, cfg.gid, backend, RcLink::Side::Coprocessor,
                                         frame::geometry_from_config(config), fwd_shape);
     }
-    TP_FAIL("%s: unknown wire", backend);
+    TP_FAIL("%s: unknown peer", backend);
 }
 
 } // namespace catalyst::transport::common

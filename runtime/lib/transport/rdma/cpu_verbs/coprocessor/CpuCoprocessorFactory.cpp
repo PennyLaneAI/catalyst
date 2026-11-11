@@ -16,14 +16,14 @@
 // this .so and resolves CatalystTransportCoprocessorFactory (see TransportBackend.h).
 // The coprocessor function is bound after construction via set_coprocessor_fn()
 // (by the coprocessor-side harness); a freshly built session defaults to the
-// built-in echo. The link speaks the wire the config names with `wire=` (WireLink.hpp).
+// built-in echo. The link faces the peer the config names with `peer=` (PeerLink.hpp).
 
 #include <string>
 
 #include "BackendConfig.hpp"
 #include "CpuCoprocessorSession.hpp"
+#include "PeerLink.hpp"
 #include "TransportBackend.h"
-#include "WireLink.hpp"
 
 namespace {
 catalyst::transport::CoprocessorSession *make_cpu_coprocessor(const std::string &config) {

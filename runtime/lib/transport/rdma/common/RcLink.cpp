@@ -34,7 +34,7 @@ constexpr int REAP_BATCH = 16;
 
 RcLink::RcLink(std::string dev, int gid_idx, const char *backend, Side side,
                frame::RingGeometry ring, QpShape fwd_shape)
-    : WireLink(Wire::RC, std::move(dev), gid_idx, ring), backend_(backend), side_(side),
+    : PeerLink(Peer::CATALYST, std::move(dev), gid_idx, ring), backend_(backend), side_(side),
       fwd_shape_(fwd_shape) {}
 
 void RcLink::connect(const ConnectInfo &info) {
@@ -99,7 +99,7 @@ PeerRef RcLink::exchange(const MemRegion &local) {
 void RcLink::establish(const MemRegion &local, const PeerRef &peer) {
     TP_CHECK(local.size >= ring_.region_bytes(), "region too small for ring: %zu < %zu",
              static_cast<std::size_t>(local.size), ring_.region_bytes());
-    peer_ = peer;
+    peer_ring_ = peer;
     send_buf_ = MemoryRegion::alloc_host(pd_, frame::frame_bytes(ring_), ring_.stride,
                                          MemAccess::LOCAL_WRITE);
 }
@@ -131,8 +131,8 @@ template <frame::Mode M> void RcLink::post(std::uint32_t seq) {
         .send_flags = static_cast<unsigned>((inline_data ? IBV_SEND_INLINE : 0) |
                                             (signaled ? IBV_SEND_SIGNALED : 0)),
     };
-    wr.wr.rdma.remote_addr = peer_.remote_addr + offset;
-    wr.wr.rdma.rkey = peer_.rkey;
+    wr.wr.rdma.remote_addr = peer_ring_.remote_addr + offset;
+    wr.wr.rdma.rkey = peer_ring_.rkey;
     ibv_send_wr *bad = nullptr;
     const int rc = ibv_post_send(from_fwd ? fwd_qp_->get() : bwd_qp_->get(), &wr, &bad);
     TP_CHECK(rc == 0, "ibv_post_send rc=%d (%s)", rc, std::strerror(rc));

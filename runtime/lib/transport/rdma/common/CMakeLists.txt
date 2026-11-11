@@ -23,8 +23,8 @@ target_link_libraries(transport_common
 
 set_property(TARGET transport_common PROPERTY POSITION_INDEPENDENT_CODE ON)
 
-# The wires the libibverbs backends (cpu_verbs, gpu_verbs) speak (WireLink.hpp).
-add_library(verbs_links STATIC WireLink.cpp RcLink.cpp)
+# The links cpu_verbs and gpu_verbs reach their peers through (PeerLink.hpp).
+add_library(verbs_links STATIC PeerLink.cpp RcLink.cpp)
 target_include_directories(verbs_links PUBLIC ${runtime_includes})
 target_link_libraries(verbs_links PUBLIC transport_common)
 set_property(TARGET verbs_links PROPERTY POSITION_INDEPENDENT_CODE ON)

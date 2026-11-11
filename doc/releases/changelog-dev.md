@@ -1169,9 +1169,9 @@
 * Updated `pylint` to version 4.1.3 in the development requirements and CI formatting workflow.
   [(#3459)](https://github.com/PennyLaneAI/catalyst/pull/3459)
 
-* The `cpu_verbs` and `gpu_verbs` transport backends reach their peer through a `WireLink`, the
-  protocol a session speaks, instead of the shared `VerbsSessionBase`. Each coprocessor is one
-  session over its link, and picks the link with a new `wire=` config key.
+* The `cpu_verbs` and `gpu_verbs` transport backends reach their peer through a `PeerLink`
+  instead of the shared `VerbsSessionBase`. Each coprocessor is one session over its link, and
+  picks the link with a new `peer=` config key.
   [(#3461)](https://github.com/PennyLaneAI/catalyst/pull/3461)
 
 * FuncOp's with quantum dialect instructions can now always be inlined.

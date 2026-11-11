@@ -39,7 +39,7 @@ GpuCoprocessorSession::GpuCoprocessorSession(std::string dev, int gid_idx, int g
           gpu_device, std::make_unique<RcLink>(std::move(dev), gid_idx, "gpu_verbs",
                                                RcLink::Side::Coprocessor, ring, FWD_QP_SHAPE)) {}
 
-GpuCoprocessorSession::GpuCoprocessorSession(int gpu_device, std::unique_ptr<WireLink> link)
+GpuCoprocessorSession::GpuCoprocessorSession(int gpu_device, std::unique_ptr<PeerLink> link)
     : link_(std::move(link)), ring_(link_->ring()), gpu_(gpu_device) {}
 
 int GpuCoprocessorSession::connect(const ConnectInfo &info) {
@@ -85,11 +85,11 @@ void GpuCoprocessorSession::set_coprocessor_launcher(CoprocessorLauncherFn fn, v
 }
 
 // The loop is compiled once per link and frame mode. The links are final, so the loop calls the
-// link directly, with no virtual call and no wire or mode check on the hot path.
+// link directly, with no virtual call and no peer or mode check on the hot path.
 void GpuCoprocessorSession::run(std::stop_token st) {
     pin_thread(pin_cpu_, pin_realtime_);
-    switch (link_->wire()) {
-    case Wire::RC:
+    switch (link_->peer()) {
+    case Peer::CATALYST:
         if (ring_.mode == frame::Mode::BL16) {
             serve<frame::Mode::BL16>(static_cast<RcLink &>(*link_), st);
         } else {

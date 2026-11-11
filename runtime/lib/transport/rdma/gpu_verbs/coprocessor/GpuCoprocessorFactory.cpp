@@ -28,8 +28,8 @@
 
 #include "BackendConfig.hpp"
 #include "GpuCoprocessorSession.hpp"
+#include "PeerLink.hpp"
 #include "TransportBackend.h"
-#include "WireLink.hpp"
 
 namespace {
 catalyst::transport::CoprocessorSession *make_gpu_coprocessor(const std::string &config) {

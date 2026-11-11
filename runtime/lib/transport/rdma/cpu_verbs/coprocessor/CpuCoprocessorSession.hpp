@@ -25,8 +25,8 @@
 
 #include "Frame.hpp"
 #include "MemoryRegion.hpp"
+#include "PeerLink.hpp"
 #include "Transport.hpp"
-#include "WireLink.hpp"
 
 namespace catalyst::transport::cpu_verbs {
 
@@ -34,14 +34,14 @@ namespace catalyst::transport::cpu_verbs {
 // the result. The function is bound via set_coprocessor_fn; nullptr selects the
 // built-in echo. Each message's decoder_id is handed to the function, which may
 // serve several codes and dispatch on it, or ignore it if it serves only one.
-// The link speaks the wire to the controller (WireLink.hpp).
+// The link connects the session to its controller (PeerLink.hpp).
 class CpuCoprocessorSession final : public CoprocessorSession {
   public:
-    /// On the RC wire, with `ring` the frames both ends agree on.
+    /// Facing a catalyst controller over RC, with `ring` the frames both ends agree on.
     explicit CpuCoprocessorSession(std::string dev, int gid_idx,
                                    common::frame::RingGeometry ring = common::frame::BL16_RING);
-    /// On the wire `link` speaks (common::make_coprocessor_link).
-    explicit CpuCoprocessorSession(std::unique_ptr<common::WireLink> link);
+    /// Facing the peer `link` connects to (common::make_coprocessor_link).
+    explicit CpuCoprocessorSession(std::unique_ptr<common::PeerLink> link);
     ~CpuCoprocessorSession() override { stop(); }
 
     CpuCoprocessorSession(const CpuCoprocessorSession &) = delete;
@@ -68,7 +68,7 @@ class CpuCoprocessorSession final : public CoprocessorSession {
     void run(std::stop_token st);
     template <common::frame::Mode M, class Link> void serve(Link &link, std::stop_token st);
 
-    std::unique_ptr<common::WireLink> link_;
+    std::unique_ptr<common::PeerLink> link_;
     common::frame::RingGeometry ring_;
     std::vector<common::MemoryRegion> regions_; // handed out by alloc_memory()
     std::uint8_t *ring_buf_ = nullptr; // the ring requests land in, from establish_channel()

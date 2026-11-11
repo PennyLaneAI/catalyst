@@ -54,7 +54,7 @@ class MemoryRegion {
     MemoryRegion(std::shared_ptr<ProtectionDomain> pd, void *addr, std::size_t length,
                  MemAccess access, std::shared_ptr<void> backing);
     // register caller-provided memory under a chosen I/O virtual address, the one a peer writes
-    // to (WireLink::ring_iova); `backing` as above.
+    // to (PeerLink::ring_iova); `backing` as above.
     MemoryRegion(std::shared_ptr<ProtectionDomain> pd, void *addr, std::size_t length,
                  std::uint64_t iova, MemAccess access, std::shared_ptr<void> backing);
     // register a dma-buf (does not own the buffer).

@@ -14,12 +14,12 @@
 
 /**
  * @file
- * One end of a wire: the protocol a session speaks to its peer. A coprocessor's config picks the
- * wire with `wire=` (BackendConfig.hpp):
+ * One end of a session's connection to its peer. A coprocessor's config names the peer with
+ * `peer=` (BackendConfig.hpp), and the peer decides the protocol the link speaks:
  *
- * | wire | link   | peer                                           |
- * |------|--------|------------------------------------------------|
- * | rc   | RcLink | another catalyst session, such as a controller |
+ * | peer     | link   | the other end                                  |
+ * |----------|--------|------------------------------------------------|
+ * | catalyst | RcLink | another catalyst session, such as a controller |
  *
  * The peer writes each request into a ring of frames that the session owns. The links are final,
  * so call one through its concrete type on the critical path to skip the virtual call.
@@ -39,24 +39,24 @@
 
 namespace catalyst::transport::common {
 
-class WireLink {
+class PeerLink {
   public:
-    virtual ~WireLink() = default;
-    WireLink(const WireLink &) = delete;
-    WireLink &operator=(const WireLink &) = delete;
+    virtual ~PeerLink() = default;
+    PeerLink(const PeerLink &) = delete;
+    PeerLink &operator=(const PeerLink &) = delete;
 
-    Wire wire() const { return wire_; }
+    Peer peer() const { return peer_; }
     /// Frame layout of the ring the peer writes into.
     const frame::RingGeometry &ring() const { return ring_; }
     std::shared_ptr<ProtectionDomain> pd() const { return pd_; }
 
-    /// Open the device, bring the wire's queue pairs to INIT, and connect to the peer over the
+    /// Open the device, bring the link's queue pairs to INIT, and connect to the peer over the
     /// out-of-band socket.
     virtual void connect(const ConnectInfo &info) = 0;
     /// IOVA at which to register the local ring that starts at `addr`.
     virtual std::uint64_t ring_iova(const void *addr) const = 0;
     /// Trade handshakes with the peer, advertising `local` as the ring the peer writes into.
-    /// Returns the peer's ring if the wire has one.
+    /// Returns the peer's ring if the peer has one.
     virtual PeerRef exchange(const MemRegion &local) = 0;
     /// Finish bring-up. Once this returns, the peer may start sending.
     virtual void establish(const MemRegion &local, const PeerRef &peer) = 0;
@@ -71,10 +71,10 @@ class WireLink {
     virtual void drain() = 0;
 
   protected:
-    WireLink(Wire wire, std::string dev, int gid_idx, frame::RingGeometry ring)
-        : wire_(wire), dev_name_(std::move(dev)), gid_idx_(gid_idx), ring_(ring) {}
+    PeerLink(Peer peer, std::string dev, int gid_idx, frame::RingGeometry ring)
+        : peer_(peer), dev_name_(std::move(dev)), gid_idx_(gid_idx), ring_(ring) {}
 
-    Wire wire_;
+    Peer peer_;
     std::string dev_name_;
     int gid_idx_;
     frame::RingGeometry ring_;
@@ -82,9 +82,9 @@ class WireLink {
     std::shared_ptr<ProtectionDomain> pd_;
 };
 
-/// Build the link that a coprocessor's `config` selects with `wire=`. `backend` names it in
+/// Build the link that a coprocessor's `config` names with `peer=`. `backend` names it in
 /// messages, and `fwd_shape` sizes the fwd queue pair of an RC link.
-std::unique_ptr<WireLink> make_coprocessor_link(const std::string &config, const char *backend,
+std::unique_ptr<PeerLink> make_coprocessor_link(const std::string &config, const char *backend,
                                                 QpShape fwd_shape = DEFAULT_QP_SHAPE);
 
 } // namespace catalyst::transport::common

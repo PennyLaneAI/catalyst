@@ -14,10 +14,10 @@
 
 /**
  * @file
- * One end of the RC wire, which every catalyst controller speaks: two RC queue pairs, fwd
+ * One end of the RC protocol, which every catalyst session speaks: two RC queue pairs, fwd
  * (controller to coprocessor) and bwd (coprocessor to controller), connected over the out-of-band
  * socket with a HandshakeMsg. Each end owns a ring of frames the other RDMA WRITEs into, round n
- * into slot n with seq n + 1. A coprocessor on another wire uses WireLink.hpp instead.
+ * into slot n with seq n + 1. A coprocessor facing another peer uses another PeerLink.
  */
 
 #pragma once
@@ -29,11 +29,11 @@
 #include "CompletionQueue.hpp"
 #include "MemoryRegion.hpp"
 #include "OobSocket.hpp"
-#include "WireLink.hpp"
+#include "PeerLink.hpp"
 
 namespace catalyst::transport::common {
 
-class RcLink final : public WireLink {
+class RcLink final : public PeerLink {
   public:
     /// The coprocessor listens on the out-of-band socket, sends its HandshakeMsg first and
     /// WRITEs on bwd; the controller connects and WRITEs on fwd.
@@ -83,7 +83,7 @@ class RcLink final : public WireLink {
     std::shared_ptr<QueuePair> fwd_qp_, bwd_qp_;
     FdGuard oob_fd_;
     std::optional<MemoryRegion> send_buf_; // local send source (one frame)
-    PeerRef peer_{};
+    PeerRef peer_ring_{};
     int outstanding_ = 0; // signaled sends not yet reaped
 };
 
