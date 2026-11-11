@@ -23,6 +23,12 @@ from utils import get_cpp_files
 
 CLANG_FMT_BIN = "clang-format"
 
+# Headers copied from Backline's hardware tree, which keep its formatting.
+BACKLINE_VENDOR = [
+    "rdma/fpga_hsb/hsb_regs.h",
+    "rdma/fpga_hsb/hwhs_regs.h",
+]
+
 IGNORE_PATTERNS = [
     "external",
     "build",
@@ -31,8 +37,7 @@ IGNORE_PATTERNS = [
     "stablehlo",
     "rdma/vendor/infiniband",
     "coproc/onnx/vendor",
-    "rdma/fpga_hsb/hsb_regs.h",
-    "rdma/fpga_hsb/hwhs_regs.h",
+    *BACKLINE_VENDOR,
 ]
 
 DEFAULT_CLANG_FORMAT_VERSION = 20
