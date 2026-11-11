@@ -84,12 +84,14 @@ func::FuncOp ZneLowering::getOrCreateFoldedCallee(Location loc, PatternRewriter 
         return SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(calleeOp, foldedOpRefAttr);
     }
 
+    llvm::SmallPtrSet<Operation *, 8> zneFunctions;
     // Traverse the callgraph, copy all the function to a `.zne` version and fold qnodes
     traverseCallGraph(calleeOp, /*symbolTable=*/nullptr, [&](func::FuncOp funcOp) {
         if (!funcOp->hasAttr("qnode")) {
             // Copy the function and create a .zne counter part and add the scale factor as last
             // argument
             auto currentFnFoldedOp = createZneFunc(funcOp, rewriter, foldCountType);
+            zneFunctions.insert(currentFnFoldedOp);
             // Folding of the qnodes and replace their calls with the folded version
             if (containsQnodes(currentFnFoldedOp)) {
                 currentFnFoldedOp.walk([&](func::CallOp callOp) {
@@ -125,6 +127,11 @@ func::FuncOp ZneLowering::getOrCreateFoldedCallee(Location loc, PatternRewriter 
     // Traverse the call graph a second time, in orderd to replace the function calls to their
     // .zne counterparts.
     traverseCallGraph(fnFoldedOp, /*symbolTable=*/nullptr, [&](func::FuncOp funcOp) {
+        // Only the copied workflow functions carry a fold count. QNode helpers can instead
+        // have a quantum register as their last argument.
+        if (!zneFunctions.contains(funcOp)) {
+            return;
+        }
         funcOp.walk([&](func::CallOp callOp) {
             PatternRewriter::InsertionGuard insertionGuard(rewriter);
             std::string fnName = callOp.getCallee().str() + ".zne";

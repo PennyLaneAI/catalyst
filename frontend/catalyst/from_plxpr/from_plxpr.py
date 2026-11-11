@@ -18,7 +18,7 @@ This submodule defines a utility for converting plxpr into Catalyst jaxpr.
 # pylint: disable=protected-access
 
 from copy import copy
-from functools import partial
+from functools import partial, wraps
 from importlib.metadata import entry_points
 from typing import Callable
 
@@ -43,7 +43,9 @@ from catalyst.jax_primitives import (
     device_init_p,
     device_release_p,
     quantum_kernel_p,
+    zne_p,
 )
+from catalyst.jax_tracer import Function
 from catalyst.utils.patching import Patcher
 
 from .device_utils import create_device_preprocessing_pipeline
@@ -267,6 +269,19 @@ class WorkflowInterpreter(PlxprInterpreter):
         self.plugin_paths = plugin_paths if plugin_paths is not None else []
 
         super().__init__()
+
+
+@WorkflowInterpreter.register_primitive(zne_p)
+def handle_zne(self, *args, folding, jaxpr: ClosedJaxpr, fn: Callable):
+    """Convert the captured ZNE target while retaining its function boundary."""
+    interpreter = copy(self)
+
+    @wraps(fn)
+    def target(*inner_args):
+        return interpreter.eval(jaxpr.jaxpr, jaxpr.consts, *inner_args)
+
+    converted_jaxpr = jax.make_jaxpr(Function(target))(*args[:-1])
+    return zne_p.bind(*args, folding=folding, jaxpr=converted_jaxpr, fn=target)
 
 
 # pylint: disable=unused-argument, too-many-arguments

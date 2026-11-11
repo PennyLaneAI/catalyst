@@ -182,6 +182,9 @@
 
 <h3>Improvements 🛠</h3>
 
+* `catalyst.mitigate_with_zne` now supports `qjit(capture=True)` for QNodes and
+  classical workflows that call QNodes, with all three folding methods.
+  [(#3462)](https://github.com/PennyLaneAI/catalyst/pull/3462)
 * Ahead-of-time compilation with `qjit` can now stop at any of the main internal compiler stages,
   in addition to the frontend-controlled stages (`target="jaxpr"|"mlir"|"binary"`).
   The `"llvmir"` target now correctly stops after LLVM IR is first generated from the MLIR, and
