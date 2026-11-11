@@ -1208,7 +1208,8 @@ class TestPrecompiled:
             NoParams(reg=0)
             return qp.state()
 
-        assert circuit.mlir_opt is not None
+        resources = qp.analyze(circuit, level="all-user")().resources
+        assert resources["graph-decomposition"].counts == {"NoParamsCustomOp": 1}
 
     def test_precompiled_with_decomposition_E2E(self):
         """Test that precompiled rules are used in E2E decomposition."""
