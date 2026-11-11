@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include <algorithm>
+#include <cstdint>
 #include <string>
 
 #include "Error.hpp"
@@ -20,6 +21,7 @@
 #include "HipCheck.hpp"
 
 #include <hip/hip_runtime.h>
+#include <unistd.h>
 
 namespace catalyst::transport::coproc {
 
@@ -51,23 +53,42 @@ GpuRuntime::~GpuRuntime() {
 }
 
 GpuRuntime::HbmRing GpuRuntime::alloc_hbm_ring(std::size_t bytes) {
-    // Allocate exactly `bytes` (caller passes a page-aligned size).
-    HbmRing r{.size = bytes};
+    // dma-buf export needs a page-aligned range, so round the size up and align the start.
+    const std::size_t page = static_cast<std::size_t>(::sysconf(_SC_PAGESIZE));
+    HbmRing r{.size = (bytes + page - 1) / page * page};
+    void *base = nullptr;
 #if defined(__HIP_PLATFORM_AMD__)
     // NOTE: fine grained coherence is AMD specific and does not have
     // a CUDA equivalent, therefore, use standard `hipMalloc` in that case
-    HIP_CHECK(hipExtMallocWithFlags(&r.ptr, r.size, hipDeviceMallocFinegrained),
+    HIP_CHECK(hipExtMallocWithFlags(&base, r.size + page, hipDeviceMallocFinegrained),
               "hipExtMallocWithFlags(finegrained)");
 #elif defined(__HIP_PLATFORM_NVIDIA__)
-    HIP_CHECK(hipMalloc(&r.ptr, r.size), "hipMalloc");
+    HIP_CHECK(hipMalloc(&base, r.size + page), "hipMalloc");
 #else
 #error "Unsupported HIP platform"
 #endif
+    hbm_ptr_ = base;
+    r.ptr = reinterpret_cast<void *>((reinterpret_cast<std::uintptr_t>(base) + page - 1) &
+                                     ~static_cast<std::uintptr_t>(page - 1));
     HIP_CHECK(hipMemset(r.ptr, 0, r.size), "hipMemset(ring)");
+#if defined(__HIP_PLATFORM_NVIDIA__)
+    // hipMemGetHandleForAddressRange needs CUDA 12.8+ on NVIDIA, so ask the CUDA driver instead.
+    using GetHandleFn =
+        CUresult (*)(void *, CUdeviceptr, std::size_t, CUmemRangeHandleType, unsigned long long);
+    void *get_handle = nullptr;
+    TP_CHECK(cudaGetDriverEntryPoint("cuMemGetHandleForAddressRange", &get_handle,
+                                     cudaEnableDefault) == cudaSuccess &&
+                 get_handle != nullptr,
+             "GpuRuntime: driver has no cuMemGetHandleForAddressRange");
+    TP_CHECK(reinterpret_cast<GetHandleFn>(get_handle)(
+                 &r.dmabuf_fd, reinterpret_cast<CUdeviceptr>(r.ptr), r.size,
+                 CU_MEM_RANGE_HANDLE_TYPE_DMA_BUF_FD, 0) == CUDA_SUCCESS,
+             "cuMemGetHandleForAddressRange(DmaBufFd)");
+#else
     HIP_CHECK(hipMemGetHandleForAddressRange(&r.dmabuf_fd, reinterpret_cast<hipDeviceptr_t>(r.ptr),
                                              r.size, hipMemRangeHandleTypeDmaBufFd, 0),
               "hipMemGetHandleForAddressRange(DmaBufFd)");
-    hbm_ptr_ = r.ptr;
+#endif
     return r;
 }
 

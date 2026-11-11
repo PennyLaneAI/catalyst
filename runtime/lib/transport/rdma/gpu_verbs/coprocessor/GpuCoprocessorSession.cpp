@@ -50,10 +50,9 @@ int GpuCoprocessorSession::connect(const ConnectInfo &info) {
 
 MemRegion GpuCoprocessorSession::alloc_memory(std::size_t size, MemKind kind) {
     TP_CHECK(kind == MemKind::GpuHbm, "gpu_verbs: only MemKind::GpuHbm supported");
-    // The peer writes a ring of frames into the region, which may be larger than asked for; a small
-    // ring still takes a whole page, as the dma-buf export needs. It comes zeroed, so no stale seq
-    // looks like a request.
-    hbm_ = gpu_.alloc_hbm_ring(std::max({size, ring_.region_bytes(), std::size_t{4096}}));
+    // The peer writes a ring of frames into the region, which may be larger than asked for. It comes
+    // zeroed, so no stale seq looks like a request.
+    hbm_ = gpu_.alloc_hbm_ring(std::max(size, ring_.region_bytes()));
     hbm_ring_.emplace(link_->pd(), /*offset=*/std::uint64_t{0}, hbm_.size,
                       link_->ring_iova(hbm_.ptr), hbm_.dmabuf_fd, MemAccess::REMOTE_WRITE);
     ::close(hbm_.dmabuf_fd); // MR holds its own reference
