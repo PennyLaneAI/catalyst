@@ -85,13 +85,6 @@ from catalyst.passes import graph_decomposition
 from catalyst.utils.exceptions import CompileError
 
 
-@pytest.fixture
-def isolated_shared_wire_decompositions():
-    """Keep registrations for fixed phase-gradient rules local to each test."""
-    with qp.decomposition.local_decomps():
-        yield
-
-
 class TestGenericUtilities:
     """Tests for common decomposition rule lowering utilities."""
 
@@ -1207,138 +1200,150 @@ class TestHybridOperatorArgDecomposition:
                 compiled(theta, angles), reference(theta, angles), rtol=1e-7, atol=1e-7
             )
 
-    @pytest.mark.usefixtures("isolated_shared_wire_decompositions")
     @pytest.mark.parametrize("modifier", ["plain", "adjoint", "controlled"])
     @pytest.mark.parametrize("dynamic_wire", [False, True])
     def test_change_op_basis_shared_wire(self, modifier, dynamic_wire):
         """Shared nested wires retain the gate order, parameters, and modifiers."""
 
-        def basis_change(theta, wire):
-            qp.change_op_basis(qp.RX(theta, wire), qp.RY(2 * theta, wire))
+        with local_decomps():
 
-        def expanded(theta, wire):
-            qp.RX(theta, wire)
-            qp.RY(2 * theta, wire)
-            qp.RX(-theta, wire)
+            def basis_change(theta, wire):
+                qp.change_op_basis(qp.RX(theta, wire), qp.RY(2 * theta, wire))
 
-        def circuit_body(theta, wire, operation):
-            qp.H(2)
-            if modifier == "controlled":
-                qp.ctrl(operation, control=2)(theta, wire)
-            elif modifier == "adjoint":
-                qp.adjoint(operation)(theta, wire)
-            else:
-                operation(theta, wire)
+            def expanded(theta, wire):
+                qp.RX(theta, wire)
+                qp.RY(2 * theta, wire)
+                qp.RX(-theta, wire)
 
-        @qp.qjit(capture=True)
-        @qp.decompose(gate_set={qp.RX, qp.RY, qp.RZ, qp.H, qp.X, qp.CNOT})
-        @qp.qnode(qp.device("lightning.qubit", wires=3))
-        def compiled(theta, wire):
-            circuit_body(theta, wire if dynamic_wire else 0, basis_change)
-            return qp.probs(wires=range(3))
+            def circuit_body(theta, wire, operation):
+                qp.H(2)
+                if modifier == "controlled":
+                    qp.ctrl(operation, control=2)(theta, wire)
+                elif modifier == "adjoint":
+                    qp.adjoint(operation)(theta, wire)
+                else:
+                    operation(theta, wire)
 
-        @qp.qnode(qp.device("default.qubit", wires=3))
-        def reference(theta, wire):
-            circuit_body(theta, wire if dynamic_wire else 0, expanded)
-            return qp.probs(wires=range(3))
+            @qp.qjit(capture=True)
+            @qp.decompose(gate_set={qp.RX, qp.RY, qp.RZ, qp.H, qp.X, qp.CNOT})
+            @qp.qnode(qp.device("lightning.qubit", wires=3))
+            def compiled(theta, wire):
+                circuit_body(theta, wire if dynamic_wire else 0, basis_change)
+                return qp.probs(wires=range(3))
 
-        for theta, wire in [(0.17, 0), (0.49, 1)]:
-            np.testing.assert_allclose(compiled(theta, wire), reference(theta, wire), atol=1e-8)
+            @qp.qnode(qp.device("default.qubit", wires=3))
+            def reference(theta, wire):
+                circuit_body(theta, wire if dynamic_wire else 0, expanded)
+                return qp.probs(wires=range(3))
 
-    @pytest.mark.usefixtures("isolated_shared_wire_decompositions")
+            for theta, wire in [(0.17, 0), (0.49, 1)]:
+                np.testing.assert_allclose(compiled(theta, wire), reference(theta, wire), atol=1e-8)
+
     def test_change_op_basis_estimate(self):
         """Resource estimation accepts shared compute, target, and uncompute wires."""
 
-        @qp.qjit(capture=True, target="mlir", enable_aot_compilation=False)
-        @qp.qnode(qp.device("null.qubit", wires=1))
-        def circuit(theta):
-            qp.change_op_basis(qp.H(0), qp.RX(theta, 0), qp.H(0))
-            return qp.probs(wires=0)
+        with local_decomps():
 
-        specs = qp.estimate(circuit, target={qp.H, qp.RX})(0.17)
-        assert specs.resources.counts == {"Hadamard": 2, "RX": 1}
+            @qp.qjit(capture=True, target="mlir", enable_aot_compilation=False)
+            @qp.qnode(qp.device("null.qubit", wires=1))
+            def circuit(theta):
+                qp.change_op_basis(qp.H(0), qp.RX(theta, 0), qp.H(0))
+                return qp.probs(wires=0)
 
-    @pytest.mark.usefixtures("isolated_shared_wire_decompositions")
+            specs = qp.estimate(circuit, target={qp.H, qp.RX})(0.17)
+            assert specs.resources.counts == {"Hadamard": 2, "RX": 1}
+
     def test_nested_basis_change_with_subcircuit(self):
         """Nested composites preserve partially overlapping and permuted wire groups."""
 
-        @qp.subcircuit(dynamic_argnames=("theta",))
-        @qp.register_resources({qp.RX: 1, qp.CNOT: 1})
-        def compute(theta, wires):
-            qp.RX(theta, wires[0])
-            qp.CNOT(wires)
+        with local_decomps():
 
-        @qp.qjit(capture=True)
-        @qp.decompose(gate_set={qp.RX, qp.RY, qp.RZ, qp.H, qp.X, qp.CNOT})
-        @qp.qnode(qp.device("lightning.qubit", wires=3))
-        def compiled(theta):
-            qp.H(0)
-            qp.H(1)
-            qp.change_op_basis(
-                compute(theta, wires=[2, 0]),
-                qp.change_op_basis(qp.RX(2 * theta, 1), qp.IsingZZ(3 * theta, [0, 1])),
-            )
-            return qp.probs(wires=range(3))
+            @qp.subcircuit(dynamic_argnames=("theta",))
+            @qp.register_resources({qp.RX: 1, qp.CNOT: 1})
+            def compute(theta, wires):
+                qp.RX(theta, wires[0])
+                qp.CNOT(wires)
 
-        @qp.qnode(qp.device("default.qubit", wires=3))
-        def reference(theta):
-            qp.H(0)
-            qp.H(1)
-            qp.RX(theta, 2)
-            qp.CNOT([2, 0])
-            qp.RX(2 * theta, 1)
-            qp.IsingZZ(3 * theta, [0, 1])
-            qp.RX(-2 * theta, 1)
-            qp.CNOT([2, 0])
-            qp.RX(-theta, 2)
-            return qp.probs(wires=range(3))
+            @qp.qjit(capture=True)
+            @qp.decompose(gate_set={qp.RX, qp.RY, qp.RZ, qp.H, qp.X, qp.CNOT})
+            @qp.qnode(qp.device("lightning.qubit", wires=3))
+            def compiled(theta):
+                qp.H(0)
+                qp.H(1)
+                qp.change_op_basis(
+                    compute(theta, wires=[2, 0]),
+                    qp.change_op_basis(qp.RX(2 * theta, 1), qp.IsingZZ(3 * theta, [0, 1])),
+                )
+                return qp.probs(wires=range(3))
 
-        for theta in (0.17, 0.49):
-            np.testing.assert_allclose(compiled(theta), reference(theta), atol=1e-8)
+            @qp.qnode(qp.device("default.qubit", wires=3))
+            def reference(theta):
+                qp.H(0)
+                qp.H(1)
+                qp.RX(theta, 2)
+                qp.CNOT([2, 0])
+                qp.RX(2 * theta, 1)
+                qp.IsingZZ(3 * theta, [0, 1])
+                qp.RX(-2 * theta, 1)
+                qp.CNOT([2, 0])
+                qp.RX(-theta, 2)
+                return qp.probs(wires=range(3))
 
-    @pytest.mark.usefixtures("isolated_shared_wire_decompositions")
+            for theta in (0.17, 0.49):
+                np.testing.assert_allclose(compiled(theta), reference(theta), atol=1e-8)
+
     def test_rz_phase_gradient_estimate(self):
         """The Photosensitizer rule has 71 logical wire occurrences on 42 physical wires."""
-        rule = qp.transforms.decompositions.make_rz_to_phase_gradient_decomp(
-            angle_wires=range(1, 15),
-            phase_grad_wires=range(15, 29),
-            work_wires=range(29, 42),
-        )
-        qp.add_decomps(qp.RZ, rule)
-        target = {qp.CNOT, qp.X, qp.SemiAdder, qp.GlobalPhase}
+        with local_decomps():
+            rule = qp.transforms.decompositions.make_rz_to_phase_gradient_decomp(
+                angle_wires=range(1, 15),
+                phase_grad_wires=range(15, 29),
+                work_wires=range(29, 42),
+            )
+            qp.add_decomps(qp.RZ, rule)
+            target = {qp.CNOT, qp.X, qp.SemiAdder, qp.GlobalPhase}
 
-        @qp.qjit(capture=True, target="mlir", enable_aot_compilation=False)
-        @qp.decompose(gate_set=target, fixed_decomps={qp.RZ: rule})
-        @qp.qnode(qp.device("null.qubit", wires=42))
-        def circuit(theta):
-            qp.RZ(theta, 0)
-            return qp.probs(wires=0)
+            @qp.qjit(capture=True, target="mlir", enable_aot_compilation=False)
+            @qp.decompose(gate_set=target, fixed_decomps={qp.RZ: rule})
+            @qp.qnode(qp.device("null.qubit", wires=42))
+            def circuit(theta):
+                qp.RZ(theta, 0)
+                return qp.probs(wires=0)
 
-        specs = qp.estimate(circuit, target=target)(0.17)
-        assert specs.resources.counts["SemiAdder"] == 1
-        assert "ChangeOpBasis2" not in specs.resources.counts
+            specs = qp.estimate(circuit, target=target)(0.17)
+            assert specs.resources.counts["SemiAdder"] == 1
+            assert "ChangeOpBasis2" not in specs.resources.counts
 
-    @pytest.mark.usefixtures("isolated_shared_wire_decompositions")
     @pytest.mark.parametrize("rot_axis", ["X", "Y", "Z"])
     def test_select_phase_gradient_estimate(self, rot_axis):
         """Subcircuit resources retain abstract control-wire information."""
-        rule = qp.transforms.decompositions.make_selectpaulirot_to_phase_gradient_decomp(
-            angle_wires=[2, 3], phase_grad_wires=[4, 5], work_wires=[6]
-        )
-        qp.add_decomps(qp.SelectPauliRot, rule)
-        target = {qp.QROM, qp.SemiAdder, qp.X, qp.CNOT, qp.H, qp.S, "Adjoint(S)", qp.GlobalPhase}
+        with local_decomps():
+            rule = qp.transforms.decompositions.make_selectpaulirot_to_phase_gradient_decomp(
+                angle_wires=[2, 3], phase_grad_wires=[4, 5], work_wires=[6]
+            )
+            qp.add_decomps(qp.SelectPauliRot, rule)
+            target = {
+                qp.QROM,
+                qp.SemiAdder,
+                qp.X,
+                qp.CNOT,
+                qp.H,
+                qp.S,
+                "Adjoint(S)",
+                qp.GlobalPhase,
+            }
 
-        @qp.qjit(capture=True, target="mlir", enable_aot_compilation=False)
-        @qp.decompose(gate_set=target, fixed_decomps={qp.SelectPauliRot: rule})
-        @qp.qnode(qp.device("null.qubit", wires=7))
-        def circuit(angles):
-            qp.SelectPauliRot(angles, control_wires=[0], target_wire=1, rot_axis=rot_axis)
-            return qp.probs(wires=1)
+            @qp.qjit(capture=True, target="mlir", enable_aot_compilation=False)
+            @qp.decompose(gate_set=target, fixed_decomps={qp.SelectPauliRot: rule})
+            @qp.qnode(qp.device("null.qubit", wires=7))
+            def circuit(angles):
+                qp.SelectPauliRot(angles, control_wires=[0], target_wire=1, rot_axis=rot_axis)
+                return qp.probs(wires=1)
 
-        counts = qp.estimate(circuit, target=target)(np.array([0.1, 0.3])).resources.counts
-        assert counts["QROM"] == 2
-        assert counts["SemiAdder"] == 1
-        assert counts["CNOT"] == 4
+            counts = qp.estimate(circuit, target=target)(np.array([0.1, 0.3])).resources.counts
+            assert counts["QROM"] == 2
+            assert counts["SemiAdder"] == 1
+            assert counts["CNOT"] == 4
 
 
 class TestOnDemand:
