@@ -990,6 +990,10 @@
 * The `gpu_verbs` coprocessor now supports the NVIDIA GH200 with CUDA 12.4.
   [(#3467)](https://github.com/PennyLaneAI/catalyst/pull/3467)
 
+* The `cpu_verbs` and `gpu_verbs` coprocessors no longer stall after a lost UC request. The next
+  request is served when `frame_slots=1` for HSB.
+  [(#3468)](https://github.com/PennyLaneAI/catalyst/pull/3468)
+
 * A `qp.Backline` device with a `qec_code` no longer fails to compile circuits whose gates are
   `Operator2`. The unused decomposition rules captured with the circuit are now removed before
   `convert-quantum-to-qecl`, which could not convert them.

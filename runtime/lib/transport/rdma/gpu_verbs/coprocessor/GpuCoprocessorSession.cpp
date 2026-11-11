@@ -103,14 +103,19 @@ void GpuCoprocessorSession::run(std::stop_token st) {
 }
 
 // Coprocessor: wait for the fused kernel to publish its n-th reply frame in handoff slot n, then
-// send it, inline when it fits, under that request's seq.
+// send it, inline when it fits, under the seq of the request it answers. After a lost request that
+// seq is later than expected.
 template <frame::Mode M, class Link>
 void GpuCoprocessorSession::serve(Link &link, std::stop_token st) {
     std::uint64_t served = 0;
+    std::uint32_t expect = 1; // the lowest seq to take
     for (std::uint64_t spin = 0;; ++spin) {
-        const std::uint32_t seq = static_cast<std::uint32_t>(served + 1);
+        std::uint8_t *rep = handoff_.host + ring_.slot_offset(served);
+        const std::uint32_t seq = std::atomic_ref<std::uint32_t>(
+                                      *reinterpret_cast<std::uint32_t *>(rep + ring_.poll_offset()))
+                                      .load(std::memory_order_acquire);
         frame::FrameView reply; // the kernel's reply, published with one store
-        if (frame::poll<M>(ring_, handoff_.host + ring_.slot_offset(served), seq, reply)) {
+        if (frame::seq_reached(seq, expect) && frame::poll<M>(ring_, rep, seq, reply)) {
             std::int64_t first = 0;
             std::memcpy(&first, reply.data, std::min<std::size_t>(reply.len, sizeof(first)));
             last_word_.store(first, std::memory_order_relaxed);
@@ -123,6 +128,7 @@ void GpuCoprocessorSession::serve(Link &link, std::stop_token st) {
             link.send(seq); // the controller matches the reply by it
             completed_.fetch_add(1, std::memory_order_release);
             ++served;
+            expect = seq + 1;
             continue;
         }
 
