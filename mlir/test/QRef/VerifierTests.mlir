@@ -574,3 +574,19 @@ func.func @operator_custom_invalid_ctrl_static_length(%r : !qref.reg<?>, %idx : 
 }
 
 // -----
+
+// -----
+
+func.func @reference_map_out_of_bounds(%q: !qref.bit) {
+  // expected-error@+1 {{qubit_map index is out of bounds}}
+  qref.operator "Composite"() qubits(%q) qubit_map = {compute = [1]}
+  return
+}
+
+// -----
+
+func.func @reference_map_missing_qubit(%q0: !qref.bit, %q1: !qref.bit) {
+  // expected-error@+1 {{qubit_map must cover all qubit values}}
+  qref.operator "Composite"() qubits(%q0, %q1) qubit_map = {compute = [0], target = [0]}
+  return
+}

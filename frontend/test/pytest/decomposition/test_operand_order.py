@@ -341,3 +341,72 @@ def test_graph_op_id_metadata_matches_lowered_operands(op_name):
 
     if uid is not None:
         assert gid.getGraphOpId().endswith(f"[{uid}]")
+
+
+@qp.subcircuit(
+    dynamic_argnames=("theta",),
+    wire_argnames=("z_wires", "a_wires", "empty_wires"),
+)
+@qp.register_resources({qp.RX: 1, qp.RY: 1, qp.CNOT: 2})
+def shared_register_compute(theta, z_wires, a_wires, empty_wires):
+    """Apply distinct gates to named groups that may share wires."""
+    assert len(empty_wires) == 0
+    qp.RX(theta, z_wires[0])
+    qp.CNOT(z_wires)
+    qp.RY(2 * theta, a_wires[0])
+    qp.CNOT(a_wires)
+
+
+@pytest.mark.parametrize("modifier", ["plain", "adjoint", "controlled"])
+def test_shared_subcircuit_wire_groups(modifier):
+    """Shared, permuted and empty groups retain their names under gate modifiers."""
+
+    def basis_change(theta):
+        return qp.change_op_basis(
+            shared_register_compute(theta, z_wires=[2, 0], a_wires=[0, 1], empty_wires=[]),
+            qp.RZ(3 * theta, 0),
+        )
+
+    def expanded(theta):
+        qp.RX(theta, 2)
+        qp.CNOT([2, 0])
+        qp.RY(2 * theta, 0)
+        qp.CNOT([0, 1])
+        qp.RZ(3 * theta, 0)
+        qp.CNOT([0, 1])
+        qp.RY(-2 * theta, 0)
+        qp.CNOT([2, 0])
+        qp.RX(-theta, 2)
+
+    def body(theta, operation):
+        qp.H(0)
+        qp.H(3)
+        if modifier == "controlled":
+            qp.ctrl(operation, control=3)(theta)
+        elif modifier == "adjoint":
+            qp.adjoint(operation)(theta)
+        else:
+            operation(theta)
+
+    @qp.qjit(capture=True)
+    @qp.decompose(gate_set={qp.RX, qp.RY, qp.RZ, qp.H, qp.X, qp.CNOT})
+    @qp.qnode(qp.device("lightning.qubit", wires=4))
+    def compiled(theta):
+        qp.H(0)
+        qp.H(3)
+        operation = basis_change(theta)
+        if modifier == "controlled":
+            qp.ctrl(operation, control=3)
+        elif modifier == "adjoint":
+            qp.adjoint(operation)
+        return qp.probs(wires=range(4))
+
+    @qp.qnode(qp.device("default.qubit", wires=4))
+    def reference(theta):
+        body(theta, expanded)
+        return qp.probs(wires=range(4))
+
+    for theta in (0.17, 0.49):
+        with qp.capture.pause():
+            expected = reference(theta)
+        np.testing.assert_allclose(compiled(theta), expected, atol=1e-8)

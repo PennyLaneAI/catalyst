@@ -236,6 +236,44 @@ struct RQubitAliasSet {
     llvm::DenseSet<Value> rQubits;
 }; // struct RQubitAliasSet
 
+// Composite arguments can share wires. Keep each named group's indices while threading
+// each physical qubit through value semantics only once.
+void normalizeOperatorQubits(Operation *root, IRRewriter &builder) {
+    root->walk([&](qref::OperatorOp op) {
+        if (op.getQreg() || op.getQubits().size() < 2 || op.getQubitMap().empty()) {
+            return;
+        }
+
+        RQubitAliasSet aliases;
+        llvm::DenseMap<Value, int64_t> positions;
+        SmallVector<Value> qubits;
+        SmallVector<int64_t> operandMap;
+        for (Value qubit : op.getQubits()) {
+            Value canonical = aliases.insert(qubit);
+            if (!canonical) {
+                canonical = qubit;
+                positions[canonical] = qubits.size();
+                qubits.push_back(canonical);
+            }
+            operandMap.push_back(positions.lookup(canonical));
+        }
+        if (qubits.size() == op.getQubits().size()) {
+            return;
+        }
+
+        SmallVector<NamedAttribute> groups;
+        for (NamedAttribute group : op.getQubitMap()) {
+            SmallVector<int64_t> indices;
+            for (int64_t index : cast<DenseI64ArrayAttr>(group.getValue()).asArrayRef()) {
+                indices.push_back(operandMap[index]);
+            }
+            groups.emplace_back(group.getName(), builder.getDenseI64ArrayAttr(indices));
+        }
+        op.getQubitsMutable().assign(qubits);
+        op.setQubitMapAttr(builder.getDictionaryAttr(groups));
+    });
+}
+
 /**
  * @brief Emit an error on `op` if two of the qref.bit Values in `rValues` refer to the same wire.
  * Values of other types are ignored.
@@ -2214,6 +2252,7 @@ struct ValueSemanticsConversionPass
             return signalPassFailure();
         }
 
+        normalizeOperatorQubits(mod, builder);
         if (failed(verifyDistinctWireOperands(mod))) {
             return signalPassFailure();
         }

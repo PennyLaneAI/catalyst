@@ -462,7 +462,7 @@ def unpack_rule_operands(
         operands (tuple): the traced operands the rule body received
         n_params (int): how many of them are positional parameters
         kwarg_names (list[str]): parameter names first, followed by wire names
-        wire_lens (dict[str, int]): wire names in operand order and their lengths
+        wire_lens (dict[str, int]): wire names and their lengths
         has_ctrl_wires (bool): whether trailing control-wire and control-value operands are present
         hybrid_specs (list[HybridArgumentSpec]): reconstruction specs for hybrid arguments whose
             numeric leaves sit between the parameter kwargs and the grouped wire operand
@@ -775,6 +775,9 @@ def build_decomp_target_spec(
         DecompTargetSpec: callables and metadata consumable by either eager JAXPR capture or the
         legacy standalone MLIR materializer
     """
+    # Rule lowering gathers named base-wire groups in lexicographic order through qubit_map.
+    # Control work wires are appended separately below.
+    wire_lens = dict(sorted(wire_lens.items()))
     kwargs = prepare_dynamic_op_kwargs(dynamic_shape, wire_lens)
     extra_data = extra_data or {}
     n_base_wires = sum(wire_lens.values())
@@ -784,9 +787,12 @@ def build_decomp_target_spec(
         {**wire_lens, CTRL_WORK_WIRES: num_work_wires} if num_work_wires else wire_lens
     )
 
+    # Resource functions need wire types, while rule capture needs concrete dummy labels.
+    # Restore nested operators from extra_data after replacing their flattened wire groups.
+    resource_kwargs = kwargs | {name: qp.typing.Wire[length] for name, length in wire_lens.items()}
     name_to_resources, name_to_resource_ids, decomp_rules = collect_resources_for_op(
         op_name,
-        kwargs | static_data | extra_data,
+        resource_kwargs | static_data | extra_data,
         is_custom_op,
         op_cls=op_cls,
         modifiers=modifiers,
@@ -1148,6 +1154,7 @@ def build_registered_decomp_target_spec(
 
     extra_data = extra_data or {}
     static_and_extra = static_data | extra_data
+    wire_lens = dict(sorted(wire_lens.items()))
     kwargs = prepare_dynamic_op_kwargs(dynamic_shape, wire_lens)
     n_base_wires = sum(wire_lens.values())
     kind = "adjoint" if modifiers.adjoint else "control"
@@ -1192,7 +1199,10 @@ def build_registered_decomp_target_spec(
             if _adjoint_folds_to_base(ids, base_id):
                 rewritten[rule_name] = {controls.wrap_id(op_id): 1}
             elif wrap_control:
-                rewritten[rule_name] = {controls.wrap_id(rid): count for rid, count in ids.items()}
+                rewritten[rule_name] = {
+                    GraphOpID(op).getGraphOpId(controls): count
+                    for op, count in name_to_resources[rule_name].items()
+                }
             else:
                 rewritten[rule_name] = ids
         name_to_resource_ids = rewritten
