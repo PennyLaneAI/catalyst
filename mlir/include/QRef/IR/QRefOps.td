@@ -885,8 +885,12 @@ def MeasurementOp : QRef_Op<"measurement", [
             qubits(%q) static_data = {plane = "XY"} : i1
 
         %bits = qref.measurement "MeasureMany"()
-            quregs(%reg: !qref.reg<?>) indices(%wires: tensor<?xi64>)
             : tensor<?xi1>
+
+        // Note: PPM example shown below is the 1:1 lowering to the corresponding example in PPMeasurementOp.
+        %result = qref.measurement "PauliMeasure"()
+            qubits(%q0, %q1, %q2)
+            static_data = {pauli_word = "XIZ"} : i1
         ```
 
         An empty result list is written `: ()`. Measurement names and static

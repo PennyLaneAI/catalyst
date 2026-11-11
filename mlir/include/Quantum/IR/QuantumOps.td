@@ -1273,6 +1273,12 @@ def MeasurementOp : Quantum_Op<"measurement", [
         %bits, %out_reg = quantum.measurement "MeasureMany"()
             quregs(%reg) indices(%wires: tensor<?xi64>)
             : tensor<?xi1>, !quantum.reg
+
+        // Note: PPM example shown below is the 1:1 lowering to the corresponding example in PPMeasurementOp.
+        %result, %out:3 = quantum.measurement "PauliMeasure"()
+            qubits(%q0, %q1, %q2)
+            static_data = {pauli_word = "XIZ"}
+            : i1, !quantum.bit, !quantum.bit, !quantum.bit
         ```
 
         An empty result list is written `: ()`. Measurement names and static
