@@ -36,11 +36,12 @@ def state_prep_example():
 
 
 # CHECK-LABEL: func.func public @state_prep_example
-#       CHECK: quantum.set_state
+#       CHECK: qref.set_state
 print(state_prep_example.mlir)
 
 
-@qjit(target="mlir")
+# old_frontend: checks skipping the tape decomposition of the initial BasisState.
+@qjit(capture=False, target="mlir")
 @qp.qnode(qp.device("lightning.qubit", wires=2))
 def basis_state_example():
     """Test example from
@@ -58,7 +59,8 @@ def basis_state_example():
 print(basis_state_example.mlir)
 
 
-@qjit(target="mlir")
+# old_frontend: checks tape-based state-preparation decomposition and TrotterProduct integration.
+@qjit(capture=False, target="mlir")
 @qp.qnode(qp.device("lightning.qubit", wires=2))
 def state_prep_example_double():
     """What happens if we have two? It shouldn't be repeated because
@@ -75,7 +77,8 @@ def state_prep_example_double():
 print(state_prep_example_double.mlir)
 
 
-@qjit(target="mlir")
+# old_frontend: checks tape-based state-preparation decomposition and TrotterProduct integration.
+@qjit(capture=False, target="mlir")
 @qp.qnode(qp.device("lightning.qubit", wires=2))
 def state_prep_trotter():
     """
@@ -98,7 +101,8 @@ def state_prep_trotter():
 print(state_prep_trotter.mlir)
 
 
-@qjit(target="mlir")
+# old_frontend: checks tape-based state-preparation decomposition and TrotterProduct integration.
+@qjit(capture=False, target="mlir")
 @qp.qnode(qp.device("lightning.qubit", wires=2))
 def basis_state_trotter():
     """
