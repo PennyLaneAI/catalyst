@@ -133,6 +133,12 @@ def _mcm_preprocessing(
     """Preprocess mid-circuit measurements."""
     mcm_config = execution_config.mcm_config
 
+    if mcm_config.mcm_method == MCM_METHOD.DEVICE:
+        _delegated_feedforward_preprocessing(
+            pipeline, unsupported_transforms, device, mcm_config, capabilities
+        )
+        return
+
     if mcm_config.postselect_mode not in (POSTSELECT_MODE.FILL_SHOTS, None):
         raise CompileError(
             f"postselect_mode='{mcm_config.postselect_mode.value} is not supported with "
@@ -156,6 +162,46 @@ def _mcm_preprocessing(
             f"mcm_method='{mcm_config.mcm_method.value}' is not supported with {device.name}"
             "when using 'qp.qjit(capture=True)'."
         )
+
+
+def _delegated_feedforward_preprocessing(
+    pipeline: list[BoundTransform],
+    unsupported_transforms: list[str],
+    device: qp.devices.Device,
+    mcm_config,
+    capabilities: DeviceCapabilities,
+) -> None:
+    """Hand mid-circuit feed-forward to the device as data, for ``mcm_method="device"``.
+
+    The device runs the program once for all shots, with every measurement outcome kept on the
+    device. It must list ``"device"`` among its qjit ``supported_mcm_methods``, and its library
+    must provide the "Delegated" extension, which the compiled program checks at load.
+    """
+    if MCM_METHOD.DEVICE.value not in capabilities.supported_mcm_methods:
+        raise CompileError(
+            f"mcm_method='device' is not supported with {device.name} when using "
+            "'qp.qjit(capture=True)': the device does not list 'device' among its "
+            "supported_mcm_methods."
+        )
+    postselect_mode = mcm_config.postselect_mode or POSTSELECT_MODE.FILL_SHOTS
+    pass_mode = {POSTSELECT_MODE.FILL_SHOTS: "fill-shots", POSTSELECT_MODE.HW_LIKE: "hw-like"}
+    if postselect_mode not in pass_mode:
+        raise CompileError(
+            f"postselect_mode='{postselect_mode.value}' is not supported with mcm_method='device'."
+        )
+    # Gadgets are checked while their conditions are still bits.
+    pipeline.append(
+        _safe_create_bound_transform(
+            Transform(pass_name="verify-pbc-gadgets"), unsupported_transforms
+        )
+    )
+    pipeline.append(
+        _safe_create_bound_transform(
+            Transform(pass_name="delegate-feedforward"),
+            unsupported_transforms,
+            kwargs={"postselect_mode": pass_mode[postselect_mode]},
+        )
+    )
 
 
 # pylint: disable=unused-argument

@@ -42,7 +42,7 @@ struct PPRToPPMPass : public impl::PPRToPPMPassBase<PPRToPPMPass> {
 
         RewritePatternSet non_clifford_patterns(ctx);
         populateDecomposeNonCliffordPPRPatterns(non_clifford_patterns, decomposeMethod,
-                                                avoidYMeasure);
+                                                avoidYMeasure, emitGadgets);
 
         if (failed(applyPatternsGreedily(module, std::move(non_clifford_patterns)))) {
             return signalPassFailure();
@@ -50,7 +50,7 @@ struct PPRToPPMPass : public impl::PPRToPPMPassBase<PPRToPPMPass> {
 
         // Decompose Clifford PPRs into PPMs
         RewritePatternSet clifford_patterns(ctx);
-        populateDecomposeCliffordPPRPatterns(clifford_patterns, avoidYMeasure);
+        populateDecomposeCliffordPPRPatterns(clifford_patterns, avoidYMeasure, emitGadgets);
 
         if (failed(applyPatternsGreedily(module, std::move(clifford_patterns)))) {
             return signalPassFailure();

@@ -1268,7 +1268,9 @@ def merge_ppr_ppm_setup_inputs(max_pauli_size=0):
 merge_ppr_ppm = qp.transform(pass_name="merge-ppr-ppm", setup_inputs=merge_ppr_ppm_setup_inputs)
 
 
-def ppr_to_ppm_setup_inputs(decompose_method="pauli-corrected", avoid_y_measure=False):
+def ppr_to_ppm_setup_inputs(
+    decompose_method="pauli-corrected", avoid_y_measure=False, emit_gadgets=False
+):
     r"""A quantum compilation pass that decomposes Pauli product rotations (PPRs),
     :math:`P(\theta) = \exp(-iP\theta)`, into Pauli product measurements (PPMs).
 
@@ -1305,6 +1307,9 @@ def ppr_to_ppm_setup_inputs(decompose_method="pauli-corrected", avoid_y_measure=
             (requires :math:`Y`-state preparation). This is currently only supported when using the
             ``"clifford-corrected"`` and ``"pauli-corrected"`` decomposition methods. Defaults to
             ``False``.
+        emit_gadgets (bool): Wrap the operations that decompose each rotation in a gadget that
+            records the source rotation, so that the compiler and the device can check that the
+            decomposition implements it. Defaults to ``False``.
 
     Returns:
         :class:`QNode <pennylane.QNode>`
@@ -1378,6 +1383,7 @@ def ppr_to_ppm_setup_inputs(decompose_method="pauli-corrected", avoid_y_measure=
     return (), {
         "decompose_method": decompose_method,
         "avoid_y_measure": avoid_y_measure,
+        "emit_gadgets": emit_gadgets,
     }
 
 
@@ -1385,7 +1391,7 @@ ppr_to_ppm = qp.transform(pass_name="ppr-to-ppm", setup_inputs=ppr_to_ppm_setup_
 
 
 def ppm_compilation_setup_inputs(
-    decompose_method="pauli-corrected", avoid_y_measure=False, max_pauli_size=0
+    decompose_method="pauli-corrected", avoid_y_measure=False, max_pauli_size=0, emit_gadgets=False
 ):
     r"""A quantum compilation pass that transforms Clifford+T gates into Pauli product measurements
     (PPMs).
@@ -1430,6 +1436,9 @@ def ppm_compilation_setup_inputs(
 
         max_pauli_size (int): The maximum size of the Pauli strings after commuting or merging.
             Defaults to 0 (no limit).
+        emit_gadgets (bool): Wrap the operations that decompose each rotation in a gadget that
+            records the source rotation, so that the compiler and the device can check that the
+            decomposition implements it. Defaults to ``False``.
 
     Returns:
         :class:`QNode <pennylane.QNode>`
@@ -1493,11 +1502,43 @@ def ppm_compilation_setup_inputs(
         "decompose_method": decompose_method,
         "avoid_y_measure": avoid_y_measure,
         "max_pauli_size": max_pauli_size,
+        "emit_gadgets": emit_gadgets,
     }
 
 
 ppm_compilation = qp.transform(
     pass_name="ppm-compilation", setup_inputs=ppm_compilation_setup_inputs
+)
+
+
+def verify_pbc_gadgets_setup_inputs(strict=False):
+    r"""A quantum compilation pass that checks that each gadget implements the rotation it
+    stands for.
+
+    .. note::
+
+        This transform requires decorating the workflow with :func:`@qp.qjit <pennylane.qjit>`,
+        and gadgets emitted by :func:`pennylane.transforms.ppr_to_ppm` or
+        :func:`pennylane.transforms.ppm_compilation` with ``emit_gadgets=True``.
+
+    Each gadget runs on a Choi state of its data qubits along every outcome of its measurements.
+    A gadget is verified when every branch implements its source rotation within ``1e-12``, and
+    every auxiliary qubit is released in a product state. The verdict is recorded on the gadget,
+    and reaches a device that supports gadget brackets.
+
+    Args:
+        qnode (QNode): QNode to apply the pass to.
+        strict (bool): Fail compilation on a gadget that does not implement its source rotation,
+            instead of warning. Defaults to ``False``.
+
+    Returns:
+        :class:`QNode <pennylane.QNode>`
+    """
+    return (), {"strict": strict}
+
+
+verify_pbc_gadgets = qp.transform(
+    pass_name="verify-pbc-gadgets", setup_inputs=verify_pbc_gadgets_setup_inputs
 )
 
 

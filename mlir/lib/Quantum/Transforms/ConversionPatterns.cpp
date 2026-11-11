@@ -975,9 +975,106 @@ struct MeasureOpPattern : public OpConversionPattern<MeasureOp> {
         SmallVector<Value> args = {adaptor.getInQubit(), postselect};
 
         Value resultPtr = LLVM::CallOp::create(rewriter, loc, fnDecl, args).getResult();
+        // On a delegated program the result is a handle, and is not read.
+        if (isa<ResultType>(op.getMres().getType())) {
+            rewriter.replaceOp(op, {resultPtr, adaptor.getInQubit()});
+            return success();
+        }
         Value mres = LLVM::LoadOp::create(rewriter, loc, IntegerType::get(ctx, 1), resultPtr);
         rewriter.replaceOp(op, {mres, adaptor.getInQubit()});
 
+        return success();
+    }
+};
+
+////////////////////////////////
+// Delegated feed-forward     //
+////////////////////////////////
+
+/// Declare the runtime function `name` and call it.
+Value callRuntime(ConversionPatternRewriter &rewriter, Operation *op, StringRef name,
+                  Type resultType, ValueRange args) {
+    MLIRContext *ctx = rewriter.getContext();
+    Type returnType = resultType ? resultType : LLVM::LLVMVoidType::get(ctx);
+    Type signature = LLVM::LLVMFunctionType::get(returnType, SmallVector<Type>(args.getTypes()));
+    LLVM::LLVMFuncOp fnDecl =
+        catalyst::ensureFunctionDeclaration<LLVM::LLVMFuncOp>(rewriter, op, name, signature);
+    auto call = LLVM::CallOp::create(rewriter, op->getLoc(), fnDecl, args);
+    return resultType ? call.getResult() : Value{};
+}
+
+struct DelegateOpPattern : public OpConversionPattern<DelegateOp> {
+    using OpConversionPattern::OpConversionPattern;
+
+    LogicalResult matchAndRewrite(DelegateOp op, DelegateOpAdaptor adaptor,
+                                  ConversionPatternRewriter &rewriter) const override {
+        Location loc = op.getLoc();
+        ModuleOp mod = op->getParentOfType<ModuleOp>();
+
+        // The program fails at load on a device without the Delegated extension.
+        StringRef table = "Delegated";
+        Value name = getGlobalString(loc, rewriter, "device_extension_Delegated",
+                                     StringRef(table.data(), table.size() + 1), mod);
+        Value version = LLVM::ConstantOp::create(rewriter, loc, rewriter.getI32IntegerAttr(1));
+        callRuntime(rewriter, op, "__catalyst__rt__device_require", {}, {name, version});
+
+        Value mode = LLVM::ConstantOp::create(
+            rewriter, loc,
+            rewriter.getI32IntegerAttr(static_cast<int32_t>(op.getPostselectMode())));
+        callRuntime(rewriter, op, "__catalyst__qis__BeginDelegatedProgram", {}, {mode});
+
+        rewriter.eraseOp(op);
+        return success();
+    }
+};
+
+template <typename OpTy> struct ResultOpPattern : public OpConversionPattern<OpTy> {
+    using OpConversionPattern<OpTy>::OpConversionPattern;
+
+    LogicalResult matchAndRewrite(OpTy op, typename OpTy::Adaptor adaptor,
+                                  ConversionPatternRewriter &rewriter) const override {
+        Type ptrType = LLVM::LLVMPointerType::get(rewriter.getContext());
+        SmallVector<Value> args(adaptor.getOperands());
+        StringRef name;
+        if constexpr (std::is_same_v<OpTy, ResultConstantOp>) {
+            args.push_back(LLVM::ConstantOp::create(rewriter, op.getLoc(),
+                                                    rewriter.getBoolAttr(op.getValue())));
+            name = "__catalyst__qis__ResultConstant";
+        } else if constexpr (std::is_same_v<OpTy, ResultXorOp>) {
+            name = "__catalyst__qis__ResultXor";
+        } else if constexpr (std::is_same_v<OpTy, ResultNotOp>) {
+            name = "__catalyst__qis__ResultNot";
+        } else if constexpr (std::is_same_v<OpTy, ResultSelectOp>) {
+            name = "__catalyst__qis__ResultSelect";
+        } else {
+            static_assert(std::is_same_v<OpTy, ResultReleaseOp>, "unexpected result op");
+            callRuntime(rewriter, op, "__catalyst__qis__ReleaseResult", {}, args);
+            rewriter.eraseOp(op);
+            return success();
+        }
+        rewriter.replaceOp(op, callRuntime(rewriter, op, name, ptrType, args));
+        return success();
+    }
+};
+
+struct PredicatePushOpPattern : public OpConversionPattern<PredicatePushOp> {
+    using OpConversionPattern::OpConversionPattern;
+
+    LogicalResult matchAndRewrite(PredicatePushOp op, PredicatePushOpAdaptor adaptor,
+                                  ConversionPatternRewriter &rewriter) const override {
+        callRuntime(rewriter, op, "__catalyst__qis__PushPredicate", {}, {adaptor.getCondition()});
+        rewriter.eraseOp(op);
+        return success();
+    }
+};
+
+struct PredicatePopOpPattern : public OpConversionPattern<PredicatePopOp> {
+    using OpConversionPattern::OpConversionPattern;
+
+    LogicalResult matchAndRewrite(PredicatePopOp op, PredicatePopOpAdaptor adaptor,
+                                  ConversionPatternRewriter &rewriter) const override {
+        callRuntime(rewriter, op, "__catalyst__qis__PopPredicate", {}, {});
+        rewriter.eraseOp(op);
         return success();
     }
 };
@@ -1253,6 +1350,78 @@ struct SetBasisStateOpPattern : public OpConversionPattern<SetBasisStateOp> {
 namespace catalyst {
 namespace quantum {
 
+void flattenPredicatedOps(Operation *root) {
+    IRRewriter rewriter(root->getContext());
+    // Inner ops first, so that each region is flat when its parent is flattened.
+    SmallVector<PredicatedOp> worklist;
+    root->walk<WalkOrder::PostOrder>([&](PredicatedOp op) { worklist.push_back(op); });
+    for (PredicatedOp op : worklist) {
+        Location loc = op.getLoc();
+        const size_t numQubits = op.getQubits().size();
+        Value condition = op.getCondition();
+        rewriter.setInsertionPoint(op);
+
+        // Inline a region at the op, on the given qubits; returns its yielded values, and which
+        // of them the region defined.
+        auto inlineRegion = [&](Region &region, ValueRange qubits) {
+            Block *block = &region.front();
+            auto yield = cast<YieldOp>(block->getTerminator());
+            SmallVector<Value> yielded(yield.getRetvals());
+            SmallVector<bool> local;
+            for (Value &value : yielded) {
+                // A yielded block argument is replaced by its qubit when the block is inlined.
+                if (auto arg = dyn_cast<BlockArgument>(value); arg && arg.getOwner() == block) {
+                    value = qubits[arg.getArgNumber()];
+                    local.push_back(false);
+                    continue;
+                }
+                local.push_back(region.isAncestor(value.getParentRegion()));
+            }
+            rewriter.eraseOp(yield);
+            rewriter.inlineBlockBefore(block, op, qubits);
+            return std::pair{yielded, local};
+        };
+        // A region that holds no op needs no predicate.
+        auto isEmpty = [](Region &region) { return region.front().getOperations().size() == 1; };
+
+        const bool thenEmpty = isEmpty(op.getThenRegion());
+        const bool elseEmpty = isEmpty(op.getElseRegion());
+        if (!thenEmpty) {
+            PredicatePushOp::create(rewriter, loc, condition);
+        }
+        SmallVector<Value> qubits(op.getQubits());
+        auto [thenValues, thenLocal] = inlineRegion(op.getThenRegion(), qubits);
+        if (!thenEmpty) {
+            PredicatePopOp::create(rewriter, loc);
+        }
+        Value negated;
+        if (!elseEmpty) {
+            negated = ResultNotOp::create(rewriter, loc, condition.getType(), condition);
+            PredicatePushOp::create(rewriter, loc, negated);
+        }
+        auto [elseValues, elseLocal] =
+            inlineRegion(op.getElseRegion(), ValueRange(thenValues).take_front(numQubits));
+        if (!elseEmpty) {
+            PredicatePopOp::create(rewriter, loc);
+            ResultReleaseOp::create(rewriter, loc, negated);
+        }
+
+        SmallVector<Value> results(elseValues.begin(), elseValues.begin() + numQubits);
+        for (size_t i = numQubits; i < thenValues.size(); i++) {
+            results.push_back(ResultSelectOp::create(rewriter, loc, thenValues[i].getType(),
+                                                     condition, thenValues[i], elseValues[i]));
+            // Handles a region defined are released once the op has selected between them.
+            if (thenLocal[i]) {
+                ResultReleaseOp::create(rewriter, loc, thenValues[i]);
+            }
+            if (elseLocal[i]) {
+                ResultReleaseOp::create(rewriter, loc, elseValues[i]);
+            }
+        }
+        rewriter.replaceOp(op, results);
+    }
+}
+
 void populateQIRConversionPatterns(TypeConverter &typeConverter, RewritePatternSet &patterns,
                                    bool useArrayBackedRegisters) {
     patterns.add<RTBasedPattern<InitializeOp>>(typeConverter, patterns.getContext());
@@ -1278,6 +1447,14 @@ void populateQIRConversionPatterns(TypeConverter &typeConverter, RewritePatternS
     patterns.add<GlobalPhaseOpPattern>(typeConverter, patterns.getContext());
     patterns.add<QubitUnitaryOpPattern>(typeConverter, patterns.getContext());
     patterns.add<MeasureOpPattern>(typeConverter, patterns.getContext());
+    patterns.add<DelegateOpPattern>(typeConverter, patterns.getContext());
+    patterns.add<ResultOpPattern<ResultConstantOp>>(typeConverter, patterns.getContext());
+    patterns.add<ResultOpPattern<ResultXorOp>>(typeConverter, patterns.getContext());
+    patterns.add<ResultOpPattern<ResultNotOp>>(typeConverter, patterns.getContext());
+    patterns.add<ResultOpPattern<ResultSelectOp>>(typeConverter, patterns.getContext());
+    patterns.add<ResultOpPattern<ResultReleaseOp>>(typeConverter, patterns.getContext());
+    patterns.add<PredicatePushOpPattern>(typeConverter, patterns.getContext());
+    patterns.add<PredicatePopOpPattern>(typeConverter, patterns.getContext());
     patterns.add<ComputationalBasisOpPattern>(typeConverter, patterns.getContext());
     patterns.add<NamedObsOpPattern>(typeConverter, patterns.getContext());
     patterns.add<HermitianOpPattern>(typeConverter, patterns.getContext());

@@ -24,6 +24,7 @@
 
 #include "Driver/Timer.h"
 
+#include "DeviceExtensions.h"
 #include "Exception.hpp"
 #include "ExecutionContext.hpp"
 #include "MemRefUtils.hpp"
@@ -85,6 +86,21 @@ std::vector<bool> getModifiersControlledValues(const Modifiers *modifiers) {
  */
 auto getQuantumDevicePtr() -> const std::unique_ptr<QuantumDevice> & {
     return RTD_PTR->getQuantumDevicePtr();
+}
+
+/**
+ * @brief The active device's extension table `name`, or null.
+ */
+template <typename Table> auto queryTable(const char *name) -> const Table * {
+    return static_cast<const Table *>(RTD_PTR->queryInterface(name, 1));
+}
+
+/**
+ * @brief The active device's "Delegated" table. Fails if the device has none.
+ */
+auto delegatedTable() -> const CatalystDelegatedTable & {
+    RT_FAIL_IF(!RTD_PTR, "Invalid use of a device extension without an active device");
+    return *static_cast<const CatalystDelegatedTable *>(RTD_PTR->requireInterface("Delegated", 1));
 }
 
 /**
@@ -274,6 +290,12 @@ static int __catalyst__rt__device_release__impl() {
 
 void __catalyst__rt__device_release() {
     timer::timer(__catalyst__rt__device_release__impl, "device_release", /* add_endl */ true);
+}
+
+void __catalyst__rt__device_require(int8_t *name, int32_t min_version) {
+    RT_FAIL_IF(!RTD_PTR, "Cannot check device extensions without an active device");
+    RT_FAIL_IF(!name || min_version < 1, "Invalid device extension requirement");
+    RTD_PTR->requireInterface(reinterpret_cast<char *>(name), static_cast<uint32_t>(min_version));
 }
 
 void __catalyst__rt__print_state() {
@@ -961,7 +983,8 @@ RESULT *__catalyst__qis__Measure(QUBIT *wire, int32_t postselect) {
 }
 
 RESULT *__catalyst__qis__PauliMeasure(const char *pauliStr, bool negated, const char *pauliStrAlt,
-                                      bool negatedAlt, bool selectSwitch, int64_t numQubits, ...) {
+                                      bool negatedAlt, bool selectSwitch, int32_t postselect,
+                                      int64_t numQubits, ...) {
     RT_ASSERT(numQubits >= 0);
 
     // convert chat* to string
@@ -984,13 +1007,99 @@ RESULT *__catalyst__qis__PauliMeasure(const char *pauliStr, bool negated, const 
     }
     va_end(args);
 
+    const bool negated_ = selectSwitch ? negated : negatedAlt;
+    if (postselect != 0 && postselect != 1) {
+        postselect = CATALYST_NO_POSTSELECT;
+    }
+
+    // A device with the Delegated table takes the sign and the postselection itself: on a
+    // delegated program the result is a handle that cannot be read here.
+    if (const auto *table = queryTable<CatalystDelegatedTable>("Delegated");
+        table && table->pauli_measure) {
+        return table->pauli_measure(table->header.self, pauliStr_.c_str(), wires.data(),
+                                    wires.size(), negated_, postselect);
+    }
+
+    RT_FAIL_IF(postselect != CATALYST_NO_POSTSELECT,
+               "Postselection on a Pauli measurement is unsupported by device");
     RESULT *res = getQuantumDevicePtr()->PauliMeasure(pauliStr_, wires);
-    if ((negated && selectSwitch) || (negatedAlt && !selectSwitch)) {
+    if (negated_) {
         // Can't assume the result is writable, so flip using our constants.
         res = *res ? __catalyst__rt__result_get_zero() : __catalyst__rt__result_get_one();
     }
 
     return res;
+}
+
+void __catalyst__qis__BeginDelegatedProgram(int32_t postselectMode) {
+    RT_FAIL_IF(postselectMode != CATALYST_POSTSELECT_FILL_SHOTS &&
+                   postselectMode != CATALYST_POSTSELECT_HW_LIKE,
+               "Invalid postselection mode for a delegated program");
+    const auto &table = delegatedTable();
+    table.begin_program(table.header.self, static_cast<uint32_t>(postselectMode));
+}
+
+void __catalyst__qis__PushPredicate(RESULT *condition) {
+    const auto &table = delegatedTable();
+    table.push_predicate(table.header.self, condition);
+}
+
+void __catalyst__qis__PopPredicate() {
+    const auto &table = delegatedTable();
+    table.pop_predicate(table.header.self);
+}
+
+RESULT *__catalyst__qis__ResultConstant(bool value) {
+    const auto &table = delegatedTable();
+    return table.result_constant(table.header.self, value);
+}
+
+RESULT *__catalyst__qis__ResultXor(RESULT *a, RESULT *b) {
+    const auto &table = delegatedTable();
+    return table.result_xor(table.header.self, a, b);
+}
+
+RESULT *__catalyst__qis__ResultNot(RESULT *a) {
+    const auto &table = delegatedTable();
+    return table.result_not(table.header.self, a);
+}
+
+RESULT *__catalyst__qis__ResultSelect(RESULT *condition, RESULT *ifTrue, RESULT *ifFalse) {
+    const auto &table = delegatedTable();
+    return table.result_select(table.header.self, condition, ifTrue, ifFalse);
+}
+
+void __catalyst__qis__ReleaseResult(RESULT *result) {
+    const auto &table = delegatedTable();
+    table.release_result(table.header.self, result);
+}
+
+void __catalyst__qis__BeginGadget(const char *pauliStr, double theta, int32_t verdict,
+                                  int64_t numQubits, ...) {
+    RT_ASSERT(numQubits >= 0);
+    RT_FAIL_IF(pauliStr == nullptr ||
+                   std::string_view(pauliStr).size() != static_cast<size_t>(numQubits),
+               "The length of the pauli string must be equal to the number of wires.");
+
+    va_list args;
+    va_start(args, numQubits);
+    std::vector<QubitIdType> wires(numQubits);
+    for (int64_t i = 0; i < numQubits; i++) {
+        wires[i] = va_arg(args, QubitIdType);
+    }
+    va_end(args);
+
+    // Brackets are informational: a device without the table runs the span as given.
+    if (const auto *table = queryTable<CatalystGadgetTable>("Gadget"); table) {
+        table->begin_gadget(table->header.self, pauliStr, wires.data(), wires.size(), theta,
+                            static_cast<uint32_t>(verdict));
+    }
+}
+
+void __catalyst__qis__EndGadget() {
+    if (const auto *table = queryTable<CatalystGadgetTable>("Gadget"); table) {
+        table->end_gadget(table->header.self);
+    }
 }
 
 double __catalyst__qis__Expval(ObsIdType obsKey) { return getQuantumDevicePtr()->Expval(obsKey); }

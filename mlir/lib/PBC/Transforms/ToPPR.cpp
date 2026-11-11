@@ -301,7 +301,7 @@ LogicalResult convertMeasureOpToPPM(MeasureOp op, StringRef axis,
     SmallVector<Type> outQubitTypes({qubitType});
 
     auto ppmOp = PPMeasurementOp::create(rewriter, loc, mresType, outQubitTypes, pauliProduct,
-                                         nullptr, inQubits);
+                                         nullptr, inQubits, op.getPostselectAttr());
 
     rewriter.replaceOp(op, ppmOp);
     return success();

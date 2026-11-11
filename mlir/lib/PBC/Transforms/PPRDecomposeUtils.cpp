@@ -14,7 +14,10 @@
 
 #include "PBC/Transforms/PPRDecomposeUtils.h"
 
-#include "PBC/IR/PBCOps.h"         // for FabricateOp
+#include "llvm/Support/MathExtras.h"
+#include "mlir/IR/IRMapping.h"
+
+#include "PBC/IR/PBCOps.h"         // for FabricateOp, GadgetOp
 #include "Quantum/IR/QuantumOps.h" // for quantum::AllocQubitOp
 
 namespace catalyst {
@@ -38,6 +41,34 @@ mlir::OpResult initializeZeroOrPlusI(bool avoidPauliYMeasure, mlir::Location loc
     // Initialize |0⟩
     auto allocatedQubit = quantum::AllocQubitOp::create(rewriter, loc);
     return allocatedQubit.getOutQubit();
+}
+
+PPRotationOp wrapInGadget(PPRotationOp op, mlir::PatternRewriter &rewriter) {
+    assert(!op.getCondition() && "a gadget implements an unconditional rotation");
+    mlir::Location loc = op.getLoc();
+
+    // pbc.ppr P(k) is exp(-i pi/k P), that is, exp(-i theta/2 P) with theta = 2 pi / k.
+    const double theta = 2 * llvm::numbers::pi / static_cast<double>(op.getRotationKind());
+    auto gadget = GadgetOp::create(rewriter, loc, op.getOutQubits().getTypes(),
+                                   op.getPauliProduct(), rewriter.getF64FloatAttr(theta),
+                                   /*verdict=*/nullptr, op.getInQubits());
+
+    mlir::ValueRange inQubits = op.getInQubits();
+    mlir::Block *body =
+        rewriter.createBlock(&gadget.getRegion(), {}, inQubits.getTypes(),
+                             llvm::SmallVector<mlir::Location>(inQubits.size(), loc));
+    mlir::IRMapping mapping;
+    mapping.map(inQubits, body->getArguments());
+    auto inner = llvm::cast<PPRotationOp>(rewriter.clone(*op, mapping));
+    YieldOp::create(rewriter, loc, inner.getOutQubits());
+
+    rewriter.replaceOp(op, gadget.getOutQubits());
+    rewriter.setInsertionPoint(inner);
+    return inner;
+}
+
+bool needsGadget(PPRotationOp op, bool emitGadgets) {
+    return emitGadgets && !op->getParentOfType<GadgetOp>();
 }
 
 } // namespace pbc

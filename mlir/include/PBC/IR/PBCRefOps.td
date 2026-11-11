@@ -53,7 +53,9 @@ def RefPPMeasurementOp : PBC_Op<"ref.ppm",
     let arguments = (ins
         PauliWord:$pauli_product,
         UnitAttr:$negated,  // Pauli words can carry a negative sign, which flips the result
-        Variadic<QubitRefType>:$qubits
+        Variadic<QubitRefType>:$qubits,
+        // The outcome to keep, after the sign is applied.
+        OptionalAttr<ConfinedAttr<I32Attr, [IntMinValue<0>, IntMaxValue<1>]>>:$postselect
     );
 
     let results = (outs
@@ -61,7 +63,8 @@ def RefPPMeasurementOp : PBC_Op<"ref.ppm",
     );
 
     let assemblyFormat = [{
-        $pauli_product (`(``-``)` $negated^)? $qubits attr-dict `:` type(results)
+        $pauli_product (`(``-``)` $negated^)? $qubits (`postselect` $postselect^)? attr-dict
+        `:` type(results)
     }];
 
     let hasVerifier = 1;

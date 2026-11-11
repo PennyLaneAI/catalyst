@@ -52,6 +52,7 @@ from catalyst.passes.builtin_passes import (
     ppr_to_ppm,
     reduce_t_depth,
     to_ppr,
+    verify_pbc_gadgets,
 )
 
 __all__ = (
@@ -62,6 +63,7 @@ __all__ = (
     "ppr_to_ppm",
     "merge_ppr_ppm",
     "ppm_compilation",
+    "verify_pbc_gadgets",
     "reduce_t_depth",
     "decompose_arbitrary_ppr",
     "combine_global_phases",

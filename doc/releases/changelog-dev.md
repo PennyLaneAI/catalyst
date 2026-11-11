@@ -2,6 +2,34 @@
 
 <h3>New features since last release</h3>
 
+* Mid-circuit feed-forward can now be handed to the device as data, with
+  `mcm_method="device"` under `qjit(capture=True)`, on a device that lists `"device"` among its
+  qjit `supported_mcm_methods`. The program runs once for all shots.
+  [(#3464)](https://github.com/PennyLaneAI/catalyst/pull/3464)
+
+  - The new `delegate-feedforward` pass makes measurements return `!quantum.res` result handles,
+    turns conditions on them into `quantum.predicated` regions and `quantum.result.*` ops, and
+    marks the program with `quantum.delegate`.
+  - The program checks at load that the device provides the new "Delegated" extension.
+  - `null.qubit` provides it.
+
+* PBC decompositions can record the rotation each gadget implements, and the compiler can check it.
+  [(#3464)](https://github.com/PennyLaneAI/catalyst/pull/3464)
+
+  - `ppr_to_ppm` and `ppm_compilation` take `emit_gadgets=True`, which wraps each decomposed
+    rotation in a `pbc.gadget` region.
+  - The new `verify_pbc_gadgets` pass runs each gadget on a Choi state, along every measurement
+    outcome. It marks the gadget `verified` or `mismatch`, and with `strict=True` it fails on a
+    mismatch.
+  - Gadgets reach a device with the new "Gadget" extension as brackets that carry the source
+    rotation and the verdict.
+
+* Device libraries now have a versioned ABI. `GENERATE_DEVICE_FACTORY` emits
+  `<Name>DeviceAbiVersion`, and a device can provide optional, append-only C function tables
+  through the new `QuantumDevice::QueryInterface` (`DeviceExtensions.h`). Existing devices keep
+  working unchanged.
+  [(#3464)](https://github.com/PennyLaneAI/catalyst/pull/3464)
+
 * A new coprocessor function called `catalyst_onnx_coprocessor` has been added, which runs an
   ONNX model on the CPU or a GPU through onnxruntime, and is built with the transport runtime.
   PennyLane's
@@ -975,6 +1003,11 @@
 <h3>Deprecations 👋</h3>
 
 <h3>Bug fixes 🐛</h3>
+
+* The postselection of a Pauli product measurement is no longer dropped. Under capture,
+  `qp.pauli_measure(postselect=...)` keeps it, as do `to-ppr` (from `quantum.measure`) and
+  `merge-ppr-ppm`, and `pbc.ppm` carries it to the device.
+  [(#3464)](https://github.com/PennyLaneAI/catalyst/pull/3464)
 
 * Runtime functions that take a boolean argument are now declared with `zeroext` on it. Before, a
   computed `i1`, such as a negated measurement result in the condition of a conditional Pauli

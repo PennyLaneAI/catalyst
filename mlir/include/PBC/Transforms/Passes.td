@@ -67,6 +67,14 @@ def AvoidYMeasureOption : Option<
     /*default=*/"false",
     "Avoid Pauli-Y measurements for Clifford rotations. Rather than performing a Pauli-Y measurement for Clifford rotations (sometimes more costly), a Y state is used instead (requires Y state preparation).">;
 
+def EmitGadgetsOption : Option<
+    /*C++ var name=*/"emitGadgets",
+    /*CLI arg name=*/"emit-gadgets",
+    /*type=*/"bool",
+    /*default=*/"false",
+    "Wrap the ops that decompose each rotation in a `pbc.gadget` region that records the source "
+    "rotation, so that `verify-pbc-gadgets` and the device can check it.">;
+
 def OnlyDisjointQubitOption : Option<
     /*C++ var name=*/"onlyDisjointQubit",
     /*CLI arg name=*/"disjoint-qubit",
@@ -113,7 +121,7 @@ def DecomposeNonCliffordPPRPass : Pass<"decompose-non-clifford-ppr"> {
     
     let dependentDialects = [ "catalyst::pbc::PBCDialect", "scf::SCFDialect" ];
 
-    let options = [DecomposeMethodOption, AvoidYMeasureOption];
+    let options = [DecomposeMethodOption, AvoidYMeasureOption, EmitGadgetsOption];
 }
 
 def DecomposeCliffordPPRPass : Pass<"decompose-clifford-ppr"> {
@@ -121,7 +129,7 @@ def DecomposeCliffordPPRPass : Pass<"decompose-clifford-ppr"> {
 
     let dependentDialects = [ "catalyst::pbc::PBCDialect", "scf::SCFDialect" ];
 
-    let options = [AvoidYMeasureOption];
+    let options = [AvoidYMeasureOption, EmitGadgetsOption];
 }
 
 def PPRToPPMPass : Pass<"ppr-to-ppm"> {
@@ -129,7 +137,7 @@ def PPRToPPMPass : Pass<"ppr-to-ppm"> {
 
     let dependentDialects = [ "catalyst::pbc::PBCDialect", "scf::SCFDialect" ];
 
-    let options = [DecomposeMethodOption, AvoidYMeasureOption];
+    let options = [DecomposeMethodOption, AvoidYMeasureOption, EmitGadgetsOption];
 }
 
 def PPMCompilationPass : Pass<"ppm-compilation"> {
@@ -137,7 +145,49 @@ def PPMCompilationPass : Pass<"ppm-compilation"> {
 
     let dependentDialects = [ "catalyst::pbc::PBCDialect", "scf::SCFDialect" ];
 
-    let options = [MaxPauliSizeOption, DecomposeMethodOption, AvoidYMeasureOption];
+    let options = [MaxPauliSizeOption, DecomposeMethodOption, AvoidYMeasureOption, EmitGadgetsOption];
+}
+
+def VerifyPBCGadgetsPass : Pass<"verify-pbc-gadgets"> {
+    let summary = "Check that each pbc.gadget implements its source rotation.";
+    let description = [{
+        Runs each `pbc.gadget` region on a Choi state of its data qubits, following every
+        measurement outcome, and checks that every branch implements the gadget's source
+        rotation exactly (within 1e-12), with every auxiliary qubit released in a product state.
+        Records the result in the gadget's `verdict`: `verified`, `mismatch`, or `unchecked` when
+        the region holds an op the check cannot follow. A mismatch is a warning, or an error with
+        `strict`.
+    }];
+
+    let dependentDialects = [ "catalyst::pbc::PBCDialect" ];
+
+    let options = [
+        Option<"strict", "strict", "bool", /*default=*/"false",
+               "Fail on a gadget that does not implement its source rotation.">
+    ];
+}
+
+def DelegateFeedforwardPass : Pass<"delegate-feedforward", "mlir::ModuleOp"> {
+    let summary = "Hand mid-circuit feed-forward to the device as data.";
+    let description = [{
+        Rewrites each quantum function so that compiled code no longer branches on measurement
+        outcomes. Measurements return `!quantum.res` result handles; `scf.if` on an outcome
+        becomes `quantum.predicated`; conditional PPRs and `pbc.select.ppm` become predicated
+        PPRs and PPMs; i1 arithmetic on outcomes becomes `quantum.result.*` ops. A
+        `quantum.delegate` marker follows the device initialization, and each handle is released
+        after its last use.
+
+        The rewrite applies to the whole function or not at all. It fails, naming the op, on any
+        other use of an outcome: classical control flow, arithmetic outside the supported set,
+        or an outcome returned or sampled as a value.
+    }];
+
+    let dependentDialects = [ "catalyst::quantum::QuantumDialect", "catalyst::pbc::PBCDialect" ];
+
+    let options = [
+        Option<"postselectMode", "postselect-mode", "std::string", /*default=*/"\"fill-shots\"",
+               "How the device applies postselection: fill-shots or hw-like.">
+    ];
 }
 
 def PartitionLayersPass : Pass<"partition-layers"> {

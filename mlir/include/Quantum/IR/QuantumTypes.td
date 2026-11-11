@@ -39,6 +39,11 @@ def ObservableType : Quantum_Type<"Observable", "obs"> {
 }
 def ResultType : Quantum_Type<"Result", "res"> {
     let summary = "A quantum measurement result.";
+    let description = [{
+        On a delegated program (see `quantum.delegate`), a device-owned handle to a
+        measurement's outcome in every shot. Compiled code passes it on as a condition or to an
+        output, and never reads it as a bit.
+    }];
 }
 
 #endif // QUANTUM_TYPES

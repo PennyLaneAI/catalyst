@@ -66,15 +66,16 @@ module @test_ppr_arbitrary {
 
 // CHECK-LABEL: @test_ppm
 module @test_ppm {
-    // CHECK: llvm.func @__catalyst__qis__PauliMeasure(!llvm.ptr, i1 {llvm.zeroext}, !llvm.ptr, i1 {llvm.zeroext}, i1 {llvm.zeroext}, i64, ...) -> !llvm.ptr
+    // CHECK: llvm.func @__catalyst__qis__PauliMeasure(!llvm.ptr, i1 {llvm.zeroext}, !llvm.ptr, i1 {llvm.zeroext}, i1 {llvm.zeroext}, i32, i64, ...) -> !llvm.ptr
     // CHECK: llvm.mlir.global internal constant @pauli_word_XY("XY\00")
     func.func @ppm(%q0 : !quantum.bit, %q1 : !quantum.bit) -> (i1, !quantum.bit, !quantum.bit) {
         // CHECK-DAG: [[ctrue:%.+]] = llvm.mlir.constant(true) : i1
         // CHECK-DAG: [[cfalse:%.+]] = llvm.mlir.constant(false) : i1
         // CHECK-DAG: llvm.mlir.addressof @pauli_word_XY : !llvm.ptr
         // CHECK-DAG: [[pauliPtr:%.+]] = llvm.getelementptr inbounds {{.*}}[0, 0] : (!llvm.ptr) -> !llvm.ptr, !llvm.array<3 x i8>
+        // CHECK-DAG: [[nopost:%.+]] = llvm.mlir.constant(-1 : i32) : i32
         // CHECK-DAG: [[numQubits:%.+]] = llvm.mlir.constant(2 : i64) : i64
-        // CHECK: [[resultPtr:%.+]] = llvm.call @__catalyst__qis__PauliMeasure([[pauliPtr]], [[cfalse]], [[pauliPtr]], [[cfalse]], [[ctrue]], [[numQubits]], %arg0, %arg1)
+        // CHECK: [[resultPtr:%.+]] = llvm.call @__catalyst__qis__PauliMeasure([[pauliPtr]], [[cfalse]], [[pauliPtr]], [[cfalse]], [[ctrue]], [[nopost]], [[numQubits]], %arg0, %arg1)
         // CHECK: [[mres:%.+]] = llvm.load [[resultPtr]] : !llvm.ptr -> i1
         %mres, %out:2 = pbc.ppm ["X", "Y"] %q0, %q1 : i1, !quantum.bit, !quantum.bit
         return %mres, %out#0, %out#1 : i1, !quantum.bit, !quantum.bit
@@ -85,15 +86,16 @@ module @test_ppm {
 
 // CHECK-LABEL: @test_ppm_negative_basis
 module @test_ppm_negative_basis {
-    // CHECK: llvm.func @__catalyst__qis__PauliMeasure(!llvm.ptr, i1 {llvm.zeroext}, !llvm.ptr, i1 {llvm.zeroext}, i1 {llvm.zeroext}, i64, ...) -> !llvm.ptr
+    // CHECK: llvm.func @__catalyst__qis__PauliMeasure(!llvm.ptr, i1 {llvm.zeroext}, !llvm.ptr, i1 {llvm.zeroext}, i1 {llvm.zeroext}, i32, i64, ...) -> !llvm.ptr
     // CHECK: llvm.mlir.global internal constant @pauli_word_XY("XY\00")
     func.func @ppm_negative_basis(%q0 : !quantum.bit, %q1 : !quantum.bit) -> (i1, !quantum.bit, !quantum.bit) {
         // CHECK-DAG: [[neg:%.+]] = llvm.mlir.constant(true) : i1
         // CHECK-DAG: [[switch:%.+]] = llvm.mlir.constant(true) : i1
         // CHECK-DAG: llvm.mlir.addressof @pauli_word_XY : !llvm.ptr
         // CHECK-DAG: [[pauliPtr:%.+]] = llvm.getelementptr inbounds {{.*}}[0, 0] : (!llvm.ptr) -> !llvm.ptr, !llvm.array<3 x i8>
+        // CHECK-DAG: [[nopost:%.+]] = llvm.mlir.constant(-1 : i32) : i32
         // CHECK-DAG: [[numQubits:%.+]] = llvm.mlir.constant(2 : i64) : i64
-        // CHECK: [[resultPtr:%.+]] = llvm.call @__catalyst__qis__PauliMeasure([[pauliPtr]], [[neg]], [[pauliPtr]], [[neg]], [[switch]], [[numQubits]], %arg0, %arg1)
+        // CHECK: [[resultPtr:%.+]] = llvm.call @__catalyst__qis__PauliMeasure([[pauliPtr]], [[neg]], [[pauliPtr]], [[neg]], [[switch]], [[nopost]], [[numQubits]], %arg0, %arg1)
         // CHECK: [[mres:%.+]] = llvm.load [[resultPtr]] : !llvm.ptr -> i1
         %mres, %out:2 = pbc.ppm ["X", "Y"](-) %q0, %q1 : i1, !quantum.bit, !quantum.bit
         return %mres, %out#0, %out#1 : i1, !quantum.bit, !quantum.bit
@@ -104,7 +106,7 @@ module @test_ppm_negative_basis {
 
 // CHECK-LABEL: @test_select_ppm
 module @test_select_ppm {
-    // CHECK: llvm.func @__catalyst__qis__PauliMeasure(!llvm.ptr, i1 {llvm.zeroext}, !llvm.ptr, i1 {llvm.zeroext}, i1 {llvm.zeroext}, i64, ...) -> !llvm.ptr
+    // CHECK: llvm.func @__catalyst__qis__PauliMeasure(!llvm.ptr, i1 {llvm.zeroext}, !llvm.ptr, i1 {llvm.zeroext}, i1 {llvm.zeroext}, i32, i64, ...) -> !llvm.ptr
     // CHECK: llvm.mlir.global internal constant @pauli_word_XY("XY\00")
     func.func @select_ppm(%q0 : !quantum.bit, %q1 : !quantum.bit, %sel : i1) -> (i1, !quantum.bit, !quantum.bit) {
         // CHECK-DAG: [[cfalse:%.+]] = llvm.mlir.constant(false) : i1
@@ -113,10 +115,64 @@ module @test_select_ppm {
         // CHECK-DAG: [[pauliPtr0:%.+]] = llvm.getelementptr inbounds {{.*}}[0, 0] : (!llvm.ptr) -> !llvm.ptr, !llvm.array<3 x i8>
         // CHECK-DAG: llvm.mlir.addressof @pauli_word_XZ : !llvm.ptr
         // CHECK-DAG: [[pauliPtr1:%.+]] = llvm.getelementptr inbounds {{.*}}[0, 0] : (!llvm.ptr) -> !llvm.ptr, !llvm.array<3 x i8>
+        // CHECK-DAG: [[nopost:%.+]] = llvm.mlir.constant(-1 : i32) : i32
         // CHECK-DAG: [[numQubits:%.+]] = llvm.mlir.constant(2 : i64) : i64
-        // CHECK: [[resultPtr:%.+]] = llvm.call @__catalyst__qis__PauliMeasure([[pauliPtr0]], [[cfalse]], [[pauliPtr1]], [[ctrue]], %arg2, [[numQubits]], %arg0, %arg1)
+        // CHECK: [[resultPtr:%.+]] = llvm.call @__catalyst__qis__PauliMeasure([[pauliPtr0]], [[cfalse]], [[pauliPtr1]], [[ctrue]], %arg2, [[nopost]], [[numQubits]], %arg0, %arg1)
         // CHECK: [[mres:%.+]] = llvm.load [[resultPtr]] : !llvm.ptr -> i1
         %mres, %out:2 = pbc.select.ppm (%sel ? ["X", "Y"] : ["X", "Z"](-)) %q0, %q1 : i1, !quantum.bit, !quantum.bit
         return %mres, %out#0, %out#1 : i1, !quantum.bit, !quantum.bit
+    }
+}
+
+// -----
+
+// CHECK-LABEL: @test_ppm_postselect
+module @test_ppm_postselect {
+    func.func @ppm_postselect(%q0 : !quantum.bit) -> (i1, !quantum.bit) {
+        // CHECK: [[post:%.+]] = llvm.mlir.constant(1 : i32) : i32
+        // CHECK: [[resultPtr:%.+]] = llvm.call @__catalyst__qis__PauliMeasure({{.*}}, [[post]], {{.*}}, %arg0)
+        // CHECK: llvm.load [[resultPtr]] : !llvm.ptr -> i1
+        %mres, %out = pbc.ppm ["Z"] %q0 postselect 1 : i1, !quantum.bit
+        return %mres, %out : i1, !quantum.bit
+    }
+}
+
+// -----
+
+// A delegated PPM returns its result handle, without reading it.
+
+// CHECK-LABEL: @test_ppm_handle
+module @test_ppm_handle {
+    func.func @ppm_handle(%q0 : !quantum.bit) -> (!quantum.res, !quantum.bit) {
+        // CHECK: [[resultPtr:%.+]] = llvm.call @__catalyst__qis__PauliMeasure
+        // CHECK-NOT: llvm.load
+        // CHECK: llvm.insertvalue [[resultPtr]]
+        %mres, %out = pbc.ppm ["Z"] %q0 : !quantum.res, !quantum.bit
+        return %mres, %out : !quantum.res, !quantum.bit
+    }
+}
+
+// -----
+
+// A gadget is lowered in place, bracketed by calls that carry its source rotation and verdict.
+
+// CHECK-LABEL: @test_gadget
+module @test_gadget {
+    // CHECK: llvm.func @__catalyst__qis__EndGadget()
+    // CHECK: llvm.func @__catalyst__qis__BeginGadget(!llvm.ptr, f64, i32, i64, ...)
+    func.func @gadget(%q0 : !quantum.bit, %q1 : !quantum.bit) -> (!quantum.bit, !quantum.bit) {
+        // CHECK-DAG: [[word:%.+]] = llvm.getelementptr inbounds {{.*}}[0, 0] : (!llvm.ptr) -> !llvm.ptr, !llvm.array<3 x i8>
+        // CHECK-DAG: [[theta:%.+]] = llvm.mlir.constant(0.78539816339744828 : f64) : f64
+        // CHECK-DAG: [[verdict:%.+]] = llvm.mlir.constant(1 : i32) : i32
+        // CHECK-DAG: [[size:%.+]] = llvm.mlir.constant(2 : i64) : i64
+        // CHECK: llvm.call @__catalyst__qis__BeginGadget([[word]], [[theta]], [[verdict]], [[size]], %arg0, %arg1)
+        // CHECK: llvm.call @__catalyst__qis__PauliRot
+        // CHECK: llvm.call @__catalyst__qis__EndGadget()
+        %out:2 = pbc.gadget ["X", "Z"] theta(0.78539816339744828) verdict(verified) (%q0, %q1) : !quantum.bit, !quantum.bit {
+        ^bb0(%a: !quantum.bit, %b: !quantum.bit):
+            %r:2 = pbc.ppr ["X", "Z"](8) %a, %b : !quantum.bit, !quantum.bit
+            pbc.yield %r#0, %r#1 : !quantum.bit, !quantum.bit
+        }
+        return %out#0, %out#1 : !quantum.bit, !quantum.bit
     }
 }

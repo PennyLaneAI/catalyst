@@ -678,6 +678,64 @@ LogicalResult AdjointOp::verify() {
     return success();
 }
 
+// Both regions run, each on the shots its predicate selects, and return to the op.
+void PredicatedOp::getSuccessorRegions(RegionBranchPoint point,
+                                       SmallVectorImpl<RegionSuccessor> &regions) {
+    if (!point.isParent()) {
+        regions.push_back(RegionSuccessor(getOperation(), getResults()));
+        return;
+    }
+    regions.push_back(RegionSuccessor(&getThenRegion(), getThenRegion().getArguments()));
+    regions.push_back(RegionSuccessor(&getElseRegion(), getElseRegion().getArguments()));
+}
+
+OperandRange PredicatedOp::getEntrySuccessorOperands(RegionSuccessor successor) {
+    return getQubits();
+}
+
+LogicalResult PredicatedOp::verify() {
+    const size_t numQubits = getQubits().size();
+    if (getNumResults() < numQubits) {
+        return emitOpError("must return one qubit per qubit operand");
+    }
+    for (auto [operand, result] : llvm::zip(getQubits(), getOutQubits())) {
+        if (operand.getType() != result.getType()) {
+            return emitOpError("must return its qubits first, in operand order");
+        }
+    }
+    for (Value handle : getResultHandles()) {
+        if (!isa<ResultType>(handle.getType())) {
+            return emitOpError("may only return qubits and result handles");
+        }
+    }
+
+    for (Region *region : {&getThenRegion(), &getElseRegion()}) {
+        Block &block = region->front();
+        if (block.getArgumentTypes() != getQubits().getTypes()) {
+            return emitOpError("region arguments must match the qubit operands");
+        }
+        auto yield = dyn_cast<YieldOp>(block.getTerminator());
+        if (!yield || yield.getRetvals().getTypes() != getResultTypes()) {
+            return emitOpError("regions must yield values of the op's result types");
+        }
+        // Qubits are threaded through the block arguments, so that each region can be
+        // flattened in turn.
+        auto captured = region->walk([&](Operation *op) {
+            for (Value operand : op->getOperands()) {
+                if (isa<QubitType, QuregType>(operand.getType()) &&
+                    !region->isAncestor(operand.getParentRegion())) {
+                    return WalkResult::interrupt();
+                }
+            }
+            return WalkResult::advance();
+        });
+        if (captured.wasInterrupted()) {
+            return emitOpError("regions may not use qubits or registers from above");
+        }
+    }
+    return success();
+}
+
 LogicalResult CtrlOp::verify() {
     auto noMeasureWalkRes = this->getRegion().walk([](Operation *op) {
         return isa<MeasurementProcess, MeasureOp, pbc::PPMeasurementOp, mbqc::MeasureInBasisOp>(op)

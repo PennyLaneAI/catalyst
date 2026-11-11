@@ -39,6 +39,10 @@ void populateCtrlLoweringPatterns(mlir::RewritePatternSet &);
 void populateGridsynthPatterns(mlir::RewritePatternSet &patterns, double epsilon, bool pprBasis,
                                GridsynthMethod method);
 void populateQIRConversionPatterns(mlir::TypeConverter &, mlir::RewritePatternSet &, bool);
+/// Flatten every quantum.predicated under `root` into its regions' ops, between
+/// quantum.predicate_push and quantum.predicate_pop. Run before the LLVM conversion, so that the
+/// conversion never maps values across regions.
+void flattenPredicatedOps(mlir::Operation *root);
 void populateCancelInversesPatterns(mlir::RewritePatternSet &);
 void populateMergeRotationsPatterns(mlir::RewritePatternSet &);
 void populateResolveStatePrepOperatorPatterns(mlir::RewritePatternSet &);

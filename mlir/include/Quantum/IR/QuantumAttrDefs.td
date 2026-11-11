@@ -38,6 +38,17 @@ def NamedObservable : I32EnumAttr<"NamedObservable",
 
 def NamedObservableAttr : EnumAttr<QuantumDialect, NamedObservable, "named_observable">;
 
+def PostselectModeAttr : I32EnumAttr<"PostselectMode",
+    "How a delegated program applies postselection.",
+    [
+        // Project the state and renormalise; fail on zero probability.
+        I32EnumAttrCase<"fill_shots", 0>,
+        // Keep every shot and mark the ones that fail postselection dead.
+        I32EnumAttrCase<"hw_like",    1>,
+    ]> {
+    let cppNamespace = "catalyst::quantum";
+}
+
 def PauliWord : TypedArrayAttrBase<StrAttr, "A product of Pauli operators, aka a Pauli word.">;
 
 class DictValuesOfType<string attrCppType> : AttrConstraint<
