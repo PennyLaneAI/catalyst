@@ -605,6 +605,11 @@
   operations without control wires.
   [(#3143)](https://github.com/PennyLaneAI/catalyst/pull/3143)
 
+* A `pbc-ref-collapse-if-ppr` pass is added, which turns `scf.if` branches that only apply pi/2
+  `pbc.ref.ppr` operations into conditional `pbc.ref.ppr` operations, so that they no longer need
+  host control flow.
+  [(#3435)](https://github.com/PennyLaneAI/catalyst/pull/3435)
+
 * An X/Z syndrome decode can now be routed to its own decoder in a backline coprocessor.
   `qecp.decode_esm_css` carries an optional `check_type` attribute recording which check family a
   syndrome came from, which `lower-decode-to-transport` maps to a `decoder_id` on `transport.kick`.
@@ -865,6 +870,9 @@
 
 <h3>Breaking changes 💔</h3>
 
+* We now have `capture=True` as the default mode for Catalyst `qjit`.
+  [(#3414)](https://github.com/PennyLaneAI/catalyst/pull/3414)
+
 * The `register-decomp-rule-resource` pass is being removed, since rules are now attributed on-demand via `ResourceAnalysis`.
   [(#3432)](https://github.com/PennyLaneAI/catalyst/pull/3432)
 
@@ -972,6 +980,11 @@
 <h3>Deprecations 👋</h3>
 
 <h3>Bug fixes 🐛</h3>
+
+* A `qp.Backline` device with a `qec_code` no longer fails to compile circuits whose gates are
+  `Operator2`. The unused decomposition rules captured with the circuit are now removed before
+  `convert-quantum-to-qecl`, which could not convert them.
+  [(#3472)](https://github.com/PennyLaneAI/catalyst/pull/3472)
 
 * Runtime functions that take a boolean argument are now declared with `zeroext` on it. Before, a
   computed `i1`, such as a negated measurement result in the condition of a conditional Pauli

@@ -1313,8 +1313,9 @@ def test_qec_pass_names_match_the_transforms_that_provide_them():
 
     scheduled = [name for name, _ in _qec_pass_specs("steane")]
     assert scheduled == [
-        convert_quantum_to_qecl_pass.pass_name,
         "symbol-dce",  # a built-in MLIR pass, with no transform of its own
+        convert_quantum_to_qecl_pass.pass_name,
+        "symbol-dce",
         inject_noise_to_qecl_pass.pass_name,
         convert_qecl_to_qecp_pass.pass_name,
         convert_qecp_to_quantum_pass.pass_name,
