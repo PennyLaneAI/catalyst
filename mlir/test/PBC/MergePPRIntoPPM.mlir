@@ -290,3 +290,96 @@ func.func public @circuit_transformed_0() -> (tensor<i1>, tensor<i1>) {
     quantum.device_release
     return %from_elements, %from_elements_2 : tensor<i1>, tensor<i1>
 }
+
+// -----
+
+// A PPR output used inside a nested region after the PPM does not block the merge.
+
+// CHECK-LABEL: @merge_ppr_ppm_nested_use_after_ppm
+func.func public @merge_ppr_ppm_nested_use_after_ppm(%q0: !quantum.bit, %q1: !quantum.bit, %c: i1) -> (!quantum.bit, !quantum.bit) {
+
+    // CHECK: [[q:%.+]] = pbc.ppr ["Z"](8)
+    // CHECK: [[m:%.+]], [[o:%.+]]:2 = pbc.ppm ["Z", "X"](-) {{%.+}}, [[q]]
+    // CHECK: [[r:%.+]]:2 = pbc.ppr ["Z", "Y"](4) [[o]]#0, [[o]]#1
+    // CHECK: scf.if
+    // CHECK:   pbc.ppr ["Z"](8) [[r]]#0
+    %0 = pbc.ppr ["Z"](8) %q1 : !quantum.bit
+    %1:2 = pbc.ppr ["Z", "Y"](4) %q0, %0 : !quantum.bit, !quantum.bit
+    %m, %2 = pbc.ppm ["Z"] %1#1 : i1, !quantum.bit
+    %3 = scf.if %c -> !quantum.bit {
+        %4 = pbc.ppr ["Z"](8) %1#0 : !quantum.bit
+        scf.yield %4 : !quantum.bit
+    } else {
+        scf.yield %1#0 : !quantum.bit
+    }
+    return %3, %2 : !quantum.bit, !quantum.bit
+}
+
+// -----
+
+// A PPR output that reaches the PPM through a nested region blocks the merge.
+
+// CHECK-LABEL: @merge_ppr_ppm_nested_use_before_ppm
+func.func public @merge_ppr_ppm_nested_use_before_ppm(%q0: !quantum.bit, %q1: !quantum.bit, %c: i1) -> (!quantum.bit, !quantum.bit) {
+
+    // CHECK: [[r:%.+]]:2 = pbc.ppr ["Z", "Y"](4)
+    // CHECK: [[if:%.+]] = scf.if
+    // CHECK: pbc.ppm ["Z", "Z"] [[r]]#1, [[if]]
+    %0 = pbc.ppr ["Z"](8) %q1 : !quantum.bit
+    %1:2 = pbc.ppr ["Z", "Y"](4) %q0, %0 : !quantum.bit, !quantum.bit
+    %2 = scf.if %c -> !quantum.bit {
+        %3 = pbc.ppr ["X"](8) %1#0 : !quantum.bit
+        scf.yield %3 : !quantum.bit
+    } else {
+        scf.yield %1#0 : !quantum.bit
+    }
+    %m, %4:2 = pbc.ppm ["Z", "Z"] %1#1, %2 : i1, !quantum.bit, !quantum.bit
+    return %4#0, %4#1 : !quantum.bit, !quantum.bit
+}
+
+// -----
+
+// Both branches yield the same PPR output directly to the PPM.
+// The yield operations have no users, so the surrounding scf.if must be checked.
+
+// CHECK-LABEL: @merge_ppr_ppm_identical_yields_before_ppm
+func.func public @merge_ppr_ppm_identical_yields_before_ppm(%q0: !quantum.bit, %q1: !quantum.bit, %c: i1) -> (!quantum.bit, !quantum.bit) {
+
+    // CHECK: [[r:%.+]]:2 = pbc.ppr ["Z", "Y"](4)
+    // CHECK: [[if:%.+]] = scf.if
+    // CHECK:   scf.yield [[r]]#0
+    // CHECK: } else {
+    // CHECK:   scf.yield [[r]]#0
+    // CHECK: pbc.ppm ["Z", "Z"] [[r]]#1, [[if]]
+    %0 = pbc.ppr ["Z"](8) %q1 : !quantum.bit
+    %1:2 = pbc.ppr ["Z", "Y"](4) %q0, %0 : !quantum.bit, !quantum.bit
+    %2 = scf.if %c -> !quantum.bit {
+        scf.yield %1#0 : !quantum.bit
+    } else {
+        scf.yield %1#0 : !quantum.bit
+    }
+    %m, %3:2 = pbc.ppm ["Z", "Z"] %1#1, %2 : i1, !quantum.bit, !quantum.bit
+    return %3#0, %3#1 : !quantum.bit, !quantum.bit
+}
+
+// -----
+
+// A PPR is not merged into a PPM in a different block.
+
+// CHECK-LABEL: @merge_ppr_ppm_different_block
+func.func public @merge_ppr_ppm_different_block(%q0: !quantum.bit, %q1: !quantum.bit, %c: i1) -> (!quantum.bit, !quantum.bit, i1) {
+
+    // CHECK: [[r:%.+]]:2 = pbc.ppr ["Z", "Y"](4)
+    // CHECK: scf.if
+    // CHECK:   pbc.ppm ["Z"] [[r]]#1
+    %0 = pbc.ppr ["Z"](8) %q1 : !quantum.bit
+    %1:2 = pbc.ppr ["Z", "Y"](4) %q0, %0 : !quantum.bit, !quantum.bit
+    %2:2 = scf.if %c -> (i1, !quantum.bit) {
+        %m, %3 = pbc.ppm ["Z"] %1#1 : i1, !quantum.bit
+        scf.yield %m, %3 : i1, !quantum.bit
+    } else {
+        %false = arith.constant false
+        scf.yield %false, %1#1 : i1, !quantum.bit
+    }
+    return %1#0, %2#1, %2#0 : !quantum.bit, !quantum.bit, i1
+}
