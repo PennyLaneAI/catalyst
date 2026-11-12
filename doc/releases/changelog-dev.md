@@ -1446,13 +1446,20 @@
 
 * The preparation of the graph solver is moved to a shared algorithm used by passes that need to use it.
   - The `resource-analysis` pass and `graph-decomposition` pass use the same shared logic owned 
-by `ResourceAnalysis` object to forward walk through the module, and collect all operators
-encountered, and their resource counts, accounting for modifier regions (across function call
-sites as well) accurately. [(#3349)](https://github.com/PennyLaneAI/catalyst/pull/3349)
+    by `ResourceAnalysis` object to forward walk through the module, and collect all operators 
+    encountered, and their resource counts, accounting for modifier regions (across function call 
+    sites as well) accurately. [(#3349)](https://github.com/PennyLaneAI/catalyst/pull/3349)
 
-  - The preparation of inputs to the graph solver, including parsing the fixed/alt decomps, gateset, and collecting rule nodes
-are refactored into their own file, 'GraphPrep.hpp/cpp`. This is to expose the shared logic of graph solver preparation
-among passes that need to use it. [(#3349)](https://github.com/PennyLaneAI/catalyst/pull/3349)
+  - The preparation of inputs to the graph solver, including parsing the fixed/alt decomps, gateset, 
+    and collecting rule nodes are refactored into their own file, `GraphPrep.hpp/cpp`. This is to 
+    expose the shared logic of graph solver preparation among passes that need to use it. 
+    [(#3349)](https://github.com/PennyLaneAI/catalyst/pull/3349)
+
+* A new pass `resource-estimate` was added, it is used by `qp.estimate`. This is a pass that 
+  does not apply decompositions; currently loads rule definitions into the module.
+  It uses `ResourceAnalysis` to gather resource counts, and `GraphPrep` to build and solve the graph 
+  to project those resource counts in the target gate-set for `qp.estimate(..., target=gate_set)`.
+  [(#3351)](https://github.com/PennyLaneAI/catalyst/pull/3351)
 
 
 <h3>Documentation 📝</h3>

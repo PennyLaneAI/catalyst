@@ -1790,6 +1790,9 @@ def graph_decomposition_setup_inputs(
     and the graph solver will determine the optimal decomposition rules to apply,
     minimizing the overall gate count or the cost according to user-specified weights.
 
+    The same options are also used by the ``-resource-estimate`` MLIR compiler analysis pass for
+    the graph-based resource estimation.
+
     .. note::
 
         The QNode itself will not be changed or transformed by applying these decorators.
@@ -1931,6 +1934,10 @@ def graph_decomposition_setup_inputs(
 
 graph_decomposition = qp.transform(
     pass_name="graph-decomposition", setup_inputs=graph_decomposition_setup_inputs
+)
+
+resource_estimate = qp.transform(
+    pass_name="resource-estimate", setup_inputs=graph_decomposition_setup_inputs
 )
 
 __all__ = [
