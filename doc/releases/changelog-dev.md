@@ -1165,6 +1165,11 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* The runtime test suite can test `lightning.cliffish`, a device built in pennylane-lightning,
+  through the runtime C-API. Pass the path of its library to
+  `make -C runtime test LIGHTNING_CLIFFISH_LIB=<path>`; without it, nothing changes.
+  [(#3422)](https://github.com/PennyLaneAI/catalyst/pull/3422)
+
 * FuncOp's with quantum dialect instructions can now always be inlined.
   [(#3420)](https://github.com/PennyLaneAI/catalyst/pull/3420)
 

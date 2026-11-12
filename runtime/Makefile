@@ -17,6 +17,8 @@ ENABLE_OQD ?= OFF
 ENABLE_TRANSPORT ?= OFF
 TRANSPORT_HIP ?= AUTO
 ENABLE_EXECUTOR ?= OFF
+# Path to liblightning_cliffish_catalyst built in pennylane-lightning; set it to test that device
+LIGHTNING_CLIFFISH_LIB ?=
 ENABLE_ASAN ?= OFF
 STRICT_WARNINGS ?= ON
 LLVM_SRC_DIR ?= $(MK_DIR)/../mlir/llvm-project/
@@ -68,6 +70,10 @@ ifeq ($(ENABLE_EXECUTOR), ON)
 	TEST_TARGETS += runner_tests_executor
 endif
 
+ifneq ($(LIGHTNING_CLIFFISH_LIB),)
+	TEST_TARGETS += runner_tests_lightning_cliffish
+endif
+
 .PHONY: help
 help:
 	@echo "Please use \`make <target>' where <target> is one of"
@@ -98,6 +104,7 @@ configure:
 		-DENABLE_TRANSPORT=$(ENABLE_TRANSPORT) \
 		-DTRANSPORT_HIP=$(TRANSPORT_HIP) \
 		-DENABLE_EXECUTOR=$(ENABLE_EXECUTOR) \
+		-DLIGHTNING_CLIFFISH_LIB=$(LIGHTNING_CLIFFISH_LIB) \
 		-DENABLE_CODE_COVERAGE=$(CODE_COVERAGE) \
 		-DPython_EXECUTABLE=$(PYTHON) \
 		-DENABLE_ADDRESS_SANITIZER=$(ENABLE_ASAN) \
@@ -144,6 +151,10 @@ endif
 ifeq ($(ENABLE_EXECUTOR), ON)
 	# Test the catalyst-executor server over a loopback connection
 	$(ASAN_COMMAND) $(RT_BUILD_DIR)/tests/runner_tests_executor
+endif
+ifneq ($(LIGHTNING_CLIFFISH_LIB),)
+	# Test lightning.cliffish, built in pennylane-lightning, through the runtime C-API
+	$(ASAN_COMMAND) $(RT_BUILD_DIR)/tests/runner_tests_lightning_cliffish
 endif
 
 .PHONY: test-transport
