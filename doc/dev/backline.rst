@@ -346,7 +346,7 @@ image. The controller runs as root on the board and currently supports only BL16
     In the coprocessor's config, set ``peer=balboa`` and set ``gid=`` to the RoCE v2 GID of its
     IPv4 address.
 
-The `Backline repository <https://github.com/PennyLaneAI/backline>`_ has all three images, with
+The `Backline repository <https://github.com/PennyLaneAI/backline>`_ provides more information about the images, with
 steps to build and boot them and to reproduce its measurements.
 
 The transport dialect
