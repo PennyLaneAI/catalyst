@@ -217,7 +217,7 @@ To reuse LLVM, StableHLO and Enzyme built in another Catalyst checkout, run:
 
 .. code-block:: console
 
-  make worktree CATALYST_MAIN_CHECKOUT_DIR="$HOME/Github/catalyst"
+  make worktree CATALYST_MAIN_CHECKOUT_DIR="/path/to/a/catalyst/checkout/with/built/dependencies"
 
 This builds Catalyst's components locally and installs the frontend, while sharing
 the other checkout's dependencies. Their revisions, patches and build configuration
