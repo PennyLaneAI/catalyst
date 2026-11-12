@@ -1516,6 +1516,10 @@
   `lightning.kokkos` and `lightning.gpu` or `null.qubit` (for mock-execution).
   [(#3413)](https://github.com/PennyLaneAI/catalyst/pull/3413)
 
+* The Backline developer guide now covers the `peer=` key for RDMA coprocessors, the
+  `hsb_hwhs` and `balboa_hwhs` FPGA controllers and the board image each controller needs.
+  [(#XXXX)](https://github.com/PennyLaneAI/catalyst/pull/XXXX)
+
 <h3>Contributors ✍️</h3>
 
 This release contains contributions from (in alphabetical order):
