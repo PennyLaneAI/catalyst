@@ -46,6 +46,9 @@ const PipelineList pipelineList{
       "split-multiple-tapes",
       // Run the transform sequence defined in the MLIR module
       ApplyTransformSequencePassName,
+      // Drop unused decomposition rules before flattening modules, which renames
+      // every remaining symbol and updates its uses.
+      "symbol-dce",
       // Nested modules are something that will be used in the future
       // for making device-specific transformations.
       // Since at the moment, nothing in the runtime is using them
