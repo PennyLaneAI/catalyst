@@ -146,6 +146,31 @@ static bool validateSupportedControlFlow(Operation *op) {
     return !result.wasSkipped();
 }
 
+// Returns true if `value` is written into the memory of another buffer, as in the rank-0
+// indirection used to make a reallocatable buffer visible from inside nested control flow:
+//
+//   %buffer = memref.alloc(%capacity) : memref<?xi8>
+//   %holder = memref.alloc() : memref<memref<?xi8>>
+//   memref.store %buffer, %holder[] : memref<memref<?xi8>>
+//
+// Such a buffer falls outside the model this pass is built on. Liveness sees the store as the last
+// use of `%buffer`, and BufferViewFlowAnalysis does not follow buffers through memory, so every
+// later `memref.load %holder[]` that hands the buffer back is invisible to both. That makes both
+// phases of the pass unsound for it: a dealloc placed from that liveness frees the buffer while it
+// is still reachable, and a clone introduced for it breaks the aliasing the indirection exists to
+// provide in the first place.
+//
+// There is no placement this pass could compute instead. The buffer's lifetime is bounded by the
+// holder's, but the deallocation that actually ends it frees the *loaded* value, which is a
+// different SSA value that this pass cannot connect back to the allocation. Ownership of buffers
+// that escape this way therefore stays with whoever built the indirection.
+static bool isStoredIntoBuffer(Value value) {
+    return llvm::any_of(value.getUses(), [](OpOperand &use) {
+        auto storeOp = dyn_cast<memref::StoreOp>(use.getOwner());
+        return storeOp && storeOp.getValueToStore() == use.get();
+    });
+}
+
 namespace {
 
 //===----------------------------------------------------------------------===//
@@ -268,11 +293,19 @@ class BufferDeallocation : public BufferPlacementTransformationBase {
             aliasToAllocations[alloc] = allocationInterface;
 
             // Get the alias information for the current allocation node.
+            bool escapes = false;
             for (Value alias : aliases.resolve(alloc)) {
                 // TODO: check for incompatible implementations of the
                 // AllocationOpInterface. This could be realized by promoting the
                 // AllocationOpInterface to a DialectInterface.
                 aliasToAllocations[alias] = allocationInterface;
+
+                // Note that the escape has to be looked for across the whole alias set, not just on
+                // the allocation itself: what gets stored is typically a `memref.cast` of it.
+                escapes |= isStoredIntoBuffer(alias);
+            }
+            if (escapes) {
+                escapingAllocs.insert(alloc);
             }
         }
         return success();
@@ -331,6 +364,11 @@ class BufferDeallocation : public BufferPlacementTransformationBase {
         // Detect possibly unsafe aliases starting from all allocations.
         for (BufferPlacementAllocs::AllocEntry &entry : allocs) {
             Value allocValue = std::get<0>(entry);
+            // Cloning a buffer that is reachable through memory would silently split it in two:
+            // the clone would be written to while readers keep loading the original.
+            if (escapingAllocs.contains(allocValue)) {
+                continue;
+            }
             findUnsafeValues(allocValue, allocValue.getDefiningOp()->getBlock());
         }
         // Try to find block arguments that require an explicit free operation
@@ -549,6 +587,14 @@ class BufferDeallocation : public BufferPlacementTransformationBase {
         // liveness.
         for (const BufferPlacementAllocs::AllocEntry &entry : allocs) {
             Value alloc = std::get<0>(entry);
+
+            // Buffers that are stored into other buffers outlive every use this pass can see, so
+            // neither inserting a dealloc for them nor moving an existing one is sound. Leave them
+            // exactly as the author wrote them; see isStoredIntoBuffer.
+            if (escapingAllocs.contains(alloc)) {
+                continue;
+            }
+
             auto aliasesSet = aliases.resolve(alloc);
             assert(!aliasesSet.empty() && "must contain at least one alias");
 
@@ -663,6 +709,10 @@ class BufferDeallocation : public BufferPlacementTransformationBase {
 
     /// Maps aliases to their source allocation interfaces (inverse mapping).
     AliasAllocationMapT aliasToAllocations;
+
+    /// Allocations whose buffer is stored into another buffer, and whose lifetime is therefore not
+    /// observable from SSA use lists. This pass leaves their deallocation alone.
+    ValueSetT escapingAllocs;
 };
 
 //===----------------------------------------------------------------------===//
