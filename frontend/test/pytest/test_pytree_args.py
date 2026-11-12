@@ -46,6 +46,7 @@ class TestPyTreesReturnValues:
         result = jitted_fn(params)
         assert jnp.allclose(result, expected)
 
+    @pytest.mark.old_frontend
     def test_return_value_mcm(self, backend):
         """Test that a qnode can return a scalar mcm."""
 
@@ -53,10 +54,29 @@ class TestPyTreesReturnValues:
         def circuit2():
             return measure(0)
 
-        jitted_fn = qjit(circuit2)
+        jitted_fn = qjit(circuit2, capture=False)
 
         result = jitted_fn()
         assert not result
+
+    @pytest.mark.old_frontend
+    @pytest.mark.parametrize("classical_value", [0.4, {"c": (0.4, 0.6)}])
+    def test_return_value_classical(self, backend, classical_value):
+        """Test returning classical scalars and nested values alongside a measurement."""
+
+        @qjit(capture=False)
+        @qp.qnode(qp.device(backend, wires=2))
+        def circuit(value):
+            qp.RX(0.4, wires=0)
+            qp.RX(0.8, wires=1)
+            return qp.expval(qp.Z(0) @ qp.Z(1)), value
+
+        result, returned_value = circuit(classical_value)
+        assert np.allclose(result, np.cos(0.4) * np.cos(0.8))
+        returned_leaves, returned_tree = tree_flatten(returned_value)
+        expected_leaves, expected_tree = tree_flatten(classical_value)
+        assert returned_tree == expected_tree
+        assert np.allclose(returned_leaves, expected_leaves)
 
     def test_return_value_arrays(self, backend):
         """Test arrays."""
@@ -78,14 +98,14 @@ class TestPyTreesReturnValues:
         def circuit2(params):
             qp.RX(params[0], wires=0)
             qp.RX(params[1], wires=1)
-            return [jnp.pi, qp.state()]
+            return [qp.expval(qp.Z(0)), qp.state()]
 
         jitted_fn = qjit(circuit2)
 
         params = [0.4, 0.8]
         result = jitted_fn(params)
         assert isinstance(result, list)
-        assert jnp.allclose(result[0], jnp.pi)
+        assert jnp.allclose(result[0], jnp.cos(params[0]))
         assert jnp.allclose(result[1], ip_result)
 
     def test_return_value_tuples(self, backend, tol_stochastic):
@@ -95,9 +115,7 @@ class TestPyTreesReturnValues:
         def circuit1():
             qp.Hadamard(0)
             qp.CNOT(wires=[0, 1])
-            m0 = measure(0)
-            m1 = measure(1)
-            return (m0, m1)
+            return (qp.probs(wires=0), qp.probs(wires=1))
 
         jitted_fn = qjit(circuit1)
 
@@ -108,17 +126,20 @@ class TestPyTreesReturnValues:
         def circuit2():
             qp.Hadamard(0)
             qp.CNOT(wires=[0, 1])
-            m0 = measure(0)
-            m1 = measure(1)
-            return (((m0, m1), m0 + m1), m0 * m1)
+            return (
+                ((qp.probs(wires=0), qp.expval(qp.PauliZ(1))), qp.probs(wires=[0, 1])),
+                qp.expval(qp.PauliZ(0) @ qp.PauliZ(1)),
+            )
 
         jitted_fn = qjit(circuit2)
         result = jitted_fn()
         assert isinstance(result, tuple)
         assert isinstance(result[0], tuple)
         assert isinstance(result[0][0], tuple)
-        assert result[0][0][0] + result[0][0][1] == result[0][1]
-        assert result[0][0][0] * result[0][0][1] == result[1]
+        assert np.allclose(result[0][0][0], [0.5, 0.5])
+        assert jnp.allclose(result[0][0][1], 0.0)
+        assert np.allclose(result[0][1], [0.5, 0.0, 0.0, 0.5])
+        assert jnp.allclose(result[1], 1.0)
 
         @qp.set_shots(1000)
         @qp.qnode(qp.device(backend, wires=2))
@@ -194,7 +215,7 @@ class TestPyTreesReturnValues:
 
         # QFunc Path.
         @qjit
-        @qp.qnode(qp.device(backend, wires=1))
+        @qp.qnode(qp.device(backend, wires=3))
         def circuit1(n):
             @cond(n > 4)
             def cond_fn():
@@ -204,15 +225,19 @@ class TestPyTreesReturnValues:
             def else_fn():
                 return n, (n**2, n**3)
 
-            return cond_fn()
+            values = cond_fn()
+            qp.RX(values[0], wires=0)
+            qp.RX(values[1][0], wires=1)
+            qp.RX(values[1][1], wires=2)
+            return qp.expval(qp.Z(0)), (qp.expval(qp.Z(1)), qp.expval(qp.Z(2)))
 
         res2 = circuit1(2)
-        assert res2[0] == 2
-        assert res2[1] == (4, 8)
+        assert np.allclose(res2[0], np.cos(2))
+        assert np.allclose(res2[1], np.cos([4, 8]))
 
         res5 = circuit1(5)
-        assert res5[0] == 25
-        assert res5[1] == (125, 625)
+        assert np.allclose(res5[0], np.cos(25))
+        assert np.allclose(res5[1], np.cos([125, 625]))
 
         # Classical Path.
         @qjit
@@ -239,12 +264,17 @@ class TestPyTreesReturnValues:
         assert res5["cond"][1] == (125, 625)
         assert res5["const"] == 5
 
-    @pytest.mark.parametrize("mcm_method", ["single-branch-statistics", "one-shot"])
-    def test_return_value_dict(self, backend, tol_stochastic, mcm_method):
+    @pytest.mark.parametrize(
+        "capture_mode,mcm_method",
+        [
+            pytest.param(False, "single-branch-statistics", marks=pytest.mark.old_frontend),
+            pytest.param(False, "one-shot", marks=pytest.mark.old_frontend),
+            pytest.param(True, None, marks=pytest.mark.capture),
+        ],
+        indirect=["capture_mode"],
+    )
+    def test_return_value_dict(self, backend, tol_stochastic, capture_mode, mcm_method):
         """Test dictionaries."""
-
-        if mcm_method == "one-shot" and qp.capture.enabled():
-            pytest.xfail()
 
         @qp.qnode(qp.device(backend, wires=2))
         def circuit1(params):
@@ -255,7 +285,7 @@ class TestPyTreesReturnValues:
                 "w1": qp.expval(qp.PauliZ(1)),
             }
 
-        jitted_fn = qjit(circuit1)
+        jitted_fn = qjit(circuit1, capture=capture_mode)
 
         params = [0.2, 0.6]
         expected = {"w0": 0.98006658, "w1": 0.82533561}
@@ -279,13 +309,47 @@ class TestPyTreesReturnValues:
         params = [0.5, 0.6]
         expected_expval = 0.87758256
 
-        jitted_fn = qjit(circuit2)
+        jitted_fn = qjit(circuit2, capture=capture_mode)
         result = jitted_fn(params)
         assert isinstance(result, dict)
         assert isinstance(result["counts"], tuple)
         assert jnp.allclose(
             result["expval"]["z0"], expected_expval, atol=tol_stochastic, rtol=tol_stochastic
         )
+
+        @qp.set_shots(None)
+        @qp.qnode(qp.device(backend, wires=2))
+        def circuit3(params):
+            qp.RX(params[0], wires=0)
+            qp.RX(params[1], wires=1)
+            return {
+                "state": qp.state(),
+                "expval": {
+                    "z0": qp.expval(qp.PauliZ(0)),
+                },
+            }
+
+        params = [0.5, 0.6]
+        expected_expval = 0.87758256
+
+        jitted_fn = qjit(circuit3, capture=capture_mode)
+        result = jitted_fn(params)
+        assert isinstance(result, dict)
+        assert len(result["state"]) == 4
+        assert jnp.allclose(result["expval"]["z0"], expected_expval)
+
+        @qjit(capture=capture_mode)
+        def workflow1(param):
+            return {"w": jnp.sin(param), "q": jnp.cos(param)}
+
+        result = workflow1(jnp.pi / 2)
+        assert isinstance(result, dict)
+        assert result["w"] == 1
+
+    @pytest.mark.old_frontend
+    @pytest.mark.parametrize("mcm_method", ["single-branch-statistics", "one-shot"])
+    def test_return_value_dict_with_snapshots(self, backend, tol_stochastic, mcm_method):
+        """Test dictionary returns alongside snapshot states."""
 
         @qp.set_shots(1000)
         @qp.qnode(qp.device(backend, wires=2), mcm_method=mcm_method)
@@ -310,7 +374,7 @@ class TestPyTreesReturnValues:
                 dtype=jnp.complex128,
             ),
         ]
-        jitted_fn = qjit(circuit2_snapshot)
+        jitted_fn = qjit(circuit2_snapshot, capture=False)
         result = jitted_fn(params)
         assert isinstance(result, tuple)
         assert isinstance(result[0], list)
@@ -323,35 +387,6 @@ class TestPyTreesReturnValues:
             result[1]["expval"]["z0"], expected_expval, atol=tol_stochastic, rtol=tol_stochastic
         )
 
-        @qp.set_shots(None)
-        @qp.qnode(qp.device(backend, wires=2))
-        def circuit3(params):
-            qp.RX(params[0], wires=0)
-            qp.RX(params[1], wires=1)
-            return {
-                "state": qp.state(),
-                "expval": {
-                    "z0": qp.expval(qp.PauliZ(0)),
-                },
-            }
-
-        params = [0.5, 0.6]
-        expected_expval = 0.87758256
-
-        jitted_fn = qjit(circuit3)
-        result = jitted_fn(params)
-        assert isinstance(result, dict)
-        assert len(result["state"]) == 4
-        assert jnp.allclose(result["expval"]["z0"], expected_expval)
-
-        @qjit
-        def workflow1(param):
-            return {"w": jnp.sin(param), "q": jnp.cos(param)}
-
-        result = workflow1(jnp.pi / 2)
-        assert isinstance(result, dict)
-        assert result["w"] == 1
-
 
 class TestPyTreesFuncArgs:
     """Test QJIT workflows with PyTrees as function arguments."""
@@ -363,7 +398,7 @@ class TestPyTreesFuncArgs:
         def circuit1(params):
             qp.RX(params["a"][0], wires=0)
             qp.RX(params["b"][0], wires=1)
-            return qp.expval(qp.PauliZ(0) @ qp.PauliZ(1)), params["a"][0]
+            return qp.expval(qp.PauliZ(0) @ qp.PauliZ(1))
 
         jitted_fn = qjit(circuit1)
 
@@ -374,14 +409,13 @@ class TestPyTreesFuncArgs:
         expected = 0.64170937
         result = jitted_fn(params)
 
-        assert jnp.allclose(result[0], expected)
-        assert jnp.allclose(result[1], params["a"][0])
+        assert jnp.allclose(result, expected)
 
         @qp.qnode(qp.device(backend, wires=2))
         def circuit2(params):
             qp.RX(params["a"]["c"][0], wires=0)
             qp.RX(params["b"][0], wires=1)
-            return qp.expval(qp.PauliZ(0) @ qp.PauliZ(1)), params["a"]
+            return qp.expval(qp.PauliZ(0) @ qp.PauliZ(1))
 
         jitted_fn = qjit(circuit2)
 
@@ -392,11 +426,7 @@ class TestPyTreesFuncArgs:
         expected = 0.64170937
         result = jitted_fn(params)
 
-        assert isinstance(result, tuple)
-        assert jnp.allclose(result[0], expected)
-        assert isinstance(result[1]["c"], tuple)
-        assert jnp.allclose(result[1]["c"][0], params["a"]["c"][0])
-        assert jnp.allclose(result[1]["c"][1], params["a"]["c"][1])
+        assert jnp.allclose(result, expected)
 
         @qp.qnode(qp.device(backend, wires=2))
         def circuit3(params1, params2):
@@ -411,7 +441,7 @@ class TestPyTreesFuncArgs:
         def circuit1(params):
             qp.RX(params["a"][0], wires=0)
             qp.RX(params["b"][0], wires=1)
-            return qp.expval(qp.PauliZ(0) @ qp.PauliZ(1)), params["a"][0]
+            return qp.expval(qp.PauliZ(0) @ qp.PauliZ(1))
 
         jitted_fn = qjit(circuit1)
 
@@ -430,7 +460,7 @@ class TestPyTreesFuncArgs:
         def circuit1(params):
             qp.RX(params["a"][0], wires=0)
             qp.RX(params["b"][0], wires=1)
-            return qp.expval(qp.PauliZ(0) @ qp.PauliZ(1)), params["a"][0]
+            return qp.expval(qp.PauliZ(0) @ qp.PauliZ(1))
 
         jitted_fn = qjit(circuit1)
 
@@ -559,12 +589,12 @@ class TestPyTreesFuncArgs:
         def circuit(dictionary):
             """q0 = 1; q1 = 0;"""
             qp.RX(jnp.pi, wires=0)
-            return measure(dictionary["wire"])
+            return qp.probs(wires=dictionary["wire"])
 
         result = circuit({"wire": 0})
-        assert jnp.allclose(result, True)
+        assert np.allclose(result, [0.0, 1.0])
         result = circuit({"wire": 1})
-        assert jnp.allclose(result, False)
+        assert np.allclose(result, [1.0, 0.0])
 
     def test_args_used_indirectly_in_measure(self, backend):
         """Argument is used indirectly in measurement"""
@@ -574,12 +604,12 @@ class TestPyTreesFuncArgs:
         def circuit(dictionary):
             """q0 = 1; q1 = 0;"""
             qp.RX(jnp.pi, wires=0)
-            return measure((dictionary["wire"] + 1) % 2)
+            return qp.probs(wires=(dictionary["wire"] + 1) % 2)
 
         result = circuit({"wire": 0})
-        assert jnp.allclose(result, False)
+        assert np.allclose(result, [1.0, 0.0])
         result = circuit({"wire": 1})
-        assert jnp.allclose(result, True)
+        assert np.allclose(result, [0.0, 1.0])
 
     def test_dev_wires_have_pytree(self, backend, capture_mode):
         """Device wires are pytree-compatible."""

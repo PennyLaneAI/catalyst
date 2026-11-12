@@ -25,6 +25,8 @@
 #include "mlir/IR/Types.h"
 #include "mlir/Support/LLVM.h"
 
+#include "StringConstants.h"
+
 using namespace mlir;
 using namespace catalyst::quantum;
 
@@ -97,17 +99,15 @@ namespace quantum {
 // Always emitting the control-outermost form keeps such ops on a single node. The
 // caller appends the param/wire/static/uid groups. Extend this helper to support future op-level
 // modifiers, preserving the canonical order (mirror the Python side in decomposition_rules.py).
-static std::string wrapModifiers(std::string name, Operation *op) {
-    if (op->hasAttr("adjoint")) {
+static std::string wrapModifiers(std::string name, Operation *op, bool isAdjoint,
+                                 unsigned numControlQubits) {
+    if (isAdjoint) {
         name = "Adjoint(" + name + ")";
     }
-    if (auto gate = mlir::dyn_cast<QuantumGate>(op)) {
-        size_t numCtrl = gate.getCtrlQubitOperands().size();
-        if (numCtrl == 1) {
-            name = "C(" + name + ")";
-        } else if (numCtrl > 1) {
-            name = std::to_string(numCtrl) + "C(" + name + ")";
-        }
+    if (numControlQubits == 1) {
+        name = "C(" + name + ")";
+    } else if (numControlQubits > 1) {
+        name = std::to_string(numControlQubits) + "C(" + name + ")";
     }
     return name;
 }
@@ -121,7 +121,15 @@ std::string defaultGetGraphOpId(Operation *op) {
     // Fold op-level modifiers into the operator name so that `Op`, `Adjoint(Op)`, `C(Op)`, and
     // nested combinations are distinct in the graphOpId. Modifiers wrap only the name; the
     // param/wire/static/uid groups follow, e.g. `C(Adjoint(Rot)){...}{wires...}`.
-    ss << wrapModifiers(gate.getOperatorName(), op);
+
+    bool isAdjoint = op->hasAttr("adjoint");
+    size_t numCtrlQubits = 0;
+
+    if (auto gate = mlir::dyn_cast<QuantumGate>(op)) {
+        numCtrlQubits = gate.getCtrlQubitOperands().size();
+    }
+
+    ss << wrapModifiers(gate.getOperatorName(), op, isAdjoint, numCtrlQubits);
     printDynamicShape(gate.getDynamicShape(), ss);
     printWireLens(gate.getWireLens(), ss);
     gate.getStaticData().print(ss);
@@ -133,5 +141,52 @@ std::string defaultGetGraphOpId(Operation *op) {
     return out;
 }
 
+std::string defaultGetGraphOpIdExplicitModifiers(Operation *op, bool isAdjoint,
+                                                 unsigned numControlQubits, unsigned numWorkWires,
+                                                 bool isBorrowed) {
+    std::string out;
+    llvm::raw_string_ostream ss(out);
+
+    DecomposableGate gate = cast<DecomposableGate>(op);
+
+    // Fold op-level (Adjoint/Ctrl/WorkWire) modifiers into the operator name so that `Op`,
+    // `Adjoint(Op)`, `C(Op)`, `WorkWires(Op)`, and nested combinations are distinct in the
+    // graphOpId. Modifiers wrap only the name; the param/wire/static/uid groups follow, e.g.
+    // `C(Adjoint(Rot)){...}{wires...}`.
+
+    // Note: Currently WorkWire modifiers are supported as Ctrl modifiers with `work_wire` and
+    // `work_wire_type` attributes. Therefore, to "apply" WorkWire modifier, we need to over-write
+    // the wireLens and staticData with the explicit values.
+    ss << wrapModifiers(gate.getOperatorName(), op, isAdjoint, numControlQubits);
+    printDynamicShape(gate.getDynamicShape(), ss);
+
+    // Get Operation's wireLens and staticData without the WorkWire modifiers.
+    WireLens wireLens;
+    for (const auto &entry : gate.getWireLens()) {
+        if (entry.first != catalyst::CTRL_WORK_WIRES) {
+            wireLens.push_back(entry);
+        }
+    }
+    NamedAttrList staticData(gate.getStaticData());
+    staticData.erase(catalyst::CTRL_WORK_WIRE_TYPE);
+
+    // Apply the WorkWire modifiers to the wireLens and staticData.
+    if (numWorkWires > 0) {
+        wireLens.emplace_back(catalyst::CTRL_WORK_WIRES, numWorkWires);
+        staticData.set(
+            catalyst::CTRL_WORK_WIRE_TYPE,
+            StringAttr::get(op->getContext(), isBorrowed ? catalyst::CTRL_WORK_WIRE_TYPE_BORROWED
+                                                         : catalyst::CTRL_WORK_WIRE_TYPE_ZEROED));
+    }
+
+    printWireLens(wireLens, ss);
+    staticData.getDictionary(op->getContext()).print(ss);
+    if (gate.getExtraData() != "") {
+        ss << '[' << gate.getExtraData() << ']';
+    }
+    ss.flush();
+
+    return out;
+}
 } // namespace quantum
 } // namespace catalyst

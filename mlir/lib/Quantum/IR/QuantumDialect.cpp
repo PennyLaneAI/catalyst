@@ -88,9 +88,9 @@ void QuantumDialect::initialize() {
 
     addInterfaces<QuantumInlinerInterface>();
 
-    declarePromisedInterfaces<bufferization::BufferizableOpInterface, QubitUnitaryOp, HermitianOp,
-                              HamiltonianOp, SampleOp, CountsOp, ProbsOp, StateOp, SetStateOp,
-                              SetBasisStateOp>();
+    declarePromisedInterfaces<bufferization::BufferizableOpInterface, OperatorOp, QubitUnitaryOp,
+                              HermitianOp, HamiltonianOp, SampleOp, CountsOp, ProbsOp, StateOp,
+                              SetStateOp, SetBasisStateOp>();
 }
 
 /// Verify the QNode and kernel entry point attribute invariants

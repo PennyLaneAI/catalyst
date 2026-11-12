@@ -221,12 +221,12 @@ def GraphDecompositionPass : Pass<"graph-decomposition", "mlir::ModuleOp"> {
             /*Type*/"std::string",
             /*Description*/"Maps an operator to a decomposition rule that will be applied.">,
         ListOption<
-            /*C++ name*/"altDecompsOption",
-            /*CLI name*/"alt-decomps",
+            /*C++ name*/"excludeDecompsOption",
+            /*CLI name*/"exclude-decomps",
             /*Type*/"std::string",
             /*Description*/
-            "Maps an operator to a list of alternative decomposition rules that will be considered"
-            " alongside any built-in rules for the operator.">,
+            "Maps an operator to a list of decomposition rules to exclude from the graph."
+            " The rules remain available for subsequent passes.">,
         Option<
             /*C++ name*/"bytecodeRulesFile",
             /*CLI name*/"bytecode-rules",
