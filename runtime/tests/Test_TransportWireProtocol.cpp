@@ -17,6 +17,7 @@
 #include <cstring>
 
 #include "Frame.hpp"
+#include "HsbWire.hpp"
 #include "WireProtocol.hpp"
 
 #include <catch2/catch_test_macros.hpp>
@@ -149,6 +150,14 @@ TEST_CASE("a session's config may set the ring's slot count") {
                       Catch::Matchers::ContainsSubstring("power of two"));
     CHECK_THROWS_WITH(frame::geometry_from_config("frame_slots=0"),
                       Catch::Matchers::ContainsSubstring("power of two"));
+}
+
+TEST_CASE("an HSB ring has one slot") {
+    namespace hsb = catalyst::transport::common::hsb;
+    CHECK(hsb::ring_from_config("dev=mlx5_0;gid=3;peer=hsb").slots == 1);
+    CHECK(hsb::ring_from_config("frame_slots=1").region_bytes() == hsb::SLOT_BYTES);
+    CHECK_THROWS_WITH(hsb::ring_from_config("frame_slots=256"),
+                      Catch::Matchers::ContainsSubstring("one-slot ring"));
 }
 
 TEST_CASE("a BLV frame carries its payload, length and fn_id, and completes last") {

@@ -17,9 +17,9 @@
  * The HSB wire: a controller on an FPGA running NVIDIA's Holoscan Sensor Bridge (HSB) IP talking
  * to a coprocessor's NIC.
  *
- * - Request: HSB writes each 64 B request into the coprocessor's ring, slot n at n * SLOT_BYTES
- *   from IOVA 0, as a plain UC WRITE. It starts with a BL16 frame (Frame.hpp); the
- *   controller stamps its seq, counting from 1.
+ * - Request: HSB writes each 64 B request into the coprocessor's one-slot ring at IOVA 0, as a
+ *   plain UC WRITE. It starts with a BL16 frame (Frame.hpp); the controller stamps its seq,
+ *   counting from 1.
  * - Reply: the coprocessor sends a Payload back as an inline UC SEND to FPGA_RX_QPN, echoing the
  *   request's seq_num, which is how the controller matches it.
  * - Session setup: the coprocessor listens on its out-of-band port; once the controller has
@@ -46,8 +46,6 @@ inline constexpr std::uint32_t HS_VERSION = 1;
 
 // HSB's page is 128 B, the smallest slot pitch it can express.
 inline constexpr std::uint32_t SLOT_BYTES = 128;
-// The immediate carries a 12-bit slot index.
-inline constexpr std::uint32_t MAX_SLOTS = 4096;
 // One 512-bit beat: HSB's data path cannot carry less per message.
 inline constexpr std::uint32_t FRAME_BYTES = 64;
 inline constexpr std::uint32_t REPLY_BYTES = sizeof(Payload);
@@ -94,13 +92,15 @@ static_assert(sizeof(Ready) == 8, "Ready layout");
 static_assert(offsetof(Payload, seq_num) + sizeof(Payload::seq_num) <= FRAME_BYTES,
               "the seq a request carries must fall inside the frame HSB writes");
 
-/// The ring HSB writes into: BL16 frames, SLOT_BYTES apart, `frame_slots` of them
+/// The ring HSB writes into: one BL16 frame, so the request after a lost one lands in the slot the
+/// coprocessor polls
 inline frame::RingGeometry ring_from_config(std::string_view config) {
     frame::RingGeometry ring = frame::geometry_from_config(config);
     TP_CHECK(ring.mode == frame::Mode::BL16,
              "peer=hsb: HSB carries only BL16 frames (8 B messages)");
-    TP_CHECK(ring.slots <= MAX_SLOTS, "peer=hsb: frame_slots is %u, HSB addresses at most %u",
-             ring.slots, MAX_SLOTS);
+    TP_CHECK(!configparser::find(config, "frame_slots") || ring.slots == 1,
+             "peer=hsb: HSB uses a one-slot ring, so frame_slots must be 1, not %u", ring.slots);
+    ring.slots = 1;
     ring.stride = SLOT_BYTES;
     return ring;
 }
