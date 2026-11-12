@@ -214,16 +214,31 @@ The built-in backends are:
   ``fpga_verbs``, ``hsb_hwhs`` and ``balboa_hwhs`` are also available on ``fpga`` when named.
 * ``memcpy``: ``memcpy`` on ``cpu`` and ``memcpy_gpu`` on ``gpu``.
 
-An RDMA coprocessor also names its controller, its **peer**, with ``peer=`` in its backend config.
-The coprocessor backends stay ``cpu_verbs`` and ``gpu_verbs``; the peer picks the link they reach
-it through (``runtime/lib/transport/rdma/common/PeerLink.hpp``):
+A node's backend config is the ``config`` string in its ``init_args``, made of ``key=value``
+pairs separated by ``;``. An RDMA coprocessor names its controller, its **peer**, with ``peer=``
+in that string. The coprocessor backends stay ``cpu_verbs`` and ``gpu_verbs``; the peer picks the
+link they reach it through (``runtime/lib/transport/rdma/common/PeerLink.hpp``):
 
-* ``catalyst``: For the catalyst controllers (``cpu_verbs``, ``hwhs``, ``fpga_verbs``).
+* ``catalyst``: The default, used when ``peer=`` is left out. For the catalyst controllers
+  (``cpu_verbs``, ``hwhs``, ``fpga_verbs``).
 * ``hsb``: For ``hsb_hwhs``, a controller behind NVIDIA's Holoscan Sensor Bridge.
 * ``balboa``: For ``balboa_hwhs``, a controller behind ETH Zurich's BALBOA.
 
 A node placed on ``hsb_hwhs`` needs ``peer=hsb`` in its coprocessors' configs, and one on
-``balboa_hwhs`` needs ``peer=balboa``.
+``balboa_hwhs`` needs ``peer=balboa``. For example, a GPU coprocessor facing an ``hsb_hwhs``
+controller:
+
+.. code-block:: python
+
+    controller = qp.Controller(..., hardware="fpga", backend="hsb_hwhs")
+    coprocessor = qp.Coprocessor(
+        ...,
+        hardware="gpu",
+        init_args={"config": "dev=mlx5_0;gid=3;peer=hsb"},
+    )
+
+``dev`` and ``gid`` are required by every RDMA coprocessor: the RDMA device and the GID index on
+its port.
 
 A backend is a shared library implementing ``ControllerSession`` or ``CoprocessorSession`` from
 ``runtime/include/Transport.hpp`` and exporting the matching factory symbol declared in
@@ -336,7 +351,8 @@ image. The controller runs as root on the board and currently supports only BL16
 
 ``hwhs``
     The ERNIC image, with AMD's ERNIC as the network IP core. The controller opens ``/dev/xib0``
-    and ``/dev/mem``. Its coprocessors use the default ``peer``.
+    and ``/dev/mem``. Its coprocessors use the default, ``peer=catalyst``, and can leave ``peer``
+    out.
 ``hsb_hwhs``
     The HSB image, with NVIDIA's Holoscan Sensor Bridge as the network IP core.
     In the coprocessor's config, set ``peer=hsb`` and set ``gid=`` to the RoCE v2 GID of its IPv4
