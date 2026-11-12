@@ -24,8 +24,7 @@ target_link_libraries(catalyst_transport_coproc_gpu PUBLIC
     catalyst_transport_common
     hip::host)
 if(CMAKE_HIP_COMPILER_ID STREQUAL "NVIDIA")
-    # hipMemGetHandleForAddressRange dispatches through the CUDA driver symbol
-    # cuMemGetHandleForAddressRange, which isn't in the HIP runtime alone.
+    # GpuRuntime calls cuMemGetHandleForAddressRange from the CUDA driver library.
     target_link_libraries(catalyst_transport_coproc_gpu PUBLIC CUDA::cuda_driver)
 endif()
 

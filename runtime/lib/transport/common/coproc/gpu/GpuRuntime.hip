@@ -72,18 +72,11 @@ GpuRuntime::HbmRing GpuRuntime::alloc_hbm_ring(std::size_t bytes) {
                                      ~static_cast<std::uintptr_t>(page - 1));
     HIP_CHECK(hipMemset(r.ptr, 0, r.size), "hipMemset(ring)");
 #if defined(__HIP_PLATFORM_NVIDIA__)
-    // hipMemGetHandleForAddressRange needs CUDA 12.8+ on NVIDIA, so ask the CUDA driver instead.
-    using GetHandleFn =
-        CUresult (*)(void *, CUdeviceptr, std::size_t, CUmemRangeHandleType, unsigned long long);
-    void *get_handle = nullptr;
-    TP_CHECK(cudaGetDriverEntryPoint("cuMemGetHandleForAddressRange", &get_handle,
-                                     cudaEnableDefault) == cudaSuccess &&
-                 get_handle != nullptr,
-             "GpuRuntime: driver has no cuMemGetHandleForAddressRange");
-    TP_CHECK(reinterpret_cast<GetHandleFn>(get_handle)(
-                 &r.dmabuf_fd, reinterpret_cast<CUdeviceptr>(r.ptr), r.size,
-                 CU_MEM_RANGE_HANDLE_TYPE_DMA_BUF_FD, 0) == CUDA_SUCCESS,
-             "cuMemGetHandleForAddressRange(DmaBufFd)");
+    const CUresult rc =
+        cuMemGetHandleForAddressRange(&r.dmabuf_fd, reinterpret_cast<CUdeviceptr>(r.ptr), r.size,
+                                      CU_MEM_RANGE_HANDLE_TYPE_DMA_BUF_FD, 0);
+    TP_CHECK(rc == CUDA_SUCCESS, "cuMemGetHandleForAddressRange(DmaBufFd) failed: %d",
+             static_cast<int>(rc));
 #else
     HIP_CHECK(hipMemGetHandleForAddressRange(&r.dmabuf_fd, reinterpret_cast<hipDeviceptr_t>(r.ptr),
                                              r.size, hipMemRangeHandleTypeDmaBufFd, 0),
