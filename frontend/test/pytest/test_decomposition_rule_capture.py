@@ -620,10 +620,14 @@ def test_work_wire_variants_are_captured_independently():
 
         mlir = str(circuit.mlir_module)
 
+    # Count the distributed rule independently of generic alternatives for the same target.
+    empty_rule_definitions = "\n".join(
+        line for line in mlir.splitlines() if 'frontend_name = "empty_rule"' in line
+    )
     work_wire_id = "2C(RepeatedGate){}{ctrl_work_wires:1,wires:1}"
-    assert mlir.count('target_gate = "2C(RepeatedGate){}{wires:1}{}"') == 1
-    assert mlir.count(f'target_gate = "{work_wire_id}{BORROWED}"') == 1
-    assert mlir.count(f'target_gate = "{work_wire_id}{ZEROED}"') == 1
+    assert empty_rule_definitions.count('target_gate = "2C(RepeatedGate){}{wires:1}{}"') == 1
+    assert empty_rule_definitions.count(f'target_gate = "{work_wire_id}{BORROWED}"') == 1
+    assert empty_rule_definitions.count(f'target_gate = "{work_wire_id}{ZEROED}"') == 1
 
 
 def test_region_work_wires_are_ambient():
@@ -690,7 +694,11 @@ def test_distributed_control_carries_work_wires():
 
     root_id = f"2C(ContextRoot){{}}{{ctrl_work_wires:1,wires:1}}{ZEROED}"
     leaf_id = f"2C(ContextLeaf){{}}{{ctrl_work_wires:1,wires:1}}{ZEROED}"
-    (root_rule_line,) = [line for line in mlir.splitlines() if f'target_gate = "{root_id}"' in line]
+    (root_rule_line,) = [
+        line
+        for line in mlir.splitlines()
+        if f'target_gate = "{root_id}"' in line and 'frontend_name = "root_rule"' in line
+    ]
 
     assert (
         "(%arg0: !qref.reg<?>, %arg1: tensor<2xi64>, %arg2: tensor<2xi64>, "
@@ -734,10 +742,16 @@ def test_registered_callable_captures_work_wire_operands(work_wire_type):
             return qp.state()
 
     kernel_jaxpr = circuit.jaxpr.eqns[0].params["call_jaxpr"]
+    target_id = (
+        "2C(RepeatedGate){}{ctrl_work_wires:1,wires:1}"
+        f'{{ctrl_work_wire_type = "{work_wire_type}"}}'
+    )
+    # The zeroed-work-wire fallback also reaches a one-control variant of this rule.
     (rule,) = [
         eqn
         for eqn in find_eqns(kernel_jaxpr, decomp_definition_p)
         if eqn.params["frontend_name"] == "callable_ctrl_rule"
+        and eqn.params["target_gate"] == target_id
     ]
     (control,) = find_eqns(rule.params["func_jaxpr"], ctrl_transform_prim)
     assert "work_wires" not in control.params
