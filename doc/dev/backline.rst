@@ -332,7 +332,7 @@ FPGA controllers
 
 ``hwhs``, ``hsb_hwhs`` and ``balboa_hwhs`` drive an engine in the FPGA of an AMD VPK120, next to
 the network IP core that carries the RDMA traffic. Each one needs the board booted from its own
-image. The controller runs as root on the board and supports only BL16 frames.
+image. The controller runs as root on the board and currently supports only BL16 frames.
 
 ``hwhs``
     The ERNIC image, with AMD's ERNIC as the network IP core. The controller opens ``/dev/xib0``
