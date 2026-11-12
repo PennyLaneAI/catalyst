@@ -14,17 +14,12 @@
 
 #include "BalboaDevice.hpp"
 
-#include <cerrno>
-#include <cinttypes>
-#include <cstdio>
 #include <cstring>
 #include <ctime>
-#include <string>
-#include <sys/mman.h>
 
 #include "Error.hpp"
+#include "PhysWindow.hpp"
 
-#include <fcntl.h>
 #include <unistd.h>
 
 namespace catalyst::transport::balboa {
@@ -39,52 +34,6 @@ std::uint64_t now_ns() {
     clock_gettime(CLOCK_MONOTONIC, &ts);
     return static_cast<std::uint64_t>(ts.tv_sec) * 1'000'000'000ull +
            static_cast<std::uint64_t>(ts.tv_nsec);
-}
-
-bool read_sysfs_u64(const std::string &path, std::uint64_t *v) {
-    std::FILE *f = std::fopen(path.c_str(), "r");
-    if (f == nullptr) {
-        return false;
-    }
-    const bool ok = std::fscanf(f, "%" SCNx64, v) == 1;
-    std::fclose(f);
-    return ok;
-}
-
-// Map a physical window: the UIO device whose map0 starts at `phys`, else /dev/mem.
-void *map_window(std::uint64_t phys, std::size_t len) {
-    for (int i = 0; i < 64; ++i) {
-        const std::string dir = "/sys/class/uio/uio" + std::to_string(i) + "/maps/map0/";
-        std::uint64_t addr = 0, size = 0;
-        if (!read_sysfs_u64(dir + "addr", &addr) || addr != phys ||
-            !read_sysfs_u64(dir + "size", &size) || size < len) {
-            continue;
-        }
-        const std::string dev = "/dev/uio" + std::to_string(i);
-        const int fd = ::open(dev.c_str(), O_RDWR | O_SYNC);
-        TP_CHECK(fd >= 0, "balboa: %s (0x%" PRIx64 "): %s (the controller needs root)", dev.c_str(),
-                 phys, std::strerror(errno));
-        void *p = ::mmap(nullptr, len, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
-        ::close(fd);
-        TP_CHECK(p != MAP_FAILED, "balboa: mmap %s: %s", dev.c_str(), std::strerror(errno));
-        return p;
-    }
-    // No UIO device covers the window (device tree not applied?)
-    const int fd = ::open("/dev/mem", O_RDWR | O_SYNC);
-    TP_CHECK(fd >= 0, "balboa: no UIO device at 0x%" PRIx64 " and /dev/mem: %s", phys,
-             std::strerror(errno));
-    void *p =
-        ::mmap(nullptr, len, PROT_READ | PROT_WRITE, MAP_SHARED, fd, static_cast<off_t>(phys));
-    ::close(fd);
-    TP_CHECK(p != MAP_FAILED, "balboa: mmap /dev/mem at 0x%" PRIx64 ": %s", phys,
-             std::strerror(errno));
-    return p;
-}
-
-void unmap(volatile void *p, std::size_t len) {
-    if (p != nullptr) {
-        ::munmap(const_cast<void *>(p), len);
-    }
 }
 
 // `width` bits of `v` into the 192-bit context `w` at bit `lsb`.
@@ -133,16 +82,20 @@ void BalboaDevice::copy_from_dev64(void *dst, const volatile std::uint8_t *src, 
 
 BalboaDevice::BalboaDevice() {
     try {
-        regs_ = static_cast<volatile std::uint32_t *>(map_window(HWHS_PHYS_REGS, HWHS_SIZE_REGS));
-        slot_ = static_cast<volatile std::uint8_t *>(map_window(HWHS_PHYS_SLOT, HWHS_SIZE_SLOT));
-        reply_ = static_cast<volatile std::uint8_t *>(map_window(HWHS_PHYS_REPLY, HWHS_SIZE_REPLY));
-        trace_ =
-            static_cast<volatile std::uint32_t *>(map_window(HWHS_PHYS_TRACE, HWHS_SIZE_TRACE));
-        pacer_ = static_cast<volatile std::uint8_t *>(map_window(HWHS_PHYS_DEMO, HWHS_SIZE_DEMO));
-        gpio_id_ =
-            static_cast<volatile std::uint32_t *>(map_window(HWHS_PHYS_GPIO_ID, HWHS_SIZE_GPIO));
-        gpio_ctl_ =
-            static_cast<volatile std::uint32_t *>(map_window(HWHS_PHYS_GPIO_CTL, HWHS_SIZE_GPIO));
+        regs_ = static_cast<volatile std::uint32_t *>(
+            common::map_phys_window(HWHS_PHYS_REGS, HWHS_SIZE_REGS, "balboa"));
+        slot_ = static_cast<volatile std::uint8_t *>(
+            common::map_phys_window(HWHS_PHYS_SLOT, HWHS_SIZE_SLOT, "balboa"));
+        reply_ = static_cast<volatile std::uint8_t *>(
+            common::map_phys_window(HWHS_PHYS_REPLY, HWHS_SIZE_REPLY, "balboa"));
+        trace_ = static_cast<volatile std::uint32_t *>(
+            common::map_phys_window(HWHS_PHYS_TRACE, HWHS_SIZE_TRACE, "balboa"));
+        pacer_ = static_cast<volatile std::uint8_t *>(
+            common::map_phys_window(HWHS_PHYS_DEMO, HWHS_SIZE_DEMO, "balboa"));
+        gpio_id_ = static_cast<volatile std::uint32_t *>(
+            common::map_phys_window(HWHS_PHYS_GPIO_ID, HWHS_SIZE_GPIO, "balboa"));
+        gpio_ctl_ = static_cast<volatile std::uint32_t *>(
+            common::map_phys_window(HWHS_PHYS_GPIO_CTL, HWHS_SIZE_GPIO, "balboa"));
 
         // The GPIO is in the always-on pl0 domain and hwhs needs the net clock: check it before
         // touching hwhs, so a dead clock reports instead of hanging the bus.
@@ -163,13 +116,13 @@ BalboaDevice::BalboaDevice() {
 BalboaDevice::~BalboaDevice() { release(); }
 
 void BalboaDevice::release() noexcept {
-    unmap(regs_, HWHS_SIZE_REGS);
-    unmap(slot_, HWHS_SIZE_SLOT);
-    unmap(reply_, HWHS_SIZE_REPLY);
-    unmap(trace_, HWHS_SIZE_TRACE);
-    unmap(pacer_, HWHS_SIZE_DEMO);
-    unmap(gpio_id_, HWHS_SIZE_GPIO);
-    unmap(gpio_ctl_, HWHS_SIZE_GPIO);
+    common::unmap_phys_window(regs_, HWHS_SIZE_REGS);
+    common::unmap_phys_window(slot_, HWHS_SIZE_SLOT);
+    common::unmap_phys_window(reply_, HWHS_SIZE_REPLY);
+    common::unmap_phys_window(trace_, HWHS_SIZE_TRACE);
+    common::unmap_phys_window(pacer_, HWHS_SIZE_DEMO);
+    common::unmap_phys_window(gpio_id_, HWHS_SIZE_GPIO);
+    common::unmap_phys_window(gpio_ctl_, HWHS_SIZE_GPIO);
     regs_ = nullptr;
     slot_ = reply_ = pacer_ = nullptr;
     trace_ = gpio_id_ = gpio_ctl_ = nullptr;
