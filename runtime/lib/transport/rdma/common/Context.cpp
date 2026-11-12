@@ -18,27 +18,16 @@
 #include <cstdio>
 #include <cstring>
 #include <string>
+#include <sys/ioctl.h>
+#include <sys/socket.h>
 
 #include "Error.hpp"
+#include "OobSocket.hpp"
+
+#include <net/if.h>
 namespace catalyst::transport::common {
 
 namespace {
-// One line of a sysfs file, without its newline; empty if it cannot be read.
-std::string read_sysfs(const std::string &path) {
-    std::FILE *f = std::fopen(path.c_str(), "r");
-    if (f == nullptr) {
-        return {};
-    }
-    char buf[128] = {};
-    const bool ok = std::fgets(buf, sizeof(buf), f) != nullptr;
-    std::fclose(f);
-    if (!ok) {
-        return {};
-    }
-    buf[std::strcspn(buf, "\n")] = 0;
-    return buf;
-}
-
 constexpr std::uint8_t V4_PREFIX[12] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xff, 0xff};
 } // namespace
 
@@ -92,31 +81,28 @@ ibv_gid Context::gid(std::uint8_t port, int idx) const {
     return gid;
 }
 Ipv4Gid Context::ipv4_gid(std::uint8_t port, int idx) const {
-    const ibv_gid g = gid(port, idx);
-    TP_CHECK(std::memcmp(g.raw, V4_PREFIX, sizeof(V4_PREFIX)) == 0,
+    ibv_gid_entry e{};
+    const int rc = ibv_query_gid_ex(ctx_, port, idx, &e, 0);
+    TP_CHECK(rc == 0, "ibv_query_gid_ex(%u,%d) rc=%d (%s)", port, idx, rc, std::strerror(rc));
+    TP_CHECK(std::memcmp(e.gid.raw, V4_PREFIX, sizeof(V4_PREFIX)) == 0,
              "GID %d of %s is not an IPv4 GID; pick the RoCE v2 IPv4 one (gid=)", idx,
              dev_name_.c_str());
+    if (e.gid_type != IBV_GID_TYPE_ROCE_V2) {
+        std::fprintf(stderr, "warning: GID %d of %s is not RoCE v2\n", idx, dev_name_.c_str());
+    }
     Ipv4Gid out;
-    out.ip = (static_cast<std::uint32_t>(g.raw[12]) << 24) |
-             (static_cast<std::uint32_t>(g.raw[13]) << 16) |
-             (static_cast<std::uint32_t>(g.raw[14]) << 8) | g.raw[15];
-    const std::string attrs =
-        "/sys/class/infiniband/" + dev_name_ + "/ports/" + std::to_string(port) + "/gid_attrs/";
-    const std::string type = read_sysfs(attrs + "types/" + std::to_string(idx));
-    if (!type.empty() && type.find("v2") == std::string::npos) {
-        std::fprintf(stderr, "warning: GID %d of %s is \"%s\", not RoCE v2\n", idx,
-                     dev_name_.c_str(), type.c_str());
-    }
-    const std::string netdev = read_sysfs(attrs + "ndevs/" + std::to_string(idx));
-    TP_CHECK(!netdev.empty(), "no netdev behind GID %d of %s", idx, dev_name_.c_str());
-    unsigned m[6] = {};
-    const std::string mac = read_sysfs("/sys/class/net/" + netdev + "/address");
-    TP_CHECK(std::sscanf(mac.c_str(), "%x:%x:%x:%x:%x:%x", &m[0], &m[1], &m[2], &m[3], &m[4],
-                         &m[5]) == 6,
-             "cannot read the MAC of %s", netdev.c_str());
-    for (int i = 0; i < 6; ++i) {
-        out.mac[i] = static_cast<std::uint8_t>(m[i]);
-    }
+    out.ip = (static_cast<std::uint32_t>(e.gid.raw[12]) << 24) |
+             (static_cast<std::uint32_t>(e.gid.raw[13]) << 16) |
+             (static_cast<std::uint32_t>(e.gid.raw[14]) << 8) | e.gid.raw[15];
+
+    ifreq ifr{};
+    TP_CHECK(e.ndev_ifindex != 0 && ::if_indextoname(e.ndev_ifindex, ifr.ifr_name) != nullptr,
+             "no netdev behind GID %d of %s", idx, dev_name_.c_str());
+    const FdGuard fd(::socket(AF_INET, SOCK_DGRAM, 0));
+    TP_CHECK_ERRNO(fd.valid(), "socket");
+    TP_CHECK_ERRNO(::ioctl(fd.get(), SIOCGIFHWADDR, &ifr) == 0, "cannot read the MAC of %s",
+                   ifr.ifr_name);
+    std::memcpy(out.mac, ifr.ifr_hwaddr.sa_data, sizeof(out.mac));
     return out;
 }
 } // namespace catalyst::transport::common
