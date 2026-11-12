@@ -1,6 +1,19 @@
 # Shared dependency configuration, also included by component Makefiles.
-CATALYST_WORKTREE_CONFIG := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))/.catalyst-worktree
+CATALYST_ROOT_DIR := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
+CATALYST_WORKTREE_CONFIG := $(CATALYST_ROOT_DIR)/.catalyst-worktree
 CATALYST_WORKTREE_CHECKOUT := $(shell cat "$(CATALYST_WORKTREE_CONFIG)" 2>/dev/null)
+
+# Compare only the dependencies whose builds are shared between checkouts.
+dependency-version = $(strip $(shell sed -n 's/^$(1)=//p' "$(2)/.dep-versions" 2>/dev/null))
+define check-worktree-dependency-versions
+$(foreach dependency,llvm stablehlo enzyme,\
+	$(if $(filter 1,$(words $(call dependency-version,$(dependency),$(CATALYST_ROOT_DIR)))),,\
+		$(error Missing or invalid $(dependency) version in $(CATALYST_ROOT_DIR)/.dep-versions))\
+	$(if $(filter 1,$(words $(call dependency-version,$(dependency),$(1)))),,\
+		$(error Missing or invalid $(dependency) version in $(1)/.dep-versions))\
+	$(if $(filter $(call dependency-version,$(dependency),$(CATALYST_ROOT_DIR)),$(call dependency-version,$(dependency),$(1))),,\
+		$(error Incompatible shared $(dependency): worktree requires $(call dependency-version,$(dependency),$(CATALYST_ROOT_DIR)), but $(1)/.dep-versions specifies $(call dependency-version,$(dependency),$(1)); use a checkout with matching dependency versions)))
+endef
 
 ifneq ($(strip $(CATALYST_WORKTREE_CHECKOUT)),)
 export LLVM_SRC_DIR = $(CATALYST_WORKTREE_CHECKOUT)/mlir/llvm-project
@@ -18,6 +31,7 @@ endif
 
 # Cleanup and setup must remain available when shared builds have disappeared.
 ifneq ($(filter-out worktree help clean% format%,$(MAKECMDGOALS)),)
+$(call check-worktree-dependency-versions,$(CATALYST_WORKTREE_CHECKOUT))
 ifeq ($(wildcard $(LLVM_BUILD_DIR)/lib/cmake/mlir/MLIRConfig.cmake),)
 $(error Shared LLVM/MLIR build is missing in $(LLVM_BUILD_DIR); run make clean-worktree and make worktree with a compatible built checkout)
 endif
@@ -168,6 +182,7 @@ endif
 ifeq ($(realpath $(CATALYST_MAIN_CHECKOUT_DIR)),$(realpath $(MK_DIR)))
 $(error make worktree requires another checkout; run make all to build this checkout's dependencies)
 endif
+$(call check-worktree-dependency-versions,$(abspath $(CATALYST_MAIN_CHECKOUT_DIR)))
 ifeq ($(wildcard $(MAIN_MLIR_DIR)/llvm-project/build/lib/cmake/mlir/MLIRConfig.cmake),)
 $(error No LLVM/MLIR build found in $(MAIN_MLIR_DIR)/llvm-project/build; run make all in the main checkout first)
 endif

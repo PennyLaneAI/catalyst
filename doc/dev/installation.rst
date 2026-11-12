@@ -220,8 +220,10 @@ To reuse LLVM, StableHLO and Enzyme built in another Catalyst checkout, run:
   make worktree CATALYST_MAIN_CHECKOUT_DIR="/path/to/a/catalyst/checkout/with/built/dependencies"
 
 This builds Catalyst's components locally and installs the frontend, while sharing
-the other checkout's dependencies. Their revisions, patches and build configuration
-must be compatible, with builds in the usual ``mlir/<submodule>/build`` directories.
+the other checkout's dependencies. Setup and subsequent builds check that the LLVM,
+StableHLO and Enzyme versions in both checkouts' ``.dep-versions`` files match.
+Patches and build configuration must also be compatible, with builds in the usual
+``mlir/<submodule>/build`` directories.
 
 The selected checkout's absolute path is saved in the ignored ``.catalyst-worktree``
 file. Later builds, tests and Python sessions reuse it automatically, including
