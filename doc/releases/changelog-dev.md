@@ -1471,19 +1471,19 @@
   [(#3303)](https://github.com/PennyLaneAI/catalyst/pull/3303)
 
 * The preparation of the graph solver is moved to a shared algorithm used by passes that need to use it.
-  - The `resource-analysis` pass and `graph-decomposition` pass use the same shared logic owned 
-    by `ResourceAnalysis` object to forward walk through the module, and collect all operators 
-    encountered, and their resource counts, accounting for modifier regions (across function call 
+  - The `resource-analysis` pass and `graph-decomposition` pass use the same shared logic owned
+    by `ResourceAnalysis` object to forward walk through the module, and collect all operators
+    encountered, and their resource counts, accounting for modifier regions (across function call
     sites as well) accurately. [(#3349)](https://github.com/PennyLaneAI/catalyst/pull/3349)
 
-  - The preparation of inputs to the graph solver, including parsing the fixed/alt decomps, gateset, 
-    and collecting rule nodes are refactored into their own file, `GraphPrep.hpp/cpp`. This is to 
-    expose the shared logic of graph solver preparation among passes that need to use it. 
+  - The preparation of inputs to the graph solver, including parsing the fixed/alt decomps, gateset,
+    and collecting rule nodes are refactored into their own file, `GraphPrep.hpp/cpp`. This is to
+    expose the shared logic of graph solver preparation among passes that need to use it.
     [(#3349)](https://github.com/PennyLaneAI/catalyst/pull/3349)
 
-* A new pass `resource-estimate` was added, it is used by `qp.estimate`. This is a pass that 
+* A new pass `resource-estimate` was added, it is used by `qp.estimate`. This is a pass that
   does not apply decompositions; currently loads rule definitions into the module.
-  It uses `ResourceAnalysis` to gather resource counts, and `GraphPrep` to build and solve the graph 
+  It uses `ResourceAnalysis` to gather resource counts, and `GraphPrep` to build and solve the graph
   to project those resource counts in the target gate-set for `qp.estimate(..., target=gate_set)`.
   [(#3351)](https://github.com/PennyLaneAI/catalyst/pull/3351)
 
@@ -1515,10 +1515,6 @@
   passes and by `gridsynth` with `ppr_basis=True` are updated: they run on `lightning.qubit`,
   `lightning.kokkos` and `lightning.gpu` or `null.qubit` (for mock-execution).
   [(#3413)](https://github.com/PennyLaneAI/catalyst/pull/3413)
-
-* The Backline developer guide now covers the `peer=` key for RDMA coprocessors, the
-  `hsb_hwhs` and `balboa_hwhs` FPGA controllers and the board image each controller needs.
-  [(#XXXX)](https://github.com/PennyLaneAI/catalyst/pull/XXXX)
 
 <h3>Contributors ✍️</h3>
 
