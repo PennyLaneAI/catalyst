@@ -1,11 +1,9 @@
-// RUN: quantum-opt %s | FileCheck %s --check-prefix=VALUE
-// RUN: quantum-opt --convert-to-reference-semantics %s | FileCheck %s --check-prefix=REF
-// RUN: quantum-opt --convert-to-reference-semantics --convert-to-value-semantics %s | FileCheck %s --check-prefix=VALUE
-// RUN: quantum-opt --inline-nested-module --convert-quantum-to-llvm %s | FileCheck %s --check-prefix=LLVM
+// RUN: quantum-opt %s | FileCheck %s --check-prefixes=ALL,VALUE
+// RUN: quantum-opt --convert-to-reference-semantics %s | FileCheck %s --check-prefixes=ALL,REF
+// RUN: quantum-opt --convert-to-reference-semantics --convert-to-value-semantics %s | FileCheck %s --check-prefixes=ALL,VALUE
+// RUN: quantum-opt --inline-nested-module --convert-quantum-to-llvm %s | FileCheck %s --check-prefixes=ALL,LLVM
 
-// VALUE-LABEL: @barrier_registers
-// REF-LABEL: @barrier_registers
-// LLVM-LABEL: @barrier_registers
+// ALL-LABEL: @barrier_registers
 // LLVM-NOT: Barrier
 // LLVM-NOT: barrier
 // LLVM: llvm.return
@@ -20,9 +18,7 @@ func.func @barrier_registers(%n: i64) attributes {quantum.node} {
     return
 }
 
-// VALUE-LABEL: @barrier_qubit_and_register
-// REF-LABEL: @barrier_qubit_and_register
-// LLVM-LABEL: @barrier_qubit_and_register
+// ALL-LABEL: @barrier_qubit_and_register
 // LLVM-NOT: Barrier
 // LLVM-NOT: barrier
 // LLVM: llvm.return
