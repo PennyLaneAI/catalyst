@@ -16,6 +16,9 @@
 // RUN: catalyst --tool=opt --empty --emit-bytecode %t/library.mlir -o %t/library.mlirbc
 // RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{gate-set=RX=1.0 bytecode-rules="%t/library.mlirbc"})' %t/circuit.mlir | FileCheck %s
 // RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{gate-set=RX=1.0 bytecode-rules="%t/library.mlirbc"})' %t/empty.mlir | FileCheck %s --check-prefix=EMPTY
+// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(resource-estimate{output-json gate-set=RX=1.0 bytecode-rules="%t/library.mlirbc"})' %t/circuit.mlir -o %t/estimated.mlir | FileCheck %s --check-prefix=ESTIMATE
+// RUN: catalyst --tool=opt --empty %t/circuit.mlir -o %t/original.mlir
+// RUN: diff %t/original.mlir %t/estimated.mlir
 
 // Importing a library must preserve calls to helpers with colliding names and types.
 // Unused rules and helpers must not enter the circuit or undergo semantics conversion.
@@ -37,6 +40,12 @@
 // EMPTY-NEXT: return
 // EMPTY-NEXT: }
 // EMPTY-NEXT: }
+
+// Estimation uses the library's resource counts while leaving the circuit and its symbols intact.
+// ESTIMATE-LABEL: "circuit"
+// ESTIMATE: "quantum_operations"
+// ESTIMATE: "RX": 1
+// ESTIMATE-NOT: "CollisionGate"
 
 //--- empty.mlir
 func.func @empty_circuit() {

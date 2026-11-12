@@ -66,6 +66,7 @@ struct ResourceEstimatePass : public impl::ResourceEstimatePassBase<ResourceEsti
             }
         }
 
+        OwningOpRef<ModuleOp> ruleLibrary;
         std::unique_ptr<DecompositionGraph> graph =
             GraphPrep::prepareGraph(module, opIDs,
                                     {
@@ -75,7 +76,8 @@ struct ResourceEstimatePass : public impl::ResourceEstimatePassBase<ResourceEsti
                                         .bytecodeRulesFile = bytecodeRulesFile,
                                         .libQPDPath = libQPDPath,
                                         .libpythonPath = libpythonPath,
-                                    });
+                                    },
+                                    ruleLibrary);
 
         if (!graph) {
             return signalPassFailure();
