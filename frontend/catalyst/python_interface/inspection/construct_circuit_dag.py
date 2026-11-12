@@ -279,22 +279,25 @@ class ConstructCircuitDAG:
         self._connect(wires, node_uid)
 
     @_visit_operation.register
-    def _ppm(self, op: pbc.PPMeasurementOp) -> None:
-        """Handler for the PPM operation."""
+    def _ppm(self, op: pbc.PPMeasurementOp | quantum.MeasurementOp) -> None:
+        """Handler for Pauli product and generic mid-circuit measurements."""
 
         wires = ssa_to_qp_wires(op)
         if wires == []:
             wires_str = "all"
         else:
             wires_str = f"[{', '.join(map(str, wires))}]"
-        pw = []
-        for str_attr in op.pauli_product.data:
-            pw.append(str(str_attr).replace('"', ""))
-        pw = "".join(pw)
+        if isinstance(op, quantum.MeasurementOp):
+            if op.op_name.data == "PauliMeasure":
+                label = "PPM-" + op.static_data.data["pauli_word"].data
+            else:
+                label = op.op_name.data
+        else:
+            label = "PPM-" + "".join(str_attr.data for str_attr in op.pauli_product.data)
 
         # Add node to current cluster
         node_uid = self.dag_builder.add_node(
-            label=f"<name> PPM-{pw}|<wire> {wires_str}",
+            label=f"<name> {label}|<wire> {wires_str}",
             cluster_uid=self._cluster_stack[-1].uid,
             # NOTE: "record" allows us to use ports
             # (https://graphviz.org/doc/info/shapes.html#record)

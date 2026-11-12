@@ -218,7 +218,8 @@ def test_dynamic_qubit_allocation(i: int):
         qp.ftqc.measure_arbitrary_basis(wires=q[0], angle=0.1, plane="XY")
 
         # CHECK: [[q0:%.+]] = qref.get [[reg_device]][ 0] : !qref.reg<3> -> !qref.bit
-        # CHECK: {{%.+}} = pbc.ref.ppm ["X", "Y"] [[q0]], [[alloc_q1]] : i1
+        # CHECK: {{%.+}} = qref.measurement "PauliMeasure"() qubits([[q0]], [[alloc_q1]])
+        # CHECK-SAME: static_data = {pauli_word = "XY", postselect = none} : i1
         qp.pauli_measure("XY", wires=[0, q[1]])
 
     # CHECK: qref.dealloc [[reg_alloc]] : !qref.reg<2>
@@ -342,12 +343,14 @@ def test_pauli_measure():
     # CHECK: [[reg:%.+]] = qref.alloc( 4) : !qref.reg<4>
 
     # CHECK: [[q0:%.+]] = qref.get [[reg]][ 0] : !qref.reg<4> -> !qref.bit
-    # CHECK: {{%.+}} = pbc.ref.ppm ["X"] [[q0]] : i1
+    # CHECK: {{%.+}} = qref.measurement "PauliMeasure"() qubits([[q0]])
+    # CHECK-SAME: static_data = {pauli_word = "X", postselect = none} : i1
     qp.pauli_measure("X", wires=0)
 
     # CHECK: [[q0:%.+]] = qref.get [[reg]][ 0] : !qref.reg<4> -> !qref.bit
     # CHECK: [[q1:%.+]] = qref.get [[reg]][ 1] : !qref.reg<4> -> !qref.bit
-    # CHECK: {{%.+}} = pbc.ref.ppm ["X", "Y"] [[q0]], [[q1]] : i1
+    # CHECK: {{%.+}} = qref.measurement "PauliMeasure"() qubits([[q0]], [[q1]])
+    # CHECK-SAME: static_data = {pauli_word = "XY", postselect = none} : i1
     qp.pauli_measure("XY", wires=[0, 1])
 
     return qp.expval(qp.X(0))

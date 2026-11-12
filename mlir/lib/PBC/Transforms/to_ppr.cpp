@@ -53,6 +53,8 @@ struct ToPPRPass : impl::ToPPRPassBase<ToPPRPass> {
         target.addDynamicallyLegalDialect<quantum::QuantumDialect>(
             [](Operation *op) { return !isa<quantum::QuantumOperation>(op); });
         target.addIllegalOp<quantum::MeasureOp>();
+        target.addDynamicallyLegalOp<quantum::MeasurementOp>(
+            [](quantum::MeasurementOp op) { return op.getOpName() != "PauliMeasure"; });
 
         // Need to declare the ops we generate as explicitly legal
         target.addLegalDialect<pbc::PBCDialect>();
