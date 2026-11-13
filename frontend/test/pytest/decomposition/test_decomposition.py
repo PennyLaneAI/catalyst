@@ -1118,7 +1118,7 @@ class TestPrecompiled:
         cached_root = RuleIdentity(
             SerializedGraphOpID("NoParams{}{reg:1}{}"),
             "root_to_single",
-            {SerializedGraphOpID("SingleParam{x:[tensor<f64>]}{reg:1}{}"): 1},
+            ((SerializedGraphOpID("SingleParam{x:[tensor<f64>]}{reg:1}{}"), 1),),
         )
         mocker.patch(
             "pennylane.decomposition.signature_registry",

@@ -53,6 +53,35 @@ def _write_test_cache(bytecode_path, manifest=None):
     )
 
 
+class TestRuleIdentity:
+    """Rule identities require canonical resources for cache lookup and deduplication."""
+
+    @pytest.mark.parametrize(
+        "resources",
+        [
+            (),
+            ((SerializedGraphOpID("A"), 1),),
+            ((SerializedGraphOpID("A"), 1), (SerializedGraphOpID("Z"), 2)),
+        ],
+    )
+    def test_sorted_resources_are_hashable(self, resources):
+        """Sorted tuples, including empty resources, can be used as cache keys."""
+        identity = RuleIdentity(SerializedGraphOpID("Target"), "rule", resources)
+        equivalent = RuleIdentity(SerializedGraphOpID("Target"), "rule", resources)
+
+        assert identity.resources == resources
+        assert {identity: "cached"}[equivalent] == "cached"
+
+    def test_unsorted_resources_are_rejected(self):
+        """The identity rejects resources that callers have not canonicalized."""
+        with pytest.raises(AssertionError, match="resources must be sorted"):
+            RuleIdentity(
+                SerializedGraphOpID("Target"),
+                "rule",
+                ((SerializedGraphOpID("Z"), 2), (SerializedGraphOpID("A"), 1)),
+            )
+
+
 def test_load_valid_default_cache(monkeypatch, tmp_path):
     """The default cache path loads canonical, immutable rule identities."""
     bytecode_path = tmp_path / "rules.mlirbc"
@@ -69,7 +98,7 @@ def test_load_valid_default_cache(monkeypatch, tmp_path):
             RuleIdentity(
                 SerializedGraphOpID("Target"),
                 "rule",
-                {SerializedGraphOpID("A"): 1, SerializedGraphOpID("Z"): 2},
+                ((SerializedGraphOpID("A"), 1), (SerializedGraphOpID("Z"), 2)),
             )
         }
     )
@@ -83,12 +112,12 @@ def test_load_empty_cache(tmp_path):
     assert load_precompiled_rule_identities(bytecode_path) == frozenset()
 
 
-def test_manifest_entry_canonicalizes_resources():
-    """Manifest entries use the same canonical resource ordering as rule identities."""
+def test_manifest_entry_preserves_canonical_resources():
+    """Manifest entries preserve the canonical resource ordering of rule identities."""
     identity = RuleIdentity(
         SerializedGraphOpID("Target"),
         "rule",
-        {SerializedGraphOpID("Z"): 2, SerializedGraphOpID("A"): 1},
+        ((SerializedGraphOpID("A"), 1), (SerializedGraphOpID("Z"), 2)),
     )
     entry = get_rule_entry(identity)
 

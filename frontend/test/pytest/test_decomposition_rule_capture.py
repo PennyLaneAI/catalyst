@@ -280,7 +280,7 @@ def test_precompilation_preserves_traversal(mocker):
     cached_rule_identity = RuleIdentity(
         SerializedGraphOpID("CacheRoot{}{wires:1}{}"),
         "cacheroot_to_cacheleaf",
-        {SerializedGraphOpID("CacheLeaf{}{wires:1}{}"): 1},
+        ((SerializedGraphOpID("CacheLeaf{}{wires:1}{}"), 1),),
     )
 
     # mock the cache to only include the test CacheRoot
@@ -328,7 +328,7 @@ def test_changed_resources_get_recaptured(mocker):
     stale_identity = RuleIdentity(
         SerializedGraphOpID("RepeatedGate{}{wires:1}{}"),
         "current_rule",
-        {SerializedGraphOpID("PauliX{}{wires:1}{}"): 1},
+        ((SerializedGraphOpID("PauliX{}{wires:1}{}"), 1),),
     )
     load_cache = mocker.patch.object(
         capture_frontend,

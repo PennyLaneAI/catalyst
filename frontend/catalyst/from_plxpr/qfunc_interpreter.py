@@ -448,7 +448,11 @@ def _convert_decomp_target_spec(
     out = []
     for rule in target_spec.rules:
         if (
-            RuleIdentity(target_spec.target_id, rule.frontend_name, rule.resource_counts_by_id)
+            RuleIdentity(
+                target_spec.target_id,
+                rule.frontend_name,
+                tuple(sorted(rule.resource_counts_by_id.items())),
+            )
             in precompiled_rule_identities
         ):
             continue

@@ -71,7 +71,7 @@ def _validate_rule_entry(entry: dict) -> RuleIdentity:
     return RuleIdentity(
         SerializedGraphOpID(target_gate),
         frontend_name,
-        {SerializedGraphOpID(gate): count for gate, count in resources.items()},
+        tuple(sorted((SerializedGraphOpID(gate), count) for gate, count in resources.items())),
     )
 
 

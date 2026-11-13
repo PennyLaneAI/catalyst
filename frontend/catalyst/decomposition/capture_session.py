@@ -15,7 +15,7 @@
 """Managed state for the decomposition rule discovery and capture mechanism."""
 
 from dataclasses import dataclass, field
-from typing import Callable, Mapping
+from typing import Callable
 
 import pennylane as qp
 from jax.extend.core import ClosedJaxpr
@@ -29,7 +29,7 @@ from catalyst.decomposition.type_utils import SerializedGraphOpID
 ResourceEntry = tuple[SerializedGraphOpID, int]
 
 
-@dataclass(frozen=True, init=False)
+@dataclass(frozen=True)
 class RuleIdentity:
     """Dataclass with information needed to distinguish unique decomposition rules.
 
@@ -43,16 +43,11 @@ class RuleIdentity:
     frontend_name: str
     resources: tuple[ResourceEntry, ...]
 
-    def __init__(
-        self,
-        target_gate: SerializedGraphOpID,
-        frontend_name: str,
-        resources: Mapping[SerializedGraphOpID, int],
-    ) -> None:
-        """Create an identity with a canonical resource ordering."""
-        object.__setattr__(self, "target_gate", target_gate)
-        object.__setattr__(self, "frontend_name", frontend_name)
-        object.__setattr__(self, "resources", tuple(sorted(resources.items())))
+    def __post_init__(self) -> None:
+        """Require canonical resource ordering for cache lookup and deduplication."""
+        assert self.resources == tuple(
+            sorted(self.resources)
+        ), "RuleIdentity resources must be sorted for correctness."
 
 
 @dataclass(frozen=True)
@@ -152,7 +147,9 @@ class TracedRule:
     @property
     def identifier(self) -> RuleIdentity:
         """Rule identifier for deduplication."""
-        return RuleIdentity(self.target_gate, self.frontend_name, self.resources)
+        return RuleIdentity(
+            self.target_gate, self.frontend_name, tuple(sorted(self.resources.items()))
+        )
 
 
 @dataclass
