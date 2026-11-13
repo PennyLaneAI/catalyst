@@ -182,6 +182,12 @@
 
 <h3>Improvements 🛠</h3>
 
+* Unused decomposition rules are now dropped before `inline-nested-module` in the default
+  pipeline, instead of after it. This avoids renaming thousands of dead rule functions, and
+  makes compiling circuits with large decomposition graphs (e.g. `SuperpositionTHC`) about
+  2-3x faster in local benchmarks.
+  [(#3477)](https://github.com/PennyLaneAI/catalyst/pull/3477)
+
 * Ahead-of-time compilation with `qjit` can now stop at any of the main internal compiler stages,
   in addition to the frontend-controlled stages (`target="jaxpr"|"mlir"|"binary"`).
   The `"llvmir"` target now correctly stops after LLVM IR is first generated from the MLIR, and
