@@ -40,7 +40,7 @@ RULE_ENTRY = {
 def _get_test_manifest(entries=(RULE_ENTRY,)):
     """Return a valid cache manifest."""
     return {
-        ManifestEntries.BYTECODE_HASH: get_bytecode_hash(BYTECODE),
+        ManifestEntries.PRECOMPILED_BYTECODE_HASH: get_bytecode_hash(BYTECODE),
         ManifestEntries.PRECOMPILED_RULES: list(entries),
     }
 
@@ -89,7 +89,7 @@ def test_load_valid_default_cache(monkeypatch, tmp_path):
     _write_test_cache(bytecode_path)
 
     # mock the default file location to the tmp file
-    monkeypatch.setattr(precompiled_rule_loading, "BYTECODE_FILE_PATH", str(bytecode_path))
+    monkeypatch.setattr(precompiled_rule_loading, "PRECOMPILED_BYTECODE_PATH", str(bytecode_path))
 
     # load from the mocked cache
     identities = load_precompiled_rule_identities()
@@ -157,14 +157,14 @@ def test_malformed_manifest(tmp_path):
     [
         [],
         {},
-        {ManifestEntries.BYTECODE_HASH: 1, ManifestEntries.PRECOMPILED_RULES: []},
-        {ManifestEntries.BYTECODE_HASH: "wrong", ManifestEntries.PRECOMPILED_RULES: []},
+        {ManifestEntries.PRECOMPILED_BYTECODE_HASH: 1, ManifestEntries.PRECOMPILED_RULES: []},
+        {ManifestEntries.PRECOMPILED_BYTECODE_HASH: "wrong", ManifestEntries.PRECOMPILED_RULES: []},
         {
-            ManifestEntries.BYTECODE_HASH: get_bytecode_hash(BYTECODE),
+            ManifestEntries.PRECOMPILED_BYTECODE_HASH: get_bytecode_hash(BYTECODE),
             ManifestEntries.PRECOMPILED_RULES: {},
         },
         {
-            ManifestEntries.BYTECODE_HASH: get_bytecode_hash(BYTECODE),
+            ManifestEntries.PRECOMPILED_BYTECODE_HASH: get_bytecode_hash(BYTECODE),
             ManifestEntries.PRECOMPILED_RULES: [],
             "unexpected": None,
         },

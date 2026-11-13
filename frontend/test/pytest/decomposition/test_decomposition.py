@@ -1006,7 +1006,7 @@ class TestPrecompiled:
         manifest = json.loads(get_precompiled_manifest_path(bytecode_path).read_text())
         assert bytecode_path.read_bytes() == b"bytecode"
         assert manifest == {
-            ManifestEntries.BYTECODE_HASH: hashlib.sha256(b"bytecode").hexdigest(),
+            ManifestEntries.PRECOMPILED_BYTECODE_HASH: hashlib.sha256(b"bytecode").hexdigest(),
             ManifestEntries.PRECOMPILED_RULES: [],
         }
 
@@ -1172,7 +1172,7 @@ class TestPrecompiled:
                 rule["frontend_name"] for rule in manifest[ManifestEntries.PRECOMPILED_RULES]
             } == {"root_to_leaf"}
             mocker.patch(
-                "catalyst.decomposition.precompiled_rule_loading.BYTECODE_FILE_PATH",
+                "catalyst.decomposition.precompiled_rule_loading.PRECOMPILED_BYTECODE_PATH",
                 str(bytecode_path),
             )
 

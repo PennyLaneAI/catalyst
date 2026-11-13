@@ -78,7 +78,10 @@ if os.environ.get("ENABLE_LIT_COVERAGE", "0") == "1":
 
 config.substitutions.append(("%PYTHON", python_executable))
 config.substitutions.append(
-    ("%BYTECODE_PATH", config.test_source_root + "/GraphDecomposition/test_rules.mlirbc")
+    (
+        "%PRECOMPILED_BYTECODE_PATH",
+        config.test_source_root + "/GraphDecomposition/test_rules.mlirbc",
+    )
 )
 
 # allow virtual env for embedded interpreter

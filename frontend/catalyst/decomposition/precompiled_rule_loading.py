@@ -31,7 +31,7 @@ from catalyst.utils.runtime_environment import (
 class ManifestEntries(StrEnum):
     """Manifest JSON keys."""
 
-    BYTECODE_HASH = "bytecode_hash"
+    PRECOMPILED_BYTECODE_HASH = "bytecode_hash"
     PRECOMPILED_RULES = "precompiled_rules"
 
 
@@ -89,12 +89,12 @@ def _validate_rule_entry(entry: dict) -> RuleIdentity:
 def _validate_manifest(manifest: dict, bytecode: bytes) -> frozenset[RuleIdentity]:
     """Validate a manifest and return its canonical rule identities."""
     if not isinstance(manifest, dict) or set(manifest) != {
-        ManifestEntries.BYTECODE_HASH,
+        ManifestEntries.PRECOMPILED_BYTECODE_HASH,
         ManifestEntries.PRECOMPILED_RULES,
     }:
         raise ValueError("Malformed decomposition cache manifest.")
 
-    bytecode_hash = manifest[ManifestEntries.BYTECODE_HASH]
+    bytecode_hash = manifest[ManifestEntries.PRECOMPILED_BYTECODE_HASH]
     if not isinstance(bytecode_hash, str) or bytecode_hash != get_bytecode_hash(bytecode):
         raise ValueError(
             "Decomposition cache hash mismatch. The bytecode version is likely out of date."

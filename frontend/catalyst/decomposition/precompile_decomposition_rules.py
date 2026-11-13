@@ -24,6 +24,7 @@ from catalyst.compiler import _quantum_opt
 from catalyst.decomposition.capture_session import DecompositionScope, OpDecompRequest
 from catalyst.decomposition.modifier_state import ModifierState
 from catalyst.decomposition.precompiled_rule_loading import (
+    ManifestEntries,
     get_bytecode_hash,
     get_rule_entry,
 )
@@ -100,8 +101,8 @@ def precompile_decomp_rules(_decomp_file_path: str | Path = PRECOMPILED_BYTECODE
         get_precompiled_manifest_path(_decomp_file_path), "w", encoding="utf-8"
     ) as manifest_file:
         manifest = {
-            "bytecode_hash": get_bytecode_hash(bytecode),
-            "precompiled_rules": [get_rule_entry(rule) for rule in scope.definitions],
+            ManifestEntries.PRECOMPILED_BYTECODE_HASH: get_bytecode_hash(bytecode),
+            ManifestEntries.PRECOMPILED_RULES: [get_rule_entry(rule) for rule in scope.definitions],
         }
 
         json.dump(manifest, manifest_file)
