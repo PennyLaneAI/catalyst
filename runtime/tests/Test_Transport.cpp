@@ -131,9 +131,10 @@ TEST_CASE("start_benchmark does not ask a backend before version 4 whether it pa
 TEST_CASE("a backend built for a newer ABI is refused, naming both versions", "[transport]") {
     CHECK(__catalyst__transport__create(STUB_V99_BACKEND_PATH, "cfg",
                                         CATALYST_TRANSPORT_ROLE_CONTROLLER, "abi_v99") == nullptr);
-    REQUIRE_THROWS_WITH(__catalyst__transport__check_session(nullptr, "create"),
-                        ContainsSubstring("transport ABI version 99") &&
-                            ContainsSubstring("supports up to 3"));
+    REQUIRE_THROWS_WITH(
+        __catalyst__transport__check_session(nullptr, "create"),
+        ContainsSubstring("transport ABI version 99") &&
+            ContainsSubstring("supports up to " + std::to_string(CATALYST_TRANSPORT_ABI_VERSION)));
 }
 
 TEST_CASE("in-tree backends report their capabilities", "[transport]") {
