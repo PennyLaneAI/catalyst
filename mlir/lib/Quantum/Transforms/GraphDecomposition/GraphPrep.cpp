@@ -41,12 +41,14 @@
 #include "mlir/IR/OwningOpRef.h"
 #include "mlir/IR/SymbolTable.h"
 #include "mlir/Parser/Parser.h"
+#include "mlir/Pass/PassManager.h"
 #include "mlir/Support/LLVM.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Support/WalkResult.h"
 
 #include "Catalyst/Analysis/ResourceAnalysis.h"
 #include "Catalyst/Analysis/ResourceResult.h"
+#include "QRef/Transforms/Passes.h"
 #include "Quantum/IR/QuantumInterfaces.h"
 #include "Quantum/Transforms/QPDLoader.h"
 
@@ -228,31 +230,27 @@ LogicalResult addRuleNode(func::FuncOp rule, std::vector<RuleNode> &ruleNodes) {
     return success();
 }
 
-OwningOpRef<ModuleOp> loadPrecompiledRules(ModuleOp module, llvm::StringRef filename) {
-    ParserConfig config(module.getContext());
-    OwningOpRef<ModuleOp> precompiledModule = parseSourceFile<ModuleOp>(filename, config);
-
+// Prepare either a precompiled or captured library before graph construction. Resolve names
+// in the source so calls retain their dependencies when selected rules are imported later.
+LogicalResult prepareRuleLibrary(ModuleOp module, ModuleOp library,
+                                 SymbolTable *reservedSymbols = nullptr) {
     SymbolTable symbolTable(module);
-
-    if (!precompiledModule) {
-        llvm::errs() << "failed to load built-in decomposition rules from '" << filename
-                     << "': the rules file could not be parsed\n";
-        return {};
-    }
-
-    SymbolTable precompiledSymbolTable(precompiledModule.get());
+    SymbolTable librarySymbols(library);
     llvm::SmallVector<func::FuncOp> worklist;
-    for (auto rule : llvm::make_early_inc_range(precompiledModule.get().getOps<func::FuncOp>())) {
+    for (auto rule : llvm::make_early_inc_range(library.getOps<func::FuncOp>())) {
         if (!rule->hasAttr(DecompUtils::target_gate_attr_name)) {
             continue;
         }
         auto existing = symbolTable.lookup<func::FuncOp>(rule.getName());
+        if (!existing && reservedSymbols) {
+            existing = reservedSymbols->lookup<func::FuncOp>(rule.getName());
+        }
         if (existing && existing->getAttr("target_gate") == rule->getAttr("target_gate") &&
             existing->getAttr("frontend_name") == rule->getAttr("frontend_name") &&
             existing->getAttr("resources") == rule->getAttr("resources")) {
             // References to a reused rule will resolve to the existing circuit symbol when
             // dependent functions are materialized.
-            precompiledSymbolTable.erase(rule);
+            librarySymbols.erase(rule);
             continue;
         }
         worklist.push_back(rule);
@@ -268,19 +266,19 @@ OwningOpRef<ModuleOp> loadPrecompiledRules(ModuleOp module, llvm::StringRef file
         }
         auto uses = SymbolTable::getSymbolUses(function);
         if (!uses) {
-            function.emitError("cannot inspect precompiled rule dependencies");
-            return {};
+            function.emitError("cannot inspect decomposition rule dependencies");
+            return failure();
         }
         for (const auto &use : *uses) {
             if (auto dependency = dyn_cast_or_null<func::FuncOp>(
-                    SymbolTable::lookupSymbolIn(precompiledModule.get(), use.getSymbolRef()))) {
+                    SymbolTable::lookupSymbolIn(library, use.getSymbolRef()))) {
                 worklist.push_back(dependency);
             }
         }
     }
 
     llvm::SmallVector<func::FuncOp> functions;
-    for (auto function : precompiledModule.get().getOps<func::FuncOp>()) {
+    for (auto function : library.getOps<func::FuncOp>()) {
         if (required.contains(function)) {
             functions.push_back(function);
         }
@@ -288,13 +286,38 @@ OwningOpRef<ModuleOp> loadPrecompiledRules(ModuleOp module, llvm::StringRef file
 
     // Rename inside the source symbol table so every call is updated before moving functions.
     for (auto function : functions) {
-        if (symbolTable.lookup(function.getName()) &&
-            failed(precompiledSymbolTable.renameToUnique(function, {&symbolTable}))) {
-            function.emitError("cannot rename a precompiled rule dependency");
-            return {};
+        if (!symbolTable.lookup(function.getName()) &&
+            (!reservedSymbols || !reservedSymbols->lookup(function.getName()))) {
+            continue;
+        }
+        LogicalResult renamed =
+            reservedSymbols
+                ? librarySymbols.renameToUnique(function, {&symbolTable, reservedSymbols})
+                : librarySymbols.renameToUnique(function, {&symbolTable});
+        if (failed(renamed)) {
+            return function.emitError("cannot rename a decomposition rule dependency");
         }
     }
-    return precompiledModule;
+    for (auto function : llvm::make_early_inc_range(library.getOps<func::FuncOp>())) {
+        if (!required.contains(function)) {
+            librarySymbols.erase(function);
+        }
+    }
+    return success();
+}
+
+OwningOpRef<ModuleOp> loadPrecompiledRules(ModuleOp module, llvm::StringRef filename) {
+    ParserConfig config(module.getContext());
+    auto library = parseSourceFile<ModuleOp>(filename, config);
+    if (!library) {
+        llvm::errs() << "failed to load built-in decomposition rules from '" << filename
+                     << "': the rules file could not be parsed\n";
+        return {};
+    }
+    if (failed(prepareRuleLibrary(module, *library))) {
+        return {};
+    }
+    return library;
 }
 
 /**
@@ -352,44 +375,40 @@ LogicalResult loadDecompositionRules(ModuleOp module,
     return success();
 }
 
-/**
- * @brief
- * Use python to lower decomposition rules for all unhandled decomposable operations in the
- * circuit, annotating the lowered decomposition rules with resources and target gates.
- *
- * This only *materializes* the lowered rule funcs (as `__builtin`-prefixed funcs) into the
- * module; `loadUserDecompositionRules`, which runs afterwards, is what registers them as
- * RuleNodes. It therefore takes no `ruleNodes` output.
- */
-[[maybe_unused]] LogicalResult loadPythonDecomps(ModuleOp module, llvm::StringRef libQPDPath,
-                                                 llvm::StringRef libpythonPath) {
+// Capture missing root closures through Python and add candidates to the rule library.
+LogicalResult loadPythonDecomps(ModuleOp module, ModuleOp ruleLibrary, ArrayRef<std::string> opIDs,
+                                const WeightedGateset &targetGateSet, llvm::StringRef libQPDPath,
+                                llvm::StringRef libpythonPath) {
     MLIRContext *context = module.getContext();
-    SymbolTable symbolTable(module);
+    SymbolTable circuitSymbols(module);
+    SymbolTable librarySymbols(ruleLibrary);
 
     llvm::StringSet<> handledOpIds;
     // Add IDs from existing decomposable ops with decomposition rules
     // NOTE: we assume in general that if one decomposition rule for an op is available,
     // then all decomposition rules for that op are available. No system should introduce a
     // subset of the rules for an op.
-    module.walk([&](mlir::func::FuncOp func) {
-        if (func->hasAttr("target_gate")) {
-            handledOpIds.insert(func->getAttrOfType<StringAttr>("target_gate").str());
+    for (ModuleOp source : {module, ruleLibrary}) {
+        source.walk([&](func::FuncOp func) {
+            if (auto target = func->getAttrOfType<StringAttr>("target_gate")) {
+                handledOpIds.insert(target.getValue());
+            }
+        });
+    }
+
+    llvm::StringSet<> requestedOpIds;
+    for (const auto &opId : opIDs) {
+        if (!handledOpIds.contains(opId) && !targetGateSet.contains(parseOperator(opId))) {
+            requestedOpIds.insert(opId);
         }
-    });
+    }
 
     llvm::SmallVector<catalyst::quantum::DecomposableGate> decomposableOps;
     module.walk([&](catalyst::quantum::DecomposableGate op) {
-        if (!DecompUtils::isInDecompRule(op)) {
+        if (!DecompUtils::isInDecompRule(op) && requestedOpIds.contains(op.getGraphOpId())) {
             decomposableOps.push_back(op);
         }
     });
-
-    if (!decomposableOps.empty()) {
-        if (!loadQPD(libQPDPath.str(), libpythonPath.str())) {
-            llvm::errs() << "failed to load libQuantumPythonCallbacks\n";
-            return failure();
-        }
-    }
 
     for (catalyst::quantum::DecomposableGate op : decomposableOps) {
         std::string opId = op.getGraphOpId();
@@ -398,10 +417,21 @@ LogicalResult loadDecompositionRules(ModuleOp module,
             continue;
         }
 
-        std::string mlirText = pythonRuleLowering(op);
+        // Resolve Python only when a gate actually needs rules. Modules whose rules are already
+        // embedded, or whose gates are native to the target, do not need a Python runtime.
+        if (!loadQPD(libQPDPath.str(), libpythonPath.str())) {
+            return op.emitError("failed to load the Python decomposition callback");
+        }
+
+        std::string mlirText;
+        std::string errorMessage;
+        if (!pythonRuleLowering(op, mlirText, errorMessage)) {
+            return op.emitError() << "failed to load decomposition rules for " << opId << ": "
+                                  << errorMessage;
+        }
 
         mlir::ParserConfig config(context);
-        auto moduleOp = mlir::parseSourceString(llvm::StringRef(mlirText), config);
+        auto moduleOp = mlir::parseSourceString<ModuleOp>(llvm::StringRef(mlirText), config);
         if (!moduleOp) {
             // If we fail to parse the lowered module this op will be left without a
             // decomposition, so we must fail here.
@@ -409,37 +439,37 @@ LogicalResult loadDecompositionRules(ModuleOp module,
             return failure();
         }
 
-        // The Python wrapper returns the *whole reachable rule closure* for this op, not
-        // just its direct rules: the loader does not recurse into a rule's resource ops, so
-        // every rule on the path down to the gate set (e.g. `Adjoint(S)` ->
-        // `Adjoint(PhaseShift)` -> `PhaseShift`) must arrive together. We only
-        // *materialize* each rule func (named
-        // `__builtin_...`) into the module here; `loadUserDecompositionRules` runs next and
-        // is the single place that turns `__builtin`-prefixed funcs into RuleNodes (the
-        // same path the eager frontend relies on for its pre-embedded rules). We must NOT
-        // also call `addRuleNode` here, or every on-demand rule would be registered twice.
-        // We still skip helper funcs (no `target_gate`) and any target already materialized
-        // by an earlier op's closure or embedded in the module, to avoid duplicate symbols.
-        llvm::SmallVector<llvm::StringRef> newlyHandled;
-        moduleOp->walk([&](mlir::func::FuncOp func) {
-            // Note: a single target gate may have several alternative rules, so we only
-            // mark a target handled *after* walking the whole module, otherwise the second
-            // alternative would be dropped.
+        // Shared tracing emits reference semantics. Convert before inserting the rules so
+        // decompose-lowering's modifier preprocessing can see their adjoint/control regions.
+        PassManager rulesPm(context);
+        rulesPm.addPass(catalyst::qref::createValueSemanticsConversionPass());
+        if (failed(rulesPm.run(*moduleOp))) {
+            return op.emitError() << "failed to prepare decomposition rules for " << opId;
+        }
+
+        // The captured closure supplies every candidate needed by the solver. Keep it in the
+        // same library as precompiled rules; only selected rules and their helpers are imported.
+        llvm::StringSet<> newlyHandled;
+        for (auto func : llvm::make_early_inc_range(moduleOp->getOps<func::FuncOp>())) {
             auto targetGate = func->getAttrOfType<StringAttr>("target_gate");
-            if (!targetGate || handledOpIds.contains(targetGate.getValue())) {
-                return mlir::WalkResult::advance();
+            if (!targetGate) {
+                continue;
             }
-            mlir::OwningOpRef<mlir::func::FuncOp> outOp;
+            if (handledOpIds.contains(targetGate.getValue())) {
+                func.erase();
+                continue;
+            }
+            newlyHandled.insert(targetGate.getValue());
+        }
+        if (failed(prepareRuleLibrary(ruleLibrary, *moduleOp, &circuitSymbols))) {
+            return failure();
+        }
+        for (auto func : llvm::make_early_inc_range(moduleOp->getOps<func::FuncOp>())) {
             func->remove();
-            outOp = mlir::OwningOpRef<mlir::func::FuncOp>(func);
-            LDBG() << "materializing rule " << outOp.get().getName();
-            newlyHandled.push_back(targetGate.getValue());
-            // Resolve name collisions with rules already embedded in the module.
-            symbolTable.insert(outOp.release());
-            return mlir::WalkResult::advance();
-        });
-        for (llvm::StringRef target : newlyHandled) {
-            handledOpIds.insert(target);
+            librarySymbols.insert(func);
+        }
+        for (const auto &target : newlyHandled) {
+            handledOpIds.insert(target.getKey());
         }
         // Mark this op handled even if its closure produced no rule (e.g. no decomposition
         // exists), so repeated instances of the same gate do not re-invoke the Python
@@ -452,11 +482,11 @@ LogicalResult loadDecompositionRules(ModuleOp module,
 /**
  * @brief Create RuleNodes for each rule available to be used in graph decomposition.
  */
-LogicalResult getRuleNodes(ModuleOp module, llvm::StringRef filename,
+LogicalResult getRuleNodes(ModuleOp module, ArrayRef<std::string> opIDs,
+                           const WeightedGateset &targetGateSet, llvm::StringRef filename,
                            llvm::StringMap<std::string> &opToFixedDecompName,
                            llvm::StringMap<llvm::StringSet<>> &opToExcludedDecompNames,
-                           [[maybe_unused]] llvm::StringRef libQPDPath,
-                           [[maybe_unused]] llvm::StringRef libpythonPath,
+                           llvm::StringRef libQPDPath, llvm::StringRef libpythonPath,
                            std::vector<RuleNode> &rules, OwningOpRef<ModuleOp> &ruleLibrary) {
 
     // Read library candidates separately from the circuit. Ignore a missing library: rules
@@ -465,13 +495,13 @@ LogicalResult getRuleNodes(ModuleOp module, llvm::StringRef filename,
         ruleLibrary = loadPrecompiledRules(module, filename);
     }
 
-    // Lower compile-time rules into the module
-    // TODO: re-enable once the frontend for this has been updated
-    // These need to be removed for now since they result in symbol conflicts and we have no
-    // simple way of fixing this.
-    // if (failed(loadPythonDecomps(module, libQPDPath, libpythonPath))) {
-    //     return failure();
-    // }
+    if (!ruleLibrary) {
+        ruleLibrary = ModuleOp::create(module.getLoc());
+    }
+    if (failed(loadPythonDecomps(module, *ruleLibrary, opIDs, targetGateSet, libQPDPath,
+                                 libpythonPath))) {
+        return failure();
+    }
 
     // Load rules from the module into the set of rules used by the graph, filtering by
     // fixed- and exclude-decomps
@@ -575,9 +605,9 @@ std::unique_ptr<DecompositionGraph> prepareGraph(ModuleOp module, ArrayRef<std::
         return nullptr;
     }
 
-    if (failed(getRuleNodes(module, opts.bytecodeRulesFile, opToFixedDecompName,
-                            opToExcludedDecompNames, opts.libQPDPath, opts.libpythonPath,
-                            setOfRules, ruleLibrary))) {
+    if (failed(getRuleNodes(module, opIDs, targetGateSet, opts.bytecodeRulesFile,
+                            opToFixedDecompName, opToExcludedDecompNames, opts.libQPDPath,
+                            opts.libpythonPath, setOfRules, ruleLibrary))) {
         return nullptr;
     }
 

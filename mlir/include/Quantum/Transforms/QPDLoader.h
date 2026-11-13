@@ -21,7 +21,9 @@
 
 namespace catalyst::quantum {
 
-using PythonRuleLoweringFn = std::string (*)(DecomposableGate op);
+// Keep Python exceptions inside the plugin: compiler passes are built without exception support.
+using PythonRuleLoweringFn = bool (*)(DecomposableGate op, std::string &mlirText,
+                                      std::string &errorMessage);
 
 extern PythonRuleLoweringFn pythonRuleLowering;
 

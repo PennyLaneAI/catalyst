@@ -37,6 +37,7 @@
 
 #include "Quantum/IR/QuantumInterfaces.h"
 #include "Quantum/IR/QuantumOps.h"
+#include "Quantum/Transforms/QPDLoader.h"
 
 #include "PythonDriverUtils.hpp"
 
@@ -213,32 +214,47 @@ static nb::object getPyvalFromMlirAttribute(mlir::Attribute attr) {
 
 } // namespace
 
-std::string pythonRuleLowering(catalyst::quantum::DecomposableGate op) {
-    QuantumPythonDecompositions::PyInterpreterGuard guard;
-    std::string mlirText = guard.withGil([&] -> std::string {
-        const char *moduleName = "catalyst.decomposition.decomposition_rules";
-        const char *functionName = "compile_reachable_decomposition_rules_wrapper";
+bool pythonRuleLowering(catalyst::quantum::DecomposableGate op, std::string &mlirText,
+                        std::string &errorMessage) {
+    try {
+        QuantumPythonDecompositions::PyInterpreterGuard guard;
+        mlirText = guard.withGil([&] -> std::string {
+            const char *moduleName = "catalyst.decomposition.decomposition_rules";
+            const char *functionName = "compile_reachable_decomposition_rules_wrapper";
 
-        try {
-            nb::module_ wrapperModule = nb::module_::import_(moduleName);
-            nb::object wrapperFunction = wrapperModule.attr(functionName);
+            try {
+                nb::module_ wrapperModule = nb::module_::import_(moduleName);
+                nb::object wrapperFunction = wrapperModule.attr(functionName);
 
-            nb::object pythonResult = wrapperFunction(
-                op.getOperatorName(), op.getGraphOpId(),
-                getPyvalFromDynamicShape(op.getDynamicShape()),
-                getPyvalFromWireLens(op.getWireLens()),
-                getPyvalFromMlirAttribute(op.getStaticData()), nb::arg("extra_data") = nb::none(),
-                nb::arg("is_custom_op") = isa<catalyst::quantum::CustomOp>(op));
-            return nb::borrow<nb::str>(pythonResult).c_str();
-        } catch (const nb::python_error &error) {
-            throw QuantumPythonDecompositions::TracingError(moduleName, functionName,
-                                                            op.getGraphOpId(), error.what());
-        } catch (const std::exception &error) {
-            throw;
-        }
-    });
-
-    return mlirText;
+                // The wrapper resolves OperatorRegistry and traces the reachable closure in one
+                // module. Pass the full identity, including operation-level modifiers and work
+                // wires.
+                auto dynamicShape = op.getDynamicShape();
+                // Control lowering promotes custom gates with work wires to OperatorOp, while
+                // retaining their positional parameter names and operand layout.
+                bool positionalParameters =
+                    !dynamicShape.empty() && llvm::all_of(dynamicShape, [](const auto &parameter) {
+                        return !parameter.first.empty() &&
+                               llvm::StringRef(parameter.first).find_first_not_of("0123456789") ==
+                                   llvm::StringRef::npos;
+                    });
+                nb::object pythonResult = wrapperFunction(
+                    op.getOperatorName(), op.getGraphOpId(), getPyvalFromDynamicShape(dynamicShape),
+                    getPyvalFromWireLens(op.getWireLens()),
+                    getPyvalFromMlirAttribute(op.getStaticData()),
+                    nb::arg("is_custom_op") =
+                        isa<catalyst::quantum::CustomOp>(op) || positionalParameters);
+                return nb::borrow<nb::str>(pythonResult).c_str();
+            } catch (const nb::python_error &error) {
+                throw QuantumPythonDecompositions::TracingError(moduleName, functionName,
+                                                                op.getGraphOpId(), error.what());
+            }
+        });
+        return true;
+    } catch (const std::exception &error) {
+        errorMessage = error.what();
+        return false;
+    }
 }
 
 extern "C" __attribute__((visibility("default"))) void *getPythonRuleLoweringFunction() {
