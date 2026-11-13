@@ -16,12 +16,20 @@
 
 import hashlib
 import json
+from enum import StrEnum
 from pathlib import Path
 from typing import TypedDict
 
 from catalyst.decomposition.capture_session import RuleIdentity
 from catalyst.decomposition.type_utils import SerializedGraphOpID
 from catalyst.utils.runtime_environment import BYTECODE_FILE_PATH, get_bytecode_manifest_path
+
+
+class ManifestEntries(StrEnum):
+    """Manifest JSON keys."""
+
+    BYTECODE_HASH = "bytecode_hash"
+    PRECOMPILED_RULES = "precompiled_rules"
 
 
 class _RuleEntry(TypedDict):
@@ -78,19 +86,18 @@ def _validate_rule_entry(entry: dict) -> RuleIdentity:
 def _validate_manifest(manifest: dict, bytecode: bytes) -> frozenset[RuleIdentity]:
     """Validate a manifest and return its canonical rule identities."""
     if not isinstance(manifest, dict) or set(manifest) != {
-        "bytecode_hash",
-        "precompiled_rules",
+        ManifestEntries.BYTECODE_HASH,
+        ManifestEntries.PRECOMPILED_RULES,
     }:
         raise ValueError("Malformed decomposition cache manifest.")
 
-    if not isinstance(manifest["bytecode_hash"], str) or manifest[
-        "bytecode_hash"
-    ] != get_bytecode_hash(bytecode):
+    bytecode_hash = manifest[ManifestEntries.BYTECODE_HASH]
+    if not isinstance(bytecode_hash, str) or bytecode_hash != get_bytecode_hash(bytecode):
         raise ValueError(
             "Decomposition cache hash mismatch. The bytecode version is likely out of date."
         )
 
-    entries = manifest["precompiled_rules"]
+    entries = manifest[ManifestEntries.PRECOMPILED_RULES]
     if not isinstance(entries, list):
         raise ValueError("Malformed precompiled rule list")
     return frozenset(_validate_rule_entry(entry) for entry in entries)

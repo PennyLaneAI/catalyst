@@ -21,6 +21,7 @@ import pytest
 from catalyst.decomposition import precompiled_rule_loading
 from catalyst.decomposition.capture_session import RuleIdentity
 from catalyst.decomposition.precompiled_rule_loading import (
+    ManifestEntries,
     get_bytecode_hash,
     get_rule_entry,
     load_precompiled_rule_identities,
@@ -39,8 +40,8 @@ RULE_ENTRY = {
 def _get_test_manifest(entries=(RULE_ENTRY,)):
     """Return a valid cache manifest."""
     return {
-        "bytecode_hash": get_bytecode_hash(BYTECODE),
-        "precompiled_rules": list(entries),
+        ManifestEntries.BYTECODE_HASH: get_bytecode_hash(BYTECODE),
+        ManifestEntries.PRECOMPILED_RULES: list(entries),
     }
 
 
@@ -156,12 +157,15 @@ def test_malformed_manifest(tmp_path):
     [
         [],
         {},
-        {"bytecode_hash": 1, "precompiled_rules": []},
-        {"bytecode_hash": "wrong", "precompiled_rules": []},
-        {"bytecode_hash": get_bytecode_hash(BYTECODE), "precompiled_rules": {}},
+        {ManifestEntries.BYTECODE_HASH: 1, ManifestEntries.PRECOMPILED_RULES: []},
+        {ManifestEntries.BYTECODE_HASH: "wrong", ManifestEntries.PRECOMPILED_RULES: []},
         {
-            "bytecode_hash": get_bytecode_hash(BYTECODE),
-            "precompiled_rules": [],
+            ManifestEntries.BYTECODE_HASH: get_bytecode_hash(BYTECODE),
+            ManifestEntries.PRECOMPILED_RULES: {},
+        },
+        {
+            ManifestEntries.BYTECODE_HASH: get_bytecode_hash(BYTECODE),
+            ManifestEntries.PRECOMPILED_RULES: [],
             "unexpected": None,
         },
     ],

@@ -87,6 +87,7 @@ from catalyst.decomposition.modifier_state import ModifierState
 from catalyst.decomposition.precompile_decomposition_rules import (
     precompile_decomp_rules,
 )
+from catalyst.decomposition.precompiled_rule_loading import ManifestEntries
 from catalyst.decomposition.type_utils import (
     SerializedGraphOpID,
     convert_item_to_mlir_type,
@@ -1002,8 +1003,8 @@ class TestPrecompiled:
         manifest = json.loads(get_bytecode_manifest_path(bytecode_path).read_text())
         assert bytecode_path.read_bytes() == b"bytecode"
         assert manifest == {
-            "bytecode_hash": hashlib.sha256(b"bytecode").hexdigest(),
-            "precompiled_rules": [],
+            ManifestEntries.BYTECODE_HASH: hashlib.sha256(b"bytecode").hexdigest(),
+            ManifestEntries.PRECOMPILED_RULES: [],
         }
 
     def test_failed_rules_are_not_written(self, mocker, tmp_path):
@@ -1028,7 +1029,7 @@ class TestPrecompiled:
         bytecode = _quantum_opt("--empty", str(bytecode_path))
         manifest = json.loads(get_bytecode_manifest_path(bytecode_path).read_text())
         assert "failing_rule" not in bytecode
-        assert manifest["precompiled_rules"] == []
+        assert manifest[ManifestEntries.PRECOMPILED_RULES] == []
 
     def test_failed_rules_dont_block_successful_rules(self, mocker, tmp_path):
         """A failed rules does not prevent a successful rule for the same op from being registered."""
@@ -1057,8 +1058,10 @@ class TestPrecompiled:
         manifest = json.loads(get_bytecode_manifest_path(bytecode_path).read_text())
         assert "good_rule" in bytecode
         assert "failing_rule" not in bytecode
-        assert {rule["frontend_name"] for rule in manifest["precompiled_rules"]} == {"good_rule"}
-        assert {rule["target_gate"] for rule in manifest["precompiled_rules"]} == {
+        assert {rule["frontend_name"] for rule in manifest[ManifestEntries.PRECOMPILED_RULES]} == {
+            "good_rule"
+        }
+        assert {rule["target_gate"] for rule in manifest[ManifestEntries.PRECOMPILED_RULES]} == {
             "NoParams{}{reg:1}{}",
             "Adjoint(NoParams){}{reg:1}{}",
         }
@@ -1100,7 +1103,8 @@ class TestPrecompiled:
 
         manifest = json.loads(get_bytecode_manifest_path(bytecode_path).read_text())
         assert {
-            (rule["target_gate"], rule["frontend_name"]) for rule in manifest["precompiled_rules"]
+            (rule["target_gate"], rule["frontend_name"])
+            for rule in manifest[ManifestEntries.PRECOMPILED_RULES]
         } == {
             ("NoParams{}{reg:1}{}", "root_to_single"),
             ("Adjoint(NoParams){}{reg:1}{}", "root_to_single"),
@@ -1141,7 +1145,7 @@ class TestPrecompiled:
         assert any(
             rule["target_gate"] == "NoParams{}{reg:1}{}"
             and rule["frontend_name"] == "root_to_single"
-            for rule in manifest["precompiled_rules"]
+            for rule in manifest[ManifestEntries.PRECOMPILED_RULES]
         )
 
     def test_trace_uses_generated_manifest(self, mocker, tmp_path):
@@ -1161,9 +1165,9 @@ class TestPrecompiled:
             add_decomps(NoParams, root_to_leaf)
             precompile_decomp_rules(bytecode_path)
             manifest = json.loads(get_bytecode_manifest_path(bytecode_path).read_text())
-            assert {rule["frontend_name"] for rule in manifest["precompiled_rules"]} == {
-                "root_to_leaf"
-            }
+            assert {
+                rule["frontend_name"] for rule in manifest[ManifestEntries.PRECOMPILED_RULES]
+            } == {"root_to_leaf"}
             mocker.patch(
                 "catalyst.decomposition.precompiled_rule_loading.BYTECODE_FILE_PATH",
                 str(bytecode_path),
