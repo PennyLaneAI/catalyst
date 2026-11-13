@@ -230,8 +230,6 @@ def test_pass_decomposition():
 
     dev = qp.device("null.qubit", wires=1)
 
-    qp.decomposition.enable_graph()
-
     # CHECK-LABEL: module @circuit1
     @qp.qjit(capture=True, collect_decomp_rules=False, target="mlir")
     @qp.transforms.cancel_inverses
@@ -276,8 +274,6 @@ def test_pass_decomposition():
     # CHECK-NEXT: transform.apply_registered_pass "graph-decomposition" {{.*}} to [[second_pass]]
 
     print(circuit3.mlir)
-
-    qp.decomposition.disable_graph()
 
 
 test_pass_decomposition()

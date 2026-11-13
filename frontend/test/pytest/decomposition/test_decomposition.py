@@ -2882,7 +2882,7 @@ class TestCustomRuleApplication:
 class TestDecomposeAlias:
     """``qp.decompose`` under capture is an alias for ``graph_decomposition`` (same C++ pass)."""
 
-    @pytest.mark.usefixtures("use_capture_dgraph")
+    @pytest.mark.usefixtures("use_capture")
     @pytest.mark.parametrize("clean", [False, None], ids=["false", "none"])
     @pytest.mark.xfail(
         reason="On-demand rules use separate JAX contexts and can produce duplicate symbols.",
