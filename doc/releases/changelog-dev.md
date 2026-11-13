@@ -116,7 +116,7 @@
   rule written against the base op's parameters instead is skipped with a `RuleLoweringWarning`.
 
 * The graph-based decomposition system now supports **controlled operators** for `Operator2`,
-  including single control (`C(Op)`), multiple controls (`<n>C(Op)`), and their composition with
+  including single control (`1C(Op)`), multiple controls (`<n>C(Op)`), and their composition with
   adjoint.
   [(#3129)](https://github.com/PennyLaneAI/catalyst/pull/3129)
   [(#3127)](https://github.com/PennyLaneAI/catalyst/pull/3127)
@@ -127,7 +127,7 @@
   [(#3382)](https://github.com/PennyLaneAI/catalyst/pull/3382)
   [(#3421)](https://github.com/PennyLaneAI/catalyst/pull/3421)
 
-  Control is folded into the operator identity *control-outermost* (e.g. `C(Adjoint(Op))`), so
+  Control is folded into the operator identity *control-outermost* (e.g. `1C(Adjoint(Op))`), so
   `ctrl(adjoint(Op))` and `adjoint(ctrl(Op))` collapse to a single node, while a distinct control
   count is its own node keyed. For a target gate set, `<n>C(Op)` is reached through:
     1. Rules registered directly for `C(Op)` (PennyLane names a controlled operator `C(Op)` whatever
@@ -135,7 +135,9 @@
     2. Rules *synthesized by distribution* (`decompose(C(Op)) = ctrl(decompose(Op))`), controlling
        each produced gate with the same control count.
 
-  Controls can be specified in the `gate_set` argument of decomposition with `C(Op)`, which matches any number of controls.
+  Controls can be specified in the `gate_set` argument of decomposition with `C(Op)`, which
+  matches any number of controls. Every specific control count is spelled `<n>C(Op)` in
+  decomposition identities and resource reports, including `1C(Op)` for one control.
 
   A rule may re-emit its base decomposition inside a `quantum.ctrl` region; the apply pipeline
   reduces it to op-level controls with `ctrl-lowering`, iterating
