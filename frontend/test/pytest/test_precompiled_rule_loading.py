@@ -27,7 +27,7 @@ from catalyst.decomposition.precompiled_rule_loading import (
     load_precompiled_rule_identities,
 )
 from catalyst.decomposition.type_utils import SerializedGraphOpID
-from catalyst.utils.runtime_environment import get_bytecode_manifest_path
+from catalyst.utils.runtime_environment import get_precompiled_manifest_path
 
 BYTECODE = b"bytecode"
 RULE_ENTRY = {
@@ -48,7 +48,7 @@ def _get_test_manifest(entries=(RULE_ENTRY,)):
 def _write_test_cache(bytecode_path, manifest=None):
     """Write a temporary bytecode file and its manifest for testing."""
     bytecode_path.write_bytes(BYTECODE)
-    get_bytecode_manifest_path(bytecode_path).write_text(
+    get_precompiled_manifest_path(bytecode_path).write_text(
         json.dumps(_get_test_manifest() if manifest is None else manifest),
         encoding="utf-8",
     )
@@ -134,7 +134,7 @@ def test_missing_cache_file_raises(tmp_path, missing_file):
     if missing_file == "manifest":
         bytecode_path.write_bytes(BYTECODE)
     else:
-        get_bytecode_manifest_path(bytecode_path).write_text(
+        get_precompiled_manifest_path(bytecode_path).write_text(
             json.dumps(_get_test_manifest()), encoding="utf-8"
         )
 
@@ -146,7 +146,7 @@ def test_malformed_manifest(tmp_path):
     """Malformed JSON raises a parsing error."""
     bytecode_path = tmp_path / "rules.mlirbc"
     bytecode_path.write_bytes(BYTECODE)
-    get_bytecode_manifest_path(bytecode_path).write_text("{", encoding="utf-8")
+    get_precompiled_manifest_path(bytecode_path).write_text("{", encoding="utf-8")
 
     with pytest.raises(json.JSONDecodeError):
         load_precompiled_rule_identities(bytecode_path)

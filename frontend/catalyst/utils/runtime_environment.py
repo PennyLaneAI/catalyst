@@ -58,14 +58,14 @@ DEFAULT_BIN_PATHS = {
     "cli": os.path.join(package_root, "..", "..", "mlir", "build", "bin"),
 }
 
-BYTECODE_FILE_PATH = os.path.join(
+PRECOMPILED_BYTECODE_PATH = os.path.join(
     package_root,
     "resources",
     "decomposition_rules_" + (__revision__ if __revision__ else __version__) + ".mlirbc",
 )
 
 
-def get_bytecode_manifest_path(bytecode_path: str | Path) -> Path:
+def get_precompiled_manifest_path(bytecode_path: str | Path) -> Path:
     """Return the manifest path associated with a given bytecode file."""
     return Path(bytecode_path).with_suffix(".json")
 

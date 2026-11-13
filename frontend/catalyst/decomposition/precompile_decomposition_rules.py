@@ -24,7 +24,6 @@ from catalyst.compiler import _quantum_opt
 from catalyst.decomposition.capture_session import DecompositionScope, OpDecompRequest
 from catalyst.decomposition.modifier_state import ModifierState
 from catalyst.decomposition.precompiled_rule_loading import (
-    ManifestEntries,
     get_bytecode_hash,
     get_rule_entry,
 )
@@ -34,7 +33,10 @@ from catalyst.from_plxpr.qfunc_interpreter import (
 )
 from catalyst.from_plxpr.qref_jax_primitives import QrefQreg
 from catalyst.utils.exceptions import CompileError
-from catalyst.utils.runtime_environment import BYTECODE_FILE_PATH, get_bytecode_manifest_path
+from catalyst.utils.runtime_environment import (
+    PRECOMPILED_BYTECODE_PATH,
+    get_precompiled_manifest_path,
+)
 
 PRECOMPILATION_MODIFIERS = (
     ModifierState(),
@@ -63,7 +65,7 @@ def _capture_rule_module(scope: DecompositionScope) -> ir.Module:
     return module
 
 
-def precompile_decomp_rules(_decomp_file_path: str | Path = BYTECODE_FILE_PATH) -> None:
+def precompile_decomp_rules(_decomp_file_path: str | Path = PRECOMPILED_BYTECODE_PATH) -> None:
     """Compile PennyLane built-in decomposition rules to MLIR Bytecode.
 
     Args:
@@ -95,11 +97,11 @@ def precompile_decomp_rules(_decomp_file_path: str | Path = BYTECODE_FILE_PATH) 
         bytecode_file.write(bytecode)
 
     with open(
-        get_bytecode_manifest_path(_decomp_file_path), "w", encoding="utf-8"
+        get_precompiled_manifest_path(_decomp_file_path), "w", encoding="utf-8"
     ) as manifest_file:
         manifest = {
-            ManifestEntries.BYTECODE_HASH: get_bytecode_hash(bytecode),
-            ManifestEntries.PRECOMPILED_RULES: [get_rule_entry(rule) for rule in scope.definitions],
+            "bytecode_hash": get_bytecode_hash(bytecode),
+            "precompiled_rules": [get_rule_entry(rule) for rule in scope.definitions],
         }
 
         json.dump(manifest, manifest_file)

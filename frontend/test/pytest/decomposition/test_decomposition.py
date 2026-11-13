@@ -96,7 +96,10 @@ from catalyst.decomposition.type_utils import (
 )
 from catalyst.passes import graph_decomposition
 from catalyst.utils.exceptions import CompileError
-from catalyst.utils.runtime_environment import BYTECODE_FILE_PATH, get_bytecode_manifest_path
+from catalyst.utils.runtime_environment import (
+    PRECOMPILED_BYTECODE_PATH,
+    get_precompiled_manifest_path,
+)
 
 
 class TestGenericUtilities:
@@ -1000,7 +1003,7 @@ class TestPrecompiled:
         precompile_decomp_rules(str(bytecode_path))
 
         compiler.assert_called_once()
-        manifest = json.loads(get_bytecode_manifest_path(bytecode_path).read_text())
+        manifest = json.loads(get_precompiled_manifest_path(bytecode_path).read_text())
         assert bytecode_path.read_bytes() == b"bytecode"
         assert manifest == {
             ManifestEntries.BYTECODE_HASH: hashlib.sha256(b"bytecode").hexdigest(),
@@ -1027,7 +1030,7 @@ class TestPrecompiled:
                 precompile_decomp_rules(bytecode_path)
 
         bytecode = _quantum_opt("--empty", str(bytecode_path))
-        manifest = json.loads(get_bytecode_manifest_path(bytecode_path).read_text())
+        manifest = json.loads(get_precompiled_manifest_path(bytecode_path).read_text())
         assert "failing_rule" not in bytecode
         assert manifest[ManifestEntries.PRECOMPILED_RULES] == []
 
@@ -1055,7 +1058,7 @@ class TestPrecompiled:
                 precompile_decomp_rules(bytecode_path)
 
         bytecode = _quantum_opt("--empty", str(bytecode_path))
-        manifest = json.loads(get_bytecode_manifest_path(bytecode_path).read_text())
+        manifest = json.loads(get_precompiled_manifest_path(bytecode_path).read_text())
         assert "good_rule" in bytecode
         assert "failing_rule" not in bytecode
         assert {rule["frontend_name"] for rule in manifest[ManifestEntries.PRECOMPILED_RULES]} == {
@@ -1101,7 +1104,7 @@ class TestPrecompiled:
         # we should not include control variants
         assert 'target_gate = "C(NoParams){}{reg:1}{}"' not in bytecode
 
-        manifest = json.loads(get_bytecode_manifest_path(bytecode_path).read_text())
+        manifest = json.loads(get_precompiled_manifest_path(bytecode_path).read_text())
         assert {
             (rule["target_gate"], rule["frontend_name"])
             for rule in manifest[ManifestEntries.PRECOMPILED_RULES]
@@ -1141,7 +1144,7 @@ class TestPrecompiled:
         bytecode = _quantum_opt("--empty", str(bytecode_path))
         load_cache.assert_not_called()
         assert 'target_gate = "NoParams{}{reg:1}{}"' in bytecode
-        manifest = json.loads(get_bytecode_manifest_path(bytecode_path).read_text())
+        manifest = json.loads(get_precompiled_manifest_path(bytecode_path).read_text())
         assert any(
             rule["target_gate"] == "NoParams{}{reg:1}{}"
             and rule["frontend_name"] == "root_to_single"
@@ -1164,7 +1167,7 @@ class TestPrecompiled:
         with local_decomps():
             add_decomps(NoParams, root_to_leaf)
             precompile_decomp_rules(bytecode_path)
-            manifest = json.loads(get_bytecode_manifest_path(bytecode_path).read_text())
+            manifest = json.loads(get_precompiled_manifest_path(bytecode_path).read_text())
             assert {
                 rule["frontend_name"] for rule in manifest[ManifestEntries.PRECOMPILED_RULES]
             } == {"root_to_leaf"}
