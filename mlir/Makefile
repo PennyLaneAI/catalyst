@@ -6,8 +6,7 @@ COMPILER_LAUNCHER ?= $(shell which ccache)
 MK_ABSPATH := $(abspath $(lastword $(MAKEFILE_LIST)))
 MK_DIR := $(dir $(MK_ABSPATH))
 export CCACHE_BASEDIR ?= $(abspath $(MK_DIR)/..)
-CATALYST_CONFIG_ONLY := 1
-include $(MK_DIR)/../Makefile
+include $(MK_DIR)/../Makefile.worktree
 DIALECTS_BUILD_DIR ?= $(MK_DIR)/build
 DIALECTS_DOCS_BUILD_DIR ?= $(MK_DIR)/build-docs
 LLVM_SRC_DIR ?= $(MK_DIR)/llvm-project
