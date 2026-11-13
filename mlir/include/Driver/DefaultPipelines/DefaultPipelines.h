@@ -46,8 +46,9 @@ const PipelineList pipelineList{
       "split-multiple-tapes",
       // Run the transform sequence defined in the MLIR module
       ApplyTransformSequencePassName,
-      // Drop unused decomposition rules before flattening modules, which renames
-      // every remaining symbol and updates its uses.
+      // Decomposition rules are only consumed by graph-decomposition (run inside
+      // apply-transform-sequence). Drop unused rules before module inlining renames
+      // their symbols and modifiers-lowering processes their ctrl/adjoint regions.
       "symbol-dce",
       // Nested modules are something that will be used in the future
       // for making device-specific transformations.
@@ -59,10 +60,6 @@ const PipelineList pipelineList{
       // this into something else.
       "inline-nested-module",
       "lower-mitigation",
-      // Decomposition rules are only consumed by graph-decomposition (run inside
-      // apply-transform-sequence). Any that survive here are dead; drop them before
-      // modifiers-lowering so we don't needlessly lower the ctrl/adjoint regions in their bodies.
-      "symbol-dce",
       // Reduce any remaining quantum.ctrl/quantum.adjoint regions to op-level modifiers,
       // including nested regions (e.g. ctrl(adjoint(...))) and the quantum.adjoint/ctrl
       // regions that lower-mitigation (ZNE) emits.
