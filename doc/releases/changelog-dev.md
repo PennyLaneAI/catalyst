@@ -985,10 +985,13 @@
   operations they classically control, matching the depth reported by PennyLane for tapes.
   A mid-circuit measurement now occupies a layer on its wire, and operations in a conditional
   branch, `while` loop body, or measurement-bounded `for` loop are placed after the measurements
-  the branch or loop depends on. The new `--instrument-classical-control` pass informs the device
-  of these dependencies, and is only added to the pipeline for QNodes executing on `null.qubit`
-  with both `track_resources` and `compute_depth` enabled, e.g. through `qp.track`. In addition,
-  `null.qubit` now returns the postselected outcome of a postselected mid-circuit measurement.
+  the branch or loop depends on. With program capture, device preprocessing adds the new
+  `--tag-classical-control-measurements` pass to QNodes executing on `null.qubit` with both
+  `track_resources` and `compute_depth` enabled, e.g. through `qp.track`. The new
+  `--instrument-classical-control` pass, at the start of the bufferization stage, then informs the
+  device of the classically controlled operations of these tagged measurements, and does nothing
+  for other QNodes. In addition, `null.qubit` now returns the postselected outcome of a
+  postselected mid-circuit measurement.
   [(#3454)](https://github.com/PennyLaneAI/catalyst/pull/3454)
 
 * A `qp.Backline` device with a `qec_code` no longer fails to compile circuits whose gates are

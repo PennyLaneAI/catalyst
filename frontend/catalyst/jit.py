@@ -646,28 +646,6 @@ class QJIT(CatalystCallable):
         )
         settle_executors(self._placement)
 
-    def _configure_resource_tracking(self):
-        """Prepare compilation for tracking the circuit depth at runtime, if a QNode of this
-        program runs on a device that tracks it.
-
-        The ``instrument-classical-control`` pass informs the device which operations are
-        classically controlled by mid-circuit measurements, so that they are placed after these
-        measurements in the tracked circuit depth. It runs at the start of the bufferization
-        stage, after all quantum transformations and before the measurement results are stored
-        in memory. Pipelines without a bufferization stage are left unchanged.
-        """
-        if not any(_tracks_circuit_depth(device) for device in _traced_devices(self.jaxpr)):
-            return
-
-        self.compile_options.pipelines = [
-            (
-                (name, [_CLASSICAL_CONTROL_PASS, *passes])
-                if name == "BufferizationStage" and _CLASSICAL_CONTROL_PASS not in passes
-                else (name, passes)
-            )
-            for name, passes in self.compile_options.get_pipelines()
-        ]
-
     def _get_effective_capture_mode(self):
         """Calculate the effective capture mode for this QJIT instance.
 
@@ -791,7 +769,6 @@ class QJIT(CatalystCallable):
             return
 
         self._configure_backline()
-        self._configure_resource_tracking()
         self.mlir_module = self.generate_ir()
         if target == "mlir":
             return
@@ -836,7 +813,6 @@ class QJIT(CatalystCallable):
             self.jaxpr, self.out_type, self.out_treedef, self.c_sig = self.capture(args, **kwargs)
 
             self._configure_backline()
-            self._configure_resource_tracking()
             self.mlir_module = self.generate_ir()
             self.compiled_function = self.compile()
 
@@ -1240,34 +1216,6 @@ def _target_compile_options(options: CompileOptions):
         yield
     finally:
         options.compiler_tool, options.link = original_values
-
-
-# Informs the device which operations are classically controlled by mid-circuit measurements.
-_CLASSICAL_CONTROL_PASS = "instrument-classical-control"
-
-
-def _traced_devices(jaxpr):
-    """Yield the device of each QNode in ``jaxpr``, in encounter order and with repeats.
-
-    Recurses through nested jaxprs, so a QNode inside a control-flow region counts.
-    """
-    for eqn in jaxpr.eqns:
-        qnode = eqn.params.get("qnode")
-        if qnode is not None:
-            yield qnode.device
-        for inner in jax.core.jaxprs_in_params(eqn.params):
-            yield from _traced_devices(inner)
-
-
-def _tracks_circuit_depth(device) -> bool:
-    """Whether ``device`` tracks the circuit depth of its executions at runtime, which is only
-    the case for ``null.qubit`` with both resource tracking and depth computation enabled."""
-    device_kwargs = getattr(device, "device_kwargs", None) or {}
-    return (
-        getattr(device, "name", None) == "null.qubit"
-        and bool(device_kwargs.get("track_resources"))
-        and bool(device_kwargs.get("compute_depth"))
-    )
 
 
 @Transform.generic_register
