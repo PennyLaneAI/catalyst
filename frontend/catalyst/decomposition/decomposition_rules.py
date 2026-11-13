@@ -17,8 +17,8 @@
 :func:`walk_reachable_decomp_rule_sets` builds batches of prepared callables, dummy inputs,
 and resource counts.
 The QNode capture path consumes these batches before lowering the rules with the program.
-The compiler's on-demand loader instead uses the standalone compilation helpers in this
-module to obtain MLIR rule functions.
+The compiler's on-demand loader traces these same batches and lowers their definitions together
+into a standalone module.
 
 Argument preparation and packing preserve the operator's operand order so each rule's
 signature matches the operation it decomposes.
@@ -37,14 +37,12 @@ import jax.numpy as jnp
 import numpy as np
 import pennylane as qp
 from jax import Array
-from jax._src.lib.mlir import ir
-from pennylane.core.operator import Operator2, abstractify
+from pennylane.core.operator import Operator2, abstractify, get_op_class_by_name
 from pennylane.decomposition import DecompositionRule
 from pennylane.decomposition.utils import to_name
 from pennylane.wires import Wires
 
-from catalyst.compiler import _quantum_opt
-from catalyst.decomposition.capture_session import OpDecompRequest
+from catalyst.decomposition.capture_session import DecompositionScope, OpDecompRequest
 from catalyst.decomposition.graph_op_id import (
     CTRL_WORK_WIRE_TYPE,
     CTRL_WORK_WIRES,
@@ -57,16 +55,7 @@ from catalyst.decomposition.type_utils import (
     _RuleBuilderArgs,
     get_dummy_values_for_dynamic_shape,
 )
-from catalyst.jax_extras.lowering import get_mlir_attribute_from_pyval
 from catalyst.utils.exceptions import CompileError
-
-# Ops that make a decomposition body non-invertible
-_NON_INVERTIBLE_MARKERS = (
-    "qref.measure",
-    "quantum.measure",
-    "measure_in_basis",
-    ".ppm",  # pbc.ppm / pbc.ref.ppm / pbc.select.ppm
-)
 
 _NON_INVERTIBLE_RESOURCE_TYPES = (qp.ops.MidMeasure, qp.ops.PauliMeasure)
 
@@ -151,7 +140,6 @@ class DecompTargetSpec:
         rules: Applicable rule alternatives for this target.
         trace_inputs: Shared dummy arguments and operand layout used to trace the rules.
         target_id: Full GraphOpID that every rule in the set decomposes.
-        num_qreg_qubits: Register size required by the legacy standalone materializer.
         modifier_context: Additional modifiers propagated to resource operations when
             discovering child rules. May differ from the target's modifiers because
             registered rules can already account for them in their resource operations.
@@ -161,7 +149,6 @@ class DecompTargetSpec:
     rules: list[DecompRuleSpec]
     trace_inputs: RuleTraceInputs
     target_id: SerializedGraphOpID
-    num_qreg_qubits: int
     modifier_context: ModifierState
     reject_noninvertible: bool = False
 
@@ -528,70 +515,6 @@ def unpack_rule_operands(
     return params, named, ctrl_wires, ctrl_values, work_wires
 
 
-def get_rule_strings_from_module(module: ir.Module) -> list[str]:
-    """Extract the decomposition rules held by a module as MLIR strings.
-
-    Every FuncOp carrying a ``target_gate`` attribute is a decomposition rule.
-
-    Args:
-        module (ir.Module): the module a rule-compiling qjit produced
-
-    Returns:
-        list[str]: one string per rule, with the ``__builtin_`` prefix added to its name
-    """
-    raw_funcOps = []
-
-    def find_condition(op):
-        if op.name == "func.func":
-            if "target_gate" in op.attributes:
-                raw_funcOps.append(op)
-                return ir.WalkResult.SKIP
-        return ir.WalkResult.ADVANCE
-
-    module.operation.walk(find_condition)
-
-    # If we simply rename the rule func op in the original module (from the qjit that compiles the
-    # rule), the call op to the rule subroutine from the main qjit function will complain that its
-    # callee doesn't exist.
-    # We have to do a clone, and rename the clone.
-    # And to clone safely, we must set the insertion point to a separate sandbox module
-    funcOps = []
-    ctx = module.context
-    with ctx, ir.Location.unknown(ctx):
-        sandbox_module = ir.Module.create()
-        with ir.InsertionPoint(sandbox_module.body):
-            for op in raw_funcOps:
-                clone = op.clone()
-
-                old_attr = clone.attributes["sym_name"]
-                clean_name = old_attr.value.strip('"')
-
-                if not clean_name.startswith("__builtin_"):
-                    clone.attributes["sym_name"] = ir.StringAttr.get(
-                        "__builtin_" + clean_name, context=ctx
-                    )
-
-                funcOps.append(str(clone))
-
-    return funcOps
-
-
-def get_rules_from_module(module: ir.Module) -> str:
-    """
-    Parse and modify decomposition rules from a ModuleOp.
-
-    Args:
-        module (ir.Module): an MLIR module object; every FuncOp carrying a `target_gate`
-            attribute is extracted as a decomposition rule.
-
-    Returns:
-        str: The string representation of any decomposition rules from `module`, pre-pending the
-             `__builtin_` prefix to their names.
-    """
-    funcOps = get_rule_strings_from_module(module)
-    return "\n".join(str(funcOp) for funcOp in funcOps) if funcOps else ""
-
-
 def prepare_dummy_rule_arguments(kwargs, is_custom_op: bool):
     """Prepare dummy positional and keyword arguments for a rule or resource function.
 
@@ -788,8 +711,7 @@ def build_decomp_target_spec(
         modifiers (ModifierState): the modifiers to distribute the base rules over
 
     Returns:
-        DecompTargetSpec: callables and metadata consumable by either eager JAXPR capture or the
-        legacy standalone MLIR materializer
+        DecompTargetSpec: callables and metadata consumed by the shared rule tracer.
     """
     kwargs = prepare_dynamic_op_kwargs(dynamic_shape, wire_lens)
     extra_data = extra_data or {}
@@ -889,150 +811,9 @@ def build_decomp_target_spec(
             hybrid_leaves=tuple(hybrid_leaves),
         ),
         target_id=target_id,
-        num_qreg_qubits=n_base_wires + n_ctrl + num_work_wires,
         modifier_context=modifiers,
         reject_noninvertible=modifiers.is_modified,
     )
-
-
-def materialize_decomp_target_spec(target_spec: DecompTargetSpec) -> ir.Operation:
-    """Materialize one target specification through the legacy standalone qjit path."""
-
-    return build_rule_module(
-        [qp.capture.subroutine(rule.prepared_rule_fn) for rule in target_spec.rules],
-        qp.device("null.qubit", wires=target_spec.num_qreg_qubits),
-        target_spec.trace_inputs,
-        {rule.prepared_rule_fn.__name__: rule for rule in target_spec.rules},
-        target_spec.target_id,
-    )
-
-
-def compile_decomposition_rules(
-    op_name: str,
-    op_id: SerializedGraphOpID,
-    dynamic_shape,
-    wire_lens,
-    static_data,
-    extra_data=None,
-    is_custom_op=False,
-    modifiers=ModifierState(),
-) -> ir.Operation:
-    """Compile decomposition rules into the legacy standalone MLIR module."""
-
-    target_spec = build_decomp_target_spec(
-        op_name,
-        op_id,
-        dynamic_shape,
-        wire_lens,
-        static_data,
-        extra_data=extra_data,
-        is_custom_op=is_custom_op,
-        modifiers=modifiers,
-    )
-    return materialize_decomp_target_spec(target_spec)
-
-
-def build_rule_module(
-    subroutines,
-    device,
-    trace_inputs: RuleTraceInputs,
-    name_to_rule_specs,
-    target_id: SerializedGraphOpID,
-) -> ir.Operation:
-    """Trace ``subroutines`` into a module of standalone decomposition-rule functions.
-
-    Args:
-        subroutines (list): the rule bodies, as captured subroutines
-        device (Device): the device to trace them on, sized for the operator's wires
-        trace_inputs (RuleTraceInputs): shared dummy arguments and operand layout for the subroutines
-        name_to_rule_specs (dict): generated function name to its rule specification
-        target_id (SerializedGraphOpID): the graphOpId of the gate the rules decompose
-
-    Returns:
-        ir.Operation: the module holding the rules
-
-    Raises:
-        CompileError: if the rules could not be traced
-    """
-
-    operands = rule_call_operands(trace_inputs)
-
-    @qp.qjit(target="mlir", capture=True, collect_decomp_rules=False)
-    @qp.qnode(device=device)
-    def circuit():
-        for subroutine in subroutines:
-            subroutine(*operands)
-
-    module = circuit.mlir_module
-    if module is None:
-        raise CompileError(
-            f"Failed to generate an MLIR module while compiling decomposition rules for {target_id}"
-        )
-
-    def update_funcop_attributes(op):
-        """Update the decomposition rule attributes if op is a decomposition rule.
-
-        For use with module.walk
-
-        This function updates the following attributes:
-            - Adds the `target_gate` attribute.
-            - Adds the `resources` attribute.
-            - Sets the visibility to public (so the inliner does not remove them)
-        """
-        if op.name == "func.func":
-            func_name = ir.StringAttr(op.attributes["sym_name"]).value
-            if rule := name_to_rule_specs.get(func_name):
-                op.attributes["resources"] = get_mlir_attribute_from_pyval(
-                    {"operations": rule.resource_counts_by_id}
-                )
-                op.attributes["target_gate"] = ir.StringAttr.get(target_id)
-                op.attributes["sym_visibility"] = ir.StringAttr.get("public")
-                op.attributes["frontend_name"] = ir.StringAttr.get(rule.frontend_name)
-
-        return ir.WalkResult.ADVANCE
-
-    with module.context, ir.Location.unknown():
-        module.operation.walk(update_funcop_attributes)
-
-    # Inline to avoid helper functions. We want all decomp rule functions to be standalone
-    # Generic printing needed when parsing --quantum-opt string output back to jax IR ModuleOps
-    # since Catalyst's python bindings never export the Catalyst dialects
-    # Before inlining we need to remove the qnode function, since that has a call to the compiled
-    # rule subroutine
-    qnode_func_erasure_worklist = []
-
-    def remove_qnode_func(op):
-        if op.name == "catalyst.launch_kernel":
-            qnode_func_erasure_worklist.append(op.parent)
-            return ir.WalkResult.ADVANCE
-        if op.name == "func.func" and "quantum.node" in op.attributes:
-            qnode_func_erasure_worklist.append(op)
-            return ir.WalkResult.ADVANCE
-        return ir.WalkResult.ADVANCE
-
-    with module.context, ir.Location.unknown():
-        module.operation.walk(remove_qnode_func)
-
-    for qnode_func in qnode_func_erasure_worklist:
-        qnode_func.erase()
-
-    inlined = _quantum_opt(
-        "--inline=inlining-threshold=4294967295",  # Use uint max to indicate always inline
-        "--mlir-print-op-generic",
-        stdin=str(module),
-    )
-
-    inlined_module = ir.Operation.parse(inlined, context=module.context)
-
-    def re_privatize_rules(op):
-        if op.name == "func.func" and "target_gate" in op.attributes:
-            op.attributes["sym_visibility"] = ir.StringAttr.get("private")
-        return ir.WalkResult.ADVANCE
-
-    with inlined_module.context, ir.Location.unknown():
-        inlined_module.operation.walk(re_privatize_rules)
-
-    return inlined_module
 
 
 def collect_symbolic_resources(
@@ -1305,40 +1086,9 @@ def build_registered_decomp_target_spec(
             hybrid_leaves=tuple(hybrid_leaves),
         ),
         target_id=target_id,
-        num_qreg_qubits=n_wires + controls.num_work_wires,
         modifier_context=controls if wrap_control else ModifierState(),
         reject_noninvertible=wrap_control,
     )
-
-
-def compile_registered_symbolic_rules(
-    op_name: str,
-    op_id: SerializedGraphOpID,
-    dynamic_shape,
-    wire_lens,
-    static_data,
-    extra_data=None,
-    is_custom_op=False,
-    op_cls=None,
-    *,
-    modifiers,
-) -> ir.Operation | None:
-    """Compile registered symbolic rules into the legacy standalone MLIR module."""
-
-    target_spec = build_registered_decomp_target_spec(
-        op_name,
-        op_id,
-        dynamic_shape,
-        wire_lens,
-        static_data,
-        extra_data=extra_data,
-        is_custom_op=is_custom_op,
-        op_cls=op_cls,
-        modifiers=modifiers,
-    )
-    if target_spec is None:
-        return None
-    return materialize_decomp_target_spec(target_spec)
 
 
 def _append_decomp_target_spec(out, description, factory):
@@ -1475,42 +1225,6 @@ def walk_reachable_decomp_rule_sets(
     return target_specs
 
 
-def compile_decomposition_rules_wrapper(
-    op_name: str,
-    op_id: str,
-    dynamic_shape,
-    wire_lens,
-    static_data,
-    extra_data=None,
-    is_custom_op=False,
-) -> str:
-    """Return a string MLIR module containing the decomposition rules for an operator instance.
-
-    Args:
-        op_name (str): the operator's name, as PennyLane registers its rules
-        op_id (str): the operator's graphOpId
-        dynamic_shape (dict): dynamic argument names to their MLIR types
-        wire_lens (dict): wire argument names to their lengths
-        static_data (dict): compiler-static argument names to their values
-        extra_data (dict): argument values the graphOpId identifies by UID instead of spelling
-        is_custom_op (bool): whether the operator lowers to ``qref.custom``
-
-    Returns:
-        str: the module holding the rules
-    """
-    return str(
-        compile_decomposition_rules(
-            op_name,
-            SerializedGraphOpID(op_id),
-            dynamic_shape,
-            wire_lens,
-            static_data,
-            extra_data=extra_data,
-            is_custom_op=is_custom_op,
-        )
-    )
-
-
 def compile_reachable_decomposition_rules_wrapper(
     op_name: str,
     op_id: str,
@@ -1522,22 +1236,10 @@ def compile_reachable_decomposition_rules_wrapper(
 ) -> str:
     """Return an MLIR module with the full reachable decomposition-rule closure for an operator.
 
-    This is the entry point for the compiler's *on-demand* rule loader (``loadPythonDecomps`` ->
-    ``pythonRuleLowering``). The callback currently receives the op's *base* name
-    (``getOperatorName()``) together with its full graphOpId (``getGraphOpId()``). Two things matter
-    here:
-
-    * **Modifier ids.** For a plain op the name and id agree (``"S"`` / ``"S{...}"``). For an
-      op-level modifier the graphOpId is name-wrapped while the name stays the base (``"S"``). We
-      recover the base id and modifier state so discovery starts from that variant. Control work
-      wires also appear in the wire/static dictionaries; remove them from the base arguments.
-    * **The whole closure, not just this op's direct rules.** The loader does not recurse into a
-      rule's resource ops, so it needs every rule reachable from this op down to the gate set in one
-      shot. For ``Adjoint(S)`` that includes ``Adjoint(S) -> Adjoint(PhaseShift)`` *and*
-      ``Adjoint(PhaseShift) -> PhaseShift``; returning only the first would leave the solver unable
-      to complete a path. :func:`materialize_reachable_rule_strings` builds that closure
-      (base + adjoint-registered + distributed-adjoint rules, transitively) and each returned func
-      keeps its own ``target_gate``, which is how the loader registers them.
+    The compiler supplies a base class name and a full GraphOpID. Resolve the class through
+    PennyLane's OperatorRegistry and separate modifier metadata from the base arguments. Rule
+    discovery, tracing and definition lowering then use the same infrastructure as eager capture.
+    The loader receives the entire reachable closure because it does not recurse into resources.
 
     Args:
         op_name (str): the operator's *base* name
@@ -1551,6 +1253,18 @@ def compile_reachable_decomposition_rules_wrapper(
     Returns:
         str: a module holding the whole reachable rule closure
     """
+    try:
+        op_cls = get_op_class_by_name(op_name)
+    except KeyError:
+        # A standalone compiler cannot resolve a class defined only in the calling process.
+        # Leave this gate to the solver, which can still use rules supplied in the module.
+        warnings.warn(
+            f"Cannot load decomposition rules for {op_name}: no Operator2 class with this name is "
+            "registered in the compiler's Python process.",
+            category=RuleLoweringWarning,
+        )
+        return "module {}"
+
     base_id, modifiers = ModifierState.from_graph_op_id(op_name, SerializedGraphOpID(op_id))
     if modifiers.is_controlled:
         wire_lens = {name: size for name, size in wire_lens.items() if name != CTRL_WORK_WIRES}
@@ -1558,54 +1272,8 @@ def compile_reachable_decomposition_rules_wrapper(
             name: value for name, value in static_data.items() if name != CTRL_WORK_WIRE_TYPE
         }
 
-    rule_strings = materialize_reachable_rule_strings(
-        op_name=op_name,
-        op_id=base_id,
-        dynamic_shape=dynamic_shape,
-        wire_lens=wire_lens,
-        static_data=static_data,
-        extra_data=extra_data,
-        is_custom_op=is_custom_op,
-        modifiers=modifiers,
-    )
-    # Wrap the rule funcs in a module: the compiler parses this string with
-    # `parseSourceString<ModuleOp>`, which requires a single top-level op.
-    return "module {\n" + "\n".join(rule_strings) + "\n}"
-
-
-def materialize_reachable_rule_strings(
-    op_name: str,
-    op_id: SerializedGraphOpID,
-    dynamic_shape,
-    wire_lens,
-    static_data,
-    extra_data=None,
-    is_custom_op=False,
-    modifiers=ModifierState(),
-    op_cls=None,
-):
-    """Materialize reachable rules as MLIR strings for the compiler's on-demand callback.
-
-    This is the string-producing compatibility boundary. Eager capture consumes DecompTargetSpecs
-    directly.
-
-    Args:
-        op_name (str): the operator's name, as PennyLane registers its rules
-        op_id (SerializedGraphOpID): the operator's graphOpId
-        dynamic_shape (dict): dynamic argument names to their MLIR types
-        wire_lens (dict): wire argument names to their lengths
-        static_data (dict): compiler-static argument names to their values
-        extra_data (dict): argument values the graphOpId identifies by UID instead of spelling
-        is_custom_op (bool): whether the operator lowers to ``qref.custom``
-        modifiers (ModifierState): the modifiers on the operator instance being decomposed
-        op_cls (type): the operator's class; classes of the ops met along the way are taken from
-            the resources themselves
-
-    Returns:
-        list[str]: the rules, as MLIR strings
-    """
     request = OpDecompRequest(
-        base_id=op_id,
+        base_id=base_id,
         op_name=op_name,
         op_cls=op_cls,
         dynamic_shape=dynamic_shape,
@@ -1615,30 +1283,11 @@ def materialize_reachable_rule_strings(
         is_custom_op=is_custom_op,
         modifier_state=modifiers,
     )
-    target_specs = walk_reachable_decomp_rule_sets([(request, {request.modifier_state})])
+    scope = DecompositionScope()
+    scope.record_root(request)
+    # The interpreter also imports the rule builders in this module.
+    from catalyst.decomposition.precompile_decomposition_rules import (  # pylint: disable=import-outside-toplevel
+        _capture_rule_module,
+    )
 
-    return materialize_decomp_rule_strings(target_specs)
-
-
-def materialize_decomp_rule_strings(target_specs: list[DecompTargetSpec]) -> list[str]:
-    """Materialize decomposition rules from DecompTargetSpecs as MLIR rule strings."""
-    rules = []
-
-    for target_spec in target_specs:
-        if not target_spec.rules:
-            continue
-        try:
-            rule_strings = get_rule_strings_from_module(materialize_decomp_target_spec(target_spec))
-            if target_spec.reject_noninvertible:
-                rule_strings = [
-                    rule
-                    for rule in rule_strings
-                    if not any(marker in rule for marker in _NON_INVERTIBLE_MARKERS)
-                ]
-            rules.extend(rule_strings)
-        except Exception as exc:  # pylint: disable=broad-except
-            warnings.warn(
-                f"Failed to materialize decomposition rules for {target_spec.target_id}: {exc}",
-                category=RuleLoweringWarning,
-            )
-    return rules
+    return str(_capture_rule_module(scope))
