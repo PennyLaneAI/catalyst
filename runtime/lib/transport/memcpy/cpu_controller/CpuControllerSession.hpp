@@ -30,7 +30,10 @@ namespace catalyst::transport::memcpy {
 class CpuControllerSession : public ControllerSession {
   public:
     explicit CpuControllerSession(const std::string &config = {})
-        : pair_key_(parse_pair_key(config)), ring_(common::frame::geometry_from_config(config)) {}
+        : pair_key_(parse_pair_key(config)), ring_(common::frame::geometry_from_config(config)) {
+        TP_CHECK(ring_.mode != common::frame::Mode::CUQR,
+                 "memcpy: CUQR frames are carried only by cpu_verbs and gpu_verbs");
+    }
     ~CpuControllerSession() override;
 
     // TransportSession

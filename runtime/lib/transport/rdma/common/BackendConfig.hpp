@@ -26,9 +26,17 @@ namespace catalyst::transport::common {
 // `config` string ("key=value;..."). Connection parameters (peer/oob_port) are not here —
 // they arrive later via connect(). Both keys are required and have no defaults, e.g.
 // "dev=rxe0;gid=1".
+/// How a session with CUQR frames completes them and whom it talks to.
+struct CuqrConfig {
+    bool write_imm = false;  // cuqr_tx=write_imm: RDMA write with immediate; else SEND (default)
+    bool cudaq_peer = false; // peer=cudaq: the peer is cudaq-realtime (UC queue pair, its
+                             // rendezvous, zero-based addressing)
+};
+
 struct BackendConfig {
     std::string dev; // RDMA device name
     int gid;         // GID index on that device's port
+    CuqrConfig cuqr;
 };
 
 /**
@@ -45,6 +53,7 @@ inline BackendConfig parse_backend_config(const std::string &config) {
     std::string dev;
     int gid = 0;
     bool have_dev = false, have_gid = false;
+    CuqrConfig cuqr;
     configparser::for_each_kv(config, [&](std::string_view key, std::string_view val) {
         if (key == "dev") {
             TP_CHECK(!val.empty(), "config: 'dev' must not be empty");
@@ -53,12 +62,21 @@ inline BackendConfig parse_backend_config(const std::string &config) {
         } else if (key == "gid") {
             gid = configparser::parse_index(val, "gid");
             have_gid = true;
+        } else if (key == "cuqr_tx") {
+            TP_CHECK(val == "send" || val == "write_imm",
+                     "config: 'cuqr_tx' must be 'send' or 'write_imm', got '%.*s'",
+                     static_cast<int>(val.size()), val.data());
+            cuqr.write_imm = val == "write_imm";
+        } else if (key == "peer") {
+            TP_CHECK(val == "cudaq", "config: 'peer' must be 'cudaq', got '%.*s'",
+                     static_cast<int>(val.size()), val.data());
+            cuqr.cudaq_peer = true;
         }
     });
     TP_CHECK(have_dev && have_gid,
              "config requires both 'dev' and 'gid' (e.g. \"dev=rxe0;gid=1\"), got \"%s\"",
              config.c_str());
-    return BackendConfig{std::move(dev), gid};
+    return BackendConfig{std::move(dev), gid, cuqr};
 }
 
 } // namespace catalyst::transport::common

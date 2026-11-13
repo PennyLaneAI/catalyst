@@ -50,15 +50,16 @@ class MemoryRegion {
     // register caller-provided memory; region does not own the buffer.
     MemoryRegion(std::shared_ptr<ProtectionDomain> pd, void *addr, std::size_t length,
                  MemAccess access);
-    // register caller-provided memory and keep a shared_ptr for lifetime.
+    // register caller-provided memory and keep a shared_ptr for lifetime; with `zero_iova`, peers
+    // address it from 0 (as cudaq-realtime does) instead of from `addr`.
     MemoryRegion(std::shared_ptr<ProtectionDomain> pd, void *addr, std::size_t length,
-                 MemAccess access, std::shared_ptr<void> backing);
+                 MemAccess access, std::shared_ptr<void> backing, bool zero_iova = false);
     // register a dma-buf (does not own the buffer).
     MemoryRegion(std::shared_ptr<ProtectionDomain> pd, std::uint64_t offset, std::size_t length,
                  std::uint64_t iova, int fd, MemAccess access);
-    // allocate + own an aligned host buffer, then register it.
+    // allocate + own an aligned host buffer, then register it (at iova 0 with `zero_iova`).
     static MemoryRegion alloc_host(std::shared_ptr<ProtectionDomain> pd, std::size_t length,
-                                   std::size_t alignment, MemAccess access);
+                                   std::size_t alignment, MemAccess access, bool zero_iova = false);
     ~MemoryRegion();
 
     MemoryRegion(const MemoryRegion &) = delete;

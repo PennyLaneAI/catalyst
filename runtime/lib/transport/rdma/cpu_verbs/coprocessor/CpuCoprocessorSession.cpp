@@ -91,11 +91,7 @@ void CpuCoprocessorSession::stop() {
 // reaped in batches at signal points.
 void CpuCoprocessorSession::run(std::stop_token st) {
     pin_thread(pin_cpu_, pin_realtime_);
-    if (ring_.mode == frame::Mode::BL16) {
-        serve<frame::Mode::BL16>(st);
-    } else {
-        serve<frame::Mode::BLV>(st);
-    }
+    CATALYST_FRAME_DISPATCH(ring_.mode, serve, st);
 }
 
 // Compiled once per frame mode, so the BL16 loop has no mode checks.
@@ -106,6 +102,9 @@ template <frame::Mode M> void CpuCoprocessorSession::serve(std::stop_token st) {
         if (!poll_message_arrival<M>(c, st, r)) {
             reap(bwd_cq_->get(), signaled_outstanding, /*drain=*/true);
             return;
+        }
+        if (M == frame::Mode::CUQR && r.data == nullptr) {
+            continue; // not a CUQR frame: dropped unanswered, as cudaq-realtime does
         }
         const std::size_t len = M == frame::Mode::BL16 ? PAYLOAD_DATA_BYTES : r.len;
         std::uint64_t word = 0;
@@ -122,12 +121,21 @@ template <frame::Mode M> void CpuCoprocessorSession::serve(std::stop_token st) {
         std::size_t nb = len;
         if (coproc_fn_) {
             nb = coproc_fn_(r.data, len, r.fn_id, reply, cap, coproc_ctx_);
-            TP_CHECK(nb > 0 && nb <= cap, "coprocessor function wrote %zu bytes, expected 1..%zu",
-                     nb, cap);
+            if constexpr (M == frame::Mode::CUQR) {
+                // CUQR reports a failed function in its reply, as cudaq-realtime does; an empty
+                // result is a valid one.
+                if (nb == COPROCESSOR_FN_ERROR || nb > cap) {
+                    r.status = 1;
+                    nb = 0;
+                }
+            } else {
+                TP_CHECK(nb > 0 && nb <= cap,
+                         "coprocessor function wrote %zu bytes, expected 1..%zu", nb, cap);
+            }
         } else {
             std::memcpy(reply, r.data, nb);
         }
-        frame::stage<M>(ring_, send, r.fn_id, reply, nb);
+        frame::stage<M>(ring_, send, r.fn_id, reply, nb, &r); // a CUQR reply echoes `r`
         const bool sig = (c % SIGNAL_EVERY == 0);
         post_write<M>(bwd_qp_->get(), c, /*inline_data=*/true, sig);
         if (sig) {

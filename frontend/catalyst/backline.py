@@ -68,7 +68,8 @@ class TransportBackend:
         hardware: The node hardware it runs on: ``"cpu"``, ``"gpu"`` or ``"fpga"``.
         roles: The roles it provides, ``"controller"`` and/or ``"coprocessor"``.
         frame_modes: The frame layouts it speaks: ``"bl16"``, the 16 B frame, carries messages of up
-            to 8 B, and ``"blv"`` larger ones, so a backend with a larger limit must list ``"blv"``.
+            to 8 B, and ``"blv"`` larger ones, so a backend with a larger limit must list ``"blv"``;
+            ``"cuqr"`` is cudaq-realtime's format.
         max_payload_bytes: The largest request it carries per message, ``None`` for no limit.
         max_reply_bytes: The largest reply it carries per message, ``None`` for no limit.
         default: Whether it is picked for its transport and hardware without being named. A node
@@ -101,7 +102,7 @@ _REGISTRY: list[TransportBackend] = [
         "rdma",
         "cpu",
         ("controller", "coprocessor"),
-        frame_modes=("bl16", "blv"),
+        frame_modes=("bl16", "blv", "cuqr"),
         max_payload_bytes=None,
         max_reply_bytes=None,
     ),
@@ -110,7 +111,7 @@ _REGISTRY: list[TransportBackend] = [
         "rdma",
         "gpu",
         ("coprocessor",),
-        frame_modes=("bl16", "blv"),
+        frame_modes=("bl16", "blv", "cuqr"),
         max_payload_bytes=None,
         max_reply_bytes=None,
     ),
@@ -583,15 +584,17 @@ def _frame_config(placement: Placement, transport: str, in_bytes: int, out_bytes
 
     Messages of up to 8 B travel in the 16 B frame (BL16), which needs no entries, so such programs
     compile as before. Larger ones travel in BLV frames sized for the larger message, written as
-    ``frame=blv;frame_payload=<bytes>``. Each ring has 256 slots unless a node's config sets
-    ``frame_slots=<n>``, a power of two, which is then passed to every node. Nodes given an
-    explicit ``backend_lib`` are taken at their word; the runtime checks them.
+    ``frame=blv;frame_payload=<bytes>``. The placement's ``frame``, when not ``"auto"``, overrides
+    that choice: ``"bl16"``, ``"blv"``, or ``"cuqr"`` for cudaq-realtime's format, to talk to a
+    cudaq-realtime peer. Each ring has 256 slots unless a node's config sets ``frame_slots=<n>``, a
+    power of two, which is then passed to every node. Nodes given an explicit ``backend_lib`` are
+    taken at their word; the runtime checks them.
 
     Raises:
         CompileError: If a node's config sets a frame key, nodes ask for different slot counts, a
-            selected backend cannot carry the layout, or an FPGA node would need a slot count
-            other than 256. A persistent GPU kernel that cannot read the layout refuses it at
-            launch.
+            selected backend cannot carry the layout, the messages do not fit the 16 B frame the
+            placement asks for, or an FPGA node would need a slot count other than 256. A
+            persistent GPU kernel that cannot read the layout refuses it at launch.
     """
     slots = set()
     for node in (placement.controller, *placement.coprocessors):
@@ -613,7 +616,15 @@ def _frame_config(placement: Placement, transport: str, in_bytes: int, out_bytes
         return {}  # a controller alone exchanges no frames
     # One layout serves both rings, so its slots hold the larger of the request and the reply.
     largest = max(in_bytes, out_bytes)
-    mode = "bl16" if largest <= _BL16_PAYLOAD_BYTES else "blv"
+    requested = getattr(placement, "frame", "auto")  # an older PennyLane has no ``frame``
+    if requested == "auto":
+        mode = "bl16" if largest <= _BL16_PAYLOAD_BYTES else "blv"
+    elif requested == "bl16" and largest > _BL16_PAYLOAD_BYTES:
+        raise CompileError(
+            f"{largest} B messages do not fit 'bl16' frames, which carry {_BL16_PAYLOAD_BYTES} B"
+        )
+    else:
+        mode = requested
     # Nodes whose backend the compiler picks; one with its own backend_lib is checked at runtime.
     nodes = [
         (node, role)
@@ -629,7 +640,7 @@ def _frame_config(placement: Placement, transport: str, in_bytes: int, out_bytes
         if mode not in backend.frame_modes:
             raise CompileError(
                 f"backline {role} backend {backend.name!r} carries {list(backend.frame_modes)} "
-                f"frames, but {largest} B messages need {mode!r} frames"
+                f"frames, but this placement needs {mode!r} frames"
             )
     config = {}
     if slots and (count := slots.pop()) != _DEFAULT_FRAME_SLOTS:
@@ -642,7 +653,7 @@ def _frame_config(placement: Placement, transport: str, in_bytes: int, out_bytes
         config["frame_slots"] = str(count)
     if mode == "bl16":
         return config
-    return {"frame": "blv", "frame_payload": str(largest), **config}
+    return {"frame": mode, "frame_payload": str(largest), **config}
 
 
 def serialize_backline(placement: Placement) -> dict:
