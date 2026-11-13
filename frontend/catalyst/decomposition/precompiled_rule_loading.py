@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Module for loading decomposition rules from the precompilation cache."""
+"""Module for loading decomposition rules from a precompilation cache."""
 
 import hashlib
 import json

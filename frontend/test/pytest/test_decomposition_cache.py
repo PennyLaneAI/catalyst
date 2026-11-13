@@ -18,9 +18,9 @@ import json
 
 import pytest
 
-from catalyst.decomposition import decomposition_cache
+from catalyst.decomposition import precompiled_rule_loading
 from catalyst.decomposition.capture_session import RuleIdentity
-from catalyst.decomposition.decomposition_cache import (
+from catalyst.decomposition.precompiled_rule_loading import (
     get_bytecode_hash,
     get_rule_entry,
     load_precompiled_rule_identities,
@@ -88,7 +88,7 @@ def test_load_valid_default_cache(monkeypatch, tmp_path):
     _write_test_cache(bytecode_path)
 
     # mock the default file location to the tmp file
-    monkeypatch.setattr(decomposition_cache, "BYTECODE_FILE_PATH", str(bytecode_path))
+    monkeypatch.setattr(precompiled_rule_loading, "BYTECODE_FILE_PATH", str(bytecode_path))
 
     # load from the mocked cache
     identities = load_precompiled_rule_identities()

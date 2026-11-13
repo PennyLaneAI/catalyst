@@ -1165,7 +1165,7 @@ class TestPrecompiled:
                 "root_to_leaf"
             }
             mocker.patch(
-                "catalyst.decomposition.decomposition_cache.BYTECODE_FILE_PATH",
+                "catalyst.decomposition.precompiled_rule_loading.BYTECODE_FILE_PATH",
                 str(bytecode_path),
             )
 

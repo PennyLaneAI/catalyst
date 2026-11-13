@@ -49,13 +49,13 @@ from catalyst.decomposition.capture_session import (
     RuleIdentity,
     TracedRule,
 )
-from catalyst.decomposition.decomposition_cache import load_precompiled_rule_identities
 from catalyst.decomposition.decomposition_rules import (
     DecompTargetSpec,
     rule_call_operands,
     walk_reachable_decomp_rule_sets,
 )
 from catalyst.decomposition.modifier_state import ModifierState
+from catalyst.decomposition.precompiled_rule_loading import load_precompiled_rule_identities
 from catalyst.decomposition.rule_lowering_warning import RuleLoweringWarning
 from catalyst.from_plxpr.qref_jax_primitives import (
     MeasurementPlane,

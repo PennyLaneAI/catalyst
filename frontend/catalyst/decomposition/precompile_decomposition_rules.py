@@ -22,11 +22,11 @@ from jax._src.lib.mlir import ir
 
 from catalyst.compiler import _quantum_opt
 from catalyst.decomposition.capture_session import DecompositionScope, OpDecompRequest
-from catalyst.decomposition.decomposition_cache import (
+from catalyst.decomposition.modifier_state import ModifierState
+from catalyst.decomposition.precompiled_rule_loading import (
     get_bytecode_hash,
     get_rule_entry,
 )
-from catalyst.decomposition.modifier_state import ModifierState
 from catalyst.from_plxpr.qfunc_interpreter import (
     PLxPRToQuantumJaxprInterpreter,
     capture_and_bind_kernel_rules,
