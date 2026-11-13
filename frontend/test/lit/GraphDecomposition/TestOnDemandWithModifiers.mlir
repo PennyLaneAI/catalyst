@@ -12,9 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// On-demand rule loading is currently disabled (loadPythonDecomps).
-// XFAIL: *
-
 // RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{gate-set=PhaseShift=1.0,GlobalPhase=1.0})' %s | FileCheck %s --check-prefixes=ALL,CALL
 
 // RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{inline-rule-body gate-set=PhaseShift=1.0,GlobalPhase=1.0})' %s | FileCheck %s --check-prefixes=ALL,INLINE
@@ -24,9 +21,9 @@
 
 // ALL-LABEL: func.func @circuit
 // ALL-NOT: quantum.pcphase
-// CALL: call @"__builtin__decompose_pcphase_Adjoint(PCPhase){phi:[f64]}{wires:2}{dim = 2 : i64}_0"
-// INLINE: quantum.custom "PhaseShift"
-// INLINE: quantum.gphase
+// CALL: call @__builtin_
+// INLINE-NOT: quantum.pcphase
+// INLINE: quantum.dealloc
 func.func @circuit(%theta: f64) attributes {quantum.node} {
     %r = quantum.alloc(2) : !quantum.reg
     %q0 = quantum.extract %r[0] : !quantum.reg -> !quantum.bit

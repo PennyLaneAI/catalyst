@@ -14,6 +14,7 @@
 
 # pylint: disable=undefined-variable
 import os
+import sys
 
 import lit.formats
 from lit.llvm import llvm_config
@@ -85,7 +86,9 @@ config.substitutions.append(
 )
 
 # allow virtual env for embedded interpreter
-config.environment["VIRTUAL_ENV"] = os.getenv("VIRTUAL_ENV", "")
+config.environment["VIRTUAL_ENV"] = os.getenv(
+    "VIRTUAL_ENV", sys.prefix if sys.prefix != sys.base_prefix else ""
+)
 
 # Define PATH when running frontend tests from an mlir build target.
 try:
@@ -132,9 +135,11 @@ except AttributeError:
     llvm_config.with_system_environment("MLIR_LIB_DIR")
     llvm_config.with_system_environment("CATALYST_BIN_DIR")
     llvm_config.with_system_environment("CATALYST_LIB_DIR")
-    llvm_config.with_system_environment("CATALYST_LIBPYTHON")
     llvm_config.with_system_environment("ENZYME_LIB_DIR")
 
     catalyst_bin_dir = os.getenv("CATALYST_BIN_DIR", "")
     if os.path.exists(catalyst_bin_dir):
         llvm_config.add_tool_substitutions(["catalyst"], [catalyst_bin_dir])
+
+# The Makefile resolves libpython using the shared runtime-environment helper.
+llvm_config.with_system_environment("CATALYST_LIBPYTHON")

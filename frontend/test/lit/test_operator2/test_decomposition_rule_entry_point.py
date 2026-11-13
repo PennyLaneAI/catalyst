@@ -13,10 +13,7 @@
 # limitations under the License.
 
 """
-Unit tests for the compile_decomposition_rules_wrapper() entry point function.
-
-This function is the unified entry point for all pathways in Catalyst that generate decomposition
-rules, including precompiled rules, lower time rules, and on-demand rules.
+Test the compiler's on-demand decomposition callback and shared rule capture.
 """
 
 # RUN: %PYTHON %s | FileCheck %s
@@ -43,7 +40,7 @@ from pennylane.core import Operator2
 from pennylane.typing import Complex, Float, Int, Wire
 
 from catalyst.decomposition.decomposition_rules import (
-    compile_decomposition_rules_wrapper,
+    compile_reachable_decomposition_rules_wrapper,
 )
 
 
@@ -66,13 +63,13 @@ def test_to_dynamic_argnames():
 
     with qp.decomposition.local_decomps():
         qp.add_decomps(NoParams, rule)
-        result = compile_decomposition_rules_wrapper(
+        result = compile_reachable_decomposition_rules_wrapper(
             "NoParams", "NoParams{}{reg:2}{}", {}, {"reg": 2}, {}
         )
         print(result)
 
 
-# CHECK: func.func private @rule{{(_[0-9]+)?}}
+# CHECK: func.func private @__builtin_rule{{(_[0-9]+)?}}
 # CHECK-SAME:   resources = {operations = {
 # CHECK-SAME:   "SingleParam{x:[tensor<2xf64>]}{reg:2}{}" = 1 : i64,
 # CHECK-SAME:   "SingleParam{x:[tensor<f64>]}{reg:2}{}" = 2 : i64
@@ -94,7 +91,7 @@ def test_from_dynamic_argnames():
 
     with qp.decomposition.local_decomps():
         qp.add_decomps(SingleParam, rule)
-        result = compile_decomposition_rules_wrapper(
+        result = compile_reachable_decomposition_rules_wrapper(
             "SingleParam",
             "SingleParam{x:[tensor<2xf64>]}{reg:2}{}",
             {"x": ["f64", "f64"]},
@@ -104,7 +101,7 @@ def test_from_dynamic_argnames():
         print(result)
 
 
-# CHECK: func.func private @rule{{(_[0-9]+)?}}
+# CHECK: func.func private @__builtin_rule{{(_[0-9]+)?}}
 # CHECK-SAME:   resources = {operations = {"NoParams{}{reg:1}{}" = 1 : i64}}
 # CHECK-SAME:   target_gate = "SingleParam{x:[tensor<2xf64>]}{reg:2}{}"
 test_from_dynamic_argnames()
@@ -126,13 +123,13 @@ def test_to_multiple_dynamic_argnames():
 
     with qp.decomposition.local_decomps():
         qp.add_decomps(NoParams, rule)
-        result = compile_decomposition_rules_wrapper(
+        result = compile_reachable_decomposition_rules_wrapper(
             "NoParams", "NoParams{}{reg:1}{}", {}, {"reg": 1}, {}
         )
         print(result)
 
 
-# CHECK: func.func private @rule{{(_[0-9]+)?}}
+# CHECK: func.func private @__builtin_rule{{(_[0-9]+)?}}
 # CHECK-SAME:   resources = {operations =
 # CHECK-SAME:   "MultiParams{a:[tensor<f64>],b:[tensor<2x2xi64>],c:[tensor<complex<f64>>]}{reg:1}{}" = 1 : i64
 # CHECK-SAME:   target_gate = "NoParams{}{reg:1}{}"
@@ -153,7 +150,7 @@ def test_from_multiple_dynamic_argnames():
 
     with qp.decomposition.local_decomps():
         qp.add_decomps(MultiParams, rule)
-        result = compile_decomposition_rules_wrapper(
+        result = compile_reachable_decomposition_rules_wrapper(
             "MultiParams",
             "MultiParams{a:[tensor<f64>],b:[tensor<i32>,tensor<i32>],c:[tensor<f64>,tensor<f64>]}{reg:2}{}",
             {"b": ["i32", "i32"], "c": ["f64", "f64"], "a": ["f64"]},
@@ -163,7 +160,7 @@ def test_from_multiple_dynamic_argnames():
         print(result)
 
 
-# CHECK: func.func private @rule{{(_[0-9]+)?}}
+# CHECK: func.func private @__builtin_rule{{(_[0-9]+)?}}
 # CHECK-SAME:   resources = {operations = {"NoParamsCustomOp{}{wires:2}{}" = 1 : i64}
 # CHECK-SAME:   target_gate = "MultiParams{a:[tensor<f64>],b:[tensor<i32>,tensor<i32>],c:[tensor<f64>,tensor<f64>]}{reg:2}{}"
 test_from_multiple_dynamic_argnames()
@@ -185,13 +182,13 @@ def test_to_multiple_wire_argnames():
 
     with qp.decomposition.local_decomps():
         qp.add_decomps(NoParams, rule)
-        result = compile_decomposition_rules_wrapper(
+        result = compile_reachable_decomposition_rules_wrapper(
             "NoParams", "NoParams{}{reg:1}{}", {}, {"reg": 1}, {}
         )
         print(result)
 
 
-# CHECK: func.func private @rule{{(_[0-9]+)?}}
+# CHECK: func.func private @__builtin_rule{{(_[0-9]+)?}}
 # CHECK-SAME:   resources = {operations =
 # CHECK-SAME:   "MultipleRegisters{}{reg1:1,reg2:2}{}" = 1 : i64
 # CHECK-SAME:   target_gate = "NoParams{}{reg:1}{}"
@@ -213,7 +210,7 @@ def test_from_multiple_wire_argnames():
 
     with qp.decomposition.local_decomps():
         qp.add_decomps(MultipleRegisters, rule)
-        result = compile_decomposition_rules_wrapper(
+        result = compile_reachable_decomposition_rules_wrapper(
             "MultipleRegisters",
             "MultipleRegisters{}{reg1:2,reg2:3}{}",
             {},
@@ -223,8 +220,8 @@ def test_from_multiple_wire_argnames():
         print(result)
 
 
-# CHECK: func.func private @rule{{(_[0-9]+)?}}
-# CHECK-SAME: (%[[QREG:arg[0-9]+]]: !qref.reg<5>, %[[WIRES:arg[0-9]+]]: tensor<5xi64>)
+# CHECK: func.func private @__builtin_rule{{(_[0-9]+)?}}
+# CHECK-SAME: (%[[QREG:arg[0-9]+]]: !qref.reg<?>, %[[WIRES:arg[0-9]+]]: tensor<5xi64>)
 # CHECK-SAME:   resources = {operations = {
 # CHECK-SAME:   "NoParamsCustomOp{}{wires:2}{}" = 1 : i64
 # CHECK-SAME:   "NoParamsCustomOp{}{wires:3}{}" = 1 : i64
@@ -253,13 +250,13 @@ def test_to_compilable_data():
 
     with qp.decomposition.local_decomps():
         qp.add_decomps(NoParams, rule)
-        result = compile_decomposition_rules_wrapper(
+        result = compile_reachable_decomposition_rules_wrapper(
             "NoParams", "NoParams{}{reg:2}{}", {}, {"reg": 2}, {}
         )
         print(result)
 
 
-# CHECK: func.func private @rule{{(_[0-9]+)?}}
+# CHECK: func.func private @__builtin_rule{{(_[0-9]+)?}}
 # CHECK-SAME:   resources = {operations = {
 # CHECK-SAME:     "CompilableData{}{wires:1}{a = \22a\22, b = \22b\22, thing = \22thing\22}" = 1 : i64,
 # CHECK-SAME:     "CompilableData{}{wires:1}{a = \22aa\22, b = \22bb\22, thing = \22stuff\22}" = 2 : i64
@@ -284,7 +281,7 @@ def test_from_compilable_data():
 
     with qp.decomposition.local_decomps():
         qp.add_decomps(CompilableData, rule)
-        result_a1 = compile_decomposition_rules_wrapper(
+        result_a1 = compile_reachable_decomposition_rules_wrapper(
             "CompilableData",
             "CompilableData{}{wires:1}{a = 1 : i64, b = 2 : i64, thing = 3 : i64}",
             {},
@@ -293,7 +290,7 @@ def test_from_compilable_data():
         )
         print(result_a1)
 
-        result_a10 = compile_decomposition_rules_wrapper(
+        result_a10 = compile_reachable_decomposition_rules_wrapper(
             "CompilableData",
             "CompilableData{}{wires:1}{a = 10 : i64, b = 2 : i64, thing = 3 : i64}",
             {},
@@ -303,13 +300,13 @@ def test_from_compilable_data():
         print(result_a10)
 
 
-# CHECK: func.func private @rule{{(_[0-9]+)?}}
+# CHECK: func.func private @__builtin_rule{{(_[0-9]+)?}}
 # CHECK-SAME:   resources = {operations = {"SingleParam{x:[tensor<f64>]}{reg:1}{}" = 1 : i64}
 # CHECK-SAME:   target_gate = "CompilableData{}{wires:1}{a = 1 : i64, b = 2 : i64, thing = 3 : i64}"
 # CHECK: stablehlo.constant dense<1.000000e-01> : tensor<f64>
 # CHECK-NOT: stablehlo.constant dense<1.100000e+00> : tensor<f64>
 #
-# CHECK: func.func private @rule{{(_[0-9]+)?}}
+# CHECK: func.func private @__builtin_rule{{(_[0-9]+)?}}
 # CHECK-SAME:   resources = {operations = {"SingleParam{x:[tensor<f64>]}{reg:1}{}" = 1 : i64}
 # CHECK-SAME:   target_gate = "CompilableData{}{wires:1}{a = 10 : i64, b = 2 : i64, thing = 3 : i64}"
 # CHECK: stablehlo.constant dense<1.100000e+00> : tensor<f64>
@@ -336,13 +333,13 @@ def test_to_static_data():
 
     with qp.decomposition.local_decomps():
         qp.add_decomps(NoParams, rule)
-        result = compile_decomposition_rules_wrapper(
+        result = compile_reachable_decomposition_rules_wrapper(
             "NoParams", "NoParams{}{reg:2}{}", {}, {"reg": 2}, {}
         )
         print(result)
 
 
-# CHECK: func.func private @rule{{(_[0-9]+)?}}
+# CHECK: func.func private @__builtin_rule{{(_[0-9]+)?}}
 # CHECK-DAG: "StaticData{}{reg:1}{}[[[uid_1:[0-9]+]]]" = 1
 # CHECK-DAG: "StaticData{}{reg:1}{}[[[uid_2:[0-9]+]]]" = 2
 # CHECK-DAG:   target_gate = "NoParams{}{reg:2}{}"
@@ -376,23 +373,23 @@ def test_from_static_data():
 
     with qp.decomposition.local_decomps():
         qp.add_decomps(StaticData, rule)
-        result_1234 = compile_decomposition_rules_wrapper(
+        result_1234 = compile_reachable_decomposition_rules_wrapper(
             "StaticData", "StaticData{}{reg:1}{}[1234]", {}, {"reg": 1}, {}, {"label": 1234}
         )
         print(result_1234)
 
-        result_4321 = compile_decomposition_rules_wrapper(
+        result_4321 = compile_reachable_decomposition_rules_wrapper(
             "StaticData", "StaticData{}{reg:1}{}[4321]", {}, {"reg": 1}, {}, {"label": 4321}
         )
         print(result_4321)
 
 
-# CHECK: func.func private @rule{{(_[0-9]+)?}}
+# CHECK: func.func private @__builtin_rule{{(_[0-9]+)?}}
 # CHECK-SAME:   resources = {operations = {"SingleParam{x:[tensor<f64>]}{reg:1}{}" = 1 : i64}
 # CHECK-SAME:   target_gate = "StaticData{}{reg:1}{}[1234]"
 # CHECK: stablehlo.constant dense<1.000000e-01> : tensor<f64>
 #
-# CHECK: func.func private @rule{{(_[0-9]+)?}}
+# CHECK: func.func private @__builtin_rule{{(_[0-9]+)?}}
 # CHECK-SAME:   resources = {operations = {"SingleParam{x:[tensor<f64>]}{reg:1}{}" = 2 : i64}
 # CHECK-SAME:   target_gate = "StaticData{}{reg:1}{}[4321]"
 # CHECK-DAG: stablehlo.constant dense<1.100000e+00> : tensor<f64>
@@ -421,13 +418,13 @@ def test_to_hybrid_wires():
 
     with qp.decomposition.local_decomps():
         qp.add_decomps(NoParams, rule)
-        result = compile_decomposition_rules_wrapper(
+        result = compile_reachable_decomposition_rules_wrapper(
             "NoParams", "NoParams{}{reg:3}{}", {}, {"reg": 3}, {}
         )
         print(result)
 
 
-# CHECK: func.func private @rule{{(_[0-9]+)?}}
+# CHECK: func.func private @__builtin_rule{{(_[0-9]+)?}}
 # CHECK-DAG: "HybridWires{}{cwires:3}{}[[[uid_1:[0-9]+]]]" = 1
 # CHECK-DAG: "HybridWires{}{cwires:1}{}[[[uid_2:[0-9]+]]]" = 2
 # CHECK-DAG:   target_gate = "NoParams{}{reg:3}{}"
@@ -459,7 +456,7 @@ def test_from_hybrid_wires():
 
     with qp.decomposition.local_decomps():
         qp.add_decomps(HybridWires, rule)
-        result = compile_decomposition_rules_wrapper(
+        result = compile_reachable_decomposition_rules_wrapper(
             "HybridWires",
             "HybridWires{}{cwires:3}{}[3742]",
             {},
@@ -470,7 +467,7 @@ def test_from_hybrid_wires():
         print(result)
 
 
-# CHECK: func.func private @rule{{(_[0-9]+)?}}
+# CHECK: func.func private @__builtin_rule{{(_[0-9]+)?}}
 # CHECK-SAME:   resources = {operations = {"NoParams{}{reg:1}{}" = 3 : i64}}
 # CHECK-SAME:   target_gate = "HybridWires{}{cwires:3}{}[3742]"
 # CHECK: stablehlo.slice %arg1 [0:1]
@@ -523,13 +520,13 @@ def test_to_hybrid_op():
 
     with qp.decomposition.local_decomps():
         qp.add_decomps(NoParams, rule)
-        result = compile_decomposition_rules_wrapper(
+        result = compile_reachable_decomposition_rules_wrapper(
             "NoParams", "NoParams{}{reg:3}{}", {}, {"reg": 3}, {}
         )
         print(result)
 
 
-# CHECK: func.func private @rule{{(_[0-9]+)?}}
+# CHECK: func.func private @__builtin_rule{{(_[0-9]+)?}}
 # CHECK-DAG: "HybridOpArg{angle:[tensor<f64>]}{cwires:1,op:3}{}[[[uid_1:[0-9]+]]]" = 1
 # CHECK-DAG: "HybridOpArg{angle:[tensor<f64>]}{cwires:1,op:3}{}[[[uid_2:[0-9]+]]]" = 2
 # CHECK-DAG:   target_gate = "NoParams{}{reg:3}{}"
@@ -560,7 +557,7 @@ def test_from_hybrid_op():
 
     with qp.decomposition.local_decomps():
         qp.add_decomps(HybridOpArg, rule)
-        result = compile_decomposition_rules_wrapper(
+        result = compile_reachable_decomposition_rules_wrapper(
             "HybridOpArg",
             "HybridOpArg{angle:[tensor<f64>]}{cwires:1,op:3}{}[5678]",
             {"angle": ["f64"]},
@@ -574,7 +571,7 @@ def test_from_hybrid_op():
         print(result)
 
 
-# CHECK: func.func private @rule{{(_[0-9]+)?}}
+# CHECK: func.func private @__builtin_rule{{(_[0-9]+)?}}
 # CHECK-SAME:   resources = {operations = {
 # CHECK-SAME:   "NoParams{}{reg:1}{}" = 1 : i64,
 # CHECK-SAME:   "StaticDataMultiReg{theta:[tensor<f64>]}{reg:1,reg2:2}{}[[[uid:[0-9]+]]]" = 1 : i64
@@ -620,13 +617,13 @@ def test_to_hybrid_op_nested():
 
     with qp.decomposition.local_decomps():
         qp.add_decomps(NoParams, rule)
-        result = compile_decomposition_rules_wrapper(
+        result = compile_reachable_decomposition_rules_wrapper(
             "NoParams", "NoParams{}{reg:3}{}", {}, {"reg": 3}, {}
         )
         print(result)
 
 
-# CHECK: func.func private @rule{{(_[0-9]+)?}}
+# CHECK: func.func private @__builtin_rule{{(_[0-9]+)?}}
 # CHECK-SAME: "HybridOpArg{angle:[tensor<f64>]}{cwires:1,op:6}{}[[[uid:[0-9]+]]]" = 1
 # CHECK-SAME:   target_gate = "NoParams{}{reg:3}{}"
 # CHECK: "qref.operator"
@@ -651,7 +648,7 @@ def test_from_hybrid_op_nested():
 
     with qp.decomposition.local_decomps():
         qp.add_decomps(HybridOpArg, rule)
-        result = compile_decomposition_rules_wrapper(
+        result = compile_reachable_decomposition_rules_wrapper(
             "HybridOpArg",
             "HybridOpArg{angle:[tensor<f64>]}{cwires:1,op:4}{}[7654]",
             {"angle": ["f64"]},
@@ -670,7 +667,7 @@ def test_from_hybrid_op_nested():
         print(result)
 
 
-# CHECK: func.func private @rule{{(_[0-9]+)?}}
+# CHECK: func.func private @__builtin_rule{{(_[0-9]+)?}}
 # CHECK-SAME:   resources = {operations = {
 # CHECK-SAME:   "HybridOpArg{angle:[tensor<f64>]}{cwires:1,op:3}{}[[[uid_outer:[0-9]+]]]" = 1 : i64,
 # CHECK-SAME:   "NoParams{}{reg:1}{}" = 1 : i64,
@@ -734,13 +731,13 @@ def test_to_multiple_full_args_op():
 
     with qp.decomposition.local_decomps():
         qp.add_decomps(NoParams, rule)
-        result = compile_decomposition_rules_wrapper(
+        result = compile_reachable_decomposition_rules_wrapper(
             "NoParams", "NoParams{}{reg:3}{}", {}, {"reg": 3}, {}
         )
         print(result)
 
 
-# CHECK: func.func private @rule{{(_[0-9]+)?}}
+# CHECK: func.func private @__builtin_rule{{(_[0-9]+)?}}
 # CHECK-DAG: "MultipleFullArgs{angles1:[tensor<f64>],angles2:[tensor<2xf64>]}{hwires1:2,hwires2:1,op1:1,op2:1,reg1:1,reg2:2}{}[[[uid:[0-9]+]]]" = 2
 # CHECK-DAG:   target_gate = "NoParams{}{reg:3}{}"
 # CHECK: "qref.operator"
@@ -770,7 +767,7 @@ def test_from_multiple_full_args_op():
 
     with qp.decomposition.local_decomps():
         qp.add_decomps(MultipleFullArgs, rule)
-        result = compile_decomposition_rules_wrapper(
+        result = compile_reachable_decomposition_rules_wrapper(
             "MultipleFullArgs",
             "MultipleFullArgs{angles1:[tensor<f64>],angles2:[tensor<2xf64>]}{hwires1:2,hwires2:1,op1:1,op2:1,reg1:1,reg2:2}{}[4444]",
             {"angles1": ["f64"], "angles2": ["f64", "f64"]},
@@ -788,7 +785,7 @@ def test_from_multiple_full_args_op():
         print(result)
 
 
-# CHECK: func.func private @rule{{(_[0-9]+)?}}
+# CHECK: func.func private @__builtin_rule{{(_[0-9]+)?}}
 # CHECK-SAME:   resources = {operations = {
 # CHECK-SAME:   "NoParams{}{reg:1}{}" = 1 : i64
 # CHECK-SAME:   "SingleParam{x:[tensor<f64>]}{reg:1}{}" = 1 : i64
@@ -829,16 +826,16 @@ def test_multiple_rules():
     with qp.decomposition.local_decomps():
         qp.add_decomps(NoParams, rule1)
         qp.add_decomps(NoParams, rule2)
-        result = compile_decomposition_rules_wrapper(
+        result = compile_reachable_decomposition_rules_wrapper(
             "NoParams", "NoParams{}{reg:1}{}", {}, {"reg": 1}, {}
         )
         print(result)
 
 
-# CHECK: func.func private @rule1{{(_[0-9]+)?}}
+# CHECK: func.func private @__builtin_rule1{{(_[0-9]+)?}}
 # CHECK-SAME:   resources = {operations = {"SingleParam{x:[tensor<f64>]}{reg:1}{}" = 1 : i64}}
 # CHECK-SAME:   target_gate = "NoParams{}{reg:1}{}"
-# CHECK: func.func private @rule2{{(_[0-9]+)?}}
+# CHECK: func.func private @__builtin_rule2{{(_[0-9]+)?}}
 # CHECK-SAME:   resources = {operations = {"CompilableData{}{wires:3}{a = \22a\22, b = \22b\22, thing = \22thing\22}" = 1 : i64}}
 # CHECK-SAME:   target_gate = "NoParams{}{reg:1}{}"
 test_multiple_rules()
@@ -872,18 +869,18 @@ def test_for_loop():
     with qp.decomposition.local_decomps():
         qp.add_decomps(LayerRX, test_rule)
 
-        result = compile_decomposition_rules_wrapper(
+        result = compile_reachable_decomposition_rules_wrapper(
             "LayerRX", "TestID", {"angles": ["f64", "f64", "f64"]}, {"wires": 3}, {}
         )
         print(result)
 
 
-# CHECK: func.func private @test_rule{{(_[0-9]+)?}}
+# CHECK: func.func private @__builtin_test_rule{{(_[0-9]+)?}}
 # CHECK-SAME:   resources = {operations = {"TestRX{0:[f64]}{wires:1}{}" = 3 : i64}}
 # CHECK-SAME:   target_gate = "TestID"
-# CHECK-DAG: arith.constant 0 : index
-# CHECK-DAG: arith.constant 3 : index
-# CHECK-DAG: arith.constant 1 : index
+# CHECK-DAG: stablehlo.constant dense<0> : tensor<i64>
+# CHECK-DAG: stablehlo.constant dense<3> : tensor<i64>
+# CHECK-DAG: stablehlo.constant dense<1> : tensor<i64>
 # CHECK: scf.for
 test_for_loop()
 
@@ -904,7 +901,11 @@ def test_if():
 
     qp.add_decomps(TestOp, if_decomp)
 
-    print(compile_decomposition_rules_wrapper("TestOp", "IfID", {"flag": ["i1"]}, {"wires": 1}, {}))
+    print(
+        compile_reachable_decomposition_rules_wrapper(
+            "TestOp", "IfID", {"flag": ["i1"]}, {"wires": 1}, {}
+        )
+    )
 
 
 # CHECK: if_decomp
@@ -935,7 +936,7 @@ def test_while_loop():
     qp.add_decomps(WhileOp, while_decomp)
 
     print(
-        compile_decomposition_rules_wrapper(
+        compile_reachable_decomposition_rules_wrapper(
             "WhileOp", "whileID", {"angle": ["f64"]}, {"wires": 1}, {}
         )
     )
@@ -955,7 +956,7 @@ def test_custom_op_numbered_args():
     that they are parsed into args and used correctly to call the decomposition rules.
     """
     print(
-        compile_decomposition_rules_wrapper(
+        compile_reachable_decomposition_rules_wrapper(
             "RZ",
             "RZ{0:[f64]}{wires:2}{}",
             {"0": ["f64"]},
@@ -971,7 +972,7 @@ test_custom_op_numbered_args()
 
 def test_rule_with_helper_functions():
     """
-    Check that decomp rules that call helper functions are correctly inlined.
+    Check that the captured module includes helper functions and their callers.
     """
 
     @qp.capture.subroutine
@@ -984,19 +985,19 @@ def test_rule_with_helper_functions():
 
     with qp.decomposition.local_decomps():
         qp.add_decomps(NoParams, rule)
-        result = compile_decomposition_rules_wrapper(
+        result = compile_reachable_decomposition_rules_wrapper(
             "NoParams", "NoParams{}{reg:1}{}", {}, {"reg": 1}, {}
         )
         print(result)
 
 
-# CHECK: func.func private @rule{{(_[0-9]+)?}}
+# CHECK: func.func private @__builtin_rule{{(_[0-9]+)?}}
 # CHECK-SAME:   resources = {operations = {
 # CHECK-SAME:   "MultiParams{a:[tensor<f64>],b:[tensor<f64>],c:[tensor<f64>]}{reg:1}{}" = 1 : i64
 # CHECK-SAME:   target_gate = "NoParams{}{reg:1}{}"
+# CHECK: call @my_helper
+# CHECK: func.func private @my_helper
 # CHECK: stablehlo.constant dense<4.200000e+00> : tensor<f64>
-# CHECK-NOT: call
-# CHECK-NOT: my_helper
 test_rule_with_helper_functions()
 
 
@@ -1011,7 +1012,7 @@ def test_frontend_name_attr():
     with qp.decomposition.local_decomps():
         qp.add_decomps(NoParams, frontend_rule)
         print(
-            compile_decomposition_rules_wrapper(
+            compile_reachable_decomposition_rules_wrapper(
                 "NoParams",
                 "NoParams{}{reg:2}{}",
                 {},
@@ -1021,7 +1022,7 @@ def test_frontend_name_attr():
         )
 
 
-# CHECK-LABEL: func.func private @frontend_rule{{(_[0-9]+)?}}
+# CHECK-LABEL: func.func private @__builtin_frontend_rule{{(_[0-9]+)?}}
 # CHECK-SAME: frontend_name = "frontend_rule"
 # CHECK-SAME: target_gate = "NoParams{}{reg:2}{}"
 test_frontend_name_attr()
