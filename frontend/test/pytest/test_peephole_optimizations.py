@@ -17,7 +17,10 @@
 import numpy as np
 import pennylane as qp
 import pytest
+from operator2_dummy_gates import NoParams, NoParamsCustomOp
+from pennylane.decomposition import add_decomps, local_decomps, register_resources
 from pennylane.transforms import to_ppr as qp_to_ppr
+from pennylane.typing import Wire
 
 from catalyst import qjit
 from catalyst.passes import (
@@ -30,6 +33,7 @@ from catalyst.passes import (
     ppr_to_ppm,
     to_ppr,
 )
+from catalyst.utils.exceptions import CompileError
 
 # pylint: disable=missing-function-docstring
 
@@ -136,46 +140,49 @@ def test_chained_passes():
     assert "merge-rotations" in mlir
 
 
-# should be fixed when decomposition rules get their own module
-@pytest.mark.xfail(reason="cant run these transforms on decomposition rules", strict=True)
-def test_disentangle_passes():
+# Captured decomposition rules still share the module with the circuit.
+@pytest.mark.xfail(
+    reason="disentangle passes cannot analyze captured decomposition rules",
+    raises=CompileError,
+    strict=True,
+)
+@pytest.mark.parametrize("initial_wire", [0, 1])
+def test_disentangle_passes(initial_wire):
     """
-    Test that disentangle passes are present in the transform passes
-    and are applied correctly.
+    Test that disentangle passes preserve circuits with captured decomposition rules.
     """
 
-    @qjit
-    @qp.qnode(qp.device("lightning.qubit", wires=2))
-    def circuit_with_no_disentangle_passes():
-        # first qubit in |1>
-        qp.X(0)
-        # current state : |10>
-        qp.CNOT(wires=[0, 1])  # state after CNOT |11>
-        qp.SWAP(wires=[0, 1])  # state after SWAP |11>
-        return qp.state()
+    @register_resources({qp.CNOT(wires=Wire[2]): 1})
+    def custom_cnot(reg):
+        qp.CNOT(wires=reg)
 
-    @qjit
-    @disentangle_cnot
-    @disentangle_swap
-    @qp.qnode(qp.device("lightning.qubit", wires=2))
-    def circuit_with_disentangle_passes():
-        # first qubit in |1>
-        qp.X(0)
-        # current state : |10>
-        qp.CNOT(wires=[0, 1])  # state after CNOT |11>
-        qp.SWAP(wires=[0, 1])  # state after SWAP |11>
-        return qp.state()
+    @register_resources({qp.SWAP(wires=Wire[2]): 1})
+    def custom_swap(wires):
+        qp.SWAP(wires=wires)
 
-    input_mlir_string = circuit_with_disentangle_passes.mlir
-    assert "disentangle-cnot" in input_mlir_string
-    assert "disentangle-swap" in input_mlir_string
+    with local_decomps():
+        add_decomps(NoParams, custom_cnot)
+        add_decomps(NoParamsCustomOp, custom_swap)
 
-    # both SWAP and CNOT should be removed by the disentangle passes
-    transformed_mlir_string = circuit_with_disentangle_passes.mlir_opt
-    assert "CNOT" not in transformed_mlir_string
-    assert "SWAP" not in transformed_mlir_string
+        @qp.qnode(qp.device("lightning.qubit", wires=2))
+        def circuit():
+            qp.X(initial_wire)
+            NoParams(reg=[0, 1])
+            NoParamsCustomOp(wires=[0, 1])
+            return qp.state()
 
-    assert np.allclose(circuit_with_no_disentangle_passes(), circuit_with_disentangle_passes())
+        circuit_with_no_disentangle_passes = qjit(circuit, capture=True)
+        circuit_with_disentangle_passes = qjit(
+            disentangle_cnot(disentangle_swap(circuit)), capture=True
+        )
+
+        input_mlir_string = circuit_with_disentangle_passes.mlir
+        assert 'frontend_name = "custom_cnot"' in input_mlir_string
+        assert 'frontend_name = "custom_swap"' in input_mlir_string
+        assert "disentangle-cnot" in input_mlir_string
+        assert "disentangle-swap" in input_mlir_string
+
+        assert np.allclose(circuit_with_no_disentangle_passes(), circuit_with_disentangle_passes())
 
 
 def test_convert_clifford_to_ppr():

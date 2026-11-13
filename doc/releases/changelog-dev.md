@@ -401,10 +401,11 @@
 
   - A decomposition rule function can arrive in a piece of MLIR in one of three ways:
     1. As a precompiled rule shipped with the Catalyst package directly.
-    This pathway was implemented in Catalyst v0.15.
-    Note that this pathway only includes rules from gates with a fixed number of wires and no static data.
+    Catalyst now generates this library from the abstract operator signatures in PennyLane's `signature_registry`.
+    Every registered signature is lowered, as well as any operations/rules reachable from these signatures, or their adjoint/control variants.
+    [(#3057)](https://github.com/PennyLaneAI/catalyst/pull/3057)
 
-    2. When lowering a gate operation from JAXPR to MLIR, all rules reachable from that gate are injected into the IR.
+    2. When tracing a gate operation to JAXPR, all rules reachable from that gate are injected. Note that rules already available in the precompiled rule library will not get re-traced. 
     [(#3061)](https://github.com/PennyLaneAI/catalyst/pull/3061)
     [(#3160)](https://github.com/PennyLaneAI/catalyst/pull/3160)
     [(#3149)](https://github.com/PennyLaneAI/catalyst/pull/3149)

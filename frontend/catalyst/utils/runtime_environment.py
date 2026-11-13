@@ -19,6 +19,7 @@ import os
 import os.path
 import sys
 import sysconfig
+from pathlib import Path
 
 package_root = os.path.join(os.path.dirname(__file__), "..")
 
@@ -57,11 +58,16 @@ DEFAULT_BIN_PATHS = {
     "cli": os.path.join(package_root, "..", "..", "mlir", "build", "bin"),
 }
 
-BYTECODE_FILE_PATH = os.path.join(
+PRECOMPILED_BYTECODE_PATH = os.path.join(
     package_root,
     "resources",
     "decomposition_rules_" + (__revision__ if __revision__ else __version__) + ".mlirbc",
 )
+
+
+def get_precompiled_manifest_path(bytecode_path: str | Path) -> Path:
+    """Return the manifest path associated with a given bytecode file."""
+    return Path(bytecode_path).with_suffix(".json")
 
 
 def get_libpython_path() -> str:  # pragma: no cover

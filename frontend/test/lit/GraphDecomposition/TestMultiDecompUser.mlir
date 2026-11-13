@@ -13,9 +13,9 @@
 // limitations under the License.
 
 // RUN: catalyst --tool=opt --split-input-file --pass-pipeline='builtin.module( \
-// RUN:   graph-decomposition{inline-rule-body gate-set=testHadamard=1.0 fixed-decomps=testPauliX=x_to_h bytecode-rules="%BYTECODE_PATH"}, \
-// RUN:   graph-decomposition{inline-rule-body gate-set=testPauliX=1.0 fixed-decomps=testHadamard=h_to_x bytecode-rules="%BYTECODE_PATH"}, \
-// RUN:   graph-decomposition{inline-rule-body gate-set=testHadamard=1.0 fixed-decomps=testPauliX=x_to_h bytecode-rules="%BYTECODE_PATH"})' \
+// RUN:   graph-decomposition{inline-rule-body gate-set=testHadamard=1.0 fixed-decomps=testPauliX=x_to_h bytecode-rules="%PRECOMPILED_BYTECODE_PATH"}, \
+// RUN:   graph-decomposition{inline-rule-body gate-set=testPauliX=1.0 fixed-decomps=testHadamard=h_to_x bytecode-rules="%PRECOMPILED_BYTECODE_PATH"}, \
+// RUN:   graph-decomposition{inline-rule-body gate-set=testHadamard=1.0 fixed-decomps=testPauliX=x_to_h bytecode-rules="%PRECOMPILED_BYTECODE_PATH"})' \
 // RUN:   %s | FileCheck %s
 
 func.func @circuit() {
